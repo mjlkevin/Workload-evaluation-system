@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 
 type ApiResponse<T> = {
   code: number;
@@ -25,6 +25,13 @@ type ExportResult = {
   expireAt: string;
 };
 
+type ExportHistoryItem = {
+  fileName: string;
+  size: number;
+  modifiedAt: string;
+  downloadUrl: string;
+};
+
 const form = ref({
   templateId: "tmpl-demo-001",
   ruleSetId: "rules-demo-001",
@@ -37,9 +44,12 @@ const form = ref({
 
 const loading = ref(false);
 const exporting = ref(false);
+const historyLoading = ref(false);
 const error = ref("");
 const result = ref<CalculateResult | null>(null);
 const exportInfo = ref<ExportResult | null>(null);
+const exportHistory = ref<ExportHistoryItem[]>([]);
+const historyError = ref("");
 
 const payload = computed(() => ({
   templateId: form.value.templateId,
@@ -88,6 +98,7 @@ async function calculateAndExport(exportType: "excel" | "pdf") {
       throw new Error(data.message || "导出失败");
     }
     exportInfo.value = data.data;
+    await loadExportHistory();
     window.open(data.data.downloadUrl, "_blank");
   } catch (err) {
     error.value = err instanceof Error ? err.message : "导出失败";
@@ -95,6 +106,42 @@ async function calculateAndExport(exportType: "excel" | "pdf") {
     exporting.value = false;
   }
 }
+
+function formatBytes(size: number): string {
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function loadExportHistory() {
+  historyLoading.value = true;
+  historyError.value = "";
+  try {
+    const response = await fetch("/api/v1/exports/history?page=1&pageSize=8");
+    const payload = (await response.json()) as ApiResponse<{
+      page: number;
+      pageSize: number;
+      total: number;
+      items: ExportHistoryItem[];
+    }>;
+    if (!response.ok || payload.code !== 0) {
+      throw new Error(payload.message || "读取导出历史失败");
+    }
+    exportHistory.value = payload.data.items;
+  } catch (err) {
+    historyError.value = err instanceof Error ? err.message : "读取导出历史失败";
+  } finally {
+    historyLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  void loadExportHistory();
+});
 </script>
 
 <template>
@@ -160,6 +207,24 @@ async function calculateAndExport(exportType: "excel" | "pdf") {
           <a :href="exportInfo.downloadUrl" target="_blank">{{ exportInfo.downloadUrl }}</a>
         </p>
         <p class="meta">过期时间：{{ exportInfo.expireAt }}</p>
+      </section>
+
+      <section class="result">
+        <div class="history-head">
+          <h2>最近导出记录</h2>
+          <button class="link-btn" :disabled="historyLoading" @click="loadExportHistory">
+            {{ historyLoading ? "刷新中..." : "刷新" }}
+          </button>
+        </div>
+        <p v-if="historyError" class="error">{{ historyError }}</p>
+        <p v-else-if="historyLoading" class="meta">正在加载导出记录...</p>
+        <p v-else-if="exportHistory.length === 0" class="meta">暂无导出记录</p>
+        <ul v-else class="history-list">
+          <li v-for="item in exportHistory" :key="item.fileName">
+            <a :href="item.downloadUrl" target="_blank">{{ item.fileName }}</a>
+            <span class="meta">{{ formatBytes(item.size) }} · {{ new Date(item.modifiedAt).toLocaleString() }}</span>
+          </li>
+        </ul>
       </section>
     </section>
   </main>
@@ -281,5 +346,35 @@ h2 {
 .meta {
   color: #64748b;
   font-size: 13px;
+}
+
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.link-btn {
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.history-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.history-list li {
+  margin: 8px 0;
+}
+
+.history-list a {
+  color: #0b57d0;
+  text-decoration: none;
+  margin-right: 8px;
 }
 </style>

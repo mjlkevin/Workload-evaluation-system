@@ -2,6 +2,8 @@ import express from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import XLSX from "xlsx";
+import PDFDocument from "pdfkit";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -126,32 +128,140 @@ function ensureExportDir(): string {
   return exportDir;
 }
 
-function writeExportFile(
+async function writePdfFile(
+  exportPath: string,
+  result: EstimateResult,
+  requestBody: CalculateRequest
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
+    const stream = fs.createWriteStream(exportPath);
+    doc.pipe(stream);
+
+    doc.fontSize(18).text("Workload Estimate Report", { underline: true });
+    doc.moveDown(0.8);
+    doc.fontSize(11);
+    doc.text(`exportedAt: ${new Date().toISOString()}`);
+    doc.text(`templateId: ${result.templateId}`);
+    doc.text(`ruleSetId: ${result.ruleSetId}`);
+    doc.text(`templateVersion: ${result.templateVersion}`);
+    doc.text(`ruleVersion: ${result.ruleVersion}`);
+    doc.text(`pipelineVersion: ${result.pipelineVersion}`);
+
+    doc.moveDown(0.8);
+    doc.fontSize(13).text("Summary");
+    doc.fontSize(11);
+    doc.text(`baseDays: ${result.baseDays}`);
+    doc.text(`userIncrementDays: ${result.userIncrementDays}`);
+    doc.text(`difficultyIncrementDays: ${result.difficultyIncrementDays}`);
+    doc.text(`orgIncrementDays: ${result.orgIncrementDays}`);
+    doc.text(`totalDays: ${result.totalDays}`);
+
+    doc.moveDown(0.8);
+    doc.fontSize(13).text("Request");
+    doc.fontSize(11).text(
+      `userCount=${requestBody.userCount}, difficultyFactor=${requestBody.difficultyFactor}, orgCount=${requestBody.orgCount}, orgSimilarityFactor=${requestBody.orgSimilarityFactor}`
+    );
+
+    doc.moveDown(0.8);
+    doc.fontSize(13).text("Items");
+    doc.fontSize(11);
+    for (const item of result.itemResults) {
+      doc.text(
+        `${item.templateItemId} | included=${item.included ? "Y" : "N"} | standard=${item.standardDays} | subtotal=${item.itemSubtotalDays}`
+      );
+    }
+
+    doc.end();
+    stream.on("finish", () => resolve());
+    stream.on("error", (err) => reject(err));
+  });
+}
+
+async function writeExportFile(
   fileName: string,
   exportType: "excel" | "pdf",
   result: EstimateResult,
   requestBody: CalculateRequest
-): void {
+): Promise<void> {
   const exportDir = ensureExportDir();
   const exportPath = path.resolve(exportDir, fileName);
-  const lines = [
-    "工作量评估导出（占位版）",
-    `导出类型: ${exportType}`,
-    `导出时间: ${new Date().toISOString()}`,
-    `templateId: ${result.templateId}`,
-    `ruleSetId: ${result.ruleSetId}`,
-    `templateVersion: ${result.templateVersion}`,
-    `ruleVersion: ${result.ruleVersion}`,
-    `pipelineVersion: ${result.pipelineVersion}`,
-    `totalDays: ${result.totalDays}`,
-    "",
-    "请求参数:",
-    JSON.stringify(requestBody, null, 2),
-    "",
-    "计算结果:",
-    JSON.stringify(result, null, 2)
-  ];
-  fs.writeFileSync(exportPath, lines.join("\n"), "utf-8");
+  if (exportType === "excel") {
+    const workbook = XLSX.utils.book_new();
+
+    const metaRows = [
+      ["field", "value"],
+      ["exportedAt", new Date().toISOString()],
+      ["templateId", result.templateId],
+      ["ruleSetId", result.ruleSetId],
+      ["templateVersion", result.templateVersion],
+      ["ruleVersion", result.ruleVersion],
+      ["pipelineVersion", result.pipelineVersion]
+    ];
+    const summaryRows = [
+      ["metric", "value"],
+      ["baseDays", result.baseDays],
+      ["userIncrementDays", result.userIncrementDays],
+      ["difficultyIncrementDays", result.difficultyIncrementDays],
+      ["orgIncrementDays", result.orgIncrementDays],
+      ["totalDays", result.totalDays]
+    ];
+    const itemRows = [
+      ["templateItemId", "included", "standardDays", "itemSubtotalDays"],
+      ...result.itemResults.map((item) => [
+        item.templateItemId,
+        item.included ? "Y" : "N",
+        item.standardDays,
+        item.itemSubtotalDays
+      ])
+    ];
+    const requestRows = [
+      ["requestField", "value"],
+      ["userCount", requestBody.userCount],
+      ["difficultyFactor", requestBody.difficultyFactor],
+      ["orgCount", requestBody.orgCount],
+      ["orgSimilarityFactor", requestBody.orgSimilarityFactor]
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(metaRows), "META");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryRows), "SUMMARY");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(itemRows), "ITEMS");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(requestRows), "REQUEST");
+    XLSX.writeFile(workbook, exportPath);
+    return;
+  }
+  await writePdfFile(exportPath, result, requestBody);
+}
+
+type ExportHistoryItem = {
+  fileName: string;
+  size: number;
+  modifiedAt: string;
+  downloadUrl: string;
+};
+
+function listExportHistory(page: number, pageSize: number): { total: number; items: ExportHistoryItem[] } {
+  const exportDir = ensureExportDir();
+  const files = fs
+    .readdirSync(exportDir)
+    .filter((name) => name.endsWith(".xlsx") || name.endsWith(".pdf"))
+    .map((fileName) => {
+      const fullPath = path.resolve(exportDir, fileName);
+      const stat = fs.statSync(fullPath);
+      return {
+        fileName,
+        size: stat.size,
+        modifiedAt: stat.mtime.toISOString(),
+        downloadUrl: `/downloads/${fileName}`,
+        mtimeMs: stat.mtimeMs
+      };
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+  const total = files.length;
+  const start = (page - 1) * pageSize;
+  const items = files.slice(start, start + pageSize).map(({ mtimeMs, ...rest }) => rest);
+  return { total, items };
 }
 
 function validateCalculateRequest(
@@ -329,7 +439,7 @@ app.post("/api/v1/estimates/calculate", (req, res) => {
   res.json(ok(calculateEstimate(body, template, ruleSet)));
 });
 
-app.post("/api/v1/estimates/calculate-and-export", (req, res) => {
+app.post("/api/v1/estimates/calculate-and-export", async (req, res) => {
   const body = req.body as CalculateRequest & { exportType?: "excel" | "pdf" };
   const template = loadJsonFile<Template>("config/templates/example-template.json");
   const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
@@ -341,7 +451,7 @@ app.post("/api/v1/estimates/calculate-and-export", (req, res) => {
   const exportType = body.exportType === "pdf" ? "pdf" : "excel";
   const extension = exportType === "pdf" ? "pdf" : "xlsx";
   const fileName = `estimate-${Date.now()}.${extension}`;
-  writeExportFile(fileName, exportType, result, body);
+  await writeExportFile(fileName, exportType, result, body);
   const expireAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   res.json(
     ok({
@@ -350,6 +460,13 @@ app.post("/api/v1/estimates/calculate-and-export", (req, res) => {
       expireAt
     })
   );
+});
+
+app.get("/api/v1/exports/history", (req, res) => {
+  const page = Math.max(1, Number(req.query.page || 1));
+  const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize || 20)));
+  const data = listExportHistory(page, pageSize);
+  res.json(ok({ page, pageSize, ...data }));
 });
 
 app.get("/downloads/:fileName", (req, res) => {
