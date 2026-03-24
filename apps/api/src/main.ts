@@ -39,6 +39,14 @@ type RuleSet = {
   };
 };
 
+type RuleSetMeta = {
+  grouping: string[];
+  itemRule: string[];
+  baseRule: RuleSet["baseRule"];
+  orgIncrementRule: RuleSet["orgIncrementRule"];
+  pipeline: RuleSet["pipeline"];
+};
+
 type CalculateRequest = {
   templateId: string;
   ruleSetId: string;
@@ -264,6 +272,32 @@ function listExportHistory(page: number, pageSize: number): { total: number; ite
   return { total, items };
 }
 
+async function handleCalculateAndExport(
+  body: CalculateRequest & { exportType?: "excel" | "pdf" },
+  res: express.Response
+): Promise<void> {
+  const template = loadJsonFile<Template>("config/templates/example-template.json");
+  const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
+  const validation = validateCalculateRequest(body, template, ruleSet);
+  if (!validation.ok) {
+    fail(res, validation.code, validation.message, validation.details);
+    return;
+  }
+  const result = calculateEstimate(body, template, ruleSet);
+  const exportType = body.exportType === "pdf" ? "pdf" : "excel";
+  const extension = exportType === "pdf" ? "pdf" : "xlsx";
+  const fileName = `estimate-${Date.now()}.${extension}`;
+  await writeExportFile(fileName, exportType, result, body);
+  const expireAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  res.json(
+    ok({
+      totalDays: result.totalDays,
+      downloadUrl: `/downloads/${fileName}`,
+      expireAt
+    })
+  );
+}
+
 function validateCalculateRequest(
   body: CalculateRequest,
   template: Template,
@@ -414,6 +448,21 @@ app.get("/api/v1/health", (_req, res) => {
   res.json(ok({ service: "workload-api", status: "up" }));
 });
 
+app.get("/api/v1/templates", (_req, res) => {
+  const template = loadJsonFile<Template>("config/templates/example-template.json");
+  res.json(
+    ok({
+      list: [
+        {
+          templateId: template.templateId,
+          templateVersion: template.templateVersion,
+          templateName: template.templateName
+        }
+      ]
+    })
+  );
+});
+
 app.get("/api/v1/templates/:templateId", (req, res) => {
   const template = loadJsonFile<Template>("config/templates/example-template.json");
   if (req.params.templateId !== template.templateId) {
@@ -425,6 +474,18 @@ app.get("/api/v1/templates/:templateId", (req, res) => {
 app.get("/api/v1/rule-sets/active", (_req, res) => {
   const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
   res.json(ok(ruleSet));
+});
+
+app.get("/api/v1/rule-sets/meta", (_req, res) => {
+  const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
+  const meta: RuleSetMeta = {
+    grouping: ["group by groupId from template.items"],
+    itemRule: ["included ? standardDays : 0"],
+    baseRule: ruleSet.baseRule,
+    orgIncrementRule: ruleSet.orgIncrementRule,
+    pipeline: ruleSet.pipeline
+  };
+  res.json(ok(meta));
 });
 
 app.post("/api/v1/estimates/calculate", (req, res) => {
@@ -441,25 +502,17 @@ app.post("/api/v1/estimates/calculate", (req, res) => {
 
 app.post("/api/v1/estimates/calculate-and-export", async (req, res) => {
   const body = req.body as CalculateRequest & { exportType?: "excel" | "pdf" };
-  const template = loadJsonFile<Template>("config/templates/example-template.json");
-  const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
-  const validation = validateCalculateRequest(body, template, ruleSet);
-  if (!validation.ok) {
-    return fail(res, validation.code, validation.message, validation.details);
-  }
-  const result = calculateEstimate(body, template, ruleSet);
-  const exportType = body.exportType === "pdf" ? "pdf" : "excel";
-  const extension = exportType === "pdf" ? "pdf" : "xlsx";
-  const fileName = `estimate-${Date.now()}.${extension}`;
-  await writeExportFile(fileName, exportType, result, body);
-  const expireAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  res.json(
-    ok({
-      totalDays: result.totalDays,
-      downloadUrl: `/downloads/${fileName}`,
-      expireAt
-    })
-  );
+  await handleCalculateAndExport(body, res);
+});
+
+app.post("/api/v1/estimates/export/excel", async (req, res) => {
+  const body = req.body as CalculateRequest;
+  await handleCalculateAndExport({ ...body, exportType: "excel" }, res);
+});
+
+app.post("/api/v1/estimates/export/pdf", async (req, res) => {
+  const body = req.body as CalculateRequest;
+  await handleCalculateAndExport({ ...body, exportType: "pdf" }, res);
 });
 
 app.get("/api/v1/exports/history", (req, res) => {

@@ -45,11 +45,15 @@ const form = ref({
 const loading = ref(false);
 const exporting = ref(false);
 const historyLoading = ref(false);
+const historyLoadingMore = ref(false);
 const error = ref("");
 const result = ref<CalculateResult | null>(null);
 const exportInfo = ref<ExportResult | null>(null);
 const exportHistory = ref<ExportHistoryItem[]>([]);
 const historyError = ref("");
+const historyPage = ref(1);
+const historyPageSize = ref(8);
+const historyTotal = ref(0);
 
 const payload = computed(() => ({
   templateId: form.value.templateId,
@@ -98,7 +102,7 @@ async function calculateAndExport(exportType: "excel" | "pdf") {
       throw new Error(data.message || "导出失败");
     }
     exportInfo.value = data.data;
-    await loadExportHistory();
+    await loadExportHistory(true);
     window.open(data.data.downloadUrl, "_blank");
   } catch (err) {
     error.value = err instanceof Error ? err.message : "导出失败";
@@ -117,11 +121,20 @@ function formatBytes(size: number): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function loadExportHistory() {
-  historyLoading.value = true;
+async function loadExportHistory(reset = false) {
+  if (reset) {
+    historyPage.value = 1;
+  }
+  if (reset) {
+    historyLoading.value = true;
+  } else {
+    historyLoadingMore.value = true;
+  }
   historyError.value = "";
   try {
-    const response = await fetch("/api/v1/exports/history?page=1&pageSize=8");
+    const response = await fetch(
+      `/api/v1/exports/history?page=${historyPage.value}&pageSize=${historyPageSize.value}`
+    );
     const payload = (await response.json()) as ApiResponse<{
       page: number;
       pageSize: number;
@@ -131,16 +144,29 @@ async function loadExportHistory() {
     if (!response.ok || payload.code !== 0) {
       throw new Error(payload.message || "读取导出历史失败");
     }
-    exportHistory.value = payload.data.items;
+    historyTotal.value = payload.data.total;
+    if (reset) {
+      exportHistory.value = payload.data.items;
+    } else {
+      exportHistory.value = [...exportHistory.value, ...payload.data.items];
+    }
+    historyPage.value += 1;
   } catch (err) {
     historyError.value = err instanceof Error ? err.message : "读取导出历史失败";
   } finally {
     historyLoading.value = false;
+    historyLoadingMore.value = false;
   }
 }
 
+async function refreshExportHistory() {
+  await loadExportHistory(true);
+}
+
+const hasMoreHistory = computed(() => exportHistory.value.length < historyTotal.value);
+
 onMounted(() => {
-  void loadExportHistory();
+  void loadExportHistory(true);
 });
 </script>
 
@@ -212,10 +238,11 @@ onMounted(() => {
       <section class="result">
         <div class="history-head">
           <h2>最近导出记录</h2>
-          <button class="link-btn" :disabled="historyLoading" @click="loadExportHistory">
+          <button class="link-btn" :disabled="historyLoading || historyLoadingMore" @click="refreshExportHistory">
             {{ historyLoading ? "刷新中..." : "刷新" }}
           </button>
         </div>
+        <p v-if="!historyError" class="meta">共 {{ historyTotal }} 条记录</p>
         <p v-if="historyError" class="error">{{ historyError }}</p>
         <p v-else-if="historyLoading" class="meta">正在加载导出记录...</p>
         <p v-else-if="exportHistory.length === 0" class="meta">暂无导出记录</p>
@@ -225,6 +252,14 @@ onMounted(() => {
             <span class="meta">{{ formatBytes(item.size) }} · {{ new Date(item.modifiedAt).toLocaleString() }}</span>
           </li>
         </ul>
+        <button
+          v-if="!historyError && !historyLoading && hasMoreHistory"
+          class="link-btn"
+          :disabled="historyLoadingMore"
+          @click="loadExportHistory(false)"
+        >
+          {{ historyLoadingMore ? "加载中..." : "查看更多" }}
+        </button>
       </section>
     </section>
   </main>
