@@ -1,7 +1,7 @@
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import XLSX from "xlsx";
 import PDFDocument from "pdfkit";
 
@@ -248,6 +248,20 @@ type ExportHistoryItem = {
   downloadUrl: string;
 };
 
+type IdempotencyRecord = {
+  payloadHash: string;
+  data: {
+    totalDays: number;
+    downloadUrl: string;
+    expireAt: string;
+  };
+  requestId: string;
+  createdAt: number;
+};
+
+const EXPORT_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+const idempotencyStore = new Map<string, IdempotencyRecord>();
+
 function listExportHistory(page: number, pageSize: number): { total: number; items: ExportHistoryItem[] } {
   const exportDir = ensureExportDir();
   const files = fs
@@ -274,7 +288,8 @@ function listExportHistory(page: number, pageSize: number): { total: number; ite
 
 async function handleCalculateAndExport(
   body: CalculateRequest & { exportType?: "excel" | "pdf" },
-  res: express.Response
+  res: express.Response,
+  idempotencyKey?: string
 ): Promise<void> {
   const requestId = randomUUID();
   const template = loadJsonFile<Template>("config/templates/example-template.json");
@@ -286,16 +301,47 @@ async function handleCalculateAndExport(
   }
   const result = calculateEstimate(body, template, ruleSet);
   const exportType = body.exportType === "pdf" ? "pdf" : "excel";
+  const payloadHash = createHash("sha256")
+    .update(JSON.stringify({ ...body, exportType }))
+    .digest("hex");
+
+  if (idempotencyKey) {
+    const existing = idempotencyStore.get(idempotencyKey);
+    if (existing) {
+      const expired = Date.now() - existing.createdAt > EXPORT_IDEMPOTENCY_TTL_MS;
+      if (expired) {
+        idempotencyStore.delete(idempotencyKey);
+      } else if (existing.payloadHash !== payloadHash) {
+        fail(res, 40001, "参数错误", [{ field: "Idempotency-Key", reason: "payload_conflict" }]);
+        return;
+      } else {
+        res.json(ok(existing.data, existing.requestId));
+        return;
+      }
+    }
+  }
+
   const extension = exportType === "pdf" ? "pdf" : "xlsx";
   const fileName = `estimate-${Date.now()}.${extension}`;
   await writeExportFile(fileName, exportType, result, body);
   const expireAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const responseData = {
+    totalDays: result.totalDays,
+    downloadUrl: `/downloads/${fileName}`,
+    expireAt
+  };
+
+  if (idempotencyKey) {
+    idempotencyStore.set(idempotencyKey, {
+      payloadHash,
+      data: responseData,
+      requestId,
+      createdAt: Date.now()
+    });
+  }
+
   res.json(
-    ok({
-      totalDays: result.totalDays,
-      downloadUrl: `/downloads/${fileName}`,
-      expireAt
-    }, requestId)
+    ok(responseData, requestId)
   );
 }
 
@@ -367,6 +413,32 @@ function validateCalculateRequest(
       details: [{ field: "items", reason: "required" }]
     };
   }
+
+  const templateItemIds = new Set(template.items.map((item) => item.templateItemId));
+  const requestItemIds = new Set(body.items.map((item) => item.templateItemId));
+  const unknownItems = body.items
+    .filter((item) => !templateItemIds.has(item.templateItemId))
+    .map((item) => item.templateItemId);
+  if (unknownItems.length > 0) {
+    return {
+      ok: false,
+      code: 40001,
+      message: "参数错误",
+      details: [{ field: "items", reason: `unknown_item_ids:${unknownItems.join(",")}` }]
+    };
+  }
+  const missingItems = template.items
+    .filter((item) => !requestItemIds.has(item.templateItemId))
+    .map((item) => item.templateItemId);
+  if (missingItems.length > 0) {
+    return {
+      ok: false,
+      code: 42201,
+      message: "计算请求数据不完整",
+      details: [{ field: "items", reason: `missing_item_ids:${missingItems.join(",")}` }]
+    };
+  }
+
   return { ok: true };
 }
 
@@ -504,17 +576,20 @@ app.post("/api/v1/estimates/calculate", (req, res) => {
 
 app.post("/api/v1/estimates/calculate-and-export", async (req, res) => {
   const body = req.body as CalculateRequest & { exportType?: "excel" | "pdf" };
-  await handleCalculateAndExport(body, res);
+  const idempotencyKey = String(req.header("Idempotency-Key") || "").trim() || undefined;
+  await handleCalculateAndExport(body, res, idempotencyKey);
 });
 
 app.post("/api/v1/estimates/export/excel", async (req, res) => {
   const body = req.body as CalculateRequest;
-  await handleCalculateAndExport({ ...body, exportType: "excel" }, res);
+  const idempotencyKey = String(req.header("Idempotency-Key") || "").trim() || undefined;
+  await handleCalculateAndExport({ ...body, exportType: "excel" }, res, idempotencyKey);
 });
 
 app.post("/api/v1/estimates/export/pdf", async (req, res) => {
   const body = req.body as CalculateRequest;
-  await handleCalculateAndExport({ ...body, exportType: "pdf" }, res);
+  const idempotencyKey = String(req.header("Idempotency-Key") || "").trim() || undefined;
+  await handleCalculateAndExport({ ...body, exportType: "pdf" }, res, idempotencyKey);
 });
 
 app.get("/api/v1/exports/history", (req, res) => {
