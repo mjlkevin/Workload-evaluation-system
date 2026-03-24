@@ -1,0 +1,46 @@
+# Python（Excel 解析等本地脚本）
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.Python
+
+# Node / 前端（Vue、Vite）
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+.pnpm-store/
+
+# Nest / TypeScript
+build/
+*.tsbuildinfo
+
+# 环境变量与密钥
+.env
+.env.*
+!.env.example
+
+# 导出产物与运行时目录（与设计文档约定一致时可调整路径）
+exports/
+
+# 日志与覆盖率
+logs/
+*.log
+npm-debug.log*
+coverage/
+.nyc_output/
+
+# 测试与缓存
+.cache/
+.parcel-cache/
+.turbo/
+.eslintcache
+
+# IDE / OS
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
