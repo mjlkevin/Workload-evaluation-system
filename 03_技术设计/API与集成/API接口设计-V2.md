@@ -113,6 +113,19 @@ flowchart LR
 ## 4.3 刷新模板缓存
 - `POST /templates/reload`
 
+## 4.4 导入模板（JSON）
+- `POST /templates/import-json`
+- Body：完整 `Template` 结构（`templateId/templateVersion/templateName/groups/items`）
+- 说明：导入成功后覆盖当前运行配置模板源文件，便于后续 `calculate` 直接使用
+
+## 4.5 导入模板（Excel）
+- `POST /templates/import-excel`（`multipart/form-data`）
+- FormData：
+  - `file`：Excel 文件（必填）
+  - `sheetName`：工作表名（选填，支持去空格匹配）
+  - `templateId/templateName/templateVersion`：导入元信息（选填）
+- 说明：按工作表行解析分组与条目，生成模板 JSON 并覆盖当前运行配置模板源文件
+
 ## 5. 规则接口
 
 ## 5.1 当前生效规则
@@ -124,6 +137,16 @@ flowchart LR
 ## 5.3 规则元信息（可选）
 - `GET /rule-sets/meta?templateId={id}`
 - 返回：`grouping`、`itemRule`、`baseRule`、`orgIncrementRule`、`pipeline`
+- 规则字段约定（当前实现）：
+  - `baseRule.userCountTiers[]`：用户数分段系数
+  - `baseRule.difficultyFactorList[]`：难度系数枚举
+  - `baseRule.userIncrementRounding`：用户数增量取整方式（`none|ceil_int`）
+  - `orgIncrementRule.factor`：多组织增量系数（Excel 对应 `G215`）
+
+## 5.4 导入规则（JSON）
+- `POST /rule-sets/import-json`
+- Body：完整 `RuleSet` 结构（含 `baseRule`、`orgIncrementRule`、`pipeline`）
+- 说明：导入成功后覆盖当前运行配置规则源文件
 
 ## 6. 估算接口（核心）
 
@@ -363,8 +386,8 @@ sequenceDiagram
 - 失败：`code`、`message`、可选 `details[]`、**`requestId`**（§2.2）；与 Agent 排障要求一致（§11）。
 
 ### 14.3 核心端点分组
-- **模板**：`GET /templates`、`GET /templates/{templateId}`、`POST /templates/reload`（§4）。
-- **规则**：`GET /rule-sets/active`、`POST /rule-sets/reload`、可选 `GET /rule-sets/meta`（§5）。
+- **模板**：`GET /templates`、`GET /templates/{templateId}`、`POST /templates/reload`、`POST /templates/import-json`、`POST /templates/import-excel`（§4）。
+- **规则**：`GET /rule-sets/active`、`POST /rule-sets/reload`、可选 `GET /rule-sets/meta`、`POST /rule-sets/import-json`（§5）。
 - **估算**：`POST /estimates/calculate`、`POST /estimates/calculate-and-export`（§6）。
 - **导出与下载**：`POST /estimates/export/excel|pdf`、`GET /downloads/{fileName}`；可选 `GET /exports/history`（§7）。
 

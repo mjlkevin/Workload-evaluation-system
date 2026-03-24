@@ -1,0 +1,132 @@
+{
+  "generatedAt": "2026-03-24T07:59:32.597Z",
+  "excelFile": "金蝶AI星空-实施人天估算-R202602-V1.0（0303版本）.xlsx",
+  "sheetName": "模块报价 ",
+  "checks": [
+    {
+      "name": "用户分段规则一致",
+      "pass": true
+    },
+    {
+      "name": "难度系数枚举一致",
+      "pass": true
+    },
+    {
+      "name": "用户增量取整一致",
+      "pass": true
+    },
+    {
+      "name": "多组织系数一致",
+      "pass": true
+    },
+    {
+      "name": "模板基准人天接近Excel(J210)",
+      "pass": true
+    }
+  ],
+  "metrics": {
+    "excelBaseDays": 998,
+    "parsedBaseDays": 998.1,
+    "baseDaysDelta": 0.1,
+    "excelOrgFactor": 0.1,
+    "ruleOrgFactor": 0.1
+  },
+  "scenarioResults": [
+    {
+      "userCount": 50,
+      "difficultyFactor": 0,
+      "orgCount": 1,
+      "orgSimilarityFactor": 1,
+      "byRule": {
+        "userIncrementDays": 0,
+        "difficultyIncrementDays": 0,
+        "orgIncrementDays": 0,
+        "totalDays": 998
+      },
+      "byExcel": {
+        "userIncrementDays": 0,
+        "difficultyIncrementDays": 0,
+        "orgIncrementDays": 0,
+        "totalDays": 998
+      },
+      "pass": true
+    },
+    {
+      "userCount": 51,
+      "difficultyFactor": 0,
+      "orgCount": 1,
+      "orgSimilarityFactor": 1,
+      "byRule": {
+        "userIncrementDays": 50,
+        "difficultyIncrementDays": 0,
+        "orgIncrementDays": 0,
+        "totalDays": 1048
+      },
+      "byExcel": {
+        "userIncrementDays": 50,
+        "difficultyIncrementDays": 0,
+        "orgIncrementDays": 0,
+        "totalDays": 1048
+      },
+      "pass": true
+    },
+    {
+      "userCount": 90,
+      "difficultyFactor": 0.1,
+      "orgCount": 2,
+      "orgSimilarityFactor": 0.6,
+      "byRule": {
+        "userIncrementDays": 100,
+        "difficultyIncrementDays": 99.8,
+        "orgIncrementDays": 39.9,
+        "totalDays": 1237.7
+      },
+      "byExcel": {
+        "userIncrementDays": 100,
+        "difficultyIncrementDays": 99.8,
+        "orgIncrementDays": 39.9,
+        "totalDays": 1237.7
+      },
+      "pass": true
+    },
+    {
+      "userCount": 130,
+      "difficultyFactor": 0.2,
+      "orgCount": 3,
+      "orgSimilarityFactor": 0.6,
+      "byRule": {
+        "userIncrementDays": 150,
+        "difficultyIncrementDays": 199.6,
+        "orgIncrementDays": 79.8,
+        "totalDays": 1427.4
+      },
+      "byExcel": {
+        "userIncrementDays": 150,
+        "difficultyIncrementDays": 199.6,
+        "orgIncrementDays": 79.8,
+        "totalDays": 1427.4
+      },
+      "pass": true
+    },
+    {
+      "userCount": 131,
+      "difficultyFactor": 0.3,
+      "orgCount": 3,
+      "orgSimilarityFactor": 0.3,
+      "byRule": {
+        "userIncrementDays": 250,
+        "difficultyIncrementDays": 299.4,
+        "orgIncrementDays": 139.7,
+        "totalDays": 1687.1
+      },
+      "byExcel": {
+        "userIncrementDays": 250,
+        "difficultyIncrementDays": 299.4,
+        "orgIncrementDays": 139.7,
+        "totalDays": 1687.1
+      },
+      "pass": true
+    }
+  ],
+  "pass": true
+}

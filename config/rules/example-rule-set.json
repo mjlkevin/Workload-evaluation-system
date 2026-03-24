@@ -1,24 +1,61 @@
 {
   "ruleSetId": "rules-demo-001",
-  "ruleVersion": "2026.03.1",
-  "pipelineVersion": "2026.03.1",
-  "pipeline": ["grouping", "itemRule", "baseRule", "orgIncrementRule"],
+  "ruleVersion": "excel-std-2026-03-24",
+  "pipelineVersion": "excel-std-2026-03-24",
+  "pipeline": [
+    "grouping",
+    "itemRule",
+    "baseRule",
+    "orgIncrementRule"
+  ],
   "baseRule": {
     "userCountTiers": [
       {
         "min": 0,
-        "max": 90,
+        "max": 50,
         "factor": 0
+      },
+      {
+        "min": 51,
+        "max": 70,
+        "factor": 0.05
+      },
+      {
+        "min": 71,
+        "max": 90,
+        "factor": 0.1
       },
       {
         "min": 91,
         "max": 130,
         "factor": 0.15
+      },
+      {
+        "min": 131,
+        "max": 1000,
+        "factor": 0.25
       }
     ],
-    "difficultyFactorList": [0, 0.1, 0.2, 0.3]
+    "difficultyFactorList": [
+      0,
+      0.1,
+      0.2,
+      0.3
+    ],
+    "userIncrementRounding": "ceil_int"
   },
   "orgIncrementRule": {
-    "enabled": true
+    "enabled": true,
+    "factor": 0.1
+  },
+  "excelStandardization": {
+    "workbook": "金蝶AI星空-实施人天估算-R202602-V1.0（0303版本）.xlsx",
+    "sheetName": "模块报价 ",
+    "extractedAt": "2026-03-24T07:21:32.781Z",
+    "formulaRefs": {
+      "userTier": "F211",
+      "orgFactor": "G215",
+      "orgIncrement": "J215=J214*I215*G215"
+    }
   }
 }

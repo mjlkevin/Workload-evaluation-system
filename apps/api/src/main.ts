@@ -4,9 +4,15 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import XLSX from "xlsx";
 import PDFDocument from "pdfkit";
+import multer from "multer";
+import { calculateEstimate, validateCalculateRequest } from "./engine";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
 
 app.use(express.json());
 
@@ -15,6 +21,15 @@ type TemplateItem = {
   groupId: string;
   itemName: string;
   standardDays: number;
+  sheetName?: string;
+  cloudProduct?: string;
+  skuName?: string;
+  appGroup?: string;
+  deliveryModule?: string;
+  deliveryPoint?: string;
+  deliveryDesc?: string;
+  evalDesc?: string;
+  defaultIncluded?: boolean;
 };
 
 type Template = {
@@ -23,6 +38,7 @@ type Template = {
   templateName: string;
   groups: Array<{ groupId: string; groupName: string }>;
   items: TemplateItem[];
+  sheets?: Array<{ sheetId: string; sheetName: string }>;
 };
 
 type RuleSet = {
@@ -33,9 +49,11 @@ type RuleSet = {
   baseRule: {
     userCountTiers: Array<{ min: number; max: number; factor: number }>;
     difficultyFactorList: number[];
+    userIncrementRounding?: "none" | "ceil_int";
   };
   orgIncrementRule: {
     enabled: boolean;
+    factor?: number;
   };
 };
 
@@ -98,6 +116,12 @@ function loadJsonFile<T>(relativePath: string): T {
   throw new Error(`Config file not found: ${relativePath}`);
 }
 
+function saveJsonFile(relativePath: string, data: unknown): void {
+  const filePath = path.resolve(resolveRootDir(), relativePath);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+}
+
 function ok(data: unknown, requestId?: string) {
   return requestId ? { code: 0, message: "ok", data, requestId } : { code: 0, message: "ok", data };
 }
@@ -118,6 +142,193 @@ function fail(
 
 function round1(input: number): number {
   return Math.round(input * 10) / 10;
+}
+
+function applyRounding(value: number, mode: "none" | "ceil_int" = "none"): number {
+  if (mode === "ceil_int") {
+    return Math.ceil(value);
+  }
+  return round1(value);
+}
+
+function asString(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function isTemplateLike(input: unknown): input is Template {
+  const t = input as Partial<Template>;
+  return Boolean(
+    t &&
+      typeof t.templateId === "string" &&
+      typeof t.templateVersion === "string" &&
+      typeof t.templateName === "string" &&
+      Array.isArray(t.groups) &&
+      Array.isArray(t.items)
+  );
+}
+
+function isRuleSetLike(input: unknown): input is RuleSet {
+  const r = input as Partial<RuleSet>;
+  return Boolean(
+    r &&
+      typeof r.ruleSetId === "string" &&
+      typeof r.ruleVersion === "string" &&
+      typeof r.pipelineVersion === "string" &&
+      Array.isArray(r.pipeline) &&
+      r.baseRule &&
+      Array.isArray(r.baseRule.userCountTiers) &&
+      Array.isArray(r.baseRule.difficultyFactorList) &&
+      r.orgIncrementRule &&
+      typeof r.orgIncrementRule.enabled === "boolean"
+  );
+}
+
+function normalizeCellText(value: unknown): string {
+  return asString(value).replace(/\s+/g, "");
+}
+
+function parseDefaultIncluded(value: unknown): boolean {
+  const raw = asString(value).toLowerCase();
+  return raw === "√" || raw === "v" || raw === "true" || raw === "1" || raw === "y" || raw === "yes";
+}
+
+function resolveTargetSheetNames(workbook: XLSX.WorkBook, sheetNameOrList: string | undefined): string[] {
+  const requested = asString(sheetNameOrList);
+  if (requested) {
+    const requestedNames = requested
+      .split(",")
+      .map((x) => asString(x))
+      .filter(Boolean);
+    const matched = requestedNames
+      .map((name) => {
+        return (
+          workbook.SheetNames.find((sheet) => asString(sheet) === name) ??
+          workbook.SheetNames.find((sheet) => asString(sheet).includes(name))
+        );
+      })
+      .filter((x): x is string => Boolean(x));
+    if (matched.length > 0) {
+      return Array.from(new Set(matched));
+    }
+  }
+  const defaults = ["模块报价", "【NEW】金蝶AI超级套件", "套件报价-AI星空基础套件"];
+  const matchedDefaults = defaults
+    .map((name) => workbook.SheetNames.find((sheet) => asString(sheet) === name || asString(sheet).includes(name)))
+    .filter((x): x is string => Boolean(x));
+  if (matchedDefaults.length > 0) {
+    return matchedDefaults;
+  }
+  return [workbook.SheetNames[0]];
+}
+
+function parseTemplateFromWorkbook(
+  workbook: XLSX.WorkBook,
+  sheetNameOrList: string | undefined,
+  fallbackTemplateName: string,
+  fallbackVersion: string
+): Template {
+  const targetSheetNames = resolveTargetSheetNames(workbook, sheetNameOrList);
+  const groupIdByKey = new Map<string, string>();
+  const groups: Array<{ groupId: string; groupName: string }> = [];
+  const items: TemplateItem[] = [];
+  let itemSeq = 1;
+
+  for (const sheetName of targetSheetNames) {
+    const ws = workbook.Sheets[sheetName];
+    if (!ws) {
+      continue;
+    }
+    const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, {
+      header: 1,
+      defval: "",
+      raw: true
+    });
+
+    const headerRowIndex = rows.findIndex((row) =>
+      row.some((cell) => {
+        const normalized = normalizeCellText(cell);
+        return normalized.includes("标准实施人天") || normalized.includes("标准实施天数");
+      })
+    );
+    if (headerRowIndex < 0) {
+      continue;
+    }
+    const headerRow = rows[headerRowIndex];
+    const findColByAny = (keywords: string[]): number =>
+      headerRow.findIndex((cell) => keywords.some((keyword) => normalizeCellText(cell).includes(normalizeCellText(keyword))));
+
+    const colCloud = findColByAny(["云产品"]);
+    const colSku = findColByAny(["SKU", "SKU名称"]);
+    const colAppGroup = findColByAny(["应用分组", "套件内应用分组", "实施要点"]);
+    const colDeliveryModule = findColByAny(["交付模块", "实施要点"]);
+    const colDeliveryPoint = findColByAny(["交付颗粒", "实施要点"]);
+    const colDeliveryDesc = findColByAny(["交付说明", "实施要点内容说明"]);
+    const colEvalDesc = findColByAny(["评估说明"]);
+    const colStandardDays = findColByAny(["标准实施人天", "标准实施天数"]);
+    const colIncluded = findColByAny(["是否包含"]);
+
+    let currentCloud = "";
+    let currentSku = "";
+    let currentAppGroup = "";
+
+    for (let i = headerRowIndex + 1; i < rows.length; i += 1) {
+      const row = rows[i];
+      if (colCloud >= 0 && asString(row[colCloud])) currentCloud = asString(row[colCloud]);
+      if (colSku >= 0 && asString(row[colSku])) currentSku = asString(row[colSku]);
+      if (colAppGroup >= 0 && asString(row[colAppGroup])) currentAppGroup = asString(row[colAppGroup]);
+
+      const standardDays = Number(colStandardDays >= 0 ? row[colStandardDays] : NaN);
+      if (!Number.isFinite(standardDays) || standardDays <= 0) {
+        continue;
+      }
+
+      const deliveryPoint = asString(colDeliveryPoint >= 0 ? row[colDeliveryPoint] : "");
+      const deliveryModule = asString(colDeliveryModule >= 0 ? row[colDeliveryModule] : "");
+      const itemName = deliveryPoint || deliveryModule || currentAppGroup || currentSku || currentCloud;
+      if (!itemName || itemName.includes("工作量") || itemName.includes("小计") || itemName.includes("合计")) {
+        continue;
+      }
+
+      const groupName = currentAppGroup || currentSku || currentCloud || "未分组";
+      const groupKey = `${sheetName}::${groupName}`;
+      let groupId = groupIdByKey.get(groupKey);
+      if (!groupId) {
+        groupId = `grp-${groupIdByKey.size + 1}`;
+        groupIdByKey.set(groupKey, groupId);
+        groups.push({ groupId, groupName });
+      }
+
+      items.push({
+        templateItemId: `item-${itemSeq}`,
+        groupId,
+        itemName,
+        standardDays: round1(standardDays),
+        sheetName: asString(sheetName),
+        cloudProduct: currentCloud,
+        skuName: currentSku,
+        appGroup: currentAppGroup,
+        deliveryModule,
+        deliveryPoint,
+        deliveryDesc: asString(colDeliveryDesc >= 0 ? row[colDeliveryDesc] : ""),
+        evalDesc: asString(colEvalDesc >= 0 ? row[colEvalDesc] : ""),
+        defaultIncluded: parseDefaultIncluded(colIncluded >= 0 ? row[colIncluded] : "")
+      });
+      itemSeq += 1;
+    }
+  }
+
+  if (items.length === 0) {
+    throw new Error("no_template_items_parsed");
+  }
+
+  return {
+    templateId: `tmpl-import-${Date.now()}`,
+    templateVersion: fallbackVersion,
+    templateName: fallbackTemplateName,
+    groups,
+    items,
+    sheets: targetSheetNames.map((sheet, idx) => ({ sheetId: `sheet-${idx + 1}`, sheetName: asString(sheet) }))
+  };
 }
 
 function resolveRootDir(): string {
@@ -248,6 +459,14 @@ type ExportHistoryItem = {
   downloadUrl: string;
 };
 
+type SessionEstimateContext = {
+  sessionId: string;
+  templateId: string;
+  ruleSetId: string;
+  createdAt: number;
+  expiresAt: number;
+};
+
 type IdempotencyRecord = {
   payloadHash: string;
   data: {
@@ -260,7 +479,31 @@ type IdempotencyRecord = {
 };
 
 const EXPORT_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 const idempotencyStore = new Map<string, IdempotencyRecord>();
+const sessionStore = new Map<string, SessionEstimateContext>();
+
+function cleanupExpiredSessions(nowMs = Date.now()): void {
+  for (const [sessionId, ctx] of sessionStore.entries()) {
+    if (ctx.expiresAt <= nowMs) {
+      sessionStore.delete(sessionId);
+    }
+  }
+}
+
+function getRequesterRole(req: express.Request): "admin" | "operator" {
+  const raw = String(req.header("X-Role") || "operator").trim().toLowerCase();
+  return raw === "admin" ? "admin" : "operator";
+}
+
+function requireRole(req: express.Request, res: express.Response, allowed: Array<"admin" | "operator">): boolean {
+  const role = getRequesterRole(req);
+  if (!allowed.includes(role)) {
+    fail(res, 40301, "权限不足", [{ field: "role", reason: "forbidden" }]);
+    return false;
+  }
+  return true;
+}
 
 function listExportHistory(page: number, pageSize: number): { total: number; items: ExportHistoryItem[] } {
   const exportDir = ensureExportDir();
@@ -345,178 +588,6 @@ async function handleCalculateAndExport(
   );
 }
 
-function validateCalculateRequest(
-  body: CalculateRequest,
-  template: Template,
-  ruleSet: RuleSet
-): { ok: true } | { ok: false; code: number; message: string; details: Array<{ field: string; reason: string }> } {
-  if (!body?.templateId || !body?.ruleSetId) {
-    return {
-      ok: false,
-      code: 40001,
-      message: "参数错误",
-      details: [
-        { field: "templateId", reason: "required" },
-        { field: "ruleSetId", reason: "required" }
-      ]
-    };
-  }
-  if (body.templateId !== template.templateId || body.ruleSetId !== ruleSet.ruleSetId) {
-    return {
-      ok: false,
-      code: 40401,
-      message: "资源不存在",
-      details: [{ field: "templateId/ruleSetId", reason: "not_found" }]
-    };
-  }
-  if (
-    !Number.isInteger(body.userCount) ||
-    !Number.isInteger(body.orgCount) ||
-    body.userCount < 0 ||
-    body.orgCount < 0
-  ) {
-    return {
-      ok: false,
-      code: 40001,
-      message: "参数错误",
-      details: [
-        { field: "userCount", reason: "must_be_non_negative_integer" },
-        { field: "orgCount", reason: "must_be_non_negative_integer" }
-      ]
-    };
-  }
-  if (
-    typeof body.orgSimilarityFactor !== "number" ||
-    body.orgSimilarityFactor < 0 ||
-    body.orgSimilarityFactor > 1
-  ) {
-    return {
-      ok: false,
-      code: 40001,
-      message: "参数错误",
-      details: [{ field: "orgSimilarityFactor", reason: "must_be_in_0_to_1" }]
-    };
-  }
-  if (!ruleSet.baseRule.difficultyFactorList.includes(body.difficultyFactor)) {
-    return {
-      ok: false,
-      code: 40003,
-      message: "规则校验失败",
-      details: [{ field: "difficultyFactor", reason: "not_in_rule_set" }]
-    };
-  }
-  if (!Array.isArray(body.items) || body.items.length === 0) {
-    return {
-      ok: false,
-      code: 42201,
-      message: "计算请求数据不完整",
-      details: [{ field: "items", reason: "required" }]
-    };
-  }
-
-  const templateItemIds = new Set(template.items.map((item) => item.templateItemId));
-  const requestItemIds = new Set(body.items.map((item) => item.templateItemId));
-  const unknownItems = body.items
-    .filter((item) => !templateItemIds.has(item.templateItemId))
-    .map((item) => item.templateItemId);
-  if (unknownItems.length > 0) {
-    return {
-      ok: false,
-      code: 40001,
-      message: "参数错误",
-      details: [{ field: "items", reason: `unknown_item_ids:${unknownItems.join(",")}` }]
-    };
-  }
-  const missingItems = template.items
-    .filter((item) => !requestItemIds.has(item.templateItemId))
-    .map((item) => item.templateItemId);
-  if (missingItems.length > 0) {
-    return {
-      ok: false,
-      code: 42201,
-      message: "计算请求数据不完整",
-      details: [{ field: "items", reason: `missing_item_ids:${missingItems.join(",")}` }]
-    };
-  }
-
-  return { ok: true };
-}
-
-function calculateEstimate(body: CalculateRequest, template: Template, ruleSet: RuleSet): EstimateResult {
-  const selectedMap = new Map<string, boolean>(
-    body.items.map((item) => [item.templateItemId, Boolean(item.included)])
-  );
-  const itemResults = template.items.map((item) => {
-    const included = selectedMap.get(item.templateItemId) ?? false;
-    return {
-      templateItemId: item.templateItemId,
-      included,
-      standardDays: item.standardDays,
-      itemSubtotalDays: included ? item.standardDays : 0
-    };
-  });
-
-  const baseDays = round1(itemResults.reduce((sum, cur) => sum + cur.itemSubtotalDays, 0));
-  const tier =
-    ruleSet.baseRule.userCountTiers.find(
-      (x) => body.userCount >= x.min && body.userCount <= x.max
-    ) || { min: 0, max: 0, factor: 0 };
-  const userIncrementDays = round1(baseDays * tier.factor);
-  const difficultyIncrementDays = round1(baseDays * body.difficultyFactor);
-  const orgFactor = ruleSet.orgIncrementRule.enabled
-    ? Math.max(0, body.orgCount - 1) * (1 - body.orgSimilarityFactor) * 0.1
-    : 0;
-  const orgIncrementDays = round1(baseDays * orgFactor);
-  const totalDays = round1(baseDays + userIncrementDays + difficultyIncrementDays + orgIncrementDays);
-
-  const groupSubtotals = template.groups.map((group) => {
-    const subtotalDays = round1(
-      template.items
-        .filter((item) => item.groupId === group.groupId)
-        .reduce((sum, item) => {
-          const selected = selectedMap.get(item.templateItemId) ?? false;
-          return sum + (selected ? item.standardDays : 0);
-        }, 0)
-    );
-    return {
-      groupId: group.groupId,
-      groupName: group.groupName,
-      subtotalDays
-    };
-  });
-
-  return {
-    templateId: template.templateId,
-    ruleSetId: ruleSet.ruleSetId,
-    templateVersion: template.templateVersion,
-    ruleVersion: ruleSet.ruleVersion,
-    pipelineVersion: ruleSet.pipelineVersion,
-    baseDays,
-    userIncrementDays,
-    difficultyIncrementDays,
-    orgIncrementDays,
-    totalDays,
-    calculationBreakdown: {
-      userCountTier: {
-        hitRange: `${tier.min}-${tier.max}`,
-        factor: tier.factor,
-        incrementDays: userIncrementDays
-      },
-      difficulty: {
-        factor: body.difficultyFactor,
-        incrementDays: difficultyIncrementDays
-      },
-      organization: {
-        orgCount: body.orgCount,
-        similarityFactor: body.orgSimilarityFactor,
-        incrementDays: orgIncrementDays
-      }
-    },
-    groupSubtotals,
-    itemResults
-  };
-}
-
 app.get("/api/v1/health", (_req, res) => {
   res.json(ok({ service: "workload-api", status: "up" }));
 });
@@ -561,7 +632,91 @@ app.get("/api/v1/rule-sets/meta", (_req, res) => {
   res.json(ok(meta));
 });
 
+app.post("/api/v1/templates/import-json", (req, res) => {
+  if (!requireRole(req, res, ["admin"])) {
+    return;
+  }
+  const requestId = randomUUID();
+  const input = req.body;
+  if (!isTemplateLike(input)) {
+    return fail(res, 40001, "参数错误", [{ field: "template", reason: "invalid_structure" }]);
+  }
+  saveJsonFile("config/templates/example-template.json", input);
+  res.json(
+    ok(
+      {
+        templateId: input.templateId,
+        templateVersion: input.templateVersion,
+        groups: input.groups.length,
+        items: input.items.length
+      },
+      requestId
+    )
+  );
+});
+
+app.post("/api/v1/rule-sets/import-json", (req, res) => {
+  if (!requireRole(req, res, ["admin"])) {
+    return;
+  }
+  const requestId = randomUUID();
+  const input = req.body;
+  if (!isRuleSetLike(input)) {
+    return fail(res, 40001, "参数错误", [{ field: "ruleSet", reason: "invalid_structure" }]);
+  }
+  saveJsonFile("config/rules/example-rule-set.json", input);
+  res.json(
+    ok(
+      {
+        ruleSetId: input.ruleSetId,
+        ruleVersion: input.ruleVersion,
+        pipelineVersion: input.pipelineVersion
+      },
+      requestId
+    )
+  );
+});
+
+app.post("/api/v1/templates/import-excel", upload.single("file"), (req, res) => {
+  if (!requireRole(req, res, ["admin"])) {
+    return;
+  }
+  const requestId = randomUUID();
+  if (!req.file) {
+    return fail(res, 40001, "参数错误", [{ field: "file", reason: "required" }]);
+  }
+  try {
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+    const templateName = asString(req.body.templateName) || `导入模板-${Date.now()}`;
+    const templateVersion = asString(req.body.templateVersion) || "imported-v1";
+    const sheetHint = asString(req.body.sheetNames) || asString(req.body.sheetName);
+    const parsed = parseTemplateFromWorkbook(workbook, sheetHint, templateName, templateVersion);
+    if (asString(req.body.templateId)) {
+      parsed.templateId = asString(req.body.templateId);
+    }
+    saveJsonFile("config/templates/example-template.json", parsed);
+    res.json(
+      ok(
+        {
+          templateId: parsed.templateId,
+          templateVersion: parsed.templateVersion,
+          groups: parsed.groups.length,
+          items: parsed.items.length,
+          sourceSheets: parsed.sheets?.map((sheet) => sheet.sheetName) || [workbook.SheetNames[0]]
+        },
+        requestId
+      )
+    );
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "parse_failed";
+    fail(res, 40001, "参数错误", [{ field: "file", reason }]);
+  }
+});
+
 app.post("/api/v1/estimates/calculate", (req, res) => {
+  if (!requireRole(req, res, ["admin", "operator"])) {
+    return;
+  }
   const body = req.body as CalculateRequest;
   const template = loadJsonFile<Template>("config/templates/example-template.json");
   const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
@@ -575,28 +730,115 @@ app.post("/api/v1/estimates/calculate", (req, res) => {
 });
 
 app.post("/api/v1/estimates/calculate-and-export", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "operator"])) {
+    return;
+  }
   const body = req.body as CalculateRequest & { exportType?: "excel" | "pdf" };
   const idempotencyKey = String(req.header("Idempotency-Key") || "").trim() || undefined;
   await handleCalculateAndExport(body, res, idempotencyKey);
 });
 
 app.post("/api/v1/estimates/export/excel", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "operator"])) {
+    return;
+  }
   const body = req.body as CalculateRequest;
   const idempotencyKey = String(req.header("Idempotency-Key") || "").trim() || undefined;
   await handleCalculateAndExport({ ...body, exportType: "excel" }, res, idempotencyKey);
 });
 
 app.post("/api/v1/estimates/export/pdf", async (req, res) => {
+  if (!requireRole(req, res, ["admin", "operator"])) {
+    return;
+  }
   const body = req.body as CalculateRequest;
   const idempotencyKey = String(req.header("Idempotency-Key") || "").trim() || undefined;
   await handleCalculateAndExport({ ...body, exportType: "pdf" }, res, idempotencyKey);
 });
 
 app.get("/api/v1/exports/history", (req, res) => {
+  if (!requireRole(req, res, ["admin", "operator"])) {
+    return;
+  }
   const page = Math.max(1, Number(req.query.page || 1));
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize || 20)));
   const data = listExportHistory(page, pageSize);
   res.json(ok({ page, pageSize, ...data }));
+});
+
+app.post("/api/v1/sessions/start", (req, res) => {
+  if (!requireRole(req, res, ["admin", "operator"])) {
+    return;
+  }
+  const { templateId, ruleSetId } = (req.body || {}) as { templateId?: string; ruleSetId?: string };
+  const template = loadJsonFile<Template>("config/templates/example-template.json");
+  const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
+  if (!templateId || !ruleSetId) {
+    return fail(res, 40001, "参数错误", [
+      { field: "templateId", reason: "required" },
+      { field: "ruleSetId", reason: "required" }
+    ]);
+  }
+  if (templateId !== template.templateId || ruleSetId !== ruleSet.ruleSetId) {
+    return fail(res, 40401, "资源不存在", [{ field: "templateId/ruleSetId", reason: "not_found" }]);
+  }
+  cleanupExpiredSessions();
+  const now = Date.now();
+  const sessionId = randomUUID();
+  const ctx: SessionEstimateContext = {
+    sessionId,
+    templateId,
+    ruleSetId,
+    createdAt: now,
+    expiresAt: now + SESSION_TTL_MS
+  };
+  sessionStore.set(sessionId, ctx);
+  res.json(
+    ok({
+      sessionId,
+      templateId,
+      ruleSetId,
+      expiresAt: new Date(ctx.expiresAt).toISOString()
+    })
+  );
+});
+
+app.post("/api/v1/sessions/:sessionId/calculate", (req, res) => {
+  if (!requireRole(req, res, ["admin", "operator"])) {
+    return;
+  }
+  cleanupExpiredSessions();
+  const sessionId = String(req.params.sessionId || "");
+  const session = sessionStore.get(sessionId);
+  if (!session) {
+    return fail(res, 40401, "资源不存在", [{ field: "sessionId", reason: "not_found_or_expired" }]);
+  }
+  const body = req.body as Omit<CalculateRequest, "templateId" | "ruleSetId">;
+  const mergedBody: CalculateRequest = {
+    templateId: session.templateId,
+    ruleSetId: session.ruleSetId,
+    userCount: body.userCount,
+    difficultyFactor: body.difficultyFactor,
+    orgCount: body.orgCount,
+    orgSimilarityFactor: body.orgSimilarityFactor,
+    items: body.items
+  };
+  const template = loadJsonFile<Template>("config/templates/example-template.json");
+  const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
+  const requestId = randomUUID();
+  const validation = validateCalculateRequest(mergedBody, template, ruleSet);
+  if (!validation.ok) {
+    return fail(res, validation.code, validation.message, validation.details);
+  }
+  res.json(
+    ok(
+      {
+        sessionId,
+        ...calculateEstimate(mergedBody, template, ruleSet)
+      },
+      requestId
+    )
+  );
 });
 
 app.get("/downloads/:fileName", (req, res) => {

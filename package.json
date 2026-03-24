@@ -10,6 +10,13 @@
     "dev:web": "npm run dev -w apps/web",
     "dev:api": "npm run dev -w apps/api",
     "build:web": "npm run build -w apps/web",
-    "build:api": "npm run build -w apps/api"
+    "build:api": "npm run build -w apps/api",
+    "rules:standardize": "node scripts/standardize-rules-from-excel.js",
+    "rules:regression": "node scripts/rule-regression-check.js",
+    "rules:excel-report": "node scripts/excel-regression-report.js",
+    "test:api:integration": "node scripts/api-integration-check.js",
+    "test:rules": "npm run test:rules -w apps/api",
+    "test:integration": "npm run test:integration -w apps/api",
+    "test:all": "npm run test:rules && npm run test:integration && npm run rules:regression && npm run rules:excel-report"
   }
 }
