@@ -75,9 +75,28 @@ type TemplateDetail = {
 
 type RuleSetActive = {
   ruleSetId: string;
+  ruleVersion?: string;
+  pipelineVersion?: string;
   baseRule: {
+    userCountTiers: Array<{ min: number; max: number; factor: number }>;
     difficultyFactorList: number[];
   };
+  orgIncrementRule?: {
+    enabled: boolean;
+  };
+};
+
+type RuleSetMeta = {
+  grouping: string[];
+  itemRule: string[];
+  baseRule: {
+    userCountTiers: Array<{ min: number; max: number; factor: number }>;
+    difficultyFactorList: number[];
+  };
+  orgIncrementRule: {
+    enabled: boolean;
+  };
+  pipeline: string[];
 };
 
 const form = ref({
@@ -110,6 +129,8 @@ const templateOptions = ref<TemplateOption[]>([]);
 const difficultyOptions = ref<number[]>([0, 0.1, 0.2, 0.3]);
 const templateDetail = ref<TemplateDetail | null>(null);
 const itemSelection = ref<Record<string, boolean>>({});
+const ruleSetActive = ref<RuleSetActive | null>(null);
+const ruleSetMeta = ref<RuleSetMeta | null>(null);
 
 const payload = computed(() => ({
   templateId: form.value.templateId,
@@ -153,18 +174,23 @@ async function loadInitialOptions() {
   initLoading.value = true;
   initError.value = "";
   try {
-    const [templatesRes, rulesRes] = await Promise.all([
+    const [templatesRes, rulesRes, rulesMetaRes] = await Promise.all([
       fetch("/api/v1/templates"),
-      fetch("/api/v1/rule-sets/active")
+      fetch("/api/v1/rule-sets/active"),
+      fetch("/api/v1/rule-sets/meta")
     ]);
     const templatesPayload = (await templatesRes.json()) as ApiResponse<{ list: TemplateOption[] }>;
     const rulesPayload = (await rulesRes.json()) as ApiResponse<RuleSetActive>;
+    const rulesMetaPayload = (await rulesMetaRes.json()) as ApiResponse<RuleSetMeta>;
 
     if (!templatesRes.ok || templatesPayload.code !== 0) {
       throw new Error(templatesPayload.message || "读取模板列表失败");
     }
     if (!rulesRes.ok || rulesPayload.code !== 0) {
       throw new Error(rulesPayload.message || "读取规则集失败");
+    }
+    if (!rulesMetaRes.ok || rulesMetaPayload.code !== 0) {
+      throw new Error(rulesMetaPayload.message || "读取规则元信息失败");
     }
 
     templateOptions.value = templatesPayload.data.list || [];
@@ -173,6 +199,8 @@ async function loadInitialOptions() {
       await loadTemplateDetail(form.value.templateId);
     }
     form.value.ruleSetId = rulesPayload.data.ruleSetId;
+    ruleSetActive.value = rulesPayload.data;
+    ruleSetMeta.value = rulesMetaPayload.data;
     if (Array.isArray(rulesPayload.data.baseRule?.difficultyFactorList)) {
       difficultyOptions.value = rulesPayload.data.baseRule.difficultyFactorList;
       if (!difficultyOptions.value.includes(form.value.difficultyFactor)) {
@@ -410,6 +438,46 @@ onMounted(() => {
           <input v-model.number="form.orgSimilarityFactor" type="number" min="0" max="1" step="0.1" />
         </label>
       </div>
+
+      <section class="result">
+        <h2>规则配置摘要（只读）</h2>
+        <p class="meta" v-if="ruleSetActive">
+          ruleSetId={{ ruleSetActive.ruleSetId }} | ruleVersion={{ ruleSetActive.ruleVersion || "-" }} |
+          pipelineVersion={{ ruleSetActive.pipelineVersion || "-" }}
+        </p>
+        <p v-if="!ruleSetMeta" class="meta">规则配置加载中...</p>
+        <div v-else class="split">
+          <div class="result-card">
+            <h3>执行 Pipeline</h3>
+            <ul class="history-list compact">
+              <li v-for="step in ruleSetMeta.pipeline" :key="step">
+                <span>{{ step }}</span>
+              </li>
+            </ul>
+          </div>
+          <div class="result-card">
+            <h3>用户分段规则</h3>
+            <ul class="history-list compact">
+              <li v-for="tier in ruleSetMeta.baseRule.userCountTiers" :key="`${tier.min}-${tier.max}`">
+                <span>{{ tier.min }}-{{ tier.max }}</span>
+                <span class="meta">系数 {{ tier.factor }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div v-if="ruleSetMeta" class="split">
+          <div class="result-card">
+            <h3>难度系数枚举</h3>
+            <p class="meta">{{ ruleSetMeta.baseRule.difficultyFactorList.join(", ") }}</p>
+          </div>
+          <div class="result-card">
+            <h3>多组织规则</h3>
+            <p class="meta">orgIncrementRule.enabled = {{ ruleSetMeta.orgIncrementRule.enabled ? "true" : "false" }}</p>
+            <p class="meta">grouping: {{ ruleSetMeta.grouping.join(" | ") }}</p>
+            <p class="meta">itemRule: {{ ruleSetMeta.itemRule.join(" | ") }}</p>
+          </div>
+        </div>
+      </section>
 
       <section class="result">
         <div class="history-head">
