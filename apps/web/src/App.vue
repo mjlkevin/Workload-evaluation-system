@@ -258,10 +258,15 @@ async function calculateAndExport(exportType: "excel" | "pdf") {
   exporting.value = true;
   error.value = "";
   try {
+    const exportPayload = { ...payload.value, exportType };
+    const idempotencyKey = await buildIdempotencyKey(exportPayload);
     const response = await fetch("/api/v1/estimates/calculate-and-export", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload.value, exportType })
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey
+      },
+      body: JSON.stringify(exportPayload)
     });
     const data = (await response.json()) as ApiResponse<ExportResult>;
     if (!response.ok || data.code !== 0) {
@@ -276,6 +281,16 @@ async function calculateAndExport(exportType: "excel" | "pdf") {
   } finally {
     exporting.value = false;
   }
+}
+
+async function buildIdempotencyKey(input: unknown): Promise<string> {
+  const normalized = JSON.stringify(input);
+  const bytes = new TextEncoder().encode(normalized);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const hashHex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `export-${hashHex.slice(0, 32)}`;
 }
 
 async function copyText(text: string, successText: string) {
