@@ -1,0 +1,24 @@
+{
+  "ruleSetId": "rules-demo-001",
+  "ruleVersion": "2026.03.1",
+  "pipelineVersion": "2026.03.1",
+  "pipeline": ["grouping", "itemRule", "baseRule", "orgIncrementRule"],
+  "baseRule": {
+    "userCountTiers": [
+      {
+        "min": 0,
+        "max": 90,
+        "factor": 0
+      },
+      {
+        "min": 91,
+        "max": 130,
+        "factor": 0.15
+      }
+    ],
+    "difficultyFactorList": [0, 0.1, 0.2, 0.3]
+  },
+  "orgIncrementRule": {
+    "enabled": true
+  }
+}

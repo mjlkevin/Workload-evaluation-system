@@ -1,0 +1,20 @@
+{
+  "templateId": "tmpl-demo-001",
+  "templateVersion": "2026.03",
+  "templateName": "示例模板-模块报价",
+  "templateType": "module",
+  "groups": [
+    {
+      "groupId": "grp-finance",
+      "groupName": "财务云"
+    }
+  ],
+  "items": [
+    {
+      "templateItemId": "item-finance-voucher",
+      "groupId": "grp-finance",
+      "itemName": "凭证管理",
+      "standardDays": 8
+    }
+  ]
+}

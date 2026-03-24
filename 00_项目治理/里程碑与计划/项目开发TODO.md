@@ -37,7 +37,7 @@
 - [ ] 输出结果页原型（总计、增量拆解、对比分析）
 
 ## 4. 开发实现（MVP）
-- [ ] 初始化代码仓（Monorepo 或前后端分离）
+- [x] 初始化代码仓（已本地初始化 Git、接入 GitHub 远程并完成 main 首次推送）
 - [ ] 完成模板/规则导入能力（从 Excel 或 JSON）
 - [ ] 完成估算计算引擎
 - [ ] 完成规则引擎 pipeline 化（grouping/item/base/orgIncrement 可配置）
