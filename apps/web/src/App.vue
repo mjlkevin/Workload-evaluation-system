@@ -10,6 +10,9 @@ type ApiResponse<T> = {
 };
 
 type CalculateResult = {
+  templateId: string;
+  ruleSetId: string;
+  templateVersion: string;
   baseDays: number;
   userIncrementDays: number;
   difficultyIncrementDays: number;
@@ -17,6 +20,18 @@ type CalculateResult = {
   totalDays: number;
   ruleVersion: string;
   pipelineVersion: string;
+  groupSubtotals: Array<{ groupId: string; groupName: string; subtotalDays: number }>;
+  itemResults: Array<{
+    templateItemId: string;
+    included: boolean;
+    standardDays: number;
+    itemSubtotalDays: number;
+  }>;
+  calculationBreakdown: {
+    userCountTier: { hitRange: string; factor: number; incrementDays: number };
+    difficulty: { factor: number; incrementDays: number };
+    organization: { orgCount: number; similarityFactor: number; incrementDays: number };
+  };
 };
 
 type ExportResult = {
@@ -81,8 +96,11 @@ const historyLoading = ref(false);
 const historyLoadingMore = ref(false);
 const error = ref("");
 const initError = ref("");
+const actionMessage = ref("");
 const result = ref<CalculateResult | null>(null);
+const calculateRequestId = ref("");
 const exportInfo = ref<ExportResult | null>(null);
+const exportRequestId = ref("");
 const exportHistory = ref<ExportHistoryItem[]>([]);
 const historyError = ref("");
 const historyPage = ref(1);
@@ -122,6 +140,7 @@ async function calculate() {
       throw new Error(data.message || "计算失败");
     }
     result.value = data.data;
+    calculateRequestId.value = data.requestId || "";
   } catch (err) {
     result.value = null;
     error.value = err instanceof Error ? err.message : "计算失败";
@@ -221,6 +240,7 @@ async function calculateAndExport(exportType: "excel" | "pdf") {
       throw new Error(data.message || "导出失败");
     }
     exportInfo.value = data.data;
+    exportRequestId.value = data.requestId || "";
     await loadExportHistory(true);
     window.open(data.data.downloadUrl, "_blank");
   } catch (err) {
@@ -228,6 +248,32 @@ async function calculateAndExport(exportType: "excel" | "pdf") {
   } finally {
     exporting.value = false;
   }
+}
+
+async function copyText(text: string, successText: string) {
+  if (!text) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    actionMessage.value = successText;
+    setTimeout(() => {
+      actionMessage.value = "";
+    }, 1800);
+  } catch (_err) {
+    actionMessage.value = "复制失败，请手动复制";
+  }
+}
+
+async function copyResultJson() {
+  if (!result.value) {
+    return;
+  }
+  const payload = {
+    requestId: calculateRequestId.value || undefined,
+    result: result.value
+  };
+  await copyText(JSON.stringify(payload, null, 2), "结果 JSON 已复制");
 }
 
 function formatBytes(size: number): string {
@@ -314,6 +360,12 @@ const groupPreviewRows = computed(() =>
 const localBasePreview = computed(() =>
   groupPreviewRows.value.reduce((sum, row) => sum + row.subtotalDays, 0)
 );
+const includedItemResults = computed(
+  () => result.value?.itemResults.filter((item) => item.included) ?? []
+);
+function getTemplateItemName(templateItemId: string): string {
+  return templateDetail.value?.items.find((item) => item.templateItemId === templateItemId)?.itemName || templateItemId;
+}
 
 onMounted(() => {
   void loadInitialOptions();
@@ -410,15 +462,83 @@ onMounted(() => {
       </div>
 
       <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="actionMessage" class="meta">{{ actionMessage }}</p>
 
       <section v-if="result" class="result">
         <h2>计算结果</h2>
-        <p>总人天：<strong>{{ result.totalDays }}</strong></p>
-        <p>基础人天：{{ result.baseDays }}</p>
-        <p>用户增量：{{ result.userIncrementDays }}</p>
-        <p>难度增量：{{ result.difficultyIncrementDays }}</p>
-        <p>组织增量：{{ result.orgIncrementDays }}</p>
-        <p class="meta">ruleVersion: {{ result.ruleVersion }} | pipelineVersion: {{ result.pipelineVersion }}</p>
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="meta">总人天</span>
+            <strong>{{ result.totalDays }}</strong>
+          </div>
+          <div class="kpi-card">
+            <span class="meta">基础人天</span>
+            <strong>{{ result.baseDays }}</strong>
+          </div>
+          <div class="kpi-card">
+            <span class="meta">用户增量</span>
+            <strong>{{ result.userIncrementDays }}</strong>
+          </div>
+          <div class="kpi-card">
+            <span class="meta">难度增量</span>
+            <strong>{{ result.difficultyIncrementDays }}</strong>
+          </div>
+          <div class="kpi-card">
+            <span class="meta">组织增量</span>
+            <strong>{{ result.orgIncrementDays }}</strong>
+          </div>
+        </div>
+        <p class="meta">
+          template={{ result.templateId }}@{{ result.templateVersion }} | rule={{ result.ruleVersion }} | pipeline={{
+            result.pipelineVersion
+          }}
+        </p>
+        <div class="inline-actions">
+          <p v-if="calculateRequestId" class="meta">requestId: {{ calculateRequestId }}</p>
+          <button v-if="calculateRequestId" class="link-btn" @click="copyText(calculateRequestId, 'requestId 已复制')">
+            复制 requestId
+          </button>
+          <button class="link-btn" @click="copyResultJson">复制 JSON</button>
+        </div>
+
+        <div class="split">
+          <div class="result-card">
+            <h3>增量解释</h3>
+            <p class="meta">
+              用户分段：{{ result.calculationBreakdown.userCountTier.hitRange }}，系数
+              {{ result.calculationBreakdown.userCountTier.factor }}，增量
+              {{ result.calculationBreakdown.userCountTier.incrementDays }}
+            </p>
+            <p class="meta">
+              难度系数：{{ result.calculationBreakdown.difficulty.factor }}，增量
+              {{ result.calculationBreakdown.difficulty.incrementDays }}
+            </p>
+            <p class="meta">
+              组织：{{ result.calculationBreakdown.organization.orgCount }} 个，相似度
+              {{ result.calculationBreakdown.organization.similarityFactor }}，增量
+              {{ result.calculationBreakdown.organization.incrementDays }}
+            </p>
+          </div>
+          <div class="result-card">
+            <h3>分组小计</h3>
+            <ul class="history-list compact">
+              <li v-for="group in result.groupSubtotals" :key="group.groupId">
+                <span>{{ group.groupName }}</span>
+                <span class="meta">{{ group.subtotalDays }} 人天</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="result-card">
+          <h3>已选条目明细</h3>
+          <ul class="history-list compact">
+            <li v-for="item in includedItemResults" :key="item.templateItemId">
+              <span>{{ getTemplateItemName(item.templateItemId) }}</span>
+              <span class="meta">{{ item.itemSubtotalDays }} 人天（标准 {{ item.standardDays }}）</span>
+            </li>
+          </ul>
+        </div>
       </section>
 
       <section v-if="exportInfo" class="result">
@@ -429,6 +549,12 @@ onMounted(() => {
           <a :href="exportInfo.downloadUrl" target="_blank">{{ exportInfo.downloadUrl }}</a>
         </p>
         <p class="meta">过期时间：{{ exportInfo.expireAt }}</p>
+        <div class="inline-actions">
+          <p v-if="exportRequestId" class="meta">requestId: {{ exportRequestId }}</p>
+          <button v-if="exportRequestId" class="link-btn" @click="copyText(exportRequestId, 'requestId 已复制')">
+            复制 requestId
+          </button>
+        </div>
       </section>
 
       <section class="result">
@@ -647,5 +773,46 @@ h3 {
 
 .compact {
   margin-top: 6px;
+}
+
+.inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.kpi-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpi-card strong {
+  font-size: 18px;
+}
+
+.split {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.result-card {
+  margin-top: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
 }
 </style>

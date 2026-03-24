@@ -98,8 +98,8 @@ function loadJsonFile<T>(relativePath: string): T {
   throw new Error(`Config file not found: ${relativePath}`);
 }
 
-function ok(data: unknown) {
-  return { code: 0, message: "ok", data };
+function ok(data: unknown, requestId?: string) {
+  return requestId ? { code: 0, message: "ok", data, requestId } : { code: 0, message: "ok", data };
 }
 
 function fail(
@@ -276,6 +276,7 @@ async function handleCalculateAndExport(
   body: CalculateRequest & { exportType?: "excel" | "pdf" },
   res: express.Response
 ): Promise<void> {
+  const requestId = randomUUID();
   const template = loadJsonFile<Template>("config/templates/example-template.json");
   const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
   const validation = validateCalculateRequest(body, template, ruleSet);
@@ -294,7 +295,7 @@ async function handleCalculateAndExport(
       totalDays: result.totalDays,
       downloadUrl: `/downloads/${fileName}`,
       expireAt
-    })
+    }, requestId)
   );
 }
 
@@ -492,12 +493,13 @@ app.post("/api/v1/estimates/calculate", (req, res) => {
   const body = req.body as CalculateRequest;
   const template = loadJsonFile<Template>("config/templates/example-template.json");
   const ruleSet = loadJsonFile<RuleSet>("config/rules/example-rule-set.json");
+  const requestId = randomUUID();
 
   const validation = validateCalculateRequest(body, template, ruleSet);
   if (!validation.ok) {
     return fail(res, validation.code, validation.message, validation.details);
   }
-  res.json(ok(calculateEstimate(body, template, ruleSet)));
+  res.json(ok(calculateEstimate(body, template, ruleSet), requestId));
 });
 
 app.post("/api/v1/estimates/calculate-and-export", async (req, res) => {
