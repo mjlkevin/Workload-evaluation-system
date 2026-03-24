@@ -281,6 +281,8 @@ sequenceDiagram
 ## 10. 幂等与并发建议
 
 - 关键导出接口支持 `Idempotency-Key`，避免重复导出。
+- 同一 `Idempotency-Key` + 相同请求体：返回相同 `downloadUrl` 与同一 `requestId`（幂等重放）。
+- 同一 `Idempotency-Key` + 不同请求体：返回 `40001`，`details.reason=payload_conflict`。
 - 导出支持同步返回（小文件）和异步返回（大文件）两种模式。
 
 ## 11. Agent 兼容要求（V1）
@@ -326,7 +328,8 @@ sequenceDiagram
 - `userCount`：整数，`>= 0`
 - `orgCount`：整数，`>= 0`
 - `difficultyFactor`、`orgSimilarityFactor`：须与当前 `rule-sets/active` 中枚举一致，否则 `40003`
-- `items[]`：须覆盖模板内全部可选项或按约定子集（以模板定义为准），缺失项按 `42201` 处理
+- `items[]`：当前实现要求**完整覆盖模板条目**；缺失条目返回 `42201`（`missing_item_ids:*`）。
+- `items[]`：若包含模板中不存在的 `templateItemId`，返回 `40001`（`unknown_item_ids:*`）。
 - 规则执行由 `pipeline` 决定，不允许前端自行指定执行顺序
 
 ### 12.3 权威结果
@@ -356,7 +359,7 @@ sequenceDiagram
 - Base URL：`/api/v1`；请求/响应体：`application/json`；时间：ISO-8601（UTC）；列表分页：`page` / `pageSize`（§1）。
 
 ### 14.2 响应与可观测性
-- 成功：`code`、`message`、`data`（§2.1）。
+- 成功：`code`、`message`、`data`；`calculate` 与导出成功响应建议/当前实现也返回 `requestId` 便于端到端追踪。
 - 失败：`code`、`message`、可选 `details[]`、**`requestId`**（§2.2）；与 Agent 排障要求一致（§11）。
 
 ### 14.3 核心端点分组
@@ -373,6 +376,7 @@ sequenceDiagram
 
 ### 14.5 幂等、导出模式与 TTL
 - 导出类接口支持请求头 **`Idempotency-Key`**；支持同步返回与小文件、异步与大文件两种模式（§10）。
+- 幂等键建议由前端在“点击导出”时生成并复用到重试请求；不要跨不同业务参数复用同一键。
 - 下载文件默认 TTL 7 天，环境变量 `EXPORT_FILE_TTL_DAYS` 可配（§12.5）。
 
 ### 14.6 OpenAPI 与 Agent 工具描述
