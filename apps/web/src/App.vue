@@ -32,21 +32,55 @@ type ExportHistoryItem = {
   downloadUrl: string;
 };
 
+type TemplateOption = {
+  templateId: string;
+  templateVersion: string;
+  templateName: string;
+};
+
+type TemplateGroup = {
+  groupId: string;
+  groupName: string;
+};
+
+type TemplateItem = {
+  templateItemId: string;
+  groupId: string;
+  itemName: string;
+  standardDays: number;
+};
+
+type TemplateDetail = {
+  templateId: string;
+  templateVersion: string;
+  templateName: string;
+  groups: TemplateGroup[];
+  items: TemplateItem[];
+};
+
+type RuleSetActive = {
+  ruleSetId: string;
+  baseRule: {
+    difficultyFactorList: number[];
+  };
+};
+
 const form = ref({
   templateId: "tmpl-demo-001",
   ruleSetId: "rules-demo-001",
   userCount: 120,
   difficultyFactor: 0.2,
   orgCount: 3,
-  orgSimilarityFactor: 0.6,
-  included: true
+  orgSimilarityFactor: 0.6
 });
 
 const loading = ref(false);
 const exporting = ref(false);
+const initLoading = ref(false);
 const historyLoading = ref(false);
 const historyLoadingMore = ref(false);
 const error = ref("");
+const initError = ref("");
 const result = ref<CalculateResult | null>(null);
 const exportInfo = ref<ExportResult | null>(null);
 const exportHistory = ref<ExportHistoryItem[]>([]);
@@ -54,6 +88,10 @@ const historyError = ref("");
 const historyPage = ref(1);
 const historyPageSize = ref(8);
 const historyTotal = ref(0);
+const templateOptions = ref<TemplateOption[]>([]);
+const difficultyOptions = ref<number[]>([0, 0.1, 0.2, 0.3]);
+const templateDetail = ref<TemplateDetail | null>(null);
+const itemSelection = ref<Record<string, boolean>>({});
 
 const payload = computed(() => ({
   templateId: form.value.templateId,
@@ -62,7 +100,11 @@ const payload = computed(() => ({
   difficultyFactor: Number(form.value.difficultyFactor),
   orgCount: Number(form.value.orgCount),
   orgSimilarityFactor: Number(form.value.orgSimilarityFactor),
-  items: [{ templateItemId: "item-finance-voucher", included: form.value.included }]
+  items:
+    templateDetail.value?.items.map((item) => ({
+      templateItemId: item.templateItemId,
+      included: itemSelection.value[item.templateItemId] ?? false
+    })) ?? []
 }));
 
 async function calculate() {
@@ -86,6 +128,83 @@ async function calculate() {
   } finally {
     loading.value = false;
   }
+}
+
+async function loadInitialOptions() {
+  initLoading.value = true;
+  initError.value = "";
+  try {
+    const [templatesRes, rulesRes] = await Promise.all([
+      fetch("/api/v1/templates"),
+      fetch("/api/v1/rule-sets/active")
+    ]);
+    const templatesPayload = (await templatesRes.json()) as ApiResponse<{ list: TemplateOption[] }>;
+    const rulesPayload = (await rulesRes.json()) as ApiResponse<RuleSetActive>;
+
+    if (!templatesRes.ok || templatesPayload.code !== 0) {
+      throw new Error(templatesPayload.message || "读取模板列表失败");
+    }
+    if (!rulesRes.ok || rulesPayload.code !== 0) {
+      throw new Error(rulesPayload.message || "读取规则集失败");
+    }
+
+    templateOptions.value = templatesPayload.data.list || [];
+    if (templateOptions.value.length > 0) {
+      form.value.templateId = templateOptions.value[0].templateId;
+      await loadTemplateDetail(form.value.templateId);
+    }
+    form.value.ruleSetId = rulesPayload.data.ruleSetId;
+    if (Array.isArray(rulesPayload.data.baseRule?.difficultyFactorList)) {
+      difficultyOptions.value = rulesPayload.data.baseRule.difficultyFactorList;
+      if (!difficultyOptions.value.includes(form.value.difficultyFactor)) {
+        form.value.difficultyFactor = difficultyOptions.value[0] ?? 0;
+      }
+    }
+  } catch (err) {
+    initError.value = err instanceof Error ? err.message : "初始化失败";
+  } finally {
+    initLoading.value = false;
+  }
+}
+
+async function loadTemplateDetail(templateId: string) {
+  const response = await fetch(`/api/v1/templates/${templateId}`);
+  const payload = (await response.json()) as ApiResponse<TemplateDetail>;
+  if (!response.ok || payload.code !== 0) {
+    throw new Error(payload.message || "读取模板详情失败");
+  }
+  templateDetail.value = payload.data;
+  const nextSelection: Record<string, boolean> = {};
+  for (const item of payload.data.items) {
+    // Default checked to keep behavior close to spreadsheet baseline.
+    nextSelection[item.templateItemId] = true;
+  }
+  itemSelection.value = nextSelection;
+}
+
+async function onTemplateChange() {
+  initError.value = "";
+  initLoading.value = true;
+  try {
+    await loadTemplateDetail(form.value.templateId);
+    result.value = null;
+    exportInfo.value = null;
+  } catch (err) {
+    initError.value = err instanceof Error ? err.message : "读取模板详情失败";
+  } finally {
+    initLoading.value = false;
+  }
+}
+
+function selectAllItems(checked: boolean) {
+  if (!templateDetail.value) {
+    return;
+  }
+  const nextSelection: Record<string, boolean> = {};
+  for (const item of templateDetail.value.items) {
+    nextSelection[item.templateItemId] = checked;
+  }
+  itemSelection.value = nextSelection;
 }
 
 async function calculateAndExport(exportType: "excel" | "pdf") {
@@ -164,8 +283,40 @@ async function refreshExportHistory() {
 }
 
 const hasMoreHistory = computed(() => exportHistory.value.length < historyTotal.value);
+const selectedItemCount = computed(
+  () => Object.values(itemSelection.value).filter(Boolean).length
+);
+const groupedTemplateItems = computed(() => {
+  if (!templateDetail.value) {
+    return [];
+  }
+  return templateDetail.value.groups.map((group) => ({
+    groupId: group.groupId,
+    groupName: group.groupName,
+    items: templateDetail.value?.items.filter((item) => item.groupId === group.groupId) ?? []
+  }));
+});
+const groupPreviewRows = computed(() =>
+  groupedTemplateItems.value.map((group) => {
+    const selectedCount = group.items.filter((item) => itemSelection.value[item.templateItemId]).length;
+    const subtotalDays = group.items.reduce((sum, item) => {
+      return sum + (itemSelection.value[item.templateItemId] ? item.standardDays : 0);
+    }, 0);
+    return {
+      groupId: group.groupId,
+      groupName: group.groupName,
+      selectedCount,
+      totalCount: group.items.length,
+      subtotalDays
+    };
+  })
+);
+const localBasePreview = computed(() =>
+  groupPreviewRows.value.reduce((sum, row) => sum + row.subtotalDays, 0)
+);
 
 onMounted(() => {
+  void loadInitialOptions();
   void loadExportHistory(true);
 });
 </script>
@@ -175,18 +326,30 @@ onMounted(() => {
     <section class="card">
       <h1>工作量评估系统</h1>
       <p class="subtitle">Calendly 风格录入页（最小闭环）</p>
+      <p v-if="initError" class="error">{{ initError }}</p>
 
       <div class="grid">
-        <label>模板 ID<input v-model="form.templateId" /></label>
-        <label>规则集 ID<input v-model="form.ruleSetId" /></label>
+        <label>
+          模板
+          <select
+            v-model="form.templateId"
+            :disabled="initLoading || templateOptions.length === 0"
+            @change="onTemplateChange"
+          >
+            <option v-for="item in templateOptions" :key="item.templateId" :value="item.templateId">
+              {{ item.templateName }} ({{ item.templateVersion }})
+            </option>
+          </select>
+        </label>
+        <label>
+          规则集 ID
+          <input v-model="form.ruleSetId" :disabled="initLoading" />
+        </label>
         <label>用户数<input v-model.number="form.userCount" type="number" min="0" /></label>
         <label>
           难度系数
           <select v-model.number="form.difficultyFactor">
-            <option :value="0">0</option>
-            <option :value="0.1">0.1</option>
-            <option :value="0.2">0.2</option>
-            <option :value="0.3">0.3</option>
+            <option v-for="item in difficultyOptions" :key="item" :value="item">{{ item }}</option>
           </select>
         </label>
         <label>组织数<input v-model.number="form.orgCount" type="number" min="0" /></label>
@@ -196,19 +359,52 @@ onMounted(() => {
         </label>
       </div>
 
-      <label class="checkbox">
-        <input v-model="form.included" type="checkbox" />
-        包含“凭证管理”条目
-      </label>
+      <section class="result">
+        <div class="history-head">
+          <h2>模板条目勾选</h2>
+          <div class="actions">
+            <button class="link-btn" @click="selectAllItems(true)">全选</button>
+            <button class="link-btn" @click="selectAllItems(false)">全不选</button>
+          </div>
+        </div>
+        <p class="meta">
+          已勾选 {{ selectedItemCount }} / {{ templateDetail?.items.length ?? 0 }} 项
+        </p>
+        <p v-if="!templateDetail" class="meta">暂无模板条目</p>
+        <div v-else class="group-list">
+          <div v-for="group in groupedTemplateItems" :key="group.groupId" class="group-card">
+            <h3>{{ group.groupName }}</h3>
+            <label v-for="item in group.items" :key="item.templateItemId" class="checkbox row">
+              <span class="left">
+                <input v-model="itemSelection[item.templateItemId]" type="checkbox" />
+                {{ item.itemName }}
+              </span>
+              <span class="meta">{{ item.standardDays }} 人天</span>
+            </label>
+          </div>
+        </div>
+        <div v-if="groupPreviewRows.length > 0" class="preview-card">
+          <h3>本地实时预览（未叠加增量规则）</h3>
+          <p class="meta">基础人天预估：{{ localBasePreview }}</p>
+          <ul class="history-list compact">
+            <li v-for="row in groupPreviewRows" :key="row.groupId">
+              <span>{{ row.groupName }}</span>
+              <span class="meta">
+                {{ row.selectedCount }}/{{ row.totalCount }} 项 · 小计 {{ row.subtotalDays }} 人天
+              </span>
+            </li>
+          </ul>
+        </div>
+      </section>
 
-      <button class="btn" :disabled="loading" @click="calculate">
+      <button class="btn" :disabled="loading || initLoading" @click="calculate">
         {{ loading ? "计算中..." : "计算人天" }}
       </button>
       <div class="actions">
-        <button class="btn secondary" :disabled="exporting" @click="calculateAndExport('excel')">
+        <button class="btn secondary" :disabled="exporting || initLoading" @click="calculateAndExport('excel')">
           {{ exporting ? "导出中..." : "计算并导出 Excel" }}
         </button>
-        <button class="btn ghost" :disabled="exporting" @click="calculateAndExport('pdf')">
+        <button class="btn ghost" :disabled="exporting || initLoading" @click="calculateAndExport('pdf')">
           {{ exporting ? "导出中..." : "计算并导出 PDF" }}
         </button>
       </div>
@@ -411,5 +607,45 @@ h2 {
   color: #0b57d0;
   text-decoration: none;
   margin-right: 8px;
+}
+
+.group-list {
+  display: grid;
+  gap: 10px;
+}
+
+.group-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.row {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin: 6px 0;
+}
+
+.left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-card {
+  margin-top: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.compact {
+  margin-top: 6px;
 }
 </style>
