@@ -1,8 +1,166 @@
+<script setup lang="ts">
+import { computed, ref } from "vue";
+
+type ApiResponse<T> = {
+  code: number;
+  message: string;
+  data: T;
+  details?: Array<{ field: string; reason: string }>;
+  requestId?: string;
+};
+
+type CalculateResult = {
+  baseDays: number;
+  userIncrementDays: number;
+  difficultyIncrementDays: number;
+  orgIncrementDays: number;
+  totalDays: number;
+  ruleVersion: string;
+  pipelineVersion: string;
+};
+
+type ExportResult = {
+  totalDays: number;
+  downloadUrl: string;
+  expireAt: string;
+};
+
+const form = ref({
+  templateId: "tmpl-demo-001",
+  ruleSetId: "rules-demo-001",
+  userCount: 120,
+  difficultyFactor: 0.2,
+  orgCount: 3,
+  orgSimilarityFactor: 0.6,
+  included: true
+});
+
+const loading = ref(false);
+const exporting = ref(false);
+const error = ref("");
+const result = ref<CalculateResult | null>(null);
+const exportInfo = ref<ExportResult | null>(null);
+
+const payload = computed(() => ({
+  templateId: form.value.templateId,
+  ruleSetId: form.value.ruleSetId,
+  userCount: Number(form.value.userCount),
+  difficultyFactor: Number(form.value.difficultyFactor),
+  orgCount: Number(form.value.orgCount),
+  orgSimilarityFactor: Number(form.value.orgSimilarityFactor),
+  items: [{ templateItemId: "item-finance-voucher", included: form.value.included }]
+}));
+
+async function calculate() {
+  loading.value = true;
+  error.value = "";
+  exportInfo.value = null;
+  try {
+    const response = await fetch("/api/v1/estimates/calculate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload.value)
+    });
+    const data = (await response.json()) as ApiResponse<CalculateResult>;
+    if (!response.ok || data.code !== 0) {
+      throw new Error(data.message || "计算失败");
+    }
+    result.value = data.data;
+  } catch (err) {
+    result.value = null;
+    error.value = err instanceof Error ? err.message : "计算失败";
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function calculateAndExport(exportType: "excel" | "pdf") {
+  exporting.value = true;
+  error.value = "";
+  try {
+    const response = await fetch("/api/v1/estimates/calculate-and-export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload.value, exportType })
+    });
+    const data = (await response.json()) as ApiResponse<ExportResult>;
+    if (!response.ok || data.code !== 0) {
+      throw new Error(data.message || "导出失败");
+    }
+    exportInfo.value = data.data;
+    window.open(data.data.downloadUrl, "_blank");
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "导出失败";
+  } finally {
+    exporting.value = false;
+  }
+}
+</script>
+
 <template>
   <main class="page">
     <section class="card">
       <h1>工作量评估系统</h1>
-      <p>前端骨架已初始化（Vue 3 + Vite）。</p>
+      <p class="subtitle">Calendly 风格录入页（最小闭环）</p>
+
+      <div class="grid">
+        <label>模板 ID<input v-model="form.templateId" /></label>
+        <label>规则集 ID<input v-model="form.ruleSetId" /></label>
+        <label>用户数<input v-model.number="form.userCount" type="number" min="0" /></label>
+        <label>
+          难度系数
+          <select v-model.number="form.difficultyFactor">
+            <option :value="0">0</option>
+            <option :value="0.1">0.1</option>
+            <option :value="0.2">0.2</option>
+            <option :value="0.3">0.3</option>
+          </select>
+        </label>
+        <label>组织数<input v-model.number="form.orgCount" type="number" min="0" /></label>
+        <label>
+          组织相似度
+          <input v-model.number="form.orgSimilarityFactor" type="number" min="0" max="1" step="0.1" />
+        </label>
+      </div>
+
+      <label class="checkbox">
+        <input v-model="form.included" type="checkbox" />
+        包含“凭证管理”条目
+      </label>
+
+      <button class="btn" :disabled="loading" @click="calculate">
+        {{ loading ? "计算中..." : "计算人天" }}
+      </button>
+      <div class="actions">
+        <button class="btn secondary" :disabled="exporting" @click="calculateAndExport('excel')">
+          {{ exporting ? "导出中..." : "计算并导出 Excel" }}
+        </button>
+        <button class="btn ghost" :disabled="exporting" @click="calculateAndExport('pdf')">
+          {{ exporting ? "导出中..." : "计算并导出 PDF" }}
+        </button>
+      </div>
+
+      <p v-if="error" class="error">{{ error }}</p>
+
+      <section v-if="result" class="result">
+        <h2>计算结果</h2>
+        <p>总人天：<strong>{{ result.totalDays }}</strong></p>
+        <p>基础人天：{{ result.baseDays }}</p>
+        <p>用户增量：{{ result.userIncrementDays }}</p>
+        <p>难度增量：{{ result.difficultyIncrementDays }}</p>
+        <p>组织增量：{{ result.orgIncrementDays }}</p>
+        <p class="meta">ruleVersion: {{ result.ruleVersion }} | pipelineVersion: {{ result.pipelineVersion }}</p>
+      </section>
+
+      <section v-if="exportInfo" class="result">
+        <h2>导出结果</h2>
+        <p>总人天：{{ exportInfo.totalDays }}</p>
+        <p>
+          下载链接：
+          <a :href="exportInfo.downloadUrl" target="_blank">{{ exportInfo.downloadUrl }}</a>
+        </p>
+        <p class="meta">过期时间：{{ exportInfo.expireAt }}</p>
+      </section>
     </section>
   </main>
 </template>
@@ -11,30 +169,117 @@
 .page {
   min-height: 100vh;
   margin: 0;
-  display: grid;
-  place-items: center;
+  padding: 24px;
   background: #f8fafc;
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #0f172a;
 }
 
 .card {
-  width: min(640px, 92vw);
-  background: #ffffff;
+  width: min(780px, 96vw);
+  margin: 0 auto;
+  background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  padding: 28px;
+  padding: 24px;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
 }
 
 h1 {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 28px;
-  line-height: 1.2;
 }
 
-p {
-  margin: 0;
+.subtitle {
+  margin: 6px 0 20px;
   color: #475569;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+input,
+select {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.checkbox {
+  margin: 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox input {
+  width: 16px;
+  height: 16px;
+}
+
+.btn {
+  border: 0;
+  border-radius: 10px;
+  background: #0b57d0;
+  color: #fff;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.secondary {
+  background: #2563eb;
+}
+
+.ghost {
+  background: #0f172a;
+}
+
+.error {
+  margin: 12px 0 0;
+  color: #b42318;
+}
+
+.result {
+  margin-top: 18px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.result p {
+  margin: 6px 0;
+}
+
+.meta {
+  color: #64748b;
+  font-size: 13px;
 }
 </style>
