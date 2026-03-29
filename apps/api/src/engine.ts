@@ -39,6 +39,7 @@ export type CalculateRequest = {
   items: Array<{
     templateItemId: string;
     included: boolean;
+    customStandardDays?: number;
   }>;
 };
 
@@ -63,6 +64,7 @@ export type EstimateResult = {
     templateItemId: string;
     included: boolean;
     standardDays: number;
+    effectiveStandardDays: number;
     itemSubtotalDays: number;
   }>;
 };
@@ -160,6 +162,19 @@ export function validateCalculateRequest(
       details: [{ field: "items", reason: `unknown_item_ids:${unknownItems.join(",")}` }]
     };
   }
+  const invalidCustomDays = body.items.filter(
+    (item) =>
+      item.customStandardDays !== undefined &&
+      (!Number.isFinite(item.customStandardDays) || Number(item.customStandardDays) < 0)
+  );
+  if (invalidCustomDays.length > 0) {
+    return {
+      ok: false,
+      code: 40001,
+      message: "参数错误",
+      details: [{ field: "items.customStandardDays", reason: "must_be_non_negative_number" }]
+    };
+  }
   const missingItems = template.items
     .filter((item) => !requestItemIds.has(item.templateItemId))
     .map((item) => item.templateItemId);
@@ -178,14 +193,21 @@ export function validateCalculateRequest(
 export function calculateEstimate(body: CalculateRequest, template: Template, ruleSet: RuleSet): EstimateResult {
   const hasStage = (stage: string) => ruleSet.pipeline.includes(stage);
   const selectedMap = new Map<string, boolean>(body.items.map((item) => [item.templateItemId, Boolean(item.included)]));
+  const customDaysMap = new Map<string, number>(
+    body.items
+      .filter((item) => item.customStandardDays !== undefined)
+      .map((item) => [item.templateItemId, round1(Number(item.customStandardDays))])
+  );
   const itemResults = template.items.map((item) => {
     const itemRuleEnabled = hasStage("itemRule");
     const included = selectedMap.get(item.templateItemId) ?? false;
+    const effectiveStandardDays = customDaysMap.get(item.templateItemId) ?? item.standardDays;
     return {
       templateItemId: item.templateItemId,
       included,
       standardDays: item.standardDays,
-      itemSubtotalDays: itemRuleEnabled && included ? item.standardDays : 0
+      effectiveStandardDays,
+      itemSubtotalDays: itemRuleEnabled && included ? effectiveStandardDays : 0
     };
   });
 
@@ -214,7 +236,8 @@ export function calculateEstimate(body: CalculateRequest, template: Template, ru
             .filter((item) => item.groupId === group.groupId)
             .reduce((sum, item) => {
               const selected = selectedMap.get(item.templateItemId) ?? false;
-              return sum + (selected ? item.standardDays : 0);
+              const effectiveDays = customDaysMap.get(item.templateItemId) ?? item.standardDays;
+              return sum + (selected ? effectiveDays : 0);
             }, 0)
         );
         return {

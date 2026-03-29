@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "id": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "username": "mjlkevin",
+      "passwordHash": "$2b$10$F10aLp9bi3yM/7tle.c96.yAkyjUE4ytxt.NxdSQlRpWikIqqDs1G",
+      "role": "admin",
+      "status": "active",
+      "createdAt": "2026-03-28T10:23:51.881Z",
+      "lastLoginAt": "2026-03-29T14:47:12.195Z"
+    },
+    {
+      "id": "b4de9eca-fe62-4210-964e-7e59b74ab715",
+      "username": "elly",
+      "passwordHash": "$2b$10$Ywaznai5zvsOnr4B/SLLlunAU8vNcS5jg5Ce3v4PkQRKjj1jgikyS",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-03-28T10:29:24.272Z",
+      "lastLoginAt": "2026-03-28T10:29:24.272Z"
+    }
+  ]
+}

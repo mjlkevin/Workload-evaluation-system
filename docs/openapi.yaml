@@ -1,0 +1,939 @@
+openapi: 3.1.0
+info:
+  title: Workload Evaluation API
+  version: 0.1.0
+  description: >
+    本地工作量评估系统 API。响应统一为 { code, message, data, requestId? }。
+
+    **鉴权（以运行代码为准）**：当前实现使用 JWT，请求头 `Authorization: Bearer <token>`。
+    本文档中仍出现的 `X-Role` 参数为历史草稿，**运行时不再作为权限依据**。
+
+    **未在本文档中展开的已实现端点**（完整列表见仓库
+    `03_技术设计/系统演进/实现与文档对齐说明.md`）包括但不限于：
+    `/api/v1/auth/*`、`/api/v1/versions/*`、`/api/v1/ai/parse-basic-info`；
+    下载路径为 `GET /downloads/{fileName}`（非 `/api/v1` 前缀）。
+servers:
+  - url: http://localhost:3000
+    description: Local API server
+
+tags:
+  - name: Health
+  - name: Templates
+  - name: RuleSets
+  - name: Estimates
+  - name: Sessions
+  - name: Exports
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: 健康检查
+      operationId: getHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/templates:
+    get:
+      tags: [Templates]
+      summary: 获取模板列表
+      operationId: getTemplates
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateListResponse"
+
+  /api/v1/templates/{templateId}:
+    get:
+      tags: [Templates]
+      summary: 获取模板详情
+      operationId: getTemplateDetail
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateDetailResponse"
+        "400":
+          description: 参数或资源错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/templates/import-json:
+    post:
+      tags: [Templates]
+      summary: 导入模板 JSON（admin）
+      operationId: importTemplateJson
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateDetail"
+      responses:
+        "200":
+          description: 导入成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "400":
+          description: 失败（含权限不足）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/templates/import-excel:
+    post:
+      tags: [Templates]
+      summary: 导入模板 Excel（admin）
+      operationId: importTemplateExcel
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                templateName:
+                  type: string
+                templateVersion:
+                  type: string
+                templateId:
+                  type: string
+                sheetNames:
+                  type: string
+                  description: 多 sheet 时可逗号分隔
+                sheetName:
+                  type: string
+      responses:
+        "200":
+          description: 导入成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "400":
+          description: 失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/rule-sets/active:
+    get:
+      tags: [RuleSets]
+      summary: 获取当前激活规则集
+      operationId: getActiveRuleSet
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleSetResponse"
+
+  /api/v1/rule-sets/meta:
+    get:
+      tags: [RuleSets]
+      summary: 获取规则元信息
+      operationId: getRuleSetMeta
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleSetMetaResponse"
+
+  /api/v1/rule-sets/import-json:
+    post:
+      tags: [RuleSets]
+      summary: 导入规则 JSON（admin）
+      operationId: importRuleSetJson
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleSet"
+      responses:
+        "200":
+          description: 导入成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "400":
+          description: 失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/estimates/calculate:
+    post:
+      tags: [Estimates]
+      summary: 计算估算结果
+      operationId: calculateEstimate
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculateRequest"
+      responses:
+        "200":
+          description: 计算成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EstimateResponse"
+        "400":
+          description: 参数错误/规则错误/权限错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/estimates/calculate-and-export:
+    post:
+      tags: [Estimates]
+      summary: 计算并导出（excel/pdf）
+      operationId: calculateAndExport
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+        - $ref: "#/components/parameters/IdempotencyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CalculateRequest"
+                - type: object
+                  properties:
+                    exportType:
+                      type: string
+                      enum: [excel, pdf]
+      responses:
+        "200":
+          description: 成功，返回下载地址
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+        "400":
+          description: 失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/estimates/export/excel:
+    post:
+      tags: [Estimates]
+      summary: 导出 Excel
+      operationId: exportEstimateExcel
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+        - $ref: "#/components/parameters/IdempotencyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculateRequest"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+        "400":
+          description: 失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/estimates/export/pdf:
+    post:
+      tags: [Estimates]
+      summary: 导出 PDF
+      operationId: exportEstimatePdf
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+        - $ref: "#/components/parameters/IdempotencyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculateRequest"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+        "400":
+          description: 失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/exports/history:
+    get:
+      tags: [Exports]
+      summary: 获取导出历史
+      operationId: getExportHistory
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportHistoryResponse"
+        "400":
+          description: 失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/sessions/start:
+    post:
+      tags: [Sessions]
+      summary: 开始会话态估算
+      operationId: startSession
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [templateId, ruleSetId]
+              properties:
+                templateId:
+                  type: string
+                ruleSetId:
+                  type: string
+      responses:
+        "200":
+          description: 会话创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStartResponse"
+        "400":
+          description: 失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/sessions/{sessionId}/calculate:
+    post:
+      tags: [Sessions]
+      summary: 会话态估算（无需重复传 templateId/ruleSetId）
+      operationId: sessionCalculate
+      parameters:
+        - $ref: "#/components/parameters/XRoleHeader"
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userCount, difficultyFactor, orgCount, orgSimilarityFactor, items]
+              properties:
+                userCount:
+                  type: integer
+                difficultyFactor:
+                  type: number
+                orgCount:
+                  type: integer
+                orgSimilarityFactor:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/CalculateItem"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EstimateResponse"
+        "400":
+          description: 失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /downloads/{fileName}:
+    get:
+      tags: [Exports]
+      summary: 下载导出文件
+      operationId: downloadExport
+      parameters:
+        - name: fileName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 文件流
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: 文件不存在等错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 登录 `POST /api/v1/auth/login` 获取 token，请求头 `Authorization: Bearer <token>`
+  parameters:
+    XRoleHeader:
+      name: X-Role
+      in: header
+      required: false
+      schema:
+        type: string
+        enum: [admin, operator]
+      description: >
+        **[已废弃 / 勿依赖]** 历史草稿字段。当前实现以 JWT 内用户角色为准，服务端不信任此头。
+    IdempotencyHeader:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: 导出接口幂等键。相同 payload + 相同 key 会复用结果。
+
+  schemas:
+    GenericOkResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+      required: [code, message, data]
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        requestId:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              reason:
+                type: string
+            required: [field, reason]
+      required: [code, message, details, requestId]
+
+    TemplateListItem:
+      type: object
+      properties:
+        templateId:
+          type: string
+        templateVersion:
+          type: string
+        templateName:
+          type: string
+      required: [templateId, templateVersion, templateName]
+
+    TemplateGroup:
+      type: object
+      properties:
+        groupId:
+          type: string
+        groupName:
+          type: string
+      required: [groupId, groupName]
+
+    TemplateItem:
+      type: object
+      properties:
+        templateItemId:
+          type: string
+        groupId:
+          type: string
+        itemName:
+          type: string
+        standardDays:
+          type: number
+        sheetName:
+          type: string
+        cloudProduct:
+          type: string
+        skuName:
+          type: string
+        appGroup:
+          type: string
+        deliveryModule:
+          type: string
+        deliveryPoint:
+          type: string
+        deliveryDesc:
+          type: string
+        evalDesc:
+          type: string
+        defaultIncluded:
+          type: boolean
+      required: [templateItemId, groupId, itemName, standardDays]
+
+    TemplateDetail:
+      type: object
+      properties:
+        templateId:
+          type: string
+        templateVersion:
+          type: string
+        templateName:
+          type: string
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateGroup"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateItem"
+      required: [templateId, templateVersion, templateName, groups, items]
+
+    UserCountTier:
+      type: object
+      properties:
+        min:
+          type: integer
+        max:
+          type: integer
+        factor:
+          type: number
+      required: [min, max, factor]
+
+    BaseRule:
+      type: object
+      properties:
+        userCountTiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserCountTier"
+        difficultyFactorList:
+          type: array
+          items:
+            type: number
+        userIncrementRounding:
+          type: string
+          enum: [none, ceil_int]
+      required: [userCountTiers, difficultyFactorList]
+
+    OrgIncrementRule:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        factor:
+          type: number
+      required: [enabled]
+
+    RuleSet:
+      type: object
+      properties:
+        ruleSetId:
+          type: string
+        ruleVersion:
+          type: string
+        pipelineVersion:
+          type: string
+        pipeline:
+          type: array
+          items:
+            type: string
+        baseRule:
+          $ref: "#/components/schemas/BaseRule"
+        orgIncrementRule:
+          $ref: "#/components/schemas/OrgIncrementRule"
+      required: [ruleSetId, ruleVersion, pipelineVersion, pipeline, baseRule, orgIncrementRule]
+
+    RuleSetMeta:
+      type: object
+      properties:
+        grouping:
+          type: array
+          items:
+            type: string
+        itemRule:
+          type: array
+          items:
+            type: string
+        baseRule:
+          $ref: "#/components/schemas/BaseRule"
+        orgIncrementRule:
+          $ref: "#/components/schemas/OrgIncrementRule"
+        pipeline:
+          type: array
+          items:
+            type: string
+      required: [grouping, itemRule, baseRule, orgIncrementRule, pipeline]
+
+    CalculateItem:
+      type: object
+      properties:
+        templateItemId:
+          type: string
+        included:
+          type: boolean
+      required: [templateItemId, included]
+
+    CalculateRequest:
+      type: object
+      required: [templateId, ruleSetId, userCount, difficultyFactor, orgCount, orgSimilarityFactor, items]
+      properties:
+        templateId:
+          type: string
+        ruleSetId:
+          type: string
+        userCount:
+          type: integer
+          minimum: 0
+        difficultyFactor:
+          type: number
+        orgCount:
+          type: integer
+          minimum: 0
+        orgSimilarityFactor:
+          type: number
+          minimum: 0
+          maximum: 1
+        items:
+          type: array
+          description: 必须覆盖模板中的所有 templateItemId
+          items:
+            $ref: "#/components/schemas/CalculateItem"
+
+    EstimateResult:
+      type: object
+      properties:
+        templateId:
+          type: string
+        ruleSetId:
+          type: string
+        templateVersion:
+          type: string
+        ruleVersion:
+          type: string
+        pipelineVersion:
+          type: string
+        baseDays:
+          type: number
+        userIncrementDays:
+          type: number
+        difficultyIncrementDays:
+          type: number
+        orgIncrementDays:
+          type: number
+        totalDays:
+          type: number
+        calculationBreakdown:
+          type: object
+          additionalProperties: true
+        groupSubtotals:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        itemResults:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      required:
+        - templateId
+        - ruleSetId
+        - templateVersion
+        - ruleVersion
+        - pipelineVersion
+        - baseDays
+        - userIncrementDays
+        - difficultyIncrementDays
+        - orgIncrementDays
+        - totalDays
+        - calculationBreakdown
+        - groupSubtotals
+        - itemResults
+
+    ExportResult:
+      type: object
+      properties:
+        totalDays:
+          type: number
+        downloadUrl:
+          type: string
+        expireAt:
+          type: string
+      required: [totalDays, downloadUrl, expireAt]
+
+    ExportHistoryItem:
+      type: object
+      properties:
+        fileName:
+          type: string
+        exportType:
+          type: string
+          enum: [excel, pdf]
+        sizeBytes:
+          type: integer
+        modifiedAt:
+          type: string
+        downloadUrl:
+          type: string
+      required: [fileName, exportType, sizeBytes, modifiedAt, downloadUrl]
+
+    HealthResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            service:
+              type: string
+            status:
+              type: string
+          required: [service, status]
+      required: [code, message, data]
+
+    TemplateListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: "#/components/schemas/TemplateListItem"
+          required: [list]
+      required: [code, message, data]
+
+    TemplateDetailResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/TemplateDetail"
+      required: [code, message, data]
+
+    RuleSetResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/RuleSet"
+      required: [code, message, data]
+
+    RuleSetMetaResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/RuleSetMeta"
+      required: [code, message, data]
+
+    EstimateResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          $ref: "#/components/schemas/EstimateResult"
+      required: [code, message, data]
+
+    ExportResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          $ref: "#/components/schemas/ExportResult"
+      required: [code, message, data]
+
+    ExportHistoryResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ExportHistoryItem"
+          required: [page, pageSize, total, items]
+      required: [code, message, data]
+
+    SessionStartResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            sessionId:
+              type: string
+            templateId:
+              type: string
+            ruleSetId:
+              type: string
+            expiresAt:
+              type: string
+          required: [sessionId, templateId, ruleSetId, expiresAt]
+      required: [code, message, data]

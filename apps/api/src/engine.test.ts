@@ -105,3 +105,37 @@ test("pipeline can disable base and org increments", () => {
   assert.equal(result.orgIncrementDays, 0);
   assert.equal(result.totalDays, 10);
 });
+
+test("customStandardDays overrides base item standardDays", () => {
+  const result = calculateEstimate(
+    {
+      ...validBody,
+      items: [
+        { templateItemId: "i1", included: true, customStandardDays: 3 },
+        { templateItemId: "i2", included: true }
+      ]
+    },
+    template,
+    ruleSet
+  );
+  assert.equal(result.baseDays, 5);
+  assert.equal(result.totalDays, 6.7);
+  const i1 = result.itemResults.find((x) => x.templateItemId === "i1");
+  assert.equal(i1?.effectiveStandardDays, 3);
+});
+
+test("validate fails when customStandardDays is invalid", () => {
+  const result = validateCalculateRequest(
+    {
+      ...validBody,
+      items: [{ templateItemId: "i1", included: true, customStandardDays: -1 }, { templateItemId: "i2", included: true }]
+    },
+    template,
+    ruleSet
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.code, 40001);
+    assert.match(result.details[0].field, /customStandardDays/);
+  }
+});

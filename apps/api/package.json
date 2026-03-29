@@ -6,17 +6,23 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
+    "test:modules": "tsx --test src/modules/modules.unit.test.ts src/modules/modules.usecase.test.ts src/modules/modules.handlers.test.ts",
     "test:rules": "tsx --test src/engine.test.ts",
     "test:integration": "tsx --test src/integration.test.ts"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.3.1",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
+    "jszip": "^3.10.1",
     "multer": "^2.1.1",
     "pdfkit": "^0.18.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.1.0",
     "@types/node": "^22.13.10",
     "@types/pdfkit": "^0.17.5",

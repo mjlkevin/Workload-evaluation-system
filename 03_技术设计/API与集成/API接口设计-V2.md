@@ -4,7 +4,7 @@
 
 - Base URL：`/api/v1`
 - 数据格式：`application/json`
-- 鉴权方式：可选（内网可关闭鉴权）
+- 鉴权方式：**当前实现默认为 JWT**（`Authorization: Bearer <token>`）；健康检查等少数路径除外。历史文档「可选鉴权 / 内网关闭」仍可作为部署策略目标，但与现网代码不一致处见 **§15** 与 `03_技术设计/系统演进/实现与文档对齐说明.md`。
 - 时间格式：ISO-8601（UTC）
 - 分页参数：
   - `page`（默认 1）
@@ -57,8 +57,10 @@ flowchart LR
 
 ## 3. 认证（可选）
 
+> **实现补充**：当前仓库已落地注册/登录/JWT，路径为 `/api/v1/auth/*`（详见 **§15**）。下列 JSON 结构仍为合同级参考，字段名以实际响应为准。
+
 ## 3.1 登录
-- `POST /auth/login`
+- `POST /auth/login`（实现路径：`POST /api/v1/auth/login`）
 
 请求：
 ```json
@@ -406,5 +408,24 @@ sequenceDiagram
 - 建议以 **OpenAPI 3.x** 作为对外契约的单一事实来源（路径、模型、错误码），Agent 工具（function calling）的参数与说明从同一 OpenAPI 派生或与之同步，避免「文档一套、实现一套」。
 
 ### 14.7 鉴权与权限矩阵对齐
-- 启用鉴权时，JWT 内 `roles` 仅 **`admin` | `operator`**，与权限模型 V2 一致；`template.reload`、`rule_set.reload` 等维护类接口仅 `admin`（见权限矩阵）。
-- 内网可关闭鉴权时，维护类接口仍建议通过部署配置限制来源网段或独立管理端口。
+- **当前实现**：用户持久化角色为 **`admin` | `user`**；接口层将 `user` 视为与 V2「**operator**」等价的业务角色（可计算/导出/读模板规则等），**不再信任请求头 `X-Role`**。维护类接口（模板/规则导入、用户与推荐码管理）仅 **`admin`**。
+- 历史表述「JWT 内 roles 仅 admin|operator」与存储模型不完全一致时，以 **`03_技术设计/系统演进/实现与文档对齐说明.md` §4** 为准。
+- 内网若需关闭鉴权，需改代码/中间件；当前默认要求登录。
+
+## 15. 当前实现补充（2026-03，以代码为准）
+
+以下端点与行为为 V2 正文未单独成章、但已存在于 `apps/api/src/main.ts` 的能力；完整表格见 `03_技术设计/系统演进/实现与文档对齐说明.md` §3。
+
+- **认证与用户**：`POST /api/v1/auth/register`（需 `inviteCode`）、`login`、`me`、`logout`；`GET/PATCH /api/v1/auth/users*`（admin）。
+- **推荐码**：`GET/POST /api/v1/auth/invite-codes*`（admin）。
+- **版本记录**：`GET/POST /api/v1/versions`、`PATCH /api/v1/versions/:recordId/status`、`DELETE /api/v1/versions/:type/:versionCode`（删除时校验总方案引用）。
+- **需求解析**：`POST /api/v1/ai/parse-basic-info`（`multipart/form-data` 上传 Excel；服务端 Kimi + 规则回退）。
+- **下载**：`GET /downloads/:fileName`（**不在** `/api/v1` 前缀下；需 JWT 且校验归属）。
+
+**未实现或路径不同的 V2 条目（截至对齐扫描）**：
+
+- `POST /templates/reload`、`POST /rule-sets/reload`：未见等价路由；生效方式仍为文件导入或进程重启加载（以运维为准）。
+- `GET /users/me`：实现为 `GET /api/v1/auth/me`。
+- `POST /auth/refresh`：未见等价实现。
+
+**OpenAPI**：`docs/openapi.yaml` 仍部分描述 `X-Role`，与当前 JWT 行为不一致；待逐步修订，优先以本文 §15 与对齐说明 §3 为准。
