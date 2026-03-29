@@ -23,6 +23,7 @@ tags:
   - name: Estimates
   - name: Sessions
   - name: Exports
+  - name: Agent
 
 paths:
   /api/v1/health:
@@ -426,6 +427,87 @@ paths:
                 $ref: "#/components/schemas/EstimateResponse"
         "400":
           description: 失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/agent/estimate:
+    post:
+      tags: [Agent]
+      summary: Agent 高层估算入口（缺参时返回结构化追问）
+      operationId: agentEstimate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentEstimateRequest"
+      responses:
+        "200":
+          description: 统一 Agent 响应（success / needs_clarification / failed）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentApiResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/agent/session/start:
+    post:
+      tags: [Agent]
+      summary: 创建 Agent 会话并返回首轮结构化响应
+      operationId: agentSessionStart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentSessionStartRequest"
+      responses:
+        "200":
+          description: 统一 Agent 响应
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentApiResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/agent/session/{sessionId}/continue:
+    post:
+      tags: [Agent]
+      summary: 继续 Agent 会话并补全参数
+      operationId: agentSessionContinue
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentSessionContinueRequest"
+      responses:
+        "200":
+          description: 统一 Agent 响应
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentApiResponse"
+        "401":
+          description: 未登录或凭证失效
           content:
             application/json:
               schema:
@@ -936,4 +1018,170 @@ components:
             expiresAt:
               type: string
           required: [sessionId, templateId, ruleSetId, expiresAt]
+      required: [code, message, data]
+
+    AgentHints:
+      type: object
+      properties:
+        templateId:
+          type: string
+        ruleSetId:
+          type: string
+        userCount:
+          type: number
+        difficultyFactor:
+          type: number
+        orgCount:
+          type: number
+        orgSimilarityFactor:
+          type: number
+          minimum: 0
+          maximum: 1
+        selectedSheet:
+          type: string
+        includedTemplateItemIds:
+          type: array
+          items:
+            type: string
+        contextNote:
+          type: string
+
+    AgentEstimateRequest:
+      type: object
+      properties:
+        userMessage:
+          type: string
+        sessionId:
+          type: string
+        hints:
+          $ref: "#/components/schemas/AgentHints"
+
+    AgentSessionStartRequest:
+      type: object
+      properties:
+        userMessage:
+          type: string
+        hints:
+          $ref: "#/components/schemas/AgentHints"
+
+    AgentSessionContinueRequest:
+      type: object
+      properties:
+        userMessage:
+          type: string
+        hints:
+          $ref: "#/components/schemas/AgentHints"
+
+    AgentQuestion:
+      type: object
+      properties:
+        field:
+          type: string
+        question:
+          type: string
+        expectedType:
+          type: string
+          enum: [string, number]
+        options:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: number
+      required: [field, question, expectedType]
+
+    AgentAssumption:
+      type: object
+      properties:
+        field:
+          type: string
+        value:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+        reason:
+          type: string
+      required: [field, value, reason]
+
+    AgentEstimatePayload:
+      type: object
+      properties:
+        totalDays:
+          type: number
+        result:
+          $ref: "#/components/schemas/EstimateResult"
+      required: [totalDays, result]
+
+    AgentResponseData:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, needs_clarification, failed]
+        sessionId:
+          type: string
+        missingFieldsCount:
+          type: integer
+        contextSummary:
+          type: string
+        intentCandidates:
+          type: array
+          description: 基于 userMessage 解析的 topK 候选（含置信度与原因）
+          items:
+            $ref: "#/components/schemas/AgentIntentCandidate"
+        normalizedRequest:
+          type: object
+          additionalProperties: true
+        missingFields:
+          type: array
+          items:
+            type: string
+        assumptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentAssumption"
+        nextQuestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentQuestion"
+        estimate:
+          $ref: "#/components/schemas/AgentEstimatePayload"
+        errorCode:
+          type: string
+        suggestedFixes:
+          type: array
+          items:
+            type: string
+      required: [status]
+
+    AgentIntentCandidate:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [sheet, item]
+        value:
+          type: string
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        reason:
+          type: string
+      required: [kind, value, score, reason]
+
+    AgentApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          $ref: "#/components/schemas/AgentResponseData"
       required: [code, message, data]

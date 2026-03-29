@@ -71,3 +71,71 @@ curl -s -X POST http://localhost:3000/api/v1/estimates/calculate \
 如果遇到业务错误，优先根据 details 中的 field/reason 自修正重试。
 任何计算请求都必须包含完整 items 列表。
 ```
+
+## 6) Agent-Friendly MVP（推荐优先）
+
+当你不想自己拼完整 `calculate` 参数时，可直接使用高层接口：
+
+- `POST /api/v1/agent/estimate`
+- `POST /api/v1/agent/session/start`
+- `POST /api/v1/agent/session/{sessionId}/continue`
+
+### 6.1 响应语义
+
+- `status=success`：已完成估算，`estimate.totalDays` 可直接使用。
+- `status=needs_clarification`：参数仍有缺失，请按 `nextQuestions` 继续追问用户。
+- `status=failed`：不可恢复失败，查看 `errorCode` 与 `suggestedFixes`。
+
+所有返回都包含可解释字段（按场景出现）：
+
+- `normalizedRequest`
+- `missingFields`
+- `missingFieldsCount`
+- `assumptions`
+- `nextQuestions`
+- `intentCandidates`（P1-MVP：topK 候选，含 `score` 与 `reason`）
+
+### 6.2 P1 增强：意图候选（topK + 置信度）
+
+- 当你只给自然语言（例如“评估财务云和供应链云”）时，接口会返回：
+  - `intentCandidates[]`：`kind=sheet|item`，并给 `score`（0~1）和 `reason`
+- 建议调用方策略：
+  - `score >= 0.9`：可直接采用
+  - `0.7 <= score < 0.9`：给用户一次确认
+  - `< 0.7`：进入澄清提问路径
+### 6.3 最小调用示例
+
+```bash
+# 1) 首次调用（可能返回 needs_clarification）
+curl -s -X POST http://localhost:3000/api/v1/agent/estimate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <YOUR_JWT>" \
+  -d '{
+    "userMessage": "帮我评估实施工作量"
+  }'
+
+# 2) 建会话 + 继续补参（多轮）
+curl -s -X POST http://localhost:3000/api/v1/agent/session/start \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <YOUR_JWT>" \
+  -d '{
+    "userMessage": "先开始会话",
+    "hints": { "userCount": 80, "difficultyFactor": 0.1 }
+  }'
+
+curl -s -X POST http://localhost:3000/api/v1/agent/session/<SESSION_ID>/continue \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <YOUR_JWT>" \
+  -d '{
+    "userMessage": "补充其余参数",
+    "hints": { "orgCount": 2, "orgSimilarityFactor": 0.8 }
+  }'
+```
+
+### 6.4 本地冒烟
+
+仓库已提供 Agent 高层 API 冒烟脚本：
+
+```bash
+npm run test:api:agent
+```

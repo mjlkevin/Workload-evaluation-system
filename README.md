@@ -49,6 +49,21 @@
   - `npm run build:api`
   - `npm run build:web`
 
+## Agent-Friendly API（MVP已落地）
+
+- 已交付高层 Agent 接口：
+  - `POST /api/v1/agent/estimate`
+  - `POST /api/v1/agent/session/start`
+  - `POST /api/v1/agent/session/:sessionId/continue`
+- 响应可解释字段：
+  - `status`（`success | needs_clarification | failed`）
+  - `normalizedRequest`、`missingFields`、`missingFieldsCount`
+  - `assumptions`、`nextQuestions`
+  - `intentCandidates`（topK + `score` + `reason`）
+- 可观测性增强：
+  - 已新增访问日志：`logs/api-access.log`
+  - 已新增日志汇总脚本：`npm run logs:api:report`
+
 ## 技术栈
 
 - 前端：`Vue 3` + `TypeScript` + `Vite`
@@ -103,12 +118,18 @@ npm run dev:web
   - `POST /api/v1/estimates/calculate-and-export`
   - `GET /api/v1/exports/history`
   - `GET /api/v1/downloads/:fileName`
+- Agent 高层接口：
+  - `POST /api/v1/agent/estimate`
+  - `POST /api/v1/agent/session/start`
+  - `POST /api/v1/agent/session/:sessionId/continue`
 
 ## 常用脚本
 
 - `npm run build:web`：构建前端
 - `npm run build:api`：构建后端
 - `npm run test:modules`：模块级单元/行为测试（API）
+- `npm run test:api:agent`：Agent 高层接口冒烟测试
+- `npm run logs:api:report`：API 访问日志汇总（成功率/耗时）
 - `npm run rules:standardize`：规则标准化抽取
 - `npm run rules:regression`：规则回归
 - `npm run rules:excel-report`：Excel 对比报告
@@ -122,3 +143,4 @@ npm run dev:web
 - 环境变量：`.env.example`、`docs/ENVIRONMENT.md`
 - 部署占位说明：`06_发布与部署/部署说明-待完善.md`
 - 调用说明：`docs/LLM_API_CALLING_GUIDE.md`
+- 外部 Agent 调用模板：`docs/EXTERNAL_AGENT_SKILL_TEMPLATE.md`
