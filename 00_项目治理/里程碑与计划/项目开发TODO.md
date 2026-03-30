@@ -124,6 +124,21 @@
 
 ---
 
+## 今日推进（2026-03-30）
+
+- [x] 回归校验通过：`npm run test:modules`、`npm run test:api:agent`
+- [x] 日志窗口统计可用：`npm run logs:api:report`（支持 `--window=10m/1h/all`）
+- [x] 团队协同 P0 评审结论：`01_需求管理/需求分析/团队协同-P0需求评审结论.md`
+- [x] 团队协同 PRD 草案：`01_需求管理/需求分析/团队协同与角色化工作台-PRD草案.md`
+- [x] 团队协同技术方案草图：`03_技术设计/系统架构/团队协同能力-技术方案草图.md`
+- [x] 团队协同后端骨架：`apps/api/src/modules/team/*` + `apps/api/src/routes/team.routes.ts`
+- [x] 团队协同后端测试：`modules.usecase.test.ts` 新增 3 条（权限/隔离/状态流转）
+- [x] 对齐验证通过：`npm run build:api`、`npm run test:modules`
+- [x] 团队协同接口契约对齐：`docs/openapi.yaml`（Teams 路径 + 当前错误语义）
+- [x] 团队协同联调文档与全链路 curl：`docs/LLM_API_CALLING_GUIDE.md`
+- [x] 团队协同自动化冒烟：`npm run test:api:team`（正常 + 异常场景）
+- [x] 团队存储并发加固：原子写入 + `version` 乐观并发控制（冲突码 `40909`）
+
 ## 里程碑地图（可视化）
 
 ### 1) 总体里程碑时间线

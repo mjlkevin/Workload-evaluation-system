@@ -139,3 +139,144 @@ curl -s -X POST http://localhost:3000/api/v1/agent/session/<SESSION_ID>/continue
 ```bash
 npm run test:api:agent
 ```
+
+### 6.5 访问日志窗口统计（近 10 分钟 / 1 小时）
+
+```bash
+# 默认输出 10m / 1h / all
+npm run logs:api:report
+
+# 指定窗口
+npm run logs:api:report -- --window=10m
+npm run logs:api:report -- --window=1h
+```
+
+## 7) 团队协同 P0（当前实现说明）
+
+- 已有接口骨架：`/api/v1/teams/*`（团队、成员、方案、评审、评论）。
+- 鉴权失败返回 401（凭证缺失或失效）。
+- 业务校验与权限拒绝在当前实现中统一返回 400，结合 `code` 识别：
+  - `40301`：权限不足
+  - `40401`：对象不存在（团队/成员/评审/总方案）
+  - `42201`：参数错误
+  - `40909`：并发写入冲突（建议重试）
+
+### 7.0 并发冲突重试建议
+
+- 当返回 `code=40909` 时，说明同一时刻有其他写操作已更新团队数据版本。
+- 建议调用方采用“短退避重试”策略：
+  - 首次等待 `100~200ms` 后重试
+  - 最多重试 `2~3` 次
+  - 超过重试次数后提示“数据已变更，请刷新后重试”
+
+### 7.1 最小联调清单（curl 全链路）
+
+> 说明：以下示例按当前 P0 骨架接口编写，建议先准备两个有效账号：
+> - 账号A（负责人 / manager）
+> - 账号B（成员 / implementer 或 sales）
+
+#### Step 0) 登录并获取 TOKEN
+
+```bash
+# 负责人登录
+curl -s -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"<MANAGER_USERNAME>","password":"<PASSWORD>"}'
+
+# 成员登录
+curl -s -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"<MEMBER_USERNAME>","password":"<PASSWORD>"}'
+```
+
+从响应里取：
+
+- `MANAGER_TOKEN`
+- `MEMBER_TOKEN`
+
+#### Step 1) 创建团队（负责人）
+
+```bash
+curl -s -X POST http://localhost:3000/api/v1/teams \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <MANAGER_TOKEN>" \
+  -d '{"name":"售前实施协同组-UT"}'
+```
+
+从响应 `data` 里取 `TEAM_ID`。
+
+#### Step 2) 添加团队成员（负责人）
+
+```bash
+curl -s -X POST "http://localhost:3000/api/v1/teams/<TEAM_ID>/members" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <MANAGER_TOKEN>" \
+  -d '{"userId":"<MEMBER_USER_ID>","role":"implementer"}'
+```
+
+#### Step 3) 创建评审（成员或负责人）
+
+```bash
+curl -s -X POST "http://localhost:3000/api/v1/teams/<TEAM_ID>/reviews" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <MEMBER_TOKEN>" \
+  -d '{"globalVersionCode":"GL-UT-001","title":"首次评审"}'
+```
+
+从响应 `data` 里取 `REVIEW_ID`。
+
+#### Step 4) 发表评论（成员）
+
+```bash
+curl -s -X POST "http://localhost:3000/api/v1/teams/<TEAM_ID>/reviews/<REVIEW_ID>/comments" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <MEMBER_TOKEN>" \
+  -d '{"content":"实施侧建议先完成主数据范围确认。"}'
+```
+
+#### Step 5) 查询评论列表（负责人）
+
+```bash
+curl -s "http://localhost:3000/api/v1/teams/<TEAM_ID>/reviews/<REVIEW_ID>/comments" \
+  -H "Authorization: Bearer <MANAGER_TOKEN>"
+```
+
+#### Step 6) 关闭评审（仅负责人）
+
+```bash
+curl -s -X PATCH "http://localhost:3000/api/v1/teams/<TEAM_ID>/reviews/<REVIEW_ID>/status" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <MANAGER_TOKEN>" \
+  -d '{"status":"closed"}'
+```
+
+#### Step 7) 负向校验（成员关闭应失败）
+
+```bash
+curl -s -X PATCH "http://localhost:3000/api/v1/teams/<TEAM_ID>/reviews/<REVIEW_ID>/status" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <MEMBER_TOKEN>" \
+  -d '{"status":"closed"}'
+```
+
+期望：HTTP 400 且 `code=40301`。
+
+### 7.2 自动化冒烟（团队协同）
+
+仓库已提供团队协同链路冒烟脚本：
+
+```bash
+npm run test:api:team
+```
+
+脚本覆盖：
+
+- 创建团队
+- 添加成员
+- 添加成员非法角色校验（`code=42201`）
+- 成员创建评审
+- 成员发表评论 + 负责人查询评论
+- 负责人关闭评审
+- 成员关闭评审失败（`code=40301`）
+- 评审不存在校验（`code=40401`）
+- 团队详情读取（成员可读）与未知团队不存在校验（`code=40401`）

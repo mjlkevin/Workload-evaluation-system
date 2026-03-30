@@ -11,6 +11,7 @@ import { listUsers, login, me } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
 import { createVersion, deleteVersion, listVersions, updateVersionStatus } from "./versions/versions.usecase";
+import { patchReviewStatus, postTeam } from "./team/team.controller";
 
 type MockRes = {
   statusCode: number;
@@ -206,7 +207,7 @@ test("versions.usecase: deleteVersion returns type invalid", () => {
 test("versions.usecase: create -> update -> delete lifecycle works", () => {
   const versionsPath = versionsStorePath();
   withFileSnapshotRestore(versionsPath, () => {
-    const versionCode = `UT-LC-${Date.now()}`;
+    const versionCode = `UT-LC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
     const createReq = createMockReq({
       token: getActiveUserToken(),
@@ -249,4 +250,23 @@ test("versions.usecase: create -> update -> delete lifecycle works", () => {
     assert.equal(deleted.code, 0);
     assert.equal(deleted.data.deleted, true);
   });
+});
+
+test("team.controller: postTeam returns 401 without token", () => {
+  const req = createMockReq({ body: { name: "UT Team" } });
+  const res = createMockRes();
+  postTeam(req, res as unknown as Response);
+  assert.equal(res.statusCode, 401);
+  assert.equal((res.body as { code?: number }).code, 40101);
+});
+
+test("team.controller: patchReviewStatus returns 401 without token", () => {
+  const req = createMockReq({
+    params: { teamId: "t1", reviewId: "r1" },
+    body: { status: "closed" }
+  });
+  const res = createMockRes();
+  patchReviewStatus(req, res as unknown as Response);
+  assert.equal(res.statusCode, 401);
+  assert.equal((res.body as { code?: number }).code, 40101);
 });

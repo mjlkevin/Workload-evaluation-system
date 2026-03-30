@@ -24,6 +24,7 @@ tags:
   - name: Sessions
   - name: Exports
   - name: Agent
+  - name: Teams
 
 paths:
   /api/v1/health:
@@ -508,6 +509,409 @@ paths:
                 $ref: "#/components/schemas/AgentApiResponse"
         "401":
           description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/teams:
+    post:
+      tags: [Teams]
+      summary: 创建团队（P0 草案，当前实现为业务错误统一 400）
+      operationId: createTeam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamCreateRequest"
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 42201 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/teams/{teamId}:
+    get:
+      tags: [Teams]
+      summary: 获取团队详情（P0 草案）
+      operationId: getTeam
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 40401 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/teams/{teamId}/members:
+    post:
+      tags: [Teams]
+      summary: 添加团队成员（P0 草案）
+      operationId: addTeamMember
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamMemberUpsertRequest"
+      responses:
+        "200":
+          description: 添加成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 42201 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/teams/{teamId}/members/{userId}:
+    patch:
+      tags: [Teams]
+      summary: 调整成员角色（P0 草案）
+      operationId: updateTeamMemberRole
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamMemberRoleUpdateRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 40401 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Teams]
+      summary: 移除团队成员（P0 草案）
+      operationId: removeTeamMember
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 移除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 42201 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/teams/{teamId}/plans:
+    get:
+      tags: [Teams]
+      summary: 获取团队总方案列表（P0 草案）
+      operationId: getTeamPlans
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamPlanListResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/teams/{teamId}/plans/{globalVersionCode}/binding:
+    patch:
+      tags: [Teams]
+      summary: 变更总方案归属团队（P0 草案）
+      operationId: updateTeamPlanBinding
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: globalVersionCode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamPlanBindingUpdateRequest"
+      responses:
+        "200":
+          description: 变更成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 40401 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/teams/{teamId}/reviews:
+    post:
+      tags: [Teams]
+      summary: 创建评审（P0 草案）
+      operationId: createTeamReview
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamReviewCreateRequest"
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamReviewResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 42201 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/teams/{teamId}/reviews/{reviewId}/status:
+    patch:
+      tags: [Teams]
+      summary: 变更评审状态（P0 草案）
+      operationId: updateTeamReviewStatus
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamReviewStatusUpdateRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamReviewResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 40401 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/teams/{teamId}/reviews/{reviewId}/comments:
+    get:
+      tags: [Teams]
+      summary: 获取评审评论列表（P0 草案）
+      operationId: getTeamReviewComments
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamReviewCommentListResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 40401 / 40909）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Teams]
+      summary: 发表评论（P0 草案）
+      operationId: createTeamReviewComment
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamReviewCommentCreateRequest"
+      responses:
+        "200":
+          description: 发布成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamReviewCommentResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: 业务校验或权限拒绝（例如 code=40301 / 42201 / 40909）
           content:
             application/json:
               schema:
@@ -1184,4 +1588,232 @@ components:
           type: string
         data:
           $ref: "#/components/schemas/AgentResponseData"
+      required: [code, message, data]
+
+    TeamRole:
+      type: string
+      enum: [manager, implementer, presale, sales]
+
+    TeamMember:
+      type: object
+      properties:
+        userId:
+          type: string
+        role:
+          $ref: "#/components/schemas/TeamRole"
+        joinedAt:
+          type: string
+      required: [userId, role]
+
+    Team:
+      type: object
+      properties:
+        teamId:
+          type: string
+        name:
+          type: string
+        ownerUserId:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamMember"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [teamId, name, ownerUserId]
+
+    TeamCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+      required: [name]
+
+    TeamMemberUpsertRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+        role:
+          $ref: "#/components/schemas/TeamRole"
+      required: [userId, role]
+
+    TeamMemberRoleUpdateRequest:
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/TeamRole"
+      required: [role]
+
+    TeamResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          $ref: "#/components/schemas/Team"
+      required: [code, message, data]
+
+    TeamPlan:
+      type: object
+      properties:
+        globalVersionCode:
+          type: string
+        projectName:
+          type: string
+        status:
+          type: string
+        ownerUserId:
+          type: string
+        updatedAt:
+          type: string
+        reviewStatus:
+          type: string
+          enum: [open, closed, none]
+      required: [globalVersionCode]
+
+    TeamPlanListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/TeamPlan"
+          required: [items]
+      required: [code, message, data]
+
+    TeamPlanBindingUpdateRequest:
+      type: object
+      properties:
+        targetTeamId:
+          type: string
+      required: [targetTeamId]
+
+    TeamReview:
+      type: object
+      properties:
+        reviewId:
+          type: string
+        teamId:
+          type: string
+        globalVersionCode:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [open, closed]
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+      required: [reviewId, teamId, globalVersionCode, status]
+
+    TeamReviewCreateRequest:
+      type: object
+      properties:
+        globalVersionCode:
+          type: string
+        title:
+          type: string
+      required: [globalVersionCode]
+
+    TeamReviewStatusUpdateRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [open, closed]
+      required: [status]
+
+    TeamReviewResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          $ref: "#/components/schemas/TeamReview"
+      required: [code, message, data]
+
+    TeamReviewComment:
+      type: object
+      properties:
+        commentId:
+          type: string
+        reviewId:
+          type: string
+        authorUserId:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+      required: [commentId, reviewId, authorUserId, content]
+
+    TeamReviewCommentCreateRequest:
+      type: object
+      properties:
+        content:
+          type: string
+      required: [content]
+
+    TeamReviewCommentResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          $ref: "#/components/schemas/TeamReviewComment"
+      required: [code, message, data]
+
+    TeamReviewCommentListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/TeamReviewComment"
+          required: [items]
       required: [code, message, data]
