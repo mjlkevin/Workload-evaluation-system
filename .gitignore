@@ -44,3 +44,7 @@ coverage/
 *.swo
 .DS_Store
 Thumbs.db
+
+# 本地临时目录
+.tmp-gh-push/
+backups/
