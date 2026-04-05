@@ -195,6 +195,7 @@
 - [ ] `npm run test:modules`
 - [ ] `npm run test:rules`
 - [ ] `npm run test:integration`
+- [x] 最小 CI 已接入：`.github/workflows/minimal-ci.yml`（构建 + API 测试）
 
 ---
 
