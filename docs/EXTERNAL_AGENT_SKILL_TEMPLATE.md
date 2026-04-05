@@ -1,6 +1,9 @@
 # 外部 Agent 最小 Skill 调用模板（MVP）
 
-用于让第三方 Agent（不登录 Web）直接调用本系统高层 API：
+> **重要（2026-04）**：`/api/v1/agent/*` **当前未在主线 API 中挂载**。下方路径为**历史草案**，仅供未来实现时参考。  
+> **现状**请改用：`POST /api/v1/auth/login` 取 JWT → `GET /api/v1/templates` / `GET /api/v1/rule-sets/active` → `POST /api/v1/estimates/calculate`（详见 `docs/LLM_API_CALLING_GUIDE.md`）。
+
+曾规划的草案高层接口（未挂载）：
 
 - `POST /api/v1/agent/estimate`
 - `POST /api/v1/agent/session/start`
@@ -24,11 +27,10 @@
 
 规则：
 1) 先登录拿 JWT（Bearer）。
-2) 优先调用 /api/v1/agent/estimate 或 /api/v1/agent/session/*。
-3) 若返回 status=needs_clarification，必须按 nextQuestions 向用户追问并继续调用 continue。
-4) 若返回 status=success，直接输出 estimate.totalDays，并附 assumptions 摘要。
-5) 若返回 status=failed，输出 errorCode 与 suggestedFixes，不要编造结果。
-6) 保留并透传 requestId 便于排障。
+2) 拉取模板与规则集，构造完整 `POST /api/v1/estimates/calculate` 请求（或先 `POST /api/v1/sessions/start` 再会话计算）。
+3) 若业务返回 400，根据 `details[].field/reason` 修正参数后重试。
+4) 成功时输出权威 `totalDays` 与结果摘要；不要编造未返回的字段。
+5) 保留并透传 `requestId` 便于排障。
 ```
 
 ---

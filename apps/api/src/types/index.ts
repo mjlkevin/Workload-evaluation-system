@@ -100,7 +100,7 @@ export type EstimateResult = {
   }>;
 };
 
-// -------------------- 需求导入相关 --------------------
+// -------------------- 需求相关 --------------------
 
 export type BasicProjectInfo = {
   customerName: string;
@@ -223,6 +223,12 @@ export type AuthJwtPayload = {
 export type VersionType = "assessment" | "resource" | "requirementImport" | "dev" | "global";
 export type VersionStatus = "draft" | "reviewed" | "published" | "archived";
 
+/** 检出状态：已检入 | 已检出 */
+export type CheckoutStatus = "checked_in" | "checked_out";
+
+/** 版本文档状态：修订中 | 已审核 */
+export type VersionDocStatus = "drafting" | "reviewed";
+
 export type VersionRecord = {
   id: string;
   type: VersionType;
@@ -237,6 +243,29 @@ export type VersionRecord = {
   createdByUsername: string;
   reviewedAt?: string;
   reviewedByUserId?: string;
+  // --- 检入检出字段 ---
+  /** 检出状态，默认 checked_in */
+  checkoutStatus: CheckoutStatus;
+  /** 版本文档状态，默认 drafting */
+  versionDocStatus: VersionDocStatus;
+  /** 检出人 ID */
+  checkedOutByUserId?: string;
+  /** 检出人用户名 */
+  checkedOutByUsername?: string;
+  /** 检出时间 */
+  checkoutAt?: string;
+  /** 升版字母（A/B/C…），首版为 A */
+  majorLetter: string;
+  /** 检入轮次（首次检入为 1，每次检入 +1） */
+  minorNumber: number;
+  /** 单据基础码（不含 -Vxx 后缀） */
+  baseCode: string;
+  /** 是否历史归档版本（升版后旧版本为 true） */
+  isHistoricalArchive: boolean;
+  /** 归档时间 */
+  archivedAt?: string;
+  /** 升版前保留的最后检入 payload 快照（用于撤销检出恢复） */
+  lastCheckinPayload?: Record<string, unknown>;
 };
 
 export type VersionsStore = {
@@ -283,6 +312,39 @@ export function isVersionType(value: string): value is VersionType {
 
 export function isVersionStatus(value: string): value is VersionStatus {
   return ["draft", "reviewed", "published", "archived"].includes(value);
+}
+
+export function isCheckoutStatus(value: string): value is CheckoutStatus {
+  return ["checked_in", "checked_out"].includes(value);
+}
+
+export function isVersionDocStatus(value: string): value is VersionDocStatus {
+  return ["drafting", "reviewed"].includes(value);
+}
+
+/**
+ * 迁移补全旧版本记录缺失的检入检出字段
+ */
+export function migrateVersionRecord(record: VersionRecord): VersionRecord {
+  if (record.checkoutStatus === undefined) {
+    record.checkoutStatus = "checked_in";
+  }
+  if (record.versionDocStatus === undefined) {
+    record.versionDocStatus = "drafting";
+  }
+  if (record.majorLetter === undefined) {
+    record.majorLetter = "A";
+  }
+  if (record.minorNumber === undefined) {
+    record.minorNumber = 1;
+  }
+  if (record.baseCode === undefined) {
+    record.baseCode = record.versionCode;
+  }
+  if (record.isHistoricalArchive === undefined) {
+    record.isHistoricalArchive = false;
+  }
+  return record;
 }
 
 export function isTemplateLike(input: unknown): input is Template {

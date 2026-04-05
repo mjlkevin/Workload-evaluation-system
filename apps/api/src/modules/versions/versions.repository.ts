@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { VersionRecord, VersionType, VersionsStore } from "../../types";
+import { VersionRecord, VersionType, VersionsStore, migrateVersionRecord } from "../../types";
 import { versionsStorePath } from "../../utils";
 import { asString } from "../../utils/helpers";
 
@@ -18,7 +18,9 @@ export function loadVersionsStore(): VersionsStore {
     if (!parsed || !Array.isArray(parsed.records)) {
       return { records: [] };
     }
-    return { records: parsed.records };
+    // 迁移补全旧版本记录缺失的检入检出字段
+    const records = parsed.records.map(migrateVersionRecord);
+    return { records };
   } catch {
     return { records: [] };
   }

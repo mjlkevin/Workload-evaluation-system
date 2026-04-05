@@ -9,8 +9,9 @@
 | `PORT` | 否 | `3000` | API 监听端口 |
 | `JWT_SECRET` | 生产必填 | 开发内置弱密钥 | JWT 签名密钥，**生产环境必须更换** |
 | `JWT_EXPIRES_IN` | 否 | `8h` | Token 有效期 |
+| `CONFIG_INTEGRITY_ON_STARTUP` | 否 | `true` | 是否在 API 启动时执行 `config/*` 完整性校验（`false` 关闭） |
 
-## 需求导入 / Excel 智能解析（Kimi / Moonshot）
+## 需求 / Excel 智能解析（Kimi / Moonshot）
 
 | 变量 | 必填 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -20,7 +21,7 @@
 
 ## 前端
 
-前端通过 `Vite` 开发时默认请求本地 API；跨域与代理若需配置，在 `apps/web/vite.config` 中维护（以实际文件为准）。
+主前端使用 `ui/V0_SAAS`（Next.js）。前端请求封装见 `ui/V0_SAAS/lib/api-client.ts`；如需调整代理/跨域策略，请按 `ui/V0_SAAS` 现行配置维护。
 
 ## 本地示例文件
 
@@ -32,6 +33,7 @@ JWT_SECRET=please-change-in-production
 JWT_EXPIRES_IN=8h
 KIMI_API_KEY=
 KIMI_MODEL=moonshot-v1-8k
+CONFIG_INTEGRITY_ON_STARTUP=true
 ```
 
 **注意**：不要将包含真实 Key 的 `.env.local` 提交到 Git。

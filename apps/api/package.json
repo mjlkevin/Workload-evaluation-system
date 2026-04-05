@@ -6,6 +6,8 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
+    "ops:config:check": "tsx src/ops/config-integrity.cli.ts",
+    "ops:config:check:repair": "tsx src/ops/config-integrity.cli.ts --repair",
     "test:modules": "tsx --test src/modules/modules.unit.test.ts src/modules/modules.usecase.test.ts src/modules/modules.handlers.test.ts",
     "test:rules": "tsx --test src/engine.test.ts",
     "test:integration": "tsx --test src/integration.test.ts"

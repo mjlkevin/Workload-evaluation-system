@@ -10,6 +10,7 @@ import {
   createTeam,
   getTeam,
   getTeamPlans,
+  listReviews,
   listReviewComments,
   removeTeamMember,
   updateReviewStatus,
@@ -83,6 +84,12 @@ export function postReview(req: Request, res: Response) {
   const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, createReview(auth.user, String(req.params.teamId || ""), req.body || {}));
+}
+
+export function getReviews(req: Request, res: Response) {
+  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+  if (!auth) return;
+  return handleResult(res, listReviews(auth.user, String(req.params.teamId || "")));
 }
 
 export function patchReviewStatus(req: Request, res: Response) {

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>评审</title><link rel="stylesheet" href="./styles.css" /></head>
+  <body>
+    <div class="app">
+      <aside class="sidebar"><div class="brand"><div class="logo"></div><div><div class="brand-name">工作量评估系统</div><div class="brand-sub">Apple UI Preview</div></div></div><nav class="nav"><a href="./index.html">总览</a><a href="./requirement-import.html">需求</a><a href="./assessment.html">实施评估</a><a href="./dev-assessment.html">开发评估</a><a href="./resource-cost.html">资源成本</a><a href="./wbs.html">WBS</a><a class="active" href="./review.html">评审</a><a href="./user-management.html">用户管理</a><a href="./api-keys.html">API Key</a><a href="./login.html">登录页</a></nav></aside>
+      <main class="content">
+        <header class="topbar"><div><h1 class="title">评审与意见闭环</h1><p class="subtitle">保持评审记录与状态流转逻辑，增强可视化反馈。</p></div><span class="badge">RV-待处理</span></header>
+        <section class="grid-2">
+          <article class="card"><h3 style="margin-top:0">评审意见</h3><table class="table"><thead><tr><th>时间</th><th>评审人</th><th>意见</th><th>状态</th></tr></thead><tbody><tr><td>03-29 10:20</td><td>王总</td><td>资源成本需补充差旅口径</td><td><span class="tag warn">待处理</span></td></tr><tr><td>03-28 18:40</td><td>架构师</td><td>开发条目需补估算依据</td><td><span class="tag ok">已闭环</span></td></tr></tbody></table></article>
+          <article class="card"><h3 style="margin-top:0">闭环操作</h3><div class="field"><label>处理说明</label><textarea rows="6" placeholder="填写处理动作、影响范围与结论..."></textarea></div><div class="row"><button class="btn primary">提交闭环</button><button class="btn ghost">退回修订</button></div></article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

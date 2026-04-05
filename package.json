@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/web",
     "apps/api"
   ],
   "scripts": {
-    "dev:web": "npm run dev -w apps/web",
+    "dev:web": "npm run dev --prefix ui/V0_SAAS",
     "dev:api": "npm run dev -w apps/api",
-    "build:web": "npm run build -w apps/web",
+    "build:web": "npm run build --prefix ui/V0_SAAS",
     "build:api": "npm run build -w apps/api",
     "rules:standardize": "node scripts/standardize-rules-from-excel.js",
     "rules:regression": "node scripts/rule-regression-check.js",
@@ -19,6 +18,10 @@
     "test:modules": "npm run test:modules -w apps/api",
     "test:rules": "npm run test:rules -w apps/api",
     "test:integration": "npm run test:integration -w apps/api",
-    "test:all": "npm run test:modules && npm run test:rules && npm run test:integration && npm run rules:regression && npm run rules:excel-report"
+    "ops:backup:config": "node scripts/backup-config.js",
+    "ops:check:config": "npm run ops:config:check -w apps/api",
+    "ops:check:config:repair": "npm run ops:config:check:repair -w apps/api",
+    "test:all": "npm run test:modules && npm run test:rules && npm run test:integration && npm run rules:regression && npm run rules:excel-report",
+    "test:e2e:web": "npm run test:e2e --prefix ui/V0_SAAS"
   }
 }

@@ -10,7 +10,17 @@ import { versionsStorePath } from "../utils";
 import { listUsers, login, me } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
-import { createVersion, deleteVersion, listVersions, updateVersionStatus } from "./versions/versions.usecase";
+import {
+  checkinVersion,
+  checkoutVersion,
+  createVersion,
+  deleteVersion,
+  forceUnlockVersion,
+  listVersions,
+  promoteVersion,
+  undoCheckout,
+  updateVersionStatus
+} from "./versions/versions.usecase";
 import { patchReviewStatus, postTeam } from "./team/team.controller";
 
 type MockRes = {
@@ -68,6 +78,13 @@ function getActiveUserToken(): string {
 
 function getActiveUserRole(): AuthUser["role"] {
   return getActiveUser().role;
+}
+
+function getNonAdminUserToken(): string {
+  const store = loadUsersStore();
+  const user = store.users.find((x) => x.status === "active" && x.role !== "admin");
+  assert.ok(user, "non-admin active user required for handler tests");
+  return signAuthToken(user);
 }
 
 function withFileSnapshotRestore(filePath: string, run: () => void): void {
@@ -151,7 +168,7 @@ test("templates.usecase: getTemplate returns not_found code for wrong templateId
   });
   const res = createMockRes();
   getTemplate(req, res as unknown as Response);
-  assert.equal(res.statusCode, 400);
+  assert.equal(res.statusCode, 404);
   assert.equal((res.body as { code?: number }).code, 40401);
 });
 
@@ -249,6 +266,162 @@ test("versions.usecase: create -> update -> delete lifecycle works", () => {
     const deleted = deleteRes.body as { code: number; data: { deleted: boolean } };
     assert.equal(deleted.code, 0);
     assert.equal(deleted.data.deleted, true);
+  });
+});
+
+test("versions.usecase: checkout -> checkin updates lock and version code", () => {
+  const versionsPath = versionsStorePath();
+  withFileSnapshotRestore(versionsPath, () => {
+    const versionCode = `UT-VCS-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const createReq = createMockReq({
+      token: getActiveUserToken(),
+      body: {
+        type: "assessment",
+        versionCode,
+        templateId: "default",
+        status: "draft",
+        payload: { a: 1 }
+      }
+    });
+    const createRes = createMockRes();
+    createVersion(createReq, createRes as unknown as Response);
+    assert.equal(createRes.statusCode, 200);
+    const created = createRes.body as { data: { record: { id: string } } };
+    const recordId = created.data.record.id;
+
+    const checkoutReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
+    const checkoutRes = createMockRes();
+    checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
+    assert.equal(checkoutRes.statusCode, 200);
+    const checkedOut = checkoutRes.body as { data: { record: { checkoutStatus: string; checkedOutByUserId?: string } } };
+    assert.equal(checkedOut.data.record.checkoutStatus, "checked_out");
+    assert.ok(checkedOut.data.record.checkedOutByUserId);
+
+    const checkinReq = createMockReq({
+      token: getActiveUserToken(),
+      params: { id: recordId },
+      body: { payload: { a: 2 } }
+    });
+    const checkinRes = createMockRes();
+    checkinVersion(checkinReq, checkinRes as unknown as Response);
+    assert.equal(checkinRes.statusCode, 200);
+    const checkedIn = checkinRes.body as { data: { record: { checkoutStatus: string; versionCode: string; payload: { a: number } } } };
+    assert.equal(checkedIn.data.record.checkoutStatus, "checked_in");
+    assert.equal(checkedIn.data.record.payload.a, 2);
+    assert.ok(checkedIn.data.record.versionCode.includes("-VA1"));
+  });
+});
+
+test("versions.usecase: undo-checkout restores last checkin payload", () => {
+  const versionsPath = versionsStorePath();
+  withFileSnapshotRestore(versionsPath, () => {
+    const versionCode = `UT-UNDO-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const createReq = createMockReq({
+      token: getActiveUserToken(),
+      body: {
+        type: "assessment",
+        versionCode,
+        templateId: "default",
+        status: "draft",
+        payload: { name: "before" }
+      }
+    });
+    const createRes = createMockRes();
+    createVersion(createReq, createRes as unknown as Response);
+    const recordId = (createRes.body as { data: { record: { id: string } } }).data.record.id;
+
+    const checkoutReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
+    const checkoutRes = createMockRes();
+    checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
+    assert.equal(checkoutRes.statusCode, 200);
+
+    const store = JSON.parse(fs.readFileSync(versionsPath, "utf-8")) as {
+      records: Array<{ id: string; payload: Record<string, unknown> }>;
+    };
+    const target = store.records.find((x) => x.id === recordId);
+    assert.ok(target);
+    target.payload = { name: "changed" };
+    fs.writeFileSync(versionsPath, JSON.stringify(store, null, 2), "utf-8");
+
+    const undoReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
+    const undoRes = createMockRes();
+    undoCheckout(undoReq, undoRes as unknown as Response);
+    assert.equal(undoRes.statusCode, 200);
+    const body = undoRes.body as { data: { record: { checkoutStatus: string; payload: { name: string } } } };
+    assert.equal(body.data.record.checkoutStatus, "checked_in");
+    assert.equal(body.data.record.payload.name, "before");
+  });
+});
+
+test("versions.usecase: promote archives current record and creates checked_out record", () => {
+  const versionsPath = versionsStorePath();
+  withFileSnapshotRestore(versionsPath, () => {
+    const versionCode = `UT-PM-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const createReq = createMockReq({
+      token: getActiveUserToken(),
+      body: {
+        type: "assessment",
+        versionCode,
+        templateId: "default",
+        status: "draft",
+        payload: { p: 1 }
+      }
+    });
+    const createRes = createMockRes();
+    createVersion(createReq, createRes as unknown as Response);
+    const recordId = (createRes.body as { data: { record: { id: string } } }).data.record.id;
+
+    const promoteReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
+    const promoteRes = createMockRes();
+    promoteVersion(promoteReq, promoteRes as unknown as Response);
+    assert.equal(promoteRes.statusCode, 200);
+    const body = promoteRes.body as {
+      data: {
+        archived: { isHistoricalArchive: boolean };
+        newRecord: { checkoutStatus: string; versionCode: string };
+      };
+    };
+    assert.equal(body.data.archived.isHistoricalArchive, true);
+    assert.equal(body.data.newRecord.checkoutStatus, "checked_out");
+    assert.ok(body.data.newRecord.versionCode.includes("-VB1"));
+  });
+});
+
+test("versions.usecase: force-unlock requires admin and unlocks checked out record", () => {
+  const versionsPath = versionsStorePath();
+  withFileSnapshotRestore(versionsPath, () => {
+    const versionCode = `UT-FU-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const createReq = createMockReq({
+      token: getActiveUserToken(),
+      body: {
+        type: "assessment",
+        versionCode,
+        templateId: "default",
+        status: "draft",
+        payload: {}
+      }
+    });
+    const createRes = createMockRes();
+    createVersion(createReq, createRes as unknown as Response);
+    const recordId = (createRes.body as { data: { record: { id: string } } }).data.record.id;
+
+    const checkoutReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
+    const checkoutRes = createMockRes();
+    checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
+    assert.equal(checkoutRes.statusCode, 200);
+
+    const nonAdminReq = createMockReq({ token: getNonAdminUserToken(), params: { id: recordId } });
+    const nonAdminRes = createMockRes();
+    forceUnlockVersion(nonAdminReq, nonAdminRes as unknown as Response);
+    assert.equal(nonAdminRes.statusCode, 403);
+    assert.equal((nonAdminRes.body as { code?: number }).code, 40301);
+
+    const adminReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
+    const adminRes = createMockRes();
+    forceUnlockVersion(adminReq, adminRes as unknown as Response);
+    assert.equal(adminRes.statusCode, 200);
+    const unlocked = adminRes.body as { data: { record: { checkoutStatus: string } } };
+    assert.equal(unlocked.data.record.checkoutStatus, "checked_in");
   });
 });
 

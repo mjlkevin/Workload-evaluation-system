@@ -97,7 +97,13 @@
       "createdAt": "2026-03-28T14:41:24.587Z",
       "updatedAt": "2026-03-28T14:41:24.587Z",
       "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "createdByUsername": "mjlkevin"
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "RI-20260328001A",
+      "isHistoricalArchive": false
     },
     {
       "id": "70e0d764-b703-4f86-9730-aeaa7381c8c8",
@@ -531,7 +537,13 @@
       "createdAt": "2026-03-28T14:46:25.476Z",
       "updatedAt": "2026-03-28T14:46:25.476Z",
       "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "createdByUsername": "mjlkevin"
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "RI-20260328001B",
+      "isHistoricalArchive": false
     },
     {
       "id": "f39ae1b0-1aed-478b-9655-74f3a3cf26d7",
@@ -965,7 +977,13 @@
       "createdAt": "2026-03-28T14:47:05.572Z",
       "updatedAt": "2026-03-28T14:47:05.572Z",
       "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "createdByUsername": "mjlkevin"
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "RI-20260328001C",
+      "isHistoricalArchive": false
     },
     {
       "id": "967594ff-ae4f-43bd-a45a-bdfdc7546688",
@@ -1576,7 +1594,13 @@
       "createdAt": "2026-03-28T15:00:37.867Z",
       "updatedAt": "2026-03-28T15:00:37.867Z",
       "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "createdByUsername": "mjlkevin"
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "PG-20260328001A",
+      "isHistoricalArchive": false
     },
     {
       "id": "70311d23-5f5b-4915-b3ba-44caf082277a",
@@ -1695,7 +1719,13 @@
       "createdAt": "2026-03-28T16:54:58.635Z",
       "updatedAt": "2026-03-28T16:54:58.635Z",
       "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "createdByUsername": "mjlkevin"
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "RS-20260329001A",
+      "isHistoricalArchive": false
     },
     {
       "id": "dbcb7da1-e4d8-4b9c-bc6e-7a81530eb009",
@@ -1747,7 +1777,13 @@
       "createdAt": "2026-03-28T16:57:37.932Z",
       "updatedAt": "2026-03-28T16:57:37.932Z",
       "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "createdByUsername": "mjlkevin"
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "DV-20260329001A",
+      "isHistoricalArchive": false
     },
     {
       "id": "2e373591-8151-4b6c-80f5-9c5e1de7c4dc",
@@ -2358,7 +2394,341 @@
       "createdAt": "2026-03-29T06:32:20.448Z",
       "updatedAt": "2026-03-29T06:32:20.448Z",
       "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "createdByUsername": "mjlkevin"
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "PG-20260329001A",
+      "isHistoricalArchive": false
+    },
+    {
+      "id": "ver-ut-gl-1",
+      "type": "global",
+      "versionCode": "GL-UT-03",
+      "templateId": "default",
+      "ownerUserId": "team-owner-a-ut",
+      "status": "draft",
+      "payload": {
+        "projectName": "UT Project"
+      },
+      "createdAt": "2026-03-30T08:34:17.101Z",
+      "updatedAt": "2026-03-30T08:34:17.101Z",
+      "createdByUserId": "team-owner-a-ut",
+      "createdByUsername": "ownerA",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "GL-UT-03",
+      "isHistoricalArchive": false
+    },
+    {
+      "id": "9702049a-976a-45bf-926d-7fc14bf78319",
+      "type": "global",
+      "versionCode": "GLOBAL-20260404-0053",
+      "templateId": "default",
+      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "status": "draft",
+      "payload": {
+        "projectName": "未命名项目",
+        "basicInfo": {
+          "projectName": "未命名项目"
+        }
+      },
+      "createdAt": "2026-04-03T16:53:29.855Z",
+      "updatedAt": "2026-04-03T16:53:29.855Z",
+      "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "GLOBAL-20260404-0053",
+      "isHistoricalArchive": false
+    },
+    {
+      "id": "57e7e7c2-148d-4bd3-938c-deb9d426bcd3",
+      "type": "requirementImport",
+      "versionCode": "RI-20260404-010153-G6YK",
+      "templateId": "default",
+      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "status": "draft",
+      "payload": {
+        "globalVersionCode": "GLOBAL-20260404-0053",
+        "basicInfo": {
+          "customerName": "南方航空",
+          "projectName": "南方航空",
+          "opportunityNo": "",
+          "customerIndustry": "L 租赁和商务服务业 > 72 商务服务业 > 729 其他商务服务业 > 7299 其他未列明商务服务业",
+          "enterpriseRevenue": "2021年营业收入约1016.4亿元人民币，净利润约-121亿元人民币。资产负债率约77%，财务杠杆较高。",
+          "itStatus": "南航信息化建设较为成熟，已建立较为完善的IT系统架构。主要系统包括：1）ERP系统，实现财务、人力、物资等核心业务流程的数字化管理；2）CRM系统，实现客户关系管理与营销自动化；3）飞行运行控制系统，实现飞行计划、机组排班等核心业务的数字化管理。整体信息化水平处于行业领先。",
+          "expectedGoLive": "",
+          "enterpriseProfile": "南方航空是中国运输飞机最多、航线网络最发达、年客运量最大的航空公司。截至2022年，南航运营超过860架飞机，员工规模超过10万人，年旅客运输量超过1.5亿人次。2021年营业收入约1016.4亿元人民币，净利润约-121亿元人民币。",
+          "projectBackgroundNeeds": "",
+          "projectGoals": ""
+        },
+        "valuePropositionRows": [
+          {
+            "id": "d8aab10f-18c5-41e8-891c-71e94acbb6f5",
+            "summary": "",
+            "refinedContent": "",
+            "originalDemand": "",
+            "interviewOutline": ""
+          }
+        ],
+        "businessNeedRows": [
+          {
+            "id": "022166dc-3e85-419c-9092-21db42b05b5a",
+            "businessDomain": "",
+            "category": "",
+            "businessNeed": "",
+            "proposer": "",
+            "title": "",
+            "requiresCustomDev": "否"
+          }
+        ],
+        "devOverviewRows": [
+          {
+            "id": "1075085e-f592-4e12-b046-06679693ab08",
+            "businessDomain": "",
+            "moduleName": "",
+            "moduleBrief": "",
+            "functionDesc": "",
+            "solutionSuggestion": "",
+            "codingDays": 0,
+            "estimateBasis": ""
+          }
+        ],
+        "productModuleRows": [
+          {
+            "id": "7e66f1fe-4a18-4a12-9df3-9d67b97fe22d",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "",
+            "userCount": "",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          }
+        ],
+        "implementationScopeRows": [
+          {
+            "id": "0664ab10-cbeb-477c-a90c-a6ec8e15305d",
+            "companyName": "",
+            "companyType": "",
+            "moduleScope": "",
+            "location": "",
+            "implementationMode": "",
+            "note": ""
+          }
+        ],
+        "meetingNotes": "",
+        "keyPointRows": [
+          {
+            "id": "94c428f0-1d3f-4c5d-a239-2b369aea446f",
+            "analysisCategory": "",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          }
+        ]
+      },
+      "createdAt": "2026-04-03T17:01:53.718Z",
+      "updatedAt": "2026-04-04T15:20:49.809Z",
+      "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_out",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 1,
+      "baseCode": "RI-20260404-010153-G6YK",
+      "isHistoricalArchive": false,
+      "checkedOutByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "checkedOutByUsername": "mjlkevin",
+      "checkoutAt": "2026-04-04T15:20:49.809Z",
+      "lastCheckinPayload": {
+        "globalVersionCode": "GLOBAL-20260404-0053",
+        "basicInfo": {
+          "customerName": "南方航空",
+          "projectName": "南方航空",
+          "opportunityNo": "",
+          "customerIndustry": "L 租赁和商务服务业 > 72 商务服务业 > 729 其他商务服务业 > 7299 其他未列明商务服务业",
+          "enterpriseRevenue": "2021年营业收入约1016.4亿元人民币，净利润约-121亿元人民币。资产负债率约77%，财务杠杆较高。",
+          "itStatus": "南航信息化建设较为成熟，已建立较为完善的IT系统架构。主要系统包括：1）ERP系统，实现财务、人力、物资等核心业务流程的数字化管理；2）CRM系统，实现客户关系管理与营销自动化；3）飞行运行控制系统，实现飞行计划、机组排班等核心业务的数字化管理。整体信息化水平处于行业领先。",
+          "expectedGoLive": "",
+          "enterpriseProfile": "南方航空是中国运输飞机最多、航线网络最发达、年客运量最大的航空公司。截至2022年，南航运营超过860架飞机，员工规模超过10万人，年旅客运输量超过1.5亿人次。2021年营业收入约1016.4亿元人民币，净利润约-121亿元人民币。",
+          "projectBackgroundNeeds": "",
+          "projectGoals": ""
+        },
+        "valuePropositionRows": [
+          {
+            "id": "d8aab10f-18c5-41e8-891c-71e94acbb6f5",
+            "summary": "",
+            "refinedContent": "",
+            "originalDemand": "",
+            "interviewOutline": ""
+          }
+        ],
+        "businessNeedRows": [
+          {
+            "id": "022166dc-3e85-419c-9092-21db42b05b5a",
+            "businessDomain": "",
+            "category": "",
+            "businessNeed": "",
+            "proposer": "",
+            "title": "",
+            "requiresCustomDev": "否"
+          }
+        ],
+        "devOverviewRows": [
+          {
+            "id": "1075085e-f592-4e12-b046-06679693ab08",
+            "businessDomain": "",
+            "moduleName": "",
+            "moduleBrief": "",
+            "functionDesc": "",
+            "solutionSuggestion": "",
+            "codingDays": 0,
+            "estimateBasis": ""
+          }
+        ],
+        "productModuleRows": [
+          {
+            "id": "7e66f1fe-4a18-4a12-9df3-9d67b97fe22d",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "",
+            "userCount": "",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          }
+        ],
+        "implementationScopeRows": [
+          {
+            "id": "0664ab10-cbeb-477c-a90c-a6ec8e15305d",
+            "companyName": "",
+            "companyType": "",
+            "moduleScope": "",
+            "location": "",
+            "implementationMode": "",
+            "note": ""
+          }
+        ],
+        "meetingNotes": "",
+        "keyPointRows": [
+          {
+            "id": "94c428f0-1d3f-4c5d-a239-2b369aea446f",
+            "analysisCategory": "",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          }
+        ]
+      }
+    },
+    {
+      "id": "71079940-efd4-41d6-be3a-723cf322b513",
+      "type": "requirementImport",
+      "versionCode": "RI-20260404-232100-LBJR",
+      "templateId": "default",
+      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "status": "draft",
+      "payload": {
+        "globalVersionCode": "GLOBAL-20260404-0053",
+        "basicInfo": {
+          "customerName": "南方航空",
+          "projectName": "南方航空",
+          "opportunityNo": "",
+          "customerIndustry": "L 租赁和商务服务业 > 72 商务服务业 > 729 其他商务服务业 > 7299 其他未列明商务服务业",
+          "enterpriseRevenue": "2021年营业收入约1016.4亿元人民币，净利润约-121亿元人民币。资产负债率约77%，财务杠杆较高。",
+          "itStatus": "南航信息化建设较为成熟，已建立较为完善的IT系统架构。主要系统包括：1）ERP系统，实现财务、人力、物资等核心业务流程的数字化管理；2）CRM系统，实现客户关系管理与营销自动化；3）飞行运行控制系统，实现飞行计划、机组排班等核心业务的数字化管理。整体信息化水平处于行业领先。",
+          "expectedGoLive": "2026-12",
+          "enterpriseProfile": "南方航空是中国运输飞机最多、航线网络最发达、年客运量最大的航空公司。截至2022年，南航运营超过860架飞机，员工规模超过10万人，年旅客运输量超过1.5亿人次。2021年营业收入约1016.4亿元人民币，净利润约-121亿元人民币。",
+          "projectBackgroundNeeds": "",
+          "projectGoals": ""
+        },
+        "valuePropositionRows": [
+          {
+            "id": "d8aab10f-18c5-41e8-891c-71e94acbb6f5",
+            "summary": "",
+            "refinedContent": "",
+            "originalDemand": "",
+            "interviewOutline": ""
+          }
+        ],
+        "businessNeedRows": [
+          {
+            "id": "022166dc-3e85-419c-9092-21db42b05b5a",
+            "businessDomain": "",
+            "category": "",
+            "businessNeed": "",
+            "proposer": "",
+            "title": "",
+            "requiresCustomDev": "否"
+          }
+        ],
+        "devOverviewRows": [
+          {
+            "id": "1075085e-f592-4e12-b046-06679693ab08",
+            "businessDomain": "",
+            "moduleName": "",
+            "moduleBrief": "",
+            "functionDesc": "",
+            "solutionSuggestion": "",
+            "codingDays": 0,
+            "estimateBasis": ""
+          }
+        ],
+        "productModuleRows": [
+          {
+            "id": "7e66f1fe-4a18-4a12-9df3-9d67b97fe22d",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "",
+            "userCount": "",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          }
+        ],
+        "implementationScopeRows": [
+          {
+            "id": "0664ab10-cbeb-477c-a90c-a6ec8e15305d",
+            "companyName": "",
+            "companyType": "",
+            "moduleScope": "",
+            "location": "",
+            "implementationMode": "",
+            "note": ""
+          }
+        ],
+        "meetingNotes": "",
+        "keyPointRows": [
+          {
+            "id": "94c428f0-1d3f-4c5d-a239-2b369aea446f",
+            "analysisCategory": "",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          }
+        ]
+      },
+      "createdAt": "2026-04-04T15:21:00.253Z",
+      "updatedAt": "2026-04-04T15:21:00.253Z",
+      "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "createdByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 0,
+      "baseCode": "RI-20260404-232100-LBJR",
+      "isHistoricalArchive": false,
+      "lastCheckinPayload": {}
     }
   ]
 }

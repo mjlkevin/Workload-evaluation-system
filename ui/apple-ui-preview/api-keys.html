@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>API Key 管理</title><link rel="stylesheet" href="./styles.css" /></head>
+  <body>
+    <div class="app">
+      <aside class="sidebar"><div class="brand"><div class="logo"></div><div><div class="brand-name">工作量评估系统</div><div class="brand-sub">Apple UI Preview</div></div></div><nav class="nav"><a href="./index.html">总览</a><a href="./requirement-import.html">需求</a><a href="./assessment.html">实施评估</a><a href="./dev-assessment.html">开发评估</a><a href="./resource-cost.html">资源成本</a><a href="./wbs.html">WBS</a><a href="./review.html">评审</a><a href="./user-management.html">用户管理</a><a class="active" href="./api-keys.html">API Key</a><a href="./login.html">登录页</a></nav></aside>
+      <main class="content">
+        <header class="topbar"><div><h1 class="title">API Key 管理</h1><p class="subtitle">保持密钥展示与说明结构，优化安全提示与可读性。</p></div><span class="badge">安全配置</span></header>
+        <section class="card" style="margin-bottom:12px"><div class="field"><label>KIMI_API_KEY</label><input value="sk-6zr4S2AVLMoVR3kkdYoXchEWZ4kAlBw7D2bLgLuiaxwjnKIi" /></div><div class="grid-2"><div class="field"><label>KIMI_MODEL</label><select><option>moonshot-v1-auto</option></select></div><div class="field"><label>KIMI_API_BASE_URL</label><input value="https://api.moonshot.cn/v1" /></div></div><div class="row"><button class="btn primary">保存配置</button><button class="btn ghost">测试连通性</button></div></section>
+        <section class="card"><h3 style="margin-top:0">调用状态</h3><table class="table"><thead><tr><th>时间</th><th>接口</th><th>模型</th><th>结果</th></tr></thead><tbody><tr><td>16:40:12</td><td>/api/v1/ai/company-profile-summary</td><td>moonshot-v1-auto</td><td><span class="tag ok">200</span></td></tr><tr><td>16:35:08</td><td>/api/v1/ai/parse-basic-info</td><td>moonshot-v1-auto</td><td><span class="tag ok">200</span></td></tr></tbody></table></section>
+      </main>
+    </div>
+  </body>
+</html>

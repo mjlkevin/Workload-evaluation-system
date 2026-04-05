@@ -2,5 +2,10 @@ export {
   listVersions,
   createVersion,
   updateVersionStatus,
-  deleteVersion
+  deleteVersion,
+  checkoutVersion,
+  checkinVersion,
+  undoCheckout,
+  promoteVersion,
+  forceUnlockVersion,
 } from "./versions.usecase";

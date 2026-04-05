@@ -4,6 +4,17 @@
 
 import { createApp } from "./app";
 import { config } from "./config/env";
+import { runConfigIntegrityCheck } from "./ops/config-integrity";
+
+const shouldRunIntegrityCheck = process.env.CONFIG_INTEGRITY_ON_STARTUP !== "false";
+if (shouldRunIntegrityCheck) {
+  const integrity = runConfigIntegrityCheck("startup", false);
+  if (!integrity.ok) {
+    console.warn(
+      `[api] config integrity check found ${integrity.issues.length} issue(s), see logs/data-anomaly-repair.log`
+    );
+  }
+}
 
 const app = createApp();
 

@@ -7,6 +7,7 @@ export {
   getPlans,
   patchPlanBinding,
   postReview,
+  getReviews,
   patchReviewStatus,
   getReviewComments,
   postReviewComment

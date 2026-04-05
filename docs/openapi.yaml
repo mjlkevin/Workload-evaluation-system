@@ -10,21 +10,26 @@ info:
 
     **未在本文档中展开的已实现端点**（完整列表见仓库
     `03_技术设计/系统演进/实现与文档对齐说明.md`）包括但不限于：
-    `/api/v1/auth/*`、`/api/v1/versions/*`、`/api/v1/ai/parse-basic-info`；
+    `/api/v1/auth/*`、`/api/v1/versions/*`、`/api/v1/ai/parse-basic-info`、
+    `/api/v1/teams/*`、`GET /api/v1/wbs`；
     下载路径为 `GET /downloads/{fileName}`（非 `/api/v1` 前缀）。
+
+    **`/api/v1/agent/*` 说明**：当前主线运行时**未挂载** Agent 高层路由；历史设计与待办见
+    `00_项目治理/里程碑与计划/项目开发TODO.md`。对外集成请使用既有估算与会话接口。
 servers:
   - url: http://localhost:3000
     description: Local API server
 
 tags:
   - name: Health
+  - name: Versions
   - name: Templates
   - name: RuleSets
   - name: Estimates
   - name: Sessions
   - name: Exports
-  - name: Agent
   - name: Teams
+  - name: Wbs
 
 paths:
   /api/v1/health:
@@ -433,63 +438,74 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /api/v1/agent/estimate:
-    post:
-      tags: [Agent]
-      summary: Agent 高层估算入口（缺参时返回结构化追问）
-      operationId: agentEstimate
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AgentEstimateRequest"
-      responses:
-        "200":
-          description: 统一 Agent 响应（success / needs_clarification / failed）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AgentApiResponse"
-        "401":
-          description: 未登录或凭证失效
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /api/v1/agent/session/start:
-    post:
-      tags: [Agent]
-      summary: 创建 Agent 会话并返回首轮结构化响应
-      operationId: agentSessionStart
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AgentSessionStartRequest"
-      responses:
-        "200":
-          description: 统一 Agent 响应
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AgentApiResponse"
-        "401":
-          description: 未登录或凭证失效
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /api/v1/agent/session/{sessionId}/continue:
-    post:
-      tags: [Agent]
-      summary: 继续 Agent 会话并补全参数
-      operationId: agentSessionContinue
+  /api/v1/versions:
+    get:
+      tags: [Versions]
+      summary: 查询当前用户版本列表
+      operationId: listVersions
       parameters:
-        - name: sessionId
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [requirementImport, assessment, resource, dev, global]
+        - name: templateId
+          in: query
+          required: false
+          schema:
+            type: string
+            default: default
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionListResponse"
+        "400":
+          description: 参数错误或权限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Versions]
+      summary: 创建版本记录
+      operationId: createVersion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionCreateRequest"
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSingleResponse"
+        "400":
+          description: 参数错误或权限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 版本号冲突等业务冲突
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/versions/{recordId}/status:
+    patch:
+      tags: [Versions]
+      summary: 更新版本状态（draft/reviewed/published）
+      operationId: updateVersionStatus
+      parameters:
+        - name: recordId
           in: path
           required: true
           schema:
@@ -499,16 +515,245 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AgentSessionContinueRequest"
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [draft, reviewed, published]
       responses:
         "200":
-          description: 统一 Agent 响应
+          description: 更新成功
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AgentApiResponse"
+                $ref: "#/components/schemas/VersionSingleResponse"
+        "400":
+          description: 参数错误或权限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/versions/{id}/checkout:
+    post:
+      tags: [Versions]
+      summary: 检出版本（排他锁）
+      operationId: checkoutVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 检出成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSingleResponse"
+        "409":
+          description: 当前状态不允许检出
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/versions/{id}/checkin:
+    post:
+      tags: [Versions]
+      summary: 检入版本（释放锁并递增小版本）
+      operationId: checkinVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payload:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: 检入成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionCheckinResponse"
+        "403":
+          description: 非检出人不能检入
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 当前状态不允许检入
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/versions/{id}/undo-checkout:
+    post:
+      tags: [Versions]
+      summary: 撤销检出（恢复至上次检入快照）
+      operationId: undoCheckoutVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 撤销成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSingleResponse"
+        "403":
+          description: 非检出人不能撤销检出
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 当前状态不允许撤销
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/versions/{id}/promote:
+    post:
+      tags: [Versions]
+      summary: 升版（当前记录归档并创建新记录）
+      operationId: promoteVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 升版成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionPromoteResponse"
+        "409":
+          description: 当前状态不允许升版
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/versions/{id}/force-unlock:
+    patch:
+      tags: [Versions]
+      summary: 管理员强制解锁
+      operationId: forceUnlockVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 解锁成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionForceUnlockResponse"
+        "403":
+          description: 仅管理员可操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 当前状态无需解锁
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/versions/{type}/{versionCode}:
+    delete:
+      tags: [Versions]
+      summary: 删除版本（若被总方案引用则拒绝）
+      operationId: deleteVersion
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [requirementImport, assessment, resource, dev, global]
+        - name: versionCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: templateId
+          in: query
+          required: false
+          schema:
+            type: string
+            default: default
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionDeleteResponse"
+        "409":
+          description: 被总方案引用等业务冲突
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/wbs:
+    get:
+      tags: [Wbs]
+      summary: WBS 只读派生列表（基于当前用户最新总方案 GL-）
+      description: >
+        无独立 WBS 持久化：服务端根据 `config/versions/records.json` 中该用户最新一条
+        `type=global` 记录，生成占位任务行（日期与状态为演示口径，随实现调整）。
+      operationId: getWbsDerived
+      responses:
+        "200":
+          description: 成功；无总方案时 `data` 为空数组
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WbsListResponse"
         "401":
           description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 权限不足
           content:
             application/json:
               schema:
@@ -1010,6 +1255,197 @@ components:
             required: [field, reason]
       required: [code, message, details, requestId]
 
+    VersionRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [requirementImport, assessment, resource, dev, global]
+        versionCode:
+          type: string
+        templateId:
+          type: string
+        ownerUserId:
+          type: string
+        status:
+          type: string
+          enum: [draft, reviewed, published]
+        payload:
+          type: object
+          additionalProperties: true
+        checkoutStatus:
+          type: string
+          enum: [checked_in, checked_out]
+        versionDocStatus:
+          type: string
+          enum: [drafting, reviewed]
+        checkedOutByUserId:
+          type: string
+        checkedOutByUsername:
+          type: string
+        checkoutAt:
+          type: string
+        majorLetter:
+          type: string
+        minorNumber:
+          type: integer
+        baseCode:
+          type: string
+        isHistoricalArchive:
+          type: boolean
+        archivedAt:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, type, versionCode, templateId, ownerUserId, status, payload, checkoutStatus, versionDocStatus, majorLetter, minorNumber, baseCode, isHistoricalArchive, createdAt, updatedAt]
+
+    VersionCreateRequest:
+      type: object
+      required: [type, versionCode, status]
+      properties:
+        type:
+          type: string
+          enum: [requirementImport, assessment, resource, dev, global]
+        versionCode:
+          type: string
+        templateId:
+          type: string
+          default: default
+        status:
+          type: string
+          enum: [draft, reviewed, published]
+        payload:
+          type: object
+          additionalProperties: true
+
+    VersionSingleResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            record:
+              $ref: "#/components/schemas/VersionRecord"
+          required: [record]
+      required: [code, message, data]
+
+    VersionListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/VersionRecord"
+          required: [items]
+      required: [code, message, data]
+
+    VersionCheckinResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            record:
+              $ref: "#/components/schemas/VersionRecord"
+            versionCode:
+              type: string
+          required: [record, versionCode]
+      required: [code, message, data]
+
+    VersionPromoteResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            archived:
+              $ref: "#/components/schemas/VersionRecord"
+            newRecord:
+              $ref: "#/components/schemas/VersionRecord"
+          required: [archived, newRecord]
+      required: [code, message, data]
+
+    VersionForceUnlockResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            record:
+              $ref: "#/components/schemas/VersionRecord"
+            unlockedBy:
+              type: string
+          required: [record, unlockedBy]
+      required: [code, message, data]
+
+    VersionDeleteResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            deleted:
+              type: boolean
+            record:
+              $ref: "#/components/schemas/VersionRecord"
+          required: [deleted, record]
+      required: [code, message, data]
+
     TemplateListItem:
       type: object
       properties:
@@ -1424,158 +1860,39 @@ components:
           required: [sessionId, templateId, ruleSetId, expiresAt]
       required: [code, message, data]
 
-    AgentHints:
+    WbsItem:
       type: object
       properties:
-        templateId:
+        id:
           type: string
-        ruleSetId:
+          format: uuid
+        moduleKey:
           type: string
-        userCount:
-          type: number
-        difficultyFactor:
-          type: number
-        orgCount:
-          type: number
-        orgSimilarityFactor:
-          type: number
-          minimum: 0
-          maximum: 1
-        selectedSheet:
+          enum: [requirementImport, assessment, dev, resource]
+        taskName:
           type: string
-        includedTemplateItemIds:
-          type: array
-          items:
-            type: string
-        contextNote:
+        owner:
           type: string
-
-    AgentEstimateRequest:
-      type: object
-      properties:
-        userMessage:
+        linkedVersionCode:
           type: string
-        sessionId:
+        sourceGlobalVersionCode:
           type: string
-        hints:
-          $ref: "#/components/schemas/AgentHints"
-
-    AgentSessionStartRequest:
-      type: object
-      properties:
-        userMessage:
+        sourceGlobalRecordId:
           type: string
-        hints:
-          $ref: "#/components/schemas/AgentHints"
-
-    AgentSessionContinueRequest:
-      type: object
-      properties:
-        userMessage:
+        isDerived:
+          type: boolean
+        start:
           type: string
-        hints:
-          $ref: "#/components/schemas/AgentHints"
-
-    AgentQuestion:
-      type: object
-      properties:
-        field:
+          description: YYYY-MM-DD
+        end:
           type: string
-        question:
-          type: string
-        expectedType:
-          type: string
-          enum: [string, number]
-        options:
-          type: array
-          items:
-            oneOf:
-              - type: string
-              - type: number
-      required: [field, question, expectedType]
-
-    AgentAssumption:
-      type: object
-      properties:
-        field:
-          type: string
-        value:
-          oneOf:
-            - type: string
-            - type: number
-            - type: boolean
-        reason:
-          type: string
-      required: [field, value, reason]
-
-    AgentEstimatePayload:
-      type: object
-      properties:
-        totalDays:
-          type: number
-        result:
-          $ref: "#/components/schemas/EstimateResult"
-      required: [totalDays, result]
-
-    AgentResponseData:
-      type: object
-      properties:
+          description: YYYY-MM-DD
         status:
           type: string
-          enum: [success, needs_clarification, failed]
-        sessionId:
-          type: string
-        missingFieldsCount:
-          type: integer
-        contextSummary:
-          type: string
-        intentCandidates:
-          type: array
-          description: 基于 userMessage 解析的 topK 候选（含置信度与原因）
-          items:
-            $ref: "#/components/schemas/AgentIntentCandidate"
-        normalizedRequest:
-          type: object
-          additionalProperties: true
-        missingFields:
-          type: array
-          items:
-            type: string
-        assumptions:
-          type: array
-          items:
-            $ref: "#/components/schemas/AgentAssumption"
-        nextQuestions:
-          type: array
-          items:
-            $ref: "#/components/schemas/AgentQuestion"
-        estimate:
-          $ref: "#/components/schemas/AgentEstimatePayload"
-        errorCode:
-          type: string
-        suggestedFixes:
-          type: array
-          items:
-            type: string
-      required: [status]
+          enum: [未开始, 进行中, 已完成]
+      required: [id, moduleKey, taskName, owner, linkedVersionCode, sourceGlobalVersionCode, sourceGlobalRecordId, isDerived, start, end, status]
 
-    AgentIntentCandidate:
-      type: object
-      properties:
-        kind:
-          type: string
-          enum: [sheet, item]
-        value:
-          type: string
-        score:
-          type: number
-          minimum: 0
-          maximum: 1
-        reason:
-          type: string
-      required: [kind, value, score, reason]
-
-    AgentApiResponse:
+    WbsListResponse:
       type: object
       properties:
         code:
@@ -1584,10 +1901,10 @@ components:
         message:
           type: string
           const: ok
-        requestId:
-          type: string
         data:
-          $ref: "#/components/schemas/AgentResponseData"
+          type: array
+          items:
+            $ref: "#/components/schemas/WbsItem"
       required: [code, message, data]
 
     TeamRole:

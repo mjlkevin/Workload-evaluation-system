@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>WBS</title><link rel="stylesheet" href="./styles.css" /></head>
+  <body>
+    <div class="app">
+      <aside class="sidebar"><div class="brand"><div class="logo"></div><div><div class="brand-name">工作量评估系统</div><div class="brand-sub">Apple UI Preview</div></div></div><nav class="nav"><a href="./index.html">总览</a><a href="./requirement-import.html">需求</a><a href="./assessment.html">实施评估</a><a href="./dev-assessment.html">开发评估</a><a href="./resource-cost.html">资源成本</a><a class="active" href="./wbs.html">WBS</a><a href="./review.html">评审</a><a href="./user-management.html">用户管理</a><a href="./api-keys.html">API Key</a><a href="./login.html">登录页</a></nav></aside>
+      <main class="content">
+        <header class="topbar"><div><h1 class="title">WBS 工作分解</h1><p class="subtitle">维持原有分解结构与工时字段，优化阅读与层级展示。</p></div><span class="badge">WBS-草稿</span></header>
+        <section class="card">
+          <table class="table">
+            <thead><tr><th>层级</th><th>任务名称</th><th>负责人</th><th>计划工时</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td>L1</td><td>需求调研与蓝图设计</td><td>PM</td><td>12d</td><td><span class="tag ok">进行中</span></td></tr>
+              <tr><td>L2</td><td>实施方案设计</td><td>顾问A</td><td>8d</td><td><span class="tag warn">待开始</span></td></tr>
+              <tr><td>L2</td><td>开发方案评审</td><td>架构师</td><td>5d</td><td><span class="tag warn">待开始</span></td></tr>
+              <tr><td>L3</td><td>联调与验收</td><td>测试组</td><td>10d</td><td><span class="tag danger">阻塞</span></td></tr>
+            </tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

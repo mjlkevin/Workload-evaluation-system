@@ -13,6 +13,7 @@ import aiRoutes from "./ai.routes";
 import sessionsRoutes from "./sessions.routes";
 import exportsRoutes from "./exports.routes";
 import teamRoutes from "./team.routes";
+import wbsRoutes from "./wbs.routes";
 
 import { ok } from "../utils/response";
 
@@ -33,5 +34,6 @@ router.use("/ai", aiRoutes);
 router.use("/sessions", sessionsRoutes);
 router.use("/exports", exportsRoutes);
 router.use("/teams", teamRoutes);
+router.use("/wbs", wbsRoutes);
 
 export default router;

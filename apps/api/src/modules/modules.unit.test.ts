@@ -79,7 +79,13 @@ test("versions.repository: isVersionReferencedByGlobal returns true when referen
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         createdByUserId: "u1",
-        createdByUsername: "tester"
+        createdByUsername: "tester",
+        checkoutStatus: "checked_in",
+        versionDocStatus: "drafting",
+        majorLetter: "A",
+        minorNumber: 0,
+        baseCode: "G01",
+        isHistoricalArchive: false
       }
     ]
   };

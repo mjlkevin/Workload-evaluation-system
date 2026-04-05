@@ -283,6 +283,19 @@ export function createReview(
   return ok(review);
 }
 
+export function listReviews(currentUser: CurrentUser, teamId: string) {
+  const store = loadTeamStore();
+  const team = store.teams.find((x) => x.teamId === teamId);
+  if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
+  if (!ensureTeamMember(team, currentUser.id)) return fail(40301, "权限不足", "teamId", "not_team_member");
+
+  const items = store.reviews
+    .filter((x) => x.teamId === teamId)
+    .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)));
+
+  return ok({ items });
+}
+
 export function updateReviewStatus(
   currentUser: CurrentUser,
   teamId: string,

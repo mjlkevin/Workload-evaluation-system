@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apple UI 预览 - 总览</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand"><div class="logo"></div><div><div class="brand-name">工作量评估系统</div><div class="brand-sub">Apple UI Preview</div></div></div>
+        <nav class="nav">
+          <a class="active" href="./index.html">总览</a>
+          <a href="./requirement-import.html">需求</a>
+          <a href="./assessment.html">实施评估</a>
+          <a href="./dev-assessment.html">开发评估</a>
+          <a href="./resource-cost.html">资源成本</a>
+          <a href="./wbs.html">WBS</a>
+          <a href="./review.html">评审</a>
+          <a href="./user-management.html">用户管理</a>
+          <a href="./api-keys.html">API Key</a>
+          <a href="./login.html">登录页</a>
+        </nav>
+      </aside>
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <h1 class="title">总览 Dashboard</h1>
+            <p class="subtitle">功能架构不变，仅重构视觉层级与交互感知。</p>
+          </div>
+          <span class="badge">管理员 · mjlkevin</span>
+        </header>
+
+        <section class="card" style="margin-bottom: 12px">
+          <div class="row">
+            <button class="btn primary">新建总方案</button>
+            <button class="btn ghost">打开最新方案</button>
+            <button class="btn ghost">导入 Excel 并解析</button>
+          </div>
+          <div class="grid-3" style="margin-top: 12px">
+            <div class="kpi"><div class="label">我的评估</div><div class="value">12</div></div>
+            <div class="kpi"><div class="label">待评审</div><div class="value">3</div></div>
+            <div class="kpi"><div class="label">今日导出</div><div class="value">18</div></div>
+          </div>
+        </section>
+
+        <section class="grid-2">
+          <article class="card">
+            <h3 style="margin-top: 0">流程入口</h3>
+            <p class="subtitle">需求 → 实施评估 → 开发评估 → 资源成本 → 总方案</p>
+            <table class="table">
+              <thead><tr><th>模块</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr><td>需求</td><td>Excel 解析、企业画像、字段回填</td></tr>
+                <tr><td>实施评估</td><td>模板勾选、规则计算、导出</td></tr>
+                <tr><td>开发评估</td><td>开发条目与人天估算</td></tr>
+                <tr><td>资源成本</td><td>角色排期与成本归集</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="card">
+            <h3 style="margin-top: 0">我的方案</h3>
+            <p class="subtitle">展示 GL/PG/RI/DV/RS 版本关系</p>
+            <table class="table">
+              <thead><tr><th>项目</th><th>版本</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr><td>南方电网数字化评估</td><td>GL-20260329001A</td><td><span class="tag ok">已评审</span></td></tr>
+                <tr><td>蓝海集团星空AI</td><td>GL-20260328002B</td><td><span class="tag warn">待评审</span></td></tr>
+                <tr><td>制造云升级专项</td><td>GL-20260327004C</td><td><span class="tag danger">需修订</span></td></tr>
+              </tbody>
+            </table>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

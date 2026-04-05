@@ -72,83 +72,20 @@ curl -s -X POST http://localhost:3000/api/v1/estimates/calculate \
 任何计算请求都必须包含完整 items 列表。
 ```
 
-## 6) Agent-Friendly MVP（推荐优先）
+## 6) Agent-Friendly 高层接口（规划项，当前未挂载）
 
-当你不想自己拼完整 `calculate` 参数时，可直接使用高层接口：
+`/api/v1/agent/estimate`、`/api/v1/agent/session/*` **未包含在当前主线 API 路由中**。自动化与 Agent 集成请使用：
 
-- `POST /api/v1/agent/estimate`
-- `POST /api/v1/agent/session/start`
-- `POST /api/v1/agent/session/{sessionId}/continue`
+- `GET /api/v1/templates`、`GET /api/v1/rule-sets/active` 拉取权威配置；
+- `POST /api/v1/estimates/calculate`（或 `POST /api/v1/sessions/start` + `.../calculate`）提交完整参数。
 
-### 6.1 响应语义
+分阶段实现与验收项见 `00_项目治理/里程碑与计划/项目开发TODO.md`。
 
-- `status=success`：已完成估算，`estimate.totalDays` 可直接使用。
-- `status=needs_clarification`：参数仍有缺失，请按 `nextQuestions` 继续追问用户。
-- `status=failed`：不可恢复失败，查看 `errorCode` 与 `suggestedFixes`。
-
-所有返回都包含可解释字段（按场景出现）：
-
-- `normalizedRequest`
-- `missingFields`
-- `missingFieldsCount`
-- `assumptions`
-- `nextQuestions`
-- `intentCandidates`（P1-MVP：topK 候选，含 `score` 与 `reason`）
-
-### 6.2 P1 增强：意图候选（topK + 置信度）
-
-- 当你只给自然语言（例如“评估财务云和供应链云”）时，接口会返回：
-  - `intentCandidates[]`：`kind=sheet|item`，并给 `score`（0~1）和 `reason`
-- 建议调用方策略：
-  - `score >= 0.9`：可直接采用
-  - `0.7 <= score < 0.9`：给用户一次确认
-  - `< 0.7`：进入澄清提问路径
-### 6.3 最小调用示例
+### 6.1 本地冒烟（当前可用）
 
 ```bash
-# 1) 首次调用（可能返回 needs_clarification）
-curl -s -X POST http://localhost:3000/api/v1/agent/estimate \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <YOUR_JWT>" \
-  -d '{
-    "userMessage": "帮我评估实施工作量"
-  }'
-
-# 2) 建会话 + 继续补参（多轮）
-curl -s -X POST http://localhost:3000/api/v1/agent/session/start \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <YOUR_JWT>" \
-  -d '{
-    "userMessage": "先开始会话",
-    "hints": { "userCount": 80, "difficultyFactor": 0.1 }
-  }'
-
-curl -s -X POST http://localhost:3000/api/v1/agent/session/<SESSION_ID>/continue \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <YOUR_JWT>" \
-  -d '{
-    "userMessage": "补充其余参数",
-    "hints": { "orgCount": 2, "orgSimilarityFactor": 0.8 }
-  }'
-```
-
-### 6.4 本地冒烟
-
-仓库已提供 Agent 高层 API 冒烟脚本：
-
-```bash
-npm run test:api:agent
-```
-
-### 6.5 访问日志窗口统计（近 10 分钟 / 1 小时）
-
-```bash
-# 默认输出 10m / 1h / all
-npm run logs:api:report
-
-# 指定窗口
-npm run logs:api:report -- --window=10m
-npm run logs:api:report -- --window=1h
+npm run test:modules
+npm run test:api:team
 ```
 
 ## 7) 团队协同 P0（当前实现说明）

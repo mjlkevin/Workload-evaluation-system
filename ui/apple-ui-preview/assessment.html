@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>实施评估</title><link rel="stylesheet" href="./styles.css" /></head>
+  <body>
+    <div class="app">
+      <aside class="sidebar"><div class="brand"><div class="logo"></div><div><div class="brand-name">工作量评估系统</div><div class="brand-sub">Apple UI Preview</div></div></div><nav class="nav"><a href="./index.html">总览</a><a href="./requirement-import.html">需求</a><a class="active" href="./assessment.html">实施评估</a><a href="./dev-assessment.html">开发评估</a><a href="./resource-cost.html">资源成本</a><a href="./wbs.html">WBS</a><a href="./review.html">评审</a><a href="./user-management.html">用户管理</a><a href="./api-keys.html">API Key</a><a href="./login.html">登录页</a></nav></aside>
+      <main class="content">
+        <header class="topbar"><div><h1 class="title">实施评估</h1><p class="subtitle">参数配置、实时预览、条目勾选保持原功能。</p></div><span class="badge">PG-20260329001A</span></header>
+        <section class="grid-2" style="margin-bottom:12px">
+          <article class="card">
+            <h3 style="margin-top:0">参数配置</h3>
+            <div class="field"><label>模板</label><select><option>金蝶AI星空-实施人天估算模板</option></select></div>
+            <div class="grid-2"><div class="field"><label>用户数</label><input value="120" /></div><div class="field"><label>难度系数</label><input value="0.2" /></div></div>
+            <div class="grid-2"><div class="field"><label>组织数</label><input value="2" /></div><div class="field"><label>组织相似度</label><input value="0.8" /></div></div>
+            <div class="row"><button class="btn primary">计算并导出</button><button class="btn ghost">保存评估版本</button></div>
+          </article>
+          <article class="card">
+            <h3 style="margin-top:0">实时预览</h3>
+            <div class="grid-3"><div class="kpi"><div class="label">基础人天</div><div class="value">85.4</div></div><div class="kpi"><div class="label">增量人天</div><div class="value">31.6</div></div><div class="kpi"><div class="label">总人天</div><div class="value">117.0</div></div></div>
+            <p class="subtitle" style="margin-top:10px">此处可继续挂接云产品占比图、人天构成图。</p>
+          </article>
+        </section>
+        <section class="card">
+          <h3 style="margin-top:0">模块条目勾选</h3>
+          <table class="table"><thead><tr><th>云产品</th><th>模块</th><th>标准人天</th><th>是否包含</th></tr></thead><tbody><tr><td>财务云</td><td>总账</td><td>12.0</td><td>是</td></tr><tr><td>供应链云</td><td>采购管理</td><td>9.0</td><td>是</td></tr><tr><td>制造云</td><td>生产管理</td><td>10.0</td><td>否</td></tr></tbody></table>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

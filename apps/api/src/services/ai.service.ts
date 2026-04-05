@@ -71,11 +71,12 @@ function pickNumberField(input: Record<string, unknown>, keys: string[]): number
 }
 
 function normalizeBasicProjectInfo(input: Record<string, unknown>): BasicProjectInfo {
+  const rawIndustry = pickModelField(input, ["customerIndustry", "客户行业", "行业"]);
   return {
     customerName: pickModelField(input, ["customerName", "客户名称"]),
     projectName: pickModelField(input, ["projectName", "项目名称"]),
     opportunityNo: pickModelField(input, ["opportunityNo", "商机号"]),
-    customerIndustry: pickModelField(input, ["customerIndustry", "客户行业", "行业"]),
+    customerIndustry: normalizeIndustryTagText(rawIndustry),
     enterpriseRevenue: pickModelField(input, ["enterpriseRevenue", "企业营收", "营收"]),
     itStatus: pickModelField(input, ["itStatus", "信息化现状"]),
     expectedGoLive: pickModelField(input, ["expectedGoLive", "预期上线时间"]),
@@ -83,6 +84,112 @@ function normalizeBasicProjectInfo(input: Record<string, unknown>): BasicProject
     projectBackgroundNeeds: pickModelField(input, ["projectBackgroundNeeds", "项目背景和需求", "项目背景需求"]),
     projectGoals: pickModelField(input, ["projectGoals", "项目目标"])
   };
+}
+
+function normalizeIndustryTagText(input: string): string {
+  const raw = asString(input);
+  if (!raw) return "";
+  const normalized = raw
+    .replace(/[／/\\|]+/g, " > ")
+    .replace(/[＞>]+/g, " > ")
+    .replace(/[，、;；]+/g, " > ")
+    .replace(/\s*-\s*/g, " > ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const parts = normalized
+    .split(">")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+  if (parts.length >= 2) return parts.join(" > ");
+  const inferred = inferIndustry4Level(raw);
+  return inferred || raw;
+}
+
+const INDUSTRY_CODE_NAME_MAP: Record<string, string> = {
+  // 门类（常见）
+  I: "信息传输、软件和信息技术服务业",
+  C: "制造业",
+  F: "批发和零售业",
+  E: "建筑业",
+  L: "租赁和商务服务业",
+  // 大类/中类/小类（按当前高频场景补充，可持续扩展）
+  "61": "商务服务业",
+  "611": "组织管理服务",
+  "6110": "企业总部管理",
+  "65": "软件和信息技术服务业",
+  "651": "软件开发",
+  "6510": "软件开发",
+}
+
+function enrichIndustrySegment(segment: string, idx: number): string {
+  const text = asString(segment).trim();
+  if (!text) return "";
+  if (isIndustrySegmentCodeAndName(text, idx)) return text;
+
+  const alphaCode = text.match(/\b([A-Z])\b/)?.[1] || "";
+  const numCode = text.match(/\b(\d{2,4})\b/)?.[1] || "";
+  const pureCode = idx === 0 ? (alphaCode || text.replace(/\s+/g, "")) : (numCode || text.replace(/\s+/g, ""));
+  const name = INDUSTRY_CODE_NAME_MAP[pureCode] || "";
+  if (!name) return text;
+  return `${pureCode} ${name}`;
+}
+
+function isIndustrySegmentCodeAndName(segment: string, idx: number): boolean {
+  const text = asString(segment);
+  if (!text) return false;
+  const hasName = /[\u4e00-\u9fa5]/.test(text);
+  if (idx === 0) {
+    const hasCode = /\b[A-Z]\b/.test(text);
+    return hasCode && hasName;
+  }
+  const hasCode = /\b\d{2,4}\b/.test(text);
+  return hasCode && hasName;
+}
+
+function ensureIndustryCodeAndName(value: string): string {
+  const normalized = normalizeIndustryTagText(value);
+  const rawParts = normalized
+    .split(">")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+  if (rawParts.length < 2) return "";
+  const parts = rawParts.map((x, idx) => enrichIndustrySegment(x, idx));
+  for (let idx = 0; idx < parts.length; idx += 1) {
+    if (!isIndustrySegmentCodeAndName(parts[idx], idx)) return "";
+  }
+  return parts.join(" > ");
+}
+
+function inferIndustry4Level(text: string): string {
+  const t = asString(text).toLowerCase();
+  if (!t) return "";
+  if (/软件|信息技术|it|saas|云服务|系统集成|数字化/.test(t)) {
+    return "I 信息传输、软件和信息技术服务业 > 65 软件和信息技术服务业 > 651 软件开发 > 6510 软件开发";
+  }
+  if (/制造|工厂|生产|装备|零部件/.test(t)) {
+    return "C 制造业 > 35 专用设备制造业 > 359 环保、邮政、社会公共服务及其他专用设备制造 > 3599 其他专用设备制造";
+  }
+  if (/批发|零售|商贸|门店|经销/.test(t)) {
+    return "F 批发和零售业 > 52 零售业 > 521 综合零售 > 5211 百货零售";
+  }
+  if (/建筑|地产|工程|施工/.test(t)) {
+    return "E 建筑业 > 47 房屋建筑业 > 471 住宅房屋建筑 > 4710 住宅房屋建筑";
+  }
+  if (/医疗|医院|诊所|诊疗|卫生院/.test(t)) {
+    return "Q 卫生和社会工作 > 84 卫生 > 841 医院 > 8411 综合医院";
+  }
+  if (/医药|制药|生物医药|药品/.test(t)) {
+    return "C 制造业 > 27 医药制造业 > 271 化学药品原料药制造 > 2710 化学药品原料药制造";
+  }
+  if (/物流|运输|仓储|供应链|快递/.test(t)) {
+    return "G 交通运输、仓储和邮政业 > 59 仓储和邮政业 > 592 通用仓储 > 5920 通用仓储";
+  }
+  if (/教育|学校|培训|高校|大学/.test(t)) {
+    return "P 教育 > 83 教育 > 831 学前教育 > 8310 学前教育";
+  }
+  return "";
 }
 
 function normalizeRequirementImportData(input: Record<string, unknown>): RequirementImportData {
@@ -220,7 +327,7 @@ function buildCompanyProfileFallback(params: {
   enterpriseRevenue: string;
   itStatus: string;
 }): { enterpriseProfile: string; customerIndustry: string; enterpriseRevenue: string; itStatus: string } {
-  const customerIndustry = asString(params.customerIndustry) || "待补充行业";
+  const customerIndustry = ensureIndustryCodeAndName(asString(params.customerIndustry)) || asString(params.customerIndustry) || "待补充行业";
   const enterpriseRevenue = asString(params.enterpriseRevenue) || "待补充规模";
   const itStatus = asString(params.itStatus) || "待补充信息化现状";
   const enterpriseProfile =
@@ -251,7 +358,12 @@ async function parseRequirementImportByKimi(params: {
       },
       {
         role: "user",
-        content: `请从以下 Excel 文本中提取【需求导入】全量信息，并输出 JSON：\n\n${params.workbookText}`
+        content:
+          `请从以下 Excel 文本中提取【需求】全量信息，并输出 JSON。\n` +
+          `要求：basicInfo.customerIndustry 必须按《国民经济行业分类》（GB/T 4754）四级分类输出，且每一级都必须为“编码+名称”。` +
+          `格式为："门类编码 门类名称 > 大类编码 大类名称 > 中类编码 中类名称 > 小类编码 小类名称"。` +
+          `例如：I 信息传输、软件和信息技术服务业 > 65 软件和信息技术服务业 > 651 软件开发 > 6510 软件开发。\n\n` +
+          `${params.workbookText}`
       }
     ]
   };
@@ -275,12 +387,38 @@ async function parseRequirementImportByKimi(params: {
   const parsed = parseJsonFromModelText(content);
   const basicInfoSource = asModelObject(parsed.basicInfo);
   
+  const normalizedBasicInfo = normalizeBasicProjectInfo(Object.keys(basicInfoSource).length ? basicInfoSource : parsed);
+  const strictIndustry = ensureIndustryCodeAndName(normalizedBasicInfo.customerIndustry);
+  if (!strictIndustry) {
+    throw new Error("industry_not_code_name_format");
+  }
   return {
-    basicInfo: normalizeBasicProjectInfo(Object.keys(basicInfoSource).length ? basicInfoSource : parsed),
+    basicInfo: {
+      ...normalizedBasicInfo,
+      customerIndustry: strictIndustry
+    },
     requirementImportData: normalizeRequirementImportData(parsed),
     rawContent: content
   };
 }
+
+/** 从 Kimi 返回体中读取字段（支持嵌套在 data / company 等对象内） */
+function pickCompanyProfileField(parsed: Record<string, unknown>, keys: string[]): string {
+  const direct = pickModelField(parsed, keys);
+  if (direct) return direct;
+  const nestKeys = ["data", "company", "basicInfo", "result", "payload", "output", "summary"] as const;
+  for (const nk of nestKeys) {
+    const sub = asModelObject(parsed[nk]);
+    const v = pickModelField(sub, keys);
+    if (v) return v;
+  }
+  return "";
+}
+
+const PLACEHOLDER_REVENUE =
+  "未公开：公开渠道未见可靠营收披露，请结合客户访谈、招投标或财报手工补充（模型未返回有效字段）。";
+const PLACEHOLDER_IT =
+  "信息有限：模型未返回可信信息化描述，请访谈确认是否已建设 ERP/CRM/主数据/集成平台及数据治理现状。";
 
 async function summarizeCompanyProfileByKimi(params: {
   apiUrl: string;
@@ -314,7 +452,7 @@ async function summarizeCompanyProfileByKimi(params: {
       {
         role: "system",
         content:
-          "你是企业信息摘要助手。请只输出 JSON 对象，不要输出任何解释文字。必须返回且仅返回以下四个字段：enterpriseProfile、customerIndustry、enterpriseRevenue、itStatus。四个字段都必须是非空字符串。若公开信息不足，请基于行业常识给出审慎表述，不要留空。"
+          "你是企业经营分析与信息摘要助手。请只输出 JSON 对象，不要输出任何解释文字。必须返回且仅返回以下四个字段：enterpriseProfile、customerIndustry、enterpriseRevenue、itStatus。四个字段都必须是非空字符串。若公开信息不足，请基于行业公开口径与行业常识给出审慎估计，并在表述中标注“估计/区间/未公开”。"
       },
       {
         role: "user",
@@ -323,10 +461,12 @@ async function summarizeCompanyProfileByKimi(params: {
           `输出要求：\n` +
           `1) 仅输出 JSON，不要 Markdown，不要代码块。\n` +
           `2) 字段必须完整：enterpriseProfile、customerIndustry、enterpriseRevenue、itStatus。\n` +
-          `3) enterpriseProfile 为 120-220 字中文简介，避免空泛口号。\n` +
-          `4) customerIndustry 为明确行业名称。\n` +
-          `5) enterpriseRevenue 描述营收规模区间或“未公开（行业估计）”。\n` +
-          `6) itStatus 描述信息化现状成熟度与典型系统情况。\n\n` +
+          `3) 强调“高度提炼与总结”，避免空泛口号，优先写经营情况、营收情况、财务情况。\n` +
+          `4) enterpriseProfile 为 120-220 字中文简介，要求至少包含 2 处可量化信息（如营收区间、增长率、利润率、资产规模、员工规模、门店/产能等），若无公开精确值可给区间并标注估计。\n` +
+          `5) customerIndustry 必须按《国民经济行业分类》（GB/T 4754）四级分类返回，且每一级都必须为“编码+名称”，格式："门类编码 门类名称 > 大类编码 大类名称 > 中类编码 中类名称 > 小类编码 小类名称"。\n` +
+          `6) enterpriseRevenue 必须包含数值或区间（例如“约50-80亿元”或“未公开，行业估计30-50亿元”），并尽量补充一条财务相关支撑信息（如毛利率区间/利润水平/资产规模/现金流特征）。\n` +
+          `7) itStatus 描述信息化现状成熟度，并尽量给出具体系统或建设内容（如 ERP/CRM/MES/BI/主数据/集成平台等）；若信息可信度低请明确标注“信息有限”。\n` +
+          `8) 数据支撑原则：优先公开数据；无公开数据时使用行业估计并显式说明“估计依据为行业均值/同规模企业区间”。\n\n` +
           `已知信息：\n${knownContextLines.join("\n")}\n\n` +
           `请按如下结构返回：\n` +
           `{"enterpriseProfile":"","customerIndustry":"","enterpriseRevenue":"","itStatus":""}`
@@ -351,16 +491,49 @@ async function summarizeCompanyProfileByKimi(params: {
   const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = asString(json?.choices?.[0]?.message?.content);
   const parsed = parseJsonFromModelText(content);
-  const enterpriseProfile = asString(parsed.enterpriseProfile || parsed.profile || parsed["企业简介"]);
-  const customerIndustry = pickModelField(parsed, ["customerIndustry", "客户行业", "行业"]) || asString(params.customerIndustry);
-  const enterpriseRevenue = pickModelField(parsed, ["enterpriseRevenue", "企业营收", "营收"]) || asString(params.enterpriseRevenue);
-  const itStatus = pickModelField(parsed, ["itStatus", "信息化现状", "数字化现状"]) || asString(params.itStatus);
-  
-  if (!enterpriseProfile || !customerIndustry || !enterpriseRevenue || !itStatus) {
+  const rawIndustry = pickCompanyProfileField(parsed, ["customerIndustry", "客户行业", "行业"]);
+  let enterpriseProfile = asString(
+    pickCompanyProfileField(parsed, ["enterpriseProfile", "企业简介"]) ||
+      pickModelField(parsed, ["profile"]) ||
+      pickModelField(parsed, ["企业简介"])
+  );
+  const inferBlob = [rawIndustry, params.customerIndustry, enterpriseProfile, params.customerName].filter(Boolean).join(" ");
+  let customerIndustry =
+    ensureIndustryCodeAndName(rawIndustry) ||
+    ensureIndustryCodeAndName(asString(params.customerIndustry)) ||
+    ensureIndustryCodeAndName(inferIndustry4Level(inferBlob));
+  if (!customerIndustry) {
+    customerIndustry = ensureIndustryCodeAndName(
+      "L 租赁和商务服务业 > 72 商务服务业 > 729 其他商务服务业 > 7299 其他未列明商务服务业"
+    );
+  }
+  let enterpriseRevenue =
+    pickCompanyProfileField(parsed, ["enterpriseRevenue", "企业营收", "营收"]) || asString(params.enterpriseRevenue);
+  let itStatus =
+    pickCompanyProfileField(parsed, ["itStatus", "信息化现状", "数字化现状", "信息化"]) || asString(params.itStatus);
+
+  if (!enterpriseRevenue.trim()) {
+    enterpriseRevenue = PLACEHOLDER_REVENUE;
+  }
+  if (!itStatus.trim()) {
+    itStatus = PLACEHOLDER_IT;
+  }
+  if (!enterpriseProfile.trim()) {
+    enterpriseProfile =
+      `${params.customerName}：公开可核资料有限，模型未返回企业简介正文。` +
+      `建议结合工商登记信息、年报、招投标与客户访谈补充主营业务、规模区间、财务与信息化投入；` +
+      `下方「客户行业」等字段已尽量根据名称与上下文推断或保留占位，插入后请务必人工核对。`;
+  }
+
+  if (!customerIndustry) {
     throw new Error("model_missing_required_fields");
   }
-  
-  return { enterpriseProfile, customerIndustry, enterpriseRevenue, itStatus, rawContent: content };
+
+  const enterpriseProfileNormalized = enterpriseProfile.replace(
+    /\b[A-Z]\s*>\s*\d{2}\s*>\s*\d{3}\s*>\s*\d{4}\b/g,
+    customerIndustry,
+  );
+  return { enterpriseProfile: enterpriseProfileNormalized, customerIndustry, enterpriseRevenue, itStatus, rawContent: content };
 }
 
 async function chatWithKimi(params: {

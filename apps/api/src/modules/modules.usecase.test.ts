@@ -247,7 +247,13 @@ test("team.usecase: team plan visibility blocks cross-team user", () => {
       createdAt: now,
       updatedAt: now,
       createdByUserId: ownerA,
-      createdByUsername: "ownerA"
+      createdByUsername: "ownerA",
+      checkoutStatus: "checked_in",
+      versionDocStatus: "drafting",
+      majorLetter: "A",
+      minorNumber: 0,
+      baseCode: "GL-UT-03",
+      isHistoricalArchive: false
     });
     saveVersionsStore(store);
 

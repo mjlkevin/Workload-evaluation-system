@@ -21,7 +21,17 @@ export function fail(
   message: string,
   details?: Array<{ field: string; reason: string }>
 ) {
-  return res.status(400).json({
+  const status =
+    code >= 40400 && code < 40500
+      ? 404
+      : code >= 40900 && code < 41000
+        ? 409
+        : code >= 40300 && code < 40400
+          ? 403
+          : code >= 40100 && code < 40200
+            ? 401
+            : 400;
+  return res.status(status).json({
     code,
     message,
     details: details || [],
