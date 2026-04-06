@@ -56,3 +56,53 @@ export async function apiRequest<T>(
 
   return payload.data
 }
+
+function deriveDownloadFileName(path: string, contentDisposition: string | null): string {
+  if (contentDisposition) {
+    const utf8Match = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i)
+    if (utf8Match?.[1]) {
+      try {
+        return decodeURIComponent(utf8Match[1].trim())
+      } catch {
+        return utf8Match[1].trim()
+      }
+    }
+    const plainMatch = contentDisposition.match(/filename\s*=\s*"?([^";]+)"?/i)
+    if (plainMatch?.[1]) return plainMatch[1].trim()
+  }
+  const seg = path.split("/").filter(Boolean).pop() || "download.bin"
+  return seg.split("?")[0] || "download.bin"
+}
+
+export async function downloadWithAuth(path: string, fileNameHint?: string): Promise<void> {
+  const authToken = getStoredToken()
+  const headers = new Headers()
+  if (authToken) headers.set("Authorization", `Bearer ${authToken}`)
+
+  const response = await fetch(path, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { message?: string } | null
+    const message = payload?.message || `下载失败(${response.status})`
+    throw new ApiError(message, response.status, payload)
+  }
+
+  const blob = await response.blob()
+  const fileName = fileNameHint || deriveDownloadFileName(path, response.headers.get("Content-Disposition"))
+  const objectUrl = URL.createObjectURL(blob)
+  try {
+    const anchor = document.createElement("a")
+    anchor.href = objectUrl
+    anchor.download = fileName
+    anchor.rel = "noopener noreferrer"
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}

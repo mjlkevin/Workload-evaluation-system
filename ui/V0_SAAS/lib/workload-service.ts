@@ -1,6 +1,6 @@
 "use client"
 
-import { apiRequest, ApiError } from "@/lib/api-client"
+import { apiRequest, ApiError, downloadWithAuth } from "@/lib/api-client"
 import {
   mockAssessments,
   mockDevAssessments,
@@ -70,6 +70,23 @@ export type ModuleVersionRecord = {
   baseCode: string
   isHistoricalArchive: boolean
   archivedAt?: string
+}
+
+export type ModuleDocListType = CoreModuleVersionType | "wbs" | "review"
+
+export type ModuleDocListItem = {
+  docKey: string
+  moduleType: ModuleDocListType
+  title: string
+  latestVersionCode: string
+  globalVersionCode: string
+  projectName: string
+  updatedAt: string
+  statusText: string
+  recordId?: string
+  historySupported: boolean
+  latestRecord?: ModuleVersionRecord
+  historyRecords?: ModuleVersionRecord[]
 }
 
 export type GlobalVersionRecord = {
@@ -440,6 +457,16 @@ export async function deleteGlobalPlanVersion(versionCode: string): Promise<void
   })
 }
 
+/** 删除当前用户指定模块版本（非 global）；若被总方案引用，后端会返回业务错误。 */
+export async function deleteModuleVersion(type: CoreModuleVersionType, versionCode: string): Promise<void> {
+  const code = versionCode.trim()
+  if (!code) throw new Error("版本号不能为空")
+  const params = new URLSearchParams({ templateId: "default" })
+  await apiRequest(`/api/v1/versions/${encodeURIComponent(type)}/${encodeURIComponent(code)}?${params.toString()}`, {
+    method: "DELETE",
+  })
+}
+
 export async function createModuleVersion(
   type: CoreModuleVersionType,
   payload: Record<string, unknown>,
@@ -617,6 +644,15 @@ export async function calculateAndExportEstimate(
   })
 }
 
+export async function downloadOwnedExportFile(downloadUrl: string, fileNameHint?: string): Promise<void> {
+  const safeUrl = downloadUrl.trim()
+  if (!safeUrl) throw new Error("下载链接为空")
+  const normalized = safeUrl.startsWith("http")
+    ? safeUrl
+    : `${window.location.origin}${safeUrl.startsWith("/") ? "" : "/"}${safeUrl}`
+  await downloadWithAuth(normalized, fileNameHint)
+}
+
 export async function listEstimateExportHistory(page = 1, pageSize = 8): Promise<{
   total: number
   items: ExportHistoryItem[]
@@ -633,6 +669,67 @@ export async function listEstimateExportHistory(page = 1, pageSize = 8): Promise
       return { total: Number(data.total || 0), items: data.items || [] }
     },
     { total: 0, items: [] },
+  )
+}
+
+function mapRecordStatusText(record: ModuleVersionRecord): string {
+  if (record.checkoutStatus === "checked_out") return "已检出"
+  if (record.versionDocStatus === "reviewed") return "已审核"
+  if (record.isHistoricalArchive) return "历史归档"
+  return "已检入"
+}
+
+function pickProjectNameFromPayload(payload: Record<string, unknown>): string {
+  const fromRoot = String(payload.projectName || "").trim()
+  if (fromRoot) return fromRoot
+  const fromBasicInfo = String((payload.basicInfo as { projectName?: string } | undefined)?.projectName || "").trim()
+  if (fromBasicInfo) return fromBasicInfo
+  return "未命名项目"
+}
+
+/**
+ * 聚合当前用户某模块“最新单据”：
+ * - 有 globalVersionCode：按 globalVersionCode 取最新一条，其他作为历史
+ * - 无 globalVersionCode：按 versionCode 作为独立单据
+ */
+export async function listLatestModuleDocuments(type: CoreModuleVersionType): Promise<ModuleDocListItem[]> {
+  const records = await listModuleVersions(type)
+  const grouped = new Map<string, ModuleVersionRecord[]>()
+  for (const record of records) {
+    const globalVersionCode = String(record.payload?.globalVersionCode || "").trim()
+    const key = globalVersionCode || `standalone:${record.versionCode}`
+    const list = grouped.get(key) || []
+    list.push(record)
+    grouped.set(key, list)
+  }
+  const items: ModuleDocListItem[] = []
+  for (const [key, list] of grouped.entries()) {
+    const sorted = [...list].sort(
+      (a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)) || b.versionCode.localeCompare(a.versionCode),
+    )
+    const latest = sorted[0]
+    if (!latest) continue
+    const globalVersionCode = String(latest.payload?.globalVersionCode || "").trim() || "—"
+    const projectName = pickProjectNameFromPayload(latest.payload || {})
+    const latestVersionCode = latest.versionCode
+    const title = projectName
+    items.push({
+      docKey: key,
+      moduleType: type,
+      title,
+      latestVersionCode,
+      globalVersionCode,
+      projectName,
+      updatedAt: latest.updatedAt,
+      statusText: mapRecordStatusText(latest),
+      recordId: latest.id,
+      historySupported: true,
+      latestRecord: latest,
+      historyRecords: sorted,
+    })
+  }
+  return items.sort(
+    (a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)) || b.latestVersionCode.localeCompare(a.latestVersionCode),
   )
 }
 

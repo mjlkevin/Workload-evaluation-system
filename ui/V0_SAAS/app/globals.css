@@ -130,6 +130,22 @@
 }
 
 @layer components {
+  /* Dashboard form field title default color */
+  .wes-field-label-theme label > span:first-child {
+    color: #d97706;
+  }
+
+  /* Dashboard field value text size unification */
+  .wes-field-label-theme [data-slot="input"],
+  .wes-field-label-theme [data-slot="textarea"],
+  .wes-field-label-theme [data-slot="select-trigger"],
+  .wes-field-label-theme input,
+  .wes-field-label-theme select,
+  .wes-field-label-theme textarea {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
   .embed-mode [data-slot="button"],
   .embed-mode button {
     display: none !important;

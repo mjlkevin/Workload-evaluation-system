@@ -98,6 +98,15 @@ const mainNavItems = [
   },
 ]
 
+const submenuEnabledMainNav = new Set([
+  "/dashboard/requirement-import",
+  "/dashboard/assessment",
+  "/dashboard/resource-cost",
+  "/dashboard/dev-assessment",
+  "/dashboard/wbs",
+  "/dashboard/review",
+])
+
 const teamNavItems = [
   {
     title: "用户管理",
@@ -145,6 +154,12 @@ export function AppSidebar() {
     router.push(dest)
   }
 
+  function handleMenuNavigate(href: string) {
+    const allowed = requestNavigation(href)
+    if (!allowed) return
+    router.push(href)
+  }
+
   return (
     <>
       <Sidebar className="border-r border-border/40">
@@ -186,20 +201,42 @@ export function AppSidebar() {
               <SidebarMenu>
                 {mainNavItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={
-                        item.url === "/dashboard"
-                          ? pathname === item.url
-                          : pathname === item.url || pathname.startsWith(`${item.url}/`)
-                      }
-                      className="rounded-xl px-3 py-2.5 transition-all data-[active=true]:bg-foreground data-[active=true]:text-background data-[active=true]:shadow-lg"
-                    >
-                      <Link href={item.url} onClick={(e) => handleNavClick(e, item.url)}>
-                        <item.icon className="size-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
+                    {submenuEnabledMainNav.has(item.url) ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <SidebarMenuButton
+                            isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                            className="rounded-xl px-3 py-2.5 transition-all data-[active=true]:bg-foreground data-[active=true]:text-background data-[active=true]:shadow-lg"
+                          >
+                            <item.icon className="size-4" />
+                            <span>{item.title}</span>
+                          </SidebarMenuButton>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" side="right" sideOffset={8} className="w-36 rounded-xl">
+                          <DropdownMenuItem className="rounded-lg" onClick={() => handleMenuNavigate(`${item.url}/list`)}>
+                            列表
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="rounded-lg" onClick={() => handleMenuNavigate(item.url)}>
+                            新增
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <SidebarMenuButton
+                        asChild
+                        isActive={
+                          item.url === "/dashboard"
+                            ? pathname === item.url
+                            : pathname === item.url || pathname.startsWith(`${item.url}/`)
+                        }
+                        className="rounded-xl px-3 py-2.5 transition-all data-[active=true]:bg-foreground data-[active=true]:text-background data-[active=true]:shadow-lg"
+                      >
+                        <Link href={item.url} onClick={(e) => handleNavClick(e, item.url)}>
+                          <item.icon className="size-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    )}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

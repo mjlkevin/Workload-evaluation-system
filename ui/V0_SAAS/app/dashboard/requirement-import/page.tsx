@@ -7,6 +7,16 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -22,6 +32,7 @@ import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
 import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
 import { useAuth } from "@/hooks/use-auth"
 import { apiRequest } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import {
   checkinVersionById,
   checkoutVersionById,
@@ -39,6 +50,7 @@ type BasicInfo = {
   customerName: string
   projectName: string
   opportunityNo: string
+  productLines: string[]
   customerIndustry: string
   enterpriseRevenue: string
   itStatus: string
@@ -238,6 +250,19 @@ function parseIndustryTags(value: string): string[] {
     .slice(0, 4)
 }
 
+function normalizeProductLines(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const line of value) {
+    const text = String(line || "").trim()
+    if (!text || seen.has(text)) continue
+    seen.add(text)
+    result.push(text)
+  }
+  return result
+}
+
 function buildVersionOptions(records: ModuleVersionRecord[]) {
   return records.map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` }))
 }
@@ -246,6 +271,7 @@ const EMPTY_BASIC_INFO: BasicInfo = {
   customerName: "",
   projectName: "",
   opportunityNo: "",
+  productLines: [],
   customerIndustry: "",
   enterpriseRevenue: "",
   itStatus: "",
@@ -254,6 +280,8 @@ const EMPTY_BASIC_INFO: BasicInfo = {
   projectBackgroundNeeds: "",
   projectGoals: "",
 }
+
+const PRODUCT_LINE_OPTIONS = ["金蝶AI星空", "金蝶AI星瀚", "云之家", "发票云"] as const
 
 type RequirementSectionKey =
   | "basicInfo"
@@ -298,6 +326,9 @@ export default function RequirementImportPage() {
   const [meetingNotes, setMeetingNotes] = useState("")
   const [keyPointRows, setKeyPointRows] = useState<KeyPointRow[]>([createEmptyKeyPointRow()])
   const [saving, setSaving] = useState(false)
+  const [createNewConfirmOpen, setCreateNewConfirmOpen] = useState(false)
+  const [createNewSubmitting, setCreateNewSubmitting] = useState(false)
+  const [hasLocalChanges, setHasLocalChanges] = useState(false)
   const [basicInfoModelName, setBasicInfoModelName] = useState("moonshot-v1-8k")
   const [basicInfoImportVisible, setBasicInfoImportVisible] = useState(false)
   const [basicInfoImportFile, setBasicInfoImportFile] = useState<File | null>(null)
@@ -318,6 +349,9 @@ export default function RequirementImportPage() {
   const [sectionCollapsed, setSectionCollapsed] = useState<Record<RequirementSectionKey, boolean>>(
     createInitialSectionCollapsed(),
   )
+  const enterpriseProfileRef = useRef<HTMLTextAreaElement | null>(null)
+  const projectBackgroundNeedsRef = useRef<HTMLTextAreaElement | null>(null)
+  const projectGoalsRef = useRef<HTMLTextAreaElement | null>(null)
 
   const setDirty = useSetUnsavedDirty()
   const dirtyEnabled = useRef(false)
@@ -351,11 +385,29 @@ export default function RequirementImportPage() {
     }, 120)
   }
 
+  function autoResizeTextarea(el: HTMLTextAreaElement | null, minHeight = 72) {
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${Math.max(el.scrollHeight, minHeight)}px`
+  }
+
   useEffect(() => {
     return () => {
       clearKimiHelpCloseTimer()
     }
   }, [])
+
+  useEffect(() => {
+    autoResizeTextarea(enterpriseProfileRef.current, 72)
+  }, [basicInfo.enterpriseProfile])
+
+  useEffect(() => {
+    autoResizeTextarea(projectBackgroundNeedsRef.current, 72)
+  }, [basicInfo.projectBackgroundNeeds])
+
+  useEffect(() => {
+    autoResizeTextarea(projectGoalsRef.current, 72)
+  }, [basicInfo.projectGoals])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -402,9 +454,11 @@ export default function RequirementImportPage() {
     if (!dirtyEnabled.current) return
     if (suppressUnsavedPrompt) {
       setDirty(false)
+      setHasLocalChanges(false)
       return
     }
     setDirty(true)
+    setHasLocalChanges(true)
   }, [basicInfo, valuePropositionRows, businessNeedRows, devOverviewRows, productModuleRows, implementationScopeRows, meetingNotes, keyPointRows, suppressUnsavedPrompt])
 
   useEffect(() => {
@@ -489,7 +543,11 @@ export default function RequirementImportPage() {
         : []
       const nextKeyPointRows = Array.isArray(payload.keyPointRows) ? (payload.keyPointRows as KeyPointRow[]) : []
       setGlobalVersionCode((payload.globalVersionCode as string) || "")
-      setBasicInfo({ ...EMPTY_BASIC_INFO, ...nextBasic })
+      setBasicInfo({
+        ...EMPTY_BASIC_INFO,
+        ...nextBasic,
+        productLines: normalizeProductLines(nextBasic.productLines),
+      })
       setValuePropositionRows(
         nextValueRows.length
           ? nextValueRows.map((row) => ({ ...row, id: row.id || crypto.randomUUID() }))
@@ -524,6 +582,7 @@ export default function RequirementImportPage() {
       )
       showGlobalNotice(`已回读版本：${code}`)
       setDirty(false)
+      setHasLocalChanges(false)
       setTimeout(() => { dirtyEnabled.current = true }, 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : "版本回读失败")
@@ -545,7 +604,7 @@ export default function RequirementImportPage() {
     }
   }
 
-  function currentPayload() {
+  function currentPayload(checkinNote?: string) {
     return {
       globalVersionCode: globalVersionCode.trim(),
       basicInfo,
@@ -556,16 +615,18 @@ export default function RequirementImportPage() {
       implementationScopeRows,
       meetingNotes,
       keyPointRows,
+      ...(checkinNote ? { checkinNote } : {}),
     }
   }
 
-  async function onCheckin() {
+  async function onCheckin(checkinNote: string) {
     if (!selectedVersionRecord) return
     try {
-      const data = await checkinVersionById(selectedVersionRecord.id, currentPayload())
+      const data = await checkinVersionById(selectedVersionRecord.id, currentPayload(checkinNote))
       await reloadVersions(data.versionCode || selectedVersionRecord.versionCode)
       showGlobalNotice(`检入成功：${data.versionCode}`)
       setDirty(false)
+      setHasLocalChanges(false)
     } catch (err) {
       showGlobalWarning(err instanceof Error ? err.message : "检入失败")
     }
@@ -608,14 +669,14 @@ export default function RequirementImportPage() {
     }
   }
 
-  async function onSave() {
+  async function onSave(): Promise<boolean> {
     if (!globalVersionCode.trim()) {
       setError("请先选择总方案版本号")
-      return
+      return false
     }
     if (!basicInfo.projectName.trim()) {
       setError("请填写项目名称")
-      return
+      return false
     }
     setSaving(true)
     setMessage("")
@@ -639,10 +700,58 @@ export default function RequirementImportPage() {
       await reloadVersions(created.versionCode)
       showGlobalNotice(`已保存需求版本：${created.versionCode}`)
       setDirty(false)
+      setHasLocalChanges(false)
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败")
+      return false
     } finally {
       setSaving(false)
+    }
+  }
+
+  function resetToNewRequirementDraft() {
+    setGlobalVersionCode("")
+    setSelectedVersionCode("")
+    setVersionOptions([])
+    setBasicInfo(EMPTY_BASIC_INFO)
+    setValuePropositionRows([createEmptyValuePropositionRow()])
+    setBusinessNeedRows([createEmptyBusinessNeedRow()])
+    setDevOverviewRows([createEmptyDevOverviewRow()])
+    setProductModuleRows([createEmptyProductModuleRow()])
+    setImplementationScopeRows([createEmptyImplementationScopeRow()])
+    setMeetingNotes("")
+    setKeyPointRows([createEmptyKeyPointRow()])
+    setSectionCollapsed(createInitialSectionCollapsed())
+    setMessage("")
+    setError("")
+    setDirty(false)
+    setHasLocalChanges(false)
+    dirtyEnabled.current = true
+  }
+
+  function onCreateNewRequirement() {
+    if (saving) return
+    const isCheckedOut = selectedVersionRecord?.checkoutStatus === "checked_out"
+    if (isCheckedOut && hasLocalChanges) {
+      setCreateNewConfirmOpen(true)
+      return
+    }
+    resetToNewRequirementDraft()
+    showGlobalNotice("已进入新建需求")
+  }
+
+  async function onSaveAndCreateNewRequirement() {
+    if (createNewSubmitting) return
+    setCreateNewSubmitting(true)
+    try {
+      const saved = await onSave()
+      if (!saved) return
+      setCreateNewConfirmOpen(false)
+      resetToNewRequirementDraft()
+      showGlobalNotice("已保存并新建需求")
+    } finally {
+      setCreateNewSubmitting(false)
     }
   }
 
@@ -841,9 +950,12 @@ export default function RequirementImportPage() {
       description="需求结构化导入、条目编辑、版本保存与回读。"
       breadcrumbs={[{ label: "需求" }]}
     >
-      <div className="space-y-6 [&_input]:border-border/70 [&_input]:bg-background/95 [&_input]:shadow-sm [&_select]:border-border/70 [&_select]:bg-background/95 [&_select]:shadow-sm [&_textarea]:border-border/70 [&_textarea]:bg-background/95 [&_textarea]:shadow-sm">
+      <div className="space-y-6 [&_input]:border-border/70 [&_input]:bg-background/95 [&_input]:shadow-sm [&_select]:border-border/70 [&_select]:bg-background/95 [&_select]:shadow-sm [&_textarea]:border-border/70 [&_textarea]:bg-background/95 [&_textarea]:shadow-sm [&_td>input]:block [&_td>input]:w-full [&_td>input]:min-h-9 [&_td>input]:h-full">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/40 bg-card/50 p-3 shadow-sm backdrop-blur-sm transition-all duration-300 md:flex-nowrap">
+          <Button className="rounded-xl" variant="outline" onClick={() => void onCreateNewRequirement()} disabled={saving || createNewSubmitting}>
+            新建需求
+          </Button>
           <Button className="rounded-xl" onClick={() => void onSave()} disabled={saving}>
             {saving ? "保存中..." : "保存版本"}
           </Button>
@@ -862,12 +974,76 @@ export default function RequirementImportPage() {
             showStatusField={false}
             onVersionHistory={() => setVersionHistoryOpen(true)}
             onCheckout={() => void onCheckout()}
-            onCheckin={() => void onCheckin()}
+            onCheckin={(checkinNote) => void onCheckin(checkinNote)}
             onUndoCheckout={() => void onUndoCheckout()}
             onPromote={() => void onPromote()}
             onForceUnlock={() => void onForceUnlock()}
             forceUnlockVisible={isAdmin}
           />
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">模型：{basicInfoModelName}</span>
+            <Popover open={kimiHelpOpen} onOpenChange={setKimiHelpOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onMouseEnter={openKimiHelpByHover}
+                  onMouseLeave={scheduleCloseKimiHelpByHover}
+                >
+                  Kimi-help
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={8}
+                className="w-44 p-2"
+                onMouseEnter={openKimiHelpByHover}
+                onMouseLeave={scheduleCloseKimiHelpByHover}
+              >
+                <div className="flex flex-col gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 justify-start rounded-md px-2 text-xs"
+                    onClick={() => {
+                      setKimiHelpOpen(false)
+                      void onGenerateEnterpriseProfileByKimi()
+                    }}
+                    disabled={enterpriseProfileGenerating}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {enterpriseProfileGenerating ? "Kimi生成中..." : "Kimi生成"}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-muted-foreground/50 text-[10px] leading-none text-muted-foreground"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            ?
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" sideOffset={6} className="max-w-64 text-xs leading-5">
+                          维护好客户名称后，通过kimi生成回填企业简介、企业营收、信息化现状等信息
+                        </TooltipContent>
+                      </Tooltip>
+                    </span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 justify-start rounded-md px-2 text-xs"
+                    onClick={() => {
+                      setKimiHelpOpen(false)
+                      setBasicInfoImportVisible(true)
+                    }}
+                  >
+                    Kimi解析文件
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
         <Card collapsed={false} collapsible={false} className="gap-4 py-4 border-border/40 bg-card/50 backdrop-blur-sm">
           <CardHeader className="space-y-2">
@@ -921,77 +1097,13 @@ export default function RequirementImportPage() {
         onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, basicInfo: collapsed }))}
         className="border-border/40 bg-card/50 backdrop-blur-sm"
       >
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-1">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base">基本情况</CardTitle>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">模型：{basicInfoModelName}</span>
-              <Popover open={kimiHelpOpen} onOpenChange={setKimiHelpOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-xl"
-                    onMouseEnter={openKimiHelpByHover}
-                    onMouseLeave={scheduleCloseKimiHelpByHover}
-                  >
-                    Kimi-help
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="end"
-                  sideOffset={8}
-                  className="w-44 p-2"
-                  onMouseEnter={openKimiHelpByHover}
-                  onMouseLeave={scheduleCloseKimiHelpByHover}
-                >
-                  <div className="flex flex-col gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-8 justify-start rounded-md px-2 text-xs"
-                      onClick={() => {
-                        setKimiHelpOpen(false)
-                        void onGenerateEnterpriseProfileByKimi()
-                      }}
-                      disabled={enterpriseProfileGenerating}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        {enterpriseProfileGenerating ? "Kimi生成中..." : "Kimi生成"}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span
-                              className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-muted-foreground/50 text-[10px] leading-none text-muted-foreground"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              ?
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" sideOffset={6} className="max-w-64 text-xs leading-5">
-                            维护好客户名称后，通过kimi生成回填企业简介、企业营收、信息化现状等信息
-                          </TooltipContent>
-                        </Tooltip>
-                      </span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-8 justify-start rounded-md px-2 text-xs"
-                      onClick={() => {
-                        setKimiHelpOpen(false)
-                        setBasicInfoImportVisible(true)
-                      }}
-                    >
-                      Kimi解析文件
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-3">
+        <CardContent className="space-y-3">
+          <div className="grid gap-2 md:grid-cols-3">
             <label className="space-y-1">
               <span className="text-xs text-[#D97706]">客户名称</span>
               <Input value={basicInfo.customerName} onChange={(e) => setBasicInfo((s) => ({ ...s, customerName: e.target.value }))} />
@@ -1003,6 +1115,52 @@ export default function RequirementImportPage() {
             <label className="space-y-1">
               <span className="text-xs text-muted-foreground">商机号</span>
               <Input value={basicInfo.opportunityNo} onChange={(e) => setBasicInfo((s) => ({ ...s, opportunityNo: e.target.value }))} />
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs text-muted-foreground">产品线</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-9 w-full rounded-md border border-border/70 bg-background/95 px-3 text-left text-sm leading-9 shadow-sm"
+                  >
+                    {basicInfo.productLines.length ? (
+                      <span className="block truncate">{basicInfo.productLines.join(" / ")}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">请选择产品线（可多选）</span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-64 p-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {PRODUCT_LINE_OPTIONS.map((line) => {
+                      const active = basicInfo.productLines.includes(line)
+                      return (
+                        <button
+                          key={line}
+                          type="button"
+                          className={cn(
+                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] transition-colors",
+                            active
+                              ? "border-primary/30 bg-primary/10 text-primary"
+                              : "border-border/70 bg-background text-muted-foreground hover:text-foreground",
+                          )}
+                          onClick={() =>
+                            setBasicInfo((prev) => ({
+                              ...prev,
+                              productLines: prev.productLines.includes(line)
+                                ? prev.productLines.filter((x) => x !== line)
+                                : [...prev.productLines, line],
+                            }))
+                          }
+                        >
+                          {line}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </label>
             <label className="space-y-1">
               <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -1029,7 +1187,7 @@ export default function RequirementImportPage() {
                       <Badge
                         key={`${tag}-${idx}`}
                         variant={idx === customerIndustryTags.length - 1 ? "default" : "secondary"}
-                        className="rounded-full px-2 py-0 text-[10px]"
+                        className="rounded-full px-2.5 py-0.5 text-xs"
                       >
                         {tag}
                       </Badge>
@@ -1054,32 +1212,38 @@ export default function RequirementImportPage() {
             </label>
           </div>
 
-          <div className="space-y-4 rounded-lg border border-border/50 bg-secondary/20 p-4">
+          <div className="space-y-3 rounded-lg border border-border/50 bg-secondary/20 p-3">
             <label className="block space-y-1">
               <span className="text-xs text-muted-foreground">企业简介</span>
               <textarea
-                className="min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm"
+                ref={enterpriseProfileRef}
+                className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm"
                 placeholder="请输入企业简介"
                 value={basicInfo.enterpriseProfile}
                 onChange={(e) => setBasicInfo((s) => ({ ...s, enterpriseProfile: e.target.value }))}
+                onInput={(e) => autoResizeTextarea(e.currentTarget, 72)}
               />
             </label>
             <label className="block space-y-1">
               <span className="text-xs text-muted-foreground">项目背景和需求</span>
               <textarea
-                className="min-h-36 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm"
+                ref={projectBackgroundNeedsRef}
+                className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm"
                 placeholder="请输入项目背景和需求"
                 value={basicInfo.projectBackgroundNeeds}
                 onChange={(e) => setBasicInfo((s) => ({ ...s, projectBackgroundNeeds: e.target.value }))}
+                onInput={(e) => autoResizeTextarea(e.currentTarget, 72)}
               />
             </label>
             <label className="block space-y-1">
               <span className="text-xs text-muted-foreground">项目目标</span>
               <textarea
-                className="min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm"
+                ref={projectGoalsRef}
+                className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm"
                 placeholder="请输入项目目标"
                 value={basicInfo.projectGoals}
                 onChange={(e) => setBasicInfo((s) => ({ ...s, projectGoals: e.target.value }))}
+                onInput={(e) => autoResizeTextarea(e.currentTarget, 72)}
               />
             </label>
           </div>
@@ -1118,6 +1282,29 @@ export default function RequirementImportPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={createNewConfirmOpen} onOpenChange={setCreateNewConfirmOpen}>
+        <AlertDialogContent className="sm:max-w-lg rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>检测到未保存修改</AlertDialogTitle>
+            <AlertDialogDescription>
+              当前需求版本处于已检出状态，且存在未保存修改。请先保存当前修改，再进入新建空白界面。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={createNewSubmitting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={createNewSubmitting || saving}
+              onClick={(event) => {
+                event.preventDefault()
+                void onSaveAndCreateNewRequirement()
+              }}
+            >
+              {createNewSubmitting ? "处理中..." : "保存并新建"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={enterpriseProfilePreviewVisible}
@@ -1270,74 +1457,80 @@ export default function RequirementImportPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>业务领域</TableHead>
-                <TableHead>分类</TableHead>
-                <TableHead>业务需求及问题</TableHead>
-                <TableHead>提出人</TableHead>
-                <TableHead>职务</TableHead>
-                <TableHead>是否定开</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>
-                    <Input
-                      value={row.businessDomain}
-                      onChange={(e) =>
-                        setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessDomain: e.target.value } : x)))
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={row.category}
-                      onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, category: e.target.value } : x)))}
-                    />
-                  </TableCell>
-                  <TableCell className="min-w-56">
-                    <textarea
-                      className="min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={row.businessNeed}
-                      onChange={(e) =>
-                        setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessNeed: e.target.value } : x)))
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={row.proposer}
-                      onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, proposer: e.target.value } : x)))}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={row.title}
-                      onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, title: e.target.value } : x)))}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <button
-                      type="button"
-                      className="rounded-md border border-input px-2 py-1 text-xs"
-                      onClick={() =>
-                        setBusinessNeedRows((items) =>
-                          items.map((x) =>
-                            x.id === row.id ? { ...x, requiresCustomDev: x.requiresCustomDev === "是" ? "否" : "是" } : x,
-                          ),
-                        )
-                      }
-                    >
-                      <Badge variant={row.requiresCustomDev === "是" ? "default" : "outline"}>{row.requiresCustomDev}</Badge>
-                    </button>
-                  </TableCell>
+          <div className="rounded-xl border border-border/50">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/20">
+                  <TableHead className="whitespace-nowrap">业务领域</TableHead>
+                  <TableHead className="whitespace-nowrap">分类</TableHead>
+                  <TableHead className="whitespace-nowrap">业务需求及问题</TableHead>
+                  <TableHead className="whitespace-nowrap">提出人</TableHead>
+                  <TableHead className="whitespace-nowrap">职务</TableHead>
+                  <TableHead className="whitespace-nowrap">是否定开</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredRows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="p-0 align-top">
+                      <Input
+                        className="h-11 rounded-none border-0 shadow-none"
+                        value={row.businessDomain}
+                        onChange={(e) =>
+                          setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessDomain: e.target.value } : x)))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="p-0 align-top">
+                      <Input
+                        className="h-11 rounded-none border-0 shadow-none"
+                        value={row.category}
+                        onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, category: e.target.value } : x)))}
+                      />
+                    </TableCell>
+                    <TableCell className="min-w-56 align-top">
+                      <textarea
+                        className="min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={row.businessNeed}
+                        onChange={(e) =>
+                          setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessNeed: e.target.value } : x)))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="p-0 align-top">
+                      <Input
+                        className="h-11 rounded-none border-0 shadow-none"
+                        value={row.proposer}
+                        onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, proposer: e.target.value } : x)))}
+                      />
+                    </TableCell>
+                    <TableCell className="p-0 align-top">
+                      <Input
+                        className="h-11 rounded-none border-0 shadow-none"
+                        value={row.title}
+                        onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, title: e.target.value } : x)))}
+                      />
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <button
+                        type="button"
+                        className="rounded-md border border-input px-2 py-1 text-xs"
+                        onClick={() =>
+                          setBusinessNeedRows((items) =>
+                            items.map((x) =>
+                              x.id === row.id ? { ...x, requiresCustomDev: x.requiresCustomDev === "是" ? "否" : "是" } : x,
+                            ),
+                          )
+                        }
+                      >
+                        <Badge variant={row.requiresCustomDev === "是" ? "default" : "outline"}>{row.requiresCustomDev}</Badge>
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
