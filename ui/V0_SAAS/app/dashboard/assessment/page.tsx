@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import type { CSSProperties } from "react"
-import { useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
+import { shouldSuppressUnsavedPrompt, useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { VersionCheckoutStatusDisplay, VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
 import {
@@ -225,9 +225,7 @@ export default function AssessmentPage() {
   const showOnlySelectedSkuRows = Boolean(
     selectedVersionRecord && selectedVersionRecord.checkoutStatus === "checked_in",
   )
-  const suppressUnsavedPrompt = Boolean(
-    selectedVersionRecord && selectedVersionRecord.checkoutStatus === "checked_in",
-  )
+  const suppressUnsavedPrompt = shouldSuppressUnsavedPrompt(selectedVersionRecord)
 
   const setDirty = useSetUnsavedDirty()
   const dirtyEnabled = useRef(false)

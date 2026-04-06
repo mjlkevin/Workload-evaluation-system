@@ -2,6 +2,10 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
 
+type MaybeCheckoutRecord = {
+  checkoutStatus?: "checked_in" | "checked_out"
+} | null | undefined
+
 type UnsavedNavigationContextValue = {
   isDirty: boolean
   /** href the user tried to navigate to; null = no pending navigation */
@@ -64,4 +68,9 @@ export function useUnsavedNavigation() {
   const ctx = useContext(UnsavedNavigationContext)
   if (!ctx) throw new Error("useUnsavedNavigation must be used within UnsavedChangesProvider")
   return ctx
+}
+
+/** 已检入版本为只读浏览态，不应触发未保存离开提醒 */
+export function shouldSuppressUnsavedPrompt(record: MaybeCheckoutRecord): boolean {
+  return record?.checkoutStatus === "checked_in"
 }

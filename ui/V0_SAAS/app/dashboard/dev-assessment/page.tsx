@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
+import { shouldSuppressUnsavedPrompt, useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
 import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
@@ -85,6 +85,7 @@ export default function DevAssessmentPage() {
     selectedVersionRecord &&
       (selectedVersionRecord.checkoutStatus === "checked_in" || selectedVersionRecord.versionDocStatus === "reviewed"),
   )
+  const suppressUnsavedPrompt = shouldSuppressUnsavedPrompt(selectedVersionRecord)
 
   const setDirty = useSetUnsavedDirty()
   const dirtyEnabled = useRef(false)
@@ -148,8 +149,13 @@ export default function DevAssessmentPage() {
 
   // 数据变化时标记脏状态
   useEffect(() => {
-    if (dirtyEnabled.current) setDirty(true)
-  }, [rows, evaluator, evaluateDate, globalVersionCode, linkedAssessmentVersionCode, projectName])
+    if (!dirtyEnabled.current) return
+    if (suppressUnsavedPrompt) {
+      setDirty(false)
+      return
+    }
+    setDirty(true)
+  }, [rows, evaluator, evaluateDate, globalVersionCode, linkedAssessmentVersionCode, projectName, suppressUnsavedPrompt])
 
   const summary = useMemo(() => {
     return rows.reduce(

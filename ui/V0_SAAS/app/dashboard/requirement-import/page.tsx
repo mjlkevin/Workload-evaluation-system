@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
+import { shouldSuppressUnsavedPrompt, useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -323,6 +323,9 @@ export default function RequirementImportPage() {
   const dirtyEnabled = useRef(false)
   const initialEmbedQueryRef = useRef<{ globalVersion: string; version: string } | null>(null)
   const initialEmbedAppliedRef = useRef(false)
+  const suppressUnsavedPrompt = shouldSuppressUnsavedPrompt(
+    versionRecords.find((x) => x.versionCode === selectedVersionCode),
+  )
 
   function showGlobalNotice(text: string) {
     setMessage(text)
@@ -396,8 +399,13 @@ export default function RequirementImportPage() {
 
   // 数据变化时标记脏状态
   useEffect(() => {
-    if (dirtyEnabled.current) setDirty(true)
-  }, [basicInfo, valuePropositionRows, businessNeedRows, devOverviewRows, productModuleRows, implementationScopeRows, meetingNotes, keyPointRows])
+    if (!dirtyEnabled.current) return
+    if (suppressUnsavedPrompt) {
+      setDirty(false)
+      return
+    }
+    setDirty(true)
+  }, [basicInfo, valuePropositionRows, businessNeedRows, devOverviewRows, productModuleRows, implementationScopeRows, meetingNotes, keyPointRows, suppressUnsavedPrompt])
 
   useEffect(() => {
     // 未选择需求版本号时，子卡片恢复默认折叠状态，减少视觉噪音。
