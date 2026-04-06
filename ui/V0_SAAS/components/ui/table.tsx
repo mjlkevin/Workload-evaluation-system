@@ -4,17 +4,112 @@ import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+function Table({ className, children, ...props }: React.ComponentProps<'table'>) {
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  const tableRef = React.useRef<HTMLTableElement>(null)
+  const previewRef = React.useRef<HTMLDivElement>(null)
+  const [preview, setPreview] = React.useState<{
+    text: string
+    top: number
+    left: number
+    maxWidth: number
+  } | null>(null)
+
+  React.useEffect(() => {
+    const table = tableRef.current
+    if (!table) return
+
+    const headerCells = Array.from(table.querySelectorAll('thead th'))
+    if (!headerCells.length) return
+
+    // 默认按内容估算列宽，并对长文本列做上限控制，避免盲目拉宽。
+    const allRows = Array.from(table.querySelectorAll('tr'))
+    for (let colIndex = 0; colIndex < headerCells.length; colIndex += 1) {
+      const columnCells = allRows
+        .map((row) => row.children.item(colIndex) as HTMLElement | null)
+        .filter(Boolean) as HTMLElement[]
+      if (!columnCells.length) continue
+
+      const textSamples = columnCells
+        .filter((cell) => !cell.querySelector('input, textarea, select, button, [role="button"]'))
+        .map((cell) => (cell.textContent || '').trim())
+        .filter(Boolean)
+        .slice(0, 24)
+
+      if (!textSamples.length) continue
+      const maxLength = Math.max(...textSamples.map((t) => t.length))
+      const targetWidth = Math.max(96, Math.min(320, maxLength * 9 + 36))
+      columnCells.forEach((cell) => {
+        if ((cell as HTMLElement).dataset.manualWidth === '1') return
+        ;(cell as HTMLElement).style.width = `${targetWidth}px`
+        ;(cell as HTMLElement).style.maxWidth = `${targetWidth}px`
+      })
+    }
+  }, [children])
+
+  React.useEffect(() => {
+    if (!preview) return
+    function onDocClick(event: MouseEvent) {
+      const target = event.target as HTMLElement
+      if (previewRef.current?.contains(target)) return
+      setPreview(null)
+    }
+    function onEsc(event: KeyboardEvent) {
+      if (event.key === 'Escape') setPreview(null)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [preview])
+
+  function handleTableClick(event: React.MouseEvent<HTMLTableElement>) {
+    const target = event.target as HTMLElement
+    if (target.closest('input, textarea, select, button, [role="button"], a')) return
+    const cell = target.closest('td') as HTMLTableCellElement | null
+    if (!cell) return
+    const text = (cell.textContent || '').trim()
+    if (text.length < 20) return
+    const rect = cell.getBoundingClientRect()
+    const maxWidth = Math.min(560, Math.max(320, Math.floor(window.innerWidth * 0.45)))
+    const left = Math.min(rect.left, window.innerWidth - maxWidth - 16)
+    setPreview({
+      text,
+      top: rect.bottom + 8,
+      left: Math.max(12, left),
+      maxWidth,
+    })
+  }
+
   return (
     <div
+      ref={containerRef}
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
     >
       <table
+        ref={tableRef}
         data-slot="table"
-        className={cn('w-full caption-bottom text-sm', className)}
+        className={cn(
+          'w-full caption-bottom text-sm [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0',
+          className,
+        )}
+        onClick={handleTableClick}
         {...props}
-      />
+      >
+        {children}
+      </table>
+      {preview ? (
+        <div
+          ref={previewRef}
+          className="fixed z-50 rounded-lg border border-border bg-popover p-3 text-sm leading-6 shadow-xl"
+          style={{ top: preview.top, left: preview.left, maxWidth: preview.maxWidth }}
+        >
+          <div className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-popover-foreground">{preview.text}</div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -66,15 +161,55 @@ function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
 }
 
 function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
+  function onStartResize(event: React.MouseEvent<HTMLSpanElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    const th = event.currentTarget.closest('th') as HTMLTableCellElement | null
+    const table = th?.closest('table') as HTMLTableElement | null
+    if (!th || !table || !th.parentElement) return
+    const colIndex = Array.from(th.parentElement.children).indexOf(th)
+    if (colIndex < 0) return
+
+    const startX = event.clientX
+    const startWidth = th.getBoundingClientRect().width
+    const cells = Array.from(table.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`)) as HTMLElement[]
+    table.style.tableLayout = 'fixed'
+
+    function onMove(moveEvent: MouseEvent) {
+      const nextWidth = Math.max(88, startWidth + (moveEvent.clientX - startX))
+      cells.forEach((cell) => {
+        cell.style.width = `${nextWidth}px`
+        cell.style.minWidth = `${nextWidth}px`
+        cell.style.maxWidth = `${nextWidth}px`
+        cell.dataset.manualWidth = '1'
+      })
+    }
+
+    function onUp() {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
   return (
     <th
       data-slot="table-head"
       className={cn(
-        'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        'text-foreground relative h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
         className,
       )}
       {...props}
-    />
+    >
+      {props.children}
+      <span
+        aria-hidden="true"
+        className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none"
+        onMouseDown={onStartResize}
+      />
+    </th>
   )
 }
 
@@ -83,7 +218,7 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
     <td
       data-slot="table-cell"
       className={cn(
-        'p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        'p-2 align-middle whitespace-nowrap overflow-hidden text-ellipsis [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
         className,
       )}
       {...props}

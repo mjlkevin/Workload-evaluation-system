@@ -15,6 +15,7 @@ const router = Router();
 
 router.post("/parse-basic-info", upload.single("file"), AiModule.parseBasicInfo);
 router.post("/company-profile-summary", AiModule.companyProfileSummary);
+router.post("/kimi-assessment/preview", AiModule.kimiAssessmentPreview);
 router.post("/chat", AiModule.chat);
 
 export default router;

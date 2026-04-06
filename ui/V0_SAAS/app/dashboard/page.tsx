@@ -54,6 +54,7 @@ import {
   type ModuleVersionRecord,
 } from "@/lib/workload-service"
 import type { PlanRow } from "@/lib/workload-types"
+import { getCheckoutStatusBadgeClass, getCheckoutStatusText } from "@/lib/checkout-status-ui"
 
 const overviewCards = [
   { label: "总方案数", desc: "近 7 天新增", icon: FolderGit2 },
@@ -706,10 +707,10 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={rowGlobalRecord?.checkoutStatus === "checked_out" ? "default" : "secondary"}
-                          className="rounded-lg"
+                          variant="outline"
+                          className={`rounded-lg ${getCheckoutStatusBadgeClass(rowGlobalRecord?.checkoutStatus)}`}
                         >
-                          {rowGlobalRecord?.checkoutStatus === "checked_out" ? "已检出" : "已检入"}
+                          {getCheckoutStatusText(rowGlobalRecord?.checkoutStatus) || "已检入"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{row.updatedAt}</TableCell>

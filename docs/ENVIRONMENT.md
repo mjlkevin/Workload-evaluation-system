@@ -16,7 +16,7 @@
 | 变量 | 必填 | 默认值 | 说明 |
 |------|------|--------|------|
 | `KIMI_API_KEY` | 使用 AI 解析时必填 | 无 | Moonshot API Key，仅服务端使用，勿提交到仓库 |
-| `KIMI_MODEL` | 否 | `moonshot-v1-8k` | 模型名 |
+| `KIMI_MODEL` | 否 | `kimi-k2.5` | 模型名 |
 | `KIMI_API_BASE_URL` | 否 | `https://api.moonshot.cn/v1` | API 基址 |
 
 ## 前端
@@ -32,7 +32,7 @@ PORT=3000
 JWT_SECRET=please-change-in-production
 JWT_EXPIRES_IN=8h
 KIMI_API_KEY=
-KIMI_MODEL=moonshot-v1-8k
+KIMI_MODEL=kimi-k2.5
 CONFIG_INTEGRITY_ON_STARTUP=true
 ```
 

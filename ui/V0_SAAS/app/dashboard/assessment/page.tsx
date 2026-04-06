@@ -40,6 +40,7 @@ import {
   getActiveRuleSet,
   getDashboardPlans,
   getTemplateDetail,
+  KIMI_ASSESSMENT_PREFILL_STORAGE_KEY,
   listGlobalVersions,
   listEstimateExportHistory,
   listModuleVersions,
@@ -283,6 +284,7 @@ export default function AssessmentPage() {
   const dirtyEnabled = useRef(false)
   const initialEmbedQueryRef = useRef<{ globalVersion: string; version: string } | null>(null)
   const initialEmbedAppliedRef = useRef(false)
+  const kimiPrefillAppliedRef = useRef(false)
 
   function showGlobalNotice(text: string) {
     toast(text)
@@ -457,6 +459,110 @@ export default function AssessmentPage() {
       }
     })()
   }, [])
+
+  useEffect(() => {
+    if (initLoading || !templateDetail || kimiPrefillAppliedRef.current) return
+    const raw = window.sessionStorage.getItem(KIMI_ASSESSMENT_PREFILL_STORAGE_KEY)
+    if (!raw) return
+    kimiPrefillAppliedRef.current = true
+    window.sessionStorage.removeItem(KIMI_ASSESSMENT_PREFILL_STORAGE_KEY)
+    try {
+      const parsed = JSON.parse(raw) as {
+        source?: { globalVersionCode?: string }
+        draft?: {
+          quoteMode?: string
+          productLines?: unknown
+          userCount?: number
+          orgCount?: number
+          orgSimilarity?: number
+          difficultyFactor?: number
+          moduleItems?: Array<{
+            cloudProduct?: string
+            skuName?: string
+            moduleName?: string
+            suggestedDays?: number
+            reason?: string
+          }>
+        }
+        projectName?: string
+      }
+      const draft = parsed.draft
+      if (!draft) return
+
+      resetToNewAssessmentDraft()
+      const sourceGlobal = String(parsed.source?.globalVersionCode || "").trim()
+      if (sourceGlobal) applyGlobalVersionSelection(sourceGlobal)
+      if (parsed.projectName) setProjectName(String(parsed.projectName).trim())
+
+      setSelectedSheet(SHEET_MODULE_QUOTE)
+      if (draft.quoteMode) setSelectedPresetMode(String(draft.quoteMode))
+
+      setForm((prev) => ({
+        ...prev,
+        productLines: normalizeProductLines(draft.productLines),
+        userCount: Math.max(0, Number(draft.userCount || 0)),
+        orgCount: Math.max(1, Number(draft.orgCount || 1)),
+        orgSimilarityFactor: Math.min(1, Math.max(0, Number(draft.orgSimilarity ?? 0))),
+        difficultyFactor: Math.min(1, Math.max(0, Number(draft.difficultyFactor ?? 0))),
+      }))
+
+      const byModule = new Map<string, { suggestedDays: number; reason: string }>()
+      const byCloudSku = new Map<string, { suggestedDays: number; reason: string }>()
+      const normalizeName = (value: unknown) => String(value || "").trim().toLowerCase()
+      for (const item of draft.moduleItems || []) {
+        const moduleName = normalizeName(item.moduleName)
+        const cloudProduct = normalizeName(item.cloudProduct)
+        const skuName = normalizeName(item.skuName)
+        const ai = {
+          suggestedDays: Math.max(0, Number(item.suggestedDays || 0)),
+          reason: String(item.reason || "").trim(),
+        }
+        if (moduleName) byModule.set(moduleName, ai)
+        if (skuName) byModule.set(skuName, ai)
+        if (cloudProduct && skuName) {
+          byCloudSku.set(`${cloudProduct}::${skuName}`, ai)
+        }
+      }
+
+      const nextSelection: Record<string, ItemSelectionState> = {}
+      const hitCloud = new Set<string>()
+      for (const item of templateDetail.items) {
+        const fallbackDays = toInteger(Number(item.standardDays || 0))
+        nextSelection[item.templateItemId] = {
+          included: false,
+          customStandardDays: fallbackDays,
+        }
+        const cloud = cloudLabelFromItem(item)
+        const cloudKey = normalizeName(cloud)
+        const skuCandidates = [
+          normalizeName(item.skuName),
+          normalizeName(item.itemName),
+          normalizeName(item.deliveryModule),
+        ].filter(Boolean)
+        const cloudSkuMatched = skuCandidates
+          .map((sku) => byCloudSku.get(`${cloudKey}::${sku}`))
+          .find(Boolean)
+        const fallbackMatched = skuCandidates.map((sku) => byModule.get(sku)).find(Boolean)
+        const ai = cloudSkuMatched || fallbackMatched
+        if (!ai) continue
+        nextSelection[item.templateItemId] = {
+          included: true,
+          customStandardDays: Math.max(0, toInteger(ai.suggestedDays || fallbackDays)),
+          customAdjustReason: ai.reason || undefined,
+          customAdjustReasonStatus: ai.reason ? "saved" : undefined,
+        }
+        hitCloud.add(cloud)
+      }
+      setItemSelection(nextSelection)
+      setSelectedCloudNames(Array.from(hitCloud))
+      setCustomModeByCloud(Object.fromEntries(Array.from(hitCloud).map((cloud) => [cloud, true])))
+      setServerResult(null)
+      setError("")
+      showGlobalNotice("已应用 Kimi 评估草稿，请确认后保存版本")
+    } catch {
+      showGlobalWarning("Kimi 评估草稿解析失败，已忽略本次预填数据")
+    }
+  }, [initLoading, templateDetail])
 
   useEffect(() => {
     const list = ruleSet?.baseRule?.difficultyFactorList

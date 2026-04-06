@@ -11,6 +11,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { getCheckoutStatusBadgeClass, getCheckoutStatusText } from "@/lib/checkout-status-ui"
 
 export type VersionHistoryRow = {
   id: string
@@ -47,10 +49,6 @@ export function recordsToVersionHistoryRows(
     isHistoricalArchive: r.isHistoricalArchive,
     checkinNote: String(r.payload?.checkinNote || "").trim(),
   }))
-}
-
-function formatCheckout(s: VersionHistoryRow["checkoutStatus"]) {
-  return s === "checked_out" ? "已检出" : "已检入"
 }
 
 function formatDocStatus(s: VersionHistoryRow["versionDocStatus"]) {
@@ -177,7 +175,11 @@ export function VersionHistoryDialog({
                       <TableCell className="max-w-[320px] truncate text-xs" title={row.checkinNote || "—"}>
                         {row.checkinNote || "—"}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs">{formatCheckout(row.checkoutStatus)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        <Badge variant="outline" className={cn("rounded-lg", getCheckoutStatusBadgeClass(row.checkoutStatus))}>
+                          {getCheckoutStatusText(row.checkoutStatus) || "已检入"}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-xs">{formatDocStatus(row.versionDocStatus)}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs">{row.isHistoricalArchive ? "是" : "否"}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs">{formatRecordStatus(row.status)}</TableCell>

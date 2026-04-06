@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { shouldSuppressUnsavedPrompt, useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { Badge } from "@/components/ui/badge"
@@ -26,10 +27,11 @@ import {
 } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TableCell, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
 import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
+import { TableTemplate } from "@/components/table-template"
 import { useAuth } from "@/hooks/use-auth"
 import { apiRequest } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
@@ -38,8 +40,11 @@ import {
   checkoutVersionById,
   createModuleVersion,
   forceUnlockById,
+  generateKimiAssessmentPreview,
   getDashboardPlans,
+  KIMI_ASSESSMENT_PREFILL_STORAGE_KEY,
   listModuleVersions,
+  type KimiAssessmentPreviewResult,
   type ModuleVersionRecord,
   promoteVersionById,
   undoCheckoutById,
@@ -307,8 +312,10 @@ function createInitialSectionCollapsed(): Record<RequirementSectionKey, boolean>
 }
 
 export default function RequirementImportPage() {
+  const router = useRouter()
   const { isAdmin } = useAuth()
   const [keyword, setKeyword] = useState("")
+  const [businessNeedViewMode, setBusinessNeedViewMode] = useState<"list" | "grid">("list")
   const [globalVersionCode, setGlobalVersionCode] = useState("")
   const [globalOptions, setGlobalOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionOptions, setVersionOptions] = useState<Array<{ value: string; label: string }>>([])
@@ -329,7 +336,7 @@ export default function RequirementImportPage() {
   const [createNewConfirmOpen, setCreateNewConfirmOpen] = useState(false)
   const [createNewSubmitting, setCreateNewSubmitting] = useState(false)
   const [hasLocalChanges, setHasLocalChanges] = useState(false)
-  const [basicInfoModelName, setBasicInfoModelName] = useState("moonshot-v1-8k")
+  const [basicInfoModelName, setBasicInfoModelName] = useState("kimi-k2.5")
   const [basicInfoImportVisible, setBasicInfoImportVisible] = useState(false)
   const [basicInfoImportFile, setBasicInfoImportFile] = useState<File | null>(null)
   const [basicInfoImporting, setBasicInfoImporting] = useState(false)
@@ -349,6 +356,7 @@ export default function RequirementImportPage() {
   const [sectionCollapsed, setSectionCollapsed] = useState<Record<RequirementSectionKey, boolean>>(
     createInitialSectionCollapsed(),
   )
+  const [valuePropositionViewMode, setValuePropositionViewMode] = useState<"list" | "grid">("list")
   const enterpriseProfileRef = useRef<HTMLTextAreaElement | null>(null)
   const projectBackgroundNeedsRef = useRef<HTMLTextAreaElement | null>(null)
   const projectGoalsRef = useRef<HTMLTextAreaElement | null>(null)
@@ -913,6 +921,69 @@ export default function RequirementImportPage() {
     }
   }
 
+  async function onGenerateAssessmentPreviewByKimi() {
+    if (kimiAssessing) return
+    if (!basicInfo.projectName.trim()) {
+      setError("请先填写项目名称，再进行 Kimi 评估")
+      return
+    }
+    setKimiAssessing(true)
+    setError("")
+    setMessage("")
+    try {
+      const data = await generateKimiAssessmentPreview({
+        source: {
+          globalVersionCode: globalVersionCode.trim(),
+          requirementVersionCode: selectedVersionCode.trim(),
+        },
+        requirementSnapshot: {
+          basicInfo: basicInfo as unknown as Record<string, unknown>,
+          valuePropositionRows: valuePropositionRows as unknown as Array<Record<string, unknown>>,
+          businessNeedRows: businessNeedRows as unknown as Array<Record<string, unknown>>,
+          devOverviewRows: devOverviewRows as unknown as Array<Record<string, unknown>>,
+          productModuleRows: productModuleRows as unknown as Array<Record<string, unknown>>,
+          implementationScopeRows: implementationScopeRows as unknown as Array<Record<string, unknown>>,
+          meetingNotes,
+          keyPointRows: keyPointRows as unknown as Array<Record<string, unknown>>,
+        },
+        ruleContext: {
+          promptProfile: "assessment_default_v1",
+        },
+      })
+      setKimiAssessmentPreview(data)
+      setKimiAssessmentPreviewOpen(true)
+      if (data.meta.mode === "rule_fallback") {
+        const hint = data.meta.fallbackReason ? `（${data.meta.fallbackReason}）` : ""
+        showGlobalNotice(`Kimi 评估已生成（规则兜底）${hint}`)
+      } else {
+        showGlobalNotice("Kimi 评估预览已生成")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kimi 评估生成失败")
+    } finally {
+      setKimiAssessing(false)
+      setKimiHelpOpen(false)
+    }
+  }
+
+  function onApplyKimiAssessmentToAssessmentPage() {
+    if (!kimiAssessmentPreview || kimiApplying) return
+    setKimiApplying(true)
+    try {
+      const payload = {
+        source: kimiAssessmentPreview.source,
+        draft: kimiAssessmentPreview.assessmentDraft,
+        generatedMeta: kimiAssessmentPreview.meta,
+        projectName: basicInfo.projectName.trim(),
+      }
+      window.sessionStorage.setItem(KIMI_ASSESSMENT_PREFILL_STORAGE_KEY, JSON.stringify(payload))
+      setKimiAssessmentPreviewOpen(false)
+      router.push("/dashboard/assessment")
+    } finally {
+      setKimiApplying(false)
+    }
+  }
+
   function applyGeneratedEnterpriseProfile() {
     const generatedIndustry = enterpriseProfileGeneratedFields.customerIndustry.trim()
     const generatedRevenue = enterpriseProfileGeneratedFields.enterpriseRevenue.trim()
@@ -943,6 +1014,14 @@ export default function RequirementImportPage() {
 
   const revenueUncertainPreview = isUncertainRevenue(enterpriseProfileGeneratedFields.enterpriseRevenue)
   const itStatusUncertainPreview = isUncertainItStatus(enterpriseProfileGeneratedFields.itStatus)
+  const [devOverviewViewMode, setDevOverviewViewMode] = useState<"list" | "grid">("list")
+  const [productModuleViewMode, setProductModuleViewMode] = useState<"list" | "grid">("list")
+  const [implementationScopeViewMode, setImplementationScopeViewMode] = useState<"list" | "grid">("list")
+  const [keyPointViewMode, setKeyPointViewMode] = useState<"list" | "grid">("list")
+  const [kimiAssessmentPreviewOpen, setKimiAssessmentPreviewOpen] = useState(false)
+  const [kimiAssessing, setKimiAssessing] = useState(false)
+  const [kimiApplying, setKimiApplying] = useState(false)
+  const [kimiAssessmentPreview, setKimiAssessmentPreview] = useState<KimiAssessmentPreviewResult | null>(null)
 
   return (
     <ModuleShell
@@ -950,7 +1029,7 @@ export default function RequirementImportPage() {
       description="需求结构化导入、条目编辑、版本保存与回读。"
       breadcrumbs={[{ label: "需求" }]}
     >
-      <div className="space-y-6 [&_input]:border-border/70 [&_input]:bg-background/95 [&_input]:shadow-sm [&_select]:border-border/70 [&_select]:bg-background/95 [&_select]:shadow-sm [&_textarea]:border-border/70 [&_textarea]:bg-background/95 [&_textarea]:shadow-sm [&_td>input]:block [&_td>input]:w-full [&_td>input]:min-h-9 [&_td>input]:h-full">
+      <div className="space-y-6 [&_input]:border-border/70 [&_input]:bg-background/95 [&_input]:shadow-sm [&_select]:border-border/70 [&_select]:bg-background/95 [&_select]:shadow-sm [&_textarea]:border-border/70 [&_textarea]:bg-background/95 [&_textarea]:shadow-sm [&_td:has(>input)]:h-11 [&_td:has(>input)]:p-0 [&_td:has(>input)]:align-middle [&_td>input]:block [&_td>input]:w-full [&_td>input]:h-full [&_td>input]:min-h-9 [&_td>input]:rounded-none [&_td>input]:border-0 [&_td>input]:py-0 [&_td>input]:shadow-none">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/40 bg-card/50 p-3 shadow-sm backdrop-blur-sm transition-all duration-300 md:flex-nowrap">
           <Button className="rounded-xl" variant="outline" onClick={() => void onCreateNewRequirement()} disabled={saving || createNewSubmitting}>
@@ -1002,6 +1081,17 @@ export default function RequirementImportPage() {
                 onMouseLeave={scheduleCloseKimiHelpByHover}
               >
                 <div className="flex flex-col gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 justify-start rounded-md px-2 text-xs"
+                    onClick={() => {
+                      void onGenerateAssessmentPreviewByKimi()
+                    }}
+                    disabled={kimiAssessing}
+                  >
+                    {kimiAssessing ? "Kimi评估中..." : "Kimi评估"}
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
@@ -1091,7 +1181,10 @@ export default function RequirementImportPage() {
         </Card>
       </div>
 
-      <fieldset disabled={isReadonly} className="space-y-6">
+      <fieldset
+        disabled={isReadonly}
+        className="space-y-3 [&>[data-slot=card][data-collapsed=true]]:h-14 [&>[data-slot=card][data-collapsed=true]]:min-h-14 [&>[data-slot=card][data-collapsed=true]]:overflow-hidden"
+      >
       <Card
         collapsed={sectionCollapsed.basicInfo}
         onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, basicInfo: collapsed }))}
@@ -1353,183 +1446,288 @@ export default function RequirementImportPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={kimiAssessmentPreviewOpen} onOpenChange={setKimiAssessmentPreviewOpen}>
+        <DialogContent className="sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Kimi 评估预览（实施评估草稿）</DialogTitle>
+            <DialogDescription>
+              该结果为 AI 草稿，请确认后再应用到实施评估页面。
+            </DialogDescription>
+          </DialogHeader>
+          {kimiAssessmentPreview ? (
+            <div className="space-y-4">
+              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-4">
+                <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
+                  模型：{kimiAssessmentPreview.meta.model}
+                </div>
+                <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
+                  模式：{kimiAssessmentPreview.meta.mode === "model" ? "模型生成" : "规则兜底"}
+                </div>
+                <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
+                  置信度：{Math.round((Number(kimiAssessmentPreview.meta.confidence) || 0) * 100)}%
+                </div>
+                <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
+                  规则集：{kimiAssessmentPreview.meta.ruleSetId}
+                </div>
+              </div>
+              <div className="grid gap-3 rounded-lg border border-border/60 bg-secondary/10 p-3 text-sm sm:grid-cols-3">
+                <div>报价模式：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.quoteMode || "—"}</span></div>
+                <div>用户数：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.userCount}</span></div>
+                <div>组织数：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.orgCount}</span></div>
+                <div>组织相似度：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.orgSimilarity}</span></div>
+                <div>难度系数：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.difficultyFactor}</span></div>
+                <div>
+                  总人天：
+                  <span className="font-medium">
+                    {kimiAssessmentPreview.assessmentDraft.moduleItems.reduce(
+                      (sum, item) => sum + Number(item.suggestedDays || 0),
+                      0,
+                    )}
+                  </span>
+                </div>
+                <div className="sm:col-span-3">
+                  产品线：
+                  <span className="font-medium">
+                    {kimiAssessmentPreview.assessmentDraft.productLines.length
+                      ? kimiAssessmentPreview.assessmentDraft.productLines.join(" / ")
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">模块估算建议</p>
+                <div className="max-h-64 overflow-auto rounded-lg border border-border/60">
+                  {kimiAssessmentPreview.assessmentDraft.moduleItems.length ? (
+                    <div className="divide-y divide-border/50">
+                      <div className="grid gap-2 bg-secondary/20 px-3 py-2 text-xs font-semibold text-foreground sm:grid-cols-[1fr_1fr_0.7fr_0.7fr_2fr]">
+                        <span>云产品</span>
+                        <span>SKU</span>
+                        <span>标准人天</span>
+                        <span>建议人天</span>
+                        <span>原因</span>
+                      </div>
+                      {kimiAssessmentPreview.assessmentDraft.moduleItems.map((item, index) => (
+                        <div key={`${item.cloudProduct || "cloud"}-${item.skuName || item.moduleName}-${index}`} className="grid gap-2 px-3 py-2 text-sm sm:grid-cols-[1fr_1fr_0.7fr_0.7fr_2fr]">
+                          <span className="font-medium">{item.cloudProduct || "未分类云产品"}</span>
+                          <span className="font-medium">{item.skuName || item.moduleName || "未命名SKU"}</span>
+                          <span>标准：{item.standardDays}</span>
+                          <span>建议：{item.suggestedDays}</span>
+                          <span className="text-muted-foreground">{item.reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="px-3 py-5 text-sm text-muted-foreground">暂无模块估算建议</div>
+                  )}
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-border/60 p-3">
+                  <p className="mb-2 text-sm font-medium">风险提示</p>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {kimiAssessmentPreview.assessmentDraft.risks.map((risk, idx) => (
+                      <li key={`risk-${idx}`}>- {risk}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-border/60 p-3">
+                  <p className="mb-2 text-sm font-medium">前提假设</p>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {kimiAssessmentPreview.assessmentDraft.assumptions.map((assumption, idx) => (
+                      <li key={`assumption-${idx}`}>- {assumption}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => setKimiAssessmentPreviewOpen(false)}>
+              关闭
+            </Button>
+            <Button
+              type="button"
+              className="rounded-xl"
+              onClick={onApplyKimiAssessmentToAssessmentPage}
+              disabled={!kimiAssessmentPreview || kimiApplying}
+            >
+              {kimiApplying ? "处理中..." : "应用到实施评估"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card
         collapsed={sectionCollapsed.valueProposition}
         onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, valueProposition: collapsed }))}
-        className="border-border/40 bg-card/50 backdrop-blur-sm"
+        contentClassName="gap-1"
+        className="gap-3 py-4 border-border/40 bg-card/50 backdrop-blur-sm"
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">价值主张</CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={() => setValuePropositionRows((rows) => [...rows, createEmptyValuePropositionRow()])}>
-                新增行
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => setValuePropositionRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}
-              >
-                删除末行
-              </Button>
-            </div>
-          </div>
+        <CardHeader className="gap-0 pb-0">
+          <CardTitle className="text-base">价值主张</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>简要内容</TableHead>
-                <TableHead>具体内容（提炼）</TableHead>
-                <TableHead>访谈原始诉求</TableHead>
-                <TableHead>访谈提纲</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {valuePropositionRows.map((row) => (
+        <CardContent className="px-0">
+          <div className="[&>div]:p-0">
+            <TableTemplate
+              rows={valuePropositionRows}
+              columns={[
+                { key: "summary", label: "简要内容", className: "whitespace-nowrap" },
+                { key: "refinedContent", label: "具体内容（提炼）", className: "whitespace-nowrap" },
+                { key: "originalDemand", label: "访谈原始诉求", className: "whitespace-nowrap" },
+                { key: "interviewOutline", label: "访谈提纲", className: "whitespace-nowrap" },
+              ]}
+              emptyState="暂无价值主张行，请点击“新增行”"
+              showSearch={false}
+              showFilter={false}
+              viewMode={valuePropositionViewMode}
+              onViewModeChange={setValuePropositionViewMode}
+              createButtonLabel="新增行"
+              onCreate={() => setValuePropositionRows((rows) => [...rows, createEmptyValuePropositionRow()])}
+              toolbarActions={
+                <Button
+                  className="h-10 rounded-xl"
+                  variant="outline"
+                  onClick={() => setValuePropositionRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}
+                >
+                  删除末行
+                </Button>
+              }
+              renderRow={(row) => (
                 <TableRow key={row.id}>
-                  <TableCell>
+                  <TableCell className="h-11 p-0 align-middle">
                     <Input
+                      className="h-full rounded-none border-0 py-0 shadow-none"
                       value={row.summary}
                       onChange={(e) => setValuePropositionRows((items) => items.map((x) => (x.id === row.id ? { ...x, summary: e.target.value } : x)))}
                     />
                   </TableCell>
-                  <TableCell>
-                    <textarea
-                      className="min-h-14 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  <TableCell className="h-11 p-0 align-middle">
+                    <Input
+                      className="h-full rounded-none border-0 py-0 shadow-none"
                       value={row.refinedContent}
-                      onChange={(e) =>
-                        setValuePropositionRows((items) => items.map((x) => (x.id === row.id ? { ...x, refinedContent: e.target.value } : x)))
-                      }
+                      onChange={(e) => setValuePropositionRows((items) => items.map((x) => (x.id === row.id ? { ...x, refinedContent: e.target.value } : x)))}
                     />
                   </TableCell>
-                  <TableCell>
-                    <textarea
-                      className="min-h-14 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  <TableCell className="h-11 p-0 align-middle">
+                    <Input
+                      className="h-full rounded-none border-0 py-0 shadow-none"
                       value={row.originalDemand}
-                      onChange={(e) =>
-                        setValuePropositionRows((items) => items.map((x) => (x.id === row.id ? { ...x, originalDemand: e.target.value } : x)))
-                      }
+                      onChange={(e) => setValuePropositionRows((items) => items.map((x) => (x.id === row.id ? { ...x, originalDemand: e.target.value } : x)))}
                     />
                   </TableCell>
-                  <TableCell>
-                    <textarea
-                      className="min-h-14 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  <TableCell className="h-11 p-0 align-middle">
+                    <Input
+                      className="h-full rounded-none border-0 py-0 shadow-none"
                       value={row.interviewOutline}
-                      onChange={(e) =>
-                        setValuePropositionRows((items) => items.map((x) => (x.id === row.id ? { ...x, interviewOutline: e.target.value } : x)))
-                      }
+                      onChange={(e) => setValuePropositionRows((items) => items.map((x) => (x.id === row.id ? { ...x, interviewOutline: e.target.value } : x)))}
                     />
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              )}
+            />
+          </div>
         </CardContent>
       </Card>
 
       <Card
         collapsed={sectionCollapsed.businessNeed}
         onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, businessNeed: collapsed }))}
-        className="border-border/40 bg-card/50 backdrop-blur-sm"
+        contentClassName="gap-1"
+        className="gap-3 py-4 border-border/40 bg-card/50 backdrop-blur-sm"
       >
-        <CardHeader className="pb-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-base">业务需求及问题一览</CardTitle>
-            <div className="flex w-full gap-2 sm:w-auto">
-              <Input
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="搜索业务需求/领域/提出人"
-                className="sm:w-72"
-              />
-              <Button className="rounded-xl" variant="outline" onClick={() => setBusinessNeedRows((rows) => [...rows, createEmptyBusinessNeedRow()])}>
-                新增行
-              </Button>
-              <Button
-                className="rounded-xl"
-                variant="outline"
-                onClick={() => setBusinessNeedRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}
-              >
-                删除末行
-              </Button>
-            </div>
-          </div>
+        <CardHeader className="gap-0 pb-0">
+          <CardTitle className="text-base">业务需求及问题一览</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-xl border border-border/50">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/20">
-                  <TableHead className="whitespace-nowrap">业务领域</TableHead>
-                  <TableHead className="whitespace-nowrap">分类</TableHead>
-                  <TableHead className="whitespace-nowrap">业务需求及问题</TableHead>
-                  <TableHead className="whitespace-nowrap">提出人</TableHead>
-                  <TableHead className="whitespace-nowrap">职务</TableHead>
-                  <TableHead className="whitespace-nowrap">是否定开</TableHead>
+        <CardContent className="px-0">
+          <div className="[&>div]:p-0">
+            <TableTemplate
+              rows={filteredRows}
+              columns={[
+                { key: "businessDomain", label: "业务领域", className: "whitespace-nowrap" },
+                { key: "category", label: "分类", className: "whitespace-nowrap" },
+                { key: "businessNeed", label: "业务需求及问题", className: "whitespace-nowrap" },
+                { key: "proposer", label: "提出人", className: "whitespace-nowrap" },
+                { key: "title", label: "职务", className: "whitespace-nowrap" },
+                { key: "requiresCustomDev", label: "是否定开", className: "whitespace-nowrap" },
+              ]}
+              emptyState="暂无业务需求行，请点击“新增行”"
+              showSearch
+              searchValue={keyword}
+              onSearchValueChange={setKeyword}
+              searchPlaceholder="搜索业务需求/领域/提出人"
+              showFilter={false}
+              viewMode={businessNeedViewMode}
+              onViewModeChange={setBusinessNeedViewMode}
+              createButtonLabel="新增行"
+              onCreate={() => setBusinessNeedRows((rows) => [...rows, createEmptyBusinessNeedRow()])}
+              toolbarActions={
+                <Button
+                  className="h-10 rounded-xl"
+                  variant="outline"
+                  onClick={() => setBusinessNeedRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}
+                >
+                  删除末行
+                </Button>
+              }
+              renderRow={(row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="h-11 p-0 align-middle">
+                    <Input
+                      className="h-full rounded-none border-0 py-0 shadow-none"
+                      value={row.businessDomain}
+                      onChange={(e) =>
+                        setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessDomain: e.target.value } : x)))
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="h-11 p-0 align-middle">
+                    <Input
+                      className="h-full rounded-none border-0 py-0 shadow-none"
+                      value={row.category}
+                      onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, category: e.target.value } : x)))}
+                    />
+                  </TableCell>
+                  <TableCell className="h-11 p-0 align-middle">
+                    <Input
+                      className="h-full rounded-none border-0 py-0 shadow-none"
+                      value={row.businessNeed}
+                      onChange={(e) =>
+                        setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessNeed: e.target.value } : x)))
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="h-11 p-0 align-middle">
+                    <Input
+                      className="h-full rounded-none border-0 py-0 shadow-none"
+                      value={row.proposer}
+                      onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, proposer: e.target.value } : x)))}
+                    />
+                  </TableCell>
+                  <TableCell className="h-11 p-0 align-middle">
+                    <Input
+                      className="h-full rounded-none border-0 py-0 shadow-none"
+                      value={row.title}
+                      onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, title: e.target.value } : x)))}
+                    />
+                  </TableCell>
+                  <TableCell className="h-11 p-0 align-middle">
+                    <button
+                      type="button"
+                      className="h-full w-full rounded-none border-0 bg-background px-2 py-0 text-xs"
+                      onClick={() =>
+                        setBusinessNeedRows((items) =>
+                          items.map((x) =>
+                            x.id === row.id ? { ...x, requiresCustomDev: x.requiresCustomDev === "是" ? "否" : "是" } : x,
+                          ),
+                        )
+                      }
+                    >
+                      <Badge variant={row.requiresCustomDev === "是" ? "default" : "outline"}>{row.requiresCustomDev}</Badge>
+                    </button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="p-0 align-top">
-                      <Input
-                        className="h-11 rounded-none border-0 shadow-none"
-                        value={row.businessDomain}
-                        onChange={(e) =>
-                          setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessDomain: e.target.value } : x)))
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="p-0 align-top">
-                      <Input
-                        className="h-11 rounded-none border-0 shadow-none"
-                        value={row.category}
-                        onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, category: e.target.value } : x)))}
-                      />
-                    </TableCell>
-                    <TableCell className="min-w-56 align-top">
-                      <textarea
-                        className="min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        value={row.businessNeed}
-                        onChange={(e) =>
-                          setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessNeed: e.target.value } : x)))
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="p-0 align-top">
-                      <Input
-                        className="h-11 rounded-none border-0 shadow-none"
-                        value={row.proposer}
-                        onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, proposer: e.target.value } : x)))}
-                      />
-                    </TableCell>
-                    <TableCell className="p-0 align-top">
-                      <Input
-                        className="h-11 rounded-none border-0 shadow-none"
-                        value={row.title}
-                        onChange={(e) => setBusinessNeedRows((items) => items.map((x) => (x.id === row.id ? { ...x, title: e.target.value } : x)))}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <button
-                        type="button"
-                        className="rounded-md border border-input px-2 py-1 text-xs"
-                        onClick={() =>
-                          setBusinessNeedRows((items) =>
-                            items.map((x) =>
-                              x.id === row.id ? { ...x, requiresCustomDev: x.requiresCustomDev === "是" ? "否" : "是" } : x,
-                            ),
-                          )
-                        }
-                      >
-                        <Badge variant={row.requiresCustomDev === "是" ? "default" : "outline"}>{row.requiresCustomDev}</Badge>
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+              )}
+            />
           </div>
         </CardContent>
       </Card>
@@ -1537,85 +1735,63 @@ export default function RequirementImportPage() {
       <Card
         collapsed={sectionCollapsed.devOverview}
         onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, devOverview: collapsed }))}
-        className="border-border/40 bg-card/50 backdrop-blur-sm"
+        contentClassName="gap-1"
+        className="gap-3 py-4 border-border/40 bg-card/50 backdrop-blur-sm"
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">开发需求概要</CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={() => setDevOverviewRows((rows) => [...rows, createEmptyDevOverviewRow()])}>
-                新增行
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => setDevOverviewRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}
-              >
-                删除末行
-              </Button>
-            </div>
-          </div>
+        <CardHeader className="gap-0 pb-0">
+          <CardTitle className="text-base">开发需求概要</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>业务领域</TableHead>
-                <TableHead>模块名称</TableHead>
-                <TableHead>功能说明</TableHead>
-                <TableHead>基准编码人天</TableHead>
-                <TableHead>需求分析(20%)</TableHead>
-                <TableHead>系统测试(40%)</TableHead>
-                <TableHead>合计</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {devOverviewRows.map((row) => {
+        <CardContent className="space-y-2 px-0">
+          <div className="[&>div]:p-0">
+            <TableTemplate
+              rows={devOverviewRows}
+              columns={[
+                { key: "businessDomain", label: "业务领域", className: "whitespace-nowrap" },
+                { key: "moduleName", label: "模块名称", className: "whitespace-nowrap" },
+                { key: "functionDesc", label: "功能说明", className: "whitespace-nowrap" },
+                { key: "codingDays", label: "基准编码人天", className: "whitespace-nowrap" },
+                { key: "analysis", label: "需求分析(20%)", className: "whitespace-nowrap" },
+                { key: "testing", label: "系统测试(40%)", className: "whitespace-nowrap" },
+                { key: "total", label: "合计", className: "whitespace-nowrap" },
+              ]}
+              emptyState="暂无开发需求行，请点击“新增行”"
+              showSearch={false}
+              showFilter={false}
+              viewMode={devOverviewViewMode}
+              onViewModeChange={setDevOverviewViewMode}
+              createButtonLabel="新增行"
+              onCreate={() => setDevOverviewRows((rows) => [...rows, createEmptyDevOverviewRow()])}
+              toolbarActions={
+                <Button className="h-10 rounded-xl" variant="outline" onClick={() => setDevOverviewRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}>
+                  删除末行
+                </Button>
+              }
+              renderRow={(row) => {
                 const analysis = row.codingDays * 0.2
                 const testing = row.codingDays * 0.4
                 const total = row.codingDays * 1.6
                 return (
                   <TableRow key={row.id}>
-                    <TableCell>
-                      <Input
-                        value={row.businessDomain}
-                        onChange={(e) => setDevOverviewRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessDomain: e.target.value } : x)))}
-                      />
+                    <TableCell className="h-11 p-0 align-middle">
+                      <Input className="h-full rounded-none border-0 py-0 shadow-none" value={row.businessDomain} onChange={(e) => setDevOverviewRows((items) => items.map((x) => (x.id === row.id ? { ...x, businessDomain: e.target.value } : x)))} />
                     </TableCell>
-                    <TableCell>
-                      <Input
-                        value={row.moduleName}
-                        onChange={(e) => setDevOverviewRows((items) => items.map((x) => (x.id === row.id ? { ...x, moduleName: e.target.value } : x)))}
-                      />
+                    <TableCell className="h-11 p-0 align-middle">
+                      <Input className="h-full rounded-none border-0 py-0 shadow-none" value={row.moduleName} onChange={(e) => setDevOverviewRows((items) => items.map((x) => (x.id === row.id ? { ...x, moduleName: e.target.value } : x)))} />
                     </TableCell>
-                    <TableCell className="min-w-56">
-                      <textarea
-                        className="min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        value={row.functionDesc}
-                        onChange={(e) => setDevOverviewRows((items) => items.map((x) => (x.id === row.id ? { ...x, functionDesc: e.target.value } : x)))}
-                      />
+                    <TableCell className="h-11 p-0 align-middle">
+                      <Input className="h-full rounded-none border-0 py-0 shadow-none" value={row.functionDesc} onChange={(e) => setDevOverviewRows((items) => items.map((x) => (x.id === row.id ? { ...x, functionDesc: e.target.value } : x)))} />
                     </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.1"
-                        value={row.codingDays}
-                        onChange={(e) =>
-                          setDevOverviewRows((items) =>
-                            items.map((x) => (x.id === row.id ? { ...x, codingDays: Number(e.target.value || 0) } : x)),
-                          )
-                        }
-                      />
+                    <TableCell className="h-11 p-0 align-middle">
+                      <Input className="h-full rounded-none border-0 py-0 shadow-none" type="number" min={0} step="0.1" value={row.codingDays} onChange={(e) => setDevOverviewRows((items) => items.map((x) => (x.id === row.id ? { ...x, codingDays: Number(e.target.value || 0) } : x)))} />
                     </TableCell>
-                    <TableCell>{analysis.toFixed(1)}</TableCell>
-                    <TableCell>{testing.toFixed(1)}</TableCell>
-                    <TableCell>{total.toFixed(1)}</TableCell>
+                    <TableCell className="h-11 align-middle">{analysis.toFixed(1)}</TableCell>
+                    <TableCell className="h-11 align-middle">{testing.toFixed(1)}</TableCell>
+                    <TableCell className="h-11 align-middle">{total.toFixed(1)}</TableCell>
                   </TableRow>
                 )
-              })}
-            </TableBody>
-          </Table>
+              }}
+            />
+          </div>
           <div className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-sm">
             合计：编码 {devSummary.coding.toFixed(1)}，分析 {devSummary.analysis.toFixed(1)}，测试 {devSummary.testing.toFixed(1)}，总计{" "}
             {devSummary.total.toFixed(1)} 人天
@@ -1626,39 +1802,37 @@ export default function RequirementImportPage() {
       <Card
         collapsed={sectionCollapsed.productModule}
         onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, productModule: collapsed }))}
-        className="border-border/40 bg-card/50 backdrop-blur-sm"
+        contentClassName="gap-1"
+        className="gap-3 py-4 border-border/40 bg-card/50 backdrop-blur-sm"
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">产品及模块信息</CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={() => setProductModuleRows((rows) => [...rows, createEmptyProductModuleRow()])}>
-                新增行
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => setProductModuleRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}
-              >
-                删除末行
-              </Button>
-            </div>
-          </div>
+        <CardHeader className="gap-0 pb-0">
+          <CardTitle className="text-base">产品及模块信息</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>产品领域</TableHead>
-                <TableHead>模块</TableHead>
-                <TableHead>子模块</TableHead>
-                <TableHead>用户数</TableHead>
-                <TableHead>实施组织数</TableHead>
-                <TableHead>试点家数</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {productModuleRows.map((row) => (
+        <CardContent className="px-0">
+          <div className="[&>div]:p-0">
+            <TableTemplate
+              rows={productModuleRows}
+              columns={[
+                { key: "productDomain", label: "产品领域", className: "whitespace-nowrap" },
+                { key: "moduleName", label: "模块", className: "whitespace-nowrap" },
+                { key: "subModule", label: "子模块", className: "whitespace-nowrap" },
+                { key: "userCount", label: "用户数", className: "whitespace-nowrap" },
+                { key: "implementationOrgCount", label: "实施组织数", className: "whitespace-nowrap" },
+                { key: "pilotOrgCount", label: "试点家数", className: "whitespace-nowrap" },
+              ]}
+              emptyState="暂无产品模块行，请点击“新增行”"
+              showSearch={false}
+              showFilter={false}
+              viewMode={productModuleViewMode}
+              onViewModeChange={setProductModuleViewMode}
+              createButtonLabel="新增行"
+              onCreate={() => setProductModuleRows((rows) => [...rows, createEmptyProductModuleRow()])}
+              toolbarActions={
+                <Button className="h-10 rounded-xl" variant="outline" onClick={() => setProductModuleRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}>
+                  删除末行
+                </Button>
+              }
+              renderRow={(row) => (
                 <TableRow key={row.id}>
                   <TableCell><Input value={row.productDomain} onChange={(e) => setProductModuleRows((items) => items.map((x) => (x.id === row.id ? { ...x, productDomain: e.target.value } : x)))} /></TableCell>
                   <TableCell><Input value={row.moduleName} onChange={(e) => setProductModuleRows((items) => items.map((x) => (x.id === row.id ? { ...x, moduleName: e.target.value } : x)))} /></TableCell>
@@ -1667,59 +1841,57 @@ export default function RequirementImportPage() {
                   <TableCell><Input value={row.implementationOrgCount} onChange={(e) => setProductModuleRows((items) => items.map((x) => (x.id === row.id ? { ...x, implementationOrgCount: e.target.value } : x)))} /></TableCell>
                   <TableCell><Input value={row.pilotOrgCount} onChange={(e) => setProductModuleRows((items) => items.map((x) => (x.id === row.id ? { ...x, pilotOrgCount: e.target.value } : x)))} /></TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              )}
+            />
+          </div>
         </CardContent>
       </Card>
 
       <Card
         collapsed={sectionCollapsed.implementationScope}
         onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, implementationScope: collapsed }))}
-        className="border-border/40 bg-card/50 backdrop-blur-sm"
+        contentClassName="gap-1"
+        className="gap-3 py-4 border-border/40 bg-card/50 backdrop-blur-sm"
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">实施组织范围</CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={() => setImplementationScopeRows((rows) => [...rows, createEmptyImplementationScopeRow()])}>
-                新增行
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => setImplementationScopeRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}
-              >
-                删除末行
-              </Button>
-            </div>
-          </div>
+        <CardHeader className="gap-0 pb-0">
+          <CardTitle className="text-base">实施组织范围</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>公司名称</TableHead>
-                <TableHead>公司性质</TableHead>
-                <TableHead>实施模块范围说明</TableHead>
-                <TableHead>实施地点</TableHead>
-                <TableHead>实施/推广模式</TableHead>
-                <TableHead>备注</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {implementationScopeRows.map((row) => (
+        <CardContent className="px-0">
+          <div className="[&>div]:p-0">
+            <TableTemplate
+              rows={implementationScopeRows}
+              columns={[
+                { key: "companyName", label: "公司名称", className: "whitespace-nowrap" },
+                { key: "companyType", label: "公司性质", className: "whitespace-nowrap" },
+                { key: "moduleScope", label: "实施模块范围说明", className: "whitespace-nowrap" },
+                { key: "location", label: "实施地点", className: "whitespace-nowrap" },
+                { key: "implementationMode", label: "实施/推广模式", className: "whitespace-nowrap" },
+                { key: "note", label: "备注", className: "whitespace-nowrap" },
+              ]}
+              emptyState="暂无实施组织范围行，请点击“新增行”"
+              showSearch={false}
+              showFilter={false}
+              viewMode={implementationScopeViewMode}
+              onViewModeChange={setImplementationScopeViewMode}
+              createButtonLabel="新增行"
+              onCreate={() => setImplementationScopeRows((rows) => [...rows, createEmptyImplementationScopeRow()])}
+              toolbarActions={
+                <Button className="h-10 rounded-xl" variant="outline" onClick={() => setImplementationScopeRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}>
+                  删除末行
+                </Button>
+              }
+              renderRow={(row) => (
                 <TableRow key={row.id}>
                   <TableCell><Input value={row.companyName} onChange={(e) => setImplementationScopeRows((items) => items.map((x) => (x.id === row.id ? { ...x, companyName: e.target.value } : x)))} /></TableCell>
                   <TableCell><Input value={row.companyType} onChange={(e) => setImplementationScopeRows((items) => items.map((x) => (x.id === row.id ? { ...x, companyType: e.target.value } : x)))} /></TableCell>
-                  <TableCell><textarea className="min-h-14 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={row.moduleScope} onChange={(e) => setImplementationScopeRows((items) => items.map((x) => (x.id === row.id ? { ...x, moduleScope: e.target.value } : x)))} /></TableCell>
+                  <TableCell><Input value={row.moduleScope} onChange={(e) => setImplementationScopeRows((items) => items.map((x) => (x.id === row.id ? { ...x, moduleScope: e.target.value } : x)))} /></TableCell>
                   <TableCell><Input value={row.location} onChange={(e) => setImplementationScopeRows((items) => items.map((x) => (x.id === row.id ? { ...x, location: e.target.value } : x)))} /></TableCell>
                   <TableCell><Input value={row.implementationMode} onChange={(e) => setImplementationScopeRows((items) => items.map((x) => (x.id === row.id ? { ...x, implementationMode: e.target.value } : x)))} /></TableCell>
-                  <TableCell><textarea className="min-h-14 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={row.note} onChange={(e) => setImplementationScopeRows((items) => items.map((x) => (x.id === row.id ? { ...x, note: e.target.value } : x)))} /></TableCell>
+                  <TableCell><Input value={row.note} onChange={(e) => setImplementationScopeRows((items) => items.map((x) => (x.id === row.id ? { ...x, note: e.target.value } : x)))} /></TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              )}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -1744,46 +1916,44 @@ export default function RequirementImportPage() {
       <Card
         collapsed={sectionCollapsed.keyPoints}
         onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, keyPoints: collapsed }))}
-        className="border-border/40 bg-card/50 backdrop-blur-sm"
+        contentClassName="gap-1"
+        className="gap-3 py-4 border-border/40 bg-card/50 backdrop-blur-sm"
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">需求、方案关键点（合同金额≥100万）</CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={() => setKeyPointRows((rows) => [...rows, createEmptyKeyPointRow()])}>
-                新增行
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => setKeyPointRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}
-              >
-                删除末行
-              </Button>
-            </div>
-          </div>
+        <CardHeader className="gap-0 pb-0">
+          <CardTitle className="text-base">需求、方案关键点（合同金额≥100万）</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>分析项目</TableHead>
-                <TableHead>子项</TableHead>
-                <TableHead>明细内容</TableHead>
-                <TableHead>备注</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {keyPointRows.map((row) => (
+        <CardContent className="px-0">
+          <div className="[&>div]:p-0">
+            <TableTemplate
+              rows={keyPointRows}
+              columns={[
+                { key: "analysisCategory", label: "分析项目", className: "whitespace-nowrap" },
+                { key: "subItem", label: "子项", className: "whitespace-nowrap" },
+                { key: "detail", label: "明细内容", className: "whitespace-nowrap" },
+                { key: "note", label: "备注", className: "whitespace-nowrap" },
+              ]}
+              emptyState="暂无关键点行，请点击“新增行”"
+              showSearch={false}
+              showFilter={false}
+              viewMode={keyPointViewMode}
+              onViewModeChange={setKeyPointViewMode}
+              createButtonLabel="新增行"
+              onCreate={() => setKeyPointRows((rows) => [...rows, createEmptyKeyPointRow()])}
+              toolbarActions={
+                <Button className="h-10 rounded-xl" variant="outline" onClick={() => setKeyPointRows((rows) => (rows.length > 1 ? rows.slice(0, -1) : rows))}>
+                  删除末行
+                </Button>
+              }
+              renderRow={(row) => (
                 <TableRow key={row.id}>
                   <TableCell><Input value={row.analysisCategory} onChange={(e) => setKeyPointRows((items) => items.map((x) => (x.id === row.id ? { ...x, analysisCategory: e.target.value } : x)))} /></TableCell>
                   <TableCell><Input value={row.subItem} onChange={(e) => setKeyPointRows((items) => items.map((x) => (x.id === row.id ? { ...x, subItem: e.target.value } : x)))} /></TableCell>
-                  <TableCell><textarea className="min-h-14 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={row.detail} onChange={(e) => setKeyPointRows((items) => items.map((x) => (x.id === row.id ? { ...x, detail: e.target.value } : x)))} /></TableCell>
-                  <TableCell><textarea className="min-h-14 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={row.note} onChange={(e) => setKeyPointRows((items) => items.map((x) => (x.id === row.id ? { ...x, note: e.target.value } : x)))} /></TableCell>
+                  <TableCell><Input value={row.detail} onChange={(e) => setKeyPointRows((items) => items.map((x) => (x.id === row.id ? { ...x, detail: e.target.value } : x)))} /></TableCell>
+                  <TableCell><Input value={row.note} onChange={(e) => setKeyPointRows((items) => items.map((x) => (x.id === row.id ? { ...x, note: e.target.value } : x)))} /></TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              )}
+            />
+          </div>
         </CardContent>
       </Card>
       </fieldset>

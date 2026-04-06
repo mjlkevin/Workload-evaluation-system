@@ -70,12 +70,108 @@ function pickNumberField(input: Record<string, unknown>, keys: string[]): number
   return 0;
 }
 
+function normalizeProductDomainName(value: string): string {
+  const text = asString(value);
+  if (!text) return "";
+  if (/星空旗舰版/.test(text)) {
+    return text.replace(/星空旗舰版/g, "金蝶AI星空");
+  }
+  return text;
+}
+
+function mapProductDomainToProductLine(value: string): string {
+  const text = normalizeProductDomainName(value);
+  if (!text) return "";
+  if (/金蝶AI星空|星空/.test(text)) return "金蝶AI星空";
+  if (/金蝶AI星瀚|星瀚/.test(text)) return "金蝶AI星瀚";
+  if (/云之家/.test(text)) return "云之家";
+  if (/发票云/.test(text)) return "发票云";
+  return "";
+}
+
+function inferProductLinesFromProductModules(
+  rows: RequirementImportData["productModuleRows"]
+): string[] {
+  const picked = new Set<string>();
+  for (const row of rows) {
+    const line = mapProductDomainToProductLine(asString(row.productDomain));
+    if (line) picked.add(line);
+  }
+  return Array.from(picked);
+}
+
+function normalizeProductModuleRows(
+  rows: RequirementImportData["productModuleRows"]
+): RequirementImportData["productModuleRows"] {
+  const result: RequirementImportData["productModuleRows"] = [];
+  let lastProductDomain = "";
+  let lastModuleName = "";
+  let lastSubModule = "";
+  let lastImplementationOrgCount = "";
+  let lastPilotOrgCount = "";
+  let lastPartyBLead = "";
+  let lastPartyALead = "";
+  const userCountByModule = new Map<string, string>();
+  let sharedBusinessUserCount = "";
+
+  for (const row of rows) {
+    const productDomain = normalizeProductDomainName(asString(row.productDomain) || lastProductDomain);
+    const moduleName = asString(row.moduleName) || lastModuleName;
+    const subModule = asString(row.subModule) || lastSubModule;
+
+    let userCount = asString(row.userCount);
+    if (userCount) {
+      userCountByModule.set(moduleName, userCount);
+      if (/财务云|供应链云/.test(moduleName)) {
+        sharedBusinessUserCount = userCount;
+      }
+    } else if (moduleName && userCountByModule.has(moduleName)) {
+      userCount = userCountByModule.get(moduleName) || "";
+    } else if (/财务云|供应链云/.test(moduleName) && sharedBusinessUserCount) {
+      // 财务云与供应链云共用业务用户规模（如示例中的 10）。
+      userCount = sharedBusinessUserCount;
+    } else if (/流程服务云/.test(moduleName)) {
+      // 工作流属于独立用户规模，不复用业务模块用户数。
+      userCount = "";
+    }
+
+    const implementationOrgCount = asString(row.implementationOrgCount) || lastImplementationOrgCount;
+    const pilotOrgCount = asString(row.pilotOrgCount) || lastPilotOrgCount;
+    const partyBLead = asString(row.partyBLead) || lastPartyBLead;
+    const partyALead = asString(row.partyALead) || lastPartyALead;
+
+    result.push({
+      productDomain,
+      moduleName,
+      subModule,
+      userCount,
+      implementationOrgCount,
+      pilotOrgCount,
+      partyBLead,
+      partyALead
+    });
+
+    lastProductDomain = productDomain || lastProductDomain;
+    lastModuleName = moduleName || lastModuleName;
+    lastSubModule = subModule || lastSubModule;
+    lastImplementationOrgCount = implementationOrgCount || lastImplementationOrgCount;
+    lastPilotOrgCount = pilotOrgCount || lastPilotOrgCount;
+    lastPartyBLead = partyBLead || lastPartyBLead;
+    lastPartyALead = partyALead || lastPartyALead;
+  }
+
+  return result;
+}
+
 function normalizeBasicProjectInfo(input: Record<string, unknown>): BasicProjectInfo {
   const rawIndustry = pickModelField(input, ["customerIndustry", "客户行业", "行业"]);
   return {
     customerName: pickModelField(input, ["customerName", "客户名称"]),
     projectName: pickModelField(input, ["projectName", "项目名称"]),
     opportunityNo: pickModelField(input, ["opportunityNo", "商机号"]),
+    productLines: uniqueStringList(
+      Array.isArray(input.productLines) ? (input.productLines as unknown[]) : []
+    ),
     customerIndustry: normalizeIndustryTagText(rawIndustry),
     enterpriseRevenue: pickModelField(input, ["enterpriseRevenue", "企业营收", "营收"]),
     itStatus: pickModelField(input, ["itStatus", "信息化现状"]),
@@ -233,7 +329,7 @@ function normalizeRequirementImportData(input: Record<string, unknown>): Require
 
   const productModuleRows = asModelObjectArray(source.productModuleRows || source.productModules || source["产品及模块信息"])
     .map((row) => ({
-      productDomain: pickModelField(row, ["productDomain", "产品领域"]),
+      productDomain: normalizeProductDomainName(pickModelField(row, ["productDomain", "产品领域"])),
       moduleName: pickModelField(row, ["moduleName", "模块名称"]),
       subModule: pickModelField(row, ["subModule", "子模块"]),
       userCount: pickModelField(row, ["userCount", "用户数"]),
@@ -243,6 +339,8 @@ function normalizeRequirementImportData(input: Record<string, unknown>): Require
       partyALead: pickModelField(row, ["partyALead", "甲方负责人"])
     }))
     .filter((row) => Object.values(row).some((x) => asString(x)));
+
+  const normalizedProductModuleRows = normalizeProductModuleRows(productModuleRows);
 
   const implementationScopeRows = asModelObjectArray(source.implementationScopeRows || source.implementationScopes || source["实施组织范围"])
     .map((row) => ({
@@ -268,7 +366,7 @@ function normalizeRequirementImportData(input: Record<string, unknown>): Require
     valuePropositionRows,
     businessNeedRows,
     devOverviewRows,
-    productModuleRows,
+    productModuleRows: normalizedProductModuleRows,
     implementationScopeRows,
     meetingNotes: pickModelField(source, ["meetingNotes", "会议纪要", "meetingSummary", "调研纪要"]),
     keyPointRows
@@ -299,6 +397,8 @@ function mergeBasicInfo(primary: BasicProjectInfo, fallback: BasicProjectInfo): 
     customerName: primary.customerName || fallback.customerName,
     projectName: primary.projectName || fallback.projectName,
     opportunityNo: primary.opportunityNo || fallback.opportunityNo,
+    productLines:
+      (primary.productLines && primary.productLines.length ? primary.productLines : fallback.productLines) || [],
     customerIndustry: primary.customerIndustry || fallback.customerIndustry,
     enterpriseRevenue: primary.enterpriseRevenue || fallback.enterpriseRevenue,
     itStatus: primary.itStatus || fallback.itStatus,
@@ -348,7 +448,7 @@ async function parseRequirementImportByKimi(params: {
   const baseUrl = asString(params.apiUrl).replace(/\/+$/, "") || "https://api.moonshot.cn/v1";
   const endpoint = `${baseUrl}/chat/completions`;
   const body = {
-    model: asString(params.model) || "moonshot-v1-8k",
+    model: asString(params.model) || "kimi-k2.5",
     temperature: 0.1,
     response_format: { type: "json_object" },
     messages: [
@@ -445,7 +545,7 @@ async function summarizeCompanyProfileByKimi(params: {
   ].filter(Boolean);
   
   const body = {
-    model: asString(params.model) || "moonshot-v1-8k",
+    model: asString(params.model) || "kimi-k2.5",
     temperature: 0.1,
     response_format: { type: "json_object" },
     messages: [
@@ -552,7 +652,7 @@ async function chatWithKimi(params: {
     .filter((item) => item.content);
     
   const body = {
-    model: asString(params.model) || "moonshot-v1-8k",
+    model: asString(params.model) || "kimi-k2.5",
     temperature: 0.3,
     messages: [
       {
@@ -587,6 +687,306 @@ async function chatWithKimi(params: {
   return { answer: content, rawContent: content };
 }
 
+type KimiAssessmentModuleItem = {
+  cloudProduct?: string;
+  skuName?: string;
+  moduleName: string;
+  standardDays: number;
+  suggestedDays: number;
+  reason: string;
+};
+
+type KimiAssessmentDraft = {
+  quoteMode: string;
+  productLines: string[];
+  userCount: number;
+  orgCount: number;
+  orgSimilarity: number;
+  difficultyFactor: number;
+  moduleItems: KimiAssessmentModuleItem[];
+  risks: string[];
+  assumptions: string[];
+};
+
+type KimiAssessmentSnapshot = {
+  basicInfo?: Record<string, unknown>;
+  valuePropositionRows?: Array<Record<string, unknown>>;
+  businessNeedRows?: Array<Record<string, unknown>>;
+  devOverviewRows?: Array<Record<string, unknown>>;
+  productModuleRows?: Array<Record<string, unknown>>;
+  implementationScopeRows?: Array<Record<string, unknown>>;
+  meetingNotes?: string;
+  keyPointRows?: Array<Record<string, unknown>>;
+};
+
+type KimiAssessmentPreviewInput = {
+  source?: {
+    globalVersionCode?: string;
+    requirementVersionCode?: string;
+  };
+  requirementSnapshot?: KimiAssessmentSnapshot;
+  ruleContext?: {
+    promptProfile?: string;
+  };
+};
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
+function toNumberSafe(value: unknown): number {
+  const text = asString(value).replace(/[^\d.-]/g, "");
+  if (!text) return 0;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function uniqueStringList(values: unknown[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const text = asString(value);
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    result.push(text);
+  }
+  return result;
+}
+
+function estimateFallbackAssessmentDraft(snapshot: KimiAssessmentSnapshot): KimiAssessmentDraft {
+  const basicInfo = asModelObject(snapshot.basicInfo);
+  const productModuleRows = Array.isArray(snapshot.productModuleRows) ? snapshot.productModuleRows : [];
+  const devOverviewRows = Array.isArray(snapshot.devOverviewRows) ? snapshot.devOverviewRows : [];
+  const businessNeedRows = Array.isArray(snapshot.businessNeedRows) ? snapshot.businessNeedRows : [];
+  const scopeRows = Array.isArray(snapshot.implementationScopeRows) ? snapshot.implementationScopeRows : [];
+  const keyPointRows = Array.isArray(snapshot.keyPointRows) ? snapshot.keyPointRows : [];
+  const meetingNotes = asString(snapshot.meetingNotes);
+
+  const productLines = uniqueStringList(
+    Array.isArray(basicInfo.productLines) ? (basicInfo.productLines as unknown[]) : []
+  );
+  const orgCount = Math.max(1, scopeRows.length || 1);
+
+  let summedUserCount = 0;
+  for (const row of productModuleRows) {
+    const o = asModelObject(row);
+    summedUserCount += toNumberSafe(o.userCount);
+  }
+  const userCount = Math.max(0, Math.round(summedUserCount || 100));
+  const orgSimilarity = orgCount <= 1 ? 0 : 0.6;
+
+  const complexityScore =
+    (businessNeedRows.length >= 8 ? 0.4 : businessNeedRows.length >= 3 ? 0.25 : 0.15) +
+    (keyPointRows.length >= 4 ? 0.2 : keyPointRows.length >= 1 ? 0.1 : 0) +
+    (!meetingNotes ? 0.15 : 0);
+  const difficultyFactor = clampNumber(Number(complexityScore.toFixed(2)), 0, 1);
+
+  const moduleItems: KimiAssessmentModuleItem[] = [];
+  for (const row of productModuleRows.slice(0, 12)) {
+    const o = asModelObject(row);
+    const cloudProduct = normalizeProductDomainName(asString(o.moduleName));
+    const skuName = asString(o.subModule);
+    const moduleName = skuName || cloudProduct;
+    if (!moduleName) continue;
+    const base = clampNumber(Math.round(toNumberSafe(o.userCount) / 120) || 2, 1, 20);
+    const suggested = clampNumber(Math.round(base * (1 + difficultyFactor * 0.6)), base, 30);
+    moduleItems.push({
+      cloudProduct: cloudProduct || undefined,
+      skuName: skuName || undefined,
+      moduleName,
+      standardDays: base,
+      suggestedDays: suggested,
+      reason: "基于用户规模、需求复杂度与组织协同成本进行估算（规则兜底）。"
+    });
+  }
+
+  if (!moduleItems.length) {
+    for (const row of devOverviewRows.slice(0, 12)) {
+      const o = asModelObject(row);
+      const cloudProduct = asString(o.businessDomain);
+      const skuName = asString(o.moduleName);
+      const moduleName = skuName || cloudProduct;
+      if (!moduleName) continue;
+      const coding = Math.max(1, Math.round(toNumberSafe(o.codingDays)));
+      moduleItems.push({
+        cloudProduct: cloudProduct || undefined,
+        skuName: skuName || undefined,
+        moduleName,
+        standardDays: coding,
+        suggestedDays: clampNumber(Math.round(coding * 1.2), coding, 60),
+        reason: "基于开发需求概要的编码人天做实施侧换算（规则兜底）。"
+      });
+    }
+  }
+
+  const risks: string[] = [];
+  if (!meetingNotes) risks.push("未提供会议纪要，关键边界条件可能遗漏。");
+  if (!scopeRows.length) risks.push("实施组织范围未明确，组织推广成本存在偏差风险。");
+  if (!productLines.length) risks.push("未标注产品线，模块组合可能存在偏差。");
+  if (!risks.length) risks.push("需在实施前确认主数据口径与组织推广策略。");
+
+  return {
+    quoteMode: "模块报价",
+    productLines,
+    userCount,
+    orgCount,
+    orgSimilarity,
+    difficultyFactor,
+    moduleItems,
+    risks,
+    assumptions: [
+      "当前结果为 AI 草稿，需人工校核后再作为正式评估输入。",
+      "本次估算以需求页当前内容为边界，未纳入未记录的外部约束。"
+    ]
+  };
+}
+
+function normalizeKimiAssessmentDraft(input: Record<string, unknown>, fallback: KimiAssessmentDraft): KimiAssessmentDraft {
+  const normalized = asModelObject(input.assessmentDraft);
+  const source = Object.keys(normalized).length ? normalized : input;
+  const moduleItemsRaw = Array.isArray(source.moduleItems) ? source.moduleItems : [];
+  const moduleItems = moduleItemsRaw
+    .map((row) => asModelObject(row))
+    .map((row) => ({
+      cloudProduct: normalizeProductDomainName(asString(row.cloudProduct)),
+      skuName: asString(row.skuName),
+      moduleName: asString(row.moduleName),
+      standardDays: Math.max(0, Math.round(toNumberSafe(row.standardDays))),
+      suggestedDays: Math.max(0, Math.round(toNumberSafe(row.suggestedDays))),
+      reason: asString(row.reason)
+    }))
+    .filter((row) => row.moduleName);
+
+  const productLines = uniqueStringList(Array.isArray(source.productLines) ? (source.productLines as unknown[]) : []);
+  const risks = uniqueStringList(Array.isArray(source.risks) ? (source.risks as unknown[]) : []);
+  const assumptions = uniqueStringList(Array.isArray(source.assumptions) ? (source.assumptions as unknown[]) : []);
+
+  return {
+    quoteMode: asString(source.quoteMode) || fallback.quoteMode,
+    productLines: productLines.length ? productLines : fallback.productLines,
+    userCount: Math.max(0, Math.round(toNumberSafe(source.userCount) || fallback.userCount)),
+    orgCount: Math.max(1, Math.round(toNumberSafe(source.orgCount) || fallback.orgCount)),
+    orgSimilarity: clampNumber(Number(source.orgSimilarity ?? fallback.orgSimilarity), 0, 1),
+    difficultyFactor: clampNumber(Number(source.difficultyFactor ?? fallback.difficultyFactor), 0, 1),
+    moduleItems: moduleItems.length ? moduleItems : fallback.moduleItems,
+    risks: risks.length ? risks : fallback.risks,
+    assumptions: assumptions.length ? assumptions : fallback.assumptions
+  };
+}
+
+function buildCloudSkuModuleItemsFromSnapshot(
+  snapshot: KimiAssessmentSnapshot,
+  draft: KimiAssessmentDraft
+): KimiAssessmentModuleItem[] {
+  const productModuleRows = normalizeProductModuleRows(
+    Array.isArray(snapshot.productModuleRows)
+      ? (snapshot.productModuleRows.map((x) => asModelObject(x)) as RequirementImportData["productModuleRows"])
+      : []
+  );
+  if (!productModuleRows.length) return draft.moduleItems;
+
+  const normalize = (value: unknown) => asString(value).toLowerCase();
+  const aiBySku = new Map<string, KimiAssessmentModuleItem>();
+  for (const item of draft.moduleItems) {
+    const sku = normalize(item.skuName || item.moduleName);
+    if (sku) aiBySku.set(sku, item);
+  }
+
+  const result: KimiAssessmentModuleItem[] = [];
+  for (const row of productModuleRows) {
+    const cloudProduct = asString(row.moduleName);
+    const skuName = asString(row.subModule);
+    if (!cloudProduct || !skuName) continue;
+    const hit = aiBySku.get(normalize(skuName));
+    const userCount = Math.max(0, toNumberSafe(row.userCount));
+    const inferredStandard = clampNumber(Math.round(userCount / 120) || 2, 1, 20);
+    const standardDays = Math.max(
+      1,
+      Math.round(hit?.standardDays || inferredStandard)
+    );
+    const suggestedDays = Math.max(
+      standardDays,
+      Math.round(
+        hit?.suggestedDays ||
+          standardDays * (1 + clampNumber(Number(draft.difficultyFactor || 0), 0, 1) * 0.4)
+      )
+    );
+    result.push({
+      cloudProduct,
+      skuName,
+      moduleName: `${cloudProduct}-${skuName}`,
+      standardDays,
+      suggestedDays,
+      reason:
+        asString(hit?.reason) ||
+        "按产品模块清单（云产品+SKU）重排后的估算建议，需结合实施范围人工复核。"
+    });
+  }
+
+  return result.length ? result : draft.moduleItems;
+}
+
+async function generateAssessmentDraftByKimi(params: {
+  apiUrl: string;
+  apiKey: string;
+  model: string;
+  payload: KimiAssessmentPreviewInput;
+  fallback: KimiAssessmentDraft;
+}): Promise<{ draft: KimiAssessmentDraft; rawContent: string }> {
+  const baseUrl = asString(params.apiUrl).replace(/\/+$/, "") || "https://api.moonshot.cn/v1";
+  const endpoint = `${baseUrl}/chat/completions`;
+  const body = {
+    model: asString(params.model) || "kimi-k2.5",
+    temperature: 0.1,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "你是实施评估顾问。必须只返回 JSON。字段固定：assessmentDraft.quoteMode/productLines/userCount/orgCount/orgSimilarity/difficultyFactor/moduleItems/risks/assumptions。moduleItems 每项字段：cloudProduct/skuName/moduleName/standardDays/suggestedDays/reason。所有数值字段必须为非负数，orgSimilarity 和 difficultyFactor 范围 0-1。"
+      },
+      {
+        role: "user",
+        content:
+          `请基于以下需求快照输出实施评估草稿。\n` +
+          `要求：\n` +
+          `1) 只输出 JSON 对象；\n` +
+          `2) quoteMode 默认优先“模块报价”；\n` +
+          `3) 若信息不足，给出审慎估算并在 risks/assumptions 说明；\n` +
+          `4) moduleItems 至少返回 1 条。\n\n` +
+          `${JSON.stringify(params.payload)}`
+      }
+    ]
+  };
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${params.apiKey}`
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`kimi_request_failed:${response.status}:${errorText.slice(0, 240)}`);
+  }
+
+  const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = asString(json?.choices?.[0]?.message?.content);
+  if (!content) {
+    throw new Error("model_empty_assessment_response");
+  }
+  const parsed = parseJsonFromModelText(content);
+  if (!Object.keys(parsed).length) {
+    throw new Error("model_invalid_assessment_json");
+  }
+  const draft = normalizeKimiAssessmentDraft(parsed, params.fallback);
+  return { draft, rawContent: content };
+}
+
 // -------------------- 工作簿解析（规则回退） --------------------
 
 function findSheetByKeyword(workbook: XLSX.WorkBook, keyword: string): string {
@@ -606,10 +1006,11 @@ function parseBasicInfoFromWorkbook(workbook: XLSX.WorkBook): BasicProjectInfo {
   const rows = getSheetRows(workbook, findSheetByKeyword(workbook, "项目概况"));
   const result: BasicProjectInfo = {
     customerName: "", projectName: "", opportunityNo: "", customerIndustry: "",
+    productLines: [],
     enterpriseRevenue: "", itStatus: "", expectedGoLive: "", enterpriseProfile: "",
     projectBackgroundNeeds: "", projectGoals: ""
   };
-  const fieldMap: Array<{ keys: string[]; target: keyof BasicProjectInfo }> = [
+  const fieldMap: Array<{ keys: string[]; target: Exclude<keyof BasicProjectInfo, "productLines"> }> = [
     { keys: ["客户名称"], target: "customerName" },
     { keys: ["项目名称"], target: "projectName" },
     { keys: ["商机号"], target: "opportunityNo" },
@@ -827,7 +1228,9 @@ function parseRequirementImportFromWorkbook(workbook: XLSX.WorkBook): Requiremen
         }),
         (row) => Object.values(row).some((value) => asString(value))
       );
-      sectionData.productModuleRows = list as RequirementImportData["productModuleRows"];
+      sectionData.productModuleRows = normalizeProductModuleRows(
+        list as RequirementImportData["productModuleRows"]
+      );
     }
 
     if (sectionData.implementationScopeRows.length === 0) {
@@ -876,6 +1279,7 @@ function parseRequirementImportFromWorkbook(workbook: XLSX.WorkBook): Requiremen
   }
 
   sectionData.meetingNotes = collectedMeetingNotes.join("\n").trim();
+  sectionData.productModuleRows = normalizeProductModuleRows(sectionData.productModuleRows);
   return sectionData;
 }
 
@@ -898,10 +1302,17 @@ export async function parseBasicInfo(req: Request, res: Response) {
     const model = config.kimi.model;
 
     if (!apiKey) {
+      const inferredLines = inferProductLinesFromProductModules(workbookRequirementData.productModuleRows);
       return res.json(
         ok(
           {
-            basicInfo: workbookBasicInfo,
+            basicInfo: {
+              ...workbookBasicInfo,
+              productLines:
+                (workbookBasicInfo.productLines && workbookBasicInfo.productLines.length
+                  ? workbookBasicInfo.productLines
+                  : inferredLines),
+            },
             requirementImportData: workbookRequirementData,
             sourceSheets: workbook.SheetNames,
             model: "rule-fallback",
@@ -922,11 +1333,20 @@ export async function parseBasicInfo(req: Request, res: Response) {
         workbookText
       });
 
+      const mergedBasic = mergeBasicInfo(parsed.basicInfo, workbookBasicInfo);
+      const mergedRequirement = mergeRequirementImportData(parsed.requirementImportData, workbookRequirementData);
+      const inferredLines = inferProductLinesFromProductModules(mergedRequirement.productModuleRows);
       return res.json(
         ok(
           {
-            basicInfo: mergeBasicInfo(parsed.basicInfo, workbookBasicInfo),
-            requirementImportData: mergeRequirementImportData(parsed.requirementImportData, workbookRequirementData),
+            basicInfo: {
+              ...mergedBasic,
+              productLines:
+                (mergedBasic.productLines && mergedBasic.productLines.length
+                  ? mergedBasic.productLines
+                  : inferredLines),
+            },
+            requirementImportData: mergedRequirement,
             sourceSheets: workbook.SheetNames,
             model,
             mode: "model",
@@ -938,10 +1358,17 @@ export async function parseBasicInfo(req: Request, res: Response) {
       );
     } catch (modelErr) {
       const fallbackReason = modelErr instanceof Error ? modelErr.message : "model_parse_failed";
+      const inferredLines = inferProductLinesFromProductModules(workbookRequirementData.productModuleRows);
       return res.json(
         ok(
           {
-            basicInfo: workbookBasicInfo,
+            basicInfo: {
+              ...workbookBasicInfo,
+              productLines:
+                (workbookBasicInfo.productLines && workbookBasicInfo.productLines.length
+                  ? workbookBasicInfo.productLines
+                  : inferredLines),
+            },
             requirementImportData: workbookRequirementData,
             sourceSheets: workbook.SheetNames,
             model: "rule-fallback",
@@ -1037,6 +1464,109 @@ export async function companyProfileSummary(req: Request, res: Response) {
           mode: "rule_fallback",
           fallbackReason,
           rawContent: ""
+        },
+        requestId
+      )
+    );
+  }
+}
+
+export async function kimiAssessmentPreview(req: Request, res: Response) {
+  if (!requireRole(req, res, ["admin", "operator"])) return;
+
+  const requestId = randomUUID();
+  const body = (req.body || {}) as KimiAssessmentPreviewInput;
+  const snapshot = asModelObject(body.requirementSnapshot) as KimiAssessmentSnapshot;
+  const source = asModelObject(body.source);
+  const globalVersionCode = asString(source.globalVersionCode);
+  const requirementVersionCode = asString(source.requirementVersionCode);
+
+  if (!snapshot || Object.keys(snapshot).length === 0) {
+    return fail(res, 40001, "参数错误", [{ field: "requirementSnapshot", reason: "required" }]);
+  }
+
+  const fallbackDraft = estimateFallbackAssessmentDraft(snapshot);
+  const fallbackDraftAligned: KimiAssessmentDraft = {
+    ...fallbackDraft,
+    moduleItems: buildCloudSkuModuleItemsFromSnapshot(snapshot, fallbackDraft)
+  };
+  const apiKey = config.kimi.apiKey;
+  const model = config.kimi.model;
+  const promptProfile = asString(asModelObject(body.ruleContext).promptProfile) || "assessment_default_v1";
+  const startedAt = Date.now();
+
+  if (!apiKey) {
+    return res.json(
+      ok(
+        {
+          meta: {
+            model: "rule-fallback",
+            generatedAt: new Date().toISOString(),
+            confidence: 0.62,
+            promptVersion: promptProfile,
+            ruleSetId: "fallback-rules-v1",
+            mode: "rule_fallback",
+            fallbackReason: "api_key_missing",
+            elapsedMs: Date.now() - startedAt
+          },
+          source: { globalVersionCode, requirementVersionCode },
+          assessmentDraft: fallbackDraft
+        },
+        requestId
+      )
+    );
+  }
+
+  try {
+    const result = await generateAssessmentDraftByKimi({
+      apiUrl: config.kimi.apiBaseUrl,
+      apiKey,
+      model,
+      payload: body,
+      fallback: fallbackDraftAligned
+    });
+    const alignedDraft: KimiAssessmentDraft = {
+      ...result.draft,
+      moduleItems: buildCloudSkuModuleItemsFromSnapshot(snapshot, result.draft)
+    };
+
+    return res.json(
+      ok(
+        {
+          meta: {
+            model,
+            generatedAt: new Date().toISOString(),
+            confidence: 0.78,
+            promptVersion: promptProfile,
+            ruleSetId: "assessment-rules-v1",
+            mode: "model",
+            fallbackReason: "",
+            elapsedMs: Date.now() - startedAt,
+            rawContent: result.rawContent
+          },
+          source: { globalVersionCode, requirementVersionCode },
+          assessmentDraft: alignedDraft
+        },
+        requestId
+      )
+    );
+  } catch (err) {
+    const fallbackReason = err instanceof Error ? err.message : "model_generate_failed";
+    return res.json(
+      ok(
+        {
+          meta: {
+            model: "rule-fallback",
+            generatedAt: new Date().toISOString(),
+            confidence: 0.62,
+            promptVersion: promptProfile,
+            ruleSetId: "fallback-rules-v1",
+            mode: "rule_fallback",
+            fallbackReason,
+            elapsedMs: Date.now() - startedAt
+          },
+          source: { globalVersionCode, requirementVersionCode },
+          assessmentDraft: fallbackDraftAligned
         },
         requestId
       )

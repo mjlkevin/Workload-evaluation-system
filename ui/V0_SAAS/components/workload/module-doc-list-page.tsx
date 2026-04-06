@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { getCheckoutStatusBadgeClass, getCheckoutStatusText } from "@/lib/checkout-status-ui"
 import {
   deleteModuleVersion,
   getReviewItems,
@@ -154,6 +155,15 @@ function renderProductLineBadges(item: ModuleDocListItem) {
         </Badge>
       ))}
     </div>
+  )
+}
+
+function renderCheckoutStatusBadge(item: ModuleDocListItem) {
+  const label = getCheckoutStatusText(item.latestRecord?.checkoutStatus || item.statusText) || item.statusText || "—"
+  return (
+    <Badge variant="outline" className={cn("rounded-lg", getCheckoutStatusBadgeClass(item.latestRecord?.checkoutStatus || item.statusText))}>
+      {label}
+    </Badge>
   )
 }
 
@@ -395,7 +405,7 @@ export function ModuleDocListPage({
                           <TableCell className="max-w-[220px] truncate" title={pickCustomerName(item)}>
                             {pickCustomerName(item)}
                           </TableCell>
-                          <TableCell>{item.statusText}</TableCell>
+                          <TableCell>{renderCheckoutStatusBadge(item)}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{item.updatedAt || "—"}</TableCell>
                         </>
                       ) : (
@@ -410,7 +420,7 @@ export function ModuleDocListPage({
                           <TableCell className="tabular-nums">{formatNum(pickTotalDays(item))}</TableCell>
                           <TableCell className="tabular-nums">{formatNum(pickOrgCount(item))}</TableCell>
                           <TableCell className="tabular-nums">{formatNum(pickDifficultyFactor(item))}</TableCell>
-                          <TableCell>{item.statusText}</TableCell>
+                          <TableCell>{renderCheckoutStatusBadge(item)}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{item.updatedAt || "—"}</TableCell>
                         </>
                       )}

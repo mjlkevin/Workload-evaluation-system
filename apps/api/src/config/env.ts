@@ -19,7 +19,7 @@ export const config = {
   
   kimi: {
     apiKey: process.env.KIMI_API_KEY || "",
-    model: process.env.KIMI_MODEL || "moonshot-v1-8k",
+    model: process.env.KIMI_MODEL || "kimi-k2.5",
     apiBaseUrl: process.env.KIMI_API_BASE_URL || "https://api.moonshot.cn/v1",
   },
   

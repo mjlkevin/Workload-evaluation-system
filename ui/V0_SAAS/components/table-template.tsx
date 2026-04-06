@@ -31,6 +31,9 @@ interface TableTemplateColumn<Row> {
   key: keyof Row | string
   label: string
   className?: string
+  width?: number | string
+  minWidth?: number | string
+  maxWidth?: number | string
 }
 
 interface TableTemplatePageItem {
@@ -68,12 +71,14 @@ interface TableTemplateProps<Row> {
   onViewModeChange: (mode: ViewMode) => void
   createButtonLabel?: string
   onCreate?: () => void
+  toolbarActions?: ReactNode
   selectedCount?: number
   selectedCountLabel?: (count: number) => string
   selectedActions?: ReactNode
   leadingHeaderCell?: ReactNode
   trailingHeaderCell?: ReactNode
   pagination?: TableTemplatePagination
+  tableClassName?: string
 }
 
 export function TableTemplate<Row>({
@@ -94,12 +99,14 @@ export function TableTemplate<Row>({
   onViewModeChange,
   createButtonLabel = "新建",
   onCreate,
+  toolbarActions,
   selectedCount = 0,
   selectedCountLabel = (count) => `已选择 ${count} 项`,
   selectedActions,
   leadingHeaderCell,
   trailingHeaderCell,
   pagination,
+  tableClassName,
 }: TableTemplateProps<Row>) {
   const showFilterControl = showFilter && filterOptions.length > 0
   const totalColumnCount =
@@ -175,6 +182,7 @@ export function TableTemplate<Row>({
               <Plus className="size-4" />
               <span>{createButtonLabel}</span>
             </Button>
+            {toolbarActions ? <div className="flex items-center gap-2">{toolbarActions}</div> : null}
           </div>
         </div>
 
@@ -189,12 +197,27 @@ export function TableTemplate<Row>({
           </div>
         )}
 
-        <Table>
+        <Table className={`table-auto ${tableClassName ?? ""}`.trim()}>
           <TableHeader>
             <TableRow className="border-border/50 hover:bg-transparent">
               {leadingHeaderCell}
               {columns.map((col) => (
-                <TableHead key={String(col.key)} className={col.className}>
+                <TableHead
+                  key={String(col.key)}
+                  className={col.className}
+                  style={{
+                    width:
+                      typeof col.width === "number" ? `${col.width}px` : col.width,
+                    minWidth:
+                      typeof col.minWidth === "number"
+                        ? `${col.minWidth}px`
+                        : col.minWidth,
+                    maxWidth:
+                      typeof col.maxWidth === "number"
+                        ? `${col.maxWidth}px`
+                        : col.maxWidth,
+                  }}
+                >
                   {col.label}
                 </TableHead>
               ))}

@@ -1033,3 +1033,72 @@ export async function disableVersionCodeRule(ruleId: string): Promise<VersionCod
   )
   return data.item
 }
+
+export const KIMI_ASSESSMENT_PREFILL_STORAGE_KEY = "wes-kimi-assessment-prefill-v1"
+
+export type KimiAssessmentPreviewPayload = {
+  source: {
+    globalVersionCode?: string
+    requirementVersionCode?: string
+  }
+  requirementSnapshot: {
+    basicInfo: Record<string, unknown>
+    valuePropositionRows: Array<Record<string, unknown>>
+    businessNeedRows: Array<Record<string, unknown>>
+    devOverviewRows: Array<Record<string, unknown>>
+    productModuleRows: Array<Record<string, unknown>>
+    implementationScopeRows: Array<Record<string, unknown>>
+    meetingNotes: string
+    keyPointRows: Array<Record<string, unknown>>
+  }
+  ruleContext?: {
+    promptProfile?: string
+  }
+}
+
+export type KimiAssessmentDraftModuleItem = {
+  cloudProduct?: string
+  skuName?: string
+  moduleName: string
+  standardDays: number
+  suggestedDays: number
+  reason: string
+}
+
+export type KimiAssessmentPreviewResult = {
+  meta: {
+    model: string
+    generatedAt: string
+    confidence: number
+    promptVersion: string
+    ruleSetId: string
+    mode: "model" | "rule_fallback"
+    fallbackReason?: string
+    elapsedMs?: number
+    rawContent?: string
+  }
+  source: {
+    globalVersionCode: string
+    requirementVersionCode: string
+  }
+  assessmentDraft: {
+    quoteMode: string
+    productLines: string[]
+    userCount: number
+    orgCount: number
+    orgSimilarity: number
+    difficultyFactor: number
+    moduleItems: KimiAssessmentDraftModuleItem[]
+    risks: string[]
+    assumptions: string[]
+  }
+}
+
+export async function generateKimiAssessmentPreview(
+  payload: KimiAssessmentPreviewPayload,
+): Promise<KimiAssessmentPreviewResult> {
+  return apiRequest<KimiAssessmentPreviewResult>("/api/v1/ai/kimi-assessment/preview", {
+    method: "POST",
+    body: payload,
+  })
+}

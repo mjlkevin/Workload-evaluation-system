@@ -106,6 +106,7 @@ export type BasicProjectInfo = {
   customerName: string;
   projectName: string;
   opportunityNo: string;
+  productLines?: string[];
   customerIndustry: string;
   enterpriseRevenue: string;
   itStatus: string;
