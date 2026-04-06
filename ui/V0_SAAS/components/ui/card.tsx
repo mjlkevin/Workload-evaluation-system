@@ -82,7 +82,7 @@ function Card({
       data-slot="card"
       data-collapsed={isCollapsed ? "true" : "false"}
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm transition-all duration-300",
+        "bg-card text-card-foreground flex min-w-0 flex-col gap-6 rounded-xl border py-6 shadow-sm transition-all duration-300",
         isCollapsed &&
           "gap-2 py-2 border-border/70 bg-secondary/20 shadow-sm dark:bg-secondary/10",
         className,
@@ -92,8 +92,10 @@ function Card({
     >
       <div
         className={cn(
-          "flex flex-col gap-6 overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-out",
-          isCollapsed ? "max-h-0 opacity-0 -translate-y-1 pointer-events-none" : "max-h-[2000px] opacity-100 translate-y-0",
+          "flex min-w-0 flex-col gap-6 transition-[max-height,opacity,transform] duration-300 ease-out",
+          isCollapsed
+            ? "max-h-0 overflow-hidden opacity-0 -translate-y-1 pointer-events-none"
+            : "max-h-none min-h-0 overflow-visible opacity-100 translate-y-0",
         )}
       >
         {children}
@@ -116,8 +118,8 @@ function Card({
         ) : (
           <div className="rounded-md border border-border/70 bg-background/80 px-3 py-1.5 text-xs">
             <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate font-medium text-foreground">{summaryTitle}</p>
+              <div className="min-w-0 flex items-center gap-2">
+                <p className="shrink-0 truncate font-medium text-blue-700 dark:text-blue-300">{summaryTitle}</p>
                 <p className="truncate text-[11px] text-muted-foreground">{summaryDesc}</p>
               </div>
               <span className="shrink-0 rounded-full bg-blue-500/12 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
@@ -136,7 +138,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
+        "@container/card-header grid min-w-0 auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
         className,
       )}
       {...props}

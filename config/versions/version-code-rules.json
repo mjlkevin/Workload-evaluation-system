@@ -1,0 +1,76 @@
+{
+  "rules": [
+    {
+      "id": "rule-global",
+      "moduleKey": "global",
+      "moduleName": "总方案",
+      "moduleCode": "GL",
+      "prefix": "GL",
+      "format": "{PREFIX}-{YYMMDD}-{N}",
+      "sample": "GL-{YYMMDD}-{N}",
+      "status": "active",
+      "effectiveAt": "2026-04-06T00:00:00.000Z",
+      "updatedAt": "2026-04-05T16:51:08.816Z"
+    },
+    {
+      "id": "rule-requirement",
+      "moduleKey": "requirement",
+      "moduleName": "需求",
+      "moduleCode": "RQ",
+      "prefix": "RQ",
+      "format": "{PREFIX}-{GL}-{NN}",
+      "sample": "RQ-GL001-01",
+      "status": "active",
+      "effectiveAt": "2026-04-06T00:00:00.000Z",
+      "updatedAt": "2026-04-06T00:00:00.000Z"
+    },
+    {
+      "id": "rule-implementation",
+      "moduleKey": "implementation",
+      "moduleName": "实施评估",
+      "moduleCode": "IA",
+      "prefix": "IA",
+      "format": "{PREFIX}-{GL}-{NN}",
+      "sample": "IA-GL001-01",
+      "status": "active",
+      "effectiveAt": "2026-04-05T16:51:45.770Z",
+      "updatedAt": "2026-04-05T16:51:45.770Z"
+    },
+    {
+      "id": "rule-dev",
+      "moduleKey": "dev",
+      "moduleName": "开发评估",
+      "moduleCode": "DV",
+      "prefix": "DV",
+      "format": "{PREFIX}-{YYYY}-{NNN}",
+      "sample": "DV-2026-001",
+      "status": "disabled",
+      "effectiveAt": "--",
+      "updatedAt": "2026-04-06T00:00:00.000Z"
+    },
+    {
+      "id": "rule-resource",
+      "moduleKey": "resource",
+      "moduleName": "资源人天及成本",
+      "moduleCode": "RS",
+      "prefix": "RS",
+      "format": "{PREFIX}-{YYYYMM}-{NNN}",
+      "sample": "RS-202604-001",
+      "status": "active",
+      "effectiveAt": "2026-04-06T00:00:00.000Z",
+      "updatedAt": "2026-04-06T00:00:00.000Z"
+    },
+    {
+      "id": "rule-wbs",
+      "moduleKey": "wbs",
+      "moduleName": "WBS",
+      "moduleCode": "WB",
+      "prefix": "WB",
+      "format": "{PREFIX}-{YYYYMM}-{NNN}",
+      "sample": "WB-202604-001",
+      "status": "draft",
+      "effectiveAt": "--",
+      "updatedAt": "2026-04-06T00:00:00.000Z"
+    }
+  ]
+}

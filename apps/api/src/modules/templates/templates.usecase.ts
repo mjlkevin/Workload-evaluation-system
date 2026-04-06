@@ -77,7 +77,11 @@ function parseTemplateFromWorkbook(
     const colAppGroup = findColByAny(["应用分组", "套件内应用分组", "实施要点"]);
     const colDeliveryModule = findColByAny(["交付模块", "实施要点"]);
     const colDeliveryPoint = findColByAny(["交付颗粒", "实施要点"]);
-    const colDeliveryDesc = findColByAny(["交付说明", "实施要点内容说明"]);
+    const colDeliveryDesc = findColByAny([
+      "交付说明",
+      "实施要点内容说明",
+      "要点内容说明",
+    ]);
     const colEvalDesc = findColByAny(["评估说明"]);
     const colStandardDays = findColByAny(["标准实施人天", "标准实施天数"]);
     const colIncluded = findColByAny(["是否包含"]);

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   VersionRecord,
+  VersionCodeRuleModuleKey,
   VersionType,
   VersionStatus,
   isVersionType,
@@ -18,6 +19,110 @@ import {
   saveVersionsStore,
   toPublicVersionRecord
 } from "./versions.repository";
+import { loadVersionCodeRulesStore } from "../system/system.repository";
+
+function mapTypeToRuleModuleKey(type: VersionType): VersionCodeRuleModuleKey {
+  if (type === "global") return "global";
+  if (type === "requirementImport") return "requirement";
+  if (type === "assessment") return "implementation";
+  if (type === "resource") return "resource";
+  if (type === "dev") return "dev";
+  return "wbs";
+}
+
+function padNumber(value: number, width: number): string {
+  return String(value).padStart(width, "0");
+}
+
+function renderVersionCodeFromFormat(
+  format: string,
+  input: {
+    prefix: string;
+    moduleCode: string;
+    globalCode: string;
+    seq: number;
+    now: Date;
+  }
+): string {
+  const yyyy = String(input.now.getFullYear());
+  const mm = padNumber(input.now.getMonth() + 1, 2);
+  const dd = padNumber(input.now.getDate(), 2);
+  const values: Record<string, string> = {
+    "{PREFIX}": input.prefix,
+    "{MODULE}": input.moduleCode,
+    "{YYYYMMDD}": `${yyyy}${mm}${dd}`,
+    "{YYYYMM}": `${yyyy}${mm}`,
+    "{YYYY}": yyyy,
+    "{GL}": input.globalCode,
+    "{NNN}": padNumber(input.seq, 3),
+    "{NN}": padNumber(input.seq, 2),
+  };
+  return Object.entries(values).reduce((result, [token, value]) => result.split(token).join(value), format);
+}
+
+function generateVersionCodeByRule(
+  store: { records: VersionRecord[] },
+  input: {
+    ownerUserId: string;
+    type: VersionType;
+    templateId: string;
+    payload: Record<string, unknown>;
+  }
+): { versionCode: string } | { errorCode: number; message: string; field: string; reason: string } {
+  const moduleKey = mapTypeToRuleModuleKey(input.type);
+  const rulesStore = loadVersionCodeRulesStore();
+  const rule = rulesStore.rules.find((item) => item.moduleKey === moduleKey);
+  if (!rule) {
+    return {
+      errorCode: 40401,
+      message: "版本号编码规则不存在",
+      field: "moduleKey",
+      reason: "rule_not_found",
+    };
+  }
+  if (rule.status !== "active") {
+    return {
+      errorCode: 40902,
+      message: "当前模块编码规则未生效，请先在系统管理中生效",
+      field: "moduleKey",
+      reason: "rule_not_active",
+    };
+  }
+
+  const format = rule.format || "{PREFIX}-{YYYYMMDD}-{NNN}";
+  const hasSeqToken = format.includes("{NNN}") || format.includes("{NN}");
+  const now = new Date();
+  const rawGlobalCode = asString(input.payload.globalVersionCode) || "GL000";
+  const globalCode = rawGlobalCode.split("-V")[0] || "GL000";
+
+  for (let seq = 1; seq <= 9999; seq += 1) {
+    if (!hasSeqToken && seq > 1) break;
+    const candidate = renderVersionCodeFromFormat(format, {
+      prefix: rule.prefix,
+      moduleCode: rule.moduleCode,
+      globalCode,
+      seq,
+      now,
+    });
+    const existed = store.records.find(
+      (record) =>
+        record.ownerUserId === input.ownerUserId &&
+        record.type === input.type &&
+        record.templateId === input.templateId &&
+        record.versionCode === candidate
+    );
+    if (!existed) {
+      return { versionCode: candidate };
+    }
+  }
+
+  return {
+    errorCode: 40901,
+    message: hasSeqToken ? "版本号已存在，请重试" : "编码规则缺少序号占位符，无法保证版本号唯一",
+    field: "versionCodeRule",
+    reason: hasSeqToken ? "conflict" : "missing_sequence_placeholder",
+  };
+}
 
 export function listVersions(req: Request, res: Response) {
   const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
@@ -54,7 +159,7 @@ export function createVersion(req: Request, res: Response) {
   };
 
   const type = asString(body.type);
-  const versionCode = asString(body.versionCode);
+  let versionCode = asString(body.versionCode);
   const templateId = asString(body.templateId) || "default";
   const status = asString(body.status) || "draft";
   const payload = body.payload && typeof body.payload === "object" ? body.payload : {};
@@ -62,14 +167,23 @@ export function createVersion(req: Request, res: Response) {
   if (!isVersionType(type)) {
     return fail(res, 40001, "参数错误", [{ field: "type", reason: "invalid" }]);
   }
-  if (!versionCode) {
-    return fail(res, 40001, "参数错误", [{ field: "versionCode", reason: "required" }]);
-  }
   if (!isVersionStatus(status)) {
     return fail(res, 40001, "参数错误", [{ field: "status", reason: "invalid" }]);
   }
 
   const store = loadVersionsStore();
+  if (!versionCode) {
+    const generated = generateVersionCodeByRule(store, {
+      ownerUserId: auth.user.id,
+      type,
+      templateId,
+      payload: payload as Record<string, unknown>,
+    });
+    if ("errorCode" in generated) {
+      return fail(res, generated.errorCode, generated.message, [{ field: generated.field, reason: generated.reason }]);
+    }
+    versionCode = generated.versionCode;
+  }
   const existed = store.records.find(
     (record) =>
       record.ownerUserId === auth.user.id &&

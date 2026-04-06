@@ -1,13 +1,20 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import type { CSSProperties } from "react"
+import { useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
-import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
+import { VersionCheckoutStatusDisplay, VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
+import {
+  recordsToVersionHistoryRows,
+  VersionHistoryDialog,
+  type VersionHistoryRow,
+} from "@/components/workload/version-history-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useAuth } from "@/hooks/use-auth"
 import {
@@ -35,7 +42,9 @@ import {
   type TemplateItemOption,
   type TemplateSummary,
 } from "@/lib/workload-service"
+import type { PlanRow } from "@/lib/workload-types"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 type ItemSelectionState = {
   included: boolean
@@ -76,8 +85,38 @@ const orgTypeOptions = ["集团总部", "分子公司", "工厂", "事业部"]
 const deliveryStrategyOptions = ["全新上线", "复制推广", "局部改造", "并行切换"]
 const MULTI_ORG_DRAFT_KEY = "workload-assessment-multi-org-draft-v1"
 
+/** 与模板工作表名一致；仅该表展示「预置评估模式」；自定义人天按云产品在条目表工具条开启 */
+const SHEET_MODULE_QUOTE = "模块报价"
+
+/** 模块评估云产品表：列与列之间竖线（与 SKU|实施要点 同色） */
+const ASSESS_TABLE_COL_BORDER = "border-l border-border/40"
+
 function formatDays(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+/** 模板中小计/汇总行写入的 cloudProduct，不作为云产品切换标签展示 */
+function isSelectableCloudProductLabel(name: string): boolean {
+  const t = String(name || "").trim()
+  if (!t) return false
+  if (/产品实施工作量小计/i.test(t)) return false
+  if (/工作量小计/i.test(t) && /人天/i.test(t)) return false
+  return true
+}
+
+function cloudLabelFromItem(item: { cloudProduct?: string }) {
+  return item.cloudProduct || "未分类云产品"
+}
+
+function cloudKeysOnSheet(items: TemplateItemOption[], sheet: string): Set<string> {
+  const set = new Set<string>()
+  for (const item of items) {
+    if (sheet && sheet !== "全部工作表" && (item.sheetName || "全部工作表") !== sheet) continue
+    const c = cloudLabelFromItem(item)
+    if (!isSelectableCloudProductLabel(c)) continue
+    set.add(c)
+  }
+  return set
 }
 
 function pieStyle(slices: Array<{ value: number; color: string }>) {
@@ -110,13 +149,19 @@ function createEmptyMultiOrgRow(): MultiOrgRow {
   }
 }
 
-function buildVersionOptions<T extends { versionCode: string; updatedAt: string; isHistoricalArchive?: boolean }>(
-  records: T[],
-  showHistorical: boolean,
-) {
-  return records
-    .filter((x) => showHistorical || !x.isHistoricalArchive)
-    .map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` }))
+/** 按更新时间取当前生效（最新）实施评估版本，用于主界面下拉仅展示一条 */
+function pickLatestAssessmentRecord(records: ModuleVersionRecord[]): ModuleVersionRecord | undefined {
+  if (!records.length) return undefined
+  return [...records].sort(
+    (a, b) =>
+      Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)) ||
+      b.versionCode.localeCompare(a.versionCode),
+  )[0]
+}
+
+function buildLatestAssessmentVersionOptions(records: ModuleVersionRecord[]) {
+  const tip = pickLatestAssessmentRecord(records)
+  return tip ? [{ value: tip.versionCode, label: `${tip.versionCode}（当前生效）` }] : []
 }
 
 export default function AssessmentPage() {
@@ -125,7 +170,7 @@ export default function AssessmentPage() {
     templateId: "",
     ruleSetId: "",
     userCount: 100,
-    difficultyFactor: 1,
+    difficultyFactor: 0.2,
     orgCount: 1,
     orgSimilarityFactor: 0.8,
   })
@@ -133,10 +178,11 @@ export default function AssessmentPage() {
   const [templateDetail, setTemplateDetail] = useState<TemplateDetail | null>(null)
   const [ruleSet, setRuleSet] = useState<RuleSetMeta | null>(null)
   const [selectedSheet, setSelectedSheet] = useState("")
-  const [selectedPresetMode, setSelectedPresetMode] = useState("标准财务供应链制造")
+  const [selectedPresetMode, setSelectedPresetMode] = useState("")
   const [selectedCloudNames, setSelectedCloudNames] = useState<string[]>([])
   const [itemSelection, setItemSelection] = useState<Record<string, ItemSelectionState>>({})
-  const [customModeEnabled, setCustomModeEnabled] = useState(false)
+  /** 按云产品开启「自定义人天」列与有效人天计算 */
+  const [customModeByCloud, setCustomModeByCloud] = useState<Record<string, boolean>>({})
   const [multiOrgRows, setMultiOrgRows] = useState<MultiOrgRow[]>([createEmptyMultiOrgRow()])
   const [serverResult, setServerResult] = useState<EstimateResult | null>(null)
   const [exportInfo, setExportInfo] = useState<EstimateExportResult | null>(null)
@@ -145,20 +191,28 @@ export default function AssessmentPage() {
   const [historyTotal, setHistoryTotal] = useState(0)
   const [historyPage, setHistoryPage] = useState(1)
   const [globalVersionCode, setGlobalVersionCode] = useState("")
+  /** 与仪表盘总方案列表一致，用于选择总方案时回填项目名称 */
+  const [dashboardPlans, setDashboardPlans] = useState<PlanRow[]>([])
+  /** 未选总方案时可手填；选择总方案时从方案携带，仍可再改 */
+  const [projectName, setProjectName] = useState("")
   const [globalOptions, setGlobalOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionOptions, setVersionOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionRecords, setVersionRecords] = useState<ModuleVersionRecord[]>([])
   const [globalVersionRecords, setGlobalVersionRecords] = useState<GlobalVersionRecord[]>([])
-  const [showHistoricalVersions, setShowHistoricalVersions] = useState(false)
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
+  const [creatingFromHistory, setCreatingFromHistory] = useState(false)
   const [currentVersionCode, setCurrentVersionCode] = useState("")
   const [paramCardCollapsed, setParamCardCollapsed] = useState(false)
-  const [paramCardFadeProgress, setParamCardFadeProgress] = useState(0)
   const [saving, setSaving] = useState(false)
   const [savePhase, setSavePhase] = useState<"idle" | "validating" | "saving">("idle")
   const [calculating, setCalculating] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [initLoading, setInitLoading] = useState(true)
   const [error, setError] = useState("")
+  const latestAssessmentRecord = useMemo(
+    () => pickLatestAssessmentRecord(versionRecords),
+    [versionRecords],
+  )
   const selectedVersionRecord = useMemo(
     () => versionRecords.find((x) => x.versionCode === currentVersionCode),
     [versionRecords, currentVersionCode],
@@ -167,9 +221,18 @@ export default function AssessmentPage() {
     selectedVersionRecord &&
       (selectedVersionRecord.checkoutStatus === "checked_in" || selectedVersionRecord.versionDocStatus === "reviewed"),
   )
+  /** 已检入只读浏览：SKU 表仅展示已勾选行，检出后可编辑时再展示全部 */
+  const showOnlySelectedSkuRows = Boolean(
+    selectedVersionRecord && selectedVersionRecord.checkoutStatus === "checked_in",
+  )
+  const suppressUnsavedPrompt = Boolean(
+    selectedVersionRecord && selectedVersionRecord.checkoutStatus === "checked_in",
+  )
 
-  const { setDirty } = useUnsavedChanges()
+  const setDirty = useSetUnsavedDirty()
   const dirtyEnabled = useRef(false)
+  const initialEmbedQueryRef = useRef<{ globalVersion: string; version: string } | null>(null)
+  const initialEmbedAppliedRef = useRef(false)
 
   function showGlobalNotice(text: string) {
     toast(text)
@@ -178,6 +241,14 @@ export default function AssessmentPage() {
   function showGlobalWarning(text: string) {
     toast.warning(text)
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    initialEmbedQueryRef.current = {
+      globalVersion: params.get("globalVersion") || "",
+      version: params.get("version") || "",
+    }
+  }, [])
 
   const allItems = useMemo(() => templateDetail?.items || [], [templateDetail])
   const sheets = useMemo(
@@ -193,7 +264,11 @@ export default function AssessmentPage() {
 
   const allCloudNames = useMemo(() => {
     const set = new Set<string>()
-    for (const item of itemsInSheet) set.add(item.cloudProduct || "未分类云产品")
+    for (const item of itemsInSheet) {
+      const c = item.cloudProduct || "未分类云产品"
+      if (!isSelectableCloudProductLabel(c)) continue
+      set.add(c)
+    }
     return Array.from(set)
   }, [itemsInSheet])
 
@@ -231,19 +306,29 @@ export default function AssessmentPage() {
     return itemsInSheet.reduce((sum, item) => {
       const state = itemSelection[item.templateItemId]
       if (!state?.included) return sum
+      const cloud = cloudLabelFromItem(item)
       const fallback = Number(item.standardDays || 0)
-      const effective = customModeEnabled && Number.isFinite(Number(state.customStandardDays))
-        ? Number(state.customStandardDays || 0)
-        : fallback
+      const effective =
+        customModeByCloud[cloud] && Number.isFinite(Number(state.customStandardDays))
+          ? Number(state.customStandardDays || 0)
+          : fallback
       return sum + Math.max(0, effective)
     }, 0)
-  }, [customModeEnabled, itemSelection, itemsInSheet])
+  }, [customModeByCloud, itemSelection, itemsInSheet])
 
   const tierFactor = useMemo(() => {
     const tiers = ruleSet?.baseRule?.userCountTiers || []
     const hit = tiers.find((x) => form.userCount >= x.min && form.userCount <= x.max)
     return Number(hit?.factor || 0)
   }, [form.userCount, ruleSet])
+
+  useEffect(() => {
+    const allowed = new Set(allCloudNames)
+    setSelectedCloudNames((prev) => {
+      const next = prev.filter((x) => allowed.has(x))
+      return next.length === prev.length ? prev : next
+    })
+  }, [allCloudNames])
 
   useEffect(() => {
     void (async () => {
@@ -257,19 +342,15 @@ export default function AssessmentPage() {
           listGlobalVersions(),
         ])
         setGlobalVersionRecords(globals)
+        setDashboardPlans(plans)
         setGlobalOptions(
-          plans
-            .filter((x) => {
-              const record = globals.find((g) => g.versionCode === x.globalVersion)
-              return showHistoricalVersions || !record?.isHistoricalArchive
-            })
-            .map((x) => ({
+          plans.map((x) => ({
             value: x.globalVersion,
             label: `${x.globalVersion}（${x.projectName}）`,
-            })),
+          })),
         )
         setVersionRecords(records)
-        setVersionOptions(buildVersionOptions(records, showHistoricalVersions))
+        setVersionOptions(buildLatestAssessmentVersionOptions(records))
         setTemplateOptions(templates)
         setRuleSet(activeRule)
         setForm((prev) => ({ ...prev, ruleSetId: activeRule.ruleSetId }))
@@ -280,13 +361,11 @@ export default function AssessmentPage() {
           setTemplateDetail(detail)
           const firstSheet = detail.sheets?.[0]?.sheetName || "全部工作表"
           setSelectedSheet(firstSheet)
-          setSelectedCloudNames(
-            Array.from(new Set(detail.items.filter((x) => (x.sheetName || firstSheet) === firstSheet).map((x) => x.cloudProduct || "未分类云产品"))),
-          )
+          setSelectedCloudNames([])
           const initialSelection: Record<string, ItemSelectionState> = {}
           for (const item of detail.items) {
             initialSelection[item.templateItemId] = {
-              included: Boolean(item.defaultIncluded),
+              included: false,
               customStandardDays: Number(item.standardDays || 0),
             }
           }
@@ -297,6 +376,27 @@ export default function AssessmentPage() {
         setHistoryTotal(history.total)
         setHistoryPage(1)
         setExportHistory(history.items)
+        const initialQuery = initialEmbedQueryRef.current
+        if (!initialEmbedAppliedRef.current && initialQuery) {
+          if (initialQuery.globalVersion) {
+            setGlobalVersionCode(initialQuery.globalVersion)
+            const plan = plans.find((p) => p.globalVersion === initialQuery.globalVersion)
+            if (plan?.projectName) setProjectName(plan.projectName)
+          }
+          const tip = pickLatestAssessmentRecord(records)
+          const qv = initialQuery.version?.trim() || ""
+          if (qv) {
+            const hit = records.find((r) => r.versionCode === qv)
+            if (hit && tip && hit.versionCode !== tip.versionCode) {
+              showGlobalNotice(
+                "链接中的实施评估版本非当前生效版本，已加载当前生效版本。回退请打开「版本历史」，使用「按历史版本创建新版」。",
+              )
+            }
+          }
+          const loadCode = tip?.versionCode ?? ""
+          if (loadCode) await onLoadVersion(loadCode, plans)
+          initialEmbedAppliedRef.current = true
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "初始化失败"
         setError(msg)
@@ -306,7 +406,17 @@ export default function AssessmentPage() {
         dirtyEnabled.current = true
       }
     })()
-  }, [showHistoricalVersions])
+  }, [])
+
+  useEffect(() => {
+    const list = ruleSet?.baseRule?.difficultyFactorList
+    if (!list?.length) return
+    setForm((s) => {
+      if (list.includes(s.difficultyFactor)) return s
+      const pick = list.includes(0.2) ? 0.2 : list[0]!
+      return { ...s, difficultyFactor: pick }
+    })
+  }, [ruleSet, form.difficultyFactor])
 
   // 卸载时重置 dirty 状态
   useEffect(() => {
@@ -316,23 +426,26 @@ export default function AssessmentPage() {
 
   // 数据变化时标记脏状态
   useEffect(() => {
-    if (dirtyEnabled.current) setDirty(true)
-  }, [form, selectedSheet, selectedPresetMode, selectedCloudNames, itemSelection, multiOrgRows, customModeEnabled])
-
-  useEffect(() => {
-    const fadeThreshold = 200
-    const collapseThreshold = 240
-    const expandThreshold = 140
-    const onWindowScroll = () => {
-      const y = window.scrollY || 0
-      const progress = Math.min(1, y / collapseThreshold)
-      setParamCardFadeProgress(progress)
-      setParamCardCollapsed((prev) => (prev ? y > expandThreshold : y >= collapseThreshold))
+    if (!dirtyEnabled.current) return
+    if (suppressUnsavedPrompt) {
+      setDirty(false)
+      return
     }
-    onWindowScroll()
-    window.addEventListener("scroll", onWindowScroll, { passive: true })
-    return () => window.removeEventListener("scroll", onWindowScroll)
-  }, [])
+    setDirty(true)
+  }, [
+    form,
+    globalVersionCode,
+    projectName,
+    selectedSheet,
+    selectedPresetMode,
+    selectedCloudNames,
+    itemSelection,
+    multiOrgRows,
+    customModeByCloud,
+    suppressUnsavedPrompt,
+  ])
+
+  // 滚动联动折叠/视差已暂时关闭；仍可通过卡片标题区手动折叠（paramCardCollapsed）。
 
   const scaleFactor = useMemo(() => {
     const userIncrement = (ruleSet?.baseRule?.userIncrementRounding === "ceil_int"
@@ -357,10 +470,11 @@ export default function AssessmentPage() {
     for (const item of itemsInSheet) {
       const state = itemSelection[item.templateItemId]
       if (!state?.included) continue
-      const cloud = item.cloudProduct || "未分类云产品"
-      const effective = customModeEnabled && Number.isFinite(Number(state.customStandardDays))
-        ? Number(state.customStandardDays || 0)
-        : Number(item.standardDays || 0)
+      const cloud = cloudLabelFromItem(item)
+      const effective =
+        customModeByCloud[cloud] && Number.isFinite(Number(state.customStandardDays))
+          ? Number(state.customStandardDays || 0)
+          : Number(item.standardDays || 0)
       sums.set(cloud, Number(sums.get(cloud) || 0) + effective)
     }
     const rows = Array.from(sums.entries()).map(([label, value]) => ({ label, value }))
@@ -369,7 +483,7 @@ export default function AssessmentPage() {
       ...row,
       percent: total > 0 ? ((row.value / total) * 100).toFixed(1) : "0.0",
     }))
-  }, [customModeEnabled, itemSelection, itemsInSheet])
+  }, [customModeByCloud, itemSelection, itemsInSheet])
 
   const breakdownSlices = useMemo(
     () => [
@@ -455,8 +569,15 @@ export default function AssessmentPage() {
   async function reloadVersions(nextSelected?: string) {
     const records = await listModuleVersions("assessment")
     setVersionRecords(records)
-    setVersionOptions(buildVersionOptions(records, showHistoricalVersions))
-    if (nextSelected) setCurrentVersionCode(nextSelected)
+    setVersionOptions(buildLatestAssessmentVersionOptions(records))
+    const tip = pickLatestAssessmentRecord(records)
+    if (nextSelected) {
+      setCurrentVersionCode(nextSelected)
+    } else if (tip) {
+      setCurrentVersionCode(tip.versionCode)
+    } else {
+      setCurrentVersionCode("")
+    }
   }
 
   async function onCheckout() {
@@ -466,8 +587,24 @@ export default function AssessmentPage() {
       return
     }
     try {
-      await checkoutVersionById(selectedVersionRecord.id)
+      const updated = await checkoutVersionById(selectedVersionRecord.id)
       await reloadVersions(selectedVersionRecord.versionCode)
+      // 列表接口若未及时带上 checkoutStatus，会回落为 checked_in 导致整表只读；以检出接口返回为准写回
+      setVersionRecords((prev) =>
+        prev.map((r) =>
+          r.id !== updated.id
+            ? r
+            : {
+                ...r,
+                checkoutStatus: updated.checkoutStatus ?? "checked_out",
+                versionDocStatus: updated.versionDocStatus ?? r.versionDocStatus,
+                checkedOutByUserId: updated.checkedOutByUserId,
+                checkedOutByUsername: updated.checkedOutByUsername,
+                checkoutAt: updated.checkoutAt,
+                updatedAt: updated.updatedAt,
+              },
+        ),
+      )
       showGlobalNotice("检出成功")
     } catch (err) {
       showGlobalWarning(err instanceof Error ? err.message : "检出失败")
@@ -479,11 +616,13 @@ export default function AssessmentPage() {
     try {
       const data = await checkinVersionById(selectedVersionRecord.id, {
         globalVersionCode,
+        projectName: projectName.trim(),
         form,
         selectedSheet,
         selectedPresetMode,
         selectedCloudNames,
-        customModeEnabled,
+        customModeByCloud,
+        customModeEnabled: Object.values(customModeByCloud).some(Boolean),
         itemSelection: currentItemsPayload(),
         multiOrgRows,
       })
@@ -551,7 +690,9 @@ export default function AssessmentPage() {
       return {
         templateItemId: item.templateItemId,
         included: Boolean(state.included),
-        customStandardDays: customModeEnabled ? Number(state.customStandardDays || item.standardDays || 0) : undefined,
+        customStandardDays: customModeByCloud[cloudLabelFromItem(item)]
+          ? Number(state.customStandardDays || item.standardDays || 0)
+          : undefined,
       }
     })
   }
@@ -603,11 +744,13 @@ export default function AssessmentPage() {
         "assessment",
         {
           globalVersionCode,
+          projectName: projectName.trim(),
           form,
           selectedSheet,
           selectedPresetMode,
           selectedCloudNames,
-          customModeEnabled,
+          customModeByCloud,
+          customModeEnabled: Object.values(customModeByCloud).some(Boolean),
           itemSelection: currentItemsPayload(),
           multiOrgRows,
           localSummary: {
@@ -636,7 +779,14 @@ export default function AssessmentPage() {
     }
   }
 
-  async function onLoadVersion(code: string) {
+  function applyGlobalVersionSelection(code: string) {
+    setGlobalVersionCode(code)
+    if (!code.trim()) return
+    const plan = dashboardPlans.find((p) => p.globalVersion === code)
+    if (plan?.projectName) setProjectName(plan.projectName)
+  }
+
+  async function onLoadVersion(code: string, plansOverride?: PlanRow[]) {
     setCurrentVersionCode(code)
     if (!code) return
     setError("")
@@ -645,14 +795,25 @@ export default function AssessmentPage() {
       const target = records.find((x) => x.versionCode === code)
       if (!target) return
       const payload = target.payload || {}
+      const plansLookup = plansOverride ?? dashboardPlans
       const payloadForm = (payload.form || {}) as Partial<AssessmentForm>
       const nextTemplateId = String(payloadForm.templateId || form.templateId)
-      if (nextTemplateId && nextTemplateId !== form.templateId) {
-        const detail = await getTemplateDetail(nextTemplateId)
-        setTemplateDetail(detail)
+      const loadedDetailForVersion = nextTemplateId ? await getTemplateDetail(nextTemplateId) : null
+      if (loadedDetailForVersion && nextTemplateId !== form.templateId) {
+        setTemplateDetail(loadedDetailForVersion)
       }
       dirtyEnabled.current = false
-      setGlobalVersionCode((payload.globalVersionCode as string) || "")
+      const gv = String((payload.globalVersionCode as string) || "")
+      setGlobalVersionCode(gv)
+      const savedPn = String((payload as { projectName?: string }).projectName || "").trim()
+      if (savedPn) {
+        setProjectName(savedPn)
+      } else if (gv) {
+        const plan = plansLookup.find((p) => p.globalVersion === gv)
+        setProjectName(plan?.projectName || "")
+      } else {
+        setProjectName("")
+      }
       setForm((prev) => ({
         templateId: nextTemplateId || prev.templateId,
         ruleSetId: String(payloadForm.ruleSetId || prev.ruleSetId),
@@ -661,10 +822,31 @@ export default function AssessmentPage() {
         orgCount: Number(payloadForm.orgCount || prev.orgCount),
         orgSimilarityFactor: Number(payloadForm.orgSimilarityFactor || prev.orgSimilarityFactor),
       }))
-      setSelectedSheet(String(payload.selectedSheet || selectedSheet || "全部工作表"))
-      setSelectedPresetMode(String(payload.selectedPresetMode || "标准财务供应链制造"))
+      const nextSheet = String(payload.selectedSheet || selectedSheet || "全部工作表")
+      setSelectedSheet(nextSheet)
       setSelectedCloudNames(Array.isArray(payload.selectedCloudNames) ? (payload.selectedCloudNames as string[]) : [])
-      setCustomModeEnabled(Boolean(payload.customModeEnabled))
+      if (nextSheet === SHEET_MODULE_QUOTE) {
+        setSelectedPresetMode(
+          payload.selectedPresetMode !== undefined && payload.selectedPresetMode !== null
+            ? String(payload.selectedPresetMode)
+            : "",
+        )
+        const rawByCloud = payload.customModeByCloud as Record<string, boolean> | undefined
+        if (rawByCloud && typeof rawByCloud === "object" && !Array.isArray(rawByCloud)) {
+          setCustomModeByCloud({ ...rawByCloud })
+        } else if (Boolean(payload.customModeEnabled) && loadedDetailForVersion?.items?.length) {
+          const next: Record<string, boolean> = {}
+          for (const c of cloudKeysOnSheet(loadedDetailForVersion.items, nextSheet)) {
+            next[c] = true
+          }
+          setCustomModeByCloud(next)
+        } else {
+          setCustomModeByCloud({})
+        }
+      } else {
+        setSelectedPresetMode("")
+        setCustomModeByCloud({})
+      }
       const selectionPayload = Array.isArray(payload.itemSelection)
         ? (payload.itemSelection as Array<{ templateItemId: string; included: boolean; customStandardDays?: number }>)
         : []
@@ -689,16 +871,44 @@ export default function AssessmentPage() {
     }
   }
 
+  async function onCreateAssessmentVersionFromHistory(row: VersionHistoryRow) {
+    const source = versionRecords.find((r) => r.id === row.id)
+    if (!source) {
+      showGlobalWarning("找不到所选版本记录")
+      return
+    }
+    setCreatingFromHistory(true)
+    setError("")
+    try {
+      const payload = JSON.parse(JSON.stringify(source.payload || {})) as Record<string, unknown>
+      const created = await createModuleVersion("assessment", payload, "AS")
+      await reloadVersions(created.versionCode)
+      await onLoadVersion(created.versionCode, dashboardPlans)
+      setVersionHistoryOpen(false)
+      showGlobalNotice(`已按历史快照创建新版：${created.versionCode}（来源：${source.versionCode}）`)
+      setDirty(false)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "创建失败"
+      setError(msg)
+      showGlobalWarning(msg)
+    } finally {
+      setCreatingFromHistory(false)
+    }
+  }
+
   function applyPreset(mode: string) {
     setSelectedPresetMode(mode)
+    if (mode === "全量云产品") {
+      setSelectedCloudNames(allCloudNames)
+      return
+    }
     const matchers: Record<string, string[]> = {
       标准财务供应链制造: ["财务", "供应链", "制造"],
       标准财务供应链: ["财务", "供应链"],
-      全量云产品: [],
     }
     const keywords = matchers[mode] || []
     if (!keywords.length) {
-      setSelectedCloudNames(allCloudNames)
+      setSelectedCloudNames([])
       return
     }
     setSelectedCloudNames(allCloudNames.filter((x) => keywords.some((k) => x.includes(k))))
@@ -720,6 +930,22 @@ export default function AssessmentPage() {
     })
   }
 
+  /** SKU 列与行点击分离：原 SKU 单元格 stopPropagation 导致点左侧无法勾选；此处整组切换该 SKU 下条目 */
+  function toggleSkuGroupInclusion(groupItems: TemplateDetail["items"]) {
+    if (isReadonly) return
+    setItemSelection((prev) => {
+      if (!groupItems.length) return prev
+      const allIncluded = groupItems.every((it) => Boolean(prev[it.templateItemId]?.included))
+      const nextIncluded = !allIncluded
+      const next = { ...prev }
+      for (const item of groupItems) {
+        const old = next[item.templateItemId] || { included: false, customStandardDays: item.standardDays }
+        next[item.templateItemId] = { ...old, included: nextIncluded }
+      }
+      return next
+    })
+  }
+
   async function onExport(type: "excel" | "pdf") {
     if (!form.templateId || !form.ruleSetId) {
       showGlobalWarning("模板或规则集未就绪")
@@ -731,7 +957,7 @@ export default function AssessmentPage() {
       const result = await calculateAndExportEstimate({
         ...buildEstimatePayload(),
         exportType: type,
-        exportProjectName: globalOptions.find((x) => x.value === globalVersionCode)?.label || "未命名项目",
+        exportProjectName: projectName.trim() || "未命名项目",
         exportAssessmentVersionCode: currentVersionCode || "UNSAVED",
       })
       setExportInfo(result)
@@ -779,26 +1005,26 @@ export default function AssessmentPage() {
       description="参数配置、规则计算、版本持久化与导出。"
       breadcrumbs={[{ label: "实施评估" }]}
     >
-      <div className="space-y-6 overflow-x-hidden">
+      <div className="max-w-full min-w-0 space-y-6 overflow-x-hidden">
       <Card
         className={
           (paramCardCollapsed
             ? "fixed right-4 top-[4.5rem] z-30 w-[calc(100vw-2rem)] md:w-[min(980px,calc(100vw-15rem))] shadow-lg "
-            : "relative z-0 w-full shadow-sm ") + "border-border/40 bg-card/80 backdrop-blur-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+            : "relative z-0 w-full shadow-sm ") +
+            "border-border/40 bg-card/80 backdrop-blur-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] gap-2 py-3"
         }
         style={
           paramCardCollapsed
             ? { opacity: 0.98, transform: "translateY(0px) scale(0.985)" }
-            : {
-                opacity: 1 - paramCardFadeProgress * 0.45,
-                transform: `translateY(${Math.max(-6, -paramCardFadeProgress * 8)}px) scale(${1 - paramCardFadeProgress * 0.01})`,
-              }
+            : { opacity: 1, transform: "translateY(0px) scale(1)" }
         }
         collapsed={paramCardCollapsed}
         onCollapsedChange={setParamCardCollapsed}
         collapsedSummary={
           <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap text-[11px] text-muted-foreground">
             <span className="font-medium text-foreground">参数与版本</span>
+            <span>|</span>
+            <span>项目 <span className="font-semibold text-foreground">{projectName.trim() || "未填写"}</span></span>
             <span>|</span>
             <span>总方案 <span className="font-semibold text-foreground">{globalVersionCode || "未选择"}</span></span>
             <span>|</span>
@@ -816,126 +1042,169 @@ export default function AssessmentPage() {
           </div>
         }
       >
-        <CardHeader className="space-y-3">
-          <CardTitle className="text-base">参数与版本</CardTitle>
-          <div className="grid gap-3 md:grid-cols-5">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">总方案版本号</p>
-              <select
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={globalVersionCode}
-                onChange={(e) => setGlobalVersionCode(e.target.value)}
-              >
-                <option value="">请选择总方案版本</option>
-                {globalOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+        <CardHeader className="space-y-2">
+          <div className="grid gap-2 xl:grid-cols-2 xl:gap-3">
+            <div className="rounded-lg border border-border/50 bg-muted/15 px-3 py-2 dark:bg-muted/10">
+              <p className="mb-1.5 text-xs font-semibold text-foreground">基本信息</p>
+              <div className="grid gap-x-2 gap-y-1.5 sm:grid-cols-2">
+                <div className="space-y-0.5 sm:col-span-2">
+                  <p className="text-[11px] leading-tight text-muted-foreground">项目名称</p>
+                  <Input
+                    className="h-8 text-xs"
+                    value={projectName}
+                    placeholder="未选总方案时请填写；选择总方案后将自动带出，可再修改"
+                    onChange={(e) => setProjectName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[11px] leading-tight text-muted-foreground">总方案版本号</p>
+                  <select
+                    className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                    value={globalVersionCode}
+                    onChange={(e) => applyGlobalVersionSelection(e.target.value)}
+                  >
+                    <option value="">请选择总方案版本</option>
+                    {globalOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[11px] leading-tight text-muted-foreground">当前生效版本</p>
+                  <select
+                    className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                    value={currentVersionCode}
+                    disabled={initLoading || !versionOptions.length}
+                    onChange={(e) => void onLoadVersion(e.target.value, dashboardPlans)}
+                  >
+                    {!versionOptions.length ? (
+                      <option value="">尚无版本，请先保存</option>
+                    ) : (
+                      versionOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[11px] leading-tight text-muted-foreground">模板</p>
+                  <select
+                    className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                    value={form.templateId}
+                    disabled={initLoading}
+                    onChange={async (e) => {
+                      const nextId = e.target.value
+                      setForm((s) => ({ ...s, templateId: nextId }))
+                      const detail = await getTemplateDetail(nextId)
+                      setTemplateDetail(detail)
+                      const firstSheet = detail.sheets?.[0]?.sheetName || "全部工作表"
+                      setSelectedSheet(firstSheet)
+                      setSelectedCloudNames([])
+                      setSelectedPresetMode("")
+                      if (firstSheet !== SHEET_MODULE_QUOTE) setCustomModeByCloud({})
+                      setItemSelection(
+                        Object.fromEntries(
+                          detail.items.map((item) => [
+                            item.templateItemId,
+                            { included: false, customStandardDays: Number(item.standardDays || 0) },
+                          ]),
+                        ),
+                      )
+                    }}
+                  >
+                    <option value="">请选择模板</option>
+                    {templateOptions.map((item) => (
+                      <option key={item.templateId} value={item.templateId}>
+                        {item.templateName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[11px] leading-tight text-muted-foreground">规则集 ID</p>
+                  <Input className="h-8 text-xs" value={form.ruleSetId} disabled placeholder="规则集 ID" />
+                </div>
+                <VersionCheckoutStatusDisplay
+                  compact
+                  className="min-w-0 sm:col-span-2"
+                  labelClassName="text-[11px] leading-tight text-muted-foreground"
+                  state={
+                    selectedVersionRecord
+                      ? {
+                          recordId: selectedVersionRecord.id,
+                          checkoutStatus: selectedVersionRecord.checkoutStatus,
+                          versionDocStatus: selectedVersionRecord.versionDocStatus,
+                          checkedOutByUsername: selectedVersionRecord.checkedOutByUsername,
+                        }
+                      : undefined
+                  }
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">实施评估版本号</p>
-              <select
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={currentVersionCode}
-                onChange={(e) => void onLoadVersion(e.target.value)}
-              >
-                <option value="">请选择历史版本回读</option>
-                {versionOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">模板</p>
-              <select
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={form.templateId}
-                disabled={initLoading}
-                onChange={async (e) => {
-                  const nextId = e.target.value
-                  setForm((s) => ({ ...s, templateId: nextId }))
-                  const detail = await getTemplateDetail(nextId)
-                  setTemplateDetail(detail)
-                  const firstSheet = detail.sheets?.[0]?.sheetName || "全部工作表"
-                  setSelectedSheet(firstSheet)
-                  setSelectedCloudNames(
-                    Array.from(new Set(detail.items.filter((x) => (x.sheetName || firstSheet) === firstSheet).map((x) => x.cloudProduct || "未分类云产品"))),
-                  )
-                  setItemSelection(
-                    Object.fromEntries(
-                      detail.items.map((item) => [
-                        item.templateItemId,
-                        { included: Boolean(item.defaultIncluded), customStandardDays: Number(item.standardDays || 0) },
-                      ]),
-                    ),
-                  )
-                }}
-              >
-                <option value="">请选择模板</option>
-                {templateOptions.map((item) => (
-                  <option key={item.templateId} value={item.templateId}>
-                    {item.templateName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">规则集 ID</p>
-              <Input value={form.ruleSetId} disabled placeholder="规则集 ID" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">用户数</p>
-              <Input
-                type="number"
-                min={0}
-                value={form.userCount}
-                onChange={(e) => setForm((s) => ({ ...s, userCount: Number(e.target.value || 0) }))}
-                placeholder="用户数"
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">难度系数</p>
-              <Input
-                type="number"
-                min={0}
-                step="0.1"
-                value={form.difficultyFactor}
-                onChange={(e) => setForm((s) => ({ ...s, difficultyFactor: Number(e.target.value || 0) }))}
-                placeholder="难度系数"
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">组织数</p>
-              <Input
-                type="number"
-                min={1}
-                value={form.orgCount}
-                onChange={(e) => setForm((s) => ({ ...s, orgCount: Number(e.target.value || 1) }))}
-                placeholder="组织数"
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">组织相似度</p>
-              <Input
-                type="number"
-                min={0}
-                max={1}
-                step="0.1"
-                value={form.orgSimilarityFactor}
-                onChange={(e) => setForm((s) => ({ ...s, orgSimilarityFactor: Number(e.target.value || 0) }))}
-                placeholder="组织相似度"
-              />
+            <div className="rounded-lg border border-border/50 bg-muted/15 px-3 py-2 dark:bg-muted/10">
+              <p className="mb-1.5 text-xs font-semibold text-foreground">评估信息</p>
+              <div className="grid gap-x-2 gap-y-1.5 sm:grid-cols-2">
+                <div className="space-y-0.5">
+                  <p className="text-[11px] leading-tight text-muted-foreground">用户数</p>
+                  <Input
+                    className="h-8 text-xs"
+                    type="number"
+                    min={0}
+                    value={form.userCount}
+                    onChange={(e) => setForm((s) => ({ ...s, userCount: Number(e.target.value || 0) }))}
+                    placeholder="用户数"
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[11px] leading-tight text-muted-foreground">难度系数</p>
+                  <Input
+                    className="h-8 text-xs"
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={form.difficultyFactor}
+                    onChange={(e) => setForm((s) => ({ ...s, difficultyFactor: Number(e.target.value || 0) }))}
+                    placeholder="难度系数"
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[11px] leading-tight text-muted-foreground">组织数</p>
+                  <Input
+                    className="h-8 text-xs"
+                    type="number"
+                    min={1}
+                    value={form.orgCount}
+                    onChange={(e) => setForm((s) => ({ ...s, orgCount: Number(e.target.value || 1) }))}
+                    placeholder="组织数"
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[11px] leading-tight text-muted-foreground">组织相似度</p>
+                  <Input
+                    className="h-8 text-xs"
+                    type="number"
+                    min={0}
+                    max={1}
+                    step="0.1"
+                    value={form.orgSimilarityFactor}
+                    onChange={(e) => setForm((s) => ({ ...s, orgSimilarityFactor: Number(e.target.value || 0) }))}
+                    placeholder="组织相似度"
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button className="rounded-xl" onClick={() => void onSave()} disabled={savePhase !== "idle"}>
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <Button className="rounded-lg" size="sm" onClick={() => void onSave()} disabled={savePhase !== "idle"}>
               {savePhase === "validating" ? "校验中..." : savePhase === "saving" ? "保存中..." : "保存版本"}
             </Button>
             <VersionVcsToolbar
+              compact
+              showStatusField={false}
               state={
                 selectedVersionRecord
                   ? {
@@ -946,8 +1215,7 @@ export default function AssessmentPage() {
                     }
                   : undefined
               }
-              showHistory={showHistoricalVersions}
-              onToggleHistory={() => setShowHistoricalVersions((v) => !v)}
+              onVersionHistory={() => setVersionHistoryOpen(true)}
               onCheckout={() => void onCheckout()}
               onCheckin={() => void onCheckin()}
               onUndoCheckout={() => void onUndoCheckout()}
@@ -955,13 +1223,13 @@ export default function AssessmentPage() {
               onForceUnlock={() => void onForceUnlock()}
               forceUnlockVisible={isAdmin}
             />
-            <Button className="rounded-xl" variant="outline" onClick={() => void onCalculate()} disabled={calculating || savePhase !== "idle"}>
+            <Button className="rounded-lg" size="sm" variant="outline" onClick={() => void onCalculate()} disabled={calculating || savePhase !== "idle"}>
               {calculating ? "计算中..." : "实时校验"}
             </Button>
-            <Button className="rounded-xl" variant="outline" onClick={() => void onExport("excel")} disabled={exporting || savePhase !== "idle"}>
+            <Button className="rounded-lg" size="sm" variant="outline" onClick={() => void onExport("excel")} disabled={exporting || savePhase !== "idle"}>
               {exporting ? "导出中..." : "导出 Excel"}
             </Button>
-            <Button className="rounded-xl" variant="outline" onClick={() => void onExport("pdf")} disabled={exporting || savePhase !== "idle"}>
+            <Button className="rounded-lg" size="sm" variant="outline" onClick={() => void onExport("pdf")} disabled={exporting || savePhase !== "idle"}>
               {exporting ? "导出中..." : "导出 PDF"}
             </Button>
             {error ? <span className="text-xs text-destructive">{error}</span> : null}
@@ -972,12 +1240,34 @@ export default function AssessmentPage() {
         </CardHeader>
       </Card>
 
-      <fieldset disabled={isReadonly} className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
-          <CardContent className="h-full p-3">
+      <fieldset disabled={isReadonly} className="max-w-full min-w-0 space-y-6">
+      <Card className="max-w-full min-w-0 border-border/40 bg-card/50 backdrop-blur-sm pt-4">
+        <Tabs defaultValue="module" className="w-full min-w-0">
+          <CardContent className="min-w-0 space-y-6 px-6 pb-6 pt-3">
+            <TabsList className="grid h-10 w-full grid-cols-2 sm:inline-flex sm:w-auto sm:max-w-lg">
+              <TabsTrigger
+                value="module"
+                className="rounded-lg px-4 data-[state=active]:border-transparent data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-blue-600 dark:data-[state=active]:text-white"
+              >
+                模块评估
+              </TabsTrigger>
+              <TabsTrigger
+                value="multi-org"
+                className="rounded-lg px-4 data-[state=active]:border-transparent data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-blue-600 dark:data-[state=active]:text-white"
+              >
+                多组织推广估算
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="module" className="mt-0 min-w-0 space-y-6 outline-none">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-[repeat(4,minmax(0,1fr))]">
+        <Card
+          collapsible={false}
+          className="min-w-0 gap-2 border-border/40 bg-card/50 py-2.5 backdrop-blur-sm"
+        >
+          <CardContent className="h-full min-w-0 px-3 py-2">
             <p className="text-sm font-medium">人天构成</p>
-            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_92px] items-center gap-2">
+            <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_92px] items-center gap-2">
               <div className="flex justify-center">
                 <div className="h-32 w-32 shrink-0 rounded-full border border-border/40" style={{ background: breakdownPieStyle }} />
               </div>
@@ -992,10 +1282,13 @@ export default function AssessmentPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
-          <CardContent className="h-full p-3">
+        <Card
+          collapsible={false}
+          className="min-w-0 gap-2 border-border/40 bg-card/50 py-2.5 backdrop-blur-sm"
+        >
+          <CardContent className="h-full min-w-0 px-3 py-2">
             <p className="text-sm font-medium">云产品工作量占比</p>
-            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_92px] items-center gap-2">
+            <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_92px] items-center gap-2">
               <div className="flex justify-center">
                 <div className="h-32 w-32 shrink-0 rounded-full border border-border/40" style={{ background: cloudPieStyle }} />
               </div>
@@ -1017,29 +1310,33 @@ export default function AssessmentPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
-          <CardContent className="p-5">
+        <Card
+          collapsible={false}
+          className="min-w-0 gap-2 border-border/40 bg-card/50 py-2.5 backdrop-blur-sm"
+        >
+          <CardContent className="min-w-0 px-3 py-2">
             <p className="text-sm text-muted-foreground">勾选条目 / 基础人天</p>
-            <p className="mt-2 text-2xl font-semibold">{selectedCount} / {formatDays(baseDays)}</p>
+            <p className="mt-1.5 text-2xl font-semibold">{selectedCount} / {formatDays(baseDays)}</p>
           </CardContent>
         </Card>
-        <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
-          <CardContent className="p-5">
+        <Card
+          collapsible={false}
+          className="min-w-0 gap-2 border-border/40 bg-card/50 py-2.5 backdrop-blur-sm"
+        >
+          <CardContent className="min-w-0 px-3 py-2">
             <p className="text-sm text-muted-foreground">总评估人天（实时）</p>
-            <p className="mt-2 text-2xl font-semibold">{formatDays(scaleFactor.total)}</p>
+            <p className="mt-1.5 text-2xl font-semibold">{formatDays(scaleFactor.total)}</p>
           </CardContent>
         </Card>
       </div>
 
       <Card
-        className="border-border/40 bg-card/50 backdrop-blur-sm"
+        className="min-w-0 max-w-full border-border/40 bg-card/50 backdrop-blur-sm"
         collapsedSummary={
           <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap text-[11px] text-muted-foreground">
-            <span className="font-medium text-foreground">模块评估工作台</span>
-            <span>|</span>
             <span>工作表 <span className="font-semibold text-foreground">{selectedSheet || "—"}</span></span>
             <span>|</span>
-            <span>预置 <span className="font-semibold text-foreground">{selectedPresetMode}</span></span>
+            <span>预置 <span className="font-semibold text-foreground">{selectedPresetMode || "未选择"}</span></span>
             <span>|</span>
             <span>云产品 <span className="font-semibold text-foreground">{cloudSummaryText}</span></span>
             <span>|</span>
@@ -1051,55 +1348,65 @@ export default function AssessmentPage() {
           </div>
         }
       >
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">模块评估工作台</CardTitle>
-            <div className="flex gap-2">
-              {["标准财务供应链制造", "标准财务供应链", "全量云产品"].map((mode) => (
+        <CardHeader className="min-w-0 space-y-4 pb-3">
+          <div className="flex w-full min-w-0 max-w-full flex-col gap-4 md:flex-row md:items-start md:gap-6">
+            <div className="flex min-w-0 max-w-full flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+              <span className="text-xs font-medium text-muted-foreground shrink-0 pt-2 sm:pt-1.5">报价模式</span>
+              <div className="flex min-w-0 max-w-full flex-1 flex-wrap gap-2 overflow-x-auto [scrollbar-gutter:stable]">
+                {sheets.map((sheet) => (
+                  <Button
+                    key={sheet}
+                    size="sm"
+                    className="h-8 w-fit max-w-full shrink-0 rounded-lg px-3"
+                    variant={selectedSheet === sheet ? "default" : "outline"}
+                    onClick={() => {
+                      setSelectedSheet(sheet)
+                      setSelectedCloudNames([])
+                      if (sheet !== SHEET_MODULE_QUOTE) {
+                        setSelectedPresetMode("")
+                        setCustomModeByCloud({})
+                      }
+                    }}
+                  >
+                    {sheet}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {selectedSheet === SHEET_MODULE_QUOTE ? (
+              <div className="flex min-w-0 max-w-full flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+                <span className="text-xs font-medium text-muted-foreground shrink-0 pt-2 sm:pt-1.5">预置评估模式</span>
+                <div className="flex min-w-0 max-w-full flex-1 flex-wrap gap-2 overflow-x-auto [scrollbar-gutter:stable]">
+                  {["标准财务供应链制造", "标准财务供应链", "全量云产品"].map((mode) => (
+                    <Button
+                      key={mode}
+                      size="sm"
+                      className="max-w-full shrink-0 whitespace-normal rounded-xl text-center leading-snug"
+                      variant={selectedPresetMode === mode ? "default" : "outline"}
+                      onClick={() => applyPreset(mode)}
+                    >
+                      {mode}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex w-full min-w-0 max-w-full flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+            <span className="text-xs font-medium text-muted-foreground shrink-0 pt-2 sm:pt-1.5">云产品</span>
+            <div className="flex min-w-0 max-w-full flex-1 flex-wrap gap-2 overflow-x-auto [scrollbar-gutter:stable]">
+              {allCloudNames.map((cloud) => (
                 <Button
-                  key={mode}
-                  className="rounded-xl"
-                  variant={selectedPresetMode === mode ? "default" : "outline"}
-                  onClick={() => applyPreset(mode)}
+                  key={cloud}
+                  size="sm"
+                  className="h-auto min-h-8 w-fit max-w-full shrink-0 whitespace-normal rounded-lg px-3 py-1.5 text-center leading-snug"
+                  variant={selectedCloudNames.includes(cloud) ? "default" : "outline"}
+                  onClick={() => toggleCloud(cloud)}
                 >
-                  {mode}
+                  {cloud}
                 </Button>
               ))}
-              <Button className="rounded-xl" variant="outline" onClick={() => setCustomModeEnabled((v) => !v)}>
-                {customModeEnabled ? "取消自定义人天" : "自定义人天"}
-              </Button>
             </div>
-          </div>
-          <div className="grid gap-2 md:grid-cols-4">
-            {sheets.map((sheet) => (
-              <Button
-                key={sheet}
-                size="sm"
-                className="rounded-lg"
-                variant={selectedSheet === sheet ? "default" : "outline"}
-                onClick={() => {
-                  setSelectedSheet(sheet)
-                  const clouds = Array.from(new Set((templateDetail?.items || [])
-                    .filter((x) => (x.sheetName || sheet) === sheet)
-                    .map((x) => x.cloudProduct || "未分类云产品")))
-                  setSelectedCloudNames(clouds)
-                }}
-              >
-                {sheet}
-              </Button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {allCloudNames.map((cloud) => (
-              <Button
-                key={cloud}
-                size="sm"
-                variant={selectedCloudNames.includes(cloud) ? "default" : "outline"}
-                onClick={() => toggleCloud(cloud)}
-              >
-                {cloud}
-              </Button>
-            ))}
           </div>
         </CardHeader>
         <CardContent>
@@ -1107,8 +1414,23 @@ export default function AssessmentPage() {
             <p className="text-sm text-muted-foreground">请选择一个或多个云产品标签查看条目。</p>
           ) : (
             <div className="space-y-4">
+              {showOnlySelectedSkuRows && selectedCount === 0 ? (
+                <p className="text-sm text-muted-foreground px-1">已检入：当前工作表下暂无已勾选条目。</p>
+              ) : null}
               {Array.from(cloudTree.entries()).map(([cloudName, skuMap]) => {
                 const flat = Array.from(skuMap.values()).flat()
+                const skuEntriesForTable = Array.from(skuMap.entries())
+                  .map(([skuName, items]) => {
+                    const rowItems = showOnlySelectedSkuRows
+                      ? items.filter((it) => itemSelection[it.templateItemId]?.included)
+                      : items
+                    return [skuName, rowItems] as const
+                  })
+                  .filter(([, rowItems]) => rowItems.length > 0)
+                if (showOnlySelectedSkuRows && skuEntriesForTable.length === 0) {
+                  return null
+                }
+                const cloudCustom = Boolean(customModeByCloud[cloudName])
                 const includedCount = flat.filter((x) => itemSelection[x.templateItemId]?.included).length
                 const selectedModuleCount = new Set(
                   flat
@@ -1118,7 +1440,9 @@ export default function AssessmentPage() {
                 const totalDays = flat.reduce((sum, item) => {
                   const state = itemSelection[item.templateItemId]
                   if (!state?.included) return sum
-                  const effective = customModeEnabled
+                  const useCustom =
+                    cloudCustom && Number.isFinite(Number(state.customStandardDays))
+                  const effective = useCustom
                     ? Number(state.customStandardDays || item.standardDays || 0)
                     : Number(item.standardDays || 0)
                   return sum + effective
@@ -1158,85 +1482,245 @@ export default function AssessmentPage() {
                       </div>
                     }
                   >
-                    <div className="mb-2 flex items-center justify-between px-4">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-4">
                       <div className="text-sm font-semibold">
-                        云产品：{cloudName}（已选 {includedCount}/{flat.length}，{formatDays(totalDays)} 人天，模块 {selectedModuleCount}）
-                        <p className="mt-1 text-[11px] font-normal text-muted-foreground">双击空白处可折叠/展开该云产品卡片</p>
+                        云产品：{cloudName}
+                        {showOnlySelectedSkuRows ? (
+                          <span className="ml-1.5 text-xs font-normal text-muted-foreground">（已检入 · 仅显示已勾选条目）</span>
+                        ) : null}
+                        （已选 {includedCount}/{flat.length}，{formatDays(totalDays)} 人天，模块 {selectedModuleCount}）
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setCloudSelections(cloudName, true)}>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {selectedSheet === SHEET_MODULE_QUOTE ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isReadonly}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setCustomModeByCloud((prev) => ({ ...prev, [cloudName]: !prev[cloudName] }))
+                            }}
+                          >
+                            {cloudCustom ? "取消自定义人天" : "自定义人天"}
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isReadonly}
+                          onClick={() => setCloudSelections(cloudName, true)}
+                        >
                           全选
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setCloudSelections(cloudName, false)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isReadonly}
+                          onClick={() => setCloudSelections(cloudName, false)}
+                        >
                           全不选
                         </Button>
                       </div>
                     </div>
-                    <div className="space-y-3 px-4">
-                      {Array.from(skuMap.entries()).map(([skuName, items]) => (
-                        <div key={`${cloudName}-${skuName}`} className="rounded-lg border border-border/50">
-                          <div className="border-b border-border/40 px-3 py-2 text-xs font-medium text-muted-foreground">SKU：{skuName}</div>
-                          <div className="w-full overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="w-20">选择</TableHead>
-                                <TableHead>实施要点</TableHead>
-                                <TableHead>评估说明</TableHead>
-                                <TableHead className="w-28 text-right">标准人天</TableHead>
-                                {customModeEnabled ? <TableHead className="w-36">自定义人天</TableHead> : null}
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {items.map((item) => (
-                                <TableRow key={item.templateItemId}>
-                                  <TableCell>
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(itemSelection[item.templateItemId]?.included)}
-                                      onChange={(e) =>
-                                        setItemSelection((prev) => ({
-                                          ...prev,
-                                          [item.templateItemId]: {
-                                            included: e.target.checked,
-                                            customStandardDays: Number(prev[item.templateItemId]?.customStandardDays ?? item.standardDays),
-                                          },
-                                        }))
+                    <div className="px-4">
+                      <div className="w-full min-w-0 overflow-x-auto rounded-lg border border-border/50">
+                        <Table
+                          className="w-full min-w-0 border-collapse table-fixed"
+                          style={
+                            {
+                              // 与左侧 SKU/实施要点、右侧标准人天/自定义列宽之和大致对齐；中间两列按 75%/25% 分剩余宽
+                              ["--assess-fixed-side" as string]: cloudCustom ? "33rem" : "24rem",
+                            } as CSSProperties
+                          }
+                        >
+                          <colgroup>
+                            <col className="w-[min(7.5rem,15vw)]" />
+                            <col className="w-[min(12rem,26vw)]" />
+                            <col
+                              style={{
+                                width: "calc((100% - var(--assess-fixed-side, 24rem)) * 0.75)",
+                              }}
+                            />
+                            <col
+                              style={{
+                                width: "calc((100% - var(--assess-fixed-side, 24rem)) * 0.25)",
+                              }}
+                            />
+                            <col className="w-24" />
+                            {cloudCustom ? <col className="w-36" /> : null}
+                          </colgroup>
+                          <TableHeader className="[&_th]:bg-accent/12 dark:[&_th]:bg-accent/20 [&_th]:text-foreground">
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead className="border-r border-border/40 whitespace-normal">SKU</TableHead>
+                              <TableHead className={cn("min-w-0 whitespace-normal", ASSESS_TABLE_COL_BORDER)}>
+                                实施要点
+                              </TableHead>
+                              <TableHead className={cn("min-w-0 whitespace-normal", ASSESS_TABLE_COL_BORDER)}>
+                                实施要点内容说明
+                              </TableHead>
+                              <TableHead className={cn("min-w-0 whitespace-normal", ASSESS_TABLE_COL_BORDER)}>
+                                评估说明
+                              </TableHead>
+                              <TableHead className={cn("w-24 text-left whitespace-normal", ASSESS_TABLE_COL_BORDER)}>
+                                标准人天
+                              </TableHead>
+                              {cloudCustom ? (
+                                <TableHead className={cn("w-36 whitespace-normal", ASSESS_TABLE_COL_BORDER)}>
+                                  自定义人天
+                                </TableHead>
+                              ) : null}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {skuEntriesForTable.map(([skuName, rowItems]) => (
+                              <Fragment key={`${cloudName}-${skuName}`}>
+                                {rowItems.map((item, rowIdx) => {
+                                  const primary =
+                                    String(item.deliveryPoint || item.itemName || "").trim() || "-"
+                                  const moduleLine = String(item.deliveryModule || "").trim()
+                                  const showModuleLine = moduleLine.length > 0 && moduleLine !== primary
+                                  const pointsOneLine = showModuleLine
+                                    ? `${primary} · ${moduleLine}`
+                                    : primary
+                                  const evalText = String(item.evalDesc || "-").trim() || "-"
+                                  const deliveryDescText =
+                                    String(item.deliveryDesc || "").trim() || "-"
+                                  const included = Boolean(itemSelection[item.templateItemId]?.included)
+                                  const standardDaysNum = Number(item.standardDays || 0)
+                                  const standardDaysCellClass =
+                                    standardDaysNum > 10
+                                      ? "font-semibold text-red-800 dark:text-red-400"
+                                      : standardDaysNum > 5
+                                        ? "font-semibold text-orange-800 dark:text-orange-400"
+                                        : "font-semibold text-foreground"
+                                  function toggleRowIncluded() {
+                                    if (isReadonly) return
+                                    setItemSelection((prev) => {
+                                      const cur = prev[item.templateItemId]
+                                      return {
+                                        ...prev,
+                                        [item.templateItemId]: {
+                                          included: !included,
+                                          customStandardDays: Number(
+                                            cur?.customStandardDays ?? item.standardDays,
+                                          ),
+                                        },
                                       }
-                                    />
-                                  </TableCell>
-                                  <TableCell className="font-medium">
-                                    {item.deliveryPoint || item.itemName}
-                                    <p className="text-xs text-muted-foreground">{item.deliveryModule || item.itemName}</p>
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground">{item.evalDesc || "-"}</TableCell>
-                                  <TableCell className="text-right">{formatDays(Number(item.standardDays || 0))}</TableCell>
-                                  {customModeEnabled ? (
-                                    <TableCell>
-                                      <Input
-                                        type="number"
-                                        min={0}
-                                        step="0.1"
-                                        value={Number(itemSelection[item.templateItemId]?.customStandardDays ?? item.standardDays)}
-                                        onChange={(e) =>
-                                          setItemSelection((prev) => ({
-                                            ...prev,
-                                            [item.templateItemId]: {
-                                              included: Boolean(prev[item.templateItemId]?.included),
-                                              customStandardDays: Number(e.target.value || 0),
-                                            },
-                                          }))
-                                        }
-                                      />
-                                    </TableCell>
-                                  ) : null}
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                          </div>
-                        </div>
-                      ))}
+                                    })
+                                  }
+                                  return (
+                                    <TableRow
+                                      key={item.templateItemId}
+                                      data-state={included ? "selected" : undefined}
+                                      aria-selected={included}
+                                      tabIndex={isReadonly ? undefined : 0}
+                                      className={cn(
+                                        "border-b transition-colors data-[state=selected]:bg-blue-500/12 dark:data-[state=selected]:bg-blue-500/20",
+                                        !isReadonly &&
+                                          "cursor-pointer hover:bg-accent/28 dark:hover:bg-accent/42 data-[state=selected]:hover:bg-blue-500/18 dark:data-[state=selected]:hover:bg-blue-500/25",
+                                        isReadonly && "cursor-default",
+                                      )}
+                                      onClick={isReadonly ? undefined : toggleRowIncluded}
+                                      onKeyDown={
+                                        isReadonly
+                                          ? undefined
+                                          : (e) => {
+                                              if (e.key === "Enter" || e.key === " ") {
+                                                e.preventDefault()
+                                                toggleRowIncluded()
+                                              }
+                                            }
+                                      }
+                                    >
+                                      {rowIdx === 0 ? (
+                                        <TableCell
+                                          rowSpan={rowItems.length}
+                                          className={cn(
+                                            "align-middle border-r border-border/40 bg-muted/20 text-xs font-medium text-muted-foreground whitespace-nowrap",
+                                            !isReadonly && "cursor-pointer hover:bg-muted/35",
+                                          )}
+                                          title={
+                                            isReadonly
+                                              ? "当前版本只读（已检入或已审核），不可更改勾选"
+                                              : "单击切换本 SKU 下全部条目的勾选"
+                                          }
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            if (isReadonly) return
+                                            toggleSkuGroupInclusion(
+                                              skuMap.get(skuName) ?? rowItems,
+                                            )
+                                          }}
+                                        >
+                                          {skuName}
+                                        </TableCell>
+                                      ) : null}
+                                      <TableCell
+                                        className={cn(
+                                          "min-w-0 align-top break-words whitespace-normal text-sm font-medium leading-snug",
+                                          ASSESS_TABLE_COL_BORDER,
+                                        )}
+                                        title={pointsOneLine}
+                                      >
+                                        {pointsOneLine}
+                                      </TableCell>
+                                      <TableCell
+                                        className={cn(
+                                          "min-w-0 align-top break-words whitespace-normal text-muted-foreground text-sm leading-snug",
+                                          ASSESS_TABLE_COL_BORDER,
+                                        )}
+                                      >
+                                        {deliveryDescText}
+                                      </TableCell>
+                                      <TableCell
+                                        className={cn(
+                                          "min-w-0 align-top break-words whitespace-normal text-muted-foreground text-sm leading-snug",
+                                          ASSESS_TABLE_COL_BORDER,
+                                        )}
+                                      >
+                                        {evalText}
+                                      </TableCell>
+                                      <TableCell
+                                        className={cn(
+                                          "align-top text-left whitespace-nowrap tabular-nums",
+                                          standardDaysCellClass,
+                                          ASSESS_TABLE_COL_BORDER,
+                                        )}
+                                      >
+                                        {formatDays(standardDaysNum)}
+                                      </TableCell>
+                                      {cloudCustom ? (
+                                        <TableCell
+                                          className={cn("align-top", ASSESS_TABLE_COL_BORDER)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <Input
+                                            type="number"
+                                            min={0}
+                                            step="0.1"
+                                            value={Number(
+                                              itemSelection[item.templateItemId]?.customStandardDays ?? item.standardDays,
+                                            )}
+                                            onChange={(e) =>
+                                              setItemSelection((prev) => ({
+                                                ...prev,
+                                                [item.templateItemId]: {
+                                                  included: Boolean(prev[item.templateItemId]?.included),
+                                                  customStandardDays: Number(e.target.value || 0),
+                                                },
+                                              }))
+                                            }
+                                          />
+                                        </TableCell>
+                                      ) : null}
+                                    </TableRow>
+                                  )
+                                })}
+                              </Fragment>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
                   </Card>
                 )
@@ -1245,77 +1729,19 @@ export default function AssessmentPage() {
           )}
         </CardContent>
       </Card>
+            </TabsContent>
 
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">导出历史</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {serverResult ? (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-50/60 p-3 text-xs text-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">
-              后端校验：ruleVersion {serverResult.ruleVersion}，pipelineVersion {serverResult.pipelineVersion}，总人天{" "}
-              {formatDays(serverResult.totalDays)}
-            </div>
-          ) : null}
-          {exportInfo ? (
-            <div className="rounded-xl border border-border/50 p-3 text-xs text-muted-foreground">
-              最近导出：{formatDays(exportInfo.totalDays)} 人天，文件链接 {exportInfo.downloadUrl}
-            </div>
-          ) : null}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-medium">导出历史</p>
-              <Input
-                className="h-8 max-w-xs"
-                placeholder="按评估版本号过滤（如 AS-2026）"
-                value={exportHistoryFilter}
-                onChange={(e) => setExportHistoryFilter(e.target.value)}
-              />
-            </div>
-            {filteredExportHistory.length ? (
-              <div className="space-y-1">
-                {filteredExportHistory.map((item) => (
-                  <div key={`${item.fileName}-${item.modifiedAt}`} className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2 text-xs">
-                    <div>
-                      <p className="font-medium">{item.fileName}</p>
-                      <p className="text-muted-foreground">{new Date(item.modifiedAt).toLocaleString()}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => void onCopyExportLink(item.downloadUrl)}>
-                        复制链接
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => window.open(item.downloadUrl, "_blank", "noopener,noreferrer")}>
-                        下载
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+            <TabsContent value="multi-org" className="mt-0 space-y-4 outline-none">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-base font-semibold text-foreground">多组织推广估算</p>
+                  <p className="text-xs text-muted-foreground">按组织维度汇总推广人天，与模块评估基础人天联动。</p>
+                </div>
+                <Button className="rounded-xl shrink-0" variant="outline" onClick={() => setMultiOrgRows((prev) => [...prev, createEmptyMultiOrgRow()])}>
+                  新增组织
+                </Button>
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {exportHistory.length ? "没有匹配的导出记录" : "暂无导出历史"}
-              </p>
-            )}
-            {exportHistory.length < historyTotal ? (
-              <Button size="sm" variant="outline" onClick={() => void loadHistory(false)}>
-                查看更多
-              </Button>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">多组织推广估算</CardTitle>
-            <Button className="rounded-xl" variant="outline" onClick={() => setMultiOrgRows((prev) => [...prev, createEmptyMultiOrgRow()])}>
-              新增组织
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full overflow-x-auto">
+              <div className="w-full overflow-x-auto rounded-xl border border-border/50">
           <Table>
             <TableHeader>
               <TableRow>
@@ -1407,14 +1833,86 @@ export default function AssessmentPage() {
               ))}
             </TableBody>
           </Table>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                推广人天合计：<span className="font-semibold text-foreground">{formatDays(multiOrgTotalDays)}</span>
+              </p>
+            </TabsContent>
+          </CardContent>
+        </Tabs>
+      </Card>
+
+      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">导出历史</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {serverResult ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-50/60 p-3 text-xs text-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">
+              后端校验：ruleVersion {serverResult.ruleVersion}，pipelineVersion {serverResult.pipelineVersion}，总人天{" "}
+              {formatDays(serverResult.totalDays)}
+            </div>
+          ) : null}
+          {exportInfo ? (
+            <div className="rounded-xl border border-border/50 p-3 text-xs text-muted-foreground">
+              最近导出：{formatDays(exportInfo.totalDays)} 人天，文件链接 {exportInfo.downloadUrl}
+            </div>
+          ) : null}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium">导出历史</p>
+              <Input
+                className="h-8 max-w-xs"
+                placeholder="按评估版本号过滤（如 AS-2026）"
+                value={exportHistoryFilter}
+                onChange={(e) => setExportHistoryFilter(e.target.value)}
+              />
+            </div>
+            {filteredExportHistory.length ? (
+              <div className="space-y-1">
+                {filteredExportHistory.map((item) => (
+                  <div key={`${item.fileName}-${item.modifiedAt}`} className="flex items-center justify-between rounded-md border border-border/40 px-3 py-2 text-xs">
+                    <div>
+                      <p className="font-medium">{item.fileName}</p>
+                      <p className="text-muted-foreground">{new Date(item.modifiedAt).toLocaleString()}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => void onCopyExportLink(item.downloadUrl)}>
+                        复制链接
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => window.open(item.downloadUrl, "_blank", "noopener,noreferrer")}>
+                        下载
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {exportHistory.length ? "没有匹配的导出记录" : "暂无导出历史"}
+              </p>
+            )}
+            {exportHistory.length < historyTotal ? (
+              <Button size="sm" variant="outline" onClick={() => void loadHistory(false)}>
+                查看更多
+              </Button>
+            ) : null}
           </div>
-          <p className="mt-3 text-sm text-muted-foreground">
-            推广人天合计：<span className="font-semibold text-foreground">{formatDays(multiOrgTotalDays)}</span>
-          </p>
         </CardContent>
       </Card>
       </fieldset>
       </div>
+      <VersionHistoryDialog
+        open={versionHistoryOpen}
+        onOpenChange={setVersionHistoryOpen}
+        title="实施评估版本历史"
+        description="按更新时间由新到旧排列，含已归档版本。主界面仅可选当前生效版本；回退历史内容请选中行后使用「按历史版本创建新版」。"
+        rows={recordsToVersionHistoryRows(versionRecords)}
+        highlightVersionCode={currentVersionCode.trim() || undefined}
+        latestRecordId={latestAssessmentRecord?.id}
+        onCreateFromHistory={(r) => void onCreateAssessmentVersionFromHistory(r)}
+        createFromHistoryLoading={creatingFromHistory}
+      />
     </ModuleShell>
   )
 }

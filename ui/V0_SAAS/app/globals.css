@@ -7,9 +7,9 @@
   /* Apple-inspired light theme - clean, minimal, elegant */
   --background: #fafafa;
   --foreground: #1a1a1a;
-  --card: #ffffff;
+  --card: #f5f7fa;
   --card-foreground: #1a1a1a;
-  --popover: #ffffff;
+  --popover: #f7f9fc;
   --popover-foreground: #1a1a1a;
   --primary: #1a1a1a;
   --primary-foreground: #fafafa;
@@ -126,5 +126,20 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .embed-mode [data-slot="button"],
+  .embed-mode button {
+    display: none !important;
+  }
+
+  .embed-mode input,
+  .embed-mode select,
+  .embed-mode textarea {
+    pointer-events: none;
+    user-select: text;
+    opacity: 0.95;
   }
 }

@@ -5,12 +5,27 @@
 import { Request, Response, NextFunction } from "express";
 import { randomUUID } from "node:crypto";
 
+function isPayloadTooLarge(err: Error): boolean {
+  const anyErr = err as Error & { type?: string; status?: number };
+  return anyErr.type === "entity.too.large" || anyErr.status === 413;
+}
+
 /**
  * 全局错误处理中间件
  */
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
   console.error("[error-handler]", err);
-  
+
+  if (isPayloadTooLarge(err)) {
+    res.status(413).json({
+      code: 41301,
+      message: "请求体过大，请缩小提交内容或联系管理员调大接口限制",
+      details: [{ field: "body", reason: "payload_too_large" }],
+      requestId: randomUUID()
+    });
+    return;
+  }
+
   res.status(500).json({
     code: 50000,
     message: "服务器内部错误",

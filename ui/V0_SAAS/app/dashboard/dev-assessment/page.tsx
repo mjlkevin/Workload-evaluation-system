@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
+import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +22,7 @@ import {
   promoteVersionById,
   undoCheckoutById,
 } from "@/lib/workload-service"
+import type { PlanRow } from "@/lib/workload-types"
 import { toast } from "sonner"
 
 type DevRow = {
@@ -54,10 +56,8 @@ function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
-function buildVersionOptions(records: ModuleVersionRecord[], showHistorical: boolean) {
-  return records
-    .filter((x) => showHistorical || !x.isHistoricalArchive)
-    .map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` }))
+function buildVersionOptions(records: ModuleVersionRecord[]) {
+  return records.map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` }))
 }
 
 export default function DevAssessmentPage() {
@@ -66,12 +66,14 @@ export default function DevAssessmentPage() {
   const [evaluator, setEvaluator] = useState("")
   const [evaluateDate, setEvaluateDate] = useState(new Date().toISOString().slice(0, 10))
   const [globalVersionCode, setGlobalVersionCode] = useState("")
+  const [dashboardPlans, setDashboardPlans] = useState<PlanRow[]>([])
+  const [projectName, setProjectName] = useState("")
   const [linkedAssessmentVersionCode, setLinkedAssessmentVersionCode] = useState("")
   const [globalOptions, setGlobalOptions] = useState<Array<{ value: string; label: string }>>([])
   const [assessmentOptions, setAssessmentOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionOptions, setVersionOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionRecords, setVersionRecords] = useState<ModuleVersionRecord[]>([])
-  const [showHistoricalVersions, setShowHistoricalVersions] = useState(false)
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const [currentVersionCode, setCurrentVersionCode] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -84,8 +86,10 @@ export default function DevAssessmentPage() {
       (selectedVersionRecord.checkoutStatus === "checked_in" || selectedVersionRecord.versionDocStatus === "reviewed"),
   )
 
-  const { setDirty } = useUnsavedChanges()
+  const setDirty = useSetUnsavedDirty()
   const dirtyEnabled = useRef(false)
+  const initialEmbedQueryRef = useRef<{ globalVersion: string; version: string } | null>(null)
+  const initialEmbedAppliedRef = useRef(false)
 
   function showGlobalNotice(text: string) {
     toast(text)
@@ -96,6 +100,14 @@ export default function DevAssessmentPage() {
   }
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    initialEmbedQueryRef.current = {
+      globalVersion: params.get("globalVersion") || "",
+      version: params.get("version") || "",
+    }
+  }, [])
+
+  useEffect(() => {
     void (async () => {
       try {
         const [plans, assessments, devs] = await Promise.all([
@@ -103,10 +115,21 @@ export default function DevAssessmentPage() {
           listModuleVersions("assessment"),
           listModuleVersions("dev"),
         ])
+        setDashboardPlans(plans)
         setGlobalOptions(plans.map((x) => ({ value: x.globalVersion, label: `${x.globalVersion}（${x.projectName}）` })))
         setAssessmentOptions(assessments.map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` })))
         setVersionRecords(devs)
-        setVersionOptions(buildVersionOptions(devs, showHistoricalVersions))
+        setVersionOptions(buildVersionOptions(devs))
+        const initialQuery = initialEmbedQueryRef.current
+        if (!initialEmbedAppliedRef.current && initialQuery) {
+          if (initialQuery.globalVersion) {
+            setGlobalVersionCode(initialQuery.globalVersion)
+            const plan = plans.find((p) => p.globalVersion === initialQuery.globalVersion)
+            if (plan?.projectName) setProjectName(plan.projectName)
+          }
+          if (initialQuery.version) await onLoadVersion(initialQuery.version, plans)
+          initialEmbedAppliedRef.current = true
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "初始化失败"
         setError(msg)
@@ -115,7 +138,7 @@ export default function DevAssessmentPage() {
         dirtyEnabled.current = true
       }
     })()
-  }, [showHistoricalVersions])
+  }, [])
 
   // 卸载时重置 dirty 状态
   useEffect(() => {
@@ -126,7 +149,7 @@ export default function DevAssessmentPage() {
   // 数据变化时标记脏状态
   useEffect(() => {
     if (dirtyEnabled.current) setDirty(true)
-  }, [rows, evaluator, evaluateDate])
+  }, [rows, evaluator, evaluateDate, globalVersionCode, linkedAssessmentVersionCode, projectName])
 
   const summary = useMemo(() => {
     return rows.reduce(
@@ -145,13 +168,14 @@ export default function DevAssessmentPage() {
   async function reloadVersions(nextSelected?: string) {
     const records = await listModuleVersions("dev")
     setVersionRecords(records)
-    setVersionOptions(buildVersionOptions(records, showHistoricalVersions))
+    setVersionOptions(buildVersionOptions(records))
     if (nextSelected) setCurrentVersionCode(nextSelected)
   }
 
   function currentPayload() {
     return {
       globalVersionCode,
+      projectName: projectName.trim(),
       selectedEstimateVersionCode: linkedAssessmentVersionCode,
       evaluator,
       evaluateDate,
@@ -223,7 +247,14 @@ export default function DevAssessmentPage() {
     }
   }
 
-  async function onLoadVersion(code: string) {
+  function applyGlobalVersionSelection(code: string) {
+    setGlobalVersionCode(code)
+    if (!code.trim()) return
+    const plan = dashboardPlans.find((p) => p.globalVersion === code)
+    if (plan?.projectName) setProjectName(plan.projectName)
+  }
+
+  async function onLoadVersion(code: string, plansOverride?: PlanRow[]) {
     setCurrentVersionCode(code)
     if (!code) return
     setError("")
@@ -232,13 +263,25 @@ export default function DevAssessmentPage() {
       const target = records.find((x) => x.versionCode === code)
       if (!target) return
       const payload = target.payload || {}
-      setGlobalVersionCode((payload.globalVersionCode as string) || "")
+      const plansLookup = plansOverride ?? dashboardPlans
+      const gv = String((payload.globalVersionCode as string) || "")
+      setGlobalVersionCode(gv)
+      const savedPn = String((payload as { projectName?: string }).projectName || "").trim()
+      if (savedPn) {
+        setProjectName(savedPn)
+      } else if (gv) {
+        const plan = plansLookup.find((p) => p.globalVersion === gv)
+        setProjectName(plan?.projectName || "")
+      } else {
+        setProjectName("")
+      }
       setLinkedAssessmentVersionCode((payload.selectedEstimateVersionCode as string) || "")
       setEvaluator((payload.evaluator as string) || "")
       setEvaluateDate((payload.evaluateDate as string) || new Date().toISOString().slice(0, 10))
       const nextRows = (Array.isArray(payload.rows) ? payload.rows : []) as DevRow[]
       setRows(nextRows.length ? nextRows.map((x) => ({ ...x, id: x.id || crypto.randomUUID(), codingDays: Number(x.codingDays || 0) })) : [createEmptyDevRow()])
       showGlobalNotice(`已回读版本：${code}`)
+      setDirty(false)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "回读失败"
       setError(msg)
@@ -260,6 +303,7 @@ export default function DevAssessmentPage() {
         "dev",
         {
           globalVersionCode,
+          projectName: projectName.trim(),
           selectedEstimateVersionCode: linkedAssessmentVersionCode,
           evaluator,
           evaluateDate,
@@ -294,7 +338,8 @@ export default function DevAssessmentPage() {
       ]),
       ["合计", "-", "-", "-", summary.coding.toFixed(1), summary.planning.toFixed(1), summary.testing.toFixed(1), summary.total.toFixed(1)],
     ]
-    downloadCsv(`dev-assessment-${currentVersionCode || Date.now()}.csv`, data)
+    const nameSlug = (projectName.trim() || "未命名项目").replace(/[/\\?%*:|"<>]/g, "-").slice(0, 48)
+    downloadCsv(`dev-assessment-${nameSlug}-${currentVersionCode || Date.now()}.csv`, data)
     showGlobalNotice("开发评估已导出 CSV")
   }
 
@@ -307,13 +352,22 @@ export default function DevAssessmentPage() {
       <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
         <CardHeader className="space-y-3">
           <CardTitle className="text-base">版本与参数</CardTitle>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">项目名称</p>
+            <Input
+              className="h-9"
+              value={projectName}
+              placeholder="未选总方案时请填写；选择总方案后将自动带出，可再修改"
+              onChange={(e) => setProjectName(e.target.value)}
+            />
+          </div>
           <div className="grid gap-3 md:grid-cols-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">总方案版本号</p>
               <select
                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={globalVersionCode}
-                onChange={(e) => setGlobalVersionCode(e.target.value)}
+                onChange={(e) => applyGlobalVersionSelection(e.target.value)}
               >
                 <option value="">请选择总方案版本</option>
                 {globalOptions.map((option) => (
@@ -374,8 +428,7 @@ export default function DevAssessmentPage() {
                     }
                   : undefined
               }
-              showHistory={showHistoricalVersions}
-              onToggleHistory={() => setShowHistoricalVersions((v) => !v)}
+              onVersionHistory={() => setVersionHistoryOpen(true)}
               onCheckout={() => void onCheckout()}
               onCheckin={() => void onCheckin()}
               onUndoCheckout={() => void onUndoCheckout()}
@@ -392,8 +445,8 @@ export default function DevAssessmentPage() {
             <p className="text-xs text-muted-foreground">当前版本为只读状态，请先检出后编辑。</p>
           ) : null}
           <div className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-sm">
-            编码人天 {summary.coding.toFixed(1)}，需求规划 {summary.planning.toFixed(1)}，功能测试 {summary.testing.toFixed(1)}，
-            总计 {summary.total.toFixed(1)}
+            项目 {projectName.trim() || "未填写"} · 编码人天 {summary.coding.toFixed(1)}，需求规划 {summary.planning.toFixed(1)}，功能测试{" "}
+            {summary.testing.toFixed(1)}，总计 {summary.total.toFixed(1)}
           </div>
           <CardTitle className="text-base">开发项评估明细</CardTitle>
         </CardHeader>
@@ -476,6 +529,14 @@ export default function DevAssessmentPage() {
         </CardContent>
         </fieldset>
       </Card>
+      <VersionHistoryDialog
+        open={versionHistoryOpen}
+        onOpenChange={setVersionHistoryOpen}
+        title="开发评估版本历史"
+        description="按更新时间由新到旧排列，含已归档版本。"
+        rows={recordsToVersionHistoryRows(versionRecords)}
+        highlightVersionCode={currentVersionCode.trim() || undefined}
+      />
     </ModuleShell>
   )
 }

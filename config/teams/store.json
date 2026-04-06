@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 13,
   "teams": [
     {
       "teamId": "59acb0e3-751e-40c6-80a2-7865885e47e0",
@@ -184,6 +184,62 @@
       ],
       "createdAt": "2026-03-30T14:36:19.005Z",
       "updatedAt": "2026-03-30T14:36:19.005Z"
+    },
+    {
+      "teamId": "13c81f10-2f28-4e71-b51e-88b37233cbb3",
+      "name": "默认协同组",
+      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "members": [
+        {
+          "userId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+          "role": "manager",
+          "joinedAt": "2026-04-05T12:15:02.546Z"
+        }
+      ],
+      "createdAt": "2026-04-05T12:15:02.546Z",
+      "updatedAt": "2026-04-05T12:15:02.546Z"
+    },
+    {
+      "teamId": "1872161b-cb2f-42c2-8732-f2c66e671a85",
+      "name": "默认协同组",
+      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "members": [
+        {
+          "userId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+          "role": "manager",
+          "joinedAt": "2026-04-05T12:15:02.552Z"
+        }
+      ],
+      "createdAt": "2026-04-05T12:15:02.552Z",
+      "updatedAt": "2026-04-05T12:15:02.552Z"
+    },
+    {
+      "teamId": "a45ef9d7-1d6e-472c-887a-12bdaa355acd",
+      "name": "默认协同组",
+      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "members": [
+        {
+          "userId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+          "role": "manager",
+          "joinedAt": "2026-04-05T12:15:02.558Z"
+        }
+      ],
+      "createdAt": "2026-04-05T12:15:02.558Z",
+      "updatedAt": "2026-04-05T12:15:02.558Z"
+    },
+    {
+      "teamId": "0ccbd05f-1292-4334-8dec-1c3e95be70a2",
+      "name": "默认协同组",
+      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "members": [
+        {
+          "userId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+          "role": "manager",
+          "joinedAt": "2026-04-05T12:15:02.561Z"
+        }
+      ],
+      "createdAt": "2026-04-05T12:15:02.561Z",
+      "updatedAt": "2026-04-05T12:15:02.561Z"
     }
   ],
   "reviews": [
@@ -256,6 +312,26 @@
       "createdBy": "804d4b81-2471-468c-b1d2-a366dd34a53f",
       "createdAt": "2026-04-04T15:13:12.154Z",
       "updatedAt": "2026-04-04T15:13:12.154Z"
+    },
+    {
+      "reviewId": "cd784e7c-bd13-4f45-b5ae-4c4ff054a808",
+      "teamId": "0ccbd05f-1292-4334-8dec-1c3e95be70a2",
+      "globalVersionCode": "GLOBAL-20260404-0053",
+      "title": "Review for GLOBAL-20260404-0053",
+      "status": "open",
+      "createdBy": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "createdAt": "2026-04-05T12:15:04.682Z",
+      "updatedAt": "2026-04-05T12:15:04.682Z"
+    },
+    {
+      "reviewId": "1e2b6036-0dfd-453c-9967-e1405a486ae7",
+      "teamId": "0ccbd05f-1292-4334-8dec-1c3e95be70a2",
+      "globalVersionCode": "GLOBAL-20260404-0053",
+      "title": "Review for GLOBAL-20260404-0053",
+      "status": "closed",
+      "createdBy": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "createdAt": "2026-04-05T12:15:17.986Z",
+      "updatedAt": "2026-04-05T12:15:19.556Z"
     }
   ],
   "comments": [
@@ -527,6 +603,69 @@
       "action": "review.create",
       "targetType": "review",
       "targetId": "20186805-819a-4935-a4b9-6d72e9645239"
+    },
+    {
+      "auditId": "b485f777-3c43-4c21-aabc-2872545026a6",
+      "at": "2026-04-05T12:15:02.546Z",
+      "teamId": "13c81f10-2f28-4e71-b51e-88b37233cbb3",
+      "actorUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "action": "team.create",
+      "targetType": "team",
+      "targetId": "13c81f10-2f28-4e71-b51e-88b37233cbb3"
+    },
+    {
+      "auditId": "a023b80e-8dfd-4bdf-a196-dea934d39670",
+      "at": "2026-04-05T12:15:02.552Z",
+      "teamId": "1872161b-cb2f-42c2-8732-f2c66e671a85",
+      "actorUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "action": "team.create",
+      "targetType": "team",
+      "targetId": "1872161b-cb2f-42c2-8732-f2c66e671a85"
+    },
+    {
+      "auditId": "a455ed1b-aa77-4789-a698-ca57b1291421",
+      "at": "2026-04-05T12:15:02.558Z",
+      "teamId": "a45ef9d7-1d6e-472c-887a-12bdaa355acd",
+      "actorUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "action": "team.create",
+      "targetType": "team",
+      "targetId": "a45ef9d7-1d6e-472c-887a-12bdaa355acd"
+    },
+    {
+      "auditId": "267c4557-475c-4478-ac1e-5d4625c22d53",
+      "at": "2026-04-05T12:15:02.561Z",
+      "teamId": "0ccbd05f-1292-4334-8dec-1c3e95be70a2",
+      "actorUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "action": "team.create",
+      "targetType": "team",
+      "targetId": "0ccbd05f-1292-4334-8dec-1c3e95be70a2"
+    },
+    {
+      "auditId": "4611344f-55cc-4438-9883-bce6cc19f5c8",
+      "at": "2026-04-05T12:15:04.682Z",
+      "teamId": "0ccbd05f-1292-4334-8dec-1c3e95be70a2",
+      "actorUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "action": "review.create",
+      "targetType": "review",
+      "targetId": "cd784e7c-bd13-4f45-b5ae-4c4ff054a808"
+    },
+    {
+      "auditId": "fa94d01d-23d5-4326-b79e-9a4826765afc",
+      "at": "2026-04-05T12:15:17.986Z",
+      "teamId": "0ccbd05f-1292-4334-8dec-1c3e95be70a2",
+      "actorUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "action": "review.create",
+      "targetType": "review",
+      "targetId": "1e2b6036-0dfd-453c-9967-e1405a486ae7"
+    },
+    {
+      "auditId": "338185ad-7bf0-42b8-9009-fc007fb8955f",
+      "at": "2026-04-05T12:15:19.556Z",
+      "teamId": "0ccbd05f-1292-4334-8dec-1c3e95be70a2",
+      "actorUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "action": "review.status.update",
+      "targetType": "review",
+      "targetId": "1e2b6036-0dfd-453c-9967-e1405a486ae7"
     }
   ]
 }

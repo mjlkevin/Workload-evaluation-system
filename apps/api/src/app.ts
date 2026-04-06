@@ -17,7 +17,8 @@ export function createApp(): Express {
   const app = express();
 
   // ========== 基础中间件 ==========
-  app.use(express.json());
+  // 默认 100kb 不足以承载「大模板 + itemSelection + serverResult」的版本保存体；超限会走 error-handler 表现为 500
+  app.use(express.json({ limit: "5mb" }));
   
   // 文件上传配置
   const upload = multer({

@@ -57,9 +57,9 @@ export default function LoginPage() {
             <span className="text-sm font-medium text-muted-foreground">WorkEvolutionSys</span>
           </div>
           <CardTitle>{isRegister ? "注册并登录" : "登录系统"}</CardTitle>
-          <CardDescription>
-            {isRegister ? "输入用户名、密码和推荐码完成注册" : "输入账号密码后进入新版 V0 工作台"}
-          </CardDescription>
+          {isRegister ? (
+            <CardDescription>输入用户名、密码和推荐码完成注册</CardDescription>
+          ) : null}
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>

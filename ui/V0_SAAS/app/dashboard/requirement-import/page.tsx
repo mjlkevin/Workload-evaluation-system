@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
+import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
 import { useAuth } from "@/hooks/use-auth"
 import { apiRequest } from "@/lib/api-client"
 import {
@@ -237,10 +238,8 @@ function parseIndustryTags(value: string): string[] {
     .slice(0, 4)
 }
 
-function buildVersionOptions(records: ModuleVersionRecord[], showHistorical: boolean) {
-  return records
-    .filter((x) => showHistorical || !x.isHistoricalArchive)
-    .map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` }))
+function buildVersionOptions(records: ModuleVersionRecord[]) {
+  return records.map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` }))
 }
 
 const EMPTY_BASIC_INFO: BasicInfo = {
@@ -256,6 +255,29 @@ const EMPTY_BASIC_INFO: BasicInfo = {
   projectGoals: "",
 }
 
+type RequirementSectionKey =
+  | "basicInfo"
+  | "valueProposition"
+  | "businessNeed"
+  | "devOverview"
+  | "productModule"
+  | "implementationScope"
+  | "meetingNotes"
+  | "keyPoints"
+
+function createInitialSectionCollapsed(): Record<RequirementSectionKey, boolean> {
+  return {
+    basicInfo: true,
+    valueProposition: true,
+    businessNeed: true,
+    devOverview: true,
+    productModule: true,
+    implementationScope: true,
+    meetingNotes: true,
+    keyPoints: true,
+  }
+}
+
 export default function RequirementImportPage() {
   const { isAdmin } = useAuth()
   const [keyword, setKeyword] = useState("")
@@ -264,7 +286,7 @@ export default function RequirementImportPage() {
   const [versionOptions, setVersionOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionRecords, setVersionRecords] = useState<ModuleVersionRecord[]>([])
   const [selectedVersionCode, setSelectedVersionCode] = useState("")
-  const [showHistoricalVersions, setShowHistoricalVersions] = useState(false)
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const [basicInfo, setBasicInfo] = useState<BasicInfo>(EMPTY_BASIC_INFO)
   const [valuePropositionRows, setValuePropositionRows] = useState<ValuePropositionRow[]>([createEmptyValuePropositionRow()])
   const [businessNeedRows, setBusinessNeedRows] = useState<BusinessNeedRow[]>([createEmptyBusinessNeedRow()])
@@ -293,9 +315,14 @@ export default function RequirementImportPage() {
   })
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
+  const [sectionCollapsed, setSectionCollapsed] = useState<Record<RequirementSectionKey, boolean>>(
+    createInitialSectionCollapsed(),
+  )
 
-  const { setDirty } = useUnsavedChanges()
+  const setDirty = useSetUnsavedDirty()
   const dirtyEnabled = useRef(false)
+  const initialEmbedQueryRef = useRef<{ globalVersion: string; version: string } | null>(null)
+  const initialEmbedAppliedRef = useRef(false)
 
   function showGlobalNotice(text: string) {
     setMessage(text)
@@ -328,6 +355,14 @@ export default function RequirementImportPage() {
   }, [])
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    initialEmbedQueryRef.current = {
+      globalVersion: params.get("globalVersion") || "",
+      version: params.get("version") || "",
+    }
+  }, [])
+
+  useEffect(() => {
     void (async () => {
       try {
         const [plans, records] = await Promise.all([getDashboardPlans(), listModuleVersions("requirementImport")])
@@ -338,14 +373,20 @@ export default function RequirementImportPage() {
           })),
         )
         setVersionRecords(records)
-        setVersionOptions(buildVersionOptions(records, showHistoricalVersions))
+        setVersionOptions(buildVersionOptions(records))
+        const initialQuery = initialEmbedQueryRef.current
+        if (!initialEmbedAppliedRef.current && initialQuery) {
+          if (initialQuery.globalVersion) setGlobalVersionCode(initialQuery.globalVersion)
+          if (initialQuery.version) await onLoadVersion(initialQuery.version)
+          initialEmbedAppliedRef.current = true
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "初始化失败")
       } finally {
         dirtyEnabled.current = true
       }
     })()
-  }, [showHistoricalVersions])
+  }, [])
 
   // 卸载时重置 dirty 状态
   useEffect(() => {
@@ -357,6 +398,13 @@ export default function RequirementImportPage() {
   useEffect(() => {
     if (dirtyEnabled.current) setDirty(true)
   }, [basicInfo, valuePropositionRows, businessNeedRows, devOverviewRows, productModuleRows, implementationScopeRows, meetingNotes, keyPointRows])
+
+  useEffect(() => {
+    // 未选择需求版本号时，子卡片恢复默认折叠状态，减少视觉噪音。
+    if (!selectedVersionCode) {
+      setSectionCollapsed(createInitialSectionCollapsed())
+    }
+  }, [selectedVersionCode])
 
   const filteredRows = useMemo(() => {
     const q = keyword.trim().toLowerCase()
@@ -387,6 +435,14 @@ export default function RequirementImportPage() {
     () => versionRecords.find((x) => x.versionCode === selectedVersionCode),
     [versionRecords, selectedVersionCode],
   )
+  const checkoutStatusText = useMemo(() => {
+    if (!selectedVersionRecord) return "未选择版本"
+    const base =
+      selectedVersionRecord.checkoutStatus === "checked_out"
+        ? `已检出（${selectedVersionRecord.checkedOutByUsername || "未知"}）`
+        : "已检入"
+    return selectedVersionRecord.versionDocStatus === "reviewed" ? `${base} · 已审核` : base
+  }, [selectedVersionRecord])
   const isReadonly = Boolean(
     selectedVersionRecord &&
       (selectedVersionRecord.checkoutStatus === "checked_in" || selectedVersionRecord.versionDocStatus === "reviewed"),
@@ -395,7 +451,7 @@ export default function RequirementImportPage() {
   async function reloadVersions(nextSelected?: string) {
     const records = await listModuleVersions("requirementImport")
     setVersionRecords(records)
-    const nextOptions = buildVersionOptions(records, showHistoricalVersions)
+    const nextOptions = buildVersionOptions(records)
     setVersionOptions(nextOptions)
     if (nextSelected) {
       setSelectedVersionCode(nextSelected)
@@ -777,12 +833,41 @@ export default function RequirementImportPage() {
       description="需求结构化导入、条目编辑、版本保存与回读。"
       breadcrumbs={[{ label: "需求" }]}
     >
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
-        <CardHeader className="space-y-3">
-          <CardTitle className="text-base">版本与上下文</CardTitle>
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="space-y-1">
+      <div className="space-y-6 [&_input]:border-border/70 [&_input]:bg-background/95 [&_input]:shadow-sm [&_select]:border-border/70 [&_select]:bg-background/95 [&_select]:shadow-sm [&_textarea]:border-border/70 [&_textarea]:bg-background/95 [&_textarea]:shadow-sm">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/40 bg-card/50 p-3 shadow-sm backdrop-blur-sm transition-all duration-300 md:flex-nowrap">
+          <Button className="rounded-xl" onClick={() => void onSave()} disabled={saving}>
+            {saving ? "保存中..." : "保存版本"}
+          </Button>
+          <VersionVcsToolbar
+            state={
+              selectedVersionRecord
+                ? {
+                    recordId: selectedVersionRecord.id,
+                    checkoutStatus: selectedVersionRecord.checkoutStatus,
+                    versionDocStatus: selectedVersionRecord.versionDocStatus,
+                    checkedOutByUsername: selectedVersionRecord.checkedOutByUsername,
+                  }
+                : undefined
+            }
+            alwaysShowActions
+            showStatusField={false}
+            onVersionHistory={() => setVersionHistoryOpen(true)}
+            onCheckout={() => void onCheckout()}
+            onCheckin={() => void onCheckin()}
+            onUndoCheckout={() => void onUndoCheckout()}
+            onPromote={() => void onPromote()}
+            onForceUnlock={() => void onForceUnlock()}
+            forceUnlockVisible={isAdmin}
+          />
+        </div>
+        <Card collapsed={false} collapsible={false} className="gap-4 py-4 border-border/40 bg-card/50 backdrop-blur-sm">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-base">版本与上下文</CardTitle>
+            <div className="grid gap-x-3 gap-y-2 md:grid-cols-3">
               <p className="text-xs text-muted-foreground">总方案版本号</p>
+              <p className="text-xs text-muted-foreground">需求版本号</p>
+              <p className="text-xs text-muted-foreground">检出状态</p>
               <select
                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={globalVersionCode}
@@ -795,9 +880,6 @@ export default function RequirementImportPage() {
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">需求版本号</p>
               <select
                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={selectedVersionCode}
@@ -810,43 +892,27 @@ export default function RequirementImportPage() {
                   </option>
                 ))}
               </select>
+              <div className="h-9 w-full rounded-md border border-border/70 bg-background/95 px-3 text-sm leading-9 shadow-sm">
+                {checkoutStatusText}
+              </div>
             </div>
-            <div className="md:col-span-2 flex items-end gap-2">
-              <Button className="rounded-xl" onClick={() => void onSave()} disabled={saving}>
-                {saving ? "保存中..." : "保存版本"}
-              </Button>
-              <VersionVcsToolbar
-                state={
-                  selectedVersionRecord
-                    ? {
-                        recordId: selectedVersionRecord.id,
-                        checkoutStatus: selectedVersionRecord.checkoutStatus,
-                        versionDocStatus: selectedVersionRecord.versionDocStatus,
-                        checkedOutByUsername: selectedVersionRecord.checkedOutByUsername,
-                      }
-                    : undefined
-                }
-                showHistory={showHistoricalVersions}
-                onToggleHistory={() => setShowHistoricalVersions((v) => !v)}
-                onCheckout={() => void onCheckout()}
-                onCheckin={() => void onCheckin()}
-                onUndoCheckout={() => void onUndoCheckout()}
-                onPromote={() => void onPromote()}
-                onForceUnlock={() => void onForceUnlock()}
-                forceUnlockVisible={isAdmin}
-              />
+            <div className="min-h-4">
               {message ? <span className="text-xs text-emerald-600">{message}</span> : null}
               {error ? <span className="text-xs text-destructive">{error}</span> : null}
             </div>
-          </div>
-          {isReadonly ? (
-            <p className="text-xs text-muted-foreground">当前版本为只读状态，请先检出后编辑。</p>
-          ) : null}
-        </CardHeader>
-      </Card>
+            {isReadonly ? (
+              <p className="text-xs text-muted-foreground">当前版本为只读状态，请先检出后编辑。</p>
+            ) : null}
+          </CardHeader>
+        </Card>
+      </div>
 
       <fieldset disabled={isReadonly} className="space-y-6">
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+      <Card
+        collapsed={sectionCollapsed.basicInfo}
+        onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, basicInfo: collapsed }))}
+        className="border-border/40 bg-card/50 backdrop-blur-sm"
+      >
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base">基本情况</CardTitle>
@@ -931,8 +997,24 @@ export default function RequirementImportPage() {
               <Input value={basicInfo.opportunityNo} onChange={(e) => setBasicInfo((s) => ({ ...s, opportunityNo: e.target.value }))} />
             </label>
             <label className="space-y-1">
-              <span className="text-xs text-muted-foreground">客户行业</span>
-              <div className="min-h-9 rounded-md border border-input bg-background px-2 py-2">
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                客户行业
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-muted-foreground/50 text-[10px] leading-none text-muted-foreground"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      ?
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6} className="max-w-72 text-xs leading-5">
+                    <p>等待 Kimi 返回 GB/T 4754 四级分类标签（编码+名称）。</p>
+                    <p>客户行业字段已改为标签显示，不再展示文本输入。</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+              <div className="min-h-9 rounded-md border border-border/70 bg-background/95 px-2 py-2 shadow-sm">
                 <div className="flex flex-wrap gap-1.5">
                   {customerIndustryTags.length > 0 ? (
                     customerIndustryTags.map((tag, idx) => (
@@ -945,16 +1027,9 @@ export default function RequirementImportPage() {
                       </Badge>
                     ))
                   ) : (
-                    <span className="text-[10px] text-muted-foreground">等待 Kimi 返回 GB/T 4754 四级分类标签（编码+名称）</span>
+                    <span className="text-[10px] text-muted-foreground">暂无标签</span>
                   )}
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {customerIndustryTags.length > 0 ? (
-                  <span className="text-[10px] text-muted-foreground">已按 GB/T 4754 进行标签化展示（编码+名称）</span>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">客户行业字段改为标签显示，不再展示文本输入</span>
-                )}
               </div>
             </label>
             <label className="space-y-1">
@@ -1083,7 +1158,11 @@ export default function RequirementImportPage() {
         </DialogContent>
       </Dialog>
 
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+      <Card
+        collapsed={sectionCollapsed.valueProposition}
+        onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, valueProposition: collapsed }))}
+        className="border-border/40 bg-card/50 backdrop-blur-sm"
+      >
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">价值主张</CardTitle>
@@ -1154,7 +1233,11 @@ export default function RequirementImportPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+      <Card
+        collapsed={sectionCollapsed.businessNeed}
+        onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, businessNeed: collapsed }))}
+        className="border-border/40 bg-card/50 backdrop-blur-sm"
+      >
         <CardHeader className="pb-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base">业务需求及问题一览</CardTitle>
@@ -1250,7 +1333,11 @@ export default function RequirementImportPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+      <Card
+        collapsed={sectionCollapsed.devOverview}
+        onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, devOverview: collapsed }))}
+        className="border-border/40 bg-card/50 backdrop-blur-sm"
+      >
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">开发需求概要</CardTitle>
@@ -1335,7 +1422,11 @@ export default function RequirementImportPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+      <Card
+        collapsed={sectionCollapsed.productModule}
+        onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, productModule: collapsed }))}
+        className="border-border/40 bg-card/50 backdrop-blur-sm"
+      >
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">产品及模块信息</CardTitle>
@@ -1381,7 +1472,11 @@ export default function RequirementImportPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+      <Card
+        collapsed={sectionCollapsed.implementationScope}
+        onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, implementationScope: collapsed }))}
+        className="border-border/40 bg-card/50 backdrop-blur-sm"
+      >
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">实施组织范围</CardTitle>
@@ -1427,7 +1522,11 @@ export default function RequirementImportPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+      <Card
+        collapsed={sectionCollapsed.meetingNotes}
+        onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, meetingNotes: collapsed }))}
+        className="border-border/40 bg-card/50 backdrop-blur-sm"
+      >
         <CardHeader className="pb-3">
           <CardTitle className="text-base">会议纪要或调研纪要</CardTitle>
         </CardHeader>
@@ -1441,7 +1540,11 @@ export default function RequirementImportPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+      <Card
+        collapsed={sectionCollapsed.keyPoints}
+        onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, keyPoints: collapsed }))}
+        className="border-border/40 bg-card/50 backdrop-blur-sm"
+      >
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">需求、方案关键点（合同金额≥100万）</CardTitle>
@@ -1483,6 +1586,15 @@ export default function RequirementImportPage() {
         </CardContent>
       </Card>
       </fieldset>
+      </div>
+      <VersionHistoryDialog
+        open={versionHistoryOpen}
+        onOpenChange={setVersionHistoryOpen}
+        title="需求导入版本历史"
+        description="按更新时间由新到旧排列，含已归档版本。"
+        rows={recordsToVersionHistoryRows(versionRecords)}
+        highlightVersionCode={selectedVersionCode.trim() || undefined}
+      />
     </ModuleShell>
   )
 }

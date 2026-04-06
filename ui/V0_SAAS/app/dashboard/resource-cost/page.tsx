@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
+import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -65,10 +66,8 @@ function downloadCsv(filename: string, rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
-function buildVersionOptions(records: ModuleVersionRecord[], showHistorical: boolean) {
-  return records
-    .filter((x) => showHistorical || !x.isHistoricalArchive)
-    .map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` }))
+function buildVersionOptions(records: ModuleVersionRecord[]) {
+  return records.map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` }))
 }
 
 export default function ResourceCostPage() {
@@ -82,7 +81,7 @@ export default function ResourceCostPage() {
   const [assessmentOptions, setAssessmentOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionOptions, setVersionOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionRecords, setVersionRecords] = useState<ModuleVersionRecord[]>([])
-  const [showHistoricalVersions, setShowHistoricalVersions] = useState(false)
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const [currentVersionCode, setCurrentVersionCode] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -95,8 +94,10 @@ export default function ResourceCostPage() {
       (selectedVersionRecord.checkoutStatus === "checked_in" || selectedVersionRecord.versionDocStatus === "reviewed"),
   )
 
-  const { setDirty } = useUnsavedChanges()
+  const setDirty = useSetUnsavedDirty()
   const dirtyEnabled = useRef(false)
+  const initialEmbedQueryRef = useRef<{ globalVersion: string; version: string } | null>(null)
+  const initialEmbedAppliedRef = useRef(false)
 
   function showGlobalNotice(text: string) {
     toast(text)
@@ -105,6 +106,14 @@ export default function ResourceCostPage() {
   function showGlobalWarning(text: string) {
     toast.warning(text)
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    initialEmbedQueryRef.current = {
+      globalVersion: params.get("globalVersion") || "",
+      version: params.get("version") || "",
+    }
+  }, [])
 
   useEffect(() => {
     void (async () => {
@@ -117,7 +126,13 @@ export default function ResourceCostPage() {
         setGlobalOptions(plans.map((x) => ({ value: x.globalVersion, label: `${x.globalVersion}（${x.projectName}）` })))
         setAssessmentOptions(assessments.map((x) => ({ value: x.versionCode, label: `${x.versionCode}（${x.updatedAt}）` })))
         setVersionRecords(resources)
-        setVersionOptions(buildVersionOptions(resources, showHistoricalVersions))
+        setVersionOptions(buildVersionOptions(resources))
+        const initialQuery = initialEmbedQueryRef.current
+        if (!initialEmbedAppliedRef.current && initialQuery) {
+          if (initialQuery.globalVersion) setGlobalVersionCode(initialQuery.globalVersion)
+          if (initialQuery.version) await onLoadVersion(initialQuery.version)
+          initialEmbedAppliedRef.current = true
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "初始化失败"
         setError(msg)
@@ -126,7 +141,7 @@ export default function ResourceCostPage() {
         dirtyEnabled.current = true
       }
     })()
-  }, [showHistoricalVersions])
+  }, [])
 
   // 卸载时重置 dirty 状态
   useEffect(() => {
@@ -178,7 +193,7 @@ export default function ResourceCostPage() {
   async function reloadVersions(nextSelected?: string) {
     const records = await listModuleVersions("resource")
     setVersionRecords(records)
-    setVersionOptions(buildVersionOptions(records, showHistoricalVersions))
+    setVersionOptions(buildVersionOptions(records))
     if (nextSelected) setCurrentVersionCode(nextSelected)
   }
 
@@ -443,8 +458,7 @@ export default function ResourceCostPage() {
                     }
                   : undefined
               }
-              showHistory={showHistoricalVersions}
-              onToggleHistory={() => setShowHistoricalVersions((v) => !v)}
+              onVersionHistory={() => setVersionHistoryOpen(true)}
               onCheckout={() => void onCheckout()}
               onCheckin={() => void onCheckin()}
               onUndoCheckout={() => void onUndoCheckout()}
@@ -548,6 +562,14 @@ export default function ResourceCostPage() {
         </CardContent>
         </fieldset>
       </Card>
+      <VersionHistoryDialog
+        open={versionHistoryOpen}
+        onOpenChange={setVersionHistoryOpen}
+        title="资源成本版本历史"
+        description="按更新时间由新到旧排列，含已归档版本。"
+        rows={recordsToVersionHistoryRows(versionRecords)}
+        highlightVersionCode={currentVersionCode.trim() || undefined}
+      />
     </ModuleShell>
   )
 }

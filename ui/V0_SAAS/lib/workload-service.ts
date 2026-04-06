@@ -172,6 +172,21 @@ export type RuleSetMeta = {
   }
 }
 
+export type VersionCodeRuleStatus = "active" | "draft" | "disabled"
+
+export type VersionCodeRuleItem = {
+  id: string
+  moduleKey: "global" | "requirement" | "implementation" | "dev" | "resource" | "wbs"
+  moduleName: string
+  moduleCode: string
+  prefix: string
+  format: string
+  sample: string
+  status: VersionCodeRuleStatus
+  effectiveAt: string
+  updatedAt: string
+}
+
 export type EstimateItemSelection = {
   templateItemId: string
   included: boolean
@@ -330,19 +345,6 @@ async function listVersions(type: VersionType): Promise<VersionRecordDto[]> {
   return data.items || []
 }
 
-function buildVersionCode(prefix: string) {
-  const now = new Date()
-  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(
-    2,
-    "0",
-  )}`
-  const time = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(
-    now.getSeconds(),
-  ).padStart(2, "0")}`
-  const tail = Math.random().toString(36).slice(2, 6).toUpperCase()
-  return `${prefix}-${date}-${time}-${tail}`
-}
-
 export async function listModuleVersions(type: CoreModuleVersionType): Promise<ModuleVersionRecord[]> {
   const records = await listVersions(type)
   return records.map((x) => ({
@@ -353,8 +355,8 @@ export async function listModuleVersions(type: CoreModuleVersionType): Promise<M
     payload: (x.payload || {}) as Record<string, unknown>,
     createdAt: x.createdAt,
     updatedAt: x.updatedAt,
-    checkoutStatus: x.checkoutStatus || "checked_in",
-    versionDocStatus: x.versionDocStatus || "drafting",
+    checkoutStatus: x.checkoutStatus ?? "checked_in",
+    versionDocStatus: x.versionDocStatus ?? "drafting",
     checkedOutByUserId: x.checkedOutByUserId,
     checkedOutByUsername: x.checkedOutByUsername,
     checkoutAt: x.checkoutAt,
@@ -376,8 +378,8 @@ export async function listGlobalVersions(): Promise<GlobalVersionRecord[]> {
     payload: (x.payload || {}) as Record<string, unknown>,
     createdAt: x.createdAt,
     updatedAt: x.updatedAt,
-    checkoutStatus: x.checkoutStatus || "checked_in",
-    versionDocStatus: x.versionDocStatus || "drafting",
+    checkoutStatus: x.checkoutStatus ?? "checked_in",
+    versionDocStatus: x.versionDocStatus ?? "drafting",
     checkedOutByUserId: x.checkedOutByUserId,
     checkedOutByUsername: x.checkedOutByUsername,
     checkoutAt: x.checkoutAt,
@@ -428,42 +430,39 @@ export async function forceUnlockById(recordId: string): Promise<VersionRecordDt
   return data.record
 }
 
+/** 按版本号删除当前用户的总方案（global）记录；需 operator/admin 权限 */
+export async function deleteGlobalPlanVersion(versionCode: string): Promise<void> {
+  const code = versionCode.trim()
+  if (!code) throw new Error("版本号不能为空")
+  const params = new URLSearchParams({ templateId: "default" })
+  await apiRequest(`/api/v1/versions/global/${encodeURIComponent(code)}?${params.toString()}`, {
+    method: "DELETE",
+  })
+}
+
 export async function createModuleVersion(
   type: CoreModuleVersionType,
   payload: Record<string, unknown>,
-  prefix: string,
+  _prefix?: string,
 ): Promise<ModuleVersionRecord> {
-  let lastError: unknown = null
-  for (let i = 0; i < 3; i += 1) {
-    const versionCode = buildVersionCode(prefix)
-    try {
-      const data = await apiRequest<{ record: VersionRecordDto }>("/api/v1/versions", {
-        method: "POST",
-        body: {
-          type,
-          versionCode,
-          templateId: "default",
-          status: "draft",
-          payload,
-        },
-      })
-      return {
-        id: data.record.id,
-        type: data.record.type as CoreModuleVersionType,
-        versionCode: data.record.versionCode,
-        status: data.record.status,
-        payload: (data.record.payload || {}) as Record<string, unknown>,
-        createdAt: data.record.createdAt,
-        updatedAt: data.record.updatedAt,
-      }
-    } catch (error) {
-      lastError = error
-      if (!(error instanceof ApiError) || error.code !== 40901) {
-        throw error
-      }
-    }
+  const data = await apiRequest<{ record: VersionRecordDto }>("/api/v1/versions", {
+    method: "POST",
+    body: {
+      type,
+      templateId: "default",
+      status: "draft",
+      payload,
+    },
+  })
+  return {
+    id: data.record.id,
+    type: data.record.type as CoreModuleVersionType,
+    versionCode: data.record.versionCode,
+    status: data.record.status,
+    payload: (data.record.payload || {}) as Record<string, unknown>,
+    createdAt: data.record.createdAt,
+    updatedAt: data.record.updatedAt,
   }
-  throw lastError instanceof Error ? lastError : new Error("创建版本失败，请稍后重试")
 }
 
 async function getTeamDetail(teamId: string): Promise<TeamRecordDto> {
@@ -565,30 +564,22 @@ export async function createTeamAndBindPlan(
 }
 
 export async function createGlobalPlanVersion(projectName?: string): Promise<{ versionCode: string }> {
-  const now = new Date()
-  const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(
-    2,
-    "0",
-  )}`
-  const seq = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`
-  const versionCode = `GLOBAL-${date}-${seq}`
   const payload = {
     projectName: projectName || "未命名项目",
     basicInfo: {
       projectName: projectName || "未命名项目",
     },
   }
-  await apiRequest<{ record: VersionRecordDto }>("/api/v1/versions", {
+  const data = await apiRequest<{ record: VersionRecordDto }>("/api/v1/versions", {
     method: "POST",
     body: {
       type: "global",
-      versionCode,
       templateId: "default",
       status: "draft",
       payload,
     },
   })
-  return { versionCode }
+  return { versionCode: data.record.versionCode }
 }
 
 export async function listTemplateSummaries(): Promise<TemplateSummary[]> {
@@ -886,4 +877,62 @@ export async function generateInviteCode(): Promise<InviteCodeItem> {
     body: {},
   })
   return data.code
+}
+
+export async function listVersionCodeRules(params?: {
+  moduleKey?: VersionCodeRuleItem["moduleKey"] | "all"
+  keyword?: string
+  status?: VersionCodeRuleStatus | "all"
+}): Promise<VersionCodeRuleItem[]> {
+  const search = new URLSearchParams()
+  if (params?.moduleKey && params.moduleKey !== "all") search.set("moduleKey", params.moduleKey)
+  if (params?.keyword?.trim()) search.set("keyword", params.keyword.trim())
+  if (params?.status && params.status !== "all") search.set("status", params.status)
+  const query = search.toString()
+  const data = await apiRequest<{ items: VersionCodeRuleItem[] }>(
+    `/api/v1/system/version-code-rules${query ? `?${query}` : ""}`,
+  )
+  return data.items || []
+}
+
+export async function updateVersionCodeRuleConfig(
+  ruleId: string,
+  payload: { prefix: string; format: string },
+): Promise<VersionCodeRuleItem> {
+  const id = ruleId.trim()
+  if (!id) throw new Error("ruleId 不能为空")
+  const data = await apiRequest<{ item: VersionCodeRuleItem }>(
+    `/api/v1/system/version-code-rules/${encodeURIComponent(id)}/config`,
+    {
+      method: "PATCH",
+      body: payload,
+    },
+  )
+  return data.item
+}
+
+export async function activateVersionCodeRule(ruleId: string): Promise<VersionCodeRuleItem> {
+  const id = ruleId.trim()
+  if (!id) throw new Error("ruleId 不能为空")
+  const data = await apiRequest<{ item: VersionCodeRuleItem }>(
+    `/api/v1/system/version-code-rules/${encodeURIComponent(id)}/activate`,
+    {
+      method: "POST",
+      body: {},
+    },
+  )
+  return data.item
+}
+
+export async function disableVersionCodeRule(ruleId: string): Promise<VersionCodeRuleItem> {
+  const id = ruleId.trim()
+  if (!id) throw new Error("ruleId 不能为空")
+  const data = await apiRequest<{ item: VersionCodeRuleItem }>(
+    `/api/v1/system/version-code-rules/${encodeURIComponent(id)}/disable`,
+    {
+      method: "POST",
+      body: {},
+    },
+  )
+  return data.item
 }

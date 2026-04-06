@@ -272,6 +272,35 @@ export type VersionsStore = {
   records: VersionRecord[];
 };
 
+// -------------------- 系统管理：版本号编码规则 --------------------
+
+export type VersionCodeRuleStatus = "active" | "draft" | "disabled";
+
+export type VersionCodeRuleModuleKey =
+  | "global"
+  | "requirement"
+  | "implementation"
+  | "dev"
+  | "resource"
+  | "wbs";
+
+export type VersionCodeRule = {
+  id: string;
+  moduleKey: VersionCodeRuleModuleKey;
+  moduleName: string;
+  moduleCode: string;
+  prefix: string;
+  format: string;
+  sample: string;
+  status: VersionCodeRuleStatus;
+  effectiveAt: string;
+  updatedAt: string;
+};
+
+export type VersionCodeRulesStore = {
+  rules: VersionCodeRule[];
+};
+
 // -------------------- 会话与幂等 --------------------
 
 export type SessionEstimateContext = {

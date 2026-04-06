@@ -1,21 +1,49 @@
 "use client"
 
-import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react"
+import Link from "next/link"
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
+import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowRight, ClipboardCheck, FolderGit2, Layers, Plus, Sparkles, Users } from "lucide-react"
+import {
+  ArrowRight,
+  Banknote,
+  ChevronDown,
+  ClipboardCheck,
+  Code2,
+  FolderGit2,
+  Inbox,
+  Layers,
+  Plus,
+  Search,
+  Sparkles,
+  Trash2,
+  Users,
+} from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import {
   checkinVersionById,
   checkoutVersionById,
   createGlobalPlanVersion,
+  deleteGlobalPlanVersion,
   forceUnlockById,
   getDashboardPlans,
   listGlobalVersions,
@@ -41,12 +69,26 @@ const recentActivities = [
   "系统 已同步资源成本草稿到总方案版本",
 ]
 
+const newPlanWorkflowSteps: Array<{
+  id: string
+  step: number
+  title: string
+  hint: string
+  href: string
+  icon: typeof Inbox
+}> = [
+  { id: "requirement", step: 1, title: "需求", hint: "录入与结构化需求", href: "/dashboard/requirement-import", icon: Inbox },
+  { id: "assessment", step: 2, title: "实施评估", hint: "工作量估算", href: "/dashboard/assessment", icon: ClipboardCheck },
+  { id: "dev", step: 3, title: "开发评估", hint: "开发侧评估与填报", href: "/dashboard/dev-assessment", icon: Code2 },
+  { id: "resource", step: 4, title: "资源人天及成本", hint: "人天与成本核算", href: "/dashboard/resource-cost", icon: Banknote },
+]
+
 export default function DashboardPage() {
   const { isAdmin } = useAuth()
   const [planRows, setPlanRows] = useState<PlanRow[]>([])
   const [globalRecords, setGlobalRecords] = useState<GlobalVersionRecord[]>([])
   const [selectedGlobalVersionCode, setSelectedGlobalVersionCode] = useState("")
-  const [showHistoricalVersions, setShowHistoricalVersions] = useState(false)
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createMessage, setCreateMessage] = useState("")
   const [previewRow, setPreviewRow] = useState<PlanRow | null>(null)
@@ -54,15 +96,20 @@ export default function DashboardPage() {
   const [graphScale, setGraphScale] = useState(1)
   const [draggingGraph, setDraggingGraph] = useState(false)
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null)
+  const [erModulePreview, setErModulePreview] = useState<{ label: string; version: string; src: string } | null>(null)
+  const [hoveredErNodeKey, setHoveredErNodeKey] = useState<string | null>(null)
+  const [selectedErNodeKey, setSelectedErNodeKey] = useState<string | null>(null)
+  const [deletePlanDialogOpen, setDeletePlanDialogOpen] = useState(false)
+  const [deletingPlan, setDeletingPlan] = useState(false)
+  const [planListSearch, setPlanListSearch] = useState("")
+  const [createPlanWizardOpen, setCreatePlanWizardOpen] = useState(false)
+  const [newProjectNameInput, setNewProjectNameInput] = useState("")
+  const [postCreateGuide, setPostCreateGuide] = useState<{ versionCode: string; projectName: string } | null>(null)
 
   const loadPlans = () => {
     void Promise.all([getDashboardPlans(), listGlobalVersions()]).then(([plans, globals]) => {
       setGlobalRecords(globals)
-      const filtered = plans.filter((row) => {
-        const record = globals.find((x) => x.versionCode === row.globalVersion)
-        return showHistoricalVersions || !record?.isHistoricalArchive
-      })
-      setPlanRows(filtered)
+      setPlanRows(plans)
     })
   }
 
@@ -78,7 +125,7 @@ export default function DashboardPage() {
       window.removeEventListener("focus", onFocus)
       document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [showHistoricalVersions])
+  }, [])
 
   useEffect(() => {
     if (!previewRow) return
@@ -86,14 +133,27 @@ export default function DashboardPage() {
     setGraphScale(1)
     setDraggingGraph(false)
     setDragStart(null)
+    setSelectedErNodeKey(null)
+    setHoveredErNodeKey(null)
   }, [previewRow?.id])
 
-  async function onCreatePlan() {
+  function openCreatePlanWizard() {
+    setNewProjectNameInput("")
+    setCreateMessage("")
+    setCreatePlanWizardOpen(true)
+  }
+
+  async function submitCreatePlanFromWizard() {
+    const trimmed = newProjectNameInput.trim()
     setCreating(true)
     setCreateMessage("")
     try {
-      const created = await createGlobalPlanVersion()
-      setCreateMessage(`已创建版本：${created.versionCode}`)
+      const created = await createGlobalPlanVersion(trimmed || undefined)
+      const displayName = trimmed || "未命名项目"
+      setCreatePlanWizardOpen(false)
+      setPostCreateGuide({ versionCode: created.versionCode, projectName: displayName })
+      setCreateMessage(`已创建方案「${displayName}」：${created.versionCode}`)
+      setSelectedGlobalVersionCode(created.versionCode)
       loadPlans()
     } catch (error) {
       setCreateMessage(error instanceof Error ? error.message : "新建失败，请稍后重试")
@@ -106,6 +166,41 @@ export default function DashboardPage() {
     () => globalRecords.find((x) => x.versionCode === selectedGlobalVersionCode),
     [globalRecords, selectedGlobalVersionCode],
   )
+  const selectedPlanRow = useMemo(
+    () => planRows.find((row) => row.globalVersion === selectedGlobalVersionCode),
+    [planRows, selectedGlobalVersionCode],
+  )
+  const globalRecordByVersionCode = useMemo(
+    () => new Map(globalRecords.map((record) => [record.versionCode, record])),
+    [globalRecords],
+  )
+
+  const displayPlanRows = useMemo(() => {
+    const q = planListSearch.trim().toLowerCase()
+    if (!q) return planRows
+    return planRows.filter((row) => {
+      const rec = globalRecordByVersionCode.get(row.globalVersion)
+      const checkoutText = rec?.checkoutStatus === "checked_out" ? "已检出" : "已检入"
+      const haystack = [
+        row.id,
+        row.projectName,
+        row.globalVersion,
+        row.assessmentVersion,
+        row.resourceVersion,
+        row.requirementVersion,
+        row.devVersion,
+        row.status,
+        row.createdAt,
+        row.updatedAt,
+        row.reviewedAt,
+        checkoutText,
+      ]
+        .map((x) => String(x ?? ""))
+        .join(" ")
+        .toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [planRows, planListSearch, globalRecordByVersionCode])
 
   async function onCheckout() {
     if (!selectedGlobalRecord) return
@@ -164,6 +259,32 @@ export default function DashboardPage() {
     }
   }
 
+  function onOpenDeletePlanDialog() {
+    if (!selectedGlobalRecord) {
+      setCreateMessage("请先在列表中选中要删除的方案行")
+      return
+    }
+    setDeletePlanDialogOpen(true)
+  }
+
+  async function onConfirmDeletePlan() {
+    if (!selectedGlobalRecord) return
+    const code = selectedGlobalRecord.versionCode
+    setDeletingPlan(true)
+    setCreateMessage("")
+    try {
+      await deleteGlobalPlanVersion(code)
+      setCreateMessage(`已删除方案：${code}`)
+      setSelectedGlobalVersionCode("")
+      setDeletePlanDialogOpen(false)
+      loadPlans()
+    } catch (error) {
+      setCreateMessage(error instanceof Error ? error.message : "删除失败，请稍后重试")
+    } finally {
+      setDeletingPlan(false)
+    }
+  }
+
   const summary = useMemo(() => {
     const totalPlans = planRows.length
     const activeCount = planRows.filter((x) => x.status === "进行中").length
@@ -207,6 +328,10 @@ export default function DashboardPage() {
     ],
     [previewRow],
   )
+  const selectedErNode = useMemo(
+    () => previewRelations.find((node) => node.key === selectedErNodeKey),
+    [previewRelations, selectedErNodeKey],
+  )
 
   function zoomGraph(step: number) {
     setGraphScale((prev) => Math.max(0.8, Math.min(1.8, Number((prev + step).toFixed(2)))))
@@ -218,6 +343,8 @@ export default function DashboardPage() {
   }
 
   function onGraphPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    const target = event.target as Element | null
+    if (target?.closest("[data-er-node='true']")) return
     setDraggingGraph(true)
     setDragStart({ x: event.clientX - graphOffset.x, y: event.clientY - graphOffset.y })
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -234,6 +361,55 @@ export default function DashboardPage() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
+  }
+
+  function onGraphWheel(event: ReactWheelEvent<HTMLDivElement>) {
+    event.preventDefault()
+    const step = event.deltaY < 0 ? 0.08 : -0.08
+    zoomGraph(step)
+  }
+
+  function buildErModuleTarget(node: { key: string; label: string; value: string }, embedded: boolean) {
+    if (!previewRow || !node.value || node.value === "—") return
+    const pathMap: Record<string, string> = {
+      requirement: "/dashboard/requirement-import",
+      assessment: "/dashboard/assessment",
+      resource: "/dashboard/resource-cost",
+      dev: "/dashboard/dev-assessment",
+    }
+    const path = pathMap[node.key]
+    if (!path) return
+    const params = new URLSearchParams()
+    if (embedded) params.set("embed", "1")
+    if (previewRow.globalVersion) params.set("globalVersion", previewRow.globalVersion)
+    params.set("version", node.value)
+    return {
+      label: node.label,
+      version: node.value,
+      target: `${path}?${params.toString()}`,
+    }
+  }
+
+  function onOpenErModulePreview(node: { key: string; label: string; value: string }) {
+    const target = buildErModuleTarget(node, true)
+    if (!target) return
+    setErModulePreview({
+      label: target.label,
+      version: target.version,
+      src: target.target,
+    })
+  }
+
+  function onPreviewSelectedNode() {
+    if (!selectedErNode) return
+    onOpenErModulePreview(selectedErNode)
+  }
+
+  function onModifySelectedNode() {
+    if (!selectedErNode) return
+    const target = buildErModuleTarget(selectedErNode, false)
+    if (!target) return
+    window.location.href = target.target
   }
 
   return (
@@ -282,42 +458,70 @@ export default function DashboardPage() {
           ))}
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-3">
-          <Card collapsible={false} className="border-border/40 bg-card/50 backdrop-blur-sm lg:col-span-2">
+        <section className="grid gap-6 lg:grid-cols-3 xl:grid-cols-4 xl:gap-4">
+          <Card collapsible={false} className="border-border/40 bg-card/50 backdrop-blur-sm lg:col-span-2 xl:col-span-3">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <CardTitle>评估方案列表</CardTitle>
-                  <CardDescription>双击列表行打开预览弹窗</CardDescription>
+              <div className="space-y-3">
+                <div className="min-w-[220px]">
+                  <CardTitle className="whitespace-nowrap">评估方案列表</CardTitle>
+                  <CardDescription className="whitespace-nowrap">双击列表行打开预览弹窗</CardDescription>
                 </div>
-                <Button
-                  className="rounded-xl gap-2 bg-foreground text-background hover:bg-foreground/90"
-                  onClick={onCreatePlan}
-                  disabled={creating}
-                >
-                  <Plus className="size-4" />
-                  {creating ? "创建中..." : "新建方案"}
-                </Button>
-                <VersionVcsToolbar
-                  state={
-                    selectedGlobalRecord
-                      ? {
-                          recordId: selectedGlobalRecord.id,
-                          checkoutStatus: selectedGlobalRecord.checkoutStatus,
-                          versionDocStatus: selectedGlobalRecord.versionDocStatus,
-                          checkedOutByUsername: selectedGlobalRecord.checkedOutByUsername,
-                        }
-                      : undefined
-                  }
-                  showHistory={showHistoricalVersions}
-                  onToggleHistory={() => setShowHistoricalVersions((v) => !v)}
-                  onCheckout={() => void onCheckout()}
-                  onCheckin={() => void onCheckin()}
-                  onUndoCheckout={() => void onUndoCheckout()}
-                  onPromote={() => void onPromote()}
-                  onForceUnlock={() => void onForceUnlock()}
-                  forceUnlockVisible={isAdmin}
-                />
+                <div className="flex flex-col gap-3 rounded-xl border border-border/40 bg-card/50 p-3 shadow-sm backdrop-blur-sm lg:flex-row lg:items-center lg:justify-between lg:gap-3">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <Button
+                      className="rounded-xl gap-2 bg-foreground text-background hover:bg-foreground/90"
+                      onClick={openCreatePlanWizard}
+                      disabled={creating}
+                    >
+                      <Plus className="size-4" />
+                      新建方案
+                    </Button>
+                    <VersionVcsToolbar
+                      state={
+                        selectedGlobalRecord
+                          ? {
+                              recordId: selectedGlobalRecord.id,
+                              checkoutStatus: selectedGlobalRecord.checkoutStatus,
+                              versionDocStatus: selectedGlobalRecord.versionDocStatus,
+                              checkedOutByUsername: selectedGlobalRecord.checkedOutByUsername,
+                            }
+                          : undefined
+                      }
+                      showStatusField={false}
+                      onVersionHistory={() => setVersionHistoryOpen(true)}
+                      onCheckout={() => void onCheckout()}
+                      onCheckin={() => void onCheckin()}
+                      onUndoCheckout={() => void onUndoCheckout()}
+                      onPromote={() => void onPromote()}
+                      onForceUnlock={() => void onForceUnlock()}
+                      forceUnlockVisible={isAdmin}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-xl gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      disabled={!selectedGlobalRecord || deletingPlan}
+                      onClick={onOpenDeletePlanDialog}
+                    >
+                      <Trash2 className="size-4" />
+                      删除方案
+                    </Button>
+                  </div>
+                  <div className="relative w-full shrink-0 lg:max-w-sm">
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden
+                    />
+                    <Input
+                      type="search"
+                      value={planListSearch}
+                      onChange={(e) => setPlanListSearch(e.target.value)}
+                      placeholder="搜索项目名称、版本号、状态、检出…"
+                      className="h-10 rounded-xl border-border/60 bg-background/95 pl-9 pr-3 shadow-sm"
+                      aria-label="筛选评估方案列表"
+                    />
+                  </div>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -325,6 +529,43 @@ export default function DashboardPage() {
                 <p className="mb-3 rounded-lg border border-border/50 bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
                   {createMessage}
                 </p>
+              ) : null}
+              {postCreateGuide ? (
+                <div className="mb-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm">
+                  <p className="mb-2 font-medium text-foreground">下一步：按顺序完善方案内容</p>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    已绑定总方案版本 {postCreateGuide.versionCode}，点击下方入口将带上该版本（请在各页确认总方案选择）。
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {newPlanWorkflowSteps.map((item) => {
+                      const q = `globalVersion=${encodeURIComponent(postCreateGuide.versionCode)}`
+                      return (
+                        <Button
+                          key={item.id}
+                          asChild
+                          variant="secondary"
+                          size="sm"
+                          className="h-auto min-h-9 w-full justify-start gap-2 rounded-lg py-2 whitespace-normal"
+                        >
+                          <Link href={`${item.href}?${q}`} className="flex w-full items-start gap-2">
+                            <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-background text-xs font-semibold text-foreground">
+                              {item.step}
+                            </span>
+                            <item.icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0 flex-1 text-left text-sm leading-snug break-words">{item.title}</span>
+                          </Link>
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    onClick={() => setPostCreateGuide(null)}
+                  >
+                    收起引导
+                  </button>
+                </div>
               ) : null}
               <Table>
                 <TableHeader>
@@ -337,15 +578,32 @@ export default function DashboardPage() {
                     <TableHead>需求版本</TableHead>
                     <TableHead>开发版本</TableHead>
                     <TableHead>状态</TableHead>
+                    <TableHead>检出状态</TableHead>
                     <TableHead>更新时间</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {planRows.map((row, rowIndex) => (
+                  {displayPlanRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="h-24 text-center text-muted-foreground text-sm">
+                        {!planRows.length
+                          ? "暂无方案数据"
+                          : planListSearch.trim()
+                            ? "没有匹配当前关键字的方案，请尝试其它关键词或清空搜索框"
+                            : "暂无方案数据"}
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                  {displayPlanRows.map((row, rowIndex) => {
+                    const isSelected = selectedGlobalVersionCode === row.globalVersion
+                    const rowGlobalRecord = globalRecordByVersionCode.get(row.globalVersion)
+                    return (
                     <TableRow
                       key={row.id}
-                      className="cursor-pointer"
-                      onClick={() => setSelectedGlobalVersionCode(row.globalVersion)}
+                      data-state={isSelected ? "selected" : undefined}
+                      aria-selected={isSelected}
+                      className="cursor-pointer data-[state=selected]:bg-primary/10 data-[state=selected]:hover:bg-primary/15"
+                      onClick={() => setSelectedGlobalVersionCode((prev) => (prev === row.globalVersion ? "" : row.globalVersion))}
                       onDoubleClick={() => onRowDoubleClick(row)}
                     >
                       <TableCell>{rowIndex + 1}</TableCell>
@@ -363,15 +621,24 @@ export default function DashboardPage() {
                           {row.status}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={rowGlobalRecord?.checkoutStatus === "checked_out" ? "default" : "secondary"}
+                          className="rounded-lg"
+                        >
+                          {rowGlobalRecord?.checkoutStatus === "checked_out" ? "已检出" : "已检入"}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{row.updatedAt}</TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
+          <div className="space-y-6 xl:col-span-1">
             <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">快速操作</CardTitle>
@@ -407,6 +674,118 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        <Dialog
+          open={createPlanWizardOpen}
+          onOpenChange={(open) => {
+            if (!open && !creating) setCreatePlanWizardOpen(false)
+          }}
+        >
+          <DialogContent className="gap-0 border-border/60 p-0 sm:max-w-md" showCloseButton={!creating}>
+            <DialogHeader className="space-y-2 border-b border-border/50 px-6 py-5">
+              <DialogTitle>新建评估方案</DialogTitle>
+              <DialogDescription>
+                请先填写项目名称。创建完成后方案会出现在下方列表中；请再按顺序完善：需求 → 实施评估 → 开发评估 → 资源人天及成本。
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-5 px-6 py-5">
+              <div className="space-y-2">
+                <Label htmlFor="dashboard-new-plan-name">项目名称</Label>
+                <Input
+                  id="dashboard-new-plan-name"
+                  value={newProjectNameInput}
+                  onChange={(e) => setNewProjectNameInput(e.target.value)}
+                  placeholder="例如：XX 集团数字化项目（可留空，将使用「未命名项目」）"
+                  className="h-11 rounded-xl border-border/60 bg-background"
+                  autoComplete="off"
+                  disabled={creating}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !creating) {
+                      e.preventDefault()
+                      void submitCreatePlanFromWizard()
+                    }
+                  }}
+                />
+              </div>
+              <div className="rounded-xl border border-border/50 bg-secondary/25 p-4">
+                <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">建议完成顺序</p>
+                <div className="flex flex-col gap-0">
+                  {newPlanWorkflowSteps.map((item, i) => (
+                    <div key={item.id}>
+                      <div className="flex w-full items-start gap-3 rounded-lg border border-border/40 bg-card/80 px-3 py-3 text-left shadow-sm">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-foreground">
+                          {item.step}
+                        </span>
+                        <item.icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium leading-snug break-words text-foreground">{item.title}</p>
+                          <p className="mt-0.5 text-xs leading-snug break-words text-muted-foreground">{item.hint}</p>
+                        </div>
+                      </div>
+                      {i < newPlanWorkflowSteps.length - 1 ? (
+                        <div className="flex justify-center py-1.5" aria-hidden>
+                          <ChevronDown className="size-4 text-muted-foreground/70" />
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  创建成功后，列表上方会出现带版本号的快捷入口，也可随时从左侧主菜单进入上述页面并选择总方案。
+                </p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 border-t border-border/50 bg-secondary/10 px-6 py-4 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                disabled={creating}
+                onClick={() => setCreatePlanWizardOpen(false)}
+              >
+                取消
+              </Button>
+              <Button
+                type="button"
+                className="rounded-xl bg-foreground text-background hover:bg-foreground/90"
+                disabled={creating}
+                onClick={() => void submitCreatePlanFromWizard()}
+              >
+                {creating ? "创建中…" : "创建方案"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={deletePlanDialogOpen} onOpenChange={setDeletePlanDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除该评估方案？</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-muted-foreground text-sm">
+                  <p>
+                    将删除总方案版本「{selectedGlobalRecord?.versionCode ?? "—"}」
+                    {selectedPlanRow?.projectName ? `（${selectedPlanRow.projectName}）` : ""}
+                    对应的版本记录。此操作不可恢复。
+                  </p>
+                  <p>若该方案仍处于检出状态，删除后未保存的检出内容将一并丢失。请确认后再继续。</p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deletingPlan}>取消</AlertDialogCancel>
+              <Button
+                type="button"
+                variant="destructive"
+                className="rounded-xl"
+                disabled={deletingPlan}
+                onClick={() => void onConfirmDeletePlan()}
+              >
+                {deletingPlan ? "删除中…" : "确认删除"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <Dialog open={!!previewRow} onOpenChange={(open) => { if (!open) setPreviewRow(null) }}>
           <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-4xl">
             <DialogHeader>
@@ -415,7 +794,7 @@ export default function DashboardPage() {
 
             <div className="space-y-4">
               <section className="rounded-xl border border-border/60 bg-secondary/20 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-foreground">0、时间信息</h3>
+                <h3 className="mb-3 text-sm font-semibold text-foreground">基本信息</h3>
                 <div className="grid gap-3 md:grid-cols-3">
                   {previewTimeline.map((item) => (
                     <article key={item.key} className="rounded-lg border border-border/60 bg-background p-3">
@@ -427,10 +806,9 @@ export default function DashboardPage() {
               </section>
 
               <section className="rounded-xl border border-border/60 bg-secondary/20 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-foreground">1、版本号关联关系图（ER）</h3>
+                <h3 className="mb-3 text-sm font-semibold text-foreground">版本号关联关系图（ER）</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs text-muted-foreground">支持拖拽查看，点击控件可缩放与重置视图。</p>
                     <div className="flex items-center gap-2">
                       <Button type="button" variant="outline" size="sm" className="h-7 rounded-lg px-2" onClick={() => zoomGraph(-0.1)}>
                         -
@@ -441,6 +819,26 @@ export default function DashboardPage() {
                       </Button>
                       <Button type="button" variant="outline" size="sm" className="h-7 rounded-lg px-2" onClick={resetGraphView}>
                         重置
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-lg px-2"
+                        onClick={onPreviewSelectedNode}
+                        disabled={!selectedErNode || selectedErNode.value === "—"}
+                      >
+                        预览
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 rounded-lg px-2"
+                        onClick={onModifySelectedNode}
+                        disabled={!selectedErNode || selectedErNode.value === "—"}
+                      >
+                        修改
                       </Button>
                     </div>
                   </div>
@@ -454,13 +852,14 @@ export default function DashboardPage() {
                     onPointerUp={onGraphPointerUp}
                     onPointerCancel={onGraphPointerUp}
                     onPointerLeave={onGraphPointerUp}
+                    onWheel={onGraphWheel}
                   >
                     <svg className="absolute inset-0 h-full w-full" viewBox="0 0 860 420">
                       <g transform={`translate(${graphOffset.x} ${graphOffset.y}) scale(${graphScale})`}>
-                        <line x1="430" y1="136" x2="170" y2="220" stroke="#94A3B8" strokeWidth="2" />
-                        <line x1="430" y1="136" x2="350" y2="220" stroke="#94A3B8" strokeWidth="2" />
-                        <line x1="430" y1="136" x2="530" y2="220" stroke="#94A3B8" strokeWidth="2" />
-                        <line x1="430" y1="136" x2="710" y2="220" stroke="#94A3B8" strokeWidth="2" />
+                        <line x1="430" y1="136" x2="130" y2="220" stroke="#94A3B8" strokeWidth="2" />
+                        <line x1="430" y1="136" x2="340" y2="220" stroke="#94A3B8" strokeWidth="2" />
+                        <line x1="430" y1="136" x2="550" y2="220" stroke="#94A3B8" strokeWidth="2" />
+                        <line x1="430" y1="136" x2="760" y2="220" stroke="#94A3B8" strokeWidth="2" />
 
                         <rect x="320" y="60" width="220" height="76" rx="12" fill="#EFF6FF" stroke="#3B82F6" />
                         <text x="430" y="88" textAnchor="middle" fontSize="12" fill="#64748B">
@@ -472,22 +871,36 @@ export default function DashboardPage() {
 
                         {previewRelations.map((node, idx) => {
                           const positions = [
-                            { x: 70, y: 220 },
+                            { x: 40, y: 220 },
                             { x: 250, y: 220 },
-                            { x: 430, y: 220 },
-                            { x: 610, y: 220 },
+                            { x: 460, y: 220 },
+                            { x: 670, y: 220 },
                           ]
                           const pos = positions[idx]
+                          const canOpen = Boolean(node.value && node.value !== "—")
+                          const isHovered = hoveredErNodeKey === node.key
+                          const isSelected = selectedErNodeKey === node.key
                           return (
-                            <g key={node.key}>
+                            <g
+                              key={node.key}
+                              data-er-node="true"
+                              className={canOpen ? "cursor-pointer" : "cursor-not-allowed"}
+                              onMouseEnter={() => setHoveredErNodeKey(node.key)}
+                              onMouseLeave={() => setHoveredErNodeKey(null)}
+                              onClick={() => setSelectedErNodeKey((prev) => (prev === node.key ? null : node.key))}
+                              onDoubleClick={(event) => {
+                                event.stopPropagation()
+                                onOpenErModulePreview(node)
+                              }}
+                            >
                               <rect
                                 x={pos.x}
                                 y={pos.y}
                                 width="180"
                                 height="78"
                                 rx="12"
-                                fill="#F8FAFC"
-                                stroke="#CBD5E1"
+                                fill={isSelected ? "#DBEAFE" : isHovered ? "#EEF6FF" : "#F8FAFC"}
+                                stroke={isSelected ? "#3B82F6" : isHovered ? "#93C5FD" : "#CBD5E1"}
                               />
                               <text x={pos.x + 90} y={pos.y + 27} textAnchor="middle" fontSize="12" fill="#64748B">
                                 {node.label}
@@ -504,30 +917,38 @@ export default function DashboardPage() {
                 </div>
               </section>
 
-              <section className="rounded-xl border border-border/60 bg-secondary/20 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-foreground">2、已关联模块概览</h3>
-                <div className="grid gap-2 md:grid-cols-2">
-                  <div className="rounded-lg border border-border/60 bg-background p-3 text-sm">
-                    <p className="font-medium">需求概览</p>
-                    <p className="mt-1 text-muted-foreground">版本号：{previewRow?.requirementVersion || "—"}</p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-background p-3 text-sm">
-                    <p className="font-medium">实施评估概览</p>
-                    <p className="mt-1 text-muted-foreground">版本号：{previewRow?.assessmentVersion || "—"}</p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-background p-3 text-sm">
-                    <p className="font-medium">资源人天概览</p>
-                    <p className="mt-1 text-muted-foreground">版本号：{previewRow?.resourceVersion || "—"}</p>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-background p-3 text-sm">
-                    <p className="font-medium">开发评估概览</p>
-                    <p className="mt-1 text-muted-foreground">版本号：{previewRow?.devVersion || "—"}</p>
-                  </div>
-                </div>
-              </section>
             </div>
           </DialogContent>
         </Dialog>
+        <Dialog
+          open={!!erModulePreview}
+          onOpenChange={(open) => {
+            if (!open) setErModulePreview(null)
+          }}
+        >
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>{erModulePreview ? `${erModulePreview.label} · ${erModulePreview.version}` : "模块内容预览"}</DialogTitle>
+            </DialogHeader>
+            <div className="rounded-lg border border-border/60 bg-background p-1">
+              {erModulePreview ? (
+                <iframe
+                  title={`${erModulePreview.label}内容预览`}
+                  src={erModulePreview.src}
+                  className="h-[70vh] w-full rounded-md border-0"
+                />
+              ) : null}
+            </div>
+          </DialogContent>
+        </Dialog>
+        <VersionHistoryDialog
+          open={versionHistoryOpen}
+          onOpenChange={setVersionHistoryOpen}
+          title="总方案版本历史"
+          description="按更新时间由新到旧排列，含已归档版本。"
+          rows={recordsToVersionHistoryRows(globalRecords)}
+          highlightVersionCode={selectedGlobalVersionCode.trim() || undefined}
+        />
     </ModuleShell>
   )
 }

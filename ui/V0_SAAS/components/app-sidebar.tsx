@@ -10,6 +10,7 @@ import {
   FileSearch,
   Users,
   UserCog,
+  ShieldCheck,
   KeyRound,
   Settings,
   Search,
@@ -52,7 +53,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
-import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { useUnsavedNavigation } from "@/hooks/use-unsaved-changes"
 
 const mainNavItems = [
   {
@@ -104,6 +105,11 @@ const teamNavItems = [
     icon: UserCog,
   },
   {
+    title: "系统管理",
+    url: "/dashboard/system-management",
+    icon: ShieldCheck,
+  },
+  {
     title: "API",
     url: "/dashboard/api-keys",
     icon: KeyRound,
@@ -114,11 +120,16 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, isAdmin, logout } = useAuth()
-  const { pendingHref, requestNavigation, confirmNavigation, cancelNavigation } = useUnsavedChanges()
+  const { pendingHref, requestNavigation, confirmNavigation, cancelNavigation } = useUnsavedNavigation()
 
   const visibleTeamNavItems = isAdmin
     ? teamNavItems
-    : teamNavItems.filter((item) => item.url !== "/dashboard/user-management" && item.url !== "/dashboard/api-keys")
+    : teamNavItems.filter(
+        (item) =>
+          item.url !== "/dashboard/user-management" &&
+          item.url !== "/dashboard/system-management" &&
+          item.url !== "/dashboard/api-keys",
+      )
 
   function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
     const allowed = requestNavigation(href)

@@ -14,6 +14,7 @@ import sessionsRoutes from "./sessions.routes";
 import exportsRoutes from "./exports.routes";
 import teamRoutes from "./team.routes";
 import wbsRoutes from "./wbs.routes";
+import systemRoutes from "./system.routes";
 
 import { ok } from "../utils/response";
 
@@ -35,5 +36,6 @@ router.use("/sessions", sessionsRoutes);
 router.use("/exports", exportsRoutes);
 router.use("/teams", teamRoutes);
 router.use("/wbs", wbsRoutes);
+router.use("/system", systemRoutes);
 
 export default router;

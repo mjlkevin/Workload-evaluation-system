@@ -6,7 +6,7 @@ import { Request, Response } from "express";
 
 import { AuthUser } from "../types";
 import { loadUsersStore, signAuthToken } from "../middleware/auth";
-import { versionsStorePath } from "../utils";
+import { versionCodeRulesStorePath, versionsStorePath } from "../utils";
 import { listUsers, login, me } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
@@ -97,6 +97,25 @@ function withFileSnapshotRestore(filePath: string, run: () => void): void {
       fs.writeFileSync(filePath, before, "utf-8");
     } else if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
+    }
+  }
+}
+
+function withFilesSnapshotRestore(filePaths: string[], run: () => void): void {
+  const snapshots = filePaths.map((filePath) => ({
+    filePath,
+    existed: fs.existsSync(filePath),
+    content: fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "",
+  }));
+  try {
+    run();
+  } finally {
+    for (const item of snapshots) {
+      if (item.existed) {
+        fs.writeFileSync(item.filePath, item.content, "utf-8");
+      } else if (fs.existsSync(item.filePath)) {
+        fs.unlinkSync(item.filePath);
+      }
     }
   }
 }
@@ -221,7 +240,7 @@ test("versions.usecase: deleteVersion returns type invalid", () => {
   assert.equal((res.body as { code?: number }).code, 40001);
 });
 
-test("versions.usecase: create -> update -> delete lifecycle works", () => {
+test("versions.usecase: create -> update -> delete lifecycle works", { concurrency: false }, () => {
   const versionsPath = versionsStorePath();
   withFileSnapshotRestore(versionsPath, () => {
     const versionCode = `UT-LC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -269,7 +288,221 @@ test("versions.usecase: create -> update -> delete lifecycle works", () => {
   });
 });
 
-test("versions.usecase: checkout -> checkin updates lock and version code", () => {
+test("versions.usecase: createVersion generates versionCode by active rule when omitted", { concurrency: false }, () => {
+  const versionsPath = versionsStorePath();
+  const rulesPath = versionCodeRulesStorePath();
+  withFilesSnapshotRestore([versionsPath, rulesPath], () => {
+    fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
+    fs.writeFileSync(
+      rulesPath,
+      JSON.stringify(
+        {
+          rules: [
+            {
+              id: "rule-implementation",
+              moduleKey: "implementation",
+              moduleName: "实施评估",
+              moduleCode: "IA",
+              prefix: "IA",
+              format: "{PREFIX}-{GL}-{NN}",
+              sample: "IA-GL-UT-01",
+              status: "active",
+              effectiveAt: "2026-04-06T00:00:00.000Z",
+              updatedAt: "2026-04-06T00:00:00.000Z",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const req = createMockReq({
+      token: getActiveUserToken(),
+      body: {
+        type: "assessment",
+        templateId: "default",
+        status: "draft",
+        payload: { globalVersionCode: "GL-UT-BASE" },
+      },
+    });
+    const res = createMockRes();
+    createVersion(req, res as unknown as Response);
+    assert.equal(res.statusCode, 200);
+    const body = res.body as { code: number; data: { record: { versionCode: string } } };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.record.versionCode, "IA-GL-UT-BASE-01");
+  });
+});
+
+test("versions.usecase: createVersion increments sequence on conflict under active rule", { concurrency: false }, () => {
+  const versionsPath = versionsStorePath();
+  const rulesPath = versionCodeRulesStorePath();
+  withFilesSnapshotRestore([versionsPath, rulesPath], () => {
+    fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
+    fs.writeFileSync(
+      rulesPath,
+      JSON.stringify(
+        {
+          rules: [
+            {
+              id: "rule-implementation",
+              moduleKey: "implementation",
+              moduleName: "实施评估",
+              moduleCode: "IA",
+              prefix: "IA",
+              format: "{PREFIX}-{NN}",
+              sample: "IA-01",
+              status: "active",
+              effectiveAt: "2026-04-06T00:00:00.000Z",
+              updatedAt: "2026-04-06T00:00:00.000Z",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const req1 = createMockReq({
+      token: getActiveUserToken(),
+      body: { type: "assessment", templateId: "default", status: "draft", payload: {} },
+    });
+    const res1 = createMockRes();
+    createVersion(req1, res1 as unknown as Response);
+    assert.equal(res1.statusCode, 200);
+    const versionCode1 = (res1.body as { data: { record: { versionCode: string } } }).data.record.versionCode;
+    assert.equal(versionCode1, "IA-01");
+
+    const req2 = createMockReq({
+      token: getActiveUserToken(),
+      body: { type: "assessment", templateId: "default", status: "draft", payload: {} },
+    });
+    const res2 = createMockRes();
+    createVersion(req2, res2 as unknown as Response);
+    assert.equal(res2.statusCode, 200);
+    const versionCode2 = (res2.body as { data: { record: { versionCode: string } } }).data.record.versionCode;
+    assert.equal(versionCode2, "IA-02");
+  });
+});
+
+test("versions.usecase: createVersion fails when rule is not active", { concurrency: false }, () => {
+  const versionsPath = versionsStorePath();
+  const rulesPath = versionCodeRulesStorePath();
+  withFilesSnapshotRestore([versionsPath, rulesPath], () => {
+    fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
+    fs.writeFileSync(
+      rulesPath,
+      JSON.stringify(
+        {
+          rules: [
+            {
+              id: "rule-implementation",
+              moduleKey: "implementation",
+              moduleName: "实施评估",
+              moduleCode: "IA",
+              prefix: "IA",
+              format: "{PREFIX}-{NN}",
+              sample: "IA-01",
+              status: "draft",
+              effectiveAt: "--",
+              updatedAt: "2026-04-06T00:00:00.000Z",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const req = createMockReq({
+      token: getActiveUserToken(),
+      body: { type: "assessment", templateId: "default", status: "draft", payload: {} },
+    });
+    const res = createMockRes();
+    createVersion(req, res as unknown as Response);
+    assert.equal(res.statusCode, 409);
+    assert.equal((res.body as { code?: number }).code, 40902);
+  });
+});
+
+test("versions.usecase: createVersion fails when active rule lacks sequence placeholder and conflicts", { concurrency: false }, () => {
+  const versionsPath = versionsStorePath();
+  const rulesPath = versionCodeRulesStorePath();
+  withFilesSnapshotRestore([versionsPath, rulesPath], () => {
+    const owner = getActiveUser();
+    const now = new Date().toISOString();
+    fs.writeFileSync(
+      versionsPath,
+      JSON.stringify(
+        {
+          records: [
+            {
+              id: "ut-fixed-existing",
+              type: "assessment",
+              versionCode: "IA-FIXED",
+              templateId: "default",
+              ownerUserId: owner.id,
+              status: "draft",
+              payload: {},
+              createdAt: now,
+              updatedAt: now,
+              createdByUserId: owner.id,
+              createdByUsername: owner.username,
+              checkoutStatus: "checked_in",
+              versionDocStatus: "drafting",
+              majorLetter: "A",
+              minorNumber: 0,
+              baseCode: "IA-FIXED",
+              isHistoricalArchive: false,
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      rulesPath,
+      JSON.stringify(
+        {
+          rules: [
+            {
+              id: "rule-implementation",
+              moduleKey: "implementation",
+              moduleName: "实施评估",
+              moduleCode: "IA",
+              prefix: "IA",
+              format: "{PREFIX}-FIXED",
+              sample: "IA-FIXED",
+              status: "active",
+              effectiveAt: now,
+              updatedAt: now,
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const req = createMockReq({
+      token: getActiveUserToken(),
+      body: { type: "assessment", templateId: "default", status: "draft", payload: {} },
+    });
+    const res = createMockRes();
+    createVersion(req, res as unknown as Response);
+    assert.equal(res.statusCode, 409);
+    assert.equal((res.body as { code?: number }).code, 40901);
+  });
+});
+
+test("versions.usecase: checkout -> checkin updates lock and version code", { concurrency: false }, () => {
   const versionsPath = versionsStorePath();
   withFileSnapshotRestore(versionsPath, () => {
     const versionCode = `UT-VCS-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -312,7 +545,7 @@ test("versions.usecase: checkout -> checkin updates lock and version code", () =
   });
 });
 
-test("versions.usecase: undo-checkout restores last checkin payload", () => {
+test("versions.usecase: undo-checkout restores last checkin payload", { concurrency: false }, () => {
   const versionsPath = versionsStorePath();
   withFileSnapshotRestore(versionsPath, () => {
     const versionCode = `UT-UNDO-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -353,7 +586,7 @@ test("versions.usecase: undo-checkout restores last checkin payload", () => {
   });
 });
 
-test("versions.usecase: promote archives current record and creates checked_out record", () => {
+test("versions.usecase: promote archives current record and creates checked_out record", { concurrency: false }, () => {
   const versionsPath = versionsStorePath();
   withFileSnapshotRestore(versionsPath, () => {
     const versionCode = `UT-PM-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -387,7 +620,7 @@ test("versions.usecase: promote archives current record and creates checked_out 
   });
 });
 
-test("versions.usecase: force-unlock requires admin and unlocks checked out record", () => {
+test("versions.usecase: force-unlock requires admin and unlocks checked out record", { concurrency: false }, () => {
   const versionsPath = versionsStorePath();
   withFileSnapshotRestore(versionsPath, () => {
     const versionCode = `UT-FU-${Date.now()}-${Math.floor(Math.random() * 10000)}`;

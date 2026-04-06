@@ -74,6 +74,13 @@ export function versionsStorePath(): string {
 }
 
 /**
+ * 版本号编码规则存储路径
+ */
+export function versionCodeRulesStorePath(): string {
+  return path.resolve(resolveRootDir(), "config/versions/version-code-rules.json");
+}
+
+/**
  * 原型导出源文件路径
  */
 export const PROTOTYPE_EXPORT_SOURCE_XLSX_RELATIVE_PATH =
