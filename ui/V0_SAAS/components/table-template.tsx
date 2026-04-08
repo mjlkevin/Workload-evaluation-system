@@ -1,6 +1,6 @@
 "use client"
 
-import { ReactNode } from "react"
+import { MouseEvent as ReactMouseEvent, ReactNode, useMemo, useRef, useState } from "react"
 import { Filter, ChevronDown, Grid3X3, List, Plus, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -108,11 +108,102 @@ export function TableTemplate<Row>({
   pagination,
   tableClassName,
 }: TableTemplateProps<Row>) {
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const resizingRef = useRef<{
+    key: string
+    startX: number
+    startWidth: number
+    minWidth: number
+    maxWidth: number
+  } | null>(null)
   const showFilterControl = showFilter && filterOptions.length > 0
   const totalColumnCount =
     columns.length +
     (leadingHeaderCell ? 1 : 0) +
     (trailingHeaderCell ? 1 : 0)
+
+  const resolvedColumnWidths = useMemo(() => {
+    return columns.map((col) => {
+      const key = String(col.key)
+      const custom = columnWidths[key]
+      if (typeof custom === "number" && Number.isFinite(custom)) {
+        const next = Math.min(getMaxWidth(col), Math.max(getMinWidth(col), custom))
+        return `${next}px`
+      }
+      if (typeof col.width === "number") return `${col.width}px`
+      if (typeof col.width === "string") return col.width
+      return undefined
+    })
+  }, [columns, columnWidths])
+
+  function parsePixel(value?: number | string): number | undefined {
+    if (typeof value === "number" && Number.isFinite(value)) return value
+    if (typeof value === "string" && /^\d+(\.\d+)?px$/.test(value.trim())) {
+      return Number(value.replace("px", "").trim())
+    }
+    return undefined
+  }
+
+  function getMinWidth(col: TableTemplateColumn<Row>): number {
+    return parsePixel(col.minWidth) ?? 80
+  }
+
+  function getMaxWidth(col: TableTemplateColumn<Row>): number {
+    const explicitMax = parsePixel(col.maxWidth)
+    if (typeof explicitMax === "number" && Number.isFinite(explicitMax)) return Math.max(120, explicitMax)
+    return 720
+  }
+
+  function onResizeStart(event: ReactMouseEvent<HTMLButtonElement>, col: TableTemplateColumn<Row>) {
+    event.preventDefault()
+    event.stopPropagation()
+    const th = event.currentTarget.closest("th")
+    if (!th) return
+    const key = String(col.key)
+    const startWidth = th.getBoundingClientRect().width
+    resizingRef.current = {
+      key,
+      startX: event.clientX,
+      startWidth,
+      minWidth: getMinWidth(col),
+      maxWidth: getMaxWidth(col),
+    }
+    const originalUserSelect = document.body.style.userSelect
+    document.body.style.userSelect = "none"
+    const onMove = (e: MouseEvent) => {
+      const current = resizingRef.current
+      if (!current) return
+      const delta = e.clientX - current.startX
+      const next = Math.min(current.maxWidth, Math.max(current.minWidth, Math.round(current.startWidth + delta)))
+      setColumnWidths((prev) => ({ ...prev, [current.key]: next }))
+    }
+    const onUp = () => {
+      resizingRef.current = null
+      document.body.style.userSelect = originalUserSelect
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+  }
+
+  function onResizeReset(event: ReactMouseEvent<HTMLButtonElement>, col: TableTemplateColumn<Row>) {
+    event.preventDefault()
+    event.stopPropagation()
+    const key = String(col.key)
+    setColumnWidths((prev) => {
+      if (!(key in prev)) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
+  function onResetAllColumnWidthsByContextMenu(event: ReactMouseEvent<HTMLElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    setColumnWidths({})
+  }
 
   return (
     <div className="flex-1 p-6">
@@ -197,17 +288,38 @@ export function TableTemplate<Row>({
           </div>
         )}
 
-        <Table className={`table-auto ${tableClassName ?? ""}`.trim()}>
-          <TableHeader>
+        <Table
+          containerClassName="max-h-[60vh] overflow-auto"
+          className={`table-auto [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0 ${tableClassName ?? ""}`.trim()}
+        >
+          <colgroup>
+            {leadingHeaderCell ? <col /> : null}
+            {columns.map((col, index) => (
+              <col
+                key={`col-${String(col.key)}`}
+                style={{
+                  width: resolvedColumnWidths[index],
+                  minWidth:
+                    typeof col.minWidth === "number" ? `${col.minWidth}px` : col.minWidth,
+                  maxWidth:
+                    typeof col.maxWidth === "number" ? `${col.maxWidth}px` : col.maxWidth,
+                }}
+              />
+            ))}
+            {trailingHeaderCell ? <col /> : null}
+          </colgroup>
+          <TableHeader
+            className="sticky top-0 z-20 bg-accent/12 text-foreground backdrop-blur-sm dark:bg-accent/20"
+            onContextMenu={onResetAllColumnWidthsByContextMenu}
+          >
             <TableRow className="border-border/50 hover:bg-transparent">
               {leadingHeaderCell}
-              {columns.map((col) => (
+              {columns.map((col, index) => (
                 <TableHead
                   key={String(col.key)}
-                  className={col.className}
+                  className={`relative top-0 z-20 select-none bg-accent/12 text-foreground backdrop-blur-sm dark:bg-accent/20 ${col.className ?? ""}`.trim()}
                   style={{
-                    width:
-                      typeof col.width === "number" ? `${col.width}px` : col.width,
+                    width: resolvedColumnWidths[index],
                     minWidth:
                       typeof col.minWidth === "number"
                         ? `${col.minWidth}px`
@@ -218,7 +330,15 @@ export function TableTemplate<Row>({
                         : col.maxWidth,
                   }}
                 >
-                  {col.label}
+                  <div className="pr-3">{col.label}</div>
+                  <button
+                    type="button"
+                    aria-label={`调整列宽：${col.label}`}
+                    className="absolute right-0 top-0 h-full w-2 cursor-col-resize border-l border-border/60 opacity-0 transition-opacity hover:bg-primary/10 group-hover:opacity-100"
+                    onMouseDown={(event) => onResizeStart(event, col)}
+                    onDoubleClick={(event) => onResizeReset(event, col)}
+                    title="拖拽调整列宽，双击恢复默认宽度"
+                  />
                 </TableHead>
               ))}
               {trailingHeaderCell}

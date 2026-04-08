@@ -9,6 +9,7 @@ export {
   logout,
   listUsers,
   updateUserStatus,
+  updateUserRole,
   listInviteCodes,
   generateInviteCodeHandler
 } from "./auth.controller";

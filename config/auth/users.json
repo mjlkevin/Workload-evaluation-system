@@ -7,7 +7,7 @@
       "role": "admin",
       "status": "active",
       "createdAt": "2026-03-28T10:23:51.881Z",
-      "lastLoginAt": "2026-04-06T07:31:22.410Z"
+      "lastLoginAt": "2026-04-08T15:06:07.440Z"
     },
     {
       "id": "b4de9eca-fe62-4210-964e-7e59b74ab715",
@@ -17,6 +17,15 @@
       "status": "active",
       "createdAt": "2026-03-28T10:29:24.272Z",
       "lastLoginAt": "2026-03-28T10:29:24.272Z"
+    },
+    {
+      "id": "0bfae09b-d3da-4b28-b8b8-56a384dac458",
+      "username": "马文玲",
+      "passwordHash": "$2b$10$8g6pNsE3HMGHQK3oQ/Hi1uD4IqIGasLBRS8BgVyJd1doLW7awYasK",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-04-08T06:00:07.420Z",
+      "lastLoginAt": "2026-04-08T06:00:07.420Z"
     }
   ]
 }

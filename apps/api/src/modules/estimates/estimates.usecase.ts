@@ -113,7 +113,7 @@ export async function calculateAndExportEstimate(
     asString(body.exportAssessmentVersionCode) || "V00"
   );
 
-  await writeExportFile(fileName, exportType, result, body, template);
+  await writeExportFile(fileName, exportType, result, body, template, ruleSet);
   const responseData = {
     totalDays: result.totalDays,
     downloadUrl: `/downloads/${fileName}`,

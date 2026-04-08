@@ -57,8 +57,27 @@ import {
   type TemplateSummary,
 } from "@/lib/workload-service"
 import type { PlanRow } from "@/lib/workload-types"
+import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, createClientRowId } from "@/lib/utils"
+
+const INIT_LOAD_TIMEOUT_MS = 30_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error(message)), ms)
+    promise.then(
+      (v) => {
+        window.clearTimeout(t)
+        resolve(v)
+      },
+      (e) => {
+        window.clearTimeout(t)
+        reject(e)
+      },
+    )
+  })
+}
 
 type ItemSelectionState = {
   included: boolean
@@ -181,7 +200,7 @@ function createEmptyMultiOrgRow(): MultiOrgRow {
   const scope: Record<string, boolean> = {}
   for (const def of multiOrgScopeDefs) scope[def.key] = false
   return {
-    rowId: crypto.randomUUID(),
+    rowId: createClientRowId(),
     orgName: "",
     orgType: orgTypeOptions[0],
     location: "",
@@ -386,13 +405,17 @@ export default function AssessmentPage() {
     void (async () => {
       try {
         setInitLoading(true)
-        const [plans, records, templates, activeRule, globals] = await Promise.all([
-          getDashboardPlans(),
-          listModuleVersions("assessment"),
-          listTemplateSummaries(),
-          getActiveRuleSet(),
-          listGlobalVersions(),
-        ])
+        const [plans, records, templates, activeRule, globals] = await withTimeout(
+          Promise.all([
+            getDashboardPlans(),
+            listModuleVersions("assessment"),
+            listTemplateSummaries(),
+            getActiveRuleSet(),
+            listGlobalVersions(),
+          ]),
+          INIT_LOAD_TIMEOUT_MS,
+          "加载超时（30s）：请确认本机 API 已启动（npm run dev:api，默认 3000 端口），或检查网络后刷新页面。",
+        )
         setGlobalVersionRecords(globals)
         setDashboardPlans(plans)
         setGlobalOptions(
@@ -409,7 +432,11 @@ export default function AssessmentPage() {
 
         const chosenTemplateId = templates[0]?.templateId || ""
         if (chosenTemplateId) {
-          const detail = await getTemplateDetail(chosenTemplateId)
+          const detail = await withTimeout(
+            getTemplateDetail(chosenTemplateId),
+            INIT_LOAD_TIMEOUT_MS,
+            "加载模板详情超时：请检查 API 服务后刷新。",
+          )
           setTemplateDetail(detail)
           const firstSheet = detail.sheets?.[0]?.sheetName || "全部工作表"
           setSelectedSheet(firstSheet)
@@ -424,7 +451,11 @@ export default function AssessmentPage() {
           setItemSelection(initialSelection)
           setForm((prev) => ({ ...prev, templateId: detail.templateId }))
         }
-        const history = await listEstimateExportHistory(1, 8)
+        const history = await withTimeout(
+          listEstimateExportHistory(1, 8),
+          INIT_LOAD_TIMEOUT_MS,
+          "加载导出历史超时：请检查 API 后刷新。",
+        )
         setHistoryTotal(history.total)
         setHistoryPage(1)
         setExportHistory(history.items)
@@ -867,6 +898,7 @@ export default function AssessmentPage() {
     return {
       ...form,
       selectedSheet,
+      selectedCloudNames,
       items: currentItemsPayload(),
     }
   }
@@ -1269,6 +1301,15 @@ export default function AssessmentPage() {
       breadcrumbs={[{ label: "实施评估" }]}
     >
       <div className="max-w-full min-w-0 space-y-6 overflow-x-hidden">
+      {initLoading ? (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs text-foreground"
+        >
+          <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
+          <span>正在加载模板、版本与规则…若长时间停留在此，请确认已启动 API（端口 3000）并尝试强制刷新（Ctrl+Shift+R / Cmd+Shift+R）。</span>
+        </div>
+      ) : null}
       <Card
         className={
           (paramCardCollapsed

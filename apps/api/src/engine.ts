@@ -36,6 +36,10 @@ export type CalculateRequest = {
   difficultyFactor: number;
   orgCount: number;
   orgSimilarityFactor: number;
+  selectedSheet?: string;
+  selectedCloudNames?: string[];
+  exportProjectName?: string;
+  exportAssessmentVersionCode?: string;
   items: Array<{
     templateItemId: string;
     included: boolean;

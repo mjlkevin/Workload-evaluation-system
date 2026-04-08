@@ -553,7 +553,8 @@ export default function DashboardPage() {
                 <div className="flex flex-col gap-3 rounded-xl border border-border/40 bg-card/50 p-3 shadow-sm backdrop-blur-sm lg:flex-row lg:items-center lg:justify-between lg:gap-3">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <Button
-                      className="rounded-xl gap-2 bg-foreground text-background hover:bg-foreground/90"
+                      size="sm"
+                      className="rounded-lg gap-1.5 bg-foreground px-3 text-xs text-background hover:bg-foreground/90"
                       onClick={openCreatePlanWizard}
                       disabled={creating}
                     >
@@ -561,6 +562,7 @@ export default function DashboardPage() {
                       新建方案
                     </Button>
                     <VersionVcsToolbar
+                      compact
                       state={
                         selectedGlobalRecord
                           ? {
@@ -583,7 +585,8 @@ export default function DashboardPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="rounded-xl gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      size="sm"
+                      className="rounded-lg gap-1.5 border-destructive/40 px-3 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
                       disabled={!selectedGlobalRecord || deletingPlan}
                       onClick={onOpenDeletePlanDialog}
                     >
@@ -591,7 +594,7 @@ export default function DashboardPage() {
                       删除方案
                     </Button>
                   </div>
-                  <div className="relative w-full shrink-0 lg:max-w-sm">
+                  <div className="relative w-full shrink-0 lg:w-72">
                     <Search
                       className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                       aria-hidden

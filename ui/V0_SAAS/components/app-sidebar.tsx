@@ -128,17 +128,14 @@ const teamNavItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, canManageUsers, logout } = useAuth()
   const { pendingHref, requestNavigation, confirmNavigation, cancelNavigation } = useUnsavedNavigation()
 
-  const visibleTeamNavItems = isAdmin
-    ? teamNavItems
-    : teamNavItems.filter(
-        (item) =>
-          item.url !== "/dashboard/user-management" &&
-          item.url !== "/dashboard/system-management" &&
-          item.url !== "/dashboard/api-keys",
-      )
+  const visibleTeamNavItems = teamNavItems.filter((item) => {
+    if (item.url === "/dashboard/user-management") return canManageUsers
+    if (item.url === "/dashboard/system-management" || item.url === "/dashboard/api-keys") return isAdmin
+    return true
+  })
 
   function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
     const allowed = requestNavigation(href)
@@ -289,7 +286,11 @@ export function AppSidebar() {
                     <div className="flex flex-col items-start text-sm">
                       <span className="font-medium">{user?.username || "未登录"}</span>
                       <span className="text-xs text-muted-foreground">
-                        {user?.role === "admin" ? "管理员" : "普通用户"}
+                        {user?.role === "admin"
+                          ? "超级管理员"
+                          : user?.role === "sub_admin"
+                            ? "子管理员"
+                            : "普通用户"}
                       </span>
                     </div>
                     <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
@@ -303,9 +304,9 @@ export function AppSidebar() {
                 >
                   <DropdownMenuItem className="rounded-lg" asChild>
                     <Link
-                      href={isAdmin ? "/dashboard/user-management" : "/dashboard"}
+                      href={canManageUsers ? "/dashboard/user-management" : "/dashboard"}
                       onClick={(e) =>
-                        handleNavClick(e, isAdmin ? "/dashboard/user-management" : "/dashboard")
+                        handleNavClick(e, canManageUsers ? "/dashboard/user-management" : "/dashboard")
                       }
                     >
                       <Settings className="mr-2 size-4" />

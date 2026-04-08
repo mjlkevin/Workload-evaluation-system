@@ -167,6 +167,17 @@ function renderCheckoutStatusBadge(item: ModuleDocListItem) {
   )
 }
 
+function pickListCreator(item: ModuleDocListItem): string {
+  const u = item.latestRecord?.createdByUsername?.trim()
+  return u || "—"
+}
+
+function pickListModifier(item: ModuleDocListItem): string {
+  const u = item.latestRecord?.updatedByUsername?.trim()
+  if (u) return u
+  return pickListCreator(item)
+}
+
 export function ModuleDocListPage({
   moduleType,
   title,
@@ -184,7 +195,7 @@ export function ModuleDocListPage({
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
   const isRequirementList = moduleType === "requirementImport"
   const isAssessmentList = moduleType === "assessment"
-  const listColSpan = isRequirementList ? 7 : isAssessmentList ? 10 : 9
+  const listColSpan = isRequirementList ? 9 : isAssessmentList ? 12 : 11
 
   const selected = useMemo(
     () => items.find((item) => item.docKey === selectedKey) || null,
@@ -203,6 +214,8 @@ export function ModuleDocListPage({
         item.statusText,
         pickCustomerName(item),
         pickProductLines(item),
+        pickListCreator(item),
+        pickListModifier(item),
       ]
         .join(" ")
         .toLowerCase()
@@ -316,7 +329,7 @@ export function ModuleDocListPage({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Input
               className="h-9 w-full max-w-sm"
-              placeholder="搜索项目/版本号/状态"
+              placeholder="搜索项目/版本号/状态/创建人/修改人"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
             />
@@ -359,6 +372,8 @@ export function ModuleDocListPage({
                       <TableHead>产品线</TableHead>
                       <TableHead>客户名称</TableHead>
                       <TableHead>状态</TableHead>
+                      <TableHead>创建人</TableHead>
+                      <TableHead>修改人</TableHead>
                       <TableHead>更新时间</TableHead>
                     </>
                   ) : (
@@ -372,6 +387,8 @@ export function ModuleDocListPage({
                       <TableHead>组织数</TableHead>
                       <TableHead>难度系数</TableHead>
                       <TableHead>状态</TableHead>
+                      <TableHead>创建人</TableHead>
+                      <TableHead>修改人</TableHead>
                       <TableHead>更新时间</TableHead>
                     </>
                   )}
@@ -406,6 +423,12 @@ export function ModuleDocListPage({
                             {pickCustomerName(item)}
                           </TableCell>
                           <TableCell>{renderCheckoutStatusBadge(item)}</TableCell>
+                          <TableCell className="max-w-[120px] truncate text-xs" title={pickListCreator(item)}>
+                            {pickListCreator(item)}
+                          </TableCell>
+                          <TableCell className="max-w-[120px] truncate text-xs" title={pickListModifier(item)}>
+                            {pickListModifier(item)}
+                          </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{item.updatedAt || "—"}</TableCell>
                         </>
                       ) : (
@@ -421,6 +444,12 @@ export function ModuleDocListPage({
                           <TableCell className="tabular-nums">{formatNum(pickOrgCount(item))}</TableCell>
                           <TableCell className="tabular-nums">{formatNum(pickDifficultyFactor(item))}</TableCell>
                           <TableCell>{renderCheckoutStatusBadge(item)}</TableCell>
+                          <TableCell className="max-w-[120px] truncate text-xs" title={pickListCreator(item)}>
+                            {pickListCreator(item)}
+                          </TableCell>
+                          <TableCell className="max-w-[120px] truncate text-xs" title={pickListModifier(item)}>
+                            {pickListModifier(item)}
+                          </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{item.updatedAt || "—"}</TableCell>
                         </>
                       )}

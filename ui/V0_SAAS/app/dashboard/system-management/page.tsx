@@ -28,6 +28,7 @@ import {
   type VersionCodeRuleItem,
   type VersionCodeRuleStatus,
 } from "@/lib/workload-service"
+import { cn } from "@/lib/utils"
 
 const MODULE_OPTIONS: Array<{ value: VersionCodeRuleItem["moduleKey"] | "all"; label: string }> = [
   { value: "all", label: "全部模块" },
@@ -97,6 +98,7 @@ export default function SystemManagementPage() {
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [actingRuleId, setActingRuleId] = useState("")
+  const [selectedRuleId, setSelectedRuleId] = useState("")
 
   async function loadRules() {
     setLoading(true)
@@ -132,7 +134,22 @@ export default function SystemManagementPage() {
     })
   }, [rules, moduleFilter, keyword])
 
+  const selectedRule = useMemo(
+    () => visibleRules.find((item) => item.id === selectedRuleId) ?? null,
+    [visibleRules, selectedRuleId],
+  )
+
+  useEffect(() => {
+    if (!selectedRuleId) return
+    if (visibleRules.some((item) => item.id === selectedRuleId)) return
+    setSelectedRuleId("")
+  }, [visibleRules, selectedRuleId])
+
   function startEdit(item: VersionCodeRuleItem) {
+    if (item.status !== "disabled") {
+      setMessage("仅“已禁用”状态的编码规则允许进入配置。")
+      return
+    }
     setEditingRule(item)
     setEditingPrefix(item.prefix)
     setEditingFormat(item.format)
@@ -246,6 +263,42 @@ export default function SystemManagementPage() {
                 <p className="rounded-lg border border-border/50 bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">{message}</p>
               ) : null}
 
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/50 bg-background/60 p-3">
+                <p className="text-xs text-muted-foreground">
+                  {selectedRule
+                    ? `当前选中：${selectedRule.moduleName}（${STATUS_LABEL[selectedRule.status]}）`
+                    : "请先在表格中选择一行，再使用下方工具栏操作。"}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => selectedRule && startEdit(selectedRule)}
+                    disabled={!selectedRule || selectedRule.status !== "disabled" || actingRuleId === selectedRule?.id}
+                    title={!selectedRule ? "请先选择一行" : selectedRule.status !== "disabled" ? "仅“已禁用”状态可配置" : ""}
+                  >
+                    配置
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => selectedRule && void onActivateRule(selectedRule.id)}
+                    disabled={!selectedRule || selectedRule.status === "active" || actingRuleId === selectedRule?.id}
+                    title={!selectedRule ? "请先选择一行" : ""}
+                  >
+                    生效
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => selectedRule && void onDisableRule(selectedRule.id)}
+                    disabled={!selectedRule || selectedRule.status === "disabled" || actingRuleId === selectedRule?.id}
+                    title={!selectedRule ? "请先选择一行" : ""}
+                  >
+                    禁用
+                  </Button>
+                </div>
+              </div>
+
               <div className="rounded-xl border border-border/50">
                 <Table>
                   <TableHeader>
@@ -262,12 +315,15 @@ export default function SystemManagementPage() {
                       <TableHead>示例</TableHead>
                       <TableHead>状态</TableHead>
                       <TableHead>生效时间</TableHead>
-                      <TableHead className="w-[260px]">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {visibleRules.map((item) => (
-                      <TableRow key={item.id}>
+                      <TableRow
+                        key={item.id}
+                        className={cn("cursor-pointer", selectedRuleId === item.id ? "bg-primary/10" : "")}
+                        onClick={() => setSelectedRuleId(item.id)}
+                      >
                         <TableCell className="font-medium">{item.moduleName}</TableCell>
                         <TableCell>{item.moduleCode}</TableCell>
                         <TableCell>{item.prefix}</TableCell>
@@ -287,28 +343,6 @@ export default function SystemManagementPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>{formatDisplayTime(item.effectiveAt)}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" size="sm" onClick={() => startEdit(item)}>
-                              配置
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => void onActivateRule(item.id)}
-                              disabled={item.status === "active" || actingRuleId === item.id}
-                            >
-                              生效
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => void onDisableRule(item.id)}
-                              disabled={item.status === "disabled" || actingRuleId === item.id}
-                            >
-                              禁用
-                            </Button>
-                          </div>
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

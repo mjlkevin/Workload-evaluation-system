@@ -80,6 +80,8 @@ test("versions.repository: isVersionReferencedByGlobal returns true when referen
         updatedAt: new Date().toISOString(),
         createdByUserId: "u1",
         createdByUsername: "tester",
+        updatedByUserId: "u1",
+        updatedByUsername: "tester",
         checkoutStatus: "checked_in",
         versionDocStatus: "drafting",
         majorLetter: "A",

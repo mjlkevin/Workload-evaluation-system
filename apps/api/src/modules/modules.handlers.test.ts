@@ -153,13 +153,14 @@ test("auth.usecase: listUsers follows role branch", () => {
   const res = createMockRes();
   listUsers(req, res as unknown as Response);
 
-  if (getActiveUserRole() === "admin") {
+  const role = getActiveUserRole();
+  if (role === "admin" || role === "sub_admin") {
     assert.equal(res.statusCode, 200);
     const body = res.body as { code: number; data: { users: unknown[] } };
     assert.equal(body.code, 0);
     assert.ok(Array.isArray(body.data.users));
   } else {
-    assert.equal(res.statusCode, 400);
+    assert.equal(res.statusCode, 403);
     assert.equal((res.body as { code?: number }).code, 40301);
   }
 });
@@ -454,6 +455,8 @@ test("versions.usecase: createVersion fails when active rule lacks sequence plac
               updatedAt: now,
               createdByUserId: owner.id,
               createdByUsername: owner.username,
+              updatedByUserId: owner.id,
+              updatedByUsername: owner.username,
               checkoutStatus: "checked_in",
               versionDocStatus: "drafting",
               majorLetter: "A",

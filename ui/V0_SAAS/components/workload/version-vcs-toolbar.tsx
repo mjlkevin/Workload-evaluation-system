@@ -98,7 +98,7 @@ export function VersionVcsToolbar({
   const canRenderActions = alwaysShowActions || hasState
   const checkoutStatus = state?.checkoutStatus ?? "checked_in"
   const btnSize = compact ? "sm" : "default"
-  const btnClass = compact ? "rounded-lg" : "rounded-xl"
+  const btnClass = compact ? "rounded-lg text-xs" : "rounded-xl"
   const [promoteAlertOpen, setPromoteAlertOpen] = useState(false)
   const [checkinDialogOpen, setCheckinDialogOpen] = useState(false)
   const [checkinNote, setCheckinNote] = useState("")

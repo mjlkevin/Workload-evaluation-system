@@ -55,6 +55,7 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const contentRef = React.useRef<HTMLDivElement | null>(null)
   const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 })
   const [dragging, setDragging] = React.useState(false)
   const dragStateRef = React.useRef<{
@@ -76,8 +77,18 @@ function DialogContent({
   const onPointerMove = React.useCallback((event: PointerEvent) => {
     const state = dragStateRef.current
     if (!state.active || event.pointerId !== state.pointerId) return
-    const nextX = state.originX + (event.clientX - state.startX)
-    const nextY = state.originY + (event.clientY - state.startY)
+    const rawNextX = state.originX + (event.clientX - state.startX)
+    const rawNextY = state.originY + (event.clientY - state.startY)
+    const rect = contentRef.current?.getBoundingClientRect()
+    const viewportWidth = window.innerWidth || 0
+    const viewportHeight = window.innerHeight || 0
+    const safeGap = 8
+    const halfWidth = Math.max(0, (rect?.width || 0) / 2)
+    const halfHeight = Math.max(0, (rect?.height || 0) / 2)
+    const maxOffsetX = Math.max(0, viewportWidth / 2 - halfWidth - safeGap)
+    const maxOffsetY = Math.max(0, viewportHeight / 2 - halfHeight - safeGap)
+    const nextX = Math.min(maxOffsetX, Math.max(-maxOffsetX, rawNextX))
+    const nextY = Math.min(maxOffsetY, Math.max(-maxOffsetY, rawNextY))
     setDragOffset({ x: nextX, y: nextY })
   }, [])
 
@@ -134,6 +145,7 @@ function DialogContent({
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
+        ref={contentRef}
         data-slot="dialog-content"
         className={cn(
           'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[calc(-50%+var(--wes-dialog-drag-x,0px))] translate-y-[calc(-50%+var(--wes-dialog-drag-y,0px))] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg',

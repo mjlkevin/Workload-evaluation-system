@@ -37,6 +37,10 @@ type VersionRecordDto = {
   payload: Record<string, unknown>
   createdAt: string
   updatedAt: string
+  createdByUserId?: string
+  createdByUsername?: string
+  updatedByUserId?: string
+  updatedByUsername?: string
   reviewedAt?: string
   checkoutStatus?: "checked_in" | "checked_out"
   versionDocStatus?: "drafting" | "reviewed"
@@ -60,6 +64,10 @@ export type ModuleVersionRecord = {
   payload: Record<string, unknown>
   createdAt: string
   updatedAt: string
+  createdByUserId?: string
+  createdByUsername?: string
+  updatedByUserId?: string
+  updatedByUsername?: string
   checkoutStatus: "checked_in" | "checked_out"
   versionDocStatus: "drafting" | "reviewed"
   checkedOutByUserId?: string
@@ -97,6 +105,10 @@ export type GlobalVersionRecord = {
   payload: Record<string, unknown>
   createdAt: string
   updatedAt: string
+  createdByUserId?: string
+  createdByUsername?: string
+  updatedByUserId?: string
+  updatedByUsername?: string
   checkoutStatus: "checked_in" | "checked_out"
   versionDocStatus: "drafting" | "reviewed"
   checkedOutByUserId?: string
@@ -218,6 +230,8 @@ export type EstimateCalculatePayload = {
   orgCount: number
   orgSimilarityFactor: number
   selectedSheet?: string
+  /** 与实施评估页云产品筛选一致；导出时仅包含这些云产品下已勾选的条目 */
+  selectedCloudNames?: string[]
   exportProjectName?: string
   exportAssessmentVersionCode?: string
   items: EstimateItemSelection[]
@@ -372,6 +386,10 @@ export async function listModuleVersions(type: CoreModuleVersionType): Promise<M
     payload: (x.payload || {}) as Record<string, unknown>,
     createdAt: x.createdAt,
     updatedAt: x.updatedAt,
+    createdByUserId: x.createdByUserId,
+    createdByUsername: x.createdByUsername,
+    updatedByUserId: x.updatedByUserId,
+    updatedByUsername: x.updatedByUsername,
     checkoutStatus: x.checkoutStatus ?? "checked_in",
     versionDocStatus: x.versionDocStatus ?? "drafting",
     checkedOutByUserId: x.checkedOutByUserId,
@@ -395,6 +413,10 @@ export async function listGlobalVersions(): Promise<GlobalVersionRecord[]> {
     payload: (x.payload || {}) as Record<string, unknown>,
     createdAt: x.createdAt,
     updatedAt: x.updatedAt,
+    createdByUserId: x.createdByUserId,
+    createdByUsername: x.createdByUsername,
+    updatedByUserId: x.updatedByUserId,
+    updatedByUsername: x.updatedByUsername,
     checkoutStatus: x.checkoutStatus ?? "checked_in",
     versionDocStatus: x.versionDocStatus ?? "drafting",
     checkedOutByUserId: x.checkedOutByUserId,
@@ -961,6 +983,18 @@ export async function updateUserStatus(userId: string, status: "active" | "disab
   return data.user
 }
 
+export async function updateUserRole(
+  userId: string,
+  role: UserItem["role"],
+): Promise<UserItem> {
+  if (!userId) throw new Error("用户 ID 不能为空")
+  const data = await apiRequest<{ user: UserItem }>(`/api/v1/auth/users/${encodeURIComponent(userId)}/role`, {
+    method: "PATCH",
+    body: { role },
+  })
+  return data.user
+}
+
 export async function getInviteCodes(): Promise<InviteCodeItem[]> {
   return withFallback(async () => {
     const data = await apiRequest<{ codes: InviteCodeItem[] }>("/api/v1/auth/invite-codes")
@@ -1046,6 +1080,7 @@ export type KimiAssessmentPreviewPayload = {
     valuePropositionRows: Array<Record<string, unknown>>
     businessNeedRows: Array<Record<string, unknown>>
     devOverviewRows: Array<Record<string, unknown>>
+    devTotalDays?: number
     productModuleRows: Array<Record<string, unknown>>
     implementationScopeRows: Array<Record<string, unknown>>
     meetingNotes: string

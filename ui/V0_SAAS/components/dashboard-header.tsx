@@ -33,7 +33,7 @@ export function DashboardHeader({ title, breadcrumbs }: DashboardHeaderProps) {
   }, [])
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border/40 bg-background/80 px-6 py-2 backdrop-blur-xl">
+    <header className="sticky top-0 z-10 border-b border-border/40 bg-background/80 px-6 py-2 shadow-[0_4px_14px_-4px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:shadow-[0_6px_20px_-6px_rgba(0,0,0,0.45)]">
       <div className="flex h-12 shrink-0 items-center gap-4">
         {!embedded ? (
           <>

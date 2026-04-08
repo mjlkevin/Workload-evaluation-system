@@ -13,6 +13,12 @@ import { asString, usersStorePath } from "../utils";
 
 // -------------------- 用户存储操作 --------------------
 
+function normalizeAuthUserRole(user: AuthUser): AuthUser {
+  const r = user.role as string;
+  if (r === "admin" || r === "sub_admin" || r === "user") return user;
+  return { ...user, role: "user" };
+}
+
 export function loadUsersStore(): UsersStore {
   const filePath = usersStorePath();
   if (!fs.existsSync(filePath)) {
@@ -26,7 +32,7 @@ export function loadUsersStore(): UsersStore {
     if (!parsed || !Array.isArray(parsed.users)) {
       return { users: [] };
     }
-    return { users: parsed.users };
+    return { users: parsed.users.map((u) => normalizeAuthUserRole(u as AuthUser)) };
   } catch {
     return { users: [] };
   }
@@ -60,7 +66,9 @@ export function verifyAuthToken(token: string): AuthJwtPayload | null {
     const payload = decoded as jwt.JwtPayload;
     const sub = asString(payload.sub);
     const username = asString(payload.username);
-    const role = asString(payload.role) === "admin" ? "admin" : "user";
+    const roleRaw = asString(payload.role);
+    const role: AuthUser["role"] =
+      roleRaw === "admin" ? "admin" : roleRaw === "sub_admin" ? "sub_admin" : "user";
     if (!sub || !username) return null;
     return { sub, username, role };
   } catch {
@@ -83,6 +91,11 @@ export function toPublicUser(user: AuthUser): Omit<AuthUser, "passwordHash"> {
 
 export function isAdminUser(user: AuthUser): boolean {
   return user.role === "admin";
+}
+
+/** 可进入用户管理：超级管理员 + 子管理员 */
+export function canManageUsers(user: AuthUser): boolean {
+  return user.role === "admin" || user.role === "sub_admin";
 }
 
 export function resolveApiRoleFromUser(user: AuthUser): "admin" | "operator" {

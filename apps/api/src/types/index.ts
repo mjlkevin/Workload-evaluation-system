@@ -65,6 +65,8 @@ export type CalculateRequest = {
   orgCount: number;
   orgSimilarityFactor: number;
   selectedSheet?: string;
+  /** 实施评估工作台当前选中的云产品；导出 Excel 时仅输出这些云产品下已勾选的行（不传或空数组则不按云产品过滤） */
+  selectedCloudNames?: string[];
   exportProjectName?: string;
   exportAssessmentVersionCode?: string;
   items: Array<{
@@ -104,6 +106,7 @@ export type EstimateResult = {
 
 export type BasicProjectInfo = {
   customerName: string;
+  location: string;
   projectName: string;
   opportunityNo: string;
   productLines?: string[];
@@ -188,7 +191,8 @@ export type AuthUser = {
   id: string;
   username: string;
   passwordHash: string;
-  role: "admin" | "user";
+  /** admin：全权限；sub_admin：用户管理（不可动超级管理员/不可授 admin）；user：普通 */
+  role: "admin" | "sub_admin" | "user";
   status: "active" | "disabled";
   createdAt: string;
   lastLoginAt: string;
@@ -242,6 +246,9 @@ export type VersionRecord = {
   updatedAt: string;
   createdByUserId: string;
   createdByUsername: string;
+  /** 最近一次写入该版本记录的用户（新建时与创建人相同） */
+  updatedByUserId: string;
+  updatedByUsername: string;
   reviewedAt?: string;
   reviewedByUserId?: string;
   // --- 检入检出字段 ---
@@ -373,6 +380,16 @@ export function migrateVersionRecord(record: VersionRecord): VersionRecord {
   }
   if (record.isHistoricalArchive === undefined) {
     record.isHistoricalArchive = false;
+  }
+  if (!record.createdByUserId) {
+    record.createdByUserId = record.ownerUserId;
+  }
+  if (!record.createdByUsername) {
+    record.createdByUsername = "—";
+  }
+  if (!record.updatedByUserId) {
+    record.updatedByUserId = record.createdByUserId;
+    record.updatedByUsername = record.createdByUsername;
   }
   return record;
 }

@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { BasicProjectInfo, RequirementImportData } from "../types";
 import { config } from "../config/env";
 import { asString, normalizeCellText, parseCellNumber } from "../utils/helpers";
+import { normalizeKimiModelName } from "../utils/model-name";
 import { ok, fail } from "../utils/response";
 import { requireRole } from "../middleware/auth";
 
@@ -167,6 +168,7 @@ function normalizeBasicProjectInfo(input: Record<string, unknown>): BasicProject
   const rawIndustry = pickModelField(input, ["customerIndustry", "客户行业", "行业"]);
   return {
     customerName: pickModelField(input, ["customerName", "客户名称"]),
+    location: pickModelField(input, ["location", "地点", "所在地区", "地区", "城市"]),
     projectName: pickModelField(input, ["projectName", "项目名称"]),
     opportunityNo: pickModelField(input, ["opportunityNo", "商机号"]),
     productLines: uniqueStringList(
@@ -395,6 +397,7 @@ function buildWorkbookPreviewText(workbook: XLSX.WorkBook): string {
 function mergeBasicInfo(primary: BasicProjectInfo, fallback: BasicProjectInfo): BasicProjectInfo {
   return {
     customerName: primary.customerName || fallback.customerName,
+    location: primary.location || fallback.location,
     projectName: primary.projectName || fallback.projectName,
     opportunityNo: primary.opportunityNo || fallback.opportunityNo,
     productLines:
@@ -423,21 +426,86 @@ function mergeRequirementImportData(primary: RequirementImportData, fallback: Re
 
 function buildCompanyProfileFallback(params: {
   customerName: string;
+  location?: string;
   customerIndustry: string;
   enterpriseRevenue: string;
   itStatus: string;
-}): { enterpriseProfile: string; customerIndustry: string; enterpriseRevenue: string; itStatus: string } {
+}): { enterpriseProfile: string; location: string; customerIndustry: string; enterpriseRevenue: string; itStatus: string } {
+  const location = asString(params.location) || "待补充地点";
   const customerIndustry = ensureIndustryCodeAndName(asString(params.customerIndustry)) || asString(params.customerIndustry) || "待补充行业";
   const enterpriseRevenue = asString(params.enterpriseRevenue) || "待补充规模";
   const itStatus = asString(params.itStatus) || "待补充信息化现状";
   const enterpriseProfile =
-    `${params.customerName}是一家${customerIndustry}企业，当前企业规模/营收约为${enterpriseRevenue}。` +
+    `${params.customerName}位于${location}，是一家${customerIndustry}企业，当前企业规模/营收约为${enterpriseRevenue}。` +
     `从信息化现状看，${itStatus}。建议围绕“业务流程标准化、数据口径统一、关键场景数字化闭环”推进项目落地，` +
     `优先梳理主数据、核心业务流程与管理看板，形成可分阶段交付的实施路线。`;
-  return { enterpriseProfile, customerIndustry, enterpriseRevenue, itStatus };
+  return { enterpriseProfile, location, customerIndustry, enterpriseRevenue, itStatus };
 }
 
 // -------------------- Kimi API 调用 --------------------
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildKimiRequestError(status: number, errorText: string): string {
+  const raw = asString(errorText);
+  if (/engine_overloaded_error|overloaded|try again later/i.test(raw)) {
+    return "kimi_engine_overloaded";
+  }
+  if (status === 429) return "kimi_rate_limited";
+  if (status === 503 || status === 502) return "kimi_service_unavailable";
+  if (status === 401 || status === 403) return "kimi_auth_failed";
+  return `kimi_request_failed:${status}:${raw.slice(0, 240)}`;
+}
+
+function toFriendlyFallbackReason(reason: string): string {
+  const key = asString(reason);
+  if (!key) return "";
+  if (key === "api_key_missing") return "未配置 Kimi API Key，已按规则兜底";
+  if (key === "industry_not_code_name_format") {
+    return "客户行业未按国标四级“编码+名称”格式返回，已自动使用规则回填";
+  }
+  if (key === "kimi_engine_overloaded") return "Kimi 服务繁忙（引擎拥塞），已自动降级为规则回填";
+  if (key === "kimi_rate_limited") return "Kimi 请求触发限流（429），已自动降级为规则回填";
+  if (key === "kimi_service_unavailable") return "Kimi 服务暂不可用（5xx），已自动降级为规则回填";
+  if (key === "kimi_auth_failed") return "Kimi 鉴权失败，请检查 API Key 配置";
+  if (key.includes("engine_overloaded_error")) return "Kimi 服务繁忙（引擎拥塞），已自动降级为规则回填";
+  if (key.startsWith("kimi_request_failed:429")) return "Kimi 请求触发限流（429），已自动降级为规则回填";
+  return key;
+}
+
+async function requestKimiCompletion(params: {
+  endpoint: string;
+  apiKey: string;
+  body: Record<string, unknown>;
+}): Promise<globalThis.Response> {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(params.endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${params.apiKey}`
+      },
+      body: JSON.stringify(params.body)
+    });
+    if (response.ok) return response;
+
+    const errorText = await response.text();
+    const reason = buildKimiRequestError(response.status, errorText);
+    const retryable =
+      reason === "kimi_engine_overloaded" ||
+      reason === "kimi_rate_limited" ||
+      reason === "kimi_service_unavailable";
+    if (retryable && attempt < maxAttempts) {
+      await sleep(350 * 2 ** (attempt - 1));
+      continue;
+    }
+    throw new Error(reason);
+  }
+  throw new Error("kimi_request_failed:unknown");
+}
 
 async function parseRequirementImportByKimi(params: {
   apiUrl: string;
@@ -460,27 +528,22 @@ async function parseRequirementImportByKimi(params: {
         role: "user",
         content:
           `请从以下 Excel 文本中提取【需求】全量信息，并输出 JSON。\n` +
+          `要求：basicInfo.location 优先提取客户实施地点/所在地区（如省市区），缺失时返回空字符串。\n` +
           `要求：basicInfo.customerIndustry 必须按《国民经济行业分类》（GB/T 4754）四级分类输出，且每一级都必须为“编码+名称”。` +
           `格式为："门类编码 门类名称 > 大类编码 大类名称 > 中类编码 中类名称 > 小类编码 小类名称"。` +
-          `例如：I 信息传输、软件和信息技术服务业 > 65 软件和信息技术服务业 > 651 软件开发 > 6510 软件开发。\n\n` +
+          `例如：I 信息传输、软件和信息技术服务业 > 65 软件和信息技术服务业 > 651 软件开发 > 6510 软件开发。\n` +
+          `若原文无法确定精确行业：仍需给出“最可能的建议国标四级分类”，并写入 basicInfo.customerIndustrySuggestion 字段（格式同上）。` +
+          `同时 basicInfo.customerIndustry 可为空字符串，不能输出非标准格式文本。\n\n` +
           `${params.workbookText}`
       }
     ]
   };
   
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.apiKey}`
-    },
-    body: JSON.stringify(body)
+  const response = await requestKimiCompletion({
+    endpoint,
+    apiKey: params.apiKey,
+    body
   });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`kimi_request_failed:${response.status}:${errorText.slice(0, 240)}`);
-  }
   
   const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = asString(json?.choices?.[0]?.message?.content);
@@ -488,7 +551,25 @@ async function parseRequirementImportByKimi(params: {
   const basicInfoSource = asModelObject(parsed.basicInfo);
   
   const normalizedBasicInfo = normalizeBasicProjectInfo(Object.keys(basicInfoSource).length ? basicInfoSource : parsed);
-  const strictIndustry = ensureIndustryCodeAndName(normalizedBasicInfo.customerIndustry);
+  const suggestedIndustry =
+    pickModelField(basicInfoSource, ["customerIndustrySuggestion", "建议国标分类", "行业建议"]) ||
+    pickModelField(parsed, ["customerIndustrySuggestion", "建议国标分类", "行业建议"]);
+  const strictIndustry =
+    ensureIndustryCodeAndName(normalizedBasicInfo.customerIndustry) ||
+    ensureIndustryCodeAndName(suggestedIndustry) ||
+    ensureIndustryCodeAndName(
+      inferIndustry4Level(
+        [
+          normalizedBasicInfo.customerName,
+          normalizedBasicInfo.customerIndustry,
+          suggestedIndustry,
+          normalizedBasicInfo.enterpriseProfile,
+          normalizedBasicInfo.projectBackgroundNeeds,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      ),
+    );
   if (!strictIndustry) {
     throw new Error("industry_not_code_name_format");
   }
@@ -525,11 +606,13 @@ async function summarizeCompanyProfileByKimi(params: {
   apiKey: string;
   model: string;
   customerName: string;
+  location?: string;
   customerIndustry?: string;
   enterpriseRevenue?: string;
   itStatus?: string;
 }): Promise<{
   enterpriseProfile: string;
+  location: string;
   customerIndustry: string;
   enterpriseRevenue: string;
   itStatus: string;
@@ -539,6 +622,7 @@ async function summarizeCompanyProfileByKimi(params: {
   const endpoint = `${baseUrl}/chat/completions`;
   const knownContextLines = [
     `客户名称：${params.customerName}`,
+    params.location ? `已知地点：${params.location}` : "",
     params.customerIndustry ? `已知行业：${params.customerIndustry}` : "",
     params.enterpriseRevenue ? `已知规模/营收：${params.enterpriseRevenue}` : "",
     params.itStatus ? `已知信息化现状：${params.itStatus}` : ""
@@ -552,7 +636,7 @@ async function summarizeCompanyProfileByKimi(params: {
       {
         role: "system",
         content:
-          "你是企业经营分析与信息摘要助手。请只输出 JSON 对象，不要输出任何解释文字。必须返回且仅返回以下四个字段：enterpriseProfile、customerIndustry、enterpriseRevenue、itStatus。四个字段都必须是非空字符串。若公开信息不足，请基于行业公开口径与行业常识给出审慎估计，并在表述中标注“估计/区间/未公开”。"
+          "你是企业经营分析与信息摘要助手。请只输出 JSON 对象，不要输出任何解释文字。必须返回且仅返回以下五个字段：enterpriseProfile、location、customerIndustry、enterpriseRevenue、itStatus。五个字段都必须是非空字符串。若公开信息不足，请基于行业公开口径与行业常识给出审慎估计，并在表述中标注“估计/区间/未公开”。"
       },
       {
         role: "user",
@@ -560,37 +644,32 @@ async function summarizeCompanyProfileByKimi(params: {
           `请根据客户名称与已知信息，输出该客户的企业画像并严格按指定 JSON 字段返回。\n\n` +
           `输出要求：\n` +
           `1) 仅输出 JSON，不要 Markdown，不要代码块。\n` +
-          `2) 字段必须完整：enterpriseProfile、customerIndustry、enterpriseRevenue、itStatus。\n` +
+          `2) 字段必须完整：enterpriseProfile、location、customerIndustry、enterpriseRevenue、itStatus。\n` +
           `3) 强调“高度提炼与总结”，避免空泛口号，优先写经营情况、营收情况、财务情况。\n` +
           `4) enterpriseProfile 为 120-220 字中文简介，要求至少包含 2 处可量化信息（如营收区间、增长率、利润率、资产规模、员工规模、门店/产能等），若无公开精确值可给区间并标注估计。\n` +
-          `5) customerIndustry 必须按《国民经济行业分类》（GB/T 4754）四级分类返回，且每一级都必须为“编码+名称”，格式："门类编码 门类名称 > 大类编码 大类名称 > 中类编码 中类名称 > 小类编码 小类名称"。\n` +
-          `6) enterpriseRevenue 必须包含数值或区间（例如“约50-80亿元”或“未公开，行业估计30-50亿元”），并尽量补充一条财务相关支撑信息（如毛利率区间/利润水平/资产规模/现金流特征）。\n` +
-          `7) itStatus 描述信息化现状成熟度，并尽量给出具体系统或建设内容（如 ERP/CRM/MES/BI/主数据/集成平台等）；若信息可信度低请明确标注“信息有限”。\n` +
-          `8) 数据支撑原则：优先公开数据；无公开数据时使用行业估计并显式说明“估计依据为行业均值/同规模企业区间”。\n\n` +
+          `5) location 返回客户主要经营/实施所在地（省市或城市），若无公开信息可给出最可信地点并标注“待核实”。\n` +
+          `6) customerIndustry 必须按《国民经济行业分类》（GB/T 4754）四级分类返回，且每一级都必须为“编码+名称”，格式："门类编码 门类名称 > 大类编码 大类名称 > 中类编码 中类名称 > 小类编码 小类名称"。\n` +
+          `7) enterpriseRevenue 必须包含数值或区间（例如“约50-80亿元”或“未公开，行业估计30-50亿元”），并尽量补充一条财务相关支撑信息（如毛利率区间/利润水平/资产规模/现金流特征）。\n` +
+          `8) itStatus 描述信息化现状成熟度，并尽量给出具体系统或建设内容（如 ERP/CRM/MES/BI/主数据/集成平台等）；若信息可信度低请明确标注“信息有限”。\n` +
+          `9) 数据支撑原则：优先公开数据；无公开数据时使用行业估计并显式说明“估计依据为行业均值/同规模企业区间”。\n\n` +
           `已知信息：\n${knownContextLines.join("\n")}\n\n` +
           `请按如下结构返回：\n` +
-          `{"enterpriseProfile":"","customerIndustry":"","enterpriseRevenue":"","itStatus":""}`
+          `{"enterpriseProfile":"","location":"","customerIndustry":"","enterpriseRevenue":"","itStatus":""}`
       }
     ]
   };
   
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.apiKey}`
-    },
-    body: JSON.stringify(body)
+  const response = await requestKimiCompletion({
+    endpoint,
+    apiKey: params.apiKey,
+    body
   });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`kimi_request_failed:${response.status}:${errorText.slice(0, 240)}`);
-  }
   
   const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = asString(json?.choices?.[0]?.message?.content);
   const parsed = parseJsonFromModelText(content);
+  let location =
+    pickCompanyProfileField(parsed, ["location", "地点", "所在地区", "地区", "城市"]) || asString(params.location);
   const rawIndustry = pickCompanyProfileField(parsed, ["customerIndustry", "客户行业", "行业"]);
   let enterpriseProfile = asString(
     pickCompanyProfileField(parsed, ["enterpriseProfile", "企业简介"]) ||
@@ -618,6 +697,9 @@ async function summarizeCompanyProfileByKimi(params: {
   if (!itStatus.trim()) {
     itStatus = PLACEHOLDER_IT;
   }
+  if (!location.trim()) {
+    location = "待补充地点";
+  }
   if (!enterpriseProfile.trim()) {
     enterpriseProfile =
       `${params.customerName}：公开可核资料有限，模型未返回企业简介正文。` +
@@ -633,7 +715,7 @@ async function summarizeCompanyProfileByKimi(params: {
     /\b[A-Z]\s*>\s*\d{2}\s*>\s*\d{3}\s*>\s*\d{4}\b/g,
     customerIndustry,
   );
-  return { enterpriseProfile: enterpriseProfileNormalized, customerIndustry, enterpriseRevenue, itStatus, rawContent: content };
+  return { enterpriseProfile: enterpriseProfileNormalized, location, customerIndustry, enterpriseRevenue, itStatus, rawContent: content };
 }
 
 async function chatWithKimi(params: {
@@ -713,6 +795,7 @@ type KimiAssessmentSnapshot = {
   valuePropositionRows?: Array<Record<string, unknown>>;
   businessNeedRows?: Array<Record<string, unknown>>;
   devOverviewRows?: Array<Record<string, unknown>>;
+  devTotalDays?: number;
   productModuleRows?: Array<Record<string, unknown>>;
   implementationScopeRows?: Array<Record<string, unknown>>;
   meetingNotes?: string;
@@ -752,6 +835,41 @@ function uniqueStringList(values: unknown[]): string[] {
     result.push(text);
   }
   return result;
+}
+
+function deriveDevTotalDays(snapshot: KimiAssessmentSnapshot): number {
+  const explicit = Math.max(0, Number(snapshot.devTotalDays || 0));
+  if (explicit > 0) return explicit;
+  const rows = Array.isArray(snapshot.devOverviewRows) ? snapshot.devOverviewRows : [];
+  const codingSum = rows.reduce((sum, row) => sum + toNumberSafe(asModelObject(row).codingDays), 0);
+  return Math.max(0, Number((codingSum * 1.6).toFixed(1)));
+}
+
+function mergeDevTotalModuleItem(moduleItems: KimiAssessmentModuleItem[], snapshot: KimiAssessmentSnapshot): KimiAssessmentModuleItem[] {
+  const devTotalDays = deriveDevTotalDays(snapshot);
+  if (devTotalDays <= 0) return moduleItems;
+
+  const rounded = Math.max(1, Math.round(devTotalDays));
+  const merged = [...moduleItems];
+  const matchIndex = merged.findIndex((item) => {
+    const cloud = asString(item.cloudProduct);
+    const sku = asString(item.skuName || item.moduleName);
+    return /开发需求概要/.test(cloud) || /开发(总|汇)人天|开发需求/.test(sku);
+  });
+  const devItem: KimiAssessmentModuleItem = {
+    cloudProduct: "开发需求概要",
+    skuName: "合计行",
+    moduleName: "开发总人天",
+    standardDays: rounded,
+    suggestedDays: rounded,
+    reason: "取开发需求概要“合计”列总人天纳入评估范围，用于体现开发实施工作量基线。"
+  };
+  if (matchIndex >= 0) {
+    merged[matchIndex] = devItem;
+  } else {
+    merged.push(devItem);
+  }
+  return merged;
 }
 
 function estimateFallbackAssessmentDraft(snapshot: KimiAssessmentSnapshot): KimiAssessmentDraft {
@@ -833,7 +951,7 @@ function estimateFallbackAssessmentDraft(snapshot: KimiAssessmentSnapshot): Kimi
     orgCount,
     orgSimilarity,
     difficultyFactor,
-    moduleItems,
+    moduleItems: mergeDevTotalModuleItem(moduleItems, snapshot),
     risks,
     assumptions: [
       "当前结果为 AI 草稿，需人工校核后再作为正式评估输入。",
@@ -873,6 +991,43 @@ function normalizeKimiAssessmentDraft(input: Record<string, unknown>, fallback: 
     risks: risks.length ? risks : fallback.risks,
     assumptions: assumptions.length ? assumptions : fallback.assumptions
   };
+}
+
+function isGenericAssessmentReason(reason: string): boolean {
+  const text = asString(reason).trim();
+  if (!text) return true;
+  if (text.length < 8) return true;
+  const patterns = [
+    /重排后的估算建议/,
+    /人工复核/,
+    /规则兜底/,
+    /基于用户规模、需求复杂度与组织协同成本进行估算/,
+    /开发需求概要的编码人天做实施侧换算/
+  ];
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function buildDeviationReason(standardDays: number, suggestedDays: number): string {
+  const standard = Math.max(0, Math.round(Number(standardDays) || 0));
+  const suggested = Math.max(0, Math.round(Number(suggestedDays) || 0));
+  if (standard <= 0) {
+    return "标准人天缺少有效基线，建议人天按当前需求复杂度与实施范围估算，请人工复核。";
+  }
+  const delta = suggested - standard;
+  if (delta === 0) {
+    return "建议人天与标准人天一致，当前范围未识别到明显偏离因素。";
+  }
+  const pct = Math.round((Math.abs(delta) / standard) * 100);
+  if (delta > 0) {
+    return `建议人天较标准人天增加 ${delta} 天（约 +${pct}%），主要考虑需求复杂度、组织协同与推广范围带来的额外工作量。`;
+  }
+  return `建议人天较标准人天减少 ${Math.abs(delta)} 天（约 -${pct}%），当前实施范围较聚焦，标准交付能力可覆盖主要工作项。`;
+}
+
+function resolveAssessmentReason(rawReason: string, standardDays: number, suggestedDays: number): string {
+  const reason = asString(rawReason).trim();
+  if (!isGenericAssessmentReason(reason)) return reason;
+  return buildDeviationReason(standardDays, suggestedDays);
 }
 
 function buildCloudSkuModuleItemsFromSnapshot(
@@ -918,9 +1073,7 @@ function buildCloudSkuModuleItemsFromSnapshot(
       moduleName: `${cloudProduct}-${skuName}`,
       standardDays,
       suggestedDays,
-      reason:
-        asString(hit?.reason) ||
-        "按产品模块清单（云产品+SKU）重排后的估算建议，需结合实施范围人工复核。"
+      reason: resolveAssessmentReason(asString(hit?.reason), standardDays, suggestedDays)
     });
   }
 
@@ -954,25 +1107,18 @@ async function generateAssessmentDraftByKimi(params: {
           `1) 只输出 JSON 对象；\n` +
           `2) quoteMode 默认优先“模块报价”；\n` +
           `3) 若信息不足，给出审慎估算并在 risks/assumptions 说明；\n` +
-          `4) moduleItems 至少返回 1 条。\n\n` +
+          `4) moduleItems 至少返回 1 条；\n` +
+          `5) 若 requirementSnapshot.devTotalDays > 0，请将其作为“开发总人天”纳入 moduleItems。\n\n` +
           `${JSON.stringify(params.payload)}`
       }
     ]
   };
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.apiKey}`
-    },
-    body: JSON.stringify(body)
+  const response = await requestKimiCompletion({
+    endpoint,
+    apiKey: params.apiKey,
+    body
   });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`kimi_request_failed:${response.status}:${errorText.slice(0, 240)}`);
-  }
 
   const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = asString(json?.choices?.[0]?.message?.content);
@@ -999,19 +1145,65 @@ function getSheetRows(workbook: XLSX.WorkBook, sheetName: string): (string | num
   if (!sheetName) return [];
   const ws = workbook.Sheets[sheetName];
   if (!ws) return [];
-  return XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1, defval: "", raw: false });
+  const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1, defval: "", raw: false });
+  try {
+    const merges = Array.isArray(ws["!merges"]) ? (ws["!merges"] as XLSX.Range[]) : [];
+    if (!merges.length) return rows;
+    if (!rows.length) return rows;
+
+    const rowCount = rows.length;
+    const maxColCount = Math.max(1, ...rows.map((r) => (Array.isArray(r) ? r.length : 0)));
+    let expandedCellBudget = 0;
+    const maxExpandedCells = 120000;
+
+    for (const merge of merges) {
+      const rawStartRow = merge?.s?.r ?? -1;
+      const rawEndRow = merge?.e?.r ?? -1;
+      const rawStartCol = merge?.s?.c ?? -1;
+      const rawEndCol = merge?.e?.c ?? -1;
+      if (rawStartRow < 0 || rawEndRow < rawStartRow || rawStartCol < 0 || rawEndCol < rawStartCol) continue;
+
+      // 仅在当前已解析出的可见数据范围内做合并展开，避免超大坐标导致性能/内存问题。
+      const startRow = Math.min(rowCount - 1, rawStartRow);
+      const endRow = Math.min(rowCount - 1, rawEndRow);
+      const startCol = Math.min(maxColCount - 1, rawStartCol);
+      const endCol = Math.min(maxColCount - 1, rawEndCol);
+      if (endRow < startRow || endCol < startCol) continue;
+      const area = (endRow - startRow + 1) * (endCol - startCol + 1);
+      if (area > 20000) continue;
+      if (expandedCellBudget + area > maxExpandedCells) break;
+
+      const startCellAddress = XLSX.utils.encode_cell({ r: startRow, c: startCol });
+      const mergedValue = asString(rows[startRow]?.[startCol] ?? ws[startCellAddress]?.v ?? "");
+      if (!mergedValue) continue;
+      for (let r = startRow; r <= endRow; r += 1) {
+        if (!rows[r]) rows[r] = [];
+        for (let c = startCol; c <= endCol; c += 1) {
+          if (!asString(rows[r][c])) {
+            rows[r][c] = mergedValue;
+          }
+        }
+      }
+      expandedCellBudget += area;
+    }
+    return rows;
+  } catch {
+    // 解析异常时回退原始行数据，避免影响整体导入流程。
+    return rows;
+  }
 }
 
 function parseBasicInfoFromWorkbook(workbook: XLSX.WorkBook): BasicProjectInfo {
   const rows = getSheetRows(workbook, findSheetByKeyword(workbook, "项目概况"));
   const result: BasicProjectInfo = {
-    customerName: "", projectName: "", opportunityNo: "", customerIndustry: "",
+    customerName: "", location: "", projectName: "", opportunityNo: "", customerIndustry: "",
     productLines: [],
     enterpriseRevenue: "", itStatus: "", expectedGoLive: "", enterpriseProfile: "",
     projectBackgroundNeeds: "", projectGoals: ""
   };
   const fieldMap: Array<{ keys: string[]; target: Exclude<keyof BasicProjectInfo, "productLines"> }> = [
     { keys: ["客户名称"], target: "customerName" },
+    { keys: ["地点", "所在地区", "区域", "城市"], target: "location" },
     { keys: ["项目名称"], target: "projectName" },
     { keys: ["商机号"], target: "opportunityNo" },
     { keys: ["客户行业", "行业"], target: "customerIndustry" },
@@ -1032,6 +1224,68 @@ function parseBasicInfoFromWorkbook(workbook: XLSX.WorkBook): BasicProjectInfo {
     result[matched.target] = value;
   }
   return result;
+}
+
+function scoreHumanReadableChinese(text: string): number {
+  const value = asString(text);
+  if (!value) return -1;
+  const chineseCount = (value.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const mojibakeCount = (value.match(/[ÃÂÐÕÊÖ×ÓÆðÖÞÑÍË]{1}/g) || []).length;
+  return chineseCount * 2 - mojibakeCount;
+}
+
+function normalizeUploadedFileName(fileName: string): string {
+  const raw = asString(fileName).trim();
+  if (!raw) return "";
+  const latin1Decoded = Buffer.from(raw, "latin1").toString("utf8").trim();
+  const candidates = [raw, latin1Decoded].filter(Boolean);
+  if (!candidates.length) return "";
+  return candidates.sort((a, b) => scoreHumanReadableChinese(b) - scoreHumanReadableChinese(a))[0] || raw;
+}
+
+function inferCustomerNameFromFileName(fileName: string): string {
+  const raw = normalizeUploadedFileName(fileName);
+  if (!raw) return "";
+  const withoutExt = raw.replace(/\.[^.]+$/, "");
+  const normalized = withoutExt
+    .replace(/[（(][^)）]*[)）]/g, " ")
+    .replace(/[_\-—]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return "";
+
+  const blocked = [
+    "工作量评估申请表",
+    "评估申请表",
+    "评估",
+    "实施",
+    "需求",
+    "导入",
+    "模板",
+    "附件",
+    "excel",
+    "xlsx",
+    "xls",
+    "副本",
+    "最终版",
+    "终版"
+  ];
+
+  const dateLike = /^(?:19|20)\d{2}(?:[./-]?\d{1,2}){0,2}$/;
+  const numericLike = /^\d{4,}$/;
+  const candidates = normalized
+    .split(/[ \t]+/)
+    .map((x) => asString(x))
+    .filter(Boolean)
+    .filter((x) => !dateLike.test(x))
+    .filter((x) => !numericLike.test(x))
+    .filter((x) => !blocked.some((k) => x.includes(k)));
+
+  if (!candidates.length) return "";
+  const withChinese = candidates.filter((x) => /[\u4e00-\u9fa5]/.test(x));
+  const picked = (withChinese.length ? withChinese : candidates)
+    .sort((a, b) => b.length - a.length)[0] || "";
+  return picked.trim();
 }
 
 function parseRequirementImportFromWorkbook(workbook: XLSX.WorkBook): RequirementImportData {
@@ -1297,9 +1551,15 @@ export async function parseBasicInfo(req: Request, res: Response) {
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const workbookText = buildWorkbookPreviewText(workbook);
     const workbookBasicInfo = parseBasicInfoFromWorkbook(workbook);
+    const fileNameCustomerName = inferCustomerNameFromFileName(req.file.originalname || "");
+    const workbookBasicInfoWithFileName: BasicProjectInfo = {
+      ...workbookBasicInfo,
+      customerName: workbookBasicInfo.customerName || fileNameCustomerName
+    };
     const workbookRequirementData = parseRequirementImportFromWorkbook(workbook);
     const apiKey = config.kimi.apiKey;
     const model = config.kimi.model;
+    const modelForClient = normalizeKimiModelName(model);
 
     if (!apiKey) {
       const inferredLines = inferProductLinesFromProductModules(workbookRequirementData.productModuleRows);
@@ -1307,17 +1567,17 @@ export async function parseBasicInfo(req: Request, res: Response) {
         ok(
           {
             basicInfo: {
-              ...workbookBasicInfo,
+              ...workbookBasicInfoWithFileName,
               productLines:
-                (workbookBasicInfo.productLines && workbookBasicInfo.productLines.length
-                  ? workbookBasicInfo.productLines
+                (workbookBasicInfoWithFileName.productLines && workbookBasicInfoWithFileName.productLines.length
+                  ? workbookBasicInfoWithFileName.productLines
                   : inferredLines),
             },
             requirementImportData: workbookRequirementData,
             sourceSheets: workbook.SheetNames,
             model: "rule-fallback",
             mode: "rule_fallback",
-            fallbackReason: "api_key_missing",
+            fallbackReason: toFriendlyFallbackReason("api_key_missing"),
             rawContent: ""
           },
           requestId
@@ -1333,7 +1593,7 @@ export async function parseBasicInfo(req: Request, res: Response) {
         workbookText
       });
 
-      const mergedBasic = mergeBasicInfo(parsed.basicInfo, workbookBasicInfo);
+      const mergedBasic = mergeBasicInfo(parsed.basicInfo, workbookBasicInfoWithFileName);
       const mergedRequirement = mergeRequirementImportData(parsed.requirementImportData, workbookRequirementData);
       const inferredLines = inferProductLinesFromProductModules(mergedRequirement.productModuleRows);
       return res.json(
@@ -1348,7 +1608,7 @@ export async function parseBasicInfo(req: Request, res: Response) {
             },
             requirementImportData: mergedRequirement,
             sourceSheets: workbook.SheetNames,
-            model,
+            model: modelForClient,
             mode: "model",
             fallbackReason: "",
             rawContent: parsed.rawContent
@@ -1357,16 +1617,17 @@ export async function parseBasicInfo(req: Request, res: Response) {
         )
       );
     } catch (modelErr) {
-      const fallbackReason = modelErr instanceof Error ? modelErr.message : "model_parse_failed";
+      const fallbackReasonRaw = modelErr instanceof Error ? modelErr.message : "model_parse_failed";
+      const fallbackReason = toFriendlyFallbackReason(fallbackReasonRaw);
       const inferredLines = inferProductLinesFromProductModules(workbookRequirementData.productModuleRows);
       return res.json(
         ok(
           {
             basicInfo: {
-              ...workbookBasicInfo,
+              ...workbookBasicInfoWithFileName,
               productLines:
-                (workbookBasicInfo.productLines && workbookBasicInfo.productLines.length
-                  ? workbookBasicInfo.productLines
+                (workbookBasicInfoWithFileName.productLines && workbookBasicInfoWithFileName.productLines.length
+                  ? workbookBasicInfoWithFileName.productLines
                   : inferredLines),
             },
             requirementImportData: workbookRequirementData,
@@ -1392,6 +1653,7 @@ export async function companyProfileSummary(req: Request, res: Response) {
   const requestId = randomUUID();
   const body = (req.body || {}) as {
     customerName?: string;
+    location?: string;
     customerIndustry?: string;
     enterpriseRevenue?: string;
     itStatus?: string;
@@ -1402,13 +1664,14 @@ export async function companyProfileSummary(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "customerName", reason: "required" }]);
   }
 
+  const location = asString(body.location);
   const customerIndustry = asString(body.customerIndustry);
   const enterpriseRevenue = asString(body.enterpriseRevenue);
   const itStatus = asString(body.itStatus);
   const apiKey = config.kimi.apiKey;
 
   if (!apiKey) {
-    const fallback = buildCompanyProfileFallback({ customerName, customerIndustry, enterpriseRevenue, itStatus });
+    const fallback = buildCompanyProfileFallback({ customerName, location, customerIndustry, enterpriseRevenue, itStatus });
     return res.json(
       ok(
         {
@@ -1416,7 +1679,7 @@ export async function companyProfileSummary(req: Request, res: Response) {
           ...fallback,
           model: "rule-fallback",
           mode: "rule_fallback",
-          fallbackReason: "api_key_missing",
+          fallbackReason: toFriendlyFallbackReason("api_key_missing"),
           rawContent: ""
         },
         requestId
@@ -1426,11 +1689,13 @@ export async function companyProfileSummary(req: Request, res: Response) {
 
   try {
     const model = config.kimi.model;
+    const modelForClient = normalizeKimiModelName(model);
     const parsed = await summarizeCompanyProfileByKimi({
       apiUrl: config.kimi.apiBaseUrl,
       apiKey,
       model,
       customerName,
+      location,
       customerIndustry,
       enterpriseRevenue,
       itStatus
@@ -1441,10 +1706,11 @@ export async function companyProfileSummary(req: Request, res: Response) {
         {
           customerName,
           enterpriseProfile: parsed.enterpriseProfile,
+          location: parsed.location,
           customerIndustry: parsed.customerIndustry,
           enterpriseRevenue: parsed.enterpriseRevenue,
           itStatus: parsed.itStatus,
-          model,
+          model: modelForClient,
           mode: "model",
           fallbackReason: "",
           rawContent: parsed.rawContent
@@ -1453,8 +1719,9 @@ export async function companyProfileSummary(req: Request, res: Response) {
       )
     );
   } catch (err) {
-    const fallbackReason = err instanceof Error ? err.message : "summary_failed";
-    const fallback = buildCompanyProfileFallback({ customerName, customerIndustry, enterpriseRevenue, itStatus });
+    const fallbackReasonRaw = err instanceof Error ? err.message : "summary_failed";
+    const fallbackReason = toFriendlyFallbackReason(fallbackReasonRaw);
+    const fallback = buildCompanyProfileFallback({ customerName, location, customerIndustry, enterpriseRevenue, itStatus });
     return res.json(
       ok(
         {
@@ -1488,10 +1755,11 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
   const fallbackDraft = estimateFallbackAssessmentDraft(snapshot);
   const fallbackDraftAligned: KimiAssessmentDraft = {
     ...fallbackDraft,
-    moduleItems: buildCloudSkuModuleItemsFromSnapshot(snapshot, fallbackDraft)
+    moduleItems: mergeDevTotalModuleItem(buildCloudSkuModuleItemsFromSnapshot(snapshot, fallbackDraft), snapshot)
   };
   const apiKey = config.kimi.apiKey;
   const model = config.kimi.model;
+  const modelForClient = normalizeKimiModelName(model);
   const promptProfile = asString(asModelObject(body.ruleContext).promptProfile) || "assessment_default_v1";
   const startedAt = Date.now();
 
@@ -1506,11 +1774,11 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
             promptVersion: promptProfile,
             ruleSetId: "fallback-rules-v1",
             mode: "rule_fallback",
-            fallbackReason: "api_key_missing",
+            fallbackReason: toFriendlyFallbackReason("api_key_missing"),
             elapsedMs: Date.now() - startedAt
           },
           source: { globalVersionCode, requirementVersionCode },
-          assessmentDraft: fallbackDraft
+          assessmentDraft: fallbackDraftAligned
         },
         requestId
       )
@@ -1527,14 +1795,14 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
     });
     const alignedDraft: KimiAssessmentDraft = {
       ...result.draft,
-      moduleItems: buildCloudSkuModuleItemsFromSnapshot(snapshot, result.draft)
+      moduleItems: mergeDevTotalModuleItem(buildCloudSkuModuleItemsFromSnapshot(snapshot, result.draft), snapshot)
     };
 
     return res.json(
       ok(
         {
           meta: {
-            model,
+            model: modelForClient,
             generatedAt: new Date().toISOString(),
             confidence: 0.78,
             promptVersion: promptProfile,
@@ -1551,7 +1819,8 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
       )
     );
   } catch (err) {
-    const fallbackReason = err instanceof Error ? err.message : "model_generate_failed";
+    const fallbackReasonRaw = err instanceof Error ? err.message : "model_generate_failed";
+    const fallbackReason = toFriendlyFallbackReason(fallbackReasonRaw);
     return res.json(
       ok(
         {
@@ -1601,6 +1870,7 @@ export async function chat(req: Request, res: Response) {
   
   try {
     const model = config.kimi.model;
+    const modelForClient = normalizeKimiModelName(model);
     const result = await chatWithKimi({
       apiUrl: config.kimi.apiBaseUrl,
       apiKey,
@@ -1608,7 +1878,7 @@ export async function chat(req: Request, res: Response) {
       messages: messages.slice(-12)
     });
     
-    res.json(ok({ answer: result.answer, model }, requestId));
+    res.json(ok({ answer: result.answer, model: modelForClient }, requestId));
   } catch (err) {
     const reason = err instanceof Error ? err.message : "chat_failed";
     return fail(res, 40001, "参数错误", [{ field: "messages/api", reason }]);

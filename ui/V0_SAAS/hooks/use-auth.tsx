@@ -1,12 +1,12 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { apiRequest, getStoredToken } from "@/lib/api-client"
 
 export type AuthUser = {
   id: string
   username: string
-  role: "admin" | "user"
+  role: "admin" | "sub_admin" | "user"
   status: "active" | "disabled"
   createdAt: string
   lastLoginAt: string
@@ -18,13 +18,21 @@ type AuthContextValue = {
   loading: boolean
   initialized: boolean
   isAdmin: boolean
+  /** 用户管理（含子管理员）；系统管理/API 等仍仅用 isAdmin */
+  canManageUsers: boolean
   login: (username: string, password: string) => Promise<void>
   register: (username: string, password: string, inviteCode: string) => Promise<void>
   logout: () => Promise<void>
-  refresh: () => Promise<void>
+  refresh: (signal?: AbortSignal) => Promise<void>
 }
 
 const AUTH_TOKEN_KEY = "workload-auth-token-v1"
+
+function isAbortError(e: unknown): boolean {
+  if (e instanceof DOMException && e.name === "AbortError") return true
+  if (e instanceof Error && e.name === "AbortError") return true
+  return false
+}
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
@@ -34,67 +42,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false)
   const [initialized, setInitialized] = useState(false)
 
-  const clearAuth = () => {
+  const clearAuth = useCallback(() => {
     setToken("")
     setUser(null)
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(AUTH_TOKEN_KEY)
     }
-  }
+  }, [])
 
-  const applyAuth = (nextToken: string, nextUser: AuthUser) => {
+  const applyAuth = useCallback((nextToken: string, nextUser: AuthUser) => {
     setToken(nextToken)
     setUser(nextUser)
     if (typeof window !== "undefined") {
       window.localStorage.setItem(AUTH_TOKEN_KEY, nextToken)
     }
-  }
+  }, [])
 
-  const refresh = async () => {
+  const refresh = useCallback(
+    async (signal?: AbortSignal) => {
+      const localToken = getStoredToken()
+      if (!localToken) {
+        clearAuth()
+        return
+      }
+      setLoading(true)
+      try {
+        const data = await apiRequest<{ user: AuthUser }>("/api/v1/auth/me", { token: localToken, signal })
+        // 登录/注册可能已换新 token；勿用旧 /me 响应覆盖或误清会话
+        if (getStoredToken() !== localToken) return
+        applyAuth(localToken, data.user)
+      } catch (e) {
+        if (isAbortError(e)) return
+        if (getStoredToken() === localToken) clearAuth()
+      } finally {
+        setLoading(false)
+      }
+    },
+    [applyAuth, clearAuth],
+  )
+
+  const login = useCallback(
+    async (username: string, password: string) => {
+      setLoading(true)
+      try {
+        const data = await apiRequest<{ token: string; user: AuthUser }>("/api/v1/auth/login", {
+          method: "POST",
+          body: { username, password },
+        })
+        applyAuth(data.token, data.user)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [applyAuth],
+  )
+
+  const register = useCallback(
+    async (username: string, password: string, inviteCode: string) => {
+      setLoading(true)
+      try {
+        const data = await apiRequest<{ token: string; user: AuthUser }>("/api/v1/auth/register", {
+          method: "POST",
+          body: { username, password, inviteCode },
+        })
+        applyAuth(data.token, data.user)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [applyAuth],
+  )
+
+  const logout = useCallback(async () => {
     const localToken = getStoredToken()
-    if (!localToken) {
-      clearAuth()
-      return
-    }
-    setLoading(true)
-    try {
-      const data = await apiRequest<{ user: AuthUser }>("/api/v1/auth/me", { token: localToken })
-      applyAuth(localToken, data.user)
-    } catch {
-      clearAuth()
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const login = async (username: string, password: string) => {
-    setLoading(true)
-    try {
-      const data = await apiRequest<{ token: string; user: AuthUser }>("/api/v1/auth/login", {
-        method: "POST",
-        body: { username, password },
-      })
-      applyAuth(data.token, data.user)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const register = async (username: string, password: string, inviteCode: string) => {
-    setLoading(true)
-    try {
-      const data = await apiRequest<{ token: string; user: AuthUser }>("/api/v1/auth/register", {
-        method: "POST",
-        body: { username, password, inviteCode },
-      })
-      applyAuth(data.token, data.user)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const logout = async () => {
-    const localToken = token || getStoredToken()
     try {
       if (localToken) {
         await apiRequest<{ success: boolean }>("/api/v1/auth/logout", {
@@ -107,11 +127,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       clearAuth()
     }
-  }
+  }, [clearAuth])
 
   useEffect(() => {
-    void refresh().finally(() => setInitialized(true))
-  }, [])
+    const ac = new AbortController()
+    const id = window.setTimeout(() => ac.abort(), 12_000)
+    void refresh(ac.signal).finally(() => {
+      window.clearTimeout(id)
+      setInitialized(true)
+    })
+    return () => {
+      window.clearTimeout(id)
+      ac.abort()
+    }
+  }, [refresh])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -120,12 +149,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       initialized,
       isAdmin: user?.role === "admin",
+      canManageUsers: user?.role === "admin" || user?.role === "sub_admin",
       login,
       register,
       logout,
       refresh,
     }),
-    [token, user, loading, initialized],
+    [token, user, loading, initialized, login, register, logout, refresh],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

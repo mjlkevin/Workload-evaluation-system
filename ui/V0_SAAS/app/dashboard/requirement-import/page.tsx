@@ -26,15 +26,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
-import { TableCell, TableRow } from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
 import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
 import { TableTemplate } from "@/components/table-template"
 import { useAuth } from "@/hooks/use-auth"
 import { apiRequest } from "@/lib/api-client"
-import { cn } from "@/lib/utils"
+import { normalizeKimiModelName } from "@/lib/model-name"
+import { cn, createClientRowId } from "@/lib/utils"
 import {
   checkinVersionById,
   checkoutVersionById,
@@ -53,6 +55,7 @@ import { toast } from "sonner"
 
 type BasicInfo = {
   customerName: string
+  location: string
   projectName: string
   opportunityNo: string
   productLines: string[]
@@ -142,6 +145,7 @@ type ParseBasicInfoResponse = {
 
 type CompanyProfileSummaryResponse = {
   enterpriseProfile: string
+  location: string
   customerIndustry: string
   enterpriseRevenue: string
   itStatus: string
@@ -150,9 +154,11 @@ type CompanyProfileSummaryResponse = {
   fallbackReason?: string
 }
 
+const DEV_OVERVIEW_TOTAL_ROW_ID = "__dev-overview-total__"
+
 function createEmptyBusinessNeedRow(): BusinessNeedRow {
   return {
-    id: crypto.randomUUID(),
+    id: createClientRowId(),
     businessDomain: "",
     category: "",
     businessNeed: "",
@@ -164,7 +170,7 @@ function createEmptyBusinessNeedRow(): BusinessNeedRow {
 
 function createEmptyDevOverviewRow(): DevOverviewRow {
   return {
-    id: crypto.randomUUID(),
+    id: createClientRowId(),
     businessDomain: "",
     moduleName: "",
     moduleBrief: "",
@@ -177,7 +183,7 @@ function createEmptyDevOverviewRow(): DevOverviewRow {
 
 function createEmptyValuePropositionRow(): ValuePropositionRow {
   return {
-    id: crypto.randomUUID(),
+    id: createClientRowId(),
     summary: "",
     refinedContent: "",
     originalDemand: "",
@@ -187,7 +193,7 @@ function createEmptyValuePropositionRow(): ValuePropositionRow {
 
 function createEmptyProductModuleRow(): ProductModuleRow {
   return {
-    id: crypto.randomUUID(),
+    id: createClientRowId(),
     productDomain: "",
     moduleName: "",
     subModule: "",
@@ -201,7 +207,7 @@ function createEmptyProductModuleRow(): ProductModuleRow {
 
 function createEmptyImplementationScopeRow(): ImplementationScopeRow {
   return {
-    id: crypto.randomUUID(),
+    id: createClientRowId(),
     companyName: "",
     companyType: "",
     moduleScope: "",
@@ -213,7 +219,7 @@ function createEmptyImplementationScopeRow(): ImplementationScopeRow {
 
 function createEmptyKeyPointRow(): KeyPointRow {
   return {
-    id: crypto.randomUUID(),
+    id: createClientRowId(),
     analysisCategory: "",
     subItem: "",
     detail: "",
@@ -274,6 +280,7 @@ function buildVersionOptions(records: ModuleVersionRecord[]) {
 
 const EMPTY_BASIC_INFO: BasicInfo = {
   customerName: "",
+  location: "",
   projectName: "",
   opportunityNo: "",
   productLines: [],
@@ -334,6 +341,7 @@ export default function RequirementImportPage() {
   const [keyPointRows, setKeyPointRows] = useState<KeyPointRow[]>([createEmptyKeyPointRow()])
   const [saving, setSaving] = useState(false)
   const [createNewConfirmOpen, setCreateNewConfirmOpen] = useState(false)
+  const [saveWithoutGlobalConfirmOpen, setSaveWithoutGlobalConfirmOpen] = useState(false)
   const [createNewSubmitting, setCreateNewSubmitting] = useState(false)
   const [hasLocalChanges, setHasLocalChanges] = useState(false)
   const [basicInfoModelName, setBasicInfoModelName] = useState("kimi-k2.5")
@@ -347,6 +355,7 @@ export default function RequirementImportPage() {
   const [enterpriseProfilePreviewVisible, setEnterpriseProfilePreviewVisible] = useState(false)
   const [enterpriseProfileGeneratedText, setEnterpriseProfileGeneratedText] = useState("")
   const [enterpriseProfileGeneratedFields, setEnterpriseProfileGeneratedFields] = useState({
+    location: "",
     customerIndustry: "",
     enterpriseRevenue: "",
     itStatus: "",
@@ -500,6 +509,21 @@ export default function RequirementImportPage() {
       { coding: 0, analysis: 0, testing: 0, total: 0 },
     )
   }, [devOverviewRows])
+  const devOverviewDisplayRows = useMemo<DevOverviewRow[]>(
+    () => [
+      ...devOverviewRows,
+      {
+        id: DEV_OVERVIEW_TOTAL_ROW_ID,
+        businessDomain: "合计",
+        moduleName: `${devOverviewRows.length} 行`,
+        functionDesc: "开发总人天按合计列计入 KIMI 评估范围",
+        solutionSuggestion: "",
+        codingDays: Number(devSummary.coding.toFixed(1)),
+        estimateBasis: "",
+      },
+    ],
+    [devOverviewRows, devSummary.coding],
+  )
   const customerIndustryTags = useMemo(() => parseIndustryTags(basicInfo.customerIndustry), [basicInfo.customerIndustry])
   const selectedVersionRecord = useMemo(
     () => versionRecords.find((x) => x.versionCode === selectedVersionCode),
@@ -558,34 +582,34 @@ export default function RequirementImportPage() {
       })
       setValuePropositionRows(
         nextValueRows.length
-          ? nextValueRows.map((row) => ({ ...row, id: row.id || crypto.randomUUID() }))
+          ? nextValueRows.map((row) => ({ ...row, id: row.id || createClientRowId() }))
           : [createEmptyValuePropositionRow()],
       )
       setBusinessNeedRows(
         nextRows.length
-          ? nextRows.map((row) => ({ ...row, id: row.id || crypto.randomUUID(), requiresCustomDev: row.requiresCustomDev || "否" }))
+          ? nextRows.map((row) => ({ ...row, id: row.id || createClientRowId(), requiresCustomDev: row.requiresCustomDev || "否" }))
           : [createEmptyBusinessNeedRow()],
       )
       setDevOverviewRows(
         nextDevRows.length
-          ? nextDevRows.map((row) => ({ ...row, id: row.id || crypto.randomUUID(), codingDays: Number(row.codingDays || 0) }))
+          ? nextDevRows.map((row) => ({ ...row, id: row.id || createClientRowId(), codingDays: Number(row.codingDays || 0) }))
           : [createEmptyDevOverviewRow()],
       )
       setProductModuleRows(
         nextProductRows.length
-          ? nextProductRows.map((row) => ({ ...row, id: row.id || crypto.randomUUID() }))
+          ? nextProductRows.map((row) => ({ ...row, id: row.id || createClientRowId() }))
           : [createEmptyProductModuleRow()],
       )
       setImplementationScopeRows(
         nextScopeRows.length
-          ? nextScopeRows.map((row) => ({ ...row, id: row.id || crypto.randomUUID() }))
+          ? nextScopeRows.map((row) => ({ ...row, id: row.id || createClientRowId() }))
           : [createEmptyImplementationScopeRow()],
       )
       dirtyEnabled.current = false
       setMeetingNotes((payload.meetingNotes as string) || "")
       setKeyPointRows(
         nextKeyPointRows.length
-          ? nextKeyPointRows.map((row) => ({ ...row, id: row.id || crypto.randomUUID() }))
+          ? nextKeyPointRows.map((row) => ({ ...row, id: row.id || createClientRowId() }))
           : [createEmptyKeyPointRow()],
       )
       showGlobalNotice(`已回读版本：${code}`)
@@ -677,9 +701,9 @@ export default function RequirementImportPage() {
     }
   }
 
-  async function onSave(): Promise<boolean> {
-    if (!globalVersionCode.trim()) {
-      setError("请先选择总方案版本号")
+  async function onSave(options?: { allowWithoutGlobal?: boolean }): Promise<boolean> {
+    if (!globalVersionCode.trim() && !options?.allowWithoutGlobal) {
+      setSaveWithoutGlobalConfirmOpen(true)
       return false
     }
     if (!basicInfo.projectName.trim()) {
@@ -718,6 +742,11 @@ export default function RequirementImportPage() {
     }
   }
 
+  async function onConfirmSaveWithoutGlobal() {
+    const saved = await onSave({ allowWithoutGlobal: true })
+    if (saved) setSaveWithoutGlobalConfirmOpen(false)
+  }
+
   function resetToNewRequirementDraft() {
     setGlobalVersionCode("")
     setSelectedVersionCode("")
@@ -753,7 +782,7 @@ export default function RequirementImportPage() {
     if (createNewSubmitting) return
     setCreateNewSubmitting(true)
     try {
-      const saved = await onSave()
+      const saved = await onSave({ allowWithoutGlobal: true })
       if (!saved) return
       setCreateNewConfirmOpen(false)
       resetToNewRequirementDraft()
@@ -768,7 +797,7 @@ export default function RequirementImportPage() {
     if (Array.isArray(data.valuePropositionRows) && data.valuePropositionRows.length > 0) {
       setValuePropositionRows(
         data.valuePropositionRows.map((row) => ({
-          id: crypto.randomUUID(),
+          id: createClientRowId(),
           summary: String(row.summary || ""),
           refinedContent: String(row.refinedContent || ""),
           originalDemand: String(row.originalDemand || ""),
@@ -779,7 +808,7 @@ export default function RequirementImportPage() {
     if (Array.isArray(data.businessNeedRows) && data.businessNeedRows.length > 0) {
       setBusinessNeedRows(
         data.businessNeedRows.map((row) => ({
-          id: crypto.randomUUID(),
+          id: createClientRowId(),
           businessDomain: String(row.businessDomain || ""),
           category: String(row.category || ""),
           businessNeed: String(row.businessNeed || ""),
@@ -792,7 +821,7 @@ export default function RequirementImportPage() {
     if (Array.isArray(data.devOverviewRows) && data.devOverviewRows.length > 0) {
       setDevOverviewRows(
         data.devOverviewRows.map((row) => ({
-          id: crypto.randomUUID(),
+          id: createClientRowId(),
           businessDomain: String(row.businessDomain || ""),
           moduleName: String(row.moduleName || ""),
           moduleBrief: String(row.moduleBrief || ""),
@@ -806,7 +835,7 @@ export default function RequirementImportPage() {
     if (Array.isArray(data.productModuleRows) && data.productModuleRows.length > 0) {
       setProductModuleRows(
         data.productModuleRows.map((row) => ({
-          id: crypto.randomUUID(),
+          id: createClientRowId(),
           productDomain: String(row.productDomain || ""),
           moduleName: String(row.moduleName || ""),
           subModule: String(row.subModule || ""),
@@ -821,7 +850,7 @@ export default function RequirementImportPage() {
     if (Array.isArray(data.implementationScopeRows) && data.implementationScopeRows.length > 0) {
       setImplementationScopeRows(
         data.implementationScopeRows.map((row) => ({
-          id: crypto.randomUUID(),
+          id: createClientRowId(),
           companyName: String(row.companyName || ""),
           companyType: String(row.companyType || ""),
           moduleScope: String(row.moduleScope || ""),
@@ -837,7 +866,7 @@ export default function RequirementImportPage() {
     if (Array.isArray(data.keyPointRows) && data.keyPointRows.length > 0) {
       setKeyPointRows(
         data.keyPointRows.map((row) => ({
-          id: crypto.randomUUID(),
+          id: createClientRowId(),
           analysisCategory: String(row.analysisCategory || ""),
           subItem: String(row.subItem || ""),
           detail: String(row.detail || ""),
@@ -895,6 +924,7 @@ export default function RequirementImportPage() {
         method: "POST",
         body: {
           customerName,
+          location: basicInfo.location || "",
           customerIndustry: basicInfo.customerIndustry || "",
           enterpriseRevenue: basicInfo.enterpriseRevenue || "",
           itStatus: basicInfo.itStatus || "",
@@ -902,6 +932,7 @@ export default function RequirementImportPage() {
       })
       setEnterpriseProfileGeneratedText(data.enterpriseProfile)
       setEnterpriseProfileGeneratedFields({
+        location: data.location || "",
         customerIndustry: data.customerIndustry || "",
         enterpriseRevenue: data.enterpriseRevenue || "",
         itStatus: data.itStatus || "",
@@ -928,9 +959,36 @@ export default function RequirementImportPage() {
       return
     }
     setKimiAssessing(true)
+    setKimiAssessProgressOpen(true)
+    setKimiAssessProgressValue(8)
+    setKimiAssessProgressLogs([`[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] 已启动 Kimi 评估任务`])
     setError("")
     setMessage("")
+    const appendAssessProgress = (text: string, progress?: number) => {
+      setKimiAssessProgressLogs((logs) => [
+        ...logs,
+        `[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] ${text}`,
+      ])
+      if (typeof progress === "number") {
+        setKimiAssessProgressValue((prev) => Math.max(prev, Math.min(100, progress)))
+      }
+    }
+    let rollingTimer: ReturnType<typeof window.setInterval> | null = null
     try {
+      appendAssessProgress("正在校验项目名称与需求快照...", 18)
+      appendAssessProgress("正在整理开发需求合计并构建评估上下文...", 30)
+      appendAssessProgress("已提交评估请求，等待 Kimi 返回结果...", 45)
+      const rollingTips = [
+        "模型正在分析模块边界与实施范围...",
+        "模型正在计算标准/建议人天与偏离原因...",
+        "模型正在汇总风险与前提假设...",
+      ]
+      let tipIndex = 0
+      rollingTimer = window.setInterval(() => {
+        tipIndex = (tipIndex + 1) % rollingTips.length
+        appendAssessProgress(rollingTips[tipIndex])
+        setKimiAssessProgressValue((prev) => Math.min(88, prev + 4))
+      }, 1600)
       const data = await generateKimiAssessmentPreview({
         source: {
           globalVersionCode: globalVersionCode.trim(),
@@ -941,6 +999,7 @@ export default function RequirementImportPage() {
           valuePropositionRows: valuePropositionRows as unknown as Array<Record<string, unknown>>,
           businessNeedRows: businessNeedRows as unknown as Array<Record<string, unknown>>,
           devOverviewRows: devOverviewRows as unknown as Array<Record<string, unknown>>,
+          devTotalDays: Number(devSummary.total.toFixed(1)),
           productModuleRows: productModuleRows as unknown as Array<Record<string, unknown>>,
           implementationScopeRows: implementationScopeRows as unknown as Array<Record<string, unknown>>,
           meetingNotes,
@@ -950,17 +1009,32 @@ export default function RequirementImportPage() {
           promptProfile: "assessment_default_v1",
         },
       })
+      if (rollingTimer) {
+        window.clearInterval(rollingTimer)
+        rollingTimer = null
+      }
+      appendAssessProgress("已收到评估响应，正在渲染预览...", 94)
       setKimiAssessmentPreview(data)
       setKimiAssessmentPreviewOpen(true)
+      appendAssessProgress("评估预览已生成", 100)
       if (data.meta.mode === "rule_fallback") {
         const hint = data.meta.fallbackReason ? `（${data.meta.fallbackReason}）` : ""
         showGlobalNotice(`Kimi 评估已生成（规则兜底）${hint}`)
       } else {
         showGlobalNotice("Kimi 评估预览已生成")
       }
+      window.setTimeout(() => {
+        setKimiAssessProgressOpen(false)
+      }, 450)
     } catch (err) {
+      if (rollingTimer) {
+        window.clearInterval(rollingTimer)
+        rollingTimer = null
+      }
+      appendAssessProgress("评估失败，请检查网络或稍后重试。", 100)
       setError(err instanceof Error ? err.message : "Kimi 评估生成失败")
     } finally {
+      if (rollingTimer) window.clearInterval(rollingTimer)
       setKimiAssessing(false)
       setKimiHelpOpen(false)
     }
@@ -985,6 +1059,7 @@ export default function RequirementImportPage() {
   }
 
   function applyGeneratedEnterpriseProfile() {
+    const generatedLocation = enterpriseProfileGeneratedFields.location.trim()
     const generatedIndustry = enterpriseProfileGeneratedFields.customerIndustry.trim()
     const generatedRevenue = enterpriseProfileGeneratedFields.enterpriseRevenue.trim()
     const generatedItStatus = enterpriseProfileGeneratedFields.itStatus.trim()
@@ -997,6 +1072,7 @@ export default function RequirementImportPage() {
     setBasicInfo((prev) => ({
       ...prev,
       enterpriseProfile: enterpriseProfileGeneratedText,
+      location: generatedLocation || prev.location,
       customerIndustry: generatedIndustry,
       enterpriseRevenue: skipRevenue ? prev.enterpriseRevenue : generatedRevenue,
       itStatus: skipItStatus ? prev.itStatus : generatedItStatus,
@@ -1008,7 +1084,7 @@ export default function RequirementImportPage() {
     if (skipped.length > 0) {
       showGlobalNotice(`已插入企业简介并回填明确字段，已跳过：${skipped.join("、")}`)
     } else {
-      showGlobalNotice("已插入企业简介并同步回填客户行业/企业营收/信息化现状")
+      showGlobalNotice("已插入企业简介并同步回填地点/客户行业/企业营收/信息化现状")
     }
   }
 
@@ -1022,6 +1098,30 @@ export default function RequirementImportPage() {
   const [kimiAssessing, setKimiAssessing] = useState(false)
   const [kimiApplying, setKimiApplying] = useState(false)
   const [kimiAssessmentPreview, setKimiAssessmentPreview] = useState<KimiAssessmentPreviewResult | null>(null)
+  const [kimiAssessProgressOpen, setKimiAssessProgressOpen] = useState(false)
+  const [kimiAssessProgressValue, setKimiAssessProgressValue] = useState(0)
+  const [kimiAssessProgressLogs, setKimiAssessProgressLogs] = useState<string[]>([])
+  const kimiAssessProgressLogRef = useRef<HTMLDivElement | null>(null)
+  const kimiDevTotalDays = useMemo(() => {
+    if (!kimiAssessmentPreview) return 0
+    const hit = kimiAssessmentPreview.assessmentDraft.moduleItems.find((item) => {
+      const cloud = String(item.cloudProduct || "")
+      const sku = String(item.skuName || item.moduleName || "")
+      return /开发需求概要/.test(cloud) || /开发总人天|合计行/.test(sku)
+    })
+    return Number(hit?.suggestedDays || 0)
+  }, [kimiAssessmentPreview])
+  const kimiAssessProgressCurrentText = useMemo(
+    () => kimiAssessProgressLogs[kimiAssessProgressLogs.length - 1] || "准备中...",
+    [kimiAssessProgressLogs],
+  )
+
+  useEffect(() => {
+    if (!kimiAssessProgressOpen) return
+    const el = kimiAssessProgressLogRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+  }, [kimiAssessProgressLogs, kimiAssessProgressOpen])
 
   return (
     <ModuleShell
@@ -1029,8 +1129,8 @@ export default function RequirementImportPage() {
       description="需求结构化导入、条目编辑、版本保存与回读。"
       breadcrumbs={[{ label: "需求" }]}
     >
-      <div className="space-y-6 [&_input]:border-border/70 [&_input]:bg-background/95 [&_input]:shadow-sm [&_select]:border-border/70 [&_select]:bg-background/95 [&_select]:shadow-sm [&_textarea]:border-border/70 [&_textarea]:bg-background/95 [&_textarea]:shadow-sm [&_td:has(>input)]:h-11 [&_td:has(>input)]:p-0 [&_td:has(>input)]:align-middle [&_td>input]:block [&_td>input]:w-full [&_td>input]:h-full [&_td>input]:min-h-9 [&_td>input]:rounded-none [&_td>input]:border-0 [&_td>input]:py-0 [&_td>input]:shadow-none">
-      <div className="space-y-2">
+    <div className="min-w-0 max-w-full space-y-2 overflow-x-hidden [&_input]:border-border/70 [&_input]:bg-background/95 [&_input]:shadow-sm [&_select]:border-border/70 [&_select]:bg-background/95 [&_select]:shadow-sm [&_textarea]:border-border/70 [&_textarea]:bg-background/95 [&_textarea]:shadow-sm [&_td:has(>input)]:h-11 [&_td:has(>input)]:p-0 [&_td:has(>input)]:align-middle [&_td>input]:block [&_td>input]:w-full [&_td>input]:h-full [&_td>input]:min-h-9 [&_td>input]:rounded-none [&_td>input]:border-0 [&_td>input]:py-0 [&_td>input]:shadow-none">
+      <div className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/40 bg-card/50 p-3 shadow-sm backdrop-blur-sm transition-all duration-300 md:flex-nowrap">
           <Button className="rounded-xl" variant="outline" onClick={() => void onCreateNewRequirement()} disabled={saving || createNewSubmitting}>
             新建需求
@@ -1060,7 +1160,7 @@ export default function RequirementImportPage() {
             forceUnlockVisible={isAdmin}
           />
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">模型：{basicInfoModelName}</span>
+            <span className="text-xs text-muted-foreground">模型：{normalizeKimiModelName(basicInfoModelName)}</span>
             <Popover open={kimiHelpOpen} onOpenChange={setKimiHelpOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -1114,7 +1214,7 @@ export default function RequirementImportPage() {
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="top" sideOffset={6} className="max-w-64 text-xs leading-5">
-                          维护好客户名称后，通过kimi生成回填企业简介、企业营收、信息化现状等信息
+                          维护好客户名称后，通过kimi生成回填企业简介、地点、企业营收、信息化现状等信息
                         </TooltipContent>
                       </Tooltip>
                     </span>
@@ -1135,15 +1235,20 @@ export default function RequirementImportPage() {
             </Popover>
           </div>
         </div>
-        <Card collapsed={false} collapsible={false} className="gap-4 py-4 border-border/40 bg-card/50 backdrop-blur-sm">
-          <CardHeader className="space-y-2">
-            <CardTitle className="text-base">版本与上下文</CardTitle>
-            <div className="grid gap-x-3 gap-y-2 md:grid-cols-3">
-              <p className="text-xs text-muted-foreground">总方案版本号</p>
-              <p className="text-xs text-muted-foreground">需求版本号</p>
-              <p className="text-xs text-muted-foreground">检出状态</p>
+        <Card
+          collapsed={false}
+          collapsible={false}
+          className="gap-1.5 py-2 border-border/40 bg-card/50 backdrop-blur-sm"
+          contentClassName="!gap-0"
+        >
+          <CardHeader className="space-y-1 gap-1 px-4 pb-1.5 pt-1">
+            <CardTitle className="text-sm">版本与上下文</CardTitle>
+            <div className="grid gap-x-2 gap-y-1 md:grid-cols-3">
+              <p className="text-[11px] leading-tight text-muted-foreground">总方案版本号</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">需求版本号</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">检出状态</p>
               <select
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
                 value={globalVersionCode}
                 onChange={(e) => setGlobalVersionCode(e.target.value)}
               >
@@ -1155,7 +1260,7 @@ export default function RequirementImportPage() {
                 ))}
               </select>
               <select
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
                 value={selectedVersionCode}
                 onChange={(e) => void onLoadVersion(e.target.value)}
               >
@@ -1166,16 +1271,18 @@ export default function RequirementImportPage() {
                   </option>
                 ))}
               </select>
-              <div className="h-9 w-full rounded-md border border-border/70 bg-background/95 px-3 text-sm leading-9 shadow-sm">
+              <div className="h-8 w-full rounded-md border border-border/70 bg-background/95 px-2 text-xs leading-8 shadow-sm">
                 {checkoutStatusText}
               </div>
             </div>
-            <div className="min-h-4">
-              {message ? <span className="text-xs text-emerald-600">{message}</span> : null}
-              {error ? <span className="text-xs text-destructive">{error}</span> : null}
-            </div>
+            {message || error ? (
+              <div className="pt-0.5">
+                {message ? <span className="text-xs text-emerald-600">{message}</span> : null}
+                {error ? <span className="text-xs text-destructive">{error}</span> : null}
+              </div>
+            ) : null}
             {isReadonly ? (
-              <p className="text-xs text-muted-foreground">当前版本为只读状态，请先检出后编辑。</p>
+              <p className="text-[11px] leading-snug text-muted-foreground">当前版本为只读状态，请先检出后编辑。</p>
             ) : null}
           </CardHeader>
         </Card>
@@ -1183,39 +1290,44 @@ export default function RequirementImportPage() {
 
       <fieldset
         disabled={isReadonly}
-        className="space-y-3 [&>[data-slot=card][data-collapsed=true]]:h-14 [&>[data-slot=card][data-collapsed=true]]:min-h-14 [&>[data-slot=card][data-collapsed=true]]:overflow-hidden"
+        className="min-w-0 max-w-full space-y-2 overflow-x-hidden [&>[data-slot=card][data-collapsed=true]]:h-14 [&>[data-slot=card][data-collapsed=true]]:min-h-14 [&>[data-slot=card][data-collapsed=true]]:overflow-hidden"
       >
       <Card
         collapsed={sectionCollapsed.basicInfo}
         onCollapsedChange={(collapsed) => setSectionCollapsed((prev) => ({ ...prev, basicInfo: collapsed }))}
-        className="border-border/40 bg-card/50 backdrop-blur-sm"
+        className="w-full min-w-0 max-w-full gap-2 py-3 overflow-x-hidden border-border/40 bg-card/50 backdrop-blur-sm"
+        contentClassName="!gap-2"
       >
-        <CardHeader className="pb-1">
+        <CardHeader className="gap-1 px-4 pb-0.5 pt-0">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base">基本情况</CardTitle>
+            <CardTitle className="text-sm">基本情况</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-2 md:grid-cols-3">
-            <label className="space-y-1">
+        <CardContent className="space-y-2 px-4 pb-3 pt-0">
+          <div className="grid gap-x-2 gap-y-1.5 md:grid-cols-3">
+            <label className="space-y-0.5">
               <span className="text-xs text-[#D97706]">客户名称</span>
               <Input value={basicInfo.customerName} onChange={(e) => setBasicInfo((s) => ({ ...s, customerName: e.target.value }))} />
             </label>
-            <label className="space-y-1">
+            <label className="space-y-0.5">
+              <span className="text-xs text-muted-foreground">地点</span>
+              <Input value={basicInfo.location} onChange={(e) => setBasicInfo((s) => ({ ...s, location: e.target.value }))} />
+            </label>
+            <label className="space-y-0.5">
               <span className="text-xs text-muted-foreground">项目名称（必填）</span>
               <Input value={basicInfo.projectName} onChange={(e) => setBasicInfo((s) => ({ ...s, projectName: e.target.value }))} />
             </label>
-            <label className="space-y-1">
+            <label className="space-y-0.5">
               <span className="text-xs text-muted-foreground">商机号</span>
               <Input value={basicInfo.opportunityNo} onChange={(e) => setBasicInfo((s) => ({ ...s, opportunityNo: e.target.value }))} />
             </label>
-            <label className="space-y-1">
+            <label className="space-y-0.5">
               <span className="text-xs text-muted-foreground">产品线</span>
               <Popover>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="h-9 w-full rounded-md border border-border/70 bg-background/95 px-3 text-left text-sm leading-9 shadow-sm"
+                    className="h-8 w-full rounded-md border border-border/70 bg-background/95 px-2 text-left text-xs leading-8 shadow-sm"
                   >
                     {basicInfo.productLines.length ? (
                       <span className="block truncate">{basicInfo.productLines.join(" / ")}</span>
@@ -1255,7 +1367,7 @@ export default function RequirementImportPage() {
                 </PopoverContent>
               </Popover>
             </label>
-            <label className="space-y-1">
+            <label className="space-y-0.5">
               <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                 客户行业
                 <Tooltip>
@@ -1273,14 +1385,14 @@ export default function RequirementImportPage() {
                   </TooltipContent>
                 </Tooltip>
               </span>
-              <div className="min-h-9 rounded-md border border-border/70 bg-background/95 px-2 py-2 shadow-sm">
-                <div className="flex flex-wrap gap-1.5">
+              <div className="min-h-8 min-w-0 max-w-full rounded-md border border-border/70 bg-background/95 px-2 py-1 shadow-sm">
+                <div className="flex min-w-0 max-w-full flex-wrap gap-1.5">
                   {customerIndustryTags.length > 0 ? (
                     customerIndustryTags.map((tag, idx) => (
                       <Badge
                         key={`${tag}-${idx}`}
                         variant={idx === customerIndustryTags.length - 1 ? "default" : "secondary"}
-                        className="rounded-full px-2.5 py-0.5 text-xs"
+                        className="max-w-full whitespace-normal break-all rounded-full px-2.5 py-0.5 text-xs"
                       >
                         {tag}
                       </Badge>
@@ -1291,48 +1403,48 @@ export default function RequirementImportPage() {
                 </div>
               </div>
             </label>
-            <label className="space-y-1">
+            <label className="space-y-0.5">
               <span className="text-xs text-muted-foreground">企业营收</span>
               <Input value={basicInfo.enterpriseRevenue} onChange={(e) => setBasicInfo((s) => ({ ...s, enterpriseRevenue: e.target.value }))} />
             </label>
-            <label className="space-y-1">
+            <label className="space-y-0.5">
               <span className="text-xs text-muted-foreground">信息化现状</span>
               <Input value={basicInfo.itStatus} onChange={(e) => setBasicInfo((s) => ({ ...s, itStatus: e.target.value }))} />
             </label>
-            <label className="space-y-1">
+            <label className="space-y-0.5">
               <span className="text-xs text-muted-foreground">预期上线时间</span>
               <Input type="month" value={basicInfo.expectedGoLive} onChange={(e) => setBasicInfo((s) => ({ ...s, expectedGoLive: e.target.value }))} />
             </label>
           </div>
 
-          <div className="space-y-3 rounded-lg border border-border/50 bg-secondary/20 p-3">
-            <label className="block space-y-1">
+          <div className="space-y-2 rounded-lg border border-border/50 bg-secondary/20 p-2">
+            <label className="block space-y-0.5">
               <span className="text-xs text-muted-foreground">企业简介</span>
               <textarea
                 ref={enterpriseProfileRef}
-                className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                 placeholder="请输入企业简介"
                 value={basicInfo.enterpriseProfile}
                 onChange={(e) => setBasicInfo((s) => ({ ...s, enterpriseProfile: e.target.value }))}
                 onInput={(e) => autoResizeTextarea(e.currentTarget, 72)}
               />
             </label>
-            <label className="block space-y-1">
+            <label className="block space-y-0.5">
               <span className="text-xs text-muted-foreground">项目背景和需求</span>
               <textarea
                 ref={projectBackgroundNeedsRef}
-                className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                 placeholder="请输入项目背景和需求"
                 value={basicInfo.projectBackgroundNeeds}
                 onChange={(e) => setBasicInfo((s) => ({ ...s, projectBackgroundNeeds: e.target.value }))}
                 onInput={(e) => autoResizeTextarea(e.currentTarget, 72)}
               />
             </label>
-            <label className="block space-y-1">
+            <label className="block space-y-0.5">
               <span className="text-xs text-muted-foreground">项目目标</span>
               <textarea
                 ref={projectGoalsRef}
-                className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                 placeholder="请输入项目目标"
                 value={basicInfo.projectGoals}
                 onChange={(e) => setBasicInfo((s) => ({ ...s, projectGoals: e.target.value }))}
@@ -1344,6 +1456,48 @@ export default function RequirementImportPage() {
       </Card>
 
       <Dialog
+        open={kimiAssessProgressOpen}
+        onOpenChange={(open) => {
+          if (kimiAssessing) return
+          setKimiAssessProgressOpen(open)
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Kimi 评估进行中</DialogTitle>
+            <DialogDescription>系统正在生成实施评估草稿，进度会实时更新。</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border/60 bg-secondary/10 px-3 py-2 text-sm text-muted-foreground">
+              当前进度：{kimiAssessProgressCurrentText}
+            </div>
+            <Progress value={kimiAssessProgressValue} />
+            <div
+              ref={kimiAssessProgressLogRef}
+              className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-border/60 bg-background/80 p-3 text-xs text-muted-foreground"
+            >
+              {kimiAssessProgressLogs.length ? (
+                kimiAssessProgressLogs.map((line, idx) => <p key={`${line}-${idx}`}>{line}</p>)
+              ) : (
+                <p>等待任务启动...</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setKimiAssessProgressOpen(false)}
+              disabled={kimiAssessing}
+            >
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={basicInfoImportVisible}
         onOpenChange={(open) => {
           if (basicInfoImporting) return
@@ -1353,7 +1507,7 @@ export default function RequirementImportPage() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>导入 Excel 并解析基本情况</DialogTitle>
-            <DialogDescription>优先使用 KIMI {basicInfoModelName} 模型，失败时自动规则回填。</DialogDescription>
+            <DialogDescription>优先使用 KIMI {normalizeKimiModelName(basicInfoModelName)} 模型，失败时自动规则回填。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Input
@@ -1398,6 +1552,28 @@ export default function RequirementImportPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog open={saveWithoutGlobalConfirmOpen} onOpenChange={setSaveWithoutGlobalConfirmOpen}>
+        <AlertDialogContent className="sm:max-w-lg rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>未关联总方案版本号</AlertDialogTitle>
+            <AlertDialogDescription>
+              当前【需求】未关联总方案版本号，本次将独立保存为一个需求版本，确定继续吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving}
+              onClick={(event) => {
+                event.preventDefault()
+                void onConfirmSaveWithoutGlobal()
+              }}
+            >
+              {saving ? "保存中..." : "确定继续"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={enterpriseProfilePreviewVisible}
@@ -1411,7 +1587,8 @@ export default function RequirementImportPage() {
             <DialogDescription>Kimi不一定能够获取到准确的企业信息，如信息可信度低，系统会自动忽略</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
+              <Input value={enterpriseProfileGeneratedFields.location} readOnly />
               <Input value={enterpriseProfileGeneratedFields.customerIndustry} readOnly />
               <Input
                 value={enterpriseProfileGeneratedFields.enterpriseRevenue}
@@ -1458,7 +1635,7 @@ export default function RequirementImportPage() {
             <div className="space-y-4">
               <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-4">
                 <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
-                  模型：{kimiAssessmentPreview.meta.model}
+                  模型：{normalizeKimiModelName(kimiAssessmentPreview.meta.model)}
                 </div>
                 <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
                   模式：{kimiAssessmentPreview.meta.mode === "model" ? "模型生成" : "规则兜底"}
@@ -1485,6 +1662,10 @@ export default function RequirementImportPage() {
                     )}
                   </span>
                 </div>
+                <div>
+                  开发总人天：
+                  <span className="font-medium">{kimiDevTotalDays > 0 ? kimiDevTotalDays : "未识别"}</span>
+                </div>
                 <div className="sm:col-span-3">
                   产品线：
                   <span className="font-medium">
@@ -1496,26 +1677,33 @@ export default function RequirementImportPage() {
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">模块估算建议</p>
-                <div className="max-h-64 overflow-auto rounded-lg border border-border/60">
+                <div className="overflow-hidden rounded-lg border border-border/60">
                   {kimiAssessmentPreview.assessmentDraft.moduleItems.length ? (
-                    <div className="divide-y divide-border/50">
-                      <div className="grid gap-2 bg-secondary/20 px-3 py-2 text-xs font-semibold text-foreground sm:grid-cols-[1fr_1fr_0.7fr_0.7fr_2fr]">
-                        <span>云产品</span>
-                        <span>SKU</span>
-                        <span>标准人天</span>
-                        <span>建议人天</span>
-                        <span>原因</span>
-                      </div>
-                      {kimiAssessmentPreview.assessmentDraft.moduleItems.map((item, index) => (
-                        <div key={`${item.cloudProduct || "cloud"}-${item.skuName || item.moduleName}-${index}`} className="grid gap-2 px-3 py-2 text-sm sm:grid-cols-[1fr_1fr_0.7fr_0.7fr_2fr]">
-                          <span className="font-medium">{item.cloudProduct || "未分类云产品"}</span>
-                          <span className="font-medium">{item.skuName || item.moduleName || "未命名SKU"}</span>
-                          <span>标准：{item.standardDays}</span>
-                          <span>建议：{item.suggestedDays}</span>
-                          <span className="text-muted-foreground">{item.reason}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <Table
+                      containerClassName="max-h-64 overflow-auto"
+                      className="table-auto [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0"
+                    >
+                      <TableHeader className="sticky top-0 z-20 bg-accent/12 text-foreground backdrop-blur-sm dark:bg-accent/20">
+                        <TableRow className="border-border/50 hover:bg-transparent">
+                          <TableHead className="whitespace-nowrap">云产品</TableHead>
+                          <TableHead className="whitespace-nowrap">SKU</TableHead>
+                          <TableHead className="whitespace-nowrap">标准人天</TableHead>
+                          <TableHead className="whitespace-nowrap">建议人天</TableHead>
+                          <TableHead className="whitespace-nowrap">原因</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {kimiAssessmentPreview.assessmentDraft.moduleItems.map((item, index) => (
+                          <TableRow key={`${item.cloudProduct || "cloud"}-${item.skuName || item.moduleName}-${index}`}>
+                            <TableCell className="font-medium">{item.cloudProduct || "未分类云产品"}</TableCell>
+                            <TableCell className="font-medium">{item.skuName || item.moduleName || "未命名SKU"}</TableCell>
+                            <TableCell>{item.standardDays}</TableCell>
+                            <TableCell>{item.suggestedDays}</TableCell>
+                            <TableCell className="text-muted-foreground">{item.reason}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   ) : (
                     <div className="px-3 py-5 text-sm text-muted-foreground">暂无模块估算建议</div>
                   )}
@@ -1744,7 +1932,7 @@ export default function RequirementImportPage() {
         <CardContent className="space-y-2 px-0">
           <div className="[&>div]:p-0">
             <TableTemplate
-              rows={devOverviewRows}
+              rows={devOverviewDisplayRows}
               columns={[
                 { key: "businessDomain", label: "业务领域", className: "whitespace-nowrap" },
                 { key: "moduleName", label: "模块名称", className: "whitespace-nowrap" },
@@ -1767,6 +1955,19 @@ export default function RequirementImportPage() {
                 </Button>
               }
               renderRow={(row) => {
+                if (row.id === DEV_OVERVIEW_TOTAL_ROW_ID) {
+                  return (
+                    <TableRow key={row.id} className="bg-secondary/25 font-medium hover:bg-secondary/35">
+                      <TableCell className="h-11 align-middle">合计</TableCell>
+                      <TableCell className="h-11 align-middle">{devOverviewRows.length} 行</TableCell>
+                      <TableCell className="h-11 align-middle text-muted-foreground">开发总人天按合计列计入 KIMI 评估范围</TableCell>
+                      <TableCell className="h-11 align-middle">{devSummary.coding.toFixed(1)}</TableCell>
+                      <TableCell className="h-11 align-middle">{devSummary.analysis.toFixed(1)}</TableCell>
+                      <TableCell className="h-11 align-middle">{devSummary.testing.toFixed(1)}</TableCell>
+                      <TableCell className="h-11 align-middle">{devSummary.total.toFixed(1)}</TableCell>
+                    </TableRow>
+                  )
+                }
                 const analysis = row.codingDays * 0.2
                 const testing = row.codingDays * 0.4
                 const total = row.codingDays * 1.6

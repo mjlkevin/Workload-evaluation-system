@@ -2,16 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { X, MoreHorizontal } from "lucide-react"
+import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { useUnsavedNavigation } from "@/hooks/use-unsaved-changes"
 
 type DashboardTab = {
@@ -49,14 +49,32 @@ function resolveTabTitle(path: string) {
   return decodeURIComponent(last)
 }
 
+function normalizeTabPath(path: string): string {
+  const raw = String(path || "").trim()
+  if (!raw) return "/dashboard"
+  const [basePath, query = ""] = raw.split("?")
+  if (!query) return basePath || "/dashboard"
+  const params = new URLSearchParams(query)
+  // 从列表双击进入编辑页会携带随机 tabKey，仅用于强制新开；去重时应忽略。
+  params.delete("tabKey")
+  const entries = [...params.entries()].sort(([aKey, aVal], [bKey, bVal]) => {
+    const keyOrder = aKey.localeCompare(bKey)
+    return keyOrder !== 0 ? keyOrder : aVal.localeCompare(bVal)
+  })
+  if (!entries.length) return basePath || "/dashboard"
+  const normalizedQuery = new URLSearchParams(entries).toString()
+  return `${basePath || "/dashboard"}?${normalizedQuery}`
+}
+
 function normalizeTabs(input: DashboardTab[]): DashboardTab[] {
   const seen = new Set<string>()
   const normalized: DashboardTab[] = []
   for (const tab of input) {
     const path = String(tab.path || "").trim()
     if (!path.startsWith("/dashboard")) continue
-    if (seen.has(path)) continue
-    seen.add(path)
+    const dedupeKey = normalizeTabPath(path)
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
     normalized.push({ path, title: resolveTabTitle(path) })
   }
   return normalized
@@ -91,7 +109,21 @@ export function DashboardTabs() {
 
   useEffect(() => {
     if (!ready) return
-    setTabs((prev) => normalizeTabs([...prev, { path: currentRouteKey, title: resolveTabTitle(pathname) }]))
+    const currentDedupeKey = normalizeTabPath(currentRouteKey)
+    const existing = tabs.find((tab) => normalizeTabPath(tab.path) === currentDedupeKey)
+    if (existing && existing.path !== currentRouteKey) {
+      // 命中重复版本页签：不新增，直接切回已存在页签。
+      router.replace(existing.path)
+    }
+  }, [currentRouteKey, ready, tabs, router])
+
+  useEffect(() => {
+    if (!ready) return
+    const currentDedupeKey = normalizeTabPath(currentRouteKey)
+    setTabs((prev) => {
+      if (prev.some((tab) => normalizeTabPath(tab.path) === currentDedupeKey)) return prev
+      return normalizeTabs([...prev, { path: currentRouteKey, title: resolveTabTitle(pathname) }])
+    })
   }, [pathname, currentRouteKey, ready])
 
   useEffect(() => {
@@ -150,46 +182,38 @@ export function DashboardTabs() {
         {tabs.map((tab) => {
           const isActive = tab.path === activePath
           return (
-            <div
-              key={tab.path}
-              className={cn(
-                "group flex items-center gap-1 rounded-lg border px-2 py-1 text-xs",
-                isActive
-                  ? "border-primary/40 bg-primary/10 text-primary"
-                  : "border-border/60 bg-background/70 text-muted-foreground hover:bg-accent/50",
-              )}
-            >
-              <button type="button" className="max-w-[160px] truncate text-left" onClick={() => openTab(tab.path)}>
-                {tab.title}
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    aria-label="页签操作"
-                  >
-                    <MoreHorizontal className="size-3.5" />
+            <ContextMenu key={tab.path}>
+              <ContextMenuTrigger>
+                <div
+                  className={cn(
+                    "group flex min-h-8 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm",
+                    isActive
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border/60 bg-background/70 text-muted-foreground hover:bg-accent/50",
+                  )}
+                >
+                  <button type="button" className="max-w-[180px] truncate text-left" onClick={() => openTab(tab.path)}>
+                    {tab.title}
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-36 rounded-lg">
-                  <DropdownMenuItem onClick={() => closeTab(tab.path)}>关闭页签</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => closeOtherTabs(tab.path)}>关闭其他页签</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => closeAllTabs(tab.path)}>关闭所有页签</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-4 w-4 rounded p-0 text-muted-foreground hover:text-foreground"
-                onClick={() => closeTab(tab.path)}
-                aria-label="关闭页签"
-              >
-                <X className="size-3.5" />
-              </Button>
-            </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 rounded p-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => closeTab(tab.path)}
+                    aria-label="关闭页签"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="w-36 rounded-lg">
+                <ContextMenuItem onClick={() => closeTab(tab.path)}>关闭页签</ContextMenuItem>
+                <ContextMenuItem onClick={() => closeOtherTabs(tab.path)}>关闭其他页签</ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem onClick={() => closeAllTabs(tab.path)}>关闭所有页签</ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           )
         })}
       </div>

@@ -4,7 +4,12 @@ import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
-function Table({ className, children, ...props }: React.ComponentProps<'table'>) {
+function Table({
+  className,
+  containerClassName,
+  children,
+  ...props
+}: React.ComponentProps<'table'> & { containerClassName?: string }) {
   const containerRef = React.useRef<HTMLDivElement>(null)
   const tableRef = React.useRef<HTMLTableElement>(null)
   const previewRef = React.useRef<HTMLDivElement>(null)
@@ -18,6 +23,12 @@ function Table({ className, children, ...props }: React.ComponentProps<'table'>)
   React.useEffect(() => {
     const table = tableRef.current
     if (!table) return
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth || 0 : 0
+    const maxSafeTableWidth = Math.max(1600, Math.round(viewportWidth * 2.2))
+    const currentMinWidth = Number((table.style.minWidth || '').replace('px', '').trim())
+    if (Number.isFinite(currentMinWidth) && currentMinWidth > maxSafeTableWidth) {
+      table.style.minWidth = `${maxSafeTableWidth}px`
+    }
 
     const headerCells = Array.from(table.querySelectorAll('thead th'))
     if (!headerCells.length) return
@@ -87,13 +98,13 @@ function Table({ className, children, ...props }: React.ComponentProps<'table'>)
     <div
       ref={containerRef}
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className={cn("relative w-full min-w-0 max-w-full overflow-x-auto", containerClassName)}
     >
       <table
         ref={tableRef}
         data-slot="table"
         className={cn(
-          'w-full caption-bottom text-sm [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0',
+          'w-full min-w-full caption-bottom text-sm [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0',
           className,
         )}
         onClick={handleTableClick}
@@ -169,20 +180,33 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     if (!th || !table || !th.parentElement) return
     const colIndex = Array.from(th.parentElement.children).indexOf(th)
     if (colIndex < 0) return
+    const isLastColumn = colIndex === th.parentElement.children.length - 1
+    const container = table.closest('[data-slot="table-container"]') as HTMLElement | null
 
     const startX = event.clientX
     const startWidth = th.getBoundingClientRect().width
+    const containerWidth = container?.clientWidth || table.getBoundingClientRect().width
+    const baseTableWidth = Math.max(containerWidth, table.getBoundingClientRect().width, table.scrollWidth)
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth || 0 : 0
+    const maxColumnWidth = Math.max(320, Math.round(viewportWidth * 0.55) || 560)
+    const maxTableWidth = Math.max(1600, Math.round(viewportWidth * 2.2) || 2200)
     const cells = Array.from(table.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`)) as HTMLElement[]
     table.style.tableLayout = 'fixed'
+    table.style.minWidth = `${Math.min(baseTableWidth, maxTableWidth)}px`
 
     function onMove(moveEvent: MouseEvent) {
-      const nextWidth = Math.max(88, startWidth + (moveEvent.clientX - startX))
+      const nextWidth = Math.min(maxColumnWidth, Math.max(88, startWidth + (moveEvent.clientX - startX)))
       cells.forEach((cell) => {
         cell.style.width = `${nextWidth}px`
         cell.style.minWidth = `${nextWidth}px`
         cell.style.maxWidth = `${nextWidth}px`
         cell.dataset.manualWidth = '1'
       })
+      if (isLastColumn) {
+        const delta = nextWidth - startWidth
+        const nextTableWidth = Math.min(maxTableWidth, Math.max(containerWidth, Math.round(baseTableWidth + delta)))
+        table.style.minWidth = `${nextTableWidth}px`
+      }
     }
 
     function onUp() {
