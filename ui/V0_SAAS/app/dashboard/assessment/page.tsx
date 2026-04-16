@@ -34,6 +34,7 @@ import {
   checkoutVersionById,
   calculateAndExportEstimate,
   calculateEstimate,
+  getActiveImplementationDependencyRules,
   createModuleVersion,
   downloadOwnedExportFile,
   forceUnlockById,
@@ -45,6 +46,7 @@ import {
   listEstimateExportHistory,
   listModuleVersions,
   type ModuleVersionRecord,
+  type ImplementationDependencyRulesConfig,
   listTemplateSummaries,
   promoteVersionById,
   undoCheckoutById,
@@ -108,6 +110,13 @@ type AssessmentForm = {
   orgSimilarityFactor: number
 }
 
+type DependencyIssue = {
+  ruleId: string
+  subject: string
+  trigger: string
+  missing: string[]
+}
+
 const PRODUCT_LINE_OPTIONS = ["金蝶AI星空", "金蝶AI星瀚", "云之家", "发票云"] as const
 const PRODUCT_LINE_BADGE_STYLE_MAP: Record<string, string> = {
   金蝶AI星空: "border-sky-400 bg-sky-500 text-white dark:border-sky-500 dark:bg-sky-500 dark:text-white",
@@ -136,6 +145,116 @@ const ASSESSMENT_VERSION_LOAD_TOAST_ID = "assessment-version-loaded"
 /** 模块评估云产品表：列与列之间竖线（与 SKU|实施要点 同色） */
 const ASSESS_TABLE_COL_BORDER = "border-l border-border/40"
 const COLLAPSED_KEY_TEXT_CLASS = "font-semibold text-emerald-700 dark:text-emerald-300"
+
+function normalizeDependencyToken(value: unknown): string {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[()（）]/g, "")
+}
+
+function hasSelectedDependencyLabel(tokens: Set<string>, target: string): boolean {
+  const normalizedTarget = normalizeDependencyToken(target)
+  if (!normalizedTarget) return false
+  for (const token of tokens) {
+    if (!token) continue
+    if (token === normalizedTarget) return true
+    if (normalizedTarget.length >= 2 && token.includes(normalizedTarget)) return true
+    if (token.length >= 4 && normalizedTarget.includes(token)) return true
+  }
+  return false
+}
+
+function collectSelectedDependencyTokens(
+  allItems: TemplateItemOption[],
+  itemSelection: Record<string, ItemSelectionState>,
+  selectedCloudNames: string[],
+): Set<string> {
+  const result = new Set<string>()
+  for (const cloudName of selectedCloudNames) {
+    const token = normalizeDependencyToken(cloudName)
+    if (token) result.add(token)
+  }
+  for (const item of allItems) {
+    if (!itemSelection[item.templateItemId]?.included) continue
+    const candidates = [item.skuName, item.itemName, item.deliveryModule, item.appGroup, item.cloudProduct]
+    for (const candidate of candidates) {
+      const token = normalizeDependencyToken(candidate)
+      if (token) result.add(token)
+    }
+  }
+  return result
+}
+
+function evaluateDependencyIssues(
+  rules: ImplementationDependencyRulesConfig | null,
+  selectedTokens: Set<string>,
+): DependencyIssue[] {
+  if (!rules || !Array.isArray(rules.rules) || rules.rules.length === 0 || selectedTokens.size === 0) return []
+  const issues: DependencyIssue[] = []
+  for (const rule of rules.rules) {
+    if (!rule?.enabled) continue
+    if (!hasSelectedDependencyLabel(selectedTokens, rule.subject)) continue
+
+    const missingDependencies = (rule.dependencies || []).filter((dep) => !hasSelectedDependencyLabel(selectedTokens, dep))
+    if (rule.logic === "requires_all") {
+      if (missingDependencies.length > 0) {
+        issues.push({
+          ruleId: rule.id,
+          subject: rule.subject,
+          trigger: rule.trigger,
+          missing: missingDependencies,
+        })
+      }
+      continue
+    }
+
+    if (rule.logic === "requires_any") {
+      const anyGroups = Array.isArray(rule.anyOfGroups) ? rule.anyOfGroups : []
+      const missingAny = anyGroups
+        .map((group) => group.filter((item) => String(item || "").trim()))
+        .filter((group) => group.length > 0)
+        .filter((group) => !group.some((candidate) => hasSelectedDependencyLabel(selectedTokens, candidate)))
+      if (missingDependencies.length > 0 || missingAny.length > 0) {
+        const anyMissingFlat = missingAny.map((group) => `(${group.join(" / ")})至少一项`).join("、")
+        issues.push({
+          ruleId: rule.id,
+          subject: rule.subject,
+          trigger: rule.trigger,
+          missing: [...missingDependencies, ...(anyMissingFlat ? [anyMissingFlat] : [])],
+        })
+      }
+      continue
+    }
+
+    if (rule.logic === "combo") {
+      const comboDependencies = (rule.comboDependencies || []).filter((item) => String(item || "").trim())
+      const comboSatisfied = comboDependencies.length === 0 || comboDependencies.some((dep) => hasSelectedDependencyLabel(selectedTokens, dep))
+      if (missingDependencies.length > 0 || !comboSatisfied) {
+        issues.push({
+          ruleId: rule.id,
+          subject: rule.subject,
+          trigger: rule.trigger,
+          missing: [...missingDependencies, ...(!comboSatisfied ? [`(${comboDependencies.join(" / ")})至少一项`] : [])],
+        })
+      }
+    }
+  }
+
+  const mutexRules = Array.isArray(rules.mutualExclusionRules) ? rules.mutualExclusionRules : []
+  for (const pair of mutexRules) {
+    if (hasSelectedDependencyLabel(selectedTokens, pair.left) && hasSelectedDependencyLabel(selectedTokens, pair.right)) {
+      issues.push({
+        ruleId: `mutex-${pair.left}-${pair.right}`,
+        subject: `${pair.left} / ${pair.right}`,
+        trigger: "互斥规则",
+        missing: [pair.reason || "不可同时选择"],
+      })
+    }
+  }
+  return issues
+}
 
 function formatDays(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
@@ -258,6 +377,7 @@ export default function AssessmentPage() {
   const [exportHistoryFilter, setExportHistoryFilter] = useState("")
   const [historyTotal, setHistoryTotal] = useState(0)
   const [historyPage, setHistoryPage] = useState(1)
+  const [activeDependencyRules, setActiveDependencyRules] = useState<ImplementationDependencyRulesConfig | null>(null)
   const [globalVersionCode, setGlobalVersionCode] = useState("")
   /** 与仪表盘总方案列表一致，用于选择总方案时回填项目名称 */
   const [dashboardPlans, setDashboardPlans] = useState<PlanRow[]>([])
@@ -373,6 +493,11 @@ export default function AssessmentPage() {
     return itemsInSheet.filter((item) => itemSelection[item.templateItemId]?.included).length
   }, [itemsInSheet, itemSelection])
 
+  const dependencyIssues = useMemo(() => {
+    const selectedTokens = collectSelectedDependencyTokens(allItems, itemSelection, selectedCloudNames)
+    return evaluateDependencyIssues(activeDependencyRules, selectedTokens)
+  }, [activeDependencyRules, allItems, itemSelection, selectedCloudNames])
+
   const baseDays = useMemo(() => {
     return itemsInSheet.reduce((sum, item) => {
       const state = itemSelection[item.templateItemId]
@@ -405,13 +530,14 @@ export default function AssessmentPage() {
     void (async () => {
       try {
         setInitLoading(true)
-        const [plans, records, templates, activeRule, globals] = await withTimeout(
+        const [plans, records, templates, activeRule, globals, activeDependencyRuleView] = await withTimeout(
           Promise.all([
             getDashboardPlans(),
             listModuleVersions("assessment"),
             listTemplateSummaries(),
             getActiveRuleSet(),
             listGlobalVersions(),
+            getActiveImplementationDependencyRules().catch(() => null),
           ]),
           INIT_LOAD_TIMEOUT_MS,
           "加载超时（30s）：请确认本机 API 已启动（npm run dev:api，默认 3000 端口），或检查网络后刷新页面。",
@@ -428,6 +554,7 @@ export default function AssessmentPage() {
         setVersionOptions(buildLatestAssessmentVersionOptions(records))
         setTemplateOptions(templates)
         setRuleSet(activeRule)
+        setActiveDependencyRules(activeDependencyRuleView?.active || null)
         setForm((prev) => ({ ...prev, ruleSetId: activeRule.ruleSetId }))
 
         const chosenTemplateId = templates[0]?.templateId || ""
@@ -903,11 +1030,21 @@ export default function AssessmentPage() {
     }
   }
 
+  function ensureDependencyValidationPassed(): boolean {
+    if (!dependencyIssues.length) return true
+    const first = dependencyIssues[0]
+    const text = `依赖校验未通过：${first.subject}（${first.trigger}）缺少 ${first.missing.join("、")}`
+    setError(text)
+    showGlobalWarning(text)
+    return false
+  }
+
   async function onCalculate() {
     if (!form.templateId || !form.ruleSetId) {
       showGlobalWarning("模板或规则集未就绪")
       return
     }
+    if (!ensureDependencyValidationPassed()) return
     setCalculating(true)
     setError("")
     try {
@@ -929,6 +1066,7 @@ export default function AssessmentPage() {
       setSaveWithoutGlobalConfirmOpen(true)
       return false
     }
+    if (!ensureDependencyValidationPassed()) return false
     setSaving(true)
     setSavePhase("validating")
     setError("")
@@ -1234,6 +1372,7 @@ export default function AssessmentPage() {
       showGlobalWarning("模板或规则集未就绪")
       return
     }
+    if (!ensureDependencyValidationPassed()) return
     setExporting(true)
     setError("")
     try {
@@ -1600,6 +1739,11 @@ export default function AssessmentPage() {
             <Button className="rounded-lg" size="sm" variant="outline" onClick={() => void onExport("pdf")} disabled={exporting || savePhase !== "idle"}>
               {exporting ? "导出中..." : "导出 PDF"}
             </Button>
+            {dependencyIssues.length > 0 ? (
+              <span className="text-xs text-amber-600">
+                检测到 {dependencyIssues.length} 条 SKU 依赖风险，请先补齐依赖后再校验/保存/导出。
+              </span>
+            ) : null}
             {error ? <span className="text-xs text-destructive">{error}</span> : null}
           </div>
           {isReadonly ? (

@@ -16,7 +16,6 @@ import {
   Search,
   ChevronsUpDown,
   LogOut,
-  Sparkles,
   AlertTriangle,
 } from "lucide-react"
 import Link from "next/link"
@@ -159,7 +158,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar className="border-r border-border/40">
+      <Sidebar className="border-r border-border/40 shadow-[7px_0_22px_-10px_rgba(0,0,0,0.085)] dark:shadow-[8px_0_26px_-12px_rgba(0,0,0,0.38)]">
         <SidebarHeader className="px-4 py-5">
           <Link
             href="/dashboard"
@@ -167,9 +166,9 @@ export function AppSidebar() {
             onClick={(e) => handleNavClick(e, "/dashboard")}
           >
             <div className="flex size-9 items-center justify-center rounded-xl bg-foreground">
-              <Sparkles className="size-5 text-background" />
+              <span className="text-sm font-black leading-none text-background">W</span>
             </div>
-            <span className="text-lg font-semibold tracking-tight">Nova</span>
+            <span className="text-lg font-semibold tracking-tight">WorkEvolutionSys</span>
           </Link>
         </SidebarHeader>
 

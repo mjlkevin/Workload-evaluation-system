@@ -309,6 +309,87 @@ export type VersionCodeRulesStore = {
   rules: VersionCodeRule[];
 };
 
+// -------------------- 系统管理：需求模块配置 --------------------
+
+export type RequirementKimiEvaluationConfig = {
+  enabled: boolean;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  timeoutMs: number;
+  fallbackToRule: boolean;
+  promptProfile: string;
+  promptTemplate: string;
+};
+
+export type RequirementFileParsingConfig = {
+  enabled: boolean;
+  allowedExtensions: string[];
+  maxFileSizeMb: number;
+  maxSheetCount: number;
+  strictMode: boolean;
+  ocrEnabled: boolean;
+};
+
+export type RequirementKimiGenerationConfig = {
+  enabled: boolean;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  outputStyle: "concise" | "balanced" | "detailed";
+  includeRiskHints: boolean;
+  includeAssumptions: boolean;
+};
+
+export type RequirementSystemConfig = {
+  kimiEvaluation: RequirementKimiEvaluationConfig;
+  fileParsing: RequirementFileParsingConfig;
+  kimiGeneration: RequirementKimiGenerationConfig;
+};
+
+export type RequirementSystemConfigStore = {
+  version: number;
+  draft: RequirementSystemConfig;
+  active: RequirementSystemConfig;
+  updatedAt: string;
+  effectiveAt: string;
+};
+
+// -------------------- 系统管理：实施评估-依赖规则 --------------------
+
+export type ImplementationDependencyRuleScope = "feature" | "scenario" | "data_source";
+
+export type ImplementationDependencyRuleLogic = "requires_all" | "requires_any" | "combo";
+
+export type ImplementationDependencyRuleItem = {
+  id: string;
+  subject: string;
+  scope: ImplementationDependencyRuleScope;
+  logic: ImplementationDependencyRuleLogic;
+  trigger: string;
+  dependencies: string[];
+  anyOfGroups?: string[][];
+  comboDependencies?: string[];
+  note?: string;
+  enabled: boolean;
+};
+
+export type ImplementationDependencyRulesConfig = {
+  schemaVersion: string;
+  source: string;
+  updatedFrom: string;
+  mutualExclusionRules: Array<{ left: string; right: string; reason: string }>;
+  rules: ImplementationDependencyRuleItem[];
+};
+
+export type ImplementationDependencyRulesStore = {
+  version: number;
+  draft: ImplementationDependencyRulesConfig;
+  active: ImplementationDependencyRulesConfig;
+  updatedAt: string;
+  effectiveAt: string;
+};
+
 // -------------------- 会话与幂等 --------------------
 
 export type SessionEstimateContext = {

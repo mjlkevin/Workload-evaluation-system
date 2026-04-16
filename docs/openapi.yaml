@@ -10,7 +10,8 @@ info:
 
     **未在本文档中展开的已实现端点**（完整列表见仓库
     `03_技术设计/系统演进/实现与文档对齐说明.md`）包括但不限于：
-    `/api/v1/auth/*`、`/api/v1/versions/*`、`/api/v1/system/*`、`/api/v1/ai/parse-basic-info`、
+    `/api/v1/auth/*`、`/api/v1/versions/*`、`/api/v1/system/*`、
+    `/api/v1/ai/parse-basic-info`、`/api/v1/ai/kimi-assessment/preview`、`/api/v1/ai/kimi-assessment/export-markdown`、
     `/api/v1/teams/*`、`GET /api/v1/wbs`；
     下载路径为 `GET /downloads/{fileName}`（非 `/api/v1` 前缀）。
 

@@ -159,3 +159,11 @@
     opacity: 0.95;
   }
 }
+
+/* Kimi 评估预览：打印/PDF 时保留卡片与条带背景色 */
+@media print {
+  .kimi-assessment-print-root {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

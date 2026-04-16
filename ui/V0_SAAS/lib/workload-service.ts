@@ -216,6 +216,79 @@ export type VersionCodeRuleItem = {
   updatedAt: string
 }
 
+export type RequirementSystemConfig = {
+  kimiEvaluation: {
+    enabled: boolean
+    model: string
+    temperature: number
+    maxTokens: number
+    timeoutMs: number
+    fallbackToRule: boolean
+    promptProfile: string
+    promptTemplate: string
+  }
+  fileParsing: {
+    enabled: boolean
+    allowedExtensions: string[]
+    maxFileSizeMb: number
+    maxSheetCount: number
+    strictMode: boolean
+    ocrEnabled: boolean
+  }
+  kimiGeneration: {
+    enabled: boolean
+    model: string
+    temperature: number
+    maxTokens: number
+    outputStyle: "concise" | "balanced" | "detailed"
+    includeRiskHints: boolean
+    includeAssumptions: boolean
+  }
+}
+
+export type RequirementSystemConfigView = {
+  version: number
+  draft: RequirementSystemConfig
+  active: RequirementSystemConfig
+  updatedAt: string
+  effectiveAt: string
+}
+
+export type ImplementationDependencyRuleItem = {
+  id: string
+  subject: string
+  scope: "feature" | "scenario" | "data_source"
+  logic: "requires_all" | "requires_any" | "combo"
+  trigger: string
+  dependencies: string[]
+  anyOfGroups?: string[][]
+  comboDependencies?: string[]
+  note?: string
+  enabled: boolean
+}
+
+export type ImplementationDependencyRulesConfig = {
+  schemaVersion: string
+  source: string
+  updatedFrom: string
+  mutualExclusionRules: Array<{ left: string; right: string; reason: string }>
+  rules: ImplementationDependencyRuleItem[]
+}
+
+export type ImplementationDependencyRulesView = {
+  version: number
+  draft: ImplementationDependencyRulesConfig
+  active: ImplementationDependencyRulesConfig
+  updatedAt: string
+  effectiveAt: string
+}
+
+export type ActiveImplementationDependencyRulesView = {
+  version: number
+  effectiveAt: string
+  active: ImplementationDependencyRulesConfig
+}
+
 export type EstimateItemSelection = {
   templateItemId: string
   included: boolean
@@ -1068,6 +1141,78 @@ export async function disableVersionCodeRule(ruleId: string): Promise<VersionCod
   return data.item
 }
 
+export async function getRequirementSystemConfig(): Promise<RequirementSystemConfigView> {
+  return apiRequest<RequirementSystemConfigView>("/api/v1/system/requirement-settings")
+}
+
+export async function updateRequirementSystemConfigDraft(payload: Partial<RequirementSystemConfig>): Promise<{
+  version: number
+  draft: RequirementSystemConfig
+  updatedAt: string
+}> {
+  return apiRequest<{
+    version: number
+    draft: RequirementSystemConfig
+    updatedAt: string
+  }>("/api/v1/system/requirement-settings/draft", {
+    method: "PATCH",
+    body: payload,
+  })
+}
+
+export async function activateRequirementSystemConfig(): Promise<{
+  version: number
+  active: RequirementSystemConfig
+  effectiveAt: string
+}> {
+  return apiRequest<{
+    version: number
+    active: RequirementSystemConfig
+    effectiveAt: string
+  }>("/api/v1/system/requirement-settings/activate", {
+    method: "POST",
+    body: {},
+  })
+}
+
+export async function getImplementationDependencyRules(): Promise<ImplementationDependencyRulesView> {
+  return apiRequest<ImplementationDependencyRulesView>("/api/v1/system/implementation-dependency-rules")
+}
+
+export async function updateImplementationDependencyRulesDraft(payload: Partial<ImplementationDependencyRulesConfig>): Promise<{
+  version: number
+  draft: ImplementationDependencyRulesConfig
+  updatedAt: string
+}> {
+  return apiRequest<{
+    version: number
+    draft: ImplementationDependencyRulesConfig
+    updatedAt: string
+  }>("/api/v1/system/implementation-dependency-rules/draft", {
+    method: "PATCH",
+    body: payload,
+  })
+}
+
+export async function activateImplementationDependencyRules(): Promise<{
+  version: number
+  active: ImplementationDependencyRulesConfig
+  effectiveAt: string
+}> {
+  return apiRequest<{
+    version: number
+    active: ImplementationDependencyRulesConfig
+    effectiveAt: string
+  }>("/api/v1/system/implementation-dependency-rules/activate", {
+    method: "POST",
+    body: {},
+  })
+}
+
+export async function getActiveImplementationDependencyRules(): Promise<ActiveImplementationDependencyRulesView> {
+  return apiRequest<ActiveImplementationDependencyRulesView>("/api/v1/estimates/dependency-rules/active")
+}
+
 export const KIMI_ASSESSMENT_PREFILL_STORAGE_KEY = "wes-kimi-assessment-prefill-v1"
 
 export type KimiAssessmentPreviewPayload = {
@@ -1111,6 +1256,7 @@ export type KimiAssessmentPreviewResult = {
     fallbackReason?: string
     elapsedMs?: number
     rawContent?: string
+    coarseFilteredCount?: number
   }
   source: {
     globalVersionCode: string

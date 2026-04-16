@@ -13,13 +13,12 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { useUnsavedNavigation } from "@/hooks/use-unsaved-changes"
+import { DASHBOARD_TABS_STORAGE_KEY } from "@/lib/dashboard-tabs-state"
 
 type DashboardTab = {
   path: string
   title: string
 }
-
-const DASHBOARD_TABS_STORAGE_KEY = "wes-dashboard-tabs-v1"
 
 const TAB_TITLE_MAP: Record<string, string> = {
   "/dashboard": "主页",

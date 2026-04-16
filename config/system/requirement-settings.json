@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "draft": {
+    "kimiEvaluation": {
+      "enabled": true,
+      "model": "moonshot-v1-128k",
+      "temperature": 0.3,
+      "maxTokens": 4000,
+      "timeoutMs": 45000,
+      "fallbackToRule": true,
+      "promptProfile": "default",
+      "promptTemplate": "你是实施评估顾问。必须只返回 JSON。字段固定：assessmentDraft.quoteMode/productLines/userCount/orgCount/orgSimilarity/difficultyFactor/moduleItems/risks/assumptions。moduleItems 每项字段：cloudProduct/skuName/moduleName/standardDays/suggestedDays/reason。所有数值字段必须为非负数，orgSimilarity 和 difficultyFactor 范围 0-1。严禁仅凭业务需求正文中出现与 SKU 同名的词、或「总账、报表、出纳」类标准功能并列枚举，就认定 suggestedDays 必须高于 standardDays；须结合该条需求完整语义做专业判断，只有存在相对标准产品交付的明确增量（如二开、深度集成、多组织推广等）时才上调，并在 reason 中写清增量内容而非复述关键词。财务云、供应链云等为实施域级云产品：cloudProduct 填该域名，skuName 仅填子模块，勿将域名挂在金蝶AI星空下写入 skuName。"
+    },
+    "fileParsing": {
+      "enabled": true,
+      "allowedExtensions": [
+        ".xlsx",
+        ".xls",
+        ".csv"
+      ],
+      "maxFileSizeMb": 20,
+      "maxSheetCount": 20,
+      "strictMode": false,
+      "ocrEnabled": false
+    },
+    "kimiGeneration": {
+      "enabled": true,
+      "model": "moonshot-v1-128k",
+      "temperature": 0.5,
+      "maxTokens": 6000,
+      "outputStyle": "balanced",
+      "includeRiskHints": true,
+      "includeAssumptions": true
+    }
+  },
+  "active": {
+    "kimiEvaluation": {
+      "enabled": true,
+      "model": "moonshot-v1-128k",
+      "temperature": 0.3,
+      "maxTokens": 4000,
+      "timeoutMs": 45000,
+      "fallbackToRule": true,
+      "promptProfile": "default",
+      "promptTemplate": "你是实施评估顾问。必须只返回 JSON。字段固定：assessmentDraft.quoteMode/productLines/userCount/orgCount/orgSimilarity/difficultyFactor/moduleItems/risks/assumptions。moduleItems 每项字段：cloudProduct/skuName/moduleName/standardDays/suggestedDays/reason。所有数值字段必须为非负数，orgSimilarity 和 difficultyFactor 范围 0-1。严禁仅凭业务需求正文中出现与 SKU 同名的词、或「总账、报表、出纳」类标准功能并列枚举，就认定 suggestedDays 必须高于 standardDays；须结合该条需求完整语义做专业判断，只有存在相对标准产品交付的明确增量（如二开、深度集成、多组织推广等）时才上调，并在 reason 中写清增量内容而非复述关键词。财务云、供应链云等为实施域级云产品：cloudProduct 填该域名，skuName 仅填子模块，勿将域名挂在金蝶AI星空下写入 skuName。"
+    },
+    "fileParsing": {
+      "enabled": true,
+      "allowedExtensions": [
+        ".xlsx",
+        ".xls",
+        ".csv"
+      ],
+      "maxFileSizeMb": 20,
+      "maxSheetCount": 20,
+      "strictMode": false,
+      "ocrEnabled": false
+    },
+    "kimiGeneration": {
+      "enabled": true,
+      "model": "moonshot-v1-128k",
+      "temperature": 0.5,
+      "maxTokens": 6000,
+      "outputStyle": "balanced",
+      "includeRiskHints": true,
+      "includeAssumptions": true
+    }
+  },
+  "updatedAt": "2026-04-10T15:49:06.549Z",
+  "effectiveAt": "2026-04-10T15:49:06.549Z"
+}

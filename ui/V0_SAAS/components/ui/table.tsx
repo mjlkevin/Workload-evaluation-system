@@ -81,6 +81,7 @@ function Table({
     if (target.closest('input, textarea, select, button, [role="button"], a')) return
     const cell = target.closest('td') as HTMLTableCellElement | null
     if (!cell) return
+    if (cell.hasAttribute('data-skip-table-preview')) return
     const text = (cell.textContent || '').trim()
     if (text.length < 20) return
     const rect = cell.getBoundingClientRect()

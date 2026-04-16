@@ -12,6 +12,8 @@ import { asString, normalizeCellText, parseCellNumber } from "../utils/helpers";
 import { normalizeKimiModelName } from "../utils/model-name";
 import { ok, fail } from "../utils/response";
 import { requireRole } from "../middleware/auth";
+import { loadRequirementSystemConfigStore } from "../modules/system/system.repository";
+import { buildKimiAssessmentDraftMarkdown } from "../utils/kimi-assessment-markdown";
 
 // -------------------- 解析辅助函数 --------------------
 
@@ -813,6 +815,81 @@ type KimiAssessmentPreviewInput = {
   };
 };
 
+/** 实施域级「云产品」（与产品模块表 moduleName 一致），不得出现在平台产品线下的 skuName 中 */
+const KINGDEE_DOMAIN_IMPLEMENTATION_CLOUDS = new Set<string>([
+  "财务云",
+  "供应链云",
+  "制造云",
+  "人力资源云",
+  "全渠道云",
+  "税务云",
+  "流程服务云",
+  "研发管理云",
+  "电商与渠道云",
+  "管理会计云",
+  "制造协同云",
+]);
+
+function isKingdeeProductLineUmbrella(name: string): boolean {
+  const t = asString(name).trim();
+  if (!t) return false;
+  return /金蝶AI星空|金蝶AI星瀚|^(星空|星瀚)$|云之家/.test(t);
+}
+
+function isKingdeeDomainImplementationCloud(name: string): boolean {
+  const t = asString(name).trim();
+  return Boolean(t && KINGDEE_DOMAIN_IMPLEMENTATION_CLOUDS.has(t));
+}
+
+/** 是否已有「云产品=domain + 具体 SKU」的明细行（用于去掉平台下错误的域级重复行） */
+function hasConcreteSkuRowsUnderDomain(all: KimiAssessmentModuleItem[], domain: string): boolean {
+  const d = asString(domain).trim();
+  if (!d) return false;
+  return all.some((it) => {
+    const c = asString(it.cloudProduct).trim();
+    const s = asString(it.skuName).trim();
+    if (c !== d) return false;
+    if (!s) return false;
+    if (isKingdeeDomainImplementationCloud(s)) return false;
+    return true;
+  });
+}
+
+/**
+ * 模型常把「财务云/供应链云」填在 skuName、cloudProduct 填「金蝶AI星空」。
+ * 若已有该域下 SKU 明细则删除域级重复行；否则提升为云产品行并清空 skuName（非 SKU 人天）。
+ */
+function realignKingdeeDomainCloudModuleItems(items: KimiAssessmentModuleItem[]): KimiAssessmentModuleItem[] {
+  const out: KimiAssessmentModuleItem[] = [];
+  for (const item of items) {
+    const cloud = asString(item.cloudProduct).trim();
+    const sku = asString(item.skuName).trim();
+    if (isKingdeeProductLineUmbrella(cloud) && isKingdeeDomainImplementationCloud(sku)) {
+      if (hasConcreteSkuRowsUnderDomain(items, sku)) {
+        continue;
+      }
+      out.push({
+        ...item,
+        cloudProduct: sku,
+        skuName: "",
+        moduleName: sku || item.moduleName,
+      });
+      continue;
+    }
+    out.push(item);
+  }
+  return out;
+}
+
+function formatAssessmentEntityPrefix(item: KimiAssessmentModuleItem): string {
+  const sku = asString(item.skuName).trim();
+  const cloud = asString(item.cloudProduct).trim();
+  if (sku) return `SKU「${sku}」`;
+  if (cloud) return `云产品「${cloud}」`;
+  const mod = asString(item.moduleName).trim();
+  return `条目「${mod || "未命名"}」`;
+}
+
 function clampNumber(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
@@ -1024,66 +1101,303 @@ function buildDeviationReason(standardDays: number, suggestedDays: number): stri
   return `建议人天较标准人天减少 ${Math.abs(delta)} 天（约 -${pct}%），当前实施范围较聚焦，标准交付能力可覆盖主要工作项。`;
 }
 
+function buildHolisticSupplementReason(params: {
+  businessNeedCount: number;
+  devOverviewCount: number;
+  scopeCount: number;
+  hasMeetingNotes: boolean;
+  hasKeyPoints: boolean;
+}): string {
+  const signals: string[] = [];
+  if (params.businessNeedCount >= 8) signals.push("业务需求条目较多");
+  if (params.devOverviewCount >= 5) signals.push("开发概要涉及模块较广");
+  if (params.scopeCount >= 2) signals.push("实施组织范围跨多单位");
+  if (params.hasMeetingNotes) signals.push("会议纪要存在额外约束");
+  if (params.hasKeyPoints) signals.push("关键点中包含风险事项");
+  if (!signals.length) signals.push("基于当前信息做审慎估算");
+  return `该项由模型按综合评估补齐：${signals.join("、")}，并结合复杂度与协同成本给出建议人天。`;
+}
+
 function resolveAssessmentReason(rawReason: string, standardDays: number, suggestedDays: number): string {
   const reason = asString(rawReason).trim();
   if (!isGenericAssessmentReason(reason)) return reason;
   return buildDeviationReason(standardDays, suggestedDays);
 }
 
+/** 实施侧“明显加工作量”语义：禁止把单独出现的「报表」等标准产品词当作加严信号（易与「总账、报表」类枚举误配）。 */
+function containsWorkloadEscalationSignal(text: string): boolean {
+  return /二开|定开|改造|复杂|高并发|多组织|跨组织|接口|集成|主数据|流程重构|性能|迁移|联调|审批链|深度定制|定制开发|个性化|二次开发|报表(?:定制|二开|开发|对接|改造|实施)|自定义报表|开发报表|报表.{0,10}(?:对接|集成|二开|改造)/.test(
+    asString(text),
+  );
+}
+
+/** 业务需求单元格内多为顿号/逗号分隔的模块范围枚举，不等同于该 SKU 需额外实施人天。 */
+function looksLikeWeakModuleEnumerationInBusinessNeed(text: string): boolean {
+  const t = asString(text).trim();
+  if (t.length < 12) return false;
+  const segments = t
+    .split(/[、，,;/；]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (segments.length >= 4) return true;
+  if (segments.length >= 3) return true;
+  if (segments.length >= 2 && t.length >= 36) return true;
+  return false;
+}
+
+function buildSkuEvidence(snapshot: KimiAssessmentSnapshot, item: KimiAssessmentModuleItem): {
+  hasStrongEvidence: boolean;
+  summary: string;
+} {
+  const sku = asString(item.skuName || item.moduleName);
+  const moduleName = asString(item.moduleName);
+  const cloud = asString(item.cloudProduct);
+  const keys = [sku, moduleName, cloud].filter(Boolean);
+  const normalize = (text: string) => asString(text).toLowerCase();
+  const hit = (text: string) => {
+    const source = normalize(text);
+    return keys.some((k) => normalize(k) && source.includes(normalize(k)));
+  };
+
+  const evidence: string[] = [];
+  let score = 0;
+
+  const businessNeedRows = Array.isArray(snapshot.businessNeedRows) ? snapshot.businessNeedRows : [];
+  businessNeedRows.forEach((row, idx) => {
+    const obj = asModelObject(row);
+    const packed = `${asString(obj.businessNeed)} ${asString(obj.solutionSuggestion)} ${asString(obj.title)} ${asString(obj.requiresCustomDev)}`;
+    if (!hit(packed)) return;
+    const bizNeedOnly = asString(obj.businessNeed);
+    const requiresDev = asString(obj.requiresCustomDev) === "是";
+    const enumerationHit =
+      looksLikeWeakModuleEnumerationInBusinessNeed(bizNeedOnly) && !requiresDev && !containsWorkloadEscalationSignal(packed);
+    if (enumerationHit) {
+      return;
+    }
+    if (requiresDev || containsWorkloadEscalationSignal(packed)) {
+      score += 2;
+    } else {
+      score += 1;
+    }
+    if (evidence.length < 2) {
+      evidence.push(`业务需求#${idx + 1}：${asString(obj.businessNeed).slice(0, 26) || "匹配到该SKU需求"}`);
+    }
+  });
+
+  const devRows = Array.isArray(snapshot.devOverviewRows) ? snapshot.devOverviewRows : [];
+  devRows.forEach((row, idx) => {
+    const obj = asModelObject(row);
+    const packed = `${asString(obj.moduleName)} ${asString(obj.functionDesc)} ${asString(obj.solutionSuggestion)}`;
+    if (!hit(packed)) return;
+    const coding = toNumberSafe(obj.codingDays);
+    if (coding > Number(item.standardDays || 0)) {
+      score += 2;
+      if (evidence.length < 3) {
+        evidence.push(`开发概要#${idx + 1}：编码人天${coding}高于标准${item.standardDays}`);
+      }
+    } else {
+      score += 1;
+      if (evidence.length < 3) {
+        evidence.push(`开发概要#${idx + 1}：${asString(obj.functionDesc).slice(0, 24) || "匹配到该SKU模块"}`);
+      }
+    }
+  });
+
+  const keyPointRows = Array.isArray(snapshot.keyPointRows) ? snapshot.keyPointRows : [];
+  keyPointRows.forEach((row, idx) => {
+    const obj = asModelObject(row);
+    const packed = `${asString(obj.subItem)} ${asString(obj.detail)} ${asString(obj.note)}`;
+    if (!hit(packed)) return;
+    score += containsWorkloadEscalationSignal(packed) ? 2 : 1;
+    if (evidence.length < 4) {
+      evidence.push(`关键点#${idx + 1}：${asString(obj.detail).slice(0, 24) || "存在相关风险约束"}`);
+    }
+  });
+
+  const notes = asString(snapshot.meetingNotes);
+  if (notes && hit(notes)) {
+    score += containsWorkloadEscalationSignal(notes) ? 2 : 1;
+    if (evidence.length < 4) {
+      evidence.push("会议纪要：存在该SKU相关范围/约束描述");
+    }
+  }
+
+  return {
+    hasStrongEvidence: score >= 2,
+    summary: evidence.length ? evidence.join("；") : "未命中该SKU的明确超标证据",
+  };
+}
+
+function normalizeSkuReason(snapshot: KimiAssessmentSnapshot, item: KimiAssessmentModuleItem): KimiAssessmentModuleItem {
+  const standard = Math.max(1, Math.round(Number(item.standardDays || 0)));
+  const suggestedRaw = Math.max(0, Math.round(Number(item.suggestedDays || 0)));
+  const evidence = buildSkuEvidence(snapshot, item);
+  const entity = formatAssessmentEntityPrefix(item);
+
+  if (suggestedRaw > standard && !evidence.hasStrongEvidence) {
+    return {
+      ...item,
+      standardDays: standard,
+      suggestedDays: standard,
+      reason: `${entity}未在需求记录中发现明确超标证据（${evidence.summary}），建议人天回落至标准人天 ${standard}。`,
+    };
+  }
+
+  if (suggestedRaw > standard) {
+    const delta = suggestedRaw - standard;
+    return {
+      ...item,
+      standardDays: standard,
+      suggestedDays: suggestedRaw,
+      reason: `${entity}建议人天 +${delta}（${standard} -> ${suggestedRaw}），依据：${evidence.summary}。`,
+    };
+  }
+
+  if (suggestedRaw < standard) {
+    const delta = standard - suggestedRaw;
+    const rawReason = resolveAssessmentReason(asString(item.reason), standard, suggestedRaw);
+    return {
+      ...item,
+      standardDays: standard,
+      suggestedDays: suggestedRaw,
+      reason: `${entity}建议人天 -${delta}（${standard} -> ${suggestedRaw}），${rawReason}`,
+    };
+  }
+
+  return {
+    ...item,
+    standardDays: standard,
+    suggestedDays: standard,
+    reason: `${entity}建议人天与标准一致（${standard}），依据：${evidence.summary}。`,
+  };
+}
+
+function isDevTotalItem(item: KimiAssessmentModuleItem): boolean {
+  const cloud = asString(item.cloudProduct);
+  const sku = asString(item.skuName || item.moduleName);
+  return /开发需求概要/.test(cloud) || /开发总人天|合计行/.test(sku);
+}
+
+function isCoarseGrainedAssessmentItem(item: KimiAssessmentModuleItem): boolean {
+  if (isDevTotalItem(item)) return false;
+  const cloud = asString(item.cloudProduct).trim();
+  const sku = asString(item.skuName || "").trim();
+  const moduleName = asString(item.moduleName || "").trim();
+  const coarseKeywords = [
+    "金蝶AI星空",
+    "金蝶AI星瀚",
+    "云之家",
+    "发票云",
+    "旗舰版",
+    "标准版",
+    "专业版",
+    "企业版",
+    "集团版",
+    "系统",
+    "平台",
+    "整体",
+    "全模块",
+    "全部模块",
+  ];
+  const text = `${cloud}|${sku}|${moduleName}`;
+  const hitKeyword = coarseKeywords.some((keyword) => text.includes(keyword));
+  if (!hitKeyword) return false;
+  if (sku && sku === cloud) return true;
+  if (!sku && moduleName && moduleName === cloud) return true;
+  if (/旗舰版|标准版|专业版|企业版|集团版/.test(sku || moduleName)) return true;
+  return /(^|[-_])?(系统|平台|整体|全模块|全部模块)$/.test(sku || moduleName);
+}
+
 function buildCloudSkuModuleItemsFromSnapshot(
   snapshot: KimiAssessmentSnapshot,
   draft: KimiAssessmentDraft
-): KimiAssessmentModuleItem[] {
+): { items: KimiAssessmentModuleItem[]; coarseFilteredCount: number } {
+  const draftForCloudSku: KimiAssessmentDraft = {
+    ...draft,
+    moduleItems: realignKingdeeDomainCloudModuleItems(draft.moduleItems),
+  };
   const productModuleRows = normalizeProductModuleRows(
     Array.isArray(snapshot.productModuleRows)
       ? (snapshot.productModuleRows.map((x) => asModelObject(x)) as RequirementImportData["productModuleRows"])
       : []
   );
-  if (!productModuleRows.length) return draft.moduleItems;
-
-  const normalize = (value: unknown) => asString(value).toLowerCase();
-  const aiBySku = new Map<string, KimiAssessmentModuleItem>();
-  for (const item of draft.moduleItems) {
-    const sku = normalize(item.skuName || item.moduleName);
-    if (sku) aiBySku.set(sku, item);
+  if (!productModuleRows.length) {
+    const normalized = draftForCloudSku.moduleItems.map((item) => normalizeSkuReason(snapshot, item));
+    const filtered = normalized.filter((item) => !isCoarseGrainedAssessmentItem(item));
+    return {
+      items: filtered.length ? filtered : normalized,
+      coarseFilteredCount: Math.max(0, normalized.length - filtered.length),
+    };
   }
 
-  const result: KimiAssessmentModuleItem[] = [];
+  const normalize = (value: unknown) => asString(value).toLowerCase();
+  const merged: KimiAssessmentModuleItem[] = draftForCloudSku.moduleItems.map((item) => normalizeSkuReason(snapshot, item));
+
+  const covered = new Set<string>();
+  for (const item of merged) {
+    covered.add(normalize(item.moduleName));
+    covered.add(normalize(item.skuName));
+    covered.add(normalize(`${item.cloudProduct}-${item.skuName}`));
+  }
+
+  const businessNeedCount = Array.isArray(snapshot.businessNeedRows) ? snapshot.businessNeedRows.length : 0;
+  const devOverviewCount = Array.isArray(snapshot.devOverviewRows) ? snapshot.devOverviewRows.length : 0;
+  const scopeCount = Array.isArray(snapshot.implementationScopeRows) ? snapshot.implementationScopeRows.length : 0;
+  const hasMeetingNotes = Boolean(asString(snapshot.meetingNotes));
+  const hasKeyPoints = Array.isArray(snapshot.keyPointRows) && snapshot.keyPointRows.length > 0;
+
   for (const row of productModuleRows) {
     const cloudProduct = asString(row.moduleName);
     const skuName = asString(row.subModule);
     if (!cloudProduct || !skuName) continue;
-    const hit = aiBySku.get(normalize(skuName));
+    const key = normalize(`${cloudProduct}-${skuName}`);
+    if (covered.has(key) || covered.has(normalize(skuName))) continue;
+
     const userCount = Math.max(0, toNumberSafe(row.userCount));
     const inferredStandard = clampNumber(Math.round(userCount / 120) || 2, 1, 20);
-    const standardDays = Math.max(
-      1,
-      Math.round(hit?.standardDays || inferredStandard)
-    );
+    const extraComplexity =
+      (businessNeedCount >= 8 ? 0.2 : 0.1) +
+      (devOverviewCount >= 5 ? 0.15 : 0.05) +
+      (scopeCount >= 2 ? 0.15 : 0) +
+      (hasMeetingNotes ? 0.08 : 0) +
+      (hasKeyPoints ? 0.12 : 0);
     const suggestedDays = Math.max(
-      standardDays,
+      inferredStandard,
       Math.round(
-        hit?.suggestedDays ||
-          standardDays * (1 + clampNumber(Number(draft.difficultyFactor || 0), 0, 1) * 0.4)
-      )
+        inferredStandard * (1 + clampNumber(Number(draftForCloudSku.difficultyFactor || 0), 0, 1) * 0.45 + extraComplexity),
+      ),
     );
-    result.push({
+
+    merged.push(normalizeSkuReason(snapshot, {
       cloudProduct,
       skuName,
       moduleName: `${cloudProduct}-${skuName}`,
-      standardDays,
+      standardDays: inferredStandard,
       suggestedDays,
-      reason: resolveAssessmentReason(asString(hit?.reason), standardDays, suggestedDays)
-    });
+      reason: buildHolisticSupplementReason({
+        businessNeedCount,
+        devOverviewCount,
+        scopeCount,
+        hasMeetingNotes,
+        hasKeyPoints,
+      }),
+    }));
+    covered.add(key);
   }
 
-  return result.length ? result : draft.moduleItems;
+  const filtered = merged.filter((item) => !isCoarseGrainedAssessmentItem(item));
+  const fallbackItems = merged.length ? merged : draftForCloudSku.moduleItems;
+  return {
+    items: filtered.length ? filtered : fallbackItems,
+    coarseFilteredCount: Math.max(0, merged.length - filtered.length),
+  };
 }
 
 async function generateAssessmentDraftByKimi(params: {
   apiUrl: string;
   apiKey: string;
   model: string;
+  promptTemplate: string;
   payload: KimiAssessmentPreviewInput;
   fallback: KimiAssessmentDraft;
 }): Promise<{ draft: KimiAssessmentDraft; rawContent: string }> {
@@ -1097,7 +1411,8 @@ async function generateAssessmentDraftByKimi(params: {
       {
         role: "system",
         content:
-          "你是实施评估顾问。必须只返回 JSON。字段固定：assessmentDraft.quoteMode/productLines/userCount/orgCount/orgSimilarity/difficultyFactor/moduleItems/risks/assumptions。moduleItems 每项字段：cloudProduct/skuName/moduleName/standardDays/suggestedDays/reason。所有数值字段必须为非负数，orgSimilarity 和 difficultyFactor 范围 0-1。"
+          asString(params.promptTemplate) ||
+          "你是资深项目经理 + 资深实施顾问。你不是做简单 SKU 对照，而是要基于需求全量信息做综合实施评估。必须只返回 JSON。字段固定：assessmentDraft.quoteMode/productLines/userCount/orgCount/orgSimilarity/difficultyFactor/moduleItems/risks/assumptions。moduleItems 每项字段：cloudProduct/skuName/moduleName/standardDays/suggestedDays/reason。所有数值字段必须为非负数，orgSimilarity 和 difficultyFactor 范围 0-1。评估时必须综合：basicInfo（行业、规模、上线目标）、businessNeedRows（业务复杂度）、devOverviewRows（开发基线）、implementationScopeRows（组织范围与地域）、meetingNotes（隐性约束）、keyPointRows（重点风险）。reason 必须体现增加/减少人天的业务原因与实施原因，不能仅写“按模板匹配”。禁止把“产品名/版本名/平台名（如金蝶AI星空、旗舰版）”直接当成 SKU，必须下钻到可实施功能项。财务云、供应链云等是实施域级云产品，不得填入 skuName 并挂在金蝶AI星空下冒充 SKU；域级人天归 cloudProduct=该域名，skuName 仅写子模块。若信息不足，给出审慎估算并在 risks/assumptions 明确不确定性来源。严禁仅凭业务需求正文中出现与 SKU 同名的词、或「总账、报表、出纳」类标准功能并列枚举，就认定 suggestedDays 必须高于 standardDays；须结合该条需求完整语义与实施顾问角色做专业判断，只有存在相对标准产品交付的明确增量（如二开、深度集成、多组织推广、性能/迁移、额外培训与方案等）时才上调，并在 reason 中写清增量内容而非复述关键词。"
       },
       {
         role: "user",
@@ -1108,7 +1423,11 @@ async function generateAssessmentDraftByKimi(params: {
           `2) quoteMode 默认优先“模块报价”；\n` +
           `3) 若信息不足，给出审慎估算并在 risks/assumptions 说明；\n` +
           `4) moduleItems 至少返回 1 条；\n` +
-          `5) 若 requirementSnapshot.devTotalDays > 0，请将其作为“开发总人天”纳入 moduleItems。\n\n` +
+          `5) 若 requirementSnapshot.devTotalDays > 0，请将其作为“开发总人天”纳入 moduleItems；\n` +
+          `6) 对每个 SKU 必须给出“该 SKU 专属”的 reason，禁止全表复用同一条模糊理由；\n` +
+          `7) 当 suggestedDays > standardDays 时，reason 必须明确写出该 SKU 的超标证据来源（对应业务需求/开发概要/关键点/会议纪要中的具体记录），且须说明相对标准交付的增量工作，不得仅复述需求中与 SKU 同名的词或并列功能清单；\n` +
+          `8) 业务需求里用顿号/逗号并列多个标准模块名称（如出纳、存货、成本、总账、报表）通常只表示实施范围而非单项加人天，不得据此对其中每个 SKU 自动做同幅度上调；\n` +
+          `9) cloudProduct 表示产品线或实施域云产品（如金蝶AI星空、财务云）；skuName 仅填可交付子模块/SKU（如总账、采购管理）。禁止把财务云、供应链云等「实施域云」写进 skuName 又挂在金蝶AI星空下；域级人天应归在云产品行，SKU 列留空或仅列真实子模块。\n\n` +
           `${JSON.stringify(params.payload)}`
       }
     ]
@@ -1753,14 +2072,22 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
   }
 
   const fallbackDraft = estimateFallbackAssessmentDraft(snapshot);
+  const fallbackCloudSku = buildCloudSkuModuleItemsFromSnapshot(snapshot, fallbackDraft);
   const fallbackDraftAligned: KimiAssessmentDraft = {
     ...fallbackDraft,
-    moduleItems: mergeDevTotalModuleItem(buildCloudSkuModuleItemsFromSnapshot(snapshot, fallbackDraft), snapshot)
+    moduleItems: mergeDevTotalModuleItem(fallbackCloudSku.items, snapshot)
   };
   const apiKey = config.kimi.apiKey;
   const model = config.kimi.model;
   const modelForClient = normalizeKimiModelName(model);
-  const promptProfile = asString(asModelObject(body.ruleContext).promptProfile) || "assessment_default_v1";
+  const requirementSettings = loadRequirementSystemConfigStore().active;
+  const promptProfile =
+    asString(asModelObject(body.ruleContext).promptProfile) ||
+    asString(requirementSettings.kimiEvaluation.promptProfile) ||
+    "assessment_default_v1";
+  const promptTemplate =
+    asString(requirementSettings.kimiEvaluation.promptTemplate) ||
+    "你是资深项目经理 + 资深实施顾问。你不是做简单 SKU 对照，而是要基于需求全量信息做综合实施评估。必须只返回 JSON。字段固定：assessmentDraft.quoteMode/productLines/userCount/orgCount/orgSimilarity/difficultyFactor/moduleItems/risks/assumptions。moduleItems 每项字段：cloudProduct/skuName/moduleName/standardDays/suggestedDays/reason。所有数值字段必须为非负数，orgSimilarity 和 difficultyFactor 范围 0-1。评估时必须综合：basicInfo（行业、规模、上线目标）、businessNeedRows（业务复杂度）、devOverviewRows（开发基线）、implementationScopeRows（组织范围与地域）、meetingNotes（隐性约束）、keyPointRows（重点风险）。reason 必须体现增加/减少人天的业务原因与实施原因，不能仅写“按模板匹配”。禁止把产品名/版本名/平台名（如金蝶AI星空、旗舰版）直接当成 SKU，必须下钻到可实施功能项。财务云、供应链云等是实施域级云产品，不得填入 skuName 并挂在金蝶AI星空下冒充 SKU；域级人天归 cloudProduct=该域名，skuName 仅写子模块。若信息不足，给出审慎估算并在 risks/assumptions 明确不确定性来源。严禁仅凭业务需求正文中出现与 SKU 同名的词、或「总账、报表、出纳」类标准功能并列枚举，就认定 suggestedDays 必须高于 standardDays；须结合该条需求完整语义与实施顾问角色做专业判断，只有存在相对标准产品交付的明确增量（如二开、深度集成、多组织推广、性能/迁移、额外培训与方案等）时才上调，并在 reason 中写清增量内容而非复述关键词。";
   const startedAt = Date.now();
 
   if (!apiKey) {
@@ -1775,7 +2102,8 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
             ruleSetId: "fallback-rules-v1",
             mode: "rule_fallback",
             fallbackReason: toFriendlyFallbackReason("api_key_missing"),
-            elapsedMs: Date.now() - startedAt
+            elapsedMs: Date.now() - startedAt,
+            coarseFilteredCount: fallbackCloudSku.coarseFilteredCount
           },
           source: { globalVersionCode, requirementVersionCode },
           assessmentDraft: fallbackDraftAligned
@@ -1790,12 +2118,14 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
       apiUrl: config.kimi.apiBaseUrl,
       apiKey,
       model,
+      promptTemplate,
       payload: body,
       fallback: fallbackDraftAligned
     });
+    const alignedCloudSku = buildCloudSkuModuleItemsFromSnapshot(snapshot, result.draft);
     const alignedDraft: KimiAssessmentDraft = {
       ...result.draft,
-      moduleItems: mergeDevTotalModuleItem(buildCloudSkuModuleItemsFromSnapshot(snapshot, result.draft), snapshot)
+      moduleItems: mergeDevTotalModuleItem(alignedCloudSku.items, snapshot)
     };
 
     return res.json(
@@ -1810,7 +2140,8 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
             mode: "model",
             fallbackReason: "",
             elapsedMs: Date.now() - startedAt,
-            rawContent: result.rawContent
+            rawContent: result.rawContent,
+            coarseFilteredCount: alignedCloudSku.coarseFilteredCount
           },
           source: { globalVersionCode, requirementVersionCode },
           assessmentDraft: alignedDraft
@@ -1832,7 +2163,8 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
             ruleSetId: "fallback-rules-v1",
             mode: "rule_fallback",
             fallbackReason,
-            elapsedMs: Date.now() - startedAt
+            elapsedMs: Date.now() - startedAt,
+            coarseFilteredCount: fallbackCloudSku.coarseFilteredCount
           },
           source: { globalVersionCode, requirementVersionCode },
           assessmentDraft: fallbackDraftAligned
@@ -1841,6 +2173,40 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
       )
     );
   }
+}
+
+/** 将 `POST /api/v1/ai/kimi-assessment/preview` 返回的 `assessmentDraft`（及可选 `meta`）导出为 Markdown，便于 Kimiclaw 等 Agent 转 PDF 或作为附件发送。 */
+export async function exportKimiAssessmentMarkdown(req: Request, res: Response) {
+  if (!requireRole(req, res, ["admin", "operator"])) return;
+
+  const body = (req.body || {}) as {
+    assessmentDraft?: Record<string, unknown>;
+    meta?: Record<string, unknown>;
+    projectName?: string;
+  };
+  const draft =
+    body.assessmentDraft && typeof body.assessmentDraft === "object" ? (body.assessmentDraft as Record<string, unknown>) : {};
+  if (!Object.keys(draft).length) {
+    return fail(res, 40001, "参数错误", [{ field: "assessmentDraft", reason: "required" }]);
+  }
+
+  const meta =
+    body.meta && typeof body.meta === "object" ? (body.meta as Record<string, unknown>) : {};
+  const md = buildKimiAssessmentDraftMarkdown({
+    projectName: asString(body.projectName),
+    assessmentDraft: draft,
+    meta,
+  });
+
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const filenameAscii = `kimi-assessment-draft-${date}.md`;
+  const filenameUtf = `Kimi评估草稿-${date}.md`;
+  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${filenameAscii}"; filename*=UTF-8''${encodeURIComponent(filenameUtf)}`,
+  );
+  res.status(200).send(md);
 }
 
 export async function chat(req: Request, res: Response) {

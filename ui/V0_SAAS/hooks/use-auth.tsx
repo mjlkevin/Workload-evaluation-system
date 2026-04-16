@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { apiRequest, getStoredToken } from "@/lib/api-client"
+import { clearDashboardTabsState } from "@/lib/dashboard-tabs-state"
 
 export type AuthUser = {
   id: string
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(AUTH_TOKEN_KEY)
     }
+    clearDashboardTabsState()
   }, [])
 
   const applyAuth = useCallback((nextToken: string, nextUser: AuthUser) => {

@@ -2,6 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Brain,
+  CheckCircle2,
+  ClipboardList,
+  FileDown,
+  Gauge,
+  Lightbulb,
+  ShieldAlert,
+  TrendingUp,
+} from "lucide-react"
 import { shouldSuppressUnsavedPrompt, useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { Badge } from "@/components/ui/badge"
@@ -51,6 +64,7 @@ import {
   promoteVersionById,
   undoCheckoutById,
 } from "@/lib/workload-service"
+import { useReactToPrint } from "react-to-print"
 import { toast } from "sonner"
 
 type BasicInfo = {
@@ -1005,9 +1019,6 @@ export default function RequirementImportPage() {
           meetingNotes,
           keyPointRows: keyPointRows as unknown as Array<Record<string, unknown>>,
         },
-        ruleContext: {
-          promptProfile: "assessment_default_v1",
-        },
       })
       if (rollingTimer) {
         window.clearInterval(rollingTimer)
@@ -1102,6 +1113,20 @@ export default function RequirementImportPage() {
   const [kimiAssessProgressValue, setKimiAssessProgressValue] = useState(0)
   const [kimiAssessProgressLogs, setKimiAssessProgressLogs] = useState<string[]>([])
   const kimiAssessProgressLogRef = useRef<HTMLDivElement | null>(null)
+  const kimiAssessmentPrintRef = useRef<HTMLDivElement | null>(null)
+  const printKimiAssessmentPreview = useReactToPrint({
+    contentRef: kimiAssessmentPrintRef,
+    documentTitle: () => {
+      const d = new Date()
+      const p = (n: number) => String(n).padStart(2, "0")
+      return `Kimi评估预览_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`
+    },
+    pageStyle: "@page { size: A4; margin: 12mm; }",
+    onPrintError: (_loc, err) => {
+      console.error(err)
+      toast.error("无法打开打印/导出，请检查浏览器是否拦截弹出窗口")
+    },
+  })
   const kimiDevTotalDays = useMemo(() => {
     if (!kimiAssessmentPreview) return 0
     const hit = kimiAssessmentPreview.assessmentDraft.moduleItems.find((item) => {
@@ -1111,6 +1136,202 @@ export default function RequirementImportPage() {
     })
     return Number(hit?.suggestedDays || 0)
   }, [kimiAssessmentPreview])
+  const kimiPreviewMetrics = useMemo(() => {
+    if (!kimiAssessmentPreview) {
+      return {
+        confidencePct: 0,
+        totalSuggestedDays: 0,
+        totalStandardDays: 0,
+        avgDeltaPct: 0,
+        riskCount: 0,
+        assumptionCount: 0,
+        highDeltaCount: 0,
+      }
+    }
+    const items = kimiAssessmentPreview.assessmentDraft.moduleItems || []
+    const totalSuggestedDays = items.reduce((sum, item) => sum + Number(item.suggestedDays || 0), 0)
+    const totalStandardDays = items.reduce((sum, item) => sum + Number(item.standardDays || 0), 0)
+    const avgDeltaPct =
+      totalStandardDays > 0 ? Math.round(((totalSuggestedDays - totalStandardDays) / totalStandardDays) * 100) : 0
+    const highDeltaCount = items.filter((item) => {
+      const std = Number(item.standardDays || 0)
+      if (std <= 0) return false
+      return Math.abs((Number(item.suggestedDays || 0) - std) / std) >= 0.3
+    }).length
+    return {
+      confidencePct: Math.round((Number(kimiAssessmentPreview.meta.confidence) || 0) * 100),
+      totalSuggestedDays: Math.round(totalSuggestedDays),
+      totalStandardDays: Math.round(totalStandardDays),
+      avgDeltaPct,
+      riskCount: kimiAssessmentPreview.assessmentDraft.risks.length,
+      assumptionCount: kimiAssessmentPreview.assessmentDraft.assumptions.length,
+      highDeltaCount,
+    }
+  }, [kimiAssessmentPreview])
+  const kimiRiskLevel = useMemo(() => {
+    if (!kimiAssessmentPreview) return { label: "未知", className: "text-muted-foreground", score: 0 }
+    const riskCount = kimiPreviewMetrics.riskCount
+    const highDeltaCount = kimiPreviewMetrics.highDeltaCount
+    const score = riskCount * 0.7 + highDeltaCount * 0.9 + Math.max(0, kimiPreviewMetrics.avgDeltaPct) / 20
+    if (score >= 4) return { label: "高", className: "text-destructive", score: 90 }
+    if (score >= 2.2) return { label: "中", className: "text-amber-600", score: 60 }
+    return { label: "低", className: "text-emerald-600", score: 30 }
+  }, [kimiAssessmentPreview, kimiPreviewMetrics])
+  const kimiRiskRationale = useMemo(() => {
+    if (!kimiAssessmentPreview) return ["暂无评估数据"]
+    const reasons: string[] = []
+    if (kimiPreviewMetrics.riskCount >= 4) reasons.push(`风险条目较多（${kimiPreviewMetrics.riskCount} 条）`)
+    else if (kimiPreviewMetrics.riskCount > 0) reasons.push(`存在风险条目（${kimiPreviewMetrics.riskCount} 条）`)
+
+    if (kimiPreviewMetrics.highDeltaCount >= 3) reasons.push(`高偏差SKU较多（${kimiPreviewMetrics.highDeltaCount} 项）`)
+    else if (kimiPreviewMetrics.highDeltaCount > 0) reasons.push(`存在高偏差SKU（${kimiPreviewMetrics.highDeltaCount} 项）`)
+
+    if (kimiPreviewMetrics.avgDeltaPct >= 50) reasons.push(`平均偏差较高（${kimiPreviewMetrics.avgDeltaPct}%）`)
+    else if (kimiPreviewMetrics.avgDeltaPct > 20) reasons.push(`平均偏差中等（${kimiPreviewMetrics.avgDeltaPct}%）`)
+    else reasons.push(`平均偏差可控（${kimiPreviewMetrics.avgDeltaPct}%）`)
+
+    if (kimiAssessmentPreview.assessmentDraft.orgCount >= 3) {
+      reasons.push(`组织数量较多（${kimiAssessmentPreview.assessmentDraft.orgCount}），协同复杂度提升`)
+    }
+    return reasons
+  }, [kimiAssessmentPreview, kimiPreviewMetrics])
+  const kimiTopEvidence = useMemo(() => {
+    if (!kimiAssessmentPreview) return []
+    return [...(kimiAssessmentPreview.assessmentDraft.moduleItems || [])]
+      .map((item) => {
+        const std = Number(item.standardDays || 0)
+        const sug = Number(item.suggestedDays || 0)
+        const deltaPct = std > 0 ? Math.round(((sug - std) / std) * 100) : 0
+        const sku = String(item.skuName ?? "").trim()
+        const cloud = String(item.cloudProduct ?? "").trim()
+        const moduleName =
+          sku || (cloud ? `${cloud}（云级）` : String(item.moduleName || "").trim() || "未命名模块")
+        return {
+          moduleName,
+          deltaPct,
+          reason: item.reason || "未给出原因",
+        }
+      })
+      .sort((a, b) => Math.abs(b.deltaPct) - Math.abs(a.deltaPct))
+      .slice(0, 3)
+  }, [kimiAssessmentPreview])
+  const kimiWaterfall = useMemo(() => {
+    if (!kimiAssessmentPreview) {
+      return {
+        rows: [] as Array<{ key: string; label: string; value: number; cumulative: number; cumulativeEnd: number; tone: "base" | "up" | "down" | "final" }>,
+        maxAbs: 1,
+        breakdowns: [] as Array<{
+          key: string
+          label: string
+          formula: string
+          computed: string
+          inputs: Array<{ name: string; value: string | number }>
+          note: string
+        }>,
+      }
+    }
+    const base = kimiPreviewMetrics.totalStandardDays
+    const suggested = kimiPreviewMetrics.totalSuggestedDays
+    const draft = kimiAssessmentPreview.assessmentDraft
+    const difficulty = Number(draft.difficultyFactor || 0)
+    const orgSimilarity = Number(draft.orgSimilarity || 0)
+    const orgCount = Math.max(1, Number(draft.orgCount || 1))
+    const riskCount = draft.risks.length
+
+    const complexityAdj = Math.round(base * difficulty * 0.35)
+    const orgAdj = Math.round(base * orgSimilarity * Math.max(0, orgCount - 1) * 0.08)
+    const riskAdj = Math.round(base * Math.min(6, riskCount) * 0.03)
+    const calibration = suggested - (base + complexityAdj + orgAdj + riskAdj)
+
+    const items = [
+      { key: "base", label: "标准人天基线", value: base, tone: "base" as const },
+      { key: "complexity", label: "复杂度调整", value: complexityAdj, tone: complexityAdj >= 0 ? ("up" as const) : ("down" as const) },
+      { key: "org", label: "组织协同调整", value: orgAdj, tone: orgAdj >= 0 ? ("up" as const) : ("down" as const) },
+      { key: "risk", label: "风险缓冲调整", value: riskAdj, tone: riskAdj >= 0 ? ("up" as const) : ("down" as const) },
+      { key: "calibration", label: "模型校准调整", value: calibration, tone: calibration >= 0 ? ("up" as const) : ("down" as const) },
+    ]
+
+    let running = 0
+    const rows = items.map((item) => {
+      const start = running
+      const end = running + item.value
+      running = end
+      return {
+        ...item,
+        cumulative: start,
+        cumulativeEnd: end,
+      }
+    })
+    rows.push({
+      key: "final",
+      label: "建议人天结果",
+      value: suggested,
+      cumulative: 0,
+      cumulativeEnd: suggested,
+      tone: "final",
+    })
+    const maxAbs = Math.max(
+      1,
+      ...rows.map((row) => Math.abs(row.value)),
+      Math.abs(suggested),
+      Math.abs(base),
+    )
+    const breakdowns = [
+      {
+        key: "complexity",
+        label: "复杂度调整",
+        formula: "复杂度调整 = 标准人天 × 难度系数 × 0.35",
+        computed: `${base} × ${difficulty.toFixed(2)} × 0.35 = ${(base * difficulty * 0.35).toFixed(2)} ≈ ${complexityAdj}`,
+        inputs: [
+          { name: "标准人天", value: base },
+          { name: "难度系数", value: difficulty.toFixed(2) },
+          { name: "系数", value: "0.35" },
+        ],
+        note: "体现需求复杂性对实施工作量的增量影响。",
+      },
+      {
+        key: "org",
+        label: "组织协同调整",
+        formula: "组织协同调整 = 标准人天 × 组织相似度 × max(组织数-1,0) × 0.08",
+        computed: `${base} × ${orgSimilarity.toFixed(2)} × ${Math.max(0, orgCount - 1)} × 0.08 = ${(base * orgSimilarity * Math.max(0, orgCount - 1) * 0.08).toFixed(2)} ≈ ${orgAdj}`,
+        inputs: [
+          { name: "标准人天", value: base },
+          { name: "组织相似度", value: orgSimilarity.toFixed(2) },
+          { name: "组织数", value: orgCount },
+          { name: "系数", value: "0.08" },
+        ],
+        note: "组织越多、差异越大，跨组织协调与推广成本越高。",
+      },
+      {
+        key: "risk",
+        label: "风险缓冲调整",
+        formula: "风险缓冲调整 = 标准人天 × min(风险条目数,6) × 0.03",
+        computed: `${base} × ${Math.min(riskCount, 6)} × 0.03 = ${(base * Math.min(riskCount, 6) * 0.03).toFixed(2)} ≈ ${riskAdj}`,
+        inputs: [
+          { name: "标准人天", value: base },
+          { name: "风险条目数", value: riskCount },
+          { name: "封顶条目数", value: Math.min(riskCount, 6) },
+          { name: "系数", value: "0.03" },
+        ],
+        note: "用于给高风险场景留出缓冲人天，避免排期过紧。",
+      },
+      {
+        key: "calibration",
+        label: "模型校准调整",
+        formula: "模型校准调整 = 建议人天 - (标准人天 + 复杂度调整 + 组织协同调整 + 风险缓冲调整)",
+        computed: `${suggested} - (${base} + ${complexityAdj} + ${orgAdj} + ${riskAdj}) = ${calibration}`,
+        inputs: [
+          { name: "建议人天", value: suggested },
+          { name: "标准人天", value: base },
+          { name: "复杂度调整", value: complexityAdj },
+          { name: "组织协同调整", value: orgAdj },
+          { name: "风险缓冲调整", value: riskAdj },
+        ],
+        note: "用于吸收模型综合判断（行业经验、上下文语义）带来的剩余差值。",
+      },
+    ]
+    return { rows, maxAbs, breakdowns }
+  }, [kimiAssessmentPreview, kimiPreviewMetrics])
   const kimiAssessProgressCurrentText = useMemo(
     () => kimiAssessProgressLogs[kimiAssessProgressLogs.length - 1] || "准备中...",
     [kimiAssessProgressLogs],
@@ -1474,7 +1695,7 @@ export default function RequirementImportPage() {
             <Progress value={kimiAssessProgressValue} />
             <div
               ref={kimiAssessProgressLogRef}
-              className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-border/60 bg-background/80 p-3 text-xs text-muted-foreground"
+              className="h-52 shrink-0 space-y-1 overflow-y-auto overflow-x-hidden rounded-lg border border-border/60 bg-background/80 p-3 text-xs text-muted-foreground"
             >
               {kimiAssessProgressLogs.length ? (
                 kimiAssessProgressLogs.map((line, idx) => <p key={`${line}-${idx}`}>{line}</p>)
@@ -1624,82 +1845,322 @@ export default function RequirementImportPage() {
       </Dialog>
 
       <Dialog open={kimiAssessmentPreviewOpen} onOpenChange={setKimiAssessmentPreviewOpen}>
-        <DialogContent className="sm:max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>Kimi 评估预览（实施评估草稿）</DialogTitle>
-            <DialogDescription>
-              该结果为 AI 草稿，请确认后再应用到实施评估页面。
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+          <div
+            ref={kimiAssessmentPrintRef}
+            className="kimi-assessment-print-root flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-foreground print:h-auto print:max-h-none print:overflow-visible"
+          >
+          <div className="shrink-0 px-6 pt-6 pr-14 pb-0">
+            <DialogHeader>
+              <DialogTitle>Kimi 评估预览</DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 pt-4 print:max-h-none print:overflow-visible">
           {kimiAssessmentPreview ? (
             <div className="space-y-4">
-              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-4">
-                <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
-                  模型：{normalizeKimiModelName(kimiAssessmentPreview.meta.model)}
+              <div className="grid gap-2 sm:grid-cols-4">
+                <div className="flex min-h-0 items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/20 px-3 py-2">
+                  <span className="inline-flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
+                    <Brain className="size-3.5" /> 模型
+                  </span>
+                  <span className="truncate text-right text-sm font-medium text-foreground">
+                    {normalizeKimiModelName(kimiAssessmentPreview.meta.model)}
+                  </span>
                 </div>
-                <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
-                  模式：{kimiAssessmentPreview.meta.mode === "model" ? "模型生成" : "规则兜底"}
+                <div className="flex min-h-0 items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/20 px-3 py-2">
+                  <span className="inline-flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
+                    <Activity className="size-3.5" /> 评估模式
+                  </span>
+                  <span className="truncate text-right text-sm font-medium text-foreground">
+                    {kimiAssessmentPreview.meta.mode === "model" ? "模型生成" : "规则兜底"}
+                  </span>
                 </div>
-                <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
-                  置信度：{Math.round((Number(kimiAssessmentPreview.meta.confidence) || 0) * 100)}%
+                <div className="flex min-h-0 items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/20 px-3 py-2">
+                  <span className="inline-flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
+                    <Gauge className="size-3.5" /> 置信度
+                  </span>
+                  <span className="tabular-nums text-sm font-semibold text-primary">
+                    {kimiPreviewMetrics.confidencePct}%
+                  </span>
                 </div>
-                <div className="rounded-md border border-border/60 bg-secondary/20 px-3 py-2">
-                  规则集：{kimiAssessmentPreview.meta.ruleSetId}
+                <div className="flex min-h-0 items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/20 px-3 py-2">
+                  <span className="inline-flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
+                    <ClipboardList className="size-3.5" /> 规则集
+                  </span>
+                  <span className="truncate text-right text-sm font-medium text-foreground">
+                    {kimiAssessmentPreview.meta.ruleSetId}
+                  </span>
                 </div>
               </div>
-              <div className="grid gap-3 rounded-lg border border-border/60 bg-secondary/10 p-3 text-sm sm:grid-cols-3">
-                <div>报价模式：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.quoteMode || "—"}</span></div>
-                <div>用户数：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.userCount}</span></div>
-                <div>组织数：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.orgCount}</span></div>
-                <div>组织相似度：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.orgSimilarity}</span></div>
-                <div>难度系数：<span className="font-medium">{kimiAssessmentPreview.assessmentDraft.difficultyFactor}</span></div>
-                <div>
-                  总人天：
-                  <span className="font-medium">
+
+              <div className="grid gap-2 sm:grid-cols-4">
+                <div className="rounded-lg border border-border/60 bg-background/70 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                      <BarChart3 className="size-3.5" /> 总建议人天
+                    </span>
+                    <span className="tabular-nums text-xl font-semibold text-primary">
+                      {kimiPreviewMetrics.totalSuggestedDays}
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-background/70 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                      <BarChart3 className="size-3.5" /> 总标准人天
+                    </span>
+                    <span className="tabular-nums text-xl font-semibold text-primary">
+                      {kimiPreviewMetrics.totalStandardDays}
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-background/70 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                      <Lightbulb className="size-3.5" /> 平均偏差
+                    </span>
+                    <span className="tabular-nums text-xl font-semibold text-primary">
+                      {kimiPreviewMetrics.avgDeltaPct > 0 ? "+" : ""}
+                      {kimiPreviewMetrics.avgDeltaPct}%
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-background/70 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                      <ShieldAlert className="size-3.5" /> 风险等级
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-muted-foreground/50 text-[10px] leading-none text-muted-foreground print:hidden">
+                            ?
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" sideOffset={6} className="max-w-72 text-xs leading-5">
+                          {kimiRiskRationale.map((line, idx) => (
+                            <p key={`${line}-${idx}`}>- {line}</p>
+                          ))}
+                        </TooltipContent>
+                      </Tooltip>
+                    </span>
+                    <span className="text-xl font-semibold text-primary">{kimiRiskLevel.label}</span>
+                  </div>
+                  <ul className="mt-1 hidden list-none space-y-0.5 text-[10px] leading-snug text-muted-foreground print:block">
+                    {kimiRiskRationale.map((line, idx) => (
+                      <li key={`print-risk-${line}-${idx}`}>- {line}</li>
+                    ))}
+                  </ul>
+                  <div className="mt-2 h-1.5 w-full rounded-full bg-secondary">
+                    <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${kimiRiskLevel.score}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-x-4 gap-y-2 rounded-lg border border-border/60 bg-secondary/10 p-3 text-sm sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
+                <div className="flex min-w-0 items-baseline gap-1.5">
+                  <span className="shrink-0 text-muted-foreground">报价模式</span>
+                  <span className="min-w-0 truncate font-medium text-foreground">
+                    {kimiAssessmentPreview.assessmentDraft.quoteMode || "—"}
+                  </span>
+                </div>
+                <div className="flex min-w-0 items-baseline gap-1.5">
+                  <span className="shrink-0 text-muted-foreground">用户数</span>
+                  <span className="font-medium tabular-nums text-primary">{kimiAssessmentPreview.assessmentDraft.userCount}</span>
+                </div>
+                <div className="flex min-w-0 items-baseline gap-1.5">
+                  <span className="shrink-0 text-muted-foreground">组织数</span>
+                  <span className="font-medium tabular-nums text-primary">{kimiAssessmentPreview.assessmentDraft.orgCount}</span>
+                </div>
+                <div className="flex min-w-0 items-baseline gap-1.5">
+                  <span className="shrink-0 text-muted-foreground">组织相似度</span>
+                  <span className="font-medium tabular-nums text-primary">{kimiAssessmentPreview.assessmentDraft.orgSimilarity}</span>
+                </div>
+                <div className="flex min-w-0 items-baseline gap-1.5">
+                  <span className="shrink-0 text-muted-foreground">难度系数</span>
+                  <span className="font-medium tabular-nums text-primary">{kimiAssessmentPreview.assessmentDraft.difficultyFactor}</span>
+                </div>
+                <div className="flex min-w-0 items-baseline gap-1.5">
+                  <span className="shrink-0 text-muted-foreground">总人天</span>
+                  <span className="font-medium tabular-nums text-primary">
                     {kimiAssessmentPreview.assessmentDraft.moduleItems.reduce(
                       (sum, item) => sum + Number(item.suggestedDays || 0),
                       0,
                     )}
                   </span>
                 </div>
-                <div>
-                  开发总人天：
-                  <span className="font-medium">{kimiDevTotalDays > 0 ? kimiDevTotalDays : "未识别"}</span>
+                <div className="flex min-w-0 items-baseline gap-1.5">
+                  <span className="shrink-0 text-muted-foreground">开发总人天</span>
+                  <span className="font-medium tabular-nums text-primary">{kimiDevTotalDays > 0 ? kimiDevTotalDays : "未识别"}</span>
                 </div>
-                <div className="sm:col-span-3">
-                  产品线：
-                  <span className="font-medium">
+                <div className="flex min-w-0 items-baseline gap-1.5 sm:col-span-2 md:col-span-4 xl:col-span-7">
+                  <span className="shrink-0 text-muted-foreground">产品线</span>
+                  <span className="min-w-0 break-words font-medium text-foreground">
                     {kimiAssessmentPreview.assessmentDraft.productLines.length
                       ? kimiAssessmentPreview.assessmentDraft.productLines.join(" / ")
                       : "—"}
                   </span>
                 </div>
               </div>
+
+              <div className="rounded-lg border border-border/60 bg-background/60 p-3">
+                <p className="mb-2 inline-flex items-center gap-1 text-sm font-medium">
+                  <CheckCircle2 className="size-4 text-emerald-600" />
+                  关键论证证据（偏差最大的模块）
+                </p>
+                <div className="space-y-2">
+                  {kimiTopEvidence.length ? (
+                    kimiTopEvidence.map((item, idx) => (
+                      <div key={`${item.moduleName}-${idx}`} className="rounded-md border border-border/50 bg-background/80 p-2">
+                        <p className="text-sm font-medium">{item.moduleName}（偏差 {item.deltaPct > 0 ? "+" : ""}{item.deltaPct}%）</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.reason}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">暂无可展示的证据项</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-background/60 p-3">
+                <p className="mb-2 inline-flex items-center gap-1 text-sm font-medium">
+                  <TrendingUp className="size-4 text-indigo-600" />
+                  人天构成瀑布图（标准 -&gt; 调整 -&gt; 建议）
+                </p>
+                <div className="space-y-2">
+                  {kimiWaterfall.rows.map((row) => {
+                    const widthPct = Math.max(3, Math.round((Math.abs(row.value) / kimiWaterfall.maxAbs) * 100))
+                    const barClass =
+                      row.tone === "base"
+                        ? "bg-slate-500"
+                        : row.tone === "final"
+                          ? "bg-indigo-600"
+                          : row.tone === "up"
+                            ? "bg-amber-500"
+                            : "bg-emerald-600"
+                    return (
+                      <div key={row.key} className="grid grid-cols-[140px_1fr_92px] items-center gap-2">
+                        <p className="text-xs text-muted-foreground">{row.label}</p>
+                        <div className="h-6 rounded-md bg-secondary/50 px-1">
+                          <div
+                            className={cn("mt-[3px] h-4 rounded-sm transition-all", barClass)}
+                            style={{ width: `${widthPct}%` }}
+                          />
+                        </div>
+                        <p className="text-right text-xs font-medium">
+                          {row.value > 0 && row.tone !== "base" && row.tone !== "final" ? "+" : ""}
+                          {row.value}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  说明：复杂度/组织/风险调整基于本次评估关键参数计算，模型校准调整用于对齐最终建议人天。
+                </p>
+                <details className="mt-2 rounded-md border border-border/50 bg-background/70 p-2 text-xs">
+                  <summary className="cursor-pointer font-medium text-foreground">查看计算公式与输入来源</summary>
+                  <div className="mt-2 space-y-2">
+                    {kimiWaterfall.breakdowns.map((item) => (
+                      <div key={item.key} className="rounded-md border border-border/40 bg-background p-2">
+                        <p className="font-medium">{item.label}</p>
+                        <p className="mt-1 text-muted-foreground">{item.formula}</p>
+                        <p className="mt-1 text-muted-foreground">计算过程：{item.computed}</p>
+                        <p className="mt-1 text-muted-foreground">
+                          输入：
+                          {item.inputs.map((input) => `${input.name}=${input.value}`).join("，")}
+                        </p>
+                        <p className="mt-1 text-muted-foreground">来源说明：{item.note}</p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+
               <div className="space-y-2">
                 <p className="text-sm font-medium">模块估算建议</p>
-                <div className="overflow-hidden rounded-lg border border-border/60">
+                <div className="min-w-0 max-w-full overflow-x-auto rounded-lg border border-border/60">
                   {kimiAssessmentPreview.assessmentDraft.moduleItems.length ? (
                     <Table
-                      containerClassName="max-h-64 overflow-auto"
-                      className="table-auto [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0"
+                      containerClassName="max-h-64 min-w-0 overflow-x-auto overflow-y-auto print:max-h-none print:h-auto print:overflow-visible"
+                      className="min-w-[520px] table-fixed [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0"
                     >
-                      <TableHeader className="sticky top-0 z-20 bg-accent/12 text-foreground backdrop-blur-sm dark:bg-accent/20">
+                      <TableHeader className="sticky top-0 z-20 bg-accent/12 text-foreground backdrop-blur-sm dark:bg-accent/20 print:static print:z-auto">
                         <TableRow className="border-border/50 hover:bg-transparent">
-                          <TableHead className="whitespace-nowrap">云产品</TableHead>
-                          <TableHead className="whitespace-nowrap">SKU</TableHead>
-                          <TableHead className="whitespace-nowrap">标准人天</TableHead>
-                          <TableHead className="whitespace-nowrap">建议人天</TableHead>
-                          <TableHead className="whitespace-nowrap">原因</TableHead>
+                          <TableHead className="w-[92px] max-w-[92px] whitespace-nowrap px-2" data-manual-width="1">
+                            云产品
+                          </TableHead>
+                          <TableHead className="w-[108px] max-w-[108px] whitespace-nowrap px-2" data-manual-width="1">
+                            SKU
+                          </TableHead>
+                          <TableHead className="w-14 whitespace-nowrap px-1 text-center" data-manual-width="1">
+                            标准人天
+                          </TableHead>
+                          <TableHead className="w-14 whitespace-nowrap px-1 text-center" data-manual-width="1">
+                            建议人天
+                          </TableHead>
+                          <TableHead className="min-w-0 whitespace-nowrap px-2" data-manual-width="1">
+                            原因
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {kimiAssessmentPreview.assessmentDraft.moduleItems.map((item, index) => (
                           <TableRow key={`${item.cloudProduct || "cloud"}-${item.skuName || item.moduleName}-${index}`}>
-                            <TableCell className="font-medium">{item.cloudProduct || "未分类云产品"}</TableCell>
-                            <TableCell className="font-medium">{item.skuName || item.moduleName || "未命名SKU"}</TableCell>
-                            <TableCell>{item.standardDays}</TableCell>
-                            <TableCell>{item.suggestedDays}</TableCell>
-                            <TableCell className="text-muted-foreground">{item.reason}</TableCell>
+                            <TableCell
+                              className="max-w-[92px] truncate font-medium px-2"
+                              data-manual-width="1"
+                              title={item.cloudProduct || "未分类云产品"}
+                            >
+                              {item.cloudProduct || "未分类云产品"}
+                            </TableCell>
+                            <TableCell
+                              className="max-w-[108px] truncate font-medium px-2"
+                              data-manual-width="1"
+                              title={
+                                String(item.skuName ?? "").trim()
+                                  ? String(item.skuName)
+                                  : "—（云级或非 SKU 明细）"
+                              }
+                            >
+                              {String(item.skuName ?? "").trim() ? item.skuName : "—"}
+                            </TableCell>
+                            <TableCell className="w-14 px-1 text-center tabular-nums" data-manual-width="1">
+                              {item.standardDays}
+                            </TableCell>
+                            <TableCell className="w-14 px-1 text-center tabular-nums" data-manual-width="1">
+                              {item.suggestedDays}
+                            </TableCell>
+                            <TableCell
+                              className="min-w-0 p-2 align-middle text-muted-foreground"
+                              data-manual-width="1"
+                              data-skip-table-preview=""
+                            >
+                              {String(item.reason || "").length > 16 ? (
+                                <>
+                                  <Tooltip delayDuration={200}>
+                                    <TooltipTrigger asChild>
+                                      <span className="block w-full max-w-full cursor-default truncate text-left print:hidden">
+                                        {item.reason}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      side="top"
+                                      align="start"
+                                      sideOffset={8}
+                                      className="z-[100] max-w-md border border-border bg-popover p-3 text-xs leading-relaxed text-popover-foreground shadow-lg break-words whitespace-pre-wrap"
+                                    >
+                                      {item.reason}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <span className="hidden text-left text-xs leading-relaxed whitespace-pre-wrap break-words print:block">
+                                    {item.reason}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="block truncate print:whitespace-normal print:break-words">
+                                  {item.reason}
+                                </span>
+                              )}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1711,7 +2172,10 @@ export default function RequirementImportPage() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-border/60 p-3">
-                  <p className="mb-2 text-sm font-medium">风险提示</p>
+                  <p className="mb-2 inline-flex items-center gap-1 text-sm font-medium">
+                    <AlertTriangle className="size-4 text-amber-600" />
+                    风险提示（{kimiPreviewMetrics.riskCount}）
+                  </p>
                   <ul className="space-y-1 text-xs text-muted-foreground">
                     {kimiAssessmentPreview.assessmentDraft.risks.map((risk, idx) => (
                       <li key={`risk-${idx}`}>- {risk}</li>
@@ -1719,7 +2183,10 @@ export default function RequirementImportPage() {
                   </ul>
                 </div>
                 <div className="rounded-lg border border-border/60 p-3">
-                  <p className="mb-2 text-sm font-medium">前提假设</p>
+                  <p className="mb-2 inline-flex items-center gap-1 text-sm font-medium">
+                    <Lightbulb className="size-4 text-blue-600" />
+                    前提假设（{kimiPreviewMetrics.assumptionCount}）
+                  </p>
                   <ul className="space-y-1 text-xs text-muted-foreground">
                     {kimiAssessmentPreview.assessmentDraft.assumptions.map((assumption, idx) => (
                       <li key={`assumption-${idx}`}>- {assumption}</li>
@@ -1729,19 +2196,40 @@ export default function RequirementImportPage() {
               </div>
             </div>
           ) : null}
-          <DialogFooter>
-            <Button type="button" variant="outline" className="rounded-xl" onClick={() => setKimiAssessmentPreviewOpen(false)}>
-              关闭
-            </Button>
-            <Button
-              type="button"
-              className="rounded-xl"
-              onClick={onApplyKimiAssessmentToAssessmentPage}
-              disabled={!kimiAssessmentPreview || kimiApplying}
-            >
-              {kimiApplying ? "处理中..." : "应用到实施评估"}
-            </Button>
-          </DialogFooter>
+          </div>
+          </div>
+          <div className="shrink-0 border-t border-border/50 px-6 py-4">
+            <DialogFooter className="gap-2 p-0 sm:justify-end">
+              <Button type="button" variant="outline" className="rounded-xl" onClick={() => setKimiAssessmentPreviewOpen(false)}>
+                关闭
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                disabled={!kimiAssessmentPreview}
+                onClick={() => {
+                  if (!kimiAssessmentPrintRef.current || !kimiAssessmentPreview) {
+                    toast.error("暂无可导出的预览内容")
+                    return
+                  }
+                  void printKimiAssessmentPreview()
+                  toast.message("请在打印对话框中选择「存储为 PDF」或「另存为 PDF」")
+                }}
+              >
+                <FileDown className="size-4" />
+                导出 PDF
+              </Button>
+              <Button
+                type="button"
+                className="rounded-xl"
+                onClick={onApplyKimiAssessmentToAssessmentPage}
+                disabled={!kimiAssessmentPreview || kimiApplying}
+              >
+                {kimiApplying ? "处理中..." : "应用到实施评估"}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
