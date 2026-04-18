@@ -2,4 +2,10 @@
 // AI Module Export
 // ============================================================
 
-export { parseBasicInfo, companyProfileSummary, chat } from "./ai.controller";
+export {
+  parseBasicInfo,
+  companyProfileSummary,
+  kimiAssessmentPreview,
+  exportKimiAssessmentMarkdown,
+  chat,
+} from "./ai.controller";

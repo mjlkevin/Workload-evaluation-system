@@ -1,6 +1,6 @@
 "use client"
 
-import { apiRequest, ApiError } from "@/lib/api-client"
+import { apiRequest, ApiError, downloadWithAuth } from "@/lib/api-client"
 import {
   mockAssessments,
   mockDevAssessments,
@@ -37,6 +37,10 @@ type VersionRecordDto = {
   payload: Record<string, unknown>
   createdAt: string
   updatedAt: string
+  createdByUserId?: string
+  createdByUsername?: string
+  updatedByUserId?: string
+  updatedByUsername?: string
   reviewedAt?: string
   checkoutStatus?: "checked_in" | "checked_out"
   versionDocStatus?: "drafting" | "reviewed"
@@ -60,6 +64,10 @@ export type ModuleVersionRecord = {
   payload: Record<string, unknown>
   createdAt: string
   updatedAt: string
+  createdByUserId?: string
+  createdByUsername?: string
+  updatedByUserId?: string
+  updatedByUsername?: string
   checkoutStatus: "checked_in" | "checked_out"
   versionDocStatus: "drafting" | "reviewed"
   checkedOutByUserId?: string
@@ -72,6 +80,23 @@ export type ModuleVersionRecord = {
   archivedAt?: string
 }
 
+export type ModuleDocListType = CoreModuleVersionType | "wbs" | "review"
+
+export type ModuleDocListItem = {
+  docKey: string
+  moduleType: ModuleDocListType
+  title: string
+  latestVersionCode: string
+  globalVersionCode: string
+  projectName: string
+  updatedAt: string
+  statusText: string
+  recordId?: string
+  historySupported: boolean
+  latestRecord?: ModuleVersionRecord
+  historyRecords?: ModuleVersionRecord[]
+}
+
 export type GlobalVersionRecord = {
   id: string
   type: "global"
@@ -80,6 +105,10 @@ export type GlobalVersionRecord = {
   payload: Record<string, unknown>
   createdAt: string
   updatedAt: string
+  createdByUserId?: string
+  createdByUsername?: string
+  updatedByUserId?: string
+  updatedByUsername?: string
   checkoutStatus: "checked_in" | "checked_out"
   versionDocStatus: "drafting" | "reviewed"
   checkedOutByUserId?: string
@@ -187,6 +216,79 @@ export type VersionCodeRuleItem = {
   updatedAt: string
 }
 
+export type RequirementSystemConfig = {
+  kimiEvaluation: {
+    enabled: boolean
+    model: string
+    temperature: number
+    maxTokens: number
+    timeoutMs: number
+    fallbackToRule: boolean
+    promptProfile: string
+    promptTemplate: string
+  }
+  fileParsing: {
+    enabled: boolean
+    allowedExtensions: string[]
+    maxFileSizeMb: number
+    maxSheetCount: number
+    strictMode: boolean
+    ocrEnabled: boolean
+  }
+  kimiGeneration: {
+    enabled: boolean
+    model: string
+    temperature: number
+    maxTokens: number
+    outputStyle: "concise" | "balanced" | "detailed"
+    includeRiskHints: boolean
+    includeAssumptions: boolean
+  }
+}
+
+export type RequirementSystemConfigView = {
+  version: number
+  draft: RequirementSystemConfig
+  active: RequirementSystemConfig
+  updatedAt: string
+  effectiveAt: string
+}
+
+export type ImplementationDependencyRuleItem = {
+  id: string
+  subject: string
+  scope: "feature" | "scenario" | "data_source"
+  logic: "requires_all" | "requires_any" | "combo"
+  trigger: string
+  dependencies: string[]
+  anyOfGroups?: string[][]
+  comboDependencies?: string[]
+  note?: string
+  enabled: boolean
+}
+
+export type ImplementationDependencyRulesConfig = {
+  schemaVersion: string
+  source: string
+  updatedFrom: string
+  mutualExclusionRules: Array<{ left: string; right: string; reason: string }>
+  rules: ImplementationDependencyRuleItem[]
+}
+
+export type ImplementationDependencyRulesView = {
+  version: number
+  draft: ImplementationDependencyRulesConfig
+  active: ImplementationDependencyRulesConfig
+  updatedAt: string
+  effectiveAt: string
+}
+
+export type ActiveImplementationDependencyRulesView = {
+  version: number
+  effectiveAt: string
+  active: ImplementationDependencyRulesConfig
+}
+
 export type EstimateItemSelection = {
   templateItemId: string
   included: boolean
@@ -201,6 +303,8 @@ export type EstimateCalculatePayload = {
   orgCount: number
   orgSimilarityFactor: number
   selectedSheet?: string
+  /** 与实施评估页云产品筛选一致；导出时仅包含这些云产品下已勾选的条目 */
+  selectedCloudNames?: string[]
   exportProjectName?: string
   exportAssessmentVersionCode?: string
   items: EstimateItemSelection[]
@@ -355,6 +459,10 @@ export async function listModuleVersions(type: CoreModuleVersionType): Promise<M
     payload: (x.payload || {}) as Record<string, unknown>,
     createdAt: x.createdAt,
     updatedAt: x.updatedAt,
+    createdByUserId: x.createdByUserId,
+    createdByUsername: x.createdByUsername,
+    updatedByUserId: x.updatedByUserId,
+    updatedByUsername: x.updatedByUsername,
     checkoutStatus: x.checkoutStatus ?? "checked_in",
     versionDocStatus: x.versionDocStatus ?? "drafting",
     checkedOutByUserId: x.checkedOutByUserId,
@@ -378,6 +486,10 @@ export async function listGlobalVersions(): Promise<GlobalVersionRecord[]> {
     payload: (x.payload || {}) as Record<string, unknown>,
     createdAt: x.createdAt,
     updatedAt: x.updatedAt,
+    createdByUserId: x.createdByUserId,
+    createdByUsername: x.createdByUsername,
+    updatedByUserId: x.updatedByUserId,
+    updatedByUsername: x.updatedByUsername,
     checkoutStatus: x.checkoutStatus ?? "checked_in",
     versionDocStatus: x.versionDocStatus ?? "drafting",
     checkedOutByUserId: x.checkedOutByUserId,
@@ -436,6 +548,16 @@ export async function deleteGlobalPlanVersion(versionCode: string): Promise<void
   if (!code) throw new Error("版本号不能为空")
   const params = new URLSearchParams({ templateId: "default" })
   await apiRequest(`/api/v1/versions/global/${encodeURIComponent(code)}?${params.toString()}`, {
+    method: "DELETE",
+  })
+}
+
+/** 删除当前用户指定模块版本（非 global）；若被总方案引用，后端会返回业务错误。 */
+export async function deleteModuleVersion(type: CoreModuleVersionType, versionCode: string): Promise<void> {
+  const code = versionCode.trim()
+  if (!code) throw new Error("版本号不能为空")
+  const params = new URLSearchParams({ templateId: "default" })
+  await apiRequest(`/api/v1/versions/${encodeURIComponent(type)}/${encodeURIComponent(code)}?${params.toString()}`, {
     method: "DELETE",
   })
 }
@@ -617,6 +739,15 @@ export async function calculateAndExportEstimate(
   })
 }
 
+export async function downloadOwnedExportFile(downloadUrl: string, fileNameHint?: string): Promise<void> {
+  const safeUrl = downloadUrl.trim()
+  if (!safeUrl) throw new Error("下载链接为空")
+  const normalized = safeUrl.startsWith("http")
+    ? safeUrl
+    : `${window.location.origin}${safeUrl.startsWith("/") ? "" : "/"}${safeUrl}`
+  await downloadWithAuth(normalized, fileNameHint)
+}
+
 export async function listEstimateExportHistory(page = 1, pageSize = 8): Promise<{
   total: number
   items: ExportHistoryItem[]
@@ -633,6 +764,67 @@ export async function listEstimateExportHistory(page = 1, pageSize = 8): Promise
       return { total: Number(data.total || 0), items: data.items || [] }
     },
     { total: 0, items: [] },
+  )
+}
+
+function mapRecordStatusText(record: ModuleVersionRecord): string {
+  if (record.checkoutStatus === "checked_out") return "已检出"
+  if (record.versionDocStatus === "reviewed") return "已审核"
+  if (record.isHistoricalArchive) return "历史归档"
+  return "已检入"
+}
+
+function pickProjectNameFromPayload(payload: Record<string, unknown>): string {
+  const fromRoot = String(payload.projectName || "").trim()
+  if (fromRoot) return fromRoot
+  const fromBasicInfo = String((payload.basicInfo as { projectName?: string } | undefined)?.projectName || "").trim()
+  if (fromBasicInfo) return fromBasicInfo
+  return "未命名项目"
+}
+
+/**
+ * 聚合当前用户某模块“最新单据”：
+ * - 有 globalVersionCode：按 globalVersionCode 取最新一条，其他作为历史
+ * - 无 globalVersionCode：按 versionCode 作为独立单据
+ */
+export async function listLatestModuleDocuments(type: CoreModuleVersionType): Promise<ModuleDocListItem[]> {
+  const records = await listModuleVersions(type)
+  const grouped = new Map<string, ModuleVersionRecord[]>()
+  for (const record of records) {
+    const globalVersionCode = String(record.payload?.globalVersionCode || "").trim()
+    const key = globalVersionCode || `standalone:${record.versionCode}`
+    const list = grouped.get(key) || []
+    list.push(record)
+    grouped.set(key, list)
+  }
+  const items: ModuleDocListItem[] = []
+  for (const [key, list] of grouped.entries()) {
+    const sorted = [...list].sort(
+      (a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)) || b.versionCode.localeCompare(a.versionCode),
+    )
+    const latest = sorted[0]
+    if (!latest) continue
+    const globalVersionCode = String(latest.payload?.globalVersionCode || "").trim() || "—"
+    const projectName = pickProjectNameFromPayload(latest.payload || {})
+    const latestVersionCode = latest.versionCode
+    const title = projectName
+    items.push({
+      docKey: key,
+      moduleType: type,
+      title,
+      latestVersionCode,
+      globalVersionCode,
+      projectName,
+      updatedAt: latest.updatedAt,
+      statusText: mapRecordStatusText(latest),
+      recordId: latest.id,
+      historySupported: true,
+      latestRecord: latest,
+      historyRecords: sorted,
+    })
+  }
+  return items.sort(
+    (a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)) || b.latestVersionCode.localeCompare(a.latestVersionCode),
   )
 }
 
@@ -864,6 +1056,18 @@ export async function updateUserStatus(userId: string, status: "active" | "disab
   return data.user
 }
 
+export async function updateUserRole(
+  userId: string,
+  role: UserItem["role"],
+): Promise<UserItem> {
+  if (!userId) throw new Error("用户 ID 不能为空")
+  const data = await apiRequest<{ user: UserItem }>(`/api/v1/auth/users/${encodeURIComponent(userId)}/role`, {
+    method: "PATCH",
+    body: { role },
+  })
+  return data.user
+}
+
 export async function getInviteCodes(): Promise<InviteCodeItem[]> {
   return withFallback(async () => {
     const data = await apiRequest<{ codes: InviteCodeItem[] }>("/api/v1/auth/invite-codes")
@@ -935,4 +1139,147 @@ export async function disableVersionCodeRule(ruleId: string): Promise<VersionCod
     },
   )
   return data.item
+}
+
+export async function getRequirementSystemConfig(): Promise<RequirementSystemConfigView> {
+  return apiRequest<RequirementSystemConfigView>("/api/v1/system/requirement-settings")
+}
+
+export async function updateRequirementSystemConfigDraft(payload: Partial<RequirementSystemConfig>): Promise<{
+  version: number
+  draft: RequirementSystemConfig
+  updatedAt: string
+}> {
+  return apiRequest<{
+    version: number
+    draft: RequirementSystemConfig
+    updatedAt: string
+  }>("/api/v1/system/requirement-settings/draft", {
+    method: "PATCH",
+    body: payload,
+  })
+}
+
+export async function activateRequirementSystemConfig(): Promise<{
+  version: number
+  active: RequirementSystemConfig
+  effectiveAt: string
+}> {
+  return apiRequest<{
+    version: number
+    active: RequirementSystemConfig
+    effectiveAt: string
+  }>("/api/v1/system/requirement-settings/activate", {
+    method: "POST",
+    body: {},
+  })
+}
+
+export async function getImplementationDependencyRules(): Promise<ImplementationDependencyRulesView> {
+  return apiRequest<ImplementationDependencyRulesView>("/api/v1/system/implementation-dependency-rules")
+}
+
+export async function updateImplementationDependencyRulesDraft(payload: Partial<ImplementationDependencyRulesConfig>): Promise<{
+  version: number
+  draft: ImplementationDependencyRulesConfig
+  updatedAt: string
+}> {
+  return apiRequest<{
+    version: number
+    draft: ImplementationDependencyRulesConfig
+    updatedAt: string
+  }>("/api/v1/system/implementation-dependency-rules/draft", {
+    method: "PATCH",
+    body: payload,
+  })
+}
+
+export async function activateImplementationDependencyRules(): Promise<{
+  version: number
+  active: ImplementationDependencyRulesConfig
+  effectiveAt: string
+}> {
+  return apiRequest<{
+    version: number
+    active: ImplementationDependencyRulesConfig
+    effectiveAt: string
+  }>("/api/v1/system/implementation-dependency-rules/activate", {
+    method: "POST",
+    body: {},
+  })
+}
+
+export async function getActiveImplementationDependencyRules(): Promise<ActiveImplementationDependencyRulesView> {
+  return apiRequest<ActiveImplementationDependencyRulesView>("/api/v1/estimates/dependency-rules/active")
+}
+
+export const KIMI_ASSESSMENT_PREFILL_STORAGE_KEY = "wes-kimi-assessment-prefill-v1"
+
+export type KimiAssessmentPreviewPayload = {
+  source: {
+    globalVersionCode?: string
+    requirementVersionCode?: string
+  }
+  requirementSnapshot: {
+    basicInfo: Record<string, unknown>
+    valuePropositionRows: Array<Record<string, unknown>>
+    businessNeedRows: Array<Record<string, unknown>>
+    devOverviewRows: Array<Record<string, unknown>>
+    devTotalDays?: number
+    productModuleRows: Array<Record<string, unknown>>
+    implementationScopeRows: Array<Record<string, unknown>>
+    meetingNotes: string
+    keyPointRows: Array<Record<string, unknown>>
+  }
+  ruleContext?: {
+    promptProfile?: string
+  }
+}
+
+export type KimiAssessmentDraftModuleItem = {
+  cloudProduct?: string
+  skuName?: string
+  moduleName: string
+  standardDays: number
+  suggestedDays: number
+  reason: string
+}
+
+export type KimiAssessmentPreviewResult = {
+  meta: {
+    model: string
+    generatedAt: string
+    confidence: number
+    promptVersion: string
+    ruleSetId: string
+    mode: "model" | "rule_fallback"
+    fallbackReason?: string
+    elapsedMs?: number
+    rawContent?: string
+    coarseFilteredCount?: number
+  }
+  source: {
+    globalVersionCode: string
+    requirementVersionCode: string
+  }
+  assessmentDraft: {
+    quoteMode: string
+    productLines: string[]
+    userCount: number
+    orgCount: number
+    orgSimilarity: number
+    difficultyFactor: number
+    moduleItems: KimiAssessmentDraftModuleItem[]
+    risks: string[]
+    assumptions: string[]
+  }
+}
+
+export async function generateKimiAssessmentPreview(
+  payload: KimiAssessmentPreviewPayload,
+): Promise<KimiAssessmentPreviewResult> {
+  return apiRequest<KimiAssessmentPreviewResult>("/api/v1/ai/kimi-assessment/preview", {
+    method: "POST",
+    body: payload,
+  })
 }

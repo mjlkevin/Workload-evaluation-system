@@ -46,12 +46,15 @@ import {
   deleteGlobalPlanVersion,
   forceUnlockById,
   getDashboardPlans,
+  listModuleVersions,
   listGlobalVersions,
   promoteVersionById,
   undoCheckoutById,
   type GlobalVersionRecord,
+  type ModuleVersionRecord,
 } from "@/lib/workload-service"
 import type { PlanRow } from "@/lib/workload-types"
+import { getCheckoutStatusBadgeClass, getCheckoutStatusText } from "@/lib/checkout-status-ui"
 
 const overviewCards = [
   { label: "总方案数", desc: "近 7 天新增", icon: FolderGit2 },
@@ -68,6 +71,22 @@ const recentActivities = [
   "张凯 在 DEV-20260329-02 增加了 5 个开发子项",
   "系统 已同步资源成本草稿到总方案版本",
 ]
+
+function trimSvgText(value: string, maxUnits: number) {
+  const text = String(value || "").trim()
+  if (!text) return "—"
+  let units = 0
+  let result = ""
+  for (const ch of text) {
+    const charUnits = /[ -~]/.test(ch) ? 0.55 : 1
+    if (units + charUnits > maxUnits) {
+      return `${result}…`
+    }
+    result += ch
+    units += charUnits
+  }
+  return result
+}
 
 const newPlanWorkflowSteps: Array<{
   id: string
@@ -99,6 +118,14 @@ export default function DashboardPage() {
   const [erModulePreview, setErModulePreview] = useState<{ label: string; version: string; src: string } | null>(null)
   const [hoveredErNodeKey, setHoveredErNodeKey] = useState<string | null>(null)
   const [selectedErNodeKey, setSelectedErNodeKey] = useState<string | null>(null)
+  const [expandedErNodeKeys, setExpandedErNodeKeys] = useState<Record<string, boolean>>({})
+  const [moduleHistoryByGlobal, setModuleHistoryByGlobal] = useState<{
+    requirement: Record<string, string[]>
+    assessment: Record<string, string[]>
+  }>({
+    requirement: {},
+    assessment: {},
+  })
   const [deletePlanDialogOpen, setDeletePlanDialogOpen] = useState(false)
   const [deletingPlan, setDeletingPlan] = useState(false)
   const [planListSearch, setPlanListSearch] = useState("")
@@ -135,7 +162,45 @@ export default function DashboardPage() {
     setDragStart(null)
     setSelectedErNodeKey(null)
     setHoveredErNodeKey(null)
+    setExpandedErNodeKeys({})
   }, [previewRow?.id])
+
+  useEffect(() => {
+    const byGlobal = (records: ModuleVersionRecord[]) => {
+      const map: Record<string, Array<{ versionCode: string; updatedAtMs: number }>> = {}
+      for (const record of records) {
+        const globalVersionCode = String(record.payload?.globalVersionCode || "").trim()
+        if (!globalVersionCode) continue
+        if (!map[globalVersionCode]) map[globalVersionCode] = []
+        map[globalVersionCode].push({
+          versionCode: record.versionCode,
+          updatedAtMs: Number(new Date(record.updatedAt || 0)),
+        })
+      }
+      const normalized: Record<string, string[]> = {}
+      for (const [globalCode, rows] of Object.entries(map)) {
+        const seen = new Set<string>()
+        normalized[globalCode] = rows
+          .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.versionCode.localeCompare(a.versionCode))
+          .map((row) => row.versionCode)
+          .filter((code) => {
+            if (seen.has(code)) return false
+            seen.add(code)
+            return true
+          })
+      }
+      return normalized
+    }
+
+    void Promise.all([listModuleVersions("requirementImport"), listModuleVersions("assessment")]).then(
+      ([requirements, assessments]) => {
+        setModuleHistoryByGlobal({
+          requirement: byGlobal(requirements),
+          assessment: byGlobal(assessments),
+        })
+      },
+    )
+  }, [])
 
   function openCreatePlanWizard() {
     setNewProjectNameInput("")
@@ -213,10 +278,13 @@ export default function DashboardPage() {
     }
   }
 
-  async function onCheckin() {
+  async function onCheckin(checkinNote: string) {
     if (!selectedGlobalRecord) return
     try {
-      const data = await checkinVersionById(selectedGlobalRecord.id, selectedGlobalRecord.payload || {})
+      const data = await checkinVersionById(selectedGlobalRecord.id, {
+        ...((selectedGlobalRecord.payload || {}) as Record<string, unknown>),
+        checkinNote,
+      })
       setSelectedGlobalVersionCode(data.versionCode)
       loadPlans()
       setCreateMessage(`检入成功：${data.versionCode}`)
@@ -321,12 +389,28 @@ export default function DashboardPage() {
 
   const previewRelations = useMemo(
     () => [
-      { key: "requirement", label: "需求版本号", value: previewRow?.requirementVersion || "—" },
-      { key: "assessment", label: "实施评估版本号", value: previewRow?.assessmentVersion || "—" },
-      { key: "resource", label: "资源版本号", value: previewRow?.resourceVersion || "—" },
-      { key: "dev", label: "开发版本号", value: previewRow?.devVersion || "—" },
+      {
+        key: "requirement",
+        label: "需求版本号",
+        value: previewRow?.requirementVersion || "—",
+        historyVersions: (moduleHistoryByGlobal.requirement[previewRow?.globalVersion || ""] || []).filter(
+          (code) => code !== (previewRow?.requirementVersion || "—"),
+        ),
+        allowHistoryExpand: true,
+      },
+      {
+        key: "assessment",
+        label: "实施评估版本号",
+        value: previewRow?.assessmentVersion || "—",
+        historyVersions: (moduleHistoryByGlobal.assessment[previewRow?.globalVersion || ""] || []).filter(
+          (code) => code !== (previewRow?.assessmentVersion || "—"),
+        ),
+        allowHistoryExpand: true,
+      },
+      { key: "resource", label: "资源版本号", value: previewRow?.resourceVersion || "—", historyVersions: [], allowHistoryExpand: false },
+      { key: "dev", label: "开发版本号", value: previewRow?.devVersion || "—", historyVersions: [], allowHistoryExpand: false },
     ],
-    [previewRow],
+    [previewRow, moduleHistoryByGlobal],
   )
   const selectedErNode = useMemo(
     () => previewRelations.find((node) => node.key === selectedErNodeKey),
@@ -469,7 +553,8 @@ export default function DashboardPage() {
                 <div className="flex flex-col gap-3 rounded-xl border border-border/40 bg-card/50 p-3 shadow-sm backdrop-blur-sm lg:flex-row lg:items-center lg:justify-between lg:gap-3">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <Button
-                      className="rounded-xl gap-2 bg-foreground text-background hover:bg-foreground/90"
+                      size="sm"
+                      className="rounded-lg gap-1.5 bg-foreground px-3 text-xs text-background hover:bg-foreground/90"
                       onClick={openCreatePlanWizard}
                       disabled={creating}
                     >
@@ -477,6 +562,7 @@ export default function DashboardPage() {
                       新建方案
                     </Button>
                     <VersionVcsToolbar
+                      compact
                       state={
                         selectedGlobalRecord
                           ? {
@@ -490,7 +576,7 @@ export default function DashboardPage() {
                       showStatusField={false}
                       onVersionHistory={() => setVersionHistoryOpen(true)}
                       onCheckout={() => void onCheckout()}
-                      onCheckin={() => void onCheckin()}
+                      onCheckin={(checkinNote) => void onCheckin(checkinNote)}
                       onUndoCheckout={() => void onUndoCheckout()}
                       onPromote={() => void onPromote()}
                       onForceUnlock={() => void onForceUnlock()}
@@ -499,7 +585,8 @@ export default function DashboardPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="rounded-xl gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      size="sm"
+                      className="rounded-lg gap-1.5 border-destructive/40 px-3 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
                       disabled={!selectedGlobalRecord || deletingPlan}
                       onClick={onOpenDeletePlanDialog}
                     >
@@ -507,7 +594,7 @@ export default function DashboardPage() {
                       删除方案
                     </Button>
                   </div>
-                  <div className="relative w-full shrink-0 lg:max-w-sm">
+                  <div className="relative w-full shrink-0 lg:w-72">
                     <Search
                       className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                       aria-hidden
@@ -623,10 +710,10 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={rowGlobalRecord?.checkoutStatus === "checked_out" ? "default" : "secondary"}
-                          className="rounded-lg"
+                          variant="outline"
+                          className={`rounded-lg ${getCheckoutStatusBadgeClass(rowGlobalRecord?.checkoutStatus)}`}
                         >
-                          {rowGlobalRecord?.checkoutStatus === "checked_out" ? "已检出" : "已检入"}
+                          {getCheckoutStatusText(rowGlobalRecord?.checkoutStatus) || "已检入"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{row.updatedAt}</TableCell>
@@ -866,7 +953,7 @@ export default function DashboardPage() {
                           总方案版本号
                         </text>
                         <text x="430" y="113" textAnchor="middle" fontSize="14" fontWeight="700" fill="#0F172A">
-                          {previewRow?.globalVersion || "—"}
+                          {trimSvgText(previewRow?.globalVersion || "—", 14)}
                         </text>
 
                         {previewRelations.map((node, idx) => {
@@ -880,6 +967,10 @@ export default function DashboardPage() {
                           const canOpen = Boolean(node.value && node.value !== "—")
                           const isHovered = hoveredErNodeKey === node.key
                           const isSelected = selectedErNodeKey === node.key
+                          const expanded = Boolean(expandedErNodeKeys[node.key])
+                          const historyRows = node.allowHistoryExpand ? node.historyVersions : []
+                          const showHistoryPanel = expanded
+                          const nodeHeight = showHistoryPanel ? 156 : 78
                           return (
                             <g
                               key={node.key}
@@ -897,17 +988,84 @@ export default function DashboardPage() {
                                 x={pos.x}
                                 y={pos.y}
                                 width="180"
-                                height="78"
+                                height={nodeHeight}
                                 rx="12"
                                 fill={isSelected ? "#DBEAFE" : isHovered ? "#EEF6FF" : "#F8FAFC"}
                                 stroke={isSelected ? "#3B82F6" : isHovered ? "#93C5FD" : "#CBD5E1"}
                               />
                               <text x={pos.x + 90} y={pos.y + 27} textAnchor="middle" fontSize="12" fill="#64748B">
-                                {node.label}
+                                {trimSvgText(node.label, 12)}
                               </text>
                               <text x={pos.x + 90} y={pos.y + 53} textAnchor="middle" fontSize="13" fontWeight="600" fill="#0F172A">
-                                {node.value || "—"}
+                                {trimSvgText(node.value || "—", 12)}
                               </text>
+                              {node.allowHistoryExpand ? (
+                                <g
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    setExpandedErNodeKeys((prev) => ({ ...prev, [node.key]: !expanded }))
+                                  }}
+                                  style={{ cursor: "pointer" }}
+                                >
+                                  <rect
+                                    x={pos.x + 156}
+                                    y={pos.y + 10}
+                                    width="14"
+                                    height="14"
+                                    rx="7"
+                                    fill="#F1F5F9"
+                                    stroke="#94A3B8"
+                                  />
+                                  <text
+                                    x={pos.x + 163}
+                                    y={pos.y + 20}
+                                    textAnchor="middle"
+                                    fontSize="11"
+                                    fontWeight="700"
+                                    fill="#334155"
+                                  >
+                                    {expanded ? "−" : "+"}
+                                  </text>
+                                </g>
+                              ) : null}
+                              {showHistoryPanel ? (
+                                <>
+                                  <rect
+                                    x={pos.x + 10}
+                                    y={pos.y + 86}
+                                    width="160"
+                                    height="62"
+                                    rx="8"
+                                    fill="#F8FAFC"
+                                    stroke="#CBD5E1"
+                                  />
+                                  <foreignObject x={pos.x + 12} y={pos.y + 88} width="156" height="58">
+                                    <div
+                                      xmlns="http://www.w3.org/1999/xhtml"
+                                      style={{
+                                        height: "58px",
+                                        overflowY: "auto",
+                                        overflowX: "hidden",
+                                        fontSize: "11px",
+                                        lineHeight: "16px",
+                                        color: "#475569",
+                                        paddingRight: "4px",
+                                      }}
+                                    >
+                                      {historyRows.length ? (
+                                        historyRows.map((historyVersion, historyIdx) => (
+                                          <div key={`${node.key}-history-${historyVersion}-${historyIdx}`}>
+                                            {"- "}
+                                            {trimSvgText(historyVersion, 20)}
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div style={{ color: "#94A3B8" }}>暂无历史版本</div>
+                                      )}
+                                    </div>
+                                  </foreignObject>
+                                </>
+                              ) : null}
                             </g>
                           )
                         })}

@@ -77,7 +77,7 @@ export const mockTeamBindings: TeamPlanBinding[] = [
 
 export const mockUsers: UserItem[] = [
   { id: "u-1", username: "admin", role: "admin", status: "active", lastLoginAt: "2026-03-30 09:10" },
-  { id: "u-2", username: "lilei", role: "user", status: "active", lastLoginAt: "2026-03-30 10:42" },
+  { id: "u-2", username: "lilei", role: "sub_admin", status: "active", lastLoginAt: "2026-03-30 10:42" },
   { id: "u-3", username: "hanmeimei", role: "user", status: "disabled", lastLoginAt: "2026-03-29 19:33" },
 ]
 

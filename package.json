@@ -8,6 +8,13 @@
   "scripts": {
     "dev:web": "npm run dev --prefix ui/V0_SAAS",
     "dev:api": "npm run dev -w apps/api",
+    "dev:recover": "bash scripts/recover-dev.sh",
+    "tunnel:api": "bash scripts/tunnel-api-cloudflared.sh",
+    "tunnel:web": "bash scripts/tunnel-web-cloudflared.sh",
+    "tunnel:api:ngrok": "bash scripts/tunnel-api-ngrok.sh",
+    "tunnel:web:ngrok": "bash scripts/tunnel-web-ngrok.sh",
+    "tunnel:api:lt": "bash scripts/tunnel-api-localtunnel.sh",
+    "tunnel:web:lt": "bash scripts/tunnel-web-localtunnel.sh",
     "build:web": "npm run build --prefix ui/V0_SAAS",
     "build:api": "npm run build -w apps/api",
     "rules:standardize": "node scripts/standardize-rules-from-excel.js",

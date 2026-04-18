@@ -41,7 +41,11 @@ export default function DashboardLayout({
       <UnsavedChangesProvider>
         <SidebarProvider>
           {!embedded ? <AppSidebar /> : null}
-          {embedded ? <main className="embed-view bg-background min-h-screen">{children}</main> : <SidebarInset className="bg-background">{children}</SidebarInset>}
+          {embedded ? (
+            <main className="embed-view wes-field-label-theme bg-background min-h-screen">{children}</main>
+          ) : (
+            <SidebarInset className="wes-field-label-theme bg-background h-svh overflow-y-auto">{children}</SidebarInset>
+          )}
         </SidebarProvider>
       </UnsavedChangesProvider>
     </AuthGate>

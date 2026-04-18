@@ -22,6 +22,7 @@ import {
   undoCheckoutById,
 } from "@/lib/workload-service"
 import { toast } from "sonner"
+import { createClientRowId } from "@/lib/utils"
 
 type ResourceRow = {
   id: string
@@ -40,7 +41,7 @@ type ResourceRow = {
 
 function createEmptyRow(monthCount: number): ResourceRow {
   return {
-    id: crypto.randomUUID(),
+    id: createClientRowId(),
     role: "实施顾问",
     name: "",
     unitCost: 0,
@@ -203,7 +204,7 @@ export default function ResourceCostPage() {
     if (nextSelected) setCurrentVersionCode(nextSelected)
   }
 
-  function currentPayload() {
+  function currentPayload(checkinNote?: string) {
     return {
       globalVersionCode,
       selectedEstimateVersionCode: linkedAssessmentVersionCode,
@@ -212,6 +213,7 @@ export default function ResourceCostPage() {
       rows,
       totalDays,
       totalCost,
+      ...(checkinNote ? { checkinNote } : {}),
     }
   }
 
@@ -230,10 +232,10 @@ export default function ResourceCostPage() {
     }
   }
 
-  async function onCheckin() {
+  async function onCheckin(checkinNote: string) {
     if (!selectedVersionRecord) return
     try {
-      const data = await checkinVersionById(selectedVersionRecord.id, currentPayload())
+      const data = await checkinVersionById(selectedVersionRecord.id, currentPayload(checkinNote))
       await reloadVersions(data.versionCode || selectedVersionRecord.versionCode)
       showGlobalNotice(`检入成功：${data.versionCode}`)
       setDirty(false)
@@ -298,7 +300,7 @@ export default function ResourceCostPage() {
         nextRows.length
           ? nextRows.map((x) => ({
               ...x,
-              id: x.id || crypto.randomUUID(),
+              id: x.id || createClientRowId(),
               monthDays: Array.from({ length: nextMonthCount }, (_, i) => Number(x.monthDays?.[i] || 0)),
             }))
           : [createEmptyRow(nextMonthCount)],
@@ -466,7 +468,7 @@ export default function ResourceCostPage() {
               }
               onVersionHistory={() => setVersionHistoryOpen(true)}
               onCheckout={() => void onCheckout()}
-              onCheckin={() => void onCheckin()}
+              onCheckin={(checkinNote) => void onCheckin(checkinNote)}
               onUndoCheckout={() => void onUndoCheckout()}
               onPromote={() => void onPromote()}
               onForceUnlock={() => void onForceUnlock()}

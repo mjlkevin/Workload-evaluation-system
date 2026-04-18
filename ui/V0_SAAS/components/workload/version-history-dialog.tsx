@@ -11,15 +11,19 @@ import {
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { getCheckoutStatusBadgeClass, getCheckoutStatusText } from "@/lib/checkout-status-ui"
 
 export type VersionHistoryRow = {
   id: string
+  projectName: string
   versionCode: string
   updatedAt: string
   checkoutStatus: "checked_in" | "checked_out"
   versionDocStatus: "drafting" | "reviewed"
   status: string
   isHistoricalArchive: boolean
+  checkinNote: string
 }
 
 export function recordsToVersionHistoryRows(
@@ -31,21 +35,20 @@ export function recordsToVersionHistoryRows(
     versionDocStatus: "drafting" | "reviewed"
     status: string
     isHistoricalArchive: boolean
+    payload?: Record<string, unknown>
   }>,
 ): VersionHistoryRow[] {
   return records.map((r) => ({
     id: r.id,
+    projectName: String(r.payload?.projectName || (r.payload?.basicInfo as { projectName?: string } | undefined)?.projectName || "").trim(),
     versionCode: r.versionCode,
     updatedAt: r.updatedAt,
     checkoutStatus: r.checkoutStatus,
     versionDocStatus: r.versionDocStatus,
     status: r.status,
     isHistoricalArchive: r.isHistoricalArchive,
+    checkinNote: String(r.payload?.checkinNote || "").trim(),
   }))
-}
-
-function formatCheckout(s: VersionHistoryRow["checkoutStatus"]) {
-  return s === "checked_out" ? "已检出" : "已检入"
 }
 
 function formatDocStatus(s: VersionHistoryRow["versionDocStatus"]) {
@@ -72,6 +75,7 @@ export function VersionHistoryDialog({
   latestRecordId,
   onCreateFromHistory,
   createFromHistoryLoading,
+  showProjectNameColumn = false,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -84,6 +88,8 @@ export function VersionHistoryDialog({
   /** 基于选中行的快照创建新版本（版本号由后端递增，仅最新版在主页可选） */
   onCreateFromHistory?: (row: VersionHistoryRow) => void | Promise<void>
   createFromHistoryLoading?: boolean
+  /** 仅在需要时显示“项目名称”列（如实施评估版本历史） */
+  showProjectNameColumn?: boolean
 }) {
   const sorted = useMemo(
     () => [...rows].sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt))),
@@ -117,8 +123,10 @@ export function VersionHistoryDialog({
           <Table>
             <TableHeader>
               <TableRow>
+                {showProjectNameColumn ? <TableHead className="whitespace-nowrap">项目名称</TableHead> : null}
                 <TableHead className="whitespace-nowrap">版本号</TableHead>
                 <TableHead className="whitespace-nowrap">更新时间</TableHead>
+                <TableHead className="whitespace-nowrap">检入说明</TableHead>
                 <TableHead className="whitespace-nowrap">检出状态</TableHead>
                 <TableHead className="whitespace-nowrap">文档状态</TableHead>
                 <TableHead className="whitespace-nowrap">历史归档</TableHead>
@@ -128,7 +136,7 @@ export function VersionHistoryDialog({
             <TableBody>
               {sorted.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={showProjectNameColumn ? 8 : 7} className="text-center text-muted-foreground">
                     暂无版本记录
                   </TableCell>
                 </TableRow>
@@ -155,11 +163,23 @@ export function VersionHistoryDialog({
                         onCreateFromHistory && "cursor-pointer hover:bg-muted/40",
                       )}
                     >
+                      {showProjectNameColumn ? (
+                        <TableCell className="max-w-[220px] truncate text-xs font-medium" title={row.projectName || "—"}>
+                          {row.projectName || "—"}
+                        </TableCell>
+                      ) : null}
                       <TableCell className="max-w-[200px] truncate font-mono text-xs" title={row.versionCode}>
                         {row.versionCode}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{row.updatedAt}</TableCell>
-                      <TableCell className="whitespace-nowrap text-xs">{formatCheckout(row.checkoutStatus)}</TableCell>
+                      <TableCell className="max-w-[320px] truncate text-xs" title={row.checkinNote || "—"}>
+                        {row.checkinNote || "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">
+                        <Badge variant="outline" className={cn("rounded-lg", getCheckoutStatusBadgeClass(row.checkoutStatus))}>
+                          {getCheckoutStatusText(row.checkoutStatus) || "已检入"}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-xs">{formatDocStatus(row.versionDocStatus)}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs">{row.isHistoricalArchive ? "是" : "否"}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs">{formatRecordStatus(row.status)}</TableCell>

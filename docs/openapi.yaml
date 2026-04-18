@@ -10,7 +10,8 @@ info:
 
     **未在本文档中展开的已实现端点**（完整列表见仓库
     `03_技术设计/系统演进/实现与文档对齐说明.md`）包括但不限于：
-    `/api/v1/auth/*`、`/api/v1/versions/*`、`/api/v1/system/*`、`/api/v1/ai/parse-basic-info`、
+    `/api/v1/auth/*`、`/api/v1/versions/*`、`/api/v1/system/*`、
+    `/api/v1/ai/parse-basic-info`、`/api/v1/ai/kimi-assessment/preview`、`/api/v1/ai/kimi-assessment/export-markdown`、
     `/api/v1/teams/*`、`GET /api/v1/wbs`；
     下载路径为 `GET /downloads/{fileName}`（非 `/api/v1` 前缀）。
 
@@ -1301,6 +1302,14 @@ components:
           type: string
         updatedAt:
           type: string
+        createdByUserId:
+          type: string
+        createdByUsername:
+          type: string
+        updatedByUserId:
+          type: string
+        updatedByUsername:
+          type: string
       required: [id, type, versionCode, templateId, ownerUserId, status, payload, checkoutStatus, versionDocStatus, majorLetter, minorNumber, baseCode, isHistoricalArchive, createdAt, updatedAt]
 
     VersionCreateRequest:
@@ -1621,6 +1630,14 @@ components:
           type: number
           minimum: 0
           maximum: 1
+        selectedSheet:
+          type: string
+          description: 实施评估当前工作表名（如「模块报价」）；导出时用于匹配参考 Excel 工作表
+        selectedCloudNames:
+          type: array
+          description: 实施评估当前选中的云产品列表；导出 Excel 时仅输出这些云产品下已勾选的行（空数组或不传则不按云产品过滤）
+          items:
+            type: string
         items:
           type: array
           description: 必须覆盖模板中的所有 templateItemId

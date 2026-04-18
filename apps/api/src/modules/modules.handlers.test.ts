@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { Request, Response } from "express";
 
 import { AuthUser } from "../types";
+import { config } from "../config/env";
 import { loadUsersStore, signAuthToken } from "../middleware/auth";
 import { versionCodeRulesStorePath, versionsStorePath } from "../utils";
 import { listUsers, login, me } from "./auth/auth.usecase";
@@ -22,6 +23,7 @@ import {
   updateVersionStatus
 } from "./versions/versions.usecase";
 import { patchReviewStatus, postTeam } from "./team/team.controller";
+import { kimiAssessmentPreview } from "./ai/ai.usecase";
 
 type MockRes = {
   statusCode: number;
@@ -151,13 +153,14 @@ test("auth.usecase: listUsers follows role branch", () => {
   const res = createMockRes();
   listUsers(req, res as unknown as Response);
 
-  if (getActiveUserRole() === "admin") {
+  const role = getActiveUserRole();
+  if (role === "admin" || role === "sub_admin") {
     assert.equal(res.statusCode, 200);
     const body = res.body as { code: number; data: { users: unknown[] } };
     assert.equal(body.code, 0);
     assert.ok(Array.isArray(body.data.users));
   } else {
-    assert.equal(res.statusCode, 400);
+    assert.equal(res.statusCode, 403);
     assert.equal((res.body as { code?: number }).code, 40301);
   }
 });
@@ -452,6 +455,8 @@ test("versions.usecase: createVersion fails when active rule lacks sequence plac
               updatedAt: now,
               createdByUserId: owner.id,
               createdByUsername: owner.username,
+              updatedByUserId: owner.id,
+              updatedByUsername: owner.username,
               checkoutStatus: "checked_in",
               versionDocStatus: "drafting",
               majorLetter: "A",
@@ -675,4 +680,158 @@ test("team.controller: patchReviewStatus returns 401 without token", () => {
   patchReviewStatus(req, res as unknown as Response);
   assert.equal(res.statusCode, 401);
   assert.equal((res.body as { code?: number }).code, 40101);
+});
+
+test("ai.usecase: kimiAssessmentPreview returns model result on valid response", async () => {
+  const req = createMockReq({
+    token: getActiveUserToken(),
+    body: {
+      source: { globalVersionCode: "GL-UT-01", requirementVersionCode: "RI-UT-01" },
+      requirementSnapshot: {
+        basicInfo: { projectName: "UT 项目", productLines: ["金蝶AI星空"] },
+        valuePropositionRows: [],
+        businessNeedRows: [{ businessNeed: "订单到收款流程打通" }],
+        devOverviewRows: [],
+        productModuleRows: [{ moduleName: "总账", userCount: "120" }],
+        implementationScopeRows: [{ companyName: "A公司" }],
+        meetingNotes: "范围一期，先财务后供应链",
+        keyPointRows: [{ detail: "主数据统一" }],
+      },
+      ruleContext: { promptProfile: "assessment_default_v1" },
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    (globalThis as { fetch?: unknown }).fetch = async () =>
+      ({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  assessmentDraft: {
+                    quoteMode: "模块报价",
+                    productLines: ["金蝶AI星空"],
+                    userCount: 120,
+                    orgCount: 1,
+                    orgSimilarity: 0,
+                    difficultyFactor: 0.4,
+                    moduleItems: [
+                      { moduleName: "总账", standardDays: 2, suggestedDays: 3, reason: "基础财务域复杂度中等" },
+                    ],
+                    risks: ["主数据口径需先统一"],
+                    assumptions: ["按一期范围估算"],
+                  },
+                }),
+              },
+            },
+          ],
+        }),
+      }) as unknown;
+    await kimiAssessmentPreview(req, res as unknown as Response);
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: {
+        meta: { mode: string };
+        assessmentDraft: { moduleItems: Array<{ moduleName: string }> };
+      };
+    };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.meta.mode, "model");
+    assert.equal(body.data.assessmentDraft.moduleItems[0]?.moduleName, "总账");
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+  }
+});
+
+test("ai.usecase: kimiAssessmentPreview falls back on model timeout", async () => {
+  const req = createMockReq({
+    token: getActiveUserToken(),
+    body: {
+      source: { globalVersionCode: "GL-UT-02", requirementVersionCode: "RI-UT-02" },
+      requirementSnapshot: {
+        basicInfo: { projectName: "UT 项目2", productLines: ["云之家"] },
+        valuePropositionRows: [],
+        businessNeedRows: [{ businessNeed: "供应链到财务协同" }],
+        devOverviewRows: [],
+        productModuleRows: [{ moduleName: "供应链", userCount: "80" }],
+        implementationScopeRows: [],
+        meetingNotes: "",
+        keyPointRows: [],
+      },
+      ruleContext: { promptProfile: "assessment_default_v1" },
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    (globalThis as { fetch?: unknown }).fetch = async () => {
+      throw new Error("timeout");
+    };
+    await kimiAssessmentPreview(req, res as unknown as Response);
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: { meta: { mode: string; fallbackReason: string } };
+    };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.meta.mode, "rule_fallback");
+    assert.match(body.data.meta.fallbackReason, /timeout/i);
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+  }
+});
+
+test("ai.usecase: kimiAssessmentPreview falls back on invalid model json", async () => {
+  const req = createMockReq({
+    token: getActiveUserToken(),
+    body: {
+      source: { globalVersionCode: "GL-UT-03", requirementVersionCode: "RI-UT-03" },
+      requirementSnapshot: {
+        basicInfo: { projectName: "UT 项目3" },
+        valuePropositionRows: [],
+        businessNeedRows: [{ businessNeed: "预算管控" }],
+        devOverviewRows: [],
+        productModuleRows: [{ moduleName: "预算", userCount: "60" }],
+        implementationScopeRows: [],
+        meetingNotes: "有部分约束",
+        keyPointRows: [],
+      },
+      ruleContext: { promptProfile: "assessment_default_v1" },
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    (globalThis as { fetch?: unknown }).fetch = async () =>
+      ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "{}" } }],
+        }),
+      }) as unknown;
+    await kimiAssessmentPreview(req, res as unknown as Response);
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: { meta: { mode: string; fallbackReason: string } };
+    };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.meta.mode, "rule_fallback");
+    assert.match(body.data.meta.fallbackReason, /model_invalid_assessment_json/i);
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+  }
 });

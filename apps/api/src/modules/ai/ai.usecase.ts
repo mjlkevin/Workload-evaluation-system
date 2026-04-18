@@ -1,1 +1,7 @@
-export { parseBasicInfo, companyProfileSummary, chat } from "../../services/ai.service";
+export {
+  parseBasicInfo,
+  companyProfileSummary,
+  kimiAssessmentPreview,
+  exportKimiAssessmentMarkdown,
+  chat,
+} from "../../services/ai.service";

@@ -1,12 +1,24 @@
 import { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 
-import { VersionCodeRule, VersionCodeRuleModuleKey, VersionCodeRuleStatus } from "../../types";
+import {
+  ImplementationDependencyRulesConfig,
+  RequirementSystemConfig,
+  VersionCodeRule,
+  VersionCodeRuleModuleKey,
+  VersionCodeRuleStatus,
+} from "../../types";
 import { requireAuth, isAdminUser } from "../../middleware/auth";
 import { fail, ok } from "../../utils/response";
 import {
   buildVersionCodeSample,
+  loadImplementationDependencyRulesStore,
   loadVersionCodeRulesStore,
+  loadRequirementSystemConfigStore,
+  normalizeImplementationDependencyRulesConfig,
+  normalizeRequirementSystemConfig,
+  saveImplementationDependencyRulesStore,
+  saveRequirementSystemConfigStore,
   saveVersionCodeRulesStore,
 } from "./system.repository";
 
@@ -158,4 +170,111 @@ export function disableVersionCodeRule(req: Request, res: Response) {
   saveVersionCodeRulesStore(store);
 
   return res.json(ok({ item: sanitizeRule(target) }, randomUUID()));
+}
+
+export function getRequirementSystemConfig(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const store = loadRequirementSystemConfigStore();
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        draft: store.draft,
+        active: store.active,
+        updatedAt: store.updatedAt,
+        effectiveAt: store.effectiveAt,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+export function updateRequirementSystemConfigDraft(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const payload = (req.body || {}) as Partial<RequirementSystemConfig>;
+  const now = new Date().toISOString();
+  const store = loadRequirementSystemConfigStore();
+  store.draft = normalizeRequirementSystemConfig({
+    ...store.draft,
+    ...payload,
+    kimiEvaluation: { ...store.draft.kimiEvaluation, ...(payload.kimiEvaluation || {}) },
+    fileParsing: { ...store.draft.fileParsing, ...(payload.fileParsing || {}) },
+    kimiGeneration: { ...store.draft.kimiGeneration, ...(payload.kimiGeneration || {}) },
+  });
+  store.updatedAt = now;
+  saveRequirementSystemConfigStore(store);
+  return res.json(ok({ version: store.version, draft: store.draft, updatedAt: store.updatedAt }, randomUUID()));
+}
+
+export function activateRequirementSystemConfig(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const now = new Date().toISOString();
+  const store = loadRequirementSystemConfigStore();
+  store.active = normalizeRequirementSystemConfig(store.draft);
+  store.version = Number(store.version || 1) + 1;
+  store.effectiveAt = now;
+  store.updatedAt = now;
+  saveRequirementSystemConfigStore(store);
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        active: store.active,
+        effectiveAt: store.effectiveAt,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+export function getImplementationDependencyRules(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const store = loadImplementationDependencyRulesStore();
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        draft: store.draft,
+        active: store.active,
+        updatedAt: store.updatedAt,
+        effectiveAt: store.effectiveAt,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+export function updateImplementationDependencyRulesDraft(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const payload = (req.body || {}) as Partial<ImplementationDependencyRulesConfig>;
+  const now = new Date().toISOString();
+  const store = loadImplementationDependencyRulesStore();
+  store.draft = normalizeImplementationDependencyRulesConfig({
+    ...store.draft,
+    ...payload,
+  });
+  store.updatedAt = now;
+  saveImplementationDependencyRulesStore(store);
+  return res.json(ok({ version: store.version, draft: store.draft, updatedAt: store.updatedAt }, randomUUID()));
+}
+
+export function activateImplementationDependencyRules(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const now = new Date().toISOString();
+  const store = loadImplementationDependencyRulesStore();
+  store.active = normalizeImplementationDependencyRulesConfig(store.draft);
+  store.version = Number(store.version || 1) + 1;
+  store.effectiveAt = now;
+  store.updatedAt = now;
+  saveImplementationDependencyRulesStore(store);
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        active: store.active,
+        effectiveAt: store.effectiveAt,
+      },
+      randomUUID(),
+    ),
+  );
 }

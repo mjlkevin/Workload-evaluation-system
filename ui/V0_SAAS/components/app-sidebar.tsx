@@ -16,7 +16,6 @@ import {
   Search,
   ChevronsUpDown,
   LogOut,
-  Sparkles,
   AlertTriangle,
 } from "lucide-react"
 import Link from "next/link"
@@ -98,6 +97,15 @@ const mainNavItems = [
   },
 ]
 
+const submenuEnabledMainNav = new Set([
+  "/dashboard/requirement-import",
+  "/dashboard/assessment",
+  "/dashboard/resource-cost",
+  "/dashboard/dev-assessment",
+  "/dashboard/wbs",
+  "/dashboard/review",
+])
+
 const teamNavItems = [
   {
     title: "用户管理",
@@ -119,17 +127,14 @@ const teamNavItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, canManageUsers, logout } = useAuth()
   const { pendingHref, requestNavigation, confirmNavigation, cancelNavigation } = useUnsavedNavigation()
 
-  const visibleTeamNavItems = isAdmin
-    ? teamNavItems
-    : teamNavItems.filter(
-        (item) =>
-          item.url !== "/dashboard/user-management" &&
-          item.url !== "/dashboard/system-management" &&
-          item.url !== "/dashboard/api-keys",
-      )
+  const visibleTeamNavItems = teamNavItems.filter((item) => {
+    if (item.url === "/dashboard/user-management") return canManageUsers
+    if (item.url === "/dashboard/system-management" || item.url === "/dashboard/api-keys") return isAdmin
+    return true
+  })
 
   function handleNavClick(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
     const allowed = requestNavigation(href)
@@ -145,9 +150,15 @@ export function AppSidebar() {
     router.push(dest)
   }
 
+  function handleMenuNavigate(href: string) {
+    const allowed = requestNavigation(href)
+    if (!allowed) return
+    router.push(href)
+  }
+
   return (
     <>
-      <Sidebar className="border-r border-border/40">
+      <Sidebar className="border-r border-border/40 shadow-[7px_0_22px_-10px_rgba(0,0,0,0.085)] dark:shadow-[8px_0_26px_-12px_rgba(0,0,0,0.38)]">
         <SidebarHeader className="px-4 py-5">
           <Link
             href="/dashboard"
@@ -155,9 +166,9 @@ export function AppSidebar() {
             onClick={(e) => handleNavClick(e, "/dashboard")}
           >
             <div className="flex size-9 items-center justify-center rounded-xl bg-foreground">
-              <Sparkles className="size-5 text-background" />
+              <span className="text-sm font-black leading-none text-background">W</span>
             </div>
-            <span className="text-lg font-semibold tracking-tight">Nova</span>
+            <span className="text-lg font-semibold tracking-tight">WorkEvolutionSys</span>
           </Link>
         </SidebarHeader>
 
@@ -186,20 +197,42 @@ export function AppSidebar() {
               <SidebarMenu>
                 {mainNavItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={
-                        item.url === "/dashboard"
-                          ? pathname === item.url
-                          : pathname === item.url || pathname.startsWith(`${item.url}/`)
-                      }
-                      className="rounded-xl px-3 py-2.5 transition-all data-[active=true]:bg-foreground data-[active=true]:text-background data-[active=true]:shadow-lg"
-                    >
-                      <Link href={item.url} onClick={(e) => handleNavClick(e, item.url)}>
-                        <item.icon className="size-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
+                    {submenuEnabledMainNav.has(item.url) ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <SidebarMenuButton
+                            isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                            className="rounded-xl px-3 py-2.5 transition-all data-[active=true]:bg-foreground data-[active=true]:text-background data-[active=true]:shadow-lg"
+                          >
+                            <item.icon className="size-4" />
+                            <span>{item.title}</span>
+                          </SidebarMenuButton>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" side="right" sideOffset={8} className="w-36 rounded-xl">
+                          <DropdownMenuItem className="rounded-lg" onClick={() => handleMenuNavigate(`${item.url}/list`)}>
+                            列表
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="rounded-lg" onClick={() => handleMenuNavigate(item.url)}>
+                            新增
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <SidebarMenuButton
+                        asChild
+                        isActive={
+                          item.url === "/dashboard"
+                            ? pathname === item.url
+                            : pathname === item.url || pathname.startsWith(`${item.url}/`)
+                        }
+                        className="rounded-xl px-3 py-2.5 transition-all data-[active=true]:bg-foreground data-[active=true]:text-background data-[active=true]:shadow-lg"
+                      >
+                        <Link href={item.url} onClick={(e) => handleNavClick(e, item.url)}>
+                          <item.icon className="size-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    )}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
@@ -252,7 +285,11 @@ export function AppSidebar() {
                     <div className="flex flex-col items-start text-sm">
                       <span className="font-medium">{user?.username || "未登录"}</span>
                       <span className="text-xs text-muted-foreground">
-                        {user?.role === "admin" ? "管理员" : "普通用户"}
+                        {user?.role === "admin"
+                          ? "超级管理员"
+                          : user?.role === "sub_admin"
+                            ? "子管理员"
+                            : "普通用户"}
                       </span>
                     </div>
                     <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
@@ -266,9 +303,9 @@ export function AppSidebar() {
                 >
                   <DropdownMenuItem className="rounded-lg" asChild>
                     <Link
-                      href={isAdmin ? "/dashboard/user-management" : "/dashboard"}
+                      href={canManageUsers ? "/dashboard/user-management" : "/dashboard"}
                       onClick={(e) =>
-                        handleNavClick(e, isAdmin ? "/dashboard/user-management" : "/dashboard")
+                        handleNavClick(e, canManageUsers ? "/dashboard/user-management" : "/dashboard")
                       }
                     >
                       <Settings className="mr-2 size-4" />

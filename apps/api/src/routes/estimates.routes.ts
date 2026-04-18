@@ -11,5 +11,6 @@ router.post("/calculate", EstimatesModule.calculate);
 router.post("/calculate-and-export", EstimatesModule.calculateAndExport);
 router.post("/export/excel", EstimatesModule.exportExcel);
 router.post("/export/pdf", EstimatesModule.exportPdf);
+router.get("/dependency-rules/active", EstimatesModule.getActiveDependencyRules);
 
 export default router;

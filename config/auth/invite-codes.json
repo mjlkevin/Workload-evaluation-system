@@ -7,6 +7,22 @@
       "usedAt": "2026-03-28T10:29:24.272Z",
       "usedByUserId": "b4de9eca-fe62-4210-964e-7e59b74ab715",
       "usedByUsername": "elly"
+    },
+    {
+      "code": "KD-20260408-9EZHXE",
+      "status": "used",
+      "createdAt": "2026-04-08T05:53:14.485Z",
+      "usedAt": "2026-04-08T06:00:07.420Z",
+      "usedByUserId": "0bfae09b-d3da-4b28-b8b8-56a384dac458",
+      "usedByUsername": "马文玲"
+    },
+    {
+      "code": "KD-20260416-SB8EXJ",
+      "status": "used",
+      "createdAt": "2026-04-16T07:35:24.441Z",
+      "usedAt": "2026-04-17T05:07:04.779Z",
+      "usedByUserId": "b0b53b64-550b-4d54-b361-8d9f987e1179",
+      "usedByUsername": "林悦填"
     }
   ]
 }

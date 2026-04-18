@@ -14,23 +14,39 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/hooks/use-auth"
 import {
   checkinVersionById,
   checkoutVersionById,
   calculateAndExportEstimate,
   calculateEstimate,
+  getActiveImplementationDependencyRules,
   createModuleVersion,
+  downloadOwnedExportFile,
   forceUnlockById,
   getActiveRuleSet,
   getDashboardPlans,
   getTemplateDetail,
+  KIMI_ASSESSMENT_PREFILL_STORAGE_KEY,
   listGlobalVersions,
   listEstimateExportHistory,
   listModuleVersions,
   type ModuleVersionRecord,
+  type ImplementationDependencyRulesConfig,
   listTemplateSummaries,
   promoteVersionById,
   undoCheckoutById,
@@ -43,12 +59,33 @@ import {
   type TemplateSummary,
 } from "@/lib/workload-service"
 import type { PlanRow } from "@/lib/workload-types"
+import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, createClientRowId } from "@/lib/utils"
+
+const INIT_LOAD_TIMEOUT_MS = 30_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error(message)), ms)
+    promise.then(
+      (v) => {
+        window.clearTimeout(t)
+        resolve(v)
+      },
+      (e) => {
+        window.clearTimeout(t)
+        reject(e)
+      },
+    )
+  })
+}
 
 type ItemSelectionState = {
   included: boolean
   customStandardDays?: number
+  customAdjustReason?: string
+  customAdjustReasonStatus?: "pending" | "saved"
 }
 
 type MultiOrgRow = {
@@ -66,10 +103,26 @@ type MultiOrgRow = {
 type AssessmentForm = {
   templateId: string
   ruleSetId: string
+  productLines: string[]
   userCount: number
   difficultyFactor: number
   orgCount: number
   orgSimilarityFactor: number
+}
+
+type DependencyIssue = {
+  ruleId: string
+  subject: string
+  trigger: string
+  missing: string[]
+}
+
+const PRODUCT_LINE_OPTIONS = ["金蝶AI星空", "金蝶AI星瀚", "云之家", "发票云"] as const
+const PRODUCT_LINE_BADGE_STYLE_MAP: Record<string, string> = {
+  金蝶AI星空: "border-sky-400 bg-sky-500 text-white dark:border-sky-500 dark:bg-sky-500 dark:text-white",
+  云之家: "border-cyan-300 bg-cyan-400 text-white dark:border-cyan-400 dark:bg-cyan-400 dark:text-white",
+  金蝶AI星瀚: "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-900/30 dark:text-violet-200",
+  发票云: "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
 }
 
 const multiOrgScopeDefs: Array<{ key: string; label: string; cloudName: string }> = [
@@ -87,12 +140,141 @@ const MULTI_ORG_DRAFT_KEY = "workload-assessment-multi-org-draft-v1"
 
 /** 与模板工作表名一致；仅该表展示「预置评估模式」；自定义人天按云产品在条目表工具条开启 */
 const SHEET_MODULE_QUOTE = "模块报价"
+const ASSESSMENT_VERSION_LOAD_TOAST_ID = "assessment-version-loaded"
 
 /** 模块评估云产品表：列与列之间竖线（与 SKU|实施要点 同色） */
 const ASSESS_TABLE_COL_BORDER = "border-l border-border/40"
+const COLLAPSED_KEY_TEXT_CLASS = "font-semibold text-emerald-700 dark:text-emerald-300"
+
+function normalizeDependencyToken(value: unknown): string {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[()（）]/g, "")
+}
+
+function hasSelectedDependencyLabel(tokens: Set<string>, target: string): boolean {
+  const normalizedTarget = normalizeDependencyToken(target)
+  if (!normalizedTarget) return false
+  for (const token of tokens) {
+    if (!token) continue
+    if (token === normalizedTarget) return true
+    if (normalizedTarget.length >= 2 && token.includes(normalizedTarget)) return true
+    if (token.length >= 4 && normalizedTarget.includes(token)) return true
+  }
+  return false
+}
+
+function collectSelectedDependencyTokens(
+  allItems: TemplateItemOption[],
+  itemSelection: Record<string, ItemSelectionState>,
+  selectedCloudNames: string[],
+): Set<string> {
+  const result = new Set<string>()
+  for (const cloudName of selectedCloudNames) {
+    const token = normalizeDependencyToken(cloudName)
+    if (token) result.add(token)
+  }
+  for (const item of allItems) {
+    if (!itemSelection[item.templateItemId]?.included) continue
+    const candidates = [item.skuName, item.itemName, item.deliveryModule, item.appGroup, item.cloudProduct]
+    for (const candidate of candidates) {
+      const token = normalizeDependencyToken(candidate)
+      if (token) result.add(token)
+    }
+  }
+  return result
+}
+
+function evaluateDependencyIssues(
+  rules: ImplementationDependencyRulesConfig | null,
+  selectedTokens: Set<string>,
+): DependencyIssue[] {
+  if (!rules || !Array.isArray(rules.rules) || rules.rules.length === 0 || selectedTokens.size === 0) return []
+  const issues: DependencyIssue[] = []
+  for (const rule of rules.rules) {
+    if (!rule?.enabled) continue
+    if (!hasSelectedDependencyLabel(selectedTokens, rule.subject)) continue
+
+    const missingDependencies = (rule.dependencies || []).filter((dep) => !hasSelectedDependencyLabel(selectedTokens, dep))
+    if (rule.logic === "requires_all") {
+      if (missingDependencies.length > 0) {
+        issues.push({
+          ruleId: rule.id,
+          subject: rule.subject,
+          trigger: rule.trigger,
+          missing: missingDependencies,
+        })
+      }
+      continue
+    }
+
+    if (rule.logic === "requires_any") {
+      const anyGroups = Array.isArray(rule.anyOfGroups) ? rule.anyOfGroups : []
+      const missingAny = anyGroups
+        .map((group) => group.filter((item) => String(item || "").trim()))
+        .filter((group) => group.length > 0)
+        .filter((group) => !group.some((candidate) => hasSelectedDependencyLabel(selectedTokens, candidate)))
+      if (missingDependencies.length > 0 || missingAny.length > 0) {
+        const anyMissingFlat = missingAny.map((group) => `(${group.join(" / ")})至少一项`).join("、")
+        issues.push({
+          ruleId: rule.id,
+          subject: rule.subject,
+          trigger: rule.trigger,
+          missing: [...missingDependencies, ...(anyMissingFlat ? [anyMissingFlat] : [])],
+        })
+      }
+      continue
+    }
+
+    if (rule.logic === "combo") {
+      const comboDependencies = (rule.comboDependencies || []).filter((item) => String(item || "").trim())
+      const comboSatisfied = comboDependencies.length === 0 || comboDependencies.some((dep) => hasSelectedDependencyLabel(selectedTokens, dep))
+      if (missingDependencies.length > 0 || !comboSatisfied) {
+        issues.push({
+          ruleId: rule.id,
+          subject: rule.subject,
+          trigger: rule.trigger,
+          missing: [...missingDependencies, ...(!comboSatisfied ? [`(${comboDependencies.join(" / ")})至少一项`] : [])],
+        })
+      }
+    }
+  }
+
+  const mutexRules = Array.isArray(rules.mutualExclusionRules) ? rules.mutualExclusionRules : []
+  for (const pair of mutexRules) {
+    if (hasSelectedDependencyLabel(selectedTokens, pair.left) && hasSelectedDependencyLabel(selectedTokens, pair.right)) {
+      issues.push({
+        ruleId: `mutex-${pair.left}-${pair.right}`,
+        subject: `${pair.left} / ${pair.right}`,
+        trigger: "互斥规则",
+        missing: [pair.reason || "不可同时选择"],
+      })
+    }
+  }
+  return issues
+}
 
 function formatDays(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function toInteger(value: number): number {
+  return Math.round(value)
+}
+
+function normalizeProductLines(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const line of value) {
+    const text = String(line || "").trim()
+    if (!text || seen.has(text)) continue
+    seen.add(text)
+    result.push(text)
+  }
+  return result
 }
 
 /** 模板中小计/汇总行写入的 cloudProduct，不作为云产品切换标签展示 */
@@ -137,7 +319,7 @@ function createEmptyMultiOrgRow(): MultiOrgRow {
   const scope: Record<string, boolean> = {}
   for (const def of multiOrgScopeDefs) scope[def.key] = false
   return {
-    rowId: crypto.randomUUID(),
+    rowId: createClientRowId(),
     orgName: "",
     orgType: orgTypeOptions[0],
     location: "",
@@ -169,6 +351,7 @@ export default function AssessmentPage() {
   const [form, setForm] = useState<AssessmentForm>({
     templateId: "",
     ruleSetId: "",
+    productLines: [],
     userCount: 100,
     difficultyFactor: 0.2,
     orgCount: 1,
@@ -181,6 +364,10 @@ export default function AssessmentPage() {
   const [selectedPresetMode, setSelectedPresetMode] = useState("")
   const [selectedCloudNames, setSelectedCloudNames] = useState<string[]>([])
   const [itemSelection, setItemSelection] = useState<Record<string, ItemSelectionState>>({})
+  const [customAdjustReasonEditor, setCustomAdjustReasonEditor] = useState<{
+    itemId: string
+    draft: string
+  } | null>(null)
   /** 按云产品开启「自定义人天」列与有效人天计算 */
   const [customModeByCloud, setCustomModeByCloud] = useState<Record<string, boolean>>({})
   const [multiOrgRows, setMultiOrgRows] = useState<MultiOrgRow[]>([createEmptyMultiOrgRow()])
@@ -190,6 +377,7 @@ export default function AssessmentPage() {
   const [exportHistoryFilter, setExportHistoryFilter] = useState("")
   const [historyTotal, setHistoryTotal] = useState(0)
   const [historyPage, setHistoryPage] = useState(1)
+  const [activeDependencyRules, setActiveDependencyRules] = useState<ImplementationDependencyRulesConfig | null>(null)
   const [globalVersionCode, setGlobalVersionCode] = useState("")
   /** 与仪表盘总方案列表一致，用于选择总方案时回填项目名称 */
   const [dashboardPlans, setDashboardPlans] = useState<PlanRow[]>([])
@@ -205,6 +393,10 @@ export default function AssessmentPage() {
   const [paramCardCollapsed, setParamCardCollapsed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savePhase, setSavePhase] = useState<"idle" | "validating" | "saving">("idle")
+  const [hasLocalChanges, setHasLocalChanges] = useState(false)
+  const [createNewConfirmOpen, setCreateNewConfirmOpen] = useState(false)
+  const [createNewSubmitting, setCreateNewSubmitting] = useState(false)
+  const [saveWithoutGlobalConfirmOpen, setSaveWithoutGlobalConfirmOpen] = useState(false)
   const [calculating, setCalculating] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [initLoading, setInitLoading] = useState(true)
@@ -231,6 +423,7 @@ export default function AssessmentPage() {
   const dirtyEnabled = useRef(false)
   const initialEmbedQueryRef = useRef<{ globalVersion: string; version: string } | null>(null)
   const initialEmbedAppliedRef = useRef(false)
+  const kimiPrefillAppliedRef = useRef(false)
 
   function showGlobalNotice(text: string) {
     toast(text)
@@ -300,6 +493,11 @@ export default function AssessmentPage() {
     return itemsInSheet.filter((item) => itemSelection[item.templateItemId]?.included).length
   }, [itemsInSheet, itemSelection])
 
+  const dependencyIssues = useMemo(() => {
+    const selectedTokens = collectSelectedDependencyTokens(allItems, itemSelection, selectedCloudNames)
+    return evaluateDependencyIssues(activeDependencyRules, selectedTokens)
+  }, [activeDependencyRules, allItems, itemSelection, selectedCloudNames])
+
   const baseDays = useMemo(() => {
     return itemsInSheet.reduce((sum, item) => {
       const state = itemSelection[item.templateItemId]
@@ -332,13 +530,18 @@ export default function AssessmentPage() {
     void (async () => {
       try {
         setInitLoading(true)
-        const [plans, records, templates, activeRule, globals] = await Promise.all([
-          getDashboardPlans(),
-          listModuleVersions("assessment"),
-          listTemplateSummaries(),
-          getActiveRuleSet(),
-          listGlobalVersions(),
-        ])
+        const [plans, records, templates, activeRule, globals, activeDependencyRuleView] = await withTimeout(
+          Promise.all([
+            getDashboardPlans(),
+            listModuleVersions("assessment"),
+            listTemplateSummaries(),
+            getActiveRuleSet(),
+            listGlobalVersions(),
+            getActiveImplementationDependencyRules().catch(() => null),
+          ]),
+          INIT_LOAD_TIMEOUT_MS,
+          "加载超时（30s）：请确认本机 API 已启动（npm run dev:api，默认 3000 端口），或检查网络后刷新页面。",
+        )
         setGlobalVersionRecords(globals)
         setDashboardPlans(plans)
         setGlobalOptions(
@@ -351,11 +554,16 @@ export default function AssessmentPage() {
         setVersionOptions(buildLatestAssessmentVersionOptions(records))
         setTemplateOptions(templates)
         setRuleSet(activeRule)
+        setActiveDependencyRules(activeDependencyRuleView?.active || null)
         setForm((prev) => ({ ...prev, ruleSetId: activeRule.ruleSetId }))
 
         const chosenTemplateId = templates[0]?.templateId || ""
         if (chosenTemplateId) {
-          const detail = await getTemplateDetail(chosenTemplateId)
+          const detail = await withTimeout(
+            getTemplateDetail(chosenTemplateId),
+            INIT_LOAD_TIMEOUT_MS,
+            "加载模板详情超时：请检查 API 服务后刷新。",
+          )
           setTemplateDetail(detail)
           const firstSheet = detail.sheets?.[0]?.sheetName || "全部工作表"
           setSelectedSheet(firstSheet)
@@ -370,7 +578,11 @@ export default function AssessmentPage() {
           setItemSelection(initialSelection)
           setForm((prev) => ({ ...prev, templateId: detail.templateId }))
         }
-        const history = await listEstimateExportHistory(1, 8)
+        const history = await withTimeout(
+          listEstimateExportHistory(1, 8),
+          INIT_LOAD_TIMEOUT_MS,
+          "加载导出历史超时：请检查 API 后刷新。",
+        )
         setHistoryTotal(history.total)
         setHistoryPage(1)
         setExportHistory(history.items)
@@ -407,6 +619,110 @@ export default function AssessmentPage() {
   }, [])
 
   useEffect(() => {
+    if (initLoading || !templateDetail || kimiPrefillAppliedRef.current) return
+    const raw = window.sessionStorage.getItem(KIMI_ASSESSMENT_PREFILL_STORAGE_KEY)
+    if (!raw) return
+    kimiPrefillAppliedRef.current = true
+    window.sessionStorage.removeItem(KIMI_ASSESSMENT_PREFILL_STORAGE_KEY)
+    try {
+      const parsed = JSON.parse(raw) as {
+        source?: { globalVersionCode?: string }
+        draft?: {
+          quoteMode?: string
+          productLines?: unknown
+          userCount?: number
+          orgCount?: number
+          orgSimilarity?: number
+          difficultyFactor?: number
+          moduleItems?: Array<{
+            cloudProduct?: string
+            skuName?: string
+            moduleName?: string
+            suggestedDays?: number
+            reason?: string
+          }>
+        }
+        projectName?: string
+      }
+      const draft = parsed.draft
+      if (!draft) return
+
+      resetToNewAssessmentDraft()
+      const sourceGlobal = String(parsed.source?.globalVersionCode || "").trim()
+      if (sourceGlobal) applyGlobalVersionSelection(sourceGlobal)
+      if (parsed.projectName) setProjectName(String(parsed.projectName).trim())
+
+      setSelectedSheet(SHEET_MODULE_QUOTE)
+      if (draft.quoteMode) setSelectedPresetMode(String(draft.quoteMode))
+
+      setForm((prev) => ({
+        ...prev,
+        productLines: normalizeProductLines(draft.productLines),
+        userCount: Math.max(0, Number(draft.userCount || 0)),
+        orgCount: Math.max(1, Number(draft.orgCount || 1)),
+        orgSimilarityFactor: Math.min(1, Math.max(0, Number(draft.orgSimilarity ?? 0))),
+        difficultyFactor: Math.min(1, Math.max(0, Number(draft.difficultyFactor ?? 0))),
+      }))
+
+      const byModule = new Map<string, { suggestedDays: number; reason: string }>()
+      const byCloudSku = new Map<string, { suggestedDays: number; reason: string }>()
+      const normalizeName = (value: unknown) => String(value || "").trim().toLowerCase()
+      for (const item of draft.moduleItems || []) {
+        const moduleName = normalizeName(item.moduleName)
+        const cloudProduct = normalizeName(item.cloudProduct)
+        const skuName = normalizeName(item.skuName)
+        const ai = {
+          suggestedDays: Math.max(0, Number(item.suggestedDays || 0)),
+          reason: String(item.reason || "").trim(),
+        }
+        if (moduleName) byModule.set(moduleName, ai)
+        if (skuName) byModule.set(skuName, ai)
+        if (cloudProduct && skuName) {
+          byCloudSku.set(`${cloudProduct}::${skuName}`, ai)
+        }
+      }
+
+      const nextSelection: Record<string, ItemSelectionState> = {}
+      const hitCloud = new Set<string>()
+      for (const item of templateDetail.items) {
+        const fallbackDays = toInteger(Number(item.standardDays || 0))
+        nextSelection[item.templateItemId] = {
+          included: false,
+          customStandardDays: fallbackDays,
+        }
+        const cloud = cloudLabelFromItem(item)
+        const cloudKey = normalizeName(cloud)
+        const skuCandidates = [
+          normalizeName(item.skuName),
+          normalizeName(item.itemName),
+          normalizeName(item.deliveryModule),
+        ].filter(Boolean)
+        const cloudSkuMatched = skuCandidates
+          .map((sku) => byCloudSku.get(`${cloudKey}::${sku}`))
+          .find(Boolean)
+        const fallbackMatched = skuCandidates.map((sku) => byModule.get(sku)).find(Boolean)
+        const ai = cloudSkuMatched || fallbackMatched
+        if (!ai) continue
+        nextSelection[item.templateItemId] = {
+          included: true,
+          customStandardDays: Math.max(0, toInteger(ai.suggestedDays || fallbackDays)),
+          customAdjustReason: ai.reason || undefined,
+          customAdjustReasonStatus: ai.reason ? "saved" : undefined,
+        }
+        hitCloud.add(cloud)
+      }
+      setItemSelection(nextSelection)
+      setSelectedCloudNames(Array.from(hitCloud))
+      setCustomModeByCloud(Object.fromEntries(Array.from(hitCloud).map((cloud) => [cloud, true])))
+      setServerResult(null)
+      setError("")
+      showGlobalNotice("已应用 Kimi 评估草稿，请确认后保存版本")
+    } catch {
+      showGlobalWarning("Kimi 评估草稿解析失败，已忽略本次预填数据")
+    }
+  }, [initLoading, templateDetail])
+
+  useEffect(() => {
     const list = ruleSet?.baseRule?.difficultyFactorList
     if (!list?.length) return
     setForm((s) => {
@@ -427,9 +743,11 @@ export default function AssessmentPage() {
     if (!dirtyEnabled.current) return
     if (suppressUnsavedPrompt) {
       setDirty(false)
+      setHasLocalChanges(false)
       return
     }
     setDirty(true)
+    setHasLocalChanges(true)
   }, [
     form,
     globalVersionCode,
@@ -609,7 +927,7 @@ export default function AssessmentPage() {
     }
   }
 
-  async function onCheckin() {
+  async function onCheckin(checkinNote: string) {
     if (!selectedVersionRecord) return
     try {
       const data = await checkinVersionById(selectedVersionRecord.id, {
@@ -623,10 +941,12 @@ export default function AssessmentPage() {
         customModeEnabled: Object.values(customModeByCloud).some(Boolean),
         itemSelection: currentItemsPayload(),
         multiOrgRows,
+        checkinNote,
       })
       await reloadVersions(data.versionCode || selectedVersionRecord.versionCode)
       showGlobalNotice(`检入成功：${data.versionCode}`)
       setDirty(false)
+      setHasLocalChanges(false)
     } catch (err) {
       showGlobalWarning(err instanceof Error ? err.message : "检入失败")
     }
@@ -691,6 +1011,12 @@ export default function AssessmentPage() {
         customStandardDays: customModeByCloud[cloudLabelFromItem(item)]
           ? Number(state.customStandardDays || item.standardDays || 0)
           : undefined,
+        customAdjustReason: customModeByCloud[cloudLabelFromItem(item)]
+          ? String(state.customAdjustReason || "").trim() || undefined
+          : undefined,
+        customAdjustReasonStatus: customModeByCloud[cloudLabelFromItem(item)]
+          ? state.customAdjustReasonStatus
+          : undefined,
       }
     })
   }
@@ -699,8 +1025,18 @@ export default function AssessmentPage() {
     return {
       ...form,
       selectedSheet,
+      selectedCloudNames,
       items: currentItemsPayload(),
     }
+  }
+
+  function ensureDependencyValidationPassed(): boolean {
+    if (!dependencyIssues.length) return true
+    const first = dependencyIssues[0]
+    const text = `依赖校验未通过：${first.subject}（${first.trigger}）缺少 ${first.missing.join("、")}`
+    setError(text)
+    showGlobalWarning(text)
+    return false
   }
 
   async function onCalculate() {
@@ -708,6 +1044,7 @@ export default function AssessmentPage() {
       showGlobalWarning("模板或规则集未就绪")
       return
     }
+    if (!ensureDependencyValidationPassed()) return
     setCalculating(true)
     setError("")
     try {
@@ -723,14 +1060,13 @@ export default function AssessmentPage() {
     }
   }
 
-  async function onSave() {
-    if (savePhase !== "idle") return
-    if (!globalVersionCode.trim()) {
-      const msg = "请先选择总方案版本号"
-      setError(msg)
-      showGlobalWarning(msg)
-      return
+  async function onSave(options?: { allowWithoutGlobal?: boolean }): Promise<boolean> {
+    if (savePhase !== "idle") return false
+    if (!globalVersionCode.trim() && !options?.allowWithoutGlobal) {
+      setSaveWithoutGlobalConfirmOpen(true)
+      return false
     }
+    if (!ensureDependencyValidationPassed()) return false
     setSaving(true)
     setSavePhase("validating")
     setError("")
@@ -767,13 +1103,82 @@ export default function AssessmentPage() {
       await reloadVersions(created.versionCode)
       showGlobalNotice(`已保存实施评估版本：${created.versionCode}`)
       setDirty(false)
+      setHasLocalChanges(false)
+      return true
     } catch (err) {
       const msg = err instanceof Error ? err.message : "保存失败"
       setError(msg)
       showGlobalWarning(msg)
+      return false
     } finally {
       setSaving(false)
       setSavePhase("idle")
+    }
+  }
+
+  async function onConfirmSaveWithoutGlobal() {
+    const saved = await onSave({ allowWithoutGlobal: true })
+    if (saved) setSaveWithoutGlobalConfirmOpen(false)
+  }
+
+  function resetToNewAssessmentDraft() {
+    setGlobalVersionCode("")
+    setCurrentVersionCode("")
+    setVersionOptions([])
+    setProjectName("")
+    setSelectedPresetMode("")
+    setSelectedCloudNames([])
+    setCustomModeByCloud({})
+    setForm((prev) => ({
+      ...prev,
+      productLines: [],
+      userCount: 0,
+      difficultyFactor: 0,
+      orgCount: 1,
+      orgSimilarityFactor: 0,
+    }))
+    if (templateDetail?.items?.length) {
+      const nextSelection: Record<string, ItemSelectionState> = {}
+      for (const item of templateDetail.items) {
+        nextSelection[item.templateItemId] = {
+          included: false,
+          customStandardDays: toInteger(Number(item.standardDays || 0)),
+        }
+      }
+      setItemSelection(nextSelection)
+    } else {
+      setItemSelection({})
+    }
+    setMultiOrgRows([createEmptyMultiOrgRow()])
+    setServerResult(null)
+    setError("")
+    setDirty(false)
+    setHasLocalChanges(false)
+    dirtyEnabled.current = true
+  }
+
+  function onCreateNewAssessment() {
+    if (savePhase !== "idle") return
+    const isCheckedOut = selectedVersionRecord?.checkoutStatus === "checked_out"
+    if (isCheckedOut && hasLocalChanges) {
+      setCreateNewConfirmOpen(true)
+      return
+    }
+    resetToNewAssessmentDraft()
+    showGlobalNotice("已进入新建实施评估")
+  }
+
+  async function onSaveAndCreateNew() {
+    if (createNewSubmitting) return
+    setCreateNewSubmitting(true)
+    try {
+      const saved = await onSave({ allowWithoutGlobal: true })
+      if (!saved) return
+      setCreateNewConfirmOpen(false)
+      resetToNewAssessmentDraft()
+      showGlobalNotice("已保存并新建实施评估")
+    } finally {
+      setCreateNewSubmitting(false)
     }
   }
 
@@ -812,9 +1217,12 @@ export default function AssessmentPage() {
       } else {
         setProjectName("")
       }
+      const productLinesFromForm = normalizeProductLines(payloadForm.productLines)
+      const productLinesFromPayload = normalizeProductLines((payload as { productLines?: unknown }).productLines)
       setForm((prev) => ({
         templateId: nextTemplateId || prev.templateId,
         ruleSetId: String(payloadForm.ruleSetId || prev.ruleSetId),
+        productLines: productLinesFromForm.length ? productLinesFromForm : productLinesFromPayload,
         userCount: Number(payloadForm.userCount || prev.userCount),
         difficultyFactor: Number(payloadForm.difficultyFactor || prev.difficultyFactor),
         orgCount: Number(payloadForm.orgCount || prev.orgCount),
@@ -846,21 +1254,35 @@ export default function AssessmentPage() {
         setCustomModeByCloud({})
       }
       const selectionPayload = Array.isArray(payload.itemSelection)
-        ? (payload.itemSelection as Array<{ templateItemId: string; included: boolean; customStandardDays?: number }>)
+        ? (payload.itemSelection as Array<{
+            templateItemId: string
+            included: boolean
+            customStandardDays?: number
+            customAdjustReason?: string
+            customAdjustReasonStatus?: "pending" | "saved"
+          }>)
         : []
       const nextSelection: Record<string, ItemSelectionState> = {}
       for (const row of selectionPayload) {
         nextSelection[row.templateItemId] = {
           included: Boolean(row.included),
           customStandardDays: Number(row.customStandardDays || 0),
+          customAdjustReason: String(row.customAdjustReason || "").trim() || undefined,
+          customAdjustReasonStatus:
+            row.customAdjustReasonStatus === "pending" || row.customAdjustReasonStatus === "saved"
+              ? row.customAdjustReasonStatus
+              : row.customAdjustReason
+                ? "saved"
+                : undefined,
         }
       }
       if (Object.keys(nextSelection).length) setItemSelection(nextSelection)
       const nextMultiOrg = Array.isArray(payload.multiOrgRows) ? (payload.multiOrgRows as MultiOrgRow[]) : []
       setMultiOrgRows(nextMultiOrg.length ? nextMultiOrg : [createEmptyMultiOrgRow()])
       setServerResult((payload.serverResult as EstimateResult) || null)
-      showGlobalNotice(`已回读版本：${code}`)
+      toast(`已回读版本：${code}`, { id: ASSESSMENT_VERSION_LOAD_TOAST_ID })
       setDirty(false)
+      setHasLocalChanges(false)
       setTimeout(() => { dirtyEnabled.current = true }, 0)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "回读失败"
@@ -885,6 +1307,7 @@ export default function AssessmentPage() {
       setVersionHistoryOpen(false)
       showGlobalNotice(`已按历史快照创建新版：${created.versionCode}（来源：${source.versionCode}）`)
       setDirty(false)
+      setHasLocalChanges(false)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "创建失败"
       setError(msg)
@@ -949,6 +1372,7 @@ export default function AssessmentPage() {
       showGlobalWarning("模板或规则集未就绪")
       return
     }
+    if (!ensureDependencyValidationPassed()) return
     setExporting(true)
     setError("")
     try {
@@ -960,7 +1384,11 @@ export default function AssessmentPage() {
       })
       setExportInfo(result)
       if (result.downloadUrl) {
-        window.open(result.downloadUrl, "_blank", "noopener,noreferrer")
+        const safeProjectName = (projectName.trim() || "未命名项目").replace(/[\/\\?%*:|"<>]/g, "-")
+        const fallbackName = `assessment-${safeProjectName}-${currentVersionCode || Date.now()}.${
+          type === "excel" ? "xlsx" : "pdf"
+        }`
+        await downloadOwnedExportFile(result.downloadUrl, fallbackName)
       }
       await loadHistory(true)
       showGlobalNotice(`已导出${type === "excel" ? "Excel" : "PDF"}：${formatDays(result.totalDays)} 人天`)
@@ -989,6 +1417,14 @@ export default function AssessmentPage() {
     }
   }
 
+  async function onDownloadExport(downloadUrl: string, fileName?: string) {
+    try {
+      await downloadOwnedExportFile(downloadUrl, fileName)
+    } catch (err) {
+      showGlobalWarning(err instanceof Error ? err.message : "下载失败")
+    }
+  }
+
   const templateDisplayName = templateOptions.find((x) => x.templateId === form.templateId)?.templateName || "未选择模板"
   const cloudSummaryText =
     selectedCloudNames.length === 0
@@ -1004,6 +1440,15 @@ export default function AssessmentPage() {
       breadcrumbs={[{ label: "实施评估" }]}
     >
       <div className="max-w-full min-w-0 space-y-6 overflow-x-hidden">
+      {initLoading ? (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs text-foreground"
+        >
+          <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
+          <span>正在加载模板、版本与规则…若长时间停留在此，请确认已启动 API（端口 3000）并尝试强制刷新（Ctrl+Shift+R / Cmd+Shift+R）。</span>
+        </div>
+      ) : null}
       <Card
         className={
           (paramCardCollapsed
@@ -1077,15 +1522,12 @@ export default function AssessmentPage() {
                     disabled={initLoading || !versionOptions.length}
                     onChange={(e) => void onLoadVersion(e.target.value, dashboardPlans)}
                   >
-                    {!versionOptions.length ? (
-                      <option value="">尚无版本，请先保存</option>
-                    ) : (
-                      versionOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))
-                    )}
+                    <option value="">{!versionOptions.length ? "尚无版本，请先保存" : "未选择版本"}</option>
+                    {versionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-0.5">
@@ -1153,6 +1595,11 @@ export default function AssessmentPage() {
                     type="number"
                     min={0}
                     value={form.userCount}
+                    onFocus={(event) => {
+                      if (Number(event.currentTarget.value || 0) === 0) {
+                        event.currentTarget.select()
+                      }
+                    }}
                     onChange={(e) => setForm((s) => ({ ...s, userCount: Number(e.target.value || 0) }))}
                     placeholder="用户数"
                   />
@@ -1193,10 +1640,72 @@ export default function AssessmentPage() {
                     placeholder="组织相似度"
                   />
                 </div>
+                <div className="space-y-0.5 sm:col-span-2">
+                  <p className="text-[11px] leading-tight text-muted-foreground">产品线</p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="min-h-8 w-full rounded-md border border-border/70 bg-background px-2 py-1.5 text-left"
+                      >
+                        {form.productLines.length ? (
+                          <span className="flex flex-wrap gap-1">
+                            {form.productLines.map((line) => (
+                              <Badge
+                                key={line}
+                                variant="outline"
+                                className={cn(
+                                  "rounded-full px-3 py-0.5 text-xs font-medium leading-5",
+                                  PRODUCT_LINE_BADGE_STYLE_MAP[line] || "border-border/70 bg-background text-foreground",
+                                )}
+                              >
+                                {line}
+                              </Badge>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">请选择产品线（可多选）</span>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-80 p-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {PRODUCT_LINE_OPTIONS.map((line) => {
+                          const active = form.productLines.includes(line)
+                          return (
+                            <button
+                              key={line}
+                              type="button"
+                              className={cn(
+                                "inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-medium transition-colors",
+                                active
+                                  ? PRODUCT_LINE_BADGE_STYLE_MAP[line]
+                                  : "border-border/70 bg-background text-muted-foreground hover:text-foreground",
+                              )}
+                              onClick={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  productLines: prev.productLines.includes(line)
+                                    ? prev.productLines.filter((x) => x !== line)
+                                    : [...prev.productLines, line],
+                                }))
+                              }
+                            >
+                              {line}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <Button className="rounded-lg" size="sm" variant="outline" onClick={() => void onCreateNewAssessment()} disabled={savePhase !== "idle" || createNewSubmitting}>
+              新建
+            </Button>
             <Button className="rounded-lg" size="sm" onClick={() => void onSave()} disabled={savePhase !== "idle"}>
               {savePhase === "validating" ? "校验中..." : savePhase === "saving" ? "保存中..." : "保存版本"}
             </Button>
@@ -1215,7 +1724,7 @@ export default function AssessmentPage() {
               }
               onVersionHistory={() => setVersionHistoryOpen(true)}
               onCheckout={() => void onCheckout()}
-              onCheckin={() => void onCheckin()}
+              onCheckin={(checkinNote) => void onCheckin(checkinNote)}
               onUndoCheckout={() => void onUndoCheckout()}
               onPromote={() => void onPromote()}
               onForceUnlock={() => void onForceUnlock()}
@@ -1230,6 +1739,11 @@ export default function AssessmentPage() {
             <Button className="rounded-lg" size="sm" variant="outline" onClick={() => void onExport("pdf")} disabled={exporting || savePhase !== "idle"}>
               {exporting ? "导出中..." : "导出 PDF"}
             </Button>
+            {dependencyIssues.length > 0 ? (
+              <span className="text-xs text-amber-600">
+                检测到 {dependencyIssues.length} 条 SKU 依赖风险，请先补齐依赖后再校验/保存/导出。
+              </span>
+            ) : null}
             {error ? <span className="text-xs text-destructive">{error}</span> : null}
           </div>
           {isReadonly ? (
@@ -1451,31 +1965,29 @@ export default function AssessmentPage() {
                 const selectedSkuText =
                   selectedSkuNames.length === 0
                     ? "未选SKU"
-                    : selectedSkuNames.length <= 2
-                      ? selectedSkuNames.join("、")
-                      : `${selectedSkuNames.slice(0, 2).join("、")} 等 ${selectedSkuNames.length} 个`
+                    : selectedSkuNames.join("、")
                 return (
                   <Card
                     key={cloudName}
-                    className="gap-3 rounded-xl border border-border/60 py-4"
+                    className="gap-3 rounded-xl border border-border/60 py-4 data-[collapsed=true]:gap-1.5 data-[collapsed=true]:py-1.5"
                     collapsedSummary={
-                      <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap text-[12px] leading-5 text-muted-foreground">
                         <span className="font-medium text-foreground">{cloudName}</span>
                         <span>|</span>
                         <span>
-                          已选模块 <span className="font-semibold text-foreground">{selectedModuleCount}</span>
+                          已选模块 <span className={COLLAPSED_KEY_TEXT_CLASS}>{selectedModuleCount}</span>
                         </span>
                         <span>|</span>
                         <span>
-                          已选条目 <span className="font-semibold text-foreground">{includedCount}</span> / {flat.length}
+                          已选条目 <span className={COLLAPSED_KEY_TEXT_CLASS}>{includedCount}</span> / {flat.length}
                         </span>
                         <span>|</span>
                         <span>
-                          累计人天 <span className="font-semibold text-primary">{formatDays(totalDays)}</span>
+                          累计人天 <span className={COLLAPSED_KEY_TEXT_CLASS}>{formatDays(totalDays)}</span>
                         </span>
                         <span>|</span>
                         <span>
-                          已选SKU <span className="font-semibold text-foreground">{selectedSkuText}</span>
+                          已选SKU <span className={COLLAPSED_KEY_TEXT_CLASS}>{selectedSkuText}</span>
                         </span>
                       </div>
                     }
@@ -1496,7 +2008,24 @@ export default function AssessmentPage() {
                             disabled={isReadonly}
                             onClick={(e) => {
                               e.stopPropagation()
-                              setCustomModeByCloud((prev) => ({ ...prev, [cloudName]: !prev[cloudName] }))
+                              const willEnable = !cloudCustom
+                              setCustomModeByCloud((prev) => ({ ...prev, [cloudName]: willEnable }))
+                              if (willEnable) {
+                                // 开启自定义人天时，默认按标准人天回填（整数），便于按 +/- 整数调整
+                                setItemSelection((prev) => {
+                                  const next = { ...prev }
+                                  for (const item of flat) {
+                                    const cur = next[item.templateItemId]
+                                    next[item.templateItemId] = {
+                                      included: Boolean(cur?.included),
+                                      customStandardDays: toInteger(Number(item.standardDays || 0)),
+                                      customAdjustReason: cur?.customAdjustReason,
+                                      customAdjustReasonStatus: cur?.customAdjustReasonStatus,
+                                    }
+                                  }
+                                  return next
+                                })
+                              }
                             }}
                           >
                             {cloudCustom ? "取消自定义人天" : "自定义人天"}
@@ -1547,7 +2076,7 @@ export default function AssessmentPage() {
                             <col className="w-24" />
                             {cloudCustom ? <col className="w-36" /> : null}
                           </colgroup>
-                          <TableHeader className="[&_th]:bg-accent/12 dark:[&_th]:bg-accent/20 [&_th]:text-foreground">
+                          <TableHeader>
                             <TableRow className="hover:bg-transparent">
                               <TableHead className="border-r border-border/40 whitespace-normal">SKU</TableHead>
                               <TableHead className={cn("min-w-0 whitespace-normal", ASSESS_TABLE_COL_BORDER)}>
@@ -1602,6 +2131,8 @@ export default function AssessmentPage() {
                                           customStandardDays: Number(
                                             cur?.customStandardDays ?? item.standardDays,
                                           ),
+                                          customAdjustReason: cur?.customAdjustReason,
+                                          customAdjustReasonStatus: cur?.customAdjustReasonStatus,
                                         },
                                       }
                                     })
@@ -1680,7 +2211,7 @@ export default function AssessmentPage() {
                                       </TableCell>
                                       <TableCell
                                         className={cn(
-                                          "align-top text-left whitespace-nowrap tabular-nums",
+                                          "align-middle text-center whitespace-nowrap tabular-nums",
                                           standardDaysCellClass,
                                           ASSESS_TABLE_COL_BORDER,
                                         )}
@@ -1689,26 +2220,226 @@ export default function AssessmentPage() {
                                       </TableCell>
                                       {cloudCustom ? (
                                         <TableCell
-                                          className={cn("align-top", ASSESS_TABLE_COL_BORDER)}
+                                          className={cn("align-middle text-center", ASSESS_TABLE_COL_BORDER)}
                                           onClick={(e) => e.stopPropagation()}
                                         >
-                                          <Input
-                                            type="number"
-                                            min={0}
-                                            step="0.1"
-                                            value={Number(
-                                              itemSelection[item.templateItemId]?.customStandardDays ?? item.standardDays,
-                                            )}
-                                            onChange={(e) =>
-                                              setItemSelection((prev) => ({
-                                                ...prev,
-                                                [item.templateItemId]: {
-                                                  included: Boolean(prev[item.templateItemId]?.included),
-                                                  customStandardDays: Number(e.target.value || 0),
-                                                },
-                                              }))
-                                            }
-                                          />
+                                          <div className="mx-auto inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-2 py-1.5">
+                                            {(() => {
+                                              const standardDaysBase = toInteger(Number(item.standardDays || 0))
+                                              const customDaysCurrent = Number(
+                                                itemSelection[item.templateItemId]?.customStandardDays ??
+                                                  item.standardDays ??
+                                                  0,
+                                              )
+                                              const reasonStatus =
+                                                itemSelection[item.templateItemId]?.customAdjustReasonStatus
+                                              const reasonPreview =
+                                                String(
+                                                  itemSelection[item.templateItemId]?.customAdjustReason || "",
+                                                ).trim() || "暂未填写调整原因"
+                                              const dotSide =
+                                                customDaysCurrent > standardDaysBase
+                                                  ? "plus"
+                                                  : customDaysCurrent < standardDaysBase
+                                                    ? "minus"
+                                                    : null
+                                              return (
+                                                <>
+                                            <span className="min-w-0 truncate text-sm tabular-nums">
+                                              {formatDays(
+                                                customDaysCurrent,
+                                              )}
+                                            </span>
+                                            <Popover
+                                              open={customAdjustReasonEditor?.itemId === item.templateItemId}
+                                              onOpenChange={(open) => {
+                                                if (open) return
+                                                if (customAdjustReasonEditor?.itemId !== item.templateItemId) return
+                                                const reason = customAdjustReasonEditor.draft.trim()
+                                                if (reason.length < 2) {
+                                                  showGlobalWarning("调整原因不能少于2个字")
+                                                  return
+                                                }
+                                                setItemSelection((prev) => {
+                                                  const cur = prev[item.templateItemId]
+                                                  const nextCustom = Number(
+                                                    cur?.customStandardDays ?? item.standardDays ?? 0,
+                                                  )
+                                                  const nextStatus =
+                                                    nextCustom === standardDaysBase ? undefined : "saved"
+                                                  return {
+                                                    ...prev,
+                                                    [item.templateItemId]: {
+                                                      included: Boolean(cur?.included),
+                                                      customStandardDays: nextCustom,
+                                                      customAdjustReason:
+                                                        nextCustom === standardDaysBase
+                                                          ? undefined
+                                                          : reason || undefined,
+                                                      customAdjustReasonStatus: nextStatus,
+                                                    },
+                                                  }
+                                                })
+                                                setCustomAdjustReasonEditor(null)
+                                              }}
+                                            >
+                                              <div className="flex items-center gap-1">
+                                                <div className="relative">
+                                                  <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-6 w-6 rounded-md px-0"
+                                                    disabled={isReadonly}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      setItemSelection((prev) => {
+                                                        const cur = prev[item.templateItemId]
+                                                        const base = Number(cur?.customStandardDays ?? item.standardDays ?? 0)
+                                                        const nextCustom = Math.max(0, toInteger(base) - 1)
+                                                        const nextStatus =
+                                                          nextCustom === standardDaysBase ? undefined : "pending"
+                                                        return {
+                                                          ...prev,
+                                                          [item.templateItemId]: {
+                                                            included: Boolean(cur?.included),
+                                                            customStandardDays: nextCustom,
+                                                            customAdjustReason:
+                                                              nextCustom === standardDaysBase
+                                                                ? undefined
+                                                                : cur?.customAdjustReason,
+                                                            customAdjustReasonStatus: nextStatus,
+                                                          },
+                                                        }
+                                                      })
+                                                    }}
+                                                  >
+                                                    -
+                                                  </Button>
+                                                  {reasonStatus && dotSide === "minus" ? (
+                                                    <Tooltip delayDuration={2000}>
+                                                      <PopoverAnchor asChild>
+                                                        <TooltipTrigger asChild>
+                                                          <button
+                                                            type="button"
+                                                            className={cn(
+                                                              "absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full ring-2 ring-background transition-all duration-200 ease-out hover:scale-125 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.18)] focus-visible:scale-125 focus-visible:shadow-[0_0_0_3px_rgba(16,185,129,0.22)]",
+                                                              reasonStatus === "saved"
+                                                                ? "bg-emerald-500"
+                                                                : "bg-red-500",
+                                                            )}
+                                                            aria-label="维护调整原因"
+                                                            onClick={(e) => {
+                                                              e.stopPropagation()
+                                                              setCustomAdjustReasonEditor({
+                                                                itemId: item.templateItemId,
+                                                                draft:
+                                                                  itemSelection[item.templateItemId]
+                                                                    ?.customAdjustReason || "",
+                                                              })
+                                                            }}
+                                                          />
+                                                        </TooltipTrigger>
+                                                      </PopoverAnchor>
+                                                      <TooltipContent side="top" sideOffset={6}>
+                                                        {reasonPreview}
+                                                      </TooltipContent>
+                                                    </Tooltip>
+                                                  ) : null}
+                                                </div>
+                                                <div className="relative">
+                                                  <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-6 w-6 rounded-md px-0"
+                                                    disabled={isReadonly}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      setItemSelection((prev) => {
+                                                        const cur = prev[item.templateItemId]
+                                                        const base = Number(cur?.customStandardDays ?? item.standardDays ?? 0)
+                                                        const nextCustom = toInteger(base) + 1
+                                                        const nextStatus =
+                                                          nextCustom === standardDaysBase ? undefined : "pending"
+                                                        return {
+                                                          ...prev,
+                                                          [item.templateItemId]: {
+                                                            included: Boolean(cur?.included),
+                                                            customStandardDays: nextCustom,
+                                                            customAdjustReason:
+                                                              nextCustom === standardDaysBase
+                                                                ? undefined
+                                                                : cur?.customAdjustReason,
+                                                            customAdjustReasonStatus: nextStatus,
+                                                          },
+                                                        }
+                                                      })
+                                                    }}
+                                                  >
+                                                    +
+                                                  </Button>
+                                                  {reasonStatus && dotSide === "plus" ? (
+                                                    <Tooltip delayDuration={2000}>
+                                                      <PopoverAnchor asChild>
+                                                        <TooltipTrigger asChild>
+                                                          <button
+                                                            type="button"
+                                                            className={cn(
+                                                              "absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full ring-2 ring-background transition-all duration-200 ease-out hover:scale-125 hover:shadow-[0_0_0_3px_rgba(16,185,129,0.18)] focus-visible:scale-125 focus-visible:shadow-[0_0_0_3px_rgba(16,185,129,0.22)]",
+                                                              reasonStatus === "saved"
+                                                                ? "bg-emerald-500"
+                                                                : "bg-red-500",
+                                                            )}
+                                                            aria-label="维护调整原因"
+                                                            onClick={(e) => {
+                                                              e.stopPropagation()
+                                                              setCustomAdjustReasonEditor({
+                                                                itemId: item.templateItemId,
+                                                                draft:
+                                                                  itemSelection[item.templateItemId]
+                                                                    ?.customAdjustReason || "",
+                                                              })
+                                                            }}
+                                                          />
+                                                        </TooltipTrigger>
+                                                      </PopoverAnchor>
+                                                      <TooltipContent side="top" sideOffset={6}>
+                                                        {reasonPreview}
+                                                      </TooltipContent>
+                                                    </Tooltip>
+                                                  ) : null}
+                                                </div>
+                                              </div>
+                                              <PopoverContent
+                                                side="top"
+                                                align="end"
+                                                className="w-64 space-y-2 rounded-xl p-3"
+                                                onOpenAutoFocus={(event) => event.preventDefault()}
+                                              >
+                                                <p className="text-xs font-medium text-foreground">调整原因</p>
+                                                <Input
+                                                  value={
+                                                    customAdjustReasonEditor?.itemId === item.templateItemId
+                                                      ? customAdjustReasonEditor.draft
+                                                      : ""
+                                                  }
+                                                  placeholder="请填写本次调增/调减原因"
+                                                  maxLength={120}
+                                                  onChange={(event) => {
+                                                    setCustomAdjustReasonEditor((prev) =>
+                                                      prev && prev.itemId === item.templateItemId
+                                                        ? { ...prev, draft: event.target.value }
+                                                        : prev,
+                                                    )
+                                                  }}
+                                                />
+                                              </PopoverContent>
+                                            </Popover>
+                                                </>
+                                              )
+                                            })()}
+                                          </div>
                                         </TableCell>
                                       ) : null}
                                     </TableRow>
@@ -1878,7 +2609,7 @@ export default function AssessmentPage() {
                       <Button size="sm" variant="outline" onClick={() => void onCopyExportLink(item.downloadUrl)}>
                         复制链接
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => window.open(item.downloadUrl, "_blank", "noopener,noreferrer")}>
+                      <Button size="sm" variant="outline" onClick={() => void onDownloadExport(item.downloadUrl, item.fileName)}>
                         下载
                       </Button>
                     </div>
@@ -1900,12 +2631,57 @@ export default function AssessmentPage() {
       </Card>
       </fieldset>
       </div>
+      <AlertDialog open={createNewConfirmOpen} onOpenChange={setCreateNewConfirmOpen}>
+        <AlertDialogContent className="sm:max-w-lg rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>检测到未保存修改</AlertDialogTitle>
+            <AlertDialogDescription>
+              当前版本处于已检出状态，且存在未保存修改。请先保存当前修改，再进入新建空白界面。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={createNewSubmitting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={createNewSubmitting || savePhase !== "idle"}
+              onClick={(event) => {
+                event.preventDefault()
+                void onSaveAndCreateNew()
+              }}
+            >
+              {createNewSubmitting ? "处理中..." : "保存并新建"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={saveWithoutGlobalConfirmOpen} onOpenChange={setSaveWithoutGlobalConfirmOpen}>
+        <AlertDialogContent className="sm:max-w-lg rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>未关联总方案版本号</AlertDialogTitle>
+            <AlertDialogDescription>
+              当前【实施评估】未关联总方案版本号，本次评估将独立保存为一个实施评估版本，确定继续吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savePhase !== "idle"}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={savePhase !== "idle"}
+              onClick={(event) => {
+                event.preventDefault()
+                void onConfirmSaveWithoutGlobal()
+              }}
+            >
+              {savePhase === "validating" ? "校验中..." : savePhase === "saving" ? "保存中..." : "确定继续"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <VersionHistoryDialog
         open={versionHistoryOpen}
         onOpenChange={setVersionHistoryOpen}
         title="实施评估版本历史"
         description="按更新时间由新到旧排列，含已归档版本。主界面仅可选当前生效版本；回退历史内容请选中行后使用「按历史版本创建新版」。"
         rows={recordsToVersionHistoryRows(versionRecords)}
+        showProjectNameColumn
         highlightVersionCode={currentVersionCode.trim() || undefined}
         latestRecordId={latestAssessmentRecord?.id}
         onCreateFromHistory={(r) => void onCreateAssessmentVersionFromHistory(r)}

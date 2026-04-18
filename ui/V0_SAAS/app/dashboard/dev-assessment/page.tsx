@@ -24,6 +24,7 @@ import {
 } from "@/lib/workload-service"
 import type { PlanRow } from "@/lib/workload-types"
 import { toast } from "sonner"
+import { createClientRowId } from "@/lib/utils"
 
 type DevRow = {
   id: string
@@ -36,7 +37,7 @@ type DevRow = {
 
 function createEmptyDevRow(): DevRow {
   return {
-    id: crypto.randomUUID(),
+    id: createClientRowId(),
     moduleName: "",
     devType: "功能开发",
     functionDesc: "",
@@ -178,7 +179,7 @@ export default function DevAssessmentPage() {
     if (nextSelected) setCurrentVersionCode(nextSelected)
   }
 
-  function currentPayload() {
+  function currentPayload(checkinNote?: string) {
     return {
       globalVersionCode,
       projectName: projectName.trim(),
@@ -186,6 +187,7 @@ export default function DevAssessmentPage() {
       evaluator,
       evaluateDate,
       rows,
+      ...(checkinNote ? { checkinNote } : {}),
     }
   }
 
@@ -204,10 +206,10 @@ export default function DevAssessmentPage() {
     }
   }
 
-  async function onCheckin() {
+  async function onCheckin(checkinNote: string) {
     if (!selectedVersionRecord) return
     try {
-      const data = await checkinVersionById(selectedVersionRecord.id, currentPayload())
+      const data = await checkinVersionById(selectedVersionRecord.id, currentPayload(checkinNote))
       await reloadVersions(data.versionCode || selectedVersionRecord.versionCode)
       showGlobalNotice(`检入成功：${data.versionCode}`)
       setDirty(false)
@@ -285,7 +287,7 @@ export default function DevAssessmentPage() {
       setEvaluator((payload.evaluator as string) || "")
       setEvaluateDate((payload.evaluateDate as string) || new Date().toISOString().slice(0, 10))
       const nextRows = (Array.isArray(payload.rows) ? payload.rows : []) as DevRow[]
-      setRows(nextRows.length ? nextRows.map((x) => ({ ...x, id: x.id || crypto.randomUUID(), codingDays: Number(x.codingDays || 0) })) : [createEmptyDevRow()])
+      setRows(nextRows.length ? nextRows.map((x) => ({ ...x, id: x.id || createClientRowId(), codingDays: Number(x.codingDays || 0) })) : [createEmptyDevRow()])
       showGlobalNotice(`已回读版本：${code}`)
       setDirty(false)
     } catch (err) {
@@ -436,7 +438,7 @@ export default function DevAssessmentPage() {
               }
               onVersionHistory={() => setVersionHistoryOpen(true)}
               onCheckout={() => void onCheckout()}
-              onCheckin={() => void onCheckin()}
+              onCheckin={(checkinNote) => void onCheckin(checkinNote)}
               onUndoCheckout={() => void onUndoCheckout()}
               onPromote={() => void onPromote()}
               onForceUnlock={() => void onForceUnlock()}

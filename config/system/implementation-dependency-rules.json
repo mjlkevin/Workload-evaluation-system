@@ -1,0 +1,799 @@
+{
+  "version": 1,
+  "draft": {
+    "schemaVersion": "1.0.0",
+    "source": "01_需求管理/原始需求/实施评估RR/依赖管理/depent.md",
+    "updatedFrom": "2026-04-10",
+    "mutualExclusionRules": [],
+    "rules": [
+      {
+        "id": "dep-rd-doc-read",
+        "subject": "研发文档查阅",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用研发文档查阅场景",
+        "dependencies": [
+          "研发文档管理",
+          "研发物料管理"
+        ],
+        "note": "未购买任一依赖时不可使用该功能",
+        "enabled": true
+      },
+      {
+        "id": "dep-project-accounting",
+        "subject": "项目会计",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "使用项目余额表、项目明细账",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "总账",
+            "基础财务包"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-receivable-cashier",
+        "subject": "应收款管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用收款单、付款单场景",
+        "dependencies": [
+          "出纳管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-payable-cashier",
+        "subject": "应付款管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用收款单、付款单场景",
+        "dependencies": [
+          "出纳管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-budget-mrp",
+        "subject": "预算管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用预算MRP功能",
+        "dependencies": [
+          "物料需求计划"
+        ],
+        "note": "含费用预算应用",
+        "enabled": true
+      },
+      {
+        "id": "dep-sales-contract",
+        "subject": "销售管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用销售合同场景",
+        "dependencies": [
+          "合同管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-rolling-sales",
+        "subject": "滚动销售管理",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "支持寄售",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "销售管理",
+            "基础供应链包"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-purchase-contract",
+        "subject": "采购管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用采购合同场景",
+        "dependencies": [
+          "合同管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-rolling-purchase",
+        "subject": "滚动采购管理",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "支持VMI",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "VMI采购",
+            "基础供应链包"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-contract-ocr",
+        "subject": "合同管理",
+        "scope": "feature",
+        "logic": "requires_all",
+        "trigger": "使用文本比对功能",
+        "dependencies": [
+          "视觉识别服务 流量版"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-rolling-prod-plan",
+        "subject": "滚动生产计划",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用计划订单作为生产线需求源",
+        "dependencies": [
+          "物料需求计划"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-quality-inspection",
+        "subject": "质量检验",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "采购/库存/销售检验场景",
+        "dependencies": [
+          "生产管理"
+        ],
+        "anyOfGroups": [
+          [
+            "采购管理",
+            "基础供应链包"
+          ],
+          [
+            "库存管理",
+            "基础供应链包"
+          ],
+          [
+            "销售管理",
+            "基础供应链包"
+          ]
+        ],
+        "note": "生产检验单独依赖生产管理",
+        "enabled": true
+      },
+      {
+        "id": "dep-project-cost",
+        "subject": "项目成本",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "核算到WBS任务/阶段成本",
+        "dependencies": [
+          "项目管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-rental-assets",
+        "subject": "租赁资产",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "从租赁资产发起租金支付",
+        "dependencies": [
+          "对公费用"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-sim-quote",
+        "subject": "模拟报价",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "从工程数据管理获取BOM",
+        "dependencies": [
+          "工程数据管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-simple-production",
+        "subject": "简单生产",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "根据BOM生成简单生产领料单据",
+        "dependencies": [
+          "工程数据管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-design-change",
+        "subject": "设计变更管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用研发文档/研发物料/产品BOM变更场景",
+        "dependencies": [
+          "研发文档管理",
+          "研发物料管理",
+          "产品BOM管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-tax-direct-connect",
+        "subject": "税务直连报税",
+        "scope": "scenario",
+        "logic": "combo",
+        "trigger": "直连税局报税场景",
+        "dependencies": [
+          "税企直连"
+        ],
+        "comboDependencies": [
+          "ISV伙伴直连通道接口"
+        ],
+        "note": "适用于增值税/企业所得税/财产和行为税/其他税费/税务报表报告",
+        "enabled": true
+      },
+      {
+        "id": "dep-tax-workbench",
+        "subject": "报税工作台",
+        "scope": "scenario",
+        "logic": "combo",
+        "trigger": "批量直连报税场景",
+        "dependencies": [
+          "税企直连",
+          "ISV伙伴直连通道接口"
+        ],
+        "comboDependencies": [
+          "增值税",
+          "企业所得税",
+          "财产和行为税",
+          "其他税费",
+          "税务报表报告"
+        ],
+        "note": "税种应用至少选择一项",
+        "enabled": true
+      },
+      {
+        "id": "dep-tax-analytics",
+        "subject": "税务统计分析",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "统计税金场景",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "增值税",
+            "企业所得税",
+            "财产和行为税",
+            "其他税费"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-contract-center",
+        "subject": "合同中心(CM)",
+        "scope": "feature",
+        "logic": "requires_all",
+        "trigger": "使用合同电子归档",
+        "dependencies": [
+          "电子档案管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-earchive-ocr",
+        "subject": "电子档案管理",
+        "scope": "feature",
+        "logic": "requires_all",
+        "trigger": "银行回单离线采集识别",
+        "dependencies": [
+          "视觉识别服务-流量版"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-mobile-sales",
+        "subject": "移动销售",
+        "scope": "feature",
+        "logic": "requires_any",
+        "trigger": "实时回填客户企业信息",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "企业工商信息查询",
+            "企业工商信息查询（包年）"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-mobile-quality",
+        "subject": "移动质检",
+        "scope": "feature",
+        "logic": "requires_all",
+        "trigger": "启用条码管理场景",
+        "dependencies": [
+          "条码管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-enterprise-bigscreen",
+        "subject": "企业智能决策大屏",
+        "scope": "data_source",
+        "logic": "requires_all",
+        "trigger": "使用企业智能决策大屏",
+        "dependencies": [
+          "销售管理",
+          "采购管理",
+          "库存管理",
+          "生产管理",
+          "存货核算",
+          "应收款管理",
+          "总账"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-finance-bigscreen",
+        "subject": "财务智能决策大屏",
+        "scope": "data_source",
+        "logic": "requires_all",
+        "trigger": "使用财务智能决策大屏",
+        "dependencies": [
+          "总账",
+          "出纳管理",
+          "存货核算"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-scm-bigscreen",
+        "subject": "供应链智能决策大屏",
+        "scope": "data_source",
+        "logic": "requires_all",
+        "trigger": "使用供应链智能决策大屏",
+        "dependencies": [
+          "销售管理",
+          "采购管理",
+          "库存管理",
+          "存货核算"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-online-banking",
+        "subject": "网上银行",
+        "scope": "scenario",
+        "logic": "combo",
+        "trigger": "银企付款/流水/回单场景",
+        "dependencies": [
+          "查询与支付接口"
+        ],
+        "comboDependencies": [
+          "电子回单接口"
+        ],
+        "note": "付款与流水依赖查询与支付接口；电子回单依赖电子回单接口",
+        "enabled": true
+      },
+      {
+        "id": "dep-cashier-ticket",
+        "subject": "出纳管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "结算方式使用票据业务",
+        "dependencies": [
+          "票据管理"
+        ],
+        "enabled": true
+      }
+    ]
+  },
+  "active": {
+    "schemaVersion": "1.0.0",
+    "source": "01_需求管理/原始需求/实施评估RR/依赖管理/depent.md",
+    "updatedFrom": "2026-04-10",
+    "mutualExclusionRules": [],
+    "rules": [
+      {
+        "id": "dep-rd-doc-read",
+        "subject": "研发文档查阅",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用研发文档查阅场景",
+        "dependencies": [
+          "研发文档管理",
+          "研发物料管理"
+        ],
+        "note": "未购买任一依赖时不可使用该功能",
+        "enabled": true
+      },
+      {
+        "id": "dep-project-accounting",
+        "subject": "项目会计",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "使用项目余额表、项目明细账",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "总账",
+            "基础财务包"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-receivable-cashier",
+        "subject": "应收款管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用收款单、付款单场景",
+        "dependencies": [
+          "出纳管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-payable-cashier",
+        "subject": "应付款管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用收款单、付款单场景",
+        "dependencies": [
+          "出纳管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-budget-mrp",
+        "subject": "预算管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用预算MRP功能",
+        "dependencies": [
+          "物料需求计划"
+        ],
+        "note": "含费用预算应用",
+        "enabled": true
+      },
+      {
+        "id": "dep-sales-contract",
+        "subject": "销售管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用销售合同场景",
+        "dependencies": [
+          "合同管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-rolling-sales",
+        "subject": "滚动销售管理",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "支持寄售",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "销售管理",
+            "基础供应链包"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-purchase-contract",
+        "subject": "采购管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用采购合同场景",
+        "dependencies": [
+          "合同管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-rolling-purchase",
+        "subject": "滚动采购管理",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "支持VMI",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "VMI采购",
+            "基础供应链包"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-contract-ocr",
+        "subject": "合同管理",
+        "scope": "feature",
+        "logic": "requires_all",
+        "trigger": "使用文本比对功能",
+        "dependencies": [
+          "视觉识别服务 流量版"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-rolling-prod-plan",
+        "subject": "滚动生产计划",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用计划订单作为生产线需求源",
+        "dependencies": [
+          "物料需求计划"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-quality-inspection",
+        "subject": "质量检验",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "采购/库存/销售检验场景",
+        "dependencies": [
+          "生产管理"
+        ],
+        "anyOfGroups": [
+          [
+            "采购管理",
+            "基础供应链包"
+          ],
+          [
+            "库存管理",
+            "基础供应链包"
+          ],
+          [
+            "销售管理",
+            "基础供应链包"
+          ]
+        ],
+        "note": "生产检验单独依赖生产管理",
+        "enabled": true
+      },
+      {
+        "id": "dep-project-cost",
+        "subject": "项目成本",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "核算到WBS任务/阶段成本",
+        "dependencies": [
+          "项目管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-rental-assets",
+        "subject": "租赁资产",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "从租赁资产发起租金支付",
+        "dependencies": [
+          "对公费用"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-sim-quote",
+        "subject": "模拟报价",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "从工程数据管理获取BOM",
+        "dependencies": [
+          "工程数据管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-simple-production",
+        "subject": "简单生产",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "根据BOM生成简单生产领料单据",
+        "dependencies": [
+          "工程数据管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-design-change",
+        "subject": "设计变更管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "使用研发文档/研发物料/产品BOM变更场景",
+        "dependencies": [
+          "研发文档管理",
+          "研发物料管理",
+          "产品BOM管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-tax-direct-connect",
+        "subject": "税务直连报税",
+        "scope": "scenario",
+        "logic": "combo",
+        "trigger": "直连税局报税场景",
+        "dependencies": [
+          "税企直连"
+        ],
+        "comboDependencies": [
+          "ISV伙伴直连通道接口"
+        ],
+        "note": "适用于增值税/企业所得税/财产和行为税/其他税费/税务报表报告",
+        "enabled": true
+      },
+      {
+        "id": "dep-tax-workbench",
+        "subject": "报税工作台",
+        "scope": "scenario",
+        "logic": "combo",
+        "trigger": "批量直连报税场景",
+        "dependencies": [
+          "税企直连",
+          "ISV伙伴直连通道接口"
+        ],
+        "comboDependencies": [
+          "增值税",
+          "企业所得税",
+          "财产和行为税",
+          "其他税费",
+          "税务报表报告"
+        ],
+        "note": "税种应用至少选择一项",
+        "enabled": true
+      },
+      {
+        "id": "dep-tax-analytics",
+        "subject": "税务统计分析",
+        "scope": "scenario",
+        "logic": "requires_any",
+        "trigger": "统计税金场景",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "增值税",
+            "企业所得税",
+            "财产和行为税",
+            "其他税费"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-contract-center",
+        "subject": "合同中心(CM)",
+        "scope": "feature",
+        "logic": "requires_all",
+        "trigger": "使用合同电子归档",
+        "dependencies": [
+          "电子档案管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-earchive-ocr",
+        "subject": "电子档案管理",
+        "scope": "feature",
+        "logic": "requires_all",
+        "trigger": "银行回单离线采集识别",
+        "dependencies": [
+          "视觉识别服务-流量版"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-mobile-sales",
+        "subject": "移动销售",
+        "scope": "feature",
+        "logic": "requires_any",
+        "trigger": "实时回填客户企业信息",
+        "dependencies": [],
+        "anyOfGroups": [
+          [
+            "企业工商信息查询",
+            "企业工商信息查询（包年）"
+          ]
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-mobile-quality",
+        "subject": "移动质检",
+        "scope": "feature",
+        "logic": "requires_all",
+        "trigger": "启用条码管理场景",
+        "dependencies": [
+          "条码管理"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-enterprise-bigscreen",
+        "subject": "企业智能决策大屏",
+        "scope": "data_source",
+        "logic": "requires_all",
+        "trigger": "使用企业智能决策大屏",
+        "dependencies": [
+          "销售管理",
+          "采购管理",
+          "库存管理",
+          "生产管理",
+          "存货核算",
+          "应收款管理",
+          "总账"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-finance-bigscreen",
+        "subject": "财务智能决策大屏",
+        "scope": "data_source",
+        "logic": "requires_all",
+        "trigger": "使用财务智能决策大屏",
+        "dependencies": [
+          "总账",
+          "出纳管理",
+          "存货核算"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-scm-bigscreen",
+        "subject": "供应链智能决策大屏",
+        "scope": "data_source",
+        "logic": "requires_all",
+        "trigger": "使用供应链智能决策大屏",
+        "dependencies": [
+          "销售管理",
+          "采购管理",
+          "库存管理",
+          "存货核算"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "dep-online-banking",
+        "subject": "网上银行",
+        "scope": "scenario",
+        "logic": "combo",
+        "trigger": "银企付款/流水/回单场景",
+        "dependencies": [
+          "查询与支付接口"
+        ],
+        "comboDependencies": [
+          "电子回单接口"
+        ],
+        "note": "付款与流水依赖查询与支付接口；电子回单依赖电子回单接口",
+        "enabled": true
+      },
+      {
+        "id": "dep-cashier-ticket",
+        "subject": "出纳管理",
+        "scope": "scenario",
+        "logic": "requires_all",
+        "trigger": "结算方式使用票据业务",
+        "dependencies": [
+          "票据管理"
+        ],
+        "enabled": true
+      }
+    ]
+  },
+  "updatedAt": "2026-04-10T00:00:00.000Z",
+  "effectiveAt": "2026-04-10T00:00:00.000Z"
+}

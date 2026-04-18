@@ -248,6 +248,8 @@ test("team.usecase: team plan visibility blocks cross-team user", () => {
       updatedAt: now,
       createdByUserId: ownerA,
       createdByUsername: "ownerA",
+      updatedByUserId: ownerA,
+      updatedByUsername: "ownerA",
       checkoutStatus: "checked_in",
       versionDocStatus: "drafting",
       majorLetter: "A",

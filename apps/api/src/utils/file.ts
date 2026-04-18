@@ -81,7 +81,21 @@ export function versionCodeRulesStorePath(): string {
 }
 
 /**
+ * 系统管理-需求模块配置存储路径
+ */
+export function requirementSystemConfigStorePath(): string {
+  return path.resolve(resolveRootDir(), "config/system/requirement-settings.json");
+}
+
+/**
+ * 系统管理-实施评估依赖规则存储路径
+ */
+export function implementationDependencyRulesStorePath(): string {
+  return path.resolve(resolveRootDir(), "config/system/implementation-dependency-rules.json");
+}
+
+/**
  * 原型导出源文件路径
  */
 export const PROTOTYPE_EXPORT_SOURCE_XLSX_RELATIVE_PATH =
-  "01_需求管理/原始需求/金蝶AI星空-实施人天估算-R202602-V1.0（0303版本）.xlsx";
+  "01_需求管理/原始需求/实施评估RR/金蝶AI星空-实施人天估算-R202602-V1.0（0303版本）.xlsx";

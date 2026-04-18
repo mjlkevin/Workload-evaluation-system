@@ -11,6 +11,7 @@ import {
   signAuthToken,
   toPublicUser,
   isAdminUser,
+  canManageUsers,
   requireAuth,
 } from "../../middleware/auth";
 import { loadInviteCodesStore, saveInviteCodesStore } from "./auth.repository";
@@ -115,8 +116,8 @@ export function logout(req: Request, res: Response) {
 export function listUsers(req: Request, res: Response) {
   const auth = requireAuth(req, res);
   if (!auth) return;
-  if (!isAdminUser(auth.user)) {
-    return fail(res, 40301, "权限不足", [{ field: "role", reason: "admin_required" }]);
+  if (!canManageUsers(auth.user)) {
+    return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
   }
 
   const store = loadUsersStore();
@@ -129,8 +130,8 @@ export function listUsers(req: Request, res: Response) {
 export function updateUserStatus(req: Request, res: Response) {
   const auth = requireAuth(req, res);
   if (!auth) return;
-  if (!isAdminUser(auth.user)) {
-    return fail(res, 40301, "权限不足", [{ field: "role", reason: "admin_required" }]);
+  if (!canManageUsers(auth.user)) {
+    return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
   }
 
   const userId = asString(req.params.userId);
@@ -149,7 +150,56 @@ export function updateUserStatus(req: Request, res: Response) {
     return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
   }
 
+  if (auth.user.role === "sub_admin" && target.role === "admin" && nextStatus === "disabled") {
+    return fail(res, 40301, "权限不足", [{ field: "user", reason: "sub_admin_cannot_disable_admin" }]);
+  }
+
   target.status = nextStatus;
+  saveUsersStore(store);
+  res.json(ok({ user: toPublicUser(target) }, randomUUID()));
+}
+
+export function updateUserRole(req: Request, res: Response) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  if (!canManageUsers(auth.user)) {
+    return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
+  }
+
+  const userId = asString(req.params.userId);
+  const rawRole = asString(req.body?.role);
+  if (!userId) {
+    return fail(res, 40001, "参数错误", [{ field: "userId", reason: "required" }]);
+  }
+
+  const nextRole = rawRole as AuthUser["role"];
+  if (nextRole !== "admin" && nextRole !== "sub_admin" && nextRole !== "user") {
+    return fail(res, 40001, "参数错误", [{ field: "role", reason: "invalid" }]);
+  }
+
+  const store = loadUsersStore();
+  const target = store.users.find((u) => u.id === userId);
+  if (!target) {
+    return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
+  }
+
+  if (auth.user.role === "sub_admin") {
+    if (target.role === "admin") {
+      return fail(res, 40301, "权限不足", [{ field: "role", reason: "cannot_modify_super_admin" }]);
+    }
+    if (nextRole === "admin") {
+      return fail(res, 40301, "权限不足", [{ field: "role", reason: "sub_admin_cannot_grant_admin" }]);
+    }
+  }
+
+  if (target.role === "admin" && nextRole !== "admin") {
+    const adminCount = store.users.filter((u) => u.role === "admin").length;
+    if (adminCount <= 1) {
+      return fail(res, 40001, "参数错误", [{ field: "role", reason: "last_admin_demote_forbidden" }]);
+    }
+  }
+
+  target.role = nextRole;
   saveUsersStore(store);
   res.json(ok({ user: toPublicUser(target) }, randomUUID()));
 }

@@ -1,6 +1,26 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 export type VersionVcsState = {
@@ -18,7 +38,7 @@ type VersionVcsToolbarProps = {
   showStatusField?: boolean
   onVersionHistory: () => void
   onCheckout: () => void
-  onCheckin: () => void
+  onCheckin: (checkinNote: string) => void | Promise<void>
   onUndoCheckout: () => void
   onPromote: () => void
   onForceUnlock?: () => void
@@ -78,7 +98,48 @@ export function VersionVcsToolbar({
   const canRenderActions = alwaysShowActions || hasState
   const checkoutStatus = state?.checkoutStatus ?? "checked_in"
   const btnSize = compact ? "sm" : "default"
-  const btnClass = compact ? "rounded-lg" : "rounded-xl"
+  const btnClass = compact ? "rounded-lg text-xs" : "rounded-xl"
+  const [promoteAlertOpen, setPromoteAlertOpen] = useState(false)
+  const [checkinDialogOpen, setCheckinDialogOpen] = useState(false)
+  const [checkinNote, setCheckinNote] = useState("")
+  const [checkinNoteError, setCheckinNoteError] = useState("")
+  const [checkinSubmitting, setCheckinSubmitting] = useState(false)
+
+  function openPromoteAlert() {
+    if (!hasState || checkoutStatus === "checked_out") return
+    setPromoteAlertOpen(true)
+  }
+
+  function openCheckinDialog() {
+    if (!hasState || checkoutStatus === "checked_in") return
+    setCheckinNote("")
+    setCheckinNoteError("")
+    setCheckinDialogOpen(true)
+  }
+
+  async function confirmCheckin() {
+    const note = checkinNote.trim()
+    if (!note) {
+      setCheckinNoteError("请填写检入说明")
+      return
+    }
+    setCheckinSubmitting(true)
+    try {
+      await onCheckin(note)
+      setCheckinDialogOpen(false)
+      setCheckinNote("")
+      setCheckinNoteError("")
+    } catch (error) {
+      setCheckinNoteError(error instanceof Error ? error.message : "检入失败")
+    } finally {
+      setCheckinSubmitting(false)
+    }
+  }
+
+  function confirmPromote() {
+    setPromoteAlertOpen(false)
+    onPromote()
+  }
 
   return (
     <>
@@ -90,13 +151,13 @@ export function VersionVcsToolbar({
           <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_out"} onClick={onCheckout}>
             检出
           </Button>
-          <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_in"} onClick={onCheckin}>
+          <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_in"} onClick={openCheckinDialog}>
             检入
           </Button>
           <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_in"} onClick={onUndoCheckout}>
             撤销检出
           </Button>
-          <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_out"} onClick={onPromote}>
+          <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_out"} onClick={openPromoteAlert}>
             升版
           </Button>
           {forceUnlockVisible && onForceUnlock ? (
@@ -107,6 +168,49 @@ export function VersionVcsToolbar({
           {showStatusField ? <VersionCheckoutStatusDisplay state={state} compact={compact} /> : null}
         </>
       ) : null}
+      <Dialog open={checkinDialogOpen} onOpenChange={setCheckinDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>检入提醒</DialogTitle>
+            <DialogDescription>检入后只读，后续修改前，先检出。</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">检入说明</p>
+            <Textarea
+              value={checkinNote}
+              onChange={(event) => {
+                setCheckinNote(event.target.value)
+                if (checkinNoteError) setCheckinNoteError("")
+              }}
+              placeholder="请填写本次修改内容（必填）"
+              rows={4}
+            />
+            {checkinNoteError ? <p className="text-xs text-destructive">{checkinNoteError}</p> : null}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setCheckinDialogOpen(false)} disabled={checkinSubmitting}>
+              取消
+            </Button>
+            <Button onClick={() => void confirmCheckin()} disabled={checkinSubmitting}>
+              {checkinSubmitting ? "检入中..." : "确认检入"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={promoteAlertOpen} onOpenChange={setPromoteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>升版提醒</AlertDialogTitle>
+            <AlertDialogDescription>
+              升版后，当前版本记入历史版本中，后续可通过【版本历史】进行回溯或还原。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPromote}>确认升版</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

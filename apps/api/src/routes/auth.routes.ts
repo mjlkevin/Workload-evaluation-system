@@ -12,6 +12,7 @@ router.post("/login", AuthModule.login);
 router.get("/me", AuthModule.me);
 router.post("/logout", AuthModule.logout);
 router.get("/users", AuthModule.listUsers);
+router.patch("/users/:userId/role", AuthModule.updateUserRole);
 router.patch("/users/:userId/status", AuthModule.updateUserStatus);
 router.get("/invite-codes", AuthModule.listInviteCodes);
 router.post("/invite-codes/generate", AuthModule.generateInviteCodeHandler);

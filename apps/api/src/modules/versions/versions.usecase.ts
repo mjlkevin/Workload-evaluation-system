@@ -209,6 +209,8 @@ export function createVersion(req: Request, res: Response) {
     updatedAt: nowIso,
     createdByUserId: auth.user.id,
     createdByUsername: auth.user.username,
+    updatedByUserId: auth.user.id,
+    updatedByUsername: auth.user.username,
     // 检入检出字段默认值（新建记录默认已检入草稿）
     checkoutStatus: "checked_in",
     versionDocStatus: "drafting",
@@ -253,6 +255,8 @@ export function updateVersionStatus(req: Request, res: Response) {
 
   target.status = nextStatus;
   target.updatedAt = new Date().toISOString();
+  target.updatedByUserId = auth.user.id;
+  target.updatedByUsername = auth.user.username;
 
   if ((nextStatus === "reviewed" || nextStatus === "published") && !target.reviewedAt) {
     target.reviewedAt = target.updatedAt;
@@ -328,6 +332,8 @@ export function checkoutVersion(req: Request, res: Response) {
   target.checkedOutByUsername = auth.user.username;
   target.checkoutAt = nowIso;
   target.updatedAt = nowIso;
+  target.updatedByUserId = auth.user.id;
+  target.updatedByUsername = auth.user.username;
   // 保留当前检入快照，用于必要时撤销恢复
   target.lastCheckinPayload = target.payload ? { ...target.payload } : {};
 
@@ -375,6 +381,8 @@ export function checkinVersion(req: Request, res: Response) {
   target.checkedOutByUsername = undefined;
   target.checkoutAt = undefined;
   target.updatedAt = nowIso;
+  target.updatedByUserId = auth.user.id;
+  target.updatedByUsername = auth.user.username;
   if (newPayload) {
     target.payload = newPayload;
     target.lastCheckinPayload = { ...newPayload };
@@ -417,6 +425,8 @@ export function undoCheckout(req: Request, res: Response) {
   target.checkedOutByUsername = undefined;
   target.checkoutAt = undefined;
   target.updatedAt = nowIso;
+  target.updatedByUserId = auth.user.id;
+  target.updatedByUsername = auth.user.username;
 
   saveVersionsStore(store);
   return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
@@ -455,6 +465,8 @@ export function promoteVersion(req: Request, res: Response) {
   target.isHistoricalArchive = true;
   target.archivedAt = nowIso;
   target.updatedAt = nowIso;
+  target.updatedByUserId = auth.user.id;
+  target.updatedByUsername = auth.user.username;
 
   // 创建新版本记录（已检出状态—升版后需要用户检入）
   const newRecord: VersionRecord = {
@@ -469,6 +481,8 @@ export function promoteVersion(req: Request, res: Response) {
     updatedAt: nowIso,
     createdByUserId: auth.user.id,
     createdByUsername: auth.user.username,
+    updatedByUserId: auth.user.id,
+    updatedByUsername: auth.user.username,
     // 检入检出字段
     checkoutStatus: "checked_out",
     versionDocStatus: "drafting",
@@ -512,6 +526,8 @@ export function forceUnlockVersion(req: Request, res: Response) {
   target.checkedOutByUsername = undefined;
   target.checkoutAt = undefined;
   target.updatedAt = nowIso;
+  target.updatedByUserId = auth.user.id;
+  target.updatedByUsername = auth.user.username;
 
   saveVersionsStore(store);
   return res.json(ok({ record: toPublicVersionRecord(target), unlockedBy: auth.user.username }, randomUUID()));

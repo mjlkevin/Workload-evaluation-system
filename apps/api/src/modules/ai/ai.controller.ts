@@ -1,1 +1,7 @@
-export { parseBasicInfo, companyProfileSummary, chat } from "./ai.usecase";
+export {
+  parseBasicInfo,
+  companyProfileSummary,
+  kimiAssessmentPreview,
+  exportKimiAssessmentMarkdown,
+  chat,
+} from "./ai.usecase";
