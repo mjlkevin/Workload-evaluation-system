@@ -18,8 +18,11 @@
     },
     {
       "code": "KD-20260416-SB8EXJ",
-      "status": "active",
-      "createdAt": "2026-04-16T07:35:24.441Z"
+      "status": "used",
+      "createdAt": "2026-04-16T07:35:24.441Z",
+      "usedAt": "2026-04-17T05:07:04.779Z",
+      "usedByUserId": "b0b53b64-550b-4d54-b361-8d9f987e1179",
+      "usedByUsername": "林悦填"
     }
   ]
 }

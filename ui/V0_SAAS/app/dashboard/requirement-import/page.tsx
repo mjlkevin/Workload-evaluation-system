@@ -2083,7 +2083,7 @@ export default function RequirementImportPage() {
                       containerClassName="max-h-64 min-w-0 overflow-x-auto overflow-y-auto print:max-h-none print:h-auto print:overflow-visible"
                       className="min-w-[520px] table-fixed [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0"
                     >
-                      <TableHeader className="sticky top-0 z-20 bg-accent/12 text-foreground backdrop-blur-sm dark:bg-accent/20 print:static print:z-auto">
+                      <TableHeader className="sticky top-0 z-20 backdrop-blur-sm print:static print:z-auto">
                         <TableRow className="border-border/50 hover:bg-transparent">
                           <TableHead className="w-[92px] max-w-[92px] whitespace-nowrap px-2" data-manual-width="1">
                             云产品

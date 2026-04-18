@@ -50775,16 +50775,16 @@
     {
       "id": "b0304704-966a-465a-802a-fe82e02589f0",
       "type": "requirementImport",
-      "versionCode": "RQ-GLOBAL-20260404-0053-03",
+      "versionCode": "RQ-GLOBAL-20260404-0053-03-VA1",
       "templateId": "default",
       "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
       "status": "draft",
       "payload": {
         "globalVersionCode": "GLOBAL-20260404-0053",
         "basicInfo": {
-          "customerName": "小鹏汽车",
+          "customerName": "广东巨三集团有限公司",
           "location": "",
-          "projectName": "小鹏汽车",
+          "projectName": "巨三集团星空套件-财务供应链",
           "opportunityNo": "",
           "productLines": [],
           "customerIndustry": "新材料制造行业",
@@ -51130,10 +51130,11 @@
             "detail": "",
             "note": ""
           }
-        ]
+        ],
+        "checkinNote": "更新"
       },
       "createdAt": "2026-04-16T02:56:23.520Z",
-      "updatedAt": "2026-04-16T02:56:23.520Z",
+      "updatedAt": "2026-04-17T05:10:04.956Z",
       "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
       "createdByUsername": "mjlkevin",
       "updatedByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
@@ -51141,10 +51142,363 @@
       "checkoutStatus": "checked_in",
       "versionDocStatus": "drafting",
       "majorLetter": "A",
-      "minorNumber": 0,
+      "minorNumber": 1,
       "baseCode": "RQ-GLOBAL-20260404-0053-03",
       "isHistoricalArchive": false,
-      "lastCheckinPayload": {}
+      "lastCheckinPayload": {
+        "globalVersionCode": "GLOBAL-20260404-0053",
+        "basicInfo": {
+          "customerName": "广东巨三集团有限公司",
+          "location": "",
+          "projectName": "巨三集团星空套件-财务供应链",
+          "opportunityNo": "",
+          "productLines": [],
+          "customerIndustry": "新材料制造行业",
+          "enterpriseRevenue": "5亿左右",
+          "itStatus": "空白",
+          "expectedGoLive": "7/1/25",
+          "enterpriseProfile": "广东巨三集团有限公司是一家*研发、生产、销售特种建材及新型建材和承包防护工程施工为一体的股份制企业，于2010年8月注册成立，总投资1亿元。经过多年的努力与发展，已具备一定的规模及势力，现拥有一支技术精湛的团队，以卓越的品质、服务、*安全的技术能力，为不同的用户提供更高更好的产品和技术服务。总部基地设立于风景秀丽的东莞，并在*多地设有分支机构。",
+          "projectBackgroundNeeds": "1.客户目前使用KIS，系统不能满足业务发展需要\n2.目前企业信息化薄弱，响应数字化建设要求，搭建一套ERP系统，数字化平台。",
+          "projectGoals": "价值：实现业务财务一体化系统平台管理\n要求：满足日常销售、采购、仓库、财务核算的基本管理。"
+        },
+        "valuePropositionRows": [
+          {
+            "id": "6e4093ca-7a67-4426-9af6-0d3782bdfdd2",
+            "summary": "满足数字化建设",
+            "refinedContent": "价值：实现业务财务一体化系统平台管理\n要求：满足日常销售、采购、仓库、财务核算的基本管理。",
+            "originalDemand": "",
+            "interviewOutline": ""
+          }
+        ],
+        "businessNeedRows": [
+          {
+            "id": "d2463a6b-65e3-4c9b-a777-53a1814e64d2",
+            "businessDomain": "供应链",
+            "category": "销售",
+            "businessNeed": "通过系统完成订单下达，关联出库，形成应收、收款核销",
+            "proposer": "陈经理",
+            "title": "采购经理",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "bf2ff539-f947-4900-93d3-0999e32f0dba",
+            "businessDomain": "供应链",
+            "category": "采购",
+            "businessNeed": "通过系统完成订单下达，关联入库，形成应付，付款核销",
+            "proposer": "陈经理",
+            "title": "采购经理",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "a6b8f9e7-b475-4b11-8db5-58ecd97efdde",
+            "businessDomain": "供应链",
+            "category": "仓库",
+            "businessNeed": "通过系统完成日常出入库管理，盘点等",
+            "proposer": "陈经理",
+            "title": "采购经理",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "113f5334-ced5-403e-ac8a-095e3f738190",
+            "businessDomain": "财务",
+            "category": "财务",
+            "businessNeed": "日常出纳管理和存货核算、产品成本核算、总账、报表",
+            "proposer": "陈经理",
+            "title": "采购经理",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "77335b98-42cb-4c83-8f96-982c48dee431",
+            "businessDomain": "项目管理",
+            "category": "第三方",
+            "businessNeed": "第三方数据会传到金蝶\n包括：采购订单、采购入库、销售订单、销售出库、收款单、付款单、应付单",
+            "proposer": "陈经理",
+            "title": "采购经理",
+            "requiresCustomDev": "是"
+          }
+        ],
+        "devOverviewRows": [
+          {
+            "id": "39a5cc07-d1bf-465a-8417-635887eaa5c6",
+            "businessDomain": "供应链",
+            "moduleName": "供应链",
+            "moduleBrief": "销售",
+            "functionDesc": "第三方数据会传到金蝶\n1、销售订单",
+            "solutionSuggestion": "金蝶配合，不用写代码",
+            "codingDays": 1.5,
+            "estimateBasis": "提供标准接口，配合异构系统沟通需求、配置标准接口参数给异构系统调用、配合测试联调；"
+          },
+          {
+            "id": "0e1e1a5c-d0d8-41ce-b62f-469ef713558f",
+            "businessDomain": "供应链",
+            "moduleName": "供应链",
+            "moduleBrief": "采购",
+            "functionDesc": "第三方数据会传到金蝶\n1、采购订单",
+            "solutionSuggestion": "金蝶配合，不用写代码",
+            "codingDays": 1.5,
+            "estimateBasis": ""
+          },
+          {
+            "id": "73ef1a07-7578-431a-853e-c72ca266c4d7",
+            "businessDomain": "供应链",
+            "moduleName": "供应链",
+            "moduleBrief": "仓库",
+            "functionDesc": "第三方数据会传到金蝶\n1、采购入库、销售出库",
+            "solutionSuggestion": "金蝶配合，不用写代码",
+            "codingDays": 3,
+            "estimateBasis": ""
+          },
+          {
+            "id": "a98d4a52-646d-4146-9a39-3a8b2b9a10e9",
+            "businessDomain": "财务会计",
+            "moduleName": "财务会计",
+            "moduleBrief": "应付款",
+            "functionDesc": "第三方数据会传到金蝶\n1、应付单",
+            "solutionSuggestion": "金蝶配合，不用写代码",
+            "codingDays": 1.5,
+            "estimateBasis": ""
+          },
+          {
+            "id": "a04de974-c554-47ef-b78d-a360986be1c4",
+            "businessDomain": "财务会计",
+            "moduleName": "财务会计",
+            "moduleBrief": "出纳",
+            "functionDesc": "第三方数据会传到金蝶\n1、收款单、付款单",
+            "solutionSuggestion": "金蝶配合，不用写代码",
+            "codingDays": 3,
+            "estimateBasis": ""
+          },
+          {
+            "id": "0f209fc6-36cc-40c6-9af5-833c1795a10c",
+            "businessDomain": "合计",
+            "moduleName": "",
+            "moduleBrief": "",
+            "functionDesc": "",
+            "solutionSuggestion": "",
+            "codingDays": 0,
+            "estimateBasis": ""
+          }
+        ],
+        "productModuleRows": [
+          {
+            "id": "16deb775-b8b0-470d-aeca-601c78a89a62",
+            "productDomain": "星空旗舰版",
+            "moduleName": "财务云",
+            "subModule": "总账",
+            "userCount": "10",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "2db4c349-d013-4fe3-ae87-d00174822806",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "报表",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "0de4b57b-2289-47d5-9b54-dcd6613ef460",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "智能会计平台",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "0ba6ee5b-720e-4354-91a1-8591563db8df",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "出纳管理",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "b05aa26c-cb06-4b40-b8ef-a29fabb1b72f",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "票据管理",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "c29ad96d-4ff1-457a-adba-edd682ba20a1",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "应收款管理",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "0aff30a1-6ac9-4b85-9352-c5bbbf9e4d96",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "应付款管理",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "4f4a53cb-bb67-4d31-931d-abe6a6c70a0a",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "费用核算",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "2932a098-5108-4238-99ef-fe01695a8554",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "固定资产",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "7179ec48-acad-4fdf-b123-8d049732a9f1",
+            "productDomain": "",
+            "moduleName": "供应链云",
+            "subModule": "合同管理",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "880c0039-0a90-4106-9e42-558672b73e77",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "销售管理",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "8a39281d-86cd-43c0-8585-4cf571208ed9",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "采购管理",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "5d9e8adf-4a86-4597-a944-3e46b1620e54",
+            "productDomain": "",
+            "moduleName": "",
+            "subModule": "库存管理",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "bfba7dd4-6d38-4d1f-8a3b-e98b91bf3910",
+            "productDomain": "",
+            "moduleName": "平台",
+            "subModule": "API接口年包",
+            "userCount": "",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          },
+          {
+            "id": "9fbbe294-a59d-431b-bf27-48a47c58fc3e",
+            "productDomain": "",
+            "moduleName": "流程服务云",
+            "subModule": "工作流服务-流量版",
+            "userCount": "50",
+            "implementationOrgCount": "2",
+            "pilotOrgCount": "/",
+            "partyBLead": "2",
+            "partyALead": "/"
+          }
+        ],
+        "implementationScopeRows": [
+          {
+            "id": "62b4e666-744d-44eb-9abf-3062b0b8a3ec",
+            "companyName": "广东巨三集团有限公司",
+            "companyType": "集团公司",
+            "moduleScope": "本次项目范围全模块",
+            "location": "东莞",
+            "implementationMode": "集中实施/推广",
+            "note": ""
+          },
+          {
+            "id": "604fbde2-11ba-4e01-9af6-48127229378c",
+            "companyName": "子公司A",
+            "companyType": "集团公司",
+            "moduleScope": "本次项目范围全模块",
+            "location": "东莞",
+            "implementationMode": "集中实施/推广",
+            "note": "与主站组织一样的业态，主要是工程材料不一样"
+          }
+        ],
+        "meetingNotes": "本页粘贴会议纪要或调研纪要",
+        "keyPointRows": [
+          {
+            "id": "e07716ae-f294-4248-bd82-64c9e63ac552",
+            "analysisCategory": "需求分析",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          },
+          {
+            "id": "49040879-9c3b-4d70-bb97-8aaf4d9bc23e",
+            "analysisCategory": "三维需求",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          },
+          {
+            "id": "823977a6-1312-4934-8828-0cccb4934446",
+            "analysisCategory": "对应方案卖点",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          },
+          {
+            "id": "28f3c4ce-e443-466b-80f5-af10fd44aab9",
+            "analysisCategory": "赢在哪里",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          }
+        ],
+        "checkinNote": "更新"
+      }
     }
   ]
 }

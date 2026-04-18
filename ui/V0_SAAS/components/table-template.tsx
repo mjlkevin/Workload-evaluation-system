@@ -309,7 +309,7 @@ export function TableTemplate<Row>({
             {trailingHeaderCell ? <col /> : null}
           </colgroup>
           <TableHeader
-            className="sticky top-0 z-20 bg-accent/12 text-foreground backdrop-blur-sm dark:bg-accent/20"
+            className="sticky top-0 z-20 backdrop-blur-sm"
             onContextMenu={onResetAllColumnWidthsByContextMenu}
           >
             <TableRow className="border-border/50 hover:bg-transparent">
@@ -317,7 +317,7 @@ export function TableTemplate<Row>({
               {columns.map((col, index) => (
                 <TableHead
                   key={String(col.key)}
-                  className={`relative top-0 z-20 select-none bg-accent/12 text-foreground backdrop-blur-sm dark:bg-accent/20 ${col.className ?? ""}`.trim()}
+                  className={`relative top-0 z-20 select-none backdrop-blur-sm ${col.className ?? ""}`.trim()}
                   style={{
                     width: resolvedColumnWidths[index],
                     minWidth:
@@ -334,7 +334,7 @@ export function TableTemplate<Row>({
                   <button
                     type="button"
                     aria-label={`调整列宽：${col.label}`}
-                    className="absolute right-0 top-0 h-full w-2 cursor-col-resize border-l border-border/60 opacity-0 transition-opacity hover:bg-primary/10 group-hover:opacity-100"
+                    className="absolute right-0 top-0 h-full w-2 cursor-col-resize border-l border-white/25 opacity-0 transition-opacity hover:bg-white/15 group-hover:opacity-100"
                     onMouseDown={(event) => onResizeStart(event, col)}
                     onDoubleClick={(event) => onResizeReset(event, col)}
                     title="拖拽调整列宽，双击恢复默认宽度"

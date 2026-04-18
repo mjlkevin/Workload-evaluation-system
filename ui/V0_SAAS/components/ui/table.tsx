@@ -96,23 +96,27 @@ function Table({
   }
 
   return (
-    <div
-      ref={containerRef}
-      data-slot="table-container"
-      className={cn("relative w-full min-w-0 max-w-full overflow-x-auto", containerClassName)}
-    >
-      <table
-        ref={tableRef}
-        data-slot="table"
-        className={cn(
-          'w-full min-w-full caption-bottom text-sm [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0',
-          className,
-        )}
-        onClick={handleTableClick}
-        {...props}
-      >
-        {children}
-      </table>
+    <>
+      <div className="relative w-full min-w-0 max-w-full overflow-hidden rounded-md border border-border/50">
+        <div
+          ref={containerRef}
+          data-slot="table-container"
+          className={cn('w-full min-w-0 overflow-x-auto', containerClassName)}
+        >
+          <table
+            ref={tableRef}
+            data-slot="table"
+            className={cn(
+              'w-full min-w-full caption-bottom text-sm [&_th]:border-r [&_th]:border-border/50 [&_thead_th]:border-white/15 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0',
+              className,
+            )}
+            onClick={handleTableClick}
+            {...props}
+          >
+            {children}
+          </table>
+        </div>
+      </div>
       {preview ? (
         <div
           ref={previewRef}
@@ -122,7 +126,7 @@ function Table({
           <div className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-popover-foreground">{preview.text}</div>
         </div>
       ) : null}
-    </div>
+    </>
   )
 }
 
@@ -130,7 +134,10 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
   return (
     <thead
       data-slot="table-header"
-      className={cn('[&_tr]:border-b', className)}
+      className={cn(
+        'text-white shadow-[0_3px_8px_-2px_rgba(0,0,0,0.14)] [&_tr]:border-b [&_tr]:border-white/20 [&_tr]:hover:bg-transparent',
+        className,
+      )}
       {...props}
     />
   )
@@ -223,7 +230,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        'text-foreground relative h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        'relative h-10 bg-gradient-to-b from-zinc-700 from-0% via-zinc-800 via-40% to-zinc-900 to-100% px-2 text-left align-middle font-medium whitespace-nowrap text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),inset_0_-1px_0_0_rgba(0,0,0,0.28)] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
         className,
       )}
       {...props}
@@ -231,7 +238,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
       {props.children}
       <span
         aria-hidden="true"
-        className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none"
+        className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none hover:bg-white/10"
         onMouseDown={onStartResize}
       />
     </th>

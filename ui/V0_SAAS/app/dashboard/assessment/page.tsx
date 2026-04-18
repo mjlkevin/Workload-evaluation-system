@@ -2076,7 +2076,7 @@ export default function AssessmentPage() {
                             <col className="w-24" />
                             {cloudCustom ? <col className="w-36" /> : null}
                           </colgroup>
-                          <TableHeader className="[&_th]:bg-accent/12 dark:[&_th]:bg-accent/20 [&_th]:text-foreground">
+                          <TableHeader>
                             <TableRow className="hover:bg-transparent">
                               <TableHead className="border-r border-border/40 whitespace-normal">SKU</TableHead>
                               <TableHead className={cn("min-w-0 whitespace-normal", ASSESS_TABLE_COL_BORDER)}>
