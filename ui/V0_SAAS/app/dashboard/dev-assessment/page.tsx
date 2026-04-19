@@ -20,6 +20,7 @@ import {
   listModuleVersions,
   type ModuleVersionRecord,
   promoteVersionById,
+  saveCheckedOutVersionDraft,
   undoCheckoutById,
 } from "@/lib/workload-service"
 import type { PlanRow } from "@/lib/workload-types"
@@ -307,20 +308,24 @@ export default function DevAssessmentPage() {
     setSaving(true)
     setError("")
     try {
-      const created = await createModuleVersion(
-        "dev",
-        {
-          globalVersionCode,
-          projectName: projectName.trim(),
-          selectedEstimateVersionCode: linkedAssessmentVersionCode,
-          evaluator,
-          evaluateDate,
-          rows,
-        },
-        "DV",
-      )
-      await reloadVersions(created.versionCode)
-      showGlobalNotice(`已保存开发评估版本：${created.versionCode}`)
+      const draftPayload = {
+        globalVersionCode,
+        projectName: projectName.trim(),
+        selectedEstimateVersionCode: linkedAssessmentVersionCode,
+        evaluator,
+        evaluateDate,
+        rows,
+      }
+      const co = selectedVersionRecord
+      if (co?.checkoutStatus === "checked_out" && co.id) {
+        await saveCheckedOutVersionDraft(co.id, draftPayload)
+        await reloadVersions(co.versionCode)
+        showGlobalNotice(`已保存修改（仍为检出）：${co.versionCode}`)
+      } else {
+        const created = await createModuleVersion("dev", draftPayload, "DV")
+        await reloadVersions(created.versionCode)
+        showGlobalNotice(`已保存开发评估版本：${created.versionCode}`)
+      }
       setDirty(false)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "保存失败"

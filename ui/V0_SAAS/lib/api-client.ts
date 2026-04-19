@@ -57,7 +57,7 @@ function resolveApiUrl(path: string): string {
   if (explicit) return `${explicit}${path.startsWith("/") ? path : `/${path}`}`
   if (typeof window === "undefined") return path
   const host = window.location.hostname
-  if (host === "localhost" || host === "127.0.0.1") {
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
     return `http://127.0.0.1:${DEFAULT_DEV_API_PORT}${path.startsWith("/") ? path : `/${path}`}`
   }
   if (isPrivateOrLocalHostname(host)) {

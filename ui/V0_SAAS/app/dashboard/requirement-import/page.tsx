@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Activity,
   AlertTriangle,
@@ -15,11 +15,12 @@ import {
   ShieldAlert,
   TrendingUp,
 } from "lucide-react"
-import { shouldSuppressUnsavedPrompt, useSetUnsavedDirty } from "@/hooks/use-unsaved-changes"
+import { shouldSuppressUnsavedPrompt, useSetUnsavedDirty, useUnsavedNavigation } from "@/hooks/use-unsaved-changes"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,10 +39,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  wesTableHeaderStickyClassName,
+  wesTableToolbarHeaderRowClassName,
+} from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
 import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
@@ -57,11 +68,14 @@ import {
   forceUnlockById,
   generateKimiAssessmentPreview,
   getDashboardPlans,
+  getRequirementSystemConfig,
   KIMI_ASSESSMENT_PREFILL_STORAGE_KEY,
   listModuleVersions,
   type KimiAssessmentPreviewResult,
   type ModuleVersionRecord,
+  type RequirementSystemConfig,
   promoteVersionById,
+  saveCheckedOutVersionDraft,
   undoCheckoutById,
 } from "@/lib/workload-service"
 import { useReactToPrint } from "react-to-print"
@@ -157,6 +171,12 @@ type ParseBasicInfoResponse = {
   fallbackReason?: string
 }
 
+type CompanyProfileDisambiguationCandidate = {
+  id: string
+  displayName: string
+  summary: string
+}
+
 type CompanyProfileSummaryResponse = {
   enterpriseProfile: string
   location: string
@@ -164,11 +184,18 @@ type CompanyProfileSummaryResponse = {
   enterpriseRevenue: string
   itStatus: string
   model: string
-  mode?: "model" | "rule_fallback"
+  mode?: "model" | "rule_fallback" | "disambiguation"
   fallbackReason?: string
+  disambiguationCandidates?: CompanyProfileDisambiguationCandidate[]
 }
 
 const DEV_OVERVIEW_TOTAL_ROW_ID = "__dev-overview-total__"
+
+function resolveEffectiveKimiModelForFileParsing(active: RequirementSystemConfig): string {
+  const fp = (active.fileParsing.model || "").trim()
+  const ke = (active.kimiEvaluation.model || "").trim()
+  return fp || ke || ""
+}
 
 function createEmptyBusinessNeedRow(): BusinessNeedRow {
   return {
@@ -321,19 +348,43 @@ type RequirementSectionKey =
 
 function createInitialSectionCollapsed(): Record<RequirementSectionKey, boolean> {
   return {
-    basicInfo: true,
-    valueProposition: true,
-    businessNeed: true,
-    devOverview: true,
-    productModule: true,
-    implementationScope: true,
-    meetingNotes: true,
-    keyPoints: true,
+    basicInfo: false,
+    valueProposition: false,
+    businessNeed: false,
+    devOverview: false,
+    productModule: false,
+    implementationScope: false,
+    meetingNotes: false,
+    keyPoints: false,
   }
+}
+
+/** 需求单里曾保存占位符式总方案号（如 GL-{YYMMDD}-{N}），总方案修复后用项目名称对齐到当前列表中的真实版本号 */
+function resolveStaleGlobalVersionCode(
+  stored: string,
+  plans: Array<{ globalVersion: string; projectName: string }>,
+  projectName: string,
+): string {
+  const t = stored.trim()
+  if (!t) return ""
+  if (!/\{[A-Za-z0-9]+\}/.test(t)) return t
+  const pn = projectName.trim()
+  if (!pn) return ""
+  return plans.find((p) => p.projectName === pn)?.globalVersion ?? ""
+}
+
+/** 与后端升版/检入逻辑一致：同一 `baseCode` 视为同一条需求文档的版本脉络 */
+function requirementVersionLineageKey(record: ModuleVersionRecord): string {
+  const base = String(record.baseCode || "").trim()
+  if (base) return base
+  return String(record.versionCode || "").trim()
 }
 
 export default function RequirementImportPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { requestNavigation } = useUnsavedNavigation()
+  const lastDraftKeyRef = useRef<string | null>(null)
   const { isAdmin } = useAuth()
   const [keyword, setKeyword] = useState("")
   const [businessNeedViewMode, setBusinessNeedViewMode] = useState<"list" | "grid">("list")
@@ -363,10 +414,18 @@ export default function RequirementImportPage() {
   const [basicInfoImportFile, setBasicInfoImportFile] = useState<File | null>(null)
   const [basicInfoImporting, setBasicInfoImporting] = useState(false)
   const [basicInfoImportError, setBasicInfoImportError] = useState("")
+  const [basicInfoImportProgressValue, setBasicInfoImportProgressValue] = useState(0)
+  const [basicInfoImportProgressStatus, setBasicInfoImportProgressStatus] = useState("")
+  const [basicInfoImportOverwriteNonEmpty, setBasicInfoImportOverwriteNonEmpty] = useState(true)
+  const basicInfoImportAbortRef = useRef<AbortController | null>(null)
   const [enterpriseProfileGenerating, setEnterpriseProfileGenerating] = useState(false)
   const [kimiHelpOpen, setKimiHelpOpen] = useState(false)
   const kimiHelpCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [enterpriseProfilePreviewVisible, setEnterpriseProfilePreviewVisible] = useState(false)
+  const [enterpriseProfileDisambiguationOpen, setEnterpriseProfileDisambiguationOpen] = useState(false)
+  const [enterpriseProfileDisambiguationList, setEnterpriseProfileDisambiguationList] = useState<
+    CompanyProfileDisambiguationCandidate[]
+  >([])
   const [enterpriseProfileGeneratedText, setEnterpriseProfileGeneratedText] = useState("")
   const [enterpriseProfileGeneratedFields, setEnterpriseProfileGeneratedFields] = useState({
     location: "",
@@ -374,7 +433,6 @@ export default function RequirementImportPage() {
     enterpriseRevenue: "",
     itStatus: "",
   })
-  const [message, setMessage] = useState("")
   const [error, setError] = useState("")
   const [sectionCollapsed, setSectionCollapsed] = useState<Record<RequirementSectionKey, boolean>>(
     createInitialSectionCollapsed(),
@@ -393,8 +451,11 @@ export default function RequirementImportPage() {
   )
 
   function showGlobalNotice(text: string) {
-    setMessage(text)
-    toast(text)
+    toast.success(text)
+  }
+
+  function showGlobalWarning(text: string) {
+    toast.warning(text)
   }
 
   function clearKimiHelpCloseTimer() {
@@ -474,6 +535,16 @@ export default function RequirementImportPage() {
     })()
   }, [])
 
+  // 总方案版本号曾为未展开的占位符时，按项目名称与当前总方案列表对齐，避免下拉一直显示 GL-{…}-{N}
+  useEffect(() => {
+    if (!globalOptions.length || !globalVersionCode) return
+    if (globalOptions.some((o) => o.value === globalVersionCode)) return
+    if (!/\{[A-Za-z0-9]+\}/.test(globalVersionCode)) return
+    const pn = basicInfo.projectName?.trim()
+    const hit = pn ? globalOptions.find((o) => o.label.includes(`（${pn}）`)) : undefined
+    setGlobalVersionCode(hit?.value ?? "")
+  }, [globalOptions, globalVersionCode, basicInfo.projectName])
+
   // 卸载时重置 dirty 状态
   useEffect(() => {
     return () => { setDirty(false) }
@@ -529,8 +600,9 @@ export default function RequirementImportPage() {
       {
         id: DEV_OVERVIEW_TOTAL_ROW_ID,
         businessDomain: "合计",
-        moduleName: `${devOverviewRows.length} 行`,
-        functionDesc: "开发总人天按合计列计入 KIMI 评估范围",
+        moduleName: "",
+        moduleBrief: "",
+        functionDesc: "",
         solutionSuggestion: "",
         codingDays: Number(devSummary.coding.toFixed(1)),
         estimateBasis: "",
@@ -543,6 +615,11 @@ export default function RequirementImportPage() {
     () => versionRecords.find((x) => x.versionCode === selectedVersionCode),
     [versionRecords, selectedVersionCode],
   )
+  const requirementVersionHistoryRecords = useMemo(() => {
+    if (!selectedVersionCode.trim() || !selectedVersionRecord) return []
+    const key = requirementVersionLineageKey(selectedVersionRecord)
+    return versionRecords.filter((r) => requirementVersionLineageKey(r) === key)
+  }, [versionRecords, selectedVersionCode, selectedVersionRecord])
   const checkoutStatusText = useMemo(() => {
     if (!selectedVersionRecord) return "未选择版本"
     const base =
@@ -555,6 +632,38 @@ export default function RequirementImportPage() {
     selectedVersionRecord &&
       (selectedVersionRecord.checkoutStatus === "checked_in" || selectedVersionRecord.versionDocStatus === "reviewed"),
   )
+
+  const resetToNewRequirementDraft = useCallback(() => {
+    setGlobalVersionCode("")
+    setSelectedVersionCode("")
+    setVersionOptions([])
+    setBasicInfo(EMPTY_BASIC_INFO)
+    setValuePropositionRows([createEmptyValuePropositionRow()])
+    setBusinessNeedRows([createEmptyBusinessNeedRow()])
+    setDevOverviewRows([createEmptyDevOverviewRow()])
+    setProductModuleRows([createEmptyProductModuleRow()])
+    setImplementationScopeRows([createEmptyImplementationScopeRow()])
+    setMeetingNotes("")
+    setKeyPointRows([createEmptyKeyPointRow()])
+    setSectionCollapsed(createInitialSectionCollapsed())
+    setError("")
+    setDirty(false)
+    setHasLocalChanges(false)
+    dirtyEnabled.current = true
+  }, [setDirty])
+
+  /** 顶部 Dashboard 页签：带 draftKey 且无 version 时视为「空白需求」实例，与已打开版本页签并存 */
+  useEffect(() => {
+    const version = searchParams.get("version")?.trim() || ""
+    const draftKey = searchParams.get("draftKey")?.trim() || ""
+    if (!draftKey || version) {
+      lastDraftKeyRef.current = null
+      return
+    }
+    if (lastDraftKeyRef.current === draftKey) return
+    lastDraftKeyRef.current = draftKey
+    resetToNewRequirementDraft()
+  }, [searchParams, resetToNewRequirementDraft])
 
   async function reloadVersions(nextSelected?: string) {
     const records = await listModuleVersions("requirementImport")
@@ -588,7 +697,13 @@ export default function RequirementImportPage() {
         ? (payload.implementationScopeRows as ImplementationScopeRow[])
         : []
       const nextKeyPointRows = Array.isArray(payload.keyPointRows) ? (payload.keyPointRows as KeyPointRow[]) : []
-      setGlobalVersionCode((payload.globalVersionCode as string) || "")
+      const plans = await getDashboardPlans()
+      const rawGlobal = (payload.globalVersionCode as string) || ""
+      const pn = String(nextBasic.projectName || "").trim()
+      const t = rawGlobal.trim()
+      setGlobalVersionCode(
+        /\{[A-Za-z0-9]+\}/.test(t) ? resolveStaleGlobalVersionCode(rawGlobal, plans, pn) : t,
+      )
       setBasicInfo({
         ...EMPTY_BASIC_INFO,
         ...nextBasic,
@@ -716,35 +831,46 @@ export default function RequirementImportPage() {
   }
 
   async function onSave(options?: { allowWithoutGlobal?: boolean }): Promise<boolean> {
-    if (!globalVersionCode.trim() && !options?.allowWithoutGlobal) {
-      setSaveWithoutGlobalConfirmOpen(true)
+    if (!(basicInfo.customerName || "").trim()) {
+      setError("请填写客户名称")
+      return false
+    }
+    if (!basicInfo.productLines.length) {
+      setError("请至少选择一条产品线")
       return false
     }
     if (!basicInfo.projectName.trim()) {
       setError("请填写项目名称")
       return false
     }
+    if (!globalVersionCode.trim() && !options?.allowWithoutGlobal) {
+      setSaveWithoutGlobalConfirmOpen(true)
+      return false
+    }
     setSaving(true)
-    setMessage("")
     setError("")
     try {
-      const created = await createModuleVersion(
-        "requirementImport",
-        {
-          globalVersionCode: globalVersionCode.trim(),
-          basicInfo,
-          valuePropositionRows,
-          businessNeedRows,
-          devOverviewRows,
-          productModuleRows,
-          implementationScopeRows,
-          meetingNotes,
-          keyPointRows,
-        },
-        "RI",
-      )
-      await reloadVersions(created.versionCode)
-      showGlobalNotice(`已保存需求版本：${created.versionCode}`)
+      const draftPayload = {
+        globalVersionCode: globalVersionCode.trim(),
+        basicInfo,
+        valuePropositionRows,
+        businessNeedRows,
+        devOverviewRows,
+        productModuleRows,
+        implementationScopeRows,
+        meetingNotes,
+        keyPointRows,
+      }
+      const co = selectedVersionRecord
+      if (co?.checkoutStatus === "checked_out" && co.id) {
+        await saveCheckedOutVersionDraft(co.id, draftPayload)
+        await reloadVersions(co.versionCode)
+        showGlobalNotice(`已保存修改（仍为检出）：${co.versionCode}`)
+      } else {
+        const created = await createModuleVersion("requirementImport", draftPayload, "RI")
+        await reloadVersions(created.versionCode)
+        showGlobalNotice(`已保存需求版本：${created.versionCode}`)
+      }
       setDirty(false)
       setHasLocalChanges(false)
       return true
@@ -761,28 +887,17 @@ export default function RequirementImportPage() {
     if (saved) setSaveWithoutGlobalConfirmOpen(false)
   }
 
-  function resetToNewRequirementDraft() {
-    setGlobalVersionCode("")
-    setSelectedVersionCode("")
-    setVersionOptions([])
-    setBasicInfo(EMPTY_BASIC_INFO)
-    setValuePropositionRows([createEmptyValuePropositionRow()])
-    setBusinessNeedRows([createEmptyBusinessNeedRow()])
-    setDevOverviewRows([createEmptyDevOverviewRow()])
-    setProductModuleRows([createEmptyProductModuleRow()])
-    setImplementationScopeRows([createEmptyImplementationScopeRow()])
-    setMeetingNotes("")
-    setKeyPointRows([createEmptyKeyPointRow()])
-    setSectionCollapsed(createInitialSectionCollapsed())
-    setMessage("")
-    setError("")
-    setDirty(false)
-    setHasLocalChanges(false)
-    dirtyEnabled.current = true
-  }
-
   function onCreateNewRequirement() {
     if (saving) return
+    // 已加载某一需求版本时：新增顶部页签打开空白表单，不替换当前页
+    if (selectedVersionCode.trim()) {
+      const draftKey = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+      const href = `/dashboard/requirement-import?draftKey=${encodeURIComponent(draftKey)}`
+      if (!requestNavigation(href)) return
+      router.push(href)
+      showGlobalNotice("已新增空白需求页签")
+      return
+    }
     const isCheckedOut = selectedVersionRecord?.checkoutStatus === "checked_out"
     if (isCheckedOut && hasLocalChanges) {
       setCreateNewConfirmOpen(true)
@@ -806,88 +921,333 @@ export default function RequirementImportPage() {
     }
   }
 
-  function applyRequirementImportData(data?: ParseBasicInfoResponse["requirementImportData"]) {
+  function isFilledImportStr(v: string | undefined | null): boolean {
+    return String(v ?? "").trim().length > 0
+  }
+
+  function mergeBasicInfoFromImport(prev: BasicInfo, inc: Partial<BasicInfo>, overwriteNonEmpty: boolean): BasicInfo {
+    if (overwriteNonEmpty) {
+      return { ...prev, ...inc }
+    }
+    const next: BasicInfo = { ...prev }
+    const strKeys: (keyof BasicInfo)[] = [
+      "customerName",
+      "location",
+      "projectName",
+      "opportunityNo",
+      "customerIndustry",
+      "enterpriseRevenue",
+      "itStatus",
+      "expectedGoLive",
+      "enterpriseProfile",
+      "projectBackgroundNeeds",
+      "projectGoals",
+    ]
+    for (const k of strKeys) {
+      if (!(k in inc) || typeof inc[k] !== "string") continue
+      if (!isFilledImportStr(prev[k])) {
+        next[k] = inc[k] as string
+      }
+    }
+    if (inc.productLines && Array.isArray(inc.productLines)) {
+      const pp = prev.productLines
+      const anyPrev = pp.some((s) => isFilledImportStr(s))
+      if (!anyPrev) {
+        next.productLines = [...inc.productLines]
+      } else {
+        const maxLen = Math.max(pp.length, inc.productLines.length)
+        next.productLines = Array.from({ length: maxLen }, (_, i) =>
+          isFilledImportStr(pp[i] ?? "") ? (pp[i] ?? "") : (inc.productLines![i] ?? ""),
+        )
+      }
+    }
+    return next
+  }
+
+  function mergeValuePropositionRows(
+    prev: ValuePropositionRow[],
+    incoming: Array<Omit<ValuePropositionRow, "id">>,
+  ): ValuePropositionRow[] {
+    const maxLen = Math.max(prev.length, incoming.length)
+    const out: ValuePropositionRow[] = []
+    for (let i = 0; i < maxLen; i++) {
+      const p = prev[i]
+      const c = incoming[i]
+      if (!p && c) {
+        out.push({ id: createClientRowId(), ...c })
+        continue
+      }
+      if (p && !c) {
+        out.push(p)
+        continue
+      }
+      if (p && c) {
+        out.push({
+          id: p.id,
+          summary: isFilledImportStr(p.summary) ? p.summary : c.summary,
+          refinedContent: isFilledImportStr(p.refinedContent) ? p.refinedContent : c.refinedContent,
+          originalDemand: isFilledImportStr(p.originalDemand) ? p.originalDemand : c.originalDemand,
+          interviewOutline: isFilledImportStr(p.interviewOutline) ? p.interviewOutline : c.interviewOutline,
+        })
+      }
+    }
+    return out
+  }
+
+  function businessNeedRowHasUserInput(p: BusinessNeedRow): boolean {
+    return (
+      isFilledImportStr(p.businessDomain) ||
+      isFilledImportStr(p.category) ||
+      isFilledImportStr(p.businessNeed) ||
+      isFilledImportStr(p.proposer) ||
+      isFilledImportStr(p.title) ||
+      p.requiresCustomDev === "是"
+    )
+  }
+
+  function mergeBusinessNeedRows(prev: BusinessNeedRow[], incoming: BusinessNeedRow[]): BusinessNeedRow[] {
+    const maxLen = Math.max(prev.length, incoming.length)
+    const out: BusinessNeedRow[] = []
+    for (let i = 0; i < maxLen; i++) {
+      const p = prev[i]
+      const c = incoming[i]
+      if (!p && c) {
+        out.push({ ...c, id: createClientRowId() })
+        continue
+      }
+      if (p && !c) {
+        out.push(p)
+        continue
+      }
+      if (p && c) {
+        const touched = businessNeedRowHasUserInput(p)
+        out.push({
+          id: p.id,
+          businessDomain: isFilledImportStr(p.businessDomain) ? p.businessDomain : c.businessDomain,
+          category: isFilledImportStr(p.category) ? p.category : c.category,
+          businessNeed: isFilledImportStr(p.businessNeed) ? p.businessNeed : c.businessNeed,
+          proposer: isFilledImportStr(p.proposer) ? p.proposer : c.proposer,
+          title: isFilledImportStr(p.title) ? p.title : c.title,
+          requiresCustomDev: touched ? p.requiresCustomDev : c.requiresCustomDev,
+        })
+      }
+    }
+    return out
+  }
+
+  function mergeDevOverviewRows(prev: DevOverviewRow[], incoming: DevOverviewRow[]): DevOverviewRow[] {
+    const maxLen = Math.max(prev.length, incoming.length)
+    const out: DevOverviewRow[] = []
+    for (let i = 0; i < maxLen; i++) {
+      const p = prev[i]
+      const c = incoming[i]
+      if (!p && c) {
+        out.push({ ...c, id: createClientRowId() })
+        continue
+      }
+      if (p && !c) {
+        out.push(p)
+        continue
+      }
+      if (p && c) {
+        out.push({
+          id: p.id,
+          businessDomain: isFilledImportStr(p.businessDomain) ? p.businessDomain : c.businessDomain,
+          moduleName: isFilledImportStr(p.moduleName) ? p.moduleName : c.moduleName,
+          moduleBrief: isFilledImportStr(p.moduleBrief) ? p.moduleBrief : c.moduleBrief,
+          functionDesc: isFilledImportStr(p.functionDesc) ? p.functionDesc : c.functionDesc,
+          solutionSuggestion: isFilledImportStr(p.solutionSuggestion) ? p.solutionSuggestion : c.solutionSuggestion,
+          codingDays: p.codingDays !== 0 ? p.codingDays : c.codingDays,
+          estimateBasis: isFilledImportStr(p.estimateBasis) ? p.estimateBasis : c.estimateBasis,
+        })
+      }
+    }
+    return out
+  }
+
+  function mergeProductModuleRows(prev: ProductModuleRow[], incoming: ProductModuleRow[]): ProductModuleRow[] {
+    const maxLen = Math.max(prev.length, incoming.length)
+    const out: ProductModuleRow[] = []
+    for (let i = 0; i < maxLen; i++) {
+      const p = prev[i]
+      const c = incoming[i]
+      if (!p && c) {
+        out.push({ ...c, id: createClientRowId() })
+        continue
+      }
+      if (p && !c) {
+        out.push(p)
+        continue
+      }
+      if (p && c) {
+        out.push({
+          id: p.id,
+          productDomain: isFilledImportStr(p.productDomain) ? p.productDomain : c.productDomain,
+          moduleName: isFilledImportStr(p.moduleName) ? p.moduleName : c.moduleName,
+          subModule: isFilledImportStr(p.subModule) ? p.subModule : c.subModule,
+          userCount: isFilledImportStr(p.userCount) ? p.userCount : c.userCount,
+          implementationOrgCount: isFilledImportStr(p.implementationOrgCount)
+            ? p.implementationOrgCount
+            : c.implementationOrgCount,
+          pilotOrgCount: isFilledImportStr(p.pilotOrgCount) ? p.pilotOrgCount : c.pilotOrgCount,
+          partyBLead: isFilledImportStr(p.partyBLead) ? p.partyBLead : c.partyBLead,
+          partyALead: isFilledImportStr(p.partyALead) ? p.partyALead : c.partyALead,
+        })
+      }
+    }
+    return out
+  }
+
+  function mergeImplementationScopeRows(
+    prev: ImplementationScopeRow[],
+    incoming: ImplementationScopeRow[],
+  ): ImplementationScopeRow[] {
+    const maxLen = Math.max(prev.length, incoming.length)
+    const out: ImplementationScopeRow[] = []
+    for (let i = 0; i < maxLen; i++) {
+      const p = prev[i]
+      const c = incoming[i]
+      if (!p && c) {
+        out.push({ ...c, id: createClientRowId() })
+        continue
+      }
+      if (p && !c) {
+        out.push(p)
+        continue
+      }
+      if (p && c) {
+        out.push({
+          id: p.id,
+          companyName: isFilledImportStr(p.companyName) ? p.companyName : c.companyName,
+          companyType: isFilledImportStr(p.companyType) ? p.companyType : c.companyType,
+          moduleScope: isFilledImportStr(p.moduleScope) ? p.moduleScope : c.moduleScope,
+          location: isFilledImportStr(p.location) ? p.location : c.location,
+          implementationMode: isFilledImportStr(p.implementationMode) ? p.implementationMode : c.implementationMode,
+          note: isFilledImportStr(p.note) ? p.note : c.note,
+        })
+      }
+    }
+    return out
+  }
+
+  function mergeKeyPointRows(prev: KeyPointRow[], incoming: KeyPointRow[]): KeyPointRow[] {
+    const maxLen = Math.max(prev.length, incoming.length)
+    const out: KeyPointRow[] = []
+    for (let i = 0; i < maxLen; i++) {
+      const p = prev[i]
+      const c = incoming[i]
+      if (!p && c) {
+        out.push({ ...c, id: createClientRowId() })
+        continue
+      }
+      if (p && !c) {
+        out.push(p)
+        continue
+      }
+      if (p && c) {
+        out.push({
+          id: p.id,
+          analysisCategory: isFilledImportStr(p.analysisCategory) ? p.analysisCategory : c.analysisCategory,
+          subItem: isFilledImportStr(p.subItem) ? p.subItem : c.subItem,
+          detail: isFilledImportStr(p.detail) ? p.detail : c.detail,
+          note: isFilledImportStr(p.note) ? p.note : c.note,
+        })
+      }
+    }
+    return out
+  }
+
+  function applyRequirementImportData(
+    data?: ParseBasicInfoResponse["requirementImportData"],
+    overwriteNonEmpty = true,
+  ) {
     if (!data) return
+    const ow = overwriteNonEmpty
+
     if (Array.isArray(data.valuePropositionRows) && data.valuePropositionRows.length > 0) {
-      setValuePropositionRows(
-        data.valuePropositionRows.map((row) => ({
-          id: createClientRowId(),
-          summary: String(row.summary || ""),
-          refinedContent: String(row.refinedContent || ""),
-          originalDemand: String(row.originalDemand || ""),
-          interviewOutline: String(row.interviewOutline || ""),
-        })),
+      const incoming = data.valuePropositionRows.map((row) => ({
+        summary: String(row.summary || ""),
+        refinedContent: String(row.refinedContent || ""),
+        originalDemand: String(row.originalDemand || ""),
+        interviewOutline: String(row.interviewOutline || ""),
+      }))
+      setValuePropositionRows((prev) =>
+        ow ? incoming.map((r) => ({ id: createClientRowId(), ...r })) : mergeValuePropositionRows(prev, incoming),
       )
     }
     if (Array.isArray(data.businessNeedRows) && data.businessNeedRows.length > 0) {
-      setBusinessNeedRows(
-        data.businessNeedRows.map((row) => ({
-          id: createClientRowId(),
-          businessDomain: String(row.businessDomain || ""),
-          category: String(row.category || ""),
-          businessNeed: String(row.businessNeed || ""),
-          proposer: String(row.proposer || ""),
-          title: String(row.title || ""),
-          requiresCustomDev: row.requiresCustomDev === "是" ? "是" : "否",
-        })),
-      )
+      const incoming = data.businessNeedRows.map((row) => ({
+        id: createClientRowId(),
+        businessDomain: String(row.businessDomain || ""),
+        category: String(row.category || ""),
+        businessNeed: String(row.businessNeed || ""),
+        proposer: String(row.proposer || ""),
+        title: String(row.title || ""),
+        requiresCustomDev: row.requiresCustomDev === "是" ? "是" : ("否" as const),
+      }))
+      setBusinessNeedRows((prev) => (ow ? incoming : mergeBusinessNeedRows(prev, incoming)))
     }
     if (Array.isArray(data.devOverviewRows) && data.devOverviewRows.length > 0) {
-      setDevOverviewRows(
-        data.devOverviewRows.map((row) => ({
-          id: createClientRowId(),
-          businessDomain: String(row.businessDomain || ""),
-          moduleName: String(row.moduleName || ""),
-          moduleBrief: String(row.moduleBrief || ""),
-          functionDesc: String(row.functionDesc || ""),
-          solutionSuggestion: String(row.solutionSuggestion || ""),
-          codingDays: Number(row.codingDays || 0),
-          estimateBasis: String(row.estimateBasis || ""),
-        })),
-      )
+      const incoming = data.devOverviewRows.map((row) => ({
+        id: createClientRowId(),
+        businessDomain: String(row.businessDomain || ""),
+        moduleName: String(row.moduleName || ""),
+        moduleBrief: String(row.moduleBrief || ""),
+        functionDesc: String(row.functionDesc || ""),
+        solutionSuggestion: String(row.solutionSuggestion || ""),
+        codingDays: Number(row.codingDays || 0),
+        estimateBasis: String(row.estimateBasis || ""),
+      }))
+      setDevOverviewRows((prev) => (ow ? incoming : mergeDevOverviewRows(prev, incoming)))
     }
     if (Array.isArray(data.productModuleRows) && data.productModuleRows.length > 0) {
-      setProductModuleRows(
-        data.productModuleRows.map((row) => ({
-          id: createClientRowId(),
-          productDomain: String(row.productDomain || ""),
-          moduleName: String(row.moduleName || ""),
-          subModule: String(row.subModule || ""),
-          userCount: String(row.userCount || ""),
-          implementationOrgCount: String(row.implementationOrgCount || ""),
-          pilotOrgCount: String(row.pilotOrgCount || ""),
-          partyBLead: String(row.partyBLead || ""),
-          partyALead: String(row.partyALead || ""),
-        })),
-      )
+      const incoming = data.productModuleRows.map((row) => ({
+        id: createClientRowId(),
+        productDomain: String(row.productDomain || ""),
+        moduleName: String(row.moduleName || ""),
+        subModule: String(row.subModule || ""),
+        userCount: String(row.userCount || ""),
+        implementationOrgCount: String(row.implementationOrgCount || ""),
+        pilotOrgCount: String(row.pilotOrgCount || ""),
+        partyBLead: String(row.partyBLead || ""),
+        partyALead: String(row.partyALead || ""),
+      }))
+      setProductModuleRows((prev) => (ow ? incoming : mergeProductModuleRows(prev, incoming)))
     }
     if (Array.isArray(data.implementationScopeRows) && data.implementationScopeRows.length > 0) {
-      setImplementationScopeRows(
-        data.implementationScopeRows.map((row) => ({
-          id: createClientRowId(),
-          companyName: String(row.companyName || ""),
-          companyType: String(row.companyType || ""),
-          moduleScope: String(row.moduleScope || ""),
-          location: String(row.location || ""),
-          implementationMode: String(row.implementationMode || ""),
-          note: String(row.note || ""),
-        })),
-      )
+      const incoming = data.implementationScopeRows.map((row) => ({
+        id: createClientRowId(),
+        companyName: String(row.companyName || ""),
+        companyType: String(row.companyType || ""),
+        moduleScope: String(row.moduleScope || ""),
+        location: String(row.location || ""),
+        implementationMode: String(row.implementationMode || ""),
+        note: String(row.note || ""),
+      }))
+      setImplementationScopeRows((prev) => (ow ? incoming : mergeImplementationScopeRows(prev, incoming)))
     }
     if (typeof data.meetingNotes === "string" && data.meetingNotes.trim()) {
-      setMeetingNotes(data.meetingNotes)
+      setMeetingNotes((prev) => (ow || !prev.trim() ? data.meetingNotes! : prev))
     }
     if (Array.isArray(data.keyPointRows) && data.keyPointRows.length > 0) {
-      setKeyPointRows(
-        data.keyPointRows.map((row) => ({
-          id: createClientRowId(),
-          analysisCategory: String(row.analysisCategory || ""),
-          subItem: String(row.subItem || ""),
-          detail: String(row.detail || ""),
-          note: String(row.note || ""),
-        })),
-      )
+      const incoming = data.keyPointRows.map((row) => ({
+        id: createClientRowId(),
+        analysisCategory: String(row.analysisCategory || ""),
+        subItem: String(row.subItem || ""),
+        detail: String(row.detail || ""),
+        note: String(row.note || ""),
+      }))
+      setKeyPointRows((prev) => (ow ? incoming : mergeKeyPointRows(prev, incoming)))
     }
+  }
+
+  function closeBasicInfoImportDialog() {
+    basicInfoImportAbortRef.current?.abort()
+    setBasicInfoImporting(false)
+    setBasicInfoImportVisible(false)
+    setBasicInfoImportProgressStatus("")
+    setBasicInfoImportProgressValue(0)
+    setBasicInfoImportError("")
   }
 
   async function onImportBasicInfoByExcel() {
@@ -897,30 +1257,89 @@ export default function RequirementImportPage() {
       setBasicInfoImportError("请先选择 Excel 文件")
       return
     }
+    const ac = new AbortController()
+    basicInfoImportAbortRef.current = ac
+    const overwriteNonEmpty = basicInfoImportOverwriteNonEmpty
     setBasicInfoImporting(true)
-    setMessage("")
+    setBasicInfoImportProgressValue(8)
+    setBasicInfoImportProgressStatus("正在准备解析请求…")
+    const bumpBasicInfoImportProgress = (text: string, progress?: number) => {
+      if (ac.signal.aborted) return
+      setBasicInfoImportProgressStatus(text)
+      if (typeof progress === "number") {
+        setBasicInfoImportProgressValue((prev) => Math.max(prev, Math.min(100, progress)))
+      }
+    }
     try {
+      let waitModelLabel = normalizeKimiModelName(basicInfoModelName)
+      try {
+        bumpBasicInfoImportProgress("正在获取解析模型配置…", 12)
+        const cfgView = await getRequirementSystemConfig()
+        if (ac.signal.aborted) return
+        const raw = resolveEffectiveKimiModelForFileParsing(cfgView.active)
+        if (raw) {
+          setBasicInfoModelName(raw)
+          waitModelLabel = normalizeKimiModelName(raw)
+        }
+      } catch {
+        // 配置不可用则沿用页面上已有的模型名
+      }
+      bumpBasicInfoImportProgress("正在上传文件并调用解析接口…", 22)
       const formData = new FormData()
       formData.append("file", basicInfoImportFile)
+      bumpBasicInfoImportProgress(`解析请求已发送，正在等待 ${waitModelLabel} 返回结果…`, 40)
       const data = await apiRequest<ParseBasicInfoResponse>("/api/v1/ai/parse-basic-info", {
         method: "POST",
         body: formData,
+        signal: ac.signal,
       })
-      setBasicInfo((prev) => ({ ...prev, ...data.basicInfo }))
-      applyRequirementImportData(data.requirementImportData)
+      if (ac.signal.aborted) return
+      bumpBasicInfoImportProgress("已收到解析结果，正在写入基本情况与需求表…", 88)
+      setBasicInfo((prev) => mergeBasicInfoFromImport(prev, data.basicInfo ?? {}, overwriteNonEmpty))
+      applyRequirementImportData(data.requirementImportData, overwriteNonEmpty)
       if (data.model) setBasicInfoModelName(data.model)
+      bumpBasicInfoImportProgress(
+        data.mode === "rule_fallback" ? "解析完成（已使用规则回填）" : "解析完成（模型已返回结构化结果）",
+        100,
+      )
       setBasicInfoImportVisible(false)
       setBasicInfoImportFile(null)
+      setBasicInfoImportProgressStatus("")
+      setBasicInfoImportProgressValue(0)
+      const mergeHint = overwriteNonEmpty ? "" : "（已保留已有非空字段）"
       if (data.mode === "rule_fallback") {
         const fallbackHint = data.fallbackReason ? `（${data.fallbackReason}）` : ""
-        showGlobalNotice(`Excel 已按规则回填${fallbackHint}`)
+        showGlobalNotice(`Excel 已按规则回填${fallbackHint}${mergeHint}`)
       } else {
-        showGlobalNotice("Excel 解析完成，已回填需求内容")
+        showGlobalNotice(`Excel 解析完成，已回填需求内容${mergeHint}`)
       }
     } catch (err) {
+      if (ac.signal.aborted) return
+      setBasicInfoImportProgressStatus("解析失败，请检查网络或文件内容后重试。")
       setBasicInfoImportError(err instanceof Error ? err.message : "解析失败")
     } finally {
+      if (basicInfoImportAbortRef.current === ac) {
+        basicInfoImportAbortRef.current = null
+      }
       setBasicInfoImporting(false)
+    }
+  }
+
+  function applyCompanyProfileSummaryToPreview(data: CompanyProfileSummaryResponse) {
+    setEnterpriseProfileGeneratedText(data.enterpriseProfile)
+    setEnterpriseProfileGeneratedFields({
+      location: data.location || "",
+      customerIndustry: data.customerIndustry || "",
+      enterpriseRevenue: data.enterpriseRevenue || "",
+      itStatus: data.itStatus || "",
+    })
+    setEnterpriseProfilePreviewVisible(true)
+    if (data.model) setBasicInfoModelName(data.model)
+    if (data.mode === "rule_fallback") {
+      const fallbackHint = data.fallbackReason ? `（${data.fallbackReason}）` : ""
+      showGlobalNotice(`企业简介已按规则生成${fallbackHint}，请确认是否插入`)
+    } else {
+      showGlobalNotice("企业简介已生成，请确认是否插入")
     }
   }
 
@@ -932,7 +1351,8 @@ export default function RequirementImportPage() {
     }
     setEnterpriseProfileGenerating(true)
     setError("")
-    setMessage("")
+    setEnterpriseProfileDisambiguationOpen(false)
+    setEnterpriseProfileDisambiguationList([])
     try {
       const data = await apiRequest<CompanyProfileSummaryResponse>("/api/v1/ai/company-profile-summary", {
         method: "POST",
@@ -944,21 +1364,51 @@ export default function RequirementImportPage() {
           itStatus: basicInfo.itStatus || "",
         },
       })
-      setEnterpriseProfileGeneratedText(data.enterpriseProfile)
-      setEnterpriseProfileGeneratedFields({
-        location: data.location || "",
-        customerIndustry: data.customerIndustry || "",
-        enterpriseRevenue: data.enterpriseRevenue || "",
-        itStatus: data.itStatus || "",
-      })
-      setEnterpriseProfilePreviewVisible(true)
-      if (data.model) setBasicInfoModelName(data.model)
-      if (data.mode === "rule_fallback") {
-        const fallbackHint = data.fallbackReason ? `（${data.fallbackReason}）` : ""
-        showGlobalNotice(`企业简介已按规则生成${fallbackHint}，请确认是否插入`)
-      } else {
-        showGlobalNotice("企业简介已生成，请确认是否插入")
+      if (data.mode === "disambiguation" && data.disambiguationCandidates?.length) {
+        setEnterpriseProfileDisambiguationList(data.disambiguationCandidates.slice(0, 3))
+        setEnterpriseProfileDisambiguationOpen(true)
+        showGlobalNotice("识别到多个可能的企业主体，请任选一项后继续生成")
+        return
       }
+      applyCompanyProfileSummaryToPreview(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "企业简介生成失败")
+    } finally {
+      setEnterpriseProfileGenerating(false)
+    }
+  }
+
+  async function onContinueEnterpriseProfileAfterDisambiguation(choice: CompanyProfileDisambiguationCandidate) {
+    const customerName = (basicInfo.customerName || "").trim()
+    if (!customerName) {
+      setError("请先填写客户名称")
+      return
+    }
+    setEnterpriseProfileGenerating(true)
+    setError("")
+    try {
+      const data = await apiRequest<CompanyProfileSummaryResponse>("/api/v1/ai/company-profile-summary", {
+        method: "POST",
+        body: {
+          customerName,
+          location: basicInfo.location || "",
+          customerIndustry: basicInfo.customerIndustry || "",
+          enterpriseRevenue: basicInfo.enterpriseRevenue || "",
+          itStatus: basicInfo.itStatus || "",
+          disambiguationChoice: {
+            displayName: choice.displayName,
+            summary: choice.summary,
+          },
+        },
+      })
+      if (data.mode === "disambiguation" && data.disambiguationCandidates?.length) {
+        setEnterpriseProfileDisambiguationList(data.disambiguationCandidates.slice(0, 3))
+        showGlobalNotice("模型仍返回多个主体，请再次选择")
+        return
+      }
+      setEnterpriseProfileDisambiguationOpen(false)
+      setEnterpriseProfileDisambiguationList([])
+      applyCompanyProfileSummaryToPreview(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "企业简介生成失败")
     } finally {
@@ -968,6 +1418,14 @@ export default function RequirementImportPage() {
 
   async function onGenerateAssessmentPreviewByKimi() {
     if (kimiAssessing) return
+    if (!(basicInfo.customerName || "").trim()) {
+      setError("请先填写客户名称，再进行 Kimi 评估")
+      return
+    }
+    if (!basicInfo.productLines.length) {
+      setError("请先选择至少一条产品线，再进行 Kimi 评估")
+      return
+    }
     if (!basicInfo.projectName.trim()) {
       setError("请先填写项目名称，再进行 Kimi 评估")
       return
@@ -977,7 +1435,6 @@ export default function RequirementImportPage() {
     setKimiAssessProgressValue(8)
     setKimiAssessProgressLogs([`[${new Date().toLocaleTimeString("zh-CN", { hour12: false })}] 已启动 Kimi 评估任务`])
     setError("")
-    setMessage("")
     const appendAssessProgress = (text: string, progress?: number) => {
       setKimiAssessProgressLogs((logs) => [
         ...logs,
@@ -1336,7 +1793,6 @@ export default function RequirementImportPage() {
     () => kimiAssessProgressLogs[kimiAssessProgressLogs.length - 1] || "准备中...",
     [kimiAssessProgressLogs],
   )
-
   useEffect(() => {
     if (!kimiAssessProgressOpen) return
     const el = kimiAssessProgressLogRef.current
@@ -1347,19 +1803,19 @@ export default function RequirementImportPage() {
   return (
     <ModuleShell
       title="需求"
-      description="需求结构化导入、条目编辑、版本保存与回读。"
       breadcrumbs={[{ label: "需求" }]}
     >
-    <div className="min-w-0 max-w-full space-y-2 overflow-x-hidden [&_input]:border-border/70 [&_input]:bg-background/95 [&_input]:shadow-sm [&_select]:border-border/70 [&_select]:bg-background/95 [&_select]:shadow-sm [&_textarea]:border-border/70 [&_textarea]:bg-background/95 [&_textarea]:shadow-sm [&_td:has(>input)]:h-11 [&_td:has(>input)]:p-0 [&_td:has(>input)]:align-middle [&_td>input]:block [&_td>input]:w-full [&_td>input]:h-full [&_td>input]:min-h-9 [&_td>input]:rounded-none [&_td>input]:border-0 [&_td>input]:py-0 [&_td>input]:shadow-none">
+    <div className="wes-requirement-page min-w-0 max-w-full space-y-2 overflow-x-hidden [&_td:has(>input)]:h-11 [&_td:has(>input)]:p-0 [&_td:has(>input)]:align-middle [&_td>input]:block [&_td>input]:w-full [&_td>input]:h-full [&_td>input]:min-h-9 [&_td>input]:rounded-none [&_td>input]:border-0 [&_td>input]:py-0 [&_td>input]:shadow-none">
       <div className="space-y-1.5">
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/40 bg-card/50 p-3 shadow-sm backdrop-blur-sm transition-all duration-300 md:flex-nowrap">
-          <Button className="rounded-xl" variant="outline" onClick={() => void onCreateNewRequirement()} disabled={saving || createNewSubmitting}>
+        <div className="flex flex-wrap items-center gap-1.5 md:flex-nowrap">
+          <Button className="rounded-lg text-xs" size="sm" variant="outline" onClick={() => void onCreateNewRequirement()} disabled={saving || createNewSubmitting}>
             新建需求
           </Button>
-          <Button className="rounded-xl" onClick={() => void onSave()} disabled={saving}>
+          <Button className="rounded-lg text-xs" size="sm" onClick={() => void onSave()} disabled={saving}>
             {saving ? "保存中..." : "保存版本"}
           </Button>
           <VersionVcsToolbar
+            compact
             state={
               selectedVersionRecord
                 ? {
@@ -1372,7 +1828,13 @@ export default function RequirementImportPage() {
             }
             alwaysShowActions
             showStatusField={false}
-            onVersionHistory={() => setVersionHistoryOpen(true)}
+            onVersionHistory={() => {
+              if (!selectedVersionCode.trim()) {
+                toast.warning("请先选择需求版本")
+                return
+              }
+              setVersionHistoryOpen(true)
+            }}
             onCheckout={() => void onCheckout()}
             onCheckin={(checkinNote) => void onCheckin(checkinNote)}
             onUndoCheckout={() => void onUndoCheckout()}
@@ -1380,14 +1842,14 @@ export default function RequirementImportPage() {
             onForceUnlock={() => void onForceUnlock()}
             forceUnlockVisible={isAdmin}
           />
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">模型：{normalizeKimiModelName(basicInfoModelName)}</span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="text-[11px] leading-tight text-muted-foreground">模型：{normalizeKimiModelName(basicInfoModelName)}</span>
             <Popover open={kimiHelpOpen} onOpenChange={setKimiHelpOpen}>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
-                  variant="outline"
-                  className="rounded-xl"
+                  size="sm"
+                  className="wes-kimi-help-btn rounded-lg px-3 text-xs focus-visible:ring-violet-400/45"
                   onMouseEnter={openKimiHelpByHover}
                   onMouseLeave={scheduleCloseKimiHelpByHover}
                 >
@@ -1397,7 +1859,7 @@ export default function RequirementImportPage() {
               <PopoverContent
                 align="end"
                 sideOffset={8}
-                className="w-44 p-2"
+                className="w-44 gap-1 border border-violet-500/30 bg-gradient-to-b from-violet-950/[0.07] via-background to-background p-2 shadow-md shadow-violet-500/15"
                 onMouseEnter={openKimiHelpByHover}
                 onMouseLeave={scheduleCloseKimiHelpByHover}
               >
@@ -1405,7 +1867,7 @@ export default function RequirementImportPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-8 justify-start rounded-md px-2 text-xs"
+                    className="wes-kimi-help-menu-btn h-8 justify-start rounded-lg px-2 text-xs"
                     onClick={() => {
                       void onGenerateAssessmentPreviewByKimi()
                     }}
@@ -1416,7 +1878,7 @@ export default function RequirementImportPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-8 justify-start rounded-md px-2 text-xs"
+                    className="wes-kimi-help-menu-btn h-8 justify-start rounded-lg px-2 text-xs"
                     onClick={() => {
                       setKimiHelpOpen(false)
                       void onGenerateEnterpriseProfileByKimi()
@@ -1428,7 +1890,7 @@ export default function RequirementImportPage() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span
-                            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-muted-foreground/50 text-[10px] leading-none text-muted-foreground"
+                            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/45 text-[10px] leading-none text-white/90"
                             onClick={(e) => e.stopPropagation()}
                           >
                             ?
@@ -1443,9 +1905,12 @@ export default function RequirementImportPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-8 justify-start rounded-md px-2 text-xs"
+                    className="wes-kimi-help-menu-btn h-8 justify-start rounded-lg px-2 text-xs"
                     onClick={() => {
                       setKimiHelpOpen(false)
+                      setBasicInfoImportProgressStatus("")
+                      setBasicInfoImportProgressValue(0)
+                      setBasicInfoImportError("")
                       setBasicInfoImportVisible(true)
                     }}
                   >
@@ -1465,9 +1930,9 @@ export default function RequirementImportPage() {
           <CardHeader className="space-y-1 gap-1 px-4 pb-1.5 pt-1">
             <CardTitle className="text-sm">版本与上下文</CardTitle>
             <div className="grid gap-x-2 gap-y-1 md:grid-cols-3">
-              <p className="text-[11px] leading-tight text-muted-foreground">总方案版本号</p>
-              <p className="text-[11px] leading-tight text-muted-foreground">需求版本号</p>
-              <p className="text-[11px] leading-tight text-muted-foreground">检出状态</p>
+              <p className="wes-req-field-caption text-[11px] leading-tight">总方案版本号</p>
+              <p className="wes-req-field-caption text-[11px] leading-tight">需求版本号</p>
+              <p className="wes-req-field-caption text-[11px] leading-tight">检出状态</p>
               <select
                 className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
                 value={globalVersionCode}
@@ -1496,10 +1961,9 @@ export default function RequirementImportPage() {
                 {checkoutStatusText}
               </div>
             </div>
-            {message || error ? (
+            {error ? (
               <div className="pt-0.5">
-                {message ? <span className="text-xs text-emerald-600">{message}</span> : null}
-                {error ? <span className="text-xs text-destructive">{error}</span> : null}
+                <span className="text-xs text-destructive">{error}</span>
               </div>
             ) : null}
             {isReadonly ? (
@@ -1527,33 +1991,54 @@ export default function RequirementImportPage() {
         <CardContent className="space-y-2 px-4 pb-3 pt-0">
           <div className="grid gap-x-2 gap-y-1.5 md:grid-cols-3">
             <label className="space-y-0.5">
-              <span className="text-xs text-[#D97706]">客户名称</span>
-              <Input value={basicInfo.customerName} onChange={(e) => setBasicInfo((s) => ({ ...s, customerName: e.target.value }))} />
+              <span className="text-xs">
+                客户名称
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </span>
+              <Input
+                value={basicInfo.customerName}
+                onChange={(e) => setBasicInfo((s) => ({ ...s, customerName: e.target.value }))}
+                required
+                aria-required
+              />
             </label>
             <label className="space-y-0.5">
-              <span className="text-xs text-muted-foreground">地点</span>
+              <span className="text-xs">地点</span>
               <Input value={basicInfo.location} onChange={(e) => setBasicInfo((s) => ({ ...s, location: e.target.value }))} />
             </label>
             <label className="space-y-0.5">
-              <span className="text-xs text-muted-foreground">项目名称（必填）</span>
+              <span className="text-xs">
+                项目名称
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </span>
               <Input value={basicInfo.projectName} onChange={(e) => setBasicInfo((s) => ({ ...s, projectName: e.target.value }))} />
             </label>
             <label className="space-y-0.5">
-              <span className="text-xs text-muted-foreground">商机号</span>
+              <span className="text-xs">商机号</span>
               <Input value={basicInfo.opportunityNo} onChange={(e) => setBasicInfo((s) => ({ ...s, opportunityNo: e.target.value }))} />
             </label>
             <label className="space-y-0.5">
-              <span className="text-xs text-muted-foreground">产品线</span>
+              <span className="text-xs">
+                产品线
+                <span className="ml-0.5 text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </span>
               <Popover>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
                     className="h-8 w-full rounded-md border border-border/70 bg-background/95 px-2 text-left text-xs leading-8 shadow-sm"
+                    aria-required
                   >
                     {basicInfo.productLines.length ? (
                       <span className="block truncate">{basicInfo.productLines.join(" / ")}</span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">请选择产品线（可多选）</span>
+                      <span className="text-xs text-muted-foreground">请选择产品线（可多选，至少一项）</span>
                     )}
                   </button>
                 </PopoverTrigger>
@@ -1589,7 +2074,7 @@ export default function RequirementImportPage() {
               </Popover>
             </label>
             <label className="space-y-0.5">
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1 text-xs">
                 客户行业
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1625,7 +2110,7 @@ export default function RequirementImportPage() {
               </div>
             </label>
             <label className="space-y-0.5">
-              <span className="text-xs text-muted-foreground">企业营收</span>
+              <span className="text-xs">企业营收</span>
               <Input value={basicInfo.enterpriseRevenue} onChange={(e) => setBasicInfo((s) => ({ ...s, enterpriseRevenue: e.target.value }))} />
             </label>
             <label className="space-y-0.5">
@@ -1633,14 +2118,14 @@ export default function RequirementImportPage() {
               <Input value={basicInfo.itStatus} onChange={(e) => setBasicInfo((s) => ({ ...s, itStatus: e.target.value }))} />
             </label>
             <label className="space-y-0.5">
-              <span className="text-xs text-muted-foreground">预期上线时间</span>
+              <span className="text-xs">预期上线时间</span>
               <Input type="month" value={basicInfo.expectedGoLive} onChange={(e) => setBasicInfo((s) => ({ ...s, expectedGoLive: e.target.value }))} />
             </label>
           </div>
 
           <div className="space-y-2 rounded-lg border border-border/50 bg-secondary/20 p-2">
             <label className="block space-y-0.5">
-              <span className="text-xs text-muted-foreground">企业简介</span>
+              <span className="text-xs">企业简介</span>
               <textarea
                 ref={enterpriseProfileRef}
                 className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-2 py-1.5 text-sm"
@@ -1651,7 +2136,7 @@ export default function RequirementImportPage() {
               />
             </label>
             <label className="block space-y-0.5">
-              <span className="text-xs text-muted-foreground">项目背景和需求</span>
+              <span className="text-xs">项目背景和需求</span>
               <textarea
                 ref={projectBackgroundNeedsRef}
                 className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-2 py-1.5 text-sm"
@@ -1662,7 +2147,7 @@ export default function RequirementImportPage() {
               />
             </label>
             <label className="block space-y-0.5">
-              <span className="text-xs text-muted-foreground">项目目标</span>
+              <span className="text-xs">项目目标</span>
               <textarea
                 ref={projectGoalsRef}
                 className="w-full resize-none overflow-hidden rounded-md border border-input bg-background px-2 py-1.5 text-sm"
@@ -1721,13 +2206,18 @@ export default function RequirementImportPage() {
       <Dialog
         open={basicInfoImportVisible}
         onOpenChange={(open) => {
-          if (basicInfoImporting) return
-          setBasicInfoImportVisible(open)
+          if (!open) {
+            closeBasicInfoImportDialog()
+            return
+          }
+          setBasicInfoImportVisible(true)
+          setBasicInfoImportProgressStatus("")
+          setBasicInfoImportProgressValue(0)
         }}
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>导入 Excel 并解析基本情况</DialogTitle>
+            <DialogTitle>智能解析回填</DialogTitle>
             <DialogDescription>优先使用 KIMI {normalizeKimiModelName(basicInfoModelName)} 模型，失败时自动规则回填。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -1738,10 +2228,30 @@ export default function RequirementImportPage() {
               className="cursor-pointer transition-colors hover:bg-amber-50/70 dark:hover:bg-amber-900/20"
               onChange={(e) => setBasicInfoImportFile(e.target.files?.[0] || null)}
             />
+            <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
+              <Checkbox
+                id="basic-info-import-overwrite"
+                checked={basicInfoImportOverwriteNonEmpty}
+                disabled={basicInfoImporting}
+                onCheckedChange={(v) => setBasicInfoImportOverwriteNonEmpty(v === true)}
+              />
+              <Label htmlFor="basic-info-import-overwrite" className="cursor-pointer text-sm font-medium leading-snug">
+                是否覆盖非空字段
+              </Label>
+            </div>
             {basicInfoImportError ? <p className="text-xs text-destructive">{basicInfoImportError}</p> : null}
+            {basicInfoImporting || basicInfoImportProgressStatus ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-border/60 bg-secondary/10 px-3 py-2 text-sm text-muted-foreground">
+                  {basicInfoImporting ? "当前进度" : "处理记录"}：
+                  {basicInfoImportProgressStatus || "准备中..."}
+                </div>
+                <Progress value={basicInfoImportProgressValue} />
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" className="rounded-xl" onClick={() => setBasicInfoImportVisible(false)} disabled={basicInfoImporting}>
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => closeBasicInfoImportDialog()}>
               取消
             </Button>
             <Button type="button" className="rounded-xl" onClick={() => void onImportBasicInfoByExcel()} disabled={basicInfoImporting}>
@@ -1795,6 +2305,57 @@ export default function RequirementImportPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={enterpriseProfileDisambiguationOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEnterpriseProfileDisambiguationOpen(false)
+            setEnterpriseProfileDisambiguationList([])
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>请选择企业主体</DialogTitle>
+            <DialogDescription>
+              根据客户名称匹配到多个可能主体，请任选最符合的一项；系统将据此再次调用 Kimi 生成结构化企业简介与关联字段（最多展示 3 项）。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[min(420px,55vh)] space-y-2 overflow-y-auto pr-1">
+            {enterpriseProfileDisambiguationList.map((c) => (
+              <button
+                key={`${c.id}-${c.displayName}`}
+                type="button"
+                disabled={enterpriseProfileGenerating}
+                className={cn(
+                  "w-full rounded-xl border border-border/70 bg-card px-4 py-3 text-left text-sm transition-colors",
+                  "hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  enterpriseProfileGenerating && "pointer-events-none opacity-60",
+                )}
+                onClick={() => void onContinueEnterpriseProfileAfterDisambiguation(c)}
+              >
+                <p className="font-medium text-foreground">{c.displayName}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{c.summary}</p>
+              </button>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              disabled={enterpriseProfileGenerating}
+              onClick={() => {
+                setEnterpriseProfileDisambiguationOpen(false)
+                setEnterpriseProfileDisambiguationList([])
+              }}
+            >
+              取消
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={enterpriseProfilePreviewVisible}
@@ -1957,29 +2518,29 @@ export default function RequirementImportPage() {
 
               <div className="grid gap-x-4 gap-y-2 rounded-lg border border-border/60 bg-secondary/10 p-3 text-sm sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
                 <div className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="shrink-0 text-muted-foreground">报价模式</span>
+                  <span className="wes-req-field-caption shrink-0">报价模式</span>
                   <span className="min-w-0 truncate font-medium text-foreground">
                     {kimiAssessmentPreview.assessmentDraft.quoteMode || "—"}
                   </span>
                 </div>
                 <div className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="shrink-0 text-muted-foreground">用户数</span>
+                  <span className="wes-req-field-caption shrink-0">用户数</span>
                   <span className="font-medium tabular-nums text-primary">{kimiAssessmentPreview.assessmentDraft.userCount}</span>
                 </div>
                 <div className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="shrink-0 text-muted-foreground">组织数</span>
+                  <span className="wes-req-field-caption shrink-0">组织数</span>
                   <span className="font-medium tabular-nums text-primary">{kimiAssessmentPreview.assessmentDraft.orgCount}</span>
                 </div>
                 <div className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="shrink-0 text-muted-foreground">组织相似度</span>
+                  <span className="wes-req-field-caption shrink-0">组织相似度</span>
                   <span className="font-medium tabular-nums text-primary">{kimiAssessmentPreview.assessmentDraft.orgSimilarity}</span>
                 </div>
                 <div className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="shrink-0 text-muted-foreground">难度系数</span>
+                  <span className="wes-req-field-caption shrink-0">难度系数</span>
                   <span className="font-medium tabular-nums text-primary">{kimiAssessmentPreview.assessmentDraft.difficultyFactor}</span>
                 </div>
                 <div className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="shrink-0 text-muted-foreground">总人天</span>
+                  <span className="wes-req-field-caption shrink-0">总人天</span>
                   <span className="font-medium tabular-nums text-primary">
                     {kimiAssessmentPreview.assessmentDraft.moduleItems.reduce(
                       (sum, item) => sum + Number(item.suggestedDays || 0),
@@ -1988,11 +2549,11 @@ export default function RequirementImportPage() {
                   </span>
                 </div>
                 <div className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="shrink-0 text-muted-foreground">开发总人天</span>
+                  <span className="wes-req-field-caption shrink-0">开发总人天</span>
                   <span className="font-medium tabular-nums text-primary">{kimiDevTotalDays > 0 ? kimiDevTotalDays : "未识别"}</span>
                 </div>
                 <div className="flex min-w-0 items-baseline gap-1.5 sm:col-span-2 md:col-span-4 xl:col-span-7">
-                  <span className="shrink-0 text-muted-foreground">产品线</span>
+                  <span className="wes-req-field-caption shrink-0">产品线</span>
                   <span className="min-w-0 break-words font-medium text-foreground">
                     {kimiAssessmentPreview.assessmentDraft.productLines.length
                       ? kimiAssessmentPreview.assessmentDraft.productLines.join(" / ")
@@ -2081,10 +2642,10 @@ export default function RequirementImportPage() {
                   {kimiAssessmentPreview.assessmentDraft.moduleItems.length ? (
                     <Table
                       containerClassName="max-h-64 min-w-0 overflow-x-auto overflow-y-auto print:max-h-none print:h-auto print:overflow-visible"
-                      className="min-w-[520px] table-fixed [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0"
+                      className="min-w-[520px] table-fixed"
                     >
-                      <TableHeader className="sticky top-0 z-20 backdrop-blur-sm print:static print:z-auto">
-                        <TableRow className="border-border/50 hover:bg-transparent">
+                      <TableHeader className={wesTableHeaderStickyClassName}>
+                        <TableRow className={wesTableToolbarHeaderRowClassName}>
                           <TableHead className="w-[92px] max-w-[92px] whitespace-nowrap px-2" data-manual-width="1">
                             云产品
                           </TableHead>
@@ -2446,9 +3007,9 @@ export default function RequirementImportPage() {
                 if (row.id === DEV_OVERVIEW_TOTAL_ROW_ID) {
                   return (
                     <TableRow key={row.id} className="bg-secondary/25 font-medium hover:bg-secondary/35">
-                      <TableCell className="h-11 align-middle">合计</TableCell>
-                      <TableCell className="h-11 align-middle">{devOverviewRows.length} 行</TableCell>
-                      <TableCell className="h-11 align-middle text-muted-foreground">开发总人天按合计列计入 KIMI 评估范围</TableCell>
+                      <TableCell colSpan={3} className="h-11 align-middle">
+                        合计
+                      </TableCell>
                       <TableCell className="h-11 align-middle">{devSummary.coding.toFixed(1)}</TableCell>
                       <TableCell className="h-11 align-middle">{devSummary.analysis.toFixed(1)}</TableCell>
                       <TableCell className="h-11 align-middle">{devSummary.testing.toFixed(1)}</TableCell>
@@ -2650,9 +3211,9 @@ export default function RequirementImportPage() {
       <VersionHistoryDialog
         open={versionHistoryOpen}
         onOpenChange={setVersionHistoryOpen}
-        title="需求导入版本历史"
-        description="按更新时间由新到旧排列，含已归档版本。"
-        rows={recordsToVersionHistoryRows(versionRecords)}
+        title="需求版本历史"
+        description="仅展示与当前所选版本同一脉络（检入、升版）的记录；按更新时间由新到旧排列，含已归档版本。"
+        rows={recordsToVersionHistoryRows(requirementVersionHistoryRecords)}
         highlightVersionCode={selectedVersionCode.trim() || undefined}
       />
     </ModuleShell>

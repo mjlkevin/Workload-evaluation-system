@@ -12,8 +12,12 @@ import { asString, normalizeCellText, parseCellNumber } from "../utils/helpers";
 import { normalizeKimiModelName } from "../utils/model-name";
 import { ok, fail } from "../utils/response";
 import { requireRole } from "../middleware/auth";
-import { loadRequirementSystemConfigStore } from "../modules/system/system.repository";
+import {
+  loadRequirementSystemConfigStore,
+  resolveActiveRequirementKimiApiKey,
+} from "../modules/system/system.repository";
 import { buildKimiAssessmentDraftMarkdown } from "../utils/kimi-assessment-markdown";
+import { isKimiTemperatureMustBeOneError, resolveKimiCompletionTemperature } from "../utils/kimi-completion-params";
 
 // -------------------- 解析辅助函数 --------------------
 
@@ -44,8 +48,17 @@ function parseJsonFromModelText(text: string): Record<string, unknown> {
 
 function pickModelField(input: Record<string, unknown>, keys: string[]): string {
   for (const key of keys) {
+    if (!(key in input)) continue;
     const value = input[key];
-    if (typeof value === "string" && asString(value)) return asString(value);
+    if (value === null || value === undefined) continue;
+    if (typeof value === "boolean") continue;
+    if (typeof value === "object") continue;
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) continue;
+      return String(value);
+    }
+    const s = asString(value);
+    if (s) return s;
   }
   return "";
 }
@@ -116,13 +129,20 @@ function normalizeProductModuleRows(
   let lastPartyALead = "";
   const userCountByModule = new Map<string, string>();
   let sharedBusinessUserCount = "";
+  /** Excel 合并或仅首行填写「用户数」时，后续空行沿用同一列最近出现的值 */
+  let lastUserCountColumnValue = "";
 
   for (const row of rows) {
     const productDomain = normalizeProductDomainName(asString(row.productDomain) || lastProductDomain);
     const moduleName = asString(row.moduleName) || lastModuleName;
     const subModule = asString(row.subModule) || lastSubModule;
 
-    let userCount = asString(row.userCount);
+    const rawUserCountCell = asString(row.userCount).trim();
+    if (rawUserCountCell) {
+      lastUserCountColumnValue = rawUserCountCell;
+    }
+
+    let userCount = rawUserCountCell || lastUserCountColumnValue;
     if (userCount) {
       userCountByModule.set(moduleName, userCount);
       if (/财务云|供应链云/.test(moduleName)) {
@@ -331,10 +351,18 @@ function normalizeRequirementImportData(input: Record<string, unknown>): Require
     }))
     .filter((row) => Object.values(row).some((x) => (typeof x === "number" ? x > 0 : asString(x))));
 
-  const productModuleRows = asModelObjectArray(source.productModuleRows || source.productModules || source["产品及模块信息"])
+  const productModuleRows = asModelObjectArray(
+    source.productModuleRows ||
+      source.productModules ||
+      source["产品及模块信息"] ||
+      source["4.产品及模块信息"] ||
+      source["产品模块"]
+  )
     .map((row) => ({
-      productDomain: normalizeProductDomainName(pickModelField(row, ["productDomain", "产品领域"])),
-      moduleName: pickModelField(row, ["moduleName", "模块名称"]),
+      productDomain: normalizeProductDomainName(
+        pickModelField(row, ["productDomain", "产品领域", "产品分组", "产品组", "云产品"])
+      ),
+      moduleName: pickModelField(row, ["moduleName", "模块名称", "应用", "模块", "SKU", "sku"]),
       subModule: pickModelField(row, ["subModule", "子模块"]),
       userCount: pickModelField(row, ["userCount", "用户数"]),
       implementationOrgCount: pickModelField(row, ["implementationOrgCount", "实施组织数量"]),
@@ -414,12 +442,18 @@ function mergeBasicInfo(primary: BasicProjectInfo, fallback: BasicProjectInfo): 
   };
 }
 
-function mergeRequirementImportData(primary: RequirementImportData, fallback: RequirementImportData): RequirementImportData {
+export function mergeRequirementImportData(primary: RequirementImportData, fallback: RequirementImportData): RequirementImportData {
+  const productModuleRows = requirementProductModuleRowsHaveMeaningfulContent(primary.productModuleRows)
+    ? primary.productModuleRows
+    : fallback.productModuleRows.length
+      ? fallback.productModuleRows
+      : primary.productModuleRows;
+
   return {
     valuePropositionRows: primary.valuePropositionRows.length ? primary.valuePropositionRows : fallback.valuePropositionRows,
     businessNeedRows: primary.businessNeedRows.length ? primary.businessNeedRows : fallback.businessNeedRows,
     devOverviewRows: primary.devOverviewRows.length ? primary.devOverviewRows : fallback.devOverviewRows,
-    productModuleRows: primary.productModuleRows.length ? primary.productModuleRows : fallback.productModuleRows,
+    productModuleRows,
     implementationScopeRows: primary.implementationScopeRows.length ? primary.implementationScopeRows : fallback.implementationScopeRows,
     meetingNotes: primary.meetingNotes || fallback.meetingNotes,
     keyPointRows: primary.keyPointRows.length ? primary.keyPointRows : fallback.keyPointRows
@@ -474,27 +508,76 @@ function toFriendlyFallbackReason(reason: string): string {
   if (key === "kimi_auth_failed") return "Kimi 鉴权失败，请检查 API Key 配置";
   if (key.includes("engine_overloaded_error")) return "Kimi 服务繁忙（引擎拥塞），已自动降级为规则回填";
   if (key.startsWith("kimi_request_failed:429")) return "Kimi 请求触发限流（429），已自动降级为规则回填";
+  if (key === "kimi_request_timeout") return "等待 Kimi 响应超时，已自动降级为规则回填";
   return key;
+}
+
+function resolveKimiCompletionTimeoutMs(value: unknown): number {
+  const n = Number(value);
+  const base = Number.isFinite(n) && n > 0 ? n : 120_000;
+  return Math.min(120_000, Math.max(3_000, Math.floor(base)));
+}
+
+function isFetchAbortError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  if (e.name === "AbortError" || e.name === "TimeoutError") return true;
+  return /aborted|timeout/i.test(e.message);
+}
+
+async function fetchKimiCompletionOnce(
+  endpoint: string,
+  apiKey: string,
+  jsonBody: string,
+  timeoutMs: number,
+): Promise<globalThis.Response> {
+  try {
+    return await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: jsonBody,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (e) {
+    if (isFetchAbortError(e)) throw new Error("kimi_request_timeout");
+    throw e;
+  }
 }
 
 async function requestKimiCompletion(params: {
   endpoint: string;
   apiKey: string;
   body: Record<string, unknown>;
+  /** 单次 HTTP 等待上限（毫秒），与系统管理「KIMI评估 → 超时」一致 */
+  timeoutMs: number;
 }): Promise<globalThis.Response> {
+  let body: Record<string, unknown> = { ...params.body };
   const maxAttempts = 3;
+  const timeoutMs = resolveKimiCompletionTimeoutMs(params.timeoutMs);
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const response = await fetch(params.endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${params.apiKey}`
-      },
-      body: JSON.stringify(params.body)
-    });
+    const response = await fetchKimiCompletionOnce(params.endpoint, params.apiKey, JSON.stringify(body), timeoutMs);
     if (response.ok) return response;
 
-    const errorText = await response.text();
+    let errorText = await response.text();
+    if (isKimiTemperatureMustBeOneError(response.status, errorText) && Number(body.temperature) !== 1) {
+      body = { ...body, temperature: 1 };
+      const second = await fetchKimiCompletionOnce(params.endpoint, params.apiKey, JSON.stringify(body), timeoutMs);
+      if (second.ok) return second;
+      errorText = await second.text();
+      const reason2 = buildKimiRequestError(second.status, errorText);
+      const retryable2 =
+        reason2 === "kimi_engine_overloaded" ||
+        reason2 === "kimi_rate_limited" ||
+        reason2 === "kimi_service_unavailable";
+      if (retryable2 && attempt < maxAttempts) {
+        await sleep(350 * 2 ** (attempt - 1));
+        continue;
+      }
+      throw new Error(reason2);
+    }
+
     const reason = buildKimiRequestError(response.status, errorText);
     const retryable =
       reason === "kimi_engine_overloaded" ||
@@ -514,12 +597,14 @@ async function parseRequirementImportByKimi(params: {
   apiKey: string;
   model: string;
   workbookText: string;
+  timeoutMs: number;
 }): Promise<{ basicInfo: BasicProjectInfo; requirementImportData: RequirementImportData; rawContent: string }> {
   const baseUrl = asString(params.apiUrl).replace(/\/+$/, "") || "https://api.moonshot.cn/v1";
   const endpoint = `${baseUrl}/chat/completions`;
+  const model = asString(params.model) || "kimi-k2.5";
   const body = {
-    model: asString(params.model) || "kimi-k2.5",
-    temperature: 0.1,
+    model,
+    temperature: resolveKimiCompletionTemperature(model, 0.1),
     response_format: { type: "json_object" },
     messages: [
       {
@@ -535,7 +620,11 @@ async function parseRequirementImportByKimi(params: {
           `格式为："门类编码 门类名称 > 大类编码 大类名称 > 中类编码 中类名称 > 小类编码 小类名称"。` +
           `例如：I 信息传输、软件和信息技术服务业 > 65 软件和信息技术服务业 > 651 软件开发 > 6510 软件开发。\n` +
           `若原文无法确定精确行业：仍需给出“最可能的建议国标四级分类”，并写入 basicInfo.customerIndustrySuggestion 字段（格式同上）。` +
-          `同时 basicInfo.customerIndustry 可为空字符串，不能输出非标准格式文本。\n\n` +
+          `同时 basicInfo.customerIndustry 可为空字符串，不能输出非标准格式文本。\n` +
+          `要求：requirementImportData.productModuleRows 为数组；必须根据工作表「4.产品及模块信息」等同名/含「产品及模块」的表格逐行抽取。` +
+          `每行对象字段：productDomain=「产品分组」或「产品领域」（合并单元格向下沿用上一分组），moduleName=「应用」或「模块名称」，userCount=「用户数」（可为数字）；` +
+          `忽略 REC、RILHK、RILNS 等组织勾选列。若无该表则 productModuleRows 为 []。\n` +
+          `顶层 JSON 须包含 basicInfo 与 requirementImportData（含各块 rows 与 meetingNotes 等），键名使用英文驼峰。\n\n` +
           `${params.workbookText}`
       }
     ]
@@ -544,7 +633,8 @@ async function parseRequirementImportByKimi(params: {
   const response = await requestKimiCompletion({
     endpoint,
     apiKey: params.apiKey,
-    body
+    body,
+    timeoutMs: params.timeoutMs,
   });
   
   const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
@@ -598,10 +688,59 @@ function pickCompanyProfileField(parsed: Record<string, unknown>, keys: string[]
   return "";
 }
 
+function jsonTruth(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === "string" && /^(true|yes|1|需要|是)$/i.test(value.trim())) return true;
+  return false;
+}
+
+function normalizeCompanyProfileDisambiguationCandidates(
+  parsed: Record<string, unknown>
+): Array<{ displayName: string; summary: string }> {
+  const raw = parsed.candidates ?? parsed.options ?? parsed.choices ?? parsed.entities;
+  const arr = asModelObjectArray(raw);
+  const out: Array<{ displayName: string; summary: string }> = [];
+  for (const item of arr) {
+    const displayName = pickModelField(item, [
+      "displayName",
+      "name",
+      "title",
+      "companyName",
+      "企业名称",
+      "主体名称",
+      "法定名称"
+    ]);
+    const summary = pickModelField(item, ["summary", "brief", "description", "detail", "区别说明", "区分", "线索"]);
+    if (!displayName.trim()) continue;
+    out.push({
+      displayName: displayName.trim(),
+      summary: (summary || "").trim() || "（暂无区分说明）"
+    });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
 const PLACEHOLDER_REVENUE =
   "未公开：公开渠道未见可靠营收披露，请结合客户访谈、招投标或财报手工补充（模型未返回有效字段）。";
 const PLACEHOLDER_IT =
   "信息有限：模型未返回可信信息化描述，请访谈确认是否已建设 ERP/CRM/主数据/集成平台及数据治理现状。";
+
+type CompanyProfileKimiResult =
+  | {
+      kind: "profile";
+      enterpriseProfile: string;
+      location: string;
+      customerIndustry: string;
+      enterpriseRevenue: string;
+      itStatus: string;
+      rawContent: string;
+    }
+  | {
+      kind: "disambiguation";
+      candidates: Array<{ id: string; displayName: string; summary: string }>;
+      rawContent: string;
+    };
 
 async function summarizeCompanyProfileByKimi(params: {
   apiUrl: string;
@@ -612,14 +751,9 @@ async function summarizeCompanyProfileByKimi(params: {
   customerIndustry?: string;
   enterpriseRevenue?: string;
   itStatus?: string;
-}): Promise<{
-  enterpriseProfile: string;
-  location: string;
-  customerIndustry: string;
-  enterpriseRevenue: string;
-  itStatus: string;
-  rawContent: string;
-}> {
+  timeoutMs: number;
+  disambiguationChoice?: { displayName: string; summary?: string };
+}): Promise<CompanyProfileKimiResult> {
   const baseUrl = asString(params.apiUrl).replace(/\/+$/, "") || "https://api.moonshot.cn/v1";
   const endpoint = `${baseUrl}/chat/completions`;
   const knownContextLines = [
@@ -629,47 +763,87 @@ async function summarizeCompanyProfileByKimi(params: {
     params.enterpriseRevenue ? `已知规模/营收：${params.enterpriseRevenue}` : "",
     params.itStatus ? `已知信息化现状：${params.itStatus}` : ""
   ].filter(Boolean);
-  
+
+  const resolutionIntro = params.disambiguationChoice
+    ? `【已选主体】用户已确认本次企业画像的唯一目标主体为「${params.disambiguationChoice.displayName}」。` +
+      `区分线索：${(params.disambiguationChoice.summary || "").trim() || "无"}。\n` +
+      `你必须以该主体为目标输出：needsDisambiguation=false、candidates=[]，并完整填充 enterpriseProfile 等五个字段。禁止再次输出待选列表或要求用户选择。\n\n`
+    : "";
+
+  const systemPrompt =
+    "你是企业经营分析与信息摘要助手。请只输出 JSON 对象，不要输出任何解释文字。\n\n" +
+    "【消歧】顶层必须包含 needsDisambiguation（布尔）与 candidates（数组，可为空）。\n" +
+    "- 若公开信息足以唯一确定「客户名称」对应的企业主体：needsDisambiguation=false、candidates=[]，并正常填充 enterpriseProfile、location、customerIndustry、enterpriseRevenue、itStatus（均需非空字符串，口径见用户消息）。\n" +
+    "- 若存在多个名称相近、易混淆且无法可靠唯一匹配的不同主体：needsDisambiguation=true，candidates 最多 3 项，每项含 displayName（完整常用名称）与 summary（不超过 80 字的关键区分信息）。此时五个画像字段必须均为空字符串 \"\"。禁止编造画像字段。\n\n" +
+    "【画像字段口径】（仅当 needsDisambiguation=false 时）若公开信息不足，请基于行业公开口径与行业常识给出审慎估计，并在表述中标注“估计/区间/未公开”。enterpriseProfile 为 120-220 字中文简介，至少 2 处可量化信息。customerIndustry 按 GB/T 4754 四级「编码+名称」链。";
+
+  const userPrompt =
+    resolutionIntro +
+    `请根据客户名称与已知信息，输出企业画像 JSON。\n\n` +
+    `输出要求：\n` +
+    `1) 仅输出 JSON，不要 Markdown，不要代码块。\n` +
+    `2) 顶层字段顺序建议：needsDisambiguation、candidates、enterpriseProfile、location、customerIndustry、enterpriseRevenue、itStatus。\n` +
+    `3) 当 needsDisambiguation=false 时：五个画像字段必须完整、非空（按下列口径）。\n` +
+    `4) 强调“高度提炼与总结”，避免空泛口号，优先写经营情况、营收情况、财务情况。\n` +
+    `5) enterpriseProfile 为 120-220 字中文简介，要求至少包含 2 处可量化信息（如营收区间、增长率、利润率、资产规模、员工规模、门店/产能等），若无公开精确值可给区间并标注估计。\n` +
+    `6) location 返回客户主要经营/实施所在地（省市或城市），若无公开信息可给出最可信地点并标注“待核实”。\n` +
+    `7) customerIndustry 必须按《国民经济行业分类》（GB/T 4754）四级分类返回，且每一级都必须为“编码+名称”，格式："门类编码 门类名称 > 大类编码 大类名称 > 中类编码 中类名称 > 小类编码 小类名称"。\n` +
+    `8) enterpriseRevenue 必须包含数值或区间（例如“约50-80亿元”或“未公开，行业估计30-50亿元”），并尽量补充一条财务相关支撑信息（如毛利率区间/利润水平/资产规模/现金流特征）。\n` +
+    `9) itStatus 描述信息化现状成熟度，并尽量给出具体系统或建设内容（如 ERP/CRM/MES/BI/主数据/集成平台等）；若信息可信度低请明确标注“信息有限”。\n` +
+    `10) 数据支撑原则：优先公开数据；无公开数据时使用行业估计并显式说明“估计依据为行业均值/同规模企业区间”。\n\n` +
+    `已知信息：\n${knownContextLines.join("\n")}\n\n` +
+    `结构示例（唯一主体）：` +
+    `{"needsDisambiguation":false,"candidates":[],"enterpriseProfile":"","location":"","customerIndustry":"","enterpriseRevenue":"","itStatus":""}\n` +
+    `结构示例（需用户选择，画像字段必须为空字符串）：` +
+    `{"needsDisambiguation":true,"candidates":[{"displayName":"","summary":""}],"enterpriseProfile":"","location":"","customerIndustry":"","enterpriseRevenue":"","itStatus":""}`;
+
+  const model = asString(params.model) || "kimi-k2.5";
   const body = {
-    model: asString(params.model) || "kimi-k2.5",
-    temperature: 0.1,
+    model,
+    temperature: resolveKimiCompletionTemperature(model, 0.1),
     response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
-        content:
-          "你是企业经营分析与信息摘要助手。请只输出 JSON 对象，不要输出任何解释文字。必须返回且仅返回以下五个字段：enterpriseProfile、location、customerIndustry、enterpriseRevenue、itStatus。五个字段都必须是非空字符串。若公开信息不足，请基于行业公开口径与行业常识给出审慎估计，并在表述中标注“估计/区间/未公开”。"
+        content: systemPrompt
       },
       {
         role: "user",
-        content:
-          `请根据客户名称与已知信息，输出该客户的企业画像并严格按指定 JSON 字段返回。\n\n` +
-          `输出要求：\n` +
-          `1) 仅输出 JSON，不要 Markdown，不要代码块。\n` +
-          `2) 字段必须完整：enterpriseProfile、location、customerIndustry、enterpriseRevenue、itStatus。\n` +
-          `3) 强调“高度提炼与总结”，避免空泛口号，优先写经营情况、营收情况、财务情况。\n` +
-          `4) enterpriseProfile 为 120-220 字中文简介，要求至少包含 2 处可量化信息（如营收区间、增长率、利润率、资产规模、员工规模、门店/产能等），若无公开精确值可给区间并标注估计。\n` +
-          `5) location 返回客户主要经营/实施所在地（省市或城市），若无公开信息可给出最可信地点并标注“待核实”。\n` +
-          `6) customerIndustry 必须按《国民经济行业分类》（GB/T 4754）四级分类返回，且每一级都必须为“编码+名称”，格式："门类编码 门类名称 > 大类编码 大类名称 > 中类编码 中类名称 > 小类编码 小类名称"。\n` +
-          `7) enterpriseRevenue 必须包含数值或区间（例如“约50-80亿元”或“未公开，行业估计30-50亿元”），并尽量补充一条财务相关支撑信息（如毛利率区间/利润水平/资产规模/现金流特征）。\n` +
-          `8) itStatus 描述信息化现状成熟度，并尽量给出具体系统或建设内容（如 ERP/CRM/MES/BI/主数据/集成平台等）；若信息可信度低请明确标注“信息有限”。\n` +
-          `9) 数据支撑原则：优先公开数据；无公开数据时使用行业估计并显式说明“估计依据为行业均值/同规模企业区间”。\n\n` +
-          `已知信息：\n${knownContextLines.join("\n")}\n\n` +
-          `请按如下结构返回：\n` +
-          `{"enterpriseProfile":"","location":"","customerIndustry":"","enterpriseRevenue":"","itStatus":""}`
+        content: userPrompt
       }
     ]
   };
-  
+
   const response = await requestKimiCompletion({
     endpoint,
     apiKey: params.apiKey,
-    body
+    body,
+    timeoutMs: params.timeoutMs,
   });
-  
+
   const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = asString(json?.choices?.[0]?.message?.content);
   const parsed = parseJsonFromModelText(content);
+
+  if (!params.disambiguationChoice) {
+    const needs =
+      jsonTruth(parsed.needsDisambiguation) ||
+      jsonTruth(parsed.needDisambiguation) ||
+      jsonTruth(parsed.disambiguation);
+    const candidates = normalizeCompanyProfileDisambiguationCandidates(parsed);
+    if (needs && candidates.length > 0) {
+      return {
+        kind: "disambiguation",
+        candidates: candidates.map((c, idx) => ({
+          id: String(idx + 1),
+          displayName: c.displayName,
+          summary: c.summary
+        })),
+        rawContent: content
+      };
+    }
+  }
+
   let location =
     pickCompanyProfileField(parsed, ["location", "地点", "所在地区", "地区", "城市"]) || asString(params.location);
   const rawIndustry = pickCompanyProfileField(parsed, ["customerIndustry", "客户行业", "行业"]);
@@ -717,7 +891,15 @@ async function summarizeCompanyProfileByKimi(params: {
     /\b[A-Z]\s*>\s*\d{2}\s*>\s*\d{3}\s*>\s*\d{4}\b/g,
     customerIndustry,
   );
-  return { enterpriseProfile: enterpriseProfileNormalized, location, customerIndustry, enterpriseRevenue, itStatus, rawContent: content };
+  return {
+    kind: "profile",
+    enterpriseProfile: enterpriseProfileNormalized,
+    location,
+    customerIndustry,
+    enterpriseRevenue,
+    itStatus,
+    rawContent: content
+  };
 }
 
 async function chatWithKimi(params: {
@@ -735,9 +917,10 @@ async function chatWithKimi(params: {
     }))
     .filter((item) => item.content);
     
+  const model = asString(params.model) || "kimi-k2.5";
   const body = {
-    model: asString(params.model) || "kimi-k2.5",
-    temperature: 0.3,
+    model,
+    temperature: resolveKimiCompletionTemperature(model, 0.3),
     messages: [
       {
         role: "system",
@@ -747,7 +930,7 @@ async function chatWithKimi(params: {
     ]
   };
   
-  const response = await fetch(endpoint, {
+  let response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -755,7 +938,21 @@ async function chatWithKimi(params: {
     },
     body: JSON.stringify(body)
   });
-  
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    if (isKimiTemperatureMustBeOneError(response.status, errorText) && Number(body.temperature) !== 1) {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${params.apiKey}`
+        },
+        body: JSON.stringify({ ...body, temperature: 1 })
+      });
+    }
+  }
+
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`kimi_chat_failed:${response.status}:${errorText.slice(0, 240)}`);
@@ -814,6 +1011,41 @@ type KimiAssessmentPreviewInput = {
     promptProfile?: string;
   };
 };
+
+/** 产品及模块表是否有任意一行有效（域/模块/子模块任一非空） */
+function snapshotHasProductModuleGrid(snapshot: KimiAssessmentSnapshot | undefined): boolean {
+  if (!snapshot) return false;
+  const rows = Array.isArray(snapshot.productModuleRows) ? snapshot.productModuleRows : [];
+  return requirementProductModuleRowsHaveMeaningfulContent(
+    rows.map((raw) => {
+      const row = asModelObject(raw);
+      return {
+        productDomain: asString(row.productDomain),
+        moduleName: asString(row.moduleName),
+        subModule: asString(row.subModule),
+        userCount: asString(row.userCount),
+        implementationOrgCount: asString(row.implementationOrgCount),
+        pilotOrgCount: asString(row.pilotOrgCount),
+        partyBLead: asString(row.partyBLead),
+        partyALead: asString(row.partyALead)
+      };
+    })
+  );
+}
+
+/** 与 snapshotHasProductModuleGrid 同口径：至少一行含产品域/模块/子模块文案（排除仅用户数等） */
+function requirementProductModuleRowsHaveMeaningfulContent(rows: RequirementImportData["productModuleRows"]): boolean {
+  if (!rows.length) return false;
+  return rows.some(
+    (r) =>
+      asString(r.productDomain).trim() ||
+      asString(r.moduleName).trim() ||
+      asString(r.subModule).trim()
+  );
+}
+
+const KIMI_ASSESSMENT_NO_PRODUCT_MODULE_SYSTEM_SUPPLEMENT =
+  "\n\n【无产品及模块表时的推断】若 requirementSnapshot.productModuleRows 为空或无有效行，不得因此只返回极少 moduleItems。你必须结合 businessNeedRows（业务需求）、keyPointRows（问题一览/关键点）、devOverviewRows、implementationScopeRows、meetingNotes 与 basicInfo.productLines（产品线），在遵守上文域级/平台级拆分规则的前提下，**语义推理**本次实施应纳入评估的 cloudProduct 与 skuName；每条 moduleItems.reason 须点名对应的业务需求或关键点依据，并在 assumptions 中说明「产品及模块表为空，模块清单由需求语义推断」。";
 
 /** 实施域级「云产品」（与产品模块表 moduleName 一致），不得出现在平台产品线下的 skuName 中 */
 const KINGDEE_DOMAIN_IMPLEMENTATION_CLOUDS = new Set<string>([
@@ -1400,19 +1632,28 @@ async function generateAssessmentDraftByKimi(params: {
   promptTemplate: string;
   payload: KimiAssessmentPreviewInput;
   fallback: KimiAssessmentDraft;
+  timeoutMs: number;
 }): Promise<{ draft: KimiAssessmentDraft; rawContent: string }> {
   const baseUrl = asString(params.apiUrl).replace(/\/+$/, "") || "https://api.moonshot.cn/v1";
   const endpoint = `${baseUrl}/chat/completions`;
+  const model = asString(params.model) || "kimi-k2.5";
+  const assessSnap = asModelObject(params.payload.requirementSnapshot) as KimiAssessmentSnapshot;
+  const noProductModuleGrid = !snapshotHasProductModuleGrid(assessSnap);
+  const defaultSystemPrompt =
+    "你是资深项目经理 + 资深实施顾问。你不是做简单 SKU 对照，而是要基于需求全量信息做综合实施评估。必须只返回 JSON。字段固定：assessmentDraft.quoteMode/productLines/userCount/orgCount/orgSimilarity/difficultyFactor/moduleItems/risks/assumptions。moduleItems 每项字段：cloudProduct/skuName/moduleName/standardDays/suggestedDays/reason。所有数值字段必须为非负数，orgSimilarity 和 difficultyFactor 范围 0-1。评估时必须综合：basicInfo（行业、规模、上线目标）、businessNeedRows（业务复杂度）、devOverviewRows（开发基线）、implementationScopeRows（组织范围与地域）、meetingNotes（隐性约束）、keyPointRows（重点风险）。reason 必须体现增加/减少人天的业务原因与实施原因，不能仅写“按模板匹配”。禁止把“产品名/版本名/平台名（如金蝶AI星空、旗舰版）”直接当成 SKU，必须下钻到可实施功能项。财务云、供应链云等是实施域级云产品，不得填入 skuName 并挂在金蝶AI星空下冒充 SKU；域级人天归 cloudProduct=该域名，skuName 仅写子模块。若信息不足，给出审慎估算并在 risks/assumptions 明确不确定性来源。严禁仅凭业务需求正文中出现与 SKU 同名的词、或「总账、报表、出纳」类标准功能并列枚举，就认定 suggestedDays 必须高于 standardDays；须结合该条需求完整语义与实施顾问角色做专业判断，只有存在相对标准产品交付的明确增量（如二开、深度集成、多组织推广、性能/迁移、额外培训与方案等）时才上调，并在 reason 中写清增量内容而非复述关键词。";
+  const systemPromptCore = asString(params.promptTemplate) || defaultSystemPrompt;
+  const systemPrompt = noProductModuleGrid ? systemPromptCore + KIMI_ASSESSMENT_NO_PRODUCT_MODULE_SYSTEM_SUPPLEMENT : systemPromptCore;
+  const userNoGridClause = noProductModuleGrid
+    ? `10) 当前快照无有效的「产品及模块」表数据：你必须根据业务需求、问题一览（keyPointRows）、开发概要、实施范围、会议纪要与 basicInfo.productLines，按 system 中域级/平台级规则**推理**应评估的模块清单；moduleItems 须覆盖推断到的主要交付域/子模块，每条 reason 写明对应需求或关键点；assumptions 须声明模块范围由语义推断。\n`
+    : "";
   const body = {
-    model: asString(params.model) || "kimi-k2.5",
-    temperature: 0.1,
+    model,
+    temperature: resolveKimiCompletionTemperature(model, 0.1),
     response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
-        content:
-          asString(params.promptTemplate) ||
-          "你是资深项目经理 + 资深实施顾问。你不是做简单 SKU 对照，而是要基于需求全量信息做综合实施评估。必须只返回 JSON。字段固定：assessmentDraft.quoteMode/productLines/userCount/orgCount/orgSimilarity/difficultyFactor/moduleItems/risks/assumptions。moduleItems 每项字段：cloudProduct/skuName/moduleName/standardDays/suggestedDays/reason。所有数值字段必须为非负数，orgSimilarity 和 difficultyFactor 范围 0-1。评估时必须综合：basicInfo（行业、规模、上线目标）、businessNeedRows（业务复杂度）、devOverviewRows（开发基线）、implementationScopeRows（组织范围与地域）、meetingNotes（隐性约束）、keyPointRows（重点风险）。reason 必须体现增加/减少人天的业务原因与实施原因，不能仅写“按模板匹配”。禁止把“产品名/版本名/平台名（如金蝶AI星空、旗舰版）”直接当成 SKU，必须下钻到可实施功能项。财务云、供应链云等是实施域级云产品，不得填入 skuName 并挂在金蝶AI星空下冒充 SKU；域级人天归 cloudProduct=该域名，skuName 仅写子模块。若信息不足，给出审慎估算并在 risks/assumptions 明确不确定性来源。严禁仅凭业务需求正文中出现与 SKU 同名的词、或「总账、报表、出纳」类标准功能并列枚举，就认定 suggestedDays 必须高于 standardDays；须结合该条需求完整语义与实施顾问角色做专业判断，只有存在相对标准产品交付的明确增量（如二开、深度集成、多组织推广、性能/迁移、额外培训与方案等）时才上调，并在 reason 中写清增量内容而非复述关键词。"
+        content: systemPrompt
       },
       {
         role: "user",
@@ -1427,8 +1668,9 @@ async function generateAssessmentDraftByKimi(params: {
           `6) 对每个 SKU 必须给出“该 SKU 专属”的 reason，禁止全表复用同一条模糊理由；\n` +
           `7) 当 suggestedDays > standardDays 时，reason 必须明确写出该 SKU 的超标证据来源（对应业务需求/开发概要/关键点/会议纪要中的具体记录），且须说明相对标准交付的增量工作，不得仅复述需求中与 SKU 同名的词或并列功能清单；\n` +
           `8) 业务需求里用顿号/逗号并列多个标准模块名称（如出纳、存货、成本、总账、报表）通常只表示实施范围而非单项加人天，不得据此对其中每个 SKU 自动做同幅度上调；\n` +
-          `9) cloudProduct 表示产品线或实施域云产品（如金蝶AI星空、财务云）；skuName 仅填可交付子模块/SKU（如总账、采购管理）。禁止把财务云、供应链云等「实施域云」写进 skuName 又挂在金蝶AI星空下；域级人天应归在云产品行，SKU 列留空或仅列真实子模块。\n\n` +
-          `${JSON.stringify(params.payload)}`
+          `9) cloudProduct 表示产品线或实施域云产品（如金蝶AI星空、财务云）；skuName 仅填可交付子模块/SKU（如总账、采购管理）。禁止把财务云、供应链云等「实施域云」写进 skuName 又挂在金蝶AI星空下；域级人天应归在云产品行，SKU 列留空或仅列真实子模块。\n` +
+          userNoGridClause +
+          `\n${JSON.stringify(params.payload)}`
       }
     ]
   };
@@ -1436,7 +1678,8 @@ async function generateAssessmentDraftByKimi(params: {
   const response = await requestKimiCompletion({
     endpoint,
     apiKey: params.apiKey,
-    body
+    body,
+    timeoutMs: params.timeoutMs,
   });
 
   const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
@@ -1607,7 +1850,7 @@ function inferCustomerNameFromFileName(fileName: string): string {
   return picked.trim();
 }
 
-function parseRequirementImportFromWorkbook(workbook: XLSX.WorkBook): RequirementImportData {
+export function parseRequirementImportFromWorkbook(workbook: XLSX.WorkBook): RequirementImportData {
   const sectionData: RequirementImportData = {
     valuePropositionRows: [],
     businessNeedRows: [],
@@ -1780,10 +2023,10 @@ function parseRequirementImportFromWorkbook(workbook: XLSX.WorkBook): Requiremen
       const list = parseTable(
         rows,
         {
-          productDomain: ["产品领域"],
-          moduleName: ["模块"],
+          productDomain: ["产品领域", "产品分组", "产品组"],
+          moduleName: ["模块名称", "模块", "应用"],
           subModule: ["子模块"],
-          userCount: ["用户数"],
+          userCount: ["用户数", "用户数量"],
           implementationOrgCount: ["实施组织数", "实施组织数量"],
           pilotOrgCount: ["试点家数", "试点单位数量"],
           partyBLead: ["乙方主导推广"],
@@ -1876,8 +2119,13 @@ export async function parseBasicInfo(req: Request, res: Response) {
       customerName: workbookBasicInfo.customerName || fileNameCustomerName
     };
     const workbookRequirementData = parseRequirementImportFromWorkbook(workbook);
-    const apiKey = config.kimi.apiKey;
-    const model = config.kimi.model;
+    const { apiKey } = resolveActiveRequirementKimiApiKey();
+    const requirementSettings = loadRequirementSystemConfigStore().active;
+    const parseModelRaw =
+      requirementSettings.fileParsing.model?.trim() ||
+      requirementSettings.kimiEvaluation.model?.trim() ||
+      config.kimi.model;
+    const model = parseModelRaw;
     const modelForClient = normalizeKimiModelName(model);
 
     if (!apiKey) {
@@ -1909,7 +2157,8 @@ export async function parseBasicInfo(req: Request, res: Response) {
         apiUrl: config.kimi.apiBaseUrl,
         apiKey,
         model,
-        workbookText
+        workbookText,
+        timeoutMs: resolveKimiCompletionTimeoutMs(requirementSettings.kimiEvaluation.timeoutMs),
       });
 
       const mergedBasic = mergeBasicInfo(parsed.basicInfo, workbookBasicInfoWithFileName);
@@ -1976,18 +2225,31 @@ export async function companyProfileSummary(req: Request, res: Response) {
     customerIndustry?: string;
     enterpriseRevenue?: string;
     itStatus?: string;
+    disambiguationChoice?: { displayName?: string; summary?: string };
   };
-  
+
   const customerName = asString(body.customerName);
   if (!customerName) {
     return fail(res, 40001, "参数错误", [{ field: "customerName", reason: "required" }]);
+  }
+
+  const choiceObj = asModelObject(body.disambiguationChoice);
+  const disambiguationChoice =
+    choiceObj && Object.keys(choiceObj).length > 0
+      ? {
+          displayName: asString(choiceObj.displayName).trim(),
+          summary: asString(choiceObj.summary).trim()
+        }
+      : undefined;
+  if (disambiguationChoice && !disambiguationChoice.displayName) {
+    return fail(res, 40001, "参数错误", [{ field: "disambiguationChoice.displayName", reason: "required" }]);
   }
 
   const location = asString(body.location);
   const customerIndustry = asString(body.customerIndustry);
   const enterpriseRevenue = asString(body.enterpriseRevenue);
   const itStatus = asString(body.itStatus);
-  const apiKey = config.kimi.apiKey;
+  const { apiKey } = resolveActiveRequirementKimiApiKey();
 
   if (!apiKey) {
     const fallback = buildCompanyProfileFallback({ customerName, location, customerIndustry, enterpriseRevenue, itStatus });
@@ -2007,6 +2269,7 @@ export async function companyProfileSummary(req: Request, res: Response) {
   }
 
   try {
+    const requirementSettings = loadRequirementSystemConfigStore().active;
     const model = config.kimi.model;
     const modelForClient = normalizeKimiModelName(model);
     const parsed = await summarizeCompanyProfileByKimi({
@@ -2017,8 +2280,33 @@ export async function companyProfileSummary(req: Request, res: Response) {
       location,
       customerIndustry,
       enterpriseRevenue,
-      itStatus
+      itStatus,
+      timeoutMs: resolveKimiCompletionTimeoutMs(requirementSettings.kimiEvaluation.timeoutMs),
+      disambiguationChoice: disambiguationChoice
+        ? { displayName: disambiguationChoice.displayName, summary: disambiguationChoice.summary }
+        : undefined
     });
+
+    if (parsed.kind === "disambiguation") {
+      return res.json(
+        ok(
+          {
+            customerName,
+            enterpriseProfile: "",
+            location: "",
+            customerIndustry: "",
+            enterpriseRevenue: "",
+            itStatus: "",
+            model: modelForClient,
+            mode: "disambiguation",
+            fallbackReason: "",
+            rawContent: parsed.rawContent,
+            disambiguationCandidates: parsed.candidates
+          },
+          requestId
+        )
+      );
+    }
 
     return res.json(
       ok(
@@ -2077,7 +2365,7 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
     ...fallbackDraft,
     moduleItems: mergeDevTotalModuleItem(fallbackCloudSku.items, snapshot)
   };
-  const apiKey = config.kimi.apiKey;
+  const { apiKey } = resolveActiveRequirementKimiApiKey();
   const model = config.kimi.model;
   const modelForClient = normalizeKimiModelName(model);
   const requirementSettings = loadRequirementSystemConfigStore().active;
@@ -2120,7 +2408,8 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
       model,
       promptTemplate,
       payload: body,
-      fallback: fallbackDraftAligned
+      fallback: fallbackDraftAligned,
+      timeoutMs: resolveKimiCompletionTimeoutMs(requirementSettings.kimiEvaluation.timeoutMs),
     });
     const alignedCloudSku = buildCloudSkuModuleItemsFromSnapshot(snapshot, result.draft);
     const alignedDraft: KimiAssessmentDraft = {

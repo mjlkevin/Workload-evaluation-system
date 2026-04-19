@@ -6,6 +6,7 @@ export {
   getRequirementSystemConfig,
   updateRequirementSystemConfigDraft,
   activateRequirementSystemConfig,
+  testRequirementKimiApiKey,
   getImplementationDependencyRules,
   updateImplementationDependencyRulesDraft,
   activateImplementationDependencyRules,

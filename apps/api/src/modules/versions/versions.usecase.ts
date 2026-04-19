@@ -11,6 +11,7 @@ import {
   migrateVersionRecord,
 } from "../../types";
 import { asString } from "../../utils";
+import { applyVersionCodeFormat, formatHasSequenceToken } from "../../utils/version-code-format";
 import { ok, fail } from "../../utils/response";
 import { requireRoleWithAuth } from "../../middleware/auth";
 import {
@@ -28,36 +29,6 @@ function mapTypeToRuleModuleKey(type: VersionType): VersionCodeRuleModuleKey {
   if (type === "resource") return "resource";
   if (type === "dev") return "dev";
   return "wbs";
-}
-
-function padNumber(value: number, width: number): string {
-  return String(value).padStart(width, "0");
-}
-
-function renderVersionCodeFromFormat(
-  format: string,
-  input: {
-    prefix: string;
-    moduleCode: string;
-    globalCode: string;
-    seq: number;
-    now: Date;
-  }
-): string {
-  const yyyy = String(input.now.getFullYear());
-  const mm = padNumber(input.now.getMonth() + 1, 2);
-  const dd = padNumber(input.now.getDate(), 2);
-  const values: Record<string, string> = {
-    "{PREFIX}": input.prefix,
-    "{MODULE}": input.moduleCode,
-    "{YYYYMMDD}": `${yyyy}${mm}${dd}`,
-    "{YYYYMM}": `${yyyy}${mm}`,
-    "{YYYY}": yyyy,
-    "{GL}": input.globalCode,
-    "{NNN}": padNumber(input.seq, 3),
-    "{NN}": padNumber(input.seq, 2),
-  };
-  return Object.entries(values).reduce((result, [token, value]) => result.split(token).join(value), format);
 }
 
 function generateVersionCodeByRule(
@@ -90,14 +61,14 @@ function generateVersionCodeByRule(
   }
 
   const format = rule.format || "{PREFIX}-{YYYYMMDD}-{NNN}";
-  const hasSeqToken = format.includes("{NNN}") || format.includes("{NN}");
+  const hasSeqToken = formatHasSequenceToken(format);
   const now = new Date();
   const rawGlobalCode = asString(input.payload.globalVersionCode) || "GL000";
   const globalCode = rawGlobalCode.split("-V")[0] || "GL000";
 
   for (let seq = 1; seq <= 9999; seq += 1) {
     if (!hasSeqToken && seq > 1) break;
-    const candidate = renderVersionCodeFromFormat(format, {
+    const candidate = applyVersionCodeFormat(format, {
       prefix: rule.prefix,
       moduleCode: rule.moduleCode,
       globalCode,
@@ -336,6 +307,47 @@ export function checkoutVersion(req: Request, res: Response) {
   target.updatedByUsername = auth.user.username;
   // 保留当前检入快照，用于必要时撤销恢复
   target.lastCheckinPayload = target.payload ? { ...target.payload } : {};
+
+  saveVersionsStore(store);
+  return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
+}
+
+/**
+ * PATCH /api/v1/versions/:id/save-draft — 检出态下保存草稿（仅更新 payload，不递增版本号、不检入）
+ */
+export function saveCheckedOutDraft(req: Request, res: Response) {
+  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+  if (!auth) return;
+
+  const recordId = asString(req.params.id);
+  if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
+
+  const body = req.body as { payload?: Record<string, unknown> };
+  const newPayload = body.payload && typeof body.payload === "object" ? body.payload : null;
+  if (!newPayload) {
+    return fail(res, 40001, "参数错误", [{ field: "payload", reason: "required" }]);
+  }
+
+  const store = loadVersionsStore();
+  const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
+  if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+
+  migrateVersionRecord(target);
+
+  if (target.checkoutStatus !== "checked_out") {
+    return fail(res, 40902, "当前版本未检出，请使用「保存版本」创建新版本记录", [
+      { field: "checkoutStatus", reason: "not_checked_out" },
+    ]);
+  }
+  if (target.checkedOutByUserId !== auth.user.id) {
+    return fail(res, 40301, "只有检出人才能保存检出草稿", [{ field: "checkedOutByUserId", reason: "not_owner" }]);
+  }
+
+  const nowIso = new Date().toISOString();
+  target.payload = newPayload;
+  target.updatedAt = nowIso;
+  target.updatedByUserId = auth.user.id;
+  target.updatedByUsername = auth.user.username;
 
   saveVersionsStore(store);
   return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));

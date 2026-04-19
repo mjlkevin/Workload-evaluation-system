@@ -34,7 +34,8 @@ import { toast } from "sonner"
 type ModuleListPageConfig = {
   moduleType: CoreModuleVersionType | "wbs" | "review"
   title: string
-  description: string
+  /** 不传则 ModuleShell 不展示副标题段落 */
+  description?: string
   editorPath: string
   breadcrumbs: Array<{ label: string; href?: string }>
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { CircleHelp } from "lucide-react"
+import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { Badge } from "@/components/ui/badge"
@@ -32,23 +33,29 @@ import {
   listVersionCodeRules,
   updateImplementationDependencyRulesDraft,
   updateRequirementSystemConfigDraft,
+  testRequirementKimiApiKey,
   updateVersionCodeRuleConfig,
   type ImplementationDependencyRulesConfig,
   type RequirementSystemConfig,
   type VersionCodeRuleItem,
   type VersionCodeRuleStatus,
 } from "@/lib/workload-service"
+import { ApiError } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 
-const MODULE_OPTIONS: Array<{ value: VersionCodeRuleItem["moduleKey"] | "all"; label: string }> = [
-  { value: "all", label: "全部模块" },
-  { value: "global", label: "总方案" },
-  { value: "requirement", label: "需求" },
-  { value: "implementation", label: "实施评估" },
-  { value: "dev", label: "开发评估" },
-  { value: "resource", label: "资源人天及成本" },
-  { value: "wbs", label: "WBS" },
-]
+function toastApiWarning(error: unknown, fallback: string) {
+  if (error instanceof ApiError) {
+    const payload = error.details as { details?: Array<{ field: string; reason: string }> } | undefined
+    const rows = payload?.details
+    if (Array.isArray(rows) && rows.length > 0) {
+      toast.warning(`${error.message}（${rows.map((r) => `${r.field}: ${r.reason}`).join("；")}）`)
+      return
+    }
+    toast.warning(error.message || fallback)
+    return
+  }
+  toast.warning(error instanceof Error ? error.message : fallback)
+}
 
 const STATUS_LABEL: Record<VersionCodeRuleStatus, string> = {
   active: "已生效",
@@ -57,14 +64,16 @@ const STATUS_LABEL: Record<VersionCodeRuleStatus, string> = {
 }
 
 const VERSION_FORMAT_HELP = [
-  "{PREFIX}: 模块前缀（来自本行“版本前缀”配置）",
+  "本弹窗内只需维护「前缀之后的格式」；保存时系统会自动在开头拼接 {PREFIX}（无需手写）。",
   "{GL}: 关联总方案基础码（例如 GL001）",
   "{NN}: 2位递增序号（01, 02, 03...）",
   "{NNN}: 3位递增序号（001, 002, 003...）",
   "{YYYY}: 年份（例如 2026）",
   "{YYYYMM}: 年月（例如 202604）",
+  "{MM}: 月份两位（01–12）",
   "{YYYYMMDD}: 日期（例如 20260406）",
   "{MODULE}: 模块编码（例如 IA, RQ）",
+  "高级：也可在格式中显式写出 {PREFIX}，则不再自动拼接。",
 ]
 
 function FormatHelpTooltip() {
@@ -122,7 +131,7 @@ const DEFAULT_REQUIREMENT_CONFIG: RequirementSystemConfig = {
     model: "moonshot-v1-128k",
     temperature: 0.3,
     maxTokens: 4000,
-    timeoutMs: 45000,
+    timeoutMs: 120000,
     fallbackToRule: true,
     promptProfile: "default",
     promptTemplate:
@@ -130,6 +139,7 @@ const DEFAULT_REQUIREMENT_CONFIG: RequirementSystemConfig = {
   },
   fileParsing: {
     enabled: true,
+    model: "moonshot-v1-128k",
     allowedExtensions: [".xlsx", ".xls", ".csv"],
     maxFileSizeMb: 20,
     maxSheetCount: 20,
@@ -145,6 +155,32 @@ const DEFAULT_REQUIREMENT_CONFIG: RequirementSystemConfig = {
     includeRiskHints: true,
     includeAssumptions: true,
   },
+  kimiCredentials: {
+    apiKey: "",
+    hint: null,
+    envFallbackAvailable: false,
+    resolvedFrom: "none",
+  },
+}
+
+function describeKimiKeySource(meta?: RequirementSystemConfig["kimiCredentials"] | null): string {
+  const m = { ...DEFAULT_REQUIREMENT_CONFIG.kimiCredentials, ...(meta && typeof meta === "object" ? meta : {}) }
+  if (m.resolvedFrom === "store") return `仓库密钥 ${m.hint || "（已配置）"}`
+  if (m.resolvedFrom === "env") return "环境变量 KIMI_API_KEY"
+  return m.envFallbackAvailable ? "未写入仓库（将尝试环境变量）" : "未配置可用密钥"
+}
+
+/** 合并接口返回，避免旧数据或异常响应缺少 kimiCredentials 等嵌套字段 */
+function coerceRequirementConfig(input: Partial<RequirementSystemConfig> | undefined | null): RequirementSystemConfig {
+  const d = input && typeof input === "object" ? input : {}
+  return {
+    ...DEFAULT_REQUIREMENT_CONFIG,
+    ...d,
+    kimiEvaluation: { ...DEFAULT_REQUIREMENT_CONFIG.kimiEvaluation, ...d.kimiEvaluation },
+    fileParsing: { ...DEFAULT_REQUIREMENT_CONFIG.fileParsing, ...d.fileParsing },
+    kimiGeneration: { ...DEFAULT_REQUIREMENT_CONFIG.kimiGeneration, ...d.kimiGeneration },
+    kimiCredentials: { ...DEFAULT_REQUIREMENT_CONFIG.kimiCredentials, ...d.kimiCredentials },
+  }
 }
 
 const DEFAULT_IMPLEMENTATION_DEPENDENCY_RULES: ImplementationDependencyRulesConfig = {
@@ -178,13 +214,8 @@ function parseExtensionInput(value: string): string[] {
 export default function SystemManagementPage() {
   const { isAdmin, user } = useAuth()
   const [rules, setRules] = useState<VersionCodeRuleItem[]>([])
-  const [keyword, setKeyword] = useState("")
-  const [moduleFilter, setModuleFilter] = useState<VersionCodeRuleItem["moduleKey"] | "all">("all")
   const [editingRule, setEditingRule] = useState<VersionCodeRuleItem | null>(null)
-  const [editingPrefix, setEditingPrefix] = useState("")
   const [editingFormat, setEditingFormat] = useState("")
-  const [message, setMessage] = useState("")
-  const [loading, setLoading] = useState(false)
   const [actingRuleId, setActingRuleId] = useState("")
   const [selectedRuleId, setSelectedRuleId] = useState("")
   const [requirementDraft, setRequirementDraft] = useState<RequirementSystemConfig>(DEFAULT_REQUIREMENT_CONFIG)
@@ -194,6 +225,9 @@ export default function SystemManagementPage() {
   const [requirementEffectiveAt, setRequirementEffectiveAt] = useState("--")
   const [savingRequirement, setSavingRequirement] = useState(false)
   const [activatingRequirement, setActivatingRequirement] = useState(false)
+  const [testingKimiKey, setTestingKimiKey] = useState(false)
+  const [testingFileParsingModel, setTestingFileParsingModel] = useState(false)
+  const [testingKimiGenerationModel, setTestingKimiGenerationModel] = useState(false)
   const [promptEditorOpen, setPromptEditorOpen] = useState(false)
   const [promptTemplateDraft, setPromptTemplateDraft] = useState("")
   const [implementationRulesDraftText, setImplementationRulesDraftText] = useState(
@@ -208,18 +242,17 @@ export default function SystemManagementPage() {
   const [savingImplementationRules, setSavingImplementationRules] = useState(false)
   const [activatingImplementationRules, setActivatingImplementationRules] = useState(false)
 
-  async function loadRules() {
-    setLoading(true)
+  async function loadRules(): Promise<boolean> {
     try {
       const items = await listVersionCodeRules({
-        moduleKey: moduleFilter,
-        keyword,
+        moduleKey: "all",
+        keyword: "",
       })
       setRules(items)
+      return true
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "加载版本号编码规则失败")
-    } finally {
-      setLoading(false)
+      toast.warning(error instanceof Error ? error.message : "加载版本号编码规则失败")
+      return false
     }
   }
 
@@ -227,12 +260,12 @@ export default function SystemManagementPage() {
     try {
       const data = await getRequirementSystemConfig()
       setRequirementVersion(Number(data.version || 1))
-      setRequirementDraft(data.draft || DEFAULT_REQUIREMENT_CONFIG)
-      setRequirementActive(data.active || DEFAULT_REQUIREMENT_CONFIG)
+      setRequirementDraft(coerceRequirementConfig(data.draft))
+      setRequirementActive(coerceRequirementConfig(data.active))
       setRequirementUpdatedAt(data.updatedAt || "--")
       setRequirementEffectiveAt(data.effectiveAt || "--")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "加载需求模块配置失败")
+      toast.warning(error instanceof Error ? error.message : "加载需求模块配置失败")
     }
   }
 
@@ -245,7 +278,7 @@ export default function SystemManagementPage() {
       setImplementationRulesUpdatedAt(data.updatedAt || "--")
       setImplementationRulesEffectiveAt(data.effectiveAt || "--")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "加载实施评估依赖规则失败")
+      toast.warning(error instanceof Error ? error.message : "加载实施评估依赖规则失败")
     }
   }
 
@@ -256,45 +289,32 @@ export default function SystemManagementPage() {
     void loadImplementationDependencyRulesConfig()
   }, [isAdmin])
 
-  const visibleRules = useMemo(() => {
-    const q = keyword.trim().toLowerCase()
-    return rules.filter((item) => {
-      const matchModule = moduleFilter === "all" || item.moduleKey === moduleFilter
-      const matchKeyword =
-        q.length === 0 ||
-        item.moduleName.toLowerCase().includes(q) ||
-        item.moduleCode.toLowerCase().includes(q) ||
-        item.prefix.toLowerCase().includes(q) ||
-        item.format.toLowerCase().includes(q)
-      return matchModule && matchKeyword
-    })
-  }, [rules, moduleFilter, keyword])
-
   const selectedRule = useMemo(
-    () => visibleRules.find((item) => item.id === selectedRuleId) ?? null,
-    [visibleRules, selectedRuleId],
+    () => rules.find((item) => item.id === selectedRuleId) ?? null,
+    [rules, selectedRuleId],
   )
 
   useEffect(() => {
     if (!selectedRuleId) return
-    if (visibleRules.some((item) => item.id === selectedRuleId)) return
+    if (rules.some((item) => item.id === selectedRuleId)) return
     setSelectedRuleId("")
-  }, [visibleRules, selectedRuleId])
+  }, [rules, selectedRuleId])
 
   function startEdit(item: VersionCodeRuleItem) {
     if (item.status !== "disabled") {
-      setMessage("仅“已禁用”状态的编码规则允许进入配置。")
+      toast.warning("仅“已禁用”状态的编码规则允许进入配置。")
       return
     }
     setEditingRule(item)
-    setEditingPrefix(item.prefix)
-    setEditingFormat(item.format)
-    setMessage(`正在配置「${item.moduleName}」编码规则`)
+    setEditingFormat(
+      item.format.startsWith("{PREFIX}")
+        ? item.format.slice("{PREFIX}".length)
+        : item.format,
+    )
   }
 
   function clearEdit() {
     setEditingRule(null)
-    setEditingPrefix("")
     setEditingFormat("")
   }
 
@@ -303,14 +323,14 @@ export default function SystemManagementPage() {
     setActingRuleId(editingRule.id)
     try {
       await updateVersionCodeRuleConfig(editingRule.id, {
-        prefix: editingPrefix.trim().toUpperCase(),
+        prefix: editingRule.prefix.trim().toUpperCase(),
         format: editingFormat.trim(),
       })
-      setMessage("规则配置已保存，可继续执行“生效”操作。")
+      toast.success("规则配置已保存，可继续执行“生效”操作。")
       clearEdit()
       await loadRules()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存规则配置失败")
+      toastApiWarning(error, "保存规则配置失败")
     } finally {
       setActingRuleId("")
     }
@@ -320,10 +340,10 @@ export default function SystemManagementPage() {
     setActingRuleId(ruleId)
     try {
       await activateVersionCodeRule(ruleId)
-      setMessage("编码规则已生效。")
+      toast.success("编码规则已生效。")
       await loadRules()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "规则生效失败")
+      toast.warning(error instanceof Error ? error.message : "规则生效失败")
     } finally {
       setActingRuleId("")
     }
@@ -333,10 +353,10 @@ export default function SystemManagementPage() {
     setActingRuleId(ruleId)
     try {
       await disableVersionCodeRule(ruleId)
-      setMessage("编码规则已禁用。")
+      toast.success("编码规则已禁用。")
       await loadRules()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "规则禁用失败")
+      toast.warning(error instanceof Error ? error.message : "规则禁用失败")
     } finally {
       setActingRuleId("")
     }
@@ -347,11 +367,11 @@ export default function SystemManagementPage() {
     try {
       const result = await updateRequirementSystemConfigDraft(requirementDraft)
       setRequirementVersion(Number(result.version || requirementVersion))
-      setRequirementDraft(result.draft || requirementDraft)
+      setRequirementDraft(coerceRequirementConfig(result.draft ?? requirementDraft))
       setRequirementUpdatedAt(result.updatedAt || requirementUpdatedAt)
-      setMessage("需求模块配置草稿已保存。")
+      toast.success("需求模块配置草稿已保存。")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存需求模块配置失败")
+      toast.warning(error instanceof Error ? error.message : "保存需求模块配置失败")
     } finally {
       setSavingRequirement(false)
     }
@@ -362,13 +382,97 @@ export default function SystemManagementPage() {
     try {
       const result = await activateRequirementSystemConfig()
       setRequirementVersion(Number(result.version || requirementVersion))
-      setRequirementActive(result.active || requirementActive)
+      setRequirementActive(coerceRequirementConfig(result.active ?? requirementActive))
       setRequirementEffectiveAt(result.effectiveAt || requirementEffectiveAt)
-      setMessage("需求模块配置已生效。")
+      toast.success("需求模块配置已生效。")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "需求模块配置生效失败")
+      toast.warning(error instanceof Error ? error.message : "需求模块配置生效失败")
     } finally {
       setActivatingRequirement(false)
+    }
+  }
+
+  async function onTestKimiApiKey(overrides?: { model?: string }) {
+    setTestingKimiKey(true)
+    try {
+      const key = (requirementDraft.kimiCredentials?.apiKey ?? "").trim()
+      const model = (overrides?.model ?? requirementDraft.kimiEvaluation.model ?? "").trim()
+      const result = await testRequirementKimiApiKey({
+        ...(key ? { apiKey: key } : {}),
+        ...(model ? { model } : {}),
+      })
+      const src =
+        result.testedSource === "request_body"
+          ? "输入框密钥"
+          : result.testedSource === "draft_store"
+            ? "草稿已存密钥"
+            : "环境变量"
+      toast.success(`连接成功（${src}，模型 ${result.model}）`)
+    } catch (error) {
+      toastApiWarning(error, "KIMI 连通性测试失败")
+    } finally {
+      setTestingKimiKey(false)
+    }
+  }
+
+  async function onTestFileParsingModel() {
+    setTestingFileParsingModel(true)
+    try {
+      const key = (requirementDraft.kimiCredentials?.apiKey ?? "").trim()
+      const model = (requirementDraft.fileParsing.model ?? "").trim()
+      const result = await testRequirementKimiApiKey({
+        ...(key ? { apiKey: key } : {}),
+        ...(model ? { model } : {}),
+      })
+      const src =
+        result.testedSource === "request_body"
+          ? "输入框密钥"
+          : result.testedSource === "draft_store"
+            ? "草稿已存密钥"
+            : "环境变量"
+      toast.success(`解析模型连通成功（${src}，模型 ${result.model}）`)
+    } catch (error) {
+      toastApiWarning(error, "解析模型连通性测试失败")
+    } finally {
+      setTestingFileParsingModel(false)
+    }
+  }
+
+  async function onTestKimiGenerationModel() {
+    setTestingKimiGenerationModel(true)
+    try {
+      const key = (requirementDraft.kimiCredentials?.apiKey ?? "").trim()
+      const model = (requirementDraft.kimiGeneration.model ?? "").trim()
+      const result = await testRequirementKimiApiKey({
+        ...(key ? { apiKey: key } : {}),
+        ...(model ? { model } : {}),
+      })
+      const src =
+        result.testedSource === "request_body"
+          ? "输入框密钥"
+          : result.testedSource === "draft_store"
+            ? "草稿已存密钥"
+            : "环境变量"
+      toast.success(`KIMI 生成模型连通成功（${src}，模型 ${result.model}）`)
+    } catch (error) {
+      toastApiWarning(error, "KIMI 生成模型连通性测试失败")
+    } finally {
+      setTestingKimiGenerationModel(false)
+    }
+  }
+
+  async function onClearKimiApiKeyOverride() {
+    setSavingRequirement(true)
+    try {
+      const result = await updateRequirementSystemConfigDraft({ kimiCredentials: { apiKey: null } })
+      setRequirementVersion(Number(result.version || requirementVersion))
+      setRequirementDraft(coerceRequirementConfig(result.draft ?? requirementDraft))
+      setRequirementUpdatedAt(result.updatedAt || requirementUpdatedAt)
+      toast.success("已清除仓库中的 API Key，将回退为环境变量 KIMI_API_KEY（若已配置）。")
+    } catch (error) {
+      toast.warning(error instanceof Error ? error.message : "清除失败")
+    } finally {
+      setSavingRequirement(false)
     }
   }
 
@@ -384,12 +488,12 @@ export default function SystemManagementPage() {
       }
       const result = await updateRequirementSystemConfigDraft(nextConfig)
       setRequirementVersion(Number(result.version || requirementVersion))
-      setRequirementDraft(result.draft || nextConfig)
+      setRequirementDraft(coerceRequirementConfig(result.draft ?? nextConfig))
       setRequirementUpdatedAt(result.updatedAt || requirementUpdatedAt)
       setPromptEditorOpen(false)
-      setMessage("提示词草稿已保存。")
+      toast.success("提示词草稿已保存。")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存提示词草稿失败")
+      toast.warning(error instanceof Error ? error.message : "保存提示词草稿失败")
     } finally {
       setSavingRequirement(false)
     }
@@ -407,17 +511,17 @@ export default function SystemManagementPage() {
       }
       const saved = await updateRequirementSystemConfigDraft(nextConfig)
       setRequirementVersion(Number(saved.version || requirementVersion))
-      setRequirementDraft(saved.draft || nextConfig)
+      setRequirementDraft(coerceRequirementConfig(saved.draft ?? nextConfig))
       setRequirementUpdatedAt(saved.updatedAt || requirementUpdatedAt)
 
       const activated = await activateRequirementSystemConfig()
       setRequirementVersion(Number(activated.version || requirementVersion))
-      setRequirementActive(activated.active || requirementActive)
+      setRequirementActive(coerceRequirementConfig(activated.active ?? requirementActive))
       setRequirementEffectiveAt(activated.effectiveAt || requirementEffectiveAt)
       setPromptEditorOpen(false)
-      setMessage("提示词已生效，后续 KIMI 评估将按新提示词执行。")
+      toast.success("提示词已生效，后续 KIMI 评估将按新提示词执行。")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "提示词生效失败")
+      toast.warning(error instanceof Error ? error.message : "提示词生效失败")
     } finally {
       setActivatingRequirement(false)
     }
@@ -431,9 +535,9 @@ export default function SystemManagementPage() {
       setImplementationRulesVersion(Number(result.version || implementationRulesVersion))
       setImplementationRulesDraftText(formatJsonContent(result.draft || DEFAULT_IMPLEMENTATION_DEPENDENCY_RULES))
       setImplementationRulesUpdatedAt(result.updatedAt || implementationRulesUpdatedAt)
-      setMessage("实施评估依赖规则草稿已保存。")
+      toast.success("实施评估依赖规则草稿已保存。")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存实施评估依赖规则失败")
+      toast.warning(error instanceof Error ? error.message : "保存实施评估依赖规则失败")
     } finally {
       setSavingImplementationRules(false)
     }
@@ -446,20 +550,16 @@ export default function SystemManagementPage() {
       setImplementationRulesVersion(Number(result.version || implementationRulesVersion))
       setImplementationRulesActiveText(formatJsonContent(result.active || DEFAULT_IMPLEMENTATION_DEPENDENCY_RULES))
       setImplementationRulesEffectiveAt(result.effectiveAt || implementationRulesEffectiveAt)
-      setMessage("实施评估依赖规则已生效。")
+      toast.success("实施评估依赖规则已生效。")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "实施评估依赖规则生效失败")
+      toast.warning(error instanceof Error ? error.message : "实施评估依赖规则生效失败")
     } finally {
       setActivatingImplementationRules(false)
     }
   }
 
   return (
-    <ModuleShell
-      title="系统管理"
-      description="集中维护系统级配置能力；支持版本号编码规则、需求子模块配置与实施评估依赖规则。"
-      breadcrumbs={[{ label: "系统管理" }]}
-    >
+    <ModuleShell title="系统管理" breadcrumbs={[{ label: "系统管理" }]}>
       {!isAdmin ? (
         <Card className="border-border/40 bg-card/50">
           <CardContent className="p-6 text-sm text-muted-foreground">
@@ -470,57 +570,20 @@ export default function SystemManagementPage() {
 
       {isAdmin ? (
         <div className="space-y-6">
-          <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
-            <CardHeader className="space-y-2 pb-3">
-              <CardTitle className="text-base">版本号编码规则</CardTitle>
-              <CardDescription>支持按模块进行编码规则配置、禁用和生效；采用“工具栏 + 表格”方式维护。</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/50 bg-background/70 p-3">
-                <Select value={moduleFilter} onValueChange={(value) => setModuleFilter(value as typeof moduleFilter)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="选择模块" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MODULE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  className="w-[280px]"
-                  placeholder="搜索模块/前缀/编码格式"
-                  value={keyword}
-                  onChange={(event) => setKeyword(event.target.value)}
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    void loadRules()
-                    setMessage("已刷新规则列表。")
-                  }}
-                  disabled={loading}
-                >
-                  {loading ? "刷新中..." : "刷新"}
-                </Button>
-              </div>
-
-              {message ? (
-                <p className="rounded-lg border border-border/50 bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">{message}</p>
-              ) : null}
-
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/50 bg-background/60 p-3">
-                <p className="text-xs text-muted-foreground">
-                  {selectedRule
-                    ? `当前选中：${selectedRule.moduleName}（${STATUS_LABEL[selectedRule.status]}）`
-                    : "请先在表格中选择一行，再使用下方工具栏操作。"}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
+          <Card className="gap-3 py-4 border-border/40 bg-card/50 backdrop-blur-sm">
+            <CardHeader className="flex flex-col gap-2 space-y-0 px-6 pb-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <CardTitle className="text-base shrink-0">版本号编码规则</CardTitle>
+              <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                {selectedRule ? (
+                  <p className="max-w-full text-xs text-muted-foreground sm:mr-auto sm:max-w-[min(100%,22rem)]">
+                    {`当前选中：${selectedRule.moduleName}（${STATUS_LABEL[selectedRule.status]}）`}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-1.5">
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-8"
                     onClick={() => selectedRule && startEdit(selectedRule)}
                     disabled={!selectedRule || selectedRule.status !== "disabled" || actingRuleId === selectedRule?.id}
                     title={!selectedRule ? "请先选择一行" : selectedRule.status !== "disabled" ? "仅“已禁用”状态可配置" : ""}
@@ -529,6 +592,7 @@ export default function SystemManagementPage() {
                   </Button>
                   <Button
                     size="sm"
+                    className="h-8"
                     onClick={() => selectedRule && void onActivateRule(selectedRule.id)}
                     disabled={!selectedRule || selectedRule.status === "active" || actingRuleId === selectedRule?.id}
                     title={!selectedRule ? "请先选择一行" : ""}
@@ -538,6 +602,7 @@ export default function SystemManagementPage() {
                   <Button
                     variant="destructive"
                     size="sm"
+                    className="h-8"
                     onClick={() => selectedRule && void onDisableRule(selectedRule.id)}
                     disabled={!selectedRule || selectedRule.status === "disabled" || actingRuleId === selectedRule?.id}
                     title={!selectedRule ? "请先选择一行" : ""}
@@ -546,9 +611,10 @@ export default function SystemManagementPage() {
                   </Button>
                 </div>
               </div>
-
-              <div className="rounded-xl border border-border/50">
-                <Table>
+            </CardHeader>
+            <CardContent className="px-6 pb-4 pt-0">
+              <div className="rounded-lg border border-border/50">
+                <Table density="compact">
                   <TableHeader>
                     <TableRow>
                       <TableHead>模块</TableHead>
@@ -566,7 +632,7 @@ export default function SystemManagementPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visibleRules.map((item) => (
+                    {rules.map((item) => (
                       <TableRow
                         key={item.id}
                         className={cn("cursor-pointer", selectedRuleId === item.id ? "bg-primary/10" : "")}
@@ -579,13 +645,13 @@ export default function SystemManagementPage() {
                         <TableCell>{item.sample}</TableCell>
                         <TableCell>
                           <Badge
-                            variant={
-                              item.status === "active"
-                                ? "secondary"
-                                : item.status === "disabled"
-                                  ? "destructive"
-                                  : "outline"
-                            }
+                            variant={item.status === "disabled" ? "destructive" : "secondary"}
+                            className={cn(
+                              item.status === "active" &&
+                                "border-emerald-300 bg-emerald-50 text-emerald-800 [a&]:hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200 dark:[a&]:hover:bg-emerald-900/40",
+                              item.status === "draft" &&
+                                "border-amber-200 bg-amber-50 text-amber-950 [a&]:hover:bg-amber-100/90 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100 dark:[a&]:hover:bg-amber-950/40",
+                            )}
                           >
                             {STATUS_LABEL[item.status]}
                           </Badge>
@@ -601,7 +667,7 @@ export default function SystemManagementPage() {
 
           <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
             <CardHeader className="space-y-2 pb-3">
-              <CardTitle className="text-base">需求子模块配置</CardTitle>
+              <CardTitle className="text-base">模型配置</CardTitle>
               <CardDescription>
                 对“需求”模块的 KIMI评估、文件解析、KIMI生成能力进行可视化配置；支持草稿保存与一键生效。
               </CardDescription>
@@ -620,6 +686,68 @@ export default function SystemManagementPage() {
                     {activatingRequirement ? "生效中..." : "生效配置"}
                   </Button>
                 </div>
+              </div>
+
+              <div className="space-y-3 rounded-xl border border-border/50 bg-background/60 p-4">
+                <div className="space-y-1">
+                  <Label className="inline-flex items-center gap-1.5 text-sm font-medium">
+                    <span>大模型 API Key（KIMI）</span>
+                    <QuestionHelpTooltip
+                      label="API Key"
+                      content="用于需求导入智能解析、企业信息 KIMI 摘要、KIMI 实施评估预览等。保存至仓库的密钥优先于环境变量 KIMI_API_KEY；留空并保存其它配置不会覆盖已有密钥；「改用环境变量」可清空仓库密钥。"
+                    />
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    草稿侧：{describeKimiKeySource(requirementDraft.kimiCredentials)}；生效侧：
+                    {describeKimiKeySource(requirementActive.kimiCredentials)}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Label htmlFor="kimi-api-key-input">新密钥（可选）</Label>
+                    <Input
+                      id="kimi-api-key-input"
+                      type="password"
+                      autoComplete="off"
+                      placeholder={
+                        requirementDraft.kimiCredentials.hint
+                          ? "留空表示不修改；填写则覆盖保存"
+                          : "sk-…"
+                      }
+                      value={requirementDraft.kimiCredentials.apiKey}
+                      onChange={(e) =>
+                        setRequirementDraft((prev) => ({
+                          ...prev,
+                          kimiCredentials: { ...prev.kimiCredentials, apiKey: e.target.value },
+                        }))
+                      }
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={testingKimiKey}
+                      onClick={() => void onTestKimiApiKey()}
+                    >
+                      {testingKimiKey ? "测试中…" : "测试连接"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={savingRequirement}
+                      onClick={() => void onClearKimiApiKeyOverride()}
+                    >
+                      改用环境变量
+                    </Button>
+                  </div>
+                </div>
+                  <p className="text-[11px] text-muted-foreground">
+                  测试连接：优先使用输入框中的密钥；若为空则依次尝试草稿已保存密钥与环境变量。请求模型与「KIMI评估 → 模型」草稿一致，缺省为服务端环境配置；需求 Excel 智能解析另见「文件解析 → 解析模型」。
+                </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -767,6 +895,21 @@ export default function SystemManagementPage() {
                       />
                     </div>
                   </div>
+                  <div className="flex flex-col gap-2 rounded-lg border border-border/40 bg-background/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      按当前表单中的「模型」发起最小对话请求校验连通性（可先改模型再测，无需先点保存草稿）。密钥与上方「大模型 API Key」规则一致。
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={testingKimiKey}
+                      onClick={() => void onTestKimiApiKey()}
+                    >
+                      {testingKimiKey ? "测试中…" : "测试连通性"}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 rounded-xl border border-border/50 bg-background/60 p-4">
@@ -787,6 +930,41 @@ export default function SystemManagementPage() {
                         }))
                       }
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="inline-flex items-center gap-1.5">
+                      <span>解析模型</span>
+                      <QuestionHelpTooltip
+                        label="解析模型"
+                        content="用于需求 Excel 智能解析（上传需求表）的 Kimi 模型 id。保存并生效后优先使用本字段；未配置时依次回退到「KIMI评估 → 模型」与服务端环境变量默认模型。"
+                      />
+                    </Label>
+                    <Input
+                      value={requirementDraft.fileParsing.model}
+                      onChange={(e) =>
+                        setRequirementDraft((prev) => ({
+                          ...prev,
+                          fileParsing: { ...prev.fileParsing, model: e.target.value },
+                        }))
+                      }
+                      placeholder="例如 moonshot-v1-128k、kimi-k2-turbo-preview"
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2 rounded-lg border border-border/40 bg-background/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      按当前「解析模型」发起最小对话请求校验连通性（可先改模型再测，无需先保存草稿）。密钥与「大模型 API Key」及 KIMI 评估测试规则一致；未填模型时服务端将回退为评估草稿中的模型。
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={testingFileParsingModel}
+                      onClick={() => void onTestFileParsingModel()}
+                    >
+                      {testingFileParsingModel ? "测试中…" : "测试连通性"}
+                    </Button>
                   </div>
                   <div className="grid gap-2 md:grid-cols-2">
                     <div className="space-y-1 md:col-span-2">
@@ -1032,12 +1210,28 @@ export default function SystemManagementPage() {
                     />
                   </div>
                 </div>
+                <div className="flex flex-col gap-2 rounded-lg border border-border/40 bg-background/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    按当前「生成 → 模型」发起最小对话请求校验连通性（可先改模型再测，无需先保存草稿）。密钥规则与上方一致；未填模型时服务端将回退为 KIMI 评估草稿中的模型。
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={testingKimiGenerationModel}
+                    onClick={() => void onTestKimiGenerationModel()}
+                  >
+                    {testingKimiGenerationModel ? "测试中…" : "测试连通性"}
+                  </Button>
+                </div>
               </div>
 
               <div className="rounded-xl border border-dashed border-border/50 bg-background/40 p-3 text-xs text-muted-foreground">
                 当前生效配置快照：KIMI评估({requirementActive.kimiEvaluation.enabled ? "启用" : "禁用"})，
-                文件解析({requirementActive.fileParsing.enabled ? "启用" : "禁用"})，
-                KIMI生成({requirementActive.kimiGeneration.enabled ? "启用" : "禁用"})
+                文件解析({requirementActive.fileParsing.enabled ? "启用" : "禁用"}，模型 {requirementActive.fileParsing.model || "—"})，
+                KIMI生成({requirementActive.kimiGeneration.enabled ? "启用" : "禁用"})，
+                KIMI密钥({describeKimiKeySource(requirementActive.kimiCredentials)})
               </div>
             </CardContent>
           </Card>
@@ -1106,29 +1300,33 @@ export default function SystemManagementPage() {
           <DialogHeader>
             <DialogTitle>配置版本号编码规则</DialogTitle>
             <DialogDescription>
-              {editingRule ? `模块：${editingRule.moduleName}（${editingRule.moduleCode}）` : "编辑规则配置"}
+              {editingRule
+                ? `模块：${editingRule.moduleName}（${editingRule.moduleCode}）。版本前缀由规则固定，仅可维护其后的编码格式片段。`
+                : "编辑规则配置"}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="rule-prefix-dialog">版本前缀</Label>
+              <Label htmlFor="rule-prefix-dialog">版本前缀（只读）</Label>
               <Input
                 id="rule-prefix-dialog"
-                value={editingPrefix}
-                onChange={(event) => setEditingPrefix(event.target.value)}
-                placeholder="例如 GL"
+                value={editingRule?.prefix ?? ""}
+                readOnly
+                disabled
+                className="cursor-not-allowed bg-muted/50 text-muted-foreground"
+                title="前缀由系统按模块预设，不在此修改"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="rule-format-dialog" className="inline-flex items-center gap-1.5">
-                <span>编码格式</span>
+                <span>编码格式（不含前缀）</span>
                 <FormatHelpTooltip />
               </Label>
               <Input
                 id="rule-format-dialog"
                 value={editingFormat}
                 onChange={(event) => setEditingFormat(event.target.value)}
-                placeholder="例如 {PREFIX}-{YYYYMMDD}-{NNN}"
+                placeholder="例如 -{MM}-{NNN} 或 -{YYYYMMDD}-{NNN}"
               />
             </div>
           </div>

@@ -19,6 +19,7 @@ import {
   forceUnlockVersion,
   listVersions,
   promoteVersion,
+  saveCheckedOutDraft,
   undoCheckout,
   updateVersionStatus
 } from "./versions/versions.usecase";
@@ -547,6 +548,47 @@ test("versions.usecase: checkout -> checkin updates lock and version code", { co
     assert.equal(checkedIn.data.record.checkoutStatus, "checked_in");
     assert.equal(checkedIn.data.record.payload.a, 2);
     assert.ok(checkedIn.data.record.versionCode.includes("-VA1"));
+  });
+});
+
+test("versions.usecase: save-draft updates payload while staying checked out", { concurrency: false }, () => {
+  const versionsPath = versionsStorePath();
+  withFileSnapshotRestore(versionsPath, () => {
+    const versionCode = `UT-DRAFT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const createReq = createMockReq({
+      token: getActiveUserToken(),
+      body: {
+        type: "assessment",
+        versionCode,
+        templateId: "default",
+        status: "draft",
+        payload: { a: 1 },
+      },
+    });
+    const createRes = createMockRes();
+    createVersion(createReq, createRes as unknown as Response);
+    assert.equal(createRes.statusCode, 200);
+    const recordId = (createRes.body as { data: { record: { id: string } } }).data.record.id;
+
+    const checkoutReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
+    const checkoutRes = createMockRes();
+    checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
+    assert.equal(checkoutRes.statusCode, 200);
+
+    const draftReq = createMockReq({
+      token: getActiveUserToken(),
+      params: { id: recordId },
+      body: { payload: { a: 99 } },
+    });
+    const draftRes = createMockRes();
+    saveCheckedOutDraft(draftReq, draftRes as unknown as Response);
+    assert.equal(draftRes.statusCode, 200);
+    const body = draftRes.body as {
+      data: { record: { checkoutStatus: string; versionCode: string; payload: { a: number } } };
+    };
+    assert.equal(body.data.record.checkoutStatus, "checked_out");
+    assert.equal(body.data.record.versionCode, versionCode);
+    assert.equal(body.data.record.payload.a, 99);
   });
 });
 

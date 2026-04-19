@@ -1,6 +1,7 @@
 "use client"
 
 import { MouseEvent as ReactMouseEvent, ReactNode, useMemo, useRef, useState } from "react"
+import { cn } from "@/lib/utils"
 import { Filter, ChevronDown, Grid3X3, List, Plus, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -18,6 +19,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  wesTableHeaderStickyClassName,
+  wesTableToolbarHeaderRowClassName,
 } from "@/components/ui/table"
 
 type ViewMode = "list" | "grid"
@@ -290,7 +293,7 @@ export function TableTemplate<Row>({
 
         <Table
           containerClassName="max-h-[60vh] overflow-auto"
-          className={`table-auto [&_th]:border-r [&_th]:border-border/50 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0 ${tableClassName ?? ""}`.trim()}
+          className={cn("table-auto", tableClassName)}
         >
           <colgroup>
             {leadingHeaderCell ? <col /> : null}
@@ -309,10 +312,10 @@ export function TableTemplate<Row>({
             {trailingHeaderCell ? <col /> : null}
           </colgroup>
           <TableHeader
-            className="sticky top-0 z-20 backdrop-blur-sm"
+            className={wesTableHeaderStickyClassName}
             onContextMenu={onResetAllColumnWidthsByContextMenu}
           >
-            <TableRow className="border-border/50 hover:bg-transparent">
+            <TableRow className={wesTableToolbarHeaderRowClassName}>
               {leadingHeaderCell}
               {columns.map((col, index) => (
                 <TableHead
@@ -356,7 +359,7 @@ export function TableTemplate<Row>({
               : null}
             {!loading && rows.length > 0 ? rows.map((row) => renderRow(row)) : null}
             {!loading && rows.length === 0 ? (
-              <TableRow className="border-border/50 hover:bg-transparent">
+              <TableRow className={wesTableToolbarHeaderRowClassName}>
                 <TableCell
                   colSpan={totalColumnCount}
                   className="py-10 text-center text-muted-foreground"

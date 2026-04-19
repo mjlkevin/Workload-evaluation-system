@@ -2440,40 +2440,6 @@
       "updatedByUsername": "ownerA"
     },
     {
-      "id": "9702049a-976a-45bf-926d-7fc14bf78319",
-      "type": "global",
-      "versionCode": "GLOBAL-20260404-0053-VA2",
-      "templateId": "default",
-      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "status": "draft",
-      "payload": {
-        "projectName": "未命名项目",
-        "basicInfo": {
-          "projectName": "未命名项目"
-        },
-        "checkinNote": "1"
-      },
-      "createdAt": "2026-04-03T16:53:29.855Z",
-      "updatedAt": "2026-04-07T06:33:19.575Z",
-      "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "createdByUsername": "mjlkevin",
-      "checkoutStatus": "checked_in",
-      "versionDocStatus": "drafting",
-      "majorLetter": "A",
-      "minorNumber": 2,
-      "baseCode": "GLOBAL-20260404-0053",
-      "isHistoricalArchive": false,
-      "lastCheckinPayload": {
-        "projectName": "未命名项目",
-        "basicInfo": {
-          "projectName": "未命名项目"
-        },
-        "checkinNote": "1"
-      },
-      "updatedByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
-      "updatedByUsername": "mjlkevin"
-    },
-    {
       "id": "57e7e7c2-148d-4bd3-938c-deb9d426bcd3",
       "type": "requirementImport",
       "versionCode": "RI-20260404-010153-G6YK",
@@ -43133,7 +43099,7 @@
     {
       "id": "9576841a-9cc2-4428-8ea3-f7b1490b19c3",
       "type": "global",
-      "versionCode": "GL-{YYMMDD}-{N}",
+      "versionCode": "GL-260408-1",
       "templateId": "default",
       "ownerUserId": "0bfae09b-d3da-4b28-b8b8-56a384dac458",
       "status": "draft",
@@ -43151,7 +43117,7 @@
       "versionDocStatus": "drafting",
       "majorLetter": "A",
       "minorNumber": 0,
-      "baseCode": "GL-{YYMMDD}-{N}",
+      "baseCode": "GL-260408-1",
       "isHistoricalArchive": false,
       "lastCheckinPayload": {},
       "updatedByUserId": "0bfae09b-d3da-4b28-b8b8-56a384dac458",
@@ -50775,7 +50741,7 @@
     {
       "id": "b0304704-966a-465a-802a-fe82e02589f0",
       "type": "requirementImport",
-      "versionCode": "RQ-GLOBAL-20260404-0053-03-VA1",
+      "versionCode": "RQ-GLOBAL-20260404-0053-03-VA2",
       "templateId": "default",
       "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
       "status": "draft",
@@ -50783,7 +50749,7 @@
         "globalVersionCode": "GLOBAL-20260404-0053",
         "basicInfo": {
           "customerName": "广东巨三集团有限公司",
-          "location": "",
+          "location": "广州",
           "projectName": "巨三集团星空套件-财务供应链",
           "opportunityNo": "",
           "productLines": [],
@@ -51131,10 +51097,10 @@
             "note": ""
           }
         ],
-        "checkinNote": "更新"
+        "checkinNote": "未说明"
       },
       "createdAt": "2026-04-16T02:56:23.520Z",
-      "updatedAt": "2026-04-17T05:10:04.956Z",
+      "updatedAt": "2026-04-18T10:45:23.755Z",
       "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
       "createdByUsername": "mjlkevin",
       "updatedByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
@@ -51142,14 +51108,14 @@
       "checkoutStatus": "checked_in",
       "versionDocStatus": "drafting",
       "majorLetter": "A",
-      "minorNumber": 1,
+      "minorNumber": 2,
       "baseCode": "RQ-GLOBAL-20260404-0053-03",
       "isHistoricalArchive": false,
       "lastCheckinPayload": {
         "globalVersionCode": "GLOBAL-20260404-0053",
         "basicInfo": {
           "customerName": "广东巨三集团有限公司",
-          "location": "",
+          "location": "广州",
           "projectName": "巨三集团星空套件-财务供应链",
           "opportunityNo": "",
           "productLines": [],
@@ -51497,8 +51463,569 @@
             "note": ""
           }
         ],
-        "checkinNote": "更新"
+        "checkinNote": "未说明"
       }
+    },
+    {
+      "id": "2bcb6255-25cf-4138-8e35-0ad54dd79ad5",
+      "type": "global",
+      "versionCode": "GL04001",
+      "templateId": "default",
+      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "status": "draft",
+      "payload": {
+        "projectName": "利民",
+        "basicInfo": {
+          "projectName": "利民"
+        }
+      },
+      "createdAt": "2026-04-18T14:33:42.340Z",
+      "updatedAt": "2026-04-18T14:33:42.340Z",
+      "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "createdByUsername": "mjlkevin",
+      "updatedByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "updatedByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 0,
+      "baseCode": "GL04001",
+      "isHistoricalArchive": false,
+      "lastCheckinPayload": {}
+    },
+    {
+      "id": "dd57921c-c486-4ad0-86fa-7683fc31f474",
+      "type": "requirementImport",
+      "versionCode": "RQ04001",
+      "templateId": "default",
+      "ownerUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "status": "draft",
+      "payload": {
+        "globalVersionCode": "",
+        "basicInfo": {
+          "customerName": "广州利民",
+          "location": "广东省广州市黄埔区",
+          "projectName": "广州利民",
+          "opportunityNo": "",
+          "productLines": [
+            "金蝶AI星空"
+          ],
+          "customerIndustry": "C 制造业 > 38 电气机械和器材制造业 > 385 家用电力器具制造 > 3859 其他家用电力器具制造",
+          "enterpriseRevenue": "",
+          "itStatus": "企业拥有自动化生产线，估计已部署基础ERP系统（财务及进销存模块）及外贸业务管理软件（如报关、单证处理系统），生产环节可能应用简易版MES进行设备监控与排产，但系统间集成度有限，尚未建立完整的数据中台或商业智能分析平台，具体系统品牌及建设深度信息有限。",
+          "expectedGoLive": "",
+          "enterpriseProfile": "广州利民电器有限公司成立于1994年，总部位于广州市黄埔区，是专注于电风扇、加湿器等环境小家电研发制造的老牌出口企业。公司拥有自动化生产线，年产能估计达300-500万台（依据公开线索），产品主要销往欧美及东南亚市场。基于同规模出口型小家电企业均值估计，其年营业收入约为3-6亿元，员工规模估计500-800人，毛利率区间约15%-25%。公司具备完整的外贸出口资质与生产制造能力，在华南小家电出口细分市场具有稳定份额。",
+          "projectBackgroundNeeds": "",
+          "projectGoals": ""
+        },
+        "valuePropositionRows": [
+          {
+            "id": "cf85f3b5-e75d-4222-91b2-da4dfe0ee158",
+            "summary": "围绕REC公司的客户关联集团内部交易业务，实现业务财务一体化系统平台",
+            "refinedContent": "1、本期实现集团三个组织，REC（香港贸易公司）、RILHK（香港贸易公司）、RILNS（广州工厂）的统一调研、需求分析、方案设计；\n2、考虑项目风险，客户老板要求实现业务最简单的REC组织（只有一家客户）财务供应链全模块的应用，而RILHK（香港贸易公司）、RILNS（广州工厂）该一家客户相关流程配置与测试，上线；\n而非该客户的流程将放在二期实现，不在本期范围。",
+            "originalDemand": "1、目前客户三个组织，REC（香港贸易公司）、RILHK（香港贸易公司）、RILNS（广州工厂）\n2、目前各个公司之间，以及内部各个系统间存在数据孤岛\n3、客户考虑整体统一平台，实现数据互通，减少人工重复性录入工作，实现降本增效。",
+            "interviewOutline": ""
+          }
+        ],
+        "businessNeedRows": [
+          {
+            "id": "641809b9-8a63-412e-827e-32fb290bd146",
+            "businessDomain": "财务云",
+            "category": "总账",
+            "businessNeed": "基于标准产品功能，基于统一财务核算体系下核算主体的会计科目、初始化、月末结账、结转损益、期末调汇、账表查询。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "e02aa983-e235-4ded-9234-3f3d6fcb0f02",
+            "businessDomain": "财务云",
+            "category": "智能会计平台",
+            "businessNeed": "基于标准产品功能，主要提供设置凭证模板用于生成总账凭证。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "a72f1366-af48-4ced-9814-8766875ba105",
+            "businessDomain": "财务云",
+            "category": "报表",
+            "businessNeed": "基于标准产品功能，主要通过财务报表可实现单体组织的报表出具，同时完成合并报表应用所需报表的编制、审批以及上报处理。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "ca0a44f8-545f-4b76-aa90-2a3fb7bf34c2",
+            "businessDomain": "财务云",
+            "category": "固定资产",
+            "businessNeed": "基于标准产品功能，基于统一财务核算体系下核算主体的资产基础资料、初始化、日常资产账务业务处理（新增、清理、调拨、变更）、月末折旧、关账、账表查询。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "6810ea73-1a5c-4d20-a7e6-2da97f080c01",
+            "businessDomain": "财务云",
+            "category": "出纳管理",
+            "businessNeed": "实现日常出纳收付款业务处理",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "4a19f7ec-4905-48b3-87f3-680bb1d77c54",
+            "businessDomain": "财务云",
+            "category": "应收款管理",
+            "businessNeed": "基于标准产品功能，主要将供应链销售以及出纳收款紧密结合，完成客户往来数据转换为应收数据，并完成往来资金的结算。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "904f651f-7080-4c59-8b6e-cca76ac50966",
+            "businessDomain": "财务云",
+            "category": "应付款管理",
+            "businessNeed": "基于标准产品功能，主要将供应链采购以及出纳付款紧密结合，完成供应商往来数据转换为应付数据，并完成往来资金的结算。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "e4df74b1-206c-495d-95ae-5578a513c16f",
+            "businessDomain": "财务云",
+            "category": "发票管理",
+            "businessNeed": "基于标准产品功能，主要将供应链采购应付与销售应收紧密结合，完成往来数据转换为发票数据，并完成发票台账记录。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "824c006c-a711-49bc-ad7a-8d77a3e5b0b1",
+            "businessDomain": "财务云",
+            "category": "存货核算",
+            "businessNeed": "基于标准产品功能，主要通过与供应链、生产制造、应收应付、资产管理、总账等系统的无缝集成，完成成本管理、为成本分析提供财务数据。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "35ac2d99-fe0f-49fc-88ec-ec9719539f30",
+            "businessDomain": "财务云",
+            "category": "实际成本核算",
+            "businessNeed": "基于标准产品功能，通过完成投入、产品、费用归集，完成细化成本的核算。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "8c00f534-11bd-490a-9544-872b6da4be42",
+            "businessDomain": "供应链云",
+            "category": "采购管理",
+            "businessNeed": "基于标准产品功能。从采购订单、收货、入库、采购退货申请、采购退料、暂估、应付、采购发票、付款申请、付款处理等功能。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "2b169cdf-1c2c-43b9-94fc-8dcadbc5f7d8",
+            "businessDomain": "供应链云",
+            "category": "销售管理",
+            "businessNeed": "基于标准产品功能。从销售订单、发货通知、出库、销售退货、暂估、应收、销售发票、收款处理等功能。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "97fddc86-d00a-473d-8472-0bcdaac9190c",
+            "businessDomain": "供应链云",
+            "category": "库存管理",
+            "businessNeed": "基于标准产品功能。实现库存盘点、库存调拨、其他出入库等库存相关业务操作。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "5c35b47c-6115-414d-9088-897b5c169e07",
+            "businessDomain": "供应链云",
+            "category": "组织间结算",
+            "businessNeed": "基于标准产品功能，通过组织间结算平台，配置多种结算模式，选择不同的业务配置模型，定义参与结算的业务单据、取价规则、结算路径等完成组织间结算。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "b7034575-94e1-4c29-82c4-adbd618f615d",
+            "businessDomain": "制造云",
+            "category": "工程数据管理",
+            "businessNeed": "对生产制造领域的BOM、工艺、工程变更等进行集中管理。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "07acf56c-739b-48fe-9188-df03e4fd3ba9",
+            "businessDomain": "制造云",
+            "category": "生产管理",
+            "businessNeed": "基于标准产品功能，以生产工单为主线，从领料、退料、补料，到产品完工入库，实现了生产管理的全过程监督与控制。实现产线日产能，满足单一约束条件排程。",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "85213d05-9829-44fa-843c-c39fd0bb0b40",
+            "businessDomain": "制造云",
+            "category": "委外管理",
+            "businessNeed": "基于标准产品功能，以委外工单为主线，从委外采购、委外领料、委外退料、委外补料、到委外入库，实现了委外管理的全过程监督与控制",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "b42bed06-40df-435b-9af0-dca9aa794c9a",
+            "businessDomain": "财务云",
+            "category": "总账",
+            "businessNeed": "香港会计准则记账模式",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "67d49b27-f8cd-4c20-84b9-c210d2d2ee99",
+            "businessDomain": "轻应用",
+            "category": "业务审批",
+            "businessNeed": "在企业微信上实现移动业务审批",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "57bac025-dd26-4456-aaa0-a398f10a4b81",
+            "businessDomain": "开发服务云-融合版",
+            "category": "开发服务云-融合版",
+            "businessNeed": "开发服务云-融合版进行用户基础功能培训",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          },
+          {
+            "id": "053cb88f-6edb-4f42-9665-de8bbd440c05",
+            "businessDomain": "多语言",
+            "category": "多语言",
+            "businessNeed": "产品界面需要支持中英文",
+            "proposer": "高层",
+            "title": "管理层",
+            "requiresCustomDev": "否"
+          }
+        ],
+        "devOverviewRows": [
+          {
+            "id": "228c8680-a93b-4aad-bef8-6ed3aeb19f0f",
+            "businessDomain": "",
+            "moduleName": "",
+            "moduleBrief": "",
+            "functionDesc": "",
+            "solutionSuggestion": "",
+            "codingDays": 0,
+            "estimateBasis": ""
+          }
+        ],
+        "productModuleRows": [
+          {
+            "id": "99418250-4164-4cec-83d8-0390c0cf0b4b",
+            "productDomain": "财务云",
+            "moduleName": "总账",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "cae60b7e-a359-4498-a7c2-6b5c1de569e4",
+            "productDomain": "财务云",
+            "moduleName": "智能会计平台",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "6dc40fbd-2421-46ef-b7f9-206b0c0e420f",
+            "productDomain": "财务云",
+            "moduleName": "报表",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "0562bf0b-c678-4a63-af7a-5ab64f74fd30",
+            "productDomain": "财务云",
+            "moduleName": "固定资产",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "436a85f3-6c13-4150-a834-b93e21624753",
+            "productDomain": "财务云",
+            "moduleName": "出纳管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "c34d06dc-8c48-4f86-8577-bcd38415f785",
+            "productDomain": "财务云",
+            "moduleName": "应收款管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "7a830214-d5bf-49d9-8dc2-0e9f13b7b4f9",
+            "productDomain": "财务云",
+            "moduleName": "应付款管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "d23a52b5-8ee7-4b41-9505-cefc5f484fa4",
+            "productDomain": "财务云",
+            "moduleName": "发票管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "eb15869e-4c77-4075-ad14-897ea22db65f",
+            "productDomain": "财务云",
+            "moduleName": "存货核算",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "91d9a42c-6645-478d-b255-b4eeab2ae835",
+            "productDomain": "财务云",
+            "moduleName": "实际成本核算",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "22e5ab9b-6411-4e1c-b0b2-493692b626b3",
+            "productDomain": "供应链云",
+            "moduleName": "采购管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "b067276d-b94c-4a89-b267-3c929a820cec",
+            "productDomain": "供应链云",
+            "moduleName": "销售管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "ae5ab576-1310-4acd-94cc-b20be9b9dc1b",
+            "productDomain": "供应链云",
+            "moduleName": "库存管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "eecb2368-3382-46a3-a80c-52ae90799c56",
+            "productDomain": "供应链云",
+            "moduleName": "组织间结算",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "a96f3d6b-a302-4c38-a1f8-197e22e688ab",
+            "productDomain": "制造云",
+            "moduleName": "工程数据管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "b98f49eb-54fd-4ef4-bbe4-1edf797cb299",
+            "productDomain": "制造云",
+            "moduleName": "生产管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "6c718021-679c-455b-bfc5-5cfed88a23fa",
+            "productDomain": "制造云",
+            "moduleName": "委外管理",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "507dbf0e-10e3-42d1-9e0a-131daf8fe0c4",
+            "productDomain": "移动应用",
+            "moduleName": "业务审批",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "1805732c-a323-4de8-9d8f-a217c8ade6ee",
+            "productDomain": "开发服务云-融合版",
+            "moduleName": "开发服务云-融合版",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          },
+          {
+            "id": "aed89abe-2a6f-490a-acd6-e7ecde2aa3d8",
+            "productDomain": "多语言",
+            "moduleName": "多语言",
+            "subModule": "",
+            "userCount": "50",
+            "implementationOrgCount": "",
+            "pilotOrgCount": "",
+            "partyBLead": "",
+            "partyALead": ""
+          }
+        ],
+        "implementationScopeRows": [
+          {
+            "id": "0ac96fe9-b129-4b59-9c28-112d435ed357",
+            "companyName": "REC（香港贸易公司）",
+            "companyType": "子公司",
+            "moduleScope": "财务、供应链",
+            "location": "广州",
+            "implementationMode": "集中实施/推广",
+            "note": "要求提供香港现场1周进行用户培训及辅导，其他时间客户可过来广州"
+          },
+          {
+            "id": "de4d840b-280e-4dc4-b4b5-cad9dc678d61",
+            "companyName": "RILHK（香港贸易公司）",
+            "companyType": "集团公司",
+            "moduleScope": "财务、供应链",
+            "location": "广州",
+            "implementationMode": "集中实施/推广",
+            "note": "要求提供香港现场1周进行用户培训及辅导，其他时间客户可过来广州"
+          },
+          {
+            "id": "70234335-2d89-4b0d-b9b6-1bd719defde2",
+            "companyName": "RILNS（广州工厂）",
+            "companyType": "子公司",
+            "moduleScope": "财务、供应链、制造",
+            "location": "广州",
+            "implementationMode": "集中实施/推广",
+            "note": ""
+          }
+        ],
+        "meetingNotes": "关于此方案已经跟客户明确过会存在以下问题，客户是清楚的。\n一、一阶段系统架构 一、一阶段系统架构\n二、业务流程与数据效果评估 二、业务流程与数据效果评估\n公司 业务流程完整性 数据完整性 可出具报表 主要问题\nREC 完整 完整 可出具财报 无\nRILHK 完整 仅 MSCP 数据 无法出具整体财报 业务流完整；销售、采购、库存、财务数据不完整\nRILNS 完整 仅 MSCP 数据 无法出具整体财报 业务流完整；生产计划、采购、库存、成本核算数据不完整\n三、业务初始化评估\n公司 初始化内容 初始化内容 问题与风险 问题与风险\nREC 全新初始化 全新初始化 无 无\nRILHK 仅 MSCP 相关销售、采购、库存、财务数据 仅 MSCP 相关销售、采购、库存、财务数据 非 MSCP 数据在INFOR同时录入或将MSCP 数据导入到INFOR，金蝶云星空财务报表不完整 非 MSCP 数据在INFOR同时录入或将MSCP 数据导入到INFOR，金蝶云星空财务报表不完整\nRILNS 仅 MSCP 相关销售、采购、库存、生产、财务数据 仅 MSCP 相关销售、采购、库存、生产、财务数据 共耗材料分配难，成本核算偏差，库存数据、财务报表不完整 共耗材料分配难，成本核算偏差，库存数据、财务报表不完整",
+        "keyPointRows": [
+          {
+            "id": "e90ce1c8-07a7-42fc-90fb-0e9537622117",
+            "analysisCategory": "需求分析",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          },
+          {
+            "id": "d4f58f9f-716b-4975-b362-f5f850774321",
+            "analysisCategory": "三维需求",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          },
+          {
+            "id": "5a5af2d1-d0b8-458b-9d9d-761719f0892f",
+            "analysisCategory": "对应方案卖点",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          },
+          {
+            "id": "f9590622-2136-460a-80f6-642eaae315fd",
+            "analysisCategory": "赢在哪里",
+            "subItem": "",
+            "detail": "",
+            "note": ""
+          }
+        ]
+      },
+      "createdAt": "2026-04-18T17:15:14.164Z",
+      "updatedAt": "2026-04-18T17:15:14.164Z",
+      "createdByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "createdByUsername": "mjlkevin",
+      "updatedByUserId": "804d4b81-2471-468c-b1d2-a366dd34a53f",
+      "updatedByUsername": "mjlkevin",
+      "checkoutStatus": "checked_in",
+      "versionDocStatus": "drafting",
+      "majorLetter": "A",
+      "minorNumber": 0,
+      "baseCode": "RQ04001",
+      "isHistoricalArchive": false,
+      "lastCheckinPayload": {}
     }
   ]
 }

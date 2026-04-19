@@ -216,6 +216,14 @@ export type VersionCodeRuleItem = {
   updatedAt: string
 }
 
+export type RequirementKimiCredentialsPublic = {
+  /** 服务端不下发明文，仅用于本地暂存待提交的密钥 */
+  apiKey: string
+  hint: string | null
+  envFallbackAvailable: boolean
+  resolvedFrom: "store" | "env" | "none"
+}
+
 export type RequirementSystemConfig = {
   kimiEvaluation: {
     enabled: boolean
@@ -229,6 +237,7 @@ export type RequirementSystemConfig = {
   }
   fileParsing: {
     enabled: boolean
+    model: string
     allowedExtensions: string[]
     maxFileSizeMb: number
     maxSheetCount: number
@@ -244,6 +253,7 @@ export type RequirementSystemConfig = {
     includeRiskHints: boolean
     includeAssumptions: boolean
   }
+  kimiCredentials: RequirementKimiCredentialsPublic
 }
 
 export type RequirementSystemConfigView = {
@@ -519,6 +529,18 @@ export async function checkinVersionById(recordId: string, payload: Record<strin
     },
   )
   return data
+}
+
+/** 检出状态下原地保存草稿（不检入、版本号不变） */
+export async function saveCheckedOutVersionDraft(recordId: string, payload: Record<string, unknown>): Promise<VersionRecordDto> {
+  const data = await apiRequest<{ record: VersionRecordDto }>(
+    `/api/v1/versions/${encodeURIComponent(recordId)}/save-draft`,
+    {
+      method: "PATCH",
+      body: { payload },
+    },
+  )
+  return data.record
 }
 
 export async function undoCheckoutById(recordId: string): Promise<VersionRecordDto> {
@@ -1145,7 +1167,9 @@ export async function getRequirementSystemConfig(): Promise<RequirementSystemCon
   return apiRequest<RequirementSystemConfigView>("/api/v1/system/requirement-settings")
 }
 
-export async function updateRequirementSystemConfigDraft(payload: Partial<RequirementSystemConfig>): Promise<{
+export async function updateRequirementSystemConfigDraft(
+  payload: Partial<RequirementSystemConfig> & { kimiCredentials?: { apiKey?: string | null } },
+): Promise<{
   version: number
   draft: RequirementSystemConfig
   updatedAt: string
@@ -1173,6 +1197,20 @@ export async function activateRequirementSystemConfig(): Promise<{
     method: "POST",
     body: {},
   })
+}
+
+export async function testRequirementKimiApiKey(body?: { apiKey?: string; model?: string }): Promise<{
+  ok: boolean
+  testedSource: "request_body" | "draft_store" | "environment"
+  model: string
+}> {
+  return apiRequest<{ ok: boolean; testedSource: string; model: string }>(
+    "/api/v1/ai/kimi-api-key/test",
+    {
+      method: "POST",
+      body: body || {},
+    },
+  )
 }
 
 export async function getImplementationDependencyRules(): Promise<ImplementationDependencyRulesView> {

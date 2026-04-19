@@ -10,6 +10,7 @@ router.post("/version-code-rules/:ruleId/disable", SystemModule.disableVersionCo
 router.get("/requirement-settings", SystemModule.getRequirementSystemConfig);
 router.patch("/requirement-settings/draft", SystemModule.updateRequirementSystemConfigDraft);
 router.post("/requirement-settings/activate", SystemModule.activateRequirementSystemConfig);
+router.post("/requirement-settings/kimi-api-key/test", SystemModule.testRequirementKimiApiKey);
 router.get("/implementation-dependency-rules", SystemModule.getImplementationDependencyRules);
 router.patch("/implementation-dependency-rules/draft", SystemModule.updateImplementationDependencyRulesDraft);
 router.post("/implementation-dependency-rules/activate", SystemModule.activateImplementationDependencyRules);

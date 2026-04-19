@@ -14,6 +14,7 @@ router.delete("/:type/:versionCode", VersionsModule.deleteVersion);
 
 // 检入检出升版
 router.post("/:id/checkout", VersionsModule.checkoutVersion);
+router.patch("/:id/save-draft", VersionsModule.saveCheckedOutDraft);
 router.post("/:id/checkin", VersionsModule.checkinVersion);
 router.post("/:id/undo-checkout", VersionsModule.undoCheckout);
 router.post("/:id/promote", VersionsModule.promoteVersion);

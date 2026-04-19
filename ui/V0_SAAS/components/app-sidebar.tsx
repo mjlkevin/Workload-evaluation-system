@@ -150,12 +150,6 @@ export function AppSidebar() {
     router.push(dest)
   }
 
-  function handleMenuNavigate(href: string) {
-    const allowed = requestNavigation(href)
-    if (!allowed) return
-    router.push(href)
-  }
-
   return (
     <>
       <Sidebar className="border-r border-border/40 shadow-[7px_0_22px_-10px_rgba(0,0,0,0.085)] dark:shadow-[8px_0_26px_-12px_rgba(0,0,0,0.38)]">
@@ -198,25 +192,19 @@ export function AppSidebar() {
                 {mainNavItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     {submenuEnabledMainNav.has(item.url) ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <SidebarMenuButton
-                            isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
-                            className="rounded-xl px-3 py-2.5 transition-all data-[active=true]:bg-foreground data-[active=true]:text-background data-[active=true]:shadow-lg"
-                          >
-                            <item.icon className="size-4" />
-                            <span>{item.title}</span>
-                          </SidebarMenuButton>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" side="right" sideOffset={8} className="w-36 rounded-xl">
-                          <DropdownMenuItem className="rounded-lg" onClick={() => handleMenuNavigate(`${item.url}/list`)}>
-                            列表
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="rounded-lg" onClick={() => handleMenuNavigate(item.url)}>
-                            新增
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                        className="rounded-xl px-3 py-2.5 transition-all data-[active=true]:bg-foreground data-[active=true]:text-background data-[active=true]:shadow-lg"
+                      >
+                        <Link
+                          href={`${item.url}/list`}
+                          onClick={(e) => handleNavClick(e, `${item.url}/list`)}
+                        >
+                          <item.icon className="size-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
                     ) : (
                       <SidebarMenuButton
                         asChild

@@ -4,12 +4,34 @@ import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
+/** 表头/单元格右侧竖线栅格，全局统一，避免在各页重复拼接 Tailwind */
+export const wesTableCellGridClassName =
+  '[&_th]:border-r [&_th]:border-border/50 [&_thead_th]:border-border/40 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0'
+
+/** 滚动区域内粘性表头（含打印时回落为静态） */
+export const wesTableHeaderStickyClassName =
+  'sticky top-0 z-20 backdrop-blur-sm print:static print:z-auto'
+
+/** 工具栏式表头行：与数据行 hover 区分，避免表头行出现斑马 hover */
+export const wesTableToolbarHeaderRowClassName = 'border-border/50 hover:bg-transparent'
+
+/** 高密度数据表（多列清单、方案列表等） */
+export const wesTableDensityCompactClassName =
+  '[&_th]:!h-auto [&_th]:!min-h-0 [&_th]:!px-1.5 [&_th]:!py-1.5 [&_th]:!text-xs [&_th]:!font-medium [&_th]:!leading-tight [&_td]:!p-1.5 [&_td]:!text-xs [&_td]:leading-tight'
+
+export type WesTableDensity = 'default' | 'compact'
+
 function Table({
   className,
   containerClassName,
+  density = 'default',
   children,
   ...props
-}: React.ComponentProps<'table'> & { containerClassName?: string }) {
+}: React.ComponentProps<'table'> & {
+  containerClassName?: string
+  /** default：标准行高；compact：更小表头/单元格内边距与字号 */
+  density?: WesTableDensity
+}) {
   const containerRef = React.useRef<HTMLDivElement>(null)
   const tableRef = React.useRef<HTMLTableElement>(null)
   const previewRef = React.useRef<HTMLDivElement>(null)
@@ -107,7 +129,9 @@ function Table({
             ref={tableRef}
             data-slot="table"
             className={cn(
-              'w-full min-w-full caption-bottom text-sm [&_th]:border-r [&_th]:border-border/50 [&_thead_th]:border-white/15 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-border/50 [&_td:last-child]:border-r-0',
+              'w-full min-w-full caption-bottom text-sm',
+              wesTableCellGridClassName,
+              density === 'compact' ? wesTableDensityCompactClassName : null,
               className,
             )}
             onClick={handleTableClick}
@@ -135,7 +159,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
     <thead
       data-slot="table-header"
       className={cn(
-        'text-white shadow-[0_3px_8px_-2px_rgba(0,0,0,0.14)] [&_tr]:border-b [&_tr]:border-white/20 [&_tr]:hover:bg-transparent',
+        'text-foreground shadow-sm [&_tr]:border-b [&_tr]:border-border [&_tr]:hover:bg-transparent',
         className,
       )}
       {...props}
@@ -186,21 +210,22 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     const th = event.currentTarget.closest('th') as HTMLTableCellElement | null
     const table = th?.closest('table') as HTMLTableElement | null
     if (!th || !table || !th.parentElement) return
+    const tableEl = table
     const colIndex = Array.from(th.parentElement.children).indexOf(th)
     if (colIndex < 0) return
     const isLastColumn = colIndex === th.parentElement.children.length - 1
-    const container = table.closest('[data-slot="table-container"]') as HTMLElement | null
+    const container = tableEl.closest('[data-slot="table-container"]') as HTMLElement | null
 
     const startX = event.clientX
     const startWidth = th.getBoundingClientRect().width
-    const containerWidth = container?.clientWidth || table.getBoundingClientRect().width
-    const baseTableWidth = Math.max(containerWidth, table.getBoundingClientRect().width, table.scrollWidth)
+    const containerWidth = container?.clientWidth || tableEl.getBoundingClientRect().width
+    const baseTableWidth = Math.max(containerWidth, tableEl.getBoundingClientRect().width, tableEl.scrollWidth)
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth || 0 : 0
     const maxColumnWidth = Math.max(320, Math.round(viewportWidth * 0.55) || 560)
     const maxTableWidth = Math.max(1600, Math.round(viewportWidth * 2.2) || 2200)
-    const cells = Array.from(table.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`)) as HTMLElement[]
-    table.style.tableLayout = 'fixed'
-    table.style.minWidth = `${Math.min(baseTableWidth, maxTableWidth)}px`
+    const cells = Array.from(tableEl.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`)) as HTMLElement[]
+    tableEl.style.tableLayout = 'fixed'
+    tableEl.style.minWidth = `${Math.min(baseTableWidth, maxTableWidth)}px`
 
     function onMove(moveEvent: MouseEvent) {
       const nextWidth = Math.min(maxColumnWidth, Math.max(88, startWidth + (moveEvent.clientX - startX)))
@@ -213,7 +238,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
       if (isLastColumn) {
         const delta = nextWidth - startWidth
         const nextTableWidth = Math.min(maxTableWidth, Math.max(containerWidth, Math.round(baseTableWidth + delta)))
-        table.style.minWidth = `${nextTableWidth}px`
+        tableEl.style.minWidth = `${nextTableWidth}px`
       }
     }
 
@@ -230,7 +255,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        'relative h-10 bg-gradient-to-b from-zinc-700 from-0% via-zinc-800 via-40% to-zinc-900 to-100% px-2 text-left align-middle font-medium whitespace-nowrap text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),inset_0_-1px_0_0_rgba(0,0,0,0.28)] [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+        'relative h-auto min-h-0 border-b border-border/70 bg-muted/80 px-2 py-2 text-left align-middle text-sm font-medium text-foreground whitespace-nowrap dark:bg-muted/50 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
         className,
       )}
       {...props}
@@ -238,7 +263,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
       {props.children}
       <span
         aria-hidden="true"
-        className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none hover:bg-white/10"
+        className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none hover:bg-foreground/10"
         onMouseDown={onStartResize}
       />
     </th>

@@ -5,31 +5,31 @@ import {
   ImplementationDependencyRuleItem,
   ImplementationDependencyRulesConfig,
   ImplementationDependencyRulesStore,
+  RequirementKimiCredentialsConfig,
   RequirementSystemConfig,
   RequirementSystemConfigStore,
   VersionCodeRule,
   VersionCodeRulesStore,
 } from "../../types";
+import { config } from "../../config/env";
 import {
   implementationDependencyRulesStorePath,
   requirementSystemConfigStorePath,
   versionCodeRulesStorePath,
 } from "../../utils";
+import { applyVersionCodeFormat } from "../../utils/version-code-format";
 
 const EMPTY_TIME = "--";
 
+/** 与生成真实版本号同一套占位符，固定参考时间便于示例列展示 */
 function buildSample(format: string, prefix: string, moduleCode: string): string {
-  const replacements: Array<[string, string]> = [
-    ["{PREFIX}", prefix],
-    ["{MODULE}", moduleCode],
-    ["{YYYYMMDD}", "20260406"],
-    ["{YYYYMM}", "202604"],
-    ["{YYYY}", "2026"],
-    ["{GL}", "GL001"],
-    ["{NNN}", "001"],
-    ["{NN}", "01"],
-  ];
-  return replacements.reduce((result, [token, value]) => result.split(token).join(value), format);
+  return applyVersionCodeFormat(format, {
+    prefix,
+    moduleCode,
+    globalCode: "GL001",
+    seq: 1,
+    now: new Date("2026-04-06T08:00:00.000Z"),
+  });
 }
 
 function createDefaultRules(): VersionCodeRule[] {
@@ -89,8 +89,8 @@ function createDefaultRules(): VersionCodeRule[] {
       id: "rule-wbs",
       moduleKey: "wbs",
       moduleName: "WBS",
-      moduleCode: "WB",
-      prefix: "WB",
+      moduleCode: "WBS",
+      prefix: "WBS",
       format: "{PREFIX}-{YYYYMM}-{NNN}",
       status: "draft",
       effectiveAt: EMPTY_TIME,
@@ -160,7 +160,7 @@ function createDefaultRequirementConfig(): RequirementSystemConfig {
       model: "moonshot-v1-128k",
       temperature: 0.3,
       maxTokens: 4000,
-      timeoutMs: 45000,
+      timeoutMs: 120000,
       fallbackToRule: true,
       promptProfile: "default",
       promptTemplate:
@@ -168,6 +168,7 @@ function createDefaultRequirementConfig(): RequirementSystemConfig {
     },
     fileParsing: {
       enabled: true,
+      model: "moonshot-v1-128k",
       allowedExtensions: [".xlsx", ".xls", ".csv"],
       maxFileSizeMb: 20,
       maxSheetCount: 20,
@@ -182,6 +183,9 @@ function createDefaultRequirementConfig(): RequirementSystemConfig {
       outputStyle: "balanced",
       includeRiskHints: true,
       includeAssumptions: true,
+    },
+    kimiCredentials: {
+      apiKey: "",
     },
   };
 }
@@ -208,6 +212,7 @@ function normalizeRequirementConfig(input: unknown): RequirementSystemConfig {
   const kimiEvaluation = (source.kimiEvaluation || {}) as Partial<RequirementSystemConfig["kimiEvaluation"]>;
   const fileParsing = (source.fileParsing || {}) as Partial<RequirementSystemConfig["fileParsing"]>;
   const kimiGeneration = (source.kimiGeneration || {}) as Partial<RequirementSystemConfig["kimiGeneration"]>;
+  const kimiCredentials = (source.kimiCredentials || {}) as Partial<RequirementKimiCredentialsConfig>;
 
   return {
     kimiEvaluation: {
@@ -222,6 +227,7 @@ function normalizeRequirementConfig(input: unknown): RequirementSystemConfig {
     },
     fileParsing: {
       enabled: Boolean(fileParsing.enabled ?? base.fileParsing.enabled),
+      model: String(fileParsing.model || base.fileParsing.model).trim(),
       allowedExtensions: normalizeStringArray(fileParsing.allowedExtensions, base.fileParsing.allowedExtensions),
       maxFileSizeMb: clampNumber(fileParsing.maxFileSizeMb, 1, 200, base.fileParsing.maxFileSizeMb),
       maxSheetCount: clampNumber(fileParsing.maxSheetCount, 1, 200, base.fileParsing.maxSheetCount),
@@ -238,6 +244,9 @@ function normalizeRequirementConfig(input: unknown): RequirementSystemConfig {
         : base.kimiGeneration.outputStyle,
       includeRiskHints: Boolean(kimiGeneration.includeRiskHints ?? base.kimiGeneration.includeRiskHints),
       includeAssumptions: Boolean(kimiGeneration.includeAssumptions ?? base.kimiGeneration.includeAssumptions),
+    },
+    kimiCredentials: {
+      apiKey: String(kimiCredentials.apiKey ?? base.kimiCredentials.apiKey ?? "").trim(),
     },
   };
 }
@@ -302,6 +311,49 @@ export function saveRequirementSystemConfigStore(store: RequirementSystemConfigS
 
 export function normalizeRequirementSystemConfig(input: unknown): RequirementSystemConfig {
   return normalizeRequirementConfig(input);
+}
+
+/** 合并 PATCH：null 表示清除仓库密钥；空字符串表示不修改；非空则写入 */
+export function mergeKimiCredentialsPatch(
+  prev: RequirementKimiCredentialsConfig,
+  incoming: Partial<{ apiKey: string | null }> | undefined,
+): RequirementKimiCredentialsConfig {
+  if (!incoming) return prev;
+  if (incoming.apiKey === null) return { apiKey: "" };
+  if (typeof incoming.apiKey === "string") {
+    const t = incoming.apiKey.trim();
+    if (!t) return prev;
+    return { apiKey: t };
+  }
+  return prev;
+}
+
+/** 需求侧 KIMI 实际调用：已生效配置中的密钥优先，否则环境变量 */
+export function resolveActiveRequirementKimiApiKey(): {
+  apiKey: string;
+  source: "store" | "env" | "none";
+} {
+  const store = loadRequirementSystemConfigStore();
+  const fromStore = store.active.kimiCredentials?.apiKey?.trim() || "";
+  if (fromStore) return { apiKey: fromStore, source: "store" };
+  const env = config.kimi.apiKey.trim();
+  if (env) return { apiKey: env, source: "env" };
+  return { apiKey: "", source: "none" };
+}
+
+/** 测试连接：显式传入优先；否则草稿仓库密钥；再否则环境变量 */
+export function resolveDraftKimiApiKeyForTest(override?: string): {
+  apiKey: string;
+  source: "override" | "draft" | "env" | "none";
+} {
+  const o = override?.trim() || "";
+  if (o) return { apiKey: o, source: "override" };
+  const store = loadRequirementSystemConfigStore();
+  const draftKey = store.draft.kimiCredentials?.apiKey?.trim() || "";
+  if (draftKey) return { apiKey: draftKey, source: "draft" };
+  const env = config.kimi.apiKey.trim();
+  if (env) return { apiKey: env, source: "env" };
+  return { apiKey: "", source: "none" };
 }
 
 function normalizeStringList(input: unknown): string[] {

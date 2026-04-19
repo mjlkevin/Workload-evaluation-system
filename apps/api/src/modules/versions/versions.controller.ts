@@ -4,6 +4,7 @@ export {
   updateVersionStatus,
   deleteVersion,
   checkoutVersion,
+  saveCheckedOutDraft,
   checkinVersion,
   undoCheckout,
   promoteVersion,

@@ -11,7 +11,7 @@ info:
     **未在本文档中展开的已实现端点**（完整列表见仓库
     `03_技术设计/系统演进/实现与文档对齐说明.md`）包括但不限于：
     `/api/v1/auth/*`、`/api/v1/versions/*`、`/api/v1/system/*`、
-    `/api/v1/ai/parse-basic-info`、`/api/v1/ai/kimi-assessment/preview`、`/api/v1/ai/kimi-assessment/export-markdown`、
+    `/api/v1/ai/parse-basic-info`、`/api/v1/ai/company-profile-summary`、`/api/v1/ai/kimi-assessment/preview`、`/api/v1/ai/kimi-assessment/export-markdown`、
     `/api/v1/teams/*`、`GET /api/v1/wbs`；
     下载路径为 `GET /downloads/{fileName}`（非 `/api/v1` 前缀）。
 
@@ -562,6 +562,48 @@ paths:
                 $ref: "#/components/schemas/VersionSingleResponse"
         "409":
           description: 当前状态不允许检出
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/versions/{id}/save-draft:
+    patch:
+      tags: [Versions]
+      summary: 检出态保存草稿（更新 payload，不检入、版本号不变）
+      operationId: saveCheckedOutVersionDraft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payload]
+              properties:
+                payload:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionSingleResponse"
+        "403":
+          description: 非检出人不能保存
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 当前未检出等状态不允许保存草稿
           content:
             application/json:
               schema:

@@ -27,9 +27,13 @@ const TAB_TITLE_MAP: Record<string, string> = {
   "/dashboard/assessment": "实施评估",
   "/dashboard/assessment/list": "实施评估列表",
   "/dashboard/resource-cost": "资源人天及成本",
+  "/dashboard/resource-cost/list": "资源人天及成本列表",
   "/dashboard/dev-assessment": "开发评估",
+  "/dashboard/dev-assessment/list": "开发评估列表",
   "/dashboard/wbs": "WBS",
+  "/dashboard/wbs/list": "WBS列表",
   "/dashboard/review": "评审",
+  "/dashboard/review/list": "评审列表",
   "/dashboard/team-collaboration": "团队协同",
   "/dashboard/user-management": "用户管理",
   "/dashboard/system-management": "系统管理",
@@ -42,6 +46,15 @@ const TAB_TITLE_MAP: Record<string, string> = {
 
 function resolveTabTitle(path: string) {
   const purePath = path.split("?")[0] || path
+  try {
+    const q = path.includes("?") ? path.slice(path.indexOf("?") + 1) : ""
+    const params = new URLSearchParams(q)
+    if (purePath === "/dashboard/requirement-import" && params.get("draftKey") && !params.get("version")) {
+      return "需求（新建）"
+    }
+  } catch {
+    /* ignore */
+  }
   if (TAB_TITLE_MAP[purePath]) return TAB_TITLE_MAP[purePath]
   const segments = purePath.split("/").filter(Boolean)
   const last = segments[segments.length - 1] || "页面"
@@ -83,7 +96,7 @@ export function DashboardTabs() {
   const pathname = usePathname() || "/dashboard"
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { requestNavigation } = useUnsavedNavigation()
+  const { requestNavigation, confirmNavigation, isDirty } = useUnsavedNavigation()
   const [tabs, setTabs] = useState<DashboardTab[]>([])
   const [ready, setReady] = useState(false)
 
@@ -101,7 +114,7 @@ export function DashboardTabs() {
     } catch {
       restored = []
     }
-    const merged = normalizeTabs([...restored, { path: currentRouteKey, title: resolveTabTitle(pathname) }])
+    const merged = normalizeTabs([...restored, { path: currentRouteKey, title: resolveTabTitle(currentRouteKey) }])
     setTabs(merged.length ? merged : [{ path: "/dashboard", title: resolveTabTitle("/dashboard") }])
     setReady(true)
   }, [])
@@ -121,7 +134,7 @@ export function DashboardTabs() {
     const currentDedupeKey = normalizeTabPath(currentRouteKey)
     setTabs((prev) => {
       if (prev.some((tab) => normalizeTabPath(tab.path) === currentDedupeKey)) return prev
-      return normalizeTabs([...prev, { path: currentRouteKey, title: resolveTabTitle(pathname) }])
+      return normalizeTabs([...prev, { path: currentRouteKey, title: resolveTabTitle(currentRouteKey) }])
     })
   }, [pathname, currentRouteKey, ready])
 
@@ -144,7 +157,11 @@ export function DashboardTabs() {
     if (!nextTabs.length) return
     if (path === activePath) {
       const fallbackPath = nextTabs[nextTabs.length - 1]?.path || "/dashboard"
-      if (!requestNavigation(fallbackPath)) return
+      // 关闭页签 = 放弃当前页并切走；不能用 requestNavigation 阻塞（pendingHref 与 setTabs 不同步会卡死）
+      if (isDirty) {
+        if (!window.confirm("当前页有未保存修改，关闭页签后将丢弃这些修改。是否关闭？")) return
+        confirmNavigation()
+      }
       setTabs(nextTabs)
       router.push(fallbackPath)
       return
@@ -156,19 +173,22 @@ export function DashboardTabs() {
     const kept = tabs.find((tab) => tab.path === path) || { path, title: resolveTabTitle(path) }
     setTabs([kept])
     if (activePath !== path) {
-      if (!requestNavigation(path)) return
+      if (isDirty) {
+        if (!window.confirm("当前页有未保存修改，关闭其他页签并切换后将丢弃这些修改。是否继续？")) return
+        confirmNavigation()
+      }
       router.push(path)
     }
   }
 
-  function closeAllTabs(path: string) {
+  function closeAllTabs() {
     const fallback = { path: "/dashboard", title: resolveTabTitle("/dashboard") }
     setTabs([fallback])
-    if (path !== "/dashboard" && activePath !== "/dashboard") {
-      if (!requestNavigation("/dashboard")) return
-      router.push("/dashboard")
-    } else if (activePath !== "/dashboard") {
-      if (!requestNavigation("/dashboard")) return
+    if (activePath !== "/dashboard") {
+      if (isDirty) {
+        if (!window.confirm("当前页有未保存修改，关闭所有页签后将丢弃这些修改。是否继续？")) return
+        confirmNavigation()
+      }
       router.push("/dashboard")
     }
   }
@@ -199,7 +219,11 @@ export function DashboardTabs() {
                     variant="ghost"
                     size="icon"
                     className="h-5 w-5 rounded p-0 text-muted-foreground hover:text-foreground"
-                    onClick={() => closeTab(tab.path)}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      closeTab(tab.path)
+                    }}
                     aria-label="关闭页签"
                   >
                     <X className="size-3.5" />
@@ -210,7 +234,7 @@ export function DashboardTabs() {
                 <ContextMenuItem onClick={() => closeTab(tab.path)}>关闭页签</ContextMenuItem>
                 <ContextMenuItem onClick={() => closeOtherTabs(tab.path)}>关闭其他页签</ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem onClick={() => closeAllTabs(tab.path)}>关闭所有页签</ContextMenuItem>
+                <ContextMenuItem onClick={() => closeAllTabs()}>关闭所有页签</ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
           )

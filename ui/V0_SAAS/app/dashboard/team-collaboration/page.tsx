@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { toast } from "sonner"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -42,7 +43,6 @@ export default function TeamCollaborationPage() {
   const [globalVersionCode, setGlobalVersionCode] = useState("")
   const [newTeamName, setNewTeamName] = useState("")
   const [binding, setBinding] = useState(false)
-  const [message, setMessage] = useState("")
 
   const [teamIdInput, setTeamIdInput] = useState("")
   const [teamDetail, setTeamDetail] = useState<TeamRecordSummary | null>(null)
@@ -95,10 +95,9 @@ export default function TeamCollaborationPage() {
       const id = (overrideTeamId || teamIdInput.trim() || getActiveTeamId()).trim()
       if (!id) {
         setTeamDetail(null)
-        setMessage("请填写团队 ID 或先通过下方绑定生成团队")
+        toast.warning("请填写团队 ID 或先通过下方绑定生成团队")
         return
       }
-      setMessage("")
       try {
         const detail = await fetchTeamDetail(id)
         setTeamDetail(detail)
@@ -107,7 +106,7 @@ export default function TeamCollaborationPage() {
         await loadReviews(detail.teamId)
       } catch (e) {
         setTeamDetail(null)
-        setMessage(e instanceof Error ? e.message : "加载团队失败")
+        toast.warning(e instanceof Error ? e.message : "加载团队失败")
       }
     },
     [teamIdInput, loadReviews],
@@ -136,16 +135,15 @@ export default function TeamCollaborationPage() {
 
   async function onBindPlan() {
     setBinding(true)
-    setMessage("")
     try {
       const result = await createTeamAndBindPlan(globalVersionCode, newTeamName)
-      setMessage(`绑定成功：${result.globalVersionCode} -> 新团队(${result.teamId})`)
+      toast.success(`绑定成功：${result.globalVersionCode} -> 新团队(${result.teamId})`)
       setActiveTeamId(result.teamId)
       await refreshTeam(result.teamId)
       loadBindings()
       setNewTeamName("")
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "绑定失败")
+      toast.warning(error instanceof Error ? error.message : "绑定失败")
     } finally {
       setBinding(false)
     }
@@ -159,18 +157,17 @@ export default function TeamCollaborationPage() {
   async function onAddMember() {
     const tid = activeTeamId
     if (!tid) {
-      setMessage("请先加载有效团队")
+      toast.warning("请先加载有效团队")
       return
     }
     setMemberBusy(true)
-    setMessage("")
     try {
       const next = await addTeamMemberToTeam(tid, memberUserId, memberRole)
       setTeamDetail(next)
       setMemberUserId("")
-      setMessage("成员已更新")
+      toast.success("成员已更新")
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "添加成员失败")
+      toast.warning(e instanceof Error ? e.message : "添加成员失败")
     } finally {
       setMemberBusy(false)
     }
@@ -179,23 +176,22 @@ export default function TeamCollaborationPage() {
   async function onCreateReview() {
     const tid = activeTeamId
     if (!tid) {
-      setMessage("请先加载有效团队")
+      toast.warning("请先加载有效团队")
       return
     }
     const code = reviewGlCode.trim()
     if (!code) {
-      setMessage("请填写总方案版本号")
+      toast.warning("请填写总方案版本号")
       return
     }
     setReviewBusy(true)
-    setMessage("")
     try {
       await createTeamReviewForPlan(tid, code, reviewTitle.trim() || undefined)
       setReviewTitle("")
       await loadReviews(tid)
-      setMessage("评审已创建")
+      toast.success("评审已创建")
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "创建评审失败")
+      toast.warning(e instanceof Error ? e.message : "创建评审失败")
     } finally {
       setReviewBusy(false)
     }
@@ -205,13 +201,12 @@ export default function TeamCollaborationPage() {
     const tid = activeTeamId
     if (!tid) return
     setReviewBusy(true)
-    setMessage("")
     try {
       await closeTeamReview(tid, rid)
       await loadReviews(tid)
-      setMessage("评审已关闭")
+      toast.success("评审已关闭")
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "关闭失败")
+      toast.warning(e instanceof Error ? e.message : "关闭失败")
     } finally {
       setReviewBusy(false)
     }
@@ -221,17 +216,16 @@ export default function TeamCollaborationPage() {
     const tid = activeTeamId
     const rid = selectedReviewId.trim()
     if (!tid || !rid) {
-      setMessage("请选择评审")
+      toast.warning("请选择评审")
       return
     }
     setCommentBusy(true)
-    setMessage("")
     try {
       const items = await fetchReviewComments(tid, rid)
       setComments(items)
     } catch (e) {
       setComments([])
-      setMessage(e instanceof Error ? e.message : "加载评论失败")
+      toast.warning(e instanceof Error ? e.message : "加载评论失败")
     } finally {
       setCommentBusy(false)
     }
@@ -241,23 +235,23 @@ export default function TeamCollaborationPage() {
     const tid = activeTeamId
     const rid = selectedReviewId.trim()
     if (!tid || !rid) {
-      setMessage("请选择评审")
+      toast.warning("请选择评审")
       return
     }
     const text = commentText.trim()
     if (!text) {
-      setMessage("评论内容不能为空")
+      toast.warning("评论内容不能为空")
       return
     }
     setCommentBusy(true)
-    setMessage("")
     try {
       await postTeamReviewComment(tid, rid, text)
       setCommentText("")
       const items = await fetchReviewComments(tid, rid)
       setComments(items)
+      toast.success("评论已发表")
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "发表评论失败")
+      toast.warning(e instanceof Error ? e.message : "发表评论失败")
     } finally {
       setCommentBusy(false)
     }
@@ -269,12 +263,6 @@ export default function TeamCollaborationPage() {
       description="团队、成员、方案绑定、评审与评论（对接 /api/v1/teams）。"
       breadcrumbs={[{ label: "团队协同" }]}
     >
-      {message ? (
-        <p className="mb-4 rounded-lg border border-border/50 bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
-          {message}
-        </p>
-      ) : null}
-
       <div className="flex flex-col gap-4">
         <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
           <CardHeader className="pb-3">

@@ -24,6 +24,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -49,6 +57,7 @@ import {
   type ImplementationDependencyRulesConfig,
   listTemplateSummaries,
   promoteVersionById,
+  saveCheckedOutVersionDraft,
   undoCheckoutById,
   type EstimateExportResult,
   type EstimateResult,
@@ -346,6 +355,45 @@ function buildLatestAssessmentVersionOptions(records: ModuleVersionRecord[]) {
   return tip ? [{ value: tip.versionCode, label: `${tip.versionCode}（当前生效）` }] : []
 }
 
+/** 与需求导入页一致：占位符式总方案号在修复后按项目名称对齐真实总方案号 */
+function resolveStaleGlobalVersionCodeForAssessment(
+  stored: string,
+  plans: Array<{ globalVersion: string; projectName: string }>,
+  projectName: string,
+): string {
+  const t = stored.trim()
+  if (!t) return ""
+  if (!/\{[A-Za-z0-9]+\}/.test(t)) return t
+  const pn = projectName.trim()
+  if (!pn) return ""
+  return plans.find((p) => p.projectName === pn)?.globalVersion ?? ""
+}
+
+/** 与需求导入页一致：同一 `baseCode` 视为同一条需求文档的版本脉络 */
+function requirementVersionLineageKey(record: ModuleVersionRecord): string {
+  const base = String(record.baseCode || "").trim()
+  if (base) return base
+  return String(record.versionCode || "").trim()
+}
+
+/** 每条需求脉络只保留更新时间最新的一条（用于需求来源弹窗，避免罗列历史小版本） */
+function pickLatestRequirementImportPerLineage(records: ModuleVersionRecord[]): ModuleVersionRecord[] {
+  const sorted = [...records].sort(
+    (a, b) =>
+      Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)) ||
+      b.versionCode.localeCompare(a.versionCode),
+  )
+  const seen = new Set<string>()
+  const out: ModuleVersionRecord[] = []
+  for (const rec of sorted) {
+    const key = requirementVersionLineageKey(rec)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(rec)
+  }
+  return out
+}
+
 export default function AssessmentPage() {
   const { isAdmin } = useAuth()
   const [form, setForm] = useState<AssessmentForm>({
@@ -379,11 +427,15 @@ export default function AssessmentPage() {
   const [historyPage, setHistoryPage] = useState(1)
   const [activeDependencyRules, setActiveDependencyRules] = useState<ImplementationDependencyRulesConfig | null>(null)
   const [globalVersionCode, setGlobalVersionCode] = useState("")
+  /** 从需求导入模块选中的需求版本号，作为「需求来源」并驱动总方案/项目名称回填 */
+  const [requirementSourceVersionCode, setRequirementSourceVersionCode] = useState("")
+  const [requirementSourceDialogOpen, setRequirementSourceDialogOpen] = useState(false)
+  const [requirementImportPickerRecords, setRequirementImportPickerRecords] = useState<ModuleVersionRecord[]>([])
+  const [requirementImportPickerLoading, setRequirementImportPickerLoading] = useState(false)
   /** 与仪表盘总方案列表一致，用于选择总方案时回填项目名称 */
   const [dashboardPlans, setDashboardPlans] = useState<PlanRow[]>([])
   /** 未选总方案时可手填；选择总方案时从方案携带，仍可再改 */
   const [projectName, setProjectName] = useState("")
-  const [globalOptions, setGlobalOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionOptions, setVersionOptions] = useState<Array<{ value: string; label: string }>>([])
   const [versionRecords, setVersionRecords] = useState<ModuleVersionRecord[]>([])
   const [globalVersionRecords, setGlobalVersionRecords] = useState<GlobalVersionRecord[]>([])
@@ -440,6 +492,34 @@ export default function AssessmentPage() {
       version: params.get("version") || "",
     }
   }, [])
+
+  useEffect(() => {
+    if (!requirementSourceDialogOpen) return
+    let cancelled = false
+    void (async () => {
+      setRequirementImportPickerLoading(true)
+      try {
+        const records = await listModuleVersions("requirementImport")
+        if (!cancelled) setRequirementImportPickerRecords(pickLatestRequirementImportPerLineage(records))
+      } catch {
+        if (!cancelled) setRequirementImportPickerRecords([])
+      } finally {
+        if (!cancelled) setRequirementImportPickerLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [requirementSourceDialogOpen])
+
+  const requirementSourceTriggerText = useMemo(() => {
+    if (requirementSourceVersionCode.trim()) {
+      const hint = projectName.trim() || globalVersionCode.trim()
+      return hint ? `${requirementSourceVersionCode} · ${hint}` : requirementSourceVersionCode
+    }
+    if (globalVersionCode.trim()) return `总方案 ${globalVersionCode}（未绑定需求版本）`
+    return "点击选择需求版本号…"
+  }, [requirementSourceVersionCode, projectName, globalVersionCode])
 
   const allItems = useMemo(() => templateDetail?.items || [], [templateDetail])
   const sheets = useMemo(
@@ -544,12 +624,6 @@ export default function AssessmentPage() {
         )
         setGlobalVersionRecords(globals)
         setDashboardPlans(plans)
-        setGlobalOptions(
-          plans.map((x) => ({
-            value: x.globalVersion,
-            label: `${x.globalVersion}（${x.projectName}）`,
-          })),
-        )
         setVersionRecords(records)
         setVersionOptions(buildLatestAssessmentVersionOptions(records))
         setTemplateOptions(templates)
@@ -1074,34 +1148,56 @@ export default function AssessmentPage() {
       const validatedResult = await calculateEstimate(buildEstimatePayload())
       setServerResult(validatedResult)
       setSavePhase("saving")
-      const created = await createModuleVersion(
-        "assessment",
-        {
-          globalVersionCode,
-          projectName: projectName.trim(),
-          form,
-          selectedSheet,
-          selectedPresetMode,
-          selectedCloudNames,
-          customModeByCloud,
-          customModeEnabled: Object.values(customModeByCloud).some(Boolean),
-          itemSelection: currentItemsPayload(),
-          multiOrgRows,
-          localSummary: {
-            selectedCount,
-            baseDays,
-            totalDays: scaleFactor.total,
-            userIncrementDays: scaleFactor.userIncrement,
-            difficultyIncrementDays: scaleFactor.difficultyIncrement,
-            orgIncrementDays: scaleFactor.orgIncrement,
-            multiOrgTotalDays,
-          },
-          serverResult: validatedResult,
+      const co = selectedVersionRecord
+      const draftPayload = {
+        globalVersionCode,
+        requirementImportVersionCode: requirementSourceVersionCode.trim(),
+        projectName: projectName.trim(),
+        form,
+        selectedSheet,
+        selectedPresetMode,
+        selectedCloudNames,
+        customModeByCloud,
+        customModeEnabled: Object.values(customModeByCloud).some(Boolean),
+        itemSelection: currentItemsPayload(),
+        multiOrgRows,
+        localSummary: {
+          selectedCount,
+          baseDays,
+          totalDays: scaleFactor.total,
+          userIncrementDays: scaleFactor.userIncrement,
+          difficultyIncrementDays: scaleFactor.difficultyIncrement,
+          orgIncrementDays: scaleFactor.orgIncrement,
+          multiOrgTotalDays,
         },
-        "AS",
-      )
-      await reloadVersions(created.versionCode)
-      showGlobalNotice(`已保存实施评估版本：${created.versionCode}`)
+        serverResult: validatedResult,
+      }
+      if (co?.checkoutStatus === "checked_out" && co.id) {
+        const updated = await saveCheckedOutVersionDraft(co.id, draftPayload)
+        await reloadVersions(co.versionCode)
+        setVersionRecords((prev) =>
+          prev.map((r) =>
+            r.id !== updated.id
+              ? r
+              : {
+                  ...r,
+                  payload: (updated.payload || r.payload) as Record<string, unknown>,
+                  updatedAt: updated.updatedAt,
+                  updatedByUserId: updated.updatedByUserId,
+                  updatedByUsername: updated.updatedByUsername,
+                  checkoutStatus: updated.checkoutStatus ?? "checked_out",
+                  checkedOutByUserId: updated.checkedOutByUserId,
+                  checkedOutByUsername: updated.checkedOutByUsername,
+                  checkoutAt: updated.checkoutAt,
+                },
+          ),
+        )
+        showGlobalNotice(`已保存修改（仍为检出）：${co.versionCode}`)
+      } else {
+        const created = await createModuleVersion("assessment", draftPayload, "AS")
+        await reloadVersions(created.versionCode)
+        showGlobalNotice(`已保存实施评估版本：${created.versionCode}`)
+      }
       setDirty(false)
       setHasLocalChanges(false)
       return true
@@ -1123,6 +1219,7 @@ export default function AssessmentPage() {
 
   function resetToNewAssessmentDraft() {
     setGlobalVersionCode("")
+    setRequirementSourceVersionCode("")
     setCurrentVersionCode("")
     setVersionOptions([])
     setProjectName("")
@@ -1183,10 +1280,40 @@ export default function AssessmentPage() {
   }
 
   function applyGlobalVersionSelection(code: string) {
+    setRequirementSourceVersionCode("")
     setGlobalVersionCode(code)
     if (!code.trim()) return
     const plan = dashboardPlans.find((p) => p.globalVersion === code)
     if (plan?.projectName) setProjectName(plan.projectName)
+  }
+
+  function applyRequirementSourceFromRecord(record: ModuleVersionRecord) {
+    const payload = record.payload || {}
+    const plans = dashboardPlans
+    const rawGlobal = String((payload.globalVersionCode as string) || "").trim()
+    const basicInfo = (payload.basicInfo || {}) as { projectName?: string }
+    const pn = String(basicInfo.projectName || "").trim()
+    let gv = rawGlobal
+    if (gv && /\{[A-Za-z0-9]+\}/.test(gv)) {
+      gv = resolveStaleGlobalVersionCodeForAssessment(gv, plans, pn)
+    }
+    setRequirementSourceVersionCode(record.versionCode)
+    setGlobalVersionCode(gv)
+    if (pn) {
+      setProjectName(pn)
+    } else if (gv) {
+      const plan = plans.find((p) => p.globalVersion === gv)
+      if (plan?.projectName) setProjectName(plan.projectName)
+    }
+    setRequirementSourceDialogOpen(false)
+    showGlobalNotice(`已关联需求来源：${record.versionCode}`)
+  }
+
+  function clearRequirementSource() {
+    setRequirementSourceVersionCode("")
+    setGlobalVersionCode("")
+    setRequirementSourceDialogOpen(false)
+    showGlobalNotice("已清除需求来源与总方案关联")
   }
 
   async function onLoadVersion(code: string, plansOverride?: PlanRow[]) {
@@ -1208,6 +1335,9 @@ export default function AssessmentPage() {
       dirtyEnabled.current = false
       const gv = String((payload.globalVersionCode as string) || "")
       setGlobalVersionCode(gv)
+      setRequirementSourceVersionCode(
+        String((payload as { requirementImportVersionCode?: string }).requirementImportVersionCode || "").trim(),
+      )
       const savedPn = String((payload as { projectName?: string }).projectName || "").trim()
       if (savedPn) {
         setProjectName(savedPn)
@@ -1436,7 +1566,6 @@ export default function AssessmentPage() {
   return (
     <ModuleShell
       title="实施评估"
-      description="参数配置、规则计算、版本持久化与导出。"
       breadcrumbs={[{ label: "实施评估" }]}
     >
       <div className="max-w-full min-w-0 space-y-6 overflow-x-hidden">
@@ -1469,7 +1598,12 @@ export default function AssessmentPage() {
             <span>|</span>
             <span>项目 <span className="font-semibold text-foreground">{projectName.trim() || "未填写"}</span></span>
             <span>|</span>
-            <span>总方案 <span className="font-semibold text-foreground">{globalVersionCode || "未选择"}</span></span>
+            <span>
+              需求来源{" "}
+              <span className="font-semibold text-foreground">
+                {requirementSourceVersionCode || globalVersionCode || "未选择"}
+              </span>
+            </span>
             <span>|</span>
             <span>评估版本 <span className="font-semibold text-foreground">{currentVersionCode || "未选择"}</span></span>
             <span>|</span>
@@ -1495,24 +1629,21 @@ export default function AssessmentPage() {
                   <Input
                     className="h-8 text-xs"
                     value={projectName}
-                    placeholder="未选总方案时请填写；选择总方案后将自动带出，可再修改"
+                    placeholder="可从「需求来源」带出；亦可手填"
                     onChange={(e) => setProjectName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[11px] leading-tight text-muted-foreground">总方案版本号</p>
-                  <select
-                    className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                    value={globalVersionCode}
-                    onChange={(e) => applyGlobalVersionSelection(e.target.value)}
+                  <p className="text-[11px] leading-tight text-muted-foreground">需求来源</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 w-full justify-start gap-2 px-2 text-left text-xs font-normal"
+                    disabled={initLoading || isReadonly}
+                    onClick={() => setRequirementSourceDialogOpen(true)}
                   >
-                    <option value="">请选择总方案版本</option>
-                    {globalOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    <span className="min-w-0 flex-1 truncate">{requirementSourceTriggerText}</span>
+                  </Button>
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-[11px] leading-tight text-muted-foreground">当前生效版本</p>
@@ -2631,6 +2762,67 @@ export default function AssessmentPage() {
       </Card>
       </fieldset>
       </div>
+      <Dialog
+        open={requirementSourceDialogOpen}
+        onOpenChange={(open) => {
+          setRequirementSourceDialogOpen(open)
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>选择需求版本（需求来源）</DialogTitle>
+            <DialogDescription>
+              每条需求脉络仅展示该脉络下最新已保存版本。请选择一项；系统将据此回填总方案版本号与项目名称（与需求单中一致）。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[min(360px,50vh)] space-y-2 overflow-y-auto pr-1">
+            {requirementImportPickerLoading ? (
+              <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-4 text-xs text-muted-foreground">
+                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                正在加载需求版本列表…
+              </div>
+            ) : requirementImportPickerRecords.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border/70 px-3 py-6 text-center text-xs text-muted-foreground">
+                暂无需求导入版本。请先在「需求导入」模块保存至少一个需求版本后再试。
+              </p>
+            ) : (
+              requirementImportPickerRecords.map((rec) => {
+                const p = rec.payload || {}
+                const bi = (p.basicInfo || {}) as { projectName?: string; customerName?: string }
+                const pn = String(bi.projectName || "").trim()
+                const gv = String((p.globalVersionCode as string) || "").trim()
+                const sub = [pn || undefined, gv ? `总方案 ${gv}` : undefined].filter(Boolean).join(" · ")
+                return (
+                  <button
+                    key={rec.id}
+                    type="button"
+                    className="w-full rounded-xl border border-border/70 bg-card px-3 py-2.5 text-left text-xs transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => applyRequirementSourceFromRecord(rec)}
+                  >
+                    <p className="font-medium text-foreground">{rec.versionCode}</p>
+                    {sub ? <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{sub}</p> : null}
+                    <p className="mt-1 text-[10px] text-muted-foreground/90">更新 {rec.updatedAt}</p>
+                  </button>
+                )
+              })
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => setRequirementSourceDialogOpen(false)}>
+              取消
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="rounded-xl text-muted-foreground"
+              disabled={!requirementSourceVersionCode.trim() && !globalVersionCode.trim()}
+              onClick={() => clearRequirementSource()}
+            >
+              清除关联
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={createNewConfirmOpen} onOpenChange={setCreateNewConfirmOpen}>
         <AlertDialogContent className="sm:max-w-lg rounded-2xl">
           <AlertDialogHeader>
@@ -2656,9 +2848,9 @@ export default function AssessmentPage() {
       <AlertDialog open={saveWithoutGlobalConfirmOpen} onOpenChange={setSaveWithoutGlobalConfirmOpen}>
         <AlertDialogContent className="sm:max-w-lg rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>未关联总方案版本号</AlertDialogTitle>
+            <AlertDialogTitle>未关联需求来源</AlertDialogTitle>
             <AlertDialogDescription>
-              当前【实施评估】未关联总方案版本号，本次评估将独立保存为一个实施评估版本，确定继续吗？
+              当前【实施评估】未选择需求版本号（总方案亦为空），本次将独立保存为一个实施评估版本，确定继续吗？
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

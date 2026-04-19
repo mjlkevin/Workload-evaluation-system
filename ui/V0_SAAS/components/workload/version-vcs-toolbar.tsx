@@ -1,7 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactElement } from "react"
+import {
+  FolderInput,
+  FolderOutput,
+  History,
+  KeyRound,
+  TrendingUp,
+  Undo2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +43,8 @@ type VersionVcsToolbarProps = {
   state?: VersionVcsState
   /** 更小按钮与状态区，用于参数条等紧凑布局 */
   compact?: boolean
+  /** 仅显示图标（需配合 title/aria-label 保证可访问性） */
+  iconOnly?: boolean
   alwaysShowActions?: boolean
   showStatusField?: boolean
   onVersionHistory: () => void
@@ -43,6 +54,28 @@ type VersionVcsToolbarProps = {
   onPromote: () => void
   onForceUnlock?: () => void
   forceUnlockVisible?: boolean
+}
+
+function VcsTooltip({
+  iconOnly,
+  content,
+  children,
+}: {
+  iconOnly: boolean
+  content: string
+  children: ReactElement
+}) {
+  if (!iconOnly) return children
+  return (
+    <Tooltip delayDuration={250}>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6}>
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  )
 }
 
 /** 检出状态只读展示：可放在表单栅格内（传 className 覆盖 min-width）或工具条内 */
@@ -84,6 +117,7 @@ export function VersionCheckoutStatusDisplay({
 export function VersionVcsToolbar({
   state,
   compact = false,
+  iconOnly = false,
   alwaysShowActions = false,
   showStatusField = true,
   onVersionHistory,
@@ -97,8 +131,11 @@ export function VersionVcsToolbar({
   const hasState = Boolean(state)
   const canRenderActions = alwaysShowActions || hasState
   const checkoutStatus = state?.checkoutStatus ?? "checked_in"
-  const btnSize = compact ? "sm" : "default"
-  const btnClass = compact ? "rounded-lg text-xs" : "rounded-xl"
+  const btnSize = iconOnly ? (compact ? "icon-sm" : "icon") : compact ? "sm" : "default"
+  const btnClass = cn(
+    iconOnly ? (compact ? "rounded-lg" : "rounded-xl") : compact ? "rounded-lg text-xs" : "rounded-xl",
+    "shrink-0",
+  )
   const [promoteAlertOpen, setPromoteAlertOpen] = useState(false)
   const [checkinDialogOpen, setCheckinDialogOpen] = useState(false)
   const [checkinNote, setCheckinNote] = useState("")
@@ -118,11 +155,7 @@ export function VersionVcsToolbar({
   }
 
   async function confirmCheckin() {
-    const note = checkinNote.trim()
-    if (!note) {
-      setCheckinNoteError("请填写检入说明")
-      return
-    }
+    const note = checkinNote.trim() || "未说明"
     setCheckinSubmitting(true)
     try {
       await onCheckin(note)
@@ -143,27 +176,99 @@ export function VersionVcsToolbar({
 
   return (
     <>
-      <Button type="button" variant="outline" size={btnSize} className={btnClass} onClick={onVersionHistory}>
-        版本历史
-      </Button>
+      <VcsTooltip
+        iconOnly={iconOnly}
+        content="版本历史：查看总方案各历史记录，可进行对比或还原等操作。"
+      >
+        <Button
+          type="button"
+          variant="outline"
+          size={btnSize}
+          className={btnClass}
+          onClick={onVersionHistory}
+          aria-label="版本历史"
+        >
+          {iconOnly ? <History className="size-4" /> : "版本历史"}
+        </Button>
+      </VcsTooltip>
       {canRenderActions ? (
         <>
-          <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_out"} onClick={onCheckout}>
-            检出
-          </Button>
-          <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_in"} onClick={openCheckinDialog}>
-            检入
-          </Button>
-          <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_in"} onClick={onUndoCheckout}>
-            撤销检出
-          </Button>
-          <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_out"} onClick={openPromoteAlert}>
-            升版
-          </Button>
-          {forceUnlockVisible && onForceUnlock ? (
-            <Button variant="outline" size={btnSize} className={btnClass} disabled={!hasState || checkoutStatus === "checked_in"} onClick={onForceUnlock}>
-              强制解锁
+          <VcsTooltip
+            iconOnly={iconOnly}
+            content="检出：将当前版本切换为可编辑；检出后其他人将看到占用状态。"
+          >
+            <Button
+              variant="outline"
+              size={btnSize}
+              className={btnClass}
+              disabled={!hasState || checkoutStatus === "checked_out"}
+              onClick={onCheckout}
+              aria-label="检出"
+            >
+              {iconOnly ? <FolderOutput className="size-4" /> : "检出"}
             </Button>
+          </VcsTooltip>
+          <VcsTooltip
+            iconOnly={iconOnly}
+            content="检入：提交本次修改并恢复为只读，需填写检入说明。"
+          >
+            <Button
+              variant="outline"
+              size={btnSize}
+              className={btnClass}
+              disabled={!hasState || checkoutStatus === "checked_in"}
+              onClick={openCheckinDialog}
+              aria-label="检入"
+            >
+              {iconOnly ? <FolderInput className="size-4" /> : "检入"}
+            </Button>
+          </VcsTooltip>
+          <VcsTooltip
+            iconOnly={iconOnly}
+            content="撤销检出：取消检出锁；请确认本地未提交的改动已妥善处理。"
+          >
+            <Button
+              variant="outline"
+              size={btnSize}
+              className={btnClass}
+              disabled={!hasState || checkoutStatus === "checked_in"}
+              onClick={onUndoCheckout}
+              aria-label="撤销检出"
+            >
+              {iconOnly ? <Undo2 className="size-4" /> : "撤销检出"}
+            </Button>
+          </VcsTooltip>
+          <VcsTooltip
+            iconOnly={iconOnly}
+            content="升版：将当前版本记入历史并生成新的主版本线。"
+          >
+            <Button
+              variant="outline"
+              size={btnSize}
+              className={btnClass}
+              disabled={!hasState || checkoutStatus === "checked_out"}
+              onClick={openPromoteAlert}
+              aria-label="升版"
+            >
+              {iconOnly ? <TrendingUp className="size-4" /> : "升版"}
+            </Button>
+          </VcsTooltip>
+          {forceUnlockVisible && onForceUnlock ? (
+            <VcsTooltip
+              iconOnly={iconOnly}
+              content="强制解锁：以管理员身份解除他人检出（可能造成编辑冲突，请谨慎）。"
+            >
+              <Button
+                variant="outline"
+                size={btnSize}
+                className={btnClass}
+                disabled={!hasState || checkoutStatus === "checked_in"}
+                onClick={onForceUnlock}
+                aria-label="强制解锁"
+              >
+                {iconOnly ? <KeyRound className="size-4" /> : "强制解锁"}
+              </Button>
+            </VcsTooltip>
           ) : null}
           {showStatusField ? <VersionCheckoutStatusDisplay state={state} compact={compact} /> : null}
         </>
@@ -182,7 +287,7 @@ export function VersionVcsToolbar({
                 setCheckinNote(event.target.value)
                 if (checkinNoteError) setCheckinNoteError("")
               }}
-              placeholder="请填写本次修改内容（必填）"
+              placeholder="请填写本次修改内容（可选，留空将记为「未说明」）"
               rows={4}
             />
             {checkinNoteError ? <p className="text-xs text-destructive">{checkinNoteError}</p> : null}

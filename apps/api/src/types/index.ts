@@ -324,6 +324,8 @@ export type RequirementKimiEvaluationConfig = {
 
 export type RequirementFileParsingConfig = {
   enabled: boolean;
+  /** Excel/需求智能解析（parse-basic-info）使用的 Kimi 模型标识 */
+  model: string;
   allowedExtensions: string[];
   maxFileSizeMb: number;
   maxSheetCount: number;
@@ -341,10 +343,28 @@ export type RequirementKimiGenerationConfig = {
   includeAssumptions: boolean;
 };
 
+/** 需求模块 KIMI 调用密钥；非空时优先于环境变量 KIMI_API_KEY */
+export type RequirementKimiCredentialsConfig = {
+  apiKey: string;
+};
+
 export type RequirementSystemConfig = {
   kimiEvaluation: RequirementKimiEvaluationConfig;
   fileParsing: RequirementFileParsingConfig;
   kimiGeneration: RequirementKimiGenerationConfig;
+  kimiCredentials: RequirementKimiCredentialsConfig;
+};
+
+/** 返回给前端的密钥展示（永不下发明文） */
+export type RequirementKimiCredentialsPublic = {
+  apiKey: "";
+  hint: string | null;
+  envFallbackAvailable: boolean;
+  resolvedFrom: "store" | "env" | "none";
+};
+
+export type RequirementSystemConfigPublic = Omit<RequirementSystemConfig, "kimiCredentials"> & {
+  kimiCredentials: RequirementKimiCredentialsPublic;
 };
 
 export type RequirementSystemConfigStore = {

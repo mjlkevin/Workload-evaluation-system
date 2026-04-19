@@ -103,37 +103,39 @@ function Card({
       >
         {children}
       </div>
-      <div
-        className={cn(
-          "overflow-hidden px-6 transition-[max-height,opacity,transform] duration-300 ease-out",
-          isCollapsed
-            ? "flex h-full max-h-none items-center justify-start opacity-100 translate-y-0"
-            : "max-h-0 opacity-0 -translate-y-1 pointer-events-none",
-        )}
-      >
-        {collapsedSummary ? (
-          <div className="w-full rounded-md border border-border/70 bg-background/90 px-3 py-2 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1 overflow-x-auto">{collapsedSummary}</div>
-              <span className="shrink-0 rounded-full bg-blue-500/12 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
-                双击展开
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="w-full rounded-md border border-border/70 bg-background/80 px-3 py-1.5 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 flex items-center gap-2">
-                <p className="shrink-0 truncate text-sm font-semibold text-blue-700 dark:text-blue-300">{summaryTitle}</p>
-                <p className="truncate text-xs text-muted-foreground">{summaryDesc}</p>
+      {collapsible ? (
+        <div
+          className={cn(
+            "overflow-hidden px-6 transition-[max-height,opacity,transform] duration-300 ease-out",
+            isCollapsed
+              ? "flex h-full max-h-none items-center justify-start opacity-100 translate-y-0"
+              : "max-h-0 opacity-0 -translate-y-1 pointer-events-none",
+          )}
+        >
+          {collapsedSummary ? (
+            <div className="w-full rounded-md border border-border/70 bg-background/90 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1 overflow-x-auto">{collapsedSummary}</div>
+                <span className="shrink-0 rounded-full bg-blue-500/12 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300">
+                  双击展开
+                </span>
               </div>
-              <span className="shrink-0 rounded-full bg-blue-500/12 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
-                已收起
-              </span>
             </div>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="w-full rounded-md border border-border/70 bg-background/80 px-3 py-1.5 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex items-center gap-2">
+                  <p className="shrink-0 truncate text-sm font-semibold text-blue-700 dark:text-blue-300">{summaryTitle}</p>
+                  <p className="truncate text-xs text-muted-foreground">{summaryDesc}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-blue-500/12 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+                  已收起
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }
