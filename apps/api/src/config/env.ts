@@ -22,7 +22,13 @@ export const config = {
     model: process.env.KIMI_MODEL || "kimi-k2.5",
     apiBaseUrl: process.env.KIMI_API_BASE_URL || "https://api.moonshot.cn/v1",
   },
-  
+
+  database: {
+    /** PG 连接串，dev 默认 workload_eval 库；测试用 workload_eval_test */
+    url: process.env.DATABASE_URL || "",
+    poolMax: Number(process.env.DATABASE_POOL_MAX || 10),
+  },
+
   // 常量配置
   constants: {
     EXPORT_IDEMPOTENCY_TTL_MS: 10 * 60 * 1000,

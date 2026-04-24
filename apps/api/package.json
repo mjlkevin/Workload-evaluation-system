@@ -10,17 +10,22 @@
     "ops:config:check:repair": "tsx src/ops/config-integrity.cli.ts --repair",
     "test:modules": "tsx --test src/modules/modules.unit.test.ts src/modules/modules.usecase.test.ts src/modules/modules.handlers.test.ts",
     "test:rules": "tsx --test src/engine.test.ts",
-    "test:integration": "tsx --test src/integration.test.ts"
+    "test:integration": "tsx --test src/integration.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
+    "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
     "multer": "^2.1.1",
     "pdfkit": "^0.18.0",
+    "pg": "^8.20.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -29,6 +34,8 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^22.13.10",
     "@types/pdfkit": "^0.17.5",
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }
