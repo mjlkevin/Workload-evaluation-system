@@ -15,6 +15,7 @@ import exportsRoutes from "./exports.routes";
 import teamRoutes from "./team.routes";
 import wbsRoutes from "./wbs.routes";
 import systemRoutes from "./system.routes";
+import presalesRoutes from "./presales.routes";
 
 import { ok } from "../utils/response";
 import { notFoundHandler } from "../middleware/error-handler";
@@ -38,6 +39,7 @@ router.use("/exports", exportsRoutes);
 router.use("/teams", teamRoutes);
 router.use("/wbs", wbsRoutes);
 router.use("/system", systemRoutes);
+router.use("/presales", presalesRoutes);
 
 /** 未匹配 /api/v1/* 时返回标准 JSON，避免 Express 默认纯文本 404 导致前端误判为「非 JSON」 */
 router.use((req, res) => {
