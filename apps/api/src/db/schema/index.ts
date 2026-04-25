@@ -10,3 +10,8 @@ export * from "./requirement_packs";
 export * from "./sow_documents";
 export * from "./initial_estimates";
 export * from "./assessment_versions";
+export * from "./assessment_handoffs";
+export * from "./assessment_narratives";
+export * from "./deliverables";
+export * from "./quality_gate_reviews";
+export * from "./sealed_baselines";
