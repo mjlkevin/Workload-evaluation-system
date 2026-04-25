@@ -16,3 +16,5 @@ export * from "./deliverables";
 export * from "./quality_gate_reviews";
 export * from "./sealed_baselines";
 export * from "./opportunity_briefs";
+export * from "./collab_workspaces";
+export * from "./collab_messages";
