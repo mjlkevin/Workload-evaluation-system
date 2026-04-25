@@ -17,7 +17,20 @@ import {
   resolveActiveRequirementKimiApiKey,
 } from "../modules/system/system.repository";
 import { buildKimiAssessmentDraftMarkdown } from "../utils/kimi-assessment-markdown";
-import { isKimiTemperatureMustBeOneError, resolveKimiCompletionTemperature } from "../utils/kimi-completion-params";
+import { defaultProviderRegistry, type ModelProvider } from "../ai/provider";
+
+// -------------------- AI Provider 取用（T4 起）--------------------
+// 旧 requestKimiCompletion / fetchKimiCompletionOnce / buildKimiRequestError
+// 已整体迁入 KimiProvider；本文件保留业务编排（prompt 组装、JSON 解析、
+// 字段归一化）逻辑。Provider 在 createApp() 启动期注册到 defaultProviderRegistry。
+
+function getKimiProvider(): ModelProvider {
+  const provider = defaultProviderRegistry.get("kimi");
+  if (!provider) {
+    throw new Error("kimi_provider_not_registered");
+  }
+  return provider;
+}
 
 // -------------------- 解析辅助函数 --------------------
 
@@ -478,22 +491,9 @@ function buildCompanyProfileFallback(params: {
   return { enterpriseProfile, location, customerIndustry, enterpriseRevenue, itStatus };
 }
 
-// -------------------- Kimi API 调用 --------------------
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function buildKimiRequestError(status: number, errorText: string): string {
-  const raw = asString(errorText);
-  if (/engine_overloaded_error|overloaded|try again later/i.test(raw)) {
-    return "kimi_engine_overloaded";
-  }
-  if (status === 429) return "kimi_rate_limited";
-  if (status === 503 || status === 502) return "kimi_service_unavailable";
-  if (status === 401 || status === 403) return "kimi_auth_failed";
-  return `kimi_request_failed:${status}:${raw.slice(0, 240)}`;
-}
+// -------------------- Kimi 友好文案与超时（仍由 handler 直接使用）--------------------
+// 注：底层稳定性逻辑（重试/超时/温度兼容/错误码映射）已整体迁入 KimiProvider；
+// 本节仅保留两个 handler 直接消费的工具函数。
 
 function toFriendlyFallbackReason(reason: string): string {
   const key = asString(reason);
@@ -518,80 +518,6 @@ function resolveKimiCompletionTimeoutMs(value: unknown): number {
   return Math.min(120_000, Math.max(3_000, Math.floor(base)));
 }
 
-function isFetchAbortError(e: unknown): boolean {
-  if (!(e instanceof Error)) return false;
-  if (e.name === "AbortError" || e.name === "TimeoutError") return true;
-  return /aborted|timeout/i.test(e.message);
-}
-
-async function fetchKimiCompletionOnce(
-  endpoint: string,
-  apiKey: string,
-  jsonBody: string,
-  timeoutMs: number,
-): Promise<globalThis.Response> {
-  try {
-    return await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: jsonBody,
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch (e) {
-    if (isFetchAbortError(e)) throw new Error("kimi_request_timeout");
-    throw e;
-  }
-}
-
-async function requestKimiCompletion(params: {
-  endpoint: string;
-  apiKey: string;
-  body: Record<string, unknown>;
-  /** 单次 HTTP 等待上限（毫秒），与系统管理「KIMI评估 → 超时」一致 */
-  timeoutMs: number;
-}): Promise<globalThis.Response> {
-  let body: Record<string, unknown> = { ...params.body };
-  const maxAttempts = 3;
-  const timeoutMs = resolveKimiCompletionTimeoutMs(params.timeoutMs);
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const response = await fetchKimiCompletionOnce(params.endpoint, params.apiKey, JSON.stringify(body), timeoutMs);
-    if (response.ok) return response;
-
-    let errorText = await response.text();
-    if (isKimiTemperatureMustBeOneError(response.status, errorText) && Number(body.temperature) !== 1) {
-      body = { ...body, temperature: 1 };
-      const second = await fetchKimiCompletionOnce(params.endpoint, params.apiKey, JSON.stringify(body), timeoutMs);
-      if (second.ok) return second;
-      errorText = await second.text();
-      const reason2 = buildKimiRequestError(second.status, errorText);
-      const retryable2 =
-        reason2 === "kimi_engine_overloaded" ||
-        reason2 === "kimi_rate_limited" ||
-        reason2 === "kimi_service_unavailable";
-      if (retryable2 && attempt < maxAttempts) {
-        await sleep(350 * 2 ** (attempt - 1));
-        continue;
-      }
-      throw new Error(reason2);
-    }
-
-    const reason = buildKimiRequestError(response.status, errorText);
-    const retryable =
-      reason === "kimi_engine_overloaded" ||
-      reason === "kimi_rate_limited" ||
-      reason === "kimi_service_unavailable";
-    if (retryable && attempt < maxAttempts) {
-      await sleep(350 * 2 ** (attempt - 1));
-      continue;
-    }
-    throw new Error(reason);
-  }
-  throw new Error("kimi_request_failed:unknown");
-}
-
 async function parseRequirementImportByKimi(params: {
   apiUrl: string;
   apiKey: string;
@@ -599,13 +525,16 @@ async function parseRequirementImportByKimi(params: {
   workbookText: string;
   timeoutMs: number;
 }): Promise<{ basicInfo: BasicProjectInfo; requirementImportData: RequirementImportData; rawContent: string }> {
-  const baseUrl = asString(params.apiUrl).replace(/\/+$/, "") || "https://api.moonshot.cn/v1";
-  const endpoint = `${baseUrl}/chat/completions`;
-  const model = asString(params.model) || "kimi-k2.5";
-  const body = {
-    model,
-    temperature: resolveKimiCompletionTemperature(model, 0.1),
-    response_format: { type: "json_object" },
+  const provider = getKimiProvider();
+  const completion = await provider.chatCompletion({
+    model: params.model,
+    temperature: 0.1,
+    responseFormat: "json_object",
+    timeoutMs: params.timeoutMs,
+    credentialsOverride: {
+      apiKey: params.apiKey,
+      apiBaseUrl: params.apiUrl,
+    },
     messages: [
       {
         role: "system",
@@ -628,17 +557,9 @@ async function parseRequirementImportByKimi(params: {
           `${params.workbookText}`
       }
     ]
-  };
-  
-  const response = await requestKimiCompletion({
-    endpoint,
-    apiKey: params.apiKey,
-    body,
-    timeoutMs: params.timeoutMs,
   });
-  
-  const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = asString(json?.choices?.[0]?.message?.content);
+
+  const content = completion.content;
   const parsed = parseJsonFromModelText(content);
   const basicInfoSource = asModelObject(parsed.basicInfo);
   
@@ -754,8 +675,6 @@ async function summarizeCompanyProfileByKimi(params: {
   timeoutMs: number;
   disambiguationChoice?: { displayName: string; summary?: string };
 }): Promise<CompanyProfileKimiResult> {
-  const baseUrl = asString(params.apiUrl).replace(/\/+$/, "") || "https://api.moonshot.cn/v1";
-  const endpoint = `${baseUrl}/chat/completions`;
   const knownContextLines = [
     `客户名称：${params.customerName}`,
     params.location ? `已知地点：${params.location}` : "",
@@ -797,32 +716,23 @@ async function summarizeCompanyProfileByKimi(params: {
     `结构示例（需用户选择，画像字段必须为空字符串）：` +
     `{"needsDisambiguation":true,"candidates":[{"displayName":"","summary":""}],"enterpriseProfile":"","location":"","customerIndustry":"","enterpriseRevenue":"","itStatus":""}`;
 
-  const model = asString(params.model) || "kimi-k2.5";
-  const body = {
-    model,
-    temperature: resolveKimiCompletionTemperature(model, 0.1),
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: systemPrompt
-      },
-      {
-        role: "user",
-        content: userPrompt
-      }
-    ]
-  };
-
-  const response = await requestKimiCompletion({
-    endpoint,
-    apiKey: params.apiKey,
-    body,
+  const provider = getKimiProvider();
+  const completion = await provider.chatCompletion({
+    model: params.model,
+    temperature: 0.1,
+    responseFormat: "json_object",
     timeoutMs: params.timeoutMs,
+    credentialsOverride: {
+      apiKey: params.apiKey,
+      apiBaseUrl: params.apiUrl,
+    },
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
   });
 
-  const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = asString(json?.choices?.[0]?.message?.content);
+  const content = completion.content;
   const parsed = parseJsonFromModelText(content);
 
   if (!params.disambiguationChoice) {
@@ -908,64 +818,31 @@ async function chatWithKimi(params: {
   model: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
 }): Promise<{ answer: string; rawContent: string }> {
-  const baseUrl = asString(params.apiUrl).replace(/\/+$/, "") || "https://api.moonshot.cn/v1";
-  const endpoint = `${baseUrl}/chat/completions`;
   const safeMessages = params.messages
     .map((item) => ({
-      role: item.role === "assistant" ? "assistant" : "user",
-      content: asString(item.content)
+      role: item.role === "assistant" ? ("assistant" as const) : ("user" as const),
+      content: asString(item.content),
     }))
     .filter((item) => item.content);
-    
-  const model = asString(params.model) || "kimi-k2.5";
-  const body = {
-    model,
-    temperature: resolveKimiCompletionTemperature(model, 0.3),
+
+  const provider = getKimiProvider();
+  const completion = await provider.chatCompletion({
+    model: params.model,
+    temperature: 0.3,
+    credentialsOverride: {
+      apiKey: params.apiKey,
+      apiBaseUrl: params.apiUrl,
+    },
     messages: [
       {
         role: "system",
-        content: "你是工作量评估系统内置助手（KIMI）。请用中文简洁回答，优先结合用户上下文，避免冗余。"
+        content: "你是工作量评估系统内置助手（KIMI）。请用中文简洁回答，优先结合用户上下文，避免冗余。",
       },
-      ...safeMessages
-    ]
-  };
-  
-  let response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${params.apiKey}`
-    },
-    body: JSON.stringify(body)
+      ...safeMessages,
+    ],
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    if (isKimiTemperatureMustBeOneError(response.status, errorText) && Number(body.temperature) !== 1) {
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${params.apiKey}`
-        },
-        body: JSON.stringify({ ...body, temperature: 1 })
-      });
-    }
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`kimi_chat_failed:${response.status}:${errorText.slice(0, 240)}`);
-  }
-  
-  const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = asString(json?.choices?.[0]?.message?.content);
-  
-  if (!content) {
-    throw new Error("model_empty_chat_response");
-  }
-  
-  return { answer: content, rawContent: content };
+  return { answer: completion.content, rawContent: completion.rawContent };
 }
 
 type KimiAssessmentModuleItem = {
@@ -1634,9 +1511,6 @@ async function generateAssessmentDraftByKimi(params: {
   fallback: KimiAssessmentDraft;
   timeoutMs: number;
 }): Promise<{ draft: KimiAssessmentDraft; rawContent: string }> {
-  const baseUrl = asString(params.apiUrl).replace(/\/+$/, "") || "https://api.moonshot.cn/v1";
-  const endpoint = `${baseUrl}/chat/completions`;
-  const model = asString(params.model) || "kimi-k2.5";
   const assessSnap = asModelObject(params.payload.requirementSnapshot) as KimiAssessmentSnapshot;
   const noProductModuleGrid = !snapshotHasProductModuleGrid(assessSnap);
   const defaultSystemPrompt =
@@ -1646,47 +1520,40 @@ async function generateAssessmentDraftByKimi(params: {
   const userNoGridClause = noProductModuleGrid
     ? `10) 当前快照无有效的「产品及模块」表数据：你必须根据业务需求、问题一览（keyPointRows）、开发概要、实施范围、会议纪要与 basicInfo.productLines，按 system 中域级/平台级规则**推理**应评估的模块清单；moduleItems 须覆盖推断到的主要交付域/子模块，每条 reason 写明对应需求或关键点；assumptions 须声明模块范围由语义推断。\n`
     : "";
-  const body = {
-    model,
-    temperature: resolveKimiCompletionTemperature(model, 0.1),
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: systemPrompt
-      },
-      {
-        role: "user",
-        content:
-          `请基于以下需求快照输出实施评估草稿。\n` +
-          `要求：\n` +
-          `1) 只输出 JSON 对象；\n` +
-          `2) quoteMode 默认优先“模块报价”；\n` +
-          `3) 若信息不足，给出审慎估算并在 risks/assumptions 说明；\n` +
-          `4) moduleItems 至少返回 1 条；\n` +
-          `5) 若 requirementSnapshot.devTotalDays > 0，请将其作为“开发总人天”纳入 moduleItems；\n` +
-          `6) 对每个 SKU 必须给出“该 SKU 专属”的 reason，禁止全表复用同一条模糊理由；\n` +
-          `7) 当 suggestedDays > standardDays 时，reason 必须明确写出该 SKU 的超标证据来源（对应业务需求/开发概要/关键点/会议纪要中的具体记录），且须说明相对标准交付的增量工作，不得仅复述需求中与 SKU 同名的词或并列功能清单；\n` +
-          `8) 业务需求里用顿号/逗号并列多个标准模块名称（如出纳、存货、成本、总账、报表）通常只表示实施范围而非单项加人天，不得据此对其中每个 SKU 自动做同幅度上调；\n` +
-          `9) cloudProduct 表示产品线或实施域云产品（如金蝶AI星空、财务云）；skuName 仅填可交付子模块/SKU（如总账、采购管理）。禁止把财务云、供应链云等「实施域云」写进 skuName 又挂在金蝶AI星空下；域级人天应归在云产品行，SKU 列留空或仅列真实子模块。\n` +
-          userNoGridClause +
-          `\n${JSON.stringify(params.payload)}`
-      }
-    ]
-  };
+  const userPrompt =
+    `请基于以下需求快照输出实施评估草稿。\n` +
+    `要求：\n` +
+    `1) 只输出 JSON 对象；\n` +
+    `2) quoteMode 默认优先“模块报价”；\n` +
+    `3) 若信息不足，给出审慎估算并在 risks/assumptions 说明；\n` +
+    `4) moduleItems 至少返回 1 条；\n` +
+    `5) 若 requirementSnapshot.devTotalDays > 0，请将其作为“开发总人天”纳入 moduleItems；\n` +
+    `6) 对每个 SKU 必须给出“该 SKU 专属”的 reason，禁止全表复用同一条模糊理由；\n` +
+    `7) 当 suggestedDays > standardDays 时，reason 必须明确写出该 SKU 的超标证据来源（对应业务需求/开发概要/关键点/会议纪要中的具体记录），且须说明相对标准交付的增量工作，不得仅复述需求中与 SKU 同名的词或并列功能清单；\n` +
+    `8) 业务需求里用顿号/逗号并列多个标准模块名称（如出纳、存货、成本、总账、报表）通常只表示实施范围而非单项加人天，不得据此对其中每个 SKU 自动做同幅度上调；\n` +
+    `9) cloudProduct 表示产品线或实施域云产品（如金蝶AI星空、财务云）；skuName 仅填可交付子模块/SKU（如总账、采购管理）。禁止把财务云、供应链云等「实施域云」写进 skuName 又挂在金蝶AI星空下；域级人天应归在云产品行，SKU 列留空或仅列真实子模块。\n` +
+    userNoGridClause +
+    `\n${JSON.stringify(params.payload)}`;
 
-  const response = await requestKimiCompletion({
-    endpoint,
-    apiKey: params.apiKey,
-    body,
+  const provider = getKimiProvider();
+  const completion = await provider.chatCompletion({
+    model: params.model,
+    temperature: 0.1,
+    responseFormat: "json_object",
     timeoutMs: params.timeoutMs,
+    credentialsOverride: {
+      apiKey: params.apiKey,
+      apiBaseUrl: params.apiUrl,
+    },
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
   });
 
-  const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = asString(json?.choices?.[0]?.message?.content);
-  if (!content) {
-    throw new Error("model_empty_assessment_response");
-  }
+  const content = completion.content;
+  // 注：KimiProvider 在 content 为空时已抛 ProviderError("empty_response", "model_empty_response")，
+  // 此处不再重复检查；保留 JSON 字段级校验。
   const parsed = parseJsonFromModelText(content);
   if (!Object.keys(parsed).length) {
     throw new Error("model_invalid_assessment_json");

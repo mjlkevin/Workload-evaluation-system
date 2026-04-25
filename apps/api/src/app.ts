@@ -9,6 +9,7 @@ import { config } from "./config/env";
 import routes from "./routes";
 import { downloadFile } from "./modules/exports/exports.module";
 import { errorHandler } from "./middleware";
+import { bootstrapAiProviders } from "./ai/bootstrap";
 
 function isPrivateNetworkOrigin(origin: string): boolean {
   try {
@@ -33,6 +34,10 @@ function isPrivateNetworkOrigin(origin: string): boolean {
  * 创建并配置 Express 应用
  */
 export function createApp(): Express {
+  // 注册 AI Provider（KimiProvider）—— 业务层从 defaultProviderRegistry 取用，
+  // 不再直接 new。凭据每次请求级覆盖（credentialsOverride）。幂等。
+  bootstrapAiProviders();
+
   const app = express();
 
   // 浏览器直连 API（:3000）时需 CORS。开发环境全开；生产环境仅对私网 Origin 反射，避免公网任意 Origin。

@@ -334,7 +334,7 @@
         <strong>P0 重构执行中</strong>　本文档为<strong>目标态设计基线</strong>；实际迁移路径、任务进度、决策台账、未决 TBD 处置见执行台账 <a href="重构执行计划-P0-2026-04-24.md">重构执行计划-P0-2026-04-24.md</a>。<br/>
         当前 P0 进度快照同步在 <a href="#roadmap">§12 落地路线图</a> 内。
       </div>
-      <span class="snap">2026-04-24 · 4/8 基座已完成（T1 / T2 / DB / T3）· 9 条 TBD 全部已决</span>
+      <span class="snap">2026-04-24 · 5/8 基座已完成（T1 / T2 / DB / T3 / T4）· 9 条 TBD 全部已决</span>
     </div>
 
     <!-- ============ 1. OVERVIEW ============ -->
@@ -1222,7 +1222,7 @@ flowchart TB
         <div class="head">
           <div class="title">▎P0 执行进度 · 2026-04-24 快照</div>
           <div class="summary">
-            完成度 <span class="pct">4 / 8</span>　·　本次 P0 ≈ v2 路线图 <strong>P0-1 / P0-3 首批 + P0-2 雏形</strong>（精确称 <strong>P0.1</strong>，保留 P0.2 做剩余）　·
+            完成度 <span class="pct">5 / 8</span>　·　本次 P0 ≈ v2 路线图 <strong>P0-1 / P0-3 首批 + P0-2 雏形</strong>（精确称 <strong>P0.1</strong>，保留 P0.2 做剩余）　·
             详情见 <a href="重构执行计划-P0-2026-04-24.md" style="color:#2563eb;">执行台账</a>
           </div>
         </div>
@@ -1257,9 +1257,9 @@ flowchart TB
 
         <div class="task-row">
           <div class="tid">T4</div>
-          <div class="status todo">TODO</div>
-          <div class="desc">迁移旧 <code>ai.service.ts</code>（2541 行）四个 Kimi 调用点改走新 Provider，目标瘦身至 &lt;1800 行，不回归集成测试。</div>
-          <div class="commit">—</div>
+          <div class="status done">DONE</div>
+          <div class="desc">新增 <code>apps/api/src/ai/bootstrap.ts</code>（启动期注册 KimiProvider · 幂等）；<code>ai.service.ts</code> 四处 Kimi 调用全部改走 <code>provider.chatCompletion(...)</code> + <code>credentialsOverride</code>；删除旧 HTTP 底座（<code>requestKimiCompletion</code> 等 ~85 行）。瘦身 2541→2408 行（-133）。<strong>注</strong>：30% 瘦身目标未达，剩余体量为归一化/handler，留 P0.2。<code>test:ai</code> 11/11 + <code>test:rules</code> 8/8 + 既有 ai.service 测试 2/2 全绿。</div>
+          <div class="commit">本次提交</div>
         </div>
 
         <div class="task-row">
