@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import XLSX from "xlsx";
 
-import { mergeRequirementImportData, parseRequirementImportFromWorkbook } from "./ai.service";
+import { mergeRequirementImportData, parseRequirementImportFromWorkbook } from "./ai-workbook";
 
 test("产品及模块：产品分组 + 应用列 + 中间自定义列 + 末尾用户数（首行填数向下沿用）", () => {
   const wb = XLSX.utils.book_new();

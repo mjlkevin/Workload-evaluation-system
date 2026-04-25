@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 
-import { requireRoleWithAuth } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
+import { requireCapability } from "../rbac/middleware";
 import { loadVersionsStore } from "../modules/versions/versions.repository";
 import { ok } from "../utils/response";
 
@@ -21,8 +22,8 @@ type WbsItem = {
 
 const router = Router();
 
-router.get("/", (req, res) => {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+router.get("/", requireCapability("estimates:read"), (req, res) => {
+  const auth = requireAuth(req, res);
   if (!auth) return;
 
   const store = loadVersionsStore();

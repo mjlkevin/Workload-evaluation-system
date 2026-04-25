@@ -9,4 +9,5 @@ export * from "./rule.service";
 export * from "./estimate.service";
 export * from "./export.service";
 export * from "./ai.service";
+export * from "./ai-workbook";
 export * from "./session.service";

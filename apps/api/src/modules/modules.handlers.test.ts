@@ -25,6 +25,7 @@ import {
 } from "./versions/versions.usecase";
 import { patchReviewStatus, postTeam } from "./team/team.controller";
 import { kimiAssessmentPreview } from "./ai/ai.usecase";
+import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap";
 
 type MockRes = {
   statusCode: number;
@@ -747,6 +748,7 @@ test("ai.usecase: kimiAssessmentPreview returns model result on valid response",
   const originalApiKey = config.kimi.apiKey;
   try {
     config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
     (globalThis as { fetch?: unknown }).fetch = async () =>
       ({
         ok: true,
@@ -789,6 +791,7 @@ test("ai.usecase: kimiAssessmentPreview returns model result on valid response",
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
   }
 });
 
@@ -815,6 +818,7 @@ test("ai.usecase: kimiAssessmentPreview falls back on model timeout", async () =
   const originalApiKey = config.kimi.apiKey;
   try {
     config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
     (globalThis as { fetch?: unknown }).fetch = async () => {
       throw new Error("timeout");
     };
@@ -826,10 +830,11 @@ test("ai.usecase: kimiAssessmentPreview falls back on model timeout", async () =
     };
     assert.equal(body.code, 0);
     assert.equal(body.data.meta.mode, "rule_fallback");
-    assert.match(body.data.meta.fallbackReason, /timeout/i);
+    assert.match(body.data.meta.fallbackReason, /超时|kimi_request_timeout/i);
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
   }
 });
 
@@ -856,6 +861,7 @@ test("ai.usecase: kimiAssessmentPreview falls back on invalid model json", async
   const originalApiKey = config.kimi.apiKey;
   try {
     config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
     (globalThis as { fetch?: unknown }).fetch = async () =>
       ({
         ok: true,
@@ -875,5 +881,6 @@ test("ai.usecase: kimiAssessmentPreview falls back on invalid model json", async
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
   }
 });

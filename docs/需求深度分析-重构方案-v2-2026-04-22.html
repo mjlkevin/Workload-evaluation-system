@@ -320,7 +320,7 @@
         <span>版本 v2.0（全量重写）</span>
         <span>日期 2026-04-22</span>
         <span>面向 销售 / 售前 / 实施 / PM / 开发 / PMO</span>
-        <span>状态 P0 执行中 · 2026-04-24</span>
+        <span>状态 P0.1 完成 · P0.2 / P1 规划中 · 2026-04-25</span>
       </div>
     </header>
 
@@ -331,10 +331,10 @@
     <div class="progress-banner">
       <span class="pulse" aria-hidden="true"></span>
       <div style="flex:1; min-width: 260px;">
-        <strong>P0 重构执行中</strong>　本文档为<strong>目标态设计基线</strong>；实际迁移路径、任务进度、决策台账、未决 TBD 处置见执行台账 <a href="重构执行计划-P0-2026-04-24.md">重构执行计划-P0-2026-04-24.md</a>。<br/>
-        当前 P0 进度快照同步在 <a href="#roadmap">§12 落地路线图</a> 内。
+        <strong>P0.1 已完成（100/100 测试通过）</strong>　本文档为<strong>目标态设计基线</strong>；实际迁移路径、任务进度、决策台账、未决 TBD 处置见执行台账 <a href="重构执行计划-P0-2026-04-24.md">重构执行计划-P0-2026-04-24.md</a>。<br/>
+        当前进入 <strong>P0.2 基座巩固</strong>阶段， roadmap 已按重新分析结果更新，详见 <a href="#roadmap">§12 落地路线图</a>。
       </div>
-      <span class="snap">2026-04-24 · 5/8 基座已完成（T1 / T2 / DB / T3 / T4）· 9 条 TBD 全部已决</span>
+      <span class="snap">2026-04-25 · P0 T1-T8 全部 DONE · 100/100 pass · 新增 P0.2 阶段 · P1 三条线重排优先级</span>
     </div>
 
     <!-- ============ 1. OVERVIEW ============ -->
@@ -1217,13 +1217,14 @@ flowchart TB
       <div class="roadmap-row"><div class="pri p0">P0-2</div><div class="roadmap-item"><strong>规则引擎（双引擎 + DSL）</strong>　语法设计 + 解释器 + 灰度 + 命中追溯；计算引擎重构，完备性引擎从零建。</div></div>
       <div class="roadmap-row"><div class="pri p0">P0-3</div><div class="roadmap-item"><strong>Kimi Agent 基座</strong>　ModelProvider 抽象；长文抽取 + 证据链 + 置信度核心能力；覆盖理由存储链路。</div></div>
 
-      <!-- ============ P0 执行进度快照 · 2026-04-24 ============ -->
+      <!-- ============ P0 执行进度快照 · 2026-04-25 ============ -->
       <div class="progress-panel">
         <div class="head">
-          <div class="title">▎P0 执行进度 · 2026-04-24 快照</div>
+          <div class="title">▎P0 执行进度 · 2026-04-25 快照</div>
           <div class="summary">
-            完成度 <span class="pct">5 / 8</span>　·　本次 P0 ≈ v2 路线图 <strong>P0-1 / P0-3 首批 + P0-2 雏形</strong>（精确称 <strong>P0.1</strong>，保留 P0.2 做剩余）　·
-            详情见 <a href="重构执行计划-P0-2026-04-24.md" style="color:#2563eb;">执行台账</a>
+            完成度 <span class="pct">8 / 8</span>　·　本次 P0 精确称 <strong>P0.1</strong>（v2 路线图 P0-1/P0-3 首批 + P0-2 雏形）　·
+            100/100 测试通过（<code>test:ai</code> 53 + <code>test:modules</code> 39 + <code>test:rules</code> 8 + tsc 0 错）　·
+            详情见 <a href="重构执行计划-P0-2026-04-24.md" style="color:#2563eb;">执行台账</a> 与 <a href="WORK_LOG_KIMI_P0_2026-04-25.md" style="color:#2563eb;">Kimi 工作日志</a>
           </div>
         </div>
 
@@ -1264,47 +1265,58 @@ flowchart TB
 
         <div class="task-row">
           <div class="tid">T5</div>
-          <div class="status todo">TODO</div>
-          <div class="desc"><strong>Evidence / change_log 持久化</strong>　新增 <code>extraction_results</code> + <code>change_logs</code> 表 + <code>EvidenceRepository</code>，支持 history 追加。</div>
-          <div class="commit">—</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>Evidence / change_log 持久化</strong>　新增 <code>extraction_results</code> + <code>change_logs</code> 表（migration <code>0001_furry_gambit</code>）；<code>EvidenceRepository</code> 支持 saveExtractionResult（事务写入头+明细）、findByExtractionId（反向组装）、appendEvidenceHistory（evidences.history 追加 + change_logs 审计双写）。Repository 构造函数可注入 db 实例，测试用 <code>workload_eval_test</code> 隔离库。</div>
+          <div class="commit">2026-04-25 · Kimi</div>
         </div>
 
         <div class="task-row">
           <div class="tid">T6</div>
-          <div class="status todo">TODO</div>
-          <div class="desc"><strong>DSL 引擎雏形 + 1 条规则</strong>　完备性引擎 + <code>sow-completeness-v1</code>。承接 v2 P-5 "规则皆 DSL"（仅雏形，非全量）。</div>
-          <div class="commit">—</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>DSL 引擎雏形 + 1 条规则</strong>　<code>src/dsl/engine.ts</code> 规则执行器（顺序执行、异常隔离、结果合并）；<code>sow-completeness-v1</code> 检查 SOW 4 项核心范围（组织/模块/开发/WBS），支持 fallback 路径兼容旧 fieldPath，开发范围允许"无"（info 级），其余 error 级。基于 3 份真实 SOW 文档（简版/标准版/利民实例）分析确认字段边界。</div>
+          <div class="commit">2026-04-25 · Kimi</div>
         </div>
 
         <div class="task-row">
           <div class="tid">T7</div>
-          <div class="status todo">TODO</div>
-          <div class="desc"><strong>7 角色 RBAC 常量 + 权限矩阵</strong>　后端中间件按角色拦截；角色名已从 v2 §03 落地：<code>SALES / PRE_SALES / IMPL / PM / DEV / PMO / ADMIN</code>。</div>
-          <div class="commit">—</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>7 角色 RBAC 常量 + 权限矩阵</strong>　<code>src/rbac/roles.ts</code> 7 角色常量；<code>permissions.ts</code> 25 个能力位 + 矩阵；<code>middleware.ts</code> 提供 <code>requireCapability</code> / <code>requireAnyCapability</code> / <code>requireV2Role</code> 三层中间件。旧角色兼容映射：admin→ADMIN、sub_admin→PM、user→PRE_SALES（P0 不迁 users.json）。</div>
+          <div class="commit">2026-04-25 · Kimi</div>
         </div>
 
         <div class="task-row">
           <div class="tid">T8</div>
-          <div class="status todo">TODO</div>
-          <div class="desc"><strong>IA 初评冒烟（Vitest）</strong>　跑通：上传 Excel → 抽取 → 证据入库 → DSL 校验 → 角色拦截；依赖 T1-T7 全部完成。</div>
-          <div class="commit">—</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>IA 初评冒烟</strong>　<code>src/ai/smoke/ia-initial-smoke.test.ts</code> 6 条测试串联 T1-T7 完整链路：模拟抽取 → <code>EvidenceRepository.saveExtractionResult</code>（T5）→ <code>findByExtractionId</code> 查询 → <code>evaluate([sowCompletenessV1])</code> DSL 校验（T6）→ <code>legacyRoleToV2Roles + anyRoleHasCapability</code> 角色权限验证（T7）。含 happy path / 缺字段 / 开发范围"无" / history 双写。共享 <code>test-helpers/db.ts</code> Pool 避免并发死锁；<code>test:ai</code> 加 <code>--test-concurrency=1</code> 串行。</div>
+          <div class="commit">2026-04-25 · Kimi</div>
         </div>
       </div>
 
       <div class="callout" style="margin-top:12px; font-size: 13px;">
-        <strong>P0 本次范围边界</strong>　不动前端 UI、不迁旧 JSON stores（users / versions / templates / system configs）、不接第二个 AI provider、不引 BullMQ、DSL 只做 1 条规则。剩余 9 个 v2 新实体（SOW / Narrative / Deliverable / Handoff / RateCard / QualityGate / SealedBaseline / DevAssessment / CollabWorkspace / Methodology）留待 P0.2 / P1。
+        <strong>P0.1 范围边界</strong>　不动前端 UI、不迁旧 JSON stores（users / versions / templates / system configs）、不接第二个 AI provider、不引 BullMQ、DSL 只做 1 条规则。v2 18 个实体中仅 3 个落 PG（Evidence / ExtractionResult / ChangeLog），剩余 15 个实体（含 SOW / Narrative / Deliverable / Handoff / RateCard / QualityGate / SealedBaseline / DevAssessment / CollabWorkspace / Methodology 等）待 P0.2/P1 分批建表。
       </div>
 
-      <h3>P1 · 角色前端（三条并行）</h3>
-      <div class="roadmap-row"><div class="pri p1">P1-1</div><div class="roadmap-item"><strong>售前审查 Agent</strong>　原始物料 → 需求包 + SOW + 问询 + 初估包 端到端流程。</div></div>
-      <div class="roadmap-row"><div class="pri p1">P1-2</div><div class="roadmap-item"><strong>销售快报 Skill</strong>　对话式描述 + 商机档案落库 + 分期方案生成；客户成功场景的"老客户继承"分支（可选）。</div></div>
-      <div class="roadmap-row"><div class="pri p1">P1-3</div><div class="roadmap-item"><strong>PM / PMO Web 工作台</strong>　接力视图、Narrative 生成、4 大交付物自动派生、PMO 审核 checklist、封版发起。</div></div>
+      <h3>P0.2 · 基座巩固（新增阶段，P1 前必须完成）</h3>
+      <div class="roadmap-row"><div class="pri p0">P0.2-1</div><div class="roadmap-item"><strong>RBAC 接入路由</strong>　将 <code>requireCapability</code> / <code>requireV2Role</code> 中间件接入全部路由；旧 <code>requireRole</code> 逐步下线。7 角色权限从"后端常量"升级为"运行时守卫"。<span class="tag tag-warn">阻塞 P1 所有前端</span></div></div>
+      <div class="roadmap-row"><div class="pri p0">P0.2-2</div><div class="roadmap-item"><strong>ai.service.ts 二次拆分</strong>　2408 行 → 按垂直领域拆为 extractor / sales / assessment / chat / export 五个独立模块。当前 7 个导出函数各自归位，消除 P1 叠加的技术债务。</div></div>
+      <div class="roadmap-row"><div class="pri p0">P0.2-3</div><div class="roadmap-item"><strong>首批实体建表（3 张）</strong>　<code>requirement_packs</code> + <code>sow_documents</code> + <code>initial_estimates</code>。P1-1 售前审查 Agent 的最低数据层依赖。</div></div>
+      <div class="roadmap-row"><div class="pri p0">P0.2-4</div><div class="roadmap-item"><strong>DSL 规则集扩展</strong>　从 1 条 → 4~5 条：行业必选项检查、模块依赖检查、WBS 完整性检查、置信度阈值检查。支撑 US-6"漏了行业必问项时 AI 主动提醒"。</div></div>
+      <div class="roadmap-row"><div class="pri p0">P0.2-5</div><div class="roadmap-item"><strong>AssessmentVersion schema 设计</strong>　将现有 JSON-based versions 模块映射到 PG schema（Correction/Revision 语义、linkedSOW、linkedNarrative、ownerRole、deliveryMode）。只做 schema + 设计文档，不迁数据。</div></div>
+
+      <div class="callout good" style="margin-top:12px; font-size: 13px;">
+        <strong>P0.2 为什么必须存在？</strong>　P0.1 是"任务完成"（T1-T8 全绿），但 v2 P0 三大目标达成度仅 10%~75%。当前 RBAC 未接入路由、仅 3 张 PG 表、DSL 仅 1 条规则、ai.service.ts 仍 2408 行——这些债务若不还，P1 的任何一条线都会塌进不可逆的技术债务。P0.2 工作量约 4-6 天，是 P1 的"承重墙"。
+      </div>
+
+      <h3>P1 · 角色前端（<strong>重排优先级</strong>：P1-1 → P1-3 → P1-2，非三条并行）</h3>
+      <div class="roadmap-row"><div class="pri p1">P1-1</div><div class="roadmap-item"><strong>售前审查 Agent（首攻）</strong>　原始物料 → 需求包 + SOW + 问询 + 初估包 端到端流程。覆盖 US-5~US-8、US-21。<br/><span style="font-size:12.5px;color:#6b7280;">已有基础最多：Extractor（T3）+ Evidence（T5）+ DSL 雏形（T6）。需补 RequirementPack / SOWDocument / InitialEstimate 三张表（P0.2-3）。</span></div></div>
+      <div class="roadmap-row"><div class="pri p1">P1-3</div><div class="roadmap-item"><strong>PM / PMO Web 工作台（次攻）</strong>　接力视图、Narrative 生成、4 大交付物自动派生、PMO 审核 checklist、封版发起。覆盖 US-10~US-13、US-25~US-27、US-30~US-31。<br/><span style="font-size:12.5px;color:#6b7280;">v2 核心价值主张（P-2 责任接力），但依赖最多：AssessmentHandoff 状态机 + AssessmentVersion PG 化 + Deliverable 4 件套 + QualityGateReview + SealedBaseline。必须等 P1-1 数据沉淀 + P0.2 RBAC 接入。</span></div></div>
+      <div class="roadmap-row"><div class="pri p1">P1-2</div><div class="roadmap-item"><strong>销售快报 Skill（可与 P1-3 并行）</strong>　对话式描述 + 商机档案落库 + 分期方案生成。覆盖 US-1~US-3。<br/><span style="font-size:12.5px;color:#6b7280;">OpportunityBrief 是独立实体，不依赖 P1-1/P1-3 的数据链路。但 US-19"老客户继承"必须等 P2-4 历史项目库。</span></div></div>
 
       <h3>P2 · 协同与历史沉淀</h3>
       <div class="roadmap-row"><div class="pri p2">P2-1</div><div class="roadmap-item"><strong>评估协同工作区</strong>　CollabWorkspace 承载群聊替代品；质询-回复结构化入证据链。</div></div>
       <div class="roadmap-row"><div class="pri p2">P2-2</div><div class="roadmap-item"><strong>开发评估 Agent + 工时占用可视化</strong>　开发顾问独立工作面；可选：工时占用热力图（若公司无独立资源调度系统）。</div></div>
       <div class="roadmap-row"><div class="pri p2">P2-3</div><div class="roadmap-item"><strong>变更描述 Skill + 差分影响分析</strong>　销售侧变更提报 + PM 侧 diff 视图。</div></div>
-      <div class="roadmap-row"><div class="pri p2">P2-4</div><div class="roadmap-item"><strong>历史项目库 + 相似度检索</strong>　项目结案数据回流；行业 × 规模的向量检索。</div></div>
+      <div class="roadmap-row"><div class="pri p2">P2-4</div><div class="roadmap-item"><strong>历史项目库 + 相似度检索</strong>　项目结案数据回流；行业 × 规模的向量检索。支撑 P1-2 US-19"老客户继承"。</div></div>
 
       <h3>P3 · 组织级增强</h3>
       <div class="roadmap-row"><div class="pri p3">P3-1</div><div class="roadmap-item"><strong>规则进化闭环</strong>　基于 PM 覆盖理由聚类，自动提示规则优化建议。</div></div>
@@ -1312,7 +1324,7 @@ flowchart TB
       <div class="roadmap-row"><div class="pri p3">P3-3</div><div class="roadmap-item"><strong>多租户 / SSO / 精细权限</strong>　面向大客户本地化部署。</div></div>
 
       <div class="callout warn" style="margin-top:24px;">
-        <strong>风险提示</strong>　P0 三项是所有前端能力的前置依赖，建议并行启动同一里程碑交付。任何一项延期都会让 P1 失去落脚点。
+        <strong>风险提示（2026-04-25 更新）</strong>　原 v2 路线图将 P1 三条线标记为"并行"，重新分析后发现当前基座不足以支撑并行。P0.1 是"搭好了脚手架"，但房子只有地基。P1 想盖三层楼，必须先把 P0.2 的"承重墙"（RBAC、数据表、DSL 规则集、服务拆分）砌好。建议执行顺序：<strong>P0.2（4-6 天）→ P1-1（2-3 周）→ P1-3（3-4 周）→ P1-2（1-2 周，可与 P1-3 并行）</strong>。跳过 P0.2 直接进 P1，会在数据模型层和权限层产生不可逆的技术债务。
       </div>
     </section>
 
