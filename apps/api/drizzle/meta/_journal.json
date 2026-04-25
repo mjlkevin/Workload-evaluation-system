@@ -43,6 +43,13 @@
       "when": 1777112922120,
       "tag": "0005_eminent_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777134031417,
+      "tag": "0006_rich_morg",
+      "breakpoints": true
     }
   ]
 }
