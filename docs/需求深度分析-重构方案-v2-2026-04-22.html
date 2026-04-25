@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workload Evaluation System · 需求深度分析与重构方案 v2</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    color: #1f2937;
+    background: #fafafa;
+    line-height: 1.75;
+    font-size: 15px;
+  }
+  .layout { display: grid; grid-template-columns: 240px 1fr; max-width: 1500px; margin: 0 auto; }
+
+  .toc {
+    position: sticky; top: 0; height: 100vh;
+    padding: 32px 22px; border-right: 1px solid #e5e7eb;
+    background: #fff; overflow-y: auto;
+  }
+  .toc .brand { font-size: 12px; font-weight: 700; color: #2563eb; letter-spacing: 2px; margin-bottom: 6px; }
+  .toc .brand-sub { font-size: 11px; color: #9ca3af; margin-bottom: 24px; }
+  .toc ol { list-style: none; counter-reset: section; }
+  .toc li { counter-increment: section; margin: 7px 0; line-height: 1.5; }
+  .toc li::before { content: counter(section, decimal-leading-zero) "  "; color: #9ca3af; font-variant-numeric: tabular-nums; font-size: 11px; }
+  .toc a { color: #4b5563; text-decoration: none; font-size: 13px; }
+  .toc a:hover { color: #2563eb; }
+  .toc .version-tag { display: inline-block; padding: 2px 8px; font-size: 10px; background: #fef3c7; color: #78350f; border-radius: 3px; margin-left: 6px; font-weight: 700; }
+  .toc .exec-tag { display: inline-block; padding: 2px 8px; font-size: 10px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-radius: 3px; margin-left: 6px; font-weight: 700; }
+
+  main { padding: 48px 56px 120px; max-width: 100%; overflow-x: hidden; }
+
+  header.cover {
+    border-left: 4px solid #2563eb;
+    padding: 14px 0 14px 24px;
+    margin-bottom: 48px;
+  }
+  header.cover .tag { color: #6b7280; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; }
+  header.cover h1 { font-size: 34px; margin: 8px 0 10px; color: #111827; font-weight: 700; }
+  header.cover .sub { color: #4b5563; font-size: 16px; line-height: 1.6; }
+  header.cover .meta { margin-top: 22px; display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px; color: #6b7280; }
+  header.cover .meta span::before { content: "◆ "; color: #2563eb; }
+
+  .evidence-banner {
+    background: linear-gradient(to right, #eff6ff, #fafafa);
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 40px;
+    font-size: 13.5px;
+    color: #1e3a8a;
+  }
+  .evidence-banner strong { color: #1e40af; }
+
+  section { margin-bottom: 56px; scroll-margin-top: 20px; }
+  section h2 {
+    font-size: 22px; color: #111827; font-weight: 700;
+    border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  section h2 .n { font-size: 13px; color: #2563eb; letter-spacing: 2px; font-weight: 700; }
+  section h3 { font-size: 17px; font-weight: 600; margin: 28px 0 12px; color: #1f2937; }
+  section h4 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; color: #374151; }
+  section p { margin: 10px 0; color: #374151; }
+
+  .callout {
+    background: #eff6ff; border-left: 3px solid #2563eb;
+    padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 16px 0;
+    font-size: 14px; color: #1e3a8a;
+  }
+  .callout.warn { background: #fffbeb; border-color: #d97706; color: #78350f; }
+  .callout.good { background: #ecfdf5; border-color: #059669; color: #065f46; }
+  .callout.tbd { background: #fef2f2; border-color: #dc2626; color: #7f1d1d; }
+
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; color: #374151; }
+
+  /* Principle cards */
+  .principles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 18px 0; }
+  .principle {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 18px 20px; border-top: 3px solid #2563eb;
+  }
+  .principle .code { font-size: 11px; color: #2563eb; font-weight: 700; letter-spacing: 1px; }
+  .principle .title { font-size: 16px; font-weight: 700; margin: 6px 0 8px; color: #111827; }
+  .principle .desc { font-size: 13.5px; color: #4b5563; line-height: 1.6; }
+
+  /* Personas */
+  .personas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px; }
+  .persona {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 20px;
+  }
+  .persona .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .persona .name { font-size: 16px; font-weight: 700; color: #111827; }
+  .persona .role { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600; letter-spacing: .5px; }
+  .persona.sales .role { background: #dbeafe; color: #1e40af; }
+  .persona.presales .role { background: #ede9fe; color: #5b21b6; }
+  .persona.impl .role { background: #cffafe; color: #155e75; }
+  .persona.pm .role { background: #dcfce7; color: #14532d; }
+  .persona.dev .role { background: #fed7aa; color: #7c2d12; }
+  .persona.pmo .role { background: #fecaca; color: #7f1d1d; }
+  .persona.admin .role { background: #fef3c7; color: #78350f; }
+  .persona .evidence { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+  .persona dt { color: #9ca3af; font-weight: 600; margin-top: 10px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+  .persona dd { color: #374151; margin-left: 0; margin-top: 4px; font-size: 13px; line-height: 1.55; }
+
+  /* Mermaid */
+  .mermaid {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 24px; margin: 20px 0; text-align: center;
+    overflow-x: auto;
+  }
+  .diagram-caption { text-align: center; color: #9ca3af; font-size: 12px; margin-top: -6px; margin-bottom: 24px; letter-spacing: .5px; }
+
+  /* Tables */
+  table {
+    width: 100%; border-collapse: collapse; margin: 16px 0;
+    background: #fff; border-radius: 8px; overflow: hidden;
+    font-size: 13px; border: 1px solid #e5e7eb;
+  }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  th { background: #f9fafb; font-weight: 600; color: #374151; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  td { color: #4b5563; }
+  td.phase { font-weight: 700; color: #2563eb; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+
+  .tag { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 4px; margin: 1px; font-weight: 500; }
+  .tag-skill { background: #dbeafe; color: #1e40af; }
+  .tag-agent { background: #ede9fe; color: #5b21b6; }
+  .tag-ui { background: #dcfce7; color: #14532d; }
+  .tag-api { background: #f3f4f6; color: #4b5563; }
+  .tag-ai { background: #fef3c7; color: #78350f; }
+  .tag-rule { background: #fce7f3; color: #9f1239; }
+  .tag-data { background: #e0e7ff; color: #3730a3; }
+  .tag-new { background: #fef2f2; color: #991b1b; font-weight: 700; }
+  .tag-tbd { background: #fee2e2; color: #991b1b; }
+
+  /* User Stories */
+  .story-group { margin: 20px 0; }
+  .story-group .glabel { font-size: 12px; color: #6b7280; margin-bottom: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; }
+  .story { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; margin: 8px 0; font-size: 13.5px; display: flex; gap: 12px; align-items: flex-start; }
+  .story .id { font-weight: 700; color: #2563eb; font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 52px; }
+  .story .text { color: #374151; line-height: 1.6; }
+  .story em { font-style: normal; background: #fef3c7; padding: 0 3px; border-radius: 2px; }
+  .story.new .id::after { content: " NEW"; background: #fef2f2; color: #991b1b; font-size: 9px; padding: 1px 4px; border-radius: 2px; margin-left: 4px; font-weight: 700; }
+
+  /* Decisions */
+  .decision {
+    background: #fff; border: 1px solid #e5e7eb; border-left: 4px solid #2563eb;
+    border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 14px 0;
+  }
+  .decision.new { border-left-color: #dc2626; }
+  .decision h4 { font-size: 15px; color: #111827; margin-bottom: 6px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .decision h4 .idx { color: #2563eb; font-weight: 700; font-size: 13px; }
+  .decision.new h4 .idx { color: #dc2626; }
+  .decision h4 .new-badge { background: #fef2f2; color: #991b1b; font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 700; letter-spacing: .5px; }
+  .decision .why, .decision .impact { font-size: 13px; margin: 6px 0; color: #4b5563; line-height: 1.65; }
+  .decision .why::before { content: "为什么 · "; color: #d97706; font-weight: 700; }
+  .decision .impact::before { content: "影响 · "; color: #2563eb; font-weight: 700; }
+
+  /* Code */
+  code { font-family: "SF Mono", Consolas, Menlo, monospace; font-size: 13px; background: #f3f4f6; padding: 1px 5px; border-radius: 3px; color: #be185d; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 16px 20px; border-radius: 8px; overflow-x: auto; font-size: 13px; margin: 12px 0; line-height: 1.7; }
+  pre code { background: none; color: inherit; padding: 0; }
+  pre .k { color: #fbbf24; }
+  pre .s { color: #86efac; }
+  pre .c { color: #64748b; font-style: italic; }
+  pre .v { color: #7dd3fc; }
+
+  /* Roadmap */
+  .roadmap-row { display: grid; grid-template-columns: 80px 1fr; gap: 16px; margin: 8px 0; align-items: start; }
+  .pri { font-weight: 700; text-align: center; padding: 6px 0; border-radius: 4px; color: #fff; font-size: 13px; letter-spacing: .5px; }
+  .p0 { background: #dc2626; }
+  .p1 { background: #d97706; }
+  .p2 { background: #2563eb; }
+  .p3 { background: #6b7280; }
+  .roadmap-item { padding: 6px 0; font-size: 14px; color: #374151; }
+  .roadmap-item strong { color: #111827; }
+
+  /* TBD list */
+  .tbd-item { background: #fff; border: 1px solid #fecaca; border-radius: 8px; padding: 14px 18px; margin: 10px 0; }
+  .tbd-item .q { font-size: 14px; font-weight: 600; color: #991b1b; margin-bottom: 4px; }
+  .tbd-item .context { font-size: 13px; color: #6b7280; line-height: 1.55; }
+  .tbd-item .answer {
+    background: #ecfdf5; border-left: 3px solid #059669;
+    padding: 10px 14px; margin-top: 10px; border-radius: 0 4px 4px 0;
+    font-size: 13px; color: #065f46; line-height: 1.65;
+  }
+  .tbd-item .answer::before { content: "裁决（2026-04-24）· "; color: #047857; font-weight: 700; }
+  .tbd-item .answer.partial { background: #fffbeb; border-left-color: #d97706; color: #78350f; }
+  .tbd-item .answer.partial::before { content: "半决（2026-04-24）· "; color: #b45309; font-weight: 700; }
+  .tbd-item .answer .impact { display: block; margin-top: 6px; font-size: 12px; color: #4b5563; padding-top: 6px; border-top: 1px dashed #a7f3d0; }
+  .tbd-item .answer .impact::before { content: "对 P0 影响 · "; color: #059669; font-weight: 700; }
+  .tbd-item .answer.partial .impact { border-top-color: #fcd34d; }
+  .tbd-item .answer.partial .impact::before { color: #b45309; }
+
+  /* Progress banner (top) */
+  .progress-banner {
+    background: linear-gradient(to right, #fff7ed, #fafafa);
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-size: 13.5px;
+    color: #7c2d12;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .progress-banner strong { color: #9a3412; }
+  .progress-banner .pulse {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #f97316; box-shadow: 0 0 0 0 rgba(249, 115, 22, .6);
+    animation: pulse 2s infinite; flex-shrink: 0;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, .6); }
+    70% { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
+  }
+  .progress-banner a { color: #c2410c; font-weight: 600; text-decoration: none; border-bottom: 1px dashed #c2410c; }
+  .progress-banner a:hover { color: #7c2d12; }
+  .progress-banner .snap { font-size: 12px; color: #9a3412; background: #fef3c7; padding: 2px 8px; border-radius: 4px; }
+
+  /* P0 execution progress panel (inside roadmap) */
+  .progress-panel {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 20px 22px; margin: 14px 0 20px;
+  }
+  .progress-panel .head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 14px;
+    border-bottom: 1px dashed #e5e7eb; padding-bottom: 10px;
+  }
+  .progress-panel .head .title { font-size: 15px; font-weight: 700; color: #111827; }
+  .progress-panel .head .summary { font-size: 12.5px; color: #6b7280; }
+  .progress-panel .head .summary .pct { color: #059669; font-weight: 700; }
+  .task-row {
+    display: grid; grid-template-columns: 62px 78px 1fr 120px;
+    gap: 12px; align-items: start;
+    padding: 10px 0; border-bottom: 1px solid #f3f4f6;
+    font-size: 13px;
+  }
+  .task-row:last-child { border-bottom: none; }
+  .task-row .tid { font-weight: 700; color: #2563eb; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .task-row .status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-align: center; letter-spacing: .5px; height: fit-content; }
+  .task-row .status.done { background: #dcfce7; color: #166534; }
+  .task-row .status.doing { background: #dbeafe; color: #1e40af; }
+  .task-row .status.todo { background: #f3f4f6; color: #6b7280; }
+  .task-row .desc { color: #374151; line-height: 1.55; }
+  .task-row .desc strong { color: #111827; }
+  .task-row .desc code { font-size: 12px; }
+  .task-row .commit { font-family: "SF Mono", Consolas, Menlo, monospace; font-size: 11.5px; color: #9ca3af; }
+  .task-row .commit code { background: none; color: #6b7280; padding: 0; }
+  @media (max-width: 900px) {
+    .task-row { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  /* Entity card */
+  .entity { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 18px; margin: 10px 0; }
+  .entity .name { font-size: 15px; font-weight: 700; color: #111827; display: flex; gap: 10px; align-items: baseline; }
+  .entity .cn { color: #6b7280; font-weight: 400; font-size: 13px; }
+  .entity .fields { font-size: 12.5px; color: #4b5563; margin-top: 6px; font-family: "SF Mono", Consolas, monospace; }
+  .entity .note { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+
+  /* Grid cards */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px; }
+  .card h4 { margin-top: 0; color: #111827; }
+  .card p { font-size: 13.5px; }
+
+  /* Timeline */
+  .timeline { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 16px 0; }
+  .timeline table { border: none; margin: 0; font-size: 12.5px; }
+  .timeline th { background: transparent; border-bottom: 2px solid #e5e7eb; }
+  .timeline td.date { font-weight: 600; color: #2563eb; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .toc { position: static; height: auto; border-right: none; border-bottom: 1px solid #e5e7eb; }
+    main { padding: 24px 20px 80px; }
+    .personas, .grid-2, .grid-3, .principles { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="toc">
+    <div class="brand">WES · v2.0</div>
+    <div class="brand-sub">重构方案 · 2026-04-22</div>
+    <ol>
+      <li><a href="#overview">核心判断</a></li>
+      <li><a href="#principles">产品原则</a><span class="version-tag">NEW</span></li>
+      <li><a href="#personas">用户画像</a></li>
+      <li><a href="#business-flow">业务流程图</a></li>
+      <li><a href="#handoff-flow">接力子流程</a><span class="version-tag">NEW</span></li>
+      <li><a href="#system-arch">系统架构图</a></li>
+      <li><a href="#overlay">业务 × 系统切入点</a></li>
+      <li><a href="#entities">核心领域实体</a></li>
+      <li><a href="#dsl">DSL 与规则引擎</a></li>
+      <li><a href="#stories">用户故事</a></li>
+      <li><a href="#decisions">关键设计决策</a></li>
+      <li><a href="#roadmap">落地路线图</a><span class="exec-tag">执行中</span></li>
+      <li><a href="#tbd">开放问题 TBD</a><span class="version-tag">NEW</span></li>
+    </ol>
+  </aside>
+
+  <main>
+
+    <header class="cover">
+      <div class="tag">需求深度分析 · 重构方案 v2</div>
+      <h1>Workload Evaluation System</h1>
+      <div class="sub">从「版本驱动的表单工具」走向「角色接力的 AI 原生协作系统」<br/>面向 ERP 销售链路的商机 → 成交成本评估重构</div>
+      <div class="meta">
+        <span>版本 v2.0（全量重写）</span>
+        <span>日期 2026-04-22</span>
+        <span>面向 销售 / 售前 / 实施 / PM / 开发 / PMO</span>
+        <span>状态 P0 执行中 · 2026-04-24</span>
+      </div>
+    </header>
+
+    <div class="evidence-banner">
+      <strong>样本出处</strong>：本方案基于对真实项目 <code>OPP202509190408 · 利民星空旗舰版</code> 全链路（2025-11-04 拉群 → 2026-02-11 评估封版，跨 3 个多月、14 人协同群）的实证分析。下文所有角色画像、交付物清单、流程节点都可追溯到该样本。
+    </div>
+
+    <div class="progress-banner">
+      <span class="pulse" aria-hidden="true"></span>
+      <div style="flex:1; min-width: 260px;">
+        <strong>P0 重构执行中</strong>　本文档为<strong>目标态设计基线</strong>；实际迁移路径、任务进度、决策台账、未决 TBD 处置见执行台账 <a href="重构执行计划-P0-2026-04-24.md">重构执行计划-P0-2026-04-24.md</a>。<br/>
+        当前 P0 进度快照同步在 <a href="#roadmap">§12 落地路线图</a> 内。
+      </div>
+      <span class="snap">2026-04-24 · 3/8 基座已完成（T1 / T2 / DB）· 9 条 TBD 全部已决（TBD-4 走路径 B）</span>
+    </div>
+
+    <!-- ============ 1. OVERVIEW ============ -->
+    <section id="overview">
+      <h2><span class="n">01</span>核心判断</h2>
+
+      <h3>一、当前系统的 3 个根本错位</h3>
+      <ol>
+        <li><strong>把"PM"当一个人</strong>：实际上评估是 <em>销售 → 实施顾问 → PM → PMO</em> 的责任接力，当前系统只为"一个精算者"设计，没有接力语义。</li>
+        <li><strong>把 AI 当格式转换器</strong>：Kimi 仅用于 Excel 解析、企业摘要两个离散点，没承担"需求分析师"的角色——抽取证据、查找缺口、生成问询。</li>
+        <li><strong>把评估当"一个数"</strong>：真实交付包括 SOW、人天评估表、资源人天成本表、差异分析表、WBS、评估说明 Narrative 等至少 <em>6 类结构化产物</em>，当前系统只覆盖人天估算。</li>
+      </ol>
+
+      <h3>二、利民项目样本揭示的现实工作流</h3>
+      <div class="timeline">
+        <table>
+          <thead>
+            <tr><th style="width:110px">时间</th><th>事件</th><th>关键信号</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="date">2025-11-04</td><td>销售黄金艳拉群 + 发 Excel 申请表 V2</td><td>只列 8 个模块、无规模信息</td></tr>
+            <tr><td class="date">2025-11-04</td><td>实施顾问田双雄反问"一期上什么"</td><td>需求澄清靠群聊</td></tr>
+            <tr><td class="date">2025-11-05</td><td>林悦填输出首版 <strong>486 人天</strong></td><td>实施顾问初评</td></tr>
+            <tr><td class="date">2026-01-22</td><td>发 V3 (2.72M) → 黄金艳审出"交通费合计有误"</td><td>评估修正（非版本升级）</td></tr>
+            <tr><td class="date">2026-01-29</td><td>SOW 出炉 → 追问"物料主数据有无特殊场景"</td><td>SOW 变更驱动评估再审</td></tr>
+            <tr><td class="date">2026-01-29</td><td>魏春芳（PMO）建议开发合同单签 → 黄金艳"合同不好调"</td><td>合同已对外，只能内部分账</td></tr>
+            <tr><td class="date">2026-02-11 11:58</td><td><strong>PM 李加柱被邀请入群</strong></td><td>签约前拉 PM 接手的实锤</td></tr>
+            <tr><td class="date">2026-02-11 12:28</td><td>李加柱发最终 <strong>289 人天 / ¥610,450</strong> 背景说明（五段式）</td><td>PM 整合输出</td></tr>
+            <tr><td class="date">2026-02-11 14:53</td><td>黄金艳"要发起系统合同流程了"</td><td>评估封版 → 合同系统交接</td></tr>
+            <tr><td class="date">2026-02-11 15:06</td><td>魏春芳（PMO）要求补齐"资源表、差异分析表、方法论七阶段"</td><td>PMO 质量门驳回</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>三、四条重构方向</h3>
+      <div class="callout">
+        <strong>1 · 角色分层交互</strong>　销售/售前走 Claude Skill + Agent（对话式），PM 和 PMO 保留 Web 工作台（结构化）。
+      </div>
+      <div class="callout">
+        <strong>2 · AI 从格式转换器升级为需求分析师</strong>　开放原始物料输入，做跨文档抽取 + 证据链 + 依赖推理 + 问询生成。
+      </div>
+      <div class="callout">
+        <strong>3 · 规则引擎一拆为二</strong>　「计算规则引擎」算人天，「完备性 / 依赖规则引擎」查缺漏，两者独立演化，均由 DSL 配置。
+      </div>
+      <div class="callout">
+        <strong>4 · 核心系统收敛为"可信源 + 稳定 API"</strong>　文件存储升级 Postgres，版本与审计保留，对三种前端（Skill / Agent / Web）统一提供服务。
+      </div>
+    </section>
+
+    <!-- ============ 2. PRINCIPLES ============ -->
+    <section id="principles">
+      <h2><span class="n">02</span>产品原则</h2>
+      <p>以下 5 条原则是贯穿所有设计决策的根本约束，遇到取舍时回到这里。</p>
+
+      <div class="principles">
+        <div class="principle">
+          <div class="code">P-1</div>
+          <div class="title">AI Suggests, Human Decides</div>
+          <div class="desc">所有需承担责任的字段（人天 / 系数 / 风险 / 分期），AI 给行业参考 + 历史参考，人类保留最终决策权并承担责任。<strong>所有覆盖强制填写理由</strong>，理由沉淀为规则进化数据源。</div>
+        </div>
+        <div class="principle">
+          <div class="code">P-2</div>
+          <div class="title">责任接力</div>
+          <div class="desc">评估 ownership 在不同阶段传递（实施顾问 → PM → PMO）。接力是显式事件，保留全部前序轨迹，接手方可见原始思路与假设，决策权归当前 owner。</div>
+        </div>
+        <div class="principle">
+          <div class="code">P-3</div>
+          <div class="title">角色分层交互</div>
+          <div class="desc">销售/售前走对话式 Skill/Agent，PM/PMO 走结构化 Web。同一套核心 API、不同形态的前端——强行统一 UI 必然牺牲至少两个角色。</div>
+        </div>
+        <div class="principle">
+          <div class="code">P-4</div>
+          <div class="title">证据不入库，只留结论</div>
+          <div class="desc">原始文档（RFP / 微信 / 邮件 / 会议纪要）不作为文件存档，只沉淀抽取结论 + 段落摘录文本 + 来源标签。系统不是文档管理器，文档易改，结论稳定。</div>
+        </div>
+        <div class="principle">
+          <div class="code">P-5</div>
+          <div class="title">规则皆 DSL</div>
+          <div class="desc">计算规则和完备性规则全部用 DSL 描述，总部产品直接维护，不经开发发版。规则独立版本化 + 灰度 + 命中追溯。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 3. PERSONAS ============ -->
+    <section id="personas">
+      <h2><span class="n">03</span>用户画像</h2>
+      <p>从真实群聊样本归纳出 7 个核心角色。其中 <strong>销售含两个子场景</strong>（新客户 vs 老客户经营）。</p>
+
+      <div class="personas">
+
+        <div class="persona sales">
+          <div class="head">
+            <div><div class="name">张锐 / 黄金艳 · 销售</div><div class="evidence">样本：客户成功业务二部</div></div>
+            <span class="role">SALES</span>
+          </div>
+          <dl>
+            <dt>子场景</dt><dd><strong>新客户销售</strong>（张锐）+ <strong>客户成功 / 老客户经营</strong>（黄金艳，老客户二期也走完整评估/合同流程）</dd>
+            <dt>背景</dt><dd>负责区域商机挖掘或老客户维系，手握多个活跃商机，在客户现场、微信、电话间切换。</dd>
+            <dt>核心诉求</dt><dd>快速给客户报价区间 + 分期方案；推进到签约时顺畅发起合同流程。</dd>
+            <dt>典型动作</dt><dd>拉群、发评估申请表、跟客户谈判、盯合同流程。</dd>
+            <dt>厌恶</dt><dd>填版本号、勾表单、等售前/PM 几天回音、合同对外报了价内部却说要加。</dd>
+            <dt>成功判定</dt><dd>用 AI 的时间 &lt; 和客户沟通的时间；老客户二期可从历史记录（如有）快速起点。</dd>
+          </dl>
+        </div>
+
+        <div class="persona presales">
+          <div class="head">
+            <div><div class="name">郭俊贤 · 售前顾问</div><div class="evidence">样本：业财解决方案与项目经理部</div></div>
+            <span class="role">PRE-SALES</span>
+          </div>
+          <dl>
+            <dt>背景</dt><dd>熟行业模板、熟 ERP 全模块，在需求澄清期配合销售和客户沟通。</dd>
+            <dt>核心诉求</dt><dd>不漏需求，漏了有智能提醒；协助销售精准识别客户痛点；做好与实施/PM 的交接。</dd>
+            <dt>典型动作</dt><dd>接原始物料、抽取需求、问完备性、生成问询清单、前期方案沟通。</dd>
+            <dt>厌恶</dt><dd>手抄 Excel、被 PM 质疑需求不全、反复找客户确认基础信息。</dd>
+            <dt>成功判定</dt><dd>交接给实施/PM 的评估包不被打回来问"怎么没问客户"。</dd>
+          </dl>
+        </div>
+
+        <div class="persona impl">
+          <div class="head">
+            <div><div class="name">林悦填 · 实施顾问</div><div class="evidence">样本：业财项目交付部</div></div>
+            <span class="role">IMPL</span>
+          </div>
+          <dl>
+            <dt>背景</dt><dd>懂 ERP 模块实施细节，承担<strong>第一轮人天评估</strong>，拉开发顾问进来评估开发项。</dd>
+            <dt>核心诉求</dt><dd>基于需求包和行业模板给出有依据的人天；发现特殊场景并追加工作量。</dd>
+            <dt>典型动作</dt><dd>评估模板 + 填人天 + 加系数 + 问开发、运维；在群里回答 PM 追问的技术细节。</dd>
+            <dt>厌恶</dt><dd>需求飘忽反复改、PM 压人天压得离谱、交付时发现漏评工作量。</dd>
+            <dt>成功判定</dt><dd>初评经得起 PM 的反问、自己不承担压缩后的超额风险。</dd>
+          </dl>
+        </div>
+
+        <div class="persona pm">
+          <div class="head">
+            <div><div class="name">李加柱 · PM（接力者）</div><div class="evidence">样本：业财解决方案与项目经理部</div></div>
+            <span class="role">PM</span>
+          </div>
+          <dl>
+            <dt>背景</dt><dd>在商机推进到<strong>接近签约</strong>时被拉入，从实施顾问手中接过初评，整合、压缩、封装。</dd>
+            <dt>核心诉求</dt><dd>接棒时看到全部前序轨迹（需求包、证据、初评、假设）；整合后输出合规交付物。</dd>
+            <dt>典型动作</dt><dd>接力 → 调人天 / 调系数 / 补风险 → 输出 3 大交付物（人天表 / 资源表 / 差异分析）+ Narrative → 过 PMO 审核。</dd>
+            <dt>厌恶</dt><dd>接手时拿不到完整背景、被迫二次调研；PMO 反复驳回补细节。</dd>
+            <dt>成功判定</dt><dd>交付物一次过 PMO 审核、数字经得起客户合同回溯。</dd>
+          </dl>
+        </div>
+
+        <div class="persona dev">
+          <div class="head">
+            <div><div class="name">林宏果 · 开发顾问</div><div class="evidence">样本：专门开发部门，无技术栈区分（均为 ERP 二次开发）</div></div>
+            <span class="role">DEV</span>
+          </div>
+          <dl>
+            <dt>背景</dt><dd>固定在开发部门，按项目被临时邀请入群，只对分配给自己的开发条目做评估。</dd>
+            <dt>核心诉求</dt><dd>清楚拿到要评估的开发点 + 客户实际业务场景；不被拉去做"全方案评估"。</dd>
+            <dt>典型动作</dt><dd>在群里被 @ → 看需求 / 截图 → 给开发人天 → 偶尔参与合同形式讨论。</dd>
+            <dt>厌恶</dt><dd>"帮忙评估一下" 没上下文、私有云部署时没人说要评估部署运维。</dd>
+            <dt>成功判定</dt><dd>开发评估独立、可被合并进总评估、可单签合同时能独立交付。</dd>
+          </dl>
+        </div>
+
+        <div class="persona pmo">
+          <div class="head">
+            <div><div class="name">魏春芳 · PMO（质量门）</div><div class="evidence">样本：项目管理部</div></div>
+            <span class="role">PMO</span>
+          </div>
+          <dl>
+            <dt>背景</dt><dd>公司级质量门，不做评估但审核评估包；签约前的最后一道关。</dd>
+            <dt>核心诉求</dt><dd>交付物齐全（资源表、差异分析表、方法论七阶段都要）、信息准确（项目经理是谁、开发工程师选择有无误）。</dd>
+            <dt>典型动作</dt><dd>检查交付物清单 → 驳回 / 通过 → 通过后销售可发起合同流程。</dd>
+            <dt>厌恶</dt><dd>PM 提交的包残缺不全、方法论阶段没还原。</dd>
+            <dt>成功判定</dt><dd>进入合同流程的评估包 100% 符合标准。</dd>
+          </dl>
+        </div>
+
+        <div class="persona admin">
+          <div class="head">
+            <div><div class="name">郑工 · 总部产品 / 管理员</div><div class="evidence">维护规则、模板、RateCard、方法论</div></div>
+            <span class="role">ADMIN</span>
+          </div>
+          <dl>
+            <dt>背景</dt><dd>总部负责评估规则、模板、RateCard 的产品经理，对业务最懂但不写代码。</dd>
+            <dt>核心诉求</dt><dd>新增行业/模块/系数时不等发版、自己能改；灰度发布、命中追溯。</dd>
+            <dt>典型动作</dt><dd>改 DSL 规则 → 灰度到事业部 → 观察命中 → 全量。</dd>
+            <dt>厌恶</dt><dd>规则埋在代码里要提工单、不知道改了影响谁。</dd>
+            <dt>成功判定</dt><dd>规则变更从"提工单 + 等一周" → "改 DSL + 30 分钟生效"。</dd>
+          </dl>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============ 4. BUSINESS FLOW ============ -->
+    <section id="business-flow">
+      <h2><span class="n">04</span>业务流程图（主）</h2>
+      <p>按商机全生命周期组织，8 个阶段，跨 6 条泳道。阶段 5（精算定版）内部是责任接力，详见下节。</p>
+
+      <div class="mermaid">
+flowchart LR
+    Start([阶段 0<br/>客户接触]):::trigger
+
+    subgraph S [销售]
+      direction TB
+      A1["阶段 1<br/>快速报价 Skill"]:::skill
+      A2["阶段 4<br/>变更描述 Skill"]:::skill
+      A7["阶段 7<br/>发起合同流程"]:::skill
+    end
+
+    subgraph P [售前 / 实施]
+      direction TB
+      B1["阶段 2<br/>需求审查 Agent<br/>（售前）"]:::agent
+      B2["阶段 3<br/>初估交接包<br/>（售前封装）"]:::agent
+    end
+
+    subgraph M [PM / PMO 工作台]
+      direction TB
+      C1["阶段 5<br/>接力精算<br/>（见下节细分）"]:::ui
+      C2["阶段 6<br/>PMO 质量门"]:::pmo
+      C3["封版基线<br/>Sealed"]:::seal
+    end
+
+    EX[("合同流程<br/>系统（下游）")]:::ext
+    K[("历史项目<br/>知识库")]:::data
+
+    Start --> A1
+    A1 -- 商机档案 v0 --> B1
+    B1 --> B2
+    B2 -- 首次提报 --> C1
+    A2 -- 变更提报 --> C1
+    C1 --> C2
+    C2 -- 驳回 --> C1
+    C2 -- 通过 --> C3
+    C3 --> A7
+    A7 -- 封版基线 --> EX
+    C3 -. 归档 .-> K
+    K -. 相似度检索 .-> A1
+    K -. 相似度检索 .-> B1
+    K -. 风险标签 .-> B2
+
+    classDef trigger fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef skill fill:#dbeafe,stroke:#1e40af,color:#1e3a8a
+    classDef agent fill:#ede9fe,stroke:#5b21b6,color:#4c1d95
+    classDef ui fill:#dcfce7,stroke:#14532d,color:#064e3b
+    classDef pmo fill:#fecaca,stroke:#7f1d1d,color:#7f1d1d
+    classDef seal fill:#fde68a,stroke:#b45309,color:#78350f
+    classDef data fill:#e0e7ff,stroke:#3730a3,color:#312e81
+    classDef ext fill:#f3f4f6,stroke:#4b5563,color:#1f2937
+      </div>
+      <div class="diagram-caption">图 4.1 · 商机全生命周期 8 阶段主流程</div>
+
+      <h3>阶段说明</h3>
+      <table>
+        <thead>
+          <tr><th>阶段</th><th>主导角色</th><th>关键动作</th><th>产出</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="phase">0 · 触发</td><td>销售</td><td>客户首次接触，拿到零散信息</td><td>非结构化客户描述</td></tr>
+          <tr><td class="phase">1 · 销售快报</td><td>销售</td><td>对话描述客户，AI 追问 + 给区间 + 分期</td><td><strong>商机档案 v0</strong></td></tr>
+          <tr><td class="phase">2 · 售前深析</td><td>售前顾问</td><td>扔原始物料，AI 抽取 + 完备性检查 + 问询</td><td><strong>需求包 v1 + SOW</strong></td></tr>
+          <tr><td class="phase">3 · 初估交接</td><td>售前顾问</td><td>Agent 生成初估 + 置信度 + 假设</td><td><strong>初估交接包</strong></td></tr>
+          <tr><td class="phase">4 · 谈判迭代</td><td>销售</td><td>客户变更 → Skill 差分重算 → 重新提报</td><td><strong>变更提报</strong></td></tr>
+          <tr><td class="phase">5 · 接力精算</td><td>实施顾问 → PM</td><td>详见下节（4 子阶段接力）</td><td><strong>评估版本 + 4 大交付物 + Narrative</strong></td></tr>
+          <tr><td class="phase">6 · PMO 审核</td><td>PMO</td><td>审核交付物齐全性、方法论映射</td><td>通过 / 驳回</td></tr>
+          <tr><td class="phase">7 · 合同流程</td><td>销售</td><td>封版基线推送到下游合同系统</td><td><strong>封版基线</strong></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ============ 5. HANDOFF FLOW ============ -->
+    <section id="handoff-flow">
+      <h2><span class="n">05</span>接力子流程（阶段 5 细分）</h2>
+      <p><strong>这是本次重构最关键的新增部分</strong>。实际工作流并非"PM 一个人精算"，而是 <em>实施顾问初评 → 迭代 → PM 接手 → PMO 审核</em> 的 4 步接力。</p>
+
+      <div class="mermaid">
+flowchart LR
+    In[初估交接包<br/>首次提报]:::in
+
+    subgraph H5a [5a · 实施顾问初评]
+      direction TB
+      I1["林悦填接手<br/>首评 486 人天"]:::impl
+      I2["群里反问<br/>'一期上什么模块'"]:::impl
+      I3["追加工作量<br/>'物料清洗 +20'"]:::impl
+    end
+
+    subgraph H5b [5b · 售前销售迭代]
+      direction TB
+      P1["审出数据错<br/>'交通费合计有误'"]:::sales
+      P2["SOW 追加描述<br/>驱动评估再审"]:::presales
+    end
+
+    subgraph H5c [5c · PM 接手整合]
+      direction TB
+      M1["李加柱入群<br/>签约前接手"]:::pm
+      M2["整合压缩<br/>289 人天 / ¥61 万"]:::pm
+      M3["输出 4 大交付物<br/>+ Narrative 五段式"]:::pm
+    end
+
+    subgraph H5d [5d · PMO 审核]
+      direction TB
+      Q1["魏春芳检查<br/>交付物齐全？"]:::pmo
+      Q2["驳回补细节<br/>'资源表、差异分析表呢？'"]:::pmo
+      Q3["通过 → 封版"]:::pmo
+    end
+
+    Out[封版基线<br/>Sealed Baseline]:::out
+
+    In --> H5a
+    H5a --> H5b
+    H5b --> H5c
+    H5c --> H5d
+    H5d -- 驳回 --> H5c
+    H5d -- 通过 --> Out
+
+    classDef in fill:#e0e7ff,stroke:#3730a3,color:#312e81
+    classDef impl fill:#cffafe,stroke:#155e75,color:#164e63
+    classDef sales fill:#dbeafe,stroke:#1e40af,color:#1e3a8a
+    classDef presales fill:#ede9fe,stroke:#5b21b6,color:#4c1d95
+    classDef pm fill:#dcfce7,stroke:#14532d,color:#064e3b
+    classDef pmo fill:#fecaca,stroke:#7f1d1d,color:#7f1d1d
+    classDef out fill:#fde68a,stroke:#b45309,color:#78350f
+      </div>
+      <div class="diagram-caption">图 5.1 · 接力子流程：从初估到封版的 4 步</div>
+
+      <h3>接力事件的关键语义</h3>
+      <ul>
+        <li><strong>接力是显式事件</strong>：从 5a → 5c 不是"PM 自己打开看看"，是"实施顾问点'交接给 PM'"按钮，产生一条 <code>AssessmentHandoff</code> 记录。</li>
+        <li><strong>接手方看到全部前序轨迹</strong>：PM 接手时，需求包 / 证据 / 初评 / 假设 / 历次变更 / 售前问询应答 全部可见。</li>
+        <li><strong>决策权显式传递</strong>：接手后实施顾问仍可 review 并提意见，但 PM 拥有修改权；冲突时以 PM 决策为准（见 TBD-5）。</li>
+        <li><strong>每次修正都区分语义</strong>：5b 的"交通费合计有误"是 Correction，5b 的"SOW 追加 → 加 20 人天"是 Revision，UI 和审计完全不同。</li>
+      </ul>
+    </section>
+
+    <!-- ============ 6. SYSTEM ARCH ============ -->
+    <section id="system-arch">
+      <h2><span class="n">06</span>系统架构图</h2>
+
+      <div class="mermaid">
+flowchart TB
+    subgraph L1 ["交互层 · Interaction"]
+      direction LR
+      U1["销售<br/>快速报价 Skill"]:::skill
+      U2["售前<br/>需求审查 Agent"]:::agent
+      U3["PM<br/>工作台 Web"]:::ui
+      U4["PMO<br/>审核台 Web"]:::pmo
+      U5["开发顾问<br/>开发评估 Agent"]:::agent
+    end
+
+    GW["API Gateway<br/>鉴权 · RLS · 审计 · 幂等 · 限流"]:::api
+
+    subgraph L3 ["领域服务层 · Domain"]
+      direction TB
+      subgraph D_core ["核心业务"]
+        D1[商机档案]:::dom
+        D2[需求包]:::dom
+        D3[SOW]:::new
+        D4[初估包]:::dom
+        D5[变更提报]:::dom
+        D6[评估版本]:::dom
+        D7[开发评估]:::new
+      end
+      subgraph D_out ["交付侧"]
+        D8[接力事件]:::new
+        D9[交付物服务<br/>人天/资源/差异/WBS]:::new
+        D10[Narrative 模板]:::new
+        D11[PMO 质量门]:::new
+        D12[封版基线]:::new
+      end
+      subgraph D_support ["支撑"]
+        D13[RateCard]:::new
+        D14[方法论七阶段]:::new
+        D15[协同工作区]:::new
+        D16[知识库]:::dom
+      end
+    end
+
+    subgraph L4 ["规则引擎层 · DSL 驱动"]
+      direction LR
+      R1["计算引擎<br/>人天 / 成本 / 系数"]:::rule
+      R2["完备性引擎<br/>依赖 / 缺口 / 质询"]:::rule
+    end
+
+    subgraph LAI ["AI 能力层 · Kimi"]
+      direction LR
+      AI1[抽取<br/>证据链]:::ai
+      AI2[追问<br/>问询生成]:::ai
+      AI3[置信度<br/>风险打分]:::ai
+      AI4[相似度<br/>历史检索]:::ai
+      AI5[差分<br/>影响分析]:::ai
+    end
+
+    subgraph L5 ["持久化层"]
+      direction LR
+      DB[("Postgres")]:::db
+      FS[("对象存储")]:::db
+    end
+
+    EXT["合同流程系统<br/>（下游）"]:::ext
+
+    U1 --> GW
+    U2 --> GW
+    U3 --> GW
+    U4 --> GW
+    U5 --> GW
+    GW --> L3
+    L3 --> L4
+    L3 --> LAI
+    L3 --> L5
+    D12 --> EXT
+
+    classDef skill fill:#dbeafe,stroke:#1e40af,color:#1e3a8a
+    classDef agent fill:#ede9fe,stroke:#5b21b6,color:#4c1d95
+    classDef ui fill:#dcfce7,stroke:#14532d,color:#064e3b
+    classDef pmo fill:#fecaca,stroke:#7f1d1d,color:#7f1d1d
+    classDef api fill:#fde68a,stroke:#b45309,color:#78350f
+    classDef dom fill:#e0f2fe,stroke:#0369a1,color:#0c4a6e
+    classDef new fill:#fef2f2,stroke:#991b1b,color:#7f1d1d,stroke-width:2px
+    classDef rule fill:#fce7f3,stroke:#be185d,color:#831843
+    classDef ai fill:#fef3c7,stroke:#b45309,color:#78350f
+    classDef db fill:#f1f5f9,stroke:#334155,color:#0f172a
+    classDef ext fill:#f3f4f6,stroke:#4b5563,color:#1f2937
+      </div>
+      <div class="diagram-caption">图 6.1 · 系统分层架构（红框为 v2 新增领域服务）</div>
+
+      <div class="callout good">
+        <strong>架构分层要点</strong>　3 种前端（Skill / Agent / Web）统一走 API Gateway。PMO 工作台和 PM 工作台都是 Web UI，但权限/视图不同。封版基线向下游合同流程系统推送时，是单向事件而非双向集成。
+      </div>
+    </section>
+
+    <!-- ============ 7. OVERLAY ============ -->
+    <section id="overlay">
+      <h2><span class="n">07</span>业务 × 系统切入点</h2>
+      <p>把业务流程每一步和系统模块、AI 能力、规则引擎、数据产物逐一对齐。</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>阶段</th>
+            <th>角色</th>
+            <th>前端</th>
+            <th>AI 能力</th>
+            <th>规则引擎</th>
+            <th>产出实体</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="phase">0 触发</td><td>销售</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          <tr>
+            <td class="phase">1 快报</td>
+            <td>销售</td>
+            <td><span class="tag tag-skill">Skill</span></td>
+            <td><span class="tag tag-ai">抽取</span><span class="tag tag-ai">追问</span><span class="tag tag-ai">相似度</span></td>
+            <td><span class="tag tag-rule">计算·轻量</span></td>
+            <td><span class="tag tag-data">商机档案 v0</span></td>
+          </tr>
+          <tr>
+            <td class="phase">2 深析</td>
+            <td>售前</td>
+            <td><span class="tag tag-agent">Agent</span></td>
+            <td><span class="tag tag-ai">抽取</span><span class="tag tag-ai">证据链</span><span class="tag tag-ai">问询</span></td>
+            <td><span class="tag tag-rule">完备性</span></td>
+            <td><span class="tag tag-data">需求包</span><span class="tag tag-data">SOW</span></td>
+          </tr>
+          <tr>
+            <td class="phase">3 交接</td>
+            <td>售前</td>
+            <td><span class="tag tag-agent">Agent</span></td>
+            <td><span class="tag tag-ai">置信度</span><span class="tag tag-ai">风险</span></td>
+            <td><span class="tag tag-rule">计算</span>+<span class="tag tag-rule">完备性</span></td>
+            <td><span class="tag tag-data">初估包</span></td>
+          </tr>
+          <tr>
+            <td class="phase">4 谈判</td>
+            <td>销售</td>
+            <td><span class="tag tag-skill">Skill</span></td>
+            <td><span class="tag tag-ai">差分</span></td>
+            <td><span class="tag tag-rule">计算·增量</span></td>
+            <td><span class="tag tag-data">变更提报</span></td>
+          </tr>
+          <tr>
+            <td class="phase">5a 初评</td>
+            <td>实施顾问</td>
+            <td><span class="tag tag-agent">Agent</span>+<span class="tag tag-ui">Web</span></td>
+            <td><span class="tag tag-ai">建议值</span></td>
+            <td><span class="tag tag-rule">计算·精确</span></td>
+            <td><span class="tag tag-data">初评版本</span></td>
+          </tr>
+          <tr>
+            <td class="phase">5b 迭代</td>
+            <td>售前+销售</td>
+            <td><span class="tag tag-skill">Skill</span>/<span class="tag tag-agent">Agent</span></td>
+            <td><span class="tag tag-ai">差分</span></td>
+            <td><span class="tag tag-rule">完备性</span></td>
+            <td><span class="tag tag-data">Correction</span>/<span class="tag tag-data">Revision</span></td>
+          </tr>
+          <tr>
+            <td class="phase">5c PM 接手</td>
+            <td>PM</td>
+            <td><span class="tag tag-ui">Web</span></td>
+            <td><span class="tag tag-ai">辅助校对</span><span class="tag tag-ai">版本 diff</span></td>
+            <td><span class="tag tag-rule">计算·最终</span></td>
+            <td><span class="tag tag-data">接力事件</span><span class="tag tag-data">4 大交付物</span><span class="tag tag-data">Narrative</span></td>
+          </tr>
+          <tr>
+            <td class="phase">5d / 6 审核</td>
+            <td>PMO</td>
+            <td><span class="tag tag-ui">Web</span></td>
+            <td>—</td>
+            <td>—</td>
+            <td><span class="tag tag-data">PMO 审核记录</span></td>
+          </tr>
+          <tr>
+            <td class="phase">7 合同</td>
+            <td>销售</td>
+            <td><span class="tag tag-ui">Web</span></td>
+            <td>—</td>
+            <td>—</td>
+            <td><span class="tag tag-data">封版基线</span> → 下游合同系统</td>
+          </tr>
+          <tr><td class="phase">8 归档</td><td>PM</td><td><span class="tag tag-ui">Web</span></td><td><span class="tag tag-ai">相似度库更新</span></td><td>—</td><td><span class="tag tag-data">历史样本</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout good">
+        <strong>AI 与规则引擎的密度分布</strong>　阶段 1-5b 是 AI 高密度调用区；5c-6 是规则 + 人工审核主战场；7-8 是系统集成与数据回流。
+      </div>
+    </section>
+
+    <!-- ============ 8. ENTITIES ============ -->
+    <section id="entities">
+      <h2><span class="n">08</span>核心领域实体</h2>
+      <p>以下实体构成系统的结构化骨架。<span class="tag tag-new">NEW</span> 为 v2 相对 v1 新增。</p>
+
+      <div class="entity">
+        <div class="name">OpportunityBrief <span class="cn">商机档案 v0</span></div>
+        <div class="fields">customerProfile / vagueRequirements / priceRange / phaseProposal / parentProjectId?（老客户继承·可选）</div>
+        <div class="note">销售 owns；老客户场景下 parentProjectId 指向历史项目作为起点，但<strong>不假设一定有历史数据</strong>。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">RequirementPack <span class="cn">需求包 v1</span></div>
+        <div class="fields">structuredRequirements / industry / scale / modules / constraints</div>
+        <div class="note">售前顾问 owns；不可变版本。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">Evidence <span class="cn">证据引用</span></div>
+        <div class="fields">fieldPath / sourceDocName / excerptText / extractedAt / modelVersion</div>
+        <div class="note">只存抽取结论 + 段落摘录文本，<strong>不存原文件</strong>（P-4）。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">SOWDocument <span class="cn">客户可见范围承诺</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">cloudProduct → module → category → description / customizationScope / version</div>
+        <div class="note">SOW 条目与评估条目双向映射；SOW 变更自动触发评估影响分析。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">InitialEstimate <span class="cn">初估交接包</span></div>
+        <div class="fields">effortEstimate / riskTags / assumptions / confidenceScore × 4 dimensions / phaseProposal</div>
+        <div class="note">售前 owns，实施顾问 review。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">ChangeSubmission <span class="cn">变更提报</span></div>
+        <div class="fields">changeDescription / diffResult / newEstimate / submittedAt / submittedBy</div>
+        <div class="note">只追加不合并，Skill 和 Web 不做实时同步（见 D-4）。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">AssessmentVersion <span class="cn">评估版本 IA/DV/RS</span></div>
+        <div class="fields">revisionType: Correction | Revision / linkedSOW / linkedNarrative / ownerRole / deliveryMode: PublicCloud | PrivateCloud</div>
+        <div class="note">保留 v1 版本号机制；<strong>Correction vs Revision 二元语义</strong>（D-12）。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">AssessmentHandoff <span class="cn">接力事件</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">fromRole / toRole / timestamp / initiatedBy / acceptedBy / fromVersion / toVersion / contextSnapshot</div>
+        <div class="note">显式接力事件（P-2），从实施顾问 → PM 的权责转移节点。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">AssessmentNarrative <span class="cn">评估说明</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">① orgAndModules / ② dataGovernance / ③ specialScenarios / ④ acceptanceScope / ⑤ timelineAndCost</div>
+        <div class="note">五段式结构化模板（从李加柱样本反推）；系统生成而非打字。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">Deliverable <span class="cn">交付物</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">type: EffortTable | ResourceEffortCost | VarianceAnalysis | WBS / derivedFromVersion</div>
+        <div class="note">4 种标准交付物，均由同一 AssessmentVersion 派生，变更时联动重算。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">BusinessGapAnalysis <span class="cn">业务需求与差异分析表</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">ownedBy: PRE_SALES / businessNeeds[] / systemCoverage[] / gaps[]</div>
+        <div class="note">售前交付的<strong>质性 gap 文档</strong>，记录"客户业务 vs 系统能力匹配度"；<strong>独立交付物</strong>，不进 PM 4 件套，与评估数字无定量钩挂（TBD-4 路径 B 裁决）。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">VarianceAnalysis <span class="cn">差异分析表（数字）</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">ownedBy: PM / baseline: InitialEstimate | BidBaseline | HistoricalAvg | CustomerBudget</div>
+        <div class="note">PM 侧数字差异表，<strong>4 选项 baseline 保留</strong>；属 <code>Deliverable</code> 4 件套之一（TBD-4 路径 B 裁决，P0 不做）。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">DevAssessment <span class="cn">开发评估</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">devItems[] / effortEstimate / contractMode: embedded | separate / ownedBy: devConsultant</div>
+        <div class="note">开发顾问独立评估；合同模式决策可能后于客户报价（内部分账 vs 单签）。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">QualityGateReview <span class="cn">PMO 审核记录</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">reviewer / checklist: {deliverables, methodology, rateCard, ...} / verdict: Pass | Reject / rejectionReasons[]</div>
+        <div class="note">PMO 驳回的理由结构化记录，可用于后续优化 PM 接力模板。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">SealedBaseline <span class="cn">封版基线</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">sealedAt / sealedBy / allArtifactsSnapshot / contractFlowId</div>
+        <div class="note">成交触发；后续变更强制走新评估版本或变更单；推送至下游合同系统。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">RateCard <span class="cn">顾问成本表</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">level: 职级 → unitPrice: 人天单价（一维）</div>
+        <div class="note">仅按<strong>职级</strong>一个维度分档（TBD-6 裁决）；无地区 / 员工性质 / 级别多维；具体职级单价表由 user 后续提供。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">TravelCost <span class="cn">差旅成本</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">consultantBaseCity / projectCity / estimatedCost / appliesWhen: base ≠ project</div>
+        <div class="note">顾问 BASE 地 ≠ 项目地时独立评估；<strong>独立于 RateCard</strong>，不进单价表维度（TBD-6 裁决）。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">ProjectMethodology <span class="cn">方法论七阶段</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">phases: ① 启动 → ② 需求 → ③ 方案（蓝图）→ ④ 构建 → ⑤ 测试（UAT）→ ⑥ 上线 → ⑦ 验收 / deliverablesPerPhase / requiredByPMO</div>
+        <div class="note">七阶段已最终确认（TBD-1 裁决），补齐的是 <strong>⑥ 上线</strong>；PMO 审核 checklist 以此 7 段为基线。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">CollabWorkspace <span class="cn">评估协同工作区</span> <span class="tag tag-new">NEW</span></div>
+        <div class="fields">members[] / questionThreads[] / decisionsLog[]</div>
+        <div class="note">承载"拉群 → 问答 → 决策"的结构化版本，把群聊沉淀到系统。外部 IM 可并存。</div>
+      </div>
+
+      <div class="entity">
+        <div class="name">HistoryProject <span class="cn">历史项目</span></div>
+        <div class="fields">industry / scale / estimateVsActual / delayReason / contractValue</div>
+        <div class="note">项目结案后回流；支持相似度检索。</div>
+      </div>
+    </section>
+
+    <!-- ============ 9. DSL ============ -->
+    <section id="dsl">
+      <h2><span class="n">09</span>DSL 与规则引擎</h2>
+
+      <h3>DSL = Domain-Specific Language（领域特定语言）</h3>
+      <p>专为评估规则设计的简洁描述语法，让总部产品直接编辑、不经开发发版。</p>
+
+      <div class="grid-2">
+        <div class="card">
+          <h4>没有 DSL 的现状</h4>
+          <p style="color:#6b7280; font-size:13px;">规则埋在 TypeScript 里，改一条系数要走发版流程——周期 3-7 天。</p>
+        </div>
+        <div class="card">
+          <h4>有 DSL 之后</h4>
+          <p style="color:#6b7280; font-size:13px;">后台改 DSL → 历史样本回归测试 → 灰度到某组织 → 观察 → 全量——周期 30 分钟。</p>
+        </div>
+      </div>
+
+      <h3>DSL 示例一 · 完备性规则</h3>
+      <pre><code><span class="c"># 勾了生产，必须同时勾 BOM 主数据和库存基础档案</span>
+<span class="k">rule</span> <span class="s">"生产模块基础数据完备性"</span>
+  <span class="k">when</span>  <span class="v">勾选</span>(生产)
+  <span class="k">require</span>  <span class="v">勾选</span>(BOM主数据) <span class="k">and</span> <span class="v">勾选</span>(库存基础档案)
+  <span class="k">severity</span>  high
+  <span class="k">message</span>  <span class="s">"勾了生产但缺 BOM 主数据源或库存基础档案"</span>
+</code></pre>
+
+      <h3>DSL 示例二 · 计算规则</h3>
+      <pre><code><span class="c"># 多组织推广：每多一个组织，实施人天 +15%</span>
+<span class="k">rule</span> <span class="s">"多组织推广系数"</span>
+  <span class="k">when</span>  <span class="v">组织数</span> &gt; 1
+  <span class="k">apply</span>  <span class="v">实施人天</span> *= (1 + 0.15 * (<span class="v">组织数</span> - 1))
+
+<span class="c"># 利民样本反推：HK 组织的 HKFRS 报表追加</span>
+<span class="k">rule</span> <span class="s">"HK 国际会计准则报表"</span>
+  <span class="k">when</span>  <span class="v">组织位置</span> == <span class="s">"HK"</span> <span class="k">and</span> <span class="v">勾选</span>(财务报表)
+  <span class="k">apply</span>  <span class="v">实施人天</span> += 20 * <span class="v">HK组织数</span>
+  <span class="k">explain</span>  <span class="s">"HK 组织需按 BS & P&L 输出 HKFRS 报表，每个 +20 人天"</span>
+</code></pre>
+
+      <h3>DSL 示例三 · 覆盖理由作为规则进化数据源</h3>
+      <p>P-1 要求所有 AI 建议字段的人类覆盖<strong>强制填写理由</strong>。理由结构化后成为规则优化的反馈：</p>
+      <pre><code><span class="c"># 系统自动分析：过去 90 天，"医药难度系数" 从 0.2 被覆盖为 0.3 的次数 = 12</span>
+<span class="c"># 覆盖理由聚类：「GMP 验证复杂度高」(8) / 「批号追溯多层级」(4)</span>
+<span class="c"># → 管理后台自动提示：</span>
+<span class="c">#   规则 "医药行业难度系数" 建议从 0.2 调整为 0.3</span>
+<span class="c">#   支持证据：12 次 PM 覆盖，理由聚类 2 大类</span>
+</code></pre>
+
+      <h3>双引擎的必要性</h3>
+      <table>
+        <thead><tr><th>维度</th><th>计算规则引擎</th><th>完备性规则引擎</th></tr></thead>
+        <tbody>
+          <tr><td>目的</td><td>算出一个数</td><td>找出缺什么</td></tr>
+          <tr><td>输出</td><td>人天 / 成本 / 周期</td><td>问询清单 / 警告</td></tr>
+          <tr><td>触发时机</td><td>所有阶段</td><td>阶段 2-3</td></tr>
+          <tr><td>演化节奏</td><td>跟随产品版本</td><td>漏过一次就加一条（经验驱动）</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ============ 10. USER STORIES ============ -->
+    <section id="stories">
+      <h2><span class="n">10</span>用户故事</h2>
+      <p>共 30 条，其中 <span class="tag tag-new">NEW</span> 为 v2 新增。</p>
+
+      <div class="story-group">
+        <div class="glabel">销售 · 张锐 / 黄金艳</div>
+        <div class="story"><span class="id">US-1</span><span class="text">作为销售，我想把客户电话零散需求直接丢给 AI，<em>30 秒内</em>拿到区间报价，以便不错过谈话窗口。</span></div>
+        <div class="story"><span class="id">US-2</span><span class="text">作为销售，我想让 AI 把报价<em>分期分讲</em>，以便客户更容易接受初期预算。</span></div>
+        <div class="story"><span class="id">US-3</span><span class="text">作为销售，客户变卦时口述"砍模块、加分公司"，让 AI 重算，不回公司等售前。</span></div>
+        <div class="story new"><span class="id">US-19</span><span class="text">作为<em>客户成功销售</em>，做老客户二期时我想<em>从一期实施记录继承起点</em>（如果有的话），只问增量部分。</span></div>
+        <div class="story new"><span class="id">US-20</span><span class="text">作为销售，评估封版后我想<em>一键发起合同流程</em>，把封版基线推送到下游合同系统。</span></div>
+      </div>
+
+      <div class="story-group">
+        <div class="glabel">售前 · 郭俊贤</div>
+        <div class="story"><span class="id">US-5</span><span class="text">作为售前，我想把 RFP + 纪要 + 微信截图一把扔给 AI，它抽出结构化需求并<em>给出证据</em>。</span></div>
+        <div class="story"><span class="id">US-6</span><span class="text">作为售前，漏了行业必问项时 AI <em>主动提醒</em>，不被 PM 返工。</span></div>
+        <div class="story"><span class="id">US-7</span><span class="text">作为售前，Agent 里审完直接生成发给 PM 的"初估包"。</span></div>
+        <div class="story"><span class="id">US-8</span><span class="text">作为售前，每个字段看到<em>置信度来源</em>（AI 抽取 / 已确认 / 未知），优先处理不确定的地方。</span></div>
+        <div class="story new"><span class="id">US-21</span><span class="text">作为售前，<em>SOW 追加一句话</em>后系统立即告警"原评估未覆盖，预估追加 X 人天"，不用我手动比对。</span></div>
+      </div>
+
+      <div class="story-group">
+        <div class="glabel">实施顾问 · 林悦填</div>
+        <div class="story new"><span class="id">US-22</span><span class="text">作为实施顾问，做第一轮评估时我想<em>看到 AI 建议值和历史 P50/P90</em>，但最终数字我填、理由我写。</span></div>
+        <div class="story new"><span class="id">US-23</span><span class="text">作为实施顾问，我想<em>一键拉开发顾问入群</em>并分配待评估的开发条目，不用截图来回传。</span></div>
+        <div class="story new"><span class="id">US-24</span><span class="text">作为实施顾问，我要<em>交接给 PM</em> 时，系统把我的思路、假设、历次变更打包成"接力上下文"，PM 看得懂。</span></div>
+      </div>
+
+      <div class="story-group">
+        <div class="glabel">PM · 李加柱</div>
+        <div class="story"><span class="id">US-10</span><span class="text">作为 PM，打开交接包时先看<em>置信度评分和假设清单</em>，决定重审深度。</span></div>
+        <div class="story"><span class="id">US-11</span><span class="text">作为 PM，看销售变更提报<em>相对上一版改了什么</em>（字段级 diff）。</span></div>
+        <div class="story"><span class="id">US-13</span><span class="text">作为 PM，一键导出<em>不同版本对比</em>（Excel/PDF）用于客户谈判。</span></div>
+        <div class="story new"><span class="id">US-25</span><span class="text">作为 PM，接力后我想<em>一键生成 4 大交付物</em>（人天表 / 资源表 / 差异分析 / WBS）+ 五段式 Narrative，而不是手打 Excel。</span></div>
+        <div class="story new"><span class="id">US-26</span><span class="text">作为 PM，我调了某项人天时系统告诉我<em>该调整触发了哪些规则、是否偏离历史样本 P80</em>。</span></div>
+        <div class="story new"><span class="id">US-27</span><span class="text">作为 PM，PMO 驳回后我看到<em>驳回理由逐条对应到要补哪个字段</em>，不用猜。</span></div>
+      </div>
+
+      <div class="story-group">
+        <div class="glabel">开发顾问 · 林宏果</div>
+        <div class="story new"><span class="id">US-28</span><span class="text">作为开发顾问，我被拉进项目时看到<em>待我评估的开发条目 + 需求上下文 + 已有证据</em>，不是一句"帮忙评估一下"。</span></div>
+        <div class="story new"><span class="id">US-29</span><span class="text">作为开发顾问，<em>私有云部署场景下</em>系统主动提醒"需追加部署运维人天评估"。</span></div>
+      </div>
+
+      <div class="story-group">
+        <div class="glabel">PMO · 魏春芳</div>
+        <div class="story new"><span class="id">US-30</span><span class="text">作为 PMO，打开评估包时自动检查<em>4 大交付物齐全、方法论七阶段还原、RateCard 应用正确</em>，缺什么高亮标出。</span></div>
+        <div class="story new"><span class="id">US-31</span><span class="text">作为 PMO，驳回时能<em>按字段逐条写驳回理由</em>，PM 接收时每条理由对应到要补的字段。</span></div>
+      </div>
+
+      <div class="story-group">
+        <div class="glabel">总部产品 · 郑工</div>
+        <div class="story"><span class="id">US-15</span><span class="text">作为管理员，用简单语法新增"勾了生产必须勾库存"的完备性规则，不等发版。</span></div>
+        <div class="story"><span class="id">US-16</span><span class="text">作为管理员，新规则先<em>灰度到某事业部</em>验证，再全量发布。</span></div>
+        <div class="story"><span class="id">US-17</span><span class="text">作为管理员，看每条规则的<em>命中历史和修正次数</em>。</span></div>
+        <div class="story new"><span class="id">US-32</span><span class="text">作为管理员，看到 PM 覆盖 AI 建议的<em>理由聚类</em>，系统主动提示"这条规则是否应该调整"。</span></div>
+        <div class="story new"><span class="id">US-33</span><span class="text">作为管理员，维护 RateCard 时仅按<em>职级 → 人天单价</em>一维分档；项目地 ≠ 顾问 BASE 地时在 <code>TravelCost</code> 内独立评估差旅（TBD-6 裁决后）。</span></div>
+      </div>
+    </section>
+
+    <!-- ============ 11. DECISIONS ============ -->
+    <section id="decisions">
+      <h2><span class="n">11</span>关键设计决策</h2>
+      <p>D-1 ~ D-6 来自 v1，D-7 ~ D-15 为 v2 新增。</p>
+
+      <div class="decision">
+        <h4><span class="idx">D-1</span>销售一等公民 · 商机档案 v0 独立落库</h4>
+        <div class="why">销售快报阶段也应可追溯、可复盘；不独立沉淀等于放弃销售资产。</div>
+        <div class="impact">新增 OpportunityBrief；支持 parentProjectId 老客户继承（可选）。</div>
+      </div>
+
+      <div class="decision">
+        <h4><span class="idx">D-2</span>原始文档不入库 · 只存抽取结论 + 证据片段</h4>
+        <div class="why">文档频繁修改，不希望系统变成文档管理器。</div>
+        <div class="impact">Evidence 存 { 文档名, 段落文本, 抽取时间 }，不存原文；隐私压力显著下降。</div>
+      </div>
+
+      <div class="decision">
+        <h4><span class="idx">D-3</span>两套规则引擎 · 均用 DSL</h4>
+        <div class="why">规则频繁演化，总部产品需直接维护。</div>
+        <div class="impact">需要 DSL 语法 + 解释器；规则独立版本化 + 灰度 + 命中追溯。</div>
+      </div>
+
+      <div class="decision">
+        <h4><span class="idx">D-4</span>Skill 与 Web UI 不实时同步 · 变更以"重新提报"送达</h4>
+        <div class="why">谈判变更频繁，实时合并冲突成本高。</div>
+        <div class="impact">每次变更形成独立 ChangeSubmission；PM 侧看到有序列表 + 字段级 diff。</div>
+      </div>
+
+      <div class="decision">
+        <h4><span class="idx">D-5</span>初估交接包打置信度标签</h4>
+        <div class="why">让"要审多深"可量化。</div>
+        <div class="impact">4 维度合成：证据覆盖率 + 问询完整度 + 历史相似度 + 规则通过率；字段级 + 整包级两层。</div>
+      </div>
+
+      <div class="decision">
+        <h4><span class="idx">D-6</span>AI 默认 Kimi · ModelProvider 抽象</h4>
+        <div class="why">成本、合规、本地化部署可行性。</div>
+        <div class="impact">ModelProvider 接口覆盖长文抽取、JSON 输出、追问对话；Claude 作为可选实现。</div>
+      </div>
+
+      <div class="decision new">
+        <h4><span class="idx">D-7</span>封版机制 · 成交后整体锁定 <span class="new-badge">NEW</span></h4>
+        <div class="why">评估作为实施基线和合同依据，封版后不可随意变更。</div>
+        <div class="impact">AssessmentVersion.sealed 状态；封版后变更强制走"新评估版本"或"变更单"；封版触发点接销售的"发起合同流程"动作。</div>
+      </div>
+
+      <div class="decision new">
+        <h4><span class="idx">D-8</span>评估协同工作区 · 沉淀群聊决策 <span class="new-badge">NEW</span></h4>
+        <div class="why">真实工作流依赖拉群讨论（样本：14 人群），关键决策不能沉在群里丢失。</div>
+        <div class="impact">CollabWorkspace 承载问询-回复结构化；外部 IM 可并存，但决策回归系统。质询-回复自动沉淀为证据链。</div>
+      </div>
+
+      <div class="decision new">
+        <h4><span class="idx">D-9</span>SOW 驱动评估 · 双向映射 <span class="new-badge">NEW</span></h4>
+        <div class="why">SOW 是客户可见承诺，比评估更正式；SOW 变更必须驱动评估再审。</div>
+        <div class="impact">SOWDocument 条目与 AssessmentVersion 条目双向映射；SOW 变更 → 系统自动 diff → 告警"原评估未覆盖 X"。</div>
+      </div>
+
+      <div class="decision new">
+        <h4><span class="idx">D-10</span>评估说明 Narrative 模板化 <span class="new-badge">NEW</span></h4>
+        <div class="why">李加柱那段 289 人天说明是高度结构化的五段式，应该生成而非手打。</div>
+        <div class="impact">AssessmentNarrative 五段式模板：组织模块 / 数据治理 / 特殊场景 / 验收范围 / 周期成本；系统根据评估版本自动生成初稿，PM 编辑确认。</div>
+      </div>
+
+      <div class="decision new">
+        <h4><span class="idx">D-11</span>开发评估独立 · 合同模式二选一 <span class="new-badge">NEW</span></h4>
+        <div class="why">开发评估由独立开发顾问完成；合同形式（embedded / separate）决策受对外已报价约束。</div>
+        <div class="impact">DevAssessment 独立实体；contractMode 字段显式决策；私有云场景自动提示"评估部署运维"。</div>
+      </div>
+
+      <div class="decision new">
+        <h4><span class="idx">D-12</span>Correction vs Revision 二元语义 <span class="new-badge">NEW</span></h4>
+        <div class="why">样本中 "交通费合计有误" 是 Correction，"SOW 追加 → 加 20 人天" 是 Revision，两者审计路径不同。</div>
+        <div class="impact">AssessmentVersion.revisionType 字段；UI 区分两种事件；Correction 不改评估基线，Revision 产生新版本号。</div>
+      </div>
+
+      <div class="decision new">
+        <h4><span class="idx">D-13</span>责任接力 · 显式事件 <span class="new-badge">NEW</span></h4>
+        <div class="why">评估 ownership 在实施顾问 → PM 之间传递（P-2），不是单人持有。</div>
+        <div class="impact">AssessmentHandoff 事件实体；接手方看到全部前序轨迹；决策权随 ownership 传递。</div>
+      </div>
+
+      <div class="decision new">
+        <h4><span class="idx">D-14</span>PMO 质量门 · 独立审核节点 <span class="new-badge">NEW</span></h4>
+        <div class="why">PMO（魏春芳）是签约前最后一道关，审查交付物齐全性和方法论合规。</div>
+        <div class="impact">QualityGateReview 实体；PMO 工作台 UI；驳回理由按字段结构化；PMO 通过才能发起合同流程。</div>
+      </div>
+
+      <div class="decision new">
+        <h4><span class="idx">D-15</span>交付模式分叉 · PublicCloud / PrivateCloud <span class="new-badge">NEW</span></h4>
+        <div class="why">样本："本次按旗舰版公有云评估，私有云需额外拉开发评估部署运维"。</div>
+        <div class="impact">AssessmentVersion.deliveryMode 字段；PrivateCloud 时自动触发开发顾问的"部署运维评估"子任务。</div>
+      </div>
+    </section>
+
+    <!-- ============ 12. ROADMAP ============ -->
+    <section id="roadmap">
+      <h2><span class="n">12</span>落地路线图</h2>
+      <p>按优先级排序，P0 为"必须先做"的基础，P3 为锦上添花。</p>
+
+      <h3>P0 · 基础能力（任一项缺失整体架构塌方）</h3>
+      <div class="roadmap-row"><div class="pri p0">P0-1</div><div class="roadmap-item"><strong>数据层升级</strong>　JSON 文件 → Postgres；补齐所有 v2 新实体（SOW / Narrative / Deliverable / Handoff / RateCard / QualityGate / SealedBaseline / DevAssessment / CollabWorkspace / Methodology）。</div></div>
+      <div class="roadmap-row"><div class="pri p0">P0-2</div><div class="roadmap-item"><strong>规则引擎（双引擎 + DSL）</strong>　语法设计 + 解释器 + 灰度 + 命中追溯；计算引擎重构，完备性引擎从零建。</div></div>
+      <div class="roadmap-row"><div class="pri p0">P0-3</div><div class="roadmap-item"><strong>Kimi Agent 基座</strong>　ModelProvider 抽象；长文抽取 + 证据链 + 置信度核心能力；覆盖理由存储链路。</div></div>
+
+      <!-- ============ P0 执行进度快照 · 2026-04-24 ============ -->
+      <div class="progress-panel">
+        <div class="head">
+          <div class="title">▎P0 执行进度 · 2026-04-24 快照</div>
+          <div class="summary">
+            完成度 <span class="pct">3 / 8</span>　·　本次 P0 ≈ v2 路线图 <strong>P0-1 / P0-3 首批 + P0-2 雏形</strong>（精确称 <strong>P0.1</strong>，保留 P0.2 做剩余）　·
+            详情见 <a href="重构执行计划-P0-2026-04-24.md" style="color:#2563eb;">执行台账</a>
+          </div>
+        </div>
+
+        <div class="task-row">
+          <div class="tid">T1</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>AI Provider 基座抽象层</strong>　<code>ModelProvider</code> 接口 + <code>KimiProvider</code> 实现 + 注册表。承接 v2 P0-3 "Kimi Agent 基座"。</div>
+          <div class="commit"><code>948451a</code></div>
+        </div>
+
+        <div class="task-row">
+          <div class="tid">T2</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>证据链契约</strong>　<code>Evidence</code> / <code>ExtractionResult</code> TS 类型 + JSON Schema draft-07。承接 v2 P-1 "AI Suggests, Human Decides" + P-4 "证据不入库只留结论"。</div>
+          <div class="commit"><code>93212a6</code></div>
+        </div>
+
+        <div class="task-row">
+          <div class="tid">DB</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>Postgres + Drizzle 基座</strong>　<code>workload_eval</code> + <code>workload_eval_test</code> 双库；<code>evidences</code> 表上线。承接 v2 P0-1 "数据层升级"首批。</div>
+          <div class="commit"><code>e50281c</code></div>
+        </div>
+
+        <div class="task-row">
+          <div class="tid">T3</div>
+          <div class="status doing">DOING</div>
+          <div class="desc"><strong>长文抽取器 <code>RequirementExtractor</code></strong>　输入 <code>workbookText</code>，输出 <code>ExtractionResult</code>；AI 成功路径 + 规则降级路径双测试。</div>
+          <div class="commit">—</div>
+        </div>
+
+        <div class="task-row">
+          <div class="tid">T4</div>
+          <div class="status todo">TODO</div>
+          <div class="desc">迁移旧 <code>ai.service.ts</code>（2541 行）四个 Kimi 调用点改走新 Provider，目标瘦身至 &lt;1800 行，不回归集成测试。</div>
+          <div class="commit">—</div>
+        </div>
+
+        <div class="task-row">
+          <div class="tid">T5</div>
+          <div class="status todo">TODO</div>
+          <div class="desc"><strong>Evidence / change_log 持久化</strong>　新增 <code>extraction_results</code> + <code>change_logs</code> 表 + <code>EvidenceRepository</code>，支持 history 追加。</div>
+          <div class="commit">—</div>
+        </div>
+
+        <div class="task-row">
+          <div class="tid">T6</div>
+          <div class="status todo">TODO</div>
+          <div class="desc"><strong>DSL 引擎雏形 + 1 条规则</strong>　完备性引擎 + <code>sow-completeness-v1</code>。承接 v2 P-5 "规则皆 DSL"（仅雏形，非全量）。</div>
+          <div class="commit">—</div>
+        </div>
+
+        <div class="task-row">
+          <div class="tid">T7</div>
+          <div class="status todo">TODO</div>
+          <div class="desc"><strong>7 角色 RBAC 常量 + 权限矩阵</strong>　后端中间件按角色拦截；角色名已从 v2 §03 落地：<code>SALES / PRE_SALES / IMPL / PM / DEV / PMO / ADMIN</code>。</div>
+          <div class="commit">—</div>
+        </div>
+
+        <div class="task-row">
+          <div class="tid">T8</div>
+          <div class="status todo">TODO</div>
+          <div class="desc"><strong>IA 初评冒烟（Vitest）</strong>　跑通：上传 Excel → 抽取 → 证据入库 → DSL 校验 → 角色拦截；依赖 T1-T7 全部完成。</div>
+          <div class="commit">—</div>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:12px; font-size: 13px;">
+        <strong>P0 本次范围边界</strong>　不动前端 UI、不迁旧 JSON stores（users / versions / templates / system configs）、不接第二个 AI provider、不引 BullMQ、DSL 只做 1 条规则。剩余 9 个 v2 新实体（SOW / Narrative / Deliverable / Handoff / RateCard / QualityGate / SealedBaseline / DevAssessment / CollabWorkspace / Methodology）留待 P0.2 / P1。
+      </div>
+
+      <h3>P1 · 角色前端（三条并行）</h3>
+      <div class="roadmap-row"><div class="pri p1">P1-1</div><div class="roadmap-item"><strong>售前审查 Agent</strong>　原始物料 → 需求包 + SOW + 问询 + 初估包 端到端流程。</div></div>
+      <div class="roadmap-row"><div class="pri p1">P1-2</div><div class="roadmap-item"><strong>销售快报 Skill</strong>　对话式描述 + 商机档案落库 + 分期方案生成；客户成功场景的"老客户继承"分支（可选）。</div></div>
+      <div class="roadmap-row"><div class="pri p1">P1-3</div><div class="roadmap-item"><strong>PM / PMO Web 工作台</strong>　接力视图、Narrative 生成、4 大交付物自动派生、PMO 审核 checklist、封版发起。</div></div>
+
+      <h3>P2 · 协同与历史沉淀</h3>
+      <div class="roadmap-row"><div class="pri p2">P2-1</div><div class="roadmap-item"><strong>评估协同工作区</strong>　CollabWorkspace 承载群聊替代品；质询-回复结构化入证据链。</div></div>
+      <div class="roadmap-row"><div class="pri p2">P2-2</div><div class="roadmap-item"><strong>开发评估 Agent + 工时占用可视化</strong>　开发顾问独立工作面；可选：工时占用热力图（若公司无独立资源调度系统）。</div></div>
+      <div class="roadmap-row"><div class="pri p2">P2-3</div><div class="roadmap-item"><strong>变更描述 Skill + 差分影响分析</strong>　销售侧变更提报 + PM 侧 diff 视图。</div></div>
+      <div class="roadmap-row"><div class="pri p2">P2-4</div><div class="roadmap-item"><strong>历史项目库 + 相似度检索</strong>　项目结案数据回流；行业 × 规模的向量检索。</div></div>
+
+      <h3>P3 · 组织级增强</h3>
+      <div class="roadmap-row"><div class="pri p3">P3-1</div><div class="roadmap-item"><strong>规则进化闭环</strong>　基于 PM 覆盖理由聚类，自动提示规则优化建议。</div></div>
+      <div class="roadmap-row"><div class="pri p3">P3-2</div><div class="roadmap-item"><strong>合同系统集成</strong>　封版基线到下游合同系统的标准化推送 + 状态回传。</div></div>
+      <div class="roadmap-row"><div class="pri p3">P3-3</div><div class="roadmap-item"><strong>多租户 / SSO / 精细权限</strong>　面向大客户本地化部署。</div></div>
+
+      <div class="callout warn" style="margin-top:24px;">
+        <strong>风险提示</strong>　P0 三项是所有前端能力的前置依赖，建议并行启动同一里程碑交付。任何一项延期都会让 P1 失去落脚点。
+      </div>
+    </section>
+
+    <!-- ============ 13. TBD ============ -->
+    <section id="tbd">
+      <h2><span class="n">13</span>开放问题 TBD</h2>
+      <p>以下 9 条是讨论未完全覆盖的点，v2 已做占位设计，正式落地前需补齐。</p>
+      <div class="callout good" style="margin: 10px 0 18px;">
+        <strong>裁决状态（2026-04-24）</strong>　9 条 TBD <strong>全部已决</strong>（含 TBD-4 最终选定"路径 B · 两表并存"）。完整裁决 + P0 影响分析见执行台账 <a href="重构执行计划-P0-2026-04-24.md" style="color:#065f46; border-bottom:1px dashed #065f46;">重构执行计划 §7.2</a>；本节同步嵌入每条裁决与影响。对应的 §08 实体区 TBD-1 / TBD-4 / TBD-6 标记已摘除，并新增 <code>BusinessGapAnalysis</code> / <code>TravelCost</code> 两枚实体占位。
+      </div>
+
+      <div class="tbd-item">
+        <div class="q">TBD-1 · 方法论七阶段具体是哪 7 段？</div>
+        <div class="context">魏春芳审核时要求"方法论七阶段请还原"。李加柱的 Narrative 里提到"调研 1 月 + 蓝图 1.5 月 + 构建 0.5 月 + UAT 2 月 + 验收 1 月"只有 5 段。完整 7 阶段的内容影响 ProjectMethodology 实体设计和 PMO 审核 checklist。</div>
+        <div class="answer">
+          七阶段确认为：<strong>① 启动 → ② 需求 → ③ 方案（蓝图）→ ④ 构建 → ⑤ 测试（UAT）→ ⑥ 上线 → ⑦ 验收</strong>。补齐的是 <strong>⑥ 上线</strong>，不是 *维保 / 切换*。
+          <span class="impact">v2 §08 <code>ProjectMethodology.phases[7]</code> 可直接落位；T6 DSL 完备性规则可启用"七阶段齐全"校验；P1 PMO 审核 checklist 能以此 7 段为基线。</span>
+        </div>
+      </div>
+
+      <div class="tbd-item">
+        <div class="q">TBD-2 · PMO 的权责边界</div>
+        <div class="context">魏春芳可以驳回让 PM 补充，但是否能否决整个评估？PMO 审核有时效要求吗？是否支持"有条件通过"（通过但挂警告）？</div>
+        <div class="answer">
+          PMO <strong>不能否决整个评估</strong>；审核范围仅为"<strong>交付物规范度 + 齐全性</strong>"（驳回→PM 补→再审）。无时效 / 无"有条件通过"机制。
+          <span class="impact">T7 权限矩阵：PMO 角色仅配"审核 / 驳回"两个位，不下发"终审否决"；QualityGateReview 状态机 P1 做，本次 P0 不实现。</span>
+        </div>
+      </div>
+
+      <div class="tbd-item">
+        <div class="q">TBD-3 · 实施顾问 → PM 接力的触发条件</div>
+        <div class="context">样本里李加柱 2026-02-11 入群，触发点是"销售主观判断快签约了"还是某个阶段事件（如 SOW 客户确认）？这决定接力是人为发起还是系统自动。</div>
+        <div class="answer">
+          <strong>人为发起</strong>。触发源是"该商机被任命项目经理"这一<strong>人事事件</strong>（李加柱 2026-02-11 被任命为 PM 后入群参与评估）。
+          <span class="impact">P1 AssessmentHandoff 实体按"人为发起 + 任命事件"建模，无需做"销售判断快签约"的自动触发器；P0 本次不实现。</span>
+        </div>
+      </div>
+
+      <div class="tbd-item">
+        <div class="q">TBD-4 · 差异分析表的"差异"基准</div>
+        <div class="context">魏春芳问"差异分析表呢"—— 差异是相对哪个基准？候选：① 相对第一轮初评（486 vs 289）② 相对投标底价 ③ 相对历史相似项目 ④ 相对客户预算。v2 预留 4 选项设计，等确认。</div>
+        <div class="answer">
+          ✅ <strong>最终裁决：走路径 B（两表并存）</strong>（2026-04-24）
+          <ul style="margin:6px 0 0 18px; font-size:12.5px;">
+            <li><strong>售前侧</strong>：新增 <code>BusinessGapAnalysis</code> 实体（质性文档，《业务需求与差异分析表》），归属 PRE_SALES，记录"客户业务 vs 系统能力匹配度"；与评估数字无钩挂；**独立交付物，不进 PM 4 件套**。</li>
+            <li><strong>PM 侧</strong>：保留 v2 §08 <code>VarianceAnalysis</code> 实体（数字差异表），归属 PM；<strong>4 选项 baseline 全部保留</strong>（InitialEstimate / BidBaseline / HistoricalAvg / CustomerBudget），继续作 <code>Deliverable</code> 4 件套之一。</li>
+          </ul>
+          <span class="impact">P1 新增 <code>BusinessGapAnalysis</code> 实体 + 保留 <code>VarianceAnalysis</code>；v2 §08 解除 VarianceAnalysis 上的 <em>TBD-4</em> 标记。<strong>遗留问题</strong>：PMO checklist 中"差异分析表"到底要售前那份还是 PM 那份（或两份都要），P1 PMO 状态机细化时需进一步确认。P0 不受影响。</span>
+        </div>
+      </div>
+
+      <div class="tbd-item">
+        <div class="q">TBD-5 · 决策冲突仲裁</div>
+        <div class="context">PM 把实施顾问的 186 人天压到 120，实施顾问不服，是 PM 决策权归属？还是升级到 PMO 或其他仲裁者？需要保留"保留意见"字段吗？</div>
+        <div class="answer">
+          <strong>无仲裁机制，无"保留意见"字段</strong>。最终人天由<strong>当前接手的顾问单独决定</strong>，定的过程通过<strong>线下沟通</strong>完成，不入系统。
+          <span class="impact">T5 change_logs 只记录"谁改了什么、何时、为何"三元，不新增异议字段；Evidence.history 沿用追加语义即可。</span>
+        </div>
+      </div>
+
+      <div class="tbd-item">
+        <div class="q">TBD-6 · RateCard 多维度</div>
+        <div class="context">v1 基线按角色分档（PM ¥2260 / 其他 ¥1770）。是否还要按：① 地区（广州/北京/海外）② 员工性质（正式/外协）③ 级别（高级/中级）？维度越多复杂度越高，需要权衡。</div>
+        <div class="answer">
+          RateCard 只按 <strong>职级</strong> 一个维度（顾问成本表，不同职级对应不同人天单价）；<strong>无地区 / 无员工性质维度</strong>。<br/>
+          地区走独立路径：以顾问 <strong>BASE 地</strong> 为基准，项目地 ≠ BASE 地时额外评估<strong>差旅成本</strong>（新实体 <code>TravelCost</code>，独立于 RateCard）。user 将后续提供该职级单价表。
+          <br/><em style="font-size:12px; color:#047857;">（2026-04-24 user 二次确认此建模方向）</em>
+          <span class="impact">P1 <code>RateCard</code> 实体"职级 → 单价"两列；新增 P1 <code>TravelCost</code> 实体承接差旅评估；两者独立演化。P0 不做，但设计空间已最终收敛。</span>
+        </div>
+      </div>
+
+      <div class="tbd-item">
+        <div class="q">TBD-7 · SOW 维护责任与变更流程</div>
+        <div class="context">SOW 是销售写、售前写、还是 PM 写？变更流程（谁提、谁批、谁通知评估系统）？SOW 能否从评估包反向生成？</div>
+        <div class="answer">
+          责任链：<strong>售前顾问起草 → 实施顾问（PM）最终修订审核</strong>。<br/>
+          反向生成：<strong>部分可以</strong> —— 评估包可反向派生 <em>组织范围 / 模块范围 / 开发范围 / WBS</em>，<em>其余条款仍需人工补充</em>。
+          <span class="impact">T6 DSL "SOW 完备性"规则得到明确字段边界：前 4 项可自动校验（必填 + 结构化），其余不校验或仅提示；T7 权限矩阵：SOW 写 = PRE_SALES + IMPL，只读 = SALES/PM/PMO。</span>
+        </div>
+      </div>
+
+      <div class="tbd-item">
+        <div class="q">TBD-8 · Narrative 模板是否全司统一</div>
+        <div class="context">李加柱的五段式是个人风格还是团队标准？不同行业项目是否都用同一模板？如果是个人风格，v2 的模板化设计要不要做成可配置？</div>
+        <div class="answer">
+          <strong>做成可配置化</strong>。不绑定李加柱的"五段式"为标准模板，而是提供模板管理能力（由 ADMIN 维护，可按行业 / 组织定制）。
+          <span class="impact">P1 <code>NarrativeTemplate</code> 实体 + ADMIN 工作台模板 CRUD；P0 不做，但 T7 ADMIN 角色需预留"模板管理"权限位。</span>
+        </div>
+      </div>
+
+      <div class="tbd-item">
+        <div class="q">TBD-9 · 开发顾问工时占用可视化是否需要</div>
+        <div class="context">如果公司有独立的资源调度系统，评估系统可不做；如果没有，开发顾问日历/占用热力图对 PM 拉人入群很有价值。等你确认。</div>
+        <div class="answer">
+          <strong>要做，但优先级最低</strong>（"可以最后做"）。排到 P2+ 兜底。
+          <span class="impact">不影响 P0 / P1 设计与数据结构；P2 再切具体方案。</span>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    fontFamily: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
+    flowchart: { curve: 'basis', padding: 18, nodeSpacing: 40, rankSpacing: 55 }
+  });
+</script>
+</body>
+</html>
