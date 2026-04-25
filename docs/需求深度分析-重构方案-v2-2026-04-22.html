@@ -334,7 +334,7 @@
         <strong>P0 重构执行中</strong>　本文档为<strong>目标态设计基线</strong>；实际迁移路径、任务进度、决策台账、未决 TBD 处置见执行台账 <a href="重构执行计划-P0-2026-04-24.md">重构执行计划-P0-2026-04-24.md</a>。<br/>
         当前 P0 进度快照同步在 <a href="#roadmap">§12 落地路线图</a> 内。
       </div>
-      <span class="snap">2026-04-24 · 3/8 基座已完成（T1 / T2 / DB）· 9 条 TBD 全部已决（TBD-4 走路径 B）</span>
+      <span class="snap">2026-04-24 · 4/8 基座已完成（T1 / T2 / DB / T3）· 9 条 TBD 全部已决</span>
     </div>
 
     <!-- ============ 1. OVERVIEW ============ -->
@@ -1222,7 +1222,7 @@ flowchart TB
         <div class="head">
           <div class="title">▎P0 执行进度 · 2026-04-24 快照</div>
           <div class="summary">
-            完成度 <span class="pct">3 / 8</span>　·　本次 P0 ≈ v2 路线图 <strong>P0-1 / P0-3 首批 + P0-2 雏形</strong>（精确称 <strong>P0.1</strong>，保留 P0.2 做剩余）　·
+            完成度 <span class="pct">4 / 8</span>　·　本次 P0 ≈ v2 路线图 <strong>P0-1 / P0-3 首批 + P0-2 雏形</strong>（精确称 <strong>P0.1</strong>，保留 P0.2 做剩余）　·
             详情见 <a href="重构执行计划-P0-2026-04-24.md" style="color:#2563eb;">执行台账</a>
           </div>
         </div>
@@ -1250,9 +1250,9 @@ flowchart TB
 
         <div class="task-row">
           <div class="tid">T3</div>
-          <div class="status doing">DOING</div>
-          <div class="desc"><strong>长文抽取器 <code>RequirementExtractor</code></strong>　输入 <code>workbookText</code>，输出 <code>ExtractionResult</code>；AI 成功路径 + 规则降级路径双测试。</div>
-          <div class="commit">—</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>长文抽取器 <code>RequirementExtractor</code></strong>　<code>apps/api/src/ai/extractor/*</code>（5 源文件 + 1 测试）；AI 成功 / 部分缺字段 / ProviderError 整体降级 / JSON 解析失败 / Provider 不可用 / disableAi / 无 Provider / 规则路径缺字段共 8 条用例全绿。降级粒度采用 whole-result（TBD-P0-T3-01 销案）。</div>
+          <div class="commit">本次提交</div>
         </div>
 
         <div class="task-row">
