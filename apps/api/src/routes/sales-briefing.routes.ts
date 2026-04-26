@@ -60,7 +60,8 @@ router.get("/briefs", requireAnyCapability("estimates:read", "estimates:create")
 
 router.get("/briefs/:id", requireAnyCapability("estimates:read", "estimates:create"), async (req, res, next) => {
   try {
-    const brief = await opportunityBriefService.findById(req.params.id);
+    const id = req.params.id as string;
+    const brief = await opportunityBriefService.findById(id);
     if (!brief) throw new ApiError(404, "商机档案不存在");
     res.json({ success: true, data: brief });
   } catch (err) { next(err); }
@@ -68,8 +69,9 @@ router.get("/briefs/:id", requireAnyCapability("estimates:read", "estimates:crea
 
 router.patch("/briefs/:id", requireCapability("estimates:create"), async (req, res, next) => {
   try {
+    const id = req.params.id as string;
     const b = req.body as Record<string, unknown>;
-    const brief = await opportunityBriefService.update(req.params.id, {
+    const brief = await opportunityBriefService.update(id, {
       customerName: typeof b.customerName === "string" ? b.customerName : undefined,
       customerProfile: b.customerProfile && typeof b.customerProfile === "object" ? b.customerProfile as Record<string, unknown> : undefined,
       vagueRequirements: typeof b.vagueRequirements === "string" ? b.vagueRequirements : undefined,
@@ -84,7 +86,8 @@ router.patch("/briefs/:id", requireCapability("estimates:create"), async (req, r
 
 router.delete("/briefs/:id", requireCapability("estimates:create"), async (req, res, next) => {
   try {
-    const ok = await opportunityBriefService.delete(req.params.id);
+    const id = req.params.id as string;
+    const ok = await opportunityBriefService.delete(id);
     if (!ok) throw new ApiError(404, "商机档案不存在");
     res.json({ success: true });
   } catch (err) { next(err); }
@@ -96,8 +99,9 @@ router.delete("/briefs/:id", requireCapability("estimates:create"), async (req, 
 
 router.post("/briefs/:id/quote", requireCapability("estimates:create"), async (req, res, next) => {
   try {
+    const id = req.params.id as string;
     const b = req.body as Record<string, unknown>;
-    const brief = await opportunityBriefService.generateQuote(req.params.id, {
+    const brief = await opportunityBriefService.generateQuote(id, {
       industry: typeof b.industry === "string" ? b.industry : undefined,
       scale: typeof b.scale === "string" ? b.scale : undefined,
       moduleCount: typeof b.moduleCount === "number" ? b.moduleCount : undefined,
@@ -115,8 +119,9 @@ router.post("/briefs/:id/quote", requireCapability("estimates:create"), async (r
 
 router.post("/briefs/:id/recalculate", requireCapability("estimates:create"), async (req, res, next) => {
   try {
+    const id = req.params.id as string;
     const b = req.body as Record<string, unknown>;
-    const brief = await opportunityBriefService.recalculate(req.params.id, {
+    const brief = await opportunityBriefService.recalculate(id, {
       removedModules: Array.isArray(b.removedModules) ? b.removedModules as string[] : undefined,
       addedModules: Array.isArray(b.addedModules) ? b.addedModules as string[] : undefined,
       addedOrgs: typeof b.addedOrgs === "number" ? b.addedOrgs : undefined,

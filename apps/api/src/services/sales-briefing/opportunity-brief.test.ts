@@ -135,7 +135,7 @@ test("OpportunityBriefService: recalculate 增删模块重算", async () => {
   assert.ok(recalculated);
   const priceRange = recalculated!.priceRange as { min: number; max: number; basis: string };
   assert.ok(priceRange.basis.includes("变更调整"), "basis 应包含变更说明");
-  assert.ok(priceRange.confidence < 0.9, "变更后置信度应下降");
+  assert.ok((priceRange as any).confidence < 0.9, "变更后置信度应下降");
 });
 
 test("OpportunityBriefService: recalculate 无报价时返回 null", async () => {

@@ -126,7 +126,8 @@ router.get("/handoffs", requireCapability("assessment:handoff"), async (req, res
 
 router.get("/handoffs/:id", requireCapability("assessment:handoff"), async (req, res, next) => {
   try {
-    const handoff = await assessmentHandoffService.findById(req.params.id);
+    const id = req.params.id as string;
+    const handoff = await assessmentHandoffService.findById(id);
     if (!handoff) throw new ApiError(404, "接力记录不存在");
     res.json({ success: true, data: handoff });
   } catch (err) { next(err); }
@@ -134,8 +135,9 @@ router.get("/handoffs/:id", requireCapability("assessment:handoff"), async (req,
 
 router.patch("/handoffs/:id", requireCapability("assessment:handoff"), async (req, res, next) => {
   try {
+    const id = req.params.id as string;
     const b = req.body as Record<string, unknown>;
-    const handoff = await assessmentHandoffService.update(req.params.id, {
+    const handoff = await assessmentHandoffService.update(id, {
       acceptedByUserId: typeof b.acceptedByUserId === "string" ? b.acceptedByUserId : req.user?.id,
       status: b.status === "pending" || b.status === "accepted" || b.status === "rejected" ? b.status : undefined,
       notes: typeof b.notes === "string" ? b.notes : undefined,
@@ -181,7 +183,8 @@ router.post("/narratives/generate", requireAnyCapability("assessment:create", "a
 
 router.get("/narratives/:id", requireAnyCapability("assessment:create", "assessment:handoff", "deliverable:review"), async (req, res, next) => {
   try {
-    const narrative = await assessmentNarrativeService.findById(req.params.id);
+    const id = req.params.id as string;
+    const narrative = await assessmentNarrativeService.findById(id);
     if (!narrative) throw new ApiError(404, "叙事不存在");
     res.json({ success: true, data: narrative });
   } catch (err) { next(err); }
@@ -189,7 +192,8 @@ router.get("/narratives/:id", requireAnyCapability("assessment:create", "assessm
 
 router.get("/versions/:versionId/narrative", requireAnyCapability("assessment:create", "assessment:handoff", "deliverable:review"), async (req, res, next) => {
   try {
-    const narrative = await assessmentNarrativeService.findByVersionId(req.params.versionId);
+    const versionId = req.params.versionId as string;
+    const narrative = await assessmentNarrativeService.findByVersionId(versionId);
     if (!narrative) throw new ApiError(404, "叙事不存在");
     res.json({ success: true, data: narrative });
   } catch (err) { next(err); }
@@ -197,8 +201,9 @@ router.get("/versions/:versionId/narrative", requireAnyCapability("assessment:cr
 
 router.patch("/narratives/:id", requireAnyCapability("assessment:create", "assessment:handoff"), async (req, res, next) => {
   try {
+    const id = req.params.id as string;
     const body = parseNarrativeBody(req.body);
-    const narrative = await assessmentNarrativeService.update(req.params.id, {
+    const narrative = await assessmentNarrativeService.update(id, {
       ...body,
       lastEditedByUserId: req.user?.id,
     });
@@ -228,7 +233,8 @@ router.post("/deliverables/generate", requireCapability("deliverable:generate"),
 
 router.get("/deliverables/:id", requireAnyCapability("deliverable:generate", "deliverable:review"), async (req, res, next) => {
   try {
-    const d = await deliverableService.findById(req.params.id);
+    const id = req.params.id as string;
+    const d = await deliverableService.findById(id);
     if (!d) throw new ApiError(404, "交付物不存在");
     res.json({ success: true, data: d });
   } catch (err) { next(err); }
@@ -236,16 +242,18 @@ router.get("/deliverables/:id", requireAnyCapability("deliverable:generate", "de
 
 router.get("/versions/:versionId/deliverables", requireAnyCapability("deliverable:generate", "deliverable:review"), async (req, res, next) => {
   try {
-    const list = await deliverableService.listByVersion(req.params.versionId);
+    const versionId = req.params.versionId as string;
+    const list = await deliverableService.listByVersion(versionId);
     res.json({ success: true, data: list });
   } catch (err) { next(err); }
 });
 
 router.patch("/deliverables/:id/status", requireAnyCapability("deliverable:generate", "deliverable:review"), async (req, res, next) => {
   try {
+    const id = req.params.id as string;
     const status = (req.body as Record<string, unknown>).status;
     if (status !== "draft" && status !== "confirmed") throw new ApiError(400, "status 必须为 draft 或 confirmed");
-    const d = await deliverableService.updateStatus(req.params.id, status);
+    const d = await deliverableService.updateStatus(id, status as "draft" | "confirmed");
     if (!d) throw new ApiError(404, "交付物不存在");
     res.json({ success: true, data: d });
   } catch (err) { next(err); }
@@ -285,7 +293,8 @@ router.post("/reviews/auto", requireCapability("deliverable:review"), async (req
 
 router.get("/reviews/:id", requireCapability("deliverable:review"), async (req, res, next) => {
   try {
-    const review = await qualityGateReviewService.findById(req.params.id);
+    const id = req.params.id as string;
+    const review = await qualityGateReviewService.findById(id);
     if (!review) throw new ApiError(404, "审核记录不存在");
     res.json({ success: true, data: review });
   } catch (err) { next(err); }
@@ -293,7 +302,8 @@ router.get("/reviews/:id", requireCapability("deliverable:review"), async (req, 
 
 router.get("/versions/:versionId/review", requireAnyCapability("deliverable:review", "assessment:handoff"), async (req, res, next) => {
   try {
-    const review = await qualityGateReviewService.findByVersionId(req.params.versionId);
+    const versionId = req.params.versionId as string;
+    const review = await qualityGateReviewService.findByVersionId(versionId);
     if (!review) throw new ApiError(404, "审核记录不存在");
     res.json({ success: true, data: review });
   } catch (err) { next(err); }
@@ -301,8 +311,9 @@ router.get("/versions/:versionId/review", requireAnyCapability("deliverable:revi
 
 router.patch("/reviews/:id", requireCapability("deliverable:review"), async (req, res, next) => {
   try {
+    const id = req.params.id as string;
     const body = parseReviewBody(req.body);
-    const review = await qualityGateReviewService.update(req.params.id, body);
+    const review = await qualityGateReviewService.update(id, body);
     if (!review) throw new ApiError(404, "审核记录不存在");
     res.json({ success: true, data: review });
   } catch (err) { next(err); }
@@ -328,7 +339,8 @@ router.post("/seal", requireCapability("deliverable:review"), async (req, res, n
 
 router.get("/seal/:id", requireAnyCapability("deliverable:review", "assessment:handoff"), async (req, res, next) => {
   try {
-    const sealed = await sealedBaselineService.findById(req.params.id);
+    const id = req.params.id as string;
+    const sealed = await sealedBaselineService.findById(id);
     if (!sealed) throw new ApiError(404, "封版记录不存在");
     res.json({ success: true, data: sealed });
   } catch (err) { next(err); }
@@ -336,7 +348,8 @@ router.get("/seal/:id", requireAnyCapability("deliverable:review", "assessment:h
 
 router.get("/versions/:versionId/seal", requireAnyCapability("deliverable:review", "assessment:handoff"), async (req, res, next) => {
   try {
-    const sealed = await sealedBaselineService.findByVersionId(req.params.versionId);
+    const versionId = req.params.versionId as string;
+    const sealed = await sealedBaselineService.findByVersionId(versionId);
     if (!sealed) throw new ApiError(404, "封版记录不存在");
     res.json({ success: true, data: sealed });
   } catch (err) { next(err); }

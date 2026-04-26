@@ -660,7 +660,7 @@ function buildCloudSkuModuleItemsFromSnapshot(
   };
   const productModuleRows = normalizeProductModuleRows(
     Array.isArray(snapshot.productModuleRows)
-      ? (snapshot.productModuleRows.map((x) => asModelObject(x)) as RequirementImportData["productModuleRows"])
+      ? (snapshot.productModuleRows.map((x) => asModelObject(x)) as any[])
       : []
   );
   if (!productModuleRows.length) {
@@ -797,4 +797,3 @@ async function generateAssessmentDraftByKimi(params: {
 }
 
 export { estimateFallbackAssessmentDraft, normalizeKimiAssessmentDraft, buildCloudSkuModuleItemsFromSnapshot, mergeDevTotalModuleItem, generateAssessmentDraftByKimi, getKimiProvider, parseJsonFromModelText };
-export type { KimiAssessmentModuleItem, KimiAssessmentDraft, KimiAssessmentSnapshot, KimiAssessmentPreviewInput };

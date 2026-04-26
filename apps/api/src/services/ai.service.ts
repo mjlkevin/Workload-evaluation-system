@@ -104,9 +104,8 @@ function normalizeBasicProjectInfo(input: Record<string, unknown>): BasicProject
     location: pickModelField(input, ["location", "地点", "所在地区", "地区", "城市"]),
     projectName: pickModelField(input, ["projectName", "项目名称"]),
     opportunityNo: pickModelField(input, ["opportunityNo", "商机号"]),
-    productLines: uniqueStringList(
-      Array.isArray(input.productLines) ? (input.productLines as unknown[]) : []
-    ),
+    productLines: (Array.isArray(input.productLines) ? (input.productLines as unknown[]) : [])
+      .filter((v): v is string => typeof v === "string"),
     customerIndustry: normalizeIndustryTagText(rawIndustry),
     enterpriseRevenue: pickModelField(input, ["enterpriseRevenue", "企业营收", "营收"]),
     itStatus: pickModelField(input, ["itStatus", "信息化现状"]),

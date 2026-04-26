@@ -195,7 +195,7 @@ export class InitialEstimateService {
     if (moduleNames.some((n) => n.includes("定制") || n.includes("开发"))) {
       tags.push("定制开发比例高");
     }
-    if ((pack.constraints ?? []).length > 3) {
+    if (((pack.constraints as unknown[]) ?? []).length > 3) {
       tags.push("约束条件多");
     }
     if ((pack.scale ?? "").includes("集团") || (pack.scale ?? "").includes("多组织")) {
@@ -217,7 +217,7 @@ export class InitialEstimateService {
       riskIfInvalid: "追加 10-20% 人天用于数据迁移与清洗",
     });
 
-    if ((pack.modules ?? []).length > 5) {
+    if (((pack.modules as unknown[]) ?? []).length > 5) {
       assumptions.push({
         assumption: "模块间依赖关系在实施前已明确",
         rationale: "模块数 > 5，依赖不清会导致实施顺序混乱",

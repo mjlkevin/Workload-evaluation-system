@@ -146,9 +146,10 @@ router.get(
 router.get(
   "/requirement-packs/:id",
   requireCapability("requirement:upload"),
-  async (req, res, next) => {
+    async (req, res, next) => {
     try {
-      const pack = await requirementPackService.findById(req.params.id);
+      const id = req.params.id as string;
+      const pack = await requirementPackService.findById(id);
       if (!pack) throw new ApiError(404, "需求包不存在");
       res.json({ success: true, data: pack });
     } catch (err) {
@@ -163,8 +164,9 @@ router.patch(
   requireCapability("requirement:maintain"),
   async (req, res, next) => {
     try {
+      const id = req.params.id as string;
       const body = parseUpdatePack(req.body);
-      const pack = await requirementPackService.update(req.params.id, body);
+      const pack = await requirementPackService.update(id, body);
       if (!pack) throw new ApiError(404, "需求包不存在");
       res.json({ success: true, data: pack });
     } catch (err) {
@@ -179,7 +181,8 @@ router.delete(
   requireCapability("requirement:maintain"),
   async (req, res, next) => {
     try {
-      const ok = await requirementPackService.delete(req.params.id);
+      const id = req.params.id as string;
+      const ok = await requirementPackService.delete(id);
       if (!ok) throw new ApiError(404, "需求包不存在");
       res.json({ success: true });
     } catch (err) {
@@ -194,7 +197,8 @@ router.post(
   requireCapability("extractor:trigger"),
   async (req, res, next) => {
     try {
-      const result = await requirementPackService.review(req.params.id);
+      const id = req.params.id as string;
+      const result = await requirementPackService.review(id);
       res.json({ success: true, data: result });
     } catch (err) {
       next(err);
@@ -208,7 +212,8 @@ router.get(
   requireCapability("requirement:upload"),
   async (req, res, next) => {
     try {
-      const confidences = await requirementPackService.getFieldConfidences(req.params.id);
+      const id = req.params.id as string;
+      const confidences = await requirementPackService.getFieldConfidences(id);
       res.json({ success: true, data: confidences });
     } catch (err) {
       next(err);
@@ -226,7 +231,8 @@ router.post(
   requireCapability("estimates:create"),
   async (req, res, next) => {
     try {
-      const pack = await requirementPackService.findById(req.params.id);
+      const id = req.params.id as string;
+      const pack = await requirementPackService.findById(id);
       if (!pack) throw new ApiError(404, "需求包不存在");
 
       // 若已存在，先删除旧 estimate（P1-1 单 estimate 策略）
@@ -252,7 +258,8 @@ router.get(
   requireAnyCapability("estimates:read", "estimates:create"),
   async (req, res, next) => {
     try {
-      const estimate = await initialEstimateService.findById(req.params.id);
+      const id = req.params.id as string;
+      const estimate = await initialEstimateService.findById(id);
       if (!estimate) throw new ApiError(404, "初估包不存在");
       res.json({ success: true, data: estimate });
     } catch (err) {
@@ -267,8 +274,9 @@ router.patch(
   requireAnyCapability("estimates:write", "estimates:create"),
   async (req, res, next) => {
     try {
+      const id = req.params.id as string;
       const body = parseUpdateEstimate(req.body);
-      const estimate = await initialEstimateService.update(req.params.id, body);
+      const estimate = await initialEstimateService.update(id, body);
       if (!estimate) throw new ApiError(404, "初估包不存在");
       res.json({ success: true, data: estimate });
     } catch (err) {
@@ -287,7 +295,8 @@ router.post(
   requireCapability("estimates:create"),
   async (req, res, next) => {
     try {
-      const pack = await requirementPackService.findById(req.params.id);
+      const id = req.params.id as string;
+      const pack = await requirementPackService.findById(id);
       if (!pack) throw new ApiError(404, "需求包不存在");
 
       const cloudProduct = (req.body.cloudProduct as string) || "金蝶AI星空";
@@ -309,7 +318,8 @@ router.get(
   requireAnyCapability("estimates:read", "estimates:create"),
   async (req, res, next) => {
     try {
-      const sow = await sowService.findById(req.params.id);
+      const id = req.params.id as string;
+      const sow = await sowService.findById(id);
       if (!sow) throw new ApiError(404, "SOW 条目不存在");
       res.json({ success: true, data: sow });
     } catch (err) {
@@ -324,8 +334,9 @@ router.patch(
   requireAnyCapability("estimates:write", "estimates:create"),
   async (req, res, next) => {
     try {
+      const id = req.params.id as string;
       const body = parseUpdateSow(req.body);
-      const sow = await sowService.update(req.params.id, body);
+      const sow = await sowService.update(id, body);
       if (!sow) throw new ApiError(404, "SOW 条目不存在");
       res.json({ success: true, data: sow });
     } catch (err) {
@@ -340,7 +351,8 @@ router.get(
   requireAnyCapability("estimates:read", "estimates:create"),
   async (req, res, next) => {
     try {
-      const sowItems = await sowService.findByPackId(req.params.id);
+      const id = req.params.id as string;
+      const sowItems = await sowService.findByPackId(id);
       res.json({ success: true, data: sowItems });
     } catch (err) {
       next(err);

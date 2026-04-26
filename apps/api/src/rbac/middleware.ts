@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middleware/auth";
 import { legacyRoleToV2Roles, type V2Role } from "./roles";
 import { anyRoleHasCapability, type Capability } from "./permissions";
+import type { AuthUser } from "../types";
 
 // ------------------------------------------------------------------
 // Express Request 扩展（TypeScript 声明合并）
@@ -28,6 +29,8 @@ declare global {
     interface Request {
       /** RBAC 映射后的 v2 角色列表 */
       v2Roles?: V2Role[];
+      /** 当前认证用户（由 requireCapability 等中间件挂载） */
+      user?: AuthUser;
     }
   }
 }
@@ -47,6 +50,7 @@ export function requireAuthenticated() {
     if (!auth) {
       return; // requireAuth 已写 401 响应
     }
+    req.user = auth.user;
     req.v2Roles = legacyRoleToV2Roles(auth.user.role);
     next();
   };
@@ -63,6 +67,7 @@ export function requireCapability(capability: Capability) {
       return; // requireAuth 已写 401 响应
     }
 
+    req.user = auth.user;
     const v2Roles = legacyRoleToV2Roles(auth.user.role);
     req.v2Roles = v2Roles;
 
@@ -96,6 +101,7 @@ export function requireAnyCapability(...capabilities: Capability[]) {
     const auth = requireAuth(req, res);
     if (!auth) return;
 
+    req.user = auth.user;
     const v2Roles = legacyRoleToV2Roles(auth.user.role);
     req.v2Roles = v2Roles;
 
@@ -131,6 +137,7 @@ export function requireV2Role(...allowedRoles: V2Role[]) {
     const auth = requireAuth(req, res);
     if (!auth) return;
 
+    req.user = auth.user;
     const v2Roles = legacyRoleToV2Roles(auth.user.role);
     req.v2Roles = v2Roles;
 
