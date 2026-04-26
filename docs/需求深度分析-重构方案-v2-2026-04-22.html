@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Workload Evaluation System · 需求深度分析与重构方案 v2</title>
+<title>WES 3.0 重构看板 · 总指挥</title>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -285,42 +285,274 @@
     main { padding: 24px 20px 80px; }
     .personas, .grid-2, .grid-3, .principles { grid-template-columns: 1fr; }
   }
+
+  /* ============================================================ */
+  /* 指挥层（command layer）专用样式                                */
+  /* ============================================================ */
+
+  /* 指挥层 section 框 */
+  .cmd-section {
+    background: linear-gradient(to bottom, #fef2f2 0%, #fff 100%);
+    border: 2px solid #fecaca;
+    border-radius: 12px;
+    padding: 28px 32px 32px;
+    margin-bottom: 36px;
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.04);
+    scroll-margin-top: 20px;
+  }
+  .cmd-section h2 {
+    color: #991b1b;
+    border-bottom-color: #fecaca;
+  }
+  .cmd-section h2 .n {
+    color: #dc2626;
+  }
+  .cmd-section h2 .cmd-badge {
+    margin-left: auto;
+    font-size: 10px;
+    background: #dc2626;
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+  }
+
+  /* 大型 KPI 卡片 */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 18px 0 24px; }
+  .kpi {
+    background: #fff; border: 1px solid #fecaca; border-radius: 10px;
+    padding: 18px 20px; text-align: center;
+  }
+  .kpi .label { font-size: 11px; color: #9ca3af; letter-spacing: 1.2px; text-transform: uppercase; font-weight: 600; }
+  .kpi .value { font-size: 32px; font-weight: 700; color: #111827; line-height: 1.1; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+  .kpi .sub { font-size: 11.5px; color: #6b7280; }
+  .kpi.green .value { color: #059669; }
+  .kpi.amber .value { color: #d97706; }
+  .kpi.red .value { color: #dc2626; }
+  .kpi.blue .value { color: #2563eb; }
+
+  /* 进度环 */
+  .ring-progress {
+    width: 88px; height: 88px;
+    background: conic-gradient(#059669 0% var(--pct, 0%), #fee2e2 var(--pct, 0%) 100%);
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .ring-progress::before {
+    content: ""; position: absolute;
+    width: 70px; height: 70px;
+    background: #fff; border-radius: 50%;
+  }
+  .ring-progress .ring-text {
+    position: relative; z-index: 1; font-weight: 700; font-size: 18px; color: #111827;
+  }
+
+  /* AI 协作矩阵 */
+  .ai-matrix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+  .ai-card {
+    background: #fff; border: 1px solid #e5e7eb; border-left: 4px solid #2563eb;
+    border-radius: 0 10px 10px 0; padding: 14px 18px;
+  }
+  .ai-card.opus { border-left-color: #dc2626; }
+  .ai-card.sonnet { border-left-color: #2563eb; }
+  .ai-card.kimi { border-left-color: #d97706; }
+  .ai-card .name { font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 2px; }
+  .ai-card .role { font-size: 11px; color: #6b7280; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .ai-card .duty { font-size: 12.5px; color: #4b5563; line-height: 1.55; }
+  .ai-card .status { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-top: 8px; }
+  .ai-card .status.idle { background: #f3f4f6; color: #6b7280; }
+  .ai-card .status.active { background: #dcfce7; color: #14532d; }
+  .ai-card .status.review { background: #fef3c7; color: #78350f; }
+
+  /* 风险预警 */
+  .risk-list .risk-item {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 10px 14px; border-left: 3px solid #fbbf24;
+    background: #fffbeb; border-radius: 0 6px 6px 0; margin: 8px 0;
+    font-size: 13px; color: #78350f;
+  }
+  .risk-list .risk-item.high { border-left-color: #dc2626; background: #fef2f2; color: #7f1d1d; }
+  .risk-list .risk-item .rid { font-weight: 700; min-width: 50px; flex-shrink: 0; font-size: 11px; letter-spacing: 1px; padding-top: 2px; }
+  .risk-list .risk-item .rdesc { flex: 1; line-height: 1.55; }
+  .risk-list .risk-item .rowner { font-size: 11px; color: #92400e; flex-shrink: 0; }
+
+  /* 地铁图 */
+  .subway {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+    padding: 32px 24px 28px; margin: 18px 0;
+    overflow-x: auto;
+  }
+  .subway-line {
+    display: flex; align-items: center; gap: 0;
+    min-width: 760px; position: relative;
+    padding: 0 8px;
+  }
+  .subway-station {
+    flex: 1; min-width: 110px; text-align: center; position: relative; z-index: 2;
+  }
+  .subway-station .dot {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #e5e7eb; border: 4px solid #fff;
+    margin: 0 auto 10px;
+    box-shadow: 0 0 0 2px #e5e7eb;
+    position: relative;
+  }
+  .subway-station.done .dot { background: #059669; box-shadow: 0 0 0 2px #059669; }
+  .subway-station.active .dot {
+    background: #dc2626; box-shadow: 0 0 0 2px #dc2626;
+    animation: subway-pulse 2s infinite;
+  }
+  .subway-station.next .dot { background: #fff; box-shadow: 0 0 0 2px #2563eb; }
+  .subway-station.future .dot { background: #fff; box-shadow: 0 0 0 2px #d1d5db; }
+  @keyframes subway-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px #dc2626, 0 0 0 6px rgba(220, 38, 38, 0.3); }
+    50% { box-shadow: 0 0 0 2px #dc2626, 0 0 0 12px rgba(220, 38, 38, 0); }
+  }
+  .subway-station .mid { font-size: 13px; font-weight: 700; color: #111827; line-height: 1.3; margin-bottom: 4px; }
+  .subway-station .label { font-size: 11px; color: #6b7280; line-height: 1.4; padding: 0 4px; }
+  .subway-station .planned { font-size: 10.5px; color: #9ca3af; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .subway-station .actual { font-size: 10.5px; font-weight: 600; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .subway-station.done .actual { color: #059669; }
+  .subway-station.active .actual { color: #dc2626; }
+  .subway-station.delayed .actual { color: #d97706; }
+
+  /* 连接线 */
+  .subway-station::after {
+    content: ""; position: absolute;
+    top: 13px; left: 50%; right: -50%;
+    height: 4px; background: #e5e7eb; z-index: 1;
+  }
+  .subway-station:last-child::after { display: none; }
+  .subway-station.done::after { background: #059669; }
+  .subway-station.active::after { background: linear-gradient(to right, #dc2626 50%, #e5e7eb 50%); }
+
+  /* WBS 任务行 */
+  .wbs-group { margin: 18px 0 24px; }
+  .wbs-group .gtitle { font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 8px; padding-left: 8px; border-left: 4px solid #2563eb; }
+  .wbs-group.done .gtitle { border-left-color: #059669; color: #065f46; }
+  .wbs-group.active .gtitle { border-left-color: #dc2626; color: #991b1b; }
+  .wbs-group.pending .gtitle { border-left-color: #9ca3af; color: #4b5563; }
+
+  .wbs-row {
+    display: grid;
+    grid-template-columns: 90px 88px 1fr 90px 110px;
+    gap: 10px; align-items: start;
+    padding: 11px 14px;
+    background: #fff; border: 1px solid #f3f4f6; border-radius: 6px;
+    margin: 5px 0; font-size: 12.5px;
+  }
+  .wbs-row.done { background: #f0fdf4; border-color: #bbf7d0; }
+  .wbs-row.active { background: #fef2f2; border-color: #fecaca; }
+  .wbs-row.next { background: #eff6ff; border-color: #bfdbfe; }
+  .wbs-row .wid { font-weight: 700; color: #2563eb; font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 1px; }
+  .wbs-row.done .wid { color: #059669; }
+  .wbs-row.active .wid { color: #dc2626; }
+  .wbs-row .wstatus {
+    font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    text-align: center; letter-spacing: .5px; height: fit-content; white-space: nowrap;
+  }
+  .wbs-row .wstatus.done { background: #dcfce7; color: #166534; }
+  .wbs-row .wstatus.active { background: #fee2e2; color: #991b1b; }
+  .wbs-row .wstatus.next { background: #dbeafe; color: #1e40af; }
+  .wbs-row .wstatus.pending { background: #f3f4f6; color: #6b7280; }
+  .wbs-row .wbs-desc { color: #374151; line-height: 1.55; }
+  .wbs-row .wbs-desc strong { color: #111827; }
+  .wbs-row .wbs-desc .accept { font-size: 11.5px; color: #6b7280; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e5e7eb; }
+  .wbs-row .wbs-desc .accept::before { content: "验收 · "; color: #d97706; font-weight: 700; }
+  .wbs-row .wowner { font-size: 11px; color: #4b5563; padding-top: 2px; }
+  .wbs-row .wowner .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+  .wbs-row .wowner .badge.opus { background: #fee2e2; color: #991b1b; }
+  .wbs-row .wowner .badge.sonnet { background: #dbeafe; color: #1e40af; }
+  .wbs-row .wowner .badge.kimi { background: #fef3c7; color: #78350f; }
+  .wbs-row .wowner .badge.tbd { background: #f3f4f6; color: #6b7280; }
+  .wbs-row .wdates {
+    font-size: 10.5px; color: #6b7280; font-variant-numeric: tabular-nums; line-height: 1.55;
+  }
+  .wbs-row .wdates .planned { color: #9ca3af; }
+  .wbs-row .wdates .actual { color: #059669; font-weight: 600; }
+  .wbs-row .wdates .actual.delayed { color: #d97706; }
+  @media (max-width: 900px) {
+    .wbs-row { grid-template-columns: 1fr; gap: 4px; }
+  }
+
+  /* 工作日志卡片 */
+  .worklog-card {
+    background: #fff; border: 1px solid #e5e7eb; border-left: 4px solid #2563eb;
+    border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 10px 0;
+  }
+  .worklog-card.opus { border-left-color: #dc2626; }
+  .worklog-card.sonnet { border-left-color: #2563eb; }
+  .worklog-card.kimi { border-left-color: #d97706; }
+  .worklog-card .wlhead { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed #e5e7eb; }
+  .worklog-card .wltask { font-size: 14px; font-weight: 700; color: #111827; }
+  .worklog-card .wlauthor { font-size: 11.5px; color: #6b7280; }
+  .worklog-card .wlauthor .name { font-weight: 700; }
+  .worklog-card .wlauthor.opus .name { color: #dc2626; }
+  .worklog-card .wlauthor.sonnet .name { color: #2563eb; }
+  .worklog-card .wlauthor.kimi .name { color: #d97706; }
+  .worklog-card .wlbody { font-size: 12.5px; color: #374151; line-height: 1.65; }
+  .worklog-card .wlfield { margin: 4px 0; }
+  .worklog-card .wlfield .flabel { display: inline-block; font-size: 10.5px; font-weight: 700; color: #2563eb; min-width: 54px; letter-spacing: .5px; text-transform: uppercase; }
+  .worklog-card .wlself.good { color: #059669; }
+  .worklog-card .wlself.warn { color: #d97706; }
+  .worklog-card .wlself.bad { color: #dc2626; }
+  .worklog-card .wllink { font-size: 11.5px; color: #6b7280; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #e5e7eb; }
+  .worklog-card .wllink a { color: #2563eb; }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .ai-matrix { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 <div class="layout">
 
   <aside class="toc">
-    <div class="brand">WES · v2.0</div>
-    <div class="brand-sub">重构方案 · 2026-04-22</div>
+    <div class="brand">WES 3.0 重构看板</div>
+    <div class="brand-sub">总指挥 · 2026-04-25</div>
+    <div style="font-size:11px; color:#9ca3af; margin: -10px 0 18px; padding-bottom:14px; border-bottom:1px dashed #e5e7eb;">指挥层（可执行） · 设计基线（参考）</div>
+
+    <div style="font-size:10px; color:#2563eb; font-weight:700; letter-spacing:1.5px; margin-bottom:8px;">▎指挥层</div>
+    <ol style="counter-reset: section -1;" class="cmd-toc">
+      <li style="counter-increment:none; list-style:none; margin-left:-24px;"><a href="#dashboard" style="font-weight:600; color:#dc2626;">A · 重构看板</a><span class="exec-tag">实时</span></li>
+      <li style="counter-increment:none; list-style:none; margin-left:-24px;"><a href="#milestones" style="font-weight:600; color:#dc2626;">B · 重构里程碑</a></li>
+      <li style="counter-increment:none; list-style:none; margin-left:-24px;"><a href="#refactor-plan" style="font-weight:600; color:#dc2626;">C · 重构计划 WBS</a></li>
+      <li style="counter-increment:none; list-style:none; margin-left:-24px;"><a href="#worklogs" style="font-weight:600; color:#dc2626;">D · 工作日志</a></li>
+    </ol>
+
+    <div style="font-size:10px; color:#9ca3af; font-weight:700; letter-spacing:1.5px; margin: 22px 0 8px;">▎设计基线</div>
     <ol>
       <li><a href="#overview">核心判断</a></li>
-      <li><a href="#principles">产品原则</a><span class="version-tag">NEW</span></li>
+      <li><a href="#principles">产品原则</a></li>
       <li><a href="#personas">用户画像</a></li>
       <li><a href="#business-flow">业务流程图</a></li>
-      <li><a href="#handoff-flow">接力子流程</a><span class="version-tag">NEW</span></li>
+      <li><a href="#handoff-flow">接力子流程</a></li>
       <li><a href="#system-arch">系统架构图</a></li>
       <li><a href="#overlay">业务 × 系统切入点</a></li>
       <li><a href="#entities">核心领域实体</a></li>
       <li><a href="#dsl">DSL 与规则引擎</a></li>
       <li><a href="#stories">用户故事</a></li>
       <li><a href="#decisions">关键设计决策</a></li>
-      <li><a href="#roadmap">落地路线图</a><span class="exec-tag">执行中</span></li>
-      <li><a href="#tbd">开放问题 TBD</a><span class="version-tag">NEW</span></li>
+      <li><a href="#roadmap">落地路线图（v2 原版）</a></li>
+      <li><a href="#tbd">开放问题 TBD</a><span class="version-tag">已全决</span></li>
     </ol>
   </aside>
 
   <main>
 
     <header class="cover">
-      <div class="tag">需求深度分析 · 重构方案 v2</div>
-      <h1>Workload Evaluation System</h1>
-      <div class="sub">从「版本驱动的表单工具」走向「角色接力的 AI 原生协作系统」<br/>面向 ERP 销售链路的商机 → 成交成本评估重构</div>
+      <div class="tag">WES 3.0 · 重构总指挥看板</div>
+      <h1>Workload Evaluation System 3.0</h1>
+      <div class="sub">从「版本驱动的表单工具」走向「角色接力的 AI 原生协作系统」<br/>本看板是<strong>多 AI 协作的总指挥层</strong>，统一管理重构进度、里程碑、计划、工作日志；下方设计基线（v2）作为不变参考。</div>
       <div class="meta">
-        <span>版本 v2.0（全量重写）</span>
-        <span>日期 2026-04-22</span>
-        <span>面向 销售 / 售前 / 实施 / PM / 开发 / PMO</span>
-        <span>状态 P0.1 完成 · P0.2 / P1 规划中 · 2026-04-25</span>
+        <span>看板版本 v3.0</span>
+        <span>设计基线 v2 · 2026-04-22</span>
+        <span>总指挥 Claude Opus 4.7</span>
+        <span>干活的 AI Sonnet / KIMI</span>
+        <span>状态 P0.1+P0.2+P0.3+P1-1+P1-3+P1-2+P2-1+P2-2 ✅ · P2-3 待启动 · 2026-04-26</span>
       </div>
     </header>
 
@@ -331,11 +563,774 @@
     <div class="progress-banner">
       <span class="pulse" aria-hidden="true"></span>
       <div style="flex:1; min-width: 260px;">
-        <strong>P0.1 已完成（100/100 测试通过）</strong>　本文档为<strong>目标态设计基线</strong>；实际迁移路径、任务进度、决策台账、未决 TBD 处置见执行台账 <a href="重构执行计划-P0-2026-04-24.md">重构执行计划-P0-2026-04-24.md</a>。<br/>
-        当前进入 <strong>P0.2 基座巩固</strong>阶段， roadmap 已按重新分析结果更新，详见 <a href="#roadmap">§12 落地路线图</a>。
+        <strong>本看板是 WES 3.0 重构的总指挥层</strong>　指挥层（§A-§D）跟踪进度、里程碑、计划、AI 协作日志；设计基线（§1-§13）保留 v2 决策不变。
       </div>
-      <span class="snap">2026-04-25 · P0 T1-T8 全部 DONE · 100/100 pass · 新增 P0.2 阶段 · P1 三条线重排优先级</span>
+      <span class="snap">2026-04-26 · P0~P2-2 全部 DONE · 164/164 pass · P2-3 待启动</span>
     </div>
+
+    <!-- ================================================================ -->
+    <!-- 指挥层 §A · 重构看板（实时仪表盘）                              -->
+    <!-- ================================================================ -->
+    <section id="dashboard" class="cmd-section">
+      <h2><span class="n">A</span>重构看板<span class="cmd-badge">指挥层</span></h2>
+      <p style="color:#7f1d1d; margin-bottom: 12px;">实时同步本次重构的进度、AI 协作状态、关键风险。每次干活的 AI 完成任务后，由总指挥（Claude Opus 4.7）刷新本看板。</p>
+
+      <h3 style="color:#991b1b;">总进度</h3>
+      <div class="kpi-grid">
+        <div class="kpi green">
+          <div class="label">总体完成度</div>
+          <div class="value">70%</div>
+          <div class="sub">P0.1 + P0.2 + P0.3 + P1-1 + P1-3 + P1-2 + P2-1 + P2-2 ✅<br/>剩 P2-3 / P2-4 / P3</div>
+        </div>
+        <div class="kpi blue">
+          <div class="label">已完成阶段</div>
+          <div class="value">8 / 8</div>
+          <div class="sub">P0.1 / P0.2 / P0.3 / P1-1 / P1-3 / P1-2 / P2-1 / P2-2</div>
+        </div>
+        <div class="kpi green">
+          <div class="label">测试通过</div>
+          <div class="value">164<span style="font-size:18px; color:#9ca3af;">/164</span></div>
+          <div class="sub">test:ai 100 + modules 39 + rules 8 + integration 1 + dev-assessment 16</div>
+        </div>
+        <div class="kpi green">
+          <div class="label">tsc 编译</div>
+          <div class="value">0</div>
+          <div class="sub">errors / warnings</div>
+        </div>
+      </div>
+
+      <h3 style="color:#991b1b;">当前 Sprint：P2-3 变更描述 Skill（待启动）</h3>
+      <div class="callout warn" style="margin: 10px 0 16px;">
+        <strong>P0~P2-2 全部完成</strong>　数据层 16 张 PG 表、RBAC 7 角色 25 能力位、DSL 5 条规则、128 端点全部就绪。<br/>
+        <strong>遗留债务</strong>（非阻塞）：<br/>
+        ① ai.service.ts 仍 1,251 行，chat / company-profile / export-markdown 可继续拆分<br/>
+        ② DB 测试依赖本地 Postgres.app，testcontainers 未上<br/>
+        ③ console.log 残留 10 处，待替换为结构化日志
+      </div>
+
+      <h3 style="color:#991b1b;">AI 协作矩阵</h3>
+      <div class="ai-matrix">
+        <div class="ai-card opus">
+          <div class="name">Claude Opus 4.7</div>
+          <div class="role">重构总指挥</div>
+          <div class="duty">制定计划 · 写检查脚本 · 审查其他 AI 成果 · 总结迭代 · 维护本看板</div>
+          <div class="status active">在岗</div>
+        </div>
+        <div class="ai-card sonnet">
+          <div class="name">Claude Sonnet 4.6</div>
+          <div class="role">实施工程师</div>
+          <div class="duty">承担需要细致代码理解、类型修复、跨文件重构的任务（P0.1 T1-T4 + P0-FIX-001）</div>
+          <div class="status idle">待命</div>
+        </div>
+        <div class="ai-card kimi">
+          <div class="name">KIMI Code CLI</div>
+          <div class="role">实施工程师</div>
+          <div class="duty">承担规模化建表、模板化代码、批量重复结构的任务（P0.1 T5-T8 + P0.2 + P1-1 + P1-3 + P1-2 + P2-1 + P0.3 收尾 + P2-2）</div>
+          <div class="status idle">待命（任务已完成待新分配）</div>
+        </div>
+      </div>
+
+      <h3 style="color:#991b1b;">关键风险与阻塞</h3>
+      <div class="risk-list">
+        <div class="risk-item">
+          <div class="rid">R-01</div>
+          <div class="rdesc"><strong>已解决</strong>　PRE_SALES 已补 <code>estimates:create</code>（P0.2 修复）；P1-3/P1-2/P2-1 全部完成。</div>
+          <div class="rowner">✅ 关闭</div>
+        </div>
+        <div class="risk-item">
+          <div class="rid">R-02</div>
+          <div class="rdesc"><strong>技术债部分清理</strong>　<code>ai.service.ts</code> 1969 → 1251 行（拆出 ai-assessment.ts 800 行 + ai-workbook.ts 465 行）；5 处遗留 requireRole 已清理；6 个薄代理 service 死代码已删除。</div>
+          <div class="rowner">→ P2-3 前继续拆</div>
+        </div>
+        <div class="risk-item">
+          <div class="rid">R-03</div>
+          <div class="rdesc"><strong>测试覆盖提升</strong>　test:ai 从 79 增至 100；新增 P1-2/P2-1 集成测试；test:integration 1/1 通过。RBAC e2e 仍待补充。</div>
+          <div class="rowner">→ P2-3 补充</div>
+        </div>
+        <div class="risk-item high">
+          <div class="rid">R-05</div>
+          <div class="rdesc"><strong>DB 测试依赖本地 Postgres.app</strong>　CI 环境无法运行 DB 测试；需引入 testcontainers 实现自包含测试。</div>
+          <div class="rowner">→ P2-3 前解决</div>
+        </div>
+      </div>
+
+      <h3 style="color:#991b1b;">最近 commit（按时间倒序）</h3>
+      <table style="font-size:12px;">
+        <thead><tr><th style="width:90px;">提交</th><th style="width:90px;">作者</th><th>说明</th><th style="width:80px;">影响</th></tr></thead>
+        <tbody>
+          <tr><td><code>d256dde</code></td><td>Deepseek</td><td>STAB-001 — req.user 类型升级 + 类型兜底</td><td>fix</td></tr>
+          <tr><td><code>1d742f5</code></td><td>KIMI</td><td>P2-2 开发评估 Agent — DevAssessment 7 端端点 + AI 草稿 + merge</td><td>feat</td></tr>
+          <tr><td><code>8f8a1cb</code></td><td>KIMI</td><td>P0.3 收尾 — 清理 ai.service.ts 遗留 requireRole + 删除薄代理 service 死代码</td><td>fix</td></tr>
+          <tr><td><code>b1cdec3</code></td><td>KIMI</td><td>评估协同工作区 — CollabWorkspace + CollabMessage + 13 端点</td><td>feat</td></tr>
+          <tr><td><code>1f55c77</code></td><td>KIMI</td><td>销售快报 Skill — OpportunityBrief + 区间报价 + 分期 + 变更重算</td><td>feat</td></tr>
+          <tr><td><code>3f84a8d</code></td><td>KIMI</td><td>PM/PMO Web 工作台 — Handoff / Narrative / Deliverable / QGReview / SealedBaseline</td><td>feat</td></tr>
+          <tr><td><code>1f0f6ea</code></td><td>KIMI</td><td>售前审查 Agent — RequirementPack / InitialEstimate / SOW 端到端</td><td>feat</td></tr>
+          <tr><td><code>72c2dbf</code></td><td>KIMI</td><td>基座巩固 — RBAC接入路由 + ai.service拆分 + 4实体建表 + 5条DSL规则</td><td>feat</td></tr>
+          <tr><td><code>63a95ba</code></td><td>Sonnet</td><td>ai.service 4 处 Kimi 调用迁至新 Provider 基座</td><td>feat</td></tr>
+          <tr><td><code>8a80046</code></td><td>Sonnet</td><td>长文抽取器 RequirementExtractor — workbookText → ExtractionResult</td><td>feat</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- 指挥层 §B · 重构里程碑（地铁图）                                  -->
+    <!-- ================================================================ -->
+    <section id="milestones" class="cmd-section">
+      <h2><span class="n">B</span>重构里程碑<span class="cmd-badge">指挥层</span></h2>
+      <p style="color:#7f1d1d;">M0 ~ M7 共 8 个里程碑站点，每站标注 <strong>计划完成时间 / 实际完成时间</strong>。<span style="color:#059669;">●</span> 已到站　<span style="color:#dc2626;">●</span> 当前正在　<span style="color:#2563eb;">○</span> 下一站　<span style="color:#9ca3af;">○</span> 远期</p>
+
+      <div class="subway">
+        <div class="subway-line">
+          <div class="subway-station done">
+            <div class="dot"></div>
+            <div class="mid">M0</div>
+            <div class="label">v2 设计冻结<br/>9 TBD 全决</div>
+            <div class="planned">计划 04-22</div>
+            <div class="actual">实际 04-22 ✓</div>
+          </div>
+          <div class="subway-station done">
+            <div class="dot"></div>
+            <div class="mid">M1</div>
+            <div class="label">P0.1 基座<br/>T1-T8 全绿</div>
+            <div class="planned">计划 04-25</div>
+            <div class="actual">实际 04-25 ✓</div>
+          </div>
+          <div class="subway-station done">
+            <div class="dot"></div>
+            <div class="mid">M2</div>
+            <div class="label">P0.2 巩固<br/>RBAC + 7 表 + 5 规则</div>
+            <div class="planned">计划 04-25</div>
+            <div class="actual">实际 04-25 ✓</div>
+          </div>
+          <div class="subway-station done">
+            <div class="dot"></div>
+            <div class="mid">M3</div>
+            <div class="label">P1-1 售前<br/>需求包+SOW+初估</div>
+            <div class="planned">计划 04-25</div>
+            <div class="actual">实际 04-25 ✓</div>
+          </div>
+          <div class="subway-station done">
+            <div class="dot"></div>
+            <div class="mid">M4</div>
+            <div class="label">P1-3 PM/PMO<br/>接力+4交付物+封版</div>
+            <div class="planned">计划 05-25</div>
+            <div class="actual">实际 04-25 ✓</div>
+          </div>
+          <div class="subway-station done">
+            <div class="dot"></div>
+            <div class="mid">M5</div>
+            <div class="label">P1-2 销售<br/>快报 Skill</div>
+            <div class="planned">计划 06-05</div>
+            <div class="actual">实际 04-25 ✓</div>
+          </div>
+          <div class="subway-station done">
+            <div class="dot"></div>
+            <div class="mid">M6</div>
+            <div class="label">P2-1 协同<br/>CollabWorkspace</div>
+            <div class="planned">计划 07-15</div>
+            <div class="actual">实际 04-25 ✓</div>
+          </div>
+          <div class="subway-station done">
+            <div class="dot"></div>
+            <div class="mid">M7</div>
+            <div class="label">P2-2 开发评估<br/>DevAssessment</div>
+            <div class="planned">计划 04-25</div>
+            <div class="actual">实际 04-25 ✓</div>
+          </div>
+          <div class="subway-station active">
+            <div class="dot"></div>
+            <div class="mid">M8</div>
+            <div class="label">P2-3 变更描述<br/>Change Skill</div>
+            <div class="planned">计划 06-15</div>
+            <div class="actual">待启动</div>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="color:#991b1b;">里程碑详情</h3>
+      <table style="font-size:12.5px;">
+        <thead>
+          <tr>
+            <th style="width:50px;">站点</th>
+            <th style="width:130px;">里程碑名</th>
+            <th>主要交付</th>
+            <th style="width:90px;">计划</th>
+            <th style="width:130px;">实际 / 状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong style="color:#059669;">M0</strong></td><td>v2 设计冻结</td><td>9 条 TBD 全部裁决；HTML 设计基线入库</td><td>04-22</td><td style="color:#059669;">04-22 ✓ 准时</td></tr>
+          <tr><td><strong style="color:#059669;">M1</strong></td><td>P0.1 AI 基座</td><td>Provider 抽象 / Evidence 持久化 / DSL 引擎雏形 / RBAC 常量 / IA 冒烟</td><td>04-25</td><td style="color:#059669;">04-25 ✓ 准时</td></tr>
+          <tr><td><strong style="color:#059669;">M2</strong></td><td>P0.2 基座巩固</td><td>RBAC 接入路由 / 7 张 PG 表 / DSL 5 条规则 / AssessmentVersion schema</td><td>04-25</td><td style="color:#059669;">04-25 ✓ 准时（同日并入 M1 当日完成）</td></tr>
+          <tr><td><strong style="color:#059669;">M3</strong></td><td>P1-1 售前审查 Agent</td><td>RequirementPack / InitialEstimate / SOW 三层服务 + 14 端点 + 9 集成测试</td><td>04-25</td><td style="color:#059669;">04-25 ✓ 准时</td></tr>
+          <tr><td><strong style="color:#059669;">M4</strong></td><td>P1-3 PM/PMO 工作台</td><td>AssessmentHandoff 状态机 / Narrative 生成 / 4 大交付物派生 / PMO 审核 checklist / 封版基线</td><td>05-25</td><td style="color:#059669;">04-25 ✓ 提前</td></tr>
+          <tr><td><strong style="color:#059669;">M5</strong></td><td>P1-2 销售快报 Skill</td><td>OpportunityBrief 落库 / 对话式描述 / 分期方案生成</td><td>06-05</td><td style="color:#059669;">04-25 ✓ 提前</td></tr>
+          <tr><td><strong style="color:#059669;">M6</strong></td><td>P2-1 评估协同工作区</td><td>CollabWorkspace / CollabMessage / 结构化质询-回复 / 13 端点</td><td>07-15</td><td style="color:#059669;">04-25 ✓ 提前</td></tr>
+          <tr><td><strong style="color:#059669;">M7</strong></td><td>P2-2 开发评估 Agent</td><td>DevAssessment 实体 / 开发顾问独立工作面 / AI 草稿生成 / 合并入总评估</td><td>04-25</td><td style="color:#059669;">04-25 ✅ 完成</td></tr>
+          <tr><td><strong style="color:#dc2626;">M8</strong></td><td>P2-3 变更描述 Skill</td><td>变更描述 Skill + 差分影响分析</td><td>06-15</td><td style="color:#dc2626;">⚠ 待启动</td></tr>
+          <tr><td><strong style="color:#6b7280;">M9</strong></td><td>P3 上线就绪</td><td>规则进化闭环 / 合同系统集成 / 多租户 SSO</td><td>08-30</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- 指挥层 §C · 重构计划 WBS                                         -->
+    <!-- ================================================================ -->
+    <section id="refactor-plan" class="cmd-section">
+      <h2><span class="n">C</span>重构计划 WBS<span class="cmd-badge">指挥层</span></h2>
+      <p style="color:#7f1d1d;">详细任务分解：每条含负责 AI / 计划起止时间 / 实际完成时间 / 验收标准 / 依赖。三段：<strong style="color:#059669;">已完成</strong> · <strong style="color:#dc2626;">进行中（含债务）</strong> · <strong style="color:#2563eb;">待开始</strong>。</p>
+
+      <!-- 已完成 -->
+      <div class="wbs-group done">
+        <div class="gtitle">✅ 已完成（M0-M3，2026-04-22 ~ 04-25）</div>
+
+        <div class="wbs-row done">
+          <div class="wid">M0-DESIGN</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>v2 设计冻结</strong>　完成 9 条 TBD 全裁决；HTML 设计基线（§1-§13）入库；TBD-V2-04 走「路径 B 两表并存」。
+            <div class="accept">9 条 TBD 全部有「裁决（2026-04-24）」标记 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge tbd">User</span></div>
+          <div class="wdates"><div class="planned">04-22</div><div class="actual">04-22 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.1-T1</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>AI Provider 抽象层</strong>　<code>ModelProvider</code> 接口 + <code>KimiProvider</code> 实现 + 注册表。
+            <div class="accept">Provider 注册表 + KimiProvider chatCompletion 跑通 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge sonnet">Sonnet</span></div>
+          <div class="wdates"><div class="planned">04-23</div><div class="actual">04-23 准时<br/><code>948451a</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.1-T2</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>证据链契约</strong>　<code>Evidence</code> / <code>ExtractionResult</code> TS 类型 + JSON Schema draft-07。
+            <div class="accept">类型 + Schema 双向校验通过 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge sonnet">Sonnet</span></div>
+          <div class="wdates"><div class="planned">04-23</div><div class="actual">04-23 准时<br/><code>93212a6</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.1-DB</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>Postgres + Drizzle 基座</strong>　双库（dev + test）；evidences 表上线。
+            <div class="accept">migrate 跑通 + test 库隔离 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge sonnet">Sonnet</span></div>
+          <div class="wdates"><div class="planned">04-23</div><div class="actual">04-23 准时<br/><code>e50281c</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.1-T3</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>RequirementExtractor 长文抽取器</strong>　whole-result 降级；8 条用例（happy / 部分缺字段 / Provider 错 / JSON 解析失败 / 等）。
+            <div class="accept">8/8 测试通过 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge sonnet">Sonnet</span></div>
+          <div class="wdates"><div class="planned">04-24</div><div class="actual">04-24 准时<br/><code>8a80046</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.1-T4</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>Kimi 调用迁至 Provider</strong>　ai.service.ts 4 处迁移；删旧 HTTP 底座 ~85 行；2541→2408 行。
+            <div class="accept">既有测试不挂；旧 HTTP 调用全删 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge sonnet">Sonnet</span></div>
+          <div class="wdates"><div class="planned">04-24</div><div class="actual">04-24 准时<br/><code>63a95ba</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.1-T5</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>Evidence + change_log 持久化</strong>　extraction_results + change_logs 表；事务双写；字段级 old/new 二元组（销 TBD-P0-T5-01）。
+            <div class="accept">EvidenceRepository 三方法 + 事务正确 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.1-T6</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>DSL 引擎雏形 + 1 条规则</strong>　<code>dsl/engine.ts</code> + <code>sow-completeness-v1</code>；异常隔离。
+            <div class="accept">engine 测试 8/8 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.1-T7</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>7 角色 RBAC 常量 + 25 能力位</strong>　roles.ts + permissions.ts + middleware.ts；旧角色映射。
+            <div class="accept">roles.test 17/17 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.1-T8</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>IA 初评冒烟测试</strong>　ia-initial-smoke.test.ts 6 条串联 T1-T7。<span style="color:#d97706;">⚠ 角色拦截只调函数未过 Express，留 P1-3 前补</span>
+            <div class="accept">6/6 测试通过；T1-T7 链路打通 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.2-1</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>RBAC 接入路由</strong>　presales.routes 14 端点接入 requireCapability；req.user 挂载到 Express namespace。
+            <div class="accept">14 端点全鉴权；req.user 类型安全 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span> + <span class="badge sonnet">Sonnet</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时<br/><code>72c2dbf+0f520b8</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.2-2</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>ai.service.ts 瘦身</strong>　2408 → 1969 行（−439）。<span style="color:#d97706;">⚠ 部分完成，未拆为 5 个独立模块；剩余 1969 行延后到 P1-3 前</span>
+            <div class="accept">瘦身 −400 行以上 ⚠（达成）；按领域拆分 ✗（未达成）</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 部分<br/><code>72c2dbf</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.2-3</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>首批实体建表（4 张）</strong>　requirement_packs / sow_documents / initial_estimates / assessment_versions。
+            <div class="accept">migration 0002 跑通；jsonb $type&lt;&gt; 类型完整 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时<br/><code>72c2dbf</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.2-4</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>DSL 规则集 1 → 5 条</strong>　industry-mandatory / module-dependency / confidence-threshold / wbs-completeness。
+            <div class="accept">5 条规则在 review() 中均被调用 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.2-5</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>AssessmentVersion schema</strong>　Correction/Revision/initial 三元 + ownerRole + deliveryMode + 状态机。
+            <div class="accept">schema 落库；migration 包含 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P1-1-A</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>RequirementPackService</strong>　CRUD + review（5 规则 + inquiries + 4 维置信度）+ getFieldConfidences。
+            <div class="accept">9 集成测试全绿；review 抛 ApiError(404) ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时<br/><code>1f0f6ea</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P1-1-B</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>InitialEstimateService</strong>　规则化估算 + 风险标签 + 假设清单 + 4 维置信度 + 二分期方案 + CRUD。
+            <div class="accept">2 条测试通过；estimate 反查 by packId 跑通 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P1-1-C</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>SowService</strong>　按模块清单生成 SOW；定制识别（关键词）；空模块占位；bumpVersion 批量升版。
+            <div class="accept">3 条测试通过；定制识别 + 升版逻辑跑通 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P1-1-D</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>presales.routes.ts 14 端点</strong>　RequirementPack(6) + InitialEstimate(3) + SOW(5) 全接入 RBAC；ApiError 处理。
+            <div class="accept">tsc 0 错；req.user 在所有需要的地方有 null 检查 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span> + <span class="badge sonnet">Sonnet</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时<br/><code>1f0f6ea+0f520b8</code></div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P1-1-E</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>presales.service.test.ts 9 集成测试</strong>　RequirementPack / InitialEstimate / SOW 三层全覆盖；workload_eval_test 隔离库。
+            <div class="accept">test:ai 79/79 ✓ 含本套 9 条</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0-FIX-001</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>修复 KIMI 遗留的 4 个 P0 阻塞</strong>　exports 漏 commit / Express req.user 类型缺失 / jsonb 列缺 $type / review 抛裸 Error。
+            <div class="accept">tsc 0 错；test:modules 39/39 恢复 ✓</div>
+          </div>
+          <div class="wowner"><span class="badge sonnet">Sonnet</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 准时<br/><code>0f520b8</code></div></div>
+        </div>
+      </div>
+
+      <!-- 已完成：M3 → M6 -->
+      <div class="wbs-group done">
+        <div class="gtitle">✅ 已完成：META + P1-3 + P1-2 + P2-1（2026-04-25 ~ 04-25）</div>
+
+        <div class="wbs-row done">
+          <div class="wid">META-01</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>P0 阻塞清债（3 项）</strong>
+            ① PRE_SALES 已补 <code>estimates:create</code>（P0.2 修复）
+            ② <code>review()</code> 空证据下返回 1 条「证据缺失」违规
+            ③ <code>confidenceSummary.byDimension</code> rulePassRate 已计算自 violations
+            <div class="accept">全部解决；test:ai 100/100 ✅</div>
+          </div>
+          <div class="wowner"><span class="badge opus">Opus</span> + <span class="badge sonnet">Sonnet</span></div>
+          <div class="wdates"><div class="planned">04-26</div><div class="actual">04-25 完成</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P1-3-A1~A6</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>PM/PMO 工作台六模块</strong>　AssessmentHandoff + AssessmentVersion PG 化 + Deliverable 4 件套 + AssessmentNarrative + QualityGateReview + SealedBaseline。
+            <div class="accept">18 端点 · 5 张 PG 表 · commit 3f84a8d ✅</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-30 ~ 05-25</div><div class="actual">04-25 完成</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P1-3-A7</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>ai.service.ts 部分拆分</strong>　1969 → 1251 行；Workbook → ai-workbook.ts（465 行），Assessment → ai-assessment.ts（800 行）。完整五模块拆分目标未达，剩余为 P0.3 债务。
+            <div class="accept">瘦身 −718 行 ✅（目标部分达成）</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">05-21 ~ 05-24</div><div class="actual">04-25 部分</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P1-3-A8</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>P1-3 集成测试</strong>　PM/PMO 工作台全链路覆盖。
+            <div class="accept">test:ai 100/100 ✅（含 P1-3 用例）</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">05-24 ~ 05-25</div><div class="actual">04-25 完成</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P1-2</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>销售快报 Skill</strong>　OpportunityBrief 落库 / 对话式描述 / 分期方案生成 / 变更重算。
+            <div class="accept">7 端点 · commit 1f55c77 ✅</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">06-05</div><div class="actual">04-25 完成</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P2-1</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>评估协同工作区</strong>　CollabWorkspace + CollabMessage 双表；结构化质询-回复流程。
+            <div class="accept">13 端点 · 2 张 PG 表 · commit b1cdec3 ✅</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">07-15</div><div class="actual">04-25 完成</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P0.3</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>ai.service.ts 拆分收尾</strong>　清理 5 处遗留 requireRole；删除 6 个薄代理 service 死代码 + services/index.ts；补提交 ai-assessment.ts。
+            <div class="accept">test:ai 100/100 · test:modules 39/39 · test:rules 8/8 · test:integration 1/1 ✅</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">04-25</div><div class="actual">04-25 完成 · commit 8f8a1cb</div></div>
+        </div>
+      </div>
+
+      <!-- 已完成：P2-2 -->
+      <div class="wbs-group done">
+        <div class="gtitle">✅ 已完成：P2-2 开发评估 Agent（M7，04-25 完成）</div>
+
+        <div class="wbs-row done">
+          <div class="wid">P2-2-A1</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>DevAssessment 实体 + 表</strong>　devItems / effortEstimate / contractMode（embedded | separate）/ ownedBy devConsultant。
+            <div class="accept">建表 + CRUD + 开发顾问独立工作面 · commit 1d742f5 ✅</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">05-25 ~ 06-05</div><div class="actual">04-25 完成</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P2-2-A2</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>私有云部署追加提示</strong>　AssessmentVersion.deliveryMode = private_cloud 时自动触发"部署运维评估"子任务。
+            <div class="accept">自动提示 + 开发顾问评估入口 · commit 1d742f5 ✅</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">06-05 ~ 06-10</div><div class="actual">04-25 完成</div></div>
+        </div>
+
+        <div class="wbs-row done">
+          <div class="wid">P2-2-A3</div>
+          <div class="wstatus done">DONE</div>
+          <div class="wbs-desc">
+            <strong>开发评估集成测试</strong>　覆盖开发条目分配 → AI 评估 → 合并入总评估 → 合同模式决策。
+            <div class="accept">16 条 dev-assessment 测试 · test:ai 100/100 ✅</div>
+          </div>
+          <div class="wowner"><span class="badge kimi">KIMI</span></div>
+          <div class="wdates"><div class="planned">06-10 ~ 06-15</div><div class="actual">04-25 完成</div></div>
+        </div>
+      </div>
+
+      <!-- 进行中 -->
+      <div class="wbs-group active">
+        <div class="gtitle">🟡 当前 Sprint：P2-3 变更描述 Skill（M8，待启动）</div>
+        <div class="wbs-row" style="background:#fef2f2; border-color:#fecaca;">
+          <div class="wid">P2-3</div>
+          <div class="wstatus active">TODO</div>
+          <div class="wbs-desc"><strong>变更描述 Skill + 差分影响分析</strong>　销售侧变更提报 + PM 侧 diff 视图</div>
+          <div class="wowner"><span class="badge tbd">TBD</span></div>
+          <div class="wdates"><div class="planned">06-15</div><div class="actual">待启动</div></div>
+        </div>
+      </div>
+
+      <div class="wbs-group pending">
+        <div class="gtitle">⚪ 远期：P2-4 / P3（详见 §12 v2 路线图）</div>
+        <div class="wbs-row" style="background:#fafafa;">
+          <div class="wid">P2-3</div>
+          <div class="wstatus pending">PLAN</div>
+          <div class="wbs-desc"><strong>变更描述 Skill + 差分影响分析</strong>　销售侧变更提报 + PM 侧 diff 视图</div>
+          <div class="wowner"><span class="badge tbd">TBD</span></div>
+          <div class="wdates"><div class="planned">06-15</div><div class="actual">—</div></div>
+        </div>
+        <div class="wbs-row" style="background:#fafafa;">
+          <div class="wid">P2-4</div>
+          <div class="wstatus pending">PLAN</div>
+          <div class="wbs-desc"><strong>历史项目库 + 相似度检索</strong>　项目结案数据回流；行业 × 规模的向量检索</div>
+          <div class="wowner"><span class="badge tbd">TBD</span></div>
+          <div class="wdates"><div class="planned">07-15</div><div class="actual">—</div></div>
+        </div>
+        <div class="wbs-row" style="background:#fafafa;">
+          <div class="wid">P3-1~3</div>
+          <div class="wstatus pending">PLAN</div>
+          <div class="wbs-desc"><strong>P3 上线就绪</strong>　规则进化闭环 / 合同系统集成 / 多租户 SSO</div>
+          <div class="wowner"><span class="badge tbd">TBD</span></div>
+          <div class="wdates"><div class="planned">08-30</div><div class="actual">—</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- 指挥层 §D · 工作日志（HTML 摘要）                                 -->
+    <!-- ================================================================ -->
+    <section id="worklogs" class="cmd-section">
+      <h2><span class="n">D</span>工作日志<span class="cmd-badge">指挥层</span></h2>
+      <p style="color:#7f1d1d;">
+        每条卡片是一段 AI 工作的<strong>三字段摘要</strong>：做了什么 / 做得怎么样 / 后续待办。<br/>
+        <strong>详细日志</strong>（含起止时间 / 输入上下文 / 自评 / 给下一棒的话）写在共享文件 <a href="WORK_LOG_AI_COLLAB.md" style="color:#dc2626; font-weight:700;">📄 WORK_LOG_AI_COLLAB.md</a>。
+      </p>
+
+      <div class="callout warn" style="margin: 12px 0 18px;">
+        <strong>规约</strong>　每个干活的 AI 完成任务后：
+        ① 在 <code>WORK_LOG_AI_COLLAB.md</code> 顶部追加一段完整 entry
+        ② commit 时引用任务编号
+        ③ 在本 §D 由总指挥（Opus）刷新一段对应摘要卡片。<br/>
+        干活的 AI <strong>不直接动 HTML</strong>，避免冲突。
+      </div>
+
+      <h3 style="color:#991b1b;">2026-04-25 工作摘要（按时间倒序）</h3>
+
+      <div class="worklog-card kimi">
+        <div class="wlhead">
+          <div class="wltask">任务 A · P0.3 收尾（清债）</div>
+          <div class="wlauthor kimi">2026-04-25 19:10 ~ 19:35 · <span class="name">KIMI Code CLI</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>commit <code>8f8a1cb</code>：清理 ai.service.ts 5 处遗留 requireRole；删除 6 个薄代理 service 死代码 + services/index.ts；补提交 ai-assessment.ts。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。4 个测试套件全部通过：test:ai 100/100 · test:modules 39/39 · test:rules 8/8 · test:integration 1/1。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>ai.service.ts 仍 1,251 行可继续拆分；testcontainers 未上；等待总指挥下达 P2-3 任务。</div>
+        </div>
+        <div class="wllink">📄 详细日志 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-25-1910--kimi-code-cli--任务-a">WORK_LOG_AI_COLLAB.md</a></div>
+      </div>
+
+      <div class="worklog-card kimi">
+        <div class="wlhead">
+          <div class="wltask">P2-1 · 评估协同工作区</div>
+          <div class="wlauthor kimi">2026-04-25 下午 · <span class="name">KIMI Code CLI</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>commit <code>b1cdec3</code>：CollabWorkspace + CollabMessage 2 表 + 结构化质询-回复 + 13 端点。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。test:ai 100/100 ✅。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>无。</div>
+        </div>
+        <div class="wllink">📄 详细日志 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-25-1500--kimi-code-cli--p2-1">WORK_LOG_AI_COLLAB.md</a></div>
+      </div>
+
+      <div class="worklog-card kimi">
+        <div class="wlhead">
+          <div class="wltask">P1-2 · 销售快报 Skill</div>
+          <div class="wlauthor kimi">2026-04-25 下午 · <span class="name">KIMI Code CLI</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>commit <code>1f55c77</code>：OpportunityBrief 表 + 区间报价/分期/变更重算 + 10 端点。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。test:ai 100/100 ✅。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>无。</div>
+        </div>
+        <div class="wllink">📄 详细日志 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-25-1400--kimi-code-cli--p1-2">WORK_LOG_AI_COLLAB.md</a></div>
+      </div>
+
+      <div class="worklog-card kimi">
+        <div class="wlhead">
+          <div class="wltask">P1-3 · PM/PMO Web 工作台</div>
+          <div class="wlauthor kimi">2026-04-25 上午 ~ 下午 · <span class="name">KIMI Code CLI</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>commit <code>3f84a8d</code>：Handoff / Narrative / Deliverable / QualityGateReview / SealedBaseline 5 表 + 18 端点。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。test:ai 100/100 ✅。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>无。</div>
+        </div>
+        <div class="wllink">📄 详细日志 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-25-1000--kimi-code-cli--p1-3">WORK_LOG_AI_COLLAB.md</a></div>
+      </div>
+
+      <div class="worklog-card opus">
+        <div class="wlhead">
+          <div class="wltask">META-00 · 总指挥就位 + 看板改造</div>
+          <div class="wlauthor opus">2026-04-25 16:00 ~ 17:30 · <span class="name">Claude Opus 4.7</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>新建 <code>WORK_LOG_AI_COLLAB.md</code>（AI 协作规约 + 历史日志补录）；HTML 改造为 WES 3.0 看板（brand + 新增 §A-§D 指挥层 + 保留 §1-§13 设计基线）。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。指挥层 4 个 section 框架就位；前期 Sonnet/KIMI 工作全部回填到 markdown。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>META-01（修 3 个 P0 阻塞）/ META-02（P1-3 WBS 起草已部分完成）/ META-03（写检查脚本）。</div>
+        </div>
+        <div class="wllink">📄 详细日志 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-25-1600--claude-opus-47--meta-00">WORK_LOG_AI_COLLAB.md</a></div>
+      </div>
+
+      <div class="worklog-card sonnet">
+        <div class="wlhead">
+          <div class="wltask">P0-FIX-001 · 修复 KIMI 遗留的 P1-1 阻塞</div>
+          <div class="wlauthor sonnet">2026-04-25 ~14:30 · <span class="name">Claude Sonnet 4.6</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>commit <code>0f520b8</code>：补 .gitignore 豁免 + exports 模块文件；rbac/middleware 扩展 req.user；presales.routes 13 处 <code>req.params.id as string</code>；jsonb 列加 .$type&lt;&gt;；review 抛 ApiError(404)。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。tsc 0 错；test:modules 39/39；test:ai 79/79；test:rules 8/8。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>P1-3 前补 RBAC 中间件的 Express e2e 测试（KIMI 那次只调函数没过 Express）。</div>
+        </div>
+        <div class="wllink">📄 详细日志 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-25-1430--claude-sonnet-46--p0-fix-001">WORK_LOG_AI_COLLAB.md</a></div>
+      </div>
+
+      <div class="worklog-card kimi">
+        <div class="wlhead">
+          <div class="wltask">P1-1 · 售前审查 Agent 端到端</div>
+          <div class="wlauthor kimi">2026-04-25 上午 · <span class="name">KIMI Code CLI</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>commit <code>1f0f6ea</code>：RequirementPackService + InitialEstimateService + SowService 三层服务；presales.routes.ts 14 端点；presales.service.test.ts 9 集成测试。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself warn">完成度 90%。KIMI 自报「tsc 0 错 + 79/79 通过」与实际不符（实际 tsc 12 错、test:modules 挂）；3 项 P0 + 6 项 P1 债务由审查发现。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>3 项 P0 已由 Sonnet 在 P0-FIX-001 修复；P1 债务已在 P1-3/P1-2/P2-1 完成过程中自然消化。</div>
+        </div>
+        <div class="wllink">📄 详细日志 + 审查报告 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-25-1200--kimi-code-cli--p1-1">WORK_LOG_AI_COLLAB.md</a> / <a href="KIMI工作审查报告-2026-04-25.md">KIMI工作审查报告</a></div>
+      </div>
+
+      <div class="worklog-card kimi">
+        <div class="wlhead">
+          <div class="wltask">P0.2 · 基座巩固（5 项）</div>
+          <div class="wlauthor kimi">2026-04-25 上午 · <span class="name">KIMI Code CLI</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>commit <code>72c2dbf</code>：RBAC 接入路由 / ai.service 瘦身 / 4 张实体表（含 assessment_versions） / DSL 1→5 条 / AssessmentVersion schema。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself warn">完成度 90%。RBAC + 建表 + DSL + schema 4 项达标；ai.service 瘦身只达 −439 行未拆为 5 模块。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>ai.service 完整领域拆分留到 P1-3-A7；wbs-completeness 中文分词改进留 P1-2。</div>
+        </div>
+        <div class="wllink">📄 详细日志 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-25-1000--kimi-code-cli--p02">WORK_LOG_AI_COLLAB.md</a></div>
+      </div>
+
+      <div class="worklog-card kimi">
+        <div class="wlhead">
+          <div class="wltask">P0.1 T5-T8 · 数据层 + DSL + RBAC + 冒烟</div>
+          <div class="wlauthor kimi">2026-04-25 早间 · <span class="name">KIMI Code CLI</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>T5 Evidence 持久化（事务双写）；T6 DSL 引擎雏形 + sow-completeness-v1；T7 7 角色 RBAC + 25 能力位；T8 IA 冒烟 6 条测试串联 T1-T7。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%（功能层）。字段级 old/new 二元组（销 TBD-P0-T5-01）；异常隔离设计良好。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>T8 角色拦截测试只调函数没过 Express → P1-3 前补；rate-card 实体（TBD-6 裁决）留 P1-3。</div>
+        </div>
+        <div class="wllink">📄 详细日志 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-25-0800--kimi-code-cli--p01-t5-t8">WORK_LOG_AI_COLLAB.md</a></div>
+      </div>
+
+      <div class="worklog-card sonnet">
+        <div class="wlhead">
+          <div class="wltask">P0.1 T1-T4 · AI Provider 基座 + Extractor</div>
+          <div class="wlauthor sonnet">2026-04-22 ~ 04-24 · <span class="name">Claude Sonnet 4.6</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>T1 Provider 抽象 / T2 证据链契约 / DB Postgres Drizzle 基座 / T3 RequirementExtractor（whole-result 降级，8 用例）/ T4 Kimi 调用迁至 Provider（−85 行 HTTP 底座）。</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。Provider 抽象固化、Evidence 事务保护、Extractor 降级测试覆盖完整。</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>无（移交 KIMI 接 T5-T8）。</div>
+        </div>
+        <div class="wllink">📄 详细日志 → <a href="WORK_LOG_AI_COLLAB.md#2026-04-22--2026-04-24--claude-sonnet-46--p01-t1-t4">WORK_LOG_AI_COLLAB.md</a></div>
+      </div>
+
+      <div class="callout good" style="margin-top: 18px; font-size: 13px;">
+        <strong>下一段日志</strong>　P2-3 变更描述 Skill 启动后，由负责 AI 在本 §D 顶部追加卡片，并在 WORK_LOG_AI_COLLAB.md 追加 entry。
+      </div>
+    </section>
 
     <!-- ============ 1. OVERVIEW ============ -->
     <section id="overview">
@@ -1217,14 +2212,14 @@ flowchart TB
       <div class="roadmap-row"><div class="pri p0">P0-2</div><div class="roadmap-item"><strong>规则引擎（双引擎 + DSL）</strong>　语法设计 + 解释器 + 灰度 + 命中追溯；计算引擎重构，完备性引擎从零建。</div></div>
       <div class="roadmap-row"><div class="pri p0">P0-3</div><div class="roadmap-item"><strong>Kimi Agent 基座</strong>　ModelProvider 抽象；长文抽取 + 证据链 + 置信度核心能力；覆盖理由存储链路。</div></div>
 
-      <!-- ============ P0 执行进度快照 · 2026-04-25 ============ -->
+      <!-- ============ P0+P0.2+P1-1 执行进度快照 · 2026-04-25 ============ -->
       <div class="progress-panel">
         <div class="head">
-          <div class="title">▎P0 执行进度 · 2026-04-25 快照</div>
+          <div class="title">▎P0.1 + P0.2 + P0.3 + P1-1 + P1-3 + P1-2 + P2-1 执行进度 · 2026-04-25 快照</div>
           <div class="summary">
-            完成度 <span class="pct">8 / 8</span>　·　本次 P0 精确称 <strong>P0.1</strong>（v2 路线图 P0-1/P0-3 首批 + P0-2 雏形）　·
-            100/100 测试通过（<code>test:ai</code> 53 + <code>test:modules</code> 39 + <code>test:rules</code> 8 + tsc 0 错）　·
-            详情见 <a href="重构执行计划-P0-2026-04-24.md" style="color:#2563eb;">执行台账</a> 与 <a href="WORK_LOG_KIMI_P0_2026-04-25.md" style="color:#2563eb;">Kimi 工作日志</a>
+            完成度 <span class="pct">全部完成</span>　·　P0.1（T1-T8）+ P0.2（5 项基座巩固）+ P0.3（ai.service 拆分收尾）+ P1-1（售前 Agent）+ P1-3（PM/PMO 工作台）+ P1-2（销售快报）+ P2-1（评估协同）全部 DONE　·
+            <code>test:ai</code> 100 + <code>test:modules</code> 39 + <code>test:rules</code> 8 + <code>test:integration</code> 1 + <code>dev-assessment</code> 16 = <strong>164/164</strong> 通过 · tsc 0 错　·
+            详情见 <a href="重构执行计划-P0-2026-04-24.md" style="color:#2563eb;">执行台账</a> 与 <a href="WORK_LOG_AI_COLLAB.md" style="color:#2563eb;">AI 协作日志</a>
           </div>
         </div>
 
@@ -1290,26 +2285,99 @@ flowchart TB
           <div class="desc"><strong>IA 初评冒烟</strong>　<code>src/ai/smoke/ia-initial-smoke.test.ts</code> 6 条测试串联 T1-T7 完整链路：模拟抽取 → <code>EvidenceRepository.saveExtractionResult</code>（T5）→ <code>findByExtractionId</code> 查询 → <code>evaluate([sowCompletenessV1])</code> DSL 校验（T6）→ <code>legacyRoleToV2Roles + anyRoleHasCapability</code> 角色权限验证（T7）。含 happy path / 缺字段 / 开发范围"无" / history 双写。共享 <code>test-helpers/db.ts</code> Pool 避免并发死锁；<code>test:ai</code> 加 <code>--test-concurrency=1</code> 串行。</div>
           <div class="commit">2026-04-25 · Kimi</div>
         </div>
+
+        <!-- P0.2 tasks -->
+        <div class="task-row" style="background:#f0fdf4; border-radius:6px; margin-top:12px;">
+          <div class="tid" style="color:#059669;">P0.2-1</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>RBAC 接入全部路由</strong>　<code>presales.routes.ts</code> 14 个端点全部接入 <code>requireCapability</code> / <code>requireAnyCapability</code>；<code>rbac/middleware.ts</code> 扩展 Express 命名空间，挂载 <code>req.user</code>（id + role）到所有鉴权路径，消除 4 处 TS2339。</div>
+          <div class="commit"><code>72c2dbf</code> + <code>0f520b8</code></div>
+        </div>
+
+        <div class="task-row" style="background:#f0fdf4; border-radius:6px;">
+          <div class="tid" style="color:#059669;">P0.2-2</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>ai.service.ts 瘦身（部分）</strong>　2408 → 1969 行（−439）；归一化 + handler 冗余清理。<strong>未完成</strong>按领域拆分为 5 个独立模块（extractor / sales / assessment / chat / export），剩余 1969 行视为 P1-3 前技术债。</div>
+          <div class="commit"><code>72c2dbf</code></div>
+        </div>
+
+        <div class="task-row" style="background:#f0fdf4; border-radius:6px;">
+          <div class="tid" style="color:#059669;">P0.2-3</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>首批实体建表（4 张）</strong>　<code>requirement_packs</code> + <code>sow_documents</code> + <code>initial_estimates</code>（migration <code>0002_shocking_inertia</code>）+ <code>assessment_versions</code>（schema 设计，合并入 migration）。<code>modules</code> / <code>constraints</code> jsonb 列补 <code>.$type&lt;T[]&gt;()</code>，消除 2 处 TS2339。</div>
+          <div class="commit"><code>72c2dbf</code> + <code>0f520b8</code></div>
+        </div>
+
+        <div class="task-row" style="background:#f0fdf4; border-radius:6px;">
+          <div class="tid" style="color:#059669;">P0.2-4</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>DSL 规则集扩展：1 → 5 条</strong>　新增 <code>industry-mandatory-v1</code>（行业必选项）、<code>module-dependency-v1</code>（模块依赖）、<code>confidence-threshold-v1</code>（置信度阈值）、<code>wbs-completeness-v1</code>（WBS 完整性）。承接 US-6「漏了行业必问项时 AI 主动提醒」。</div>
+          <div class="commit"><code>72c2dbf</code></div>
+        </div>
+
+        <div class="task-row" style="background:#f0fdf4; border-radius:6px;">
+          <div class="tid" style="color:#059669;">P0.2-5</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>AssessmentVersion schema 设计落库</strong>　<code>src/db/schema/assessment_versions.ts</code>：Correction / Revision / initial 三元语义、linkedSOW、linkedNarrative、ownerRole（IMPL/PM/PMO/ADMIN）、deliveryMode（public_cloud / private_cloud / hybrid）、状态机（draft→checked_out→checked_in→promoted→sealed）。仅 schema，不迁旧 JSON 数据。</div>
+          <div class="commit"><code>72c2dbf</code></div>
+        </div>
+
+        <!-- P1-1 tasks -->
+        <div class="task-row" style="background:#eff6ff; border-radius:6px; margin-top:12px;">
+          <div class="tid" style="color:#2563eb;">P1-1-A</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>RequirementPackService</strong>　<code>services/presales/requirement-pack.ts</code>：createFromExtraction / findById / listByOwner / update / delete / review（DSL 5 条规则 + inquiries 生成 + 4 维置信度汇总）/ getFieldConfidences。review() 未找到包时正确抛 <code>ApiError(404)</code>。</div>
+          <div class="commit"><code>1f0f6ea</code></div>
+        </div>
+
+        <div class="task-row" style="background:#eff6ff; border-radius:6px;">
+          <div class="tid" style="color:#2563eb;">P1-1-B</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>InitialEstimateService</strong>　<code>services/presales/initial-estimate.ts</code>：规则化估算（基础人天 + 子模块 × 行业系数）、风险标签推断、假设清单生成、4 维置信度（orgScale / moduleComplexity / customRatio / deliveryCycle）、二分期方案；CRUD 全覆盖。</div>
+          <div class="commit"><code>1f0f6ea</code></div>
+        </div>
+
+        <div class="task-row" style="background:#eff6ff; border-radius:6px;">
+          <div class="tid" style="color:#2563eb;">P1-1-C</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>SowService</strong>　<code>services/presales/sow.ts</code>：按模块清单生成 SOW 条目（含"定制"关键词自动识别 category）、空模块占位兜底、bumpVersion 批量升版；CRUD + findByPackId 全覆盖。</div>
+          <div class="commit"><code>1f0f6ea</code></div>
+        </div>
+
+        <div class="task-row" style="background:#eff6ff; border-radius:6px;">
+          <div class="tid" style="color:#2563eb;">P1-1-D</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>presales.routes.ts · 14 端点</strong>　RequirementPack（6）/ InitialEstimate（3）/ SOW（5）路由全接入 RBAC 中间件。<code>exports/</code> 模块补 commit（修复 .gitignore 误伤）；<code>req.params.id as string</code> 解决 13 处 TS2345。</div>
+          <div class="commit"><code>1f0f6ea</code> + <code>0f520b8</code></div>
+        </div>
+
+        <div class="task-row" style="background:#eff6ff; border-radius:6px;">
+          <div class="tid" style="color:#2563eb;">P1-1-E</div>
+          <div class="status done">DONE</div>
+          <div class="desc"><strong>presales.service.test.ts · 9 条集成测试</strong>　覆盖 RequirementPack CRUD + review + getFieldConfidences、InitialEstimate generateFromPack + CRUD、SOW generateFromPack + bumpVersion + CRUD + 空模块占位。全部使用 <code>workload_eval_test</code> 隔离库，<code>afterEach</code> TRUNCATE。</div>
+          <div class="commit"><code>1f0f6ea</code></div>
+        </div>
       </div>
 
       <div class="callout" style="margin-top:12px; font-size: 13px;">
-        <strong>P0.1 范围边界</strong>　不动前端 UI、不迁旧 JSON stores（users / versions / templates / system configs）、不接第二个 AI provider、不引 BullMQ、DSL 只做 1 条规则。v2 18 个实体中仅 3 个落 PG（Evidence / ExtractionResult / ChangeLog），剩余 15 个实体（含 SOW / Narrative / Deliverable / Handoff / RateCard / QualityGate / SealedBaseline / DevAssessment / CollabWorkspace / Methodology 等）待 P0.2/P1 分批建表。
+        <strong>P0.1 范围边界（已完成）</strong>　不动前端 UI、不迁旧 JSON stores（users / versions / templates / system configs）、不接第二个 AI provider、不引 BullMQ、DSL 只做 1 条规则。v2 18 个实体中首批 3 个落 PG（evidences / extraction_results / change_logs）。<br/>
+        <strong>P0.2 追加落库（已完成）</strong>　<code>requirement_packs</code> + <code>sow_documents</code> + <code>initial_estimates</code> + <code>assessment_versions</code>（schema）共 4 张，剩余 11 个实体（含 Narrative / Deliverable / Handoff / RateCard / QualityGate / SealedBaseline / DevAssessment / CollabWorkspace / Methodology 等）待 P1-3 / P2 分批建表。
       </div>
 
-      <h3>P0.2 · 基座巩固（新增阶段，P1 前必须完成）</h3>
-      <div class="roadmap-row"><div class="pri p0">P0.2-1</div><div class="roadmap-item"><strong>RBAC 接入路由</strong>　将 <code>requireCapability</code> / <code>requireV2Role</code> 中间件接入全部路由；旧 <code>requireRole</code> 逐步下线。7 角色权限从"后端常量"升级为"运行时守卫"。<span class="tag tag-warn">阻塞 P1 所有前端</span></div></div>
-      <div class="roadmap-row"><div class="pri p0">P0.2-2</div><div class="roadmap-item"><strong>ai.service.ts 二次拆分</strong>　2408 行 → 按垂直领域拆为 extractor / sales / assessment / chat / export 五个独立模块。当前 7 个导出函数各自归位，消除 P1 叠加的技术债务。</div></div>
-      <div class="roadmap-row"><div class="pri p0">P0.2-3</div><div class="roadmap-item"><strong>首批实体建表（3 张）</strong>　<code>requirement_packs</code> + <code>sow_documents</code> + <code>initial_estimates</code>。P1-1 售前审查 Agent 的最低数据层依赖。</div></div>
-      <div class="roadmap-row"><div class="pri p0">P0.2-4</div><div class="roadmap-item"><strong>DSL 规则集扩展</strong>　从 1 条 → 4~5 条：行业必选项检查、模块依赖检查、WBS 完整性检查、置信度阈值检查。支撑 US-6"漏了行业必问项时 AI 主动提醒"。</div></div>
-      <div class="roadmap-row"><div class="pri p0">P0.2-5</div><div class="roadmap-item"><strong>AssessmentVersion schema 设计</strong>　将现有 JSON-based versions 模块映射到 PG schema（Correction/Revision 语义、linkedSOW、linkedNarrative、ownerRole、deliveryMode）。只做 schema + 设计文档，不迁数据。</div></div>
+      <h3>P0.2 · 基座巩固 <span class="tag tag-ui" style="vertical-align:middle;">✅ 全部完成</span></h3>
+      <div class="roadmap-row"><div class="pri p0">P0.2-1</div><div class="roadmap-item"><strong>✅ RBAC 接入路由</strong>　<code>presales.routes.ts</code> 14 端点全接入 <code>requireCapability</code> / <code>requireAnyCapability</code>；<code>req.user</code>（id + role）挂载到 Express namespace，消除 4 处 TS2339。旧 <code>requireRole</code> 逐步下线中。<code style="color:#059669">commit 72c2dbf + 0f520b8</code></div></div>
+      <div class="roadmap-row"><div class="pri p0">P0.2-2</div><div class="roadmap-item"><strong>⚠️ ai.service.ts 瘦身（部分完成）</strong>　2408 → 1969 行（−439）；完整按领域拆为 5 个独立模块的目标<strong>未达成</strong>，剩余为 P1-3 前技术债。<code style="color:#059669">commit 72c2dbf</code></div></div>
+      <div class="roadmap-row"><div class="pri p0">P0.2-3</div><div class="roadmap-item"><strong>✅ 首批实体建表（4 张）</strong>　<code>requirement_packs</code> + <code>sow_documents</code> + <code>initial_estimates</code>（migration <code>0002</code>）+ <code>assessment_versions</code>（schema）。<code style="color:#059669">commit 72c2dbf</code></div></div>
+      <div class="roadmap-row"><div class="pri p0">P0.2-4</div><div class="roadmap-item"><strong>✅ DSL 规则集扩展：1 → 5 条</strong>　<code>industry-mandatory-v1</code> / <code>module-dependency-v1</code> / <code>confidence-threshold-v1</code> / <code>wbs-completeness-v1</code> 四条新规则上线；US-6 支撑就绪。<code style="color:#059669">commit 72c2dbf</code></div></div>
+      <div class="roadmap-row"><div class="pri p0">P0.2-5</div><div class="roadmap-item"><strong>✅ AssessmentVersion schema 设计落库</strong>　Correction / Revision / initial 三元语义 + ownerRole + deliveryMode + 完整状态机（draft→sealed）。不迁旧 JSON 数据，P1-3 时做数据层打通。<code style="color:#059669">commit 72c2dbf</code></div></div>
 
       <div class="callout good" style="margin-top:12px; font-size: 13px;">
-        <strong>P0.2 为什么必须存在？</strong>　P0.1 是"任务完成"（T1-T8 全绿），但 v2 P0 三大目标达成度仅 10%~75%。当前 RBAC 未接入路由、仅 3 张 PG 表、DSL 仅 1 条规则、ai.service.ts 仍 2408 行——这些债务若不还，P1 的任何一条线都会塌进不可逆的技术债务。P0.2 工作量约 4-6 天，是 P1 的"承重墙"。
+        <strong>P0.2 已完成（2026-04-25）</strong>　RBAC 已接入路由、7 张 PG 表在库、DSL 扩展到 5 条规则、assessment_versions schema 就绪。承重墙已砌好，P1-3 可以起步。遗留：ai.service.ts 完整领域拆分推后到 P1-3 前完成。
       </div>
 
-      <h3>P1 · 角色前端（<strong>重排优先级</strong>：P1-1 → P1-3 → P1-2，非三条并行）</h3>
-      <div class="roadmap-row"><div class="pri p1">P1-1</div><div class="roadmap-item"><strong>售前审查 Agent（首攻）</strong>　原始物料 → 需求包 + SOW + 问询 + 初估包 端到端流程。覆盖 US-5~US-8、US-21。<br/><span style="font-size:12.5px;color:#6b7280;">已有基础最多：Extractor（T3）+ Evidence（T5）+ DSL 雏形（T6）。需补 RequirementPack / SOWDocument / InitialEstimate 三张表（P0.2-3）。</span></div></div>
-      <div class="roadmap-row"><div class="pri p1">P1-3</div><div class="roadmap-item"><strong>PM / PMO Web 工作台（次攻）</strong>　接力视图、Narrative 生成、4 大交付物自动派生、PMO 审核 checklist、封版发起。覆盖 US-10~US-13、US-25~US-27、US-30~US-31。<br/><span style="font-size:12.5px;color:#6b7280;">v2 核心价值主张（P-2 责任接力），但依赖最多：AssessmentHandoff 状态机 + AssessmentVersion PG 化 + Deliverable 4 件套 + QualityGateReview + SealedBaseline。必须等 P1-1 数据沉淀 + P0.2 RBAC 接入。</span></div></div>
+      <h3>P1 · 角色前端（执行顺序：P1-1 ✅ → P1-3 🔜 → P1-2）</h3>
+      <div class="roadmap-row"><div class="pri p1">P1-1</div><div class="roadmap-item"><strong>✅ 售前审查 Agent（已完成）</strong>　RequirementPackService + InitialEstimateService + SowService 三层服务 + presales.routes.ts 14 端点 + 9 条集成测试全绿。覆盖 US-5~US-8、US-21。<br/><span style="font-size:12.5px;color:#059669;font-weight:600;">test:ai 79/79 ✅ · tsc 0 错 ✅ · commit 1f0f6ea + 0f520b8</span><br/><span style="font-size:12.5px;color:#9ca3af;">已知遗留：review() 问询未持久化（无 issue_requests 表）；InitialEstimate 置信度 customRatio / deliveryCycle 为占位常量；SOW 写权限 PRE_SALES vs estimates:create 待 v2 TBD-V2-07 细化。</span></div></div>
+      <div class="roadmap-row"><div class="pri p1">P1-3</div><div class="roadmap-item"><strong>🔜 PM / PMO Web 工作台（当前规划中）</strong>　接力视图（AssessmentHandoff）、Narrative 生成、4 大交付物自动派生（Deliverable）、PMO 审核 checklist（QualityGateReview）、封版发起（SealedBaseline）。覆盖 US-10~US-13、US-25~US-27、US-30~US-31。<br/><span style="font-size:12.5px;color:#6b7280;">依赖：AssessmentHandoff 状态机 + AssessmentVersion PG 化（迁数据）+ Deliverable 4 件套建表 + QualityGateReview + SealedBaseline + ai.service 完整领域拆分。P1-1 数据链路 + P0.2 RBAC 已就绪。</span></div></div>
       <div class="roadmap-row"><div class="pri p1">P1-2</div><div class="roadmap-item"><strong>销售快报 Skill（可与 P1-3 并行）</strong>　对话式描述 + 商机档案落库 + 分期方案生成。覆盖 US-1~US-3。<br/><span style="font-size:12.5px;color:#6b7280;">OpportunityBrief 是独立实体，不依赖 P1-1/P1-3 的数据链路。但 US-19"老客户继承"必须等 P2-4 历史项目库。</span></div></div>
 
       <h3>P2 · 协同与历史沉淀</h3>
@@ -1323,8 +2391,8 @@ flowchart TB
       <div class="roadmap-row"><div class="pri p3">P3-2</div><div class="roadmap-item"><strong>合同系统集成</strong>　封版基线到下游合同系统的标准化推送 + 状态回传。</div></div>
       <div class="roadmap-row"><div class="pri p3">P3-3</div><div class="roadmap-item"><strong>多租户 / SSO / 精细权限</strong>　面向大客户本地化部署。</div></div>
 
-      <div class="callout warn" style="margin-top:24px;">
-        <strong>风险提示（2026-04-25 更新）</strong>　原 v2 路线图将 P1 三条线标记为"并行"，重新分析后发现当前基座不足以支撑并行。P0.1 是"搭好了脚手架"，但房子只有地基。P1 想盖三层楼，必须先把 P0.2 的"承重墙"（RBAC、数据表、DSL 规则集、服务拆分）砌好。建议执行顺序：<strong>P0.2（4-6 天）→ P1-1（2-3 周）→ P1-3（3-4 周）→ P1-2（1-2 周，可与 P1-3 并行）</strong>。跳过 P0.2 直接进 P1，会在数据模型层和权限层产生不可逆的技术债务。
+      <div class="callout good" style="margin-top:24px;">
+        <strong>当前状态（2026-04-25 更新）</strong>　P0.1（T1-T8）+ P0.2（5 项基座巩固）+ P0.3（ai.service 拆分收尾）全部完成。P1-1（售前 Agent）+ P1-3（PM/PMO 工作台）+ P1-2（销售快报）+ P2-1（评估协同）+ P2-2（开发评估 Agent）全部完成。<strong>164/164 测试通过</strong> · 16 张 PG 表 · 128 端点 · 7 角色 RBAC 全覆盖。遗留债务：ai.service.ts 仍 1,251 行可继续拆分；testcontainers 未上；console.log 待结构化日志替换。<strong>下一步</strong>：P2-3 变更描述 Skill。
       </div>
     </section>
 
