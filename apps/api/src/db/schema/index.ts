@@ -19,3 +19,4 @@ export * from "./opportunity_briefs";
 export * from "./collab_workspaces";
 export * from "./collab_messages";
 export * from "./dev_assessments";
+export * from "./change_submissions";

@@ -50,6 +50,13 @@
       "when": 1777134031417,
       "tag": "0006_rich_morg",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777186345565,
+      "tag": "0007_parallel_earthquake",
+      "breakpoints": true
     }
   ]
 }
