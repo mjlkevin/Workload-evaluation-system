@@ -145,3 +145,43 @@ test("OpportunityBriefService: recalculate 无报价时返回 null", async () =>
   const result = await svc.recalculate(brief.opportunityBriefId, { addedModules: ["新模块"] });
   assert.equal(result, null, "未生成报价时 recalculate 应返回 null");
 });
+
+// ------------------------------------------------------------------
+// 负向测试用例（Block C）
+// ------------------------------------------------------------------
+
+test("OpportunityBriefService: findById non-existent → null", async () => {
+  const svc = new OpportunityBriefService(testDb);
+  const found = await svc.findById("00000000-0000-0000-0000-000000000000");
+  assert.equal(found, null, "不存在的 ID 应返回 null");
+});
+
+test("OpportunityBriefService: update non-existent → null", async () => {
+  const svc = new OpportunityBriefService(testDb);
+  const updated = await svc.update("00000000-0000-0000-0000-000000000000", { status: "converted" });
+  assert.equal(updated, null, "不存在的 ID 更新应返回 null");
+});
+
+test("OpportunityBriefService: delete non-existent → false", async () => {
+  const svc = new OpportunityBriefService(testDb);
+  const ok = await svc.delete("00000000-0000-0000-0000-000000000000");
+  assert.equal(ok, false, "不存在的 ID 删除应返回 false");
+});
+
+test("OpportunityBriefService: generateQuote non-existent → null", async () => {
+  const svc = new OpportunityBriefService(testDb);
+  const quoted = await svc.generateQuote("00000000-0000-0000-0000-000000000000", { moduleCount: 1 });
+  assert.equal(quoted, null, "不存在的 ID 生成报价应返回 null");
+});
+
+test("OpportunityBriefService: recalculate non-existent → null", async () => {
+  const svc = new OpportunityBriefService(testDb);
+  const result = await svc.recalculate("00000000-0000-0000-0000-000000000000", { addedModules: ["模块"] });
+  assert.equal(result, null, "不存在的 ID 重算应返回 null");
+});
+
+test("OpportunityBriefService: listByOwner with no briefs → []", async () => {
+  const svc = new OpportunityBriefService(testDb);
+  const list = await svc.listByOwner("non-existent-user");
+  assert.deepEqual(list, [], "无简报时应返回空数组");
+});
