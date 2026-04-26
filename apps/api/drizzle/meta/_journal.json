@@ -57,6 +57,13 @@
       "when": 1777186345565,
       "tag": "0007_parallel_earthquake",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777206073889,
+      "tag": "0008_furry_ben_grimm",
+      "breakpoints": true
     }
   ]
 }

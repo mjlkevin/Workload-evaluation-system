@@ -21,6 +21,7 @@ import salesBriefingRoutes from "./sales-briefing.routes";
 import collabRoutes from "./collab.routes";
 import devAssessmentRoutes from "./dev-assessment.routes";
 import changeRoutes from "./change.routes";
+import historyRoutes from "./history.routes";
 
 import { ok } from "../utils/response";
 import { notFoundHandler } from "../middleware/error-handler";
@@ -50,6 +51,7 @@ router.use("/sales", salesBriefingRoutes);
 router.use("/collab", collabRoutes);
 router.use("/dev-assessments", devAssessmentRoutes);
 router.use("/change", changeRoutes);
+router.use("/history", historyRoutes);
 
 /** 未匹配 /api/v1/* 时返回标准 JSON，避免 Express 默认纯文本 404 导致前端误判为「非 JSON」 */
 router.use((req, res) => {
