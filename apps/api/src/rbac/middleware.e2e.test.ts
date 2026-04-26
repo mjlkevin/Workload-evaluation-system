@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import express, { Request, Response } from "express";
 import supertest from "supertest";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "node:crypto";
 
 import { requireCapability, requireAnyCapability, requireV2Role, requireAuthenticated } from "./middleware";
 import { signAuthToken, loadUsersStore, saveUsersStore } from "../middleware/auth";
@@ -37,9 +38,11 @@ after(() => {
 
 function createTempUser(overrides: Partial<AuthUser> = {}): AuthUser {
   const now = new Date().toISOString();
+  // 用 randomUUID 避免 Date.now() 同毫秒冲突 (修：DEV 测试因 admin 用户被前序 sub_admin 覆盖而 403)
+  const uniqueId = randomUUID();
   const user: AuthUser = {
-    id: `test-user-${Date.now()}`,
-    username: `testuser-${Date.now()}`,
+    id: `test-user-${uniqueId}`,
+    username: `testuser-${uniqueId}`,
     role: overrides.role || "user",
     status: "active",
     passwordHash: "",
