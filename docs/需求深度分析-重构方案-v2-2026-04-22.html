@@ -565,7 +565,7 @@
       <div style="flex:1; min-width: 260px;">
         <strong>本看板是 WES 3.0 重构的总指挥层</strong>　指挥层（§A-§D）跟踪进度、里程碑、计划、AI 协作日志；设计基线（§1-§13）保留 v2 决策不变。
       </div>
-      <span class="snap">2026-04-26 · P0~P2-2 全部 DONE · 164/164 pass · P2-3 待启动</span>
+      <span class="snap">2026-04-26 · P0~P2-2 全部 DONE · 166/166 pass · P2-3 待启动</span>
     </div>
 
     <!-- ================================================================ -->
@@ -589,8 +589,8 @@
         </div>
         <div class="kpi green">
           <div class="label">测试通过</div>
-          <div class="value">164<span style="font-size:18px; color:#9ca3af;">/164</span></div>
-          <div class="sub">test:ai 116 + modules 39 + rules 8 + integration 1</div>
+          <div class="value">166<span style="font-size:18px; color:#9ca3af;">/166</span></div>
+          <div class="sub">test:ai 118 + modules 39 + rules 8 + integration 1</div>
         </div>
         <div class="kpi green">
           <div class="label">tsc 编译</div>
@@ -644,8 +644,13 @@
         </div>
         <div class="risk-item">
           <div class="rid">R-03</div>
-          <div class="rdesc"><strong>测试覆盖提升</strong>　test:ai 从 79 增至 100；新增 P1-2/P2-1 集成测试；test:integration 1/1 通过。RBAC e2e 仍待补充。</div>
-          <div class="rowner">→ P2-3 补充</div>
+          <div class="rdesc"><strong>测试覆盖提升</strong>　test:ai 从 79 增至 118（含 dev-assessment 16 + parse-requirement-workbook 2）；test:integration 1/1 通过。RBAC e2e 仍待补充。</div>
+          <div class="rowner">→ QA-WAVE2 (QWEN-PLUS)</div>
+        </div>
+        <div class="risk-item high">
+          <div class="rid">R-04</div>
+          <div class="rdesc"><strong>下游 AI 抄上游测试数字</strong>　DeepseekV4 在 STAB-001 直接抄 KIMI commit message 的「164 全绿」，没自跑 npm 脚本。实际 npm 脚本只跑 100，漏 18 条 (dev-assessment 16 + parse-requirement-workbook 2) 没接入 test:ai。已在 STAB-001-FIX-2 补完。<strong>规约</strong>：所有 AI 报告测试数字必须基于亲跑 npm 脚本的输出，禁止引用上游 commit message。</div>
+          <div class="rowner">✅ 已记录规约 (Opus)</div>
         </div>
         <div class="risk-item high">
           <div class="rid">R-05</div>

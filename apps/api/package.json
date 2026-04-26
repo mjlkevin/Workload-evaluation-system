@@ -11,7 +11,7 @@
     "test:modules": "tsx --test src/modules/modules.unit.test.ts src/modules/modules.usecase.test.ts src/modules/modules.handlers.test.ts",
     "test:rules": "tsx --test src/engine.test.ts",
     "test:integration": "tsx --test src/integration.test.ts",
-    "test:ai": "tsx --test --test-concurrency=1 src/ai/bootstrap.test.ts src/ai/extractor/requirement-extractor.test.ts src/ai/repository/evidence.repository.test.ts src/dsl/engine.test.ts src/rbac/roles.test.ts src/ai/smoke/ia-initial-smoke.test.ts src/services/presales/presales.service.test.ts src/services/pm-workbench/pm-workbench.service.test.ts src/services/sales-briefing/opportunity-brief.test.ts src/services/collab/collab.service.test.ts",
+    "test:ai": "tsx --test --test-concurrency=1 src/ai/bootstrap.test.ts src/ai/extractor/requirement-extractor.test.ts src/ai/repository/evidence.repository.test.ts src/dsl/engine.test.ts src/rbac/roles.test.ts src/ai/smoke/ia-initial-smoke.test.ts src/services/presales/presales.service.test.ts src/services/pm-workbench/pm-workbench.service.test.ts src/services/sales-briefing/opportunity-brief.test.ts src/services/collab/collab.service.test.ts src/services/dev-assessment/dev-assessment.test.ts src/services/parse-requirement-workbook.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:studio": "drizzle-kit studio"
