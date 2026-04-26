@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-04-26 11:00 · KIMI Code CLI · P2-3 · 变更描述 Skill + 差分影响分析
+
+**做了什么**
+- Schema: change_submissions 表（14 字段，3 索引）+ migration 0007_parallel_earthquake.sql
+- ChangeSubmissionService: submitChange（Kimi 解析 diff + 失败降级）/ computeDiff（字段级 added/removed/modified）/ mergeToVersion（状态更新 + payload 写入）/ findById / listByParent / listBySubmitter / reject
+- Change Routes: /change/* 5 端点（POST 提交 / GET 详情 / GET 列表 / POST merge / POST reject），RBAC 守卫
+- 覆盖 D-4 决策：Skill 与 Web 不实时同步，每次变更独立提报
+- 集成测试: 8 个用例，126/126 全绿
+- 涉及文件：12 files changed, 3240 insertions(+), 2 deletions(-)
+
+**做得怎么样**
+- 完成度 100%。
+- 全量回归：173/173 pass（test:ai 126/126 ✅ · test:modules 39/39 ✅ · test:rules 8/8 ✅）
+- tsc --noEmit 通过，无新增编译错误。
+- git status 干净，1 个 commit 完成。
+
+**给下一棒的话**
+- P2-3 后端已完成，前端需对接变更提报列表页与 diff 可视化
+- 当前 computeDiff 为浅层字段对比，未来可按需扩展深对象递归 diff
+
+---
+
 ## 2026-04-26 ~02:00 · DeepseekV4-flash · STAB-001 · 稳定化主仓
 
 **做了什么**
