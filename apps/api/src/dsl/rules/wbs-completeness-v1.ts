@@ -22,14 +22,52 @@ function findEvidenceValue(evidences: Evidence[], fieldPath: string, fallbacks: 
   return undefined;
 }
 
-/** 简单提取模块关键词（中文分词近似） */
+/** 常见模块词典（用于中文分词匹配） */
+const MODULE_KEYWORDS = [
+  // 财务云
+  "总账", "应收", "应付", "固定资产", "现金管理", "财务报表", "凭证", "账簿",
+  // 供应链云
+  "库存", "采购", "销售", "仓库", "物料", "供应商", "订单",
+  // 制造云
+  "生产", "BOM", "工单", "MES", "工艺", "车间", "排产",
+  // HR云
+  "人事", "薪酬", "考勤", "招聘", "绩效", "培训",
+  // 其他常见模块
+  "项目", "合同", "资产", "预算", "审批", "流程", "报表", "分析",
+];
+
+/** 使用词典匹配提取模块关键词（支持中文） */
 function extractModuleKeywords(text: string): string[] {
+  const found = new Set<string>();
+  const lowerText = text.toLowerCase();
+
+  // 词典匹配：查找文本中包含的模块关键词
+  for (const keyword of MODULE_KEYWORDS) {
+    if (lowerText.includes(keyword.toLowerCase())) {
+      found.add(keyword);
+    }
+  }
+
+  // 补充：仍然保留原有的分词逻辑，捕获词典外的关键词
   const cleaned = text
     .toLowerCase()
     .replace(/[、,，;；|/\\\n]/g, " ")
     .replace(/[（(].*?[)）]/g, "")
     .trim();
-  return cleaned.split(/\s+/).filter((w) => w.length >= 2);
+  const tokens = cleaned.split(/\s+/).filter((w) => w.length >= 2);
+  for (const token of tokens) {
+    // 如果 token 包含某个词典关键词，用关键词替换（标准化）
+    let standardized = token;
+    for (const keyword of MODULE_KEYWORDS) {
+      if (token.includes(keyword.toLowerCase())) {
+        standardized = keyword;
+        break;
+      }
+    }
+    found.add(standardized);
+  }
+
+  return Array.from(found);
 }
 
 export const wbsCompletenessV1: DslRule = {

@@ -4,17 +4,20 @@
 // P1-1 端点：原始物料 → 需求包 → DSL 审阅 → 问询 → 初估包 → SOW
 //
 // 能力位映射：
-//   - POST   /presales/requirement-packs         → extractor:trigger
-//   - GET    /presales/requirement-packs          → requirement:upload
-//   - GET    /presales/requirement-packs/:id      → requirement:upload
-//   - PATCH  /presales/requirement-packs/:id      → requirement:maintain
-//   - DELETE /presales/requirement-packs/:id      → requirement:maintain
-//   - POST   /presales/requirement-packs/:id/review         → extractor:trigger
-//   - GET    /presales/requirement-packs/:id/confidences    → requirement:upload
-//   - POST   /presales/requirement-packs/:id/initial-estimate → estimates:create
-//   - POST   /presales/requirement-packs/:id/sow            → estimates:create
-//   - GET    /presales/initial-estimates/:id                → estimates:read
-//   - GET    /presales/sow-documents/:id                    → estimates:read
+//   - POST   /presales/requirement-packs                      → extractor:trigger
+//   - GET    /presales/requirement-packs                       → requirement:upload
+//   - GET    /presales/requirement-packs/:id                   → requirement:upload
+//   - PATCH  /presales/requirement-packs/:id                   → requirement:maintain
+//   - DELETE /presales/requirement-packs/:id                   → requirement:maintain
+//   - POST   /presales/requirement-packs/:id/review            → extractor:trigger
+//   - GET    /presales/requirement-packs/:id/confidences       → requirement:upload
+//   - POST   /presales/requirement-packs/:id/initial-estimate  → estimates:create
+//   - GET    /presales/initial-estimates/:id                   → estimates:read OR estimates:create
+//   - PATCH  /presales/initial-estimates/:id                   → estimates:write OR estimates:create
+//   - POST   /presales/requirement-packs/:id/sow               → estimates:create
+//   - GET    /presales/sow-documents/:id                       → estimates:read OR estimates:create
+//   - PATCH  /presales/sow-documents/:id                       → estimates:write OR estimates:create
+//   - GET    /presales/requirement-packs/:id/sow               → estimates:read OR estimates:create
 
 import { Router } from "express";
 

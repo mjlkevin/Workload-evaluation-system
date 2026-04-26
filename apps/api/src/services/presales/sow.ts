@@ -52,13 +52,13 @@ export class SowService {
    */
   async generateFromPack(input: GenerateSowInput): Promise<typeof sowDocuments.$inferSelect[]> {
     const { requirementPack: pack, cloudProduct = "金蝶AI星空" } = input;
-
-    const modules = (pack.modules ?? []) as Array<{
+  
+    let modules = (pack.modules ?? []) as Array<{
       moduleName?: string;
       subModules?: string[];
       customization?: boolean;
     }>;
-
+  
     if (modules.length === 0) {
       // 无模块时生成一条占位 SOW
       const [row] = await this.dbInstance
@@ -80,7 +80,27 @@ export class SowService {
         .returning();
       return [row];
     }
-
+  
+    // 按 moduleName 去重，相同模块名的 subModules 合并
+    const moduleMap = new Map<string, { moduleName: string; subModules: string[]; customization?: boolean }>();
+    for (const mod of modules) {
+      const moduleName = mod.moduleName ?? "未命名模块";
+      const existing = moduleMap.get(moduleName);
+      if (existing) {
+        // 合并 subModules
+        existing.subModules = [...new Set([...existing.subModules, ...(mod.subModules ?? [])])];
+        // 如果任一标记为定制，则整体为定制
+        if (mod.customization) existing.customization = true;
+      } else {
+        moduleMap.set(moduleName, {
+          moduleName,
+          subModules: mod.subModules ?? [],
+          customization: mod.customization,
+        });
+      }
+    }
+    modules = Array.from(moduleMap.values());
+  
     const rows: typeof sowDocuments.$inferSelect[] = [];
     for (const mod of modules) {
       const moduleName = mod.moduleName ?? "未命名模块";
@@ -92,7 +112,7 @@ export class SowService {
       const customizationScope = hasCustomization
         ? `包含定制开发：${(mod.subModules ?? []).filter((s: string) => s.toLowerCase().includes("定制") || s.toLowerCase().includes("开发")).join("、")}`
         : undefined;
-
+  
       const [row] = await this.dbInstance
         .insert(sowDocuments)
         .values({
@@ -112,7 +132,7 @@ export class SowService {
         .returning();
       rows.push(row);
     }
-
+  
     return rows;
   }
 
