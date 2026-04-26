@@ -237,3 +237,111 @@ test("SowService: generateFromPack 空模块时生成占位 SOW", async () => {
   assert.equal(sowItems.length, 1);
   assert.equal(sowItems[0].module, "待确认模块范围");
 });
+
+test("SowService: generateFromPack 同名模块去重 + subModules 合并", async () => {
+  const packSvc = new RequirementPackService(testDb);
+  const sowSvc = new SowService(testDb);
+
+  const pack = await packSvc.createFromExtraction({ ownerUserId: "u1" });
+  // 传 2 个同名模块“总账”
+  await packSvc.update(pack.requirementPackId, {
+    modules: [
+      { moduleName: "总账", subModules: ["凭证", "报表"] },
+      { moduleName: "总账", subModules: ["账簿", "期末处理"] },
+    ],
+  });
+  const updatedPack = (await packSvc.findById(pack.requirementPackId))!;
+
+  const sowItems = await sowSvc.generateFromPack({
+    requirementPack: updatedPack,
+    ownerUserId: "u1",
+  });
+
+  // 应只生成 1 条 SOW
+  assert.equal(sowItems.length, 1, "同名模块应去重，只生成 1 条 SOW");
+  const sow = sowItems[0];
+  assert.ok(sow, "SOW 应存在");
+  assert.equal(sow.module, "总账");
+  // subModules 应合并（4 个：凭证、报表、账簿、期末处理）
+  assert.ok(sow.description?.includes("4个子项"), `应合并 subModules，实际: ${sow.description}`);
+});
+
+// ------------------------------------------------------------------
+// 负向测试用例（Block C）
+// ------------------------------------------------------------------
+
+test("RequirementPackService: findById non-existent → null", async () => {
+  const svc = new RequirementPackService(testDb);
+  const found = await svc.findById("00000000-0000-0000-0000-000000000000");
+  assert.equal(found, null, "不存在的 ID 应返回 null");
+});
+
+test("RequirementPackService: update non-existent → null", async () => {
+  const svc = new RequirementPackService(testDb);
+  const updated = await svc.update("00000000-0000-0000-0000-000000000000", { industry: "测试" });
+  assert.equal(updated, null, "不存在的 ID 更新应返回 null");
+});
+
+test("RequirementPackService: delete non-existent → false", async () => {
+  const svc = new RequirementPackService(testDb);
+  const ok = await svc.delete("00000000-0000-0000-0000-000000000000");
+  assert.equal(ok, false, "不存在的 ID 删除应返回 false");
+});
+
+test("RequirementPackService: review on non-existent pack → throws Error", async () => {
+  const svc = new RequirementPackService(testDb);
+  try {
+    await svc.review("00000000-0000-0000-0000-000000000000");
+    assert.fail("应抛出错误");
+  } catch (err: any) {
+    assert.ok(err.message.includes("not found") || err.message.includes("不存在"), "应抛出不存在错误");
+  }
+});
+
+test("InitialEstimateService: findById non-existent → null", async () => {
+  const svc = new InitialEstimateService(testDb);
+  const found = await svc.findById("00000000-0000-0000-0000-000000000000");
+  assert.equal(found, null, "不存在的 ID 应返回 null");
+});
+
+test("InitialEstimateService: update non-existent → null", async () => {
+  const svc = new InitialEstimateService(testDb);
+  const updated = await svc.update("00000000-0000-0000-0000-000000000000", { status: "reviewed" });
+  assert.equal(updated, null, "不存在的 ID 更新应返回 null");
+});
+
+test("InitialEstimateService: delete non-existent → false", async () => {
+  const svc = new InitialEstimateService(testDb);
+  const ok = await svc.delete("00000000-0000-0000-0000-000000000000");
+  assert.equal(ok, false, "不存在的 ID 删除应返回 false");
+});
+
+test("SowService: findById non-existent → null", async () => {
+  const svc = new SowService(testDb);
+  const found = await svc.findById("00000000-0000-0000-0000-000000000000");
+  assert.equal(found, null, "不存在的 ID 应返回 null");
+});
+
+test("SowService: update non-existent → null", async () => {
+  const svc = new SowService(testDb);
+  const updated = await svc.update("00000000-0000-0000-0000-000000000000", { status: "confirmed" });
+  assert.equal(updated, null, "不存在的 ID 更新应返回 null");
+});
+
+test("SowService: delete non-existent → false", async () => {
+  const svc = new SowService(testDb);
+  const ok = await svc.delete("00000000-0000-0000-0000-000000000000");
+  assert.equal(ok, false, "不存在的 ID 删除应返回 false");
+});
+
+test("SowService: findByPackId non-existent → []", async () => {
+  const svc = new SowService(testDb);
+  const items = await svc.findByPackId("00000000-0000-0000-0000-000000000000");
+  assert.deepEqual(items, [], "不存在的 pack ID 应返回空数组");
+});
+
+test("InitialEstimateService: findByPackId non-existent → null", async () => {
+  const svc = new InitialEstimateService(testDb);
+  const found = await svc.findByPackId("00000000-0000-0000-0000-000000000000");
+  assert.equal(found, null, "不存在的 pack ID 应返回 null");
+});

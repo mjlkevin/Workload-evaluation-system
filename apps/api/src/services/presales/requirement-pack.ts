@@ -296,18 +296,38 @@ export class RequirementPackService {
   }
 
   private _violationsToInquiries(violations: RuleViolation[]): InquiryItem[] {
-    return violations.map((v) => ({
+    // 按 severity + relatedFieldPath 聚合相同主题的 violation
+    const grouped = new Map<string, { severity: string; fieldPath: string; messages: string[]; suggestions: string[] }>();
+
+    for (const v of violations) {
+      const key = `${v.severity}::${v.fieldPath}`;
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.messages.push(v.message);
+        if (v.suggestion) existing.suggestions.push(v.suggestion);
+      } else {
+        grouped.set(key, {
+          severity: v.severity,
+          fieldPath: v.fieldPath,
+          messages: [v.message],
+          suggestions: v.suggestion ? [v.suggestion] : [],
+        });
+      }
+    }
+
+    // 生成聚合后的 inquiries
+    return Array.from(grouped.values()).map((group) => ({
       inquiryId: randomUUID(),
-      question: v.message,
-      severity: v.severity,
-      relatedFieldPath: v.fieldPath,
-      suggestion: v.suggestion,
+      question: group.messages.join("\n"),
+      severity: group.severity as InquiryItem["severity"],
+      relatedFieldPath: group.fieldPath,
+      suggestion: group.suggestions.length > 0 ? group.suggestions.join("\n") : undefined,
     }));
   }
 
   private _computeConfidenceSummary(
     evidences: Evidence[],
-    _pack: typeof requirementPacks.$inferSelect,
+    pack: typeof requirementPacks.$inferSelect,
   ): ReviewResult["confidenceSummary"] {
     if (evidences.length === 0) {
       return {
@@ -321,7 +341,51 @@ export class RequirementPackService {
       };
     }
 
-    const avgConfidence = evidences.reduce((sum, e) => sum + e.confidence, 0) / evidences.length;
+    // 核心字段权重：industry 0.3, scale 0.3, modules 0.4
+    const CORE_FIELD_WEIGHTS: Record<string, number> = {
+      "basicInfo.industry": 0.3,
+      "basicInfo.scale": 0.3,
+      "sow.moduleScope": 0.4,
+    };
+
+    // 收集证据的置信度，按字段分组
+    const fieldConfidences = new Map<string, number[]>();
+    for (const ev of evidences) {
+      if (!fieldConfidences.has(ev.fieldPath)) {
+        fieldConfidences.set(ev.fieldPath, []);
+      }
+      fieldConfidences.get(ev.fieldPath)!.push(ev.confidence);
+    }
+
+    // 计算核心字段的加权平均置信度
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    for (const [fieldPath, weight] of Object.entries(CORE_FIELD_WEIGHTS)) {
+      const confidences = fieldConfidences.get(fieldPath);
+      if (confidences && confidences.length > 0) {
+        const avgConf = confidences.reduce((sum, c) => sum + c, 0) / confidences.length;
+        weightedSum += avgConf * weight;
+        totalWeight += weight;
+      }
+    }
+
+    // 若核心字段缺失，权重转移给次要字段（其余证据）
+    const remainingWeight = 1 - totalWeight;
+    if (remainingWeight > 0) {
+      const nonCoreEvidences = evidences.filter(
+        (e) => !CORE_FIELD_WEIGHTS[e.fieldPath]
+      );
+      if (nonCoreEvidences.length > 0) {
+        const nonCoreAvg =
+          nonCoreEvidences.reduce((sum, e) => sum + e.confidence, 0) /
+          nonCoreEvidences.length;
+        weightedSum += nonCoreAvg * remainingWeight;
+      }
+    }
+
+    const weightedConfidence = totalWeight > 0 || remainingWeight > 0 ? weightedSum : 0;
+
     const aiCount = evidences.filter((e) => e.method === "ai").length;
     const ruleCount = evidences.filter((e) => e.method === "rule").length;
     const manualCount = evidences.filter((e) => e.method === "manual").length;
@@ -334,7 +398,7 @@ export class RequirementPackService {
         : (manualCount * 1.0 + ruleCount * 0.9 + aiCount * 0.7) / total;
 
     return {
-      overall: Math.round(avgConfidence * 100) / 100,
+      overall: Math.round(weightedConfidence * 100) / 100,
       byDimension: {
         evidenceCoverage: Math.round((evidences.length > 0 ? 1 : 0) * 100) / 100,
         inquiryCompleteness: 0, // 由前端/后续流程填充
