@@ -20,6 +20,6 @@ export const testDb = drizzle(testPool, { schema });
 
 export async function truncateTestTables(): Promise<void> {
   await testDb.execute(
-    sql`TRUNCATE TABLE change_logs, evidences, extraction_results, requirement_packs, sow_documents, initial_estimates, assessment_handoffs, assessment_narratives, deliverables, quality_gate_reviews, sealed_baselines, opportunity_briefs, collab_workspaces, collab_messages, dev_assessments, change_submissions, history_projects RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE change_logs, evidences, extraction_results, requirement_packs, sow_documents, initial_estimates, assessment_handoffs, assessment_narratives, deliverables, quality_gate_reviews, sealed_baselines, opportunity_briefs, collab_workspaces, collab_messages, dev_assessments, change_submissions, history_projects, users, version_code_rules RESTART IDENTITY CASCADE`,
   );
 }
