@@ -37,15 +37,15 @@ function parseArgs(): {
   };
 }
 
-interface MigrationReport {
-  mode: string;
+type MigrationReport = {
+  mode: "dry-run" | "live";
   timestamp: string;
-  users: ReturnType<typeof migrateUsers> extends Promise<infer T> ? T : never;
-  versionCodeRules: ReturnType<typeof migrateVersionCodeRules> extends Promise<infer T> ? T : never;
-  records: ReturnType<typeof migrateRecords> extends Promise<infer T> ? T : never;
+  users?: Awaited<ReturnType<typeof migrateUsers>>;
+  versionCodeRules?: Awaited<ReturnType<typeof migrateVersionCodeRules>>;
+  records?: Awaited<ReturnType<typeof migrateRecords>>;
   validation?: Awaited<ReturnType<typeof validateMigration>>;
   comprehensive?: Awaited<ReturnType<typeof validateComprehensive>>;
-}
+};
 
 async function main(): Promise<void> {
   const args = parseArgs();
@@ -135,7 +135,7 @@ Examples:
   }
 
   // 迁移模式（含 dry-run）
-  const report: Partial<MigrationReport> = {
+  const report: MigrationReport = {
     mode: args.dryRun ? "dry-run" : "live",
     timestamp: new Date().toISOString(),
   };
@@ -143,26 +143,26 @@ Examples:
   // 1. users
   console.log("\n--- 1/3 迁移 users ---");
   const userResult = await migrateUsers({ dryRun: args.dryRun });
-  report.users = userResult as any;
+  report.users = userResult;
   console.log(`源=${userResult.sourceCount} 插入=${userResult.inserted} 跳过=${userResult.skipped} 错误=${userResult.errors.length}`);
 
   // 2. version-code-rules
   console.log("\n--- 2/3 迁移 version_code_rules ---");
   const ruleResult = await migrateVersionCodeRules({ dryRun: args.dryRun });
-  report.versionCodeRules = ruleResult as any;
+  report.versionCodeRules = ruleResult;
   console.log(`源=${ruleResult.sourceCount} 插入=${ruleResult.inserted} 跳过=${ruleResult.skipped} 错误=${ruleResult.errors.length}`);
 
   // 3. records → assessment_versions
   console.log("\n--- 3/3 迁移 records → assessment_versions ---");
   const recordResult = await migrateRecords({ dryRun: args.dryRun });
-  report.records = recordResult as any;
+  report.records = recordResult;
   console.log(`源=${recordResult.sourceCount} 插入=${recordResult.inserted} 跳过=${recordResult.skipped} 错误=${recordResult.errors.length}`);
 
   // 基础校验
   if (!args.dryRun) {
     console.log("\n--- 迁移后基础校验 ---");
     const validations = await validateMigration();
-    report.validation = validations as any;
+    report.validation = validations;
     let allOk = true;
     for (const v of validations) {
       const mark = v.ok ? "✅" : "❌";
@@ -174,7 +174,7 @@ Examples:
     // 深度校验
     console.log("\n--- 迁移后深度校验 ---");
     const comprehensive = await validateComprehensive();
-    report.comprehensive = comprehensive as any;
+    report.comprehensive = comprehensive;
     console.log(`总计: ${comprehensive.summary.totalChecks} 项 | ✅ 通过=${comprehensive.summary.passed} | ❌ 失败=${comprehensive.summary.failed} | ⚠️ 警告=${comprehensive.summary.warnings}`);
     if (comprehensive.summary.failed > 0) {
       for (const c of comprehensive.checks.filter((x) => x.status === "fail")) {

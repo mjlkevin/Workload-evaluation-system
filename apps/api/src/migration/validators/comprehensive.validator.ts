@@ -97,7 +97,9 @@ async function validateUsers(configRoot: string): Promise<ValidationCheck[]> {
   });
 
   // 4. 源内重复识别
-  const sourceUsernames = source.map((u: any) => u.username);
+  const sourceUsernames = source
+    .map((u) => u.username)
+    .filter((username): username is string => typeof username === "string" && username.length > 0);
   const seen = new Set<string>();
   const dupes: string[] = [];
   for (const un of sourceUsernames) {
@@ -176,7 +178,9 @@ async function validateVersionCodeRules(configRoot: string): Promise<ValidationC
   });
 
   // 4. 源内重复
-  const sourceIds = source.map((r: any) => r.id);
+  const sourceIds = source
+    .map((r) => r.id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
   const seen = new Set<string>();
   const dupes: string[] = [];
   for (const id of sourceIds) {
@@ -281,7 +285,7 @@ async function validateAssessmentVersions(configRoot: string): Promise<Validatio
   checks.push({
     category: "payload",
     name: "assessment_versions payload 兼容性字段覆盖",
-    status: allHaveCompat ? "pass" : total === 0 ? "warn" : "warn",
+    status: allHaveCompat ? "pass" : "warn",
     message: total === 0
       ? "表为空，无法检查"
       : allHaveCompat
