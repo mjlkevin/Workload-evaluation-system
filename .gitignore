@@ -48,3 +48,7 @@ Thumbs.db
 # 本地临时目录
 .tmp-gh-push/
 backups/
+
+# 运行时临时缓存（tsx/node test artifacts）
+apps/api/.tmp/
+.tmp/
