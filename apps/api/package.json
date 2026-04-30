@@ -14,7 +14,8 @@
     "test:ai": "tsx --test --test-concurrency=1 src/ai/bootstrap.test.ts src/ai/extractor/requirement-extractor.test.ts src/ai/repository/evidence.repository.test.ts src/dsl/engine.test.ts src/rbac/roles.test.ts src/ai/smoke/ia-initial-smoke.test.ts src/services/presales/presales.service.test.ts src/services/pm-workbench/pm-workbench.service.test.ts src/services/sales-briefing/opportunity-brief.test.ts src/services/collab/collab.service.test.ts src/services/dev-assessment/dev-assessment.test.ts src/services/change-management/change-submission.test.ts src/services/parse-requirement-workbook.test.ts src/rbac/middleware.e2e.test.ts src/services/presales/inquiry-aggregation.test.ts src/services/presales/confidence-weighted.test.ts src/dsl/rules/wbs-completeness-v1.test.ts src/services/history/history-project.service.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "migration:v1-to-v2": "tsx src/migration/migrate-v1-to-v2.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

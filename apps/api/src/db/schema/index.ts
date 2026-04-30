@@ -21,3 +21,5 @@ export * from "./collab_messages";
 export * from "./dev_assessments";
 export * from "./change_submissions";
 export * from "./history_projects";
+export * from "./users";
+export * from "./version_code_rules";
