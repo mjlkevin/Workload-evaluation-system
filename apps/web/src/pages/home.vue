@@ -63,6 +63,7 @@ interface RoleCard {
 
 const roleCards = computed<RoleCard[]>(() => {
   const isAdmin = auth.isAdmin
+  const hasPresales = isAdmin || auth.hasAnyRole(['PRE_SALES'])
   return [
     {
       key: 'admin',
@@ -78,7 +79,7 @@ const roleCards = computed<RoleCard[]>(() => {
       desc: '需求导入、商机简报、评估预览',
       icon: '📊',
       path: '/presales',
-      disabled: true, // W4-A 待实现
+      disabled: !hasPresales,
     },
     {
       key: 'pm',

@@ -24,6 +24,30 @@ const routes: RouteRecordRaw[] = [
     meta: { auth: true, roles: ['PRE_SALES', 'ADMIN'] as AppRole[] },
   },
   {
+    path: '/presales/new',
+    name: 'PresalesNew',
+    component: () => import('@/pages/presales/new.vue'),
+    meta: { auth: true, roles: ['PRE_SALES', 'ADMIN'] as AppRole[] },
+  },
+  {
+    path: '/presales/:id',
+    name: 'PresalesDetail',
+    component: () => import('@/pages/presales/[id].vue'),
+    meta: { auth: true, roles: ['PRE_SALES', 'ADMIN'] as AppRole[] },
+  },
+  {
+    path: '/presales/:id/initial-estimate',
+    name: 'PresalesInitialEstimate',
+    component: () => import('@/pages/presales/[id]/initial-estimate.vue'),
+    meta: { auth: true, roles: ['PRE_SALES', 'ADMIN'] as AppRole[] },
+  },
+  {
+    path: '/presales/:id/sow',
+    name: 'PresalesSow',
+    component: () => import('@/pages/presales/[id]/sow.vue'),
+    meta: { auth: true, roles: ['PRE_SALES', 'ADMIN'] as AppRole[] },
+  },
+  {
     path: '/pm',
     name: 'PMWorkbench',
     component: () => import('@/pages/pm-workbench/index.vue'),
