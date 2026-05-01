@@ -1,0 +1,92 @@
+/* WorkEvolutionSys Design Tokens */
+:root {
+  /* Brand colors */
+  --wes-color-primary: #2563eb;
+  --wes-color-primary-light: #dbeafe;
+  --wes-color-primary-dark: #1d4ed8;
+  --wes-color-secondary: #7c3aed;
+  --wes-color-secondary-light: #ede9fe;
+  --wes-color-secondary-dark: #5b21b6;
+
+  /* Status colors */
+  --wes-color-success: #16a34a;
+  --wes-color-success-light: #dcfce7;
+  --wes-color-warning: #f59e0b;
+  --wes-color-warning-light: #fef3c7;
+  --wes-color-error: #dc2626;
+  --wes-color-error-light: #fee2e2;
+  --wes-color-info: #0ea5e9;
+  --wes-color-info-light: #e0f2fe;
+
+  /* Role colors */
+  --wes-role-sales: #2563eb;
+  --wes-role-sales-bg: #dbeafe;
+  --wes-role-presales: #8b5cf6;
+  --wes-role-presales-bg: #ede9fe;
+  --wes-role-implementation: #0891b2;
+  --wes-role-implementation-bg: #cffafe;
+  --wes-role-pm: #16a34a;
+  --wes-role-pm-bg: #dcfce7;
+  --wes-role-dev: #f97316;
+  --wes-role-dev-bg: #ffedd5;
+  --wes-role-pmo: #dc2626;
+  --wes-role-pmo-bg: #fee2e2;
+  --wes-role-hq: #ca8a04;
+  --wes-role-hq-bg: #fef9c3;
+
+  /* Neutral palette */
+  --wes-color-bg: #f6f8fb;
+  --wes-color-surface: #ffffff;
+  --wes-color-surface-muted: #f8fafc;
+  --wes-color-border: #e2e8f0;
+  --wes-color-text: #1f2937;
+  --wes-color-text-secondary: #64748b;
+  --wes-color-text-muted: #94a3b8;
+
+  /* Spacing */
+  --wes-space-1: 4px;
+  --wes-space-2: 8px;
+  --wes-space-3: 12px;
+  --wes-space-4: 16px;
+  --wes-space-5: 20px;
+  --wes-space-6: 24px;
+  --wes-space-8: 32px;
+  --wes-space-10: 40px;
+
+  /* Typography */
+  --wes-font-size-xs: 12px;
+  --wes-font-size-sm: 13px;
+  --wes-font-size-base: 14px;
+  --wes-font-size-md: 16px;
+  --wes-font-size-lg: 18px;
+  --wes-font-size-xl: 22px;
+  --wes-font-size-2xl: 28px;
+  --wes-line-height-tight: 1.25;
+  --wes-line-height-base: 1.6;
+
+  /* Radius */
+  --wes-radius-sm: 6px;
+  --wes-radius-md: 10px;
+  --wes-radius-lg: 14px;
+  --wes-radius-xl: 18px;
+  --wes-radius-pill: 999px;
+
+  /* Shadows */
+  --wes-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --wes-shadow-md: 0 10px 24px rgb(15 23 42 / 0.08);
+  --wes-shadow-lg: 0 18px 48px rgb(15 23 42 / 0.12);
+}
+
+html.dark,
+[data-theme='dark'] {
+  --wes-color-bg: #0f172a;
+  --wes-color-surface: #111827;
+  --wes-color-surface-muted: #1e293b;
+  --wes-color-border: #334155;
+  --wes-color-text: #e5e7eb;
+  --wes-color-text-secondary: #cbd5e1;
+  --wes-color-text-muted: #94a3b8;
+  --wes-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --wes-shadow-md: 0 10px 24px rgb(0 0 0 / 0.28);
+  --wes-shadow-lg: 0 18px 48px rgb(0 0 0 / 0.35);
+}
