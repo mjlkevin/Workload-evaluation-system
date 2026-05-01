@@ -1,13 +1,12 @@
 <template>
   <div class="pm-page">
-    <el-card>
-      <template #header>
-        <div class="page-header">
-          <span>接力视图</span>
-          <el-button type="primary" @click="showCreate = true">新建接力</el-button>
-        </div>
+    <PageHeader title="接力视图" subtitle="IMPL → PM → PMO 的评估接力与交接">
+      <template #actions>
+        <el-button type="primary" @click="showCreate = true">新建接力</el-button>
       </template>
+    </PageHeader>
 
+    <el-card>
       <el-form inline>
         <el-form-item label="目标角色">
           <el-select v-model="filter.toRole" placeholder="选择角色" clearable>
@@ -30,25 +29,18 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="handoffs" v-loading="loading" stripe>
-        <el-table-column prop="fromRole" label="来源角色" width="120" />
-        <el-table-column prop="toRole" label="目标角色" width="120" />
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="notes" label="备注" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="createdAt" label="创建时间" width="170">
-          <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="handleAccept(row)" :disabled="row.status !== 'pending'">接受</el-button>
-            <el-button link type="danger" @click="handleReject(row)" :disabled="row.status !== 'pending'">拒绝</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <DataTable :data="handoffs" :columns="columns" :loading="loading">
+        <template #cell-status="{ row }">
+          <StatusBadge :status="row.status" :options="statusOptions" size="small" />
+        </template>
+        <template #cell-createdAt="{ row }">
+          {{ formatDate(row.createdAt) }}
+        </template>
+        <template #actions="{ row }">
+          <el-button link type="primary" @click="handleAccept(row)" :disabled="row.status !== 'pending'">接受</el-button>
+          <el-button link type="danger" @click="handleReject(row)" :disabled="row.status !== 'pending'">拒绝</el-button>
+        </template>
+      </DataTable>
     </el-card>
 
     <!-- 创建接力弹窗 -->
@@ -87,12 +79,28 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { PageHeader, DataTable, StatusBadge } from '@/components'
+import type { DataTableColumn } from '@/components'
 import { listHandoffs, createHandoff, updateHandoff, type Handoff } from '@/api/pm'
 
 const handoffs = ref<Handoff[]>([])
 const loading = ref(false)
 const showCreate = ref(false)
 const creating = ref(false)
+
+const statusOptions = [
+  { value: 'pending', label: '待处理', type: 'warning' as const },
+  { value: 'accepted', label: '已接受', type: 'success' as const },
+  { value: 'rejected', label: '已拒绝', type: 'danger' as const },
+]
+
+const columns: DataTableColumn<Handoff>[] = [
+  { prop: 'fromRole', label: '来源角色', width: 120 },
+  { prop: 'toRole', label: '目标角色', width: 120 },
+  { prop: 'status', label: '状态', width: 100 },
+  { prop: 'notes', label: '备注', minWidth: 200, tooltip: true },
+  { prop: 'createdAt', label: '创建时间', width: 170 },
+]
 
 const filter = reactive({ toRole: 'PM', status: '' })
 const createForm = reactive({
@@ -102,14 +110,6 @@ const createForm = reactive({
   notes: '',
 })
 
-function statusType(status: string) {
-  const map: Record<string, string> = { pending: 'warning', accepted: 'success', rejected: 'danger' }
-  return map[status] || 'info'
-}
-function statusLabel(status: string) {
-  const map: Record<string, string> = { pending: '待处理', accepted: '已接受', rejected: '已拒绝' }
-  return map[status] || status
-}
 function formatDate(d: string) {
   return new Date(d).toLocaleString('zh-CN')
 }
@@ -171,11 +171,5 @@ onMounted(fetchList)
 .pm-page {
   max-width: 1200px;
   margin: 0 auto;
-}
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
 }
 </style>

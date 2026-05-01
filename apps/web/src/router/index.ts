@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { ElMessage } from 'element-plus'
 import type { RouteRecordRaw } from 'vue-router'
 
 export type AppRole = 'PRE_SALES' | 'PM' | 'PMO' | 'SALES' | 'DEV' | 'ADMIN'
@@ -96,8 +97,16 @@ const routes: RouteRecordRaw[] = [
     meta: { auth: true, roles: ['ADMIN'] as AppRole[] },
   },
   {
+    path: '/404',
+    name: 'NotFound',
+    component: () => import('@/pages/404.vue'),
+    meta: { public: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
-    redirect: '/',
+    name: 'CatchAll',
+    component: () => import('@/pages/404.vue'),
+    meta: { public: true },
   },
 ]
 
@@ -123,6 +132,7 @@ router.beforeEach((to, _from, next) => {
   const requiredRoles = to.meta.roles as AppRole[] | undefined
   if (requiredRoles && requiredRoles.length > 0) {
     if (!auth.hasAnyRole(requiredRoles)) {
+      ElMessage.warning('权限不足，无法访问该页面')
       return next('/')
     }
   }
