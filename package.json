@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/api"
+    "apps/api",
+    "apps/web"
   ],
   "scripts": {
-    "dev:web": "npm run dev --prefix ui/V0_SAAS",
+    "dev:web": "npm run dev -w apps/web",
     "dev:api": "npm run dev -w apps/api",
     "dev:recover": "bash scripts/recover-dev.sh",
     "tunnel:api": "bash scripts/tunnel-api-cloudflared.sh",
@@ -15,16 +16,18 @@
     "tunnel:web:ngrok": "bash scripts/tunnel-web-ngrok.sh",
     "tunnel:api:lt": "bash scripts/tunnel-api-localtunnel.sh",
     "tunnel:web:lt": "bash scripts/tunnel-web-localtunnel.sh",
-    "build:web": "npm run build --prefix ui/V0_SAAS",
+    "build:web": "npm run build -w apps/web",
     "build:api": "npm run build -w apps/api",
     "rules:standardize": "node scripts/standardize-rules-from-excel.js",
     "rules:regression": "node scripts/rule-regression-check.js",
     "rules:excel-report": "node scripts/excel-regression-report.js",
     "test:api:integration": "node scripts/api-integration-check.js",
     "test:api:team": "node scripts/team-api-check.js",
+    "test:ai": "npm run test:ai -w apps/api",
     "test:modules": "npm run test:modules -w apps/api",
     "test:rules": "npm run test:rules -w apps/api",
     "test:integration": "npm run test:integration -w apps/api",
+    "test:bundle": "bash scripts/run-test-bundle.sh",
     "ops:backup:config": "node scripts/backup-config.js",
     "ops:check:config": "npm run ops:config:check -w apps/api",
     "ops:check:config:repair": "npm run ops:config:check:repair -w apps/api",

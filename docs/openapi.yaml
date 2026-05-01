@@ -1241,7 +1241,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: 登录 `POST /api/v1/auth/login` 获取 token，请求头 `Authorization: Bearer <token>`
+      description: "登录 `POST /api/v1/auth/login` 获取 token，请求头 `Authorization: Bearer <token>`"
   parameters:
     XRoleHeader:
       name: X-Role
