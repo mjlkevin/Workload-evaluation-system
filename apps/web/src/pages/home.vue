@@ -63,6 +63,7 @@ interface RoleCard {
 
 const roleCards = computed<RoleCard[]>(() => {
   const isAdmin = auth.isAdmin
+  const hasPm = isAdmin || auth.hasAnyRole(['PM'])
   return [
     {
       key: 'admin',
@@ -86,7 +87,7 @@ const roleCards = computed<RoleCard[]>(() => {
       desc: '工作量估算、模板管理、规则集',
       icon: '📝',
       path: '/pm',
-      disabled: true, // W4-B 待实现
+      disabled: !hasPm,
     },
     {
       key: 'pmo',

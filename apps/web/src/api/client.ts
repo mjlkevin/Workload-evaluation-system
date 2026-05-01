@@ -27,10 +27,16 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     const data = response.data
-    // 后端统一响应：{ code, message, data, requestId }
+    // 后端统一响应格式 A：{ code, message, data, requestId }
     if (data && typeof data.code === 'number' && data.code !== 0) {
       ElMessage.error(data.message || '请求失败')
       return Promise.reject(new Error(data.message || '请求失败'))
+    }
+    // 后端统一响应格式 B：{ success, data }（presales / pm 等模块）
+    if (data && data.success === false) {
+      const msg = data.message || data.error || '请求失败'
+      ElMessage.error(msg)
+      return Promise.reject(new Error(msg))
     }
     return response
   },

@@ -30,6 +30,30 @@ const routes: RouteRecordRaw[] = [
     meta: { auth: true, roles: ['PM', 'ADMIN'] as AppRole[] },
   },
   {
+    path: '/pm/handoff',
+    name: 'PMHandoff',
+    component: () => import('@/pages/pm-workbench/handoff.vue'),
+    meta: { auth: true, roles: ['PM', 'ADMIN'] as AppRole[] },
+  },
+  {
+    path: '/pm/narrative',
+    name: 'PMNarrative',
+    component: () => import('@/pages/pm-workbench/narrative.vue'),
+    meta: { auth: true, roles: ['PM', 'ADMIN'] as AppRole[] },
+  },
+  {
+    path: '/pm/deliverables',
+    name: 'PMDeliverables',
+    component: () => import('@/pages/pm-workbench/deliverables.vue'),
+    meta: { auth: true, roles: ['PM', 'ADMIN'] as AppRole[] },
+  },
+  {
+    path: '/pm/review',
+    name: 'PMReview',
+    component: () => import('@/pages/pm-workbench/review.vue'),
+    meta: { auth: true, roles: ['PM', 'PMO', 'ADMIN'] as AppRole[] },
+  },
+  {
     path: '/pmo',
     name: 'PMO',
     component: () => import('@/pages/pmo/index.vue'),
