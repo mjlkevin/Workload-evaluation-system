@@ -77,6 +77,11 @@ export function createApp(): Express {
   // 下载必须经过鉴权与归属校验，不能直接暴露静态目录
   app.get("/downloads/:fileName", downloadFile);
 
+  // ========== 裸健康检查（Docker / LB 直接探测用）==========
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
+
   // ========== API 路由 ==========
   app.use("/api/v1", routes);
 
