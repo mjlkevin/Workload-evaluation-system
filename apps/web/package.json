@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "gen:api": "openapi-typescript ../../docs/openapi.yaml -o src/api/types.ts"
+    "gen:api": "openapi-typescript ../../docs/openapi.yaml -o src/api/types.ts",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.0",
@@ -18,10 +19,15 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^5.2.0",
+    "eslint": "^10.3.0",
+    "eslint-plugin-vue": "^10.9.0",
+    "globals": "^17.6.0",
     "openapi-typescript": "^7.6.0",
     "sass": "^1.86.0",
     "typescript": "^5.8.0",
+    "typescript-eslint": "^8.59.1",
     "vite": "^6.3.0",
     "vue-tsc": "^2.2.0"
   }
