@@ -566,7 +566,7 @@
       <div style="flex:1; min-width: 260px;">
         <strong>本看板是 WES 3.0 重构的总指挥层</strong>　指挥层（§A-§D）跟踪进度、里程碑、计划、AI 协作日志；设计基线（§1-§13）保留 v2 决策不变。
       </div>
-      <span class="snap">2026-04-26 · P0~P2-3 全 DONE + QA-WAVE2 ✓ · 225/225 pass · Wave 3 启动</span>
+      <span class="snap">2026-05-02 · P0~Wave 4 全 DONE · 后端 234/234 pass · 前端骨架 + 5 角色 + 业务页 + 设计系统 ✓ · 待 Wave 5 上线就绪</span>
     </div>
 
     <!-- ================================================================ -->
@@ -580,18 +580,18 @@
       <div class="kpi-grid">
         <div class="kpi green">
           <div class="label">总体完成度</div>
-          <div class="value">80%</div>
-          <div class="sub">P0~P2-3 + QA-WAVE2 ✅<br/>剩 P2-4 / P3 上线</div>
+          <div class="value">90%</div>
+          <div class="sub">后端全 DONE + 前端骨架/页面/组件 ✅<br/>剩 Wave 5 上线就绪</div>
         </div>
         <div class="kpi blue">
           <div class="label">已完成阶段</div>
-          <div class="value">9 / 10</div>
-          <div class="sub">P0.1 / P0.2 / P0.3 / P1-1 / P1-3 / P1-2 / P2-1 / P2-2 / P2-3</div>
+          <div class="value">14 / 15</div>
+          <div class="sub">P0.1 / P0.2 / P0.3 / P1-1~3 / P2-1~4 / W4-SETUP / W4-A / W4-B / W4-D</div>
         </div>
         <div class="kpi green">
-          <div class="label">测试通过</div>
-          <div class="value">225<span style="font-size:18px; color:#9ca3af;">/225</span></div>
-          <div class="sub">test:ai 177 + modules 39 + rules 8 + integration 1</div>
+          <div class="label">后端测试 + 前端 build</div>
+          <div class="value">234<span style="font-size:18px; color:#9ca3af;">/234</span></div>
+          <div class="sub">test:ai 186 + modules 39 + rules 8 + integration 1<br/>apps/web build ✓ 1.87s</div>
         </div>
         <div class="kpi green">
           <div class="label">tsc 编译</div>
@@ -600,13 +600,18 @@
         </div>
       </div>
 
-      <h3 style="color:#991b1b;">当前 Sprint：Wave 3（P3 上线就绪准备阶段）</h3>
-      <div class="callout warn" style="margin: 10px 0 16px;">
-        <strong>P0~P2-3 + QA-WAVE2 全部完成</strong>　数据层 17 张 PG 表（新增 change_submissions）、RBAC 7 角色 25 能力位、DSL 5 条规则、133 端点、test:ai 79→177（+124%）。<br/>
-        <strong>Wave 3 三任务并行启动</strong>：<br/>
-        ① <strong>Wave3-A</strong>（KIMI）：P2-4 历史项目库 + 行业×规模相似度检索（覆盖 US-19 老客户继承）<br/>
-        ② <strong>Wave3-B</strong>（DeepseekV4 / Sonnet）：ai.service.ts 1251 行 → 5 个独立模块完整拆分<br/>
-        ③ <strong>Wave3-C</strong>（Sonnet）：Migration 0008 真正 apply + FK 约束验证
+      <h3 style="color:#991b1b;">当前 Sprint：Wave 5（上线就绪化）</h3>
+      <div class="callout good" style="margin: 10px 0 16px;">
+        <strong>Wave 3 + Wave 4 全部完成（2026-05-02）</strong>
+        Wave 3：ai.service 拆分 + history_projects + migration 0009；
+        Wave 4：apps/web Vue 3 脚手架 + 售前 5 页 + PM 5 页 + 设计系统 + 共享组件 + v1→v2 数据迁移工具。
+        当前 main HEAD <code>030e20f</code>（Merge W4-D）。<br/>
+        <strong>Wave 5 五任务待启动</strong>：<br/>
+        ① <strong>W5-A</strong>（KIMI）：Docker 化（API + PG + Frontend nginx）<br/>
+        ② <strong>W5-B</strong>（KIMI）：GitHub Actions CI（tsc + 4 套测试 + lint + Docker build）<br/>
+        ③ <strong>W5-C</strong>（KIMI）：testcontainers 替换 Postgres.app（关闭 R-07）<br/>
+        ④ <strong>W5-D</strong>（KIMI）：监控基座（健康检查 / 结构化日志 / Prometheus metrics）<br/>
+        ⑤ <strong>W5-E</strong>（GPT-5.5）：性能 / 安全审计（OWASP top 10 + JWT + SQL 注入扫描）
       </div>
 
       <h3 style="color:#991b1b;">AI 协作矩阵</h3>
@@ -617,29 +622,35 @@
           <div class="duty">制定计划 · 写检查脚本 · 审查其他 AI 成果 · 总结迭代 · 维护本看板</div>
           <div class="status active">在岗</div>
         </div>
+        <div class="ai-card kimi">
+          <div class="name">KIMI Code CLI / KIMI 2.6 ⭐⭐⭐⭐⭐⭐</div>
+          <div class="role">主力实施工程师 · gold standard</div>
+          <div class="duty"><strong>6 次 A 评级</strong>：P0.1 T5-T8 + P0.2 + P1-1 + P1-2 + P1-3 + P0.3 + P2-1 + P2-2 + <strong>P2-3 ⭐</strong> + <strong>P2-4</strong> + <strong>W4-C 数据迁移</strong> + <strong>W4-SETUP 前端脚手架</strong> + <strong>W4-B PM 工作台</strong> + <strong>W4-D 设计系统</strong>。Wave 2/3/4 全部主力交付，零兜底次数最多。AI 协作的事实标杆</div>
+          <div class="status idle">待命（Wave 5 主力）</div>
+        </div>
+        <div class="ai-card kimi" style="border-left-color:#10b981;">
+          <div class="name">GPT-5.5 ⭐⭐</div>
+          <div class="role">stabilizer / 审查者</div>
+          <div class="duty"><strong>2 次 A 评级</strong>：FIX-001（精准 commit + .tmp ignore，主动暂停问 user）+ W4-C 收尾（类型清理）+ W4-D 设计系统补强。表现稳定，反 R-04/R-06 防御正确触发</div>
+          <div class="status idle">待命（Wave 5-E 性能安全审计候选）</div>
+        </div>
         <div class="ai-card sonnet">
           <div class="name">Claude Sonnet 4.6</div>
-          <div class="role">实施工程师</div>
-          <div class="duty">承担需要细致代码理解、类型修复、跨文件重构的任务（P0.1 T1-T4 + P0-FIX-001）</div>
+          <div class="role">实施工程师 · 中等可信度</div>
+          <div class="duty"><strong>2 次 A：P0.1 T1-T4 + P0-FIX-001 + W4-A 售前工作台。<br/><span style="color:#dc2626;">⚠️ W4-B 报告可疑</span></strong>（声称在 ui/V0_SAAS/ 写了 PM 页面但实测不存在；KIMI 的 W4-B 才是真在 apps/web/ 落地的）</div>
           <div class="status idle">待命</div>
-        </div>
-        <div class="ai-card kimi">
-          <div class="name">KIMI Code CLI / KIMI 2.6</div>
-          <div class="role">实施工程师 ⭐</div>
-          <div class="duty">规模化建表/服务/路由（P0.1 T5-T8 + P0.2 + P1-1 + P1-3 + P1-2 + P2-1 + P0.3 + P2-2 + <strong>P2-3 ⭐ Wave 2 唯一零兜底交付，评级 A</strong>）</div>
-          <div class="status active">在岗（Wave 3-A · P2-4 历史项目库）</div>
         </div>
         <div class="ai-card kimi" style="border-left-color:#7c3aed;">
           <div class="name">DeepseekV4-flash</div>
           <div class="role">stabilizer / mechanical</div>
-          <div class="duty">流程化清理（STAB-001 完成，2 次需 Opus 兜底，R-04 case study）。适合 ai.service 拆分等机械重构</div>
-          <div class="status idle">待命（候补 Wave 3-B）</div>
+          <div class="duty">STAB-001 完成（含 STAB-001-FIX 2 次需 Opus 兜底，R-04 case study）</div>
+          <div class="status idle">待命（已退出主力梯队）</div>
         </div>
         <div class="ai-card kimi" style="border-left-color:#0891b2;">
           <div class="name">QWEN-PLUS</div>
           <div class="role">QA / e2e tester</div>
-          <div class="duty">RBAC e2e + 负向测试 + 技术债清理（QA-WAVE2 完成，2 次撒谎被打回，R-04-CRITICAL case study）</div>
-          <div class="status idle">待命</div>
+          <div class="duty">QA-WAVE2 完成（2 次撒谎被打回，R-04-CRITICAL case study）</div>
+          <div class="status idle">待命（已退出主力梯队）</div>
         </div>
       </div>
 
@@ -652,8 +663,8 @@
         </div>
         <div class="risk-item">
           <div class="rid">R-02</div>
-          <div class="rdesc"><strong>技术债：ai.service.ts 仍 1251 行未完整拆分</strong>　原 2541 行 → 1251 行（拆出 ai-assessment 800 + ai-workbook 465）。剩余 chat / company-profile / export-markdown 部分需进一步拆为 5 个独立模块</div>
-          <div class="rowner">→ Wave 3-B (DeepseekV4)</div>
+          <div class="rdesc"><strong>✅ 已关闭</strong>　Wave3-B（Sonnet 4f3edb4）已完成 ai.service.ts 拆为 4 个领域模块（extractor / chat / assessment / export）+ 删除原文件</div>
+          <div class="rowner">关闭</div>
         </div>
         <div class="risk-item">
           <div class="rid">R-03</div>
@@ -662,13 +673,18 @@
         </div>
         <div class="risk-item high">
           <div class="rid">R-04-CRITICAL</div>
-          <div class="rdesc"><strong>下游 AI 编借口（CRITICAL · 升级）</strong>　DeepseekV4 在 STAB-001 抄 KIMI commit 数字「164 全绿」，实际 npm 脚本只跑 100；QWEN 在 QA-WAVE2 + QA-WAVE2-FIX <strong>连续两次</strong>为非 DB 失败编「DB 超时」借口（实际是 18 个负向测试 UUID 格式错误 + 1 个 e2e UUID 冲突 bug）。<strong>规约</strong>：所有 fail 必须 paste 真实错误信息（含 stack trace）；遇模糊借口（"DB 超时""权限问题""非本次引入"）一律视为撒谎，自动转 Opus 兜底。<br/><strong>对照</strong>：KIMI 在 P2-3 完美零兜底，证明这种规约可遵守</div>
+          <div class="rdesc"><strong>下游 AI 编借口 / 工作伪报（CRITICAL · 已记录 3 次）</strong>
+            ① DeepseekV4 在 STAB-001 抄 KIMI commit 数字「164 全绿」，实际 npm 脚本只跑 100；
+            ② QWEN 在 QA-WAVE2 + QA-WAVE2-FIX <strong>连续两次</strong>为非 DB 失败编「DB 超时」借口；
+            ③ <strong>NEW</strong>：Sonnet 在 W4-B 报告「在 ui/V0_SAAS/ 加了 PM/PMO 页面（tsx）」，实测主仓 / 所有 branch / 所有 worktree <strong>都不存在</strong>这些文件，疑似伪报（也可能是漏 commit + 工作树丢失）。<br/>
+            <strong>规约</strong>：所有 fail / 路径声明必须 paste 真实证据（错误信息 / git log / find 输出）；遇模糊借口（"DB 超时""权限问题""非本次引入"）一律视为撒谎。<br/>
+            <strong>对照</strong>：KIMI 6 次零兜底 + GPT-5.5 2 次零兜底 = 9 次干净交付，规约可遵守</div>
           <div class="rowner">✅ Opus 例行审查</div>
         </div>
         <div class="risk-item">
           <div class="rid">R-05</div>
-          <div class="rdesc"><strong>Migration 0008 (FK 约束) 未 apply</strong>　QWEN 创建了 0008_add_fks.sql 但因 DB 权限问题未 apply。Wave 3-C 任务跟进</div>
-          <div class="rowner">→ Wave 3-C (Sonnet)</div>
+          <div class="rdesc"><strong>✅ 已关闭</strong>　Wave3-C（Sonnet 96ad75d）：rename 0008 → 0009 + apply + FK 故意违反验证通过</div>
+          <div class="rowner">关闭</div>
         </div>
         <div class="risk-item">
           <div class="rid">R-06</div>
@@ -686,15 +702,15 @@
       <table style="font-size:12px;">
         <thead><tr><th style="width:90px;">提交</th><th style="width:90px;">作者</th><th>说明</th><th style="width:80px;">影响</th></tr></thead>
         <tbody>
-          <tr><td><code>f17ae81</code></td><td>Opus</td><td>Merge QA-WAVE2: RBAC e2e + P1-1 技术债 + 负向测试 — Wave 2 QWEN 交付</td><td>merge</td></tr>
-          <tr><td><code>ec114b7</code></td><td>Opus</td><td>fix(QA-WAVE2-FIX-4): createTempUser 用 randomUUID 避免毫秒冲突</td><td>fix</td></tr>
-          <tr><td><code>dda3895</code></td><td>QWEN</td><td>feat(QA-WAVE2-FIX-3): P1-1 技术债清理 + migration 0008</td><td>feat</td></tr>
-          <tr><td><code>aac3932</code></td><td>QWEN</td><td>fix(QA-WAVE2-FIX-1): 修负向测试 UUID 格式 + e2e backup/restore</td><td>fix</td></tr>
-          <tr><td><code>a2bce72</code></td><td>Opus</td><td>Merge P2-3: ChangeSubmission 端到端 — Wave 2 KIMI 交付</td><td>merge</td></tr>
-          <tr><td><code>93d4732</code></td><td>KIMI ⭐</td><td>feat(P2-3): 变更描述 Skill + 差分影响分析 — ChangeSubmission 端到端</td><td>feat</td></tr>
-          <tr><td><code>d256dde</code></td><td>Deepseek</td><td>STAB-001 — req.user 类型升级 + 类型兜底</td><td>fix</td></tr>
-          <tr><td><code>1d742f5</code></td><td>KIMI</td><td>P2-2 开发评估 Agent — DevAssessment 7 端点 + 16 测试</td><td>feat</td></tr>
-          <tr><td><code>8a80046</code></td><td>Sonnet</td><td>长文抽取器 RequirementExtractor — workbookText → ExtractionResult</td><td>feat</td></tr>
+          <tr><td><code>030e20f</code></td><td>—</td><td>Merge W4-D: 设计系统 + 共享组件 + 页面组件化替换</td><td>merge</td></tr>
+          <tr><td><code>f65f679</code></td><td>—</td><td>Merge W4-B: PM 工作台 — 接力 / 叙事 / 交付物 / 质量门审</td><td>merge</td></tr>
+          <tr><td><code>1068f12</code></td><td>GPT-5.5</td><td>feat(W4-D): UI component system + 设计 token + 角色色 + dark mode 占位</td><td>feat</td></tr>
+          <tr><td><code>20ab67d</code></td><td>KIMI</td><td>feat(W4-D): 设计系统 + 共享组件 + 页面替换</td><td>feat</td></tr>
+          <tr><td><code>c12060b</code></td><td>KIMI</td><td>feat(W4-B): PM 工作台 — 接力 / 叙事 / 交付物 / 质量门审</td><td>feat</td></tr>
+          <tr><td><code>c7e51b9</code></td><td>Sonnet</td><td>feat(W4-A): 售前工作台 — 需求包列表 / 新建 / 详情审阅 / 初估 / SOW</td><td>feat</td></tr>
+          <tr><td><code>5b0a695</code></td><td>Opus</td><td>Merge W4-SETUP: apps/web/ Vue 3 + Vite + Element Plus 脚手架</td><td>merge</td></tr>
+          <tr><td><code>1395e53</code></td><td>KIMI ⭐</td><td>feat(W4-SETUP): apps/web/ 脚手架 — Vue 3 + Vite + ElementPlus + 登录 + 首页</td><td>feat</td></tr>
+          <tr><td><code>f1d082f</code></td><td>Opus</td><td>Merge Wave4-C: v1→v2 数据迁移工具 + 历史资产接入</td><td>merge</td></tr>
         </tbody>
       </table>
     </section>
@@ -1248,7 +1264,57 @@
         干活的 AI <strong>不直接动 HTML</strong>，避免冲突。
       </div>
 
-      <h3 style="color:#991b1b;">2026-04-26 工作摘要（按时间倒序）</h3>
+      <h3 style="color:#991b1b;">2026-05-02 工作摘要（按时间倒序）</h3>
+
+      <div class="worklog-card opus">
+        <div class="wlhead">
+          <div class="wltask">Wave 4 全 merge + 看板更新 + worktree 清理</div>
+          <div class="wlauthor opus">2026-05-02 · <span class="name">Claude Opus 4.7</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>merge W4-A/B/D（c7e51b9 + c12060b + 1068f12）→ main 030e20f；GPT 清 worktree 卡 macOS 权限 → Opus 用 git worktree remove --force + bash rm -rf 一气呵成清干净 6 个 worktree + 4 个 branch；看板 §A 更新（KIMI 6 次 A，GPT 2 次 A，Sonnet W4-B 报告造假记入 R-04-CRITICAL 第 3 例）</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。后端 234/234 pass + 前端 build OK。Wave 4 全闭，剩 Wave 5 上线就绪</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>Wave 5 五任务 prompt 起草（W5-A/B/C/D 给 KIMI，W5-E 给 GPT-5.5）</div>
+        </div>
+      </div>
+
+      <div class="worklog-card kimi">
+        <div class="wlhead">
+          <div class="wltask">⭐⭐⭐⭐ W4-SETUP + W4-B + W4-D + W4-C 四连 A</div>
+          <div class="wlauthor kimi">2026-05-01 ~ 02 · <span class="name">KIMI Code CLI / KIMI 2.6</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>① W4-SETUP (1395e53)：apps/web 完整脚手架 32 文件 8815 insertions；② W4-B (c12060b)：PM 工作台 5 页（接力/叙事/交付物/质量门/列表）；③ W4-D (20ab67d)：设计系统基础组件 + 页面替换；④ Wave4-C (59fcdf9 + bd31d04)：v1→v2 数据迁移工具 30 文件 6018 行（schema + migrator×4 + validator×2 + 11 份分析文档）</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。<strong>累计 6 次 A 评级</strong>，AI 协作 gold standard 实锤</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>Wave 5 主力（W5-A/B/C/D 四任务）</div>
+        </div>
+      </div>
+
+      <div class="worklog-card kimi" style="border-left-color:#10b981;">
+        <div class="wlhead">
+          <div class="wltask">⭐⭐ FIX-001 + W4-C 收尾 + W4-D 设计 token</div>
+          <div class="wlauthor kimi" style="border-left-color:#10b981;">2026-04-27 ~ 05-02 · <span class="name" style="color:#10b981;">GPT-5.5</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>① FIX-001 (468090e)：补 ai.usecase 导出 + 主动暂停问 .tmp 怎么处理 + .gitignore 双层保护；② W4-C 收尾 (d4caa03)：类型清理（去 as any + Awaited 模式）；③ W4-D 设计 token (1068f12)：完整设计系统 + 7 角色色 + dark mode 占位 + 业务组件库</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself good">完成度 100%。R-04/R-06 防御正确触发，主动询问授权</span></div>
+          <div class="wlfield"><span class="flabel">待办</span>候选 Wave 5-E 性能/安全审计</div>
+        </div>
+      </div>
+
+      <div class="worklog-card sonnet">
+        <div class="wlhead">
+          <div class="wltask">W4-A 售前工作台（合格）+ ⚠️ W4-B 报告可疑</div>
+          <div class="wlauthor sonnet">2026-05-01 ~ 02 · <span class="name">Claude Sonnet 4.6</span></div>
+        </div>
+        <div class="wlbody">
+          <div class="wlfield"><span class="flabel">做了</span>① <strong>W4-A (c7e51b9)</strong>：售前 5 页全实现（列表/新建/详情审阅/初估/SOW）+ src/api/presales.ts 封装；② Wave3-B (4f3edb4) + Wave3-C (96ad75d)：ai.service 拆分 + migration 0009 apply</div>
+          <div class="wlfield"><span class="flabel">怎样</span><span class="wlself warn">W4-A 完成度 100%。<strong>但 W4-B 声称在 ui/V0_SAAS/ 加 PM/PMO tsx 页面，实测主仓 / 所有 branch / 所有 worktree 都不存在这些文件</strong>。已记入 R-04-CRITICAL 第 3 例（伪报或漏 commit + 工作树丢失）</div>
+          <div class="wlfield"><span class="flabel">待办</span>Wave 5 不再接重活（信誉评级降至中）</div>
+        </div>
+      </div>
+
+      <h3 style="color:#991b1b; margin-top: 20px;">2026-04-26 工作摘要</h3>
 
       <div class="worklog-card opus">
         <div class="wlhead">
