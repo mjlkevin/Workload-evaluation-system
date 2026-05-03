@@ -20,6 +20,7 @@ import {
   resolveKimiCompletionTemperature,
 } from "../../utils/kimi-completion-params";
 import { ProviderError, type ProviderErrorCode } from "./errors";
+import { aiProviderRequestsTotal } from "../../metrics";
 import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
@@ -74,8 +75,18 @@ export class KimiProvider implements ModelProvider {
   }
 
   async chatCompletion(req: ChatCompletionRequest): Promise<ChatCompletionResponse> {
+    try {
+      return await this._chatCompletion(req);
+    } catch (err) {
+      aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "error" });
+      throw err;
+    }
+  }
+
+  private async _chatCompletion(req: ChatCompletionRequest): Promise<ChatCompletionResponse> {
     const credentials = this.resolveCredentials(req.credentialsOverride);
     if (!credentials.apiKey) {
+      aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "error" });
       throw new ProviderError("api_key_missing", "Kimi API Key 未配置", {
         providerName: PROVIDER_NAME,
         retryable: false,
@@ -105,7 +116,9 @@ export class KimiProvider implements ModelProvider {
       attempts = attempt;
       const response = await fetchOnce(credentials.endpoint, credentials.apiKey, body, timeoutMs);
       if (response.ok) {
-        return await parseSuccess(response, model, attempts);
+        const result = await parseSuccess(response, model, attempts);
+        aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "success" });
+        return result;
       }
 
       let errorText = await safeReadText(response);
@@ -113,7 +126,9 @@ export class KimiProvider implements ModelProvider {
         body = { ...body, temperature: 1 };
         const retried = await fetchOnce(credentials.endpoint, credentials.apiKey, body, timeoutMs);
         if (retried.ok) {
-          return await parseSuccess(retried, model, attempts);
+          const result = await parseSuccess(retried, model, attempts);
+          aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "success" });
+          return result;
         }
         errorText = await safeReadText(retried);
         const err2 = mapHttpError(retried.status, errorText);

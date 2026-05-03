@@ -5,12 +5,14 @@
 import { createApp } from "./app";
 import { config } from "./config/env";
 import { runConfigIntegrityCheck } from "./ops/config-integrity";
+import { logger } from "./utils/logger";
 
 const shouldRunIntegrityCheck = process.env.CONFIG_INTEGRITY_ON_STARTUP !== "false";
 if (shouldRunIntegrityCheck) {
   const integrity = runConfigIntegrityCheck("startup", false);
   if (!integrity.ok) {
-    console.warn(
+    logger.warn(
+      { event: "startup", issues: integrity.issues.length },
       `[api] config integrity check found ${integrity.issues.length} issue(s), see logs/data-anomaly-repair.log`
     );
   }
@@ -19,6 +21,12 @@ if (shouldRunIntegrityCheck) {
 const app = createApp();
 
 app.listen(config.port, () => {
-  console.log(`[api] listening on http://localhost:${config.port}`);
-  console.log(`[api] API docs: http://localhost:${config.port}/api/v1/health`);
+  logger.info(
+    { event: "startup", port: config.port },
+    `[api] listening on http://localhost:${config.port}`
+  );
+  logger.info(
+    { event: "startup", healthUrl: `http://localhost:${config.port}/health` },
+    `[api] health check: http://localhost:${config.port}/health`
+  );
 });

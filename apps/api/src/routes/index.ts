@@ -23,15 +23,9 @@ import devAssessmentRoutes from "./dev-assessment.routes";
 import changeRoutes from "./change.routes";
 import historyRoutes from "./history.routes";
 
-import { ok } from "../utils/response";
 import { notFoundHandler } from "../middleware/error-handler";
 
 const router = Router();
-
-// 健康检查
-router.get("/health", (_req, res) => {
-  res.json(ok({ service: "workload-api", status: "up" }));
-});
 
 // 业务路由
 router.use("/auth", authRoutes);
