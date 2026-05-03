@@ -24,6 +24,7 @@ build/
 
 # 导出产物与运行时目录（与设计文档约定一致时可调整路径）
 exports/
+!apps/api/src/modules/exports/
 
 # 日志与覆盖率
 logs/
