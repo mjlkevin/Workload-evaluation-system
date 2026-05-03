@@ -7,9 +7,12 @@ import multer from "multer";
 
 import { config } from "./config/env";
 import routes from "./routes";
+import healthRoutes from "./routes/health.routes";
+import metricsRoutes from "./routes/metrics.routes";
 import { downloadFile } from "./modules/exports/exports.module";
-import { errorHandler } from "./middleware";
+import { errorHandler, requestLogger } from "./middleware";
 import { bootstrapAiProviders } from "./ai/bootstrap";
+import { logger } from "./utils/logger";
 
 function isPrivateNetworkOrigin(origin: string): boolean {
   try {
@@ -39,6 +42,9 @@ export function createApp(): Express {
   bootstrapAiProviders();
 
   const app = express();
+
+  // ========== 结构化请求日志（最外层，确保覆盖全部请求）==========
+  app.use(requestLogger);
 
   // 浏览器直连 API（:3000）时需 CORS。开发环境全开；生产环境仅对私网 Origin 反射，避免公网任意 Origin。
   const corsOpen = process.env.NODE_ENV !== "production";
@@ -72,6 +78,10 @@ export function createApp(): Express {
   
   // 将 multer 实例挂载到 app 供路由使用
   app.set("upload", upload);
+
+  // ========== 无需鉴权的运维端点 ==========
+  app.use(healthRoutes);
+  app.use(metricsRoutes);
 
   // ========== 文件下载 ==========
   // 下载必须经过鉴权与归属校验，不能直接暴露静态目录

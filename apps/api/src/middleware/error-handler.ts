@@ -5,6 +5,7 @@
 import { Request, Response, NextFunction } from "express";
 import { randomUUID } from "node:crypto";
 import { ApiError } from "../utils/errors";
+import { logger } from "../utils/logger";
 
 function isPayloadTooLarge(err: Error): boolean {
   const anyErr = err as Error & { type?: string; status?: number };
@@ -14,8 +15,9 @@ function isPayloadTooLarge(err: Error): boolean {
 /**
  * 全局错误处理中间件
  */
-export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
-  console.error("[error-handler]", err);
+export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): void {
+  const requestLogger = res.locals.requestLogger || logger;
+  requestLogger.error({ err, event: "error_handler", route: req.route?.path || req.path }, "[error-handler]");
 
   if (err instanceof ApiError) {
     res.status(err.statusCode).json({
