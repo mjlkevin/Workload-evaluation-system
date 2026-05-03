@@ -1,30 +1,67 @@
-# 最小可复现编排：API + 主前端（Next）。
-# 使用：在仓库根目录执行 `docker compose up --build`
-# 访问：Web http://localhost:3001 ，API http://localhost:3000/api/v1/health
-# 持久化：默认挂载 ./config 到 API 容器，避免镜像内状态丢失。
+# ============================================================
+# 生产编排：API + PostgreSQL + Web（nginx）
+# 使用：docker compose up -d --build
+# ============================================================
 
 services:
+  db:
+    image: postgres:17-alpine
+    container_name: workload-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-workload}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-workload}
+      POSTGRES_DB: ${POSTGRES_DB:-workload_eval}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-workload} -d ${POSTGRES_DB:-workload_eval}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   api:
     build:
       context: .
-      dockerfile: docker/Dockerfile.api
+      dockerfile: apps/api/Dockerfile
+    container_name: workload-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # 确保容器内数据库地址指向 db 服务
+      DATABASE_URL: ${DATABASE_URL:-postgres://workload:workload@db:5432/workload_eval}
+      TEST_DATABASE_URL: ${TEST_DATABASE_URL:-postgres://workload:workload@db:5432/workload_eval_test}
+      PORT: "3000"
     ports:
       - "3000:3000"
-    environment:
-      PORT: "3000"
-      JWT_SECRET: ${JWT_SECRET:-please-change-me}
     volumes:
       - ./config:/repo/config
+      - ./apps/api/drizzle:/repo/apps/api/drizzle:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   web:
     build:
-      context: ./ui/V0_SAAS
-      dockerfile: Dockerfile
-      args:
-        WORKLOAD_API_ORIGIN: http://api:3000
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: workload-web
+    restart: unless-stopped
     ports:
-      - "3001:3001"
-    environment:
-      WORKLOAD_API_ORIGIN: http://api:3000
+      - "5173:80"
     depends_on:
       - api
+
+volumes:
+  pg_data:

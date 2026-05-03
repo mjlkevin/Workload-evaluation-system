@@ -9,7 +9,7 @@ import { Pool } from "pg";
 import { sql } from "drizzle-orm";
 import * as schema from "../db/schema";
 
-const TEST_DATABASE_URL = "postgres://kevin@localhost:5432/workload_eval_test";
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || "postgres://kevin@localhost:5432/workload_eval_test";
 
 export const testPool = new Pool({
   connectionString: TEST_DATABASE_URL,
