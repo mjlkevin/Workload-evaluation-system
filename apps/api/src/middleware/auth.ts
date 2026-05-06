@@ -46,6 +46,9 @@ export function saveUsersStore(store: UsersStore): void {
 
 // -------------------- JWT 操作 --------------------
 
+// W5-E: 固定 HS256 算法，避免算法混淆攻击（如 alg=none / RSA→HMAC 切换）
+const JWT_ALGORITHM: jwt.Algorithm = "HS256";
+
 export function signAuthToken(user: AuthUser): string {
   const expiresIn = config.jwt.expiresIn as jwt.SignOptions["expiresIn"];
   return jwt.sign(
@@ -55,13 +58,13 @@ export function signAuthToken(user: AuthUser): string {
       role: user.role
     } satisfies AuthJwtPayload,
     config.jwt.secret,
-    { expiresIn }
+    { expiresIn, algorithm: JWT_ALGORITHM }
   );
 }
 
 export function verifyAuthToken(token: string): AuthJwtPayload | null {
   try {
-    const decoded = jwt.verify(token, config.jwt.secret);
+    const decoded = jwt.verify(token, config.jwt.secret, { algorithms: [JWT_ALGORITHM] });
     if (!decoded || typeof decoded === "string") return null;
     const payload = decoded as jwt.JwtPayload;
     const sub = asString(payload.sub);

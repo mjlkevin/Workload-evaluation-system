@@ -39,6 +39,24 @@ function isValidUUID(v: unknown): boolean {
   return typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 }
 
+function canAccessOwnedResource(
+  user: { id?: string; role?: string } | undefined,
+  resource: { ownerUserId?: string | null } | null | undefined,
+): boolean {
+  if (!user || !resource) return false;
+  if (user.role === "admin") return true;
+  return Boolean(resource.ownerUserId && resource.ownerUserId === user.id);
+}
+
+function assertCanAccessOwnedResource(
+  user: { id?: string; role?: string } | undefined,
+  resource: { ownerUserId?: string | null } | null | undefined,
+): void {
+  if (!canAccessOwnedResource(user, resource)) {
+    throw new ApiError(404, "资源不存在");
+  }
+}
+
 function parseCreatePack(body: unknown): { sourceExtractionId?: string; extractionId?: string } {
   const b = body as Record<string, unknown>;
   const out: { sourceExtractionId?: string; extractionId?: string } = {};
@@ -154,6 +172,7 @@ router.get(
       const id = req.params.id as string;
       const pack = await requirementPackService.findById(id);
       if (!pack) throw new ApiError(404, "需求包不存在");
+      assertCanAccessOwnedResource(req.user, pack);
       res.json({ success: true, data: pack });
     } catch (err) {
       next(err);
@@ -168,6 +187,9 @@ router.patch(
   async (req, res, next) => {
     try {
       const id = req.params.id as string;
+      const existing = await requirementPackService.findById(id);
+      if (!existing) throw new ApiError(404, "需求包不存在");
+      assertCanAccessOwnedResource(req.user, existing);
       const body = parseUpdatePack(req.body);
       const pack = await requirementPackService.update(id, body);
       if (!pack) throw new ApiError(404, "需求包不存在");
@@ -185,6 +207,9 @@ router.delete(
   async (req, res, next) => {
     try {
       const id = req.params.id as string;
+      const existing = await requirementPackService.findById(id);
+      if (!existing) throw new ApiError(404, "需求包不存在");
+      assertCanAccessOwnedResource(req.user, existing);
       const ok = await requirementPackService.delete(id);
       if (!ok) throw new ApiError(404, "需求包不存在");
       res.json({ success: true });
@@ -201,6 +226,9 @@ router.post(
   async (req, res, next) => {
     try {
       const id = req.params.id as string;
+      const pack = await requirementPackService.findById(id);
+      if (!pack) throw new ApiError(404, "需求包不存在");
+      assertCanAccessOwnedResource(req.user, pack);
       const result = await requirementPackService.review(id);
       res.json({ success: true, data: result });
     } catch (err) {
@@ -216,6 +244,9 @@ router.get(
   async (req, res, next) => {
     try {
       const id = req.params.id as string;
+      const pack = await requirementPackService.findById(id);
+      if (!pack) throw new ApiError(404, "需求包不存在");
+      assertCanAccessOwnedResource(req.user, pack);
       const confidences = await requirementPackService.getFieldConfidences(id);
       res.json({ success: true, data: confidences });
     } catch (err) {
@@ -237,6 +268,7 @@ router.post(
       const id = req.params.id as string;
       const pack = await requirementPackService.findById(id);
       if (!pack) throw new ApiError(404, "需求包不存在");
+      assertCanAccessOwnedResource(req.user, pack);
 
       // 若已存在，先删除旧 estimate（P1-1 单 estimate 策略）
       const existing = await initialEstimateService.findByPackId(pack.requirementPackId);
@@ -264,6 +296,7 @@ router.get(
       const id = req.params.id as string;
       const estimate = await initialEstimateService.findById(id);
       if (!estimate) throw new ApiError(404, "初估包不存在");
+      assertCanAccessOwnedResource(req.user, estimate);
       res.json({ success: true, data: estimate });
     } catch (err) {
       next(err);
@@ -278,6 +311,9 @@ router.patch(
   async (req, res, next) => {
     try {
       const id = req.params.id as string;
+      const existing = await initialEstimateService.findById(id);
+      if (!existing) throw new ApiError(404, "初估包不存在");
+      assertCanAccessOwnedResource(req.user, existing);
       const body = parseUpdateEstimate(req.body);
       const estimate = await initialEstimateService.update(id, body);
       if (!estimate) throw new ApiError(404, "初估包不存在");
@@ -301,6 +337,7 @@ router.post(
       const id = req.params.id as string;
       const pack = await requirementPackService.findById(id);
       if (!pack) throw new ApiError(404, "需求包不存在");
+      assertCanAccessOwnedResource(req.user, pack);
 
       const cloudProduct = (req.body.cloudProduct as string) || "金蝶AI星空";
       const sowItems = await sowService.generateFromPack({
@@ -324,6 +361,7 @@ router.get(
       const id = req.params.id as string;
       const sow = await sowService.findById(id);
       if (!sow) throw new ApiError(404, "SOW 条目不存在");
+      assertCanAccessOwnedResource(req.user, sow);
       res.json({ success: true, data: sow });
     } catch (err) {
       next(err);
@@ -338,6 +376,9 @@ router.patch(
   async (req, res, next) => {
     try {
       const id = req.params.id as string;
+      const existing = await sowService.findById(id);
+      if (!existing) throw new ApiError(404, "SOW 条目不存在");
+      assertCanAccessOwnedResource(req.user, existing);
       const body = parseUpdateSow(req.body);
       const sow = await sowService.update(id, body);
       if (!sow) throw new ApiError(404, "SOW 条目不存在");
@@ -355,6 +396,9 @@ router.get(
   async (req, res, next) => {
     try {
       const id = req.params.id as string;
+      const pack = await requirementPackService.findById(id);
+      if (!pack) throw new ApiError(404, "需求包不存在");
+      assertCanAccessOwnedResource(req.user, pack);
       const sowItems = await sowService.findByPackId(id);
       res.json({ success: true, data: sowItems });
     } catch (err) {
