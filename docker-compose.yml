@@ -52,16 +52,9 @@ services:
       retries: 3
       start_period: 10s
 
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    container_name: workload-web
-    restart: unless-stopped
-    ports:
-      - "5173:80"
-    depends_on:
-      - api
+  # web service 已下线（apps/web W4 Vue 工作台已删除）
+  # 旧前端 ui/V0_SAAS（Next.js）暂用 host 模式启动，未容器化
+  # 新前端待基于 V0_SAAS 重建，详见 docs/TODO_V0_SAAS_FRONTEND.md
 
 volumes:
   pg_data:

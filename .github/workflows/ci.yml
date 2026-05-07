@@ -27,9 +27,7 @@ jobs:
 
       - name: Lint API
         run: cd apps/api && npm run lint
-
-      - name: Lint Web
-        run: cd apps/web && npm run lint
+      # Lint Web 已暂停（apps/web W4 Vue 工作台已删除，新前端待基于 ui/V0_SAAS 重建）
 
   tsc:
     needs: lint
@@ -50,9 +48,7 @@ jobs:
 
       - name: Type-check API
         run: cd apps/api && npx tsc --noEmit
-
-      - name: Type-check Web
-        run: cd apps/web && npx vue-tsc --noEmit
+      # Type-check Web 已暂停（apps/web 已删除）
 
   test-non-db:
     needs: tsc
@@ -146,7 +142,5 @@ jobs:
       - name: Build API image
         run: docker build -t wes-api -f docker/Dockerfile.api .
 
-      # TODO(W5-A): web Dockerfile 尚未合入，先 continue-on-error 占位。
-      - name: Build Web image
-        run: docker build -t wes-web ./apps/web
-        continue-on-error: true
+      # Web image build 已暂停（apps/web 已删除）
+      # ui/V0_SAAS 有自己的 Dockerfile，待新前端规划后接入 CI
