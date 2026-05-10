@@ -27,3 +27,21 @@ input, button, select, textarea { font-family: inherit; }
 @media (max-width: 760px) {
   .home-kpi  { grid-template-columns: 1fr; }
 }
+
+/* ---- R3-E utility grid classes ---- */
+.grid-1fr-280 { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 16px; min-width: 0; }
+.grid-3-eq    { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.grid-4-eq    { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+.grid-2-eq    { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+
+@media (max-width: 1180px) {
+  .grid-1fr-280 { grid-template-columns: 1fr; }
+  .grid-3-eq    { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .grid-4-eq    { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 760px) {
+  .grid-1fr-280 { grid-template-columns: 1fr; }
+  .grid-3-eq    { grid-template-columns: 1fr; }
+  .grid-4-eq    { grid-template-columns: 1fr; }
+  .grid-2-eq    { grid-template-columns: 1fr; }
+}

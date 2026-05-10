@@ -41,7 +41,7 @@ export default function ResourceCostDetail() {
       ]}
     >
       {/* pmstrip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, padding: '12px 18px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)' }}>
+      <div className="grid-3-eq" style={{ padding: '12px 18px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>总方案版本号</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>GL-04001</div>
@@ -67,10 +67,10 @@ export default function ResourceCostDetail() {
         <button type="button" className="t" style={{ background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>导出预览</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, padding: '16px 24px 24px' }}>
+      <div className="grid-1fr-280" style={{ padding: '16px 24px 24px' }}>
         <div style={{ display: 'grid', gap: 16 }}>
           {/* KPI3 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+          <div className="grid-3-eq">
             <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 14, boxShadow: 'var(--shadow-1)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
                 <span style={{ width: 22, height: 22, borderRadius: 5, display: 'grid', placeItems: 'center', fontSize: 12, color: '#fff', background: 'var(--brand)' }}>⊞</span>
@@ -91,7 +91,7 @@ export default function ResourceCostDetail() {
                 实施评估人天分配
                 <span className="bdg ok" style={{ marginLeft: 'auto', fontSize: 10, height: 18, padding: '0 6px' }}><span className="dot" style={{ background: 'var(--ok)' }} />联动</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div className="grid-2-eq" style={{ marginBottom: 10 }}>
                 <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>实施总人天</div><div style={{ fontSize: 22, fontWeight: 800 }}>194</div></div>
                 <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>表格已分配</div><div style={{ fontSize: 22, fontWeight: 800 }}>186</div></div>
                 <div><div style={{ fontSize: 11, color: 'var(--ink-3)' }}>差额</div><div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>−8</div></div>

@@ -11,12 +11,12 @@ export default function HistoryDetail() {
         <button key="clone" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }}>克隆此方案为新评估</button>,
       ]}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, padding: '16px 18px 18px' }}>
+      <div className="grid-1fr-280" style={{ padding: '16px 18px 18px' }}>
         <div style={{ display: 'grid', gap: 16 }}>
           <div className="section" style={{ margin: 0 }}>
             <div className="hd"><span>基本信息</span><span className="bdg ci"><span className="dot" />已交付</span></div>
             <div className="bd">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <div className="grid-3-eq">
                 {[{ k: '客户', v: '华东智造' }, { k: '行业', v: '离散制造' }, { k: '规模', v: '2400 人' }, { k: '总人天', v: '1260' }, { k: '总金额', v: '¥ 380 万' }, { k: '年份', v: '2024' }].map((item) => (
                   <div key={item.k} style={{ padding: 12, border: '1px solid var(--line)', borderRadius: 12, background: '#fff' }}>
                     <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{item.k}</div>

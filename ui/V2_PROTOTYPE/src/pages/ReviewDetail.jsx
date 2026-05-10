@@ -67,7 +67,7 @@ export default function ReviewDetail() {
         <button key="pass" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} disabled>✓ 通过</button>,
       ]}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '12px 18px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)' }}>
+      <div className="grid-4-eq" style={{ padding: '12px 18px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>关联方案</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>AE-2026-0418 · 付款/库存/报表</div>
@@ -86,7 +86,7 @@ export default function ReviewDetail() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, padding: '16px 18px 18px' }}>
+      <div className="grid-1fr-280" style={{ padding: '16px 18px 18px' }}>
         <div style={{ display: 'grid', gap: 16 }}>
           <div className="section" style={{ margin: 0 }}>
             <div className="hd"><span>Checklist</span><span className="bdg ci"><span className="dot" />5 项</span></div>
