@@ -1,6 +1,6 @@
 import React from 'react'
 
-function MiniBar({ value, max, color }) {
+function MiniBar({ value, max, color, minLabel = '0', maxLabel = max }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100))
   return (
     <>
@@ -24,14 +24,18 @@ function MiniBar({ value, max, color }) {
           marginTop: 2,
         }}
       >
-        <span>0</span>
-        <span>{max}</span>
+        <span>{minLabel}</span>
+        <span>{maxLabel}</span>
       </div>
     </>
   )
 }
 
 export default function ParamMiniBar({ params }) {
+  const difficultyValue = Number(params.difficultyFactor ?? 1)
+  const difficultyDelta = difficultyValue >= 1 ? difficultyValue - 1 : difficultyValue
+  const difficultyHigh = difficultyValue >= 1.3
+
   const items = [
     {
       key: 'userCount',
@@ -45,17 +49,19 @@ export default function ParamMiniBar({ params }) {
     {
       key: 'difficultyFactor',
       label: '难度系数',
-      value: params.difficultyFactor,
-      unit: `+${Math.round(params.difficultyFactor * 100)}%`,
+      value: difficultyValue,
+      barValue: Math.max(0, difficultyDelta),
+      unit: `+${Math.round(difficultyDelta * 100)}%`,
       max: 1.0,
-      barColor: 'var(--accent)',
-      numColor: 'var(--accent-ink)',
+      barColor: difficultyHigh ? 'var(--accent)' : 'var(--brand)',
+      numColor: difficultyHigh ? 'var(--accent-ink)' : 'var(--ink)',
+      note: difficultyHigh ? '偏高 · 需复核' : '标准范围',
     },
     {
       key: 'orgCount',
       label: '组织数',
       value: params.orgCount,
-      unit: '',
+      unit: '个',
       max: 10,
       barColor: 'var(--brand)',
       numColor: 'var(--ink)',
@@ -94,10 +100,17 @@ export default function ParamMiniBar({ params }) {
             </span>
             {it.unit && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{it.unit}</span>}
           </div>
-          {it.note ? (
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>{it.note}</div>
-          ) : (
-            <MiniBar value={it.value} max={it.max} color={it.barColor} />
+          <MiniBar value={it.barValue ?? it.value} max={it.max} color={it.barColor} />
+          {it.note && (
+            <div
+              style={{
+                fontSize: 11,
+                color: it.key === 'difficultyFactor' && difficultyHigh ? 'var(--accent-ink)' : 'var(--ink-3)',
+                marginTop: 4,
+              }}
+            >
+              {it.note}
+            </div>
           )}
         </div>
       ))}

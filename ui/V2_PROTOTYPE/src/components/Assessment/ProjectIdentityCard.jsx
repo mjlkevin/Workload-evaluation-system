@@ -8,15 +8,15 @@ export default function ProjectIdentityCard({ data }) {
   const isReadonly = data.vcs?.isReadonly ?? false
 
   const cardBg = isReadonly
-    ? 'linear-gradient(135deg, oklch(0.97 0.02 150) 0%, #fff 100%)'
+    ? 'linear-gradient(135deg, #ecfdf5 0%, #fff 100%)'
     : 'linear-gradient(135deg, oklch(0.98 0.025 262) 0%, #fff 100%)'
-  const leftBorder = isReadonly ? '3px solid var(--ok, #10b981)' : '3px solid var(--brand, #4f46e5)'
+  const leftBorder = isReadonly ? '3px solid #10b981' : '3px solid var(--brand, #4f46e5)'
 
   return (
     <div
       style={{
         background: cardBg,
-        border: '1px solid var(--line, #e5e7eb)',
+        border: isReadonly ? '1px solid #a7f3d0' : '1px solid var(--line, #e5e7eb)',
         borderLeft: leftBorder,
         borderRadius: 'var(--r-lg, 12px)',
         padding: '16px 18px',
@@ -195,11 +195,11 @@ export default function ProjectIdentityCard({ data }) {
               borderRadius: 999,
               fontSize: 12,
               fontWeight: 600,
-              background: isReadonly ? 'var(--ok-soft, #d1fae5)' : 'var(--accent-soft, #ffedd5)',
-              color: isReadonly ? 'var(--ok-ink, #047857)' : 'var(--accent-ink, #c2410c)',
+              background: isReadonly ? '#ecfdf5' : 'var(--accent-soft, #ffedd5)',
+              color: isReadonly ? '#047857' : 'var(--accent-ink, #c2410c)',
             }}
           >
-            {isReadonly ? '已检入' : '已检出'}
+            {isReadonly ? '已检入 · 只读' : '已检出'}
             <span style={{ fontSize: 10.5, fontWeight: 400, opacity: 0.8 }}>
               （{data.vcs?.checkedOutBy} · {data.vcs?.checkedOutAt?.slice(0, 10)}）
             </span>

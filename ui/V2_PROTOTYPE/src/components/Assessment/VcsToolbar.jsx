@@ -3,6 +3,10 @@ import React, { useState } from 'react'
 export default function VcsToolbar({ dsl, hasLocalChanges }) {
   const [showMore, setShowMore] = useState(false)
   const dslOk = !dsl?.issues?.length
+  const blockedByDsl = !dslOk
+  const disabledStyle = blockedByDsl
+    ? { opacity: 0.45, cursor: 'not-allowed', boxShadow: 'none' }
+    : null
 
   return (
     <div
@@ -15,8 +19,13 @@ export default function VcsToolbar({ dsl, hasLocalChanges }) {
       }}
     >
       {/* 主操作 */}
-      <button className="btn btn-pri" style={{ height: 32, padding: '0 14px', fontSize: 13 }}>
-        <span style={{ fontWeight: 600 }}>⇣</span> 检出以编辑
+      <button
+        className="btn btn-pri"
+        disabled={blockedByDsl}
+        title={blockedByDsl ? 'DSL 校验未通过，修复后才能签入' : '签入当前版本'}
+        style={{ height: 32, padding: '0 14px', fontSize: 13, ...disabledStyle }}
+      >
+        <span style={{ fontWeight: 600 }}>⇡</span> 签入版本
       </button>
       <button className="btn btn-out" style={{ height: 32, padding: '0 14px', fontSize: 13 }}>
         版本历史
@@ -24,7 +33,12 @@ export default function VcsToolbar({ dsl, hasLocalChanges }) {
       <button className="btn btn-out" style={{ height: 32, padding: '0 14px', fontSize: 13 }}>
         实时校验
       </button>
-      <button className="btn btn-out" style={{ height: 32, padding: '0 14px', fontSize: 13 }}>
+      <button
+        className="btn btn-out"
+        disabled={blockedByDsl}
+        title={blockedByDsl ? 'DSL 校验未通过，修复后才能导出' : '导出'}
+        style={{ height: 32, padding: '0 14px', fontSize: 13, ...disabledStyle }}
+      >
         导出
       </button>
 

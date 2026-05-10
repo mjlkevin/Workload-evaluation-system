@@ -1,8 +1,16 @@
 import React, { useState } from 'react'
 
-export default function DslBanner({ dsl }) {
+export default function DslBanner({ dsl, onAutoFix }) {
   const [open, setOpen] = useState(false)
   if (!dsl?.issues?.length) return null
+
+  const handleAutoFix = () => {
+    if (onAutoFix) {
+      onAutoFix(dsl.issues)
+      return
+    }
+    alert('Phase B · 将根据 DSL 违规项自动补齐依赖 SKU')
+  }
 
   return (
     <div
@@ -50,21 +58,41 @@ export default function DslBanner({ dsl }) {
           </ul>
         )}
       </div>
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          fontSize: 12,
-          color: 'var(--err-ink, #991b1b)',
-          cursor: 'pointer',
-          background: 'transparent',
-          border: 0,
-          fontFamily: 'inherit',
-          fontWeight: 600,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {open ? '收起详情 ▴' : '展开详情 ▾'}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <button
+          onClick={handleAutoFix}
+          style={{
+            height: 28,
+            padding: '0 12px',
+            borderRadius: 999,
+            border: 0,
+            background: 'var(--err, #dc2626)',
+            color: '#fff',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: 12,
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          一键修复
+        </button>
+        <button
+          onClick={() => setOpen(!open)}
+          style={{
+            fontSize: 12,
+            color: 'var(--err-ink, #991b1b)',
+            cursor: 'pointer',
+            background: 'transparent',
+            border: 0,
+            fontFamily: 'inherit',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {open ? '收起详情 ▴' : '展开详情 ▾'}
+        </button>
+      </div>
     </div>
   )
 }

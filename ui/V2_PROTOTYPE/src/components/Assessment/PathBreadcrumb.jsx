@@ -3,18 +3,36 @@ import React, { useState } from 'react'
 export default function PathBreadcrumb({ path }) {
   const [expanded, setExpanded] = useState('cloud')
   const [showAllClouds, setShowAllClouds] = useState(false)
-  const { quoteMode, preset, cloudProducts, allCloudProducts } = path
+  const [selectedQuote, setSelectedQuote] = useState(path.quoteMode)
+  const [selectedPreset, setSelectedPreset] = useState(path.preset)
+  const [selectedClouds, setSelectedClouds] = useState(path.cloudProducts)
+  const { quoteMode, preset, allCloudProducts } = path
+  const quoteModes = path.quoteModes || ['模块报价', '标准清单报价', '范围估算']
+  const presets = path.presets || ['标准财务供应链', '轻量财务供应链', '集团多组织模板']
 
   const layers = [
-    { key: 'quote', label: '报价模式', value: quoteMode, color: 'var(--brand)' },
-    { key: 'preset', label: '预置', value: preset, color: 'var(--brand)' },
-    { key: 'cloud', label: '云产品', value: cloudProducts.join(' + '), color: 'var(--accent)' },
+    { key: 'quote', label: '报价模式', value: selectedQuote || quoteMode, color: 'var(--brand)' },
+    { key: 'preset', label: '预置', value: selectedPreset || preset, color: 'var(--brand)' },
+    { key: 'cloud', label: '云产品', value: selectedClouds.join(' + '), color: 'var(--accent)' },
   ]
 
   const MAX_VISIBLE = 12
   const hasOverflow = allCloudProducts.length > MAX_VISIBLE
   const visibleClouds = showAllClouds ? allCloudProducts : allCloudProducts.slice(0, MAX_VISIBLE)
   const overflowCount = allCloudProducts.length - MAX_VISIBLE
+  const chipStyle = (selected) => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '4px 10px',
+    borderRadius: 8,
+    fontSize: 11,
+    fontWeight: 600,
+    background: selected ? 'var(--accent)' : 'var(--bg-2)',
+    color: selected ? '#fff' : 'var(--ink-3)',
+    border: '1px solid var(--line)',
+    cursor: 'pointer',
+    opacity: selected ? 1 : 0.72,
+  })
 
   return (
     <div
@@ -54,11 +72,62 @@ export default function PathBreadcrumb({ path }) {
           </React.Fragment>
         ))}
         <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-3)' }}>
-          命中 {cloudProducts.length}/{allCloudProducts.length} 云产品 · {allCloudProducts.length * 2} 条 SKU
+          命中 {selectedClouds.length}/{allCloudProducts.length} 云产品 · {allCloudProducts.length * 2} 条 SKU
         </span>
       </div>
 
-      {/* expanded cloud chips */}
+      {expanded === 'quote' && (
+        <div
+          style={{
+            borderTop: '1px dashed var(--line)',
+            marginTop: 10,
+            paddingTop: 10,
+          }}
+        >
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 500, marginBottom: 8 }}>报价模式</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {quoteModes.map((name) => (
+              <span
+                key={name}
+                onClick={() => {
+                  setSelectedQuote(name)
+                  setExpanded('preset')
+                }}
+                style={chipStyle(name === selectedQuote)}
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {expanded === 'preset' && (
+        <div
+          style={{
+            borderTop: '1px dashed var(--line)',
+            marginTop: 10,
+            paddingTop: 10,
+          }}
+        >
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 500, marginBottom: 8 }}>预置</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {presets.map((name) => (
+              <span
+                key={name}
+                onClick={() => {
+                  setSelectedPreset(name)
+                  setExpanded('cloud')
+                }}
+                style={chipStyle(name === selectedPreset)}
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {expanded === 'cloud' && (
         <div
           style={{
@@ -70,23 +139,16 @@ export default function PathBreadcrumb({ path }) {
           <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 500, marginBottom: 8 }}>云产品</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {visibleClouds.map((name) => {
-              const selected = cloudProducts.includes(name)
+              const selected = selectedClouds.includes(name)
               return (
                 <span
                   key={name}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '4px 10px',
-                    borderRadius: 8,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    background: selected ? 'var(--accent)' : 'var(--bg-2)',
-                    color: selected ? '#fff' : 'var(--ink-3)',
-                    border: '1px solid var(--line)',
-                    cursor: 'pointer',
-                    opacity: selected ? 1 : 0.55,
+                  onClick={() => {
+                    setSelectedClouds((prev) =>
+                      prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
+                    )
                   }}
+                  style={chipStyle(selected)}
                 >
                   {name}
                 </span>

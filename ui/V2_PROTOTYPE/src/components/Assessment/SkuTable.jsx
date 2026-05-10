@@ -3,7 +3,15 @@ import DaysCell from './DaysCell.jsx'
 import CustomStepper from './CustomStepper.jsx'
 
 export default function SkuTable({ groups }) {
-  const [selectedRows, setSelectedRows] = useState(new Set())
+  const [selectedRows, setSelectedRows] = useState(() => {
+    const initial = new Set()
+    groups.forEach((group, groupIdx) => {
+      group.children.slice(0, group.selected || 0).forEach((_, childIdx) => {
+        initial.add(`${groupIdx}-${childIdx}`)
+      })
+    })
+    return initial
+  })
 
   const toggleRow = (groupIdx, childIdx) => {
     const key = `${groupIdx}-${childIdx}`
@@ -11,6 +19,19 @@ export default function SkuTable({ groups }) {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
+      return next
+    })
+  }
+
+  const toggleGroup = (groupIdx, childCount) => {
+    setSelectedRows((prev) => {
+      const next = new Set(prev)
+      const keys = Array.from({ length: childCount }, (_, childIdx) => `${groupIdx}-${childIdx}`)
+      const allSelected = keys.every((key) => next.has(key))
+      keys.forEach((key) => {
+        if (allSelected) next.delete(key)
+        else next.add(key)
+      })
       return next
     })
   }
@@ -96,14 +117,22 @@ export default function SkuTable({ groups }) {
                     return (
                       <tr
                         key={key}
-                        onClick={() => toggleRow(gi, ci)}
                         style={{
-                          cursor: 'pointer',
                           boxShadow: isSelected ? 'inset 3px 0 0 var(--brand)' : 'none',
                           background: isSelected ? 'oklch(0.42 0.14 262 / 0.06)' : 'transparent',
+                          opacity: isSelected ? 1 : 0.68,
+                          transition: 'background .15s, opacity .15s',
                         }}
                       >
-                        <td style={{ textAlign: 'center', padding: '10px', borderTop: '1px solid var(--line)' }}>
+                        <td
+                          onClick={() => toggleRow(gi, ci)}
+                          style={{
+                            textAlign: 'center',
+                            padding: '10px',
+                            borderTop: '1px solid var(--line)',
+                            cursor: 'pointer',
+                          }}
+                        >
                           <span
                             style={{
                               display: 'inline-block',
@@ -119,6 +148,7 @@ export default function SkuTable({ groups }) {
                         {isFirst && (
                           <td
                             rowSpan={rowSpan}
+                            onClick={() => toggleGroup(gi, rowSpan)}
                             style={{
                               background: 'var(--bg-2)',
                               fontWeight: 600,
@@ -129,6 +159,7 @@ export default function SkuTable({ groups }) {
                               verticalAlign: 'middle',
                               textAlign: 'center',
                               padding: '10px',
+                              cursor: 'pointer',
                             }}
                           >
                             {g.name}
