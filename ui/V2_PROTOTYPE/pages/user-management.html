@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 用户管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .toolbar-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 18px;background:var(--bg-soft);border-bottom:1px solid var(--line);font-size:12px}
+  .toolbar-row .sel-count{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;font-weight:700;padding:0 4px}
+  .toolbar-row .actions{display:flex;gap:4px;padding-right:12px;border-right:1px solid var(--line)}
+  .toolbar-row .actions .ib{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;color:var(--ink-2);background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .toolbar-row .actions .ib:hover:not(:disabled){background:#fff;color:var(--ink)}
+  .toolbar-row .actions .ib.dan{color:var(--err)}
+  .toolbar-row .actions .ib:disabled{opacity:.5;cursor:not-allowed}
+  .toolbar-row .filters{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .filt{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:5px;background:var(--surface);border:1px solid var(--line);font-size:11.5px;color:var(--ink-2);cursor:pointer}
+  .filt b{color:var(--ink);font-weight:600}
+  .filt .x{color:var(--ink-3);font-size:10px}
+  .search.compact{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;background:#fff;border:1px solid var(--line);font-size:11.5px;color:var(--ink-3);width:220px;max-width:240px;flex-shrink:0}
+  .user-cell{display:flex;align-items:center;gap:10px}
+  .user-cell .av{width:28px;height:28px;border-radius:50%;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;font-size:11px;font-weight:700;flex-shrink:0}
+  .user-cell .info{display:flex;flex-direction:column}
+  .user-cell .info .nm{font-size:13px;font-weight:600}
+  .user-cell .info .em{font-size:11px;color:var(--ink-3);font-family:var(--font-mono)}
+  .role-sa{background:var(--ink);color:#fff}
+  .role-sa .dot{background:var(--accent)}
+  .sys-lock{color:var(--ink-3);font-size:11.5px}
+  .float-bar{position:fixed;left:240px;right:0;bottom:0;z-index:40;background:var(--brand-soft);border-top:1px solid var(--line);padding:10px 24px;display:none;align-items:center;gap:10px;flex-wrap:wrap}
+  .float-bar.on{display:flex}
+  @media (max-width:1180px){.float-bar{left:0}}
+  .tbl-wrp{padding-bottom:72px}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="l">W</div><div>WES</div></div>
+      <div class="grp">
+        <h6>工作台</h6>
+        <a href="home.html"><span class="ic">●</span>主页</a>
+        <a href="requirement-list.html"><span class="ic">✎</span>需求</a>
+        <a href="assessment-list.html"><span class="ic">▣</span>实施评估</a>
+        <a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a>
+        <a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a>
+        <a href="wbs.html"><span class="ic">☷</span>WBS</a>
+        <a href="review-list.html"><span class="ic">✓</span>评审</a>
+      </div>
+      <div class="grp">
+        <h6>系统</h6>
+        <a href="system-management.html"><span class="ic">⚙</span>系统管理</a>
+        <a href="user-management.html" class="on"><span class="ic">☺</span>用户管理</a>
+        <a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a>
+      </div>
+      <div class="user">
+        <div class="row"><div class="av">M</div><div><div class="nm">mjlkevin</div><div class="meta">超级管理员</div></div></div>
+        <a class="out" href="login.html">退出</a>
+      </div>
+    </aside>
+    <main class="content">
+      <div class="pg-hd">
+        <div class="crumb"><b>工作台</b> &nbsp;/&nbsp; <b style="color:var(--ink)">用户管理</b></div>
+        <div class="row">
+          <h1>用户管理</h1>
+          <span style="color:var(--ink-3);font-size:12px;margin-left:6px">用户、角色与状态管理</span>
+          <div class="right"></div>
+        </div>
+      </div>
+      <div class="section tbl-wrp">
+        <div class="toolbar-row">
+          <span class="sel-count" id="selCount">已选 0</span>
+          <div class="actions">
+            <button class="ib" id="btnEnable" disabled onclick="batch('enable')">批量启用</button>
+            <button class="ib dan" id="btnDisable" disabled onclick="batch('disable')">批量禁用</button>
+            <button class="ib" id="btnRole" disabled onclick="batch('role')">改角色</button>
+            <button class="ib pri" style="background:var(--brand);color:#fff" onclick="alert('Phase A · 静态 mock')">+ 邀请成员</button>
+          </div>
+          <div class="filters">
+            <span class="filt">角色：<b>全部</b><span class="x">×</span></span>
+            <span class="filt">状态：<b>全部</b><span class="x">×</span></span>
+          </div>
+          <span class="search compact" style="width:240px">⌕ 搜索用户名 / 邮箱</span>
+        </div>
+        <table class="table" id="userTable" style="border-radius:0;border-left:none;border-right:none">
+          <thead><tr><th style="width:34px;text-align:center">☐</th><th>用户</th><th>角色</th><th>状态</th><th>最后登录</th><th>操作</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Floating bottom bar -->
+  <div class="float-bar" id="floatBar">
+    <span style="font-size:12px;color:var(--ink-2);font-family:var(--font-mono);font-weight:700" id="floatCount">已选 0</span>
+    <button class="btn btn-out" style="font-size:12px;padding:6px 12px" onclick="batch('enable')">批量启用</button>
+    <button class="btn btn-dan" style="font-size:12px;padding:6px 12px" onclick="batch('disable')">批量禁用</button>
+    <button class="btn btn-out" style="font-size:12px;padding:6px 12px" onclick="batch('role')">改角色</button>
+    <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" onclick="clearSel()">取消</button>
+  </div>
+
+  <script src="../mock/data.js"></script>
+  <script>
+    (function(){
+      var users = (window.MOCK.users || []).slice(0,4);
+      var cur = window.MOCK.currentUser || {};
+      var tbody = document.querySelector('#userTable tbody');
+      var selCount = document.getElementById('selCount');
+      var btnEnable = document.getElementById('btnEnable');
+      var btnDisable = document.getElementById('btnDisable');
+      var btnRole = document.getElementById('btnRole');
+      var floatBar = document.getElementById('floatBar');
+      var floatCount = document.getElementById('floatCount');
+      var sel = new Set();
+
+      function roleLabel(r){
+        var map = {admin:'超级管理员',sub_admin:'管理员',user:'普通用户'};
+        return map[r] || r;
+      }
+      function fmtRoleChip(r, isSa){
+        if(isSa) return '<span class="bdg role-sa" style="font-size:10.5px;padding:1px 7px"><span class="dot"></span>'+roleLabel(r)+'</span>';
+        var cls = r==='sub_admin'?'brd':r==='user'?'draft':'ok';
+        return '<span class="bdg '+cls+'" style="font-size:10.5px;padding:1px 7px"><span class="dot"></span>'+roleLabel(r)+'</span>';
+      }
+      function fmtStatus(s){
+        return s==='active'?'<span class="bdg ok" style="font-size:10.5px;padding:1px 7px"><span class="dot"></span>正常</span>':'<span class="bdg draft" style="font-size:10.5px;padding:1px 7px"><span class="dot"></span>已禁用</span>';
+      }
+
+      function render(){
+        tbody.innerHTML = users.map(function(u,i){
+          var isSa = u.role === 'admin';
+          var isSelf = u.id === cur.id;
+          var chk = isSa ? '<span style="color:var(--ink-3);font-size:11px">—</span>' : '<span class="chk" style="cursor:pointer">☐</span>';
+          var ops = isSa ? '<span class="sys-lock">— 系统账号 —</span>' : '<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;height:28px" onclick="alert(\'Phase A · 静态 mock\')">编辑</button>';
+          var disabledAttr = isSa ? ' data-locked="1"' : '';
+          return '<tr data-id="'+u.id+'"'+disabledAttr+'><td style="text-align:center">'+chk+'</td><td><div class="user-cell"><div class="av">'+u.username.charAt(0).toUpperCase()+'</div><div class="info"><div class="nm">'+u.username+'</div><div class="em">'+u.username+'@wes.local</div></div></div></td><td>'+fmtRoleChip(u.role,isSa)+'</td><td>'+fmtStatus(u.status)+'</td><td style="color:var(--ink-3);font-family:var(--font-mono);font-size:11px">'+(u.lastLoginAt?u.lastLoginAt.replace('T',' ').replace('Z',''):'—')+'</td><td>'+ops+'</td></tr>';
+        }).join('');
+
+        tbody.querySelectorAll('tr').forEach(function(tr){
+          if(tr.dataset.locked) return;
+          tr.addEventListener('click',function(e){
+            if(e.target.closest('button')) return;
+            var rows = [].slice.call(tbody.querySelectorAll('tr')).filter(function(r){return !r.dataset.locked;});
+            var apply = function(r, on){
+              r.classList.toggle('row-selected', on);
+              if(on) sel.add(r.dataset.id); else sel.delete(r.dataset.id);
+              var c = r.querySelector('td .chk'); if(c) c.textContent = on ? '▣' : '☐';
+            };
+            if (e.shiftKey && window.__selAnchor && rows.indexOf(window.__selAnchor) >= 0) {
+              var a = rows.indexOf(window.__selAnchor), b = rows.indexOf(tr);
+              var s = Math.min(a,b), t = Math.max(a,b);
+              sel.clear();
+              rows.forEach(function(r, i){ apply(r, i>=s && i<=t); });
+            } else if (e.ctrlKey || e.metaKey) {
+              apply(tr, !tr.classList.contains('row-selected'));
+              window.__selAnchor = tr;
+            } else {
+              sel.clear();
+              rows.forEach(function(r){ apply(r, false); });
+              apply(tr, true);
+              window.__selAnchor = tr;
+            }
+            updateUI();
+          });
+        });
+        updateUI();
+      }
+
+      function updateUI(){
+        var n = sel.size;
+        selCount.textContent = '已选 '+n;
+        floatCount.textContent = '已选 '+n;
+        floatBar.classList.toggle('on', n>0);
+        btnEnable.disabled = n===0;
+        btnDisable.disabled = n===0;
+        btnRole.disabled = n===0;
+      }
+
+      window.batch = function(act){ alert('Phase A · 批量'+act+'（已选 '+sel.size+'）'); };
+      window.clearSel = function(){
+        sel.clear();
+        tbody.querySelectorAll('tr').forEach(function(tr){
+          tr.classList.remove('row-selected');
+          var chk = tr.querySelector('td .chk');
+          if(chk) chk.textContent = '☐';
+        });
+        updateUI();
+      };
+
+      render();
+    })();
+  </script>
+</body>
+</html>

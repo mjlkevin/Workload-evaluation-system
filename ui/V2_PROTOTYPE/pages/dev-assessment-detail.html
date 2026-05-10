@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 开发评估详情</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .shell-wrap{min-height:100vh;background:var(--bg)}
+  .title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pmstrip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:12px 18px;background:var(--bg-soft);border-bottom:1px solid var(--line)}
+  .pmitem{display:flex;flex-direction:column;gap:4px}
+  .pmitem .k{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+  .pmitem .v{font-size:13px;font-weight:600;color:var(--ink)}
+  .at .stepper{display:inline-flex;align-items:center;gap:4px}
+  .at .stepper button{width:22px;height:22px;border:1px solid var(--line);background:#fff;border-radius:6px;color:var(--ink);cursor:pointer}
+  .at .stepper input{width:38px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:4px 0;font:600 12px/1 var(--font-mono);color:var(--ink)}
+  .df{display:flex;gap:2px;align-items:center}
+  .df span{width:14px;height:10px;border-radius:3px;background:var(--line-2)}
+  .df span.on{background:linear-gradient(180deg,var(--brand),var(--brand-2))}
+  .calc{font-family:var(--font-mono);font-size:11px;color:var(--ink-3)}
+  .bg-soft{background:var(--bg-soft)}
+  .vcs-bar{padding:10px 18px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;color:var(--ink-3);font-size:11.5px}
+  .menu{position:absolute;right:0;top:calc(100% + 8px);min-width:210px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 32px rgba(34,32,56,.12);padding:8px;display:none;z-index:10}
+  .menu.on{display:block}
+  .menu button{display:block;width:100%;text-align:left;border:none;background:transparent;padding:10px 12px;border-radius:8px;color:var(--ink);cursor:pointer}
+  .menu button:hover{background:var(--bg-soft)}
+  .btn-pri.purple{background:linear-gradient(135deg,oklch(.55 .22 295),oklch(.62 .20 320));border-color:transparent;box-shadow:0 10px 18px rgba(109,40,217,.18)}
+  .btn-pri.purple:hover{filter:brightness(1.03)}
+  .group-row td{background:#fbfbff;font-weight:800;color:var(--ink)}
+  .subtle{color:var(--ink-3);font-size:11px}
+  @media (max-width:1180px){.pmstrip{grid-template-columns:1fr}}
+  @media (max-width:760px){.pg-hd .right{position:static;margin-top:12px;justify-content:flex-start}}
+</style>
+</head>
+<body>
+<div class="shell-wrap shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="l">W</div><div>WES</div></div>
+    <div class="grp"><h6>工作台</h6><a href="home.html"><span class="ic">●</span>主页</a><a href="requirement-list.html"><span class="ic">✎</span>需求</a><a href="assessment-list.html"><span class="ic">▣</span>实施评估</a><a href="dev-assessment-list.html" class="on"><span class="ic">◆</span>开发评估</a><a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a><a href="wbs.html"><span class="ic">☷</span>WBS</a><a href="review-list.html"><span class="ic">✓</span>评审</a></div>
+    <div class="grp"><h6>系统</h6><a href="system-management.html"><span class="ic">⚙</span>系统管理</a><a href="user-management.html"><span class="ic">☺</span>用户管理</a><a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a></div>
+    <div class="user"><div class="row"><div class="av">A</div><div><div class="nm">admin</div><div class="meta">系统管理员</div></div></div><a class="out" href="login.html">退出</a></div>
+  </aside>
+  <main class="content">
+    <div class="pg-hd" style="position:relative">
+      <div class="crumb"><b>工作台</b> &nbsp;/&nbsp; 开发评估 &nbsp;/&nbsp; <b style="color:var(--ink)">开发评估详情</b></div>
+      <div class="title-row">
+        <h1 style="margin:0">开发评估详情</h1>
+        <span class="bdg rev"><span class="dot"></span>评估中</span>
+        <span class="tag" style="font-family:var(--font-mono)">v07</span>
+        <span class="tag" style="background:var(--brand-soft);color:var(--brand-ink);border-color:var(--brand-soft)">Dev-04</span>
+      </div>
+      <div class="right" style="position:absolute;right:18px;top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+        <div style="position:relative;display:inline-block">
+          <button class="btn btn-pri purple" id="aiBtn" type="button">AI 生成 ▾</button>
+          <div class="menu" id="aiMenu">
+            <button type="button" onclick="alert('按 SKU 推断子项 · mock 占位')">按 SKU 推断子项</button>
+            <button type="button" onclick="alert('按历史项目补充 · mock 占位')">按历史项目补充</button>
+          </div>
+        </div>
+        <button class="btn btn-out" type="button" onclick="alert('导出 CSV · mock 占位')">↓ 导出 CSV</button>
+        <button class="btn btn-out" type="button" onclick="alert('合并到实施评估 · mock 占位')">⌥ 合并到实施评估</button>
+        <button class="btn btn-pri" type="button" onclick="alert('保存 · mock 占位')">⤒ 保存</button>
+      </div>
+    </div>
+
+    <div class="pmstrip">
+      <div class="pmitem"><div class="k">总方案版本</div><div class="v">实施评估 v07 · 初稿冻结</div></div>
+      <div class="pmitem"><div class="k">关联实施评估</div><div class="v"><a href="assessment-detail.html">AE-2026-0418 · 付款/库存/报表</a></div></div>
+      <div class="pmitem"><div class="k">评估人</div><div class="v">王丽 · 后端架构师</div></div>
+    </div>
+
+    <div class="section" style="margin:16px 18px 18px">
+      <div class="hd"><span>开发子项明细</span><span class="bdg ci"><span class="dot"></span>8 项 / 2 组</span></div>
+      <div class="bd" style="padding:0;overflow:hidden">
+        <table class="table at" id="devTable">
+          <thead>
+            <tr><th style="width:160px">分组</th><th>子项</th><th style="width:150px">基础人天</th><th style="width:90px">难度</th><th style="width:170px">系数后</th><th style="width:96px">状态</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="vcs-bar bg-soft">
+        <span>vcs-bar · 主次分层浅条</span>
+        <span style="font-family:var(--font-mono)">基线：dev-2026.04.18</span>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../mock/data.js"></script>
+<script>
+(function(){
+  var data = (window.MOCK && window.MOCK.devAssessments && window.MOCK.devAssessments[0]) || { items: [] };
+  var tbody = document.querySelector('#devTable tbody');
+  var aiBtn = document.getElementById('aiBtn');
+  var aiMenu = document.getElementById('aiMenu');
+  aiBtn.addEventListener('click', function(e){ e.stopPropagation(); aiMenu.classList.toggle('on'); });
+  document.addEventListener('click', function(e){ if(!aiBtn.contains(e.target) && !aiMenu.contains(e.target)) aiMenu.classList.remove('on'); });
+  function renderBar(n){ return '<div class="df">'+Array.from({length:5}, function(_,i){ return '<span class="'+(i < n ? 'on' : '')+'"></span>'; }).join('')+'</div>'; }
+  function stepper(value){ return '<div class="stepper"><button type="button" onclick="var i=this.nextElementSibling;i.stepDown();i.dispatchEvent(new Event(\'input\',{bubbles:true}))">−</button><input type="number" min="0" step="0.5" value="'+value+'"><button type="button" onclick="var i=this.previousElementSibling;i.stepUp();i.dispatchEvent(new Event(\'input\',{bubbles:true}))">+</button></div>'; }
+  var items = (data.items && data.items.length) ? data.items : [
+    {group:'A 接口开发', name:'登录/权限 API', base:3, diff:2, factor:1.15, status:'进行中'},
+    {group:'A 接口开发', name:'项目 CRUD API', base:4, diff:3, factor:1.25, status:'未开始'},
+    {group:'A 接口开发', name:'审批流接口', base:3.5, diff:4, factor:1.35, status:'待确认'},
+    {group:'A 接口开发', name:'导出与回写', base:2.5, diff:2, factor:1.10, status:'进行中'},
+    {group:'B 报表看板', name:'KPI 总览卡片', base:2, diff:1, factor:1.05, status:'已完成'},
+    {group:'B 报表看板', name:'筛选统计图表', base:3, diff:3, factor:1.20, status:'进行中'},
+    {group:'B 报表看板', name:'明细钻取列表', base:3, diff:2, factor:1.12, status:'未开始'},
+    {group:'B 报表看板', name:'权限可见性校验', base:2, diff:4, factor:1.30, status:'待确认'}
+  ];
+  var groups = [];
+  var byGroup = {};
+  items.forEach(function(it){ if(!byGroup[it.group]) { byGroup[it.group] = []; groups.push(it.group); } byGroup[it.group].push(it); });
+  tbody.innerHTML = groups.map(function(group){
+    return '<tr class="group-row"><td colspan="6">'+group+' <span class="subtle">· '+byGroup[group].length+' 项</span></td></tr>' + byGroup[group].map(function(it){
+      return '<tr><td><span class="subtle">'+group+'</span></td><td>'+it.name+'</td><td>'+stepper(it.base)+'</td><td>'+renderBar(it.diff)+'</td><td><span class="calc">'+it.base+' × '+it.factor+' = '+(it.base*it.factor).toFixed(2)+'</span></td><td><span class="bdg '+(it.status==='已完成'?'ok':it.status==='进行中'?'ci':'rev')+'"><span class="dot"></span>'+it.status+'</span></td></tr>';
+    }).join('');
+  }).join('');
+})();
+</script>
+</body>
+</html>

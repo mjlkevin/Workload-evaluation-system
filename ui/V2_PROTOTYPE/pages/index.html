@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES V2 · 导航中心</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .nav-body{max-width:960px;margin:0 auto;padding:28px 24px 56px}
+  .nav-hd{margin-bottom:28px}
+  .nav-hd h1{margin:0 0 8px;font-size:32px;letter-spacing:-.02em}
+  .nav-hd p{margin:0;color:var(--ink-2);font-size:14px}
+  .nav-grp{margin-top:28px}
+  .nav-grp h2{margin:0 0 14px;font-size:14px;font-family:var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .nav-list{display:grid;gap:10px}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-1);transition:.15s}
+  .nav-item:hover{transform:translateY(-1px);box-shadow:var(--shadow-2);border-color:var(--line-2)}
+  .nav-item .st{width:44px;text-align:center}
+  .nav-item .st .bdg{font-size:10px;padding:2px 8px;height:18px}
+  .nav-item .st .bdg.ok{background:var(--ok-soft);color:var(--ok-ink)}
+  .nav-item .st .bdg.todo{background:var(--bg-soft);color:var(--ink-3)}
+  .nav-item .tt{flex:1;font-weight:600;font-size:13.5px}
+  .nav-item .ref{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);white-space:nowrap}
+  .nav-item .lk{margin-left:auto;font-size:12px;font-weight:600}
+</style>
+</head>
+<body>
+  <div class="nav-body">
+    <div class="nav-hd">
+      <span class="tag brd">Phase 1 收尾 · W0-1</span>
+      <h1>WES V2 导航中心</h1>
+      <p>16 个页面分组验收入口；点击直链跳转到对应骨架页。</p>
+    </div>
+
+    <div class="nav-grp">
+      <h2>Public</h2>
+      <div class="nav-list">
+        <a class="nav-item" href="login.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">登录页 · login.html</span>
+          <span class="ref">§6.2 · W1</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="_kitchen-sink.html">
+          <span class="st"><span class="bdg ok">DONE</span></span>
+          <span class="tt">Kitchen Sink · _kitchen-sink.html</span>
+          <span class="ref">§1 / §2 · Phase 1</span>
+          <span class="lk">→</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="nav-grp">
+      <h2>Dashboard</h2>
+      <div class="nav-list">
+        <a class="nav-item" href="home.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">主页 · home.html</span>
+          <span class="ref">§6.3 · W2</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="requirement-list.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">需求列表 · requirement-list.html</span>
+          <span class="ref">§6.4 · W3</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="requirement-detail.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">需求详情 · requirement-detail.html</span>
+          <span class="ref">§6.5 · W4</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="assessment-list.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">实施评估列表 · assessment-list.html</span>
+          <span class="ref">§6.4 · W3</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="assessment-detail.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">实施评估详情 · assessment-detail.html</span>
+          <span class="ref">§6.5 · W3</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="dev-assessment-list.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">开发评估 · dev-assessment-list.html + detail</span>
+          <span class="ref">§6.4 / §6.10 · W3 / W7</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="resource-cost-list.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">资源成本 · resource-cost-list.html + detail</span>
+          <span class="ref">§6.4 / §6.9 · W3 / W6</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="wbs.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">WBS · wbs.html</span>
+          <span class="ref">§6.10 · W7</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="review-list.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">评审 · review-list.html + detail</span>
+          <span class="ref">§6.4 / §6.10 · W3 / W7</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="history.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">历史版本 · history.html</span>
+          <span class="ref">§7.4 · W8</span>
+          <span class="lk">→</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="nav-grp">
+      <h2>System</h2>
+      <div class="nav-list">
+        <a class="nav-item" href="system-management.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">系统管理 · system-management.html</span>
+          <span class="ref">§6.8 · W5</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="user-management.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">用户管理 · user-management.html</span>
+          <span class="ref">§6.8 · W5</span>
+          <span class="lk">→</span>
+        </a>
+        <a class="nav-item" href="api-keys.html">
+          <span class="st"><span class="bdg todo">TODO</span></span>
+          <span class="tt">API 密钥 · api-keys.html</span>
+          <span class="ref">§6.8 · W5</span>
+          <span class="lk">→</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

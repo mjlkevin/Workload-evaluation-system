@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>WES 实施评估页 · 深度打磨方案 v3 · 含 KIMI CODE 施工提示词</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    /* ========== Color tokens (oklch) ========== */
+    --bg:        oklch(.985 .003 250);
+    --bg-2:      oklch(.97 .005 250);
+    --surface:   oklch(1 0 0);
+    --line:      oklch(.92 .006 250);
+    --line-2:    oklch(.88 .008 250);
+    --ink:       oklch(.20 .02 260);
+    --ink-2:     oklch(.42 .015 260);
+    --ink-3:     oklch(.62 .012 260);
+    --ink-4:     oklch(.78 .010 260);
+
+    --primary:     oklch(.42 .14 262);   /* 深空蓝 */
+    --primary-2:   oklch(.52 .15 262);
+    --primary-soft:oklch(.95 .03 262);
+    --primary-ink: oklch(.32 .12 262);
+
+    --accent:      oklch(.69 .18 45);    /* 朱砂橙 — 仅强调 */
+    --accent-soft: oklch(.96 .04 45);
+    --accent-ink:  oklch(.45 .15 45);
+
+    --teal:        oklch(.66 .10 195);   /* 雾青 — 信息/中性强调 */
+    --teal-soft:   oklch(.95 .03 195);
+
+    /* semantic */
+    --ok:    oklch(.66 .14 155);
+    --ok-soft:oklch(.95 .04 155);
+    --warn:  oklch(.74 .16 75);
+    --warn-soft:oklch(.96 .05 75);
+    --danger:oklch(.60 .19 25);
+    --danger-soft:oklch(.96 .04 25);
+    --info:  oklch(.62 .12 240);
+    --info-soft:oklch(.95 .03 240);
+
+    /* shadows */
+    --sh-1: 0 1px 0 0 oklch(.92 .006 250 / .8);
+    --sh-2: 0 1px 2px oklch(0 0 0 / .04), 0 4px 12px oklch(0 0 0 / .04);
+    --sh-3: 0 8px 24px oklch(0 0 0 / .08), 0 2px 6px oklch(0 0 0 / .04);
+    --sh-blue: 0 6px 20px oklch(.42 .14 262 / .18);
+
+    --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  html,body{background:var(--bg);color:var(--ink);
+    font:14px/1.55 "Inter","Noto Sans SC",-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased; text-wrap:pretty;
+  }
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-feature-settings:"tnum"}
+
+  /* layout — doc + sticky side rail */
+  .shell{max-width:1440px;margin:0 auto;padding:0 56px;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:56px;align-items:start}
+  .doc{padding:64px 0 120px;min-width:0}
+  .rail{position:sticky;top:32px;padding-top:64px;font-size:12px}
+  .rail .rail-h{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-bottom:14px;padding-left:14px}
+  .rail ol{list-style:none;margin:0;padding:0;border-left:1px solid var(--line)}
+  .rail ol li{position:relative}
+  .rail ol li a{display:flex;align-items:baseline;gap:8px;padding:7px 14px;color:var(--ink-3);text-decoration:none;line-height:1.35;border-left:2px solid transparent;margin-left:-1px;transition:color .15s,border-color .15s}
+  .rail ol li a:hover{color:var(--ink)}
+  .rail ol li a.on{color:var(--primary);border-left-color:var(--primary);font-weight:600;background:linear-gradient(90deg,var(--primary-soft) 0%,transparent 100%)}
+  .rail ol li .n{font-family:"JetBrains Mono";font-size:10.5px;color:var(--ink-4);min-width:18px}
+  .rail ol li a.on .n{color:var(--primary)}
+  .rail .meta{margin-top:24px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+  .rail .meta .row{display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;color:var(--ink-2)}
+  .rail .meta .row b{color:var(--ink);font-weight:600;font-family:"JetBrains Mono"}
+  @media(max-width:1100px){.shell{grid-template-columns:1fr;padding:0 32px}.rail{display:none}}
+
+  /* section divider */
+  .hr{height:1px;background:var(--line);margin:64px 0;position:relative}
+  .hr::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:48px;height:1px;background:var(--bg);}
+  .hr::after{content:"§";position:absolute;left:50%;top:50%;transform:translate(-50%,-52%);font-family:"JetBrains Mono";font-size:13px;color:var(--ink-4);background:var(--bg);padding:0 10px;letter-spacing:.04em}
+
+  /* hero */
+  .hero{margin-bottom:56px;position:relative}
+  .hero .eyebrow{font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--primary);font-weight:600;display:flex;align-items:center;gap:12px}
+  .hero .eyebrow::before{content:"";width:24px;height:1.5px;background:var(--primary);border-radius:99px}
+  .hero .eyebrow .v{margin-left:auto;font-family:"JetBrains Mono";color:var(--ink-3);font-weight:500;letter-spacing:.06em}
+  .hero h1{font-size:48px;line-height:1.05;font-weight:700;letter-spacing:-.025em;margin:18px 0 20px;max-width:920px}
+  .hero h1 em{font-style:normal;color:var(--primary);position:relative;white-space:nowrap}
+  .hero h1 em::after{content:"";position:absolute;left:-2px;right:-2px;bottom:.04em;height:.36em;background:linear-gradient(180deg,transparent 50%,oklch(.86 .14 45 / .55) 50%);z-index:-1;border-radius:2px}
+  .hero p.lede{font-size:16.5px;color:var(--ink-2);max-width:820px;line-height:1.7}
+  .hero p.lede strong{color:var(--ink);font-weight:600}
+  .hero .impact{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:32px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 0}
+  .hero .impact .col{padding:0 22px;border-right:1px solid var(--line)}
+  .hero .impact .col:first-child{padding-left:0}
+  .hero .impact .col:last-child{border-right:0}
+  .hero .impact .lbl{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+  .hero .impact .val{font-family:"JetBrains Mono";font-size:30px;font-weight:600;color:var(--ink);line-height:1.1;margin-top:8px;font-feature-settings:"tnum"}
+  .hero .impact .val small{font-size:13px;color:var(--ink-3);font-weight:400;margin-left:4px;font-family:inherit}
+  .hero .impact .sub{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+  .hero .impact .col.feat .val{color:var(--primary)}
+  .hero .impact .col.feat .arrow{color:var(--accent-ink);margin:0 4px}
+  .hero .meta{display:flex;gap:20px;margin-top:18px;font-size:12.5px;color:var(--ink-3);flex-wrap:wrap;align-items:center}
+  .hero .meta b{color:var(--ink);font-weight:600}
+  .hero .meta .sep{color:var(--ink-4)}
+
+  /* section heading */
+  .sec{scroll-margin-top:32px}
+  .sec-h{display:flex;align-items:flex-start;gap:18px;margin-bottom:10px}
+  .sec-h .num{font-family:"JetBrains Mono";font-size:11px;color:var(--primary);font-weight:600;
+    padding:4px 0;letter-spacing:.08em;flex-shrink:0;width:48px;border-top:2px solid var(--primary);margin-top:14px}
+  .sec-h .ttl{flex:1;min-width:0}
+  .sec-h h2{font-size:32px;font-weight:700;letter-spacing:-.018em;line-height:1.15}
+  .sec-h .kicker{font-size:11px;color:var(--ink-3);font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;font-family:"JetBrains Mono"}
+  .sec-sub{color:var(--ink-2);font-size:15px;max-width:840px;margin-bottom:32px;line-height:1.7;padding-left:66px}
+  .sec-sub strong{color:var(--ink);font-weight:600}
+
+  h3{font-size:18px;font-weight:600;margin:32px 0 14px;letter-spacing:-.005em;
+    display:flex;align-items:center;gap:10px}
+  h3 .tag{font-size:11px;font-weight:500;color:var(--primary);
+    padding:2px 8px;border-radius:99px;background:var(--primary-soft);font-family:"JetBrains Mono";letter-spacing:.04em}
+  h4{font-size:14px;font-weight:600;margin:18px 0 10px;color:var(--ink)}
+  p{color:var(--ink-2);margin-bottom:12px}
+  p strong{color:var(--ink);font-weight:600}
+
+  ul.bullets{list-style:none;margin:8px 0 16px}
+  ul.bullets li{padding:6px 0 6px 22px;position:relative;color:var(--ink-2);font-size:14px}
+  ul.bullets li::before{content:"";position:absolute;left:4px;top:13px;width:6px;height:6px;
+    border-radius:99px;background:var(--primary)}
+  ul.bullets li b{color:var(--ink);font-weight:600}
+
+  code.k{font-family:"JetBrains Mono";font-size:12.5px;padding:2px 7px;border-radius:5px;
+    background:var(--bg-2);color:var(--primary-ink);border:1px solid var(--line)}
+
+  /* card grid */
+  .grid{display:grid;gap:16px}
+  .g-2{grid-template-columns:repeat(2,1fr)}
+  .g-3{grid-template-columns:repeat(3,1fr)}
+  .g-4{grid-template-columns:repeat(4,1fr)}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+    padding:18px 20px;box-shadow:var(--sh-2)}
+  .card .kicker{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--primary);margin-bottom:8px}
+  .card h4{margin-top:0}
+  .card p{font-size:13.5px;line-height:1.6;color:var(--ink-2)}
+
+  /* pain point cards */
+  .pain{display:flex;gap:14px;padding:18px 20px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+  .pain .idx{flex-shrink:0;width:36px;height:36px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;font-family:"JetBrains Mono"}
+  .pain h4{margin:0 0 6px;font-size:14.5px}
+  .pain p{font-size:13px;line-height:1.55;margin:0;color:var(--ink-2)}
+  .pain .tags{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .pain .tag{font-size:10.5px;padding:2px 7px;border-radius:99px;background:var(--bg-2);color:var(--ink-3);
+    border:1px solid var(--line);font-family:"JetBrains Mono"}
+  .pain .tag.hot{background:var(--danger-soft);color:var(--danger);border-color:transparent}
+
+  /* ============ MOCK styling — emulate the real product UI ============ */
+  .mock{border:1px solid var(--line-2);border-radius:var(--r-xl);overflow:hidden;
+    background:var(--surface);box-shadow:var(--sh-3);margin:24px 0}
+  .mock .mockbar{height:32px;background:linear-gradient(180deg,var(--bg) 0%,var(--bg-2) 100%);
+    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 14px}
+  .mock .mockbar .dot{width:10px;height:10px;border-radius:99px;background:var(--line-2)}
+  .mock .mockbar .label{margin-left:auto;font-family:"JetBrains Mono";font-size:11px;color:var(--ink-3)}
+  .mock-body{display:flex;min-height:520px}
+
+  /* Sidebar */
+  .ms{width:200px;background:#0b0d10;color:oklch(.86 .01 260);padding:18px 12px;flex-shrink:0;display:flex;flex-direction:column;gap:4px}
+  .ms .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px;font-weight:600;font-size:13px;letter-spacing:.01em}
+  .ms .brand .logo{width:26px;height:26px;border-radius:8px;background:#fff;color:#0b0d10;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .ms .grp{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:oklch(.55 .01 260);padding:14px 10px 6px}
+  .ms a{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:oklch(.78 .01 260);font-size:12.5px;text-decoration:none}
+  .ms a.on{background:oklch(.42 .14 262);color:#fff}
+  .ms a:not(.on):hover{background:oklch(.20 .01 260)}
+  .ms .ic{width:14px;height:14px;display:inline-block;background:currentColor;
+    -webkit-mask:no-repeat center/contain;mask:no-repeat center/contain}
+  .ic-home{-webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12l9-9 9 9'/><path d='M5 10v10h14V10'/></svg>");mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12l9-9 9 9'/><path d='M5 10v10h14V10'/></svg>")}
+  .ic-doc{-webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/></svg>");mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/></svg>")}
+  .ic-cl{-webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='8' y='3' width='8' height='4' rx='1'/><path d='M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2'/><path d='M9 14l2 2 4-4'/></svg>");mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='8' y='3' width='8' height='4' rx='1'/><path d='M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2'/><path d='M9 14l2 2 4-4'/></svg>")}
+  .ic-coin{-webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='6' width='20' height='12' rx='2'/><circle cx='12' cy='12' r='3'/></svg>");mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='6' width='20' height='12' rx='2'/><circle cx='12' cy='12' r='3'/></svg>")}
+  .ic-code{-webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='16 18 22 12 16 6'/><polyline points='8 6 2 12 8 18'/></svg>");mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='16 18 22 12 16 6'/><polyline points='8 6 2 12 8 18'/></svg>")}
+  .ic-grid{-webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='7' height='7'/><rect x='14' y='3' width='7' height='7'/><rect x='3' y='14' width='7' height='7'/><rect x='14' y='14' width='7' height='7'/></svg>");mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='7' height='7'/><rect x='14' y='3' width='7' height='7'/><rect x='3' y='14' width='7' height='7'/><rect x='14' y='14' width='7' height='7'/></svg>")}
+  .ic-rev{-webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><path d='M9 13l2 2 4-4'/></svg>");mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><path d='M9 13l2 2 4-4'/></svg>")}
+  .ic-team{-webkit-mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M22 21v-2a4 4 0 0 0-3-3.87'/><path d='M16 3.13a4 4 0 0 1 0 7.75'/></svg>");mask-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M22 21v-2a4 4 0 0 0-3-3.87'/><path d='M16 3.13a4 4 0 0 1 0 7.75'/></svg>")}
+
+  /* main panel */
+  .mp{flex:1;background:var(--bg);min-width:0}
+  .mp-top{height:48px;border-bottom:1px solid var(--line);display:flex;align-items:center;
+    padding:0 18px;gap:10px;background:var(--surface)}
+  .crumb{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3)}
+  .crumb b{color:var(--ink);font-weight:600}
+  .crumb .sep{color:var(--ink-4)}
+  .mp-tabs{padding:8px 18px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap}
+  .mp-tab{font-size:12px;padding:4px 10px 4px 11px;background:var(--bg-2);border:1px solid var(--line);
+    border-radius:99px;display:inline-flex;align-items:center;gap:6px;color:var(--ink-2)}
+  .mp-tab.active{background:#fff;border-color:var(--primary);color:var(--primary-ink);box-shadow:0 0 0 3px var(--primary-soft)}
+  .mp-tab .x{color:var(--ink-4);cursor:pointer}
+
+  /* page content */
+  .pg{padding:20px 22px;display:flex;flex-direction:column;gap:16px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-2)}
+  .panel-h{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .panel-h h5{font-size:14px;font-weight:600}
+  .panel-b{padding:14px 18px}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:6px 12px;border-radius:8px;
+    border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;font-weight:500;font-family:inherit;
+    transition:all .15s ease}
+  .btn:hover{border-color:var(--ink-3)}
+  .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:var(--sh-blue)}
+  .btn.primary:hover{background:var(--primary-2);border-color:var(--primary-2)}
+  .btn.acc{background:linear-gradient(135deg,var(--accent) 0%,oklch(.62 .18 35) 100%);color:#fff;border:0}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--ink-2)}
+  .btn.danger{color:var(--danger);border-color:oklch(.85 .12 25)}
+  .btn.sm{padding:4px 10px;font-size:11.5px}
+  .btn .ic{width:12px;height:12px;background:currentColor;-webkit-mask:no-repeat center/contain;mask:no-repeat center/contain}
+
+  /* table */
+  table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.t th{text-align:left;font-weight:600;color:var(--ink-3);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;
+    padding:10px 12px;background:var(--bg-2);border-bottom:1px solid var(--line);white-space:nowrap}
+  table.t td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:middle}
+  table.t tr:last-child td{border-bottom:0}
+  table.t tr:hover td{background:oklch(.97 .005 250 / .6)}
+  table.t tr.sel td{background:oklch(.42 .14 262 / .07)}
+  table.t .pname{color:var(--ink);font-weight:500}
+  table.t .num{font-family:"JetBrains Mono";font-feature-settings:"tnum";color:var(--ink)}
+
+  /* badges */
+  .bdg{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;
+    padding:2px 9px;border-radius:99px;line-height:1.5;font-family:inherit}
+  .bdg::before{content:"";width:5px;height:5px;border-radius:99px;background:currentColor}
+  .bdg.ok{background:var(--ok-soft);color:var(--ok)}
+  .bdg.warn{background:var(--warn-soft);color:oklch(.45 .14 60)}
+  .bdg.acc{background:var(--accent-soft);color:var(--accent-ink)}
+  .bdg.info{background:var(--info-soft);color:var(--info)}
+  .bdg.teal{background:var(--teal-soft);color:oklch(.40 .08 195)}
+  .bdg.danger{background:var(--danger-soft);color:var(--danger)}
+  .bdg.muted{background:var(--bg-2);color:var(--ink-3);border:1px solid var(--line)}
+  .bdg.muted::before{display:none}
+  /* product line badges (per real code) */
+  .pl{display:inline-flex;font-size:11px;font-weight:600;padding:2px 9px;border-radius:6px;color:#fff;letter-spacing:.02em}
+  .pl.starry{background:oklch(.62 .14 230)}      /* 金蝶AI星空 */
+  .pl.cloud{background:oklch(.70 .12 200)}       /* 云之家 */
+  .pl.starh{background:oklch(.55 .15 290)}       /* 金蝶AI星瀚 */
+  .pl.fapiao{background:oklch(.62 .12 155)}      /* 发票云 */
+
+  /* search */
+  .sbar{display:flex;align-items:center;gap:8px;background:var(--bg-2);border:1px solid var(--line);
+    border-radius:8px;padding:6px 12px;flex:1;max-width:420px;color:var(--ink-3);font-size:12.5px}
+  .sbar input{border:0;background:transparent;flex:1;outline:none;font-family:inherit;font-size:12.5px;color:var(--ink)}
+
+  /* KPI tiles */
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 16px;
+    display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
+  .kpi .lbl{font-size:11.5px;color:var(--ink-3);font-weight:500;letter-spacing:.02em}
+  .kpi .v{font-family:"JetBrains Mono";font-size:26px;font-weight:600;color:var(--ink);line-height:1.1;font-feature-settings:"tnum"}
+  .kpi .v small{font-size:13px;color:var(--ink-3);font-weight:400;margin-left:4px}
+  .kpi .delta{font-size:11px;color:var(--ok);font-weight:500}
+  .kpi.feat{border-color:var(--primary);background:linear-gradient(180deg,#fff 0%,var(--primary-soft) 100%)}
+  .kpi.feat .v{color:var(--primary)}
+
+  /* ring gauge (CSS conic) */
+  .ring{width:64px;height:64px;border-radius:99px;position:relative;
+    background:conic-gradient(var(--primary) 0 var(--p,30%),var(--bg-2) 0 100%)}
+  .ring::after{content:"";position:absolute;inset:8px;background:#fff;border-radius:99px}
+  .ring .pc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:"JetBrains Mono";font-size:13px;font-weight:600;color:var(--ink);z-index:1}
+
+  /* chip select bar */
+  .chiprow{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:8px 0}
+  .chiprow .lbl{font-size:11.5px;color:var(--ink-3);min-width:62px;padding-top:4px;font-weight:500}
+  .chiprow .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+  .chip{font-size:12px;padding:4px 11px;border-radius:8px;background:var(--bg-2);border:1px solid var(--line);
+    color:var(--ink-2);cursor:pointer;transition:all .15s}
+  .chip:hover{border-color:var(--ink-3)}
+  .chip.on{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:var(--sh-blue)}
+  .chip.on.acc{background:var(--accent);border-color:var(--accent);box-shadow:0 4px 14px oklch(.69 .18 45 / .25)}
+  .chip.dim{opacity:.55}
+
+  /* SKU table specific */
+  .sku-grp{margin-bottom:14px;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+  .sku-grp .head{padding:10px 14px;background:var(--bg-2);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sku-grp .head .title{font-size:13px;font-weight:600;color:var(--ink)}
+  .sku-grp .head .meta{font-size:11.5px;color:var(--ink-3)}
+  .sku-grp .head .actions{margin-left:auto;display:flex;gap:6px}
+  .sku-grp table.sk{width:100%;border-collapse:collapse;font-size:12.5px}
+  .sku-grp .sk th{padding:8px 12px;background:#fff;border-bottom:1px solid var(--line);text-align:left;
+    font-weight:600;color:var(--ink-3);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+  .sku-grp .sk td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  .sku-grp .sk tr:last-child td{border-bottom:0}
+  .sku-grp .sk tr.sel td{background:oklch(.42 .14 262 / .06)}
+  .sku-grp .sk tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
+  .sku-grp .sk td.mid{vertical-align:middle}
+  .ck{width:14px;height:14px;border:1.5px solid var(--ink-4);border-radius:4px;display:inline-block;
+    flex-shrink:0;position:relative;background:#fff;cursor:pointer}
+  .ck.on{background:var(--primary);border-color:var(--primary)}
+  .ck.on::after{content:"";position:absolute;left:3px;top:0px;width:5px;height:9px;
+    border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .ck.disabled{opacity:.4;cursor:not-allowed}
+  /* days cells */
+  .d-low{color:var(--ink);font-weight:600}
+  .d-mid{color:oklch(.50 .14 50);font-weight:600}
+  .d-hi{color:var(--danger);font-weight:600}
+  /* stepper for custom days */
+  .step{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:7px;padding:2px 4px;background:#fff}
+  .step button{width:22px;height:22px;border-radius:5px;border:0;background:transparent;color:var(--ink-2);cursor:pointer;font-size:14px;font-weight:600}
+  .step button:hover{background:var(--bg-2);color:var(--primary)}
+  .step .n{font-family:"JetBrains Mono";font-size:12px;font-weight:600;min-width:26px;text-align:center;color:var(--ink)}
+  .step .n.up{color:oklch(.50 .14 50)}
+  .step .n.down{color:var(--info)}
+  .reason-dot{display:inline-block;width:8px;height:8px;border-radius:99px;margin-left:6px;
+    box-shadow:0 0 0 2px #fff,0 0 0 3px var(--ok)}
+  .reason-dot.ok{background:var(--ok)}
+  .reason-dot.warn{background:var(--danger);box-shadow:0 0 0 2px #fff,0 0 0 3px var(--danger)}
+
+  /* DSL inline preview */
+  .dsl{background:var(--bg-2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;
+    padding:10px 14px;font-family:"JetBrains Mono";font-size:11.5px;color:var(--ink-2);line-height:1.7;margin:8px 0}
+  .dsl b{color:var(--accent-ink);font-weight:600}
+  .dsl .ok{color:var(--ok);font-weight:600}
+  .dsl .miss{color:var(--danger);font-weight:600}
+
+  /* Reasoning side panel */
+  .ai-card{background:linear-gradient(180deg,oklch(.97 .03 262) 0%,#fff 100%);border:1px solid oklch(.86 .08 262);
+    border-radius:var(--r-md);padding:12px 14px}
+  .ai-card .ai-h{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--primary-ink);margin-bottom:8px}
+  .ai-card .ai-h .pulse{width:8px;height:8px;border-radius:99px;background:var(--primary);animation:pulse 1.6s infinite ease-in-out}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.5}}
+  .ai-card p{font-size:12px;line-height:1.6;color:var(--ink-2);margin:0 0 6px}
+
+  /* Annotation callout */
+  .anno{position:relative;display:flex;gap:16px;padding:18px 22px 18px 20px;background:linear-gradient(90deg,var(--accent-soft) 0%,#fff 65%);
+    border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:0 var(--r-md) var(--r-md) 0;margin:18px 0 8px;align-items:flex-start;box-shadow:var(--sh-2)}
+  .anno .pin{flex-shrink:0;width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-family:"JetBrains Mono";font-weight:700;font-size:13px;letter-spacing:.02em}
+  .anno h6{font-size:13px;font-weight:600;margin:2px 0 6px;color:var(--ink);display:flex;align-items:center;gap:8px}
+  .anno h6::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line) 0%,transparent 100%);max-width:120px}
+  .anno p{font-size:13px;color:var(--ink-2);margin:0;line-height:1.65}
+
+  /* Before / After shells */
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}
+  .ba .col{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+  .ba .col .hd{padding:10px 14px;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    border-bottom:1px solid var(--line)}
+  .ba .col.before .hd{background:var(--bg-2);color:var(--ink-3)}
+  .ba .col.after  .hd{background:var(--primary-soft);color:var(--primary-ink)}
+  .ba .col .bd{padding:14px;background:#fff;min-height:180px}
+  .ba .small{font-size:12px;color:var(--ink-2);line-height:1.6}
+
+  /* Floating Reasoning + Stepper Mini Mocks */
+  .form-row{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;padding:6px 0}
+  .form-row .lbl{font-size:11.5px;color:var(--ink-3)}
+  .input{display:block;width:100%;padding:7px 10px;font-size:12.5px;border:1px solid var(--line);border-radius:7px;background:#fff;
+    color:var(--ink);font-family:inherit}
+  .input.disabled{background:var(--bg-2);color:var(--ink-3)}
+
+  /* Roadmap timeline */
+  .tl{position:relative;padding-left:34px}
+  .tl::before{content:"";position:absolute;left:14px;top:6px;bottom:6px;width:2px;background:linear-gradient(180deg,var(--primary),var(--accent))}
+  .tl .step{position:relative;padding:8px 0 14px}
+  .tl .step::before{content:"";position:absolute;left:-26px;top:14px;width:14px;height:14px;border-radius:99px;background:#fff;
+    border:3px solid var(--primary);box-shadow:0 0 0 3px #fff}
+  .tl .step h5{font-size:14px;font-weight:600;margin-bottom:4px;display:flex;gap:10px;align-items:center}
+  .tl .step h5 .w{font-family:"JetBrains Mono";font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--primary-soft);color:var(--primary-ink)}
+  .tl .step p{font-size:13px;color:var(--ink-2);margin:0 0 4px}
+
+  /* TOC */
+  .toc{display:flex;flex-wrap:wrap;gap:6px;margin-top:24px}
+  .toc a{font-size:11.5px;color:var(--ink-2);padding:5px 11px;border:1px solid var(--line);
+    border-radius:99px;background:#fff;text-decoration:none;font-family:"JetBrains Mono";display:inline-flex;align-items:center;gap:6px}
+  .toc a:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-soft)}
+  .toc a .n{color:var(--ink-4);font-size:10px}
+  .toc a:hover .n{color:var(--primary)}
+
+  /* ============ KIMI CODE 施工提示词块 ============ */
+  .prompt-block{margin:24px 0;border:1px solid oklch(.22 .02 260);border-radius:var(--r-lg);overflow:hidden;background:oklch(.12 .015 260);box-shadow:0 4px 16px oklch(0 0 0 / .25)}
+  .prompt-block .prompt-bar{padding:10px 16px;background:linear-gradient(90deg,oklch(.18 .02 260) 0%,oklch(.14 .015 260) 100%);border-bottom:1px solid oklch(.26 .02 260);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .prompt-block .prompt-bar .terminal{font-family:"JetBrains Mono";font-size:11px;color:oklch(.78 .12 155);font-weight:600;letter-spacing:.04em}
+  .prompt-block .prompt-bar .filepath{font-family:"JetBrains Mono";font-size:10.5px;color:oklch(.65 .01 260);margin-left:auto;letter-spacing:.02em}
+  .prompt-block .prompt-body{padding:16px 18px;font-family:"JetBrains Mono";font-size:11.5px;line-height:1.75;color:oklch(.82 .01 260);white-space:pre-wrap;word-break:break-word}
+  .prompt-block .prompt-body .cmd{color:oklch(.78 .14 262);font-weight:600}
+  .prompt-block .prompt-body .file{color:oklch(.72 .12 155);font-weight:500}
+  .prompt-block .prompt-body .warn{color:oklch(.78 .16 45);font-weight:600}
+  .prompt-block .prompt-body .val{color:oklch(.82 .14 80);font-weight:500}
+  .prompt-block .prompt-body .cmt{color:oklch(.50 .01 260);font-style:italic}
+  .prompt-block .prompt-body h6{font-size:12px;font-weight:700;color:oklch(.92 .02 262);margin:16px 0 8px;letter-spacing:.04em;font-family:"JetBrains Mono";border-bottom:1px solid oklch(.26 .02 260);padding-bottom:6px}
+  .prompt-block .prompt-body h6:first-child{margin-top:0}
+  .prompt-block .prompt-body ol{list-style:none;counter-reset:step;padding:0;margin:4px 0 12px}
+  .prompt-block .prompt-body ol li{counter-increment:step;padding:4px 0 4px 26px;position:relative}
+  .prompt-block .prompt-body ol li::before{content:counter(step) ".";position:absolute;left:0;color:oklch(.65 .12 262);font-weight:600}
+  .prompt-block .prompt-body ul{list-style:none;padding:0;margin:4px 0 12px}
+  .prompt-block .prompt-body ul li{padding:3px 0 3px 18px;position:relative}
+  .prompt-block .prompt-body ul li::before{content:"→";position:absolute;left:0;color:oklch(.55 .08 155)}
+  .prompt-block .prompt-body code{background:oklch(.20 .015 260);padding:1px 5px;border-radius:3px;color:oklch(.88 .12 80);font-size:11px}
+</style>
+</head>
+<body>
+<div class="shell">
+<div class="doc">
+
+  <!-- ================================================================== -->
+  <!-- HERO                                                                -->
+  <!-- ================================================================== -->
+  <header class="hero">
+    <div class="eyebrow">WES · Implementation Assessment · Deep Dive
+      <span class="v">v2.1 · 2026.05.08</span>
+    </div>
+    <h1>实施评估页 ·<br/><em>从单据列表到详细评估</em>，全链路重做。</h1>
+    <p class="lede">基于真实代码（<code class="k">app/dashboard/assessment</code> 列表 + 单据双视图）重新拆解。列表页围绕“批量调度 + 版本检出”，单据页围绕“基本信息 → KPI → 报价模式 → 云产品 tag → SKU 勾选 + DSL 校验”两大区。本方案聚焦三件事：<strong>列表页 8 个症结的逐一修复</strong>、<strong>单据页 6 项重设计</strong>、<strong>整体配色与控件协同</strong>。</p>
+
+    <div class="impact">
+      <div class="col"><div class="lbl">诊断痛点</div><div class="val">13<small>项</small></div><div class="sub">列表 8 · 单据 5</div></div>
+      <div class="col feat"><div class="lbl">上区占高 · 压缩</div><div class="val">320<small>px</small> <span class="arrow">→</span> 200<small>px</small></div><div class="sub">一屏可见 SKU 表前 5 行</div></div>
+      <div class="col feat"><div class="lbl">VCS 按钮 · 压缩</div><div class="val">11 <span class="arrow">→</span> 4<small>+⋯</small></div><div class="sub">主操作 + 状态条 + “更多”</div></div>
+      <div class="col"><div class="lbl">交付节奏</div><div class="val">5<small>周</small></div><div class="sub">每周可独立交付</div></div>
+    </div>
+
+    <div class="meta">
+      <span><b>2,885</b> 行 page.tsx</span>
+      <span class="sep">·</span>
+      <span><b>5</b> 个工作流（新建/检出/编辑/检入/升版）</span>
+      <span class="sep">·</span>
+      <span><b>3</b> 类报价模式 × <b>20+</b> 云产品 × <b>N</b> SKU</span>
+      <span class="sep">·</span>
+      <span>设计基线：<b>深空蓝 + 朱砂橙 + 雾青</b></span>
+    </div>
+
+    <nav class="toc">
+      <a href="#s1"><span class="n">01</span> 列表页深度重做</a>
+      <a href="#s2"><span class="n">02</span> 单据页 · 上区</a>
+      <a href="#s3"><span class="n">03</span> 单据页 · 下区</a>
+      <a href="#s4"><span class="n">04</span> SKU · 行级交互</a>
+      <a href="#s5"><span class="n">05</span> DSL + AI 协同</a>
+      <a href="#s6"><span class="n">06</span> 多组织推广</a>
+      <a href="#s7"><span class="n">07</span> 实施路线</a>
+    </nav>
+  </header>
+
+  <!-- ================================================================== -->
+  <!-- §1 列表页深度重做                                                    -->
+  <!-- ================================================================== -->
+  <section id="s1" class="sec">
+    <div class="sec-h"><span class="num">§ 01</span><h2>列表页 · 单据清单视图</h2></div>
+    <p class="sec-sub">列表页是 PM/实施顾问每天的"作业台"。原版相当于"一行项目 + 多列原始字段"，问题是<strong>状态弱、版本号像乱码、行不可点</strong>。这里先列 8 个症结，再给重做版。</p>
+
+    <h3>1.1 列表页症结诊断 <span class="tag">8 PAINS</span></h3>
+    <div class="grid g-2">
+      <div class="pain"><span class="idx">P1</span><div>
+        <h4>双"版本号"列让人看不懂</h4>
+        <p>「总方案版本号」「最新版本号」并排列，两边都常常是 <code class="k">—</code> 或 <code class="k">IA-GL000-02-VA3</code> 这种 19 字符长串，PM 完全无法快速对比。应当合并为版本一栏，用版本树/小图形呈现。</p>
+        <div class="tags"><span class="tag hot">高频抱怨</span><span class="tag">信息密度</span></div>
+      </div></div>
+
+      <div class="pain"><span class="idx">P2</span><div>
+        <h4>状态徽标语义弱</h4>
+        <p>「已检入」「已检出」语义远超过两个胶囊，背后还有 <code class="k">drafting / reviewed</code> 文档状态、是否锁定、谁锁的。当前两个 chip 同等 size，看不出锁定者。</p>
+        <div class="tags"><span class="tag">状态机</span><span class="tag">VCS</span></div>
+      </div></div>
+
+      <div class="pain"><span class="idx">P3</span><div>
+        <h4>关键操作藏在右上角按钮组</h4>
+        <p>「修改 / 删除 / 查看历史版本 / 新增」5 个按钮平铺，没有分组与默认动作。在多选 0/1/N 行时按钮应当差异化（无选 → 新建；选 1 → 修改/历史；选 N → 批量导出）。</p>
+        <div class="tags"><span class="tag">操作分组</span></div>
+      </div></div>
+
+      <div class="pain"><span class="idx">P4</span><div>
+        <h4>没有搜索高亮 / 无筛选</h4>
+        <p>仅一个搜索框，且不区分搜的是项目名 vs 版本号 vs 创建人；列字段繁多但无法按状态/产品线/创建人/时间区间筛选；也没有"我创建的 / 待我处理"快捷分流。</p>
+        <div class="tags"><span class="tag">检索</span><span class="tag">分流</span></div>
+      </div></div>
+
+      <div class="pain"><span class="idx">P5</span><div>
+        <h4>"未命名项目"刷屏</h4>
+        <p>截图 5 行有 5 个"未命名项目"——说明新建流程没强制项目名，列表又不区分。应在列表用<strong>编辑时间 + 创建人 + 业务标签</strong>组合形成可识别的"卡片名"，并在新建时强制项目名。</p>
+        <div class="tags"><span class="tag hot">数据治理</span></div>
+      </div></div>
+
+      <div class="pain"><span class="idx">P6</span><div>
+        <h4>"难度系数 0.2 / 组织数 1"信息密度低</h4>
+        <p>这两列对 PM 决策权重低，却占用整列宽度。应折叠到<strong>悬浮预览卡</strong>或合并到「评估参数」一列（用 mini bar 表达），把列让给"总人天 + 状态 + 锁定者 + 更新人"。</p>
+        <div class="tags"><span class="tag">列定义</span></div>
+      </div></div>
+
+      <div class="pain"><span class="idx">P7</span><div>
+        <h4>无行 hover、无双击进入</h4>
+        <p>用户预期"双击进入单据"，但截图列表的 hover 完全平白，行内也没有"打开"图标。同时缺<strong>悬浮快捷操作 trail</strong>（检出/历史/复制版本号）。</p>
+        <div class="tags"><span class="tag">交互手感</span></div>
+      </div></div>
+
+      <div class="pain"><span class="idx">P8</span><div>
+        <h4>更新时间是 ISO 字符串</h4>
+        <p><code class="k">2026-04-14T07:33:24.611Z</code> 反人类。应转为<strong>"4 月 14 日 · 07:33"</strong>，并在 24h / 7d 内显示相对时间（"3 小时前"），鼠标悬浮显示完整 UTC。</p>
+        <div class="tags"><span class="tag">本地化</span></div>
+      </div></div>
+    </div>
+
+    <!-- ============= 列表页 重做 mock ============= -->
+    <h3>1.2 重做版 · 列表页 mock <span class="tag">REWORKED</span></h3>
+    <p>关键改动：<strong>(a)</strong> 顶部加 KPI 概览条 + 角色分流；<strong>(b)</strong> 列重排 → 项目（含描述与时间）/ 版本树 / 评估参数 mini bar / 总人天 / 状态 / 锁定者；<strong>(c)</strong> 行 hover 出现快捷操作 trail；<strong>(d)</strong> 顶部按钮按选择数动态切换。</p>
+
+    <div class="mock">
+      <div class="mockbar">
+        <span class="dot" style="background:#ff5f56"></span>
+        <span class="dot" style="background:#ffbd2e"></span>
+        <span class="dot" style="background:#27c93f"></span>
+        <span class="label">workevolutionsys.com / dashboard / assessment / list</span>
+      </div>
+      <div class="mock-body">
+        <!-- sidebar -->
+        <aside class="ms">
+          <div class="brand"><span class="logo">W</span> WorkEvolutionSys</div>
+          <div class="grp">主菜单</div>
+          <a><i class="ic ic-home"></i> 主页</a>
+          <a><i class="ic ic-doc"></i> 需求</a>
+          <a class="on"><i class="ic ic-cl"></i> 实施评估</a>
+          <a><i class="ic ic-coin"></i> 资源人天及成本</a>
+          <a><i class="ic ic-code"></i> 开发评估</a>
+          <a><i class="ic ic-grid"></i> WBS</a>
+          <a><i class="ic ic-rev"></i> 评审</a>
+          <a><i class="ic ic-team"></i> 团队协同</a>
+        </aside>
+        <!-- main -->
+        <div class="mp">
+          <div class="mp-top">
+            <div class="crumb">工作台 <span class="sep">›</span> <b>实施评估</b> <span class="sep">›</span> 列表</div>
+          </div>
+          <div class="mp-tabs">
+            <span class="mp-tab">需求<span class="x">×</span></span>
+            <span class="mp-tab">主页<span class="x">×</span></span>
+            <span class="mp-tab active">实施评估列表<span class="x">×</span></span>
+            <span class="mp-tab">实施评估<span class="x">×</span></span>
+          </div>
+          <div class="pg" style="background:var(--bg-2)">
+
+            <!-- KPI strip -->
+            <div class="grid g-4">
+              <div class="kpi feat"><span class="lbl">本月新建评估</span><div class="v">12 <small>份</small></div><span class="delta">↑ 4 vs 上月</span></div>
+              <div class="kpi"><span class="lbl">待我处理（已检出）</span><div class="v">3 <small>份</small></div><span class="delta" style="color:var(--accent-ink)">2 份 &gt; 24h 未操作</span></div>
+              <div class="kpi"><span class="lbl">本月平均人天</span><div class="v">28.4</div><span class="delta">σ ±9.1</span></div>
+              <div class="kpi"><span class="lbl">DSL 校验通过率</span>
+                <div style="display:flex;align-items:center;gap:12px">
+                  <div class="ring" style="--p:84%"><span class="pc">84%</span></div>
+                  <div><div class="v" style="font-size:18px">21/25</div><span class="delta">5 张待补依赖</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- main panel -->
+            <div class="panel">
+              <div class="panel-h" style="flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:12px;flex:1 1 420px;min-width:0;flex-wrap:wrap">
+                  <div class="sbar" style="min-width:220px">
+                    <span style="font-size:13px">⌕</span>
+                    <input placeholder="搜索项目 / 版本号 / 创建人  ⌘K"/>
+                    <span class="bdg muted">5 列可筛选</span>
+                  </div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <span class="chip on">全部 25</span>
+                    <span class="chip">我创建 8</span>
+                    <span class="chip">待我审 3</span>
+                    <span class="chip">已检出 7</span>
+                    <span class="chip">本周更新 11</span>
+                  </div>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <button class="btn"><span class="ic" style="-webkit-mask-image:url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><path d='M21 12a9 9 0 1 1-3-6.7L21 8'/><path d='M21 3v5h-5'/></svg>&quot;);mask-image:url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><path d='M21 12a9 9 0 1 1-3-6.7L21 8'/><path d='M21 3v5h-5'/></svg>&quot;)"></span>刷新</button>
+                  <button class="btn">导出列表</button>
+                  <button class="btn primary">+ 新建评估</button>
+                </div>
+              </div>
+              <table class="t">
+                <thead>
+                  <tr>
+                    <th style="width:24px"><span class="ck"></span></th>
+                    <th>项目 / 描述</th>
+                    <th>产品线</th>
+                    <th>版本树</th>
+                    <th>报价模式</th>
+                    <th>评估参数</th>
+                    <th>总人天</th>
+                    <th>状态 · 锁定者</th>
+                    <th>更新</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="sel">
+                    <td><span class="ck on"></span></td>
+                    <td>
+                      <div class="pname">利民集团 · 财务供应链一期</div>
+                      <div style="color:var(--ink-3);font-size:11.5px;margin-top:2px">由 mjlkevin 创建 · 已审核</div>
+                    </td>
+                    <td><span class="pl starry">金蝶AI星空</span></td>
+                    <td>
+                      <div class="mono" style="font-size:11.5px;color:var(--ink)">IA-GL000-02</div>
+                      <div style="font-size:10.5px;color:var(--ink-3);margin-top:2px">v3 · 起源 v1 · ↗ 5 个分支</div>
+                    </td>
+                    <td>模块报价</td>
+                    <td>
+                      <div style="font-size:11px;color:var(--ink-3)">用户 100 · 组织 1 · 难度 0.2</div>
+                      <div style="height:4px;width:120px;background:var(--bg-2);border-radius:99px;margin-top:5px;overflow:hidden">
+                        <div style="height:100%;width:60%;background:linear-gradient(90deg,var(--primary),var(--teal))"></div>
+                      </div>
+                    </td>
+                    <td><span class="num" style="font-size:15px;font-weight:600">31.6</span> <small style="color:var(--ink-3)">天</small></td>
+                    <td><span class="bdg ok">已检入</span></td>
+                    <td><div style="font-size:12px;color:var(--ink)">3 小时前</div><div style="font-size:10.5px;color:var(--ink-3)">mjlkevin</div></td>
+                    <td><div style="display:flex;gap:4px;opacity:.92"><button class="btn sm ghost">打开</button><button class="btn sm ghost">复制</button></div></td>
+                  </tr>
+                  <tr>
+                    <td><span class="ck"></span></td>
+                    <td><div class="pname">华润万家 · ERP 升级</div><div style="color:var(--ink-3);font-size:11.5px;margin-top:2px">从 IA-GL000-02 复制</div></td>
+                    <td><span class="pl starry">金蝶AI星空</span></td>
+                    <td>
+                      <div class="mono" style="font-size:11.5px;color:var(--ink)">IA-GL000-02-VA3</div>
+                      <div style="font-size:10.5px;color:var(--ink-3);margin-top:2px">分支 · 等待审核</div>
+                    </td>
+                    <td>模块报价</td>
+                    <td><div style="font-size:11px;color:var(--ink-3)">用户 80 · 组织 1 · 难度 0.2</div></td>
+                    <td><span class="num" style="font-size:15px;font-weight:600">—</span></td>
+                    <td><span class="bdg warn">已检出 · mjlkevin</span></td>
+                    <td><div style="font-size:12px;color:var(--ink)">昨天 16:31</div><div style="font-size:10.5px;color:var(--ink-3)">mjlkevin</div></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><span class="ck"></span></td>
+                    <td><div class="pname">某制造客户 · 集团预估</div><div style="color:var(--ink-3);font-size:11.5px;margin-top:2px">未关联需求版本 · 独立评估</div></td>
+                    <td><span class="bdg muted">未指定</span></td>
+                    <td><div class="mono" style="font-size:11.5px;color:var(--ink)">IA-GL000-01</div><div style="font-size:10.5px;color:var(--ink-3);margin-top:2px">v1 · 初版</div></td>
+                    <td>模块报价</td>
+                    <td><div style="font-size:11px;color:var(--ink-3)">用户 — · 组织 1 · 难度 0</div></td>
+                    <td><span class="num" style="font-size:15px;font-weight:600">8</span> <small style="color:var(--ink-3)">天</small></td>
+                    <td><span class="bdg acc">已检出 · 你</span></td>
+                    <td><div style="font-size:12px;color:var(--ink)">5 月 6 日</div><div style="font-size:10.5px;color:var(--ink-3)">mjlkevin</div></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td><span class="ck"></span></td>
+                    <td><div class="pname">XX 集团 · 全量云产品估算</div><div style="color:var(--ink-3);font-size:11.5px;margin-top:2px">GLOBAL-20260404-0053</div></td>
+                    <td><span class="bdg muted">未指定</span></td>
+                    <td><div class="mono" style="font-size:11.5px;color:var(--ink)">…0053-01-VA1</div><div style="font-size:10.5px;color:var(--ink-3);margin-top:2px">分支</div></td>
+                    <td>模块报价</td>
+                    <td><div style="font-size:11px;color:var(--ink-3)">用户 — · 组织 1 · 难度 0.2</div></td>
+                    <td><span class="num" style="font-size:15px;font-weight:600">—</span></td>
+                    <td><span class="bdg ok">已检入</span></td>
+                    <td><div style="font-size:12px;color:var(--ink)">5 月 4 日</div><div style="font-size:10.5px;color:var(--ink-3)">mjlkevin</div></td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style="padding:12px 18px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3)">
+                <span>共 25 条 · 已选 1 条</span>
+                <span>‹  1 / 3  ›</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- callouts -->
+    <div class="anno"><div class="pin">A</div><div>
+      <h6>列表页核心改动 · 总览</h6>
+      <p>① 顶部 4 张 KPI（含"待我处理"圆环）替代裸标题；② 5 个角色分流 chip 替代单一搜索；③ 双版本号列合并为「版本树」mini-graph；④ 评估参数压缩为一行 + 进度条；⑤ 状态徽标整合「锁定者」；⑥ 行 hover 显示打开/复制；⑦ ISO 时间转人类可读。</p>
+    </div></div>
+
+    <!-- ═══ §1 KIMI CODE 施工提示词 ═══ -->
+    <div class="prompt-block">
+      <div class="prompt-bar">
+        <span class="terminal">KIMI CODE · §1 列表页施工</span>
+        <span class="filepath">components/workload/module-doc-list-page.tsx · 507 行</span>
+      </div>
+      <div class="prompt-body">
+<h6>任务 1 · 顶部 KPI 概览条</h6>
+<ol>
+<li>在 <code>ModuleDocListPage</code> 组件的 <code>&lt;Card&gt;</code> 之前，新增 <code>&lt;AssessmentKpiStrip&gt;</code> 组件（仅当 <code>moduleType === "assessment"</code> 时渲染）。</li>
+<li>KPI 数据来源：复用 <code>items: ModuleDocListItem[]</code> 列表做前端聚合：
+→ <span class="val">本月新建</span>：<code>items.filter(i =&gt; isThisMonth(i.updatedAt)).length</code>
+→ <span class="val">待我处理</span>：<code>items.filter(i =&gt; i.latestRecord?.checkoutStatus === "checked_out" &amp;&amp; i.latestRecord?.checkedOutByUsername === currentUser).length</code>
+→ <span class="val">本月平均人天</span>：<code>mean(items.map(pickTotalDays).filter(Boolean))</code>
+→ <span class="val">DSL 校验通过率</span>：需后端在 <code>ModuleDocListItem.latestRecord.payload</code> 返回 <code>dependencyIssueCount</code>，前端统计 <code>issueCount === 0</code> 占比</li>
+<li>用 shadcn <code>&lt;Card&gt;</code> 四列网格 <code>grid grid-cols-4 gap-4</code>，第一张用 <code>border-primary bg-gradient-to-b from-white to-primary/5</code> 突出。</li>
+<li>DSL 圆环用 CSS <code>conic-gradient</code> + 伪元素实现，与设计稿一致。</li>
+</ol>
+
+<h6>任务 2 · 角色分流 Chip 筛选栏</h6>
+<ol>
+<li>在搜索框 <code>&lt;Input&gt;</code> 右侧新增 5 个 <code>&lt;Badge&gt;</code> 作为快捷筛选：<span class="val">全部 · 我创建 · 待我审 · 已检出 · 本周更新</span>。</li>
+<li>新增状态 <code>const [quickFilter, setQuickFilter] = useState&lt;"all"|"mine"|"review"|"out"|"week"&gt;("all")</code>。</li>
+<li>在 <code>filteredItems</code> 的 <code>useMemo</code> 中叠加 <code>quickFilter</code> 逻辑：
+→ <span class="val">mine</span>：<code>pickListCreator(item) === currentUser</code>
+→ <span class="val">out</span>：<code>item.latestRecord?.checkoutStatus === "checked_out"</code>
+→ <span class="val">week</span>：<code>isThisWeek(item.updatedAt)</code></li>
+<li>选中 chip 样式：<code>bg-primary text-white shadow-sm</code>；未选中：<code>bg-secondary text-secondary-foreground</code>。</li>
+</ol>
+
+<h6>任务 3 · 列重排（合并版本号 + 移除低权重列）</h6>
+<ol>
+<li><span class="warn">移除列</span>：<code>组织数</code>、<code>难度系数</code> 两列从 <code>&lt;TableHead&gt;</code> 和 <code>&lt;TableCell&gt;</code> 中删除。<code>listColSpan</code> 从 12 调整为 10。</li>
+<li><span class="cmd">合并版本列</span>：将 <code>总方案版本号</code> + <code>最新版本号</code> 合并为单列 <span class="val">「版本树」</span>：
+→ 主行：<code>&lt;span className="font-mono text-xs"&gt;{item.latestVersionCode}&lt;/span&gt;</code>
+→ 副行：<code>&lt;span className="text-[10.5px] text-muted-foreground"&gt;v{N} · 起源 {baseCode} · ↗ {branchCount} 个分支&lt;/span&gt;</code>
+→ 分支数据从 <code>item.historyRecords?.length</code> 或 <code>item.latestRecord?.baseCode</code> 提取。</li>
+<li><span class="cmd">新增「评估参数」列</span>：将组织/难度/用户数压缩为一行：
+→ <code>&lt;span className="text-[11px] text-muted-foreground"&gt;用户 {userCount} · 组织 {orgCount} · 难度 {diffFactor}&lt;/span&gt;</code>
+→ 下方加 <code>&lt;Progress value={percentage} className="h-1 w-[100px] mt-1" /&gt;</code></li>
+</ol>
+
+<h6>任务 4 · ISO 时间转人类可读</h6>
+<ol>
+<li>新建工具函数 <code>formatRelativeTime(iso: string): string</code> 放入 <code>lib/utils.ts</code>。</li>
+<li>逻辑：≤1h → <span class="val">"N 分钟前"</span>；≤24h → <span class="val">"N 小时前"</span>；≤7d → <span class="val">"昨天 HH:mm" / "N 天前"</span>；>7d → <span class="val">"M 月 D 日"</span>。</li>
+<li>Tooltip 显示完整 ISO 时间：<code>&lt;Tooltip&gt;&lt;TooltipTrigger&gt;{relative}&lt;/TooltipTrigger&gt;&lt;TooltipContent&gt;{fullISO}&lt;/TooltipContent&gt;&lt;/Tooltip&gt;</code>。</li>
+<li>替换 <code>&lt;TableCell className="text-xs text-muted-foreground"&gt;{item.updatedAt || "—"}&lt;/TableCell&gt;</code> 为调用 <code>formatRelativeTime</code>。</li>
+</ol>
+
+<h6>任务 5 · 行 Hover 快捷操作</h6>
+<ol>
+<li>在每行最后一个 <code>&lt;TableCell&gt;</code> 中放 <code>&lt;div className="opacity-0 group-hover:opacity-100 flex gap-1"&gt;</code>，包含：
+→ <code>&lt;Button size="sm" variant="ghost"&gt;打开&lt;/Button&gt;</code> — 调 <code>router.push(buildEditorHref(item, "edit"))</code>
+→ <code>&lt;Button size="sm" variant="ghost"&gt;复制版本号&lt;/Button&gt;</code> — 调 <code>navigator.clipboard.writeText(item.latestVersionCode)</code></li>
+<li>给 <code>&lt;TableRow&gt;</code> 添加 <code>className="group"</code> 以启用 group-hover。</li>
+<li>保留 <code>onDoubleClick</code> 双击打开行为不变。</li>
+</ol>
+
+<h6>任务 6 · 状态徽标整合锁定者</h6>
+<ol>
+<li>修改 <code>renderCheckoutStatusBadge(item)</code>：当 <code>checkoutStatus === "checked_out"</code> 时，在 Badge 文案后附加 <code> · {checkedOutByUsername}</code>。</li>
+<li>如果 <code>checkedOutByUsername === currentUser</code>，改显示 <span class="val">"已检出 · 你"</span>，Badge 用 <code>border-orange-500 bg-orange-50 text-orange-700</code>。</li>
+</ol>
+
+<h6>任务 7 · 工具栏按选择数动态切换</h6>
+<ol>
+<li>当 <code>selectedKey</code> 为空时：仅显示 <span class="val">「刷新」「新增」</span>。</li>
+<li>当选中 1 行时：显示 <span class="val">「打开」「修改」「历史版本」「删除」「新增」</span>。</li>
+<li>未来支持多选后（checkbox 列）：选中 N 行时显示 <span class="val">「批量导出」「批量删除」</span>。</li>
+<li>用 <code>useMemo</code> 根据 <code>selectedKey</code> 和 <code>filteredItems.length</code> 计算显示哪些按钮。</li>
+</ol>
+
+<h6>注意事项</h6>
+<ul>
+<li><span class="warn">不动</span> service 层（<code>lib/workload-service.ts</code>）的接口签名和路由。</li>
+<li><span class="warn">不动</span> <code>ModuleDocListItem</code> 类型定义——如需新增字段（如 <code>dependencyIssueCount</code>），在 API 层 <code>listLatestModuleDocuments</code> 返回 payload 中透传。</li>
+<li>列表页共用组件 <code>ModuleDocListPage</code> 被 assessment / requirement-import / resource-cost / dev-assessment 四模块使用。assessment-only 的改动用 <code>isAssessmentList</code> 条件守卫。</li>
+<li>分页栏预留位置（底部 <code>共 N 条 · 已选 M 条 · ‹ 1/3 ›</code>），当前后端不分页可先前端分页 <code>slice((page-1)*pageSize, page*pageSize)</code>。</li>
+</ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="hr"></div>
+
+  <!-- ================================================================== -->
+  <!-- §2 单据页 · 上区 / 基本信息                                          -->
+  <!-- ================================================================== -->
+  <section id="s2" class="sec">
+    <div class="sec-h"><span class="num">§ 02</span><h2>单据页 · 上区 / 基本信息</h2></div>
+    <p class="sec-sub">基本信息区原版是<strong>3 列等宽栅格 + 12 个字段平铺 + 一长串 VCS 工具栏</strong>。问题：字段权重不分主次、VCS 工具栏太长、产品线 chip 仅显示不允许切换、检出状态藏在最下方一行小字。</p>
+
+    <h3>2.1 上区症结 <span class="tag">5 PAINS</span></h3>
+    <ul class="bullets">
+      <li><b>P9 · 字段权重失衡</b>：「项目名称」和「规则集 ID」权重相同，但前者每次必填，后者只在配置维护时改一次。</li>
+      <li><b>P10 · VCS 工具栏 9 个按钮通杀</b>：「新建/保存版本/版本历史/检出/检入/撤销检出/升版/强制解锁/实时校验/导出 Excel/导出 PDF」一字排开，11 个按钮一行，按钮间没有分组。</li>
+      <li><b>P11 · 产品线只读 chip</b>：截图里 <code class="k">金蝶AI星空</code> 蓝 chip 是只读，但用户期望点 chip 切换产品线（实际后端支持 <code class="k">productLines: string[]</code>）。</li>
+      <li><b>P12 · "当前版本为只读状态"提示句太弱</b>：黑色小字埋在按钮下方，新人极易忽略，导致点了字段无反应。</li>
+      <li><b>P13 · "需求来源"占了重要位置但常常空着</b>：一个 placeholder "点击选择需求版本号"占整行，字段冷场。</li>
+    </ul>
+
+    <h3>2.2 上区重做 · 三段式 <span class="tag">REWORKED</span></h3>
+    <p>把上区拆成三段：<strong>(段 1)</strong> 项目身份卡（项目名 + 产品线 + 需求来源 + 版本号 + 检出状态全部水平排成一条带有彩色背景的"项目卡"）；<strong>(段 2)</strong> 评估参数行（用户数 / 难度 / 组织 / 相似度，配 mini sliders 替代裸 input）；<strong>(段 3)</strong> 模板 / 规则集（折叠到"高级"抽屉，平时不显示）；最后是 <strong>(VCS toolbar)</strong> 浮在最右，只露主操作 + 「⋯」更多。</p>
+
+    <!-- mock for top region -->
+    <div class="mock">
+      <div class="mockbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">/dashboard/assessment · 单据页 · 上区</span></div>
+      <div style="background:var(--bg-2);padding:18px 22px">
+        <!-- 项目身份卡 -->
+        <div style="background:linear-gradient(135deg,oklch(.98 .025 262) 0%,#fff 100%);border:1px solid var(--line);
+          border-left:3px solid var(--primary);border-radius:var(--r-lg);padding:16px 18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1 1 280px;min-width:240px">
+            <div style="font-size:11.5px;color:var(--ink-3);font-weight:500;letter-spacing:.04em">项目名称</div>
+            <input class="input" value="利民集团 · 财务供应链一期" style="margin-top:4px;font-size:17px;font-weight:600;border:0;background:transparent;padding:2px 0"/>
+          </div>
+          <div>
+            <div style="font-size:11.5px;color:var(--ink-3);font-weight:500">产品线</div>
+            <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
+              <span class="pl starry">金蝶AI星空</span>
+              <span class="chip" style="font-size:11px;padding:2px 8px">+ 添加</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11.5px;color:var(--ink-3);font-weight:500">需求来源</div>
+            <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+              <span class="bdg info">RR-LM-2026-04 · v3</span>
+              <span class="btn sm ghost">↗ 查看</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11.5px;color:var(--ink-3);font-weight:500">当前生效版本</div>
+            <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+              <span class="mono" style="font-size:13px;font-weight:600;color:var(--ink)">IA-GL000-02</span>
+              <span class="bdg ok">当前生效</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            <span class="bdg ok" style="font-size:11.5px;padding:3px 10px">已检入 · 只读</span>
+            <span style="font-size:10.5px;color:var(--ink-3)">3 小时前 由 mjlkevin 检入</span>
+          </div>
+        </div>
+
+        <!-- VCS toolbar (compact) -->
+        <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn primary"><span style="font-weight:600">⇣</span> 检出以编辑</button>
+          <button class="btn">版本历史</button>
+          <button class="btn">实时校验</button>
+          <button class="btn">导出</button>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-3)">
+            <span class="bdg ok">DSL ✓ 通过</span>
+            <span>·</span>
+            <span>未保存改动 0</span>
+          </span>
+          <button class="btn ghost" title="更多操作">⋯</button>
+        </div>
+
+        <!-- 评估参数行 -->
+        <div style="margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md);padding:14px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:18px">
+          <div>
+            <div style="font-size:11px;color:var(--ink-3)">用户数</div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px"><span class="mono" style="font-size:20px;font-weight:600;color:var(--ink)">100</span><span style="font-size:11px;color:var(--ink-3)">人</span></div>
+            <div style="height:3px;background:var(--bg-2);border-radius:99px;margin-top:6px;overflow:hidden"><div style="height:100%;width:30%;background:var(--primary)"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--ink-4);margin-top:2px"><span>0</span><span>500</span></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--ink-3)">难度系数</div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px"><span class="mono" style="font-size:20px;font-weight:600;color:var(--accent-ink)">0.2</span><span style="font-size:11px;color:var(--ink-3)">+20%</span></div>
+            <div style="height:3px;background:var(--bg-2);border-radius:99px;margin-top:6px;overflow:hidden"><div style="height:100%;width:20%;background:var(--accent)"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--ink-4);margin-top:2px"><span>0</span><span>1.0</span></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--ink-3)">组织数</div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px"><span class="mono" style="font-size:20px;font-weight:600;color:var(--ink)">1</span></div>
+            <div style="font-size:11px;color:var(--ink-3);margin-top:6px">单组织 · 不计推广</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--ink-3)">组织相似度</div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px"><span class="mono" style="font-size:20px;font-weight:600;color:var(--ink)">0.8</span></div>
+            <div style="height:3px;background:var(--bg-2);border-radius:99px;margin-top:6px;overflow:hidden"><div style="height:100%;width:80%;background:var(--teal)"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--ink-4);margin-top:2px"><span>0</span><span>1.0</span></div>
+          </div>
+        </div>
+
+        <!-- 高级抽屉 -->
+        <div style="margin-top:10px;display:flex;gap:18px;align-items:center;font-size:12px;color:var(--ink-3)">
+          <span style="display:flex;align-items:center;gap:6px;cursor:pointer">▸ 模板与规则集 <span class="bdg muted">Excel层级模板-三工作表 · rules-demo-001</span></span>
+          <span style="display:flex;align-items:center;gap:6px;cursor:pointer">▸ 检出锁定记录</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="anno"><div class="pin">B</div><div>
+      <h6>上区 5 项关键改动</h6>
+      <p>① 项目身份卡（项目名 + 产品线 + 需求来源 + 版本号 + 检出状态）整合在一行彩色卡内，把"读卡片"变成读一眼的事；② 评估参数从裸数字升级为 mini bar，难度系数自动用朱砂橙警示偏高；③ VCS 11 按钮 → 主操作 + 浮动状态条（DSL 通过、未保存数）+ ⋯更多；④ 模板/规则集折叠到"高级"行；⑤ "当前版本只读"提示直接做进项目卡右上 chip + 边框柔色，再不会被忽略。</p>
+    </div></div>
+
+    <!-- ═══ §2 KIMI CODE 施工提示词 ═══ -->
+    <div class="prompt-block">
+      <div class="prompt-bar">
+        <span class="terminal">KIMI CODE · §2 单据页上区施工</span>
+        <span class="filepath">app/dashboard/assessment/page.tsx · 约第 1200–1700 行渲染区</span>
+      </div>
+      <div class="prompt-body">
+<h6>任务 1 · 抽取 ProjectIdentityCard 组件</h6>
+<ol>
+<li>新建 <code>components/workload/project-identity-card.tsx</code>，接收 props：
+→ <code>projectName: string</code> / <code>onProjectNameChange: (v: string) =&gt; void</code>
+→ <code>productLines: string[]</code> / <code>onProductLinesChange</code>
+→ <code>requirementSourceText: string</code> / <code>onRequirementSourceClick</code>
+→ <code>currentVersionCode: string</code> / <code>vcsState: VersionVcsState</code>
+→ <code>isReadonly: boolean</code></li>
+<li>布局：外层用 <code>&lt;div className="rounded-xl border border-border/50 bg-gradient-to-r from-primary/5 to-transparent border-l-[3px] border-l-primary p-4 flex items-center gap-4 flex-wrap"&gt;</code>。</li>
+<li>项目名称用 <code>&lt;Input&gt;</code>，<code>variant="ghost"</code> 样式（无边框、大字号 <code>text-lg font-semibold</code>）；<code>isReadonly</code> 时 <code>disabled</code>。</li>
+<li>产品线区：显示已选 <code>&lt;Badge&gt;</code> + <code>&lt;Button variant="ghost" size="sm"&gt;+ 添加&lt;/Button&gt;</code>（点击弹出 <code>PRODUCT_LINE_OPTIONS</code> 的 Popover multi-select）。</li>
+<li>需求来源区：显示 <code>&lt;Badge variant="outline" className="border-info"&gt;{requirementSourceText}&lt;/Badge&gt;</code> + <span class="val">「↗ 查看」</span> ghost 按钮。</li>
+<li>当前版本区：<code>&lt;span className="font-mono text-sm font-semibold"&gt;{versionCode}&lt;/span&gt;</code> + <code>&lt;Badge&gt;当前生效&lt;/Badge&gt;</code>。</li>
+<li>右侧检出状态区：使用 <code>VersionCheckoutStatusDisplay</code>，但改为 <code>&lt;Badge&gt;</code> 形式。只读态额外加 <code>className="bg-emerald-50 border-emerald-200 text-emerald-700"</code> + 文案 <span class="val">"已检入 · 只读"</span>。</li>
+</ol>
+
+<h6>任务 2 · VCS 工具栏压缩</h6>
+<ol>
+<li>修改 <code>components/workload/version-vcs-toolbar.tsx</code> 中的 <code>VersionVcsToolbar</code>：
+→ 新增 prop <code>condensed?: boolean</code>（默认 false，实施评估页传 true）。</li>
+<li>当 <code>condensed=true</code> 时，只显示 <span class="val">主操作按钮</span>（检出/检入 + 版本历史 + 实时校验 + 导出）+ 一个 <code>&lt;DropdownMenu&gt;</code>「⋯」收纳其余操作（撤销检出 / 升版 / 强制解锁）。</li>
+<li>主操作按钮右侧增加状态条：
+→ <code>&lt;Badge variant="outline"&gt;DSL {dependencyIssues.length === 0 ? "✓ 通过" : `⚠ ${n} 条`}&lt;/Badge&gt;</code>
+→ <code>&lt;span className="text-xs text-muted-foreground"&gt;未保存改动 {hasLocalChanges ? "1" : "0"}&lt;/span&gt;</code></li>
+<li>按钮间用 <code>&lt;Separator orientation="vertical" className="h-5" /&gt;</code> 分组（主操作 | 状态 | ⋯）。</li>
+</ol>
+
+<h6>任务 3 · 评估参数 Mini Bar 行</h6>
+<ol>
+<li>将 <code>form.userCount</code> / <code>form.difficultyFactor</code> / <code>form.orgCount</code> / <code>form.orgSimilarityFactor</code> 四个表单字段从原来的 3 列栅格改为 <code>grid grid-cols-4 gap-4</code> 的紧凑卡片行。</li>
+<li>每个参数卡片结构：
+→ 标签：<code>&lt;span className="text-[11px] text-muted-foreground"&gt;用户数&lt;/span&gt;</code>
+→ 数值：<code>&lt;span className="font-mono text-xl font-semibold"&gt;{form.userCount}&lt;/span&gt;</code>
+→ Mini bar：<code>&lt;Progress value={form.userCount / 500 * 100} className="h-[3px] mt-1.5" /&gt;</code>
+→ 刻度：<code>&lt;div className="flex justify-between text-[9px] text-muted-foreground/60"&gt;0 — 500&lt;/div&gt;</code></li>
+<li>难度系数 > 0.3 时用 <code>text-orange-600</code>（朱砂橙语义），Progress bar 也用 <code>bg-orange-500</code>。</li>
+<li><code>isReadonly</code> 时隐藏 Input，仅显示数值；编辑态点击数值区可编辑。</li>
+</ol>
+
+<h6>任务 4 · 模板/规则集折叠为「高级」行</h6>
+<ol>
+<li>将 <code>templateId</code> / <code>ruleSetId</code> 下拉从主表单中移除，放入 <code>&lt;Collapsible&gt;</code> 组件。</li>
+<li>收起态：显示一行 <code>&lt;Button variant="ghost"&gt;▸ 模板与规则集 &lt;Badge variant="secondary"&gt;{templateName} · {ruleSetId}&lt;/Badge&gt;&lt;/Button&gt;</code>。</li>
+<li>展开态：显示原有的两个 <code>&lt;Select&gt;</code> 字段。</li>
+<li>默认收起（<code>defaultOpen={false}</code>），减少首屏高度。</li>
+</ol>
+
+<h6>整合：在 page.tsx 渲染区替换</h6>
+<ol>
+<li>找到 <code>page.tsx</code> 中 <span class="cmt">/* 基本信息区 */</span> 的渲染位置（大约第 1200–1400 行），用 <code>&lt;ProjectIdentityCard&gt;</code> 替换原有的 3 列栅格表单。</li>
+<li><code>&lt;ProjectIdentityCard&gt;</code> 下方紧接 VCS 工具栏（<code>condensed</code> 模式），再接评估参数 mini bar，再接「高级」折叠行。</li>
+<li>目标：上区从原来 ~320px 高度压缩到 ~200px。</li>
+</ol>
+
+<h6>注意事项</h6>
+<ul>
+<li><span class="warn">不动</span> <code>AssessmentForm</code> 类型和 <code>form</code> state 结构——只改渲染层。</li>
+<li><span class="warn">不动</span> <code>onSave</code> / <code>onCheckout</code> / <code>onCheckin</code> 等回调逻辑。</li>
+<li><code>VersionVcsToolbar</code> 是共用组件，<code>condensed</code> 默认 false 保证其他模块不受影响。</li>
+<li>只读态视觉：项目身份卡背景从 <code>from-primary/5</code> 改为 <code>from-emerald-50</code>（绿色提示安全/只读），左边框从 primary 改为 emerald。</li>
+</ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="hr"></div>
+
+  <!-- ================================================================== -->
+  <!-- §3 单据页 · 下区 / 详细评估                                          -->
+  <!-- ================================================================== -->
+  <section id="s3" class="sec">
+    <div class="sec-h"><span class="num">§ 03</span><h2>单据页 · 下区 / 详细评估</h2></div>
+    <p class="sec-sub">这是真正的核心——<strong>用户在这一区花掉 80% 的时间</strong>。它叠了 6 层：模块/多组织 Tab → 4 张 KPI → 报价模式 → 预置模式 → 云产品 tag → SKU 表。原版每一层都是"水平 chip 行"，一屏装不下，纵深感弱。</p>
+
+    <h3>3.1 KPI 四卡的问题与重做</h3>
+    <p>原版四张卡视觉同质（左圆 / 右数字），但实际语义差很多：<strong>人天构成</strong>是"分项→总数"、<strong>云产品占比</strong>是"维度结构"、<strong>勾选条目 / 基础人天</strong>是"进度"、<strong>总评估人天</strong>是"最终结果"。重做后用<strong>差异化形态</strong>+<strong>视觉权重梯度</strong>突出最终结果。</p>
+
+    <div class="ba">
+      <div class="col before">
+        <div class="hd">BEFORE · 4 张同质卡</div>
+        <div class="bd">
+          <div class="grid g-4" style="gap:8px">
+            <div class="card" style="padding:10px;font-size:11px"><div style="display:flex;align-items:center;gap:6px"><div style="width:48px;height:48px;border-radius:99px;background:conic-gradient(#7c3aed 0 70%,#2563eb 0 90%,#f59e0b 0 100%)"></div><div style="font-size:9px;line-height:1.4">基础 23<br/>用户 4<br/>难度 4.6</div></div></div>
+            <div class="card" style="padding:10px;font-size:11px"><div style="display:flex;align-items:center;gap:6px"><div style="width:48px;height:48px;border-radius:99px;background:conic-gradient(#7c3aed 0 35%,#2563eb 0 100%)"></div><div style="font-size:9px;line-height:1.4">差旅 35%<br/>财务 65%</div></div></div>
+            <div class="card" style="padding:10px"><div style="font-size:9px;color:var(--ink-3)">勾选 / 基础</div><div style="font-size:18px;font-weight:600">7 / 23</div></div>
+            <div class="card" style="padding:10px"><div style="font-size:9px;color:var(--ink-3)">总人天</div><div style="font-size:18px;font-weight:600">31.6</div></div>
+          </div>
+          <p class="small" style="margin-top:10px;color:var(--ink-3)">问题：4 张卡视觉权重一致，看不出哪个是结果。两个饼图都用 conic-gradient 拼色，色板不统一（紫 / 蓝 / 橙 / 绿 各 4 种来源）。</p>
+        </div>
+      </div>
+      <div class="col after">
+        <div class="hd">AFTER · 1 主结果 + 3 辅助</div>
+        <div class="bd">
+          <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:8px">
+            <!-- 主结果卡：放大 + 朱砂橙强调 + waterfall 推导 -->
+            <div class="kpi" style="background:linear-gradient(135deg,oklch(.42 .14 262) 0%,oklch(.32 .12 262) 100%);color:#fff;border:0;padding:12px 14px">
+              <span class="lbl" style="color:oklch(.85 .04 262)">总评估人天 · 实时</span>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:2px"><span class="v" style="font-size:34px;color:#fff">31.6</span><span style="font-size:11px;color:oklch(.85 .04 262)">↑ 8.6 vs 标准</span></div>
+              <!-- waterfall mini bar -->
+              <div style="display:flex;height:8px;border-radius:99px;overflow:hidden;margin-top:8px;gap:2px">
+                <div style="flex:23;background:oklch(.78 .14 262)" title="基础 23"></div>
+                <div style="flex:4;background:oklch(.69 .18 45)" title="用户 +4"></div>
+                <div style="flex:4.6;background:oklch(.66 .10 195)" title="难度 +4.6"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;color:oklch(.85 .04 262)"><span>基础 23</span><span>用户 +4</span><span>难度 +4.6</span></div>
+            </div>
+            <div class="kpi" style="padding:10px"><span class="lbl">勾选条目</span><div class="v" style="font-size:18px">7<small> / 23</small></div><div style="height:3px;background:var(--bg-2);border-radius:99px;margin-top:6px;overflow:hidden"><div style="height:100%;width:30%;background:var(--primary)"></div></div></div>
+            <div class="kpi" style="padding:10px"><span class="lbl">云产品分布</span>
+              <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px;font-size:10.5px">
+                <div style="display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:99px;background:var(--primary)"></span>财务 65%</div>
+                <div style="display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:99px;background:var(--accent)"></span>差旅 35%</div>
+              </div>
+              <div style="height:5px;display:flex;border-radius:99px;overflow:hidden;margin-top:4px"><div style="flex:65;background:var(--primary)"></div><div style="flex:35;background:var(--accent)"></div></div>
+            </div>
+            <div class="kpi" style="padding:10px"><span class="lbl">DSL 校验</span><div class="v" style="font-size:18px;color:var(--ok)">✓ 通过</div><span class="delta" style="color:var(--ink-3)">最近 14:32</span></div>
+          </div>
+          <p class="small" style="margin-top:10px;color:var(--ink-2)">主结果卡放大 1.5 倍 + 深色背景 + waterfall 微图把"23 + 4 + 4.6"的推导可视化；其他三卡降级为辅助。</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>3.2 三层选择器折叠 · 报价模式 → 预置 → 云产品</h3>
+    <p>原版三行 chip 全部展开，<strong>3 行 = 6 cm 屏幕高度</strong>。改为<strong>纵向折叠 + 路径表达式</strong>：未操作时只显示"模块报价 / 标准财务供应链 / 财务云 + 差旅"一行；点击任一节点展开候选；用<strong>面包屑</strong>清晰传达层级。</p>
+
+    <!-- detail mock -->
+    <div class="mock">
+      <div class="mockbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">单据页 · 下区 / 详细评估区</span></div>
+      <div style="padding:18px 22px;background:var(--bg-2)">
+        <!-- KPI strip -->
+        <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="kpi" style="background:linear-gradient(135deg,oklch(.42 .14 262) 0%,oklch(.32 .12 262) 100%);color:#fff;border:0">
+            <span class="lbl" style="color:oklch(.85 .04 262)">总评估人天 · 实时</span>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px"><span class="v" style="font-size:38px;color:#fff">31.6</span><span class="bdg" style="background:oklch(.69 .18 45);color:#fff;font-size:10.5px">+37% vs 标准</span></div>
+            <div style="display:flex;height:10px;border-radius:99px;overflow:hidden;margin-top:10px;gap:2px">
+              <div style="flex:23;background:oklch(.78 .14 262);position:relative"></div>
+              <div style="flex:4;background:oklch(.69 .18 45)"></div>
+              <div style="flex:4.6;background:oklch(.66 .10 195)"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10.5px;margin-top:6px;color:oklch(.85 .04 262)">
+              <span>基础 <b style="color:#fff">23</b></span>
+              <span>用户增量 <b style="color:#fff">+4</b></span>
+              <span>难度 <b style="color:#fff">+4.6</b></span>
+              <span>组织 <b style="color:#fff">+0</b></span>
+            </div>
+          </div>
+          <div class="kpi"><span class="lbl">勾选条目 / 基础</span><div class="v" style="font-size:24px">7<small> / 23</small></div>
+            <div style="height:3px;background:var(--bg-2);border-radius:99px;margin-top:8px;overflow:hidden"><div style="height:100%;width:30%;background:var(--primary)"></div></div>
+            <span class="delta" style="color:var(--ink-3)">已选 1 SKU · 1 模块</span>
+          </div>
+          <div class="kpi"><span class="lbl">云产品工作量</span>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+              <div style="width:54px;height:54px;border-radius:99px;background:conic-gradient(var(--primary) 0 65.2%,var(--accent) 0 100%);position:relative">
+                <div style="position:absolute;inset:8px;border-radius:99px;background:#fff"></div>
+              </div>
+              <div style="font-size:10.5px;line-height:1.6">
+                <div style="display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:99px;background:var(--primary)"></span>财务云 65.2%</div>
+                <div style="display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:99px;background:var(--accent)"></span>差旅与费用 34.8%</div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi"><span class="lbl">DSL 依赖校验</span>
+            <div class="v" style="font-size:18px;color:var(--ok);margin-top:2px">✓ 通过</div>
+            <div style="display:flex;flex-direction:column;gap:2px;margin-top:6px;font-size:10.5px;color:var(--ink-3)">
+              <span>5 条规则 · 0 缺失</span>
+              <span>0 互斥冲突</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:12px">
+          <span class="chip on">模块评估</span>
+          <span class="chip">多组织推广估算 <span style="margin-left:4px;background:var(--accent);color:#fff;padding:0 5px;border-radius:99px;font-size:9px">2</span></span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+            <span class="bdg muted">仅显示已勾选</span>
+            <span class="bdg muted">展开全部</span>
+          </span>
+        </div>
+
+        <!-- 折叠选择器 · 路径表达式 -->
+        <div style="background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 16px;margin-bottom:12px">
+          <!-- breadcrumb path -->
+          <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--ink-3);font-weight:500">评估路径</span>
+            <span class="bdg" style="background:var(--primary);color:#fff;padding:3px 10px">报价模式 · <b>模块报价</b> ▾</span>
+            <span style="color:var(--ink-4)">›</span>
+            <span class="bdg" style="background:var(--primary);color:#fff;padding:3px 10px">预置 · <b>标准财务供应链</b> ▾</span>
+            <span style="color:var(--ink-4)">›</span>
+            <span class="bdg" style="background:var(--accent);color:#fff;padding:3px 10px">云产品 · <b>财务云 + 差旅与费用</b> ▾</span>
+            <span style="margin-left:auto;font-size:11px;color:var(--ink-3)">命中 2 / 20 云产品 · 23 条 SKU</span>
+          </div>
+          <!-- 展开后的云产品 chip 行（仅这一行展开）-->
+          <div class="chiprow" style="border-top:1px dashed var(--line);margin-top:10px;padding-top:10px">
+            <span class="lbl">云产品</span>
+            <div class="chips">
+              <span class="chip on acc">差旅与费用管理</span>
+              <span class="chip">人人业务云</span>
+              <span class="chip on">财务云</span>
+              <span class="chip">供应链云</span>
+              <span class="chip">制造云</span>
+              <span class="chip">质量云</span>
+              <span class="chip">条码云</span>
+              <span class="chip">渠道云</span>
+              <span class="chip">项目云</span>
+              <span class="chip">PLM 云</span>
+              <span class="chip">银企云</span>
+              <span class="chip">税务云</span>
+              <span class="chip">SRM 云</span>
+              <span class="chip">IPO 中心</span>
+              <span class="chip">合同中心 (CM)</span>
+              <span class="chip">电子档案</span>
+              <span class="chip dim">系统服务云</span>
+              <span class="chip dim">移动应用</span>
+              <span class="chip dim">+ 6 项子云产品</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SKU 表 -->
+        <div class="sku-grp">
+          <div class="head">
+            <span class="title">云产品：差旅与费用管理</span>
+            <span class="meta">已检入 · 仅显示已勾选 · <b style="color:var(--primary);font-weight:600">已选 1/7</b> · <b style="color:var(--primary);font-weight:600">8 人天</b> · 模块 1</span>
+            <div class="actions">
+              <button class="btn sm">自定义人天</button>
+              <button class="btn sm">全选</button>
+              <button class="btn sm ghost">全不选</button>
+            </div>
+          </div>
+          <div style="overflow:auto">
+          <table class="sk">
+            <colgroup><col style="width:40px"/><col style="width:120px"/><col style="width:200px"/><col/><col style="width:280px"/><col style="width:80px"/><col style="width:110px"/></colgroup>
+            <thead><tr>
+              <th></th><th>SKU</th><th>实施要点</th><th>实施要点内容说明</th><th>评估说明</th><th style="text-align:right">标准人天</th><th>自定义人天</th>
+            </tr></thead>
+            <tbody>
+              <tr class="sel">
+                <td class="mid"><span class="ck on"></span></td>
+                <td class="mid" rowspan="2" style="background:var(--bg-2);font-weight:600;color:var(--ink);font-size:12px;border-right:1px solid var(--line)">人人差旅</td>
+                <td><div style="font-weight:500;color:var(--ink)">人人差旅基本业务处理</div><div style="color:var(--ink-3);font-size:11px;margin-top:2px">· 差旅模块</div></td>
+                <td>出差申请、出差申请单（借）、差旅报销 / 流程 / 标准 / 路线 / 城市 / 班次</td>
+                <td>需结合差旅标准策略，每个组织的流程不一致，致时…根据项目实际情况评估。</td>
+                <td class="mid" style="text-align:right"><span class="d-low">3</span></td>
+                <td class="mid"><div class="step"><button>−</button><span class="n up">4</span><button>+</button><span class="reason-dot ok"></span></div></td>
+              </tr>
+              <tr>
+                <td class="mid"><span class="ck"></span></td>
+                <td><div style="font-weight:500;color:var(--ink-3)">人人差旅基础数据</div><div style="color:var(--ink-3);font-size:11px;margin-top:2px">· 基础数据</div></td>
+                <td>差旅标准、出差申请单类型、差旅城市、差旅路线…</td>
+                <td>组织流程统一时随财务一起推广。</td>
+                <td class="mid" style="text-align:right"><span class="d-low">2</span></td>
+                <td class="mid"><span style="color:var(--ink-4);font-size:11px">—</span></td>
+              </tr>
+              <tr>
+                <td class="mid"><span class="ck"></span></td>
+                <td class="mid" style="background:var(--bg-2);font-weight:600;color:var(--ink);font-size:12px;border-right:1px solid var(--line)">人人报销</td>
+                <td><div style="font-weight:500;color:var(--ink-3)">非差旅费用报销</div></td>
+                <td>日常报销、专项报销、对公付款单据…</td>
+                <td>需评估专项报销使用场景与额度控制。</td>
+                <td class="mid" style="text-align:right"><span class="d-mid">6</span></td>
+                <td class="mid"><span style="color:var(--ink-4);font-size:11px">—</span></td>
+              </tr>
+              <tr>
+                <td class="mid"><span class="ck"></span></td>
+                <td class="mid" style="background:var(--bg-2);font-weight:600;color:var(--ink);font-size:12px;border-right:1px solid var(--line)">差旅集成</td>
+                <td><div style="font-weight:500;color:var(--ink-3)">第三方差旅平台对接</div></td>
+                <td>携程 / 滴滴 / 出行平台 API 对接 + 单据回写</td>
+                <td>对接深度与回写策略需现场确认。</td>
+                <td class="mid" style="text-align:right"><span class="d-hi">15</span></td>
+                <td class="mid"><span style="color:var(--ink-4);font-size:11px">—</span></td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="anno"><div class="pin">C</div><div>
+      <h6>下区 6 项关键改动</h6>
+      <p>① KPI 区主次差异化：总人天卡放大 1.5 倍 + 深蓝背景 + waterfall 推导（基础/用户/难度/组织）；② 报价模式 / 预置 / 云产品 三层折叠为<strong>"路径面包屑"</strong>，只展开当前层；③ 云产品 chip 加了"+6 项子云产品"末尾溢出，避免横铺；④ Tab 加未读数（多组织待补 2 条）；⑤ SKU 表的 rowSpan SKU 列改为<strong>带左竖线的灰底单元格</strong>，行选中时左侧 3px 蓝竖线提示；⑥ 自定义人天 stepper 用<strong>颜色区分上调（朱砂橙）/下调（雾青）</strong>，原因小圆点保留 saved/pending 二态。</p>
+    </div></div>
+
+    <!-- ═══ §3 KIMI CODE 施工提示词 ═══ -->
+    <div class="prompt-block">
+      <div class="prompt-bar">
+        <span class="terminal">KIMI CODE · §3 单据页下区施工</span>
+        <span class="filepath">app/dashboard/assessment/page.tsx · 约第 1700–2400 行渲染区</span>
+      </div>
+      <div class="prompt-body">
+<h6>任务 1 · KPI 四卡差异化重做</h6>
+<ol>
+<li>新建 <code>components/workload/assessment-kpi-cards.tsx</code>，接收 props：
+→ <code>totalDays: number</code> / <code>baseDays: number</code> / <code>userIncrementDays: number</code> / <code>difficultyIncrementDays: number</code> / <code>orgIncrementDays: number</code>
+→ <code>selectedCount: number</code> / <code>totalItemCount: number</code>
+→ <code>cloudDistribution: Array&lt;{name: string, percentage: number}&gt;</code>
+→ <code>dependencyIssues: DependencyIssue[]</code></li>
+<li>布局：<code>grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-3</code>。</li>
+<li><span class="cmd">主结果卡（左 1）</span>：背景 <code>bg-gradient-to-br from-primary to-primary/80 text-white</code>，数字 <code>text-4xl font-mono</code>，下方 waterfall 微条形图：
+→ <code>&lt;div className="flex h-2.5 rounded-full overflow-hidden gap-0.5 mt-2"&gt;</code>
+→ 三段 <code>flex: baseDays</code> / <code>flex: userDays</code> / <code>flex: diffDays</code>，颜色分别用 <code>bg-primary/60</code> / <code>bg-orange-400</code> / <code>bg-teal-400</code>
+→ 下方标注 <code>&lt;div className="flex justify-between text-[10px] text-white/70 mt-1"&gt;</code></li>
+<li><span class="val">辅助卡 2（勾选）</span>：<code>&lt;Progress value={selectedCount/totalItemCount*100} className="h-[3px]" /&gt;</code>。</li>
+<li><span class="val">辅助卡 3（云产品分布）</span>：用 CSS <code>conic-gradient</code> 饼图 + 右侧图例列表（每行带 6px 圆点）。</li>
+<li><span class="val">辅助卡 4（DSL 校验）</span>：通过时 <code>text-emerald-500 text-lg font-semibold</code> 显示 <span class="val">✓ 通过</span>；有 issue 时 <code>text-destructive</code> 显示 <span class="val">⚠ N 条</span>。</li>
+</ol>
+
+<h6>任务 2 · 三层选择器折叠为路径面包屑</h6>
+<ol>
+<li>新建 <code>components/workload/assessment-path-breadcrumb.tsx</code>，接收：
+→ <code>selectedSheet: string</code> / <code>sheets: string[]</code> / <code>onSheetChange</code>
+→ <code>selectedPresetMode: string</code> / <code>presetModes: string[]</code> / <code>onPresetModeChange</code>
+→ <code>selectedCloudNames: string[]</code> / <code>allCloudNames: string[]</code> / <code>onCloudNamesChange</code></li>
+<li>收起态（默认）：一行面包屑 → <code>&lt;Badge className="bg-primary text-white"&gt;报价模式 · {sheet} ▾&lt;/Badge&gt;</code> <code>›</code> <code>&lt;Badge&gt;预置 · {preset} ▾&lt;/Badge&gt;</code> <code>›</code> <code>&lt;Badge className="bg-orange-500 text-white"&gt;云产品 · {cloudNames.join(" + ")} ▾&lt;/Badge&gt;</code>。</li>
+<li>点击任一 Badge 展开该层的选项列表（用 <code>&lt;Popover&gt;</code> 或行内展开）。仅展开当前点击层，其他层保持收起。</li>
+<li>行末显示命中统计：<code>&lt;span className="text-xs text-muted-foreground ml-auto"&gt;命中 {n}/{total} 云产品 · {m} 条 SKU&lt;/span&gt;</code>。</li>
+<li>替换 <code>page.tsx</code> 中原有的三行 chip 选择器（<code>sheets.map</code> / <code>presetModes</code> / <code>allCloudNames.map</code>）。</li>
+</ol>
+
+<h6>任务 3 · 云产品 Chip 溢出处理</h6>
+<ol>
+<li>当 <code>allCloudNames.length &gt; 12</code> 时，显示前 12 个 + <code>&lt;Badge variant="secondary"&gt;+ {n} 项子云产品&lt;/Badge&gt;</code>。</li>
+<li>点击溢出 Badge 展开全部（toggle 状态 <code>showAllClouds</code>）。</li>
+<li>未选中且非当前 sheet 可用的云产品降低透明度：<code>opacity-50</code>。</li>
+</ol>
+
+<h6>任务 4 · Tab 加未读数</h6>
+<ol>
+<li>「多组织推广估算」Tab 旁加 Badge 显示待补行数：
+→ <code>&lt;Badge className="ml-1 bg-orange-500 text-white text-[9px] px-1.5 rounded-full"&gt;{incompleteOrgCount}&lt;/Badge&gt;</code>
+→ <code>incompleteOrgCount = multiOrgRows.filter(r =&gt; !r.orgName.trim()).length</code></li>
+</ol>
+
+<h6>任务 5 · SKU 表 rowSpan 列视觉优化</h6>
+<ol>
+<li>SKU 名称列（<code>rowSpan</code> 列）加样式：<code>className="bg-muted/30 border-r border-border/40 font-semibold text-xs align-top"</code>。</li>
+<li>选中行左侧加 3px 竖线：<code>className="shadow-[inset_3px_0_0_hsl(var(--primary))]"</code>，替换原来的 <code>bg-primary/10</code> 整行背景（太弱）。</li>
+</ol>
+
+<h6>注意事项</h6>
+<ul>
+<li>KPI 卡片数据 <code>baseDays</code> / <code>tierFactor</code> 等已在 <code>page.tsx</code> 的 <code>useMemo</code> 中计算好，直接传 prop。</li>
+<li><code>serverResult: EstimateResult</code> 中有 <code>baseDays / userIncrementDays / difficultyIncrementDays / orgIncrementDays / totalDays</code>，优先用 serverResult；本地 fallback 用前端 <code>baseDays + tierFactor * baseDays + ...</code>。</li>
+<li>面包屑折叠不影响数据流：<code>selectedSheet</code> / <code>selectedPresetMode</code> / <code>selectedCloudNames</code> 的 state 和 onChange 回调保持不变。</li>
+</ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="hr"></div>
+
+  <!-- ================================================================== -->
+  <!-- §4 SKU 表 · 行级交互重做                                             -->
+  <!-- ================================================================== -->
+  <section id="s4" class="sec">
+    <div class="sec-h"><span class="num">§ 04</span><h2>SKU 表 · 行级交互重做</h2></div>
+    <p class="sec-sub">SKU 表是评估的最小单位，原版每行有 5 个字段 + 整行可点切换勾选 + 自定义人天 stepper + 调整原因 popover。这里聚焦<strong>5 项行内细节</strong>。</p>
+
+    <h3>4.1 标准人天的颜色梯度</h3>
+    <p>原版用 <code class="k">&gt;10 红</code> / <code class="k">&gt;5 橙</code> / <code class="k">&lt;=5 默认</code> 三档颜色。这是好习惯但当前色板用了 <code class="k">text-red-800</code>，在浅灰 hover 行上对比不足。重做：</p>
+
+    <div class="grid g-3" style="margin:12px 0">
+      <div class="card">
+        <div class="kicker">规则</div>
+        <h4>≤ 5 人天 · 默认</h4>
+        <p style="margin:8px 0">字色 <code class="k">var(--ink)</code> · 字重 600。代表"小工作量"，无需视觉提示。</p>
+        <div style="display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono'">
+          <span class="d-low" style="font-size:18px">3</span>
+          <span class="d-low" style="font-size:18px">5</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="kicker">注意</div>
+        <h4>6 ~ 10 人天 · 关注</h4>
+        <p style="margin:8px 0">字色 <code class="k">oklch(.50 .14 50)</code>（暗琥珀）+ 字重 600，告诉 PM 这条要稍多关注。</p>
+        <div style="display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono'">
+          <span class="d-mid" style="font-size:18px">6</span>
+          <span class="d-mid" style="font-size:18px">10</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="kicker">高风险</div>
+        <h4>&gt; 10 人天 · 警示</h4>
+        <p style="margin:8px 0">字色 <code class="k">var(--danger)</code> + 字重 600 + 数字旁加 <code class="k">⚠</code> 小图标，提示"这一条建议拆分"。</p>
+        <div style="display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono'">
+          <span class="d-hi" style="font-size:18px">⚠ 15</span>
+          <span class="d-hi" style="font-size:18px">⚠ 28</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>4.2 自定义人天 stepper · 重新设计</h3>
+    <p>原版是 <code class="k">[ - ] 4 [ + ]</code> 加一个红/绿小圆点。改进：</p>
+    <ul class="bullets">
+      <li><b>方向色</b>：上调时数字色变朱砂橙（<code class="k">d-mid</code>），下调时变雾青；与"标准人天"色彩区分开。</li>
+      <li><b>差量提示</b>：旁边出现 <code class="k">+1</code> / <code class="k">−1</code> 灰底胶囊，明示偏离标准。</li>
+      <li><b>调整原因</b>状态合并：未填 = 红点（必填，pending）；已填 = 绿点（saved）；标准 = 无点。</li>
+      <li><b>键盘</b>：行 focus 后 <code class="k">↑</code> <code class="k">↓</code> 直接调，<code class="k">Enter</code> 打开原因 popover。</li>
+      <li><b>批量</b>：选中多行后右侧浮出"批量 +1 / −1"工具提示。</li>
+    </ul>
+
+    <!-- ═══ §4 KIMI CODE 施工提示词 ═══ -->
+    <div class="prompt-block">
+      <div class="prompt-bar">
+        <span class="terminal">KIMI CODE · §4 SKU 行级交互施工</span>
+        <span class="filepath">app/dashboard/assessment/page.tsx · SKU 表渲染区 + 新组件</span>
+      </div>
+      <div class="prompt-body">
+<h6>任务 1 · 抽取 DaysCell 组件（标准人天颜色梯度）</h6>
+<ol>
+<li>新建 <code>components/workload/days-cell.tsx</code>：
+<code>export function DaysCell({ value }: { value: number })</code></li>
+<li>三档颜色逻辑：
+→ <code>value &lt;= 5</code>：<code>className="font-semibold text-foreground"</code>（默认色，<span class="val">d-low</span>）
+→ <code>6 &lt;= value &lt;= 10</code>：<code>className="font-semibold text-amber-600 dark:text-amber-400"</code>（<span class="val">d-mid</span>）
+→ <code>value &gt; 10</code>：<code>className="font-semibold text-destructive"</code>（<span class="val">d-hi</span>）+ 前缀 <code>⚠</code> 图标</li>
+<li>在 <code>page.tsx</code> 的 SKU 表中，找到所有 <code>&lt;TableCell&gt;</code> 渲染 <code>standardDays</code> 的位置（搜索 <code>item.standardDays</code>），替换为 <code>&lt;DaysCell value={Number(item.standardDays)} /&gt;</code>。</li>
+<li>确保字体用 <code>font-mono tabular-nums</code> 对齐数字列。</li>
+</ol>
+
+<h6>任务 2 · 自定义人天 Stepper 着色</h6>
+<ol>
+<li>找到 <code>page.tsx</code> 中渲染自定义人天 stepper 的位置（搜索 <code>customStandardDays</code> 或 <code>customAdjustReason</code> 附近的 <code>&lt;Button&gt;</code> 加减按钮）。</li>
+<li>计算偏离量：<code>const delta = (state.customStandardDays ?? standardDays) - standardDays</code></li>
+<li>数值着色：
+→ <code>delta &gt; 0</code>（上调）：数字用 <code>text-orange-600</code>（朱砂橙）
+→ <code>delta &lt; 0</code>（下调）：数字用 <code>text-teal-600</code>（雾青）
+→ <code>delta === 0</code>：默认 <code>text-foreground</code></li>
+<li>在 stepper 右侧新增差量胶囊：
+→ <code>delta !== 0 &amp;&amp; &lt;Badge variant="outline" className={delta &gt; 0 ? "border-orange-300 bg-orange-50 text-orange-700" : "border-teal-300 bg-teal-50 text-teal-700"}&gt;{delta &gt; 0 ? "+" : ""}{delta}&lt;/Badge&gt;</code></li>
+<li>调整原因状态指示器：
+→ 未填（<code>customAdjustReasonStatus !== "saved"</code> 且 <code>delta !== 0</code>）：<code>&lt;span className="w-2 h-2 rounded-full bg-destructive inline-block" title="原因待填" /&gt;</code>
+→ 已填（<code>status === "saved"</code>）：<code>&lt;span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" title="已说明" /&gt;</code> + Tooltip 悬浮显示原因全文
+→ 无偏离（<code>delta === 0</code>）：不显示指示器</li>
+</ol>
+
+<h6>任务 3 · 行级勾选反馈优化</h6>
+<ol>
+<li>选中行（<code>itemSelection[id]?.included === true</code>）样式从 <code>bg-primary/10</code> 改为 <code>shadow-[inset_3px_0_0_hsl(var(--primary))] bg-primary/5</code>。</li>
+<li>确保只有 Checkbox 列和 SKU rowSpan 列的点击触发勾选切换（<code>onClick</code>），其他列不触发（搜索 <code>toggleItemSelection</code> 或行级 <code>onClick</code>）。</li>
+<li>stepper / popover / 按钮等交互元素确保有 <code>e.stopPropagation()</code>。</li>
+<li>增加键盘支持：行 <code>tabIndex={0}</code> + <code>onKeyDown</code>：<code>Space/Enter</code> 切换勾选。</li>
+</ol>
+
+<h6>注意事项</h6>
+<ul>
+<li><code>DaysCell</code> 是纯展示组件，无 side effect；可复用于其他模块的人天列。</li>
+<li>Stepper 着色不改变数据流——<code>customStandardDays</code> 写入 <code>itemSelection</code> 的逻辑不变，只改视觉层。</li>
+<li><code>customAdjustReason</code> 的 Popover 编辑交互保持不变（搜索 <code>customAdjustReasonEditor</code>）。</li>
+</ul>
+      </div>
+    </div>
+
+    <div class="ba">
+      <div class="col before">
+        <div class="hd">BEFORE</div>
+        <div class="bd">
+          <div class="step" style="display:inline-flex"><button>−</button><span class="n">4</span><button>+</button></div>
+          <span class="reason-dot warn" style="margin-left:8px"></span>
+          <p class="small" style="margin-top:14px;color:var(--ink-3)">数字与方向无视觉差异；红/绿点位置相对按钮，新人不易理解"为什么有时左边有时右边"。</p>
+        </div>
+      </div>
+      <div class="col after">
+        <div class="hd">AFTER</div>
+        <div class="bd">
+          <div style="display:inline-flex;align-items:center;gap:8px">
+            <div class="step"><button>−</button><span class="n up">4</span><button>+</button></div>
+            <span class="bdg acc" style="font-size:10.5px">+1</span>
+            <span style="font-size:11px;color:var(--ok);font-weight:500;display:inline-flex;align-items:center;gap:3px">● 已说明</span>
+          </div>
+          <p class="small" style="margin-top:14px;color:var(--ink-2)">数字朱砂橙 = 上调；胶囊 +1 实时显示偏离量；右侧"已说明"小绿点表示原因已保存，鼠标悬浮显示原文。</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>4.3 行级勾选反馈 · 弱化"行可点"的歧义</h3>
+    <p>原版"整行可点 = 切换勾选"，但行内还有 stepper、popover、按钮等可点元素。所有 <code class="k">e.stopPropagation()</code> 是程序员式的解决，用户体感是"点哪都怕点错"。建议：</p>
+    <ul class="bullets">
+      <li><b>明确触发区</b>：勾选只发生在最左 ck 单元格 + SKU rowSpan 单元格（与原代码一致）；其余单元格 hover 显示"标准人天 · 用途"等 tooltip 但不切换勾选。</li>
+      <li><b>视觉锚点</b>：选中行左侧出现 3px 朱砂橙竖线（被覆盖原蓝色背景太弱）。</li>
+      <li><b>键盘</b>：<code class="k">Space</code>/<code class="k">Enter</code> 在行 focus 时切换；保留原代码兼容。</li>
+    </ul>
+  </section>
+
+  <div class="hr"></div>
+
+  <!-- ================================================================== -->
+  <!-- §5 DSL 依赖校验 与 AI 协同                                           -->
+  <!-- ================================================================== -->
+  <section id="s5" class="sec">
+    <div class="sec-h"><span class="num">§ 05</span><h2>DSL 依赖校验 与 AI 协同</h2></div>
+    <p class="sec-sub">代码里 <code class="k">evaluateDependencyIssues</code> 已经实现 4 类 DSL 规则（requires_all / requires_any / combo / mutex），但前端只用一行 <code class="k">检测到 N 条 SKU 依赖风险</code>提示。改造重点是把 DSL 校验<strong>渲染到 SKU 行级</strong>，并接入 AI 修复建议。</p>
+
+    <h3>5.1 行级红色 banner + 一键修复</h3>
+    <div class="mock">
+      <div class="mockbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="label">DSL 校验 · inline rendering</span></div>
+      <div style="padding:18px;background:var(--bg-2)">
+        <!-- inline DSL warning row -->
+        <div style="background:var(--surface);border:1px solid oklch(.86 .12 25);border-radius:var(--r-md);padding:14px 16px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span style="width:24px;height:24px;border-radius:99px;background:var(--danger);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">!</span>
+            <strong style="font-size:13px">DSL 校验 · 检测到 2 条依赖缺失</strong>
+            <button class="btn primary sm" style="margin-left:auto">一键自动补齐 (AI)</button>
+            <button class="btn sm">忽略本次</button>
+          </div>
+          <!-- rule 1 -->
+          <div class="dsl">
+            <span class="bdg muted" style="font-family:inherit">规则 R-002</span>
+            <b>差旅集成</b> 需要 <code style="color:#000">requires_all</code> ：
+            <span class="ok">差旅基础数据 ✓</span>，
+            <span class="miss">财务云 · 总账 ✗</span>。
+            <br/>建议：<button class="btn sm" style="margin-top:4px">勾选「财务云 · 总账」</button> · <button class="btn sm ghost">查看规则源</button>
+          </div>
+          <div class="dsl">
+            <span class="bdg muted" style="font-family:inherit">规则 R-007</span>
+            <b>互斥</b>：<span class="miss">条码云</span> 与 <span class="miss">PLM 云</span> 不可同时启用。
+            <br/>建议：<button class="btn sm">取消「条码云」</button> · <button class="btn sm">取消「PLM 云」</button>
+          </div>
+        </div>
+
+        <!-- AI suggestion side card -->
+        <div class="ai-card">
+          <div class="ai-h"><span class="pulse"></span> AI 实施顾问 · 建议</div>
+          <p>当前模块组合下，<strong>差旅集成（15 人天）</strong>在没有总账的前提下风险较高。综合需求文档第 §3.2 节"集团统一报销 + 财务对账"，建议同时勾选「财务云 · 总账」配套启用，可消除此 DSL 警告并把总人天从 31.6 调整到 36.8。</p>
+          <p style="font-size:11px;color:var(--ink-3);margin-top:6px">基于 Wave 5 KIMI 实施评估预设 prompt · 引用需求 RR-LM-2026-04 · v3</p>
+          <div style="display:flex;gap:6px;margin-top:8px"><button class="btn primary sm">应用建议</button><button class="btn sm">查看推理</button><button class="btn sm ghost">关闭</button></div>
+        </div>
+      </div>
+    </div>
+
+    <h3>5.2 与列表页 KPI 联动</h3>
+    <p>列表页 KPI"DSL 校验通过率"圆环（§1.2）的数据源就是单据页的 <code class="k">dependencyIssues.length</code>。任意单据校验状态变化时，列表页该卡片实时刷新；点击圆环可下钻"不通过的单据 → 行内点定位"。</p>
+
+    <!-- ═══ §5 KIMI CODE 施工提示词 ═══ -->
+    <div class="prompt-block">
+      <div class="prompt-bar">
+        <span class="terminal">KIMI CODE · §5 DSL 依赖校验 + AI 协同施工</span>
+        <span class="filepath">app/dashboard/assessment/page.tsx · evaluateDependencyIssues 周边</span>
+      </div>
+      <div class="prompt-body">
+<h6>任务 1 · DSL 校验结果渲染到 SKU 行级 Inline Banner</h6>
+<ol>
+<li>新建 <code>components/workload/dsl-inline-banner.tsx</code>，接收 props：
+→ <code>issues: DependencyIssue[]</code>
+→ <code>onAutoFix: () =&gt; void</code> <span class="cmt">// 一键补齐</span>
+→ <code>onDismiss: () =&gt; void</code> <span class="cmt">// 忽略本次</span></li>
+<li>Banner 样式：<code>className="rounded-lg border border-destructive/30 bg-white p-4 mb-3"</code>。</li>
+<li>顶部行：<code>&lt;div className="flex items-center gap-2.5"&gt;</code>
+→ 红色圆形感叹号 icon（24px）
+→ <code>&lt;strong className="text-sm"&gt;DSL 校验 · 检测到 {issues.length} 条依赖缺失&lt;/strong&gt;</code>
+→ 右侧：<code>&lt;Button size="sm" className="ml-auto"&gt;一键自动补齐 (AI)&lt;/Button&gt;</code> + <code>&lt;Button size="sm" variant="outline"&gt;忽略本次&lt;/Button&gt;</code></li>
+<li>每条 issue 渲染为一行 <code>&lt;div className="font-mono text-xs bg-muted/50 border-l-3 border-l-orange-400 rounded-r-lg p-2.5 mt-2 leading-relaxed"&gt;</code>：
+→ <code>&lt;Badge variant="secondary"&gt;规则 {issue.ruleId}&lt;/Badge&gt;</code>
+→ <code>&lt;strong&gt;{issue.subject}&lt;/strong&gt;</code> 需要 <code>{issue.trigger}</code>：
+→ 已满足的依赖：<code>&lt;span className="text-emerald-600 font-semibold"&gt;{dep} ✓&lt;/span&gt;</code>
+→ 缺失的依赖：<code>&lt;span className="text-destructive font-semibold"&gt;{dep} ✗&lt;/span&gt;</code>
+→ 建议行：<code>&lt;Button size="sm" className="mt-1"&gt;勾选「{missing}」&lt;/Button&gt;</code>（点击调用 <code>toggleItemSelection</code> 自动勾选）+ <code>&lt;Button size="sm" variant="ghost"&gt;查看规则源&lt;/Button&gt;</code></li>
+</ol>
+
+<h6>任务 2 · 将 Banner 插入 SKU 表上方</h6>
+<ol>
+<li>在 <code>page.tsx</code> 中，找到 SKU 表的 <code>&lt;div className="sku-grp"&gt;</code>（或等效的云产品分组渲染区）上方。</li>
+<li>条件渲染：<code>{dependencyIssues.length &gt; 0 &amp;&amp; !isReadonly &amp;&amp; &lt;DslInlineBanner issues={dependencyIssues} onAutoFix={handleAutoFix} onDismiss={() =&gt; setDismissedIssues(true)} /&gt;}</code></li>
+<li>新增 state：<code>const [dismissedIssues, setDismissedIssues] = useState(false)</code>。<code>selectedCloudNames</code> 变化时重置 <code>setDismissedIssues(false)</code>。</li>
+</ol>
+
+<h6>任务 3 · 一键自动补齐逻辑</h6>
+<ol>
+<li>新增函数 <code>handleAutoFix()</code>：
+→ 遍历 <code>dependencyIssues</code>，收集所有 <code>issue.missing</code> 标签。
+→ 对每个 missing 标签，在 <code>allItems</code> 中查找匹配的 <code>TemplateItemOption</code>（通过 <code>normalizeDependencyToken</code> 匹配 <code>skuName / itemName / cloudProduct</code>）。
+→ 对匹配到的 item，调用 <code>setItemSelection(prev =&gt; ({...prev, [item.templateItemId]: {included: true}}))</code>。
+→ 如果 missing 对应的是某个云产品名称且不在 <code>selectedCloudNames</code> 中，同时调用 <code>setSelectedCloudNames(prev =&gt; [...prev, cloudName])</code>。
+→ 完成后 <code>toast.success(`已自动勾选 ${fixedCount} 项依赖`)</code>。</li>
+</ol>
+
+<h6>任务 4 · AI 建议卡片（预留接口）</h6>
+<ol>
+<li>新建 <code>components/workload/ai-suggestion-card.tsx</code>，接收：
+→ <code>suggestion: string</code> / <code>reasoning: string</code> / <code>onApply: () =&gt; void</code> / <code>onDismiss: () =&gt; void</code></li>
+<li>样式：<code>className="rounded-lg border border-primary/30 bg-gradient-to-b from-primary/5 to-white p-3"</code>。</li>
+<li>顶部：脉动圆点 <code>&lt;span className="w-2 h-2 rounded-full bg-primary animate-pulse" /&gt;</code> + <span class="val">"AI 实施顾问 · 建议"</span>。</li>
+<li>底部按钮：<code>&lt;Button size="sm"&gt;应用建议&lt;/Button&gt;</code> / <code>&lt;Button size="sm" variant="outline"&gt;查看推理&lt;/Button&gt;</code> / <code>&lt;Button size="sm" variant="ghost"&gt;关闭&lt;/Button&gt;</code>。</li>
+<li><span class="warn">当前阶段</span>：AI 接口尚未就绪，suggestion 文案写死为模板句："当前模块组合下，{subject} 在没有 {missing} 的前提下风险较高。建议同时勾选 {missing} 配套启用。" 后续接入 KIMI API 时替换为真实推理。</li>
+<li>卡片放在 <code>DslInlineBanner</code> 下方，仅当 <code>dependencyIssues.length &gt; 0</code> 时显示。</li>
+</ol>
+
+<h6>任务 5 · 与列表页 KPI 联动</h6>
+<ol>
+<li>在 <code>lib/workload-service.ts</code> 的 <code>listLatestModuleDocuments</code> 返回的 <code>ModuleDocListItem</code> 中，新增字段 <code>dependencyIssueCount?: number</code>。</li>
+<li>后端在构造 assessment 类型的 <code>ModuleDocListItem</code> 时，从 <code>latestRecord.payload.dependencyIssues</code>（或 <code>serverResult.dependencyIssues</code>）中取 length。</li>
+<li>列表页 KPI "DSL 校验通过率" 圆环的数据源：<code>items.filter(i =&gt; (i.dependencyIssueCount ?? 0) === 0).length / items.length</code>。</li>
+</ol>
+
+<h6>注意事项</h6>
+<ul>
+<li><span class="warn">不动</span> <code>evaluateDependencyIssues</code> 函数和 DSL 引擎逻辑——只改渲染层。</li>
+<li><code>dependencyIssues</code> 已在 <code>page.tsx</code> 中通过 <code>useMemo</code> 实时计算（搜索 <code>const dependencyIssues = useMemo</code>），直接引用即可。</li>
+<li>互斥规则（<code>ruleId</code> 以 <code>mutex-</code> 开头）的建议行需提供两个按钮：取消 A / 取消 B，各自调用 <code>setItemSelection</code> 取消对应项。</li>
+</ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="hr"></div>
+
+  <!-- ================================================================== -->
+  <!-- §6 多组织推广 tab                                                    -->
+  <!-- ================================================================== -->
+  <section id="s6" class="sec">
+    <div class="sec-h"><span class="num">§ 06</span><h2>多组织推广 tab · 第二象限</h2></div>
+    <p class="sec-sub">原版"多组织推广估算"是个标准表格：<strong>组织名 / 形态 / 地点 / 策略 / 用户数 / 6 个云产品勾选 / 其他业务 / 难度系数 / 估算人天</strong>。每行 13+ 列在 1440 屏幕被压扁。改造方向：</p>
+
+    <ul class="bullets">
+      <li><b>表格 → 卡片矩阵</b>：每个组织一张卡，卡内是参数 + 云产品迷你勾选阵列 + 实时估算条；适合 6~8 个组织。</li>
+      <li><b>组织间复制</b>：右上"复制总部 → 工厂 A"快捷动作；自动应用相似度因子。</li>
+      <li><b>地点用地图</b>：6+ 组织时显示中国地图迷你视图，点 pin 滚到对应卡片。</li>
+      <li><b>"复制推广"模式</b>用<strong>朱砂橙边框</strong>提示"会基于总部 70% 折算"。</li>
+    </ul>
+
+    <div class="grid g-3" style="margin-top:18px">
+      <div class="card" style="border-left:3px solid var(--primary)">
+        <div style="display:flex;align-items:center;justify-content:space-between"><h4 style="margin:0">利民集团总部</h4><span class="bdg ok">基线</span></div>
+        <p style="margin:6px 0 10px;font-size:12px;color:var(--ink-3)">集团总部 · 北京 · 全新上线 · 用户 100</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:10px">
+          <span class="bdg" style="background:var(--primary-soft);color:var(--primary-ink)">财务云 ✓</span>
+          <span class="bdg" style="background:var(--primary-soft);color:var(--primary-ink)">供应链 ✓</span>
+          <span class="bdg muted">制造云</span>
+          <span class="bdg muted">PLM</span>
+          <span class="bdg muted">MES</span>
+          <span class="bdg" style="background:var(--primary-soft);color:var(--primary-ink)">差旅 ✓</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;color:var(--ink-3)">估算人天</span><span class="num" style="font-size:20px;font-weight:600">23.0</span></div>
+      </div>
+
+      <div class="card" style="border-left:3px solid var(--accent);background:linear-gradient(180deg,var(--accent-soft) 0%,#fff 25%)">
+        <div style="display:flex;align-items:center;justify-content:space-between"><h4 style="margin:0">华北工厂</h4><span class="bdg acc">复制推广 · ×0.7</span></div>
+        <p style="margin:6px 0 10px;font-size:12px;color:var(--ink-3)">工厂 · 廊坊 · 复制推广 · 用户 35</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:10px">
+          <span class="bdg" style="background:var(--primary-soft);color:var(--primary-ink)">财务云 ✓</span>
+          <span class="bdg" style="background:var(--primary-soft);color:var(--primary-ink)">供应链 ✓</span>
+          <span class="bdg" style="background:var(--primary-soft);color:var(--primary-ink)">制造云 ✓</span>
+          <span class="bdg muted">PLM</span>
+          <span class="bdg muted">MES</span>
+          <span class="bdg muted">差旅</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:11px;color:var(--ink-3)">估算人天 · 折扣后</span><span class="num" style="font-size:20px;font-weight:600;color:var(--accent-ink)">8.6</span></div>
+      </div>
+
+      <div class="card" style="border:1px dashed var(--line-2);background:transparent;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:12px">+ 新增组织</div>
+    </div>
+
+    <!-- ═══ §6 KIMI CODE 施工提示词 ═══ -->
+    <div class="prompt-block">
+      <div class="prompt-bar">
+        <span class="terminal">KIMI CODE · §6 多组织推广施工</span>
+        <span class="filepath">app/dashboard/assessment/page.tsx · multiOrgRows 渲染区</span>
+      </div>
+      <div class="prompt-body">
+<h6>任务 1 · 表格 → 卡片矩阵布局</h6>
+<ol>
+<li>新建 <code>components/workload/multi-org-card-grid.tsx</code>，接收 props：
+→ <code>rows: MultiOrgRow[]</code> / <code>onRowChange: (index: number, row: MultiOrgRow) =&gt; void</code>
+→ <code>onAddRow: () =&gt; void</code> / <code>onDeleteRow: (index: number) =&gt; void</code>
+→ <code>scopeDefs: typeof multiOrgScopeDefs</code>
+→ <code>isReadonly: boolean</code>
+→ <code>orgSimilarityFactor: number</code></li>
+<li>布局：<code>&lt;div className="grid grid-cols-3 gap-4"&gt;</code>（6 个以内时 3 列；>6 个时允许滚动或换 4 列）。</li>
+<li>每张组织卡片结构：
+→ <code>&lt;Card className="border-l-[3px]"&gt;</code>，基线组织用 <code>border-l-primary</code>，复制推广用 <code>border-l-orange-500</code>
+→ 卡头：<code>&lt;Input variant="ghost" value={row.orgName} placeholder="组织名称" /&gt;</code> + <code>&lt;Badge&gt;{row.deliveryStrategy === "复制推广" ? `复制推广 · ×${orgSimilarityFactor}` : "基线"}&lt;/Badge&gt;</code>
+→ 参数行：<code>&lt;span className="text-xs text-muted-foreground"&gt;{row.orgType} · {row.location} · {row.deliveryStrategy} · 用户 {row.userCount}&lt;/span&gt;</code>
+→ 云产品勾选阵列：<code>&lt;div className="grid grid-cols-3 gap-1"&gt;</code>，每个用 <code>&lt;Badge variant={row.scope[def.key] ? "default" : "secondary"} className="cursor-pointer text-[10px]" onClick={toggle}&gt;{def.label} {row.scope[def.key] ? "✓" : ""}&lt;/Badge&gt;</code>
+→ 底行：<code>&lt;span className="text-xs text-muted-foreground"&gt;估算人天&lt;/span&gt;</code> + <code>&lt;span className="font-mono text-xl font-semibold"&gt;{estimatedDays}&lt;/span&gt;</code></li>
+<li>复制推广卡片额外样式：<code>className="bg-gradient-to-b from-orange-50 to-white"</code>。</li>
+<li>最后一个位置固定为「+ 新增组织」虚线卡（<code>border-dashed</code>），点击调用 <code>onAddRow</code>。</li>
+</ol>
+
+<h6>任务 2 · 组织间复制功能</h6>
+<ol>
+<li>每张卡的右上角加 <code>&lt;DropdownMenu&gt;</code>（⋯ 图标），菜单项：
+→ <span class="val">"从总部复制"</span>：将第一行（index 0）的 scope / deliveryStrategy 复制到当前行
+→ <span class="val">"删除组织"</span>：调用 <code>onDeleteRow(index)</code>
+→ <span class="val">"设为基线"</span>：将 <code>deliveryStrategy</code> 改为 "全新上线"</li>
+<li>复制时自动设置 <code>deliveryStrategy = "复制推广"</code>，并提示 <code>toast("已从总部复制，折算系数 ×{orgSimilarityFactor}")</code>。</li>
+</ol>
+
+<h6>任务 3 · 替换原表格</h6>
+<ol>
+<li>在 <code>page.tsx</code> 中搜索多组织推广 Tab 的渲染区域（搜索 <code>multiOrgRows.map</code> 或 <code>TabsContent</code> 含多组织的位置）。</li>
+<li>将原有的 <code>&lt;Table&gt;</code> 替换为 <code>&lt;MultiOrgCardGrid rows={multiOrgRows} ... /&gt;</code>。</li>
+<li>保留原有的 <code>multiOrgRows</code> state 和 <code>setMultiOrgRows</code> 回调，仅改渲染层。</li>
+<li>编辑态（<code>!isReadonly</code>）：卡片内字段可编辑；只读态：所有 Input 和 Badge 变为纯展示。</li>
+</ol>
+
+<h6>任务 4 · 估算人天计算</h6>
+<ol>
+<li>每张卡的估算人天计算：
+→ 基线组织：<code>baseDays</code>（与模块评估 tab 一致）
+→ 复制推广组织：<code>baseDays × orgSimilarityFactor × (selectedScopeCount / totalScopeCount)</code>
+→ 数值用 <code>formatDays()</code> 格式化，复制推广时数值颜色用 <code>text-orange-600</code>。</li>
+</ol>
+
+<h6>注意事项</h6>
+<ul>
+<li><span class="warn">不动</span> <code>MultiOrgRow</code> 类型定义和 <code>multiOrgRows</code> state 结构。</li>
+<li><span class="warn">不动</span> <code>MULTI_ORG_DRAFT_KEY</code> localStorage 持久化逻辑。</li>
+<li>卡片矩阵适用于 6~8 个组织；如果组织数 > 12，考虑加分页或虚拟滚动（可后续迭代）。</li>
+<li><code>multiOrgScopeDefs</code> 已定义在 <code>page.tsx</code> 顶部（6 个云产品勾选定义），直接透传到组件。</li>
+</ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="hr"></div>
+
+  <!-- ================================================================== -->
+  <!-- §7 实施路线                                                          -->
+  <!-- ================================================================== -->
+  <section id="s7" class="sec">
+    <div class="sec-h"><span class="num">§ 07</span><h2>实施路线 · 5 周内完成</h2></div>
+    <p class="sec-sub">本方案改动较多但全部基于现有代码（不新增路由 / 不动 service 层 / 不动 DSL 引擎）。建议按下面 5 周节奏推进，每周可独立交付。</p>
+
+    <div class="tl" style="margin-top:18px">
+      <div class="step">
+        <h5><span class="w">W1</span>主题 token + 状态徽标统一</h5>
+        <p>把 §1 配色方案落到 <code class="k">globals.css</code>，重写 9 类状态 Badge；新建 <code class="k">&lt;DaysCell&gt;</code> 组件（≤5 / 6-10 / &gt;10 三档），全表自动接入。</p>
+        <p><b>DoD</b>：所有页面状态 chip 视觉一致；标准人天列在 hover 行可读。</p>
+      </div>
+      <div class="step">
+        <h5><span class="w">W2</span>列表页重做</h5>
+        <p>顶部 KPI strip + 角色 chip 分流；版本树合并列；ISO 时间转人类可读；行 hover 快捷操作。</p>
+        <p><b>DoD</b>：双击行打开单据；KPI"待我处理"圆环上线。</p>
+      </div>
+      <div class="step">
+        <h5><span class="w">W3</span>单据页上区 · 项目身份卡 + 评估参数 mini bar</h5>
+        <p>把"基本信息 + 评估信息 + 检出状态"三组字段重排；VCS 工具栏从 11 按钮压缩到 4 主 + ⋯。</p>
+        <p><b>DoD</b>：上区滚动占用从 320px 降到 200px；只读态视觉清晰。</p>
+      </div>
+      <div class="step">
+        <h5><span class="w">W4</span>单据页下区 · KPI 主结果卡 + 路径折叠</h5>
+        <p>4 张 KPI 重排（1 大 + 3 小 + waterfall）；报价模式 / 预置 / 云产品三层折叠为面包屑路径。</p>
+        <p><b>DoD</b>：1440 屏幕一屏可见 SKU 表前 5 行。</p>
+      </div>
+      <div class="step">
+        <h5><span class="w">W5</span>SKU 行级 + DSL inline + 多组织卡片化</h5>
+        <p>stepper 着色 + 差量胶囊；DSL 校验 inline banner + AI 一键修复；多组织 tab 改卡片矩阵。</p>
+        <p><b>DoD</b>：依赖缺失从一行小字变成行级红框 + AI 建议；多组织 ≤6 时一屏可见全部。</p>
+      </div>
+    </div>
+
+    <div class="anno" style="border-color:var(--primary);margin-top:24px">
+      <div class="pin" style="background:var(--primary)">D</div>
+      <div>
+        <h6>三天最低成本起步建议</h6>
+        <p>如果只能投三天，先做这三件：<strong>(1)</strong> globals.css 替换 5 个 token + 状态 Badge 重写（W1 头一天）；<strong>(2)</strong> KPI 主结果卡（W4 头一天）——总人天瞬间从平淡数字变成可视推导；<strong>(3)</strong> DSL inline banner（W5 头一天）——把"检测到 N 条"小字变成可点修复的强提示。这三件就能让产品观感跨档。</p>
+      </div>
+    </div>
+
+    <!-- ═══ §7 KIMI CODE 施工提示词 · 5 周总清单 ═══ -->
+    <div class="prompt-block">
+      <div class="prompt-bar">
+        <span class="terminal">KIMI CODE · §7 周级施工清单 · 含验收标准</span>
+        <span class="filepath">全局 · 每周可独立交付与验证</span>
+      </div>
+      <div class="prompt-body">
+<h6>W1 · 主题 Token + 状态 Badge 统一（3 天）</h6>
+<ol>
+<li><span class="cmd">D1 · globals.css Token 替换</span>
+→ 文件：<code>ui/V0_SAAS/styles/globals.css</code>
+→ 在 <code>:root</code> 中新增 WES 语义 Token（不删原有 shadcn token）：
+  <code>--wes-primary: oklch(0.42 0.14 262);</code> <span class="cmt">/* 深空蓝 */</span>
+  <code>--wes-accent: oklch(0.69 0.18 45);</code> <span class="cmt">/* 朱砂橙 */</span>
+  <code>--wes-teal: oklch(0.66 0.10 195);</code> <span class="cmt">/* 雾青 */</span>
+  <code>--wes-ok: oklch(0.66 0.14 155);</code>
+  <code>--wes-warn: oklch(0.74 0.16 75);</code>
+  <code>--wes-danger: oklch(0.60 0.19 25);</code></li>
+<li><span class="cmd">D1 · 状态 Badge 重写</span>
+→ 文件：<code>lib/checkout-status-ui.ts</code>
+→ <code>getCheckoutStatusBadgeClass</code> 将 <code>border-emerald-500 bg-emerald-500</code> 改为使用 <code>--wes-ok</code>；<code>border-orange-500 bg-orange-500</code> 改为 <code>--wes-accent</code>。
+→ 新增 <code>getDocStatusBadgeClass(status: "drafting"|"reviewed")</code>：drafting 用 <code>--wes-warn</code> 底色，reviewed 用 <code>--wes-ok</code>。</li>
+<li><span class="cmd">D2 · DaysCell 组件</span>
+→ 新建 <code>components/workload/days-cell.tsx</code>（参考 §4 任务 1）。
+→ 在 <code>page.tsx</code> 中搜索所有 <code>item.standardDays</code> 的渲染处，替换为 <code>&lt;DaysCell&gt;</code>。
+→ 三档配色使用 <code>--wes-ok / --wes-warn / --wes-danger</code>。</li>
+<li><span class="cmd">D3 · 全量验收</span>
+→ 打开实施评估页、列表页，确认所有 Badge 颜色统一。
+→ 检查暗色模式（<code>.dark</code>）下 Badge 对比度是否足够。</li>
+</ol>
+<span class="warn">DoD</span>：所有页面状态 chip 视觉一致；标准人天列在 hover 行可读；暗色模式无对比度问题。
+
+<h6>W2 · 列表页重做（5 天）</h6>
+<ol>
+<li><span class="cmd">D1 · KPI 概览条</span>（参考 §1 任务 1）
+→ 新建 <code>components/workload/assessment-kpi-strip.tsx</code>
+→ 在 <code>module-doc-list-page.tsx</code> 中，<code>isAssessmentList</code> 条件下渲染 <code>&lt;AssessmentKpiStrip items={items} /&gt;</code></li>
+<li><span class="cmd">D2 · 角色分流 Chip + 列重排</span>（参考 §1 任务 2、3）
+→ 在 <code>module-doc-list-page.tsx</code> 中新增 <code>quickFilter</code> state
+→ 合并版本号列、移除低权重列、新增评估参数列
+→ 调整 <code>listColSpan</code> 为 10</li>
+<li><span class="cmd">D3 · ISO 时间 + 行 Hover</span>（参考 §1 任务 4、5）
+→ 新建 <code>lib/format-relative-time.ts</code>
+→ <code>&lt;TableRow&gt;</code> 加 <code>className="group"</code>，末列加 hover 操作按钮</li>
+<li><span class="cmd">D4 · 状态徽标 + 工具栏动态</span>（参考 §1 任务 6、7）
+→ Badge 整合锁定者；工具栏按 <code>selectedKey</code> 动态显隐</li>
+<li><span class="cmd">D5 · 集成测试</span>
+→ 双击行进入单据页、KPI 数据刷新、搜索 + 筛选交叉验证</li>
+</ol>
+<span class="warn">DoD</span>：双击行打开单据；KPI"待我处理"圆环上线；ISO 时间全转人类可读。
+
+<h6>W3 · 单据页上区重做（4 天）</h6>
+<ol>
+<li><span class="cmd">D1 · ProjectIdentityCard 组件</span>（参考 §2 任务 1）
+→ 新建 <code>components/workload/project-identity-card.tsx</code>
+→ 在 <code>page.tsx</code> 中替换原 3 列栅格基本信息区</li>
+<li><span class="cmd">D2 · VCS 工具栏 condensed 模式</span>（参考 §2 任务 2）
+→ 修改 <code>version-vcs-toolbar.tsx</code>，新增 <code>condensed</code> prop
+→ 11 按钮压缩为 4 主操作 + ⋯ DropdownMenu</li>
+<li><span class="cmd">D3 · 评估参数 Mini Bar + 高级折叠</span>（参考 §2 任务 3、4）
+→ 4 参数改为 <code>grid-cols-4</code> mini bar 卡片
+→ 模板/规则集折叠到 <code>&lt;Collapsible&gt;</code></li>
+<li><span class="cmd">D4 · 回归测试</span>
+→ 检出/检入/撤销检出/升版全流程；只读态视觉；新建时表单可编辑</li>
+</ol>
+<span class="warn">DoD</span>：上区从 ~320px 降到 ~200px；只读态视觉清晰（绿色边框 + Badge）；VCS 按钮不超过 5 个可见。
+
+<h6>W4 · 单据页下区 · KPI + 路径折叠（4 天）</h6>
+<ol>
+<li><span class="cmd">D1 · KPI 四卡差异化</span>（参考 §3 任务 1）
+→ 新建 <code>components/workload/assessment-kpi-cards.tsx</code>
+→ 主结果卡深蓝背景 + waterfall 微图</li>
+<li><span class="cmd">D2 · 三层面包屑路径</span>（参考 §3 任务 2、3）
+→ 新建 <code>components/workload/assessment-path-breadcrumb.tsx</code>
+→ 替换原三行 chip 选择器</li>
+<li><span class="cmd">D3 · Tab 未读数 + SKU rowSpan 优化</span>（参考 §3 任务 4、5）
+→ 多组织 tab 加未读 Badge
+→ SKU rowSpan 列灰底 + 选中行左竖线</li>
+<li><span class="cmd">D4 · 验收</span>
+→ 1440 屏幕一屏可见 SKU 表前 5 行
+→ 切换报价模式/预置/云产品数据刷新正确</li>
+</ol>
+<span class="warn">DoD</span>：总人天卡 waterfall 可视化正确；面包屑折叠/展开正常；1440px 一屏 SKU 前 5 行可见。
+
+<h6>W5 · SKU 行级 + DSL Inline + 多组织卡片（5 天）</h6>
+<ol>
+<li><span class="cmd">D1 · Stepper 着色 + 差量胶囊</span>（参考 §4 任务 2）
+→ 上调朱砂橙、下调雾青；差量 Badge；原因状态圆点</li>
+<li><span class="cmd">D2 · DSL Inline Banner</span>（参考 §5 任务 1、2、3）
+→ 新建 <code>components/workload/dsl-inline-banner.tsx</code>
+→ 行级红框 + 一键自动补齐逻辑</li>
+<li><span class="cmd">D3 · AI 建议卡片（预留）</span>（参考 §5 任务 4）
+→ 新建 <code>components/workload/ai-suggestion-card.tsx</code>
+→ 当前用模板文案，后续接 KIMI API</li>
+<li><span class="cmd">D4 · 多组织卡片矩阵</span>（参考 §6 任务 1、2、3）
+→ 新建 <code>components/workload/multi-org-card-grid.tsx</code>
+→ 替换原多组织表格</li>
+<li><span class="cmd">D5 · 全链路回归</span>
+→ 列表页 → 单据页 → 勾选 SKU → DSL 校验 → 多组织估算 → 导出 Excel 全流程
+→ 检查 localStorage 持久化（multiOrgRows、paramCardCollapsed）
+→ 暗色模式全页面检查</li>
+</ol>
+<span class="warn">DoD</span>：依赖缺失从一行小字变成行级红框 + AI 建议；多组织 ≤6 时一屏可见全部；导出 Excel 数据正确。
+
+<h6>新建文件清单汇总</h6>
+<ul>
+<li><code>components/workload/days-cell.tsx</code> <span class="cmt">W1</span></li>
+<li><code>components/workload/assessment-kpi-strip.tsx</code> <span class="cmt">W2</span></li>
+<li><code>lib/format-relative-time.ts</code> <span class="cmt">W2</span></li>
+<li><code>components/workload/project-identity-card.tsx</code> <span class="cmt">W3</span></li>
+<li><code>components/workload/assessment-kpi-cards.tsx</code> <span class="cmt">W4</span></li>
+<li><code>components/workload/assessment-path-breadcrumb.tsx</code> <span class="cmt">W4</span></li>
+<li><code>components/workload/dsl-inline-banner.tsx</code> <span class="cmt">W5</span></li>
+<li><code>components/workload/ai-suggestion-card.tsx</code> <span class="cmt">W5</span></li>
+<li><code>components/workload/multi-org-card-grid.tsx</code> <span class="cmt">W5</span></li>
+</ul>
+
+<h6>修改文件清单汇总</h6>
+<ul>
+<li><code>styles/globals.css</code> → 新增 6 个 <code>--wes-*</code> token <span class="cmt">W1</span></li>
+<li><code>lib/checkout-status-ui.ts</code> → Badge 配色统一 <span class="cmt">W1</span></li>
+<li><code>lib/utils.ts</code> 或新建 <code>lib/format-relative-time.ts</code> <span class="cmt">W2</span></li>
+<li><code>components/workload/module-doc-list-page.tsx</code> → 列重排 + KPI + Chip 筛选 <span class="cmt">W2</span></li>
+<li><code>components/workload/version-vcs-toolbar.tsx</code> → 新增 <code>condensed</code> prop <span class="cmt">W3</span></li>
+<li><code>app/dashboard/assessment/page.tsx</code> → 上区/下区/SKU/DSL/多组织渲染替换 <span class="cmt">W3-W5</span></li>
+</ul>
+
+<h6>全局约束（每周均需遵守）</h6>
+<ul>
+<li><span class="warn">不新增路由</span>：所有改动在现有页面 <code>/dashboard/assessment</code> 和 <code>/dashboard/assessment/list</code> 内完成。</li>
+<li><span class="warn">不动 service 层</span>：<code>lib/workload-service.ts</code> 的接口签名、请求/响应结构不变（除非明确标注 "需后端配合"）。</li>
+<li><span class="warn">不动 DSL 引擎</span>：<code>evaluateDependencyIssues</code> / <code>collectSelectedDependencyTokens</code> / <code>hasSelectedDependencyLabel</code> 逻辑不变。</li>
+<li><span class="warn">不动类型定义</span>：<code>AssessmentForm</code> / <code>MultiOrgRow</code> / <code>ItemSelectionState</code> / <code>DependencyIssue</code> 结构不变。</li>
+<li>共用组件的改动必须用 <span class="val">条件守卫</span>（<code>isAssessmentList</code> / <code>condensed</code>）隔离，不影响其他模块。</li>
+<li>每个新组件必须包含 <code>isReadonly</code> prop，确保只读态下 Input / Button / Stepper 均 disabled。</li>
+<li>暗色模式：所有新 className 使用 <code>dark:</code> 前缀或 CSS 变量，避免硬编码浅色值。</li>
+</ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <div class="hr"></div>
+  <footer style="text-align:center;color:var(--ink-3);font-size:12px;padding:24px 0">
+    <p>WES 实施评估页深度方案 v3 · 含 KIMI CODE 施工提示词 · 基于真实代码 <code class="k">app/dashboard/assessment</code> · 2,885 行 page.tsx</p>
+    <p style="margin-top:6px">配色：深空蓝 oklch(.42 .14 262) · 朱砂橙 oklch(.69 .18 45) · 雾青 oklch(.66 .10 195)</p>
+    <p style="margin-top:6px;color:var(--ink-4)">新建 9 个组件 · 修改 6 个文件 · 不新增路由 · 不动 service 层 · 不动 DSL 引擎</p>
+  </footer>
+
+</div><!-- /.doc -->
+
+<aside class="rail">
+  <div class="rail-h">In this document</div>
+  <ol id="rail-nav">
+    <li><a href="#s1"><span class="n">01</span><span>列表页 · 单据清单</span></a></li>
+    <li><a href="#s2"><span class="n">02</span><span>单据页 · 上区</span></a></li>
+    <li><a href="#s3"><span class="n">03</span><span>单据页 · 下区</span></a></li>
+    <li><a href="#s4"><span class="n">04</span><span>SKU · 行级交互</span></a></li>
+    <li><a href="#s5"><span class="n">05</span><span>DSL + AI 协同</span></a></li>
+    <li><a href="#s6"><span class="n">06</span><span>多组织推广</span></a></li>
+    <li><a href="#s7"><span class="n">07</span><span>实施路线 · 5 周</span></a></li>
+  </ol>
+  <div class="meta">
+    <div class="row"><span>页面行数</span><b>2,885</b></div>
+    <div class="row"><span>诊断痛点</span><b>13</b></div>
+    <div class="row"><span>重做 mock</span><b>6</b></div>
+    <div class="row"><span>交付节奏</span><b>5w</b></div>
+  </div>
+</aside>
+
+</div><!-- /.shell -->
+<script>
+  // sticky rail active section
+  (function(){
+    var links = document.querySelectorAll('#rail-nav a');
+    var sections = Array.from(links).map(function(a){return document.querySelector(a.getAttribute('href'));}).filter(Boolean);
+    function update(){
+      var y = window.scrollY + 120;
+      var idx = 0;
+      sections.forEach(function(s, i){ if(s.offsetTop <= y) idx = i; });
+      links.forEach(function(a, i){ a.classList.toggle('on', i === idx); });
+    }
+    window.addEventListener('scroll', update, {passive:true});
+    update();
+  })();
+</script>
+</body>
+</html>

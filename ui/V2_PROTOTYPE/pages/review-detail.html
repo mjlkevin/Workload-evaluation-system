@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 评审详情</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .pmstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:12px 18px;background:var(--bg-soft);border-bottom:1px solid var(--line)}
+  .pmitem{display:flex;flex-direction:column;gap:4px}
+  .pmitem .k{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+  .pmitem .v{font-size:13px;font-weight:600;color:var(--ink)}
+  .accent{color:var(--accent-ink);font-weight:800}
+  .grid{display:grid;grid-template-columns:1fr 280px;gap:16px;padding:16px 18px 18px}
+  .stack{display:grid;gap:16px}
+  .check-item{display:grid;grid-template-columns:18px 92px 1fr 92px;gap:10px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .check-item:last-child{border-bottom:none}
+  .c-ok{color:var(--ok);font-weight:700}
+  .c-pend{color:var(--ink-3)}
+  .c-type{font-size:11px;color:var(--ink-3);font-family:var(--font-mono)}
+  .comment{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .comment:last-child{border-bottom:none}
+  .avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,var(--brand-soft),var(--brand));color:var(--brand-ink);font-weight:800;font-size:12px}
+  .meta{display:flex;gap:8px;align-items:center;color:var(--ink-3);font-size:11px;font-family:var(--font-mono)}
+  .textarea{width:100%;min-height:92px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font:500 13px/1.6 var(--font-sans);resize:vertical;background:#fff}
+  .side-card{display:grid;gap:14px}
+  .donut{width:128px;height:128px;border-radius:50%;background:conic-gradient(var(--brand) 0 60%, var(--line-2) 60% 100%);display:grid;place-items:center;margin:2px auto 8px;position:relative}
+  .donut:after{content:'';width:82px;height:82px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 1px var(--line)}
+  .donut .txt{position:absolute;text-align:center;font-weight:800;color:var(--ink)}
+  .doc-links a{display:block;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:8px}
+  .doc-links a:hover{background:var(--bg-soft)}
+  .dlg{position:fixed;inset:0;background:rgba(15,23,42,.42);display:none;place-items:center;padding:20px;z-index:30}
+  .dlg.on{display:grid}
+  .dlg-card{width:min(560px,100%);background:#fff;border-radius:18px;box-shadow:0 24px 64px rgba(15,23,42,.24);border:1px solid var(--line);padding:18px}
+  .dlg-card textarea{width:100%;min-height:130px;margin:10px 0 14px}
+  .right-rail{position:sticky;top:18px;height:fit-content}
+  .card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .mini{font-size:11px;color:var(--ink-3)}
+  .at{width:100%;border-collapse:separate;border-spacing:0}
+  .at th,.at td{border-bottom:1px solid var(--line);padding:8px 12px;vertical-align:middle;font-size:12.5px}
+  .at th{background:var(--bg-soft);text-align:left;color:var(--ink-3);font-weight:700;white-space:nowrap}
+  .at td.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  .at .grp td{background:color-mix(in oklab,var(--bg-soft) 82%,var(--brand-soft) 8%);font-weight:700;color:var(--ink)}
+  .seal-item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg-soft);display:flex;gap:10px;align-items:flex-start;cursor:pointer;transition:.12s}
+  .seal-item.on{border-color:var(--brand);background:var(--brand-soft)}
+  .handoff-card{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);padding:14px;box-shadow:var(--shadow-1)}
+  .handoff-card .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .handoff-card .row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0}
+  .handoff-card .row .k{color:var(--ink-3)}
+  .handoff-card .row .v{font-weight:600}
+  @media (max-width:1180px){.grid{grid-template-columns:1fr}.right-rail{position:static}.pmstrip{grid-template-columns:1fr}}
+  @media (max-width:760px){.pg-hd .row{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="l">W</div><div>WES</div></div>
+    <div class="grp"><h6>工作台</h6><a href="home.html"><span class="ic">●</span>主页</a><a href="requirement-list.html"><span class="ic">✎</span>需求</a><a href="assessment-list.html"><span class="ic">▣</span>实施评估</a><a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a><a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a><a href="wbs.html"><span class="ic">☷</span>WBS</a><a href="review-list.html" class="on"><span class="ic">✓</span>评审</a></div>
+    <div class="grp"><h6>系统</h6><a href="system-management.html"><span class="ic">⚙</span>系统管理</a><a href="user-management.html"><span class="ic">☺</span>用户管理</a><a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a></div>
+    <div class="user"><div class="row"><div class="av">A</div><div><div class="nm">admin</div><div class="meta">系统管理员</div></div></div><a class="out" href="login.html">退出</a></div>
+  </aside>
+  <main class="content">
+    <div class="pg-hd">
+      <div class="crumb"><b>工作台</b> &nbsp;/&nbsp; 评审 &nbsp;/&nbsp; <b style="color:var(--ink)">评审详情</b></div>
+      <div class="row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h1 style="margin:0">评审</h1><span class="bdg rev"><span class="dot"></span>评审中</span>
+      </div>
+      <div class="right" style="position:absolute;right:18px;top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-out" type="button" onclick="location.href='assessment-detail.html'">↗ 跳转方案 v07</button>
+        <button class="btn btn-dan" type="button" id="rejectBtn">✕ 驳回(dan)</button>
+        <button class="btn btn-pri" type="button" id="approveBtn" disabled>✓ 通过(pri)</button>
+      </div>
+    </div>
+
+    <div class="pmstrip">
+      <div class="pmitem"><div class="k">关联方案</div><div class="v"><a href="assessment-detail.html">AE-2026-0418 · 付款/库存/报表</a></div></div>
+      <div class="pmitem"><div class="k">发起人</div><div class="v">陈晨 · 产品经理</div></div>
+      <div class="pmitem"><div class="k">评审人</div><div class="v">王丽 · 后端架构师</div></div>
+      <div class="pmitem"><div class="k">截止时间</div><div class="v"><span class="accent">还剩 2 天</span> · 2026-04-20</div></div>
+    </div>
+
+    <div class="grid">
+      <div class="stack">
+        <div class="section">
+          <div class="hd"><span>Checklist</span><span class="bdg ci"><span class="dot"></span>5 项</span></div>
+          <div class="bd" style="padding:0" id="checklist"></div>
+        </div>
+        <div class="section">
+          <div class="hd"><span>评审评论</span><span class="mini">2 条评论</span></div>
+          <div class="bd">
+            <div id="comments"></div>
+            <div style="margin-top:14px">
+              <textarea class="textarea" placeholder="请输入新增评论..."></textarea>
+              <div style="display:flex;justify-content:flex-end;margin-top:10px">
+                <button class="btn btn-pri" type="button" onclick="alert('评论已保存 · mock 占位')">发表评论</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="section" id="delivPanel">
+          <div class="hd"><span>PM 交付物</span><span class="bdg ci"><span class="dot"></span>4 项</span><button class="btn btn-pri" style="height:28px;padding:0 10px;font-size:12px;margin-left:auto" id="genAllBtn">✦ 一键全部生成</button></div>
+          <div class="bd" style="padding:0"><table class="at" id="delivTable"></table></div>
+        </div>
+      </div>
+      <div class="right-rail">
+        <div class="section side-card">
+          <div class="hd"><span>完整度</span><span class="bdg ok"><span class="dot"></span>60%</span></div>
+          <div class="bd" style="text-align:center">
+            <div class="donut"><div class="txt"><div style="font-size:28px;line-height:1">60%</div><div class="mini">3 / 5</div></div></div>
+            <div class="mini">5 项中 3 项通过，2 项待审</div>
+          </div>
+        </div>
+        <div class="section side-card" style="margin-top:16px">
+          <div class="hd"><span>关联文档</span><span class="mini">跳转</span></div>
+          <div class="bd doc-links">
+            <a href="assessment-detail.html">实施评估</a>
+            <a href="resource-cost-detail.html">资源成本</a>
+            <a href="requirement-detail.html">需求</a>
+          </div>
+        </div>
+        <div class="handoff-card" style="margin-top:16px" id="handoffCard">
+          <div class="hd"><span style="font-weight:700;font-size:14px">PM 接力</span><span class="mini">下一节点</span></div>
+          <div class="row"><span class="k">来自</span><span class="v" id="handoffFrom">—</span></div>
+          <div class="row"><span class="k">交接给</span><span class="v" id="handoffTo">—</span></div>
+          <div class="row"><span class="k">截止时间</span><span class="v accent" id="handoffDue">—</span></div>
+          <button class="btn btn-out" style="width:100%;margin-top:10px;height:32px;font-size:12px" onclick="alert('接力已发起 · mock 占位')">⤳ 发起接力</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="dlg" id="sealDlg" role="dialog" aria-modal="true">
+  <div class="dlg-card">
+    <div class="card-title"><strong>为「<span id="sealFileName">—</span>」选择印章</strong></div>
+    <div id="sealList"></div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
+      <button class="btn btn-out" type="button" id="cancelSeal">取消</button>
+      <button class="btn btn-pri" type="button" id="confirmSeal">确认盖章</button>
+    </div>
+  </div>
+</div>
+
+<div class="dlg" id="rejectDlg" role="dialog" aria-modal="true">
+  <div class="dlg-card">
+    <div class="card-title"><strong>驳回评审</strong><span class="mini">必填驳回原因</span></div>
+    <textarea id="rejectReason" placeholder="请输入驳回原因..."></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:10px">
+      <button class="btn btn-out" type="button" id="cancelReject">取消</button>
+      <button class="btn btn-dan" type="button" id="confirmReject">确认驳回</button>
+    </div>
+  </div>
+</div>
+<script src="../mock/data.js"></script>
+<script>
+(function(){
+  var PM = {
+    deliverables:[
+      {id:'D1',name:'实施 SOW',type:'PDF',status:'pending',generatedAt:'',sealed:false,sealName:''},
+      {id:'D2',name:'详细实施方案',type:'DOCX',status:'pending',generatedAt:'',sealed:false,sealName:''},
+      {id:'D3',name:'实施计划',type:'MD',status:'pending',generatedAt:'',sealed:false,sealName:''},
+      {id:'D4',name:'对外报价单',type:'XLSX',status:'pending',generatedAt:'',sealed:false,sealName:''}
+    ],
+    seals:[
+      {id:'S1',name:'WES 公章 · 标准',scope:'通用'},
+      {id:'S2',name:'实施总监印 · 王丽',scope:'实施'},
+      {id:'S3',name:'交付经理印 · 张鹏',scope:'交付'}
+    ],
+    handoff:{from:'王丽 · 售前架构师',to:'刘洋 · 项目经理',status:'pending',dueAt:'2026-04-26 18:00'}
+  };
+  var review = (window.MOCK && window.MOCK.reviews && window.MOCK.reviews[0]) || { checklist: [], comments: [] };
+  var checklist = (review.checklist && review.checklist.length) ? review.checklist : [
+    {type:'必检', name:'接口覆盖完整', status:'通过'},
+    {type:'必检', name:'权限校验齐备', status:'通过'},
+    {type:'必检', name:'关键异常处理', status:'通过'},
+    {type:'建议', name:'命名统一性', status:'待审'},
+    {type:'建议', name:'日志粒度', status:'待审'}
+  ];
+  var comments = (review.comments && review.comments.length) ? review.comments : [
+    {name:'王丽', time:'2026-04-18 09:20', text:'方案覆盖度较好，但审批流异常分支需要再补充。'},
+    {name:'陈晨', time:'2026-04-18 10:05', text:'收到，今天补齐后重新提交。'}
+  ];
+  var cbox = document.getElementById('checklist');
+  var approveBtn = document.getElementById('approveBtn');
+  cbox.innerHTML = checklist.map(function(it){
+    return '<div class="check-item"><span>'+(it.status==='通过'?'☑':'☐')+'</span><span class="c-type">'+it.type+'</span><span>'+it.name+'</span><span class="'+(it.status==='通过'?'c-ok':'c-pend')+'">'+it.status+'</span></div>';
+  }).join('');
+  approveBtn.disabled = checklist.filter(function(i){ return i.type==='必检' && i.status!=='通过'; }).length > 0;
+  approveBtn.title = approveBtn.disabled ? '必检未全部通过，无法通过' : '通过评审';
+  document.getElementById('comments').innerHTML = comments.map(function(c){
+    return '<div class="comment"><div class="avatar">'+c.name.slice(0,1)+'</div><div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><strong>'+c.name+'</strong><span class="meta">'+c.time+'</span></div><div style="margin-top:4px;color:var(--ink-2);line-height:1.7">'+c.text+'</div></div></div>';
+  }).join('');
+  var dlg = document.getElementById('rejectDlg');
+  document.getElementById('rejectBtn').onclick = function(){ dlg.classList.add('on'); };
+  document.getElementById('cancelReject').onclick = function(){ dlg.classList.remove('on'); };
+  document.getElementById('confirmReject').onclick = function(){
+    var val = document.getElementById('rejectReason').value.trim();
+    if(!val) return alert('请输入驳回原因');
+    dlg.classList.remove('on');
+    alert('已驳回 · '+val);
+  };
+
+  // PM deliverables render
+  var typeMap = {PDF:{bg:'var(--info-soft)',co:'var(--info)'},DOCX:{bg:'var(--brand-soft)',co:'var(--brand)'},MD:{bg:'var(--teal-soft)',co:'var(--teal)'},XLSX:{bg:'var(--accent-soft)',co:'var(--accent)'}};
+  function renderDeliv(){
+    var rows = PM.deliverables.map(function(d){
+      var t = typeMap[d.type]||{bg:'var(--bg-soft)',co:'var(--ink-3)'};
+      var chip = '<span class="bdg" style="background:'+t.bg+';color:'+t.co+';font-size:10.5px;padding:1px 7px">'+d.type+'</span>';
+      var time = d.status==='pending'?'—':d.generatedAt;
+      var status = d.status==='pending'?'<span style="color:var(--ink-3);font-size:12px">未生成</span>':d.status==='generated'?'<span style="color:var(--ok);font-size:12px;font-weight:700">已生成</span>':'<span style="color:var(--accent);font-size:12px;font-weight:700">已盖章</span><span style="font-size:11px;color:var(--ink-3);margin-left:4px">'+d.sealName+'</span>';
+      var ops = d.status==='pending'?'<button class="btn btn-pri" style="height:24px;padding:0 8px;font-size:11px" onclick="genDeliv(\''+d.id+'\')">生成</button>':d.status==='generated'?'<button class="btn btn-out" style="height:24px;padding:0 8px;font-size:11px">↓ 下载</button> <button class="btn btn-out" style="height:24px;padding:0 8px;font-size:11px" onclick="openSeal(\''+d.id+'\')">⊘ 盖章</button>':'<button class="btn btn-out" style="height:24px;padding:0 8px;font-size:11px">↓ 下载（已盖章）</button> <span class="bdg" style="background:var(--accent-soft);color:var(--accent-ink);font-size:10.5px;padding:1px 7px">已盖章 · '+d.sealName+'</span>';
+      return '<tr><td>'+d.name+'</td><td>'+chip+'</td><td class="num" style="font-family:var(--font-mono);font-size:12px">'+time+'</td><td>'+status+'</td><td class="num">'+ops+'</td></tr>';
+    }).join('');
+    document.getElementById('delivTable').innerHTML = '<thead><tr><th>文件</th><th>类型</th><th class="num">生成时间</th><th>状态</th><th class="num">操作</th></tr></thead><tbody>'+rows+'</tbody>';
+    var pending = PM.deliverables.filter(function(d){return d.status==='pending';}).length;
+    document.getElementById('genAllBtn').disabled = pending===0;
+    document.getElementById('genAllBtn').textContent = pending===0?'✦ 已全部生成':'✦ 一键全部生成';
+  }
+  renderDeliv();
+
+  // generate single
+  window.genDeliv = function(id){
+    var d = PM.deliverables.find(function(x){return x.id===id;});
+    if(d){d.status='generated';d.generatedAt=new Date().toISOString().slice(0,16).replace('T',' ');renderDeliv();}
+  };
+
+  // generate all
+  document.getElementById('genAllBtn').onclick = function(){
+    PM.deliverables.forEach(function(d){if(d.status==='pending'){d.status='generated';d.generatedAt=new Date().toISOString().slice(0,16).replace('T',' ');}});
+    renderDeliv();
+  };
+
+  // seal dialog
+  var sealDlg = document.getElementById('sealDlg');
+  var sealTarget = null;
+  window.openSeal = function(id){
+    var d = PM.deliverables.find(function(x){return x.id===id;});
+    if(!d) return;
+    sealTarget = d;
+    document.getElementById('sealFileName').textContent = d.name;
+    document.getElementById('sealList').innerHTML = PM.seals.map(function(s,idx){
+      return '<label class="seal-item" data-idx="'+idx+'" onclick="pickSeal(this)"><input type="radio" name="seal" style="margin-top:4px" value="'+s.id+'" '+(!idx?'checked':'')+'><div><div style="font-weight:600">'+s.name+'</div><div style="font-size:12px;color:var(--ink-3)">'+s.scope+'</div></div></label>';
+    }).join('');
+    PM.seals.forEach(function(_,i){document.querySelectorAll('.seal-item')[i].classList.toggle('on',!i);});
+    sealDlg.classList.add('on');
+  };
+  window.pickSeal = function(el){document.querySelectorAll('.seal-item').forEach(function(x){x.classList.remove('on');});el.classList.add('on');el.querySelector('input').checked=true;};
+  document.getElementById('cancelSeal').onclick = function(){sealDlg.classList.remove('on');sealTarget=null;};
+  document.getElementById('confirmSeal').onclick = function(){
+    if(!sealTarget) return;
+    var val = document.querySelector('input[name="seal"]:checked');
+    var seal = PM.seals.find(function(s){return s.id===(val?val.value:'');})||PM.seals[0];
+    sealTarget.status='sealed';sealTarget.sealName=seal.name;
+    sealDlg.classList.remove('on');sealTarget=null;renderDeliv();alert('印章已应用');
+  };
+  sealDlg.addEventListener('click',function(e){if(e.target===sealDlg)sealDlg.classList.remove('on');});
+
+  // handoff render
+  var h = PM.handoff;
+  var due = new Date(h.dueAt);
+  var now = new Date('2026-04-24T10:00:00');
+  var daysLeft = Math.ceil((due-now)/86400000);
+  document.getElementById('handoffFrom').textContent = h.from;
+  document.getElementById('handoffTo').textContent = h.to;
+  document.getElementById('handoffDue').innerHTML = '还剩 '+daysLeft+' 天 · '+h.dueAt;
+})();
+</script>
+</body>
+</html>

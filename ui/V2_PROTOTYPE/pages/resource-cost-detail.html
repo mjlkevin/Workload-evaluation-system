@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 资源人天及成本详情</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .pg-hd{padding:18px 24px 14px;border-bottom:1px solid var(--line)}
+  .pg-hd .row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+  .pg-hd h1{margin:8px 0 0;font-size:28px;line-height:1.1}
+  .pg-hd .crumb{color:var(--ink-3);font-size:13px}
+  .pg-hd .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+  .pg-body{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;padding:16px 24px 24px}
+  .main-col{display:grid;gap:16px}
+  .reg{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 18px 16px;box-shadow:var(--shadow-1)}
+  .rlab{position:absolute;left:14px;top:-11px;padding:0 8px;background:var(--surface);font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--ink-3)}
+  .pmstrip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:12px 18px;background:var(--bg-soft);border-bottom:1px solid var(--line)}
+  .pmitem{display:flex;flex-direction:column;gap:4px}
+  .pmitem .k{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+  .pmitem .v{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink)}
+  .pmitem select{border:none;background:transparent;font-size:13px;font-weight:600;color:var(--ink);font-family:inherit;cursor:pointer;padding:0;outline:none}
+  .kpi3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .kpi3 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px;box-shadow:var(--shadow-1)}
+  .kpi3 .card .hd{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:10px}
+  .kpi3 .card .hd .ic{width:22px;height:22px;border-radius:5px;display:grid;place-items:center;font-size:12px;color:#fff}
+  .kpi3 .sub{font-size:11px;color:var(--ink-3);margin-top:8px}
+  .bars{display:flex;align-items:flex-end;gap:6px;height:72px;padding:0 4px}
+  .bar{flex:1;border-radius:4px 4px 0 0;min-height:4px;position:relative}
+  .bar .lb{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--ink-3);white-space:nowrap}
+  .prog{height:8px;background:var(--bg-soft);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+  .prog>div{height:100%;background:linear-gradient(90deg,var(--brand),var(--accent));border-radius:999px}
+  .donut2{display:flex;align-items:center;gap:12px}
+  .donut2 svg{flex-shrink:0}
+  .legend{display:grid;gap:4px;font-size:11px}
+  .legend .it{display:flex;align-items:center;gap:6px}
+  .legend .dot{width:8px;height:8px;border-radius:2px}
+  .tool-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .tool-bar .grp{display:flex;gap:6px;flex-wrap:wrap}
+  .summary-strip{display:flex;gap:16px;padding:10px 12px;background:var(--bg-soft);border-radius:var(--r-md);font-size:12px;color:var(--ink-3);margin-bottom:10px;flex-wrap:wrap}
+  .summary-strip b{color:var(--ink)}
+  .at{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden}
+  .at th,.at td{border-bottom:1px solid var(--line);padding:8px 10px;vertical-align:middle;font-size:12.5px}
+  .at th{background:var(--bg-soft);text-align:left;color:var(--ink-3);font-weight:700;white-space:nowrap}
+  .at td.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  .grp-row td{background:color-mix(in oklab,var(--bg-soft) 82%,var(--brand-soft) 8%);font-weight:700;color:var(--ink)}
+  .total-row td{background:linear-gradient(135deg,var(--brand-soft),var(--surface));font-weight:700}
+  .calc{color:var(--brand);font-weight:600}
+  .ec{display:flex;align-items:center;border-radius:5px;padding:0;height:24px;margin:-2px 0;transition:.12s}
+  .ec input{width:100%;height:100%;border:0;outline:0;background:transparent;text-align:right;font-family:var(--font-mono);font-size:12px;color:var(--ink);padding:0 8px;font-variant-numeric:tabular-nums}
+  td:hover .ec{background:#fff;box-shadow:inset 0 0 0 1px var(--line-2)}
+  .ec.foc,.ec:focus-within{background:#fff;box-shadow:inset 0 0 0 2px var(--brand)}
+  .ec.foc input{color:var(--brand-ink);font-weight:700}
+  .side{display:grid;gap:16px;align-content:start}
+  .side-card{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);padding:16px;box-shadow:var(--shadow-1)}
+  .ai-card{background:linear-gradient(180deg,color-mix(in oklab,oklch(.62 .20 320) 14%,var(--surface)),var(--surface))}
+  .ai-card .tag{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:oklch(.95 .03 295);color:oklch(.45 .22 295);font-size:11px;font-weight:800;letter-spacing:.04em}
+  .ai-card p{line-height:1.7;color:var(--ink);font-size:13px}
+  .ai-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .stat{display:grid;gap:8px}
+  .stat .it{display:flex;justify-content:space-between;align-items:center;font-size:12px}
+  .stat .it .k{color:var(--ink-3)}
+  .stat .it .v{font-weight:700}
+  .rate-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px}
+  .rate-row:last-child{border-bottom:none}
+  .rate-row .k{color:var(--ink-3)}
+  .rate-row .v{font-family:var(--font-mono);font-weight:600}
+  .tab-panel{display:none}
+  .tab-panel.on{display:block}
+  .dz{border:1px dashed var(--line);border-radius:var(--r-lg);padding:24px;text-align:center;background:var(--bg-soft);min-height:150px;display:grid;place-items:center;color:var(--ink-3)}
+  @media(max-width:1180px){.pg-body{grid-template-columns:1fr}.kpi3{grid-template-columns:1fr}}
+  @media(max-width:760px){.pg-hd .row,.vcs-bar{flex-direction:column;align-items:flex-start}.tabs{overflow:auto;flex-wrap:nowrap}}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+  <div class="brand"><div class="l">W</div><div>WES</div></div>
+  <div class="grp"><h6>工作台</h6><a href="home.html"><span class="ic">●</span>主页</a><a href="requirement-list.html"><span class="ic">✎</span>需求</a><a href="assessment-list.html"><span class="ic">▣</span>实施评估</a><a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a><a class="on" href="resource-cost-list.html"><span class="ic">$</span>资源人天及成本</a><a href="wbs.html"><span class="ic">☷</span>WBS</a><a href="review-list.html"><span class="ic">✓</span>评审</a></div>
+  <div class="grp"><h6>系统</h6><a href="system-management.html"><span class="ic">⚙</span>系统管理</a><a href="user-management.html"><span class="ic">☺</span>用户管理</a><a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a></div>
+  <div class="user"><div class="row"><div class="av">M</div><div><div class="nm">mjlkevin</div><div class="meta">超级管理员</div></div></div><a class="out" href="login.html">退出</a></div>
+</aside>
+<main class="content">
+  <div class="pg-hd">
+    <div class="crumb">工作台 / 资源人天及成本 / RS-04001</div>
+    <div class="row">
+      <div><h1>资源人天及成本 <span class="bdg co"><span class="dot" style="background:var(--accent)"></span>已检出</span> <span class="bdg mono">RS-04001-v04</span></h1></div>
+      <div class="right">
+        <button class="btn btn-out" onclick="alert('Phase A · 静态 mock')">⏱ 历史</button>
+        <button class="btn btn-out" onclick="alert('Phase A · 静态 mock')">↓ 导出</button>
+        <button class="btn btn-pri" onclick="alert('Phase A · 静态 mock')">⤒ 保存版本</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="vcs-bar" style="margin:0 24px;border-radius:0 0 12px 12px;border-top:0">
+    <div class="grp"><button class="ib" onclick="alert('Phase A · 静态 mock')">🕘 历史</button><button class="ib" onclick="alert('Phase A · 静态 mock')">⬆ 升版</button></div>
+    <div class="grp" style="margin-left:auto"><button class="ib pri" onclick="alert('Phase A · 静态 mock')">⤒ 检入</button><button class="ib" onclick="alert('Phase A · 静态 mock')">↶ 撤销</button><button class="ib" disabled>⤓ 检出</button></div>
+    <div class="grp"><button class="ib dan" onclick="alert('Phase A · 静态 mock')">⚠ 强制解锁</button></div>
+  </div>
+
+  <div class="pmstrip">
+    <div class="pmitem"><div class="k">总方案版本号</div><div class="v"><select onchange="alert('Phase A · 静态 mock')"><option>GL-04001</option><option>GL-04002</option></select></div></div>
+    <div class="pmitem"><div class="k">关联实施评估</div><div class="v mono">IA-04003（可选）</div></div>
+    <div class="pmitem"><div class="k">资源成本版本</div><div class="v"><span class="mono">RS-04001-v04</span> <span class="bdg co" style="margin-left:6px"><span class="dot" style="background:var(--accent)"></span>检出</span></div></div>
+  </div>
+
+  <div class="tabs">
+    <a class="t on" data-tab="t1" href="#">明细</a>
+    <a class="t" data-tab="t2" href="#">分配视图</a>
+    <a class="t" data-tab="t3" href="#">变更对比</a>
+    <a class="t" data-tab="t4" href="#">导出预览</a>
+  </div>
+
+  <div class="pg-body">
+    <section class="main-col">
+      <div class="kpi3" id="kpi3"></div>
+
+      <article class="reg" id="panel-detail">
+        <div class="rlab">DETAIL</div>
+        <div class="tool-bar">
+          <h3 style="margin:0">资源明细</h3>
+          <div class="grp">
+            <button class="btn btn-out" style="height:28px;padding:0 10px;font-size:12px" onclick="alert('Phase A · 静态 mock')">⇧ 增加投入月</button>
+            <button class="btn btn-out" style="height:28px;padding:0 10px;font-size:12px" onclick="alert('Phase A · 静态 mock')">⇩ 减少投入月</button>
+            <button class="btn btn-out" style="height:28px;padding:0 10px;font-size:12px" onclick="alert('Phase A · 静态 mock')">不含差旅</button>
+            <button class="btn btn-pri" style="height:28px;padding:0 10px;font-size:12px" onclick="alert('Phase A · 静态 mock')">+ 新增行</button>
+          </div>
+        </div>
+        <div class="summary-strip" id="sumStrip"></div>
+        <div style="overflow-x:auto"><table class="at" id="detailTable"><thead id="detailHead"></thead><tbody id="detailBody"></tbody></table></div>
+      </article>
+
+      <article class="reg tab-panel" id="tab-t2"><div class="rlab">ALLOC</div><h3>分配视图</h3><div class="dz" style="margin-top:12px"><p>分配视图占位</p></div></article>
+      <article class="reg tab-panel" id="tab-t3"><div class="rlab">DIFF</div><h3>变更对比</h3><div class="dz" style="margin-top:12px"><p>变更对比占位</p></div></article>
+      <article class="reg tab-panel" id="tab-t4"><div class="rlab">EXPORT</div><h3>导出预览</h3><div class="dz" style="margin-top:12px"><p>导出预览占位</p></div></article>
+    </section>
+
+    <aside class="side">
+      <div class="side-card">
+        <h4 style="margin:0 0 10px">与实施评估对照</h4>
+        <div class="stat" id="compareCard"></div>
+      </div>
+      <div class="side-card ai-card">
+        <span class="tag">✦ AI COPILOT</span>
+        <p>资源分配比实施评估少 8 人天（项目经理）。基于 RateCard 按 ¥4,000/天 平摊到 5–9 月，预计 +¥32,000。</p>
+        <div class="ai-btns"><button class="btn btn-pri" onclick="alert('Phase A · 静态 mock')">应用建议</button><button class="btn btn-ghost" onclick="alert('Phase A · 静态 mock')">查看依据</button></div>
+      </div>
+      <div class="side-card">
+        <h4 style="margin:0 0 10px">RateCard 2026Q2</h4>
+        <div id="rateCard"></div>
+      </div>
+    </aside>
+  </div>
+</main>
+</div>
+
+<script>
+const DETAIL = {
+  id:'RS-04001', projectName:'利民集团数字化二期',
+  globalVersion:'GL-04001', linkedAssessment:'IA-04003（可选）',
+  versionCode:'RS-04001-v04', status:'已检出', updatedAt:'2026-04-18 14:33',
+  assessmentDays: 194,
+  months: ['2026-05','2026-06','2026-07','2026-08','2026-09'],
+  groups: [
+    { group:'A', role:'实施顾问', color:'--brand', subtotal:{days:110, amount:362000},
+      rows:[
+        { name:'张鹏', unitPrice:3000, plannedDays:60, travelCost:18000, months:[20,20,15,5,0] },
+        { name:'王敏', unitPrice:2800, plannedDays:50, travelCost:12000, months:[15,20,10,5,0] }
+      ]},
+    { group:'B', role:'架构师', color:'--accent', subtotal:{days:46, amount:196000},
+      rows:[
+        { name:'李华', unitPrice:4000, plannedDays:46, travelCost:12000, months:[10,12,14,10,0] }
+      ]},
+    { group:'C', role:'项目经理', color:'--teal', subtotal:{days:30, amount:126000},
+      rows:[
+        { name:'刘洋', unitPrice:4000, plannedDays:30, travelCost:6000, months:[6,6,6,6,6] }
+      ]}
+  ],
+  rateCard:[
+    {role:'实施顾问', range:'¥2,800–3,200/天'},
+    {role:'架构师',   range:'¥4,000/天'},
+    {role:'项目经理', range:'¥4,000/天'},
+    {role:'差旅日均', range:'¥600/天'}
+  ]
+};
+const $ = q=>document.querySelector(q);
+const $$ = q=>[...document.querySelectorAll(q)];
+
+// KPI 1: bar chart (5 bars)
+const chartData = [
+  {role:'实施顾问', days:110, color:'var(--brand)'},
+  {role:'架构师', days:46, color:'var(--accent)'},
+  {role:'项目经理', days:30, color:'var(--teal)'},
+  {role:'测试工程师', days:0, color:'var(--ok)'},
+  {role:'开发工程师', days:0, color:'oklch(.55 .14 262)'}
+];
+const totalDays = 186;
+const maxDays = Math.max(...chartData.map(d=>d.days),1);
+$('#kpi3').innerHTML = [
+  // Card 1
+  `<div class="card"><div class="hd"><span class="ic" style="background:var(--brand)">⊞</span>实施评估人天结构</div><div class="bars">${chartData.map(d=>{
+    const h = Math.max(4, (d.days/maxDays)*100);
+    return `<div class="bar" style="height:${h}%;background:${d.color}"><span class="lb">${d.role}</span></div>`;
+  }).join('')}</div><div class="sub">总人天 ${totalDays} · 实施顾问 59% 最高</div></div>`,
+  // Card 2
+  `<div class="card"><div class="hd"><span class="ic" style="background:var(--accent)">⇆</span>实施评估人天分配<span class="bdg ok" style="margin-left:auto;font-size:10px;height:18px;padding:0 6px"><span class="dot" style="background:var(--ok)"></span>联动</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <div><div style="font-size:11px;color:var(--ink-3)">实施总人天</div><div style="font-size:22px;font-weight:800">194</div></div>
+    <div><div style="font-size:11px;color:var(--ink-3)">表格已分配</div><div style="font-size:22px;font-weight:800">186</div></div>
+    <div><div style="font-size:11px;color:var(--ink-3)">差额</div><div style="font-size:22px;font-weight:800;color:var(--accent)">−8</div></div>
+    <div><div style="font-size:11px;color:var(--ink-3)">分配率</div><div style="font-size:22px;font-weight:800;color:var(--brand)">96%</div></div>
+  </div>
+  <div class="prog"><div style="width:96%"></div></div><div class="sub">差额 −8 人天（4.1%）</div></div>`,
+  // Card 3
+  `<div class="card"><div class="hd"><span class="ic" style="background:var(--ok)">¥</span>成本金额占比</div>
+  <div class="donut2"><svg viewBox="0 0 72 72" width="72" height="72"><circle cx="36" cy="36" r="28" fill="none" stroke="var(--line)" stroke-width="10"/>
+    <circle cx="36" cy="36" r="28" fill="none" stroke="var(--brand)" stroke-width="10" stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="70" transform="rotate(-90 36 36)"/>
+    <circle cx="36" cy="36" r="28" fill="none" stroke="var(--accent)" stroke-width="10" stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="132" transform="rotate(54 36 36)"/>
+    <circle cx="36" cy="36" r="28" fill="none" stroke="var(--teal)" stroke-width="10" stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="158" transform="rotate(144 36 36)"/>
+  </svg><div class="legend">
+    <div class="it"><span class="dot" style="background:var(--brand)"></span><span>实施顾问 60%</span></div>
+    <div class="it"><span class="dot" style="background:var(--accent)"></span><span>架构师 25%</span></div>
+    <div class="it"><span class="dot" style="background:var(--teal)"></span><span>项目经理 15%</span></div>
+  </div></div><div class="sub">总成本 ¥68.4 万</div></div>`
+].join('');
+
+// summary strip
+const totalTravel = DETAIL.groups.reduce((s,g)=>s+g.rows.reduce((ss,r)=>ss+r.travelCost,0),0);
+const totalAmount = DETAIL.groups.reduce((s,g)=>s+g.subtotal.amount,0);
+$('#sumStrip').innerHTML = `<b>总人天 ${totalDays.toFixed(1)}</b><span>·</span><b>总成本估算 ¥${totalAmount.toLocaleString()}</b><span>·</span><span>差旅 ¥${totalTravel.toLocaleString()} 已含</span>`;
+
+// detail table
+const months = DETAIL.months;
+$('#detailHead').innerHTML = `<tr><th>角色</th><th>姓名</th><th>单价</th><th>计划人天</th><th>差旅</th><th class="num">小计</th>${months.map(m=>`<th class="num">${m.slice(5)}月</th>`).join('')}</tr>`;
+const tbody = $('#detailBody');
+let html = '';
+let grandDays = 0, grandTravel = 0, grandAmount = 0;
+const monthTotals = new Array(months.length).fill(0);
+DETAIL.groups.forEach(g=>{
+  html += `<tr class="grp-row"><td colspan="2">${g.group} · ${g.role}</td><td class="num">—</td><td class="num">${g.subtotal.days}</td><td class="num">—</td><td class="num calc">¥${g.subtotal.amount.toLocaleString()}</td>${months.map(()=>'<td></td>').join('')}</tr>`;
+  g.rows.forEach(r=>{
+    const sub = r.unitPrice * r.plannedDays + r.travelCost;
+    grandDays += r.plannedDays; grandTravel += r.travelCost;
+    r.months.forEach((v,i)=>monthTotals[i]+=v);
+    html += `<tr>
+      <td>${g.role}</td><td>${r.name}</td>
+      <td class="num"><div class="ec" onclick="focusEc(event,this)"><input value="${r.unitPrice}" onfocus="this.parentNode.classList.add('foc')" onblur="this.parentNode.classList.remove('foc')"></div></td>
+      <td class="num"><div class="ec" onclick="focusEc(event,this)"><input value="${r.plannedDays}" onfocus="this.parentNode.classList.add('foc')" onblur="this.parentNode.classList.remove('foc')"></div></td>
+      <td class="num"><div class="ec" onclick="focusEc(event,this)"><input value="${r.travelCost}" onfocus="this.parentNode.classList.add('foc')" onblur="this.parentNode.classList.remove('foc')"></div></td>
+      <td class="num calc">¥${sub.toLocaleString()}</td>
+      ${r.months.map((v,i)=>`<td class="num"><div class="ec" onclick="focusEc(event,this)"><input value="${v}" onfocus="this.parentNode.classList.add('foc')" onblur="this.parentNode.classList.remove('foc')" onclick="alert('Phase A · 静态 mock')"></div></td>`).join('')}
+    </tr>`;
+  });
+});
+html += `<tr class="total-row"><td colspan="2">合计</td><td class="num">—</td><td class="num">${grandDays}</td><td class="num">¥${grandTravel.toLocaleString()}</td><td class="num calc">¥${totalAmount.toLocaleString()}</td>${monthTotals.map(v=>`<td class="num">${v}</td>`).join('')}</tr>`;
+tbody.innerHTML = html;
+
+// compare card
+const diff = DETAIL.assessmentDays - totalDays;
+const diffPct = ((diff/DETAIL.assessmentDays)*100).toFixed(1);
+$('#compareCard').innerHTML = `
+  <div class="it"><span class="k">实施总人天</span><span class="v">${DETAIL.assessmentDays}</span></div>
+  <div class="it"><span class="k">资源已分配</span><span class="v">${totalDays}</span></div>
+  <div class="it"><span class="k">差额</span><span class="v" style="color:var(--accent)">${diff>0?'−':'+'}${Math.abs(diff)}（${diffPct}%）</span></div>
+  <div style="font-size:12px;color:var(--ink-3);margin-top:4px">建议：补项目经理 +8 人天</div>
+`;
+
+// rate card
+$('#rateCard').innerHTML = DETAIL.rateCard.map(r=>`<div class="rate-row"><span class="k">${r.role}</span><span class="v">${r.range}</span></div>`).join('');
+
+// tabs
+$$('.tabs .t').forEach(t=>t.addEventListener('click',e=>{
+  e.preventDefault();
+  $$('.tabs .t').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  const id = t.dataset.tab;
+  $$('.tab-panel').forEach(p=>p.classList.toggle('on',p.id==='tab-'+id));
+  const detailOnly = ['panel-detail'];
+  detailOnly.forEach(x=>{const el=$(x);if(el)el.style.display=(id==='t1'?'':'none');});
+}));
+$$('.tab-panel').forEach(p=>p.classList.toggle('on',false));
+
+window.focusEc = function(ev,el){ev.stopPropagation();el.querySelector('input').focus();};
+</script>
+</body>
+</html>

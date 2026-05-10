@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 主页</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .home-body{display:grid;grid-template-columns:1fr 280px;gap:16px;padding:0 24px 24px 0;min-width:0}
+  .home-main{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .home-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .kpi-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .kpi-hd .ic{width:26px;height:26px;border-radius:6px;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;font-size:12px;font-weight:700}
+  .kpi-hd .live{width:6px;height:6px;border-radius:50%;background:var(--ok);margin-left:auto;animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .kpi .num{font-size:28px;font-weight:800;font-family:var(--font-mono);letter-spacing:-.02em;line-height:1.05;margin-bottom:4px}
+  .kpi .lb{font-size:11px;font-family:var(--font-mono);color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase}
+  .kpi .bar{height:4px;border-radius:999px;background:var(--bg-soft);margin-top:10px;overflow:hidden}
+  .kpi .bar i{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--brand),var(--accent));display:block}
+  .kpi .sub{margin-top:6px;font-size:12px;color:var(--ink-2)}
+  .ltbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-soft)}
+  .filt{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:5px;background:var(--surface);border:1px solid var(--line);font-size:11.5px;color:var(--ink-2);cursor:pointer}
+  .filt b{color:var(--ink);font-weight:600}
+  .filt .x{color:var(--ink-3);font-size:10px}
+  .filt.dashed{background:#fff;color:var(--ink-3);border:1px dashed var(--line-2)}
+  .search{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:5px;background:var(--surface);border:1px solid var(--line);font-size:12px;color:var(--ink-3);flex:1;min-width:120px}
+  /* toolbar-row · 与 list 页统一布局 */
+  .toolbar-row{display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--bg-soft);border-bottom:1px solid var(--line);font-size:12px;flex-wrap:wrap}
+  .toolbar-row .sel-count{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;font-weight:700;padding:0 4px;cursor:pointer}
+  .toolbar-row .sel-count.active{color:var(--brand-ink)}
+  .toolbar-row .actions{display:flex;gap:4px;padding-right:12px;border-right:1px solid var(--line)}
+  .toolbar-row .actions .ib{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;color:var(--ink-2);background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .toolbar-row .actions .ib:hover:not(:disabled){background:#fff;color:var(--ink)}
+  .toolbar-row .actions .ib.dan{color:var(--err)}
+  .toolbar-row .actions .ib.pri{background:var(--brand);color:#fff}
+  .toolbar-row .actions .ib.pri:hover{background:var(--brand-ink);color:#fff}
+  .toolbar-row .actions .ib:disabled{opacity:.5;cursor:not-allowed}
+  .toolbar-row .filters{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;align-items:center}
+  .toolbar-row .search.compact{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:5px;background:#fff;border:1px solid var(--line);font-size:11.5px;color:var(--ink-3);min-width:200px;flex:none}
+  .qa{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-1)}
+  .qa .h{padding:12px 16px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+  .qa a{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;color:var(--ink);text-decoration:none;font-size:12.5px;border-bottom:1px solid var(--line)}
+  .qa a:last-child{border-bottom:none}
+  .qa a:hover{background:var(--bg-soft);color:var(--brand)}
+  .qa a .arr{color:var(--ink-3);font-size:11px}
+  .feed{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-1)}
+  .feed .h{padding:12px 16px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+  .feed .it{display:flex;align-items:flex-start;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line)}
+  .feed .it:last-child{border-bottom:none}
+  .feed .av{width:22px;height:22px;border-radius:50%;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px}
+  .feed .bd{font-size:12px;color:var(--ink-2);line-height:1.5}
+  .feed .bd b{color:var(--ink)}
+  .feed .ts{display:block;font-size:10px;color:var(--ink-3);font-family:var(--font-mono);margin-top:2px}
+  .dialog-wrap{display:none;position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.4);place-items:center;padding:24px}
+  .dialog-wrap.on{display:grid}
+  .dialog{max-width:640px;width:100%;max-height:calc(100vh - 48px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--dialog-radius);box-shadow:var(--shadow-3)}
+  .dialog.lg{max-width:780px}
+  .dialog .hd{padding:16px 20px;border-bottom:1px solid var(--line);font-weight:700;display:flex;align-items:center;justify-content:space-between}
+  .dialog .bd{padding:20px}
+  .dialog .ft{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:var(--bg-soft)}
+  .step-row{display:flex;gap:8px;margin-bottom:18px}
+  .step{flex:1;text-align:center;padding:10px 8px;border-radius:8px;background:var(--bg-soft);font-size:11px;font-weight:600;color:var(--ink-3)}
+  .step.on{background:var(--brand-soft);color:var(--brand-ink)}
+  .guide-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .guide-card{padding:16px;border:1px solid var(--line);border-radius:var(--r-lg);cursor:pointer;transition:.15s}
+  .guide-card:hover{border-color:var(--brand);box-shadow:var(--shadow-1)}
+  .guide-card .ic{width:32px;height:32px;border-radius:8px;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;font-size:14px;font-weight:700;margin-bottom:8px}
+  .guide-card .t{font-size:13px;font-weight:700;margin-bottom:4px}
+  .guide-card .d{font-size:11.5px;color:var(--ink-2)}
+  .er-wrap{background:var(--bg-soft);border-radius:var(--r-lg);padding:14px;position:relative}
+  .er-tools{position:absolute;top:10px;right:10px;display:flex;gap:4px;z-index:2}
+  .er-tools button{padding:4px 8px;border-radius:5px;border:1px solid var(--line);background:var(--surface);font-size:11px;cursor:pointer}
+  .er-tools button:hover{background:var(--bg-soft)}
+  .er-node{cursor:pointer}
+  .er-node:hover circle,.er-node:hover rect{stroke:var(--brand)!important;stroke-width:2.5px!important}
+  .er-node.sel circle,.er-node.sel rect{stroke:var(--accent)!important;stroke-width:2.5px!important}
+  .vcs-bar .ib:disabled{opacity:.4;cursor:not-allowed}
+  @media (max-width:1180px){.home-body{grid-template-columns:1fr}.home-side{flex-direction:row;flex-wrap:wrap}.kpi-row{grid-template-columns:1fr 1fr}}
+  @media (max-width:760px){.kpi-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="l">W</div><div>WES</div></div>
+      <div class="grp">
+        <h6>工作台</h6>
+        <a href="home.html" class="on"><span class="ic">●</span>主页</a>
+        <a href="requirement-list.html"><span class="ic">✎</span>需求</a>
+        <a href="assessment-list.html"><span class="ic">▣</span>实施评估</a>
+        <a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a>
+        <a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a>
+        <a href="wbs.html"><span class="ic">☷</span>WBS</a>
+        <a href="review-list.html"><span class="ic">✓</span>评审</a>
+      </div>
+      <div class="grp">
+        <h6>系统</h6>
+        <a href="system-management.html"><span class="ic">⚙</span>系统管理</a>
+        <a href="user-management.html"><span class="ic">☺</span>用户管理</a>
+        <a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a>
+      </div>
+      <div class="user">
+        <div class="row">
+          <div class="av">M</div>
+          <div>
+            <div class="nm">mjlkevin</div>
+            <div class="meta">超级管理员</div>
+          </div>
+        </div>
+        <a class="out" href="login.html">退出</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="pg-hd">
+        <div class="crumb"><b>工作台</b> &nbsp;/&nbsp; <b style="color:var(--ink)">主页</b></div>
+        <div class="row">
+          <h1>主页</h1>
+          <div class="right">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--bg-soft);display:grid;place-items:center;font-size:11px;color:var(--ink-2);position:relative;cursor:pointer">⋯<span style="position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid #fff"></span></div>
+            <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--accent));display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700">M</div>
+            <button class="btn btn-pri" style="font-size:12px;padding:6px 12px" onclick="openDialog('d1')">+ 新建</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-body">
+        <div class="home-main">
+          <div class="kpi-row" id="kpiRow"></div>
+
+          <div class="section">
+            <div class="hd">
+              <span>评估方案列表</span>
+              <span class="bdg ci" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>已检入 9</span>
+              <span class="bdg co" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>已检出 3</span>
+              <div class="right"><span style="font-size:11px">共 12 条</span></div>
+            </div>
+
+            <div class="toolbar-row">
+              <span class="sel-count" id="selCount">已选 0</span>
+              <div class="actions">
+                <button class="ib" title="版本历史 ⌘H" onclick="alert('Phase A · 静态 mock，未接后端')">🕘 历史</button>
+                <button class="ib vcs-dis" disabled title="检出 ⌘K" onclick="alert('Phase A · 静态 mock，未接后端')">🔓 检出</button>
+                <button class="ib vcs-dis" disabled title="检入">🔒 检入</button>
+                <button class="ib vcs-dis" disabled title="撤销检出">↺ 撤销</button>
+                <button class="ib vcs-dis" disabled title="升版">⬆ 升版</button>
+                <button class="ib vcs-dis dan" disabled title="强制解锁">⚠️ 解锁</button>
+                <button class="ib vcs-dis dan" disabled title="删除方案" onclick="alert('Phase A · 静态 mock，未接后端')">🗑 删除</button>
+                <button class="ib" title="ER 关联关系图" onclick="openDialog('d3')">🔗 ER</button>
+                <button class="ib pri" title="新建方案向导" onclick="openDialog('d1')">＋ 新建</button>
+              </div>
+              <div class="filters">
+                <span class="filt">状态：<b>全部</b><span class="x">×</span></span>
+                <span class="filt">行业：<b>制造业</b><span class="x">×</span></span>
+                <span class="filt">最近 30 天<span class="x">×</span></span>
+                <span class="filt dashed">+ 添加筛选</span>
+                <span class="search compact">⌕ 搜索项目名 / 版本号 / 检出人</span>
+              </div>
+            </div>
+
+            <table class="table" id="planTable" style="border-radius:0;border-top:none;border-left:none;border-right:none">
+              <thead><tr><th style="width:38px">#</th><th>项目名称</th><th>总方案版本</th><th>状态</th><th>检出</th><th class="num">人天</th><th>更新时间</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="home-side">
+          <div class="qa">
+            <div class="h">快速操作</div>
+            <a href="#" onclick="openDialog('d1');return false">新建评估方案<span class="arr">→</span></a>
+            <a href="#">导入需求访谈纪要<span class="arr">→</span></a>
+            <a href="review-list.html">发起评审<span class="arr">→</span></a>
+            <a href="#">查看 API 调用指南<span class="arr">→</span></a>
+          </div>
+          <div class="feed" id="feedBox"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Dialog 1: 新建方案向导 -->
+  <div class="dialog-wrap" id="d1" onclick="if(event.target===this)closeDialog('d1')">
+    <div class="dialog">
+      <div class="hd">新建评估方案向导<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px" onclick="closeDialog('d1')">✕</button></div>
+      <div class="bd">
+        <div class="step-row">
+          <div class="step on">方案</div><div class="step">需求</div><div class="step">评估</div><div class="step">资源/开发</div>
+        </div>
+        <div class="stack" style="gap:10px">
+          <input class="input" placeholder="项目名" />
+          <input class="input" placeholder="客户名" />
+          <div class="row" style="gap:10px"><select class="input"><option>制造-离散</option><option>新材料</option><option>地产</option></select><select class="input"><option>50-500人</option><option>500-2000人</option><option>2000人以上</option></select></div>
+          <select class="input"><option>标准实施模板 V3</option><option>轻量模板</option></select>
+        </div>
+      </div>
+      <div class="ft"><button class="btn btn-ghost" onclick="closeDialog('d1')">取消</button><button class="btn btn-pri" onclick="closeDialog('d1');openDialog('d2')">创建</button></div>
+    </div>
+  </div>
+
+  <!-- Dialog 2: 创建后引导窗 -->
+  <div class="dialog-wrap" id="d2" onclick="if(event.target===this)closeDialog('d2')">
+    <div class="dialog">
+      <div class="hd">方案已创建<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px" onclick="closeDialog('d2')">✕</button></div>
+      <div class="bd">
+        <p style="margin:0 0 14px;font-size:13px;color:var(--ink-2)">接下来建议完成以下步骤：</p>
+        <div class="guide-grid">
+          <div class="guide-card" onclick="alert('Phase A · 模拟跳转 需求页')">
+            <div class="ic" style="background:var(--accent-soft);color:var(--accent-ink)">✎</div>
+            <div class="t">需求</div>
+            <div class="d">导入访谈纪要并结构化需求条目</div>
+          </div>
+          <div class="guide-card" onclick="alert('Phase A · 模拟跳转 实施评估页')">
+            <div class="ic">▣</div>
+            <div class="t">实施评估</div>
+            <div class="d">基于模板生成 SKU 人天与 DSL 校验</div>
+          </div>
+          <div class="guide-card" onclick="alert('Phase A · 模拟跳转 资源成本页')">
+            <div class="ic" style="background:var(--ok-soft);color:var(--ok-ink)">$</div>
+            <div class="t">资源成本</div>
+            <div class="d">按角色分配人天并核算差旅成本</div>
+          </div>
+          <div class="guide-card" onclick="alert('Phase A · 模拟跳转 开发评估页')">
+            <div class="ic" style="background:var(--teal-soft);color:var(--teal)">◆</div>
+            <div class="t">开发评估</div>
+            <div class="d">细化开发子项与接口开发清单</div>
+          </div>
+        </div>
+      </div>
+      <div class="ft"><button class="btn btn-ghost" onclick="closeDialog('d2')">以后再说</button><button class="btn btn-pri" onclick="closeDialog('d2');location.href='requirement-list.html'">进入需求页 →</button></div>
+    </div>
+  </div>
+
+  <!-- Dialog 3: ER 关联关系图 -->
+  <div class="dialog-wrap" id="d3" onclick="if(event.target===this)closeDialog('d3')">
+    <div class="dialog lg">
+      <div class="hd">ER 关联关系图预览<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px" onclick="closeDialog('d3')">✕</button></div>
+      <div class="bd">
+        <div class="er-wrap">
+          <div class="er-tools">
+            <button onclick="erZoom(.1)">+</button>
+            <button onclick="erZoom(-.1)">−</button>
+            <button onclick="erZoom(0)">重置</button>
+            <span id="erScaleLabel" style="font-size:11px;color:var(--ink-3);font-family:var(--font-mono)">100%</span>
+          </div>
+          <svg id="erSvg" width="100%" height="380" viewBox="0 0 600 380">
+            <g id="erZoomGroup">
+              <line x1="300" y1="190" x2="150" y2="90" stroke="var(--line-2)" stroke-width="2"/>
+              <line x1="300" y1="190" x2="450" y2="90" stroke="var(--line-2)" stroke-width="2"/>
+              <line x1="300" y1="190" x2="150" y2="290" stroke="var(--line-2)" stroke-width="2"/>
+              <line x1="300" y1="190" x2="450" y2="290" stroke="var(--line-2)" stroke-width="2"/>
+              <g class="er-node" data-name="总方案" transform="translate(300,190)" onclick="this.classList.toggle('sel')" ondblclick="alert('Phase A · 模拟跳转 iframe')">
+                <circle r="44" fill="var(--brand-soft)" stroke="var(--brand)" stroke-width="2"/>
+                <text text-anchor="middle" dy="4" fill="var(--brand-ink)" font-size="12" font-weight="700">GL-04001</text>
+              </g>
+              <g class="er-node" data-name="需求" transform="translate(150,90)" onclick="this.classList.toggle('sel')" ondblclick="alert('Phase A · 模拟跳转 iframe')">
+                <rect x="-52" y="-22" width="104" height="44" rx="8" fill="#fff" stroke="var(--line)" stroke-width="1"/>
+                <text text-anchor="middle" dy="4" fill="var(--ink)" font-size="11" font-weight="600">需求 · RQ-04001</text>
+              </g>
+              <g class="er-node" data-name="实施评估" transform="translate(450,90)" onclick="this.classList.toggle('sel')" ondblclick="alert('Phase A · 模拟跳转 iframe')">
+                <rect x="-52" y="-22" width="104" height="44" rx="8" fill="#fff" stroke="var(--line)" stroke-width="1"/>
+                <text text-anchor="middle" dy="4" fill="var(--ink)" font-size="11" font-weight="600">实施评估 · IA-04003</text>
+              </g>
+              <g class="er-node" data-name="资源成本" transform="translate(150,290)" onclick="this.classList.toggle('sel')" ondblclick="alert('Phase A · 模拟跳转 iframe')">
+                <rect x="-52" y="-22" width="104" height="44" rx="8" fill="#fff" stroke="var(--line)" stroke-width="1"/>
+                <text text-anchor="middle" dy="4" fill="var(--ink)" font-size="11" font-weight="600">资源成本 · RS-04001</text>
+              </g>
+              <g class="er-node" data-name="开发评估" transform="translate(450,290)" onclick="this.classList.toggle('sel')" ondblclick="alert('Phase A · 模拟跳转 iframe')">
+                <rect x="-52" y="-22" width="104" height="44" rx="8" fill="#fff" stroke="var(--line)" stroke-width="1"/>
+                <text text-anchor="middle" dy="4" fill="var(--ink)" font-size="11" font-weight="600">开发评估 · DV-04001</text>
+              </g>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../mock/data.js"></script>
+  <script>
+    (function(){
+      const d=window.MOCK.dashboard||{};
+      const kpiData=[
+        {ic:'▣',lb:'方案数',num:d.plansTotal||12,sub:'近 7 天 +1 进行中',bar:'80%'},
+        {ic:'≡',lb:'需求条目',num:d.requirementsTotal||186,sub:'待结构化 4 · 待处理 2',bar:'62%',icBg:'var(--accent-soft)',icCo:'var(--accent)'},
+        {ic:'⏱',lb:'评估人天',num:d.mandaysTotal||762,sub:'高复杂占比 20%',bar:'48%',icBg:'var(--info-soft)',icCo:'var(--info)'},
+        {ic:'⚇',lb:'参与成员',num:d.membersTotal||14,sub:'在线 '+(d.online||6)+' 人',bar:'35%',icBg:'var(--ok-soft)',icCo:'var(--ok)'}
+      ];
+      document.getElementById('kpiRow').innerHTML=kpiData.map(k=>`
+        <div class="kpi">
+          <div class="kpi-hd"><span class="ic" style="background:${k.icBg||'var(--brand-soft)'};color:${k.icCo||'var(--brand-ink)'}">${k.ic}</span><span>${k.lb}</span><span class="live"></span></div>
+          <div class="num">${k.num}</div>
+          <div class="lb">${k.lb}</div>
+          <div class="bar"><i style="width:${k.bar};background:linear-gradient(90deg,${k.icCo||'var(--brand)'},var(--accent))"></i></div>
+          <div class="sub">${k.sub}</div>
+        </div>`).join('');
+
+      const plans=window.MOCK.plans||[];
+      const tbody=document.querySelector('#planTable tbody');
+      tbody.innerHTML=plans.slice(0,6).map((p,i)=>{
+        const st=p.status==='进行中'?'<span class="bdg co" style="font-size:10.5px"><span class="dot"></span>进行中</span>':p.status==='待评审'?'<span class="bdg rev" style="font-size:10.5px"><span class="dot"></span>评审中</span>':'<span class="bdg ci" style="font-size:10.5px"><span class="dot"></span>已发布</span>';
+        const co=i%2===0?'<span class="bdg ci" style="font-size:10.5px"><span class="dot"></span>已检入</span>':'<span class="bdg co" style="font-size:10.5px"><span class="dot"></span>已检出</span>';
+        const md=(150+Math.random()*300).toFixed(1);
+        return `<tr data-id="${p.id}"><td>${i+1}</td><td><b>${p.projectName}</b><div style="color:var(--ink-3);font-size:11px">${p.globalVersion} · 制造-离散</div></td><td class="mono" style="font-family:var(--font-mono)">${p.globalVersion.replace('GL-','v')}</td><td>${st}</td><td>${co}</td><td class="num">${md}</td><td style="color:var(--ink-3);font-family:var(--font-mono);font-size:11px">2026-04-${18-i} 14:33</td></tr>`;
+      }).join('');
+
+      let sel=new Set();
+      tbody.querySelectorAll('tr').forEach(tr=>{
+        tr.addEventListener('click', function(e){
+          var rows = [].slice.call(tbody.querySelectorAll('tr'));
+          var apply = function(r, on){
+            r.classList.toggle('row-selected', on);
+            if(on) sel.add(r.dataset.id); else sel.delete(r.dataset.id);
+          };
+          if (e.shiftKey && window.__selAnchor && rows.indexOf(window.__selAnchor) >= 0) {
+            var a = rows.indexOf(window.__selAnchor), b = rows.indexOf(tr);
+            var s = Math.min(a,b), t = Math.max(a,b);
+            sel.clear();
+            rows.forEach(function(r, i){ apply(r, i>=s && i<=t); });
+          } else if (e.ctrlKey || e.metaKey) {
+            apply(tr, !tr.classList.contains('row-selected'));
+            window.__selAnchor = tr;
+          } else {
+            sel.clear();
+            rows.forEach(function(r){ apply(r, false); });
+            apply(tr, true);
+            window.__selAnchor = tr;
+          }
+          updateVcs();
+        });
+        tr.addEventListener('dblclick',()=>openDialog('d3'));
+      });
+
+      function updateVcs(){
+        const n=sel.size;
+        document.getElementById('selCount').textContent='已选 '+n;
+        document.querySelectorAll('.vcs-dis').forEach(b=>b.disabled=n===0);
+        document.querySelectorAll('.vcs-dis').forEach(b=>b.style.opacity=n===0?'.4':'1');
+      }
+      updateVcs();
+
+      const feed=window.MOCK.feed||[];
+      document.getElementById('feedBox').innerHTML='<div class="h">最近动态</div>'+feed.map(f=>`
+        <div class="it">
+          <div class="av" style="background:${f.accent?'var(--accent-soft)':'var(--brand-soft)'};color:${f.accent?'var(--accent-ink)':'var(--brand-ink)'}">${f.avatar}</div>
+          <div class="bd"><b>${f.name}</b> ${f.action}<span class="ts">${f.time}</span></div>
+        </div>`).join('');
+    })();
+
+    function openDialog(id){document.getElementById(id).classList.add('on')}
+    function closeDialog(id){document.getElementById(id).classList.remove('on')}
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'){['d1','d2','d3'].forEach(id=>closeDialog(id))}});
+
+    let erScale=1;
+    function erZoom(d){if(d===0)erScale=1;else erScale=Math.max(.5,Math.min(2,erScale+d));document.getElementById('erZoomGroup').setAttribute('transform','scale('+erScale+')');document.getElementById('erScaleLabel').textContent=Math.round(erScale*100)+'%'}
+  </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+@import '../tokens.css';
+@import '../components.css';
+@import '../layout.css';
+
+/* Vite React 全局基线 */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-body, 'Inter', 'Noto Sans SC', system-ui, sans-serif);
+  color: var(--ink, #1f2937);
+  background: var(--bg, #f6f7f9);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 原有 CSS reset 兼容 */
+input, button, select, textarea { font-family: inherit; }

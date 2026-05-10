@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · WBS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .filt{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:5px;background:var(--surface);border:1px solid var(--line);font-size:11.5px;color:var(--ink-2);cursor:pointer}
+  .filt b{color:var(--ink);font-weight:600}
+  .filt .x{color:var(--ink-3);font-size:10px}
+  .filt.add{background:transparent;border-style:dashed;color:var(--ink-3)}
+  .search{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:5px;background:var(--surface);border:1px solid var(--line);font-size:12px;color:var(--ink-3);flex:1;min-width:120px}
+  .pager{display:flex;align-items:center;padding:10px 18px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-3);font-family:var(--font-mono)}
+  .pager .num{display:flex;gap:4px;align-items:center;margin-left:auto}
+  .pager .num span{padding:2px 7px;border-radius:4px;cursor:pointer}
+  .pager .num span.on{background:var(--brand);color:#fff}
+  .pager .num span:hover{background:var(--bg-soft)}
+  .empty{padding:48px 24px;text-align:center}
+  .empty .ic{width:64px;height:64px;border-radius:50%;background:var(--bg-soft);display:grid;place-items:center;margin:0 auto 16px;font-size:28px}
+  .empty .t{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px}
+  .empty .d{font-size:12.5px;color:var(--ink-2);margin-bottom:18px}
+  .gantt{width:120px;height:8px;border-radius:4px;background:var(--bg-soft);overflow:hidden;display:flex}
+  .gantt .done{background:var(--ok);height:100%}
+  .gantt .prog{background:var(--brand);height:100%}
+  .warn-row td{color:var(--accent-ink)!important}
+  .err-row td{color:var(--err)!important}
+  .toolbar-row{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 18px;
+    background:var(--bg-soft);
+    border-bottom:1px solid var(--line);
+    font-size:12px;
+    flex-wrap:wrap;
+  }
+  .toolbar-row .sel-count{
+    font-family:var(--font-mono); font-size:11px;
+    color:var(--ink-3); text-transform:uppercase;
+    letter-spacing:.06em; font-weight:700;
+    padding:0 4px; cursor:pointer;
+  }
+  .toolbar-row .sel-count.active{
+    color:var(--brand-ink);
+  }
+  .toolbar-row .actions{
+    display:flex; gap:4px;
+    padding-right:12px; border-right:1px solid var(--line);
+  }
+  .toolbar-row .actions .ib{
+    padding:6px 12px; border-radius:6px;
+    font-size:12px; font-weight:600;
+    color:var(--ink-2); background:transparent;
+    border:none; cursor:pointer;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .toolbar-row .actions .ib:hover:not(:disabled){background:#fff; color:var(--ink)}
+  .toolbar-row .actions .ib.dan{color:var(--err)}
+  .toolbar-row .actions .ib:disabled{opacity:.5; cursor:not-allowed}
+  .toolbar-row .filters{
+    display:flex; gap:6px; flex-wrap:wrap;
+    margin-left:auto;
+  }
+  .toolbar-row .filt.dashed{
+    background:#fff; color:var(--ink-3);
+    border:1px dashed var(--line-2);
+  }
+  .toolbar-row .search.compact{
+    display:inline-flex; align-items:center; gap:5px;
+    padding:6px 10px; border-radius:7px;
+    background:#fff; border:1px solid var(--line);
+    font-size:11.5px; color:var(--ink-3);
+    width:220px; max-width:240px;
+    flex-shrink:0;
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="l">W</div><div>WES</div></div>
+      <div class="grp">
+        <h6>工作台</h6>
+        <a href="home.html"><span class="ic">●</span>主页</a>
+        <a href="requirement-list.html"><span class="ic">✎</span>需求</a>
+        <a href="assessment-list.html"><span class="ic">▣</span>实施评估</a>
+        <a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a>
+        <a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a>
+        <a href="wbs.html" class="on"><span class="ic">☷</span>WBS</a>
+        <a href="review-list.html"><span class="ic">✓</span>评审</a>
+      </div>
+      <div class="grp">
+        <h6>系统</h6>
+        <a href="system-management.html"><span class="ic">⚙</span>系统管理</a>
+        <a href="user-management.html"><span class="ic">☺</span>用户管理</a>
+        <a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a>
+      </div>
+      <div class="user">
+        <div class="row"><div class="av">M</div><div><div class="nm">mjlkevin</div><div class="meta">超级管理员</div></div></div>
+        <a class="out" href="login.html">退出</a>
+      </div>
+    </aside>
+    <main class="content">
+      <div class="pg-hd">
+        <div class="crumb"><b>工作台</b> &nbsp;/&nbsp; WBS &nbsp;/&nbsp; <b style="color:var(--ink)">任务列表</b></div>
+        <div class="row">
+          <h1>WBS 任务分解</h1>
+          <span style="color:var(--ink-3);font-size:12px;margin-left:6px">项目全生命周期任务与甘特追踪</span>
+          <div class="right">
+            <button class="btn btn-out" style="font-size:12px;padding:6px 12px">⟳ 刷新</button>
+            <button class="btn btn-out" style="font-size:12px;padding:6px 12px">⊞ 视图</button>
+            <button class="btn btn-pri" style="font-size:12px;padding:6px 12px">＋ 新增</button>
+          </div>
+        </div>
+      </div>
+      <div class="section" id="listSection">
+        <div class="hd">
+          <span>WBS 列表</span>
+          <span class="bdg ok" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>已完成 2</span><span class="bdg co" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>进行中 3</span>
+          <div class="right"><span style="font-size:11px">共 6 条</span></div>
+        </div>
+        <div class="toolbar-row">
+          <span class="sel-count" id="selCount">已选 0</span>
+          <div class="actions">
+            <button class="ib" id="btnPreview" disabled onclick="alert('Phase A · 静态 mock，未接后端')">👁 预览</button>
+            <button class="ib" id="btnEdit" disabled onclick="alert('Phase A · 静态 mock，未接后端')">✏ 修改</button>
+            <button class="ib" id="btnHistory" disabled onclick="alert('Phase A · 静态 mock，未接后端')">🕘 历史</button>
+            <button class="ib dan" id="btnDelete" disabled onclick="alert('Phase A · 静态 mock，未接后端')">🗑 删除</button>
+          </div>
+          <div class="filters">
+            <span class="filt">状态：<b>全部</b><span class="x">×</span></span>
+            <span class="filt">阶段：<b>蓝图</b><span class="x">×</span></span>
+            <span class="filt">负责人：<b>我自己</b><span class="x">×</span></span>
+            <span class="filt dashed">+ 添加筛选</span>
+          </div>
+          <span class="search compact">⌕ 搜索项目 / 版本号 / 状态 / 创建人</span>
+        </div>
+        <table class="table" id="dataTable" style="border-radius:0;border-left:none;border-right:none">
+          <thead><tr><th class="chk" style="width:34px;text-align:center">☐</th><th>任务名</th><th>阶段</th><th>负责人</th><th>起止时间</th><th>进度</th><th>状态</th><th>关联版本</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="pager" id="pager">
+          <span>1 / 6 条</span>
+          <span class="num"><span style="background:var(--bg-soft)">‹</span><span class="on">1</span><span>2</span><span>3</span><span style="background:var(--bg-soft)">›</span></span>
+        </div>
+        
+      </div>
+    </main>
+  </div>
+  <script src="../mock/data.js"></script>
+  <script>
+function fmtStatus(s){
+  var map = {
+    '已检入':'<span class="bdg ci" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>已检入</span>',
+    '已检出':'<span class="bdg co" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>已检出</span>',
+    '进行中':'<span class="bdg co" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>进行中</span>',
+    '已发布':'<span class="bdg ci" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>已发布</span>',
+    '评审中':'<span class="bdg rev" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>评审中</span>',
+    '待评审':'<span class="bdg rev" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>待评审</span>',
+    '草拟中':'<span class="bdg draft" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>草拟中</span>',
+    '已完成':'<span class="bdg ok" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>已完成</span>',
+    '未开始':'<span class="bdg draft" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>未开始</span>',
+    '通过':'<span class="bdg ok" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>通过</span>',
+    '驳回':'<span class="bdg lock" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>驳回</span>'
+  };
+  return map[s] || '<span class="bdg draft" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>'+s+'</span>';
+}
+
+function fmtPhase(p){
+  var c = p==='启动'?'brand':p==='蓝图'?'accent':p==='实现'?'teal':'ok';
+  var bg='var(--'+c+'-soft)', co='var(--'+c+')';
+  return '<span class="tag" style="background:'+bg+';color:'+co+'">'+p+'</span>';
+}
+function fmtGantt(done, prog){
+  var d=done||0, p=prog||0;
+  return '<div class="gantt"><div class="done" style="width:'+d+'%"></div><div class="prog" style="width:'+p+'%"></div></div>';
+}
+function renderRow(row, i){
+  return '<tr data-id="'+row.id+'"><td class="chk" style="text-align:center">☐</td><td><b>'+row.taskName+'</b><div style="color:var(--ink-3);font-size:11px">'+(row.subTitle||'')+'</div></td><td>'+fmtPhase(row.phase)+'</td><td>'+(row.owner||'—')+'</td><td class="mono" style="font-family:var(--font-mono);font-size:11px">'+(row.start||'—')+' → '+(row.end||'—')+'</td><td>'+fmtGantt(row.ganttDone, row.ganttInProgress)+'</td><td>'+fmtStatus(row.status)+'</td><td class="mono">'+(row.linkedVersionCode||'—')+'</td></tr>';
+}
+(function(){
+  var data = window.MOCK.wbs || [];
+  var tbody = document.querySelector('#dataTable tbody');
+  var selCount = document.getElementById('selCount');
+  var btnPreview = document.getElementById('btnPreview');
+  var btnEdit = document.getElementById('btnEdit');
+  var btnHistory = document.getElementById('btnHistory');
+  var btnDelete = document.getElementById('btnDelete');
+  var sel = new Set();
+
+  function render(){
+    if(data.length === 0){
+      document.getElementById('dataTable').style.display='none';
+      document.getElementById('pager').style.display='none';
+      var empty = document.getElementById('emptyState');
+      if(empty) empty.style.display='block';
+      return;
+    }
+    tbody.innerHTML = data.slice(0,6).map(function(row, i){
+      return renderRow(row, i);
+    }).join('');
+    tbody.querySelectorAll('tr').forEach(function(tr){
+      tr.addEventListener('click', function(e){
+        var rows = [].slice.call(tbody.querySelectorAll('tr'));
+        var apply = function(r, on){
+          r.classList.toggle('row-selected', on);
+          if(on) sel.add(r.dataset.id); else sel.delete(r.dataset.id);
+          var c = r.querySelector('td.chk'); if(c) c.textContent = on ? '▣' : '☐';
+        };
+        if (e.shiftKey && window.__selAnchor && rows.indexOf(window.__selAnchor) >= 0) {
+          var a = rows.indexOf(window.__selAnchor), b = rows.indexOf(tr);
+          var s = Math.min(a,b), t = Math.max(a,b);
+          sel.clear();
+          rows.forEach(function(r, i){ apply(r, i>=s && i<=t); });
+        } else if (e.ctrlKey || e.metaKey) {
+          apply(tr, !tr.classList.contains('row-selected'));
+          window.__selAnchor = tr;
+        } else {
+          sel.clear();
+          rows.forEach(function(r){ apply(r, false); });
+          apply(tr, true);
+          window.__selAnchor = tr;
+        }
+        updateToolbar();
+      });
+      tr.addEventListener('dblclick', function(){
+        alert("Phase A · 模拟跳转新 tab: wbs.html?id=" + tr.dataset.id);
+      });
+    });
+  }
+
+  function updateToolbar(){
+    var n = document.querySelectorAll('.table tbody tr.row-selected').length;
+    selCount.textContent = '已选 ' + n;
+    selCount.classList.toggle('active', n > 0);
+    if(btnPreview) btnPreview.disabled = n === 0;
+    if(btnEdit) btnEdit.disabled = n !== 1;
+    if(btnHistory) btnHistory.disabled = n === 0;
+    if(btnDelete) btnDelete.disabled = n === 0;
+  }
+
+  selCount.addEventListener('click', function(){
+    sel.clear();
+    tbody.querySelectorAll('tr').forEach(function(tr){
+      tr.classList.remove('row-selected');
+      var chk = tr.querySelector('td.chk');
+      if(chk) chk.textContent = '☐';
+    });
+    updateToolbar();
+  });
+
+  render();
+})();
+  </script>
+</body>
+</html>

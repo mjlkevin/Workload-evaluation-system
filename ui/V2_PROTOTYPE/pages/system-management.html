@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 系统管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .tab-panel{display:none}
+  .tab-panel.on{display:block}
+  .sub-card{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:16px}
+  .sub-card .tt{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .sub-card .tt .sw{width:36px;height:20px;border-radius:10px;background:var(--line-2);position:relative;cursor:pointer;transition:.15s;flex-shrink:0}
+  .sub-card .tt .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+  .sub-card .tt .sw.on{background:var(--ok)}
+  .sub-card .tt .sw.on::after{left:18px}
+  .sub-card .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+  .sub-card .fields .f{display:flex;flex-direction:column;gap:4px}
+  .sub-card .fields .f label{font-size:11px;color:var(--ink-3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+  .sub-card .fields .f .v{font-size:13px;color:var(--ink);font-weight:600}
+  .hint{background:var(--brand-soft);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;margin-top:14px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-2)}
+  .hint .btn{font-size:12px;padding:5px 12px;height:30px}
+  .apikey-block{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;margin-top:16px}
+  .apikey-block .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .apikey-block .masked{font-family:var(--font-mono);font-size:13px;color:var(--ink);background:var(--bg-soft);padding:6px 10px;border-radius:6px;letter-spacing:.04em}
+  .modal-overlay{display:none;position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.4);place-items:center;padding:24px}
+  .modal-overlay.on{display:grid}
+  .modal{max-width:720px;width:100%;max-height:calc(100vh - 48px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--dialog-radius);box-shadow:var(--shadow-3)}
+  .modal .hd{padding:16px 20px;border-bottom:1px solid var(--line);font-weight:700;display:flex;align-items:center;justify-content:space-between}
+  .modal .bd{padding:20px}
+  .modal .ft{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:var(--bg-soft)}
+  .modal textarea{width:100%;min-height:400px;padding:12px;border:1px solid var(--line-2);border-radius:var(--r-md);font-family:var(--font-mono);font-size:13px;line-height:1.6;resize:vertical;outline:none}
+  .modal textarea:focus{border-color:var(--brand);box-shadow:var(--shadow-focus)}
+  .top-actions{display:flex;gap:8px;align-items:center;margin-bottom:12px;justify-content:flex-end}
+  .dsl-placeholder{min-height:200px;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:13px}
+  .rate-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .rate-it{background:var(--bg-soft);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .rate-it .lb{font-size:11px;color:var(--ink-3);font-family:var(--font-mono)}
+  .rate-it .vl{font-size:14px;font-weight:700;margin-top:4px}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="l">W</div><div>WES</div></div>
+      <div class="grp">
+        <h6>工作台</h6>
+        <a href="home.html"><span class="ic">●</span>主页</a>
+        <a href="requirement-list.html"><span class="ic">✎</span>需求</a>
+        <a href="assessment-list.html"><span class="ic">▣</span>实施评估</a>
+        <a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a>
+        <a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a>
+        <a href="wbs.html"><span class="ic">☷</span>WBS</a>
+        <a href="review-list.html"><span class="ic">✓</span>评审</a>
+      </div>
+      <div class="grp">
+        <h6>系统</h6>
+        <a href="system-management.html" class="on"><span class="ic">⚙</span>系统管理</a>
+        <a href="user-management.html"><span class="ic">☺</span>用户管理</a>
+        <a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a>
+      </div>
+      <div class="user">
+        <div class="row"><div class="av">M</div><div><div class="nm">mjlkevin</div><div class="meta">超级管理员</div></div></div>
+        <a class="out" href="login.html">退出</a>
+      </div>
+    </aside>
+    <main class="content">
+      <div class="pg-hd">
+        <div class="crumb"><b>工作台</b> &nbsp;/&nbsp; <b style="color:var(--ink)">系统管理</b></div>
+        <div class="row">
+          <h1>系统管理</h1>
+          <span style="color:var(--ink-3);font-size:12px;margin-left:6px">编码规则 / 模型配置 / RateCard / DSL</span>
+          <div class="right">
+            <button class="btn btn-out" style="font-size:12px;padding:6px 12px" onclick="openPrompt()">✎ 提示词</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs" id="sysTabs">
+        <div class="t on" data-tab="rules" onclick="switchTab('rules')">编码规则<span class="ct">6</span></div>
+        <div class="t" data-tab="model" onclick="switchTab('model')">模型配置</div>
+        <div class="t" data-tab="rate" onclick="switchTab('rate')">RateCard</div>
+        <div class="t" data-tab="dsl" onclick="switchTab('dsl')">DSL 规则集</div>
+        <div class="t" data-tab="tpl" onclick="switchTab('tpl')">模板</div>
+      </div>
+
+      <div style="padding:18px 24px">
+        <!-- 编码规则 -->
+        <div class="tab-panel on" id="panel-rules">
+          <div class="section">
+            <div class="hd">
+              <span>编码规则</span>
+              <div class="right">
+                <button class="btn btn-out" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">配置</button>
+                <button class="btn btn-pri" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">⌁ 生效</button>
+                <button class="btn btn-dan" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">禁用</button>
+              </div>
+            </div>
+            <table class="table" id="ruleTable" style="border-radius:0;border-left:none;border-right:none">
+              <thead><tr><th>模块</th><th>编码</th><th>前缀</th><th>格式</th><th>示例</th><th>状态</th><th>生效时间</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 模型配置 -->
+        <div class="tab-panel" id="panel-model">
+          <div class="top-actions">
+            <button class="btn btn-out" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">保存草稿</button>
+            <button class="btn btn-pri" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">⌁ 生效配置</button>
+          </div>
+          <div class="grid-2">
+            <div class="sub-card">
+              <div class="tt">KIMI 评估<div class="sw on" id="swEval" onclick="this.classList.toggle('on')"></div></div>
+              <div class="fields">
+                <div class="f"><label>模型</label><div class="v" id="evalModel">—</div></div>
+                <div class="f"><label>Prompt Profile</label><div class="v" id="evalProfile">—</div></div>
+                <div class="f"><label>Temperature</label><div class="v" id="evalTemp">—</div></div>
+                <div class="f"><label>最大 Tokens</label><div class="v" id="evalMax">—</div></div>
+              </div>
+              <div class="hint">
+                <span>评估模型用于实施评估与开发评估的自动打标与摘要生成。</span>
+                <button class="btn btn-out" onclick="alert('Phase A · 静态 mock')">测试连通性</button>
+              </div>
+            </div>
+            <div class="sub-card">
+              <div class="tt">文件解析<div class="sw on" id="swParse" onclick="this.classList.toggle('on')"></div></div>
+              <div class="fields">
+                <div class="f"><label>模型</label><div class="v" id="parseModel">—</div></div>
+                <div class="f"><label>Prompt Profile</label><div class="v" id="parseProfile">—</div></div>
+                <div class="f"><label>Temperature</label><div class="v" id="parseTemp">—</div></div>
+                <div class="f"><label>最大 Tokens</label><div class="v" id="parseMax">—</div></div>
+              </div>
+              <div class="hint">
+                <span>文件解析模型用于 Excel/Word/PDF 的结构化提取与内容解析。</span>
+                <button class="btn btn-out" onclick="alert('Phase A · 静态 mock')">测试连通性</button>
+              </div>
+            </div>
+          </div>
+          <div class="apikey-block">
+            <div style="font-size:13px;font-weight:700;margin-bottom:10px">API Key 管理</div>
+            <div class="row">
+              <span class="masked" id="keyMasked">sk-****-****</span>
+              <input class="input" style="flex:1;min-width:200px;max-width:360px" id="keyInput" placeholder="输入新 API Key" />
+              <button class="btn btn-out" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">测试连接</button>
+              <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">改用环境变量</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- RateCard -->
+        <div class="tab-panel" id="panel-rate">
+          <div class="section">
+            <div class="hd"><span>RateCard · 当前生效</span><div class="right"><button class="btn btn-out" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">编辑</button></div></div>
+            <div class="bd">
+              <div class="rate-grid" id="rateGrid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DSL 规则集 -->
+        <div class="tab-panel" id="panel-dsl">
+          <div class="section">
+            <div class="hd"><span>DSL 规则集</span><div class="right"><button class="btn btn-out" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">编辑 JSON</button></div></div>
+            <div class="bd">
+              <textarea class="input" style="min-height:260px;font-family:var(--font-mono);font-size:12px;line-height:1.6" readonly id="dslArea">{"placeholder": "DSL JSON 规则集占位"}</textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- 模板 -->
+        <div class="tab-panel" id="panel-tpl">
+          <div class="section">
+            <div class="hd"><span>模板管理</span></div>
+            <div class="bd">
+              <div class="dsl-placeholder">模板配置即将上线 · 当前占位</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Prompt Dialog -->
+  <div class="modal-overlay" id="promptModal" onclick="if(event.target===this)closePrompt()">
+    <div class="modal">
+      <div class="hd">提示词草稿<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px" onclick="closePrompt()">✕</button></div>
+      <div class="bd">
+        <textarea id="promptArea" placeholder="在此编辑提示词草稿…"></textarea>
+      </div>
+      <div class="ft">
+        <button class="btn btn-out" onclick="alert('草稿已保存（模拟）')">保存草稿</button>
+        <button class="btn btn-pri" onclick="alert('配置已生效（模拟）');closePrompt()">生效配置</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../mock/data.js"></script>
+  <script>
+    (function(){
+      var ss = window.MOCK.systemSettings || {};
+      var rules = ss.versionCodeRules || [];
+      var tbody = document.querySelector('#ruleTable tbody');
+      tbody.innerHTML = rules.map(function(r){
+        var st = r.status === 'active' ? '<span class="bdg ci" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>生效中</span>' : '<span class="bdg draft" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>已禁用</span>';
+        var at = r.activatedAt ? r.activatedAt.replace('T',' ').replace('Z','') : '—';
+        return '<tr><td>'+r.module+'</td><td class="mono">'+r.code+'</td><td class="mono">'+r.prefix+'</td><td class="mono">'+r.format+'</td><td class="mono">'+r.example+'</td><td>'+st+'</td><td style="color:var(--ink-3);font-family:var(--font-mono);font-size:11px">'+at+'</td></tr>';
+      }).join('');
+
+      var mc = ss.modelConfig || {};
+      document.getElementById('evalModel').textContent = mc.kimiEvaluation ? mc.kimiEvaluation.model : '—';
+      document.getElementById('evalProfile').textContent = mc.kimiEvaluation ? mc.kimiEvaluation.promptProfile : '—';
+      document.getElementById('evalTemp').textContent = mc.kimiEvaluation ? mc.kimiEvaluation.temperature : '—';
+      document.getElementById('evalMax').textContent = mc.kimiEvaluation ? mc.kimiEvaluation.maxTokens : '—';
+      document.getElementById('parseModel').textContent = mc.kimiFileParsing ? mc.kimiFileParsing.model : '—';
+      document.getElementById('parseProfile').textContent = mc.kimiFileParsing ? (mc.kimiFileParsing.promptProfile || 'default-v1') : '—';
+      document.getElementById('parseTemp').textContent = mc.kimiFileParsing ? (mc.kimiFileParsing.temperature || 0.1) : '—';
+      document.getElementById('parseMax').textContent = mc.kimiFileParsing ? (mc.kimiFileParsing.maxTokens || 4096) : '—';
+      document.getElementById('keyMasked').textContent = mc.apiKeyMasked || 'sk-****-****';
+
+      var lorem = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. ';
+      while(lorem.length < 1200) lorem += lorem;
+      document.getElementById('promptArea').value = (mc.kimiEvaluation && mc.kimiEvaluation.promptDraft) ? mc.kimiEvaluation.promptDraft : lorem.substring(0,1200);
+
+      var rc = ss.rateCardActive || {};
+      var rateData = rc.table || [];
+      document.getElementById('rateGrid').innerHTML = rateData.map(function(r){
+        return '<div class="rate-it"><div class="lb">'+r.role+'</div><div class="vl">'+r.unitPriceMax+' '+r.currency+'</div></div>';
+      }).join('');
+
+      var dsl = ss.dslRuleSetActive || {};
+      if(dsl.rulesJson) document.getElementById('dslArea').value = JSON.stringify(JSON.parse(dsl.rulesJson), null, 2);
+    })();
+
+    function switchTab(id){
+      document.querySelectorAll('.tabs .t').forEach(function(t){ t.classList.remove('on'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('on'); });
+      document.querySelector('.tabs .t[data-tab="'+id+'"]').classList.add('on');
+      document.getElementById('panel-'+id).classList.add('on');
+    }
+    function openPrompt(){ document.getElementById('promptModal').classList.add('on'); }
+    function closePrompt(){ document.getElementById('promptModal').classList.remove('on'); }
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closePrompt(); });
+  </script>
+</body>
+</html>

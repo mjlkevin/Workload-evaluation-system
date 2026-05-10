@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 需求详情</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .pg-hd{padding:18px 24px 14px;border-bottom:1px solid var(--line)}
+  .pg-hd .row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+  .pg-hd h1{margin:8px 0 0;font-size:28px;line-height:1.1}
+  .pg-hd .crumb{color:var(--ink-3);font-size:13px}
+  .pg-hd .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+  .pg-hd .mono{font-family:var(--font-mono)}
+  .pg-body{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px;padding:16px 24px 24px}
+  .main-col{display:grid;gap:16px}
+  .reg{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 18px 16px;box-shadow:var(--shadow-1)}
+  .reg.bg-soft{background:var(--bg-soft);border-style:dashed}
+  .rlab{position:absolute;left:14px;top:-11px;padding:0 8px;background:var(--surface);font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--ink-3)}
+  .reg.bg-soft .rlab{background:var(--bg-soft)}
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .grid2x2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .fbox{border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px;background:var(--bg-soft)}
+  .fbox .k{font-size:12px;color:var(--ink-3)}
+  .fbox .v{margin-top:4px;font-weight:600}
+  .longtxt{grid-column:1/-1;display:grid;gap:10px}
+  .longtxt .p{border:1px solid var(--line);border-radius:var(--r-md);padding:12px;background:var(--bg-soft);line-height:1.65;color:var(--ink)}
+  .chip{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;background:var(--bg-soft);color:var(--ink-3);border:1px solid var(--line)}
+  .chip.val{background:color-mix(in oklab,var(--ok-soft) 70%, var(--bg-soft));color:var(--ok)}
+  .chip.req{background:color-mix(in oklab,var(--brand-soft) 72%, var(--bg-soft));color:var(--brand)}
+  .chip.ind{background:color-mix(in oklab,var(--accent-soft) 72%, var(--bg-soft));color:var(--accent)}
+  .vp{display:grid;gap:10px}
+  .vp-row{display:grid;grid-template-columns:128px minmax(0,1fr);gap:10px;align-items:start;border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px;background:var(--bg-soft)}
+  .vp-row .txt{line-height:1.6}
+  .at{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden}
+  .at th,.at td{border-bottom:1px solid var(--line);padding:10px 10px;vertical-align:top;font-size:13px}
+  .at th{background:var(--bg-soft);text-align:left;color:var(--ink-3);font-weight:700}
+  .group-row td{background:color-mix(in oklab,var(--bg-soft) 75%, var(--brand-soft) 5%);font-weight:800;color:var(--ink)}
+  .summary-row td{background:var(--bg-soft);font-weight:800}
+  .row-error td{background:var(--err-soft);color:var(--err)}
+  .errtip{display:inline-flex;align-items:center;margin-left:8px;padding:2px 6px;border-radius:999px;background:var(--err-soft);color:var(--err);font-size:11px;font-weight:700}
+  tbody tr:hover{background:color-mix(in oklab,var(--brand-soft) 18%, var(--surface))}
+  tbody tr.row-selected{outline:2px solid color-mix(in oklab,var(--brand) 36%, transparent);outline-offset:-2px}
+  .mini-card{border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:14px}
+  .mini-card h4{margin:0 0 8px;font-size:14px}
+  .mini-card .meta{font-size:12px;color:var(--ink-3);margin-bottom:8px}
+  .side{display:grid;gap:16px;align-content:start}
+  .donut-card,.ai-card,.vt-card{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);padding:16px;box-shadow:var(--shadow-1)}
+  .donut-wrap{display:grid;place-items:center;gap:10px;margin-bottom:10px}
+  .donut-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--ink-3)}
+  .ai-card{background:linear-gradient(180deg,color-mix(in oklab,oklch(.62 .20 320) 14%, var(--surface)),var(--surface))}
+  .ai-card .tag{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:oklch(.95 .03 295);color:oklch(.45 .22 295);font-size:11px;font-weight:800;letter-spacing:.04em}
+  .ai-card p{line-height:1.7;color:var(--ink)}
+  .ai-btns{display:flex;gap:8px;flex-wrap:wrap}
+  .vt{display:grid;gap:12px}
+  .vt-item{display:grid;grid-template-columns:14px minmax(0,1fr);gap:10px}
+  .vt-dot{width:12px;height:12px;border-radius:999px;background:var(--line);margin-top:4px;position:relative}
+  .vt-item.cur .vt-dot{background:var(--brand);box-shadow:0 0 0 4px color-mix(in oklab,var(--brand-soft) 24%, transparent)}
+  .vt-item.cur .vt-dot::after{content:"";position:absolute;inset:-7px;border-radius:999px;border:1px solid color-mix(in oklab,var(--brand) 35%, transparent)}
+  .vt-item .t{font-size:12px;color:var(--ink-3)}
+  .vt-item .x{font-weight:700}
+  .menu-wrap{position:relative;display:inline-block}
+  .kimi-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:190px;padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-2);display:none;z-index:40}
+  .menu-wrap:hover .kimi-menu,.menu-wrap.open .kimi-menu{display:block}
+  .kimi-menu button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:10px 10px;border-radius:10px;cursor:pointer;color:var(--ink)}
+  .kimi-menu button:hover{background:var(--bg-soft)}
+  .dialog-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:20px;z-index:100}
+  .dialog-backdrop.open{display:flex}
+  .dialog{width:min(560px,100%);background:var(--surface);border-radius:var(--dialog-radius);border:1px solid var(--line);box-shadow:var(--shadow-3);overflow:hidden}
+  .dialog.large{width:min(90vw,1240px);height:min(80vh,900px);display:flex;flex-direction:column}
+  .dialog.med{width:min(680px,100%)}
+  .dialog.sm{width:min(520px,100%)}
+  .dialog-hd,.dialog-ft{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .dialog-ft{border-top:1px solid var(--line);border-bottom:0;justify-content:flex-end}
+  .dialog-bd{padding:16px;overflow:auto}
+  .dialog.large .dialog-bd{display:grid;gap:16px;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dialog .close{border:0;background:var(--bg-soft);border-radius:999px;width:32px;height:32px;cursor:pointer}
+  .log-list,.risk-list,.ass-list{margin:0;padding-left:18px;line-height:1.7}
+  .mini-table{width:100%;border-collapse:collapse}
+  .mini-table td,.mini-table th{border-bottom:1px solid var(--line);padding:8px 8px;font-size:12px;text-align:left}
+  .formula{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+  .formula .b{border:1px solid var(--line);border-radius:var(--r-md);padding:10px;background:var(--bg-soft)}
+  .dz{border:1px dashed var(--line);border-radius:var(--r-lg);padding:24px;text-align:center;background:var(--bg-soft);min-height:150px;display:grid;place-items:center;color:var(--ink-3)}
+  .chkline{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--ink-3)}
+  .radio-list{display:grid;gap:8px}
+  .radio-item{border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px;background:var(--bg-soft);display:flex;gap:10px;align-items:flex-start}
+  .radio-item input{margin-top:4px}
+  textarea{width:100%;resize:none;border:1px solid var(--line);border-radius:var(--r-md);padding:12px;background:var(--bg-soft);color:var(--ink);font:inherit}
+  .muted{color:var(--ink-3)}
+  .progress{height:10px;background:var(--bg-soft);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+  .progress > div{height:100%;width:62%;background:linear-gradient(90deg,oklch(.62 .20 320),oklch(.45 .22 295))}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:999px;background:var(--ink-3)}
+  .success{background:var(--ok)}
+  @media (max-width: 1180px){.pg-body{grid-template-columns:1fr}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}.dialog.large .dialog-bd{grid-template-columns:1fr}.formula{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width: 760px){.grid3,.grid2x2{grid-template-columns:1fr}.pg-hd .row,.vcs-bar,.dialog-hd,.dialog-ft{flex-direction:column;align-items:flex-start}.tabs{overflow:auto;flex-wrap:nowrap}}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="l">W</div><div>WES</div></div>
+      <div class="grp"><h6>工作台</h6><a href="home.html"><span class="ic">●</span>主页</a><a class="on" href="requirement-list.html">需求</a><a href="assessment-list.html"><span class="ic">▣</span>实施评估</a><a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a><a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a><a href="wbs.html"><span class="ic">☷</span>WBS</a><a href="review-list.html"><span class="ic">✓</span>评审</a></div>
+      <div class="grp"><h6>系统</h6><a href="system-management.html"><span class="ic">⚙</span>系统管理</a><a href="user-management.html"><span class="ic">☺</span>用户管理</a><a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a></div>
+      <div class="user"><div class="row"><div class="av">A</div><div><div class="nm">admin</div><div class="meta">系统管理员</div></div></div><a class="out" href="login.html">退出</a></div>
+    </aside>
+    <main class="content">
+      <div class="pg-hd"><div class="crumb">工作台 / 需求 / 需求详情</div><div class="row"><div><h1>需求详情 <span class="bdg ci"><span class="dot success"></span>已检入</span> <span class="bdg mono">v03 · VA2</span> <span class="bdg mono">模型 kimi-k2.5</span></h1></div><div class="right"><div class="menu-wrap" id="kimiWrap"><button class="kimi-trigger btn btn-pri" id="kimiBtn" type="button">Kimi-help ▾</button><div class="kimi-menu" id="kimiMenu"><button type="button" data-dialog="d2">Kimi 评估</button><button type="button" data-dialog="d4">Kimi 生成</button><button type="button" data-dialog="d3">Kimi 解析文件</button></div></div><button class="btn btn-out" type="button" onclick="uiAlert()">🕘 历史</button><button class="btn btn-out" type="button" onclick="uiAlert()">↓ 导出</button><button class="btn btn-pri" type="button" onclick="uiAlert()">⤓ 检出编辑</button></div></div></div>
+      <div class="vcs-bar"><span class="bdg ci"><span class="dot success"></span>已检入</span><span class="mono" style="font-weight:700">v03 · VA2</span><span style="color:var(--ink-3);font-size:11px">2026-05-09 14:28</span><div class="grp"><button class="ib">🕘 历史</button><button class="ib">⬆ 升版</button></div><div class="grp" style="margin-left:auto"><button class="ib pri">⤓ 检出编辑</button><button class="ib" disabled>⤒ 检入</button><button class="ib" disabled>↶ 撤销</button></div><div class="grp"><button class="ib dan">⚠️ 强制解锁</button></div></div>
+      <div class="tabs"><a class="on" href="#">条目明细 (22)</a><a href="#">版本历史 (8)</a><a href="#">变更对比</a><a href="#">附件</a><a href="#">SOW</a><a href="#">DSL 规则审阅</a></div>
+      <div class="pg-body">
+        <section class="main-col">
+          <article class="reg"><div class="rlab">CONTEXT</div><h3>版本与上下文</h3><div class="grid3" style="margin-top:12px"><div class="fbox"><div class="k">总方案</div><div class="v" id="totalPlan"></div></div><div class="fbox"><div class="k">需求版本</div><div class="v" id="reqVersion"></div></div><div class="fbox"><div class="k">检出状态</div><div class="v">已检入</div></div></div></article>
+          <article class="reg"><div class="rlab">BASIC</div><h3>基本情况</h3><div class="grid3" style="margin-top:12px" id="basicGrid"></div></article>
+          <article class="reg"><div class="rlab">VALUE</div><h3>价值主张</h3><div class="vp" style="margin-top:12px" id="valueGrid"></div></article>
+          <article class="reg"><div class="rlab">SCOPE</div><h3>业务范围 · 需求条目</h3><table class="table at" style="margin-top:12px"><thead><tr><th style="width:52px">#</th><th style="width:140px">分组</th><th>条目</th><th style="width:120px">状态</th></tr></thead><tbody id="scopeBody"></tbody></table></article>
+          <article class="reg bg-soft"><div class="rlab">4+1</div><h3>余下 4+1 区动态行表</h3><div class="grid2x2" style="margin-top:12px" id="lineGrid"></div><div class="mini-card" style="margin-top:10px"><h4>会议纪要</h4><textarea id="notesBox" readonly rows="4"></textarea></div></article>
+        </section>
+        <aside class="side">
+          <div class="donut-card"><div class="donut-wrap"><svg viewBox="0 0 120 120" width="120" height="120" aria-label="完整度"><circle cx="60" cy="60" r="44" fill="none" stroke="var(--line)" stroke-width="12"/><circle cx="60" cy="60" r="44" fill="none" stroke="oklch(.55 .22 295)" stroke-width="12" stroke-linecap="round" stroke-dasharray="276" stroke-dashoffset="60" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="22" font-weight="800" fill="var(--ink)" id="donutPct">78%</text><text x="60" y="78" text-anchor="middle" font-size="11" fill="var(--ink-3)">完整度</text></svg></div><div class="donut-stat" id="donutStats"></div></div>
+          <div class="ai-card"><span class="tag">✦ AI COPILOT</span><p>建议优先固化 DSL 冲突条目并同步到实施评估页，再以 Kimi 评估预览补足风险与公式校准，减少后续版本回滚。</p><div class="ai-btns"><button class="btn-pri" type="button" onclick="uiAlert()">应用建议</button><button class="btn-ghost" type="button" onclick="uiAlert()">查看依据</button></div></div>
+          <div class="vt-card"><h3>版本时间轴</h3><div class="vt" style="margin-top:12px" id="timeline"></div></div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <div class="dialog-backdrop" id="db-d1" data-close="1"><div class="dialog sm" role="dialog" aria-modal="true"><div class="dialog-hd"><b>Kimi 评估进度</b><button class="close" data-close="1">×</button></div><div class="dialog-bd"><div class="progress"><div></div></div><div class="muted" style="margin-top:8px">进度 62%</div><ul class="log-list"><li>已抓取需求基本情况与版本上下文</li><li>已同步价值主张 3 项</li><li>已识别 DSL 冲突 1 条</li><li>正在生成预览建议</li></ul></div></div></div>
+  <div class="dialog-backdrop" id="db-d2" data-close="1"><div class="dialog large" role="dialog" aria-modal="true"><div class="dialog-hd"><b>Kimi 评估预览</b><button class="close" data-close="1">×</button></div><div class="dialog-bd"><div><h4>模块明细</h4><table class="table mini-table"><tr><th>模块</th><th>条目</th><th>结论</th></tr><tbody id="miniMod"></tbody></table></div><div><h4>风险列表</h4><ul class="risk-list" id="riskList"></ul></div><div><h4>假设条目</h4><ul class="ass-list" id="assList"></ul></div><div><h4>公式拆解</h4><div class="formula"><div class="b"><b>基线</b><div class="muted">78</div></div><div class="b"><b>复杂度</b><div class="muted">+8</div></div><div class="b"><b>协同</b><div class="muted">+6</div></div><div class="b"><b>缓冲</b><div class="muted">+4</div></div><div class="b"><b>校准</b><div class="muted">= 96</div></div></div></div><div><h4>模型校准</h4><p class="muted">建议把 DSL 冲突优先转为实施评估约束项，并在下一版对齐版本时间轴。</p></div></div><div class="dialog-ft"><button class="btn btn-ghost" type="button" onclick="uiAlert()">打印 PDF</button><button class="btn btn-pri" type="button" onclick="uiAlert()">应用到实施评估页</button></div></div></div>
+  <div class="dialog-backdrop" id="db-d3" data-close="1"><div class="dialog med" role="dialog" aria-modal="true"><div class="dialog-hd"><b>Kimi 解析文件</b><button class="close" data-close="1">×</button></div><div class="dialog-bd"><div class="dz">Drop 文件到此处或点击选择文件</div><label class="chkline"><input type="checkbox">覆盖现有字段</label></div><div class="dialog-ft"><button class="btn btn-ghost" type="button" onclick="uiAlert()">取消</button><button class="btn btn-pri" type="button" onclick="uiAlert()">开始解析</button></div></div></div>
+  <div class="dialog-backdrop" id="db-d4" data-close="1"><div class="dialog med" role="dialog" aria-modal="true"><div class="dialog-hd"><b>企业简介歧义</b><button class="close" data-close="1">×</button></div><div class="dialog-bd"><div class="radio-list" id="companyList"></div></div><div class="dialog-ft"><button class="btn btn-ghost" type="button" onclick="uiAlert()">取消</button><button class="btn btn-pri" type="button" onclick="uiAlert()">应用</button></div></div></div>
+
+  <script src="../mock/data.js"></script>
+  <script>
+    const req = window.MOCK?.requirements?.[0] || {};
+    const b = req.basicInfo || {};
+    const v = req.valuePropositions || [];
+    const s = req.scopeItems || [];
+    const d = req.developmentOverview || [];
+    const p = req.productModules || [];
+    const i = req.implementationScope || [];
+    const k = req.keyPoints || [];
+    const t = req.timeline || [];
+    const c = req.completion || {};
+    const $ = (q) => document.querySelector(q);
+    const $$ = (q) => [...document.querySelectorAll(q)];
+    function uiAlert(){ alert('Phase A · 静态 mock'); }
+    function openDialog(id){ document.getElementById('db-' + id)?.classList.add('open'); document.getElementById('kimiWrap')?.classList.remove('open'); }
+    function closeAll(){ $$('.dialog-backdrop.open').forEach(n => n.classList.remove('open')); }
+    $('#kimiBtn')?.addEventListener('click', e => { e.stopPropagation(); $('#kimiWrap')?.classList.toggle('open'); });
+    $$('.kimi-menu button').forEach(btn => btn.addEventListener('click', () => openDialog(btn.dataset.dialog)));
+    $$('.dialog-backdrop').forEach(bd => bd.addEventListener('click', e => { if (e.target === bd || e.target.matches('[data-close="1"]')) bd.classList.remove('open'); }));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
+    document.addEventListener('click', e => { if (!e.target.closest('.menu-wrap')) $('#kimiWrap')?.classList.remove('open'); });
+    $$('#scopeBody tr').forEach && 0;
+
+    $('#totalPlan').textContent = '总方案 A2';
+    $('#reqVersion').textContent = 'v03 / VA2';
+    $('#updatedAt').textContent = '2026-05-09 14:28';
+    $('#basicGrid').innerHTML = [
+      ['客户名称', b.customer], ['地点', b.location], ['项目名称', b.project],
+      ['商机号', b.opportunityNo], ['产品线', (b.productLines || []).join(' · ')], ['客户行业', b.industry],
+      ['企业营收', b.revenue], ['信息化现状', b.itStatus], ['预期上线', b.expectedLaunch]
+    ].map(([label,val])=> `<div class="fbox"><div class="k">${label}</div><div class="v">${val || ''}</div></div>`).join('') + `<div class="longtxt"><div class="p"><b>企业简介</b><br>${b.profile || ''}</div><div class="p"><b>项目背景</b><br>${b.background || ''}</div></div>`;
+    $('#valueGrid').innerHTML = v.map((x,idx)=> `<div class="vp-row"><span class="chip ${idx===0?'val':idx===1?'req':'ind'}">${x.type}</span><div class="txt">${x.text}</div></div>`).join('');
+    const groupMap = { A: 'A 核算与凭证', B: 'B 销售与采购' };
+    const scopeRows = [];
+    let count = 0;
+    let current = null;
+    s.forEach((x) => {
+      if (current !== x.group) { current = x.group; scopeRows.push(`<tr class="group-row"><td colspan="4">${groupMap[current] || current}</td></tr>`); }
+      count += 1;
+      const issue = count === 4 ? `<span class="errtip">${x.dslIssue?.ruleId || 'DSL'} · ${x.dslIssue?.message || '规则冲突'}</span>` : '';
+      scopeRows.push(`<tr class="${count === 4 ? 'row-error' : ''}"><td>${count}</td><td>${x.group}</td><td>${x.name}${issue}</td><td>${count === 4 ? '违反' : x.status}</td></tr>`);
+    });
+    scopeRows.push('<tr class="summary-row"><td colspan="4">合计：22 条需求，1 条 DSL 违反</td></tr>');
+    $('#scopeBody').innerHTML = scopeRows.join('');
+    $$('#scopeBody tr').forEach(tr => tr.addEventListener('click', () => { if (!tr.classList.contains('group-row') && !tr.classList.contains('summary-row')) tr.classList.toggle('row-selected'); }));
+    $('#lineGrid').innerHTML = [
+      ['开发概览', d.length, '聚焦交付节奏、接口依赖与资源排布。'],
+      ['产品模块', p.length, '覆盖模块边界、映射关系与通用能力。'],
+      ['实施范围（多基地）', i.length, '按基地拆分实施边界与并行约束。'],
+      ['关键要点', k.length, '记录本次需求中最关键的管理动作与风险点。']
+    ].map(([title,count,desc])=> `<div class="mini-card"><h4>${title}</h4><div class="meta">${count} 条</div><div>${desc}</div></div>`).join('');
+    $('#notesBox').value = (req.meetingNotes || '').slice(0,200) + '...';
+    $('#donutPct').textContent = '78%';
+    $('#donutStats').innerHTML = [`基础 ${c.basic || '9/9'}`, `价值 ${c.value || '3/3'}`, `业务 ${c.items || '17/22'}`, `DSL 违反 ${c.dslViolations ?? 1}`].map(label=> { const [a,...rest]=label.split(' '); return `<div class="donut-row"><span>${a}</span><b>${rest.join(' ')}</b></div>`; }).join('');
+    $('#timeline').innerHTML = t.map(x => `<div class="vt-item ${x.cur ? 'cur' : ''}"><div class="vt-dot"></div><div><div class="t">${x.at}</div><div class="x">${x.version} · ${x.label}</div></div></div>`).join('');
+    $('#miniMod').innerHTML = [ ['流程引擎','4','可执行'], ['报表中心','3','需确认'], ['集成层','2','通过'], ['多基地','1','关注'] ].map(x => `<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join('');
+    $('#riskList').innerHTML = [ '<li>DSL 规则冲突会导致规则不可并行发布</li>', '<li>多基地实施范围存在边界重叠</li>', '<li>需要同步确认上线窗口与主数据口径</li>' ].join('');
+    $('#assList').innerHTML = [ '<li>客户组织架构稳定</li>', '<li>接口依赖可按期提供</li>', '<li>审批流权限由业务方统一确认</li>' ].join('');
+    $('#companyList').innerHTML = [ '金石科技股份有限公司', '金石制造集团有限公司', '金石供应链服务有限公司' ].map(n => `<label class="radio-item"><input type="radio" name="co"><span>${n}</span></label>`).join('');
+    document.querySelectorAll('[style*="--purple-"]').forEach(el => el.removeAttribute('style'));
+    console.log('requirement-detail mock ready');
+  </script>
+</body>
+</html>
