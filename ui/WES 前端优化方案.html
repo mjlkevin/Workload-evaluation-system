@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 前端优化方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* 提案色：深空蓝主基调 + 朱砂橙强调 + 雾青辅助 */
+    --bg:           oklch(0.985 0.004 250);
+    --bg-soft:      oklch(0.965 0.006 250);
+    --surface:      #ffffff;
+    --ink:          oklch(0.21 0.03 260);
+    --ink-2:        oklch(0.42 0.02 260);
+    --ink-3:        oklch(0.62 0.012 260);
+    --line:         oklch(0.92 0.008 255);
+    --line-2:       oklch(0.86 0.012 255);
+
+    --brand:        oklch(0.42 0.14 262);   /* 深空蓝 */
+    --brand-ink:    oklch(0.32 0.13 262);
+    --brand-soft:   oklch(0.96 0.025 260);
+    --accent:       oklch(0.69 0.18 45);    /* 朱砂橙 */
+    --accent-soft:  oklch(0.965 0.05 60);
+    --teal:         oklch(0.66 0.10 195);   /* 雾青 */
+    --teal-soft:    oklch(0.97 0.025 195);
+    --ok:           oklch(0.66 0.13 152);
+    --warn:         oklch(0.78 0.14 80);
+    --danger:       oklch(0.58 0.20 27);
+
+    --r-1: 8px; --r-2: 12px; --r-3: 16px; --r-4: 22px;
+    --shadow-1: 0 1px 2px rgba(20,28,48,.05), 0 1px 1px rgba(20,28,48,.04);
+    --shadow-2: 0 8px 28px -12px rgba(20,28,48,.18), 0 2px 6px -2px rgba(20,28,48,.06);
+    --shadow-3: 0 22px 60px -28px rgba(20,28,48,.30), 0 4px 14px -6px rgba(20,28,48,.08);
+
+    --font-sans: 'Inter','Noto Sans SC',system-ui,-apple-system,sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);font-feature-settings:"ss01","cv11";-webkit-font-smoothing:antialiased}
+  body{line-height:1.6;font-size:14px}
+  a{color:var(--brand);text-decoration:none}
+  .wrap{max-width:1320px;margin:0 auto;padding:48px 40px 120px}
+
+  /* ===== 顶栏 ===== */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 20px;border:1px solid var(--line);
+    border-radius:var(--r-3);background:var(--surface);
+    box-shadow:var(--shadow-1);margin-bottom:36px;
+    position:sticky;top:16px;z-index:30;backdrop-filter:saturate(140%) blur(10px);
+  }
+  .topbar .brand{display:flex;align-items:center;gap:12px;font-weight:700}
+  .topbar .logo{
+    width:34px;height:34px;border-radius:10px;
+    background:
+      radial-gradient(120% 120% at 0% 0%, oklch(0.55 0.16 262) 0%, transparent 60%),
+      radial-gradient(120% 120% at 100% 100%, var(--accent) 0%, transparent 55%),
+      var(--brand);
+    color:#fff;display:grid;place-items:center;font-weight:800;letter-spacing:.5px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.18), 0 6px 18px -8px var(--brand);
+  }
+  .topbar nav{display:flex;gap:6px}
+  .topbar nav a{
+    padding:8px 14px;border-radius:10px;color:var(--ink-2);font-weight:500;font-size:13px;
+  }
+  .topbar nav a.active{background:var(--brand-soft);color:var(--brand-ink)}
+
+  /* ===== 标题区 ===== */
+  .hero{
+    position:relative;padding:48px 44px;border-radius:var(--r-4);
+    background:
+      radial-gradient(60% 120% at 100% 0%, oklch(0.96 0.06 60 / .8), transparent 60%),
+      radial-gradient(80% 120% at 0% 100%, oklch(0.94 0.05 260 / .7), transparent 55%),
+      linear-gradient(180deg, oklch(0.985 0.005 250), #fff);
+    border:1px solid var(--line);overflow:hidden;
+  }
+  .hero::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:
+      linear-gradient(to right, rgba(20,28,48,.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(20,28,48,.04) 1px, transparent 1px);
+    background-size:48px 48px;mask:radial-gradient(80% 70% at 30% 30%, #000 30%, transparent 75%);
+  }
+  .hero .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:6px 12px;border-radius:999px;background:#fff;
+    border:1px solid var(--line);font-size:12px;font-weight:500;color:var(--ink-2);
+    box-shadow:var(--shadow-1);
+  }
+  .hero h1{
+    font-size:44px;line-height:1.15;letter-spacing:-.02em;font-weight:800;
+    margin:18px 0 14px;color:var(--ink);max-width:880px;
+  }
+  .hero h1 em{font-style:normal;background:linear-gradient(120deg,var(--brand),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lead{font-size:16px;color:var(--ink-2);max-width:760px;margin:0}
+  .hero .meta{display:flex;flex-wrap:wrap;gap:18px;margin-top:24px}
+  .hero .meta .pill{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);background:#fff;border:1px solid var(--line);padding:6px 12px;border-radius:999px}
+  .hero .meta .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+  /* ===== 通用 section ===== */
+  section.block{margin-top:64px}
+  .section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:22px;border-bottom:1px solid var(--line);padding-bottom:14px}
+  .section-head .num{font-family:var(--font-mono);font-size:12px;color:var(--accent);letter-spacing:.1em;font-weight:600;text-transform:uppercase}
+  .section-head h2{font-size:28px;letter-spacing:-.01em;margin:6px 0 0;font-weight:700}
+  .section-head p{margin:6px 0 0;color:var(--ink-2);max-width:720px}
+
+  /* ===== 现状诊断 ===== */
+  .diag{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px;
+  }
+  .diag .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);
+    padding:20px;position:relative;overflow:hidden;
+  }
+  .diag .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:.7}
+  .diag .card h4{margin:0 0 6px;font-size:14px;font-weight:600}
+  .diag .card .score{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);margin-bottom:10px}
+  .diag .card p{margin:0;color:var(--ink-2);font-size:13px}
+
+  /* ===== 配色：调色板对比 ===== */
+  .palette-row{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .palette{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);padding:20px;
+  }
+  .palette h3{margin:0 0 4px;font-size:16px;font-weight:700}
+  .palette .sub{font-size:12px;color:var(--ink-3);margin-bottom:16px}
+  .swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+  .sw{aspect-ratio:1/1;border-radius:10px;position:relative;border:1px solid rgba(0,0,0,.06);overflow:hidden}
+  .sw .lbl{position:absolute;left:8px;bottom:8px;font-family:var(--font-mono);font-size:10px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  .sw.dark .lbl{color:var(--ink)}
+  .palette .legend{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-family:var(--font-mono);font-size:11px;background:var(--bg-soft);padding:4px 8px;border-radius:6px;color:var(--ink-2);border:1px solid var(--line)}
+
+  /* 当前配色 swatches */
+  .curr-1{background:#fafafa}.curr-2{background:#f5f7fa}.curr-3{background:#e5e5e5}
+  .curr-4{background:#1a1a1a}.curr-5{background:#0d9488}.curr-6{background:#dc2626}
+
+  /* 新配色 */
+  .new-1{background:oklch(0.985 0.004 250)}
+  .new-2{background:oklch(0.96 0.025 260)}
+  .new-3{background:oklch(0.42 0.14 262)}
+  .new-4{background:oklch(0.21 0.03 260)}
+  .new-5{background:oklch(0.69 0.18 45)}
+  .new-6{background:oklch(0.66 0.10 195)}
+
+  /* ===== 配色应用预览（mock） ===== */
+  .mock{
+    margin-top:24px;border:1px solid var(--line);border-radius:var(--r-3);overflow:hidden;
+    background:var(--surface);box-shadow:var(--shadow-2);
+  }
+  .mock .mock-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:linear-gradient(180deg,#fafbfc,#f3f4f7);border-bottom:1px solid var(--line)}
+  .mock .mock-bar .dot{width:10px;height:10px;border-radius:50%}
+  .mock-content{display:grid;grid-template-columns:220px 1fr;min-height:380px;background:var(--bg-soft)}
+  .m-side{background:linear-gradient(180deg,#fff,#f8fafc);border-right:1px solid var(--line);padding:14px}
+  .m-side .ml-logo{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+  .m-side .ml-logo .lg{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),oklch(0.55 0.16 262));color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
+  .m-side .ml-logo b{font-size:14px}
+  .m-side .nav-it{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;font-size:12.5px;color:var(--ink-2);margin-bottom:2px}
+  .m-side .nav-it .ic{width:14px;height:14px;border-radius:4px;background:var(--ink-3);opacity:.5}
+  .m-side .nav-it.active{background:var(--brand);color:#fff}
+  .m-side .nav-it.active .ic{background:#fff;opacity:1}
+  .m-side .nav-it.accent{background:var(--accent-soft);color:var(--accent);border:1px dashed oklch(0.85 0.10 50)}
+
+  .m-main{padding:18px}
+  .m-main .crumb{font-size:11px;color:var(--ink-3);margin-bottom:8px;font-family:var(--font-mono)}
+  .m-main h3{margin:0;font-size:18px}
+  .m-main .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
+  .m-main .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;position:relative;overflow:hidden}
+  .m-main .stat .num{font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .m-main .stat .lb{font-size:11px;color:var(--ink-3)}
+  .m-main .stat .spark{position:absolute;right:8px;top:8px;width:50px;height:18px;background:linear-gradient(90deg,transparent,var(--brand-soft));border-radius:4px}
+  .m-main .stat.pri{background:linear-gradient(135deg,var(--brand),var(--brand-ink));color:#fff;border-color:transparent}
+  .m-main .stat.pri .lb{color:rgba(255,255,255,.75)}
+  .m-main .stat.pri .spark{background:linear-gradient(90deg,transparent,rgba(255,255,255,.18))}
+
+  .m-main .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:8px}
+  .m-main .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .m-main .panel-head b{font-size:13px}
+  .m-main .row-skel{display:grid;grid-template-columns:1.4fr 1fr 1fr .6fr;gap:8px;align-items:center;font-size:12px;padding:8px 4px;border-bottom:1px dashed var(--line);color:var(--ink-2)}
+  .m-main .row-skel:last-child{border-bottom:0}
+  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:600}
+  .badge.b-progress{background:var(--brand-soft);color:var(--brand-ink)}
+  .badge.b-review{background:var(--accent-soft);color:oklch(0.5 0.18 45)}
+  .badge.b-done{background:oklch(0.95 0.05 152);color:oklch(0.4 0.13 152)}
+
+  /* ===== 控件库 ===== */
+  .ctrl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+  .ctrl{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);
+    padding:22px;position:relative;
+  }
+  .ctrl h4{margin:0 0 4px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px}
+  .ctrl h4 .tag{font-family:var(--font-mono);font-size:10px;background:var(--brand-soft);color:var(--brand-ink);padding:2px 6px;border-radius:5px;font-weight:600}
+  .ctrl > p{margin:0 0 16px;color:var(--ink-2);font-size:12.5px}
+  .ctrl .demo{background:linear-gradient(180deg, var(--bg-soft), #fff);border:1px dashed var(--line-2);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+
+  /* —— Buttons —— */
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:transform .15s ease, box-shadow .2s ease, background .2s ease;font-family:inherit}
+  .btn-pri{background:var(--brand);color:#fff;box-shadow:0 6px 16px -8px var(--brand), inset 0 0 0 1px oklch(0.55 0.14 262)}
+  .btn-pri:hover{transform:translateY(-1px);box-shadow:0 10px 24px -8px var(--brand)}
+  .btn-acc{background:var(--accent);color:#fff;box-shadow:0 6px 16px -8px var(--accent)}
+  .btn-acc:hover{transform:translateY(-1px)}
+  .btn-out{background:#fff;color:var(--ink);border-color:var(--line-2)}
+  .btn-out:hover{border-color:var(--brand);color:var(--brand)}
+  .btn-ghost{background:transparent;color:var(--ink-2)}
+  .btn-ghost:hover{background:var(--bg-soft);color:var(--ink)}
+  .btn-dest{background:oklch(0.97 0.03 27);color:var(--danger);border:1px solid oklch(0.88 0.10 27)}
+
+  /* —— Inputs —— */
+  .field{display:flex;flex-direction:column;gap:6px;width:100%}
+  .field label{font-size:12px;color:var(--ink-2);font-weight:500}
+  .input{width:100%;padding:10px 12px;border:1px solid var(--line-2);border-radius:10px;background:#fff;font:inherit;font-size:13px;outline:none;transition:border-color .15s, box-shadow .15s}
+  .input:focus{border-color:var(--brand);box-shadow:0 0 0 4px oklch(0.93 0.05 262)}
+  .input.search{padding-left:34px;background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3'/></svg>") no-repeat 11px center}
+
+  /* —— Segmented —— */
+  .seg{display:inline-flex;background:var(--bg-soft);padding:3px;border-radius:10px;border:1px solid var(--line)}
+  .seg button{padding:6px 14px;font-size:12px;border:0;background:transparent;color:var(--ink-2);border-radius:7px;cursor:pointer;font-family:inherit}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow-1)}
+
+  /* —— Switch —— */
+  .switch{width:36px;height:20px;border-radius:999px;background:var(--line-2);position:relative;cursor:pointer;transition:background .2s}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:left .2s}
+  .switch.on{background:var(--brand)}
+  .switch.on::after{left:18px}
+
+  /* —— Badges status —— */
+  .badge-line{display:flex;flex-wrap:wrap;gap:6px}
+  .b{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:3px 9px;border-radius:999px;font-weight:600}
+  .b::before{content:"";width:6px;height:6px;border-radius:50%}
+  .b.draft{background:oklch(0.96 0.005 260);color:var(--ink-2)}
+  .b.draft::before{background:var(--ink-3)}
+  .b.review{background:var(--accent-soft);color:oklch(0.5 0.18 45)}
+  .b.review::before{background:var(--accent)}
+  .b.go{background:var(--brand-soft);color:var(--brand-ink)}
+  .b.go::before{background:var(--brand)}
+  .b.done{background:oklch(0.95 0.045 152);color:oklch(0.4 0.13 152)}
+  .b.done::before{background:var(--ok)}
+  .b.lock{background:oklch(0.96 0.04 27);color:var(--danger)}
+  .b.lock::before{background:var(--danger)}
+
+  /* —— VCS toolbar —— */
+  .vcs{display:inline-flex;background:#fff;border:1px solid var(--line);padding:4px;border-radius:12px;gap:2px;box-shadow:var(--shadow-1)}
+  .vcs button{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;padding:6px 10px;border-radius:8px;font-size:12px;color:var(--ink-2);cursor:pointer;font-family:inherit}
+  .vcs button:hover{background:var(--bg-soft);color:var(--ink)}
+  .vcs button.pri{background:var(--brand);color:#fff}
+  .vcs .sep{width:1px;background:var(--line);margin:4px 2px}
+  .vcs .ico{width:14px;height:14px;background:currentColor;mask-size:contain;mask-repeat:no-repeat;mask-position:center}
+
+  /* —— Stat / KPI 卡 —— */
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;width:100%;position:relative;overflow:hidden}
+  .kpi .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .kpi .ic{width:32px;height:32px;border-radius:8px;background:var(--brand-soft);display:grid;place-items:center;color:var(--brand-ink);font-weight:700}
+  .kpi .delta{font-size:11px;color:var(--ok);font-weight:600;background:oklch(0.96 0.04 152);padding:2px 7px;border-radius:5px}
+  .kpi .num{font-size:28px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .kpi .lb{font-size:12px;color:var(--ink-3)}
+  .kpi .bar{height:4px;background:var(--bg-soft);border-radius:2px;margin-top:10px;overflow:hidden}
+  .kpi .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--accent));border-radius:2px}
+
+  /* —— Stepper —— */
+  .stepper{display:flex;align-items:center;gap:0;width:100%}
+  .step{display:flex;align-items:center;gap:10px;flex:1}
+  .step .n{width:28px;height:28px;border-radius:50%;background:#fff;border:1.5px solid var(--line-2);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--ink-3)}
+  .step.done .n{background:var(--brand);border-color:var(--brand);color:#fff}
+  .step.active .n{background:#fff;border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+  .step .lb{font-size:12px;color:var(--ink-2)}
+  .step.active .lb{color:var(--ink);font-weight:600}
+  .step .line{flex:1;height:2px;background:var(--line);margin:0 8px;border-radius:1px}
+  .step.done .line{background:var(--brand)}
+
+  /* —— Confidence chip —— */
+  .conf{display:inline-flex;align-items:center;gap:8px;background:#fff;padding:5px 10px;border-radius:8px;border:1px solid var(--line)}
+  .conf .meter{display:flex;gap:2px}
+  .conf .meter i{width:6px;height:10px;background:var(--line-2);border-radius:1px}
+  .conf .meter i.on{background:var(--brand)}
+  .conf.high .meter i.on{background:var(--ok)}
+  .conf.low .meter i.on{background:var(--accent)}
+  .conf small{font-size:11px;color:var(--ink-3);font-family:var(--font-mono)}
+
+  /* ===== TODO 模块设计区 ===== */
+  .todo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+  .todo-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r-3);
+    overflow:hidden;display:flex;flex-direction:column;
+  }
+  .todo-card .th{padding:18px 20px;background:linear-gradient(180deg,#fbfbfd,#fff);border-bottom:1px solid var(--line)}
+  .todo-card .th .row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .todo-card .th .pri{font-family:var(--font-mono);font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:5px}
+  .todo-card .pri.p0{background:oklch(0.96 0.06 27);color:var(--danger)}
+  .todo-card .pri.p1{background:var(--accent-soft);color:oklch(0.5 0.18 45)}
+  .todo-card .pri.p2{background:var(--teal-soft);color:oklch(0.4 0.10 195)}
+  .todo-card .th h3{margin:0;font-size:18px;font-weight:700}
+  .todo-card .th .meta{display:flex;gap:14px;color:var(--ink-3);font-size:12px;margin-top:4px}
+  .todo-card .body{padding:20px;flex:1}
+  .todo-card .body h5{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+  .todo-card .body p{margin:0 0 16px;color:var(--ink-2);font-size:13px}
+  .todo-card .pages{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+  .todo-card .pages .pg{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11.5px;background:var(--bg-soft);padding:6px 10px;border-radius:6px}
+  .todo-card .pages .pg span:last-child{color:var(--ink-3)}
+
+  /* —— 模块独有的 mini mock —— */
+  .mini{
+    background:linear-gradient(180deg, var(--bg-soft), #fff);
+    border:1px dashed var(--line-2);border-radius:12px;padding:14px;
+    margin-top:8px;
+  }
+  .mini-title{font-size:11px;font-family:var(--font-mono);color:var(--ink-3);margin-bottom:10px;letter-spacing:.06em}
+
+  /* P0-售前 mini */
+  .pre-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .pre-flow .b{flex-direction:column;align-items:flex-start;background:#fff;border:1px solid var(--line);padding:10px;border-radius:8px;font-size:11px;font-weight:500;color:var(--ink-2);gap:4px}
+  .pre-flow .b::before{display:none}
+  .pre-flow .b b{font-size:12px;color:var(--ink)}
+  .pre-flow .b.curr{border-color:var(--accent);background:var(--accent-soft);color:oklch(0.45 0.16 45)}
+  .pre-flow .b.curr b{color:oklch(0.4 0.16 45)}
+  .pre-flow .b small{font-family:var(--font-mono);font-size:10px;color:var(--ink-3)}
+
+  /* P0-PM/PMO mini */
+  .pm-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px}
+  .pm-tabs span{padding:6px 12px;font-size:11.5px;color:var(--ink-3);border-bottom:2px solid transparent}
+  .pm-tabs span.on{color:var(--brand);border-color:var(--brand);font-weight:600}
+  .pm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .pm-grid .it{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11px}
+  .pm-grid .it b{display:block;font-size:12px;margin-bottom:4px}
+  .pm-grid .it.cur{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+
+  /* P1-销售 mini */
+  .quote{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .quote .q{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
+  .quote .q .n{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+  .quote .q .l{font-size:10.5px;color:var(--ink-3)}
+  .quote .q.mid{background:linear-gradient(135deg,var(--brand),var(--brand-ink));color:#fff;border-color:transparent}
+  .quote .q.mid .l{color:rgba(255,255,255,.75)}
+
+  /* P1-历史 mini */
+  .sim-list{display:flex;flex-direction:column;gap:6px}
+  .sim-list .it{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:11px}
+  .sim-list .it .meter{height:6px;width:120px;background:var(--bg-soft);border-radius:3px;overflow:hidden}
+  .sim-list .it .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--accent));border-radius:3px}
+
+  /* P2-变更 diff mini */
+  .diff{display:grid;grid-template-columns:1fr 24px 1fr;gap:8px;align-items:center}
+  .diff .col{font-size:11px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px}
+  .diff .col.before{border-color:oklch(0.88 0.06 27);background:oklch(0.985 0.02 27)}
+  .diff .col.after{border-color:oklch(0.88 0.06 152);background:oklch(0.985 0.02 152)}
+  .diff .col b{display:block;font-size:10.5px;font-family:var(--font-mono);color:var(--ink-3);margin-bottom:4px;letter-spacing:.06em}
+  .diff .col span{display:block;margin-top:3px}
+  .diff .arrow{text-align:center;color:var(--accent);font-weight:700}
+
+  /* P2-协同 mini */
+  .chat{display:flex;flex-direction:column;gap:8px}
+  .chat .msg{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:11.5px;max-width:85%}
+  .chat .msg.them{align-self:flex-start;border-top-left-radius:2px}
+  .chat .msg.me{align-self:flex-end;background:var(--brand-soft);border-color:transparent;border-top-right-radius:2px}
+  .chat .msg b{display:block;font-size:10px;color:var(--ink-3);margin-bottom:2px;font-weight:600}
+  .chat .msg.thread{background:linear-gradient(180deg, var(--accent-soft), #fff);border-left:2px solid var(--accent);border-radius:6px}
+
+  /* P3-开发评估占用图 mini */
+  .heat{display:grid;grid-template-columns:60px repeat(10,1fr);gap:2px;font-size:10px}
+  .heat .h{font-family:var(--font-mono);color:var(--ink-3);text-align:right;padding:0 4px;align-self:center}
+  .heat .c{aspect-ratio:1/1;background:var(--bg-soft);border-radius:3px}
+  .heat .c.l1{background:oklch(0.92 0.04 262)}
+  .heat .c.l2{background:oklch(0.78 0.10 262)}
+  .heat .c.l3{background:oklch(0.6 0.16 262)}
+  .heat .c.l4{background:oklch(0.42 0.18 27)}
+
+  /* ===== 实施路线 ===== */
+  .roadmap{position:relative;background:#fff;border:1px solid var(--line);border-radius:var(--r-3);padding:28px;}
+  .roadmap .lane{display:grid;grid-template-columns:140px 1fr;gap:22px;padding:18px 0;border-bottom:1px dashed var(--line);align-items:center}
+  .roadmap .lane:last-child{border-bottom:0}
+  .roadmap .ph{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+  .roadmap .ph b{display:block;color:var(--brand);font-size:14px;letter-spacing:0;margin-bottom:2px}
+  .roadmap .bars{position:relative;height:34px;background:var(--bg-soft);border-radius:8px;overflow:hidden}
+  .roadmap .bar{position:absolute;top:4px;bottom:4px;border-radius:6px;display:flex;align-items:center;padding:0 12px;font-size:11.5px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden}
+  .roadmap .bar.b1{background:linear-gradient(90deg,var(--brand),oklch(0.5 0.16 262));left:0%;width:14%}
+  .roadmap .bar.b2{background:linear-gradient(90deg,oklch(0.45 0.16 262),var(--accent));left:14%;width:38%}
+  .roadmap .bar.b3{background:linear-gradient(90deg,var(--accent),oklch(0.6 0.16 80));left:52%;width:18%}
+  .roadmap .bar.b4{background:linear-gradient(90deg,oklch(0.6 0.13 195),oklch(0.55 0.14 220));left:70%;width:18%}
+  .roadmap .bar.b5{background:linear-gradient(90deg,oklch(0.5 0.13 220),var(--brand));left:88%;width:12%}
+
+  /* footer */
+  footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--line);color:var(--ink-3);font-size:12px;display:flex;justify-content:space-between}
+
+  @media (max-width:980px){
+    .palette-row,.ctrl-grid,.todo-grid,.diag{grid-template-columns:1fr}
+    .mock-content{grid-template-columns:1fr}
+    .hero h1{font-size:32px}
+    .wrap{padding:24px 18px 80px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">W</div>
+      <div>
+        <div style="line-height:1.1">WorkEvolutionSys</div>
+        <div style="font-size:11px;color:var(--ink-3);font-weight:400">前端优化方案 · v1.0 · 2026-05-07</div>
+      </div>
+    </div>
+    <nav>
+      <a href="#diag" class="active">现状</a>
+      <a href="#palette">配色</a>
+      <a href="#controls">控件</a>
+      <a href="#todo">TODO 模块</a>
+      <a href="#road">路线</a>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <div class="hero">
+    <span class="eyebrow">● 设计方向 · Quiet Confidence + Engineering Precision</span>
+    <h1>从「干净的极简」走向<em>专业、克制、有节奏</em>的工程级设计语言</h1>
+    <p class="lead">当前 V0_SAAS 已具备扎实的 shadcn/Radix 基础，但整体偏「中性 SaaS 模板」。本方案围绕 <b>WES 核心业务（评估方案 → 版本流转 → 多角色协同）</b>，给出配色、控件、以及 5 个未实现模块的前端落地方案。</p>
+    <div class="meta">
+      <span class="pill"><span class="dot"></span> 11 个已有页面 · 8 个待新增模块</span>
+      <span class="pill"><span class="dot"></span> 22 路由 / 17 张 PG 表后端已就绪</span>
+      <span class="pill"><span class="dot"></span> 约 6–9 周可全量交付</span>
+    </div>
+  </div>
+
+  <!-- ============ 1. 现状诊断 ============ -->
+  <section class="block" id="diag">
+    <div class="section-head">
+      <div>
+        <div class="num">01 / Diagnose</div>
+        <h2>当前前端的几个问题</h2>
+        <p>读取 <code style="font-family:var(--font-mono);font-size:12px">app/globals.css</code>、<code style="font-family:var(--font-mono);font-size:12px">app-sidebar.tsx</code>、Dashboard / Login 等页面后的观察。</p>
+      </div>
+    </div>
+
+    <div class="diag">
+      <div class="card">
+        <h4>① 配色调性偏「灰 + 青绿点缀」</h4>
+        <div class="score">--accent: #0d9488 · --primary: #1a1a1a</div>
+        <p>主色直接用纯黑（#1a1a1a），点缀用 Tailwind teal-600；选中态、焦点态、品牌识别都借这一个绿色，缺少层次。整页给人「v0/shadcn 默认模板」的印象。</p>
+      </div>
+      <div class="card" style="--accent:var(--accent)">
+        <h4>② Kimi 紫色按钮独立于体系</h4>
+        <div class="score">.wes-kimi-help-btn · 6 段紫色渐变 + 流光动画</div>
+        <p>渐变按钮非常醒目，但与主色（青绿）+ 主背景（中性灰）完全割裂；它实际上承担了「AI 智能能力」这个核心卖点，应升格为系统级语言而不是孤岛。</p>
+      </div>
+      <div class="card" style="--accent:var(--teal)">
+        <h4>③ 数据密度高但视觉节奏弱</h4>
+        <div class="score">Dashboard：4 KPI + 长表 + ER 图 + 最近动态</div>
+        <p>所有卡片都是 1 像素灰边 + 0.75rem 圆角 + 半透明卡背景，密度高时阅读疲劳；状态徽标（进行中/待评审/已检入）颜色偏类似，难以"扫读"。</p>
+      </div>
+      <div class="card">
+        <h4>④ 版本/检出语义未被设计放大</h4>
+        <div class="score">VersionVcsToolbar · 7 个 icon-only 按钮</div>
+        <p>版本控制是 WES 的差异化能力（Check-out / Check-in / Promote / Force-Unlock），但目前只是工具栏 icon 排版，新人完全看不出是 Git 式的强语义。</p>
+      </div>
+      <div class="card" style="--accent:var(--accent)">
+        <h4>⑤ 多角色入口缺位</h4>
+        <div class="score">现有侧栏 8 项 · 后端已支持 4 大新角色</div>
+        <p>侧栏全部按"功能"组织（评估/资源/开发/WBS）；但业务真正需要的是按"角色"组织（售前/PM/PMO/销售/开发顾问），新模块若继续追加只会更挤。</p>
+      </div>
+      <div class="card" style="--accent:var(--teal)">
+        <h4>⑥ 静态、缺乏过渡反馈</h4>
+        <div class="score">仅 hover 颜色变化，无微动画</div>
+        <p>检出/检入/升版/重算这类"会改变状态"的操作，反馈仍依赖文字提示。希望在不打扰的前提下，加入 ≤200ms 的 motion 反馈和占用动画（数字滚动、版本徽标切换）。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. 配色方案 ============ -->
+  <section class="block" id="palette">
+    <div class="section-head">
+      <div>
+        <div class="num">02 / Palette</div>
+        <h2>新配色：深空蓝 × 朱砂橙 × 雾青</h2>
+        <p>用 oklch 重新校准；保持 Apple 式克制感，但通过<b>蓝主色 + 暖橙强调</b>把"工程严谨 + 智能能动"两面都立起来。</p>
+      </div>
+      <div class="seg" style="align-self:flex-end">
+        <button class="on">Light</button>
+        <button>Dark</button>
+        <button>对比度 AA+</button>
+      </div>
+    </div>
+
+    <div class="palette-row">
+      <!-- 当前配色 -->
+      <div class="palette" style="opacity:.85">
+        <h3>当前配色（参考）</h3>
+        <p class="sub">Apple-inspired light · grey + teal 点缀</p>
+        <div class="swatches">
+          <div class="sw curr-1 dark"><span class="lbl">#fafafa</span></div>
+          <div class="sw curr-2 dark"><span class="lbl">#f5f7fa</span></div>
+          <div class="sw curr-3 dark"><span class="lbl">#e5e5e5</span></div>
+          <div class="sw curr-4"><span class="lbl">#1a1a1a</span></div>
+          <div class="sw curr-5"><span class="lbl">#0d9488</span></div>
+          <div class="sw curr-6"><span class="lbl">#dc2626</span></div>
+        </div>
+        <div class="legend">
+          <span class="chip">primary = 纯黑</span>
+          <span class="chip">accent = teal-600</span>
+          <span class="chip">缺少 brand layer</span>
+        </div>
+      </div>
+
+      <!-- 新配色 -->
+      <div class="palette" style="border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)">
+        <h3>提案配色 · Quiet Confidence</h3>
+        <p class="sub">深空蓝主色 / 朱砂橙强调 / 雾青辅助 · 全部 oklch 同明度族</p>
+        <div class="swatches">
+          <div class="sw new-1 dark"><span class="lbl">L 0.985</span></div>
+          <div class="sw new-2 dark"><span class="lbl">brand-soft</span></div>
+          <div class="sw new-3"><span class="lbl">brand · 主色</span></div>
+          <div class="sw new-4"><span class="lbl">ink</span></div>
+          <div class="sw new-5"><span class="lbl">accent · 智能</span></div>
+          <div class="sw new-6"><span class="lbl">teal · 数据</span></div>
+        </div>
+        <div class="legend">
+          <span class="chip">brand = oklch(.42 .14 262)</span>
+          <span class="chip">accent = oklch(.69 .18 45)</span>
+          <span class="chip">teal = oklch(.66 .10 195)</span>
+          <span class="chip">所有色 chroma 同档：易组合不打架</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 应用预览 -->
+    <div class="mock">
+      <div class="mock-bar">
+        <span class="dot" style="background:#ff5f57"></span>
+        <span class="dot" style="background:#febc2e"></span>
+        <span class="dot" style="background:#28c840"></span>
+        <span style="margin-left:10px;font-size:12px;color:var(--ink-3);font-family:var(--font-mono)">workevolution.local/dashboard</span>
+      </div>
+      <div class="mock-content">
+        <aside class="m-side">
+          <div class="ml-logo">
+            <div class="lg">W</div>
+            <b>WES</b>
+          </div>
+          <div class="nav-it"><span class="ic"></span> 主页</div>
+          <div class="nav-it active"><span class="ic"></span> 评估方案</div>
+          <div class="nav-it"><span class="ic"></span> 需求中心</div>
+          <div class="nav-it"><span class="ic"></span> 资源 · 成本</div>
+          <div class="nav-it accent"><span class="ic" style="background:var(--accent);opacity:1"></span> AI 售前 · NEW</div>
+          <div class="nav-it"><span class="ic"></span> 开发评估</div>
+          <div class="nav-it"><span class="ic"></span> WBS</div>
+          <div class="nav-it"><span class="ic"></span> 评审中心</div>
+        </aside>
+        <main class="m-main">
+          <div class="crumb">DASHBOARD / 主页</div>
+          <h3>评估方案总览</h3>
+          <div class="stats">
+            <div class="stat pri">
+              <div class="num">128</div>
+              <div class="lb">活跃方案</div>
+              <div class="spark"></div>
+            </div>
+            <div class="stat"><div class="num">2,304</div><div class="lb">需求条目</div><div class="spark"></div></div>
+            <div class="stat"><div class="num">9,720</div><div class="lb">评估人天</div><div class="spark"></div></div>
+            <div class="stat"><div class="num">42</div><div class="lb">在线成员</div><div class="spark"></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <b>近期方案</b>
+              <span class="badge b-progress">进行中 14</span>
+            </div>
+            <div class="row-skel"><span>利民集团 · 数字化 V05</span><span style="font-family:var(--font-mono)">PLAN-2604-018</span><span class="badge b-progress">进行中</span><span>2h ago</span></div>
+            <div class="row-skel"><span>金桥财务一体化</span><span style="font-family:var(--font-mono)">PLAN-2604-016</span><span class="badge b-review">待评审</span><span>5h ago</span></div>
+            <div class="row-skel"><span>北方建工 EAM</span><span style="font-family:var(--font-mono)">PLAN-2604-009</span><span class="badge b-done">已封版</span><span>昨天</span></div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <p style="margin-top:18px;font-size:13px;color:var(--ink-2)">
+      <b>关键变化：</b> ① <code style="font-family:var(--font-mono)">--primary</code> 从纯黑改为深空蓝（更具品牌识别度，且对长时间阅读更柔和）；
+      ② Kimi/AI 紫色统一收编为 <b>朱砂橙强调色</b>，专门承载"AI 智能 / 状态变更 / 重要操作"语义；
+      ③ 新增 <b>雾青</b> 色相用于图表与数据可视化；④ 状态色族（draft/review/in-progress/done/lock）使用 oklch 同明度，色相变化清晰但视觉重量一致。
+    </p>
+  </section>
+
+  <!-- ============ 3. 控件优化 ============ -->
+  <section class="block" id="controls">
+    <div class="section-head">
+      <div>
+        <div class="num">03 / Components</div>
+        <h2>核心控件的搭配优化</h2>
+        <p>基于上面的配色，对 WES 高频控件给出新规范；保持 Tailwind + shadcn 改动量最小。</p>
+      </div>
+    </div>
+
+    <div class="ctrl-grid">
+
+      <!-- Buttons -->
+      <div class="ctrl">
+        <h4>按钮体系 <span class="tag">Button</span></h4>
+        <p>主按钮改为深空蓝（带 inset 高光 + 软阴影）；将原 Kimi 紫色渐变收编为 <b>Accent 智能按钮</b>，仅用于 AI 抽取、AI 重算、生成 SOW 等"会调用 LLM"的语义。</p>
+        <div class="demo" style="flex-direction:row;flex-wrap:wrap">
+          <button class="btn btn-pri">检入版本</button>
+          <button class="btn btn-acc">✦ AI 抽取需求</button>
+          <button class="btn btn-out">取消</button>
+          <button class="btn btn-ghost">查看历史</button>
+          <button class="btn btn-dest">删除方案</button>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="ctrl">
+        <h4>输入控件 <span class="tag">Input · Search</span></h4>
+        <p>聚焦态加 4px 蓝色软光晕；默认状态边框降一档（line-2）让密集表单不刺眼。搜索框图标内嵌 SVG，避免依赖 lucide。</p>
+        <div class="demo">
+          <div class="field" style="max-width:340px">
+            <label>项目名称</label>
+            <input class="input" value="利民集团数字化 V05" />
+          </div>
+          <div class="field" style="max-width:340px">
+            <label>搜索</label>
+            <input class="input search" placeholder="项目名/版本号/状态…" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Status badge -->
+      <div class="ctrl">
+        <h4>状态徽标 · 强语义化 <span class="tag">Badge</span></h4>
+        <p>5 种核心状态各自有独立色相（不再都用 outline 灰边），并统一加左侧色点；扫读距离 ≥3m 也能区分。</p>
+        <div class="demo">
+          <div class="badge-line">
+            <span class="b draft">草稿</span>
+            <span class="b review">待评审</span>
+            <span class="b go">进行中</span>
+            <span class="b done">已封版</span>
+            <span class="b lock">已检出 · 张凯</span>
+          </div>
+          <div class="badge-line" style="margin-top:6px">
+            <span class="conf high"><span class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span><small>置信度 0.82</small></span>
+            <span class="conf"><span class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span><small>置信度 0.61</small></span>
+            <span class="conf low"><span class="meter"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span><small>需复核</small></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- VCS toolbar -->
+      <div class="ctrl">
+        <h4>版本控制工具栏（升级） <span class="tag">VCS Toolbar</span></h4>
+        <p>明确"动作 vs 工具"分组：左侧为版本流转动作（蓝色高亮当前可执行项），右侧为辅助查看；当方案被他人检出时，整条工具栏会浮现"已锁定"红边。</p>
+        <div class="demo">
+          <div class="vcs">
+            <button class="pri">⤓ 检出</button>
+            <button>⤒ 检入</button>
+            <button>↶ 撤销</button>
+            <span class="sep"></span>
+            <button>⇪ 升版</button>
+            <button>🔓 强制解锁</button>
+            <span class="sep"></span>
+            <button>🕓 历史</button>
+            <button>⊙ 对比</button>
+          </div>
+          <span class="b lock">已检出 · 王敏 · 17 分钟前</span>
+        </div>
+      </div>
+
+      <!-- KPI -->
+      <div class="ctrl">
+        <h4>KPI 卡 · 重新分级 <span class="tag">Stat Card</span></h4>
+        <p>主指标加大字号到 28px（tabular-nums），右上挂"周环比"小徽标；底部一条蓝→橙渐变进度条同时编码"完成度"。</p>
+        <div class="demo" style="gap:10px;flex-direction:row">
+          <div class="kpi" style="max-width:240px">
+            <div class="top"><div class="ic">∑</div><span class="delta">+12%</span></div>
+            <div class="num">128</div>
+            <div class="lb">活跃方案</div>
+            <div class="bar"><i style="width:72%"></i></div>
+          </div>
+          <div class="kpi" style="max-width:240px">
+            <div class="top"><div class="ic" style="background:var(--accent-soft);color:oklch(0.5 0.18 45)">D</div><span class="delta">+5%</span></div>
+            <div class="num">9,720</div>
+            <div class="lb">评估人天</div>
+            <div class="bar"><i style="width:54%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stepper / Switch / Segmented -->
+      <div class="ctrl">
+        <h4>流程编排控件 <span class="tag">Stepper · Switch · Segmented</span></h4>
+        <p>步骤条用于售前 → PM → PMO 的阶段切换；分段控件用于"看板/列表/甘特"切换；开关用于嵌入/对比模式。</p>
+        <div class="demo">
+          <div class="stepper" style="max-width:460px">
+            <div class="step done"><div class="n">✓</div><div class="lb">需求</div><div class="line"></div></div>
+            <div class="step done"><div class="n">✓</div><div class="lb">实施评估</div><div class="line"></div></div>
+            <div class="step active"><div class="n">3</div><div class="lb">PMO 审核</div><div class="line"></div></div>
+            <div class="step"><div class="n">4</div><div class="lb">封版</div></div>
+          </div>
+          <div style="display:flex;gap:14px;align-items:center;margin-top:6px">
+            <div class="seg">
+              <button class="on">列表</button>
+              <button>看板</button>
+              <button>甘特</button>
+            </div>
+            <span style="font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:8px">嵌入模式 <span class="switch on"></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. TODO 模块设计 ============ -->
+  <section class="block" id="todo">
+    <div class="section-head">
+      <div>
+        <div class="num">04 / TODO Modules</div>
+        <h2>未实现模块的前端方案</h2>
+        <p>对照 <code style="font-family:var(--font-mono);font-size:12px">TODO_V0_SAAS_FRONTEND.md</code> P0 → P3 优先级；每个模块给出页面骨架 + 关键交互 + 视觉 mock。</p>
+      </div>
+    </div>
+
+    <div class="todo-grid">
+
+      <!-- P0-1 售前审查 Agent -->
+      <div class="todo-card">
+        <div class="th">
+          <div class="row">
+            <h3>售前审查 Agent</h3>
+            <span class="pri p0">P0 · 5–7d</span>
+          </div>
+          <div class="meta"><span>/presales</span><span>POST /presales/requirement-packs · /review · /sow</span></div>
+        </div>
+        <div class="body">
+          <h5>页面骨架</h5>
+          <div class="pages">
+            <div class="pg"><span>/presales</span><span>需求包列表 · 看板视图</span></div>
+            <div class="pg"><span>/presales/new</span><span>三步上传向导</span></div>
+            <div class="pg"><span>/presales/[id]</span><span>左：原文 / 右：DSL 5 条规则审阅</span></div>
+            <div class="pg"><span>/presales/[id]/initial-estimate</span><span>初估包 · 分模块 chip</span></div>
+            <div class="pg"><span>/presales/[id]/sow</span><span>SOW 列表 · 一键导出 docx</span></div>
+          </div>
+
+          <h5>核心交互</h5>
+          <p>关键页是「需求包详情」：左侧 <b>原始物料预览</b>（PDF/Word 内嵌），右侧 <b>抽取字段 + 置信度仪表</b>，下方 5 条 DSL 规则结果以「时间线 + 通过/驳回」形式展示。低置信度字段用朱砂橙高亮，可点击就地修正。</p>
+
+          <div class="mini">
+            <div class="mini-title">MINI MOCK · 售前需求审查管线</div>
+            <div class="pre-flow">
+              <div class="b"><b>1. 上传</b><span>SOW.docx · 招标书.pdf</span><small>3 个文件</small></div>
+              <div class="b curr"><b>2. AI 抽取</b><span>正在解析 22 字段</span><small>✦ 32s 已用</small></div>
+              <div class="b"><b>3. 规则审阅</b><span>5 条 DSL 待运行</span><small>—</small></div>
+              <div class="b"><b>4. 初估 + SOW</b><span>生成报价区间</span><small>—</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P0-2 PM/PMO 工作台 -->
+      <div class="todo-card">
+        <div class="th">
+          <div class="row">
+            <h3>PM / PMO 工作台</h3>
+            <span class="pri p0">P0 · 10–14d</span>
+          </div>
+          <div class="meta"><span>/pm · /pmo</span><span>handoffs / narratives / deliverables / reviews</span></div>
+        </div>
+        <div class="body">
+          <h5>页面骨架</h5>
+          <div class="pages">
+            <div class="pg"><span>/pm/handoff</span><span>接力收件箱 · 红点徽标</span></div>
+            <div class="pg"><span>/pm/handoff/[id]</span><span>4 大交付物 Tab + 五段式叙事</span></div>
+            <div class="pg"><span>/pm/narrative/[v]</span><span>左编辑右预览 · AI 续写</span></div>
+            <div class="pg"><span>/pmo/reviews</span><span>待审清单 · 优先级排序</span></div>
+            <div class="pg"><span>/pmo/reviews/[id]</span><span>checklist + 一键驳回理由模板</span></div>
+            <div class="pg"><span>/pmo/sealed</span><span>已封版基线 · 时间轴</span></div>
+          </div>
+
+          <h5>核心交互</h5>
+          <p>「PM 交付物」页采用 <b>Tab + 主视口</b> 模式：上方 4 个 Tab（项目计划 / 工作量明细 / 风险登记 / 五段式叙事），切换 Tab 不刷新整页。叙事编辑器左侧是 5 段固定结构（背景/范围/方法/风险/交付），右侧是渲染预览，点段落右上"✦ AI 改写"调用 accent 按钮。</p>
+
+          <div class="mini">
+            <div class="mini-title">MINI MOCK · PM 交付物 Tab</div>
+            <div class="pm-tabs">
+              <span>项目计划</span>
+              <span class="on">工作量明细</span>
+              <span>风险登记</span>
+              <span>五段式叙事</span>
+            </div>
+            <div class="pm-grid">
+              <div class="it"><b>实施工作量</b>286 人天 · ↑ 12d</div>
+              <div class="it cur"><b>开发工作量</b>168 人天 · ↑ 4d</div>
+              <div class="it"><b>测试工作量</b>72 人天 · — </div>
+              <div class="it"><b>项目管理</b>54 人天 · ↑ 6d</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P1-1 销售工作台 -->
+      <div class="todo-card">
+        <div class="th">
+          <div class="row">
+            <h3>销售工作台</h3>
+            <span class="pri p1">P1 · 3–5d</span>
+          </div>
+          <div class="meta"><span>/sales/briefs</span><span>quote · recalculate · changes</span></div>
+        </div>
+        <div class="body">
+          <h5>页面骨架</h5>
+          <div class="pages">
+            <div class="pg"><span>/sales/briefs</span><span>商机列表 · 状态筛选</span></div>
+            <div class="pg"><span>/sales/briefs/new</span><span>30 秒报价向导（行业×规模×模块）</span></div>
+            <div class="pg"><span>/sales/briefs/[id]</span><span>报价区间 + 分期表 + 一键重算</span></div>
+            <div class="pg"><span>/sales/briefs/[id]/changes</span><span>变更历史 · 差分浏览</span></div>
+          </div>
+
+          <h5>核心交互</h5>
+          <p>核心是「30 秒报价区间」：用三段式价格展示（最低 / 推荐 / 最高），中间最大、有渐变背景；下方分期付款条形图、上线时间预估线。<b>重算按钮</b> 用 accent 色 + 旋转动画，点击后报价数字滚动更新（≤ 800ms）。整个 brief 详情页也建议作为未来 Claude Skill 的 Web 兜底视图。</p>
+
+          <div class="mini">
+            <div class="mini-title">MINI MOCK · 30 秒报价区间</div>
+            <div class="quote">
+              <div class="q"><div class="n">¥186w</div><div class="l">最低区间</div></div>
+              <div class="q mid"><div class="n">¥234w</div><div class="l">推荐报价 · 78% 置信度</div></div>
+              <div class="q"><div class="n">¥298w</div><div class="l">最高区间</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P1-2 历史项目库 -->
+      <div class="todo-card">
+        <div class="th">
+          <div class="row">
+            <h3>历史项目库 · 相似度检索</h3>
+            <span class="pri p1">P1 · 2–3d</span>
+          </div>
+          <div class="meta"><span>/history</span><span>projects · similar · close-from-baseline</span></div>
+        </div>
+        <div class="body">
+          <h5>页面骨架</h5>
+          <div class="pages">
+            <div class="pg"><span>/history/projects</span><span>已交付项目档案库</span></div>
+            <div class="pg"><span>/history/projects/[id]</span><span>详情 · 复盘</span></div>
+            <div class="pg"><span>/history/similar</span><span>相似度查询面板</span></div>
+          </div>
+
+          <h5>核心交互</h5>
+          <p>相似度面板左为筛选（行业 × 规模 × 模块多选），右为 <b>Top 5 命中卡片</b>：每张卡显示项目封面、相似度条、交付实绩（人天/周期/毛利率），底部"以此为模板"按钮直接预填到当前商机。结果按相似度从高到低，相似度色阶从蓝→橙渐变。</p>
+
+          <div class="mini">
+            <div class="mini-title">MINI MOCK · 相似度 Top 5</div>
+            <div class="sim-list">
+              <div class="it"><span><b>金桥财务一体化</b> · 制造 · 1500 人</span><span class="meter"><i style="width:92%"></i></span><span style="font-family:var(--font-mono)">0.92</span></div>
+              <div class="it"><span><b>北方建工 ERP</b> · 建筑 · 2000 人</span><span class="meter"><i style="width:81%"></i></span><span style="font-family:var(--font-mono)">0.81</span></div>
+              <div class="it"><span><b>东方电气数字工厂</b> · 制造 · 3500 人</span><span class="meter"><i style="width:74%"></i></span><span style="font-family:var(--font-mono)">0.74</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P2-1 变更提报 + 差分 -->
+      <div class="todo-card">
+        <div class="th">
+          <div class="row">
+            <h3>变更提报 · 差分影响</h3>
+            <span class="pri p2">P2 · 3–4d</span>
+          </div>
+          <div class="meta"><span>/change</span><span>change-submissions · merge · reject</span></div>
+        </div>
+        <div class="body">
+          <h5>页面骨架</h5>
+          <div class="pages">
+            <div class="pg"><span>/change/submissions</span><span>变更列表 · 影响等级</span></div>
+            <div class="pg"><span>/change/submissions/[id]</span><span>左右 diff · 字段级高亮</span></div>
+            <div class="pg"><span>(嵌入) /pm/handoff</span><span>变更通知红点 · 直跳 diff</span></div>
+          </div>
+
+          <h5>核心交互</h5>
+          <p>差分视图借用 Git diff 的左右双栏：左 <b>删除（变更前）</b> 浅红底，右 <b>新增（变更后）</b> 浅绿底；字段级别 token 高亮。底部一条"差分汇总"显示「人天 +12d / 成本 +¥18w / 周期 +1 周」，并可一键 <b>合并</b>（蓝色主按钮）或 <b>驳回</b>（带原因模板）。</p>
+
+          <div class="mini">
+            <div class="mini-title">MINI MOCK · 字段级 Diff</div>
+            <div class="diff">
+              <div class="col before">
+                <b>BEFORE · v04</b>
+                <span>HR 模块：标准</span>
+                <span>实施人天：286</span>
+                <span>上线时间：2026-09</span>
+              </div>
+              <div class="arrow">→</div>
+              <div class="col after">
+                <b>AFTER · v05</b>
+                <span>HR 模块：标准 + 算薪</span>
+                <span>实施人天：298 (<b>+12</b>)</span>
+                <span>上线时间：2026-10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P2-2 评估协同工作区 -->
+      <div class="todo-card">
+        <div class="th">
+          <div class="row">
+            <h3>评估协同工作区</h3>
+            <span class="pri p2">P2 · 1–2w</span>
+          </div>
+          <div class="meta"><span>/collab/workspaces</span><span>messages · 质询-回复线程 · 15 端点</span></div>
+        </div>
+        <div class="body">
+          <h5>页面骨架</h5>
+          <div class="pages">
+            <div class="pg"><span>/collab/workspaces</span><span>工作空间列表 · 按方案分组</span></div>
+            <div class="pg"><span>/collab/workspaces/[id]</span><span>三栏：成员 / 消息流 / 关联条目</span></div>
+            <div class="pg"><span>(嵌入) /assessment/[id]</span><span>右抽屉直接看到本条目讨论</span></div>
+          </div>
+
+          <h5>核心交互</h5>
+          <p>把"群聊讨论"沉淀到系统：每条消息可<b>钉到具体评估条目</b>（左侧三栏的"关联条目"列），点击会高亮跳转。<b>质询 → 回复</b> 线程用蓝→橙左边框高亮，未解决 / 已解决两态。@提及触发待办，未读消息红点同步到顶栏铃铛。</p>
+
+          <div class="mini">
+            <div class="mini-title">MINI MOCK · 质询线程</div>
+            <div class="chat">
+              <div class="msg them"><b>李华 · 实施顾问</b>HR 算薪复杂度按高估，OK 吗？</div>
+              <div class="msg me"><b>王敏 · PM</b>建议中等，现行政策 6 项，参考利民项目。</div>
+              <div class="msg thread"><b>✦ 质询 #12 · 已解决</b>已锚定 ASM-2604-018-HR-3 条目；张凯已在评估中调整。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- P3 开发评估 v2 + 工时占用 -->
+      <div class="todo-card" style="grid-column:1 / -1">
+        <div class="th">
+          <div class="row">
+            <h3>开发评估 v2 · 工时占用可视化</h3>
+            <span class="pri p2">P3 · 1w（升级）</span>
+          </div>
+          <div class="meta"><span>/dashboard/dev-assessment</span><span>升级到 /dev-assessment-v2 后端</span></div>
+        </div>
+        <div class="body">
+          <h5>核心新增：人月-周-人 占用热力图</h5>
+          <p>把每个开发资源（行）× 时间（列）的占用率画成热力图：颜色越深占用越高。橙色（>100%）表示<b>过载</b>，可点击单元格弹出当周任务清单 + 一键挪单。在评估页右侧抽屉中嵌入这张图，让"工时是否合理"在评估时就能看见。</p>
+
+          <div class="mini">
+            <div class="mini-title">MINI MOCK · 资源占用热力图（W18 → W27）</div>
+            <div class="heat">
+              <div class="h">张凯</div><div class="c l1"></div><div class="c l2"></div><div class="c l3"></div><div class="c l3"></div><div class="c l4"></div><div class="c l3"></div><div class="c l2"></div><div class="c l1"></div><div class="c l1"></div><div class="c"></div>
+              <div class="h">王敏</div><div class="c l2"></div><div class="c l2"></div><div class="c l3"></div><div class="c l4"></div><div class="c l4"></div><div class="c l3"></div><div class="c l2"></div><div class="c l2"></div><div class="c l1"></div><div class="c l1"></div>
+              <div class="h">李华</div><div class="c"></div><div class="c l1"></div><div class="c l1"></div><div class="c l2"></div><div class="c l3"></div><div class="c l3"></div><div class="c l3"></div><div class="c l2"></div><div class="c l2"></div><div class="c l1"></div>
+              <div class="h">陈哲</div><div class="c l1"></div><div class="c l2"></div><div class="c l2"></div><div class="c l3"></div><div class="c l3"></div><div class="c l4"></div><div class="c l3"></div><div class="c l2"></div><div class="c l1"></div><div class="c"></div>
+              <div class="h">外包 A</div><div class="c"></div><div class="c"></div><div class="c l1"></div><div class="c l1"></div><div class="c l2"></div><div class="c l2"></div><div class="c l2"></div><div class="c l1"></div><div class="c"></div><div class="c"></div>
+              <div class="h" style="font-family:var(--font-sans);color:var(--ink-3);font-size:10px;text-align:right">↓ 颜色 = 占用率</div>
+              <div class="c" style="background:var(--bg-soft)"></div>
+              <div class="c l1"></div>
+              <div class="c l2"></div>
+              <div class="c l3"></div>
+              <div class="c l4"></div>
+              <div style="grid-column:span 5;font-size:10px;color:var(--ink-3);align-self:center;padding-left:6px">
+                空 ＜ 25% ＜ 60% ＜ 90% ＜ 过载
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ 5. 实施路线 ============ -->
+  <section class="block" id="road">
+    <div class="section-head">
+      <div>
+        <div class="num">05 / Roadmap</div>
+        <h2>分阶段落地路线</h2>
+        <p>建议先做"主题 + 控件"小幅刷新（Wave 0，2 天即可全站受益），再推进 P0 → P3 模块；与后端 22 路由可平行开发。</p>
+      </div>
+    </div>
+
+    <div class="roadmap">
+      <div class="lane">
+        <div class="ph"><b>W0 · 调研 + 主题</b>2 天</div>
+        <div class="bars"><div class="bar b1">主题刷新 · globals.css · 5 个 🟡 页调研</div></div>
+      </div>
+      <div class="lane">
+        <div class="ph"><b>W1–W4 · 主战场</b>P0</div>
+        <div class="bars"><div class="bar b2">售前 + PM/PMO 工作台 + 控件升级</div></div>
+      </div>
+      <div class="lane">
+        <div class="ph"><b>W5 · 销售/历史</b>P1</div>
+        <div class="bars"><div class="bar b3">销售 brief + 相似度检索</div></div>
+      </div>
+      <div class="lane">
+        <div class="ph"><b>W6–W7 · 协同/变更</b>P2</div>
+        <div class="bars"><div class="bar b4">CollabWorkspace + 变更 Diff</div></div>
+      </div>
+      <div class="lane">
+        <div class="ph"><b>W8 · 收尾</b>P3</div>
+        <div class="bars"><div class="bar b5">开发评估 v2 + 占用图</div></div>
+      </div>
+    </div>
+
+    <p style="margin-top:18px;font-size:13px;color:var(--ink-2);background:var(--brand-soft);padding:14px 16px;border-radius:12px;border:1px solid oklch(0.88 0.05 262)">
+      <b>建议先行：</b> 仅替换 <code style="font-family:var(--font-mono)">--primary / --accent / --ring / --chart-*</code> 五个 token + 重写状态 Badge 类，全站视觉立刻刷新；
+      Kimi 紫色按钮收编为 <code style="font-family:var(--font-mono)">.btn-acc</code> 即可统一 AI 入口语义，无需改动业务逻辑。
+    </p>
+  </section>
+
+  <footer>
+    <span>WES · 前端优化方案 · 2026-05-07</span>
+    <span>设计语言：Quiet Confidence · Engineering Precision</span>
+  </footer>
+</div>
+</body>
+</html>

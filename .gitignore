@@ -53,3 +53,8 @@ backups/
 # 运行时临时缓存（tsx/node test artifacts）
 apps/api/.tmp/
 .tmp/
+
+# 工具本地状态（不跨机器同步）
+.kimi/
+Session/
+.claude/worktrees/
