@@ -1,29 +1,76 @@
-import React from 'react'
+import React, { useState } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
 
+const KPI_DATA = [
+  { ic: '▣', lb: '方案数', num: 12, sub: '近 7 天 +1 进行中', bar: '80%' },
+  { ic: '≡', lb: '需求条目', num: 186, sub: '待结构化 4 · 待处理 2', bar: '62%', icBg: 'var(--accent-soft)', icCo: 'var(--accent)' },
+  { ic: '⏱', lb: '评估人天', num: 762, sub: '高复杂占比 20%', bar: '48%', icBg: 'var(--info-soft)', icCo: 'var(--info)' },
+  { ic: '⚇', lb: '参与成员', num: 14, sub: '在线 6 人', bar: '35%', icBg: 'var(--ok-soft)', icCo: 'var(--ok)' },
+]
+
+const PLANS = [
+  { id: 1, projectName: '利民集团数字化二期', globalVersion: 'GL-04001', status: '进行中', checkedOut: false, mandays: 210.5 },
+  { id: 2, projectName: '金石科技 ERP 升级', globalVersion: 'GL-04002', status: '待评审', checkedOut: true, mandays: 315.2 },
+  { id: 3, projectName: '华东智造供应链改造', globalVersion: 'GL-04003', status: '已发布', checkedOut: false, mandays: 178.0 },
+  { id: 4, projectName: '新材料集团财务共享', globalVersion: 'GL-04004', status: '进行中', checkedOut: true, mandays: 245.8 },
+  { id: 5, projectName: '地产集团成本管理', globalVersion: 'GL-04005', status: '已发布', checkedOut: false, mandays: 132.4 },
+  { id: 6, projectName: '零售集团会员中台', globalVersion: 'GL-04006', status: '进行中', checkedOut: false, mandays: 289.6 },
+]
+
+const FEED = [
+  { name: '王丽', action: '检出了 开发评估 · DV-04001', time: '10 分钟前', accent: false },
+  { name: '陈晨', action: '完成了 需求评审 · RQ-04001', time: '32 分钟前', accent: true },
+  { name: '张鹏', action: '更新了 资源成本 · RS-04001', time: '1 小时前', accent: false },
+  { name: '刘洋', action: '发布了 总方案 · GL-04005', time: '3 小时前', accent: true },
+]
+
+// VCS 9 button spec — §6.3.1
+const VCS_BUTTONS = [
+  { key: 'history', label: '🕘 历史', mode: 'always' },
+  { key: 'checkout', label: '🔓 检出', mode: 'select-checked-in' },
+  { key: 'checkin', label: '🔒 检入', mode: 'select-checked-out' },
+  { key: 'undo', label: '↺ 撤销检出', mode: 'select-checked-out' },
+  { key: 'promote', label: '⬆ 升版', mode: 'select-any' },
+  { key: 'unlock', label: '⚠ 强制解锁', mode: 'select-checked-out', danger: true },
+  { key: 'delete', label: '🗑 删除', mode: 'select-any', danger: true },
+]
+
 export default function HomePage() {
-  const kpiData = [
-    { ic: '▣', lb: '方案数', num: 12, sub: '近 7 天 +1 进行中', bar: '80%' },
-    { ic: '≡', lb: '需求条目', num: 186, sub: '待结构化 4 · 待处理 2', bar: '62%', icBg: 'var(--accent-soft)', icCo: 'var(--accent)' },
-    { ic: '⏱', lb: '评估人天', num: 762, sub: '高复杂占比 20%', bar: '48%', icBg: 'var(--info-soft)', icCo: 'var(--info)' },
-    { ic: '⚇', lb: '参与成员', num: 14, sub: '在线 6 人', bar: '35%', icBg: 'var(--ok-soft)', icCo: 'var(--ok)' },
-  ]
+  const [selected, setSelected] = useState(new Set())
+  const [anchorId, setAnchorId] = useState(null)
+  const [dialog, setDialog] = useState(null) // 'new' | 'guide' | 'er' | null
 
-  const plans = [
-    { id: 1, projectName: '利民集团数字化二期', globalVersion: 'GL-04001', status: '进行中', checkedOut: false, mandays: 210.5 },
-    { id: 2, projectName: '金石科技 ERP 升级', globalVersion: 'GL-04002', status: '待评审', checkedOut: true, mandays: 315.2 },
-    { id: 3, projectName: '华东智造供应链改造', globalVersion: 'GL-04003', status: '已发布', checkedOut: false, mandays: 178.0 },
-    { id: 4, projectName: '新材料集团财务共享', globalVersion: 'GL-04004', status: '进行中', checkedOut: true, mandays: 245.8 },
-    { id: 5, projectName: '地产集团成本管理', globalVersion: 'GL-04005', status: '已发布', checkedOut: false, mandays: 132.4 },
-    { id: 6, projectName: '零售集团会员中台', globalVersion: 'GL-04006', status: '进行中', checkedOut: false, mandays: 289.6 },
-  ]
+  // PB-R1 标准行选择
+  const handleRowClick = (e, row, idx) => {
+    const id = row.id
+    const ids = PLANS.map((p) => p.id)
+    if (e.shiftKey && anchorId !== null && ids.includes(anchorId)) {
+      const a = ids.indexOf(anchorId), b = idx
+      const [s, t] = a <= b ? [a, b] : [b, a]
+      const next = new Set()
+      for (let i = s; i <= t; i++) next.add(ids[i])
+      setSelected(next)
+    } else if (e.ctrlKey || e.metaKey) {
+      const next = new Set(selected)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      setSelected(next)
+      setAnchorId(id)
+    } else {
+      setSelected(new Set([id]))
+      setAnchorId(id)
+    }
+  }
 
-  const feed = [
-    { name: '王丽', action: '检出了 开发评估 · DV-04001', time: '10 分钟前', accent: false },
-    { name: '陈晨', action: '完成了 需求评审 · RQ-04001', time: '32 分钟前', accent: true },
-    { name: '张鹏', action: '更新了 资源成本 · RS-04001', time: '1 小时前', accent: false },
-    { name: '刘洋', action: '发布了 总方案 · GL-04005', time: '3 小时前', accent: true },
-  ]
+  // VCS 按钮启用判定
+  const selectedRows = PLANS.filter((p) => selected.has(p.id))
+  const isVcsEnabled = (mode) => {
+    if (mode === 'always') return true
+    if (selectedRows.length === 0) return false
+    if (mode === 'select-any') return true
+    if (mode === 'select-checked-in') return selectedRows.every((r) => !r.checkedOut)
+    if (mode === 'select-checked-out') return selectedRows.every((r) => r.checkedOut)
+    return false
+  }
 
   return (
     <PageShell
@@ -31,14 +78,14 @@ export default function HomePage() {
       title="主页"
       subtitle="总览、评估方案列表与快速操作"
       actions={[
-        <button key="new" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }}>+ 新建</button>,
+        <button key="new" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => setDialog('new')}>+ 新建</button>,
       ]}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16 }}>
+      <div className="home-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
           {/* KPI */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-            {kpiData.map((k, i) => (
+          <div className="home-kpi">
+            {KPI_DATA.map((k, i) => (
               <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 14, boxShadow: 'var(--shadow-1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ width: 26, height: 26, borderRadius: 6, background: k.icBg || 'var(--brand-soft)', color: k.icCo || 'var(--brand-ink)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{k.ic}</span>
@@ -55,25 +102,55 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Plan list */}
+          {/* Plan list with VCS 9-toolbar (§6.3.1) */}
           <div className="section" style={{ margin: 0 }}>
             <div className="hd">
               <span>评估方案列表</span>
               <span className="bdg ci" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />已检入 9</span>
               <span className="bdg co" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />已检出 3</span>
-              <div className="right"><span style={{ fontSize: 11 }}>共 12 条</span></div>
+              <div className="right"><span style={{ fontSize: 11 }}>共 {PLANS.length} 条 · 已选 {selected.size}</span></div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)', fontSize: 12, flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>已选 0</span>
-              <div style={{ display: 'flex', gap: 4, paddingRight: 12, borderRight: '1px solid var(--line)' }}>
-                <button className="btn btn-ghost" style={{ height: 28, fontSize: 12, padding: '0 10px' }}>🕘 历史</button>
-                <button className="btn btn-ghost" style={{ height: 28, fontSize: 12, padding: '0 10px' }}>🔗 ER</button>
-                <button className="btn btn-pri" style={{ height: 28, fontSize: 12, padding: '0 10px' }}>＋ 新建</button>
+            {/* VCS 9 toolbar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)', fontSize: 12, flexWrap: 'wrap' }}>
+              <span
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: selected.size > 0 ? 'var(--brand-ink)' : 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700, padding: '0 4px', cursor: selected.size > 0 ? 'pointer' : 'default' }}
+                onClick={selected.size > 0 ? () => { setSelected(new Set()); setAnchorId(null) } : undefined}
+              >已选 {selected.size}</span>
+              <div style={{ display: 'flex', gap: 2, paddingRight: 10, borderRight: '1px solid var(--line)' }}>
+                {VCS_BUTTONS.map((b) => {
+                  const enabled = isVcsEnabled(b.mode)
+                  return (
+                    <button
+                      key={b.key}
+                      onClick={() => enabled && alert(`Phase A · 静态 mock · [${b.label}] · 选中 ${selected.size} 条`)}
+                      disabled={!enabled}
+                      style={{
+                        padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                        color: b.danger ? 'var(--err)' : 'var(--ink-2)',
+                        background: 'transparent', border: 'none', cursor: enabled ? 'pointer' : 'not-allowed',
+                        opacity: enabled ? 1 : 0.45, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                      }}
+                    >{b.label}</button>
+                  )
+                })}
               </div>
+              <button
+                onClick={() => setDialog('er')}
+                style={{ padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              >🔗 ER</button>
+              <button
+                onClick={() => setDialog('new')}
+                className="btn btn-pri"
+                style={{ marginLeft: 4, height: 28, fontSize: 12, padding: '0 12px' }}
+              >＋ 新建</button>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'var(--surface)', border: '1px solid var(--line)', fontSize: 11.5, color: 'var(--ink-2)' }}>状态：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>全部</b><span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span></span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'var(--surface)', border: '1px solid var(--line)', fontSize: 11.5, color: 'var(--ink-2)' }}>行业：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>制造业</b><span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span></span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 5, background: '#fff', border: '1px solid var(--line)', fontSize: 12, color: 'var(--ink-3)', minWidth: 200 }}>⌕ 搜索项目名 / 版本号 / 检出人</span>
+                <input
+                  type="text"
+                  placeholder="⌕ 搜索项目名 / 版本号 / 检出人"
+                  style={{ padding: '5px 10px', borderRadius: 5, background: '#fff', border: '1px solid var(--line)', fontSize: 12, color: 'var(--ink)', minWidth: 220, fontFamily: 'inherit', outline: 'none' }}
+                />
               </div>
             </div>
             <table className="table" style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
@@ -89,28 +166,40 @@ export default function HomePage() {
                 </tr>
               </thead>
               <tbody>
-                {plans.map((p, i) => (
-                  <tr key={p.id}>
-                    <td>{i + 1}</td>
-                    <td>
-                      <b>{p.projectName}</b>
-                      <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>{p.globalVersion} · 制造-离散</div>
-                    </td>
-                    <td className="mono" style={{ fontFamily: 'var(--font-mono)' }}>{p.globalVersion.replace('GL-', 'v')}</td>
-                    <td>
-                      <span className={`bdg ${p.status === '进行中' ? 'co' : p.status === '待评审' ? 'rev' : 'ci'}`} style={{ fontSize: 10.5 }}>
-                        <span className="dot" />{p.status}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`bdg ${p.checkedOut ? 'co' : 'ci'}`} style={{ fontSize: 10.5 }}>
-                        <span className="dot" />{p.checkedOut ? '已检出' : '已检入'}
-                      </span>
-                    </td>
-                    <td className="num">{p.mandays}</td>
-                    <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>2026-04-{18 - i} 14:33</td>
-                  </tr>
-                ))}
+                {PLANS.map((p, i) => {
+                  const isSel = selected.has(p.id)
+                  return (
+                    <tr
+                      key={p.id}
+                      onClick={(e) => handleRowClick(e, p, i)}
+                      onDoubleClick={() => setDialog('er')}
+                      style={{
+                        cursor: 'pointer',
+                        background: isSel ? 'var(--brand-soft)' : undefined,
+                        userSelect: 'none',
+                      }}
+                    >
+                      <td>{i + 1}</td>
+                      <td>
+                        <b>{p.projectName}</b>
+                        <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>{p.globalVersion} · 制造-离散</div>
+                      </td>
+                      <td className="mono" style={{ fontFamily: 'var(--font-mono)' }}>{p.globalVersion.replace('GL-', 'v')}</td>
+                      <td>
+                        <span className={`bdg ${p.status === '进行中' ? 'co' : p.status === '待评审' ? 'rev' : 'ci'}`} style={{ fontSize: 10.5 }}>
+                          <span className="dot" />{p.status}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`bdg ${p.checkedOut ? 'co' : 'ci'}`} style={{ fontSize: 10.5 }}>
+                          <span className="dot" />{p.checkedOut ? '已检出' : '已检入'}
+                        </span>
+                      </td>
+                      <td className="num">{p.mandays}</td>
+                      <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>2026-04-{18 - i} 14:33</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -120,15 +209,20 @@ export default function HomePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
           <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-1)' }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', fontSize: 13, fontWeight: 700 }}>快速操作</div>
-            {['新建评估方案', '导入需求访谈纪要', '发起评审', '查看 API 调用指南'].map((t) => (
-              <a key={t} href="#" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', color: 'var(--ink)', textDecoration: 'none', fontSize: 12.5, borderBottom: '1px solid var(--line)' }}>
-                {t}<span style={{ color: 'var(--ink-3)', fontSize: 11 }}>→</span>
+            {[
+              { t: '新建评估方案', dlg: 'new' },
+              { t: '导入需求访谈纪要', dlg: null },
+              { t: '发起评审', dlg: null },
+              { t: '查看 ER 关联图', dlg: 'er' },
+            ].map((q) => (
+              <a key={q.t} href="#" onClick={(e) => { e.preventDefault(); q.dlg && setDialog(q.dlg) }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', color: 'var(--ink)', textDecoration: 'none', fontSize: 12.5, borderBottom: '1px solid var(--line)' }}>
+                {q.t}<span style={{ color: 'var(--ink-3)', fontSize: 11 }}>→</span>
               </a>
             ))}
           </div>
           <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-1)' }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', fontSize: 13, fontWeight: 700 }}>最近动态</div>
-            {feed.map((f, i) => (
+            {FEED.map((f, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--line)' }}>
                 <div style={{ width: 22, height: 22, borderRadius: '50%', background: f.accent ? 'var(--accent-soft)' : 'var(--brand-soft)', color: f.accent ? 'var(--accent-ink)' : 'var(--brand-ink)', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{f.name[0]}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>
@@ -140,6 +234,103 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* 3 Dialogs · §6.3 D1/D2/D3 */}
+      {dialog === 'new' && (
+        <DialogShell title="新建评估方案" onClose={() => setDialog(null)} onConfirm={() => { setDialog('guide') }} confirmLabel="下一步：创建">
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-2)' }}>请填写方案基础信息（mock：仅占位，未接后端）</p>
+          <Field label="项目名称" placeholder="如：利民集团数字化二期" />
+          <Field label="客户行业" placeholder="制造-离散 / 流程 / 零售..." />
+          <Field label="规模（用户数）" placeholder="100" />
+          <Field label="模板" placeholder="实施评估标准版" />
+        </DialogShell>
+      )}
+      {dialog === 'guide' && (
+        <DialogShell title="✓ 创建成功" onClose={() => setDialog(null)} onConfirm={() => setDialog(null)} confirmLabel="知道了">
+          <div style={{ background: 'var(--ok-soft)', border: '1px solid var(--ok)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 12, fontSize: 13, color: 'var(--ok-ink)' }}>
+            ✓ 新方案 GL-04007 已创建（mock 占位）
+          </div>
+          <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>下一步建议：</p>
+          <ol style={{ margin: 0, paddingLeft: 20, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.8 }}>
+            <li>录入 / 导入需求访谈纪要</li>
+            <li>选择实施评估模板生成 SKU 主表</li>
+            <li>检出方案进入实施评估编辑态</li>
+            <li>校验 DSL 规则、提交评审</li>
+          </ol>
+        </DialogShell>
+      )}
+      {dialog === 'er' && (
+        <DialogShell title="🔗 ER 关联关系图" onClose={() => setDialog(null)} onConfirm={() => setDialog(null)} confirmLabel="关闭" wide>
+          <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ink-3)' }}>方案 / 需求 / 实施评估 / 资源成本 / 开发评估 五者关系（mock 简化图）</p>
+          <svg viewBox="0 0 600 400" width="100%" height="320" style={{ border: '1px dashed var(--line)', borderRadius: 'var(--r-md)', background: 'var(--bg-soft)' }}>
+            {[
+              { x: 300, y: 60, label: '总方案', color: 'var(--brand)' },
+              { x: 130, y: 180, label: '需求', color: 'var(--accent)' },
+              { x: 470, y: 180, label: '实施评估', color: 'var(--brand)' },
+              { x: 130, y: 320, label: '资源成本', color: 'var(--teal)' },
+              { x: 470, y: 320, label: '开发评估', color: 'var(--ok)' },
+            ].map((n, i) => (
+              <g key={i}>
+                <rect x={n.x - 50} y={n.y - 18} width={100} height={36} rx={8} fill={n.color} />
+                <text x={n.x} y={n.y + 4} textAnchor="middle" fill="#fff" fontSize="13" fontWeight="700">{n.label}</text>
+              </g>
+            ))}
+            {[
+              [300, 78, 130, 162], [300, 78, 470, 162],
+              [470, 198, 470, 302], [130, 198, 130, 302],
+              [180, 180, 420, 180],
+            ].map(([x1, y1, x2, y2], i) => (
+              <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--line-2)" strokeWidth="1.5" />
+            ))}
+          </svg>
+        </DialogShell>
+      )}
     </PageShell>
+  )
+}
+
+// ---- 内联 Dialog shell（避免新增公共依赖） ----
+function DialogShell({ title, children, onClose, onConfirm, confirmLabel = '确认', wide = false }) {
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.42)',
+        display: 'grid', placeItems: 'center', padding: 20, zIndex: 50,
+      }}
+    >
+      <div style={{
+        width: wide ? 'min(720px, 100%)' : 'min(480px, 100%)',
+        background: '#fff', borderRadius: 'var(--r-lg)',
+        boxShadow: '0 24px 64px rgba(15,23,42,0.24)', border: '1px solid var(--line)',
+        overflow: 'hidden',
+      }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontSize: 14, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{title}</span>
+          <button onClick={onClose} style={{ background: 'transparent', border: 0, cursor: 'pointer', fontSize: 18, color: 'var(--ink-3)', padding: 4 }}>×</button>
+        </div>
+        <div style={{ padding: 18 }}>{children}</div>
+        <div style={{ padding: '12px 18px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', gap: 8, background: 'var(--bg-soft)' }}>
+          <button onClick={onClose} className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }}>取消</button>
+          <button onClick={onConfirm} className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, placeholder }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4, fontWeight: 600 }}>{label}</label>
+      <input
+        type="text"
+        placeholder={placeholder}
+        style={{
+          width: '100%', padding: '8px 10px', border: '1px solid var(--line)',
+          borderRadius: 'var(--r-md)', fontSize: 13, fontFamily: 'inherit', outline: 'none',
+        }}
+      />
+    </div>
   )
 }

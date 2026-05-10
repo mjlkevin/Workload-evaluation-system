@@ -1,10 +1,9 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
 import ListPage from '../components/ListPage.jsx'
 import { wbsItems } from '../mock/listData.js'
 
 export default function WbsList() {
-  const navigate = useNavigate()
+  // WBS 详情页 PB-R3 待建；列表行不导航避免 404
   return (
     <ListPage
       crumb="工作台 / WBS 任务"
@@ -12,7 +11,7 @@ export default function WbsList() {
       subtitle="工作分解结构与任务进度跟踪"
       data={wbsItems}
       rowKey="id"
-      onRowClick={(row) => navigate(`/wbs/${row.id}`)}
+      onRowClick={(row) => alert('WBS 详情页 · PB-R3 待建')}
       filterTags={[
         { key: 'all', label: '全部' },
         { key: 'completed', label: '已完成' },
@@ -21,9 +20,9 @@ export default function WbsList() {
       columns={[
         { key: 'name', title: '任务名称' },
         { key: 'assignee', title: '负责人' },
-        { key: 'start', title: '开始日期' },
-        { key: 'end', title: '结束日期' },
-        { key: 'progress', title: '进度', align: 'right', getter: (r) => `${r.progress}%` },
+        { key: 'start', title: '开始', nowrap: true },
+        { key: 'end', title: '结束', nowrap: true },
+        { key: 'progress', title: '进度', render: (r) => <MiniGantt progress={r.progress} status={r.status} /> },
         { key: 'status', title: '状态', render: (r) => <StatusBadge status={r.status} /> },
       ]}
       actions={[
@@ -31,6 +30,21 @@ export default function WbsList() {
         <button key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}}>⟳ 刷新</button>,
       ]}
     />
+  )
+}
+
+// §6.10.2 迷你甘特列 — 120px 进度条 + 已完成/进行中两段色
+function MiniGantt({ progress, status }) {
+  const done = status === '已完成' ? 100 : Math.max(0, progress - 20)
+  const inProg = status === '已完成' ? 0 : Math.min(20, progress)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ width: 120, height: 8, borderRadius: 4, background: 'var(--bg-soft)', overflow: 'hidden', display: 'flex' }}>
+        <div style={{ width: `${done}%`, height: '100%', background: 'var(--ok)' }} />
+        <div style={{ width: `${inProg}%`, height: '100%', background: 'var(--brand)' }} />
+      </div>
+      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', minWidth: 32 }}>{progress}%</span>
+    </div>
   )
 }
 

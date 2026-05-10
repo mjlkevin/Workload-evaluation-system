@@ -18,18 +18,37 @@ export default function HistoryList() {
         { key: 'archived', label: '已归档' },
       ]}
       columns={[
-        { key: 'projectName', title: '项目名称' },
-        { key: 'version', title: '版本' },
-        { key: 'similarity', title: '相似度', align: 'right', getter: (r) => `${r.similarity}%` },
+        { key: 'projectName', title: '项目名称', render: (r) => (
+          <div>
+            <b>{r.projectName}</b>
+            <div style={{ color: 'var(--ink-3)', fontSize: 11, marginTop: 2 }}>{r.customer} · {r.industry}</div>
+          </div>
+        ) },
+        { key: 'scale', title: '规模', nowrap: true },
         { key: 'totalDays', title: '总人天', align: 'right', getter: (r) => r.totalDays.toFixed(1) },
+        { key: 'totalAmount', title: '总金额(万)', align: 'right', getter: (r) => r.totalAmount.toFixed(1) },
+        { key: 'year', title: '年份' },
+        { key: 'similarity', title: '相似度', render: (r) => <SimilarityBar value={r.similarity} /> },
         { key: 'status', title: '状态', render: (r) => <StatusBadge status={r.status} /> },
-        { key: 'updatedAt', title: '更新时间' },
       ]}
       actions={[
         <button key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}}>+ 新建</button>,
         <button key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}}>⟳ 刷新</button>,
       ]}
     />
+  )
+}
+
+// v3 §7 相似度进度条 — 进度条 + 百分比，按区间染色
+function SimilarityBar({ value }) {
+  const color = value >= 80 ? 'var(--ok)' : value >= 60 ? 'var(--brand)' : 'var(--ink-3)'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 130 }}>
+      <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'var(--bg-soft)', overflow: 'hidden' }}>
+        <div style={{ width: `${value}%`, height: '100%', background: color, borderRadius: 4 }} />
+      </div>
+      <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color, fontWeight: 700, minWidth: 32 }}>{value}%</span>
+    </div>
   )
 }
 

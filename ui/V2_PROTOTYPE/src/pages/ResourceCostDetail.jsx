@@ -27,9 +27,17 @@ export default function ResourceCostDetail() {
       title="资源人天及成本"
       subtitle="RS-04001-v04 · 已检出"
       actions={[
-        <button key="hist" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 12px' }}>⏱ 历史</button>,
-        <button key="export" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 12px' }}>↓ 导出</button>,
-        <button key="save" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }}>⤒ 保存版本</button>,
+        // 全套 VCS（决策 A）—— 当前 RS-04001 已检出态：检出 disabled / 检入 pri / 撤销+解锁可用
+        <button key="hist" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => alert('Phase A · 静态 mock · [⏱ 历史]')}>⏱ 历史</button>,
+        <button key="promote" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => alert('Phase A · 静态 mock · [⬆ 升版]')}>⬆ 升版</button>,
+        <span key="sep1" style={{ width: 1, height: 18, background: 'var(--line)' }} />,
+        <button key="checkin" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => alert('Phase A · 静态 mock · [🔒 检入]')}>🔒 检入</button>,
+        <button key="undo" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => alert('Phase A · 静态 mock · [↺ 撤销检出]')}>↺ 撤销</button>,
+        <button key="checkout" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px', opacity: 0.45, cursor: 'not-allowed' }} disabled>🔓 检出</button>,
+        <span key="sep2" style={{ width: 1, height: 18, background: 'var(--line)' }} />,
+        <button key="unlock" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px', color: 'var(--err)' }} onClick={() => confirm('强制解锁会覆盖他人改动，确定？') && alert('Phase A · 静态 mock · [⚠ 强制解锁]')}>⚠ 解锁</button>,
+        <button key="export" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => alert('Phase A · 静态 mock · [↓ 导出]')}>↓ 导出</button>,
+        <button key="save" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => alert('Phase A · 静态 mock · [⤒ 保存版本]')}>⤒ 保存版本</button>,
       ]}
     >
       {/* pmstrip */}
@@ -51,12 +59,12 @@ export default function ResourceCostDetail() {
         </div>
       </div>
 
-      {/* Tabs placeholder */}
+      {/* Tabs · 用 .tabs .t 类对齐 layout.css */}
       <div className="tabs" style={{ marginBottom: 0 }}>
-        <span className="on">明细</span>
-        <span>分配视图</span>
-        <span>变更对比</span>
-        <span>导出预览</span>
+        <button type="button" className="t on" style={{ background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>明细</button>
+        <button type="button" className="t" style={{ background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>分配视图</button>
+        <button type="button" className="t" style={{ background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>变更对比</button>
+        <button type="button" className="t" style={{ background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>导出预览</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, padding: '16px 24px 24px' }}>

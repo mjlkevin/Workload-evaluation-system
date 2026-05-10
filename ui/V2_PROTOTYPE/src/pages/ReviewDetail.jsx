@@ -1,7 +1,25 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import PageShell from '../components/Layout/PageShell.jsx'
 
+const SEALS = [
+  { id: 'S1', name: 'WES 公章 · 标准', scope: '通用' },
+  { id: 'S2', name: '实施总监印 · 王丽', scope: '实施' },
+  { id: 'S3', name: '交付经理印 · 张鹏', scope: '交付' },
+]
+
 export default function ReviewDetail() {
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [sealTarget, setSealTarget] = useState(null) // deliverable id 或 null
+  const [pickedSeal, setPickedSeal] = useState(SEALS[0].id)
+  const [deliverables, setDeliverables] = useState([
+    { id: 'D1', name: '实施 SOW', type: 'PDF', status: 'pending', generatedAt: '', sealName: '' },
+    { id: 'D2', name: '详细实施方案', type: 'DOCX', status: 'pending', generatedAt: '', sealName: '' },
+    { id: 'D3', name: '实施计划', type: 'MD', status: 'pending', generatedAt: '', sealName: '' },
+    { id: 'D4', name: '对外报价单', type: 'XLSX', status: 'pending', generatedAt: '', sealName: '' },
+  ])
+
   const checklist = [
     { type: '必检', name: '接口覆盖完整', status: '通过' },
     { type: '必检', name: '权限校验齐备', status: '通过' },
@@ -15,12 +33,21 @@ export default function ReviewDetail() {
     { name: '陈晨', time: '2026-04-18 10:05', text: '收到，今天补齐后重新提交。' },
   ]
 
-  const deliverables = [
-    { name: '实施 SOW', type: 'PDF', status: 'pending' },
-    { name: '详细实施方案', type: 'DOCX', status: 'pending' },
-    { name: '实施计划', type: 'MD', status: 'pending' },
-    { name: '对外报价单', type: 'XLSX', status: 'pending' },
-  ]
+  const now = () => new Date().toISOString().slice(0, 16).replace('T', ' ')
+  const genOne = (id) => setDeliverables((d) => d.map((x) => x.id === id ? { ...x, status: 'generated', generatedAt: now() } : x))
+  const genAll = () => setDeliverables((d) => d.map((x) => x.status === 'pending' ? { ...x, status: 'generated', generatedAt: now() } : x))
+  const sealConfirm = () => {
+    if (!sealTarget) return
+    const seal = SEALS.find((s) => s.id === pickedSeal) || SEALS[0]
+    setDeliverables((d) => d.map((x) => x.id === sealTarget ? { ...x, status: 'sealed', sealName: seal.name } : x))
+    setSealTarget(null)
+  }
+  const rejectConfirm = () => {
+    if (!rejectReason.trim()) { alert('请输入驳回原因'); return }
+    alert('已驳回 · ' + rejectReason)
+    setRejectReason(''); setRejectOpen(false)
+  }
+  const pendingCount = deliverables.filter((d) => d.status === 'pending').length
 
   const typeMap = {
     PDF: { bg: 'var(--info-soft)', co: 'var(--info)' },
@@ -35,8 +62,8 @@ export default function ReviewDetail() {
       title="评审"
       subtitle="评审中 · 还剩 2 天"
       actions={[
-        <button key="jump" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 12px' }}>↗ 跳转方案 v07</button>,
-        <button key="reject" className="btn btn-dan" style={{ height: 32, fontSize: 12, padding: '0 12px' }}>✕ 驳回</button>,
+        <Link key="jump" to="/assessments/ASM-018" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 12px', display: 'inline-flex', alignItems: 'center' }}>↗ 跳转方案 v07</Link>,
+        <button key="reject" className="btn btn-dan" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => setRejectOpen(true)}>✕ 驳回</button>,
         <button key="pass" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} disabled>✓ 通过</button>,
       ]}
     >
@@ -103,7 +130,12 @@ export default function ReviewDetail() {
             <div className="hd">
               <span>PM 交付物</span>
               <span className="bdg ci"><span className="dot" />4 项</span>
-              <button className="btn btn-pri" style={{ height: 28, padding: '0 10px', fontSize: 12, marginLeft: 'auto' }}>✦ 一键全部生成</button>
+              <button
+                className="btn btn-pri"
+                style={{ height: 28, padding: '0 10px', fontSize: 12, marginLeft: 'auto', opacity: pendingCount === 0 ? 0.5 : 1 }}
+                disabled={pendingCount === 0}
+                onClick={genAll}
+              >{pendingCount === 0 ? '✦ 已全部生成' : '✦ 一键全部生成'}</button>
             </div>
             <div className="bd" style={{ padding: 0 }}>
               <table className="table">
@@ -111,15 +143,28 @@ export default function ReviewDetail() {
                   <tr><th>文件</th><th>类型</th><th className="num">生成时间</th><th>状态</th><th className="num">操作</th></tr>
                 </thead>
                 <tbody>
-                  {deliverables.map((d, i) => {
+                  {deliverables.map((d) => {
                     const t = typeMap[d.type]
+                    const statusEl = d.status === 'pending'
+                      ? <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>未生成</span>
+                      : d.status === 'generated'
+                        ? <span style={{ color: 'var(--ok)', fontSize: 12, fontWeight: 700 }}>已生成</span>
+                        : <span style={{ color: 'var(--accent-ink)', fontSize: 12, fontWeight: 700 }}>已盖章<span style={{ fontWeight: 400, color: 'var(--ink-3)', marginLeft: 4 }}>{d.sealName}</span></span>
+                    const ops = d.status === 'pending'
+                      ? <button className="btn btn-pri" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => genOne(d.id)}>生成</button>
+                      : d.status === 'generated'
+                        ? <span style={{ display: 'inline-flex', gap: 4 }}>
+                            <button className="btn btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => alert('Phase A · mock 下载 ' + d.name)}>↓ 下载</button>
+                            <button className="btn btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => { setSealTarget(d.id); setPickedSeal(SEALS[0].id) }}>⊘ 盖章</button>
+                          </span>
+                        : <button className="btn btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => alert('Phase A · mock 下载 ' + d.name + '（已盖章）')}>↓ 下载（已盖章）</button>
                     return (
-                      <tr key={i}>
+                      <tr key={d.id}>
                         <td>{d.name}</td>
                         <td><span className="bdg" style={{ background: t.bg, color: t.co, fontSize: 10.5, padding: '1px 7px' }}>{d.type}</span></td>
-                        <td className="num" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>—</td>
-                        <td><span style={{ color: 'var(--ink-3)', fontSize: 12 }}>未生成</span></td>
-                        <td className="num"><button className="btn btn-pri" style={{ height: 24, padding: '0 8px', fontSize: 11 }}>生成</button></td>
+                        <td className="num" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.generatedAt || '—'}</td>
+                        <td>{statusEl}</td>
+                        <td className="num">{ops}</td>
                       </tr>
                     )
                   })}
@@ -147,8 +192,12 @@ export default function ReviewDetail() {
           <div className="section" style={{ marginTop: 16 }}>
             <div className="hd"><span>关联文档</span><span style={{ fontSize: 11, color: 'var(--ink-3)' }}>跳转</span></div>
             <div className="bd">
-              {['实施评估', '资源成本', '需求'].map((t) => (
-                <a key={t} href="#" style={{ display: 'block', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 10, background: '#fff', marginBottom: 8, textDecoration: 'none', color: 'var(--ink)' }}>{t}</a>
+              {[
+                { t: '实施评估', to: '/assessments/ASM-018' },
+                { t: '资源成本', to: '/resource-costs/RS-04001' },
+                { t: '需求', to: '/requirements/RQ-04001' },
+              ].map(({ t, to }) => (
+                <Link key={t} to={to} style={{ display: 'block', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 10, background: '#fff', marginBottom: 8, textDecoration: 'none', color: 'var(--ink)' }}>{t}</Link>
               ))}
             </div>
           </div>
@@ -165,6 +214,70 @@ export default function ReviewDetail() {
           </div>
         </div>
       </div>
+
+      {/* 驳回 dialog */}
+      {rejectOpen && (
+        <DialogBackdrop onClose={() => setRejectOpen(false)}>
+          <DialogCard title="驳回评审" subtitle="必填驳回原因">
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="请输入驳回原因..."
+              style={{ width: '100%', minHeight: 130, padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical' }}
+            />
+            <DialogActions>
+              <button className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setRejectOpen(false)}>取消</button>
+              <button className="btn btn-dan" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={rejectConfirm}>确认驳回</button>
+            </DialogActions>
+          </DialogCard>
+        </DialogBackdrop>
+      )}
+
+      {/* 印章选择 dialog */}
+      {sealTarget && (
+        <DialogBackdrop onClose={() => setSealTarget(null)}>
+          <DialogCard title={`为「${deliverables.find((d) => d.id === sealTarget)?.name}」选择印章`}>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {SEALS.map((s) => (
+                <label key={s.id} style={{ display: 'flex', gap: 10, padding: '10px 12px', border: `1px solid ${pickedSeal === s.id ? 'var(--brand)' : 'var(--line)'}`, borderRadius: 10, background: pickedSeal === s.id ? 'var(--brand-soft)' : 'var(--bg-soft)', cursor: 'pointer' }}>
+                  <input type="radio" name="seal" value={s.id} checked={pickedSeal === s.id} onChange={() => setPickedSeal(s.id)} style={{ marginTop: 4 }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{s.scope}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <DialogActions>
+              <button className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setSealTarget(null)}>取消</button>
+              <button className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={sealConfirm}>确认盖章</button>
+            </DialogActions>
+          </DialogCard>
+        </DialogBackdrop>
+      )}
     </PageShell>
   )
+}
+
+// ---- inline Dialog primitives ----
+function DialogBackdrop({ children, onClose }) {
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.42)', display: 'grid', placeItems: 'center', padding: 20, zIndex: 50 }}>
+      {children}
+    </div>
+  )
+}
+function DialogCard({ title, subtitle, children }) {
+  return (
+    <div style={{ width: 'min(560px, 100%)', background: '#fff', borderRadius: 'var(--r-lg)', boxShadow: '0 24px 64px rgba(15,23,42,0.24)', border: '1px solid var(--line)', padding: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <strong style={{ fontSize: 14 }}>{title}</strong>
+        {subtitle && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{subtitle}</span>}
+      </div>
+      {children}
+    </div>
+  )
+}
+function DialogActions({ children }) {
+  return <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>{children}</div>
 }

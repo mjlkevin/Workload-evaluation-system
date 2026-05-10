@@ -13,7 +13,8 @@ export default defineConfig({
     port: 3002,
     strictPort: false,
     proxy: {
-      '/api': {
+      // 加尾斜杠避免吞掉 /api-keys 路由（前缀匹配 /api/ 而非 /api）
+      '/api/': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },

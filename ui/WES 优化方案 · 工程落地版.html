@@ -3273,11 +3273,11 @@ V0_SAAS 现有 Button 是 shadcn 默认 6 变体，但实际页面散落 9 种�
     </table>
 
     <div class="pb-meta" style="grid-template-columns:repeat(5,1fr)">
-      <div class="it done"><div class="v">18</div><div class="lb">DONE</div></div>
-      <div class="it run"><div class="v">3</div><div class="lb">PHASE B</div></div>
+      <div class="it done"><div class="v">19</div><div class="lb">DONE</div></div>
+      <div class="it run"><div class="v">4</div><div class="lb">PHASE B</div></div>
       <div class="it done"><div class="v">6</div><div class="lb">DONE</div></div>
       <div class="it block"><div class="v">0</div><div class="lb">BLOCKED</div></div>
-      <div class="it"><div class="v" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--ink-2);line-height:1.3">2026-05-10<br><span style="font-size:11px;color:var(--ok)">P5 ✓ v3 复验补丁</span></div><div class="lb">LAST UPDATE</div></div>
+      <div class="it"><div class="v" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--ink-2);line-height:1.3">2026-05-10<br><span style="font-size:11px;color:var(--ok)">PB-R2 ✓ 17 页闭环</span></div><div class="lb">LAST UPDATE</div></div>
     </div>
 
     <h3 style="margin-top:28px">9.3 任务清单 · 按 Phase A 派发顺序</h3>
@@ -3300,6 +3300,7 @@ V0_SAAS 现有 Button 是 shadcn 默认 6 变体，但实际页面散落 9 种�
         <tr class="done"><td class="wk">P0</td><td><b>Phase B · assessment-detail v3 严格对齐</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">Vite 基座初始化 + React 18 + react-router · 12 组件落地（ProjectIdentityCard / VcsToolbar / ParamMiniBar / AdvancedCollapsible / KpiCards / PathBreadcrumb / SkuTable / DaysCell / CustomStepper / DslBanner / AiCopilot / SidePanel）· Build 通过 · DevServer 3003</div></td><td class="ref">§3 hub + v3 §2-§5</td><td class="out">src/components/<br>Assessment/<br>(12 组件)</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
         <tr class="done"><td class="wk">P1</td><td><b>Phase B · 18 页装配 + 路由 + Layout + mock 联通</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">App.jsx 18 路由 / Shell + PageShell SaaS 壳 / 18 个 pages/*.jsx（AssessmentDetail 312 行组装 10 组件 · ResourceCostDetail 210 · SystemManagement 177 · ReviewDetail 170 · RequirementDetail 162 · HomePage 145 等，共 2080 行）/ mock/assessmentData.js 严格按 v3 §2-§5 数据结构</div></td><td class="ref">§3 hub + v3 §2-§5</td><td class="out">src/App.jsx + Layout/Shell.jsx + 18 pages<br>(2080 行)</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
         <tr class="done"><td class="wk">PB-R1</td><td><b>Phase B · assessment-detail v3 reviewer 复验补丁</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">Reviewer 初核：14 项中 7 DONE / 4 部分 / 3 严重偏差；已修 7 项偏差（mini bar 组织数 + 难度 ≥1.3、只读 emerald-50、三层路径级联、SKU 非整行点击、DSL 一键修复 + 签入/导出禁用、AI 紫族 oklch(.62 .20 320)）· Build 通过 · token grep 0 · console [] · 1280/1440/1920 复验无破图</div></td><td class="ref">v3 §2-§5 reviewer</td><td class="out">7 个 Assessment<br>组件补丁</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">PB-R2</td><td><b>Phase B · 17 页 reviewer 闭环严重项</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">Reviewer 三色矩阵：27 严重 + 30 轻度。本批闭环 4 批：批 0 横向 quick-wins（Router future flags / vite proxy 修 /api-keys / WbsList 路由保护）· 批 1 ListPage.jsx 共性（PB-R1 标准行选择 / 选中浮 actions / filter 真过滤）→ 治愈 7 list 页 · 批 2 HomePage 深度（VCS 9 toolbar + 3 dialog 新建/引导/ER + 1180/760 响应式）· 批 3 4 单页（ResourceCostDetail 全套 VCS / WbsList 迷你甘特 / ReviewDetail 驳回 dialog + 印章状态机 / HistoryList 8 mock + 相似度进度条）· Build ✓ · token grep 0 · 6 严重项延 PB-R3 深度页</div></td><td class="ref">v3 / §6 / §08 reviewer</td><td class="out">10 文件改动<br>17 页 8 严重闭环</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
       </tbody>
     </table>
     <div class="callout acc">

@@ -36,6 +36,12 @@ export const wbsItems = [
 ]
 
 export const historyItems = [
-  { id: 1, projectName: '利民集团一期', version: 'v01', similarity: 92, totalDays: 198.5, status: '已归档', updatedAt: '2025-12-15' },
-  { id: 2, projectName: '利民集团二期', version: 'v02', similarity: 88, totalDays: 210.3, status: '已归档', updatedAt: '2026-02-20' },
+  { id: 1, projectName: '利民集团一期',         customer: '利民集团',     industry: '制造-离散', scale: '2400 人', version: 'v01', similarity: 92, totalDays: 198.5, totalAmount: 79.4,  year: 2025, status: '已归档', updatedAt: '2025-12-15' },
+  { id: 2, projectName: '利民集团二期',         customer: '利民集团',     industry: '制造-离散', scale: '2800 人', version: 'v02', similarity: 88, totalDays: 210.3, totalAmount: 84.1,  year: 2026, status: '已归档', updatedAt: '2026-02-20' },
+  { id: 3, projectName: '金石科技 ERP 升级',    customer: '金石科技',     industry: '制造-离散', scale: '1200 人', version: 'v03', similarity: 76, totalDays: 156.0, totalAmount: 62.4,  year: 2025, status: '已归档', updatedAt: '2025-09-08' },
+  { id: 4, projectName: '华东智造供应链改造',   customer: '华东智造集团', industry: '制造-流程', scale: '3500 人', version: 'v05', similarity: 71, totalDays: 245.8, totalAmount: 98.3,  year: 2025, status: '已归档', updatedAt: '2025-11-12' },
+  { id: 5, projectName: '蓝海物流 TMS 集成',    customer: '蓝海物流',     industry: '交通-物流', scale: '900 人',  version: 'v04', similarity: 68, totalDays: 132.0, totalAmount: 52.8,  year: 2024, status: '已归档', updatedAt: '2024-08-30' },
+  { id: 6, projectName: '金桥电子 PLM 实施',    customer: '金桥电子',     industry: '电子-EMS',  scale: '1600 人', version: 'v07', similarity: 64, totalDays: 178.5, totalAmount: 71.4,  year: 2025, status: '已归档', updatedAt: '2025-06-22' },
+  { id: 7, projectName: '新材料财务共享中心',   customer: '新材料集团',   industry: '材料-化工', scale: '2200 人', version: 'v06', similarity: 58, totalDays: 220.0, totalAmount: 88.0,  year: 2024, status: '已归档', updatedAt: '2024-12-05' },
+  { id: 8, projectName: '零售集团会员中台',     customer: '零售连锁',     industry: '消费-零售', scale: '4500 人', version: 'v08', similarity: 51, totalDays: 289.6, totalAmount: 115.8, year: 2025, status: '已归档', updatedAt: '2025-04-18' },
 ]
