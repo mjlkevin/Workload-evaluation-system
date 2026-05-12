@@ -14,9 +14,9 @@
 
 - **Phase A · 几乎收尾**（2026-05-09）
 - 已完成：W0-1 / W1 / W2 / W3 (6 list) / W4 (requirement-detail) / W5 (assessment-detail) / W6a (resource-cost-detail) / W6b (Track B 系统三联) / Track C (4 文件) / W8a (review-detail v2 增量)
-- 仅剩：**W8b · 截图走查 + Phase B 框架决议**
+- 仅剩：**W8b · 截图走查**
   - W8b.1 · 代码级响应式走查 ✅ 完成（见下方"W8b 走查报告"）
-  - W8b.2 · Phase B 框架二选一（Next.js 升级 vs Vite + React，待 Kevin 拍板）
+  - W8b.2 · Phase B 框架二选一 ✅ 已决策 — Vite + React（见下方决策记录）
 
 ## W8b 走查报告 · 1280 / 1440 / 1920 三档（2026-05-09）
 
@@ -88,7 +88,7 @@
 
 | 优先级 | 项目 | 来源 | 状态 | 说明 |
 |---|---|---|---|---|
-| **P0** | `assessment-detail.html` v3 严格对齐 | `实施评估页 · 深度打磨方案 v3.html` §2–§5 | 🟡 **进行中** | Vite + React 基座已就绪；§02 上区组件（ProjectIdentityCard / VcsToolbar / ParamMiniBar / AdvancedCollapsible）已落地；§03 下区组件（KpiCards / PathBreadcrumb / SkuTable / DslBanner / AiCopilot / SidePanel）已落地；构建通过 ✅ |
+| **P0** | `assessment-detail.html` v3 严格对齐 | `实施评估页 · 深度打磨方案 v3.html` §2–§5 | ✅ **组件落地 + 全页面集成** | Vite + React 基座已就绪；§02 上区组件（ProjectIdentityCard / VcsToolbar / ParamMiniBar / AdvancedCollapsible）已落地；§03 下区组件（KpiCards / PathBreadcrumb / SkuTable / DslBanner / AiCopilot / SidePanel）已落地；18 页面全量集成 + api/hooks/utils/viewModels/__tests__ 基础设施完成；构建通过 ✅ |
 | P1 | 侧栏收起/展开按钮 | 设计稿全局 | ⏳ 待排 | icon-only 模式 + 状态管理 + 17 页同步 |
 | P2 | `.avatar` 紫色 hex → token | review-detail | ⏳ 待排 | 硬编码替换为 token |
 | P3 | resource-cost-detail 月份表 overflow-x | 走查偏差 #1 | ⏳ 待排 | 1280px 下加 `overflow-x:auto` wrapper |
@@ -125,11 +125,13 @@
 
 **决策记录**：Kevin 于 2026-05-09 选择 **B 方案**——接受 W5 为基础版，将 assessment-detail v3 严格对齐作为 Phase B 首项，而非回退 W5 阻塞 Phase A 收官。
 
+**决策记录**：Kevin 选择 **Vite + React** 作为 Phase B 及后续前端框架。原因：更轻量，不需要 Next.js 的服务端渲染能力；V0_SAAS 的 SSR/API Routes 对评估工具场景属于过度设计。V0_SAAS 现有功能（评估页、需求导入等）后续按需逐页迁移到 V2_PROTOTYPE 基座。
+
 ---
 
 ## 说明
 
-- 本沙箱不新增依赖，不创建 `package.json`，不执行 `npm install`。
+- 本沙箱已升级为 Vite + React 工程基座，含 `package.json` + 完整依赖链（react、react-router-dom、vitest、msw 等）。
 - 所有样式以 `tokens.css` 为唯一真源；其余文件只能消费 token，不再创造新颜色、新圆角、新字号。
 - Phase 1 结束后，先停下来给 Kevin 逐页验收，再进入 Phase 2（W1 login.html · Phase A）。
 - layout 已锁定为 SaaS 全屏 shell（侧栏贴左 + 内容铺满），后续页面 mock 必须遵循此基线，不可改回居中卡片
