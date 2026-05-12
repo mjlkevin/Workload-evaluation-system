@@ -12,7 +12,7 @@
 - ✅ 包含两条主路径：
   - **路径 A**：智能问询（无 Excel）→ 组装需求快照 → Kimi 评估预览 → 可选导出 Markdown
   - **路径 B**：上传 Excel → Kimi 解析 → Kimi 评估 → Markdown / 转 PDF
-- ✅ 覆盖接口：`/ai/chat`、`/ai/company-profile-summary`、`/ai/parse-basic-info`、`/ai/kimi-assessment/preview`、`/ai/kimi-assessment/export-markdown`
+- ✅ 覆盖接口：`/ai/chat`、`/ai/company-profile-summary`、`/ai/parse-basic-info`、`/ai/kimi-assessment/preview`、`/ai/kimi-assessment/export-markdown`、`/ai/kimi-assessment/export-pdf`
 - ✅ 含完整 curl 示例、最小 JSON 骨架、交付物说明（文字/Markdown/PDF）
 - ✅ 包含首次配置清单、账号前提、常用接口速查表
 - ✅ 提供 Agent 系统提示摘要句
