@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 项目结构与关键链路分析</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:oklch(0.985 0.004 250);
+    --bg-soft:oklch(0.965 0.006 250);
+    --surface:#fff;
+    --ink:oklch(0.21 0.03 260);
+    --ink-2:oklch(0.42 0.02 260);
+    --ink-3:oklch(0.62 0.012 260);
+    --line:oklch(0.92 0.008 255);
+    --line-2:oklch(0.86 0.012 255);
+    --brand:oklch(0.42 0.14 262);
+    --brand-ink:oklch(0.32 0.13 262);
+    --brand-soft:oklch(0.96 0.025 260);
+    --accent:oklch(0.69 0.18 45);
+    --accent-soft:oklch(0.965 0.05 60);
+    --teal:oklch(0.66 0.10 195);
+    --teal-soft:oklch(0.97 0.025 195);
+    --ok:oklch(0.66 0.13 152);
+    --ok-soft:oklch(0.96 0.04 152);
+    --warn:oklch(0.78 0.13 80);
+    --warn-soft:oklch(0.97 0.04 80);
+    --err:oklch(0.62 0.20 25);
+    --err-soft:oklch(0.97 0.04 25);
+    --font-sans:'Inter','Noto Sans SC',system-ui,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);-webkit-font-smoothing:antialiased}
+  body{font-size:14px;line-height:1.65}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+  .doc-h{padding:48px 0 28px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,transparent)}
+  .doc-h .crumb{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+  .doc-h h1{font-size:38px;line-height:1.1;letter-spacing:-.02em;font-weight:800;margin:0 0 12px}
+  .doc-h .meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--ink-3);font-size:12.5px}
+  .doc-h .meta b{color:var(--ink);font-weight:600}
+  .doc-h .pills{margin-top:18px;display:flex;gap:6px;flex-wrap:wrap}
+  .pill{font-size:11.5px;font-family:var(--font-mono);padding:3px 9px;border-radius:5px;background:var(--bg-soft);color:var(--ink-2);font-weight:600;border:1px solid var(--line)}
+  section{padding:56px 0;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:none}
+  .h-num{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.14em;color:var(--accent);font-weight:700;text-transform:uppercase;margin-bottom:8px}
+  h2{font-size:30px;line-height:1.2;letter-spacing:-.02em;font-weight:800;margin:0 0 8px}
+  h3{font-size:18px;font-weight:700;margin:32px 0 12px;letter-spacing:-.01em}
+  h4{font-size:14px;font-weight:700;margin:18px 0 10px;color:var(--ink)}
+  .lead{color:var(--ink-2);font-size:15px;max-width:820px;margin:0 0 28px}
+  .callout{display:flex;gap:14px;padding:14px 18px;border-radius:12px;border-left:3px solid var(--brand);background:var(--brand-soft);margin:14px 0;font-size:13px}
+  .callout.warn{background:var(--warn-soft);border-left-color:var(--warn)}
+  .callout.acc{background:var(--accent-soft);border-left-color:var(--accent)}
+  .callout.ok{background:var(--ok-soft);border-left-color:var(--ok)}
+  .callout b{color:var(--ink);display:block;margin-bottom:2px;font-size:12.5px}
+  .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 18px 44px -28px rgba(20,28,48,.18)}
+  .card .hd{padding:14px 18px;background:var(--bg-soft);border-bottom:1px solid var(--line);font-family:var(--font-mono);font-weight:700;font-size:12px;letter-spacing:.04em}
+  .card .bd{padding:18px}
+  .list{margin:0;padding-left:18px;color:var(--ink-2)}
+  .list li{margin:7px 0}
+  .mini{font-size:12.5px;color:var(--ink-2)}
+  .tag-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .tag{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg-soft);font-size:11.5px;font-family:var(--font-mono);color:var(--ink-2)}
+  .tag i{width:7px;height:7px;border-radius:50%}
+  .tag.brand i{background:var(--brand)}
+  .tag.accent i{background:var(--accent)}
+  .tag.ok i{background:var(--ok)}
+  .tag.teal i{background:var(--teal)}
+  .tag.warn i{background:var(--warn)}
+  .tag.err i{background:var(--err)}
+  .flow{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;padding:18px 18px 14px;box-shadow:0 22px 56px -34px rgba(20,28,48,.22)}
+  .flow-title{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px}
+  .flow-title h4{margin:0;font-size:14px}
+  .flow-title .note{font-size:12px;color:var(--ink-3)}
+  .steps{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:stretch}
+  .step{border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff,var(--bg-soft));padding:14px 12px;position:relative;min-height:122px}
+  .step .no{font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--brand)}
+  .step .t{font-size:15px;font-weight:700;margin:8px 0 6px;line-height:1.25}
+  .step .d{font-size:12.5px;color:var(--ink-2);line-height:1.65}
+  .step .foot{position:absolute;left:12px;right:12px;bottom:12px;font-size:11px;color:var(--ink-3);font-family:var(--font-mono)}
+  .arrow{display:flex;align-items:center;justify-content:center;color:var(--line-2);font-size:22px;font-weight:700}
+  .two-col{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}
+  pre,code{font-family:var(--font-mono)}
+  pre{background:#0c1330;color:oklch(0.88 0.02 220);padding:18px 22px;border-radius:12px;overflow-x:auto;margin:14px 0;line-height:1.75;font-size:11.5px}
+  code.inline{background:var(--bg-soft);padding:1.5px 6px;border-radius:4px;color:var(--brand-ink);font-size:12px}
+  .matrix{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .box{border:1px solid var(--line);border-radius:14px;background:#fff;padding:16px}
+  .box h5{margin:0 0 10px;font-size:13px;font-weight:700}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:8px 12px;font-size:12.5px}
+  .kv .k{color:var(--ink-3)}
+  .kv .v{color:var(--ink);font-weight:600}
+  .road{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .road .item{padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:#fff}
+  .road .item h5{margin:0 0 8px;font-size:13px}
+  .road .item p{margin:0;color:var(--ink-2);font-size:12.8px}
+  .timeline{position:relative;padding-left:14px}
+  .timeline::before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:2px;background:var(--line)}
+  .timeline .it{position:relative;padding:8px 0 8px 14px;font-size:12px}
+  .timeline .it::before{content:"";position:absolute;left:-14px;top:13px;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--line-2)}
+  .timeline .it.cur::before{background:var(--brand);border-color:var(--brand)}
+  .timeline .it .v{font-family:var(--font-mono);font-weight:700;font-size:11.5px}
+  .timeline .it .lb{color:var(--ink-2);font-size:11.5px;margin-top:1px}
+  .timeline .it .ts{color:var(--ink-3);font-size:10.5px;font-family:var(--font-mono);margin-top:2px}
+  .impl-frame,.pf{border:1px solid var(--line-2);border-radius:18px;overflow:hidden;background:#fff;box-shadow:0 24px 60px -28px rgba(20,28,48,.22),0 4px 12px -4px rgba(20,28,48,.06);margin:24px 0;position:relative}
+  @media (min-width:1240px){
+    .impl-frame,.pf{width:min(1440px,calc(100vw - 48px));margin-left:calc((1180px - min(1440px, 100vw - 48px)) / 2 - 32px);margin-right:0;}
+  }
+  @media (min-width:1600px){
+    .impl-frame,.pf{width:min(1520px,calc(100vw - 64px));margin-left:calc((1180px - min(1520px, 100vw - 64px)) / 2 - 32px);}
+  }
+  .impl-tb{display:flex;align-items:center;height:38px;background:var(--bg-soft);border-bottom:1px solid var(--line);padding:0 14px;gap:8px}
+  .impl-tb .dots{display:flex;gap:6px;margin-right:14px}
+  .impl-tb .dots i{width:11px;height:11px;border-radius:50%;background:var(--line-2)}
+  .impl-tb .url{flex:1;font-family:var(--font-mono);font-size:11px;color:var(--ink-3);background:#fff;padding:5px 12px;border-radius:6px;border:1px solid var(--line)}
+  .impl-grid{display:grid;grid-template-columns:212px 1fr;min-height:760px}
+  .sb{background:linear-gradient(180deg,#0a1124 0%,#10182f 100%);color:rgba(255,255,255,.75);padding:18px 0;font-size:13px}
+  .sb .brand{display:flex;align-items:center;gap:10px;padding:0 18px 22px;color:#fff;font-weight:800;font-size:14px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .sb .brand .l{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--brand),var(--accent));display:grid;place-items:center;font-size:13px;color:#fff}
+  .sb .grp{padding:14px 0 6px}
+  .sb .grp h6{margin:0;padding:0 18px 8px;font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.4);font-weight:600;text-transform:uppercase}
+  .sb a{display:flex;align-items:center;gap:10px;padding:7px 18px;color:rgba(255,255,255,.7);text-decoration:none;font-size:12.5px;border-left:2px solid transparent}
+  .sb a:hover{background:rgba(255,255,255,.04);color:#fff}
+  .sb a.on{background:rgba(255,255,255,.06);color:#fff;border-left-color:var(--accent);font-weight:600}
+  .sb a .ic{width:14px;height:14px;color:rgba(255,255,255,.5)}
+  .sb a.on .ic{color:var(--accent)}
+  .sb a .ct{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.4);background:rgba(255,255,255,.06);padding:1px 6px;border-radius:4px}
+  .pg{display:flex;flex-direction:column;background:var(--bg)}
+  .pg-hd{padding:18px 28px;background:#fff;border-bottom:1px solid var(--line)}
+  .pg-hd .crumb{font-size:11px;color:var(--ink-3);font-family:var(--font-mono);margin-bottom:6px}
+  .pg-hd .crumb b{color:var(--ink-2)}
+  .pg-hd .row{display:flex;align-items:center;gap:16px}
+  .pg-hd h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .pg-hd .row .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .pg-tabs{display:flex;gap:2px;background:#fff;padding:0 28px;border-bottom:1px solid var(--line)}
+  .pg-tabs .t{padding:10px 14px;font-size:12.5px;color:var(--ink-2);font-weight:500;border-bottom:2px solid transparent;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .pg-tabs .t .ct{font-size:10px;font-family:var(--font-mono);background:var(--bg-soft);padding:1px 5px;border-radius:3px;color:var(--ink-3)}
+  .pg-tabs .t.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:700}
+  .pg-tabs .t.on .ct{background:var(--brand-soft);color:var(--brand)}
+  .pg-body{padding:18px 28px;flex:1;display:grid;grid-template-columns:1fr 280px;gap:18px}
+  .pg-main{display:flex;flex-direction:column;gap:14px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .panel .h{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700}
+  .panel .h .right{margin-left:auto;display:flex;gap:6px;align-items:center;font-size:11px;color:var(--ink-3);font-family:var(--font-mono)}
+  .panel .b{padding:14px 16px}
+  .pmstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 16px;background:linear-gradient(135deg,#fff,var(--bg-soft))}
+  .pm{padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:8px}
+  .pm .lb{font-size:10.5px;color:var(--ink-3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em}
+  .pm .vl{display:flex;align-items:center;gap:6px;margin-top:3px}
+  .pm .x{font-size:13px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  .at{font-size:12.5px}
+  .at thead th{position:sticky;top:0;background:var(--bg-soft);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--line);font-family:var(--font-mono)}
+  .at tbody td{padding:10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  .at tbody tr:hover{background:var(--bg-soft)}
+  .at .cat{padding-left:14px;color:var(--ink);font-weight:600}
+  .at .cat .sb{display:block;font-weight:400;font-size:11px;color:var(--ink-3);margin-top:1px}
+  .at .num{text-align:right;font-family:var(--font-mono)}
+  .at .num.calc{color:var(--brand);font-weight:600}
+  .at .inp-cell{display:inline-flex;border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:#fff;font-family:var(--font-mono);width:80px}
+  .at .inp-cell input{border:0;outline:0;width:100%;font-size:12px;text-align:right;font-family:inherit;color:var(--ink)}
+  .at .difficulty{display:inline-flex;gap:2px}
+  .at .difficulty i{width:12px;height:6px;border-radius:1px;background:var(--line-2)}
+  .at .difficulty i.on{background:var(--accent)}
+  .at .total-row{background:linear-gradient(135deg,var(--brand-soft),#fff)}
+  .at .total-row td{font-weight:700;color:var(--ink);border-bottom:none}
+  .at .total-row .num{color:var(--brand);font-size:14px}
+  .pg-side{display:flex;flex-direction:column;gap:14px}
+  .side-h{font-size:11px;font-family:var(--font-mono);font-weight:700;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px}
+  .stat{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--line);font-size:12px}
+  .stat:last-child{border-bottom:none}
+  .stat .l{color:var(--ink-2)}
+  .stat .v{font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .stat .v.acc{color:var(--accent)}
+  .donut{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+  .donut svg{flex-shrink:0}
+  .donut .meta{font-size:11.5px;color:var(--ink-2)}
+  .donut .meta b{display:block;font-size:18px;color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .ai-card{background:linear-gradient(135deg,oklch(0.30 0.13 262),oklch(0.32 0.16 290));color:#fff;border-radius:12px;padding:14px 16px;position:relative;overflow:hidden}
+  .ai-card::before{content:"";position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,var(--accent),transparent 70%);opacity:.5}
+  .ai-card .h{display:flex;align-items:center;gap:7px;font-size:11px;font-family:var(--font-mono);font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.85;margin-bottom:10px;position:relative}
+  .ai-card .ti{font-size:13px;font-weight:600;line-height:1.5;position:relative;margin-bottom:10px}
+  .ai-card .btns{display:flex;gap:6px;position:relative}
+  .ai-card .b{padding:5px 10px;border-radius:5px;background:rgba(255,255,255,.14);color:#fff;font-size:11px;font-weight:600;border:0;cursor:pointer;font-family:inherit}
+  .ai-card .b.pri{background:#fff;color:oklch(0.32 0.13 262)}
+  .vt{position:relative;padding-left:14px}
+  .vt::before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:2px;background:var(--line)}
+  .vt .it{position:relative;padding:8px 0 8px 14px;font-size:12px}
+  .vt .it::before{content:"";position:absolute;left:-14px;top:13px;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--line-2)}
+  .vt .it.cur::before{background:var(--brand);border-color:var(--brand)}
+  .vt .it .v{font-family:var(--font-mono);font-weight:700;font-size:11.5px}
+  .vt .it .lb{color:var(--ink-2);font-size:11.5px;margin-top:1px}
+  .vt .it .ts{color:var(--ink-3);font-size:10.5px;font-family:var(--font-mono);margin-top:2px}
+  .foot{padding:0 0 52px;color:var(--ink-3)}
+  .foot .box{padding:18px}
+  .small{font-size:12.5px;color:var(--ink-2)}
+  .mono{font-family:var(--font-mono)}
+  @media (max-width: 1100px){
+    .grid-2,.grid-3,.two-col,.matrix,.road,.pg-body,.impl-grid,.steps{grid-template-columns:1fr}
+    .arrow{transform:rotate(90deg)}
+    .wrap{padding:0 20px}
+    .impl-frame,.pf{width:auto !important;margin-left:0 !important;margin-right:0 !important}
+    .step{min-height:auto}
+  }
+</style>
+</head>
+<body>
+  <header class="doc-h">
+    <div class="wrap">
+      <div class="crumb">WES / REPORT / STRUCTURE</div>
+      <h1>项目结构与关键链路分析</h1>
+      <div class="meta">
+        <div><b>目标</b> 用更接近业务语言的方式，说明这个系统怎么分工、怎么流转、哪里最关键。</div>
+      </div>
+      <div class="pills">
+        <span class="pill">模块地图</span>
+        <span class="pill">页面地图</span>
+        <span class="pill">版本链路</span>
+        <span class="pill">AI 链路</span>
+        <span class="pill">团队协同</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <div class="h-num">01 / 5</div>
+      <h2>这套系统到底在做什么</h2>
+      <p class="lead">可以把它理解成一套“项目评估工厂”：先收需求，再做实施评估、开发评估和资源成本核算，最后把结果固化成总方案和版本历史。整个过程不是一次性填表，而是可以反复回看、修改、检出、检入、升版。</p>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="hd">业务主线</div>
+          <div class="bd">
+            <div class="flow">
+              <div class="flow-title">
+                <h4>从需求到归档的主流程</h4>
+                <div class="note">看的是“怎么走”，不是“有哪些接口”</div>
+              </div>
+              <div class="steps">
+                <div class="step">
+                  <div class="no">STEP 01</div>
+                  <div class="t">需求进入</div>
+                  <div class="d">录入或导入需求，必要时让系统先帮忙识别和整理。</div>
+                  <div class="foot">入口：需求页 / Excel 导入</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">STEP 02</div>
+                  <div class="t">实施评估</div>
+                  <div class="d">按模板和规则估算工作量，支持预置模式和自定义人天。</div>
+                  <div class="foot">核心：可回读、可检出、可导出</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">STEP 03</div>
+                  <div class="t">开发与资源</div>
+                  <div class="d">开发评估和资源成本继续沿着同一套版本线推进。</div>
+                  <div class="foot">联动：项目名称、总方案、版本号</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">STEP 04</div>
+                  <div class="t">总方案归档</div>
+                  <div class="d">把各阶段结果汇总成总方案，形成可追溯的历史记录。</div>
+                  <div class="foot">结果：版本、历史、导出、审计</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="hd">一句话理解</div>
+          <div class="bd">
+            <div class="callout acc">
+              <div><b>它不是单独的算表工具</b> 而是一个“带版本、带协作、带导出”的评估工作台。</div>
+            </div>
+            <div class="callout ok">
+              <div><b>它不是一次填完就结束</b> 而是允许先看草稿、再修改、再锁定、再升版。</div>
+            </div>
+            <div class="callout warn">
+              <div><b>它的关键不是页面多</b> 而是每一页都要跟同一条项目线和版本线保持一致。</div>
+            </div>
+            <div class="tag-row">
+              <span class="tag brand"><i></i> 需求先行</span>
+              <span class="tag accent"><i></i> 评估可反复</span>
+              <span class="tag ok"><i></i> 版本可追溯</span>
+              <span class="tag teal"><i></i> AI 辅助整理</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div><b>你可以把它当成</b>“项目评估版的工作台 + 版本仓库 + 导出中心”。前台给业务人用，后台负责把每次修改都留痕。</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">02 / 5</div>
+      <h2>目录级项目地图：谁负责什么</h2>
+      <p class="lead">目录很多，但可以先按“前端、后端、配置、文档”四类去看。这样不会被文件名吓到，也更容易知道改动应该找哪里。</p>
+
+      <div class="matrix">
+        <div class="box">
+          <h5>前端主站：业务页面都在这里</h5>
+          <div class="kv">
+            <div class="k">目录</div><div class="v mono">ui/V0_SAAS</div>
+            <div class="k">作用</div><div class="v">用户直接看到和操作的地方</div>
+            <div class="k">常见内容</div><div class="v">首页、需求、实施评估、开发评估、资源成本、系统管理</div>
+            <div class="k">重点</div><div class="v">页面之间要共享同一条版本线</div>
+          </div>
+          <div class="tag-row">
+            <span class="tag brand"><i></i> 页面</span>
+            <span class="tag ok"><i></i> 表单</span>
+            <span class="tag teal"><i></i> 弹窗</span>
+            <span class="tag accent"><i></i> 下载</span>
+          </div>
+        </div>
+
+        <div class="box">
+          <h5>后端服务：规则、版本、导出都在这里</h5>
+          <div class="kv">
+            <div class="k">目录</div><div class="v mono">apps/api</div>
+            <div class="k">作用</div><div class="v">负责保存、校验、生成版本、处理导出</div>
+            <div class="k">常见内容</div><div class="v">认证、版本、模板、规则、估算、AI、团队、WBS</div>
+            <div class="k">重点</div><div class="v">业务判断尽量放在服务端，避免前端各写一套</div>
+          </div>
+          <div class="tag-row">
+            <span class="tag brand"><i></i> 接口</span>
+            <span class="tag ok"><i></i> 规则</span>
+            <span class="tag warn"><i></i> 审核</span>
+            <span class="tag teal"><i></i> 下载</span>
+          </div>
+        </div>
+
+        <div class="box">
+          <h5>配置目录：系统跑起来靠它们</h5>
+          <div class="kv">
+            <div class="k">目录</div><div class="v mono">config/*</div>
+            <div class="k">作用</div><div class="v">保存用户、邀请码、版本、规则、团队等数据</div>
+            <div class="k">特点</div><div class="v">不是数据库，但承担了“长期记忆”的角色</div>
+            <div class="k">重点</div><div class="v">写入稳定、读写一致、尽量避免冲突</div>
+          </div>
+          <div class="tag-row">
+            <span class="tag ok"><i></i> 持久化</span>
+            <span class="tag accent"><i></i> 规则配置</span>
+            <span class="tag warn"><i></i> 团队数据</span>
+          </div>
+        </div>
+
+        <div class="box">
+          <h5>文档目录：历史、方案、说明都在这里</h5>
+          <div class="kv">
+            <div class="k">目录</div><div class="v mono">docs / 01_~06_ / 00_~09_</div>
+            <div class="k">作用</div><div class="v">存放需求、设计、实施、测试、部署和复盘文档</div>
+            <div class="k">特点</div><div class="v">文档很全，但要以“实现与文档对齐说明”为准</div>
+            <div class="k">重点</div><div class="v">历史资料用于追溯，当前行为以代码为准</div>
+          </div>
+          <div class="tag-row">
+            <span class="tag brand"><i></i> 设计</span>
+            <span class="tag accent"><i></i> 复盘</span>
+            <span class="tag teal"><i></i> 对齐说明</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout acc">
+        <div><b>最值得记住的一点</b>前端负责“看和操作”，后端负责“算和定”，配置负责“记住规则”，文档负责“说清来龙去脉”。</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">03 / 5</div>
+      <h2>五项重点分析：从页面到链路</h2>
+      <p class="lead">下面这五项是最值得优先理解的部分。它们决定了这个系统“能不能用、好不好用、改起来稳不稳”。</p>
+
+      <div class="road">
+        <div class="item">
+          <h5>1. 模块架构</h5>
+          <p>后端已经按业务域拆开，前端也按页面拆开。好处是每个功能有自己的位置，不会所有逻辑挤在一起。</p>
+        </div>
+        <div class="item">
+          <h5>2. 目录地图</h5>
+          <p>前端、后端、配置、文档四类目录各司其职。以后找功能时，先看它属于哪一类，再去找对应目录。</p>
+        </div>
+        <div class="item">
+          <h5>3. 实施评估链路</h5>
+          <p>这是最核心的业务页，从参数、模板、规则到导出，都是围绕“怎么把项目估清楚”来设计的。</p>
+        </div>
+        <div class="item">
+          <h5>4. 版本系统</h5>
+          <p>版本不是附属能力，而是整个系统的骨架。每次修改都会留下版本、状态、人员和历史。</p>
+        </div>
+        <div class="item">
+          <h5>5. AI 评估链路</h5>
+          <p>AI 不是单独的聊天功能，而是用来帮忙整理需求、生成草稿、补齐内容、导出结果的辅助能力。</p>
+        </div>
+        <div class="item">
+          <h5>6. 团队与协同</h5>
+          <p>团队、成员、评审、评论这些能力已经接上，说明系统已经开始往“多人协作”方向走。</p>
+        </div>
+      </div>
+
+      <h3>模块架构怎么理解</h3>
+      <div class="flow">
+        <div class="flow-title">
+          <h4>前后端职责分工图</h4>
+          <div class="note">不用记代码名，先记业务分工</div>
+        </div>
+        <div class="steps" style="grid-template-columns:repeat(5,1fr)">
+          <div class="step">
+            <div class="no">前端页面</div>
+            <div class="t">收集和展示</div>
+            <div class="d">负责录入、选择、预览、弹窗、表格和导出入口。</div>
+            <div class="foot">用户直接操作</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step">
+            <div class="no">后端服务</div>
+            <div class="t">校验和处理</div>
+            <div class="d">负责鉴权、版本生成、规则校验、导出文件生成。</div>
+            <div class="foot">真正做决定</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step">
+            <div class="no">配置存储</div>
+            <div class="t">保存长期数据</div>
+            <div class="d">保存用户、邀请码、版本、规则、团队、系统配置等。</div>
+            <div class="foot">像系统记忆</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step">
+            <div class="no">导出下载</div>
+            <div class="t">输出结果</div>
+            <div class="d">把结果生成 Excel、PDF 或 Markdown，供业务分享和归档。</div>
+            <div class="foot">结果交付</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">04 / 5</div>
+      <h2>实施评估：整个平台最关键的一条线</h2>
+      <p class="lead">如果只看一个页面，最应该看实施评估。因为它把模板、规则、版本、检出检入、导出、历史回读这些关键动作都串起来了。</p>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="hd">实施评估页面的业务流</div>
+          <div class="bd">
+            <div class="flow">
+              <div class="flow-title">
+                <h4>实施评估主流程</h4>
+                <div class="note">从“选版本”到“出结果”</div>
+              </div>
+              <div class="steps">
+                <div class="step">
+                  <div class="no">1</div>
+                  <div class="t">选项目</div>
+                  <div class="d">先确定项目名称和总方案来源，让后面的结果都落在同一条线里。</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">2</div>
+                  <div class="t">选模板和规则</div>
+                  <div class="d">模板决定看哪些内容，规则决定怎么算、能不能过。</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">3</div>
+                  <div class="t">勾选条目</div>
+                  <div class="d">按云产品和 SKU 选择需要估算的内容，可用预置或自定义人天。</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">4</div>
+                  <div class="t">实时校验</div>
+                  <div class="d">系统会看当前选项是否符合依赖关系和规则要求。</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">5</div>
+                  <div class="t">保存 / 导出</div>
+                  <div class="d">完成后可保存版本、导出 Excel / PDF，并保留历史。</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="callout ok">
+              <div><b>实施评估的核心不是“填表”</b>而是“把项目说清楚，并且以后还能找回来”。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="hd">页面里最重要的几件事</div>
+          <div class="bd">
+            <div class="timeline">
+              <div class="it cur">
+                <div class="v">项目名称</div>
+                <div class="lb">所有页面尽量围绕同一个项目名展开</div>
+              </div>
+              <div class="it">
+                <div class="v">当前生效版本</div>
+                <div class="lb">主界面只看最新可用版本，历史放到版本历史里</div>
+              </div>
+              <div class="it">
+                <div class="v">版本历史</div>
+                <div class="lb">要回看时，从历史里重新开一版，不是直接改旧版</div>
+              </div>
+              <div class="it">
+                <div class="v">检出 / 检入</div>
+                <div class="lb">检出后可改，检入后只读，避免多人互相覆盖</div>
+              </div>
+              <div class="it">
+                <div class="v">导出</div>
+                <div class="lb">最终结果要能直接拿给业务、管理层或外部协作使用</div>
+              </div>
+            </div>
+
+            <div class="tag-row" style="margin-top:12px">
+              <span class="tag brand"><i></i> 项目名称</span>
+              <span class="tag ok"><i></i> 当前生效</span>
+              <span class="tag accent"><i></i> 历史回看</span>
+              <span class="tag teal"><i></i> 导出交付</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>实施评估的页面结构，简单说</h3>
+      <div class="grid-3">
+        <div class="box">
+          <h5>上半部分：先定参数</h5>
+          <p class="small">先把项目、模板、规则、版本这些基础信息定下来，避免后面估算建立在错误前提上。</p>
+        </div>
+        <div class="box">
+          <h5>中间部分：再做估算</h5>
+          <p class="small">按工作表、云产品、SKU、预置模式、自定义人天去组织估算内容。</p>
+        </div>
+        <div class="box">
+          <h5>下半部分：保存和导出</h5>
+          <p class="small">做完以后可以保存版本、看历史、导出文件，也能继续升版或回滚。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">05 / 5</div>
+      <h2>版本系统与 AI 评估链路</h2>
+      <p class="lead">这两条线决定系统是不是“可长期使用”。版本系统保证结果不丢，AI 链路负责帮助用户更快把需求整理成可评估内容。</p>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="hd">版本系统：每次修改都有记录</div>
+          <div class="bd">
+            <div class="flow">
+              <div class="flow-title">
+                <h4>版本怎么走</h4>
+                <div class="note">一个版本不是一条数据，而是一段过程</div>
+              </div>
+              <div class="steps" style="grid-template-columns:repeat(5,1fr)">
+                <div class="step">
+                  <div class="no">A</div>
+                  <div class="t">创建</div>
+                  <div class="d">新版本按规则自动生成编号，减少人工编写出错。</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">B</div>
+                  <div class="t">检出</div>
+                  <div class="d">需要修改时先检出，表示这份内容现在归你编辑。</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">C</div>
+                  <div class="t">保存草稿</div>
+                  <div class="d">检出状态下可以反复保存，但版本号不变。</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">D</div>
+                  <div class="t">检入 / 升版</div>
+                  <div class="d">确认后检入，或升版形成新记录，旧内容留作历史。</div>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                  <div class="no">E</div>
+                  <div class="t">历史追溯</div>
+                  <div class="d">需要时可以回看创建人、修改人、时间和状态变化。</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="matrix" style="margin-top:16px">
+              <div class="box">
+                <h5>版本系统的业务意义</h5>
+                <p class="small">不是为了“技术好看”，而是为了让每一次评估都能追踪：谁改的、什么时候改的、为什么改。</p>
+              </div>
+              <div class="box">
+                <h5>对业务的好处</h5>
+                <p class="small">有了版本，大家能放心反复调整，不担心把旧结果弄丢，也方便评审和复盘。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="hd">AI 评估链路：先整理，再预览，再导出</div>
+          <div class="bd">
+            <div class="flow">
+              <div class="flow-title">
+                <h4>AI 在这里做什么</h4>
+                <div class="note">不是聊天，而是帮忙“整理成可以评估的样子”</div>
+              </div>
+              <div class="steps" style="grid-template-columns:1fr">
+                <div class="step" style="min-height:auto">
+                  <div class="no">1. 读取需求</div>
+                  <div class="t">先看输入材料</div>
+                  <div class="d">系统先拿到 Excel、需求描述、项目背景和基本情况。</div>
+                </div>
+                <div class="arrow">↓</div>
+                <div class="step" style="min-height:auto">
+                  <div class="no">2. 生成草稿</div>
+                  <div class="t">先给一个可讨论的初稿</div>
+                  <div class="d">AI 帮忙把需求整理成实施评估草稿，减少人工从头写。</div>
+                </div>
+                <div class="arrow">↓</div>
+                <div class="step" style="min-height:auto">
+                  <div class="no">3. 人工确认</div>
+                  <div class="t">看懂、改对、再决定</div>
+                  <div class="d">用户会先看预览，确认云产品、SKU、建议人天等内容是否合理。</div>
+                </div>
+                <div class="arrow">↓</div>
+                <div class="step" style="min-height:auto">
+                  <div class="no">4. 应用到评估</div>
+                  <div class="t">把草稿带回实施评估</div>
+                  <div class="d">确认后把草稿回填到实施评估页面，接着走版本和导出。</div>
+                </div>
+                <div class="arrow">↓</div>
+                <div class="step" style="min-height:auto">
+                  <div class="no">5. 导出结果</div>
+                  <div class="t">形成对外可用文件</div>
+                  <div class="d">最终可以导出 Excel、PDF 或 Markdown，方便协作和交付。</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="callout acc">
+              <div><b>AI 在这里的角色</b>不是替代业务判断，而是先把材料整理好、把草稿铺出来，让人更快做决定。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>总的来说，项目最重要的三条线</h3>
+      <div class="grid-3">
+        <div class="box">
+          <h5>业务线</h5>
+          <p class="small">需求、实施评估、开发评估、资源成本、总方案，这条线决定系统有没有实际价值。</p>
+        </div>
+        <div class="box">
+          <h5>版本线</h5>
+          <p class="small">创建、检出、检入、升版、历史，这条线决定结果能不能长期稳定使用。</p>
+        </div>
+        <div class="box">
+          <h5>辅助线</h5>
+          <p class="small">AI、导出、团队协同、系统管理，这条线决定系统能不能在真实工作场景中持续落地。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="foot">
+      <div class="box">
+        <h3 style="margin-top:0">收尾判断</h3>
+        <p class="small">这个项目现在已经不是“一个能算工时的页面”，而是一个带流程、带版本、带协作、带导出的评估平台。最关键的不是单个按钮，而是每一页都围绕同一个项目、同一条版本线、同一套规则在工作。</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -51,7 +51,7 @@ function isPrivateOrLocalHostname(hostname: string): boolean {
  * - 私网 IPv4（10/172.16-31/192.168）→ http://{hostname}:3000
  * 覆盖：NEXT_PUBLIC_WORKLOAD_API_ORIGIN；端口：NEXT_PUBLIC_API_PORT
  */
-function resolveApiUrl(path: string): string {
+export function resolveApiUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) return path
   const explicit = (process.env.NEXT_PUBLIC_WORKLOAD_API_ORIGIN || "").trim().replace(/\/$/, "")
   if (explicit) return `${explicit}${path.startsWith("/") ? path : `/${path}`}`

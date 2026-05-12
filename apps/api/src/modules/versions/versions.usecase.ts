@@ -95,6 +95,20 @@ function generateVersionCodeByRule(
   };
 }
 
+export function getVersion(req: Request, res: Response) {
+  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+  if (!auth) return;
+
+  const recordId = asString(req.params.id);
+  if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
+
+  const store = loadVersionsStore();
+  const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
+  if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+
+  return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
+}
+
 export function listVersions(req: Request, res: Response) {
   const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;

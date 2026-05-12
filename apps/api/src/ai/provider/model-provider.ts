@@ -54,6 +54,21 @@ export interface ChatCompletionResponse {
   finishReason?: string;
 }
 
+export interface ChatCompletionStreamChunk {
+  /** 本次 SSE chunk 的增量文本 */
+  contentDelta: string;
+  /** 截止当前已累积的完整文本 */
+  content: string;
+  /** 实际使用的模型 id（经过 Provider 归一化） */
+  model: string;
+  /** Provider 名称（如 "kimi"） */
+  provider: string;
+  /** 实际发起的 HTTP 尝试次数 */
+  attempts: number;
+  /** 结束原因（如 "stop"、"length"），部分厂商可能不提供 */
+  finishReason?: string;
+}
+
 export interface ModelProvider {
   /** Provider 唯一标识，例如 "kimi" */
   readonly name: string;
@@ -63,4 +78,6 @@ export interface ModelProvider {
   isAvailable(): boolean;
   /** 核心调用：对话补全 */
   chatCompletion(req: ChatCompletionRequest): Promise<ChatCompletionResponse>;
+  /** 流式调用：逐段返回模型输出文本；Provider 不支持时可不实现 */
+  streamChatCompletion?(req: ChatCompletionRequest): AsyncIterable<ChatCompletionStreamChunk>;
 }

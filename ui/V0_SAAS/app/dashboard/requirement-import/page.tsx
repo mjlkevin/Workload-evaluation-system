@@ -58,7 +58,7 @@ import { VersionVcsToolbar } from "@/components/workload/version-vcs-toolbar"
 import { recordsToVersionHistoryRows, VersionHistoryDialog } from "@/components/workload/version-history-dialog"
 import { TableTemplate } from "@/components/table-template"
 import { useAuth } from "@/hooks/use-auth"
-import { apiRequest } from "@/lib/api-client"
+import { apiRequest, getStoredToken, resolveApiUrl } from "@/lib/api-client"
 import { normalizeKimiModelName } from "@/lib/model-name"
 import { cn, createClientRowId } from "@/lib/utils"
 import {
@@ -189,7 +189,77 @@ type CompanyProfileSummaryResponse = {
   disambiguationCandidates?: CompanyProfileDisambiguationCandidate[]
 }
 
+type ParseBasicInfoStreamPayload = {
+  message?: string
+  progress?: number
+  reason?: string
+  model?: string
+  totalChars?: number
+  data?: ParseBasicInfoResponse
+}
+
 const DEV_OVERVIEW_TOTAL_ROW_ID = "__dev-overview-total__"
+
+async function parseBasicInfoByStream(
+  formData: FormData,
+  signal: AbortSignal,
+  onEvent: (event: string, payload: ParseBasicInfoStreamPayload) => void,
+): Promise<ParseBasicInfoResponse> {
+  const headers = new Headers()
+  const token = getStoredToken()
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+
+  const response = await fetch(resolveApiUrl("/api/v1/ai/parse-basic-info/stream"), {
+    method: "POST",
+    headers,
+    body: formData,
+    signal,
+    cache: "no-store",
+  })
+  if (!response.ok) {
+    throw new Error(`解析请求失败(${response.status})`)
+  }
+  if (!response.body) {
+    throw new Error("浏览器未返回流式响应")
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+  let completeData: ParseBasicInfoResponse | null = null
+
+  const handleBlock = (block: string) => {
+    const lines = block.split(/\r?\n/)
+    const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim() || "message"
+    const dataText = lines
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trim())
+      .join("\n")
+    if (!dataText) return
+    const payload = JSON.parse(dataText) as ParseBasicInfoStreamPayload
+    onEvent(event, payload)
+    if (event === "complete" && payload.data) {
+      completeData = payload.data
+    }
+    if (event === "error") {
+      throw new Error(payload.reason || payload.message || "解析失败")
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const blocks = buffer.split(/\r?\n\r?\n/)
+    buffer = blocks.pop() || ""
+    for (const block of blocks) {
+      if (block.trim()) handleBlock(block)
+    }
+  }
+  if (buffer.trim()) handleBlock(buffer)
+  if (!completeData) throw new Error("解析流结束但未收到完成结果")
+  return completeData
+}
 
 function resolveEffectiveKimiModelForFileParsing(active: RequirementSystemConfig): string {
   const fp = (active.fileParsing.model || "").trim()
@@ -1512,9 +1582,21 @@ export default function RequirementImportPage() {
     if (!kimiAssessmentPreview || kimiApplying) return
     setKimiApplying(true)
     try {
+      const requirementSnapshot = {
+        basicInfo: basicInfo as unknown as Record<string, unknown>,
+        valuePropositionRows: valuePropositionRows as unknown as Array<Record<string, unknown>>,
+        businessNeedRows: businessNeedRows as unknown as Array<Record<string, unknown>>,
+        devOverviewRows: devOverviewRows as unknown as Array<Record<string, unknown>>,
+        devTotalDays: Number(devSummary.total.toFixed(1)),
+        productModuleRows: productModuleRows as unknown as Array<Record<string, unknown>>,
+        implementationScopeRows: implementationScopeRows as unknown as Array<Record<string, unknown>>,
+        meetingNotes,
+        keyPointRows: keyPointRows as unknown as Array<Record<string, unknown>>,
+      }
       const payload = {
         source: kimiAssessmentPreview.source,
         draft: kimiAssessmentPreview.assessmentDraft,
+        requirementSnapshot,
         generatedMeta: kimiAssessmentPreview.meta,
         projectName: basicInfo.projectName.trim(),
       }

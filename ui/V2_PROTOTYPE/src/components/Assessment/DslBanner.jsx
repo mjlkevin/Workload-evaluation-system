@@ -59,7 +59,7 @@ export default function DslBanner({ dsl, onAutoFix }) {
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <button
+        <button type="button"
           onClick={handleAutoFix}
           style={{
             height: 28,
@@ -77,7 +77,7 @@ export default function DslBanner({ dsl, onAutoFix }) {
         >
           一键修复
         </button>
-        <button
+        <button type="button"
           onClick={() => setOpen(!open)}
           style={{
             fontSize: 12,

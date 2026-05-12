@@ -30,7 +30,7 @@ export default function AiCopilot({ data }) {
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
         {data.actions.map((label) => (
-          <button
+          <button type="button"
             key={label}
             className={label.includes('应用') ? 'btn btn-pri' : 'btn btn-ghost'}
             style={{

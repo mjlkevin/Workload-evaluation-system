@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 业务需求及问题分析 Mock</title>
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .pg-hd{padding:18px 28px;background:#fff;border-bottom:1px solid var(--line)}
+  .pg-hd .row{display:flex;align-items:center;gap:16px}
+  .pg-hd h1{margin:0;font-size:20px;font-weight:800}
+  .pg-hd .right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .subline{margin-top:5px;color:var(--ink-3);font-size:12px}
+  .workarea{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;padding:18px 28px 28px}
+  .main{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .panel{position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-1);overflow:hidden}
+  .panel-hd{min-height:48px;padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:13px;font-weight:800}
+  .panel-hd .right{margin-left:auto;color:var(--ink-3);font-size:11px;font-family:var(--font-mono);font-weight:700}
+  .rail{position:absolute;left:-22px;top:14px;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:800;background:var(--accent-soft);padding:6px 4px;border-radius:4px}
+  .summary-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding:14px 16px;background:linear-gradient(135deg,#fff,var(--bg-soft))}
+  .metric{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:72px}
+  .metric .lb{font-size:10.5px;color:var(--ink-3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em}
+  .metric .num{margin-top:5px;font-size:24px;line-height:1;font-weight:850;font-variant-numeric:tabular-nums}
+  .metric .hint{margin-top:6px;font-size:11px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .flow{padding:16px;display:grid;gap:14px}
+  .flow-row{display:grid;grid-template-columns:86px minmax(0,1fr);gap:12px;align-items:center}
+  .flow-title{font-size:12px;font-weight:800;color:var(--ink-2)}
+  .chain{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;position:relative}
+  .node{border:1px solid var(--line);border-radius:8px;background:#fff;padding:9px 10px;min-height:58px;position:relative}
+  .node::after{content:"";position:absolute;right:-8px;top:50%;width:8px;border-top:1px solid var(--line-2)}
+  .node:last-child::after{display:none}
+  .node b{display:block;font-size:12.5px}
+  .node span{display:block;margin-top:4px;font-size:11px;color:var(--ink-3)}
+  .node.ok{background:var(--ok-soft);border-color:color-mix(in oklab,var(--ok) 28%, var(--line))}
+  .node.warn{background:var(--warn-soft);border-color:color-mix(in oklab,var(--warn) 32%, var(--line))}
+  .node.risk{background:var(--err-soft);border-color:color-mix(in oklab,var(--err) 30%, var(--line))}
+  .node.info{background:var(--brand-soft);border-color:color-mix(in oklab,var(--brand) 24%, var(--line))}
+  .diag-list{padding:14px 16px;display:grid;gap:12px}
+  .diag-card{border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
+  .diag-card.selected{border-color:color-mix(in oklab,var(--brand) 45%, var(--line));box-shadow:0 0 0 2px color-mix(in oklab,var(--brand-soft) 70%, transparent)}
+  .diag-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,#fff,var(--bg-soft))}
+  .diag-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .diag-title h3{margin:0;font-size:15px}
+  .diag-text{margin-top:8px;line-height:1.65;color:var(--ink-2);font-size:13px}
+  .diag-score{display:grid;grid-template-columns:repeat(2,70px);gap:8px;align-content:start}
+  .score{border:1px solid var(--line);border-radius:8px;background:#fff;padding:7px 8px;text-align:center}
+  .score .v{font-size:17px;font-weight:850;font-variant-numeric:tabular-nums}
+  .score .k{font-size:10px;color:var(--ink-3);font-family:var(--font-mono)}
+  .diag-body{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;padding:12px 16px}
+  .block{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px 12px;min-height:92px}
+  .block .k{font-size:11px;color:var(--ink-3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+  .block .v{font-size:12.5px;line-height:1.65;color:var(--ink-2)}
+  .diag-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line);background:var(--bg-soft)}
+  .source{margin-left:auto;font-size:11px;color:var(--ink-3);font-family:var(--font-mono)}
+  .side-card{border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:var(--shadow-1);overflow:hidden}
+  .side-card h3{margin:0;padding:12px 16px;border-bottom:1px solid var(--line);font-size:13px}
+  .side-bd{padding:14px 16px;display:grid;gap:12px}
+  .impact{display:grid;gap:9px}
+  .impact-row{display:grid;grid-template-columns:84px minmax(0,1fr) 34px;gap:8px;align-items:center;font-size:12px}
+  .bar{height:8px;background:var(--bg-soft);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+  .bar i{display:block;height:100%;border-radius:999px;background:var(--brand)}
+  .bar.warn i{background:var(--warn)}
+  .bar.err i{background:var(--err)}
+  .todo{display:grid;gap:8px}
+  .todo-item{border:1px solid var(--line);border-radius:8px;padding:10px 11px;background:#fff}
+  .todo-item b{font-size:12.5px}
+  .todo-item p{margin:5px 0 0;color:var(--ink-3);font-size:12px;line-height:1.55}
+  .input-pool{display:grid;gap:8px}
+  .pool-item{border:1px solid var(--line);border-radius:8px;padding:10px 11px;background:var(--bg-soft)}
+  .pool-item .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .pool-item .desc{margin-top:6px;color:var(--ink-3);font-size:12px;line-height:1.55}
+  .legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--ink-3)}
+  .dot-sm{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .extract{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:14px 16px}
+  .extract-card{border:1px dashed var(--line-2);border-radius:8px;background:var(--bg-soft);padding:11px 12px}
+  .extract-card b{font-size:12.5px}
+  .extract-card p{margin:5px 0 0;font-size:12px;color:var(--ink-3);line-height:1.55}
+  @media (max-width:1180px){.workarea{grid-template-columns:1fr}.summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.diag-body{grid-template-columns:1fr}.extract{grid-template-columns:1fr}.chain{grid-template-columns:repeat(2,minmax(0,1fr))}.node::after{display:none}}
+  @media (max-width:760px){.pg-hd .row{align-items:flex-start;flex-direction:column}.pg-hd .right{margin-left:0;justify-content:flex-start}.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.flow-row{grid-template-columns:1fr}.diag-top{grid-template-columns:1fr}.diag-score{grid-template-columns:repeat(2,minmax(0,1fr))}.workarea{padding:14px 16px 24px}.tabs{overflow:auto;flex-wrap:nowrap}}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="l">W</div><div>WES</div></div>
+      <div class="grp"><h6>工作台</h6><a href="home.html"><span class="ic">●</span>主页</a><a class="on" href="requirement-list.html"><span class="ic">◒</span>需求</a><a href="assessment-list.html"><span class="ic">▣</span>实施评估</a><a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a><a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a><a href="wbs.html"><span class="ic">☷</span>WBS</a><a href="review-list.html"><span class="ic">✓</span>评审</a></div>
+      <div class="grp"><h6>系统</h6><a href="system-management.html"><span class="ic">⚙</span>系统管理</a><a href="user-management.html"><span class="ic">☺</span>用户管理</a><a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a></div>
+      <div class="user"><div class="row"><div class="av">M</div><div class="account"><div class="nm">mjlkevin</div><div class="meta">超级管理员</div></div></div><a class="out" href="login.html">退出</a></div>
+    </aside>
+    <main class="content">
+      <div class="pg-hd">
+        <div class="crumb">工作台 / 需求 / 需求详情 / 业务需求及问题分析</div>
+        <div class="row">
+          <div>
+            <h1>需求详情 <span class="bdg ci"><span class="dot"></span>已检入</span> <span class="bdg draft mono">RQ05001-VA2</span></h1>
+            <div class="subline">由 Excel【3.业务需求及问题一览表】解析并经 AI 归纳，形成售前沟通与交付评估共用视图</div>
+          </div>
+          <div class="right">
+            <button class="kimi-trigger" type="button">Kimi-help ▾</button>
+            <button class="btn btn-ghost" type="button">历史</button>
+            <button class="btn btn-ghost" type="button">重新解析</button>
+            <button class="btn btn-out" type="button">查看原始明细</button>
+            <button class="btn btn-pri" type="button">生成评估输入</button>
+          </div>
+        </div>
+      </div>
+      <div class="tabs">
+        <span class="t on">分析结果</span>
+        <span class="t">原始明细 <span class="ct">5</span></span>
+        <span class="t">待确认问题 <span class="ct">3</span></span>
+        <span class="t">评估输入 <span class="ct">2</span></span>
+        <span class="t">版本历史</span>
+      </div>
+
+      <div class="workarea">
+        <section class="main">
+          <article class="panel">
+            <span class="rail">SUMMARY</span>
+            <div class="panel-hd">分析摘要 <span class="bdg ci"><span class="dot"></span>AI 已分析</span><span class="right">来源 5 行 · 聚合 3 个主题</span></div>
+            <div class="summary-grid">
+              <div class="metric"><div class="lb">Raw Rows</div><div class="num">5</div><div class="hint">Excel 原始需求</div></div>
+              <div class="metric"><div class="lb">Topics</div><div class="num">3</div><div class="hint">聚合业务主题</div></div>
+              <div class="metric"><div class="lb">Standard</div><div class="num">4</div><div class="hint">标准产品可覆盖</div></div>
+              <div class="metric"><div class="lb">Integration</div><div class="num">1</div><div class="hint">接口/第三方协同</div></div>
+              <div class="metric"><div class="lb">Confirm</div><div class="num">3</div><div class="hint">需售前补充确认</div></div>
+              <div class="metric"><div class="lb">Complexity</div><div class="num">中</div><div class="hint">初步实施复杂度</div></div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <span class="rail">FLOW</span>
+            <div class="panel-hd">业务链路影响视图 <span class="right">颜色表示标准覆盖、配置确认、接口风险</span></div>
+            <div class="flow">
+              <div class="flow-row">
+                <div class="flow-title">销售闭环</div>
+                <div class="chain">
+                  <div class="node ok"><b>销售订单</b><span>标准覆盖</span></div>
+                  <div class="node ok"><b>销售出库</b><span>标准覆盖</span></div>
+                  <div class="node warn"><b>应收形成</b><span>核销规则需确认</span></div>
+                  <div class="node warn"><b>收款核销</b><span>自动匹配待确认</span></div>
+                </div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-title">采购闭环</div>
+                <div class="chain">
+                  <div class="node ok"><b>采购订单</b><span>标准覆盖</span></div>
+                  <div class="node ok"><b>采购入库</b><span>标准覆盖</span></div>
+                  <div class="node warn"><b>应付形成</b><span>付款规则需确认</span></div>
+                  <div class="node warn"><b>付款核销</b><span>对账口径待确认</span></div>
+                </div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-title">第三方集成</div>
+                <div class="chain">
+                  <div class="node risk"><b>外部单据</b><span>字段口径未知</span></div>
+                  <div class="node risk"><b>接口同步</b><span>需金蝶配合</span></div>
+                  <div class="node info"><b>金蝶单据</b><span>不用写代码的可能性</span></div>
+                  <div class="node warn"><b>联调验收</b><span>排期依赖第三方</span></div>
+                </div>
+              </div>
+              <div class="legend">
+                <span><i class="dot-sm" style="background:var(--ok)"></i> 标准覆盖</span>
+                <span><i class="dot-sm" style="background:var(--warn)"></i> 需配置/口径确认</span>
+                <span><i class="dot-sm" style="background:var(--err)"></i> 接口或二开风险</span>
+                <span><i class="dot-sm" style="background:var(--brand)"></i> 可转评估输入</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <span class="rail">ANALYSIS</span>
+            <div class="panel-hd">业务主题诊断卡片 <span class="right">默认呈现 AI 分析结果，原始 Excel 行作为依据</span></div>
+            <div class="diag-list">
+              <section class="diag-card selected">
+                <div class="diag-top">
+                  <div>
+                    <div class="diag-title"><h3>供应链订单履约闭环</h3><span class="tag ok">标准覆盖为主</span><span class="tag warn">需核销口径确认</span></div>
+                    <div class="diag-text">客户希望通过系统完成销售、采购、仓储与收付款核销的闭环管理，本质问题是跨模块单据联动与财务核销口径需要统一。</div>
+                  </div>
+                  <div class="diag-score">
+                    <div class="score"><div class="v">高</div><div class="k">覆盖度</div></div>
+                    <div class="score"><div class="v">中</div><div class="k">复杂度</div></div>
+                  </div>
+                </div>
+                <div class="diag-body">
+                  <div class="block"><div class="k">售前顾问视角</div><div class="v">可向客户确认“订单到收付款”的端到端价值，重点强调减少人工对账与提升业务财务一致性。</div></div>
+                  <div class="block"><div class="k">交付 PM 评估提示</div><div class="v">需要拆分销售、采购、库存、财务四类配置项，并预留核销规则访谈与测试验证工作量。</div></div>
+                  <div class="block"><div class="k">待确认问题</div><div class="v">收付款是否自动匹配？是否按订单、发票或出入库单维度核销？</div></div>
+                </div>
+                <div class="diag-foot">
+                  <span class="bdg ci"><span class="dot"></span>建议方案：标准功能 + 配置</span>
+                  <span class="bdg draft"><span class="dot"></span>影响模块：销售 / 采购 / 仓库 / 财务</span>
+                  <button class="btn btn-ghost" type="button">采纳为评估输入</button>
+                  <span class="source">来源：Excel 第 1-4 行</span>
+                </div>
+              </section>
+
+              <section class="diag-card">
+                <div class="diag-top">
+                  <div>
+                    <div class="diag-title"><h3>第三方系统到金蝶的数据同步</h3><span class="tag err">集成风险</span><span class="tag warn">需二开判定</span></div>
+                    <div class="diag-text">原始需求提出第三方数据传到金蝶，包含采购、销售、收付款等多类单据。AI 判断核心风险不在“是否传输”，而在字段映射、同步频率、错误重试与验收边界。</div>
+                  </div>
+                  <div class="diag-score">
+                    <div class="score"><div class="v">中</div><div class="k">覆盖度</div></div>
+                    <div class="score"><div class="v">高</div><div class="k">复杂度</div></div>
+                  </div>
+                </div>
+                <div class="diag-body">
+                  <div class="block"><div class="k">售前顾问视角</div><div class="v">需要尽早把“接口开发，金蝶配合，不用写代码”的表述拆清楚，避免客户理解为完全零开发。</div></div>
+                  <div class="block"><div class="k">交付 PM 评估提示</div><div class="v">建议单独生成接口评估项：接口设计、字段映射、联调、异常处理、UAT 支持。</div></div>
+                  <div class="block"><div class="k">待确认问题</div><div class="v">是实时同步还是定时同步？第三方接口由谁提供？金蝶侧是否已有标准连接器？</div></div>
+                </div>
+                <div class="diag-foot">
+                  <span class="bdg co"><span class="dot"></span>建议方案：接口集成</span>
+                  <span class="bdg lock"><span class="dot"></span>风险：第三方排期依赖</span>
+                  <button class="btn btn-ghost" type="button">转为接口项</button>
+                  <span class="source">来源：Excel 第 5 行</span>
+                </div>
+              </section>
+
+              <section class="diag-card">
+                <div class="diag-top">
+                  <div>
+                    <div class="diag-title"><h3>仓储与库存日常运营管理</h3><span class="tag ok">标准覆盖</span></div>
+                    <div class="diag-text">仓库需求集中在日常出入库、盘点与库存可视化，属于标准仓储管理能力，实施重点是基础资料、仓位口径与盘点流程确认。</div>
+                  </div>
+                  <div class="diag-score">
+                    <div class="score"><div class="v">高</div><div class="k">覆盖度</div></div>
+                    <div class="score"><div class="v">低</div><div class="k">复杂度</div></div>
+                  </div>
+                </div>
+                <div class="diag-body">
+                  <div class="block"><div class="k">售前顾问视角</div><div class="v">可作为标准能力说明，用于增强客户对库存透明与盘点效率改善的预期。</div></div>
+                  <div class="block"><div class="k">交付 PM 评估提示</div><div class="v">建议按仓库基础资料、出入库流程、盘点方案、角色权限拆分配置工作。</div></div>
+                  <div class="block"><div class="k">待确认问题</div><div class="v">是否涉及批次、序列号、库位或多仓协同？是否需要移动端作业？</div></div>
+                </div>
+                <div class="diag-foot">
+                  <span class="bdg ci"><span class="dot"></span>建议方案：标准功能配置</span>
+                  <span class="bdg draft"><span class="dot"></span>影响模块：仓库 / 库存</span>
+                  <button class="btn btn-ghost" type="button">采纳为评估输入</button>
+                  <span class="source">来源：Excel 第 3 行</span>
+                </div>
+              </section>
+            </div>
+          </article>
+
+          <article class="panel">
+            <span class="rail">TRACE</span>
+            <div class="panel-hd">解析与追溯 <span class="right">展开卡片后可查看原始 Excel 行与 AI 推理依据</span></div>
+            <div class="extract">
+              <div class="extract-card"><b>原始来源保留</b><p>Excel 行不会直接回填主界面，而是作为每个分析结论的依据，可用于审计和人工纠错。</p></div>
+              <div class="extract-card"><b>AI 归纳可编辑</b><p>售前顾问可调整主题、问题描述、待确认问题，避免 AI 结论直接进入评估。</p></div>
+              <div class="extract-card"><b>评估输入可沉淀</b><p>被采纳的卡片会进入实施评估输入池，带上模块、复杂度、风险和来源引用。</p></div>
+            </div>
+          </article>
+        </section>
+
+        <aside class="side">
+          <section class="side-card">
+            <h3>评估影响</h3>
+            <div class="side-bd impact">
+              <div class="impact-row"><span>标准覆盖</span><div class="bar"><i style="width:82%"></i></div><b>高</b></div>
+              <div class="impact-row"><span>二开可能</span><div class="bar warn"><i style="width:46%"></i></div><b>中</b></div>
+              <div class="impact-row"><span>集成复杂</span><div class="bar err"><i style="width:72%"></i></div><b>高</b></div>
+              <div class="impact-row"><span>数据准备</span><div class="bar warn"><i style="width:55%"></i></div><b>中</b></div>
+              <div class="impact-row"><span>协同压力</span><div class="bar warn"><i style="width:58%"></i></div><b>中</b></div>
+            </div>
+          </section>
+
+          <section class="side-card">
+            <h3>待确认问题</h3>
+            <div class="side-bd todo">
+              <div class="todo-item"><b>第三方同步方式</b><p>实时接口、定时任务还是人工导入？失败重试和异常告警由谁负责？</p></div>
+              <div class="todo-item"><b>收付款核销口径</b><p>按订单、发票、出入库单还是客户/供应商维度自动匹配？</p></div>
+              <div class="todo-item"><b>仓储精细度</b><p>是否涉及批次、序列号、库位、移动端扫码或多仓调拨？</p></div>
+            </div>
+          </section>
+
+          <section class="side-card">
+            <h3>实施评估输入池</h3>
+            <div class="side-bd input-pool">
+              <div class="pool-item">
+                <div class="top"><b>接口集成评估项</b><span class="tag err">待评估</span></div>
+                <div class="desc">字段映射、接口设计、联调、异常处理、UAT 支持。</div>
+              </div>
+              <div class="pool-item">
+                <div class="top"><b>供应链闭环配置项</b><span class="tag warn">待确认</span></div>
+                <div class="desc">销售、采购、仓库、财务核销规则访谈与配置验证。</div>
+              </div>
+              <button class="btn btn-pri" type="button">推送到实施评估</button>
+            </div>
+          </section>
+
+          <section class="side-card">
+            <h3>版本时间轴</h3>
+            <div class="side-bd">
+              <div class="vt-item cur"><div class="vt-dot"></div><div><div class="x mono">RQ05001-VA2</div><div class="t">mjlkevin · 2026-05-11 · 已检入</div></div></div>
+              <div class="vt-item"><div class="vt-dot"></div><div><div class="x mono">RQ05001-VA1</div><div class="t">mjlkevin · 2026-05-11 · 历史归档</div></div></div>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

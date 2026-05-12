@@ -27,7 +27,7 @@ export default function CustomStepper({ baseDays, initialCustomDays, reasonStatu
           background: '#fff',
         }}
       >
-        <button
+        <button type="button"
           style={{
             width: 20,
             height: 20,
@@ -66,7 +66,7 @@ export default function CustomStepper({ baseDays, initialCustomDays, reasonStatu
         >
           {customDays}
         </span>
-        <button
+        <button type="button"
           style={{
             width: 20,
             height: 20,

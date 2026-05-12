@@ -13,7 +13,7 @@
     },
     "fileParsing": {
       "enabled": true,
-      "model": "kimi-k2.5",
+      "model": "kimi-k2-turbo-preview",
       "allowedExtensions": [
         ".xlsx",
         ".xls",
@@ -50,7 +50,7 @@
     },
     "fileParsing": {
       "enabled": true,
-      "model": "kimi-k2.5",
+      "model": "kimi-k2-turbo-preview",
       "allowedExtensions": [
         ".xlsx",
         ".xls",

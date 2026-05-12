@@ -1,7 +1,17 @@
 import React from 'react'
 
 export default function KpiCards({ kpi, dsl }) {
-  const { totalDays, baseDays, userIncrementDays, difficultyIncrementDays, orgIncrementDays, selectedCount, totalItemCount, cloudDistribution } = kpi
+  const safeKpi = kpi || {}
+  const {
+    totalDays = 0,
+    baseDays = 0,
+    userIncrementDays = 0,
+    difficultyIncrementDays = 0,
+    orgIncrementDays = 0,
+    selectedCount = 0,
+    totalItemCount = 0,
+    cloudDistribution = [],
+  } = safeKpi
   const increments = [
     { label: '基础', value: baseDays, flex: baseDays, color: 'oklch(0.78 0.14 262)' },
     { label: '用户', value: userIncrementDays, flex: userIncrementDays, color: 'oklch(0.69 0.18 45)' },
@@ -51,7 +61,7 @@ export default function KpiCards({ kpi, dsl }) {
                 color: '#fff',
               }}
             >
-              +{Math.round(((totalDays - baseDays) / baseDays) * 100)}% vs 标准
+              +{baseDays > 0 ? Math.round(((totalDays - baseDays) / baseDays) * 100) : 0}% vs 标准
             </span>
           </div>
         </div>
@@ -166,7 +176,7 @@ export default function KpiCards({ kpi, dsl }) {
                 position: 'absolute',
                 inset: 12,
                 borderRadius: '50%',
-                background: '#fff',
+                background: 'var(--surface)',
               }}
             />
           </div>

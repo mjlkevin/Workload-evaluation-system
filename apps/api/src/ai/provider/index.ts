@@ -6,6 +6,7 @@
 export type {
   ChatCompletionRequest,
   ChatCompletionResponse,
+  ChatCompletionStreamChunk,
   ChatMessage,
   ChatRole,
   ModelProvider,

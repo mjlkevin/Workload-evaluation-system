@@ -167,7 +167,7 @@ export default function ListPage({
             const enabled =
               act.mode === 'multi' ? selCount > 0 : selCount === 1
             return (
-              <button
+              <button type="button"
                 key={act.key}
                 onClick={() => enabled && triggerBulk(act)}
                 disabled={!enabled}
@@ -192,7 +192,7 @@ export default function ListPage({
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {filterTags?.map((tag) => (
-            <button
+            <button type="button"
               key={tag.key}
               onClick={() => setActiveFilter(tag.key)}
               style={{
@@ -351,9 +351,9 @@ export default function ListPage({
       >
         <span>共 {data.length} 条 · 显示 {filtered.length}{showFloat && ` · 已选 ${selCount}`}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button className="btn btn-ghost" style={{ height: 26, padding: '0 8px', fontSize: 12 }}>‹</button>
+          <button type="button" className="btn btn-ghost" style={{ height: 26, padding: '0 8px', fontSize: 12 }}>‹</button>
           <span>1 / 1</span>
-          <button className="btn btn-ghost" style={{ height: 26, padding: '0 8px', fontSize: 12 }}>›</button>
+          <button type="button" className="btn btn-ghost" style={{ height: 26, padding: '0 8px', fontSize: 12 }}>›</button>
         </span>
       </div>
     </PageShell>

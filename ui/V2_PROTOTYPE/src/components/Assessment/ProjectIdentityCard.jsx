@@ -8,15 +8,15 @@ export default function ProjectIdentityCard({ data }) {
   const isReadonly = data.vcs?.isReadonly ?? false
 
   const cardBg = isReadonly
-    ? 'linear-gradient(135deg, #ecfdf5 0%, #fff 100%)'
-    : 'linear-gradient(135deg, oklch(0.98 0.025 262) 0%, #fff 100%)'
-  const leftBorder = isReadonly ? '3px solid #10b981' : '3px solid var(--brand, #4f46e5)'
+    ? 'linear-gradient(135deg, var(--ok-soft) 0%, var(--surface) 100%)'
+    : 'linear-gradient(135deg, oklch(0.98 0.025 262) 0%, var(--surface) 100%)'
+  const leftBorder = isReadonly ? '3px solid var(--ok)' : '3px solid var(--brand, #4f46e5)'
 
   return (
     <div
       style={{
         background: cardBg,
-        border: isReadonly ? '1px solid #a7f3d0' : '1px solid var(--line, #e5e7eb)',
+        border: isReadonly ? '1px solid var(--ok-soft)' : '1px solid var(--line, #e5e7eb)',
         borderLeft: leftBorder,
         borderRadius: 'var(--r-lg, 12px)',
         padding: '16px 18px',
@@ -72,7 +72,7 @@ export default function ProjectIdentityCard({ data }) {
           ))}
           {!isReadonly && (
             <>
-              <button
+              <button type="button"
                 onClick={() => setShowAdd(!showAdd)}
                 style={{
                   display: 'inline-flex',
@@ -98,7 +98,7 @@ export default function ProjectIdentityCard({ data }) {
                 <div
                   style={{
                     position: 'absolute',
-                    background: '#fff',
+                    background: 'var(--surface)',
                     border: '1px solid var(--line)',
                     borderRadius: 8,
                     padding: 8,
@@ -195,8 +195,8 @@ export default function ProjectIdentityCard({ data }) {
               borderRadius: 999,
               fontSize: 12,
               fontWeight: 600,
-              background: isReadonly ? '#ecfdf5' : 'var(--accent-soft, #ffedd5)',
-              color: isReadonly ? '#047857' : 'var(--accent-ink, #c2410c)',
+              background: isReadonly ? 'var(--ok-soft)' : 'var(--accent-soft, #ffedd5)',
+              color: isReadonly ? 'var(--ok-ink)' : 'var(--accent-ink, #c2410c)',
             }}
           >
             {isReadonly ? '已检入 · 只读' : '已检出'}

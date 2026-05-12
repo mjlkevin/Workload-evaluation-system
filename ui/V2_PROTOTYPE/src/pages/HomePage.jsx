@@ -1,28 +1,7 @@
 import React, { useState } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
-
-const KPI_DATA = [
-  { ic: '▣', lb: '方案数', num: 12, sub: '近 7 天 +1 进行中', bar: '80%' },
-  { ic: '≡', lb: '需求条目', num: 186, sub: '待结构化 4 · 待处理 2', bar: '62%', icBg: 'var(--accent-soft)', icCo: 'var(--accent)' },
-  { ic: '⏱', lb: '评估人天', num: 762, sub: '高复杂占比 20%', bar: '48%', icBg: 'var(--info-soft)', icCo: 'var(--info)' },
-  { ic: '⚇', lb: '参与成员', num: 14, sub: '在线 6 人', bar: '35%', icBg: 'var(--ok-soft)', icCo: 'var(--ok)' },
-]
-
-const PLANS = [
-  { id: 1, projectName: '利民集团数字化二期', globalVersion: 'GL-04001', status: '进行中', checkedOut: false, mandays: 210.5 },
-  { id: 2, projectName: '金石科技 ERP 升级', globalVersion: 'GL-04002', status: '待评审', checkedOut: true, mandays: 315.2 },
-  { id: 3, projectName: '华东智造供应链改造', globalVersion: 'GL-04003', status: '已发布', checkedOut: false, mandays: 178.0 },
-  { id: 4, projectName: '新材料集团财务共享', globalVersion: 'GL-04004', status: '进行中', checkedOut: true, mandays: 245.8 },
-  { id: 5, projectName: '地产集团成本管理', globalVersion: 'GL-04005', status: '已发布', checkedOut: false, mandays: 132.4 },
-  { id: 6, projectName: '零售集团会员中台', globalVersion: 'GL-04006', status: '进行中', checkedOut: false, mandays: 289.6 },
-]
-
-const FEED = [
-  { name: '王丽', action: '检出了 开发评估 · DV-04001', time: '10 分钟前', accent: false },
-  { name: '陈晨', action: '完成了 需求评审 · RQ-04001', time: '32 分钟前', accent: true },
-  { name: '张鹏', action: '更新了 资源成本 · RS-04001', time: '1 小时前', accent: false },
-  { name: '刘洋', action: '发布了 总方案 · GL-04005', time: '3 小时前', accent: true },
-]
+import useHomeDashboard from '../hooks/useHomeDashboard.js'
+import { apiClient } from '../api/client.js'
 
 // VCS 9 button spec — §6.3.1
 const VCS_BUTTONS = [
@@ -39,11 +18,67 @@ export default function HomePage() {
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
   const [dialog, setDialog] = useState(null) // 'new' | 'guide' | 'er' | null
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [planSearch, setPlanSearch] = useState('')
+  const [creatingPlan, setCreatingPlan] = useState(false)
+  const [newPlan, setNewPlan] = useState({
+    projectName: '',
+    industry: '',
+    userCount: '',
+    template: '',
+  })
+
+  const { kpi, plans, feed, refetch, remove, create } = useHomeDashboard()
+  const filteredPlans = plans.filter((plan) => {
+    const q = planSearch.trim().toLowerCase()
+    if (!q) return true
+    return [
+      plan.projectName,
+      plan.globalVersion,
+      plan.status,
+      plan.checkedOutBy,
+      plan.owner,
+      plan.raw?.checkedOutByUsername,
+      plan.raw?.updatedByUsername,
+      plan.raw?.versionCode,
+    ].some((value) => String(value || '').toLowerCase().includes(q))
+  })
+
+  const handleBatchAction = async (key) => {
+    const ids = Array.from(selected)
+    if (!ids.length) return
+    setBatchLoading(true)
+    try {
+      for (const id of ids) {
+        switch (key) {
+          case 'checkout': await apiClient.post(`/versions/${id}/checkout`); break
+          case 'checkin': await apiClient.post(`/versions/${id}/checkin`); break
+          case 'undo': await apiClient.post(`/versions/${id}/undo-checkout`); break
+          case 'promote': await apiClient.post(`/versions/${id}/promote`); break
+          case 'unlock': await apiClient.patch(`/versions/${id}/force-unlock`); break
+          case 'delete': {
+            const plan = plans.find((p) => p.id === id)
+            if (plan) await remove(plan.raw?.versionCode || plan.globalVersion)
+            break
+          }
+          default: break
+        }
+      }
+      alert(`批量 ${key} 完成 · ${ids.length} 条`)
+      setSelected(new Set())
+      setAnchorId(null)
+      refetch()
+    } catch (err) {
+      alert(err?.message || '批量操作失败')
+    } finally {
+      setBatchLoading(false)
+    }
+  }
 
   // PB-R1 标准行选择
   const handleRowClick = (e, row, idx) => {
     const id = row.id
-    const ids = PLANS.map((p) => p.id)
+    const ids = filteredPlans.map((p) => p.id)
     if (e.shiftKey && anchorId !== null && ids.includes(anchorId)) {
       const a = ids.indexOf(anchorId), b = idx
       const [s, t] = a <= b ? [a, b] : [b, a]
@@ -62,7 +97,7 @@ export default function HomePage() {
   }
 
   // VCS 按钮启用判定
-  const selectedRows = PLANS.filter((p) => selected.has(p.id))
+  const selectedRows = plans.filter((p) => selected.has(p.id))
   const isVcsEnabled = (mode) => {
     if (mode === 'always') return true
     if (selectedRows.length === 0) return false
@@ -72,20 +107,34 @@ export default function HomePage() {
     return false
   }
 
+  const handleCreatePlan = async () => {
+    setCreatingPlan(true)
+    try {
+      await create(newPlan)
+      setNewPlan({ projectName: '', industry: '', userCount: '', template: '' })
+      setSelected(new Set())
+      setAnchorId(null)
+      setDialog('guide')
+    } catch (err) {
+      alert(err?.message || '创建失败')
+    } finally {
+      setCreatingPlan(false)
+    }
+  }
+
   return (
     <PageShell
       crumb="工作台 / 主页"
       title="主页"
-      subtitle="总览、评估方案列表与快速操作"
       actions={[
-        <button key="new" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => setDialog('new')}>+ 新建</button>,
+        <button type="button" key="new" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => setDialog('new')}>+ 新建</button>,
       ]}
     >
       <div className="home-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
           {/* KPI */}
           <div className="home-kpi">
-            {KPI_DATA.map((k, i) => (
+            {kpi.map((k, i) => (
               <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 14, boxShadow: 'var(--shadow-1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ width: 26, height: 26, borderRadius: 6, background: k.icBg || 'var(--brand-soft)', color: k.icCo || 'var(--brand-ink)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{k.ic}</span>
@@ -106,9 +155,9 @@ export default function HomePage() {
           <div className="section" style={{ margin: 0 }}>
             <div className="hd">
               <span>评估方案列表</span>
-              <span className="bdg ci" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />已检入 9</span>
-              <span className="bdg co" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />已检出 3</span>
-              <div className="right"><span style={{ fontSize: 11 }}>共 {PLANS.length} 条 · 已选 {selected.size}</span></div>
+              <span className="bdg ci" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />已检入 {plans.filter((p) => !p.checkedOut).length}</span>
+              <span className="bdg co" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />已检出 {plans.filter((p) => p.checkedOut).length}</span>
+              <div className="right"><span style={{ fontSize: 11 }}>共 {plans.length} 条 · 已选 {selected.size}</span></div>
             </div>
             {/* VCS 9 toolbar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)', fontSize: 12, flexWrap: 'wrap' }}>
@@ -120,25 +169,30 @@ export default function HomePage() {
                 {VCS_BUTTONS.map((b) => {
                   const enabled = isVcsEnabled(b.mode)
                   return (
-                    <button
+                    <button type="button"
                       key={b.key}
-                      onClick={() => enabled && alert(`Phase A · 静态 mock · [${b.label}] · 选中 ${selected.size} 条`)}
+                      onClick={() => enabled && !batchLoading && handleBatchAction(b.key)}
                       disabled={!enabled}
                       style={{
                         padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
                         color: b.danger ? 'var(--err)' : 'var(--ink-2)',
                         background: 'transparent', border: 'none', cursor: enabled ? 'pointer' : 'not-allowed',
-                        opacity: enabled ? 1 : 0.45, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                        opacity: enabled && !batchLoading ? 1 : 0.45, fontFamily: 'inherit', whiteSpace: 'nowrap',
                       }}
                     >{b.label}</button>
                   )
                 })}
               </div>
-              <button
+              <button type="button"
                 onClick={() => setDialog('er')}
                 style={{ padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
               >🔗 ER</button>
-              <button
+              <button type="button"
+                onClick={() => refetch()}
+                className="btn btn-out"
+                style={{ height: 28, fontSize: 12, padding: '0 10px' }}
+              >⟳ 刷新</button>
+              <button type="button"
                 onClick={() => setDialog('new')}
                 className="btn btn-pri"
                 style={{ marginLeft: 4, height: 28, fontSize: 12, padding: '0 12px' }}
@@ -149,6 +203,12 @@ export default function HomePage() {
                 <input
                   type="text"
                   placeholder="⌕ 搜索项目名 / 版本号 / 检出人"
+                  value={planSearch}
+                  onChange={(e) => {
+                    setPlanSearch(e.target.value)
+                    setSelected(new Set())
+                    setAnchorId(null)
+                  }}
                   style={{ padding: '5px 10px', borderRadius: 5, background: '#fff', border: '1px solid var(--line)', fontSize: 12, color: 'var(--ink)', minWidth: 220, fontFamily: 'inherit', outline: 'none' }}
                 />
               </div>
@@ -166,7 +226,7 @@ export default function HomePage() {
                 </tr>
               </thead>
               <tbody>
-                {PLANS.map((p, i) => {
+                {filteredPlans.map((p, i) => {
                   const isSel = selected.has(p.id)
                   return (
                     <tr
@@ -182,7 +242,7 @@ export default function HomePage() {
                       <td>{i + 1}</td>
                       <td>
                         <b>{p.projectName}</b>
-                        <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>{p.globalVersion} · 制造-离散</div>
+                        <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>{p.globalVersion}</div>
                       </td>
                       <td className="mono" style={{ fontFamily: 'var(--font-mono)' }}>{p.globalVersion.replace('GL-', 'v')}</td>
                       <td>
@@ -196,13 +256,18 @@ export default function HomePage() {
                         </span>
                       </td>
                       <td className="num">{p.mandays}</td>
-                      <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>2026-04-{18 - i} 14:33</td>
+                      <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.updatedAt || '—'}</td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           </div>
+          {filteredPlans.length === 0 && (
+            <div style={{ padding: '18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, borderTop: '1px solid var(--line)' }}>
+              未找到匹配的评估方案
+            </div>
+          )}
         </div>
 
         {/* Side */}
@@ -222,7 +287,7 @@ export default function HomePage() {
           </div>
           <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-1)' }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', fontSize: 13, fontWeight: 700 }}>最近动态</div>
-            {FEED.map((f, i) => (
+            {feed.map((f, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--line)' }}>
                 <div style={{ width: 22, height: 22, borderRadius: '50%', background: f.accent ? 'var(--accent-soft)' : 'var(--brand-soft)', color: f.accent ? 'var(--accent-ink)' : 'var(--brand-ink)', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{f.name[0]}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>
@@ -237,18 +302,18 @@ export default function HomePage() {
 
       {/* 3 Dialogs · §6.3 D1/D2/D3 */}
       {dialog === 'new' && (
-        <DialogShell title="新建评估方案" onClose={() => setDialog(null)} onConfirm={() => { setDialog('guide') }} confirmLabel="下一步：创建">
-          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-2)' }}>请填写方案基础信息（mock：仅占位，未接后端）</p>
-          <Field label="项目名称" placeholder="如：利民集团数字化二期" />
-          <Field label="客户行业" placeholder="制造-离散 / 流程 / 零售..." />
-          <Field label="规模（用户数）" placeholder="100" />
-          <Field label="模板" placeholder="实施评估标准版" />
+        <DialogShell title="新建评估方案" onClose={() => setDialog(null)} onConfirm={handleCreatePlan} confirmLabel={creatingPlan ? '创建中…' : '下一步：创建'} confirmDisabled={creatingPlan}>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-2)' }}>请填写方案基础信息</p>
+          <Field label="项目名称" placeholder="如：利民集团数字化二期" value={newPlan.projectName} onChange={(value) => setNewPlan((p) => ({ ...p, projectName: value }))} />
+          <Field label="客户行业" placeholder="制造-离散 / 流程 / 零售..." value={newPlan.industry} onChange={(value) => setNewPlan((p) => ({ ...p, industry: value }))} />
+          <Field label="规模（用户数）" placeholder="100" value={newPlan.userCount} onChange={(value) => setNewPlan((p) => ({ ...p, userCount: value }))} />
+          <Field label="模板" placeholder="实施评估标准版" value={newPlan.template} onChange={(value) => setNewPlan((p) => ({ ...p, template: value }))} />
         </DialogShell>
       )}
       {dialog === 'guide' && (
         <DialogShell title="✓ 创建成功" onClose={() => setDialog(null)} onConfirm={() => setDialog(null)} confirmLabel="知道了">
           <div style={{ background: 'var(--ok-soft)', border: '1px solid var(--ok)', borderRadius: 'var(--r-md)', padding: '12px 14px', marginBottom: 12, fontSize: 13, color: 'var(--ok-ink)' }}>
-            ✓ 新方案 GL-04007 已创建（mock 占位）
+            ✓ 新方案已创建
           </div>
           <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>下一步建议：</p>
           <ol style={{ margin: 0, paddingLeft: 20, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.8 }}>
@@ -261,7 +326,7 @@ export default function HomePage() {
       )}
       {dialog === 'er' && (
         <DialogShell title="🔗 ER 关联关系图" onClose={() => setDialog(null)} onConfirm={() => setDialog(null)} confirmLabel="关闭" wide>
-          <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ink-3)' }}>方案 / 需求 / 实施评估 / 资源成本 / 开发评估 五者关系（mock 简化图）</p>
+          <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ink-3)' }}>方案 / 需求 / 实施评估 / 资源成本 / 开发评估 五者关系</p>
           <svg viewBox="0 0 600 400" width="100%" height="320" style={{ border: '1px dashed var(--line)', borderRadius: 'var(--r-md)', background: 'var(--bg-soft)' }}>
             {[
               { x: 300, y: 60, label: '总方案', color: 'var(--brand)' },
@@ -290,7 +355,7 @@ export default function HomePage() {
 }
 
 // ---- 内联 Dialog shell（避免新增公共依赖） ----
-function DialogShell({ title, children, onClose, onConfirm, confirmLabel = '确认', wide = false }) {
+function DialogShell({ title, children, onClose, onConfirm, confirmLabel = '确认', confirmDisabled = false, wide = false }) {
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -307,25 +372,27 @@ function DialogShell({ title, children, onClose, onConfirm, confirmLabel = '确�
       }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', fontSize: 14, fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{title}</span>
-          <button onClick={onClose} style={{ background: 'transparent', border: 0, cursor: 'pointer', fontSize: 18, color: 'var(--ink-3)', padding: 4 }}>×</button>
+          <button type="button" onClick={onClose} style={{ background: 'transparent', border: 0, cursor: 'pointer', fontSize: 18, color: 'var(--ink-3)', padding: 4 }}>×</button>
         </div>
         <div style={{ padding: 18 }}>{children}</div>
         <div style={{ padding: '12px 18px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', gap: 8, background: 'var(--bg-soft)' }}>
-          <button onClick={onClose} className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }}>取消</button>
-          <button onClick={onConfirm} className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }}>{confirmLabel}</button>
+          <button type="button" onClick={onClose} className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }}>取消</button>
+          <button type="button" onClick={onConfirm} disabled={confirmDisabled} className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px', opacity: confirmDisabled ? 0.7 : 1 }}>{confirmLabel}</button>
         </div>
       </div>
     </div>
   )
 }
 
-function Field({ label, placeholder }) {
+function Field({ label, placeholder, value, onChange }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4, fontWeight: 600 }}>{label}</label>
       <input
         type="text"
         placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
         style={{
           width: '100%', padding: '8px 10px', border: '1px solid var(--line)',
           borderRadius: 'var(--r-md)', fontSize: 13, fontFamily: 'inherit', outline: 'none',

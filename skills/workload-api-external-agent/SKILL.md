@@ -3,8 +3,8 @@ name: workload-api-external-agent
 description: >-
   Configures external Agents (Kimiclaw / OpenClaw, HTTP toolchains, etc.) to call WorkEvolutionSys
   workload API over HTTPS. Covers base URL, health check, JWT login, Bearer usage,
-  response envelope, Path A (chat → requirementSnapshot → kimi-assessment preview → markdown),
-  Excel→Kimi 解析→Kimi 评估→Markdown 草稿导出（Agent 侧转 PDF）、 minimal curl.
+  response envelope, Path A (chat → requirementSnapshot → kimi-assessment preview → PDF),
+  Excel→Kimi 解析→Kimi 评估→服务端 PDF 导出（export-pdf 优先，export-markdown 降级）、 minimal curl.
   Use when integrating bots, MCP HTTP clients, or third-party automation with this repository's API
   or when the user mentions external Agent API setup, loca.lt tunnel, Kimiclaw demo, public API access,
   or conversational workload assessment.
@@ -20,16 +20,64 @@ description: >-
 - 失败响应：`code` 非 0，常伴 `message`、`details`；HTTP 状态与业务码对应（401/403/400 等）。
 - **未提供**专用 `/api/v1/agent/*` 路由；集成走现有业务接口（`auth`、`ai`、`templates`、`rule-sets`、`estimates` 等）。
 
-## 最终交付物：PDF / Markdown / 文字 — 分别是什么、能否让用户选
+## 最终交付物：PDF（默认自动输出）
 
-| 形态 | 来自哪里 | 说明 |
-|------|----------|------|
-| **文字** | 始终可有 | `/ai/chat` 的 `data.answer` 即字符串；`/ai/kimi-assessment/preview` 返回 **JSON**，Agent 应用自然语言总结 `assessmentDraft`（模块人天、风险等）给用户。不另调导出接口也能交付「口头报告」。 |
-| **Markdown 文件** | API | `POST /api/v1/ai/kimi-assessment/export-markdown` 的响应体为 **`text/markdown` 附件**（非 `{code,data}` JSON）。适合存档、版本管理、再编辑。 |
-| **PDF** | 通常 **Agent 侧** | Kimi 评估链 **没有**与 `export-markdown` 对等的「服务端直接返回评估 PDF」接口；Skill 约定用 **pandoc / 打印为 PDF / Kimiclaw 文档转 PDF** 等把上一步的 **.md 转成 PDF**。另：`POST /api/v1/estimates/export/pdf` 属于 **模板规则估算**导出，与 Kimi 评估草稿 **不是同一条业务链**，勿混用。 |
+**评估完成后必须自动输出 PDF 文件**，流程如下：
 
-**三种都可以吗？可以在 SKILL 里让用户选吗？**  
-可以。**建议**在 Agent 配置或首轮询问中让用户选交付方式，例如：`text`（仅对话总结）、`md`（调用 export-markdown 并保存/下发文件）、`pdf`（export-markdown 得到 md 后再转 PDF 并下发）、`all`（文字摘要 + md + pdf）。API 侧无需区分；差异只在 Agent 是否调用 `export-markdown` 以及是否做 MD→PDF。
+1. `POST /api/v1/ai/kimi-assessment/preview` → 获取 `data.assessmentDraft` 与 `data.meta`
+2. **优先**：`POST /api/v1/ai/kimi-assessment/export-pdf` → 服务端直接返回 PDF（`application/pdf`）
+3. **降级**：若 `export-pdf` 不可用（404/501），调用 `export-markdown` → Agent 侧转 PDF
+
+### 方案 A：服务端 PDF（优先）
+
+```bash
+curl -sS -X POST "${API}/ai/kimi-assessment/export-pdf" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"assessmentDraft\":$(jq '.data.assessmentDraft' preview.json),\"meta\":$(jq '.data.meta' preview.json),\"projectName\":\"项目名\"}" \
+  -o "Kimi评估报告.pdf"
+```
+
+### 方案 B：Markdown → 本地转 PDF（降级）
+
+1. `POST /api/v1/ai/kimi-assessment/export-markdown` → 获取 `.md` 文本
+2. Agent 侧将 `.md` 转为 PDF（按以下顺序尝试，第一个成功即停止）：
+
+**B1：pandoc**
+```bash
+pandoc kimi-assessment-draft.md -o kimi-assessment-draft.pdf \
+  --pdf-engine=xelatex \
+  -V mainfont="PingFang SC" \
+  -V geometry:margin=2.5cm \
+  -V colorlinks=true
+```
+若 `xelatex` 不可用则尝试 `--pdf-engine=wkhtmltopdf`。
+
+**B2：wkhtmltopdf**
+```bash
+wkhtmltopdf --encoding UTF-8 kimi-assessment-draft.md kimi-assessment-draft.pdf
+```
+
+**B3：Python markdown + weasyprint**
+```bash
+python3 -c "
+import markdown, weasyprint
+with open('kimi-assessment-draft.md') as f:
+    html = markdown.markdown(f.read(), extensions=['tables','fenced_code'])
+weasyprint.HTML(string=f'<html><meta charset=utf-8><body>{html}</body></html>').write_pdf('kimi-assessment-draft.pdf')
+"
+```
+
+**B4：纯文本兜底**
+若以上均不可用，将 `.md` 内容用 `<pre>` 包裹生成简单 HTML，打印为 PDF。
+
+### Agent 必须遵守的规则
+
+- **禁止只输出文字摘要后询问用户"是否需要 PDF"**。PDF 是默认交付物，必须自动生成。
+- **优先调用 `export-pdf`** 获取服务端渲染 PDF；仅在不可用时降级到 `export-markdown` + 本地转换。
+- 降级时转 PDF 前检查 `pandoc --version` / `wkhtmltopdf --version` / `python3 -c "import weasyprint"` 确定可用方案。
+- 文件命名：`Kimi评估报告-{项目名}-{日期}.pdf`（如无项目名则用 `Kimi评估报告-{日期}.pdf`）。
+- PDF 生成成功后，向用户汇报文件路径和摘要（模块数、总人天、关键风险）。
 
 ## 演示 1：连接系统并「记住」用户
 
@@ -61,7 +109,7 @@ description: >-
 | 1b | （可选）企业画像 | `POST /api/v1/ai/company-profile-summary` | 仅有客户名等少量信息时，可 JSON 传 `customerName` 及已知 `location`/`customerIndustry` 等，补全 `enterpriseProfile` 等，再写入 `requirementSnapshot.basicInfo`。 |
 | 2 | 组装快照 | （Agent 内存 / 工具） | 按下方「槽位与字段」把对话结论填入 `requirementSnapshot`，结构与「演示 2」步骤 B 相同。 |
 | 3 | 快速人天（评估草稿） | `POST /api/v1/ai/kimi-assessment/preview` | Body 含 `requirementSnapshot`；解析 `code===0` 的 `data.assessmentDraft`（`moduleItems[].standardDays` / `suggestedDays` 等）。无 Kimi Key 时可能为 `rule_fallback`。 |
-| 4 | （可选）下载草稿 | `POST /api/v1/ai/kimi-assessment/export-markdown` | 同「演示 2」步骤 C；响应为附件，非 JSON 包络。 |
+| 4 | 下载并输出 PDF | `POST /api/v1/ai/kimi-assessment/export-pdf`（优先）或 `export-markdown`（降级） | Body 含 `assessmentDraft`、`meta`、`projectName`；`export-pdf` 直接返回 `application/pdf`。**PDF 是默认交付物**——优先调 `export-pdf`，404/501 时降级 `export-markdown` + 本地转 PDF。 |
 
 ### `/ai/chat` 约束（路径 A 必读）
 
@@ -89,7 +137,7 @@ description: >-
 
 1. 用中文、短问句逐项补齐：客户与项目名、行业与规模、**实施产品/模块与用户规模**、是否二开/集成、组织与推广范围、已知开发人天（若有）。
 2. 每轮可调用 `chat` 向用户解释或追问；**定稿快照前**在助手侧自检：是否已有模块+规模或等价业务需求描述。
-3. 快照就绪后**再**调 `kimi-assessment/preview`，将返回的 `moduleItems` 用人话总结给用户；需要留档再调 `export-markdown`。
+3. 快照就绪后**再**调 `kimi-assessment/preview`，将返回的 `moduleItems` 用人话总结给用户；然后**自动调用 `export-pdf` 输出 PDF**（不可用时降级 `export-markdown`）。
 
 ### curl 示例（chat → preview；`snapshot.json` 由 Agent 生成）
 
@@ -125,7 +173,7 @@ curl -sS -X POST "${API}/ai/kimi-assessment/preview" \
 |------|------|------|------|
 | A | `POST` | `/api/v1/ai/parse-basic-info` | `multipart/form-data`，字段名 **`file`**，上传与需求页相同的 **Excel**。返回 JSON：`data.basicInfo`、`data.requirementImportData`（及 `model`/`mode` 等）。 |
 | B | `POST` | `/api/v1/ai/kimi-assessment/preview` | JSON：`source`（可选 `globalVersionCode` / `requirementVersionCode`）、**`requirementSnapshot`**（见下文拼装规则）。返回 `data.assessmentDraft`、`data.meta` 等。 |
-| C | `POST` | `/api/v1/ai/kimi-assessment/export-markdown` | JSON：`{ "assessmentDraft": <preview 返回的 draft>, "meta": <可选 preview.meta>, "projectName": "<可选>" }`。响应为 **`text/markdown` 附件**（非 `{code,data}` 包络）。Agent 可用 **pandoc / 打印为 PDF / Kimiclaw 内置文档转 PDF** 生成 PDF 并发送给用户。 |
+| C | 下载并输出 PDF | `POST /api/v1/ai/kimi-assessment/export-pdf`（优先）| JSON：`{ "assessmentDraft": <preview 返回的 draft>, "meta": <可选 preview.meta>, "projectName": "<可选>" }`。响应为 **`application/pdf`**。若 404/501 则降级 `export-markdown` + 本地转 PDF。**PDF 是默认交付物，必须自动生成。** |
 
 **`requirementSnapshot` 拼装（与前端 `requirement-import` 提交评估时一致）**
 
@@ -163,7 +211,17 @@ curl -sS -X POST "${API}/ai/kimi-assessment/preview" \
 
 将步骤 A 的 `basicInfo` / `requirementImportData` 各数组填入对应键即可。
 
-**步骤 C：下载 Markdown（curl 保存文件）**
+**步骤 C：下载 PDF（优先）**
+
+```bash
+curl -sS -X POST "${API}/ai/kimi-assessment/export-pdf" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"assessmentDraft\":$(jq '.data.assessmentDraft' preview.json),\"meta\":$(jq '.data.meta' preview.json),\"projectName\":\"演示项目\"}" \
+  -o "Kimi评估报告.pdf"
+```
+
+**步骤 C（降级）：下载 Markdown**
 
 ```bash
 curl -sS -X POST "${API}/ai/kimi-assessment/export-markdown" \
@@ -175,10 +233,11 @@ curl -sS -X POST "${API}/ai/kimi-assessment/export-markdown" \
 
 （将 `preview.json` 换为步骤 B 保存的响应体；若 shell 拼装困难，可用 Kimiclaw 两步调用：先取 JSON 再组 body。）
 
-**关于「发送 PDF」**
+**关于 PDF 输出**
 
-- 服务端当前提供 **Markdown 附件**，避免在无中文字体文件时 PDF 乱码；**由 Kimiclaw 将 `.md` 转为 PDF 再发送**即可满足演示。
-- 若必须服务端直接出 PDF：需自行扩展（例如配置 `WES_KIMI_ASSESSMENT_PDF_FONT_TTF` 指向 `.ttf` 并用 pdfkit 注册字体），本 Skill 不依赖该变量。
+- 评估链的最后一步 **必须是 PDF**。优先调用 `POST /api/v1/ai/kimi-assessment/export-pdf` 直接获取服务端渲染的 PDF（`application/pdf`）。
+- 若 `export-pdf` 返回 404/501，则降级为 `export-markdown` → Agent 侧按「方案 B」本地转 PDF。
+- 服务端 `export-pdf` 内置中文字体（Arial Unicode），无需 Agent 侧处理字体兼容问题。
 
 ## 首次配置清单（Agent 侧）
 
@@ -220,7 +279,8 @@ curl -sS "${API}/auth/me" -H "Authorization: Bearer ${TOKEN}"
 | POST | `/api/v1/ai/company-profile-summary` | 可选：按客户名等补全企业画像 |
 | POST | `/api/v1/ai/parse-basic-info` | Excel → Kimi（或规则）解析需求结构 |
 | POST | `/api/v1/ai/kimi-assessment/preview` | Kimi 实施评估草稿（JSON） |
-| POST | `/api/v1/ai/kimi-assessment/export-markdown` | 将草稿导出为 Markdown 附件 |
+| POST | `/api/v1/ai/kimi-assessment/export-pdf` | **优先**：将草稿导出为 PDF（application/pdf） |
+| POST | `/api/v1/ai/kimi-assessment/export-markdown` | 降级：将草稿导出为 Markdown 附件（Agent 侧自行转 PDF） |
 | GET | `/api/v1/templates` | 模板列表 |
 | GET | `/api/v1/rule-sets/active` | 当前规则集 |
 | POST | `/api/v1/estimates/calculate` | 工作量计算 |
@@ -229,4 +289,10 @@ curl -sS "${API}/auth/me" -H "Authorization: Bearer ${TOKEN}"
 
 ## 给 Agent 系统提示的摘要句（可粘贴）
 
-在同一 `BASE` 下调用 `GET /api/v1/health` 确认服务；用 `POST /api/v1/auth/login` 获取 `data.token` 并持久化；所有需登录接口加 `Authorization: Bearer <token>`；JSON 接口只解析 `code===0` 的 `data`；401 时重新登录。**路径 A（无 Excel）**：维护 `messages` 多次调用 `POST /api/v1/ai/chat` 完成问询；Agent 将结论填入 `requirementSnapshot` 后调用 `POST …/kimi-assessment/preview`，可选 `POST …/export-markdown`。**路径（有 Excel）**：`multipart` 调 `parse-basic-info` → 拼装 `requirementSnapshot` → `preview` → 可选 `export-markdown`；Markdown 可由 Agent 转 PDF 发送用户。
+在同一 `BASE` 下调用 `GET /api/v1/health` 确认服务；用 `POST /api/v1/auth/login` 获取 `data.token` 并持久化；所有需登录接口加 `Authorization: Bearer <token>`；JSON 接口只解析 `code===0` 的 `data`；401 时重新登录。
+
+**路径 A（无 Excel）**：维护 `messages` 多次调用 `POST /api/v1/ai/chat` 完成问询；Agent 将结论填入 `requirementSnapshot` 后调用 `POST …/kimi-assessment/preview`；**然后优先调用 `POST …/export-pdf` 直接获取 PDF**；若不可用则降级 `POST …/export-markdown` + 本地转 PDF（pandoc/wkhtmltopdf/weasyprint 三选一首个可用）。
+
+**路径 B（有 Excel）**：`multipart` 调 `parse-basic-info` → 拼装 `requirementSnapshot` → `preview` → **优先 `export-pdf` 直接获取 PDF**；降级 `export-markdown` → 自动转 PDF。
+
+**禁止**在评估完成后只输出文字摘要或询问用户"是否需要 PDF"——PDF 是默认交付物。

@@ -58,3 +58,5 @@ apps/api/.tmp/
 .kimi/
 Session/
 .claude/worktrees/
+.codex-tools/
+.elder-gods/

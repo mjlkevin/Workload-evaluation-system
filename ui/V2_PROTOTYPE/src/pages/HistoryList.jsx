@@ -2,17 +2,37 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import ListPage from '../components/ListPage.jsx'
 import { historyItems } from '../mock/listData.js'
+import useHistoryProjects from '../hooks/useHistoryProjects.js'
 
 export default function HistoryList() {
   const navigate = useNavigate()
+  const { projects, refetch, remove, create, creating } = useHistoryProjects({
+    fallbackData: historyItems,
+  })
+
+  const handleBulkAction = async (actionKey, selectedRows) => {
+    const first = selectedRows[0]
+    if ((actionKey === 'preview' || actionKey === 'edit' || actionKey === 'history') && first) {
+      navigate(`/history/${first.id}`)
+      return
+    }
+    if (actionKey === 'delete') {
+      for (const row of selectedRows) {
+        await remove(row.id)
+      }
+      alert(`已删除 ${selectedRows.length} 条`)
+    }
+  }
+
   return (
     <ListPage
       crumb="工作台 / 历史项目"
       title="历史项目列表"
       subtitle="历史项目归档与相似度检索"
-      data={historyItems}
+      data={projects}
       rowKey="id"
       onRowClick={(row) => navigate(`/history/${row.id}`)}
+      onBulkAction={handleBulkAction}
       filterTags={[
         { key: 'all', label: '全部' },
         { key: 'archived', label: '已归档' },
@@ -32,8 +52,8 @@ export default function HistoryList() {
         { key: 'status', title: '状态', render: (r) => <StatusBadge status={r.status} /> },
       ]}
       actions={[
-        <button key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}}>+ 新建</button>,
-        <button key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}}>⟳ 刷新</button>,
+        <button type="button" key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}} disabled={creating} onClick={async () => { const id = await create(); if (id) navigate(`/history/${id}`) }}>{creating ? '创建中...' : '+ 新建'}</button>,
+        <button type="button" key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}} onClick={() => refetch()}>⟳ 刷新</button>,
       ]}
     />
   )

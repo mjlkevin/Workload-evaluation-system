@@ -1,16 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useParams } from 'react-router-dom'
 import PageShell from '../components/Layout/PageShell.jsx'
-
-const INITIAL_ITEMS = [
-  { group: 'A 接口开发', name: '登录/权限 API', base: 3, diff: 2, factor: 1.15, status: '进行中' },
-  { group: 'A 接口开发', name: '项目 CRUD API', base: 4, diff: 3, factor: 1.25, status: '未开始' },
-  { group: 'A 接口开发', name: '审批流接口', base: 3.5, diff: 4, factor: 1.35, status: '待确认' },
-  { group: 'A 接口开发', name: '导出与回写', base: 2.5, diff: 2, factor: 1.10, status: '进行中' },
-  { group: 'B 报表看板', name: 'KPI 总览卡片', base: 2, diff: 1, factor: 1.05, status: '已完成' },
-  { group: 'B 报表看板', name: '筛选统计图表', base: 3, diff: 3, factor: 1.20, status: '进行中' },
-  { group: 'B 报表看板', name: '明细钻取列表', base: 3, diff: 2, factor: 1.12, status: '未开始' },
-  { group: 'B 报表看板', name: '权限可见性校验', base: 2, diff: 4, factor: 1.30, status: '待确认' },
-]
+import useDevAssessmentDetail from '../hooks/useDevAssessmentDetail.js'
 
 const AI_MENU = [
   { key: 'sku', label: '按 SKU 推断子项' },
@@ -18,11 +9,14 @@ const AI_MENU = [
 ]
 
 export default function DevAssessmentDetail() {
+  const { id } = useParams()
+  const detail = useDevAssessmentDetail({ id })
+  const { items = [], groups = [], actions, actionLoading } = detail
+
   const [currentUser, setCurrentUser] = useState('admin')
   const [aiOpen, setAiOpen] = useState(false)
+  const [aiResult, setAiResult] = useState(null)
   const aiRef = useRef(null)
-
-  const groups = Array.from(new Set(INITIAL_ITEMS.map((i) => i.group)))
 
   // 点击外部关闭 AI 菜单
   useEffect(() => {
@@ -62,9 +56,9 @@ export default function DevAssessmentDetail() {
     <PageShell
       crumb="工作台 / 开发评估 / 开发评估详情"
       title="开发评估详情"
-      subtitle="Dev-04 · v07 · 评估中"
+      subtitle={`${detail.code || '—'} · ${detail.version || '—'} · ${detail.status || '—'}`}
       actions={[
-        // 角色切换（仅本页 mock）
+        // 角色切换（开发测试）
         <select
           key="role"
           value={currentUser}
@@ -87,7 +81,7 @@ export default function DevAssessmentDetail() {
 
         // AI 生成 紫族下拉
         <div key="ai-wrap" ref={aiRef} style={{ position: 'relative' }}>
-          <button
+          <button type="button"
             className="btn"
             onClick={() => setAiOpen((v) => !v)}
             disabled={!canAi}
@@ -129,11 +123,15 @@ export default function DevAssessmentDetail() {
               }}
             >
               {AI_MENU.map((m) => (
-                <button
+                <button type="button"
                   key={m.key}
-                  onClick={() => {
+                  disabled={actionLoading.aiSkuSuggest || actionLoading.aiHistorySuggest}
+                  onClick={async () => {
                     setAiOpen(false)
-                    alert(`Phase A · mock 占位 · [${m.label}]`)
+                    const r = m.key === 'sku'
+                      ? await actions.aiSkuSuggest?.()
+                      : await actions.aiHistorySuggest?.()
+                    if (r) setAiResult({ type: m.key, label: m.label, data: r })
                   }}
                   style={{
                     display: 'block',
@@ -158,30 +156,30 @@ export default function DevAssessmentDetail() {
           )}
         </div>,
 
-        <button
+        <button type="button"
           key="export"
           className="btn btn-ghost"
           style={{ height: 32, fontSize: 12, padding: '0 12px' }}
         >
           ↓ 导出 CSV
         </button>,
-        <button
+        <button type="button"
           key="merge"
           className="btn btn-ghost"
           disabled={!canMerge}
           title={!canMerge ? disabledTip('合并') : undefined}
           style={{ height: 32, fontSize: 12, padding: '0 12px', opacity: canMerge ? 1 : 0.5, cursor: canMerge ? 'pointer' : 'not-allowed' }}
-          onClick={() => canMerge && alert('Phase A · mock 占位 · [合并到实施评估]')}
+          onClick={() => canMerge && actions.merge()}
         >
           ⌥ 合并到实施评估
         </button>,
-        <button
+        <button type="button"
           key="save"
           className="btn btn-pri"
           disabled={!canSave}
           title={!canSave ? disabledTip('保存') : undefined}
           style={{ height: 32, fontSize: 12, padding: '0 12px', opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
-          onClick={() => canSave && alert('Phase A · mock 占位 · [保存]')}
+          onClick={() => canSave && actions.save()}
         >
           ⤒ 保存
         </button>,
@@ -201,19 +199,19 @@ export default function DevAssessmentDetail() {
           <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
             总方案版本
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>实施评估 v07 · 初稿冻结</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{detail.code || detail.version || '—'}</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
             关联实施评估
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>AE-2026-0418 · 付款/库存/报表</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{detail.assessmentCode || '—'}</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
             评估人
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>王丽 · 后端架构师</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{detail.evaluator || '—'}</div>
         </div>
       </div>
 
@@ -221,7 +219,7 @@ export default function DevAssessmentDetail() {
         <div className="hd">
           <span>开发子项明细</span>
           <span className="bdg ci">
-            <span className="dot" />8 项 / 2 组
+            <span className="dot" />{items.length} 项 / {groups.length} 组
           </span>
         </div>
         <div className="bd" style={{ padding: 0, overflow: 'hidden' }}>
@@ -243,11 +241,11 @@ export default function DevAssessmentDetail() {
                     <td colSpan={6}>
                       {g}{' '}
                       <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>
-                        · {INITIAL_ITEMS.filter((x) => x.group === g).length} 项
+                        · {items.filter((x) => x.group === g).length} 项
                       </span>
                     </td>
                   </tr>
-                  {INITIAL_ITEMS.filter((x) => x.group === g).map((it, idx) => (
+                  {items.filter((x) => x.group === g).map((it, idx) => (
                     <tr key={idx}>
                       <td>
                         <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>{g}</span>
@@ -255,7 +253,7 @@ export default function DevAssessmentDetail() {
                       <td>{it.name}</td>
                       <td>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <button
+                          <button type="button"
                             style={{
                               width: 22,
                               height: 22,
@@ -283,7 +281,7 @@ export default function DevAssessmentDetail() {
                               color: 'var(--ink)',
                             }}
                           />
-                          <button
+                          <button type="button"
                             style={{
                               width: 22,
                               height: 22,
@@ -337,6 +335,31 @@ export default function DevAssessmentDetail() {
           <span style={{ fontFamily: 'var(--font-mono)' }}>基线：dev-2026.04.18</span>
         </div>
       </div>
+      {/* AI Result Modal */}
+      {aiResult && (
+        <div onClick={e => e.target === e.currentTarget && setAiResult(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.42)',display:'grid',placeItems:'center',padding:20,zIndex:50}}>
+          <div style={{width:'min(720px, 100%)',background:'#fff',borderRadius:'var(--r-lg)',boxShadow:'0 24px 64px rgba(15,23,42,0.24)',border:'1px solid var(--line)',padding:18,maxHeight:'80vh',display:'flex',flexDirection:'column'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <strong style={{fontSize:14}}>✦ AI 结果 · {aiResult.label}</strong>
+              <button type="button" className="btn btn-ghost" style={{height:28,fontSize:12,padding:'0 10px'}} onClick={() => setAiResult(null)}>✕ 关闭</button>
+            </div>
+            <div style={{overflowY:'auto',flex:1}}>
+              {aiResult.type === 'sku' ? (
+                <pre style={{margin:0,fontSize:11,lineHeight:1.6,whiteSpace:'pre-wrap',fontFamily:'var(--font-mono)'}}>{JSON.stringify(aiResult.data, null, 2)}</pre>
+              ) : (
+                <table className="table" style={{width:'100%'}}>
+                  <thead><tr><th>行业</th><th>规模</th><th>预估人天</th><th>模块</th></tr></thead>
+                  <tbody>
+                    {(Array.isArray(aiResult.data) ? aiResult.data : []).map((p, i) => (
+                      <tr key={i}><td>{p.industry || '—'}</td><td>{p.scale || '—'}</td><td>{p.estimatedDays ?? '—'}</td><td>{(p.modules || []).join(', ') || '—'}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </PageShell>
   )
 }

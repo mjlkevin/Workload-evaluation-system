@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
+import useUsers from '../hooks/useUsers.js'
 
 const INITIAL_USERS = [
   { id: 'u1', username: 'mjlkevin', role: 'admin', status: 'active', lastLoginAt: '2026-05-09T14:28:00Z', locked: false },
@@ -16,7 +17,8 @@ const ROLES = [
 ]
 
 export default function UserManagement() {
-  const [users, setUsers] = useState(INITIAL_USERS)
+  const { users: loadedUsers } = useUsers({ fallbackData: INITIAL_USERS })
+  const [users, setUsers] = useState(loadedUsers)
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
   const [search, setSearch] = useState('')
@@ -24,10 +26,19 @@ export default function UserManagement() {
   const [pendingRole, setPendingRole] = useState('')
   const [demoteConfirm, setDemoteConfirm] = useState('')
 
+  useEffect(() => {
+    setUsers(loadedUsers)
+    setSelected(new Set())
+    setAnchorId(null)
+  }, [loadedUsers])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return users
-    return users.filter((u) => u.username.toLowerCase().includes(q))
+    return users.filter((u) =>
+      u.username.toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q)
+    )
   }, [users, search])
 
   const visibleIds = useMemo(() => filtered.map((u) => u.id), [filtered])
@@ -198,7 +209,7 @@ export default function UserManagement() {
           </span>
 
           <div style={{ display: 'flex', gap: 4, paddingRight: 12, borderRight: '1px solid var(--line)' }}>
-            <button
+            <button type="button"
               className="btn btn-ghost"
               style={{ height: 28, fontSize: 12, padding: '0 10px' }}
               disabled={!canBulkEnable}
@@ -206,7 +217,7 @@ export default function UserManagement() {
             >
               批量启用
             </button>
-            <button
+            <button type="button"
               className="btn btn-ghost"
               style={{ height: 28, fontSize: 12, padding: '0 10px', color: 'var(--err)' }}
               disabled={!canBulkDisable}
@@ -214,7 +225,7 @@ export default function UserManagement() {
             >
               批量禁用
             </button>
-            <button
+            <button type="button"
               className="btn btn-ghost"
               style={{ height: 28, fontSize: 12, padding: '0 10px' }}
               disabled={!canChangeRole}
@@ -222,7 +233,7 @@ export default function UserManagement() {
             >
               改角色
             </button>
-            <button className="btn btn-pri" style={{ height: 28, fontSize: 12, padding: '0 10px' }}>
+            <button type="button" className="btn btn-pri" style={{ height: 28, fontSize: 12, padding: '0 10px' }}>
               + 邀请成员
             </button>
           </div>
@@ -353,7 +364,7 @@ export default function UserManagement() {
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{u.username}</div>
                         <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-                          {u.username}@wes.local
+                          {u.email || `${u.username}@wes.local`}
                         </div>
                       </div>
                     </div>
@@ -367,7 +378,7 @@ export default function UserManagement() {
                     {u.locked ? (
                       <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>— 系统账号 —</span>
                     ) : (
-                      <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px', height: 28 }}>
+                      <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px', height: 28 }}>
                         编辑
                       </button>
                     )}
@@ -412,10 +423,10 @@ export default function UserManagement() {
               ))}
             </div>
             <DialogActions>
-              <button className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
                 取消
               </button>
-              <button className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmRole}>
+              <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmRole}>
                 确认修改
               </button>
             </DialogActions>
@@ -459,10 +470,10 @@ export default function UserManagement() {
               }}
             />
             <DialogActions>
-              <button className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
                 取消
               </button>
-              <button className="btn btn-dan" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmDemote}>
+              <button type="button" className="btn btn-dan" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmDemote}>
                 确认降级
               </button>
             </DialogActions>

@@ -19,7 +19,7 @@ export default function VcsToolbar({ dsl, hasLocalChanges }) {
       }}
     >
       {/* 主操作 */}
-      <button
+      <button type="button"
         className="btn btn-pri"
         disabled={blockedByDsl}
         title={blockedByDsl ? 'DSL 校验未通过，修复后才能签入' : '签入当前版本'}
@@ -27,13 +27,13 @@ export default function VcsToolbar({ dsl, hasLocalChanges }) {
       >
         <span style={{ fontWeight: 600 }}>⇡</span> 签入版本
       </button>
-      <button className="btn btn-out" style={{ height: 32, padding: '0 14px', fontSize: 13 }}>
+      <button type="button" className="btn btn-out" style={{ height: 32, padding: '0 14px', fontSize: 13 }}>
         版本历史
       </button>
-      <button className="btn btn-out" style={{ height: 32, padding: '0 14px', fontSize: 13 }}>
+      <button type="button" className="btn btn-out" style={{ height: 32, padding: '0 14px', fontSize: 13 }}>
         实时校验
       </button>
-      <button
+      <button type="button"
         className="btn btn-out"
         disabled={blockedByDsl}
         title={blockedByDsl ? 'DSL 校验未通过，修复后才能导出' : '导出'}
@@ -74,7 +74,7 @@ export default function VcsToolbar({ dsl, hasLocalChanges }) {
 
       {/* 更多 */}
       <div style={{ position: 'relative' }}>
-        <button
+        <button type="button"
           className="btn btn-ghost"
           style={{ height: 32, width: 32, padding: 0, fontSize: 16 }}
           onClick={() => setShowMore(!showMore)}
@@ -97,7 +97,7 @@ export default function VcsToolbar({ dsl, hasLocalChanges }) {
             }}
           >
             {['撤销检出', '升版', '强制解锁'].map((label) => (
-              <button
+              <button type="button"
                 key={label}
                 style={{
                   display: 'block',

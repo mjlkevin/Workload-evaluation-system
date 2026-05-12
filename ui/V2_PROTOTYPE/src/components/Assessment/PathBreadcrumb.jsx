@@ -1,14 +1,16 @@
 import React, { useState } from 'react'
 
 export default function PathBreadcrumb({ path }) {
+  const safePath = path || {}
   const [expanded, setExpanded] = useState('cloud')
   const [showAllClouds, setShowAllClouds] = useState(false)
-  const [selectedQuote, setSelectedQuote] = useState(path.quoteMode)
-  const [selectedPreset, setSelectedPreset] = useState(path.preset)
-  const [selectedClouds, setSelectedClouds] = useState(path.cloudProducts)
-  const { quoteMode, preset, allCloudProducts } = path
-  const quoteModes = path.quoteModes || ['模块报价', '标准清单报价', '范围估算']
-  const presets = path.presets || ['标准财务供应链', '轻量财务供应链', '集团多组织模板']
+  const [selectedQuote, setSelectedQuote] = useState(safePath.quoteMode)
+  const [selectedPreset, setSelectedPreset] = useState(safePath.preset)
+  const [selectedClouds, setSelectedClouds] = useState(safePath.cloudProducts || [])
+  const { quoteMode, preset } = safePath
+  const allCloudProducts = safePath.allCloudProducts || []
+  const quoteModes = safePath.quoteModes || ['模块报价', '标准清单报价', '范围估算']
+  const presets = safePath.presets || ['标准财务供应链', '轻量财务供应链', '集团多组织模板']
 
   const layers = [
     { key: 'quote', label: '报价模式', value: selectedQuote || quoteMode, color: 'var(--brand)' },
@@ -37,7 +39,7 @@ export default function PathBreadcrumb({ path }) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--surface)',
         border: '1px solid var(--line)',
         borderRadius: 'var(--r-lg)',
         padding: '12px 16px',
@@ -50,7 +52,7 @@ export default function PathBreadcrumb({ path }) {
         {layers.map((layer, idx) => (
           <React.Fragment key={layer.key}>
             {idx > 0 && <span style={{ color: 'var(--ink-4)' }}>›</span>}
-            <button
+            <button type="button"
               onClick={() => setExpanded(expanded === layer.key ? null : layer.key)}
               style={{
                 display: 'inline-flex',

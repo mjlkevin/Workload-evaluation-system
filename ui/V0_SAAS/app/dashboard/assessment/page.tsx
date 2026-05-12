@@ -126,6 +126,46 @@ type DependencyIssue = {
   missing: string[]
 }
 
+type KimiAssessmentPrefillSnapshot = {
+  basicInfo?: Record<string, unknown>
+  productModuleRows?: Array<Record<string, unknown>>
+  implementationScopeRows?: Array<Record<string, unknown>>
+}
+
+type KimiAssessmentPrefillPayload = {
+  source?: {
+    globalVersionCode?: string
+    requirementVersionCode?: string
+  }
+  draft?: {
+    quoteMode?: string
+    productLines?: unknown
+    userCount?: number
+    orgCount?: number
+    orgSimilarity?: number
+    difficultyFactor?: number
+    moduleItems?: Array<{
+      cloudProduct?: string
+      skuName?: string
+      moduleName?: string
+      suggestedDays?: number
+      standardDays?: number
+      reason?: string
+    }>
+  }
+  requirementSnapshot?: KimiAssessmentPrefillSnapshot
+  projectName?: string
+}
+
+type KimiUnmatchedModuleItem = {
+  cloudProduct: string
+  skuName: string
+  moduleName: string
+  suggestedDays: number
+  standardDays: number
+  reason: string
+}
+
 const PRODUCT_LINE_OPTIONS = ["金蝶AI星空", "金蝶AI星瀚", "云之家", "发票云"] as const
 const PRODUCT_LINE_BADGE_STYLE_MAP: Record<string, string> = {
   金蝶AI星空: "border-sky-400 bg-sky-500 text-white dark:border-sky-500 dark:bg-sky-500 dark:text-white",
@@ -170,9 +210,14 @@ function hasSelectedDependencyLabel(tokens: Set<string>, target: string): boolea
     if (!token) continue
     if (token === normalizedTarget) return true
     if (normalizedTarget.length >= 2 && token.includes(normalizedTarget)) return true
-    if (token.length >= 4 && normalizedTarget.includes(token)) return true
   }
   return false
+}
+
+function hasSelectedDependencySubject(tokens: Set<string>, target: string): boolean {
+  const normalizedTarget = normalizeDependencyToken(target)
+  if (!normalizedTarget) return false
+  return tokens.has(normalizedTarget)
 }
 
 function collectSelectedDependencyTokens(
@@ -204,7 +249,7 @@ function evaluateDependencyIssues(
   const issues: DependencyIssue[] = []
   for (const rule of rules.rules) {
     if (!rule?.enabled) continue
-    if (!hasSelectedDependencyLabel(selectedTokens, rule.subject)) continue
+    if (!hasSelectedDependencySubject(selectedTokens, rule.subject)) continue
 
     const missingDependencies = (rule.dependencies || []).filter((dep) => !hasSelectedDependencyLabel(selectedTokens, dep))
     if (rule.logic === "requires_all") {
@@ -299,6 +344,22 @@ function cloudLabelFromItem(item: { cloudProduct?: string }) {
   return item.cloudProduct || "未分类云产品"
 }
 
+function normalizeAssessmentMatchToken(value: unknown): string {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[·・.。,_，、/\\|:：;；()（）【】\[\]《》<>-]/g, "")
+}
+
+function assessmentTokensMatch(left: string, right: string): boolean {
+  if (!left || !right) return false
+  if (left === right) return true
+  if (left.length >= 2 && right.includes(left)) return true
+  if (right.length >= 2 && left.includes(right)) return true
+  return false
+}
+
 function cloudKeysOnSheet(items: TemplateItemOption[], sheet: string): Set<string> {
   const set = new Set<string>()
   for (const item of items) {
@@ -338,6 +399,70 @@ function createEmptyMultiOrgRow(): MultiOrgRow {
     otherBusinessDays: 0,
     difficultyFactor: 1,
   }
+}
+
+function buildMultiOrgRowsFromKimiSnapshot(
+  snapshot: KimiAssessmentPrefillSnapshot | undefined,
+  selectedCloudNames: string[],
+): MultiOrgRow[] {
+  if (!snapshot) return []
+  const scopeRows = Array.isArray(snapshot.implementationScopeRows) ? snapshot.implementationScopeRows : []
+  const productRows = Array.isArray(snapshot.productModuleRows) ? snapshot.productModuleRows : []
+  const scopeFromClouds: Record<string, boolean> = {}
+  for (const def of multiOrgScopeDefs) {
+    const defToken = normalizeAssessmentMatchToken(def.cloudName)
+    scopeFromClouds[def.key] = selectedCloudNames.some((cloud) =>
+      assessmentTokensMatch(normalizeAssessmentMatchToken(cloud), defToken),
+    )
+  }
+  const rows = scopeRows
+    .map((raw) => {
+      const orgName = String(raw.companyName || raw.orgName || "").trim()
+      const moduleScope = String(raw.moduleScope || "").trim()
+      const scope = { ...scopeFromClouds }
+      if (moduleScope) {
+        const moduleScopeToken = normalizeAssessmentMatchToken(moduleScope)
+        for (const def of multiOrgScopeDefs) {
+          if (assessmentTokensMatch(moduleScopeToken, normalizeAssessmentMatchToken(def.cloudName))) {
+            scope[def.key] = true
+          }
+        }
+      }
+      const type = String(raw.companyType || "").trim()
+      const strategy = String(raw.implementationMode || "").trim()
+      return {
+        ...createEmptyMultiOrgRow(),
+        orgName,
+        orgType: orgTypeOptions.includes(type) ? type : orgTypeOptions[0],
+        location: String(raw.location || "").trim(),
+        deliveryStrategy: deliveryStrategyOptions.includes(strategy) ? strategy : deliveryStrategyOptions[0],
+        scope,
+      }
+    })
+    .filter((row) => row.orgName || row.location || Object.values(row.scope).some(Boolean))
+
+  if (rows.length) return rows
+
+  return productRows
+    .map((raw) => {
+      const cloudName = String(raw.moduleName || raw.productDomain || "").trim()
+      const scope = { ...scopeFromClouds }
+      const cloudToken = normalizeAssessmentMatchToken(cloudName)
+      for (const def of multiOrgScopeDefs) {
+        if (assessmentTokensMatch(cloudToken, normalizeAssessmentMatchToken(def.cloudName))) {
+          scope[def.key] = true
+        }
+      }
+      const orgCount = Math.max(0, Number(String(raw.implementationOrgCount || "").replace(/[^\d.]/g, "")) || 0)
+      return {
+        ...createEmptyMultiOrgRow(),
+        orgName: cloudName ? `${cloudName}推广范围` : "",
+        userCount: Math.max(0, Number(String(raw.userCount || "").replace(/[^\d.]/g, "")) || 0),
+        otherBusinessDays: orgCount > 1 ? orgCount - 1 : 0,
+        scope,
+      }
+    })
+    .filter((row) => row.orgName || row.userCount > 0 || Object.values(row.scope).some(Boolean))
 }
 
 /** 按更新时间取当前生效（最新）实施评估版本，用于主界面下拉仅展示一条 */
@@ -412,6 +537,7 @@ export default function AssessmentPage() {
   const [selectedPresetMode, setSelectedPresetMode] = useState("")
   const [selectedCloudNames, setSelectedCloudNames] = useState<string[]>([])
   const [itemSelection, setItemSelection] = useState<Record<string, ItemSelectionState>>({})
+  const [kimiUnmatchedModuleItems, setKimiUnmatchedModuleItems] = useState<KimiUnmatchedModuleItem[]>([])
   const [customAdjustReasonEditor, setCustomAdjustReasonEditor] = useState<{
     itemId: string
     draft: string
@@ -699,32 +825,27 @@ export default function AssessmentPage() {
     kimiPrefillAppliedRef.current = true
     window.sessionStorage.removeItem(KIMI_ASSESSMENT_PREFILL_STORAGE_KEY)
     try {
-      const parsed = JSON.parse(raw) as {
-        source?: { globalVersionCode?: string }
-        draft?: {
-          quoteMode?: string
-          productLines?: unknown
-          userCount?: number
-          orgCount?: number
-          orgSimilarity?: number
-          difficultyFactor?: number
-          moduleItems?: Array<{
-            cloudProduct?: string
-            skuName?: string
-            moduleName?: string
-            suggestedDays?: number
-            reason?: string
-          }>
-        }
-        projectName?: string
-      }
+      const parsed = JSON.parse(raw) as KimiAssessmentPrefillPayload
       const draft = parsed.draft
       if (!draft) return
 
       resetToNewAssessmentDraft()
+      const snapshotBasicInfo = (parsed.requirementSnapshot?.basicInfo || {}) as { projectName?: unknown }
+      const sourceRequirement = String(parsed.source?.requirementVersionCode || "").trim()
       const sourceGlobal = String(parsed.source?.globalVersionCode || "").trim()
-      if (sourceGlobal) applyGlobalVersionSelection(sourceGlobal)
-      if (parsed.projectName) setProjectName(String(parsed.projectName).trim())
+      const sourceProjectName = String(parsed.projectName || snapshotBasicInfo.projectName || "").trim()
+      const resolvedGlobal =
+        sourceGlobal && /\{[A-Za-z0-9]+\}/.test(sourceGlobal)
+          ? resolveStaleGlobalVersionCodeForAssessment(sourceGlobal, dashboardPlans, sourceProjectName)
+          : sourceGlobal
+      if (sourceRequirement) setRequirementSourceVersionCode(sourceRequirement)
+      if (resolvedGlobal) setGlobalVersionCode(resolvedGlobal)
+      if (sourceProjectName) {
+        setProjectName(sourceProjectName)
+      } else if (resolvedGlobal) {
+        const plan = dashboardPlans.find((p) => p.globalVersion === resolvedGlobal)
+        if (plan?.projectName) setProjectName(plan.projectName)
+      }
 
       setSelectedSheet(SHEET_MODULE_QUOTE)
       if (draft.quoteMode) setSelectedPresetMode(String(draft.quoteMode))
@@ -738,17 +859,35 @@ export default function AssessmentPage() {
         difficultyFactor: Math.min(1, Math.max(0, Number(draft.difficultyFactor ?? 0))),
       }))
 
+      const aiItems: Array<{
+        index: number
+        cloudProduct: string
+        skuName: string
+        moduleName: string
+        suggestedDays: number
+        standardDays: number
+        reason: string
+        raw: KimiUnmatchedModuleItem
+      }> = []
       const byModule = new Map<string, { suggestedDays: number; reason: string }>()
       const byCloudSku = new Map<string, { suggestedDays: number; reason: string }>()
-      const normalizeName = (value: unknown) => String(value || "").trim().toLowerCase()
-      for (const item of draft.moduleItems || []) {
-        const moduleName = normalizeName(item.moduleName)
-        const cloudProduct = normalizeName(item.cloudProduct)
-        const skuName = normalizeName(item.skuName)
+      for (const [index, item] of (draft.moduleItems || []).entries()) {
+        const moduleName = normalizeAssessmentMatchToken(item.moduleName)
+        const cloudProduct = normalizeAssessmentMatchToken(item.cloudProduct)
+        const skuName = normalizeAssessmentMatchToken(item.skuName)
         const ai = {
           suggestedDays: Math.max(0, Number(item.suggestedDays || 0)),
           reason: String(item.reason || "").trim(),
         }
+        const raw = {
+          cloudProduct: String(item.cloudProduct || "").trim(),
+          skuName: String(item.skuName || "").trim(),
+          moduleName: String(item.moduleName || "").trim(),
+          suggestedDays: Math.max(0, Number(item.suggestedDays || 0)),
+          standardDays: Math.max(0, Number(item.standardDays || 0)),
+          reason: String(item.reason || "").trim(),
+        }
+        aiItems.push({ index, cloudProduct, skuName, moduleName, standardDays: raw.standardDays, raw, ...ai })
         if (moduleName) byModule.set(moduleName, ai)
         if (skuName) byModule.set(skuName, ai)
         if (cloudProduct && skuName) {
@@ -758,6 +897,7 @@ export default function AssessmentPage() {
 
       const nextSelection: Record<string, ItemSelectionState> = {}
       const hitCloud = new Set<string>()
+      const matchedAiIndexes = new Set<number>()
       for (const item of templateDetail.items) {
         const fallbackDays = toInteger(Number(item.standardDays || 0))
         nextSelection[item.templateItemId] = {
@@ -765,18 +905,39 @@ export default function AssessmentPage() {
           customStandardDays: fallbackDays,
         }
         const cloud = cloudLabelFromItem(item)
-        const cloudKey = normalizeName(cloud)
+        const cloudKey = normalizeAssessmentMatchToken(cloud)
         const skuCandidates = [
-          normalizeName(item.skuName),
-          normalizeName(item.itemName),
-          normalizeName(item.deliveryModule),
+          normalizeAssessmentMatchToken(item.skuName),
+          normalizeAssessmentMatchToken(item.itemName),
+          normalizeAssessmentMatchToken(item.deliveryModule),
+          normalizeAssessmentMatchToken(item.deliveryPoint),
+          normalizeAssessmentMatchToken(item.appGroup),
         ].filter(Boolean)
         const cloudSkuMatched = skuCandidates
           .map((sku) => byCloudSku.get(`${cloudKey}::${sku}`))
           .find(Boolean)
         const fallbackMatched = skuCandidates.map((sku) => byModule.get(sku)).find(Boolean)
-        const ai = cloudSkuMatched || fallbackMatched
+        const fuzzyMatched = aiItems.find((candidate) => {
+          const cloudMatched = !candidate.cloudProduct || assessmentTokensMatch(candidate.cloudProduct, cloudKey)
+          if (!cloudMatched) return false
+          const candidateTokens = [candidate.skuName, candidate.moduleName].filter(Boolean)
+          if (!candidateTokens.length) return false
+          return skuCandidates.some((sku) => candidateTokens.some((token) => assessmentTokensMatch(token, sku)))
+        })
+        const ai = cloudSkuMatched || fallbackMatched || fuzzyMatched
         if (!ai) continue
+        if ("index" in ai) matchedAiIndexes.add(ai.index)
+        if (cloudSkuMatched || fallbackMatched) {
+          for (const candidate of aiItems) {
+            const candidateTokens = [candidate.skuName, candidate.moduleName].filter(Boolean)
+            if (
+              (!candidate.cloudProduct || assessmentTokensMatch(candidate.cloudProduct, cloudKey)) &&
+              skuCandidates.some((sku) => candidateTokens.some((token) => assessmentTokensMatch(token, sku)))
+            ) {
+              matchedAiIndexes.add(candidate.index)
+            }
+          }
+        }
         nextSelection[item.templateItemId] = {
           included: true,
           customStandardDays: Math.max(0, toInteger(ai.suggestedDays || fallbackDays)),
@@ -785,9 +946,24 @@ export default function AssessmentPage() {
         }
         hitCloud.add(cloud)
       }
+      for (const item of templateDetail.items) {
+        const cloud = cloudLabelFromItem(item)
+        const cloudKey = normalizeAssessmentMatchToken(cloud)
+        if (aiItems.some((candidate) => candidate.cloudProduct && assessmentTokensMatch(candidate.cloudProduct, cloudKey))) {
+          hitCloud.add(cloud)
+        }
+      }
+      const selectedClouds = Array.from(hitCloud)
+      const nextMultiOrgRows = buildMultiOrgRowsFromKimiSnapshot(parsed.requirementSnapshot, selectedClouds)
+      const unmatched = aiItems
+        .filter((item) => !matchedAiIndexes.has(item.index))
+        .map((item) => item.raw)
+        .filter((item) => item.moduleName || item.skuName || item.cloudProduct)
       setItemSelection(nextSelection)
-      setSelectedCloudNames(Array.from(hitCloud))
-      setCustomModeByCloud(Object.fromEntries(Array.from(hitCloud).map((cloud) => [cloud, true])))
+      setSelectedCloudNames(selectedClouds)
+      setCustomModeByCloud(Object.fromEntries(selectedClouds.map((cloud) => [cloud, true])))
+      if (nextMultiOrgRows.length) setMultiOrgRows(nextMultiOrgRows)
+      setKimiUnmatchedModuleItems(unmatched)
       setServerResult(null)
       setError("")
       showGlobalNotice("已应用 Kimi 评估草稿，请确认后保存版本")
@@ -1015,6 +1191,7 @@ export default function AssessmentPage() {
         customModeEnabled: Object.values(customModeByCloud).some(Boolean),
         itemSelection: currentItemsPayload(),
         multiOrgRows,
+        kimiUnmatchedModuleItems,
         checkinNote,
       })
       await reloadVersions(data.versionCode || selectedVersionRecord.versionCode)
@@ -1161,6 +1338,7 @@ export default function AssessmentPage() {
         customModeEnabled: Object.values(customModeByCloud).some(Boolean),
         itemSelection: currentItemsPayload(),
         multiOrgRows,
+        kimiUnmatchedModuleItems,
         localSummary: {
           selectedCount,
           baseDays,
@@ -1247,6 +1425,7 @@ export default function AssessmentPage() {
       setItemSelection({})
     }
     setMultiOrgRows([createEmptyMultiOrgRow()])
+    setKimiUnmatchedModuleItems([])
     setServerResult(null)
     setError("")
     setDirty(false)

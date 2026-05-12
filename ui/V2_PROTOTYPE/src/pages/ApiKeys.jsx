@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
+import useApiKeys from '../hooks/useApiKeys.js'
 
 const INITIAL_KEYS = [
   { id: 'k1', name: '生产环境主密钥', key: 'sk-wes-prod-7a3f9e2b', status: 'active', scope: 'admin', createdAt: '2026-04-10T08:00:00Z' },
@@ -22,12 +23,12 @@ const methodCls = {
 }
 
 export default function ApiKeys() {
-  const [apiKeys, setApiKeys] = useState(INITIAL_KEYS)
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState(null)
   const [dialog, setDialog] = useState(null) // 'new' | null
   const [newName, setNewName] = useState('')
   const [newScope, setNewScope] = useState('read')
+  const { keys: apiKeys, loading, error, actions } = useApiKeys({ fallbackData: INITIAL_KEYS })
 
   const filteredKeys = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -49,32 +50,24 @@ export default function ApiKeys() {
     }
   }
 
-  const toggleStatus = (id) => {
-    setApiKeys((prev) =>
-      prev.map((k) =>
-        k.id === id ? { ...k, status: k.status === 'active' ? 'revoked' : 'active' } : k
-      )
-    )
+  const toggleStatus = async (key) => {
+    const result = key.status === 'active'
+      ? await actions.revokeKey(key.id)
+      : await actions.restoreKey(key.id)
+    showToast(result.success ? (key.status === 'active' ? '已撤销' : '已恢复') : result.error)
   }
 
-  const createKey = () => {
+  const createKey = async () => {
     const name = newName.trim()
     if (!name) {
       alert('请输入密钥名称')
       return
     }
-    const prefix = 'sk-wes-' + Math.random().toString(36).slice(2, 10)
-    setApiKeys((prev) => [
-      ...prev,
-      {
-        id: 'k' + Date.now(),
-        name,
-        key: prefix,
-        status: 'active',
-        scope: newScope,
-        createdAt: new Date().toISOString(),
-      },
-    ])
+    const result = await actions.createKey(name, newScope)
+    if (!result.success) {
+      showToast(result.error)
+      return
+    }
     setNewName('')
     setNewScope('read')
     setDialog(null)
@@ -120,7 +113,7 @@ export default function ApiKeys() {
             >
               <span>API Keys</span>
               <div className="right" style={{ marginLeft: 'auto' }}>
-                <button
+                <button type="button"
                   className="btn btn-pri"
                   style={{ fontSize: 12, padding: '6px 12px', height: 32 }}
                   onClick={() => setDialog('new')}
@@ -148,7 +141,9 @@ export default function ApiKeys() {
                 }}
               />
             </div>
+            {error && <div style={{ padding: '0 18px 10px', fontSize: 12, color: 'var(--err)' }}>{error}</div>}
             <div style={{ padding: '16px 18px' }}>
+              {loading && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>加载中…</div>}
               <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
                 <thead>
                   <tr>
@@ -180,14 +175,14 @@ export default function ApiKeys() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
-                          <button
+                          <button type="button"
                             className="btn btn-ghost"
                             style={{ fontSize: 11, padding: '4px 8px', height: 26 }}
                             onClick={() => copyKey(k.key)}
                           >
                             复制
                           </button>
-                          <button
+                          <button type="button"
                             className="btn btn-ghost"
                             style={{
                               fontSize: 11,
@@ -195,7 +190,7 @@ export default function ApiKeys() {
                               height: 26,
                               color: k.status === 'active' ? 'var(--err)' : 'var(--ink-3)',
                             }}
-                            onClick={() => toggleStatus(k.id)}
+                            onClick={() => toggleStatus(k)}
                           >
                             {k.status === 'active' ? '撤销' : '恢复'}
                           </button>
@@ -370,10 +365,10 @@ export default function ApiKeys() {
                     {b.txt}
                     {b.actions && (
                       <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                        <button className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', height: 28 }}>
+                        <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', height: 28 }}>
                           📜 查看 OpenAPI
                         </button>
-                        <button className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', height: 28 }}>
+                        <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', height: 28 }}>
                           ⎘ 复制 cURL
                         </button>
                       </div>
@@ -547,11 +542,11 @@ export default function ApiKeys() {
               </div>
             </div>
             <DialogActions>
-              <button className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
                 取消
               </button>
-              <button className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={createKey}>
-                确认生成
+              <button type="button" className="btn btn-pri" disabled={loading} style={{ height: 30, fontSize: 12, padding: '0 14px', opacity: loading ? 0.72 : 1 }} onClick={createKey}>
+                {loading ? '生成中…' : '确认生成'}
               </button>
             </DialogActions>
           </DialogCard>

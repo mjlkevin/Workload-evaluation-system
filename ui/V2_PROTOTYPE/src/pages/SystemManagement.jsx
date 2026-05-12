@@ -1,19 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
-
-const INITIAL_RULES = [
-  { id: 'R1', type: 'blocking', message: '需求条目必须关联至少一个业务模块', enabled: true },
-  { id: 'R2', type: 'blocking', message: '评估人天不得低于基准值的 80%', enabled: true },
-  { id: 'R3', type: 'warning', message: '多组织推广估算应提供相似度依据', enabled: true },
-  { id: 'R4', type: 'warning', message: '资源成本与实施评估差额超过 10% 需说明', enabled: false },
-  { id: 'R5', type: 'blocking', message: '评审通过前必须完成全部 checklist', enabled: true },
-]
-
-const INITIAL_TEMPLATES = [
-  { id: 'T1', name: '实施评估标准版', desc: '适用于中大型离散制造项目，含 120+ SKU 条目。', tags: ['制造', '标准实施'] },
-  { id: 'T2', name: '快速交付轻量版', desc: '适用于 200 人以下组织，快速上线场景。', tags: ['轻量', '快速交付'] },
-  { id: 'T3', name: '定制开发扩展版', desc: '含接口开发、报表定制、第三方集成评估。', tags: ['定制', '扩展'] },
-]
+import useSystemManagement from '../hooks/useSystemManagement.js'
 
 const PROMPT_TABS = [
   { key: 'assessment', label: '评估提示词' },
@@ -21,46 +8,32 @@ const PROMPT_TABS = [
   { key: 'generate', label: '生成提示词' },
 ]
 
-const INITIAL_PROMPTS = {
-  assessment: '你是一位资深 ERP 实施评估专家。请根据客户提供的需求访谈纪要，提取关键业务模块、评估复杂度并输出 SKU 主表。',
-  parse: '你是一位文档解析专家。请从上传的 Excel/Word/PDF 中提取结构化需求条目，识别业务模块、约束条件与关键干系人。',
-  generate: '你是一位技术方案生成专家。请基于已确认的 SKU 主表与资源成本，生成五段叙事方案与 SOW 草案。',
-}
-
 export default function SystemManagement() {
+  const {
+    rules, models, apiKey, setApiKey, ratecard,
+    dslRules, templates, prompts, setPrompts,
+    actionLoading,
+    actions,
+  } = useSystemManagement()
+
   const [tab, setTab] = useState('rules')
   const [dialog, setDialog] = useState(null) // 'prompt' | null
   const [promptTab, setPromptTab] = useState('assessment')
-  const [prompts, setPrompts] = useState(INITIAL_PROMPTS)
-  const [dslRules, setDslRules] = useState(INITIAL_RULES)
-  const [templates] = useState(INITIAL_TEMPLATES)
+  const [promptResult, setPromptResult] = useState(null)
+  const [selectedRuleCode, setSelectedRuleCode] = useState('')
 
   const tabs = [
-    { id: 'rules', label: '编码规则', count: 6 },
+    { id: 'rules', label: '编码规则', count: rules.length },
     { id: 'model', label: '模型配置' },
     { id: 'rate', label: 'RateCard' },
     { id: 'dsl', label: 'DSL 规则集' },
     { id: 'tpl', label: '模板' },
   ]
+  const selectedRule = rules.find((rule) => rule.code === selectedRuleCode) || rules[0]
 
-  const rules = [
-    { module: '总方案', code: 'GL', prefix: 'GL-', format: 'GL-NNNNN', example: 'GL-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
-    { module: '需求', code: 'RQ', prefix: 'RQ-', format: 'RQ-NNNNN', example: 'RQ-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
-    { module: '实施评估', code: 'IA', prefix: 'IA-', format: 'IA-NNNNN', example: 'IA-04003', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
-    { module: '开发评估', code: 'DV', prefix: 'DV-', format: 'DV-NNNNN', example: 'DV-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
-    { module: '资源成本', code: 'RS', prefix: 'RS-', format: 'RS-NNNNN', example: 'RS-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
-    { module: '评审', code: 'RV', prefix: 'RV-', format: 'RV-NNNNN', example: 'RV-04001', status: 'draft', activatedAt: null },
-  ]
-
-  const models = [
-    { name: 'KIMI 评估', status: 'online', endpoint: 'https://api.moonshot.cn/v1/chat/completions', profile: 'default-v1', temp: '0.2', tokens: '8192', desc: '用于实施评估与开发评估的自动打标与摘要生成。' },
-    { name: '文件解析', status: 'online', endpoint: 'https://api.moonshot.cn/v1/files', profile: 'default-v1', temp: '0.1', tokens: '4096', desc: '用于 Excel/Word/PDF 的结构化提取与内容解析。' },
-    { name: '生成模型', status: 'offline', endpoint: 'https://api.moonshot.cn/v1/generate', profile: 'generate-v1', temp: '0.3', tokens: '8192', desc: '用于方案生成、五段叙事与 SOW 草案自动撰写。' },
-  ]
-
-  const toggleDsl = (id) => {
-    setDslRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)))
-  }
+  useEffect(() => {
+    if (!selectedRuleCode && rules[0]?.code) setSelectedRuleCode(rules[0].code)
+  }, [rules, selectedRuleCode])
 
   return (
     <PageShell
@@ -68,7 +41,7 @@ export default function SystemManagement() {
       title="系统管理"
       subtitle="编码规则 / 模型配置 / RateCard / DSL"
       actions={[
-        <button
+        <button type="button"
           key="prompt"
           className="btn btn-ghost"
           style={{ height: 32, fontSize: 12, padding: '0 12px' }}
@@ -78,33 +51,39 @@ export default function SystemManagement() {
         </button>,
       ]}
     >
-      <div className="tabs" style={{ marginBottom: 0 }}>
-        {tabs.map((t) => (
-          <span
-            key={t.id}
-            className={tab === t.id ? 'on' : ''}
-            onClick={() => setTab(t.id)}
-            style={{ cursor: 'pointer' }}
-          >
-            {t.label}
-            {t.count ? <span className="ct">{t.count}</span> : null}
-          </span>
-        ))}
+      <div className="system-tabs" role="tablist" aria-label="系统管理配置分类">
+        {tabs.map((t) => {
+          const active = tab === t.id
+          return (
+            <button
+              type="button"
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              className={active ? 'system-tab on' : 'system-tab'}
+              onClick={() => setTab(t.id)}
+            >
+              <span>{t.label}</span>
+              {t.count ? <span className="ct">{t.count}</span> : null}
+            </button>
+          )
+        })}
       </div>
 
       <div style={{ padding: '18px 24px' }}>
         {tab === 'rules' && (
-          <div className="section" style={{ margin: 0 }}>
+          <div className="section system-card" style={{ margin: 0 }}>
             <div className="hd">
-              <span>编码规则</span>
+              <span>版本号编码规则</span>
+              <span className="bdg ci" style={{ fontSize: 10, padding: '1px 6px' }}><span className="dot" />当前生效 v3</span>
               <div className="right">
-                <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
+                <button type="button" className="btn btn-out" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.configureRule(selectedRule?.code || '')}>
                   配置
                 </button>
-                <button className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
+                <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateRule(selectedRule?.code || '')}>
                   ⌁ 生效
                 </button>
-                <button className="btn btn-dan" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
+                <button type="button" className="btn btn-dan" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.disableRule(selectedRule?.code || '')}>
                   禁用
                 </button>
               </div>
@@ -122,8 +101,18 @@ export default function SystemManagement() {
                 </tr>
               </thead>
               <tbody>
-                {rules.map((r, i) => (
-                  <tr key={i}>
+                {rules.map((r, i) => {
+                  const selected = selectedRule?.code === r.code
+                  return (
+                  <tr
+                    key={i}
+                    className={selected ? 'row-selected' : ''}
+                    onClick={() => setSelectedRuleCode(r.code)}
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedRuleCode(r.code) }}
+                    aria-selected={selected}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <td>{r.module}</td>
                     <td className="mono">{r.code}</td>
                     <td className="mono">{r.prefix}</td>
@@ -139,7 +128,8 @@ export default function SystemManagement() {
                       {r.activatedAt ? r.activatedAt.replace('T', ' ').replace('Z', '') : '—'}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -148,11 +138,11 @@ export default function SystemManagement() {
         {tab === 'model' && (
           <div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
-                保存草稿
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.saveModelDraft()} disabled={actionLoading.saveModelDraft}>
+                {actionLoading.saveModelDraft ? '...' : '保存草稿'}
               </button>
-              <button className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
-                ⌁ 生效配置
+              <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateModel()} disabled={actionLoading.activateModel}>
+                {actionLoading.activateModel ? '...' : '⌁ 生效配置'}
               </button>
             </div>
             <div className="grid-3-eq" style={{ gap: 16 }}>
@@ -215,8 +205,8 @@ export default function SystemManagement() {
                     }}
                   >
                     <span>{m.desc}</span>
-                    <button className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px', height: 30 }}>
-                      测试连通性
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px', height: 30 }} onClick={() => actions.testApiKey()}>
+                      {actionLoading.testApiKey ? '...' : '测试连通性'}
                     </button>
                   </div>
                 </div>
@@ -239,18 +229,20 @@ export default function SystemManagement() {
                     letterSpacing: '.04em',
                   }}
                 >
-                  sk-****-****
+                  {apiKey ? 'sk-****-****' : '（未配置）'}
                 </span>
                 <input
                   className="input"
                   style={{ flex: 1, minWidth: 200, maxWidth: 360 }}
                   placeholder="输入新 API Key"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
                 />
-                <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.testApiKey(apiKey)}>
                   测试连接
                 </button>
-                <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
-                  改用环境变量
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => setApiKey('')}>
+                  清除
                 </button>
               </div>
             </div>
@@ -262,20 +254,14 @@ export default function SystemManagement() {
             <div className="hd">
               <span>RateCard · 当前生效</span>
               <div className="right">
-                <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
                   编辑
                 </button>
               </div>
             </div>
             <div className="bd">
               <div className="grid-3-eq">
-                {[
-                  { role: '实施顾问', price: '¥3,200 CNY' },
-                  { role: '架构师', price: '¥4,000 CNY' },
-                  { role: '项目经理', price: '¥4,000 CNY' },
-                  { role: '测试工程师', price: '¥2,800 CNY' },
-                  { role: '开发工程师', price: '¥3,500 CNY' },
-                ].map((r) => (
+                {ratecard.map((r) => (
                   <div
                     key={r.role}
                     style={{ background: 'var(--bg-soft)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px' }}
@@ -294,8 +280,11 @@ export default function SystemManagement() {
             <div className="hd">
               <span>DSL 规则集</span>
               <div className="right">
-                <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
-                  编辑 JSON
+                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.saveDslDraft()}>
+                  保存草稿
+                </button>
+                <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateDsl()}>
+                  ⌁ 生效
                 </button>
               </div>
             </div>
@@ -313,7 +302,7 @@ export default function SystemManagement() {
                   {dslRules.map((r) => (
                     <tr key={r.id}>
                       <td style={{ textAlign: 'center' }}>
-                        <input type="checkbox" checked={r.enabled} onChange={() => toggleDsl(r.id)} />
+                        <input type="checkbox" checked={r.enabled} onChange={() => actions.toggleDsl(r.id)} />
                       </td>
                       <td className="mono" style={{ fontSize: 12 }}>{r.id}</td>
                       <td>
@@ -371,10 +360,10 @@ export default function SystemManagement() {
                         </span>
                       ))}
                     </div>
-                    <button
+                    <button type="button"
                       className="btn btn-pri"
                       style={{ height: 30, fontSize: 12, padding: '0 12px', marginTop: 4 }}
-                      onClick={() => alert(`Phase A · mock 占位 · 已使用模板「${t.name}」`)}
+                      onClick={() => actions.useTemplate(t.name)}
                     >
                       使用
                     </button>
@@ -420,22 +409,32 @@ export default function SystemManagement() {
                 resize: 'vertical',
               }}
             />
+            {promptResult && (
+              <div style={{marginBottom:12,padding:12,background:'var(--bg-soft)',border:'1px solid var(--line)',borderRadius:'var(--r-md)',maxHeight:200,overflowY:'auto'}}>
+                <pre style={{margin:0,fontSize:11,lineHeight:1.6,whiteSpace:'pre-wrap',fontFamily:'var(--font-mono)'}}>{JSON.stringify(promptResult, null, 2)}</pre>
+              </div>
+            )}
             <DialogActions>
-              <button className="btn btn-ghost" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => alert('Phase A · mock 占位 · [测试提示词]')}>
-                测试
+              <button type="button" className="btn btn-ghost" style={{ height: 30, fontSize: 12, padding: '0 14px' }} disabled={actionLoading.testPrompt} onClick={async () => {
+                const r = await actions.testPrompt(prompts[promptTab])
+                if (r) setPromptResult(r)
+              }}>
+                {actionLoading.testPrompt ? '测试中...' : '测试'}
               </button>
-              <button className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => { setDialog(null); setPromptResult(null) }}>
                 取消
               </button>
-              <button
+              <button type="button"
                 className="btn btn-pri"
                 style={{ height: 30, fontSize: 12, padding: '0 14px' }}
-                onClick={() => {
-                  alert('Phase A · mock 占位 · [保存提示词]')
+                disabled={actionLoading.savePrompts}
+                onClick={async () => {
+                  await actions.savePrompts()
                   setDialog(null)
+                  setPromptResult(null)
                 }}
               >
-                保存
+                {actionLoading.savePrompts ? '保存中...' : '保存'}
               </button>
             </DialogActions>
           </DialogCard>

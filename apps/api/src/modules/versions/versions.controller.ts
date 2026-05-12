@@ -1,4 +1,5 @@
 export {
+  getVersion,
   listVersions,
   createVersion,
   updateVersionStatus,

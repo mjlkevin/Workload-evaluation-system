@@ -43,6 +43,23 @@ function buildValidCalculateRequest(): CalculateRequest {
   };
 }
 
+function buildCalculateRequestWithIncludedItems(includedIds: string[]): CalculateRequest {
+  const { template, ruleSet } = loadContext();
+  const included = new Set(includedIds);
+  return {
+    templateId: template.templateId,
+    ruleSetId: ruleSet.ruleSetId,
+    userCount: 51,
+    difficultyFactor: 0.1,
+    orgCount: 2,
+    orgSimilarityFactor: 0.6,
+    items: template.items.map((item) => ({
+      templateItemId: item.templateItemId,
+      included: included.has(item.templateItemId),
+    }))
+  };
+}
+
 test("estimates.usecase: calculateEstimateOnly returns success for valid request", () => {
   const body = buildValidCalculateRequest();
   const result = calculateEstimateOnly(body);
@@ -50,6 +67,25 @@ test("estimates.usecase: calculateEstimateOnly returns success for valid request
   if (result.ok) {
     assert.equal(typeof result.data.totalDays, "number");
   }
+});
+
+test("estimates.usecase: dependency check only triggers when the dependent module is selected", () => {
+  const purchaseOnly = calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-66"]));
+  if (!purchaseOnly.ok) {
+    assert.ok(
+      purchaseOnly.details?.every((detail) => !detail.reason.includes("滚动采购管理")),
+      "普通采购管理不应触发滚动采购管理依赖",
+    );
+  }
+
+  const rollingPurchaseWithoutVmi = calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-73"]));
+  assert.equal(rollingPurchaseWithoutVmi.ok, false);
+  if (!rollingPurchaseWithoutVmi.ok) {
+    assert.ok(rollingPurchaseWithoutVmi.details?.some((detail) => /滚动采购管理/.test(detail.reason)));
+  }
+
+  const rollingPurchaseWithVmi = calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-72", "item-73"]));
+  assert.equal(rollingPurchaseWithVmi.ok, true);
 });
 
 test("estimates.usecase: calculateAndExportEstimate returns idempotency replay", async () => {

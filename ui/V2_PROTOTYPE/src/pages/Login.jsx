@@ -1,7 +1,26 @@
 import React, { useState } from 'react'
+import useAuth from '../hooks/useAuth.js'
 
 export default function Login() {
   const [mode, setMode] = useState('login')
+  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
+  const { login, register, loading, error } = useAuth()
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const result = mode === 'login'
+      ? await login(username.trim(), password)
+      : await register(username.trim(), password, email.trim(), inviteCode.trim())
+
+    if (result.success && mode === 'register') {
+      setMode('login')
+      setPassword('')
+      setInviteCode('')
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: 'linear-gradient(135deg,var(--bg) 0%,var(--brand-soft) 100%)', fontFamily: 'var(--font-sans)' }}>
@@ -18,14 +37,14 @@ export default function Login() {
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, display: mode === 'register' ? 'block' : 'none' }}>使用邀请码激活账号</h3>
         <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 20 }}>请输入账号信息以继续</p>
 
-        <form style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={(e) => { e.preventDefault(); alert('Phase A · 静态 mock，未接后端') }}>
+        <form style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={handleSubmit}>
           {mode === 'register' && (
-            <input className="input" type="email" placeholder="邮箱" autoComplete="email" style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            <input className="input" type="email" placeholder="邮箱" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
           )}
-          <input className="input" type="text" placeholder="用户名" autoComplete="username" style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
-          <input className="input" type="password" placeholder="密码" autoComplete="current-password" style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14, borderColor: 'var(--brand)', boxShadow: 'var(--shadow-focus)' }} />
+          <input className="input" type="text" placeholder="用户名" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+          <input className="input" type="password" placeholder="密码" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14, borderColor: 'var(--brand)', boxShadow: 'var(--shadow-focus)' }} />
           {mode === 'register' && (
-            <input className="input" type="text" placeholder="邀请码（必填）" autoComplete="off" style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            <input className="input" type="text" placeholder="邀请码（必填）" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
           )}
 
           {mode === 'login' && (
@@ -38,8 +57,10 @@ export default function Login() {
             </div>
           )}
 
-          <button type="submit" className="btn btn-pri" style={{ width: '100%', height: 40, fontSize: 14, display: mode === 'login' ? 'block' : 'none' }}>登录</button>
-          <button type="submit" className="btn btn-pri" style={{ width: '100%', height: 40, fontSize: 14, display: mode === 'register' ? 'block' : 'none' }}>激活账号</button>
+          {error && <div style={{ color: 'var(--err)', fontSize: 12, lineHeight: 1.5 }}>{error}</div>}
+
+          <button type="submit" className="btn btn-pri" disabled={loading} style={{ width: '100%', height: 40, fontSize: 14, display: mode === 'login' ? 'block' : 'none', opacity: loading ? 0.72 : 1 }}>{loading ? '登录中…' : '登录'}</button>
+          <button type="submit" className="btn btn-pri" disabled={loading} style={{ width: '100%', height: 40, fontSize: 14, display: mode === 'register' ? 'block' : 'none', opacity: loading ? 0.72 : 1 }}>{loading ? '激活中…' : '激活账号'}</button>
         </form>
 
         {mode === 'login' && (

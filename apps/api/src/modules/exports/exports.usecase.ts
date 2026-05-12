@@ -1,23 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
+import { Request, Response } from "express";
+import { randomUUID } from "node:crypto";
 import { ensureExportDir } from "../../utils/file";
+import { requireAuth } from "../../middleware/auth";
+import { ok, fail } from "../../utils/response";
 
 /**
  * 解析下载文件 - 鉴权 + 存在性检查
  *
  * 文件名约定: `<userId>__<rawFileName>`
- *   - 路径前缀检验确保只有归属用户能下载
- *   - 文件存在性检查
- *
- * @returns
- *   - ok: true → { rawFileName, filePath }
- *   - 40301 → 该文件不归属当前 userId
- *   - 40401 → 文件不存在
  */
 export function resolveDownloadFile(fileName: string, userId: string):
   | { ok: true; data: { rawFileName: string; filePath: string } }
   | { ok: false; code: number; message?: string } {
-  // 1. 鉴权：文件名必须以 <userId>__ 开头
   const sep = "__";
   const sepIdx = fileName.indexOf(sep);
   if (sepIdx <= 0) {
@@ -30,7 +26,6 @@ export function resolveDownloadFile(fileName: string, userId: string):
     return { ok: false, code: 40301, message: "forbidden" };
   }
 
-  // 2. 存在性
   const exportDir = ensureExportDir();
   const filePath = path.resolve(exportDir, fileName);
   if (!fs.existsSync(filePath)) {
@@ -38,4 +33,48 @@ export function resolveDownloadFile(fileName: string, userId: string):
   }
 
   return { ok: true, data: { rawFileName, filePath } };
+}
+
+export function downloadFile(req: Request, res: Response) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+
+  const fileName = req.params.fileName || req.params.file || "";
+  if (!fileName) {
+    return fail(res, 40001, "参数错误", [{ field: "fileName", reason: "required" }]);
+  }
+
+  const result = resolveDownloadFile(fileName, auth.user.id);
+  if (!result.ok) {
+    if (result.code === 40401) {
+      return fail(res, 40401, "文件不存在或已过期", [{ field: "fileName", reason: "not_found" }]);
+    }
+    return fail(res, result.code, result.message || "权限不足");
+  }
+
+  const { rawFileName, filePath } = result.data;
+  const ext = path.extname(rawFileName).toLowerCase();
+  const mimeMap: Record<string, string> = {
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pdf": "application/pdf",
+    ".json": "application/json",
+  };
+  const contentType = mimeMap[ext] || "application/octet-stream";
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(rawFileName)}`);
+  res.setHeader("Cache-Control", "private, max-age=3600");
+
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
+  stream.on("error", () => {
+    if (!res.headersSent) {
+      res.status(500).json({ code: 50001, message: "文件读取失败", requestId: randomUUID() });
+    }
+  });
+}
+
+export function history(_req: Request, res: Response) {
+  // 导出历史暂未实现持久化存储，返回空列表
+  res.json(ok({ total: 0, items: [] }, randomUUID()));
 }

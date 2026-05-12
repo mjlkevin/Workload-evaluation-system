@@ -8,6 +8,27 @@ import XLSX from "xlsx";
 import { RequirementImportData } from "../types";
 import { asString, normalizeCellText, parseCellNumber } from "../utils/helpers";
 
+const TEMPLATE_PLACEHOLDER_PATTERNS = [
+  /本页粘贴会议纪要或调研纪要/g,
+  /请提供项目需求相关资料[^。\n]*/g,
+  /请输入[^。\n]*/g,
+  /待填写/g,
+  /示例/g,
+];
+
+function cleanTemplatePlaceholders(value: string): string {
+  let text = asString(value);
+  for (const pattern of TEMPLATE_PLACEHOLDER_PATTERNS) {
+    text = text.replace(pattern, "");
+  }
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
 // ------------------------------------------------------------------
 // Excel 读取辅助
 // ------------------------------------------------------------------
@@ -459,7 +480,7 @@ export function parseRequirementImportFromWorkbook(workbook: XLSX.WorkBook): Req
     }
   }
 
-  sectionData.meetingNotes = collectedMeetingNotes.join("\n").trim();
+  sectionData.meetingNotes = cleanTemplatePlaceholders(collectedMeetingNotes.join("\n"));
   sectionData.productModuleRows = normalizeProductModuleRows(sectionData.productModuleRows);
   return sectionData;
 }

@@ -74,13 +74,13 @@ export default function SkuTable({ groups }) {
                 · <b style={{ color: 'var(--brand)', fontWeight: 600 }}>{g.days} 人天</b> · {g.module}
               </span>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button className="btn sm" style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
+                <button type="button" className="btn sm" style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
                   自定义人天
                 </button>
-                <button className="btn sm" style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
+                <button type="button" className="btn sm" style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
                   全选
                 </button>
-                <button className="btn sm ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
+                <button type="button" className="btn sm ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
                   全不选
                 </button>
               </div>

@@ -61,9 +61,14 @@ function hasSelectedLabel(tokens: Set<string>, target: string): boolean {
     if (!token) continue;
     if (token === normalizedTarget) return true;
     if (normalizedTarget.length >= 2 && token.includes(normalizedTarget)) return true;
-    if (token.length >= 4 && normalizedTarget.includes(token)) return true;
   }
   return false;
+}
+
+function hasSelectedRuleSubject(tokens: Set<string>, target: string): boolean {
+  const normalizedTarget = normalizeToken(target);
+  if (!normalizedTarget) return false;
+  return tokens.has(normalizedTarget);
 }
 
 function collectSelectedLabels(body: CalculateRequest, template: Template): Set<string> {
@@ -100,7 +105,7 @@ function validateImplementationDependencies(body: CalculateRequest, template: Te
   const issues: DependencyIssue[] = [];
   for (const rule of activeRules.rules) {
     if (!rule?.enabled) continue;
-    if (!hasSelectedLabel(selectedTokens, rule.subject)) continue;
+    if (!hasSelectedRuleSubject(selectedTokens, rule.subject)) continue;
 
     const missingDependencies = (rule.dependencies || []).filter((dep) => !hasSelectedLabel(selectedTokens, dep));
     if (rule.logic === "requires_all") {

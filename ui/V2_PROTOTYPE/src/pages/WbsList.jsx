@@ -1,17 +1,36 @@
 import React from 'react'
 import ListPage from '../components/ListPage.jsx'
-import { wbsItems } from '../mock/listData.js'
+import useWbsList from '../hooks/useWbsList.js'
+import { wbsItems as mockData } from '../mock/listData.js'
 
 export default function WbsList() {
   // WBS 详情页 PB-R3 待建；列表行不导航避免 404
+  const { rows, refetch } = useWbsList({ fallbackData: mockData })
+
+  const handleBulkAction = (actionKey, selectedRows) => {
+    const first = selectedRows[0]
+    if ((actionKey === 'preview' || actionKey === 'edit') && first) {
+      alert(`WBS 详情页 · PB-R3 待建：${first.name}`)
+      return
+    }
+    if (actionKey === 'history' && first) {
+      alert(`WBS 派生记录 · ${first.name}`)
+      return
+    }
+    if (actionKey === 'delete') {
+      alert('WBS 任务为方案自动派生，不支持独立删除。请通过方案管理调整')
+    }
+  }
+
   return (
     <ListPage
       crumb="工作台 / WBS 任务"
       title="WBS 任务列表"
       subtitle="工作分解结构与任务进度跟踪"
-      data={wbsItems}
+      data={rows}
       rowKey="id"
       onRowClick={(row) => alert('WBS 详情页 · PB-R3 待建')}
+      onBulkAction={handleBulkAction}
       filterTags={[
         { key: 'all', label: '全部' },
         { key: 'completed', label: '已完成' },
@@ -26,8 +45,8 @@ export default function WbsList() {
         { key: 'status', title: '状态', render: (r) => <StatusBadge status={r.status} /> },
       ]}
       actions={[
-        <button key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}}>+ 新建</button>,
-        <button key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}}>⟳ 刷新</button>,
+        <button type="button" key="new" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}} disabled title="WBS 任务由总方案自动派生，不支持手动新建">派生任务</button>,
+        <button type="button" key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}} onClick={() => refetch()}>⟳ 刷新</button>,
       ]}
     />
   )

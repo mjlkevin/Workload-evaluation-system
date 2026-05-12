@@ -168,7 +168,7 @@ function createDefaultRequirementConfig(): RequirementSystemConfig {
     },
     fileParsing: {
       enabled: true,
-      model: "moonshot-v1-128k",
+      model: "kimi-k2-turbo-preview",
       allowedExtensions: [".xlsx", ".xls", ".csv"],
       maxFileSizeMb: 20,
       maxSheetCount: 20,

@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
+import WorkspaceTabs from './WorkspaceTabs.jsx'
+import { UnsavedChangesProvider } from '../../hooks/useUnsavedChanges.jsx'
 
 const navGroups = [
   {
@@ -33,7 +35,6 @@ function ToggleIcon() {
 }
 
 export default function Shell({ children }) {
-  const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
 
   return (
@@ -42,7 +43,7 @@ export default function Shell({ children }) {
         <div className="brand">
           <div className="l">W</div>
           <div>WES</div>
-          <button
+          <button type="button"
             className="toggle-btn"
             onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? '展开' : '收起'}
@@ -70,17 +71,20 @@ export default function Shell({ children }) {
         <div className="user">
           <div className="row">
             <div className="av">M</div>
-            <div>
+            <div className="account">
               <div className="nm">mjlkevin</div>
               <div className="meta">超级管理员</div>
             </div>
+            {!collapsed && <a className="out" href="/login" aria-label="退出登录">退出</a>}
           </div>
-          {!collapsed && <a className="out" href="/login">退出</a>}
         </div>
       </aside>
-      <main className="content" style={{ flex: 1, minWidth: 0 }}>
-        {children}
-      </main>
+      <UnsavedChangesProvider>
+        <main className="content" style={{ flex: 1, minWidth: 0 }}>
+          <WorkspaceTabs />
+          {children}
+        </main>
+      </UnsavedChangesProvider>
     </div>
   )
 }

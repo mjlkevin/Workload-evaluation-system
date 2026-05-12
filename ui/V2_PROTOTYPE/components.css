@@ -37,6 +37,8 @@ code,pre{font-family:var(--font-mono)}
 .bdg.ci{background:var(--ok-soft);color:var(--ok-ink)} .bdg.ci .dot{background:var(--ok)}
 .bdg.co{background:var(--accent-soft);color:var(--accent-ink)} .bdg.co .dot{background:var(--accent)}
 .bdg.lock{background:var(--err-soft);color:var(--err)} .bdg.lock .dot{background:var(--err)}
+.bdg.muted{background:var(--bg-soft);color:var(--ink-3)} .bdg.muted .dot{background:var(--ink-3)}
+.bdg.brd{background:var(--brand-soft);color:var(--brand-ink)} .bdg.brd .dot{background:var(--brand)}
 
 .kpi{background:#fff;border:1px solid var(--line);border-radius:var(--kpi-radius);padding:16px;box-shadow:var(--shadow-1)}
 .kpi .lb{font-size:11px;font-family:var(--font-mono);color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase}

@@ -81,6 +81,7 @@ export function createApp(): Express {
 
   // ========== 无需鉴权的运维端点 ==========
   app.use(healthRoutes);
+  app.use("/api/v1", healthRoutes);
   app.use(metricsRoutes);
 
   // ========== 文件下载 ==========

@@ -16,8 +16,11 @@ const upload = multer({
 const router = Router();
 
 router.post("/parse-basic-info", upload.single("file"), requireCapability("extractor:trigger"), AiModule.parseBasicInfo);
+router.post("/parse-basic-info/stream", upload.single("file"), requireCapability("extractor:trigger"), AiModule.parseBasicInfoStream);
 router.post("/company-profile-summary", requireCapability("requirement:upload"), AiModule.companyProfileSummary);
 router.post("/kimi-assessment/preview", requireCapability("assessment:create"), AiModule.kimiAssessmentPreview);
+router.post("/kimi-assessment/export-markdown", requireCapability("assessment:create"), AiModule.exportKimiAssessmentMarkdown);
+router.post("/kimi-assessment/export-pdf", requireCapability("assessment:create"), AiModule.exportKimiAssessmentPdf);
 
 /** 与 `POST /api/v1/system/requirement-settings/kimi-api-key/test` 相同处理函数，便于网关只放行 `/ai/*` 的环境 */
 router.post("/kimi-api-key/test", requireCapability("system:manage"), SystemModule.testRequirementKimiApiKey);

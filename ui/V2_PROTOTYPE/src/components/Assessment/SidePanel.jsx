@@ -2,7 +2,9 @@ import React from 'react'
 import AiCopilot from './AiCopilot.jsx'
 
 export default function SidePanel({ kpi, summary, aiCopilot }) {
-  const ratio = kpi.baseDays > 0 ? Math.round((kpi.baseDays / kpi.totalDays) * 100) : 0
+  const safeKpi = kpi || {}
+  const safeSummary = summary || {}
+  const ratio = safeKpi.baseDays > 0 && safeKpi.totalDays > 0 ? Math.round((safeKpi.baseDays / safeKpi.totalDays) * 100) : 0
 
   return (
     <div style={{ display: 'grid', gap: 16, alignContent: 'start' }}>
@@ -46,11 +48,11 @@ export default function SidePanel({ kpi, summary, aiCopilot }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: 'var(--ink-3)' }}>
           <span>总人天</span>
-          <b className="mono">{kpi.totalDays}</b>
+          <b className="mono">{safeKpi.totalDays ?? 0}</b>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>
           <span>基础人天</span>
-          <b className="mono">{kpi.baseDays}</b>
+          <b className="mono">{safeKpi.baseDays ?? 0}</b>
         </div>
       </div>
 
@@ -69,9 +71,9 @@ export default function SidePanel({ kpi, summary, aiCopilot }) {
       >
         <h4 style={{ margin: '0 0 10px', fontSize: 14 }}>校验摘要</h4>
         <div style={{ fontSize: 12, color: 'var(--ink-3)', display: 'grid', gap: 6 }}>
-          <div className="mono">规则版本：<span>{summary.ruleVersion}</span></div>
-          <div className="mono">流水线版本：<span>{summary.pipelineVersion}</span></div>
-          <div className="mono">最近运行：<span>{summary.lastRun}</span></div>
+          <div className="mono">规则版本：<span>{safeSummary.ruleVersion || '—'}</span></div>
+          <div className="mono">流水线版本：<span>{safeSummary.pipelineVersion || '—'}</span></div>
+          <div className="mono">最近运行：<span>{safeSummary.lastRun || '—'}</span></div>
         </div>
       </div>
     </div>

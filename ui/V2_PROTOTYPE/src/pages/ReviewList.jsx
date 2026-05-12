@@ -1,23 +1,42 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import ListPage from '../components/ListPage.jsx'
-import { reviews } from '../mock/listData.js'
+import useReviewList from '../hooks/useReviewList.js'
+import { reviews as mockData } from '../mock/listData.js'
 
 export default function ReviewList() {
   const navigate = useNavigate()
+  const { rows, refetch, create, creating } = useReviewList({ fallbackData: mockData })
+
+  const handleBulkAction = (actionKey, selectedRows) => {
+    const first = selectedRows[0]
+    if ((actionKey === 'preview' || actionKey === 'edit') && first) {
+      navigate(`/reviews/${first.id}`)
+      return
+    }
+    if (actionKey === 'history' && first) {
+      alert(`评审流转记录 · ${first.id}`)
+      return
+    }
+    if (actionKey === 'delete') {
+      alert('评审模块暂不支持删除，请联系管理员手动清理数据')
+    }
+  }
+
   return (
     <ListPage
       crumb="工作台 / 评审管理"
       title="评审列表"
       subtitle="方案评审流程与审批追踪"
-      data={reviews}
+      data={rows}
       rowKey="id"
       onRowClick={(row) => navigate(`/reviews/${row.id}`)}
+      onBulkAction={handleBulkAction}
       filterTags={[
         { key: 'all', label: '全部' },
-        { key: 'pending', label: '待评审' },
-        { key: 'approved', label: '已通过' },
-        { key: 'rejected', label: '驳回' },
+        { key: '待评审', label: '待评审' },
+        { key: '已通过', label: '已通过' },
+        { key: '驳回', label: '驳回' },
       ]}
       columns={[
         { key: 'id', title: '评审号' },
@@ -29,8 +48,8 @@ export default function ReviewList() {
         { key: 'updatedAt', title: '更新时间' },
       ]}
       actions={[
-        <button key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}}>+ 新建</button>,
-        <button key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}}>⟳ 刷新</button>,
+        <button type="button" key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}} disabled={creating} onClick={async () => { const id = await create(); if (id) navigate(`/reviews/${id}`) }}>{creating ? '创建中...' : '+ 新建'}</button>,
+        <button type="button" key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}} onClick={() => refetch()}>⟳ 刷新</button>,
       ]}
     />
   )

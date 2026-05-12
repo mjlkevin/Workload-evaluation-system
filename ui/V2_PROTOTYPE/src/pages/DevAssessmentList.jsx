@@ -1,18 +1,36 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import ListPage from '../components/ListPage.jsx'
-import { devAssessments } from '../mock/listData.js'
+import useDevAssessmentList from '../hooks/useDevAssessmentList.js'
+import { devAssessments as mockData } from '../mock/listData.js'
 
 export default function DevAssessmentList() {
   const navigate = useNavigate()
+  const { rows, creating, refetch, create } = useDevAssessmentList({ fallbackData: mockData })
+
+  const handleBulkAction = (actionKey, selectedRows) => {
+    const first = selectedRows[0]
+    if ((actionKey === 'preview' || actionKey === 'edit') && first) {
+      navigate(`/dev-assessments/${first.id}`)
+      return
+    }
+    if (actionKey === 'history' && first) {
+      alert(`版本历史 · ${first.devVersion || first.globalVersion}`)
+      return
+    }
+    if (actionKey === 'delete') {
+      alert('开发评估模块暂不支持删除，请联系管理员手动清理数据')
+    }
+  }
+
   return (
     <ListPage
-      crumb="工作台 / 研发评估"
-      title="研发评估列表"
-      subtitle="研发工作量评估与检入管理"
-      data={devAssessments}
+      crumb="工作台 / 开发评估"
+      title="开发评估"
+      data={rows}
       rowKey="id"
       onRowClick={(row) => navigate(`/dev-assessments/${row.id}`)}
+      onBulkAction={handleBulkAction}
       filterTags={[
         { key: 'all', label: '全部' },
         { key: 'checked-in', label: '已检入' },
@@ -29,8 +47,8 @@ export default function DevAssessmentList() {
         { key: 'updatedAt', title: '更新时间' },
       ]}
       actions={[
-        <button key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}}>+ 新建</button>,
-        <button key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}}>⟳ 刷新</button>,
+        <button type="button" key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}} disabled={creating} onClick={async () => { const id = await create(); if (id) navigate(`/dev-assessments/${id}`) }}>{creating ? '创建中...' : '+ 新建'}</button>,
+        <button type="button" key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}} onClick={() => refetch()}>⟳ 刷新</button>,
       ]}
     />
   )

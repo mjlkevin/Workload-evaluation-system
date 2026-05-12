@@ -1,6 +1,14 @@
 {
   "codes": [
     {
+      "code": "DEV-SMOKE-TEST-2026",
+      "status": "used",
+      "createdAt": "2026-05-10T14:55:00.000Z",
+      "usedAt": "2026-05-10T14:58:59.472Z",
+      "usedByUserId": "bfe0941a-c280-41b7-bf50-250bc8a2ef60",
+      "usedByUsername": "smoketest"
+    },
+    {
       "code": "KD-20260328-6B0U1E",
       "status": "used",
       "createdAt": "2026-03-28T10:29:01.662Z",

@@ -8,6 +8,7 @@ import { requireCapability } from "../rbac/middleware";
 
 const router = Router();
 
+router.get("/:id", requireCapability("estimates:read"), VersionsModule.getVersion);
 router.get("/", requireCapability("estimates:read"), VersionsModule.listVersions);
 router.post("/", requireCapability("estimates:create"), VersionsModule.createVersion);
 router.patch("/:recordId/status", requireCapability("estimates:write"), VersionsModule.updateVersionStatus);

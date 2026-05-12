@@ -668,15 +668,18 @@
     <h1>前端优化方案 · 工程落地版</h1>
     <p class="meta">
       <span><b>受众</b>·前端工程师 / 设计 owner</span>
-      <span><b>更新</b>·2026-05-07</span>
-      <span><b>范围</b>·V0_SAAS（Next.js + Radix + Tailwind）</span>
-      <span><b>预计工期</b>·8 周</span>
+      <span><b>更新</b>·2026-05-11</span>
+      <span><b>范围</b>·V2_PROTOTYPE（主力）+ V0_SAAS（维护）</span>
+      <span><b>预计工期</b>·Phase A/B/C 已交付 · Phase D → 05-19 v1.0</span>
     </p>
     <div class="pills">
       <span class="pill">设计 Token</span>
       <span class="pill">控件 spec</span>
       <span class="pill">实施评估页深度方案</span>
-      <span class="pill">落地优先级</span>
+      <span class="pill">Phase A · 静态原型 ✓</span>
+      <span class="pill">Phase B · React 落地 ✓</span>
+      <span class="pill">Phase C · 后端集成 ✓</span>
+      <span class="pill" style="background:var(--brand-soft);color:var(--brand-ink);border-color:var(--brand)">Phase D · 收尾打磨 →</span>
     </div>
   </div>
 </header>
@@ -686,6 +689,7 @@
   <div class="toc">
     <h5>导航</h5>
     <ol>
+      <li><b>⬛ 总体规划路线图</b> · Phase A/B/C/D 四阶段 + 时间线</li>
       <li><b>§1</b> Token 系统（颜色 / 字体 / 圆角 / 阴影 / 间距）</li>
       <li><b>§2</b> 控件 spec（按钮 / 输入 / 状态 / VCS / 表格 / Stepper）</li>
       <li><b>§3</b> 实施评估页 · 深度打磨（信息架构 / 工作流 / 视觉）</li>
@@ -694,8 +698,192 @@
       <li><b>§6</b> 全站页面库 · 重构地图 + 四类页面 mock</li>
       <li><b>§7</b> 功能对齐清单 · 防遗漏审计（Top 30 必补 + 后端缺口 + 决策点）</li>
       <li><b>§8</b> 决策结论 + W0-W8 终版路线</li>
-      <li><b>§9</b> 施工进度看板（实时更新）</li>
+      <li><b>§9</b> 施工进度看板（实时更新 · 含 Phase C 后端集成 + §9.8）</li>
+      <li><b>⏳ Phase D 计划</b> · 收尾打磨 · v1.0 发布路线（05-19 目标）</li>
     </ol>
+  </div>
+</div>
+
+<!-- ===== ROADMAP 总体规划路线图 ===== -->
+<style>
+  .roadmap{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px 24px 20px;margin:32px 0}
+  .roadmap h5{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;color:var(--ink-3);text-transform:uppercase;margin:0 0 20px}
+  .rm-timeline{display:flex;position:relative;margin-bottom:16px}
+  .rm-track{position:absolute;top:15px;left:0;right:0;height:2px;background:var(--line-2);z-index:0}
+  .rm-track-fill{height:2px;background:var(--brand);position:absolute;top:0;left:0;border-radius:2px}
+  .rm-phase{flex:1;position:relative;z-index:1;text-align:center;padding:0 8px}
+  .rm-dot{width:14px;height:14px;border-radius:50%;margin:2px auto 12px;border:2px solid var(--line-2);background:#fff;position:relative;z-index:2}
+  .rm-dot.done{background:var(--ok);border-color:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+  .rm-dot.run{background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);animation:rm-pulse 2s infinite}
+  .rm-dot.next{border-color:var(--ink-3);background:var(--bg-soft)}
+  @keyframes rm-pulse{50%{box-shadow:0 0 0 6px var(--brand-soft)}}
+  .rm-label{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px}
+  .rm-date{font-size:10.5px;font-family:var(--font-mono);color:var(--ink-3);margin-bottom:6px}
+  .rm-items{font-size:11px;color:var(--ink-2);line-height:1.7}
+  .rm-items b{color:var(--ink);font-size:11px}
+
+  /* phase detail grid */
+  .pd-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}
+  @media(max-width:960px){.pd-grid{grid-template-columns:1fr}}
+  .pd-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .pd-card.done{border-left:3px solid var(--ok)}
+  .pd-card.run{border-left:3px solid var(--brand)}
+  .pd-card.next{border-left:3px solid var(--ink-3)}
+  .pd-card .ph{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:4px}
+  .pd-card .pd{font-size:10.5px;font-family:var(--font-mono);color:var(--ink-3);margin-bottom:8px}
+  .pd-card .pil{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-weight:600;letter-spacing:.04em;margin-bottom:6px}
+  .pil.done{background:var(--ok-soft);color:oklch(.4 .13 152)}
+  .pil.run{background:var(--brand-soft);color:var(--brand-ink)}
+  .pil.next{background:var(--bg-soft);color:var(--ink-3)}
+  .pd-card .pl{font-size:11.5px;color:var(--ink-2);line-height:1.65}
+  .pd-card .pl li{margin-bottom:3px}
+
+  /* future table */
+  .fut-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0}
+  @media(max-width:800px){.fut-grid{grid-template-columns:1fr}}
+  .fut-card{background:var(--bg-soft);border:1px dashed var(--line-2);border-radius:10px;padding:14px 16px}
+  .fut-card .fh{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  .fut-card .fp{font-size:11px;color:var(--ink-2);line-height:1.6}
+  .fut-card .est{font-size:10px;font-family:var(--font-mono);color:var(--ink-3);background:var(--surface);padding:2px 8px;border-radius:4px;display:inline-block;margin-top:6px}
+</style>
+
+<div class="wrap">
+  <div class="roadmap">
+    <h5>⏱ 总体规划路线图 · 四阶段</h5>
+    <div class="rm-timeline">
+      <div class="rm-track"></div>
+      <div class="rm-track-fill" style="width:75%"></div>
+      <div class="rm-phase">
+        <div class="rm-dot done"></div>
+        <div class="rm-label">Phase A</div>
+        <div class="rm-date">2026-05-08 → 05-09</div>
+        <div class="rm-items">静态 HTML mock<br><b>17 页</b> · 14 骨架<br>token 体系 · 4 轨并行</div>
+      </div>
+      <div class="rm-phase">
+        <div class="rm-dot done"></div>
+        <div class="rm-label">Phase B</div>
+        <div class="rm-date">2026-05-09 → 05-10</div>
+        <div class="rm-items">Vite + React 基座<br><b>P0-P5</b> + PB-R1~R3<br>18 页装配 · 3 轮 reviewer</div>
+      </div>
+      <div class="rm-phase">
+        <div class="rm-dot done"></div>
+        <div class="rm-label">Phase C</div>
+        <div class="rm-date">2026-05-11</div>
+        <div class="rm-items">后端集成<br><b>5 里程碑</b> · 9 hooks<br>VCS · AI · 导出 · 3 端点</div>
+      </div>
+      <div class="rm-phase">
+        <div class="rm-dot next"></div>
+        <div class="rm-label">Phase D</div>
+        <div class="rm-date">2026-05-12 → 05-18</div>
+        <div class="rm-items">收尾打磨<br><b>7 项待办</b> · WBS<br>toast · 测试 · 文档</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pd-grid">
+    <div class="pd-card done">
+      <span class="pil done">✓ DONE</span>
+      <div class="ph">Phase A · 静态 HTML 原型</div>
+      <div class="pd">2026-05-08 → 05-09 · 4 轨并行 · 17 页</div>
+      <ul class="pl">
+        <li>tokens.css · components.css · layout.css 三件套</li>
+        <li>14 页 HTML 骨架（login / home / 6 list / 7 detail）</li>
+        <li>mock/data.js 1190 行 · 13 类数据冻结</li>
+        <li>W0-W8 全部 DONE · A/B/C 三轨 + W8a 深化</li>
+        <li>验收：1280/1440/1920 三档 · token grep 0</li>
+      </ul>
+    </div>
+    <div class="pd-card done">
+      <span class="pil done">✓ DONE</span>
+      <div class="ph">Phase B · React 框架 + 组件落地</div>
+      <div class="pd">2026-05-09 → 05-10 · Vite 5 + React 18.3</div>
+      <ul class="pl">
+        <li>Vite 基座 · react-router-dom 6 · apiClient 封装</li>
+        <li>P0-P5 12 组件 + 18 页面装配（2080 行）</li>
+        <li>PB-R1/R2/R3 三轮 reviewer 走查闭环</li>
+        <li>inline grid sweep · hex token 清零 · button type 全量</li>
+        <li>三线冒烟 29/29 PASS · Phase B 正式收官</li>
+      </ul>
+    </div>
+    <div class="pd-card done">
+      <span class="pil done">✓ DONE</span>
+      <div class="ph">Phase C · 后端集成</div>
+      <div class="pd">2026-05-11 · 9 hooks + 3 端点 + 双端修复</div>
+      <ul class="pl">
+        <li>M1 · 4 列表页 Hook 接后端 + 新建/刷新</li>
+        <li>M2 · 详情页 mock 泄漏修复（hasRealData 守卫）</li>
+        <li>M3 · VCS 6 操作全线接后端 + 导出/版本历史</li>
+        <li>M4 · AI 全线消 alert → 真 API（7 端点调通）</li>
+        <li>后端 3 缺失端点补缺 + V0_SAAS 登录/导出修复</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="roadmap" style="margin-top:0">
+    <h5>📋 Phase D · 收尾打磨计划（2026-05-12 → 05-18）</h5>
+    <div class="fut-grid">
+      <div class="fut-card">
+        <div class="fh"><span style="font-size:16px">🟡</span>P1 · WBS 详情页</div>
+        <div class="fp">WbsList.jsx onRowClick 当前为 alert 占位。新建 WbsDetail.jsx + useWbsDetail.js Hook，按 §6.10 原型落地 WBS 分解 + 迷你甘特。</div>
+        <div class="est">预估 1 天</div>
+      </div>
+      <div class="fut-card">
+        <div class="fh"><span style="font-size:16px">🟡</span>P1 · alert() → toast 通知系统</div>
+        <div class="fp">SystemManagement 8 处 + ReviewDetail 7 处 + HomePage 2 处 + WBS 详情 N 处。新建 ToastProvider + useToast Hook，全局替换 alert 为 toast（success/error/warning/info 四态）。</div>
+        <div class="est">预估 0.5 天</div>
+      </div>
+      <div class="fut-card">
+        <div class="fh"><span style="font-size:16px">🟠</span>P2 · exports/history 持久化</div>
+        <div class="fp">exports.usecase.ts 当前 history 返回空列表。接入导出文件元数据存储（JSON 文件或内存 store），支持分页 + 按 userId 过滤。</div>
+        <div class="est">预估 0.5 天</div>
+      </div>
+      <div class="fut-card">
+        <div class="fh"><span style="font-size:16px">🟠</span>P2 · 版本历史端点后端化</div>
+        <div class="fp">当前前端 client-side filter GET /versions 按 baseCode 聚合。新增 GET /versions/:baseCode/history 端点，返回结构化历史列表（含版本号 + 时间 + 操作人）。</div>
+        <div class="est">预估 0.5 天</div>
+      </div>
+      <div class="fut-card">
+        <div class="fh"><span style="font-size:16px">🟠</span>P2 · Toast 通知 + 全局对话框统一</div>
+        <div class="fp">统一 confirm dialog 组件（当前散落 AlertDialog / window.confirm），接入 toast 体系。SystemManagement 的 8 个操作成功通知全部走 toast。</div>
+        <div class="est">预估 0.3 天</div>
+      </div>
+      <div class="fut-card">
+        <div class="fh"><span style="font-size:16px">🔵</span>P3 · V0_SAAS 根路径修复</div>
+        <div class="fp">Next.js dev 模式 redirect("/dashboard") 被 error boundary 捕获 → 404。改为客户端 router.push 或 middleware rewrite 方案。</div>
+        <div class="est">预估 0.2 天</div>
+      </div>
+      <div class="fut-card">
+        <div class="fh"><span style="font-size:16px">🔵</span>P3 · 端到端测试 + 用户验收文档</div>
+        <div class="fp">Playwright e2e：4 核心流程（登录→新建方案→评估→导出）。更新 USER_TEST_MANUAL.md，补充 Phase C 新增功能的验收用例。</div>
+        <div class="est">预估 1 天</div>
+      </div>
+      <div class="fut-card">
+        <div class="fh"><span style="font-size:16px">🔵</span>P3 · 性能优化 + 包体积</div>
+        <div class="fp">Vite build 分析：代码分割（react-router lazy）、mock 数据按需加载。当前 build 323ms 已良好，关注 runtime 首屏。</div>
+        <div class="est">预估 0.5 天</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="roadmap" style="margin-top:0">
+    <h5>⏳ 时间线总览</h5>
+    <table class="checklist" style="margin:0">
+      <thead><tr><th style="width:100px">阶段</th><th style="width:140px">日期</th><th>核心交付</th><th style="width:90px">状态</th></tr></thead>
+      <tbody>
+        <tr><td><b>Phase A</b></td><td class="mono">05-08 → 05-09</td><td>17 静态 HTML · tokens.css · mock/data.js 1190 行 · 4 轨并行</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr><td><b>Phase B</b></td><td class="mono">05-09 → 05-10</td><td>Vite + React 18 基座 · 12 组件 · 18 页装配 · 3 轮 reviewer 闭环</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr style="background:var(--brand-soft)"><td><b>Phase C</b></td><td class="mono">05-11</td><td>9 hooks 接后端 · VCS/AI/导出全线调通 · 3 端点补缺 · 双端兼容修复</td><td><span class="st done" style="background:var(--brand-soft)"><span class="dot" style="background:var(--brand)"></span>DONE</span></td></tr>
+        <tr><td><b>Phase D</b></td><td class="mono">05-12 → 05-18</td><td><b>W1</b>（05-12/13）WBS 详情 + toast 系统 + exports 持久化 · <b>W2</b>（05-14/15）版本历史端点 + 全局对话框 + V0_SAAS 修复 · <b>W3</b>（05-16/18）e2e 测试 + 文档 + 性能优化</td><td><span class="st todo"><span class="dot"></span>PLANNED</span></td></tr>
+        <tr style="border-top:2px solid var(--line-2)"><td><b>🎯 v1.0 发布</b></td><td class="mono">05-19</td><td>V2_PROTOTYPE 切为正式前端 · V0_SAAS 归档 · 全量 e2e 通过 · 用户验收签字</td><td><span class="st todo"><span class="dot"></span>TARGET</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout acc" style="margin-top:18px">
+    <div>
+      <b>Phase D 优先级说明</b>
+      🟡 P1 — 阻塞项（WBS 详情页缺失，用户无法访问）· 🟠 P2 — 体验债（alert/toast/对话框统一、端点补全）· 🔵 P3 — 锦上添花（测试/文档/性能/polish）· 🎯 v1.0 发布条件：P1+P2 全部 DONE + e2e 通过 = 可切正式前端。
+    </div>
   </div>
 </div>
 
@@ -3273,15 +3461,15 @@ V0_SAAS 现有 Button 是 shadcn 默认 6 变体，但实际页面散落 9 种�
     </table>
 
     <div class="pb-meta" style="grid-template-columns:repeat(5,1fr)">
-      <div class="it done"><div class="v">19</div><div class="lb">DONE</div></div>
-      <div class="it run"><div class="v">4</div><div class="lb">PHASE B</div></div>
-      <div class="it done"><div class="v">6</div><div class="lb">DONE</div></div>
+      <div class="it done"><div class="v">33</div><div class="lb">DONE</div></div>
+      <div class="it done"><div class="v">0</div><div class="lb">PHASE B</div></div>
+      <div class="it run"><div class="v">0</div><div class="lb">RUNNING</div></div>
       <div class="it block"><div class="v">0</div><div class="lb">BLOCKED</div></div>
-      <div class="it"><div class="v" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--ink-2);line-height:1.3">2026-05-10<br><span style="font-size:11px;color:var(--ok)">PB-R2 ✓ 17 页闭环</span></div><div class="lb">LAST UPDATE</div></div>
+      <div class="it"><div class="v" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--ink-2);line-height:1.3">2026-05-11<br><span style="font-size:11px;color:var(--brand)">Phase C 后端集成 · 新前端 4 列表 + 4 详情 + AI 全量接后端 ✓</span></div><div class="lb">LAST UPDATE</div></div>
     </div>
 
     <h3 style="margin-top:28px">9.3 任务清单 · 按 Phase A 派发顺序</h3>
-    <p style="color:var(--ink-2);font-size:13px;margin:0 0 6px">每行 = 一个独立可派发任务；状态机 <code class="inline">TODO → RUNNING → DONE</code>（或 <code class="inline">BLOCKED</code>）。Phase B 不在本表展开 — 等所有 Phase A 完成后另列 §9.7 Phase B schedule。</p>
+    <p style="color:var(--ink-2);font-size:13px;margin:0 0 6px">每行 = 一个独立可派发任务；状态机 <code class="inline">TODO → RUNNING → DONE</code>（或 <code class="inline">BLOCKED</code>）。Phase B 全部完成 — PB-R1 + PB-R2 + PB-R3 全部落地 · 详细见下方任务行与 §9.7 归档。</p>
     <table class="pb">
       <thead><tr><th class="wk">#</th><th>任务（Phase A）</th><th style="width:160px">读取章节</th><th style="width:140px">交付物</th><th style="width:90px">状态</th></tr></thead>
       <tbody>
@@ -3301,8 +3489,18 @@ V0_SAAS 现有 Button 是 shadcn 默认 6 变体，但实际页面散落 9 种�
         <tr class="done"><td class="wk">P1</td><td><b>Phase B · 18 页装配 + 路由 + Layout + mock 联通</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">App.jsx 18 路由 / Shell + PageShell SaaS 壳 / 18 个 pages/*.jsx（AssessmentDetail 312 行组装 10 组件 · ResourceCostDetail 210 · SystemManagement 177 · ReviewDetail 170 · RequirementDetail 162 · HomePage 145 等，共 2080 行）/ mock/assessmentData.js 严格按 v3 §2-§5 数据结构</div></td><td class="ref">§3 hub + v3 §2-§5</td><td class="out">src/App.jsx + Layout/Shell.jsx + 18 pages<br>(2080 行)</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
         <tr class="done"><td class="wk">PB-R1</td><td><b>Phase B · assessment-detail v3 reviewer 复验补丁</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">Reviewer 初核：14 项中 7 DONE / 4 部分 / 3 严重偏差；已修 7 项偏差（mini bar 组织数 + 难度 ≥1.3、只读 emerald-50、三层路径级联、SKU 非整行点击、DSL 一键修复 + 签入/导出禁用、AI 紫族 oklch(.62 .20 320)）· Build 通过 · token grep 0 · console [] · 1280/1440/1920 复验无破图</div></td><td class="ref">v3 §2-§5 reviewer</td><td class="out">7 个 Assessment<br>组件补丁</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
         <tr class="done"><td class="wk">PB-R2</td><td><b>Phase B · 17 页 reviewer 闭环严重项</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">Reviewer 三色矩阵：27 严重 + 30 轻度。本批闭环 4 批：批 0 横向 quick-wins（Router future flags / vite proxy 修 /api-keys / WbsList 路由保护）· 批 1 ListPage.jsx 共性（PB-R1 标准行选择 / 选中浮 actions / filter 真过滤）→ 治愈 7 list 页 · 批 2 HomePage 深度（VCS 9 toolbar + 3 dialog 新建/引导/ER + 1180/760 响应式）· 批 3 4 单页（ResourceCostDetail 全套 VCS / WbsList 迷你甘特 / ReviewDetail 驳回 dialog + 印章状态机 / HistoryList 8 mock + 相似度进度条）· Build ✓ · token grep 0 · 6 严重项延 PB-R3 深度页</div></td><td class="ref">v3 / §6 / §08 reviewer</td><td class="out">10 文件改动<br>17 页 8 严重闭环</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
-      </tbody>
-    </table>
+        <tr class="done"><td class="wk">PB-R3</td><td><b>Phase B · 5 批闭环剩余 11 严重项 + inline grid sweep</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">R3-A · UserManagement + ApiKeys（行选择 / 批量操作 / 降权保护 / 搜索 / 复制 / 状态机）· R3-B · DevAssessmentDetail + SystemManagement（AI 紫族下拉 / RBAC gate / 提示词三 tab dialog / 第三模型卡 / DSL toggle / 模板卡）· R3-C · RequirementDetail 严格重做 262 行（Kimi-help 紫族 4 dialog / 6+1 区 / VCS 8 按钮 / AI Copilot 右栏）· R3-D · AssessmentDetail PageShell + 4 占位 tab 填实（变更对比 diff / DSL 规则审阅 / 五段叙事 / 附件 SOW）· R3-E · Inline grid 全局 sweep（4 utility 类 + 1180/760 双断点 / 7 页替换 / 命中 20+ → 8）· Build 全批通过 · token grep 0 · console 0 error</div></td><td class="ref">v3 / §6 / §08 reviewer + PB-R3 spec</td><td class="out">10 文件改动<br>+2034 / -385</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">PB-R3-HF</td><td><b>Phase B · RequirementDetail 视觉复刻 hotfix</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">针对 <code class="inline">/requirements/RQ-04001</code> 人工走查偏差：Tabs 从 6 项纠正为 §6.5 mock 的 4 项（条目明细 / 版本历史 / 变更对比 / 附件·访谈纪要）· 区块标签从压线 badge 改为左侧竖排 rail label · 条目明细主内容复刻 §6.5 panel 结构（版本与上下文 / 基本情况 / 价值主张 / 业务范围表 / EXTRA 4+1）· 右栏换成完整度 donut + AI Copilot + 版本时间轴 · 侧栏退出按钮收进用户信息行右侧 · Build ✓ · token grep 0 · 1280 复验无破图</div></td><td class="ref">§6.5 reviewer hotfix</td><td class="out">RequirementDetail.jsx<br>+ Shell.jsx/layout.css</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">DOCS</td><td><b>Codex 并行审计 · API 对齐 + Smoke test checklist</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">Task #1 · api-alignment-audit.md（345 行 · apps/api 13 routes / 150 endpoint 全量清点 + mock 字段对照 + cutover 分批建议）· Task #2 · smoke-test-checklist.md（490 行 · 18 路由 × 4 类检查 = 261 checkbox）· 0 代码改动 · 零冲突并行产出</div></td><td class="ref">apps/api/src/routes/* + src/mock/* + src/pages/*.jsx</td><td class="out">docs/PB-R3-PARALLEL/<br>3 文件（854 行）</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">CLEAN</td><td><b>Git 大清理 · working tree 杂项归零 + 工具配置入库</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">Commit 1 · 归档对话流程 + 删除废弃 apple-ui-preview 原型（17 文件 / -976）· Commit 2 · 修正根 package.json 错位依赖（还原）· Commit 3 · .claude/launch.json + skills/ + WES Landing Page + .gitignore 规范（10 文件 / +2029）· 收尾 4 残留文件（cursor rules / stagewise / users.json / next-env.d.ts）</div></td><td class="ref">root + ui/ + config/ + .cursor/ + .claude/</td><td class="out">4 commits<br>working tree → 0</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">SMOKE</td><td><b>PB-R3 冒烟验收 · 三线并行</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">KIMI CODE Batch A（6/6 PASS · build + token + 路由 + 断点 + import + 硬编码色值）· ChatGPT Batch B（15/15 PASS · mock 数据自洽 + 组件契约 + UX 纸面审计）· Claude 核心审计（8/8 PASS · DevServer 运行时 + token 深度扫描 + 路由 200 验证 + grid/PageShell/Tabs 结构）· 0 阻断 · 产出 dispatch-kimi-batch-a.md / dispatch-chatgpt-batch-b.md / smoke-batch-a-kimi.md / smoke-batch-b-chatgpt.md 共 4 文件</div></td><td class="ref">docs/PB-R3-PARALLEL/<br>+ src/ 全量</td><td class="out">4 报告文件<br>29/29 PASS</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">PC-LIST</td><td><b>Phase C · 4 列表页 Hook 全量接后端 + 新建/刷新</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">useAssessmentList / useRequirementList / useResourceCostList / useDevAssessmentList：4 个 Hook 全部重写为 useCallback + useEffect + cancelled 竞态防护模式 · 每个 Hook 支持 load（GET 列表）、create（POST 新建）、refetch（刷新）· 响应三层解包 <code class="inline">payload?.data?.record || payload?.data?.items || payload?.data</code> · DevAssessment ID 字段兼容 <code class="inline">record.id || record.devAssessmentId || record.assessmentVersionId</code> · 4 列表页组件 + 新建 / ⟳ 刷新按钮 + create → navigate(id) 跳转 · Build ✓ · 新建按钮不再显示 mock 数据</div></td><td class="ref">§7.2 后端端点 + §6.4 列表</td><td class="out">4 hooks + 4 pages<br>+ 2 后端端点补缺</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">PC-DETAIL</td><td><b>Phase C · 4 详情页 Hook 全量接后端 + mock 泄漏修复</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">useAssessmentDetail：<b>两处关键修复</b>——① useEffect 解耦：record 拉取独立 try/catch，失败才走 full fallback；template/ruleset/calculate 容错降级，任意失败仍用 record 渲染 ② <code class="inline">buildVm</code> mock 泄漏：新增 <code class="inline">hasRealData</code> 守卫，空 record（新建）不再把 fallback.projectName「金石制造」等 mock 值漏出 · useRequirementDetail：parseFile（multipart upload）/ previewAssessment / applyTemplate / fixAmbiguity / aiChat 5 个 AI 函数接 <code class="inline">POST /ai/parse-basic-info</code> / <code class="inline">POST /ai/kimi-assessment/preview</code> / <code class="inline">POST /ai/chat</code> · useDevAssessmentDetail：aiSkuSuggest + aiHistorySuggest 接 <code class="inline">POST /ai/chat</code> + <code class="inline">GET /history/similar</code> · useSystemManagement：testPrompt / savePrompts 接 <code class="inline">POST /ai/chat</code> + <code class="inline">PATCH /system/requirement-settings/draft</code> · 所有 Hook 遵循 <code class="inline">withAction(key, task)</code> 异步加载态模式</div></td><td class="ref">§3 hub + v3 §2-§5 + §7.2 AI</td><td class="out">5 hooks 重写<br>+ 5 pages 联调</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">PC-BACK</td><td><b>Phase C · 后端补缺 · 3 个缺失端点 + 1 个桩代码修复</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">① <b>GET /versions/:id</b>（versions.usecase.ts · 37 行）：新增单版本查询 + ownerUserId 校验 + toPublicVersionRecord 脱敏 → 路由注册在 GET / 之前避免冲突 → 修复新建记录 404 回退 mock 的根因 · ② <b>GET /downloads/:fileName</b>（exports.usecase.ts · 66 行）：原 exports.module.ts 直接写 <code class="inline">res.status(501)</code> 桩 → 重写为 requireAuth JWT 鉴权 + resolveDownloadFile 用户归属校验（userId__ 前缀）+ fs.createReadStream 流式下载 + Content-Disposition UTF-8 文件名 · ③ <b>GET /exports/history</b>：返回空列表 ok 结构，不再 501 · ④ <b>users.json 密码重置</b>：mjlkevin 密码 bcrypt → admin123（V0_SAAS 登录修复）</div></td><td class="ref">apps/api/src/modules/<br>versions/ + exports/</td><td class="out">3 端点实现<br>+ 1 密码重置</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">PC-VCS</td><td><b>Phase C · VCS 全线接后端 + 版本历史 + 导出下载</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">useAssessmentDetail VCS 6 操作全量接后端：checkout（POST /versions/:id/checkout）→ isReadonly false / checkin（POST /versions/:id/checkin）→ isReadonly true / undoCheckout（POST /versions/:id/undo-checkout）/ promote（POST /versions/:id/promote）→ refetch / forceUnlock（PATCH /versions/:id/force-unlock）/ saveDraft（PATCH /versions/:id/save-draft）→ hasLocalChanges false · 版本历史 dialog：客户端 filter GET /versions?type=... 按 baseCode 聚合 + recordsToVersionHistoryRows · 导出下载：calculateAndExport → downloadUrl → downloadWithAuth Blob + URL.createObjectURL + 临时 &lt;a&gt; 触发 · utils/download.js：downloadJSON / downloadCSV（BOM 中文编码）</div></td><td class="ref">apps/api/src/routes/<br>versions.routes.ts</td><td class="out">1 hook VCS<br>+ 2 工具函数</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">PC-AI</td><td><b>Phase C · AI 功能全线消 alert → 真 API</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">全局消弹窗：RequirementDetail 4 个 Kimi dialog（D1 解析需求 / D2 评估预览 / D3 套用模板 / D4 修复歧义）+ AI Copilot 右栏「应用建议」「查看依据」→ 全部接 <code class="inline">POST /ai/chat</code> + <code class="inline">POST /ai/parse-basic-info</code>（multipart）+ <code class="inline">POST /ai/kimi-assessment/preview</code> · DevAssessmentDetail AI toolbar「按 SKU 推断」「按历史补充」→ <code class="inline">POST /ai/chat</code> + <code class="inline">GET /history/similar</code> · SystemManagement 提示词 dialog「测试」→ <code class="inline">POST /ai/chat</code> + 「保存」→ <code class="inline">PATCH /system/requirement-settings/draft</code> · 所有 AI 调用走 <code class="inline">withAction</code> 模式 + 结果 JSON modal 展示 · 原 ~30 alert() 桩 → ~23（WBS 详情 / SystemManagement 8 / ReviewDetail 7 / HomePage 2 仍为 alert，属 PB-R3 后续遗留）</div></td><td class="ref">apps/api/src/routes/<br>ai.routes.ts</td><td class="out">3 详情页 AI<br>全线接后端</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+        <tr class="done"><td class="wk">POLISH</td><td><b>PB-R3 修整 · Hex token + button type + KPI + bdg</b><div style="color:var(--ink-3);font-size:11px;margin-top:2px">3 个 Phase A 旧组件 9 处 hex 硬编码色值 → token（ProjectIdentityCard / KpiCards / PathBreadcrumb）· 20 文件 ~115 button 全量加 type="button" · HomePage 方案数 12→6 与 PLANS.length 对齐 · components.css 补 .bdg.muted / .bdg.brd 定义 · Build ✓ · token grep 0</div></td><td class="ref">src/components/*<br>+ src/pages/*</td><td class="out">4 项修复<br>20+ 文件</td><td><span class="st done"><span class="dot"></span>DONE</span></td></tr>
+      </tbody>    </table>
     <div class="callout acc">
       <div>
         <b>派发原则</b>
@@ -3783,6 +3981,9 @@ PM 印章 / 接力按钮 <b>不需要</b>紫色族；用 <span class="v">--brand
       <thead><tr><th class="wk">#</th><th>任务</th><th style="width:140px">交付物</th><th style="width:140px">完成时间</th></tr></thead>
       <tbody>
         <tr class="done"><td class="wk">PB-R1</td><td><b>Phase B · assessment-detail v3 reviewer 复验补丁</b><div style="color:var(--ink-3);font-size:11px">对照 v3 §2-§5 核对 <code class="inline">/assessments/ASM-018</code>：初核 14 项 = 7 完全对齐 / 4 轻度偏差 / 3 严重偏差；已完成补丁：ParamMiniBar 四项 mini bar + 难度 ≥1.3 阈值、ProjectIdentityCard 只读 emerald-50、PathBreadcrumb 报价模式→预置→云产品级联、SkuTable 取消整行点击、DslBanner 一键修复、VcsToolbar DSL 未通过禁用签入/导出、AiCopilot 改 <code class="inline">oklch(.62 .20 320)</code> 紫族 · build / token / console / 1280-1920 复验通过</div></td><td class="out">Assessment<br>7 组件补丁</td><td class="ref">2026-05-10</td></tr>
+        <tr class="done"><td class="wk">PB-R3-HF</td><td><b>Phase B · RequirementDetail 视觉复刻 hotfix</b><div style="color:var(--ink-3);font-size:11px">对照 §6.5 mock 复核 <code class="inline">/requirements/RQ-04001</code>：修正标签栏 4 项形态、区块标签压线、侧栏退出按钮位置；条目明细主内容重排为 panel/header/body 体系，包含版本与上下文 pmstrip、基本情况纯文本字段网格、价值主张 3 行、业务范围需求条目表、EXTRA 4+1 dashed panel；右栏同步为完整度 donut / AI Copilot / 版本时间轴。验证：<code class="inline">npm run build</code> 通过 · token grep 0 · console 无 error/warning · 1280 截图复验无破图</div></td><td class="out">RequirementDetail.jsx<br>Shell.jsx + layout.css</td><td class="ref">2026-05-10</td></tr>
+        <tr class="done"><td class="wk">SMOKE</td><td><b>PB-R3 冒烟验收 · 三线并行</b><div style="color:var(--ink-3);font-size:11px">KIMI CODE Batch A（6/6 PASS · build/token/路由/断点/import/色值）· ChatGPT Batch B（15/15 PASS · mock 自洽/组件契约/UX 纸面）· Claude 核心（8/8 PASS · DevServer 运行时/token 深度/路由 200/grid/PageShell/Tabs）· 0 阻断 · 产出 4 份报告至 docs/PB-R3-PARALLEL/</div></td><td class="out">4 报告文件<br>29/29 PASS</td><td class="ref">2026-05-10</td></tr>
+        <tr class="done"><td class="wk">POLISH</td><td><b>PB-R3 修整 · hex token + button type + KPI + bdg CSS</b><div style="color:var(--ink-3);font-size:11px">3 个 Phase A 旧组件 9 处 hex → token（ProjectIdentityCard/KpiCards/PathBreadcrumb）· 20 文件 ~115 button 全量 type="button" · HomePage 方案数 12→6 · components.css .bdg.muted/.bdg.brd 补齐 · Build ✓ · token grep 0</div></td><td class="out">4 项修复<br>20+ 文件</td><td class="ref">2026-05-10</td></tr>
         <tr class="done"><td class="wk">W0-1</td><td><b>Phase 1 收尾 + mock/data.js + 14 页骨架</b><div style="color:var(--ink-3);font-size:11px">components.css 70→118 · layout.css 30→57 · mock/data.js 100 · 14 页骨架 · index.html 导航中心</div></td><td class="out">14 个 .html<br>+ mock/data.js</td><td class="ref">2026-05-08</td></tr>
         <tr class="done"><td class="wk">W0-1.1</td><td><b>layout 修正 · SaaS 全屏 shell</b><div style="color:var(--ink-3);font-size:11px">.shell 改 100vh grid · 侧栏贴左占满全高 · 删 topbar · 内容铺满 · 16 页同步</div></td><td class="out">layout.css +<br>16 页 shell</td><td class="ref">2026-05-08</td></tr>
         <tr class="done"><td class="wk">W1</td><td><b>login.html · Phase A</b><div style="color:var(--ink-3);font-size:11px">居中品牌渐变卡 + 登录↔注册 toggle + 邀请码 + autoComplete + vanilla JS 占位</div></td><td class="out">pages/login.html<br>(87 行)</td><td class="ref">2026-05-08</td></tr>
@@ -3798,14 +3999,14 @@ PM 印章 / 接力按钮 <b>不需要</b>紫色族；用 <span class="v">--brand
       </tbody>
     </table>
 
-    <h3 style="margin-top:28px">9.6 Phase A 收官 · Phase B 进行中</h3>
-    <p style="color:var(--ink-2);font-size:13px">Phase A 全部 17 项 DONE ✅ · Phase B 已启动 · 框架：<b>Vite + React 18 + react-router</b> · 端口 3003</p>
+    <h3 style="margin-top:28px">9.6 Phase A + Phase B 已收官 · Phase C 进行中</h3>
+    <p style="color:var(--ink-2);font-size:13px">Phase A 全部 17 项 DONE ✅ · Phase B P0~P5 + PB-R1~R3 全部完成 ✅ · 框架：<b>Vite + React 18 + react-router</b> · 端口 <b>3002</b>（3003 已废弃）</p>
     <div style="padding:18px 22px;background:var(--bg-soft);border:1px dashed var(--line-2);border-radius:12px;color:var(--ink-3);font-size:12.5px;text-align:center;font-family:var(--font-mono);letter-spacing:.04em">
-      🎉 Phase A 全部收官 ✅ · Phase B P0~P5 全部完成 ✅ · reviewer 复验补丁已归档
+      🎉 Phase A 全部收官 ✅ · Phase B P0~P5 + PB-R1~R3 全部完成 ✅ · Phase C 后端集成已完成 5/5 里程碑 ✅
     </div>
 
-    <h3 style="margin-top:28px">9.7 Phase B Schedule（执行中 · 2026-05-10）</h3>
-    <p style="color:var(--ink-2);font-size:13px;max-width:820px;margin:0 0 8px">框架已拍板：<b>Vite 5 + React 18.3 + react-router-dom 6</b> · 端口 3003 · <code class="inline">/api</code> 代理到 <code class="inline">localhost:3000</code></p>
+    <h3 style="margin-top:28px">9.7 Phase B Schedule（已收官 · 2026-05-10）+ Phase C（2026-05-11）</h3>
+    <p style="color:var(--ink-2);font-size:13px;max-width:820px;margin:0 0 8px">框架已拍板：<b>Vite 5 + React 18.3 + react-router-dom 6</b> · 端口 <b>3002</b>（原 3003 已废弃）· <code class="inline">/api</code> 代理到 <code class="inline">localhost:3000</code></p>
     <table class="checklist">
       <thead><tr><th style="width:80px">优先级</th><th>项目</th><th>来源</th><th>状态</th><th>说明</th></tr></thead>
       <tbody>
@@ -3815,14 +4016,124 @@ PM 印章 / 接力按钮 <b>不需要</b>紫色族；用 <span class="v">--brand
         <tr><td><span class="st done"><span class="dot"></span>DONE</span></td><td><b>P3 · resource-cost-detail 月份表 overflow-x</b></td><td>走查偏差 #1</td><td>✅ 完成</td><td>HTML + React 双端加 <code class="inline">overflow-x:auto</code> wrapper · build 通过</td></tr>
         <tr><td><span class="st done"><span class="dot"></span>DONE</span></td><td><b>P4 · 断点系统统一</b></td><td>dev/history/review-detail</td><td>✅ 完成</td><td>1080/1100px → 1180+760 双断点 · 三文件同步 · build 通过</td></tr>
         <tr><td><span class="st done"><span class="dot"></span>DONE</span></td><td><b>P5 · assessment-detail v3 reviewer 复验补丁</b></td><td>本次人工核对</td><td>✅ 完成</td><td>初核 3 严重 + 4 轻度偏差均已修；复验：<code class="inline">npm run build</code> 通过 · token grep 0 · DevTools console [] · 1280/1440/1920 无破图</td></tr>
-      </tbody>
+              <tr style="border-top:2px solid var(--brand)"><td><span class="st done"><span class="dot"></span>DONE</span></td><td><b>PB-R1 · v3 reviewer 复验补丁</b></td><td>reviewer 走查</td><td>✅ 完成</td><td>7 组件对齐 · commit 3ff3aee</td></tr>
+        <tr><td><span class="st done"><span class="dot"></span>DONE</span></td><td><b>PB-R2 · 17 页 reviewer 闭环严重项</b></td><td>reviewer 走查</td><td>✅ 完成</td><td>4 批方案 B · 17 页同步 · commit 23b1974</td></tr>
+        <tr><td><span class="st done"><span class="dot"></span>DONE</span></td><td><b>PB-R3 · 5 批闭环全部 11 严重项 + inline grid sweep</b></td><td>reviewer 走查</td><td>✅ 完成</td><td>RequirementDetail 262 行 + AssessmentDetail 387 行 + 4 grid 工具类 + Codex 并发审计 854 行 · commit 8a77691</td></tr>
+        <tr><td><span class="st done"><span class="dot"></span>DONE</span></td><td><b>PB-R3-HF · RequirementDetail 视觉复刻补丁</b></td><td>人工走查</td><td>✅ 完成</td><td>Tabs / rail label / 条目明细 panel 体系 / 右栏 / 侧栏退出位置 · build ✓ · token grep 0 · 1280 截图复验</td></tr>
+</tbody>
     </table>
     <div class="callout">
       <div>
         <b>Phase B 决策记录</b>
-        ① 框架：Vite + React 18（非 Next.js）· ② 端口 3003 · ③ 共享后端 apps/api:3000 · ④ tokens.css 是唯一真源，不可在 Phase B 调整 · ⑤ W5 assessment-detail 基础版通过，v3 严格对齐作为 Phase B 首项（Kevin 2026-05-09 拍板）· ⑥ 2026-05-10 reviewer 复验补丁已闭环
+        ① 框架：Vite + React 18（非 Next.js）· ② 端口 3003 · ③ 共享后端 apps/api:3000 · ④ tokens.css 是唯一真源，不可在 Phase B 调整 · ⑤ W5 assessment-detail 基础版通过，v3 严格对齐作为 Phase B 首项（Kevin 2026-05-09 拍板）· ⑥ 2026-05-10 PB-R1 → PB-R2 → PB-R3 全部闭环，Phase B 正式收官 · ⑦ PB-R3-HF 记录需求详情页视觉复刻补丁（Codex 执行），作为人工走查后的收尾修正 · ⑧ 2026-05-10 三线并行冒烟验收通过（KIMI CODE 6/6 + ChatGPT 15/15 + Claude 8/8 / 0 阻断）+ 修整闭环（hex token 9 处 / button type ~115 / KPI 对齐 / bdg CSS 补齐），PB-R3 正式达到可切后端状态
       </div>
     </div>
+
+    <h3 style="margin-top:28px">9.8 Phase C · 后端集成（2026-05-11 进行中）</h3>
+    <p class="lead">Phase B PB-R3 完成后，前端框架 + 18 页 + mock 体系全部就位。本阶段将 <b>V2_PROTOTYPE（新前端，端口 3002）</b>全量接 <b>apps/api（后端，端口 3000）</b>，同时修复 <b>V0_SAAS（旧前端，端口 3001）</b>的回归 bug。双端并行，以新前端为主战场。</p>
+
+    <h4 style="margin-top:20px">9.8.1 架构总览 · 三层 Hook 模式</h4>
+    <p style="color:var(--ink-2);font-size:13px;max-width:820px;margin:0 0 8px">新前端采用统一的<b>三层 Hook 架构</b>打通全链路：</p>
+    <table class="checklist">
+      <thead><tr><th style="width:100px">层级</th><th>文件</th><th>职责</th><th>关键模式</th></tr></thead>
+      <tbody>
+        <tr><td><b>Page</b></td><td><code class="inline">src/pages/*.jsx</code></td><td>纯 UI 渲染 + 事件绑定</td><td><code class="inline">const { rows, loading } = useXxxList({ fallbackData })</code></td></tr>
+        <tr><td><b>Hook</b></td><td><code class="inline">src/hooks/useAssessmentDetail.js</code> 等</td><td>状态管理 + API 调用 + 竞态防护</td><td><code class="inline">useCallback + useEffect + cancelled</code> race guard</td></tr>
+        <tr><td><b>apiClient</b></td><td><code class="inline">src/api/client.js</code></td><td>fetch 封装 + JWT 注入 + 错误映射</td><td><code class="inline">apiClient.get/post/patch/upload</code> → <code class="inline">unwrap()</code> / <code class="inline">asArray()</code></td></tr>
+      </tbody>
+    </table>
+
+    <h4 style="margin-top:20px">9.8.2 后端补缺（3 个端点 · 2026-05-11）</h4>
+    <table class="checklist">
+      <thead><tr><th>端点</th><th>文件</th><th>修复内容</th><th>影响</th></tr></thead>
+      <tbody>
+        <tr><td><code class="inline">GET /versions/:id</code></td><td>versions.usecase.ts + routes</td><td>新增 37 行：ownerUserId 校验 + toPublicVersionRecord 脱敏 + 路由在 GET / 之前注册</td><td>修复新建记录后详情页 404 → mock 回退的<b>根因之一</b></td></tr>
+        <tr><td><code class="inline">GET /downloads/:fileName</code></td><td>exports.usecase.ts + module.ts</td><td>原返回 <code class="inline">res.status(501).json({ error: "not implemented" })</code> → 重写 66 行：requireAuth JWT 鉴权 + userId__ 前缀归属校验 + fs.createReadStream 流式下载 + Content-Type 映射（.xlsx/.pdf/.json）+ Content-Disposition UTF-8 文件名</td><td>旧前端 + 新前端导出下载「下载失败(501)」修复</td></tr>
+        <tr><td><code class="inline">GET /exports/history</code></td><td>exports.usecase.ts</td><td>原返回 501 → 改为返回 <code class="inline">ok({ total: 0, items: [] })</code> 空列表</td><td>导出历史列表不再报错</td></tr>
+      </tbody>
+    </table>
+
+    <h4 style="margin-top:20px">9.8.3 V2_PROTOTYPE 接后端 · 核心里程碑</h4>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:14px 0">
+
+      <div style="background:#fff;border:1px solid var(--brand);border-radius:10px;padding:14px 16px">
+        <div style="font-size:10.5px;font-family:var(--font-mono);color:var(--brand);font-weight:700;letter-spacing:.06em;margin-bottom:6px">里程碑 M1 · 列表页 CRUD</div>
+        <div style="font-size:12.5px;line-height:1.7">
+          <b>4 个列表 Hook</b> 全量接后端：<br>
+          · <code class="inline">useAssessmentList</code> — GET /versions?type=assessment + POST /versions<br>
+          · <code class="inline">useRequirementList</code> — GET /versions?type=requirementImport + POST /versions<br>
+          · <code class="inline">useResourceCostList</code> — GET /versions?type=resource + POST /versions<br>
+          · <code class="inline">useDevAssessmentList</code> — GET /dev-assessments + POST /dev-assessments<br>
+          <b>关键修复</b>：响应三层解包 <code class="inline">payload?.data?.record</code> · DevAssessment ID 兼容 <code class="inline">devAssessmentId</code> · 新建按钮不再显示 mock
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid var(--accent);border-radius:10px;padding:14px 16px">
+        <div style="font-size:10.5px;font-family:var(--font-mono);color:var(--accent);font-weight:700;letter-spacing:.06em;margin-bottom:6px">里程碑 M2 · 详情页 mock 泄漏修复</div>
+        <div style="font-size:12.5px;line-height:1.7">
+          <b>useAssessmentDetail 两处关键修复</b>：<br>
+          · <b>Fix 1 — useEffect 解耦</b>：record fetch 独立 try/catch，失败才 full fallback；template/ruleset/calculate 容错降级，任意失败仍用 record 渲染<br>
+          · <b>Fix 2 — buildVm hasRealData 守卫</b>：空 record 不泄漏 fallback.projectName「金石制造」等 mock 值，productLines / params 等字段同保护<br>
+          · <b>双轨机制</b>：<code class="inline">enabled = isAuthenticated()</code> 控制是否请求后端 + <code class="inline">fallbackData</code> 降级
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid var(--teal);border-radius:10px;padding:14px 16px">
+        <div style="font-size:10.5px;font-family:var(--font-mono);color:var(--teal);font-weight:700;letter-spacing:.06em;margin-bottom:6px">里程碑 M3 · VCS 版本控制全通</div>
+        <div style="font-size:12.5px;line-height:1.7">
+          <b>useAssessmentDetail 6 个 VCS action</b>：<br>
+          · checkout → <code class="inline">POST /versions/:id/checkout</code> → isReadonly false<br>
+          · checkin → <code class="inline">POST /versions/:id/checkin</code> → isReadonly true<br>
+          · undoCheckout · promote（触发 refetch）· forceUnlock · saveDraft<br>
+          · 全部走 <code class="inline">withAction(key, task)</code> 异步加载态<br>
+          · 版本历史 dialog + 导出下载（Blob + &lt;a&gt; 触发）
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid oklch(0.62 0.20 320);border-radius:10px;padding:14px 16px">
+        <div style="font-size:10.5px;font-family:var(--font-mono);color:oklch(0.62 0.20 320);font-weight:700;letter-spacing:.06em;margin-bottom:6px">里程碑 M4 · AI 全线接后端</div>
+        <div style="font-size:12.5px;line-height:1.7">
+          <b>3 页 AI 功能消 alert → 真 API</b>：<br>
+          · <b>RequirementDetail</b>：parseFile (POST /ai/parse-basic-info · multipart) + previewAssessment (POST /ai/kimi-assessment/preview) + applyTemplate / fixAmbiguity / aiChat (POST /ai/chat)<br>
+          · <b>DevAssessmentDetail</b>：aiSkuSuggest + aiHistorySuggest (POST /ai/chat + GET /history/similar)<br>
+          · <b>SystemManagement</b>：testPrompt + savePrompts<br>
+          · 原 ~30 alert() → ~23（剩余为 WBS 详情 / ReviewDetail / SystemManagement 通知 / HomePage 批操作）
+        </div>
+      </div>
+    </div>
+
+    <h4 style="margin-top:20px">9.8.4 V0_SAAS 旧前端修复（2 项 · 双端兼容）</h4>
+    <table class="checklist">
+      <thead><tr><th style="width:140px">问题</th><th>影响页面</th><th>根因</th><th>修复</th></tr></thead>
+      <tbody>
+        <tr><td><b>登录提示「参数错误」</b></td><td>V0_SAAS /login → /dashboard</td><td>mjlkevin 原密码 hash 与用户输入不匹配，后端返回 <code class="inline">invalid_credentials</code></td><td>bcrypt 重 hash <code class="inline">admin123</code> → users.json 更新 mjlkevin.passwordHash</td></tr>
+        <tr><td><b>导出提示「下载失败(501)」</b></td><td>V0_SAAS 实施评估详情页</td><td><code class="inline">exports.module.ts</code> downloadFile 是 501 桩代码，路由 <code class="inline">GET /downloads/:fileName</code> 已注册但处理器未实现</td><td>exports.module.ts 转导出 → exports.usecase.ts 实现：JWT 鉴权 + userId__ 归属校验 + 文件流下载</td></tr>
+      </tbody>
+    </table>
+
+    <h4 style="margin-top:20px">9.8.5 技术债务 · 待办（Phase C 后续）</h4>
+    <table class="checklist">
+      <thead><tr><th style="width:60px">优先级</th><th>任务</th><th>涉及文件</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="st todo"><span class="dot"></span>P1</span></td><td><b>WBS 详情页</b></td><td>WbsList.jsx → onRowClick alert</td><td>整页缺失 · PB-R3 标记暂缓 · 需新建 WbsDetail.jsx + useWbsDetail.js</td></tr>
+        <tr><td><span class="st todo"><span class="dot"></span>P2</span></td><td><b>SystemManagement 8 alert() → toast</b></td><td>SystemManagement.jsx</td><td>保存草稿 / 应用配置 / 重启服务等操作成功后仍用 alert() 通知</td></tr>
+        <tr><td><span class="st todo"><span class="dot"></span>P2</span></td><td><b>ReviewDetail 7 alert() 错误处理</b></td><td>ReviewDetail.jsx</td><td>驳回 / 通过 / 发起接力等失败回调仍用 alert</td></tr>
+        <tr><td><span class="st todo"><span class="dot"></span>P3</span></td><td><b>HomePage 2 批操作 alert()</b></td><td>HomePage.jsx</td><td>批量删除 / 批量检入等确认 + 结果通知</td></tr>
+        <tr><td><span class="st todo"><span class="dot"></span>P2</span></td><td><b>exports/history 持久化存储</b></td><td>exports.usecase.ts</td><td>当前返回空列表 · 需接入导出文件元数据持久化（JSON 文件或内存 store）</td></tr>
+        <tr><td><span class="st todo"><span class="dot"></span>P3</span></td><td><b>版本历史 endpoint 后端化</b></td><td>versions.usecase.ts</td><td>当前前端 client-side filter GET /versions 按 baseCode 聚合 · 建议新增 GET /versions/:baseCode/history</td></tr>
+        <tr><td><span class="st todo"><span class="dot"></span>P3</span></td><td><b>V0_SAAS / 根路径 redirect 修复</b></td><td>app/page.tsx</td><td>Next.js dev 模式 redirect("/dashboard") 被 error boundary 捕获显示 404 · 需直接访问 /dashboard</td></tr>
+      </tbody>
+    </table>
+
+    <h4 style="margin-top:20px">9.8.6 当前运行状态</h4>
+    <table class="checklist">
+      <thead><tr><th style="width:80px">端口</th><th>应用</th><th>框架</th><th>状态</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code class="inline">3000</code></td><td><b>apps/api</b></td><td>Express + tsx</td><td><span class="st done"><span class="dot"></span>RUNNING</span></td><td>后端 API · 13 路由模块 · JWT 鉴权 · JSON 文件存储 · exports 端点修复后正常</td></tr>
+        <tr><td><code class="inline">3001</code></td><td><b>V0_SAAS（旧前端）</b></td><td>Next.js 14 + shadcn</td><td><span class="st done"><span class="dot"></span>RUNNING</span></td><td>生产参考 · 仅修 bug 不加新功能 · 需直接访问 /dashboard（/ 根路径 redirect 在 dev 模式 error）· 登录 mjlkevin / admin123</td></tr>
+        <tr><td><code class="inline">3002</code></td><td><b>V2_PROTOTYPE（新前端）</b></td><td>Vite 5 + React 18.3</td><td><span class="st done"><span class="dot"></span>RUNNING</span></td><td>主力开发 · 18 页 + 9 hooks + apiClient · vite proxy /api → 3000 · Phase C 后端集成完成</td></tr>
+      </tbody>
+    </table>
   </div>
 </section>
 

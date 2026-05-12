@@ -11,7 +11,7 @@
 //  2. 温度兼容：thinking 模型固定 1；HTTP 400 "only 1 is allowed"
 //     时重试一次（不计入 maxAttempts）。
 //  3. 超时：单次 HTTP clamp 到 [3s, 120s]，与系统管理面板一致。
-//  4. 模型名归一化：继承 normalizeKimiModelName（moonshot-* -> kimi-k2.5）。
+//  4. 模型名归一化：空值回退默认模型，显式配置的模型名保持原样。
 
 import { asString } from "../../utils/helpers";
 import { normalizeKimiModelName } from "../../utils/model-name";
@@ -24,6 +24,7 @@ import { aiProviderRequestsTotal } from "../../metrics";
 import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
+  ChatCompletionStreamChunk,
   ModelProvider,
   ProviderCredentials,
 } from "./model-provider";
@@ -83,6 +84,16 @@ export class KimiProvider implements ModelProvider {
     }
   }
 
+  async *streamChatCompletion(req: ChatCompletionRequest): AsyncIterable<ChatCompletionStreamChunk> {
+    try {
+      yield* this._streamChatCompletion(req);
+      aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "success" });
+    } catch (err) {
+      aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "error" });
+      throw err;
+    }
+  }
+
   private async _chatCompletion(req: ChatCompletionRequest): Promise<ChatCompletionResponse> {
     const credentials = this.resolveCredentials(req.credentialsOverride);
     if (!credentials.apiKey) {
@@ -129,6 +140,76 @@ export class KimiProvider implements ModelProvider {
           const result = await parseSuccess(retried, model, attempts);
           aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "success" });
           return result;
+        }
+        errorText = await safeReadText(retried);
+        const err2 = mapHttpError(retried.status, errorText);
+        if (err2.retryable && attempt < maxAttempts) {
+          lastError = err2;
+          await sleep(BACKOFF_BASE_MS * 2 ** (attempt - 1));
+          continue;
+        }
+        throw err2;
+      }
+
+      const err = mapHttpError(response.status, errorText);
+      if (err.retryable && attempt < maxAttempts) {
+        lastError = err;
+        await sleep(BACKOFF_BASE_MS * 2 ** (attempt - 1));
+        continue;
+      }
+      throw err;
+    }
+
+    throw (
+      lastError ??
+      new ProviderError("request_failed", "kimi_request_failed:unknown", {
+        providerName: PROVIDER_NAME,
+        legacyReason: "kimi_request_failed:unknown",
+      })
+    );
+  }
+
+  private async *_streamChatCompletion(req: ChatCompletionRequest): AsyncIterable<ChatCompletionStreamChunk> {
+    const credentials = this.resolveCredentials(req.credentialsOverride);
+    if (!credentials.apiKey) {
+      throw new ProviderError("api_key_missing", "Kimi API Key 未配置", {
+        providerName: PROVIDER_NAME,
+        retryable: false,
+        legacyReason: "api_key_missing",
+      });
+    }
+
+    const model = normalizeKimiModelName(asString(req.model) || this.defaultModel);
+    const preferredTemperature =
+      typeof req.temperature === "number" && Number.isFinite(req.temperature) ? req.temperature : 0.3;
+    const timeoutMs = clampTimeout(req.timeoutMs ?? this.defaultTimeoutMs);
+    const maxAttempts = resolveMaxAttempts(req.maxAttempts, this.defaultMaxAttempts);
+
+    let body: Record<string, unknown> = {
+      model,
+      temperature: resolveKimiCompletionTemperature(model, preferredTemperature),
+      messages: req.messages.map((m) => ({ role: m.role, content: asString(m.content) })),
+      stream: true,
+    };
+    if (req.responseFormat === "json_object") {
+      body.response_format = { type: "json_object" };
+    }
+
+    let lastError: ProviderError | undefined;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const response = await fetchOnce(credentials.endpoint, credentials.apiKey, body, timeoutMs);
+      if (response.ok) {
+        yield* parseStream(response, model, attempt);
+        return;
+      }
+
+      let errorText = await safeReadText(response);
+      if (isKimiTemperatureMustBeOneError(response.status, errorText) && Number(body.temperature) !== 1) {
+        body = { ...body, temperature: 1 };
+        const retried = await fetchOnce(credentials.endpoint, credentials.apiKey, body, timeoutMs);
+        if (retried.ok) {
+          yield* parseStream(retried, model, attempt);
+          return;
         }
         errorText = await safeReadText(retried);
         const err2 = mapHttpError(retried.status, errorText);
@@ -269,6 +350,84 @@ async function parseSuccess(
     attempts,
     finishReason,
   };
+}
+
+async function* parseStream(
+  response: globalThis.Response,
+  model: string,
+  attempts: number,
+): AsyncIterable<ChatCompletionStreamChunk> {
+  if (!response.body) {
+    throw new ProviderError("empty_response", "model_empty_stream", {
+      providerName: PROVIDER_NAME,
+      retryable: false,
+      legacyReason: "model_empty_stream",
+    });
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+  let finishReason: string | undefined;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split(/\r?\n\r?\n/);
+      buffer = parts.pop() || "";
+
+      for (const part of parts) {
+        const dataLines = part
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trim());
+        for (const data of dataLines) {
+          if (!data || data === "[DONE]") return;
+          let json: {
+            choices?: Array<{
+              delta?: { content?: string };
+              message?: { content?: string };
+              finish_reason?: string | null;
+            }>;
+          };
+          try {
+            json = JSON.parse(data);
+          } catch {
+            continue;
+          }
+          const choice = json.choices?.[0];
+          const delta = asString(choice?.delta?.content || choice?.message?.content);
+          finishReason = asString(choice?.finish_reason) || finishReason;
+          if (!delta && !finishReason) continue;
+          content += delta;
+          yield {
+            contentDelta: delta,
+            content,
+            model,
+            provider: PROVIDER_NAME,
+            attempts,
+            finishReason,
+          };
+        }
+      }
+    }
+  } catch (e) {
+    if (isFetchAbortError(e)) {
+      throw new ProviderError("timeout", "kimi_request_timeout", {
+        providerName: PROVIDER_NAME,
+        retryable: false,
+        legacyReason: "kimi_request_timeout",
+        cause: e,
+      });
+    }
+    throw e;
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 function mapHttpError(status: number, errorText: string): ProviderError {
