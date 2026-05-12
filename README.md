@@ -32,8 +32,9 @@
 
 ## 前端与重构说明（2026-03 起）
 
-- **主产品前端**：[`ui/V0_SAAS`](ui/V0_SAAS)（Next.js + TypeScript）。根目录 `npm run dev:web` / `npm run build:web` 指向此处。本地联调端口以子项目与代理配置为准（常见为 API `3000`，前端经代理占用其他端口，详见 [`docs/PROJECT_STATUS_2026-03-30.md`](docs/PROJECT_STATUS_2026-03-30.md)）。
-- **后端**：[`apps/api`](apps/api) 核心域已迁至 `apps/api/src/modules/*`，路由聚合于 [`apps/api/src/routes/index.ts`](apps/api/src/routes/index.ts)。
+- **主产品前端**：[`ui/V0_SAAS`](ui/V0_SAAS)（Next.js + TypeScript）。根目录 `npm run dev:web` / `npm run build:web` 指向此处。本地联调端口以子项目与代理配置为准（常见为 API `3000`，V0_SAAS 占 `3001`，详见 [`docs/PROJECT_STATUS_2026-03-30.md`](docs/PROJECT_STATUS_2026-03-30.md)）。
+- **下一代沙箱**：[`ui/V2_PROTOTYPE`](ui/V2_PROTOTYPE)（Vite + React，端口 `3002`）。Phase B 组件库与 18 页面全量集成已完成，框架决议选定 Vite + React 为后续方向。详见 [`ui/V2_PROTOTYPE/README.md`](ui/V2_PROTOTYPE/README.md)。
+- **后端**：[`apps/api`](apps/api) 10/17 核心域已迁至 `apps/api/src/modules/*`（含 auth、versions、ai、templates、rules、estimates、exports、sessions、system、team），路由聚合于 [`apps/api/src/routes/index.ts`](apps/api/src/routes/index.ts)。
 
 ## 质量回归（建议每次发布前执行）
 
@@ -64,6 +65,7 @@
 ## 目录结构
 
 - `ui/V0_SAAS`：主前端（Next.js）
+- `ui/V2_PROTOTYPE`：下一代沙箱（Vite + React，Phase B）
 - `apps/api`：后端 API 服务
 - `config/templates`：模板配置
 - `config/rules`：规则配置
@@ -137,6 +139,7 @@ npm run dev:web
 
 ## 文档入口
 
+- **AI Session 入口**：`CLAUDE.md`（架构规则、约定、新 session 必读清单）
 - **前端迭代明细**：`04_开发实现/前端/前端迭代日志.md`
 - **项目现状总结（2026-03-30）**：`docs/PROJECT_STATUS_2026-03-30.md`
 - **项目进展与后续规划（推荐阅读）**：`00_项目治理/里程碑与计划/项目进展总结与后续规划.md`
