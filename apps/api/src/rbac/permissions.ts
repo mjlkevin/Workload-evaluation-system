@@ -66,6 +66,7 @@ export const ROLE_CAPABILITIES: Record<V2Role, Capability[]> = {
     "extractor:trigger",
     "requirement:maintain",
     "evidence:read",
+    "deliverable:review",
   ],
 
   IMPL: [
