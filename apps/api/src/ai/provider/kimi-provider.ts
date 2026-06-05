@@ -27,6 +27,7 @@ import type {
   ChatCompletionStreamChunk,
   ModelProvider,
   ProviderCredentials,
+  ToolCall,
 } from "./model-provider";
 
 const PROVIDER_NAME = "kimi";
@@ -460,4 +461,37 @@ function mapHttpError(status: number, errorText: string): ProviderError {
     status,
     legacyReason,
   });
+}
+
+interface RawChoice {
+  message?: {
+    content?: string | null;
+    tool_calls?: Array<{ id?: string; type?: string; function?: { name?: string; arguments?: string } }>;
+  };
+  finish_reason?: string | null;
+}
+
+/** 纯函数：把厂商 choice 解析为 { content, toolCalls, finishReason } */
+export function parseChoiceMessage(choice: RawChoice): {
+  content: string;
+  toolCalls?: ToolCall[];
+  finishReason?: string;
+} {
+  const content = asString(choice?.message?.content);
+  const finishReason = asString(choice?.finish_reason) || undefined;
+  const rawCalls = choice?.message?.tool_calls;
+  if (!Array.isArray(rawCalls) || rawCalls.length === 0) {
+    return { content, finishReason };
+  }
+  const toolCalls: ToolCall[] = rawCalls.map((c, i) => {
+    let args: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(asString(c?.function?.arguments) || "{}");
+      if (parsed && typeof parsed === "object") args = parsed as Record<string, unknown>;
+    } catch {
+      args = {};
+    }
+    return { id: asString(c?.id) || `call_${i}`, name: asString(c?.function?.name), arguments: args };
+  });
+  return { content, toolCalls, finishReason };
 }
