@@ -19,6 +19,29 @@ export interface ChatMessage {
 
 export type ResponseFormat = "text" | "json_object";
 
+/** 工具定义（OpenAI 兼容 function-calling 协议） */
+export interface ToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    /** JSON Schema 参数对象 */
+    parameters: Record<string, unknown>;
+  };
+}
+
+/** 模型决定发起的一次工具调用 */
+export interface ToolCall {
+  /** 厂商返回的调用 id，回填结果时用 */
+  id: string;
+  /** 工具名 */
+  name: string;
+  /** 模型给出的参数（已解析为对象；解析失败为 {}） */
+  arguments: Record<string, unknown>;
+}
+
+export type ToolChoice = "auto" | "none";
+
 export interface ChatCompletionRequest {
   /** 覆盖 Provider 默认模型；不传则使用 Provider 默认 */
   model?: string;
@@ -32,6 +55,10 @@ export interface ChatCompletionRequest {
   maxAttempts?: number;
   /** 每次请求级别的凭据覆盖，用于多租户 / 用户自管 Key 场景 */
   credentialsOverride?: ProviderCredentials;
+  /** 可用工具清单；不传则普通对话 */
+  tools?: ToolDefinition[];
+  /** 工具选择策略；默认 auto */
+  toolChoice?: ToolChoice;
 }
 
 export interface ProviderCredentials {
@@ -52,6 +79,8 @@ export interface ChatCompletionResponse {
   attempts: number;
   /** 结束原因（如 "stop"、"length"），部分厂商可能不提供 */
   finishReason?: string;
+  /** 模型发起的工具调用；无则 undefined 或空数组 */
+  toolCalls?: ToolCall[];
 }
 
 export interface ChatCompletionStreamChunk {
