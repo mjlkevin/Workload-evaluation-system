@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WES Agent 产品技术方案</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#161a21; --panel2:#1c222c; --ink:#e6e9ef; --muted:#9aa4b2;
+    --line:#2a313c; --brand:#5b9dff; --brand2:#7c5cff; --green:#3ecf8e; --amber:#f5a623;
+    --red:#ff6b6b; --chip:#222a36; --code:#11151c;
+    --shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.7;font-size:15px}
+  .wrap{display:grid;grid-template-columns:260px 1fr;max-width:1320px;margin:0 auto;gap:0}
+  /* ---- TOC ---- */
+  nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+    padding:24px 16px;border-right:1px solid var(--line);background:#0c0e12}
+  nav.toc h2{font-size:13px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin:0 0 12px}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:8px;
+    font-size:13.5px;margin:2px 0;border-left:2px solid transparent}
+  nav.toc a:hover{color:var(--ink);background:var(--panel)}
+  nav.toc a.sub{padding-left:22px;font-size:12.5px}
+  /* ---- main ---- */
+  main{padding:46px 52px 120px;min-width:0}
+  .hero{border:1px solid var(--line);border-radius:18px;padding:34px 36px;
+    background:linear-gradient(135deg,#1a2030,#15181f);box-shadow:var(--shadow);margin-bottom:34px}
+  .hero h1{margin:0 0 6px;font-size:30px;letter-spacing:.01em}
+  .hero .sub{color:var(--muted);font-size:15px}
+  .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+  .meta .m{background:var(--chip);border:1px solid var(--line);border-radius:999px;
+    padding:5px 13px;font-size:12.5px;color:var(--muted)}
+  .meta .m b{color:var(--ink);font-weight:600}
+  h2.sec{font-size:22px;margin:48px 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  h2.sec .n{color:var(--brand);font-variant-numeric:tabular-nums;margin-right:10px}
+  h3{font-size:17px;margin:26px 0 10px;color:#cdd6e3}
+  p{margin:10px 0}
+  .lead{font-size:16px;color:#c6cfdb}
+  code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+    font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;color:#aee0c1}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+    overflow:auto;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12.8px;line-height:1.55;color:#d4dbe6}
+  pre .c{color:#6b7686}        /* comment */
+  pre .k{color:#7c5cff;font-weight:600}  /* keyword */
+  pre .s{color:#3ecf8e}        /* string */
+  pre .f{color:#5b9dff}        /* func */
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .card h4{margin:0 0 8px;font-size:15px}
+  .badge{display:inline-block;border-radius:6px;padding:2px 9px;font-size:11.5px;font-weight:600;letter-spacing:.02em}
+  .b-green{background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3)}
+  .b-amber{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
+  .b-red{background:rgba(255,107,107,.15);color:var(--red);border:1px solid rgba(255,107,107,.3)}
+  .b-blue{background:rgba(91,157,255,.15);color:var(--brand);border:1px solid rgba(91,157,255,.3)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.6px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;letter-spacing:.03em;background:var(--panel2)}
+  tr:hover td{background:rgba(255,255,255,.015)}
+  .callout{border-left:3px solid var(--brand);background:var(--panel2);border-radius:0 12px 12px 0;
+    padding:14px 18px;margin:16px 0}
+  .callout.warn{border-color:var(--amber)}
+  .callout.good{border-color:var(--green)}
+  .callout .t{font-weight:700;margin-bottom:4px}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  .fig{background:var(--code);border:1px solid var(--line);border-radius:14px;padding:24px;margin:18px 0;overflow:auto}
+  .figcap{color:var(--muted);font-size:12.5px;text-align:center;margin-top:10px}
+  .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .pill{background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px}
+  .pill .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle}
+  .dot-g{background:var(--green)} .dot-a{background:var(--amber)} .dot-b{background:var(--brand)}
+  .foot{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  /* svg diagram helpers */
+  .box{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+  .box-b{fill:#1a2742;stroke:#34507f}
+  .box-g{fill:#142b22;stroke:#2f6e52}
+  .box-a{fill:#2e2618;stroke:#6e5a2f}
+  .box-p{fill:#241a3a;stroke:#4a3a78}
+  .lbl{fill:var(--ink);font-size:13px;font-family:inherit}
+  .lbl-s{fill:var(--muted);font-size:11px;font-family:inherit}
+  .arrow{stroke:var(--muted);stroke-width:1.6;fill:none;marker-end:url(#ah)}
+  .arrow-b{stroke:var(--brand);stroke-width:2;fill:none;marker-end:url(#ahb)}
+  @media(max-width:980px){.wrap{grid-template-columns:1fr}nav.toc{display:none}main{padding:28px 20px}
+    .g2,.g3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ============ TOC ============ -->
+<nav class="toc">
+  <h2>目录</h2>
+  <a href="#summary">摘要 · 一页读懂</a>
+  <a href="#s1">1. 背景与目标</a>
+  <a href="#s2">2. 产品形态定义</a>
+  <a href="#s3">3. 现有家底盘点</a>
+  <a href="#s4">4. 目标架构</a>
+  <a href="#s5">5. 核心机制</a>
+  <a href="#s5a" class="sub">5.1 工具调用</a>
+  <a href="#s5b" class="sub">5.2 编排循环</a>
+  <a href="#s6">6. 工具清单映射</a>
+  <a href="#s7">7. 模型接入策略</a>
+  <a href="#s8">8. UI 形态</a>
+  <a href="#s9">9. 安全与护栏</a>
+  <a href="#s10">10. 端到端场景走查</a>
+  <a href="#s11">11. 工程落地与项管</a>
+  <a href="#s12">12. 分阶段路线图</a>
+  <a href="#s13">13. 风险与决策记录</a>
+  <a href="#s14">14. 给后续工作的上下文</a>
+</nav>
+
+<!-- ============ MAIN ============ -->
+<main>
+
+<div class="hero" id="top">
+  <h1>WES Agent 产品技术方案</h1>
+  <div class="sub">将「工作量评估系统」从系统性 UI 升级为<b>对话式智能体产品</b> · 后端编排 · 半自主执行业务流程</div>
+  <div class="meta">
+    <span class="m">版本 <b>v0.1（草案）</b></span>
+    <span class="m">状态 <b>立项论证</b></span>
+    <span class="m">分支 <b>feat/agent-workbench</b></span>
+    <span class="m">日期 <b>2026-06-05</b></span>
+    <span class="m">目标读者 <b>产品 / 全栈 / 后续 AI Session</b></span>
+  </div>
+</div>
+
+<!-- ===== 摘要 ===== -->
+<section id="summary">
+  <h2 class="sec"><span class="n">0</span>摘要 · 一页读懂</h2>
+  <p class="lead">WES 现有后端已 17/17 领域模块化，每个 <code>usecase</code> 是纯业务函数；本方案的核心思想是
+  <b>把这些 usecase 注册为 AI 的「工具」，用一个对话式工作台让用户用自然语言驱动，后端 Agent 编排层在 RBAC 权限边界内半自主地调用工具、完成业务流程。</b></p>
+  <div class="grid g3">
+    <div class="card"><h4>🎯 产品形态</h4><p>L2 内嵌 Copilot：对话驱动 + 结构化渲染。读操作自动执行，写操作停下确认。<b>不是纯聊天，也不是全自主。</b></p></div>
+    <div class="card"><h4>🧩 复用而非重写</h4><p>业务逻辑零改动，直接 <code>import</code> 现有 usecase 当工具。新增三块：工具注册表、编排循环、对话 UI。</p></div>
+    <div class="card"><h4>🔑 唯一硬门槛</h4><p>给 Provider 抽象层补 <b>function-calling（tool-calling）</b>。补完 L2/L3 皆通。</p></div>
+  </div>
+  <div class="callout good"><div class="t">一句话结论</div>
+  技术上完全可行，地基是同类项目里少见的好（业务逻辑已解耦为可调用函数）。建议<b>同仓 monorepo + feat 分支 + worktree 隔离</b>，按 PoC → 工具层 → 编排 → UI 渐进推进，先做半自主、人在环。</div>
+</section>
+
+<!-- ===== 1 ===== -->
+<section id="s1">
+  <h2 class="sec"><span class="n">1</span>背景与目标</h2>
+  <h3>1.1 现状</h3>
+  <p>WES（工作量评估系统）是一套<b>多页签系统性 UI</b> 的软件：用户在「需求 / 实施评估 / 开发评估 / 资源成本 / WBS / 评审」等页面间手动操作，完成「需求 → 评估 → 成本 → 归档」链路。后端 <code>apps/api</code> 已完成 17/17 领域模块化，前端为 <code>ui/V0_SAAS</code>（生产）+ <code>ui/V2_PROTOTYPE</code>（Vite 沙箱）。</p>
+  <h3>1.2 升级动机</h3>
+  <ul>
+    <li>系统性 UI 学习成本高：用户需要理解页签结构、字段含义、操作顺序。</li>
+    <li>业务流程是<b>线性、可描述</b>的——天然适合用自然语言驱动。</li>
+    <li>后端已模块化为干净 usecase，<b>具备被 AI 编排调用的前提</b>（这是关键差异化优势）。</li>
+  </ul>
+  <h3>1.3 目标</h3>
+  <div class="callout"><b>产品定义：</b>WES Agent = 一个对话式工作台。用户用自然语言描述目标，后端 Agent 编排层把现有 17 个 usecase 当工具调用，在 RBAC 权限边界内半自主地走完业务流程；模型支持平台默认 + 用户自带 Key（BYOK）+ 多厂商可选；读操作自动执行，写操作停下确认。</div>
+</section>
+
+<!-- ===== 2 ===== -->
+<section id="s2">
+  <h2 class="sec"><span class="n">2</span>产品形态定义：为什么选 L2</h2>
+  <p>「Agent」一词差别巨大，按自主程度分三档，本方案<b>选定 L2</b>，并为 L3 预留架构。</p>
+  <table>
+    <tr><th>档位</th><th>含义</th><th>谁在决策</th><th>本方案</th></tr>
+    <tr><td><b>L1</b> Agent-Friendly API</td><td>把估算能力包装成 NL 入口，供外部 Agent 多轮调用</td><td>外部 Agent</td><td><span class="badge b-blue">基座顺带产出</span></td></tr>
+    <tr><td><b>L2</b> 内嵌 Copilot</td><td>系统内置对话助手，调用自己的模块完成任务，人在环</td><td>内置 LLM + 工具调用</td><td><span class="badge b-green">★ 选定</span></td></tr>
+    <tr><td><b>L3</b> 自主智能体</td><td>给目标，自主多步规划→执行→自纠错，全程无人值守</td><td>LLM 自主 plan-act 循环</td><td><span class="badge b-amber">架构预留</span></td></tr>
+  </table>
+  <div class="callout warn"><div class="t">为什么不直接上 L3</div>
+  WES 的核心价值是<b>规则驱动的精确、可控、可追溯估算</b>。全自主反而削弱「可控」这一卖点。L2 人在环：读操作自动、写操作确认，既高效又守住护城河。L3 待业务价值验证后再演进。</div>
+</section>
+
+<!-- ===== 3 ===== -->
+<section id="s3">
+  <h2 class="sec"><span class="n">3</span>现有家底盘点（为什么地基好）</h2>
+  <div class="grid g2">
+    <div class="card"><h4><span class="badge b-green">已具备</span> Provider 抽象层</h4>
+      <p><code>ai/provider/model-provider.ts</code> 定义 <code>ModelProvider</code> 接口 + <code>ProviderRegistry</code> 注册表，Kimi 已实现且<b>支持流式</b>。多厂商、用户自管 Key 已预留（<code>credentialsOverride</code>）。</p></div>
+    <div class="card"><h4><span class="badge b-green">已具备</span> 17/17 模块化 usecase</h4>
+      <p>每个领域是干净的 <code>usecase</code> 纯函数——<b>天然就是 Agent 的「工具」</b>。这是多数项目改 Agent 的最大障碍，WES 已跨过。</p></div>
+    <div class="card"><h4><span class="badge b-green">已具备</span> 自然语言入口雏形</h4>
+      <p><code>ai/extractor/</code>（文档→结构化需求包）+ <code>assessment.service</code>（估算预览）+ <code>chat.service</code>。L3 最难的「NL→结构化」已做。</p></div>
+    <div class="card"><h4><span class="badge b-green">已具备</span> 会话态 + RBAC</h4>
+      <p><code>sessions</code> 模块支持多轮上下文；RBAC 能力位模型可直接约束「Agent 能做什么」，安全边界现成。</p></div>
+    <div class="card"><h4><span class="badge b-red">需补齐</span> Provider 的 tool-calling</h4>
+      <p>当前接口仅 <code>chatCompletion</code> + <code>responseFormat: text|json_object</code>，<b>无 tools 参数</b>。这是最大硬缺口。</p></div>
+    <div class="card"><h4><span class="badge b-red">需新建</span> 编排循环 + 工具注册表</h4>
+      <p>plan→act→observe 调度器、把 usecase 注册成 tools 的注册表，均为新增（约 2–3 个文件）。</p></div>
+  </div>
+</section>
+
+<!-- ===== 4 ===== -->
+<section id="s4">
+  <h2 class="sec"><span class="n">4</span>目标架构</h2>
+  <p class="lead">绿色 = 已有直接复用；蓝色 = 新建核心；下层业务逻辑<b>完全不动</b>。</p>
+  <div class="fig">
+  <svg viewBox="0 0 920 560" width="100%" height="auto" font-family="inherit">
+    <defs>
+      <marker id="ah" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#9aa4b2"/></marker>
+      <marker id="ahb" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#5b9dff"/></marker>
+    </defs>
+    <!-- frontend -->
+    <rect class="box box-p" x="60" y="20" width="800" height="78" rx="12"/>
+    <text class="lbl" x="80" y="48" font-weight="700">① 对话式工作台 UI　<tspan class="lbl-s" font-weight="400">（新建：V3_AGENT，复用 V0/V2 组件）</tspan></text>
+    <text class="lbl-s" x="80" y="72">左：对话区（驱动） ｜ 右：工作区（AI 调用后渲染表格 / 版本对比 / 可编辑面板 / 下载卡片）</text>
+    <path class="arrow-b" d="M460,98 L460,128"/>
+    <text class="lbl-s" x="470" y="118">POST /api/v1/agent/chat（流式 SSE）</text>
+
+    <!-- orchestration -->
+    <rect class="box box-b" x="60" y="130" width="800" height="118" rx="12"/>
+    <text class="lbl" x="80" y="156" font-weight="700">② Agent 编排层　<tspan class="lbl-s" font-weight="400">（新建：apps/api/src/agent/）</tspan></text>
+    <rect class="box" x="80" y="170" width="240" height="62" rx="9"/>
+    <text class="lbl-s" x="92" y="190">核心循环</text>
+    <text class="lbl-s" x="92" y="208">while: 调LLM→执行工具</text>
+    <text class="lbl-s" x="92" y="224">→ 回填 → 直到完成</text>
+    <rect class="box" x="335" y="170" width="240" height="62" rx="9"/>
+    <text class="lbl-s" x="347" y="190">护栏</text>
+    <text class="lbl-s" x="347" y="208">循环上限 · 权限校验</text>
+    <text class="lbl-s" x="347" y="224">写操作确认 · 错误降级</text>
+    <rect class="box" x="590" y="170" width="250" height="62" rx="9"/>
+    <text class="lbl-s" x="602" y="190">流式上报</text>
+    <text class="lbl-s" x="602" y="208">把「思考 / 工具执行 / 结果」</text>
+    <text class="lbl-s" x="602" y="224">分段推给前端</text>
+
+    <!-- two children -->
+    <path class="arrow-b" d="M230,248 L230,300"/>
+    <path class="arrow-b" d="M650,248 L650,300"/>
+    <!-- provider -->
+    <rect class="box box-g" x="60" y="302" width="350" height="96" rx="12"/>
+    <text class="lbl" x="80" y="328" font-weight="700">③ Provider 层　<tspan class="lbl-s" font-weight="400">（已有 · 需补 tools）</tspan></text>
+    <text class="lbl-s" x="80" y="350">Registry + Kimi（流式OK）</text>
+    <text class="lbl-s" x="80" y="368" fill="#ff8f8f">← 扩展 ChatCompletionRequest.tools</text>
+    <text class="lbl-s" x="80" y="386" fill="#ff8f8f">← Kimi 适配 function-calling</text>
+    <!-- tool registry -->
+    <rect class="box box-b" x="500" y="302" width="360" height="96" rx="12"/>
+    <text class="lbl" x="520" y="328" font-weight="700">④ 工具注册表　<tspan class="lbl-s" font-weight="400">（新建）</tspan></text>
+    <text class="lbl-s" x="520" y="350">把现有 usecase 包装成 tools，</text>
+    <text class="lbl-s" x="520" y="368">每个带 JSON「说明书」(name/desc/params)</text>
+    <text class="lbl-s" x="520" y="386">+ 绑定 RBAC 能力位 + 读/写标记</text>
+
+    <path class="arrow" d="M680,398 L680,440"/>
+    <!-- usecases -->
+    <rect class="box box-g" x="60" y="442" width="800" height="92" rx="12"/>
+    <text class="lbl" x="80" y="468" font-weight="700">⑤ 现有 17 个 modules 的 usecase　<tspan class="lbl-s" font-weight="400">（完全不动，只读复用）</tspan></text>
+    <text class="lbl-s" x="80" y="492">estimates · presales · dev-assessment · versions · team · sessions · history · change · collab · sales · pm · exports · …</text>
+    <text class="lbl-s" x="80" y="514">持久化：config/*.json（文件存储；高并发自主场景触发 DB 迁移条件时再切 PG）</text>
+  </svg>
+  <div class="figcap">图 4-1　WES Agent 目标架构（5 层）</div>
+  </div>
+  <div class="pill-row">
+    <span class="pill"><span class="dot dot-g"></span>已有，直接复用</span>
+    <span class="pill"><span class="dot dot-b"></span>新建核心</span>
+    <span class="pill"><span class="dot dot-a"></span>已有但需扩展</span>
+  </div>
+</section>
+
+<!-- ===== 5 ===== -->
+<section id="s5">
+  <h2 class="sec"><span class="n">5</span>核心机制</h2>
+  <p class="lead">智能体的全部「魔法」只有两件事：<b>工具调用</b>（让 LLM 会「做」而非只会「说」）+ <b>编排循环</b>（让它能多步自主）。</p>
+
+  <h3 id="s5a">5.1 工具调用（Tool / Function Calling）</h3>
+  <p>LLM 本身只输出文字。但现代模型被训练出能力：你告诉它「你有这些工具」，它在需要时<b>输出结构化的「我要调用 X 工具，参数 Y」</b>，而非直接回答。后端接到后真去执行那个 usecase，把结果喂回去。</p>
+  <p>给 LLM 看的「工具说明书」示例（一个 usecase 对应一份）：</p>
+  <pre><span class="c">// 由工具注册表生成，喂给 Provider 的 tools 参数</span>
+{
+  <span class="s">"name"</span>: <span class="s">"estimate_implementation"</span>,
+  <span class="s">"description"</span>: <span class="s">"对一个需求包做实施工作量评估，返回各模块人天和总计"</span>,
+  <span class="s">"parameters"</span>: {
+    <span class="s">"requirementPackId"</span>: { <span class="s">"type"</span>:<span class="s">"string"</span>, <span class="s">"description"</span>:<span class="s">"需求包ID"</span> },
+    <span class="s">"orgScope"</span>:          { <span class="s">"type"</span>:<span class="s">"string"</span>, <span class="s">"description"</span>:<span class="s">"组织范围，可选"</span> }
+  },
+  <span class="c">// 注册表附加元信息（不发给模型，后端自用）：</span>
+  <span class="s">"_capability"</span>: <span class="s">"estimates:create"</span>,   <span class="c">// RBAC 能力位</span>
+  <span class="s">"_mutates"</span>:    <span class="k">false</span>                 <span class="c">// 读操作 → 自动执行</span>
+}</pre>
+  <div class="callout good"><b>关键认知：</b>业务逻辑一行不改。你只是给现有 <code>estimates.calculate()</code> 加了一层「自然语言可发现 + 可被 LLM 调用」的外壳。</div>
+
+  <h3 id="s5b">5.2 编排循环（Agent 的发动机）</h3>
+  <p>整个智能体的核心，是后端的一个 <code>while</code> 循环。这是所有 Agent 框架的本质：</p>
+  <pre><span class="c">// apps/api/src/agent/orchestrator.ts （新建，约 50–80 行核心）</span>
+<span class="k">async function</span> <span class="f">runAgent</span>(userMessage, session, user) {
+  <span class="k">const</span> messages = [systemPrompt(user), ...session.history, userMessage];
+  <span class="k">const</span> tools = registry.<span class="f">listToolsFor</span>(user);   <span class="c">// 仅该用户权限内的工具</span>
+
+  <span class="k">for</span> (<span class="k">let</span> turn = 0; turn &lt; MAX_TURNS; turn++) {   <span class="c">// ← 循环上限护栏</span>
+    <span class="k">const</span> reply = <span class="k">await</span> provider.<span class="f">chatCompletion</span>({ messages, tools });
+
+    <span class="k">if</span> (reply.toolCalls?.length) {
+      <span class="k">for</span> (<span class="k">const</span> call <span class="k">of</span> reply.toolCalls) {
+        <span class="f">assertCapability</span>(user, call.tool._capability);   <span class="c">// ← 权限护栏</span>
+        <span class="k">if</span> (call.tool._mutates) <span class="k">await</span> <span class="f">confirmWithUser</span>(call); <span class="c">// ← 写操作确认</span>
+        <span class="k">const</span> result = <span class="k">await</span> registry.<span class="f">execute</span>(call);      <span class="c">// 真调 usecase</span>
+        messages.<span class="f">push</span>(reply, <span class="f">toToolResult</span>(call, result));    <span class="c">// 回填</span>
+        <span class="f">streamToFrontend</span>(call, result);                  <span class="c">// 流式渲染</span>
+      }
+      <span class="k">continue</span>;                          <span class="c">// LLM 看到结果，决定下一步</span>
+    }
+    <span class="k">return</span> reply.content;                <span class="c">// 无工具要调 → 回复用户，结束</span>
+  }
+}</pre>
+  <p>一次用户请求，循环可能转 1 次（简单问答）或 N 次（抽取→估算→出SOW→建评审→汇报）。<b>转几次、每次调什么，由 LLM 自主决定</b>——这就是「自主」。</p>
+  <div class="fig">
+  <svg viewBox="0 0 880 250" width="100%" height="auto" font-family="inherit">
+    <defs><marker id="ah2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#5b9dff"/></marker></defs>
+    <rect class="box box-p" x="20" y="100" width="120" height="50" rx="10"/><text class="lbl-s" x="38" y="122">用户消息</text><text class="lbl-s" x="38" y="140">（目标）</text>
+    <rect class="box box-b" x="200" y="95" width="150" height="60" rx="10"/><text class="lbl" x="222" y="122">LLM 决策</text><text class="lbl-s" x="222" y="142">调工具? or 回答?</text>
+    <rect class="box box-g" x="410" y="30" width="170" height="56" rx="10"/><text class="lbl-s" x="428" y="54">执行 usecase 工具</text><text class="lbl-s" x="428" y="72">(过权限/确认)</text>
+    <rect class="box" x="410" y="165" width="170" height="56" rx="10"/><text class="lbl-s" x="428" y="189">回填结果到 messages</text><text class="lbl-s" x="428" y="207">+ 流式渲染前端</text>
+    <rect class="box box-p" x="650" y="95" width="150" height="60" rx="10"/><text class="lbl" x="690" y="122">回复用户</text><text class="lbl-s" x="672" y="142">（无工具可调）</text>
+    <path class="arrow-b" d="M140,125 L196,125" marker-end="url(#ah2)"/>
+    <path class="arrow-b" d="M350,110 C385,90 390,75 408,62" marker-end="url(#ah2)" stroke-dasharray="0"/>
+    <text class="lbl-s" x="356" y="78" fill="#5b9dff">要调工具</text>
+    <path class="arrow-b" d="M350,140 L646,128" marker-end="url(#ah2)"/>
+    <text class="lbl-s" x="470" y="120" fill="#9aa4b2">直接回答</text>
+    <path class="arrow-b" d="M495,86 L495,163" marker-end="url(#ah2)"/>
+    <path class="arrow-b" d="M408,193 C330,190 300,175 300,158" marker-end="url(#ah2)"/>
+    <text class="lbl-s" x="300" y="240" fill="#5b9dff">↑ 循环：LLM 看到结果后再决定下一步（最多 MAX_TURNS 次）</text>
+  </svg>
+  <div class="figcap">图 5-1　编排循环：plan → act → observe → loop</div>
+  </div>
+</section>
+
+<!-- ===== 6 ===== -->
+<section id="s6">
+  <h2 class="sec"><span class="n">6</span>工具清单映射（usecase → tool）</h2>
+  <p>起步工具集（按业务流程优先级，<span class="badge b-green">读</span> 自动执行 / <span class="badge b-amber">写</span> 需确认）：</p>
+  <table>
+    <tr><th>工具名</th><th>底层 usecase</th><th>说明</th><th>RBAC 能力位</th><th>类型</th></tr>
+    <tr><td><code>extract_requirement</code></td><td>ai/extractor</td><td>文档/文本 → 结构化需求包</td><td>requirement:upload</td><td><span class="badge b-green">读</span></td></tr>
+    <tr><td><code>estimate_implementation</code></td><td>estimates.calculate</td><td>实施评估，返回模块人天</td><td>estimates:create</td><td><span class="badge b-green">读</span></td></tr>
+    <tr><td><code>estimate_dev</code></td><td>dev-assessment</td><td>开发评估</td><td>estimates:create</td><td><span class="badge b-green">读</span></td></tr>
+    <tr><td><code>generate_sow</code></td><td>presales.generateSowFromPack</td><td>由需求包生成 SOW</td><td>estimates:create</td><td><span class="badge b-green">读</span></td></tr>
+    <tr><td><code>query_versions</code></td><td>versions.list</td><td>查某模块版本历史</td><td>estimates:read</td><td><span class="badge b-green">读</span></td></tr>
+    <tr><td><code>export_excel</code></td><td>exports.usecase</td><td>导出 Excel，返回下载信息</td><td>estimates:read</td><td><span class="badge b-green">读</span></td></tr>
+    <tr><td><code>create_review</code></td><td>team.createReview</td><td>发起团队评审</td><td>system:manage</td><td><span class="badge b-amber">写</span></td></tr>
+    <tr><td><code>bump_version</code></td><td>versions.checkin/升版</td><td>升版 / 检入</td><td>estimates:write</td><td><span class="badge b-amber">写</span></td></tr>
+    <tr><td><code>update_estimate_line</code></td><td>estimates.update</td><td>改某行人天</td><td>estimates:write</td><td><span class="badge b-amber">写</span></td></tr>
+  </table>
+  <div class="callout"><b>扩展原则：</b>新增工具 = 选一个现有 usecase + 写一份说明书 + 绑能力位 + 标读/写。<b>无需碰业务逻辑</b>。工具集可随迭代增量扩充。</div>
+</section>
+
+<!-- ===== 7 ===== -->
+<section id="s7">
+  <h2 class="sec"><span class="n">7</span>模型接入策略</h2>
+  <p>得益于已有的 <code>ProviderRegistry</code> + <code>credentialsOverride</code>，三种模式天然支持：</p>
+  <table>
+    <tr><th>模式</th><th>实现</th><th>适用</th></tr>
+    <tr><td><b>平台统一 Key</b></td><td>后端配 Kimi Key，全用户共用，平台统一计费</td><td>SaaS 标准模式（建议起步）</td></tr>
+    <tr><td><b>用户自带 Key（BYOK）</b></td><td><code>credentialsOverride</code> 透传用户 Key；UI 入口复用现有 <code>api-keys</code> 页</td><td>企业客户 / 成本转嫁</td></tr>
+    <tr><td><b>多厂商可选</b></td><td>实现 <code>ModelProvider</code> 接口并注册：OpenAI / Claude / 通义 / DeepSeek / GLM</td><td>高级功能，业务层零改动</td></tr>
+  </table>
+  <div class="callout warn"><div class="t">硬约束</div>做 Agent 必须选<b>支持 function-calling 的模型</b>。✅ Kimi(Moonshot)、GPT-4o、Claude、通义千问、DeepSeek、智谱 GLM-4；❌ 部分纯文本老模型 / 小开源模型。<br><b>建议起步：</b>平台默认 Kimi（已集成）+ 预留 BYOK；后续按需加 Claude/GPT。</div>
+</section>
+
+<!-- ===== 8 ===== -->
+<section id="s8">
+  <h2 class="sec"><span class="n">8</span>UI 形态：对话驱动 + 结构化渲染</h2>
+  <div class="callout warn"><b>不要做「纯聊天」。</b>看 86 人天分 12 模块的结果、版本 diff、改某行人天——纯文字描述是灾难。正确形态是<b>对话驱动 + 结构化组件渲染</b>（业界 Cursor / ChatGPT Canvas / Claude Artifacts 同构）。</div>
+  <div class="fig">
+  <svg viewBox="0 0 820 300" width="100%" height="auto" font-family="inherit">
+    <rect class="box box-p" x="30" y="30" width="280" height="240" rx="12"/>
+    <text class="lbl" x="50" y="58" font-weight="700">对话区（左 · 驱动）</text>
+    <rect class="box" x="50" y="74" width="240" height="40" rx="8"/><text class="lbl-s" x="64" y="98">👤 把这份需求做实施评估…</text>
+    <rect class="box box-b" x="50" y="124" width="240" height="34" rx="8"/><text class="lbl-s" x="64" y="145">🤖 🔍 正在抽取需求…✓</text>
+    <rect class="box box-b" x="50" y="166" width="240" height="34" rx="8"/><text class="lbl-s" x="64" y="187">🤖 📊 评估完成，86 人天</text>
+    <rect class="box box-a" x="50" y="208" width="240" height="44" rx="8"/><text class="lbl-s" x="64" y="228">⚠️ 将发起评审，确认?</text><text class="lbl-s" x="64" y="245">[确认] [取消]</text>
+    <rect class="box box-g" x="360" y="30" width="430" height="240" rx="12"/>
+    <text class="lbl" x="380" y="58" font-weight="700">工作区（右 · AI 调用后渲染）</text>
+    <rect class="box" x="380" y="74" width="390" height="80" rx="8"/>
+    <text class="lbl-s" x="396" y="96">📋 实施评估结果（可编辑表格）</text>
+    <text class="lbl-s" x="396" y="118">模块A 12人天 ｜ 模块B 8人天 ｜ …</text>
+    <text class="lbl-s" x="396" y="140">合计 86 人天　[导出Excel] [升版]</text>
+    <rect class="box" x="380" y="164" width="185" height="90" rx="8"/><text class="lbl-s" x="396" y="186">🔀 版本对比组件</text><text class="lbl-s" x="396" y="208">AS-087 → AS-088</text><text class="lbl-s" x="396" y="230">（复用现有组件）</text>
+    <rect class="box" x="580" y="164" width="190" height="90" rx="8"/><text class="lbl-s" x="596" y="186">⬇️ 下载卡片</text><text class="lbl-s" x="596" y="208">实施评估_AS088.xlsx</text><text class="lbl-s" x="596" y="230">[下载]</text>
+  </svg>
+  <div class="figcap">图 8-1　双栏：对话驱动 + 结构化工作区（复用 V0/V2 现有组件）</div>
+  </div>
+  <p><b>不是抛弃 UI，而是 UI 的触发方式从「人手动点」变成「AI 调工具后自动渲染」。</b>V0_SAAS 现有表格 / 版本组件 / 导出卡片大部分可复用；新前端基座建议用 V2_PROTOTYPE（Vite+React，已是既定方向），新增 <code>V3_AGENT</code> 或在 V2 内扩展。</p>
+</section>
+
+<!-- ===== 9 ===== -->
+<section id="s9">
+  <h2 class="sec"><span class="n">9</span>安全与护栏（Agent 最易翻车处）</h2>
+  <div class="grid g2">
+    <div class="card"><h4>🔁 循环上限</h4><p>设 <code>MAX_TURNS</code>，防 LLM 无限调工具空转，超限优雅终止并提示。</p></div>
+    <div class="card"><h4>🔐 权限不可绕过</h4><p>每个工具调用前过 RBAC 能力位。<b>不能因「AI 想做」就越权</b>。工具清单本身按用户权限过滤。</p></div>
+    <div class="card"><h4>✋ 写操作二次确认</h4><p>删除 / 升版 / 发评审 / 改人天等 <code>_mutates=true</code> 工具，先让用户点确认再执行。</p></div>
+    <div class="card"><h4>👁 可观测 / 成本</h4><p>每次工具调用、token、耗时、回合数入日志；建质量看板（成功率 / 补问次数 / 平均回合 / 失败原因）。</p></div>
+    <div class="card"><h4>🧱 数据隔离</h4><p>沿用现有 <code>ownerUserId</code> 隔离；Agent 调工具时透传当前用户身份，不可跨用户读写。</p></div>
+    <div class="card"><h4>🩹 错误降级</h4><p>工具失败时把错误结构化喂回 LLM，让其重试 / 换路 / 向用户澄清，而非整体崩溃。</p></div>
+  </div>
+</section>
+
+<!-- ===== 10 ===== -->
+<section id="s10">
+  <h2 class="sec"><span class="n">10</span>端到端场景走查</h2>
+  <p><b>用户输入：</b>「把这份需求文档评估一下，给个实施人天，顺便发起评审」（附文档）</p>
+  <table>
+    <tr><th>轮次</th><th>LLM 决策</th><th>执行</th><th>前端呈现</th></tr>
+    <tr><td>1</td><td>先把文档结构化 → <code>extract_requirement</code></td><td>调 ai/extractor，得需求包 RI-042</td><td>🔍 正在抽取需求…✓ 识别 12 个功能点</td></tr>
+    <tr><td>2</td><td>有需求包，做估算 → <code>estimate_implementation('RI-042')</code></td><td>调 estimates.calculate，得 86 人天</td><td>📊 评估完成（右栏渲染可编辑表格）</td></tr>
+    <tr><td>3</td><td>用户要评审，<b>写操作</b> → 触发确认</td><td>用户点确认 → <code>create_review('AS-088')</code></td><td>⚠️ 「将发起评审，确认?」→ 执行</td></tr>
+    <tr><td>4</td><td>无工具可调 → 生成总结</td><td>—</td><td>✅ 需求包 RI-042 → 实施 86 人天 → 评审已发起给张三、李四</td></tr>
+  </table>
+  <div class="callout good"><b>用户一句话，AI 自主拆成 4 步、调 3 个现有功能、并在写操作前停下确认。</b>这就是「工作台对话 + 后端编排 + 执行业务流程」。</div>
+</section>
+
+<!-- ===== 11 ===== -->
+<section id="s11">
+  <h2 class="sec"><span class="n">11</span>工程落地与项目管理</h2>
+  <h3>11.1 仓库策略：同仓 monorepo，不新建仓库</h3>
+  <p>核心理由：<b>Agent 的工具 = 现有 usecase，需直接 import</b>。拆仓会导致代码复制 / 退化为远程 API 调用 / 引入发包，均得不偿失。</p>
+  <table>
+    <tr><th>隔离诉求</th><th>正确工具（无需新仓库）</th></tr>
+    <tr><td>不改坏现有系统</td><td><b>目录边界</b>：全部新增目录（<code>agent/</code>、<code>V3_AGENT/</code>），现有文件零修改，只读依赖 usecase</td></tr>
+    <tr><td>版本隔离</td><td><b>Git 分支</b>：<code>feat/agent-workbench</code>，main 始终可发布</td></tr>
+    <tr><td>一边用现有 / 一边开发</td><td><b>Git Worktree</b>：两个工作目录、两个分支、共享历史与远程，互不干扰（✅ 已建）</td></tr>
+  </table>
+  <h3>11.2 目录布局（加法不减法）</h3>
+  <pre>apps/api/src/
+  modules/                 <span class="c">← 现有 17 域，一行不动</span>
+  <span class="k">agent/</span>                  <span class="c">🆕 编排循环、工具注册表、systemPrompt</span>
+  routes/<span class="k">agent.routes.ts</span>   <span class="c">🆕 新增一条路由</span>
+  ai/provider/             <span class="c">← 扩展 tools（唯一需改的现有文件，可走独立 PR 合入 main）</span>
+ui/
+  V0_SAAS/                 <span class="c">← 生产 UI，继续跑</span>
+  <span class="k">V3_AGENT/</span>（或在 V2 内扩展） <span class="c">🆕 对话式工作台</span></pre>
+  <h3>11.3 项目管理（沿用现有治理体系）</h3>
+  <table>
+    <tr><th>阶段</th><th>产物</th><th>归档位置（现成目录）</th></tr>
+    <tr><td>立项</td><td>本技术方案</td><td><code>03_技术设计/系统架构/</code></td></tr>
+    <tr><td>需求</td><td>Agent 产品 PRD</td><td><code>01_需求管理/</code></td></tr>
+    <tr><td>任务</td><td>分阶段任务工单</td><td><code>00_项目治理/里程碑与计划/</code></td></tr>
+    <tr><td>提交</td><td><code>type(scope): 中文描述</code>，scope=<code>agent</code></td><td>git，feat 分支</td></tr>
+  </table>
+  <div class="callout warn"><div class="t">关键纪律</div>
+  ① Agent 分支<b>只新增、不修改</b>现有 modules；usecase 若需小改，单独 PR 到 main 评审合入。<br>
+  ② <b>R1 首发先收尾可发布</b>，再大力投 Agent，两件事不抢精力。<br>
+  ③ PoC 阶段可在临时目录验证，跑通再正式立项。</div>
+</section>
+
+<!-- ===== 12 ===== -->
+<section id="s12">
+  <h2 class="sec"><span class="n">12</span>分阶段路线图</h2>
+  <table>
+    <tr><th>阶段</th><th>目标</th><th>产出</th><th>预估</th></tr>
+    <tr><td><b>0 · PoC</b></td><td>验证 Kimi tool-calling 在 Provider 层跑通</td><td>最小代码挂 1 个真工具（如 <code>query_versions</code>），端到端走通</td><td>1–2 天</td></tr>
+    <tr><td><b>1 · 工具层</b></td><td>Provider 补 tools；usecase 包装</td><td>扩展接口 + Kimi 适配 + 工具注册表 + 3–5 核心工具</td><td>3–5 天</td></tr>
+    <tr><td><b>2 · 编排循环</b></td><td>核心 while 循环 + 全套护栏</td><td>orchestrator + 权限/确认/上限/降级 + <code>/agent/chat</code> 流式</td><td>3–5 天</td></tr>
+    <tr><td><b>3 · 对话 UI</b></td><td>双栏工作台 + 结构化渲染</td><td>V3_AGENT 对话页，流式展示 + 复用 V0 组件渲染结果</td><td>1 周</td></tr>
+    <tr><td><b>4 · 打磨</b></td><td>体验与可观测</td><td>补问澄清、质量看板、危险操作确认、成本统计</td><td>持续</td></tr>
+  </table>
+  <div class="callout good"><b>建议执行顺序：</b>① R1 先收尾可发布 → ② worktree + feat 分支（✅ 已就绪）→ ③ 阶段 0 半天 PoC → ④ PoC 通过后补 PRD 正式立项 → ⑤ 阶段 1–4 迭代。</div>
+</section>
+
+<!-- ===== 13 ===== -->
+<section id="s13">
+  <h2 class="sec"><span class="n">13</span>风险与决策记录</h2>
+  <table>
+    <tr><th>项</th><th>决策 / 风险</th><th>应对</th></tr>
+    <tr><td>产品形态</td><td><span class="badge b-green">决策</span> 选 L2 半自主，非纯聊天、非全自主</td><td>读自动 / 写确认；L3 架构预留</td></tr>
+    <tr><td>仓库</td><td><span class="badge b-green">决策</span> 同仓 monorepo，不新建仓库</td><td>目录+分支+worktree 三层隔离</td></tr>
+    <tr><td>UI</td><td><span class="badge b-green">决策</span> 对话驱动+结构化渲染，不抛弃组件</td><td>复用 V0 组件，V3_AGENT/V2 基座</td></tr>
+    <tr><td>模型</td><td><span class="badge b-green">决策</span> 平台默认 Kimi + BYOK + 多厂商预留</td><td>限定 function-calling 模型</td></tr>
+    <tr><td>技术门槛</td><td><span class="badge b-red">风险</span> Provider 无 tool-calling</td><td>阶段 1 优先补齐；Kimi 兼容 OpenAI tools 协议，可行</td></tr>
+    <tr><td>存储</td><td><span class="badge b-amber">风险</span> JSON 文件，高并发自主写冲突</td><td>L2 人在环并发低，暂不阻塞；触发 DB 迁移条件再切 PG</td></tr>
+    <tr><td>成本</td><td><span class="badge b-amber">风险</span> 多步循环放大 token 消耗</td><td>循环上限 + 质量看板监控 + 缓存可复用上下文</td></tr>
+    <tr><td>精力</td><td><span class="badge b-amber">风险</span> 与 R1 首发抢资源</td><td>R1 先收尾，Agent 后投入</td></tr>
+  </table>
+</section>
+
+<!-- ===== 14 ===== -->
+<section id="s14">
+  <h2 class="sec"><span class="n">14</span>给后续工作的上下文（必读）</h2>
+  <div class="callout"><div class="t">如果你是接手本项目的后续 AI Session / 工程师，请先读懂这几条：</div>
+  <ol>
+    <li><b>本方案是 L2 内嵌 Copilot</b>，不是纯聊天机器人，也不是全自主 Agent。读操作自动、写操作确认。</li>
+    <li><b>业务逻辑零改动</b>。Agent = 现有 17 个 usecase + 工具说明书外壳 + 编排循环。不要重写业务逻辑。</li>
+    <li><b>唯一需改的现有文件</b>是 <code>ai/provider/*</code>（补 tool-calling），且应走独立 PR 合入 main，不在 feat 分支偷改。</li>
+    <li><b>仓库不拆</b>。同仓 monorepo，在 <code>feat/agent-workbench</code> 分支 + worktree 工作区开发。新代码放 <code>apps/api/src/agent/</code> 与 <code>ui/V3_AGENT/</code>。</li>
+    <li><b>权限边界 = RBAC 能力位</b>。Agent 能做什么由用户能力位决定，工具调用前必过校验，不可越权。</li>
+    <li><b>从阶段 0 PoC 起步</b>：先用最小代码验证 Kimi tool-calling 跑通一个真工具，再正式立项。</li>
+    <li>相关事实来源：现有 Provider 抽象在 <code>apps/api/src/ai/provider/</code>；usecase 在 <code>apps/api/src/modules/*/</code>；遵循根 <code>CLAUDE.md</code> 架构边界与提交规范。</li>
+  </ol></div>
+</section>
+
+<div class="foot">
+  WES Agent 产品技术方案 · v0.1 草案 · 2026-06-05 · 分支 feat/agent-workbench<br>
+  本文档为单文件自包含 HTML（离线可阅），作为 Agent 化立项的事实来源与后续工作上下文。后续变更请升版并记录于「§13 决策记录」。
+</div>
+
+</main>
+</div>
+</body>
+</html>
