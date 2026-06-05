@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { resolveRootDir } from "../../utils/file";
-import { TeamAuditLog, TeamStore } from "./team.types";
+import { TeamAuditLog, TeamRecord, TeamStore } from "./team.types";
 
 function teamStorePath(): string {
   return path.resolve(resolveRootDir(), "config/teams/store.json");
@@ -74,4 +74,11 @@ export function appendTeamAuditLog(
     at: new Date().toISOString(),
     ...payload
   });
+}
+
+/** List teams where the user is the owner or a member */
+export function listTeamsByUserId(store: TeamStore, userId: string): TeamRecord[] {
+  return store.teams.filter(
+    (t) => t.ownerUserId === userId || t.members.some((m) => m.userId === userId)
+  );
 }

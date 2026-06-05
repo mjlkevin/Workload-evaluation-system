@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { VersionRecord } from "../../types";
 import { loadVersionsStore, saveVersionsStore } from "../versions/versions.repository";
-import { appendTeamAuditLog, loadTeamStore, saveTeamStoreWithExpectedVersion } from "./team.repository";
+import { appendTeamAuditLog, listTeamsByUserId, loadTeamStore, saveTeamStoreWithExpectedVersion } from "./team.repository";
 import { ReviewStatus, TeamMember, TeamRecord, TeamRole, TeamStore } from "./team.types";
 
 type CurrentUser = { id: string };
@@ -379,4 +379,10 @@ export function createReviewComment(
   const conflict = persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   return ok(comment);
+}
+
+export function listUserTeams(currentUser: CurrentUser) {
+  const store = loadTeamStore();
+  const teams = listTeamsByUserId(store, currentUser.id);
+  return ok({ items: teams });
 }

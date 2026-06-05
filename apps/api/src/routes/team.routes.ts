@@ -4,6 +4,7 @@ import { requireCapability, requireAnyCapability } from "../rbac/middleware";
 
 const router = Router();
 
+router.get("/", requireCapability("estimates:read"), TeamModule.getUserTeams);
 router.post("/", requireCapability("system:manage"), TeamModule.postTeam);
 router.get("/:teamId", requireCapability("estimates:read"), TeamModule.getTeamDetail);
 router.post("/:teamId/members", requireCapability("system:manage"), TeamModule.postTeamMember);

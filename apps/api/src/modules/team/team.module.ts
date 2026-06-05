@@ -1,4 +1,5 @@
 export {
+  getUserTeams,
   postTeam,
   getTeamDetail,
   postTeamMember,
