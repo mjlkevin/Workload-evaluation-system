@@ -1,11 +1,19 @@
 // ============================================================
-// Change Management Services — barrel export
+// Change Management Services — barrel export (backward compat)
 // ============================================================
+// Re-exports from modules/change-management — prefer importing from
+// ../modules/change-management/change-management.module directly.
 
 export {
-  ChangeSubmissionService,
-  changeSubmissionService,
-} from "./change-submission";
+  submitChange,
+  findChangeSubmissionById,
+  listChangeSubmissionsByParent,
+  listChangeSubmissionsBySubmitter,
+  mergeToVersion,
+  reject,
+  computeDiff,
+} from "../../modules/change-management/change-management.module";
+
 export type {
   SubmitChangeInput,
   DiffResult,
@@ -13,4 +21,10 @@ export type {
   DiffItemRemoved,
   DiffItemModified,
   RejectInput,
-} from "./change-submission";
+} from "../../modules/change-management/change-management.module";
+
+// Legacy singleton — retained for any code that still imports it.
+// New code should use the module functions directly.
+import { ChangeSubmissionService } from "./change-submission";
+export { ChangeSubmissionService };
+export const changeSubmissionService = new ChangeSubmissionService();

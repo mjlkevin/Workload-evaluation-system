@@ -39,7 +39,7 @@ export function downloadFile(req: Request, res: Response) {
   const auth = requireAuth(req, res);
   if (!auth) return;
 
-  const fileName = req.params.fileName || req.params.file || "";
+  const fileName = String(req.params.fileName || req.params.file || "");
   if (!fileName) {
     return fail(res, 40001, "参数错误", [{ field: "fileName", reason: "required" }]);
   }

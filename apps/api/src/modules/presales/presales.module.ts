@@ -1,8 +1,23 @@
 // ============================================================
-// Presales Services — barrel export (backward compat)
+// Presales Module Export
 // ============================================================
-// Re-exports from modules/presales — prefer importing from
-// ../modules/presales/presales.module directly.
+
+export {
+  postRequirementPack,
+  listRequirementPacksHandler,
+  getRequirementPackHandler,
+  patchRequirementPack,
+  deleteRequirementPackHandler,
+  reviewRequirementPackHandler,
+  getFieldConfidencesHandler,
+  generateInitialEstimateHandler,
+  getInitialEstimateHandler,
+  patchInitialEstimate,
+  generateSowHandler,
+  getSowHandler,
+  patchSowHandler,
+  listSowByPackHandler,
+} from "./presales.controller";
 
 export {
   createFromExtraction,
@@ -25,7 +40,7 @@ export {
   updateSowDocument,
   deleteSowDocument,
   bumpSowVersion,
-} from "../../modules/presales/presales.module";
+} from "./presales.usecase";
 
 export type {
   CreateRequirementPackInput,
@@ -38,14 +53,4 @@ export type {
   FieldConfidence,
   InquiryItem,
   ReviewResult,
-} from "../../modules/presales/presales.module";
-
-// Legacy singletons — retained for backward compat.
-import { RequirementPackService } from "./requirement-pack";
-import { InitialEstimateService } from "./initial-estimate";
-import { SowService } from "./sow";
-
-export { RequirementPackService, InitialEstimateService, SowService };
-export const requirementPackService = new RequirementPackService();
-export const initialEstimateService = new InitialEstimateService();
-export const sowService = new SowService();
+} from "./presales.usecase";

@@ -41,13 +41,13 @@
 
 ## 5. 后端模块迁移状态
 
-`apps/api/src/modules/` 已完成 10 个领域迁移（controller/usecase/repository 三层）：
+`apps/api/src/modules/` 已完成全部 17 个领域迁移（controller/usecase/repository 三层）：
 
-| 已迁移 | 未迁移（遗留 `services/` 单例模式） |
-|--------|--------------------------------------|
-| auth, versions, ai, templates, rules, estimates, exports, sessions, system, team | presales, pm-workbench, collab, dev-assessment, change-management, history, sales-briefing |
+| 已迁移（17/17） |
+|--------|
+| auth, versions, ai, templates, rules, estimates, exports, sessions, system, team, presales, pm-workbench, collab, dev-assessment, change-management, history, sales-briefing |
 
-AI 模块（`modules/ai/`）是 facade — 实际实现在 `services/ai/`。所有 repository 当前使用 JSON 文件存储。`src/db/` 已建 PostgreSQL schema 但未接入。
+遗留 `services/*/index.ts` 仅保留为 barrel re-export（向后兼容），实际实现已全部落在 `modules/*`；新代码应直接 import `modules/<域>/<域>.module`。AI 模块（`modules/ai/`）是 facade — 实际实现在 `services/ai/`。所有 repository 当前使用 JSON 文件存储。`src/db/` 已建 PostgreSQL schema 但未接入。
 
 ## 6. 前端双轨现状
 

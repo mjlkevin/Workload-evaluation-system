@@ -1,8 +1,30 @@
 // ============================================================
-// PM Workbench Services — barrel export (backward compat)
+// PM Workbench Module Export
 // ============================================================
-// Re-exports from modules/pm-workbench — prefer importing from
-// ../modules/pm-workbench/pm-workbench.module directly.
+
+export {
+  postHandoff,
+  listHandoffsHandler,
+  getHandoffHandler,
+  patchHandoff,
+  postNarrative,
+  generateNarrativeHandler,
+  getNarrativeHandler,
+  getNarrativeByVersionHandler,
+  patchNarrative,
+  generateDeliverablesHandler,
+  getDeliverableHandler,
+  listDeliverablesHandler,
+  patchDeliverableStatus,
+  postReview,
+  autoReviewHandler,
+  getReviewHandler,
+  getReviewByVersionHandler,
+  patchReview,
+  postSeal,
+  getSealHandler,
+  getSealByVersionHandler,
+} from "./pm-workbench.controller";
 
 export {
   seal,
@@ -35,7 +57,7 @@ export {
   listAssessmentHandoffsByToRole,
   updateAssessmentHandoff,
   deleteAssessmentHandoff,
-} from "../../modules/pm-workbench/pm-workbench.module";
+} from "./pm-workbench.usecase";
 
 export type {
   SealInput,
@@ -48,18 +70,4 @@ export type {
   CreateHandoffInput,
   UpdateHandoffInput,
   V2Role,
-} from "../../modules/pm-workbench/pm-workbench.module";
-
-// Legacy singletons — retained for backward compat.
-import { SealedBaselineService } from "./sealed-baseline";
-import { DeliverableService } from "./deliverable";
-import { QualityGateReviewService } from "./quality-gate-review";
-import { AssessmentNarrativeService } from "./assessment-narrative";
-import { AssessmentHandoffService } from "./assessment-handoff";
-
-export { SealedBaselineService, DeliverableService, QualityGateReviewService, AssessmentNarrativeService, AssessmentHandoffService };
-export const sealedBaselineService = new SealedBaselineService();
-export const deliverableService = new DeliverableService();
-export const qualityGateReviewService = new QualityGateReviewService();
-export const assessmentNarrativeService = new AssessmentNarrativeService();
-export const assessmentHandoffService = new AssessmentHandoffService();
+} from "./pm-workbench.usecase";
