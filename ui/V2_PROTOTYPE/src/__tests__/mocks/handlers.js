@@ -28,6 +28,7 @@ export const handlers = [
     return HttpResponse.json({ success: true, data: rows })
   }),
   http.get(`${BASE}/auth/users`, () => HttpResponse.json({ success: true, data: { users: mockUsers } })),
+  http.get(`${BASE}/auth/me`, () => HttpResponse.json({ success: true, data: { user: mockUsers[2] } })),
   http.patch(`${BASE}/auth/users/:userId/business-role`, async ({ params, request }) => {
     const body = await request.json()
     return HttpResponse.json({
