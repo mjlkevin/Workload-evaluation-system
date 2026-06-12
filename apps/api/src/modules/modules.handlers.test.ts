@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import XLSX from "xlsx";
 
 import { Request, Response } from "express";
 
@@ -24,7 +25,7 @@ import {
   updateVersionStatus
 } from "./versions/versions.usecase";
 import { patchReviewStatus, postTeam } from "./team/team.controller";
-import { homeWorkbenchChat, kimiAssessmentPreview } from "./ai/ai.usecase";
+import { homeWorkbenchChat, kimiAssessmentPreview, parseBasicInfo } from "./ai/ai.usecase";
 import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap";
 
 type MockRes = {
@@ -54,6 +55,7 @@ function createMockReq(input: {
   query?: Record<string, unknown>;
   params?: Record<string, string>;
   body?: unknown;
+  file?: { buffer: Buffer; originalname?: string };
 }): Request {
   const headers: Record<string, string> = {};
   if (input.token) {
@@ -63,10 +65,26 @@ function createMockReq(input: {
     query: input.query || {},
     params: input.params || {},
     body: input.body || {},
+    file: input.file,
     header(name: string) {
       return headers[name.toLowerCase()];
     }
   } as unknown as Request;
+}
+
+function createMinimalRequirementWorkbookBuffer(): Buffer {
+  const workbook = XLSX.utils.book_new();
+  const overview = XLSX.utils.aoa_to_sheet([
+    ["项目名称", "UT 模型解析项目"],
+    ["客户名称", "UT 客户"],
+  ]);
+  const needs = XLSX.utils.aoa_to_sheet([
+    ["序号", "业务领域", "分类", "业务需求及问题"],
+    [1, "供应链", "采购", "采购订单需要联动入库与付款"],
+  ]);
+  XLSX.utils.book_append_sheet(workbook, overview, "1.项目概况");
+  XLSX.utils.book_append_sheet(workbook, needs, "3.业务需求及问题一览表");
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
 
 function getActiveUser(): AuthUser {
@@ -891,7 +909,40 @@ test("ai.usecase: homeWorkbenchChat injects current business role context", asyn
   }
 });
 
-test("ai.usecase: kimiAssessmentPreview falls back on model timeout", async () => {
+test("ai.usecase: parseBasicInfo fails instead of returning rule fallback when model parsing fails", async () => {
+  const req = createMockReq({
+    token: getActiveUserToken(),
+    file: {
+      buffer: createMinimalRequirementWorkbookBuffer(),
+      originalname: "ut-requirement.xlsx",
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async () => {
+      throw new Error("parse timeout");
+    };
+    await parseBasicInfo(req, res as unknown as Response);
+    assert.equal(res.statusCode, 400);
+    const body = res.body as {
+      code: number;
+      details?: Array<{ field: string; reason: string }>;
+    };
+    assert.equal(body.code, 40001);
+    assert.equal(body.details?.[0]?.field, "model");
+    assert.match(body.details?.[0]?.reason || "", /parse timeout|timeout|kimi_request_timeout/i);
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
+});
+
+test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback on model timeout", async () => {
   const req = createMockReq({
     token: getActiveUserToken(),
     body: {
@@ -919,14 +970,14 @@ test("ai.usecase: kimiAssessmentPreview falls back on model timeout", async () =
       throw new Error("timeout");
     };
     await kimiAssessmentPreview(req, res as unknown as Response);
-    assert.equal(res.statusCode, 200);
+    assert.equal(res.statusCode, 400);
     const body = res.body as {
       code: number;
-      data: { meta: { mode: string; fallbackReason: string } };
+      details?: Array<{ field: string; reason: string }>;
     };
-    assert.equal(body.code, 0);
-    assert.equal(body.data.meta.mode, "rule_fallback");
-    assert.match(body.data.meta.fallbackReason, /超时|kimi_request_timeout/i);
+    assert.equal(body.code, 40001);
+    assert.equal(body.details?.[0]?.field, "model");
+    assert.match(body.details?.[0]?.reason || "", /超时|kimi_request_timeout|timeout/i);
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
@@ -934,7 +985,7 @@ test("ai.usecase: kimiAssessmentPreview falls back on model timeout", async () =
   }
 });
 
-test("ai.usecase: kimiAssessmentPreview falls back on invalid model json", async () => {
+test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback on invalid model json", async () => {
   const req = createMockReq({
     token: getActiveUserToken(),
     body: {
@@ -966,14 +1017,14 @@ test("ai.usecase: kimiAssessmentPreview falls back on invalid model json", async
         }),
       }) as unknown;
     await kimiAssessmentPreview(req, res as unknown as Response);
-    assert.equal(res.statusCode, 200);
+    assert.equal(res.statusCode, 400);
     const body = res.body as {
       code: number;
-      data: { meta: { mode: string; fallbackReason: string } };
+      details?: Array<{ field: string; reason: string }>;
     };
-    assert.equal(body.code, 0);
-    assert.equal(body.data.meta.mode, "rule_fallback");
-    assert.match(body.data.meta.fallbackReason, /model_invalid_assessment_json/i);
+    assert.equal(body.code, 40001);
+    assert.equal(body.details?.[0]?.field, "model");
+    assert.match(body.details?.[0]?.reason || "", /model_invalid_assessment_json/i);
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;

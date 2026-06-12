@@ -221,28 +221,6 @@ async function parseRequirementImportByKimiStream(
   return { basicInfo: normalizeBasicProjectInfo(asModelObject(parsed.basicInfo) || parsed), requirementImportData: normalizeRequirementImportData(parsed), rawContent };
 }
 
-function buildRuleFallbackData(
-  workbook: XLSX.WorkBook,
-  workbookBasicInfo: BasicProjectInfo,
-  workbookRequirementData: RequirementImportData,
-  fallbackReason: string,
-) {
-  return {
-    basicInfo: {
-      ...workbookBasicInfo,
-      productLines: workbookBasicInfo.productLines?.length
-        ? workbookBasicInfo.productLines
-        : inferProductLinesFromProductModules(workbookRequirementData.productModuleRows),
-    },
-    requirementImportData: workbookRequirementData,
-    sourceSheets: workbook.SheetNames,
-    model: "rule-fallback",
-    mode: "rule_fallback",
-    fallbackReason,
-    rawContent: "",
-  };
-}
-
 function writeSse(res: Response, event: string, data: unknown) {
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -291,23 +269,9 @@ export async function parseBasicInfo(req: Request, res: Response) {
     const requirementSettings = loadRequirementSystemConfigStore().active;
     const model = requirementSettings.fileParsing.model?.trim() || requirementSettings.kimiEvaluation.model?.trim() || config.kimi.model;
     const modelForClient = normalizeKimiModelName(model);
-    const ruleFallbackData = (fallbackReason: string) => ({
-      basicInfo: {
-        ...workbookBasicInfo,
-        productLines: workbookBasicInfo.productLines?.length
-          ? workbookBasicInfo.productLines
-          : inferProductLinesFromProductModules(workbookRequirementData.productModuleRows),
-      },
-      requirementImportData: workbookRequirementData,
-      sourceSheets: workbook.SheetNames,
-      model: "rule-fallback",
-      mode: "rule_fallback",
-      fallbackReason,
-      rawContent: "",
-    });
 
     if (!apiKey) {
-      return res.json(ok(ruleFallbackData("api_key_missing"), requestId));
+      return fail(res, 40001, "参数错误", [{ field: "apiKey", reason: "required_or_env_missing" }]);
     }
 
     let parsed: Awaited<ReturnType<typeof parseRequirementImportByKimi>>;
@@ -320,10 +284,7 @@ export async function parseBasicInfo(req: Request, res: Response) {
         timeoutMs: requirementSettings.kimiEvaluation.timeoutMs || 120000,
       });
     } catch (err) {
-      if (requirementSettings.kimiEvaluation.fallbackToRule) {
-        return res.json(ok(ruleFallbackData(err instanceof Error ? err.message : "model_parse_failed"), requestId));
-      }
-      throw err;
+      return fail(res, 40001, "参数错误", [{ field: "model", reason: err instanceof Error ? err.message : "model_parse_failed" }]);
     }
 
     const mergedBasic = mergeBasicInfo(parsed.basicInfo, workbookBasicInfo);
@@ -357,12 +318,9 @@ export async function parseBasicInfoStream(req: Request, res: Response) {
     const requirementSettings = loadRequirementSystemConfigStore().active;
     const model = requirementSettings.fileParsing.model?.trim() || requirementSettings.kimiEvaluation.model?.trim() || config.kimi.model;
     const modelForClient = normalizeKimiModelName(model);
-    const ruleFallback = (reason: string) => buildRuleFallbackData(workbook, workbookBasicInfo, workbookRequirementData, reason);
 
     if (!apiKey) {
-      const data = ruleFallback("api_key_missing");
-      writeSse(res, "fallback", { message: "KIMI API Key 未配置，已切换为规则回填。", progress: 82, reason: data.fallbackReason });
-      writeSse(res, "complete", { data, requestId });
+      writeSse(res, "error", { message: "参数错误", reason: "required_or_env_missing", requestId });
       return res.end();
     }
 
@@ -398,18 +356,12 @@ export async function parseBasicInfoStream(req: Request, res: Response) {
         },
       });
     } catch (err) {
-      if (requirementSettings.kimiEvaluation.fallbackToRule) {
-        const reason = err instanceof Error ? err.message : "model_parse_failed";
-        const data = ruleFallback(reason);
-        writeSse(res, "fallback", {
-          message: `${modelForClient} 未能完成解析，已切换为规则回填。`,
-          progress: 86,
-          reason,
-        });
-        writeSse(res, "complete", { data, requestId });
-        return res.end();
-      }
-      throw err;
+      writeSse(res, "error", {
+        message: `${modelForClient} 未能完成解析。`,
+        reason: err instanceof Error ? err.message : "model_parse_failed",
+        requestId,
+      });
+      return res.end();
     }
 
     writeSse(res, "progress", { message: "模型内容接收完成，正在合并回填结果…", progress: 88 });
