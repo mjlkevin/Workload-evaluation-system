@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
-import useUsers from '../hooks/useUsers.js'
+import useUsers, { BUSINESS_ROLES, businessRoleLabel } from '../hooks/useUsers.js'
+import { apiClient } from '../api/client.js'
 
 const INITIAL_USERS = [
   { id: 'u1', username: 'mjlkevin', role: 'admin', status: 'active', lastLoginAt: '2026-05-09T14:28:00Z', locked: false },
@@ -22,8 +23,9 @@ export default function UserManagement() {
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
   const [search, setSearch] = useState('')
-  const [dialog, setDialog] = useState(null) // 'role' | 'demote' | null
+  const [dialog, setDialog] = useState(null) // 'systemRole' | 'businessRole' | 'demote' | null
   const [pendingRole, setPendingRole] = useState('')
+  const [pendingBusinessRole, setPendingBusinessRole] = useState('')
   const [demoteConfirm, setDemoteConfirm] = useState('')
 
   useEffect(() => {
@@ -99,10 +101,16 @@ export default function UserManagement() {
     )
   }
 
-  const openRoleDialog = () => {
+  const openSystemRoleDialog = () => {
     if (selCount === 0) return
     setPendingRole('user')
-    setDialog('role')
+    setDialog('systemRole')
+  }
+
+  const openBusinessRoleDialog = () => {
+    if (selCount === 0) return
+    setPendingBusinessRole(selectedRows[0]?.businessRole || 'pre_sales')
+    setDialog('businessRole')
   }
 
   const confirmRole = () => {
@@ -122,6 +130,24 @@ export default function UserManagement() {
     setDialog(null)
     setPendingRole('')
     setDemoteConfirm('')
+  }
+
+  const applyBusinessRole = async () => {
+    const targetRole = pendingBusinessRole
+    const ids = Array.from(selected)
+    try {
+      for (const id of ids) {
+        await apiClient.patch(`/auth/users/${id}/business-role`, { businessRole: targetRole })
+      }
+      setUsers((prev) => prev.map((u) => selected.has(u.id)
+        ? { ...u, businessRole: targetRole, businessRoleLabel: businessRoleLabel(targetRole) }
+        : u
+      ))
+      setDialog(null)
+      setPendingBusinessRole('')
+    } catch (err) {
+      alert(err?.message || '修改业务角色失败')
+    }
   }
 
   const confirmDemote = () => {
@@ -229,9 +255,17 @@ export default function UserManagement() {
               className="btn btn-ghost"
               style={{ height: 28, fontSize: 12, padding: '0 10px' }}
               disabled={!canChangeRole}
-              onClick={openRoleDialog}
+              onClick={openSystemRoleDialog}
             >
-              改角色
+              改系统角色
+            </button>
+            <button type="button"
+              className="btn btn-ghost"
+              style={{ height: 28, fontSize: 12, padding: '0 10px' }}
+              disabled={!canChangeRole}
+              onClick={openBusinessRoleDialog}
+            >
+              改业务角色
             </button>
             <button type="button" className="btn btn-pri" style={{ height: 28, fontSize: 12, padding: '0 10px' }}>
               + 邀请成员
@@ -252,7 +286,7 @@ export default function UserManagement() {
                 color: 'var(--ink-2)',
               }}
             >
-              角色：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>全部</b>
+              系统角色：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>全部</b>
               <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span>
             </span>
             <span
@@ -313,7 +347,8 @@ export default function UserManagement() {
                 />
               </th>
               <th>用户</th>
-              <th>角色</th>
+              <th>系统角色</th>
+              <th>业务角色</th>
               <th>状态</th>
               <th>最后登录</th>
               <th>操作</th>
@@ -370,6 +405,7 @@ export default function UserManagement() {
                     </div>
                   </td>
                   <td>{fmtRoleChip(u.role)}</td>
+                  <td><span className="bdg brd" style={{ fontSize: 10.5, padding: '1px 7px' }}><span className="dot" />{u.businessRoleLabel || businessRoleLabel(u.businessRole)}</span></td>
                   <td>{fmtStatus(u.status)}</td>
                   <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                     {u.lastLoginAt ? u.lastLoginAt.replace('T', ' ').replace('Z', '') : '—'}
@@ -390,10 +426,10 @@ export default function UserManagement() {
         </table>
       </div>
 
-      {/* 改角色 dialog */}
-      {dialog === 'role' && (
+      {/* 改系统角色 dialog */}
+      {dialog === 'systemRole' && (
         <DialogBackdrop onClose={() => setDialog(null)}>
-          <DialogCard title="修改角色" subtitle={`已选 ${selCount} 人`}>
+          <DialogCard title="修改系统角色" subtitle={`已选 ${selCount} 人`}>
             <div style={{ display: 'grid', gap: 8 }}>
               {ROLES.map((r) => (
                 <label
@@ -427,6 +463,51 @@ export default function UserManagement() {
                 取消
               </button>
               <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmRole}>
+                确认修改
+              </button>
+            </DialogActions>
+          </DialogCard>
+        </DialogBackdrop>
+      )}
+
+      {/* 改业务角色 dialog */}
+      {dialog === 'businessRole' && (
+        <DialogBackdrop onClose={() => setDialog(null)}>
+          <DialogCard title="修改业务角色" subtitle={`已选 ${selCount} 人`}>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {BUSINESS_ROLES.map((r) => (
+                <label
+                  key={r.key}
+                  style={{
+                    display: 'flex',
+                    gap: 10,
+                    padding: '10px 12px',
+                    border: `1px solid ${pendingBusinessRole === r.key ? 'var(--brand)' : 'var(--line)'}`,
+                    borderRadius: 10,
+                    background: pendingBusinessRole === r.key ? 'var(--brand-soft)' : 'var(--bg-soft)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="businessRole"
+                    value={r.key}
+                    checked={pendingBusinessRole === r.key}
+                    onChange={() => setPendingBusinessRole(r.key)}
+                    style={{ marginTop: 4 }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{r.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>用于首页 AI 工作台提示词与工作流分流</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <DialogActions>
+              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+                取消
+              </button>
+              <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={applyBusinessRole}>
                 确认修改
               </button>
             </DialogActions>

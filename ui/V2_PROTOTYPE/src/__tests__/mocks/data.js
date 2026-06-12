@@ -1,7 +1,7 @@
 export const mockUsers = [
-  { id: 'u1', username: 'admin', role: 'admin', email: 'admin@wes.local' },
-  { id: 'u2', username: 'pm', role: 'user', email: 'pm@wes.local' },
-  { id: 'u3', username: 'arch', role: 'user', email: 'arch@wes.local' },
+  { id: 'u1', username: 'admin', role: 'admin', businessRole: 'admin', email: 'admin@wes.local' },
+  { id: 'u2', username: 'pm', role: 'sub_admin', businessRole: 'pm', email: 'pm@wes.local' },
+  { id: 'u3', username: 'arch', role: 'user', businessRole: 'pre_sales', email: 'arch@wes.local' },
 ]
 
 export const mockVersions = [

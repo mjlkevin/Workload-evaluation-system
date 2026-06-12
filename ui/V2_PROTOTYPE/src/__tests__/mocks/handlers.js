@@ -28,6 +28,21 @@ export const handlers = [
     return HttpResponse.json({ success: true, data: rows })
   }),
   http.get(`${BASE}/auth/users`, () => HttpResponse.json({ success: true, data: { users: mockUsers } })),
+  http.patch(`${BASE}/auth/users/:userId/business-role`, async ({ params, request }) => {
+    const body = await request.json()
+    return HttpResponse.json({
+      success: true,
+      data: {
+        user: {
+          id: params.userId,
+          username: 'patched-user',
+          role: 'user',
+          businessRole: body.businessRole,
+          status: 'active',
+        },
+      },
+    })
+  }),
 
   http.get(`${BASE}/versions/:id`, ({ params }) => {
     const data = String(params.id).startsWith('RC') ? mockResourceCost : mockAssessmentVersion
