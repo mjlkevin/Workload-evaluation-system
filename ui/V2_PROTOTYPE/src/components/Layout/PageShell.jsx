@@ -62,9 +62,17 @@ function Crumbs({ crumb }) {
   )
 }
 
-export default function PageShell({ crumb, title, subtitle, actions, children }) {
+export default function PageShell({ crumb, title, subtitle, actions, children, fillViewport = false }) {
   return (
-    <div>
+    <div
+      style={fillViewport ? {
+        height: 'calc(100vh - var(--workspace-tabs-height, 0px))',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      } : undefined}
+    >
       <div
         className="pg-hd"
         style={{
@@ -91,7 +99,10 @@ export default function PageShell({ crumb, title, subtitle, actions, children })
           )}
         </div>
       </div>
-      <div style={{ padding: '16px 24px 24px' }}>
+      <div style={{
+        padding: '16px 24px 24px',
+        ...(fillViewport ? { flex: 1, minHeight: 0, overflow: 'hidden' } : {}),
+      }}>
         {children}
       </div>
     </div>

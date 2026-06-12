@@ -41,6 +41,7 @@ export default function HomeWorkspace() {
       crumb="工作台 / AI 工作台"
       title="AI 工作台"
       subtitle={view === 'ai' ? '按登录账号业务角色预置对话工作流' : '已切换为传统主页视图'}
+      fillViewport={view === 'ai'}
       actions={[
         <div key="switch" style={{ display: 'inline-flex', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', height: 32 }}>
           <ViewButton active={view === 'ai'} onClick={() => setView('ai')}>AI 工作台</ViewButton>

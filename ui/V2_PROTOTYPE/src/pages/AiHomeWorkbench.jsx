@@ -191,8 +191,8 @@ export default function AiHomeWorkbench({ currentUser }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr) 300px', gap: 16, minHeight: 'calc(100vh - 168px)' }}>
-      <aside style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+    <div data-testid="ai-home-workbench" style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr) 300px', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+      <aside style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0, minHeight: 0, overflowY: 'auto' }}>
         <section style={{ ...panel, padding: 16 }}>
           <RoleBadge>{preset.label}</RoleBadge>
           <h2 style={{ margin: '12px 0 8px', fontSize: 18, lineHeight: 1.35 }}>{preset.headline}</h2>
@@ -225,13 +225,13 @@ export default function AiHomeWorkbench({ currentUser }) {
         </section>
       </aside>
 
-      <section style={{ ...panel, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+      <section style={{ ...panel, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
         <div style={{ minHeight: 48, padding: '12px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <RoleBadge>AI 工作台</RoleBadge>
           <span style={{ color: 'var(--ink-3)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preset.systemPrompt}</span>
         </div>
 
-        <div style={{ flex: 1, padding: 18, overflowY: 'auto', background: 'linear-gradient(180deg,#fff,var(--bg-soft))' }}>
+        <div data-testid="ai-home-message-pane" style={{ flex: 1, minHeight: 0, padding: 18, overflowY: 'auto', background: 'linear-gradient(180deg,#fff,var(--bg-soft))' }}>
           {!messages.length && (
             <div style={{ border: '1px dashed var(--line)', borderRadius: 12, padding: 28, background: '#fff' }}>
               <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>{preset.headline}</h2>
@@ -279,7 +279,7 @@ export default function AiHomeWorkbench({ currentUser }) {
               onChange={(event) => setComposer(event.target.value)}
               onKeyDown={handleComposerKeyDown}
               placeholder={preset.placeholder}
-              style={{ flex: 1, border: 0, outline: 'none', resize: 'none', minHeight: 34, padding: '8px 4px', fontFamily: 'inherit', fontSize: 13 }}
+              style={{ flex: 1, border: 0, outline: 'none', resize: 'none', height: 34, minHeight: 34, padding: '8px 4px', fontFamily: 'inherit', fontSize: 13, lineHeight: '18px', overflowY: 'hidden' }}
             />
             <button className="btn btn-pri" type="button" onClick={sendMessage} disabled={sending} style={{ height: 36, minWidth: 44 }}>{sending ? '…' : '➤'}</button>
           </div>
@@ -287,7 +287,7 @@ export default function AiHomeWorkbench({ currentUser }) {
         </div>
       </section>
 
-      <aside style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+      <aside style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0, minHeight: 0, overflowY: 'auto' }}>
         <ResultCard title="沉淀结果">
           {messages.length ? '当前对话已生成初步工作流结果，可继续补充问题或进入下游页面。' : '对话开始后，这里会沉淀项目草稿、需求包、待确认问题和评估输入。'}
         </ResultCard>

@@ -87,6 +87,20 @@ describe('HomeWorkspace', () => {
     expect(screen.getByText(/查看今日项目队列/).closest('ul')).toBeInTheDocument()
   })
 
+  test('keeps AI workbench scrolling inside the message pane', async () => {
+    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+
+    const workbench = await screen.findByTestId('ai-home-workbench')
+    const messagePane = screen.getByTestId('ai-home-message-pane')
+    const composer = screen.getByRole('textbox')
+
+    expect(workbench.style.height).toBe('100%')
+    expect(workbench.style.minHeight).toBe('0px')
+    expect(messagePane.style.overflowY).toBe('auto')
+    expect(messagePane.style.minHeight).toBe('0px')
+    expect(composer.style.overflowY).toBe('hidden')
+  })
+
   test('pressing Enter sends AI home message', async () => {
     render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
 
