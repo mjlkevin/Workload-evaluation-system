@@ -24,7 +24,7 @@ import {
   updateVersionStatus
 } from "./versions/versions.usecase";
 import { patchReviewStatus, postTeam } from "./team/team.controller";
-import { kimiAssessmentPreview } from "./ai/ai.usecase";
+import { homeWorkbenchChat, kimiAssessmentPreview } from "./ai/ai.usecase";
 import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap";
 
 type MockRes = {
@@ -842,6 +842,48 @@ test("ai.usecase: kimiAssessmentPreview returns model result on valid response",
     assert.equal(body.code, 0);
     assert.equal(body.data.meta.mode, "model");
     assert.equal(body.data.assessmentDraft.moduleItems[0]?.moduleName, "总账");
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
+});
+
+test("ai.usecase: homeWorkbenchChat injects current business role context", async () => {
+  const req = createMockReq({
+    token: getNonAdminUserToken(),
+    body: {
+      messages: [{ role: "user", content: "请帮我解析客户需求材料" }],
+      workflowKey: "parse_requirement_file",
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  let capturedBody: { messages?: Array<{ role: string; content: string }> } | null = null;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async (_url: unknown, init?: { body?: string }) => {
+      capturedBody = JSON.parse(String(init?.body || "{}")) as { messages?: Array<{ role: string; content: string }> };
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "已识别为售前需求解析任务。" } }],
+        }),
+      } as unknown;
+    };
+
+    await homeWorkbenchChat(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as { code: number; data: { answer: string; businessRole: string; model: string } };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.businessRole, "pre_sales");
+    assert.equal(body.data.answer, "已识别为售前需求解析任务。");
+    const systemPrompt = capturedBody?.messages?.find((item) => item.role === "system")?.content || "";
+    assert.match(systemPrompt, /售前顾问/);
+    assert.match(systemPrompt, /parse_requirement_file/);
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;

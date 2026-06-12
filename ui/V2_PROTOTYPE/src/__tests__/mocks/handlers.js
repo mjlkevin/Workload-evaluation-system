@@ -44,6 +44,18 @@ export const handlers = [
       },
     })
   }),
+  http.post(`${BASE}/ai/home-workbench/chat`, async ({ request }) => {
+    const body = await request.json()
+    return HttpResponse.json({
+      success: true,
+      data: {
+        answer: `模型回复：${body.messages?.at?.(-1)?.content || '收到'}`,
+        businessRole: 'pre_sales',
+        roleLabel: '售前顾问',
+        model: 'kimi-k2.5',
+      },
+    })
+  }),
 
   http.get(`${BASE}/versions/:id`, ({ params }) => {
     const data = String(params.id).startsWith('RC') ? mockResourceCost : mockAssessmentVersion

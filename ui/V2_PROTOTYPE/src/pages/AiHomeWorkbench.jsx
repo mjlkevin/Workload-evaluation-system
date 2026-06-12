@@ -1,5 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { apiClient } from '../api/client.js'
+import { unwrap } from '../api/utils.js'
 import { getAiHomePreset } from './aiHomePresets.js'
 
 const panel = {
@@ -27,6 +29,8 @@ export default function AiHomeWorkbench({ currentUser }) {
   const [composer, setComposer] = useState('')
   const [selectedFile, setSelectedFile] = useState(null)
   const [messages, setMessages] = useState([])
+  const [activeWorkflowKey, setActiveWorkflowKey] = useState('')
+  const [sending, setSending] = useState(false)
   const fileInputRef = useRef(null)
 
   function chooseFile() {
@@ -34,18 +38,40 @@ export default function AiHomeWorkbench({ currentUser }) {
   }
 
   function startWorkflow(workflow) {
+    setActiveWorkflowKey(workflow.key)
     setComposer(`${workflow.title}：${workflow.desc}`)
   }
 
-  function sendMessage() {
+  async function sendMessage() {
     const text = composer.trim()
-    if (!text && !selectedFile) return
-    setMessages((prev) => [
-      ...prev,
-      { role: 'user', text: text || '请解析这个文件并启动工作流。', fileName: selectedFile?.name },
-      { role: 'assistant', text: `${preset.label}工作流已准备：${preset.workflows[0]?.title || preset.headline}` },
-    ])
+    if ((!text && !selectedFile) || sending) return
+    const userMessage = { role: 'user', text: text || '请解析这个文件并启动工作流。', fileName: selectedFile?.name }
+    setMessages((prev) => [...prev, userMessage])
     setComposer('')
+    setSending(true)
+    try {
+      const payload = await apiClient.post('/ai/home-workbench/chat', {
+        workflowKey: activeWorkflowKey,
+        messages: [...messages, userMessage].map((message) => ({
+          role: message.role === 'assistant' ? 'assistant' : 'user',
+          content: message.text,
+        })),
+      })
+      const data = unwrap(payload) || {}
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        text: data.answer || 'AI 已收到，但暂未返回有效内容。',
+        model: data.model,
+      }])
+    } catch (err) {
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        text: `AI 对话暂未完成：${err.message || '请求失败'}`,
+        error: true,
+      }])
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -126,7 +152,7 @@ export default function AiHomeWorkbench({ currentUser }) {
               placeholder={preset.placeholder}
               style={{ flex: 1, border: 0, outline: 'none', resize: 'none', minHeight: 34, padding: '8px 4px', fontFamily: 'inherit', fontSize: 13 }}
             />
-            <button className="btn btn-pri" type="button" onClick={sendMessage} style={{ height: 36, minWidth: 44 }}>➤</button>
+            <button className="btn btn-pri" type="button" onClick={sendMessage} disabled={sending} style={{ height: 36, minWidth: 44 }}>{sending ? '…' : '➤'}</button>
           </div>
           {selectedFile && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>已附加：{selectedFile.name}</div>}
         </div>

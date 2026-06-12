@@ -21,4 +21,14 @@ describe('HomeWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '传统工作台' }))
     await waitFor(() => expect(screen.getByText('评估方案列表')).toBeInTheDocument())
   })
+
+  test('sends AI home message to backend and renders model answer', async () => {
+    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+
+    const input = await screen.findByRole('textbox')
+    fireEvent.change(input, { target: { value: '请分析这份需求材料' } })
+    fireEvent.click(screen.getByRole('button', { name: '➤' }))
+
+    expect(await screen.findByText('模型回复：请分析这份需求材料')).toBeInTheDocument()
+  })
 })
