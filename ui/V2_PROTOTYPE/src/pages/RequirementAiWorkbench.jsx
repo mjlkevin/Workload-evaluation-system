@@ -226,6 +226,61 @@ function SourcePanel({ selectedFile, savedSourceFile, parseSummary }) {
   )
 }
 
+function UserThreadMessage({ message }) {
+  const attachments = Array.isArray(message.attachments) ? message.attachments : []
+  return (
+    <article className="aiw-msg user">
+      <div className="aiw-bubble"><div className="aiw-pad">
+        <div className="aiw-text">{message.content}</div>
+        {attachments.map((attachment) => (
+          <div className="aiw-attach" key={attachment.id || attachment.name}>
+            <div className="aiw-doc">{String(attachment.name || 'FILE').split('.').pop()?.slice(0, 3).toUpperCase() || 'FILE'}</div>
+            <div><b>{attachment.name || '已上传文件'}</b><div style={{fontSize:11,opacity:.78}}>{attachment.size ? `${Math.max(1, Math.round(attachment.size / 1024))} KB · 已附加` : '已附加'}</div></div>
+          </div>
+        ))}
+      </div></div>
+      <div className="aiw-avatar">我</div>
+    </article>
+  )
+}
+
+function AssistantTextMessage({ message }) {
+  return (
+    <article className="aiw-msg">
+      <div className="aiw-avatar">AI</div>
+      <div className="aiw-bubble"><div className="aiw-pad">
+        <div className="aiw-text">{message.content}</div>
+      </div></div>
+    </article>
+  )
+}
+
+function ThreadMessage({ message, artifacts, onAccept, onAction }) {
+  if (message.role === 'user') return <UserThreadMessage message={message} />
+  if (message.type === 'parse_summary') {
+    return <ParseSummaryMessage summary={artifacts?.[message.artifactId]} />
+  }
+  if (message.type === 'assessment_preview') {
+    return (
+      <article className="aiw-msg">
+        <div className="aiw-avatar">AI</div>
+        <div className="aiw-bubble">
+          <AssessmentPreviewPanel preview={artifacts?.[message.artifactId]} onAccept={onAccept} onAction={onAction} />
+        </div>
+      </article>
+    )
+  }
+  if (message.type === 'error') {
+    return (
+      <article className="aiw-msg">
+        <div className="aiw-avatar">AI</div>
+        <div className="aiw-bubble"><div className="aiw-pad"><div className="aiw-text" style={{color:'var(--err)'}}>后端分析暂未完成：{message.content}</div></div></div>
+      </article>
+    )
+  }
+  return <AssistantTextMessage message={message} />
+}
+
 export default function RequirementAiWorkbench() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -234,6 +289,7 @@ export default function RequirementAiWorkbench() {
     acceptEvaluationInput,
     analyze,
     analysisRequest,
+    artifacts,
     chooseFile,
     composer,
     confirmationQuestions,
@@ -253,6 +309,7 @@ export default function RequirementAiWorkbench() {
     loadingSaved,
     onFileChange,
     parseSummary,
+    messages,
     saveEvaluationDraft,
     savedSourceFile,
     saving,
@@ -273,7 +330,8 @@ export default function RequirementAiWorkbench() {
   }, [moduleItems])
   const sourceName = selectedFile?.name || savedSourceFile?.name || parseSummary?.fileName
   const isMissingVersion = loadStatus === 'not_found'
-  const hasConversation = Boolean(parseSummary || lastPreview || selectedFile || analysisRequest)
+  const hasThreadMessages = messages.length > 0
+  const hasConversation = Boolean(hasThreadMessages || parseSummary || lastPreview || selectedFile || analysisRequest)
   const versionCode = versionRecord?.versionCode || latestRequirement?.versionCode || '需求版本'
   const checkoutLabel = versionRecord?.checkoutStatus === 'checked_out' ? '已检出' : '已检入'
 
@@ -333,7 +391,15 @@ export default function RequirementAiWorkbench() {
           </div>
           <div className="aiw-scroll">
             {isMissingVersion ? <MissingVersionState latestRequirement={latestRequirement} /> : !hasConversation && <EmptyState onChooseFile={chooseFile} />}
-            {(analysisRequest || selectedFile || sourceName) && (
+            {hasThreadMessages ? messages.map((message) => (
+              <ThreadMessage
+                artifacts={artifacts}
+                key={message.id}
+                message={message}
+                onAccept={acceptEvaluationInput}
+                onAction={handleResultAction}
+              />
+            )) : (analysisRequest || selectedFile || sourceName) && (
               <article className="aiw-msg user">
                 <div className="aiw-bubble"><div className="aiw-pad">
                   <div className="aiw-text">{analysisRequest || composer}</div>
@@ -343,9 +409,9 @@ export default function RequirementAiWorkbench() {
               </article>
             )}
 
-            <ParseSummaryMessage summary={parseSummary} />
+            {!hasThreadMessages && <ParseSummaryMessage summary={parseSummary} />}
 
-            {lastPreview && (
+            {!hasThreadMessages && lastPreview && (
               <article className="aiw-msg">
                 <div className="aiw-avatar">AI</div>
                 <div className="aiw-bubble">

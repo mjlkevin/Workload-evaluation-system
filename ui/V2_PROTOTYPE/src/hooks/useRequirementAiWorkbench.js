@@ -6,6 +6,7 @@ const DEFAULT_ACCEPTED = []
 const DEFAULT_CONFIRMATION_QUESTIONS = []
 const DEFAULT_FEEDBACK_RECORDS = []
 const DEFAULT_PROMPT = '请解析这份原始需求文件，重点识别业务需求及问题，并生成可用于实施评估的初稿。'
+const DEFAULT_THREAD_TITLE = '需求 AI 评估对话'
 
 function unwrapData(payload) {
   return payload?.data || payload || null
@@ -16,6 +17,87 @@ function unwrapItems(payload) {
   if (Array.isArray(payload?.items)) return payload.items
   if (Array.isArray(payload?.data)) return payload.data
   return Array.isArray(payload) ? payload : []
+}
+
+function createId(prefix) {
+  const randomId = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(16).slice(2)}`
+  return `${prefix}_${randomId}`
+}
+
+function createMessage({ role, type = 'text', content = '', attachments = [], artifactId = '', targetArtifactId = '', targetPath = '', createdAt } = {}) {
+  return {
+    id: createId('msg'),
+    role,
+    type,
+    content,
+    attachments,
+    artifactId,
+    targetArtifactId,
+    targetPath,
+    createdAt: createdAt || new Date().toISOString(),
+  }
+}
+
+function fileAttachmentSnapshot(file) {
+  if (!file) return []
+  return [{
+    id: createId('att'),
+    name: file.name,
+    size: file.size,
+    type: file.type,
+  }]
+}
+
+function normalizeThreads(value) {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((thread) => thread && typeof thread === 'object')
+    .map((thread) => ({
+      id: thread.id || createId('thread'),
+      title: thread.title || DEFAULT_THREAD_TITLE,
+      status: thread.status || 'active',
+      createdAt: thread.createdAt || new Date().toISOString(),
+      updatedAt: thread.updatedAt || thread.createdAt || new Date().toISOString(),
+      messages: Array.isArray(thread.messages) ? thread.messages : [],
+      artifacts: thread.artifacts && typeof thread.artifacts === 'object' ? thread.artifacts : {},
+    }))
+}
+
+function buildThreadState({
+  activeThreadId,
+  artifacts = {},
+  messages = [],
+  requirementId,
+  sourceName,
+  threads = [],
+}) {
+  const nextActiveThreadId = activeThreadId || threads[0]?.id || createId('thread')
+  const existing = threads.find((thread) => thread.id === nextActiveThreadId)
+  const now = new Date().toISOString()
+  const nextThread = {
+    id: nextActiveThreadId,
+    title: existing?.title || sourceName || DEFAULT_THREAD_TITLE,
+    status: existing?.status || 'active',
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+    requirementVersionId: requirementId,
+    messages,
+    artifacts: {
+      ...(existing?.artifacts || {}),
+      ...artifacts,
+    },
+  }
+  const others = threads.filter((thread) => thread.id !== nextActiveThreadId)
+  return {
+    activeThreadId: nextActiveThreadId,
+    threads: [nextThread, ...others],
+    activeThread: nextThread,
+  }
+}
+
+function deriveLatestArtifact(messages, artifacts, type) {
+  const message = [...messages].reverse().find((item) => item.type === type && item.artifactId)
+  return message ? artifacts?.[message.artifactId] : null
 }
 
 function summarizeParsedFile(file, parsed) {
@@ -69,9 +151,11 @@ function uniqueCompact(values) {
 
 function buildAssessmentSeed({
   accepted,
+  activeThreadId,
   confirmationQuestions,
   feedbackRecords,
   lastPreview,
+  messages,
   parseSummary,
   requirementId,
   savedSourceFile,
@@ -88,6 +172,7 @@ function buildAssessmentSeed({
   return {
     mode: 'conversation',
     sourceRequirementVersionId: requirementId,
+    activeThreadId,
     generatedAt: new Date().toISOString(),
     sourceFile: sourceFileSnapshot(selectedFile, parseSummary, savedSourceFile),
     parseSummary,
@@ -110,6 +195,66 @@ function buildAssessmentSeed({
     confirmationQuestions,
     feedbackRecords,
     lastPreview,
+    messages,
+  }
+}
+
+function buildAiEvaluationDraft({
+  accepted,
+  activeThreadId,
+  analysisRequest,
+  artifacts,
+  composer,
+  confirmationQuestions,
+  feedbackRecords,
+  lastPreview,
+  messages,
+  parseSummary,
+  requirementId,
+  savedSourceFile,
+  selectedFile,
+  threads,
+}) {
+  const sourceFile = sourceFileSnapshot(selectedFile, parseSummary, savedSourceFile)
+  const assessmentSeed = buildAssessmentSeed({
+    accepted,
+    activeThreadId,
+    confirmationQuestions,
+    feedbackRecords,
+    lastPreview,
+    messages,
+    parseSummary,
+    requirementId,
+    savedSourceFile,
+    selectedFile,
+    userInstruction: analysisRequest || composer,
+  })
+  const { activeThreadId: nextActiveThreadId, threads: nextThreads } = buildThreadState({
+    activeThreadId,
+    artifacts: {
+      ...(parseSummary ? { latestParseSummary: parseSummary } : {}),
+      ...(lastPreview ? { latestAssessmentPreview: lastPreview } : {}),
+      ...(artifacts || {}),
+    },
+    messages,
+    requirementId,
+    sourceName: sourceFile?.name,
+    threads,
+  })
+
+  return {
+    mode: 'conversation',
+    activeThreadId: nextActiveThreadId,
+    threads: nextThreads,
+    sourceFile,
+    parseSummary,
+    userInstruction: analysisRequest || composer,
+    acceptedInputs: accepted,
+    confirmationQuestions,
+    feedbackRecords,
+    lastPreview,
+    assessmentSeed,
+    updatedAt: new Date().toISOString(),
   }
 }
 
@@ -132,6 +277,7 @@ function buildAssessmentPayload(seed) {
       sourceFile: seed.sourceFile,
       parseSummary: seed.parseSummary,
       userInstruction: seed.userInstruction,
+      activeThreadId: seed.activeThreadId,
     },
     aiAssessmentSeed: seed,
     assessmentDraft: {
@@ -144,6 +290,7 @@ function buildAssessmentPayload(seed) {
       acceptedInputs: seed.acceptedInputs,
       confirmationQuestions: seed.confirmationQuestions,
       feedbackRecords: seed.feedbackRecords,
+      messages: seed.messages,
     },
   }
 }
@@ -164,6 +311,10 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
   const [loadingSaved, setLoadingSaved] = useState(false)
   const [parseSummary, setParseSummary] = useState(null)
   const [lastPreview, setLastPreview] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [threads, setThreads] = useState([])
+  const [activeThreadId, setActiveThreadId] = useState('')
+  const [artifacts, setArtifacts] = useState({})
   const [savedSourceFile, setSavedSourceFile] = useState(null)
   const [versionRecord, setVersionRecord] = useState(null)
   const [latestRequirement, setLatestRequirement] = useState(null)
@@ -194,6 +345,10 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
         if (isLegacyRuleFallbackEvaluation(saved)) {
           setParseSummary(null)
           setLastPreview(null)
+          setMessages([])
+          setThreads([])
+          setActiveThreadId('')
+          setArtifacts({})
           setAccepted(DEFAULT_ACCEPTED)
           setConfirmationQuestions(DEFAULT_CONFIRMATION_QUESTIONS)
           setFeedbackRecords(DEFAULT_FEEDBACK_RECORDS)
@@ -206,6 +361,19 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
         if (Array.isArray(saved.feedbackRecords)) setFeedbackRecords(saved.feedbackRecords)
         if (saved.parseSummary) setParseSummary(saved.parseSummary)
         if (saved.lastPreview) setLastPreview(saved.lastPreview)
+        const savedThreads = normalizeThreads(saved.threads)
+        if (savedThreads.length) {
+          const nextActiveThreadId = saved.activeThreadId || savedThreads[0].id
+          const activeThread = savedThreads.find((thread) => thread.id === nextActiveThreadId) || savedThreads[0]
+          setThreads(savedThreads)
+          setActiveThreadId(activeThread.id)
+          setMessages(activeThread.messages)
+          setArtifacts(activeThread.artifacts)
+          const restoredParse = deriveLatestArtifact(activeThread.messages, activeThread.artifacts, 'parse_summary')
+          const restoredPreview = deriveLatestArtifact(activeThread.messages, activeThread.artifacts, 'assessment_preview')
+          if (restoredParse) setParseSummary(restoredParse)
+          if (restoredPreview) setLastPreview(restoredPreview)
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -246,26 +414,94 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     showToast(`已附加文件：${file.name}`)
   }, [showToast])
 
+  const persistAiEvaluationDraft = useCallback(async (overrides = {}) => {
+    if (!requirementId) return null
+
+    const nextAccepted = overrides.accepted ?? accepted
+    const nextConfirmationQuestions = overrides.confirmationQuestions ?? confirmationQuestions
+    const nextFeedbackRecords = overrides.feedbackRecords ?? feedbackRecords
+    const nextLastPreview = overrides.lastPreview ?? lastPreview
+    const nextMessages = overrides.messages ?? messages
+    const nextParseSummary = overrides.parseSummary ?? parseSummary
+    const nextSavedSourceFile = overrides.savedSourceFile ?? savedSourceFile
+    const nextSelectedFile = overrides.selectedFile ?? selectedFile
+    const nextUserInstruction = overrides.userInstruction ?? analysisRequest ?? composer
+    const nextActiveThreadId = overrides.activeThreadId ?? activeThreadId
+    const nextThreadsInput = overrides.threads ?? threads
+    const nextArtifacts = overrides.artifacts ?? artifacts
+
+    const versionPayload = await apiClient.get(`/versions/${requirementId}`)
+    const versionData = unwrapData(versionPayload) || {}
+    const record = versionData.record || versionData
+    if (record.checkoutStatus !== 'checked_out') {
+      await apiClient.post(`/versions/${requirementId}/checkout`)
+    }
+
+    const currentPayload = record.payload && typeof record.payload === 'object' ? record.payload : {}
+    const aiEvaluation = buildAiEvaluationDraft({
+      accepted: nextAccepted,
+      activeThreadId: nextActiveThreadId,
+      analysisRequest: nextUserInstruction,
+      artifacts: nextArtifacts,
+      composer,
+      confirmationQuestions: nextConfirmationQuestions,
+      feedbackRecords: nextFeedbackRecords,
+      lastPreview: nextLastPreview,
+      messages: nextMessages,
+      parseSummary: nextParseSummary,
+      requirementId,
+      savedSourceFile: nextSavedSourceFile,
+      selectedFile: nextSelectedFile,
+      threads: nextThreadsInput,
+    })
+
+    const nextPayload = {
+      ...currentPayload,
+      aiEvaluation: {
+        ...(currentPayload.aiEvaluation || {}),
+        ...aiEvaluation,
+      },
+    }
+
+    await apiClient.patch(`/versions/${requirementId}/save-draft`, { payload: nextPayload })
+    setActiveThreadId(aiEvaluation.activeThreadId)
+    setThreads(aiEvaluation.threads)
+    setArtifacts(aiEvaluation.threads[0]?.artifacts || {})
+    return aiEvaluation
+  }, [accepted, activeThreadId, analysisRequest, artifacts, composer, confirmationQuestions, feedbackRecords, lastPreview, messages, parseSummary, requirementId, savedSourceFile, selectedFile, threads])
+
   const askOrRevise = useCallback((message) => {
     setFeedbackOpen(true)
-    setFeedbackRecords((records) => [
-      ...records,
+    const nextFeedbackRecords = [
+      ...feedbackRecords,
       { key: '反馈', value: message },
-    ])
+    ]
+    const nextMessages = [
+      ...messages,
+      createMessage({ role: 'user', type: 'inline_feedback', content: message }),
+    ]
+    setFeedbackRecords(nextFeedbackRecords)
+    setMessages(nextMessages)
     showToast(message)
-  }, [showToast])
+    persistAiEvaluationDraft({ feedbackRecords: nextFeedbackRecords, messages: nextMessages }).catch(() => {})
+  }, [feedbackRecords, messages, persistAiEvaluationDraft, showToast])
 
   const acceptItem = useCallback((item = {}) => {
-    setAccepted((items) => [
-      ...items,
-      {
-        title: item.title || '新采纳评估项',
-        tag: item.tag || '刚刚',
-        desc: item.desc || '从对话评估结果中采纳，等待 PM 进一步估算。',
-      },
-    ])
+    const acceptedItem = {
+      title: item.title || '新采纳评估项',
+      tag: item.tag || '刚刚',
+      desc: item.desc || '从对话评估结果中采纳，等待 PM 进一步估算。',
+    }
+    const nextAccepted = [...accepted, acceptedItem]
+    const nextMessages = [
+      ...messages,
+      createMessage({ role: 'user', type: 'accept', content: `采纳：${acceptedItem.title}` }),
+    ]
+    setAccepted(nextAccepted)
+    setMessages(nextMessages)
     showToast('已采纳到实施评估输入池')
-  }, [showToast])
+    persistAiEvaluationDraft({ accepted: nextAccepted, messages: nextMessages }).catch(() => {})
+  }, [accepted, messages, persistAiEvaluationDraft, showToast])
 
   const handleResultAction = useCallback((action, contextTitle = '当前评估项') => {
     if (action === 'ask') {
@@ -282,18 +518,27 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     }
     if (action === 'confirm') {
       const question = `请确认「${contextTitle}」的实施范围、前提假设与验收边界。`
-      setConfirmationQuestions((questions) => (
-        questions.includes(question)
-          ? questions
-          : [...questions, question]
-      ))
+      const nextConfirmationQuestions = confirmationQuestions.includes(question)
+        ? confirmationQuestions
+        : [...confirmationQuestions, question]
+      const nextMessages = [
+        ...messages,
+        createMessage({
+          role: 'user',
+          type: 'confirmation',
+          content: question,
+        }),
+      ]
+      setConfirmationQuestions(nextConfirmationQuestions)
+      setMessages(nextMessages)
       showToast('已加入售前待确认问题')
+      persistAiEvaluationDraft({ confirmationQuestions: nextConfirmationQuestions, messages: nextMessages }).catch(() => {})
       return
     }
     if (action === 'accept') {
       acceptItem()
     }
-  }, [acceptItem, askOrRevise, showToast])
+  }, [acceptItem, askOrRevise, confirmationQuestions, messages, persistAiEvaluationDraft, showToast])
 
   const analyze = useCallback(async () => {
     if (!selectedFile) {
@@ -304,13 +549,27 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     setLoading(true)
     setError(null)
     setErrorScope(null)
+    let pendingUserMessage = null
     try {
       const formData = new FormData()
       formData.append('file', selectedFile)
       const userInstruction = composer.trim() || DEFAULT_PROMPT
+      pendingUserMessage = createMessage({
+        role: 'user',
+        type: 'file_request',
+        content: userInstruction,
+        attachments: fileAttachmentSnapshot(selectedFile),
+      })
       setAnalysisRequest(userInstruction)
       const parsed = await apiClient.upload('/ai/parse-basic-info', formData)
       const summary = summarizeParsedFile(selectedFile, parsed)
+      const parseArtifactId = createId('artifact_parse')
+      const parseMessage = createMessage({
+        role: 'assistant',
+        type: 'parse_summary',
+        content: '模型识别完成',
+        artifactId: parseArtifactId,
+      })
       setParseSummary(summary)
 
       const preview = await apiClient.post('/ai/kimi-assessment/preview', {
@@ -322,16 +581,58 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
           parsed: unwrapData(parsed),
         },
       })
-      setLastPreview(unwrapData(preview))
+      const previewData = unwrapData(preview)
+      const previewArtifactId = createId('artifact_preview')
+      const previewMessage = createMessage({
+        role: 'assistant',
+        type: 'assessment_preview',
+        content: '实施评估结果',
+        artifactId: previewArtifactId,
+      })
+      const nextMessages = [
+        ...messages,
+        pendingUserMessage,
+        parseMessage,
+        previewMessage,
+      ]
+      const nextArtifacts = {
+        ...artifacts,
+        [parseArtifactId]: summary,
+        [previewArtifactId]: previewData,
+      }
+      setMessages(nextMessages)
+      setArtifacts(nextArtifacts)
+      setLastPreview(previewData)
+      await persistAiEvaluationDraft({
+        activeThreadId,
+        artifacts: nextArtifacts,
+        lastPreview: previewData,
+        messages: nextMessages,
+        parseSummary: summary,
+        selectedFile,
+        userInstruction,
+      })
       showToast('文件解析与评估预览已更新')
     } catch (err) {
       setError(err?.message || '分析失败')
       setErrorScope('analysis')
+      const errorMessage = createMessage({
+        role: 'assistant',
+        type: 'error',
+        content: err?.message || '分析失败',
+      })
+      const nextMessages = [
+        ...messages,
+        ...(pendingUserMessage ? [pendingUserMessage] : []),
+        errorMessage,
+      ]
+      setMessages(nextMessages)
+      persistAiEvaluationDraft({ messages: nextMessages }).catch(() => {})
       showToast(err?.message || '分析失败，已保留当前草稿')
     } finally {
       setLoading(false)
     }
-  }, [askOrRevise, composer, requirementId, selectedFile, showToast])
+  }, [activeThreadId, artifacts, askOrRevise, composer, messages, persistAiEvaluationDraft, requirementId, selectedFile, showToast])
 
   const saveEvaluationDraft = useCallback(async () => {
     if (!requirementId) {
@@ -343,44 +644,7 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     setError(null)
     setErrorScope(null)
     try {
-      const versionPayload = await apiClient.get(`/versions/${requirementId}`)
-      const versionData = unwrapData(versionPayload) || {}
-      const record = versionData.record || versionData
-      if (record.checkoutStatus !== 'checked_out') {
-        await apiClient.post(`/versions/${requirementId}/checkout`)
-      }
-
-      const currentPayload = record.payload && typeof record.payload === 'object' ? record.payload : {}
-      const assessmentSeed = buildAssessmentSeed({
-        accepted,
-        confirmationQuestions,
-        feedbackRecords,
-        lastPreview,
-        parseSummary,
-        requirementId,
-        savedSourceFile,
-        selectedFile,
-        userInstruction: analysisRequest || composer,
-      })
-      const sourceFile = sourceFileSnapshot(selectedFile, parseSummary, savedSourceFile)
-      const nextPayload = {
-        ...currentPayload,
-        aiEvaluation: {
-          ...(currentPayload.aiEvaluation || {}),
-          mode: 'conversation',
-          sourceFile,
-          parseSummary,
-          userInstruction: analysisRequest || composer,
-          acceptedInputs: accepted,
-          confirmationQuestions,
-          feedbackRecords,
-          lastPreview,
-          assessmentSeed,
-          updatedAt: new Date().toISOString(),
-        },
-      }
-
-      await apiClient.patch(`/versions/${requirementId}/save-draft`, { payload: nextPayload })
+      await persistAiEvaluationDraft()
       showToast('已保存到需求版本草稿')
     } catch (err) {
       setError(err?.message || '保存失败')
@@ -389,7 +653,7 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     } finally {
       setSaving(false)
     }
-  }, [accepted, analysisRequest, composer, confirmationQuestions, feedbackRecords, lastPreview, parseSummary, requirementId, savedSourceFile, selectedFile, showToast])
+  }, [persistAiEvaluationDraft, requirementId, showToast])
 
   const createAssessmentDraft = useCallback(async () => {
     if (!requirementId) {
@@ -407,9 +671,11 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     try {
       const seed = buildAssessmentSeed({
         accepted,
+        activeThreadId,
         confirmationQuestions,
         feedbackRecords,
         lastPreview,
+        messages,
         parseSummary,
         requirementId,
         savedSourceFile,
@@ -433,14 +699,16 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     } finally {
       setCreatingAssessment(false)
     }
-  }, [accepted, analysisRequest, composer, confirmationQuestions, feedbackRecords, lastPreview, parseSummary, requirementId, savedSourceFile, selectedFile, showToast])
+  }, [accepted, activeThreadId, analysisRequest, composer, confirmationQuestions, feedbackRecords, lastPreview, messages, parseSummary, requirementId, savedSourceFile, selectedFile, showToast])
 
   const exportConversation = useCallback(() => {
     const assessmentSeed = buildAssessmentSeed({
       accepted,
+      activeThreadId,
       confirmationQuestions,
       feedbackRecords,
       lastPreview,
+      messages,
       parseSummary,
       requirementId,
       savedSourceFile,
@@ -458,10 +726,14 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
       confirmationQuestions,
       feedbackRecords,
       lastPreview,
+      messages,
+      artifacts,
+      activeThreadId,
+      threads,
       assessmentSeed,
     }, `requirement-ai-evaluation-${requirementId || 'draft'}.json`)
     showToast('已导出对话式评估草稿')
-  }, [accepted, analysisRequest, composer, confirmationQuestions, feedbackRecords, lastPreview, parseSummary, requirementId, savedSourceFile, selectedFile, showToast])
+  }, [accepted, activeThreadId, analysisRequest, artifacts, composer, confirmationQuestions, feedbackRecords, lastPreview, messages, parseSummary, requirementId, savedSourceFile, selectedFile, showToast, threads])
 
   return {
     accepted,
@@ -487,6 +759,8 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     loadingSaved,
     onFileChange,
     parseSummary,
+    messages,
+    artifacts,
     saveEvaluationDraft,
     savedSourceFile,
     saving,
