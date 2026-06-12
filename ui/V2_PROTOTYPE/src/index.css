@@ -17,6 +17,36 @@ body {
 /* 原有 CSS reset 兼容 */
 input, button, select, textarea { font-family: inherit; }
 
+.ai-home-loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 12px;
+}
+
+.ai-home-loading-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--brand);
+  opacity: .3;
+  animation: ai-home-dot-pulse 1.05s infinite ease-in-out;
+}
+
+.ai-home-loading-dots span:nth-child(2) { animation-delay: .16s; }
+.ai-home-loading-dots span:nth-child(3) { animation-delay: .32s; }
+
+@keyframes ai-home-dot-pulse {
+  0%, 80%, 100% {
+    opacity: .3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
 /* HomePage 响应式（接 layout.css 1180/760 断点） */
 .home-grid { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 16px; min-width: 0; }
 .home-kpi  { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }

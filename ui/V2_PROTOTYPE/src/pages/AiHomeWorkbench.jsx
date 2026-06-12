@@ -24,6 +24,16 @@ function ResultCard({ title, children }) {
   )
 }
 
+function LoadingDots() {
+  return (
+    <span className="ai-home-loading-dots" aria-hidden="true">
+      <span />
+      <span />
+      <span />
+    </span>
+  )
+}
+
 export default function AiHomeWorkbench({ currentUser }) {
   const preset = useMemo(() => getAiHomePreset(currentUser?.businessRole), [currentUser?.businessRole])
   const [composer, setComposer] = useState('')
@@ -46,29 +56,45 @@ export default function AiHomeWorkbench({ currentUser }) {
     const text = composer.trim()
     if ((!text && !selectedFile) || sending) return
     const userMessage = { role: 'user', text: text || '请解析这个文件并启动工作流。', fileName: selectedFile?.name }
-    setMessages((prev) => [...prev, userMessage])
+    const loadingId = `ai-loading-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const loadingMessage = { id: loadingId, role: 'assistant', text: '正在理解你的问题', loading: true }
+    const outboundMessages = [...messages, userMessage]
+      .filter((message) => !message.loading && !message.error)
+      .map((message) => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: message.text,
+      }))
+
+    setMessages((prev) => [...prev, userMessage, loadingMessage])
     setComposer('')
     setSending(true)
     try {
       const payload = await apiClient.post('/ai/home-workbench/chat', {
         workflowKey: activeWorkflowKey,
-        messages: [...messages, userMessage].map((message) => ({
-          role: message.role === 'assistant' ? 'assistant' : 'user',
-          content: message.text,
-        })),
+        messages: outboundMessages,
       })
       const data = unwrap(payload) || {}
-      setMessages((prev) => [...prev, {
-        role: 'assistant',
-        text: data.answer || 'AI 已收到，但暂未返回有效内容。',
-        model: data.model,
-      }])
+      setMessages((prev) => prev.map((message) => (
+        message.id === loadingId
+          ? {
+              id: loadingId,
+              role: 'assistant',
+              text: data.answer || 'AI 已收到，但暂未返回有效内容。',
+              model: data.model,
+            }
+          : message
+      )))
     } catch (err) {
-      setMessages((prev) => [...prev, {
-        role: 'assistant',
-        text: `AI 对话暂未完成：${err.message || '请求失败'}`,
-        error: true,
-      }])
+      setMessages((prev) => prev.map((message) => (
+        message.id === loadingId
+          ? {
+              id: loadingId,
+              role: 'assistant',
+              text: `AI 对话暂未完成：${err.message || '请求失败'}`,
+              error: true,
+            }
+          : message
+      )))
     } finally {
       setSending(false)
     }
@@ -134,10 +160,20 @@ export default function AiHomeWorkbench({ currentUser }) {
             {messages.map((message, index) => {
               const isUser = message.role === 'user'
               return (
-                <article key={`${message.role}-${index}`} style={{ display: 'flex', gap: 10, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+                <article key={message.id || `${message.role}-${index}`} style={{ display: 'flex', gap: 10, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
                   {!isUser && <div style={{ width: 34, height: 34, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,var(--brand),var(--accent))', color: '#fff', fontWeight: 800 }}>AI</div>}
-                  <div style={{ maxWidth: '76%', padding: 14, borderRadius: 12, border: '1px solid var(--line)', background: isUser ? 'var(--brand)' : '#fff', color: isUser ? '#fff' : 'var(--ink)', boxShadow: 'var(--shadow-1)' }}>
-                    <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
+                  <div style={{ maxWidth: '76%', padding: 14, borderRadius: 12, border: message.error ? '1px solid color-mix(in oklab, var(--err) 28%, var(--line))' : '1px solid var(--line)', background: isUser ? 'var(--brand)' : message.error ? '#fff7f7' : '#fff', color: isUser ? '#fff' : message.error ? 'var(--err)' : 'var(--ink)', boxShadow: 'var(--shadow-1)' }}>
+                    {message.loading ? (
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.7 }}>{message.text}</div>
+                        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-3)', fontSize: 12 }}>
+                          <LoadingDots />
+                          <span>正在调用模型并组织回复</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
+                    )}
                     {message.fileName && <div style={{ marginTop: 10, padding: 8, borderRadius: 8, background: isUser ? 'rgba(255,255,255,.16)' : 'var(--bg-soft)', fontSize: 12 }}>{message.fileName}</div>}
                   </div>
                   {isUser && <div style={{ width: 34, height: 34, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--brand-soft)', color: 'var(--brand-ink)', fontWeight: 800 }}>我</div>}

@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test } from 'vitest'
 import HomeWorkspace from '../pages/HomeWorkspace.jsx'
+import { server } from './mocks/server.js'
+
+const BASE = '/api/v1'
 
 describe('HomeWorkspace', () => {
   beforeEach(() => {
@@ -30,6 +34,33 @@ describe('HomeWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '➤' }))
 
     expect(await screen.findByText('模型回复：请分析这份需求材料')).toBeInTheDocument()
+  })
+
+  test('shows loading bubble while waiting for AI answer and replaces it', async () => {
+    let releaseAnswer
+    const pendingAnswer = new Promise((resolve) => {
+      releaseAnswer = resolve
+    })
+    server.use(http.post(`${BASE}/ai/home-workbench/chat`, async () => {
+      await pendingAnswer
+      return HttpResponse.json({
+        success: true,
+        data: { answer: '模型回复：加载结束', businessRole: 'pre_sales', roleLabel: '售前顾问', model: 'kimi-k2.5' },
+      })
+    }))
+
+    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+
+    const input = await screen.findByRole('textbox')
+    fireEvent.change(input, { target: { value: '帮我看看' } })
+    fireEvent.click(screen.getByRole('button', { name: '➤' }))
+
+    expect(await screen.findByText('正在理解你的问题')).toBeInTheDocument()
+
+    releaseAnswer()
+
+    expect(await screen.findByText('模型回复：加载结束')).toBeInTheDocument()
+    expect(screen.queryByText('正在理解你的问题')).not.toBeInTheDocument()
   })
 
   test('pressing Enter sends AI home message', async () => {
