@@ -6,7 +6,7 @@ import { useUnsavedNavigation } from '../../hooks/useUnsavedChanges.jsx'
 const STORAGE_KEY = 'wes-v2-workspace-tabs-v1'
 
 const STATIC_TITLES = {
-  '/': '主页',
+  '/': 'AI 工作台',
   '/requirements': '需求',
   '/assessments': '实施评估',
   '/dev-assessments': '开发评估',
@@ -20,6 +20,7 @@ const STATIC_TITLES = {
 }
 
 const DETAIL_TITLES = [
+  { pattern: /^\/requirements\/[^/]+\/ai-evaluation$/, title: 'AI 评估台' },
   { pattern: /^\/requirements\/[^/]+$/, title: '需求详情' },
   { pattern: /^\/assessments\/[^/]+$/, title: '实施评估详情' },
   { pattern: /^\/dev-assessments\/[^/]+$/, title: '开发评估详情' },
@@ -68,7 +69,7 @@ function normalizeTabs(input) {
     seen.add(dedupeKey)
     tabs.push({ path, title: resolveTabTitle(path) })
   }
-  return tabs.length ? tabs : [{ path: '/', title: '主页' }]
+  return tabs.length ? tabs : [{ path: '/', title: 'AI 工作台' }]
 }
 
 function menuPosition(x, y) {
@@ -88,7 +89,7 @@ export default function WorkspaceTabs() {
   const navigate = useNavigate()
   const { isDirty, requestNavigation, confirmNavigation, cancelNavigation } = useUnsavedNavigation()
   const currentRouteKey = useMemo(() => routeKeyFromLocation(location), [location])
-  const [tabs, setTabs] = useState(() => [{ path: '/', title: '主页' }])
+  const [tabs, setTabs] = useState(() => [{ path: '/', title: 'AI 工作台' }])
   const [ready, setReady] = useState(false)
   const [menu, setMenu] = useState(null)
 
@@ -155,7 +156,7 @@ export default function WorkspaceTabs() {
     const index = tabs.findIndex((tab) => tab.path === path)
     const nextTabs = tabs.filter((tab) => tab.path !== path)
     if (!nextTabs.length) {
-      const fallback = { path: '/', title: '主页' }
+      const fallback = { path: '/', title: 'AI 工作台' }
       setTabs([fallback])
       if (path !== '/') navigate('/')
       return
@@ -188,7 +189,7 @@ export default function WorkspaceTabs() {
       }
       confirmNavigation()
     }
-    setTabs([{ path: '/', title: '主页' }])
+    setTabs([{ path: '/', title: 'AI 工作台' }])
     if (currentRouteKey !== '/') navigate('/')
   }
 

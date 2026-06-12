@@ -12,7 +12,7 @@ describe('HomeWorkspace', () => {
     render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'AI 工作台' })).toBeInTheDocument())
-    expect(screen.getByText(/对话式工作台/)).toBeInTheDocument()
+    expect(screen.getByText(/按登录账号业务角色预置对话工作流/)).toBeInTheDocument()
   })
 
   test('switches to traditional dashboard', async () => {

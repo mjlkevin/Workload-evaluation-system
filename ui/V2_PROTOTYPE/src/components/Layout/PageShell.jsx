@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 const CRUMB_ROUTE_MAP = {
   工作台: '/',
   主页: '/',
+  'AI 工作台': '/',
   需求: '/requirements',
   需求管理: '/requirements',
   实施评估: '/assessments',

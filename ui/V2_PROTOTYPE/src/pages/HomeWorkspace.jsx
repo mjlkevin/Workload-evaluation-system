@@ -38,9 +38,9 @@ export default function HomeWorkspace() {
 
   return (
     <PageShell
-      crumb="工作台 / 主页"
-      title="主页"
-      subtitle={view === 'ai' ? 'AI 对话式工作台' : '传统工作台'}
+      crumb="工作台 / AI 工作台"
+      title="AI 工作台"
+      subtitle={view === 'ai' ? '按登录账号业务角色预置对话工作流' : '已切换为传统主页视图'}
       actions={[
         <div key="switch" style={{ display: 'inline-flex', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', height: 32 }}>
           <ViewButton active={view === 'ai'} onClick={() => setView('ai')}>AI 工作台</ViewButton>
