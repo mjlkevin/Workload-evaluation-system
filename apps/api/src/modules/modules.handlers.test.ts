@@ -7,8 +7,8 @@ import { Request, Response } from "express";
 import { AuthUser } from "../types";
 import { config } from "../config/env";
 import { loadUsersStore, signAuthToken } from "../middleware/auth";
-import { versionCodeRulesStorePath, versionsStorePath } from "../utils";
-import { listUsers, login, me } from "./auth/auth.usecase";
+import { usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
+import { listUsers, login, me, updateUserBusinessRole } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
 import {
@@ -148,6 +148,60 @@ test("auth.usecase: me returns user with valid token", () => {
   const body = res.body as { code: number; data: { user: { id: string } } };
   assert.equal(body.code, 0);
   assert.ok(body.data.user.id);
+});
+
+test("auth.usecase: me returns businessRole with valid token", () => {
+  const req = createMockReq({ token: getActiveUserToken() });
+  const res = createMockRes();
+  me(req, res as unknown as Response);
+
+  assert.equal(res.statusCode, 200);
+  const body = res.body as { code: number; data: { user: { businessRole?: string } } };
+  assert.equal(body.code, 0);
+  assert.ok(body.data.user.businessRole);
+});
+
+test("auth.usecase: updateUserBusinessRole changes only business role", () => {
+  const store = loadUsersStore();
+  const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
+  const target = store.users.find((x) => x.status === "active" && x.role !== "admin");
+  assert.ok(admin, "active admin required");
+  assert.ok(target, "active non-admin target required");
+
+  withFileSnapshotRestore(usersStorePath(), () => {
+    const req = createMockReq({
+      token: signAuthToken(admin),
+      params: { userId: target.id },
+      body: { businessRole: "sales" },
+    });
+    const res = createMockRes();
+    updateUserBusinessRole(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as { code: number; data: { user: { role: string; businessRole: string } } };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.user.role, target.role);
+    assert.equal(body.data.user.businessRole, "sales");
+  });
+});
+
+test("auth.usecase: updateUserBusinessRole rejects invalid role", () => {
+  const store = loadUsersStore();
+  const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
+  const target = store.users.find((x) => x.status === "active");
+  assert.ok(admin, "active admin required");
+  assert.ok(target, "active target required");
+
+  const req = createMockReq({
+    token: signAuthToken(admin),
+    params: { userId: target.id },
+    body: { businessRole: "bad_role" },
+  });
+  const res = createMockRes();
+  updateUserBusinessRole(req, res as unknown as Response);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal((res.body as { code?: number }).code, 40001);
 });
 
 test("auth.usecase: listUsers follows role branch", () => {

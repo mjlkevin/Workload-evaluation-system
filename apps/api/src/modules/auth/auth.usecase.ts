@@ -13,6 +13,8 @@ import {
   isAdminUser,
   canManageUsers,
   requireAuth,
+  isBusinessRole,
+  defaultBusinessRoleForSystemRole,
 } from "../../middleware/auth";
 import { loadInviteCodesStore, saveInviteCodesStore } from "./auth.repository";
 
@@ -53,6 +55,7 @@ export async function register(req: Request, res: Response) {
     username,
     passwordHash: await bcrypt.hash(password, 10),
     role,
+    businessRole: defaultBusinessRoleForSystemRole(role),
     status: "active",
     createdAt: nowIso,
     lastLoginAt: nowIso,
@@ -200,6 +203,37 @@ export function updateUserRole(req: Request, res: Response) {
   }
 
   target.role = nextRole;
+  saveUsersStore(store);
+  res.json(ok({ user: toPublicUser(target) }, randomUUID()));
+}
+
+export function updateUserBusinessRole(req: Request, res: Response) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  if (!canManageUsers(auth.user)) {
+    return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
+  }
+
+  const userId = asString(req.params.userId);
+  const rawBusinessRole = asString(req.body?.businessRole);
+  if (!userId) {
+    return fail(res, 40001, "参数错误", [{ field: "userId", reason: "required" }]);
+  }
+  if (!isBusinessRole(rawBusinessRole)) {
+    return fail(res, 40001, "参数错误", [{ field: "businessRole", reason: "invalid" }]);
+  }
+
+  const store = loadUsersStore();
+  const target = store.users.find((u) => u.id === userId);
+  if (!target) {
+    return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
+  }
+
+  if (auth.user.role === "sub_admin" && target.role === "admin") {
+    return fail(res, 40301, "权限不足", [{ field: "role", reason: "cannot_modify_super_admin" }]);
+  }
+
+  target.businessRole = rawBusinessRole;
   saveUsersStore(store);
   res.json(ok({ user: toPublicUser(target) }, randomUUID()));
 }
