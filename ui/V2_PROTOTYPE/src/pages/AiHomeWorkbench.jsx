@@ -74,6 +74,12 @@ export default function AiHomeWorkbench({ currentUser }) {
     }
   }
 
+  function handleComposerKeyDown(event) {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent?.isComposing) return
+    event.preventDefault()
+    sendMessage()
+  }
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '260px minmax(0, 1fr) 300px', gap: 16, minHeight: 'calc(100vh - 168px)' }}>
       <aside style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
@@ -149,6 +155,7 @@ export default function AiHomeWorkbench({ currentUser }) {
               rows="1"
               value={composer}
               onChange={(event) => setComposer(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
               placeholder={preset.placeholder}
               style={{ flex: 1, border: 0, outline: 'none', resize: 'none', minHeight: 34, padding: '8px 4px', fontFamily: 'inherit', fontSize: 13 }}
             />

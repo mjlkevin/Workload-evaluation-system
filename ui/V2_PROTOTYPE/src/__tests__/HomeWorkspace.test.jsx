@@ -31,4 +31,24 @@ describe('HomeWorkspace', () => {
 
     expect(await screen.findByText('模型回复：请分析这份需求材料')).toBeInTheDocument()
   })
+
+  test('pressing Enter sends AI home message', async () => {
+    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+
+    const input = await screen.findByRole('textbox')
+    fireEvent.change(input, { target: { value: '你好' } })
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+
+    expect(await screen.findByText('模型回复：你好')).toBeInTheDocument()
+  })
+
+  test('pressing Shift Enter does not send AI home message', async () => {
+    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+
+    const input = await screen.findByRole('textbox')
+    fireEvent.change(input, { target: { value: '第一行' } })
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', shiftKey: true })
+
+    expect(screen.queryByText('模型回复：第一行')).not.toBeInTheDocument()
+  })
 })
