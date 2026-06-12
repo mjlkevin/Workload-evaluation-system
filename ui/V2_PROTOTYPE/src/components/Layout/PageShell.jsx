@@ -78,10 +78,11 @@ export default function PageShell({ crumb, title, subtitle, actions, children, f
         style={{
           padding: '18px 24px 14px',
           borderBottom: '1px solid var(--line)',
-          position: 'sticky',
-          top: 'var(--workspace-tabs-height, 0px)',
+          position: fillViewport ? 'relative' : 'sticky',
+          top: fillViewport ? undefined : 'var(--workspace-tabs-height, 0px)',
           background: 'var(--bg)',
           zIndex: 20,
+          flexShrink: 0,
         }}
       >
         {crumb && <Crumbs crumb={crumb} />}

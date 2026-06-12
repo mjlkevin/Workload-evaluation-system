@@ -88,12 +88,15 @@ describe('HomeWorkspace', () => {
   })
 
   test('keeps AI workbench scrolling inside the message pane', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
 
+    const pageHeader = container.querySelector('.pg-hd')
     const workbench = await screen.findByTestId('ai-home-workbench')
     const messagePane = screen.getByTestId('ai-home-message-pane')
     const composer = screen.getByRole('textbox')
 
+    expect(pageHeader.style.position).toBe('relative')
+    expect(pageHeader.style.flexShrink).toBe('0')
     expect(workbench.style.height).toBe('100%')
     expect(workbench.style.minHeight).toBe('0px')
     expect(messagePane.style.overflowY).toBe('auto')
