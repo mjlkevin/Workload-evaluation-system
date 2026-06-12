@@ -34,6 +34,90 @@ function LoadingDots() {
   )
 }
 
+function renderInlineMarkdown(text, keyPrefix) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean)
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={`${keyPrefix}-strong-${index}`}>{part.slice(2, -2)}</strong>
+    }
+    return <React.Fragment key={`${keyPrefix}-text-${index}`}>{part}</React.Fragment>
+  })
+}
+
+function parseMarkdownBlocks(text) {
+  const blocks = []
+  const paragraphLines = []
+  let currentList = null
+
+  function flushParagraph() {
+    const paragraph = paragraphLines.join(' ').trim()
+    if (paragraph) blocks.push({ type: 'paragraph', text: paragraph })
+    paragraphLines.length = 0
+  }
+
+  function flushList() {
+    if (currentList?.items.length) blocks.push(currentList)
+    currentList = null
+  }
+
+  text.replace(/\r\n/g, '\n').split('\n').forEach((rawLine) => {
+    const line = rawLine.trim()
+    if (!line) {
+      flushParagraph()
+      flushList()
+      return
+    }
+
+    const orderedMatch = line.match(/^\d+\.\s+(.+)$/)
+    const unorderedMatch = line.match(/^[-*]\s+(.+)$/)
+    const listType = orderedMatch ? 'orderedList' : unorderedMatch ? 'unorderedList' : null
+
+    if (listType) {
+      flushParagraph()
+      if (!currentList || currentList.type !== listType) {
+        flushList()
+        currentList = { type: listType, items: [] }
+      }
+      currentList.items.push(orderedMatch?.[1] || unorderedMatch?.[1])
+      return
+    }
+
+    flushList()
+    paragraphLines.push(line)
+  })
+
+  flushParagraph()
+  flushList()
+  return blocks.length ? blocks : [{ type: 'paragraph', text }]
+}
+
+function RichAiMessage({ text }) {
+  return (
+    <div className="ai-message-rich">
+      {parseMarkdownBlocks(text).map((block, blockIndex) => {
+        if (block.type === 'orderedList' || block.type === 'unorderedList') {
+          const ListTag = block.type === 'orderedList' ? 'ol' : 'ul'
+          return (
+            <ListTag key={`list-${blockIndex}`}>
+              {block.items.map((item, itemIndex) => (
+                <li key={`item-${blockIndex}-${itemIndex}`}>
+                  {renderInlineMarkdown(item, `item-${blockIndex}-${itemIndex}`)}
+                </li>
+              ))}
+            </ListTag>
+          )
+        }
+
+        return (
+          <p key={`paragraph-${blockIndex}`}>
+            {renderInlineMarkdown(block.text, `paragraph-${blockIndex}`)}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function AiHomeWorkbench({ currentUser }) {
   const preset = useMemo(() => getAiHomePreset(currentUser?.businessRole), [currentUser?.businessRole])
   const [composer, setComposer] = useState('')
@@ -172,7 +256,9 @@ export default function AiHomeWorkbench({ currentUser }) {
                         </div>
                       </div>
                     ) : (
-                      <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
+                      isUser || message.error
+                        ? <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
+                        : <RichAiMessage text={message.text} />
                     )}
                     {message.fileName && <div style={{ marginTop: 10, padding: 8, borderRadius: 8, background: isUser ? 'rgba(255,255,255,.16)' : 'var(--bg-soft)', fontSize: 12 }}>{message.fileName}</div>}
                   </div>

@@ -63,6 +63,30 @@ describe('HomeWorkspace', () => {
     expect(screen.queryByText('正在理解你的问题')).not.toBeInTheDocument()
   })
 
+  test('renders AI markdown answer as readable rich text', async () => {
+    server.use(http.post(`${BASE}/ai/home-workbench/chat`, () => HttpResponse.json({
+      success: true,
+      data: {
+        answer: '你好！我是 **WES 工作量评估系统** 的 AI 工作助手。\n\n我可以协助你处理以下核心事务：\n1. **全局项目队列监控** - 查看各阶段项目积压情况\n2. **异常流程诊断** - 识别卡单、超时等阻塞点\n\n**下一步建议动作：**\n- 查看今日项目队列\n- 处理异常流程',
+        businessRole: 'admin',
+        roleLabel: '管理员',
+        model: 'kimi-k2.5',
+      },
+    })))
+
+    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+
+    const input = await screen.findByRole('textbox')
+    fireEvent.change(input, { target: { value: '你好' } })
+    fireEvent.click(screen.getByRole('button', { name: '➤' }))
+
+    expect((await screen.findByText('WES 工作量评估系统')).tagName).toBe('STRONG')
+    expect(screen.getByText('全局项目队列监控').tagName).toBe('STRONG')
+    expect(screen.getByText(/查看各阶段项目积压情况/).closest('li')).toBeInTheDocument()
+    expect(screen.getByText(/查看各阶段项目积压情况/).closest('ol')).toBeInTheDocument()
+    expect(screen.getByText(/查看今日项目队列/).closest('ul')).toBeInTheDocument()
+  })
+
   test('pressing Enter sends AI home message', async () => {
     render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
 

@@ -47,6 +47,38 @@ input, button, select, textarea { font-family: inherit; }
   }
 }
 
+.ai-message-rich {
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+
+.ai-message-rich p {
+  margin: 0 0 10px;
+}
+
+.ai-message-rich p:last-child,
+.ai-message-rich ol:last-child,
+.ai-message-rich ul:last-child {
+  margin-bottom: 0;
+}
+
+.ai-message-rich ol,
+.ai-message-rich ul {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+}
+
+.ai-message-rich li {
+  margin: 6px 0;
+  padding-left: 2px;
+}
+
+.ai-message-rich strong {
+  font-weight: 800;
+  color: var(--ink);
+}
+
 /* HomePage 响应式（接 layout.css 1180/760 断点） */
 .home-grid { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 16px; min-width: 0; }
 .home-kpi  { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
