@@ -11,6 +11,7 @@ export {
   updateUserStatus,
   updateUserRole,
   updateUserBusinessRole,
+  updateUserPassword,
   listInviteCodes,
   generateInviteCodeHandler
 } from "./auth.controller";

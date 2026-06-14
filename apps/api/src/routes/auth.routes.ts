@@ -20,6 +20,7 @@ router.post("/logout", requireAuthenticated(), AuthModule.logout);
 router.get("/users", requireCapability("user:manage"), AuthModule.listUsers);
 router.patch("/users/:userId/role", requireCapability("user:manage"), AuthModule.updateUserRole);
 router.patch("/users/:userId/business-role", requireCapability("user:manage"), AuthModule.updateUserBusinessRole);
+router.patch("/users/:userId/password", requireCapability("user:manage"), AuthModule.updateUserPassword);
 router.patch("/users/:userId/status", requireCapability("user:manage"), AuthModule.updateUserStatus);
 router.get("/invite-codes", requireCapability("user:manage"), AuthModule.listInviteCodes);
 router.post("/invite-codes/generate", requireCapability("user:manage"), AuthModule.generateInviteCodeHandler);
