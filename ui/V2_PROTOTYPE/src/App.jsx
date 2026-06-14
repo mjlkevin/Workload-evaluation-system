@@ -6,6 +6,7 @@ import AssessmentList from './pages/AssessmentList.jsx'
 import AssessmentDetail from './pages/AssessmentDetail.jsx'
 import RequirementList from './pages/RequirementList.jsx'
 import RequirementDetail from './pages/RequirementDetail.jsx'
+import RequirementAiWorkbench from './pages/RequirementAiWorkbench.jsx'
 import DevAssessmentList from './pages/DevAssessmentList.jsx'
 import DevAssessmentDetail from './pages/DevAssessmentDetail.jsx'
 import ResourceCostList from './pages/ResourceCostList.jsx'
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/assessments/:id" element={<AssessmentDetail />} />
         <Route path="/requirements" element={<RequirementList />} />
         <Route path="/requirements/:id" element={<RequirementDetail />} />
+        <Route path="/requirements/:id/ai-evaluation" element={<RequirementAiWorkbench />} />
         <Route path="/dev-assessments" element={<DevAssessmentList />} />
         <Route path="/dev-assessments/:id" element={<DevAssessmentDetail />} />
         <Route path="/resource-costs" element={<ResourceCostList />} />

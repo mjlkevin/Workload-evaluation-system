@@ -14,6 +14,10 @@ export default function RequirementList() {
       navigate(`/requirements/${first.id}`)
       return
     }
+    if (actionKey === 'aiEvaluation' && first) {
+      navigate(`/requirements/${first.id}/ai-evaluation`)
+      return
+    }
     if (actionKey === 'history' && first) {
       alert(`版本历史 · ${first.versionCode || first.globalVersion}`)
       return
@@ -34,6 +38,13 @@ export default function RequirementList() {
       rowKey="id"
       onRowClick={(row) => navigate(`/requirements/${row.id}`)}
       onBulkAction={handleBulkAction}
+      bulkActions={[
+        { key: 'preview', label: '👁 预览', mode: 'single' },
+        { key: 'edit', label: '✏ 修改', mode: 'single' },
+        { key: 'aiEvaluation', label: '✦ AI 评估', mode: 'single' },
+        { key: 'history', label: '🕘 历史', mode: 'single' },
+        { key: 'delete', label: '🗑 删除', mode: 'multi', danger: true },
+      ]}
       filterTags={[
         { key: 'all', label: '全部' },
         { key: 'in-progress', label: '进行中', predicate: (row) => row.status === '进行中' },
