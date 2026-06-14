@@ -2,14 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import XLSX from "xlsx";
+import bcrypt from "bcryptjs";
 
 import { Request, Response } from "express";
 
 import { AuthUser } from "../types";
 import { config } from "../config/env";
-import { loadUsersStore, signAuthToken } from "../middleware/auth";
-import { usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
-import { listUsers, login, me, updateUserBusinessRole } from "./auth/auth.usecase";
+import { loadUsersStore, saveUsersStore, signAuthToken } from "../middleware/auth";
+import { aiSessionsStorePath, usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
+import { listUsers, login, me, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
 import {
@@ -26,6 +27,9 @@ import {
 } from "./versions/versions.usecase";
 import { patchReviewStatus, postTeam } from "./team/team.controller";
 import { homeWorkbenchChat, kimiAssessmentPreview, parseBasicInfo } from "./ai/ai.usecase";
+import * as AiSessionsModule from "./ai-sessions/ai-sessions.module";
+import * as ProjectEvaluationsModule from "./project-evaluations/project-evaluations.module";
+import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
 import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap";
 
 type MockRes = {
@@ -114,6 +118,20 @@ function withFileSnapshotRestore(filePath: string, run: () => void): void {
   const before = existed ? fs.readFileSync(filePath, "utf-8") : "";
   try {
     run();
+  } finally {
+    if (existed) {
+      fs.writeFileSync(filePath, before, "utf-8");
+    } else if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+}
+
+async function withFileSnapshotRestoreAsync(filePath: string, run: () => Promise<void>): Promise<void> {
+  const existed = fs.existsSync(filePath);
+  const before = existed ? fs.readFileSync(filePath, "utf-8") : "";
+  try {
+    await run();
   } finally {
     if (existed) {
       fs.writeFileSync(filePath, before, "utf-8");
@@ -220,6 +238,53 @@ test("auth.usecase: updateUserBusinessRole rejects invalid role", () => {
 
   assert.equal(res.statusCode, 400);
   assert.equal((res.body as { code?: number }).code, 40001);
+});
+
+test("auth.usecase: updateUserPassword lets an admin reset login password", async () => {
+  const store = loadUsersStore();
+  const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
+  assert.ok(admin, "active admin required");
+
+  await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
+    const target: AuthUser = {
+      id: "ut-reset-target",
+      username: "ut-reset-target",
+      passwordHash: await bcrypt.hash("OldPass123!", 10),
+      role: "user",
+      businessRole: "pre_sales",
+      status: "active",
+      createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+      lastLoginAt: "",
+    };
+    const testStore = loadUsersStore();
+    testStore.users = testStore.users.filter((user) => user.id !== target.id);
+    testStore.users.push(target);
+    saveUsersStore(testStore);
+
+    const req = createMockReq({
+      token: signAuthToken(admin),
+      params: { userId: target.id },
+      body: { password: "NewPass123!" },
+    });
+    const res = createMockRes();
+    await updateUserPassword(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as { code: number; data: { user: { id: string; passwordHash?: string } } };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.user.id, target.id);
+    assert.equal(body.data.user.passwordHash, undefined);
+
+    const oldLoginRes = createMockRes();
+    await login(createMockReq({ body: { username: target.username, password: "OldPass123!" } }), oldLoginRes as unknown as Response);
+    assert.equal(oldLoginRes.statusCode, 400);
+    assert.equal((oldLoginRes.body as { code?: number }).code, 40001);
+
+    const newLoginRes = createMockRes();
+    await login(createMockReq({ body: { username: target.username, password: "NewPass123!" } }), newLoginRes as unknown as Response);
+    assert.equal(newLoginRes.statusCode, 200);
+    assert.equal((newLoginRes.body as { data: { user: { id: string } } }).data.user.id, target.id);
+  });
 });
 
 test("auth.usecase: listUsers follows role branch", () => {
@@ -797,6 +862,257 @@ test("team.controller: patchReviewStatus returns 401 without token", () => {
   assert.equal((res.body as { code?: number }).code, 40101);
 });
 
+test("ai-sessions: creates and lists a persistent session", () => {
+  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+    const token = getActiveUserToken();
+    const createReq = createMockReq({
+      token,
+      body: {
+        title: "XX制造 WMS 粗评",
+        domain: "business_evaluation",
+        workflowKey: "rough_estimate",
+        status: "rough_estimate",
+      },
+    });
+    const createRes = createMockRes();
+    AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+
+    assert.equal(createRes.statusCode, 200);
+    const created = createRes.body as { code: number; data: { session: { sessionId: string; title: string; status: string } } };
+    assert.equal(created.code, 0);
+    assert.equal(created.data.session.title, "XX制造 WMS 粗评");
+    assert.equal(created.data.session.status, "rough_estimate");
+
+    const listReq = createMockReq({ token, query: { domain: "business_evaluation" } });
+    const listRes = createMockRes();
+    AiSessionsModule.listSessions(listReq, listRes as unknown as Response);
+
+    assert.equal(listRes.statusCode, 200);
+    const listed = listRes.body as { code: number; data: { items: Array<{ sessionId: string }> } };
+    assert.ok(listed.data.items.some((item) => item.sessionId === created.data.session.sessionId));
+  });
+});
+
+test("ai-sessions: appends messages and creates pending action", () => {
+  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+    const token = getActiveUserToken();
+    const createReq = createMockReq({
+      token,
+      body: { title: "创建项目确认", domain: "business_evaluation", workflowKey: "project_discovery" },
+    });
+    const createRes = createMockRes();
+    AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+    const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
+
+    const appendReq = createMockReq({
+      token,
+      params: { sessionId },
+      body: {
+        message: { role: "user", content: "请把它转成正式项目评估" },
+        artifact: { type: "rough_report", title: "粗评报告", content: "预计 120 人天" },
+        pendingAction: {
+          actionType: "create_project_evaluation",
+          title: "创建项目评估方案",
+          riskLevel: "high",
+          payload: { projectName: "XX制造 WMS 项目", customerName: "XX制造" },
+        },
+      },
+    });
+    const appendRes = createMockRes();
+    AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
+
+    assert.equal(appendRes.statusCode, 200);
+    const body = appendRes.body as { code: number; data: { session: { messages: unknown[]; artifacts: unknown[]; pendingActions: Array<{ status: string }> } } };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.session.messages.length, 1);
+    assert.equal(body.data.session.artifacts.length, 1);
+    assert.equal(body.data.session.pendingActions[0].status, "pending");
+  });
+});
+
+test("ai-sessions: normalizes invalid event fields and ignores blank events", () => {
+  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+    const token = getActiveUserToken();
+    const createReq = createMockReq({
+      token,
+      body: { title: "事件规范化", domain: "business_evaluation", workflowKey: "free_chat" },
+    });
+    const createRes = createMockRes();
+    AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+    const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
+
+    const appendReq = createMockReq({
+      token,
+      params: { sessionId },
+      body: {
+        message: { role: "bad_role", content: "  有效消息  ", attachmentIds: ["att-1", "", null], artifactIds: "bad" },
+        artifact: { type: "note", title: "  产物  ", status: "bad_status" },
+        pendingAction: { actionType: "create_project_evaluation", title: "  动作  ", riskLevel: "bad_risk", payload: [] },
+      },
+    });
+    const appendRes = createMockRes();
+    AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
+
+    const body = appendRes.body as {
+      data: {
+        session: {
+          messages: Array<{ role: string; content: string; attachmentIds: string[]; artifactIds: string[] }>;
+          artifacts: Array<{ title: string; status: string }>;
+          pendingActions: Array<{ title: string; riskLevel: string; payload: Record<string, unknown> }>;
+          updatedAt: string;
+        };
+      };
+    };
+    assert.equal(body.data.session.messages[0].role, "user");
+    assert.equal(body.data.session.messages[0].content, "有效消息");
+    assert.deepEqual(body.data.session.messages[0].attachmentIds, ["att-1"]);
+    assert.deepEqual(body.data.session.messages[0].artifactIds, []);
+    assert.equal(body.data.session.artifacts[0].title, "产物");
+    assert.equal(body.data.session.artifacts[0].status, "generated");
+    assert.equal(body.data.session.pendingActions[0].title, "动作");
+    assert.equal(body.data.session.pendingActions[0].riskLevel, "high");
+    assert.deepEqual(body.data.session.pendingActions[0].payload, {});
+    const updatedAt = body.data.session.updatedAt;
+
+    const blankReq = createMockReq({
+      token,
+      params: { sessionId },
+      body: {
+        message: { role: "assistant", content: "   " },
+        artifact: { title: "   " },
+        pendingAction: { title: "   " },
+      },
+    });
+    const blankRes = createMockRes();
+    AiSessionsModule.appendSessionEvent(blankReq, blankRes as unknown as Response);
+    const blankBody = blankRes.body as { data: { session: { messages: unknown[]; artifacts: unknown[]; pendingActions: unknown[]; updatedAt: string } } };
+
+    assert.equal(blankBody.data.session.messages.length, 1);
+    assert.equal(blankBody.data.session.artifacts.length, 1);
+    assert.equal(blankBody.data.session.pendingActions.length, 1);
+    assert.equal(blankBody.data.session.updatedAt, updatedAt);
+  });
+});
+
+test("project-evaluations: creates project plan from ai session", () => {
+  withFileSnapshotRestore(versionsStorePath(), () => {
+    const token = getActiveUserToken();
+    const req = createMockReq({
+      token,
+      body: {
+        projectName: "XX制造 WMS 项目",
+        customerName: "XX制造",
+        industry: "制造业",
+        createdFromSessionId: "session-001",
+      },
+    });
+    const res = createMockRes();
+    ProjectEvaluationsModule.createProjectEvaluation(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as { code: number; data: { project: { projectId: string; projectName: string; customerName: string; createdFromSessionId: string } } };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.project.projectName, "XX制造 WMS 项目");
+    assert.equal(body.data.project.customerName, "XX制造");
+    assert.equal(body.data.project.createdFromSessionId, "session-001");
+
+    const store = fs.readFileSync(versionsStorePath(), "utf-8");
+    const parsed = JSON.parse(store) as { records: Array<{ id: string; type: string; ownerUserId: string; payload?: Record<string, unknown> }> };
+    const backing = parsed.records.find((record) => record.id === body.data.project.projectId);
+    assert.equal(backing?.type, "global");
+    assert.equal(backing?.payload?.recordKind, "project_evaluation");
+    assert.equal(backing?.payload?.projectStatus, "draft");
+  });
+});
+
+test("project-evaluations: lists project plans", () => {
+  withFileSnapshotRestore(versionsStorePath(), () => {
+    const token = getActiveUserToken();
+    ProjectEvaluationsModule.createProjectEvaluation(createMockReq({
+      token,
+      body: { projectName: "XX制造 WMS 项目", customerName: "XX制造", industry: "制造业" },
+    }), createMockRes() as unknown as Response);
+
+    const req = createMockReq({ token, query: { q: "XX制造" } });
+    const res = createMockRes();
+    ProjectEvaluationsModule.listProjectEvaluations(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as { code: number; data: { items: Array<{ projectName: string }> } };
+    assert.equal(body.code, 0);
+    assert.ok(body.data.items.some((item) => item.projectName === "XX制造 WMS 项目"));
+  });
+});
+
+test("project-evaluations: project containers do not replace latest formal global plan for WBS", async () => {
+  withFileSnapshotRestore(versionsStorePath(), () => {
+    const user = getActiveUser();
+    const token = signAuthToken(user);
+    fs.writeFileSync(versionsStorePath(), JSON.stringify({
+      records: [
+        {
+          id: "formal-global",
+          type: "global",
+          versionCode: "GL-FORMAL",
+          templateId: "default",
+          ownerUserId: user.id,
+          status: "draft",
+          payload: { projectName: "正式总方案", requirementImportVersionCode: "RI-FORMAL" },
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          createdByUserId: user.id,
+          createdByUsername: user.username,
+          updatedByUserId: user.id,
+          updatedByUsername: user.username,
+          checkoutStatus: "checked_in",
+          versionDocStatus: "drafting",
+          majorLetter: "A",
+          minorNumber: 0,
+          baseCode: "GL-FORMAL",
+          isHistoricalArchive: false,
+          lastCheckinPayload: {},
+        },
+        {
+          id: "legacy-project-container",
+          type: "global",
+          versionCode: "PROJECT-LEGACY",
+          templateId: "project-evaluation",
+          ownerUserId: user.id,
+          status: "draft",
+          payload: { projectName: "遗留项目容器" },
+          createdAt: "2026-01-02T00:00:00.000Z",
+          updatedAt: "2026-01-02T00:00:00.000Z",
+          createdByUserId: user.id,
+          createdByUsername: user.username,
+          updatedByUserId: user.id,
+          updatedByUsername: user.username,
+          checkoutStatus: "checked_in",
+          versionDocStatus: "drafting",
+          majorLetter: "A",
+          minorNumber: 0,
+          baseCode: "PROJECT-LEGACY",
+          isHistoricalArchive: false,
+          lastCheckinPayload: {},
+        },
+      ],
+    }, null, 2), "utf-8");
+
+    ProjectEvaluationsModule.createProjectEvaluation(createMockReq({
+      token,
+      body: { projectName: "最新项目容器", customerName: "XX制造" },
+    }), createMockRes() as unknown as Response);
+
+    const items = buildDerivedWbsItemsForUser(user);
+    assert.equal(items[0].sourceGlobalVersionCode, "GL-FORMAL");
+    assert.match(items[0].taskName, /正式总方案/);
+
+    const listRes = createMockRes();
+    ProjectEvaluationsModule.listProjectEvaluations(createMockReq({ token, query: { q: "遗留" } }), listRes as unknown as Response);
+    const listBody = listRes.body as { data: { items: Array<{ projectName: string }> } };
+    assert.ok(listBody.data.items.some((item) => item.projectName === "遗留项目容器"));
+  });
+});
+
 test("ai.usecase: kimiAssessmentPreview returns model result on valid response", async () => {
   const req = createMockReq({
     token: getActiveUserToken(),
@@ -867,46 +1183,132 @@ test("ai.usecase: kimiAssessmentPreview returns model result on valid response",
   }
 });
 
-test("ai.usecase: homeWorkbenchChat injects current business role context", async () => {
-  const req = createMockReq({
-    token: getNonAdminUserToken(),
-    body: {
-      messages: [{ role: "user", content: "请帮我解析客户需求材料" }],
-      workflowKey: "parse_requirement_file",
-    },
+test("ai.usecase: homeWorkbenchChat injects role context and persists messages into an AI session", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+    const req = createMockReq({
+      token: getNonAdminUserToken(),
+      body: {
+        messages: [{ role: "user", content: "请帮我解析客户需求材料" }],
+        workflowKey: "parse_requirement_file",
+      },
+    });
+    const res = createMockRes();
+    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+    const originalApiKey = config.kimi.apiKey;
+    let capturedBody: { messages?: Array<{ role: string; content: string }> } = {};
+    try {
+      config.kimi.apiKey = "unit-test-key";
+      bootstrapAiProviders();
+      (globalThis as { fetch?: unknown }).fetch = async (_url: unknown, init?: { body?: string }) => {
+        capturedBody = JSON.parse(String(init?.body || "{}")) as { messages?: Array<{ role: string; content: string }> };
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{ message: { content: "已识别为售前需求解析任务。" } }],
+          }),
+        } as unknown;
+      };
+
+      await homeWorkbenchChat(req, res as unknown as Response);
+
+      assert.equal(res.statusCode, 200);
+      const body = res.body as {
+        code: number;
+        data: {
+          answer: string;
+          businessRole: string;
+          model: string;
+          session: { sessionId: string; workflowKey: string; status: string; messages: Array<{ role: string; content: string }> };
+        };
+      };
+      assert.equal(body.code, 0);
+      assert.equal(body.data.businessRole, "pre_sales");
+      assert.equal(body.data.answer, "已识别为售前需求解析任务。");
+      assert.equal(body.data.session.workflowKey, "parse_requirement_file");
+      assert.equal(body.data.session.status, "rough_estimate");
+      assert.equal(body.data.session.messages.length, 2);
+      assert.deepEqual(body.data.session.messages.map((message) => message.role), ["user", "assistant"]);
+      assert.equal(body.data.session.messages[0].content, "请帮我解析客户需求材料");
+      assert.equal(body.data.session.messages[1].content, "已识别为售前需求解析任务。");
+      const systemPrompt = capturedBody.messages?.find((item) => item.role === "system")?.content || "";
+      assert.match(systemPrompt, /售前顾问/);
+      assert.match(systemPrompt, /parse_requirement_file/);
+
+      const followUpReq = createMockReq({
+        token: getNonAdminUserToken(),
+        body: {
+          sessionId: body.data.session.sessionId,
+          messages: [
+            { role: "user", content: "请帮我解析客户需求材料" },
+            { role: "assistant", content: "已识别为售前需求解析任务。" },
+            { role: "user", content: "继续补充风险" },
+          ],
+          workflowKey: "parse_requirement_file",
+        },
+      });
+      const followUpRes = createMockRes();
+      await homeWorkbenchChat(followUpReq, followUpRes as unknown as Response);
+      const followUpBody = followUpRes.body as { data: { session: { sessionId: string; messages: Array<{ role: string; content: string }> } } };
+      assert.equal(followUpBody.data.session.sessionId, body.data.session.sessionId);
+      assert.equal(followUpBody.data.session.messages.length, 4);
+      assert.equal(followUpBody.data.session.messages[2].content, "继续补充风险");
+
+      const invalidSessionReq = createMockReq({
+        token: getNonAdminUserToken(),
+        body: {
+          sessionId: "missing-session",
+          messages: [{ role: "user", content: "新会话粗评" }],
+          workflowKey: "parse_requirement_file",
+        },
+      });
+      const invalidSessionRes = createMockRes();
+      await homeWorkbenchChat(invalidSessionReq, invalidSessionRes as unknown as Response);
+      const invalidSessionBody = invalidSessionRes.body as { data: { session: { sessionId: string; domain: string; messages: unknown[] } } };
+      assert.notEqual(invalidSessionBody.data.session.sessionId, "missing-session");
+      assert.equal(invalidSessionBody.data.session.domain, "business_evaluation");
+      assert.equal(invalidSessionBody.data.session.messages.length, 2);
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = originalFetch;
+      config.kimi.apiKey = originalApiKey;
+      _resetAiBootstrapForTest();
+    }
   });
-  const res = createMockRes();
-  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-  const originalApiKey = config.kimi.apiKey;
-  let capturedBody: { messages?: Array<{ role: string; content: string }> } | null = null;
-  try {
-    config.kimi.apiKey = "unit-test-key";
-    bootstrapAiProviders();
-    (globalThis as { fetch?: unknown }).fetch = async (_url: unknown, init?: { body?: string }) => {
-      capturedBody = JSON.parse(String(init?.body || "{}")) as { messages?: Array<{ role: string; content: string }> };
-      return {
-        ok: true,
-        json: async () => ({
-          choices: [{ message: { content: "已识别为售前需求解析任务。" } }],
-        }),
-      } as unknown;
-    };
+});
 
-    await homeWorkbenchChat(req, res as unknown as Response);
+test("ai.usecase: homeWorkbenchChat keeps user turn in session when model fails", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+    const originalApiKey = config.kimi.apiKey;
+    try {
+      config.kimi.apiKey = "unit-test-key";
+      bootstrapAiProviders();
+      (globalThis as { fetch?: unknown }).fetch = async () => {
+        throw new Error("model timeout");
+      };
 
-    assert.equal(res.statusCode, 200);
-    const body = res.body as { code: number; data: { answer: string; businessRole: string; model: string } };
-    assert.equal(body.code, 0);
-    assert.equal(body.data.businessRole, "pre_sales");
-    assert.equal(body.data.answer, "已识别为售前需求解析任务。");
-    const systemPrompt = capturedBody?.messages?.find((item) => item.role === "system")?.content || "";
-    assert.match(systemPrompt, /售前顾问/);
-    assert.match(systemPrompt, /parse_requirement_file/);
-  } finally {
-    (globalThis as { fetch?: unknown }).fetch = originalFetch;
-    config.kimi.apiKey = originalApiKey;
-    _resetAiBootstrapForTest();
-  }
+      const req = createMockReq({
+        token: getNonAdminUserToken(),
+        body: {
+          messages: [{ role: "user", content: "模型失败也要保留这句话" }],
+          workflowKey: "parse_requirement_file",
+        },
+      });
+      const res = createMockRes();
+      await homeWorkbenchChat(req, res as unknown as Response);
+
+      assert.equal(res.statusCode, 400);
+      const store = JSON.parse(fs.readFileSync(aiSessionsStorePath(), "utf-8")) as {
+        sessions: Array<{ workflowKey: string; messages: Array<{ role: string; content: string }> }>;
+      };
+      const session = store.sessions.find((item) => item.workflowKey === "parse_requirement_file");
+      assert.ok(session);
+      assert.deepEqual(session.messages.map((message) => message.content), ["模型失败也要保留这句话"]);
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = originalFetch;
+      config.kimi.apiKey = originalApiKey;
+      _resetAiBootstrapForTest();
+    }
+  });
 });
 
 test("ai.usecase: parseBasicInfo fails instead of returning rule fallback when model parsing fails", async () => {
