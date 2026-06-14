@@ -79,6 +79,34 @@ input, button, select, textarea { font-family: inherit; }
   color: var(--ink);
 }
 
+.ai-home-workbench {
+  grid-template-columns: 260px minmax(0, 1fr) 300px;
+}
+
+@media (max-width: 1180px) {
+  .ai-home-workbench {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    height: auto !important;
+    overflow: auto !important;
+  }
+
+  .ai-home-rail {
+    grid-column: 1 / -1;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .ai-home-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-home-workbench > section,
+  .ai-home-workbench > aside {
+    min-width: 0;
+  }
+}
+
 /* HomePage 响应式（接 layout.css 1180/760 断点） */
 .home-grid { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 16px; min-width: 0; }
 .home-kpi  { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }

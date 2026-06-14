@@ -3,14 +3,9 @@ import PageShell from '../components/Layout/PageShell.jsx'
 import useHomeDashboard from '../hooks/useHomeDashboard.js'
 import { apiClient } from '../api/client.js'
 
-// VCS 9 button spec — §6.3.1
-const VCS_BUTTONS = [
+const PROJECT_ACTIONS = [
   { key: 'history', label: '🕘 历史', mode: 'always' },
-  { key: 'checkout', label: '🔓 检出', mode: 'select-checked-in' },
-  { key: 'checkin', label: '🔒 检入', mode: 'select-checked-out' },
-  { key: 'undo', label: '↺ 撤销检出', mode: 'select-checked-out' },
-  { key: 'promote', label: '⬆ 升版', mode: 'select-any' },
-  { key: 'unlock', label: '⚠ 强制解锁', mode: 'select-checked-out', danger: true },
+  { key: 'open', label: '打开项目', mode: 'select-any' },
   { key: 'delete', label: '🗑 删除', mode: 'select-any', danger: true },
 ]
 
@@ -23,6 +18,7 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
   const [creatingPlan, setCreatingPlan] = useState(false)
   const [newPlan, setNewPlan] = useState({
     projectName: '',
+    customerName: '',
     industry: '',
     userCount: '',
     template: '',
@@ -36,35 +32,32 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
       plan.projectName,
       plan.globalVersion,
       plan.status,
-      plan.checkedOutBy,
       plan.owner,
-      plan.raw?.checkedOutByUsername,
       plan.raw?.updatedByUsername,
-      plan.raw?.versionCode,
+      plan.raw?.customerName,
+      plan.raw?.industry,
     ].some((value) => String(value || '').toLowerCase().includes(q))
   })
 
-  const handleBatchAction = async (key) => {
+  const handleProjectAction = async (key) => {
     const ids = Array.from(selected)
-    if (!ids.length) return
+    if (!ids.length && key !== 'history') return
     setBatchLoading(true)
     try {
       for (const id of ids) {
         switch (key) {
-          case 'checkout': await apiClient.post(`/versions/${id}/checkout`); break
-          case 'checkin': await apiClient.post(`/versions/${id}/checkin`); break
-          case 'undo': await apiClient.post(`/versions/${id}/undo-checkout`); break
-          case 'promote': await apiClient.post(`/versions/${id}/promote`); break
-          case 'unlock': await apiClient.patch(`/versions/${id}/force-unlock`); break
+          case 'open':
+            setDialog('er')
+            break
           case 'delete': {
             const plan = plans.find((p) => p.id === id)
-            if (plan) await remove(plan.raw?.versionCode || plan.globalVersion)
+            if (plan) await remove(plan.id)
             break
           }
           default: break
         }
       }
-      alert(`批量 ${key} 完成 · ${ids.length} 条`)
+      if (key !== 'open') alert(`项目操作 ${key} 完成 · ${ids.length} 条`)
       setSelected(new Set())
       setAnchorId(null)
       refetch()
@@ -96,14 +89,11 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
     }
   }
 
-  // VCS 按钮启用判定
   const selectedRows = plans.filter((p) => selected.has(p.id))
-  const isVcsEnabled = (mode) => {
+  const isProjectActionEnabled = (mode) => {
     if (mode === 'always') return true
     if (selectedRows.length === 0) return false
     if (mode === 'select-any') return true
-    if (mode === 'select-checked-in') return selectedRows.every((r) => !r.checkedOut)
-    if (mode === 'select-checked-out') return selectedRows.every((r) => r.checkedOut)
     return false
   }
 
@@ -111,7 +101,7 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
     setCreatingPlan(true)
     try {
       await create(newPlan)
-      setNewPlan({ projectName: '', industry: '', userCount: '', template: '' })
+      setNewPlan({ projectName: '', customerName: '', industry: '', userCount: '', template: '' })
       setSelected(new Set())
       setAnchorId(null)
       setDialog('guide')
@@ -152,24 +142,23 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
           {/* Plan list with VCS 9-toolbar (§6.3.1) */}
           <div className="section" style={{ margin: 0 }}>
             <div className="hd">
-              <span>评估方案列表</span>
-              <span className="bdg ci" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />已检入 {plans.filter((p) => !p.checkedOut).length}</span>
-              <span className="bdg co" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />已检出 {plans.filter((p) => p.checkedOut).length}</span>
+              <span>项目评估方案列表</span>
+              <span className="bdg ci" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />草稿 {plans.filter((p) => p.status === '草稿').length}</span>
+              <span className="bdg co" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />进行中 {plans.filter((p) => p.status === '进行中').length}</span>
               <div className="right"><span style={{ fontSize: 11 }}>共 {plans.length} 条 · 已选 {selected.size}</span></div>
             </div>
-            {/* VCS 9 toolbar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)', fontSize: 12, flexWrap: 'wrap' }}>
               <span
                 style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: selected.size > 0 ? 'var(--brand-ink)' : 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700, padding: '0 4px', cursor: selected.size > 0 ? 'pointer' : 'default' }}
                 onClick={selected.size > 0 ? () => { setSelected(new Set()); setAnchorId(null) } : undefined}
               >已选 {selected.size}</span>
               <div style={{ display: 'flex', gap: 2, paddingRight: 10, borderRight: '1px solid var(--line)' }}>
-                {VCS_BUTTONS.map((b) => {
-                  const enabled = isVcsEnabled(b.mode)
+                {PROJECT_ACTIONS.map((b) => {
+                  const enabled = isProjectActionEnabled(b.mode)
                   return (
                     <button type="button"
                       key={b.key}
-                      onClick={() => enabled && !batchLoading && handleBatchAction(b.key)}
+                      onClick={() => enabled && !batchLoading && handleProjectAction(b.key)}
                       disabled={!enabled}
                       style={{
                         padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
@@ -200,7 +189,7 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'var(--surface)', border: '1px solid var(--line)', fontSize: 11.5, color: 'var(--ink-2)' }}>行业：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>制造业</b><span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span></span>
                 <input
                   type="text"
-                  placeholder="⌕ 搜索项目名 / 版本号 / 检出人"
+                  placeholder="⌕ 搜索项目 / 客户 / 负责人"
                   value={planSearch}
                   onChange={(e) => {
                     setPlanSearch(e.target.value)
@@ -216,9 +205,9 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
                 <tr>
                   <th style={{ width: 38 }}>#</th>
                   <th>项目名称</th>
-                  <th>总方案版本</th>
+                  <th>项目编号</th>
                   <th>状态</th>
-                  <th>检出</th>
+                  <th>客户</th>
                   <th className="num">人天</th>
                   <th>更新时间</th>
                 </tr>
@@ -249,9 +238,7 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
                         </span>
                       </td>
                       <td>
-                        <span className={`bdg ${p.checkedOut ? 'co' : 'ci'}`} style={{ fontSize: 10.5 }}>
-                          <span className="dot" />{p.checkedOut ? '已检出' : '已检入'}
-                        </span>
+                        {p.customerName || p.raw?.customerName || '—'}
                       </td>
                       <td className="num">{p.mandays}</td>
                       <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.updatedAt || '—'}</td>
@@ -263,7 +250,7 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
           </div>
           {filteredPlans.length === 0 && (
             <div style={{ padding: '18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, borderTop: '1px solid var(--line)' }}>
-              未找到匹配的评估方案
+              未找到匹配的项目评估
             </div>
           )}
         </div>
@@ -273,7 +260,7 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
           <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-1)' }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', fontSize: 13, fontWeight: 700 }}>快速操作</div>
             {[
-              { t: '新建评估方案', dlg: 'new' },
+              { t: '新建项目评估', dlg: 'new' },
               { t: '导入需求访谈纪要', dlg: null },
               { t: '发起评审', dlg: null },
               { t: '查看 ER 关联图', dlg: 'er' },
@@ -300,9 +287,10 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
 
       {/* 3 Dialogs · §6.3 D1/D2/D3 */}
       {dialog === 'new' && (
-        <DialogShell title="新建评估方案" onClose={() => setDialog(null)} onConfirm={handleCreatePlan} confirmLabel={creatingPlan ? '创建中…' : '下一步：创建'} confirmDisabled={creatingPlan}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-2)' }}>请填写方案基础信息</p>
+        <DialogShell title="新建项目评估" onClose={() => setDialog(null)} onConfirm={handleCreatePlan} confirmLabel={creatingPlan ? '创建中…' : '下一步：创建'} confirmDisabled={creatingPlan}>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-2)' }}>请填写项目评估基础信息</p>
           <Field label="项目名称" placeholder="如：利民集团数字化二期" value={newPlan.projectName} onChange={(value) => setNewPlan((p) => ({ ...p, projectName: value }))} />
+          <Field label="客户名称" placeholder="如：利民集团" value={newPlan.customerName} onChange={(value) => setNewPlan((p) => ({ ...p, customerName: value }))} />
           <Field label="客户行业" placeholder="制造-离散 / 流程 / 零售..." value={newPlan.industry} onChange={(value) => setNewPlan((p) => ({ ...p, industry: value }))} />
           <Field label="规模（用户数）" placeholder="100" value={newPlan.userCount} onChange={(value) => setNewPlan((p) => ({ ...p, userCount: value }))} />
           <Field label="模板" placeholder="实施评估标准版" value={newPlan.template} onChange={(value) => setNewPlan((p) => ({ ...p, template: value }))} />

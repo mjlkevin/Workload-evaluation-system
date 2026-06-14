@@ -25,4 +25,11 @@ describe('getAiHomePreset', () => {
     const preset = getAiHomePreset('bad-role')
     expect(preset.key).toBe('pre_sales')
   })
+
+  test('admin preset includes standard governance workflow', () => {
+    const preset = getAiHomePreset('admin')
+    const workflow = preset.workflows.find((item) => item.key === 'standard_governance')
+    expect(workflow).toBeTruthy()
+    expect(workflow.title).toContain('标准')
+  })
 })

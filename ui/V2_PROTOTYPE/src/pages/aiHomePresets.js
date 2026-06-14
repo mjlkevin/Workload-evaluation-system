@@ -87,6 +87,7 @@ export const AI_HOME_PRESETS = {
     workflows: [
       { key: 'global_queue', title: '查看全局待办', desc: '汇总各角色待处理事项' },
       { key: 'exception_projects', title: '检查异常项目', desc: '识别超期、缺资料和流程卡点' },
+      { key: 'standard_governance', title: '更新评估标准', desc: '上传金蝶官方产品评估文件，生成标准差异和发布草稿' },
       { key: 'manage_roles', title: '管理业务角色', desc: '进入用户管理补齐业务角色' },
     ],
   },

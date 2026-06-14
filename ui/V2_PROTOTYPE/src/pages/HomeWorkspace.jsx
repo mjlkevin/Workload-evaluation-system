@@ -11,6 +11,7 @@ function ViewButton({ active, children, onClick }) {
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       style={{
         height: 32,
         padding: '0 12px',
@@ -31,6 +32,8 @@ function ViewButton({ active, children, onClick }) {
 export default function HomeWorkspace() {
   const { user } = useCurrentUser()
   const [view, setView] = useState(() => localStorage.getItem(VIEW_KEY) || 'ai')
+  const isAiView = view === 'ai'
+  const pageTitle = isAiView ? 'AI 工作台' : '项目评估工作台'
 
   useEffect(() => {
     localStorage.setItem(VIEW_KEY, view)
@@ -38,18 +41,18 @@ export default function HomeWorkspace() {
 
   return (
     <PageShell
-      crumb="工作台 / AI 工作台"
-      title="AI 工作台"
-      subtitle={view === 'ai' ? '按登录账号业务角色预置对话工作流' : '已切换为传统主页视图'}
-      fillViewport={view === 'ai'}
+      crumb={`工作台 / ${pageTitle}`}
+      title={pageTitle}
+      subtitle={isAiView ? '按登录账号业务角色预置对话工作流' : '项目评估视图：查看项目评估概览、快速操作和最近动态'}
+      fillViewport={isAiView}
       actions={[
         <div key="switch" style={{ display: 'inline-flex', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', height: 32 }}>
-          <ViewButton active={view === 'ai'} onClick={() => setView('ai')}>AI 工作台</ViewButton>
-          <ViewButton active={view === 'traditional'} onClick={() => setView('traditional')}>传统工作台</ViewButton>
+          <ViewButton active={isAiView} onClick={() => setView('ai')}>AI 工作台</ViewButton>
+          <ViewButton active={!isAiView} onClick={() => setView('traditional')}>传统工作台</ViewButton>
         </div>,
       ]}
     >
-      {view === 'ai' ? <AiHomeWorkbench currentUser={user} /> : <TraditionalHomeDashboard embedded />}
+      {isAiView ? <AiHomeWorkbench currentUser={user} /> : <TraditionalHomeDashboard embedded />}
     </PageShell>
   )
 }

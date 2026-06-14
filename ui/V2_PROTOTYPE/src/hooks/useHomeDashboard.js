@@ -1,23 +1,24 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { apiClient } from '../api/client.js'
 import { isAuthenticated } from '../api/auth.js'
-import { mapVcsStatus } from './mapVersionStatus.js'
 import { unwrapList, unwrapUsers } from '../api/utils.js'
 
 function sliceDate(d) {
   return typeof d === 'string' ? d.slice(0, 10) : ''
 }
 
-export function mapGlobalVersionToPlan(record = {}) {
-  const payload = record.payload || {}
+export function mapProjectEvaluationToPlan(record = {}) {
+  const projectId = record.projectId || record.id || ''
   return {
-    id: record.id || '',
-    projectName: payload.projectName || record.projectName || record.baseCode || '未命名',
-    globalVersion: record.baseCode || record.globalVersion || '',
-    status: mapVcsStatus(record),
-    checkedOut: record.checkoutStatus === 'checked_out',
-    mandays: Number(payload.totalDays ?? record.totalDays ?? 0),
+    id: projectId,
+    projectName: record.projectName || record.customerName || '未命名项目',
+    customerName: record.customerName || '',
+    industry: record.industry || '',
+    globalVersion: record.sourceGlobalVersionRecordId || (projectId ? `PROJECT-${projectId}` : ''),
+    status: record.status === 'published' ? '已发布' : record.status === 'reviewing' ? '待评审' : record.status === 'active' ? '进行中' : '草稿',
+    mandays: Number(record.totalDays ?? record.mandays ?? 0),
     updatedAt: sliceDate(record.updatedAt),
+    owner: record.ownerUsername || '',
     raw: record,
   }
 }
@@ -52,7 +53,7 @@ function generateFeed(allRecords) {
 }
 
 const DEFAULT_KPI = [
-  { ic: '▣', lb: '方案数', num: 0, sub: '加载中…', bar: '0%', icBg: 'var(--brand-soft)', icCo: 'var(--brand-ink)' },
+  { ic: '▣', lb: '项目数', num: 0, sub: '加载中…', bar: '0%', icBg: 'var(--brand-soft)', icCo: 'var(--brand-ink)' },
   { ic: '≡', lb: '需求条目', num: 0, sub: '加载中…', bar: '0%', icBg: 'var(--accent-soft)', icCo: 'var(--accent)' },
   { ic: '⏱', lb: '评估人天', num: 0, sub: '加载中…', bar: '0%', icBg: 'var(--info-soft)', icCo: 'var(--info)' },
   { ic: '⚇', lb: '参与成员', num: 0, sub: '加载中…', bar: '0%', icBg: 'var(--ok-soft)', icCo: 'var(--ok)' },
@@ -63,23 +64,16 @@ const EMPTY_DASHBOARD = { kpi: DEFAULT_KPI, plans: EMPTY_ROWS, feed: EMPTY_ROWS 
 function createLocalPlan(input = {}) {
   const now = new Date()
   const seq = String(now.getTime()).slice(-5)
-  const versionCode = `GL-${seq}`
-  return mapGlobalVersionToPlan({
-    id: `local-${seq}`,
-    type: 'global',
-    versionCode,
-    baseCode: versionCode,
+  return mapProjectEvaluationToPlan({
+    projectId: `local-${seq}`,
+    projectName: input.projectName || '新建项目评估',
+    customerName: input.customerName || '',
+    industry: input.industry || '制造业',
+    currentStage: 'rough_estimate',
     status: 'draft',
-    checkoutStatus: 'checked_in',
     updatedAt: now.toISOString(),
-    updatedByUsername: 'mjlkevin',
-    payload: {
-      projectName: input.projectName || '新建评估方案',
-      industry: input.industry || '制造业',
-      userCount: input.userCount || '',
-      template: input.template || '实施评估标准版',
-      totalDays: 0,
-    },
+    ownerUsername: 'mjlkevin',
+    totalDays: 0,
   })
 }
 
@@ -106,36 +100,35 @@ export default function useHomeDashboard({
 
     // 并发请求 4 个端点
     const [
-      globalPayload,
+      projectPayload,
       assessmentPayload,
       requirementPayload,
       usersPayload,
     ] = await Promise.all([
-      apiClient.get('/versions', { type: 'global' }).catch(() => ({ data: [] })),
+      apiClient.get('/project-evaluations').catch(() => ({ data: { items: [] } })),
       apiClient.get('/versions', { type: 'assessment' }).catch(() => ({ data: [] })),
       apiClient.get('/versions', { type: 'requirementImport' }).catch(() => ({ data: [] })),
       apiClient.get('/auth/users').catch(() => ({ data: [] })),
     ])
 
-    const globalRecords = unwrapList(globalPayload)
+    const projectRecords = unwrapList(projectPayload)
     const assessmentRecords = unwrapList(assessmentPayload)
     const requirementRecords = unwrapList(requirementPayload)
     const users = unwrapUsers(usersPayload)
 
     // KPI 聚合
     const kpi = [
-      { ...DEFAULT_KPI[0], num: globalRecords.length },
+      { ...DEFAULT_KPI[0], num: projectRecords.length },
       { ...DEFAULT_KPI[1], num: requirementRecords.length },
       { ...DEFAULT_KPI[2], num: Math.round(sumDays(assessmentRecords)) },
       { ...DEFAULT_KPI[3], num: users.length },
     ]
 
-    // Plans（全球方案列表）
-    const plans = [...localPlans, ...globalRecords.map(mapGlobalVersionToPlan)]
+    // Plans（项目评估方案列表）
+    const plans = [...localPlans, ...projectRecords.map(mapProjectEvaluationToPlan)]
 
     // Feed（从所有版本记录聚合）
     const allRecords = [
-      ...globalRecords.map((r) => ({ ...r, type: 'global' })),
       ...assessmentRecords.map((r) => ({ ...r, type: 'assessment' })),
       ...requirementRecords.map((r) => ({ ...r, type: 'requirementImport' })),
     ]
@@ -149,7 +142,7 @@ export default function useHomeDashboard({
       setData({
         ...EMPTY_DASHBOARD,
         plans: [...localPlans],
-        kpi: DEFAULT_KPI.map((item) => item.lb === '方案数' ? { ...item, num: localPlans.length, sub: localPlans.length ? '本地新增' : '无数据' } : { ...item, sub: '无数据' }),
+        kpi: DEFAULT_KPI.map((item) => item.lb === '项目数' ? { ...item, num: localPlans.length, sub: localPlans.length ? '本地新增' : '无数据' } : { ...item, sub: '无数据' }),
       })
       setLoading(false)
       return undefined
@@ -180,7 +173,7 @@ export default function useHomeDashboard({
       setData({
         ...EMPTY_DASHBOARD,
         plans: [...localPlans],
-        kpi: DEFAULT_KPI.map((item) => item.lb === '方案数' ? { ...item, num: localPlans.length, sub: localPlans.length ? '本地新增' : '无数据' } : { ...item, sub: '无数据' }),
+        kpi: DEFAULT_KPI.map((item) => item.lb === '项目数' ? { ...item, num: localPlans.length, sub: localPlans.length ? '本地新增' : '无数据' } : { ...item, sub: '无数据' }),
       })
       return
     }
@@ -207,9 +200,9 @@ export default function useHomeDashboard({
     setData((prev) => ({
       ...prev,
       plans: [localPlan, ...prev.plans],
-      kpi: prev.kpi.map((item) => item.lb === '方案数' ? { ...item, num: Number(item.num || 0) + 1, sub: '刚刚新增' } : item),
+      kpi: prev.kpi.map((item) => item.lb === '项目数' ? { ...item, num: Number(item.num || 0) + 1, sub: '刚刚新增' } : item),
       feed: [
-        { name: 'mjlkevin', action: `新建了 总方案 · ${localPlan.globalVersion}`, time: '刚刚', accent: true },
+        { name: 'mjlkevin', action: `新建了 项目评估 · ${localPlan.projectName}`, time: '刚刚', accent: true },
         ...prev.feed,
       ].slice(0, 4),
     }))
@@ -217,20 +210,18 @@ export default function useHomeDashboard({
     if (!enabled) return localPlan.id
 
     try {
-      const payload = await apiClient.post('/versions', {
-        type: 'global',
-        status: 'draft',
-        payload: {
-          projectName: input.projectName || localPlan.projectName,
-          industry: input.industry || '',
-          userCount: input.userCount || '',
-          template: input.template || '',
-          totalDays: 0,
-        },
+      const payload = await apiClient.post('/project-evaluations', {
+        projectName: input.projectName || localPlan.projectName,
+        customerName: input.customerName || '',
+        industry: input.industry || '',
+        currentStage: input.currentStage || 'rough_estimate',
+        projectStatus: 'draft',
+        totalDays: 0,
       })
-      const record = payload?.data?.record || payload?.data || payload
+      const record = payload?.data?.project || payload?.data || payload
+      setLocalPlans((prev) => prev.filter((plan) => plan.id !== localPlan.id))
       await refetch()
-      return record.id || record.versionRecordId || localPlan.id
+      return record.projectId || record.id || localPlan.id
     } catch (err) {
       setError(err)
       return localPlan.id

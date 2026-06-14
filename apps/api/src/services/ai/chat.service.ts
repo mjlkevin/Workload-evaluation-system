@@ -7,6 +7,8 @@ import { normalizeKimiModelName } from "../../utils/model-name";
 import { ok, fail } from "../../utils/response";
 import { requireAuth, resolveBusinessRole } from "../../middleware/auth";
 import { resolveActiveRequirementKimiApiKey, loadRequirementSystemConfigStore } from "../../modules/system/system.repository";
+import { appendAiSessionEvent, createAiSession, getAiSession } from "../../modules/ai-sessions/ai-sessions.usecase";
+import type { AiSessionRecord } from "../../modules/ai-sessions/ai-sessions.types";
 import type { AuthUser, BusinessRole } from "../../types";
 import { defaultProviderRegistry, type ModelProvider } from "../../ai/provider";
 
@@ -45,14 +47,34 @@ const HOME_ROLE_PRESETS: Record<BusinessRole, { label: string; prompt: string }>
   admin: { label: "管理视角", prompt: "你是管理员的 AI 工作助手。帮助用户查看全局项目队列、异常流程、角色配置和系统治理建议。" },
 };
 
-function normalizeHomeMessages(value: unknown): Array<{ role: "user" | "assistant"; content: string }> {
+type HomeAttachmentInput = { name: string; size?: number; type?: string };
+type HomeMessageInput = { role: "user" | "assistant"; content: string; attachments: HomeAttachmentInput[] };
+
+function normalizeHomeAttachments(value: unknown): HomeAttachmentInput[] {
+  if (!Array.isArray(value)) return [];
+  const attachments: HomeAttachmentInput[] = [];
+  for (const item of value) {
+    const record = asModelObject(item);
+    const name = asString(record.name);
+    if (!name) continue;
+    attachments.push({
+      name,
+      size: typeof record.size === "number" ? record.size : undefined,
+      type: asString(record.type) || undefined,
+    });
+  }
+  return attachments;
+}
+
+function normalizeHomeMessages(value: unknown): HomeMessageInput[] {
   if (!Array.isArray(value)) return [];
   return value
     .map((item) => {
-      const record = item && typeof item === "object" ? item as { role?: unknown; content?: unknown } : {};
+      const record = asModelObject(item);
       return {
         role: asString(record.role) === "assistant" ? "assistant" as const : "user" as const,
         content: asString(record.content),
+        attachments: normalizeHomeAttachments(record.attachments),
       };
     })
     .filter((item) => item.content);
@@ -63,7 +85,27 @@ function currentUserFromRequest(req: Request, res: Response): AuthUser | null {
   return requireAuth(req, res)?.user || null;
 }
 
-async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model: string; user: AuthUser; workflowKey: string; messages: Array<{ role: "user" | "assistant"; content: string }>; }): Promise<{ answer: string; rawContent: string; businessRole: BusinessRole; roleLabel: string }> {
+function latestUserMessage(messages: HomeMessageInput[]): { role: "user"; content: string; attachments: HomeAttachmentInput[] } | null {
+  const message = [...messages].reverse().find((item) => item.role === "user" && item.content.trim());
+  return message ? { role: "user", content: message.content, attachments: message.attachments } : null;
+}
+
+function ensureHomeAiSession(user: AuthUser, input: { sessionId?: unknown; workflowKey?: unknown; title?: unknown }): AiSessionRecord {
+  const requestedSessionId = asString(input.sessionId);
+  if (requestedSessionId) {
+    const existing = getAiSession(user, requestedSessionId);
+    if (existing) return existing;
+  }
+  const workflowKey = asString(input.workflowKey) || "free_chat";
+  return createAiSession(user, {
+    title: asString(input.title) || "AI 工作台会话",
+    domain: "business_evaluation",
+    workflowKey,
+    status: workflowKey === "free_chat" ? "temporary_chat" : "rough_estimate",
+  });
+}
+
+async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model: string; user: AuthUser; workflowKey: string; messages: HomeMessageInput[]; }): Promise<{ answer: string; rawContent: string; businessRole: BusinessRole; roleLabel: string }> {
   const businessRole = resolveBusinessRole(params.user);
   const preset = HOME_ROLE_PRESETS[businessRole];
   const workflowLine = params.workflowKey ? `当前工作流：${params.workflowKey}` : "当前工作流：自由对话";
@@ -74,7 +116,7 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
     "请用中文回答。回答要面向业务推进，优先给出下一步动作、需要确认的问题和可沉淀到系统的结果。",
     "当前阶段仅支持文本对话；如果用户提到附件或文件，请说明已收到文件意图，并提示后续会进入文件解析流程。",
   ].join("\n");
-  const safeMessages = params.messages.slice(-12);
+  const safeMessages = params.messages.slice(-12).map((message) => ({ role: message.role, content: message.content }));
   const completion = await getKimiProvider().chatCompletion({
     model: params.model,
     temperature: 0.3,
@@ -94,27 +136,43 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
   const user = currentUserFromRequest(req, res);
   if (!user) return;
 
-  const body = (req.body || {}) as { messages?: unknown; workflowKey?: unknown };
+  const body = (req.body || {}) as { messages?: unknown; workflowKey?: unknown; sessionId?: unknown };
   const messages = normalizeHomeMessages(body.messages);
   if (messages.length === 0) return fail(res, 40001, "参数错误", [{ field: "messages", reason: "required" }]);
+  const userMessage = latestUserMessage(messages);
+  if (!userMessage) return fail(res, 40001, "参数错误", [{ field: "messages", reason: "user_message_required" }]);
 
   const { apiKey } = resolveActiveRequirementKimiApiKey();
   if (!apiKey) return fail(res, 40001, "参数错误", [{ field: "apiKey", reason: "required_or_env_missing" }]);
 
   try {
+    const workflowKey = asString(body.workflowKey) || "free_chat";
+    const session = ensureHomeAiSession(user, {
+      sessionId: body.sessionId,
+      workflowKey,
+      title: userMessage.content.slice(0, 40),
+    });
+    const sessionWithUserTurn = appendAiSessionEvent(user, session.sessionId, {
+      message: userMessage,
+      attachments: userMessage.attachments,
+    }) || session;
     const result = await homeChatWithKimi({
       apiUrl: config.kimi.apiBaseUrl,
       apiKey,
       model: config.kimi.model,
       user,
-      workflowKey: asString(body.workflowKey),
+      workflowKey,
       messages,
     });
+    const updatedSession = appendAiSessionEvent(user, session.sessionId, {
+      message: { role: "assistant", content: result.answer },
+    }) || getAiSession(user, session.sessionId) || sessionWithUserTurn;
     return res.json(ok({
       answer: result.answer,
       businessRole: result.businessRole,
       roleLabel: result.roleLabel,
       model: normalizeKimiModelName(config.kimi.model),
+      session: updatedSession,
     }, requestId));
   } catch (err) {
     return fail(res, 40001, "参数错误", [{ field: "messages/api", reason: err instanceof Error ? err.message : "home_workbench_chat_failed" }]);

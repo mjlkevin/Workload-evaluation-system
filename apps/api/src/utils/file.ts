@@ -74,6 +74,13 @@ export function versionsStorePath(): string {
 }
 
 /**
+ * AI 会话存储路径
+ */
+export function aiSessionsStorePath(): string {
+  return path.resolve(resolveRootDir(), "data/ai-sessions.json");
+}
+
+/**
  * 版本号编码规则存储路径
  */
 export function versionCodeRulesStorePath(): string {
