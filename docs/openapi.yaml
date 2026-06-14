@@ -23,14 +23,27 @@ servers:
 
 tags:
   - name: Health
+  - name: Auth
   - name: Versions
   - name: Templates
   - name: RuleSets
   - name: Estimates
+  - name: AI
   - name: Sessions
   - name: Exports
   - name: Teams
   - name: Wbs
+  - name: System
+  - name: Presales
+  - name: Sales
+  - name: PM
+  - name: Collab
+  - name: DevAssessment
+  - name: Change
+  - name: History
+
+security:
+  - bearerAuth: []
 
 paths:
   /api/v1/health:
@@ -89,8 +102,6 @@ paths:
       tags: [Templates]
       summary: 导入模板 JSON（admin）
       operationId: importTemplateJson
-      parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
       requestBody:
         required: true
         content:
@@ -116,8 +127,6 @@ paths:
       tags: [Templates]
       summary: 导入模板 Excel（admin）
       operationId: importTemplateExcel
-      parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
       requestBody:
         required: true
         content:
@@ -185,8 +194,6 @@ paths:
       tags: [RuleSets]
       summary: 导入规则 JSON（admin）
       operationId: importRuleSetJson
-      parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
       requestBody:
         required: true
         content:
@@ -212,8 +219,6 @@ paths:
       tags: [Estimates]
       summary: 计算估算结果
       operationId: calculateEstimate
-      parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
       requestBody:
         required: true
         content:
@@ -240,7 +245,6 @@ paths:
       summary: 计算并导出（excel/pdf）
       operationId: calculateAndExport
       parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
         - $ref: "#/components/parameters/IdempotencyHeader"
       requestBody:
         required: true
@@ -274,7 +278,6 @@ paths:
       summary: 导出 Excel
       operationId: exportEstimateExcel
       parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
         - $ref: "#/components/parameters/IdempotencyHeader"
       requestBody:
         required: true
@@ -302,7 +305,6 @@ paths:
       summary: 导出 PDF
       operationId: exportEstimatePdf
       parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
         - $ref: "#/components/parameters/IdempotencyHeader"
       requestBody:
         required: true
@@ -330,7 +332,6 @@ paths:
       summary: 获取导出历史
       operationId: getExportHistory
       parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
         - name: page
           in: query
           schema:
@@ -363,8 +364,6 @@ paths:
       tags: [Sessions]
       summary: 开始会话态估算
       operationId: startSession
-      parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
       requestBody:
         required: true
         content:
@@ -397,7 +396,6 @@ paths:
       summary: 会话态估算（无需重复传 templateId/ruleSetId）
       operationId: sessionCalculate
       parameters:
-        - $ref: "#/components/parameters/XRoleHeader"
         - name: sessionId
           in: path
           required: true
@@ -1205,6 +1203,3154 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: 用户注册（公开）
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, inviteCode]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                inviteCode:
+                  type: string
+      responses:
+        "200":
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: 用户登录（公开）
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: 凭证错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: 获取当前用户信息
+      operationId: me
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: 登出
+      operationId: logout
+      responses:
+        "200":
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "401":
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/users:
+    get:
+      tags: [Auth]
+      summary: 获取用户列表（admin）
+      operationId: listUsers
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/users/{userId}/role:
+    patch:
+      tags: [Auth]
+      summary: 修改用户角色（admin）
+      operationId: updateUserRole
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [admin, sub_admin, user]
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/users/{userId}/status:
+    patch:
+      tags: [Auth]
+      summary: 修改用户状态（admin）
+      operationId: updateUserStatus
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [active, disabled]
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/invite-codes:
+    get:
+      tags: [Auth]
+      summary: 获取邀请码列表（admin）
+      operationId: listInviteCodes
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteCodeListResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/invite-codes/generate:
+    post:
+      tags: [Auth]
+      summary: 生成邀请码（admin）
+      operationId: generateInviteCode
+      responses:
+        "200":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteCodeResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai/parse-basic-info:
+    post:
+      tags: [AI]
+      summary: AI 解析需求导入文件（Excel）
+      operationId: parseBasicInfo
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: 解析成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParseBasicInfoResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai/parse-basic-info/stream:
+    post:
+      tags: [AI]
+      summary: AI 解析需求导入文件（SSE 流式）
+      operationId: parseBasicInfoStream
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: SSE 流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai/company-profile-summary:
+    post:
+      tags: [AI]
+      summary: 企业画像摘要
+      operationId: companyProfileSummary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerName]
+              properties:
+                customerName:
+                  type: string
+                location:
+                  type: string
+                customerIndustry:
+                  type: string
+                enterpriseRevenue:
+                  type: string
+                itStatus:
+                  type: string
+                disambiguationChoice:
+                  type: object
+                  properties:
+                    displayName:
+                      type: string
+                    summary:
+                      type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyProfileResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai/kimi-assessment/preview:
+    post:
+      tags: [AI]
+      summary: Kimi 评估预览
+      operationId: kimiAssessmentPreview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requirementSnapshot, source]
+              properties:
+                requirementSnapshot:
+                  type: object
+                source:
+                  type: object
+                  required: [globalVersionCode, requirementVersionCode]
+                  properties:
+                    globalVersionCode:
+                      type: string
+                    requirementVersionCode:
+                      type: string
+                ruleContext:
+                  type: object
+                  properties:
+                    promptProfile:
+                      type: object
+      responses:
+        "200":
+          description: 预览成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KimiAssessmentPreviewResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai/kimi-assessment/export-markdown:
+    post:
+      tags: [AI]
+      summary: 导出 Kimi 评估 Markdown
+      operationId: exportKimiAssessmentMarkdown
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assessmentDraft]
+              properties:
+                assessmentDraft:
+                  type: object
+                meta:
+                  type: object
+                projectName:
+                  type: string
+      responses:
+        "200":
+          description: Markdown 文件
+          content:
+            text/markdown:
+              schema:
+                type: string
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai/kimi-assessment/export-pdf:
+    post:
+      tags: [AI]
+      summary: 导出 Kimi 评估 PDF
+      operationId: exportKimiAssessmentPdf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assessmentDraft]
+              properties:
+                assessmentDraft:
+                  type: object
+                meta:
+                  type: object
+                projectName:
+                  type: string
+      responses:
+        "200":
+          description: PDF 文件
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai/kimi-api-key/test:
+    post:
+      tags: [AI]
+      summary: 测试 Kimi API Key 连通性（admin）
+      operationId: testKimiApiKey
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiKey:
+                  type: string
+                model:
+                  type: string
+      responses:
+        "200":
+          description: 测试成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KimiApiKeyTestResponse"
+        "400":
+          description: 测试失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai/chat:
+    post:
+      tags: [AI]
+      summary: AI 对话
+      operationId: aiChat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant]
+                      content:
+                        type: string
+      responses:
+        "200":
+          description: 对话响应
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/version-code-rules:
+    get:
+      tags: [System]
+      summary: 获取版本号规则列表（admin）
+      operationId: listVersionCodeRules
+      parameters:
+        - name: moduleKey
+          in: query
+          schema:
+            type: string
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionCodeRuleListResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/version-code-rules/{ruleId}/config:
+    patch:
+      tags: [System]
+      summary: 更新版本号规则配置（admin）
+      operationId: updateVersionCodeRuleConfig
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prefix:
+                  type: string
+                format:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionCodeRuleResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/version-code-rules/{ruleId}/activate:
+    post:
+      tags: [System]
+      summary: 激活版本号规则（admin）
+      operationId: activateVersionCodeRule
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 激活成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionCodeRuleResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/version-code-rules/{ruleId}/disable:
+    post:
+      tags: [System]
+      summary: 禁用版本号规则（admin）
+      operationId: disableVersionCodeRule
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 禁用成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionCodeRuleResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/requirement-settings:
+    get:
+      tags: [System]
+      summary: 获取需求系统配置
+      operationId: getRequirementSystemConfig
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequirementSystemConfigResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/requirement-settings/draft:
+    patch:
+      tags: [System]
+      summary: 更新需求系统配置草稿（admin）
+      operationId: updateRequirementSystemConfigDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kimiCredentials:
+                  type: object
+                  properties:
+                    apiKey:
+                      type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequirementSystemConfigDraftResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/requirement-settings/activate:
+    post:
+      tags: [System]
+      summary: 激活需求系统配置（admin）
+      operationId: activateRequirementSystemConfig
+      responses:
+        "200":
+          description: 激活成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequirementSystemConfigResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/requirement-settings/kimi-api-key/test:
+    post:
+      tags: [System]
+      summary: 测试需求 Kimi API Key（admin）
+      operationId: testRequirementKimiApiKey
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiKey:
+                  type: string
+                model:
+                  type: string
+      responses:
+        "200":
+          description: 测试成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KimiApiKeyTestResponse"
+        "400":
+          description: 测试失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/implementation-dependency-rules:
+    get:
+      tags: [System]
+      summary: 获取实施依赖规则
+      operationId: getImplementationDependencyRules
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImplementationDependencyRulesResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/implementation-dependency-rules/draft:
+    patch:
+      tags: [System]
+      summary: 更新实施依赖规则草稿（admin）
+      operationId: updateImplementationDependencyRulesDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImplementationDependencyRulesDraftResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/implementation-dependency-rules/activate:
+    post:
+      tags: [System]
+      summary: 激活实施依赖规则（admin）
+      operationId: activateImplementationDependencyRules
+      responses:
+        "200":
+          description: 激活成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImplementationDependencyRulesResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/presales/requirement-packs:
+    post:
+      tags: [Presales]
+      summary: 创建需求包
+      operationId: createRequirementPack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                sourceType:
+                  type: string
+                sourceData:
+                  type: object
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequirementPackResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Presales]
+      summary: 获取需求包列表
+      operationId: listRequirementPacks
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequirementPackListResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/presales/requirement-packs/{id}:
+    get:
+      tags: [Presales]
+      summary: 获取需求包详情
+      operationId: getRequirementPack
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequirementPackResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Presales]
+      summary: 更新需求包
+      operationId: updateRequirementPack
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                sourceData:
+                  type: object
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequirementPackResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Presales]
+      summary: 删除需求包
+      operationId: deleteRequirementPack
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/presales/requirement-packs/{id}/review:
+    post:
+      tags: [Presales]
+      summary: 审阅需求包
+      operationId: reviewRequirementPack
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 审阅完成
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResultResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/presales/requirement-packs/{id}/confidences:
+    get:
+      tags: [Presales]
+      summary: 获取字段置信度
+      operationId: getFieldConfidences
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FieldConfidenceListResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/presales/requirement-packs/{id}/initial-estimate:
+    post:
+      tags: [Presales]
+      summary: 生成初估
+      operationId: generateInitialEstimate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InitialEstimateResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/presales/initial-estimates/{id}:
+    get:
+      tags: [Presales]
+      summary: 获取初估详情
+      operationId: getInitialEstimate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InitialEstimateResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Presales]
+      summary: 更新初估
+      operationId: updateInitialEstimate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lineItems:
+                  type: array
+                phases:
+                  type: array
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InitialEstimateResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/presales/requirement-packs/{id}/sow:
+    post:
+      tags: [Presales]
+      summary: 生成 SOW 文档
+      operationId: generateSow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SowDocumentResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Presales]
+      summary: 获取需求包的 SOW 列表
+      operationId: listSowByPack
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SowDocumentListResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/presales/sow-documents/{id}:
+    get:
+      tags: [Presales]
+      summary: 获取 SOW 文档详情
+      operationId: getSowDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SowDocumentResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Presales]
+      summary: 更新 SOW 文档
+      operationId: updateSowDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                version:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SowDocumentResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/sales/briefs:
+    post:
+      tags: [Sales]
+      summary: 创建商机档案
+      operationId: createBrief
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                customerInfo:
+                  type: object
+                projectScope:
+                  type: object
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesBriefResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Sales]
+      summary: 获取商机档案列表
+      operationId: listBriefs
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesBriefListResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/sales/briefs/{id}:
+    get:
+      tags: [Sales]
+      summary: 获取商机档案详情
+      operationId: getBrief
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesBriefResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Sales]
+      summary: 更新商机档案
+      operationId: updateBrief
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                customerInfo:
+                  type: object
+                projectScope:
+                  type: object
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesBriefResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Sales]
+      summary: 删除商机档案
+      operationId: deleteBrief
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/sales/briefs/{id}/quote:
+    post:
+      tags: [Sales]
+      summary: 生成区间报价
+      operationId: generateQuote
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phases:
+                  type: array
+                assumptions:
+                  type: array
+      responses:
+        "200":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/sales/briefs/{id}/recalculate:
+    post:
+      tags: [Sales]
+      summary: 变更重算
+      operationId: recalculateBrief
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                changes:
+                  type: array
+      responses:
+        "200":
+          description: 重算成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecalculateResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/handoffs:
+    post:
+      tags: [PM]
+      summary: 创建接力交接
+      operationId: createHandoff
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [versionId, fromRole, toRole]
+              properties:
+                versionId:
+                  type: string
+                fromRole:
+                  type: string
+                toRole:
+                  type: string
+                message:
+                  type: string
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HandoffResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [PM]
+      summary: 获取交接列表
+      operationId: listHandoffs
+      parameters:
+        - name: versionId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HandoffListResponse"
+
+  /api/v1/pm/handoffs/{id}:
+    get:
+      tags: [PM]
+      summary: 获取交接详情
+      operationId: getHandoff
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HandoffResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [PM]
+      summary: 更新交接
+      operationId: updateHandoff
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                message:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HandoffResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/narratives:
+    post:
+      tags: [PM]
+      summary: 创建叙事描述
+      operationId: createNarrative
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [versionId]
+              properties:
+                versionId:
+                  type: string
+                content:
+                  type: string
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NarrativeResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/narratives/generate:
+    post:
+      tags: [PM]
+      summary: AI 生成叙事描述
+      operationId: generateNarrative
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [versionId]
+              properties:
+                versionId:
+                  type: string
+                context:
+                  type: object
+      responses:
+        "200":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NarrativeResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/narratives/{id}:
+    get:
+      tags: [PM]
+      summary: 获取叙事详情
+      operationId: getNarrative
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NarrativeResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [PM]
+      summary: 更新叙事
+      operationId: updateNarrative
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NarrativeResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/versions/{versionId}/narrative:
+    get:
+      tags: [PM]
+      summary: 按版本获取叙事
+      operationId: getNarrativeByVersion
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NarrativeResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/deliverables/generate:
+    post:
+      tags: [PM]
+      summary: 生成交付物
+      operationId: generateDeliverables
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [versionId]
+              properties:
+                versionId:
+                  type: string
+                types:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeliverableResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/deliverables/{id}:
+    get:
+      tags: [PM]
+      summary: 获取交付物详情
+      operationId: getDeliverable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliverableResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/versions/{versionId}/deliverables:
+    get:
+      tags: [PM]
+      summary: 按版本获取交付物列表
+      operationId: listDeliverables
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeliverableResponse"
+
+  /api/v1/pm/deliverables/{id}/status:
+    patch:
+      tags: [PM]
+      summary: 更新交付物状态
+      operationId: updateDeliverableStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [draft, in_review, approved, rejected]
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliverableResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/reviews:
+    post:
+      tags: [PM]
+      summary: 创建质量门评审
+      operationId: createReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [versionId]
+              properties:
+                versionId:
+                  type: string
+                comment:
+                  type: string
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/reviews/auto:
+    post:
+      tags: [PM]
+      summary: 自动评审
+      operationId: autoReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [versionId]
+              properties:
+                versionId:
+                  type: string
+      responses:
+        "200":
+          description: 评审完成
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/reviews/{id}:
+    get:
+      tags: [PM]
+      summary: 获取评审详情
+      operationId: getReview
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [PM]
+      summary: 更新评审
+      operationId: updateReview
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                comment:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/versions/{versionId}/review:
+    get:
+      tags: [PM]
+      summary: 按版本获取评审
+      operationId: getReviewByVersion
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/seal:
+    post:
+      tags: [PM]
+      summary: 封版
+      operationId: createSeal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [versionId]
+              properties:
+                versionId:
+                  type: string
+                note:
+                  type: string
+      responses:
+        "201":
+          description: 封版成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SealResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/seal/{id}:
+    get:
+      tags: [PM]
+      summary: 获取封版详情
+      operationId: getSeal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SealResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/pm/versions/{versionId}/seal:
+    get:
+      tags: [PM]
+      summary: 按版本获取封版
+      operationId: getSealByVersion
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SealResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/collab/workspaces:
+    post:
+      tags: [Collab]
+      summary: 创建工作区
+      operationId: createWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                assessmentVersionId:
+                  type: string
+                requirementPackId:
+                  type: string
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Collab]
+      summary: 获取工作区列表
+      operationId: listWorkspaces
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, archived]
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceListResponse"
+
+  /api/v1/collab/workspaces/{id}:
+    get:
+      tags: [Collab]
+      summary: 获取工作区详情
+      operationId: getWorkspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Collab]
+      summary: 更新工作区
+      operationId: updateWorkspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, archived]
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Collab]
+      summary: 删除工作区
+      operationId: deleteWorkspace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/collab/workspaces/{id}/members:
+    post:
+      tags: [Collab]
+      summary: 添加工作区成员
+      operationId: addWorkspaceMember
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                role:
+                  type: string
+      responses:
+        "200":
+          description: 添加成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/collab/workspaces/{id}/members/{userId}:
+    delete:
+      tags: [Collab]
+      summary: 移除工作区成员
+      operationId: removeWorkspaceMember
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 移除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/collab/workspaces/{id}/stats:
+    get:
+      tags: [Collab]
+      summary: 获取工作区统计
+      operationId: getWorkspaceStats
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceStatsResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/collab/workspaces/{id}/messages:
+    post:
+      tags: [Collab]
+      summary: 发送消息
+      operationId: createMessage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content, messageType]
+              properties:
+                content:
+                  type: string
+                messageType:
+                  type: string
+                  enum: [question, reply, decision, notice]
+                parentMessageId:
+                  type: string
+                relatedFieldPath:
+                  type: string
+                decisionPayload:
+                  type: object
+      responses:
+        "201":
+          description: 发送成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Collab]
+      summary: 获取消息列表
+      operationId: listMessages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageListResponse"
+
+  /api/v1/collab/messages/{messageId}:
+    get:
+      tags: [Collab]
+      summary: 获取消息详情
+      operationId: getMessage
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Collab]
+      summary: 更新消息
+      operationId: updateMessage
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                status:
+                  type: string
+                  enum: [open, resolved, closed]
+                evidenceId:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Collab]
+      summary: 删除消息
+      operationId: deleteMessage
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/collab/messages/{messageId}/thread:
+    get:
+      tags: [Collab]
+      summary: 获取消息线程
+      operationId: getMessageThread
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/dev-assessments:
+    post:
+      tags: [DevAssessment]
+      summary: 创建开发评估
+      operationId: createDevAssessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assessmentVersionId:
+                  type: string
+                contractMode:
+                  type: string
+                  enum: [embedded, separate]
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/DevAssessmentItemInput"
+                deployOpsItems:
+                  type: array
+                assessedByUserId:
+                  type: string
+                contextSnapshot:
+                  type: object
+                notes:
+                  type: string
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevAssessmentResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [DevAssessment]
+      summary: 获取开发评估列表
+      operationId: listDevAssessments
+      parameters:
+        - name: assessmentVersionId
+          in: query
+          schema:
+            type: string
+        - name: assessedByUserId
+          in: query
+          schema:
+            type: string
+        - name: assignedByUserId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DevAssessmentResponse"
+        "400":
+          description: 需至少一个查询参数
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/dev-assessments/{id}:
+    get:
+      tags: [DevAssessment]
+      summary: 获取开发评估详情
+      operationId: getDevAssessment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevAssessmentResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [DevAssessment]
+      summary: 更新开发评估
+      operationId: updateDevAssessment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contractMode:
+                  type: string
+                  enum: [embedded, separate]
+                status:
+                  type: string
+                  enum: [draft, in_progress, review_pending, confirmed, merged]
+                items:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/DevAssessmentItemInput"
+                deployOpsItems:
+                  type: array
+                assessedByUserId:
+                  type: string
+                contextSnapshot:
+                  type: object
+                notes:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevAssessmentResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/dev-assessments/{id}/generate:
+    post:
+      tags: [DevAssessment]
+      summary: AI 生成开发评估草稿
+      operationId: generateDevAssessment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevAssessmentResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/dev-assessments/{id}/merge:
+    post:
+      tags: [DevAssessment]
+      summary: 合并开发评估到总方案
+      operationId: mergeDevAssessment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 合并成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevAssessmentMergeResponse"
+        "400":
+          description: 未关联版本
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/dev-assessments/versions/{versionId}/dev-assessment:
+    get:
+      tags: [DevAssessment]
+      summary: 按版本获取开发评估
+      operationId: getDevAssessmentByVersion
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DevAssessmentResponse"
+
+  /api/v1/change/change-submissions:
+    post:
+      tags: [Change]
+      summary: 提交变更提报
+      operationId: submitChange
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [parentEntityType, parentEntityId, changeDescription]
+              properties:
+                parentEntityType:
+                  type: string
+                  enum: [opportunity_brief, requirement_pack, assessment_version]
+                parentEntityId:
+                  type: string
+                changeDescription:
+                  type: string
+      responses:
+        "201":
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeSubmissionResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Change]
+      summary: 获取变更提报列表
+      operationId: listChangeSubmissions
+      parameters:
+        - name: parentEntityId
+          in: query
+          schema:
+            type: string
+        - name: parentEntityType
+          in: query
+          schema:
+            type: string
+        - name: submitterId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChangeSubmissionResponse"
+        "401":
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/change/change-submissions/{id}:
+    get:
+      tags: [Change]
+      summary: 获取变更提报详情
+      operationId: getChangeSubmission
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeSubmissionResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/change/change-submissions/{id}/merge:
+    post:
+      tags: [Change]
+      summary: 合并变更
+      operationId: mergeChange
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetVersionId]
+              properties:
+                targetVersionId:
+                  type: string
+      responses:
+        "200":
+          description: 合并成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeSubmissionResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/change/change-submissions/{id}/reject:
+    post:
+      tags: [Change]
+      summary: 驳回变更
+      operationId: rejectChange
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 驳回成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeSubmissionResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/history/projects:
+    post:
+      tags: [History]
+      summary: 创建历史项目
+      operationId: createHistoryProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [industry, scale, estimatedDays]
+              properties:
+                industry:
+                  type: string
+                scale:
+                  type: string
+                modules:
+                  type: array
+                  items:
+                    type: string
+                estimatedDays:
+                  type: number
+                  minimum: 0
+                actualDays:
+                  type: number
+                estimatedCost:
+                  type: number
+                actualCost:
+                  type: number
+                delayReason:
+                  type: string
+                riskTags:
+                  type: array
+                  items:
+                    type: string
+                sourceAssessmentVersionId:
+                  type: string
+                sourceSealedBaselineId:
+                  type: string
+                closedAt:
+                  type: string
+                  format: date-time
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryProjectResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [History]
+      summary: 获取历史项目列表
+      operationId: listHistoryProjects
+      parameters:
+        - name: industry
+          in: query
+          schema:
+            type: string
+        - name: scale
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HistoryProjectResponse"
+
+  /api/v1/history/projects/{id}:
+    get:
+      tags: [History]
+      summary: 获取历史项目详情
+      operationId: getHistoryProject
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryProjectResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [History]
+      summary: 更新历史项目
+      operationId: updateHistoryProject
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                industry:
+                  type: string
+                scale:
+                  type: string
+                modules:
+                  type: array
+                  items:
+                    type: string
+                estimatedDays:
+                  type: number
+                actualDays:
+                  type: number
+                estimatedCost:
+                  type: number
+                actualCost:
+                  type: number
+                delayReason:
+                  type: string
+                riskTags:
+                  type: array
+                  items:
+                    type: string
+                closedAt:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryProjectResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [History]
+      summary: 删除历史项目
+      operationId: deleteHistoryProject
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/history/projects/{id}/close-from-baseline:
+    post:
+      tags: [History]
+      summary: 从基线结项
+      operationId: closeFromBaseline
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [industry, scale, estimatedDays]
+              properties:
+                industry:
+                  type: string
+                scale:
+                  type: string
+                modules:
+                  type: array
+                  items:
+                    type: string
+                estimatedDays:
+                  type: number
+                  minimum: 0
+                actualDays:
+                  type: number
+                estimatedCost:
+                  type: number
+                actualCost:
+                  type: number
+                delayReason:
+                  type: string
+                riskTags:
+                  type: array
+                  items:
+                    type: string
+                closedAt:
+                  type: string
+                  format: date-time
+      responses:
+        "201":
+          description: 结项成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryProjectResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/history/similar:
+    get:
+      tags: [History]
+      summary: 查找相似项目
+      operationId: findSimilarProjects
+      parameters:
+        - name: industry
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: scale
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: modules
+          in: query
+          schema:
+            type: string
+            description: 逗号分隔的模块名
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SimilarProjectResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /downloads/{fileName}:
     get:
       tags: [Exports]
@@ -1243,15 +4389,6 @@ components:
       bearerFormat: JWT
       description: "登录 `POST /api/v1/auth/login` 获取 token，请求头 `Authorization: Bearer <token>`"
   parameters:
-    XRoleHeader:
-      name: X-Role
-      in: header
-      required: false
-      schema:
-        type: string
-        enum: [admin, operator]
-      description: >
-        **[已废弃 / 勿依赖]** 历史草稿字段。当前实现以 JWT 内用户角色为准，服务端不信任此头。
     IdempotencyHeader:
       name: Idempotency-Key
       in: header
@@ -2192,4 +5329,1284 @@ components:
               items:
                 $ref: "#/components/schemas/TeamReviewComment"
           required: [items]
+      required: [code, message, data]
+
+    # ============================================================
+    # Auth Schemas
+    # ============================================================
+
+    PublicUser:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [admin, sub_admin, user]
+        status:
+          type: string
+          enum: [active, disabled]
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+      required: [id, username, role, status]
+
+    AuthResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+            user:
+              $ref: "#/components/schemas/PublicUser"
+          required: [token, user]
+      required: [code, message, data]
+
+    MeResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/PublicUser"
+          required: [user]
+      required: [code, message, data]
+
+    InviteCodeRecord:
+      type: object
+      properties:
+        code:
+          type: string
+        status:
+          type: string
+          enum: [active, used, expired]
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        usedBy:
+          type: string
+        usedAt:
+          type: string
+          format: date-time
+      required: [code, status]
+
+    InviteCodeListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            codes:
+              type: array
+              items:
+                $ref: "#/components/schemas/InviteCodeRecord"
+          required: [codes]
+      required: [code, message, data]
+
+    InviteCodeResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            code:
+              $ref: "#/components/schemas/InviteCodeRecord"
+          required: [code]
+      required: [code, message, data]
+
+    UserListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            users:
+              type: array
+              items:
+                $ref: "#/components/schemas/PublicUser"
+          required: [users]
+      required: [code, message, data]
+
+    # ============================================================
+    # AI Schemas
+    # ============================================================
+
+    ParseBasicInfoResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            basicInfo:
+              type: object
+            requirementImportData:
+              type: object
+            sourceSheets:
+              type: array
+              items:
+                type: string
+            model:
+              type: string
+            mode:
+              type: string
+              enum: [model, rule_fallback]
+            fallbackReason:
+              type: string
+            rawContent:
+              type: string
+          required: [basicInfo, sourceSheets, model, mode]
+      required: [code, message, data]
+
+    CompanyProfileResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            customerName:
+              type: string
+            enterpriseProfile:
+              type: string
+            location:
+              type: string
+            customerIndustry:
+              type: string
+            enterpriseRevenue:
+              type: string
+            itStatus:
+              type: string
+            model:
+              type: string
+            mode:
+              type: string
+            disambiguationCandidates:
+              type: array
+      required: [code, message, data]
+
+    KimiAssessmentPreviewResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            meta:
+              type: object
+              properties:
+                model:
+                  type: string
+                generatedAt:
+                  type: string
+                confidence:
+                  type: number
+                mode:
+                  type: string
+                fallbackReason:
+                  type: string
+                elapsedMs:
+                  type: integer
+            source:
+              type: object
+              properties:
+                globalVersionCode:
+                  type: string
+                requirementVersionCode:
+                  type: string
+            assessmentDraft:
+              type: object
+          required: [meta, source, assessmentDraft]
+      required: [code, message, data]
+
+    KimiApiKeyTestResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            ok:
+              type: boolean
+              const: true
+            testedSource:
+              type: string
+            model:
+              type: string
+          required: [ok]
+      required: [code, message, data]
+
+    ChatResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            answer:
+              type: string
+            model:
+              type: string
+          required: [answer]
+      required: [code, message, data]
+
+    # ============================================================
+    # System Schemas
+    # ============================================================
+
+    VersionCodeRule:
+      type: object
+      properties:
+        id:
+          type: string
+        moduleKey:
+          type: string
+        moduleName:
+          type: string
+        moduleCode:
+          type: string
+        prefix:
+          type: string
+        format:
+          type: string
+        sample:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled]
+        effectiveAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, moduleKey, moduleName, prefix, format, status]
+
+    VersionCodeRuleListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/VersionCodeRule"
+          required: [items]
+      required: [code, message, data]
+
+    VersionCodeRuleResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            item:
+              $ref: "#/components/schemas/VersionCodeRule"
+          required: [item]
+      required: [code, message, data]
+
+    RequirementSystemConfigResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            version:
+              type: string
+            active:
+              type: object
+            updatedAt:
+              type: string
+            effectiveAt:
+              type: string
+          required: [version]
+      required: [code, message, data]
+
+    RequirementSystemConfigDraftResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            version:
+              type: string
+            draft:
+              type: object
+            updatedAt:
+              type: string
+          required: [version]
+      required: [code, message, data]
+
+    ImplementationDependencyRulesResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            version:
+              type: string
+            active:
+              type: object
+            updatedAt:
+              type: string
+            effectiveAt:
+              type: string
+          required: [version]
+      required: [code, message, data]
+
+    ImplementationDependencyRulesDraftResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            version:
+              type: string
+            draft:
+              type: object
+            updatedAt:
+              type: string
+          required: [version]
+      required: [code, message, data]
+
+    # ============================================================
+    # Presales Schemas
+    # ============================================================
+
+    RequirementPack:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ownerUserId:
+          type: string
+        sourceType:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, name]
+
+    RequirementPackResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/RequirementPack"
+      required: [code, message, data]
+
+    RequirementPackListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequirementPack"
+      required: [code, message, data]
+
+    ReviewResultResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            packId:
+              type: string
+            reviewResult:
+              type: object
+            inquiries:
+              type: array
+          required: [packId]
+      required: [code, message, data]
+
+    FieldConfidence:
+      type: object
+      properties:
+        field:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+      required: [field, confidence]
+
+    FieldConfidenceListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldConfidence"
+      required: [code, message, data]
+
+    EstimateLineItem:
+      type: object
+      properties:
+        name:
+          type: string
+        days:
+          type: number
+        description:
+          type: string
+      required: [name]
+
+    InitialEstimateResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            packId:
+              type: string
+            lineItems:
+              type: array
+              items:
+                $ref: "#/components/schemas/EstimateLineItem"
+            totalDays:
+              type: number
+          required: [id, packId]
+      required: [code, message, data]
+
+    SowLineItem:
+      type: object
+      properties:
+        section:
+          type: string
+        content:
+          type: string
+      required: [section]
+
+    SowDocument:
+      type: object
+      properties:
+        id:
+          type: string
+        packId:
+          type: string
+        version:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+      required: [id, packId, version]
+
+    SowDocumentResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/SowDocument"
+      required: [code, message, data]
+
+    SowDocumentListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SowDocument"
+      required: [code, message, data]
+
+    # ============================================================
+    # Sales Schemas
+    # ============================================================
+
+    SalesBrief:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ownerUserId:
+          type: string
+        customerInfo:
+          type: object
+        projectScope:
+          type: object
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, name]
+
+    SalesBriefResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/SalesBrief"
+      required: [code, message, data]
+
+    SalesBriefListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesBrief"
+      required: [code, message, data]
+
+    PriceRange:
+      type: object
+      properties:
+        min:
+          type: number
+        max:
+          type: number
+        currency:
+          type: string
+      required: [min, max]
+
+    PhaseItem:
+      type: object
+      properties:
+        name:
+          type: string
+        days:
+          type: number
+        price:
+          $ref: "#/components/schemas/PriceRange"
+      required: [name, days]
+
+    QuoteResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            briefId:
+              type: string
+            phases:
+              type: array
+              items:
+                $ref: "#/components/schemas/PhaseItem"
+            totalDays:
+              type: number
+            totalPrice:
+              $ref: "#/components/schemas/PriceRange"
+          required: [briefId, phases]
+      required: [code, message, data]
+
+    RecalculateResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            briefId:
+              type: string
+            changes:
+              type: array
+            newTotalDays:
+              type: number
+          required: [briefId]
+      required: [code, message, data]
+
+    # ============================================================
+    # PM Schemas
+    # ============================================================
+
+    Handoff:
+      type: object
+      properties:
+        id:
+          type: string
+        versionId:
+          type: string
+        fromRole:
+          type: string
+        toRole:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+      required: [id, versionId, fromRole, toRole]
+
+    HandoffResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/Handoff"
+      required: [code, message, data]
+
+    HandoffListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Handoff"
+      required: [code, message, data]
+
+    Narrative:
+      type: object
+      properties:
+        id:
+          type: string
+        versionId:
+          type: string
+        content:
+          type: string
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+      required: [id, versionId]
+
+    NarrativeResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/Narrative"
+      required: [code, message, data]
+
+    Deliverable:
+      type: object
+      properties:
+        id:
+          type: string
+        versionId:
+          type: string
+        type:
+          type: string
+        content:
+          type: object
+        status:
+          type: string
+          enum: [draft, in_review, approved, rejected]
+        createdAt:
+          type: string
+      required: [id, versionId, type, status]
+
+    DeliverableResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/Deliverable"
+      required: [code, message, data]
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+        versionId:
+          type: string
+        status:
+          type: string
+          enum: [pending, passed, failed]
+        comment:
+          type: string
+        reviewedBy:
+          type: string
+        createdAt:
+          type: string
+      required: [id, versionId, status]
+
+    ReviewResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/Review"
+      required: [code, message, data]
+
+    Seal:
+      type: object
+      properties:
+        id:
+          type: string
+        versionId:
+          type: string
+        sealedBy:
+          type: string
+        note:
+          type: string
+        createdAt:
+          type: string
+      required: [id, versionId]
+
+    SealResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/Seal"
+      required: [code, message, data]
+
+    # ============================================================
+    # Collab Schemas
+    # ============================================================
+
+    Workspace:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        assessmentVersionId:
+          type: string
+        requirementPackId:
+          type: string
+        createdByUserId:
+          type: string
+        status:
+          type: string
+          enum: [active, archived]
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              role:
+                type: string
+              joinedAt:
+                type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, name, status]
+
+    WorkspaceResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/Workspace"
+      required: [code, message, data]
+
+    WorkspaceListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Workspace"
+      required: [code, message, data]
+
+    WorkspaceStatsResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            openQuestions:
+              type: integer
+          required: [openQuestions]
+      required: [code, message, data]
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        workspaceId:
+          type: string
+        messageType:
+          type: string
+          enum: [question, reply, decision, notice]
+        senderUserId:
+          type: string
+        senderRole:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved, closed]
+        relatedFieldPath:
+          type: string
+        decisionPayload:
+          type: object
+        parentMessageId:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, workspaceId, messageType, content, status]
+
+    MessageResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/Message"
+      required: [code, message, data]
+
+    MessageListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+      required: [code, message, data]
+
+    # ============================================================
+    # DevAssessment Schemas
+    # ============================================================
+
+    DevAssessmentItemInput:
+      type: object
+      properties:
+        itemId:
+          type: string
+        domain:
+          type: string
+        module:
+          type: string
+        brief:
+          type: string
+        description:
+          type: string
+        devType:
+          type: string
+          enum: [feature, report, integration]
+        basis:
+          type: string
+        codingDays:
+          type: number
+        planningDays:
+          type: number
+        testingDays:
+          type: number
+        totalDays:
+          type: number
+      required: [domain, module, description, devType, codingDays]
+
+    DevAssessment:
+      type: object
+      properties:
+        devAssessmentId:
+          type: string
+        assessmentVersionId:
+          type: string
+        contractMode:
+          type: string
+          enum: [embedded, separate]
+        status:
+          type: string
+          enum: [draft, in_progress, review_pending, confirmed, merged]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DevAssessmentItemInput"
+        deployOpsItems:
+          type: array
+        assignedByUserId:
+          type: string
+        assessedByUserId:
+          type: string
+        totalDays:
+          type: number
+        contextSnapshot:
+          type: object
+        notes:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [devAssessmentId, status]
+
+    DevAssessmentResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/DevAssessment"
+      required: [code, message, data]
+
+    DevAssessmentMergeResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            devAssessment:
+              $ref: "#/components/schemas/DevAssessment"
+            mergedPayload:
+              type: object
+          required: [devAssessment, mergedPayload]
+      required: [code, message, data]
+
+    # ============================================================
+    # Change Schemas
+    # ============================================================
+
+    ChangeSubmission:
+      type: object
+      properties:
+        id:
+          type: string
+        parentEntityType:
+          type: string
+          enum: [opportunity_brief, requirement_pack, assessment_version]
+        parentEntityId:
+          type: string
+        changeDescription:
+          type: string
+        submittedByUserId:
+          type: string
+        status:
+          type: string
+          enum: [pending, merged, rejected]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, parentEntityType, parentEntityId, changeDescription, status]
+
+    ChangeSubmissionResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/ChangeSubmission"
+      required: [code, message, data]
+
+    # ============================================================
+    # History Schemas
+    # ============================================================
+
+    HistoryProject:
+      type: object
+      properties:
+        id:
+          type: string
+        industry:
+          type: string
+        scale:
+          type: string
+        modules:
+          type: array
+          items:
+            type: string
+        estimatedDays:
+          type: number
+        actualDays:
+          type: number
+        estimatedCost:
+          type: number
+        actualCost:
+          type: number
+        delayReason:
+          type: string
+        riskTags:
+          type: array
+          items:
+            type: string
+        sourceAssessmentVersionId:
+          type: string
+        sourceSealedBaselineId:
+          type: string
+        closedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+      required: [id, industry, scale, estimatedDays]
+
+    HistoryProjectResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          $ref: "#/components/schemas/HistoryProject"
+      required: [code, message, data]
+
+    SimilarProjectResult:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/HistoryProject"
+        similarityScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        estimatedActualDiff:
+          type: object
+          properties:
+            daysDiff:
+              type: number
+            costDiff:
+              type: number
+      required: [project, similarityScore]
+
+    SimilarProjectResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SimilarProjectResult"
       required: [code, message, data]
