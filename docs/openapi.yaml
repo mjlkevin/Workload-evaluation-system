@@ -15,8 +15,8 @@ info:
     `/api/v1/teams/*`、`GET /api/v1/wbs`；
     下载路径为 `GET /downloads/{fileName}`（非 `/api/v1` 前缀）。
 
-    **`/api/v1/agent/*` 说明**：当前主线运行时**未挂载** Agent 高层路由；历史设计与待办见
-    `00_项目治理/里程碑与计划/项目开发TODO.md`。对外集成请使用既有估算与会话接口。
+    **`/api/v1/agent/*` 说明**：当前已挂载 V1 最小基座 `POST /api/v1/agent/chat`。
+    该接口返回统一 JSON 事件数组；抽取、PDF、真实归档工具和前端工作台仍在后续批次接线。
 servers:
   - url: http://localhost:3000
     description: Local API server
@@ -31,6 +31,7 @@ tags:
   - name: Exports
   - name: Teams
   - name: Wbs
+  - name: Agent
 
 paths:
   /api/v1/health:
@@ -79,6 +80,83 @@ paths:
                 $ref: "#/components/schemas/TemplateDetailResponse"
         "400":
           description: 参数或资源错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/agent/chat:
+    post:
+      tags: [Agent]
+      summary: Agent 对话编排（V1 最小基座）
+      operationId: postAgentChat
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: 用户输入消息。
+                confirm:
+                  type: boolean
+                  description: 写操作确认；未传或 false 时写工具不会执行。
+                sessionId:
+                  type: string
+                  description: 预留字段，当前最小基座未持久化会话。
+                payload:
+                  type: object
+                  additionalProperties: true
+                  description: 预留结构化上下文。
+              required: [message]
+      responses:
+        "200":
+          description: Agent 执行完成，返回最终文本和事件数组。
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    const: 0
+                  message:
+                    type: string
+                    const: ok
+                  data:
+                    type: object
+                    properties:
+                      result:
+                        type: string
+                      events:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                              enum: [assistant_message, tool_started, tool_finished, needs_confirmation, error]
+                          additionalProperties: true
+                    required: [result, events]
+                required: [code, message, data]
+        "400":
+          description: message 缺失或为空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未登录或登录态无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Agent 执行失败
           content:
             application/json:
               schema:

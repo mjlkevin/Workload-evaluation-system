@@ -4,4 +4,4 @@
 
 export { calculate, calculateAndExport, exportExcel, exportPdf, listExportHistory, getActiveDependencyRules } from "./estimates.controller";
 export { parseOwnedExportFileName } from "./estimates.repository";
-export { listExportHistoryByOwner } from "./estimates.usecase";
+export { calculateEstimateOnly, listExportHistoryByOwner } from "./estimates.usecase";

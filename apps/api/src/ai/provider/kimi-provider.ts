@@ -120,6 +120,10 @@ export class KimiProvider implements ModelProvider {
     if (req.responseFormat === "json_object") {
       body.response_format = { type: "json_object" };
     }
+    if (req.tools && req.tools.length > 0) {
+      body.tools = req.tools;
+      body.tool_choice = req.toolChoice ?? "auto";
+    }
 
     let attempts = 0;
     let lastError: ProviderError | undefined;
@@ -331,12 +335,10 @@ async function parseSuccess(
   model: string,
   attempts: number,
 ): Promise<ChatCompletionResponse> {
-  const json = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
-  };
-  const content = asString(json?.choices?.[0]?.message?.content);
-  const finishReason = asString(json?.choices?.[0]?.finish_reason) || undefined;
-  if (!content) {
+  const json = (await response.json()) as { choices?: RawChoice[] };
+  const choice = json?.choices?.[0] ?? {};
+  const { content, toolCalls, finishReason } = parseChoiceMessage(choice);
+  if (!content && (!toolCalls || toolCalls.length === 0)) {
     throw new ProviderError("empty_response", "model_empty_response", {
       providerName: PROVIDER_NAME,
       retryable: false,
@@ -350,6 +352,7 @@ async function parseSuccess(
     provider: PROVIDER_NAME,
     attempts,
     finishReason,
+    toolCalls,
   };
 }
 
@@ -487,7 +490,7 @@ export function parseChoiceMessage(choice: RawChoice): {
     let args: Record<string, unknown> = {};
     try {
       const parsed = JSON.parse(asString(c?.function?.arguments) || "{}");
-      if (parsed && typeof parsed === "object") args = parsed as Record<string, unknown>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) args = parsed as Record<string, unknown>;
     } catch {
       args = {};
     }

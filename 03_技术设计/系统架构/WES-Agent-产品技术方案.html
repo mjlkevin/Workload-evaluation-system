@@ -110,9 +110,10 @@
   <a href="#s9">9. 安全与护栏</a>
   <a href="#s10">10. 端到端场景走查</a>
   <a href="#s11">11. 工程落地与项管</a>
-  <a href="#s12">12. 分阶段路线图</a>
+  <a href="#s12">12. V1-V3 路线图</a>
   <a href="#s13">13. 风险与决策记录</a>
   <a href="#s14">14. 给后续工作的上下文</a>
+  <a href="#s15">15. V1 实施计划</a>
 </nav>
 
 <!-- ============ MAIN ============ -->
@@ -122,10 +123,10 @@
   <h1>WES Agent 产品技术方案</h1>
   <div class="sub">将「工作量评估系统」从系统性 UI 升级为<b>对话式智能体产品</b> · 后端编排 · 半自主执行业务流程</div>
   <div class="meta">
-    <span class="m">版本 <b>v0.1（草案）</b></span>
-    <span class="m">状态 <b>立项论证</b></span>
+    <span class="m">版本 <b>v0.2（路线评审版）</b></span>
+    <span class="m">状态 <b>需求审批基线</b></span>
     <span class="m">分支 <b>feat/agent-workbench</b></span>
-    <span class="m">日期 <b>2026-06-05</b></span>
+    <span class="m">日期 <b>2026-06-11</b></span>
     <span class="m">目标读者 <b>产品 / 全栈 / 后续 AI Session</b></span>
   </div>
 </div>
@@ -141,14 +142,22 @@
     <div class="card"><h4>🔑 唯一硬门槛</h4><p>给 Provider 抽象层补 <b>function-calling（tool-calling）</b>。补完 L2/L3 皆通。</p></div>
   </div>
   <div class="callout good"><div class="t">一句话结论</div>
-  技术上完全可行，地基是同类项目里少见的好（业务逻辑已解耦为可调用函数）。建议<b>同仓 monorepo + feat 分支 + worktree 隔离</b>，按 PoC → 工具层 → 编排 → UI 渐进推进，先做半自主、人在环。</div>
+  技术上完全可行，地基是同类项目里少见的好（业务逻辑已解耦为可调用函数）。V1 立即推进：<b>V0_SAAS 下线、V2_PROTOTYPE 升级为唯一 Web 前端、桌面售前 Agent 闭环</b>；V2 做微信小程序 + PM/SOW/评审；V3 做经营智能。</div>
+  <h3>0.1 2026-06-11 评审新增决策</h3>
+  <table>
+    <tr><th>议题</th><th>决策</th><th>影响</th></tr>
+    <tr><td>前端主线</td><td><code>ui/V2_PROTOTYPE</code> 升级为唯一 Web 前端主线</td><td>Agent 前端直接落在 V2；不新开 <code>ui/V3_AGENT</code></td></tr>
+    <tr><td>V0_SAAS</td><td>纳入 V1 下线范围</td><td>删除前需完成登录、API client、导出、基础交互、版本状态等资产盘点与迁移</td></tr>
+    <tr><td>移动端</td><td>微信小程序放入 V2</td><td>V1 只做移动端事件模型预留，不做小程序生产版</td></tr>
+    <tr><td>路线切分</td><td>按业务闭环切 V1/V2/V3</td><td>V1 售前估算，V2 项目交付，V3 经营智能</td></tr>
+  </table>
 </section>
 
 <!-- ===== 1 ===== -->
 <section id="s1">
   <h2 class="sec"><span class="n">1</span>背景与目标</h2>
   <h3>1.1 现状</h3>
-  <p>WES（工作量评估系统）是一套<b>多页签系统性 UI</b> 的软件：用户在「需求 / 实施评估 / 开发评估 / 资源成本 / WBS / 评审」等页面间手动操作，完成「需求 → 评估 → 成本 → 归档」链路。后端 <code>apps/api</code> 已完成 17/17 领域模块化，前端为 <code>ui/V0_SAAS</code>（生产）+ <code>ui/V2_PROTOTYPE</code>（Vite 沙箱）。</p>
+  <p>WES（工作量评估系统）是一套<b>多页签系统性 UI</b> 的软件：用户在「需求 / 实施评估 / 开发评估 / 资源成本 / WBS / 评审」等页面间手动操作，完成「需求 → 评估 → 成本 → 归档」链路。后端 <code>apps/api</code> 已完成 17/17 领域模块化；【历史说明，下线中】前端曾以 <code>ui/V0_SAAS</code>（Next 主实现）+ <code>ui/V2_PROTOTYPE</code>（Vite/React 沙箱）双轨推进。本轮评审后，V1 将推动 <code>ui/V2_PROTOTYPE</code> 升级为唯一 Web 前端主线，并下线 <code>ui/V0_SAAS</code>。</p>
   <h3>1.2 升级动机</h3>
   <ul>
     <li>系统性 UI 学习成本高：用户需要理解页签结构、字段含义、操作顺序。</li>
@@ -204,10 +213,10 @@
     </defs>
     <!-- frontend -->
     <rect class="box box-p" x="60" y="20" width="800" height="78" rx="12"/>
-    <text class="lbl" x="80" y="48" font-weight="700">① 对话式工作台 UI　<tspan class="lbl-s" font-weight="400">（新建：V3_AGENT，复用 V0/V2 组件）</tspan></text>
-    <text class="lbl-s" x="80" y="72">左：对话区（驱动） ｜ 右：工作区（AI 调用后渲染表格 / 版本对比 / 可编辑面板 / 下载卡片）</text>
+    <text class="lbl" x="80" y="48" font-weight="700">① 对话式工作台 UI　<tspan class="lbl-s" font-weight="400">（基于 ui/V2_PROTOTYPE，V1 升级为唯一 Web 前端）</tspan></text>
+    <text class="lbl-s" x="80" y="72">左：对话区 ｜ 中：结构化工作区 ｜ 右：证据 / 状态 / 工具调用进度</text>
     <path class="arrow-b" d="M460,98 L460,128"/>
-    <text class="lbl-s" x="470" y="118">POST /api/v1/agent/chat（流式 SSE）</text>
+    <text class="lbl-s" x="470" y="118">POST /api/v1/agent/chat（JSON 事件数组；SSE 后续增强）</text>
 
     <!-- orchestration -->
     <rect class="box box-b" x="60" y="130" width="800" height="118" rx="12"/>
@@ -248,7 +257,7 @@
     <text class="lbl-s" x="80" y="492">estimates · presales · dev-assessment · versions · team · sessions · history · change · collab · sales · pm · exports · …</text>
     <text class="lbl-s" x="80" y="514">持久化：config/*.json（文件存储；高并发自主场景触发 DB 迁移条件时再切 PG）</text>
   </svg>
-  <div class="figcap">图 4-1　WES Agent 目标架构（5 层）</div>
+  <div class="figcap">图 4-1　WES Agent 目标架构（5 层；前端主线以 V2_PROTOTYPE 为准）</div>
   </div>
   <div class="pill-row">
     <span class="pill"><span class="dot dot-g"></span>已有，直接复用</span>
@@ -332,15 +341,14 @@
     <tr><th>工具名</th><th>底层 usecase</th><th>说明</th><th>RBAC 能力位</th><th>类型</th></tr>
     <tr><td><code>extract_requirement</code></td><td>ai/extractor</td><td>文档/文本 → 结构化需求包</td><td>requirement:upload</td><td><span class="badge b-green">读</span></td></tr>
     <tr><td><code>estimate_implementation</code></td><td>estimates.calculate</td><td>实施评估，返回模块人天</td><td>estimates:create</td><td><span class="badge b-green">读</span></td></tr>
-    <tr><td><code>estimate_dev</code></td><td>dev-assessment</td><td>开发评估</td><td>estimates:create</td><td><span class="badge b-green">读</span></td></tr>
-    <tr><td><code>generate_sow</code></td><td>presales.generateSowFromPack</td><td>由需求包生成 SOW</td><td>estimates:create</td><td><span class="badge b-green">读</span></td></tr>
+    <tr><td><code>export_pdf</code></td><td>exports.usecase</td><td>导出 PDF，返回下载信息</td><td>estimates:read</td><td><span class="badge b-green">读</span></td></tr>
+    <tr><td><code>archive_estimate</code></td><td>presales + versions</td><td>归档售前估算，必要时关联升版</td><td>estimates:create</td><td><span class="badge b-amber">写</span></td></tr>
     <tr><td><code>query_versions</code></td><td>versions.list</td><td>查某模块版本历史</td><td>estimates:read</td><td><span class="badge b-green">读</span></td></tr>
-    <tr><td><code>export_excel</code></td><td>exports.usecase</td><td>导出 Excel，返回下载信息</td><td>estimates:read</td><td><span class="badge b-green">读</span></td></tr>
-    <tr><td><code>create_review</code></td><td>team.createReview</td><td>发起团队评审</td><td>system:manage</td><td><span class="badge b-amber">写</span></td></tr>
-    <tr><td><code>bump_version</code></td><td>versions.checkin/升版</td><td>升版 / 检入</td><td>estimates:write</td><td><span class="badge b-amber">写</span></td></tr>
-    <tr><td><code>update_estimate_line</code></td><td>estimates.update</td><td>改某行人天</td><td>estimates:write</td><td><span class="badge b-amber">写</span></td></tr>
+    <tr><td><code>estimate_dev</code></td><td>dev-assessment</td><td>开发评估（V2+）</td><td>estimates:create</td><td><span class="badge b-blue">后置</span></td></tr>
+    <tr><td><code>generate_sow</code></td><td>presales.generateSowFromPack</td><td>由需求包生成 SOW（V2）</td><td>estimates:create</td><td><span class="badge b-blue">后置</span></td></tr>
+    <tr><td><code>create_review</code></td><td>team.createReview</td><td>发起团队评审（V2）</td><td>system:manage</td><td><span class="badge b-blue">后置</span></td></tr>
   </table>
-  <div class="callout"><b>扩展原则：</b>新增工具 = 选一个现有 usecase + 写一份说明书 + 绑能力位 + 标读/写。<b>无需碰业务逻辑</b>。工具集可随迭代增量扩充。</div>
+  <div class="callout"><b>扩展原则：</b>新增工具 = 选一个现有 usecase + 写一份说明书 + 绑能力位 + 标读/写。V1 只承接售前估算闭环；SOW、开发评估、评审进入 V2。</div>
 </section>
 
 <!-- ===== 7 ===== -->
@@ -367,7 +375,7 @@
     <rect class="box" x="50" y="74" width="240" height="40" rx="8"/><text class="lbl-s" x="64" y="98">👤 把这份需求做实施评估…</text>
     <rect class="box box-b" x="50" y="124" width="240" height="34" rx="8"/><text class="lbl-s" x="64" y="145">🤖 🔍 正在抽取需求…✓</text>
     <rect class="box box-b" x="50" y="166" width="240" height="34" rx="8"/><text class="lbl-s" x="64" y="187">🤖 📊 评估完成，86 人天</text>
-    <rect class="box box-a" x="50" y="208" width="240" height="44" rx="8"/><text class="lbl-s" x="64" y="228">⚠️ 将发起评审，确认?</text><text class="lbl-s" x="64" y="245">[确认] [取消]</text>
+    <rect class="box box-a" x="50" y="208" width="240" height="44" rx="8"/><text class="lbl-s" x="64" y="228">⚠️ 是否存进系统?</text><text class="lbl-s" x="64" y="245">[存档] [不存]</text>
     <rect class="box box-g" x="360" y="30" width="430" height="240" rx="12"/>
     <text class="lbl" x="380" y="58" font-weight="700">工作区（右 · AI 调用后渲染）</text>
     <rect class="box" x="380" y="74" width="390" height="80" rx="8"/>
@@ -377,9 +385,22 @@
     <rect class="box" x="380" y="164" width="185" height="90" rx="8"/><text class="lbl-s" x="396" y="186">🔀 版本对比组件</text><text class="lbl-s" x="396" y="208">AS-087 → AS-088</text><text class="lbl-s" x="396" y="230">（复用现有组件）</text>
     <rect class="box" x="580" y="164" width="190" height="90" rx="8"/><text class="lbl-s" x="596" y="186">⬇️ 下载卡片</text><text class="lbl-s" x="596" y="208">实施评估_AS088.xlsx</text><text class="lbl-s" x="596" y="230">[下载]</text>
   </svg>
-  <div class="figcap">图 8-1　双栏：对话驱动 + 结构化工作区（复用 V0/V2 现有组件）</div>
+  <div class="figcap">图 8-1　工作台：对话驱动 + 结构化工作区（V1 在 V2_PROTOTYPE 内落地）</div>
   </div>
-  <p><b>不是抛弃 UI，而是 UI 的触发方式从「人手动点」变成「AI 调工具后自动渲染」。</b>V0_SAAS 现有表格 / 版本组件 / 导出卡片大部分可复用；新前端基座建议用 V2_PROTOTYPE（Vite+React，已是既定方向），新增 <code>V3_AGENT</code> 或在 V2 内扩展。</p>
+  <p><b>不是抛弃 UI，而是 UI 的触发方式从「人手动点」变成「AI 调工具后自动渲染」。</b>V1 前端直接基于 <code>ui/V2_PROTOTYPE</code>，不新开 <code>ui/V3_AGENT</code>。V0_SAAS 进入下线范围；删除前只迁移必要资产（登录、API client、导出下载、Toast/Dialog、表格基础交互、版本状态思路），不整页照搬。</p>
+  <h3>8.1 V1 Web 页面结构</h3>
+  <table>
+    <tr><th>页面</th><th>建议路由</th><th>用途</th></tr>
+    <tr><td>售前 Agent 工作台</td><td><code>/agent/presales</code></td><td>S0-S5 主流程：材料输入、需求包确认、初估、导出、归档决策</td></tr>
+    <tr><td>售前成果看板</td><td><code>/agent/presales/results</code></td><td>历史估算列表、搜索/筛选、查看、导出、续作入口</td></tr>
+    <tr><td>估算详情</td><td><code>/agent/presales/results/:id</code></td><td>需求包快照、初估结果、版本信息、导出记录、续作入口</td></tr>
+  </table>
+  <h3>8.2 桌面三栏原则</h3>
+  <ul>
+    <li><b>左侧：</b>对话与流程引导，承载用户输入、Agent 阶段提示、确认按钮。</li>
+    <li><b>中间：</b>结构化工作区，承载材料、需求包、初估表、导出结果。</li>
+    <li><b>右侧：</b>证据与状态区，承载低置信字段、假设、归档状态、工具调用进度。</li>
+  </ul>
 </section>
 
 <!-- ===== 9 ===== -->
@@ -398,15 +419,15 @@
 <!-- ===== 10 ===== -->
 <section id="s10">
   <h2 class="sec"><span class="n">10</span>端到端场景走查</h2>
-  <p><b>用户输入：</b>「把这份需求文档评估一下，给个实施人天，顺便发起评审」（附文档）</p>
+  <p><b>用户输入：</b>「把这几份客户材料做个售前实施初估，能导出就导出一份」（附文档）</p>
   <table>
     <tr><th>轮次</th><th>LLM 决策</th><th>执行</th><th>前端呈现</th></tr>
     <tr><td>1</td><td>先把文档结构化 → <code>extract_requirement</code></td><td>调 ai/extractor，得需求包 RI-042</td><td>🔍 正在抽取需求…✓ 识别 12 个功能点</td></tr>
-    <tr><td>2</td><td>有需求包，做估算 → <code>estimate_implementation('RI-042')</code></td><td>调 estimates.calculate，得 86 人天</td><td>📊 评估完成（右栏渲染可编辑表格）</td></tr>
-    <tr><td>3</td><td>用户要评审，<b>写操作</b> → 触发确认</td><td>用户点确认 → <code>create_review('AS-088')</code></td><td>⚠️ 「将发起评审，确认?」→ 执行</td></tr>
-    <tr><td>4</td><td>无工具可调 → 生成总结</td><td>—</td><td>✅ 需求包 RI-042 → 实施 86 人天 → 评审已发起给张三、李四</td></tr>
+    <tr><td>2</td><td>用户确认需求包后，做估算 → <code>estimate_implementation('RI-042')</code></td><td>调 estimates.calculate，得 86 人天</td><td>📊 评估完成（中栏渲染模块人天表）</td></tr>
+    <tr><td>3</td><td>用户要对外沟通 → <code>export_pdf</code></td><td>调 exports，生成 PDF 下载信息</td><td>⬇️ PDF 已生成，可下载/发送</td></tr>
+    <tr><td>4</td><td>是否存档是<b>写操作</b> → 触发确认</td><td>用户点存档 → <code>archive_estimate</code>，自动匹配已有方案</td><td>⚠️ 「是否存进系统?」→ 命中则提示续版建议</td></tr>
   </table>
-  <div class="callout good"><b>用户一句话，AI 自主拆成 4 步、调 3 个现有功能、并在写操作前停下确认。</b>这就是「工作台对话 + 后端编排 + 执行业务流程」。</div>
+  <div class="callout good"><b>用户一句话，AI 自主拆成 4 步、调 4 个现有功能、并在写操作前停下确认。</b>这就是 V1 的「售前 Agent 工作台 + 后端编排 + 可追溯归档」。</div>
 </section>
 
 <!-- ===== 11 ===== -->
@@ -416,7 +437,7 @@
   <p>核心理由：<b>Agent 的工具 = 现有 usecase，需直接 import</b>。拆仓会导致代码复制 / 退化为远程 API 调用 / 引入发包，均得不偿失。</p>
   <table>
     <tr><th>隔离诉求</th><th>正确工具（无需新仓库）</th></tr>
-    <tr><td>不改坏现有系统</td><td><b>目录边界</b>：全部新增目录（<code>agent/</code>、<code>V3_AGENT/</code>），现有文件零修改，只读依赖 usecase</td></tr>
+    <tr><td>不改坏现有系统</td><td><b>目录边界</b>：后端新增 <code>apps/api/src/agent/</code>；前端在 <code>ui/V2_PROTOTYPE</code> 内新增 Agent 路由；现有 modules 不重写，只读复用 usecase</td></tr>
     <tr><td>版本隔离</td><td><b>Git 分支</b>：<code>feat/agent-workbench</code>，main 始终可发布</td></tr>
     <tr><td>一边用现有 / 一边开发</td><td><b>Git Worktree</b>：两个工作目录、两个分支、共享历史与远程，互不干扰（✅ 已建）</td></tr>
   </table>
@@ -427,8 +448,8 @@
   routes/<span class="k">agent.routes.ts</span>   <span class="c">🆕 新增一条路由</span>
   ai/provider/             <span class="c">← 扩展 tools（唯一需改的现有文件，可走独立 PR 合入 main）</span>
 ui/
-  V0_SAAS/                 <span class="c">← 生产 UI，继续跑</span>
-  <span class="k">V3_AGENT/</span>（或在 V2 内扩展） <span class="c">🆕 对话式工作台</span></pre>
+  <span class="k">V2_PROTOTYPE/</span>            <span class="c">← V1 升级为唯一 Web 前端主线，新增 Agent 路由</span>
+  V0_SAAS/                 <span class="c">← V1 下线范围；迁移必要资产后删除</span></pre>
   <h3>11.3 项目管理（沿用现有治理体系）</h3>
   <table>
     <tr><th>阶段</th><th>产物</th><th>归档位置（现成目录）</th></tr>
@@ -438,23 +459,58 @@ ui/
     <tr><td>提交</td><td><code>type(scope): 中文描述</code>，scope=<code>agent</code></td><td>git，feat 分支</td></tr>
   </table>
   <div class="callout warn"><div class="t">关键纪律</div>
-  ① Agent 分支<b>只新增、不修改</b>现有 modules；usecase 若需小改，单独 PR 到 main 评审合入。<br>
-  ② <b>R1 首发先收尾可发布</b>，再大力投 Agent，两件事不抢精力。<br>
-  ③ PoC 阶段可在临时目录验证，跑通再正式立项。</div>
+  ① Agent 分支<b>不重写</b>现有 modules；usecase 若需小改，单独评审。<br>
+  ② V1 先完成 V2 升主线与 Agent 桌面闭环，小程序放 V2。<br>
+  ③ 删除 V0_SAAS 前必须完成资产盘点与替代验证。</div>
 </section>
 
 <!-- ===== 12 ===== -->
 <section id="s12">
-  <h2 class="sec"><span class="n">12</span>分阶段路线图</h2>
+  <h2 class="sec"><span class="n">12</span>V1-V3 产品路线与 V1 实施边界</h2>
+  <h3>12.1 总体路线</h3>
+  <p>本项目按业务闭环切分版本，而不是按纯技术层切分。这样每一版都能交付明确业务价值。</p>
   <table>
-    <tr><th>阶段</th><th>目标</th><th>产出</th><th>预估</th></tr>
-    <tr><td><b>0 · PoC</b></td><td>验证 Kimi tool-calling 在 Provider 层跑通</td><td>最小代码挂 1 个真工具（如 <code>query_versions</code>），端到端走通</td><td>1–2 天</td></tr>
-    <tr><td><b>1 · 工具层</b></td><td>Provider 补 tools；usecase 包装</td><td>扩展接口 + Kimi 适配 + 工具注册表 + 3–5 核心工具</td><td>3–5 天</td></tr>
-    <tr><td><b>2 · 编排循环</b></td><td>核心 while 循环 + 全套护栏</td><td>orchestrator + 权限/确认/上限/降级 + <code>/agent/chat</code> 流式</td><td>3–5 天</td></tr>
-    <tr><td><b>3 · 对话 UI</b></td><td>双栏工作台 + 结构化渲染</td><td>V3_AGENT 对话页，流式展示 + 复用 V0 组件渲染结果</td><td>1 周</td></tr>
-    <tr><td><b>4 · 打磨</b></td><td>体验与可观测</td><td>补问澄清、质量看板、危险操作确认、成本统计</td><td>持续</td></tr>
+    <tr><th>版本</th><th>主题</th><th>核心闭环</th><th>主要用户</th><th>交付重心</th></tr>
+    <tr><td><b>V1</b></td><td>售前估算 Agent + 前端主线切换</td><td>材料 → 需求包 → 实施初估 → PDF → 归档/续作</td><td>售前 / 商务</td><td>桌面 Web Agent 工作台、后端 Agent 基座、V0 下线</td></tr>
+    <tr><td><b>V2</b></td><td>项目交付 Agent + 微信小程序</td><td>售前结果 → PM 接力 → SOW/交付物 → 评审</td><td>PM / 实施 / PMO / 售前</td><td>PM 接力、小程序 MVP、SOW、评审闭环</td></tr>
+    <tr><td><b>V3</b></td><td>经营智能 Agent</td><td>历史项目 → 偏差分析 → 规则优化 → 经营决策</td><td>管理层 / PMO / 管理员</td><td>经营分析、报价成本、资源预测、数据层升级评估</td></tr>
   </table>
-  <div class="callout good"><b>建议执行顺序：</b>① R1 先收尾可发布 → ② worktree + feat 分支（✅ 已就绪）→ ③ 阶段 0 半天 PoC → ④ PoC 通过后补 PRD 正式立项 → ⑤ 阶段 1–4 迭代。</div>
+  <h3>12.2 V1 必做范围</h3>
+  <div class="grid g2">
+    <div class="card"><h4>前端主线切换</h4><p><code>ui/V2_PROTOTYPE</code> 升级为唯一 Web 前端；根脚本 <code>dev:web</code> / <code>build:web</code> 后续指向 V2；<code>ui/V0_SAAS</code> 完成资产盘点后删除。</p></div>
+    <div class="card"><h4>V0 必要资产迁移</h4><p>迁登录/JWT、API client、导出下载、Toast/Dialog、表格基础交互、版本状态思路。不整页照搬。</p></div>
+    <div class="card"><h4>后端 Agent 基座</h4><p>Provider tool-calling、Kimi tools 注入、<code>apps/api/src/agent/</code>、工具注册表、编排循环、权限/确认/上限/降级护栏。</p></div>
+    <div class="card"><h4>售前业务闭环</h4><p>材料输入、需求包抽取与确认、低置信提示、实施初估、PDF 导出、存/不存、自动匹配已有方案、续作入口。</p></div>
+    <div class="card"><h4>桌面 Agent 工作台</h4><p>落在 V2：<code>/agent/presales</code>、<code>/agent/presales/results</code>、<code>/agent/presales/results/:id</code>。</p></div>
+    <div class="card"><h4>移动端预留</h4><p>V1 不做小程序，但 Agent 事件模型不强绑定浏览器 SSE；V2 可改接 WebSocket 或轮询。</p></div>
+  </div>
+  <h3>12.3 V1 不做范围</h3>
+  <ul>
+    <li>微信小程序生产版（进入 V2）。</li>
+    <li>SOW 生成主线、报价 / 成本测算、CRM / 邮件 / 企业微信外部集成。</li>
+    <li>PM / 管理层专属 Agent 流程。</li>
+    <li>会话内自由追问答疑、内部运营质量看板完整版、全自主 L3 Agent。</li>
+    <li>数据库作为主持久化路径。</li>
+  </ul>
+  <h3>12.4 V1 建议实施批次</h3>
+  <table>
+    <tr><th>批次</th><th>目标</th><th>主要产物</th></tr>
+    <tr><td>Batch 1</td><td>前端资产盘点</td><td>V0/V2 能力差异表、迁移清单、删除前门禁</td></tr>
+    <tr><td>Batch 2</td><td>V2 升主线</td><td>根脚本切换、基础登录/API client、构建通过</td></tr>
+    <tr><td>Batch 3</td><td>Provider tool-calling</td><td>Kimi tools 注入、tool_calls 解析、Provider 测试</td></tr>
+    <tr><td>Batch 4</td><td>Agent 编排层</td><td><code>apps/api/src/agent/*</code>、注册表、循环、护栏</td></tr>
+    <tr><td>Batch 5</td><td>售前工具集</td><td>抽取、初估、导出、归档匹配工具</td></tr>
+    <tr><td>Batch 6</td><td>Agent 路由与事件</td><td><code>/api/v1/agent/chat</code>、SSE、事件协议</td></tr>
+    <tr><td>Batch 7</td><td>V2 Agent 工作台</td><td><code>/agent/presales</code>、S0-S5、结构化渲染</td></tr>
+    <tr><td>Batch 8</td><td>成果看板与下线收口</td><td><code>/agent/presales/results</code>、删除 V0、文档同步</td></tr>
+  </table>
+  <h3>12.5 V2 / V3 边界</h3>
+  <table>
+    <tr><th>版本</th><th>必做</th><th>不抢进上一版的内容</th></tr>
+    <tr><td><b>V2</b></td><td>PM 接力、SOW 草稿、交付物草稿、PMO 评审、微信小程序 MVP</td><td>经营分析、报价成本、复杂管理看板</td></tr>
+    <tr><td><b>V3</b></td><td>历史项目库增强、估算偏差分析、报价/成本、资源预测、规则模板优化、内部运营质量看板</td><td>除非 DB 迁移触发器满足，否则不提前强切数据库主路径</td></tr>
+  </table>
+  <div class="callout good"><b>V1 成功标准：</b>售前能把客户材料交给系统，并在可控、可追溯、可归档的前提下，快速得到可对外沟通的实施初估结果。</div>
 </section>
 
 <!-- ===== 13 ===== -->
@@ -464,12 +520,14 @@ ui/
     <tr><th>项</th><th>决策 / 风险</th><th>应对</th></tr>
     <tr><td>产品形态</td><td><span class="badge b-green">决策</span> 选 L2 半自主，非纯聊天、非全自主</td><td>读自动 / 写确认；L3 架构预留</td></tr>
     <tr><td>仓库</td><td><span class="badge b-green">决策</span> 同仓 monorepo，不新建仓库</td><td>目录+分支+worktree 三层隔离</td></tr>
-    <tr><td>UI</td><td><span class="badge b-green">决策</span> 对话驱动+结构化渲染，不抛弃组件</td><td>复用 V0 组件，V3_AGENT/V2 基座</td></tr>
+    <tr><td>UI</td><td><span class="badge b-green">决策</span> 对话驱动+结构化渲染，不抛弃组件</td><td><code>ui/V2_PROTOTYPE</code> 升级为唯一 Web 前端；不新开 <code>ui/V3_AGENT</code></td></tr>
+    <tr><td>V0_SAAS</td><td><span class="badge b-green">决策</span> V1 下线</td><td>删除前完成资产盘点与必要能力迁移</td></tr>
+    <tr><td>移动端</td><td><span class="badge b-green">决策</span> 微信小程序进入 V2</td><td>V1 只预留事件模型；V2 做小程序 MVP</td></tr>
     <tr><td>模型</td><td><span class="badge b-green">决策</span> 平台默认 Kimi + BYOK + 多厂商预留</td><td>限定 function-calling 模型</td></tr>
     <tr><td>技术门槛</td><td><span class="badge b-red">风险</span> Provider 无 tool-calling</td><td>阶段 1 优先补齐；Kimi 兼容 OpenAI tools 协议，可行</td></tr>
     <tr><td>存储</td><td><span class="badge b-amber">风险</span> JSON 文件，高并发自主写冲突</td><td>L2 人在环并发低，暂不阻塞；触发 DB 迁移条件再切 PG</td></tr>
     <tr><td>成本</td><td><span class="badge b-amber">风险</span> 多步循环放大 token 消耗</td><td>循环上限 + 质量看板监控 + 缓存可复用上下文</td></tr>
-    <tr><td>精力</td><td><span class="badge b-amber">风险</span> 与 R1 首发抢资源</td><td>R1 先收尾，Agent 后投入</td></tr>
+    <tr><td>范围</td><td><span class="badge b-amber">风险</span> V1 同时包含前端主线切换与 Agent 闭环</td><td>先做资产盘点与后端基座，SOW/小程序/经营分析全部后置</td></tr>
   </table>
 </section>
 
@@ -481,15 +539,185 @@ ui/
     <li><b>本方案是 L2 内嵌 Copilot</b>，不是纯聊天机器人，也不是全自主 Agent。读操作自动、写操作确认。</li>
     <li><b>业务逻辑零改动</b>。Agent = 现有 17 个 usecase + 工具说明书外壳 + 编排循环。不要重写业务逻辑。</li>
     <li><b>唯一需改的现有文件</b>是 <code>ai/provider/*</code>（补 tool-calling），且应走独立 PR 合入 main，不在 feat 分支偷改。</li>
-    <li><b>仓库不拆</b>。同仓 monorepo，在 <code>feat/agent-workbench</code> 分支 + worktree 工作区开发。新代码放 <code>apps/api/src/agent/</code> 与 <code>ui/V3_AGENT/</code>。</li>
+    <li><b>仓库不拆</b>。同仓 monorepo，在 <code>feat/agent-workbench</code> 分支 + worktree 工作区开发。后端新增 <code>apps/api/src/agent/</code>；前端在 <code>ui/V2_PROTOTYPE</code> 内新增 Agent 路由。</li>
+    <li><b>前端主线已改口径</b>。V1 下线 <code>ui/V0_SAAS</code>，<code>ui/V2_PROTOTYPE</code> 升级为唯一 Web 前端。旧文档中 <code>V3_AGENT</code> 是历史草案，不再作为落点。</li>
     <li><b>权限边界 = RBAC 能力位</b>。Agent 能做什么由用户能力位决定，工具调用前必过校验，不可越权。</li>
-    <li><b>从阶段 0 PoC 起步</b>：先用最小代码验证 Kimi tool-calling 跑通一个真工具，再正式立项。</li>
+    <li><b>V1 从售前闭环起步</b>：先做 V0/V2 前端资产盘点、Provider tool-calling、Agent 编排层、售前工具集和桌面工作台。</li>
     <li>相关事实来源：现有 Provider 抽象在 <code>apps/api/src/ai/provider/</code>；usecase 在 <code>apps/api/src/modules/*/</code>；遵循根 <code>CLAUDE.md</code> 架构边界与提交规范。</li>
   </ol></div>
 </section>
 
+<!-- ===== 15 ===== -->
+<section id="s15">
+  <h2 class="sec"><span class="n">15</span>V1 实施计划</h2>
+  <div class="callout"><div class="t">For agentic workers</div>
+  REQUIRED SUB-SKILL: Use <code>superpowers:subagent-driven-development</code>（推荐）或 <code>superpowers:executing-plans</code> 执行本计划。执行时按批次推进，每个批次完成后运行对应验证命令，再进入下一批。</div>
+
+  <p><b>Goal：</b>在 V1 内完成 Web 前端主线切换、后端 Agent 基座、桌面售前 Agent 闭环、成果看板与 V0_SAAS 下线。</p>
+  <p><b>Architecture：</b>后端在 <code>apps/api/src/agent/</code> 新建编排层与工具注册表，复用现有 modules usecase；前端在 <code>ui/V2_PROTOTYPE</code> 内新增 Agent 路由与组件，V0_SAAS 只作为迁移资产来源，最终删除。</p>
+  <p><b>Tech Stack：</b>Express + TypeScript + node:test + tsx；Vite 5 + React 18 + react-router-dom 6 + Vitest。</p>
+
+  <h3>15.1 文件边界</h3>
+  <table>
+    <tr><th>路径</th><th>动作</th><th>职责</th></tr>
+    <tr><td><code>package.json</code></td><td>修改</td><td>将 <code>dev:web</code> / <code>build:web</code> / <code>test:e2e:web</code> 从 V0 切到 V2，必要时新增 <code>test:web</code></td></tr>
+    <tr><td><code>ui/V2_PROTOTYPE/src/api/agent.js</code></td><td>创建</td><td>Agent 会话、事件流、归档、成果看板 API client</td></tr>
+    <tr><td><code>ui/V2_PROTOTYPE/src/hooks/usePresalesAgent.js</code></td><td>创建</td><td>S0-S5 状态机、事件消费、错误状态、确认动作</td></tr>
+    <tr><td><code>ui/V2_PROTOTYPE/src/pages/PresalesAgent.jsx</code></td><td>创建</td><td>售前 Agent 工作台主页面</td></tr>
+    <tr><td><code>ui/V2_PROTOTYPE/src/pages/PresalesResults.jsx</code></td><td>创建</td><td>售前成果看板</td></tr>
+    <tr><td><code>ui/V2_PROTOTYPE/src/pages/PresalesResultDetail.jsx</code></td><td>创建</td><td>估算详情与续作入口</td></tr>
+    <tr><td><code>ui/V2_PROTOTYPE/src/components/Agent/*</code></td><td>创建</td><td>对话区、材料输入、需求包编辑器、初估结果表、证据/状态栏、归档确认弹窗</td></tr>
+    <tr><td><code>apps/api/src/ai/provider/*</code></td><td>修改</td><td>Provider tool-calling 与 Kimi 适配</td></tr>
+    <tr><td><code>apps/api/src/agent/*</code></td><td>创建</td><td>Agent 类型、工具注册表、编排循环、售前工具集、匹配仓储</td></tr>
+    <tr><td><code>apps/api/src/routes/agent.routes.ts</code></td><td>创建</td><td><code>/api/v1/agent/chat</code>；成果查询入口后续批次补齐</td></tr>
+    <tr><td><code>apps/api/src/routes/index.ts</code></td><td>修改</td><td>挂载 <code>/agent</code> 路由</td></tr>
+    <tr><td><code>README.md</code> / <code>AGENTS.md</code> / <code>03_技术设计/系统演进/实现与文档对齐说明.md</code></td><td>修改</td><td>同步 V2 主线、V0 下线、Agent 路由状态</td></tr>
+    <tr><td><code>ui/V0_SAAS/</code></td><td>删除</td><td>完成迁移门禁后物理删除</td></tr>
+  </table>
+
+  <h3>15.2 Batch 1：V0/V2 前端资产盘点</h3>
+  <table>
+    <tr><th>步骤</th><th>动作</th><th>验证</th></tr>
+    <tr><td>1</td><td>读取 V0 的 <code>lib/api-client.ts</code>、<code>hooks/use-auth.tsx</code>、<code>lib/workload-service.ts</code>、<code>components/workload/version-vcs-toolbar.tsx</code>、<code>components/workload/version-history-dialog.tsx</code>、<code>components/ui/dialog.tsx</code>。</td><td>产出资产差异清单，标注"迁移 / 替代 / 放弃"。</td></tr>
+    <tr><td>2</td><td>读取 V2 的 <code>src/api/client.js</code>、<code>src/api/auth.js</code>、<code>src/hooks/useAuth.js</code>、<code>src/utils/download.js</code>、<code>src/components/Assessment/VcsToolbar.jsx</code>。</td><td>确认 V2 已具备 auth、API client、下载、VCS 基础能力。</td></tr>
+    <tr><td>3</td><td>在 HTML 本节或后续工作日志中维护删除门禁：登录、API、下载、VCS、构建、Agent 工作台、成果看板。</td><td>门禁未达成前不删除 <code>ui/V0_SAAS</code>。</td></tr>
+  </table>
+
+  <h4>15.2.1 资产盘点结果</h4>
+  <table>
+    <tr><th>能力域</th><th>V0 资产</th><th>V2 现状</th><th>V1 处置</th><th>可放弃项</th><th>删除 V0 前门禁</th></tr>
+    <tr>
+      <td>登录/JWT</td>
+      <td><code>hooks/use-auth.tsx</code> 提供 <code>login/register/logout/refresh</code>，<code>api-client.ts</code> 统一注入 <code>Authorization: Bearer</code>，角色字段含 <code>admin</code>、<code>sub_admin</code>、<code>user</code>，可通过 <code>/api/v1/auth/me</code> 完成会话探测。</td>
+      <td><code>hooks/useAuth.js</code> + <code>api/auth.js</code> 已有登录/注册与 token 持久化；<code>api/client.js</code> 仅在 401 时清理 token 并跳转登录，缺少 V0 的 me 探测。</td>
+      <td>迁移。V2 保留现有结构，补齐会话自检与角色语义对齐，统一 token 策略。</td>
+      <td>无（核心能力保留）</td>
+      <td>需在 <code>Batch 2</code> 验证：<code>ui/V2_PROTOTYPE/src/hooks/useAuth.js</code>、<code>ui/V2_PROTOTYPE/src/api/client.js</code> 中增加登录态恢复与鉴权一致性回归。需补充命令：<code>npm run build:web</code>、<code>npm run test:web</code>；确认无“未登录可访问核心路由”。</td>
+    </tr>
+    <tr>
+      <td>API client</td>
+      <td><code>api-client.ts</code>：统一路径解析、接口规范化、错误提示、<code>payload.data</code> 解包及本地提示。</td>
+      <td><code>api/client.js</code> 提供基础封装与参数序列化，返回 payload 或 JSON，不包含统一 <code>code/message/data</code> 解包，未覆盖表单上传/统一错误模型。</td>
+      <td>迁移。保留 V2 现有简化接口层，补齐 V0 的响应结构约束和异常处理一致性。</td>
+      <td>无（核心能力保留）</td>
+      <td>需在 <code>Batch 2</code> 验证：<code>ui/V2_PROTOTYPE/src/api/client.js</code> 的返回与后端统一响应兼容；通过 mock 和冒烟用例覆盖 401、非 200、非 JSON 场景。</td>
+    </tr>
+    <tr>
+      <td>导出下载</td>
+      <td><code>lib/api-client.ts</code> 提供 <code>downloadWithAuth</code>，<code>workload-service.ts</code> 封装 <code>calculateAndExportEstimate</code> 与下载历史文件链路。</td>
+      <td><code>utils/download.js</code> 仅提供本地 JSON/CSV 生成与导出，未接管鉴权下载；V2 页面中仍有大量 <code>alert</code> 与内联导出/下载。</td>
+      <td>迁移+补齐。V2 需新增“鉴权下载”能力并接回后端历史导出接口，不采用 V0 现成实现。</td>
+      <td>无（核心能力保留）</td>
+      <td>需在 <code>Batch 2</code> 验证：<br/>1）新增并执行鉴权下载冒烟：<code>npm run test:web -- ui/V2_PROTOTYPE/src/__tests__/utils/downloadWithAuth.test.js</code><br/>2）新增并执行列表导出集成：<code>npm run test:web -- ui/V2_PROTOTYPE/src/__tests__/pages/AssessmentDetail.download.test.jsx</code><br/>3）并发起一次真实 token 调用（开发环境下手工）：<code>ui/V2_PROTOTYPE/src/api/client.js</code> 对接导出接口返回 <code>Blob</code> 的闭环。</td>
+    </tr>
+    <tr>
+      <td>Toast/Dialog</td>
+      <td>V0 有全局 <code>Toaster</code>（<code>sonner</code>）和统一 <code>components/ui/dialog</code>（含拖拽置顶）；多处业务调用统一 toast 风格。</td>
+      <td>V2 目前分散到各页面：多数页面有页面内 <code>toast</code> state 与内联 Dialog 组件，Toast 并未统一成全局入口。</td>
+      <td>保留 V2 现有体验，统一抽取公共 <code>Toast/Dialog</code> 系统（优先保留 V2 风格实现），避免新建重复系统。</td>
+      <td>无（核心能力保留）</td>
+      <td>需在 <code>Batch 2</code> 验证：完成全局消息策略后，执行 <code>npm run test:web -- ui/V2_PROTOTYPE/src/__tests__/utils/toastDialog.test.js</code>；同时运行 <code>npm run test:web -- ui/V2_PROTOTYPE/src/__tests__/components/Dialog.shell.test.jsx</code> 并确认 <code>rg "toast\\(|DialogBackdrop|DialogShell"</code> 仅见兼容残留。</td>
+    </tr>
+    <tr>
+      <td>表格/列表基础交互</td>
+      <td>V0 有 <code>TableTemplate</code>（搜索、筛选、分页、列宽交互）、<code>Table</code> 组件体系，版本列表/模块列表交互完整。</td>
+      <td>V2 有 <code>components/ListPage.jsx</code> 的筛选/搜索/行选择逻辑，但大量列表仍为定制 <code>&lt;table&gt;</code> 与页面级交互，能力分散。</td>
+      <td>迁移。采用 V2 ListPage 为统一基线，可按能力差距补齐列状态、行动作与批量行为。</td>
+      <td>无（核心能力保留）</td>
+      <td>需在 <code>Batch 2</code> 验证：列表交互单测覆盖单选/多选/批量动作，命令如下：<br/><code>npm run test:web -- ui/V2_PROTOTYPE/src/__tests__/components/ListPage.interactions.test.jsx</code><br/><code>npm run test:web -- ui/V2_PROTOTYPE/src/__tests__/pages/AssessmentList.interactions.test.jsx</code>。</td>
+    </tr>
+    <tr>
+      <td>VCS/版本状态</td>
+      <td><code>version-vcs-toolbar.tsx</code> 与 <code>version-history-dialog.tsx</code> 完整承载检出、检入、撤销检出、升版、强制解锁、历史对照。</td>
+      <td><code>Assessment/VcsToolbar.jsx</code> 仅保留签入按钮和历史入口的 UI 外壳，未封装完整 VCS 状态动作闭环；历史查看散落在多个页面。</td>
+      <td>迁移。以 V0 的业务闭环为准，重建 V2 统一版本动作服务与弹窗组件；允许在外观上与 V2 维持一致。</td>
+      <td>无（核心能力保留）</td>
+      <td>删除 V0 前必须确认：<br/>1）<code>checkout/checkin/undo/force-unlock/promote</code> 在 V2 关键模块可执行且有回执。<br/>2）执行验证命令：<code>npm run test:web -- ui/V2_PROTOTYPE/src/__tests__/vcsActions.test.js</code>（若不存在，新建后补测）。<br/>3）执行 <code>npm run test:web -- ui/V2_PROTOTYPE/src/__tests__/components/VersionHistoryDialog.test.jsx</code>（或按目录新增对应测试）。</td>
+    </tr>
+    <tr>
+      <td>路由/布局</td>
+      <td>V0 为 Next App Router，按 <code>app/dashboard/*</code> 落模块页，布局通过顶层 provider 与 layout 管理。</td>
+      <td>V2 已是 <code>react-router-dom</code> + <code>Shell</code> + <code>WorkspaceTabs</code> 的单体路由，不支持 V0 的中间件级鉴权钩子。</td>
+      <td>可保留。V2 继续承担主布局；新增 Agent/成果看板时在现有路由树扩展，保留页签与导航约束。</td>
+      <td>可放弃：V0 Next App Router 机制、V0 整页迁移和页面级 e2e 布局路径。保留主线布局能力由 V2 Shell 接管。</td>
+      <td>需在 <code>Batch 2</code> 验证：核心路径不登录不可进入，<code>App.jsx</code> 与导航布局与业务模块可稳定联动。</td>
+    </tr>
+    <tr>
+      <td>测试/构建</td>
+      <td>根脚本当前仍指向 V0（<code>dev:web/build:web/test:e2e:web</code>），V0 有大规模页面层回归。</td>
+      <td>V2 有独立 scripts（<code>npm run build</code>/<code>npm run test</code>）和 <code>vite.config.js</code> 代理；测试资产主要在 <code>src/__tests__</code>。</td>
+      <td>可复用+迁移。V2 测试体量不足，需补齐 Batch2/Batch3 相关场景；根脚本的 web 命令切换是前置条件。</td>
+      <td>可放弃：V0 的页面级 e2e 套件与 V0 具体 UI 实现细节对比回归。保留 V2 用例与脚本作为主验收基线。</td>
+      <td>删除 V0 前门禁=根脚本已迁移到 V2 且 <code>npm run build:web</code>/<code>npm run test:web</code> 在当前状态可稳定通过（至少不回归 V2 现有页面）。</td>
+    </tr>
+  </table>
+  <p class="callout">结论：V2 已有“可落地骨架”，但就该批次范围看，V0 的版本治理、鉴权一致性、下载鉴权、消息体系与 VCS 标准化仍需迁移到位后，才可进入“V0 可删”阶段。</p>
+
+  <h3>15.3 Batch 2：V2 升级为 Web 主线</h3>
+  <div class="callout good"><div class="t">执行状态（2026-06-12）</div>
+    已完成：根 <code>dev:web</code> / <code>build:web</code> 已切到 <code>ui/V2_PROTOTYPE</code>，新增 <code>test:web</code>，<code>test:e2e:web</code> 临时映射到 <code>test:web</code>；README、AGENTS、实现与文档对齐说明已同步为 V2 唯一 Web 主线、V0 下线中口径。已验证：<code>npm run build:web</code> 通过，<code>npm run test:web</code> 通过（22 tests）。
+  </div>
+  <table>
+    <tr><th>步骤</th><th>动作</th><th>验证</th></tr>
+    <tr><td>1</td><td>修改根 <code>package.json</code>：<code>dev:web</code> 改为 <code>npm run dev --prefix ui/V2_PROTOTYPE</code>，<code>build:web</code> 改为 <code>npm run build --prefix ui/V2_PROTOTYPE</code>，新增 <code>test:web</code> 为 <code>npm run test --prefix ui/V2_PROTOTYPE</code>。</td><td>运行 <code>npm run build:web</code>，预期 Vite build 通过。</td></tr>
+    <tr><td>2</td><td>在 <code>ui/V2_PROTOTYPE/src/App.jsx</code> 保持现有路由，先不加 Agent 页面，确保切主线不引入功能噪声。</td><td>运行 <code>npm run test:web</code>，预期 Vitest 通过。</td></tr>
+    <tr><td>3</td><td>更新 <code>README.md</code>、<code>AGENTS.md</code>、<code>实现与文档对齐说明.md</code> 的前端事实来源。</td><td><code>rg "V0_SAAS（生产）|生产主实现|主产品前端" README.md AGENTS.md 03_技术设计/系统演进/实现与文档对齐说明.md</code> 不再出现旧口径。</td></tr>
+  </table>
+
+  <h3>15.4 Batch 3-5：后端 Agent 三联</h3>
+  <p>本批次沿用现有详细计划：<code>00_项目治理/里程碑与计划/WES-Agent-后端三联-实现计划-P1P2P3.md</code>。执行时以该计划为细节来源，但需遵守本文 V1 边界：SOW、开发评估、评审工具只标后置，不进入 V1 主闭环。</p>
+  <div class="callout good"><div class="t">执行状态（2026-06-12）</div>
+    已完成：Provider tool-calling、Kimi <code>tools/tool_choice</code> 请求注入、<code>tool_calls</code> 响应解析；新增 <code>apps/api/src/agent/</code> 核心类型、工具注册表、编排循环、权限过滤、写操作确认、最大轮数护栏；新增售前初估工具封装与归档匹配纯函数。已验证：<code>cd apps/api &amp;&amp; npm run test:agent</code> 通过（18 tests），<code>npm run build</code> 通过，<code>npm run test:ai</code> 通过（189 tests）。未完成：抽取、PDF、真实归档工具仍待下一批接线。
+  </div>
+  <table>
+    <tr><th>批次</th><th>目标</th><th>验证命令</th></tr>
+    <tr><td>Batch 3</td><td>Provider tool-calling：类型、Kimi <code>tool_calls</code> 解析、tools payload 注入。</td><td><code>cd apps/api &amp;&amp; npx tsx --test src/ai/provider/tool-calling.test.ts &amp;&amp; npx tsc -p tsconfig.json --noEmit</code></td></tr>
+    <tr><td>Batch 4</td><td><code>apps/api/src/agent/</code>：核心类型、工具注册表、编排循环、权限/写确认/上限。</td><td><code>cd apps/api &amp;&amp; npx tsx --test src/agent/agent.test.ts</code></td></tr>
+    <tr><td>Batch 5</td><td>售前工具集：抽取、初估、PDF、归档匹配。</td><td><code>cd apps/api &amp;&amp; npx tsx --test src/agent/tools/presales.tools.test.ts</code></td></tr>
+  </table>
+
+  <h3>15.5 Batch 6：Agent 路由与事件协议</h3>
+  <div class="callout good"><div class="t">执行状态（2026-06-12）</div>
+    已完成：创建 <code>apps/api/src/routes/agent.routes.ts</code>，挂载 <code>POST /api/v1/agent/chat</code>；接口使用 JWT 鉴权，返回统一 JSON 事件数组；事件白名单覆盖 <code>assistant_message</code>、<code>tool_started</code>、<code>tool_finished</code>、<code>needs_confirmation</code>、<code>error</code>。已验证：<code>cd apps/api &amp;&amp; npm run test:agent</code> 通过（21 tests），<code>npm run build</code> 通过。
+  </div>
+  <table>
+    <tr><th>步骤</th><th>动作</th><th>验证</th></tr>
+    <tr><td>1</td><td>创建 <code>apps/api/src/routes/agent.routes.ts</code>，提供 <code>POST /api/v1/agent/chat</code>，请求体包含 <code>message</code>、<code>sessionId?</code>、<code>confirm?</code>、<code>payload?</code>。</td><td>新增 route test：未登录返回 401，登录后能得到事件流或 JSON 事件数组。</td></tr>
+    <tr><td>2</td><td>定义统一事件：<code>assistant_message</code>、<code>tool_started</code>、<code>tool_finished</code>、<code>requirement_pack_ready</code>、<code>estimate_ready</code>、<code>needs_confirmation</code>、<code>archive_completed</code>、<code>error</code>。</td><td>测试断言事件 type 只来自白名单。</td></tr>
+    <tr><td>3</td><td>在 <code>apps/api/src/routes/index.ts</code> 挂载 <code>router.use("/agent", agentRoutes)</code>。</td><td>运行 <code>npm run build:api</code>。</td></tr>
+  </table>
+
+  <h3>15.6 Batch 7：V2 Agent 工作台</h3>
+  <table>
+    <tr><th>步骤</th><th>动作</th><th>验证</th></tr>
+    <tr><td>1</td><td>创建 <code>ui/V2_PROTOTYPE/src/api/agent.js</code>，封装 <code>sendAgentMessage</code>、<code>listPresalesResults</code>、<code>getPresalesResult</code>、<code>archiveEstimate</code>。</td><td>MSW handler 覆盖成功、确认、错误三类事件。</td></tr>
+    <tr><td>2</td><td>创建 <code>usePresalesAgent.js</code>，维护 S0-S5：等待材料、抽取中、需求包确认、初估中、结果呈现、归档决策。</td><td>Vitest 断言事件推进状态机，错误事件进入可重试状态。</td></tr>
+    <tr><td>3</td><td>创建 Agent 组件：<code>ConversationPanel</code>、<code>MaterialDropzone</code>、<code>RequirementPackEditor</code>、<code>EstimateResultTable</code>、<code>EvidenceStatusPanel</code>、<code>ArchiveDecisionDialog</code>。</td><td>组件测试至少覆盖需求包编辑、归档确认、错误提示。</td></tr>
+    <tr><td>4</td><td>在 <code>App.jsx</code> 增加 <code>/agent/presales</code> 路由。</td><td>运行 <code>npm run test:web</code> 与 <code>npm run build:web</code>。</td></tr>
+  </table>
+
+  <h3>15.7 Batch 8：成果看板、V0 删除与文档收口</h3>
+  <table>
+    <tr><th>步骤</th><th>动作</th><th>验证</th></tr>
+    <tr><td>1</td><td>创建 <code>PresalesResults.jsx</code> 与 <code>PresalesResultDetail.jsx</code>，支持列表、搜索、查看、导出、续作入口。</td><td>Vitest 覆盖搜索过滤、详情加载失败、续作按钮跳转。</td></tr>
+    <tr><td>2</td><td>确认删除门禁全部通过后，删除 <code>ui/V0_SAAS/</code>，同步删除根脚本对 V0 的引用。</td><td><code>rg "ui/V0_SAAS|V0_SAAS" package.json README.md AGENTS.md 03_技术设计/系统演进/实现与文档对齐说明.md</code> 仅允许出现在"【历史说明，已下线】"语境。</td></tr>
+    <tr><td>3</td><td>更新文档：README、AGENTS、实现与文档对齐说明、OpenAPI 注记。</td><td>运行 <code>npm run build:web</code>、<code>npm run build:api</code>、<code>npm run test:web</code>、<code>npm run test:agent</code>。</td></tr>
+  </table>
+
+  <h3>15.8 V1 最终门禁</h3>
+  <ul>
+    <li><code>npm run build:web</code> 通过，且指向 V2。</li>
+    <li><code>npm run build:api</code> 通过。</li>
+    <li><code>npm run test:web</code> 通过。</li>
+    <li><code>npm run test:agent</code> 通过。</li>
+    <li><code>npm run test:modules</code>、<code>npm run test:ai</code> 无回归。</li>
+    <li>V2 Web 可完成 S0-S5 售前 Agent 主流程。</li>
+    <li>V0_SAAS 已删除，文档只以历史说明方式提及。</li>
+  </ul>
+</section>
+
 <div class="foot">
-  WES Agent 产品技术方案 · v0.1 草案 · 2026-06-05 · 分支 feat/agent-workbench<br>
+  WES Agent 产品技术方案 · v0.2 路线评审版 · 2026-06-11 · 分支 feat/agent-workbench<br>
   本文档为单文件自包含 HTML（离线可阅），作为 Agent 化立项的事实来源与后续工作上下文。后续变更请升版并记录于「§13 决策记录」。
 </div>
 

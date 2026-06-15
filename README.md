@@ -32,8 +32,8 @@
 
 ## 前端与重构说明（2026-03 起）
 
-- **主产品前端**：[`ui/V0_SAAS`](ui/V0_SAAS)（Next.js + TypeScript）。根目录 `npm run dev:web` / `npm run build:web` 指向此处。本地联调端口以子项目与代理配置为准（常见为 API `3000`，V0_SAAS 占 `3001`，详见 [`docs/PROJECT_STATUS_2026-03-30.md`](docs/PROJECT_STATUS_2026-03-30.md)）。
-- **下一代沙箱**：[`ui/V2_PROTOTYPE`](ui/V2_PROTOTYPE)（Vite + React，端口 `3002`）。Phase B 组件库与 18 页面全量集成已完成，框架决议选定 Vite + React 为后续方向。详见 [`ui/V2_PROTOTYPE/README.md`](ui/V2_PROTOTYPE/README.md)。
+- **Web 前端主线**：[`ui/V2_PROTOTYPE`](ui/V2_PROTOTYPE)（Vite + React，端口 `3002`，代理 `/api` 到 API `3000`）。根目录 `npm run dev:web` / `npm run build:web` 指向此处；Phase B 组件库与 18 页面全量集成已完成。详见 [`ui/V2_PROTOTYPE/README.md`](ui/V2_PROTOTYPE/README.md)。
+- **【历史说明，下线中】V0 资产**：[`ui/V0_SAAS`](ui/V0_SAAS)（Next.js + TypeScript）已进入 V1 下线范围，待资产迁移门禁通过后删除；相关引用仅用于迁移核对与历史追溯。
 - **后端**：[`apps/api`](apps/api) 10/17 核心域已迁至 `apps/api/src/modules/*`（含 auth、versions、ai、templates、rules、estimates、exports、sessions、system、team），路由聚合于 [`apps/api/src/routes/index.ts`](apps/api/src/routes/index.ts)。
 
 ## 质量回归（建议每次发布前执行）
@@ -47,13 +47,13 @@
 - `npm run build:web`
 - `npm run test:api:team`（团队 API 契约冒烟，见 `scripts/team-api-check.js`）
 
-## Agent-Friendly API（规划项，当前运行时未挂载）
+## Agent-Friendly API（V1 基座）
 
-高层 `/api/v1/agent/*` **未包含在当前主线 Express 路由中**。规划与分阶段任务见 [`00_项目治理/里程碑与计划/项目开发TODO.md`](00_项目治理/里程碑与计划/项目开发TODO.md)。外部自动化或 Agent 集成请优先使用既有 **`POST /api/v1/estimates/calculate`**、**`/api/v1/sessions/*`** 等接口；契约说明见 [`docs/openapi.yaml`](docs/openapi.yaml) 文首注释。
+当前已挂载 `POST /api/v1/agent/chat`（JWT 鉴权），返回统一 JSON 事件数组；V1 先支持 Provider tool-calling、Agent 编排、售前初估工具和基础事件协议。抽取、PDF、真实归档工具与 V2 前端工作台仍在后续批次接线；契约说明见 [`docs/openapi.yaml`](docs/openapi.yaml)。
 
 ## 技术栈
 
-- 主前端：Next.js（`ui/V0_SAAS`）
+- Web 前端：Vite + React（`ui/V2_PROTOTYPE`）
 - 后端：Express + TypeScript（`apps/api`）
 - 存储：当前以本地文件持久化为主（非传统数据库）
   - 用户：`config/auth/users.json`
@@ -64,8 +64,8 @@
 
 ## 目录结构
 
-- `ui/V0_SAAS`：主前端（Next.js）
-- `ui/V2_PROTOTYPE`：下一代沙箱（Vite + React，Phase B）
+- `ui/V2_PROTOTYPE`：当前唯一 Web 前端主线（Vite + React，Phase B）
+- `ui/V0_SAAS`：【历史说明，下线中】V1 下线范围内的旧 Next.js 资产，待资产迁移门禁通过后删除
 - `apps/api`：后端 API 服务
 - `config/templates`：模板配置
 - `config/rules`：规则配置
@@ -82,7 +82,7 @@ npm run dev:api
 npm run dev:web
 ```
 
-- 主前端端口：以 `ui/V0_SAAS` 启动日志为准（勿与 API 默认 `3000` 冲突）。
+- Web 前端端口：以 `ui/V2_PROTOTYPE` 启动日志为准，默认 `3002`（勿与 API 默认 `3000` 冲突）。
 - 后端健康检查：`http://localhost:3000/api/v1/health`
 
 ## 关键 API（节选）
@@ -123,7 +123,7 @@ npm run dev:web
 
 ## 常用脚本
 
-- `npm run build:web`：构建主前端（Next）
+- `npm run build:web`：构建 Web 前端主线（Vite + React）
 - `npm run build:api`：构建后端
 - `npm run test:modules`：模块级单元/行为测试（API）
 - `npm run test:api:team`：团队 API 冒烟（`scripts/team-api-check.js`）
@@ -132,7 +132,8 @@ npm run dev:web
 - `npm run rules:regression`：规则回归
 - `npm run rules:excel-report`：Excel 对比报告
 - `docker compose up --build`：根目录最小编排（API + Web，见部署说明）
-- `npm run test:e2e:web`：Next 端 Playwright 冒烟（需先 `npx playwright install chromium` 于 `ui/V0_SAAS`，并先启动 `npm run dev`）
+- `npm run test:web`：运行 Web 前端主线 Vitest 测试
+- `npm run test:e2e:web`：当前临时映射到 `npm run test:web`；V2 e2e 后续补齐后再切回专用端到端脚本
 - `npm run ops:backup:config`：备份 `config/*` 到 `backups/config/*`
 - `npm run ops:check:config`：执行配置完整性校验
 - `npm run ops:check:config:repair`：按兜底结构修复缺失/损坏配置，并记录日志
