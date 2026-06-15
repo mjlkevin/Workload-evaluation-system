@@ -2,12 +2,13 @@ import React, { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import WorkspaceTabs from './WorkspaceTabs.jsx'
 import { UnsavedChangesProvider } from '../../hooks/useUnsavedChanges.jsx'
+import useCurrentUser from '../../hooks/useCurrentUser.js'
 
 const navGroups = [
   {
     title: '工作台',
     items: [
-      { to: '/', label: '主页', icon: '●' },
+      { to: '/', label: 'AI 工作台', icon: '●' },
       { to: '/requirements', label: '需求', icon: '✎' },
       { to: '/assessments', label: '实施评估', icon: '▣' },
       { to: '/dev-assessments', label: '开发评估', icon: '◆' },
@@ -36,6 +37,10 @@ function ToggleIcon() {
 
 export default function Shell({ children }) {
   const [collapsed, setCollapsed] = useState(false)
+  const { user } = useCurrentUser()
+  const username = user?.username || user?.name || 'mjlkevin'
+  const userInitial = String(username).slice(0, 1).toUpperCase() || 'U'
+  const roleText = user?.businessRoleLabel || (user?.role === 'admin' ? '超级管理员' : '未设置业务角色')
 
   return (
     <div className="shell" style={{ gridTemplateColumns: collapsed ? '64px minmax(0,1fr)' : undefined }}>
@@ -70,10 +75,10 @@ export default function Shell({ children }) {
         ))}
         <div className="user">
           <div className="row">
-            <div className="av">M</div>
+            <div className="av">{userInitial}</div>
             <div className="account">
-              <div className="nm">mjlkevin</div>
-              <div className="meta">超级管理员</div>
+              <div className="nm" title={username}>{username}</div>
+              <div className="meta" title={roleText}>{roleText}</div>
             </div>
             {!collapsed && <a className="out" href="/login" aria-label="退出登录">退出</a>}
           </div>

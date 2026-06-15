@@ -4,6 +4,9 @@ import { Link } from 'react-router-dom'
 const CRUMB_ROUTE_MAP = {
   工作台: '/',
   主页: '/',
+  'AI 工作台': '/',
+  传统工作台: '/',
+  项目评估工作台: '/',
   需求: '/requirements',
   需求管理: '/requirements',
   实施评估: '/assessments',
@@ -61,18 +64,27 @@ function Crumbs({ crumb }) {
   )
 }
 
-export default function PageShell({ crumb, title, subtitle, actions, children }) {
+export default function PageShell({ crumb, title, subtitle, actions, children, fillViewport = false }) {
   return (
-    <div>
+    <div
+      style={fillViewport ? {
+        height: 'calc(100vh - var(--workspace-tabs-height, 0px))',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      } : undefined}
+    >
       <div
         className="pg-hd"
         style={{
           padding: '18px 24px 14px',
           borderBottom: '1px solid var(--line)',
-          position: 'sticky',
-          top: 'var(--workspace-tabs-height, 0px)',
+          position: fillViewport ? 'relative' : 'sticky',
+          top: fillViewport ? undefined : 'var(--workspace-tabs-height, 0px)',
           background: 'var(--bg)',
           zIndex: 20,
+          flexShrink: 0,
         }}
       >
         {crumb && <Crumbs crumb={crumb} />}
@@ -90,7 +102,10 @@ export default function PageShell({ crumb, title, subtitle, actions, children })
           )}
         </div>
       </div>
-      <div style={{ padding: '16px 24px 24px' }}>
+      <div style={{
+        padding: '16px 24px 24px',
+        ...(fillViewport ? { flex: 1, minHeight: 0, overflow: 'hidden' } : {}),
+      }}>
         {children}
       </div>
     </div>

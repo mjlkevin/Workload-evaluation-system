@@ -60,3 +60,6 @@ Session/
 .claude/worktrees/
 .codex-tools/
 .elder-gods/
+.qoder/
+qa-outputs/
+observations_output.json

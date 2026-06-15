@@ -1,7 +1,25 @@
 export const mockUsers = [
-  { id: 'u1', username: 'admin', role: 'admin', email: 'admin@wes.local' },
-  { id: 'u2', username: 'pm', role: 'user', email: 'pm@wes.local' },
-  { id: 'u3', username: 'arch', role: 'user', email: 'arch@wes.local' },
+  { id: 'u1', username: 'admin', role: 'admin', businessRole: 'admin', email: 'admin@wes.local' },
+  { id: 'u2', username: 'pm', role: 'sub_admin', businessRole: 'pm', email: 'pm@wes.local' },
+  { id: 'u3', username: 'arch', role: 'user', businessRole: 'pre_sales', email: 'arch@wes.local' },
+]
+
+export const mockAiSessions = []
+
+export const mockProjectEvaluations = [
+  {
+    projectId: 'project-1',
+    projectName: '利民集团数字化二期',
+    customerName: '利民集团',
+    industry: '制造业',
+    currentStage: 'rough_estimate',
+    status: 'draft',
+    ownerUsername: 'arch',
+    participantUserIds: ['u3'],
+    createdAt: '2026-04-20T08:00:00Z',
+    updatedAt: '2026-04-20T08:00:00Z',
+    totalDays: 120,
+  },
 ]
 
 export const mockVersions = [

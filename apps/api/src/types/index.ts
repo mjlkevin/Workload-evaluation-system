@@ -193,12 +193,23 @@ export type AuthUser = {
   passwordHash: string;
   /** admin：全权限；sub_admin：用户管理（不可动超级管理员/不可授 admin）；user：普通 */
   role: "admin" | "sub_admin" | "user";
+  /** 业务身份：驱动首页 AI 提示词与工作流，不参与系统权限放行 */
+  businessRole?: BusinessRole;
   status: "active" | "disabled";
   createdAt: string;
   lastLoginAt: string;
 };
 
 export type PublicUser = Omit<AuthUser, "passwordHash">;
+
+export type BusinessRole =
+  | "sales"
+  | "pre_sales"
+  | "delivery"
+  | "pm"
+  | "pmo"
+  | "dev"
+  | "admin";
 
 export type UsersStore = {
   users: AuthUser[];
@@ -221,6 +232,7 @@ export type AuthJwtPayload = {
   sub: string;
   username: string;
   role: AuthUser["role"];
+  businessRole: BusinessRole;
 };
 
 // -------------------- 版本管理相关 --------------------

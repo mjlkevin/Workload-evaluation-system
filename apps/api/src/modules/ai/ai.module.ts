@@ -10,4 +10,5 @@ export {
   exportKimiAssessmentMarkdown,
   exportKimiAssessmentPdf,
   chat,
+  homeWorkbenchChat,
 } from "./ai.controller";

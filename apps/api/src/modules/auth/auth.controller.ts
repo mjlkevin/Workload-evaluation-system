@@ -6,6 +6,8 @@ export {
   listUsers,
   updateUserStatus,
   updateUserRole,
+  updateUserBusinessRole,
+  updateUserPassword,
   listInviteCodes,
   generateInviteCodeHandler
 } from "./auth.usecase";

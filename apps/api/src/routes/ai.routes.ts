@@ -25,5 +25,6 @@ router.post("/kimi-assessment/export-pdf", requireCapability("assessment:create"
 /** 与 `POST /api/v1/system/requirement-settings/kimi-api-key/test` 相同处理函数，便于网关只放行 `/ai/*` 的环境 */
 router.post("/kimi-api-key/test", requireCapability("system:manage"), SystemModule.testRequirementKimiApiKey);
 router.post("/chat", requireCapability("estimates:read"), AiModule.chat);
+router.post("/home-workbench/chat", requireCapability("estimates:read"), AiModule.homeWorkbenchChat);
 
 export default router;

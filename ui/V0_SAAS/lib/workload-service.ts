@@ -644,6 +644,11 @@ export async function listTeamReviews(teamId: string): Promise<TeamReviewsDto["i
   return data.items || []
 }
 
+export async function listUserTeams(): Promise<TeamRecordDto[]> {
+  const data = await apiRequest<{ items: TeamRecordDto[] }>("/api/v1/teams")
+  return data.items || []
+}
+
 export async function getTeamPlanOptions(): Promise<Array<{ globalVersionCode: string; projectName: string }>> {
   return withFallback(async () => {
     const team = await getOrCreateDefaultTeam()

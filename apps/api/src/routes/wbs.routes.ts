@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import { requireAuth } from "../middleware/auth";
 import { requireCapability } from "../rbac/middleware";
+import { isProjectEvaluationRecord } from "../modules/project-evaluations/project-evaluations.repository";
 import { loadVersionsStore } from "../modules/versions/versions.repository";
 import { ok } from "../utils/response";
 
@@ -22,18 +23,16 @@ type WbsItem = {
 
 const router = Router();
 
-router.get("/", requireCapability("estimates:read"), (req, res) => {
-  const auth = requireAuth(req, res);
-  if (!auth) return;
-
+export function buildDerivedWbsItemsForUser(user: { id: string; username: string }): WbsItem[] {
   const store = loadVersionsStore();
   const globals = store.records
-    .filter((record) => record.ownerUserId === auth.user.id && record.type === "global")
+    .filter((record) => record.ownerUserId === user.id && record.type === "global")
+    .filter((record) => !isProjectEvaluationRecord(record))
     .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)));
 
   const latest = globals[0];
   if (!latest) {
-    return res.json(ok([]));
+    return [];
   }
 
   const payload = (latest.payload || {}) as Record<string, unknown>;
@@ -58,11 +57,11 @@ router.get("/", requireCapability("estimates:read"), (req, res) => {
     { key: "resource", title: "资源人天及成本", linkedVersion: String(payload.resourceVersionCode || "") }
   ];
 
-  const items: WbsItem[] = steps.map((step, idx) => ({
+  return steps.map((step, idx) => ({
     id: randomUUID(),
     moduleKey: step.key,
     taskName: `${project} - ${step.title}`,
-    owner: auth.user.username,
+    owner: user.username,
     linkedVersionCode: step.linkedVersion,
     sourceGlobalVersionCode: latest.versionCode,
     sourceGlobalRecordId: latest.id,
@@ -71,8 +70,13 @@ router.get("/", requireCapability("estimates:read"), (req, res) => {
     end: toDate(idx * 7 + 6),
     status: step.linkedVersion ? "已完成" : idx === 0 ? "进行中" : "未开始"
   }));
+}
 
-  return res.json(ok(items));
+router.get("/", requireCapability("estimates:read"), (req, res) => {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+
+  return res.json(ok(buildDerivedWbsItemsForUser(auth.user)));
 });
 
 export default router;

@@ -1,19 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import PageShell from '../components/Layout/PageShell.jsx'
 import useRequirementDetail from '../hooks/useRequirementDetail.js'
 import { useSetUnsavedDirty } from '../hooks/useUnsavedChanges.jsx'
 import { downloadJSON } from '../utils/download.js'
 
-const KIMI_MENU = [
-  { key:'parse', label:'Kimi 解析需求' },
-  { key:'preview', label:'Kimi 评估预览' },
-  { key:'template', label:'Kimi 套用模板' },
-  { key:'ambiguous', label:'Kimi 修复歧义' },
-]
-const D1_STEPS = ['上传','OCR','NLP','结构化','完成']
-const D4_ITEMS = [] // AI 歧义修复条目由后端返回，无数据时为空
-const TEMPLATES = [] // 模板列表由后端返回，无数据时为空
 const DETAIL_TABS = [
   { key:'items', label:'条目明细' },
   { key:'history', label:'版本历史' },
@@ -25,49 +16,24 @@ function actionData(result) {
   return result && typeof result === 'object' && 'success' in result ? result.data : result
 }
 
-function parseSourceText(result) {
-  if (!result) return ''
-  if (result.mode === 'model') {
-    return `本次解析由 ${result.model || 'Kimi 模型'} 提供`
-  }
-  if (result.mode === 'rule_fallback' || result.model === 'rule-fallback') {
-    const reason = result.fallbackReason ? `，原因：${result.fallbackReason}` : ''
-    return `本次解析由系统规则兜底生成${reason}`
-  }
-  return result.model ? `本次解析来源：${result.model}` : ''
-}
-
 export default function RequirementDetail() {
   const { id } = useParams()
   const detail = useRequirementDetail({ id })
   const { actions, actionLoading } = detail
   const [aiResult, setAiResult] = useState(null)
-  const fileInputRef = useRef(null)
 
-  const [dialog, setDialog] = useState(null)
-  const [kimiOpen, setKimiOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('items')
-  const [d1Step, setD1Step] = useState(0)
-  const [d1Run, setD1Run] = useState(false)
-  const [d1File, setD1File] = useState(null)
-  const [d1Result, setD1Result] = useState(null)
-  const [d1Error, setD1Error] = useState(null)
-  const [d4Ans, setD4Ans] = useState({})
-  const kimiRef = useRef(null)
   const setUnsavedDirty = useSetUnsavedDirty()
   const isCo = detail.vcs?.status === 'checked-out'
   const tabs = DETAIL_TABS.map((tab) => tab.key === 'history'
     ? { ...tab, count: detail.versionHistory?.length || 0 }
     : tab)
 
-  useEffect(() => { function onDoc(e){ if(kimiRef.current && !kimiRef.current.contains(e.target)) setKimiOpen(false) } document.addEventListener('click',onDoc); return ()=>document.removeEventListener('click',onDoc) },[])
   useEffect(() => {
     setUnsavedDirty(Boolean(detail.vcs?.hasLocalChanges && detail.vcs?.status === 'checked-out'))
     return () => setUnsavedDirty(false)
   }, [detail.vcs?.hasLocalChanges, detail.vcs?.status, setUnsavedDirty])
 
-  const startD1=()=>{ setD1Step(0); setD1Run(false); setD1File(null); setD1Result(null); setD1Error(null); setDialog('parse') }
-  const d4Prog=Object.keys(d4Ans).length
   const handleVcs=async (key)=>{
     let result
     switch(key){
@@ -94,22 +60,7 @@ export default function RequirementDetail() {
   return (
     <PageShell crumb="工作台 / 需求 / 需求详情" title="需求详情" subtitle={`${detail.code || ''} · ${detail.version || ''} · 模型 kimi-k2.5`}
       actions={[
-        <div key="kimi" ref={kimiRef} style={{position:'relative'}}>
-          <button type="button" className="btn" onClick={()=>setKimiOpen(v=>!v)} style={{
-            height:32,fontSize:12,padding:'0 12px',background:'linear-gradient(135deg,oklch(.55 .22 295),oklch(.62 .20 320))',
-            color:'#fff',border:'none',borderRadius:6,cursor:'pointer',boxShadow:'0 2px 8px oklch(.55 .22 320 / .35)',
-            fontFamily:'inherit',fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,
-          }}><span>✦</span> Kimi-help <span>▾</span></button>
-          {kimiOpen && (
-            <div style={{position:'absolute',top:'calc(100% + 6px)',right:0,background:'#fff',border:'1px solid var(--line)',borderRadius:'var(--r-md)',boxShadow:'var(--shadow-2)',minWidth:180,zIndex:20,overflow:'hidden'}}>
-              {KIMI_MENU.map(m=>(
-                <button type="button" key={m.key} onClick={()=>{setKimiOpen(false);m.key==='parse'?startD1():setDialog(m.key)}}
-                  style={{display:'block',width:'100%',textAlign:'left',padding:'8px 12px',fontSize:12,fontFamily:'inherit',background:'transparent',border:'none',borderBottom:'1px solid var(--line)',cursor:'pointer',color:'var(--ink)'}}
-                  onMouseEnter={e=>e.currentTarget.style.background='var(--bg-soft)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>{m.label}</button>
-              ))}
-            </div>
-          )}
-        </div>,
+        <Link key="ai-evaluation" className="btn btn-pri" to={`/requirements/${id}/ai-evaluation`} style={{height:32,fontSize:12,padding:'0 12px'}}>AI 评估台</Link>,
         ...vcsBtn.map(b=>{
           const en=vcsEn(b.m)
           const actionKey = { undo: 'undoCheckout', unlock: 'forceUnlock', save: 'saveDraft' }[b.k] || b.k
@@ -204,7 +155,7 @@ export default function RequirementDetail() {
               title={activeTab === 'compare' ? '变更对比' : '附件 · 访谈纪要'}
               desc={activeTab === 'compare'
                 ? '选择两个历史版本后，可在这里展示字段级差异。当前先完成版本历史只读链路。'
-                : '访谈纪要和附件列表待接入文件服务，当前可先通过 Kimi 解析上传需求文档。'}
+                : '访谈纪要和附件列表待接入文件服务，当前可先进入 AI 评估台上传需求文档。'}
             />
           )}
         </div>
@@ -241,173 +192,6 @@ export default function RequirementDetail() {
         </aside>
       </div>
 
-      {/* D1 — Kimi 解析需求 */}
-      {dialog==='parse'&&(
-        <DlgBack onClose={()=>{setDialog(null);setD1Run(false)}}>
-          <DlgCard title="✦ Kimi 解析需求">
-            <div style={{display:'grid',gap:12}}>
-              <input ref={fileInputRef} type="file" accept=".pdf,.docx,.xlsx,.txt" style={{display:'none'}} onChange={async (e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                setD1File(file)
-                setD1Result(null)
-                setD1Error(null)
-                setD1Run(true)
-                setD1Step(0)
-                try {
-                  const result = await actions.parseFile(file)
-                  setD1Step(D1_STEPS.length - 1)
-                  setD1Run(false)
-                  if (result?.success === false) {
-                    setD1Error(result.error || '解析失败')
-                  } else {
-                    setD1Result(actionData(result))
-                  }
-                } catch (err) {
-                  setD1Run(false)
-                  setD1Error(err?.message || '上传或解析失败，请重试')
-                }
-              }} />
-              {!d1File ? (
-                <div style={{border:'2px dashed var(--line)',borderRadius:12,padding:24,textAlign:'center',cursor:'pointer',background:'var(--bg-soft)'}}
-                  onClick={() => fileInputRef.current?.click()}>
-                  <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>📄 点击上传需求文档</div>
-                  <div style={{fontSize:11,color:'var(--ink-3)'}}>支持 PDF / Word / Excel / TXT，最大 10MB</div>
-                </div>
-              ) : (
-                <div style={{border:'1px solid var(--line)',borderRadius:12,padding:14,background:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10}}>
-                    <span style={{fontSize:20}}>📄</span>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:600}}>{d1File.name}</div>
-                      <div style={{fontSize:11,color:'var(--ink-3)'}}>{(d1File.size / 1024).toFixed(1)} KB</div>
-                    </div>
-                  </div>
-                  {!d1Run && !d1Result && (
-                    <button type="button" className="btn btn-ghost" style={{height:28,fontSize:11,padding:'0 10px'}} onClick={() => { setD1File(null); setD1Error(null); fileInputRef.current.value = '' }}>✕ 重选</button>
-                  )}
-                </div>
-              )}
-              {d1File && d1Run && (
-                <div style={{display:'grid',gap:8}}>
-                  {D1_STEPS.map((s,i)=>(<div key={s} style={{display:'flex',alignItems:'center',gap:10}}>
-                    <span style={{width:22,height:22,borderRadius:'50%',display:'grid',placeItems:'center',fontSize:11,fontWeight:700,background:i<=d1Step?'var(--brand)':'var(--line)',color:i<=d1Step?'#fff':'var(--ink-3)'}}>{i<d1Step?'✓':i+1}</span>
-                    <span style={{fontSize:13,color:i<=d1Step?'var(--ink)':'var(--ink-3)'}}>{s}</span>
-                    {i===d1Step&&<span style={{marginLeft:'auto',fontSize:11,color:'var(--brand)'}}>进行中…</span>}
-                  </div>))}
-                  <div style={{height:6,borderRadius:999,background:'var(--bg-soft)',overflow:'hidden'}}>
-                    <div style={{height:'100%',width:`${((d1Step+1)/D1_STEPS.length)*100}%`,background:'linear-gradient(90deg,var(--brand),oklch(.55 .22 295))',borderRadius:999,transition:'width .4s ease'}}/></div>
-                </div>
-              )}
-              {d1Error && (
-                <div style={{padding:12,borderRadius:8,background:'var(--err-soft)',color:'var(--err)',fontSize:12}}>
-                  ✕ {d1Error}
-                </div>
-              )}
-              {d1Result && !d1Run && (
-                <div style={{padding:12,borderRadius:8,background:'var(--ok-soft)',color:'var(--ok-ink)',fontSize:12}}>
-                  ✓ 解析完成 — 需求基本信息已提取，{parseSourceText(d1Result)}。可关闭窗口后在页面中查看更新
-                </div>
-              )}
-            </div>
-            <DlgAct>
-              <button type="button" className="btn btn-out" style={{height:30,fontSize:12,padding:'0 14px'}} onClick={()=>{setDialog(null);setD1Run(false)}}>{d1Result ? '关闭' : '取消'}</button>
-              {d1Result && <button type="button" className="btn btn-pri" style={{height:30,fontSize:12,padding:'0 14px'}} onClick={()=>{setDialog(null);setAiResult({ type: 'parse', data: d1Result })}}>查看结果</button>}
-            </DlgAct>
-          </DlgCard>
-        </DlgBack>
-      )}
-
-      {/* D2 — Kimi 评估预览 */}
-      {dialog==='preview'&&(
-        <DlgBack onClose={()=>setDialog(null)}>
-          <DlgCard title="✦ Kimi 评估预览" wide>
-            {actionLoading.previewAssessment ? (
-              <div style={{padding:40,textAlign:'center',color:'var(--ink-3)'}}>正在调用 Kimi 评估，请稍候...</div>
-            ) : aiResult?.type === 'preview' ? (
-              <div className="grid-2-eq" style={{gap:14,minHeight:220}}>
-                <div style={{border:'1px solid var(--line)',borderRadius:'var(--r-md)',padding:12,background:'var(--bg-soft)',fontSize:12,lineHeight:1.7,color:'var(--ink-2)'}}>
-                  <b style={{color:'var(--ink)'}}>原文摘要</b><p style={{margin:'8px 0 0'}}>{detail.value || detail.basicFields?.[0]?.value || '暂无'}</p>
-                </div>
-                <div style={{border:'1px solid var(--line)',borderRadius:'var(--r-md)',padding:12,background:'#fff',fontSize:12,overflowY:'auto',maxHeight:300}}>
-                  <b style={{fontSize:12,color:'var(--ink)'}}>API 响应</b>
-                  <pre style={{margin:'8px 0 0',fontSize:11,lineHeight:1.6,whiteSpace:'pre-wrap'}}>{JSON.stringify(aiResult.data, null, 2)}</pre>
-                </div>
-              </div>
-            ) : (
-              <div style={{display:'grid',gap:12,minHeight:220,placeItems:'center'}}>
-                <div style={{textAlign:'center',color:'var(--ink-2)',fontSize:13}}>点击"生成预览"，将当前需求数据发送至 Kimi 进行评估预览。</div>
-              </div>
-            )}
-            <DlgAct>
-              <button type="button" className="btn btn-out" style={{height:30,fontSize:12,padding:'0 14px'}} onClick={()=>{setDialog(null);setAiResult(null)}}>取消</button>
-              <button type="button" className="btn btn-pri" style={{height:30,fontSize:12,padding:'0 14px'}} disabled={actionLoading.previewAssessment} onClick={async () => {
-                const snapshot = {
-                  projectName: detail.project,
-                  customer: detail.customer,
-                  industry: detail.industry,
-                  solution: detail.solution,
-                  scopeRows: detail.scopeRows,
-                }
-                const r = await actions.previewAssessment(snapshot)
-                if (r?.success === false) alert(r.error || '生成失败')
-                else if (r) setAiResult({ type: 'preview', data: actionData(r) })
-              }}>{actionLoading.previewAssessment ? '生成中...' : '生成预览'}</button>
-            </DlgAct>
-          </DlgCard>
-        </DlgBack>
-      )}
-
-      {/* D3 — Kimi 套用模板 */}
-      {dialog==='template'&&(
-        <DlgBack onClose={()=>setDialog(null)}>
-          <DlgCard title="✦ Kimi 套用模板">
-            <div style={{display:'grid',gap:10}}>{TEMPLATES.map(t=>(
-              <div key={t.id} style={{border:'1px solid var(--line)',borderRadius:'var(--r-md)',padding:12,background:'var(--bg-soft)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
-                <div><div style={{fontWeight:600,fontSize:13}}>{t.name}</div><div style={{fontSize:11,color:'var(--ink-3)',marginTop:2}}>{t.desc}</div></div>
-                <button type="button" className="btn btn-pri" style={{height:28,fontSize:12,padding:'0 12px',flexShrink:0}} disabled={actionLoading.applyTemplate} onClick={async () => {
-                  const r = await actions.applyTemplate(t.name)
-                  setDialog(null)
-                  if (r?.success === false) alert(r.error || '套用失败')
-                  else if (r) setAiResult({ type: 'template', data: actionData(r) })
-                }}>{actionLoading.applyTemplate ? '请求中...' : '套用'}</button>
-              </div>
-            ))}</div>
-            <DlgAct><button type="button" className="btn btn-out" style={{height:30,fontSize:12,padding:'0 14px'}} onClick={()=>setDialog(null)}>取消</button></DlgAct>
-          </DlgCard>
-        </DlgBack>
-      )}
-
-      {/* D4 */}
-      {dialog==='ambiguous'&&(
-        <DlgBack onClose={()=>setDialog(null)}>
-          <DlgCard title="✦ Kimi 修复歧义">
-            <div style={{display:'grid',gap:12}}>{D4_ITEMS.map(item=>{
-              const ans=d4Ans[item.id]
-              return <div key={item.id} style={{border:'1px solid var(--line)',borderRadius:'var(--r-md)',padding:12,background:'var(--bg-soft)'}}>
-                <div style={{fontSize:13,fontWeight:600,marginBottom:8}}>{item.text}</div>
-                <div style={{display:'flex',gap:6}}>{[
-                  {k:'A',l:item.a},{k:'B',l:item.b},{k:'skip',l:'跳过'}
-                ].map(opt=><button type="button" key={opt.k} onClick={()=>setD4Ans(p=>({...p,[item.id]:opt.k}))}
-                  style={{flex:1,padding:'6px 0',borderRadius:6,fontSize:12,fontFamily:'inherit',border:'1px solid '+(ans===opt.k?'var(--brand)':'var(--line)'),background:ans===opt.k?'var(--brand-soft)':'#fff',color:ans===opt.k?'var(--brand-ink)':'var(--ink)',cursor:'pointer',fontWeight:ans===opt.k?600:400}}>{opt.l}</button>)}</div>
-              </div>
-            })}</div>
-            <div style={{height:6,borderRadius:999,background:'var(--bg-soft)',overflow:'hidden'}}>
-              <div style={{height:'100%',width:`${(d4Prog/D4_ITEMS.length)*100}%`,background:'linear-gradient(90deg,var(--brand),oklch(.55 .22 295))',borderRadius:999,transition:'width .3s ease'}}/></div>
-            <div style={{fontSize:11,color:'var(--ink-3)',textAlign:'right'}}>已完成 {d4Prog} / {D4_ITEMS.length}</div>
-            <DlgAct>
-              <button type="button" className="btn btn-out" style={{height:30,fontSize:12,padding:'0 14px'}} onClick={()=>setDialog(null)}>取消</button>
-              <button type="button" className="btn btn-pri" style={{height:30,fontSize:12,padding:'0 14px'}} disabled={d4Prog<D4_ITEMS.length || actionLoading.fixAmbiguity} onClick={async () => {
-                  const questions = D4_ITEMS.map(item => ({ id: item.id, text: item.text, answer: d4Ans[item.id] }))
-                  const r = await actions.fixAmbiguity(questions)
-                  setDialog(null)
-                  if (r?.success === false) alert(r.error || '分析失败')
-                  else if (r) setAiResult({ type: 'fixAmbiguity', data: actionData(r) })
-                }}>{actionLoading.fixAmbiguity ? '分析中...' : '全部确认'}</button>
-            </DlgAct>
-          </DlgCard>
-        </DlgBack>
-      )}
       {/* AI Result Modal */}
       {aiResult && (
         <DlgBack onClose={() => setAiResult(null)}>

@@ -8,7 +8,7 @@ import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 
 import { config } from "../config/env";
-import { AuthUser, AuthJwtPayload, UsersStore } from "../types";
+import { AuthUser, AuthJwtPayload, BusinessRole, UsersStore } from "../types";
 import { asString, usersStorePath } from "../utils";
 
 // -------------------- 用户存储操作 --------------------
@@ -17,6 +17,24 @@ function normalizeAuthUserRole(user: AuthUser): AuthUser {
   const r = user.role as string;
   if (r === "admin" || r === "sub_admin" || r === "user") return user;
   return { ...user, role: "user" };
+}
+
+const BUSINESS_ROLES: BusinessRole[] = ["sales", "pre_sales", "delivery", "pm", "pmo", "dev", "admin"];
+
+export function isBusinessRole(value: string): value is BusinessRole {
+  return BUSINESS_ROLES.includes(value as BusinessRole);
+}
+
+export function defaultBusinessRoleForSystemRole(role: AuthUser["role"]): BusinessRole {
+  if (role === "admin") return "admin";
+  if (role === "sub_admin") return "pm";
+  return "pre_sales";
+}
+
+export function resolveBusinessRole(user: Pick<AuthUser, "role" | "businessRole">): BusinessRole {
+  return user.businessRole && isBusinessRole(user.businessRole)
+    ? user.businessRole
+    : defaultBusinessRoleForSystemRole(user.role);
 }
 
 export function loadUsersStore(): UsersStore {
@@ -55,7 +73,8 @@ export function signAuthToken(user: AuthUser): string {
     {
       sub: user.id,
       username: user.username,
-      role: user.role
+      role: user.role,
+      businessRole: resolveBusinessRole(user)
     } satisfies AuthJwtPayload,
     config.jwt.secret,
     { expiresIn, algorithm: JWT_ALGORITHM }
@@ -72,8 +91,12 @@ export function verifyAuthToken(token: string): AuthJwtPayload | null {
     const roleRaw = asString(payload.role);
     const role: AuthUser["role"] =
       roleRaw === "admin" ? "admin" : roleRaw === "sub_admin" ? "sub_admin" : "user";
+    const businessRoleRaw = asString(payload.businessRole);
+    const businessRole = isBusinessRole(businessRoleRaw)
+      ? businessRoleRaw
+      : defaultBusinessRoleForSystemRole(role);
     if (!sub || !username) return null;
-    return { sub, username, role };
+    return { sub, username, role, businessRole };
   } catch {
     return null;
   }
@@ -87,9 +110,9 @@ export function readBearerToken(req: Request): string {
 
 // -------------------- 权限检查 --------------------
 
-export function toPublicUser(user: AuthUser): Omit<AuthUser, "passwordHash"> {
+export function toPublicUser(user: AuthUser): Omit<AuthUser, "passwordHash"> & { businessRole: BusinessRole } {
   const { passwordHash, ...rest } = user;
-  return rest;
+  return { ...rest, businessRole: resolveBusinessRole(user) };
 }
 
 export function isAdminUser(user: AuthUser): boolean {
