@@ -34,6 +34,7 @@ tags:
   - name: Teams
   - name: Wbs
   - name: Agent
+  - name: Harness
   - name: System
   - name: Presales
   - name: Sales
@@ -174,6 +175,262 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+
+  /api/v1/harness/runs:
+    post:
+      tags: [Harness]
+      summary: Create Harness run
+      operationId: createHarnessRun
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                mode:
+                  type: string
+                  enum: [interactive, replay, regression]
+                aiSessionId:
+                  type: string
+      responses:
+        "200":
+          description: Harness run created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+    get:
+      tags: [Harness]
+      summary: List current user's Harness runs
+      operationId: listHarnessRuns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Harness run list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+
+  /api/v1/harness/runs/{runId}:
+    get:
+      tags: [Harness]
+      summary: Get Harness run
+      operationId: getHarnessRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Harness run detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+
+  /api/v1/harness/runs/{runId}/events:
+    get:
+      tags: [Harness]
+      summary: Harness events stream placeholder
+      description: Phase 1A reserves the SSE route; Phase 1B will implement streaming.
+      operationId: getHarnessEvents
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "501":
+          description: Not implemented in Phase 1A
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/harness/runs/{runId}/files:
+    post:
+      tags: [Harness]
+      summary: Bind a file metadata to a Harness run
+      operationId: bindHarnessFile
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [attachmentId, fileName]
+              properties:
+                attachmentId:
+                  type: string
+                fileName:
+                  type: string
+                fileSize:
+                  type: integer
+                mimeType:
+                  type: string
+                fileHash:
+                  type: string
+                storagePath:
+                  type: string
+                role:
+                  type: string
+                roleConfidence:
+                  type: number
+      responses:
+        "200":
+          description: File bound
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+
+  /api/v1/harness/runs/{runId}/answers:
+    post:
+      tags: [Harness]
+      summary: Submit structured answers to a Harness run
+      operationId: submitHarnessAnswers
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                answers:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      field:
+                        type: string
+                      value: {}
+                      source:
+                        type: string
+                        enum: [user_chat, structured_form]
+      responses:
+        "200":
+          description: Answers submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+
+  /api/v1/harness/runs/{runId}/actions/{actionId}/confirm:
+    post:
+      tags: [Harness]
+      summary: Confirm or cancel a Harness action
+      operationId: confirmHarnessAction
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: actionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmed:
+                  type: boolean
+      responses:
+        "200":
+          description: Action confirmation recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+
+  /api/v1/harness/runs/{runId}/retry:
+    post:
+      tags: [Harness]
+      summary: Retry a failed Harness run
+      operationId: retryHarnessRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run retry started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+
+  /api/v1/harness/runs/{runId}/reanalyze:
+    post:
+      tags: [Harness]
+      summary: Force reanalysis of a Harness run
+      operationId: reanalyzeHarnessRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Reanalysis flag set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
 
   /api/v1/templates/import-json:
     post:
@@ -1333,6 +1590,10 @@ paths:
                   type: string
                 password:
                   type: string
+                rememberMe:
+                  type: boolean
+                  default: false
+                  description: 为 true 时签发 7 天 JWT；否则使用服务端默认 JWT_EXPIRES_IN。
       responses:
         "200":
           description: 登录成功
@@ -1342,6 +1603,69 @@ paths:
                 $ref: "#/components/schemas/AuthResponse"
         "401":
           description: 凭证错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/password-reset/request:
+    post:
+      tags: [Auth]
+      summary: 申请密码重置（公开）
+      operationId: requestPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+      responses:
+        "200":
+          description: 已接受申请。为避免枚举用户，不存在或禁用用户也返回 accepted=true；当前文件存储实现会为有效用户返回本地 resetUrl。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordResetRequestResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/password-reset/confirm:
+    post:
+      tags: [Auth]
+      summary: 确认密码重置（公开）
+      operationId: confirmPasswordReset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          description: 重置成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordResetConfirmResponse"
+        "400":
+          description: token 无效、过期或密码不合规
           content:
             application/json:
               schema:
@@ -5448,9 +5772,56 @@ components:
           properties:
             token:
               type: string
+            rememberMe:
+              type: boolean
+            expiresIn:
+              type: string
             user:
               $ref: "#/components/schemas/PublicUser"
           required: [token, user]
+      required: [code, message, data]
+
+    PasswordResetRequestResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            accepted:
+              type: boolean
+            resetToken:
+              type: string
+              description: 当前无邮件服务时返回的一次性 token；未来接 SMTP 后可不向客户端直接暴露。
+            resetUrl:
+              type: string
+            expiresInMinutes:
+              type: integer
+            delivery:
+              type: string
+          required: [accepted, expiresInMinutes]
+      required: [code, message, data]
+
+    PasswordResetConfirmResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            success:
+              type: boolean
+          required: [success]
       required: [code, message, data]
 
     MeResponse:

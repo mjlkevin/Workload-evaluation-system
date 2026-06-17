@@ -25,6 +25,7 @@ import devAssessmentRoutes from "./dev-assessment.routes";
 import changeRoutes from "./change.routes";
 import historyRoutes from "./history.routes";
 import agentRoutes from "./agent.routes";
+import harnessRoutes from "./harness.routes";
 
 import { notFoundHandler } from "../middleware/error-handler";
 
@@ -52,6 +53,7 @@ router.use("/dev-assessments", devAssessmentRoutes);
 router.use("/change", changeRoutes);
 router.use("/history", historyRoutes);
 router.use("/agent", agentRoutes);
+router.use("/harness", harnessRoutes);
 
 /** 未匹配 /api/v1/* 时返回标准 JSON，避免 Express 默认纯文本 404 导致前端误判为「非 JSON」 */
 router.use((req, res) => {

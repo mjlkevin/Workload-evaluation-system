@@ -16,15 +16,15 @@
 
 - **前端**：唯一 Web 主线为 `ui/V2_PROTOTYPE`（Vite + React，Phase B 组件库）；`ui/V0_SAAS` 为 V1 下线范围，不再作为主线交付。禁止恢复 `apps/web`（已删除的 Vue 3 工作台）。
 - **后端**：唯一服务入口 `apps/api`（Express + modules 模式）；新增接口挂 `apps/api/src/routes/*` 并在 `routes/index.ts` 聚合。
-- **持久化**：文件存储 `config/*`（JSON）；修改数据结构需提供迁移兼容或默认值补齐。DB 迁移触发器未满足前不引入数据库作为主路径。
+- **持久化**：传统 WES 记录仍以文件存储 `config/*`（JSON）为主；修改 JSON 数据结构需提供迁移兼容或默认值补齐。Harness 域因审计、统计、权限追溯与模型回放需求明显增加，已触发 DB 迁移条件，作为首个 DB-backed 新业务域接入 PostgreSQL；除已声明的 Harness 域外，DB 迁移触发器未满足前不引入数据库作为其他模块主路径。
 - **Repository 边界**：业务层不可直接依赖 JSON 文件结构（字段路径、文件名、读写细节）。
 
-### DB 迁移触发器（全部未触发）
+### DB 迁移触发器
 
 1. 高频并发写冲突（≥2 次/周需人工修复）
 2. 核心查询 P95 超阈值
 3. 需多实例部署/容器扩容
-4. 审计/统计/权限追溯需求明显增加
+4. 审计/统计/权限追溯需求明显增加（Harness 域已触发）
 
 触发任一条件时，先更新项目计划与迁移方案，再推进数据库接入。
 
@@ -43,11 +43,11 @@
 
 `apps/api/src/modules/` 已完成全部 17 个领域迁移（controller/usecase/repository 三层）：
 
-| 已迁移（17/17） |
+| 已迁移（18/18） |
 |--------|
-| auth, versions, ai, templates, rules, estimates, exports, sessions, system, team, presales, pm-workbench, collab, dev-assessment, change-management, history, sales-briefing |
+| auth, versions, ai, templates, rules, estimates, exports, sessions, system, team, presales, pm-workbench, collab, dev-assessment, change-management, history, sales-briefing, harness |
 
-遗留 `services/*/index.ts` 仅保留为 barrel re-export（向后兼容），实际实现已全部落在 `modules/*`；新代码应直接 import `modules/<域>/<域>.module`。AI 模块（`modules/ai/`）是 facade — 实际实现在 `services/ai/`。所有 repository 当前使用 JSON 文件存储。`src/db/` 已建 PostgreSQL schema 但未接入。
+遗留 `services/*/index.ts` 仅保留为 barrel re-export（向后兼容），实际实现已全部落在 `modules/*`；新代码应直接 import `modules/<域>/<域>.module`。AI 模块（`modules/ai/`）是 facade — 实际实现在 `services/ai/`。除 **harness** 作为新业务域已进入 PostgreSQL 主存储外，其余 repository 当前仍使用 JSON 文件存储。`src/db/` 已建 PostgreSQL schema 并为 Harness 生成迁移。
 
 ## 6. 前端主线现状
 
