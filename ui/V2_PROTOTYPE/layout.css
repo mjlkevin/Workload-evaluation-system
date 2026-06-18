@@ -1,10 +1,10 @@
 @import url('./tokens.css');
 
-.shell{min-height:100vh;display:grid;grid-template-columns:240px minmax(0,1fr);background:var(--bg)}
+.shell{min-height:100vh;display:grid;grid-template-columns:208px minmax(0,1fr);background:var(--bg)}
 
 .sidebar{background:linear-gradient(180deg,#0a1124 0%,#10182f 100%);color:rgba(255,255,255,.78);height:100vh;overflow-y:auto;position:sticky;top:0;display:flex;flex-direction:column;transition:width .2s ease}
 .sidebar.collapsed{width:64px;align-items:center}
-.sidebar .brand{display:flex;align-items:center;gap:10px;padding:18px;color:#fff;font-weight:800;border-bottom:1px solid rgba(255,255,255,.08);position:relative}
+.sidebar .brand{display:flex;align-items:center;gap:10px;padding:18px 14px;color:#fff;font-weight:800;border-bottom:1px solid rgba(255,255,255,.08);position:relative}
 .sidebar.collapsed .brand{justify-content:center;gap:0;padding:18px 0}
 .sidebar.collapsed .brand div:not(.l){display:none}
 .sidebar.collapsed .grp h6{display:none}
@@ -21,15 +21,15 @@
 .sidebar.collapsed .toggle-btn svg{transform:rotate(180deg)}
 .sidebar .brand .l{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--brand),var(--accent));display:grid;place-items:center}
 .sidebar .grp{padding:14px 0 8px}
-.sidebar .grp h6{margin:0;padding:0 18px 8px;font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.4);font-weight:600;text-transform:uppercase}
-.sidebar a{display:flex;align-items:center;gap:10px;padding:8px 18px;color:rgba(255,255,255,.72);text-decoration:none;font-size:12.5px;border-left:2px solid transparent}
+.sidebar .grp h6{margin:0;padding:0 14px 8px;font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.4);font-weight:600;text-transform:uppercase}
+.sidebar a{display:flex;align-items:center;gap:10px;padding:8px 14px;color:rgba(255,255,255,.72);text-decoration:none;font-size:12.5px;border-left:2px solid transparent}
 .sidebar a:hover{background:rgba(255,255,255,.04);color:#fff}
 .sidebar a.on{background:rgba(255,255,255,.06);color:#fff;border-left-color:var(--accent);font-weight:600}
 .sidebar a .ic{display:inline-grid;place-items:center;width:18px;height:18px;font-size:12px;color:rgba(255,255,255,.5);flex-shrink:0}
 .sidebar a:hover .ic,.sidebar a.on .ic{color:rgba(255,255,255,.95)}
 .sidebar a .ct{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:rgba(255,255,255,.4);background:rgba(255,255,255,.06);padding:1px 6px;border-radius:4px}
 
-.sidebar .user{margin-top:auto;padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:12px}
+.sidebar .user{margin-top:auto;padding:14px 12px;border-top:1px solid rgba(255,255,255,.08);font-size:12px}
 .sidebar .user .row{display:flex;align-items:center;gap:10px}
 .sidebar .user .av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--accent));display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px}
 .sidebar .user .account{min-width:0;flex:1}
