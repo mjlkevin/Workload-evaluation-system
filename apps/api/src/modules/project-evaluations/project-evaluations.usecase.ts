@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { AuthUser, VersionRecord } from "../../types";
 import { asString } from "../../utils";
 import type { HarnessRequirementReportV2Content } from "../harness/harness.types";
-import { PROJECT_EVALUATION_RECORD_KIND, listProjectRecords, mapGlobalVersionToProject, saveProjectRecord, saveProjectRecords } from "./project-evaluations.repository";
+import { PROJECT_EVALUATION_RECORD_KIND, findHarnessDraftRecords, listProjectRecords, mapGlobalVersionToProject, saveProjectRecord, saveProjectRecords } from "./project-evaluations.repository";
 import type { ProjectEvaluationDraftBundle, ProjectEvaluationPlan } from "./project-evaluations.types";
 
 export function listProjectEvaluationsForUser(user: AuthUser, query: { q?: unknown } = {}): ProjectEvaluationPlan[] {
@@ -84,6 +84,18 @@ export function createProjectAndAssessmentDraftsFromHarness(
     report: HarnessRequirementReportV2Content;
   },
 ): ProjectEvaluationDraftBundle {
+  const existingDraft = findHarnessDraftRecords(user.id, input.harnessRunId, input.actionId);
+  if (existingDraft) {
+    return {
+      project: mapGlobalVersionToProject(existingDraft.projectRecord),
+      assessmentDraft: {
+        recordId: existingDraft.assessmentRecord.id,
+        versionCode: existingDraft.assessmentRecord.versionCode,
+        status: "draft_from_ai",
+      },
+    };
+  }
+
   const nowIso = new Date().toISOString();
   const report = input.report;
   const project = asRecord(report.project);

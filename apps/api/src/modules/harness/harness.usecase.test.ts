@@ -1010,6 +1010,40 @@ test("project-evaluations: harness draft creation persists project and assessmen
   });
 });
 
+test("project-evaluations: harness draft creation is idempotent by run and action", () => {
+  withFileSnapshotRestore(versionsStorePath(), () => {
+    fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
+    const user = activeHarnessUser();
+    const input = {
+      harnessRunId: "run-idempotent",
+      actionId: "enter_formal_estimation",
+      aiSessionId: "session-idempotent",
+      report: {
+        version: "v2",
+        sourceFile: "需求.xlsx",
+        project: { projectName: "幂等项目", customerName: "幂等客户", industry: "制造业" },
+        sourceSheets: ["需求清单"],
+        requirementFindings: [{ domain: "供应链", scenario: "采购闭环", moduleHint: "供应链云", confidence: 0.9, evidenceRefs: ["需求清单!B12"] }],
+        missingFields: [],
+        clarificationQuestions: [],
+        answeredQuestions: [],
+        risks: [],
+        nextActions: [{ label: "进入正式评估", actionType: "enter_formal_estimation" }],
+        clarificationSummary: "已确认。",
+      },
+    } satisfies Parameters<typeof createProjectAndAssessmentDraftsFromHarness>[1];
+
+    const first = createProjectAndAssessmentDraftsFromHarness(user, input);
+    const second = createProjectAndAssessmentDraftsFromHarness(user, input);
+
+    assert.equal(second.project.projectId, first.project.projectId);
+    assert.equal(second.assessmentDraft.recordId, first.assessmentDraft.recordId);
+    const records = loadVersionsStore().records;
+    assert.equal(records.filter((record) => record.payload?.createdFromHarnessRunId === "run-idempotent").length, 1);
+    assert.equal(records.filter((record) => record.payload?.harnessRunId === "run-idempotent").length, 1);
+  });
+});
+
 test("harness.usecase: repeated formal estimation confirmation returns existing draft result", async () => {
   const repo = makeMemoryHarnessRepo();
   const user = activeHarnessUser();

@@ -44,6 +44,31 @@ export function listProjectRecords(ownerUserId: string): VersionRecord[] {
   return loadVersionsStore().records.filter((record) => isProjectEvaluationRecord(record) && record.ownerUserId === ownerUserId);
 }
 
+export function findHarnessDraftRecords(ownerUserId: string, harnessRunId: string, actionId: string): {
+  projectRecord: VersionRecord;
+  assessmentRecord: VersionRecord;
+} | null {
+  const records = loadVersionsStore().records;
+  const projectRecord = records.find((record) =>
+    isProjectEvaluationRecord(record)
+    && record.ownerUserId === ownerUserId
+    && asString(record.payload?.createdFromHarnessRunId) === harnessRunId
+    && asString(record.payload?.createdFromHarnessActionId) === actionId);
+  if (!projectRecord) return null;
+
+  const assessmentId = asString(projectRecord.payload?.currentAssessmentVersionId);
+  const assessmentRecord = records.find((record) =>
+    record.id === assessmentId
+    && record.type === "assessment"
+    && record.ownerUserId === ownerUserId
+    && asString(record.payload?.draftSource) === "harness"
+    && asString(record.payload?.harnessRunId) === harnessRunId
+    && asString(record.payload?.harnessActionId) === actionId);
+
+  if (!assessmentRecord) throw new Error("harness_draft_link_incomplete");
+  return { projectRecord, assessmentRecord };
+}
+
 export function isProjectEvaluationRecord(record: VersionRecord): boolean {
   return record.type === "global"
     && (
