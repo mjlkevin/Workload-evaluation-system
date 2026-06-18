@@ -21,3 +21,14 @@ export type ProjectEvaluationPlan = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type AiAssessmentDraft = {
+  recordId: string;
+  versionCode: string;
+  status: "draft_from_ai";
+};
+
+export type ProjectEvaluationDraftBundle = {
+  project: ProjectEvaluationPlan;
+  assessmentDraft: AiAssessmentDraft;
+};

@@ -93,7 +93,16 @@ export function loadVersionsStore(): VersionsStore {
 export function saveVersionsStore(store: VersionsStore): void {
   const filePath = versionsStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(store, null, 2), "utf-8");
+  const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    fs.writeFileSync(tempPath, JSON.stringify(store, null, 2), "utf-8");
+    fs.renameSync(tempPath, filePath);
+  } catch (error) {
+    if (fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
+    throw error;
+  }
 }
 
 export function toPublicVersionRecord(record: VersionRecord): VersionRecord {

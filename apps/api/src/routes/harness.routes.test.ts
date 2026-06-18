@@ -9,7 +9,15 @@ import request from "supertest";
 import { createHarnessRouter } from "./harness.routes";
 import { signAuthToken, loadUsersStore, saveUsersStore } from "../middleware/auth";
 import type { HarnessRepository } from "../modules/harness/harness.repository";
-import type { HarnessRunRow } from "../db/schema";
+import type { HarnessFormalEstimationDraftWriter, HarnessModelRunner } from "../modules/harness/harness.usecase";
+import type {
+  HarnessArtifactRow,
+  HarnessEvidenceRow,
+  HarnessFileRow,
+  HarnessModelRunRow,
+  HarnessRunRow,
+  HarnessToolEventRow,
+} from "../db/schema";
 import type { AuthUser } from "../types";
 
 const USERS_JSON = path.resolve(__dirname, "../../../../config/auth/users.json");
@@ -23,15 +31,22 @@ after(() => {
   fs.writeFileSync(USERS_JSON, originalUsersJson);
 });
 
-function makeApp(repo: HarnessRepository) {
+function makeApp(repo: HarnessRepository, extra: { modelRunner?: HarnessModelRunner; formalEstimationDraftWriter?: HarnessFormalEstimationDraftWriter } = {}) {
   const app = express();
   app.use(express.json());
-  app.use("/harness", createHarnessRouter({ repo }));
+  app.use("/harness", createHarnessRouter({ repo, ...extra }));
   return app;
 }
 
 function makeRepo(): HarnessRepository {
   const runs: HarnessRunRow[] = [];
+  const files: HarnessFileRow[] = [];
+  const evidences: HarnessEvidenceRow[] = [];
+  const artifacts: HarnessArtifactRow[] = [];
+  const toolEvents: HarnessToolEventRow[] = [];
+  const modelRuns: HarnessModelRunRow[] = [];
+  const byCreatedAtAsc = <T extends { createdAt: Date }>(items: T[]): T[] =>
+    [...items].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   return {
     async createRun(input) {
       const now = new Date();
@@ -69,14 +84,60 @@ function makeRepo(): HarnessRepository {
       runs[idx] = { ...runs[idx], ...patch, updatedAt: new Date() } as HarnessRunRow;
       return runs[idx];
     },
-    async addFile(input) { return { ...input, harnessFileId: "file-1", createdAt: new Date() } as any; },
-    async listFiles() { return []; },
-    async addArtifact(input) { return { ...input, harnessArtifactId: "artifact-1", createdAt: new Date(), updatedAt: new Date() } as any; },
-    async listArtifacts() { return []; },
-    async addToolEvent(input) { return { ...input, harnessToolEventId: "tool-1", createdAt: new Date() } as any; },
-    async listToolEvents() { return []; },
-    async addModelRun(input) { return { ...input, harnessModelRunId: "model-1", createdAt: new Date() } as any; },
-    async listModelRuns() { return []; },
+    async addFile(input) {
+      const row = { ...input, harnessFileId: `file-${files.length + 1}`, createdAt: new Date() } as HarnessFileRow;
+      files.push(row);
+      return row;
+    },
+    async listFiles(runId) { return byCreatedAtAsc(files.filter((file) => file.harnessRunId === runId)); },
+    async addEvidences(inputs) {
+      const baseIndex = evidences.length;
+      const rows = inputs.map((input, index) => ({
+        harnessEvidenceId: `evidence-${baseIndex + index + 1}`,
+        harnessRunId: input.harnessRunId,
+        harnessFileId: input.harnessFileId ?? null,
+        sourceType: "attachment",
+        sourceId: input.sourceRef,
+        evidenceType: input.evidenceType,
+        businessTags: [],
+        locator: {},
+        textSnapshot: null,
+        tableSnapshot: input.content,
+        parserVersion: "phase1b-v1",
+        fileHash: null,
+        confidence: input.confidence ?? null,
+        metadata: {},
+        createdAt: new Date(),
+      } satisfies HarnessEvidenceRow));
+      evidences.push(...rows);
+      return rows;
+    },
+    async listEvidences(runId) { return byCreatedAtAsc(evidences.filter((evidence) => evidence.harnessRunId === runId)); },
+    async addArtifact(input) {
+      const now = new Date();
+      const row = { ...input, harnessArtifactId: `artifact-${artifacts.length + 1}`, createdAt: now, updatedAt: now } as HarnessArtifactRow;
+      artifacts.push(row);
+      return row;
+    },
+    async listArtifacts(runId) { return byCreatedAtAsc(artifacts.filter((artifact) => artifact.harnessRunId === runId)); },
+    async addToolEvent(input) {
+      const row = { ...input, harnessToolEventId: `tool-${toolEvents.length + 1}`, createdAt: new Date() } as HarnessToolEventRow;
+      toolEvents.push(row);
+      return row;
+    },
+    async updateToolEvent(id, patch) {
+      const idx = toolEvents.findIndex((event) => event.harnessToolEventId === id);
+      if (idx < 0) return null;
+      toolEvents[idx] = { ...toolEvents[idx], ...patch } as HarnessToolEventRow;
+      return toolEvents[idx];
+    },
+    async listToolEvents(runId) { return byCreatedAtAsc(toolEvents.filter((event) => event.harnessRunId === runId)); },
+    async addModelRun(input) {
+      const row = { ...input, harnessModelRunId: `model-${modelRuns.length + 1}`, createdAt: new Date() } as HarnessModelRunRow;
+      modelRuns.push(row);
+      return row;
+    },
+    async listModelRuns(runId) { return byCreatedAtAsc(modelRuns.filter((run) => run.harnessRunId === runId)); },
   };
 }
 
@@ -140,6 +201,208 @@ test("POST /harness/runs/:id/files binds a file and moves run to parsing", async
   assert.equal(res.body.data.file.fileName, "申请.xlsx");
 });
 
+test("POST /harness/runs/:id/parse-result stores evidence and returns detail", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepo();
+  const app = makeApp(repo);
+  await request(app).post("/harness/runs").set("Authorization", `Bearer ${token}`).send({ title: "解析" });
+  const fileRes = await request(app)
+    .post("/harness/runs/run-1/files")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ attachmentId: "att-parse", fileName: "申请.xlsx", fileSize: 100 });
+
+  const res = await request(app)
+    .post("/harness/runs/run-1/parse-result")
+    .set("Authorization", `Bearer ${token}`)
+    .send({
+      fileId: fileRes.body.data.file.harnessFileId,
+      sourceFile: "申请.xlsx",
+      sheets: ["3.业务需求及问题一览表"],
+      items: [{ sourceSheet: "3.业务需求及问题一览表", sourceCell: "B12", text: "自动生成凭证", category: "财务核算" }],
+    });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.code, 0);
+  assert.equal(res.body.data.run.stage, "evidence_ready");
+  assert.equal(res.body.data.evidences.length, 2);
+  assert.equal(res.body.data.artifacts[0].artifactType, "file_understanding");
+});
+
+test("POST /harness/runs/:id/report-v1 generates model-backed report", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepo();
+  const app = makeApp(repo, {
+    modelRunner: async () => ({
+      provider: "kimi",
+      model: "moonshot-v1-128k",
+      content: JSON.stringify({
+        version: "v1",
+        sourceFile: "申请.xlsx",
+        project: { projectName: "哈希温控项目评估", customerName: "哈希温控", industry: "制造业" },
+        sourceSheets: ["3.业务需求及问题一览表"],
+        requirementFindings: [{ domain: "财务核算", scenario: "自动生成凭证", moduleHint: "总账", confidence: 0.8, evidenceRefs: ["3.业务需求及问题一览表!B12"] }],
+        missingFields: [{ field: "规则数量", reason: "文件未明确", priority: "must" }],
+        clarificationQuestions: [{ question: "自动凭证规则多少条？", targetRole: "财务关键用户", reason: "影响评估" }],
+        risks: [{ title: "规则风险", assumption: "规则未锁定", impact: "可能增加人天" }],
+        nextActions: [{ label: "补充项目信息", actionType: "supplement_project_info" }],
+      }),
+    }),
+  });
+  await request(app).post("/harness/runs").set("Authorization", `Bearer ${token}`).send({ title: "报告" });
+  const fileRes = await request(app).post("/harness/runs/run-1/files").set("Authorization", `Bearer ${token}`).send({ attachmentId: "att-report", fileName: "申请.xlsx" });
+  await request(app)
+    .post("/harness/runs/run-1/parse-result")
+    .set("Authorization", `Bearer ${token}`)
+    .send({
+      fileId: fileRes.body.data.file.harnessFileId,
+      sourceFile: "申请.xlsx",
+      items: [{ sourceSheet: "3.业务需求及问题一览表", sourceCell: "B12", text: "自动生成凭证" }],
+    });
+
+  const res = await request(app).post("/harness/runs/run-1/report-v1").set("Authorization", `Bearer ${token}`).send({});
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.run.stage, "report_v1_ready");
+  assert.equal(res.body.data.modelRuns.length, 1);
+  assert.equal(res.body.data.artifacts.at(-1).artifactType, "requirement_report_v1");
+});
+
+test("POST /harness/runs/:id/report-v2 generates v2 report from v1 artifact", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepo();
+  const app = makeApp(repo, {
+    modelRunner: async () => ({
+      provider: "kimi",
+      model: "moonshot-v1-128k",
+      content: JSON.stringify({
+        version: "v2",
+        sourceFile: "申请.xlsx",
+        project: { projectName: "哈希温控项目评估", customerName: "哈希温控", industry: "制造业" },
+        sourceSheets: ["3.业务需求及问题一览表"],
+        requirementFindings: [{ domain: "财务核算", scenario: "自动生成凭证", moduleHint: "总账", confidence: 0.9, evidenceRefs: ["3.业务需求及问题一览表!B12"] }],
+        missingFields: [],
+        clarificationQuestions: [],
+        answeredQuestions: [{ question: "自动凭证规则数量", answer: "10 条", source: "user_chat" }],
+        risks: [{ title: "规则风险", assumption: "规则已锁定", impact: "可控" }],
+        nextActions: [{ label: "进入正式评估", actionType: "enter_formal_estimation" }],
+        clarificationSummary: "已补充规则数量。",
+      }),
+    }),
+  });
+  await request(app).post("/harness/runs").set("Authorization", `Bearer ${token}`).send({ title: "报告" });
+  await repo.updateRun("run-1", { stage: "report_v1_ready", status: "waiting" });
+  await repo.addArtifact({
+    harnessRunId: "run-1",
+    artifactType: "requirement_report_v1",
+    title: "需求解析报告 v1",
+    version: "v1",
+    status: "ready",
+    content: {
+      version: "v1",
+      sourceFile: "申请.xlsx",
+      project: { projectName: "哈希温控项目评估", customerName: "哈希温控", industry: "制造业" },
+      sourceSheets: ["3.业务需求及问题一览表"],
+      requirementFindings: [{ domain: "财务核算", scenario: "自动生成凭证", moduleHint: "总账", confidence: 0.8, evidenceRefs: ["3.业务需求及问题一览表!B12"] }],
+      missingFields: [{ field: "自动凭证规则数量", reason: "文件未明确", priority: "must" }],
+      clarificationQuestions: [{ question: "自动凭证规则多少条？", targetRole: "财务关键用户", reason: "影响评估" }],
+      risks: [{ title: "规则风险", assumption: "规则未锁定", impact: "可能增加人天" }],
+      nextActions: [{ label: "补充项目信息", actionType: "supplement_project_info" }],
+    },
+    evidenceIds: [],
+    modelRunId: null,
+  });
+  await request(app)
+    .post("/harness/runs/run-1/answers")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ answers: [{ field: "自动凭证规则数量", value: "10 条", source: "user_chat" }] });
+
+  const res = await request(app).post("/harness/runs/run-1/report-v2").set("Authorization", `Bearer ${token}`).send({});
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.run.stage, "report_v2_ready");
+  assert.equal(res.body.data.artifacts.at(-1).artifactType, "requirement_report_v2");
+  assert.equal(res.body.data.artifacts.at(-1).content.nextActions[0].actionType, "enter_formal_estimation");
+});
+
+test("POST /harness/runs/:id/report-v2 rejects invalid stage", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepo();
+  const app = makeApp(repo);
+  await request(app).post("/harness/runs").set("Authorization", `Bearer ${token}`).send({ title: "v2 阶段错误" });
+
+  const res = await request(app).post("/harness/runs/run-1/report-v2").set("Authorization", `Bearer ${token}`).send({});
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.code, 40001);
+});
+
+test("POST /harness/runs/:id/actions/:actionId/confirm creates project and assessment draft links", async () => {
+  const user = createTempUser({ role: "admin" });
+  const token = createTokenForUser(user);
+  const repo = makeRepo();
+  const app = makeApp(repo, {
+    formalEstimationDraftWriter: async ({ report }) => ({
+      project: {
+        projectId: "project-route-1",
+        projectName: report.project.projectName,
+        customerName: report.project.customerName,
+        industry: report.project.industry,
+        currentStage: "assessment_draft",
+        status: "draft",
+        ownerUserId: user.id,
+        ownerUsername: user.username,
+        participantUserIds: [],
+        currentAssessmentVersionId: "assessment-route-1",
+        createdFromSessionId: undefined,
+        sourceGlobalVersionRecordId: "project-route-1",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      assessmentDraft: {
+        recordId: "assessment-route-1",
+        versionCode: "IA-AI-DRAFT-ROUTE",
+        status: "draft_from_ai",
+      },
+    }),
+  });
+  await request(app).post("/harness/runs").set("Authorization", `Bearer ${token}`).send({ title: "正式评估草稿" });
+  await repo.updateRun("run-1", { stage: "report_v2_ready", status: "waiting" });
+  await repo.addArtifact({
+    harnessRunId: "run-1",
+    artifactType: "requirement_report_v2",
+    title: "需求解析报告 v2",
+    version: "v2",
+    status: "ready",
+    content: {
+      version: "v2",
+      sourceFile: "申请.xlsx",
+      project: { projectName: "蓝海制造项目", customerName: "蓝海制造", industry: "制造业" },
+      sourceSheets: ["需求清单"],
+      requirementFindings: [{ domain: "供应链", scenario: "采购闭环", moduleHint: "供应链云", confidence: 0.9, evidenceRefs: ["需求清单!B12"] }],
+      missingFields: [],
+      clarificationQuestions: [],
+      answeredQuestions: [{ question: "实施范围", answer: "一期", source: "user_chat" }],
+      risks: [],
+      nextActions: [{ label: "进入正式评估", actionType: "enter_formal_estimation" }],
+      clarificationSummary: "已补充范围。",
+    },
+    evidenceIds: [],
+    modelRunId: null,
+  });
+
+  const res = await request(app)
+    .post("/harness/runs/run-1/actions/enter_formal_estimation/confirm")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ confirmed: true, actionType: "enter_formal_estimation" });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.run.stage, "ready_for_estimation");
+  assert.equal(res.body.data.run.projectEvaluationId, "project-route-1");
+  assert.equal(res.body.data.run.metadata.links.assessmentVersionId, "assessment-route-1");
+  assert.equal(res.body.data.event.output.project.projectId, "project-route-1");
+  assert.equal(res.body.data.event.output.assessmentDraft.status, "draft_from_ai");
+});
+
 test("write endpoints return 404 for non-owner runs", async () => {
   const ownerToken = createTokenForUser(createTempUser({ role: "admin" }));
   const otherToken = createTokenForUser(createTempUser({ role: "admin" }));
@@ -177,6 +440,30 @@ test("write endpoints return 404 for non-owner runs", async () => {
     .set("Authorization", `Bearer ${otherToken}`)
     .send({});
   assert.equal(reanalyze.status, 404);
+
+  const parseResult = await request(app)
+    .post("/harness/runs/run-1/parse-result")
+    .set("Authorization", `Bearer ${otherToken}`)
+    .send({ sourceFile: "私有.xlsx" });
+  assert.equal(parseResult.status, 404);
+
+  const reportV1 = await request(app)
+    .post("/harness/runs/run-1/report-v1")
+    .set("Authorization", `Bearer ${otherToken}`)
+    .send({});
+  assert.equal(reportV1.status, 404);
+
+  const answersV2 = await request(app)
+    .post("/harness/runs/run-1/answers")
+    .set("Authorization", `Bearer ${otherToken}`)
+    .send({ answers: [{ field: "customerName", value: "C", source: "user_chat" }] });
+  assert.equal(answersV2.status, 404);
+
+  const reportV2 = await request(app)
+    .post("/harness/runs/run-1/report-v2")
+    .set("Authorization", `Bearer ${otherToken}`)
+    .send({});
+  assert.equal(reportV2.status, 404);
 });
 
 test("POST /harness/runs/:id/answers rejects invalid stage", async () => {
@@ -209,13 +496,32 @@ test("POST /harness/runs/:id/reanalyze rejects invalid stage", async () => {
   assert.equal(res.body.code, 40001);
 });
 
-test("GET /harness/runs/:id/events reserves SSE contract", async () => {
+test("POST /harness/runs/:id/actions/:actionId/confirm maps terminal stage to 400", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepo();
+  const app = makeApp(repo);
+  await request(app).post("/harness/runs").set("Authorization", `Bearer ${token}`).send({ title: "终态确认" });
+  await repo.updateRun("run-1", { stage: "failed_schema_validation", status: "failed" });
+
+  const res = await request(app)
+    .post("/harness/runs/run-1/actions/action-1/confirm")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ confirmed: true, actionType: "create_project_evaluation" });
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.code, 40001);
+  assert.equal(res.body.details[0].reason, "invalid_stage_for_action_confirmation");
+});
+
+test("GET /harness/runs/:id/events returns SSE snapshot", async () => {
   const token = createTokenForUser(createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo);
   await request(app).post("/harness/runs").set("Authorization", `Bearer ${token}`).send({ title: "事件" });
 
   const res = await request(app).get("/harness/runs/run-1/events").set("Authorization", `Bearer ${token}`);
-  assert.equal(res.status, 501);
-  assert.equal(res.body.code, 50101);
+  assert.equal(res.status, 200);
+  assert.match(res.headers["content-type"], /text\/event-stream/);
+  assert.match(res.text, /event: run_state/);
+  assert.match(res.text, /"stage":"uploaded"/);
 });

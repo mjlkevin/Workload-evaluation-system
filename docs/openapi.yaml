@@ -252,8 +252,8 @@ paths:
   /api/v1/harness/runs/{runId}/events:
     get:
       tags: [Harness]
-      summary: Harness events stream placeholder
-      description: Phase 1A reserves the SSE route; Phase 1B will implement streaming.
+      summary: Get Harness run event snapshot stream
+      description: Returns a minimal text/event-stream snapshot with the current Harness run stage and status.
       operationId: getHarnessEvents
       security:
         - bearerAuth: []
@@ -264,8 +264,14 @@ paths:
           schema:
             type: string
       responses:
-        "501":
-          description: Not implemented in Phase 1A
+        "200":
+          description: Harness event stream snapshot
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          description: Harness run not found
           content:
             application/json:
               schema:
@@ -315,6 +321,164 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GenericOkResponse"
+
+  /api/v1/harness/runs/{runId}/parse-result:
+    post:
+      tags: [Harness]
+      summary: Submit parsed file evidence into Harness
+      operationId: submitHarnessParseResult
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sourceFile]
+              properties:
+                fileId:
+                  type: string
+                sourceFile:
+                  type: string
+                sheets:
+                  type: array
+                  items:
+                    type: string
+                summary:
+                  type: object
+                  properties:
+                    projectName:
+                      type: string
+                    customerName:
+                      type: string
+                    industry:
+                      type: string
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [text]
+                    properties:
+                      sourceSheet:
+                        type: string
+                      sourceCell:
+                        type: string
+                      category:
+                        type: string
+                      text:
+                        type: string
+                      metadata:
+                        type: object
+      responses:
+        "200":
+          description: Parsed evidence accepted; returns Harness run detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "400":
+          description: Invalid Harness stage for parse result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Harness run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/harness/runs/{runId}/report-v1:
+    post:
+      tags: [Harness]
+      summary: Generate Harness requirement report v1 through the configured model
+      operationId: generateHarnessRequirementReportV1
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+      responses:
+        "200":
+          description: Requirement report v1 generated; returns Harness run detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "400":
+          description: Model call failed, schema validation failed, or run is in an invalid stage
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Harness run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/harness/runs/{runId}/report-v2:
+    post:
+      tags: [Harness]
+      summary: Generate Harness requirement report v2 from evidence + v1 + answers
+      operationId: generateHarnessRequirementReportV2
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+      responses:
+        "200":
+          description: Requirement report v2 generated; returns Harness run detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "400":
+          description: Model call failed, schema validation failed, missing v1 report, or run is in an invalid stage
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Harness run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/v1/harness/runs/{runId}/answers:
     post:
@@ -382,9 +546,12 @@ paths:
               properties:
                 confirmed:
                   type: boolean
+                actionType:
+                  type: string
+                  description: Harness confirmable action type. Known confirmed actions require the run to have reached `report_v2_ready`. `enter_formal_estimation` additionally requires the URL `actionId` to equal `enter_formal_estimation`, and creates draft project/assessment records for manual review; it does not publish a formal estimate. Repeating `enter_formal_estimation` for the same `(runId, actionType)`, or another known action for the same `(runId, actionId, actionType)`, is idempotent and returns the existing confirmed ToolEvent.
       responses:
         "200":
-          description: Action confirmation recorded
+          description: Action confirmation recorded. For `enter_formal_estimation`, `data.event.output.project` and `data.event.output.assessmentDraft` contain the created draft links and `data.run.metadata.links.assessmentVersionId` tracks the assessment draft. If draft creation fails, a failed ToolEvent is persisted with errorMessage and the API returns an error.
           content:
             application/json:
               schema:

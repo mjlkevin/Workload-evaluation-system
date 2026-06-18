@@ -229,7 +229,9 @@ Phase 1 关键结构化字段：
 
 ## 传统记录沉淀
 
-进入正式评估后，先创建或关联项目评估记录。项目评估是上层容器，需求记录是后续细化的子产物。
+Phase 1D 中，用户在 v2 报告上确认 `enter_formal_estimation` 后，系统先创建或关联项目评估记录草稿，并同步创建实施评估版本草稿。两者都保持草稿状态：项目评估为 `draft`，实施评估 payload 标记 `draft_from_ai`，需要用户在传统工作台人工确认/编辑后才进入正式评估。
+
+项目评估是上层容器，需求记录是后续细化的子产物。
 
 需求记录草稿生成时机：
 
@@ -582,7 +584,19 @@ Phase 1C：澄清补充 + 报告 v2 + 项目评估确认
 - 报告 v2
 - 创建/关联项目评估确认动作
 
-Phase 1D：Regression CLI
+Phase 1D：Harness confirm → 传统项目/评估草稿
+
+- `enter_formal_estimation` 仅允许从 `report_v2_ready` 确认
+- URL `actionId` 必须与 body `actionType` 一致，均为 `enter_formal_estimation`
+- 创建项目评估草稿与实施评估版本草稿
+- 两条传统草稿记录通过一次版本库变更提交，`saveVersionsStore` 使用同目录临时文件 + rename 写入
+- ToolEvent output 与 Harness Run metadata 记录草稿 ID，保证追溯
+- 同一 `(runId, actionType)` 重复确认保持幂等，不重复创建草稿
+- 其他已知 confirmed 动作至少需要达到 `report_v2_ready`，并按 `(runId, actionId, actionType)` 幂等记录 ToolEvent
+- 草稿创建异常时写入 failed ToolEvent，保留 errorMessage 供审计与重试判断
+- 不自动发布正式评估，不自动创建正式需求记录
+
+Phase 1E：Regression CLI
 
 - 样本目录
 - expected.json

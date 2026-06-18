@@ -59,3 +59,13 @@ export function saveProjectRecord(record: VersionRecord): void {
   else store.records.push(record);
   saveVersionsStore(store);
 }
+
+export function saveProjectRecords(records: VersionRecord[]): void {
+  const store = loadVersionsStore();
+  for (const record of records) {
+    const index = store.records.findIndex((item) => item.id === record.id);
+    if (index >= 0) store.records[index] = record;
+    else store.records.push(record);
+  }
+  saveVersionsStore(store);
+}

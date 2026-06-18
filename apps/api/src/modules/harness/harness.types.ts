@@ -72,6 +72,124 @@ export type HarnessAnswerInput = {
   source: "user_chat" | "structured_form";
 };
 
+export type HarnessParsedFileItemInput = {
+  sourceSheet?: string;
+  sourceCell?: string;
+  category?: string;
+  text: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type HarnessParsedFileInput = {
+  fileId?: string;
+  sourceFile: string;
+  sheets?: string[];
+  summary?: {
+    projectName?: string;
+    customerName?: string;
+    industry?: string;
+    [key: string]: unknown;
+  };
+  items?: HarnessParsedFileItemInput[];
+};
+
+export type HarnessEvidenceInput = {
+  harnessRunId: string;
+  harnessFileId?: string | null;
+  evidenceType: HarnessEvidenceType;
+  sourceRef: string;
+  content: Record<string, unknown>;
+  confidence?: number | null;
+};
+
+export type HarnessFileUnderstandingContent = {
+  version: "v1";
+  sourceFile: string;
+  sourceSheets: string[];
+  project: { projectName: string; customerName: string; industry: string };
+  extractedItemCount: number;
+};
+
+export type HarnessRequirementReportV1Content = {
+  version: "v1";
+  sourceFile: string;
+  project: {
+    projectName: string;
+    customerName: string;
+    industry: string;
+  };
+  sourceSheets: string[];
+  requirementFindings: Array<{
+    domain: string;
+    scenario: string;
+    moduleHint: string;
+    confidence: number;
+    evidenceRefs: string[];
+  }>;
+  missingFields: Array<{
+    field: string;
+    reason: string;
+    priority: "must" | "should" | "could";
+  }>;
+  clarificationQuestions: Array<{
+    question: string;
+    targetRole: string;
+    reason: string;
+  }>;
+  risks: Array<{
+    title: string;
+    assumption: string;
+    impact: string;
+  }>;
+  nextActions: Array<{
+    label: string;
+    actionType: string;
+  }>;
+};
+
+export type HarnessRequirementReportV2Content = {
+  version: "v2";
+  sourceFile: string;
+  project: {
+    projectName: string;
+    customerName: string;
+    industry: string;
+  };
+  sourceSheets: string[];
+  requirementFindings: Array<{
+    domain: string;
+    scenario: string;
+    moduleHint: string;
+    confidence: number;
+    evidenceRefs: string[];
+  }>;
+  missingFields: Array<{
+    field: string;
+    reason: string;
+    priority: "must" | "should" | "could";
+  }>;
+  clarificationQuestions: Array<{
+    question: string;
+    targetRole: string;
+    reason: string;
+  }>;
+  answeredQuestions: Array<{
+    question: string;
+    answer: unknown;
+    source?: string;
+  }>;
+  risks: Array<{
+    title: string;
+    assumption: string;
+    impact: string;
+  }>;
+  nextActions: Array<{
+    label: string;
+    actionType: string;
+  }>;
+  clarificationSummary: string;
+};
+
 export type HarnessConfirmableActionType =
   | "create_project_evaluation"
   | "link_project_evaluation"
