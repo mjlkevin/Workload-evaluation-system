@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useAuth } from "@/hooks/use-auth"
+import { ResourceCostAssessmentCharts } from "@/components/workload/resource-cost-assessment-charts"
 import {
   checkinVersionById,
   checkoutVersionById,
@@ -17,11 +18,14 @@ import {
   forceUnlockById,
   getDashboardPlans,
   listModuleVersions,
+  type EstimateResult,
   type ModuleVersionRecord,
   promoteVersionById,
+  saveCheckedOutVersionDraft,
   undoCheckoutById,
 } from "@/lib/workload-service"
 import { toast } from "sonner"
+import { createClientRowId } from "@/lib/utils"
 
 type ResourceRow = {
   id: string
@@ -40,7 +44,7 @@ type ResourceRow = {
 
 function createEmptyRow(monthCount: number): ResourceRow {
   return {
-    id: crypto.randomUUID(),
+    id: createClientRowId(),
     role: "实施顾问",
     name: "",
     unitCost: 0,
@@ -85,6 +89,8 @@ export default function ResourceCostPage() {
   const [currentVersionCode, setCurrentVersionCode] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [linkedAssessmentEstimate, setLinkedAssessmentEstimate] = useState<EstimateResult | null>(null)
+  const [linkedAssessmentLoading, setLinkedAssessmentLoading] = useState(false)
   const selectedVersionRecord = useMemo(
     () => versionRecords.find((x) => x.versionCode === currentVersionCode),
     [versionRecords, currentVersionCode],
@@ -169,6 +175,33 @@ export default function ResourceCostPage() {
     )
   }, [monthCount])
 
+  useEffect(() => {
+    const code = linkedAssessmentVersionCode.trim()
+    if (!code) {
+      setLinkedAssessmentEstimate(null)
+      setLinkedAssessmentLoading(false)
+      return
+    }
+    let cancelled = false
+    setLinkedAssessmentLoading(true)
+    void (async () => {
+      try {
+        const records = await listModuleVersions("assessment")
+        if (cancelled) return
+        const target = records.find((x) => x.versionCode === code)
+        const sr = (target?.payload?.serverResult as EstimateResult | undefined) || null
+        setLinkedAssessmentEstimate(sr)
+      } catch {
+        if (!cancelled) setLinkedAssessmentEstimate(null)
+      } finally {
+        if (!cancelled) setLinkedAssessmentLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [linkedAssessmentVersionCode])
+
   const monthColumns = useMemo(() => {
     const now = new Date()
     return Array.from({ length: monthCount }, (_, idx) => {
@@ -192,6 +225,33 @@ export default function ResourceCostPage() {
     [rows, includeTravel],
   )
   const totalDays = useMemo(() => rows.reduce((sum, x) => sum + Number(x.plannedDays || 0), 0), [rows])
+
+  const costByRolePie = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const row of rows) {
+      const key = row.role.trim() || "未填角色"
+      const travel = includeTravel
+        ? row.trafficCount * row.trafficUnitCost + row.stayDays * row.stayUnitCost + row.allowanceDays * row.allowanceUnitCost
+        : 0
+      const sub = row.unitCost * row.plannedDays + travel
+      map.set(key, (map.get(key) || 0) + sub)
+    }
+    return [...map.entries()].map(([name, value]) => ({ name, value })).filter((x) => x.value > 0)
+  }, [rows, includeTravel])
+
+  const costByNamePie = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const row of rows) {
+      const key = row.name.trim() || "未填姓名"
+      const travel = includeTravel
+        ? row.trafficCount * row.trafficUnitCost + row.stayDays * row.stayUnitCost + row.allowanceDays * row.allowanceUnitCost
+        : 0
+      const sub = row.unitCost * row.plannedDays + travel
+      map.set(key, (map.get(key) || 0) + sub)
+    }
+    return [...map.entries()].map(([name, value]) => ({ name, value })).filter((x) => x.value > 0)
+  }, [rows, includeTravel])
+
   const monthTotals = useMemo(() => {
     return Array.from({ length: monthCount }, (_, idx) => rows.reduce((sum, row) => sum + Number(row.monthDays[idx] || 0), 0))
   }, [rows, monthCount])
@@ -203,7 +263,7 @@ export default function ResourceCostPage() {
     if (nextSelected) setCurrentVersionCode(nextSelected)
   }
 
-  function currentPayload() {
+  function currentPayload(checkinNote?: string) {
     return {
       globalVersionCode,
       selectedEstimateVersionCode: linkedAssessmentVersionCode,
@@ -212,6 +272,7 @@ export default function ResourceCostPage() {
       rows,
       totalDays,
       totalCost,
+      ...(checkinNote ? { checkinNote } : {}),
     }
   }
 
@@ -230,10 +291,10 @@ export default function ResourceCostPage() {
     }
   }
 
-  async function onCheckin() {
+  async function onCheckin(checkinNote: string) {
     if (!selectedVersionRecord) return
     try {
-      const data = await checkinVersionById(selectedVersionRecord.id, currentPayload())
+      const data = await checkinVersionById(selectedVersionRecord.id, currentPayload(checkinNote))
       await reloadVersions(data.versionCode || selectedVersionRecord.versionCode)
       showGlobalNotice(`检入成功：${data.versionCode}`)
       setDirty(false)
@@ -298,7 +359,7 @@ export default function ResourceCostPage() {
         nextRows.length
           ? nextRows.map((x) => ({
               ...x,
-              id: x.id || crypto.randomUUID(),
+              id: x.id || createClientRowId(),
               monthDays: Array.from({ length: nextMonthCount }, (_, i) => Number(x.monthDays?.[i] || 0)),
             }))
           : [createEmptyRow(nextMonthCount)],
@@ -324,21 +385,25 @@ export default function ResourceCostPage() {
     setSaving(true)
     setError("")
     try {
-      const created = await createModuleVersion(
-        "resource",
-        {
-          globalVersionCode,
-          selectedEstimateVersionCode: linkedAssessmentVersionCode,
-          includeTravel,
-          monthCount,
-          rows,
-          totalDays,
-          totalCost,
-        },
-        "RS",
-      )
-      await reloadVersions(created.versionCode)
-      showGlobalNotice(`已保存资源成本版本：${created.versionCode}`)
+      const draftPayload = {
+        globalVersionCode,
+        selectedEstimateVersionCode: linkedAssessmentVersionCode,
+        includeTravel,
+        monthCount,
+        rows,
+        totalDays,
+        totalCost,
+      }
+      const co = selectedVersionRecord
+      if (co?.checkoutStatus === "checked_out" && co.id) {
+        await saveCheckedOutVersionDraft(co.id, draftPayload)
+        await reloadVersions(co.versionCode)
+        showGlobalNotice(`已保存修改（仍为检出）：${co.versionCode}`)
+      } else {
+        const created = await createModuleVersion("resource", draftPayload, "RS")
+        await reloadVersions(created.versionCode)
+        showGlobalNotice(`已保存资源成本版本：${created.versionCode}`)
+      }
       setDirty(false)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "保存失败"
@@ -376,14 +441,13 @@ export default function ResourceCostPage() {
   }
 
   return (
-    <ModuleShell
-      title="资源人天及成本"
-      description="资源行编辑、月度分配、差旅核算、版本保存与导出。"
-      breadcrumbs={[{ label: "资源人天及成本" }]}
-    >
-      <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+    <ModuleShell title="资源人天及成本" breadcrumbs={[{ label: "资源人天及成本" }]}>
+      <Card
+        collapsible={false}
+        className="border-0 bg-transparent py-0 shadow-none backdrop-blur-none rounded-none"
+      >
         <CardHeader className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-3">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">总方案版本号</p>
               <select
@@ -429,27 +493,8 @@ export default function ResourceCostPage() {
                 ))}
               </select>
             </div>
-            <div className="flex items-end gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={() => setMonthCount((x) => x + 1)}>
-                增加投入月
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => setMonthCount((x) => Math.max(1, x - 1))}
-                disabled={monthCount <= 1}
-              >
-                减少投入月
-              </Button>
-            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="rounded-xl" onClick={() => setIncludeTravel((v) => !v)}>
-              {includeTravel ? "不含差旅" : "含差旅"}
-            </Button>
-            <Button variant="outline" className="rounded-xl" onClick={() => setRows((x) => [...x, createEmptyRow(monthCount)])}>
-              新增行
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
             <Button className="rounded-xl" onClick={() => void onSave()} disabled={saving}>
               {saving ? "保存中..." : "保存版本"}
             </Button>
@@ -466,14 +511,14 @@ export default function ResourceCostPage() {
               }
               onVersionHistory={() => setVersionHistoryOpen(true)}
               onCheckout={() => void onCheckout()}
-              onCheckin={() => void onCheckin()}
+              onCheckin={(checkinNote) => void onCheckin(checkinNote)}
               onUndoCheckout={() => void onUndoCheckout()}
               onPromote={() => void onPromote()}
               onForceUnlock={() => void onForceUnlock()}
               forceUnlockVisible={isAdmin}
             />
             <Button className="rounded-xl" variant="outline" onClick={onExportCsv}>
-              导出成本清单
+              导出
             </Button>
             {error ? <span className="text-xs text-destructive">{error}</span> : null}
           </div>
@@ -481,9 +526,47 @@ export default function ResourceCostPage() {
             <p className="text-xs text-muted-foreground">当前版本为只读状态，请先检出后编辑。</p>
           ) : null}
         </CardHeader>
-        <CardHeader className="pb-3">
+        <div className="px-6">
+          <ResourceCostAssessmentCharts
+            estimate={linkedAssessmentEstimate}
+            loading={linkedAssessmentLoading}
+            assignedPlannedDays={totalDays}
+            costByRole={costByRolePie}
+            costByName={costByNamePie}
+          />
+        </div>
+        <CardHeader className="space-y-3 pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">资源成本明细</CardTitle>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              disabled={isReadonly}
+              onClick={() => setMonthCount((x) => x + 1)}
+            >
+              增加投入月
+            </Button>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setMonthCount((x) => Math.max(1, x - 1))}
+              disabled={isReadonly || monthCount <= 1}
+            >
+              减少投入月
+            </Button>
+            <Button variant="outline" className="rounded-xl" disabled={isReadonly} onClick={() => setIncludeTravel((v) => !v)}>
+              {includeTravel ? "不含差旅" : "含差旅"}
+            </Button>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              disabled={isReadonly}
+              onClick={() => setRows((x) => [...x, createEmptyRow(monthCount)])}
+            >
+              新增行
+            </Button>
           </div>
         </CardHeader>
         <fieldset disabled={isReadonly}>

@@ -79,7 +79,7 @@ export type TeamPlanBinding = {
 export type UserItem = {
   id: string
   username: string
-  role: "admin" | "user"
+  role: "admin" | "sub_admin" | "user"
   status: "active" | "disabled"
   lastLoginAt: string
 }

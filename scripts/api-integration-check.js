@@ -1,4 +1,4 @@
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const jwt = require("jsonwebtoken");
@@ -79,9 +79,10 @@ function buildAuthContext(projectRoot) {
 }
 
 async function waitForServerReady(baseUrl, maxRetry = 40) {
+  // W5-D 之后 /health 移到根路径（无 /api/v1 前缀），方便 LB/Docker 探活
   for (let i = 0; i < maxRetry; i += 1) {
     try {
-      const { status } = await requestJson(`${baseUrl}/api/v1/health`);
+      const { status } = await requestJson(`${baseUrl}/health`);
       if (status === 200) {
         return;
       }
@@ -91,6 +92,23 @@ async function waitForServerReady(baseUrl, maxRetry = 40) {
     await sleep(500);
   }
   throw new Error("api_server_not_ready");
+}
+
+function stopProcessTree(child) {
+  if (!child || !child.pid) return;
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch (_err) {
+    try {
+      child.kill("SIGTERM");
+    } catch (_killErr) {
+      // Best-effort cleanup for integration subprocesses.
+    }
+  }
 }
 
 async function run() {
@@ -104,6 +122,7 @@ async function run() {
   const baseUrl = `http://localhost:${port}`;
   const apiProcess = spawn("npm", ["run", "dev:api"], {
     env: { ...process.env, PORT: String(port) },
+    detached: process.platform !== "win32",
     stdio: ["ignore", "pipe", "pipe"]
   });
 
@@ -117,9 +136,9 @@ async function run() {
   try {
     await waitForServerReady(baseUrl);
 
-    const health = await requestJson(`${baseUrl}/api/v1/health`);
+    const health = await requestJson(`${baseUrl}/health`);
     assert(health.status === 200, "health_status_not_200");
-    assert(health.body.code === 0, "health_code_not_0");
+    assert(health.body.status === "ok", "health_status_not_ok");
 
     const templates = await requestJson(`${baseUrl}/api/v1/templates`, {
       headers: authHeaders
@@ -238,7 +257,7 @@ async function run() {
       )
     );
   } finally {
-    apiProcess.kill("SIGTERM");
+    stopProcessTree(apiProcess);
     await sleep(300);
   }
 }

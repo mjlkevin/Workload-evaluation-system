@@ -1,18 +1,25 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { ModuleShell } from "@/components/workload/module-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { closeReviewById, createReviewForVersion, getReviewItems, getTeamPlanOptions } from "@/lib/workload-service"
+import { closeReviewById, createReviewForVersion, getActiveTeamId, getReviewItems, getTeamPlanOptions, listUserTeams, setActiveTeamId } from "@/lib/workload-service"
 import type { ReviewItem } from "@/lib/workload-types"
 
+type TeamSummary = { teamId: string; name: string }
+
 export default function ReviewPage() {
+  const router = useRouter()
   const [rows, setRows] = useState<ReviewItem[]>([])
   const [globalVersionCode, setGlobalVersionCode] = useState("")
+  const [teams, setTeams] = useState<TeamSummary[]>([])
+  const [activeTeamId, setActiveTeamIdState] = useState("")
   const [creating, setCreating] = useState(false)
   const [closingReviewId, setClosingReviewId] = useState("")
   const [message, setMessage] = useState("")
@@ -27,12 +34,24 @@ export default function ReviewPage() {
       if (!items.length) return
       setGlobalVersionCode((prev) => prev || items[0].globalVersionCode)
     })
+    void listUserTeams().then((loadedTeams) => {
+      const mapped = loadedTeams.map((t) => ({ teamId: t.teamId, name: t.name }))
+      setTeams(mapped)
+      const stored = getActiveTeamId()
+      const matched = mapped.find((t) => t.teamId === stored)
+      setActiveTeamIdState(matched?.teamId || (mapped[0]?.teamId || ""))
+    })
   }, [])
 
   async function onCreateReview() {
+    if (!activeTeamId) {
+      setMessage("请先选择团队")
+      return
+    }
     setCreating(true)
     setMessage("")
     try {
+      setActiveTeamId(activeTeamId)
       await createReviewForVersion(globalVersionCode)
       setMessage(`已发起评审：${globalVersionCode}`)
       loadRows()
@@ -64,12 +83,24 @@ export default function ReviewPage() {
         <CardHeader className="pb-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base">评审记录</CardTitle>
-            <div className="flex w-full gap-2 sm:w-auto">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              {teams.length > 0 && (
+                <Select value={activeTeamId} onValueChange={(v) => { setActiveTeamIdState(v); setActiveTeamId(v) }}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="选择团队" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((t) => (
+                      <SelectItem key={t.teamId} value={t.teamId}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Input
                 value={globalVersionCode}
                 onChange={(e) => setGlobalVersionCode(e.target.value)}
                 placeholder="输入总方案版本号，例如 GLOBAL-20260330-1412"
-                className="sm:w-96"
+                className="sm:w-80"
               />
               <Button className="rounded-xl" onClick={onCreateReview} disabled={creating}>
                 {creating ? "提交中..." : "发起评审"}
@@ -95,7 +126,11 @@ export default function ReviewPage() {
             </TableHeader>
             <TableBody>
               {rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => router.push(`/dashboard/review/${row.id}`)}
+                >
                   <TableCell className="font-medium">{row.versionCode}</TableCell>
                   <TableCell>{row.reviewer}</TableCell>
                   <TableCell>
@@ -109,7 +144,10 @@ export default function ReviewPage() {
                       size="sm"
                       variant="outline"
                       disabled={row.status === "通过" || !row.reviewId || closingReviewId === row.reviewId}
-                      onClick={() => onCloseReview(row)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onCloseReview(row)
+                      }}
                     >
                       {closingReviewId === row.reviewId ? "处理中..." : row.status === "通过" ? "已通过" : "通过"}
                     </Button>

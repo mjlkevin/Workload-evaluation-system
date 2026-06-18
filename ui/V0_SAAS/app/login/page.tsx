@@ -33,6 +33,7 @@ export default function LoginPage() {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    e.stopPropagation()
     setError("")
     try {
       if (isRegister) {
@@ -40,6 +41,7 @@ export default function LoginPage() {
       } else {
         await login(username.trim(), password)
       }
+      // 登录成功后立刻跳转；useAuth 已避免陈旧 /me 清掉新 token，可与下方 effect 并存
       router.replace(nextPath)
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败，请稍后重试")
@@ -62,7 +64,7 @@ export default function LoginPage() {
           ) : null}
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={onSubmit}>
+          <form className="space-y-4" method="post" onSubmit={onSubmit}>
             <div className="space-y-2">
               <Label htmlFor="username">用户名</Label>
               <Input
@@ -104,6 +106,7 @@ export default function LoginPage() {
             </Button>
           </form>
           <Button
+            type="button"
             variant="link"
             className="mt-2 w-full"
             disabled={loading}

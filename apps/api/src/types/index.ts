@@ -65,6 +65,8 @@ export type CalculateRequest = {
   orgCount: number;
   orgSimilarityFactor: number;
   selectedSheet?: string;
+  /** 实施评估工作台当前选中的云产品；导出 Excel 时仅输出这些云产品下已勾选的行（不传或空数组则不按云产品过滤） */
+  selectedCloudNames?: string[];
   exportProjectName?: string;
   exportAssessmentVersionCode?: string;
   items: Array<{
@@ -104,8 +106,10 @@ export type EstimateResult = {
 
 export type BasicProjectInfo = {
   customerName: string;
+  location: string;
   projectName: string;
   opportunityNo: string;
+  productLines?: string[];
   customerIndustry: string;
   enterpriseRevenue: string;
   itStatus: string;
@@ -187,13 +191,25 @@ export type AuthUser = {
   id: string;
   username: string;
   passwordHash: string;
-  role: "admin" | "user";
+  /** admin：全权限；sub_admin：用户管理（不可动超级管理员/不可授 admin）；user：普通 */
+  role: "admin" | "sub_admin" | "user";
+  /** 业务身份：驱动首页 AI 提示词与工作流，不参与系统权限放行 */
+  businessRole?: BusinessRole;
   status: "active" | "disabled";
   createdAt: string;
   lastLoginAt: string;
 };
 
 export type PublicUser = Omit<AuthUser, "passwordHash">;
+
+export type BusinessRole =
+  | "sales"
+  | "pre_sales"
+  | "delivery"
+  | "pm"
+  | "pmo"
+  | "dev"
+  | "admin";
 
 export type UsersStore = {
   users: AuthUser[];
@@ -212,10 +228,26 @@ export type InviteCodesStore = {
   codes: InviteCodeRecord[];
 };
 
+export type PasswordResetTokenRecord = {
+  id: string;
+  userId: string;
+  username: string;
+  tokenHash: string;
+  status: "active" | "used";
+  createdAt: string;
+  expiresAt: string;
+  usedAt?: string;
+};
+
+export type PasswordResetTokensStore = {
+  tokens: PasswordResetTokenRecord[];
+};
+
 export type AuthJwtPayload = {
   sub: string;
   username: string;
   role: AuthUser["role"];
+  businessRole: BusinessRole;
 };
 
 // -------------------- 版本管理相关 --------------------
@@ -241,6 +273,9 @@ export type VersionRecord = {
   updatedAt: string;
   createdByUserId: string;
   createdByUsername: string;
+  /** 最近一次写入该版本记录的用户（新建时与创建人相同） */
+  updatedByUserId: string;
+  updatedByUsername: string;
   reviewedAt?: string;
   reviewedByUserId?: string;
   // --- 检入检出字段 ---
@@ -299,6 +334,107 @@ export type VersionCodeRule = {
 
 export type VersionCodeRulesStore = {
   rules: VersionCodeRule[];
+};
+
+// -------------------- 系统管理：需求模块配置 --------------------
+
+export type RequirementKimiEvaluationConfig = {
+  enabled: boolean;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  timeoutMs: number;
+  fallbackToRule: boolean;
+  promptProfile: string;
+  promptTemplate: string;
+};
+
+export type RequirementFileParsingConfig = {
+  enabled: boolean;
+  /** Excel/需求智能解析（parse-basic-info）使用的 Kimi 模型标识 */
+  model: string;
+  allowedExtensions: string[];
+  maxFileSizeMb: number;
+  maxSheetCount: number;
+  strictMode: boolean;
+  ocrEnabled: boolean;
+};
+
+export type RequirementKimiGenerationConfig = {
+  enabled: boolean;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  outputStyle: "concise" | "balanced" | "detailed";
+  includeRiskHints: boolean;
+  includeAssumptions: boolean;
+};
+
+/** 需求模块 KIMI 调用密钥；非空时优先于环境变量 KIMI_API_KEY */
+export type RequirementKimiCredentialsConfig = {
+  apiKey: string;
+};
+
+export type RequirementSystemConfig = {
+  kimiEvaluation: RequirementKimiEvaluationConfig;
+  fileParsing: RequirementFileParsingConfig;
+  kimiGeneration: RequirementKimiGenerationConfig;
+  kimiCredentials: RequirementKimiCredentialsConfig;
+};
+
+/** 返回给前端的密钥展示（永不下发明文） */
+export type RequirementKimiCredentialsPublic = {
+  apiKey: "";
+  hint: string | null;
+  envFallbackAvailable: boolean;
+  resolvedFrom: "store" | "env" | "none";
+};
+
+export type RequirementSystemConfigPublic = Omit<RequirementSystemConfig, "kimiCredentials"> & {
+  kimiCredentials: RequirementKimiCredentialsPublic;
+};
+
+export type RequirementSystemConfigStore = {
+  version: number;
+  draft: RequirementSystemConfig;
+  active: RequirementSystemConfig;
+  updatedAt: string;
+  effectiveAt: string;
+};
+
+// -------------------- 系统管理：实施评估-依赖规则 --------------------
+
+export type ImplementationDependencyRuleScope = "feature" | "scenario" | "data_source";
+
+export type ImplementationDependencyRuleLogic = "requires_all" | "requires_any" | "combo";
+
+export type ImplementationDependencyRuleItem = {
+  id: string;
+  subject: string;
+  scope: ImplementationDependencyRuleScope;
+  logic: ImplementationDependencyRuleLogic;
+  trigger: string;
+  dependencies: string[];
+  anyOfGroups?: string[][];
+  comboDependencies?: string[];
+  note?: string;
+  enabled: boolean;
+};
+
+export type ImplementationDependencyRulesConfig = {
+  schemaVersion: string;
+  source: string;
+  updatedFrom: string;
+  mutualExclusionRules: Array<{ left: string; right: string; reason: string }>;
+  rules: ImplementationDependencyRuleItem[];
+};
+
+export type ImplementationDependencyRulesStore = {
+  version: number;
+  draft: ImplementationDependencyRulesConfig;
+  active: ImplementationDependencyRulesConfig;
+  updatedAt: string;
+  effectiveAt: string;
 };
 
 // -------------------- 会话与幂等 --------------------
@@ -372,6 +508,16 @@ export function migrateVersionRecord(record: VersionRecord): VersionRecord {
   }
   if (record.isHistoricalArchive === undefined) {
     record.isHistoricalArchive = false;
+  }
+  if (!record.createdByUserId) {
+    record.createdByUserId = record.ownerUserId;
+  }
+  if (!record.createdByUsername) {
+    record.createdByUsername = "—";
+  }
+  if (!record.updatedByUserId) {
+    record.updatedByUserId = record.createdByUserId;
+    record.updatedByUsername = record.createdByUsername;
   }
   return record;
 }

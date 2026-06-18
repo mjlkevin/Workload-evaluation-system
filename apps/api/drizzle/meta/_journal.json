@@ -1,0 +1,90 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1777022310865,
+      "tag": "0000_spooky_vulcan",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777092431168,
+      "tag": "0001_furry_gambit",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777101990236,
+      "tag": "0002_shocking_inertia",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777104745714,
+      "tag": "0003_steep_red_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777112252699,
+      "tag": "0004_pink_spirit",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777112922120,
+      "tag": "0005_eminent_serpent_society",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777134031417,
+      "tag": "0006_rich_morg",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777186345565,
+      "tag": "0007_parallel_earthquake",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777206073889,
+      "tag": "0008_furry_ben_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777209337935,
+      "tag": "0009_add_fks",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777276410238,
+      "tag": "0010_dark_miek",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1781664495170,
+      "tag": "0011_fearless_brother_voodoo",
+      "breakpoints": true
+    }
+  ]
+}

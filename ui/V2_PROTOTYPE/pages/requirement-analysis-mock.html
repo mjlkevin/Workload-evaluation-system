@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 对话式需求评估台 Mock</title>
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  body{overflow:hidden}
+  .content{height:100vh;min-height:0;background:var(--bg)}
+  .topbar{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 24px;flex-shrink:0}
+  .topbar .crumb{font-size:12px;color:var(--ink-3);font-family:var(--font-sans)}
+  .topbar h1{margin:3px 0 0;font-size:20px;line-height:1.15;font-weight:850}
+  .topbar .actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .workbench{height:calc(100vh - 72px);display:grid;grid-template-columns:260px minmax(0,1fr) 340px;min-height:0}
+  .left-panel,.right-panel{background:#fff;border-right:1px solid var(--line);min-height:0;overflow:auto}
+  .right-panel{border-right:0;border-left:1px solid var(--line)}
+  .panel-title{height:46px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid var(--line);font-weight:800;font-size:13px}
+  .panel-body{padding:14px 16px;display:grid;gap:12px}
+  .file-card{border:1px solid var(--line);border-radius:10px;background:var(--bg-soft);padding:12px}
+  .file-card .name{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13px}
+  .file-card .meta{margin-top:6px;font-size:11px;color:var(--ink-3);line-height:1.55}
+  .sheet-list{display:grid;gap:8px}
+  .sheet{border:1px solid var(--line);border-radius:8px;background:#fff;padding:9px 10px}
+  .sheet b{font-size:12px}
+  .sheet p{margin:3px 0 0;font-size:11px;color:var(--ink-3);line-height:1.45}
+  .topic-nav{display:grid;gap:8px}
+  .topic{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}
+  .topic.on{border-color:color-mix(in oklab,var(--brand) 42%, var(--line));background:var(--brand-soft)}
+  .topic b{display:block;font-size:12.5px}
+  .topic span{display:block;margin-top:3px;font-size:11px;color:var(--ink-3)}
+  .chat-shell{min-width:0;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:linear-gradient(180deg,#fff 0%,var(--bg) 100%)}
+  .chat-header{height:46px;display:flex;align-items:center;gap:10px;padding:0 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.85);backdrop-filter:saturate(140%) blur(10px)}
+  .chat-header .hint{margin-left:auto;font-size:12px;color:var(--ink-3)}
+  .chat-scroll{min-height:0;overflow:auto;padding:20px 24px 22px;display:flex;flex-direction:column;gap:16px}
+  .msg{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;max-width:1000px;width:100%}
+  .msg.user{align-self:flex-end;grid-template-columns:minmax(0,1fr) 34px;max-width:820px}
+  .avatar{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:850;color:#fff;background:linear-gradient(135deg,var(--brand),var(--accent));font-size:12px}
+  .msg.user .avatar{grid-column:2;background:linear-gradient(135deg,#344054,#111827)}
+  .bubble{border:1px solid var(--line);background:#fff;border-radius:12px;box-shadow:var(--shadow-1);overflow:hidden}
+  .msg.user .bubble{grid-column:1;background:var(--brand);color:#fff;border-color:transparent}
+  .bubble-pad{padding:13px 15px}
+  .msg-text{font-size:13px;line-height:1.7}
+  .attachment{margin-top:10px;border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.12)}
+  .attachment .doc{width:32px;height:32px;border-radius:7px;background:#fff;color:var(--brand);display:grid;place-items:center;font-weight:850}
+  .attachment .small{font-size:11px;opacity:.78}
+  .ai-title{display:flex;align-items:center;gap:8px;font-weight:850;font-size:13.5px;margin-bottom:8px}
+  .parse-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .parse-tile{border:1px solid var(--line);border-radius:8px;background:var(--bg-soft);padding:10px}
+  .parse-tile .num{font-size:20px;font-weight:850;line-height:1}
+  .parse-tile .lb{margin-top:5px;font-size:11px;color:var(--ink-3);font-family:var(--font-mono)}
+  .result-card{border-top:1px solid var(--line)}
+  .result-head{padding:14px 15px;background:linear-gradient(135deg,#fff,var(--bg-soft));display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;border-bottom:1px solid var(--line)}
+  .result-head h3{margin:0;font-size:15px}
+  .result-head p{margin:7px 0 0;font-size:13px;color:var(--ink-2);line-height:1.65}
+  .score-grid{display:grid;grid-template-columns:repeat(2,72px);gap:8px;align-content:start}
+  .score{border:1px solid var(--line);border-radius:8px;background:#fff;padding:7px 8px;text-align:center}
+  .score .v{font-size:17px;font-weight:850}
+  .score .k{font-size:10px;color:var(--ink-3);font-family:var(--font-mono)}
+  .field-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:12px 15px}
+  .field{border:1px solid var(--line);border-radius:8px;background:#fff;min-height:96px;position:relative;overflow:hidden}
+  .field .k{padding:8px 10px;border-bottom:1px solid var(--line);font-size:10.5px;color:var(--ink-3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;background:var(--bg-soft)}
+  .field .v{padding:9px 10px;font-size:12.5px;line-height:1.62;color:var(--ink-2)}
+  .field:hover{border-color:color-mix(in oklab,var(--brand) 45%, var(--line));box-shadow:0 0 0 2px color-mix(in oklab,var(--brand-soft) 70%, transparent)}
+  .field-actions{display:flex;gap:5px;flex-wrap:wrap;padding:0 10px 10px}
+  .mini-btn{height:24px;border-radius:6px;border:1px solid var(--line);background:#fff;color:var(--ink-2);font-size:11px;font-weight:700;padding:0 8px;cursor:pointer;font-family:inherit}
+  .mini-btn:hover,.mini-btn.on{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+  .mini-btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+  .mini-btn.warn{border-color:color-mix(in oklab,var(--warn) 45%, var(--line));color:var(--warn-ink);background:var(--warn-soft)}
+  .mini-btn.err{border-color:color-mix(in oklab,var(--err) 45%, var(--line));color:var(--err);background:var(--err-soft)}
+  .result-foot{padding:10px 15px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg-soft)}
+  .source{margin-left:auto;color:var(--ink-3);font-size:11px;font-family:var(--font-mono)}
+  .feedback-thread{margin:0 15px 14px;border:1px solid color-mix(in oklab,var(--brand) 34%, var(--line));border-radius:10px;background:color-mix(in oklab,var(--brand-soft) 50%, #fff);overflow:hidden;display:none}
+  .feedback-thread.open{display:block}
+  .feedback-hd{padding:9px 11px;border-bottom:1px solid var(--line);font-size:12px;font-weight:850;display:flex;align-items:center;gap:8px}
+  .feedback-bd{padding:10px 11px;display:grid;gap:8px;font-size:12.5px;line-height:1.65}
+  .feedback-bd .q{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .feedback-bd .a{background:var(--bg-soft);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .composer{padding:12px 18px;border-top:1px solid var(--line);background:#fff;display:grid;gap:8px}
+  .composer-box{border:1px solid var(--line-2);border-radius:12px;background:#fff;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:end;gap:10px;padding:10px;box-shadow:var(--shadow-1)}
+  .attach-btn,.send-btn{width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--bg-soft);font-weight:850;cursor:pointer}
+  .send-btn{background:var(--brand);border-color:var(--brand);color:#fff}
+  .composer textarea{border:0;outline:0;resize:none;min-height:38px;max-height:110px;font:inherit;font-size:13px;line-height:1.6;color:var(--ink)}
+  .quick-row{display:flex;gap:8px;flex-wrap:wrap}
+  .quick{height:26px;border:1px solid var(--line);border-radius:999px;background:var(--bg-soft);padding:0 10px;font-size:11.5px;color:var(--ink-2);font-weight:700}
+  .side-card{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+  .side-card h3{margin:0;padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px}
+  .side-card .bd{padding:12px 14px;display:grid;gap:10px}
+  .accepted{border:1px solid var(--line);border-radius:8px;background:var(--bg-soft);padding:10px}
+  .accepted .top{display:flex;align-items:center;gap:8px;justify-content:space-between}
+  .accepted b{font-size:12.5px}
+  .accepted p{margin:6px 0 0;color:var(--ink-3);font-size:12px;line-height:1.5}
+  .question{border-left:3px solid var(--warn);background:var(--warn-soft);border-radius:8px;padding:9px 10px;font-size:12px;line-height:1.55}
+  .trace-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;font-size:12px;border-bottom:1px dashed var(--line);padding-bottom:8px}
+  .trace-row:last-child{border-bottom:0;padding-bottom:0}
+  .trace-row .k{color:var(--ink-3);font-family:var(--font-mono)}
+  .toast{position:fixed;right:24px;bottom:24px;background:#111827;color:#fff;border-radius:10px;padding:10px 14px;font-size:12.5px;box-shadow:var(--shadow-3);opacity:0;transform:translateY(8px);transition:.18s;z-index:80}
+  .toast.show{opacity:1;transform:translateY(0)}
+  @media (max-width:1260px){.workbench{grid-template-columns:220px minmax(0,1fr)}.right-panel{display:none}.parse-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.field-grid{grid-template-columns:1fr}.score-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:900px){body{overflow:auto}.content{height:auto}.workbench{height:auto;display:block}.left-panel{display:none}.chat-shell{min-height:calc(100vh - 72px)}.topbar{height:auto;align-items:flex-start;padding:16px}.topbar .actions{margin-left:0;justify-content:flex-start}.topbar{flex-direction:column}.chat-scroll{padding:16px}.msg,.msg.user{max-width:none}.result-head{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="l">W</div><div>WES</div></div>
+      <div class="grp"><h6>工作台</h6><a href="home.html"><span class="ic">●</span>主页</a><a class="on" href="requirement-list.html"><span class="ic">◒</span>需求</a><a href="assessment-list.html"><span class="ic">▣</span>实施评估</a><a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a><a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a><a href="wbs.html"><span class="ic">☷</span>WBS</a><a href="review-list.html"><span class="ic">✓</span>评审</a></div>
+      <div class="grp"><h6>系统</h6><a href="system-management.html"><span class="ic">⚙</span>系统管理</a><a href="user-management.html"><span class="ic">☺</span>用户管理</a><a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a></div>
+      <div class="user"><div class="row"><div class="av">M</div><div class="account"><div class="nm">mjlkevin</div><div class="meta">超级管理员</div></div></div><a class="out" href="login.html">退出</a></div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div>
+          <div class="crumb">工作台 / 需求 / 对话式需求评估台</div>
+          <h1>需求 AI 评估 <span class="bdg ci"><span class="dot"></span>已检入</span> <span class="bdg draft mono">RQ05001-VA2</span></h1>
+        </div>
+        <div class="actions">
+          <button class="kimi-trigger" type="button">Kimi-help ▾</button>
+          <button class="btn btn-ghost" type="button">历史</button>
+          <button class="btn btn-ghost" type="button">导出对话</button>
+          <button class="btn btn-out" type="button">保存草稿</button>
+          <button class="btn btn-pri" type="button">推送评估输入</button>
+        </div>
+      </header>
+
+      <section class="workbench">
+        <aside class="left-panel">
+          <div class="panel-title">原始资料</div>
+          <div class="panel-body">
+            <div class="file-card">
+              <div class="name"><span>📎</span><span>工作量评估申请表-小鹏汽车集团.xlsx</span></div>
+              <div class="meta">上传于 2026-06-11 18:42 · 识别完成 · 5 张工作表</div>
+            </div>
+            <div class="sheet-list">
+              <div class="sheet"><b>1. 基本信息</b><p>客户、产品线、行业、项目背景</p></div>
+              <div class="sheet"><b>2. 价值主张</b><p>价值、要求、指标</p></div>
+              <div class="sheet"><b>3. 业务需求及问题一览表</b><p>5 行原始需求 · 当前分析来源</p></div>
+              <div class="sheet"><b>4. 补充信息</b><p>干系人、约束、风险假设</p></div>
+            </div>
+          </div>
+
+          <div class="panel-title">AI 识别主题</div>
+          <div class="panel-body topic-nav">
+            <div class="topic on"><b>第三方系统集成</b><span>接口风险 · 来源第 5 行</span></div>
+            <div class="topic"><b>供应链订单履约闭环</b><span>标准功能 + 配置</span></div>
+            <div class="topic"><b>仓储与库存管理</b><span>标准覆盖 · 待确认库位</span></div>
+            <div class="topic"><b>财务核销与成本核算</b><span>核销口径待确认</span></div>
+          </div>
+        </aside>
+
+        <section class="chat-shell">
+          <div class="chat-header">
+            <span class="bdg brd"><span class="dot"></span>文件驱动对话</span>
+            <span class="bdg draft"><span class="dot"></span>模型 kimi-k2.5</span>
+            <span class="hint">在 AI 渲染出的评估结果上直接提问、修正、采纳</span>
+          </div>
+
+          <div class="chat-scroll" id="chatScroll">
+            <article class="msg user">
+              <div class="bubble">
+                <div class="bubble-pad">
+                  <div class="msg-text">请解析这份工作量评估申请表，重点识别【3.业务需求及问题一览表】，并生成可用于实施评估的初稿。</div>
+                  <div class="attachment">
+                    <div class="doc">XLS</div>
+                    <div>
+                      <div style="font-weight:800">工作量评估申请表-小鹏汽车集团.xlsx</div>
+                      <div class="small">2.4 MB · 5 sheets · Excel 原始文件</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="avatar">我</div>
+            </article>
+
+            <article class="msg">
+              <div class="avatar">AI</div>
+              <div class="bubble">
+                <div class="bubble-pad">
+                  <div class="ai-title">文件识别完成 <span class="bdg ci"><span class="dot"></span>可评估</span></div>
+                  <div class="msg-text">我已读取原始文件，并把【3.业务需求及问题一览表】作为本轮分析主来源。原始 Excel 行不会直接回填页面，而会作为评估结论的来源依据保留。</div>
+                  <div class="parse-grid" style="margin-top:12px">
+                    <div class="parse-tile"><div class="num">5</div><div class="lb">原始需求行</div></div>
+                    <div class="parse-tile"><div class="num">4</div><div class="lb">业务主题</div></div>
+                    <div class="parse-tile"><div class="num">1</div><div class="lb">接口风险</div></div>
+                    <div class="parse-tile"><div class="num">3</div><div class="lb">待确认问题</div></div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="msg">
+              <div class="avatar">AI</div>
+              <div class="bubble">
+                <div class="bubble-pad">
+                  <div class="ai-title">评估结果初稿 <span class="bdg co"><span class="dot"></span>等待反馈</span></div>
+                  <div class="msg-text">下面是我从原始文件中归纳出的评估结果。你可以直接在任意结果块上提问、修正或采纳，确认后的内容会进入右侧“实施评估输入”。</div>
+                </div>
+
+                <section class="result-card" data-card="integration">
+                  <div class="result-head">
+                    <div>
+                      <h3>第三方系统到金蝶的数据同步</h3>
+                      <p>原始需求涉及采购订单、采购入库、销售订单、销售出库、收款单、付款单、应付单等多类单据同步。我的初步判断是：这不是单纯的“字段导入”，需要明确接口责任边界、同步频率、异常处理和验收标准。</p>
+                    </div>
+                    <div class="score-grid">
+                      <div class="score"><div class="v">高</div><div class="k">集成风险</div></div>
+                      <div class="score"><div class="v">待定</div><div class="k">是否二开</div></div>
+                    </div>
+                  </div>
+
+                  <div class="field-grid">
+                    <div class="field" data-anchor="risk">
+                      <div class="k">AI 判断</div>
+                      <div class="v">接口集成风险较高，需要单独拆为接口评估项。</div>
+                      <div class="field-actions"><button class="mini-btn" data-action="ask">提问</button><button class="mini-btn warn" data-action="revise">修正</button></div>
+                    </div>
+                    <div class="field" data-anchor="solution">
+                      <div class="k">建议解决方向</div>
+                      <div class="v">接口开发 / 金蝶配合 / 字段映射确认 / 联调验收。</div>
+                      <div class="field-actions"><button class="mini-btn" data-action="evidence">查看依据</button><button class="mini-btn pri" data-action="accept">采纳</button></div>
+                    </div>
+                    <div class="field" data-anchor="estimate">
+                      <div class="k">实施评估影响</div>
+                      <div class="v">建议生成接口设计、字段映射、开发或配置、联调、测试、上线支持等评估项。</div>
+                      <div class="field-actions"><button class="mini-btn" data-action="ask">提问</button><button class="mini-btn pri" data-action="accept">采纳</button></div>
+                    </div>
+                    <div class="field" data-anchor="questions">
+                      <div class="k">待确认问题</div>
+                      <div class="v">第三方是否已有标准接口？同步是实时还是定时？异常数据由谁处理？</div>
+                      <div class="field-actions"><button class="mini-btn pri" data-action="confirm">加入待确认</button><button class="mini-btn" data-action="ask">追问</button></div>
+                    </div>
+                    <div class="field" data-anchor="dev">
+                      <div class="k">二开判断</div>
+                      <div class="v">待确认。若第三方与金蝶已有标准连接器，则可调整为接口配置 + 联调。</div>
+                      <div class="field-actions"><button class="mini-btn warn" data-action="revise">修正</button><button class="mini-btn" data-action="ask">提问</button></div>
+                    </div>
+                    <div class="field" data-anchor="source">
+                      <div class="k">来源依据</div>
+                      <div class="v">Excel【3.业务需求及问题一览表】第 5 行：第三方数据会传到金蝶，包含多类业务单据。</div>
+                      <div class="field-actions"><button class="mini-btn" data-action="evidence">查看原始行</button></div>
+                    </div>
+                  </div>
+
+                  <div class="feedback-thread" id="feedbackThread">
+                    <div class="feedback-hd">锚点反馈：AI 判断 / 接口集成风险较高</div>
+                    <div class="feedback-bd">
+                      <div class="q"><b>用户疑问：</b>这里为什么判断风险较高？客户说不用写代码。</div>
+                      <div class="a"><b>AI 回复：</b>判断依据不是“是否写代码”本身，而是该行涉及 7 类单据、第三方系统、金蝶配合、字段映射与异常处理。若确认已有标准接口，我会把二开判断调整为“否”，但仍建议保留联调和验收评估项。</div>
+                    </div>
+                  </div>
+
+                  <div class="result-foot">
+                    <span class="bdg co"><span class="dot"></span>建议类型：接口集成</span>
+                    <span class="bdg lock"><span class="dot"></span>风险：第三方排期</span>
+                    <span class="bdg draft"><span class="dot"></span>状态：待用户确认</span>
+                    <button class="mini-btn pri" data-action="accept-card">采纳整块为评估输入</button>
+                    <span class="source">来源：Sheet 3 / Row 5</span>
+                  </div>
+                </section>
+
+                <section class="result-card">
+                  <div class="result-head">
+                    <div>
+                      <h3>供应链订单履约闭环</h3>
+                      <p>销售下单、出库、应收、收款核销，以及采购下单、入库、应付、付款核销，整体属于标准产品能力与实施配置范围。评估重点应放在单据流、核销口径、角色权限和测试场景。</p>
+                    </div>
+                    <div class="score-grid">
+                      <div class="score"><div class="v">高</div><div class="k">标准覆盖</div></div>
+                      <div class="score"><div class="v">中</div><div class="k">复杂度</div></div>
+                    </div>
+                  </div>
+                  <div class="field-grid">
+                    <div class="field"><div class="k">售前价值</div><div class="v">可向客户说明端到端业务财务闭环价值，减少人工对账和跨部门沟通成本。</div><div class="field-actions"><button class="mini-btn" data-action="ask">提问</button></div></div>
+                    <div class="field"><div class="k">PM 评估提示</div><div class="v">拆为销售、采购、库存、财务四类配置与测试工作，核销规则需单独确认。</div><div class="field-actions"><button class="mini-btn pri" data-action="accept">采纳</button></div></div>
+                    <div class="field"><div class="k">来源依据</div><div class="v">Excel 第 1-4 行：销售、采购、仓库、财务模块标准功能实现。</div><div class="field-actions"><button class="mini-btn" data-action="evidence">查看依据</button></div></div>
+                  </div>
+                  <div class="result-foot">
+                    <span class="bdg ci"><span class="dot"></span>建议类型：标准功能 + 配置</span>
+                    <span class="bdg draft"><span class="dot"></span>待确认：核销口径</span>
+                    <span class="source">来源：Sheet 3 / Row 1-4</span>
+                  </div>
+                </section>
+              </div>
+            </article>
+
+            <article class="msg user">
+              <div class="bubble">
+                <div class="bubble-pad">
+                  <div class="msg-text">第三方已有标准接口，不需要二开。请把第一个评估结果调整成“接口配置 + 联调”，风险不要写成高。</div>
+                </div>
+              </div>
+              <div class="avatar">我</div>
+            </article>
+
+            <article class="msg">
+              <div class="avatar">AI</div>
+              <div class="bubble">
+                <div class="bubble-pad">
+                  <div class="ai-title">已根据反馈更新 <span class="bdg ci"><span class="dot"></span>局部修正</span></div>
+                  <div class="msg-text">我已将“第三方系统到金蝶的数据同步”的二开判断从“待确认”调整为“否”，解决方向调整为“标准接口配置 + 联调”。集成风险从“高”调整为“中”，但仍保留字段映射、联调、异常处理和验收支持作为实施评估项。</div>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="composer">
+            <div class="quick-row">
+              <button class="quick" type="button">重新分析选中结果</button>
+              <button class="quick" type="button">生成售前待确认问题</button>
+              <button class="quick" type="button">生成 PM 评估摘要</button>
+              <button class="quick" type="button">导出分析纪要</button>
+            </div>
+            <div class="composer-box">
+              <button class="attach-btn" type="button">＋</button>
+              <textarea rows="1">继续追问、修正评估判断，或再次附上原始文件...</textarea>
+              <button class="send-btn" type="button">➤</button>
+            </div>
+          </div>
+        </section>
+
+        <aside class="right-panel">
+          <div class="panel-title">沉淀结果</div>
+          <div class="panel-body">
+            <section class="side-card">
+              <h3>已采纳评估输入</h3>
+              <div class="bd" id="acceptedList">
+                <div class="accepted">
+                  <div class="top"><b>供应链闭环配置项</b><span class="tag ok">已采纳</span></div>
+                  <p>销售、采购、库存、财务配置与核销规则测试。</p>
+                </div>
+                <div class="accepted">
+                  <div class="top"><b>接口配置与联调项</b><span class="tag warn">待 PM 估算</span></div>
+                  <p>标准接口配置、字段映射、联调、异常处理、UAT 支持。</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="side-card">
+              <h3>待确认问题</h3>
+              <div class="bd">
+                <div class="question">第三方同步是实时、定时任务，还是人工触发？</div>
+                <div class="question">收付款核销按订单、发票、出入库单还是客户/供应商维度匹配？</div>
+                <div class="question">仓储是否涉及批次、序列号、库位或移动端扫码？</div>
+              </div>
+            </section>
+
+            <section class="side-card">
+              <h3>反馈记录</h3>
+              <div class="bd">
+                <div class="trace-row"><div class="k">锚点</div><div>第三方集成 / 二开判断</div></div>
+                <div class="trace-row"><div class="k">反馈</div><div>第三方已有标准接口，不需要二开</div></div>
+                <div class="trace-row"><div class="k">更新</div><div>二开：否；风险：高 → 中；保留联调评估</div></div>
+              </div>
+            </section>
+
+            <section class="side-card">
+              <h3>来源依据</h3>
+              <div class="bd">
+                <div class="trace-row"><div class="k">文件</div><div>工作量评估申请表-小鹏汽车集团.xlsx</div></div>
+                <div class="trace-row"><div class="k">工作表</div><div>3.业务需求及问题一览表</div></div>
+                <div class="trace-row"><div class="k">行号</div><div>Row 1-5</div></div>
+                <button class="btn btn-out" type="button">打开原始行预览</button>
+              </div>
+            </section>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast">已更新</div>
+  <script>
+    const toast = document.getElementById('toast');
+    const thread = document.getElementById('feedbackThread');
+    const acceptedList = document.getElementById('acceptedList');
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add('show');
+      window.setTimeout(() => toast.classList.remove('show'), 1500);
+    }
+    document.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        if (action === 'ask') {
+          thread?.classList.add('open');
+          showToast('已在结果块下展开锚点提问');
+        } else if (action === 'revise') {
+          thread?.classList.add('open');
+          showToast('已进入所见即所得修正模式');
+        } else if (action === 'evidence') {
+          showToast('右侧已定位到来源依据');
+        } else if (action === 'accept' || action === 'accept-card') {
+          btn.classList.add('on');
+          btn.textContent = '已采纳';
+          acceptedList?.insertAdjacentHTML('beforeend', '<div class="accepted"><div class="top"><b>新采纳评估项</b><span class="tag ok">刚刚</span></div><p>从对话评估结果中采纳，等待 PM 进一步估算。</p></div>');
+          showToast('已采纳到实施评估输入池');
+        } else if (action === 'confirm') {
+          btn.classList.add('on');
+          btn.textContent = '已加入';
+          showToast('已加入售前待确认问题');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

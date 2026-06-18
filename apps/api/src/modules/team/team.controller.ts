@@ -12,6 +12,7 @@ import {
   getTeamPlans,
   listReviews,
   listReviewComments,
+  listUserTeams,
   removeTeamMember,
   updateReviewStatus,
   updateTeamMemberRole,
@@ -36,6 +37,12 @@ export function postTeam(req: Request, res: Response) {
   const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, createTeam(auth.user, req.body || {}));
+}
+
+export function getUserTeams(req: Request, res: Response) {
+  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+  if (!auth) return;
+  return handleResult(res, listUserTeams(auth.user));
 }
 
 export function getTeamDetail(req: Request, res: Response) {

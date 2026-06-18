@@ -1,0 +1,137 @@
+@import '../tokens.css';
+@import '../components.css';
+@import '../layout.css';
+
+/* Vite React 全局基线 */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-body, 'Inter', 'Noto Sans SC', system-ui, sans-serif);
+  color: var(--ink, #1f2937);
+  background: var(--bg, #f6f7f9);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 原有 CSS reset 兼容 */
+input, button, select, textarea { font-family: inherit; }
+
+.ai-home-loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 12px;
+}
+
+.ai-home-loading-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--brand);
+  opacity: .3;
+  animation: ai-home-dot-pulse 1.05s infinite ease-in-out;
+}
+
+.ai-home-loading-dots span:nth-child(2) { animation-delay: .16s; }
+.ai-home-loading-dots span:nth-child(3) { animation-delay: .32s; }
+
+@keyframes ai-home-dot-pulse {
+  0%, 80%, 100% {
+    opacity: .3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.ai-message-rich {
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+
+.ai-message-rich p {
+  margin: 0 0 10px;
+}
+
+.ai-message-rich p:last-child,
+.ai-message-rich ol:last-child,
+.ai-message-rich ul:last-child {
+  margin-bottom: 0;
+}
+
+.ai-message-rich ol,
+.ai-message-rich ul {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+}
+
+.ai-message-rich li {
+  margin: 6px 0;
+  padding-left: 2px;
+}
+
+.ai-message-rich strong {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.ai-home-workbench {
+  grid-template-columns: 260px minmax(0, 1fr) 300px;
+}
+
+@media (max-width: 1180px) {
+  .ai-home-workbench {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    height: auto !important;
+    overflow: auto !important;
+  }
+
+  .ai-home-rail {
+    grid-column: 1 / -1;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .ai-home-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-home-workbench > section,
+  .ai-home-workbench > aside {
+    min-width: 0;
+  }
+}
+
+/* HomePage 响应式（接 layout.css 1180/760 断点） */
+.home-grid { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 16px; min-width: 0; }
+.home-kpi  { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+@media (max-width: 1180px) {
+  .home-grid { grid-template-columns: 1fr; }
+  .home-kpi  { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 760px) {
+  .home-kpi  { grid-template-columns: 1fr; }
+}
+
+/* ---- R3-E utility grid classes ---- */
+.grid-1fr-280 { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 16px; min-width: 0; }
+.grid-3-eq    { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.grid-4-eq    { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+.grid-2-eq    { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+
+@media (max-width: 1180px) {
+  .grid-1fr-280 { grid-template-columns: 1fr; }
+  .grid-3-eq    { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .grid-4-eq    { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 760px) {
+  .grid-1fr-280 { grid-template-columns: 1fr; }
+  .grid-3-eq    { grid-template-columns: 1fr; }
+  .grid-4-eq    { grid-template-columns: 1fr; }
+  .grid-2-eq    { grid-template-columns: 1fr; }
+}

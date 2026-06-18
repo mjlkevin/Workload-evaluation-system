@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · 历史项目库</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;padding:12px 18px;background:var(--bg-soft);border-bottom:1px solid var(--line);align-items:center}
+  .search-wrap{display:flex;flex-direction:column;gap:10px;align-items:flex-end;justify-self:end;min-width:min(860px,100%)}
+  .search{display:flex;gap:10px;align-items:center;width:100%}
+  .search input{flex:1;border:1px solid var(--line);border-radius:12px;padding:11px 14px;font:500 13px/1.4 var(--font-sans);background:#fff}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .chip{padding:7px 10px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink-2);font-size:12px;cursor:pointer}
+  .chip.on{background:var(--brand-soft);border-color:var(--brand-soft);color:var(--brand-ink);font-weight:700}
+  .progress{height:8px;border-radius:999px;background:var(--bg-soft);overflow:hidden}
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--accent))}
+  .row-link{cursor:pointer}
+  .empty{padding:56px 24px;text-align:center}
+  .empty .t{font-size:16px;font-weight:800;color:var(--ink);margin-bottom:6px}
+  .empty .d{font-size:13px;color:var(--ink-3);margin-bottom:14px}
+  .empty a{color:var(--brand-ink)}
+  .mini{font-size:11px;color:var(--ink-3)}
+  @media (max-width:1180px){.toolbar{grid-template-columns:1fr}.search-wrap{min-width:0;justify-self:stretch}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="l">W</div><div>WES</div></div>
+    <div class="grp"><h6>工作台</h6><a href="home.html"><span class="ic">●</span>主页</a><a href="requirement-list.html"><span class="ic">✎</span>需求</a><a href="assessment-list.html"><span class="ic">▣</span>实施评估</a><a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a><a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a><a href="wbs.html"><span class="ic">☷</span>WBS</a><a href="review-list.html"><span class="ic">✓</span>评审</a></div>
+    <div class="grp"><h6>系统</h6><a href="system-management.html"><span class="ic">⚙</span>系统管理</a><a href="user-management.html"><span class="ic">☺</span>用户管理</a><a href="api-keys.html"><span class="ic">⚿</span>API 密钥</a></div>
+    <div class="user"><div class="row"><div class="av">A</div><div><div class="nm">admin</div><div class="meta">系统管理员</div></div></div><a class="out" href="login.html">退出</a></div>
+  </aside>
+  <main class="content">
+    <div class="pg-hd">
+      <div class="crumb"><b>工作台</b> &nbsp;/&nbsp; 历史项目库</div>
+      <div class="row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h1 style="margin:0">历史项目库</h1>
+        <span style="color:var(--ink-3);font-size:12px">基于已交付项目的相似度检索</span>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div></div>
+      <div class="search-wrap">
+        <div class="search">
+          <input id="q" placeholder="输入项目名 / 客户 / 行业搜相似度，例：'离散制造 2400 人 ERP'" />
+        </div>
+        <div class="chips">
+          <span class="chip on" data-filter="行业">行业</span>
+          <span class="chip on" data-filter="规模">规模</span>
+          <span class="chip on" data-filter="年份">年份</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" style="margin:16px 18px 18px">
+      <div class="hd"><span>历史项目</span><span class="bdg ci"><span class="dot"></span>8 条</span></div>
+      <div class="bd" style="padding:0;overflow:hidden">
+        <table class="table" id="histTable">
+          <thead><tr><th>项目名</th><th>客户</th><th>行业</th><th>规模</th><th>总人天</th><th>总金额</th><th>年份</th><th style="width:180px">相似度</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="empty" class="empty" style="display:none"><div class="t">没有找到匹配项目</div><div class="d">请尝试调整筛选条件或换一个关键词继续搜索。</div><a href="javascript:void(0)" id="resetLink">调整筛选</a></div>
+    </div>
+  </main>
+</div>
+<script src="../mock/data.js"></script>
+<script>
+(function(){
+  var fallback = [
+    {name:'离散制造 ERP 升级', customer:'华东智造', industry:'离散制造', scale:'2400 人', totalDays:1260, totalAmount:3800000, year:2024, similarity:0.92, id:'GL-01'},
+    {name:'连锁零售中台建设', customer:'星火零售', industry:'零售', scale:'1800 人', totalDays:980, totalAmount:2600000, year:2023, similarity:0.84, id:'GL-02'},
+    {name:'财务共享中心', customer:'云帆集团', industry:'金融', scale:'3200 人', totalDays:1560, totalAmount:5200000, year:2024, similarity:0.80, id:'GL-03'},
+    {name:'供应链协同平台', customer:'北辰供应链', industry:'物流', scale:'900 人', totalDays:740, totalAmount:1800000, year:2022, similarity:0.76, id:'GL-04'},
+    {name:'采购结算一体化', customer:'宏远能源', industry:'能源', scale:'1500 人', totalDays:860, totalAmount:2100000, year:2021, similarity:0.69, id:'GL-05'},
+    {name:'园区运营管理平台', customer:'智城科技', industry:'政企', scale:'600 人', totalDays:540, totalAmount:1500000, year:2025, similarity:0.63, id:'GL-06'},
+    {name:'售后服务工单系统', customer:'联创家电', industry:'家电', scale:'1100 人', totalDays:620, totalAmount:1600000, year:2023, similarity:0.58, id:'GL-07'},
+    {name:'HR 人才管理升级', customer:'海岳控股', industry:'人力资源', scale:'2800 人', totalDays:1120, totalAmount:3300000, year:2024, similarity:0.54, id:'GL-08'}
+  ];
+  function getData(){
+    var d = (window.MOCK && window.MOCK.historyProjects) || [];
+    return d.length ? d : fallback;
+  }
+  var tbody = document.querySelector('#histTable tbody');
+  var empty = document.getElementById('empty');
+  var q = document.getElementById('q');
+  var chips = Array.from(document.querySelectorAll('.chip'));
+  function bar(n){ return '<div class="progress"><i style="width:'+Math.round(n*100)+'%"></i></div>'; }
+  function fmtAmount(n){ return '¥ ' + (n/10000).toFixed(0) + ' 万'; }
+  window.renderHistory = function(){
+    var data = getData();
+    var kw = q.value.trim().toLowerCase();
+    var rows = data.filter(function(it){
+      var hay = [it.name,it.customer,it.industry,it.scale,it.year].join(' ').toLowerCase();
+      return !kw || hay.indexOf(kw) >= 0;
+    });
+    if(!rows.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
+    empty.style.display='none';
+    tbody.innerHTML = rows.map(function(it){
+      return '<tr class="row-link" onclick="location.href=\'history-detail.html?id='+it.id+'\'"><td><b>'+it.name+'</b><div class="mini" style="font-family:var(--font-mono)">'+it.id+'</div></td><td>'+it.customer+'</td><td>'+it.industry+'</td><td>'+it.scale+'</td><td>'+it.totalDays+'</td><td>'+fmtAmount(it.totalAmount)+'</td><td>'+it.year+'</td><td><div style="display:grid;gap:6px">'+bar(it.similarity)+'<div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--ink-3)"><span>相似度</span><span>'+Math.round(it.similarity*100)+'%</span></div></div></td></tr>';
+    }).join('');
+  };
+  q.addEventListener('input', window.renderHistory);
+  chips.forEach(function(chip){ chip.addEventListener('click', function(){ chip.classList.toggle('on'); window.renderHistory(); }); });
+  document.getElementById('resetLink').onclick = function(){ q.value=''; chips.forEach(function(c){ c.classList.add('on'); }); window.renderHistory(); };
+  window.renderHistory();
+})();
+</script>
+</body>
+</html>

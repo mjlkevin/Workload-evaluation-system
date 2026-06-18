@@ -3,7 +3,12 @@ import { Request, Response } from "express";
 import { requireRole, requireRoleWithAuth } from "../../middleware/auth";
 import { fail, ok } from "../../utils/response";
 import { CalculateRequest } from "../../types";
-import { calculateAndExportEstimate, calculateEstimateOnly, listExportHistoryByOwner } from "./estimates.usecase";
+import {
+  calculateAndExportEstimate,
+  calculateEstimateOnly,
+  getActiveImplementationDependencyRules,
+  listExportHistoryByOwner,
+} from "./estimates.usecase";
 
 export function calculate(req: Request, res: Response) {
   if (!requireRole(req, res, ["admin", "operator"])) return;
@@ -63,4 +68,10 @@ export function listExportHistory(req: Request, res: Response) {
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize || 20)));
   const data = listExportHistoryByOwner(auth.user.id, page, pageSize);
   return res.json(ok({ page, pageSize, ...data }));
+}
+
+export function getActiveDependencyRules(req: Request, res: Response) {
+  if (!requireRole(req, res, ["admin", "operator"])) return;
+  const data = getActiveImplementationDependencyRules();
+  return res.json(ok(data));
 }

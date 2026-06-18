@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 
 import { VersionRecord } from "../../types";
+import { isProjectEvaluationRecord } from "../project-evaluations/project-evaluations.repository";
 import { loadVersionsStore, saveVersionsStore } from "../versions/versions.repository";
-import { appendTeamAuditLog, loadTeamStore, saveTeamStoreWithExpectedVersion } from "./team.repository";
+import { appendTeamAuditLog, listTeamsByUserId, loadTeamStore, saveTeamStoreWithExpectedVersion } from "./team.repository";
 import { ReviewStatus, TeamMember, TeamRecord, TeamRole, TeamStore } from "./team.types";
 
 type CurrentUser = { id: string };
@@ -165,7 +166,7 @@ export function removeTeamMember(currentUser: CurrentUser, teamId: string, userI
 }
 
 function ensureGlobalPlanOwner(record: VersionRecord, currentUserId: string): boolean {
-  return record.type === "global" && record.ownerUserId === currentUserId;
+  return record.type === "global" && !isProjectEvaluationRecord(record) && record.ownerUserId === currentUserId;
 }
 
 export function getTeamPlans(currentUser: CurrentUser, teamId: string) {
@@ -177,6 +178,7 @@ export function getTeamPlans(currentUser: CurrentUser, teamId: string) {
   const versionStore = loadVersionsStore();
   const items = versionStore.records
     .filter((x) => x.type === "global")
+    .filter((x) => !isProjectEvaluationRecord(x))
     .filter((x) => {
       const bind = teamStore.planBindings.find((b) => b.globalVersionCode === x.versionCode);
       if (bind) return bind.teamId === teamId;
@@ -216,7 +218,7 @@ export function updateTeamPlanBinding(
   if (!ensureManager(team, currentUser.id)) return fail(40301, "权限不足", "role", "manager_required");
 
   const versions = loadVersionsStore();
-  const global = versions.records.find((x) => x.type === "global" && x.versionCode === globalVersionCode);
+  const global = versions.records.find((x) => x.type === "global" && !isProjectEvaluationRecord(x) && x.versionCode === globalVersionCode);
   if (!global) return fail(40401, "总方案不存在", "globalVersionCode", "not_found");
 
   const existed = store.planBindings.find((x) => x.globalVersionCode === globalVersionCode);
@@ -379,4 +381,10 @@ export function createReviewComment(
   const conflict = persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   return ok(comment);
+}
+
+export function listUserTeams(currentUser: CurrentUser) {
+  const store = loadTeamStore();
+  const teams = listTeamsByUserId(store, currentUser.id);
+  return ok({ items: teams });
 }

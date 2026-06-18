@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 
 import { VersionsStore } from "../types";
+import { versionsStorePath } from "../utils";
 import {
   deleteIdempotencyRecord,
   getIdempotencyRecord,
@@ -9,7 +11,18 @@ import {
   setIdempotencyRecord
 } from "./estimates/estimates.repository";
 import { cleanupExpiredSessions, getSession, saveSession } from "./sessions/sessions.repository";
-import { isVersionReferencedByGlobal } from "./versions/versions.repository";
+import { isVersionReferencedByGlobal, saveVersionsStore } from "./versions/versions.repository";
+
+function withFileSnapshotRestore(filePath: string, run: () => void): void {
+  const existed = fs.existsSync(filePath);
+  const snapshot = existed ? fs.readFileSync(filePath, "utf-8") : "";
+  try {
+    run();
+  } finally {
+    if (existed) fs.writeFileSync(filePath, snapshot, "utf-8");
+    else if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+}
 
 test("estimates.repository: parseOwnedExportFileName parses owned filename", () => {
   const parsed = parseOwnedExportFileName("user-1__项目A+V01+01.xlsx");
@@ -80,6 +93,8 @@ test("versions.repository: isVersionReferencedByGlobal returns true when referen
         updatedAt: new Date().toISOString(),
         createdByUserId: "u1",
         createdByUsername: "tester",
+        updatedByUserId: "u1",
+        updatedByUsername: "tester",
         checkoutStatus: "checked_in",
         versionDocStatus: "drafting",
         majorLetter: "A",
@@ -92,4 +107,35 @@ test("versions.repository: isVersionReferencedByGlobal returns true when referen
 
   assert.equal(isVersionReferencedByGlobal(store, "u1", "default", "assessment", "A01"), true);
   assert.equal(isVersionReferencedByGlobal(store, "u1", "default", "assessment", "A02"), false);
+});
+
+test("versions.repository: saveVersionsStore writes through a temp file before rename", () => {
+  const filePath = versionsStorePath();
+  withFileSnapshotRestore(filePath, () => {
+    const originalWriteFileSync = fs.writeFileSync;
+    const originalRenameSync = fs.renameSync;
+    const writes: string[] = [];
+    const renames: Array<[string, string]> = [];
+    try {
+      (fs as any).writeFileSync = function patchedWriteFileSync(file: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, options?: fs.WriteFileOptions) {
+        writes.push(String(file));
+        return originalWriteFileSync.call(fs, file, data as any, options as any);
+      };
+      (fs as any).renameSync = function patchedRenameSync(oldPath: fs.PathLike, newPath: fs.PathLike) {
+        renames.push([String(oldPath), String(newPath)]);
+        return originalRenameSync.call(fs, oldPath, newPath);
+      };
+
+      saveVersionsStore({ records: [] });
+
+      assert.equal(renames.length, 1);
+      assert.equal(renames[0][1], filePath);
+      assert.match(renames[0][0], /\.tmp-/);
+      assert.equal(writes[0], renames[0][0]);
+      assert.equal(writes.includes(filePath), false);
+    } finally {
+      (fs as any).writeFileSync = originalWriteFileSync;
+      (fs as any).renameSync = originalRenameSync;
+    }
+  });
 });

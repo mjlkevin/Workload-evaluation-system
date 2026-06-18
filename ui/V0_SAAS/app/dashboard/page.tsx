@@ -16,13 +16,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   ArrowRight,
   Banknote,
@@ -46,12 +47,15 @@ import {
   deleteGlobalPlanVersion,
   forceUnlockById,
   getDashboardPlans,
+  listModuleVersions,
   listGlobalVersions,
   promoteVersionById,
   undoCheckoutById,
   type GlobalVersionRecord,
+  type ModuleVersionRecord,
 } from "@/lib/workload-service"
 import type { PlanRow } from "@/lib/workload-types"
+import { getCheckoutStatusBadgeClass, getCheckoutStatusText } from "@/lib/checkout-status-ui"
 
 const overviewCards = [
   { label: "总方案数", desc: "近 7 天新增", icon: FolderGit2 },
@@ -68,6 +72,22 @@ const recentActivities = [
   "张凯 在 DEV-20260329-02 增加了 5 个开发子项",
   "系统 已同步资源成本草稿到总方案版本",
 ]
+
+function trimSvgText(value: string, maxUnits: number) {
+  const text = String(value || "").trim()
+  if (!text) return "—"
+  let units = 0
+  let result = ""
+  for (const ch of text) {
+    const charUnits = /[ -~]/.test(ch) ? 0.55 : 1
+    if (units + charUnits > maxUnits) {
+      return `${result}…`
+    }
+    result += ch
+    units += charUnits
+  }
+  return result
+}
 
 const newPlanWorkflowSteps: Array<{
   id: string
@@ -99,6 +119,14 @@ export default function DashboardPage() {
   const [erModulePreview, setErModulePreview] = useState<{ label: string; version: string; src: string } | null>(null)
   const [hoveredErNodeKey, setHoveredErNodeKey] = useState<string | null>(null)
   const [selectedErNodeKey, setSelectedErNodeKey] = useState<string | null>(null)
+  const [expandedErNodeKeys, setExpandedErNodeKeys] = useState<Record<string, boolean>>({})
+  const [moduleHistoryByGlobal, setModuleHistoryByGlobal] = useState<{
+    requirement: Record<string, string[]>
+    assessment: Record<string, string[]>
+  }>({
+    requirement: {},
+    assessment: {},
+  })
   const [deletePlanDialogOpen, setDeletePlanDialogOpen] = useState(false)
   const [deletingPlan, setDeletingPlan] = useState(false)
   const [planListSearch, setPlanListSearch] = useState("")
@@ -135,7 +163,45 @@ export default function DashboardPage() {
     setDragStart(null)
     setSelectedErNodeKey(null)
     setHoveredErNodeKey(null)
+    setExpandedErNodeKeys({})
   }, [previewRow?.id])
+
+  useEffect(() => {
+    const byGlobal = (records: ModuleVersionRecord[]) => {
+      const map: Record<string, Array<{ versionCode: string; updatedAtMs: number }>> = {}
+      for (const record of records) {
+        const globalVersionCode = String(record.payload?.globalVersionCode || "").trim()
+        if (!globalVersionCode) continue
+        if (!map[globalVersionCode]) map[globalVersionCode] = []
+        map[globalVersionCode].push({
+          versionCode: record.versionCode,
+          updatedAtMs: Number(new Date(record.updatedAt || 0)),
+        })
+      }
+      const normalized: Record<string, string[]> = {}
+      for (const [globalCode, rows] of Object.entries(map)) {
+        const seen = new Set<string>()
+        normalized[globalCode] = rows
+          .sort((a, b) => b.updatedAtMs - a.updatedAtMs || b.versionCode.localeCompare(a.versionCode))
+          .map((row) => row.versionCode)
+          .filter((code) => {
+            if (seen.has(code)) return false
+            seen.add(code)
+            return true
+          })
+      }
+      return normalized
+    }
+
+    void Promise.all([listModuleVersions("requirementImport"), listModuleVersions("assessment")]).then(
+      ([requirements, assessments]) => {
+        setModuleHistoryByGlobal({
+          requirement: byGlobal(requirements),
+          assessment: byGlobal(assessments),
+        })
+      },
+    )
+  }, [])
 
   function openCreatePlanWizard() {
     setNewProjectNameInput("")
@@ -213,10 +279,13 @@ export default function DashboardPage() {
     }
   }
 
-  async function onCheckin() {
+  async function onCheckin(checkinNote: string) {
     if (!selectedGlobalRecord) return
     try {
-      const data = await checkinVersionById(selectedGlobalRecord.id, selectedGlobalRecord.payload || {})
+      const data = await checkinVersionById(selectedGlobalRecord.id, {
+        ...((selectedGlobalRecord.payload || {}) as Record<string, unknown>),
+        checkinNote,
+      })
       setSelectedGlobalVersionCode(data.versionCode)
       loadPlans()
       setCreateMessage(`检入成功：${data.versionCode}`)
@@ -303,30 +372,30 @@ export default function DashboardPage() {
     setPreviewRow(row)
   }
 
-  function formatDateTimeText(value: string) {
-    if (!value || value === "—") return "—"
-    const d = new Date(value)
-    if (Number.isNaN(d.getTime())) return value
-    return d.toLocaleString("zh-CN", { hour12: false })
-  }
-
-  const previewTimeline = useMemo(
-    () => [
-      { key: "created", label: "创建时间", value: formatDateTimeText(previewRow?.createdAt || "") },
-      { key: "updated", label: "最新修改时间", value: formatDateTimeText(previewRow?.updatedAt || "") },
-      { key: "reviewed", label: "审核时间", value: formatDateTimeText(previewRow?.reviewedAt || "") },
-    ],
-    [previewRow],
-  )
-
   const previewRelations = useMemo(
     () => [
-      { key: "requirement", label: "需求版本号", value: previewRow?.requirementVersion || "—" },
-      { key: "assessment", label: "实施评估版本号", value: previewRow?.assessmentVersion || "—" },
-      { key: "resource", label: "资源版本号", value: previewRow?.resourceVersion || "—" },
-      { key: "dev", label: "开发版本号", value: previewRow?.devVersion || "—" },
+      {
+        key: "requirement",
+        label: "需求版本号",
+        value: previewRow?.requirementVersion || "—",
+        historyVersions: (moduleHistoryByGlobal.requirement[previewRow?.globalVersion || ""] || []).filter(
+          (code) => code !== (previewRow?.requirementVersion || "—"),
+        ),
+        allowHistoryExpand: true,
+      },
+      {
+        key: "assessment",
+        label: "实施评估版本号",
+        value: previewRow?.assessmentVersion || "—",
+        historyVersions: (moduleHistoryByGlobal.assessment[previewRow?.globalVersion || ""] || []).filter(
+          (code) => code !== (previewRow?.assessmentVersion || "—"),
+        ),
+        allowHistoryExpand: true,
+      },
+      { key: "resource", label: "资源版本号", value: previewRow?.resourceVersion || "—", historyVersions: [], allowHistoryExpand: false },
+      { key: "dev", label: "开发版本号", value: previewRow?.devVersion || "—", historyVersions: [], allowHistoryExpand: false },
     ],
-    [previewRow],
+    [previewRow, moduleHistoryByGlobal],
   )
   const selectedErNode = useMemo(
     () => previewRelations.find((node) => node.key === selectedErNodeKey),
@@ -413,26 +482,26 @@ export default function DashboardPage() {
   }
 
   return (
-    <ModuleShell
-      title="主页"
-      description="按当前系统语义重绘：总览、方案版本关系、关键指标与近期协作动态。"
-      breadcrumbs={[{ label: "主页" }]}
-    >
+    <ModuleShell title="主页" showPageHeading={false} breadcrumbs={[{ label: "主页" }]}>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {overviewCards.map((item, index) => (
-            <Card key={item.label} className="border-border/40 bg-card/50 backdrop-blur-sm">
-              <CardContent className="space-y-4 p-5">
+            <Card
+              key={item.label}
+              collapsible={false}
+              className="border-border/40 bg-card/50 py-3 backdrop-blur-sm"
+            >
+              <CardContent className="space-y-2 p-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-secondary">
-                    <item.icon className="size-5 text-muted-foreground" />
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-secondary">
+                    <item.icon className="size-4 text-muted-foreground" />
                   </div>
-                  <Badge variant="outline" className="rounded-lg text-[11px]">
+                  <Badge variant="outline" className="rounded-md px-2 py-0 text-[10px]">
                     实时
                   </Badge>
                 </div>
-                <div>
-                  <p className="text-2xl font-semibold">
+                <div className="space-y-0.5">
+                  <p className="text-xl font-semibold leading-none tabular-nums">
                     {index === 0
                       ? summary.totalPlans
                       : index === 1
@@ -441,10 +510,10 @@ export default function DashboardPage() {
                           ? summary.assessmentDays
                           : summary.onlineMembers}
                   </p>
-                  <p className="text-sm text-muted-foreground">{item.label}</p>
+                  <p className="text-xs text-muted-foreground">{item.label}</p>
                 </div>
-                <Progress value={Math.min(100, 45 + index * 14 + summary.activeCount * 3)} className="h-1.5" />
-                <p className="text-xs text-muted-foreground">
+                <Progress value={Math.min(100, 45 + index * 14 + summary.activeCount * 3)} className="h-1" />
+                <p className="text-[11px] leading-snug text-muted-foreground">
                   {index === 0
                     ? `${item.desc} ${summary.activeCount} 个进行中`
                     : index === 1
@@ -459,24 +528,39 @@ export default function DashboardPage() {
         </section>
 
         <section className="grid gap-6 lg:grid-cols-3 xl:grid-cols-4 xl:gap-4">
-          <Card collapsible={false} className="border-border/40 bg-card/50 backdrop-blur-sm lg:col-span-2 xl:col-span-3">
+          <Card
+            collapsible={false}
+            className="lg:col-span-2 xl:col-span-3 gap-4 border-0 bg-transparent py-0 shadow-none backdrop-blur-none"
+          >
             <CardHeader className="pb-3">
               <div className="space-y-3">
                 <div className="min-w-[220px]">
                   <CardTitle className="whitespace-nowrap">评估方案列表</CardTitle>
-                  <CardDescription className="whitespace-nowrap">双击列表行打开预览弹窗</CardDescription>
                 </div>
                 <div className="flex flex-col gap-3 rounded-xl border border-border/40 bg-card/50 p-3 shadow-sm backdrop-blur-sm lg:flex-row lg:items-center lg:justify-between lg:gap-3">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <Button
-                      className="rounded-xl gap-2 bg-foreground text-background hover:bg-foreground/90"
-                      onClick={openCreatePlanWizard}
-                      disabled={creating}
-                    >
-                      <Plus className="size-4" />
-                      新建方案
-                    </Button>
+                    <Tooltip delayDuration={250}>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            size="icon-sm"
+                            className="rounded-lg bg-foreground text-background hover:bg-foreground/90"
+                            onClick={openCreatePlanWizard}
+                            disabled={creating}
+                            aria-label="新建方案"
+                          >
+                            <Plus className="size-4" />
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" sideOffset={6}>
+                        新建方案：打开创建向导，新增评估总方案并生成初始版本号。
+                        {creating ? "（正在创建中，请稍候。）" : ""}
+                      </TooltipContent>
+                    </Tooltip>
                     <VersionVcsToolbar
+                      compact
+                      iconOnly
                       state={
                         selectedGlobalRecord
                           ? {
@@ -490,24 +574,35 @@ export default function DashboardPage() {
                       showStatusField={false}
                       onVersionHistory={() => setVersionHistoryOpen(true)}
                       onCheckout={() => void onCheckout()}
-                      onCheckin={() => void onCheckin()}
+                      onCheckin={(checkinNote) => void onCheckin(checkinNote)}
                       onUndoCheckout={() => void onUndoCheckout()}
                       onPromote={() => void onPromote()}
                       onForceUnlock={() => void onForceUnlock()}
                       forceUnlockVisible={isAdmin}
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      disabled={!selectedGlobalRecord || deletingPlan}
-                      onClick={onOpenDeletePlanDialog}
-                    >
-                      <Trash2 className="size-4" />
-                      删除方案
-                    </Button>
+                    <Tooltip delayDuration={250}>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            className="rounded-lg border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            disabled={!selectedGlobalRecord || deletingPlan}
+                            onClick={onOpenDeletePlanDialog}
+                            aria-label="删除方案"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" sideOffset={6}>
+                        删除方案：移除列表中当前选中的方案及其关联数据（不可恢复）。
+                        {!selectedGlobalRecord ? "请先在表格中选择一行方案。" : deletingPlan ? "正在删除，请稍候。" : ""}
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                  <div className="relative w-full shrink-0 lg:max-w-sm">
+                  <div className="relative w-full shrink-0 lg:w-72">
                     <Search
                       className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                       aria-hidden
@@ -530,44 +625,7 @@ export default function DashboardPage() {
                   {createMessage}
                 </p>
               ) : null}
-              {postCreateGuide ? (
-                <div className="mb-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm">
-                  <p className="mb-2 font-medium text-foreground">下一步：按顺序完善方案内容</p>
-                  <p className="mb-3 text-xs text-muted-foreground">
-                    已绑定总方案版本 {postCreateGuide.versionCode}，点击下方入口将带上该版本（请在各页确认总方案选择）。
-                  </p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {newPlanWorkflowSteps.map((item) => {
-                      const q = `globalVersion=${encodeURIComponent(postCreateGuide.versionCode)}`
-                      return (
-                        <Button
-                          key={item.id}
-                          asChild
-                          variant="secondary"
-                          size="sm"
-                          className="h-auto min-h-9 w-full justify-start gap-2 rounded-lg py-2 whitespace-normal"
-                        >
-                          <Link href={`${item.href}?${q}`} className="flex w-full items-start gap-2">
-                            <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-background text-xs font-semibold text-foreground">
-                              {item.step}
-                            </span>
-                            <item.icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                            <span className="min-w-0 flex-1 text-left text-sm leading-snug break-words">{item.title}</span>
-                          </Link>
-                        </Button>
-                      )
-                    })}
-                  </div>
-                  <button
-                    type="button"
-                    className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                    onClick={() => setPostCreateGuide(null)}
-                  >
-                    收起引导
-                  </button>
-                </div>
-              ) : null}
-              <Table>
+              <Table density="compact">
                 <TableHeader>
                   <TableRow>
                     <TableHead>序号</TableHead>
@@ -623,10 +681,10 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={rowGlobalRecord?.checkoutStatus === "checked_out" ? "default" : "secondary"}
-                          className="rounded-lg"
+                          variant="outline"
+                          className={`rounded-lg ${getCheckoutStatusBadgeClass(rowGlobalRecord?.checkoutStatus)}`}
                         >
-                          {rowGlobalRecord?.checkoutStatus === "checked_out" ? "已检出" : "已检入"}
+                          {getCheckoutStatusText(rowGlobalRecord?.checkoutStatus) || "已检入"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{row.updatedAt}</TableCell>
@@ -730,7 +788,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  创建成功后，列表上方会出现带版本号的快捷入口，也可随时从左侧主菜单进入上述页面并选择总方案。
+                  创建成功后将弹出引导窗口，列出带当前总方案版本号的快捷入口；也可随时从左侧主菜单进入上述页面并选择总方案。
                 </p>
               </div>
             </div>
@@ -751,6 +809,57 @@ export default function DashboardPage() {
                 onClick={() => void submitCreatePlanFromWizard()}
               >
                 {creating ? "创建中…" : "创建方案"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={!!postCreateGuide}
+          onOpenChange={(open) => {
+            if (!open) setPostCreateGuide(null)
+          }}
+        >
+          <DialogContent className="gap-0 border-primary/25 bg-primary/5 p-0 sm:max-w-lg">
+            <DialogHeader className="space-y-2 px-6 pt-6 pr-14">
+              <DialogTitle>下一步：按顺序完善方案内容</DialogTitle>
+              <DialogDescription>
+                {postCreateGuide
+                  ? `已绑定总方案版本 ${postCreateGuide.versionCode}，点击下方入口将带上该版本（请在各页确认总方案选择）。`
+                  : "请按顺序点击下方模块入口。"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-2 px-6 pb-4 sm:grid-cols-2">
+              {postCreateGuide
+                ? newPlanWorkflowSteps.map((item) => {
+                    const q = `globalVersion=${encodeURIComponent(postCreateGuide.versionCode)}`
+                    return (
+                      <Button
+                        key={item.id}
+                        asChild
+                        variant="secondary"
+                        size="sm"
+                        className="h-auto min-h-9 w-full justify-start gap-2 rounded-lg border-border/60 bg-background py-2 whitespace-normal shadow-sm"
+                      >
+                        <Link
+                          href={`${item.href}?${q}`}
+                          className="flex w-full items-start gap-2"
+                          onClick={() => setPostCreateGuide(null)}
+                        >
+                          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-secondary text-xs font-semibold text-foreground">
+                            {item.step}
+                          </span>
+                          <item.icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 text-left text-sm leading-snug break-words">{item.title}</span>
+                        </Link>
+                      </Button>
+                    )
+                  })
+                : null}
+            </div>
+            <DialogFooter className="gap-2 border-t border-primary/20 bg-background/50 px-6 py-4 sm:justify-end">
+              <Button type="button" variant="outline" className="rounded-xl" onClick={() => setPostCreateGuide(null)}>
+                关闭
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -793,20 +902,8 @@ export default function DashboardPage() {
             </DialogHeader>
 
             <div className="space-y-4">
-              <section className="rounded-xl border border-border/60 bg-secondary/20 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-foreground">基本信息</h3>
-                <div className="grid gap-3 md:grid-cols-3">
-                  {previewTimeline.map((item) => (
-                    <article key={item.key} className="rounded-lg border border-border/60 bg-background p-3">
-                      <p className="text-xs text-muted-foreground">{item.label}</p>
-                      <p className="mt-1 text-sm font-medium">{item.value}</p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-border/60 bg-secondary/20 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-foreground">版本号关联关系图（ER）</h3>
+              <section className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">版本号关联关系图（ER）</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -866,7 +963,7 @@ export default function DashboardPage() {
                           总方案版本号
                         </text>
                         <text x="430" y="113" textAnchor="middle" fontSize="14" fontWeight="700" fill="#0F172A">
-                          {previewRow?.globalVersion || "—"}
+                          {trimSvgText(previewRow?.globalVersion || "—", 14)}
                         </text>
 
                         {previewRelations.map((node, idx) => {
@@ -880,6 +977,10 @@ export default function DashboardPage() {
                           const canOpen = Boolean(node.value && node.value !== "—")
                           const isHovered = hoveredErNodeKey === node.key
                           const isSelected = selectedErNodeKey === node.key
+                          const expanded = Boolean(expandedErNodeKeys[node.key])
+                          const historyRows = node.allowHistoryExpand ? node.historyVersions : []
+                          const showHistoryPanel = expanded
+                          const nodeHeight = showHistoryPanel ? 156 : 78
                           return (
                             <g
                               key={node.key}
@@ -897,17 +998,84 @@ export default function DashboardPage() {
                                 x={pos.x}
                                 y={pos.y}
                                 width="180"
-                                height="78"
+                                height={nodeHeight}
                                 rx="12"
                                 fill={isSelected ? "#DBEAFE" : isHovered ? "#EEF6FF" : "#F8FAFC"}
                                 stroke={isSelected ? "#3B82F6" : isHovered ? "#93C5FD" : "#CBD5E1"}
                               />
                               <text x={pos.x + 90} y={pos.y + 27} textAnchor="middle" fontSize="12" fill="#64748B">
-                                {node.label}
+                                {trimSvgText(node.label, 12)}
                               </text>
                               <text x={pos.x + 90} y={pos.y + 53} textAnchor="middle" fontSize="13" fontWeight="600" fill="#0F172A">
-                                {node.value || "—"}
+                                {trimSvgText(node.value || "—", 12)}
                               </text>
+                              {node.allowHistoryExpand ? (
+                                <g
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    setExpandedErNodeKeys((prev) => ({ ...prev, [node.key]: !expanded }))
+                                  }}
+                                  style={{ cursor: "pointer" }}
+                                >
+                                  <rect
+                                    x={pos.x + 156}
+                                    y={pos.y + 10}
+                                    width="14"
+                                    height="14"
+                                    rx="7"
+                                    fill="#F1F5F9"
+                                    stroke="#94A3B8"
+                                  />
+                                  <text
+                                    x={pos.x + 163}
+                                    y={pos.y + 20}
+                                    textAnchor="middle"
+                                    fontSize="11"
+                                    fontWeight="700"
+                                    fill="#334155"
+                                  >
+                                    {expanded ? "−" : "+"}
+                                  </text>
+                                </g>
+                              ) : null}
+                              {showHistoryPanel ? (
+                                <>
+                                  <rect
+                                    x={pos.x + 10}
+                                    y={pos.y + 86}
+                                    width="160"
+                                    height="62"
+                                    rx="8"
+                                    fill="#F8FAFC"
+                                    stroke="#CBD5E1"
+                                  />
+                                  <foreignObject x={pos.x + 12} y={pos.y + 88} width="156" height="58">
+                                    <div
+                                      xmlns="http://www.w3.org/1999/xhtml"
+                                      style={{
+                                        height: "58px",
+                                        overflowY: "auto",
+                                        overflowX: "hidden",
+                                        fontSize: "11px",
+                                        lineHeight: "16px",
+                                        color: "#475569",
+                                        paddingRight: "4px",
+                                      }}
+                                    >
+                                      {historyRows.length ? (
+                                        historyRows.map((historyVersion, historyIdx) => (
+                                          <div key={`${node.key}-history-${historyVersion}-${historyIdx}`}>
+                                            {"- "}
+                                            {trimSvgText(historyVersion, 20)}
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div style={{ color: "#94A3B8" }}>暂无历史版本</div>
+                                      )}
+                                    </div>
+                                  </foreignObject>
+                                </>
+                              ) : null}
                             </g>
                           )
                         })}

@@ -1,0 +1,26 @@
+# ============================================================
+# 开发覆盖：源码热重载 + Vite Dev Server
+# 使用：docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================
+
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  api:
+    build:
+      target: deps
+    command: ["npx", "tsx", "watch", "src/main.ts"]
+    volumes:
+      - ./apps/api:/repo/apps/api
+      - ./config:/repo/config
+      - ./drizzle:/repo/drizzle
+    environment:
+      NODE_ENV: development
+      CONFIG_INTEGRITY_ON_STARTUP: "false"
+    ports:
+      - "3000:3000"
+
+  # web 容器已下线（apps/web W4 Vue 工作台已删除）
+  # 开发期请直接 cd ui/V0_SAAS && npm run dev (端口 :3001)

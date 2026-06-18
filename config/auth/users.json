@@ -3,11 +3,11 @@
     {
       "id": "804d4b81-2471-468c-b1d2-a366dd34a53f",
       "username": "mjlkevin",
-      "passwordHash": "$2b$10$F10aLp9bi3yM/7tle.c96.yAkyjUE4ytxt.NxdSQlRpWikIqqDs1G",
+      "passwordHash": "$2b$10$3ztFdhe9iezEET.jInb.7.es3OFrCiOPkIo/2Vbq9VzGfwsk/.3H.",
       "role": "admin",
       "status": "active",
       "createdAt": "2026-03-28T10:23:51.881Z",
-      "lastLoginAt": "2026-04-05T16:32:23.918Z"
+      "lastLoginAt": "2026-05-12T09:16:34.639Z"
     },
     {
       "id": "b4de9eca-fe62-4210-964e-7e59b74ab715",
@@ -17,6 +17,78 @@
       "status": "active",
       "createdAt": "2026-03-28T10:29:24.272Z",
       "lastLoginAt": "2026-03-28T10:29:24.272Z"
+    },
+    {
+      "id": "0bfae09b-d3da-4b28-b8b8-56a384dac458",
+      "username": "马文玲",
+      "passwordHash": "$2b$10$8g6pNsE3HMGHQK3oQ/Hi1uD4IqIGasLBRS8BgVyJd1doLW7awYasK",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-04-08T06:00:07.420Z",
+      "lastLoginAt": "2026-04-17T05:07:13.537Z"
+    },
+    {
+      "id": "b0b53b64-550b-4d54-b361-8d9f987e1179",
+      "username": "林悦填",
+      "passwordHash": "$2b$10$.YKJSrNfASGsw7HbQ7NFdeiWO/kKdZiphBMjzIwwB5TgeMD6lGdHu",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-04-17T05:07:04.779Z",
+      "lastLoginAt": "2026-04-17T05:07:04.779Z"
+    },
+    {
+      "id": "bfe0941a-c280-41b7-bf50-250bc8a2ef60",
+      "username": "smoketest",
+      "passwordHash": "$2b$10$7sLIUu9y1VUs0ReOQdxSROEo5BCsNNs3VI8YFZdxa1vMlcGtbwcG2",
+      "role": "user",
+      "status": "active",
+      "createdAt": "2026-05-10T14:58:59.472Z",
+      "lastLoginAt": "2026-05-10T15:18:47.679Z"
+    },
+    {
+      "id": "test-user-18101f4e-66b6-4b3c-af66-5fb27b4a169d",
+      "username": "testuser-18101f4e-66b6-4b3c-af66-5fb27b4a169d",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-05-10T16:29:46.654Z",
+      "lastLoginAt": "2026-05-10T16:29:46.654Z"
+    },
+    {
+      "id": "test-user-47c6670d-f5e6-48a7-b0a6-38a4909a3194",
+      "username": "testuser-47c6670d-f5e6-48a7-b0a6-38a4909a3194",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-05-10T16:29:46.659Z",
+      "lastLoginAt": "2026-05-10T16:29:46.659Z"
+    },
+    {
+      "id": "test-user-c8da7864-a214-417f-998c-fda44150fdf2",
+      "username": "testuser-c8da7864-a214-417f-998c-fda44150fdf2",
+      "role": "sub_admin",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-05-10T16:29:46.662Z",
+      "lastLoginAt": "2026-05-10T16:29:46.662Z"
+    },
+    {
+      "id": "test-user-c350d3b3-fa7b-4586-b3da-3585e21578ba",
+      "username": "testuser-c350d3b3-fa7b-4586-b3da-3585e21578ba",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-05-10T16:29:46.667Z",
+      "lastLoginAt": "2026-05-10T16:29:46.667Z"
+    },
+    {
+      "id": "14cc60fa-0240-4b62-8138-6804f48d023f",
+      "username": "external-agent",
+      "passwordHash": "$2b$10$ioEt.j0.dIIyqHQ9/zqzK.c26dfnqkjnwxJVyAJm.lFZxBYCzfOA2",
+      "role": "admin",
+      "status": "active",
+      "createdAt": "2026-05-11T05:10:52.990Z",
+      "lastLoginAt": "2026-05-11T06:05:22.096Z"
     }
   ]
 }

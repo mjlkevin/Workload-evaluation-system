@@ -1,9 +1,11 @@
 export {
+  getVersion,
   listVersions,
   createVersion,
   updateVersionStatus,
   deleteVersion,
   checkoutVersion,
+  saveCheckedOutDraft,
   checkinVersion,
   undoCheckout,
   promoteVersion,

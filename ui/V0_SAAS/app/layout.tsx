@@ -4,7 +4,7 @@ import './globals.css'
 import { AppProviders } from './providers'
 
 export const metadata: Metadata = {
-  title: 'Nova - 智能工作流平台',
+  title: 'WorkEvolutionSys',
   description: '全新一代智能工作流平台，让团队协作更高效、更智能',
   generator: 'v0.app',
   icons: {
@@ -32,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body className="font-sans antialiased min-h-svh bg-background text-foreground">
         <AppProviders>{children}</AppProviders>
         <Analytics />

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>WES · API 密钥与接入</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css" />
+<link rel="stylesheet" href="../components.css" />
+<link rel="stylesheet" href="../layout.css" />
+<style>
+  .reg{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+  .reg .hd{padding:14px 18px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .reg .bd{padding:16px 18px}
+  .top-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:16px}
+  .contract-section{display:flex;flex-direction:column;gap:14px}
+  .contract-block{display:flex;align-items:flex-start;gap:10px}
+  .contract-block .chip{flex-shrink:0;padding:3px 10px;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--font-mono);letter-spacing:.04em}
+  .contract-block .chip.ok{background:var(--ok-soft);color:var(--ok-ink)}
+  .contract-block .chip.brand{background:var(--brand-soft);color:var(--brand-ink)}
+  .contract-block .chip.accent{background:var(--accent-soft);color:var(--accent-ink)}
+  .contract-block .chip.info{background:var(--info-soft);color:var(--info)}
+  .contract-block .txt{font-size:12.5px;color:var(--ink-2);line-height:1.6}
+  .contract-block .txt code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg-soft);padding:1px 5px;border-radius:4px;color:var(--ink)}
+  .contract-block .acts{display:flex;gap:6px;margin-top:6px}
+  .contract-block .acts .btn{font-size:11.5px;padding:4px 10px;height:28px}
+  .path-stack{display:flex;flex-direction:column;gap:2px;line-height:1.95}
+  .path-row{display:flex;align-items:center;gap:8px}
+  .path-row .m{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap}
+  .path-row .m.get{background:var(--ok-soft);color:var(--ok-ink)}
+  .path-row .m.post{background:var(--brand-soft);color:var(--brand-ink)}
+  .path-row .m.patch{background:var(--accent-soft);color:var(--accent-ink)}
+  .path-row .m.put{background:var(--warn-soft);color:var(--warn-ink)}
+  .path-row .m.delete{background:var(--err-soft);color:var(--err)}
+  .path-row .p{font-family:var(--font-mono);font-size:12px;color:var(--ink)}
+  .search.compact{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:7px;background:#fff;border:1px solid var(--line);font-size:11.5px;color:var(--ink-3);width:220px;max-width:240px;flex-shrink:0}
+  @media (max-width:1180px){.top-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="l">W</div><div>WES</div></div>
+      <div class="grp">
+        <h6>工作台</h6>
+        <a href="home.html"><span class="ic">●</span>主页</a>
+        <a href="requirement-list.html"><span class="ic">✎</span>需求</a>
+        <a href="assessment-list.html"><span class="ic">▣</span>实施评估</a>
+        <a href="dev-assessment-list.html"><span class="ic">◆</span>开发评估</a>
+        <a href="resource-cost-list.html"><span class="ic">$</span>资源成本</a>
+        <a href="wbs.html"><span class="ic">☷</span>WBS</a>
+        <a href="review-list.html"><span class="ic">✓</span>评审</a>
+      </div>
+      <div class="grp">
+        <h6>系统</h6>
+        <a href="system-management.html"><span class="ic">⚙</span>系统管理</a>
+        <a href="user-management.html"><span class="ic">☺</span>用户管理</a>
+        <a href="api-keys.html" class="on"><span class="ic">⚿</span>API 密钥</a>
+      </div>
+      <div class="user">
+        <div class="row"><div class="av">M</div><div><div class="nm">mjlkevin</div><div class="meta">超级管理员</div></div></div>
+        <a class="out" href="login.html">退出</a>
+      </div>
+    </aside>
+    <main class="content">
+      <div class="pg-hd">
+        <div class="crumb"><b>工作台</b> &nbsp;/&nbsp; <b style="color:var(--ink)">API 密钥与接入</b></div>
+        <div class="row">
+          <h1>API 密钥与接入</h1>
+          <span style="color:var(--ink-3);font-size:12px;margin-left:6px">后端 Workload API · JWT (Authorization: Bearer)</span>
+        </div>
+      </div>
+
+      <div style="padding:18px 24px">
+        <div class="top-grid">
+          <!-- 推荐码 -->
+          <div class="reg">
+            <div class="hd">
+              <span>推荐码</span>
+              <div class="right"><button class="btn btn-pri" style="font-size:12px;padding:6px 12px" onclick="alert('Phase A · 静态 mock')">+ 生成推荐码</button></div>
+            </div>
+            <div class="bd">
+              <table class="table" id="inviteTable" style="border-radius:0;border-left:none;border-right:none">
+                <thead><tr><th>Code</th><th>状态</th><th>创建时间</th><th style="width:60px">复制</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- 接入与契约 -->
+          <div class="reg">
+            <div class="hd">接入与契约</div>
+            <div class="bd contract-section">
+              <div class="contract-block">
+                <span class="chip ok">Base URL</span>
+                <div class="txt">生产环境：<code>https://api.wes.local/v1</code><br>测试环境：<code>https://staging-api.wes.local/v1</code></div>
+              </div>
+              <div class="contract-block">
+                <span class="chip brand">鉴权</span>
+                <div class="txt">所有请求须在 Header 中携带 <code>Authorization: Bearer &lt;JWT&gt;</code>。<br>JWT 通过 <code>POST /api/auth/login</code> 获取，有效期 24h，支持刷新。</div>
+                <div class="acts">
+                  <button class="btn btn-out" style="font-size:11px;padding:4px 10px" onclick="alert('Phase A · 静态 mock')">📜 查看 OpenAPI</button>
+                  <button class="btn btn-out" style="font-size:11px;padding:4px 10px" onclick="alert('Phase A · 静态 mock')">⎘ 复制 cURL</button>
+                </div>
+              </div>
+              <div class="contract-block">
+                <span class="chip accent">响应</span>
+                <div class="txt">统一 JSON 信封：<code>{ "success": bool, "data": any, "error": { "code", "message" } }</code><br>HTTP 200 仅表示通信成功，业务错误以 <code>error</code> 字段呈现。</div>
+              </div>
+              <div class="contract-block">
+                <span class="chip info">上传</span>
+                <div class="txt">文件上传使用 <code>multipart/form-data</code>，单文件上限 20MB。<br>支持类型：.xlsx / .docx / .pdf / .md</div>
+                <div class="acts">
+                  <button class="btn btn-out" style="font-size:11px;padding:4px 10px" onclick="alert('Phase A · 静态 mock')">📜 查看 OpenAPI</button>
+                  <button class="btn btn-out" style="font-size:11px;padding:4px 10px" onclick="alert('Phase A · 静态 mock')">⎘ 复制 cURL</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 接口目录 -->
+        <div class="reg" style="margin-top:16px">
+          <div class="hd">
+            <span>接口目录</span>
+            <div class="right"><span class="search compact">⌕ 搜索接口 / 路径</span></div>
+          </div>
+          <div class="bd" style="padding:0">
+            <table class="table" id="apiTable" style="border-radius:0;border-left:none;border-right:none">
+              <thead><tr><th>分组</th><th>说明</th><th>路径</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../mock/data.js"></script>
+  <script>
+    (function(){
+      var codes = window.MOCK.inviteCodes || [];
+      var tbody1 = document.querySelector('#inviteTable tbody');
+      tbody1.innerHTML = codes.map(function(c){
+        var st = c.status==='USED'?'<span class="bdg draft" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>已使用</span>':'<span class="bdg ok" style="font-size:10.5px;padding:1px 6px"><span class="dot"></span>可用</span>';
+        var t = c.createdAt ? c.createdAt.replace('T',' ').replace('Z','') : '—';
+        return '<tr><td class="mono">'+c.code+'</td><td>'+st+'</td><td style="color:var(--ink-3);font-family:var(--font-mono);font-size:11px">'+t+'</td><td><button class="btn btn-ghost" style="font-size:11px;padding:4px 8px;height:26px" onclick="alert(\'已复制 '+c.code+'\')">复制</button></td></tr>';
+      }).join('');
+
+      var catalog = window.MOCK.apiCatalog || {};
+      var tbody2 = document.querySelector('#apiTable tbody');
+      var rows = [];
+      Object.keys(catalog).forEach(function(grp){
+        var list = catalog[grp];
+        var paths = list.map(function(ep){
+          var m = ep.method.toLowerCase();
+          var cls = m==='get'?'get':m==='post'?'post':m==='patch'?'patch':m==='put'?'put':'delete';
+          return '<div class="path-row"><span class="m '+cls+'">'+ep.method+'</span><span class="p">'+ep.path+'</span></div>';
+        }).join('');
+        rows.push('<tr><td style="font-weight:700;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase">'+grp+'</td><td style="font-size:12px;color:var(--ink-2)">'+list[0].desc+'</td><td><div class="path-stack">'+paths+'</div></td></tr>');
+      });
+      tbody2.innerHTML = rows.join('');
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "v2-prototype",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "5174", "--directory", "/Users/kevin/AI/Workload-evaluation-system/ui/V2_PROTOTYPE"],
+      "port": 5174
+    }
+  ]
+}

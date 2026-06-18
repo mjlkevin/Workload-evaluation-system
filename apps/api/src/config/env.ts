@@ -9,20 +9,40 @@ import path from "node:path";
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 dotenv.config();
 
+// W5-E: 生产环境 JWT secret 强校验
+const DEFAULT_DEV_JWT_SECRET = "dev-jwt-secret-change-me";
+const MIN_JWT_SECRET_BYTES = 32;
+const jwtSecret = process.env.JWT_SECRET || DEFAULT_DEV_JWT_SECRET;
+
+if (process.env.NODE_ENV === "production") {
+  const jwtSecretBytes = Buffer.byteLength(jwtSecret, "utf8");
+  if (jwtSecret === DEFAULT_DEV_JWT_SECRET || jwtSecretBytes < MIN_JWT_SECRET_BYTES) {
+    throw new Error(
+      `JWT_SECRET must be set to a random secret of at least ${MIN_JWT_SECRET_BYTES} bytes in production`,
+    );
+  }
+}
+
 export const config = {
   port: Number(process.env.PORT || 3000),
-  
+
   jwt: {
-    secret: process.env.JWT_SECRET || "dev-jwt-secret-change-me",
+    secret: jwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || "8h",
   },
   
   kimi: {
     apiKey: process.env.KIMI_API_KEY || "",
-    model: process.env.KIMI_MODEL || "moonshot-v1-8k",
+    model: process.env.KIMI_MODEL || "kimi-k2.5",
     apiBaseUrl: process.env.KIMI_API_BASE_URL || "https://api.moonshot.cn/v1",
   },
-  
+
+  database: {
+    /** PG 连接串，dev 默认 workload_eval 库；测试用 workload_eval_test */
+    url: process.env.DATABASE_URL || "",
+    poolMax: Number(process.env.DATABASE_POOL_MAX || 10),
+  },
+
   // 常量配置
   constants: {
     EXPORT_IDEMPOTENCY_TTL_MS: 10 * 60 * 1000,

@@ -10,7 +10,7 @@ This repository is linked to a [v0](https://v0.app) project. You can continue de
 
 ## Getting Started
 
-First, run the development server:
+First, run the development server（端口 3001，避免与 API 默认 3000 冲突）:
 
 ```bash
 npm run dev

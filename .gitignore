@@ -24,6 +24,7 @@ build/
 
 # 导出产物与运行时目录（与设计文档约定一致时可调整路径）
 exports/
+!apps/api/src/modules/exports/
 
 # 日志与覆盖率
 logs/
@@ -48,3 +49,18 @@ Thumbs.db
 # 本地临时目录
 .tmp-gh-push/
 backups/
+
+# 运行时临时缓存（tsx/node test artifacts）
+apps/api/.tmp/
+.tmp/
+
+# 工具本地状态（不跨机器同步）
+.kimi/
+Session/
+.claude/worktrees/
+.codex-tools/
+.superpowers/
+.elder-gods/
+.qoder/
+qa-outputs/
+observations_output.json

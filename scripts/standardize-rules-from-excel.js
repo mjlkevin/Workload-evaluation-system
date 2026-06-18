@@ -40,7 +40,7 @@ function main() {
   const rootDir = process.cwd();
   const excelPath = path.resolve(
     rootDir,
-    "01_需求管理/原始需求/金蝶AI星空-实施人天估算-R202602-V1.0（0303版本）.xlsx"
+    "01_需求管理/原始需求/实施评估RR/金蝶AI星空-实施人天估算-R202602-V1.0（0303版本）.xlsx"
   );
   const rulePath = path.resolve(rootDir, "config/rules/example-rule-set.json");
 
