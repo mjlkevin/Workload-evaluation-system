@@ -1,4 +1,4 @@
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const jwt = require("jsonwebtoken");
@@ -94,6 +94,23 @@ async function waitForServerReady(baseUrl, maxRetry = 40) {
   throw new Error("api_server_not_ready");
 }
 
+function stopProcessTree(child) {
+  if (!child || !child.pid) return;
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch (_err) {
+    try {
+      child.kill("SIGTERM");
+    } catch (_killErr) {
+      // Best-effort cleanup for integration subprocesses.
+    }
+  }
+}
+
 async function run() {
   const projectRoot = process.cwd();
   const auth = buildAuthContext(projectRoot);
@@ -105,6 +122,7 @@ async function run() {
   const baseUrl = `http://localhost:${port}`;
   const apiProcess = spawn("npm", ["run", "dev:api"], {
     env: { ...process.env, PORT: String(port) },
+    detached: process.platform !== "win32",
     stdio: ["ignore", "pipe", "pipe"]
   });
 
@@ -239,7 +257,7 @@ async function run() {
       )
     );
   } finally {
-    apiProcess.kill("SIGTERM");
+    stopProcessTree(apiProcess);
     await sleep(300);
   }
 }
