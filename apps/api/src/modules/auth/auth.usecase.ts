@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
-import { AuthUser, InviteCodeRecord } from "../../types";
+import { AuthUser, InviteCodeRecord, PasswordResetTokenRecord } from "../../types";
+import { config } from "../../config/env";
 import { asString, generateInviteCode } from "../../utils";
 import { ok, fail } from "../../utils/response";
 import {
@@ -16,7 +17,27 @@ import {
   isBusinessRole,
   defaultBusinessRoleForSystemRole,
 } from "../../middleware/auth";
-import { loadInviteCodesStore, saveInviteCodesStore } from "./auth.repository";
+import {
+  loadInviteCodesStore,
+  loadPasswordResetTokensStore,
+  saveInviteCodesStore,
+  savePasswordResetTokensStore,
+} from "./auth.repository";
+
+const REMEMBER_ME_EXPIRES_IN = "7d";
+const PASSWORD_RESET_EXPIRES_MINUTES = 30;
+
+function asBoolean(value: unknown): boolean {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
+function hashResetToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function createResetToken(): string {
+  return randomBytes(32).toString("base64url");
+}
 
 export async function register(req: Request, res: Response) {
   const requestId = randomUUID();
@@ -78,6 +99,7 @@ export async function login(req: Request, res: Response) {
   const requestId = randomUUID();
   const username = asString(req.body?.username);
   const password = asString(req.body?.password);
+  const rememberMe = asBoolean(req.body?.rememberMe);
 
   if (!username || !password) {
     return fail(res, 40001, "参数错误", [{ field: "username/password", reason: "required" }]);
@@ -100,8 +122,99 @@ export async function login(req: Request, res: Response) {
   user.lastLoginAt = new Date().toISOString();
   saveUsersStore(store);
 
-  const token = signAuthToken(user);
-  res.json(ok({ token, user: toPublicUser(user) }, requestId));
+  const expiresIn = rememberMe ? REMEMBER_ME_EXPIRES_IN : undefined;
+  const token = signAuthToken(user, expiresIn ? { expiresIn } : {});
+  res.json(ok({
+    token,
+    user: toPublicUser(user),
+    rememberMe,
+    expiresIn: expiresIn || String(config.jwt.expiresIn),
+  }, requestId));
+}
+
+export async function requestPasswordReset(req: Request, res: Response) {
+  const requestId = randomUUID();
+  const username = asString(req.body?.username);
+  if (!username) {
+    return fail(res, 40001, "参数错误", [{ field: "username", reason: "required" }]);
+  }
+
+  const store = loadUsersStore();
+  const user = store.users.find((x) => x.username.toLowerCase() === username.toLowerCase());
+  if (!user || user.status !== "active") {
+    return res.json(ok({
+      accepted: true,
+      expiresInMinutes: PASSWORD_RESET_EXPIRES_MINUTES,
+      delivery: "admin_or_local_link",
+    }, requestId));
+  }
+
+  const token = createResetToken();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + PASSWORD_RESET_EXPIRES_MINUTES * 60 * 1000);
+  const resetStore = loadPasswordResetTokensStore();
+  for (const item of resetStore.tokens) {
+    if (item.userId === user.id && item.status === "active") {
+      item.status = "used";
+      item.usedAt = now.toISOString();
+    }
+  }
+  const record: PasswordResetTokenRecord = {
+    id: randomUUID(),
+    userId: user.id,
+    username: user.username,
+    tokenHash: hashResetToken(token),
+    status: "active",
+    createdAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+  };
+  resetStore.tokens.push(record);
+  savePasswordResetTokensStore(resetStore);
+
+  res.json(ok({
+    accepted: true,
+    resetToken: token,
+    resetUrl: `/reset-password?token=${encodeURIComponent(token)}`,
+    expiresInMinutes: PASSWORD_RESET_EXPIRES_MINUTES,
+    delivery: "admin_or_local_link",
+  }, requestId));
+}
+
+export async function confirmPasswordReset(req: Request, res: Response) {
+  const requestId = randomUUID();
+  const token = asString(req.body?.token);
+  const password = asString(req.body?.password);
+  if (!token) {
+    return fail(res, 40001, "参数错误", [{ field: "token", reason: "required" }]);
+  }
+  if (!password || password.length < 8) {
+    return fail(res, 40001, "参数错误", [{ field: "password", reason: "min_length_8" }]);
+  }
+
+  const resetStore = loadPasswordResetTokensStore();
+  const tokenHash = hashResetToken(token);
+  const record = resetStore.tokens.find((item) => item.tokenHash === tokenHash);
+  if (!record || record.status !== "active" || Number(new Date(record.expiresAt)) <= Date.now()) {
+    return fail(res, 40001, "参数错误", [{ field: "token", reason: "invalid_or_expired" }]);
+  }
+
+  const store = loadUsersStore();
+  const user = store.users.find((item) => item.id === record.userId && item.status === "active");
+  if (!user) {
+    record.status = "used";
+    record.usedAt = new Date().toISOString();
+    savePasswordResetTokensStore(resetStore);
+    return fail(res, 40001, "参数错误", [{ field: "token", reason: "invalid_or_expired" }]);
+  }
+
+  user.passwordHash = await bcrypt.hash(password, 10);
+  saveUsersStore(store);
+
+  record.status = "used";
+  record.usedAt = new Date().toISOString();
+  savePasswordResetTokensStore(resetStore);
+
+  res.json(ok({ success: true }, requestId));
 }
 
 export function me(req: Request, res: Response) {

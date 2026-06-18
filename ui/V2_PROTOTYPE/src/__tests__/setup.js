@@ -22,6 +22,7 @@ beforeEach(() => {
 afterEach(() => {
   server.resetHandlers()
   localStorage.clear()
+  sessionStorage.clear()
   vi.restoreAllMocks()
 })
 

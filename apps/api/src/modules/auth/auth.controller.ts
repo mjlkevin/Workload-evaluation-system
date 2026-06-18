@@ -1,6 +1,8 @@
 export {
   register,
   login,
+  requestPasswordReset,
+  confirmPasswordReset,
   me,
   logout,
   listUsers,

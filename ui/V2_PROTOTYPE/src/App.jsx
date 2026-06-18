@@ -20,10 +20,11 @@ import SystemManagement from './pages/SystemManagement.jsx'
 import UserManagement from './pages/UserManagement.jsx'
 import ApiKeys from './pages/ApiKeys.jsx'
 import Login from './pages/Login.jsx'
+import ResetPassword from './pages/ResetPassword.jsx'
 
 function Layout({ children }) {
   const location = useLocation()
-  const isLogin = location.pathname === '/login'
+  const isLogin = location.pathname === '/login' || location.pathname === '/reset-password'
   if (isLogin) return children
   return <Shell>{children}</Shell>
 }
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/users" element={<UserManagement />} />
         <Route path="/api-keys" element={<ApiKeys />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </Layout>
   )

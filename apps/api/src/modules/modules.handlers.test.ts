@@ -8,9 +8,9 @@ import { Request, Response } from "express";
 
 import { AuthUser } from "../types";
 import { config } from "../config/env";
-import { loadUsersStore, saveUsersStore, signAuthToken } from "../middleware/auth";
-import { aiSessionsStorePath, usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
-import { listUsers, login, me, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
+import { loadUsersStore, saveUsersStore, signAuthToken, verifyAuthToken } from "../middleware/auth";
+import { aiSessionsStorePath, passwordResetTokensStorePath, usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
+import { confirmPasswordReset, listUsers, login, me, requestPasswordReset, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
 import {
@@ -168,6 +168,41 @@ test("auth.usecase: login returns required error when username/password missing"
   assert.equal((res.body as { code?: number }).code, 40001);
 });
 
+test("auth.usecase: login can issue a remembered 7-day token", async () => {
+  await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
+    const user: AuthUser = {
+      id: "ut-remember-login-target",
+      username: "ut-remember-login-target",
+      passwordHash: await bcrypt.hash("Remember123!", 10),
+      role: "user",
+      businessRole: "pre_sales",
+      status: "active",
+      createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+      lastLoginAt: "",
+    };
+    const testStore = loadUsersStore();
+    testStore.users = testStore.users.filter((item) => item.id !== user.id);
+    testStore.users.push(user);
+    saveUsersStore(testStore);
+
+    const issuedAtSeconds = Math.floor(Date.now() / 1000);
+    const req = createMockReq({ body: { username: user.username, password: "Remember123!", rememberMe: true } });
+    const res = createMockRes();
+    await login(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as { code: number; data: { token: string; expiresIn: string; rememberMe: boolean } };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.expiresIn, "7d");
+    assert.equal(body.data.rememberMe, true);
+
+    const decoded = verifyAuthToken(body.data.token);
+    assert.ok(decoded);
+    const payload = JSON.parse(Buffer.from(body.data.token.split(".")[1], "base64url").toString("utf-8")) as { exp: number; iat: number };
+    assert.ok(payload.exp - (payload.iat || issuedAtSeconds) >= 604700);
+  });
+});
+
 test("auth.usecase: me returns 401 without token", () => {
   const req = createMockReq({});
   const res = createMockRes();
@@ -284,6 +319,68 @@ test("auth.usecase: updateUserPassword lets an admin reset login password", asyn
     await login(createMockReq({ body: { username: target.username, password: "NewPass123!" } }), newLoginRes as unknown as Response);
     assert.equal(newLoginRes.statusCode, 200);
     assert.equal((newLoginRes.body as { data: { user: { id: string } } }).data.user.id, target.id);
+  });
+});
+
+test("auth.usecase: password reset request and confirm update password once", async () => {
+  await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
+    await withFileSnapshotRestoreAsync(passwordResetTokensStorePath(), async () => {
+      const target: AuthUser = {
+        id: "ut-password-reset-target",
+        username: "ut-password-reset-target",
+        passwordHash: await bcrypt.hash("OldPass123!", 10),
+        role: "user",
+        businessRole: "pre_sales",
+        status: "active",
+        createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+        lastLoginAt: "",
+      };
+      const testStore = loadUsersStore();
+      testStore.users = testStore.users.filter((user) => user.id !== target.id);
+      testStore.users.push(target);
+      saveUsersStore(testStore);
+
+      const requestRes = createMockRes();
+      await requestPasswordReset(
+        createMockReq({ body: { username: target.username } }),
+        requestRes as unknown as Response
+      );
+
+      assert.equal(requestRes.statusCode, 200);
+      const requestBody = requestRes.body as {
+        code: number;
+        data: { accepted: boolean; resetToken?: string; resetUrl?: string; expiresInMinutes: number };
+      };
+      assert.equal(requestBody.code, 0);
+      assert.equal(requestBody.data.accepted, true);
+      assert.equal(requestBody.data.expiresInMinutes, 30);
+      assert.ok(requestBody.data.resetToken);
+      assert.ok(requestBody.data.resetUrl?.includes("/reset-password?token="));
+
+      const confirmRes = createMockRes();
+      await confirmPasswordReset(
+        createMockReq({ body: { token: requestBody.data.resetToken, password: "NewPass123!" } }),
+        confirmRes as unknown as Response
+      );
+      assert.equal(confirmRes.statusCode, 200);
+      assert.equal((confirmRes.body as { code: number; data: { success: boolean } }).data.success, true);
+
+      const oldLoginRes = createMockRes();
+      await login(createMockReq({ body: { username: target.username, password: "OldPass123!" } }), oldLoginRes as unknown as Response);
+      assert.equal(oldLoginRes.statusCode, 400);
+
+      const newLoginRes = createMockRes();
+      await login(createMockReq({ body: { username: target.username, password: "NewPass123!" } }), newLoginRes as unknown as Response);
+      assert.equal(newLoginRes.statusCode, 200);
+
+      const reuseRes = createMockRes();
+      await confirmPasswordReset(
+        createMockReq({ body: { token: requestBody.data.resetToken, password: "AnotherPass123!" } }),
+        reuseRes as unknown as Response
+      );
+      assert.equal(reuseRes.statusCode, 400);
+      assert.equal((reuseRes.body as { code?: number }).code, 40001);
+    });
   });
 });
 

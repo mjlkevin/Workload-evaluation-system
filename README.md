@@ -15,7 +15,8 @@
   - `系统管理`（**admin**：版本号编码规则列表、配置、生效、禁用；持久化 `config/versions/version-code-rules.json`）
   - `WBS`（只读派生视图，见下文 API）、`评审`（团队评审能力见 `/api/v1/teams/.../reviews`）
 - 用户与权限：
-  - 注册/登录/JWT 鉴权
+  - 注册/登录/JWT 鉴权，支持“记住 7 天”会话
+  - 自助密码重置（一次性 token，文件持久化；无邮件服务时返回本地重置链接）
   - 管理员用户管理、状态启停
   - 推荐码（邀请码）生成与注册校验
 - 版本体系（前后端联动）：
@@ -57,6 +58,7 @@
 - 后端：Express + TypeScript（`apps/api`）
 - 存储：当前以本地文件持久化为主（非传统数据库）
   - 用户：`config/auth/users.json`
+  - 密码重置令牌：`config/auth/password-reset-tokens.json`
   - 推荐码：`config/auth/invite-codes.json`
   - 版本：`config/versions/records.json`
   - 版本号规则：`config/versions/version-code-rules.json`

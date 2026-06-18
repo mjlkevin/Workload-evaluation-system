@@ -67,6 +67,13 @@ export function inviteCodesStorePath(): string {
 }
 
 /**
+ * 密码重置令牌存储路径
+ */
+export function passwordResetTokensStorePath(): string {
+  return path.resolve(resolveRootDir(), "config/auth/password-reset-tokens.json");
+}
+
+/**
  * 版本存储路径
  */
 export function versionsStorePath(): string {

@@ -11,6 +11,8 @@ const router = Router();
 // 公开（无需认证）
 router.post("/register", AuthModule.register);
 router.post("/login", AuthModule.login);
+router.post("/password-reset/request", AuthModule.requestPasswordReset);
+router.post("/password-reset/confirm", AuthModule.confirmPasswordReset);
 
 // 仅需登录态
 router.get("/me", requireAuthenticated(), AuthModule.me);

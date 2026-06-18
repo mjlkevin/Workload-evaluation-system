@@ -228,6 +228,21 @@ export type InviteCodesStore = {
   codes: InviteCodeRecord[];
 };
 
+export type PasswordResetTokenRecord = {
+  id: string;
+  userId: string;
+  username: string;
+  tokenHash: string;
+  status: "active" | "used";
+  createdAt: string;
+  expiresAt: string;
+  usedAt?: string;
+};
+
+export type PasswordResetTokensStore = {
+  tokens: PasswordResetTokenRecord[];
+};
+
 export type AuthJwtPayload = {
   sub: string;
   username: string;

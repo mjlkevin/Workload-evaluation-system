@@ -44,16 +44,16 @@ export default function useAuth({ enabled = true } = {}) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const login = async (username, password) => {
+  const login = async (username, password, rememberMe = false) => {
     if (!enabled) return { success: false, error: '登录暂不可用' }
 
     setLoading(true)
     setError(null)
     try {
-      const payload = await apiClient.post('/auth/login', { username, password })
+      const payload = await apiClient.post('/auth/login', { username, password, rememberMe })
       const token = extractToken(payload)
       if (!token) throw new Error('登录成功但未返回 token')
-      setToken(token)
+      setToken(token, { rememberMe })
       window.location.href = '/'
       return { success: true, error: null }
     } catch (err) {
