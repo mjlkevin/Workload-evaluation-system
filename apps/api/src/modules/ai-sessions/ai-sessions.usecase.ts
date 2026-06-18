@@ -106,6 +106,17 @@ export function getAiSession(user: AuthUser, sessionId: string): AiSessionRecord
   return loadAiSessionsStore().sessions.find((session) => session.ownerUserId === user.id && session.sessionId === sessionId) || null;
 }
 
+export function deleteAiSession(user: AuthUser, sessionId: string): boolean {
+  const id = asString(sessionId);
+  if (!id) return false;
+  const store = loadAiSessionsStore();
+  const beforeCount = store.sessions.length;
+  store.sessions = store.sessions.filter((session) => !(session.ownerUserId === user.id && session.sessionId === id));
+  if (store.sessions.length === beforeCount) return false;
+  saveAiSessionsStore(store);
+  return true;
+}
+
 export function appendAiSessionEvent(
   user: AuthUser,
   sessionId: string,

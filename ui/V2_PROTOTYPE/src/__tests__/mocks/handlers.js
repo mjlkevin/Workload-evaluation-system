@@ -78,6 +78,10 @@ export const handlers = [
       },
     })
   }),
+  http.delete(`${BASE}/ai-sessions/:sessionId`, ({ params }) => HttpResponse.json({
+    success: true,
+    data: { deletedSessionId: params.sessionId },
+  })),
   http.post(`${BASE}/ai-sessions/:sessionId/standard-drafts`, async ({ params, request }) => {
     const body = await request.json()
     const fileName = body.fileName || '金蝶官方评估文件'

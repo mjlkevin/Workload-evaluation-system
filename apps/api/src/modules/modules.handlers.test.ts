@@ -1027,6 +1027,33 @@ test("ai-sessions: appends messages and creates pending action", () => {
   });
 });
 
+test("ai-sessions: deletes an owned session permanently", () => {
+  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+    const token = getActiveUserToken();
+    const createReq = createMockReq({
+      token,
+      body: { title: "待删除会话", domain: "business_evaluation", workflowKey: "free_chat" },
+    });
+    const createRes = createMockRes();
+    AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+    const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
+
+    const deleteReq = createMockReq({ token, params: { sessionId } });
+    const deleteRes = createMockRes();
+    AiSessionsModule.deleteSession(deleteReq, deleteRes as unknown as Response);
+
+    assert.equal(deleteRes.statusCode, 200);
+    const body = deleteRes.body as { code: number; data: { deletedSessionId: string } };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.deletedSessionId, sessionId);
+
+    const getReq = createMockReq({ token, params: { sessionId } });
+    const getRes = createMockRes();
+    AiSessionsModule.getSession(getReq, getRes as unknown as Response);
+    assert.equal(getRes.statusCode, 404);
+  });
+});
+
 test("ai-sessions: normalizes invalid event fields and ignores blank events", () => {
   withFileSnapshotRestore(aiSessionsStorePath(), () => {
     const token = getActiveUserToken();

@@ -51,12 +51,21 @@ export function useAiSessions() {
     return session
   }, [upsertSession])
 
+  const deleteSession = useCallback(async (sessionId) => {
+    if (!sessionId) return false
+    await apiClient.delete(`/ai-sessions/${sessionId}`, { suppressUnauthorizedRedirect: true })
+    setSessions((prev) => prev.filter((item) => item.sessionId !== sessionId))
+    setActiveSession((current) => (current?.sessionId === sessionId ? null : current))
+    return true
+  }, [])
+
   return {
     sessions,
     activeSession,
     loadingSessions,
     loadSessions,
     createSession,
+    deleteSession,
     upsertSession,
     setActiveSession,
   }

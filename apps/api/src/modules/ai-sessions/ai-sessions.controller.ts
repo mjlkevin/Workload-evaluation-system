@@ -4,7 +4,7 @@ import { Request, Response } from "express";
 import { requireAuth } from "../../middleware/auth";
 import { asString } from "../../utils";
 import { fail, ok } from "../../utils/response";
-import { appendAiSessionEvent, createAiSession, getAiSession, listAiSessions } from "./ai-sessions.usecase";
+import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, listAiSessions } from "./ai-sessions.usecase";
 
 export function createSession(req: Request, res: Response) {
   const auth = requireAuth(req, res);
@@ -24,6 +24,16 @@ export function getSession(req: Request, res: Response) {
   const session = getAiSession(auth.user, asString(req.params.sessionId));
   if (!session) return fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
   return res.json(ok({ session }, randomUUID()));
+}
+
+export function deleteSession(req: Request, res: Response) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  const sessionId = asString(req.params.sessionId);
+  if (!deleteAiSession(auth.user, sessionId)) {
+    return fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
+  }
+  return res.json(ok({ deletedSessionId: sessionId }, randomUUID()));
 }
 
 export function appendSessionEvent(req: Request, res: Response) {

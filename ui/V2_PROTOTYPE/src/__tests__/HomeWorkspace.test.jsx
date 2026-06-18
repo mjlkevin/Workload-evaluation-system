@@ -297,6 +297,52 @@ describe('HomeWorkspace', () => {
     expect(projectCreateBody).toMatchObject({ projectName: 'XX制造 WMS 项目', customerName: 'XX制造' })
   })
 
+  test('deletes an AI home session after confirmation', async () => {
+    const sessions = [{
+      sessionId: 'session-delete',
+      title: '待删除会话',
+      domain: 'business_evaluation',
+      workflowKey: 'free_chat',
+      businessRole: 'pre_sales',
+      status: 'temporary_chat',
+      summary: '',
+      messages: [],
+      attachments: [],
+      artifacts: [],
+      pendingActions: [],
+      linkedRecords: {},
+      createdAt: '2026-06-14T00:00:00.000Z',
+      updatedAt: '2026-06-14T00:00:00.000Z',
+    }]
+    let deleteCalled = 0
+    server.use(
+      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: sessions } })),
+      http.delete(`${BASE}/ai-sessions/:sessionId`, ({ params }) => {
+        deleteCalled += 1
+        const index = sessions.findIndex((session) => session.sessionId === params.sessionId)
+        if (index >= 0) sessions.splice(index, 1)
+        return HttpResponse.json({ success: true, data: { deletedSessionId: params.sessionId } })
+      })
+    )
+    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+
+    expect(await screen.findByText('待删除会话')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '删除会话：待删除会话' }))
+    expect(screen.getByRole('dialog', { name: '删除会话' })).toBeInTheDocument()
+    expect(screen.getByText('确定要彻底删除这个 AI 会话吗？')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(deleteCalled).toBe(0)
+    expect(screen.queryByRole('dialog', { name: '删除会话' })).not.toBeInTheDocument()
+    expect(screen.getByText('待删除会话')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '删除会话：待删除会话' }))
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
+    await waitFor(() => expect(screen.queryByText('待删除会话')).not.toBeInTheDocument())
+    expect(deleteCalled).toBe(1)
+    expect(screen.getByText('暂无历史会话')).toBeInTheDocument()
+  })
+
   test('admin standard governance upload creates a standard draft artifact', async () => {
     server.use(
       http.get(`${BASE}/auth/me`, () => HttpResponse.json({
