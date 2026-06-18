@@ -59,6 +59,7 @@ apps/api/.tmp/
 Session/
 .claude/worktrees/
 .codex-tools/
+.superpowers/
 .elder-gods/
 .qoder/
 qa-outputs/

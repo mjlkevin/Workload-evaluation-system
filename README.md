@@ -52,6 +52,18 @@
 
 当前已挂载 `POST /api/v1/agent/chat`（JWT 鉴权），返回统一 JSON 事件数组；V1 先支持 Provider tool-calling、Agent 编排、售前初估工具和基础事件协议。抽取、PDF、真实归档工具与 V2 前端工作台仍在后续批次接线；契约说明见 [`docs/openapi.yaml`](docs/openapi.yaml)。
 
+## WES Harness Phase 1A-1D
+
+Harness 是 AI 工作台与 Agent 之间的受控业务工作环境，已从 Phase 1A 的 PostgreSQL-backed 基座推进到文件解析、证据沉淀、需求解析报告 v1/v2 与确认动作审计链路。当前 Harness 可持久化 HarnessRun、文件元数据、证据、产物、模型运行轨迹和工具事件；AI 工作台上传文件后进入 Harness 编排，报告 v2 的确认动作可生成传统项目/实施评估草稿，仍需人工确认/编辑后进入正式评估。
+
+验证：
+
+```bash
+npm run test:harness -w apps/api
+npm run test:modules -w apps/api
+npm run build -w apps/api
+```
+
 ## 技术栈
 
 - Web 前端：Vite + React（`ui/V2_PROTOTYPE`）
