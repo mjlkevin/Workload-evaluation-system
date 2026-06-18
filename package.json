@@ -35,6 +35,6 @@
     "test:e2e:web": "npm run test:web"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   }
 }
