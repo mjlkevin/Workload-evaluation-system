@@ -180,15 +180,16 @@ describe('HomeWorkspace', () => {
     fireEvent.change(input, { target: { value: '请分析附件' } })
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
 
-    expect(await screen.findByText('模型回复：请分析附件')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v1').length).toBeGreaterThan(0))
     expect(screen.getByText('客户需求说明.pdf')).toBeInTheDocument()
 
-    fireEvent.change(input, { target: { value: '继续补充范围' } })
+    fireEvent.change(input, { target: { value: '实施组织范围包含 3 个法人' } })
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
 
-    expect(await screen.findByText('模型回复：继续补充范围')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v2').length).toBeGreaterThan(0))
     expect(screen.getByText('客户需求说明.pdf')).toBeInTheDocument()
     expect(screen.getByText(/PDF · 1 KB · 已发送/)).toBeInTheDocument()
+    expect(screen.getByText('实施组织范围包含几个法人？：3 个法人')).toBeInTheDocument()
   })
 
   test('uses loaded session workflow when sending the next turn', async () => {
@@ -239,6 +240,52 @@ describe('HomeWorkspace', () => {
 
     expect(await screen.findByText('模型回复：继续需求解析')).toBeInTheDocument()
     expect(chatBody.workflowKey).toBe('parse_requirement_file')
+  })
+
+  test('deletes an AI home session after confirmation', async () => {
+    const sessions = [{
+      sessionId: 'session-delete',
+      title: '待删除会话',
+      domain: 'business_evaluation',
+      workflowKey: 'free_chat',
+      businessRole: 'pre_sales',
+      status: 'temporary_chat',
+      summary: '',
+      messages: [],
+      attachments: [],
+      artifacts: [],
+      pendingActions: [],
+      linkedRecords: {},
+      createdAt: '2026-06-14T00:00:00.000Z',
+      updatedAt: '2026-06-14T00:00:00.000Z',
+    }]
+    let deleteCalled = 0
+    server.use(
+      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: sessions } })),
+      http.delete(`${BASE}/ai-sessions/:sessionId`, ({ params }) => {
+        deleteCalled += 1
+        const index = sessions.findIndex((session) => session.sessionId === params.sessionId)
+        if (index >= 0) sessions.splice(index, 1)
+        return HttpResponse.json({ success: true, data: { deletedSessionId: params.sessionId } })
+      })
+    )
+    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+
+    expect(await screen.findByText('待删除会话')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '删除会话：待删除会话' }))
+    expect(screen.getByRole('dialog', { name: '删除会话' })).toBeInTheDocument()
+    expect(screen.getByText('确定要彻底删除这个 AI 会话吗？')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(deleteCalled).toBe(0)
+    expect(screen.queryByRole('dialog', { name: '删除会话' })).not.toBeInTheDocument()
+    expect(screen.getByText('待删除会话')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '删除会话：待删除会话' }))
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
+    await waitFor(() => expect(screen.queryByText('待删除会话')).not.toBeInTheDocument())
+    expect(deleteCalled).toBe(1)
+    expect(screen.getByText('暂无历史会话')).toBeInTheDocument()
   })
 
   test('shows session rail and confirms project creation action', async () => {
@@ -432,10 +479,364 @@ describe('HomeWorkspace', () => {
     fireEvent.change(input, { target: { value: '请分析附件' } })
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
 
-    expect(await screen.findByText('模型回复：请分析附件')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v1').length).toBeGreaterThan(0))
     expect(screen.getByText('客户需求说明.pdf')).toBeInTheDocument()
     expect(screen.getByText(/PDF · 1 KB · 已发送/)).toBeInTheDocument()
     expect(screen.queryByText(/已附加，将随下一条消息发送/)).not.toBeInTheDocument()
+  })
+
+  test('routes an attached AI home file through Harness before rendering report v1', async () => {
+    let parseCalled = false
+    let allowLocalFallback = ''
+    let createRunBody
+    let parseResultBody
+    let reportCalled = false
+    server.use(
+      http.post(`${BASE}/ai/parse-basic-info`, async ({ request }) => {
+        parseCalled = true
+        allowLocalFallback = new URL(request.url).searchParams.get('allowLocalFallback') || ''
+        return HttpResponse.json({
+          success: true,
+          data: {
+            basicInfo: {
+              projectName: '实施工作量评估申请',
+              customerName: '蓝海制造',
+              customerIndustry: '制造业',
+              productLines: ['金蝶云星空'],
+            },
+            requirementImportData: {
+              businessItems: [
+                { topic: '采购流程优化', description: '采购申请、审批与订单协同' },
+              ],
+              productModuleRows: [
+                { productLine: '金蝶云星空', moduleName: '供应链云', requirementDescription: '采购业务闭环' },
+              ],
+            },
+            sourceSheets: ['基础信息', '需求清单'],
+            model: 'kimi-k2.5',
+          },
+        })
+      }),
+      http.post(`${BASE}/harness/runs`, async ({ request }) => {
+        createRunBody = await request.json()
+        return HttpResponse.json({
+          success: true,
+          data: {
+            run: {
+              harnessRunId: 'harness-test-run',
+              title: createRunBody.title,
+              stage: 'uploaded',
+              status: 'waiting',
+            },
+          },
+        })
+      }),
+      http.post(`${BASE}/harness/runs/:runId/files`, async ({ request }) => {
+        const body = await request.json()
+        return HttpResponse.json({
+          success: true,
+          data: {
+            run: { harnessRunId: 'harness-test-run', stage: 'parsing', status: 'running' },
+            file: { harnessFileId: 'harness-test-file', fileName: body.fileName },
+          },
+        })
+      }),
+      http.post(`${BASE}/harness/runs/:runId/parse-result`, async ({ request }) => {
+        parseResultBody = await request.json()
+        return HttpResponse.json({
+          success: true,
+          data: {
+            run: { harnessRunId: 'harness-test-run', stage: 'evidence_ready', status: 'waiting' },
+            files: [],
+            evidences: [],
+            artifacts: [],
+            modelRuns: [],
+            toolEvents: [],
+          },
+        })
+      }),
+      http.post(`${BASE}/harness/runs/:runId/report-v1`, () => {
+        reportCalled = true
+        return HttpResponse.json({
+          success: true,
+          data: {
+            run: { harnessRunId: 'harness-test-run', stage: 'report_v1_ready', status: 'waiting' },
+            files: [],
+            evidences: [],
+            artifacts: [{
+              harnessArtifactId: 'artifact-report-v1',
+              artifactType: 'requirement_report_v1',
+              title: '需求解析报告 v1',
+              status: 'ready',
+              content: {
+                version: 'v1',
+                sourceFile: '实施工作量评估申请240616-V1.0.xlsx',
+                project: { projectName: '实施工作量评估申请', customerName: '蓝海制造', industry: '制造业' },
+                sourceSheets: ['基础信息', '需求清单'],
+                requirementFindings: [{ domain: '供应链', scenario: '采购流程优化', moduleHint: '供应链云', confidence: 0.8, evidenceRefs: ['需求清单'] }],
+                missingFields: [{ field: '实施组织范围', reason: '文件未明确', priority: 'must' }],
+                clarificationQuestions: [{ question: '实施组织范围包含几个法人？', targetRole: '客户项目负责人', reason: '影响工作量边界' }],
+                risks: [{ title: '范围风险', assumption: '组织范围未锁定', impact: '可能增加人天' }],
+                nextActions: [{ label: '补充项目信息', actionType: 'supplement_project_info' }],
+              },
+            }],
+            modelRuns: [{ harnessModelRunId: 'model-run-1', model: 'moonshot-v1-128k' }],
+            toolEvents: [],
+          },
+        })
+      })
+    )
+
+    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const input = await screen.findByRole('textbox')
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(['demo'], '实施工作量评估申请240616-V1.0.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+
+    fireEvent.change(fileInput, { target: { files: [file] } })
+    fireEvent.change(input, { target: { value: '请解析这个文件并启动工作流。' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v1').length).toBeGreaterThan(0))
+    expect(parseCalled).toBe(true)
+    expect(reportCalled).toBe(true)
+    expect(allowLocalFallback).toBe('true')
+    expect(createRunBody.title).toBe('实施工作量评估申请240616-V1.0.xlsx')
+    expect(parseResultBody.summary.customerName).toBe('蓝海制造')
+    expect(parseResultBody.items.some((item) => item.text.includes('采购流程优化'))).toBe(true)
+    expect(screen.getByText('蓝海制造')).toBeInTheDocument()
+    expect(screen.getByText(/采购流程优化/)).toBeInTheDocument()
+  })
+
+  test('follows up a v1 Harness report with user answers to generate v2', async () => {
+    let answersBody
+    let reportV2Called = false
+    let confirmBody
+    server.use(
+      http.post(`${BASE}/harness/runs/:runId/answers`, async ({ request }) => {
+        answersBody = await request.json()
+        return HttpResponse.json({
+          success: true,
+          data: { run: { harnessRunId: 'harness-test-run', stage: 'clarifying', status: 'waiting' } },
+        })
+      }),
+      http.post(`${BASE}/harness/runs/:runId/report-v2`, ({ params }) => {
+        reportV2Called = true
+        return HttpResponse.json({
+          success: true,
+          data: {
+            run: { harnessRunId: params.runId, stage: 'report_v2_ready', status: 'waiting' },
+            files: [],
+            evidences: [],
+            artifacts: [{
+              harnessArtifactId: 'artifact-report-v2',
+              artifactType: 'requirement_report_v2',
+              title: '需求解析报告 v2',
+              version: 'v2',
+              status: 'ready',
+              content: {
+                version: 'v2',
+                sourceFile: '实施工作量评估申请240616-V1.0.xlsx',
+                project: { projectName: '实施工作量评估申请', customerName: '蓝海制造', industry: '制造业' },
+                sourceSheets: ['基础信息', '需求清单'],
+                requirementFindings: [{ domain: '供应链', scenario: '采购流程优化', moduleHint: '供应链云', confidence: 0.9, evidenceRefs: ['需求清单'] }],
+                missingFields: [],
+                clarificationQuestions: [],
+                answeredQuestions: [{ question: '实施组织范围', answer: '3 个法人', source: 'user_chat' }],
+                risks: [{ title: '范围风险', assumption: '已锁定', impact: '可控' }],
+                nextActions: [{ label: '进入正式评估', actionType: 'enter_formal_estimation' }],
+                clarificationSummary: '已补充组织范围。',
+              },
+            }],
+            modelRuns: [{ harnessModelRunId: 'model-run-2', model: 'moonshot-v1-128k' }],
+            toolEvents: [],
+          },
+        })
+      }),
+      http.post(`${BASE}/harness/runs/:runId/actions/:actionId/confirm`, async ({ request }) => {
+        confirmBody = await request.json()
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: {
+            run: {
+              harnessRunId: 'harness-test-run',
+              stage: 'ready_for_estimation',
+              status: 'waiting',
+              projectEvaluationId: 'project-draft-1',
+              metadata: { links: { assessmentVersionId: 'assessment-draft-1' } },
+            },
+            event: {
+              harnessToolEventId: 'event-1',
+              actionId: 'enter_formal_estimation',
+              status: 'confirmed',
+              output: {
+                project: { projectId: 'project-draft-1', projectName: '实施工作量评估申请', status: 'draft' },
+                assessmentDraft: { recordId: 'assessment-draft-1', versionCode: 'IA-AI-DRAFT-001', status: 'draft_from_ai' },
+              },
+            },
+          },
+          requestId: 'test-harness-confirm',
+        })
+      }),
+    )
+
+    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const input = await screen.findByRole('textbox')
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(['demo'], '实施工作量评估申请240616-V1.0.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+
+    fireEvent.change(fileInput, { target: { files: [file] } })
+    fireEvent.change(input, { target: { value: '请解析这个文件并启动工作流。' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v1').length).toBeGreaterThan(0))
+
+    fireEvent.change(input, { target: { value: '实施组织范围包含 3 个法人' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v2').length).toBeGreaterThan(0))
+    expect(answersBody.answers[0]).toMatchObject({ field: 'user_chat_supplement', value: '实施组织范围包含 3 个法人', source: 'user_chat' })
+    expect(reportV2Called).toBe(true)
+
+    const actionButton = screen.getAllByRole('button', { name: '进入正式评估' }).find((button) => !button.disabled)
+    expect(actionButton).toBeTruthy()
+    expect(actionButton).not.toBeDisabled()
+    fireEvent.click(actionButton)
+
+    await waitFor(() => expect(confirmBody).toMatchObject({ confirmed: true, actionType: 'enter_formal_estimation' }))
+    expect(await screen.findByText(/已生成项目评估草稿：实施工作量评估申请/)).toBeInTheDocument()
+    expect(screen.getByText(/实施评估草稿：IA-AI-DRAFT-001/)).toBeInTheDocument()
+  })
+
+  test('keeps v2 fallback action buttons disabled when model returns no next actions', async () => {
+    let answersBody
+    server.use(
+      http.post(`${BASE}/harness/runs/:runId/answers`, async ({ request }) => {
+        answersBody = await request.json()
+        return HttpResponse.json({
+          success: true,
+          data: { run: { harnessRunId: 'harness-test-run', stage: 'clarifying', status: 'waiting' } },
+        })
+      }),
+      http.post(`${BASE}/harness/runs/:runId/report-v2`, ({ params }) => HttpResponse.json({
+        success: true,
+        data: {
+          run: { harnessRunId: params.runId, stage: 'report_v2_ready', status: 'waiting' },
+          files: [],
+          evidences: [],
+          artifacts: [{
+            harnessArtifactId: 'artifact-report-v2-empty-actions',
+            artifactType: 'requirement_report_v2',
+            title: '需求解析报告 v2',
+            version: 'v2',
+            status: 'ready',
+            content: {
+              version: 'v2',
+              sourceFile: '实施工作量评估申请240616-V1.0.xlsx',
+              project: { projectName: '实施工作量评估申请', customerName: '蓝海制造', industry: '制造业' },
+              sourceSheets: ['基础信息'],
+              requirementFindings: [],
+              missingFields: [],
+              clarificationQuestions: [],
+              answeredQuestions: [{ question: '实施组织范围', answer: '3 个法人', source: 'user_chat' }],
+              risks: [],
+              nextActions: [],
+              clarificationSummary: '已补充组织范围。',
+            },
+          }],
+          modelRuns: [{ harnessModelRunId: 'model-run-2', model: 'moonshot-v1-128k' }],
+          toolEvents: [],
+        },
+      })),
+    )
+
+    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const input = await screen.findByRole('textbox')
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(['demo'], '实施工作量评估申请240616-V1.0.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+
+    fireEvent.change(fileInput, { target: { files: [file] } })
+    fireEvent.change(input, { target: { value: '请解析这个文件并启动工作流。' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v1').length).toBeGreaterThan(0))
+
+    fireEvent.change(input, { target: { value: '实施组织范围包含 3 个法人' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v2').length).toBeGreaterThan(0))
+
+    expect(answersBody.answers[0].field).toBe('user_chat_supplement')
+    expect(screen.getAllByRole('button', { name: '进入正式评估' }).every((button) => button.disabled)).toBe(true)
+  })
+
+  test('renders requirement analysis report artifacts as report cards', async () => {
+    server.use(
+      http.post(`${BASE}/ai/home-workbench/chat`, async ({ request }) => {
+        const body = await request.json()
+        return HttpResponse.json({
+          success: true,
+          data: {
+            answer: '已生成《需求解析报告 v1》，请先补充关键缺失信息。',
+            businessRole: 'pre_sales',
+            roleLabel: '售前顾问',
+            model: 'kimi-k2.5',
+            session: {
+              sessionId: body.sessionId || 'session-report',
+              title: '实施工作量评估申请',
+              domain: 'business_evaluation',
+              workflowKey: body.workflowKey || 'parse_requirement_file',
+              businessRole: 'pre_sales',
+              status: 'requirement_drafting',
+              summary: '',
+              messages: [
+                { messageId: 'm-user', role: 'user', content: '请解析这个文件并启动工作流。', attachmentIds: ['att-1'], createdAt: '2026-06-14T00:00:00.000Z' },
+                { messageId: 'm-ai', role: 'assistant', content: '已生成《需求解析报告 v1》，请先补充关键缺失信息。', artifactIds: ['art-report'], createdAt: '2026-06-14T00:00:01.000Z' },
+              ],
+              attachments: [{ attachmentId: 'att-1', name: '实施工作量评估申请240616-V1.0.xlsx', size: 58000, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', createdAt: '2026-06-14T00:00:00.000Z' }],
+              artifacts: [{
+                artifactId: 'art-report',
+                type: 'requirement_analysis_report',
+                title: '需求解析报告 v1',
+                status: 'generated',
+                createdAt: '2026-06-14T00:00:01.000Z',
+                content: {
+                  sourceFile: '实施工作量评估申请240616-V1.0.xlsx',
+                  projectName: '哈希温控项目评估',
+                  customerName: '哈希温控',
+                  industry: '制造业',
+                  needs: ['智能核算：凭证处理 + 自动生成凭证', '报表体系：法定报表 + 自定义报表'],
+                  missingItems: ['自动生成凭证规则数量', '自定义报表清单'],
+                  risks: ['自定义报表范围易失控'],
+                },
+              }],
+              pendingActions: [],
+              linkedRecords: {},
+              createdAt: '2026-06-14T00:00:00.000Z',
+              updatedAt: '2026-06-14T00:00:01.000Z',
+            },
+          },
+        })
+      })
+    )
+
+    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+
+    const input = await screen.findByRole('textbox')
+    fireEvent.change(input, { target: { value: '请解析这个文件并启动工作流。' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v1').length).toBeGreaterThan(0))
+    expect(screen.getByText('哈希温控项目评估')).toBeInTheDocument()
+    expect(screen.getByText('哈希温控')).toBeInTheDocument()
+    expect(screen.getByText('智能核算：凭证处理 + 自动生成凭证')).toBeInTheDocument()
+    expect(screen.getByText('自动生成凭证规则数量')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '补充项目信息' })).toBeInTheDocument()
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
   })
 
   test('keeps the draft in place when AI home request needs login', async () => {

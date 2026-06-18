@@ -178,6 +178,35 @@ function mergeBasicInfo(primary: BasicProjectInfo, fallback: BasicProjectInfo): 
   merged.productLines = primary.productLines?.length ? primary.productLines : fallback.productLines || [];
   return merged;
 }
+
+function allowsLocalWorkbookFallback(req: Request): boolean {
+  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const query = req.query && typeof req.query === "object" ? req.query as Record<string, unknown> : {};
+  const value = asString(body.allowLocalFallback || query.allowLocalFallback).toLowerCase();
+  return value === "true" || value === "1" || value === "yes";
+}
+
+function buildLocalWorkbookParsePayload(params: {
+  workbook: XLSX.WorkBook;
+  workbookBasicInfo: BasicProjectInfo;
+  workbookRequirementData: RequirementImportData;
+  model: string;
+  fallbackReason: string;
+}) {
+  const productLines = params.workbookBasicInfo.productLines?.length
+    ? params.workbookBasicInfo.productLines
+    : inferProductLinesFromProductModules(params.workbookRequirementData.productModuleRows);
+  return {
+    basicInfo: { ...params.workbookBasicInfo, productLines },
+    requirementImportData: params.workbookRequirementData,
+    sourceSheets: params.workbook.SheetNames,
+    model: params.model,
+    mode: "local_fallback",
+    fallbackReason: params.fallbackReason,
+    rawContent: "",
+  };
+}
+
 async function parseRequirementImportByKimi(params: { apiUrl: string; apiKey: string; model: string; workbookText: string; timeoutMs: number; }) {
   const completion = await getKimiProvider().chatCompletion({ model: params.model, temperature: 0.1, responseFormat: "json_object", timeoutMs: params.timeoutMs, credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl }, messages: buildRequirementImportMessages(params.workbookText) });
   const parsed = parseJsonFromModelText(completion.content);
@@ -269,8 +298,18 @@ export async function parseBasicInfo(req: Request, res: Response) {
     const requirementSettings = loadRequirementSystemConfigStore().active;
     const model = requirementSettings.fileParsing.model?.trim() || requirementSettings.kimiEvaluation.model?.trim() || config.kimi.model;
     const modelForClient = normalizeKimiModelName(model);
+    const allowLocalFallback = allowsLocalWorkbookFallback(req);
 
     if (!apiKey) {
+      if (allowLocalFallback) {
+        return res.json(ok(buildLocalWorkbookParsePayload({
+          workbook,
+          workbookBasicInfo,
+          workbookRequirementData,
+          model: modelForClient,
+          fallbackReason: "api_key_missing",
+        }), requestId));
+      }
       return fail(res, 40001, "参数错误", [{ field: "apiKey", reason: "required_or_env_missing" }]);
     }
 
@@ -284,6 +323,15 @@ export async function parseBasicInfo(req: Request, res: Response) {
         timeoutMs: requirementSettings.kimiEvaluation.timeoutMs || 120000,
       });
     } catch (err) {
+      if (allowLocalFallback) {
+        return res.json(ok(buildLocalWorkbookParsePayload({
+          workbook,
+          workbookBasicInfo,
+          workbookRequirementData,
+          model: modelForClient,
+          fallbackReason: err instanceof Error ? err.message : "model_parse_failed",
+        }), requestId));
+      }
       return fail(res, 40001, "参数错误", [{ field: "model", reason: err instanceof Error ? err.message : "model_parse_failed" }]);
     }
 

@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiClient } from '../api/client.js'
+import {
+  bindHarnessFile,
+  confirmHarnessAction,
+  createHarnessRun,
+  generateHarnessReportV1,
+  generateHarnessReportV2,
+  submitHarnessAnswers,
+  submitHarnessParseResult,
+} from '../api/harness.js'
 import { unwrap } from '../api/utils.js'
 import ArtifactPanel from '../components/AiWorkbench/ArtifactPanel.jsx'
 import SessionRail from '../components/AiWorkbench/SessionRail.jsx'
@@ -87,6 +96,111 @@ function fileSizeLabel(size) {
   if (!size) return ''
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`
   return `${(size / 1024 / 1024).toFixed(size < 10 * 1024 * 1024 ? 1 : 0)} MB`
+}
+
+function pickArray(value) {
+  return Array.isArray(value) ? value.filter(Boolean) : []
+}
+
+function pickObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+}
+
+function findLatestHarnessV1Artifact(messages) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message.role !== 'assistant') continue
+    const v2Artifact = pickArray(message.artifacts).find((item) => (
+      item?.artifactType === 'requirement_report_v2' || item?.type === 'requirement_report_v2'
+    ))
+    if (v2Artifact) return null
+    const v1Artifact = pickArray(message.artifacts).find((item) => (
+      (item?.artifactType === 'requirement_report_v1' || item?.type === 'requirement_report_v1') && item?.harnessRunId
+    ))
+    if (v1Artifact) return { artifact: v1Artifact, message }
+  }
+  return null
+}
+
+function summarizeHomeParsedFile(file, payload) {
+  const data = unwrap(payload) || {}
+  const basicInfo = data.basicInfo || {}
+  const requirementData = data.requirementImportData || {}
+  const businessItems = [
+    ...pickArray(requirementData.businessItems),
+    ...pickArray(requirementData.businessNeedRows).map((item) => ({
+      topic: item.title || item.category || item.businessDomain,
+      description: item.businessNeed || item.solutionSuggestion,
+    })),
+  ].slice(0, 5)
+  const moduleRows = pickArray(requirementData.productModuleRows).slice(0, 5)
+  const productLines = pickArray(basicInfo.productLines).slice(0, 5)
+  const sheets = pickArray(data.sourceSheets).slice(0, 8)
+  const lines = [
+    'AI 已完成文件解析摘要：',
+    `文件：${file?.name || basicInfo.fileName || '未命名文件'}`,
+    basicInfo.projectName ? `项目：${basicInfo.projectName}` : '',
+    basicInfo.customerName ? `客户：${basicInfo.customerName}` : '',
+    basicInfo.customerIndustry ? `行业：${basicInfo.customerIndustry}` : '',
+    productLines.length ? `产品线：${productLines.join('、')}` : '',
+    sheets.length ? `工作表：${sheets.join('、')}` : '',
+  ].filter(Boolean)
+
+  if (businessItems.length) {
+    lines.push('业务需求：')
+    businessItems.forEach((item, index) => {
+      lines.push(`${index + 1}. ${item.topic || item.title || '未命名需求'}${item.description ? `：${item.description}` : ''}`)
+    })
+  }
+  if (moduleRows.length) {
+    lines.push('模块线索：')
+    moduleRows.forEach((item, index) => {
+      const title = [item.productLine, item.moduleName || item.module].filter(Boolean).join(' / ') || '未命名模块'
+      lines.push(`${index + 1}. ${title}${item.requirementDescription ? `：${item.requirementDescription}` : ''}`)
+    })
+  }
+  return lines.join('\n')
+}
+
+function buildHarnessParseResult(file, payload) {
+  const data = unwrap(payload) || {}
+  const basicInfo = pickObject(data.basicInfo)
+  const requirementData = pickObject(data.requirementImportData)
+  const sourceSheets = pickArray(data.sourceSheets)
+  const businessItems = [
+    ...pickArray(requirementData.businessItems).map((item) => ({
+      sourceSheet: item.sourceSheet || item.sheetName || '',
+      sourceCell: item.sourceCell || item.cell || '',
+      category: item.topic || item.category || item.businessDomain || '业务需求',
+      text: [item.topic || item.title || item.businessDomain, item.description || item.businessNeed || item.solutionSuggestion].filter(Boolean).join('：'),
+      metadata: item,
+    })),
+    ...pickArray(requirementData.businessNeedRows).map((item) => ({
+      sourceSheet: item.sourceSheet || item.sheetName || '',
+      sourceCell: item.sourceCell || item.cell || '',
+      category: item.category || item.businessDomain || '业务需求',
+      text: [item.title || item.category || item.businessDomain, item.businessNeed || item.solutionSuggestion].filter(Boolean).join('：'),
+      metadata: item,
+    })),
+    ...pickArray(requirementData.productModuleRows).map((item) => ({
+      sourceSheet: item.sourceSheet || item.sheetName || '',
+      sourceCell: item.sourceCell || item.cell || '',
+      category: item.productLine || '模块线索',
+      text: [item.productLine, item.moduleName || item.module, item.requirementDescription].filter(Boolean).join(' / '),
+      metadata: item,
+    })),
+  ].filter((item) => item.text)
+
+  return {
+    sourceFile: file?.name || basicInfo.fileName || '未命名文件',
+    sheets: sourceSheets,
+    summary: {
+      projectName: basicInfo.projectName || '',
+      customerName: basicInfo.customerName || '',
+      industry: basicInfo.customerIndustry || basicInfo.industry || '',
+    },
+    items: businessItems,
+  }
 }
 
 function AttachmentCard({ file, state = 'pending', onRemove, compact = false, inverted = false }) {
@@ -245,6 +359,173 @@ function RichAiMessage({ text }) {
   )
 }
 
+function ReportPill({ children, tone = 'soft' }) {
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      minHeight: 24,
+      padding: '2px 8px',
+      borderRadius: 7,
+      border: tone === 'warn' ? '1px solid #fed7aa' : '1px solid var(--line)',
+      background: tone === 'warn' ? '#fff7ed' : 'var(--bg-soft)',
+      color: tone === 'warn' ? '#9a3412' : 'var(--ink-2)',
+      fontSize: 11.5,
+      fontWeight: 700,
+    }}>
+      {children}
+    </span>
+  )
+}
+
+function ReportList({ title, items, empty = '待补充' }) {
+  const rows = pickArray(items)
+  return (
+    <div style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 10, background: '#fff', minWidth: 0 }}>
+      <b style={{ display: 'block', fontSize: 12, marginBottom: 8 }}>{title}</b>
+      {rows.length ? (
+        <ul style={{ margin: 0, paddingLeft: 16, display: 'grid', gap: 6, color: 'var(--ink-2)', fontSize: 12, lineHeight: 1.55 }}>
+          {rows.map((item, index) => <li key={`${title}-${index}`}>{String(item)}</li>)}
+        </ul>
+      ) : (
+        <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{empty}</span>
+      )}
+    </div>
+  )
+}
+
+function RequirementAnalysisReportCard({ artifact, onAction, confirmingActionId = '' }) {
+  const content = pickObject(artifact?.content)
+  const isLegacyReport = artifact?.type === 'requirement_analysis_report'
+  const isV2HarnessReport = artifact?.artifactType === 'requirement_report_v2' || artifact?.type === 'requirement_report_v2'
+  const isHarnessReport = isV2HarnessReport || artifact?.artifactType === 'requirement_report_v1' || artifact?.type === 'requirement_report_v1'
+  if (!artifact || (!isLegacyReport && !isHarnessReport)) return null
+  const title = artifact.title || (isV2HarnessReport ? '需求解析报告 v2' : '需求解析报告')
+  const project = pickObject(content.project)
+  const productLines = pickArray(content.productLines)
+  const sourceSheets = pickArray(content.sourceSheets)
+  const findings = pickArray(content.requirementFindings)
+  const missingFields = pickArray(content.missingFields)
+  const questions = pickArray(content.clarificationQuestions)
+  const risks = isHarnessReport
+    ? pickArray(content.risks).map((item) => {
+        const row = pickObject(item)
+        return [row.title, row.assumption, row.impact].filter(Boolean).join('：')
+      })
+    : pickArray(content.risks)
+  const nextActionItems = pickArray(content.nextActions).map((item) => {
+    if (typeof item === 'string') return { label: item, actionType: item }
+    const row = pickObject(item)
+    return { label: row.label || row.actionType || '下一步', actionType: row.actionType || row.label }
+  })
+  const needItems = isHarnessReport
+    ? findings.map((item) => {
+        const row = pickObject(item)
+        return [row.domain, row.scenario, row.moduleHint].filter(Boolean).join(' / ')
+      })
+    : content.needs
+  const moduleItems = isHarnessReport
+    ? findings.map((item) => pickObject(item).moduleHint).filter(Boolean)
+    : content.modules
+  const missingItems = isHarnessReport
+    ? [
+        ...missingFields.map((item) => {
+          const row = pickObject(item)
+          return [row.field, row.reason].filter(Boolean).join('：')
+        }),
+        ...questions.map((item) => {
+          const row = pickObject(item)
+          return [row.question, row.reason].filter(Boolean).join('：')
+        }),
+      ]
+    : content.missingItems
+  const answeredQuestions = isHarnessReport
+    ? pickArray(content.answeredQuestions).map((item) => {
+      const row = pickObject(item)
+      return [row.question, row.answer].filter(Boolean).join('：')
+    })
+    : []
+  return (
+    <section style={{
+      marginTop: 12,
+      border: '1px solid var(--line)',
+      borderRadius: 10,
+      background: '#fff',
+      overflow: 'hidden',
+      color: 'var(--ink)',
+    }}>
+      <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0 }}>
+          <h3 style={{ margin: 0, fontSize: 15 }}>{title}</h3>
+          <p style={{ margin: '4px 0 0', color: 'var(--ink-3)', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {content.sourceFile || '需求文件'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {isLegacyReport && <ReportPill>历史产物，非 Harness 生成</ReportPill>}
+          <ReportPill tone="warn">待补充 {pickArray(missingItems).length || 0} 项</ReportPill>
+        </div>
+      </div>
+      <div style={{ padding: 14, display: 'grid', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+          <div style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 10, background: 'var(--bg-soft)' }}>
+            <span style={{ display: 'block', color: 'var(--ink-3)', fontSize: 11 }}>项目</span>
+            <b style={{ display: 'block', marginTop: 4, fontSize: 12.5 }}>{project.projectName || content.projectName || '待补充'}</b>
+          </div>
+          <div style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 10, background: 'var(--bg-soft)' }}>
+            <span style={{ display: 'block', color: 'var(--ink-3)', fontSize: 11 }}>客户</span>
+            <b style={{ display: 'block', marginTop: 4, fontSize: 12.5 }}>{project.customerName || content.customerName || '待补充'}</b>
+          </div>
+          <div style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 10, background: 'var(--bg-soft)' }}>
+            <span style={{ display: 'block', color: 'var(--ink-3)', fontSize: 11 }}>行业</span>
+            <b style={{ display: 'block', marginTop: 4, fontSize: 12.5 }}>{project.industry || content.industry || '待补充'}</b>
+          </div>
+        </div>
+        {(productLines.length > 0 || sourceSheets.length > 0) && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {productLines.map((item) => <ReportPill key={`line-${item}`}>{item}</ReportPill>)}
+            {sourceSheets.map((item) => <ReportPill key={`sheet-${item}`}>表：{item}</ReportPill>)}
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 10 }}>
+          <ReportList title="需求识别" items={needItems} />
+          <ReportList title="模块线索" items={moduleItems} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <ReportList title="缺失/模糊信息" items={missingItems} />
+          <ReportList title="风险假设" items={risks} />
+        </div>
+        {isV2HarnessReport && answeredQuestions.length > 0 && (
+          <ReportList title="已确认信息" items={answeredQuestions} />
+        )}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {(nextActionItems.length ? nextActionItems : [{ label: '补充项目信息' }, { label: '生成待确认问题' }, { label: '进入正式评估' }]).map((action) => {
+            const actionKey = `${artifact.harnessRunId || ''}-${action.actionType || action.label}`
+            const isConfirming = confirmingActionId === actionKey
+            return (
+              <button
+                key={action.actionType || action.label}
+                className="btn btn-out"
+                type="button"
+                style={{ height: 30 }}
+                disabled={!isV2HarnessReport || !action.actionType || isConfirming}
+                title={
+                  isV2HarnessReport && action.actionType
+                    ? '点击确认该 Harness 下一步动作'
+                    : '下一阶段接入 Harness 动作确认后启用'
+                }
+                onClick={isV2HarnessReport && action.actionType ? () => onAction?.(artifact, action) : undefined}
+              >
+                {isConfirming ? '确认中…' : action.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function ConfirmDialog({ title, message, detail, error = '', confirmLabel = '确认', cancelLabel = '取消', confirming = false, onCancel, onConfirm }) {
   return (
     <div
@@ -337,17 +618,24 @@ function mapSessionMessages(session) {
   const attachmentsById = new Map((Array.isArray(session.attachments) ? session.attachments : [])
     .filter((attachment) => attachment?.attachmentId && attachment?.name)
     .map((attachment) => [attachment.attachmentId, attachment]))
+  const artifactsById = new Map((Array.isArray(session.artifacts) ? session.artifacts : [])
+    .filter((artifact) => artifact?.artifactId)
+    .map((artifact) => [artifact.artifactId, artifact]))
   return session.messages
     .filter((message) => message?.role === 'user' || message?.role === 'assistant')
     .map((message, index) => {
       const file = (Array.isArray(message.attachmentIds) ? message.attachmentIds : [])
         .map((attachmentId) => attachmentsById.get(attachmentId))
         .find(Boolean)
+      const artifacts = (Array.isArray(message.artifactIds) ? message.artifactIds : [])
+        .map((artifactId) => artifactsById.get(artifactId))
+        .filter(Boolean)
       return {
         id: message.messageId || `${session.sessionId}-${index}`,
         role: message.role,
         text: message.content || '',
         file: file ? { name: file.name, size: file.size, type: file.type } : undefined,
+        artifacts,
       }
     })
     .filter((message) => message.text)
@@ -360,7 +648,8 @@ function sameMessageList(left, right) {
     message.text === right[index]?.text &&
     message.file?.name === right[index]?.file?.name &&
     message.file?.size === right[index]?.file?.size &&
-    message.file?.type === right[index]?.file?.type
+    message.file?.type === right[index]?.file?.type &&
+    (message.artifacts || []).map((artifact) => artifact.artifactId).join(',') === (right[index]?.artifacts || []).map((artifact) => artifact.artifactId).join(',')
   ))
 }
 
@@ -373,6 +662,13 @@ function withCurrentUserFile(sessionMessages, userMessage) {
       ? { ...message, file: userMessage.file }
       : message
   ))
+}
+
+function mergePreservedLocalFileMessages(previousMessages, sessionMessages) {
+  const preserved = previousMessages.filter((message) => (
+    message.file?.name && !sessionMessages.some((item) => item.file?.name === message.file.name && item.text === message.text)
+  ))
+  return preserved.length ? [...preserved, ...sessionMessages] : sessionMessages
 }
 
 export default function AiHomeWorkbench({ currentUser }) {
@@ -420,7 +716,8 @@ export default function AiHomeWorkbench({ currentUser }) {
     setMessages((prev) => {
       if (prev.some((message) => message.loading || message.error || message.action)) return prev
       if (sessionMessages.length === 0 && prev.length > 0) return prev
-      return sameMessageList(prev, sessionMessages) ? prev : sessionMessages
+      const mergedMessages = mergePreservedLocalFileMessages(prev, sessionMessages)
+      return sameMessageList(prev, mergedMessages) ? prev : mergedMessages
     })
   }, [activeSession, sending])
 
@@ -485,6 +782,38 @@ export default function AiHomeWorkbench({ currentUser }) {
     setDeleteTargetSession(session)
   }
 
+  async function handleHarnessAction(artifact, action) {
+    if (!artifact?.harnessRunId || !action?.actionType || confirmingActionId) return
+    const actionKey = `${artifact.harnessRunId}-${action.actionType}`
+    setConfirmingActionId(actionKey)
+    try {
+      const result = await confirmHarnessAction(artifact.harnessRunId, action.actionType, { confirmed: true, actionType: action.actionType })
+      const project = result?.event?.output?.project || {}
+      const assessmentDraft = result?.event?.output?.assessmentDraft || {}
+      const successText = project.projectId || assessmentDraft.recordId
+        ? [
+            `已生成项目评估草稿：${project.projectName || project.projectId || '未命名项目'}`,
+            assessmentDraft.versionCode ? `实施评估草稿：${assessmentDraft.versionCode}` : '',
+            '请在传统工作台中人工确认/编辑后再进入正式评估。',
+          ].filter(Boolean).join('\n')
+        : `已确认「${action.label || action.actionType}」，Harness Run 阶段已推进。`
+      setMessages((prev) => [...prev, {
+        id: `ai-harness-action-${Date.now()}`,
+        role: 'assistant',
+        text: successText,
+      }])
+    } catch (err) {
+      setMessages((prev) => [...prev, {
+        id: `ai-harness-action-err-${Date.now()}`,
+        role: 'assistant',
+        text: `动作确认失败：${err.message || '请求失败'}`,
+        error: true,
+      }])
+    } finally {
+      setConfirmingActionId('')
+    }
+  }
+
   async function confirmDeleteSession() {
     const session = deleteTargetSession
     if (!session?.sessionId || deletingSessionId) return
@@ -545,14 +874,20 @@ export default function AiHomeWorkbench({ currentUser }) {
       : null
     const userMessage = { role: 'user', text: text || '请解析这个文件并启动工作流。', file: fileSnapshot }
     const loadingId = `ai-loading-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const loadingMessage = { id: loadingId, role: 'assistant', text: '正在理解你的问题', loading: true }
-    const outboundMessages = [...messages, userMessage]
+    const loadingMessage = {
+      id: loadingId,
+      role: 'assistant',
+      text: selectedFile ? '正在解析文件并调用 AI 深度分析' : '正在理解你的问题',
+      loading: true,
+    }
+    const baseOutboundMessages = messages
       .filter((message) => !message.loading && !message.error)
       .map((message) => ({
         role: message.role === 'assistant' ? 'assistant' : 'user',
         content: message.text,
         attachments: message.file ? [message.file] : [],
       }))
+    const harnessV1Context = !selectedFile && text ? findLatestHarnessV1Artifact(messages) : null
 
     setMessages((prev) => [...prev, userMessage, loadingMessage])
     setComposer('')
@@ -560,6 +895,169 @@ export default function AiHomeWorkbench({ currentUser }) {
     setDraftBeforeLogin(text)
     setSending(true)
     try {
+      let outboundFile = fileSnapshot
+      if (selectedFile) {
+        const formData = new FormData()
+        formData.append('file', selectedFile)
+        setMessages((prev) => prev.map((message) => (
+          message.id === loadingId ? { ...message, text: '正在提取文件结构并创建 Harness 运行' } : message
+        )))
+        const parsed = await apiClient.upload('/ai/parse-basic-info?allowLocalFallback=true', formData, { suppressUnauthorizedRedirect: true })
+        outboundFile = {
+          ...fileSnapshot,
+          parsedSummary: summarizeHomeParsedFile(selectedFile, parsed),
+        }
+        const workflowKey = activeWorkflowKey || activeSession?.workflowKey || 'parse_requirement_file'
+        const session = activeSession || await createSession({
+          title: text.slice(0, 40) || fileSnapshot?.name || 'AI 工作台会话',
+          workflowKey,
+          status: workflowKey === 'free_chat' ? 'temporary_chat' : 'rough_estimate',
+        })
+        setMessages((prev) => prev.map((message) => (
+          message.id === loadingId ? { ...message, text: '正在沉淀 evidence 并调用大模型生成需求解析报告' } : message
+        )))
+        const createdRun = await createHarnessRun({
+          title: fileSnapshot.name,
+          mode: 'interactive',
+          aiSessionId: session?.sessionId,
+        })
+        const run = createdRun?.run || createdRun
+        const bound = await bindHarnessFile(run.harnessRunId, {
+          attachmentId: `${Date.now()}-${fileSnapshot.name}`,
+          fileName: fileSnapshot.name,
+          fileSize: fileSnapshot.size,
+          mimeType: fileSnapshot.type,
+          role: 'requirement_source',
+        })
+        await submitHarnessParseResult(run.harnessRunId, {
+          fileId: bound?.file?.harnessFileId,
+          ...buildHarnessParseResult(selectedFile, parsed),
+        })
+        const reportDetail = await generateHarnessReportV1(run.harnessRunId, { force: false })
+        const reportArtifact = pickArray(reportDetail?.artifacts).find((artifact) => artifact.artifactType === 'requirement_report_v1')
+        if (reportArtifact) reportArtifact.harnessRunId = run.harnessRunId
+        const assistantMessage = {
+          id: `ai-harness-${Date.now()}`,
+          role: 'assistant',
+          text: '已生成《需求解析报告 v1》，请先补充关键缺失信息。',
+          artifacts: reportArtifact ? [reportArtifact] : [],
+          model: pickArray(reportDetail?.modelRuns).at(-1)?.model,
+        }
+        setMessages((prev) => prev.map((message) => (
+          message.id === loadingId ? assistantMessage : message
+        )))
+        if (session) {
+          const attachmentId = `harness-att-${Date.now()}`
+          const artifactId = reportArtifact?.harnessArtifactId || reportArtifact?.artifactId || `harness-art-${Date.now()}`
+          upsertSession({
+            ...session,
+            title: session.title || fileSnapshot.name,
+            messages: [
+              ...(Array.isArray(session.messages) ? session.messages : []),
+              {
+                messageId: `harness-user-${Date.now()}`,
+                role: 'user',
+                content: userMessage.text,
+                attachmentIds: [attachmentId],
+                createdAt: new Date().toISOString(),
+              },
+              {
+                messageId: `harness-ai-${Date.now()}`,
+                role: 'assistant',
+                content: assistantMessage.text,
+                artifactIds: reportArtifact ? [artifactId] : [],
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            attachments: [
+              ...(Array.isArray(session.attachments) ? session.attachments : []),
+              {
+                attachmentId,
+                name: fileSnapshot.name,
+                size: fileSnapshot.size,
+                type: fileSnapshot.type,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            artifacts: reportArtifact
+              ? [
+                  ...(Array.isArray(session.artifacts) ? session.artifacts : []),
+                  {
+                    artifactId,
+                    type: reportArtifact.artifactType || reportArtifact.type,
+                    ...reportArtifact,
+                  },
+                ]
+              : (Array.isArray(session.artifacts) ? session.artifacts : []),
+            updatedAt: new Date().toISOString(),
+          })
+        }
+        return
+      }
+      if (harnessV1Context) {
+        const runId = harnessV1Context.artifact.harnessRunId
+        setMessages((prev) => prev.map((message) => (
+          message.id === loadingId ? { ...message, text: '正在保存补充信息并生成需求解析报告 v2' } : message
+        )))
+        await submitHarnessAnswers(runId, {
+          answers: [{ field: 'user_chat_supplement', value: text, source: 'user_chat' }],
+        })
+        const reportDetail = await generateHarnessReportV2(runId, { force: false })
+        const v2Artifact = pickArray(reportDetail?.artifacts).find((artifact) => artifact.artifactType === 'requirement_report_v2')
+        if (v2Artifact) v2Artifact.harnessRunId = runId
+        const assistantMessage = {
+          id: `ai-harness-v2-${Date.now()}`,
+          role: 'assistant',
+          text: '已生成《需求解析报告 v2》，可点击下方动作继续推进。',
+          artifacts: v2Artifact ? [v2Artifact] : [],
+          model: pickArray(reportDetail?.modelRuns).at(-1)?.model,
+        }
+        setMessages((prev) => prev.map((message) => (
+          message.id === loadingId ? assistantMessage : message
+        )))
+        if (activeSession) {
+          const artifactId = v2Artifact?.harnessArtifactId || v2Artifact?.artifactId || `harness-art-v2-${Date.now()}`
+          upsertSession({
+            ...activeSession,
+            messages: [
+              ...(Array.isArray(activeSession.messages) ? activeSession.messages : []),
+              {
+                messageId: `harness-user-v2-${Date.now()}`,
+                role: 'user',
+                content: userMessage.text,
+                createdAt: new Date().toISOString(),
+              },
+              {
+                messageId: `harness-ai-v2-${Date.now()}`,
+                role: 'assistant',
+                content: assistantMessage.text,
+                artifactIds: v2Artifact ? [artifactId] : [],
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            artifacts: v2Artifact
+              ? [
+                  ...(Array.isArray(activeSession.artifacts) ? activeSession.artifacts : []),
+                  {
+                    artifactId,
+                    type: v2Artifact.artifactType || v2Artifact.type,
+                    ...v2Artifact,
+                  },
+                ]
+              : (Array.isArray(activeSession.artifacts) ? activeSession.artifacts : []),
+            updatedAt: new Date().toISOString(),
+          })
+        }
+        return
+      }
+      const outboundMessages = [
+        ...baseOutboundMessages,
+        {
+          role: 'user',
+          content: userMessage.text,
+          attachments: outboundFile ? [outboundFile] : [],
+        },
+      ]
       const workflowKey = activeWorkflowKey || activeSession?.workflowKey || 'free_chat'
       const session = activeSession || await createSession({
         title: text.slice(0, 40) || fileSnapshot?.name || 'AI 工作台会话',
@@ -576,7 +1074,10 @@ export default function AiHomeWorkbench({ currentUser }) {
         upsertSession(data.session)
         const sessionMessages = withCurrentUserFile(mapSessionMessages(data.session), userMessage)
         if (sessionMessages.length) {
-          setMessages((prev) => sameMessageList(prev, sessionMessages) ? prev : sessionMessages)
+          setMessages((prev) => {
+            const mergedMessages = mergePreservedLocalFileMessages(prev, sessionMessages)
+            return sameMessageList(prev, mergedMessages) ? prev : mergedMessages
+          })
         }
       } else {
         setMessages((prev) => prev.map((message) => (
@@ -711,6 +1212,14 @@ export default function AiHomeWorkbench({ currentUser }) {
                         ? <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
                         : <RichAiMessage text={message.text} />
                     )}
+                    {!isUser && !message.error && pickArray(message.artifacts).map((artifact) => (
+                      <RequirementAnalysisReportCard
+                        key={artifact.artifactId || artifact.title}
+                        artifact={artifact}
+                        onAction={handleHarnessAction}
+                        confirmingActionId={confirmingActionId}
+                      />
+                    ))}
                     {message.file && <div style={{ marginTop: 10 }}><AttachmentCard file={message.file} state="sent" compact inverted={isUser} /></div>}
                     {message.action === 'login_required' && (
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>

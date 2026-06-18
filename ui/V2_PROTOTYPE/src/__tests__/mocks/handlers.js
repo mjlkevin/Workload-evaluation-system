@@ -156,6 +156,236 @@ export const handlers = [
       },
     },
   })),
+  http.post(`${BASE}/ai/parse-basic-info`, () => HttpResponse.json({
+    success: true,
+    data: {
+      basicInfo: {
+        projectName: '测试项目',
+        customerName: '测试客户',
+        customerIndustry: '制造业',
+        productLines: ['金蝶云星空'],
+      },
+      requirementImportData: {
+        businessItems: [
+          { topic: '测试需求', description: '测试附件解析结果' },
+        ],
+        productModuleRows: [
+          {
+            productLine: '金蝶云星空',
+            moduleName: '供应链云',
+            requirementDescription: '测试模块线索',
+          },
+        ],
+      },
+      sourceSheets: ['Sheet1'],
+      model: 'rule-fallback',
+    },
+  })),
+  http.post(`${BASE}/harness/runs`, async ({ request }) => {
+    const body = await request.json()
+    return HttpResponse.json({
+      success: true,
+      data: {
+        run: {
+          harnessRunId: 'harness-run-1',
+          title: body.title || 'Harness Run',
+          mode: body.mode || 'interactive',
+          stage: 'uploaded',
+          status: 'waiting',
+          aiSessionId: body.aiSessionId || null,
+        },
+      },
+    })
+  }),
+  http.post(`${BASE}/harness/runs/:runId/files`, async ({ params, request }) => {
+    const body = await request.json()
+    return HttpResponse.json({
+      success: true,
+      data: {
+        run: {
+          harnessRunId: params.runId,
+          title: body.fileName,
+          stage: 'parsing',
+          status: 'running',
+        },
+        file: {
+          harnessFileId: 'harness-file-1',
+          harnessRunId: params.runId,
+          attachmentId: body.attachmentId,
+          fileName: body.fileName,
+          fileSize: body.fileSize,
+          mimeType: body.mimeType,
+          role: body.role,
+          createdAt: '2026-06-14T00:00:00.000Z',
+        },
+      },
+    })
+  }),
+  http.post(`${BASE}/harness/runs/:runId/parse-result`, async ({ params, request }) => {
+    const body = await request.json()
+    return HttpResponse.json({
+      success: true,
+      data: {
+        run: {
+          harnessRunId: params.runId,
+          title: body.sourceFile,
+          stage: 'evidence_ready',
+          status: 'waiting',
+        },
+        files: [],
+        evidences: [
+          { harnessEvidenceId: 'ev-1', sourceId: body.sourceFile, evidenceType: 'block' },
+          { harnessEvidenceId: 'ev-2', sourceId: 'Sheet1', evidenceType: 'item' },
+        ],
+        artifacts: [{
+          harnessArtifactId: 'artifact-file-understanding',
+          artifactType: 'file_understanding',
+          title: '文件理解结果 v1',
+          version: 'v1',
+          status: 'ready',
+          content: {
+            version: 'v1',
+            sourceFile: body.sourceFile,
+            sourceSheets: body.sheets || ['Sheet1'],
+            project: body.summary || { projectName: '测试项目', customerName: '测试客户', industry: '制造业' },
+            extractedItemCount: body.items?.length || 1,
+          },
+        }],
+        modelRuns: [],
+        toolEvents: [],
+      },
+    })
+  }),
+  http.post(`${BASE}/harness/runs/:runId/answers`, ({ params }) => HttpResponse.json({
+    success: true,
+    data: {
+      run: {
+        harnessRunId: params.runId,
+        title: '测试项目',
+        stage: 'clarifying',
+        status: 'waiting',
+      },
+    },
+  })),
+  http.post(`${BASE}/harness/runs/:runId/report-v2`, ({ params }) => HttpResponse.json({
+    success: true,
+    data: {
+      run: {
+        harnessRunId: params.runId,
+        title: '测试项目',
+        stage: 'report_v2_ready',
+        status: 'waiting',
+      },
+      files: [],
+      evidences: [],
+      artifacts: [{
+        harnessArtifactId: 'artifact-report-v2',
+        artifactType: 'requirement_report_v2',
+        title: '需求解析报告 v2',
+        version: 'v2',
+        status: 'ready',
+        content: {
+          version: 'v2',
+          sourceFile: '测试需求.xlsx',
+          project: { projectName: '测试项目', customerName: '测试客户', industry: '制造业' },
+          sourceSheets: ['Sheet1'],
+          requirementFindings: [
+            { domain: '财务核算', scenario: '测试需求', moduleHint: '总账', confidence: 0.92, evidenceRefs: ['Sheet1'] },
+          ],
+          missingFields: [],
+          clarificationQuestions: [],
+          answeredQuestions: [
+            { question: '实施组织范围包含几个法人？', answer: '3 个法人', source: 'user_chat' },
+          ],
+          risks: [
+            { title: '范围风险', assumption: '已通过补充信息锁定', impact: '可控' },
+          ],
+          nextActions: [
+            { label: '进入正式评估', actionType: 'enter_formal_estimation' },
+          ],
+          clarificationSummary: '已补充实施组织范围。',
+        },
+      }],
+      modelRuns: [{ harnessModelRunId: 'model-run-2', provider: 'kimi', model: 'moonshot-v1-128k' }],
+      toolEvents: [],
+    },
+  })),
+  http.post(`${BASE}/harness/runs/:runId/actions/:actionId/confirm`, ({ params }) => HttpResponse.json({
+    code: 0,
+    message: 'ok',
+    data: {
+      run: {
+        harnessRunId: params.runId,
+        stage: 'ready_for_estimation',
+        status: 'waiting',
+        projectEvaluationId: 'project-new',
+        metadata: { links: { assessmentVersionId: 'assessment-new', assessmentVersionCode: 'IA-AI-DRAFT-001' } },
+      },
+      event: {
+        harnessToolEventId: 'event-1',
+        actionId: params.actionId,
+        toolName: params.actionId,
+        eventType: 'confirmation',
+        status: 'confirmed',
+        output: {
+          project: { projectId: 'project-new', projectName: '测试项目', status: 'draft' },
+          assessmentDraft: { recordId: 'assessment-new', versionCode: 'IA-AI-DRAFT-001', status: 'draft_from_ai' },
+        },
+      },
+    },
+    requestId: 'mock-harness-confirm',
+  })),
+  http.post(`${BASE}/harness/runs/:runId/report-v1`, ({ params }) => HttpResponse.json({
+    success: true,
+    data: {
+      run: {
+        harnessRunId: params.runId,
+        title: '测试项目',
+        stage: 'report_v1_ready',
+        status: 'waiting',
+      },
+      files: [],
+      evidences: [],
+      artifacts: [{
+        harnessArtifactId: 'artifact-file-understanding',
+        artifactType: 'file_understanding',
+        title: '文件理解结果 v1',
+        version: 'v1',
+        status: 'ready',
+        content: {},
+      }, {
+        harnessArtifactId: 'artifact-report-v1',
+        artifactType: 'requirement_report_v1',
+        title: '需求解析报告 v1',
+        version: 'v1',
+        status: 'ready',
+        content: {
+          version: 'v1',
+          sourceFile: '测试需求.xlsx',
+          project: { projectName: '测试项目', customerName: '测试客户', industry: '制造业' },
+          sourceSheets: ['Sheet1'],
+          requirementFindings: [
+            { domain: '财务核算', scenario: '测试需求', moduleHint: '总账', confidence: 0.82, evidenceRefs: ['Sheet1'] },
+          ],
+          missingFields: [
+            { field: '实施组织范围', reason: '文件未明确', priority: 'must' },
+          ],
+          clarificationQuestions: [
+            { question: '实施组织范围包含几个法人？', targetRole: '客户项目负责人', reason: '影响工作量边界' },
+          ],
+          risks: [
+            { title: '范围风险', assumption: '组织范围未锁定', impact: '可能增加实施人天' },
+          ],
+          nextActions: [
+            { label: '补充项目信息', actionType: 'supplement_project_info' },
+            { label: '进入正式评估', actionType: 'enter_formal_estimation' },
+          ],
+        },
+      }],
+      modelRuns: [{ harnessModelRunId: 'model-run-1', provider: 'kimi', model: 'moonshot-v1-128k' }],
+      toolEvents: [],
+    },
+  })),
   http.post(`${BASE}/ai/home-workbench/chat`, async ({ request }) => {
     const body = await request.json()
     const answer = `模型回复：${body.messages?.at?.(-1)?.content || '收到'}`

@@ -1357,6 +1357,7 @@ test("ai.usecase: homeWorkbenchChat injects role context and persists messages i
       const systemPrompt = capturedBody.messages?.find((item) => item.role === "system")?.content || "";
       assert.match(systemPrompt, /售前顾问/);
       assert.match(systemPrompt, /parse_requirement_file/);
+      assert.doesNotMatch(systemPrompt, /当前阶段仅支持文本对话/);
 
       const followUpReq = createMockReq({
         token: getNonAdminUserToken(),
@@ -1435,6 +1436,109 @@ test("ai.usecase: homeWorkbenchChat keeps user turn in session when model fails"
   });
 });
 
+test("ai.usecase: homeWorkbenchChat asks the model to analyze parsed attachments into a report artifact", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+    const req = createMockReq({
+      token: getNonAdminUserToken(),
+      body: {
+        messages: [{
+          role: "user",
+          content: "请解析这个文件并启动工作流。",
+          attachments: [{
+            name: "实施工作量评估申请240616-V1.0.xlsx",
+            size: 58000,
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            parsedSummary: [
+              "AI 已完成文件解析摘要：",
+              "文件：实施工作量评估申请240616-V1.0.xlsx",
+              "项目：哈希温控项目评估",
+              "客户：哈希温控",
+              "行业：制造业",
+              "业务需求：",
+              "1. 智能核算：凭证处理 + 自动生成凭证",
+              "2. 报表体系：法定报表 + 自定义报表",
+            ].join("\n"),
+          }],
+        }],
+        workflowKey: "parse_requirement_file",
+      },
+    });
+    const res = createMockRes();
+    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+    const originalApiKey = config.kimi.apiKey;
+    let capturedBody: { messages?: Array<{ role: string; content: string }> } = {};
+    try {
+      config.kimi.apiKey = "unit-test-key";
+      bootstrapAiProviders();
+      (globalThis as { fetch?: unknown }).fetch = async (_url: unknown, init?: { body?: string }) => {
+        capturedBody = JSON.parse(String(init?.body || "{}")) as { messages?: Array<{ role: string; content: string }> };
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              message: {
+                content: JSON.stringify({
+                  answer: "已完成 AI 深度需求分析，并生成《需求解析报告 v1》。",
+                  projectName: "哈希温控项目评估",
+                  customerName: "哈希温控",
+                  industry: "制造业",
+                  productLines: ["金蝶云星空"],
+                  sourceSheets: ["1.项目概况", "3.业务需求及问题一览表"],
+                  needs: ["智能核算：凭证处理 + 自动生成凭证", "报表体系：法定报表 + 自定义报表"],
+                  modules: ["财务云 / 总账", "财务云 / 报表"],
+                  missingItems: ["自定义报表数量", "自动凭证规则复杂度"],
+                  risks: ["自定义报表范围可能扩大", "凭证规则依赖前端业务数据质量"],
+                  nextActions: ["补充项目信息", "生成待确认问题", "进入正式评估"],
+                }),
+              },
+            }],
+          }),
+        } as unknown;
+      };
+
+      await homeWorkbenchChat(req, res as unknown as Response);
+
+      assert.equal(res.statusCode, 200);
+      const body = res.body as {
+        code: number;
+        data: {
+          answer: string;
+          session: {
+            artifacts: Array<{ type: string; title: string; content: { sourceFile?: string; summary?: string; needs?: string[]; modules?: string[]; missingItems?: string[] } }>;
+            messages: Array<{ role: string; content: string; artifactIds?: string[] }>;
+            pendingActions: Array<{ actionType: string; title: string }>;
+          };
+        };
+      };
+      assert.equal(body.code, 0);
+      const systemPrompt = capturedBody.messages?.find((item) => item.role === "system")?.content || "";
+      const userPrompt = capturedBody.messages?.find((item) => item.role === "user")?.content || "";
+      assert.match(systemPrompt, /完整业务理解/);
+      assert.match(systemPrompt, /只输出 JSON/);
+      assert.match(userPrompt, /实施工作量评估申请240616-V1.0.xlsx/);
+      assert.match(userPrompt, /智能核算/);
+      assert.match(body.data.answer, /AI 深度需求分析/);
+      assert.equal(body.data.session.artifacts.length, 1);
+      assert.equal(body.data.session.artifacts[0].type, "requirement_analysis_report");
+      assert.equal(body.data.session.artifacts[0].title, "需求解析报告 v1");
+      assert.equal(body.data.session.artifacts[0].content.sourceFile, "实施工作量评估申请240616-V1.0.xlsx");
+      assert.match(body.data.session.artifacts[0].content.summary || "", /哈希温控/);
+      assert.deepEqual(body.data.session.artifacts[0].content.needs, [
+        "智能核算：凭证处理 + 自动生成凭证",
+        "报表体系：法定报表 + 自定义报表",
+      ]);
+      assert.deepEqual(body.data.session.artifacts[0].content.modules, ["财务云 / 总账", "财务云 / 报表"]);
+      assert.equal(body.data.session.pendingActions[0].actionType, "supplement_requirement_report");
+      assert.equal(body.data.session.messages[1].role, "assistant");
+      assert.equal(body.data.session.messages[1].artifactIds?.length, 1);
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = originalFetch;
+      config.kimi.apiKey = originalApiKey;
+      _resetAiBootstrapForTest();
+    }
+  });
+});
+
 test("ai.usecase: parseBasicInfo fails instead of returning rule fallback when model parsing fails", async () => {
   const req = createMockReq({
     token: getActiveUserToken(),
@@ -1461,6 +1565,49 @@ test("ai.usecase: parseBasicInfo fails instead of returning rule fallback when m
     assert.equal(body.code, 40001);
     assert.equal(body.details?.[0]?.field, "model");
     assert.match(body.details?.[0]?.reason || "", /parse timeout|timeout|kimi_request_timeout/i);
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
+});
+
+test("ai.usecase: parseBasicInfo can return local workbook fallback when explicitly allowed", async () => {
+  const req = createMockReq({
+    token: getActiveUserToken(),
+    body: { allowLocalFallback: "true" },
+    file: {
+      buffer: createMinimalRequirementWorkbookBuffer(),
+      originalname: "ut-requirement.xlsx",
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async () => {
+      throw new Error("parse timeout");
+    };
+    await parseBasicInfo(req, res as unknown as Response);
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: {
+        basicInfo: { projectName?: string; customerName?: string };
+        requirementImportData: { businessNeedRows?: Array<{ category?: string; businessNeed?: string }> };
+        mode?: string;
+        fallbackReason?: string;
+      };
+    };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.mode, "local_fallback");
+    assert.match(body.data.fallbackReason || "", /parse timeout|timeout|kimi_request_timeout/i);
+    assert.equal(body.data.basicInfo.projectName, "UT 模型解析项目");
+    assert.equal(body.data.basicInfo.customerName, "UT 客户");
+    assert.equal(body.data.requirementImportData.businessNeedRows?.[0]?.category, "采购");
+    assert.match(body.data.requirementImportData.businessNeedRows?.[0]?.businessNeed || "", /采购订单/);
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
