@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>测试 · WES Agent 升级总看板</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/dashboard.css" />
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-in">
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <nav class="navlinks" aria-label="主导航">
+        <a href="index.html">总览</a>
+        <a href="design.html">设计说明</a>
+        <a href="runtime.html">任务运行时</a>
+        <a href="plan.html">计划与进度</a>
+        <a class="active" href="testing.html">测试</a>
+        <a href="monitoring.html">监控与审计</a>
+        <a href="risks.html">风险与决策</a>
+        <a href="changes.html">变更记录</a>
+        <a href="sources.html">文档事实源</a>
+      </nav>
+      <span class="pill warn">人工测试</span>
+    </div>
+  </header>
+
+  <header class="doc-h">
+    <div class="doc-wrap">
+      <div class="crumb">WES Agent · 人工测试看板</div>
+      <h1>测试</h1>
+      <p class="meta">
+        <span><b>目标</b> 管理人工测试任务与结果反馈</span>
+        <span><b>范围</b> Phase 1E 基线 + Phase 1F 回写扩展</span>
+        <span><b>状态</b> 1E 计划已建立，1F 用例待实现后执行</span>
+        <span><b>更新</b> 2026-06-19</span>
+      </p>
+      <div class="pill-row" style="margin-top:18px">
+        <span class="pill err">P0 主链路</span>
+        <span class="pill warn">P1 边界</span>
+        <span class="pill brand">反馈台账</span>
+        <span class="pill">人工门禁</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="doc-wrap">
+    <div class="toc">
+      <h5>导航</h5>
+      <ol>
+        <li><b>§1</b> 测试策略</li>
+        <li><b>§2</b> 测试任务台账</li>
+        <li><b>§3</b> Phase 1F 扩展用例</li>
+        <li><b>§4</b> 结果反馈模板</li>
+        <li><b>§5</b> 缺陷分级</li>
+        <li><b>§6</b> 关闭标准</li>
+        <li><b>§7</b> 自动化基线</li>
+      </ol>
+    </div>
+
+    <section>
+      <div class="h-num">Section 01</div>
+      <h2>测试策略</h2>
+      <p class="lead">人工测试不重复自动化测试的断言，而是验证真实用户在浏览器中能否完成从 AI 工作台到传统草稿处理的业务闭环，并确认边界提示足够清楚：AI 只生成草稿，正式业务仍由人确认。</p>
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">P0</span><span>主链路任务</span></div>
+          <div class="v">6</div>
+          <div class="lb">上传 / v2 / confirm / 草稿追溯</div>
+        </div>
+        <div class="kpi">
+          <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">P1</span><span>边界任务</span></div>
+          <div class="v">4</div>
+          <div class="lb">权限 / fallback / 不自动正式化</div>
+        </div>
+        <div class="kpi">
+          <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">P2</span><span>巡检任务</span></div>
+          <div class="v">2</div>
+          <div class="lb">刷新持久化 / 看板链接</div>
+        </div>
+        <div class="kpi">
+          <div class="top"><span class="ic" style="background:var(--bg-soft);color:var(--ink-3)">R</span><span>当前结果</span></div>
+          <div class="v">0/12</div>
+          <div class="lb">待人工执行并回填</div>
+        </div>
+      </div>
+      <div class="grid-3" style="margin-top:22px">
+        <div class="card"><span class="pill brand">准备</span><h3>测试数据</h3><p>使用 1 份真实或脱敏的需求附件，包含项目背景、需求清单和至少一个需用户补充的信息缺口。</p></div>
+        <div class="card"><span class="pill warn">环境</span><h3>执行环境</h3><p>使用本地或集成环境的 <code class="inline">ui/V2_PROTOTYPE</code> 与 <code class="inline">apps/api</code>，以普通用户登录验证 owner 边界。</p></div>
+        <div class="card"><span class="pill ok">证据</span><h3>反馈证据</h3><p>每条失败或疑问都需要记录页面、操作步骤、实际结果、截图路径和建议处理优先级。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 02</div>
+      <h2>测试任务台账</h2>
+      <table>
+        <tr><th>ID</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>反馈记录</th></tr>
+        <tr>
+          <td class="mono">MT-1E-001</td>
+          <td>上传文件进入 Harness</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>AI 工作台上传需求附件。</td>
+          <td>创建 Harness run，绑定文件，并生成基础解析结果；不退回普通聊天路径。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-002</td>
+          <td>v1 报告边界</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>等待 v1 报告生成，查看 nextActions。</td>
+          <td>展示 <code class="inline">requirement_report_v1</code>；v1 nextActions 保持 disabled。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-003</td>
+          <td>用户补充生成 v2</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>输入补充信息，提交后等待 v2 报告。</td>
+          <td>补充内容进入 <code class="inline">user_chat_supplement</code>，run 进入 clarifying 后生成 v2。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-004</td>
+          <td>v2 confirm 创建 AI 草稿</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>点击 v2 的真实 nextAction。</td>
+          <td>confirm 成功后显示“查看评估草稿”和“前往实施评估列表”入口。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-005</td>
+          <td>传统评估列表识别 AI 草稿</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>进入实施评估列表，切换“AI 草稿”过滤。</td>
+          <td>列表展示 AI 草稿 badge、状态和来源，草稿对当前用户可见。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-006</td>
+          <td>评估详情展示 Harness 来源</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>从列表或 AI 工作台进入草稿详情。</td>
+          <td>顶部 banner 展示 Harness Run ID、Action ID、版本号，并提示需人工确认。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-007</td>
+          <td>owner 权限隔离</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>使用另一个普通用户访问草稿详情或列表。</td>
+          <td>不可查看非本人草稿，不出现跨用户 Harness 来源信息。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-008</td>
+          <td>fallback nextActions 禁用</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>构造或复用没有真实 nextActions 的 v2 报告。</td>
+          <td>fallback 按钮保持 disabled，不触发不可追溯写动作。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-009</td>
+          <td>草稿不自动正式化</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>confirm 后查看项目评估与实施评估状态。</td>
+          <td>状态保持 <code class="inline">draft_from_ai</code> 或草稿态，不自动发布正式评估。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-010</td>
+          <td>AI 工作台跳转可用</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>confirm 后分别点击两个跳转入口。</td>
+          <td>进入正确草稿详情或实施评估列表，浏览器刷新后路径仍有效。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-011</td>
+          <td>刷新后追溯信息持久化</td>
+          <td><span class="status todo"><span class="dot"></span>P2</span></td>
+          <td>刷新草稿详情页，再次查看顶部 AI 来源 banner。</td>
+          <td>Harness Run ID、Action ID、版本号仍然存在，不依赖前端临时状态。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1E-012</td>
+          <td>看板链接与文档事实源巡检</td>
+          <td><span class="status todo"><span class="dot"></span>P2</span></td>
+          <td>从首页进入计划、测试、监控、风险、文档事实源。</td>
+          <td>所有专题页可打开，文档事实源中包含 testing.html 且计数一致。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03</div>
+      <h2>Phase 1F 扩展用例</h2>
+      <p class="lead">Phase 1F 实现后，需要把以下用例加入人工验收。当前状态是“待实现后执行”，不计入 1E 已建立的 12 条人工测试结果。</p>
+      <table>
+        <tr><th>ID</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>反馈记录</th></tr>
+        <tr>
+          <td class="mono">MT-1F-001</td>
+          <td>人工确认 AI 草稿后回写 Harness</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>在传统详情页对 AI 草稿执行人工确认或进入正式流程。</td>
+          <td>Harness 记录 ToolEvent 或 metadata transition，并关联 runId/actionId。</td>
+          <td><span class="status run"><span class="dot"></span>待实现后执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1F-002</td>
+          <td>详情页展示回写状态</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>人工确认后刷新评估详情页。</td>
+          <td>页面展示“已回写 Harness 审计”或等价状态，不误导为 AI 自动正式化。</td>
+          <td><span class="status run"><span class="dot"></span>待实现后执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1F-003</td>
+          <td>重复确认幂等</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>重复触发同一草稿的人工确认动作。</td>
+          <td>不产生冲突审计事件，返回稳定的既有回写结果。</td>
+          <td><span class="status run"><span class="dot"></span>待实现后执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1F-004</td>
+          <td>非 owner 不可回写</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>使用非 owner 用户尝试确认或访问回写结果。</td>
+          <td>不能触发或查看非授权草稿的 Harness 回写审计。</td>
+          <td><span class="status run"><span class="dot"></span>待实现后执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 04</div>
+      <h2>结果反馈模板</h2>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-h">单条反馈字段<span class="right">copy format</span></div>
+          <div class="panel-b">
+<pre>Task ID:
+Tester:
+Date:
+Environment:
+Result: Pass / Fail / Blocked / Waived
+Actual:
+Expected:
+Evidence:
+Severity: P0 / P1 / P2
+Owner:
+Decision:</pre>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-h">回填规则<span class="right">ledger rule</span></div>
+          <div class="panel-b">
+            <ul class="list-clean">
+              <li>Pass：填写执行人、日期、环境和关键截图。</li>
+              <li>Fail：必须写清复现步骤、实际结果和缺陷等级。</li>
+              <li>Blocked：记录阻断原因和需要谁解除阻断。</li>
+              <li>Waived：必须有明确业务或技术决策依据。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <table style="margin-top:18px">
+        <tr><th>反馈汇总</th><th>当前值</th><th>说明</th></tr>
+        <tr><td>已通过</td><td class="mono">0</td><td>等待人工执行后更新。</td></tr>
+        <tr><td>失败</td><td class="mono">0</td><td>P0/P1 失败进入风险页或变更页。</td></tr>
+        <tr><td>阻断</td><td class="mono">0</td><td>阻断项需先解除再声明完成。</td></tr>
+        <tr><td>豁免</td><td class="mono">0</td><td>需保留决策依据。</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 05</div>
+      <h2>缺陷分级</h2>
+      <table>
+        <tr><th>等级</th><th>判定标准</th><th>处理要求</th></tr>
+        <tr>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>主链路不可用、权限泄露、重复创建草稿、自动进入正式评估、Harness 追溯丢失。</td>
+          <td>阻断发布或阶段完成声明，必须修复并重测。</td>
+        </tr>
+        <tr>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>跳转错误、状态提示误导、fallback 可点击、刷新后部分信息缺失。</td>
+          <td>进入本轮修复或明确延期决策，不能静默忽略。</td>
+        </tr>
+        <tr>
+          <td><span class="status todo"><span class="dot"></span>P2</span></td>
+          <td>文案、样式、布局、文档链接等不影响主链路和边界判断的问题。</td>
+          <td>进入后续优化池，按影响面排序处理。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 06</div>
+      <h2>关闭标准</h2>
+      <div class="callout warn">
+        <div><b>人工测试关闭条件</b>所有 P0 用例必须 Pass；P1 用例必须 Pass 或有明确延期决策；所有失败、阻断和豁免都需要在本页、风险页或变更页留下可追溯记录。</div>
+      </div>
+      <div class="grid-3">
+        <div class="card"><span class="pill ok">Must Pass</span><h3>P0 全部通过</h3><p>上传、v2、confirm、AI 草稿列表、详情来源追溯不能失败。</p></div>
+        <div class="card"><span class="pill warn">Decision</span><h3>P1 有处理结论</h3><p>权限、fallback、跳转、正式化边界出现问题时必须明确修复或延期。</p></div>
+        <div class="card"><span class="pill brand">Trace</span><h3>证据可追溯</h3><p>人工测试结果需要能反向定位到任务 ID、页面、截图和变更记录。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 07</div>
+      <h2>自动化基线</h2>
+      <p class="lead">人工测试建立在已通过的自动化基线之上。以下命令不是人工验收的替代品，而是人工测试前应保持绿色的工程底座。</p>
+      <table>
+        <tr><th>命令</th><th>最近结果</th><th>覆盖范围</th></tr>
+        <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>60 pass</span></td><td>Harness 状态机、confirm、幂等、传统草稿追溯。</td></tr>
+        <tr><td class="mono">npm run test:modules -w apps/api</td><td><span class="status done"><span class="dot"></span>59 pass</span></td><td>后端模块级回归。</td></tr>
+        <tr><td class="mono">npm run build -w apps/api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>后端构建。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>63 pass</span></td><td>前端工作台、评估列表、详情页和 mock 流程。</td></tr>
+        <tr><td class="mono">npm run build --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>前端构建；保留既有 chunk warning。</td></tr>
+      </table>
+    </section>
+
+    <footer class="footer">
+      <a href="index.html">返回总览</a> · 测试 · WES Agent 升级总看板 · 2026-06-19
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>文档事实源地图 · WES Agent 升级总看板</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/dashboard.css" />
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-in">
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <nav class="navlinks" aria-label="主导航">
+        <a href="index.html">总览</a>
+        <a href="design.html">设计说明</a>
+        <a href="runtime.html">任务运行时</a>
+        <a href="plan.html">计划与进度</a>
+        <a href="testing.html">测试</a>
+        <a href="monitoring.html">监控与审计</a>
+        <a href="risks.html">风险与决策</a>
+        <a href="changes.html">变更记录</a>
+        <a class="active" href="sources.html">文档事实源</a>
+      </nav>
+      <span class="pill warn">Phase 1F active</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="doc-h">
+      <div class="wrap">
+        <div class="crumb">Document Asset Map</div>
+        <h1>文档事实源地图</h1>
+        <div class="meta">
+          <span>共盘点 <b>27</b> 份文档资产</span>
+          <span>事实源 <b>5</b> 份</span>
+          <span>总看板页面 <b>10</b> 个</span>
+          <span>历史参考 <b>5</b> 份</span>
+          <span>更新日期 <b>2026-06-19</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <nav class="toc" aria-label="页面目录">
+        <h5>目录</h5>
+        <ol>
+          <li><b>文档分层图</b> — 按可信度分层呈现全部资产</li>
+          <li><b>Phase × 文档矩阵</b> — 文档与 Phase 的对应关系</li>
+          <li><b>事实流转图</b> — 代码事实如何进入汇报看板</li>
+          <li><b>资产清单</b> — 表格与卡片双视图</li>
+        </ol>
+      </nav>
+    </div>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">01 / Layer Map</div>
+          <h2>文档分层图</h2>
+          <p>按可信度与维护规则把文档分成四层：总看板交付物承接当前事实，设计与计划源支撑执行，历史参考源仅作追溯。</p>
+        </div>
+
+        <div class="doc-map">
+          <div class="doc-layer">
+            <div class="doc-layer-header">
+              <span class="doc-layer-title delivery">Delivery Board</span>
+              <span>总看板交付物</span>
+              <div class="doc-layer-count"><b>10</b> pages</div>
+            </div>
+            <div class="doc-node-grid">
+              <div class="doc-node">
+                <a href="index.html">index.html</a>
+                <small>总览 / KPI / 专题入口</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="design.html">design.html</a>
+                <small>设计说明</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="runtime.html">runtime.html</a>
+                <small>任务运行时 / Qoder 启发优化池</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="design-architecture.html">design-architecture.html</a>
+                <small>架构设计</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="plan.html">plan.html</a>
+                <small>计划与进度</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="testing.html">testing.html</a>
+                <small>人工测试任务与反馈</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="monitoring.html">monitoring.html</a>
+                <small>监控与审计</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="risks.html">risks.html</a>
+                <small>风险与决策</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="changes.html">changes.html</a>
+                <small>变更记录</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="sources.html">sources.html</a>
+                <small>文档事实源地图（本页）</small>
+                <span class="tag delivery">Board</span>
+              </div>
+            </div>
+            <div class="layer-connector">
+              <span>聚合 · 可视化 · 汇报</span>
+              <span class="arrow-down"></span>
+            </div>
+          </div>
+
+          <div class="doc-layer">
+            <div class="doc-layer-header">
+              <span class="doc-layer-title current">Current Truth</span>
+              <span>当前事实源</span>
+              <div class="doc-layer-count"><b>5</b> sources</div>
+            </div>
+            <div class="doc-node-grid">
+              <div class="doc-node">
+                <a href="../../../AGENTS.md">AGENTS.md</a>
+                <small>架构边界 / 约定 / 禁止事项</small>
+                <span class="tag current">Current Truth</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../README.md">README.md</a>
+                <small>项目全景 / 脚本 / 目录</small>
+                <span class="tag current">Current Truth</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../系统演进/实现与文档对齐说明.md">实现与文档对齐说明.md</a>
+                <small>V2 设计 vs 实际实现 ground truth</small>
+                <span class="tag current">Current Truth</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/openapi.yaml">docs/openapi.yaml</a>
+                <small>对外 API 契约</small>
+                <span class="tag current">Current Contract</span>
+              </div>
+              <div class="doc-node">
+                <a href="../WES-Agent-产品技术方案.html">WES-Agent-产品技术方案.html</a>
+                <small>产品技术方案总纲</small>
+                <span class="tag current">Current Truth</span>
+              </div>
+            </div>
+            <div class="layer-connector">
+              <span>指导 / 承接 / 执行</span>
+              <span class="arrow-down"></span>
+            </div>
+          </div>
+
+          <div class="doc-layer">
+            <div class="doc-layer-header">
+              <span class="doc-layer-title plan">Implementation Plan</span>
+              <span>设计与计划源</span>
+              <div class="doc-layer-count"><b>7</b> specs / plans</div>
+            </div>
+            <div class="doc-node-grid">
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/specs/2026-06-17-wes-harness-design.md">2026-06-17-wes-harness-design.md</a>
+                <small>Harness 设计规格</small>
+                <span class="tag plan">Spec</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/plans/2026-06-17-wes-harness-phase-1a.md">2026-06-17-wes-harness-phase-1a.md</a>
+                <small>Harness Phase 1A 计划</small>
+                <span class="tag plan">Plan</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/plans/2026-06-17-wes-harness-phase-1b.md">2026-06-17-wes-harness-phase-1b.md</a>
+                <small>Harness Phase 1B 计划</small>
+                <span class="tag plan">Plan</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/specs/2026-06-14-wes-agent-os-v2-design.md">2026-06-14-wes-agent-os-v2-design.md</a>
+                <small>Agent OS V2 设计</small>
+                <span class="tag plan">Spec</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/plans/2026-06-14-wes-agent-os-v2-phase-1.md">2026-06-14-wes-agent-os-v2-phase-1.md</a>
+                <small>Agent OS V2 Phase 1 计划</small>
+                <span class="tag plan">Plan</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../00_项目治理/里程碑与计划/WES-Agent-后端三联-实现计划-P1P2P3.md">WES-Agent-后端三联-实现计划-P1P2P3.md</a>
+                <small>后端三联 P1/P2/P3 计划</small>
+                <span class="tag plan">Plan</span>
+              </div>
+              <div class="doc-node">
+                <a href="phase-1f-implementation-prompt.md">phase-1f-implementation-prompt.md</a>
+                <small>Phase 1F 实现提示词</small>
+                <span class="tag plan">Prompt</span>
+              </div>
+            </div>
+            <div class="layer-connector">
+              <span>追溯 / 参考 / 谨慎引用</span>
+              <span class="arrow-down"></span>
+            </div>
+          </div>
+
+          <div class="doc-layer">
+            <div class="doc-layer-header">
+              <span class="doc-layer-title historical">Historical Reference</span>
+              <span>历史参考源（可能滞后）</span>
+              <div class="doc-layer-count"><b>5</b> refs</div>
+            </div>
+            <div class="doc-node-grid">
+              <div class="doc-node">
+                <a href="../../API与集成/API接口设计-V2.md">API接口设计-V2.md</a>
+                <small>历史接口设计 · 可能滞后</small>
+                <span class="tag historical">Historical</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../API与集成/KIMI-Files两段式解析评估初版设计.md">KIMI-Files两段式解析评估初版设计.md</a>
+                <small>初版设计 · 历史参考</small>
+                <span class="tag historical">Historical</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../00_项目治理/里程碑与计划/项目进展总结与后续规划.md">项目进展总结与后续规划.md</a>
+                <small>历史进展总结</small>
+                <span class="tag historical">Historical</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../ui/V2_PROTOTYPE/README.md">ui/V2_PROTOTYPE/README.md</a>
+                <small>前端 Phase B 组件进度</small>
+                <span class="tag historical">Historical</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../apps/api/src/modules/README.md">apps/api/src/modules/README.md</a>
+                <small>后端模块化重构进度</small>
+                <span class="tag historical">Historical</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">02 / Phase Matrix</div>
+          <h2>Phase × 文档矩阵</h2>
+          <p>横轴为当前已定义的 Phase，纵轴为文档类型。单元格展示该 Phase 下对应文档的入口或状态。</p>
+        </div>
+
+        <div class="matrix-grid">
+          <div class="matrix-cell head row-head">Type / Phase</div>
+          <div class="matrix-cell head">Agent OS V2</div>
+          <div class="matrix-cell head">Harness 1A</div>
+          <div class="matrix-cell head">Harness 1B/1C</div>
+          <div class="matrix-cell head">Harness 1D</div>
+          <div class="matrix-cell head">Harness 1E</div>
+          <div class="matrix-cell head">Harness 1F</div>
+
+          <div class="matrix-cell row-head">Spec</div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../docs/superpowers/specs/2026-06-14-wes-agent-os-v2-design.md">Agent OS V2 Design</a></div>
+            <div class="cell-meta">系统级 Agent 架构</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../docs/superpowers/specs/2026-06-17-wes-harness-design.md">Harness Design</a></div>
+            <div class="cell-meta">Harness 编排规格</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">Harness Core</div>
+            <div class="cell-meta">run / stage / toolEvent</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">Agent Workbench</div>
+            <div class="cell-meta">草稿确认闭环</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">Draft Review</div>
+            <div class="cell-meta">可见 / 跳转 / 追溯</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">Audit Write-back</div>
+            <div class="cell-meta">ToolEvent / metadata</div>
+            <span class="status-pill run">当前任务</span>
+          </div>
+
+          <div class="matrix-cell row-head">Plan</div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../docs/superpowers/plans/2026-06-14-wes-agent-os-v2-phase-1.md">Agent OS V2 P1</a></div>
+            <div class="cell-meta">Phase 1 执行计划</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../docs/superpowers/plans/2026-06-17-wes-harness-phase-1a.md">Harness 1A Plan</a></div>
+            <div class="cell-meta">DB schema / seed</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../docs/superpowers/plans/2026-06-17-wes-harness-phase-1b.md">Harness 1B Plan</a></div>
+            <div class="cell-meta">report v1/v2</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../00_项目治理/里程碑与计划/WES-Agent-后端三联-实现计划-P1P2P3.md">后端三联 P1P2P3</a></div>
+            <div class="cell-meta">模块迁移路线</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">Phase 1E Completion</div>
+            <div class="cell-meta">草稿接回工作台</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="phase-1f-implementation-prompt.md">Audit Write-back Prompt</a></div>
+            <div class="cell-meta">人工确认回写</div>
+            <span class="status-pill run">已生成</span>
+          </div>
+
+          <div class="matrix-cell row-head">Implementation Truth</div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../apps/api/src/modules/README.md">modules/README</a></div>
+            <div class="cell-meta">18/18 迁移状态</div>
+            <span class="status-pill hist">历史参考</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">apps/api/src/db</div>
+            <div class="cell-meta">PostgreSQL schema</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">modules/harness</div>
+            <div class="cell-meta">repository / usecase</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">Agent 工作台</div>
+            <div class="cell-meta">draft_from_ai</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">详情页追溯</div>
+            <div class="cell-meta">Run ID / Action ID</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">回写审计</div>
+            <div class="cell-meta">metadata transition</div>
+            <span class="status-pill run">待实现</span>
+          </div>
+
+          <div class="matrix-cell row-head">API Contract</div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../API与集成/API接口设计-V2.md">API接口设计-V2</a></div>
+            <div class="cell-meta">历史接口设计</div>
+            <span class="status-pill hist">历史参考</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../docs/openapi.yaml">openapi.yaml</a></div>
+            <div class="cell-meta">对外契约</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">Harness API</div>
+            <div class="cell-meta">run / stage / action</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">AI 工作台 API</div>
+            <div class="cell-meta">草稿 / 确认</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">详情页 API</div>
+            <div class="cell-meta">来源追溯</div>
+            <span class="status-pill done">已有文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">回写 API</div>
+            <div class="cell-meta">ToolEvent 记录</div>
+            <span class="status-pill run">待实现</span>
+          </div>
+
+          <div class="matrix-cell row-head">Dashboard</div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="index.html">index.html</a></div>
+            <div class="cell-meta">总览入口</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="design-architecture.html">design-architecture</a></div>
+            <div class="cell-meta">架构分层</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="design.html">design.html</a> / <a href="runtime.html">runtime.html</a></div>
+            <div class="cell-meta">设计说明 / 任务运行时</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="monitoring.html">monitoring.html</a></div>
+            <div class="cell-meta">监控审计</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="plan.html">plan.html</a> / <a href="testing.html">testing.html</a></div>
+            <div class="cell-meta">计划进度 / 人工测试</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="sources.html">sources.html</a></div>
+            <div class="cell-meta">文档地图</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+
+          <div class="matrix-cell row-head">Review / Change Log</div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="changes.html">changes.html</a></div>
+            <div class="cell-meta">变更记录</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="risks.html">risks.html</a></div>
+            <div class="cell-meta">风险与决策</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">T5a 回归报告</div>
+            <div class="cell-meta">06_发布与部署</div>
+            <span class="status-pill todo">待补充</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">CI 报告</div>
+            <div class="cell-meta">GitHub Actions</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">Session 复盘</div>
+            <div class="cell-meta">09_复盘与沉淀</div>
+            <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="phase-1f-implementation-prompt.md">1F 实现提示词</a></div>
+            <div class="cell-meta">KIMI / Codex</div>
+            <span class="status-pill run">已生成</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">03 / Truth Flow</div>
+          <h2>事实流转图</h2>
+          <p>代码事实优先，文档承接事实；汇报看板从事实源抽取，而不是反过来定义实现。</p>
+        </div>
+
+        <div class="truth-flow">
+          <div class="truth-flow-steps">
+            <div class="truth-step source">
+              <span class="truth-arrow"></span>
+              <span class="num">01</span>
+              <b>apps/api</b>
+              <small>Express + modules 模式；Harness 首个 DB-backed 域</small>
+            </div>
+            <div class="truth-step source">
+              <span class="truth-arrow"></span>
+              <span class="num">02</span>
+              <b>ui/V2_PROTOTYPE</b>
+              <small>Vite + React；AI 草稿接回传统工作台</small>
+            </div>
+            <div class="truth-step doc">
+              <span class="truth-arrow"></span>
+              <span class="num">03</span>
+              <b>实现与文档对齐说明.md</b>
+              <small>记录 V2 设计与实际实现的差异</small>
+            </div>
+            <div class="truth-step doc">
+              <span class="truth-arrow"></span>
+              <span class="num">04</span>
+              <b>docs/openapi.yaml</b>
+              <small>对外 API 契约从实现导出</small>
+            </div>
+            <div class="truth-step board">
+              <span class="truth-arrow"></span>
+              <span class="num">05</span>
+              <b>升级总看板/*</b>
+              <small>可视化汇报与审计入口</small>
+            </div>
+            <div class="truth-step out">
+              <span class="num">06</span>
+              <b>审计 / 汇报 / Review</b>
+              <small>KIMI Review、后续 Phase 规划</small>
+            </div>
+          </div>
+          <div class="truth-flow-note">
+            <b>核心原则：</b>代码与运行路由是最高优先级事实源。当 openapi.yaml、产品技术方案.html 与代码实现冲突时，先修文档再交付；总看板只呈现已对齐的事实，不创造新的事实。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">04 / Asset List</div>
+          <h2>资产清单</h2>
+          <p>表格视图适合按字段快速检索，卡片视图适合按分类浏览。</p>
+        </div>
+
+        <div class="view-toggle" role="tablist" aria-label="视图切换">
+          <button class="active" id="btn-table" role="tab" aria-selected="true">表格视图</button>
+          <button id="btn-cards" role="tab" aria-selected="false">卡片视图</button>
+        </div>
+
+        <div id="table-view">
+          <table>
+            <thead>
+              <tr>
+                <th>分类</th>
+                <th>文档名称</th>
+                <th>路径</th>
+                <th>当前用途</th>
+                <th>可信度</th>
+                <th>维护责任</th>
+                <th>历史标注</th>
+                <th>关联 Phase</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="index.html">index.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/index.html</td>
+                <td>总览入口、KPI、专题页导航</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>每次看板结构变更必改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="design.html">design.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/design.html</td>
+                <td>设计说明专题页</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>每次架构/设计变更必改</td>
+                <td>否</td>
+                <td>Agent OS V2, Harness 1B/1C/1D/1E</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="runtime.html">runtime.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/runtime.html</td>
+                <td>任务运行时专题页，承接 Qoder 启发下的 WES Harness Run 优化项</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>每次任务边界/运行时规划变更必改</td>
+                <td>否</td>
+                <td>Harness 1F, Phase 2 candidates</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="design-architecture.html">design-architecture.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/design-architecture.html</td>
+                <td>架构设计专题页</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>每次架构调整必改</td>
+                <td>否</td>
+                <td>Agent OS V2, Harness 1A/1B/1C/1D/1E</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="plan.html">plan.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/plan.html</td>
+                <td>计划与进度专题页</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>每次 Phase 变更必改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="testing.html">testing.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/testing.html</td>
+                <td>人工测试任务与结果反馈管理页</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>每次人工测试执行或反馈变更必改</td>
+                <td>否</td>
+                <td>Harness 1E, Harness 1F</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="monitoring.html">monitoring.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/monitoring.html</td>
+                <td>监控与审计专题页</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>每次验证/监控口径变更必改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="risks.html">risks.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/risks.html</td>
+                <td>风险与决策专题页</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>风险决策更新时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="changes.html">changes.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/changes.html</td>
+                <td>变更记录专题页</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>每次 session/PR/commit 后更新</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="sources.html">sources.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/sources.html</td>
+                <td>文档事实源地图</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>文档资产变动时更新</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../AGENTS.md">AGENTS.md</a></td>
+                <td class="mono">/AGENTS.md</td>
+                <td>架构边界、约定、禁止事项</td>
+                <td><span class="status-pill run">Current Truth</span></td>
+                <td>仅重大架构调整时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../README.md">README.md</a></td>
+                <td class="mono">/README.md</td>
+                <td>项目全景、脚本、目录</td>
+                <td><span class="status-pill run">Current Truth</span></td>
+                <td>仅重大架构调整时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../系统演进/实现与文档对齐说明.md">实现与文档对齐说明.md</a></td>
+                <td class="mono">03_技术设计/系统演进/实现与文档对齐说明.md</td>
+                <td>V2 设计 vs 实际实现 ground truth</td>
+                <td><span class="status-pill run">Current Truth</span></td>
+                <td>每次接口/架构变更必改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../docs/openapi.yaml">docs/openapi.yaml</a></td>
+                <td class="mono">docs/openapi.yaml</td>
+                <td>对外 API 契约</td>
+                <td><span class="status-pill done">Current Contract</span></td>
+                <td>每次接口变更必改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../WES-Agent-产品技术方案.html">WES-Agent-产品技术方案.html</a></td>
+                <td class="mono">03_技术设计/系统架构/WES-Agent-产品技术方案.html</td>
+                <td>产品技术方案总纲</td>
+                <td><span class="status-pill run">Current Truth</span></td>
+                <td>仅重大架构调整时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/specs/2026-06-17-wes-harness-design.md">2026-06-17-wes-harness-design.md</a></td>
+                <td class="mono">docs/superpowers/specs/2026-06-17-wes-harness-design.md</td>
+                <td>Harness 设计规格</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>每次 Phase/架构变更必改</td>
+                <td>否</td>
+                <td>Harness 1A/1B/1C/1D/1E</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/plans/2026-06-17-wes-harness-phase-1a.md">2026-06-17-wes-harness-phase-1a.md</a></td>
+                <td class="mono">docs/superpowers/plans/2026-06-17-wes-harness-phase-1a.md</td>
+                <td>Harness Phase 1A 执行计划</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>每次 Phase 变更必改</td>
+                <td>否</td>
+                <td>Harness 1A</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/plans/2026-06-17-wes-harness-phase-1b.md">2026-06-17-wes-harness-phase-1b.md</a></td>
+                <td class="mono">docs/superpowers/plans/2026-06-17-wes-harness-phase-1b.md</td>
+                <td>Harness Phase 1B/1C 执行计划</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>每次 Phase 变更必改</td>
+                <td>否</td>
+                <td>Harness 1B/1C</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/specs/2026-06-14-wes-agent-os-v2-design.md">2026-06-14-wes-agent-os-v2-design.md</a></td>
+                <td class="mono">docs/superpowers/specs/2026-06-14-wes-agent-os-v2-design.md</td>
+                <td>Agent OS V2 系统设计</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>每次 Phase/架构变更必改</td>
+                <td>否</td>
+                <td>Agent OS V2</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/plans/2026-06-14-wes-agent-os-v2-phase-1.md">2026-06-14-wes-agent-os-v2-phase-1.md</a></td>
+                <td class="mono">docs/superpowers/plans/2026-06-14-wes-agent-os-v2-phase-1.md</td>
+                <td>Agent OS V2 Phase 1 执行计划</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>每次 Phase 变更必改</td>
+                <td>否</td>
+                <td>Agent OS V2</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../00_项目治理/里程碑与计划/WES-Agent-后端三联-实现计划-P1P2P3.md">WES-Agent-后端三联-实现计划-P1P2P3.md</a></td>
+                <td class="mono">00_项目治理/里程碑与计划/WES-Agent-后端三联-实现计划-P1P2P3.md</td>
+                <td>后端三联 P1/P2/P3 迁移计划</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>每次 Phase 变更必改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="phase-1f-implementation-prompt.md">phase-1f-implementation-prompt.md</a></td>
+                <td class="mono">WES-Agent-升级总看板/phase-1f-implementation-prompt.md</td>
+                <td>Phase 1F 给 KIMI/Codex 的实现提示词</td>
+                <td><span class="status-pill warn">Implementation Prompt</span></td>
+                <td>Phase 1F 实现启动或边界调整时改</td>
+                <td>否</td>
+                <td>Harness 1F</td>
+              </tr>
+              <tr>
+                <td>历史参考</td>
+                <td><a href="../../API与集成/API接口设计-V2.md">API接口设计-V2.md</a></td>
+                <td class="mono">03_技术设计/API与集成/API接口设计-V2.md</td>
+                <td>历史接口设计参考</td>
+                <td><span class="status-pill hist">Historical Reference</span></td>
+                <td>历史参考，不主动维护</td>
+                <td>是（可能滞后）</td>
+                <td>Agent OS V2</td>
+              </tr>
+              <tr>
+                <td>历史参考</td>
+                <td><a href="../../API与集成/KIMI-Files两段式解析评估初版设计.md">KIMI-Files两段式解析评估初版设计.md</a></td>
+                <td class="mono">03_技术设计/API与集成/KIMI-Files两段式解析评估初版设计.md</td>
+                <td>两段式解析初版设计参考</td>
+                <td><span class="status-pill hist">Historical Reference</span></td>
+                <td>历史参考，不主动维护</td>
+                <td>是（可能滞后）</td>
+                <td>Agent OS V2</td>
+              </tr>
+              <tr>
+                <td>历史参考</td>
+                <td><a href="../../../00_项目治理/里程碑与计划/项目进展总结与后续规划.md">项目进展总结与后续规划.md</a></td>
+                <td class="mono">00_项目治理/里程碑与计划/项目进展总结与后续规划.md</td>
+                <td>历史进展总结与规划</td>
+                <td><span class="status-pill hist">Historical Reference</span></td>
+                <td>历史参考，不主动维护</td>
+                <td>是（可能滞后）</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>历史参考</td>
+                <td><a href="../../../ui/V2_PROTOTYPE/README.md">ui/V2_PROTOTYPE/README.md</a></td>
+                <td class="mono">ui/V2_PROTOTYPE/README.md</td>
+                <td>前端 Phase B 组件进度</td>
+                <td><span class="status-pill hist">Historical Reference</span></td>
+                <td>历史参考，不主动维护</td>
+                <td>是（可能滞后）</td>
+                <td>Agent OS V2</td>
+              </tr>
+              <tr>
+                <td>历史参考</td>
+                <td><a href="../../../apps/api/src/modules/README.md">apps/api/src/modules/README.md</a></td>
+                <td class="mono">apps/api/src/modules/README.md</td>
+                <td>后端模块化重构进度</td>
+                <td><span class="status-pill hist">Historical Reference</span></td>
+                <td>历史参考，不主动维护</td>
+                <td>是（可能滞后）</td>
+                <td>All Phases</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="cards-view" style="display:none">
+          <div class="asset-cards">
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="index.html">index.html</a></div><span class="asset-path">WES-Agent-升级总看板/index.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">总览入口、KPI、专题页导航</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="design.html">design.html</a></div><span class="asset-path">WES-Agent-升级总看板/design.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">设计说明专题页</div>
+              <div class="asset-footer"><span class="status-pill run">Agent OS V2, Harness 1B/1C/1D/1E</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="runtime.html">runtime.html</a></div><span class="asset-path">WES-Agent-升级总看板/runtime.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">任务运行时专题页，承接 Qoder 启发下的 WES Harness Run 优化项</div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1F, Phase 2 candidates</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="design-architecture.html">design-architecture.html</a></div><span class="asset-path">WES-Agent-升级总看板/design-architecture.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">架构设计专题页</div>
+              <div class="asset-footer"><span class="status-pill run">Agent OS V2, Harness 1A/1B/1C/1D/1E</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="plan.html">plan.html</a></div><span class="asset-path">WES-Agent-升级总看板/plan.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">计划与进度专题页</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="testing.html">testing.html</a></div><span class="asset-path">WES-Agent-升级总看板/testing.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">人工测试任务与结果反馈管理页</div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1E, Harness 1F</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="monitoring.html">monitoring.html</a></div><span class="asset-path">WES-Agent-升级总看板/monitoring.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">监控与审计专题页</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="risks.html">risks.html</a></div><span class="asset-path">WES-Agent-升级总看板/risks.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">风险与决策专题页</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="changes.html">changes.html</a></div><span class="asset-path">WES-Agent-升级总看板/changes.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">变更记录专题页</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="sources.html">sources.html</a></div><span class="asset-path">WES-Agent-升级总看板/sources.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">文档事实源地图（本页）</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../AGENTS.md">AGENTS.md</a></div><span class="asset-path">/AGENTS.md</span></div>
+                <span class="status-pill run">Current Truth</span>
+              </div>
+              <div class="asset-body">架构边界、约定、禁止事项</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../README.md">README.md</a></div><span class="asset-path">/README.md</span></div>
+                <span class="status-pill run">Current Truth</span>
+              </div>
+              <div class="asset-body">项目全景、脚本、目录</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../系统演进/实现与文档对齐说明.md">实现与文档对齐说明.md</a></div><span class="asset-path">03_技术设计/系统演进/实现与文档对齐说明.md</span></div>
+                <span class="status-pill run">Current Truth</span>
+              </div>
+              <div class="asset-body">V2 设计 vs 实际实现 ground truth</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/openapi.yaml">docs/openapi.yaml</a></div><span class="asset-path">docs/openapi.yaml</span></div>
+                <span class="status-pill done">Current Contract</span>
+              </div>
+              <div class="asset-body">对外 API 契约</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../WES-Agent-产品技术方案.html">WES-Agent-产品技术方案.html</a></div><span class="asset-path">03_技术设计/系统架构/WES-Agent-产品技术方案.html</span></div>
+                <span class="status-pill run">Current Truth</span>
+              </div>
+              <div class="asset-body">产品技术方案总纲</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/specs/2026-06-17-wes-harness-design.md">2026-06-17-wes-harness-design.md</a></div><span class="asset-path">docs/superpowers/specs/2026-06-17-wes-harness-design.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">Harness 设计规格</div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1A/1B/1C/1D/1E</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/plans/2026-06-17-wes-harness-phase-1a.md">2026-06-17-wes-harness-phase-1a.md</a></div><span class="asset-path">docs/superpowers/plans/2026-06-17-wes-harness-phase-1a.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">Harness Phase 1A 执行计划</div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1A</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/plans/2026-06-17-wes-harness-phase-1b.md">2026-06-17-wes-harness-phase-1b.md</a></div><span class="asset-path">docs/superpowers/plans/2026-06-17-wes-harness-phase-1b.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">Harness Phase 1B/1C 执行计划</div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1B/1C</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/specs/2026-06-14-wes-agent-os-v2-design.md">2026-06-14-wes-agent-os-v2-design.md</a></div><span class="asset-path">docs/superpowers/specs/2026-06-14-wes-agent-os-v2-design.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">Agent OS V2 系统设计</div>
+              <div class="asset-footer"><span class="status-pill run">Agent OS V2</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/plans/2026-06-14-wes-agent-os-v2-phase-1.md">2026-06-14-wes-agent-os-v2-phase-1.md</a></div><span class="asset-path">docs/superpowers/plans/2026-06-14-wes-agent-os-v2-phase-1.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">Agent OS V2 Phase 1 执行计划</div>
+              <div class="asset-footer"><span class="status-pill run">Agent OS V2</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../00_项目治理/里程碑与计划/WES-Agent-后端三联-实现计划-P1P2P3.md">WES-Agent-后端三联-实现计划-P1P2P3.md</a></div><span class="asset-path">00_项目治理/里程碑与计划/WES-Agent-后端三联-实现计划-P1P2P3.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">后端三联 P1/P2/P3 迁移计划</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="phase-1f-implementation-prompt.md">phase-1f-implementation-prompt.md</a></div><span class="asset-path">WES-Agent-升级总看板/phase-1f-implementation-prompt.md</span></div>
+                <span class="status-pill warn">Implementation Prompt</span>
+              </div>
+              <div class="asset-body">Phase 1F 给 KIMI/Codex 的实现提示词</div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1F</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../API与集成/API接口设计-V2.md">API接口设计-V2.md</a></div><span class="asset-path">03_技术设计/API与集成/API接口设计-V2.md</span></div>
+                <span class="status-pill hist">Historical Reference</span>
+              </div>
+              <div class="asset-body">历史接口设计参考，可能滞后</div>
+              <div class="asset-footer"><span class="status-pill run">Agent OS V2</span><span class="status-pill done">是</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../API与集成/KIMI-Files两段式解析评估初版设计.md">KIMI-Files两段式解析评估初版设计.md</a></div><span class="asset-path">03_技术设计/API与集成/KIMI-Files两段式解析评估初版设计.md</span></div>
+                <span class="status-pill hist">Historical Reference</span>
+              </div>
+              <div class="asset-body">两段式解析初版设计参考，可能滞后</div>
+              <div class="asset-footer"><span class="status-pill run">Agent OS V2</span><span class="status-pill done">是</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../00_项目治理/里程碑与计划/项目进展总结与后续规划.md">项目进展总结与后续规划.md</a></div><span class="asset-path">00_项目治理/里程碑与计划/项目进展总结与后续规划.md</span></div>
+                <span class="status-pill hist">Historical Reference</span>
+              </div>
+              <div class="asset-body">历史进展总结与规划，可能滞后</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill done">是</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../ui/V2_PROTOTYPE/README.md">ui/V2_PROTOTYPE/README.md</a></div><span class="asset-path">ui/V2_PROTOTYPE/README.md</span></div>
+                <span class="status-pill hist">Historical Reference</span>
+              </div>
+              <div class="asset-body">前端 Phase B 组件进度，可能滞后</div>
+              <div class="asset-footer"><span class="status-pill run">Agent OS V2</span><span class="status-pill done">是</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../apps/api/src/modules/README.md">apps/api/src/modules/README.md</a></div><span class="asset-path">apps/api/src/modules/README.md</span></div>
+                <span class="status-pill hist">Historical Reference</span>
+              </div>
+              <div class="asset-body">后端模块化重构进度，可能滞后</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill done">是</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="wrap footer">
+      WES Agent 升级总看板 · 文档事实源地图 · 2026-06-19 · 27 份资产 · 5 份历史参考
+    </footer>
+  </main>
+
+  <script>
+    const btnTable = document.getElementById('btn-table');
+    const btnCards = document.getElementById('btn-cards');
+    const tableView = document.getElementById('table-view');
+    const cardsView = document.getElementById('cards-view');
+
+    function showTable() {
+      tableView.style.display = 'block';
+      cardsView.style.display = 'none';
+      btnTable.classList.add('active');
+      btnCards.classList.remove('active');
+      btnTable.setAttribute('aria-selected', 'true');
+      btnCards.setAttribute('aria-selected', 'false');
+    }
+
+    function showCards() {
+      tableView.style.display = 'none';
+      cardsView.style.display = 'block';
+      btnCards.classList.add('active');
+      btnTable.classList.remove('active');
+      btnCards.setAttribute('aria-selected', 'true');
+      btnTable.setAttribute('aria-selected', 'false');
+    }
+
+    btnTable.addEventListener('click', showTable);
+    btnCards.addEventListener('click', showCards);
+  </script>
+</body>
+</html>

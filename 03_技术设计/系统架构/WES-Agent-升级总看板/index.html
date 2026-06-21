@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WES Agent 升级总看板 · 设计 / 计划 / 监控</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/dashboard.css" />
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-in">
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <nav class="navlinks" aria-label="主导航">
+        <a class="active" href="index.html">总览</a>
+        <a href="design.html">设计说明</a>
+        <a href="runtime.html">任务运行时</a>
+        <a href="plan.html">计划与进度</a>
+        <a href="testing.html">测试</a>
+        <a href="monitoring.html">监控与审计</a>
+        <a href="risks.html">风险与决策</a>
+        <a href="changes.html">变更记录</a>
+        <a href="sources.html">文档事实源</a>
+      </nav>
+      <span class="pill warn">Phase 1F active</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-in">
+        <div>
+          <span class="eyebrow"><span class="dot"></span>WES Agent Upgrade Command Board</span>
+          <h1>设计、计划、监控<br><em>三位一体</em>的升级总看板</h1>
+          <p class="lead">本看板是 WES 从传统工作量评估系统升级为 AI Agent 工作台 + WES 传统记录系统的汇报与审计入口。它把架构设计、实施路线、验证监控、风险决策和变更记录拆成可维护的专题页，并在首页统一串联。</p>
+          <div class="pill-row">
+            <span class="pill brand">main @ 14cc86a</span>
+            <span class="pill ok">PR #2 已合并</span>
+            <span class="pill">2026-06-19</span>
+            <span class="pill ok">Phase 1E 已完成</span>
+            <span class="pill warn">Phase 1F 已激活</span>
+          </div>
+          <div class="trust">
+            <span><b>18/18</b> 后端模块化</span>
+            <span><b>60</b> Harness tests pass</span>
+            <span><b>63</b> V2 frontend tests pass</span>
+            <span><b>12</b> 人工测试任务已规划</span>
+            <span><b>0</b> 正式业务绕过确认</span>
+          </div>
+        </div>
+
+        <div class="hero-console" aria-label="WES Agent 升级态势预览">
+          <div class="floating-card side">
+            <div class="fc-head"><b>Harness Stage</b><span class="fc-tag">DB-backed</span></div>
+            <div class="fc-row"><span>uploaded</span><b>locked</b></div>
+            <div class="fc-row"><span>report_v1_ready</span><b>done</b></div>
+            <div class="fc-row"><span>clarifying</span><b>guarded</b></div>
+            <div class="fc-row"><span>report_v2_ready</span><b>confirmable</b></div>
+          </div>
+          <div class="floating-card main">
+            <div class="fc-head"><b>Phase 1F Audit Write-back</b><span class="fc-tag">启动中</span></div>
+            <div class="fc-row"><span>1E 基线</span><b>草稿可见/跳转/追溯</b></div>
+            <div class="fc-row"><span>1F 目标</span><b>人工确认回写</b></div>
+            <div class="fc-row"><span>审计记录</span><b>ToolEvent / metadata</b></div>
+            <div class="fc-row"><span>实现状态</span><b>待开发</b></div>
+            <div class="bar"><i style="width: 18%"></i></div>
+          </div>
+          <div class="floating-card bottom">
+            <div class="fc-head"><b>Verification Snapshot</b><span class="fc-tag">local + CI</span></div>
+            <div class="fc-row"><span>apps/api harness</span><b>60 pass</b></div>
+            <div class="fc-row"><span>apps/api modules</span><b>59 pass</b></div>
+            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>63 pass</b></div>
+            <div class="fc-row"><span>人工测试</span><b>12 待执行</b></div>
+            <div class="fc-row"><span>GitHub Actions</span><b>green</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Current Board</div>
+          <h2>当前总览</h2>
+          <p>首页只回答三个问题：现在系统处于什么状态，下一步应该做什么，风险和审计证据在哪里。</p>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="top"><span class="ic">P</span><span>当前阶段</span><span class="live">已激活</span></div>
+            <div class="v">1F</div>
+            <div class="lb">人工确认回写 Harness 审计</div>
+            <div class="bar"><i style="width:18%"></i></div>
+            <div class="sub">Phase 1E 为完成基线，1F 进入实现准备</div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>验证状态</span><span class="live">通过</span></div>
+            <div class="v">212+</div>
+            <div class="lb">本轮核心自动化测试通过</div>
+            <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--ok),var(--teal))"></i></div>
+            <div class="sub">人工测试计划已建，结果待回填</div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">A</span><span>审计链路</span><span class="live">保留</span></div>
+            <div class="v">4</div>
+            <div class="lb">核心审计对象</div>
+            <div class="bar"><i style="width:88%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
+            <div class="sub">run / artifact / modelRun / toolEvent</div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">F</span><span>1F 任务包</span></div>
+            <div class="v">4</div>
+            <div class="lb">回写、权限、前端状态、测试文档</div>
+            <div class="bar"><i style="width:18%;background:linear-gradient(90deg,var(--warn),var(--accent))"></i></div>
+            <div class="sub">实现提示词已作为交付物准备</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Document Assets</div>
+          <h2>文档资产地图</h2>
+          <p>本次 WES Agent / Harness 升级过程中产出的全部文档类资产已盘点并可视化，事实源与历史参考源分层呈现。</p>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">D</span><span>文档资产</span></div>
+            <div class="v">27</div>
+            <div class="lb">已盘点文档总数</div>
+            <div class="bar"><i style="width:100%"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>事实源</span></div>
+            <div class="v">5</div>
+            <div class="lb">当前事实源 / 契约</div>
+            <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--ok),var(--teal))"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">P</span><span>看板页面</span></div>
+            <div class="v">10</div>
+            <div class="lb">总看板 HTML 页面</div>
+            <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--bg-soft);color:var(--ink-3)">H</span><span>历史参考</span></div>
+            <div class="v">5</div>
+            <div class="lb">需谨慎引用的历史文档</div>
+            <div class="bar"><i style="width:100%;background:var(--line-2)"></i></div>
+          </div>
+        </div>
+        <div class="grid-3" style="margin-top:22px">
+          <a class="res-card" href="sources.html">
+            <span class="ico" style="background:var(--brand-soft);color:var(--brand)">M</span>
+            <h3>打开文档事实源地图</h3>
+            <p>查看文档分层图、Phase × 文档矩阵、事实流转图，以及完整的表格/卡片双视图清单。</p>
+            <div class="preview">27 assets · 4 layers · 3 visualizations</div>
+            <span class="arr">打开 sources.html →</span>
+          </a>
+          <div class="card">
+            <span class="pill brand">Current Truth</span>
+            <h3>事实源优先</h3>
+            <p>AGENTS.md、README.md、实现与文档对齐说明.md、openapi.yaml 和产品技术方案.html 是当前最高优先级事实源。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">Historical</span>
+            <h3>历史参考谨慎引用</h3>
+            <p>5 份历史文档已标注“可能滞后”，包括 API接口设计-V2、KIMI-Files两段式解析初版设计、项目进展总结等。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Triad Model</div>
+          <h2>三位一体的信息架构</h2>
+          <p>总看板不是替代设计文档，而是把设计、计划、监控从一个长文档拆成可独立审阅、可持续更新的交付物。</p>
+        </div>
+        <div class="grid-3">
+          <div class="card">
+            <span class="pill brand">Design</span>
+            <h3>设计说明</h3>
+            <p>说明产品形态、Harness 编排、传统系统边界、权限和数据追溯。这里回答“为什么这样建”。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">Plan</span>
+            <h3>实施计划</h3>
+            <p>承接 Phase 1B/1C/1D/1E 的已交付事实，并把 Phase 1F 人工确认回写拆成可验收任务。这里回答“接下来怎么做”。</p>
+          </div>
+          <div class="card">
+            <span class="pill ok">Monitor</span>
+            <h3>监控审计</h3>
+            <p>汇总本地验证、CI、toolEvent、artifact、modelRun 和草稿链接。这里回答“怎么证明可控”。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Business Flow</div>
+          <h2>Phase 1D 已闭环的业务编排</h2>
+          <p>文件上传后进入 Harness；AI 生成报告和可确认动作；用户确认后只创建传统草稿，不创建正式评估。</p>
+        </div>
+        <div class="flow-steps">
+          <div class="flow-step"><span class="num">01</span><b>文件上传</b><small>parse-basic-info 后创建 Harness run，并绑定上传文件。</small></div>
+          <div class="flow-step"><span class="num">02</span><b>v1 报告</b><small>生成 file_understanding 与 requirement_report_v1，v1 nextActions 保持 disabled。</small></div>
+          <div class="flow-step"><span class="num">03</span><b>用户补充</b><small>自由文本补充进入 user_chat_supplement，并通过 submitHarnessAnswers 进入 clarifying。</small></div>
+          <div class="flow-step"><span class="num">04</span><b>v2 报告</b><small>仅 clarifying 阶段可生成，要求 metadata.answers，生成真实可确认动作。</small></div>
+          <div class="flow-step"><span class="num">05</span><b>确认草稿</b><small>enter_formal_estimation 记录 ToolEvent，并生成 draft_from_ai 传统草稿。</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Board Pages</div>
+          <h2>专题页入口</h2>
+          <p>每个页面都是一个可审计视角。后续汇报时先看首页，再按问题跳转到专题页。</p>
+        </div>
+        <div class="res-grid">
+          <a class="res-card" href="design.html">
+            <span class="ico">01</span>
+            <h3>设计说明</h3>
+            <p>产品形态、目标架构、Harness 主线、传统草稿边界、API 与权限边界。</p>
+            <div class="preview">AI/Harness 可以生成报告、建议动作和草稿；正式业务仍需人工确认。</div>
+            <span class="arr">打开设计说明 →</span>
+          </a>
+          <a class="res-card" href="runtime.html">
+            <span class="ico" style="background:var(--brand-soft);color:var(--brand)">02</span>
+            <h3>任务运行时</h3>
+            <p>承接 Qoder Quest Runtime 启发，定义 WES Harness Run 的来源、执行、产物、交付和知识边界。</p>
+            <div class="preview">Chat 是入口；Harness Run 才是可交付、可审查、可追溯的任务运行时。</div>
+            <span class="arr">打开任务运行时 →</span>
+          </a>
+          <a class="res-card" href="plan.html">
+            <span class="ico" style="background:var(--accent-soft);color:var(--accent)">03</span>
+            <h3>计划与进度</h3>
+            <p>Phase 1B/1C/1D/1E 完成项、Phase 1F 启动目标、验收门禁和后续候选池。</p>
+            <div class="preview">当前激活：人工确认回写 Harness 审计。</div>
+            <span class="arr">打开计划与进度 →</span>
+          </a>
+          <a class="res-card" href="testing.html">
+            <span class="ico" style="background:var(--accent-soft);color:var(--accent)">04</span>
+            <h3>测试</h3>
+            <p>人工测试任务、执行路径、结果反馈模板、缺陷分级和关闭标准。</p>
+            <div class="preview">12 条人工任务 · P0/P1/P2 反馈 · 人工验收门禁</div>
+            <span class="arr">打开测试页面 →</span>
+          </a>
+          <a class="res-card" href="monitoring.html">
+            <span class="ico" style="background:var(--ok-soft);color:var(--ok)">05</span>
+            <h3>监控与审计</h3>
+            <p>测试矩阵、CI 状态、Harness 审计对象、草稿追溯链路、1F 回写监控指标。</p>
+            <div class="preview">run → artifact → toolEvent → draft links → manual confirmation → audit write-back</div>
+            <span class="arr">打开监控与审计 →</span>
+          </a>
+          <a class="res-card" href="risks.html">
+            <span class="ico" style="background:var(--warn-soft);color:var(--warn)">06</span>
+            <h3>风险与决策</h3>
+            <p>权限、幂等、并发、模型 schema、传统系统边界、标准库、向量库与连接器边界。</p>
+            <div class="preview">上传文件为主，不做本地路径连接器；所有写动作必须能从 Harness ToolEvent 追溯。</div>
+            <span class="arr">打开风险与决策 →</span>
+          </a>
+          <a class="res-card" href="changes.html">
+            <span class="ico" style="background:var(--teal-soft);color:var(--teal)">07</span>
+            <h3>变更记录</h3>
+            <p>本次 session 复盘、PR、commit、CI 修复、文档升级和后续记录入口。</p>
+            <div class="preview">14cc86a feat(harness): 接入 Phase 1D Agent 工作台闭环</div>
+            <span class="arr">打开变更记录 →</span>
+          </a>
+          <a class="res-card" href="../WES-Agent-产品技术方案.html">
+            <span class="ico" style="background:var(--bg-soft);color:var(--ink-2)">R</span>
+            <h3>原产品技术方案</h3>
+            <p>保留为详细资料源，当前总看板从中抽取已合并事实和后续方向。</p>
+            <div class="preview">v0.4 Phase 1E 完成口径 · 2026-06-19</div>
+            <span class="arr">打开原文档 →</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="split">
+          <div>
+            <div class="h-num">Current Phase</div>
+            <h2>Phase 1F 启动状态</h2>
+            <p class="lead">Phase 1E 已作为完成基线冻结：AI 草稿可见、可跳转、可追溯。Phase 1F 现在激活，目标是把传统工作台中的人工确认/发布结果回写到 Harness 审计链，不扩大 AI 自治范围。</p>
+          </div>
+          <div class="panel">
+            <div class="panel-h">Phase 1F 激活口径<span class="right">audit write-back</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>1E 基线：传统项目/评估列表能识别 <code class="inline">draft_from_ai</code>。</li>
+                <li>1E 基线：AI 工作台 confirm 结果可跳转到传统草稿详情。</li>
+                <li>1E 基线：详情页展示 Harness Run ID / Action ID / 版本号。</li>
+                <li>1F 目标：人工确认后回写 Harness metadata 或 ToolEvent。</li>
+                <li>1F 交付：后端、前端、测试、OpenAPI 和总看板同步。</li>
+                <li>仍不引入向量库、Prompt Profile CRUD、标准治理 Harness 化。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Session Decisions</div>
+          <h2>本会话补齐的 Harness 决策</h2>
+          <p>这些不是代码完成项，而是后续 Phase 规划和评审必须遵守的产品技术边界。</p>
+        </div>
+        <div class="grid-3">
+          <div class="card">
+            <span class="pill warn">Input Boundary</span>
+            <h3>上传文件为主</h3>
+            <p>第一阶段不做本地路径连接器、不开放 bash 或用户工作目录操作；所有项目材料通过上传进入受控 Harness。</p>
+          </div>
+          <div class="card">
+            <span class="pill brand">Knowledge</span>
+            <h3>标准文件版本化</h3>
+            <p>金蝶制度/标准文件以原始附件存储，DB 保存元数据、解析结果和 evidence；发布或启用版本后供 Agent 检索和引用。</p>
+          </div>
+          <div class="card">
+            <span class="pill ok">Artifacts</span>
+            <h3>JSON + Markdown</h3>
+            <p>业务产物先采用结构化 JSON + 可读 Markdown 双轨输出，支持页面渲染、审计回放和后续 Regression 对比。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="wrap footer">
+      WES Agent 升级总看板 · 设计 / 计划 / 监控 · 2026-06-19 · main @ 14cc86a
+    </footer>
+  </main>
+</body>
+</html>

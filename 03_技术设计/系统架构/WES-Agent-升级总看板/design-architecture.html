@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WES Agent 目标架构视图</title>
+  <style>
+    :root {
+      --c-bg: #f8fafc;
+      --c-canvas: #ffffff;
+      --c-border: #cbd5e1;
+      --c-text-main: #0f172a;
+      --c-text-sub: #64748b;
+      --c-accent: #0f172a;
+      --c-ok: #16a34a;
+      --c-warn: #ca8a04;
+      --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'SF Mono', Monaco, Consolas, monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--c-bg);
+      font-family: var(--font-ui);
+      color: var(--c-text-main);
+      padding: 40px;
+    }
+
+    .diagram-canvas {
+      background: var(--c-canvas);
+      border: 2px solid var(--c-border);
+      padding: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .diagram-header {
+      border-bottom: 1px solid var(--c-border);
+      padding-bottom: 16px;
+      margin-bottom: 28px;
+    }
+
+    .diagram-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--c-text-main);
+    }
+
+    .diagram-subtitle {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--c-text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    .layer {
+      border: 1px solid var(--c-border);
+      padding: 20px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .layer:last-child {
+      margin-bottom: 0;
+    }
+
+    .layer-label {
+      position: absolute;
+      top: -10px;
+      left: 16px;
+      background: var(--c-canvas);
+      padding: 0 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--c-text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-family: var(--font-mono);
+    }
+
+    .layer-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      font-family: var(--font-mono);
+    }
+
+    .row {
+      display: flex;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .node {
+      background: var(--c-canvas);
+      border: 1px solid var(--c-border);
+      padding: 12px 16px;
+      flex: 1;
+    }
+
+    .node-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      font-family: var(--font-mono);
+    }
+
+    .node-meta {
+      font-size: 12px;
+      color: var(--c-text-sub);
+      line-height: 1.5;
+    }
+
+    .node-list {
+      font-size: 12px;
+      color: var(--c-text-sub);
+      line-height: 1.6;
+      margin-top: 6px;
+      font-family: var(--font-mono);
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 2px 6px;
+      border: 1px solid var(--c-text-main);
+      text-transform: uppercase;
+      margin-right: 4px;
+    }
+
+    .badge--filled {
+      background: var(--c-text-main);
+      color: var(--c-canvas);
+    }
+
+    .badge--ok {
+      border-color: var(--c-ok);
+      color: var(--c-ok);
+    }
+
+    .badge--warn {
+      border-color: var(--c-warn);
+      color: var(--c-warn);
+    }
+
+    .connector-vertical {
+      width: 1px;
+      background: var(--c-border);
+      height: 24px;
+      margin: 0 auto;
+    }
+
+    .connector-vertical--dashed {
+      border-left: 1px dashed var(--c-border);
+      background: transparent;
+    }
+
+    .connector-label {
+      text-align: center;
+      font-size: 11px;
+      color: var(--c-text-sub);
+      margin: 4px 0;
+      font-family: var(--font-mono);
+    }
+
+    .boundary-note {
+      border: 1px solid var(--c-border);
+      padding: 12px 16px;
+      margin-top: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .boundary-note__icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .boundary-note__text {
+      font-size: 12px;
+      color: var(--c-text-sub);
+      line-height: 1.6;
+    }
+
+    .boundary-note__text b {
+      color: var(--c-text-main);
+    }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .data-item {
+      border: 1px solid var(--c-border);
+      padding: 10px 12px;
+    }
+
+    .data-item__label {
+      font-size: 10px;
+      color: var(--c-text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      font-family: var(--font-mono);
+    }
+
+    .data-item__name {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+
+    .arrow-down {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .arrow-down__line {
+      width: 1px;
+      height: 20px;
+      background: var(--c-border);
+    }
+
+    .arrow-down__head {
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 6px solid var(--c-border);
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .flow-arrow {
+      font-size: 12px;
+      color: var(--c-text-sub);
+      font-family: var(--font-mono);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="diagram-canvas">
+    <div class="diagram-header">
+      <h1 class="diagram-title">WES Agent 目标架构视图</h1>
+      <p class="diagram-subtitle">Runtime Boundaries · Target Architecture</p>
+    </div>
+
+    <!-- Layer 1: Frontend -->
+    <div class="layer">
+      <div class="layer-label">Frontend Layer</div>
+      <div class="layer-title">ui/V2_PROTOTYPE</div>
+      <div class="row">
+        <div class="node">
+          <div class="node-title">AiHomeWorkbench.jsx</div>
+          <div class="node-meta">AI 工作台入口：文件上传、自然语言补充、报告展示、下一步建议</div>
+        </div>
+        <div class="node">
+          <div class="node-title">src/api/harness.js</div>
+          <div class="node-meta">前端 Harness API 客户端，封装对 <span class="mono">/api/v1/harness/*</span> 的调用</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-down">
+      <div class="arrow-down__line"></div>
+      <div class="arrow-down__head"></div>
+    </div>
+    <div class="connector-label">/api/v1/harness/*</div>
+
+    <!-- Layer 2: API + Harness -->
+    <div class="layer">
+      <div class="layer-label">API + Harness Layer</div>
+      <div class="layer-title">apps/api</div>
+      <div class="row">
+        <div class="node">
+          <div class="node-title">routes/harness.routes.ts</div>
+          <div class="node-meta">Harness 路由层：JWT 鉴权、owner 隔离、参数校验</div>
+        </div>
+        <div class="node">
+          <div class="node-title">modules/harness/*</div>
+          <div class="node-meta">Harness 业务模块：run / file / artifact / toolEvent 生命周期管理</div>
+        </div>
+      </div>
+
+      <div class="arrow-down">
+        <div class="arrow-down__line"></div>
+        <div class="arrow-down__head"></div>
+      </div>
+      <div class="connector-label">persist / call / draft</div>
+
+      <div class="flow-row">
+        <div class="node">
+          <div class="node-title">PostgreSQL</div>
+          <div class="node-list">
+            harness_runs<br>
+            harness_files<br>
+            harness_artifacts<br>
+            harness_tool_events
+          </div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="node">
+          <div class="node-title">AI Services</div>
+          <div class="node-list">
+            model provider<br>
+            schema validation<br>
+            report generation
+          </div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="node">
+          <div class="node-title">Traditional Modules</div>
+          <div class="node-list">
+            project evaluation draft<br>
+            implementation assessment draft
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-down">
+      <div class="arrow-down__line"></div>
+      <div class="arrow-down__head"></div>
+    </div>
+    <div class="connector-label">uploaded files / standard versions / evidence</div>
+
+    <div class="layer">
+      <div class="layer-label">Knowledge + Evidence Layer</div>
+      <div class="layer-title">controlled harness context</div>
+      <div class="row">
+        <div class="node">
+          <div class="node-title">Uploaded Project Files</div>
+          <div class="node-meta">项目材料通过上传进入 Harness；不连接本地工作目录，不开放 bash/命令执行。</div>
+        </div>
+        <div class="node">
+          <div class="node-title">Standard File Versions</div>
+          <div class="node-meta">官方制度/评估标准保留原始附件，DB 保存元数据、解析结果和 evidence。</div>
+        </div>
+        <div class="node">
+          <div class="node-title">JSON + Markdown Artifacts</div>
+          <div class="node-meta">结构化结果用于渲染与 Regression，可读报告用于顾问评审。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-down">
+      <div class="arrow-down__line"></div>
+      <div class="arrow-down__head"></div>
+    </div>
+    <div class="connector-label">explicit confirm only</div>
+
+    <!-- Layer 3: Traditional WES -->
+    <div class="layer">
+      <div class="layer-label">Legacy Record Layer</div>
+      <div class="layer-title">traditional WES records</div>
+      <div class="row">
+        <div class="node">
+          <div class="node-title">config/*.json</div>
+          <div class="node-meta">传统业务记录存储：项目、需求、评估、WBS、版本、审批</div>
+        </div>
+        <div class="node">
+          <div class="node-title">Formal Workflow</div>
+          <div class="node-meta">人工确认链路：草稿查看 → 来源追溯 → 编辑 → 正式发布</div>
+          <div class="node-list">
+            <span class="badge badge--warn">draft</span>
+            <span class="badge badge--ok">manual confirm</span>
+            <span class="badge badge--filled">formal</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="boundary-note">
+      <div class="boundary-note__icon">⊣⊢</div>
+      <div class="boundary-note__text">
+        <b>核心边界：</b>AI/Harness 可以生成报告、建议动作和传统草稿；正式评估、正式需求、正式项目推进必须经用户人工确认/编辑。确认动作通过 <span class="mono">enter_formal_estimation</span> 触发，且仅在 <span class="mono">report_v2_ready</span> 阶段允许执行，按 run/action 幂等返回既有结果。
+      </div>
+    </div>
+
+    <div class="boundary-note">
+      <div class="boundary-note__icon">!</div>
+      <div class="boundary-note__text">
+        <b>后置能力：</b>人工确认回写 Harness 审计已作为 Phase 1F 激活；向量库、Prompt Profile CRUD、标准治理 Harness 化和更高 Agent 自主级别仍不属于当前 1F 范围，需要在回写链路稳定后单独评审。Embedding 厂商与向量存储策略后续确定。
+      </div>
+    </div>
+  </div>
+</body>
+</html>
