@@ -24,7 +24,7 @@
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
       </nav>
-      <span class="pill warn">Phase 1F active</span>
+      <span class="pill ok">Phase 1F delivered</span>
     </div>
   </header>
 
@@ -35,12 +35,12 @@
       <p class="meta">
         <span><b>目标</b> 证明 AI 编排可控、可回放、可追溯</span>
         <span><b>覆盖</b> 本地验证 / CI / 人工测试 / Harness / 传统草稿</span>
-        <span><b>状态</b> Phase 1F 回写监控已激活，待实现回填</span>
+        <span><b>状态</b> Phase 1F 回写监控已落地，人工测试待回填</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">tests green</span>
         <span class="pill warn">人工测试已规划</span>
-        <span class="pill warn">Phase 1F audit write-back</span>
+        <span class="pill ok">Phase 1F audit write-back</span>
         <span class="pill brand">toolEvent trace</span>
         <span class="pill">artifact replay</span>
       </div>
@@ -66,7 +66,7 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>监控目标</h2>
-      <p class="lead">Phase 1D/1E 的监控重点不是模型“看起来聪明”，而是每个写动作和草稿入口都能解释：谁触发、在哪个 run、基于哪个 artifact、是否通过 schema、创建了哪个传统草稿、用户是否能在传统工作台继续人工确认。任务运行时视角补充要求：每个 Harness Run 都要能说明来源、执行、产物、交付和知识边界是否完整。</p>
+      <p class="lead">Phase 1D/1E/1F 的监控重点不是模型“看起来聪明”，而是每个写动作和草稿入口都能解释：谁触发、在哪个 run、基于哪个 artifact、是否通过 schema、创建了哪个传统草稿、用户是否能在传统工作台继续人工确认，以及确认后是否回写 Harness 审计。任务运行时视角补充要求：每个 Harness Run 都要能说明来源、执行、产物、交付和知识边界是否完整。</p>
       <div class="grid-4">
         <div class="kpi"><div class="top"><span class="ic">S</span><span>Schema</span><span class="live">guarded</span></div><div class="v">v1/v2</div><div class="lb">模型输出结构校验</div></div>
         <div class="kpi"><div class="top"><span class="ic">A</span><span>Audit</span><span class="live">persisted</span></div><div class="v">event</div><div class="lb">confirm ToolEvent 留痕</div></div>
@@ -80,13 +80,14 @@
       <h2>验证快照</h2>
       <table>
         <tr><th>命令</th><th>结果</th><th>覆盖范围</th></tr>
-        <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>60 pass</span></td><td>Harness usecase、route、confirm、幂等、阶段边界与传统评估追溯。</td></tr>
+        <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>62 pass</span></td><td>Harness usecase、route、confirm、幂等、阶段边界、传统评估追溯、人工确认回写与并发确认锁。</td></tr>
         <tr><td class="mono">npm run test:modules -w apps/api</td><td><span class="status done"><span class="dot"></span>59 pass</span></td><td>auth、versions、ai sessions、project-evaluations 等模块。</td></tr>
         <tr><td class="mono">npm run build -w apps/api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>后端 TypeScript 构建。</td></tr>
         <tr><td class="mono">npm run test:agent -w apps/api</td><td><span class="status done"><span class="dot"></span>21 pass</span></td><td>Agent 工具调用、权限过滤、路由行为。</td></tr>
-        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>63 pass</span></td><td>AI Home、AI 草稿列表/详情、登录、用户管理、业务 hook。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>64 pass</span></td><td>AI Home、AI 草稿列表/详情、登录、用户管理、业务 hook。</td></tr>
         <tr><td class="mono">npm run build --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>Vite 构建；仍有既有 chunk size warning。</td></tr>
-        <tr><td class="mono">npm run test:rules / test:integration</td><td><span class="status done"><span class="dot"></span>8 + 1 pass</span></td><td>规则与集成烟测。</td></tr>
+        <tr><td class="mono">node --test apps/api/dist/engine.test.js</td><td><span class="status done"><span class="dot"></span>8 pass</span></td><td>规则引擎逻辑；当前沙箱下 <code class="inline">npm run test:rules</code> 被 tsx IPC pipe 权限限制阻断。</td></tr>
+        <tr><td class="mono">npm run test:integration</td><td><span class="status warn"><span class="dot"></span>blocked</span></td><td>当前沙箱下 <code class="inline">tsx --test src/integration.test.ts</code> 在 IPC pipe 创建阶段 EPERM，未进入业务断言。</td></tr>
       </table>
     </section>
 
@@ -109,13 +110,14 @@
     <section>
       <div class="h-num">Section 04</div>
       <h2>Phase 1F 回写监控</h2>
-      <p class="lead">1F 激活后，监控重点从“AI 草稿是否可见”推进到“人工确认是否回写 Harness 审计链”。实现完成前，这里作为待回填监控口径；实现完成后更新为真实结果。</p>
+      <p class="lead">1F 交付后，监控重点从“AI 草稿是否可见”推进到“人工确认是否回写 Harness 审计链”。当前自动化已覆盖成功回写与重复确认幂等，人工测试需要继续确认真实页面操作与审计回查体验。</p>
       <table>
         <tr><th>监控点</th><th>目标记录</th><th>当前状态</th></tr>
-        <tr><td>人工确认动作</td><td>确认人、确认时间、草稿 ID、正式流程入口。</td><td><span class="status run"><span class="dot"></span>1F active</span></td></tr>
-        <tr><td>Harness 回写事件</td><td>ToolEvent 或 metadata transition，关联 runId/actionId。</td><td><span class="status run"><span class="dot"></span>待实现</span></td></tr>
-        <tr><td>回写幂等</td><td>重复确认不重复写入审计事件，返回既有回写结果。</td><td><span class="status run"><span class="dot"></span>待实现</span></td></tr>
-        <tr><td>前端反馈</td><td>详情页显示已回写、待回写或回写失败。</td><td><span class="status run"><span class="dot"></span>待实现</span></td></tr>
+        <tr><td>人工确认动作</td><td>确认人、确认时间、草稿 ID、确认备注。</td><td><span class="status done"><span class="dot"></span>已实现</span></td></tr>
+        <tr><td>Harness 回写事件</td><td><code class="inline">manual_confirm_ai_draft</code> ToolEvent，关联 runId/actionId。</td><td><span class="status done"><span class="dot"></span>已实现</span></td></tr>
+        <tr><td>Run metadata 回写</td><td>manualConfirmation、projectEvaluationId、assessmentVersionId、assessmentVersionCode。</td><td><span class="status done"><span class="dot"></span>已实现</span></td></tr>
+        <tr><td>回写幂等</td><td>重复确认不重复写入审计事件，也不覆盖首次确认备注。</td><td><span class="status done"><span class="dot"></span>已覆盖</span></td></tr>
+        <tr><td>前端反馈</td><td>详情页显示已回写、ToolEvent ID、确认人和确认时间。</td><td><span class="status done"><span class="dot"></span>已实现</span></td></tr>
       </table>
     </section>
 
@@ -175,7 +177,7 @@ harness_tool_events
         <tr><td>传统列表展示</td><td>草稿来源 Harness、runId、draft_from_ai 状态</td><td><span class="status done"><span class="dot"></span>已完成</span></td></tr>
         <tr><td>AI 工作台跳转</td><td>confirm 成功后进入草稿详情或实施评估列表</td><td><span class="status done"><span class="dot"></span>已完成</span></td></tr>
         <tr><td>草稿详情来源</td><td>Harness Run ID、Action ID、assessmentVersionCode</td><td><span class="status done"><span class="dot"></span>已完成</span></td></tr>
-        <tr><td>人工确认回写</td><td>用户编辑/确认时间、状态变化、正式流程入口</td><td><span class="status run"><span class="dot"></span>Phase 1F active</span></td></tr>
+        <tr><td>人工确认回写</td><td>确认人、确认时间、ToolEvent ID、传统草稿状态变化</td><td><span class="status done"><span class="dot"></span>Phase 1F delivered</span></td></tr>
       </table>
     </section>
 
@@ -211,7 +213,7 @@ harness_tool_events
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 监控与审计 · WES Agent 升级总看板 · 2026-06-19
+      <a href="index.html">返回总览</a> · 监控与审计 · WES Agent 升级总看板 · 2026-06-21
     </footer>
   </main>
 </body>

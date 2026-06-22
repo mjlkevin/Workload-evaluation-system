@@ -35,6 +35,7 @@ tags:
   - name: Wbs
   - name: Agent
   - name: Harness
+  - name: ProjectEvaluations
   - name: System
   - name: Presales
   - name: Sales
@@ -598,6 +599,146 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GenericOkResponse"
+
+  /api/v1/project-evaluations:
+    get:
+      tags: [ProjectEvaluations]
+      summary: 查询当前用户项目评估列表
+      operationId: listProjectEvaluations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 按项目名称、客户名称或行业做简单关键字过滤。
+      responses:
+        "200":
+          description: 项目评估列表。Phase 1E 起 AI 草稿会携带 Harness 追溯字段。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectEvaluationListResponse"
+        "401":
+          description: 未登录或登录态无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [ProjectEvaluations]
+      summary: 创建项目评估草稿
+      operationId: createProjectEvaluation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectEvaluationRequest"
+      responses:
+        "200":
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectEvaluationResponse"
+        "401":
+          description: 未登录或登录态无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/project-evaluations/assessment-drafts/{assessmentId}/confirm:
+    post:
+      tags: [ProjectEvaluations]
+      summary: 人工确认 AI 评估草稿并回写 Harness 审计
+      description: >
+        Phase 1F 新增。用户在传统实施评估详情页确认由 Harness 生成的
+        `draft_from_ai` 草稿时，系统记录 `manual_confirm_ai_draft`
+        ToolEvent，并把确认结果写回传统草稿和 Harness Run metadata。
+        该接口不会自动发布正式评估，后续仍走传统版本/评估流程。
+      operationId: confirmAiAssessmentDraft
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmAiAssessmentDraftRequest"
+      responses:
+        "200":
+          description: AI 草稿人工确认已记录，并已回写 Harness 审计链。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAssessmentDraftManualConfirmResponse"
+        "401":
+          description: 未登录或登录态无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 草稿不存在、无权访问或 Harness Run 不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 目标版本不是 Harness 生成的 AI 草稿
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/project-evaluations/{projectId}:
+    get:
+      tags: [ProjectEvaluations]
+      summary: 获取项目评估详情
+      description: >
+        Phase 1E 新增。用于传统工作台打开 AI 生成的项目评估草稿，并展示
+        `createdFromHarnessRunId`、`createdFromHarnessActionId` 和 `assessmentVersionCode`
+        等追溯字段。接口仍按 JWT owner 权限隔离，不返回其他用户数据。
+      operationId: getProjectEvaluation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 项目评估详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectEvaluationResponse"
+        "401":
+          description: 未登录或登录态无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 项目评估不存在或无权访问
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/v1/templates/import-json:
     post:
@@ -5003,6 +5144,215 @@ components:
                 type: string
             required: [field, reason]
       required: [code, message, details, requestId]
+
+    ProjectEvaluationPlan:
+      type: object
+      properties:
+        projectId:
+          type: string
+        projectName:
+          type: string
+        customerName:
+          type: string
+        industry:
+          type: string
+        currentStage:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, reviewing, published, archived]
+        ownerUserId:
+          type: string
+        ownerUsername:
+          type: string
+        participantUserIds:
+          type: array
+          items:
+            type: string
+        currentRequirementVersionId:
+          type: string
+        currentAssessmentVersionId:
+          type: string
+        currentDevAssessmentId:
+          type: string
+        currentResourceCostId:
+          type: string
+        currentWbsId:
+          type: string
+        defaultStandardVersionId:
+          type: string
+        createdFromSessionId:
+          type: string
+        sourceGlobalVersionRecordId:
+          type: string
+        createdFromHarnessRunId:
+          type: string
+          description: AI/Harness 创建的项目评估草稿来源 runId。仅 AI 草稿通常存在。
+        createdFromHarnessActionId:
+          type: string
+          description: AI/Harness 创建的项目评估草稿来源 actionId。
+        assessmentVersionCode:
+          type: string
+          description: 同一次 Harness confirm 创建的实施评估草稿版本号。
+        aiDraftReviewStatus:
+          type: string
+          enum: [pending, confirmed]
+          description: AI 草稿人工审核状态。Harness 来源草稿未确认时为 pending，人工确认并回写 Harness 后为 confirmed。
+        aiDraftConfirmedAt:
+          type: string
+          format: date-time
+          description: AI 草稿人工确认时间。
+        aiDraftConfirmedByUsername:
+          type: string
+          description: AI 草稿人工确认人用户名。
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - projectId
+        - projectName
+        - customerName
+        - industry
+        - currentStage
+        - status
+        - ownerUserId
+        - ownerUsername
+        - participantUserIds
+        - createdAt
+        - updatedAt
+
+    CreateProjectEvaluationRequest:
+      type: object
+      properties:
+        projectName:
+          type: string
+        customerName:
+          type: string
+        industry:
+          type: string
+        currentStage:
+          type: string
+        createdFromSessionId:
+          type: string
+        totalDays:
+          type: number
+
+    ConfirmAiAssessmentDraftRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          description: 人工确认备注。重复确认时复用首次确认记录，不覆盖既有审计备注。
+
+    AiDraftManualConfirmation:
+      type: object
+      properties:
+        status:
+          type: string
+          const: confirmed
+        confirmedAt:
+          type: string
+          format: date-time
+        confirmedByUserId:
+          type: string
+        confirmedByUsername:
+          type: string
+        note:
+          type: string
+        harnessToolEventId:
+          type: string
+      required: [status, confirmedAt, confirmedByUserId, confirmedByUsername]
+
+    AiAssessmentDraft:
+      type: object
+      properties:
+        recordId:
+          type: string
+        versionCode:
+          type: string
+        status:
+          type: string
+          const: draft_from_ai
+        manualConfirmation:
+          $ref: "#/components/schemas/AiDraftManualConfirmation"
+      required: [recordId, versionCode, status]
+
+    ProjectEvaluationListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProjectEvaluationPlan"
+          required: [items]
+      required: [code, message, data]
+
+    ProjectEvaluationResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            project:
+              $ref: "#/components/schemas/ProjectEvaluationPlan"
+          required: [project]
+      required: [code, message, data]
+
+    AiAssessmentDraftManualConfirmResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            project:
+              $ref: "#/components/schemas/ProjectEvaluationPlan"
+            assessmentDraft:
+              $ref: "#/components/schemas/AiAssessmentDraft"
+            harness:
+              type: object
+              properties:
+                runId:
+                  type: string
+                actionId:
+                  type: string
+                toolEventId:
+                  type: string
+                status:
+                  type: string
+                  const: confirmed
+              required: [runId, actionId, toolEventId, status]
+          required: [project, assessmentDraft, harness]
+      required: [code, message, data]
 
     VersionRecord:
       type: object

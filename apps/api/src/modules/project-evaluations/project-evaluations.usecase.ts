@@ -3,8 +3,9 @@ import { randomUUID } from "node:crypto";
 import type { AuthUser, VersionRecord } from "../../types";
 import { asString } from "../../utils";
 import type { HarnessRequirementReportV2Content } from "../harness/harness.types";
-import { PROJECT_EVALUATION_RECORD_KIND, findHarnessDraftRecords, listProjectRecords, mapGlobalVersionToProject, saveProjectRecord, saveProjectRecords } from "./project-evaluations.repository";
-import type { ProjectEvaluationDraftBundle, ProjectEvaluationPlan } from "./project-evaluations.types";
+import { createHarnessRepository, type HarnessRepository } from "../harness/harness.repository";
+import { PROJECT_EVALUATION_RECORD_KIND, findHarnessDraftRecords, findProjectRecordByAssessmentDraft, listProjectRecords, mapGlobalVersionToProject, saveProjectRecord, saveProjectRecords } from "./project-evaluations.repository";
+import type { AiAssessmentDraftManualConfirmResult, AiDraftManualConfirmation, ProjectEvaluationDraftBundle, ProjectEvaluationPlan } from "./project-evaluations.types";
 
 export function listProjectEvaluationsForUser(user: AuthUser, query: { q?: unknown } = {}): ProjectEvaluationPlan[] {
   const keyword = asString(query.q).toLowerCase();
@@ -15,6 +16,12 @@ export function listProjectEvaluationsForUser(user: AuthUser, query: { q?: unkno
       return [project.projectName, project.customerName, project.industry].some((value) => value.toLowerCase().includes(keyword));
     })
     .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)));
+}
+
+export function getProjectEvaluationForUser(user: AuthUser, projectId: string): ProjectEvaluationPlan | null {
+  const record = listProjectRecords(user.id).find((item) => item.id === projectId);
+  if (!record) return null;
+  return mapGlobalVersionToProject(record);
 }
 
 export function createProjectEvaluationForUser(user: AuthUser, input: Record<string, unknown>): ProjectEvaluationPlan {
@@ -75,6 +82,52 @@ function buildAiDraftVersionCode(prefix: string, id: string): string {
   return `${prefix}-AI-DRAFT-${id.slice(0, 8).toUpperCase()}`;
 }
 
+const aiDraftConfirmationLocks = new Map<string, Promise<void>>();
+
+async function withAiDraftConfirmationLock<T>(key: string, task: () => Promise<T>): Promise<T> {
+  const previous = aiDraftConfirmationLocks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.catch(() => undefined).then(() => current);
+  aiDraftConfirmationLocks.set(key, tail);
+  await previous.catch(() => undefined);
+  try {
+    return await task();
+  } finally {
+    release();
+    if (aiDraftConfirmationLocks.get(key) === tail) {
+      aiDraftConfirmationLocks.delete(key);
+    }
+  }
+}
+
+function readManualConfirmationPayload(value: unknown): AiDraftManualConfirmation | undefined {
+  const review = asRecord(value);
+  if (asString(review.status) !== "confirmed") return undefined;
+  return {
+    status: "confirmed",
+    confirmedAt: asString(review.confirmedAt),
+    confirmedByUserId: asString(review.confirmedByUserId),
+    confirmedByUsername: asString(review.confirmedByUsername),
+    note: asString(review.note) || undefined,
+    harnessToolEventId: asString(review.harnessToolEventId) || undefined,
+  };
+}
+
+function readManualConfirmation(record: VersionRecord): AiDraftManualConfirmation | undefined {
+  return readManualConfirmationPayload(asRecord(record.payload).aiDraftReview);
+}
+
+function readManualConfirmationFromEventOutput(output: unknown): AiDraftManualConfirmation | undefined {
+  return readManualConfirmationPayload(asRecord(output).manualConfirmation);
+}
+
+function readOutputAssessmentDraftId(output: unknown): string {
+  return asString(asRecord(asRecord(output).assessmentDraft).recordId);
+}
+
 export function createProjectAndAssessmentDraftsFromHarness(
   user: AuthUser,
   input: {
@@ -108,6 +161,8 @@ export function createProjectAndAssessmentDraftsFromHarness(
   const customerName = asString(project.customerName);
   const industry = asString(project.industry);
 
+  const projectRecordId = randomUUID();
+  const projectVersionCode = `PROJECT-${projectRecordId}`;
   const assessmentRecordId = randomUUID();
   const assessmentVersionCode = buildAiDraftVersionCode("IA", assessmentRecordId);
   const assessmentPayload: Record<string, unknown> = {
@@ -115,6 +170,7 @@ export function createProjectAndAssessmentDraftsFromHarness(
     draftSource: "harness",
     harnessRunId: input.harnessRunId,
     harnessActionId: input.actionId,
+    projectEvaluationId: projectRecordId,
     projectName,
     customerName,
     industry,
@@ -206,8 +262,6 @@ export function createProjectAndAssessmentDraftsFromHarness(
     lastCheckinPayload: {},
   };
 
-  const projectRecordId = randomUUID();
-  const projectVersionCode = `PROJECT-${projectRecordId}`;
   const projectRecord: VersionRecord = {
     id: projectRecordId,
     type: "global",
@@ -222,6 +276,7 @@ export function createProjectAndAssessmentDraftsFromHarness(
       industry,
       currentStage: "assessment_draft",
       projectStatus: "draft",
+      aiDraftReviewStatus: "pending",
       createdFromSessionId: input.aiSessionId || "",
       createdFromHarnessRunId: input.harnessRunId,
       createdFromHarnessActionId: input.actionId,
@@ -252,6 +307,183 @@ export function createProjectAndAssessmentDraftsFromHarness(
       recordId: assessmentRecord.id,
       versionCode: assessmentRecord.versionCode,
       status: "draft_from_ai",
+      manualConfirmation: readManualConfirmation(assessmentRecord),
+    },
+  };
+}
+
+export async function confirmAiAssessmentDraftForUser(
+  user: AuthUser,
+  assessmentRecordId: string,
+  input: { note?: unknown } = {},
+  repo: HarnessRepository = createHarnessRepository(),
+): Promise<AiAssessmentDraftManualConfirmResult | null> {
+  const pair = findProjectRecordByAssessmentDraft(user.id, assessmentRecordId);
+  if (!pair) return null;
+
+  const { projectRecord, assessmentRecord } = pair;
+  const assessmentPayload = assessmentRecord.payload || {};
+  const projectPayload = projectRecord.payload || {};
+  const harnessRunId = asString(assessmentPayload.harnessRunId) || asString(projectPayload.createdFromHarnessRunId);
+  const harnessActionId = asString(assessmentPayload.harnessActionId) || asString(projectPayload.createdFromHarnessActionId);
+  if (
+    asString(assessmentPayload.draftStatus) !== "draft_from_ai"
+    || asString(assessmentPayload.draftSource) !== "harness"
+    || !harnessRunId
+    || !harnessActionId
+  ) {
+    throw new Error("not_ai_harness_draft");
+  }
+
+  return withAiDraftConfirmationLock(
+    `${harnessRunId}:${harnessActionId}:${assessmentRecord.id}:manual_confirm_ai_draft`,
+    () => confirmAiAssessmentDraftForUserCore(user, assessmentRecordId, input, repo),
+  );
+}
+
+async function confirmAiAssessmentDraftForUserCore(
+  user: AuthUser,
+  assessmentRecordId: string,
+  input: { note?: unknown },
+  repo: HarnessRepository,
+): Promise<AiAssessmentDraftManualConfirmResult | null> {
+  const pair = findProjectRecordByAssessmentDraft(user.id, assessmentRecordId);
+  if (!pair) return null;
+
+  const { projectRecord, assessmentRecord } = pair;
+  const assessmentPayload = assessmentRecord.payload || {};
+  const projectPayload = projectRecord.payload || {};
+  const harnessRunId = asString(assessmentPayload.harnessRunId) || asString(projectPayload.createdFromHarnessRunId);
+  const harnessActionId = asString(assessmentPayload.harnessActionId) || asString(projectPayload.createdFromHarnessActionId);
+  if (
+    asString(assessmentPayload.draftStatus) !== "draft_from_ai"
+    || asString(assessmentPayload.draftSource) !== "harness"
+    || !harnessRunId
+    || !harnessActionId
+  ) {
+    throw new Error("not_ai_harness_draft");
+  }
+
+  const run = await repo.findRunById(harnessRunId);
+  if (!run || run.ownerUserId !== user.id) {
+    throw new Error("harness_run_not_found");
+  }
+
+  const existingEvent = (await repo.listToolEvents(harnessRunId)).find((event) =>
+    event.toolName === "manual_confirm_ai_draft"
+    && event.eventType === "manual_confirmation"
+    && event.actionId === harnessActionId
+    && event.status === "confirmed"
+    && readOutputAssessmentDraftId(event.output) === assessmentRecord.id);
+
+  const existingManualConfirmation = existingEvent
+    ? readManualConfirmationFromEventOutput(existingEvent.output) ?? readManualConfirmation(assessmentRecord)
+    : readManualConfirmation(assessmentRecord);
+  const confirmedAt = existingManualConfirmation?.confirmedAt || new Date().toISOString();
+  const manualConfirmation: AiDraftManualConfirmation = existingManualConfirmation
+    ? {
+      ...existingManualConfirmation,
+      harnessToolEventId: existingEvent?.harnessToolEventId || existingManualConfirmation.harnessToolEventId,
+    }
+    : {
+      status: "confirmed",
+      confirmedAt,
+      confirmedByUserId: user.id,
+      confirmedByUsername: user.username,
+      note: asString(input.note) || undefined,
+      harnessToolEventId: existingEvent?.harnessToolEventId,
+    };
+  const output = {
+    project: {
+      projectId: projectRecord.id,
+      projectName: asString(projectPayload.projectName),
+      status: "reviewing",
+    },
+    assessmentDraft: {
+      recordId: assessmentRecord.id,
+      versionCode: assessmentRecord.versionCode,
+      status: "draft_from_ai",
+    },
+    manualConfirmation,
+  };
+
+  const event = existingEvent ?? await repo.addToolEvent({
+    harnessRunId,
+    actionId: harnessActionId,
+    toolName: "manual_confirm_ai_draft",
+    eventType: "manual_confirmation",
+    status: "confirmed",
+    riskLevel: "high",
+    input: {
+      projectId: projectRecord.id,
+      assessmentRecordId: assessmentRecord.id,
+      harnessActionId,
+      note: manualConfirmation.note,
+    },
+    output,
+    errorMessage: null,
+    resolvedAt: new Date(confirmedAt),
+  });
+
+  manualConfirmation.harnessToolEventId = event.harnessToolEventId;
+  const nextAssessmentRecord: VersionRecord = {
+    ...assessmentRecord,
+    payload: {
+      ...assessmentPayload,
+      aiDraftReview: manualConfirmation,
+    },
+    updatedAt: confirmedAt,
+    updatedByUserId: user.id,
+    updatedByUsername: user.username,
+  };
+  const nextProjectRecord: VersionRecord = {
+    ...projectRecord,
+    payload: {
+      ...projectPayload,
+      currentStage: "manual_confirmed",
+      projectStatus: "reviewing",
+      aiDraftReviewStatus: "confirmed",
+      aiDraftReview: manualConfirmation,
+    },
+    updatedAt: confirmedAt,
+    updatedByUserId: user.id,
+    updatedByUsername: user.username,
+  };
+  saveProjectRecords([nextAssessmentRecord, nextProjectRecord]);
+
+  const runMetadata = asRecord(run.metadata);
+  const links = asRecord(runMetadata.links);
+  await repo.updateRun(harnessRunId, {
+    metadata: {
+      ...runMetadata,
+      links: {
+        ...links,
+        projectEvaluationId: projectRecord.id,
+        assessmentVersionId: assessmentRecord.id,
+        assessmentVersionCode: assessmentRecord.versionCode,
+      },
+      manualConfirmation: {
+        ...manualConfirmation,
+        projectEvaluationId: projectRecord.id,
+        assessmentVersionId: assessmentRecord.id,
+        sourceActionId: harnessActionId,
+      },
+    },
+  });
+
+  return {
+    project: mapGlobalVersionToProject(nextProjectRecord),
+    assessmentDraft: {
+      recordId: nextAssessmentRecord.id,
+      versionCode: nextAssessmentRecord.versionCode,
+      status: "draft_from_ai",
+      manualConfirmation,
+    },
+    harness: {
+      runId: harnessRunId,
+      actionId: harnessActionId,
+      toolEventId: event.harnessToolEventId,
+      status: "confirmed",
     },
   };
 }

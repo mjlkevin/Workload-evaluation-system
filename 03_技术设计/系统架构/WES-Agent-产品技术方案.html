@@ -114,6 +114,7 @@
   <a href="#s13">13. 风险与决策记录</a>
   <a href="#s14">14. 给后续工作的上下文</a>
   <a href="#s15">15. V1 实施计划</a>
+  <a href="#s16">16. 2026-06-19 复盘</a>
 </nav>
 
 <!-- ============ MAIN ============ -->
@@ -123,26 +124,31 @@
   <h1>WES Agent 产品技术方案</h1>
   <div class="sub">将「工作量评估系统」从系统性 UI 升级为<b>对话式智能体产品</b> · 后端编排 · 半自主执行业务流程</div>
   <div class="meta">
-    <span class="m">版本 <b>v0.2（路线评审版）</b></span>
-    <span class="m">状态 <b>需求审批基线</b></span>
-    <span class="m">分支 <b>feat/agent-workbench</b></span>
-    <span class="m">日期 <b>2026-06-11</b></span>
+    <span class="m">版本 <b>v0.5（Phase 1F 完成版）</b></span>
+    <span class="m">状态 <b>Phase 1F 已实现 · 人工验收待回填</b></span>
+    <span class="m">分支 <b>main</b></span>
+    <span class="m">日期 <b>2026-06-21</b></span>
     <span class="m">目标读者 <b>产品 / 全栈 / 后续 AI Session</b></span>
   </div>
 </div>
 
+<div class="callout good"><div class="t">2026-06-21 总看板入口</div>
+  本文档继续作为 WES Agent 产品技术方案的详细资料源；后续汇报与审计交付物已拆分为独立总看板：
+  <a href="WES-Agent-升级总看板/index.html">WES Agent 升级总看板 · 设计 / 计划 / 监控</a>。
+  总看板包含设计说明、实施计划与进度、监控审计、风险决策和变更记录五个专题页。</div>
+
 <!-- ===== 摘要 ===== -->
 <section id="summary">
   <h2 class="sec"><span class="n">0</span>摘要 · 一页读懂</h2>
-  <p class="lead">WES 现有后端已 17/17 领域模块化，每个 <code>usecase</code> 是纯业务函数；本方案的核心思想是
-  <b>把这些 usecase 注册为 AI 的「工具」，用一个对话式工作台让用户用自然语言驱动，后端 Agent 编排层在 RBAC 权限边界内半自主地调用工具、完成业务流程。</b></p>
+  <p class="lead">WES 现有后端已完成 18/18 领域模块化，其中 <code>harness</code> 作为首个 DB-backed 新业务域接入 PostgreSQL；本方案的核心思想已经从“把 usecase 注册为 AI 工具”的路线设计，演进为
+  <b>AI Agent 工作台 + WES 传统记录系统</b> 双轨协作：AI 在 Harness 受控环境内解析文件、生成 v1/v2 报告和待确认动作，传统系统承接经用户确认后的项目/评估草稿。</p>
   <div class="grid g3">
     <div class="card"><h4>🎯 产品形态</h4><p>L2 内嵌 Copilot：对话驱动 + 结构化渲染。读操作自动执行，写操作停下确认。<b>不是纯聊天，也不是全自主。</b></p></div>
-    <div class="card"><h4>🧩 复用而非重写</h4><p>业务逻辑零改动，直接 <code>import</code> 现有 usecase 当工具。新增三块：工具注册表、编排循环、对话 UI。</p></div>
-    <div class="card"><h4>🔑 唯一硬门槛</h4><p>给 Provider 抽象层补 <b>function-calling（tool-calling）</b>。补完 L2/L3 皆通。</p></div>
+    <div class="card"><h4>🧩 Harness 受控编排</h4><p>文件上传后进入 Harness run，沉淀 evidence、artifact、modelRun、toolEvent，让模型输出可校验、可回放、可审计。</p></div>
+    <div class="card"><h4>🔑 当前硬边界</h4><p>AI 只能生成报告、建议动作和草稿；正式业务记录必须经用户确认/编辑后进入传统流程。</p></div>
   </div>
   <div class="callout good"><div class="t">一句话结论</div>
-  技术上完全可行，地基是同类项目里少见的好（业务逻辑已解耦为可调用函数）。V1 立即推进：<b>V0_SAAS 下线、V2_PROTOTYPE 升级为唯一 Web 前端、桌面售前 Agent 闭环</b>；V2 做微信小程序 + PM/SOW/评审；V3 做经营智能。</div>
+  Phase 1D 已把“上传文件 → Harness v1/v2 报告 → 用户确认 → 传统项目/评估草稿”的最小闭环合并到 <code>main</code>。Phase 1E 已补齐 <b>AI 草稿的传统列表可见、详情跳转、来源追溯</b>；Phase 1F 已补齐 <b>人工确认后回写 Harness 审计</b>。后续不应扩大模型自治，正式评估仍必须走传统人工流程。</div>
   <h3>0.1 2026-06-11 评审新增决策</h3>
   <table>
     <tr><th>议题</th><th>决策</th><th>影响</th></tr>
@@ -151,13 +157,25 @@
     <tr><td>移动端</td><td>微信小程序放入 V2</td><td>V1 只做移动端事件模型预留，不做小程序生产版</td></tr>
     <tr><td>路线切分</td><td>按业务闭环切 V1/V2/V3</td><td>V1 售前估算，V2 项目交付，V3 经营智能</td></tr>
   </table>
+  <h3>0.2 2026-06-21 当前状态</h3>
+  <table>
+    <tr><th>事项</th><th>当前事实</th><th>说明</th></tr>
+    <tr><td>代码主线</td><td><code>main</code> 已合并 PR #2；总看板已提交至 <code>4bf4bcb</code></td><td>Phase 1E/1F 代码变更仍在本地 worktree，后续需精确 stage/commit。</td></tr>
+    <tr><td>前端主线</td><td><code>ui/V2_PROTOTYPE</code> 为唯一 Web 主线</td><td>AI 工作台主线落在 <code>AiHomeWorkbench.jsx</code>；【历史说明，已下线中】<code>ui/V0_SAAS</code> 仅保留迁移核对与历史追溯</td></tr>
+    <tr><td>后端主线</td><td><code>apps/api</code> 继续作为唯一服务入口</td><td>Agent 基座、Harness、传统项目/评估草稿都在 modules/routes 模式内交付</td></tr>
+    <tr><td>Phase 1B/1C</td><td>上传文件已进入 Harness，而不是只走普通聊天</td><td>链路：<code>parse-basic-info → createHarnessRun → bindHarnessFile → submitHarnessParseResult → generateHarnessReportV1</code></td></tr>
+    <tr><td>Phase 1D</td><td>v2 报告确认后可生成传统项目/实施评估草稿</td><td><code>enter_formal_estimation</code> 只生成 <code>draft_from_ai</code> 草稿；不自动发布正式评估</td></tr>
+    <tr><td>Phase 1E</td><td>AI 草稿进入传统工作台可见路径</td><td>评估列表支持 AI 草稿过滤与状态 badge；详情展示 Harness Run ID / Action ID / 版本号；AI 工作台 confirm 后展示草稿跳转入口。</td></tr>
+    <tr><td>Phase 1F</td><td>人工确认 AI 草稿后回写 Harness 审计</td><td>详情页确认后记录 <code>manual_confirm_ai_draft</code> ToolEvent，写回 Run metadata，并展示 ToolEvent、确认人和确认时间。</td></tr>
+    <tr><td>验证</td><td>本轮本地验证与 GitHub Actions 均通过</td><td>详见 §16.3 验证清单</td></tr>
+  </table>
 </section>
 
 <!-- ===== 1 ===== -->
 <section id="s1">
   <h2 class="sec"><span class="n">1</span>背景与目标</h2>
   <h3>1.1 现状</h3>
-  <p>WES（工作量评估系统）是一套<b>多页签系统性 UI</b> 的软件：用户在「需求 / 实施评估 / 开发评估 / 资源成本 / WBS / 评审」等页面间手动操作，完成「需求 → 评估 → 成本 → 归档」链路。后端 <code>apps/api</code> 已完成 17/17 领域模块化；【历史说明，下线中】前端曾以 <code>ui/V0_SAAS</code>（Next 主实现）+ <code>ui/V2_PROTOTYPE</code>（Vite/React 沙箱）双轨推进。本轮评审后，V1 将推动 <code>ui/V2_PROTOTYPE</code> 升级为唯一 Web 前端主线，并下线 <code>ui/V0_SAAS</code>。</p>
+  <p>WES（工作量评估系统）已经从单纯的多页签系统性 UI，升级为 <b>AI Agent 工作台 + WES 传统记录系统</b> 的一体化产品。用户仍可在「需求 / 实施评估 / 开发评估 / 资源成本 / WBS / 评审」等传统页面完成正式业务记录；同时，AI 工作台通过 Harness 承接文件上传、证据沉淀、模型报告、补充澄清和确认动作。后端 <code>apps/api</code> 已完成 18/18 领域模块化，<code>harness</code> 作为审计、追溯、统计需求明显增加后的首个 DB-backed 业务域接入 PostgreSQL。前端主线已确认为 <code>ui/V2_PROTOTYPE</code>；【历史说明，下线中】<code>ui/V0_SAAS</code> 不再作为主线交付。</p>
   <h3>1.2 升级动机</h3>
   <ul>
     <li>系统性 UI 学习成本高：用户需要理解页签结构、字段含义、操作顺序。</li>
@@ -165,7 +183,7 @@
     <li>后端已模块化为干净 usecase，<b>具备被 AI 编排调用的前提</b>（这是关键差异化优势）。</li>
   </ul>
   <h3>1.3 目标</h3>
-  <div class="callout"><b>产品定义：</b>WES Agent = 一个对话式工作台。用户用自然语言描述目标，后端 Agent 编排层把现有 17 个 usecase 当工具调用，在 RBAC 权限边界内半自主地走完业务流程；模型支持平台默认 + 用户自带 Key（BYOK）+ 多厂商可选；读操作自动执行，写操作停下确认。</div>
+  <div class="callout"><b>产品定义：</b>WES Agent = 一个对话式工作台 + Harness 受控业务环境。用户用自然语言描述目标，后端 Agent/Harness 编排层在 RBAC 权限边界内调用现有 18 个模块能力，完成文件理解、报告生成、补充澄清、待确认动作和传统草稿创建；读操作自动执行，写操作必须确认并留痕。</div>
 </section>
 
 <!-- ===== 2 ===== -->
@@ -188,16 +206,16 @@
   <div class="grid g2">
     <div class="card"><h4><span class="badge b-green">已具备</span> Provider 抽象层</h4>
       <p><code>ai/provider/model-provider.ts</code> 定义 <code>ModelProvider</code> 接口 + <code>ProviderRegistry</code> 注册表，Kimi 已实现且<b>支持流式</b>。多厂商、用户自管 Key 已预留（<code>credentialsOverride</code>）。</p></div>
-    <div class="card"><h4><span class="badge b-green">已具备</span> 17/17 模块化 usecase</h4>
-      <p>每个领域是干净的 <code>usecase</code> 纯函数——<b>天然就是 Agent 的「工具」</b>。这是多数项目改 Agent 的最大障碍，WES 已跨过。</p></div>
+    <div class="card"><h4><span class="badge b-green">已具备</span> 18/18 模块化 usecase</h4>
+      <p>每个领域遵循 controller / usecase / repository 边界；<code>harness</code> 已作为新业务域纳入模块化体系，并承担 Agent 文件理解、模型报告、审计追溯和确认动作。</p></div>
     <div class="card"><h4><span class="badge b-green">已具备</span> 自然语言入口雏形</h4>
       <p><code>ai/extractor/</code>（文档→结构化需求包）+ <code>assessment.service</code>（估算预览）+ <code>chat.service</code>。L3 最难的「NL→结构化」已做。</p></div>
     <div class="card"><h4><span class="badge b-green">已具备</span> 会话态 + RBAC</h4>
       <p><code>sessions</code> 模块支持多轮上下文；RBAC 能力位模型可直接约束「Agent 能做什么」，安全边界现成。</p></div>
-    <div class="card"><h4><span class="badge b-red">需补齐</span> Provider 的 tool-calling</h4>
-      <p>当前接口仅 <code>chatCompletion</code> + <code>responseFormat: text|json_object</code>，<b>无 tools 参数</b>。这是最大硬缺口。</p></div>
-    <div class="card"><h4><span class="badge b-red">需新建</span> 编排循环 + 工具注册表</h4>
-      <p>plan→act→observe 调度器、把 usecase 注册成 tools 的注册表，均为新增（约 2–3 个文件）。</p></div>
+    <div class="card"><h4><span class="badge b-green">已完成</span> Provider tool-calling</h4>
+      <p>Provider 抽象与 Kimi 适配已支持 <code>tools/tool_choice</code> 注入和 <code>tool_calls</code> 解析；Agent 路由测试覆盖工具调用事件。</p></div>
+    <div class="card"><h4><span class="badge b-green">已完成</span> 编排循环 + 工具注册表</h4>
+      <p><code>apps/api/src/agent/</code> 已包含工具注册表、编排循环、权限过滤、写操作确认与最大轮数护栏；当前主线进一步以 Harness 承载文件上传后的业务编排。</p></div>
   </div>
 </section>
 
@@ -239,23 +257,23 @@
     <path class="arrow-b" d="M650,248 L650,300"/>
     <!-- provider -->
     <rect class="box box-g" x="60" y="302" width="350" height="96" rx="12"/>
-    <text class="lbl" x="80" y="328" font-weight="700">③ Provider 层　<tspan class="lbl-s" font-weight="400">（已有 · 需补 tools）</tspan></text>
-    <text class="lbl-s" x="80" y="350">Registry + Kimi（流式OK）</text>
-    <text class="lbl-s" x="80" y="368" fill="#ff8f8f">← 扩展 ChatCompletionRequest.tools</text>
-    <text class="lbl-s" x="80" y="386" fill="#ff8f8f">← Kimi 适配 function-calling</text>
+    <text class="lbl" x="80" y="328" font-weight="700">③ Provider 层　<tspan class="lbl-s" font-weight="400">（已支持 tools）</tspan></text>
+    <text class="lbl-s" x="80" y="350">Registry + Kimi + tool_calls 解析</text>
+    <text class="lbl-s" x="80" y="368" fill="#3ecf8e">✓ ChatCompletionRequest.tools 已接入</text>
+    <text class="lbl-s" x="80" y="386" fill="#3ecf8e">✓ Kimi function-calling 已适配</text>
     <!-- tool registry -->
     <rect class="box box-b" x="500" y="302" width="360" height="96" rx="12"/>
-    <text class="lbl" x="520" y="328" font-weight="700">④ 工具注册表　<tspan class="lbl-s" font-weight="400">（新建）</tspan></text>
-    <text class="lbl-s" x="520" y="350">把现有 usecase 包装成 tools，</text>
-    <text class="lbl-s" x="520" y="368">每个带 JSON「说明书」(name/desc/params)</text>
-    <text class="lbl-s" x="520" y="386">+ 绑定 RBAC 能力位 + 读/写标记</text>
+    <text class="lbl" x="520" y="328" font-weight="700">④ 工具注册表　<tspan class="lbl-s" font-weight="400">（已落地）</tspan></text>
+    <text class="lbl-s" x="520" y="350">Agent tools + Harness typed actions</text>
+    <text class="lbl-s" x="520" y="368">权限过滤、写确认、最大轮数护栏</text>
+    <text class="lbl-s" x="520" y="386">高风险动作以 Harness toolEvent 留痕</text>
 
     <path class="arrow" d="M680,398 L680,440"/>
     <!-- usecases -->
     <rect class="box box-g" x="60" y="442" width="800" height="92" rx="12"/>
-    <text class="lbl" x="80" y="468" font-weight="700">⑤ 现有 17 个 modules 的 usecase　<tspan class="lbl-s" font-weight="400">（完全不动，只读复用）</tspan></text>
+    <text class="lbl" x="80" y="468" font-weight="700">⑤ 现有 18 个 modules 的 usecase　<tspan class="lbl-s" font-weight="400">（传统域 JSON 存储，Harness 域 DB-backed）</tspan></text>
     <text class="lbl-s" x="80" y="492">estimates · presales · dev-assessment · versions · team · sessions · history · change · collab · sales · pm · exports · …</text>
-    <text class="lbl-s" x="80" y="514">持久化：config/*.json（文件存储；高并发自主场景触发 DB 迁移条件时再切 PG）</text>
+    <text class="lbl-s" x="80" y="514">持久化：传统域仍以 config/*.json 为主；Harness 因审计/统计/权限追溯已接入 PostgreSQL</text>
   </svg>
   <div class="figcap">图 4-1　WES Agent 目标架构（5 层；前端主线以 V2_PROTOTYPE 为准）</div>
   </div>
@@ -438,15 +456,15 @@
   <table>
     <tr><th>隔离诉求</th><th>正确工具（无需新仓库）</th></tr>
     <tr><td>不改坏现有系统</td><td><b>目录边界</b>：后端新增 <code>apps/api/src/agent/</code>；前端在 <code>ui/V2_PROTOTYPE</code> 内新增 Agent 路由；现有 modules 不重写，只读复用 usecase</td></tr>
-    <tr><td>版本隔离</td><td><b>Git 分支</b>：<code>feat/agent-workbench</code>，main 始终可发布</td></tr>
+    <tr><td>版本隔离</td><td><b>Git 分支</b>：<code>feat/agent-workbench</code> 已合并并清理；当前 Phase 1E 变更在 <code>main</code> 工作区内待精确提交，main 发布态仍以最新提交为准</td></tr>
     <tr><td>一边用现有 / 一边开发</td><td><b>Git Worktree</b>：两个工作目录、两个分支、共享历史与远程，互不干扰（✅ 已建）</td></tr>
   </table>
   <h3>11.2 目录布局（加法不减法）</h3>
   <pre>apps/api/src/
-  modules/                 <span class="c">← 现有 17 域，一行不动</span>
+  modules/                 <span class="c">← 现有 18 域；传统域保持边界，Harness 域 DB-backed</span>
   <span class="k">agent/</span>                  <span class="c">🆕 编排循环、工具注册表、systemPrompt</span>
   routes/<span class="k">agent.routes.ts</span>   <span class="c">🆕 新增一条路由</span>
-  ai/provider/             <span class="c">← 扩展 tools（唯一需改的现有文件，可走独立 PR 合入 main）</span>
+  ai/provider/             <span class="c">← 已支持 tools / tool_calls；后续只按模型兼容性演进</span>
 ui/
   <span class="k">V2_PROTOTYPE/</span>            <span class="c">← V1 升级为唯一 Web 前端主线，新增 Agent 路由</span>
   V0_SAAS/                 <span class="c">← V1 下线范围；迁移必要资产后删除</span></pre>
@@ -524,8 +542,8 @@ ui/
     <tr><td>V0_SAAS</td><td><span class="badge b-green">决策</span> V1 下线</td><td>删除前完成资产盘点与必要能力迁移</td></tr>
     <tr><td>移动端</td><td><span class="badge b-green">决策</span> 微信小程序进入 V2</td><td>V1 只预留事件模型；V2 做小程序 MVP</td></tr>
     <tr><td>模型</td><td><span class="badge b-green">决策</span> 平台默认 Kimi + BYOK + 多厂商预留</td><td>限定 function-calling 模型</td></tr>
-    <tr><td>技术门槛</td><td><span class="badge b-red">风险</span> Provider 无 tool-calling</td><td>阶段 1 优先补齐；Kimi 兼容 OpenAI tools 协议，可行</td></tr>
-    <tr><td>存储</td><td><span class="badge b-amber">风险</span> JSON 文件，高并发自主写冲突</td><td>L2 人在环并发低，暂不阻塞；触发 DB 迁移条件再切 PG</td></tr>
+    <tr><td>技术门槛</td><td><span class="badge b-green">已化解</span> Provider tool-calling 已落地</td><td>Kimi tools 注入、tool_calls 解析、Agent 编排测试已进入主线</td></tr>
+    <tr><td>存储</td><td><span class="badge b-green">决策</span> Harness 域已触发 DB 迁移条件</td><td>传统域仍以 JSON 为主；Harness 因审计/统计/权限追溯接入 PostgreSQL，不扩大到其他域</td></tr>
     <tr><td>成本</td><td><span class="badge b-amber">风险</span> 多步循环放大 token 消耗</td><td>循环上限 + 质量看板监控 + 缓存可复用上下文</td></tr>
     <tr><td>范围</td><td><span class="badge b-amber">风险</span> V1 同时包含前端主线切换与 Agent 闭环</td><td>先做资产盘点与后端基座，SOW/小程序/经营分析全部后置</td></tr>
   </table>
@@ -536,20 +554,23 @@ ui/
   <h2 class="sec"><span class="n">14</span>给后续工作的上下文（必读）</h2>
   <div class="callout"><div class="t">如果你是接手本项目的后续 AI Session / 工程师，请先读懂这几条：</div>
   <ol>
-    <li><b>本方案是 L2 内嵌 Copilot</b>，不是纯聊天机器人，也不是全自主 Agent。读操作自动、写操作确认。</li>
-    <li><b>业务逻辑零改动</b>。Agent = 现有 17 个 usecase + 工具说明书外壳 + 编排循环。不要重写业务逻辑。</li>
-    <li><b>唯一需改的现有文件</b>是 <code>ai/provider/*</code>（补 tool-calling），且应走独立 PR 合入 main，不在 feat 分支偷改。</li>
-    <li><b>仓库不拆</b>。同仓 monorepo，在 <code>feat/agent-workbench</code> 分支 + worktree 工作区开发。后端新增 <code>apps/api/src/agent/</code>；前端在 <code>ui/V2_PROTOTYPE</code> 内新增 Agent 路由。</li>
-    <li><b>前端主线已改口径</b>。V1 下线 <code>ui/V0_SAAS</code>，<code>ui/V2_PROTOTYPE</code> 升级为唯一 Web 前端。旧文档中 <code>V3_AGENT</code> 是历史草案，不再作为落点。</li>
-    <li><b>权限边界 = RBAC 能力位</b>。Agent 能做什么由用户能力位决定，工具调用前必过校验，不可越权。</li>
-    <li><b>V1 从售前闭环起步</b>：先做 V0/V2 前端资产盘点、Provider tool-calling、Agent 编排层、售前工具集和桌面工作台。</li>
-    <li>相关事实来源：现有 Provider 抽象在 <code>apps/api/src/ai/provider/</code>；usecase 在 <code>apps/api/src/modules/*/</code>；遵循根 <code>CLAUDE.md</code> 架构边界与提交规范。</li>
+    <li><b>当前事实以 main 为准</b>：PR #2 已合并，merge commit <code>14cc86a</code>；<code>feat/agent-workbench</code> 本地与远端分支已清理。</li>
+    <li><b>产品主线是 AI Agent 工作台 + WES 传统记录系统</b>。AI/Harness 负责文件理解、证据、报告、澄清与待确认动作；传统 WES 负责人工确认后的项目/评估记录。</li>
+    <li><b>前端唯一 Web 主线是 <code>ui/V2_PROTOTYPE</code></b>。【历史说明，下线中】<code>ui/V0_SAAS</code> 不再作为主线交付，只做迁移核对和历史追溯。</li>
+    <li><b>后端唯一服务入口是 <code>apps/api</code></b>，所有新增接口继续按 <code>routes/*</code> 聚合并走 JWT 鉴权；禁止回退到 <code>X-Role</code>。</li>
+    <li><b>Harness 已是 DB-backed 新业务域</b>，但不要把其他传统域顺手迁入数据库；除 Harness 外，传统记录仍以 JSON 文件存储为主。</li>
+    <li><b>Phase 1D 边界已经落地</b>：<code>enter_formal_estimation</code> 确认后只生成项目/实施评估草稿 <code>draft_from_ai</code>，不创建正式评估，不跳过人工确认。</li>
+    <li><b>所有写动作必须可从 Harness toolEvent 追溯</b>。已修补确认重试场景：传统草稿会按 <code>harnessRunId + actionId</code> 幂等复用，避免重复生成。</li>
+    <li><b>Phase 1E 已落地</b>：AI 草稿在传统列表可见、AI 工作台可跳转草稿详情、详情页可追溯 Harness 来源。</li>
+    <li><b>Phase 1F 已落地</b>：传统详情页人工确认 AI 草稿后，后端写入 <code>manual_confirm_ai_draft</code> ToolEvent 与 Harness Run metadata，前端展示“已回写 Harness 审计”；重复确认复用既有 ToolEvent，不覆盖首次确认备注。</li>
   </ol></div>
 </section>
 
 <!-- ===== 15 ===== -->
 <section id="s15">
   <h2 class="sec"><span class="n">15</span>V1 实施计划</h2>
+  <div class="callout warn"><div class="t">状态说明（2026-06-19）</div>
+  本节保留 2026-06-11 路线评审时的 V1 实施计划，用于追溯最初的 Agent 化切分。实际交付已在 2026-06-17 至 2026-06-21 演进到 Harness 主线：Phase 1B/1C 完成文件上传进入 Harness、v1/v2 报告与确认动作；Phase 1D 完成确认后生成传统项目/评估草稿；Phase 1E 完成 AI 草稿在传统工作台的可见、跳转和来源追溯；Phase 1F 完成人工确认回写 Harness 审计。后续新工作以 §16 的当前状态为准。</div>
   <div class="callout"><div class="t">For agentic workers</div>
   REQUIRED SUB-SKILL: Use <code>superpowers:subagent-driven-development</code>（推荐）或 <code>superpowers:executing-plans</code> 执行本计划。执行时按批次推进，每个批次完成后运行对应验证命令，再进入下一批。</div>
 
@@ -716,9 +737,129 @@ ui/
   </ul>
 </section>
 
+<!-- ===== 16 ===== -->
+<section id="s16">
+  <h2 class="sec"><span class="n">16</span>2026-06-19 Session 复盘与当前状态</h2>
+
+  <h3>16.1 本次 Session 做了什么</h3>
+  <table>
+    <tr><th>阶段</th><th>工作内容</th><th>结果</th></tr>
+    <tr>
+      <td>Phase 1D 主链路</td>
+      <td>完成 Harness confirm action 到传统项目/实施评估草稿的闭环：<code>enter_formal_estimation</code> 记录确认 toolEvent，并生成 <code>draft_from_ai</code> 草稿。</td>
+      <td><span class="badge b-green">已合并</span> 草稿生成只发生在用户明确确认后；不创建正式评估。</td>
+    </tr>
+    <tr>
+      <td>审计与幂等</td>
+      <td>针对外部审查意见与本地自查，补强并发锁、actionId/actionType 边界、阶段约束、schema failure、v1/v2 生成边界和重复确认。</td>
+      <td><span class="badge b-green">已修复</span> 额外补丁：传统草稿写入按 <code>harnessRunId + actionId</code> 幂等复用，防止确认重试重复生成草稿。</td>
+    </tr>
+    <tr>
+      <td>前端工作台</td>
+      <td>AI Home 文件上传后进入 Harness：解析基础信息、创建 run、绑定文件、提交解析结果、生成 v1；用户补充后生成 v2；v2 next action 可确认。</td>
+      <td><span class="badge b-green">已合并</span> v1 nextActions 禁用；v2 有真实 nextActions 时启用；fallback action 仍禁用。</td>
+    </tr>
+    <tr>
+      <td>配套能力</td>
+      <td>补齐记住登录、密码重置、AI 会话删除、Harness 报告卡、阶段文档、侧边栏布局收紧。</td>
+      <td><span class="badge b-green">已合并</span> 这些能力作为 PR #2 的组成部分进入 <code>main</code>。</td>
+    </tr>
+    <tr>
+      <td>CI 修复</td>
+      <td>GitHub Actions 的 <code>test-non-db</code> 曾因 integration 脚本遗留 watch 子进程超时取消；修复为清理整个 dev server 进程组。</td>
+      <td><span class="badge b-green">已验证</span> 修复后 GitHub Actions 最新一轮 <code>lint</code> / <code>tsc</code> / <code>test-non-db</code> / <code>test-with-db</code> 全部 success。</td>
+    </tr>
+    <tr>
+      <td>Git 收口</td>
+      <td>创建并推送 PR #2，修复审查发现后合并到 <code>main</code>；随后清理本地与远端 <code>feat/agent-workbench</code> 分支。</td>
+      <td><span class="badge b-green">已完成</span> 当前 worktree 在 <code>main</code>，基线为 <code>4bf4bcb</code>，本地仍有 Phase 1E/1F 精确提交待处理。</td>
+    </tr>
+    <tr>
+      <td>Phase 1E</td>
+      <td>补齐传统评估侧的 AI 草稿可见与追溯：project-evaluations list/detail 暴露 Harness 来源字段；评估列表支持 AI 草稿筛选；评估详情展示 AI 来源 banner；AI 工作台 confirm 后提供草稿详情和实施评估列表跳转。</td>
+      <td><span class="badge b-green">已验证</span> 传统工作台可见、可跳转、可追溯；正式评估仍不自动创建。</td>
+    </tr>
+    <tr>
+      <td>Phase 1F</td>
+      <td>补齐传统详情页人工确认 AI 草稿后的 Harness 回写：新增确认接口，记录 <code>manual_confirm_ai_draft</code> ToolEvent，回写 Run metadata，并在详情页展示 ToolEvent、确认人和确认时间。</td>
+      <td><span class="badge b-green">已实现</span> Harness 定向测试 62 pass；完整验证与人工验收结果待回填。</td>
+    </tr>
+  </table>
+
+  <h3>16.2 当前业务链路事实</h3>
+  <div class="fig">
+  <pre>文件上传
+  → parse-basic-info
+  → createHarnessRun
+  → bindHarnessFile
+  → submitHarnessParseResult
+  → generateHarnessReportV1
+  → report_v1_ready
+  → 用户自由文本/结构化补充
+  → submitHarnessAnswers
+  → clarifying
+  → generateHarnessRequirementReportV2
+  → report_v2_ready
+  → 用户点击 v2 nextAction: enter_formal_estimation
+  → /harness/runs/:runId/actions/:actionId/confirm
+  → Harness toolEvent 审计
+  → 传统项目草稿 + 实施评估草稿（draft_from_ai）
+  → 传统评估列表可见
+  → 传统详情页显示 Harness 来源
+  → AI 工作台提供草稿跳转入口</pre>
+  <div class="figcap">图 16-1　Phase 1D/1E 后的 Harness 到传统草稿人工处理路径</div>
+  </div>
+  <div class="callout good"><div class="t">关键边界</div>
+    AI/Harness 可以生成报告、建议动作和传统草稿；传统业务正式落库仍必须走明确确认链路。当前 <code>draft_from_ai</code> 是待人工确认/编辑的草稿，不是正式评估结果。
+  </div>
+
+  <h3>16.3 验证清单</h3>
+  <table>
+    <tr><th>验证项</th><th>结果</th><th>备注</th></tr>
+    <tr><td><code>npm run test:harness -w apps/api</code></td><td><span class="badge b-green">62 pass</span></td><td>覆盖 Harness usecase、route、confirm、幂等、阶段边界、传统评估追溯、人工确认回写与并发确认锁。</td></tr>
+    <tr><td><code>npm run test:modules -w apps/api</code></td><td><span class="badge b-green">59 pass</span></td><td>覆盖 auth、versions、ai sessions、project-evaluations 等模块。</td></tr>
+    <tr><td><code>npm run test:agent -w apps/api</code></td><td><span class="badge b-green">21 pass</span></td><td>覆盖 tool-calling、Agent 编排与 <code>/agent/chat</code> 路由。</td></tr>
+    <tr><td><code>npm run build -w apps/api</code></td><td><span class="badge b-green">通过</span></td><td>TypeScript 编译通过。</td></tr>
+    <tr><td><code>npm run test --prefix ui/V2_PROTOTYPE</code></td><td><span class="badge b-green">64 pass</span></td><td>覆盖 AI Home、AI 草稿列表/详情、登录、用户管理、多个业务 hook。</td></tr>
+    <tr><td><code>npm run build --prefix ui/V2_PROTOTYPE</code></td><td><span class="badge b-green">通过</span></td><td>Vite build 通过；仍有既有 chunk size warning。</td></tr>
+    <tr><td><code>node --test apps/api/dist/engine.test.js</code></td><td><span class="badge b-green">8 pass</span></td><td>规则引擎逻辑替代验证；当前沙箱下 <code>npm run test:rules</code> 被 tsx IPC pipe 权限限制阻断。</td></tr>
+    <tr><td><code>npm run test:integration</code></td><td><span class="badge b-yellow">blocked</span></td><td>当前沙箱下 <code>tsx --test src/integration.test.ts</code> 在 IPC pipe 创建阶段 EPERM，未进入业务断言；需在普通本地终端/CI 复跑。</td></tr>
+    <tr><td>GitHub Actions</td><td><span class="badge b-green">通过</span></td><td><code>lint</code> / <code>tsc</code> / <code>test-non-db</code> / <code>test-with-db</code> success；<code>docker-build</code> 按条件 skipped。</td></tr>
+  </table>
+
+  <h3>16.4 本次复盘</h3>
+  <div class="grid g2">
+    <div class="card"><h4>做对的地方</h4>
+      <ul>
+        <li>坚持 Harness 作为受控业务环境，避免文件上传退回普通聊天。</li>
+        <li>把确认动作、传统草稿写入和 toolEvent 审计串成可追溯链路。</li>
+        <li>在合并前处理了 CI 超时问题，避免把“不稳定但可合并”的状态带进 main。</li>
+        <li>没有清理或提交本地运行数据，保持用户 worktree 边界。</li>
+      </ul>
+    </div>
+    <div class="card"><h4>暴露的问题</h4>
+      <ul>
+        <li>长期特性分支相对 main 的 diff 很大，PR 审查成本高；后续应拆更小 PR。</li>
+        <li>Harness 与传统 JSON 存储之间还不是单事务，已通过草稿写入幂等降低重试风险，但跨存储一致性仍需在后续阶段关注。</li>
+        <li>文档版本滞后较明显，路线文档需要在每个 Phase 合并后同步更新。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>16.5 Phase 1E / 1F 完成状态与后续候选</h3>
+  <table>
+    <tr><th>优先级</th><th>任务</th><th>状态与目标</th></tr>
+    <tr><td>Done</td><td>传统项目/评估列表显示 AI 草稿</td><td><span class="badge b-green">已完成</span> <code>draft_from_ai</code> 可见、可筛选、可识别来源 Harness。</td></tr>
+    <tr><td>Done</td><td>AI 工作台确认成功后可跳转草稿详情</td><td><span class="badge b-green">已完成</span> 用户从 v2 报告 action 到传统草稿详情形成连续体验。</td></tr>
+    <tr><td>Done</td><td>草稿详情展示 Harness 来源与 toolEvent trace</td><td><span class="badge b-green">已完成</span> 传统业务人员能看到 Harness Run ID、Action ID 和版本号。</td></tr>
+    <tr><td>Done</td><td>人工确认后回写 Harness</td><td><span class="badge b-green">已实现</span> 传统详情页确认 AI 草稿后新增 <code>manual_confirm_ai_draft</code> ToolEvent，并写回 Harness Run metadata。</td></tr>
+    <tr><td>Next</td><td>Run Timeline / Artifact Workspace</td><td><span class="badge b-yellow">后续候选</span> 把 parse、modelRun、artifact、confirm、draft、manual confirm 串成可视化任务时间线。</td></tr>
+  </table>
+</section>
+
 <div class="foot">
-  WES Agent 产品技术方案 · v0.2 路线评审版 · 2026-06-11 · 分支 feat/agent-workbench<br>
-  本文档为单文件自包含 HTML（离线可阅），作为 Agent 化立项的事实来源与后续工作上下文。后续变更请升版并记录于「§13 决策记录」。
+  WES Agent 产品技术方案 · v0.5 Phase 1F 完成版 · 2026-06-21 · main @ 4bf4bcb + local Phase 1F changes<br>
+  本文档为单文件自包含 HTML（离线可阅），作为 Agent 化与 Harness 主线的事实来源与后续工作上下文。后续变更请升版并记录于「§13 决策记录」或「§16 Session 复盘」。
 </div>
 
 </main>

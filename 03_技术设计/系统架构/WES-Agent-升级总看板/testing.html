@@ -35,8 +35,8 @@
       <p class="meta">
         <span><b>目标</b> 管理人工测试任务与结果反馈</span>
         <span><b>范围</b> Phase 1E 基线 + Phase 1F 回写扩展</span>
-        <span><b>状态</b> 1E 计划已建立，1F 用例待实现后执行</span>
-        <span><b>更新</b> 2026-06-19</span>
+        <span><b>状态</b> 1E/1F 计划已建立，1F 用例待人工验收</span>
+        <span><b>更新</b> 2026-06-21</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill err">P0 主链路</span>
@@ -213,7 +213,7 @@
     <section>
       <div class="h-num">Section 03</div>
       <h2>Phase 1F 扩展用例</h2>
-      <p class="lead">Phase 1F 实现后，需要把以下用例加入人工验收。当前状态是“待实现后执行”，不计入 1E 已建立的 12 条人工测试结果。</p>
+      <p class="lead">Phase 1F 已实现人工确认回写链路，以下用例进入人工验收队列。当前状态是“待执行”，不计入 1E 已建立的 12 条人工测试结果。</p>
       <table>
         <tr><th>ID</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>反馈记录</th></tr>
         <tr>
@@ -221,8 +221,8 @@
           <td>人工确认 AI 草稿后回写 Harness</td>
           <td><span class="status block"><span class="dot"></span>P0</span></td>
           <td>在传统详情页对 AI 草稿执行人工确认或进入正式流程。</td>
-          <td>Harness 记录 ToolEvent 或 metadata transition，并关联 runId/actionId。</td>
-          <td><span class="status run"><span class="dot"></span>待实现后执行</span></td>
+          <td>Harness 记录 <code class="inline">manual_confirm_ai_draft</code> ToolEvent，并在 Run metadata 关联 runId/actionId、草稿与人工确认信息。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
           <td>执行人 / 日期 / 结果 / 证据待填。</td>
         </tr>
         <tr>
@@ -231,7 +231,7 @@
           <td><span class="status block"><span class="dot"></span>P0</span></td>
           <td>人工确认后刷新评估详情页。</td>
           <td>页面展示“已回写 Harness 审计”或等价状态，不误导为 AI 自动正式化。</td>
-          <td><span class="status run"><span class="dot"></span>待实现后执行</span></td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
           <td>执行人 / 日期 / 结果 / 证据待填。</td>
         </tr>
         <tr>
@@ -239,8 +239,8 @@
           <td>重复确认幂等</td>
           <td><span class="status warn"><span class="dot"></span>P1</span></td>
           <td>重复触发同一草稿的人工确认动作。</td>
-          <td>不产生冲突审计事件，返回稳定的既有回写结果。</td>
-          <td><span class="status run"><span class="dot"></span>待实现后执行</span></td>
+          <td>不产生冲突审计事件，返回稳定的既有回写结果，且不覆盖首次确认备注。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
           <td>执行人 / 日期 / 结果 / 证据待填。</td>
         </tr>
         <tr>
@@ -249,7 +249,7 @@
           <td><span class="status warn"><span class="dot"></span>P1</span></td>
           <td>使用非 owner 用户尝试确认或访问回写结果。</td>
           <td>不能触发或查看非授权草稿的 Harness 回写审计。</td>
-          <td><span class="status run"><span class="dot"></span>待实现后执行</span></td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
           <td>执行人 / 日期 / 结果 / 证据待填。</td>
         </tr>
       </table>
@@ -338,16 +338,16 @@ Decision:</pre>
       <p class="lead">人工测试建立在已通过的自动化基线之上。以下命令不是人工验收的替代品，而是人工测试前应保持绿色的工程底座。</p>
       <table>
         <tr><th>命令</th><th>最近结果</th><th>覆盖范围</th></tr>
-        <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>60 pass</span></td><td>Harness 状态机、confirm、幂等、传统草稿追溯。</td></tr>
+        <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>62 pass</span></td><td>Harness 状态机、confirm、幂等、传统草稿追溯、人工确认回写与并发确认锁。</td></tr>
         <tr><td class="mono">npm run test:modules -w apps/api</td><td><span class="status done"><span class="dot"></span>59 pass</span></td><td>后端模块级回归。</td></tr>
         <tr><td class="mono">npm run build -w apps/api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>后端构建。</td></tr>
-        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>63 pass</span></td><td>前端工作台、评估列表、详情页和 mock 流程。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>64 pass</span></td><td>前端工作台、评估列表、详情页和 mock 流程。</td></tr>
         <tr><td class="mono">npm run build --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>前端构建；保留既有 chunk warning。</td></tr>
       </table>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 测试 · WES Agent 升级总看板 · 2026-06-19
+      <a href="index.html">返回总览</a> · 测试 · WES Agent 升级总看板 · 2026-06-21
     </footer>
   </main>
 </body>

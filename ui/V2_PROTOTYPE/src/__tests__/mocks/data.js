@@ -59,6 +59,26 @@ export const mockVersions = [
     updatedAt: '2026-04-22T08:00:00Z',
     payload: { projectName: '利民集团数字化二期' },
   },
+  {
+    id: 'ASM-AI-001',
+    type: 'assessment',
+    versionCode: 'IA-AI-DRAFT-001',
+    baseCode: 'GL-AI-001',
+    status: 'draft',
+    checkoutStatus: 'checked_in',
+    versionDocStatus: 'drafting',
+    updatedByUsername: 'ai',
+    updatedAt: '2026-06-18T08:00:00Z',
+    payload: {
+      projectName: 'AI 生成项目评估草稿',
+      productLine: '金蝶AI星空',
+      totalDays: 0,
+      draftStatus: 'draft_from_ai',
+      draftSource: 'harness',
+      harnessRunId: 'run-ai-001',
+      harnessActionId: 'enter_formal_estimation',
+    },
+  },
 ]
 
 export const mockTemplate = {

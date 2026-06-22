@@ -284,6 +284,7 @@ function buildVm(record, template, ruleSet, ruleSetMeta, estimateResult, fallbac
     dsl: normalizeDsl(record, ruleSet, fallback),
     context: normalizeContext(record, template, ruleSet, ruleSetMeta, fallback),
     multiOrg: payload.multiOrg || fallback.multiOrg,
+    raw: record,
     summary: {
       ...fallback.summary,
       ruleVersion: estimateResult?.ruleVersion || ruleSet?.ruleVersion || fallback.summary?.ruleVersion,
@@ -309,8 +310,8 @@ export default function useAssessmentDetail(versionId, {
   const withAction = useCallback(async (key, task) => {
     setActionLoading((prev) => ({ ...prev, [key]: true }))
     try {
-      await task()
-      return { success: true, error: null }
+      const data = await task()
+      return { success: true, error: null, data }
     } catch (error) {
       return { success: false, error: error?.message || '操作失败' }
     } finally {
@@ -347,6 +348,30 @@ export default function useAssessmentDetail(versionId, {
     await apiClient.patch(`/versions/${versionId}/save-draft`, { payload })
     setVm((current) => ({ ...current, vcs: { ...current.vcs, hasLocalChanges: false } }))
   }), [versionId, withAction])
+
+  const confirmAiDraft = useCallback(() => withAction('confirmAiDraft', async () => {
+    const response = await apiClient.post(`/project-evaluations/assessment-drafts/${encodeURIComponent(versionId)}/confirm`, {})
+    const result = unwrap(response) || {}
+    const manualConfirmation = result.assessmentDraft?.manualConfirmation || null
+    const harness = result.harness || null
+    setVm((current) => {
+      const raw = current.raw || {}
+      const payload = raw.payload || {}
+      return {
+        ...current,
+        raw: {
+          ...raw,
+          payload: {
+            ...payload,
+            aiDraftReview: manualConfirmation,
+            aiDraftHarnessWriteBack: harness,
+          },
+        },
+      }
+    })
+    refetch()
+    return result
+  }), [versionId, refetch, withAction])
 
   useEffect(() => {
     if (!enabled || !versionId) {
@@ -409,5 +434,5 @@ export default function useAssessmentDetail(versionId, {
     return () => { cancelled = true }
   }, [enabled, fallback, reloadKey, versionId])
 
-  return { ...vm, loading: vm.loading, error: vm.error, refetch, actionLoading, actions: { checkout, checkin, undoCheckout, promote, forceUnlock, saveDraft } }
+  return { ...vm, loading: vm.loading, error: vm.error, refetch, actionLoading, actions: { checkout, checkin, undoCheckout, promote, forceUnlock, saveDraft, confirmAiDraft } }
 }

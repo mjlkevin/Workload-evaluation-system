@@ -710,6 +710,10 @@ describe('HomeWorkspace', () => {
     await waitFor(() => expect(confirmBody).toMatchObject({ confirmed: true, actionType: 'enter_formal_estimation' }))
     expect(await screen.findByText(/已生成项目评估草稿：实施工作量评估申请/)).toBeInTheDocument()
     expect(screen.getByText(/实施评估草稿：IA-AI-DRAFT-001/)).toBeInTheDocument()
+
+    const draftLink = await screen.findByRole('link', { name: '查看评估草稿' })
+    expect(draftLink).toBeInTheDocument()
+    expect(draftLink.getAttribute('href')).toBe('/assessments/assessment-draft-1')
   })
 
   test('keeps v2 fallback action buttons disabled when model returns no next actions', async () => {

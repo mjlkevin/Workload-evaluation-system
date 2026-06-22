@@ -35,7 +35,7 @@
       <p class="meta">
         <span><b>启发来源</b> Qoder Quest Runtime</span>
         <span><b>WES 转译</b> Harness Run Runtime</span>
-        <span><b>当前阶段</b> Phase 1F active</span>
+        <span><b>当前阶段</b> Phase 1F delivered</span>
         <span><b>定位</b> Chat 是入口，Run 才是任务边界</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
@@ -155,9 +155,9 @@ knowledge feedback
         </tr>
         <tr>
           <td>执行边界</td>
-          <td>Phase 1F 人工确认回写、ToolEvent 幂等、失败恢复、统一 stage 状态</td>
+          <td>Phase 1F 人工确认回写、ToolEvent 幂等、Run metadata 回写、统一 stage 状态</td>
           <td>保证用户准备交付时，不会出现确认错 run、重复写、审计链断裂。</td>
-          <td><span class="status run"><span class="dot"></span>1F active</span></td>
+          <td><span class="status done"><span class="dot"></span>1F delivered</span></td>
         </tr>
         <tr>
           <td>产物工作区</td>
@@ -200,7 +200,7 @@ knowledge feedback
           <div class="panel-h">近期可做<span class="right">near term</span></div>
           <div class="panel-b">
             <ul class="list-clean">
-              <li><b>Phase 1F</b>：人工确认回写 Harness 审计，详情页展示回写状态，补齐 MT-1F 人工测试。</li>
+              <li><b>Phase 1F 收尾</b>：执行 MT-1F 人工测试，回填测试结果和业务验收反馈。</li>
               <li><b>Phase 1G 候选</b>：Run Timeline，把 parse、modelRun、artifact、confirm、draft、manual confirm 串成一条时间线。</li>
               <li><b>Phase 1G 候选</b>：Artifact Workspace 初版，集中展示 v1/v2、evidence、草稿链接和人工处理状态。</li>
             </ul>
@@ -236,7 +236,7 @@ knowledge feedback
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 任务运行时 · WES Agent 升级总看板 · 2026-06-19
+      <a href="index.html">返回总览</a> · 任务运行时 · WES Agent 升级总看板 · 2026-06-21
     </footer>
   </main>
 </body>

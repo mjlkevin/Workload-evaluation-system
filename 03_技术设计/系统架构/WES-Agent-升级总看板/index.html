@@ -24,7 +24,7 @@
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
       </nav>
-      <span class="pill warn">Phase 1F active</span>
+      <span class="pill ok">Phase 1F delivered</span>
     </div>
   </header>
 
@@ -36,16 +36,16 @@
           <h1>设计、计划、监控<br><em>三位一体</em>的升级总看板</h1>
           <p class="lead">本看板是 WES 从传统工作量评估系统升级为 AI Agent 工作台 + WES 传统记录系统的汇报与审计入口。它把架构设计、实施路线、验证监控、风险决策和变更记录拆成可维护的专题页，并在首页统一串联。</p>
           <div class="pill-row">
-            <span class="pill brand">main @ 14cc86a</span>
+            <span class="pill brand">main @ 4bf4bcb + 1F working tree</span>
             <span class="pill ok">PR #2 已合并</span>
-            <span class="pill">2026-06-19</span>
+            <span class="pill">2026-06-21</span>
             <span class="pill ok">Phase 1E 已完成</span>
-            <span class="pill warn">Phase 1F 已激活</span>
+            <span class="pill ok">Phase 1F 已实现</span>
           </div>
           <div class="trust">
             <span><b>18/18</b> 后端模块化</span>
-            <span><b>60</b> Harness tests pass</span>
-            <span><b>63</b> V2 frontend tests pass</span>
+            <span><b>62</b> Harness tests pass</span>
+            <span><b>64</b> V2 frontend tests pass</span>
             <span><b>12</b> 人工测试任务已规划</span>
             <span><b>0</b> 正式业务绕过确认</span>
           </div>
@@ -60,18 +60,18 @@
             <div class="fc-row"><span>report_v2_ready</span><b>confirmable</b></div>
           </div>
           <div class="floating-card main">
-            <div class="fc-head"><b>Phase 1F Audit Write-back</b><span class="fc-tag">启动中</span></div>
+            <div class="fc-head"><b>Phase 1F Audit Write-back</b><span class="fc-tag">已实现</span></div>
             <div class="fc-row"><span>1E 基线</span><b>草稿可见/跳转/追溯</b></div>
             <div class="fc-row"><span>1F 目标</span><b>人工确认回写</b></div>
-            <div class="fc-row"><span>审计记录</span><b>ToolEvent / metadata</b></div>
-            <div class="fc-row"><span>实现状态</span><b>待开发</b></div>
-            <div class="bar"><i style="width: 18%"></i></div>
+            <div class="fc-row"><span>审计记录</span><b>manual_confirm_ai_draft</b></div>
+            <div class="fc-row"><span>实现状态</span><b>自动化验证中</b></div>
+            <div class="bar"><i style="width: 88%"></i></div>
           </div>
           <div class="floating-card bottom">
             <div class="fc-head"><b>Verification Snapshot</b><span class="fc-tag">local + CI</span></div>
-            <div class="fc-row"><span>apps/api harness</span><b>60 pass</b></div>
+            <div class="fc-row"><span>apps/api harness</span><b>62 pass</b></div>
             <div class="fc-row"><span>apps/api modules</span><b>59 pass</b></div>
-            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>63 pass</b></div>
+            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>64 pass</b></div>
             <div class="fc-row"><span>人工测试</span><b>12 待执行</b></div>
             <div class="fc-row"><span>GitHub Actions</span><b>green</b></div>
           </div>
@@ -88,11 +88,11 @@
         </div>
         <div class="kpi-row">
           <div class="kpi">
-            <div class="top"><span class="ic">P</span><span>当前阶段</span><span class="live">已激活</span></div>
+            <div class="top"><span class="ic">P</span><span>当前阶段</span><span class="live">已实现</span></div>
             <div class="v">1F</div>
             <div class="lb">人工确认回写 Harness 审计</div>
-            <div class="bar"><i style="width:18%"></i></div>
-            <div class="sub">Phase 1E 为完成基线，1F 进入实现准备</div>
+            <div class="bar"><i style="width:88%"></i></div>
+            <div class="sub">Phase 1F 已进入自动化验证与人工验收准备</div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>验证状态</span><span class="live">通过</span></div>
@@ -112,8 +112,8 @@
             <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">F</span><span>1F 任务包</span></div>
             <div class="v">4</div>
             <div class="lb">回写、权限、前端状态、测试文档</div>
-            <div class="bar"><i style="width:18%;background:linear-gradient(90deg,var(--warn),var(--accent))"></i></div>
-            <div class="sub">实现提示词已作为交付物准备</div>
+            <div class="bar"><i style="width:88%;background:linear-gradient(90deg,var(--ok),var(--accent))"></i></div>
+            <div class="sub">实现已落地，待完整验证结果回填</div>
           </div>
         </div>
       </div>
@@ -279,7 +279,7 @@
             <span class="ico" style="background:var(--bg-soft);color:var(--ink-2)">R</span>
             <h3>原产品技术方案</h3>
             <p>保留为详细资料源，当前总看板从中抽取已合并事实和后续方向。</p>
-            <div class="preview">v0.4 Phase 1E 完成口径 · 2026-06-19</div>
+            <div class="preview">v0.5 Phase 1F 完成口径 · 2026-06-21</div>
             <span class="arr">打开原文档 →</span>
           </a>
         </div>
@@ -291,17 +291,17 @@
         <div class="split">
           <div>
             <div class="h-num">Current Phase</div>
-            <h2>Phase 1F 启动状态</h2>
-            <p class="lead">Phase 1E 已作为完成基线冻结：AI 草稿可见、可跳转、可追溯。Phase 1F 现在激活，目标是把传统工作台中的人工确认/发布结果回写到 Harness 审计链，不扩大 AI 自治范围。</p>
+            <h2>Phase 1F 交付状态</h2>
+            <p class="lead">Phase 1E 已作为完成基线冻结：AI 草稿可见、可跳转、可追溯。Phase 1F 已实现最小闭环：用户在传统详情页人工确认 Harness 来源 AI 草稿后，系统写入 Harness ToolEvent 与 Run metadata，并在详情页展示回写状态；仍不扩大 AI 自治范围。</p>
           </div>
           <div class="panel">
-            <div class="panel-h">Phase 1F 激活口径<span class="right">audit write-back</span></div>
+            <div class="panel-h">Phase 1F 交付口径<span class="right">audit write-back</span></div>
             <div class="panel-b">
               <ul class="list-clean">
                 <li>1E 基线：传统项目/评估列表能识别 <code class="inline">draft_from_ai</code>。</li>
                 <li>1E 基线：AI 工作台 confirm 结果可跳转到传统草稿详情。</li>
                 <li>1E 基线：详情页展示 Harness Run ID / Action ID / 版本号。</li>
-                <li>1F 目标：人工确认后回写 Harness metadata 或 ToolEvent。</li>
+                <li>1F 已实现：人工确认后回写 Harness ToolEvent 与 metadata。</li>
                 <li>1F 交付：后端、前端、测试、OpenAPI 和总看板同步。</li>
                 <li>仍不引入向量库、Prompt Profile CRUD、标准治理 Harness 化。</li>
               </ul>
@@ -339,7 +339,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES Agent 升级总看板 · 设计 / 计划 / 监控 · 2026-06-19 · main @ 14cc86a
+      WES Agent 升级总看板 · 设计 / 计划 / 监控 · 2026-06-21 · main @ 4bf4bcb + Phase 1F working tree
     </footer>
   </main>
 </body>

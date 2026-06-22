@@ -36,6 +36,7 @@ export default function AssessmentDetail() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyRows, setHistoryRows] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [aiConfirmError, setAiConfirmError] = useState('')
   const vm = useAssessmentDetail(id)
   const setUnsavedDirty = useSetUnsavedDirty()
   const tabs = getTabs(vm)
@@ -61,6 +62,18 @@ export default function AssessmentDetail() {
 
       {/* Top region */}
       <div style={{ padding: '16px 24px 0' }}>
+        {vm.raw?.payload?.draftStatus === 'draft_from_ai' && (
+          <AiDraftBanner
+            record={vm.raw}
+            confirming={Boolean(vm.actionLoading?.confirmAiDraft)}
+            error={aiConfirmError}
+            onConfirm={async () => {
+              setAiConfirmError('')
+              const result = await vm.actions?.confirmAiDraft?.()
+              if (!result?.success) setAiConfirmError(result?.error || '确认失败')
+            }}
+          />
+        )}
         <ProjectIdentityCard data={vm} />
         <VcsToolbar dsl={vm.dsl} hasLocalChanges={vm.vcs?.hasLocalChanges} />
         <ParamMiniBar params={vm.params} />
@@ -415,5 +428,75 @@ export default function AssessmentDetail() {
         </div>
       )}
     </PageShell>
+  )
+}
+
+function AiDraftBanner({ record, confirming = false, error = '', onConfirm }) {
+  const payload = record?.payload || {}
+  const harnessRunId = payload.harnessRunId || ''
+  const harnessActionId = payload.harnessActionId || ''
+  const versionCode = payload.versionCode || record.versionCode || ''
+  const review = payload.aiDraftReview || {}
+  const confirmed = review.status === 'confirmed'
+  const toolEventId = review.harnessToolEventId || payload.aiDraftHarnessWriteBack?.toolEventId || ''
+  const confirmedBy = review.confirmedByUsername || ''
+  const confirmedAt = review.confirmedAt ? String(review.confirmedAt).slice(0, 16).replace('T', ' ') : ''
+
+  return (
+    <div
+      style={{
+        marginBottom: 16,
+        padding: '12px 16px',
+        borderRadius: 12,
+        border: '1px solid var(--brand)',
+        background: 'var(--brand-soft)',
+        color: 'var(--brand-ink)',
+        fontSize: 13,
+        lineHeight: 1.6,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, marginBottom: 4 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: 0 }}>AI</span>
+        <span>{confirmed ? 'AI 草稿 · 已人工确认' : 'AI 草稿 · 待人工确认'}</span>
+      </div>
+      <div style={{ color: 'var(--ink-2)', fontSize: 12 }}>
+        {confirmed
+          ? '该 AI 草稿已完成传统工作台人工确认，并已回写 Harness 审计。后续仍按传统评估流程继续编辑、检入或发布。'
+          : '该评估由 Harness AI 生成，尚未进入正式评估流程。请人工审核、编辑并确认后发布。'}
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '6px 18px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          color: 'var(--ink-3)',
+        }}
+      >
+        {harnessRunId && <span>Harness Run: {harnessRunId}</span>}
+        {harnessActionId && <span>动作: {harnessActionId}</span>}
+        {versionCode && <span>版本: {versionCode}</span>}
+        {toolEventId && <span>ToolEvent: {toolEventId}</span>}
+        {confirmedBy && <span>确认人: {confirmedBy}</span>}
+        {confirmedAt && <span>确认时间: {confirmedAt}</span>}
+      </div>
+      {!confirmed && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
+          <button
+            type="button"
+            className="btn btn-pri"
+            style={{ height: 30, fontSize: 12, padding: '0 14px' }}
+            onClick={onConfirm}
+            disabled={confirming}
+          >
+            {confirming ? '确认中…' : '确认 AI 草稿'}
+          </button>
+          <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>确认后会记录 Harness ToolEvent，不会自动发布正式评估。</span>
+        </div>
+      )}
+      {error && <div style={{ marginTop: 8, color: 'var(--err)', fontSize: 12 }}>{error}</div>}
+    </div>
   )
 }

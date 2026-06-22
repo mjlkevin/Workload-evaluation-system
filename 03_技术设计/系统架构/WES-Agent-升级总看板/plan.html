@@ -24,7 +24,7 @@
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
       </nav>
-      <span class="pill warn">Phase 1F active</span>
+      <span class="pill ok">Phase 1F delivered</span>
     </div>
   </header>
 
@@ -33,17 +33,17 @@
       <div class="crumb">WES Agent · Delivery Plan</div>
       <h1>实施计划与进度</h1>
       <p class="meta">
-        <span><b>已完成</b> Phase 1B / 1C / 1D / 1E</span>
+        <span><b>已完成</b> Phase 1B / 1C / 1D / 1E / 1F</span>
         <span><b>当前阶段</b> Phase 1F 人工确认回写 Harness 审计</span>
         <span><b>人工测试</b> 计划已建立，结果待回填</span>
         <span><b>分支</b> main</span>
-        <span><b>状态</b> 已激活，待实现</span>
+        <span><b>状态</b> 已实现，进入完整验证与人工验收</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">Phase 1E delivered</span>
-        <span class="pill warn">Phase 1F activated</span>
-        <span class="pill brand">main @ 14cc86a</span>
-        <span class="pill brand">implementation prompt ready</span>
+        <span class="pill ok">Phase 1F delivered</span>
+        <span class="pill brand">main @ 4bf4bcb + 1F working tree</span>
+        <span class="pill brand">audit write-back implemented</span>
       </div>
     </div>
   </header>
@@ -67,7 +67,7 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>总体路线</h2>
-      <p class="lead">当前主线已从“文件理解和报告生成”走到“确认动作创建传统草稿”，并完成 AI 草稿在传统工作台的可见、跳转和来源追溯。Phase 1F 已激活，目标是把传统工作台中的人工确认/发布结果回写到 Harness 审计链，继续保持不扩大 AI 自治范围。</p>
+      <p class="lead">当前主线已从“文件理解和报告生成”走到“确认动作创建传统草稿”，并完成 AI 草稿在传统工作台的可见、跳转、来源追溯和人工确认回写。Phase 1F 的最小闭环已经落地：传统详情页确认 AI 草稿后回写 Harness ToolEvent 与 metadata，继续保持不扩大 AI 自治范围。</p>
       <div class="callout">
         <div><b>运行时视角</b>Qoder Quest Runtime 的启发已转译为 WES Harness Run Runtime，并沉淀到 <a href="runtime.html">任务运行时</a> 专题页。后续计划不直接照搬 IDE worktree，而是围绕来源、执行、产物、交付和知识五个边界逐步升级 WES。</div>
       </div>
@@ -101,10 +101,10 @@
             <div class="rm-items">草稿可见/跳转/追溯<br><b>Phase complete</b></div>
           </div>
           <div class="rm-phase">
-            <div class="rm-dot active"></div>
+            <div class="rm-dot done"></div>
             <div class="rm-label">Phase 1F</div>
-            <div class="rm-date">2026-06-19</div>
-            <div class="rm-items">人工确认回写审计<br><b>Activated</b></div>
+            <div class="rm-date">2026-06-21</div>
+            <div class="rm-items">人工确认回写审计<br><b>Delivered</b></div>
           </div>
         </div>
       </div>
@@ -137,13 +137,13 @@
           <td class="mono">1E</td>
           <td>AI 草稿在传统评估列表可见，详情页展示 Harness 来源，AI 工作台确认后提供草稿跳转入口。</td>
           <td><span class="status done"><span class="dot"></span>Done</span></td>
-          <td>Harness 60 pass、modules 59 pass、V2 前端 63 pass。</td>
+          <td>Harness 62 pass、modules 59 pass、V2 前端 64 pass。</td>
         </tr>
         <tr>
           <td class="mono">1F</td>
-          <td>人工确认回写 Harness 审计已激活，进入实现准备；不属于 1E 完成范围。</td>
-          <td><span class="status run"><span class="dot"></span>Active</span></td>
-          <td>实现提示词已生成，等待编码实现和验证。</td>
+          <td>传统详情页人工确认 AI 草稿后，回写 Harness ToolEvent 与 Run metadata，并展示回写状态。</td>
+          <td><span class="status done"><span class="dot"></span>Done</span></td>
+          <td>Harness 62 pass；前端 AssessmentDetail 定向测试通过；完整验证进行中。</td>
         </tr>
         <tr>
           <td class="mono">CI Fix</td>
@@ -168,9 +168,9 @@
     <section>
       <div class="h-num">Section 04</div>
       <h2>Phase 1F 目标</h2>
-      <div class="callout warn"><div><b>目标口径</b>当用户在传统工作台对 AI 草稿执行人工确认、发布或进入正式评估流程时，系统必须把这次人工动作回写到对应 Harness run/action 的审计链中，形成从 AI 建议到人工落地的闭环证据。</div></div>
+      <div class="callout ok"><div><b>交付口径</b>当用户在传统工作台对 AI 草稿执行人工确认时，系统把这次人工动作回写到对应 Harness run/action 的审计链中，形成从 AI 建议到人工落地的闭环证据；正式发布仍走传统版本/评估流程。</div></div>
       <div class="grid-3">
-        <div class="card"><span class="pill warn">Audit</span><h3>回写审计</h3><p>记录确认人、确认时间、草稿 ID、状态变化、正式记录入口和回写结果。</p></div>
+        <div class="card"><span class="pill ok">Audit</span><h3>回写审计</h3><p>记录确认人、确认时间、草稿 ID、ToolEvent ID、状态变化和回写结果。</p></div>
         <div class="card"><span class="pill brand">Boundary</span><h3>权限边界</h3><p>只允许 owner 或具备权限的用户触发回写，不绕过 JWT、owner 和传统版本流程。</p></div>
         <div class="card"><span class="pill ok">UX</span><h3>可见反馈</h3><p>传统详情页展示回写状态，让用户知道草稿已被人工处理并纳入 Harness 审计。</p></div>
       </div>
@@ -200,25 +200,25 @@
           <td>详情页能显示 Harness runId、actionId、生成时间和“需人工确认”状态。</td>
         </tr>
         <tr>
-          <td><span class="status run"><span class="dot"></span>P0</span></td>
+          <td><span class="status done"><span class="dot"></span>Done</span></td>
           <td>传统草稿人工确认后回写审计</td>
           <td class="mono">apps/api project/assessment usecase + harness repository</td>
-          <td>草稿进入正式流程时留下 ToolEvent 或 metadata transition，记录 runId、actionId、用户、时间和正式记录入口。</td>
+          <td>新增 <code class="inline">manual_confirm_ai_draft</code> ToolEvent，记录 runId、actionId、用户、时间、草稿 ID，并写回 Harness Run metadata。</td>
         </tr>
         <tr>
-          <td><span class="status run"><span class="dot"></span>P0</span></td>
+          <td><span class="status done"><span class="dot"></span>Done</span></td>
           <td>前端展示人工确认回写状态</td>
           <td class="mono">ui/V2_PROTOTYPE AssessmentDetail / hooks</td>
-          <td>详情页能展示“已回写 Harness 审计”或“待回写/回写失败”的清晰状态。</td>
+          <td>详情页可点击“确认 AI 草稿”，成功后展示“已回写 Harness 审计”、ToolEvent ID、确认人和确认时间。</td>
         </tr>
         <tr>
-          <td><span class="status run"><span class="dot"></span>P0</span></td>
+          <td><span class="status done"><span class="dot"></span>Done</span></td>
           <td>测试覆盖回写闭环</td>
           <td class="mono">apps/api tests + ui/V2_PROTOTYPE tests</td>
-          <td>新增后端和前端测试，覆盖权限、幂等、成功回写和失败反馈。</td>
+          <td>新增后端 Harness 用例覆盖成功回写与重复确认幂等，前端详情页用例覆盖确认按钮和回写状态。</td>
         </tr>
         <tr>
-          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td><span class="status done"><span class="dot"></span>Done</span></td>
           <td>契约与看板同步</td>
           <td class="mono">docs/openapi.yaml + 总看板 + 对齐说明</td>
           <td>接口契约、实现与文档对齐说明、总看板状态同步到 1F 实现结果。</td>
@@ -273,7 +273,7 @@
         </tr>
       </table>
       <div class="callout warn">
-        <div><b>1F 补充</b>Phase 1F 实现后需要在本页或测试页新增人工回写用例：确认 AI 草稿、查看回写状态、校验 Harness 审计记录、验证非 owner 不可回写。</div>
+        <div><b>1F 补充</b>Phase 1F 人工回写用例已纳入测试页：确认 AI 草稿、查看回写状态、校验 Harness 审计记录、验证非 owner 不可回写。</div>
       </div>
       <div class="callout">
         <div><b>管理入口</b>人工测试任务与结果反馈统一沉淀到 <a href="testing.html">testing.html</a>。计划页只保留测试包和门禁口径，具体执行记录由测试页持续维护。</div>
@@ -364,7 +364,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 计划与进度 · WES Agent 升级总看板 · 2026-06-19
+      <a href="index.html">返回总览</a> · 计划与进度 · WES Agent 升级总看板 · 2026-06-21
     </footer>
   </main>
 </body>

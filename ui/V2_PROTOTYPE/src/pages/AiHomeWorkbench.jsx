@@ -790,17 +790,25 @@ export default function AiHomeWorkbench({ currentUser }) {
       const result = await confirmHarnessAction(artifact.harnessRunId, action.actionType, { confirmed: true, actionType: action.actionType })
       const project = result?.event?.output?.project || {}
       const assessmentDraft = result?.event?.output?.assessmentDraft || {}
-      const successText = project.projectId || assessmentDraft.recordId
+      const hasDraft = project.projectId || assessmentDraft.recordId
+      const successText = hasDraft
         ? [
             `已生成项目评估草稿：${project.projectName || project.projectId || '未命名项目'}`,
             assessmentDraft.versionCode ? `实施评估草稿：${assessmentDraft.versionCode}` : '',
             '请在传统工作台中人工确认/编辑后再进入正式评估。',
           ].filter(Boolean).join('\n')
         : `已确认「${action.label || action.actionType}」，Harness Run 阶段已推进。`
+      const actions = hasDraft && assessmentDraft.recordId
+        ? [
+            { label: '查看评估草稿', to: `/assessments/${encodeURIComponent(assessmentDraft.recordId)}` },
+            { label: '返回实施评估列表', to: '/assessments' },
+          ]
+        : undefined
       setMessages((prev) => [...prev, {
         id: `ai-harness-action-${Date.now()}`,
         role: 'assistant',
         text: successText,
+        actions,
       }])
     } catch (err) {
       setMessages((prev) => [...prev, {
@@ -1220,6 +1228,20 @@ export default function AiHomeWorkbench({ currentUser }) {
                         confirmingActionId={confirmingActionId}
                       />
                     ))}
+                    {!isUser && !message.error && message.actions && (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                        {message.actions.map((action) => (
+                          <Link
+                            key={action.label}
+                            className={action.primary ? 'btn btn-pri' : 'btn btn-out'}
+                            style={{ height: 30 }}
+                            to={action.to}
+                          >
+                            {action.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                     {message.file && <div style={{ marginTop: 10 }}><AttachmentCard file={message.file} state="sent" compact inverted={isUser} /></div>}
                     {message.action === 'login_required' && (
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>

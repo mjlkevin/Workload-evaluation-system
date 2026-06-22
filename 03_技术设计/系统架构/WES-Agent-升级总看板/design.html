@@ -34,10 +34,10 @@
       <h1>设计说明</h1>
       <p class="meta">
         <span><b>定位</b> AI Agent 工作台 + WES 传统记录系统</span>
-        <span><b>事实基线</b> Phase 1E 已完成</span>
-        <span><b>当前阶段</b> Phase 1F 已激活</span>
+        <span><b>事实基线</b> Phase 1F 已实现</span>
+        <span><b>当前阶段</b> 1F 验证与人工验收</span>
         <span><b>主线</b> ui/V2_PROTOTYPE + apps/api</span>
-        <span><b>更新</b> 2026-06-19</span>
+        <span><b>更新</b> 2026-06-21</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">Harness DB-backed</span>
@@ -65,7 +65,7 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>产品定义</h2>
-      <p class="lead">WES Agent 不是把传统系统包装成聊天窗口，而是在传统记录系统之外新增一个受控的 AI 工作台。AI 在 Harness 内完成文件理解、报告生成、补充澄清和待确认动作；传统系统承接用户明确确认后的草稿，并在 Phase 1E 中补齐 AI 草稿可见、可跳转、可追溯。Phase 1F 已激活，目标是把传统人工确认结果回写到 Harness 审计链。</p>
+      <p class="lead">WES Agent 不是把传统系统包装成聊天窗口，而是在传统记录系统之外新增一个受控的 AI 工作台。AI 在 Harness 内完成文件理解、报告生成、补充澄清和待确认动作；传统系统承接用户明确确认后的草稿，并在 Phase 1E 中补齐 AI 草稿可见、可跳转、可追溯。Phase 1F 已把传统人工确认结果回写到 Harness 审计链。</p>
       <div class="grid-3">
         <div class="card"><span class="pill brand">AI Workbench</span><h3>AI 工作台</h3><p>面向上传文件、自然语言补充、模型报告和下一步建议，confirm 后可进入传统评估草稿。</p></div>
         <div class="card"><span class="pill ok">Harness</span><h3>受控编排层</h3><p>沉淀 run、file、evidence、artifact、modelRun、toolEvent，让模型输出可验证、可追溯。</p></div>
@@ -180,13 +180,14 @@
     <section>
       <div class="h-num">Section 03</div>
       <h2>Harness 主链路</h2>
-      <p class="lead">Phase 1B/1C 把“上传文件后只走普通聊天”修正为“上传文件后进入 Harness”。Phase 1D 把 v2 报告后的确认动作串到传统项目/评估草稿。Phase 1E 让这些 AI 草稿在传统工作台可见、可跳转、可追溯。Phase 1F 接续处理人工确认后的 Harness 审计回写。</p>
+      <p class="lead">Phase 1B/1C 把“上传文件后只走普通聊天”修正为“上传文件后进入 Harness”。Phase 1D 把 v2 报告后的确认动作串到传统项目/评估草稿。Phase 1E 让这些 AI 草稿在传统工作台可见、可跳转、可追溯。Phase 1F 进一步处理人工确认后的 Harness 审计回写。</p>
       <div class="flow-steps">
         <div class="flow-step"><span class="num">01</span><b>parse-basic-info</b><small>抽取基础信息，创建文件理解入口。</small></div>
         <div class="flow-step"><span class="num">02</span><b>createHarnessRun</b><small>创建 run，进入 uploaded 阶段。</small></div>
         <div class="flow-step"><span class="num">03</span><b>bindHarnessFile</b><small>仅 uploaded 阶段允许绑定文件。</small></div>
         <div class="flow-step"><span class="num">04</span><b>generate v1/v2</b><small>v2 只能从 clarifying 阶段生成，且要求 metadata.answers。</small></div>
         <div class="flow-step"><span class="num">05</span><b>confirm action</b><small>记录 ToolEvent，再生成传统草稿。</small></div>
+        <div class="flow-step"><span class="num">06</span><b>manual confirm</b><small>传统详情页人工确认后，回写 Harness ToolEvent 与 Run metadata。</small></div>
       </div>
       <table>
         <tr><th>阶段</th><th>允许动作</th><th>禁止动作</th></tr>
@@ -217,7 +218,7 @@
       <table>
         <tr><th>对象</th><th>创建时机</th><th>状态</th><th>后续动作</th></tr>
         <tr><td>项目评估记录草稿</td><td>v2 报告上确认 <code class="inline">enter_formal_estimation</code></td><td><span class="status warn"><span class="dot"></span>draft</span></td><td>传统工作台人工查看、编辑、确认</td></tr>
-        <tr><td>实施评估版本草稿</td><td>同一次确认动作内生成</td><td><span class="status warn"><span class="dot"></span>draft_from_ai</span></td><td>补齐参数、确认版本、进入正式评估</td></tr>
+        <tr><td>实施评估版本草稿</td><td>同一次确认动作内生成</td><td><span class="status warn"><span class="dot"></span>draft_from_ai</span></td><td>人工确认后回写 Harness，再按传统流程补齐参数、检入、升版或发布</td></tr>
         <tr><td>正式需求/正式评估</td><td>不由 Phase 1D 自动创建</td><td><span class="status todo"><span class="dot"></span>manual</span></td><td>保留传统人工确认链路</td></tr>
       </table>
     </section>
@@ -288,7 +289,7 @@
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 设计说明 · WES Agent 升级总看板 · 2026-06-19
+      <a href="index.html">返回总览</a> · 设计说明 · WES Agent 升级总看板 · 2026-06-21
     </footer>
   </main>
 </body>

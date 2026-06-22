@@ -17,6 +17,9 @@ function asStringArray(value: unknown): string[] {
 
 export function mapGlobalVersionToProject(record: VersionRecord): ProjectEvaluationPlan {
   const payload = record.payload || {};
+  const aiDraftReview = payload.aiDraftReview && typeof payload.aiDraftReview === "object" && !Array.isArray(payload.aiDraftReview)
+    ? payload.aiDraftReview as Record<string, unknown>
+    : {};
   return {
     projectId: record.id,
     projectName: asString(payload.projectName) || record.versionCode,
@@ -35,6 +38,12 @@ export function mapGlobalVersionToProject(record: VersionRecord): ProjectEvaluat
     defaultStandardVersionId: asString(payload.defaultStandardVersionId) || undefined,
     createdFromSessionId: asString(payload.createdFromSessionId) || undefined,
     sourceGlobalVersionRecordId: record.id,
+    createdFromHarnessRunId: asString(payload.createdFromHarnessRunId) || undefined,
+    createdFromHarnessActionId: asString(payload.createdFromHarnessActionId) || undefined,
+    assessmentVersionCode: asString(payload.assessmentVersionCode) || undefined,
+    aiDraftReviewStatus: asString(aiDraftReview.status) === "confirmed" ? "confirmed" : (payload.createdFromHarnessRunId ? "pending" : undefined),
+    aiDraftConfirmedAt: asString(aiDraftReview.confirmedAt) || undefined,
+    aiDraftConfirmedByUsername: asString(aiDraftReview.confirmedByUsername) || undefined,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
@@ -65,6 +74,25 @@ export function findHarnessDraftRecords(ownerUserId: string, harnessRunId: strin
     && asString(record.payload?.harnessRunId) === harnessRunId
     && asString(record.payload?.harnessActionId) === actionId);
 
+  if (!assessmentRecord) throw new Error("harness_draft_link_incomplete");
+  return { projectRecord, assessmentRecord };
+}
+
+export function findProjectRecordByAssessmentDraft(ownerUserId: string, assessmentRecordId: string): {
+  projectRecord: VersionRecord;
+  assessmentRecord: VersionRecord;
+} | null {
+  const records = loadVersionsStore().records;
+  const projectRecord = records.find((record) =>
+    isProjectEvaluationRecord(record)
+    && record.ownerUserId === ownerUserId
+    && asString(record.payload?.currentAssessmentVersionId) === assessmentRecordId);
+  if (!projectRecord) return null;
+
+  const assessmentRecord = records.find((record) =>
+    record.id === assessmentRecordId
+    && record.type === "assessment"
+    && record.ownerUserId === ownerUserId);
   if (!assessmentRecord) throw new Error("harness_draft_link_incomplete");
   return { projectRecord, assessmentRecord };
 }

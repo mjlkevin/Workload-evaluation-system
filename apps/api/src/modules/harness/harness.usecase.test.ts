@@ -40,7 +40,7 @@ import type {
 import type { AuthUser } from "../../types";
 import { versionsStorePath } from "../../utils";
 import { loadVersionsStore } from "../versions/versions.repository";
-import { createProjectAndAssessmentDraftsFromHarness } from "../project-evaluations/project-evaluations.usecase";
+import { createProjectAndAssessmentDraftsFromHarness, listProjectEvaluationsForUser, getProjectEvaluationForUser, confirmAiAssessmentDraftForUser } from "../project-evaluations/project-evaluations.usecase";
 import {
   createHarnessRun,
   generateHarnessRequirementReportV1,
@@ -159,6 +159,17 @@ function withFileSnapshotRestore(filePath: string, run: () => void): void {
   const snapshot = existed ? fs.readFileSync(filePath, "utf-8") : "";
   try {
     run();
+  } finally {
+    if (existed) fs.writeFileSync(filePath, snapshot, "utf-8");
+    else if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+}
+
+async function withFileSnapshotRestoreAsync(filePath: string, run: () => Promise<void>): Promise<void> {
+  const existed = fs.existsSync(filePath);
+  const snapshot = existed ? fs.readFileSync(filePath, "utf-8") : "";
+  try {
+    await run();
   } finally {
     if (existed) fs.writeFileSync(filePath, snapshot, "utf-8");
     else if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -1041,6 +1052,176 @@ test("project-evaluations: harness draft creation is idempotent by run and actio
     const records = loadVersionsStore().records;
     assert.equal(records.filter((record) => record.payload?.createdFromHarnessRunId === "run-idempotent").length, 1);
     assert.equal(records.filter((record) => record.payload?.harnessRunId === "run-idempotent").length, 1);
+  });
+});
+
+test("project-evaluations: list and detail expose harness trace fields for ai drafts", () => {
+  withFileSnapshotRestore(versionsStorePath(), () => {
+    fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
+    const user = activeHarnessUser();
+    const result = createProjectAndAssessmentDraftsFromHarness(user, {
+      harnessRunId: "run-trace",
+      actionId: "enter_formal_estimation",
+      aiSessionId: "session-trace",
+      report: {
+        version: "v2",
+        sourceFile: "需求.xlsx",
+        project: { projectName: "追溯项目", customerName: "追溯客户", industry: "制造业" },
+        sourceSheets: ["需求清单"],
+        requirementFindings: [{ domain: "供应链", scenario: "采购闭环", moduleHint: "供应链云", confidence: 0.9, evidenceRefs: ["需求清单!B12"] }],
+        missingFields: [],
+        clarificationQuestions: [],
+        answeredQuestions: [],
+        risks: [],
+        nextActions: [{ label: "进入正式评估", actionType: "enter_formal_estimation" }],
+        clarificationSummary: "已确认。",
+      },
+    });
+
+    const list = listProjectEvaluationsForUser(user);
+    const fromList = list.find((item) => item.projectId === result.project.projectId);
+    assert.ok(fromList, "ai draft project should appear in list");
+    assert.equal(fromList?.createdFromHarnessRunId, "run-trace");
+    assert.equal(fromList?.createdFromHarnessActionId, "enter_formal_estimation");
+    assert.equal(fromList?.assessmentVersionCode, result.assessmentDraft.versionCode);
+
+    const fromDetail = getProjectEvaluationForUser(user, result.project.projectId);
+    assert.ok(fromDetail, "ai draft project should be fetchable by detail");
+    assert.equal(fromDetail?.createdFromHarnessRunId, "run-trace");
+    assert.equal(fromDetail?.createdFromHarnessActionId, "enter_formal_estimation");
+    assert.equal(fromDetail?.assessmentVersionCode, result.assessmentDraft.versionCode);
+
+    const otherUser = {
+      id: "other-user",
+      username: "other",
+      role: "user",
+      status: "active",
+      passwordHash: "",
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+      permissions: [],
+    } as AuthUser;
+    assert.equal(getProjectEvaluationForUser(otherUser, result.project.projectId), null, "non-owner should not access ai draft");
+  });
+});
+
+test("project-evaluations: manual confirmation of ai assessment draft writes back harness audit", async () => {
+  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
+    fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
+    const repo = makeMemoryHarnessRepo();
+    const user = activeHarnessUser();
+    const run = await repo.createRun({
+      ownerUserId: user.id,
+      ownerUsername: user.username,
+      mode: "interactive",
+      stage: "ready_for_estimation",
+      status: "waiting",
+      title: "AI 草稿人工确认",
+      aiSessionId: "session-manual-confirm",
+      metadata: { links: { aiSessionId: "session-manual-confirm" } },
+    });
+    const draft = createProjectAndAssessmentDraftsFromHarness(user, {
+      harnessRunId: run.harnessRunId,
+      actionId: "enter_formal_estimation",
+      aiSessionId: "session-manual-confirm",
+      report: {
+        version: "v2",
+        sourceFile: "需求.xlsx",
+        project: { projectName: "人工确认项目", customerName: "确认客户", industry: "制造业" },
+        sourceSheets: ["需求清单"],
+        requirementFindings: [{ domain: "供应链", scenario: "采购闭环", moduleHint: "供应链云", confidence: 0.9, evidenceRefs: ["需求清单!B12"] }],
+        missingFields: [],
+        clarificationQuestions: [],
+        answeredQuestions: [],
+        risks: [],
+        nextActions: [{ label: "进入正式评估", actionType: "enter_formal_estimation" }],
+        clarificationSummary: "已确认。",
+      },
+    });
+
+    const result = await confirmAiAssessmentDraftForUser(user, draft.assessmentDraft.recordId, { note: "人工审核通过" }, repo);
+
+    assert.equal(result?.harness.status, "confirmed");
+    assert.equal(result?.harness.runId, run.harnessRunId);
+    assert.equal(result?.harness.actionId, "enter_formal_estimation");
+    assert.equal(result?.assessmentDraft.manualConfirmation?.status, "confirmed");
+    assert.equal(result?.assessmentDraft.manualConfirmation?.confirmedByUsername, user.username);
+
+    const events = await repo.listToolEvents(run.harnessRunId);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].toolName, "manual_confirm_ai_draft");
+    assert.equal(events[0].eventType, "manual_confirmation");
+    assert.equal(events[0].actionId, "enter_formal_estimation");
+    assert.equal((events[0].output as { assessmentDraft?: { recordId?: string } })?.assessmentDraft?.recordId, draft.assessmentDraft.recordId);
+
+    const store = loadVersionsStore();
+    const assessmentRecord = store.records.find((record) => record.id === draft.assessmentDraft.recordId);
+    const projectRecord = store.records.find((record) => record.id === draft.project.projectId);
+    assert.equal((assessmentRecord?.payload?.aiDraftReview as { status?: string } | undefined)?.status, "confirmed");
+    assert.equal(projectRecord?.payload?.currentStage, "manual_confirmed");
+    assert.equal(projectRecord?.payload?.projectStatus, "reviewing");
+    assert.equal(projectRecord?.payload?.aiDraftReviewStatus, "confirmed");
+    assert.equal((projectRecord?.payload?.aiDraftReview as { status?: string } | undefined)?.status, "confirmed");
+
+    const updatedRun = await repo.findRunById(run.harnessRunId);
+    assert.equal((updatedRun?.metadata as any)?.links?.projectEvaluationId, draft.project.projectId);
+    assert.equal((updatedRun?.metadata as any)?.links?.assessmentVersionId, draft.assessmentDraft.recordId);
+    assert.equal((updatedRun?.metadata as any)?.links?.assessmentVersionCode, draft.assessmentDraft.versionCode);
+    assert.equal((updatedRun?.metadata as any)?.manualConfirmation?.status, "confirmed");
+    assert.equal((updatedRun?.metadata as any)?.manualConfirmation?.harnessToolEventId, events[0].harnessToolEventId);
+
+    const second = await confirmAiAssessmentDraftForUser(user, draft.assessmentDraft.recordId, { note: "重复点击" }, repo);
+    assert.equal(second?.harness.toolEventId, result?.harness.toolEventId);
+    assert.equal(second?.assessmentDraft.manualConfirmation?.note, "人工审核通过");
+    assert.equal((await repo.listToolEvents(run.harnessRunId)).length, 1);
+  });
+});
+
+test("project-evaluations: concurrent manual confirmation creates one audit event", async () => {
+  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
+    fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
+    const repo = makeMemoryHarnessRepo();
+    const user = activeHarnessUser();
+    const run = await repo.createRun({
+      ownerUserId: user.id,
+      ownerUsername: user.username,
+      mode: "interactive",
+      stage: "ready_for_estimation",
+      status: "waiting",
+      title: "AI 草稿并发人工确认",
+      aiSessionId: "session-manual-confirm-concurrent",
+      metadata: { links: { aiSessionId: "session-manual-confirm-concurrent" } },
+    });
+    const draft = createProjectAndAssessmentDraftsFromHarness(user, {
+      harnessRunId: run.harnessRunId,
+      actionId: "enter_formal_estimation",
+      aiSessionId: "session-manual-confirm-concurrent",
+      report: {
+        version: "v2",
+        sourceFile: "需求.xlsx",
+        project: { projectName: "并发确认项目", customerName: "确认客户", industry: "制造业" },
+        sourceSheets: ["需求清单"],
+        requirementFindings: [{ domain: "供应链", scenario: "采购闭环", moduleHint: "供应链云", confidence: 0.9, evidenceRefs: ["需求清单!B12"] }],
+        missingFields: [],
+        clarificationQuestions: [],
+        answeredQuestions: [],
+        risks: [],
+        nextActions: [{ label: "进入正式评估", actionType: "enter_formal_estimation" }],
+        clarificationSummary: "已确认。",
+      },
+    });
+
+    const [first, second] = await Promise.all([
+      confirmAiAssessmentDraftForUser(user, draft.assessmentDraft.recordId, { note: "第一次确认" }, repo),
+      confirmAiAssessmentDraftForUser(user, draft.assessmentDraft.recordId, { note: "第二次确认" }, repo),
+    ]);
+
+    assert.equal(first?.harness.toolEventId, second?.harness.toolEventId);
+    const events = await repo.listToolEvents(run.harnessRunId);
+    assert.equal(events.filter((event) => event.toolName === "manual_confirm_ai_draft").length, 1);
+    const store = loadVersionsStore();
+    const assessmentRecord = store.records.find((record) => record.id === draft.assessmentDraft.recordId);
+    assert.equal((assessmentRecord?.payload?.aiDraftReview as { note?: string } | undefined)?.note, "第一次确认");
   });
 });
 

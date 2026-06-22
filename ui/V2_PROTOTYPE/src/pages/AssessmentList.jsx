@@ -44,6 +44,7 @@ export default function AssessmentList() {
       onBulkAction={handleBulkAction}
       filterTags={[
         { key: 'all', label: '全部' },
+        { key: 'ai-draft', label: 'AI 草稿', predicate: (row) => row.isAiDraft },
         { key: 'checked-out', label: '已检出', predicate: (row) => row.status === '已检出' },
         { key: 'checked-in', label: '已检入', predicate: (row) => row.status === '已检入' },
         { key: 'in-progress', label: '进行中', predicate: (row) => row.status === '进行中' },
@@ -56,7 +57,7 @@ export default function AssessmentList() {
         { key: 'quoteMode', title: '报价模式' },
         { key: 'totalDays', title: '总人天', align: 'right', getter: (r) => r.totalDays.toFixed(1) },
         { key: 'orgCount', title: '组织数', align: 'right' },
-        { key: 'status', title: '状态', render: (r) => <StatusBadge status={r.status} /> },
+        { key: 'status', title: '状态', render: (r) => <StatusBadge status={r.status} isAiDraft={r.isAiDraft} /> },
         { key: 'owner', title: '创建/修改人' },
         { key: 'updatedAt', title: '更新时间' },
       ]}
@@ -68,8 +69,9 @@ export default function AssessmentList() {
   )
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, isAiDraft }) {
   const map = {
+    'AI 草稿': { bg: 'var(--brand-soft)', color: 'var(--brand-ink)' },
     '已检出': { bg: 'var(--accent-soft)', color: 'var(--accent-ink)' },
     '已检入': { bg: 'var(--ok-soft)', color: 'var(--ok-ink)' },
     '进行中': { bg: 'var(--info-soft)', color: 'var(--info)' },
@@ -84,7 +86,7 @@ function StatusBadge({ status }) {
   const s = map[status] || { bg: 'var(--bg-soft)', color: 'var(--ink-3)' }
   return (
     <span style={{display:'inline-flex',alignItems:'center',padding:'2px 8px',borderRadius:999,fontSize:11,fontWeight:600,background:s.bg,color:s.color}}>
-      {status}
+      {isAiDraft ? 'AI · ' : ''}{status}
     </span>
   )
 }

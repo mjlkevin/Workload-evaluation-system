@@ -7,6 +7,7 @@ import { unwrapList } from '../api/utils.js'
 export function mapAssessmentToVM(record = {}) {
   const payload = record.payload || {}
   const detailId = record.id || record.versionRecordId || record.versionId || record.versionCode || record.assessmentVersion || ''
+  const isAiDraft = payload.draftStatus === 'draft_from_ai' || record.draftStatus === 'draft_from_ai'
 
   return {
     id: detailId,
@@ -18,7 +19,11 @@ export function mapAssessmentToVM(record = {}) {
     totalDays: Number(payload.totalDays ?? record.totalDays ?? 0),
     orgCount: Number(payload.orgCount ?? record.orgCount ?? 1),
     difficultyFactor: Number(payload.difficultyFactor ?? record.difficultyFactor ?? 1.0),
-    status: mapVcsStatus(record),
+    status: isAiDraft ? 'AI 草稿' : mapVcsStatus(record),
+    isAiDraft,
+    draftSource: payload.draftSource || record.draftSource || '',
+    harnessRunId: payload.harnessRunId || record.harnessRunId || '',
+    harnessActionId: payload.harnessActionId || record.harnessActionId || '',
     owner: record.checkedOutByUsername || record.updatedByUsername || record.owner || '—',
     updatedAt: (record.updatedAt || '').slice(0, 10),
     raw: record,
