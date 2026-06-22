@@ -45,7 +45,7 @@ Phase 1F 的业务目标：
 现有验证基线：
 
 - `npm run test:harness -w apps/api`：60 pass
-- `npm run test:modules -w apps/api`：59 pass
+- `npm run test:modules -w apps/api`：66 pass
 - `npm run build -w apps/api`：通过
 - `npm run test --prefix ui/V2_PROTOTYPE`：63 pass
 - `npm run build --prefix ui/V2_PROTOTYPE`：通过

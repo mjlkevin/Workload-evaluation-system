@@ -1,13 +1,24 @@
-import { Router } from "express";
+import { RequestHandler, Router } from "express";
 
 import * as ProjectEvaluationsModule from "../modules/project-evaluations/project-evaluations.module";
 import { requireCapability } from "../rbac/middleware";
 
-const router = Router();
+export type ProjectEvaluationsRouterHandlers = {
+  listProjectEvaluations: RequestHandler;
+  createProjectEvaluation: RequestHandler;
+  confirmAiAssessmentDraft: RequestHandler;
+  getProjectEvaluation: RequestHandler;
+};
 
-router.get("/", requireCapability("estimates:read"), ProjectEvaluationsModule.listProjectEvaluations);
-router.post("/", requireCapability("estimates:write"), ProjectEvaluationsModule.createProjectEvaluation);
-router.post("/assessment-drafts/:assessmentId/confirm", requireCapability("estimates:write"), ProjectEvaluationsModule.confirmAiAssessmentDraft);
-router.get("/:projectId", requireCapability("estimates:read"), ProjectEvaluationsModule.getProjectEvaluation);
+export function createProjectEvaluationsRouter(handlers: ProjectEvaluationsRouterHandlers = ProjectEvaluationsModule) {
+  const router = Router();
 
-export default router;
+  router.get("/", requireCapability("estimates:read"), handlers.listProjectEvaluations);
+  router.post("/", requireCapability("estimates:write"), handlers.createProjectEvaluation);
+  router.post("/assessment-drafts/:assessmentId/confirm", requireCapability("estimates:write"), handlers.confirmAiAssessmentDraft);
+  router.get("/:projectId", requireCapability("estimates:read"), handlers.getProjectEvaluation);
+
+  return router;
+}
+
+export default createProjectEvaluationsRouter();

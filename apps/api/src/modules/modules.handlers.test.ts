@@ -4,7 +4,7 @@ import fs from "node:fs";
 import XLSX from "xlsx";
 import bcrypt from "bcryptjs";
 
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 
 import { AuthUser } from "../types";
 import { config } from "../config/env";
@@ -29,6 +29,7 @@ import { patchReviewStatus, postTeam } from "./team/team.controller";
 import { homeWorkbenchChat, kimiAssessmentPreview, parseBasicInfo } from "./ai/ai.usecase";
 import * as AiSessionsModule from "./ai-sessions/ai-sessions.module";
 import * as ProjectEvaluationsModule from "./project-evaluations/project-evaluations.module";
+import { createConfirmAiAssessmentDraftHandler } from "./project-evaluations/project-evaluations.controller";
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
 import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap";
 
@@ -75,6 +76,8 @@ function createMockReq(input: {
     }
   } as unknown as Request;
 }
+
+const noopNext: NextFunction = () => undefined;
 
 function createMinimalRequirementWorkbookBuffer(): Buffer {
   const workbook = XLSX.utils.book_new();
@@ -1235,6 +1238,115 @@ test("project-evaluations: project containers do not replace latest formal globa
     const listBody = listRes.body as { data: { items: Array<{ projectName: string }> } };
     assert.ok(listBody.data.items.some((item) => item.projectName === "遗留项目容器"));
   });
+});
+
+test("project-evaluations.controller: confirm AI assessment draft returns success response", async () => {
+  const token = getActiveUserToken();
+  const handler = createConfirmAiAssessmentDraftHandler({
+    async confirmAiAssessmentDraftForUser(user, assessmentRecordId, input, _repo) {
+      assert.equal(user.id, getActiveUser().id);
+      assert.equal(assessmentRecordId, "assessment-ai-1");
+      assert.deepEqual(input, { note: "人工确认可进入评估" });
+      return {
+        project: {
+          projectId: "project-ai-1",
+          projectName: "AI 草稿项目",
+          customerName: "测试客户",
+          industry: "制造业",
+          currentStage: "manual_confirmed",
+          status: "reviewing",
+          ownerUserId: user.id,
+          ownerUsername: user.username,
+          participantUserIds: [],
+          createdFromSessionId: "",
+          createdFromHarnessRunId: "run-ai-1",
+          createdFromHarnessActionId: "create_requirement_draft",
+          assessmentVersionCode: "IA-DRAFT-1",
+          aiDraftReviewStatus: "confirmed",
+          aiDraftConfirmedAt: "2026-06-22T00:00:00.000Z",
+          aiDraftConfirmedByUsername: user.username,
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:00.000Z",
+        },
+        assessmentDraft: {
+          recordId: "assessment-ai-1",
+          versionCode: "IA-DRAFT-1",
+          status: "draft_from_ai",
+          manualConfirmation: {
+            status: "confirmed",
+            confirmedAt: "2026-06-22T00:00:00.000Z",
+            confirmedByUserId: user.id,
+            confirmedByUsername: user.username,
+            note: "人工确认可进入评估",
+            harnessToolEventId: "tool-ai-1",
+          },
+        },
+        harness: {
+          runId: "run-ai-1",
+          actionId: "create_requirement_draft",
+          toolEventId: "tool-ai-1",
+          status: "confirmed",
+        },
+      };
+    },
+  });
+
+  const req = createMockReq({
+    token,
+    params: { assessmentId: "assessment-ai-1" },
+    body: { note: "人工确认可进入评估" },
+  });
+  const res = createMockRes();
+  await handler(req, res as unknown as Response, noopNext);
+
+  assert.equal(res.statusCode, 200);
+  const body = res.body as { code: number; data: { project: { projectId: string }; assessmentDraft: { manualConfirmation: { harnessToolEventId: string } }; harness: { toolEventId: string } } };
+  assert.equal(body.code, 0);
+  assert.equal(body.data.project.projectId, "project-ai-1");
+  assert.equal(body.data.assessmentDraft.manualConfirmation.harnessToolEventId, "tool-ai-1");
+  assert.equal(body.data.harness.toolEventId, "tool-ai-1");
+});
+
+test("project-evaluations.controller: confirm AI assessment draft returns 404 when draft is not owned or missing", async () => {
+  const handler = createConfirmAiAssessmentDraftHandler({
+    async confirmAiAssessmentDraftForUser(_user, _assessmentRecordId, _input, _repo) {
+      return null;
+    },
+  });
+
+  const res = createMockRes();
+  await handler(createMockReq({ token: getActiveUserToken(), params: { assessmentId: "missing-assessment" } }), res as unknown as Response, noopNext);
+
+  assert.equal(res.statusCode, 404);
+  assert.equal((res.body as { code?: number }).code, 40404);
+});
+
+test("project-evaluations.controller: confirm AI assessment draft maps non-harness draft to 409", async () => {
+  const handler = createConfirmAiAssessmentDraftHandler({
+    async confirmAiAssessmentDraftForUser(_user, _assessmentRecordId, _input, _repo) {
+      throw new Error("not_ai_harness_draft");
+    },
+  });
+
+  const res = createMockRes();
+  await handler(createMockReq({ token: getActiveUserToken(), params: { assessmentId: "formal-assessment" } }), res as unknown as Response, noopNext);
+
+  assert.equal(res.statusCode, 409);
+  assert.equal((res.body as { code?: number }).code, 40902);
+});
+
+test("project-evaluations.controller: confirm AI assessment draft maps inaccessible harness run to 404", async () => {
+  const handler = createConfirmAiAssessmentDraftHandler({
+    async confirmAiAssessmentDraftForUser(_user, _assessmentRecordId, _input, _repo) {
+      throw new Error("harness_run_not_found");
+    },
+  });
+
+  const res = createMockRes();
+  await handler(createMockReq({ token: getActiveUserToken(), params: { assessmentId: "broken-harness-run" } }), res as unknown as Response, noopNext);
+
+  assert.equal(res.statusCode, 404);
+  assert.equal((res.body as { code?: number }).code, 40404);
 });
 
 test("ai.usecase: kimiAssessmentPreview returns model result on valid response", async () => {
