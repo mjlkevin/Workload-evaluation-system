@@ -1,0 +1,6 @@
+interface:
+  display_name: "WES 总看板维护"
+  short_description: "约束模型持续更新 WES 项目总看板"
+  default_prompt: "Use $maintain-wes-command-board to update WES project process data in the command board."
+policy:
+  allow_implicit_invocation: true

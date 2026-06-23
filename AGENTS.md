@@ -77,14 +77,21 @@
 - 接口改动时补充模块/集成测试
 - 变更涉及文档时同步更新 `README.md`、`实现与文档对齐说明.md`（按需）
 
-## 9. 提交规范
+## 9. 总看板与过程数据沉淀
+
+- 涉及需求、设计、开发、测试、变更、监控、风险、发布、文档资产或项目治理的任务，必须读取并执行 `skills/maintain-wes-command-board/SKILL.md`。
+- 用户消息包含“测试问题”“需求”“反馈”“缺陷”“bug”“体验调整”“功能调整”“大方向思考”“需求池”等关键词，或通过 UI 截图反馈可用性问题时，必须读取并执行 `skills/recording-wes-requirements/SKILL.md`；非阻塞且信息足够的问题直接进入需求池，信息不足时先追问。
+- 关键过程事实不得只停留在对话、临时计划、测试输出或 commit 中；应按 Skill 映射同步更新 `03_技术设计/系统架构/WES-Agent-升级总看板/` 下的对应页面。
+- 若本次任务不产生可沉淀的项目过程事实，最终回复必须说明“本次无需更新总看板”的理由。
+
+## 10. 提交规范
 
 - 格式：`type(scope): 中文描述`
 - 类型前缀：`feat` / `fix` / `chore` / `docs` / `refactor` / `revert`
 - 示例：`feat(WES Phase B): PB-R3 · 5 批闭环全部 11 严重项 + inline grid sweep`
 - 聚焦"为什么"而非"改了什么"
 
-## 10. 新 Session 必读清单
+## 11. 新 Session 必读清单
 
 首次进入本项目的 AI session 建议按顺序阅读：
 
@@ -94,8 +101,10 @@
 4. `00_项目治理/里程碑与计划/项目进展总结与后续规划.md` — 当前开发阶段与里程碑
 5. `ui/V2_PROTOTYPE/README.md` — Phase B 组件进度与 Web 主线状态
 6. `apps/api/src/modules/README.md` — 后端模块化重构进度
+7. `skills/maintain-wes-command-board/SKILL.md` — 总看板过程数据沉淀与项目管理门禁
+8. `skills/recording-wes-requirements/SKILL.md` — 测试反馈、需求与问题入池治理规则
 
-## 11. 禁止事项
+## 12. 禁止事项
 
 - 禁止引入与当前架构冲突的第二前端/后端主实现。
 - 禁止在未标注历史说明的情况下引用已下线路径/脚本（`apps/web`、`apple-ui-preview` 等）。

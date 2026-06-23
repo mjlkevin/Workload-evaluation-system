@@ -8,11 +8,38 @@
 
 | 日期 | Skill 名称 | 版本 | 类型 | 说明 |
 |------|-----------|------|------|------|
+| 2026-06-23 | `recording-wes-requirements` | v1.0.0 | 🚀 发布 | 新增项目级需求记录 Skill，规范测试问题、需求、反馈、缺陷、体验调整等输入进入需求池的分析与看板同步流程 |
+| 2026-06-23 | `maintain-wes-command-board` | v1.0.0 | 🚀 发布 | 新增 WES Agent 总看板维护 Skill，规范需求、设计、开发、测试、变更、监控和风险过程数据沉淀 |
 | 2026-05-07 | `workload-api-external-agent` | v1.0.0 | 🚀 发布 | 从 `.cursor/skills/` 迁移至独立 `skills/` 目录，初始发布 |
 
 ---
 
 ## 详细记录
+
+### 2026-06-23
+
+#### recording-wes-requirements v1.0.0 🚀
+
+- **操作类型**：初始发布
+- **来源**：用户提出希望把测试问题、需求反馈、体验调整和大方向思考先交给 AI 分析，再规范记录到项目级需求池，后续统一规划。
+- **变更内容**：
+  - 新增 `skills/recording-wes-requirements/SKILL.md`
+  - 新增 `skills/recording-wes-requirements/CHANGELOG.md`
+  - 明确触发词、阻塞判断、直接入池/追问策略、需求分析字段、看板同步位置和最终回复口径
+- **对应系统版本**：WorkEvolutionSys / WES Agent 升级总看板
+- **发布者**：AI Agent
+
+#### maintain-wes-command-board v1.0.0 🚀
+
+- **操作类型**：初始发布
+- **来源**：本次 WES 项目管理体系与总看板治理需求
+- **变更内容**：
+  - 新增 `skills/maintain-wes-command-board/SKILL.md`
+  - 新增 `references/board-module-map.md`，定义总看板页面职责与生命周期映射
+  - 新增 CHANGELOG 与 `agents/openai.yaml`
+  - 将 Skill 登记到项目 Skill 管理中心
+- **对应系统版本**：WorkEvolutionSys / WES Agent 升级总看板
+- **发布者**：AI Agent
 
 ### 2026-05-07
 

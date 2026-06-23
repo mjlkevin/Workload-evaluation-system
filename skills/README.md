@@ -12,6 +12,14 @@ skills/
 ├── SKILL_TEMPLATE.md                  # 新建 Skill 的标准模板
 ├── VERSION_HISTORY.md                 # 全局版本迭代记录
 │
+├── maintain-wes-command-board/        # 【已发布】WES Agent 总看板过程数据沉淀
+│   ├── SKILL.md                       #   Skill 正文
+│   └── CHANGELOG.md                   #   该 Skill 的独立变更日志
+│
+├── recording-wes-requirements/        # 【已发布】测试反馈与需求入池治理
+│   ├── SKILL.md                       #   Skill 正文
+│   └── CHANGELOG.md                   #   该 Skill 的独立变更日志
+│
 ├── workload-api-external-agent/       # 【已发布】外部 Agent 接入 API 的完整配置
 │   ├── SKILL.md                       #   Skill 正文
 │   └── CHANGELOG.md                   #   该 Skill 的独立变更日志
@@ -103,6 +111,8 @@ ln -sf ../../skills/workload-api-external-agent .kimi/skills/workload-api-extern
 
 | Skill 名称 | 状态 | 当前版本 | 说明 | 最后更新 |
 |-----------|------|---------|------|---------|
+| `maintain-wes-command-board` | ✅ 已发布 | v1.0.0 | 约束后续模型把需求、设计、开发、测试、变更、监控和风险过程数据同步沉淀到 WES Agent 升级总看板 | 2026-06-23 |
+| `recording-wes-requirements` | ✅ 已发布 | v1.0.0 | 将测试问题、需求、反馈、缺陷和体验调整先分析并规范记录到项目级需求池，支持非阻塞问题直接入池、信息不足先追问 | 2026-06-23 |
 | `workload-api-external-agent` | ✅ 已发布 | v1.0.0 | 外部 Agent（Kimiclaw 等）接入 WES API 的完整配置与演示 | 2026-05-07 |
 
 ---
