@@ -59,6 +59,7 @@ apps/api/.tmp/
 data/
 apps/api/data/
 config/auth/password-reset-tokens.json
+config/system/knowledge-base-config.json
 
 # 工具本地状态（不跨机器同步）
 .kimi/
