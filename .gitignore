@@ -47,12 +47,18 @@ coverage/
 Thumbs.db
 
 # 本地临时目录
+.worktrees/
 .tmp-gh-push/
 backups/
 
 # 运行时临时缓存（tsx/node test artifacts）
 apps/api/.tmp/
 .tmp/
+
+# 本地运行态数据（AI sessions / Trace / password reset tokens）
+data/
+apps/api/data/
+config/auth/password-reset-tokens.json
 
 # 工具本地状态（不跨机器同步）
 .kimi/
