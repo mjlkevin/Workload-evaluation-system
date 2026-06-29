@@ -43,7 +43,7 @@ export default function HomeWorkspace() {
     <PageShell
       crumb={`工作台 / ${pageTitle}`}
       title={pageTitle}
-      subtitle={isAiView ? '按登录账号业务角色预置对话工作流' : '项目评估视图：查看项目评估概览、快速操作和最近动态'}
+      subtitle={isAiView ? undefined : '项目评估视图：查看项目评估概览、快速操作和最近动态'}
       fillViewport={isAiView}
       actions={[
         <div key="switch" style={{ display: 'inline-flex', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', height: 32 }}>

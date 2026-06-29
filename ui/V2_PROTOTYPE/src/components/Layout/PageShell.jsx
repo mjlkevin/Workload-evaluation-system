@@ -78,7 +78,7 @@ export default function PageShell({ crumb, title, subtitle, actions, children, f
       <div
         className="pg-hd"
         style={{
-          padding: '18px 24px 14px',
+          padding: fillViewport ? '10px 24px 8px' : '18px 24px 14px',
           borderBottom: '1px solid var(--line)',
           position: fillViewport ? 'relative' : 'sticky',
           top: fillViewport ? undefined : 'var(--workspace-tabs-height, 0px)',
@@ -90,7 +90,7 @@ export default function PageShell({ crumb, title, subtitle, actions, children, f
         {crumb && <Crumbs crumb={crumb} />}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{title}</h1>
+            <h1 style={{ margin: 0, fontSize: fillViewport ? 16 : 20, fontWeight: 700 }}>{title}</h1>
             {subtitle && (
               <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--ink-3)' }}>{subtitle}</p>
             )}

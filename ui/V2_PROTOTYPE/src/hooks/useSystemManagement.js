@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiClient } from '../api/client.js'
 import { isAuthenticated } from '../api/auth.js'
+import { ApiError } from '../api/errors.js'
 import { unwrapList, unwrapSingle } from '../api/utils.js'
 
 const DEFAULT_RULES = [
@@ -12,11 +13,26 @@ const DEFAULT_RULES = [
   { module: '评审', code: 'RV', prefix: 'RV-', format: 'RV-NNNNN', example: 'RV-04001', status: 'draft', activatedAt: null },
 ]
 
-const DEFAULT_MODELS = [
-  { name: 'KIMI 评估', status: 'online', endpoint: 'https://api.moonshot.cn/v1/chat/completions', profile: 'default-v1', temp: '0.2', tokens: '8192', desc: '用于实施评估与开发评估的自动打标与摘要生成。' },
-  { name: '文件解析', status: 'online', endpoint: 'https://api.moonshot.cn/v1/files', profile: 'default-v1', temp: '0.1', tokens: '4096', desc: '用于 Excel/Word/PDF 的结构化提取与内容解析。' },
-  { name: '生成模型', status: 'offline', endpoint: 'https://api.moonshot.cn/v1/generate', profile: 'generate-v1', temp: '0.3', tokens: '8192', desc: '用于方案生成、五段叙事与 SOW 草案自动撰写。' },
-]
+const DEFAULT_MODEL_CONFIG = {
+  kimiEvaluation: {
+    enabled: true, model: 'kimi-k2.5', temperature: 0.3,
+    maxTokens: 4000, timeoutMs: 120000, fallbackToRule: true,
+    promptProfile: 'default', promptTemplate: '',
+  },
+  fileParsing: {
+    enabled: true, model: 'kimi-k2.6',
+    allowedExtensions: ['.xlsx', '.xls', '.csv'],
+    maxFileSizeMb: 20, maxSheetCount: 20, strictMode: false, ocrEnabled: false,
+  },
+  kimiGeneration: {
+    enabled: true, model: 'kimi-k2.5', temperature: 0.5,
+    maxTokens: 6000, outputStyle: 'balanced',
+    includeRiskHints: true, includeAssumptions: true,
+  },
+  kimiCredentials: {
+    apiKey: '', hint: null, envFallbackAvailable: false, resolvedFrom: 'none',
+  },
+}
 
 const DEFAULT_RATECARD = [
   { role: '实施顾问', price: '¥3,200 CNY' },
@@ -80,7 +96,7 @@ function mapTemplates(raw) {
 function mergeFallback(fb) {
   return {
     rules: fb?.rules || DEFAULT_RULES,
-    models: fb?.models || DEFAULT_MODELS,
+    modelConfig: fb?.modelConfig || DEFAULT_MODEL_CONFIG,
     ratecard: fb?.ratecard || DEFAULT_RATECARD,
     dslRules: fb?.dslRules || DEFAULT_DSL_RULES,
     templates: fb?.templates || DEFAULT_TEMPLATES,
@@ -97,8 +113,7 @@ export default function useSystemManagement({
   const [rules, setRules] = useState(fallback.rules)
   const [rulesLoading, setRulesLoading] = useState(false)
 
-  const [models, setModels] = useState(fallback.models)
-  const [apiKey, setApiKey] = useState('')
+  const [modelConfig, setModelConfig] = useState(fallback.modelConfig)
   const [modelsLoading, setModelsLoading] = useState(false)
 
   const [ratecard, setRatecard] = useState(fallback.ratecard)
@@ -110,6 +125,18 @@ export default function useSystemManagement({
   const [templatesLoading, setTemplatesLoading] = useState(false)
 
   const [prompts, setPrompts] = useState(fallback.prompts)
+
+  // --- 知识库配置 ---
+  const [kbConfig, setKbConfig] = useState({ model: 'glm-4.6', apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', apiKey: '', knowledgeId: '', apiHint: null, resolvedFrom: 'none' })
+  const [kbLoading, setKbLoading] = useState(false)
+
+  // --- 人工测试结果 ---
+  const [testResults, setTestResults] = useState([])
+  const [testResultsLoading, setTestResultsLoading] = useState(false)
+
+  // --- RP-026: 角色能力矩阵 ---
+  const [roleCapabilities, setRoleCapabilities] = useState({ roles: [], legacyMapping: [], capabilityLabels: {} })
+  const [roleCapabilitiesLoading, setRoleCapabilitiesLoading] = useState(false)
 
   const [actionLoading, setActionLoading] = useState({})
 
@@ -159,30 +186,65 @@ export default function useSystemManagement({
     try {
       const payload = await apiClient.get('/system/requirement-settings')
       const data = unwrapSingle(payload)
-      if (data) {
-        if (Array.isArray(data.models)) setModels(data.models)
-        if (data.apiKey) setApiKey(data.apiKey)
+      if (data?.draft) {
+        const d = data.draft
+        setModelConfig({
+          kimiEvaluation: { ...DEFAULT_MODEL_CONFIG.kimiEvaluation, ...d.kimiEvaluation },
+          fileParsing: { ...DEFAULT_MODEL_CONFIG.fileParsing, ...d.fileParsing },
+          kimiGeneration: { ...DEFAULT_MODEL_CONFIG.kimiGeneration, ...d.kimiGeneration },
+          kimiCredentials: d.kimiCredentials || DEFAULT_MODEL_CONFIG.kimiCredentials,
+        })
       }
     } catch (_) { /* keep fallback */ }
     finally { setModelsLoading(false) }
   }, [enabled])
 
+  const updateModelConfig = useCallback((key, patch) => {
+    setModelConfig((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], ...patch },
+    }))
+  }, [])
+
   const saveModelDraft = useCallback(() => withAction('saveModelDraft', async () => {
-    if (enabled) await apiClient.patch('/system/requirement-settings/draft', { models, apiKey })
+    if (!enabled) return
+    const { kimiCredentials: _creds, ...rest } = modelConfig
+    await apiClient.patch('/system/requirement-settings/draft', rest)
     alert('草稿已保存')
-  }), [enabled, models, apiKey, withAction])
+  }), [enabled, modelConfig, withAction])
+
+  const saveModelDraftWithKey = useCallback((apiKeyInput) => withAction('saveModelDraft', async () => {
+    if (!enabled) return
+    const { kimiCredentials: _creds, ...rest } = modelConfig
+    const body = { ...rest }
+    if (apiKeyInput) {
+      body.kimiCredentials = { apiKey: apiKeyInput }
+    }
+    await apiClient.patch('/system/requirement-settings/draft', body)
+    await loadModels()
+    alert('草稿已保存')
+  }), [enabled, modelConfig, withAction, loadModels])
+
+  const clearApiKeyDraft = useCallback(() => withAction('clearApiKey', async () => {
+    if (!enabled) return
+    await apiClient.patch('/system/requirement-settings/draft', {
+      kimiCredentials: { apiKey: null },
+    })
+    await loadModels()
+  }), [enabled, withAction, loadModels])
 
   const activateModel = useCallback(() => withAction('activateModel', async () => {
     if (enabled) await apiClient.post('/system/requirement-settings/activate')
+    await loadModels()
     alert('配置已生效')
-  }), [enabled, withAction])
+  }), [enabled, withAction, loadModels])
 
   const testApiKey = useCallback((key) => withAction('testApiKey', async () => {
     if (enabled) {
-      await apiClient.post('/system/requirement-settings/kimi-api-key/test', { apiKey: key || apiKey })
+      await apiClient.post('/system/requirement-settings/kimi-api-key/test', { apiKey: key || undefined })
     }
     alert('连接测试通过')
-  }), [enabled, apiKey, withAction])
+  }), [enabled, withAction])
 
   // --- DSL ---
   const loadDsl = useCallback(async () => {
@@ -244,6 +306,102 @@ export default function useSystemManagement({
     if (enabled) await apiClient.patch('/system/requirement-settings/draft', { prompts })
   }), [enabled, prompts, withAction])
 
+  // --- 人工测试结果 ---
+  const loadTestResults = useCallback(async () => {
+    if (!enabled) return
+    setTestResultsLoading(true)
+    try {
+      const payload = await apiClient.get('/harness/test-results')
+      const items = payload?.data?.items || payload?.items || []
+      setTestResults(Array.isArray(items) ? items : [])
+    } catch (_) { /* keep empty */ }
+    finally { setTestResultsLoading(false) }
+  }, [enabled])
+
+  const createTestResult = useCallback((data) => withAction('createTestResult', async () => {
+    if (!enabled) return
+    const runId = data.harnessRunId || '00000000-0000-0000-0000-000000000000'
+    await apiClient.post(`/harness/runs/${runId}/test-results`, data)
+    await loadTestResults()
+  }), [enabled, withAction, loadTestResults])
+
+  const deleteTestResult = useCallback(async (runId, resultId) => {
+    if (!enabled) return
+    const rid = runId || '00000000-0000-0000-0000-000000000000'
+    await apiClient.delete(`/harness/runs/${rid}/test-results/${resultId}`)
+    await loadTestResults()
+  }, [enabled, loadTestResults])
+
+  // --- 知识库配置 ---
+  const loadKbConfig = useCallback(async () => {
+    if (!enabled) return
+    setKbLoading(true)
+    try {
+      const payload = await apiClient.get('/system/knowledge-base-config')
+      const data = unwrapSingle(payload)
+      if (data) {
+        const draft = data.draft || {}
+        const active = data.active || {}
+        const creds = active.credentials || {}
+        setKbConfig({
+          model: draft.model || active.model || 'glm-4.6',
+          apiBaseUrl: draft.apiBaseUrl || active.apiBaseUrl || 'https://open.bigmodel.cn/api/paas/v4',
+          apiKey: '',
+          knowledgeId: draft.credentials?.knowledgeId || creds.knowledgeId || '',
+          apiHint: draft.credentials?.apiHint || creds.apiHint || null,
+          resolvedFrom: creds.resolvedFrom || 'none',
+        })
+      }
+    } catch (_) { /* keep fallback */ }
+    finally { setKbLoading(false) }
+  }, [enabled])
+
+  const saveKbDraft = useCallback(() => withAction('saveKbDraft', async () => {
+    if (enabled) {
+      await apiClient.patch('/system/knowledge-base-config/draft', {
+        model: kbConfig.model,
+        apiBaseUrl: kbConfig.apiBaseUrl,
+        credentials: {
+          apiKey: kbConfig.apiKey || null,
+          knowledgeId: kbConfig.knowledgeId || null,
+        },
+      })
+    }
+    alert('知识库配置草稿已保存')
+  }), [enabled, kbConfig, withAction])
+
+  const activateKbConfig = useCallback(() => withAction('activateKbConfig', async () => {
+    if (enabled) await apiClient.post('/system/knowledge-base-config/activate')
+    alert('知识库配置已生效')
+  }), [enabled, withAction])
+
+  const testKbConnectivity = useCallback(async () => {
+    if (!enabled) return null
+    try {
+      const result = await apiClient.post('/system/knowledge-base-config/test', {
+        apiKey: kbConfig.apiKey || undefined,
+        knowledgeId: kbConfig.knowledgeId || undefined,
+      })
+      const data = result?.data || result
+      return { ok: true, ...data }
+    } catch (e) {
+      if (e instanceof ApiError) {
+        const isNotFound = e.status === 404 || e.code === 'UNKNOWN'
+        return {
+          ok: false,
+          error: isNotFound ? '接口不存在，请确认后端已更新并重启' : e.message,
+          status: e.status,
+          code: e.code,
+        }
+      }
+      return { ok: false, error: e?.message || '未知错误' }
+    }
+  }, [enabled, kbConfig])
+
+  const updateKbConfig = useCallback((patch) => {
+    setKbConfig((prev) => ({ ...prev, ...patch }))
+  }, [])
+
   // --- Initial load ---
   useEffect(() => {
     if (!enabled) return
@@ -251,15 +409,15 @@ export default function useSystemManagement({
     loadModels()
     loadDsl()
     loadTemplates()
-  }, [enabled, loadRules, loadModels, loadDsl, loadTemplates])
+    loadKbConfig()
+    loadTestResults()
+  }, [enabled, loadRules, loadModels, loadDsl, loadTemplates, loadKbConfig, loadTestResults])
 
   return {
     rules,
     rulesLoading,
-    models,
+    modelConfig,
     modelsLoading,
-    apiKey,
-    setApiKey,
     ratecard,
     dslRules,
     dslLoading,
@@ -267,12 +425,19 @@ export default function useSystemManagement({
     templatesLoading,
     prompts,
     setPrompts,
+    kbConfig,
+    kbLoading,
+    testResults,
+    testResultsLoading,
     actionLoading,
     actions: {
       configureRule,
       activateRule,
       disableRule,
       saveModelDraft,
+      saveModelDraftWithKey,
+      clearApiKeyDraft,
+      updateModelConfig,
       activateModel,
       testApiKey,
       toggleDsl,
@@ -282,6 +447,13 @@ export default function useSystemManagement({
       importTemplate,
       testPrompt,
       savePrompts,
+      saveKbDraft,
+      activateKbConfig,
+      testKbConnectivity,
+      updateKbConfig,
+      loadTestResults,
+      createTestResult,
+      deleteTestResult,
     },
   }
 }

@@ -388,7 +388,26 @@ export const handlers = [
   })),
   http.post(`${BASE}/ai/home-workbench/chat`, async ({ request }) => {
     const body = await request.json()
-    const answer = `模型回复：${body.messages?.at?.(-1)?.content || '收到'}`
+    const lastMessage = body.messages?.at?.(-1)
+    const userText = lastMessage?.content || ''
+    const hasAttachment = (lastMessage?.attachments || []).some((a) => a.parsedSummary)
+    // Phase 1G: 模拟意图路由返回
+    let intent = 'domain_qa'
+    let suggestedActions = []
+    if (/你能做什么|能做什么|帮助/.test(userText)) {
+      intent = 'capability_discovery'
+      suggestedActions = [
+        { id: 'upload_file', label: '上传需求文件', actionType: 'send_message', requiresConfirm: false },
+        { id: 'query_projects', label: '查看我的项目', actionType: 'open_project_list', requiresConfirm: false },
+        { id: 'lookup_customer', label: '检索客户主体', actionType: 'company_lookup', requiresConfirm: false },
+      ]
+    } else if (/我之前.*项目|创建过哪些项目|我的项目/.test(userText)) {
+      intent = 'wes_data_query'
+    } else if (hasAttachment) {
+      intent = 'attachment_qa'
+      suggestedActions = [{ id: 'generate_requirement_report', label: '生成需求解析报告', actionType: 'generate_requirement_report', requiresConfirm: false }]
+    }
+    const answer = `模型回复：${userText || '收到'}`
     const attachments = []
     const messages = (body.messages || []).map((message, index) => {
       const attachmentIds = (message.attachments || []).map((attachment, attachmentIndex) => {
@@ -413,10 +432,13 @@ export const handlers = [
     return HttpResponse.json({
       success: true,
       data: {
+        intent,
         answer,
         businessRole: 'pre_sales',
         roleLabel: '售前顾问',
         model: 'kimi-k2.5',
+        suggestedActions,
+        trace: { intentConfidence: 0.8, routingRule: 'mock', contextRefs: [] },
         session: {
           sessionId: body.sessionId || 'session-new',
           title: 'AI 工作台会话',
@@ -470,8 +492,75 @@ export const handlers = [
   http.get(`${BASE}/reviews`, () => HttpResponse.json({ success: true, data: [] })),
 
   http.get(`${BASE}/system/version-code-rules`, () => HttpResponse.json({ success: true, data: mockSystemRules })),
-  http.get(`${BASE}/system/requirement-settings`, () => HttpResponse.json({ success: true, data: { models: [{ name: 'KIMI 评估', status: 'online' }], apiKey: 'sk-test' } })),
+  http.get(`${BASE}/system/role-capabilities`, () => HttpResponse.json({
+    success: true,
+    data: {
+      roles: [
+        { role: 'admin', capabilities: ['estimates:create', 'estimates:read', 'estimates:write', 'system:manage', 'user:manage'] },
+        { role: 'presales', capabilities: ['estimates:create', 'estimates:read', 'contract:initiate'] },
+        { role: 'pm', capabilities: ['estimates:read', 'assessment:handoff', 'deliverable:generate'] },
+      ],
+      legacyMapping: [
+        { legacyRole: 'admin', label: '超级管理员', v2Roles: ['admin'] },
+        { legacyRole: 'sub_admin', label: '管理员', v2Roles: ['admin', 'presales'] },
+        { legacyRole: 'user', label: '普通用户', v2Roles: ['presales', 'pm'] },
+      ],
+      capabilityLabels: {
+        'estimates:create': '创建评估包',
+        'estimates:read': '查看评估包',
+        'estimates:write': '编辑评估包',
+        'contract:initiate': '发起合同',
+        'assessment:handoff': '交接评估包',
+        'deliverable:generate': '生成交付物',
+        'system:manage': '系统管理',
+        'user:manage': '管理用户',
+      },
+    },
+  })),
+  http.get(`${BASE}/system/requirement-settings`, () => HttpResponse.json({ success: true, data: {
+    version: 1,
+    draft: {
+      kimiEvaluation: { enabled: true, model: 'kimi-k2.5', temperature: 0.3, maxTokens: 4000, timeoutMs: 120000, fallbackToRule: true, promptProfile: 'default', promptTemplate: '' },
+      fileParsing: { enabled: true, model: 'kimi-k2.6', allowedExtensions: ['.xlsx', '.xls', '.csv'], maxFileSizeMb: 20, maxSheetCount: 20, strictMode: false, ocrEnabled: false },
+      kimiGeneration: { enabled: true, model: 'kimi-k2.5', temperature: 0.5, maxTokens: 6000, outputStyle: 'balanced', includeRiskHints: true, includeAssumptions: true },
+      kimiCredentials: { apiKey: '', hint: null, envFallbackAvailable: false, resolvedFrom: 'none' },
+    },
+    active: {
+      kimiEvaluation: { enabled: true, model: 'kimi-k2.5', temperature: 0.3, maxTokens: 4000, timeoutMs: 120000, fallbackToRule: true, promptProfile: 'default', promptTemplate: '' },
+      fileParsing: { enabled: true, model: 'kimi-k2.6', allowedExtensions: ['.xlsx', '.xls', '.csv'], maxFileSizeMb: 20, maxSheetCount: 20, strictMode: false, ocrEnabled: false },
+      kimiGeneration: { enabled: true, model: 'kimi-k2.5', temperature: 0.5, maxTokens: 6000, outputStyle: 'balanced', includeRiskHints: true, includeAssumptions: true },
+      kimiCredentials: { apiKey: '', hint: null, envFallbackAvailable: false, resolvedFrom: 'none' },
+    },
+    updatedAt: '2026-01-15T08:00:00Z',
+    effectiveAt: '2026-01-15T08:00:00Z',
+  } })),
+  http.patch(`${BASE}/system/requirement-settings/draft`, async ({ request }) => {
+    const body = await request.json()
+    return HttpResponse.json({ success: true, data: { version: 2, draft: body, updatedAt: new Date().toISOString() } })
+  }),
+  http.get(`${BASE}/system/knowledge-base-config`, () => HttpResponse.json({ success: true, data: {
+    version: 1,
+    draft: {
+      model: 'glm-4.6',
+      apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+      credentials: { apiKey: '', apiHint: null, knowledgeId: '' },
+    },
+    active: {
+      model: 'glm-4.6',
+      apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+      credentials: { apiKey: '', apiHint: null, knowledgeId: '', resolvedFrom: 'none' },
+    },
+    updatedAt: '2026-01-15T08:00:00Z',
+    effectiveAt: '2026-01-15T08:00:00Z',
+  } })),
+  http.patch(`${BASE}/system/knowledge-base-config/draft`, async ({ request }) => {
+    const body = await request.json()
+    return HttpResponse.json({ success: true, data: { version: 2, draft: body, updatedAt: new Date().toISOString() } })
+  }),
+  http.post(`${BASE}/system/knowledge-base-config/activate`, () => HttpResponse.json({ success: true, data: { version: 2 } })),
+  http.post(`${BASE}/system/knowledge-base-config/test`, () => HttpResponse.json({ success: true, data: { ok: true, testedSource: 'mock', retrievalTriggered: true } })),
   http.get(`${BASE}/system/implementation-dependency-rules`, () => HttpResponse.json({ success: true, data: mockDslRules })),
+  http.get(`${BASE}/harness/test-results`, () => HttpResponse.json({ success: true, data: { items: [] } })),
   http.get(`${BASE}/templates`, () => HttpResponse.json({ success: true, data: [{ templateId: 'T1', templateName: '实施评估标准版', description: '标准模板', tags: ['标准'] }] })),
   http.post(`${BASE}/system/version-code-rules/:id/activate`, () => HttpResponse.json({ success: true, data: {} })),
 

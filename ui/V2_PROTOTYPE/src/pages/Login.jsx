@@ -1,8 +1,18 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { apiClient } from '../api/client.js'
 import { unwrap } from '../api/utils.js'
 import useAuth from '../hooks/useAuth.js'
+
+const RECENT_USERS_KEY = 'wes_recent_users'
+const MAX_RECENT = 5
+
+function loadRecentUsers() {
+  try { return JSON.parse(localStorage.getItem(RECENT_USERS_KEY)) || [] } catch { return [] }
+}
+function saveRecentUsers(list) {
+  localStorage.setItem(RECENT_USERS_KEY, JSON.stringify(list))
+}
 
 export default function Login() {
   const [mode, setMode] = useState('login')
@@ -15,19 +25,71 @@ export default function Login() {
   const [resetLoading, setResetLoading] = useState(false)
   const [resetMessage, setResetMessage] = useState('')
   const [resetLink, setResetLink] = useState('')
+  const [recentUsers, setRecentUsers] = useState([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef(null)
+  const usernameInputRef = useRef(null)
   const { login, register, loading, error } = useAuth()
+
+  useEffect(() => {
+    setRecentUsers(loadRecentUsers())
+  }, [])
+
+  useEffect(() => {
+    if (!showDropdown) return
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showDropdown])
+
+  const addRecentUser = (uname, pwd) => {
+    const filtered = recentUsers.filter((u) => u.username !== uname)
+    const entry = { username: uname, password: pwd || null, ts: Date.now() }
+    const next = [entry, ...filtered].slice(0, MAX_RECENT)
+    setRecentUsers(next)
+    saveRecentUsers(next)
+  }
+
+  const removeRecentUser = (uname) => {
+    const next = recentUsers.filter((u) => u.username !== uname)
+    setRecentUsers(next)
+    saveRecentUsers(next)
+  }
+
+  const clearRecentUsers = () => {
+    setRecentUsers([])
+    saveRecentUsers([])
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const result = mode === 'login'
-      ? await login(username.trim(), password, rememberMe)
-      : await register(username.trim(), password, email.trim(), inviteCode.trim())
-
-    if (result.success && mode === 'register') {
-      setMode('login')
-      setPassword('')
-      setInviteCode('')
+    if (mode !== 'login') {
+      const result = await register(username.trim(), password, email.trim(), inviteCode.trim())
+      if (result.success) {
+        setMode('login')
+        setPassword('')
+        setInviteCode('')
+      }
+      return
     }
+    const result = await login(username.trim(), password, rememberMe)
+    if (result.success) {
+      addRecentUser(username.trim(), rememberMe ? password : null)
+    }
+  }
+
+  const handleSelectUser = (entry) => {
+    setUsername(entry.username)
+    if (entry.password) {
+      setPassword(entry.password)
+      setRememberMe(true)
+    }
+    setShowDropdown(false)
+    if (usernameInputRef.current) usernameInputRef.current.focus()
   }
 
   const requestReset = async () => {
@@ -70,7 +132,48 @@ export default function Login() {
           {mode === 'register' && (
             <input className="input" type="email" placeholder="邮箱" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
           )}
-          <input className="input" type="text" placeholder="用户名" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+          <div ref={dropdownRef} style={{ position: 'relative' }}>
+            <input
+              ref={usernameInputRef}
+              className="input"
+              type="text"
+              placeholder="用户名"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onFocus={() => { if (recentUsers.length > 0) setShowDropdown(true) }}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }}
+            />
+            {showDropdown && recentUsers.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: '#fff', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', boxShadow: 'var(--shadow-3)', zIndex: 10, overflow: 'hidden' }}>
+                {recentUsers.map((u) => (
+                  <div
+                    key={u.username}
+                    onClick={() => handleSelectUser(u)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--ink-1)', transition: 'background .15s' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--brand-soft)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.username}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeRecentUser(u.username) }}
+                      style={{ border: 0, background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+                      title="移除"
+                    >×</button>
+                  </div>
+                ))}
+                {recentUsers.length > 1 && (
+                  <div
+                    onClick={clearRecentUsers}
+                    style={{ borderTop: '1px solid var(--line)', padding: '6px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', transition: 'background .15s' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--brand-soft)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >清除全部记录</div>
+                )}
+              </div>
+            )}
+          </div>
           <input className="input" type="password" placeholder="密码" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14, borderColor: 'var(--brand)', boxShadow: 'var(--shadow-focus)' }} />
           {mode === 'register' && (
             <input className="input" type="text" placeholder="邀请码（必填）" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />

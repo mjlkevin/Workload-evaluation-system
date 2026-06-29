@@ -2,6 +2,25 @@ import { useCallback, useState } from 'react'
 import { apiClient } from '../api/client.js'
 import { unwrap } from '../api/utils.js'
 
+const ACTIVE_SESSION_STORAGE_KEY = 'wes-ai-active-session-id'
+
+function readStoredActiveSessionId() {
+  try {
+    return window.localStorage?.getItem(ACTIVE_SESSION_STORAGE_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+function writeStoredActiveSessionId(sessionId) {
+  try {
+    if (sessionId) window.localStorage?.setItem(ACTIVE_SESSION_STORAGE_KEY, sessionId)
+    else window.localStorage?.removeItem(ACTIVE_SESSION_STORAGE_KEY)
+  } catch {
+    // Local storage is a convenience cache; failure must not block the workbench.
+  }
+}
+
 function normalizeSessions(payload) {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.items)) return payload.items
@@ -13,6 +32,16 @@ export function useAiSessions() {
   const [sessions, setSessions] = useState([])
   const [activeSession, setActiveSession] = useState(null)
   const [loadingSessions, setLoadingSessions] = useState(false)
+  const [sessionsError, setSessionsError] = useState('')
+
+  const selectActiveSession = useCallback((session) => {
+    writeStoredActiveSessionId(session?.sessionId || '')
+    setActiveSession(session || null)
+  }, [])
+
+  const clearSessionsError = useCallback(() => {
+    setSessionsError('')
+  }, [])
 
   const upsertSession = useCallback((session) => {
     if (!session?.sessionId) return
@@ -20,11 +49,12 @@ export function useAiSessions() {
       const next = prev.filter((item) => item.sessionId !== session.sessionId)
       return [session, ...next]
     })
-    setActiveSession(session)
-  }, [])
+    selectActiveSession(session)
+  }, [selectActiveSession])
 
   const loadSessions = useCallback(async (params = {}) => {
     setLoadingSessions(true)
+    setSessionsError('')
     try {
       const payload = await apiClient.get('/ai-sessions', {
         domain: 'business_evaluation',
@@ -32,8 +62,20 @@ export function useAiSessions() {
       }, { suppressUnauthorizedRedirect: true })
       const items = normalizeSessions(unwrap(payload))
       setSessions(items)
-      setActiveSession((current) => current || items[0] || null)
+      setActiveSession((current) => {
+        const storedId = readStoredActiveSessionId()
+        const restored = items.find((item) => item.sessionId === storedId)
+        const next = current && items.some((item) => item.sessionId === current.sessionId)
+          ? current
+          : (restored || items[0] || null)
+        writeStoredActiveSessionId(next?.sessionId || '')
+        return next
+      })
       return items
+    } catch (err) {
+      const message = `AI 会话加载失败：${err.message || '请求失败'}`
+      setSessionsError(message)
+      throw err
     } finally {
       setLoadingSessions(false)
     }
@@ -55,7 +97,13 @@ export function useAiSessions() {
     if (!sessionId) return false
     await apiClient.delete(`/ai-sessions/${sessionId}`, { suppressUnauthorizedRedirect: true })
     setSessions((prev) => prev.filter((item) => item.sessionId !== sessionId))
-    setActiveSession((current) => (current?.sessionId === sessionId ? null : current))
+    setActiveSession((current) => {
+      if (current?.sessionId === sessionId) {
+        writeStoredActiveSessionId('')
+        return null
+      }
+      return current
+    })
     return true
   }, [])
 
@@ -63,10 +111,12 @@ export function useAiSessions() {
     sessions,
     activeSession,
     loadingSessions,
+    sessionsError,
+    clearSessionsError,
     loadSessions,
     createSession,
     deleteSession,
     upsertSession,
-    setActiveSession,
+    setActiveSession: selectActiveSession,
   }
 }

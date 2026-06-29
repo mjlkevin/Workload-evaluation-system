@@ -5,7 +5,7 @@ export default function SessionRail({ sessions = [], activeSessionId, onSelect, 
         <b style={{ fontSize: 13 }}>会话</b>
         <button type="button" className="btn btn-out" onClick={onNew} style={{ marginLeft: 'auto', height: 28, minWidth: 34 }} aria-label="新建会话" title="新建会话">＋</button>
       </div>
-      <div style={{ padding: 10, display: 'grid', gap: 8 }}>
+      <div className="ai-session-list" style={{ padding: 10, display: 'grid', gap: 8, maxHeight: 240, overflowY: 'auto', minHeight: 0 }}>
         {sessions.length ? sessions.map((session) => {
           const active = activeSessionId === session.sessionId
           const title = session.title || '未命名会话'

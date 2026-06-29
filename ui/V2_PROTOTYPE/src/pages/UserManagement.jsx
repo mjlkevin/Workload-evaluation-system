@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
 import useUsers, { BUSINESS_ROLES, businessRoleLabel } from '../hooks/useUsers.js'
+import useRoleCapabilities from '../hooks/useRoleCapabilities.js'
 import { apiClient } from '../api/client.js'
 
 const INITIAL_USERS = [
@@ -19,6 +20,13 @@ const ROLES = [
 
 export default function UserManagement() {
   const { users: loadedUsers } = useUsers({ fallbackData: INITIAL_USERS })
+  const {
+    legacyMapping,
+    capabilityLabels,
+    loading: roleCapsLoading,
+    error: roleCapsError,
+  } = useRoleCapabilities()
+  const [showRoleCaps, setShowRoleCaps] = useState(false)
   const [users, setUsers] = useState(loadedUsers)
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
@@ -469,6 +477,79 @@ export default function UserManagement() {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* RP-026: 角色能力矩阵（可折叠） */}
+      <div className="section" style={{ marginTop: 12 }}>
+        <button
+          type="button"
+          aria-expanded={showRoleCaps}
+          aria-controls="role-capability-panel"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 18px',
+            background: 'var(--bg-soft)',
+            border: 0,
+            borderBottom: '1px solid var(--line)',
+            cursor: 'pointer',
+            fontSize: 12,
+            textAlign: 'left',
+          }}
+          onClick={() => setShowRoleCaps((v) => !v)}
+        >
+          <span style={{ fontWeight: 600, color: 'var(--ink)' }}>角色能力矩阵</span>
+          {roleCapsLoading && <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>加载中…</span>}
+          {roleCapsError && <span style={{ color: 'var(--err)', fontSize: 11 }}>加载失败</span>}
+          <span style={{ marginLeft: 'auto', color: 'var(--ink-3)', fontSize: 11 }}>{showRoleCaps ? '▾ 收起' : '▸ 展开'}</span>
+        </button>
+        {showRoleCaps && !roleCapsLoading && !roleCapsError && legacyMapping.length > 0 && (
+          <div id="role-capability-panel" style={{ padding: '12px 18px', display: 'grid', gap: 10 }}>
+            {legacyMapping.map((item) => (
+              <div key={item.legacyRole} style={{ fontSize: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--ink)' }}>
+                  {item.label}
+                  <span style={{ fontWeight: 400, color: 'var(--ink-3)', marginLeft: 6, fontSize: 11 }}>
+                    {item.legacyRole}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {(item.v2Roles || []).map((v2Role) => (
+                    <span
+                      key={v2Role}
+                      className="bdg brd"
+                      style={{ fontSize: 10.5, padding: '1px 6px' }}
+                    >
+                      {v2Role}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {Object.keys(capabilityLabels).length > 0 && (
+              <details style={{ fontSize: 11, color: 'var(--ink-2)' }}>
+                <summary style={{ cursor: 'pointer', color: 'var(--ink-3)', marginBottom: 4 }}>
+                  能力位说明（{Object.keys(capabilityLabels).length} 项）
+                </summary>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '2px 12px' }}>
+                  {Object.entries(capabilityLabels).map(([key, label]) => (
+                    <div key={key} style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5 }}>
+                      <span style={{ color: 'var(--ink)' }}>{label}</span>
+                      <span style={{ color: 'var(--ink-3)', marginLeft: 4 }}>{key}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+        {showRoleCaps && roleCapsError && (
+          <div id="role-capability-panel" style={{ padding: '12px 18px', fontSize: 12, color: 'var(--err)' }}>
+            角色能力矩阵加载失败，请稍后重试
+          </div>
+        )}
       </div>
 
       {/* 改系统角色 dialog */}
