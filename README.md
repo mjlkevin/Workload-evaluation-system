@@ -154,7 +154,9 @@ npm run dev:web
 
 ## 文档入口
 
-- **AI Session 入口**：`CLAUDE.md`（架构规则、约定、新 session 必读清单）
+- **Codex 项目入口**：`codex-project-registry.md`（正确路径、禁止路径、验证命令、子代理分工）
+- **AI Session 入口**：`AGENTS.md`（架构规则、约定、新 session 必读清单）；`CLAUDE.md` 仅保留为兼容入口并指向 `AGENTS.md`
+- **Codex 工作流模板**：`docs/codex-workflows/`（需求反馈去重、长文档/Skill 交叉检查、外部 AI 回填、API 密钥验证）
 - **前端迭代明细**：`04_开发实现/前端/前端迭代日志.md`
 - **项目现状总结（2026-03-30）**：`docs/PROJECT_STATUS_2026-03-30.md`
 - **项目进展与后续规划（推荐阅读）**：`00_项目治理/里程碑与计划/项目进展总结与后续规划.md`

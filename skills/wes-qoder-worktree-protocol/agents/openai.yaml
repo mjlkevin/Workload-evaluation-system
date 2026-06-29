@@ -1,0 +1,4 @@
+interface:
+  display_name: "WES Qoder Worktree Protocol"
+  short_description: "Qoder 在 WES 中使用隔离 worktree 执行需求池任务的协作协议。"
+  default_prompt: "在 WES 项目中执行 Qoder 需求池或 Loop 任务前，使用该 Skill 建立 worktree contract、执行边界、验证和回填协议。"

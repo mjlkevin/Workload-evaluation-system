@@ -1,0 +1,4 @@
+interface:
+  display_name: "WES Multi-Agent Collaboration"
+  short_description: "Coordinate WES agent assignments, NightOps, peer audit, and handoffs"
+  default_prompt: "Use $wes-multi-agent-collaboration to coordinate WES multi-agent work with task classification, registry status, assignment gates, Night Mission Packets, Qoder execution handoffs, KIMICODE peer audit, Codex Gate decisions, isolated worktrees, rework rules, conflict rules, and board synchronization."

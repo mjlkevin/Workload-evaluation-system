@@ -7,8 +7,7 @@
 | 页面 | 职责 | 必须更新的典型字段 |
 |---|---|---|
 | `index.html` | 总览入口，展示当前阶段、KPI、文档资产和关键状态。 | phase label、hero pill、trust strip、KPI、文档数量、下一步入口、页脚日期。 |
-| `requirements.html` | 升级需求池与治理台账，不是业务系统正式需求模块。 | 需求 ID、标题、来源、类型、优先级、phase、状态、范围、验收证据、下一步。 |
-| `requirements-editor.html` | 需求池可编辑静态工具页，维护预置需求 seed。 | 与 `requirements.html` 同步的 seed 数据、状态枚举、导入导出字段。 |
+| `requirements.html` | 升级需求池与治理台账，不是业务系统正式需求模块；2026-06-26 起作为唯一需求池页面。 | 需求 ID、标题、来源、类型、优先级、phase、状态、范围、验收证据、下一步。 |
 | `design.html` | 产品/技术方案、边界、工作台形态、权限和数据追溯口径。 | 新设计决策、实现事实、暂不进入范围、相关文档链接。 |
 | `design-architecture.html` | 架构专题，承接更细的模块、运行、数据、接口边界。 | 模块边界、路由/数据流、存储策略、权限边界、依赖。 |
 | `runtime.html` | Harness/Agent 任务运行时专题。 | source、execution、artifact、delivery、knowledge boundary、后续 runtime 优化项。 |
@@ -23,7 +22,7 @@
 
 | 生命周期事件 | 主页面 | 辅助页面 |
 |---|---|---|
-| 新需求录入 | `requirements.html` | `requirements-editor.html`, `plan.html`, `changes.html` |
+| 新需求录入 | `requirements.html` | `plan.html`, `changes.html` |
 | 需求优先级/范围变化 | `requirements.html` | `plan.html`, `risks.html`, `changes.html` |
 | 设计方案创建/修订 | `design.html` | `design-architecture.html`, `sources.html`, `risks.html`, `changes.html` |
 | 架构边界变化 | `design-architecture.html` | `risks.html`, `monitoring.html`, `changes.html` |

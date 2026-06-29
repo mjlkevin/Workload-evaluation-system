@@ -37,6 +37,18 @@ Use this Skill when the user message contains or clearly implies any of these si
 3. **Information insufficient**: ask the minimum necessary follow-up before writing. Typical missing fields are affected page, expected behavior, actual behavior, reproduction condition, or priority signal.
 4. **Implementation request explicitly included**: if the user asks to fix it now, record the requirement first, then proceed with normal implementation workflow.
 
+## Deduplication Gate
+
+Before adding a new RP, search existing demand-pool and change-log entries for the same page, module, symptom, screenshot wording, action, or error phrase. Use `docs/codex-workflows/wes-feedback-intake.md` as the executable template.
+
+If a match exists:
+
+1. **Same fact and same scope**: do not create a new RP. Add evidence/comment/status detail to the existing RP and record the intake in `changes.html` only when the new evidence is material.
+2. **Same RP but broader scope**: update the existing RP's scope, impact, acceptance口径, priority, and next step as needed.
+3. **Related but independent behavior**: create a new RP and cross-reference the related RP in the focused analysis section.
+
+The final response must state the dedup result: `命中 RP-XXX` or `未命中，新增 RP-XXX`.
+
 ## Required Analysis Fields
 
 Every recorded item should include:
@@ -61,14 +73,14 @@ Minimum board updates:
 
 1. `03_技术设计/系统架构/WES-Agent-升级总看板/requirements.html`
    - Add the requirement to the status board, ledger, breakdown matrix, planning view, and a focused analysis section when the item needs context for later planning.
-2. `03_技术设计/系统架构/WES-Agent-升级总看板/requirements-editor.html`
-   - Add the same item to `DEFAULT_DATA` so the editable demand-pool seed stays aligned.
-3. `03_技术设计/系统架构/WES-Agent-升级总看板/plan.html`
+2. `03_技术设计/系统架构/WES-Agent-升级总看板/plan.html`
    - Add to the follow-up task pool when it affects phase planning or iteration grouping.
-4. `03_技术设计/系统架构/WES-Agent-升级总看板/changes.html`
+3. `03_技术设计/系统架构/WES-Agent-升级总看板/changes.html`
    - Record the intake event and status.
-5. `risks.html` or `testing.html`
+4. `risks.html` or `testing.html`
    - Update only when the item creates a material risk, test case, or validation result. Do not invent test results.
+
+`requirements-editor.html` was removed on 2026-06-26. Future agents update `requirements.html` directly and record status changes in `changes.html`.
 
 ## ID And Status Rules
 
