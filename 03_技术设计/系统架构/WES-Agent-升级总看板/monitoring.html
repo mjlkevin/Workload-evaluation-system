@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>监控与审计 · WES Agent 升级总看板</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/dashboard.css" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
 </head>
 <body>
   <header class="topnav">
@@ -23,8 +23,11 @@
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="requirements.html">需求池</a>
       </nav>
-      <span class="pill ok">Phase 1F delivered</span>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill brand">Phase 1H-C monitoring</span>
     </div>
   </header>
 
@@ -35,7 +38,7 @@
       <p class="meta">
         <span><b>目标</b> 证明 AI 编排可控、可回放、可追溯</span>
         <span><b>覆盖</b> 本地验证 / CI / 人工测试 / Harness / 传统草稿</span>
-        <span><b>状态</b> Phase 1F 回写监控已落地，人工测试待回填</span>
+        <span><b>状态</b> Phase 1F 回写监控已落地；历史需求池迭代 Loop <code class="inline">wes-loop</code> 曾完成 RP-004/RP-005/RP-002/RP-007 与反幻觉批次；Codex 侧 heartbeat 已删除，持续 Loop 改由 Qoder 执行；2026-06-29 Codex 已复核 Qoder 集成的 RP-027/RP-028/RP-029/RP-030/RP-031/RP-026/RP-033，并补 RP-029 知识库 fallback 流式最终内容修复；自动化基线已扩展到 modules 142/142、AI 190/190、agent 25/25、harness 70/70、V2 96/96、API/Web build pass；模型成本、失败分类与真实外部配置仍进入监控候选</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">tests green</span>
@@ -43,6 +46,7 @@
         <span class="pill ok">Phase 1F audit write-back</span>
         <span class="pill brand">toolEvent trace</span>
         <span class="pill">artifact replay</span>
+        <span class="pill warn">Codex loop disabled</span>
       </div>
     </div>
   </header>
@@ -60,6 +64,7 @@
         <li><b>§7</b> 草稿追溯</li>
         <li><b>§8</b> 后续指标</li>
         <li><b>§9</b> Trace 留存策略</li>
+        <li><b>§10</b> 需求池 Loop 监控</li>
       </ol>
     </div>
 
@@ -80,14 +85,19 @@
       <h2>验证快照</h2>
       <table>
         <tr><th>命令</th><th>结果</th><th>覆盖范围</th></tr>
-        <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>62 pass</span></td><td>Harness usecase、route、confirm、幂等、阶段边界、传统评估追溯、人工确认回写与并发确认锁。</td></tr>
-        <tr><td class="mono">npm run test:modules -w apps/api</td><td><span class="status done"><span class="dot"></span>66 pass</span></td><td>auth、versions、ai sessions、project-evaluations 与确认接口路由/controller 等模块。</td></tr>
+        <tr><td class="mono">Codex 复核 · Qoder RP-027~033 集成验证矩阵</td><td><span class="status done"><span class="dot"></span>全量通过</span></td><td>2026-06-29：<code class="inline">chat.service.test.ts</code> 15/15、<code class="inline">trace.test.ts</code> 25/25、RAG/knowledge focused 19/19、Provider/Kimi ping focused 12/12、<code class="inline">npm run build:api</code> pass、<code class="inline">npm run test:modules</code> 142/142、<code class="inline">npm run test:ai</code> 190/190、<code class="inline">npm run test:agent -w apps/api</code> 25/25、<code class="inline">npm run test:harness -w apps/api</code> 70/70、<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 96/96、<code class="inline">npm run build:web</code> pass。覆盖流式 dispatch、Trace 查询/写入、Kimi Provider、RAG chunks 复用、角色能力窄加载和会话滚动。</td></tr>
+        <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>70 pass</span></td><td>Harness usecase、route、confirm、幂等、阶段边界、传统评估追溯、人工确认回写、并发确认锁、人工测试结果接口，以及 RP-007 regression sample normalization / requirement_match_v1 评分规则。</td></tr>
+        <tr><td class="mono">npm run test:modules</td><td><span class="status done"><span class="dot"></span>142 pass</span></td><td>auth、versions、ai sessions、project-evaluations、AI 工作台 intent/dispatch、RP-013 formBlock 协议、RP-018 knowledge service、RP-029 流式最终内容、RP-030 trace、RP-031 RAG baseline、dispatch trace/session metadata，以及 RP-004 owner-scoped 状态汇总、RP-002 附件问答 trace.modelRun。</td></tr>
+        <tr><td class="mono">npm run build:api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>RP-018 知识库服务、RP-004 WES 数据查询扩展、RP-002 trace.modelRun 轻量审计、RP-007 Harness regression 评分模块、意图路由、dispatch trace、session metadata、RP-013 后端协议、OpenAPI 对齐后的 API TypeScript 编译。</td></tr>
         <tr><td class="mono">npm run build -w apps/api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>后端 TypeScript 构建。</td></tr>
-        <tr><td class="mono">npm run test:agent -w apps/api</td><td><span class="status done"><span class="dot"></span>21 pass</span></td><td>Agent 工具调用、权限过滤、路由行为。</td></tr>
-        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>64 pass</span></td><td>AI Home、AI 草稿列表/详情、登录、用户管理、业务 hook。</td></tr>
+        <tr><td class="mono">npm run test:agent -w apps/api</td><td><span class="status done"><span class="dot"></span>25 pass</span></td><td>Agent 工具调用、权限过滤、Provider tool calling 与路由行为。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>96 pass</span></td><td>AI Home、AI 草稿列表/详情、登录、用户管理、业务 hook、Phase 1H-B 布局优化、RP-020 引导选项、RP-013 formBlock 交互、RP-018 knowledgeTool trace chip、RP-019 右侧工作区折叠/Markdown 安全渲染、RP-032 工作流模板可达性、RP-033 会话列表滚动，以及 RP-005 产物工作区时间线回归。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE -- HomeWorkspace.test.jsx</td><td><span class="status done"><span class="dot"></span>49 pass</span></td><td>RP-018 前端 trace chip、RP-019 右侧工作区折叠/Markdown 表格/sanitize、RP-032 工作流模板标签/滚动容器/选中态 aria-label、RP-033 会话列表滚动与 RP-005 产物工作区时间线聚焦测试。</td></tr>
+        <tr><td class="mono">RP-025 回归补丁验证</td><td><span class="status done"><span class="dot"></span>通过</span></td><td>覆盖 PRE_SALES <code class="inline">estimates:create</code>、项目创建路由 <code class="inline">estimates:create/write</code> 任一放行、AI 工作台 suggested action 403 可见错误、简短问候 <code class="inline">greeting_keywords</code> 本地路由。证据：targeted API 77 pass、HomeWorkspace 46 pass、test:ai 190 pass、test:web 90 pass、build:api/web pass；<code class="inline">test:modules</code> 仍有 RP-018 知识库工具既有失败 5 项。</td></tr>
         <tr><td class="mono">npm run build --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>Vite 构建；仍有既有 chunk size warning。</td></tr>
-        <tr><td class="mono">node --test apps/api/dist/engine.test.js</td><td><span class="status done"><span class="dot"></span>8 pass</span></td><td>规则引擎逻辑；当前沙箱下 <code class="inline">npm run test:rules</code> 被 tsx IPC pipe 权限限制阻断。</td></tr>
-        <tr><td class="mono">npm run test:integration</td><td><span class="status warn"><span class="dot"></span>blocked</span></td><td>当前沙箱下 <code class="inline">tsx --test src/integration.test.ts</code> 在 IPC pipe 创建阶段 EPERM，未进入业务断言。</td></tr>
+        <tr><td class="mono">npm run test:rules -w apps/api</td><td><span class="status done"><span class="dot"></span>8 pass</span></td><td>规则引擎逻辑。</td></tr>
+        <tr><td class="mono">npm run test:integration -w apps/api</td><td><span class="status done"><span class="dot"></span>1 pass</span></td><td>API 集成烟测。</td></tr>
+        <tr><td class="mono">Napkin API smoke test</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>RP-024 外部视觉工具最小调用：<code class="inline">POST /v1/visual</code> 返回 201，requestId <code class="inline">dad79438-d3a5-4234-bf91-63ff410abce1</code>；第 2 次轮询 <code class="inline">completed</code>；下载 SVG 返回 200，<code class="inline">image/svg+xml</code>，13934 bytes。API Key 仅运行时使用，未写入看板。</td></tr>
       </table>
     </section>
 
@@ -189,6 +199,7 @@ harness_tool_events
         <div class="card"><span class="pill warn">Workflow</span><h3>草稿确认转化率</h3><p>v2 报告生成后，用户点击 nextAction、进入草稿、完成确认的漏斗。</p></div>
         <div class="card"><span class="pill ok">Audit</span><h3>追溯完整率</h3><p>抽样检查 ToolEvent output 与传统草稿链接是否可互相追溯。</p></div>
         <div class="card"><span class="pill brand">Runtime</span><h3>边界完整率</h3><p>抽样检查 Harness Run 是否具备 source、execution、artifact、delivery 和 knowledge reference 的最小闭环。</p></div>
+        <div class="card"><span class="pill warn">Model Cost</span><h3>Kimi 调用成本与失败分类</h3><p>按模型、场景、cache key、thinking 策略和失败类型统计 token、缓存命中、JSON fallback 与上游错误。</p></div>
       </div>
       <table style="margin-top:18px">
         <tr><th>指标</th><th>含义</th><th>用途</th></tr>
@@ -196,6 +207,7 @@ harness_tool_events
         <tr><td>LLM 调用完成率</td><td>上传文件后是否真实创建 modelRun，并得到 schema 校验后的 artifact。</td><td>防止 AI 工作台退化成纯代码拼装的“秒回假分析”。</td></tr>
         <tr><td>人工答案覆盖率</td><td>v1 缺失项中有多少被用户补充并进入 v2 answeredQuestions。</td><td>衡量高交互式工作流是否有效。</td></tr>
         <tr><td>模块/需求匹配度</td><td>模型识别出的模块和需求与人工标准答案的匹配比例。</td><td>作为 Harness Regression 的核心质量指标。</td></tr>
+        <tr><td>Kimi Provider 成本与稳定性</td><td>按场景记录 model、prompt/completion tokens、cacheKey 策略、thinking、responseFormat、fallbackReason、batchRunId 和上游错误分类。</td><td>支撑 RP-027 模型升级后“降本提质”是否真实发生，并快速定位余额不足、限流、参数不兼容或模型不可用。</td></tr>
       </table>
     </section>
 
@@ -212,8 +224,62 @@ harness_tool_events
       </table>
     </section>
 
+    <section>
+      <div class="h-num">Section 10</div>
+      <h2>需求池 Loop 监控（Codex 已停用）</h2>
+      <p class="lead">Codex heartbeat 自动化 <code class="inline">wes-loop</code> 已删除；本页保留历史执行证据，并记录后续持续 Loop 转交 Qoder。Qoder 已安装 <code class="inline">wes-qoder-worktree-protocol</code>，监控重点从“唤醒次数”转为“每个外部 Loop 是否先给出任务级 Worktree Contract ACK，并在结束时回填目标、文件、验证、风险和看板同步证据”。</p>
+      <table>
+        <tr><th>监控点</th><th>目标记录</th><th>当前状态</th></tr>
+        <tr>
+          <td>自动化 ID</td>
+          <td><code class="inline">wes-loop</code></td>
+          <td><span class="status done"><span class="dot"></span>deleted / Qoder 接管持续 Loop；协议 Skill 已安装，等待首个任务级 Worktree ACK</span></td>
+        </tr>
+        <tr>
+          <td>Qoder 协议安装</td>
+          <td><code class="inline">QODER.md</code> + <code class="inline">skills/wes-qoder-worktree-protocol</code></td>
+          <td><span class="status done"><span class="dot"></span>2026-06-26：Qoder 回执 <code class="inline">status=installed</code>，承诺一任务一 worktree、ACK 前置、结构化 handoff、仅回填到“待 Codex 复核”。</span></td>
+        </tr>
+        <tr>
+          <td>Qoder Loop 第 1 轮</td>
+          <td>RP-032 · AI 工作台推荐工作流列表可达性与语义优化；worktree <code class="inline">/Users/kevin/AI/wes-rp032-workflow-accessibility</code>；branch <code class="inline">qoder/rp-032-workflow-accessibility</code></td>
+          <td><span class="status run"><span class="dot"></span>已回填 / Codex 复核自动化通过 / 待人工验收：Qoder worktree 缺少 node_modules，Codex 在相同文件状态主 checkout 复跑 <code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 92 pass、<code class="inline">npm run build:web</code> pass；整 commit 含较多既有工作台变更，集成时需拆最小 patch 或基于当前 main 文件状态。</span></td>
+        </tr>
+        <tr>
+          <td>Qoder Loop R2-R7 复核</td>
+          <td>RP-033 / RP-026 / RP-027+028 / RP-029 / RP-030 / RP-031；worktree 分别为 <code class="inline">/Users/kevin/AI/wes-rp033-session-scroll</code>、<code class="inline">/Users/kevin/AI/wes-rp026-role-capability</code>、<code class="inline">/Users/kevin/AI/wes-rp027-028-kimi-provider</code>、<code class="inline">/Users/kevin/AI/wes-rp029-kimi-streaming</code>、<code class="inline">/Users/kevin/AI/wes-rp030-trace-schema</code>、<code class="inline">/Users/kevin/AI/wes-rp031-rag-baseline</code></td>
+          <td><span class="status warn"><span class="dot"></span>Codex 复核完成：RP-027/RP-028 原分支 <code class="inline">build:api</code> pass + <code class="inline">test:ai</code> 189/189，后续已由 clean patch 与 Codex 修复分支取代；RP-031 重复检索修复已验证，rag-baseline 11/11、knowledge-tool 8/8，但当前 <code class="inline">build:api</code> 被非 RAG 既有编译错误阻断；RP-033 原分支核心通过但叠加范围过大，后续 clean worktree 已收敛为 3 文件 patch 且通过 V2 全量 65/65 + build:web；RP-026 需补 mock/收敛加载副作用；RP-029/RP-030 已另行修复验证通过。RP-033 clean patch 当前未提交，集成前需提交或抽取最小 patch。</span></td>
+        </tr>
+        <tr>
+          <td>RP-027/RP-028 clean patch 复核</td>
+          <td>worktree <code class="inline">/Users/kevin/AI/wes-rp027-028-clean</code>；Qoder branch <code class="inline">qoder/rp-027-028-clean</code> commit <code class="inline">d5f2246</code>；Codex branch <code class="inline">codex/rp-027-028-clean-fix</code> commit <code class="inline">5226deb</code></td>
+          <td><span class="status done"><span class="dot"></span>Codex 修复验证通过：clean patch 已剔除 ZHIPU/env/file utils 旁路文件；Codex 修复 timeout retryable 未实际重试问题，补 K2 temperature 省略、max_completion_tokens、usage、quota、stream reasoning 测试。验证：provider 10/10、build:api、test:ai 189/189、test:modules 66/66。</span></td>
+        </tr>
+        <tr>
+          <td>Qoder R8 RP-029/RP-030 返工复核</td>
+          <td>worktree <code class="inline">/Users/kevin/AI/wes-rp029-030-rework</code>；Qoder branch <code class="inline">qoder/rp-029-030-streaming-trace-rework</code> commit <code class="inline">6e34390</code>；Codex 修复 branch <code class="inline">codex/rp-029-030-rework-fixes</code></td>
+          <td><span class="status done"><span class="dot"></span>Codex 修复验证通过：保留流式 dispatch 与 /traces 鉴权修复，并补齐测试 store 隔离、运行态 trace-store 删除、失败/abort failed/cancelled trace、SSE 成功/失败/断连测试。验证：<code class="inline">build</code> pass、<code class="inline">test:modules</code> 137/137、<code class="inline">test:ai</code> 189/189、<code class="inline">test:agent</code> 21/21、<code class="inline">test:harness</code> 62/62。</span></td>
+        </tr>
+        <tr>
+          <td>每轮选择依据</td>
+          <td>RP-ID、优先级、Phase、是否可独立验收、依赖关系。</td>
+          <td><span class="status done"><span class="dot"></span>2026-06-24：反幻觉四层防御批次；P1；Phase 1H-B；针对 Kimi 编造知识库文档的根因，实施显式知识库查询意图路由、fallback 文案重写、systemPrompt 反幻觉约束和前端来源区分；本轮完成 intent+knowledge focused 31 pass、V2 build pass</span></td>
+        </tr>
+        <tr>
+          <td>验证证据</td>
+          <td>对应测试/构建命令、人工测试 ID、失败诊断或跳过原因。</td>
+          <td><span class="status done"><span class="dot"></span>反幻觉四层防御批次：新增 4 条显式知识库查询路由测试，修复 1 条断言；<code class="inline">workbench-intent.service.test.ts</code> 26 pass，<code class="inline">knowledge-tool.service.test.ts</code> 5 pass；<code class="inline">npm run build --prefix ui/V2_PROTOTYPE</code> pass。</span></td>
+        </tr>
+        <tr>
+          <td>看板同步</td>
+          <td>requirements、plan、changes、testing、monitoring、risks、sources 中拥有事实的页面；requirements.html 是唯一需求池页面。</td>
+          <td><span class="status run"><span class="dot"></span>已同步 requirements、plan、changes、testing、monitoring、risks、sources、runtime、index；requirements-editor 已移除</span></td>
+        </tr>
+      </table>
+    </section>
+
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 监控与审计 · WES Agent 升级总看板 · 2026-06-21
+      <a href="index.html">返回总览</a> · 监控与审计 · WES Agent 升级总看板 · 2026-06-29
     </footer>
   </main>
 </body>

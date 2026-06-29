@@ -1,0 +1,3006 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>需求池 · WES Agent 升级总看板</title>
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-in">
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <nav class="navlinks" aria-label="主导航">
+        <a href="index.html">总览</a>
+        <a href="design.html">设计说明</a>
+        <a href="runtime.html">任务运行时</a>
+        <a href="plan.html">计划与进度</a>
+        <a href="testing.html">测试</a>
+        <a href="monitoring.html">监控与审计</a>
+        <a href="risks.html">风险与决策</a>
+        <a href="changes.html">变更记录</a>
+        <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a class="active" href="requirements.html">需求池</a>
+      </nav>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill brand">Backlog governance</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="doc-h">
+      <div class="wrap">
+        <div class="crumb">Backlog Governance</div>
+        <h1>需求池</h1>
+        <div class="meta">
+          <span><b>当前阶段</b> Phase 1H-B delivery baseline / Phase 1H-C planning</span>
+          <span><b>管理范围</b> 升级需求 / 技术债 / 审计项 / 测试项 / 后续候选</span>
+          <span><b>页面定位</b> 总看板唯一需求池页面，不是业务系统正式需求模块</span>
+          <span><b>更新日期</b> 2026-06-26</span>
+        </div>
+        <div class="pill-row" style="margin-top:18px">
+          <span class="pill brand">34 已登记需求</span>
+          <span class="pill ok">22 已交付</span>
+          <span class="pill warn">10 待规划/待确认</span>
+          <span class="pill">2 暂缓</span>
+          <span class="pill ok">可编辑子页面已移除</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI 总览 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">01 / Overview</div>
+          <h2>KPI 总览</h2>
+          <p>当前需求池整体状态一览。</p>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">T</span><span>总需求数</span></div>
+            <div class="v">34</div>
+            <div class="lb">已登记需求项</div>
+            <div class="bar"><i style="width:100%"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>已交付</span></div>
+            <div class="v">22</div>
+            <div class="lb">当前池内已交付</div>
+            <div class="bar"><i style="width:67%;background:var(--ok)"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">W</span><span>进行中 / 待实现</span></div>
+            <div class="v">10</div>
+            <div class="lb">已分析 / 待规划 / 待确认</div>
+            <div class="bar"><i style="width:29%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">C</span><span>暂缓 / 待评审</span></div>
+            <div class="v">2</div>
+            <div class="lb">需人工架构评审</div>
+            <div class="bar"><i style="width:6%;background:linear-gradient(90deg,var(--warn),var(--accent))"></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 需求生命周期 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">02 / Lifecycle</div>
+          <h2>需求生命周期</h2>
+          <p>每条需求从记录到归档经历七个节点，确保可追溯、可验收。</p>
+        </div>
+        <div class="lifecycle">
+          <div class="lifecycle-step">
+            <span class="ls-num">01</span>
+            <b>记录 Intake</b>
+            <small>来源、背景、触发人、原始描述</small>
+          </div>
+          <div class="lifecycle-step">
+            <span class="ls-num">02</span>
+            <b>分析 Analysis</b>
+            <small>业务价值、边界、影响范围、风险</small>
+          </div>
+          <div class="lifecycle-step">
+            <span class="ls-num">03</span>
+            <b>拆解 Breakdown</b>
+            <small>前端、后端、文档、测试、审计</small>
+          </div>
+          <div class="lifecycle-step">
+            <span class="ls-num">04</span>
+            <b>排期 Planning</b>
+            <small>归属 Phase、优先级、依赖</small>
+          </div>
+          <div class="lifecycle-step">
+            <span class="ls-num">05</span>
+            <b>实施 Delivery</b>
+            <small>关联文件、PR、commit、负责人</small>
+          </div>
+          <div class="lifecycle-step">
+            <span class="ls-num">06</span>
+            <b>验收 Validation</b>
+            <small>自动化/人工测试、审计提示词、结果</small>
+          </div>
+          <div class="lifecycle-step">
+            <span class="ls-num">07</span>
+            <b>归档 Archive</b>
+            <small>完成事实、交付证据、后续项</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 需求状态看板 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">03 / Status Board</div>
+          <h2>需求状态看板</h2>
+          <p>按状态分列展示当前需求池，卡片包含关键信息与下一步。</p>
+        </div>
+        <div class="backlog-board">
+          <div class="backlog-column">
+            <h4>已交付 · 22</h4>
+            <div class="backlog-card">
+              <span class="req-id">RP-002 / 004 / 005 / 007 / 018</span>
+              <h5>运行时与审计基础</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">Phase 1H-B</span>
+                <span class="pill">第一批/MVP 已交付</span>
+              </div>
+              <div class="bc-next">附件问答轻量审计、WES 数据查询、Artifact Workspace、Regression 样本规则、知识库工具 MVP 已进入交付基线；RP-018 仍保留真实 ZHIPU 配置人工验收回填项。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-003 / 006 / 008 / 009 / 010</span>
+              <h5>Loop 已确认交付项</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p2">P2</span>
+                <span class="pill">AI / Harness / 测试治理</span>
+                <span class="pill">已交付</span>
+              </div>
+              <div class="bc-next">模型意图分类兜底、多文件 Evidence 合并、客户主体消歧、报告卡片内联编辑、人工测试结果回填机制已从候选状态更新为已交付。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-011 / 013 / 014 / 015 / 016 / 017</span>
+              <h5>AI 工作台体验闭环</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">Phase 1H-A / 1H-B</span>
+                <span class="pill">已交付</span>
+              </div>
+              <div class="bc-next">检索主体弹窗、通用 formBlock 交互、自动滚动、输入框高度、创建后刷新和会话恢复已闭合。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-019 / 020 / 021 / 022 / 023 / 025</span>
+              <h5>消息渲染、系统配置与创建项目链路</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">Phase 1H-B</span>
+                <span class="pill">已交付</span>
+              </div>
+              <div class="bc-next">布局与 Markdown、引导选项、编号选项、模型配置保存、消息复制按钮和“创建项目”意图路由/权限回归补丁已交付。</div>
+            </div>
+          </div>
+          <div class="backlog-column">
+            <h4>待规划 / 待确认 · 9</h4>
+            <div class="backlog-card">
+              <span class="req-id">RP-024</span>
+              <h5>Napkin 视觉生成融合售前解决方案 PPT 页面</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">AI 能力 / 外部工具</span>
+                <span class="pill">待确认</span>
+              </div>
+              <div class="bc-next">确认客户数据出站合规、品牌样式、PPT 页面范围和 Harness 外部工具审计口径后再实施。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-026</span>
+              <h5>用户管理补充角色能力位配置与说明</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">权限治理</span>
+                <span class="pill">Codex 复核：需补测</span>
+              </div>
+              <div class="bc-next">Qoder 已回填只读能力矩阵。Codex 复核：build:api 通过，UserManagement 测试通过但出现未 mock 的 /system/role-capabilities 请求；前端复用 useSystemManagement 会额外加载模型、规则、模板等系统接口，需补最小 hook/测试后再验收。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-027</span>
+              <h5>Kimi API 模型升级与 Provider 成本优化</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">AI Provider</span>
+                <span class="pill">Codex 修复验证通过 / 待集成</span>
+              </div>
+              <div class="bc-next">Qoder clean 分支 <code class="inline">qoder/rp-027-028-clean</code> 已收敛为 5 个 Kimi Provider 核心文件；Codex 在 <code class="inline">codex/rp-027-028-clean-fix</code> 修复 timeout 标记 retryable 但未进入 retry loop 的缺口，并补 K2 参数、usage、quota、stream reasoning 专项断言。验证：provider 10/10、build:api、test:ai 189/189、test:modules 66/66。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-028</span>
+              <h5>Kimi Provider 稳定性增强：超时、重试与 Token 审计</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">AI Provider</span>
+                <span class="pill">Codex 修复验证通过 / 待集成</span>
+              </div>
+              <div class="bc-next">与 RP-027 合并回填：非流式超时 300s、timeout 纳入指数退避重试、usage 提取、quota 分类和 stream reasoning 覆盖已补专项测试。剩余验收为真实 Kimi 配置下的人工/运行态审计展示确认，验证时不得泄露 API Key。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-029</span>
+              <h5>Kimi 流式输出与 WES 实时响应功能模块</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">AI 能力</span>
+                <span class="pill">Codex 修复验证通过 / 待集成</span>
+              </div>
+              <div class="bc-next">Codex 在 <code class="inline">codex/rp-029-030-rework-fixes</code> 修复 R8 阻断：流式接口继续复用 dispatchHomeWorkbenchTurn，新增真实流式成功、provider 失败、client abort 三类 SSE/trace 测试；<code class="inline">npm run build -w apps/api</code>、<code class="inline">test:modules</code> 137/137、<code class="inline">test:ai</code> 189/189、<code class="inline">test:agent</code> 21/21、<code class="inline">test:harness</code> 62/62 通过。待集成到主线后再启动前端逐字渲染。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-030</span>
+              <h5>Agent Runtime 统一 Trace Schema 与查询入口</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">Runtime / 监控审计</span>
+                <span class="pill">Codex 修复验证通过 / 待集成</span>
+              </div>
+              <div class="bc-next">Codex 修复 trace 数据治理与异常闭环：trace repository 支持 <code class="inline">WES_TRACE_STORE_PATH</code> 测试隔离，运行态 trace-store JSON 已从提交中删除并加入 <code class="inline">.gitignore</code>；homeWorkbenchChat / stream 的失败和 client abort 会写入 failed/cancelled trace；RBAC 断言已按 PRE_SALES 当前能力矩阵校准。待最小 patch 集成。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-031</span>
+              <h5>RAG Baseline 与知识库评测闭环</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">知识库 / 质量评估</span>
+                <span class="pill done">重复检索修复已验证 / 待真实配置</span>
+              </div>
+              <div class="bc-next">RAG baseline runner 已改为复用 <code class="inline">trace.chunks</code>，每条样本只调用一次 queryFn，不再额外调用 retrieveKnowledgeChunks；Codex 复核 <code class="inline">rag-baseline-runner.test.ts</code> 11/11、<code class="inline">knowledge-tool.service.test.ts</code> 8/8。<code class="inline">build:api</code> 当前被 kimi-provider/system/dev-assessment 既有编译错误阻断，真实 ZHIPU 配置仍待人工验收。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-033</span>
+              <h5>AI 工作台会话列表容器滚动</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p2">P2</span>
+                <span class="pill">前端体验</span>
+                <span class="pill">clean patch 已验证 / 待提交集成</span>
+              </div>
+              <div class="bc-next">Qoder clean worktree <code class="inline">.worktrees/rp-033-clean</code> 已收敛为 3 文件 patch：SessionRail.jsx、index.css、HomeWorkspace.test.jsx。Codex 复核 diff scope 通过，<code class="inline">HomeWorkspace.test.jsx</code> 25/25、V2 全量 65/65、<code class="inline">build:web</code> pass；当前 patch 未提交，集成前需提交或抽取最小 patch，并做人工低高度滚动验收。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-032</span>
+              <h5>AI 工作台推荐工作流列表可达性与语义优化</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">前端体验 / 可达性</span>
+                <span class="pill">已回填 / 待人工验收</span>
+              </div>
+              <div class="bc-next">Qoder 已回填第一批：标题改为“工作流模板”、列表独立滚动、隐藏原生滚动条、选中态圆点与 aria-label/title；Codex 复核前端测试 92 pass、build:web pass，仍需桌面/窄屏人工验收。</div>
+            </div>
+          </div>
+          <div class="backlog-column">
+            <h4>暂缓 / 待人工评审 · 2</h4>
+            <div class="backlog-card">
+              <span class="req-id">RP-001</span>
+              <h5>Phase 1H 低代码 AI 工作流设计器</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">产品能力</span>
+                <span class="pill">暂缓</span>
+              </div>
+              <div class="bc-next">完整 scope 触发架构变更，需要先人工评审 MVP：JSON 声明式定义 + 预置模板 + orchestrator 接入主链路。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-012</span>
+              <h5>WES Skill 作为 AI 工作流辅助工具</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">产品能力</span>
+                <span class="pill">暂缓</span>
+              </div>
+              <div class="bc-next">Skill 治理框架、数据源边界、MVP scope 均需人工定义后再进入设计或实施。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 需求台账表格 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">04 / Ledger</div>
+          <h2>需求台账表格</h2>
+          <p>全字段台账视图，便于快速检索和审计追溯。</p>
+        </div>
+        <!-- 筛选栏 -->
+        <div class="ledger-filter-bar">
+          <div class="ledger-filter-row">
+            <div class="ledger-filter-group ledger-filter-search">
+              <label for="filter-search">搜索</label>
+              <input type="text" id="filter-search" placeholder="ID / 需求标题 / 来源..." />
+            </div>
+            <div class="ledger-filter-group">
+              <label for="filter-status">状态</label>
+              <select id="filter-status">
+                <option value="">全部</option>
+                <option value="done">已交付 / 已完成</option>
+                <option value="run">进行中</option>
+                <option value="todo">待处理</option>
+              </select>
+            </div>
+            <div class="ledger-filter-group">
+              <label for="filter-user-flag">用户标识</label>
+              <select id="filter-user-flag">
+                <option value="">全部</option>
+                <option value="优先处理">优先处理</option>
+                <option value="冻结">冻结</option>
+                <option value="取消">取消</option>
+              </select>
+            </div>
+            <div class="ledger-filter-group">
+              <label for="filter-priority">优先级</label>
+              <select id="filter-priority">
+                <option value="">全部</option>
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+              </select>
+            </div>
+            <div class="ledger-filter-group">
+              <label for="filter-phase">阶段</label>
+              <select id="filter-phase">
+                <option value="">全部</option>
+                <option value="Phase 1H">Phase 1H</option>
+                <option value="Phase 1H-A">Phase 1H-A</option>
+                <option value="Phase 1H-B">Phase 1H-B</option>
+                <option value="Phase 1H-C">Phase 1H-C</option>
+                <option value="Phase 1H / Phase 2">Phase 1H / Phase 2</option>
+                <option value="Phase 1H-B / Phase 2">Phase 1H-B / Phase 2</option>
+                <option value="Phase 1H-B / Phase 1H-C">Phase 1H-B / Phase 1H-C</option>
+                <option value="Phase 1H-C / Phase 2">Phase 1H-C / Phase 2</option>
+                <option value="Phase 2">Phase 2</option>
+                <option value="Phase 2 / 独立候选包">Phase 2 / 独立候选包</option>
+              </select>
+            </div>
+            <div class="ledger-filter-actions">
+              <button type="button" id="filter-reset" class="ledger-filter-reset-btn">重置</button>
+            </div>
+          </div>
+          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">33</b> / 33 条需求</div>
+        </div>
+        <div class="table-scroll">
+        <table>
+          <colgroup>
+            <col style="width:6%">
+            <col style="width:12%">
+            <col style="width:12%">
+            <col style="width:8%">
+            <col style="width:5%">
+            <col style="width:8%">
+            <col style="width:10%">
+            <col style="width:14%">
+            <col style="width:15%">
+            <col style="width:10%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>需求标题</th>
+              <th>来源</th>
+              <th>类型</th>
+              <th>优先级</th>
+              <th>所属阶段</th>
+              <th>状态</th>
+              <th>影响范围</th>
+              <th>验收证据</th>
+              <th>下一步</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">RP-001</td>
+              <td>Phase 1H 低代码 AI 工作流设计器</td>
+              <td>用户提出"搭建一个工作流低代码模块"</td>
+              <td>产品能力</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H</td>
+              <td><span class="status run"><span class="dot"></span>暂缓 / 待人工评审</span></td>
+              <td>工作流节点、意图、上下文、工具、确认策略、可视化编排</td>
+              <td>待产出</td>
+              <td>人工评审 MVP scope 后再输出正式设计</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-002</td>
+              <td>附件问答轻量审计</td>
+              <td>Phase 1G 后续项</td>
+              <td>审计增强</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H / Phase 2</td>
+              <td><span class="status done"><span class="dot"></span>已交付 / 第一批</span></td>
+              <td>普通附件问答不创建 Harness Run，但返回并持久化 trace.modelRun 轻量摘要，保留 provider/model/latency/rawContentLength/contextRefs 等审计线索</td>
+              <td>workbench-dispatch.service.ts + chat.service.ts + ai-sessions.types.ts + docs/openapi.yaml；新增 dispatch 与 handler 回归用例先见红后转绿；test:modules 102 pass，build:api pass</td>
+              <td>后续可继续拆批：统一轻量审计 schema、retention 策略、查询入口和多附件上下文摘要</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-003</td>
+              <td>模型意图分类兜底</td>
+              <td>Phase 1G 未完成项</td>
+              <td>AI 能力</td>
+              <td><span class="pill priority-p2">P2</span></td>
+              <td>Phase 1H</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>规则路由之外，用模型分类处理模糊问法</td>
+              <td>classifyIntentWithModel + INTENT_CLASSIFICATION_PROMPT + modelClassification trace；intent 35 pass，build:api pass</td>
+              <td>人工验收：输入模糊问法，观察 trace.modelClassification 分类结果</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-004</td>
+              <td>WES 数据查询扩展</td>
+              <td>Phase 1G 未完成项</td>
+              <td>业务查询</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H</td>
+              <td><span class="status done"><span class="dot"></span>已交付 / 第一批</span></td>
+              <td>第一批从项目列表扩展到项目状态汇总、待确认 AI 草稿提示和 owner-scoped trace；需求列表/评估列表深查后续拆批</td>
+              <td><code class="inline">workbench-intent.service.ts</code> + <code class="inline">workbench-context.service.ts</code> + <code class="inline">workbench-dispatch.service.ts</code>；intent 22 pass，dispatch 5 pass，test:modules 100 pass，build:api pass</td>
+              <td>后续可继续拆批：需求/评估详情深查、AI session pendingActions 汇总</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-005</td>
+              <td>Run Timeline 与 Artifact Workspace</td>
+              <td>Qoder Runtime 启发</td>
+              <td>体验增强</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H / Phase 2</td>
+              <td><span class="status done"><span class="dot"></span>已交付 / 第一批</span></td>
+              <td>第一批将 AI 工作台右侧 ArtifactPanel 从分散卡片改为“来源 / 执行 / 产物 / 交付”时间线，集中展示附件来源、消息执行、产物预览、待确认动作与关联记录；Harness run 级证据/模型/报告版本细化后续拆批</td>
+              <td><code class="inline">ArtifactPanel.jsx</code> + <code class="inline">HomeWorkspace.test.jsx</code>；新增 <code class="inline">renders artifact workspace as a run timeline</code> 用例先见红后转绿，HomeWorkspace 43 pass，V2 前端 83 pass，build:web pass</td>
+              <td>后续可继续拆批：Harness run 级 source/evidence/modelRun/toolEvent 时间线、报告版本切换、AI 草稿 Diff</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-006</td>
+              <td>多文件 Evidence 合并</td>
+              <td>Harness 后续候选</td>
+              <td>Harness 能力</td>
+              <td><span class="pill priority-p2">P2</span></td>
+              <td>Phase 2</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>多个附件分别理解，再合并为一份需求解析报告</td>
+              <td>chat.service.ts 多附件报告分支；chat.service.test.ts 7 pass，build:api pass，test:modules 126 pass</td>
+              <td>后续可扩展：dispatch 层多附件 attachment_qa 支持、合并报告 UI 展示优化</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-007</td>
+              <td>Harness Regression 样本集</td>
+              <td>监控与审计页指标</td>
+              <td>质量评估</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H / Phase 2</td>
+              <td><span class="status done"><span class="dot"></span>已交付 / 第一批</span></td>
+              <td>第一批定义固定样本 schema、默认样本集和模块/需求/evidence 匹配评分规则；回放执行器和评分持久化后续拆批</td>
+              <td><code class="inline">apps/api/src/modules/harness/harness.regression.ts</code> + <code class="inline">harness.usecase.test.ts</code>；新增 sample normalization 与 requirement_match_v1 评分用例先见红后转绿；<code class="inline">npm run test:harness --prefix apps/api</code> 65 pass，<code class="inline">npm run build:api</code> pass</td>
+              <td>后续可继续拆批：回放执行入口、harness_scores 持久化、5-10 个真实脱敏样本与质量趋势面板</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-008</td>
+              <td>客户工商信息检索与主体消歧</td>
+              <td>用户人工测试反馈</td>
+              <td>AI 辅助补全</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>从附件提取疑似客户名，调用模型/检索生成候选主体，由用户选择</td>
+              <td>报告生成后自动添加 company_lookup suggestedAction；openWorkbenchCompanyLookup 支持客户名预填充；build:api/web pass</td>
+              <td>人工验收：上传含客户名附件后生成报告，点击“检索主体”查看候选或画像</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-009</td>
+              <td>报告卡片字段内联编辑</td>
+              <td>用户人工测试反馈</td>
+              <td>前端体验</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>需求解析报告卡片中双击字段编辑，提交补充后生成 v2</td>
+              <td>InlineEditableValue + RequirementAnalysisReportCard + report-v2 API；前后端测试覆盖，build:web pass</td>
+              <td>人工验收：上传附件触发 v1 报告，双击字段编辑并生成 v2 报告</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-010</td>
+              <td>人工测试结果回填机制</td>
+              <td>testing.html</td>
+              <td>测试治理</td>
+              <td><span class="pill priority-p2">P2</span></td>
+              <td>Phase 1H</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>记录执行人、环境、账号、截图、Harness Run ID、ToolEvent ID、结果</td>
+              <td>harnessManualTestResults 表 + Harness test-results CRUD + 系统管理测试结果 Tab；routes 5 个 CRUD 测试 pass，build:api pass</td>
+              <td>人工验收：系统管理 → 测试结果 Tab → 新建 → 查看列表</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-011</td>
+              <td>检索主体弹窗化改造</td>
+              <td>用户人工测试反馈（RP-008 子项）</td>
+              <td>前端体验</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-A</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>将检索主体从内联按钮列表改为 Dialog 弹窗，增加 loading spinner 与结果感知</td>
+              <td>CompanyLookupDialog 工作台级入口 + loading/error/empty/selected 态完善</td>
+              <td>人工验收</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-012</td>
+              <td>WES Skill 作为 AI 工作流辅助工具</td>
+              <td>用户提出制造业售前背调与问题清单回复场景</td>
+              <td>产品能力</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H / Phase 2</td>
+              <td><span class="status run"><span class="dot"></span>暂缓 / 待架构决策</span></td>
+              <td>把行业背调、客户画像、问题清单回复、工具白名单与产物 schema 封装为可治理 Skill 包</td>
+              <td>本页 RP-012 专题分析已记录</td>
+              <td>阶段性需求池规划时确定 MVP、数据源边界和 Skill 治理方式</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-014</td>
+              <td>AI 工作台消息发送后自动滚动到底部</td>
+              <td>用户人工测试反馈</td>
+              <td>前端体验</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-A</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>AiHomeWorkbench 与 RequirementAiWorkbench 消息面板缺少 useLayoutEffect + useRef 自动滚动逻辑，发送消息后新消息被截断在视口外</td>
+              <td>messagePaneRef + useLayoutEffect scrollTo bottom</td>
+              <td>人工验收</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-013</td>
+              <td>AI 工作台通用化交互渲染</td>
+              <td>用户人工测试反馈（AI 回复中需要用户完善信息时仅输出 Markdown）</td>
+              <td>前端体验 / AI 能力</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-B</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>后端新增 formBlock 结构化协议 + 前端 InteractiveFormCard 组件，覆盖单选/文本/布尔等字段类型，用户填完后一键提交</td>
+              <td><code class="inline">InteractiveFormCard</code> + session <code class="inline">metadata.formBlock</code> 回放；<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 77 pass；<code class="inline">npm run test:modules</code> 88 pass；<code class="inline">npm run build:web</code> / <code class="inline">npm run build:api</code> pass</td>
+              <td>人工验收：MT-1H-B-002 真实 AI formBlock 输出与提交体验待执行</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-015</td>
+              <td>AI 工作台消息发送框高度不可调节</td>
+              <td>用户人工测试反馈（截图：AI 工作台底部消息发送框）</td>
+              <td>前端体验</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-A</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>底部消息 composer / textarea 固定高度，长文本编辑只能在受限区域滚动或显示，影响需求、测试反馈和长问题清单输入效率</td>
+              <td>composer minHeight 54 / maxHeight 180 / resize vertical + 按钮布局稳定</td>
+              <td>人工验收</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-016</td>
+              <td>AI 工作台创建项目后关联记录与列表未刷新</td>
+              <td>用户人工测试反馈（AI 工作台创建项目成功后截图）</td>
+              <td>前端体验 / 数据同步</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-A</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>AI 工作台右侧关联记录面板未显示新创建项目，项目列表也未出现新项目记录；项目创建 API 成功后前端未触发关联组件与列表刷新</td>
+              <td>upsertSession + 成功消息 + wes-project-evaluation-created 事件派发</td>
+              <td>人工验收</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-017</td>
+              <td>AI 工作台切换后会话丢失</td>
+              <td>用户截图反馈 + 代码根因分析</td>
+              <td>前端缺陷 / 会话持久化</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-A</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>AiHomeWorkbench 卸载后 React state 清零，重载时缺少 activeSessionId 恢复机制，且 loadSessions 失败被静默吞掉</td>
+              <td>localStorage 持久化 activeSessionId + loadSessions 失败可见提示</td>
+              <td>人工验收</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-018</td>
+              <td>AI 可发现知识库资源工具</td>
+              <td>Qoder 智谱 AI 知识库最小闭环技术文档 + 用户规划要求</td>
+              <td>AI 能力 / 知识库工具</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-B / Phase 2</td>
+              <td><span class="status done"><span class="dot"></span>已交付 / 人工验收待回填</span></td>
+              <td>将智谱知识库检索封装为 Agent Tool Registry 可发现、只读、可审计的知识查询工具，辅助模块识别和工作量评估</td>
+              <td>本页 RP-018 专题分析 + docs/智谱AI知识库集成指南.md + docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md + apps/api/src/services/ai/knowledge-tool.service.ts + apps/api/src/services/ai/workbench-intent.service.ts + apps/api/src/services/ai/workbench-dispatch.service.ts + apps/api/src/services/ai/chat.service.ts + ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx + ui/V2_PROTOTYPE/src/__tests__/HomeWorkspace.test.jsx + docs/openapi.yaml</td>
+              <td>MVP 已完成：后端 service、5 条服务测试、knowledge_query 意图路由、dispatch trace、session metadata、OpenAPI 契约与前端知识库参考 trace chip；当前自动化基线已推进到 HomeWorkspace 43 pass、V2 前端 83 pass、test:modules 100 pass、build:web/build:api pass；MT-1H-B-003 真实 ZHIPU 配置人工验收待回填</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-021</td>
+              <td>AI 消息流选择场景渲染为交互式选项卡片</td>
+              <td>用户截图反馈（AI 工作台消息区编号选项列表需手动输入回复）</td>
+              <td>前端体验 / AI 交互</td>
+              <td><span class="pill priority-p2">P2</span></td>
+              <td>Phase 1H-B / Phase 2</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>AI 消息流中需要用户选择时（如编号选项列表"1. 工作量评估 → 2. 需求梳理"），渲染为可点击的交互式选项卡片，而非要求用户手动输入数字回复</td>
+              <td>shouldPromoteOrderedListToOptions 关键词扩展 + 路径 B 测试覆盖；89 前端测试通过，build:web pass</td>
+              <td>人工验收：真实 AI 回复包含选择编号时渲染为可点击卡片，普通编号列表保持原样</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-022</td>
+              <td>系统管理模型配置缺少编辑入口</td>
+              <td>用户截图反馈（系统管理 / 模型配置页无法编辑具体模型）+ 代码根因分析</td>
+              <td>系统配置 / 前端体验</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-B / Phase 2</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>管理员无法在模型配置卡片中编辑具体模型、Prompt Profile、Temperature、最大 Tokens 等参数；当前前端还以旧 models 数组保存，未映射后端 requirement-settings schema</td>
+              <td><code class="inline">SystemManagement.jsx</code> 编辑 Dialog“确定”按钮修复为先调用 <code class="inline">saveModelDraft()</code> 再关闭；build:web pass</td>
+              <td>人工验收：编辑模型配置，点确定后刷新页面确认值已持久化</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-023</td>
+              <td>AI 消息气泡悬停复制按钮</td>
+              <td>用户截图反馈（AI 工作台消息区缺少复制操作入口）+ 代码审查</td>
+              <td>前端体验</td>
+              <td><span class="pill priority-p2">P2</span></td>
+              <td>Phase 1H-B / Phase 1H-C</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>AI 消息气泡缺少 hover 触发的复制按钮，长回复复制路径长</td>
+              <td>CopyMessageButton 组件 + ai-bubble-wrap className + index.css hover 规则；build:web pass</td>
+              <td>人工验收：hover AI 消息气泡出现复制按钮，点击后文本复制到剪贴板并显示反馈</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-024</td>
+              <td>Napkin 视觉生成融合售前解决方案 PPT 页面</td>
+              <td>用户提出查看 Napkin API 文档并规划融合 AI 能力，为售前顾问创建解决方案 PPT 页面</td>
+              <td>AI 能力 / 售前交付物 / 外部工具</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 2 / 独立候选包</td>
+              <td><span class="status run"><span class="dot"></span>已分析 / 待确认</span></td>
+              <td>基于需求包、SOW、售前商机摘要或 Harness 报告，生成解决方案 PPT 页面计划，并调用 Napkin API 输出可下载的 PPT/PNG/SVG 视觉页</td>
+              <td>本页 RP-024 专题分析；Napkin 官方 API 文档：异步生成、支持 svg/png/ppt、1-4 个视觉变体、style_id、visual_query、zh-CN、状态轮询和文件下载；2026-06-24 最小 smoke test 通过：create 201、poll completed、download SVG 200</td>
+              <td>先确认客户数据出站合规、默认品牌样式、页面范围、失败降级和 Harness ToolEvent 审计字段，再进入实现计划</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-025</td>
+              <td>AI 工作台"创建项目"意图路由偏移</td>
+              <td>用户会话反馈（session 6a0c4d5a：用户输入"帮我创建 广州可味达项目"，模型返回信息收集表单而非创建项目）；2026-06-25 用户截图补证：确认创建按钮点击后无可见反馈，普通问候触发 Kimi 限流提示</td>
+              <td>AI 意图路由 / 写动作</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-B / Phase 1H-C</td>
+              <td><span class="status done"><span class="dot"></span>已交付 / 回归补丁</span></td>
+              <td>"创建XXX项目"未命中 WRITE_TARGET_PATTERNS（缺少"项目"关键词），落入 domain_qa 兜底，模型自由生成 formBlock 信息收集表单而非走项目创建写动作确认流程；回归补证显示 PRE_SALES 缺少项目创建能力且前端吞掉 403，造成"点击无反应"</td>
+              <td>本页 RP-025 专题分析；根因：workbench-intent.service.ts Rule 4 WRITE_TARGET_PATTERNS 不含"项目"；2026-06-25 补丁覆盖 PRE_SALES estimates:create、项目创建失败可见反馈和 greeting_keywords 本地路由</td>
+              <td>新增 CREATE_PROJECT_PATTERNS 路由规则 + buildWriteActionResponse 提取项目名 + 前端建议按钮处理器支持 create_project_evaluation + system prompt 写动作边界约束；回归修复：POST /project-evaluations 支持 estimates:create/write 任一能力，confirmPendingAction catch 401/403/空响应并显示失败原因</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-026</td>
+              <td>用户管理补充角色能力位配置与说明</td>
+              <td>2026-06-25 用户截图反馈：AI 工作台提示“项目创建失败：权限不足（缺少能力位: estimates:write）”，追问用户管理中是否需要补充对应权限配置</td>
+              <td>权限治理 / 用户管理</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C / Phase 2</td>
+              <td><span class="status warn"><span class="dot"></span>Codex 复核：需补测</span></td>
+              <td>用户管理当前只能改系统角色和业务角色，无法查看角色对应 capability，也无法解释或治理 estimates:create/write 等能力位</td>
+              <td>代码事实：<code class="inline">UserManagement.jsx</code> 仅提供改系统角色/改业务角色/重置密码；<code class="inline">permissions.ts</code> 静态维护 <code class="inline">ROLE_CAPABILITIES</code>；auth 用户接口未提供能力位配置</td>
+              <td>Qoder 回填只读能力矩阵；Codex 复核 build:api pass、UserManagement focused pass，但测试缺少 /system/role-capabilities mock，且前端复用 useSystemManagement 触发额外系统接口加载；需补最小 hook/测试后验收</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-027</td>
+              <td>Kimi API 模型升级与 Provider 成本优化</td>
+              <td>2026-06-25 外部 AI 分析建议：当前 WES Kimi 调用仍存在旧模型、已下线模型、K2 参数不兼容、未利用 prompt cache / structured output / partial mode / thinking / batch 等问题；本地代码与配置核验后确认主要风险成立</td>
+              <td>AI Provider / 模型治理 / 成本优化</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C / Phase 2</td>
+              <td><span class="status done"><span class="dot"></span>Codex 修复验证通过 / 待集成</span></td>
+              <td>升级默认 Kimi 模型并修复 Provider 协议适配，降低评估成本、提升 JSON 输出稳定性，并为复杂评估引入 thinking 分级与批量评估调度能力</td>
+              <td>代码事实：<code class="inline">config/system/requirement-settings.json</code> 仍存在 <code class="inline">kimi-k2-turbo-preview</code>；<code class="inline">system.repository.ts</code> 默认仍含 <code class="inline">moonshot-v1-128k</code>；<code class="inline">kimi-provider.ts</code> 尚未透传 <code class="inline">prompt_cache_key</code>、<code class="inline">json_schema</code>、partial assistant prefill、thinking 或 reasoning_content；官方 Kimi 文档确认 Chat Completion、模型参数与 Batch API 能力</td>
+              <td>Qoder clean 分支已剔除 ZHIPU env/file utils 旁路改动；Codex 修复 timeout retry loop 缺口并补 provider 契约测试。验证：tool-calling 10/10、build:api、test:ai 189/189、test:modules 66/66；待集成与真实 Kimi 配置人工验收</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-028</td>
+              <td>Kimi Provider 稳定性增强：超时、重试与 Token 审计</td>
+              <td>2026-06-25 Kimi API 深度分析发现：当前 MAX_TIMEOUT 120s 对思考模型偏短、超时错误标记为不可重试导致网络瞬断直接失败、未提取 usage 字段无法追踪 Token 消耗</td>
+              <td>AI Provider / 成本监控</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C</td>
+              <td><span class="status done"><span class="dot"></span>Codex 修复验证通过 / 待集成</span></td>
+              <td>提升非流式超时上限至 300s、将 timeout 错误标记为可重试、提取并记录 usage Token 消耗，降低网络瞬断和超时导致的评估失败率</td>
+              <td>代码事实：<code class="inline">kimi-provider.ts</code> MAX_TIMEOUT_MS=120000、fetchAbort 的 retryable=false、parseSuccess 未提取 usage；官方文档 stream=false 超时为 2 小时</td>
+              <td>与 RP-027 clean patch 合并回填；Codex 修复 timeout retryable 未实际重试问题，并新增 usage、quota、stream reasoning 断言。后续需确认 usage 字段进入模型运行审计或监控展示</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-029</td>
+              <td>Kimi 流式输出与 WES 实时响应功能模块</td>
+              <td>用户主动要求：启用 Kimi 流式输出并设计 WES 功能模块匹配流式输出能力</td>
+              <td>AI 能力 / 前端体验</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C / Phase 2</td>
+              <td><span class="status run"><span class="dot"></span>Codex 修复验证通过 / 待集成</span></td>
+              <td>后端 SSE 流式接口、前端逐字渲染组件、AI 工作台流式交互适配，让用户实时看到模型生成过程，提升交互体验</td>
+              <td>代码事实：当前 <code class="inline">kimi-provider.ts</code> 已有 streamChatCompletion 实现但仅限内部使用；AI 工作台 chat 接口全部走非流式 chatCompletion；前端无逐字渲染组件</td>
+              <td>Codex 修复分支 <code class="inline">codex/rp-029-030-rework-fixes</code> 已补真实流式成功、provider 失败、client abort SSE/trace 集成测试；<code class="inline">build</code>、<code class="inline">test:modules</code>、<code class="inline">test:ai</code>、<code class="inline">test:agent</code>、<code class="inline">test:harness</code> 均通过。待集成后再推进前端逐字渲染与停止按钮。</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-030</td>
+              <td>Agent Runtime 统一 Trace Schema 与查询入口</td>
+              <td>2026-06-26 用户要求将 Agent 工程化经验转化为 WES 具体需求；去重后确认现有 RP-002/RP-005 只覆盖轻量审计与时间线第一批，尚缺跨 AI session / Harness / ModelRun / ToolEvent 的统一 trace schema</td>
+              <td>监控审计 / Runtime 治理</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C / Phase 2</td>
+              <td><span class="status run"><span class="dot"></span>Codex 修复验证通过 / 待集成</span></td>
+              <td>统一记录用户请求、意图路由、知识库检索、模型调用、工具调用、Artifact 生成、人工确认和降级原因，形成可查询的 trace 链路与留存策略</td>
+              <td>去重结果：命中 RP-002 轻量审计、RP-005 Artifact Workspace 后续，但两者未覆盖统一 schema、span 父子关系、查询入口和 retention 策略；因此新增独立 RP-030，并与 RP-002/RP-005 交叉引用</td>
+              <td>Codex 已移除运行态 trace-store 提交并补 <code class="inline">.gitignore</code>；trace repository 支持测试 store 注入，失败/abort 写入 failed/cancelled trace，PRE_SALES RBAC 断言已按当前权限模型校准。验证命令全通过，待最小 patch 集成。</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-031</td>
+              <td>RAG Baseline 与知识库评测闭环</td>
+              <td>2026-06-26 用户基于 Dify/ReAct/LangFuse/RAGAS/RAG 优化路线要求沉淀需求；去重后确认 RP-018 已交付知识库工具 MVP，但缺少固定 baseline 与策略对比评测</td>
+              <td>知识库 / RAG 质量评估</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C / Phase 2</td>
+              <td><span class="status run"><span class="dot"></span>重复检索修复已验证 / 待真实配置</span></td>
+              <td>为知识库问答和模块识别建立固定样本、知识库版本、检索参数、评价指标和对比报告，避免凭主观体验调整 Hybrid Search、Rerank 或 Query Rewriting</td>
+              <td>去重结果：命中 RP-018 知识库工具与 RP-007 Harness Regression 后续，但当前没有独立的 RAG baseline 记录、检索参数矩阵或知识库质量趋势报告；因此新增 RP-031</td>
+              <td>已修复每样本重复检索：queryZhipuKnowledgeBase 在 success / empty_answer / answer_failed 路径回传 trace.chunks，rag-baseline runner 复用 chunks，不再调用 retrieveKnowledgeChunks。Codex 复核 rag-baseline 11/11、knowledge-tool 8/8；build:api 仍被非 RAG 既有编译错误阻断，真实 ZHIPU 配置待人工验收。</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-033</td>
+              <td>AI 工作台会话列表容器滚动</td>
+              <td>用户截图反馈（AI 工作台左侧会话列表：第 5 个会话被遮挡，无法滚动查看）</td>
+              <td>前端体验</td>
+              <td><span class="pill priority-p2">P2</span></td>
+              <td>Phase 1H-C</td>
+              <td><span class="status run"><span class="dot"></span>clean patch 已验证 / 待提交集成</span></td>
+              <td>SessionRail 会话列表容器缺少 maxHeight + overflowY 滚动能力，会话数量超出容器高度时底部会话被外层 overflow:hidden 裁剪遮挡</td>
+              <td>SessionRail.jsx 会话列表容器添加 maxHeight + overflowY:auto + 隐藏原生滚动条（::-webkit-scrollbar display:none）；纯前端改动，不涉及后端</td>
+              <td>clean worktree <code class="inline">.worktrees/rp-033-clean</code> 已收敛为 3 文件未提交 patch；Codex 复核 <code class="inline">HomeWorkspace.test.jsx</code> 25/25、<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 65/65、<code class="inline">npm run build:web</code> pass。待提交/集成后人工验收低高度滚动。</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-034</td>
+              <td>AI 工作台需求解析报告按钮与消息均不触发报告生成</td>
+              <td>2026-06-29 用户截图反馈（session 4cb9ec0a）：上传 Excel 附件后 AI 正确解析并给出 3 个选项，点击"生成《需求解析报告 v1》"按钮后 AI 回复"请上传需求文件后点击下方按钮"，用户再发消息也不执行，陷入死循环</td>
+              <td>AI 意图路由 / 附件上下文</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C</td>
+              <td><span class="status run"><span class="dot"></span>已分析 / 待规划</span></td>
+              <td>后端 <code class="inline">chat.service.ts</code> 第 474 行 <code class="inline">parsedAttachment && isExplicitReportRequest(...)</code> 只检查最新消息的附件；用户点击按钮或发消息时新消息本身无附件（附件在历史消息中），条件失败落入普通聊天路径；前端按钮仅 <code class="inline">setComposer</code> 填充文本，不自动发送也不传 <code class="inline">clientAction</code></td>
+              <td>后端：将条件改为 <code class="inline">allAttachments.length > 0 && isExplicitReportRequest(...)</code>，利用已有的全量附件变量；前端：按钮点击时传递 <code class="inline">clientAction: 'generate_requirement_report'</code> 并自动发送，走 <code class="inline">workbench-intent.service.ts</code> 的 clientAction 优先路由</td>
+              <td>人工验收：上传附件 → 点击"生成需求解析报告"按钮 → 自动生成 v1 报告卡片；或发送"请基于当前附件生成需求解析报告"→ 同样触发报告生成，不再回复"请上传文件"</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-032</td>
+              <td>AI 工作台推荐工作流列表可达性与语义优化</td>
+              <td>2026-06-26 用户截图反馈：AI 工作台左侧“推荐工作流”区域作用不清，且无法滚动查看最下方内容；去重后确认 RP-019 已覆盖推荐工作流定位不清，但未覆盖列表底部可达性</td>
+              <td>前端体验 / 可达性</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C</td>
+              <td><span class="status run"><span class="dot"></span>已回填 / 待人工验收</span></td>
+              <td>左侧工作流入口既承担业务角色默认任务模板选择，又会影响 activeWorkflowKey、输入框预填、后续 workflowKey 和沉淀结果；当前命名像静态推荐内容，且截图显示列表底部被视口裁切，用户无法完整访问最后的工作流按钮</td>
+              <td>Qoder branch <code class="inline">qoder/rp-032-workflow-accessibility</code>；<code class="inline">AiHomeWorkbench.jsx</code>、<code class="inline">index.css</code>、<code class="inline">HomeWorkspace.test.jsx</code> 已回填；Codex 在相同文件状态下复跑 <code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 92 pass、<code class="inline">npm run build:web</code> pass</td>
+              <td>人工验收：桌面视口管理视角 4 个工作流均可滚动访问，选中态圆点和 aria-label/title 符合预期；窄屏响应式折叠未纳入本轮，后续单独补小任务或扩展 RP-032。</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-020</td>
+              <td>AI 消息引导性选项交互化渲染</td>
+              <td>用户截图反馈（AI 工作台消息区引导选项）</td>
+              <td>前端体验 / AI 交互</td>
+              <td><span class="pill priority-p2">P2</span></td>
+              <td>Phase 1H-B</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>AI 回复中"选项A/B/C"及编号问题列表渲染为可点击按钮/卡片，点击后自动填充并发送对应文本</td>
+              <td>InteractiveOptionCard + 选项识别规则；75 前端测试通过 + Vite 构建通过</td>
+              <td>人工验收：确认真实 AI 回复中的引导选项可点击发送，且普通编号列表不被误转为按钮</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-019</td>
+              <td>AI 工作台布局与 Markdown 渲染深度优化</td>
+              <td>用户截图反馈 + 当前 AiHomeWorkbench 代码审查</td>
+              <td>前端体验 / 布局治理</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-B</td>
+              <td><span class="status done"><span class="dot"></span>已交付</span></td>
+              <td>收敛首页标题/提示、推荐工作流定位、三栏信息密度、右侧面板折叠和 Markdown 渲染机制</td>
+              <td>冗余副标题删除 + 三栏密度收敛 + Markdown 渲染增强（含标准管道表格与 unsafe link 降级）+ 右栏卡片合并 + 右侧工作区折叠状态记忆；当前 HomeWorkspace 43 pass、V2 前端 83 pass、build:web pass</td>
+              <td>Phase 1H-B 后续可选批次：右栏宽度拖拽/宽度记忆</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 需求拆解矩阵 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">05 / Breakdown Matrix</div>
+          <h2>需求拆解矩阵</h2>
+          <p>每条需求按用户价值、业务边界和各技术域影响进行拆解。</p>
+        </div>
+        <div class="table-scroll">
+        <table>
+          <colgroup>
+            <col style="width:7%">
+            <col style="width:14%">
+            <col style="width:16%">
+            <col style="width:15%">
+            <col style="width:15%">
+            <col style="width:14%">
+            <col style="width:10%">
+            <col style="width:9%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>需求 ID</th>
+              <th>用户价值</th>
+              <th>业务边界</th>
+              <th>前端影响</th>
+              <th>后端影响</th>
+              <th>数据/审计影响</th>
+              <th>测试要求</th>
+              <th>文档要求</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">RP-030</td>
+              <td>让一次 AI 请求从用户输入到产物/确认/降级全链路可追溯，降低排障、审计和成本归因成本</td>
+              <td>覆盖 AI session、Harness Run、ModelRun、ToolEvent、KnowledgeTool、Artifact 和人工确认；不把外部 LangFuse 作为唯一审计源</td>
+              <td>监控/审计页增加 trace 查询入口；AI 工作台可展示简化 trace chip；Artifact Workspace 后续可按 span 串联来源、执行、产物和交付</td>
+              <td>定义 trace/span schema、上下文关联 ID、写入适配器和查询 API；现有 dispatch trace、session metadata、Harness ToolEvent/ModelRun 逐步映射到统一结构</td>
+              <td>新增或扩展 Harness trace 存储时需明确 raw trace 短期留存、摘要长期保存、敏感字段脱敏和 owner 隔离；不保存 API Key/token/cookie/私钥</td>
+              <td>schema normalization 单测、owner 隔离查询测试、trace 链路完整性测试、敏感字段脱敏测试</td>
+              <td>同步 runtime、monitoring、OpenAPI 和实现对齐说明；保留 RP-002/RP-005 关联关系</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-031</td>
+              <td>用固定基准判断知识库检索和回答质量是否真正提升，支撑后续 Hybrid Search、Rerank、Query Rewriting 的取舍</td>
+              <td>第一批限定 RP-018 知识库工具的只读检索/问答，不自动影响正式评估工时和业务写入</td>
+              <td>监控页或测试结果页展示 baseline 批次、命中率、引用准确率、延迟和成本；AI 工作台继续只显示轻量知识库参考</td>
+              <td>新增 baseline runner 或测试脚本，固定知识库版本、样本、检索参数和评分器；可复用 Harness Regression 样本/评分结构</td>
+              <td>保存评测摘要、知识库版本、检索参数和指标；不保存用户私有原文；真实知识库配置继续走环境变量/系统配置脱敏展示</td>
+              <td>20 条样本 baseline、Top-3 命中率、引用准确率、fallbackReason 覆盖、延迟/成本对比；后续策略必须与 baseline 对比</td>
+              <td>同步知识库工具计划、monitoring 指标、requirements 和 changes；如引入 RAGAS 仅作为辅助指标说明</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-033</td>
+              <td>让用户在会话数量超出容器高度时仍可滚动查看全部会话，避免底部会话被遮挡导致切换/删除操作不可达</td>
+              <td>SessionRail 会话列表容器的滚动能力；不改变会话数据结构、不新增后端接口、不改变会话列表布局样式</td>
+              <td>SessionRail.jsx 会话列表容器添加 maxHeight + overflowY:auto + 隐藏原生滚动条样式</td>
+              <td>无后端改动</td>
+              <td>无数据/审计影响</td>
+              <td>人工验收：会话超出容器高度时可滚动查看、无生硬滚动条</td>
+              <td>同步 requirements 和 changes</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-032</td>
+              <td>让用户明确知道左侧工作流入口会启动具体业务任务，并能完整访问所有工作流按钮，避免底部模板被遮挡</td>
+              <td>仅优化 AI 工作台左侧角色工作流入口的命名、滚动可达性、选中反馈和响应式表现；不改变 workflowKey 协议、意图路由、后端接口或正式写动作边界</td>
+              <td>第一批已回填：<code class="inline">AiHomeWorkbench</code> 左栏“推荐工作流”改为“工作流模板”，列表容器 <code class="inline">maxHeight:220px</code> + <code class="inline">overflowY:auto</code>，选中按钮增加圆点、<code class="inline">aria-label</code> 和 <code class="inline">title</code>。</td>
+              <td>无需后端改动；继续沿用现有 <code class="inline">workflowKey</code> 传参和 session metadata</td>
+              <td>无新增存储；若未来记忆展开/折叠状态，可使用本地偏好且不写入业务数据</td>
+              <td>已补 HomeWorkspace 自动化：工作流模板标签、滚动容器、选中态 aria-label；Codex 复核前端全量 92 pass、build:web pass。仍需人工视觉验收桌面/低高度/窄屏。</td>
+              <td>已同步 requirements、plan、changes、testing、monitoring；窄屏折叠作为后续缺口保留。</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-027</td>
+              <td>评估、文件解析和 AI 工作台对话可以使用可用且更经济的 Kimi 模型，减少因模型下线、参数冲突或 JSON 输出不稳造成的失败</td>
+              <td>Kimi Provider、系统模型配置、需求评估、文件解析、变更/开发评估与 Harness 批量场景；不改变业务确认链路和正式写入边界</td>
+              <td>系统管理模型配置需展示新模型、thinking/缓存/结构化输出能力与错误提示；AI 工作台可展示 reasoning/模型运行 trace 的受控摘要</td>
+              <td>扩展 <code class="inline">KimiProvider</code> 请求参数、temperature/max_completion_tokens 兼容、prompt cache key、partial/json_schema、thinking 与 stream reasoning_content；Batch API 作为后续异步能力</td>
+              <td>模型运行审计需记录 model、thinking、cacheKey 策略、responseFormat、batchRunId、reasoning 摘要与降级原因；API Key 不进入看板或日志明文</td>
+              <td>Provider 单测 + 评估 JSON schema 回归 + stream reasoning_content 解析测试 + 模型配置迁移测试 + Batch dry-run/模拟测试</td>
+              <td>同步 Kimi Provider 设计、系统配置说明、实现对齐说明和成本策略；引用官方 Kimi Chat / Model / Batch 文档</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-028</td>
+              <td>减少因超时、网络瞬断导致的评估失败，并提供 Token 消耗可见性，支持成本优化决策</td>
+              <td>Kimi Provider 内部实现；不改变业务链路和配置结构</td>
+              <td>无直接影响；后续可在系统管理面板展示 Token 消耗统计</td>
+              <td><code class="inline">kimi-provider.ts</code> 超时上限调整、timeout retryable 标志、parseSuccess/parseStream 提取 usage 字段、审计日志记录 Token 消耗</td>
+              <td>模型运行审计扩展 usage 字段（prompt_tokens/completion_tokens/total_tokens）；不影响现有存储结构</td>
+              <td>Provider 单测：超时重试、usage 解析、非流式/流式两条路径</td>
+              <td>同步 Kimi Provider 设计文档；引用官方断线重连指南</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-029</td>
+              <td>用户在 AI 工作台、评估和文件解析场景实时看到模型生成过程，提升交互体验和等待感知</td>
+              <td>AI 工作台、需求评估、文件解析、变更/开发评估的对话接口；不改变意图路由和工具调用链路</td>
+              <td>新增 SSE 流式渲染组件、逐字输出动画、思考过程折叠展示、中断/停止按钮；AI 工作台消息发送区适配流式响应</td>
+              <td>新增 SSE 流式接口层（/chat/stream、/assessment/stream、/parse/stream）；复用现有 KimiProvider.streamChatCompletion；dispatch 层适配流式返回</td>
+              <td>流式审计需记录首 token 延迟、总延迟、Token 消耗；session 存储需适配流式拼接后的完整消息</td>
+              <td>Provider 流式单测 + SSE 接口集成测试 + 前端组件渲染测试 + 中断/重试场景测试</td>
+              <td>同步 AI 工作台交互设计、流式接口 OpenAPI spec 和实现对齐说明</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-026</td>
+              <td>管理员能从用户管理直接理解“某用户为什么没有某能力”，并看到角色对应 capability，减少权限问题定位成本</td>
+              <td>用户管理 / RBAC 治理；短期以可视化和解释为主，不默认允许任意用户级能力覆盖</td>
+              <td>用户表新增能力摘要或详情入口；系统角色/业务角色 Dialog 展示对应能力位和典型业务动作；缺失能力可搜索定位</td>
+              <td>需新增只读角色能力矩阵接口；若后续开放自定义授权，再新增能力覆盖 API、审计记录和回滚机制</td>
+              <td>短期无存储变更；自定义授权会引入用户级能力覆盖与审计记录，需先设计存储和追溯字段</td>
+              <td>UserManagement 能力矩阵渲染测试 + RBAC 矩阵接口测试 + 权限错误到用户管理定位的人工验收</td>
+              <td>同步用户管理、RBAC 权限边界和实现对齐说明</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-025</td>
+              <td>用户说"创建项目"可直接在 WES 项目列表中创建，而非被模型自由发挥生成信息收集表单</td>
+              <td>AI 工作台意图路由层；新增"创建XXX项目"模式匹配，复用现有 write_action_request 写动作确认流程</td>
+              <td>建议按钮处理器新增 create_project_evaluation 分支，复用已有 confirmPendingAction 逻辑</td>
+              <td>workbench-intent.service.ts 新增 CREATE_PROJECT_PATTERNS 规则；workbench-dispatch.service.ts buildWriteActionResponse 提取项目名 + actionType 扩展 + system prompt 写动作边界约束</td>
+              <td>复用现有 session pendingActions 与 project-evaluations 存储；不新增 DB/存储</td>
+              <td>intent 路由测试 + dispatch 测试 + 前端建议按钮点击测试 + 构建验证</td>
+              <td>意图路由设计说明更新</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-022</td>
+              <td>管理员可直接编辑模型配置，减少配置需改文件或依赖后端接口知识的成本</td>
+              <td>系统管理 / 模型配置页；只影响 admin 配置草稿与生效，不改变业务模型调用权限边界</td>
+              <td>新增行级或卡片级编辑按钮与 Dialog；将后端 draft/active 配置映射为三张模型卡片；保存、清除密钥和测试连接有明确状态反馈</td>
+              <td>复用现有 <code class="inline">/system/requirement-settings</code> GET/PATCH/activate/test 接口；必要时补充更清晰的响应映射或校验错误</td>
+              <td>继续使用 <code class="inline">config/system/requirement-settings.json</code>；不引入 DB；API Key 只显示脱敏 hint，不在前端回显明文</td>
+              <td>hook 映射单测 + 模型编辑 Dialog 交互测试 + 保存草稿/生效接口契约测试 + 手工验证真实页面可编辑</td>
+              <td>同步 OpenAPI/实现对齐说明中系统管理模型配置口径（按实现范围）</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-021</td>
+              <td>选择场景点击即发送，无需手动输入数字</td>
+              <td>AI 工作台消息渲染层，识别编号选项模式并渲染交互控件</td>
+              <td>扩展 InteractiveOptionCard 或新增编号选项识别逻辑 + 渲染组件</td>
+              <td>无需后端改动（选项文本由前端拼接发送）</td>
+              <td>无审计影响，点击行为可记录为 ToolEvent（可选）</td>
+              <td>选项渲染 E2E + 点击发送验证 + 普通编号列表降级回退测试</td>
+              <td>交互渲染设计说明更新</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-020</td>
+              <td>引导选项点击即发送，无需手动打字</td>
+              <td>AI 工作台消息渲染层，识别选项模式并渲染交互控件</td>
+              <td>新增 InteractiveOptionCard 组件 + 消息渲染层选项模式识别逻辑</td>
+              <td>无需后端改动（选项文本由前端拼接发送）</td>
+              <td>无审计影响，点击行为可记录为 ToolEvent（可选）</td>
+              <td>选项渲染 E2E + 点击发送验证 + Markdown 降级回退测试</td>
+              <td>交互渲染设计说明更新</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-013</td>
+              <td>AI 回复中需用户补全信息时可直接交互填写，无需手动打字</td>
+              <td>AI 工作台消息渲染层，不改变现有意图路由与 dispatch 逻辑</td>
+              <td>新增 InteractiveFormCard 组件 + AiHomeWorkbench 消息渲染集成</td>
+              <td>WorkbenchDispatchData 新增 formBlock 字段 + LLM prompt 增加结构化输出指令</td>
+              <td>formBlock 数据进入 session messages，可追溯</td>
+              <td>表单渲染 E2E + 提交消息拼接验证 + LLM 不遵守格式时的降级测试</td>
+              <td>交互渲染设计说明更新</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-001</td>
+              <td>可视化编排工作流，降低使用门槛</td>
+              <td>仅 AI 工作台内部，不触及正式业务流</td>
+              <td>新增工作流设计器页面与组件</td>
+              <td>新增工作流定义 API、节点执行引擎</td>
+              <td>工作流定义存储、执行日志</td>
+              <td>设计器 E2E + 节点回归</td>
+              <td>Phase 1H spec + 用户指引</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-002</td>
+              <td>附件问答可追溯但不增加审计负担</td>
+              <td>普通附件问答不创建 Run，但保留模型调用轻量摘要</td>
+              <td>无 UI 变化</td>
+              <td>WorkbenchDispatchData.trace 新增 modelRun；homeWorkbenchChat 将 modelRun 写入 assistant message metadata</td>
+              <td>复用 AI session message metadata 与响应 trace；不新增 DB/文件表、不创建 Harness Run、不保存完整 prompt/raw trace</td>
+              <td>dispatch 6 pass、handler focused 51 pass、test:modules 102 pass、build:api pass</td>
+              <td>OpenAPI 与审计口径说明更新</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-003</td>
+              <td>模糊问法也能正确路由</td>
+              <td>规则路由之外增加模型分类层</td>
+              <td>无 UI 变化</td>
+              <td>新增模型分类调用与降级逻辑</td>
+              <td>分类结果记录到 modelRun</td>
+              <td>回归集覆盖模糊问法</td>
+              <td>意图路由设计文档更新</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-004</td>
+              <td>Agent 可查询更多业务数据；第一批已支持 owner 可见项目状态汇总和待确认 AI 草稿提示</td>
+              <td>只读查询，不触发写动作；继续复用 JWT user 与 <code class="inline">listProjectEvaluationsForUser</code> owner 隔离</td>
+              <td>无 UI 变化（Agent 回答中呈现状态汇总、项目列表和待确认提示）</td>
+              <td>扩展 intent 关键词、WorkbenchContext 项目摘要、dispatch 静态回复和 trace.contextRefs</td>
+              <td>无新增存储，不引入 DB 迁移</td>
+              <td>intent 22 pass、dispatch 5 pass、test:modules 100 pass、build:api pass</td>
+              <td>实现与文档对齐说明、总看板测试/监控/变更同步</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-005</td>
+              <td>任务产物一目了然，提升工作体验</td>
+              <td>AI 工作台右侧产物工作区第一批已时间线化</td>
+              <td>复用 <code class="inline">ArtifactPanel</code>，不新增页面</td>
+              <td>本批不新增 API；复用 AI session <code class="inline">artifacts</code>、<code class="inline">pendingActions</code>、<code class="inline">linkedRecords</code></td>
+              <td>无新增存储；后续 Harness run 级引用再评估</td>
+              <td>HomeWorkspace 43 pass、V2 前端 83 pass、build:web pass</td>
+              <td>总看板 runtime/testing/monitoring/changes 同步</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-006</td>
+              <td>多附件场景下报告更完整</td>
+              <td>Harness 内部合并逻辑</td>
+              <td>报告页展示合并来源</td>
+              <td>新增 evidence merge 服务</td>
+              <td>合并结果存储与引用</td>
+              <td>多文件场景回归</td>
+              <td>Harness 设计文档更新</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-007</td>
+              <td>可量化评估 AI 质量变化</td>
+              <td>质量评估基础设施；第一批只定义样本格式与评分规则，不执行批量回放</td>
+              <td>无 UI 变化</td>
+              <td>新增 Harness regression 纯函数模块，导出默认样本、normalize 与 requirement_match_v1 评分</td>
+              <td>复用既有 harness_cases / harness_expected_answers / harness_scores schema；本批不新增迁移、不写入数据库</td>
+              <td>Harness 聚焦测试 65 pass，覆盖样本 schema 默认值、项目字段、需求覆盖率和 evidence refs 评分</td>
+              <td>需求池、测试、监控、风险与来源页同步评分口径</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-008</td>
+              <td>减少手动查找工商信息的工作量</td>
+              <td>辅助补全，不自动写入正式字段</td>
+              <td>新增候选主体选择交互</td>
+              <td>新增检索/模型调用逻辑</td>
+              <td>检索结果缓存与审计</td>
+              <td>人工测试 + 合规验证</td>
+              <td>数据源与合规边界文档</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-009</td>
+              <td>报告字段可快速修正，减少重跑</td>
+              <td>报告卡片内编辑，提交后生成新版本</td>
+              <td>双击编辑 + 提交入口</td>
+              <td>字段更新 API + v2 生成</td>
+              <td>编辑记录进入审计链</td>
+              <td>字段编辑 E2E</td>
+              <td>报告 schema 文档更新</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-010</td>
+              <td>人工测试结果可追溯可统计</td>
+              <td>测试治理，不影响业务</td>
+              <td>测试结果展示页</td>
+              <td>测试结果记录 API</td>
+              <td>测试结果存储</td>
+              <td>回填完整性验证</td>
+              <td>测试治理规范文档</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-011</td>
+              <td>检索主体交互体验提升，用户可感知检索过程与结果</td>
+              <td>RP-008 的 UI 交互子项，不改变后端逻辑</td>
+              <td>新增 Dialog 组件 + 改造 AiHomeWorkbench 检索按钮与候选渲染</td>
+              <td>无（复用现有 /ai/company-profile-summary API）</td>
+              <td>无新增存储</td>
+              <td>弹窗打开/选择/关闭 E2E + loading 状态验证</td>
+              <td>无</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-012</td>
+              <td>售前可复用行业 Skill，快速完成客户背调和问题清单回复</td>
+              <td>Skill 是受控工作流资产，不直接绕过 WES 权限、版本、审计和人工确认</td>
+              <td>AI 工作台选择/推荐 Skill，展示背调证据、问题清单回复草稿和下一步动作</td>
+              <td>新增 Skill registry / resolver，复用 company-profile、presales、Agent tools 与 Harness 编排</td>
+              <td>Skill 版本、promptProfileId、数据源、modelRun、artifact、ToolEvent 进入追溯链</td>
+              <td>制造业售前样例回归 + 权限/来源/人工确认测试</td>
+              <td>Skill 规格、数据源合规边界、首批制造业售前 Skill 说明</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-014</td>
+              <td>消息发送和 AI 回复后自动定位到最新内容，减少用户手动滚动查找</td>
+              <td>仅 AI 工作台消息面板滚动行为，不改变消息发送协议、会话存储和后端接口</td>
+              <td>为消息面板容器添加 ref 与 useLayoutEffect，监听消息数量和发送状态变化后 scrollTo bottom</td>
+              <td>无后端改动</td>
+              <td>无新增审计字段</td>
+              <td>发送消息、收到 AI 回复、渲染建议动作或报告卡片后，消息面板稳定滚动到底部</td>
+              <td>无</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-016</td>
+              <td>项目创建后用户能立即在关联记录面板看到新项目，项目列表也能看到新记录</td>
+              <td>AI 工作台右侧面板 + 项目列表页面，不改变项目创建 API 与后端逻辑</td>
+              <td>关联记录面板组件 + 项目列表组件增加项目创建事件监听或 API 成功后主动刷新</td>
+              <td>无后端改动，除非项目创建 API 需返回关联上下文</td>
+              <td>无新增审计字段</td>
+              <td>创建项目后关联记录面板自动显示新项目 + 项目列表刷新可见新记录</td>
+              <td>无</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-015</td>
+              <td>长文本需求、测试反馈和问题清单输入时可扩大编辑区，减少来回滚动和误发风险</td>
+              <td>仅 AI 工作台消息发送框体验优化，不改变消息发送、附件上传、会话存储和后端接口</td>
+              <td>调整 composer / textarea 布局，支持自动增高或用户手动纵向调节，并保持附件按钮与发送按钮固定可用</td>
+              <td>无后端改动，除非后续规划要求保存用户输入框高度偏好</td>
+              <td>默认无新增审计字段；若保存偏好则需明确本地存储或用户配置边界</td>
+              <td>长文本输入、拖拽调高、发送按钮可见、桌面/移动视口无遮挡的交互与视觉回归</td>
+              <td>AI 工作台体验优化说明；若实现时新增用户偏好再补充前端设计说明</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-017</td>
+              <td>AI 工作台切换导航后返回，对话会话与消息全部丢失，用户需重新发起对话</td>
+              <td>用户截图反馈 + 代码分析确认：AiHomeWorkbench 卸载后 React state 全部清零，重载时 loadSessions 虽从后端拉回会话列表，但无机制记住卸载前的 activeSession，且 loadSessions 失败被静默吞掉</td>
+              <td>useAiSessions 增加 localStorage 持久化 activeSessionId；AiHomeWorkbench 重载时优先恢复该 ID；loadSessions 失败时展示错误提示而非空白</td>
+              <td>后端会话持久化逻辑已正确（appendAiSessionEvent），无需改动</td>
+              <td>activeSessionId 存 localStorage，不涉后端新增字段</td>
+              <td>切换侧边栏导航再返回 → 会话列表与消息正确恢复；loadSessions 失败 → 用户可见错误提示</td>
+              <td>无</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-018</td>
+              <td>AI 在做详细实施模块和工作量评估时，可按需查询已治理的金蝶产品知识，减少模块识别错配和无依据推断</td>
+              <td>只读知识库查询工具，不替代估算主流程、不自动改写正式评估、不绕过人工确认；智谱检索不使用 <code class="inline">prompt_template</code></td>
+              <td>AI 工作台展示知识库工具引用、检索触发状态、低置信提示和必要的人工确认入口</td>
+              <td>新增 Zhipu knowledge service + Agent Tool Registry 能力声明 + tool router；Kimi 仍负责 SOW/工作量主评估，Zhipu KB 用于产品知识增强</td>
+              <td>记录 knowledgeId、model、query、promptTokens、retrievalTriggered、toolCallId、modelRun/contextRefs；<code class="inline">reasoning_content</code> 仅调试留存或脱敏截断</td>
+              <td>mock 智谱 SDK/HTTP、缺失 env 禁用、检索未触发降级、禁用 prompt_template、工具发现与路由回归</td>
+              <td>更新 env、工具协议、审计口径、实现与文档对齐说明；必要时补 docs/openapi.yaml</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-019</td>
+              <td>把 AI 工作台从“三栏都抢注意力”收敛为以对话与产物为中心的工作空间，提升阅读、输入和任务接力效率</td>
+              <td>仅优化 <code class="inline">ui/V2_PROTOTYPE</code> 首页 AI 工作台体验；不改变 JWT、Harness 写动作确认、AI session API 或传统工作台主流程</td>
+              <td>删除或降级冗余副标题；推荐工作流改为可解释的启动器；右侧卡片支持折叠/重点优先；引入受控 Markdown 渲染组件和消息样式规范</td>
+              <td>默认无后端改动；右侧工作区折叠偏好已采用 localStorage，本轮不新增用户配置 API；若后续保存面板宽度再单独评估</td>
+              <td>Markdown 渲染已避免 <code class="inline">dangerouslySetInnerHTML</code>，原始 HTML 作为文本展示；链接使用协议白名单，不安全协议降级为不可点击文本；代码块和表格渲染保留可追溯内容，不改变 session 原文</td>
+              <td>桌面/窄屏布局回归、右栏折叠状态回归、Markdown 标题/列表/表格/代码块/安全链接渲染回归、unsafe link 降级与长消息滚动验收</td>
+              <td>输出布局重构方案；实现时同步 README/对齐说明中 AI 工作台前端口径（按需）</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-007 第一批交付说明 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">06 / RP-007 Delivery</div>
+          <h2>RP-007 · Harness Regression 样本集第一批</h2>
+          <p>本批聚焦“定义样本格式和评分规则”，为后续固定样本回放、模型质量趋势和版本间对比提供可测试基础。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill ok">已交付</span>
+            <h3>样本 schema</h3>
+            <p><code class="inline">harness-regression-sample.v1</code> 定义 <code class="inline">caseKey</code>、<code class="inline">sampleType</code>、<code class="inline">fileRefs</code>、<code class="inline">expected</code> 与启用状态；默认样本为制造业采购闭环 MVP。</p>
+          </div>
+          <div class="card">
+            <span class="pill brand">评分规则</span>
+            <h3>requirement_match_v1</h3>
+            <p>评分由项目字段、需求覆盖率和 evidence 引用三部分组成，默认权重 0.3 / 0.5 / 0.2，阈值 0.8；输出可映射到 <code class="inline">harness_scores.details</code>。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">未进入本批</span>
+            <h3>回放与持久化后续拆批</h3>
+            <p>本批不新增 API、CLI、DB 迁移或批量执行器；后续再把样本写入 <code class="inline">harness_cases</code>，将评分摘要写入 <code class="inline">harness_scores</code>。</p>
+          </div>
+        </div>
+
+        <div class="callout ok">
+          <div><b>验证证据</b>新增 <code class="inline">harness.regression: normalizes deterministic sample format</code> 与 <code class="inline">harness.regression: scores report by project fields requirement coverage and evidence refs</code> 两条用例，先因缺少模块见红，补实现后 <code class="inline">npm run test:harness --prefix apps/api</code> 65 pass，<code class="inline">npm run build:api</code> pass。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-017 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">06 / RP-017 Analysis</div>
+          <h2>RP-017 · AI 工作台切换后会话丢失</h2>
+          <p>用户在 AI 工作台发起对话后，切换侧边栏导航或 AI/传统工作台 toggle 再返回，对话会话与消息全部丢失。后端会话持久化逻辑正确，问题在前端恢复链路。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill err">问题</span>
+            <h3>AiHomeWorkbench 卸载后 state 全部清零</h3>
+            <p>组件卸载时 <code class="inline">sessions</code>、<code class="inline">activeSession</code>、<code class="inline">messages</code> 全部丢失。重载时 <code class="inline">loadSessions()</code> 虽从后端拉回会话列表，但 <code class="inline">setActiveSession((current) =&gt; current || items[0] || null)</code> 总是回退到 <code class="inline">items[0]</code>，无法记住卸载前的活跃会话。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">影响</span>
+            <h3>用户体验断裂</h3>
+            <p>用户每次切换导航后返回 AI 工作台，都看到空白会话列表或错误的会话，需要重新发起对话。高频操作场景下体验极差。</p>
+          </div>
+          <div class="card">
+            <span class="pill brand">边界</span>
+            <h3>前端恢复链路，不涉及后端</h3>
+            <p>后端 <code class="inline">appendAiSessionEvent</code> 已正确持久化消息到 <code class="inline">data/ai-sessions.json</code>。修复范围限定在 <code class="inline">useAiSessions</code> hook 与 <code class="inline">AiHomeWorkbench</code> 组件。</p>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:18px">
+          <div class="callout">
+            <div><b>初步方案</b>在 <code class="inline">useAiSessions</code> 中用 localStorage 持久化 <code class="inline">activeSessionId</code>：<code class="inline">upsertSession</code> / <code class="inline">setActiveSession</code> 时同步写入；<code class="inline">loadSessions</code> 完成后优先按存储的 ID 恢复 activeSession。同时在 <code class="inline">AiHomeWorkbench</code> 中为 <code class="inline">loadSessions()</code> 的 <code class="inline">.catch</code> 增加用户可见的错误提示（而非静默吞掉）。</div>
+          </div>
+          <div class="callout ok">
+            <div><b>验收口径</b>用户在 AI 工作台发送消息 → 切换侧边栏到"需求" → 切回"AI 工作台" → 原会话与消息完整恢复。切换 AI/传统工作台 toggle 同理。若 <code class="inline">loadSessions</code> API 失败，用户看到错误提示而非空白页面。</div>
+          </div>
+        </div>
+
+        <div class="callout warn">
+          <div><b>待规划输入</b>实现时需确认 localStorage key 命名规范（建议 <code class="inline">wes-ai-active-session-id</code>），并处理存储的 sessionId 在后端已不存在时的降级逻辑（回退到 items[0]）。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-012 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">06 / RP-012 Analysis</div>
+          <h2>RP-012 · WES Skill 工作流辅助工具</h2>
+          <p>记录本轮关于“将 Skill 引入 WES，辅助制造业售前背调与问题清单回复”的完整需求分析。当前状态为已分析 / 待规划，后续进入阶段性需求池规划。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill brand">定位</span>
+            <h3>受控工作流资产</h3>
+            <p>WES Skill 不是把 Codex 本地 Skill 原样搬进系统，而是在 WES 内部登记一组可治理的行业/角色工作流资产。</p>
+          </div>
+          <div class="card">
+            <span class="pill ok">首个场景</span>
+            <h3>制造业售前答复</h3>
+            <p>售前顾问上传客户需求清单后，系统基于客户行业背调、需求理解和金蝶实施经验生成问题清单回复草稿。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">边界</span>
+            <h3>人在环落地</h3>
+            <p>Skill 可以生成分析、建议和草稿；凡涉及正式业务写入、发布或客户外发，都必须由用户确认。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>需求结论</b>该方向与 WES Agent OS 的产品定位一致：AI 作为主交互层，WES 作为业务数据层、工作流约束层和版本记录层。Skill 应作为“场景编排资产”接在 AI 工作台、Agent Tool Registry 与 Harness 之间，复用现有 <code class="inline">company-profile-summary</code>、Presales、Sales Briefing、Project Evaluation 和 Harness 审计链路。</div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-h">用户与业务场景<span class="right">who / when</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li><b>目标用户：</b>专注制造业客户的售前顾问、销售顾问、方案顾问。</li>
+                <li><b>输入材料：</b>客户名称、行业线索、需求清单、Excel/Word/PDF、会议纪要、客户问题列表。</li>
+                <li><b>业务动作：</b>先做客户/行业背调，再理解需求清单，最后逐条生成可回客户的问题回复草稿。</li>
+                <li><b>交付物：</b>行业背景摘要、客户画像、需求-模块映射、问题清单回复、待确认问题、实施评估输入建议。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">业务价值<span class="right">why</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>降低售前顾问从材料到客户回复的准备时间。</li>
+                <li>把制造业方法论、金蝶产品模块经验和 WES 评估口径沉淀为可复用资产。</li>
+                <li>让 AI 输出具备证据、假设和待确认问题，避免“看起来专业但不可复核”。</li>
+                <li>为后续行业 Skill、客户专项 Skill、售前知识包和需求包生成打基础。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <table style="margin-top:18px">
+          <tr><th>分析维度</th><th>需求口径</th><th>当前 WES 可复用事实</th><th>后续规划输入</th></tr>
+          <tr>
+            <td>Skill 定义</td>
+            <td>一个包含角色、行业、输入 schema、输出 schema、提示词、工具白名单和确认策略的受控包。</td>
+            <td>已有 AI 工作台角色 preset、Agent Tool Registry、Prompt Profile 字段、Harness modelRun / artifact / ToolEvent。</td>
+            <td>定义 Skill manifest：skillId、version、owner、industry、role、allowedTools、artifactTypes、riskPolicy。</td>
+          </tr>
+          <tr>
+            <td>首批能力</td>
+            <td>制造业客户背调、需求清单解析、问题逐条回复、待确认问题、评估输入建议。</td>
+            <td>已有 <code class="inline">/ai/company-profile-summary</code>、Presales 需求包、Harness v1/v2 报告和项目评估草稿链路。</td>
+            <td>首个内置 Skill 建议命名为 <code class="inline">manufacturing-presales-response</code>。</td>
+          </tr>
+          <tr>
+            <td>执行方式</td>
+            <td>用户选择或 AI 推荐 Skill；Skill 装配上下文、调用模型与 WES 工具，输出 artifact 和 suggestedActions。</td>
+            <td>Phase 1G 已有 intent router、context builder、dispatch service 和 suggestedActions。</td>
+            <td>新增 Skill resolver，把 workflowKey / intent / role / industry 映射到 Skill。</td>
+          </tr>
+          <tr>
+            <td>数据与审计</td>
+            <td>每次执行必须记录 skillId、skillVersion、promptProfileId、modelRun、artifact、evidenceRefs 和 ToolEvent。</td>
+            <td>Harness 已 DB-backed，具备 run、evidence、artifact、modelRun、toolEvent 表。</td>
+            <td>Skill 执行结果优先进入 Harness artifact；写动作继续走人工确认。</td>
+          </tr>
+          <tr>
+            <td>权限边界</td>
+            <td>Skill 只能调用当前用户能力位允许的工具；不得越过 JWT、owner、版本和正式写入确认。</td>
+            <td>Agent 工具已按 capability 过滤，传统业务接口默认 JWT 鉴权。</td>
+            <td>Skill allowedTools 必须与 RBAC capability 双重校验。</td>
+          </tr>
+          <tr>
+            <td>知识来源</td>
+            <td>优先使用上传材料、WES 结构化数据、已发布标准和明确标注的数据源；外部背调需标明来源和不确定性。</td>
+            <td>已有客户画像摘要接口和 Harness evidence 机制；向量库仍后置。</td>
+            <td>先不引入独立向量库；如需行业知识库，先定义数据源合规与版本策略。</td>
+          </tr>
+        </table>
+
+        <div class="grid-3" style="margin-top:18px">
+          <div class="card">
+            <span class="pill ok">推荐 MVP</span>
+            <h3>内置标准 Skill</h3>
+            <p>先做平台内置的制造业售前 Skill，由管理员维护。它能最快验证价值，并降低个人 Skill 带来的治理复杂度。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">轻量方案</span>
+            <h3>Prompt Profile 扩展</h3>
+            <p>只扩展角色提示词和模板，落地快，但工具、审计、版本和可复用工作流能力不足。</p>
+          </div>
+          <div class="card">
+            <span class="pill">后置方案</span>
+            <h3>Skill 市场 / 设计器</h3>
+            <p>允许用户自建、共享和编排 Skill，价值高但治理复杂，应在内置 Skill 跑通后再进入 Phase 规划。</p>
+          </div>
+        </div>
+
+        <table style="margin-top:18px">
+          <tr><th>范围</th><th>纳入</th><th>暂不纳入</th></tr>
+          <tr>
+            <td>MVP</td>
+            <td>制造业售前背调、问题清单回复、证据/假设标注、待确认问题、结构化回复草稿。</td>
+            <td>自动外发客户、自动创建正式项目、自动发布正式评估、个人 Skill 市场。</td>
+          </tr>
+          <tr>
+            <td>系统集成</td>
+            <td>复用 AI 工作台、Harness、Agent Tool Registry、Presales、company-profile-summary。</td>
+            <td>新增第二前端、第二后端、绕过 modules 边界的直读文件实现。</td>
+          </tr>
+          <tr>
+            <td>知识能力</td>
+            <td>上传材料、当前 WES 数据、明确登记的行业知识和已发布标准版本。</td>
+            <td>未治理外部爬取、未标注来源的行业结论、未经审核的自动标准更新。</td>
+          </tr>
+        </table>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="panel">
+            <div class="panel-h">第一验收口径<span class="right">acceptance</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>售前用户可在 AI 工作台选择或触发制造业售前 Skill。</li>
+                <li>上传客户需求清单后，系统输出客户/行业摘要和逐条问题回复草稿。</li>
+                <li>每条关键结论能说明来源材料、WES 数据、模型推断或待确认假设。</li>
+                <li>Skill 执行记录包含 skillId、version、promptProfileId、modelRun 和 artifact。</li>
+                <li>生成需求包或实施评估草稿前必须出现确认动作，不自动写正式记录。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">待澄清问题<span class="right">open</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>第一阶段只做管理员维护的标准 Skill，还是允许售前顾问自建个人 Skill？</li>
+                <li>客户背调的数据源边界是什么：仅模型总结、平台内置知识、还是接入外部工商/行业检索？</li>
+                <li>回复草稿是否需要支持企业模板、金蝶标准话术或客户行业话术分层？</li>
+                <li>Skill 输出是否直接关联需求包，还是先仅作为 AI artifact 供人工采纳？</li>
+                <li>阶段性规划中 RP-012 是否优先于 RP-001 低代码工作流设计器，还是作为其试点场景？</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-013 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">07 / RP-013 Analysis</div>
+          <h2>RP-013 · AI 工作台通用化交互渲染</h2>
+          <p>记录本轮关于"AI 回复中需要用户完善信息时，渲染通用化交互界面"的完整需求分析。当前状态为已交付，人工用例 MT-1H-B-002 仍待真实 AI 输出场景回填。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill brand">问题</span>
+            <h3>Markdown 文本无法交互</h3>
+            <p>AI 回复中需要用户补全信息时（如合同金额范围、负责人、交付周期等），仅输出 Markdown 文本，用户必须手动打字回复，体验割裂。</p>
+          </div>
+          <div class="card">
+            <span class="pill ok">方案</span>
+            <h3>后端结构化协议 + 前端交互组件</h3>
+            <p>LLM 输出 markdown 的同时附加 formBlock JSON 结构，前端检测到后渲染为 InteractiveFormCard 组件，用户填完后一键提交。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">边界</span>
+            <h3>通用化能力，非单场景</h3>
+            <p>不限于"创建项目"场景，任何 AI 需要用户补充信息的场景都能受益。LLM 不遵守格式时降级为纯文本。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>需求结论</b>该能力是 AI 工作台从"对话式"向"交互式"演进的关键一步。通过后端结构化协议（formBlock）让 LLM 明确告诉前端"这里需要表单"，前端渲染对应控件（单选/文本/数字/布尔等），用户填完后自动拼成普通 chat 消息发送。当前已完成前后端闭环：<code class="inline">WorkbenchDispatchData.formBlock</code>、白名单校验、JSON 协议剥离、session message <code class="inline">metadata.formBlock</code>、<code class="inline">InteractiveFormCard</code>、即时响应回退挂载、会话 metadata 回放、OpenAPI 与实现对齐说明。</div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-h">现状与根因<span class="right">as-is</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li><b>后端 LLM 输出：</b>纯 markdown 字符串 <code class="inline">answer: string</code>，无结构化表单语义。</li>
+                <li><b>API 响应结构：</b><code class="inline">WorkbenchDispatchData</code> 已支持可选 <code class="inline">formBlock</code>，并通过 <code class="inline">metadata.formBlock</code> 写入 assistant session message。</li>
+                <li><b>前端渲染：</b><code class="inline">RichAiMessage</code> 下方已接入 <code class="inline">InteractiveFormCard</code>，可从即时响应 <code class="inline">formBlock</code> 或 session <code class="inline">metadata.formBlock</code> 渲染。</li>
+                <li><b>核心矛盾：</b>LLM 输出自然语言问题列表时仍只能阅读；输出受控 <code class="inline">formBlock</code> 时前端可渲染交互组件并一键回传。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">推荐方案（方案 A）<span class="right">to-be</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li><b>数据结构：</b>已新增 <code class="inline">InteractiveFormField</code>（id/label/type/options/required）和 <code class="inline">InteractiveFormBlock</code>（title/fields/submitLabel）。</li>
+                <li><b>API 扩展：</b><code class="inline">WorkbenchDispatchData</code> 已新增 <code class="inline">formBlock?: InteractiveFormBlock</code> 字段，<code class="inline">/api/v1/ai/home-workbench/chat</code> 同步返回该字段。</li>
+                <li><b>前端组件：</b>已新增 <code class="inline">InteractiveFormCard</code> 组件，根据字段类型渲染下拉/文本框/数字框/布尔勾选和多行输入。</li>
+                <li><b>LLM Prompt：</b>已在 system prompt 中增加指令，要求 LLM 在需要用户填写信息时附加 JSON 格式的 formBlock。</li>
+                <li><b>降级策略：</b>LLM 不遵守格式时，前端 fallback 到纯文本渲染，不影响现有功能。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <table style="margin-top:18px">
+          <tr><th>分析维度</th><th>需求口径</th><th>当前 WES 可复用事实</th><th>后续规划输入</th></tr>
+          <tr><td>用户价值</td><td>AI 回复中需补全信息时可直接交互填写，无需手动打字，提升信息补全效率</td><td>现有 <code class="inline">RichAiMessage</code> markdown 渲染 + <code class="inline">suggestedActions</code> 按钮机制</td><td>通用化交互能力可作为 Phase 1H 体验增强项</td></tr>
+          <tr><td>业务边界</td><td>AI 工作台消息渲染层，不改变现有意图路由与 dispatch 逻辑</td><td><code class="inline">workbench-dispatch.service.ts</code> 的 <code class="inline">WorkbenchDispatchData</code> 结构</td><td>formBlock 作为可选字段，向后兼容</td></tr>
+          <tr><td>前端影响</td><td>新增 InteractiveFormCard 组件 + AiHomeWorkbench 消息渲染集成</td><td><code class="inline">AiHomeWorkbench.jsx</code> 已在助手正文下方、产物/建议动作上方渲染 formBlock；提交复用 <code class="inline">sendMessage(messageOverride)</code></td><td>后续可扩展日期、文件上传等复杂控件</td></tr>
+          <tr><td>后端影响</td><td>WorkbenchDispatchData 新增 formBlock 字段 + LLM prompt 增加结构化输出指令</td><td><code class="inline">workbench-dispatch.service.ts</code> 已完成协议解析、白名单校验和无效协议降级</td><td>后续关注真实模型输出稳定性</td></tr>
+          <tr><td>数据/审计</td><td>formBlock 数据进入 session messages，可追溯</td><td><code class="inline">AiMessage.metadata</code> 已支持 <code class="inline">formBlock</code></td><td>无需新增存储表</td></tr>
+          <tr><td>测试要求</td><td>表单渲染 E2E + 提交消息拼接验证 + LLM 不遵守格式时的降级测试</td><td>后端已覆盖有效提取、无效降级、API 响应和 session metadata；前端已覆盖即时响应 formBlock 与 session metadata 回放提交</td><td>MT-1H-B-002 仍需真实模型输出人工验收</td></tr>
+          <tr><td>文档要求</td><td>交互渲染设计说明更新</td><td><code class="inline">docs/openapi.yaml</code>、实现对齐说明与总看板已更新</td><td>人工验收通过后补截图/执行人/日期证据</td></tr>
+        </table>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="panel">
+            <div class="panel-h">方案对比<span class="right">options</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li><b>方案 A（推荐）：</b>后端结构化协议 — LLM 输出 formBlock JSON，前端渲染交互组件。精确可控，支持多字段类型。</li>
+                <li><b>方案 B：</b>前端启发式解析 — 正则匹配 markdown 中的问题列表模式。不改后端但脆弱，维护成本高。</li>
+                <li><b>方案 C（后续）：</b>混合方案 — 方案 A 为主 + 方案 B 为兜底。LLM 不遵守格式时降级渲染。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">待澄清问题<span class="right">open</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>LLM 输出 JSON formBlock 的可靠性如何？是否需要 few-shot 示例或强制 responseFormat？</li>
+                <li>当前提交为自然语言模板；后续是否需要同时保留结构化 JSON 影子字段，用于更强的自动解析？</li>
+                <li>是否需要在 <code class="inline">RequirementAiWorkbench</code> 也支持此能力，还是先仅在 AI 工作台落地？</li>
+                <li>字段类型是否需要支持文件上传、日期选择等复杂控件？</li>
+                <li>阶段性规划中 RP-013 是否优先于 RP-001 低代码工作流设计器？</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-015 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">08 / RP-015 Analysis</div>
+          <h2>RP-015 · AI 工作台消息发送框高度不可调节</h2>
+          <p>记录用户人工测试中反馈的 AI 工作台底部消息发送框体验问题。当前判断为非阻塞、信息足够，已直接入池并进入阶段性需求池规划。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill brand">问题来源</span>
+            <h3>用户截图反馈</h3>
+            <p>截图显示 AI 工作台底部 composer 区域固定高度，用户反馈“消息发送框无法调节高度”。红框区域为底部输入与发送区。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">用户影响</span>
+            <h3>长文本输入受限</h3>
+            <p>售前问题清单、测试反馈和需求分析常为多段长文本。输入框不可调高时，用户需要在小区域内滚动编辑，降低校对效率并增加误发风险。</p>
+          </div>
+          <div class="card">
+            <span class="pill ok">初步方案</span>
+            <h3>自动增高 + 手动调节</h3>
+            <p>输入框随内容自动增高，同时允许用户纵向调整高度；通过 min/max-height 约束避免遮挡消息列表、右侧栏和底部操作区。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>需求结论</b>这是 AI 工作台核心输入体验的高频优化项，不涉及后端与数据模型。建议纳入 Phase 1H 前端体验批次，与消息自动滚动、通用交互渲染等 composer/message UX 需求统一规划，避免零散修补。</div>
+        </div>
+
+        <table>
+          <tr><th>分析维度</th><th>记录内容</th><th>后续规划输入</th></tr>
+          <tr><td>当前事实</td><td>从用户截图与反馈可确认：底部消息发送框高度不可由用户调节，长文本只能在固定输入区内处理。</td><td>后续实现前需在本地复现并确认现有 textarea / composer DOM 结构。</td></tr>
+          <tr><td>业务边界</td><td>仅优化 AI 工作台输入区，不改变消息发送协议、会话存储、附件上传、权限或后端接口。</td><td>如未来保存用户自定义高度，再单独评估本地存储或用户配置边界。</td></tr>
+          <tr><td>前端方案</td><td>为输入控件增加可控高度策略：默认 min-height，内容自动增高到 max-height，允许用户纵向拖拽或提供明确 resize affordance。</td><td>发送按钮、附件按钮和快捷入口使用稳定尺寸；高度变化不能造成布局跳动或遮挡。</td></tr>
+          <tr><td>优先级</td><td>P1。虽不阻塞主流程，但影响 AI 工作台长需求输入、测试反馈记录和售前问题清单回复等高频场景。</td><td>进入 Phase 1H 前端体验规划，和 RP-014 消息自动滚动联动验收。</td></tr>
+          <tr><td>验收口径</td><td>用户输入多段长文本时，可扩大编辑区；发送按钮始终可见；桌面与移动视口下不遮挡消息列表、右侧面板或快捷入口。</td><td>补充交互测试或 Playwright 视觉检查，覆盖长文本、调高、发送和窗口缩放。</td></tr>
+        </table>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="panel">
+            <div class="panel-h">初步拆解<span class="right">breakdown</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li><b>涉及页面：</b><code class="inline">ui/V2_PROTOTYPE</code> AI 工作台底部 composer。</li>
+                <li><b>实现方向：</b>优先 CSS / React 层处理 textarea 高度和容器布局，不新增后端 API。</li>
+                <li><b>风险控制：</b>限定最大高度，防止输入区挤压消息阅读区或覆盖右侧栏。</li>
+                <li><b>联动项：</b>与 RP-014 消息自动滚动共同验证底部 composer 的滚动与焦点体验。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">待规划问题<span class="right">open</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>优先采用浏览器原生 textarea resize，还是自定义拖拽手柄以保持统一视觉？</li>
+                <li>输入框最大高度按固定像素、视口比例，还是消息区剩余空间计算？</li>
+                <li>是否需要记住用户上一次调整后的高度，还是每次进入工作台恢复默认高度？</li>
+                <li>RequirementAiWorkbench 是否也存在同类 composer，需要在同一批次统一处理？</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-016 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">09 / RP-016 Analysis</div>
+          <h2>RP-016 · AI 工作台创建项目后关联记录与列表未刷新</h2>
+          <p>记录用户人工测试中反馈的 AI 工作台创建项目后数据同步问题。当前判断为非阻塞、信息足够，已直接入池并进入待规划。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill brand">问题来源</span>
+            <h3>用户截图反馈</h3>
+            <p>AI 工作台对话中项目创建成功后，右侧"关联记录"面板仍显示"项目：未关联"，未自动更新显示新创建的项目。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">用户影响</span>
+            <h3>核心流程断裂</h3>
+            <p>用户通过 AI 工作台成功创建项目后，无法在关联记录和项目列表中看到结果，产生"是否创建成功"的困惑，破坏核心工作流闭环。</p>
+          </div>
+          <div class="card">
+            <span class="pill ok">初步方案</span>
+            <h3>补事件传播与刷新触发</h3>
+            <p>项目创建 API 成功后，通过事件总线或状态管理通知关联记录面板和项目列表组件触发数据刷新。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>需求结论</b>这是 AI 工作台核心工作流闭环的高优先级问题。项目创建成功但前端未同步，属于事件传播链路缺失。建议纳入 Phase 1H 前端体验批次，与关联记录面板整体刷新机制统一规划。</div>
+        </div>
+
+        <table>
+          <tr><th>分析维度</th><th>记录内容</th><th>后续规划输入</th></tr>
+          <tr><td>当前事实</td><td>AI 工作台对话中项目创建 API 调用成功（对话中显示"项目创建成功"），但右侧关联记录面板显示"项目：未关联"，项目列表页面也未出现新项目记录。</td><td>后续实现前需排查项目创建 API 的响应结构与前端组件的事件监听机制。</td></tr>
+          <tr><td>业务边界</td><td>仅优化 AI 工作台创建项目后的前端数据同步，不改变项目创建 API、后端逻辑或数据存储。</td><td>如项目创建 API 需返回关联上下文（如 projectId），再评估 API 响应结构调整。</td></tr>
+          <tr><td>前端方案</td><td>项目创建 API 成功后，通过事件总线 / 状态管理 / 回调机制通知关联记录面板和项目列表组件触发数据刷新；或在 API 响应中携带新项目信息直接更新本地状态。</td><td>需确认现有前端状态管理方案（Context / Zustand / 事件总线）并选择最一致的刷新策略。</td></tr>
+          <tr><td>优先级</td><td>P1。虽不阻塞项目创建本身，但破坏用户"创建 → 确认 → 继续操作"的核心闭环，影响高频使用场景。</td><td>进入 Phase 1H 前端体验规划，与关联记录面板整体数据同步机制联动。</td></tr>
+          <tr><td>验收口径</td><td>AI 工作台创建项目成功后，右侧关联记录面板立即显示新项目信息；切换到项目列表页面后也能看到新项目记录。</td><td>补充 E2E 测试：创建项目 → 验证关联记录面板刷新 → 验证项目列表刷新。</td></tr>
+        </table>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="panel">
+            <div class="panel-h">初步拆解<span class="right">breakdown</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li><b>涉及页面：</b><code class="inline">ui/V2_PROTOTYPE</code> AI 工作台右侧关联记录面板 + 项目列表页面。</li>
+                <li><b>实现方向：</b>排查项目创建 API 成功后的前端事件传播链路，补关联记录面板与项目列表的刷新触发。</li>
+                <li><b>风险控制：</b>避免不必要的整页刷新，优先局部组件状态更新。</li>
+                <li><b>联动项：</b>与关联记录面板整体数据同步机制统一规划，避免零散修补。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">待规划问题<span class="right">open</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>现有前端状态管理方案是什么（React Context / Zustand / 事件总线）？哪种刷新策略最一致？</li>
+                <li>项目创建 API 响应是否已携带新项目完整信息（projectId、项目名称等），还是需要额外查询？</li>
+                <li>关联记录面板是否还有其他业务实体（需求、评估等）的创建后刷新问题？</li>
+                <li>项目列表页面是否通过路由切换进入，切换时是否已有数据刷新机制？</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-018 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">10 / RP-018 Analysis</div>
+          <h2>RP-018 · AI 可发现知识库资源工具</h2>
+          <p>基于 Qoder 已验证的智谱知识库最小闭环，规划一个 WES AI 可发现、可调用、可审计的只读知识库工具，用于增强详细实施模块识别和工作量评估时的产品知识依据。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill brand">来源</span>
+            <h3>最小闭环已验证</h3>
+            <p><code class="inline">docs/智谱AI知识库集成指南.md</code> 已记录 SDK、环境变量、Python/TypeScript 示例、响应结构和检索触发判断；<code class="inline">scripts/test-zhipu-knowledge-base.py</code> 可做调试验证。</p>
+          </div>
+          <div class="card">
+            <span class="pill ok">价值</span>
+            <h3>补足产品知识依据</h3>
+            <p>在 AI 进行模块拆分、范围界定和工作量评估时，先检索金蝶产品知识库，给出更接近真实产品边界的模块解释、适配建议和依据提示。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">边界</span>
+            <h3>工具增强，不替代评估</h3>
+            <p>智谱知识库只作为只读辅助工具；Kimi 仍负责 SOW/工作量主评估，WES 规则仍负责正式估算口径，所有正式写入仍需人工确认。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>需求结论</b>建议将智谱知识库封装为 Agent Tool Registry 中的可发现工具，而不是直接替换现有 AI 模型或估算规则。MVP 聚焦“查询产品知识、返回可审计证据、标记检索是否触发、供评估链路引用”，暂不让知识库结果自动改变正式工作量结论。</div>
+        </div>
+        <div class="callout" style="margin-bottom:18px">
+          <div><b>计划状态</b>2026-06-24 已输出实施计划 <code class="inline">docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md</code>，明确 native fetch 调用智谱、禁用 <code class="inline">prompt_template</code>、<code class="inline">retrievalTriggered</code> 判定、缺失配置降级、<code class="inline">trace.knowledgeTool</code> 审计字段和前端轻量 trace chip；本轮已完成后端 <code class="inline">knowledge-tool.service</code>、5 条服务测试、<code class="inline">knowledge_query</code> 意图路由、dispatch <code class="inline">trace.knowledgeTool</code>、assistant message <code class="inline">metadata.knowledgeTool</code>、OpenAPI 契约与前端 <code class="inline">知识库参考</code> trace chip，状态更新为已交付 / 人工验收待回填；真实 ZHIPU 配置验收 MT-1H-B-003 仍待人工执行。</div>
+        </div>
+
+        <table>
+          <tr><th>分析维度</th><th>需求口径</th><th>当前可复用事实</th><th>后续规划输入</th></tr>
+          <tr>
+            <td>工具定位</td>
+            <td>一个 AI 可发现的只读工具，例如 <code class="inline">knowledge_base.query_product_knowledge</code>，由 Agent 根据问题意图按需调用。</td>
+            <td>Phase 1G 已有 intent router、context builder、dispatch service 和 suggestedActions；RP-012 已提出 Skill / Tool Registry 治理方向。</td>
+            <td>定义 tool manifest：toolId、capability、input schema、output schema、audit fields、disabled reason。</td>
+          </tr>
+          <tr>
+            <td>模型路由</td>
+            <td>Kimi 继续承担 SOW 理解、工作量评估和综合推理；Zhipu GLM + knowledge retrieval 承担金蝶产品知识、模块解释、产品边界问答。</td>
+            <td>智谱文档建议 <code class="inline">glm-4.6</code> + <code class="inline">ZHIPU_KNOWLEDGE_ID</code>；当前 AI facade 实际实现仍在 <code class="inline">services/ai/</code>。</td>
+            <td>输出场景路由策略：何时只用 Kimi、何时先查知识库、何时把 KB 摘要并入 Kimi 上下文。</td>
+          </tr>
+          <tr>
+            <td>检索可靠性</td>
+            <td>严禁使用 <code class="inline">prompt_template</code>；通过 <code class="inline">usage.prompt_tokens</code> 判断检索是否触发，低 token 或无命中必须降级为低置信回答。</td>
+            <td>Qoder 实测：使用 <code class="inline">prompt_template</code> 会导致检索失效；具体模块词比宽泛产品名更容易触发检索。</td>
+            <td>工具返回必须包含 <code class="inline">retrievalTriggered</code>、<code class="inline">promptTokens</code>、<code class="inline">confidence</code> 和 <code class="inline">fallbackReason</code>。</td>
+          </tr>
+          <tr>
+            <td>数据与审计</td>
+            <td>每次工具调用记录 query、knowledgeId、model、promptTokens、retrievalTriggered、latency、cost 近似值和调用结果摘要。</td>
+            <td>Harness 已具备 modelRun、artifact、ToolEvent、contextRefs；普通附件问答轻量审计仍在 RP-002。</td>
+            <td>决定该工具调用进入 Harness ToolEvent，还是普通问答走轻量审计；正式报告引用时必须有 contextRef。</td>
+          </tr>
+          <tr>
+            <td>权限与配置</td>
+            <td>缺失 <code class="inline">ZHIPU_API_KEY</code> 或 <code class="inline">ZHIPU_KNOWLEDGE_ID</code> 时工具标记为 unavailable，不影响现有 AI 工作台。</td>
+            <td><code class="inline">apps/api/.env.example</code> 已补充 ZHIPU 配置；当前 JWT/owner 边界仍必须保留。</td>
+            <td>配置读取、健康检查、工具可发现状态和管理员诊断信息需要统一设计。</td>
+          </tr>
+          <tr>
+            <td>输出使用</td>
+            <td>知识库结果可以作为“参考依据/候选模块解释/待确认知识”，不能直接覆盖估算字段或发布正式记录。</td>
+            <td>WES 当前正式写动作均需确认，传统评估版本机制仍是最终业务口径。</td>
+            <td>报告中区分：用户材料证据、WES 数据、知识库参考、模型推断和人工确认。</td>
+          </tr>
+        </table>
+
+        <div class="grid-3" style="margin-top:18px">
+          <div class="card">
+            <span class="pill ok">MVP 纳入</span>
+            <h3>只读查询 + 审计追踪</h3>
+            <p>后端工具封装、可发现能力声明、AI 工作台调用展示、检索触发判断、低置信降级、基础 mock 测试和文档同步。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">暂不纳入</span>
+            <h3>自动改写估算</h3>
+            <p>不让知识库结果直接写正式工作量、报价、实施计划或客户外发内容；不做知识库管理后台和自动知识同步。</p>
+          </div>
+          <div class="card">
+            <span class="pill">后续扩展</span>
+            <h3>Skill 与评估链路增强</h3>
+            <p>与 RP-012 Skill、RP-007 Regression、RP-005 Artifact Workspace 联动，沉淀可回放的知识引用质量评估。</p>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="panel">
+            <div class="panel-h">第一验收口径<span class="right">acceptance</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>AI 工作台工具清单能发现知识库查询能力；缺少 ZHIPU 配置时显示不可用原因。</li>
+                <li>输入“智能会计平台是什么”这类知识库覆盖问题时，工具返回答案，并标记 <code class="inline">retrievalTriggered=true</code>。</li>
+                <li>输入知识库未覆盖或检索未触发的问题时，返回低置信提示，不伪装成已引用知识库。</li>
+                <li>工具调用 trace 包含 model、knowledgeId、promptTokens、retrievalTriggered、query 和结果摘要。</li>
+                <li>详细实施模块或工作量评估流程可引用知识库摘要作为上下文，但正式结论仍显示依据类型和人工确认边界。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">评审结论<span class="right">review</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li><b>通过入池：</b>该能力与 WES Agent OS 的可控工具化方向一致，具备已验证技术材料和明确业务价值。</li>
+                <li><b>条件通过：</b>MVP 必须只读、可关闭、可审计、可降级；不得绕过 JWT、owner、版本机制和人工确认。</li>
+                <li><b>主要风险：</b>检索未触发、知识源过期、外部模型成本、隐私数据发送和错误引用。需在工具输出中显式暴露置信与来源。</li>
+                <li><b>排期建议：</b>不进入 Phase 1H-A；作为 Phase 1H-B/Phase 2 的 AI 能力候选，与 RP-012 Skill 和 RP-013 交互渲染分批评审。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>待澄清问题</b>第一阶段知识库内容是否仅覆盖当前智谱知识库中的金蝶产品资料？是否允许把客户附件片段发给智谱做联合检索？知识库答案在正式报告中展示到什么粒度：摘要、引用片段、还是仅展示“知识库参考”标签？</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-019 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">11 / RP-019 Analysis</div>
+          <h2>RP-019 · AI 工作台布局与 Markdown 渲染深度优化</h2>
+          <p>记录用户基于 AI 工作台截图提出的体验优化评审：当前页面存在顶部信息冗余、推荐工作流定位不清、右侧过程面板常驻占用空间、AI 回复 Markdown 渲染混乱等问题。该反馈不阻塞主流程，但影响 AI 工作台作为主交互入口的效率和可信度。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill err">问题</span>
+            <h3>主任务空间被次要信息挤压</h3>
+            <p>截图显示顶部副标题、左侧角色卡/会话/推荐工作流、右侧产物/动作/关联/沉淀/快捷入口同时出现，真正用于用户消息和 AI 回复的区域被压缩。<code class="inline">HomeWorkspace.jsx</code> 仍固定展示“按登录账号业务角色预置对话工作流”，但该文案对当前任务没有直接帮助。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">影响</span>
+            <h3>用户难判断入口含义和下一步</h3>
+            <p>“推荐工作流”实际会设置 <code class="inline">activeWorkflowKey</code>，影响中心空态、输入上下文和沉淀结果，但 UI 上更像静态引导卡；右侧卡片又像状态看板，缺少可折叠、可聚焦和优先级表达。</p>
+          </div>
+          <div class="card">
+            <span class="pill brand">根因</span>
+            <h3>渲染层能力不足</h3>
+            <p><code class="inline">AiHomeWorkbench.jsx</code> 当前用 <code class="inline">parseMarkdownBlocks</code> 和 <code class="inline">renderInlineMarkdown</code> 自写轻量解析，仅支持段落、基础列表和加粗；表格、标题、分隔线、代码块和链接会退化成近似纯文本，导致 AI 回复显得杂乱。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>评审结论</b>建议把 RP-019 作为 Phase 1H-B 的 AI 工作台信息架构重构项，而不是零散调整文案。推荐方案是“对话优先 + 过程面板可折叠 + 工作流启动器语义化 + 受控 Markdown 渲染器”：顶部保留必要身份和切换，左侧只保留会话与可解释工作流入口，右侧默认折叠为可展开工作区，AI 回复统一走安全 Markdown 渲染组件。</div>
+        </div>
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>交付更新（2026-06-24）</b>RP-019 右侧工作区折叠批次已完成：<code class="inline">AiHomeWorkbench</code> 右栏新增折叠/展开按钮，使用 <code class="inline">wes-ai-workspace-panel-collapsed</code> 记录折叠状态，折叠后桌面三栏从 <code class="inline">240px / 1fr / 300px</code> 调整为 <code class="inline">240px / 1fr / 48px</code>，窄屏也保留 48px 工作区入口。当前验证基线：<code class="inline">HomeWorkspace.test.jsx</code> 43 pass，V2 前端 83 pass，<code class="inline">build:web</code> pass。</div>
+        </div>
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>交付更新（2026-06-24）</b>RP-019 Markdown 表格渲染批次已完成：<code class="inline">RichAiMessage</code> 识别标准管道表格（表头 + 分隔行 + 数据行），渲染为真实 <code class="inline">table</code>，单元格继续复用现有 inline Markdown 渲染，长表通过横向滚动保护消息区布局。本批不引入新依赖，不使用 <code class="inline">dangerouslySetInnerHTML</code>，不改写 session 原文。验证：<code class="inline">HomeWorkspace.test.jsx</code> 43 pass，V2 前端 83 pass，<code class="inline">build:web</code> pass。</div>
+        </div>
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>交付更新（2026-06-24）</b>RP-019 Markdown sanitize 批次已完成：<code class="inline">renderInlineMarkdown</code> 增加链接协议白名单，允许 <code class="inline">http</code>、<code class="inline">https</code>、<code class="inline">mailto</code> 与相对链接；<code class="inline">javascript:</code> 等不安全协议降级为不可点击文本。原始 HTML 仍由 React 文本节点展示，不使用 <code class="inline">dangerouslySetInnerHTML</code>，不改写 session 原文。验证：新增 unsafe link/raw HTML 回归用例先见红再转绿，<code class="inline">HomeWorkspace.test.jsx</code> 43 pass，V2 前端 83 pass，<code class="inline">build:web</code> pass。</div>
+        </div>
+
+        <table>
+          <tr><th>评审维度</th><th>当前事实</th><th>优化建议</th><th>验收口径</th></tr>
+          <tr>
+            <td>顶部信息密度</td>
+            <td><code class="inline">HomeWorkspace.jsx</code> 为 AI 视图固定输出副标题“按登录账号业务角色预置对话工作流”。</td>
+            <td>AI 视图移除副标题或压缩为 Tooltip / 状态 chip；保留“AI 工作台/传统工作台”切换即可。</td>
+            <td>首屏顶部高度减少，用户无需阅读解释文案即可进入对话；传统工作台副标题不受影响。</td>
+          </tr>
+          <tr>
+            <td>推荐工作流</td>
+            <td>点击会调用 <code class="inline">startWorkflow(workflow)</code> 并设置当前 workflow，但入口命名偏“推荐内容”。</td>
+            <td>改为“开始任务”或“工作流模板”，展示选中后会改变输入提示、预期产物和建议动作；支持收起或仅显示当前选中任务。</td>
+            <td>用户能明确知道点击后会启动哪类对话上下文，不误认为只是宣传或帮助卡片。</td>
+          </tr>
+          <tr>
+            <td>右侧过程面板</td>
+            <td><code class="inline">ArtifactPanel</code>、沉淀结果、当前文件、快捷入口曾全部常驻，占用 300px 宽度；当前已合并空态卡片并支持整体折叠。</td>
+            <td>参考 Codex 类工作台：已交付整体折叠与窄栏入口；后续可继续补分组折叠、重要项置顶和待确认动作自动提示。</td>
+            <td>用户可一键把视觉空间让给消息区；折叠状态刷新后保持；有待确认动作时后续可自动提示或保持展开。</td>
+          </tr>
+          <tr>
+            <td>Markdown 阅读质量</td>
+            <td>现有自写 parser 曾不支持 Markdown 表格，截图中表格线和分隔线挤在正文；当前已支持标准管道表格，并对不安全链接做降级。</td>
+            <td>已覆盖 heading、paragraph、ordered/unordered list、table、code/pre、link 与 unsafe link 降级；后续如需要再补 blockquote/hr。</td>
+            <td>同一段 AI 回复在前端呈现为清晰标题、表格和段落；不安全链接不可点击，原始 HTML 不被执行，原始 session message 不被改写。</td>
+          </tr>
+          <tr>
+            <td>响应式与状态记忆</td>
+            <td>当前三栏桌面基线已收敛为 <code class="inline">240px / 1fr / 300px</code>，折叠态为 <code class="inline">240px / 1fr / 48px</code>，窄屏保留 48px 工作区入口。</td>
+            <td>已支持折叠状态记忆；后续若用户需要，可再评估右栏宽度拖拽记忆或窄屏抽屉化。</td>
+            <td>1440/1920 桌面消息区可通过折叠右栏明显扩大；1180 以下不出现横向挤压和内容重叠。</td>
+          </tr>
+        </table>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="card">
+            <span class="pill brand">推荐方案</span>
+            <h3>分两步实施</h3>
+            <ul class="list-clean" style="margin-top:12px">
+              <li><b>Step 1：</b>信息架构快速收敛：移除冗余副标题、合并空态、右栏整体折叠已完成；推荐工作流命名与更深层启动器语义可继续细化。</li>
+              <li><b>Step 2：</b>渲染机制治理：安全 Markdown 渲染与样式回归已覆盖标题、表格、代码、链接协议白名单和原始 HTML 文本化；后续可再抽共享组件。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="pill warn">边界与依赖</span>
+            <h3>不与 RP-013 混淆</h3>
+            <p>RP-013 解决“AI 回复中需要用户补全信息时渲染交互表单”；RP-019 解决“已有文本和工作台布局是否易读、可聚焦”。两者可在 Phase 1H-B 合并规划，但实现边界应分开验收。</p>
+          </div>
+        </div>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>后续输入</b>右栏折叠偏好已采用 localStorage 保存，标准 Markdown 表格已渲染为真实 table，unsafe link/raw HTML 已有渲染层防护；剩余仅需评估是否确有必要引入右栏宽度拖拽/宽度记忆。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-020 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">12 / RP-020 Analysis</div>
+          <h2>RP-020 · AI 消息引导性选项交互化渲染</h2>
+          <p>用户在 AI 工作台截图中反馈：AI 回复中的引导性选项（如“选项A/B/C”及编号问题列表）以纯文本 Markdown 呈现，用户需手动输入文字回复才能继续交互。该需求是 RP-013 通用化交互渲染的一个具体高频场景延伸。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill err">问题</span>
+            <h3>引导选项以纯文本呈现，需手动输入回复</h3>
+            <p>截图显示 AI 回复中包含“选项A：需求深化分析”“选项B：方案匹配设计”“选项C：实施风险评估”以及编号问题列表，底部提示“如需启动工作流，请回复'启动[选项A/B/C]'”。用户必须阅读后手动打字才能选择，交互效率低。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">影响</span>
+            <h3>增加认知与操作成本，降低 AI 工作台交互效率</h3>
+            <p>引导选项是 AI 工作台的高频交互模式，每次都需要用户手动输入选项文本，增加了不必要的打字负担，且容易因输入格式不匹配导致意图识别失败。</p>
+          </div>
+          <div class="card">
+            <span class="pill brand">根因</span>
+            <h3>消息渲染层缺少选项模式识别与交互控件渲染</h3>
+            <p>当前 <code class="inline">AiHomeWorkbench</code> 消息渲染使用 <code class="inline">parseMarkdownBlocks</code> 轻量解析，仅支持基础 Markdown 元素，无法识别“选项A/B/C”或编号问题列表等结构化模式，更不会渲染为可点击控件。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>评审结论</b>已作为 RP-013 的前端轻量子场景优先落地：消息渲染层新增“选项X：”显式识别，并对带选择/问题提示的编号列表保守增强为 <code class="inline">InteractiveOptionCard</code>；用户点击后发送对应文本，无需后端改动。</div>
+        </div>
+
+        <table>
+          <tr><th>评审维度</th><th>当前事实</th><th>优化建议</th><th>验收口径</th></tr>
+          <tr>
+            <td>选项识别规则</td>
+            <td>AI 回复中的“选项A/B/C”和编号问题列表均为纯文本 Markdown。</td>
+            <td>前端正则识别模式：<code class="inline">/^选项[\u4e00-\u9fa5A-Z0-9]+[：:]/</code>；编号列表仅在前置文案包含选择/回复/启动/待确认问题等上下文时增强，降低误识别。</td>
+            <td>AI 回复中符合模式的文本行被识别为选项，普通报告编号列表保持原样渲染。</td>
+          </tr>
+          <tr>
+            <td>交互控件渲染</td>
+            <td>已新增 <code class="inline">InteractiveOptionCard</code> 组件，集成在 <code class="inline">RichAiMessage</code> 渲染流程。</td>
+            <td>显式选项渲染为按钮/卡片；点击后调用现有 <code class="inline">sendMessage(optionText)</code> 发送，不新增后端协议。</td>
+            <td>用户点击“选项A：需求深化分析”后发送“启动选项A：需求深化分析”，无需手动打字。</td>
+          </tr>
+          <tr>
+            <td>降级策略</td>
+            <td>无降级机制。</td>
+            <td>选项识别失败时，文本仍以 Markdown 渲染，不影响现有消息展示。</td>
+            <td>不符合选项模式的 AI 回复不受影响，渲染效果与当前一致。</td>
+          </tr>
+          <tr>
+            <td>与 RP-013 关系</td>
+            <td>RP-013 解决通用 formBlock 结构化交互渲染。</td>
+            <td>RP-020 聚焦前端侧选项模式识别与轻量交互，可作为 RP-013 的前置子集先落地。</td>
+            <td>RP-020 不依赖 RP-013 后端协议，可独立实现和验收。</td>
+          </tr>
+        </table>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="card">
+            <span class="pill brand">推荐方案</span>
+            <h3>前端轻量选项识别 + InteractiveOptionCard</h3>
+            <ul class="list-clean" style="margin-top:12px">
+              <li><b>Step 1：</b>在 <code class="inline">parseMarkdownBlocks</code> 中新增选项模式识别，提取选项标签与描述。</li>
+              <li><b>Step 2：</b>新增 <code class="inline">InteractiveOptionCard</code> 组件，渲染选项按钮组，点击自动填充并发送。</li>
+              <li><b>Step 3：</b>集成到 <code class="inline">AiHomeWorkbench</code> 消息渲染流程，选项区域替换纯文本渲染。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="pill warn">边界与依赖</span>
+            <h3>与 RP-013 / RP-019 的关系</h3>
+            <p>RP-020 是 RP-013 的前端轻量子集，不依赖后端 formBlock 协议；与 RP-019 的 Markdown 渲染优化可并行，但建议 RP-019 的渲染器重构完成后再集成，避免重复改造。</p>
+          </div>
+        </div>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>交付证据</b>已新增前端回归用例 <code class="inline">renders AI guided options as click-to-send actions</code>；<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 75 pass，<code class="inline">npm run build --prefix ui/V2_PROTOTYPE</code> 通过。后续若 RP-013 的 formBlock 协议落地，RP-020 的正则识别逻辑可被结构化协议替代。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-021 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">13 / RP-021 Analysis</div>
+          <h2>RP-021 · AI 消息流选择场景渲染为交互式选项卡片</h2>
+          <p>用户在 AI 工作台截图中反馈：AI 回复中需要用户选择时（如编号选项列表"1. 工作量评估 → 2. 需求梳理与确认 → 3. 风险与可行性评估 → 4. 实施方案建议"），底部提示"请回复数字（1-4）"，用户需手动输入数字才能继续交互。该需求是 RP-020 引导性选项交互化渲染的扩展场景，聚焦编号选项列表的交互化。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill err">问题</span>
+            <h3>编号选项列表以纯文本呈现，需手动输入数字回复</h3>
+            <p>截图显示 AI 回复中包含编号选项列表（1-4），每项有标题和描述，底部提示"请回复数字（1-4）或具体说明您当前需要支持的环节"。用户必须阅读后手动打字输入数字才能选择，交互效率低。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">影响</span>
+            <h3>增加认知与操作成本，降低 AI 工作台交互效率</h3>
+            <p>选择场景是 AI 工作台的高频交互模式，每次都需要用户手动输入选项编号，增加了不必要的打字负担，且容易因输入格式不匹配导致意图识别失败。</p>
+          </div>
+          <div class="card">
+            <span class="pill brand">根因</span>
+            <h3>消息渲染层缺少编号选项模式识别与交互控件渲染</h3>
+            <p>当前 <code class="inline">RichAiMessage</code> 渲染层使用 <code class="inline">parseMarkdownBlocks</code> 解析，仅支持基础 Markdown 元素和 RP-020 的"选项A/B/C"显式模式识别，无法识别"编号+标题+描述+选择提示"的复合模式，更不会渲染为可点击的交互式选项卡片。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>评审结论</b>作为 RP-020 的扩展场景入池：在现有 <code class="inline">InteractiveOptionCard</code> 基础上扩展编号选项识别规则，支持"编号. 标题 → 描述"模式，并在检测到选择/回复提示上下文时渲染为可点击卡片。</div>
+        </div>
+
+        <table>
+          <tr><th>评审维度</th><th>当前事实</th><th>优化建议</th><th>验收口径</th></tr>
+          <tr>
+            <td>编号选项识别规则</td>
+            <td>AI 回复中的编号选项列表（如"1. 工作量评估"）和选择提示（如"请回复数字（1-4）"）均为纯文本 Markdown。</td>
+            <td>扩展前端正则识别：<code class="inline">/^\d+[.、]\s*.+→.+/</code> 匹配编号+标题+描述模式；检测前置/后置文案包含"回复数字/请选择/启动"等上下文时增强渲染。</td>
+            <td>AI 回复中符合编号选项模式的文本行被识别为选项卡片，普通报告编号列表保持原样渲染。</td>
+          </tr>
+          <tr>
+            <td>交互控件渲染</td>
+            <td>RP-020 的 <code class="inline">InteractiveOptionCard</code> 已支持"选项A/B/C"模式。</td>
+            <td>复用或扩展 <code class="inline">InteractiveOptionCard</code>，支持编号选项渲染为卡片/按钮组；点击后调用现有 <code class="inline">sendMessage(optionText)</code> 发送对应编号或标题文本。</td>
+            <td>用户点击"1. 工作量评估"后发送"1"或"启动工作量评估"，无需手动打字。</td>
+          </tr>
+          <tr>
+            <td>降级策略</td>
+            <td>无降级机制。</td>
+            <td>编号选项识别失败时，文本仍以 Markdown 渲染，不影响现有消息展示。</td>
+            <td>不符合编号选项模式的 AI 回复不受影响，渲染效果与当前一致。</td>
+          </tr>
+          <tr>
+            <td>与 RP-020 关系</td>
+            <td>RP-020 解决"选项A/B/C"显式模式和编号问题列表的交互化。</td>
+            <td>RP-021 聚焦"编号+标题+描述+选择提示"的复合模式，可作为 RP-020 的扩展子场景合并实现。</td>
+            <td>RP-021 可与 RP-020 合并验收，也可独立实现和验收。</td>
+          </tr>
+        </table>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="card">
+            <span class="pill brand">推荐方案</span>
+            <h3>扩展 InteractiveOptionCard 支持编号选项模式</h3>
+            <ul class="list-clean" style="margin-top:12px">
+              <li><b>Step 1：</b>在 <code class="inline">parseMarkdownBlocks</code> 中扩展编号选项模式识别，支持"编号. 标题 → 描述"格式。</li>
+              <li><b>Step 2：</b>扩展 <code class="inline">InteractiveOptionCard</code> 组件，支持编号选项渲染为卡片/按钮组。</li>
+              <li><b>Step 3：</b>集成到 <code class="inline">RichAiMessage</code> 渲染流程，选项区域替换纯文本渲染。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="pill warn">边界与依赖</span>
+            <h3>与 RP-020 / RP-013 的关系</h3>
+            <p>RP-021 是 RP-020 的扩展场景，复用现有 <code class="inline">InteractiveOptionCard</code> 组件；与 RP-013 的 formBlock 协议无直接依赖，但未来可被结构化协议替代。</p>
+          </div>
+        </div>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>后续输入</b>本需求为非阻塞体验优化，信息已足够直接入池。后续排期时可与 RP-020 合并为"AI 消息流选项交互化"统一批次，或作为独立 P2 优化项推进。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 排期视图 -->
+    <!-- RP-022 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">14 / RP-022 Analysis</div>
+          <h2>RP-022 · 系统管理模型配置缺少编辑入口</h2>
+          <p>用户在 <code class="inline">localhost:3002/system</code> 的「系统管理 / 模型配置」页反馈：三张模型卡片只有展示、测试连通性、保存草稿和生效配置，无法对具体模型进行编辑。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill err">问题</span>
+            <h3>模型卡片没有编辑入口</h3>
+            <p>当前页面只展示模型名、Prompt Profile、Temperature、最大 Tokens 和说明文案；卡片内唯一动作是测试连通性，用户无法修改单个模型配置。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">影响</span>
+            <h3>管理员配置流被阻断</h3>
+            <p>实施评估、文件解析和生成模型的参数都属于 admin 核心配置。无法编辑会导致模型切换、温度、Token 上限、Prompt Profile 等配置只能通过后端文件或接口间接处理。</p>
+          </div>
+          <div class="card">
+            <span class="pill brand">根因</span>
+            <h3>前端仍按旧 models 数组展示，未接入后端真实配置 schema</h3>
+            <p><code class="inline">SystemManagement.jsx</code> 未渲染编辑按钮，模型字段还硬编码为 <code class="inline">kimi-k2.5</code>；<code class="inline">useSystemManagement.js</code> 只读取 <code class="inline">data.models</code>，保存时发送 <code class="inline">{ models, apiKey }</code>。后端实际返回和消费的是 <code class="inline">draft/active.kimiEvaluation</code>、<code class="inline">fileParsing</code>、<code class="inline">kimiGeneration</code> 与 <code class="inline">kimiCredentials</code>。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>评审结论</b>这是系统配置前端未完成后端 schema 接线的 P1 缺口，不是权限不足、样式遮挡或按钮被隐藏。修复时应补齐「查看 draft/active → 编辑具体配置 → 保存草稿 → 生效配置 → 回读验证」闭环。</div>
+        </div>
+
+        <table>
+          <tr><th>评审维度</th><th>当前事实</th><th>优化建议</th><th>验收口径</th></tr>
+          <tr>
+            <td>配置展示</td>
+            <td>模型卡片来自 fallback <code class="inline">DEFAULT_MODELS</code> 或旧 <code class="inline">data.models</code>，与后端 <code class="inline">RequirementSystemConfig</code> 结构不一致。</td>
+            <td>在 hook 中把后端 <code class="inline">draft</code> 映射为三张可编辑卡片，保留 active/effectiveAt 作为状态提示。</td>
+            <td>页面显示的模型、温度、Token 与 GET <code class="inline">/system/requirement-settings</code> 返回 draft 保持一致。</td>
+          </tr>
+          <tr>
+            <td>编辑入口</td>
+            <td>卡片内没有「编辑」按钮或 Dialog。</td>
+            <td>每张模型卡片增加编辑按钮，弹窗内修改模型名、温度、Token、Prompt Profile/Prompt 模板或对应特有字段。</td>
+            <td>点击任一模型卡片的编辑按钮可打开弹窗，保存后卡片即时更新。</td>
+          </tr>
+          <tr>
+            <td>草稿保存</td>
+            <td>前端 PATCH <code class="inline">{ models, apiKey }</code>，后端 <code class="inline">updateRequirementSystemConfigDraft</code> 不消费该结构，配置修改不会落到真实字段。</td>
+            <td>按 <code class="inline">kimiEvaluation/fileParsing/kimiGeneration/kimiCredentials</code> 发送 PATCH；API Key 使用 <code class="inline">kimiCredentials.apiKey</code>，空字符串不覆盖，清除用 <code class="inline">null</code>。</td>
+            <td>保存草稿后刷新页面仍能回读修改；生效后后端 active 配置同步变化。</td>
+          </tr>
+          <tr>
+            <td>权限与安全</td>
+            <td>后端路由已有 <code class="inline">system:manage</code> 能力保护，API Key public 响应为空字符串并提供 hint。</td>
+            <td>前端不回显明文 API Key，只显示脱敏 hint 与来源；保留 admin-only 操作。</td>
+            <td>非 admin 不可保存/生效；前端不会把已保存密钥明文渲染到页面。</td>
+          </tr>
+        </table>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>后续输入</b>实现前需要明确每类配置的可编辑字段范围：评估模型重点是 model/temperature/maxTokens/timeout/promptProfile/promptTemplate；文件解析重点是 model/扩展名/文件大小/Sheet 数/strict/OCR；生成模型重点是 model/temperature/maxTokens/outputStyle/risk/assumption 开关。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-023 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">15 / RP-023 Analysis</div>
+          <h2>RP-023 · AI 消息气泡悬停复制按钮</h2>
+          <p>用户在 AI 工作台截图中反馈：AI 回复的消息气泡没有快速复制入口，用户需手动选中才能复制 AI 回复内容，操作不便。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill err">问题</span>
+            <h3>AI 消息气泡没有复制操作入口</h3>
+            <p>当前 <code class="inline">AiHomeWorkbench.jsx</code> 中 AI 消息气泡（L2302-2388）是纯 inline style 渲染，没有任何交互操作按钮，用户无法一键复制 AI 回复文本。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">影响</span>
+            <h3>降低 AI 工作台日常使用效率</h3>
+            <p>用户想复制 AI 回复内容时需手动选中，操作路径长，尤其在长回复场景下体验不佳。</p>
+          </div>
+          <div class="card">
+            <span class="pill brand">根因</span>
+            <h3>消息气泡未设计交互操作区域</h3>
+            <p>消息气泡容器仅有展示样式，缺少 hover 触发的操作按钮层。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>评审结论</b>非阻塞体验优化，信息已足够直接入池。推荐方案为在消息气泡容器上添加 <code class="inline">position: relative</code>，悬停时在右上角显示 SVG 复制按钮，点击调用 <code class="inline">navigator.clipboard.writeText(message.text)</code> 并显示短暂反馈。</div>
+        </div>
+
+        <table>
+          <tr><th>评审维度</th><th>当前事实</th><th>优化建议</th><th>验收口径</th></tr>
+          <tr>
+            <td>触发方式</td>
+            <td>消息气泡无任何 hover 交互。</td>
+            <td>容器 <code class="inline">:hover</code> 时显示复制按钮，默认 <code class="inline">opacity: 0</code>，过渡 <code class="inline">opacity 0.2s</code>。</td>
+            <td>鼠标悬停 AI 消息气泡时复制按钮平滑出现，移开后消失。</td>
+          </tr>
+          <tr>
+            <td>复制逻辑</td>
+            <td>无复制功能。</td>
+            <td>使用 <code class="inline">navigator.clipboard.writeText(message.text)</code> 复制纯文本内容；点击后按钮短暂显示 "✓" 反馈（约 1.5s）。</td>
+            <td>点击按钮后消息文本已复制到剪贴板，按钮显示 "✓" 反馈后恢复复制图标。</td>
+          </tr>
+          <tr>
+            <td>适用范围</td>
+            <td>所有 AI 消息气泡。</td>
+            <td>仅对 AI 消息（<code class="inline">!isUser</code>）且非 loading、非 error 状态显示复制按钮。</td>
+            <td>用户消息、loading 态、error 态不显示复制按钮。</td>
+          </tr>
+          <tr>
+            <td>降级策略</td>
+            <td>无降级机制。</td>
+            <td>触控设备可通过 <code class="inline">focus-within</code> 或始终显示作为降级；<code class="inline">navigator.clipboard</code> 不可用时静默失败。</td>
+            <td>不支持 Clipboard API 的环境不影响现有消息展示。</td>
+          </tr>
+        </table>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="card">
+            <span class="pill brand">推荐方案</span>
+            <h3>消息气泡容器 + hover 复制按钮</h3>
+            <ul class="list-clean" style="margin-top:12px">
+              <li><b>Step 1：</b>将 AI 消息气泡外层 <code class="inline">div</code> 包裹在 <code class="inline">position: relative</code> 容器中。</li>
+              <li><b>Step 2：</b>在右上角添加绝对定位的 SVG 复制按钮，hover 时显示，点击执行复制并显示反馈。</li>
+              <li><b>Step 3：</b>使用 <code class="inline">useState</code> 管理每个消息的复制反馈状态（以 <code class="inline">message.id || index</code> 为 key）。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="pill warn">边界与依赖</span>
+            <h3>影响范围</h3>
+            <p>纯前端改动，仅涉及 <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx</code> 消息渲染区域；不新增后端接口、不改变消息数据结构、不影响现有自动化测试。</p>
+          </div>
+        </div>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>后续输入</b>本需求为非阻塞体验优化，信息已足够直接入池。后续排期时作为 Phase 1H-B/1H-C 前端体验优化项推进，可与 RP-021 合并为"AI 消息交互增强"批次。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-024 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">16 / RP-024 Analysis</div>
+          <h2>RP-024 · Napkin 视觉生成融合售前解决方案 PPT 页面</h2>
+          <p>售前顾问在 AI 工作台中基于客户材料、需求包、SOW 或商机摘要生成解决方案 PPT 页面，需要把文字型分析转成可交付的专业视觉页。Napkin API 可把文本生成 SVG/PNG/PPT 视觉，并支持 style、language、visual query、最多 4 个变体和异步状态轮询，适合接入为 WES 的外部视觉生成工具。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill brand">场景</span>
+            <h3>售前方案页</h3>
+            <p>面向客户痛点、业务蓝图、模块地图、实施路径、价值收益和风险假设等页面，降低顾问从分析报告到 PPT 初稿的制作成本。</p>
+          </div>
+          <div class="card">
+            <span class="pill ok">能力</span>
+            <h3>外部视觉生成</h3>
+            <p>Napkin 负责把受控文本转换为 PPT/PNG/SVG 视觉页；WES 负责输入组织、确认、审计、文件下载与权限隔离。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">边界</span>
+            <h3>先确认后出站</h3>
+            <p>客户材料和方案内容属于敏感输入。首次实施必须增加用户确认、脱敏策略、API Key 服务端保管和文件本地落地。</p>
+          </div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>推荐方案</b>采用“AI Workbench 发起 + Harness 编排 + Napkin 外部工具 + Artifact Workspace 展示”的路径。AI 先生成 <code class="inline">solution_ppt_page_plan_v1</code>，用户确认后 Harness 调用 Napkin，轮询完成后立即下载文件并保存到 WES 导出目录，前端展示 WES 自有下载链接，不直接引用 Napkin 30 分钟临时 URL。</div>
+        </div>
+
+        <table>
+          <tr><th>设计维度</th><th>推荐口径</th><th>原因</th><th>验收口径</th></tr>
+          <tr>
+            <td>入口</td>
+            <td>优先从售前顾问 AI 工作台发起；来源可绑定 Harness report v2、Presales requirement pack、SOW 或 Sales briefing。</td>
+            <td>符合当前 V2 主线和 AI Workbench 交互，不新增第二前端。</td>
+            <td>售前顾问能从已有材料选择“生成解决方案 PPT 页面”，并看到引用来源。</td>
+          </tr>
+          <tr>
+            <td>后端边界</td>
+            <td>新增 Napkin client 作为 server-side integration；业务入口优先挂 Harness，Presales/Sales 只做场景化 facade。</td>
+            <td>外部 API 调用需要 ToolEvent、owner、状态和失败审计，不能绕过 Harness。</td>
+            <td>每次生成都有 request/status/download 三段审计事件，且 owner 隔离生效。</td>
+          </tr>
+          <tr>
+            <td>生成策略</td>
+            <td>中文场景使用 <code class="inline">language=zh-CN</code>、正式/企业风格 <code class="inline">style_id</code>、<code class="inline">orientation=horizontal</code>；按页面选择 flowchart、timeline、mindmap 等 visual query。</td>
+            <td>Napkin 支持语言、样式、方向和视觉查询；可先做 3-5 个页面模板，再扩展完整方案包。</td>
+            <td>同一需求包至少生成 3 类页面：业务蓝图、方案模块地图、实施路径。</td>
+          </tr>
+          <tr>
+            <td>文件策略</td>
+            <td>MVP 返回 Napkin PPT 页面文件和 PNG/SVG 预览；后续再引入 PPTX 组装库或模板引擎合成完整方案 deck。</td>
+            <td>当前后端未引入 PPTX 组装依赖；Napkin 已支持 PPT 导出，先降低实现风险。</td>
+            <td>文件落地到 WES 自有下载链接；不把 Napkin 临时下载 URL 作为持久链接展示。</td>
+          </tr>
+          <tr>
+            <td>失败降级</td>
+            <td>处理 no_credits、no_visuals、429、410、invalid_style_id 和部分变体失败；失败时保留页面计划和可重试入口。</td>
+            <td>Napkin 是异步外部服务，积分、限流、文件过期和样式无效都可能影响交付。</td>
+            <td>用户能看到明确失败原因；已生成文件不丢失；未生成页面可单独重试。</td>
+          </tr>
+        </table>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>后续输入</b>实施前必须确认：是否允许客户原文发送到 Napkin、默认企业样式或自定义品牌 style_id、MVP 输出几页、是否需要完整 PPTX 合并、以及售前顾问和管理员的权限边界。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-025 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">17 / RP-025 Analysis</div>
+          <h2>RP-025 · AI 工作台"创建项目"意图路由偏移</h2>
+          <p>用户在 AI 工作台输入"帮我创建 广州可味达项目"，期望在传统工作台的项目列表中创建项目，但意图路由器未匹配到该模式，落入 domain_qa 兆底，模型自由生成了一个信息收集表单（formBlock），完全偏离了用户的实际操作意图。</p>
+        </div>
+
+        <div class="callout err" style="margin-bottom:18px">
+          <div><b>问题</b>"帮我创建 广州可味达项目"中，<code class="inline">WRITE_ACTION_PATTERNS</code> 匹配了"创建"，但 <code class="inline">WRITE_TARGET_PATTERNS = /草稿|正式|评估记录|需求记录|项目评估|正式评估|发布/</code> 未匹配"项目"（只含"项目评估"），导致 Rule 4 未命中，最终落入 Rule 9 domain_qa 兆底。</div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>影响</b>核心写动作场景（创建项目）完全失效，用户无法通过 AI 工作台创建项目，模型自行生成表单收集信息，体验与预期严重偏离。影响所有使用 AI 工作台创建项目的用户。</div>
+        </div>
+
+        <div class="callout" style="margin-bottom:18px">
+          <div><b>边界</b>本次需求涉及意图路由器规则扩展、写动作分发器增强和前端建议按钮处理器扩展；不涉及项目创建 API 本身（已存在 <code class="inline">POST /project-evaluations</code>）、不涉及 Harness 审计链变更、不引入新存储。</div>
+        </div>
+
+        <div class="callout warn" style="margin-bottom:18px">
+          <div><b>2026-06-25 回归补证</b>用户截图显示 suggested action 中的“确认创建项目”点击后无反馈；换新会话发送“你好”后显示“AI 服务当前繁忙（接口限流）”。根因拆分为两条：项目创建确认对普通 <code class="inline">user</code>（映射 PRE_SALES）会触发 <code class="inline">POST /project-evaluations</code> 403，因为路由只接受 <code class="inline">estimates:write</code>，且前端 <code class="inline">confirmPendingAction</code> 没有 catch；问候语落入 <code class="inline">domain_qa</code> 并调用 Kimi，外部限流时展示繁忙。补丁已将 PRE_SALES 增加 <code class="inline">estimates:create</code>、项目创建路由改为 <code class="inline">estimates:create</code> 或 <code class="inline">estimates:write</code> 任一放行、确认失败显示“项目创建失败”，并将简短问候路由到本地能力说明。</div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>推荐方案</b>新增 <code class="inline">CREATE_PROJECT_PATTERNS = /(?:创建|新建|建一个|开一个|立一个)[^\n]{0,30}项目/</code> 规则，在 Rule 3（WES 数据查询）之后插入 Rule 3b，路由到 <code class="inline">write_action_request</code>（routingRule: <code class="inline">create_project_keywords</code>）；<code class="inline">buildWriteActionResponse</code> 根据 routingRule 提取项目名，返回 <code class="inline">actionType: "create_project_evaluation"</code> 的 suggested action；前端建议按钮处理器复用已有 <code class="inline">confirmPendingAction</code> 逻辑。</div>
+        </div>
+
+        <table>
+          <tr><th>设计维度</th><th>推荐口径</th><th>原因</th><th>验收口径</th></tr>
+          <tr>
+            <td>意图路由</td>
+            <td>新增 Rule 3b，匹配"创建/新建 + XXX + 项目"模式，路由到 write_action_request</td>
+            <td>复用现有写动作确认流程，不新增 Intent 类型，避免修改 WorkbenchDispatchData 类型契约</td>
+            <td>"帮我创建 广州可味达项目" 路由到 write_action_request + create_project_keywords；"我之前创建过哪些项目"仍路由到 wes_data_query</td>
+          </tr>
+          <tr>
+            <td>写动作分发</td>
+            <td>buildWriteActionResponse 根据 routingRule 提取项目名，返回 create_project_evaluation actionType + payload</td>
+            <td>前端已有 confirmPendingAction 处理 create_project_evaluation 的完整逻辑</td>
+            <td>suggested action 包含正确的 projectName 和 actionType</td>
+          </tr>
+          <tr>
+            <td>前端处理</td>
+            <td>建议按钮点击处理器新增 create_project_evaluation 分支，复用 confirmPendingAction；confirmPendingAction 必须捕获 401/403/空响应并给出对话内错误反馈</td>
+            <td>confirmPendingAction 已实现 POST /project-evaluations + linkedRecords + 成功消息 + 事件派发；失败反馈避免用户看到“点击无反应”</td>
+            <td>点击确认按钮后项目创建成功并刷新项目列表；若权限或接口失败，消息区显示“项目创建失败：...”</td>
+          </tr>
+          <tr>
+            <td>防御性约束</td>
+            <td>system prompt 增加写动作边界约束，防止模型在 domain_qa 路径下自行处理创建请求</td>
+            <td>即使路由规则未覆盖，模型也不应自行生成表单执行写动作</td>
+            <td>domain_qa 路径下模型不生成 formBlock 处理创建项目请求</td>
+          </tr>
+        </table>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>后续输入</b>实施时需注意：正则提取对复杂输入（如"帮我创建一个叫广州可味达的项目"）可能提取不准确，可考虑在确认弹窗中允许用户编辑项目名；前端 confirmPendingAction 依赖 activeSession，需处理 session 不存在时的降级。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-026 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">18 / RP-026 Analysis</div>
+          <h2>RP-026 · 用户管理补充角色能力位配置与说明</h2>
+          <p>用户在 AI 工作台看到“项目创建失败：权限不足（缺少能力位: estimates:write）”后，合理追问管理员是否应在用户管理中配置对应权限。当前用户管理只提供系统角色、业务角色、状态和密码操作，无法查看角色对应 capability，也无法定位为什么某个业务动作缺权限。</p>
+        </div>
+
+        <div class="callout err" style="margin-bottom:18px">
+          <div><b>问题</b>错误提示已经暴露 capability，但管理端没有“角色 → 能力位 → 业务动作”的可视化入口。管理员只能看到“普通用户 / 售前顾问”等标签，无法判断 <code class="inline">estimates:create</code>、<code class="inline">estimates:write</code> 分别对应哪些操作，也无法判断应该调整系统角色、业务角色，还是等待 RBAC 矩阵修复。</div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>影响</b>权限失败从“用户可见”变成“管理员不可诊断”：一线测试或业务用户看到缺少能力位后，仍需要开发介入查代码中的 <code class="inline">ROLE_CAPABILITIES</code>。这会降低 AI 工作台写动作治理的可运维性。</div>
+        </div>
+
+        <div class="callout" style="margin-bottom:18px">
+          <div><b>当前事实</b><code class="inline">ui/V2_PROTOTYPE/src/pages/UserManagement.jsx</code> 只提供改系统角色、改业务角色、重置密码等操作；<code class="inline">apps/api/src/rbac/permissions.ts</code> 静态定义 <code class="inline">ROLE_CAPABILITIES</code>；<code class="inline">apps/api/src/modules/auth/auth.usecase.ts</code> 只支持 role / businessRole / status / password 更新，没有用户级 capability 配置接口。</div>
+        </div>
+
+        <table>
+          <tr><th>设计层级</th><th>推荐口径</th><th>原因</th><th>验收口径</th></tr>
+          <tr>
+            <td>短期可视化</td>
+            <td>用户管理展示系统角色映射的 V2 角色、能力位摘要和典型业务动作；错误中的 capability 可在页面中搜索定位</td>
+            <td>不改变权限模型，先解决管理员定位问题</td>
+            <td>管理员搜索 <code class="inline">estimates:write</code> 可看到哪些角色拥有、哪些业务动作需要该能力</td>
+          </tr>
+          <tr>
+            <td>角色模板</td>
+            <td>系统角色 / 业务角色 Dialog 增加只读能力说明，例如“售前顾问可创建项目评估，但不可编辑正式估算”</td>
+            <td>减少把业务角色误解成权限角色的风险</td>
+            <td>切换角色前能看到对应 capability 差异和影响范围</td>
+          </tr>
+          <tr>
+            <td>授权配置</td>
+            <td>如需支持管理员直接配置能力位，应作为后续批次增加用户级或角色级 override，并记录变更审计、操作者、原因、回滚</td>
+            <td>能力位直接决定写动作权限，不能只做前端开关</td>
+            <td>能力变更必须有后端校验、审计记录、最小授权限制和回滚路径</td>
+          </tr>
+          <tr>
+            <td>错误联动</td>
+            <td>权限错误文案可给出“去用户管理查看角色能力”的入口，但不自动跳转执行授权</td>
+            <td>保持人在环，避免从错误提示直接越权</td>
+            <td>缺权限时用户看到可理解的业务说明，管理员可按能力位定位配置项</td>
+          </tr>
+        </table>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>待规划输入</b>需要先确定 RBAC 管理策略：仅展示静态角色矩阵，还是允许 admin 修改角色模板 / 用户级能力覆盖。后者会触发权限审计、配置持久化和回滚设计，不应作为 RP-025 的小补丁直接混入。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-027 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">19 / RP-027 Analysis</div>
+          <h2>RP-027 · Kimi API 模型升级与 Provider 成本优化</h2>
+          <p>接收 2026-06-25 Kimi API 深度分析建议后，对 WES 当前模型配置、KimiProvider 实现和官方 Kimi 文档进行核验。结论是：该建议大方向成立，但应拆成“立即兼容修复”和“能力增强批次”，避免一次性更换模型、输出协议和异步调度造成评估链路回归。</p>
+        </div>
+
+        <div class="callout err" style="margin-bottom:18px">
+          <div><b>当前问题</b>本地配置和默认值仍包含旧模型或不可用模型，且 Provider 仍按通用 OpenAI Chat 参数发送 temperature / max_tokens / json_object。K2 系列模型对 temperature、thinking、输出格式和流式 reasoning_content 的行为不同，若继续沿用旧参数，可能造成请求失败、JSON 解析不稳、成本偏高或思考内容丢失。</div>
+        </div>
+
+        <div class="callout" style="margin-bottom:18px">
+          <div><b>代码证据</b><code class="inline">config/system/requirement-settings.json</code> 中仍能看到 <code class="inline">kimi-k2-turbo-preview</code> 配置；<code class="inline">apps/api/src/modules/system/system.repository.ts</code> 默认配置仍包含 <code class="inline">moonshot-v1-128k</code>；<code class="inline">apps/api/src/ai/provider/kimi-provider.ts</code> 当前只支持 <code class="inline">text/json_object</code>，未透传 <code class="inline">prompt_cache_key</code>、partial assistant prefill、thinking、strict JSON schema 或 stream <code class="inline">reasoning_content</code>。</div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>官方资料核验</b>Kimi 官方 Chat Completion 文档覆盖标准对话、Partial Mode 和工具调用；模型参数文档显示 K2.5/K2.6 均为 256K 上下文，并存在 thinking 分级；Batch Pricing 文档明确 Batch API 价格为标准模型的 60%，且支持 K2.5/K2.6 等模型。具体人民币价格与可用模型列表仍以当前 Kimi 控制台/价格页为准。</div>
+        </div>
+
+        <table>
+          <tr><th>优先级</th><th>建议</th><th>WES 落地口径</th><th>验收口径</th></tr>
+          <tr>
+            <td>P0</td>
+            <td>模型升级与不可用模型清理</td>
+            <td>默认评估模型切到当前可用 K2 系列；清理 <code class="inline">kimi-k2-turbo-preview</code>；保留配置迁移和失败降级，避免历史配置直接报错</td>
+            <td>系统配置回读无下线模型；文件解析、需求评估和 AI 工作台 smoke test 均能成功调用或给出明确外部账户错误</td>
+          </tr>
+          <tr>
+            <td>P1</td>
+            <td>Prompt Cache 透传</td>
+            <td>在 KimiProvider 请求结构中增加 <code class="inline">promptCacheKey</code> / <code class="inline">prompt_cache_key</code>，按评估模板、prompt profile 和 schema version 生成稳定 key</td>
+            <td>重复模板调用审计中能看到 cache key 策略；未配置时不影响现有调用</td>
+          </tr>
+          <tr>
+            <td>P6</td>
+            <td>Provider 技术债修复</td>
+            <td>K2 模型跳过或规范化 temperature；使用 <code class="inline">max_completion_tokens</code>；流式解析补充 <code class="inline">reasoning_content</code>；错误分类区分余额不足、限流、参数不兼容和模型不可用</td>
+            <td>覆盖参数构造、重试/降级和 stream parser 单测；K2.5/K2.6 不因 temperature 冲突失败</td>
+          </tr>
+          <tr>
+            <td>P2/P3</td>
+            <td>Partial Mode 与结构化输出</td>
+            <td>评估 JSON 输出优先试点 assistant prefill partial；如当前模型/账号支持 strict JSON schema，再把评估结果 schema 固化为可版本化协议</td>
+            <td>评估 JSON 解析失败率下降；无效 schema 自动降级到现有 json_object + 解析修复路径，并记录 fallbackReason</td>
+          </tr>
+          <tr>
+            <td>P4</td>
+            <td>Thinking 分级</td>
+            <td>复杂需求评估可启用 thinking；普通问候、WES 数据查询、变更 diff、开发评估默认禁用或使用轻量模式</td>
+            <td>模型运行 trace 记录 thinking 策略；复杂样本质量由 Harness Regression 或人工复核对比</td>
+          </tr>
+          <tr>
+            <td>P5</td>
+            <td>Batch API</td>
+            <td>仅用于 Harness 批量文件解析、批量项目评估、离线回放等非实时场景；实时 AI 工作台继续走 Chat Completion</td>
+            <td>异步任务有 batchRunId、状态轮询、失败重试、成本记录和用户可见进度；不受实时交互链路阻塞</td>
+          </tr>
+        </table>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>实施约束</b>本需求与 RP-022 模型配置编辑入口相关但不合并：RP-022 解决“管理员能改配置”，RP-027 解决“Provider 能正确、经济、可审计地调用 Kimi”。实现时不得把真实 API Key 写入对话、文档、看板或提交；本地配置中如已有明文密钥，应另行纳入密钥治理和轮换。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-028 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">20 / RP-028 Analysis</div>
+          <h2>RP-028 · Kimi Provider 稳定性增强：超时、重试与 Token 审计</h2>
+          <p>基于 2026-06-25 Kimi API 深度分析发现的三项 Provider 层稳定性缺口，与 RP-027 合并实施但独立跟踪。</p>
+        </div>
+
+        <div class="callout err" style="margin-bottom:18px">
+          <div><b>当前问题</b>三个独立问题：① <code class="inline">MAX_TIMEOUT_MS = 120_000</code> 对思考模型偏短，官方文档 stream=false 超时为 2 小时；② fetch 超时抛出的 ProviderError("timeout") 标记为 <code class="inline">retryable: false</code>，网络瞬断不会重试；③ <code class="inline">parseSuccess</code> 和 <code class="inline">parseStream</code> 均未提取响应中的 <code class="inline">usage</code> 字段，无法追踪 Token 消耗。</div>
+        </div>
+
+        <table>
+          <tr><th>子项</th><th>问题</th><th>初步方案</th><th>验收口径</th></tr>
+          <tr>
+            <td>超时上限</td>
+            <td>MAX_TIMEOUT_MS=120s 硬上限，复杂评估/长文档解析在思考模式下可能超时</td>
+            <td>非流式调用 MAX_TIMEOUT 提升到 300s；流式保持 120s（官方推荐 stream=true 保持连接活跃）</td>
+            <td>思考模式下复杂评估样本不因超时而失败；Provider 单测覆盖新上限</td>
+          </tr>
+          <tr>
+            <td>超时重试</td>
+            <td>fetchAbort 的 ProviderError("timeout") retryable=false，网络瞬断直接失败</td>
+            <td>将 timeout 类型标记为 retryable=true，纳入现有指数退避重试逻辑</td>
+            <td>Provider 单测：模拟 fetch 超时后重试成功；重试次数不超过 maxAttempts</td>
+          </tr>
+          <tr>
+            <td>Token 审计</td>
+            <td>parseSuccess/parseStream 均未提取 usage 字段</td>
+            <td>ChatCompletionResponse 增加 usage 字段；parseSuccess 提取 response.usage；parseStream 提取最后一个 chunk 的 usage</td>
+            <td>审计日志可看到每次调用的 prompt_tokens / completion_tokens / total_tokens</td>
+          </tr>
+        </table>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>实施约束</b>本需求与 RP-027 P6 技术债修复合并实施，不单独拆批。实现时不得改变现有 chatCompletion/streamChatCompletion 接口签名，usage 字段为可选扩展。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-029 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">21 / RP-029 Analysis</div>
+          <h2>RP-029 · Kimi 流式输出与 WES 实时响应功能模块</h2>
+          <p>用户主动要求启用 Kimi 流式输出，并设计 WES 功能模块匹配流式输出能力。当前 KimiProvider 已实现 streamChatCompletion，但所有业务接口均使用非流式 chatCompletion。</p>
+        </div>
+
+        <div class="callout err" style="margin-bottom:18px">
+          <div><b>当前问题</b>用户发送消息后需等待模型完整响应（通常 10-60 秒），期间无任何反馈。评估和文件解析场景同样等待完整响应后才返回结果。等待感知差、无法中断、无法实时看到思考过程。</div>
+        </div>
+
+        <div class="callout ok" style="margin-bottom:18px">
+          <div><b>现有基础</b><code class="inline">kimi-provider.ts</code> 已实现 <code class="inline">streamChatCompletion</code>，支持 SSE 解析、reasoning_content 增量、finishReason 提取。前端 AI 工作台已有 SSE 接收经验（文件解析流式进度）。</div>
+        </div>
+
+        <table>
+          <tr><th>批次</th><th>范围</th><th>关键设计点</th><th>验收口径</th></tr>
+          <tr>
+            <td>第一批：后端 SSE 接口层</td>
+            <td>AI 工作台 /chat/stream、评估 /assessment/stream、文件解析 /parse/stream</td>
+            <td>复用 KimiProvider.streamChatCompletion；新增 SSE 路由层；dispatch 层适配流式返回；保留非流式接口作为降级</td>
+            <td>SSE 接口可返回增量文本；首 token 延迟 &lt; 3s；错误时返回 SSE error 事件</td>
+          </tr>
+          <tr>
+            <td>第二批：前端逐字渲染</td>
+            <td>AI 工作台消息区、评估结果区、文件解析结果区</td>
+            <td>新增 StreamRenderer 组件；支持 reasoning_content 折叠展示；消息发送区显示“正在思考…”状态；支持中断/停止按钮</td>
+            <td>用户可实时看到模型输出；思考过程可折叠；停止按钮可中断流式连接</td>
+          </tr>
+          <tr>
+            <td>第三批：流式场景完善</td>
+            <td>中断/重试/错误处理、Token 消耗实时展示、流式工具调用</td>
+            <td>流式 tool_calls 解析；Token 消耗实时更新；网络断开自动重连或降级提示；session 存储适配流式拼接</td>
+            <td>网络断开后前端显示重连提示；流式工具调用可正确解析并执行；session 历史消息完整</td>
+          </tr>
+        </table>
+
+        <div class="callout warn" style="margin-top:18px">
+          <div><b>实施约束</b>流式输出不改变意图路由、工具调用和审计链路。第一批必须先完成后端 SSE 接口层，再做前端适配。评估场景的流式输出需考虑 JSON 解析稳定性（流式 JSON 需缓冲到完整后再解析）。与 RP-027 thinking 分级合并时，思考过程可在流式界面中折叠展示。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-030 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">22 / RP-030 Analysis</div>
+          <h2>RP-030 · Agent Runtime 统一 Trace Schema 与查询入口</h2>
+          <p>本需求来自 2026-06-26 对 Dify、ReAct、LangFuse、RAGAS、RAG 优化路线的框架性复盘。去重结论：RP-002 已覆盖普通附件问答轻量 <code class="inline">trace.modelRun</code> 第一批，RP-005 已覆盖 Artifact Workspace 时间线第一批，但 WES 仍缺少跨 AI session、Harness、ModelRun、ToolEvent、KnowledgeTool、Artifact 和人工确认的统一 trace schema。</p>
+        </div>
+
+        <div class="callout">
+          <div><b>问题</b>当前 trace 分散在 response trace、assistant message metadata、Harness ModelRun、ToolEvent、Artifact 和前端时间线中。它们能支撑局部回放，但还不能稳定回答“一次用户请求经过哪些步骤、每步耗时多少、调用了哪些工具、是否降级、花费多少、产物和人工确认在哪里”。</div>
+        </div>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="panel">
+            <div class="panel-h">范围<span class="right">scope</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>定义统一 <code class="inline">traceId/spanId/parentSpanId</code>、<code class="inline">spanType</code>、上下文引用、耗时、状态、错误、降级和成本字段。</li>
+                <li>把意图路由、知识库检索、模型调用、工具调用、产物生成、写动作确认、人工确认回写纳入同一链路。</li>
+                <li>提供 owner-scoped 查询入口，用于监控页和排障，不作为业务用户正式记录编辑入口。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">边界<span class="right">guardrails</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>不把 LangFuse 或任何外部工具作为唯一审计源；WES Harness 仍是正式审计事实源。</li>
+                <li>不保存 API Key、token、cookie、私钥；raw prompt/raw response 需短期留存或脱敏摘要化。</li>
+                <li>不改变写动作确认边界；trace 只记录，不替代用户确认。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <table style="margin-top:18px">
+          <tr><th>初步方案</th><th>验收口径</th><th>待规划输入</th></tr>
+          <tr>
+            <td>先输出 schema 和字段白名单，再实现轻量写入适配器，把现有 dispatch trace、session metadata、Harness ModelRun/ToolEvent 映射成 span；最后补监控页查询入口。</td>
+            <td>任一 AI 工作台请求可查到完整 trace 树；至少包含 intent routing、model call、knowledge/tool call、artifact 或 answer、错误/降级原因；跨 owner 不可查。</td>
+            <td>需明确 raw trace 留存周期、摘要长期字段、是否新增表或复用 Harness 表、与 RP-002/RP-005 的拆批边界。</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- RP-031 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">23 / RP-031 Analysis</div>
+          <h2>RP-031 · RAG Baseline 与知识库评测闭环</h2>
+          <p>本需求来自 2026-06-26 对 RAG 深度优化路线的转化。去重结论：RP-018 已交付 AI 可发现知识库工具 MVP，RP-007 已交付 Harness Regression 样本格式与评分规则第一批；但当前还没有固定的知识库 RAG baseline、检索参数矩阵、质量指标和策略对比报告。</p>
+        </div>
+
+        <div class="callout">
+          <div><b>问题</b>知识库检索如果只靠主观体验调参，后续开启 Hybrid Search、Rerank 或 Query Rewriting 时，很难判断质量提升是否抵消了成本和延迟增加。WES 需要先建立 baseline，再做策略优化。</div>
+        </div>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="panel">
+            <div class="panel-h">第一批范围<span class="right">baseline</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>固定知识库版本、样本集、检索参数、Prompt 模板和评分规则。</li>
+                <li>首批覆盖 20 条产品知识问答、模块识别和证据引用样本。</li>
+                <li>记录 <code class="inline">topK</code>、<code class="inline">chunksCount</code>、<code class="inline">topScore</code>、<code class="inline">retrievalTriggered</code>、延迟、成本、Top-3 命中和引用准确率。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">不进入范围<span class="right">not now</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>第一批不自动改写正式评估和工时建议。</li>
+                <li>不直接切换向量库或引入第二套知识库主路径。</li>
+                <li>RAGAS 可作为辅助指标，不替代 WES 业务样本评分。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <table style="margin-top:18px">
+          <tr><th>初步方案</th><th>验收口径</th><th>待规划输入</th></tr>
+          <tr>
+            <td>复用 RP-018 知识库工具 trace 和 RP-007 Regression 思路，建立只读 baseline runner；先跑当前配置，再用同一批样本对比 Hybrid Search、Rerank、Query Rewriting。</td>
+            <td>监控页或测试结果页可查看 baseline 批次、知识库版本、参数、Top-3 命中率、引用准确率、延迟和成本；策略变更必须带前后对比。</td>
+            <td>需确认样本来源、是否可使用脱敏真实客户材料、真实 ZHIPU 配置验收完成状态，以及 baseline 结果保存位置。</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- RP-032 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">24 / RP-032 Analysis</div>
+          <h2>RP-032 · AI 工作台推荐工作流列表可达性与语义优化</h2>
+          <p>本需求来自 2026-06-26 用户对 AI 工作台截图的反馈：左侧“推荐工作流”区域作用不清，且当前无法滚动查看最下方内容。去重结果：命中 RP-019 的“推荐工作流定位不清”方向，但 RP-019 已交付批次主要覆盖布局密度、右栏折叠和 Markdown 渲染，未覆盖左侧工作流列表自身的底部可达性，因此新增独立 RP-032。</p>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill brand">作用</span>
+            <h3>不是静态推荐卡</h3>
+            <p>当前代码中点击工作流会调用 <code class="inline">startWorkflow(workflow)</code>，设置 <code class="inline">activeWorkflowKey</code>，并把输入框预填为工作流标题和说明；发送消息时会携带 <code class="inline">workflowKey</code>，影响后续上下文和沉淀结果。</p>
+          </div>
+          <div class="card">
+            <span class="pill err">问题</span>
+            <h3>入口含义与内容可达性不足</h3>
+            <p>“推荐工作流”命名像静态建议或帮助内容，用户不容易判断点击会改变当前任务上下文。截图中管理视角第 4 个工作流被视口裁切，用户反馈无法滚动到最下方，说明左栏滚动与列表区域高度缺少明确可达性约束。</p>
+          </div>
+          <div class="card">
+            <span class="pill warn">影响</span>
+            <h3>主入口任务选择受阻</h3>
+            <p>管理员等角色有 4 个工作流，底部按钮不可见会导致“管理业务角色”等任务模板无法启动；即便可通过输入框自由对话绕过，也会降低 AI 工作台作为角色化业务入口的效率和可信度。</p>
+          </div>
+        </div>
+
+        <table>
+          <tr><th>分析项</th><th>结论</th><th>验收口径</th></tr>
+          <tr>
+            <td>产品定位</td>
+            <td>建议把“推荐工作流”改口径为“工作流模板”或“开始任务”，明确这是可执行任务入口，而不是静态推荐内容。</td>
+            <td>用户看到标题和选中态后能判断：点击会切换当前 AI 对话上下文、预填输入框并影响后续产物类型。</td>
+          </tr>
+          <tr>
+            <td>交互结构</td>
+            <td>左栏应在角色说明、会话列表和工作流模板之间做稳定高度分配；工作流列表至少支持独立滚动或折叠/展开，避免底部按钮被页面 composer 或浏览器视口裁切。</td>
+            <td>1440 桌面、低高度桌面和窄屏下，所有 workflow 按钮均可通过鼠标滚轮、触控板和键盘 Tab 访问。</td>
+          </tr>
+          <tr>
+            <td>技术边界</td>
+            <td>短期只改 <code class="inline">ui/V2_PROTOTYPE</code> 前端布局与文案；不改变 <code class="inline">workflowKey</code>、AI session、后端 chat API 或写动作确认机制。</td>
+            <td>点击任一工作流后，<code class="inline">activeWorkflowKey</code>、composer 预填和发送请求中的 <code class="inline">workflowKey</code> 与现有逻辑一致。</td>
+          </tr>
+        </table>
+
+        <div class="callout ok" style="margin-top:18px">
+          <div><b>初步方案</b>第一批按前端体验修复推进：将标题改为“工作流模板/开始任务”；给工作流列表设置可预测的最大高度与 <code class="inline">overflow-y:auto</code>，或在左栏中让会话列表和工作流列表分别滚动；补充选中态说明和 Tooltip；增加 HomeWorkspace 布局/交互回归测试。若后续要引入可配置工作流或低代码编排，再回到 RP-001 架构评审，不在本需求中扩大范围。</div>
+        </div>
+        <div class="callout" style="margin-top:14px">
+          <div><b>回填进展（2026-06-26）</b>Qoder 已完成第一批前端回填，Codex 复核通过自动化与构建。当前不标记“已交付”，等待人工确认实际多角色工作流列表滚动、选中态圆点和窄屏表现；Qoder commit 相对 base 含较多既有工作台变更，后续集成需使用当前 main 文件状态或拆出最小 patch，不建议直接按整 commit 合并。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RP-033 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">25 / RP-033 Analysis</div>
+          <h2>RP-033 · AI 工作台会话列表容器滚动</h2>
+          <p>本需求来自用户截图反馈：AI 工作台左侧“会话”列表区域，当会话数量超出容器可视高度时，底部会话被外层 <code class="inline">overflow:hidden</code> 裁剪遮挡，用户无法滚动查看第 5 个及之后的会话。去重结果：RP-032 覆盖的是“推荐工作流”列表可达性，与会话列表（<code class="inline">SessionRail</code>）为不同组件，因此新增独立 RP-033。</p>
+        </div>
+
+        <div class="callout">
+          <div><b>问题</b><code class="inline">SessionRail.jsx</code> 会话列表容器（<code class="inline">div</code> with <code class="inline">padding: 10, display: 'grid'</code>）未设置 <code class="inline">maxHeight</code> 和 <code class="inline">overflowY</code>，外层容器 <code class="inline">overflow: 'hidden'</code> 导致超出部分被裁剪。用户无法通过滚动查看被遮挡的会话。</div>
+        </div>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="panel">
+            <div class="panel-h">范围<span class="right">scope</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>SessionRail 会话列表容器添加 <code class="inline">maxHeight</code>（建议 240px，适配当前左栏密度）+ <code class="inline">overflowY: auto</code>。</li>
+                <li>隐藏原生滚动条：CSS <code class="inline">::-webkit-scrollbar { display: none }</code> + <code class="inline">scrollbar-width: none</code>，保持交互简洁干净。</li>
+                <li>不新增滚动条组件、不改变会话卡片样式、不改变会话列表布局结构。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">不进入范围<span class="right">not now</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>不引入虚拟列表（会话数量级无需优化性能）。</li>
+                <li>不改变会话数据结构或新增后端接口。</li>
+                <li>不做会话分组、折叠或分页。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <table style="margin-top:18px">
+          <tr><th>初步方案</th><th>验收口径</th><th>待规划输入</th></tr>
+          <tr>
+            <td>SessionRail.jsx 会话列表容器添加 maxHeight + overflowY:auto；通过 CSS 隐藏原生滚动条（webkit + Firefox scrollbar-width:none），保留鼠标滚轮/触控板滚动能力。</td>
+            <td>会话数量超出容器高度时可滚动查看全部会话；不出现可见滚动条；交互简洁干净，与整体设计一致。</td>
+            <td>确认 maxHeight 值（建议 240px）是否适配不同屏幕密度；是否需要保留滚动条 hover 可见的备选方案。</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- 排期视图 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">26 / Planning</div>
+          <h2>排期视图</h2>
+          <p>按 Phase 归属组织需求，避免候选需求混入当前冲刺导致范围失控。</p>
+        </div>
+        <div class="grid-3" style="margin-bottom:18px">
+          <div class="card">
+            <span class="pill brand">Phase 1H</span>
+            <h3>近期规划</h3>
+            <ul class="list-clean" style="margin-top:12px">
+              <li><b>Phase 1H-A / 已交付：</b>RP-017 会话恢复、RP-014 自动滚动、RP-015 输入框高度、RP-016 创建后刷新、RP-011 检索主体弹窗化。</li>
+              <li><b>Phase 1H-B / 已交付基线：</b>RP-019 AI 工作台布局与 Markdown 渲染、RP-020 引导选项交互、RP-021 编号选项交互、RP-022 系统管理模型配置保存、RP-023 消息复制按钮、RP-025 创建项目意图路由与回归补丁已交付；RP-018 剩余 MT-1H-B-003 真实 ZHIPU 配置人工验收待回填。</li>
+              <li><b>Phase 1H-C / 已回填待验收：</b>RP-032 推荐工作流列表可达性第一批已回填，待人工确认桌面/低高度/窄屏体验。</li>
+              <li><b>Phase 1H-C / Codex 复核分流：</b>RP-027/RP-028 Provider 批次自动化通过待最小 patch 集成；RP-026 能力矩阵补改已通过窄加载、无副作用和降级测试；RP-031 RAG Baseline 重复检索与构建基线已验证通过，真实 ZHIPU 配置仍待人工验收；RP-033 clean patch 已通过自动化复核但尚未提交/集成；RP-029 流式 SSE 与 RP-030 Trace 查询入口已由 Codex 修复验证通过，待集成。</li>
+              <li><b>Phase 1H-C / 暂缓待评审：</b>RP-001 低代码工作流设计器、RP-012 WES Skill 工作流辅助工具。</li>
+              <li><b>Phase 1H 后续候选：</b>RP-004 后续深查子项、RP-005 Harness run 级时间线深化、RP-002 轻量审计统一 schema / retention / 查询入口。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="pill warn">Phase 2</span>
+            <h3>后续规划</h3>
+            <ul class="list-clean" style="margin-top:12px">
+              <li><b>RP-024</b> Napkin 视觉生成融合售前解决方案 PPT 页面（待确认）</li>
+              <li><b>RP-007 后续</b> Regression 回放执行器、评分持久化与样本扩容</li>
+              <li><b>RP-005 后续</b> Harness run 级 evidence / modelRun / toolEvent 时间线深化</li>
+              <li><b>RP-026</b> 用户管理补充角色能力位配置与说明</li>
+              <li><b>RP-027</b> Kimi API 模型升级与 Provider 成本优化</li>
+              <li><b>RP-028</b> Kimi Provider 稳定性增强：超时、重试与 Token 审计</li>
+              <li><b>RP-029</b> Kimi 流式输出与 WES 实时响应功能模块</li>
+              <li><b>RP-030</b> Agent Runtime 统一 Trace Schema 与查询入口</li>
+              <li><b>RP-031</b> RAG Baseline 与知识库评测闭环</li>
+              <li><b>RP-032</b> AI 工作台推荐工作流列表可达性与语义优化</li>
+              <li><b>RP-033</b> AI 工作台会话列表容器滚动</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="pill">暂缓</span>
+            <h3>暂缓 / 冻结</h3>
+            <ul class="list-clean" style="margin-top:12px">
+              <li>向量库集成</li>
+              <li>Prompt Profile CRUD</li>
+              <li>标准治理 Harness 化</li>
+            </ul>
+            <p style="margin-top:12px;color:var(--ink-3);font-size:12px">除非后续明确切阶段，否则不进入当前冲刺。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 维护规则 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">25 / Governance</div>
+          <h2>维护规则</h2>
+          <p>需求池治理约定，确保需求可追溯、范围可控。</p>
+        </div>
+        <div class="grid-2">
+          <div class="callout">
+            <div><b>登记必填</b>所有新需求必须有 ID、来源、类型、优先级、状态、下一步。缺少任一字段的需求不进入需求池。</div>
+          </div>
+          <div class="callout warn">
+            <div><b>状态可追溯</b>需求状态变化必须在 changes.html 或本页状态栏可追溯。不允许静默修改状态。</div>
+          </div>
+          <div class="callout">
+            <div><b>用户干预</b>台账状态列提供优先处理、冻结、取消三个用户级标识；标识仅保存在当前浏览器，不替代需求正式状态。</div>
+          </div>
+          <div class="callout">
+            <div><b>实施前置</b>进入实施前必须有设计说明或实现提示词。不允许无设计直接编码。</div>
+          </div>
+          <div class="callout ok">
+            <div><b>业务写入边界</b>涉及正式业务写入时必须明确 JWT、owner、确认链路和审计证据。AI 不能代替用户做正式业务决策。</div>
+          </div>
+        </div>
+        <div class="callout err" style="margin-top:14px">
+          <div><b>范围控制</b>不把候选需求直接混入当前 Phase，避免范围失控。候选需求必须先经过分析、排期后才能进入实施。</div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="wrap footer">
+      WES Agent 升级总看板 · 需求池 · 2026-06-26 · 33 条需求 · 22 delivered · 9 pending · 2 deferred
+    </footer>
+  </main>
+  <script>
+  (function() {
+    'use strict';
+
+    // ── DOM 引用 ──
+    const filterSearch = document.getElementById('filter-search');
+    const filterStatus = document.getElementById('filter-status');
+    const filterUserFlag = document.getElementById('filter-user-flag');
+    const filterPriority = document.getElementById('filter-priority');
+    const filterPhase = document.getElementById('filter-phase');
+    const filterReset = document.getElementById('filter-reset');
+    const visibleCountEl = document.getElementById('filter-visible-count');
+    const USER_FLAG_STORAGE_KEY = 'wes-requirements-user-flags-v1';
+    const USER_FLAGS = ['优先处理', '冻结', '取消'];
+    const USER_FLAG_CLASSES = {
+      '优先处理': 'user-flag-priority',
+      '冻结': 'user-flag-frozen',
+      '取消': 'user-flag-cancelled',
+    };
+
+    // 定位需求台账表格（第 4 个 section）
+    const sections = document.querySelectorAll('main > section');
+    const ledgerSection = sections[3]; // 0-indexed, 第4个是需求台账
+    if (!ledgerSection || !filterSearch) return;
+
+    const table = ledgerSection.querySelector('.table-scroll table');
+    if (!table) return;
+
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const totalRows = rows.length;
+    let userFlagState = loadUserFlagState();
+
+    // 初始化计数
+    visibleCountEl.textContent = totalRows;
+
+    // ── 用户级干预标识 ──
+    function loadUserFlagState() {
+      try {
+        const raw = window.localStorage.getItem(USER_FLAG_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+
+        return Object.fromEntries(
+          Object.entries(parsed).filter(([, value]) => USER_FLAGS.includes(value))
+        );
+      } catch (error) {
+        return {};
+      }
+    }
+
+    function saveUserFlagState() {
+      try {
+        window.localStorage.setItem(USER_FLAG_STORAGE_KEY, JSON.stringify(userFlagState));
+      } catch (error) {
+        // 本页可在 file:// 下打开；浏览器禁用 localStorage 时保留当前会话内标识。
+      }
+    }
+
+    function applyUserFlagClass(tr, value) {
+      Object.values(USER_FLAG_CLASSES).forEach(className => tr.classList.remove(className));
+      tr.dataset.userFlag = value || '';
+      if (value && USER_FLAG_CLASSES[value]) {
+        tr.classList.add(USER_FLAG_CLASSES[value]);
+      }
+    }
+
+    function renderUserFlagControls() {
+      rows.forEach(tr => {
+        const cells = tr.querySelectorAll('td');
+        if (cells.length < 7) return;
+
+        const id = cells[0].textContent.trim();
+        const statusCell = cells[6];
+        const currentValue = userFlagState[id] || '';
+        applyUserFlagClass(tr, currentValue);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'user-flag-control';
+
+        const select = document.createElement('select');
+        select.className = 'user-flag-select';
+        select.setAttribute('aria-label', `${id} 用户干预状态`);
+
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '用户标识';
+        select.appendChild(emptyOption);
+
+        USER_FLAGS.forEach(flag => {
+          const option = document.createElement('option');
+          option.value = flag;
+          option.textContent = flag;
+          select.appendChild(option);
+        });
+
+        select.value = currentValue;
+        updateUserFlagSelectClass(select, currentValue);
+        select.addEventListener('change', () => {
+          const nextValue = select.value;
+          if (nextValue) {
+            userFlagState[id] = nextValue;
+          } else {
+            delete userFlagState[id];
+          }
+
+          updateUserFlagSelectClass(select, nextValue);
+          applyUserFlagClass(tr, nextValue);
+          saveUserFlagState();
+          applyFilters();
+        });
+
+        wrapper.appendChild(select);
+        statusCell.appendChild(wrapper);
+      });
+    }
+
+    function updateUserFlagSelectClass(select, value) {
+      select.classList.remove('flag-priority', 'flag-frozen', 'flag-cancelled');
+      if (value === '优先处理') select.classList.add('flag-priority');
+      if (value === '冻结') select.classList.add('flag-frozen');
+      if (value === '取消') select.classList.add('flag-cancelled');
+    }
+
+    // ── 提取行数据 ──
+    function extractRowData(tr) {
+      const cells = tr.querySelectorAll('td');
+      if (cells.length < 7) return null;
+
+      const id = cells[0].textContent.trim();
+      const title = cells[1].textContent.trim();
+      const source = cells[2].textContent.trim();
+      const priorityEl = cells[4].querySelector('.pill');
+      const priority = priorityEl ? priorityEl.textContent.trim() : '';
+      const phase = cells[5].textContent.trim();
+      const statusEl = cells[6].querySelector('.status');
+      let statusClass = '';
+      if (statusEl) {
+        if (statusEl.classList.contains('done')) statusClass = 'done';
+        else if (statusEl.classList.contains('run')) statusClass = 'run';
+        else if (statusEl.classList.contains('todo')) statusClass = 'todo';
+      }
+
+      return { id, title, source, priority, phase, statusClass, userFlag: tr.dataset.userFlag || '' };
+    }
+
+    // ── 筛选逻辑 ──
+    function applyFilters() {
+      const searchText = filterSearch.value.trim().toLowerCase();
+      const statusValue = filterStatus.value;
+      const userFlagValue = filterUserFlag.value;
+      const priorityValue = filterPriority.value;
+      const phaseValue = filterPhase.value;
+
+      let visibleNum = 0;
+
+      rows.forEach(tr => {
+        const data = extractRowData(tr);
+        if (!data) return;
+
+        let show = true;
+
+        // 文本搜索（ID / 标题 / 来源）
+        if (searchText) {
+          const matchId = data.id.toLowerCase().includes(searchText);
+          const matchTitle = data.title.toLowerCase().includes(searchText);
+          const matchSource = data.source.toLowerCase().includes(searchText);
+          if (!matchId && !matchTitle && !matchSource) show = false;
+        }
+
+        // 状态筛选
+        if (statusValue && data.statusClass !== statusValue) show = false;
+
+        // 用户级干预标识筛选
+        if (userFlagValue && data.userFlag !== userFlagValue) show = false;
+
+        // 优先级筛选
+        if (priorityValue && data.priority !== priorityValue) show = false;
+
+        // 阶段筛选（包含匹配，支持 "Phase 1H" 匹配 "Phase 1H / Phase 2"）
+        if (phaseValue && !data.phase.includes(phaseValue)) show = false;
+
+        if (show) {
+          tr.classList.remove('ledger-row-hidden');
+          visibleNum++;
+        } else {
+          tr.classList.add('ledger-row-hidden');
+        }
+      });
+
+      visibleCountEl.textContent = visibleNum;
+    }
+
+    // ── 重置筛选 ──
+    function resetFilters() {
+      filterSearch.value = '';
+      filterStatus.value = '';
+      filterUserFlag.value = '';
+      filterPriority.value = '';
+      filterPhase.value = '';
+      applyFilters();
+    }
+
+    renderUserFlagControls();
+
+    // ── 事件绑定 ──
+    filterSearch.addEventListener('input', applyFilters);
+    filterStatus.addEventListener('change', applyFilters);
+    filterUserFlag.addEventListener('change', applyFilters);
+    filterPriority.addEventListener('change', applyFilters);
+    filterPhase.addEventListener('change', applyFilters);
+    filterReset.addEventListener('click', resetFilters);
+  })();
+  </script>
+</body>
+</html>

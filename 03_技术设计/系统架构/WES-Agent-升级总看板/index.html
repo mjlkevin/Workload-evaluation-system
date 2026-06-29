@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>WES Agent 升级总看板 · 设计 / 计划 / 监控</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/dashboard.css" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
 </head>
 <body>
   <header class="topnav">
@@ -23,8 +23,11 @@
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="requirements.html">需求池</a>
       </nav>
-      <span class="pill ok">Phase 1F delivered</span>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill brand">Phase 1H-C planning</span>
     </div>
   </header>
 
@@ -36,17 +39,20 @@
           <h1>设计、计划、监控<br><em>三位一体</em>的升级总看板</h1>
           <p class="lead">本看板是 WES 从传统工作量评估系统升级为 AI Agent 工作台 + WES 传统记录系统的汇报与审计入口。它把架构设计、实施路线、验证监控、风险决策和变更记录拆成可维护的专题页，并在首页统一串联。</p>
           <div class="pill-row">
-            <span class="pill brand">main @ 4bf4bcb + 1F working tree</span>
+            <span class="pill brand">main + Phase 1H-C planning</span>
             <span class="pill ok">PR #2 已合并</span>
-            <span class="pill">2026-06-21</span>
+            <span class="pill">2026-06-29</span>
             <span class="pill ok">Phase 1E 已完成</span>
-            <span class="pill ok">Phase 1F 已实现</span>
+            <span class="pill ok">Phase 1F 已交付</span>
+            <span class="pill ok">Phase 1G 已交付</span>
+            <span class="pill brand">需求池 33 项</span>
+            <span class="pill ok">22 已交付</span>
           </div>
           <div class="trust">
             <span><b>18/18</b> 后端模块化</span>
-            <span><b>62</b> Harness tests pass</span>
-            <span><b>64</b> V2 frontend tests pass</span>
-            <span><b>12</b> 人工测试任务已规划</span>
+            <span><b>65</b> Harness tests pass</span>
+            <span><b>92</b> V2 frontend tests pass</span>
+            <span><b>34</b> 人工测试任务已规划</span>
             <span><b>0</b> 正式业务绕过确认</span>
           </div>
         </div>
@@ -60,19 +66,19 @@
             <div class="fc-row"><span>report_v2_ready</span><b>confirmable</b></div>
           </div>
           <div class="floating-card main">
-            <div class="fc-head"><b>Phase 1F Audit Write-back</b><span class="fc-tag">已实现</span></div>
-            <div class="fc-row"><span>1E 基线</span><b>草稿可见/跳转/追溯</b></div>
-            <div class="fc-row"><span>1F 目标</span><b>人工确认回写</b></div>
-            <div class="fc-row"><span>审计记录</span><b>manual_confirm_ai_draft</b></div>
-            <div class="fc-row"><span>实现状态</span><b>自动化验证中</b></div>
-            <div class="bar"><i style="width: 88%"></i></div>
+            <div class="fc-head"><b>Phase 1G Intent Runtime</b><span class="fc-tag">delivered</span></div>
+            <div class="fc-row"><span>1F 基线</span><b>人工确认回写审计</b></div>
+            <div class="fc-row"><span>1G 原则</span><b>文件是上下文，意图触发工作流</b></div>
+            <div class="fc-row"><span>路由目标</span><b>问答 / 报告 / 查询 / 写动作</b></div>
+            <div class="fc-row"><span>当前状态</span><b>实现完成并验证</b></div>
+            <div class="bar"><i style="width: 100%"></i></div>
           </div>
           <div class="floating-card bottom">
             <div class="fc-head"><b>Verification Snapshot</b><span class="fc-tag">local + CI</span></div>
-            <div class="fc-row"><span>apps/api harness</span><b>62 pass</b></div>
-            <div class="fc-row"><span>apps/api modules</span><b>66 pass</b></div>
-            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>64 pass</b></div>
-            <div class="fc-row"><span>人工测试</span><b>12 待执行</b></div>
+            <div class="fc-row"><span>apps/api harness</span><b>65 pass</b></div>
+            <div class="fc-row"><span>apps/api modules</span><b>102 pass</b></div>
+            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>92 pass</b></div>
+            <div class="fc-row"><span>人工测试</span><b>34 待执行</b></div>
             <div class="fc-row"><span>GitHub Actions</span><b>green</b></div>
           </div>
         </div>
@@ -88,18 +94,18 @@
         </div>
         <div class="kpi-row">
           <div class="kpi">
-            <div class="top"><span class="ic">P</span><span>当前阶段</span><span class="live">已实现</span></div>
-            <div class="v">1F</div>
-            <div class="lb">人工确认回写 Harness 审计</div>
-            <div class="bar"><i style="width:88%"></i></div>
-            <div class="sub">Phase 1F 已进入自动化验证与人工验收准备</div>
+            <div class="top"><span class="ic">P</span><span>当前阶段</span><span class="live">进行中</span></div>
+            <div class="v">1H-C</div>
+            <div class="lb">需求池治理后续规划</div>
+            <div class="bar"><i style="width:72%"></i></div>
+            <div class="sub">需求池统一为 33 项：22 项已交付、9 项待规划/待确认/待验收、2 项暂缓；RP-026 补改、RP-027/RP-028 clean patch、RP-031 重复检索和构建基线已由 Codex 验证通过，RP-029/RP-030 已在修复分支验证通过，RP-033 clean patch 已验证但待提交集成。</div>
           </div>
           <div class="kpi">
-            <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>验证状态</span><span class="live">通过</span></div>
-            <div class="v">212+</div>
-            <div class="lb">本轮核心自动化测试通过</div>
+            <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>验证状态</span><span class="live">已修复</span></div>
+            <div class="v">7</div>
+            <div class="lb">本轮复核验证命令通过</div>
             <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--ok),var(--teal))"></i></div>
-            <div class="sub">人工测试计划已建，结果待回填</div>
+            <div class="sub">RP-027/RP-028 provider 专项 10/10、build:api、test:modules 66/66、test:ai 189/189 通过；RP-026、RP-029/RP-030、RP-031 修复分支仍保持待集成。</div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">A</span><span>审计链路</span><span class="live">保留</span></div>
@@ -109,11 +115,11 @@
             <div class="sub">run / artifact / modelRun / toolEvent</div>
           </div>
           <div class="kpi">
-            <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">F</span><span>1F 任务包</span></div>
-            <div class="v">4</div>
-            <div class="lb">回写、权限、前端状态、测试文档</div>
-            <div class="bar"><i style="width:88%;background:linear-gradient(90deg,var(--ok),var(--accent))"></i></div>
-            <div class="sub">实现已落地，待完整验证结果回填</div>
+            <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">H</span><span>1H-A 迭代包</span></div>
+            <div class="v">5</div>
+            <div class="lb">会话、滚动、输入、刷新、检索弹窗</div>
+            <div class="bar"><i style="width:35%;background:linear-gradient(90deg,var(--brand),var(--accent))"></i></div>
+            <div class="sub">计划与施工提示词已生成，MT-1H-A 人工测试待实现后执行</div>
           </div>
         </div>
       </div>
@@ -129,19 +135,19 @@
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">D</span><span>文档资产</span></div>
-            <div class="v">27</div>
+            <div class="v">51</div>
             <div class="lb">已盘点文档总数</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>事实源</span></div>
-            <div class="v">5</div>
+            <div class="v">16</div>
             <div class="lb">当前事实源 / 契约</div>
             <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--ok),var(--teal))"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">P</span><span>看板页面</span></div>
-            <div class="v">10</div>
+            <div class="v">12</div>
             <div class="lb">总看板 HTML 页面</div>
             <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
           </div>
@@ -157,13 +163,13 @@
             <span class="ico" style="background:var(--brand-soft);color:var(--brand)">M</span>
             <h3>打开文档事实源地图</h3>
             <p>查看文档分层图、Phase × 文档矩阵、事实流转图，以及完整的表格/卡片双视图清单。</p>
-            <div class="preview">27 assets · 4 layers · 3 visualizations</div>
+            <div class="preview">51 assets · 4 layers · 3 visualizations</div>
             <span class="arr">打开 sources.html →</span>
           </a>
           <div class="card">
             <span class="pill brand">Current Truth</span>
             <h3>事实源优先</h3>
-            <p>AGENTS.md、README.md、实现与文档对齐说明.md、openapi.yaml 和产品技术方案.html 是当前最高优先级事实源。</p>
+            <p>AGENTS.md、codex-project-registry.md、QODER.md、KIMICODE.md、README.md、实现与文档对齐说明.md、openapi.yaml 和产品技术方案.html 是当前最高优先级事实源。</p>
           </div>
           <div class="card">
             <span class="pill warn">Historical</span>
@@ -190,7 +196,7 @@
           <div class="card">
             <span class="pill warn">Plan</span>
             <h3>实施计划</h3>
-            <p>承接 Phase 1B/1C/1D/1E 的已交付事实，并把 Phase 1F 人工确认回写拆成可验收任务。这里回答“接下来怎么做”。</p>
+            <p>承接 Phase 1B/1C/1D/1E/1F 的已交付事实，并把 Phase 1G 意图路由与任务运行时升级拆成可验收任务。这里回答“接下来怎么做”。</p>
           </div>
           <div class="card">
             <span class="pill ok">Monitor</span>
@@ -243,15 +249,15 @@
           <a class="res-card" href="plan.html">
             <span class="ico" style="background:var(--accent-soft);color:var(--accent)">03</span>
             <h3>计划与进度</h3>
-            <p>Phase 1B/1C/1D/1E 完成项、Phase 1F 启动目标、验收门禁和后续候选池。</p>
-            <div class="preview">当前激活：人工确认回写 Harness 审计。</div>
+            <p>Phase 1B/1C/1D/1E/1F 完成项、Phase 1G 交付目标、验收门禁和后续候选池。</p>
+            <div class="preview">当前激活：意图路由与任务运行时升级。</div>
             <span class="arr">打开计划与进度 →</span>
           </a>
           <a class="res-card" href="testing.html">
             <span class="ico" style="background:var(--accent-soft);color:var(--accent)">04</span>
             <h3>测试</h3>
             <p>人工测试任务、执行路径、结果反馈模板、缺陷分级和关闭标准。</p>
-            <div class="preview">12 条人工任务 · P0/P1/P2 反馈 · 人工验收门禁</div>
+            <div class="preview">34 条人工任务 · P0/P1/P2 反馈 · 人工验收门禁</div>
             <span class="arr">打开测试页面 →</span>
           </a>
           <a class="res-card" href="monitoring.html">
@@ -275,12 +281,33 @@
             <div class="preview">14cc86a feat(harness): 接入 Phase 1D Agent 工作台闭环</div>
             <span class="arr">打开变更记录 →</span>
           </a>
+          <a class="res-card" href="collaboration-protocol.html">
+            <span class="ico" style="background:var(--brand-soft);color:var(--brand)">A2</span>
+            <h3>协作协议</h3>
+            <p>说明 WES + Qoder + KIMICODE + Codex 及后续候选 Agent 的本地 A2A 协作机制：团队注册表、NightOps、Git 状态载体、handoff、总看板事实源和验证门禁。</p>
+            <div class="preview">registry → worktree → handoff → review → verification → board sync</div>
+            <span class="arr">打开协作协议 →</span>
+          </a>
+          <a class="res-card" href="requirements.html">
+            <span class="ico" style="background:var(--warn-soft);color:var(--warn)">RP</span>
+            <h3>需求池</h3>
+            <p>升级需求记录、分析、拆解、排期与状态管理；当前只保留只读需求池页面，后续由 AI 直接维护。</p>
+            <div class="preview">33 requirements · 22 delivered · 9 pending/review · 2 deferred</div>
+            <span class="arr">打开需求池 →</span>
+          </a>
           <a class="res-card" href="../WES-Agent-产品技术方案.html">
             <span class="ico" style="background:var(--bg-soft);color:var(--ink-2)">R</span>
             <h3>原产品技术方案</h3>
             <p>保留为详细资料源，当前总看板从中抽取已合并事实和后续方向。</p>
             <div class="preview">v0.5 Phase 1F 完成口径 · 2026-06-21</div>
             <span class="arr">打开原文档 →</span>
+          </a>
+          <a class="res-card" href="../../../docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md">
+            <span class="ico" style="background:var(--brand-soft);color:var(--brand)">1G</span>
+            <h3>Phase 1G 设计文档</h3>
+            <p>定义 AI 工作台意图路由、上下文构建、工具规划、附件问答、WES 数据查询和确认边界。</p>
+            <div class="preview">文件是上下文，用户意图才触发工作流。</div>
+            <span class="arr">打开 1G spec →</span>
           </a>
         </div>
       </div>
@@ -291,19 +318,19 @@
         <div class="split">
           <div>
             <div class="h-num">Current Phase</div>
-            <h2>Phase 1F 交付状态</h2>
-            <p class="lead">Phase 1E 已作为完成基线冻结：AI 草稿可见、可跳转、可追溯。Phase 1F 已实现最小闭环：用户在传统详情页人工确认 Harness 来源 AI 草稿后，系统写入 Harness ToolEvent 与 Run metadata，并在详情页展示回写状态；仍不扩大 AI 自治范围。</p>
+            <h2>Phase 1G 交付状态</h2>
+            <p class="lead">Phase 1G 已把 AI 工作台从固定评估流水线升级为受控任务运行时：文件上传提供上下文，用户意图决定是业务问答、附件问答、WES 数据查询、报告生成还是写动作确认。v1 后普通追问不再自动生成 v2，结构化卡片提交或明确报告意图才推进报告链路。</p>
           </div>
           <div class="panel">
-            <div class="panel-h">Phase 1F 交付口径<span class="right">audit write-back</span></div>
+            <div class="panel-h">Phase 1G 交付口径<span class="right">intent runtime</span></div>
             <div class="panel-b">
               <ul class="list-clean">
-                <li>1E 基线：传统项目/评估列表能识别 <code class="inline">draft_from_ai</code>。</li>
-                <li>1E 基线：AI 工作台 confirm 结果可跳转到传统草稿详情。</li>
-                <li>1E 基线：详情页展示 Harness Run ID / Action ID / 版本号。</li>
-                <li>1F 已实现：人工确认后回写 Harness ToolEvent 与 metadata。</li>
-                <li>1F 交付：后端、前端、测试、OpenAPI 和总看板同步。</li>
-                <li>仍不引入向量库、Prompt Profile CRUD、标准治理 Harness 化。</li>
+                <li>1F 基线：人工确认后回写 Harness ToolEvent 与 metadata。</li>
+                <li>1G 原则：文件是上下文，用户意图才触发工作流。</li>
+                <li>1G 路由：已覆盖能力发现、业务问答、附件问答、报告生成、WES 查询、写动作确认。</li>
+                <li>1G 边界：普通追问不再自动生成 v2，卡片提交或明确意图才推进报告。</li>
+                <li>1G 审计：关键模型回答保留 trace，写动作继续记录 ToolEvent。</li>
+                <li>仍不引入向量库、Prompt Profile CRUD、标准治理 Harness 化和低代码设计器。</li>
               </ul>
             </div>
           </div>
@@ -339,7 +366,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES Agent 升级总看板 · 设计 / 计划 / 监控 · 2026-06-21 · main @ 4bf4bcb + Phase 1F working tree
+      WES Agent 升级总看板 · 设计 / 计划 / 监控 · 2026-06-29 · main + Phase 1H-C planning
     </footer>
   </main>
 </body>

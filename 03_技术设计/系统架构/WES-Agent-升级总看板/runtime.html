@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>任务运行时 · WES Agent 升级总看板</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/dashboard.css" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
 </head>
 <body>
   <header class="topnav">
@@ -23,8 +23,11 @@
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="requirements.html">需求池</a>
       </nav>
-      <span class="pill warn">Runtime Design</span>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill ok">Runtime Delivered</span>
     </div>
   </header>
 
@@ -35,11 +38,12 @@
       <p class="meta">
         <span><b>启发来源</b> Qoder Quest Runtime</span>
         <span><b>WES 转译</b> Harness Run Runtime</span>
-        <span><b>当前阶段</b> Phase 1F delivered</span>
-        <span><b>定位</b> Chat 是入口，Run 才是任务边界</span>
+        <span><b>当前阶段</b> Phase 1G delivered</span>
+        <span><b>定位</b> Chat 是入口，Intent 决定工作流</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill brand">source boundary</span>
+        <span class="pill brand">intent boundary</span>
         <span class="pill ok">execution boundary</span>
         <span class="pill warn">artifact workspace</span>
         <span class="pill">delivery gate</span>
@@ -54,7 +58,7 @@
       <ol>
         <li><b>§1</b> 核心判断</li>
         <li><b>§2</b> Qoder 到 WES 的映射</li>
-        <li><b>§3</b> 五个运行时边界</li>
+        <li><b>§3</b> 六个运行时边界</li>
         <li><b>§4</b> WES 优化项清单</li>
         <li><b>§5</b> Phase 排期建议</li>
         <li><b>§6</b> 监控与评测指标</li>
@@ -64,12 +68,12 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>核心判断</h2>
-      <p class="lead">Qoder 的关键启发不是“三栏 UI”，而是把 Chat 从对话窗口升级为任务运行时。转译到 WES，AI 工作台不应只是上传文件后给出一段回答，而应该围绕一个 Harness Run 管理来源、执行、产物、交付和知识边界。</p>
-      <div class="callout ok"><div><b>WES 版本定义</b>Harness Run 是一次 AI 业务任务运行时。Chat 负责输入和澄清，Runtime 负责记录任务属于谁、用了哪些文件和知识、执行到哪个阶段、生成了哪些 artifact、哪些动作被人工确认、最终交付到了哪个传统草稿或正式业务入口。</div></div>
+      <p class="lead">Qoder 的关键启发不是“三栏 UI”，而是把 Chat 从对话窗口升级为任务运行时。转译到 WES，AI 工作台不应只是上传文件后进入固定评估报告流水线，而应该由用户意图决定下一步是业务问答、附件问答、报告生成、WES 数据查询还是写动作确认。</p>
+      <div class="callout ok"><div><b>WES 版本定义</b>Harness Run 是一次 AI 业务任务运行时。Chat 负责输入和澄清，Intent Router 决定执行路径，Runtime 负责记录任务属于谁、用了哪些文件和知识、执行到哪个阶段、生成了哪些 artifact、哪些动作被人工确认、最终交付到了哪个传统草稿或正式业务入口。</div></div>
       <div class="grid-3">
-        <div class="card"><span class="pill brand">不是聊天增强</span><h3>Chat 只是入口</h3><p>用户上传文件、补充说明和点击 nextAction 都是 Run 事件，不应散落在普通会话里。</p></div>
+        <div class="card"><span class="pill brand">不是聊天增强</span><h3>Chat 只是入口</h3><p>用户上传文件、补充说明、业务追问和点击 nextAction 都应进入可追溯的运行时视角。</p></div>
         <div class="card"><span class="pill ok">不是自动落库</span><h3>Runtime 管边界</h3><p>AI 可以生成报告、草稿和建议动作；正式业务仍必须经过传统系统人工确认链路。</p></div>
-        <div class="card"><span class="pill warn">不是全局知识池</span><h3>知识要有 Scope</h3><p>用户、团队、项目、标准文件和任务引用需要分层注入，避免知识污染和责任不清。</p></div>
+        <div class="card"><span class="pill warn">不是固定流水线</span><h3>意图触发工作流</h3><p>附件提供上下文，是否生成报告、查询项目或只回答问题，由用户当前意图决定。</p></div>
       </div>
     </section>
 
@@ -84,19 +88,24 @@
           <td>一个 Run 承载一次文件理解、报告生成、澄清、确认和草稿交付。</td>
         </tr>
         <tr>
+          <td>Intent Router</td>
+          <td>Phase 1G 意图路由 / Tool Planner</td>
+          <td>区分能力发现、业务问答、附件问答、报告生成、数据查询和写动作确认。</td>
+        </tr>
+        <tr>
           <td>Source Workspace</td>
           <td>上传文件、用户补充、项目背景、标准文件版本</td>
-          <td>所有输入必须绑定到 Run，避免“这份报告到底基于什么材料”不可追溯。</td>
+          <td>报告生成和写动作必须绑定到 Run；普通附件问答第一批采用 <code class="inline">trace.modelRun</code> + <code class="inline">attachment:</code> contextRef 的轻量审计，不创建 Harness Run。</td>
         </tr>
         <tr>
           <td>Execution Workspace</td>
           <td>Harness stage、modelRun、toolEvent、schema validation</td>
-          <td>执行状态不靠前端猜测，而由后端阶段机和审计对象驱动。</td>
+          <td>执行状态不靠前端猜测；Harness 流程由阶段机和审计对象驱动，普通附件问答仅保留 <code class="inline">auditMode=lightweight</code> 的模型调用摘要。</td>
         </tr>
         <tr>
           <td>Artifact Workspace</td>
           <td><code class="inline">file_understanding</code>、v1/v2 report、evidence、AI 草稿链接</td>
-          <td>用户不仅看回答，还能看产物、证据、差异和下一步动作。</td>
+          <td>RP-005 第一批已在 AI 工作台右侧把 session 来源、执行、产物、待确认动作和关联记录组织为运行时间线；后续继续补 Harness run 级 evidence/modelRun/toolEvent。</td>
         </tr>
         <tr>
           <td>Delivery Workspace</td>
@@ -113,19 +122,23 @@
 
     <section>
       <div class="h-num">Section 03</div>
-      <h2>五个运行时边界</h2>
+      <h2>六个运行时边界</h2>
       <div class="flow-steps">
         <div class="flow-step"><span class="num">01</span><b>来源边界</b><small>Run 绑定 sourceFile、用户补充、标准版本和项目背景；不连接本地目录，不开放命令执行。</small></div>
-        <div class="flow-step"><span class="num">02</span><b>执行边界</b><small>阶段机决定是否可 parse、generate v1/v2、confirm；模型调用、schema 和失败状态都进审计。</small></div>
-        <div class="flow-step"><span class="num">03</span><b>产物边界</b><small>artifact、evidence、报告、草稿链接集中展示，形成可审查的右侧产物工作区。</small></div>
-        <div class="flow-step"><span class="num">04</span><b>交付边界</b><small>AI 草稿进入传统 WES；正式业务动作必须人工确认，Phase 1F 回写 Harness 审计。</small></div>
-        <div class="flow-step"><span class="num">05</span><b>知识边界</b><small>知识按用户、团队、项目、标准、任务引用分层；报告必须说明采用了哪些上下文。</small></div>
+        <div class="flow-step"><span class="num">02</span><b>意图边界</b><small>普通追问、附件问答、报告生成、WES 数据查询和写动作请求走不同路径。</small></div>
+        <div class="flow-step"><span class="num">03</span><b>执行边界</b><small>阶段机决定是否可 parse、generate v1/v2、confirm；普通附件问答不创建 Run，仅保留轻量 modelRun 摘要。</small></div>
+        <div class="flow-step"><span class="num">04</span><b>产物边界</b><small>artifact、回答、待确认动作和关联记录已在右侧时间线集中展示；evidence/modelRun 细粒度追溯后续补齐。</small></div>
+        <div class="flow-step"><span class="num">05</span><b>交付边界</b><small>AI 草稿进入传统 WES；正式业务动作必须人工确认，Phase 1F 回写 Harness 审计。</small></div>
+        <div class="flow-step"><span class="num">06</span><b>知识边界</b><small>知识按用户、团队、项目、标准、任务引用分层；回答和报告都应说明采用了哪些上下文。</small></div>
       </div>
       <div class="panel" style="margin-top:18px">
         <div class="panel-h">Run Runtime Chain<span class="right">WES interpretation</span></div>
         <div class="panel-b">
 <pre>source workspace
   uploaded files / user_chat_supplement / standard version / project context
+    ↓
+intent router
+  capability discovery / domain qa / attachment qa / report generation / data query / write confirm
     ↓
 harness run runtime
   stage machine / modelRun / schema validation / toolEvent
@@ -162,8 +175,14 @@ knowledge feedback
         <tr>
           <td>产物工作区</td>
           <td>右侧 Artifact Workspace、证据引用、报告版本切换、AI 草稿 Diff、任务总结</td>
-          <td>让用户审查“为什么这样改/这样评估”，而不是只看 AI 给出的最终结论。</td>
-          <td><span class="status todo"><span class="dot"></span>1G/2</span></td>
+          <td>第一批已把 AI session 的来源、执行、产物、交付组织成右侧运行时间线；仍需补 evidence/modelRun/toolEvent 级追溯。</td>
+          <td><span class="status done"><span class="dot"></span>first batch</span></td>
+        </tr>
+        <tr>
+          <td>售前交付物</td>
+          <td>Napkin 视觉页生成、PPT/PNG/SVG 资产落地、外部 request/status/download ToolEvent、方案页预览与下载</td>
+          <td>把需求分析、SOW 和商机摘要转成可交付的解决方案 PPT 页面，同时保留客户数据出站确认、文件落地和生成过程追溯。</td>
+          <td><span class="status todo"><span class="dot"></span>RP-024 candidate</span></td>
         </tr>
         <tr>
           <td>交付边界</td>
@@ -200,9 +219,9 @@ knowledge feedback
           <div class="panel-h">近期可做<span class="right">near term</span></div>
           <div class="panel-b">
             <ul class="list-clean">
-              <li><b>Phase 1F 收尾</b>：执行 MT-1F 人工测试，回填测试结果和业务验收反馈。</li>
-              <li><b>Phase 1G 候选</b>：Run Timeline，把 parse、modelRun、artifact、confirm、draft、manual confirm 串成一条时间线。</li>
-              <li><b>Phase 1G 候选</b>：Artifact Workspace 初版，集中展示 v1/v2、evidence、草稿链接和人工处理状态。</li>
+              <li><b>Phase 1G 已交付</b>：建立 Intent Router，拆分能力发现、业务问答、附件问答、报告生成、WES 查询和写动作确认。</li>
+              <li><b>Phase 1G 已交付</b>：修正 v1 后普通追问自动生成 v2 的路径，卡片提交和明确报告意图才推进 v2。</li>
+              <li><b>Phase 1H 第一批已交付</b>：Run Timeline 与 Artifact Workspace 初版，复用 AI session 数据集中展示来源、执行、产物、待确认动作和关联记录；后续补 Harness run 级证据链。</li>
             </ul>
           </div>
         </div>
@@ -212,7 +231,7 @@ knowledge feedback
             <ul class="list-clean">
               <li>向量库与 embedding 厂商选型后置到标准文件/知识规模清晰后。</li>
               <li>Prompt Profile CRUD 后置到多角色、多客户、多模型差异稳定后。</li>
-              <li>标准治理 Harness 化不挤进 1F，避免扩大当前闭环范围。</li>
+              <li>标准治理 Harness 化不挤进 1G，避免扩大当前闭环范围。</li>
               <li>不自动创建正式项目评估、正式需求或正式发布记录。</li>
             </ul>
           </div>
@@ -225,6 +244,7 @@ knowledge feedback
       <div class="h-num">Section 06</div>
       <h2>监控与评测指标</h2>
       <div class="grid-3">
+        <div class="card"><span class="pill brand">Intent</span><h3>意图命中率</h3><p>抽样检查业务问答、附件问答、报告生成、数据查询和写动作是否被正确路由。</p></div>
         <div class="card"><span class="pill brand">Boundary</span><h3>边界完整率</h3><p>抽样检查每个 Run 是否有 source、stage、artifact、toolEvent、draft link 和 owner 信息。</p></div>
         <div class="card"><span class="pill ok">Trace</span><h3>追溯完整率</h3><p>从传统草稿能反查 Harness run/action，从 Harness 能反查草稿和人工确认结果。</p></div>
         <div class="card"><span class="pill warn">Evidence</span><h3>证据覆盖率</h3><p>报告关键结论是否有 evidence、来源文件、标准版本或用户补充作为依据。</p></div>
@@ -236,7 +256,7 @@ knowledge feedback
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 任务运行时 · WES Agent 升级总看板 · 2026-06-21
+      <a href="index.html">返回总览</a> · 任务运行时 · WES Agent 升级总看板 · 2026-06-29
     </footer>
   </main>
 </body>

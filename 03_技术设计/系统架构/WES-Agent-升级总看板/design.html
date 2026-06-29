@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>设计说明 · WES Agent 升级总看板</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/dashboard.css" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
 </head>
 <body>
   <header class="topnav">
@@ -23,7 +23,10 @@
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="requirements.html">需求池</a>
       </nav>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
       <span class="pill brand">Design</span>
     </div>
   </header>
@@ -34,10 +37,10 @@
       <h1>设计说明</h1>
       <p class="meta">
         <span><b>定位</b> AI Agent 工作台 + WES 传统记录系统</span>
-        <span><b>事实基线</b> Phase 1F 已实现</span>
-        <span><b>当前阶段</b> 1F 验证与人工验收</span>
+        <span><b>事实基线</b> Phase 1H-B 已交付</span>
+        <span><b>当前阶段</b> Phase 1H-C planning</span>
         <span><b>主线</b> ui/V2_PROTOTYPE + apps/api</span>
-        <span><b>更新</b> 2026-06-21</span>
+        <span><b>更新</b> 2026-06-29</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">Harness DB-backed</span>
@@ -285,11 +288,16 @@
           <td>允许生成低置信度粗评，并生成待补标准/规则动作。</td>
           <td>缺标准不阻断内部讨论，但必须标记假设、缺失依据和需要管理员补标准的动作。</td>
         </tr>
+        <tr>
+          <td>外部视觉工具</td>
+          <td>Napkin 只作为受控的视觉生成工具接入，不直接成为售前页面的前端依赖。</td>
+          <td>售前解决方案 PPT 页面生成需要先由 WES/AI 产出页面计划并经用户确认，再由 Harness 调用 Napkin、轮询状态、下载文件和记录 ToolEvent；前端只展示 WES 自有产物链接。</td>
+        </tr>
       </table>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 设计说明 · WES Agent 升级总看板 · 2026-06-21
+      <a href="index.html">返回总览</a> · 设计说明 · WES Agent 升级总看板 · 2026-06-29
     </footer>
   </main>
 </body>

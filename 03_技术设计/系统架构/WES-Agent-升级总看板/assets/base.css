@@ -1,0 +1,105 @@
+/* ══════════════════════════════════════════════
+   WES Agent 升级总看板 — Base Styles
+   CSS 变量 / Reset / 排版 / 基础布局
+   ══════════════════════════════════════════════ */
+
+:root {
+  --bg: oklch(0.985 0.004 250);
+  --bg-soft: oklch(0.965 0.006 250);
+  --surface: #fff;
+  --ink: oklch(0.21 0.03 260);
+  --ink-2: oklch(0.42 0.02 260);
+  --ink-3: oklch(0.62 0.012 260);
+  --line: oklch(0.92 0.008 255);
+  --line-2: oklch(0.86 0.012 255);
+  --brand: oklch(0.42 0.14 262);
+  --brand-ink: oklch(0.32 0.13 262);
+  --brand-soft: oklch(0.96 0.025 260);
+  --accent: oklch(0.69 0.18 45);
+  --accent-soft: oklch(0.965 0.05 60);
+  --teal: oklch(0.66 0.10 195);
+  --teal-soft: oklch(0.97 0.025 195);
+  --ok: oklch(0.66 0.13 152);
+  --ok-soft: oklch(0.96 0.04 152);
+  --warn: oklch(0.78 0.13 80);
+  --warn-soft: oklch(0.97 0.04 80);
+  --err: oklch(0.62 0.20 25);
+  --err-soft: oklch(0.97 0.04 25);
+  --font-sans: "Inter", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --shadow-1: 0 1px 2px rgba(20, 28, 48, .05), 0 1px 1px rgba(20, 28, 48, .04);
+  --shadow-2: 0 8px 28px -12px rgba(20, 28, 48, .18), 0 2px 6px -2px rgba(20, 28, 48, .06);
+  --shadow-3: 0 30px 80px -34px rgba(20, 28, 48, .32), 0 8px 24px -10px rgba(20, 28, 48, .08);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+a { color: var(--brand); text-decoration: none; }
+code, pre { font-family: var(--font-mono); }
+code.inline {
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  background: var(--bg-soft);
+  color: var(--brand-ink);
+  font-size: 12px;
+}
+pre {
+  margin: 14px 0;
+  padding: 18px 22px;
+  overflow-x: auto;
+  color: oklch(0.88 0.02 220);
+  background: #0c1330;
+  border-radius: 12px;
+  font-size: 11.5px;
+  line-height: 1.75;
+}
+
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 32px; }
+.doc-wrap { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+
+/* ── Sections & Typography ── */
+section { padding: 56px 0; border-top: 1px solid var(--line); }
+section:first-of-type { border-top: none; }
+.sec-head { text-align: center; margin-bottom: 42px; }
+.h-num,
+.sec-head .num {
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: .14em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+h2 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -.02em;
+  font-weight: 800;
+}
+.sec-head h2 { font-size: 42px; line-height: 1.1; }
+h3 {
+  margin: 32px 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+p.lead,
+.sec-head p {
+  max-width: 780px;
+  margin: 0 0 28px;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+.sec-head p { margin: 0 auto; font-size: 16px; }

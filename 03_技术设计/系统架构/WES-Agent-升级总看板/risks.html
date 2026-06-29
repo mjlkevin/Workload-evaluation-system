@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>风险与决策 · WES Agent 升级总看板</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/dashboard.css" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
 </head>
 <body>
   <header class="topnav">
@@ -23,8 +23,11 @@
         <a class="active" href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="requirements.html">需求池</a>
       </nav>
-      <span class="pill ok">Phase 1F controlled</span>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill brand">Phase 1H-C risks</span>
     </div>
   </header>
 
@@ -34,7 +37,7 @@
       <h1>风险与决策</h1>
       <p class="meta">
         <span><b>目标</b> 把边界和风险显式化</span>
-        <span><b>状态</b> Phase 1F 回写审计已实现，人工测试风险待回填</span>
+        <span><b>状态</b> Phase 1F 回写审计已实现；知识库、附件问答轻量审计、formBlock 真实模型输出、引导选项误识别、Harness Regression 评分偏差、需求池 Loop 治理风险、反幻觉防御、RP-026 用户管理能力位治理风险、RP-027/RP-028 Kimi Provider 迁移与稳定性风险、Qoder 回填集成风险、RP-029 流式边界风险与 RP-030 Trace 数据治理/测试隔离风险已入池；Codex 侧 Loop 已删除并由 Qoder 接管持续执行；RP-019 右侧空间挤压、表格可读性和 unsafe link/raw HTML 风险已通过折叠、表格渲染与 sanitize 批次降低</span>
         <span><b>原则</b> AI 草稿可以自动，正式业务不能绕过确认</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
@@ -65,9 +68,9 @@
       <h2>风险总览</h2>
       <div class="kpi-row">
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">P0</span><span>阻断风险</span></div><div class="v">0</div><div class="lb">Phase 1D 合并前已处理</div></div>
-        <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">1F</span><span>当前风险</span></div><div class="v">2</div><div class="lb">人工测试 / 运行时边界</div></div>
+        <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">1F</span><span>当前风险</span></div><div class="v">14</div><div class="lb">人工测试 / 运行时边界 / 知识库工具 / 附件问答轻量审计 / Markdown 边界 / formBlock 真实输出 / 引导选项 / Regression 评分 / Loop 治理 / 反幻觉 / 权限治理 / Qoder 集成 / 流式边界 / Trace 鉴权</div></div>
         <div class="kpi"><div class="top"><span class="ic">B</span><span>边界</span></div><div class="v">5</div><div class="lb">权限、阶段、schema、幂等、正式写</div></div>
-        <div class="kpi"><div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>决策</span></div><div class="v">8</div><div class="lb">当前主线决策可追溯</div></div>
+        <div class="kpi"><div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>决策</span></div><div class="v">9</div><div class="lb">当前主线决策可追溯</div></div>
       </div>
     </section>
 
@@ -146,6 +149,7 @@
         <tr><td>输入方式</td><td>上传文件为主，不做本地路径连接器和命令执行。</td><td>降低权限、数据泄露和不可审计文件操作风险。</td></tr>
         <tr><td>标准文件</td><td>原始附件文件存储，DB 保存元数据、解析结果和 evidence。</td><td>官方标准频繁升版，不适合过早字段级内置。</td></tr>
         <tr><td>模型职责</td><td>文件业务理解必须真实调用 LLM。</td><td>代码抽取只负责证据整理，不能代替业务理解和风险判断。</td></tr>
+        <tr><td>formBlock 交互协议</td><td>结构化表单必须先经过后端白名单校验，再由前端渲染；提交仍是普通用户 chat 消息。</td><td>后端协议、session metadata 与前端 InteractiveFormCard 已实现；提交复用 <code class="inline">sendMessage(messageOverride)</code>，避免 LLM 直接驱动写动作。</td></tr>
         <tr><td>低置信度粗评</td><td>规则缺失时允许生成低置信度粗评，并生成待补标准动作。</td><td>不阻断内部讨论，但必须暴露假设和依据缺口。</td></tr>
       </table>
     </section>
@@ -216,7 +220,23 @@
       <div class="h-num">Section 08</div>
       <h2>新增风险池</h2>
       <table>
-        <tr><th>风险</th><th>影响</th><th>控制方式</th></tr>
+        <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr>
+          <td>普通附件问答 trace 过重或被误认为 Harness Run。</td>
+          <td>如果把每次附件追问都创建完整 Harness Run 或保存完整 prompt/raw trace，会带来存储膨胀、隐私暴露和审计语义混乱；如果完全不留 trace，又无法解释模型回答基于哪个附件。</td>
+          <td>RP-002 第一批采用轻量审计：仅在 <code class="inline">attachment_qa</code> / <code class="inline">attachment_summary</code> 返回 <code class="inline">trace.modelRun</code> 并写入 assistant message <code class="inline">metadata.modelRun</code>；字段限于 provider、model、latency、rawContentLength、contextRefs、attempts、finishReason，显式标记 <code class="inline">auditMode=lightweight</code> 与 <code class="inline">createsHarnessRun=false</code>；不新增 DB/存储表，不保存完整 prompt/raw trace。验证：dispatch 用例先见红后转绿、handler 持久化用例先见红后转绿，<code class="inline">test:modules</code> 102 pass，<code class="inline">build:api</code> pass。</td>
+          <td><span class="status done"><span class="dot"></span>已缓解</span></td>
+        </tr>
+        <tr>
+          <td>用户管理若直接开放能力位修改，可能绕过角色治理和正式写动作边界。</td>
+          <td>能力位如 <code class="inline">estimates:write</code> 会影响正式估算编辑等写动作；如果仅通过前端开关调整，没有后端校验、审计和回滚，可能造成越权、追责困难或角色模板漂移。</td>
+          <td>RP-026 第一阶段应优先做只读角色能力矩阵、业务动作说明和缺失能力定位；如后续开放 admin 授权，必须新增后端能力覆盖模型、变更审计、操作者/原因/时间记录、最小授权限制和回滚路径，不得只在前端保存配置。</td>
+        </tr>
+        <tr>
+          <td>Kimi 模型和 Provider 参数迁移可能导致评估链路批量失败或成本不可解释。</td>
+          <td>如果只替换模型名而不处理 K2 系列 temperature、<code class="inline">max_completion_tokens</code>、thinking、Partial/JSON schema、stream reasoning、prompt cache 和 Batch API 差异，可能出现请求 400、JSON 解析失败、思考内容丢失、缓存未命中或批量任务无法追溯。</td>
+          <td>RP-027 必须分批实施：clean patch 已先覆盖 Kimi 参数兼容、timeout retry、usage、quota 与 stream reasoning；后续再逐步打开 prompt cache、结构化输出、thinking 和 Batch。每次模型调用都记录 model、responseFormat、thinking 策略、cacheKey 策略、fallbackReason 和 batchRunId。真实 API Key 不得写入看板、日志或提交。</td>
+        </tr>
         <tr>
           <td>上传文件后“秒回”的报告并非模型理解结果。</td>
           <td>用户以为 AI 已完整分析，但实际只是代码模板或基础解析结果。</td>
@@ -242,11 +262,91 @@
           <td>artifact、review、confirm 或人工回写落到错误 run、项目或草稿上，问题通常到交付阶段才暴露。</td>
           <td>以 <a href="runtime.html">任务运行时</a> 的五边界模型约束实现：所有写动作必须同时携带 runId、actionId、owner、传统草稿 ID 和回写状态，并按 run/action 幂等。</td>
         </tr>
+        <tr>
+          <td>Skill 退化为不可治理的提示词或外部资料拼接。</td>
+          <td>售前回复可能缺少来源、越过权限边界，或无法解释采用了哪个行业规则、客户画像和模型版本。</td>
+          <td>Skill 必须作为受控资产登记：包含版本、适用行业、数据源边界、允许工具、promptProfileId、输出 schema、人工确认策略；模型调用进入 modelRun，关键动作进入 ToolEvent，结论引用 evidence 或明示假设。</td>
+        </tr>
+        <tr>
+          <td>AI 知识库工具检索未触发、误引用或把外部模型结果当作正式估算依据。</td>
+          <td>模块识别和工作量评估可能被错误产品知识带偏，且用户难以判断答案是否真实来自知识库。</td>
+          <td>RP-018 MVP 必须只读、可关闭、可审计；实施计划 <code class="inline">docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md</code> 已把 native fetch、禁用 <code class="inline">prompt_template</code>、<code class="inline">retrievalTriggered</code> 阈值、缺失配置降级、<code class="inline">trace.knowledgeTool</code>、session metadata 和前端 trace chip 纳入门禁；本轮后端服务已实现缺配置、未触发检索、请求失败和空答案低置信降级，并新增 <code class="inline">knowledge_query</code> 意图路由，WES 数据查询、附件问答、报告生成和写动作仍优先于知识库路由；dispatch 已直接调用只读知识库工具并返回 <code class="inline">trace.knowledgeTool</code>，assistant message 已写入 <code class="inline">metadata.knowledgeTool</code>，OpenAPI 已补 <code class="inline">KnowledgeToolTrace</code>，前端已渲染 <code class="inline">知识库参考</code> trace chip；验证覆盖服务测试 5 pass、intent focused 22 pass、dispatch focused 5 pass、session metadata focused 50 pass、当前 HomeWorkspace 43 pass、V2 前端 83 pass、<code class="inline">test:modules</code> 102 pass、<code class="inline">build:api</code> 与 <code class="inline">build:web</code>。剩余风险在真实 ZHIPU 配置人工验收未完成前继续保留；知识库结果只能作为参考上下文，正式估算仍走 Kimi/WES 规则和人工确认。</td>
+        </tr>
+        <tr>
+          <td>Kimi Provider 升级缺少回归样本和成本观测。</td>
+          <td>模型升级可能提升单次智能度但改变输出风格、字段命名和 token 消耗；如果没有固定样本和成本维度，很难判断“降本提质”是否真实发生。</td>
+          <td>Codex 已为 clean patch 补 provider 契约测试（timeout retry、K2 参数、usage、quota、stream reasoning）并验证 build:api、test:ai 189/189、test:modules 66/66；RP-027 后续仍应复用 RP-007 Harness Regression 样本，至少覆盖需求评估、文件解析、变更 diff、开发评估和 AI 工作台问候/数据查询；监控中记录 prompt tokens、completion tokens、cache hit 策略、失败类型、JSON parse fallback 和人工复核结论。</td>
+        </tr>
+        <tr>
+          <td>Napkin 外部视觉生成导致客户数据出站、临时 URL 过期、积分/限流或文件追溯缺失。</td>
+          <td>售前解决方案 PPT 页面可能包含客户痛点、组织流程、预算范围和实施范围；如果直接把原文发送到外部 API、直接展示 Napkin 临时下载 URL，或未记录 request/status/download，会造成合规、交付和审计风险。</td>
+          <td>RP-024 必须走 Harness 外部工具边界：用户确认后才调用 Napkin；API Key 仅服务端保存；优先传递脱敏后的页面计划而非完整原始材料；轮询完成后立即下载 PPT/PNG/SVG 到 WES 自有导出目录；Napkin requestId、style_id、visual_query、状态、耗时、失败原因和本地 fileName 写入 ToolEvent；不把 30 分钟临时 URL 当成持久产物链接。</td>
+        </tr>
+        <tr>
+          <td>Harness Regression 样本少或评分规则过窄导致质量判断失真。</td>
+          <td>如果只看单个固定样本或过度依赖字段精确匹配，可能把模型对样本的局部适配误判为真实质量提升，影响后续 prompt、模型和知识工具决策。</td>
+          <td>RP-007 第一批只声明“样本格式与评分规则已交付”，不声明完整 Regression 平台完成；<code class="inline">requirement_match_v1</code> 明确输出 project、requirements、evidence 三类明细和未命中项，默认阈值 0.8，评分结果后续才进入 <code class="inline">harness_scores</code> 长期趋势。后续批次必须扩容到 5-10 个真实脱敏项目样本，并在 changes/testing/monitoring 中同时记录样本数量、通过率、失败样本和人工复核结论。</td>
+        </tr>
+        <tr>
+          <td>WES 数据查询扩展泄露跨 owner 项目、或被误认为执行了待办写动作。</td>
+          <td>AI 工作台若返回其他用户项目、或把“待确认动作”回答包装成实际执行结果，会破坏权限边界和审计可信度。</td>
+          <td>RP-004 第一批继续复用 <code class="inline">listProjectEvaluationsForUser</code>，只读取当前 JWT user owner 可见项目；dispatch 使用 rule-static 回复，不调用模型、不执行写动作、不新增存储，只返回状态汇总、待确认 AI 草稿提示和 <code class="inline">project:</code> trace refs。自动化覆盖其他 owner 项目不出现在回答中，验证：intent 22 pass、dispatch 5 pass、<code class="inline">test:modules</code> 100 pass、<code class="inline">build:api</code> pass。</td>
+        </tr>
+        <tr>
+          <td>Artifact Workspace 时间线若混淆来源、产物和交付动作，用户可能误判当前结果已正式回写。</td>
+          <td>AI 工作台右侧面板承担审查与确认入口，一旦把 pending action、artifact 和 linked record 语义混在一起，会削弱人工确认边界。</td>
+          <td>RP-005 第一批仅做只读信息架构：<code class="inline">ArtifactPanel</code> 复用当前 AI session 的 <code class="inline">artifacts</code>、<code class="inline">pendingActions</code>、<code class="inline">linkedRecords</code> 和附件/消息上下文，分为“来源 / 执行 / 产物 / 交付”四段；确认按钮仍走既有 <code class="inline">PendingActionCard</code>，不新增写动作、不新增 API、不写存储。验证：新增右侧运行时间线用例先见红后转绿，HomeWorkspace 43 pass，V2 前端 83 pass，build:web pass。</td>
+        </tr>
+        <tr>
+          <td>AI 回复 Markdown 渲染器引入危险 HTML、链接跳转或样式漂移。</td>
+          <td>用户可能看到被污染的内容、点击不可信链接，或因为表格/代码块/标题样式失控导致 AI 回复可信度下降。</td>
+          <td>RP-019 首批已改善标题、链接、代码块、斜体和三栏密度；右侧工作区整体折叠与 localStorage 折叠状态记忆已降低消息区被右栏挤压的阅读风险；标准管道表格已渲染为真实 table，且单元格复用 React inline renderer、不使用 <code class="inline">dangerouslySetInnerHTML</code>。本轮 sanitize 批次已增加 href 协议白名单，<code class="inline">javascript:</code> 等不安全协议降级为不可点击文本，原始 HTML 作为文本展示。剩余风险集中在更完整 Markdown 语法边界、长文本和异常 Markdown 的视觉回归；session 原文保持不变，渲染层不得改写业务内容。</td>
+        </tr>
+        <tr>
+          <td>formBlock 协议漂移或字段过宽导致前端渲染错误表单。</td>
+          <td>AI 可能输出不完整 JSON、未知字段类型、过多选项或诱导性提交文案，导致用户补充信息被误导，甚至误以为触发了正式业务动作。</td>
+          <td>RP-013 已规范化 <code class="inline">formBlock</code>：字段类型白名单、字段/选项数量上限、无效协议降级为普通 Markdown，并写入 <code class="inline">metadata.formBlock</code>；前端 <code class="inline">InteractiveFormCard</code> 只生成普通 chat 消息并复用现有发送链路，不直接触发 Harness 写动作、版本升版或正式业务落库。剩余风险为真实模型是否稳定输出合规 formBlock，纳入 MT-1H-B-002 人工验收。</td>
+        </tr>
+        <tr>
+          <td>需求池 Loop 为追求“全部迭代完毕”而扩大范围、跳过设计或误标已交付。</td>
+          <td>多个需求可能被混入同一批次，导致回归面过大、验收不可追溯，或在测试/人工验收缺失时错误推进状态。</td>
+          <td>Codex 侧 heartbeat 自动化 <code class="inline">wes-loop</code> 已删除，仓库内 <code class="inline">skills/wes-loop</code> 入口已移除；持续需求池 Loop 后续由 Qoder 创建和执行。Codex 仅在用户明确要求时处理单条需求，不再自动创建下一轮 heartbeat；单条需求仍必须先去重、再设计/实现/测试/看板同步。</td>
+        </tr>
+        <tr>
+          <td>Qoder 回填分支混入既有工作台变更，直接整 commit 合并可能扩大集成范围。</td>
+          <td>RP-032 目标是工作流模板列表可达性小改，但 Qoder commit 相对 base 包含大量既有 AI 工作台文件差异；若直接 merge/cherry-pick 整 commit，可能把无关历史改动、未复核变更或当前 main dirty 状态一并纳入。</td>
+          <td>Codex 已核对当前 main 三个声明文件与 Qoder worktree 完全一致，并在相同文件状态下复跑前端 92 pass 与 build:web pass；后续集成时不得直接按整 commit 合并，应基于当前 main 文件状态提交，或要求 Qoder 重做最小 patch / rebase 后再复核。</td>
+        </tr>
+        <tr>
+          <td>RP-029 R8 流式接口结构修复后曾缺少可验收的成功/失败/断连闭环。</td>
+          <td>Codex 修复分支已在 <code class="inline">homeWorkbenchChatStream</code> 保持复用 <code class="inline">dispatchHomeWorkbenchTurn</code>，并新增真实 modelChatStream 成功、provider 失败、client abort 后不发送 done 且写 cancelled trace 的测试；<code class="inline">test:modules</code> 与 <code class="inline">test:ai</code> 已恢复通过。</td>
+          <td>风险状态降为“已缓解 / 待集成”。前端逐字渲染、停止按钮与窄屏体验仍应等 RP-029/RP-030 最小 patch 合入主线后再推进。</td>
+        </tr>
+        <tr>
+          <td>RP-030 R8 曾提交运行态 trace 数据并让测试污染已跟踪文件。</td>
+          <td>Codex 已从修复分支删除 <code class="inline">data/traces/trace-store.json</code> 与 <code class="inline">apps/api/data/traces/trace-store.json</code>，补充 <code class="inline">.gitignore</code>，并让 trace repository 支持 <code class="inline">WES_TRACE_STORE_PATH</code> 测试隔离。失败和 client abort 会写 failed/cancelled trace。</td>
+          <td>风险状态降为“已缓解 / 待集成”。集成前需确认最小 patch 不带回任何运行态数据文件。</td>
+        </tr>
+        <tr>
+          <td>RP-031 RAG baseline 曾因每样本二次检索放大成本和延迟。</td>
+          <td>已将 <code class="inline">queryZhipuKnowledgeBase</code> 的检索结果通过 <code class="inline">trace.chunks</code> 回传，并让 <code class="inline">rag-baseline-runner</code> 复用该结果；Codex 复核 <code class="inline">rag-baseline-runner.test.ts</code> 11/11 与 <code class="inline">knowledge-tool.service.test.ts</code> 8/8，通过 queryFn 计数证明每样本只查询一次。</td>
+          <td>重复检索风险降为“已缓解”。构建基线已由 Codex 清理并验证 <code class="inline">build:api</code>、<code class="inline">test:modules</code>、<code class="inline">test:ai</code> 通过；剩余门禁为真实 ZHIPU 配置人工验收，验证时不得泄露 API Key 或知识库凭据。</td>
+        </tr>
+        <tr>
+          <td>AI 引导选项识别过宽，导致普通编号列表被错误渲染为按钮或误触发发送。</td>
+          <td>用户可能把普通报告条目当成下一步动作，或者点击后发送非预期文本，影响对话上下文和意图识别。</td>
+          <td>RP-020 仅对显式“选项X：”无条件转交互；编号列表必须有选择/回复/启动/待确认问题等上下文才增强；点击只走普通 chat 发送链路，不触发 Harness 写动作或正式业务落库，仍需 MT-1H-B-001 人工验证真实回复。</td>
+        </tr>
+        <tr>
+          <td>大模型在知识库未配置或检索未命中时编造文档名称、版本号或案例。</td>
+          <td>用户可能将编造内容当作真实产品知识依据，导致实施规划或工作量评估失真；sessionId <code class="inline">ef70ba00</code> 已出现 Kimi 编造完整文档标题和版本号的案例。</td>
+          <td>反幻觉四层防御：(1) <code class="inline">EXPLICIT_KNOWLEDGE_QUERY_PATTERNS</code> 显式知识库查询路由，避免用户明确提到知识库时走通用问答；(2) <code class="inline">knowledge-tool.service</code> 4 处 fallback 文案明确告知无法检索真实文档，不再暗示有真实检索；(3) <code class="inline">workbench-dispatch.service</code> systemPrompt 新增反幻觉约束段落，禁止编造文档名称/版本号/案例/数据；(4) 前端 <code class="inline">KnowledgeTraceChip</code> 区分“知识库参考”“模型通用知识”“知识库未配置”“检索未命中”四种状态。验证：intent focused 26 pass（含 4 条新增显式知识库查询路由测试），knowledge-tool 5 pass，V2 build pass。剩余风险：真实 ZHIPU 配置下检索质量仍需 MT-1H-B-003 人工验收。</td>
+        </tr>
       </table>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 风险与决策 · WES Agent 升级总看板 · 2026-06-21
+      <a href="index.html">返回总览</a> · 风险与决策 · WES Agent 升级总看板 · 2026-06-26
     </footer>
   </main>
 </body>

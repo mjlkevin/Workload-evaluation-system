@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>测试 · WES Agent 升级总看板</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/dashboard.css" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
 </head>
 <body>
   <header class="topnav">
@@ -23,8 +23,11 @@
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="requirements.html">需求池</a>
       </nav>
-      <span class="pill warn">人工测试</span>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill brand">Phase 1H-C test plan</span>
     </div>
   </header>
 
@@ -34,9 +37,9 @@
       <h1>测试</h1>
       <p class="meta">
         <span><b>目标</b> 管理人工测试任务与结果反馈</span>
-        <span><b>范围</b> Phase 1E 基线 + Phase 1F 回写扩展</span>
-        <span><b>状态</b> 1E/1F 计划已建立，1F 用例待人工验收</span>
-        <span><b>更新</b> 2026-06-21</span>
+        <span><b>范围</b> Phase 1E 基线 + Phase 1F 回写扩展 + Phase 1G 意图路由 + Phase 1H-A 工作台体验闭环 + Phase 1H-B 引导选项交互 + RP-013 结构化表单 + RP-018 知识库工具 + RP-019 Markdown 渲染安全 + RP-004 WES 数据查询扩展 + RP-005 产物工作区时间线 + RP-002 附件问答轻量审计 + RP-007 Harness Regression 评分规则 + RP-025 AI 工作台项目创建确认回归 + RP-032 工作流模板可达性 + Qoder Loop R2-R8 Codex 复核</span>
+        <span><b>状态</b> 1H-A / 1H-B / 1H-C 用例已登记，RP-013/RP-018/RP-019/RP-004/RP-005/RP-002/RP-007/RP-025/RP-032 自动化已验证；2026-06-29 Codex 已复核 Qoder 集成的 RP-027/RP-028/RP-029/RP-030/RP-031/RP-026/RP-033，并补 RP-029 知识库 fallback 流式最终内容修复：build:api、build:web、V2 全量 96/96、test:modules 142/142、test:ai 190/190、test:agent 25/25、test:harness 70/70 均通过；人工验收项仍待执行</span>
+        <span><b>更新</b> 2026-06-29</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill err">P0 主链路</span>
@@ -54,6 +57,15 @@
         <li><b>§1</b> 测试策略</li>
         <li><b>§2</b> 测试任务台账</li>
         <li><b>§3</b> Phase 1F 扩展用例</li>
+        <li><b>§3.5</b> Phase 1G 意图路由用例</li>
+        <li><b>§3.6</b> Phase 1H-A 工作台体验用例</li>
+        <li><b>§3.7</b> Phase 1H-B 引导选项用例</li>
+        <li><b>§3.8</b> RP-013 通用交互用例</li>
+        <li><b>§3.9</b> RP-018 知识库工具用例</li>
+        <li><b>§3.10</b> RP-005 产物工作区时间线用例</li>
+        <li><b>§3.11</b> RP-002 附件问答轻量审计用例</li>
+        <li><b>§3.12</b> RP-007 Harness Regression 评分规则</li>
+        <li><b>§3.13</b> RP-032 工作流模板可达性用例</li>
         <li><b>§4</b> 结果反馈模板</li>
         <li><b>§5</b> 缺陷分级</li>
         <li><b>§6</b> 关闭标准</li>
@@ -68,22 +80,22 @@
       <div class="kpi-row">
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">P0</span><span>主链路任务</span></div>
-          <div class="v">6</div>
-          <div class="lb">上传 / v2 / confirm / 草稿追溯</div>
+          <div class="v">14</div>
+          <div class="lb">上传 / v2 / confirm / 草稿追溯 / 会话恢复 / 创建刷新</div>
         </div>
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">P1</span><span>边界任务</span></div>
-          <div class="v">4</div>
-          <div class="lb">权限 / fallback / 不自动正式化</div>
+          <div class="v">17</div>
+          <div class="lb">权限 / fallback / 不自动正式化 / 滚动 / 输入 / 弹窗 / formBlock / 知识库工具 / 工作流模板</div>
         </div>
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">P2</span><span>巡检任务</span></div>
-          <div class="v">2</div>
-          <div class="lb">刷新持久化 / 看板链接</div>
+          <div class="v">3</div>
+          <div class="lb">刷新持久化 / 看板链接 / 选项交互</div>
         </div>
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--bg-soft);color:var(--ink-3)">R</span><span>当前结果</span></div>
-          <div class="v">0/12</div>
+          <div class="v">0/34</div>
           <div class="lb">待人工执行并回填</div>
         </div>
       </div>
@@ -97,6 +109,7 @@
     <section>
       <div class="h-num">Section 02</div>
       <h2>测试任务台账</h2>
+      <div class="callout warn"><div><b>超期预警</b>以下 MT-1E / MT-1F / MT-1H-A / MT-1H-B 人工测试自登记以来已超过 2 周未执行。P0 测试应在人工验收窗口优先完成；超期未执行的测试将在监控页标红。如需延期，请在 changes.html 记录决策。</div></div>
       <table>
         <tr><th>ID</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>反馈记录</th></tr>
         <tr>
@@ -106,7 +119,7 @@
           <td>AI 工作台上传需求附件。</td>
           <td>创建 Harness run，绑定文件，并生成基础解析结果；不退回普通聊天路径。</td>
           <td><span class="status todo"><span class="dot"></span>待执行</span></td>
-          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+          <td>自动化补充：RP-004 dispatch 测试已覆盖不返回其他 owner 项目；人工执行人 / 日期 / 结果 / 证据待填。</td>
         </tr>
         <tr>
           <td class="mono">MT-1E-002</td>
@@ -256,6 +269,287 @@
     </section>
 
     <section>
+      <div class="h-num">Section 03.5</div>
+      <h2>Phase 1G 意图路由用例</h2>
+      <p class="lead">Phase 1G 已实现 AI 工作台意图路由与任务运行时升级，以下用例进入人工验收队列。</p>
+      <table>
+        <tr><th>ID</th><th>场景</th><th>优先级</th><th>输入材料</th><th>期望结果</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">MT-1G-001</td>
+          <td>上传附件 + 附件问答</td>
+          <td><span class="status warn"><span class="dot"></span>P0</span></td>
+          <td>上传 Excel 附件 + 输入「多组织业务往来一般包含哪些模块？」</td>
+          <td>系统回答问题，不自动生成需求解析报告 v1；显示「生成需求解析报告」建议动作。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1G-002</td>
+          <td>上传附件 + 明确报告生成</td>
+          <td><span class="status warn"><span class="dot"></span>P0</span></td>
+          <td>上传 Excel 附件 + 输入「请生成需求解析报告」</td>
+          <td>系统进入 Harness v1 报告生成流程。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1G-003</td>
+          <td>v1 后普通追问</td>
+          <td><span class="status warn"><span class="dot"></span>P0</span></td>
+          <td>v1 报告生成后输入「这个风险是什么意思？」</td>
+          <td>系统解释风险，不自动生成 v2。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1G-004</td>
+          <td>结构化补充生成 v2</td>
+          <td><span class="status warn"><span class="dot"></span>P0</span></td>
+          <td>v1 报告卡片内双击补字段并点击「提交补充并生成 v2」</td>
+          <td>系统生成 v2 报告。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1G-005</td>
+          <td>能力发现</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>输入「你能做什么？」</td>
+          <td>系统返回 AI 工作台能力清单。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1G-006</td>
+          <td>WES 项目查询</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>输入「我之前创建过哪些项目？」</td>
+          <td>系统返回当前 owner 可见项目摘要。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1G-007</td>
+          <td>写动作确认边界</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>输入「帮我创建评估草稿」</td>
+          <td>系统返回待确认动作，不自动创建正式记录。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1G-008</td>
+          <td>非 owner 数据隔离</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>用户 A 查询项目，验证不返回用户 B 的数据。</td>
+          <td>WES 数据查询只返回当前 owner 可见数据。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03.6</div>
+      <h2>Phase 1H-A 工作台体验用例</h2>
+      <p class="lead">Phase 1H-A 已从需求池提取 RP-011 / RP-014 / RP-015 / RP-016 / RP-017。以下用例用于实现后人工验收；当前只登记计划，不声明通过。</p>
+      <table>
+        <tr><th>ID</th><th>关联需求</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">MT-1H-A-001</td>
+          <td class="mono">RP-017</td>
+          <td>切换导航后恢复 AI 会话</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>在 AI 工作台发送消息，切换到任一侧边栏页面，再返回 AI 工作台。</td>
+          <td>原 activeSession 与消息列表完整恢复；若会话 API 失败，页面展示可见错误提示。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1H-A-002</td>
+          <td class="mono">RP-014</td>
+          <td>发送和接收消息后自动滚动到底部</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>连续发送多条消息，让消息区高度超过可视区域。</td>
+          <td>用户发送消息、AI 回复、渲染建议动作或报告卡片后，消息面板都自动滚动到底部。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1H-A-003</td>
+          <td class="mono">RP-015</td>
+          <td>长文本输入框高度可控</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>在底部 composer 输入多段长文本，并手动调整或观察自动增高。</td>
+          <td>输入区可扩大，发送/附件按钮始终可见；桌面与移动视口下不遮挡消息列表和右侧面板。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1H-A-004</td>
+          <td class="mono">RP-016</td>
+          <td>AI 创建项目后刷新关联记录与项目列表</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>通过 AI 工作台创建项目，确认成功后查看右侧关联记录，再切换到项目列表。</td>
+          <td>右侧关联记录立即显示新项目；项目列表可见新记录；不需要手动刷新整页。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1H-A-005</td>
+          <td class="mono">RP-011</td>
+          <td>客户主体检索弹窗化</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>在 AI 工作台触发客户主体检索，观察弹窗、loading、候选选择、空结果和失败提示。</td>
+          <td>检索过程和结果在 Dialog 中展示；选择候选后写回上下文；关闭、空结果和失败态都有明确反馈。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+        <tr>
+          <td class="mono">MT-1H-A-006</td>
+          <td class="mono">回归</td>
+          <td>Phase 1G 意图路由不回退</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>执行一条 v1 后普通追问、一条明确报告生成请求和一条结构化补充生成 v2。</td>
+          <td>普通追问不生成 v2；明确报告请求和结构化补充仍按 Phase 1G 口径进入对应链路。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03.7</div>
+      <h2>Phase 1H-B 引导选项用例</h2>
+      <p class="lead">RP-020 已完成自动化覆盖；人工测试用于验证真实 AI 回复中的引导选项是否足够明显、不会误导用户，并确认普通 Markdown 编号列表不会被错误转成按钮。</p>
+      <table>
+        <tr><th>ID</th><th>关联需求</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">MT-1H-B-001</td>
+          <td class="mono">RP-020</td>
+          <td>AI 回复引导选项点击即发送</td>
+          <td><span class="status todo"><span class="dot"></span>P2</span></td>
+          <td>让 AI 工作台返回包含“选项A：需求深化分析 / 选项B：方案匹配设计 / 选项C：实施风险评估”的回复，点击其中一个选项。</td>
+          <td>选项显示为按钮/卡片；点击后发送“启动选项X：...”文本并进入下一轮回复；普通报告编号列表仍按 Markdown 列表展示。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>执行人 / 日期 / 结果 / 证据待填；自动化：<code class="inline">renders AI guided options as click-to-send actions</code> 已通过。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03.8</div>
+      <h2>RP-013 通用交互用例</h2>
+      <p class="lead">RP-013 当前已完成后端 formBlock 协议、session metadata 批次与前端 InteractiveFormCard 接入。以下用例用于真实 AI 输出场景人工验收；自动化通过不替代人工结果。</p>
+      <table>
+        <tr><th>ID</th><th>关联需求</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">MT-1H-B-002</td>
+          <td class="mono">RP-013</td>
+          <td>AI 回复结构化补充表单</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>让 AI 工作台返回包含项目金额、交付周期、是否多组织等字段的 <code class="inline">formBlock</code>，填写后提交。</td>
+          <td>前端渲染为稳定的表单卡片；必填校验可见；提交后通过现有 chat send 链路发送结构化补充消息，不触发任何未确认写动作。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>自动化：<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 77 pass，<code class="inline">npm run test:modules</code> 88 pass，<code class="inline">npm run build:web</code> / <code class="inline">npm run build:api</code> pass；人工执行人 / 日期 / 结果 / 截图证据待填。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03.9</div>
+      <h2>RP-018 知识库工具用例</h2>
+      <p class="lead">RP-018 当前已完成后端 <code class="inline">knowledge-tool.service</code>、<code class="inline">knowledge_query</code> 意图路由、AI 工作台 dispatch <code class="inline">trace.knowledgeTool</code>、assistant message <code class="inline">metadata.knowledgeTool</code>、OpenAPI 契约与前端 <code class="inline">知识库参考</code> trace chip 自动化验证。以下用例用于完整接入后的真实配置验收；缺少 ZHIPU 配置时必须显示不可用原因，不能伪装为知识库命中。</p>
+      <table>
+        <tr><th>ID</th><th>关联需求</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">MT-1H-B-003</td>
+          <td class="mono">RP-018</td>
+          <td>知识库工具可发现、可调用、可降级</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>在配置 <code class="inline">ZHIPU_API_KEY</code> 与 <code class="inline">ZHIPU_KNOWLEDGE_ID</code> 的环境中输入“智能会计平台是什么”；再在缺失配置或低命中问题下重复验证。</td>
+          <td>AI 工作台能发现并调用 <code class="inline">knowledge_base.query_product_knowledge</code>；命中时返回知识库摘要和 <code class="inline">retrievalTriggered=true</code>；缺失配置时显示 unavailable 原因；低置信时显示 fallbackReason；不自动改写正式估算或传统记录。</td>
+          <td><span class="status run"><span class="dot"></span>自动化已验证 / 人工待执行</span></td>
+          <td>自动化证据：<code class="inline">knowledge-tool.service.test.ts</code> 5 pass，<code class="inline">workbench-intent.service.test.ts</code> 26 pass（含反幻觉批次 4 条新增），<code class="inline">workbench-dispatch.service.test.ts</code> 5 pass，session metadata focused 50 pass，当前 <code class="inline">HomeWorkspace.test.jsx</code> 48 pass，<code class="inline">npm run test:modules</code> 102 pass，当前 <code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 92 pass，<code class="inline">npm run build:api</code> pass，<code class="inline">npm run build:web</code> pass；人工执行人 / 日期 / 结果 / 截图证据待填。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03.10</div>
+      <h2>RP-005 产物工作区时间线用例</h2>
+      <p class="lead">RP-005 第一批已把 AI 工作台右侧 ArtifactPanel 从分散卡片升级为“来源 / 执行 / 产物 / 交付”的只读运行时间线。以下用例用于人工确认真实会话中的信息组织是否清晰，不替代后续 Harness run 级 evidence/modelRun/toolEvent 追溯。</p>
+      <table>
+        <tr><th>ID</th><th>关联需求</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">MT-1H-B-004</td>
+          <td class="mono">RP-005</td>
+          <td>右侧产物工作区按运行时间线展示</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>在 AI 工作台打开一个包含附件、AI 产物、待确认动作和关联项目的会话，观察右侧工作区。</td>
+          <td>右侧出现“来源 / 执行 / 产物 / 交付”四段；附件、产物、待确认动作、关联记录不混淆；确认动作仍需人工点击，不自动写入；折叠工作区后可恢复。</td>
+          <td><span class="status run"><span class="dot"></span>自动化已验证 / 人工待执行</span></td>
+          <td>自动化证据：新增 <code class="inline">renders artifact workspace as a run timeline</code> 用例先见红后转绿；当前 <code class="inline">HomeWorkspace.test.jsx</code> 48 pass，<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 92 pass，<code class="inline">npm run build:web</code> pass。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03.11</div>
+      <h2>RP-002 附件问答轻量审计用例</h2>
+      <p class="lead">RP-002 第一批已让普通附件问答返回并持久化 <code class="inline">trace.modelRun</code> 轻量摘要。以下用例用于人工确认真实附件问答可追溯，但不会被误认为创建了 Harness Run。</p>
+      <table>
+        <tr><th>ID</th><th>关联需求</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">MT-1H-B-005</td>
+          <td class="mono">RP-002</td>
+          <td>附件问答保留轻量模型调用审计</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>上传带解析摘要的需求附件后，仅追问“这个附件里有哪些实施风险？”，不要点击生成报告。</td>
+          <td>响应 intent 为 <code class="inline">attachment_qa</code>；trace 包含 <code class="inline">modelRun</code> 与 <code class="inline">attachment:</code> contextRef；assistant message metadata 同步保留 <code class="inline">modelRun</code>；不创建 Harness Run、不新增正式草稿、不保存完整 prompt/raw trace。</td>
+          <td><span class="status run"><span class="dot"></span>自动化已验证 / 人工待执行</span></td>
+          <td>自动化证据：新增 dispatch 与 handler 用例先见红后转绿；focused dispatch 6 pass，focused handler 51 pass，<code class="inline">npm run test:modules</code> 102 pass，<code class="inline">npm run build:api</code> pass。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03.12</div>
+      <h2>RP-007 Harness Regression 评分规则</h2>
+      <p class="lead">RP-007 第一批为后续固定样本回放奠定可测试基础：本批只覆盖样本格式、默认样本和评分规则，不新增人工测试任务、不新增路由或数据库写入。</p>
+      <table>
+        <tr><th>ID</th><th>需求</th><th>场景</th><th>验证方式</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">AT-1H-B-007</td>
+          <td class="mono">RP-007</td>
+          <td>固定样本 schema 默认值与 requirement_match_v1 评分</td>
+          <td>后端 node:test：先导入缺失模块见红，再实现 <code class="inline">harness.regression.ts</code>，验证 sample normalization、项目字段匹配、需求覆盖率和 evidence refs 匹配。</td>
+          <td><span class="status done"><span class="dot"></span>自动化通过</span></td>
+          <td><code class="inline">npm run test:harness --prefix apps/api</code> 65 pass；<code class="inline">npm run build:api</code> pass。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03.13</div>
+      <h2>RP-032 工作流模板可达性用例</h2>
+      <p class="lead">RP-032 第一批已由 Qoder 回填并经 Codex 复核自动化通过。以下人工用例只验证真实浏览器中的视觉与可达性表现，不把自动化结果等同于人工通过。</p>
+      <table>
+        <tr><th>ID</th><th>需求</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">MT-1H-C-001</td>
+          <td class="mono">RP-032</td>
+          <td>AI 工作台工作流模板列表滚动与选中反馈</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>以管理视角进入 AI 工作台，在桌面和低高度视口查看左侧“工作流模板”，滚动访问全部工作流按钮，并点击任一工作流。</td>
+          <td>标题显示为“工作流模板”；列表可滚动且不显示原生滚动条；全部工作流按钮可访问；选中按钮显示圆点，读屏名称包含“当前任务”，hover 有 title tooltip；composer 预填和 workflowKey 行为不变。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>自动化证据：Codex 复核 <code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 92 pass、<code class="inline">npm run build:web</code> pass；人工截图 / 日期 / 执行人待回填。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
       <div class="h-num">Section 04</div>
       <h2>结果反馈模板</h2>
       <div class="grid-2">
@@ -334,20 +628,57 @@ Decision:</pre>
 
     <section>
       <div class="h-num">Section 07</div>
+      <h2>RP-024 Napkin API Smoke Test</h2>
+      <p class="lead">RP-024 当前尚未进入 WES 代码实现。本节只记录外部 Napkin API 最小可用性验证，不代表 WES 已完成 Napkin 集成。</p>
+      <table>
+        <tr><th>ID</th><th>范围</th><th>验证方式</th><th>状态</th><th>证据</th></tr>
+        <tr>
+          <td class="mono">EXT-RP-024-001</td>
+          <td>Napkin <code class="inline">/v1/visual</code> 最小调用、状态轮询和文件下载。</td>
+          <td>使用运行时提供的 API Key 发起 <code class="inline">format=svg</code>、中文三步流程图请求；轮询 status；下载第一个生成文件。</td>
+          <td><span class="status done"><span class="dot"></span>外部 smoke 通过</span></td>
+          <td>2026-06-24：create 201，requestId <code class="inline">dad79438-d3a5-4234-bf91-63ff410abce1</code>；第 2 次 poll completed；download 200，<code class="inline">image/svg+xml</code>，13934 bytes。未记录 API Key。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 08</div>
       <h2>自动化基线</h2>
       <p class="lead">人工测试建立在已通过的自动化基线之上。以下命令不是人工验收的替代品，而是人工测试前应保持绿色的工程底座。</p>
       <table>
         <tr><th>命令</th><th>最近结果</th><th>覆盖范围</th></tr>
-        <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>62 pass</span></td><td>Harness 状态机、confirm、幂等、传统草稿追溯、人工确认回写与并发确认锁。</td></tr>
-        <tr><td class="mono">npm run test:modules -w apps/api</td><td><span class="status done"><span class="dot"></span>66 pass</span></td><td>后端模块级回归，含人工确认接口路由/controller。</td></tr>
+        <tr><td class="mono">Codex 复核 · Qoder RP-027~033 集成验证矩阵</td><td><span class="status done"><span class="dot"></span>全量通过</span></td><td>2026-06-29：<code class="inline">chat.service.test.ts</code> 15/15、<code class="inline">trace.test.ts</code> 25/25、RAG/knowledge focused 19/19、Provider/Kimi ping focused 12/12、<code class="inline">build:api</code> pass、<code class="inline">test:modules</code> 142/142、<code class="inline">test:ai</code> 190/190、<code class="inline">test:agent</code> 25/25、<code class="inline">test:harness</code> 70/70、V2 96/96、<code class="inline">build:web</code> pass。Codex 同步补 RP-029 知识库 fallback 流式最终内容修复，确保 session/done 内容以 dispatch answer 为准。</td></tr>
+        <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>70 pass</span></td><td>Harness 状态机、confirm、幂等、传统草稿追溯、人工确认回写、并发确认锁、人工测试结果接口，以及 RP-007 regression sample schema 与 requirement_match_v1 评分规则。</td></tr>
+        <tr><td class="mono">npm run test:modules</td><td><span class="status done"><span class="dot"></span>142 pass</span></td><td>后端模块级回归，含 RP-013 formBlock、RP-018 knowledge service、knowledge_query 意图路由、RP-029 流式最终内容、RP-030 trace、RP-031 RAG baseline、dispatch trace、homeWorkbenchChat 响应与 session metadata，以及 RP-004 WES 数据查询 owner-scoped 状态汇总、RP-002 附件问答 trace.modelRun。</td></tr>
         <tr><td class="mono">npm run build -w apps/api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>后端构建。</td></tr>
-        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>64 pass</span></td><td>前端工作台、评估列表、详情页和 mock 流程。</td></tr>
+        <tr><td class="mono">npm run test:agent -w apps/api</td><td><span class="status done"><span class="dot"></span>25 pass</span></td><td>Agent 工具调用、权限过滤、Provider tool calling 和路由行为。</td></tr>
+        <tr><td class="mono">npm run test:rules -w apps/api</td><td><span class="status done"><span class="dot"></span>8 pass</span></td><td>规则引擎逻辑。</td></tr>
+        <tr><td class="mono">npm run test:integration -w apps/api</td><td><span class="status done"><span class="dot"></span>1 pass</span></td><td>API 集成烟测。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>96 pass</span></td><td>前端工作台、评估列表、详情页、mock 流程、RP-020 引导选项点击发送、RP-013 formBlock 渲染/回放/提交、RP-018 knowledgeTool trace chip、RP-019 右侧工作区折叠状态/Markdown 表格渲染/unsafe link raw HTML 防护、RP-032 工作流模板列表滚动/选中态、RP-033 会话列表滚动，以及 RP-005 产物工作区时间线回归。</td></tr>
         <tr><td class="mono">npm run build --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>前端构建；保留既有 chunk warning。</td></tr>
+        <tr><td class="mono">npm run build:api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>RP-018 知识库服务、RP-004 WES 数据查询扩展、RP-002 trace.modelRun 轻量审计、RP-007 Harness regression 评分模块、意图路由、dispatch trace、API 响应字段和 session metadata 编译通过。</td></tr>
+        <tr><td class="mono">npm run build:web</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>RP-013 前端组件、RP-018 AiHomeWorkbench trace chip、RP-019 右侧工作区折叠/Markdown 表格渲染/sanitize、RP-032 工作流模板列表滚动与 RP-005 ArtifactPanel 时间线集成构建通过，保留既有 chunk warning。</td></tr>
+        <tr><td class="mono">rg "RP-013|2026-06-24-wes-agent-rp-013-interactive-formblock" 03_技术设计/系统架构/WES-Agent-升级总看板 docs/superpowers/plans</td><td><span class="status run"><span class="dot"></span>docs check</span></td><td>本轮为计划与看板同步批次，校验 RP-013 计划文档与总看板引用一致。</td></tr>
+        <tr><td class="mono">npx tsx --test --test-global-setup=./test-setup.mts src/services/ai/knowledge-tool.service.test.ts</td><td><span class="status done"><span class="dot"></span>5 pass</span></td><td>RP-018 后端知识库服务聚焦测试：缺配置、命中、未触发检索、上游失败、空答案。</td></tr>
+        <tr><td class="mono">npx tsx --test --test-global-setup=./test-setup.mts src/services/ai/workbench-intent.service.test.ts</td><td><span class="status done"><span class="dot"></span>26 pass</span></td><td>RP-018 knowledge_query 意图路由、WES 数据查询优先级、附件问答、报告生成、RP-004 待确认动作关键词回归，以及反幻觉批次新增 4 条显式知识库查询路由测试。</td></tr>
+        <tr><td class="mono">npx tsx --test --test-global-setup=./test-setup.mts src/services/ai/workbench-dispatch.service.test.ts</td><td><span class="status done"><span class="dot"></span>5 pass</span></td><td>RP-018 dispatch trace 与 RP-004 owner-scoped 项目状态汇总聚焦测试：知识库命中、缺配置降级、只读边界、contextRef、待确认 AI 草稿提示。</td></tr>
+        <tr><td class="mono">npx tsx --test --test-global-setup=./test-setup.mts src/modules/modules.handlers.test.ts --test-name-pattern "knowledge tool trace"</td><td><span class="status done"><span class="dot"></span>50 pass</span></td><td>RP-018 session metadata 聚焦测试：homeWorkbenchChat 响应 trace 与 assistant message metadata.knowledgeTool 持久化。</td></tr>
+        <tr><td class="mono">npm run test:modules</td><td><span class="status done"><span class="dot"></span>102 pass</span></td><td>新增 RP-018 服务、意图、dispatch、session metadata、RP-004 WES 数据查询扩展与 RP-002 附件问答 trace.modelRun 测试已纳入模块测试基线。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE -- HomeWorkspace.test.jsx</td><td><span class="status done"><span class="dot"></span>49 pass</span></td><td>RP-018 前端 trace chip、RP-019 右侧工作区折叠/Markdown 表格/sanitize、RP-032 工作流模板标签/滚动容器/选中态 aria-label、RP-033 会话列表滚动，以及 RP-005 产物工作区时间线聚焦测试。</td></tr>
+        <tr><td class="mono">RP-025 回归补丁自动化</td><td><span class="status done"><span class="dot"></span>通过</span></td><td>新增/更新 RBAC、项目创建路由、AI intent 和 HomeWorkspace 用例：PRE_SALES 可创建项目评估、项目创建路由接受 estimates:create/write 任一能力、suggested action 403 显示“项目创建失败”、简短问候走本地 capability discovery；targeted API 77 pass，HomeWorkspace 46 pass，test:ai 190 pass，test:web 90 pass，build:api/web pass。人工验收待执行。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>92 pass</span></td><td>RP-005 产物工作区时间线、RP-019 Markdown 表格渲染与 unsafe link/raw HTML 防护、RP-032 工作流模板可达性纳入 V2 前端全量回归。</td></tr>
+        <tr><td class="mono">Qoder R2/R3/R4/R5/R6/R7 Codex focused checks</td><td><span class="status warn"><span class="dot"></span>部分通过 / 部分返工</span></td><td>2026-06-27：RP-033 <code class="inline">HomeWorkspace.test.jsx</code> 49/49 + build:web pass；RP-026 build:api pass + <code class="inline">UserManagement.test.jsx</code> 1/1（MSW 未 mock 新接口）；RP-027/RP-028 原分支 build:api pass + <code class="inline">test:ai</code> 189/189，后续已由 clean patch 与 Codex 修复分支取代；RP-029 build:api pass + <code class="inline">chat.service.test.ts</code> 7/7 但缺 SSE 路由/dispatch 集成测试；RP-030 trace 20/20 + build:api pass 但缺路由鉴权集成测试；RP-031 rag-baseline 12/12 + build:api pass。</td></tr>
+        <tr><td class="mono">RP-027/RP-028 clean provider checks</td><td><span class="status done"><span class="dot"></span>通过 / 待集成</span></td><td>2026-06-28：复核 <code class="inline">qoder/rp-027-028-clean</code>（commit <code class="inline">d5f2246</code>）确认仅 5 个 Kimi Provider 核心文件；Codex 发现 timeout 标记 retryable 但未进入 retry loop，在 <code class="inline">codex/rp-027-028-clean-fix</code> commit <code class="inline">5226deb</code> 修复并补 provider 契约测试。验证：<code class="inline">tool-calling.test.ts</code> 10/10（timeout retry、K2 参数、usage、quota、stream reasoning）、<code class="inline">build:api</code> pass、<code class="inline">test:ai</code> 189/189、<code class="inline">test:modules</code> 66/66。</td></tr>
+        <tr><td class="mono">RP-026 role capabilities补改 checks</td><td><span class="status done"><span class="dot"></span>通过 / 待集成</span></td><td>2026-06-28：用户管理改用 <code class="inline">useRoleCapabilities</code>，仅请求 <code class="inline">/system/role-capabilities</code>；补 MSW mock、能力矩阵展开、无 rules/models/DSL/templates 副作用、API 失败稳定降级测试；折叠触发器改为语义化 button。验证：<code class="inline">UserManagement.test.jsx</code> 4/4，<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 96/96，<code class="inline">npm run build:web</code> pass。</td></tr>
+        <tr><td class="mono">RP-031 RAG duplicate retrieval checks</td><td><span class="status done"><span class="dot"></span>通过 / 真实配置待验收</span></td><td>2026-06-28：复核重复检索修复，<code class="inline">rag-baseline-runner.test.ts</code> 11/11 pass，覆盖 2 样本只调用 2 次 queryFn、3 样本只调用 3 次 queryFn、retrieveCallCount=0；<code class="inline">knowledge-tool.service.test.ts</code> 8/8 pass，覆盖 trace.chunks 与 answer_failed 降级。随后清理非 RAG 构建阻断与工作台测试基线：<code class="inline">build:api</code> pass，<code class="inline">test:modules</code> 134/134 pass，<code class="inline">test:ai</code> 190/190 pass。</td></tr>
+        <tr><td class="mono">RP-033 clean branch Codex checks</td><td><span class="status done"><span class="dot"></span>通过 / 待提交集成</span></td><td>2026-06-28：复核 <code class="inline">.worktrees/rp-033-clean</code> / <code class="inline">qoder/rp-033-clean</code>，diff scope 仅 3 文件且 <code class="inline">git diff --check</code> 通过；<code class="inline">npm run test --prefix ui/V2_PROTOTYPE -- HomeWorkspace.test.jsx</code> 25/25 pass；<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 65/65 pass；<code class="inline">npm run build:web</code> pass。注意：patch 当前未提交。</td></tr>
+        <tr><td class="mono">Qoder R8 RP-029/RP-030 Codex rework checks</td><td><span class="status done"><span class="dot"></span>Codex 修复通过 / 待集成</span></td><td>2026-06-28：Codex 在 <code class="inline">codex/rp-029-030-rework-fixes</code> 修复 R8 阻断并复跑验证：<code class="inline">npm run build -w apps/api</code> pass；<code class="inline">npm run test:modules -w apps/api</code> 137/137 pass；<code class="inline">npm run test:ai -w apps/api</code> 189/189 pass；<code class="inline">npm run test:agent -w apps/api</code> 21/21 pass；<code class="inline">npm run test:harness -w apps/api</code> 62/62 pass。已移除提交中的 <code class="inline">trace-store.json</code> 运行态数据，并补测试 store 隔离、流式成功/失败/abort trace 覆盖。</td></tr>
       </table>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 测试 · WES Agent 升级总看板 · 2026-06-21
+      <a href="index.html">返回总览</a> · 测试 · WES Agent 升级总看板 · 2026-06-29
     </footer>
   </main>
 </body>

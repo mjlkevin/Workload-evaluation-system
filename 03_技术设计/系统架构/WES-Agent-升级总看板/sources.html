@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>文档事实源地图 · WES Agent 升级总看板</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/dashboard.css" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
 </head>
 <body>
   <header class="topnav">
@@ -23,8 +23,11 @@
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
         <a class="active" href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="requirements.html">需求池</a>
       </nav>
-      <span class="pill ok">Phase 1F delivered</span>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill brand">Phase 1H-B in progress</span>
     </div>
   </header>
 
@@ -34,11 +37,11 @@
         <div class="crumb">Document Asset Map</div>
         <h1>文档事实源地图</h1>
         <div class="meta">
-          <span>共盘点 <b>27</b> 份文档资产</span>
-          <span>事实源 <b>5</b> 份</span>
-          <span>总看板页面 <b>10</b> 个</span>
+          <span>共盘点 <b>51</b> 份文档资产</span>
+          <span>事实源 <b>16</b> 份</span>
+          <span>总看板页面 <b>12</b> 个</span>
           <span>历史参考 <b>5</b> 份</span>
-          <span>更新日期 <b>2026-06-21</b></span>
+          <span>更新日期 <b>2026-06-29</b></span>
         </div>
       </div>
     </div>
@@ -53,6 +56,7 @@
           <li><b>资产清单</b> — 表格与卡片双视图</li>
         </ol>
       </nav>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
     </div>
 
     <section>
@@ -68,7 +72,7 @@
             <div class="doc-layer-header">
               <span class="doc-layer-title delivery">Delivery Board</span>
               <span>总看板交付物</span>
-              <div class="doc-layer-count"><b>10</b> pages</div>
+              <div class="doc-layer-count"><b>12</b> pages</div>
             </div>
             <div class="doc-node-grid">
               <div class="doc-node">
@@ -121,6 +125,16 @@
                 <small>文档事实源地图（本页）</small>
                 <span class="tag delivery">Board</span>
               </div>
+              <div class="doc-node">
+                <a href="collaboration-protocol.html">collaboration-protocol.html</a>
+                <small>WES + Codex + Qoder + KIMICODE NightOps 本地 A2A / 多 Agent 协作协议</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="requirements.html">requirements.html</a>
+                <small>升级需求池 / Backlog Governance</small>
+                <span class="tag delivery">Board</span>
+              </div>
             </div>
             <div class="layer-connector">
               <span>聚合 · 可视化 · 汇报</span>
@@ -132,13 +146,78 @@
             <div class="doc-layer-header">
               <span class="doc-layer-title current">Current Truth</span>
               <span>当前事实源</span>
-              <div class="doc-layer-count"><b>5</b> sources</div>
+              <div class="doc-layer-count"><b>18</b> sources</div>
             </div>
             <div class="doc-node-grid">
               <div class="doc-node">
                 <a href="../../../AGENTS.md">AGENTS.md</a>
                 <small>架构边界 / 约定 / 禁止事项</small>
                 <span class="tag current">Current Truth</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../codex-project-registry.md">codex-project-registry.md</a>
+                <small>Codex 项目入口 / 禁止路径 / 验证命令 / 子代理分工</small>
+                <span class="tag current">Current Truth</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../QODER.md">QODER.md</a>
+                <small>Qoder 进入 WES 项目的 worktree 协作入口</small>
+                <span class="tag current">Current Truth</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../KIMICODE.md">KIMICODE.md</a>
+                <small>KIMICODE NightOps peer audit / controlled-fix 入口</small>
+                <span class="tag current">Current Truth</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/agent-loop/nightops-templates.md">nightops-templates.md</a>
+                <small>Night Mission Packet、handoff、peer audit、Codex Gate 与晨间简报模板</small>
+                <span class="tag current">Workflow</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/codex-workflows/wes-feedback-intake.md">wes-feedback-intake.md</a>
+                <small>WES 反馈去重、补证据、入池与立即修复入口</small>
+                <span class="tag current">Workflow</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/codex-workflows/long-doc-skill-review-template.md">long-doc-skill-review-template.md</a>
+                <small>长文档 / Skill 升版交叉检查模板</small>
+                <span class="tag current">Workflow</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/codex-workflows/external-ai-handoff-template.md">external-ai-handoff-template.md</a>
+                <small>Qoder / Kimi / Codex 外部交付回填与看板事件格式</small>
+                <span class="tag current">Workflow</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/codex-workflows/api-secret-handling.md">api-secret-handling.md</a>
+                <small>外部 API 密钥不进对话、不进看板的验证流程</small>
+                <span class="tag current">Workflow</span>
+              </div>
+              <div class="doc-node">
+                <a href="https://platform.kimi.ai/docs/api/chat">Kimi Chat Completion</a>
+                <small>Chat Completion、Partial Mode 与工具调用官方接口说明</small>
+                <span class="tag current">External Official</span>
+              </div>
+              <div class="doc-node">
+                <a href="https://platform.kimi.ai/docs/api/models-overview">Kimi Model Parameters</a>
+                <small>K2.5/K2.6 上下文、thinking 与模型参数官方说明</small>
+                <span class="tag current">External Official</span>
+              </div>
+              <div class="doc-node">
+                <a href="https://platform.kimi.ai/docs/pricing/batch">Kimi Batch Pricing</a>
+                <small>Batch API 支持模型、窗口与 60% 标准价官方说明</small>
+                <span class="tag current">External Official</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../skills/maintain-wes-command-board/SKILL.md">maintain-wes-command-board</a>
+                <small>总看板过程数据沉淀 Skill</small>
+                <span class="tag current">Governance Skill</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../skills/wes-qoder-worktree-protocol/SKILL.md">wes-qoder-worktree-protocol</a>
+                <small>Qoder worktree contract、验证与 handoff 协议 Skill</small>
+                <span class="tag current">Governance Skill</span>
               </div>
               <div class="doc-node">
                 <a href="../../../README.md">README.md</a>
@@ -152,7 +231,7 @@
               </div>
               <div class="doc-node">
                 <a href="../../../docs/openapi.yaml">docs/openapi.yaml</a>
-                <small>对外 API 契约</small>
+                <small>对外 API 契约，含 AI 工作台 formBlock 响应</small>
                 <span class="tag current">Current Contract</span>
               </div>
               <div class="doc-node">
@@ -171,13 +250,43 @@
             <div class="doc-layer-header">
               <span class="doc-layer-title plan">Implementation Plan</span>
               <span>设计与计划源</span>
-              <div class="doc-layer-count"><b>7</b> specs / plans</div>
+              <div class="doc-layer-count"><b>16</b> specs / plans</div>
             </div>
             <div class="doc-node-grid">
               <div class="doc-node">
                 <a href="../../../docs/superpowers/specs/2026-06-17-wes-harness-design.md">2026-06-17-wes-harness-design.md</a>
                 <small>Harness 设计规格</small>
                 <span class="tag plan">Spec</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md">2026-06-22-wes-agent-phase-1g-intent-runtime-design.md</a>
+                <small>Phase 1G 意图路由与任务运行时设计</small>
+                <span class="tag plan">Spec</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1g-intent-runtime.md">2026-06-23-wes-agent-phase-1g-intent-runtime.md</a>
+                <small>Phase 1G 实施计划</small>
+                <span class="tag plan">Plan</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1h-a-workbench-ux.md">2026-06-23-wes-agent-phase-1h-a-workbench-ux.md</a>
+                <small>Phase 1H-A AI 工作台体验闭环实施计划</small>
+                <span class="tag plan">Plan</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/plans/2026-06-24-wes-agent-rp-013-interactive-formblock.md">2026-06-24-wes-agent-rp-013-interactive-formblock.md</a>
+                <small>RP-013 AI 工作台 formBlock 通用交互实施计划与交付验收口径</small>
+                <span class="tag plan">Plan</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md">2026-06-24-wes-agent-rp-018-knowledge-tool.md</a>
+                <small>RP-018 知识库工具实施计划与工具协议</small>
+                <span class="tag plan">Plan</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/智谱AI知识库集成指南.md">智谱AI知识库集成指南.md</a>
+                <small>智谱知识库最小闭环、检索触发判断与 WES 接入建议</small>
+                <span class="tag plan">Technical Guide</span>
               </div>
               <div class="doc-node">
                 <a href="../../../docs/superpowers/plans/2026-06-17-wes-harness-phase-1a.md">2026-06-17-wes-harness-phase-1a.md</a>
@@ -208,6 +317,21 @@
                 <a href="phase-1f-implementation-prompt.md">phase-1f-implementation-prompt.md</a>
                 <small>Phase 1F 实现提示词</small>
                 <span class="tag plan">Prompt</span>
+              </div>
+              <div class="doc-node">
+                <a href="phase-1g-implementation-prompt.md">phase-1g-implementation-prompt.md</a>
+                <small>Phase 1G 实现提示词</small>
+                <span class="tag plan">Prompt</span>
+              </div>
+              <div class="doc-node">
+                <a href="phase-1h-a-implementation-prompt.md">phase-1h-a-implementation-prompt.md</a>
+                <small>Phase 1H-A 施工提示词</small>
+                <span class="tag plan">Prompt</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../skills/wes-multi-agent-collaboration/SKILL.md">wes-multi-agent-collaboration</a>
+                <small>WES 多 Agent 团队注册、NightOps、handoff、peer audit、Codex Gate 与冲突规则 v0.3 草案</small>
+                <span class="tag plan">Skill Draft</span>
               </div>
             </div>
             <div class="layer-connector">
@@ -270,6 +394,7 @@
           <div class="matrix-cell head">Harness 1D</div>
           <div class="matrix-cell head">Harness 1E</div>
           <div class="matrix-cell head">Harness 1F</div>
+          <div class="matrix-cell head">Harness 1G</div>
 
           <div class="matrix-cell row-head">Spec</div>
           <div class="matrix-cell">
@@ -301,6 +426,11 @@
             <div class="cell-title">Audit Write-back</div>
             <div class="cell-meta">ToolEvent / metadata</div>
             <span class="status-pill run">当前任务</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md">Intent Runtime</a></div>
+            <div class="cell-meta">意图路由 / 任务运行时</div>
+            <span class="status-pill run">设计中</span>
           </div>
 
           <div class="matrix-cell row-head">Plan</div>
@@ -334,6 +464,11 @@
             <div class="cell-meta">人工确认回写</div>
             <span class="status-pill run">已生成</span>
           </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1g-intent-runtime.md">1G Implementation Plan</a></div>
+            <div class="cell-meta">意图路由实施计划</div>
+            <span class="status-pill run">已生成</span>
+          </div>
 
           <div class="matrix-cell row-head">Implementation Truth</div>
           <div class="matrix-cell">
@@ -348,7 +483,7 @@
           </div>
           <div class="matrix-cell">
             <div class="cell-title">modules/harness</div>
-            <div class="cell-meta">repository / usecase</div>
+            <div class="cell-meta">repository / usecase / regression scoring</div>
             <span class="status-pill run">当前总看板承接</span>
           </div>
           <div class="matrix-cell">
@@ -365,6 +500,11 @@
             <div class="cell-title">回写审计</div>
             <div class="cell-meta">ToolEvent / metadata</div>
             <span class="status-pill done">已纳入文档</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title">意图路由</div>
+            <div class="cell-meta">chat / dispatch / context</div>
+            <span class="status-pill todo">待实现</span>
           </div>
 
           <div class="matrix-cell row-head">API Contract</div>
@@ -398,6 +538,11 @@
             <div class="cell-meta">ToolEvent 记录</div>
             <span class="status-pill done">已纳入契约</span>
           </div>
+          <div class="matrix-cell">
+            <div class="cell-title">Dispatch API</div>
+            <div class="cell-meta">chat 意图分发</div>
+            <span class="status-pill todo">待设计确认</span>
+          </div>
 
           <div class="matrix-cell row-head">Dashboard</div>
           <div class="matrix-cell">
@@ -429,6 +574,11 @@
             <div class="cell-title"><a href="sources.html">sources.html</a></div>
             <div class="cell-meta">文档地图</div>
             <span class="status-pill run">当前总看板承接</span>
+          </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="plan.html">plan.html</a> / <a href="runtime.html">runtime.html</a></div>
+            <div class="cell-meta">1G 设计与实现交付</div>
+            <span class="status-pill run">已更新</span>
           </div>
 
           <div class="matrix-cell row-head">Review / Change Log</div>
@@ -462,6 +612,11 @@
             <div class="cell-meta">KIMI / Codex</div>
             <span class="status-pill run">已生成</span>
           </div>
+          <div class="matrix-cell">
+            <div class="cell-title"><a href="phase-1g-implementation-prompt.md">1G 实现提示词</a></div>
+            <div class="cell-meta">KIMI / Codex</div>
+            <span class="status-pill run">已生成</span>
+          </div>
         </div>
       </div>
     </section>
@@ -480,13 +635,13 @@
               <span class="truth-arrow"></span>
               <span class="num">01</span>
               <b>apps/api</b>
-              <small>Express + modules 模式；Harness 首个 DB-backed 域</small>
+              <small>Express + modules 模式；Harness 首个 DB-backed 域；AI 工作台 WES 数据查询已支持 owner-scoped 项目状态摘要与 project trace refs；附件问答已返回并持久化 trace.modelRun 轻量审计；RP-007 已新增 Harness regression sample schema 与 requirement_match_v1 评分规则</small>
             </div>
             <div class="truth-step source">
               <span class="truth-arrow"></span>
               <span class="num">02</span>
               <b>ui/V2_PROTOTYPE</b>
-              <small>Vite + React；AI 草稿接回传统工作台</small>
+              <small>Vite + React；AI 草稿接回传统工作台；AI 工作台右侧工作区折叠状态已记忆，Artifact Workspace 已支持来源/执行/产物/交付时间线，Markdown 表格与 unsafe link/raw HTML 已做渲染层防护</small>
             </div>
             <div class="truth-step doc">
               <span class="truth-arrow"></span>
@@ -498,7 +653,7 @@
               <span class="truth-arrow"></span>
               <span class="num">04</span>
               <b>docs/openapi.yaml</b>
-              <small>对外 API 契约从实现导出</small>
+              <small>对外 API 契约从实现导出，含 LightweightModelRunTrace 与 KnowledgeToolTrace</small>
             </div>
             <div class="truth-step board">
               <span class="truth-arrow"></span>
@@ -605,7 +760,7 @@
                 <td><span class="status-pill run">Delivery Board</span></td>
                 <td>每次人工测试执行或反馈变更必改</td>
                 <td>否</td>
-                <td>Harness 1E, Harness 1F</td>
+                <td>Harness 1E, Harness 1F, Phase 1G, Phase 1H-A/B</td>
               </tr>
               <tr>
                 <td>总看板交付物</td>
@@ -648,12 +803,162 @@
                 <td>All Phases</td>
               </tr>
               <tr>
+                <td>总看板交付物</td>
+                <td><a href="collaboration-protocol.html">collaboration-protocol.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/collaboration-protocol.html</td>
+                <td>WES + Codex + Qoder + KIMICODE 及候选 Agent 的本地 A2A / 多 Agent 协作协议，解释团队注册表、Git 状态载体、handoff、总看板事实源、验证门禁，以及 NightOps 的 Night Mission Packet、Qoder executor、KIMICODE peer audit、Codex Gate 闭环</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>跨工具协作协议变化时更新</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>总看板交付物</td>
+                <td><a href="requirements.html">requirements.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/requirements.html</td>
+                <td>升级需求池 / Backlog Governance</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>需求变更时更新</td>
+                <td>否</td>
+                <td>Phase 1H-A/B, Phase 2</td>
+              </tr>
+              <tr>
                 <td>当前事实源</td>
                 <td><a href="../../../AGENTS.md">AGENTS.md</a></td>
                 <td class="mono">/AGENTS.md</td>
                 <td>架构边界、约定、禁止事项</td>
                 <td><span class="status-pill run">Current Truth</span></td>
                 <td>仅重大架构调整时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../codex-project-registry.md">codex-project-registry.md</a></td>
+                <td class="mono">/codex-project-registry.md</td>
+                <td>Codex 项目入口、禁止路径、验证命令和子代理分工</td>
+                <td><span class="status-pill run">Current Truth</span></td>
+                <td>项目入口或协作边界变化时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../QODER.md">QODER.md</a></td>
+                <td class="mono">/QODER.md</td>
+                <td>Qoder 进入 WES 项目的协作入口，要求读取 worktree 协议 Skill 与多 Agent 协作 Skill、完成 ACK 并结构化回填</td>
+                <td><span class="status-pill run">Current Truth</span></td>
+                <td>Qoder 协作边界变化时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../KIMICODE.md">KIMICODE.md</a></td>
+                <td class="mono">/KIMICODE.md</td>
+                <td>KIMICODE 进入 WES NightOps 的 peer audit / controlled-fix 入口，要求读取多 Agent 协作 Skill、NightOps 模板、任务包和 Qoder handoff 后输出审计 ACK 与结构化审计结论</td>
+                <td><span class="status-pill run">Current Truth</span></td>
+                <td>KIMICODE 协作边界变化时改</td>
+                <td>否</td>
+                <td>All Phases / NightOps</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../docs/agent-loop/nightops-templates.md">nightops-templates.md</a></td>
+                <td class="mono">docs/agent-loop/nightops-templates.md</td>
+                <td>NightOps 文件协议模板，覆盖 Night Mission Packet、Qoder handoff、KIMICODE peer audit、Codex Gate Result 和 Morning Brief</td>
+                <td><span class="status-pill run">Workflow</span></td>
+                <td>NightOps 交接格式变化时改</td>
+                <td>否</td>
+                <td>NightOps / All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../docs/codex-workflows/wes-feedback-intake.md">wes-feedback-intake.md</a></td>
+                <td class="mono">docs/codex-workflows/wes-feedback-intake.md</td>
+                <td>WES 反馈去重、补证据、入池和立即修复流程</td>
+                <td><span class="status-pill run">Workflow</span></td>
+                <td>需求池治理规则变化时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../docs/codex-workflows/long-doc-skill-review-template.md">long-doc-skill-review-template.md</a></td>
+                <td class="mono">docs/codex-workflows/long-doc-skill-review-template.md</td>
+                <td>长文档与 Skill 升版交叉检查模板</td>
+                <td><span class="status-pill run">Workflow</span></td>
+                <td>文档检查口径变化时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../docs/codex-workflows/external-ai-handoff-template.md">external-ai-handoff-template.md</a></td>
+                <td class="mono">docs/codex-workflows/external-ai-handoff-template.md</td>
+                <td>外部 AI 交付回填和看板结构化事件模板</td>
+                <td><span class="status-pill run">Workflow</span></td>
+                <td>外部协作流程变化时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../docs/codex-workflows/api-secret-handling.md">api-secret-handling.md</a></td>
+                <td class="mono">docs/codex-workflows/api-secret-handling.md</td>
+                <td>Napkin / 智谱 / Kimi 等外部 API 密钥验证流程</td>
+                <td><span class="status-pill run">Workflow</span></td>
+                <td>外部 API 验证安全口径变化时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="https://platform.kimi.ai/docs/api/chat">Kimi Chat Completion</a></td>
+                <td class="mono">https://platform.kimi.ai/docs/api/chat</td>
+                <td>Kimi Chat Completion、Partial Mode 与工具调用官方接口说明；支撑 RP-027 Provider 输出协议改造</td>
+                <td><span class="status-pill run">External Official</span></td>
+                <td>Kimi Chat API 变更时复核</td>
+                <td>否</td>
+                <td>RP-027</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="https://platform.kimi.ai/docs/api/models-overview">Kimi Model Parameters</a></td>
+                <td class="mono">https://platform.kimi.ai/docs/api/models-overview</td>
+                <td>K2.5/K2.6 上下文、thinking 与模型参数官方说明；支撑 RP-027 模型分级与参数兼容</td>
+                <td><span class="status-pill run">External Official</span></td>
+                <td>Kimi 模型列表或参数规则变化时复核</td>
+                <td>否</td>
+                <td>RP-027</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="https://platform.kimi.ai/docs/pricing/batch">Kimi Batch Pricing</a></td>
+                <td class="mono">https://platform.kimi.ai/docs/pricing/batch</td>
+                <td>Batch API 支持模型、completion_window、实时并发边界与 60% 标准价说明；支撑 RP-027 批量评估调度</td>
+                <td><span class="status-pill run">External Official</span></td>
+                <td>Kimi Batch API 或价格页变化时复核</td>
+                <td>否</td>
+                <td>RP-027</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../skills/maintain-wes-command-board/SKILL.md">maintain-wes-command-board</a></td>
+                <td class="mono">skills/maintain-wes-command-board/SKILL.md</td>
+                <td>总看板过程数据沉淀与项目管理门禁</td>
+                <td><span class="status-pill run">Governance Skill</span></td>
+                <td>总看板治理规则变化时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>当前事实源</td>
+                <td><a href="../../../skills/wes-qoder-worktree-protocol/SKILL.md">wes-qoder-worktree-protocol</a></td>
+                <td class="mono">skills/wes-qoder-worktree-protocol/SKILL.md</td>
+                <td>Qoder worktree contract、执行边界、验证矩阵与 handoff 协议；详细模板见 references/protocol.md</td>
+                <td><span class="status-pill run">Governance Skill</span></td>
+                <td>Qoder 协作协议变化时改</td>
                 <td>否</td>
                 <td>All Phases</td>
               </tr>
@@ -681,11 +986,11 @@
                 <td>当前事实源</td>
                 <td><a href="../../../docs/openapi.yaml">docs/openapi.yaml</a></td>
                 <td class="mono">docs/openapi.yaml</td>
-                <td>对外 API 契约</td>
+                <td>对外 API 契约，含 <code class="inline">/api/v1/ai/home-workbench/chat</code>、<code class="inline">formBlock</code>、<code class="inline">KnowledgeToolTrace</code> 与 <code class="inline">LightweightModelRunTrace</code> schema</td>
                 <td><span class="status-pill done">Current Contract</span></td>
                 <td>每次接口变更必改</td>
                 <td>否</td>
-                <td>All Phases</td>
+                <td>All Phases / Phase 1H-B</td>
               </tr>
               <tr>
                 <td>当前事实源</td>
@@ -699,13 +1004,83 @@
               </tr>
               <tr>
                 <td>设计与计划源</td>
+                <td><a href="../../../skills/wes-multi-agent-collaboration/SKILL.md">wes-multi-agent-collaboration</a></td>
+                <td class="mono">skills/wes-multi-agent-collaboration/SKILL.md</td>
+                <td>WES 多 Agent 团队注册表、启用状态、任务分级、分派门禁、NightOps 三 AI Loop、handoff、验收/返工/拒收、验证矩阵、冲突权责与看板同步机制 v0.3 草案；Codex 本地安装副本位于 <code class="inline">~/.codex/skills/wes-multi-agent-collaboration</code>，Qoder 通过 <code class="inline">QODER.md</code> 项目级上下文注入；KIMICODE 通过 <code class="inline">KIMICODE.md</code> 进入 NightOps peer audit pilot</td>
+                <td><span class="status-pill run">Active Draft</span></td>
+                <td>多 Agent 协作规则或候选 Agent 状态变化时改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
                 <td><a href="../../../docs/superpowers/specs/2026-06-17-wes-harness-design.md">2026-06-17-wes-harness-design.md</a></td>
                 <td class="mono">docs/superpowers/specs/2026-06-17-wes-harness-design.md</td>
                 <td>Harness 设计规格</td>
-                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td><span class="status-pill warn">Design Source</span></td>
                 <td>每次 Phase/架构变更必改</td>
                 <td>否</td>
-                <td>Harness 1A/1B/1C/1D/1E</td>
+                <td>Harness 1A/1B/1C/1D/1E/1F</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md">2026-06-22-wes-agent-phase-1g-intent-runtime-design.md</a></td>
+                <td class="mono">docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md</td>
+                <td>Phase 1G 意图路由与任务运行时升级设计</td>
+                <td><span class="status-pill warn">Design Source</span></td>
+                <td>1G 实现计划、提示词或验收口径变化时改</td>
+                <td>否</td>
+                <td>Harness 1G / AI Workbench Runtime</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1g-intent-runtime.md">2026-06-23-wes-agent-phase-1g-intent-runtime.md</a></td>
+                <td class="mono">docs/superpowers/plans/2026-06-23-wes-agent-phase-1g-intent-runtime.md</td>
+                <td>Phase 1G 意图路由与任务运行时实施计划</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>1G 任务拆解或验收门禁变化时改</td>
+                <td>否</td>
+                <td>Harness 1G / AI Workbench Runtime</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1h-a-workbench-ux.md">2026-06-23-wes-agent-phase-1h-a-workbench-ux.md</a></td>
+                <td class="mono">docs/superpowers/plans/2026-06-23-wes-agent-phase-1h-a-workbench-ux.md</td>
+                <td>Phase 1H-A AI 工作台体验闭环实施计划</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>1H-A 范围、任务拆解或验收门禁变化时改</td>
+                <td>否</td>
+                <td>Phase 1H-A / AI Workbench UX</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/plans/2026-06-24-wes-agent-rp-013-interactive-formblock.md">2026-06-24-wes-agent-rp-013-interactive-formblock.md</a></td>
+                <td class="mono">docs/superpowers/plans/2026-06-24-wes-agent-rp-013-interactive-formblock.md</td>
+                <td>RP-013 AI 工作台通用化交互渲染实施计划与交付验收口径</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>RP-013 协议、任务拆解、验收门禁或实现状态变化时改</td>
+                <td>否</td>
+                <td>Phase 1H-B / AI Workbench UX</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md">2026-06-24-wes-agent-rp-018-knowledge-tool.md</a></td>
+                <td class="mono">docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md</td>
+                <td>RP-018 AI 可发现知识库资源工具实施计划，约束工具协议、Zhipu 调用、trace、前端展示和验收门禁；后端 service、intent routing、dispatch/session、OpenAPI 与前端 trace chip MVP 已完成</td>
+                <td><span class="status-pill done">Implementation Plan + MVP Delivered</span></td>
+                <td>RP-018 dispatch/session/frontend 实现状态变化时改</td>
+                <td>否</td>
+                <td>RP-018 / Phase 1H-B / AI Workbench Runtime</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/智谱AI知识库集成指南.md">智谱AI知识库集成指南.md</a></td>
+                <td class="mono">docs/智谱AI知识库集成指南.md</td>
+                <td>智谱知识库最小闭环、检索触发判断、prompt_template 避坑和 WES 接入建议</td>
+                <td><span class="status-pill warn">Technical Guide</span></td>
+                <td>知识库工具接入或模型配置变化时改</td>
+                <td>否</td>
+                <td>RP-018 / Phase 1H-B candidates</td>
               </tr>
               <tr>
                 <td>设计与计划源</td>
@@ -766,6 +1141,26 @@
                 <td>Phase 1F 实现启动或边界调整时改</td>
                 <td>否</td>
                 <td>Harness 1F</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="phase-1g-implementation-prompt.md">phase-1g-implementation-prompt.md</a></td>
+                <td class="mono">WES-Agent-升级总看板/phase-1g-implementation-prompt.md</td>
+                <td>Phase 1G 给 KIMI/Codex 的实现提示词</td>
+                <td><span class="status-pill warn">Implementation Prompt</span></td>
+                <td>Phase 1G 实现启动或边界调整时改</td>
+                <td>否</td>
+                <td>Harness 1G</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="phase-1h-a-implementation-prompt.md">phase-1h-a-implementation-prompt.md</a></td>
+                <td class="mono">WES-Agent-升级总看板/phase-1h-a-implementation-prompt.md</td>
+                <td>Phase 1H-A 给 KIMI/Codex 的施工提示词</td>
+                <td><span class="status-pill warn">Implementation Prompt</span></td>
+                <td>Phase 1H-A 实现启动或边界调整时改</td>
+                <td>否</td>
+                <td>Phase 1H-A</td>
               </tr>
               <tr>
                 <td>历史参考</td>
@@ -905,10 +1300,138 @@
             </div>
             <div class="asset-card">
               <div class="asset-head">
+                <div><div class="asset-title"><a href="collaboration-protocol.html">collaboration-protocol.html</a></div><span class="asset-path">WES-Agent-升级总看板/collaboration-protocol.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">WES + Codex + Qoder + KIMICODE 及候选 Agent 的本地 A2A / 多 Agent 协作协议，说明团队注册表、Git 状态载体、handoff、总看板事实源、验证门禁，以及 NightOps 的任务包、执行、交叉审计、Codex Gate 和晨间决策闭环</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="requirements.html">requirements.html</a></div><span class="asset-path">WES-Agent-升级总看板/requirements.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">升级需求池 / Backlog Governance</div>
+              <div class="asset-footer"><span class="status-pill run">Phase 1H-A/B, Phase 2</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
                 <div><div class="asset-title"><a href="../../../AGENTS.md">AGENTS.md</a></div><span class="asset-path">/AGENTS.md</span></div>
                 <span class="status-pill run">Current Truth</span>
               </div>
               <div class="asset-body">架构边界、约定、禁止事项</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../codex-project-registry.md">codex-project-registry.md</a></div><span class="asset-path">/codex-project-registry.md</span></div>
+                <span class="status-pill run">Current Truth</span>
+              </div>
+              <div class="asset-body">Codex 项目入口、禁止路径、验证命令和子代理分工</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../QODER.md">QODER.md</a></div><span class="asset-path">/QODER.md</span></div>
+                <span class="status-pill run">Current Truth</span>
+              </div>
+              <div class="asset-body">Qoder 进入 WES 项目的协作入口，要求读取 worktree 协议 Skill 与多 Agent 协作 Skill、完成 ACK 并结构化回填</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../KIMICODE.md">KIMICODE.md</a></div><span class="asset-path">/KIMICODE.md</span></div>
+                <span class="status-pill run">Current Truth</span>
+              </div>
+              <div class="asset-body">KIMICODE 进入 WES NightOps 的 peer audit / controlled-fix 入口，要求审计 ACK、范围校验、验证复核和结构化审计结论。</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases / NightOps</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/agent-loop/nightops-templates.md">nightops-templates.md</a></div><span class="asset-path">docs/agent-loop/nightops-templates.md</span></div>
+                <span class="status-pill run">Workflow</span>
+              </div>
+              <div class="asset-body">NightOps 文件协议模板，覆盖 Night Mission Packet、Qoder handoff、KIMICODE peer audit、Codex Gate Result 和 Morning Brief。</div>
+              <div class="asset-footer"><span class="status-pill run">NightOps / All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/codex-workflows/wes-feedback-intake.md">wes-feedback-intake.md</a></div><span class="asset-path">docs/codex-workflows/wes-feedback-intake.md</span></div>
+                <span class="status-pill run">Workflow</span>
+              </div>
+              <div class="asset-body">WES 反馈去重、补证据、入池和立即修复流程</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/codex-workflows/long-doc-skill-review-template.md">long-doc-skill-review-template.md</a></div><span class="asset-path">docs/codex-workflows/long-doc-skill-review-template.md</span></div>
+                <span class="status-pill run">Workflow</span>
+              </div>
+              <div class="asset-body">长文档与 Skill 升版交叉检查模板</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/codex-workflows/external-ai-handoff-template.md">external-ai-handoff-template.md</a></div><span class="asset-path">docs/codex-workflows/external-ai-handoff-template.md</span></div>
+                <span class="status-pill run">Workflow</span>
+              </div>
+              <div class="asset-body">外部 AI 交付回填和看板结构化事件模板</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/codex-workflows/api-secret-handling.md">api-secret-handling.md</a></div><span class="asset-path">docs/codex-workflows/api-secret-handling.md</span></div>
+                <span class="status-pill run">Workflow</span>
+              </div>
+              <div class="asset-body">Napkin / 智谱 / Kimi 等外部 API 密钥验证流程</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="https://platform.kimi.ai/docs/api/chat">Kimi Chat Completion</a></div><span class="asset-path">https://platform.kimi.ai/docs/api/chat</span></div>
+                <span class="status-pill run">External Official</span>
+              </div>
+              <div class="asset-body">Chat Completion、Partial Mode 与工具调用官方接口说明，支撑 RP-027 Provider 输出协议改造</div>
+              <div class="asset-footer"><span class="status-pill run">RP-027</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="https://platform.kimi.ai/docs/api/models-overview">Kimi Model Parameters</a></div><span class="asset-path">https://platform.kimi.ai/docs/api/models-overview</span></div>
+                <span class="status-pill run">External Official</span>
+              </div>
+              <div class="asset-body">K2.5/K2.6 上下文、thinking 与模型参数官方说明，支撑 RP-027 模型分级与参数兼容</div>
+              <div class="asset-footer"><span class="status-pill run">RP-027</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="https://platform.kimi.ai/docs/pricing/batch">Kimi Batch Pricing</a></div><span class="asset-path">https://platform.kimi.ai/docs/pricing/batch</span></div>
+                <span class="status-pill run">External Official</span>
+              </div>
+              <div class="asset-body">Batch API 支持模型、completion_window、实时并发边界与 60% 标准价说明，支撑 RP-027 批量评估调度</div>
+              <div class="asset-footer"><span class="status-pill run">RP-027</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../skills/maintain-wes-command-board/SKILL.md">maintain-wes-command-board</a></div><span class="asset-path">skills/maintain-wes-command-board/SKILL.md</span></div>
+                <span class="status-pill run">Governance Skill</span>
+              </div>
+              <div class="asset-body">总看板过程数据沉淀与项目管理门禁</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../skills/wes-qoder-worktree-protocol/SKILL.md">wes-qoder-worktree-protocol</a></div><span class="asset-path">skills/wes-qoder-worktree-protocol/SKILL.md</span></div>
+                <span class="status-pill run">Governance Skill</span>
+              </div>
+              <div class="asset-body">Qoder worktree contract、执行边界、验证矩阵与 handoff 协议；详细模板见 references/protocol.md</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../skills/wes-multi-agent-collaboration/SKILL.md">wes-multi-agent-collaboration</a></div><span class="asset-path">skills/wes-multi-agent-collaboration/SKILL.md</span></div>
+                <span class="status-pill run">Active Draft</span>
+              </div>
+              <div class="asset-body">WES 多 Agent 团队注册、启用状态、任务分级、角色槽位、分派门禁、NightOps 三 AI Loop、handoff、验收/返工/拒收、验证矩阵、冲突权责与看板同步机制 v0.3 草案，覆盖 KIMICODE / Claude Code 等候选 Agent 的可扩展接入方式；Codex 本地安装副本位于 ~/.codex/skills/wes-multi-agent-collaboration，Qoder 已通过 QODER.md 注入必读上下文，KIMICODE 通过 KIMICODE.md 登记为 NightOps peer audit pilot 槽位</div>
               <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
             </div>
             <div class="asset-card">
@@ -932,8 +1455,8 @@
                 <div><div class="asset-title"><a href="../../../docs/openapi.yaml">docs/openapi.yaml</a></div><span class="asset-path">docs/openapi.yaml</span></div>
                 <span class="status-pill done">Current Contract</span>
               </div>
-              <div class="asset-body">对外 API 契约</div>
-              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+              <div class="asset-body">对外 API 契约，含 AI 工作台 home-workbench chat、formBlock、KnowledgeToolTrace 与 LightweightModelRunTrace schema</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases / Phase 1H-B</span><span class="status-pill todo">否</span></div>
             </div>
             <div class="asset-card">
               <div class="asset-head">
@@ -946,10 +1469,58 @@
             <div class="asset-card">
               <div class="asset-head">
                 <div><div class="asset-title"><a href="../../../docs/superpowers/specs/2026-06-17-wes-harness-design.md">2026-06-17-wes-harness-design.md</a></div><span class="asset-path">docs/superpowers/specs/2026-06-17-wes-harness-design.md</span></div>
-                <span class="status-pill warn">Implementation Plan</span>
+                <span class="status-pill warn">Design Source</span>
               </div>
               <div class="asset-body">Harness 设计规格</div>
-              <div class="asset-footer"><span class="status-pill run">Harness 1A/1B/1C/1D/1E</span><span class="status-pill todo">否</span></div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1A/1B/1C/1D/1E/1F</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md">2026-06-22-wes-agent-phase-1g-intent-runtime-design.md</a></div><span class="asset-path">docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md</span></div>
+                <span class="status-pill warn">Design Source</span>
+              </div>
+              <div class="asset-body">Phase 1G 意图路由与任务运行时升级设计</div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1G</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1g-intent-runtime.md">2026-06-23-wes-agent-phase-1g-intent-runtime.md</a></div><span class="asset-path">docs/superpowers/plans/2026-06-23-wes-agent-phase-1g-intent-runtime.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">Phase 1G 意图路由与任务运行时实施计划</div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1G</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1h-a-workbench-ux.md">2026-06-23-wes-agent-phase-1h-a-workbench-ux.md</a></div><span class="asset-path">docs/superpowers/plans/2026-06-23-wes-agent-phase-1h-a-workbench-ux.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">Phase 1H-A AI 工作台体验闭环实施计划</div>
+              <div class="asset-footer"><span class="status-pill run">Phase 1H-A</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/plans/2026-06-24-wes-agent-rp-013-interactive-formblock.md">2026-06-24-wes-agent-rp-013-interactive-formblock.md</a></div><span class="asset-path">docs/superpowers/plans/2026-06-24-wes-agent-rp-013-interactive-formblock.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">RP-013 AI 工作台 formBlock 通用交互实施计划与交付验收口径</div>
+              <div class="asset-footer"><span class="status-pill run">Phase 1H-B</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md">2026-06-24-wes-agent-rp-018-knowledge-tool.md</a></div><span class="asset-path">docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md</span></div>
+                <span class="status-pill done">Implementation Plan + MVP Delivered</span>
+              </div>
+              <div class="asset-body">RP-018 知识库工具实施计划，明确 Zhipu native fetch、retrievalTriggered、trace.knowledgeTool、前端 trace chip 和测试门禁；当前已完成后端 service、knowledge_query 意图路由、dispatch trace、session metadata、OpenAPI 契约与前端“知识库参考” trace chip，剩余真实 ZHIPU 配置人工验收</div>
+              <div class="asset-footer"><span class="status-pill done">RP-018 / Phase 1H-B MVP</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/智谱AI知识库集成指南.md">智谱AI知识库集成指南.md</a></div><span class="asset-path">docs/智谱AI知识库集成指南.md</span></div>
+                <span class="status-pill warn">Technical Guide</span>
+              </div>
+              <div class="asset-body">智谱知识库最小闭环、retrieval 触发判断、prompt_template 避坑和 WES 接入建议</div>
+              <div class="asset-footer"><span class="status-pill run">RP-018</span><span class="status-pill todo">否</span></div>
             </div>
             <div class="asset-card">
               <div class="asset-head">
@@ -1001,6 +1572,22 @@
             </div>
             <div class="asset-card">
               <div class="asset-head">
+                <div><div class="asset-title"><a href="phase-1g-implementation-prompt.md">phase-1g-implementation-prompt.md</a></div><span class="asset-path">WES-Agent-升级总看板/phase-1g-implementation-prompt.md</span></div>
+                <span class="status-pill warn">Implementation Prompt</span>
+              </div>
+              <div class="asset-body">Phase 1G 给 KIMI/Codex 的实现提示词</div>
+              <div class="asset-footer"><span class="status-pill run">Harness 1G</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="phase-1h-a-implementation-prompt.md">phase-1h-a-implementation-prompt.md</a></div><span class="asset-path">WES-Agent-升级总看板/phase-1h-a-implementation-prompt.md</span></div>
+                <span class="status-pill warn">Implementation Prompt</span>
+              </div>
+              <div class="asset-body">Phase 1H-A 给 KIMI/Codex 的施工提示词</div>
+              <div class="asset-footer"><span class="status-pill run">Phase 1H-A</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
                 <div><div class="asset-title"><a href="../../API与集成/API接口设计-V2.md">API接口设计-V2.md</a></div><span class="asset-path">03_技术设计/API与集成/API接口设计-V2.md</span></div>
                 <span class="status-pill hist">Historical Reference</span>
               </div>
@@ -1045,7 +1632,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES Agent 升级总看板 · 文档事实源地图 · 2026-06-21 · 27 份资产 · 5 份历史参考
+      WES Agent 升级总看板 · 文档事实源地图 · 2026-06-29 · 51 份资产 · 5 份历史参考
     </footer>
   </main>
 

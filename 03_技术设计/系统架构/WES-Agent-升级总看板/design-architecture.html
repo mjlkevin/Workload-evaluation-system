@@ -27,6 +27,30 @@
       padding: 40px;
     }
 
+    .top-links {
+      max-width: 1200px;
+      margin: 0 auto 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .top-links a {
+      color: var(--c-text-sub);
+      text-decoration: none;
+      padding: 6px 10px;
+      border: 1px solid var(--c-border);
+      background: #fff;
+    }
+
+    .top-links a:hover,
+    .top-links a.active {
+      color: var(--c-text-main);
+      border-color: var(--c-accent);
+    }
+
     .diagram-canvas {
       background: var(--c-canvas);
       border: 2px solid var(--c-border);
@@ -255,6 +279,20 @@
   </style>
 </head>
 <body>
+  <nav class="top-links" aria-label="总看板导航">
+    <a href="index.html">总览</a>
+    <a href="design.html">设计说明</a>
+    <a href="runtime.html">任务运行时</a>
+    <a href="plan.html">计划与进度</a>
+    <a href="testing.html">测试</a>
+    <a href="monitoring.html">监控与审计</a>
+        <a href="risks.html">风险与决策</a>
+        <a href="changes.html">变更记录</a>
+        <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="requirements.html">需求池</a>
+  </nav>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
   <div class="diagram-canvas">
     <div class="diagram-header">
       <h1 class="diagram-title">WES Agent 目标架构视图</h1>
@@ -394,11 +432,22 @@
     </div>
 
     <div class="boundary-note">
+      <div class="boundary-note__icon">API</div>
+      <div class="boundary-note__text">
+        <b>外部视觉工具边界：</b>Napkin 作为 server-side integration 接在 Harness 编排之后，用于把售前页面计划生成 PPT/PNG/SVG 视觉资产。调用前需要用户确认，调用中记录 request/status/download ToolEvent，完成后立即下载到 WES 自有导出目录；前端不得直接持久化或展示 Napkin 临时文件 URL。
+      </div>
+    </div>
+
+    <div class="boundary-note">
       <div class="boundary-note__icon">!</div>
       <div class="boundary-note__text">
         <b>后置能力：</b>人工确认回写 Harness 审计已作为 Phase 1F 交付；向量库、Prompt Profile CRUD、标准治理 Harness 化和更高 Agent 自主级别仍不属于当前 1F 范围，需要在回写链路稳定并完成人工验收后单独评审。Embedding 厂商与向量存储策略后续确定。
       </div>
     </div>
+
+    <footer class="footer">
+      <a href="index.html">返回总览</a> · 设计架构 · WES Agent 升级总看板 · 2026-06-29
+    </footer>
   </div>
 </body>
 </html>

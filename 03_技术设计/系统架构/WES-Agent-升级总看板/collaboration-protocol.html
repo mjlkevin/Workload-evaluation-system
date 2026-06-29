@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>多 Agent 协作协议 · WES Agent 升级总看板</title>
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
+  <style>
+    .diagram-canvas {
+      --c-bg: #f8fafc;
+      --c-canvas: #ffffff;
+      --c-border: #cbd5e1;
+      --c-border-strong: #64748b;
+      --c-text-main: #0f172a;
+      --c-text-sub: #64748b;
+      --c-accent: #0f172a;
+      --font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+      --font-mono: "SF Mono", Monaco, Consolas, monospace;
+      background: var(--c-canvas);
+      border: 2px solid var(--c-border);
+      color: var(--c-text-main);
+      font-family: var(--font-ui);
+      margin: 22px 0;
+      padding: 28px;
+    }
+
+    .diagram-header {
+      border-bottom: 1px solid var(--c-border);
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+    }
+
+    .diagram-title {
+      color: var(--c-text-main);
+      font-size: 24px;
+      font-weight: 650;
+      line-height: 1.2;
+      margin: 0;
+    }
+
+    .diagram-subtitle {
+      color: var(--c-text-sub);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: .5px;
+      margin: 5px 0 0;
+      text-transform: uppercase;
+    }
+
+    .diagram-row {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr 48px 1fr 48px 1fr;
+      margin-bottom: 16px;
+    }
+
+    .diagram-row.four {
+      grid-template-columns: 1fr 40px 1fr 40px 1fr 40px 1fr;
+    }
+
+    .node {
+      background: #fff;
+      border: 1px solid var(--c-border);
+      min-height: 104px;
+      padding: 12px 14px;
+    }
+
+    .node.strong { border-color: var(--c-border-strong); border-width: 2px; }
+    .node.warn { border-style: dashed; }
+
+    .node-k {
+      color: var(--c-text-sub);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: .35px;
+      text-transform: uppercase;
+    }
+
+    .node h3 {
+      color: var(--c-text-main);
+      font-size: 16px;
+      line-height: 1.3;
+      margin: 5px 0 8px;
+    }
+
+    .node p {
+      color: var(--c-text-sub);
+      font-size: 12px;
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    .mono-line {
+      color: var(--c-text-main);
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      margin-top: 8px;
+    }
+
+    .connector {
+      align-items: center;
+      color: var(--c-text-sub);
+      display: flex;
+      font-family: var(--font-mono);
+      font-size: 18px;
+      justify-content: center;
+      min-height: 104px;
+      position: relative;
+    }
+
+    .connector::before {
+      background: var(--c-border-strong);
+      content: "";
+      height: 1px;
+      left: 0;
+      position: absolute;
+      right: 0;
+      top: 50%;
+    }
+
+    .connector span {
+      background: #fff;
+      border: 1px solid var(--c-border);
+      color: var(--c-text-main);
+      line-height: 1;
+      padding: 2px 5px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .swimlane {
+      border: 1px solid var(--c-border);
+      margin-top: 18px;
+    }
+
+    .swimlane-row {
+      display: grid;
+      grid-template-columns: 140px repeat(5, 1fr);
+      min-height: 72px;
+    }
+
+    .swimlane-row + .swimlane-row { border-top: 1px solid var(--c-border); }
+
+    .lane-head,
+    .lane-cell {
+      border-right: 1px solid var(--c-border);
+      padding: 10px 12px;
+    }
+
+    .lane-cell:last-child { border-right: 0; }
+
+    .lane-head {
+      background: var(--c-bg);
+      color: var(--c-text-main);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .lane-cell b {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .lane-cell span {
+      color: var(--c-text-sub);
+      display: block;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .badge {
+      border: 1px solid var(--c-text-main);
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      margin-bottom: 8px;
+      padding: 2px 6px;
+      text-transform: uppercase;
+    }
+
+    .badge.filled {
+      background: var(--c-text-main);
+      color: #fff;
+    }
+
+    .protocol-list {
+      counter-reset: protocol;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      margin-top: 18px;
+    }
+
+    .protocol-item {
+      border: 1px solid var(--line-2);
+      padding: 14px;
+    }
+
+    .protocol-item::before {
+      color: var(--ink-3);
+      content: "P" counter(protocol, decimal-leading-zero);
+      counter-increment: protocol;
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .protocol-item b { display: block; margin-bottom: 6px; }
+    .protocol-item span { color: var(--ink-2); display: block; font-size: 12.5px; line-height: 1.55; }
+
+    @media (max-width: 980px) {
+      .diagram-row,
+      .diagram-row.four {
+        grid-template-columns: 1fr;
+      }
+      .connector { min-height: 32px; }
+      .connector::before { left: 48%; right: 48%; top: 0; bottom: 0; height: auto; width: 1px; }
+      .swimlane-row { grid-template-columns: 1fr; }
+      .lane-head,
+      .lane-cell { border-right: 0; border-bottom: 1px solid var(--c-border); }
+      .lane-cell:last-child { border-bottom: 0; }
+      .protocol-list { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-in">
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <nav class="navlinks" aria-label="主导航">
+        <a href="index.html">总览</a>
+        <a href="design.html">设计说明</a>
+        <a href="runtime.html">任务运行时</a>
+        <a href="plan.html">计划与进度</a>
+        <a href="testing.html">测试</a>
+        <a href="monitoring.html">监控与审计</a>
+        <a href="risks.html">风险与决策</a>
+        <a href="changes.html">变更记录</a>
+        <a href="sources.html">文档事实源</a>
+        <a class="active" href="collaboration-protocol.html">协作协议</a>
+        <a href="requirements.html">需求池</a>
+      </nav>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill brand">Local A2A Protocol</span>
+    </div>
+  </header>
+
+  <header class="doc-h">
+    <div class="doc-wrap">
+      <div class="crumb">WES Agent · Codex + Qoder + KIMICODE Collaboration</div>
+      <h1>本地 A2A / 多 Agent 协作协议</h1>
+      <p class="meta">
+        <span><b>定位</b> 跨工具协作的本地协议，不是行业通用 A2A runtime</span>
+        <span><b>状态载体</b> Git branch / worktree / commit</span>
+        <span><b>交付协议</b> Qoder structured handoff</span>
+        <span><b>共享事实源</b> WES 总看板 + workflow docs</span>
+        <span><b>验收协议</b> 可复跑验证命令 + Codex 复核</span>
+        <span><b>团队模型</b> Active / Candidate / Paused / Retired</span>
+        <span><b>无人值守</b> Night Mission Packet + Peer Audit + Codex Gate</span>
+      </p>
+      <div class="pill-row" style="margin-top:18px">
+        <span class="pill brand">agent registry</span>
+        <span class="pill brand">worktree isolation</span>
+        <span class="pill brand">handoff envelope</span>
+        <span class="pill ok">codex review gate</span>
+        <span class="pill">candidate agent slots</span>
+        <span class="pill brand">nightops pilot</span>
+        <span class="pill warn">no secrets</span>
+        <span class="pill warn">no codex loop automation</span>
+        <span class="pill">user acceptance</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="doc-wrap">
+    <div class="toc">
+      <h5>导航</h5>
+      <ol>
+        <li><b>§1</b> 核心判断</li>
+        <li><b>§2</b> 协作架构图</li>
+        <li><b>§3</b> 五层协议</li>
+        <li><b>§4</b> 团队成员与启用状态</li>
+        <li><b>§5</b> 多 Agent 协作机制</li>
+        <li><b>§6</b> NightOps 无人值守机制</li>
+        <li><b>§7</b> 状态机</li>
+        <li><b>§8</b> 角色与权限槽位</li>
+        <li><b>§9</b> 交付包与拒收条件</li>
+        <li><b>§10</b> 当前队列映射</li>
+      </ol>
+    </div>
+
+    <section>
+      <div class="h-num">Section 01</div>
+      <h2>核心判断</h2>
+      <p class="lead">当前 WES + Codex + Qoder + KIMICODE 的跨工具协作，本质上是一套“协议先本地化”的 Agent-to-Agent 工作约定：用 Git 保存执行状态，用固定 handoff 承载交付事实，用总看板沉淀共享项目记忆，用可复跑验证命令替代口头完成声明。Codex 是规划指挥与审计 Gate，Qoder 是高吞吐执行者，KIMICODE 进入 NightOps peer audit pilot；Claude Code 或后续 Agent 在完成注册、ACK、试运行和复核前仍只能处于候选状态。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">State</span><h3>Git 是状态载体</h3><p>每个 RP 或工作单对应独立 worktree、branch、baseCommit 和 commit。状态不靠聊天上下文记忆，而靠可检查的版本对象。</p></div>
+        <div class="card"><span class="pill ok">Contract</span><h3>Handoff 是交付协议</h3><p>执行 Agent 输出目标、Worktree、文件清单、验证命令、风险、看板建议和下一步。缺字段时 Codex 可拒收。</p></div>
+        <div class="card"><span class="pill warn">Authority</span><h3>状态权责分离</h3><p>执行 Agent 只能报告“已回填 / 待 Codex 复核”；Codex 做复核和必要修复；用户保留最终验收与是否集成的判断。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 02</div>
+      <h2>协作架构图</h2>
+      <div class="diagram-canvas" aria-label="WES 本地 A2A / 多 Agent 协作协议架构图">
+        <div class="diagram-header">
+          <h2 class="diagram-title">WES Local A2A Collaboration Protocol</h2>
+          <p class="diagram-subtitle">AGENT REGISTRY · GIT WORKTREE · STRUCTURED HANDOFF · COMMAND BOARD · VERIFICATION GATE</p>
+        </div>
+
+        <div class="diagram-row">
+          <div class="node strong">
+            <span class="badge filled">USER</span>
+            <h3>任务意图与验收权</h3>
+            <p>给出需求、优先级、Loop 指令或单条任务；决定最终是否集成、是否标记已交付。</p>
+            <span class="mono-line">authority: final acceptance</span>
+          </div>
+          <div class="connector"><span>1</span></div>
+          <div class="node">
+            <span class="badge">EXECUTOR</span>
+            <h3>执行 Agent 插槽</h3>
+            <p>当前启用 Qoder；后续 KIMICODE 或其他工具必须先注册、ACK、试运行，再获得执行范围。</p>
+            <span class="mono-line">active now: qoder1</span>
+          </div>
+          <div class="connector"><span>2</span></div>
+          <div class="node">
+            <span class="badge">GIT STATE</span>
+            <h3>branch / worktree / commit</h3>
+            <p>保存范围、baseCommit、diff、测试变更和可回滚边界；禁止混入无关 dirty changes。</p>
+            <span class="mono-line">carrier: qoder/* or codex/*</span>
+          </div>
+        </div>
+
+        <div class="diagram-row">
+          <div class="node">
+            <span class="badge">HANDOFF</span>
+            <h3>交付事实信封</h3>
+            <p>目标、文件、验证、风险、看板建议、下一步；缺 worktree、文件清单或命令证据即拒收。</p>
+            <span class="mono-line">template: external-ai-handoff</span>
+          </div>
+          <div class="connector"><span>3</span></div>
+          <div class="node strong">
+            <span class="badge filled">CODEX</span>
+            <h3>复核与修复闸门</h3>
+            <p>核验路径、diff、测试、权限、数据隔离和范围；必要时切 codex/* 分支补最小修复。</p>
+            <span class="mono-line">gate: review + verification</span>
+          </div>
+          <div class="connector"><span>4</span></div>
+          <div class="node">
+            <span class="badge">VERIFICATION</span>
+            <h3>可复跑命令证据</h3>
+            <p>按变更类型运行 build、unit、module、AI、Harness、web 测试；不能运行则记录残余风险。</p>
+            <span class="mono-line">evidence: command + result</span>
+          </div>
+        </div>
+
+        <div class="diagram-row">
+          <div class="node">
+            <span class="badge">BOARD</span>
+            <h3>共享事实源</h3>
+            <p>requirements、plan、testing、monitoring、risks、changes、sources 保持一致，不让关键事实只留在聊天或 commit。</p>
+            <span class="mono-line">ledger: WES command board</span>
+          </div>
+          <div class="connector"><span>5</span></div>
+          <div class="node">
+            <span class="badge">INTEGRATION</span>
+            <h3>最小 patch 集成</h3>
+            <p>按 RP 提取已验证最小差异，不整分支粗暴合并，不恢复历史主线，不带入运行态数据。</p>
+            <span class="mono-line">rule: one scoped patch</span>
+          </div>
+          <div class="connector"><span>6</span></div>
+          <div class="node warn">
+            <span class="badge">REJECT / REWORK</span>
+            <h3>拒收与返工路径</h3>
+            <p>缺验证、越权改文件、混入旁路、绕过 dispatch、泄露密钥、错误标记已交付，均退回复工。</p>
+            <span class="mono-line">fallback: rework prompt</span>
+          </div>
+        </div>
+
+        <div class="swimlane">
+          <div class="swimlane-row">
+            <div class="lane-head">TASK</div>
+            <div class="lane-cell"><b>需求 / 指令</b><span>用户或需求池给出 RP、边界和优先级。</span></div>
+            <div class="lane-cell"><b>Worktree ACK</b><span>Qoder 记录 projectRoot、branch、baseCommit、allowedPaths。</span></div>
+            <div class="lane-cell"><b>实现与验证</b><span>执行最小变更和匹配测试。</span></div>
+            <div class="lane-cell"><b>Handoff</b><span>结构化交付结果，等待 Codex。</span></div>
+            <div class="lane-cell"><b>Acceptance</b><span>Codex/用户复核后决定合并或返工。</span></div>
+          </div>
+          <div class="swimlane-row">
+            <div class="lane-head">EVIDENCE</div>
+            <div class="lane-cell"><b>需求池</b><span>requirements.html / plan.html</span></div>
+            <div class="lane-cell"><b>Git 对象</b><span>worktree path / branch / commit</span></div>
+            <div class="lane-cell"><b>命令输出</b><span>build / test / targeted checks</span></div>
+            <div class="lane-cell"><b>交付信封</b><span>目标、文件、验证、风险、下一步</span></div>
+            <div class="lane-cell"><b>总看板</b><span>changes / testing / monitoring / risks</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03</div>
+      <h2>五层协议</h2>
+      <div class="protocol-list">
+        <div class="protocol-item"><b>任务层</b><span>用户、需求池或计划页定义目标、范围和优先级；Codex 不在本项目中创建持续 Loop，当前由 Qoder 负责 Loop 执行。</span></div>
+        <div class="protocol-item"><b>隔离层</b><span>执行 Agent 每个 RP 使用独立 worktree 和专属 branch prefix；Codex 修复使用 codex/* branch；主 checkout dirty 变更不得被清理或混入。</span></div>
+        <div class="protocol-item"><b>交付层</b><span>handoff 必须包含 Worktree、变更文件、验证命令与结果、风险、看板同步建议和下一步。没有证据不接受“已完成”。</span></div>
+        <div class="protocol-item"><b>复核层</b><span>Codex 对照声明文件查 diff，复跑相关命令，检查权限、owner 隔离、API 契约、前端主线和无关变更。</span></div>
+        <div class="protocol-item"><b>沉淀层</b><span>可接受事实同步到总看板；需求状态、验证结果、风险和变更记录在页面之间保持一致。</span></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 04</div>
+      <h2>团队成员与启用状态</h2>
+      <p class="lead">WES 多 Agent 团队按“注册表”治理，而不是按工具名天然授权。只有 active 成员可以接收正式任务；candidate 成员只是预留能力槽位，必须完成规则读取、ACK、分支边界、试运行和 Codex 复核后才能启用。</p>
+      <table>
+        <tr><th>成员 / Agent</th><th>启用状态</th><th>默认分工</th><th>当前边界</th><th>启用条件或备注</th></tr>
+        <tr>
+          <td>Kevin / 用户</td>
+          <td><span class="status done"><span class="dot"></span>active</span></td>
+          <td>Owner、优先级设定、用户级干预标识、最终验收。</td>
+          <td>决定是否启动 Loop、是否集成、是否标记已交付。</td>
+          <td>保留最终产品判断和人工验收权。</td>
+        </tr>
+        <tr>
+          <td>Codex</td>
+          <td><span class="status done"><span class="dot"></span>active</span></td>
+          <td>Reviewer、Fixer、Integrator、Board steward。</td>
+          <td>复核外部 handoff、补最小修复、跑验证、同步总看板；NightOps 中发布任务包并执行 Audit Gate，但不创建需求池实现 Loop。</td>
+          <td>使用 <code class="inline">codex/*</code> 分支；不得还原无关 dirty changes；审计 Gate 不等同于无人值守实现。</td>
+        </tr>
+        <tr>
+          <td>Qoder1</td>
+          <td><span class="status done"><span class="dot"></span>active</span></td>
+          <td>Executor、Loop runner、NightOps primary executor。</td>
+          <td>一任务一 worktree，按 Qoder worktree protocol 实现、测试、回填 handoff；夜间默认承担高吞吐执行。</td>
+          <td>只能把需求推进到“已回填 / 待 Codex 复核”；夜间不得跳过 peer audit 与 Codex Gate。</td>
+        </tr>
+        <tr>
+          <td>KIMICODE</td>
+          <td><span class="status run"><span class="dot"></span>candidate / NightOps pilot</span></td>
+          <td>建议作为 peer auditor、可靠性复核、必要时小修或后端专项执行槽位。</td>
+          <td>完成 onboarding 前不得独立接收正式 RP；NightOps 试运行阶段只按 Codex 任务包做交叉审计或受控小修。</td>
+          <td><code class="inline">KIMICODE.md</code> 入口与 NightOps 模板已补，2026-06-29 已完成 onboarding ACK；仍需只读试运行、branch prefix 和 TokenPlan 边界记录。</td>
+        </tr>
+        <tr>
+          <td>Claude Code</td>
+          <td><span class="status todo"><span class="dot"></span>candidate / 未介入</span></td>
+          <td>待定。建议作为复核、重构分析或测试审计槽位。</td>
+          <td>当前不得接收正式 RP，不得替代 Codex 复核门禁。</td>
+          <td>需补入口文件、ACK、allowedScopes、verification profile 和试运行记录。</td>
+        </tr>
+      </table>
+
+      <div class="diagram-canvas" aria-label="WES 多 Agent 团队注册表图">
+        <div class="diagram-header">
+          <h2 class="diagram-title">Team Registry Snapshot</h2>
+          <p class="diagram-subtitle">ACTIVE MEMBERS · CANDIDATE SLOTS · REVIEW GATE · USER ACCEPTANCE</p>
+        </div>
+        <div class="diagram-row four">
+          <div class="node strong">
+            <span class="badge filled">ACTIVE</span>
+            <h3>Codex</h3>
+            <p>复核、修复、验证、看板沉淀和集成建议。负责防止外部交付越界。</p>
+            <span class="mono-line">branch: codex/*</span>
+          </div>
+          <div class="connector"><span>+</span></div>
+          <div class="node strong">
+            <span class="badge filled">ACTIVE</span>
+            <h3>Qoder1</h3>
+            <p>需求池 Loop 执行代理。产出隔离 worktree、commit 和 handoff。</p>
+            <span class="mono-line">branch: qoder/*</span>
+          </div>
+          <div class="connector"><span>+</span></div>
+          <div class="node warn">
+            <span class="badge">CANDIDATE</span>
+            <h3>KIMICODE</h3>
+            <p>NightOps peer audit 候选槽位。已有入口文件、审计模板和 onboarding ACK，启用前仍需完成只读试运行和范围登记。</p>
+            <span class="mono-line">ack: 2026-06-29</span>
+          </div>
+          <div class="connector"><span>+</span></div>
+          <div class="node warn">
+            <span class="badge">CANDIDATE</span>
+            <h3>Claude Code</h3>
+            <p>候选复核或重构槽位。启用前必须定义 handoff 与 verification profile。</p>
+            <span class="mono-line">status: not onboarded</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 05</div>
+      <h2>多 Agent 协作机制</h2>
+      <div class="grid-2">
+        <div class="card">
+          <span class="pill brand">Registry Fields</span>
+          <h3>每个 Agent 都要登记</h3>
+          <ul>
+            <li><code class="inline">agentId</code>、平台、启用状态。</li>
+            <li>角色槽位：owner、planner、executor、reviewer、integrator、board-steward。</li>
+            <li>allowedScopes、forbiddenScopes、branchPrefix。</li>
+            <li>handoffProfile、verificationProfile、boardSync 责任。</li>
+            <li>onboardingAck 与试运行记录。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="pill ok">Assignment Gate</span>
+          <h3>任务分派前置门禁</h3>
+          <ul>
+            <li>只有 active Agent 可以承接正式任务。</li>
+            <li>并行任务必须文件范围独立、验证命令独立、worktree 独立。</li>
+            <li>执行 Agent 不拥有“已交付”状态权。</li>
+            <li>新 Agent 的第一轮只能做非关键试运行或只读复核。</li>
+            <li>任何 Agent 不得绕过密钥、权限、owner 隔离和人工确认规则。</li>
+          </ul>
+        </div>
+      </div>
+      <table>
+        <tr><th>协作模式</th><th>使用场景</th><th>控制点</th><th>失败时处理</th></tr>
+        <tr>
+          <td>顺序 handoff</td>
+          <td>一个 Agent 完成实现，另一个 Agent 复核或集成。</td>
+          <td>先完整 handoff，再开始 review。</td>
+          <td>缺字段或缺验证时退回返工。</td>
+        </tr>
+        <tr>
+          <td>并行 worktree</td>
+          <td>多个 RP 文件范围独立，可同时推进。</td>
+          <td>一任务一 worktree / branch / baseCommit。</td>
+          <td>发现共享文件冲突时暂停其中一项。</td>
+        </tr>
+        <tr>
+          <td>复核升级</td>
+          <td>存在权限、API 契约、数据隔离、测试缺口或范围叠加。</td>
+          <td>Codex 记录阻断原因并生成返工提示词。</td>
+          <td>不得通过看板直接标记已交付。</td>
+        </tr>
+        <tr>
+          <td>集成队列</td>
+          <td>多条已验证 patch 等待进入主线。</td>
+          <td>按 RP 提取最小 patch，逐条合并逐条验证。</td>
+          <td>任一项失败时只回滚该项，不扩大范围。</td>
+        </tr>
+        <tr>
+          <td>看板治理</td>
+          <td>只改变协作规则、事实源、计划或流程资产。</td>
+          <td>更新 sources / changes / collaboration protocol。</td>
+          <td>不得伪造成代码交付。</td>
+        </tr>
+      </table>
+      <div class="callout"><div><b>扩展原则</b>新增 Agent 时只新增注册表条目、入口文件、handoff profile 与试运行记录；不重写现有协议，也不把工具品牌直接等同于权限。</div></div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 06</div>
+      <h2>NightOps 无人值守机制</h2>
+      <p class="lead">NightOps 用于北京时间 00:00-09:30 的无人值守窗口。Codex 负责发布任务包、限定范围和最终审计 Gate；Qoder 默认作为主执行者；KIMICODE 作为交叉审计者或受控小修槽位。该机制只允许推进“已回填 / 待复核”或“返工完成 / 待 Gate”状态，不允许无人值守标记“已交付”、合并主线或处理需要用户裁决的架构事项。共享模板见 <a href="../../../docs/agent-loop/nightops-templates.md">docs/agent-loop/nightops-templates.md</a>。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">Commander</span><h3>Codex 发布任务包</h3><p>在固定时间点生成 Night Mission Packet，定义任务、执行者、审计者、allowedPaths、stopConditions、验证命令和 handoff/audit 路径。</p></div>
+        <div class="card"><span class="pill ok">Executor</span><h3>Qoder 主执行</h3><p>读取任务包和上一轮 Codex Gate，按一任务一 worktree 实现、测试并输出 handoff；如存在返工指令，先返工再谈新任务。</p></div>
+        <div class="card"><span class="pill warn">Peer Audit</span><h3>KIMICODE 交叉审计</h3><p>检查范围污染、权限边界、测试缺口、架构风险和 handoff 完整性；必要时只做受控小修，不替代 Codex 最终 Gate。</p></div>
+      </div>
+      <table>
+        <tr><th>时间段（北京时间）</th><th>负责方</th><th>动作</th><th>输出物</th><th>硬限制</th></tr>
+        <tr>
+          <td class="mono">23:40-23:55</td>
+          <td>Codex</td>
+          <td>发布 Night Mission Packet，选择 1 条低风险 RP 或返工任务。</td>
+          <td><code class="inline">docs/agent-loop/nightly/YYYY-MM-DD-mission.md</code></td>
+          <td>不启动实现；只做规划、边界和门禁。</td>
+        </tr>
+        <tr>
+          <td class="mono">00:00-03:30</td>
+          <td>Qoder</td>
+          <td>按任务包执行，创建隔离 worktree，完成实现和自测。</td>
+          <td>Qoder handoff + branch / worktree / verification evidence</td>
+          <td>最多推进到“已回填 / 待 Codex 复核”。</td>
+        </tr>
+        <tr>
+          <td class="mono">04:00-05:30</td>
+          <td>KIMICODE</td>
+          <td>审计 Qoder handoff、diff 范围、验证命令、权限和架构边界。</td>
+          <td>KIMICODE peer audit</td>
+          <td>不得宣布交付；发现硬边界问题必须要求停止。</td>
+        </tr>
+        <tr>
+          <td class="mono">05:30-07:00</td>
+          <td>Qoder</td>
+          <td>若 peer audit 要求返工，先修当前任务；不得拿新需求。</td>
+          <td>rework handoff</td>
+          <td>无 Codex <code class="inline">allowNextTask=true</code> 不进入下一 RP。</td>
+        </tr>
+        <tr>
+          <td class="mono">07:00-08:00</td>
+          <td>KIMICODE</td>
+          <td>复核返工结果，标注剩余风险和建议结论。</td>
+          <td>peer re-audit</td>
+          <td>仍不能替代 Codex Gate。</td>
+        </tr>
+        <tr>
+          <td class="mono">08:00-09:00</td>
+          <td>Codex</td>
+          <td>执行 Audit Gate，复核 Qoder + KIMICODE 证据，给出结论。</td>
+          <td>Codex Gate Result</td>
+          <td>审计 Gate 不是需求池实现 Loop，不自动写新需求代码。</td>
+        </tr>
+        <tr>
+          <td class="mono">09:00-09:30</td>
+          <td>Codex</td>
+          <td>输出晨间简报和下一步要求。</td>
+          <td>晨间摘要 / next action</td>
+          <td>需要用户决策时停止。</td>
+        </tr>
+      </table>
+      <div class="diagram-canvas" aria-label="NightOps 三 AI 无人值守闭环">
+        <div class="diagram-header">
+          <h2 class="diagram-title">NightOps 3AI Closed Loop</h2>
+          <p class="diagram-subtitle">CODEX COMMANDER · QODER EXECUTOR · KIMICODE PEER AUDITOR · USER FINAL ACCEPTANCE</p>
+        </div>
+        <div class="diagram-row">
+          <div class="node strong">
+            <span class="badge filled">CODEX</span>
+            <h3>Night Mission Packet</h3>
+            <p>发布任务包、限定路径、指定 Qoder/KIMICODE 角色、设置 stopConditions。</p>
+            <span class="mono-line">allowNextTask: false by default</span>
+          </div>
+          <div class="connector"><span>1</span></div>
+          <div class="node">
+            <span class="badge">QODER</span>
+            <h3>Execute + Handoff</h3>
+            <p>高吞吐执行、测试和结构化回填；返工优先于新需求。</p>
+            <span class="mono-line">state: QODER_HANDOFF_POSTED</span>
+          </div>
+          <div class="connector"><span>2</span></div>
+          <div class="node warn">
+            <span class="badge">KIMICODE</span>
+            <h3>Peer Audit</h3>
+            <p>审计范围、测试、权限、架构和证据；输出通过、返工或停止建议。</p>
+            <span class="mono-line">state: PEER_AUDIT_POSTED</span>
+          </div>
+        </div>
+        <div class="diagram-row">
+          <div class="node">
+            <span class="badge">REWORK</span>
+            <h3>Qoder 修复审计项</h3>
+            <p>存在审计问题时只修当前任务，不拿新 RP，不扩大范围。</p>
+            <span class="mono-line">mustReworkFirst: true</span>
+          </div>
+          <div class="connector"><span>3</span></div>
+          <div class="node strong">
+            <span class="badge filled">CODEX GATE</span>
+            <h3>最终审计闸门</h3>
+            <p>给出 ACCEPTED_PENDING_USER、REWORK_REQUIRED、REJECTED、USER_DECISION_REQUIRED 或 ALLOW_NEXT。</p>
+            <span class="mono-line">gate: no auto delivery</span>
+          </div>
+          <div class="connector"><span>4</span></div>
+          <div class="node">
+            <span class="badge">USER</span>
+            <h3>晨间决策</h3>
+            <p>查看 Codex 摘要，决定人工验收、集成、暂停或调整下一夜任务。</p>
+            <span class="mono-line">authority: final acceptance</span>
+          </div>
+        </div>
+      </div>
+      <table>
+        <tr><th>Gate 结论</th><th>含义</th><th>Qoder 下一步</th><th>KIMICODE 下一步</th><th>用户是否介入</th></tr>
+        <tr><td class="mono">ACCEPTED_PENDING_USER</td><td>自动化和审计证据足够，但仍待人工验收或集成判断。</td><td>等待，不拿新任务。</td><td>等待。</td><td>是。</td></tr>
+        <tr><td class="mono">REWORK_REQUIRED</td><td>方向正确但存在可修复缺口。</td><td>先返工当前任务。</td><td>返工后复核。</td><td>通常否。</td></tr>
+        <tr><td class="mono">REJECTED</td><td>越权、污染范围、绕过边界或证据不可用。</td><td>停止沿用结果。</td><td>记录阻断证据。</td><td>视情况。</td></tr>
+        <tr><td class="mono">USER_DECISION_REQUIRED</td><td>涉及架构、权限、DB、外部密钥或产品方向。</td><td>停止。</td><td>停止。</td><td>是。</td></tr>
+        <tr><td class="mono">ALLOW_NEXT</td><td>当前任务可封存，允许进入下一条低风险任务。</td><td>下一轮先读 Gate 再执行。</td><td>按任务包审计。</td><td>否，但晨间可覆盖。</td></tr>
+      </table>
+      <div class="callout warn"><div><b>无人值守硬边界</b>NightOps 不允许无人值守合并 main、标记“已交付”、触碰真实 API Key、推进架构变更、执行 DB 迁移、绕过 JWT/owner 隔离/人工确认，也不允许 Qoder 在没有 Codex <code class="inline">allowNextTask=true</code> 的情况下领取新 RP。</div></div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 07</div>
+      <h2>状态机</h2>
+      <table>
+        <tr><th>状态</th><th>进入条件</th><th>证据</th><th>下一步</th><th>状态权威</th></tr>
+        <tr>
+          <td><span class="status run"><span class="dot"></span>NIGHT_MISSION_READY</span></td>
+          <td>Codex 发布 Night Mission Packet，明确执行者、审计者、路径和停止条件。</td>
+          <td>missionId、allowedPaths、requiredVerification、stopConditions。</td>
+          <td>Qoder 读取任务包并完成 Worktree Contract ACK。</td>
+          <td>Codex</td>
+        </tr>
+        <tr>
+          <td><span class="status run"><span class="dot"></span>待规划 / 待处理</span></td>
+          <td>需求池或用户指定任务，边界可识别。</td>
+          <td>RP 编号、目标、范围、优先级。</td>
+          <td>创建执行 Agent worktree（当前为 Qoder）或由 Codex 做一次性任务。</td>
+          <td>用户 / Codex</td>
+        </tr>
+        <tr>
+          <td><span class="status run"><span class="dot"></span>执行 Agent 工作中</span></td>
+          <td>active 执行 Agent 完成 Worktree Contract ACK。</td>
+          <td>worktreePath、branch、baseCommit、allowedPaths。</td>
+          <td>实现、测试、handoff。</td>
+          <td>执行 Agent</td>
+        </tr>
+        <tr>
+          <td><span class="status warn"><span class="dot"></span>已回填 / 待 Codex 复核</span></td>
+          <td>执行 Agent 提交 handoff，但尚未由 Codex 复跑验证。</td>
+          <td>changed files、verification commands、risks。</td>
+          <td>Codex 复核；通过、返工或补修。</td>
+          <td>执行 Agent 只能到此状态</td>
+        </tr>
+        <tr>
+          <td><span class="status run"><span class="dot"></span>PEER_AUDIT_POSTED</span></td>
+          <td>KIMICODE 完成对 Qoder handoff 的交叉审计。</td>
+          <td>peer audit、finding、required rework、residual risk。</td>
+          <td>Qoder 返工或进入 Codex Gate。</td>
+          <td>KIMICODE / Codex Gate 复核</td>
+        </tr>
+        <tr>
+          <td><span class="status warn"><span class="dot"></span>CODEX_GATE_POSTED</span></td>
+          <td>Codex 审计 Qoder + KIMICODE 证据后发布 Gate 结论。</td>
+          <td>verdict、allowNextTask、mustReworkFirst、nextOwner。</td>
+          <td>返工、等待用户、或允许下一轮。</td>
+          <td>Codex</td>
+        </tr>
+        <tr>
+          <td><span class="status done"><span class="dot"></span>Codex 修复验证通过 / 待集成</span></td>
+          <td>Codex 复跑验证，必要时在 codex/* 分支补最小修复。</td>
+          <td>targeted tests、build、commit、diff scope、看板记录。</td>
+          <td>提取最小 patch 集成主线，或等待人工验收。</td>
+          <td>Codex</td>
+        </tr>
+        <tr>
+          <td><span class="status done"><span class="dot"></span>已交付</span></td>
+          <td>代码集成、验证和必要人工验收完成，状态已同步看板。</td>
+          <td>main commit / PR、验证记录、changes/testing/monitoring 同步。</td>
+          <td>进入下一 RP 或关闭需求。</td>
+          <td>用户 / Codex 验收结论</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 08</div>
+      <h2>角色与权限槽位</h2>
+      <table>
+        <tr><th>槽位</th><th>能做什么</th><th>不能做什么</th><th>当前承担者</th><th>关键输出</th></tr>
+        <tr>
+          <td>Owner / Acceptor</td>
+          <td>设定目标、优先级、最终验收口径；决定是否启动 Qoder Loop 或让 Codex 一次性执行。</td>
+          <td>不需要直接维护内部状态文件。</td>
+          <td>用户</td>
+          <td>任务目标、验收反馈、是否继续下一项。</td>
+        </tr>
+        <tr>
+          <td>Planner / Commander</td>
+          <td>发布任务包、设置执行/审计角色、限定路径、设置 Gate 结论和下一步。</td>
+          <td>不得在无人值守窗口自行实现新需求；不得跳过用户最终验收。</td>
+          <td>Codex</td>
+          <td>Night Mission Packet、Codex Gate Result、晨间简报。</td>
+        </tr>
+        <tr>
+          <td>Executor</td>
+          <td>在隔离 worktree 中实现、测试、提交结构化 handoff。</td>
+          <td>不得编辑 main checkout；不得宣告“已交付”；不得改无关文件或泄露密钥。</td>
+          <td>Qoder1；KIMICODE 可在专项任务中候选</td>
+          <td>Worktree Contract ACK、commit、handoff。</td>
+        </tr>
+        <tr>
+          <td>Peer Auditor</td>
+          <td>交叉审计执行结果、验证证据、范围污染、权限和架构边界。</td>
+          <td>不得替代 Codex Gate；不得标记已交付；不得扩大返工范围。</td>
+          <td>KIMICODE pilot；Codex 兜底</td>
+          <td>peer audit、finding、返工建议。</td>
+        </tr>
+        <tr>
+          <td>Reviewer / Fixer</td>
+          <td>复核 Qoder 交付、跑验证、补最小修复、同步总看板、给出合并建议。</td>
+          <td>不得创建 WES 持续 Loop；不得还原用户或其他工具的无关 dirty changes。</td>
+          <td>Codex；KIMICODE / Claude Code 候选</td>
+          <td>复核结论、修复分支、验证证据、看板同步。</td>
+        </tr>
+        <tr>
+          <td>Integrator</td>
+          <td>提取最小 patch、给出合并顺序、验证集成后状态。</td>
+          <td>不得整分支粗暴合并，不得带入运行态数据。</td>
+          <td>Codex / 用户授权</td>
+          <td>最小 patch、验证记录、集成建议。</td>
+        </tr>
+        <tr>
+          <td>Board steward</td>
+          <td>承载跨工具共享项目事实、风险、计划、验证、变更和需求状态。</td>
+          <td>不替代代码、测试和人工验收；不得保存密钥或临时日志。</td>
+          <td>Codex 维护；总看板承载</td>
+          <td>requirements / plan / testing / monitoring / risks / changes / sources。</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <div class="h-num">Section 09</div>
+      <h2>交付包与拒收条件</h2>
+      <div class="grid-2">
+        <div class="card">
+          <span class="pill ok">Required Handoff</span>
+          <h3>每轮必须包含</h3>
+          <ul>
+            <li>目标和边界。</li>
+            <li>projectRoot、worktreePath、branch、baseCommit、taskId。</li>
+            <li>逐文件变更清单。</li>
+            <li>验证命令、pass/fail/not run 和关键输出。</li>
+            <li>风险、未验证项、看板同步建议和下一步。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="pill err">Reject Conditions</span>
+          <h3>Codex 应退回</h3>
+          <ul>
+            <li>没有 worktree、branch、baseCommit。</li>
+            <li>没有文件清单或验证命令证据。</li>
+            <li>混入无关 dirty changes、运行态数据、历史主线路径。</li>
+            <li>绕过 JWT、owner 隔离、人工确认或 dispatch 边界。</li>
+            <li>泄露 API Key、token、cookie、私钥。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 10</div>
+      <h2>当前队列映射</h2>
+      <table>
+        <tr><th>队列项</th><th>推荐状态载体</th><th>复核重点</th><th>验收证据</th></tr>
+        <tr>
+          <td>RP-027 / RP-028 Kimi Provider</td>
+          <td><code class="inline">codex/rp-027-028-clean-fix</code> / commit <code class="inline">5226deb</code></td>
+          <td>timeout retry loop、K2 参数、usage、quota、stream reasoning；真实 Kimi 配置不得泄密。</td>
+          <td>provider 10/10、build:api、test:ai 189/189、test:modules 66/66。</td>
+        </tr>
+        <tr>
+          <td>RP-029 / RP-030 Streaming + Trace</td>
+          <td><code class="inline">codex/rp-029-030-rework-fixes</code></td>
+          <td>SSE 必须复用 dispatch；trace 查询必须鉴权和 owner 隔离；abort/failure 需要可追溯。</td>
+          <td>build、test:modules、test:ai、test:agent、test:harness。</td>
+        </tr>
+        <tr>
+          <td>RP-031 RAG Baseline</td>
+          <td>最小 patch / RAG service tests</td>
+          <td>每样本只调用一次 queryFn，复用 trace.chunks；真实 ZHIPU 配置单独人工验收。</td>
+          <td>rag-baseline-runner、knowledge-tool service、build:api、test:modules、test:ai。</td>
+        </tr>
+        <tr>
+          <td>RP-026 Role Capabilities</td>
+          <td>前端 hook + system route patch</td>
+          <td>UserManagement 只请求 <code class="inline">/system/role-capabilities</code>，不能顺带加载系统配置全量接口。</td>
+          <td>UserManagement focused、V2 全量、build:web、build:api。</td>
+        </tr>
+        <tr>
+          <td>RP-033 Session Scroll</td>
+          <td>3 文件 clean patch</td>
+          <td>只改 SessionRail 容器滚动、CSS 隐藏滚动条和测试，不触碰其他工作台交互。</td>
+          <td>HomeWorkspace focused、V2 全量、build:web、人工低高度视觉验收。</td>
+        </tr>
+      </table>
+      <div class="callout warn"><div><b>集成原则</b>上述队列不应一次性整批合并。每个 RP 提取最小 patch、单独验证、单独看板同步；如果发现范围叠加或验证缺口，回到“返工任务提示词”而不是扩大当前集成范围。</div></div>
+    </section>
+  </main>
+
+  <footer>WES Agent 升级总看板 · 本地 A2A / 多 Agent 协作协议 · 2026-06-29</footer>
+</body>
+</html>
