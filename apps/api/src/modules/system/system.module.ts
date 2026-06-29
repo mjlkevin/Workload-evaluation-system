@@ -10,4 +10,9 @@ export {
   getImplementationDependencyRules,
   updateImplementationDependencyRulesDraft,
   activateImplementationDependencyRules,
+  getKnowledgeBaseConfig,
+  updateKnowledgeBaseConfigDraft,
+  activateKnowledgeBaseConfig,
+  testKnowledgeBaseConnectivity,
+  getRoleCapabilitiesMatrix,
 } from "./system.controller";

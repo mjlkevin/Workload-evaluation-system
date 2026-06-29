@@ -225,6 +225,30 @@ export const harnessExpectedAnswers = pgTable(
   }),
 );
 
+export const harnessManualTestResults = pgTable(
+  "harness_manual_test_results",
+  {
+    manualTestResultId: uuid("manual_test_result_id").primaryKey(),
+    harnessRunId: uuid("harness_run_id").references(() => harnessRuns.harnessRunId, { onDelete: "set null" }),
+    harnessToolEventId: uuid("harness_tool_event_id"),
+    testCaseKey: text("test_case_key"),
+    executorName: text("executor_name").notNull(),
+    environment: text("environment").notNull(),
+    account: text("account"),
+    screenshotUrl: text("screenshot_url"),
+    resultStatus: text("result_status", { enum: ["passed", "failed", "blocked", "skipped"] }).notNull(),
+    notes: text("notes"),
+    metadata: jsonb("metadata").default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    runIdx: index("harness_mtr_run_idx").on(table.harnessRunId),
+    statusIdx: index("harness_mtr_status_idx").on(table.resultStatus),
+    caseKeyIdx: index("harness_mtr_case_key_idx").on(table.testCaseKey),
+  }),
+);
+
 export type HarnessRunRow = typeof harnessRuns.$inferSelect;
 export type HarnessRunInsert = typeof harnessRuns.$inferInsert;
 export type HarnessFileRow = typeof harnessFiles.$inferSelect;
@@ -243,3 +267,5 @@ export type HarnessCaseRow = typeof harnessCases.$inferSelect;
 export type HarnessCaseInsert = typeof harnessCases.$inferInsert;
 export type HarnessExpectedAnswerRow = typeof harnessExpectedAnswers.$inferSelect;
 export type HarnessExpectedAnswerInsert = typeof harnessExpectedAnswers.$inferInsert;
+export type HarnessManualTestResultRow = typeof harnessManualTestResults.$inferSelect;
+export type HarnessManualTestResultInsert = typeof harnessManualTestResults.$inferInsert;

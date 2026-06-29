@@ -152,12 +152,13 @@ async function tryParseChangeWithAi(
 
   try {
     const response = await provider.chatCompletion({
-      model: "moonshot-v1-8k",
+      model: "kimi-k2.5",
       messages: [
         { role: "system", content: buildDiffSystemPrompt() },
         { role: "user", content: buildDiffUserPrompt(snapshot, changeDescription) },
       ],
       temperature: 0.2,
+      promptCacheKey: "change-management-diff-v1",
       responseFormat: "json_object",
     });
 

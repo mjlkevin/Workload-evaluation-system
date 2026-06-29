@@ -15,6 +15,40 @@ export type AiArtifactStatus = "generated" | "accepted" | "linked" | "superseded
 export type AiPendingActionStatus = "pending" | "confirmed" | "cancelled" | "executed" | "failed";
 export type AiRiskLevel = "low" | "high";
 
+export type AiMessageMetadata = Record<string, unknown> & {
+  formBlock?: unknown;
+  modelRun?: {
+    runKind: "attachment_summary" | "attachment_qa" | "knowledge_fallback";
+    auditMode: "lightweight";
+    createsHarnessRun: false;
+    provider: string;
+    model: string;
+    contextRefs: string[];
+    latencyMs: number;
+    rawContentLength: number;
+    attempts?: number;
+    finishReason?: string;
+  };
+  knowledgeTool?: {
+    toolId: "knowledge_base.query_product_knowledge";
+    available: boolean;
+    retrievalTriggered: boolean;
+    confidence: "high" | "low";
+    fallbackReason?: "missing_config" | "retrieval_empty" | "retrieval_failed" | "answer_failed" | "empty_answer";
+    query: string;
+    answer: string;
+    model: string;
+    knowledgeId: string;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    latencyMs: number;
+    contextRef: string;
+    chunksCount: number;
+    topScore: number;
+  };
+};
+
 export type AiMessage = {
   messageId: string;
   role: AiMessageRole;
@@ -22,6 +56,7 @@ export type AiMessage = {
   createdAt: string;
   attachmentIds?: string[];
   artifactIds?: string[];
+  metadata?: AiMessageMetadata;
 };
 
 export type AiAttachment = {

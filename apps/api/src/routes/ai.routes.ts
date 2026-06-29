@@ -26,5 +26,6 @@ router.post("/kimi-assessment/export-pdf", requireCapability("assessment:create"
 router.post("/kimi-api-key/test", requireCapability("system:manage"), SystemModule.testRequirementKimiApiKey);
 router.post("/chat", requireCapability("estimates:read"), AiModule.chat);
 router.post("/home-workbench/chat", requireCapability("estimates:read"), AiModule.homeWorkbenchChat);
+router.post("/home-workbench/chat/stream", requireCapability("estimates:read"), AiModule.homeWorkbenchChatStream);
 
 export default router;

@@ -167,10 +167,8 @@ test("RBAC e2e: requireV2Role 角色不在白名单 → 403", async () => {
   assert.equal(response.body.details[0].field, "role");
 });
 
-test("RBAC e2e: SALES 角色 → estimates:create 通过", async () => {
+test("RBAC e2e: legacy user/PRE_SALES → estimates:create 通过", async () => {
   const user = createTempUser({ id: "sales-001", username: "sales001", role: "user" });
-  // 注意：旧角色 user 映射到 PRE_SALES，不是 SALES
-  // 要测 SALES，需要直接创建 v2 角色场景，这里用 admin 代替测试所有能力
   const token = createTokenForUser(user);
 
   const app = express();
@@ -183,8 +181,8 @@ test("RBAC e2e: SALES 角色 → estimates:create 通过", async () => {
     .get("/test")
     .set("Authorization", `Bearer ${token}`);
 
-  // user → PRE_SALES，PRE_SALES 没有 estimates:create
-  assert.equal(response.status, 403);
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.v2Roles, ["PRE_SALES"]);
 });
 
 test("RBAC e2e: ADMIN 角色 → 所有能力位通过", async () => {

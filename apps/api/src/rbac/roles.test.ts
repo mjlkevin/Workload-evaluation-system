@@ -106,6 +106,11 @@ test("PRE_SALES 有 extractor:trigger 但没有 assessment:create", () => {
   assert.equal(roleHasCapability("PRE_SALES", "assessment:create"), false);
 });
 
+test("PRE_SALES 可创建项目评估但不可直接改写评估记录", () => {
+  assert.equal(roleHasCapability("PRE_SALES", "estimates:create"), true);
+  assert.equal(roleHasCapability("PRE_SALES", "estimates:write"), false);
+});
+
 test("SALES 只有 estimates 和 contract 相关能力", () => {
   const salesCaps = getRoleCapabilities("SALES");
   assert.ok(salesCaps.includes("estimates:create"));

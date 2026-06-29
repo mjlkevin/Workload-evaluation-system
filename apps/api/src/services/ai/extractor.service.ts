@@ -208,7 +208,7 @@ function buildLocalWorkbookParsePayload(params: {
 }
 
 async function parseRequirementImportByKimi(params: { apiUrl: string; apiKey: string; model: string; workbookText: string; timeoutMs: number; }) {
-  const completion = await getKimiProvider().chatCompletion({ model: params.model, temperature: 0.1, responseFormat: "json_object", timeoutMs: params.timeoutMs, credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl }, messages: buildRequirementImportMessages(params.workbookText) });
+  const completion = await getKimiProvider().chatCompletion({ model: params.model, temperature: 0.1, responseFormat: "json_object", promptCacheKey: "requirement-import-parser-v1", timeoutMs: params.timeoutMs, credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl }, messages: buildRequirementImportMessages(params.workbookText) });
   const parsed = parseJsonFromModelText(completion.content);
   return { basicInfo: normalizeBasicProjectInfo(asModelObject(parsed.basicInfo) || parsed), requirementImportData: normalizeRequirementImportData(parsed), rawContent: completion.content };
 }
@@ -232,6 +232,7 @@ async function parseRequirementImportByKimiStream(
     model: params.model,
     temperature: 0.1,
     responseFormat: "json_object",
+    promptCacheKey: "requirement-import-parser-v1",
     timeoutMs: params.timeoutMs,
     credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl },
     messages: buildRequirementImportMessages(params.workbookText),

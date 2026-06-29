@@ -11,4 +11,5 @@ export {
   exportKimiAssessmentPdf,
   chat,
   homeWorkbenchChat,
+  homeWorkbenchChatStream,
 } from "./ai.controller";

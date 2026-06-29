@@ -437,6 +437,42 @@ export type ImplementationDependencyRulesStore = {
   effectiveAt: string;
 };
 
+// -------------------- 系统管理：知识库配置 --------------------
+
+/** 智谱知识库凭证配置 */
+export type KnowledgeBaseCredentialsConfig = {
+  apiKey: string;
+  knowledgeId: string;
+};
+
+/** 知识库配置（含模型与 API 地址） */
+export type KnowledgeBaseConfig = {
+  model: string;
+  apiBaseUrl: string;
+  credentials: KnowledgeBaseCredentialsConfig;
+};
+
+/** 返回给前端的密钥展示 */
+export type KnowledgeBaseCredentialsPublic = {
+  apiKey: "";
+  apiHint: string | null;
+  knowledgeId: string;
+  envFallbackAvailable: boolean;
+  resolvedFrom: "store" | "env" | "none";
+};
+
+export type KnowledgeBaseConfigPublic = Omit<KnowledgeBaseConfig, "credentials"> & {
+  credentials: KnowledgeBaseCredentialsPublic;
+};
+
+export type KnowledgeBaseConfigStore = {
+  version: number;
+  draft: KnowledgeBaseConfig;
+  active: KnowledgeBaseConfig;
+  updatedAt: string;
+  effectiveAt: string;
+};
+
 // -------------------- 会话与幂等 --------------------
 
 export type SessionEstimateContext = {

@@ -11,6 +11,7 @@ import { asString } from "../../utils";
 import { fail, ok } from "../../utils/response";
 import type { HarnessRepository } from "./harness.repository";
 import { createHarnessRepository } from "./harness.repository";
+import { MANUAL_TEST_RESULT_STATUSES, type ManualTestResultStatus } from "./harness.types";
 import {
   bindHarnessFile,
   confirmHarnessAction,
@@ -35,6 +36,22 @@ export interface HarnessControllerDeps {
 
 function repoFrom(deps: HarnessControllerDeps): HarnessRepository {
   return deps.repo ?? createHarnessRepository();
+}
+
+function modelErrorReason(err: unknown): string {
+  const legacyReason = (err as { legacyReason?: unknown } | null)?.legacyReason;
+  if (typeof legacyReason === "string" && legacyReason) return legacyReason;
+  return err instanceof Error ? err.message : String(err);
+}
+
+function failModelGeneration(res: Response, message: string, err: unknown) {
+  const reason = modelErrorReason(err);
+  const providerCode = (err as { code?: unknown } | null)?.code;
+  const providerStatus = (err as { status?: unknown } | null)?.status;
+  if (reason === "kimi_rate_limited" || providerCode === "rate_limited" || providerStatus === 429) {
+    return fail(res, 42901, "模型服务请求过于频繁，请稍后重试", [{ field: "model", reason }]);
+  }
+  return fail(res, 40001, message, [{ field: "model", reason }]);
 }
 
 export function createRunHandler(deps: HarnessControllerDeps = {}) {
@@ -133,8 +150,7 @@ export function generateReportV1Handler(deps: HarnessControllerDeps = {}) {
       if (!detail) return fail(res, 40404, "Harness Run 不存在", [{ field: "runId", reason: "not_found" }]);
       res.json(ok(detail, randomUUID()));
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return fail(res, 40001, "需求解析报告生成失败", [{ field: "model", reason: message }]);
+      return failModelGeneration(res, "需求解析报告生成失败", err);
     }
   };
 }
@@ -148,8 +164,7 @@ export function generateReportV2Handler(deps: HarnessControllerDeps = {}) {
       if (!detail) return fail(res, 40404, "Harness Run 不存在", [{ field: "runId", reason: "not_found" }]);
       res.json(ok(detail, randomUUID()));
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return fail(res, 40001, "v2 需求解析报告生成失败", [{ field: "model", reason: message }]);
+      return failModelGeneration(res, "v2 需求解析报告生成失败", err);
     }
   };
 }
@@ -210,5 +225,96 @@ export function eventsHandler(deps: HarnessControllerDeps = {}) {
     res.write("event: run_state\n");
     res.write(`data: ${JSON.stringify({ stage: detail.run.stage, status: detail.run.status })}\n\n`);
     res.end();
+  };
+}
+
+// ============================================================
+// Manual Test Result Handlers
+// ============================================================
+
+export function createManualTestResultHandler(deps: HarnessControllerDeps = {}) {
+  return async (req: Request, res: Response) => {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    const body = req.body || {};
+    const executorName = asString(body.executorName);
+    const environment = asString(body.environment);
+    const resultStatus = asString(body.resultStatus) as ManualTestResultStatus;
+    if (!executorName) return fail(res, 40001, "参数错误", [{ field: "executorName", reason: "required" }]);
+    if (!environment) return fail(res, 40001, "参数错误", [{ field: "environment", reason: "required" }]);
+    if (!resultStatus || !(MANUAL_TEST_RESULT_STATUSES as readonly string[]).includes(resultStatus)) {
+      return fail(res, 40001, "参数错误", [{ field: "resultStatus", reason: "must be one of: passed, failed, blocked, skipped" }]);
+    }
+    const result = await repoFrom(deps).createManualTestResult({
+      harnessRunId: asString(body.harnessRunId) || asString(req.params.runId) || undefined,
+      harnessToolEventId: asString(body.harnessToolEventId) || undefined,
+      testCaseKey: asString(body.testCaseKey) || undefined,
+      executorName,
+      environment,
+      account: asString(body.account) || undefined,
+      screenshotUrl: asString(body.screenshotUrl) || undefined,
+      resultStatus,
+      notes: asString(body.notes) || undefined,
+      metadata: typeof body.metadata === "object" && body.metadata ? body.metadata : undefined,
+    });
+    res.json(ok({ result }, randomUUID()));
+  };
+}
+
+export function listManualTestResultsHandler(deps: HarnessControllerDeps = {}) {
+  return async (req: Request, res: Response) => {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    const runId = asString(req.params.runId) || null;
+    const status = asString(req.query.status) || undefined;
+    const limit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : undefined;
+    const offset = typeof req.query.offset === "string" ? parseInt(req.query.offset, 10) : undefined;
+    const items = await repoFrom(deps).listManualTestResults(runId, { status, limit, offset });
+    res.json(ok({ items }, randomUUID()));
+  };
+}
+
+export function getManualTestResultHandler(deps: HarnessControllerDeps = {}) {
+  return async (req: Request, res: Response) => {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    const result = await repoFrom(deps).getManualTestResult(asString(req.params.resultId));
+    if (!result) return fail(res, 40404, "测试结果不存在", [{ field: "resultId", reason: "not_found" }]);
+    res.json(ok({ result }, randomUUID()));
+  };
+}
+
+export function updateManualTestResultHandler(deps: HarnessControllerDeps = {}) {
+  return async (req: Request, res: Response) => {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    const body = req.body || {};
+    const resultStatus = asString(body.resultStatus) as ManualTestResultStatus | undefined;
+    if (resultStatus && !(MANUAL_TEST_RESULT_STATUSES as readonly string[]).includes(resultStatus)) {
+      return fail(res, 40001, "参数错误", [{ field: "resultStatus", reason: "must be one of: passed, failed, blocked, skipped" }]);
+    }
+    const patch: Record<string, unknown> = {};
+    if (body.executorName !== undefined) patch.executorName = asString(body.executorName);
+    if (body.environment !== undefined) patch.environment = asString(body.environment);
+    if (body.account !== undefined) patch.account = asString(body.account) || null;
+    if (body.screenshotUrl !== undefined) patch.screenshotUrl = asString(body.screenshotUrl) || null;
+    if (resultStatus) patch.resultStatus = resultStatus;
+    if (body.notes !== undefined) patch.notes = asString(body.notes) || null;
+    if (body.testCaseKey !== undefined) patch.testCaseKey = asString(body.testCaseKey) || null;
+    if (body.harnessToolEventId !== undefined) patch.harnessToolEventId = asString(body.harnessToolEventId) || null;
+    if (typeof body.metadata === "object" && body.metadata) patch.metadata = body.metadata;
+    const result = await repoFrom(deps).updateManualTestResult(asString(req.params.resultId), patch as any);
+    if (!result) return fail(res, 40404, "测试结果不存在", [{ field: "resultId", reason: "not_found" }]);
+    res.json(ok({ result }, randomUUID()));
+  };
+}
+
+export function deleteManualTestResultHandler(deps: HarnessControllerDeps = {}) {
+  return async (req: Request, res: Response) => {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    const deleted = await repoFrom(deps).deleteManualTestResult(asString(req.params.resultId));
+    if (!deleted) return fail(res, 40404, "测试结果不存在", [{ field: "resultId", reason: "not_found" }]);
+    res.json(ok({ deleted: true }, randomUUID()));
   };
 }

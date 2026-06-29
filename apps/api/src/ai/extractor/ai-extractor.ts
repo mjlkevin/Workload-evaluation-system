@@ -49,6 +49,7 @@ export async function extractByAi(
       { role: "user", content: USER_PROMPT_HEAD + req.workbookText },
     ],
     responseFormat: "json_object",
+    promptCacheKey: "requirement-extractor-basic-info-v1",
     temperature: 0.1,
     timeoutMs: options.aiTimeoutMs,
     maxAttempts: options.aiMaxAttempts,

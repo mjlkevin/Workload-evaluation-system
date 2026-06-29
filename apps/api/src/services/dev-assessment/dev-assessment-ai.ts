@@ -174,12 +174,14 @@ export async function generateDevAssessmentDraft(params: {
     const user = buildUserPrompt(params.items, params.contextSnapshot);
 
     const response = await provider.chatCompletion({
-      model: "moonshot-v1-8k",
+      model: "kimi-k2.5",
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
       temperature: 0.2,
+      promptCacheKey: "dev-assessment-draft-v1",
+      responseFormat: "json_object",
     });
 
     const rawText = response.content ?? "";

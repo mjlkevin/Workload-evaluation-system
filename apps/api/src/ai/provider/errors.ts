@@ -18,6 +18,7 @@
 export type ProviderErrorCode =
   | "api_key_missing"
   | "auth_failed"
+  | "quota_exceeded"
   | "rate_limited"
   | "engine_overloaded"
   | "service_unavailable"

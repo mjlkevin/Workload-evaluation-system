@@ -1,0 +1,150 @@
+// ============================================================
+// RAG Baseline Runner — 知识库评测闭环
+// 对固定样本集执行单次 queryZhipuKnowledgeBase 调用，
+// 复用 trace.chunks 计算命中率 / 引用 / 延迟等指标。
+//
+// 设计要点：
+// - 每条样本仅触发一次知识库查询（内部已含检索 + 生成）
+// - 通过 trace.chunks 复用检索结果，不再额外调用 retrieveKnowledgeChunks
+// - 支持注入 query 函数，便于测试验证调用次数
+// ============================================================
+
+import {
+  queryZhipuKnowledgeBase,
+  type ZhipuKnowledgeToolConfig,
+  type ZhipuKnowledgeToolTrace,
+  type KnowledgeChunk,
+} from "../knowledge-tool.service";
+
+// ── 样本与结果类型 ──────────────────────────────────────────
+
+/** 单条评测样本 */
+export type RagBaselineSample = {
+  /** 样本唯一标识 */
+  id: string;
+  /** 提给知识库的问题 */
+  question: string;
+  /** 期望答案中应包含的关键词（用于评分） */
+  expectedKeywords?: string[];
+  /** 期望引用的文档名（用于引用准确率评分） */
+  expectedDocs?: string[];
+};
+
+/** 单条样本评测结果 */
+export type RagBaselineResult = {
+  sampleId: string;
+  question: string;
+  answer: string;
+  /** 检索到的 chunks（来自 trace，无二次检索） */
+  chunks: KnowledgeChunk[];
+  /** 引用 / 来源文档列表 */
+  citations: string[];
+  /** 端到端延迟（ms） */
+  latencyMs: number;
+  /** 命中率：expectedKeywords 中被 answer 覆盖的比例 0-1 */
+  keywordHitRate: number;
+  /** 引用准确率：expectedDocs 中被 chunks 覆盖的比例 0-1 */
+  docRecallRate: number;
+  /** 置信度 */
+  confidence: ZhipuKnowledgeToolTrace["confidence"];
+  /** 降级原因（如有） */
+  fallbackReason?: string;
+  /** 模型使用的 token 数 */
+  totalTokens: number;
+};
+
+/** 整批评测汇总 */
+export type RagBaselineReport = {
+  sampleCount: number;
+  avgLatencyMs: number;
+  avgKeywordHitRate: number;
+  avgDocRecallRate: number;
+  highConfidenceRate: number;
+  fallbackRate: number;
+  results: RagBaselineResult[];
+};
+
+// ── 评分工具函数 ─────────────────────────────────────────────
+
+/** 计算关键词命中率 */
+export function computeKeywordHitRate(answer: string, expectedKeywords: string[]): number {
+  if (expectedKeywords.length === 0) return 1;
+  const lower = answer.toLowerCase();
+  const hits = expectedKeywords.filter((kw) => lower.includes(kw.toLowerCase()));
+  return hits.length / expectedKeywords.length;
+}
+
+/** 计算文档引用召回率 */
+export function computeDocRecallRate(chunks: KnowledgeChunk[], expectedDocs: string[]): number {
+  if (expectedDocs.length === 0) return 1;
+  const chunkDocs = new Set(chunks.map((c) => c.docName.toLowerCase()));
+  const hits = expectedDocs.filter((d) => chunkDocs.has(d.toLowerCase()));
+  return hits.length / expectedDocs.length;
+}
+
+// ── 查询函数类型（可注入，便于测试） ─────────────────────────
+
+export type KnowledgeQueryFn = (
+  query: string,
+  config?: ZhipuKnowledgeToolConfig
+) => Promise<ZhipuKnowledgeToolTrace>;
+
+// ── Runner ────────────────────────────────────────────────────
+
+/**
+ * 执行 RAG baseline 评测。
+ *
+ * @param samples 评测样本集
+ * @param config 知识库配置（apiKey / knowledgeId 等）
+ * @param queryFn 可注入的查询函数，默认使用 queryZhipuKnowledgeBase
+ *                注入后可用于断言每条样本仅触发一次检索
+ */
+export async function runRagBaseline(
+  samples: RagBaselineSample[],
+  config: ZhipuKnowledgeToolConfig = {},
+  queryFn: KnowledgeQueryFn = (q, conf) => queryZhipuKnowledgeBase(q, conf)
+): Promise<RagBaselineReport> {
+  const results: RagBaselineResult[] = [];
+
+  for (const sample of samples) {
+    // 每条样本仅调用一次 queryFn（内部已包含检索 + 生成）
+    const trace = await queryFn(sample.question, config);
+
+    // 从 trace 复用 chunks，不做二次检索
+    const chunks: KnowledgeChunk[] = trace.chunks ?? [];
+
+    const citations = [...new Set(chunks.map((c) => c.docName).filter(Boolean))];
+
+    const keywordHitRate = computeKeywordHitRate(
+      trace.answer,
+      sample.expectedKeywords ?? []
+    );
+
+    const docRecallRate = computeDocRecallRate(chunks, sample.expectedDocs ?? []);
+
+    results.push({
+      sampleId: sample.id,
+      question: sample.question,
+      answer: trace.answer,
+      chunks,
+      citations,
+      latencyMs: trace.latencyMs,
+      keywordHitRate,
+      docRecallRate,
+      confidence: trace.confidence,
+      fallbackReason: trace.fallbackReason,
+      totalTokens: trace.totalTokens,
+    });
+  }
+
+  const n = results.length || 1;
+  return {
+    sampleCount: results.length,
+    avgLatencyMs: results.reduce((s, r) => s + r.latencyMs, 0) / n,
+    avgKeywordHitRate: results.reduce((s, r) => s + r.keywordHitRate, 0) / n,
+    avgDocRecallRate: results.reduce((s, r) => s + r.docRecallRate, 0) / n,
+    highConfidenceRate: results.filter((r) => r.confidence === "high").length / n,
+    fallbackRate: results.filter((r) => r.fallbackReason != null).length / n,
+    results,
+  };
+}

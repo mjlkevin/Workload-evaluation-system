@@ -10,23 +10,30 @@
 //     engine_overloaded / rate_limited / service_unavailable。
 //  2. 温度兼容：thinking 模型固定 1；HTTP 400 "only 1 is allowed"
 //     时重试一次（不计入 maxAttempts）。
-//  3. 超时：单次 HTTP clamp 到 [3s, 120s]，与系统管理面板一致。
-//  4. 模型名归一化：空值回退默认模型，显式配置的模型名保持原样。
+//  3. 超时：非流式 clamp 到 [3s, 300s]；流式 clamp 到 [3s, 120s]。
+//  4. 超时重试：timeout 错误标记为 retryable，纳入指数退避。
+//  5. Token 审计：parseSuccess / parseStream 提取 usage 字段。
+//  6. 模型名归一化：空值回退默认模型，显式配置的模型名保持原样。
 
 import { asString } from "../../utils/helpers";
 import { normalizeKimiModelName } from "../../utils/model-name";
 import {
   isKimiTemperatureMustBeOneError,
-  resolveKimiCompletionTemperature,
+  resolveKimiCompletionTemperatureParam,
 } from "../../utils/kimi-completion-params";
 import { ProviderError, type ProviderErrorCode } from "./errors";
 import { aiProviderRequestsTotal } from "../../metrics";
 import type {
   ChatCompletionRequest,
+  ChatMessage,
   ChatCompletionResponse,
   ChatCompletionStreamChunk,
+  JsonSchemaResponseFormat,
   ModelProvider,
   ProviderCredentials,
+  ResponseFormat,
+  ThinkingConfig,
+  TokenUsage,
   ToolCall,
 } from "./model-provider";
 
@@ -36,7 +43,8 @@ const DEFAULT_API_BASE_URL = "https://api.moonshot.cn/v1";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 const MIN_TIMEOUT_MS = 3_000;
-const MAX_TIMEOUT_MS = 120_000;
+const MAX_TIMEOUT_MS = 300_000;
+const STREAM_MAX_TIMEOUT_MS = 120_000;
 const BACKOFF_BASE_MS = 350;
 
 export interface KimiProviderOptions {
@@ -114,12 +122,9 @@ export class KimiProvider implements ModelProvider {
 
     let body: Record<string, unknown> = {
       model,
-      temperature: resolveKimiCompletionTemperature(model, preferredTemperature),
-      messages: req.messages.map((m) => ({ role: m.role, content: asString(m.content) })),
+      messages: req.messages.map(toKimiMessage),
     };
-    if (req.responseFormat === "json_object") {
-      body.response_format = { type: "json_object" };
-    }
+    applyCommonKimiOptions(body, req, model, preferredTemperature);
     if (req.tools && req.tools.length > 0) {
       body.tools = req.tools;
       body.tool_choice = req.toolChoice ?? "auto";
@@ -130,7 +135,20 @@ export class KimiProvider implements ModelProvider {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       attempts = attempt;
-      const response = await fetchOnce(credentials.endpoint, credentials.apiKey, body, timeoutMs);
+      const responseOrRetryableError = await fetchAttemptOrRetryableError(
+        credentials.endpoint,
+        credentials.apiKey,
+        body,
+        timeoutMs,
+        attempt,
+        maxAttempts,
+      );
+      if (responseOrRetryableError instanceof ProviderError) {
+        lastError = responseOrRetryableError;
+        await sleep(BACKOFF_BASE_MS * 2 ** (attempt - 1));
+        continue;
+      }
+      const response = responseOrRetryableError;
       if (response.ok) {
         const result = await parseSuccess(response, model, attempts);
         aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "success" });
@@ -140,7 +158,20 @@ export class KimiProvider implements ModelProvider {
       let errorText = await safeReadText(response);
       if (isKimiTemperatureMustBeOneError(response.status, errorText) && Number(body.temperature) !== 1) {
         body = { ...body, temperature: 1 };
-        const retried = await fetchOnce(credentials.endpoint, credentials.apiKey, body, timeoutMs);
+        const retriedOrRetryableError = await fetchAttemptOrRetryableError(
+          credentials.endpoint,
+          credentials.apiKey,
+          body,
+          timeoutMs,
+          attempt,
+          maxAttempts,
+        );
+        if (retriedOrRetryableError instanceof ProviderError) {
+          lastError = retriedOrRetryableError;
+          await sleep(BACKOFF_BASE_MS * 2 ** (attempt - 1));
+          continue;
+        }
+        const retried = retriedOrRetryableError;
         if (retried.ok) {
           const result = await parseSuccess(retried, model, attempts);
           aiProviderRequestsTotal.inc({ provider: PROVIDER_NAME, status: "success" });
@@ -192,17 +223,30 @@ export class KimiProvider implements ModelProvider {
 
     let body: Record<string, unknown> = {
       model,
-      temperature: resolveKimiCompletionTemperature(model, preferredTemperature),
-      messages: req.messages.map((m) => ({ role: m.role, content: asString(m.content) })),
+      messages: req.messages.map(toKimiMessage),
       stream: true,
     };
-    if (req.responseFormat === "json_object") {
-      body.response_format = { type: "json_object" };
-    }
+    applyCommonKimiOptions(body, req, model, preferredTemperature);
+
+    // 流式调用使用更保守的超时上限（官方推荐 stream=true 保持连接活跃）
+    const streamTimeoutMs = Math.min(STREAM_MAX_TIMEOUT_MS, timeoutMs);
 
     let lastError: ProviderError | undefined;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      const response = await fetchOnce(credentials.endpoint, credentials.apiKey, body, timeoutMs);
+      const responseOrRetryableError = await fetchAttemptOrRetryableError(
+        credentials.endpoint,
+        credentials.apiKey,
+        body,
+        streamTimeoutMs,
+        attempt,
+        maxAttempts,
+      );
+      if (responseOrRetryableError instanceof ProviderError) {
+        lastError = responseOrRetryableError;
+        await sleep(BACKOFF_BASE_MS * 2 ** (attempt - 1));
+        continue;
+      }
+      const response = responseOrRetryableError;
       if (response.ok) {
         yield* parseStream(response, model, attempt);
         return;
@@ -211,7 +255,20 @@ export class KimiProvider implements ModelProvider {
       let errorText = await safeReadText(response);
       if (isKimiTemperatureMustBeOneError(response.status, errorText) && Number(body.temperature) !== 1) {
         body = { ...body, temperature: 1 };
-        const retried = await fetchOnce(credentials.endpoint, credentials.apiKey, body, timeoutMs);
+        const retriedOrRetryableError = await fetchAttemptOrRetryableError(
+          credentials.endpoint,
+          credentials.apiKey,
+          body,
+          streamTimeoutMs,
+          attempt,
+          maxAttempts,
+        );
+        if (retriedOrRetryableError instanceof ProviderError) {
+          lastError = retriedOrRetryableError;
+          await sleep(BACKOFF_BASE_MS * 2 ** (attempt - 1));
+          continue;
+        }
+        const retried = retriedOrRetryableError;
         if (retried.ok) {
           yield* parseStream(retried, model, attempt);
           return;
@@ -274,6 +331,69 @@ function resolveMaxAttempts(requested: number | undefined, fallback: number): nu
   return Math.floor(n);
 }
 
+function toKimiMessage(message: ChatMessage): Record<string, unknown> {
+  const item: Record<string, unknown> = {
+    role: message.role,
+    content: asString(message.content),
+  };
+  if (message.partial === true) item.partial = true;
+  return item;
+}
+
+function applyCommonKimiOptions(
+  body: Record<string, unknown>,
+  req: ChatCompletionRequest,
+  model: string,
+  preferredTemperature: number,
+): void {
+  const temperature = resolveKimiCompletionTemperatureParam(model, preferredTemperature);
+  if (temperature !== undefined) body.temperature = temperature;
+
+  const maxCompletionTokens = normalizePositiveInteger(req.maxCompletionTokens);
+  if (maxCompletionTokens !== undefined) body.max_completion_tokens = maxCompletionTokens;
+
+  const promptCacheKey = asString(req.promptCacheKey).trim();
+  if (promptCacheKey) body.prompt_cache_key = promptCacheKey;
+
+  const responseFormat = normalizeResponseFormat(req.responseFormat);
+  if (responseFormat) body.response_format = responseFormat;
+
+  const thinking = normalizeThinking(req.thinking);
+  if (thinking !== undefined) body.thinking = thinking;
+}
+
+function normalizePositiveInteger(value: unknown): number | undefined {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.floor(n);
+}
+
+function normalizeResponseFormat(format: ResponseFormat | undefined): Record<string, unknown> | undefined {
+  if (!format || format === "text") return undefined;
+  if (format === "json_object") return { type: "json_object" };
+  if (isJsonSchemaResponseFormat(format)) return { ...format };
+  return undefined;
+}
+
+function isJsonSchemaResponseFormat(format: unknown): format is JsonSchemaResponseFormat {
+  if (!format || typeof format !== "object") return false;
+  const candidate = format as { type?: unknown; json_schema?: unknown };
+  if (candidate.type !== "json_schema") return false;
+  const schema = candidate.json_schema;
+  if (!schema || typeof schema !== "object") return false;
+  const typed = schema as { name?: unknown; schema?: unknown };
+  return typeof typed.name === "string" && !!typed.schema && typeof typed.schema === "object";
+}
+
+function normalizeThinking(value: ThinkingConfig | undefined): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  if (value === true) return { type: "enabled" };
+  if (value === false) return { type: "disabled" };
+  if (value === "enabled" || value === "disabled") return { type: value };
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return value;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -298,7 +418,7 @@ async function fetchOnce(
     if (isFetchAbortError(e)) {
       throw new ProviderError("timeout", "kimi_request_timeout", {
         providerName: PROVIDER_NAME,
-        retryable: false,
+        retryable: true,
         legacyReason: "kimi_request_timeout",
         cause: e,
       });
@@ -308,6 +428,24 @@ async function fetchOnce(
       retryable: false,
       cause: e,
     });
+  }
+}
+
+async function fetchAttemptOrRetryableError(
+  endpoint: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+  timeoutMs: number,
+  attempt: number,
+  maxAttempts: number,
+): Promise<globalThis.Response | ProviderError> {
+  try {
+    return await fetchOnce(endpoint, apiKey, body, timeoutMs);
+  } catch (e) {
+    if (e instanceof ProviderError && e.retryable && attempt < maxAttempts) {
+      return e;
+    }
+    throw e;
   }
 }
 
@@ -335,7 +473,7 @@ async function parseSuccess(
   model: string,
   attempts: number,
 ): Promise<ChatCompletionResponse> {
-  const json = (await response.json()) as { choices?: RawChoice[] };
+  const json = (await response.json()) as { choices?: RawChoice[]; usage?: RawUsage };
   const choice = json?.choices?.[0] ?? {};
   const { content, toolCalls, finishReason } = parseChoiceMessage(choice);
   if (!content && (!toolCalls || toolCalls.length === 0)) {
@@ -353,6 +491,7 @@ async function parseSuccess(
     attempts,
     finishReason,
     toolCalls,
+    usage: extractUsage(json?.usage),
   };
 }
 
@@ -373,7 +512,9 @@ async function* parseStream(
   const decoder = new TextDecoder();
   let buffer = "";
   let content = "";
+  let reasoningContent = "";
   let finishReason: string | undefined;
+  let lastUsage: TokenUsage | undefined;
 
   try {
     while (true) {
@@ -390,13 +531,17 @@ async function* parseStream(
           .filter((line) => line.startsWith("data:"))
           .map((line) => line.slice(5).trim());
         for (const data of dataLines) {
-          if (!data || data === "[DONE]") return;
+          if (!data || data === "[DONE]") {
+            // 流结束前如果未输出 usage，不额外补充（部分厂商不返回流式 usage）
+            return;
+          }
           let json: {
             choices?: Array<{
-              delta?: { content?: string };
-              message?: { content?: string };
+              delta?: { content?: string; reasoning_content?: string; reasoningContent?: string };
+              message?: { content?: string; reasoning_content?: string; reasoningContent?: string };
               finish_reason?: string | null;
             }>;
+            usage?: RawUsage;
           };
           try {
             json = JSON.parse(data);
@@ -405,16 +550,28 @@ async function* parseStream(
           }
           const choice = json.choices?.[0];
           const delta = asString(choice?.delta?.content || choice?.message?.content);
+          const reasoningDelta = asString(
+            choice?.delta?.reasoning_content ||
+              choice?.delta?.reasoningContent ||
+              choice?.message?.reasoning_content ||
+              choice?.message?.reasoningContent,
+          );
           finishReason = asString(choice?.finish_reason) || finishReason;
-          if (!delta && !finishReason) continue;
+          const streamUsage = extractUsage(json?.usage);
+          if (streamUsage) lastUsage = streamUsage;
+          if (!delta && !reasoningDelta && !finishReason && !streamUsage) continue;
           content += delta;
+          reasoningContent += reasoningDelta;
           yield {
             contentDelta: delta,
             content,
+            reasoningContentDelta: reasoningDelta || undefined,
+            reasoningContent: reasoningContent || undefined,
             model,
             provider: PROVIDER_NAME,
             attempts,
             finishReason,
+            usage: streamUsage,
           };
         }
       }
@@ -423,7 +580,7 @@ async function* parseStream(
     if (isFetchAbortError(e)) {
       throw new ProviderError("timeout", "kimi_request_timeout", {
         providerName: PROVIDER_NAME,
-        retryable: false,
+        retryable: true,
         legacyReason: "kimi_request_timeout",
         cause: e,
       });
@@ -439,7 +596,10 @@ function mapHttpError(status: number, errorText: string): ProviderError {
   let code: ProviderErrorCode;
   let legacyReason: string;
 
-  if (/engine_overloaded_error|overloaded|try again later/i.test(raw)) {
+  if (/insufficient|balance|quota|credit|arrears|欠费|余额|额度|账户余额/i.test(raw)) {
+    code = "quota_exceeded";
+    legacyReason = "kimi_quota_exceeded";
+  } else if (/engine_overloaded_error|overloaded|try again later/i.test(raw)) {
     code = "engine_overloaded";
     legacyReason = "kimi_engine_overloaded";
   } else if (status === 429) {
@@ -472,6 +632,25 @@ interface RawChoice {
     tool_calls?: Array<{ id?: string; type?: string; function?: { name?: string; arguments?: string } }>;
   };
   finish_reason?: string | null;
+}
+
+interface RawUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
+function extractUsage(raw: RawUsage | undefined): TokenUsage | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const pt = Number(raw.prompt_tokens);
+  const ct = Number(raw.completion_tokens);
+  const tt = Number(raw.total_tokens);
+  if (!Number.isFinite(pt) && !Number.isFinite(ct) && !Number.isFinite(tt)) return undefined;
+  return {
+    promptTokens: Number.isFinite(pt) ? pt : 0,
+    completionTokens: Number.isFinite(ct) ? ct : 0,
+    totalTokens: Number.isFinite(tt) ? tt : (Number.isFinite(pt) ? pt : 0) + (Number.isFinite(ct) ? ct : 0),
+  };
 }
 
 /** 纯函数：把厂商 choice 解析为 { content, toolCalls, finishReason } */

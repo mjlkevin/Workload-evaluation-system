@@ -3,6 +3,9 @@ import { randomUUID } from "node:crypto";
 
 import {
   ImplementationDependencyRulesConfig,
+  KnowledgeBaseConfigPublic,
+  KnowledgeBaseConfigStore,
+  KnowledgeBaseCredentialsPublic,
   RequirementKimiCredentialsPublic,
   RequirementSystemConfig,
   RequirementSystemConfigPublic,
@@ -17,16 +20,25 @@ import { KimiPingFailure, pingKimiChatCompletion } from "../../utils/kimi-ping";
 import {
   buildVersionCodeSample,
   loadImplementationDependencyRulesStore,
+  loadKnowledgeBaseConfigStore,
   loadVersionCodeRulesStore,
   loadRequirementSystemConfigStore,
   mergeKimiCredentialsPatch,
+  mergeKnowledgeBaseCredentialsPatch,
   normalizeImplementationDependencyRulesConfig,
+  normalizeKnowledgeBaseConfig,
   normalizeRequirementSystemConfig,
+  resolveActiveKnowledgeBaseConfig,
   resolveDraftKimiApiKeyForTest,
+  resolveDraftKnowledgeBaseConfigForTest,
   saveImplementationDependencyRulesStore,
+  saveKnowledgeBaseConfigStore,
   saveRequirementSystemConfigStore,
   saveVersionCodeRulesStore,
 } from "./system.repository";
+import { queryZhipuKnowledgeBase } from "../../services/ai/knowledge-tool.service";
+import { ROLE_CAPABILITIES } from "../../rbac/permissions";
+import { legacyRoleToV2Roles, V2_ROLES } from "../../rbac/roles";
 
 function maskKimiApiKeyHint(key: string): string | null {
   const t = key.trim();
@@ -370,4 +382,237 @@ export function activateImplementationDependencyRules(req: Request, res: Respons
       randomUUID(),
     ),
   );
+}
+
+// -------------------- 知识库配置 --------------------
+
+function maskKnowledgeBaseApiKeyHint(key: string): string | null {
+  const t = key.trim();
+  if (!t) return null;
+  if (t.length <= 4) return "····";
+  return `····${t.slice(-4)}`;
+}
+
+function toPublicKnowledgeBaseCredentials(store: KnowledgeBaseConfigStore): KnowledgeBaseCredentialsPublic {
+  const trimmedKey = store.active.credentials.apiKey.trim();
+  const trimmedKid = store.active.credentials.knowledgeId.trim();
+  const envOk = Boolean(config.zhipu.apiKey?.trim() && config.zhipu.knowledgeId?.trim());
+  return {
+    apiKey: "",
+    apiHint: maskKnowledgeBaseApiKeyHint(trimmedKey),
+    knowledgeId: trimmedKid || "",
+    envFallbackAvailable: envOk,
+    resolvedFrom: trimmedKey && trimmedKid ? "store" : envOk ? "env" : "none",
+  };
+}
+
+function toPublicKnowledgeBaseConfig(store: KnowledgeBaseConfigStore): KnowledgeBaseConfigPublic {
+  return {
+    model: store.active.model,
+    apiBaseUrl: store.active.apiBaseUrl,
+    credentials: toPublicKnowledgeBaseCredentials(store),
+  };
+}
+
+export function getKnowledgeBaseConfig(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const store = loadKnowledgeBaseConfigStore();
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        draft: {
+          model: store.draft.model,
+          apiBaseUrl: store.draft.apiBaseUrl,
+          credentials: {
+            apiKey: "",
+            apiHint: maskKnowledgeBaseApiKeyHint(store.draft.credentials.apiKey),
+            knowledgeId: store.draft.credentials.knowledgeId,
+          },
+        },
+        active: toPublicKnowledgeBaseConfig(store),
+        updatedAt: store.updatedAt,
+        effectiveAt: store.effectiveAt,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+export function updateKnowledgeBaseConfigDraft(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const payload = (req.body || {}) as {
+    model?: string;
+    apiBaseUrl?: string;
+    credentials?: { apiKey?: string | null; knowledgeId?: string | null };
+  };
+  const now = new Date().toISOString();
+  const store = loadKnowledgeBaseConfigStore();
+  const nextCreds = mergeKnowledgeBaseCredentialsPatch(store.draft.credentials, payload.credentials);
+  store.draft = normalizeKnowledgeBaseConfig({
+    ...store.draft,
+    model: payload.model ?? store.draft.model,
+    apiBaseUrl: payload.apiBaseUrl ?? store.draft.apiBaseUrl,
+    credentials: nextCreds,
+  });
+  store.updatedAt = now;
+  saveKnowledgeBaseConfigStore(store);
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        draft: {
+          model: store.draft.model,
+          apiBaseUrl: store.draft.apiBaseUrl,
+          credentials: {
+            apiKey: "",
+            apiHint: maskKnowledgeBaseApiKeyHint(store.draft.credentials.apiKey),
+            knowledgeId: store.draft.credentials.knowledgeId,
+          },
+        },
+        updatedAt: store.updatedAt,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+export function activateKnowledgeBaseConfig(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const now = new Date().toISOString();
+  const store = loadKnowledgeBaseConfigStore();
+  store.active = normalizeKnowledgeBaseConfig(store.draft);
+  store.version = Number(store.version || 1) + 1;
+  store.effectiveAt = now;
+  store.updatedAt = now;
+  saveKnowledgeBaseConfigStore(store);
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        active: toPublicKnowledgeBaseConfig(store),
+        effectiveAt: store.effectiveAt,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+// ------------------------------------------------------------------
+// RP-026: 角色能力矩阵（只读可视化）
+// ------------------------------------------------------------------
+
+/** 能力位业务含义摘要（用于前端展示） */
+const CAPABILITY_LABELS: Record<string, string> = {
+  "estimates:create": "创建评估包",
+  "estimates:read": "查看评估包",
+  "estimates:write": "编辑评估包",
+  "contract:initiate": "发起合同",
+  "requirement:upload": "上传需求文件",
+  "extractor:trigger": "触发智能抽取",
+  "requirement:maintain": "维护需求",
+  "assessment:create": "创建实施评估",
+  "dev:assign": "分配开发任务",
+  "assumption:write": "编辑假设条件",
+  "assessment:handoff": "交接评估包",
+  "man-day:adjust": "调整人天",
+  "dev:read": "查看开发评估",
+  "dev:write": "编辑开发评估",
+  "deliverable:generate": "生成交付物",
+  "deliverable:review": "审核交付物",
+  "deliverable:reject": "驳回交付物",
+  "evidence:read": "查看证据链",
+  "evidence:write": "编辑证据链",
+  "dsl:manage": "管理 DSL 规则",
+  "template:manage": "管理评估模板",
+  "rate-card:manage": "管理费率卡",
+  "methodology:manage": "管理方法论",
+  "rule:manage": "管理评估规则",
+  "user:manage": "管理用户",
+  "system:manage": "系统管理",
+};
+
+/** 旧系统角色 → V2 角色显示名 */
+const LEGACY_ROLE_LABELS: Record<string, string> = {
+  admin: "超级管理员",
+  sub_admin: "管理员",
+  user: "普通用户",
+};
+
+export function getRoleCapabilitiesMatrix(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+
+  const matrix = V2_ROLES.map((role) => ({
+    role,
+    capabilities: ROLE_CAPABILITIES[role],
+  }));
+
+  const legacyMapping = Object.entries(LEGACY_ROLE_LABELS).map(
+    ([legacyKey, label]) => ({
+      legacyRole: legacyKey,
+      label,
+      v2Roles: legacyRoleToV2Roles(legacyKey),
+    }),
+  );
+
+  return res.json(
+    ok(
+      {
+        roles: matrix,
+        legacyMapping,
+        capabilityLabels: CAPABILITY_LABELS,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+export async function testKnowledgeBaseConnectivity(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const body = (req.body || {}) as { apiKey?: string; knowledgeId?: string };
+  const explicitApiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+  const explicitKnowledgeId = typeof body.knowledgeId === "string" ? body.knowledgeId.trim() : "";
+  const { apiKey, knowledgeId, model, apiBaseUrl, source } = resolveDraftKnowledgeBaseConfigForTest(
+    explicitApiKey || undefined,
+    explicitKnowledgeId || undefined,
+  );
+  if (!apiKey || !knowledgeId) {
+    return fail(res, 40001, "未配置可用的 API Key 或知识库 ID", [
+      { field: "credentials", reason: "missing_in_store_and_env" },
+    ]);
+  }
+  try {
+    const trace = await queryZhipuKnowledgeBase("知识库连通性测试", {
+      apiKey,
+      knowledgeId,
+      model,
+      apiBaseUrl,
+    });
+    const testedSource =
+      source === "override" ? "request_body" : source === "draft" ? "draft_store" : "environment";
+    if (trace.confidence === "high" || (trace.confidence === "low" && !trace.fallbackReason)) {
+      return res.json(
+        ok(
+          {
+            ok: true,
+            testedSource,
+            model,
+            knowledgeId,
+            latencyMs: trace.latencyMs,
+            retrievalTriggered: trace.retrievalTriggered,
+          },
+          randomUUID(),
+        ),
+      );
+    }
+    return fail(
+      res,
+      40001,
+      `知识库连通性测试未通过：${trace.fallbackReason || "unknown_reason"}`,
+      [{ field: "knowledgeBase", reason: trace.errorMessage || trace.fallbackReason || "test_failed" }],
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "test_failed";
+    return fail(res, 40001, "调用智谱知识库失败", [{ field: "knowledgeBase", reason: msg }]);
+  }
 }

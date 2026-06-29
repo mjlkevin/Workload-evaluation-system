@@ -364,6 +364,7 @@ async function defaultHarnessModelRunner(input: {
     model: config.kimi.model,
     temperature: 0.2,
     responseFormat: input.responseFormat,
+    promptCacheKey: "harness-requirement-report-v1",
     timeoutMs,
     credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
     messages: [
@@ -1100,8 +1101,8 @@ export async function retryHarnessRun(
   if (!run) throw new Error("not_found");
   if (!isHarnessRunStage(run.stage) || !canRetryHarnessStage(run.stage)) throw new Error("cannot_retry");
   const updated = await repo.updateRun(run.harnessRunId, {
-    stage: "analyzing",
-    status: "running",
+    stage: "evidence_ready",
+    status: "waiting",
     errorCode: null,
     errorMessage: null,
   });

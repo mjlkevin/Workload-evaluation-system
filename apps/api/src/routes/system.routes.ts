@@ -15,5 +15,10 @@ router.post("/requirement-settings/kimi-api-key/test", requireCapability("system
 router.get("/implementation-dependency-rules", requireAnyCapability("system:manage", "rule:manage"), SystemModule.getImplementationDependencyRules);
 router.patch("/implementation-dependency-rules/draft", requireAnyCapability("system:manage", "rule:manage"), SystemModule.updateImplementationDependencyRulesDraft);
 router.post("/implementation-dependency-rules/activate", requireAnyCapability("system:manage", "rule:manage"), SystemModule.activateImplementationDependencyRules);
+router.get("/knowledge-base-config", requireCapability("system:manage"), SystemModule.getKnowledgeBaseConfig);
+router.patch("/knowledge-base-config/draft", requireCapability("system:manage"), SystemModule.updateKnowledgeBaseConfigDraft);
+router.post("/knowledge-base-config/activate", requireCapability("system:manage"), SystemModule.activateKnowledgeBaseConfig);
+router.post("/knowledge-base-config/test", requireCapability("system:manage"), SystemModule.testKnowledgeBaseConnectivity);
+router.get("/role-capabilities", requireCapability("system:manage"), SystemModule.getRoleCapabilitiesMatrix);
 
 export default router;

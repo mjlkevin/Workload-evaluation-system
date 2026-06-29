@@ -177,6 +177,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/ai/home-workbench/chat:
+    post:
+      tags: [AI]
+      summary: AI 工作台首页对话
+      operationId: postAiHomeWorkbenchChat
+      description: >
+        根据首页 AI 工作台消息执行意图路由、模型问答或静态动作建议。
+        当模型需要用户补充结构化信息时，响应可返回可选 `formBlock`；
+        `formBlock` 已经过后端白名单校验，前端提交仍应作为普通用户消息再次发送。
+        当产品知识问题命中知识库意图时，响应 `trace.knowledgeTool`
+        返回只读知识库调用状态和检索置信边界，且不会自动改写正式估算或传统业务记录。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant]
+                      content:
+                        type: string
+                      attachments:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+                    required: [role, content]
+                workflowKey:
+                  type: string
+                sessionId:
+                  type: string
+                clientAction:
+                  type: string
+              required: [messages]
+      responses:
+        "200":
+          description: AI 工作台回复。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomeWorkbenchChatResponse"
+        "400":
+          description: 参数错误或模型调用失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未登录或登录态无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 
   /api/v1/harness/runs:
     post:
@@ -5144,6 +5207,199 @@ components:
                 type: string
             required: [field, reason]
       required: [code, message, details, requestId]
+
+    HomeWorkbenchChatResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            intent:
+              type: string
+            answer:
+              type: string
+            businessRole:
+              type: string
+            roleLabel:
+              type: string
+            model:
+              type: string
+            rawContent:
+              type: string
+            formBlock:
+              $ref: "#/components/schemas/InteractiveFormBlock"
+            session:
+              type: object
+              additionalProperties: true
+            suggestedActions:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            trace:
+              type: object
+              properties:
+                intentConfidence:
+                  type: number
+                routingRule:
+                  type: string
+                contextRefs:
+                  type: array
+                  items:
+                    type: string
+                knowledgeTool:
+                  $ref: "#/components/schemas/KnowledgeToolTrace"
+                modelRun:
+                  $ref: "#/components/schemas/LightweightModelRunTrace"
+              required: [intentConfidence, routingRule, contextRefs]
+          required: [intent, answer, businessRole, roleLabel, suggestedActions, trace]
+      required: [code, message, data]
+
+    LightweightModelRunTrace:
+      type: object
+      description: 普通附件问答的轻量模型调用审计摘要；不代表 Harness Run，也不保存完整 prompt/raw trace。
+      properties:
+        runKind:
+          type: string
+          enum: [attachment_summary, attachment_qa]
+        auditMode:
+          type: string
+          enum: [lightweight]
+        createsHarnessRun:
+          type: boolean
+          const: false
+        provider:
+          type: string
+        model:
+          type: string
+        contextRefs:
+          type: array
+          items:
+            type: string
+        latencyMs:
+          type: integer
+        rawContentLength:
+          type: integer
+        attempts:
+          type: integer
+        finishReason:
+          type: string
+      required:
+        - runKind
+        - auditMode
+        - createsHarnessRun
+        - provider
+        - model
+        - contextRefs
+        - latencyMs
+        - rawContentLength
+
+    KnowledgeToolTrace:
+      type: object
+      properties:
+        toolId:
+          type: string
+          enum: [knowledge_base.query_product_knowledge]
+        available:
+          type: boolean
+        retrievalTriggered:
+          type: boolean
+        confidence:
+          type: string
+          enum: [high, low]
+        fallbackReason:
+          type: string
+          enum: [missing_config, retrieval_not_triggered, request_failed, empty_answer]
+        query:
+          type: string
+        answer:
+          type: string
+        model:
+          type: string
+        knowledgeId:
+          type: string
+        promptTokens:
+          type: integer
+        completionTokens:
+          type: integer
+        totalTokens:
+          type: integer
+        latencyMs:
+          type: integer
+        contextRef:
+          type: string
+      required:
+        - toolId
+        - available
+        - retrievalTriggered
+        - confidence
+        - query
+        - answer
+        - model
+        - knowledgeId
+        - promptTokens
+        - completionTokens
+        - totalTokens
+        - latencyMs
+        - contextRef
+
+    InteractiveFormBlock:
+      type: object
+      properties:
+        blockId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        submitLabel:
+          type: string
+        submitMessageTemplate:
+          type: string
+        fields:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            $ref: "#/components/schemas/InteractiveFormField"
+      required: [blockId, title, submitLabel, fields]
+
+    InteractiveFormField:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+          enum: [text, textarea, single_select, boolean, number]
+        required:
+          type: boolean
+        placeholder:
+          type: string
+        helperText:
+          type: string
+        options:
+          type: array
+          maxItems: 8
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              value:
+                type: string
+            required: [label, value]
+      required: [id, label, type]
 
     ProjectEvaluationPlan:
       type: object

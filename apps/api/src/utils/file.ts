@@ -109,6 +109,13 @@ export function implementationDependencyRulesStorePath(): string {
 }
 
 /**
+ * 系统管理-知识库配置存储路径
+ */
+export function knowledgeBaseConfigStorePath(): string {
+  return path.resolve(resolveRootDir(), "config/system/knowledge-base-config.json");
+}
+
+/**
  * 原型导出源文件路径
  */
 export const PROTOTYPE_EXPORT_SOURCE_XLSX_RELATIVE_PATH =

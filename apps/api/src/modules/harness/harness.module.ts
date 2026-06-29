@@ -5,6 +5,7 @@
 // 供路由层按 `../modules/harness/harness.module` 引用。
 
 export * from "./harness.controller";
+export * from "./harness.regression";
 export * from "./harness.repository";
 export * from "./harness.types";
 export * from "./harness.usecase";

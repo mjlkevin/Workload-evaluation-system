@@ -10,7 +10,13 @@ import {
   expectedStatusForHarnessStage,
   isValidHarnessStageStatus,
   nextStageForConfirmedAction,
+  type HarnessRequirementReportV2Content,
 } from "./harness.types";
+import {
+  DEFAULT_HARNESS_REGRESSION_SAMPLES,
+  normalizeHarnessRegressionSample,
+  scoreHarnessRegressionReport,
+} from "./harness.regression";
 
 import {
   harnessRuns,
@@ -103,6 +109,84 @@ test("harness.schema: exports all harness tables", () => {
   assert.ok(harnessScores);
   assert.ok(harnessCases);
   assert.ok(harnessExpectedAnswers);
+});
+
+test("harness.regression: normalizes deterministic sample format", () => {
+  const sample = normalizeHarnessRegressionSample({
+    caseKey: "manufacturing-procurement-mvp",
+    title: "制造业采购闭环 MVP",
+    expected: {
+      project: { customerName: "蓝海制造", industry: "制造业" },
+      requirementFindings: [
+        {
+          domain: "供应链",
+          scenario: "采购到入库闭环",
+          moduleHint: "供应链云",
+          evidenceRefs: ["需求清单!B12"],
+        },
+      ],
+    },
+  });
+
+  assert.equal(sample.version, "harness-regression-sample.v1");
+  assert.equal(sample.sampleType, "requirement_report_v2");
+  assert.equal(sample.active, true);
+  assert.equal(sample.expected.version, "harness-regression-expected.v1");
+  assert.equal(sample.expected.threshold, 0.8);
+});
+
+test("harness.regression: scores report by project fields requirement coverage and evidence refs", () => {
+  const sample = DEFAULT_HARNESS_REGRESSION_SAMPLES[0];
+  const partialReport: HarnessRequirementReportV2Content = {
+    version: "v2",
+    sourceFile: "蓝海制造需求.xlsx",
+    project: { projectName: "蓝海采购协同", customerName: "蓝海制造", industry: "制造业" },
+    sourceSheets: ["需求清单"],
+    requirementFindings: [
+      {
+        domain: "供应链",
+        scenario: "采购到入库闭环",
+        moduleHint: "供应链云",
+        confidence: 0.88,
+        evidenceRefs: ["需求清单!B12"],
+      },
+    ],
+    missingFields: [],
+    clarificationQuestions: [],
+    answeredQuestions: [],
+    risks: [],
+    nextActions: [],
+    clarificationSummary: "已补充范围。",
+  };
+
+  const partialScore = scoreHarnessRegressionReport(partialReport, sample.expected);
+
+  assert.equal(partialScore.scoreType, "requirement_match_v1");
+  assert.equal(partialScore.value, 0.65);
+  assert.equal(partialScore.passed, false);
+  assert.equal(partialScore.details.project.matchedFields, 3);
+  assert.equal(partialScore.details.requirements.expectedCount, 2);
+  assert.equal(partialScore.details.requirements.matchedCount, 1);
+  assert.deepEqual(partialScore.details.evidence.matchedRefs, ["需求清单!B12"]);
+
+  const fullReport: HarnessRequirementReportV2Content = {
+    ...partialReport,
+    requirementFindings: [
+      ...partialReport.requirementFindings,
+      {
+        domain: "财务核算",
+        scenario: "自动生成采购凭证",
+        moduleHint: "总账",
+        confidence: 0.81,
+        evidenceRefs: ["需求清单!B14"],
+      },
+    ],
+  };
+
+  const fullScore = scoreHarnessRegressionReport(fullReport, sample.expected);
+  assert.equal(fullScore.value, 1);
+  assert.equal(fullScore.passed, true);
+  assert.equal(fullScore.details.requirements.matchedCount, 2);
 });
 
 test("harness.repository: repository contract exposes create and detail list functions", () => {
@@ -291,6 +375,11 @@ function makeMemoryHarnessRepo(): HarnessRepository {
     async listModelRuns(runId) {
       return byCreatedAtAsc(modelRuns.filter((run) => run.harnessRunId === runId));
     },
+    async createManualTestResult() { throw new Error("not_implemented"); },
+    async getManualTestResult() { return null; },
+    async listManualTestResults() { return []; },
+    async updateManualTestResult() { return null; },
+    async deleteManualTestResult() { return false; },
   };
 }
 
@@ -1311,8 +1400,8 @@ test("harness.usecase: retry only works for failed runs", async () => {
 
   await repo.updateRun(created.harnessRunId, { stage: "failed", status: "failed", errorMessage: "timeout" });
   const retried = await retryHarnessRun(user, created.harnessRunId, repo);
-  assert.equal(retried.stage, "analyzing");
-  assert.equal(retried.status, "running");
+  assert.equal(retried.stage, "evidence_ready");
+  assert.equal(retried.status, "waiting");
   assert.equal(retried.errorMessage, null);
 });
 

@@ -112,6 +112,7 @@ test("AI 成功路径：返回 3 条 AI 证据，status=success，无 fallback",
   // Provider 收到了 system + user 两条消息，且要求 json_object
   assert.equal(provider.lastRequest?.messages.length, 2);
   assert.equal(provider.lastRequest?.responseFormat, "json_object");
+  assert.equal(provider.lastRequest?.promptCacheKey, "requirement-extractor-basic-info-v1");
 });
 
 test("AI 路径返回部分字段：缺失字段进 warnings，status=partial", async () => {

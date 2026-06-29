@@ -1,7 +1,7 @@
 import { RequestHandler, Router } from "express";
 
 import * as ProjectEvaluationsModule from "../modules/project-evaluations/project-evaluations.module";
-import { requireCapability } from "../rbac/middleware";
+import { requireAnyCapability, requireCapability } from "../rbac/middleware";
 
 export type ProjectEvaluationsRouterHandlers = {
   listProjectEvaluations: RequestHandler;
@@ -14,7 +14,7 @@ export function createProjectEvaluationsRouter(handlers: ProjectEvaluationsRoute
   const router = Router();
 
   router.get("/", requireCapability("estimates:read"), handlers.listProjectEvaluations);
-  router.post("/", requireCapability("estimates:write"), handlers.createProjectEvaluation);
+  router.post("/", requireAnyCapability("estimates:create", "estimates:write"), handlers.createProjectEvaluation);
   router.post("/assessment-drafts/:assessmentId/confirm", requireCapability("estimates:write"), handlers.confirmAiAssessmentDraft);
   router.get("/:projectId", requireCapability("estimates:read"), handlers.getProjectEvaluation);
 

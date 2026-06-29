@@ -61,6 +61,7 @@ export const ROLE_CAPABILITIES: Record<V2Role, Capability[]> = {
   ],
 
   PRE_SALES: [
+    "estimates:create",
     "estimates:read",
     "requirement:upload",
     "extractor:trigger",

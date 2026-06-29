@@ -49,6 +49,24 @@ export type HarnessArtifactType = (typeof HARNESS_ARTIFACT_TYPES)[number];
 export const HARNESS_ACTION_STATUSES = ["pending", "confirmed", "cancelled", "executed", "failed"] as const;
 export type HarnessActionStatus = (typeof HARNESS_ACTION_STATUSES)[number];
 
+export const MANUAL_TEST_RESULT_STATUSES = ["passed", "failed", "blocked", "skipped"] as const;
+export type ManualTestResultStatus = (typeof MANUAL_TEST_RESULT_STATUSES)[number];
+
+export type CreateManualTestResultInput = {
+  harnessRunId?: string;
+  harnessToolEventId?: string;
+  testCaseKey?: string;
+  executorName: string;
+  environment: string;
+  account?: string;
+  screenshotUrl?: string;
+  resultStatus: ManualTestResultStatus;
+  notes?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type UpdateManualTestResultInput = Partial<CreateManualTestResultInput>;
+
 export type HarnessRunLinks = {
   aiSessionId?: string;
   projectEvaluationId?: string;

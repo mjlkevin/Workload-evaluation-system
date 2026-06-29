@@ -116,3 +116,20 @@ test("POST /project-evaluations/assessment-drafts/:assessmentId/confirm reaches 
   assert.equal(response.body.data.harness.toolEventId, "tool-1");
   assert.equal(reachedAssessmentId, "assessment-1");
 });
+
+test("POST /project-evaluations lets legacy user create project evaluations", async () => {
+  const token = createTokenForUser(createTempUser({ role: "user" }));
+  let reached = false;
+
+  const response = await supertest(miniApp((_req, res) => {
+    res.json({ code: 0 });
+  }))
+    .post("/project-evaluations")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ projectName: "广州波达通信项目" });
+
+  reached = response.status === 200;
+  assert.equal(response.status, 200);
+  assert.equal(response.body.code, 0);
+  assert.equal(reached, true);
+});

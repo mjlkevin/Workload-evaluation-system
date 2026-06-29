@@ -12,6 +12,7 @@ import {
   harnessArtifacts,
   harnessEvidences,
   harnessFiles,
+  harnessManualTestResults,
   harnessModelRuns,
   harnessRuns,
   harnessToolEvents,
@@ -21,6 +22,8 @@ import {
   type HarnessEvidenceRow,
   type HarnessFileInsert,
   type HarnessFileRow,
+  type HarnessManualTestResultInsert,
+  type HarnessManualTestResultRow,
   type HarnessModelRunInsert,
   type HarnessModelRunRow,
   type HarnessRunInsert,
@@ -57,6 +60,11 @@ export interface HarnessRepository {
   listToolEvents(runId: string): Promise<HarnessToolEventRow[]>;
   addModelRun(input: Omit<HarnessModelRunInsert, "harnessModelRunId" | "createdAt">): Promise<HarnessModelRunRow>;
   listModelRuns(runId: string): Promise<HarnessModelRunRow[]>;
+  createManualTestResult(input: Omit<HarnessManualTestResultInsert, "manualTestResultId" | "createdAt" | "updatedAt">): Promise<HarnessManualTestResultRow>;
+  getManualTestResult(id: string): Promise<HarnessManualTestResultRow | null>;
+  listManualTestResults(runId: string | null, opts?: { status?: string; limit?: number; offset?: number }): Promise<HarnessManualTestResultRow[]>;
+  updateManualTestResult(id: string, patch: Partial<HarnessManualTestResultInsert>): Promise<HarnessManualTestResultRow | null>;
+  deleteManualTestResult(id: string): Promise<boolean>;
 }
 
 export function createHarnessRepository(dbInstance: Database = db): HarnessRepository {
@@ -76,6 +84,11 @@ export function createHarnessRepository(dbInstance: Database = db): HarnessRepos
     listToolEvents: (runId) => listHarnessToolEvents(runId, dbInstance),
     addModelRun: (input) => addHarnessModelRunRecord(input, dbInstance),
     listModelRuns: (runId) => listHarnessModelRuns(runId, dbInstance),
+    createManualTestResult: (input) => createManualTestResultRecord(input, dbInstance),
+    getManualTestResult: (id) => getManualTestResultById(id, dbInstance),
+    listManualTestResults: (runId, opts) => listManualTestResults(runId, opts, dbInstance),
+    updateManualTestResult: (id, patch) => updateManualTestResultRecord(id, patch, dbInstance),
+    deleteManualTestResult: (id) => deleteManualTestResultRecord(id, dbInstance),
   };
 }
 
@@ -221,4 +234,63 @@ export function addHarnessModelRunRecord(
 
 export function listHarnessModelRuns(runId: string, dbInstance: Database = db): Promise<HarnessModelRunRow[]> {
   return dbInstance.select().from(harnessModelRuns).where(eq(harnessModelRuns.harnessRunId, runId)).orderBy(asc(harnessModelRuns.createdAt));
+}
+
+// ============================================================
+// Manual Test Results
+// ============================================================
+
+export function createManualTestResultRecord(
+  input: Omit<HarnessManualTestResultInsert, "manualTestResultId" | "createdAt" | "updatedAt">,
+  dbInstance: Database = db,
+): Promise<HarnessManualTestResultRow> {
+  const now = new Date();
+  return dbInstance
+    .insert(harnessManualTestResults)
+    .values({ ...input, manualTestResultId: randomUUID(), createdAt: now, updatedAt: now } as HarnessManualTestResultInsert)
+    .returning()
+    .then((rows) => rows[0]);
+}
+
+export function getManualTestResultById(id: string, dbInstance: Database = db): Promise<HarnessManualTestResultRow | null> {
+  return dbInstance
+    .select()
+    .from(harnessManualTestResults)
+    .where(eq(harnessManualTestResults.manualTestResultId, id))
+    .then((rows) => rows[0] ?? null);
+}
+
+export function listManualTestResults(
+  runId: string | null,
+  opts: { status?: string; limit?: number; offset?: number } = {},
+  dbInstance: Database = db,
+): Promise<HarnessManualTestResultRow[]> {
+  const limit = Math.max(1, Math.min(100, opts.limit ?? 20));
+  const offset = Math.max(0, opts.offset ?? 0);
+  let query = dbInstance.select().from(harnessManualTestResults).orderBy(desc(harnessManualTestResults.createdAt));
+  if (runId) {
+    query = query.where(eq(harnessManualTestResults.harnessRunId, runId)) as typeof query;
+  }
+  return query.limit(limit).offset(offset);
+}
+
+export function updateManualTestResultRecord(
+  id: string,
+  patch: Partial<HarnessManualTestResultInsert>,
+  dbInstance: Database = db,
+): Promise<HarnessManualTestResultRow | null> {
+  return dbInstance
+    .update(harnessManualTestResults)
+    .set({ ...patch, updatedAt: new Date() } as Partial<HarnessManualTestResultInsert>)
+    .where(eq(harnessManualTestResults.manualTestResultId, id))
+    .returning()
+    .then((rows) => rows[0] ?? null);
+}
+
+export function deleteManualTestResultRecord(id: string, dbInstance: Database = db): Promise<boolean> {
+  return dbInstance
+    .delete(harnessManualTestResults)
+    .where(eq(harnessManualTestResults.manualTestResultId, id))
+    .returning()
+    .then((rows) => rows.length > 0);
 }

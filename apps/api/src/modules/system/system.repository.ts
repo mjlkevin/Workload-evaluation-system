@@ -5,6 +5,9 @@ import {
   ImplementationDependencyRuleItem,
   ImplementationDependencyRulesConfig,
   ImplementationDependencyRulesStore,
+  KnowledgeBaseConfig,
+  KnowledgeBaseConfigStore,
+  KnowledgeBaseCredentialsConfig,
   RequirementKimiCredentialsConfig,
   RequirementSystemConfig,
   RequirementSystemConfigStore,
@@ -14,12 +17,16 @@ import {
 import { config } from "../../config/env";
 import {
   implementationDependencyRulesStorePath,
+  knowledgeBaseConfigStorePath,
   requirementSystemConfigStorePath,
   versionCodeRulesStorePath,
 } from "../../utils";
 import { applyVersionCodeFormat } from "../../utils/version-code-format";
 
 const EMPTY_TIME = "--";
+const DEFAULT_KIMI_EVALUATION_MODEL = "kimi-k2.5";
+const DEFAULT_KIMI_FILE_PARSING_MODEL = "kimi-k2.6";
+const DEFAULT_KIMI_GENERATION_MODEL = "kimi-k2.5";
 
 /** 与生成真实版本号同一套占位符，固定参考时间便于示例列展示 */
 function buildSample(format: string, prefix: string, moduleCode: string): string {
@@ -157,7 +164,7 @@ function createDefaultRequirementConfig(): RequirementSystemConfig {
   return {
     kimiEvaluation: {
       enabled: true,
-      model: "moonshot-v1-128k",
+      model: DEFAULT_KIMI_EVALUATION_MODEL,
       temperature: 0.3,
       maxTokens: 4000,
       timeoutMs: 120000,
@@ -168,7 +175,7 @@ function createDefaultRequirementConfig(): RequirementSystemConfig {
     },
     fileParsing: {
       enabled: true,
-      model: "kimi-k2-turbo-preview",
+      model: DEFAULT_KIMI_FILE_PARSING_MODEL,
       allowedExtensions: [".xlsx", ".xls", ".csv"],
       maxFileSizeMb: 20,
       maxSheetCount: 20,
@@ -177,7 +184,7 @@ function createDefaultRequirementConfig(): RequirementSystemConfig {
     },
     kimiGeneration: {
       enabled: true,
-      model: "moonshot-v1-128k",
+      model: DEFAULT_KIMI_GENERATION_MODEL,
       temperature: 0.5,
       maxTokens: 6000,
       outputStyle: "balanced",
@@ -217,7 +224,7 @@ function normalizeRequirementConfig(input: unknown): RequirementSystemConfig {
   return {
     kimiEvaluation: {
       enabled: Boolean(kimiEvaluation.enabled ?? base.kimiEvaluation.enabled),
-      model: String(kimiEvaluation.model || base.kimiEvaluation.model).trim(),
+      model: normalizeKimiConfiguredModel(kimiEvaluation.model, base.kimiEvaluation.model),
       temperature: clampNumber(kimiEvaluation.temperature, 0, 1, base.kimiEvaluation.temperature),
       maxTokens: clampNumber(kimiEvaluation.maxTokens, 256, 32000, base.kimiEvaluation.maxTokens),
       timeoutMs: clampNumber(kimiEvaluation.timeoutMs, 3000, 120000, base.kimiEvaluation.timeoutMs),
@@ -227,7 +234,7 @@ function normalizeRequirementConfig(input: unknown): RequirementSystemConfig {
     },
     fileParsing: {
       enabled: Boolean(fileParsing.enabled ?? base.fileParsing.enabled),
-      model: String(fileParsing.model || base.fileParsing.model).trim(),
+      model: normalizeKimiConfiguredModel(fileParsing.model, base.fileParsing.model),
       allowedExtensions: normalizeStringArray(fileParsing.allowedExtensions, base.fileParsing.allowedExtensions),
       maxFileSizeMb: clampNumber(fileParsing.maxFileSizeMb, 1, 200, base.fileParsing.maxFileSizeMb),
       maxSheetCount: clampNumber(fileParsing.maxSheetCount, 1, 200, base.fileParsing.maxSheetCount),
@@ -236,7 +243,7 @@ function normalizeRequirementConfig(input: unknown): RequirementSystemConfig {
     },
     kimiGeneration: {
       enabled: Boolean(kimiGeneration.enabled ?? base.kimiGeneration.enabled),
-      model: String(kimiGeneration.model || base.kimiGeneration.model).trim(),
+      model: normalizeKimiConfiguredModel(kimiGeneration.model, base.kimiGeneration.model),
       temperature: clampNumber(kimiGeneration.temperature, 0, 1, base.kimiGeneration.temperature),
       maxTokens: clampNumber(kimiGeneration.maxTokens, 256, 32000, base.kimiGeneration.maxTokens),
       outputStyle: ["concise", "balanced", "detailed"].includes(String(kimiGeneration.outputStyle))
@@ -249,6 +256,15 @@ function normalizeRequirementConfig(input: unknown): RequirementSystemConfig {
       apiKey: String(kimiCredentials.apiKey ?? base.kimiCredentials.apiKey ?? "").trim(),
     },
   };
+}
+
+function normalizeKimiConfiguredModel(value: unknown, fallback: string): string {
+  const model = String(value || fallback).trim();
+  if (!model) return fallback;
+  const id = model.toLowerCase();
+  if (id === "kimi-k2-turbo-preview") return fallback;
+  if (id.startsWith("moonshot-v1-")) return fallback;
+  return model;
 }
 
 function normalizeRequirementStore(input: unknown): RequirementSystemConfigStore {
@@ -776,4 +792,166 @@ export function saveImplementationDependencyRulesStore(store: ImplementationDepe
 
 export function normalizeImplementationDependencyRulesConfig(input: unknown): ImplementationDependencyRulesConfig {
   return normalizeImplementationDependencyConfig(input);
+}
+
+// -------------------- 知识库配置 --------------------
+
+function createDefaultKnowledgeBaseConfig(): KnowledgeBaseConfig {
+  return {
+    model: "glm-4.6",
+    apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    credentials: {
+      apiKey: "",
+      knowledgeId: "",
+    },
+  };
+}
+
+export function normalizeKnowledgeBaseConfig(input: unknown): KnowledgeBaseConfig {
+  const base = createDefaultKnowledgeBaseConfig();
+  const source = (input || {}) as Partial<KnowledgeBaseConfig>;
+  const credentials = (source.credentials || {}) as Partial<KnowledgeBaseCredentialsConfig>;
+  return {
+    model: String(source.model || base.model).trim(),
+    apiBaseUrl: String(source.apiBaseUrl || base.apiBaseUrl).trim(),
+    credentials: {
+      apiKey: String(credentials.apiKey ?? base.credentials.apiKey ?? "").trim(),
+      knowledgeId: String(credentials.knowledgeId ?? base.credentials.knowledgeId ?? "").trim(),
+    },
+  };
+}
+
+function normalizeKnowledgeBaseStore(input: unknown): KnowledgeBaseConfigStore {
+  const data = (input || {}) as Partial<KnowledgeBaseConfigStore>;
+  const now = new Date().toISOString();
+  const draft = normalizeKnowledgeBaseConfig(data.draft);
+  const active = normalizeKnowledgeBaseConfig(data.active || data.draft);
+  return {
+    version: Number.isFinite(Number(data.version)) ? Math.max(1, Number(data.version)) : 1,
+    draft,
+    active,
+    updatedAt: String(data.updatedAt || now),
+    effectiveAt: String(data.effectiveAt || now),
+  };
+}
+
+export function loadKnowledgeBaseConfigStore(): KnowledgeBaseConfigStore {
+  const filePath = knowledgeBaseConfigStorePath();
+  if (!fs.existsSync(filePath)) {
+    const now = new Date().toISOString();
+    const initial = createDefaultKnowledgeBaseConfig();
+    const initStore: KnowledgeBaseConfigStore = {
+      version: 1,
+      draft: initial,
+      active: initial,
+      updatedAt: now,
+      effectiveAt: now,
+    };
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(initStore, null, 2), "utf-8");
+    return initStore;
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
+    const normalized = normalizeKnowledgeBaseStore(parsed);
+    fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
+    return normalized;
+  } catch {
+    const now = new Date().toISOString();
+    const fallbackConfig = createDefaultKnowledgeBaseConfig();
+    const fallback: KnowledgeBaseConfigStore = {
+      version: 1,
+      draft: fallbackConfig,
+      active: fallbackConfig,
+      updatedAt: now,
+      effectiveAt: now,
+    };
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(fallback, null, 2), "utf-8");
+    return fallback;
+  }
+}
+
+export function saveKnowledgeBaseConfigStore(store: KnowledgeBaseConfigStore): void {
+  const filePath = knowledgeBaseConfigStorePath();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const normalized = normalizeKnowledgeBaseStore(store);
+  fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
+}
+
+/** 合并知识库凭证 PATCH：null 表示清除；空字符串表示不修改；非空则写入 */
+export function mergeKnowledgeBaseCredentialsPatch(
+  prev: KnowledgeBaseCredentialsConfig,
+  incoming: Partial<{ apiKey: string | null; knowledgeId: string | null }> | undefined,
+): KnowledgeBaseCredentialsConfig {
+  if (!incoming) return prev;
+  let apiKey = prev.apiKey;
+  let knowledgeId = prev.knowledgeId;
+  if (incoming.apiKey === null) apiKey = "";
+  else if (typeof incoming.apiKey === "string" && incoming.apiKey.trim()) apiKey = incoming.apiKey.trim();
+  if (incoming.knowledgeId === null) knowledgeId = "";
+  else if (typeof incoming.knowledgeId === "string" && incoming.knowledgeId.trim()) knowledgeId = incoming.knowledgeId.trim();
+  return { apiKey, knowledgeId };
+}
+
+/** 知识库实际调用：已生效配置中的凭证优先，否则环境变量 */
+export function resolveActiveKnowledgeBaseConfig(): {
+  apiKey: string;
+  knowledgeId: string;
+  model: string;
+  apiBaseUrl: string;
+  source: "store" | "env" | "none";
+} {
+  const store = loadKnowledgeBaseConfigStore();
+  const storeApiKey = store.active.credentials.apiKey.trim();
+  const storeKnowledgeId = store.active.credentials.knowledgeId.trim();
+  if (storeApiKey && storeKnowledgeId) {
+    return {
+      apiKey: storeApiKey,
+      knowledgeId: storeKnowledgeId,
+      model: store.active.model,
+      apiBaseUrl: store.active.apiBaseUrl,
+      source: "store",
+    };
+  }
+  const envApiKey = config.zhipu.apiKey.trim();
+  const envKnowledgeId = config.zhipu.knowledgeId.trim();
+  if (envApiKey && envKnowledgeId) {
+    return {
+      apiKey: envApiKey,
+      knowledgeId: envKnowledgeId,
+      model: config.zhipu.model,
+      apiBaseUrl: config.zhipu.apiBaseUrl,
+      source: "env",
+    };
+  }
+  return { apiKey: "", knowledgeId: "", model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "none" };
+}
+
+/** 测试连接：显式传入优先；否则草稿仓库；再否则环境变量 */
+export function resolveDraftKnowledgeBaseConfigForTest(
+  overrideApiKey?: string,
+  overrideKnowledgeId?: string,
+): {
+  apiKey: string;
+  knowledgeId: string;
+  model: string;
+  apiBaseUrl: string;
+  source: "override" | "draft" | "env" | "none";
+} {
+  const oKey = overrideApiKey?.trim() || "";
+  const oKid = overrideKnowledgeId?.trim() || "";
+  if (oKey && oKid) return { apiKey: oKey, knowledgeId: oKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "override" };
+  const store = loadKnowledgeBaseConfigStore();
+  const draftKey = store.draft.credentials.apiKey.trim();
+  const draftKid = store.draft.credentials.knowledgeId.trim();
+  if (draftKey && draftKid) {
+    return { apiKey: oKey || draftKey, knowledgeId: oKid || draftKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, source: "draft" };
+  }
+  const envKey = config.zhipu.apiKey.trim();
+  const envKid = config.zhipu.knowledgeId.trim();
+  if (envKey && envKid) {
+    return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "env" };
+  }
+  return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "none" };
 }

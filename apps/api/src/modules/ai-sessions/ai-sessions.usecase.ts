@@ -149,6 +149,7 @@ export function appendAiSessionEvent(
   if (attachmentIds.length > 0) changed = true;
   const messageContent = asString(messageInput?.content);
   if (messageContent) {
+    const metadata = normalizeRecord(messageInput?.metadata);
     session.messages.push({
       messageId: messageInput?.messageId || randomUUID(),
       role: normalizeMessageRole(messageInput?.role),
@@ -156,6 +157,7 @@ export function appendAiSessionEvent(
       createdAt: messageInput?.createdAt || nowIso,
       attachmentIds: [...normalizeStringArray(messageInput?.attachmentIds), ...attachmentIds],
       artifactIds: normalizeStringArray(messageInput?.artifactIds),
+      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     });
     changed = true;
   }

@@ -1,8 +1,8 @@
 /** 最小化调用 Moonshot/OpenAI 兼容接口，校验 API Key 是否可用 */
 
-import { isKimiTemperatureMustBeOneError, resolveKimiCompletionTemperature } from "./kimi-completion-params";
+import { isKimiTemperatureMustBeOneError, resolveKimiCompletionTemperatureParam } from "./kimi-completion-params";
 
-export type KimiPingFailureKind = "overload" | "rate_limited" | "auth" | "model_not_found" | "unknown";
+export type KimiPingFailureKind = "overload" | "rate_limited" | "quota_exceeded" | "auth" | "model_not_found" | "unknown";
 
 export class KimiPingFailure extends Error {
   readonly kind: KimiPingFailureKind;
@@ -29,6 +29,7 @@ function extractErrorMessage(bodyText: string, httpStatus: number): string {
 
 function classifyPingFailure(status: number, msg: string): KimiPingFailureKind {
   const t = msg.toLowerCase();
+  if (/insufficient|balance|quota|credit|arrears|欠费|余额|额度|账户余额/i.test(msg)) return "quota_exceeded";
   if (status === 401) return "auth";
   if (status === 429) return "rate_limited";
   if (
@@ -55,13 +56,13 @@ export async function pingKimiChatCompletion(params: {
   if (!baseUrl) throw new Error("apiUrl 为空");
 
   const model = String(params.model || "").trim() || "kimi-k2.5";
-  let temperature = resolveKimiCompletionTemperature(model, 0.3);
+  let temperature = resolveKimiCompletionTemperatureParam(model, 0.3);
   const payload = () =>
     JSON.stringify({
       model,
-      temperature,
       messages: [{ role: "user", content: "ping" }],
-      max_tokens: 1,
+      max_completion_tokens: 1,
+      ...(temperature === undefined ? {} : { temperature }),
     });
 
   let res = await fetch(`${baseUrl}/chat/completions`, {

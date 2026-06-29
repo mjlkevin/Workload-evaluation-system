@@ -13,7 +13,7 @@ import { testDb, truncateTestTables } from "../../test-helpers/db";
 import { ChangeSubmissionService } from "./change-submission";
 import { OpportunityBriefService } from "../sales-briefing";
 import { defaultProviderRegistry } from "../../ai/provider";
-import type { ModelProvider, ChatCompletionResponse } from "../../ai/provider/model-provider";
+import type { ModelProvider, ChatCompletionRequest, ChatCompletionResponse } from "../../ai/provider/model-provider";
 import { assessmentVersions } from "../../db/schema";
 
 before(async () => {
@@ -31,12 +31,13 @@ test.afterEach(async () => {
 // Mock Provider helpers
 // ------------------------------------------------------------------
 
-function createMockKimiProvider(responseContent: string): ModelProvider {
+function createMockKimiProvider(responseContent: string): ModelProvider & { lastRequest?: ChatCompletionRequest } {
   return {
     name: "kimi",
     defaultModel: "mock",
     isAvailable: () => true,
-    async chatCompletion(): Promise<ChatCompletionResponse> {
+    async chatCompletion(req): Promise<ChatCompletionResponse> {
+      this.lastRequest = req;
       return {
         content: responseContent,
         rawContent: responseContent,
@@ -112,6 +113,9 @@ test("ChangeSubmissionService: submitChange 成功路径 — AI 解析出 diff",
   const estimate = submission.newEstimate as { totalDays: number } | null;
   assert.ok(estimate);
   assert.equal(estimate!.totalDays, 45);
+  assert.equal(mockProvider.lastRequest?.model, "kimi-k2.5");
+  assert.equal(mockProvider.lastRequest?.promptCacheKey, "change-management-diff-v1");
+  assert.equal(mockProvider.lastRequest?.responseFormat, "json_object");
 });
 
 // ------------------------------------------------------------------

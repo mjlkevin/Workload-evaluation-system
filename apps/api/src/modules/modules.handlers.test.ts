@@ -9,7 +9,7 @@ import { NextFunction, Request, Response } from "express";
 import { AuthUser } from "../types";
 import { config } from "../config/env";
 import { loadUsersStore, saveUsersStore, signAuthToken, verifyAuthToken } from "../middleware/auth";
-import { aiSessionsStorePath, passwordResetTokensStorePath, usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
+import { aiSessionsStorePath, knowledgeBaseConfigStorePath, passwordResetTokensStorePath, usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
 import { confirmPasswordReset, listUsers, login, me, requestPasswordReset, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
@@ -1512,6 +1512,251 @@ test("ai.usecase: homeWorkbenchChat injects role context and persists messages i
   });
 });
 
+test("ai.usecase: homeWorkbenchChat returns formBlock and persists it in assistant message metadata", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+    const req = createMockReq({
+      token: getNonAdminUserToken(),
+      body: {
+        messages: [{ role: "user", content: "请帮我补齐项目信息" }],
+        workflowKey: "parse_requirement_file",
+      },
+    });
+    const res = createMockRes();
+    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+    const originalApiKey = config.kimi.apiKey;
+    try {
+      config.kimi.apiKey = "unit-test-key";
+      bootstrapAiProviders();
+      (globalThis as { fetch?: unknown }).fetch = async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: [
+                "还需要补充金额和周期。",
+                "",
+                "```json",
+                JSON.stringify({
+                  formBlock: {
+                    blockId: "clarify-project",
+                    title: "补充项目关键字段",
+                    submitLabel: "提交补充",
+                    fields: [
+                      { id: "amountRange", label: "预计金额范围", type: "single_select", required: true, options: [{ label: "50万以下", value: "under_500k" }] },
+                      { id: "deliveryMonths", label: "目标交付周期（月）", type: "number" },
+                    ],
+                  },
+                }),
+                "```",
+              ].join("\n"),
+            },
+          }],
+        }),
+      }) as unknown;
+
+      await homeWorkbenchChat(req, res as unknown as Response);
+
+      assert.equal(res.statusCode, 200);
+      const body = res.body as {
+        code: number;
+        data: {
+          answer: string;
+          formBlock?: { blockId: string; fields: Array<{ id: string; type: string }> };
+          session: { messages: Array<{ role: string; content: string; metadata?: { formBlock?: { blockId: string } } }> };
+        };
+      };
+      assert.equal(body.code, 0);
+      assert.equal(body.data.answer.trim(), "还需要补充金额和周期。");
+      assert.equal(body.data.formBlock?.blockId, "clarify-project");
+      assert.equal(body.data.formBlock?.fields[0]?.type, "single_select");
+      assert.equal(body.data.session.messages[1]?.metadata?.formBlock?.blockId, "clarify-project");
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = originalFetch;
+      config.kimi.apiKey = originalApiKey;
+      _resetAiBootstrapForTest();
+    }
+  });
+});
+
+test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant message metadata", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+    await withFileSnapshotRestoreAsync(knowledgeBaseConfigStorePath(), async () => {
+      const req = createMockReq({
+        token: getNonAdminUserToken(),
+        body: {
+          messages: [{ role: "user", content: "购买存货核算模块必须购买哪些相关模块？" }],
+          workflowKey: "free_chat",
+        },
+      });
+      const res = createMockRes();
+      const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+      const originalZhipu = { ...(config as any).zhipu };
+      try {
+        (config as any).zhipu = {
+          apiKey: "zhipu-unit-test-key",
+          model: "glm-4.6",
+          knowledgeId: "kb-sales",
+          apiBaseUrl: "https://example.test/api/paas/v4",
+        };
+        fs.writeFileSync(knowledgeBaseConfigStorePath(), JSON.stringify({
+          version: 1,
+          draft: {
+            model: "glm-4.6",
+            apiBaseUrl: "https://example.test/api/paas/v4",
+            credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
+          },
+          active: {
+            model: "glm-4.6",
+            apiBaseUrl: "https://example.test/api/paas/v4",
+            credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
+          },
+          updatedAt: "2026-06-28T00:00:00.000Z",
+          effectiveAt: "2026-06-28T00:00:00.000Z",
+        }, null, 2), "utf-8");
+        const zhipuCalls: Array<{ url: string; payload: Record<string, unknown> }> = [];
+        (globalThis as { fetch?: unknown }).fetch = async (url: unknown, init?: { body?: string }) => {
+          const urlText = String(url);
+          const payload = JSON.parse(String(init?.body || "{}")) as { tools?: unknown };
+          zhipuCalls.push({ url: urlText, payload: payload as Record<string, unknown> });
+          if (urlText.includes("/knowledge/retrieve")) {
+            assert.deepEqual((payload as Record<string, unknown>).knowledge_ids, ["kb-sales"]);
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                code: 200,
+                data: [
+                  {
+                    text: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。",
+                    score: 0.92,
+                    metadata: { doc_name: "产品知识文档", doc_id: "doc-1", knowledge_id: "kb-sales" },
+                  },
+                ],
+              }),
+            } as unknown;
+          }
+          assert.ok(urlText.includes("/chat/completions"));
+          assert.equal((payload as Record<string, unknown>).model, "glm-4.6");
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              choices: [{ message: { content: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。" } }],
+              usage: { prompt_tokens: 1420, completion_tokens: 48, total_tokens: 1468 },
+            }),
+          } as unknown;
+        };
+
+        await homeWorkbenchChat(req, res as unknown as Response);
+
+        assert.equal(res.statusCode, 200);
+        const body = res.body as {
+          code: number;
+          data: {
+            intent: string;
+            answer: string;
+            trace: { knowledgeTool?: { toolId: string; retrievalTriggered: boolean; confidence: string; contextRef: string } };
+            session: { messages: Array<{ role: string; content: string; metadata?: { knowledgeTool?: { toolId: string; contextRef: string } } }> };
+          };
+        };
+        assert.equal(body.code, 0);
+        assert.equal(body.data.intent, "knowledge_query");
+        assert.match(body.data.answer, /知识库参考/);
+        assert.equal(body.data.trace.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
+        assert.equal(body.data.trace.knowledgeTool?.retrievalTriggered, true);
+        assert.equal(body.data.trace.knowledgeTool?.confidence, "high");
+        assert.equal(body.data.session.messages.length, 2);
+        assert.equal(body.data.session.messages[1]?.metadata?.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
+        assert.equal(body.data.session.messages[1]?.metadata?.knowledgeTool?.contextRef, body.data.trace.knowledgeTool?.contextRef);
+        assert.equal(zhipuCalls.length, 2);
+        assert.ok(zhipuCalls[0]?.url.includes("/knowledge/retrieve"));
+        assert.ok(zhipuCalls[1]?.url.includes("/chat/completions"));
+      } finally {
+        (globalThis as { fetch?: unknown }).fetch = originalFetch;
+        (config as any).zhipu = originalZhipu;
+      }
+    });
+  });
+});
+
+test("ai.usecase: homeWorkbenchChat persists lightweight model run trace for attachment qa", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+    const req = createMockReq({
+      token: getNonAdminUserToken(),
+      body: {
+        messages: [{
+          role: "user",
+          content: "这个附件里有哪些实施风险？",
+          attachments: [{
+            name: "蓝海需求.xlsx",
+            size: 2048,
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            parsedSummary: "项目：蓝海 WMS\n客户：蓝海制造\n业务需求：多组织库存协同\n风险：交付周期紧",
+          }],
+        }],
+        workflowKey: "parse_requirement_file",
+      },
+    });
+    const res = createMockRes();
+    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+    const originalApiKey = config.kimi.apiKey;
+    try {
+      config.kimi.apiKey = "unit-test-key";
+      bootstrapAiProviders();
+      (globalThis as { fetch?: unknown }).fetch = async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "主要风险是多组织库存协同边界和交付周期。" }, finish_reason: "stop" }],
+        }),
+      }) as unknown;
+
+      await homeWorkbenchChat(req, res as unknown as Response);
+
+      assert.equal(res.statusCode, 200);
+      const body = res.body as {
+        code: number;
+        data: {
+          intent: string;
+          trace: {
+            modelRun?: {
+              runKind: string;
+              provider: string;
+              model: string;
+              contextRefs: string[];
+              rawContentLength: number;
+            };
+          };
+          session: {
+            messages: Array<{
+              role: string;
+              content: string;
+              metadata?: {
+                modelRun?: {
+                  runKind: string;
+                  contextRefs: string[];
+                };
+              };
+            }>;
+          };
+        };
+      };
+      assert.equal(body.code, 0);
+      assert.equal(body.data.intent, "attachment_qa");
+      assert.equal(body.data.trace.modelRun?.runKind, "attachment_qa");
+      assert.equal(body.data.trace.modelRun?.provider, "kimi");
+      assert.match(body.data.trace.modelRun?.model || "", /kimi/);
+      assert.ok(body.data.trace.modelRun?.rawContentLength);
+      assert.ok(body.data.trace.modelRun?.contextRefs.includes("attachment:蓝海需求.xlsx"));
+      assert.equal(body.data.session.messages[1]?.metadata?.modelRun?.runKind, "attachment_qa");
+      assert.ok(body.data.session.messages[1]?.metadata?.modelRun?.contextRefs.includes("attachment:蓝海需求.xlsx"));
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = originalFetch;
+      config.kimi.apiKey = originalApiKey;
+      _resetAiBootstrapForTest();
+    }
+  });
+});
+
 test("ai.usecase: homeWorkbenchChat keeps user turn in session when model fails", async () => {
   await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
     const originalFetch = (globalThis as { fetch?: unknown }).fetch;
@@ -1555,7 +1800,7 @@ test("ai.usecase: homeWorkbenchChat asks the model to analyze parsed attachments
       body: {
         messages: [{
           role: "user",
-          content: "请解析这个文件并启动工作流。",
+          content: "请解析这个文件并生成需求解析报告",
           attachments: [{
             name: "实施工作量评估申请240616-V1.0.xlsx",
             size: 58000,

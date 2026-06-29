@@ -744,6 +744,7 @@ async function generateAssessmentDraftByKimi(params: {
   payload: KimiAssessmentPreviewInput;
   fallback: KimiAssessmentDraft;
   timeoutMs: number;
+  maxTokens?: number;
 }): Promise<{ draft: KimiAssessmentDraft; rawContent: string }> {
   const assessSnap = asModelObject(params.payload.requirementSnapshot) as KimiAssessmentSnapshot;
   const noProductModuleGrid = !snapshotHasProductModuleGrid(assessSnap);
@@ -774,7 +775,9 @@ async function generateAssessmentDraftByKimi(params: {
     model: params.model,
     temperature: 0.1,
     responseFormat: "json_object",
+    promptCacheKey: "implementation-assessment-draft-v1",
     timeoutMs: params.timeoutMs,
+    maxCompletionTokens: params.maxTokens,
     credentialsOverride: {
       apiKey: params.apiKey,
       apiBaseUrl: params.apiUrl,

@@ -138,6 +138,11 @@ function makeRepo(): HarnessRepository {
       return row;
     },
     async listModelRuns(runId) { return byCreatedAtAsc(modelRuns.filter((run) => run.harnessRunId === runId)); },
+    async createManualTestResult() { throw new Error("not_implemented"); },
+    async getManualTestResult() { return null; },
+    async listManualTestResults() { return []; },
+    async updateManualTestResult() { return null; },
+    async deleteManualTestResult() { return false; },
   };
 }
 
@@ -265,6 +270,32 @@ test("POST /harness/runs/:id/report-v1 generates model-backed report", async () 
   assert.equal(res.body.data.run.stage, "report_v1_ready");
   assert.equal(res.body.data.modelRuns.length, 1);
   assert.equal(res.body.data.artifacts.at(-1).artifactType, "requirement_report_v1");
+});
+
+test("POST /harness/runs/:id/report-v1 maps kimi rate limit to 429", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepo();
+  const app = makeApp(repo, {
+    modelRunner: async () => {
+      throw new Error("kimi_rate_limited");
+    },
+  });
+  await request(app).post("/harness/runs").set("Authorization", `Bearer ${token}`).send({ title: "报告" });
+  const fileRes = await request(app).post("/harness/runs/run-1/files").set("Authorization", `Bearer ${token}`).send({ attachmentId: "att-report", fileName: "申请.xlsx" });
+  await request(app)
+    .post("/harness/runs/run-1/parse-result")
+    .set("Authorization", `Bearer ${token}`)
+    .send({
+      fileId: fileRes.body.data.file.harnessFileId,
+      sourceFile: "申请.xlsx",
+      items: [{ sourceSheet: "3.业务需求及问题一览表", sourceCell: "B12", text: "自动生成凭证" }],
+    });
+
+  const res = await request(app).post("/harness/runs/run-1/report-v1").set("Authorization", `Bearer ${token}`).send({});
+
+  assert.equal(res.status, 429);
+  assert.equal(res.body.code, 42901);
+  assert.equal(res.body.details[0].reason, "kimi_rate_limited");
 });
 
 test("POST /harness/runs/:id/report-v2 generates v2 report from v1 artifact", async () => {
@@ -524,4 +555,172 @@ test("GET /harness/runs/:id/events returns SSE snapshot", async () => {
   assert.match(res.headers["content-type"], /text\/event-stream/);
   assert.match(res.text, /event: run_state/);
   assert.match(res.text, /"stage":"uploaded"/);
+});
+
+// ============================================================
+// Manual Test Results Tests
+// ============================================================
+
+function makeRepoWithManualTestResults() {
+  const baseRepo = makeRepo();
+  const results: Array<{
+    manualTestResultId: string;
+    harnessRunId: string | null;
+    harnessToolEventId: string | null;
+    testCaseKey: string | null;
+    executorName: string;
+    environment: string;
+    account: string | null;
+    screenshotUrl: string | null;
+    resultStatus: "passed" | "failed" | "blocked" | "skipped";
+    notes: string | null;
+    metadata: Record<string, unknown>;
+    createdAt: Date;
+    updatedAt: Date;
+  }> = [];
+
+  return {
+    ...baseRepo,
+    async createManualTestResult(input: any) {
+      const now = new Date();
+      const row = {
+        manualTestResultId: `mtr-${results.length + 1}`,
+        harnessRunId: input.harnessRunId ?? null,
+        harnessToolEventId: input.harnessToolEventId ?? null,
+        testCaseKey: input.testCaseKey ?? null,
+        executorName: input.executorName,
+        environment: input.environment,
+        account: input.account ?? null,
+        screenshotUrl: input.screenshotUrl ?? null,
+        resultStatus: input.resultStatus as "passed" | "failed" | "blocked" | "skipped",
+        notes: input.notes ?? null,
+        metadata: input.metadata ?? {},
+        createdAt: now,
+        updatedAt: now,
+      };
+      results.push(row);
+      return row;
+    },
+    async getManualTestResult(id: string) {
+      return results.find((r) => r.manualTestResultId === id) ?? null;
+    },
+    async listManualTestResults(runId: string | null, opts?: { status?: string; limit?: number; offset?: number }) {
+      let items = results;
+      if (runId) items = items.filter((r) => r.harnessRunId === runId);
+      if (opts?.status) items = items.filter((r) => r.resultStatus === opts.status);
+      return items;
+    },
+    async updateManualTestResult(id: string, patch: any) {
+      const idx = results.findIndex((r) => r.manualTestResultId === id);
+      if (idx < 0) return null;
+      results[idx] = { ...results[idx], ...patch, updatedAt: new Date() };
+      return results[idx];
+    },
+    async deleteManualTestResult(id: string) {
+      const idx = results.findIndex((r) => r.manualTestResultId === id);
+      if (idx < 0) return false;
+      results.splice(idx, 1);
+      return true;
+    },
+  };
+}
+
+test("POST /harness/runs/:runId/test-results creates a manual test result", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepoWithManualTestResults();
+  const app = makeApp(repo);
+
+  const res = await request(app)
+    .post("/harness/runs/run-1/test-results")
+    .set("Authorization", `Bearer ${token}`)
+    .send({
+      executorName: "张三",
+      environment: "staging",
+      account: "test-user-01",
+      resultStatus: "passed",
+      notes: "测试通过",
+    });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.code, 0);
+  assert.equal(res.body.data.result.executorName, "张三");
+  assert.equal(res.body.data.result.environment, "staging");
+  assert.equal(res.body.data.result.resultStatus, "passed");
+});
+
+test("POST /harness/runs/:runId/test-results validates required fields", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepoWithManualTestResults();
+  const app = makeApp(repo);
+
+  const res = await request(app)
+    .post("/harness/runs/run-1/test-results")
+    .set("Authorization", `Bearer ${token}`)
+    .send({});
+
+  assert.equal(res.status, 400);
+  assert.equal(res.body.code, 40001);
+});
+
+test("GET /harness/runs/:runId/test-results lists results", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepoWithManualTestResults();
+  const app = makeApp(repo);
+
+  await repo.createManualTestResult({
+    harnessRunId: "run-1",
+    executorName: "李四",
+    environment: "local",
+    resultStatus: "failed",
+  });
+
+  const res = await request(app)
+    .get("/harness/runs/run-1/test-results")
+    .set("Authorization", `Bearer ${token}`);
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.items.length, 1);
+  assert.equal(res.body.data.items[0].executorName, "李四");
+});
+
+test("PATCH /harness/runs/:runId/test-results/:resultId updates a result", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepoWithManualTestResults();
+  const app = makeApp(repo);
+
+  const created = await repo.createManualTestResult({
+    harnessRunId: "run-1",
+    executorName: "王五",
+    environment: "local",
+    resultStatus: "blocked",
+  });
+
+  const res = await request(app)
+    .patch(`/harness/runs/run-1/test-results/${created.manualTestResultId}`)
+    .set("Authorization", `Bearer ${token}`)
+    .send({ resultStatus: "passed", notes: "已修复" });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.result.resultStatus, "passed");
+  assert.equal(res.body.data.result.notes, "已修复");
+});
+
+test("DELETE /harness/runs/:runId/test-results/:resultId deletes a result", async () => {
+  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const repo = makeRepoWithManualTestResults();
+  const app = makeApp(repo);
+
+  const created = await repo.createManualTestResult({
+    harnessRunId: "run-1",
+    executorName: "赵六",
+    environment: "local",
+    resultStatus: "skipped",
+  });
+
+  const res = await request(app)
+    .delete(`/harness/runs/run-1/test-results/${created.manualTestResultId}`)
+    .set("Authorization", `Bearer ${token}`);
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.deleted, true);
 });

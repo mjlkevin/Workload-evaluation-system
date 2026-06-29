@@ -15,9 +15,27 @@ export type ChatRole = "system" | "user" | "assistant";
 export interface ChatMessage {
   role: ChatRole;
   content: string;
+  /**
+   * Kimi Partial Mode assistant prefill. 仅 Kimi 等支持 partial 的
+   * provider 会透传；其他 provider 可忽略。
+   */
+  partial?: boolean;
 }
 
-export type ResponseFormat = "text" | "json_object";
+export interface JsonSchemaResponseFormat {
+  type: "json_schema";
+  json_schema: {
+    name: string;
+    strict?: boolean;
+    schema: Record<string, unknown>;
+    description?: string;
+  };
+}
+
+export type ResponseFormat = "text" | "json_object" | JsonSchemaResponseFormat;
+
+export type ThinkingMode = "enabled" | "disabled";
+export type ThinkingConfig = ThinkingMode | boolean | { type: ThinkingMode | string; [key: string]: unknown };
 
 /** 工具定义（OpenAI 兼容 function-calling 协议） */
 export interface ToolDefinition {
@@ -48,6 +66,12 @@ export interface ChatCompletionRequest {
   messages: ChatMessage[];
   /** 期望温度；Provider 可能按模型兼容规则做二次修正（如 thinking=1） */
   temperature?: number;
+  /** 最大输出 token；Kimi 使用 max_completion_tokens。 */
+  maxCompletionTokens?: number;
+  /** Kimi prompt cache key，用于同类系统 prompt / 模板复用缓存。 */
+  promptCacheKey?: string;
+  /** Kimi thinking 开关；不传则由模型默认策略决定。 */
+  thinking?: ThinkingConfig;
   responseFormat?: ResponseFormat;
   /** 单次 HTTP 超时上限（毫秒），不传使用 Provider 默认 */
   timeoutMs?: number;
@@ -66,6 +90,13 @@ export interface ProviderCredentials {
   apiBaseUrl?: string;
 }
 
+/** Token 消耗统计（Kimi / OpenAI 兼容） */
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface ChatCompletionResponse {
   /** 模型输出文本内容（choices[0].message.content） */
   content: string;
@@ -81,6 +112,8 @@ export interface ChatCompletionResponse {
   finishReason?: string;
   /** 模型发起的工具调用；无则 undefined 或空数组 */
   toolCalls?: ToolCall[];
+  /** Token 消耗统计；部分厂商或场景可能不返回 */
+  usage?: TokenUsage;
 }
 
 export interface ChatCompletionStreamChunk {
@@ -88,6 +121,10 @@ export interface ChatCompletionStreamChunk {
   contentDelta: string;
   /** 截止当前已累积的完整文本 */
   content: string;
+  /** 本次 SSE chunk 的思考增量文本（Kimi reasoning_content） */
+  reasoningContentDelta?: string;
+  /** 截止当前已累积的完整思考文本 */
+  reasoningContent?: string;
   /** 实际使用的模型 id（经过 Provider 归一化） */
   model: string;
   /** Provider 名称（如 "kimi"） */
@@ -96,6 +133,8 @@ export interface ChatCompletionStreamChunk {
   attempts: number;
   /** 结束原因（如 "stop"、"length"），部分厂商可能不提供 */
   finishReason?: string;
+  /** Token 消耗统计；流式场景通常在最后一个 chunk 中出现 */
+  usage?: TokenUsage;
 }
 
 export interface ModelProvider {
