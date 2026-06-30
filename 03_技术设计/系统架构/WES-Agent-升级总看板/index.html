@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WES Agent 升级总看板 · 设计 / 计划 / 监控</title>
+  <title>WES 项目管理 · 设计 / 计划 / 监控</title>
   <link rel="stylesheet" href="assets/fonts/fonts.css" />
   <link rel="stylesheet" href="assets/base.css" />
   <link rel="stylesheet" href="assets/components.css" />
@@ -12,9 +12,10 @@
 <body>
   <header class="topnav">
     <div class="topnav-in">
-      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a class="active" href="index.html">总览</a>
+        <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
         <a href="runtime.html">任务运行时</a>
         <a href="plan.html">计划与进度</a>
@@ -35,9 +36,9 @@
     <section class="hero">
       <div class="wrap hero-in">
         <div>
-          <span class="eyebrow"><span class="dot"></span>WES Agent Upgrade Command Board</span>
-          <h1>设计、计划、监控<br><em>三位一体</em>的升级总看板</h1>
-          <p class="lead">本看板是 WES 从传统工作量评估系统升级为 AI Agent 工作台 + WES 传统记录系统的汇报与审计入口。它把架构设计、实施路线、验证监控、风险决策和变更记录拆成可维护的专题页，并在首页统一串联。</p>
+          <span class="eyebrow"><span class="dot"></span>WES Project Management</span>
+          <h1>需求、路标、计划、监控<br><em>一体化</em>的项目管理入口</h1>
+          <p class="lead">WES 项目管理承接需求池、版本路标、实施计划、验证监控、风险决策和变更记录。它既保留 WES Agent 升级过程的审计事实，也作为后续版本规划和 AI 工作流治理的统一入口。</p>
           <div class="pill-row">
             <span class="pill brand">main + Phase 1H-C planning</span>
             <span class="pill ok">PR #2 已合并</span>
@@ -45,7 +46,8 @@
             <span class="pill ok">Phase 1E 已完成</span>
             <span class="pill ok">Phase 1F 已交付</span>
             <span class="pill ok">Phase 1G 已交付</span>
-            <span class="pill brand">需求池 34 项</span>
+            <span class="pill brand">需求池 35 项</span>
+            <span class="pill brand">路标管理已初始化</span>
             <span class="pill ok">22 已交付</span>
           </div>
           <div class="trust">
@@ -98,7 +100,7 @@
             <div class="v">1H-C</div>
             <div class="lb">需求池治理后续规划</div>
             <div class="bar"><i style="width:72%"></i></div>
-            <div class="sub">需求池统一为 34 项：22 项已交付、10 项待规划/待确认/待验收、2 项暂缓；RP-026 补改、RP-027/RP-028 clean patch、RP-031 重复检索和构建基线已由 Codex 验证通过，RP-029/RP-030 已在修复分支验证通过，RP-033 clean patch 已验证但待提交集成，RP-034 已入池待规划。</div>
+            <div class="sub">需求池统一为 35 项：22 项已交付、11 项待规划/待确认/待验收、2 项暂缓；RP-026 补改、RP-027/RP-028 clean patch、RP-031 重复检索和构建基线已由 Codex 验证通过，RP-029/RP-030 已在修复分支验证通过，RP-033 clean patch 已验证但待提交集成，RP-034 已入池待规划，RP-035 已分析待设计。</div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>验证状态</span><span class="live">已修复</span></div>
@@ -229,9 +231,16 @@
         <div class="sec-head">
           <div class="num">Board Pages</div>
           <h2>专题页入口</h2>
-          <p>每个页面都是一个可审计视角。后续汇报时先看首页，再按问题跳转到专题页。</p>
+          <p>每个页面都是一个可审计视角。后续汇报时先看首页和路标，再按问题跳转到专题页。</p>
         </div>
         <div class="res-grid">
+          <a class="res-card" href="roadmap.html">
+            <span class="ico" style="background:var(--brand-soft);color:var(--brand)">00</span>
+            <h3>路标管理</h3>
+            <p>管理版本、路标与需求池 RP 的关联，初始化 V-PM-0 / RM-PM-0，并把 AI Native Command Center 作为 RM-AIOS-2 候选路标。</p>
+            <div class="preview">Version · Roadmap · Requirement Pool · AI Workflow</div>
+            <span class="arr">打开路标管理 →</span>
+          </a>
           <a class="res-card" href="design.html">
             <span class="ico">01</span>
             <h3>设计说明</h3>
@@ -257,7 +266,7 @@
             <span class="ico" style="background:var(--accent-soft);color:var(--accent)">04</span>
             <h3>测试</h3>
             <p>人工测试任务、执行路径、结果反馈模板、缺陷分级和关闭标准。</p>
-            <div class="preview">34 条人工任务 · P0/P1/P2 反馈 · 人工验收门禁</div>
+            <div class="preview">35 条人工任务 · P0/P1/P2 反馈 · 人工验收门禁</div>
             <span class="arr">打开测试页面 →</span>
           </a>
           <a class="res-card" href="monitoring.html">
@@ -366,7 +375,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES Agent 升级总看板 · 设计 / 计划 / 监控 · 2026-06-29 · main + Phase 1H-C planning
+      WES 项目管理 · 设计 / 计划 / 监控 · 2026-06-29 · main + Phase 1H-C planning
     </footer>
   </main>
 </body>

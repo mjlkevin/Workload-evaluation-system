@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>变更记录 · WES Agent 升级总看板</title>
+  <title>变更记录 · WES 项目管理</title>
   <link rel="stylesheet" href="assets/fonts/fonts.css" />
   <link rel="stylesheet" href="assets/base.css" />
   <link rel="stylesheet" href="assets/components.css" />
@@ -12,9 +12,10 @@
 <body>
   <header class="topnav">
     <div class="topnav-in">
-      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
+        <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
         <a href="runtime.html">任务运行时</a>
         <a href="plan.html">计划与进度</a>
@@ -37,7 +38,7 @@
       <h1>变更记录</h1>
       <p class="meta">
         <span><b>本轮目标</b> Phase 1H-A AI 工作台体验闭环规划 + Codex 协作治理收敛</span>
-        <span><b>当前基线</b> main + Phase 1H-B 交付基线 + 需求池 34 项中 22 项已交付 + 10 项待规划/待确认/待验收 + RP-001/RP-012 暂缓待人工评审 + Qoder Loop R2-R8 Codex 复核记录 + 本地 A2A / 多 Agent 协作协议模块 + NightOps 三 AI 无人值守机制载体</span>
+        <span><b>当前基线</b> main + Phase 1H-B 交付基线 + 需求池 35 项中 22 项已交付 + 11 项待规划/待确认/待验收 + RP-001/RP-012 暂缓待人工评审 + Qoder Loop R2-R8 Codex 复核记录 + 本地 A2A / 多 Agent 协作协议模块 + NightOps 三 AI 无人值守机制载体 + 路标管理初始化</span>
         <span><b>状态</b> 需求池治理口径已统一：<code class="inline">requirements.html</code> 为唯一需求池页面，可编辑子页面已移除；Phase 1H-B RP-019/RP-020/RP-021/RP-022/RP-023/RP-025 已交付，RP-018 知识库工具 MVP 已交付并等待 MT-1H-B-003 人工验收；Qoder Loop R2-R7 已复核并分流；RP-026/RP-027/RP-028/RP-029/RP-030/RP-031/RP-033 已由 Qoder 集成到 main dirty changes，Codex 于 2026-06-29 复核并补 RP-029 知识库 fallback 流式最终内容修复，完整自动化验证通过；本地 A2A 协作协议已扩展为多 Agent 团队注册表，Qoder 与 KIMICODE 已完成 NightOps v0.3 onboarding ACK，KIMICODE 当前仍为 NightOps peer audit pilot / candidate，Claude Code 仍为 candidate / 未介入；<code class="inline">wes-multi-agent-collaboration</code> Skill 已升到 v0.3 草案，覆盖 Night Mission Packet、Qoder handoff、KIMICODE peer audit、Codex Gate、返工/拒收、验证矩阵和冲突规则，已完成 Codex 本地安装与 Qoder 项目级上下文注入；Codex 侧 <code class="inline">wes-loop</code> heartbeat 已删除，持续实现 Loop 改由 Qoder 执行，Codex 仅保留 NightOps 任务包与审计 Gate 职责</span>
         <span><b>更新</b> 2026-06-29</span>
       </p>
@@ -71,7 +72,7 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>Session 总结</h2>
-      <p class="lead">本页保留 Phase 1D/1E/1F/1G 的历史变更脉络，并记录 Phase 1H-A 规划与实现事实：本轮从需求池提取 AI 工作台高频体验闭环需求，完成计划页、需求池状态、测试用例、文档事实源和施工提示词同步；当前需求池治理口径为 34 项中 22 项已交付、10 项待规划/待确认/待验收、2 项暂缓；RP-019/RP-020/RP-021/RP-022/RP-023/RP-025 已完成 Phase 1H-B 交付，RP-018 已完成知识库工具 MVP 且 MT-1H-B-003 待人工验收；Qoder Loop R2-R8 已由 Codex 复核并分流，RP-029/RP-030 R8 阻断已转入 Codex 修复验证通过、待集成；RP-034 根据 AI 工作台需求解析报告按钮/消息不执行截图反馈入池；Codex 侧需求池迭代 Loop 已清理，后续持续 Loop 由 Qoder 创建和执行。</p>
+      <p class="lead">本页保留 Phase 1D/1E/1F/1G 的历史变更脉络，并记录 Phase 1H-A 规划与实现事实：本轮从需求池提取 AI 工作台高频体验闭环需求，完成计划页、需求池状态、测试用例、文档事实源和施工提示词同步；当前需求池治理口径为 35 项中 22 项已交付、11 项待规划/待确认/待验收、2 项暂缓；RP-019/RP-020/RP-021/RP-022/RP-023/RP-025 已完成 Phase 1H-B 交付，RP-018 已完成知识库工具 MVP 且 MT-1H-B-003 待人工验收；Qoder Loop R2-R8 已由 Codex 复核并分流，RP-029/RP-030 R8 阻断已转入 Codex 修复验证通过、待集成；RP-034 根据 AI 工作台需求解析报告按钮/消息不执行截图反馈入池；RP-035 根据用户战略评审进入 AI Native Command Center 候选；Codex 侧需求池迭代 Loop 已清理，后续持续 Loop 由 Qoder 创建和执行。</p>
       <div class="timeline-card">
         <h5>Work Timeline</h5>
         <table>
@@ -85,8 +86,10 @@
           <tr><td class="mono">NightOps 载体实现</td><td>落地 <code class="inline">KIMICODE.md</code> 与 <code class="inline">docs/agent-loop/nightops-templates.md</code>，将 KIMICODE peer audit ACK、Night Mission Packet、Qoder handoff、KIMICODE peer audit、Codex Gate Result 和 Morning Brief 固化为本地文件协议；同步 <code class="inline">QODER.md</code> NightOps 执行合同与 <code class="inline">AGENTS.md</code> 项目边界，明确 Codex 只做任务包、审计 Gate 和晨间简报，不创建持续实现自动化。</td><td><span class="status run"><span class="dot"></span>v0.3 草案 / 模板已落地 / 待试运行</span></td></tr>
           <tr><td class="mono">NightOps onboarding ACK</td><td>接收 Qoder 与 KIMICODE 的 NightOps v0.3 onboarding ACK：Qoder 确认 primary executor 角色、<code class="inline">allowNextTask=false</code> 默认值、<code class="inline">mustReworkFirst=true</code> 返工优先、只回填到“已回填 / 待 Codex 复核”、不合并 main、不触碰密钥、不清理无关 dirty changes；KIMICODE 确认 peer auditor 角色、<code class="inline">kimicodeCanPatch=false</code> 默认只审不改、四类 verdict 与缺失 handoff 关键字段时拒收。Codex 据此创建 <code class="inline">docs/agent-loop/nightly/2026-06-29-mission.md</code> 作为只读试运行任务包，并创建 Codex 侧审计自动化：<code class="inline">wes-nightops-codex-gate-a</code>、<code class="inline">wes-nightops-codex-gate-b</code>、<code class="inline">wes-nightops-morning-brief</code>。</td><td><span class="status run"><span class="dot"></span>ACK 通过 / 三方 Loop 已创建</span></td></tr>
           <tr><td class="mono">NightOps Loop 授权澄清</td><td>根据用户 owner 明确指令，补充项目规则：Qoder / KIMICODE 可在各自平台创建 NightOps 本地定时 Loop，并与 Codex Gate 时间点配合；该授权仅限读取最新 Night Mission Packet、Codex Gate、handoff，并写入 mission 指定 artifact，不等同于 Codex 需求池实现 Loop，不允许自选 RP、合并 main、标记已交付、触碰密钥或越界改代码。同步更新 <code class="inline">AGENTS.md</code>、<code class="inline">QODER.md</code>、<code class="inline">KIMICODE.md</code>、<code class="inline">wes-multi-agent-collaboration</code> Skill 与 NightOps 模板。</td><td><span class="status run"><span class="dot"></span>授权已澄清 / 待外部 Loop 创建回执</span></td></tr>
-          <tr><td class="mono">需求池治理</td><td>统一需求池数量与状态口径：34 项需求中 22 项已交付、10 项待规划/待确认、2 项暂缓；RP-030/RP-031 已根据 Agent 工程化启发入池，RP-032 根据 AI 工作台左侧推荐工作流截图反馈入池，RP-033 根据 AI 工作台会话列表滚动遮挡截图反馈入池，RP-034 根据 AI 工作台需求解析报告按钮/消息不执行截图反馈入池；可编辑子页面已移除，后续由 AI 直接维护 <code class="inline">requirements.html</code> 并通过本页记录状态变化。</td><td><span class="status done"><span class="dot"></span>治理同步</span></td></tr>
+          <tr><td class="mono">需求池治理</td><td>统一需求池数量与状态口径：35 项需求中 22 项已交付、11 项待规划/待确认、2 项暂缓；RP-030/RP-031 已根据 Agent 工程化启发入池，RP-032 根据 AI 工作台左侧推荐工作流截图反馈入池，RP-033 根据 AI 工作台会话列表滚动遮挡截图反馈入池，RP-034 根据 AI 工作台需求解析报告按钮/消息不执行截图反馈入池，RP-035 根据 AI Native Command Center 战略评审入池；可编辑子页面已移除，后续由 AI 直接维护 <code class="inline">requirements.html</code> 并通过本页记录状态变化。</td><td><span class="status done"><span class="dot"></span>治理同步</span></td></tr>
           <tr><td class="mono">RP-034 入池</td><td>2026-06-29 用户截图反馈 session 4cb9ec0a：上传附件后点击"生成需求解析报告"按钮或发消息均不触发报告生成，AI 陷入"请上传文件"死循环。根因：后端 <code class="inline">chat.service.ts</code> 第 474 行只检查最新消息附件，前端按钮仅填充文本不传 <code class="inline">clientAction</code>。状态：已分析 / 待规划。</td><td><span class="status run"><span class="dot"></span>已入池 / 待规划</span></td></tr>
+          <tr><td class="mono">路标初始化</td><td>将静态总看板品牌名统一为 WES 项目管理，新增 <code class="inline">roadmap.html</code>，建立版本、路标、需求池三者的治理模型。本次初始化不复用目标需求池已存在的 RP-009 编号，作为治理变更记录。</td><td><span class="status run"><span class="dot"></span>已初始化 / 待后续规划</span></td></tr>
+          <tr><td class="mono">RP-035 入池</td><td>记录 AI Native Command Center / AI Workflow Driven 升级：保留现有 Project Knowledge Center，不推倒重来；后续把首页从文档导航升级为 Vision、Roadmap、Current Goal、AI Commander、AI Pipeline、Knowledge Center，并新增 AI Workflow 页面承载 Prompt / Output / Artifact / Status。</td><td><span class="status warn"><span class="dot"></span>已分析 / 待设计</span></td></tr>
           <tr><td class="mono">需求台账治理</td><td>移除 <code class="inline">requirements.html</code> 顶部目录块；需求台账状态列新增用户级干预标识下拉，支持优先处理、冻结、取消三种本地标记，并提供按用户标识筛选。该标识保存在当前浏览器，不替代需求正式状态。</td><td><span class="status done"><span class="dot"></span>页面治理</span></td></tr>
           <tr><td class="mono">Qoder Loop 复核</td><td>接收 RP-032 handoff：<code class="inline">qoder/rp-032-workflow-accessibility</code> 在 <code class="inline">AiHomeWorkbench.jsx</code>、<code class="inline">index.css</code>、<code class="inline">HomeWorkspace.test.jsx</code> 回填工作流模板命名、列表滚动、隐藏滚动条、选中态圆点、<code class="inline">aria-label</code> 与 <code class="inline">title</code>。Codex 发现 Qoder worktree 缺少 node_modules，改在相同文件状态的主 checkout 复跑：<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 92 pass，<code class="inline">npm run build:web</code> pass。注意：Qoder commit 相对 base 包含较多既有工作台变更，不建议直接整 commit 合并。</td><td><span class="status run"><span class="dot"></span>已回填 / 待人工验收</span></td></tr>
           <tr><td class="mono">Codex 复核 · RP-033 clean</td><td>2026-06-28 接收 <code class="inline">.worktrees/rp-033-clean</code> / <code class="inline">qoder/rp-033-clean</code> handoff：相对 base 仅 3 个未提交文件变更，覆盖 <code class="inline">SessionRail.jsx</code> 会话列表 <code class="inline">ai-session-list</code>、<code class="inline">maxHeight:240</code>、<code class="inline">overflowY:auto</code>、<code class="inline">minHeight:0</code>，<code class="inline">index.css</code> 隐藏原生滚动条，<code class="inline">HomeWorkspace.test.jsx</code> 增加 RP-033 样式断言。Codex 验证：<code class="inline">git diff --check</code> pass，<code class="inline">HomeWorkspace.test.jsx</code> 25/25，V2 全量 65/65，<code class="inline">build:web</code> pass。下一步：提交/集成最小 patch，并人工验收低高度滚动。</td><td><span class="status done"><span class="dot"></span>clean patch 已验证 / 待提交集成</span></td></tr>
@@ -294,7 +297,7 @@
         <tr><td class="mono">2026-06-19 看板补全</td><td>补充本会话 Harness 产品技术决策：上传文件主路径、标准文件版本化、JSON+Markdown、Regression 指标、raw trace 留存和向量库后置。</td><td><span class="status done"><span class="dot"></span>已补充</span></td></tr>
         <tr><td class="mono">phase-1f-implementation-prompt.md</td><td>Phase 1F 给 KIMI/Codex 的实现提示词，已作为本次实现边界参考，保留为审计交付物。</td><td><span class="status done"><span class="dot"></span>已执行</span></td></tr>
         <tr><td class="mono">runtime.html</td><td>任务运行时专题页：承接 Qoder 启发，沉淀 WES Harness Run 的来源、执行、产物、交付和知识边界，以及后续优化项。</td><td><span class="status run"><span class="dot"></span>本次新增</span></td></tr>
-        <tr><td class="mono">sources.html</td><td>文档事实源地图：当前盘点 51 份资产，新增 <code class="inline">collaboration-protocol.html</code>、<code class="inline">QODER.md</code>、<code class="inline">KIMICODE.md</code>、<code class="inline">docs/agent-loop/nightops-templates.md</code>、<code class="inline">wes-qoder-worktree-protocol</code> 与 <code class="inline">wes-multi-agent-collaboration</code> active draft Skill，覆盖本地 A2A / 多 Agent 协作协议、Qoder worktree contract、NightOps 文件交接模板、验证矩阵、结构化 handoff、团队注册表和候选 Agent 接入机制；既有 <code class="inline">codex-project-registry.md</code> 与 <code class="inline">docs/codex-workflows/</code> 继续作为 Codex 协作事实源。</td><td><span class="status run"><span class="dot"></span>已更新</span></td></tr>
+        <tr><td class="mono">sources.html</td><td>文档事实源地图：当前盘点 52 份资产，新增 <code class="inline">roadmap.html</code>、<code class="inline">collaboration-protocol.html</code>、<code class="inline">QODER.md</code>、<code class="inline">KIMICODE.md</code>、<code class="inline">docs/agent-loop/nightops-templates.md</code>、<code class="inline">wes-qoder-worktree-protocol</code> 与 <code class="inline">wes-multi-agent-collaboration</code> active draft Skill，覆盖路标管理、本地 A2A / 多 Agent 协作协议、Qoder worktree contract、NightOps 文件交接模板、验证矩阵、结构化 handoff、团队注册表和候选 Agent 接入机制；既有 <code class="inline">codex-project-registry.md</code> 与 <code class="inline">docs/codex-workflows/</code> 继续作为 Codex 协作事实源。</td><td><span class="status run"><span class="dot"></span>已更新</span></td></tr>
         <tr><td class="mono">2026-06-24-wes-agent-rp-013-interactive-formblock.md</td><td>RP-013 AI 工作台通用化交互渲染实施计划，约束 formBlock 协议、会话 metadata、前端组件与验收命令；本轮已回填前端与最终验证清单。</td><td><span class="status done"><span class="dot"></span>已更新</span></td></tr>
         <tr><td class="mono">2026-06-23-wes-agent-phase-1h-a-workbench-ux.md / phase-1h-a-implementation-prompt.md</td><td>Phase 1H-A AI 工作台体验闭环的实施计划与 KIMI/Codex 施工提示词。</td><td><span class="status run"><span class="dot"></span>已生成</span></td></tr>
         <tr><td class="mono">docs/智谱AI知识库集成指南.md</td><td>Qoder 交付的智谱知识库最小闭环集成指南，作为 RP-018 知识库工具的技术事实源和避坑依据。</td><td><span class="status run"><span class="dot"></span>已纳入需求分析</span></td></tr>
@@ -318,7 +321,7 @@
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 变更记录 · WES Agent 升级总看板 · 2026-06-29
+      <a href="index.html">返回总览</a> · 变更记录 · WES 项目管理 · 2026-06-29
     </footer>
   </main>
 </body>

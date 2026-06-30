@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>需求池 · WES Agent 升级总看板</title>
+  <title>需求池 · WES 项目管理</title>
   <link rel="stylesheet" href="assets/fonts/fonts.css" />
   <link rel="stylesheet" href="assets/base.css" />
   <link rel="stylesheet" href="assets/components.css" />
@@ -12,9 +12,10 @@
 <body>
   <header class="topnav">
     <div class="topnav-in">
-      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
+        <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
         <a href="runtime.html">任务运行时</a>
         <a href="plan.html">计划与进度</a>
@@ -43,9 +44,9 @@
           <span><b>更新日期</b> 2026-06-26</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">34 已登记需求</span>
+          <span class="pill brand">35 已登记需求</span>
           <span class="pill ok">22 已交付</span>
-          <span class="pill warn">10 待规划/待确认</span>
+          <span class="pill warn">11 待规划/待确认</span>
           <span class="pill">2 暂缓</span>
           <span class="pill ok">可编辑子页面已移除</span>
         </div>
@@ -63,7 +64,7 @@
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">T</span><span>总需求数</span></div>
-            <div class="v">34</div>
+            <div class="v">35</div>
             <div class="lb">已登记需求项</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
@@ -75,9 +76,9 @@
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">W</span><span>进行中 / 待实现</span></div>
-            <div class="v">10</div>
+            <div class="v">11</div>
             <div class="lb">已分析 / 待规划 / 待确认</div>
-            <div class="bar"><i style="width:29%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
+            <div class="bar"><i style="width:31%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">C</span><span>暂缓 / 待评审</span></div>
@@ -190,7 +191,7 @@
             </div>
           </div>
           <div class="backlog-column">
-            <h4>待规划 / 待确认 · 9</h4>
+            <h4>待规划 / 待确认 · 10</h4>
             <div class="backlog-card">
               <span class="req-id">RP-024</span>
               <h5>Napkin 视觉生成融合售前解决方案 PPT 页面</h5>
@@ -210,6 +211,16 @@
                 <span class="pill">Codex 复核：需补测</span>
               </div>
               <div class="bc-next">Qoder 已回填只读能力矩阵。Codex 复核：build:api 通过，UserManagement 测试通过但出现未 mock 的 /system/role-capabilities 请求；前端复用 useSystemManagement 会额外加载模型、规则、模板等系统接口，需补最小 hook/测试后再验收。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-035</span>
+              <h5>AI Native Command Center / AI Workflow Driven 升级</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">战略体验 / AI 工作流</span>
+                <span class="pill">已分析 / 待设计</span>
+              </div>
+              <div class="bc-next">保留现有 Project Knowledge Center 作为知识资产层，后续把首页升级为 Vision、Roadmap、Current Goal、AI Commander、AI Pipeline、Knowledge Center，并新增 AI Workflow 页面。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-027</span>
@@ -370,7 +381,7 @@
               <button type="button" id="filter-reset" class="ledger-filter-reset-btn">重置</button>
             </div>
           </div>
-          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">34</b> / 34 条需求</div>
+          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">35</b> / 35 条需求</div>
         </div>
         <div class="table-scroll">
         <table>
@@ -774,6 +785,18 @@
               <td>人工验收：上传附件 → 点击"生成需求解析报告"按钮 → 自动生成 v1 报告卡片；或发送"请基于当前附件生成需求解析报告"→ 同样触发报告生成，不再回复"请上传文件"</td>
             </tr>
             <tr>
+              <td class="mono">RP-035</td>
+              <td>AI Native Command Center / AI Workflow Driven 升级</td>
+              <td>2026-06-30 用户战略评审：现有体系已接近 Project Knowledge Center，不建议推倒重来；核心缺口是首页仍按文档导航组织，而非围绕 AI Workflow 组织</td>
+              <td>战略体验 / AI 工作流</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 2 / 独立候选包</td>
+              <td><span class="status warn"><span class="dot"></span>已分析 / 待设计</span></td>
+              <td>当前首页信息完整但仍偏文档中心，AI 当前任务、当前阶段、当前 Agent、下一步动作、Prompt、Output、Artifact 和 AI 指标尚未成为一等对象</td>
+              <td>保留现有 Design / Plan / Requirements / Runtime / Monitoring / Risks / Changes 作为 Knowledge Assets；首页升级为 Vision、Roadmap、Current Goal、AI Command Center、AI Pipeline、Knowledge Center；新增 AI Workflow 页面承载阶段状态链</td>
+              <td>验收：首页能回答“AI 今天应该做什么”；AI Workflow 页面展示 AI Analyze → AI Design → Task Breakdown → Coding → Testing → Review → Deploy → Done 的状态、Prompt、Output、Artifact 和 Next Action</td>
+            </tr>
+            <tr>
               <td class="mono">RP-032</td>
               <td>AI 工作台推荐工作流列表可达性与语义优化</td>
               <td>2026-06-26 用户截图反馈：AI 工作台左侧“推荐工作流”区域作用不清，且无法滚动查看最下方内容；去重后确认 RP-019 已覆盖推荐工作流定位不清，但未覆盖列表底部可达性</td>
@@ -1097,6 +1120,16 @@
               <td>Skill 版本、promptProfileId、数据源、modelRun、artifact、ToolEvent 进入追溯链</td>
               <td>制造业售前样例回归 + 权限/来源/人工确认测试</td>
               <td>Skill 规格、数据源合规边界、首批制造业售前 Skill 说明</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-035</td>
+              <td>首页从文档导航升级为 AI Workflow 指挥中心</td>
+              <td>战略体验升级；保留既有知识资产，不推倒重来</td>
+              <td>AI Native 首页 + AI Workflow 页面</td>
+              <td>阶段字典、Prompt / Output / Artifact 状态模型、Knowledge Assets 引用关系</td>
+              <td>先复用静态看板文件，后续再评估是否进入数据化存储</td>
+              <td>HTML 结构、导航、状态链与人工评审</td>
+              <td>路标管理、设计、计划、运行时、监控页同步 AI Workflow Driven 口径</td>
             </tr>
             <tr>
               <td class="mono">RP-014</td>
@@ -2784,7 +2817,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES Agent 升级总看板 · 需求池 · 2026-06-26 · 34 条需求 · 22 delivered · 10 pending · 2 deferred
+      WES 项目管理 · 需求池 · 2026-06-26 · 35 条需求 · 22 delivered · 11 pending · 2 deferred
     </footer>
   </main>
   <script>
