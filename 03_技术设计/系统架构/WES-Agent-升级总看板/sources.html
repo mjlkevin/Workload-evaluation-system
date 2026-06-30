@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>文档事实源地图 · WES Agent 升级总看板</title>
+  <title>文档事实源地图 · WES 项目管理</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,9 +12,10 @@
 <body>
   <header class="topnav">
     <div class="topnav-in">
-      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
+        <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
         <a href="runtime.html">任务运行时</a>
         <a href="plan.html">计划与进度</a>
@@ -34,11 +35,11 @@
         <div class="crumb">Document Asset Map</div>
         <h1>文档事实源地图</h1>
         <div class="meta">
-          <span>共盘点 <b>27</b> 份文档资产</span>
+          <span>共盘点 <b>28</b> 份文档资产</span>
           <span>事实源 <b>5</b> 份</span>
-          <span>总看板页面 <b>10</b> 个</span>
+          <span>项目管理页面 <b>11</b> 个</span>
           <span>历史参考 <b>5</b> 份</span>
-          <span>更新日期 <b>2026-06-21</b></span>
+          <span>更新日期 <b>2026-06-30</b></span>
         </div>
       </div>
     </div>
@@ -60,20 +61,25 @@
         <div class="sec-head">
           <div class="num">01 / Layer Map</div>
           <h2>文档分层图</h2>
-          <p>按可信度与维护规则把文档分成四层：总看板交付物承接当前事实，设计与计划源支撑执行，历史参考源仅作追溯。</p>
+          <p>按可信度与维护规则把文档分成四层：项目管理交付物承接当前事实，设计与计划源支撑执行，历史参考源仅作追溯。</p>
         </div>
 
         <div class="doc-map">
           <div class="doc-layer">
             <div class="doc-layer-header">
               <span class="doc-layer-title delivery">Delivery Board</span>
-              <span>总看板交付物</span>
-              <div class="doc-layer-count"><b>10</b> pages</div>
+              <span>项目管理交付物</span>
+              <div class="doc-layer-count"><b>11</b> pages</div>
             </div>
             <div class="doc-node-grid">
               <div class="doc-node">
                 <a href="index.html">index.html</a>
                 <small>总览 / KPI / 专题入口</small>
+                <span class="tag delivery">Board</span>
+              </div>
+              <div class="doc-node">
+                <a href="roadmap.html">roadmap.html</a>
+                <small>路标管理 / 版本 / 需求关联</small>
                 <span class="tag delivery">Board</span>
               </div>
               <div class="doc-node">
@@ -285,12 +291,12 @@
           <div class="matrix-cell">
             <div class="cell-title">Harness Core</div>
             <div class="cell-meta">run / stage / toolEvent</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title">Agent Workbench</div>
             <div class="cell-meta">草稿确认闭环</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title">Draft Review</div>
@@ -327,7 +333,7 @@
           <div class="matrix-cell">
             <div class="cell-title">Phase 1E Completion</div>
             <div class="cell-meta">草稿接回工作台</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title"><a href="phase-1f-implementation-prompt.md">Audit Write-back Prompt</a></div>
@@ -344,17 +350,17 @@
           <div class="matrix-cell">
             <div class="cell-title">apps/api/src/db</div>
             <div class="cell-meta">PostgreSQL schema</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title">modules/harness</div>
             <div class="cell-meta">repository / usecase</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title">Agent 工作台</div>
             <div class="cell-meta">draft_from_ai</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title">详情页追溯</div>
@@ -381,12 +387,12 @@
           <div class="matrix-cell">
             <div class="cell-title">Harness API</div>
             <div class="cell-meta">run / stage / action</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title">AI 工作台 API</div>
             <div class="cell-meta">草稿 / 确认</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title">详情页 API</div>
@@ -401,46 +407,46 @@
 
           <div class="matrix-cell row-head">Dashboard</div>
           <div class="matrix-cell">
-            <div class="cell-title"><a href="index.html">index.html</a></div>
-            <div class="cell-meta">总览入口</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <div class="cell-title"><a href="index.html">index.html</a> / <a href="roadmap.html">roadmap.html</a></div>
+            <div class="cell-meta">总览入口 / 路标管理</div>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title"><a href="design-architecture.html">design-architecture</a></div>
             <div class="cell-meta">架构分层</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title"><a href="design.html">design.html</a> / <a href="runtime.html">runtime.html</a></div>
             <div class="cell-meta">设计说明 / 任务运行时</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title"><a href="monitoring.html">monitoring.html</a></div>
             <div class="cell-meta">监控审计</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title"><a href="plan.html">plan.html</a> / <a href="testing.html">testing.html</a></div>
             <div class="cell-meta">计划进度 / 人工测试</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title"><a href="sources.html">sources.html</a></div>
             <div class="cell-meta">文档地图</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
 
           <div class="matrix-cell row-head">Review / Change Log</div>
           <div class="matrix-cell">
             <div class="cell-title"><a href="changes.html">changes.html</a></div>
             <div class="cell-meta">变更记录</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title"><a href="risks.html">risks.html</a></div>
             <div class="cell-meta">风险与决策</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title">T5a 回归报告</div>
@@ -450,12 +456,12 @@
           <div class="matrix-cell">
             <div class="cell-title">CI 报告</div>
             <div class="cell-meta">GitHub Actions</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title">Session 复盘</div>
             <div class="cell-meta">09_复盘与沉淀</div>
-            <span class="status-pill run">当前总看板承接</span>
+            <span class="status-pill run">当前项目管理承接</span>
           </div>
           <div class="matrix-cell">
             <div class="cell-title"><a href="phase-1f-implementation-prompt.md">1F 实现提示词</a></div>
@@ -503,7 +509,7 @@
             <div class="truth-step board">
               <span class="truth-arrow"></span>
               <span class="num">05</span>
-              <b>升级总看板/*</b>
+              <b>WES 项目管理/*</b>
               <small>可视化汇报与审计入口</small>
             </div>
             <div class="truth-step out">
@@ -513,7 +519,7 @@
             </div>
           </div>
           <div class="truth-flow-note">
-            <b>核心原则：</b>代码与运行路由是最高优先级事实源。当 openapi.yaml、产品技术方案.html 与代码实现冲突时，先修文档再交付；总看板只呈现已对齐的事实，不创造新的事实。
+            <b>核心原则：</b>代码与运行路由是最高优先级事实源。当 openapi.yaml、产品技术方案.html 与代码实现冲突时，先修文档再交付；项目管理页只呈现已对齐的事实，不创造新的事实。
           </div>
         </div>
       </div>
@@ -548,7 +554,7 @@
             </thead>
             <tbody>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
                 <td><a href="index.html">index.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/index.html</td>
                 <td>总览入口、KPI、专题页导航</td>
@@ -558,7 +564,17 @@
                 <td>All Phases</td>
               </tr>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
+                <td><a href="roadmap.html">roadmap.html</a></td>
+                <td class="mono">WES-Agent-升级总看板/roadmap.html</td>
+                <td>路标管理、版本台账、需求池关联治理</td>
+                <td><span class="status-pill run">Delivery Board</span></td>
+                <td>每次版本/路标规划变更必改</td>
+                <td>否</td>
+                <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>项目管理交付物</td>
                 <td><a href="design.html">design.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/design.html</td>
                 <td>设计说明专题页</td>
@@ -568,7 +584,7 @@
                 <td>Agent OS V2, Harness 1B/1C/1D/1E</td>
               </tr>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
                 <td><a href="runtime.html">runtime.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/runtime.html</td>
                 <td>任务运行时专题页，承接 Qoder 启发下的 WES Harness Run 优化项</td>
@@ -578,7 +594,7 @@
                 <td>Harness 1F, Phase 2 candidates</td>
               </tr>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
                 <td><a href="design-architecture.html">design-architecture.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/design-architecture.html</td>
                 <td>架构设计专题页</td>
@@ -588,7 +604,7 @@
                 <td>Agent OS V2, Harness 1A/1B/1C/1D/1E</td>
               </tr>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
                 <td><a href="plan.html">plan.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/plan.html</td>
                 <td>计划与进度专题页</td>
@@ -598,7 +614,7 @@
                 <td>All Phases</td>
               </tr>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
                 <td><a href="testing.html">testing.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/testing.html</td>
                 <td>人工测试任务与结果反馈管理页</td>
@@ -608,7 +624,7 @@
                 <td>Harness 1E, Harness 1F</td>
               </tr>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
                 <td><a href="monitoring.html">monitoring.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/monitoring.html</td>
                 <td>监控与审计专题页</td>
@@ -618,7 +634,7 @@
                 <td>All Phases</td>
               </tr>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
                 <td><a href="risks.html">risks.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/risks.html</td>
                 <td>风险与决策专题页</td>
@@ -628,7 +644,7 @@
                 <td>All Phases</td>
               </tr>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
                 <td><a href="changes.html">changes.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/changes.html</td>
                 <td>变更记录专题页</td>
@@ -638,7 +654,7 @@
                 <td>All Phases</td>
               </tr>
               <tr>
-                <td>总看板交付物</td>
+                <td>项目管理交付物</td>
                 <td><a href="sources.html">sources.html</a></td>
                 <td class="mono">WES-Agent-升级总看板/sources.html</td>
                 <td>文档事实源地图</td>
@@ -829,6 +845,14 @@
                 <span class="status-pill run">Delivery Board</span>
               </div>
               <div class="asset-body">总览入口、KPI、专题页导航</div>
+              <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="roadmap.html">roadmap.html</a></div><span class="asset-path">WES-Agent-升级总看板/roadmap.html</span></div>
+                <span class="status-pill run">Delivery Board</span>
+              </div>
+              <div class="asset-body">路标管理、版本台账、需求池关联治理</div>
               <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
             </div>
             <div class="asset-card">
@@ -1045,7 +1069,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES Agent 升级总看板 · 文档事实源地图 · 2026-06-21 · 27 份资产 · 5 份历史参考
+      WES 项目管理 · 文档事实源地图 · 2026-06-30 · 28 份资产 · 5 份历史参考
     </footer>
   </main>
 

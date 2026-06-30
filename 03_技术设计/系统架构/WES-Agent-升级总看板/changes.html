@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>变更记录 · WES Agent 升级总看板</title>
+  <title>变更记录 · WES 项目管理</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,9 +12,10 @@
 <body>
   <header class="topnav">
     <div class="topnav-in">
-      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
+        <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
         <a href="runtime.html">任务运行时</a>
         <a href="plan.html">计划与进度</a>
@@ -33,10 +34,10 @@
       <div class="crumb">WES Agent · Session Retrospective</div>
       <h1>变更记录</h1>
       <p class="meta">
-        <span><b>本轮目标</b> Phase 1F 人工确认回写 Harness 审计 + 总看板更新</span>
+        <span><b>本轮目标</b> Phase 1F 人工确认回写 Harness 审计 + 项目管理更新</span>
         <span><b>当前基线</b> main @ 4bf4bcb + 本地 Phase 1F 实现变更</span>
         <span><b>状态</b> Phase 1F 已实现，完整验证与人工验收待回填</span>
-        <span><b>更新</b> 2026-06-21</span>
+        <span><b>更新</b> 2026-06-30</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">Phase 1E verified</span>
@@ -80,6 +81,13 @@
           <tr><td class="mono">测试</td><td>在计划中加入人工测试门禁，并新增测试页管理 MT-1E-001 ~ MT-1E-012 的任务与结果反馈。</td><td><span class="status run"><span class="dot"></span>待人工执行</span></td></tr>
           <tr><td class="mono">1F 实现</td><td>新增 AI 草稿人工确认接口，记录 <code class="inline">manual_confirm_ai_draft</code> ToolEvent，回写 Harness Run metadata，并在传统详情页展示确认状态。</td><td><span class="status done"><span class="dot"></span>已实现</span></td></tr>
           <tr><td class="mono">Runtime</td><td>将 Qoder Quest Runtime 启发转译为 WES Harness Run Runtime，新增任务运行时专题页与后续优化项清单。</td><td><span class="status run"><span class="dot"></span>已纳入看板</span></td></tr>
+          <tr><td class="mono">需求池复核</td><td>扫描未来需求池、需求基线、项目 TODO、R2/R3 Backlog、Agent 规格与当前代码，形成可直接修复、可排期迭代和暂不建议开工的候选清单。</td><td><span class="status run"><span class="dot"></span>2026-06-29</span></td></tr>
+          <tr><td class="mono">RP-001</td><td>修复导出历史接线：<code class="inline">/api/v1/exports/history</code> 复用 owner 维度导出目录扫描，不再返回旧空列表。</td><td><span class="status done"><span class="dot"></span>已处理</span></td></tr>
+          <tr><td class="mono">RP-002</td><td>纠偏 README、项目进展、V2 README 和 docker compose 注释中的 V0/Agent/模块迁移过期口径。</td><td><span class="status done"><span class="dot"></span>已处理</span></td></tr>
+          <tr><td class="mono">RP-003</td><td>需求详情页移除“待后续接入”占位，改为版本对比基准、附件台账和评审动态真实数据展示。</td><td><span class="status done"><span class="dot"></span>已处理</span></td></tr>
+          <tr><td class="mono">RP-008</td><td>深度研读 WPS WebOffice 官方接入文档，形成 WES 文档资产集成候选：持久化附件、在线编辑、多版本解析和导出归档必须按独立文档域规划。</td><td><span class="status run"><span class="dot"></span>已分析 / 待规划</span></td></tr>
+          <tr><td class="mono">RP-009</td><td>将 WES Agent 升级总看板改名为 WES 项目管理，并新增路标管理模块，初始化版本、路标与需求池需求的关联模型。</td><td><span class="status done"><span class="dot"></span>已处理</span></td></tr>
+          <tr><td class="mono">RP-035</td><td>吸收用户对 WES 项目管理的战略评审：不推倒重来，后续从 Documentation Driven 升级为 AI Workflow Driven / AI Native Command Center。</td><td><span class="status warn"><span class="dot"></span>已分析 / 待设计</span></td></tr>
         </table>
       </div>
     </section>
@@ -149,6 +157,40 @@
           </div>
         </div>
       </div>
+      <div class="grid-2" style="margin-top:18px">
+        <div class="panel">
+          <div class="panel-h">需求池 RP-001<span class="right">exports</span></div>
+          <div class="panel-b">
+            <ul class="list-clean">
+              <li><code class="inline">apps/api/src/modules/exports/exports.usecase.ts</code> 接入 <code class="inline">listExportHistoryByOwner</code>。</li>
+              <li>保留分页参数 <code class="inline">page</code> / <code class="inline">pageSize</code> 与统一响应结构。</li>
+              <li>新增 handler 测试覆盖当前用户导出文件可见、其他用户导出文件不可见。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-h">需求池 RP-002<span class="right">docs</span></div>
+          <div class="panel-b">
+            <ul class="list-clean">
+              <li>README 后端迁移进度修正为 18/18，Harness 更新到 Phase 1A-1F。</li>
+              <li>项目进展总结修正 Web 主线、Agent 已挂载和 3002 端口口径。</li>
+              <li>V2 README 与 docker compose 注释修正为 Vite + React 主线。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:18px">
+        <div class="panel">
+          <div class="panel-h">需求池 RP-003<span class="right">RequirementDetail</span></div>
+          <div class="panel-b">
+            <ul class="list-clean">
+              <li><code class="inline">useRequirementDetail.js</code> 新增评审摘要映射，复用已有 <code class="inline">/reviews</code>、requirement-pack 附件和版本族数据。</li>
+              <li><code class="inline">RequirementDetail.jsx</code> 将 TODO 占位替换为“版本对比基准”“附件台账”“评审动态”。</li>
+              <li>无附件或无评审时展示明确空态，并保留进入 AI 评估台上传材料的操作入口。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section>
@@ -160,7 +202,10 @@
         <tr><td class="mono">npm run test:modules -w apps/api</td><td><span class="status done"><span class="dot"></span>66 pass</span></td><td>模块级回归，含人工确认接口 route/controller 覆盖。</td></tr>
         <tr><td class="mono">npm run build -w apps/api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>后端构建。</td></tr>
         <tr><td class="mono">npm run test:agent -w apps/api</td><td><span class="status done"><span class="dot"></span>21 pass</span></td><td>Agent 层测试。</td></tr>
-        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>64 pass</span></td><td>前端 Vitest。</td></tr>
+        <tr><td class="mono">npx tsx --test --test-global-setup=./test-setup.mts src/modules/modules.handlers.test.ts</td><td><span class="status done"><span class="dot"></span>49 pass</span></td><td>本次 RP-001 RED/GREEN 定向验证；新增导出历史 owner 隔离用例。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE -- RequirementDetail.test.jsx</td><td><span class="status done"><span class="dot"></span>1 pass</span></td><td>本次 RP-003 RED/GREEN 定向验证；覆盖附件、评审、版本对比真实数据展示与占位清理。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE -- useRequirementDetail.test.js RequirementDetail.test.jsx</td><td><span class="status done"><span class="dot"></span>4 pass</span></td><td>需求详情 hook 与页面联动回归。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>65 pass</span></td><td>前端 Vitest，含 RP-003 需求详情页新增用例。</td></tr>
         <tr><td class="mono">npm run build --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>Vite 构建，有既有 chunk warning。</td></tr>
         <tr><td class="mono">node --test apps/api/dist/engine.test.js</td><td><span class="status done"><span class="dot"></span>8 pass</span></td><td>规则引擎逻辑替代验证。</td></tr>
         <tr><td class="mono">npm run test:rules / test:integration</td><td><span class="status warn"><span class="dot"></span>blocked</span></td><td>当前沙箱下 tsx IPC pipe 创建 EPERM，未进入业务断言。</td></tr>
@@ -175,7 +220,7 @@
       <table>
         <tr><th>文件</th><th>用途</th><th>状态</th></tr>
         <tr><td class="mono">WES-Agent-产品技术方案.html</td><td>原单页产品技术方案，已更新为 v0.5 Phase 1F 完成口径。</td><td><span class="status done"><span class="dot"></span>已更新</span></td></tr>
-        <tr><td class="mono">WES-Agent-升级总看板/index.html</td><td>总看板入口，三位一体状态总览。</td><td><span class="status run"><span class="dot"></span>本次新增</span></td></tr>
+        <tr><td class="mono">WES-Agent-升级总看板/index.html</td><td>项目管理入口，三位一体状态总览。</td><td><span class="status run"><span class="dot"></span>本次新增</span></td></tr>
         <tr><td class="mono">design.html / plan.html / monitoring.html</td><td>设计说明、实施计划、监控审计三大主视角。</td><td><span class="status run"><span class="dot"></span>本次新增</span></td></tr>
         <tr><td class="mono">testing.html</td><td>人工测试管理页：维护任务台账、测试结果反馈模板、缺陷分级和关闭标准。</td><td><span class="status run"><span class="dot"></span>本次新增</span></td></tr>
         <tr><td class="mono">risks.html / changes.html</td><td>风险决策与变更复盘。</td><td><span class="status run"><span class="dot"></span>本次新增</span></td></tr>
@@ -183,6 +228,12 @@
         <tr><td class="mono">phase-1f-implementation-prompt.md</td><td>Phase 1F 给 KIMI/Codex 的实现提示词，已作为本次实现边界参考，保留为审计交付物。</td><td><span class="status done"><span class="dot"></span>已执行</span></td></tr>
         <tr><td class="mono">runtime.html</td><td>任务运行时专题页：承接 Qoder 启发，沉淀 WES Harness Run 的来源、执行、产物、交付和知识边界，以及后续优化项。</td><td><span class="status run"><span class="dot"></span>本次新增</span></td></tr>
         <tr><td class="mono">sources.html</td><td>文档事实源地图：盘点 27 份资产，新增文档分层图、Phase × 文档矩阵、事实流转图，以及表格/卡片双视图清单。</td><td><span class="status run"><span class="dot"></span>本次新增</span></td></tr>
+        <tr><td class="mono">未来需求池.md / plan.html</td><td>补充 2026-06-29 需求池复核结果：导出历史接线、主线口径纠偏、需求详情 TODO 面板、Run Timeline、售前估算助手、WBS 与团队协同候选。</td><td><span class="status run"><span class="dot"></span>本次更新</span></td></tr>
+        <tr><td class="mono">未来需求池.md / plan.html / testing.html / monitoring.html</td><td>完成 RP-003 状态回填：需求详情页 TODO 占位已替换为真实数据面板，测试证据进入看板。</td><td><span class="status done"><span class="dot"></span>本次更新</span></td></tr>
+        <tr><td class="mono">README / 项目进展 / V2 README / docker-compose.yml</td><td>完成 RP-002 主线口径纠偏：Web 主线、Agent 最小基座、Harness Phase 1F、模块迁移进度和历史资产标注。</td><td><span class="status done"><span class="dot"></span>本次更新</span></td></tr>
+        <tr><td class="mono">未来需求池.md / design.html / plan.html / risks.html</td><td>补充 RP-008 WPS WebOffice 文档资产集成研读：明确不能只接 iframe，需先规划附件持久化、版本、三阶段保存回调、重复解析和导出回灌。</td><td><span class="status run"><span class="dot"></span>本次更新</span></td></tr>
+        <tr><td class="mono">roadmap.html / index.html / plan.html / sources.html</td><td>完成 RP-009：看板显示名称升级为 WES 项目管理；新增路标管理模块，初始化 <code class="inline">V-PM-0</code> / <code class="inline">RM-PM-0</code> / <code class="inline">RP-009</code> 关联。</td><td><span class="status done"><span class="dot"></span>本次更新</span></td></tr>
+        <tr><td class="mono">未来需求池.md / roadmap.html / design.html / plan.html</td><td>补充 RP-035 AI Native Command Center 升级方向：保留 Project Knowledge Center，后续新增 AI Workflow 页面并将首页升级为 AI 指挥中心。</td><td><span class="status warn"><span class="dot"></span>待设计</span></td></tr>
       </table>
     </section>
 
@@ -199,7 +250,7 @@
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 变更记录 · WES Agent 升级总看板 · 2026-06-21
+      <a href="index.html">返回总览</a> · 变更记录 · WES 项目管理 · 2026-06-30
     </footer>
   </main>
 </body>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>设计说明 · WES Agent 升级总看板</title>
+  <title>设计说明 · WES 项目管理</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,9 +12,10 @@
 <body>
   <header class="topnav">
     <div class="topnav-in">
-      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
+        <a href="roadmap.html">路标管理</a>
         <a class="active" href="design.html">设计说明</a>
         <a href="runtime.html">任务运行时</a>
         <a href="plan.html">计划与进度</a>
@@ -281,6 +282,21 @@
           <td>每个文件形成独立 evidence 和理解结果，合并报告引用来源，避免不同文件证据混杂。</td>
         </tr>
         <tr>
+          <td>WebOffice</td>
+          <td>未来集成应作为 WES 文档资产域演进，不作为单纯 iframe 组件。</td>
+          <td>WPS WebOffice 由业务方通过回调提供文件信息、下载、权限、用户、保存和历史版本；因此 WES 需要先有持久化附件、版本、解析批次、导出任务和公网回调安全边界。</td>
+        </tr>
+        <tr>
+          <td>项目治理</td>
+          <td>WES 项目管理新增路标管理层，版本与路标必须关联需求池 RP。</td>
+          <td>后续不直接把需求散落在计划页；先进入需求池，再进入路标方向，最后纳入具体版本并定义验收口径。</td>
+        </tr>
+        <tr>
+          <td>AI Native</td>
+          <td>下一代项目管理入口应从 Documentation Driven 升级为 AI Workflow Driven。</td>
+          <td>现有 Design、Plan、Requirements、Runtime、Monitoring、Risks、Changes 不推倒重来，而是作为 AI Workflow 阶段可引用的 Knowledge Assets；首页主角改为 Vision、Roadmap、Current Goal、AI Commander、AI Pipeline 和 Knowledge Center。</td>
+        </tr>
+        <tr>
           <td>缺失规则</td>
           <td>允许生成低置信度粗评，并生成待补标准/规则动作。</td>
           <td>缺标准不阻断内部讨论，但必须标记假设、缺失依据和需要管理员补标准的动作。</td>
@@ -289,7 +305,7 @@
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 设计说明 · WES Agent 升级总看板 · 2026-06-21
+      <a href="index.html">返回总览</a> · 设计说明 · WES 项目管理 · 2026-06-30
     </footer>
   </main>
 </body>

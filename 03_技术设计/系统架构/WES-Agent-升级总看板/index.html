@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WES Agent 升级总看板 · 设计 / 计划 / 监控</title>
+  <title>WES 项目管理 · 需求 / 路标 / 计划 / 监控</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,9 +12,10 @@
 <body>
   <header class="topnav">
     <div class="topnav-in">
-      <a class="brand" href="index.html"><span class="logo">W</span><span>WES Agent 升级总看板</span></a>
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a class="active" href="index.html">总览</a>
+        <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
         <a href="runtime.html">任务运行时</a>
         <a href="plan.html">计划与进度</a>
@@ -32,21 +33,22 @@
     <section class="hero">
       <div class="wrap hero-in">
         <div>
-          <span class="eyebrow"><span class="dot"></span>WES Agent Upgrade Command Board</span>
-          <h1>设计、计划、监控<br><em>三位一体</em>的升级总看板</h1>
-          <p class="lead">本看板是 WES 从传统工作量评估系统升级为 AI Agent 工作台 + WES 传统记录系统的汇报与审计入口。它把架构设计、实施路线、验证监控、风险决策和变更记录拆成可维护的专题页，并在首页统一串联。</p>
+          <span class="eyebrow"><span class="dot"></span>WES Project Management</span>
+          <h1>需求、路标、计划、监控<br><em>一体化</em>的项目管理入口</h1>
+          <p class="lead">WES 项目管理承接需求池、版本路标、实施计划、验证监控、风险决策和变更记录。它既保留 WES Agent 升级过程的审计事实，也作为后续版本规划和项目治理的统一入口。</p>
           <div class="pill-row">
             <span class="pill brand">main @ 4bf4bcb + 1F working tree</span>
             <span class="pill ok">PR #2 已合并</span>
-            <span class="pill">2026-06-21</span>
+            <span class="pill">2026-06-30</span>
             <span class="pill ok">Phase 1E 已完成</span>
             <span class="pill ok">Phase 1F 已实现</span>
+            <span class="pill brand">路标管理已初始化</span>
           </div>
           <div class="trust">
             <span><b>18/18</b> 后端模块化</span>
             <span><b>62</b> Harness tests pass</span>
             <span><b>64</b> V2 frontend tests pass</span>
-            <span><b>12</b> 人工测试任务已规划</span>
+            <span><b>1</b> 路标管理模块已初始化</span>
             <span><b>0</b> 正式业务绕过确认</span>
           </div>
         </div>
@@ -71,7 +73,7 @@
             <div class="fc-head"><b>Verification Snapshot</b><span class="fc-tag">local + CI</span></div>
             <div class="fc-row"><span>apps/api harness</span><b>62 pass</b></div>
             <div class="fc-row"><span>apps/api modules</span><b>66 pass</b></div>
-            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>64 pass</b></div>
+            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>65 pass</b></div>
             <div class="fc-row"><span>人工测试</span><b>12 待执行</b></div>
             <div class="fc-row"><span>GitHub Actions</span><b>green</b></div>
           </div>
@@ -84,7 +86,7 @@
         <div class="sec-head">
           <div class="num">Current Board</div>
           <h2>当前总览</h2>
-          <p>首页只回答三个问题：现在系统处于什么状态，下一步应该做什么，风险和审计证据在哪里。</p>
+          <p>首页回答四个问题：需求在哪里，路标怎么承接，当前系统处于什么状态，风险和审计证据在哪里。</p>
         </div>
         <div class="kpi-row">
           <div class="kpi">
@@ -109,11 +111,11 @@
             <div class="sub">run / artifact / modelRun / toolEvent</div>
           </div>
           <div class="kpi">
-            <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">F</span><span>1F 任务包</span></div>
-            <div class="v">4</div>
-            <div class="lb">回写、权限、前端状态、测试文档</div>
+            <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">R</span><span>路标管理</span></div>
+            <div class="v">1</div>
+            <div class="lb">V-PM-0 / RM-PM-0 / RP-009</div>
             <div class="bar"><i style="width:88%;background:linear-gradient(90deg,var(--ok),var(--accent))"></i></div>
-            <div class="sub">实现已落地，待完整验证结果回填</div>
+            <div class="sub">版本、路标、需求关联模型已初始化</div>
           </div>
         </div>
       </div>
@@ -129,7 +131,7 @@
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">D</span><span>文档资产</span></div>
-            <div class="v">27</div>
+            <div class="v">28</div>
             <div class="lb">已盘点文档总数</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
@@ -141,8 +143,8 @@
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">P</span><span>看板页面</span></div>
-            <div class="v">10</div>
-            <div class="lb">总看板 HTML 页面</div>
+            <div class="v">11</div>
+            <div class="lb">项目管理 HTML 页面</div>
             <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
           </div>
           <div class="kpi">
@@ -157,7 +159,7 @@
             <span class="ico" style="background:var(--brand-soft);color:var(--brand)">M</span>
             <h3>打开文档事实源地图</h3>
             <p>查看文档分层图、Phase × 文档矩阵、事实流转图，以及完整的表格/卡片双视图清单。</p>
-            <div class="preview">27 assets · 4 layers · 3 visualizations</div>
+            <div class="preview">28 assets · 4 layers · 3 visualizations</div>
             <span class="arr">打开 sources.html →</span>
           </a>
           <div class="card">
@@ -177,11 +179,16 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">Triad Model</div>
-          <h2>三位一体的信息架构</h2>
-          <p>总看板不是替代设计文档，而是把设计、计划、监控从一个长文档拆成可独立审阅、可持续更新的交付物。</p>
+          <div class="num">Project Model</div>
+          <h2>项目管理的信息架构</h2>
+          <p>WES 项目管理不是替代需求或设计文档，而是把需求池、路标、计划、监控从长文档拆成可独立审阅、可持续更新的交付物。</p>
         </div>
         <div class="grid-3">
+          <div class="card">
+            <span class="pill brand">Roadmap</span>
+            <h3>路标管理</h3>
+            <p>管理版本、路标和需求池关联。这里回答“哪些需求进入哪个产品方向和交付窗口”。</p>
+          </div>
           <div class="card">
             <span class="pill brand">Design</span>
             <h3>设计说明</h3>
@@ -226,6 +233,13 @@
           <p>每个页面都是一个可审计视角。后续汇报时先看首页，再按问题跳转到专题页。</p>
         </div>
         <div class="res-grid">
+          <a class="res-card" href="roadmap.html">
+            <span class="ico" style="background:var(--brand-soft);color:var(--brand)">00</span>
+            <h3>路标管理</h3>
+            <p>管理版本、路标与需求池 RP 的关联，初始化 V-PM-0 / RM-PM-0 / RP-009，并保留后续规划入口。</p>
+            <div class="preview">Version · Roadmap · Requirement Pool</div>
+            <span class="arr">打开路标管理 →</span>
+          </a>
           <a class="res-card" href="design.html">
             <span class="ico">01</span>
             <h3>设计说明</h3>
@@ -278,7 +292,7 @@
           <a class="res-card" href="../WES-Agent-产品技术方案.html">
             <span class="ico" style="background:var(--bg-soft);color:var(--ink-2)">R</span>
             <h3>原产品技术方案</h3>
-            <p>保留为详细资料源，当前总看板从中抽取已合并事实和后续方向。</p>
+            <p>保留为详细资料源，当前项目管理入口从中抽取已合并事实和后续方向。</p>
             <div class="preview">v0.5 Phase 1F 完成口径 · 2026-06-21</div>
             <span class="arr">打开原文档 →</span>
           </a>
@@ -302,7 +316,7 @@
                 <li>1E 基线：AI 工作台 confirm 结果可跳转到传统草稿详情。</li>
                 <li>1E 基线：详情页展示 Harness Run ID / Action ID / 版本号。</li>
                 <li>1F 已实现：人工确认后回写 Harness ToolEvent 与 metadata。</li>
-                <li>1F 交付：后端、前端、测试、OpenAPI 和总看板同步。</li>
+                <li>1F 交付：后端、前端、测试、OpenAPI 和项目管理看板同步。</li>
                 <li>仍不引入向量库、Prompt Profile CRUD、标准治理 Harness 化。</li>
               </ul>
             </div>
@@ -339,7 +353,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES Agent 升级总看板 · 设计 / 计划 / 监控 · 2026-06-21 · main @ 4bf4bcb + Phase 1F working tree
+      WES 项目管理 · 需求 / 路标 / 计划 / 监控 · 2026-06-30 · main @ 4bf4bcb + Phase 1F working tree
     </footer>
   </main>
 </body>
