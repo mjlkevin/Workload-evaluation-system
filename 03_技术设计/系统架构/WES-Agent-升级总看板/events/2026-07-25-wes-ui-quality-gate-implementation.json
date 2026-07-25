@@ -1,0 +1,58 @@
+{
+  "id": "BE-2026-07-25-wes-ui-quality-gate-implementation",
+  "date": "2026-07-25",
+  "type": "implementation",
+  "scope": "RP-043 WES UI 质量门禁与系统管理共享 Dialog 试点",
+  "summary": "完成项目内 improving-wes-ui Skill、RED/GREEN 压力验证、无新增依赖的共享可访问 Dialog，以及 SystemManagement 四处弹窗迁移；自动化与构建通过，真实浏览器因缺少有效管理员会话停在登录页，桌面、窄屏、键盘和拖拽人工证据待回填。",
+  "status": "已实现 / 自动化通过 / 人工待回填",
+  "pages": ["index", "requirements", "plan", "testing", "monitoring", "risks", "changes", "sources"],
+  "evidence": [
+    {
+      "kind": "artifact",
+      "ref": "skills/improving-wes-ui/SKILL.md; skills/improving-wes-ui/references/quality-checklist.md; skills/improving-wes-ui/references/upstream-provenance.md",
+      "summary": "项目内 UI 改进门禁固定上游来源，强制 WES 技术栈、Issue-first、单页面族和最多三个根问题边界。"
+    },
+    {
+      "kind": "verification",
+      "ref": "node --test skills/improving-wes-ui/scripts/check-ui-scope.test.mjs",
+      "summary": "Skill 确定性检查器 3/3 通过；Skill 结构 quick_validate 通过。"
+    },
+    {
+      "kind": "artifact",
+      "ref": "docs/superpowers/evaluations/2026-07-25-improving-wes-ui-red-green.md",
+      "summary": "保留两组 RED 与 GREEN 压力样本，证明门禁能阻止第二技术栈、全站重构和把静态候选误报为已证实缺陷。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/components/ui/Dialog.jsx; ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx; ui/V2_PROTOTYPE/components.css",
+      "summary": "新增共享 Dialog owner，覆盖原生 dialog/可访问降级、标题描述关联、关闭按钮、Escape、初始焦点、Tab 环、焦点恢复、遮罩策略和视口内拖拽，并迁移 SystemManagement 四处弹窗。"
+    },
+    {
+      "kind": "verification",
+      "ref": "Dialog.test.jsx; SystemManagementDialogs.test.jsx; SystemManagementCodeRules.test.jsx; SystemManagementKnowledgeBase.test.jsx",
+      "summary": "Dialog 与系统管理聚焦测试 13/13，通过语义、焦点、关闭、拖拽和既有业务动作回归。"
+    },
+    {
+      "kind": "verification",
+      "ref": "npm run test:web; npm run build:web",
+      "summary": "V2 Web 全量回归 128/128；生产构建通过，共转换 114 个模块，仅保留既有 606.21 kB 大 chunk 警告。"
+    },
+    {
+      "kind": "artifact",
+      "ref": "docs/superpowers/evaluations/2026-07-25-system-management-dialog-qa.md; docs/superpowers/evaluations/assets/rp-043/00-authentication-blocked.png",
+      "summary": "浏览器验收记录显示受保护路由正确跳转登录页、控制台无错误；因无有效管理员会话未进入系统管理，1440/760、键盘与拖拽人工证据保持待回填。"
+    },
+    {
+      "kind": "commit",
+      "ref": "03c115c; a59b93b",
+      "summary": "分别提交项目内 UI Skill 与共享 Dialog/SystemManagement 试点实现。"
+    }
+  ],
+  "next": "在保留的 Chrome 登录页取得有效管理员会话后，补做 1440px 与 760px 视口、键盘焦点路径、Escape、遮罩策略和拖拽边界人工验收；通过前不扩展迁移其他 Dialog，也不把 RP-043 标记为已交付。",
+  "board": {
+    "change": {
+      "stage": "RP-043 UI 质量门禁实施",
+      "result": "已实现 / 自动化通过 / 人工待回填"
+    }
+  }
+}
