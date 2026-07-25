@@ -163,6 +163,42 @@ test("KimiProvider: fetch timeout 会按 retryable 错误重试并返回后续�
   }
 });
 
+test("KimiProvider: caller abort signal cancels the upstream request without retry", async () => {
+  const originalFetch = globalThis.fetch;
+  const controller = new AbortController();
+  controller.abort();
+  let receivedSignal: AbortSignal | undefined;
+  let callCount = 0;
+  globalThis.fetch = async (_input, init) => {
+    callCount += 1;
+    receivedSignal = init?.signal as AbortSignal;
+    throw new DOMException("The operation was aborted.", "AbortError");
+  };
+
+  try {
+    const provider = new KimiProvider({ apiKey: "test-key", defaultMaxAttempts: 3 });
+    const stream = provider.streamChatCompletion({
+      messages: [{ role: "user", content: "停止" }],
+      abortSignal: controller.signal,
+    })[Symbol.asyncIterator]();
+
+    await assert.rejects(
+      () => stream.next(),
+      (err) => {
+        assert.ok(err instanceof ProviderError);
+        assert.equal(err.code, "request_failed");
+        assert.equal(err.legacyReason, "client_aborted");
+        assert.equal(err.retryable, false);
+        return true;
+      },
+    );
+    assert.equal((receivedSignal as AbortSignal | undefined)?.aborted, true);
+    assert.equal(callCount, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("KimiProvider: K2 请求省略 temperature 并透传 Kimi 专属补全参数与 usage", async () => {
   const originalFetch = globalThis.fetch;
   let capturedBody: Record<string, unknown> | undefined;

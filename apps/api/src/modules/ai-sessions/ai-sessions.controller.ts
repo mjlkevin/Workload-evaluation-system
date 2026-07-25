@@ -9,7 +9,8 @@ import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, l
 export function createSession(req: Request, res: Response) {
   const auth = requireAuth(req, res);
   if (!auth) return;
-  return res.json(ok({ session: createAiSession(auth.user, req.body || {}) }, randomUUID()));
+  const session = createAiSession(auth.user, req.body || {});
+  return res.json(ok({ session }, randomUUID()));
 }
 
 export function listSessions(req: Request, res: Response) {

@@ -142,6 +142,7 @@ export class KimiProvider implements ModelProvider {
         timeoutMs,
         attempt,
         maxAttempts,
+        req.abortSignal,
       );
       if (responseOrRetryableError instanceof ProviderError) {
         lastError = responseOrRetryableError;
@@ -165,6 +166,7 @@ export class KimiProvider implements ModelProvider {
           timeoutMs,
           attempt,
           maxAttempts,
+          req.abortSignal,
         );
         if (retriedOrRetryableError instanceof ProviderError) {
           lastError = retriedOrRetryableError;
@@ -240,6 +242,7 @@ export class KimiProvider implements ModelProvider {
         streamTimeoutMs,
         attempt,
         maxAttempts,
+        req.abortSignal,
       );
       if (responseOrRetryableError instanceof ProviderError) {
         lastError = responseOrRetryableError;
@@ -262,6 +265,7 @@ export class KimiProvider implements ModelProvider {
           streamTimeoutMs,
           attempt,
           maxAttempts,
+          req.abortSignal,
         );
         if (retriedOrRetryableError instanceof ProviderError) {
           lastError = retriedOrRetryableError;
@@ -403,8 +407,13 @@ async function fetchOnce(
   apiKey: string,
   body: Record<string, unknown>,
   timeoutMs: number,
+  abortSignal?: AbortSignal,
 ): Promise<globalThis.Response> {
   try {
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const signal = abortSignal
+      ? AbortSignal.any([timeoutSignal, abortSignal])
+      : timeoutSignal;
     return await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -412,9 +421,17 @@ async function fetchOnce(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal,
     });
   } catch (e) {
+    if (abortSignal?.aborted) {
+      throw new ProviderError("request_failed", "client_aborted", {
+        providerName: PROVIDER_NAME,
+        retryable: false,
+        legacyReason: "client_aborted",
+        cause: e,
+      });
+    }
     if (isFetchAbortError(e)) {
       throw new ProviderError("timeout", "kimi_request_timeout", {
         providerName: PROVIDER_NAME,
@@ -438,9 +455,10 @@ async function fetchAttemptOrRetryableError(
   timeoutMs: number,
   attempt: number,
   maxAttempts: number,
+  abortSignal?: AbortSignal,
 ): Promise<globalThis.Response | ProviderError> {
   try {
-    return await fetchOnce(endpoint, apiKey, body, timeoutMs);
+    return await fetchOnce(endpoint, apiKey, body, timeoutMs, abortSignal);
   } catch (e) {
     if (e instanceof ProviderError && e.retryable && attempt < maxAttempts) {
       return e;
@@ -511,8 +529,8 @@ async function* parseStream(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let content = "";
-  let reasoningContent = "";
+  // P1-1: 不再累积 content/reasoningContent 完整文本。原实现每次 yield 携带累积完整文本
+  // 导致 O(N²) 传输（2000 token 回复 ~2MB）。消费方仅需 contentDelta，自行累积即可。
   let finishReason: string | undefined;
   let lastUsage: TokenUsage | undefined;
 
@@ -560,13 +578,10 @@ async function* parseStream(
           const streamUsage = extractUsage(json?.usage);
           if (streamUsage) lastUsage = streamUsage;
           if (!delta && !reasoningDelta && !finishReason && !streamUsage) continue;
-          content += delta;
-          reasoningContent += reasoningDelta;
+          // P1-1: 仅 yield delta，不再携带累积的 content/reasoningContent 字段
           yield {
             contentDelta: delta,
-            content,
             reasoningContentDelta: reasoningDelta || undefined,
-            reasoningContent: reasoningContent || undefined,
             model,
             provider: PROVIDER_NAME,
             attempts,

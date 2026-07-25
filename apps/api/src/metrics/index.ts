@@ -49,3 +49,11 @@ export const aiProviderRequestsTotal = new Counter({
   labelNames: ["provider", "status"],
   registers: [register],
 });
+
+// ---------- 结构化输出契约事件总量 ----------
+export const structuredOutputEventsTotal = new Counter({
+  name: "structured_output_events_total",
+  help: "Total number of structured output contract events",
+  labelNames: ["contract_id", "schema_version", "outcome"],
+  registers: [register],
+});

@@ -11,6 +11,7 @@
 
 import { config } from "../config/env";
 import { KimiProvider, defaultProviderRegistry } from "./provider";
+import { CircuitBreakingProvider } from "./provider/circuit-breaker";
 
 let bootstrapped = false;
 
@@ -23,7 +24,13 @@ export function bootstrapAiProviders(): void {
     apiBaseUrl: config.kimi.apiBaseUrl,
     defaultModel: config.kimi.model,
   });
-  defaultProviderRegistry.register(kimi, { asDefault: true });
+  // 用断路器包裹 KimiProvider：连续 5 次 trippable 错误后进入 OPEN 状态
+  // （快速失败 30s），后半开试探 1 请求，避免 Kimi 宕机时高并发耗尽连接池。
+  const provider = new CircuitBreakingProvider(kimi, {
+    failureThreshold: 5,
+    resetTimeoutMs: 30_000,
+  });
+  defaultProviderRegistry.register(provider, { asDefault: true });
 }
 
 /** 测试场景下重置注册状态（生产路径不调用） */

@@ -75,6 +75,8 @@ export interface ChatCompletionRequest {
   responseFormat?: ResponseFormat;
   /** 单次 HTTP 超时上限（毫秒），不传使用 Provider 默认 */
   timeoutMs?: number;
+  /** 调用方取消信号；用于客户端断开时终止上游模型请求。 */
+  abortSignal?: AbortSignal;
   /** 最大尝试次数（含首次），不传使用 Provider 默认（通常 3） */
   maxAttempts?: number;
   /** 每次请求级别的凭据覆盖，用于多租户 / 用户自管 Key 场景 */
@@ -119,11 +121,22 @@ export interface ChatCompletionResponse {
 export interface ChatCompletionStreamChunk {
   /** 本次 SSE chunk 的增量文本 */
   contentDelta: string;
-  /** 截止当前已累积的完整文本 */
-  content: string;
+  /**
+   * 截止当前已累积的完整文本。
+   *
+   * @deprecated P1-1: 已废弃，Provider 不再累积完整文本。原实现每次 yield 携带累积完整文本
+   * 导致 O(N²) 传输量（2000 token 回复 ~2MB）。消费方应使用 contentDelta 自行累积。
+   * 保留为 optional 字段以确保向后兼容，但值通常为 undefined。
+   */
+  content?: string;
   /** 本次 SSE chunk 的思考增量文本（Kimi reasoning_content） */
   reasoningContentDelta?: string;
-  /** 截止当前已累积的完整思考文本 */
+  /**
+   * 截止当前已累积的完整思考文本。
+   *
+   * @deprecated P1-1: 已废弃，Provider 不再累积完整思考文本。消费方应使用 reasoningContentDelta 自行累积。
+   * 保留为 optional 字段以确保向后兼容，但值通常为 undefined。
+   */
   reasoningContent?: string;
   /** 实际使用的模型 id（经过 Provider 归一化） */
   model: string;

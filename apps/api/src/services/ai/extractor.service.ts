@@ -7,6 +7,7 @@ import { config } from "../../config/env";
 import { asString, normalizeCellText } from "../../utils/helpers";
 import { normalizeKimiModelName } from "../../utils/model-name";
 import { ok, fail } from "../../utils/response";
+import { openSse, writeSse, createAbortBridge, type AbortGuard } from "../../utils/sse";
 import {
   loadRequirementSystemConfigStore,
   resolveActiveRequirementKimiApiKey,
@@ -21,7 +22,12 @@ import {
   parseRequirementImportFromWorkbook,
 } from "../ai-workbook";
 import { defaultProviderRegistry, type ModelProvider } from "../../ai/provider";
-import { parseJsonFromModelText } from "./assessment.service";
+import {
+  parseStructuredOutput,
+  responseFormatForContract,
+  runStructuredCompletion,
+} from "../../ai/contracts/structured-output";
+import { REQUIREMENT_IMPORT_CONTRACT } from "../../ai/contracts/wes-contracts";
 
 function getKimiProvider(): ModelProvider {
   const provider = defaultProviderRegistry.get("kimi");
@@ -208,9 +214,31 @@ function buildLocalWorkbookParsePayload(params: {
 }
 
 async function parseRequirementImportByKimi(params: { apiUrl: string; apiKey: string; model: string; workbookText: string; timeoutMs: number; }) {
-  const completion = await getKimiProvider().chatCompletion({ model: params.model, temperature: 0.1, responseFormat: "json_object", promptCacheKey: "requirement-import-parser-v1", timeoutMs: params.timeoutMs, credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl }, messages: buildRequirementImportMessages(params.workbookText) });
-  const parsed = parseJsonFromModelText(completion.content);
-  return { basicInfo: normalizeBasicProjectInfo(asModelObject(parsed.basicInfo) || parsed), requirementImportData: normalizeRequirementImportData(parsed), rawContent: completion.content };
+  const result = await runStructuredCompletion({
+    provider: getKimiProvider(),
+    contract: REQUIREMENT_IMPORT_CONTRACT,
+    request: {
+      model: params.model,
+      temperature: 0.1,
+      promptCacheKey: "requirement-import-parser-v1",
+      timeoutMs: params.timeoutMs,
+      credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl },
+      messages: buildRequirementImportMessages(params.workbookText),
+    },
+  });
+  const parsed = result.data as unknown as Record<string, unknown>;
+  return {
+    basicInfo: normalizeBasicProjectInfo(asModelObject(parsed.basicInfo)),
+    requirementImportData: normalizeRequirementImportData(parsed),
+    rawContent: result.rawContent,
+    structuredOutput: {
+      contractId: result.contractId,
+      schemaVersion: result.schemaVersion,
+      responseFormat: result.responseFormat,
+      repairAttempts: result.repairAttempts,
+      fallbackReason: result.fallbackReason,
+    },
+  };
 }
 
 async function parseRequirementImportByKimiStream(
@@ -220,50 +248,83 @@ async function parseRequirementImportByKimiStream(
     model: string;
     workbookText: string;
     timeoutMs: number;
-    onModelStart: () => void;
-    onDelta: (info: { deltaChars: number; totalChars: number }) => void;
+    abortGuard: AbortGuard;
+    // P1-2：回调支持 async，以便在写入 SSE 时感知背压
+    onModelStart: () => Promise<void> | void;
+    onDelta: (info: { deltaChars: number; totalChars: number }) => Promise<void> | void;
   },
 ) {
   const provider = getKimiProvider();
   if (!provider.streamChatCompletion) throw new Error("kimi_stream_not_supported");
   let rawContent = "";
   let started = false;
+  // P0-2：将 abortGuard.signal 透传至 Provider fetch，实现客户端断开后上游 fetch 立即取消
   for await (const chunk of provider.streamChatCompletion({
     model: params.model,
     temperature: 0.1,
-    responseFormat: "json_object",
+    responseFormat: responseFormatForContract(REQUIREMENT_IMPORT_CONTRACT),
     promptCacheKey: "requirement-import-parser-v1",
     timeoutMs: params.timeoutMs,
     credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl },
     messages: buildRequirementImportMessages(params.workbookText),
+    abortSignal: params.abortGuard.signal,
   })) {
+    // P0-1：客户端断开时提前退出消费循环，避免向已关闭 socket 盲写触发 EPIPE
+    if (params.abortGuard.isAborted()) break;
     if (chunk.contentDelta) {
-      rawContent = chunk.content;
+      rawContent += chunk.contentDelta;
       if (!started) {
         started = true;
-        params.onModelStart();
+        await params.onModelStart();
       }
-      params.onDelta({ deltaChars: chunk.contentDelta.length, totalChars: rawContent.length });
+      await params.onDelta({ deltaChars: chunk.contentDelta.length, totalChars: rawContent.length });
     }
   }
   if (!rawContent) throw new Error("model_empty_response");
-  const parsed = parseJsonFromModelText(rawContent);
-  return { basicInfo: normalizeBasicProjectInfo(asModelObject(parsed.basicInfo) || parsed), requirementImportData: normalizeRequirementImportData(parsed), rawContent };
+  try {
+    const parsed = parseStructuredOutput(REQUIREMENT_IMPORT_CONTRACT, rawContent) as unknown as Record<string, unknown>;
+    return {
+      basicInfo: normalizeBasicProjectInfo(asModelObject(parsed.basicInfo)),
+      requirementImportData: normalizeRequirementImportData(parsed),
+      rawContent,
+      structuredOutput: {
+        contractId: REQUIREMENT_IMPORT_CONTRACT.id,
+        schemaVersion: REQUIREMENT_IMPORT_CONTRACT.version,
+        responseFormat: "json_schema" as const,
+        repairAttempts: 0,
+      },
+    };
+  } catch {
+    const repaired = await runStructuredCompletion({
+      provider,
+      contract: REQUIREMENT_IMPORT_CONTRACT,
+      request: {
+        model: params.model,
+        temperature: 0.1,
+        promptCacheKey: "requirement-import-parser-v1-repair",
+        timeoutMs: params.timeoutMs,
+        credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl },
+        messages: buildRequirementImportMessages(params.workbookText),
+        abortSignal: params.abortGuard.signal,
+      },
+    });
+    const parsed = repaired.data as unknown as Record<string, unknown>;
+    return {
+      basicInfo: normalizeBasicProjectInfo(asModelObject(parsed.basicInfo)),
+      requirementImportData: normalizeRequirementImportData(parsed),
+      rawContent: repaired.rawContent,
+      structuredOutput: {
+        contractId: repaired.contractId,
+        schemaVersion: repaired.schemaVersion,
+        responseFormat: repaired.responseFormat,
+        repairAttempts: repaired.repairAttempts + 1,
+        fallbackReason: repaired.fallbackReason,
+      },
+    };
+  }
 }
 
-function writeSse(res: Response, event: string, data: unknown) {
-  res.write(`event: ${event}\n`);
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
-}
-
-function openSse(res: Response) {
-  res.status(200);
-  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders?.();
-}
+// writeSse / openSse 已迁移至 ../../utils/sse（P0-1 统一 SSE 基础设施）
 
 function parseBasicInfoFromWorkbook(workbook: XLSX.WorkBook): BasicProjectInfo {
   const rows = getSheetRows(workbook, workbook.SheetNames.find((n) => asString(n).includes("项目概况")) || "");
@@ -338,7 +399,7 @@ export async function parseBasicInfo(req: Request, res: Response) {
 
     const mergedBasic = mergeBasicInfo(parsed.basicInfo, workbookBasicInfo);
     const mergedRequirement = mergeRequirementImportData(parsed.requirementImportData, workbookRequirementData);
-    return res.json(ok({ basicInfo: { ...mergedBasic, productLines: mergedBasic.productLines?.length ? mergedBasic.productLines : inferProductLinesFromProductModules(mergedRequirement.productModuleRows) }, requirementImportData: mergedRequirement, sourceSheets: workbook.SheetNames, model: modelForClient, mode: "model", fallbackReason: "", rawContent: parsed.rawContent }, requestId));
+    return res.json(ok({ basicInfo: { ...mergedBasic, productLines: mergedBasic.productLines?.length ? mergedBasic.productLines : inferProductLinesFromProductModules(mergedRequirement.productModuleRows) }, requirementImportData: mergedRequirement, sourceSheets: workbook.SheetNames, model: modelForClient, mode: parsed.structuredOutput.repairAttempts > 0 ? "model_repaired" : "model", fallbackReason: parsed.structuredOutput.fallbackReason || "", rawContent: parsed.rawContent, structuredOutput: parsed.structuredOutput }, requestId));
   } catch (err) {
     return fail(res, 40001, "参数错误", [{ field: "file/api", reason: err instanceof Error ? err.message : "parse_failed" }]);
   }
@@ -346,22 +407,30 @@ export async function parseBasicInfo(req: Request, res: Response) {
 
 export async function parseBasicInfoStream(req: Request, res: Response) {
   const requestId = randomUUID();
+  // openSse 必须在 createAbortBridge 之前：若 openSse 抛错（如 res 已结束），
+  // createAbortBridge 尚未创建，finally 的 cleanup 不会因未定义而报错，避免监听器泄漏。
+  // 与 chat.service.ts 的顺序保持一致。
   openSse(res);
-  if (!req.file) {
-    writeSse(res, "error", { message: "参数错误", reason: "file_required", requestId });
-    return res.end();
-  }
-
+  // P0-1：extractor 文件解析可能较慢，idle 超时设为 60s；总超时 3 分钟
+  const abortGuard = createAbortBridge(req, res, { totalTimeoutMs: 180_000, idleTimeoutMs: 60_000 });
   try {
-    writeSse(res, "progress", { message: "已收到文件，正在读取 Excel…", progress: 8 });
+    if (!req.file) {
+      await writeSse(res, "error", { message: "参数错误", reason: "file_required", retryable: false, requestId }, abortGuard);
+      abortGuard.resetIdleTimer();
+      return res.end();
+    }
+
+    await writeSse(res, "progress", { message: "已收到文件，正在读取 Excel…", progress: 8 }, abortGuard);
+    abortGuard.resetIdleTimer();
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const workbookText = buildWorkbookPreviewText(workbook);
     const workbookBasicInfo = parseBasicInfoFromWorkbook(workbook);
     const workbookRequirementData = parseRequirementImportFromWorkbook(workbook);
-    writeSse(res, "progress", {
+    await writeSse(res, "progress", {
       message: `规则解析完成，已读取 ${workbook.SheetNames.length} 个工作表。`,
       progress: 24,
-    });
+    }, abortGuard);
+    abortGuard.resetIdleTimer();
 
     const { apiKey } = resolveActiveRequirementKimiApiKey();
     const requirementSettings = loadRequirementSystemConfigStore().active;
@@ -369,15 +438,17 @@ export async function parseBasicInfoStream(req: Request, res: Response) {
     const modelForClient = normalizeKimiModelName(model);
 
     if (!apiKey) {
-      writeSse(res, "error", { message: "参数错误", reason: "required_or_env_missing", requestId });
+      await writeSse(res, "error", { message: "参数错误", reason: "required_or_env_missing", retryable: false, requestId }, abortGuard);
+      abortGuard.resetIdleTimer();
       return res.end();
     }
 
-    writeSse(res, "progress", {
+    await writeSse(res, "progress", {
       message: `解析请求已发送，正在等待 ${modelForClient} 返回结果…`,
       progress: 40,
       model: modelForClient,
-    });
+    }, abortGuard);
+    abortGuard.resetIdleTimer();
 
     let parsed: Awaited<ReturnType<typeof parseRequirementImportByKimiStream>>;
     try {
@@ -387,33 +458,40 @@ export async function parseBasicInfoStream(req: Request, res: Response) {
         model,
         workbookText,
         timeoutMs: requirementSettings.kimiEvaluation.timeoutMs || 120000,
-        onModelStart: () => {
-          writeSse(res, "model_start", {
+        abortGuard,
+        onModelStart: async () => {
+          await writeSse(res, "model_start", {
             message: `${modelForClient} 已开始返回内容…`,
             progress: 48,
             model: modelForClient,
-          });
+          }, abortGuard);
+          abortGuard.resetIdleTimer();
         },
-        onDelta: ({ deltaChars, totalChars }) => {
-          writeSse(res, "model_delta", {
+        onDelta: async ({ deltaChars, totalChars }) => {
+          await writeSse(res, "model_delta", {
             message: `已收到部分内容（累计 ${totalChars} 字符）…`,
             progress: Math.min(84, 48 + Math.floor(totalChars / 160)),
             model: modelForClient,
             deltaChars,
             totalChars,
-          });
+          }, abortGuard);
+          abortGuard.resetIdleTimer();
         },
       });
     } catch (err) {
-      writeSse(res, "error", {
+      const modelErrorReason = err instanceof Error ? err.message : "model_parse_failed";
+      await writeSse(res, "error", {
         message: `${modelForClient} 未能完成解析。`,
-        reason: err instanceof Error ? err.message : "model_parse_failed",
+        reason: modelErrorReason,
+        retryable: modelErrorReason !== "client_aborted",
         requestId,
-      });
+      }, abortGuard);
+      abortGuard.resetIdleTimer();
       return res.end();
     }
 
-    writeSse(res, "progress", { message: "模型内容接收完成，正在合并回填结果…", progress: 88 });
+    await writeSse(res, "progress", { message: "模型内容接收完成，正在合并回填结果…", progress: 88 }, abortGuard);
+    abortGuard.resetIdleTimer();
     const mergedBasic = mergeBasicInfo(parsed.basicInfo, workbookBasicInfo);
     const mergedRequirement = mergeRequirementImportData(parsed.requirementImportData, workbookRequirementData);
     const data = {
@@ -427,17 +505,25 @@ export async function parseBasicInfoStream(req: Request, res: Response) {
       sourceSheets: workbook.SheetNames,
       model: modelForClient,
       mode: "model",
-      fallbackReason: "",
+      fallbackReason: parsed.structuredOutput.fallbackReason || "",
       rawContent: parsed.rawContent,
+      structuredOutput: parsed.structuredOutput,
     };
-    writeSse(res, "complete", { data, requestId });
+    await writeSse(res, "complete", { data, requestId }, abortGuard);
+    abortGuard.resetIdleTimer();
     return res.end();
   } catch (err) {
-    writeSse(res, "error", {
+    const parseErrorReason = err instanceof Error ? err.message : "parse_failed";
+    await writeSse(res, "error", {
       message: "参数错误",
-      reason: err instanceof Error ? err.message : "parse_failed",
+      reason: parseErrorReason,
+      retryable: parseErrorReason !== "client_aborted",
       requestId,
-    });
+    }, abortGuard);
+    abortGuard.resetIdleTimer();
     return res.end();
+  } finally {
+    // 移除 abort 监听器与清除超时计时器，防止内存泄漏
+    abortGuard.cleanup();
   }
 }

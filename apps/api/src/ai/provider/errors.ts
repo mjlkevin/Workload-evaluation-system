@@ -25,7 +25,8 @@ export type ProviderErrorCode =
   | "timeout"
   | "bad_request"
   | "empty_response"
-  | "request_failed";
+  | "request_failed"
+  | "circuit_open";
 
 export interface ProviderErrorOptions {
   status?: number;

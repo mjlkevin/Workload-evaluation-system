@@ -2785,6 +2785,43 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/system/knowledge-base-config/test:
+    post:
+      tags: [System]
+      summary: 测试智谱知识库连通性（admin）
+      description: 上游检索接口返回成功但固定测试语句未命中文档时，仍视为连通性通过，并在 data.warning 中返回 retrieval_empty。
+      operationId: testKnowledgeBaseConnectivity
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiKey:
+                  type: string
+                knowledgeId:
+                  type: string
+      responses:
+        "200":
+          description: 连通性测试通过
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeBaseConnectivityTestResponse"
+        "400":
+          description: 参数错误或上游连接失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/v1/system/implementation-dependency-rules:
     get:
       tags: [System]
@@ -6816,6 +6853,39 @@ components:
             model:
               type: string
           required: [ok]
+      required: [code, message, data]
+
+    KnowledgeBaseConnectivityTestResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            ok:
+              type: boolean
+              const: true
+            testedSource:
+              type: string
+              enum: [request_body, draft_store, environment]
+            model:
+              type: string
+            knowledgeId:
+              type: string
+            latencyMs:
+              type: integer
+            retrievalTriggered:
+              type: boolean
+            warning:
+              type: string
+              enum: [retrieval_empty]
+              description: 上游接口可达，但固定测试语句未命中文档。
+          required: [ok, testedSource, model, knowledgeId, latencyMs, retrievalTriggered]
       required: [code, message, data]
 
     ChatResponse:
