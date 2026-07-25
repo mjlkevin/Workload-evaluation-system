@@ -15,6 +15,7 @@ describe('UserManagement', () => {
     const editArch = await screen.findByRole('button', { name: '编辑 arch' })
 
     expect(screen.queryByText(/已选 0/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ 邀请成员' })).not.toBeInTheDocument()
 
     fireEvent.click(editArch)
 
@@ -31,6 +32,9 @@ describe('UserManagement', () => {
     const selectionBar = selectedSummary.closest('.user-management__selection')
     expect(selectionBar).not.toBeNull()
     expect(within(selectionBar).getByRole('button', { name: '清除选择' })).toBeInTheDocument()
+    for (const actionName of ['批量启用', '批量禁用', '改系统角色', '改业务角色']) {
+      expect(within(selectionBar).getByRole('button', { name: actionName })).toBeInTheDocument()
+    }
     expect(within(selectionBar).queryByRole('button', { name: /重置密码/ })).not.toBeInTheDocument()
   })
 
@@ -50,7 +54,22 @@ describe('UserManagement', () => {
       expect(screen.queryByText('已选 1 人')).not.toBeInTheDocument()
     })
 
+    fireEvent.change(screen.getByLabelText('状态'), { target: { value: 'active' } })
+    fireEvent.change(screen.getByPlaceholderText('搜索用户名 / 邮箱'), {
+      target: { value: 'pm@wes.local' },
+    })
+    expect(screen.getByRole('checkbox', { name: '选择 pm' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: '选择 arch' })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText('搜索用户名 / 邮箱'), {
+      target: { value: 'nobody@wes.local' },
+    })
+    expect(screen.queryByRole('checkbox', { name: '选择 pm' })).not.toBeInTheDocument()
+
     fireEvent.change(screen.getByLabelText('状态'), { target: { value: 'disabled' } })
+    fireEvent.change(screen.getByPlaceholderText('搜索用户名 / 邮箱'), {
+      target: { value: '' },
+    })
     expect(screen.queryByRole('checkbox', { name: '选择 pm' })).not.toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('系统角色'), { target: { value: 'all' } })
