@@ -161,14 +161,14 @@ describe('UserManagement', () => {
     expect(screen.queryByRole('checkbox', { name: '选择 pm' })).not.toBeInTheDocument()
   })
 
-  test('persists changed user fields in business-role then role order', async () => {
+  test('persists changed user fields in business-role then role then status order', async () => {
     let serverUser = {
       id: 'u3',
       username: 'arch',
       email: 'arch@wes.local',
       role: 'user',
       businessRole: 'pre_sales',
-      status: 'active',
+      status: 'disabled',
       locked: false,
     }
     let getCount = 0
@@ -208,6 +208,16 @@ describe('UserManagement', () => {
           message: 'ok',
           data: { user: serverUser },
         })
+      }),
+      http.patch(`${BASE}/auth/users/:userId/status`, async ({ params, request }) => {
+        const body = await request.json()
+        calls.push({ endpoint: 'status', body })
+        serverUser = { ...serverUser, id: params.userId, status: body.status }
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: serverUser },
+        })
       })
     )
 
@@ -221,12 +231,16 @@ describe('UserManagement', () => {
     fireEvent.change(within(editor).getByLabelText('业务角色'), {
       target: { value: 'pm' },
     })
+    fireEvent.change(within(editor).getByLabelText('账户状态'), {
+      target: { value: 'active' },
+    })
     fireEvent.click(within(editor).getByRole('button', { name: '保存变更' }))
 
     await waitFor(() => {
       expect(calls).toEqual([
         { endpoint: 'businessRole', body: { businessRole: 'pm' } },
         { endpoint: 'role', body: { role: 'sub_admin' } },
+        { endpoint: 'status', body: { status: 'active' } },
       ])
     })
     await waitFor(() => {
@@ -240,6 +254,60 @@ describe('UserManagement', () => {
       expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
     })
     expect(screen.getByRole('status')).toHaveTextContent('已保存 arch')
+  })
+
+  test('does not patch unchanged user fields', async () => {
+    const serverUser = {
+      id: 'u3',
+      username: 'arch',
+      email: 'arch@wes.local',
+      role: 'user',
+      businessRole: 'pre_sales',
+      status: 'active',
+      locked: false,
+    }
+    const calls = []
+
+    server.use(
+      http.get(`${BASE}/auth/users`, () => HttpResponse.json({
+        code: 0,
+        message: 'ok',
+        data: { users: [serverUser] },
+      })),
+      http.patch(`${BASE}/auth/users/:userId/business-role`, async ({ request }) => {
+        calls.push({ endpoint: 'businessRole', body: await request.json() })
+        return HttpResponse.json({ code: 0, message: 'ok', data: { user: serverUser } })
+      }),
+      http.patch(`${BASE}/auth/users/:userId/role`, async ({ request }) => {
+        const body = await request.json()
+        calls.push({ endpoint: 'role', body })
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: { ...serverUser, role: body.role } },
+        })
+      }),
+      http.patch(`${BASE}/auth/users/:userId/status`, async ({ request }) => {
+        calls.push({ endpoint: 'status', body: await request.json() })
+        return HttpResponse.json({ code: 0, message: 'ok', data: { user: serverUser } })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.change(within(editor).getByLabelText('系统角色'), {
+      target: { value: 'sub_admin' },
+    })
+    fireEvent.click(within(editor).getByRole('button', { name: '保存变更' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('已保存 arch')
+    })
+    expect(calls).toEqual([
+      { endpoint: 'role', body: { role: 'sub_admin' } },
+    ])
   })
 
   test('stops after a failed patch, reloads users, and keeps the editor open', async () => {
@@ -284,6 +352,9 @@ describe('UserManagement', () => {
     const editor = screen.getByRole('dialog', { name: '编辑用户' })
     fireEvent.change(within(editor).getByLabelText('业务角色'), {
       target: { value: 'pm' },
+    })
+    fireEvent.change(within(editor).getByLabelText('系统角色'), {
+      target: { value: 'sub_admin' },
     })
     fireEvent.click(within(editor).getByRole('button', { name: '保存变更' }))
 
