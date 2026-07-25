@@ -26,6 +26,7 @@ export default function UserEditorDrawer({
   open,
   user,
   saving,
+  blocked,
   message,
   onRequestClose,
   onRetry,
@@ -63,6 +64,7 @@ export default function UserEditorDrawer({
       description={user.username}
       initialFocusRef={fieldsDisabled ? undefined : systemRoleRef}
       closeOnBackdrop
+      blocked={blocked}
       onClose={requestClose}
       footer={(
         <>

@@ -81,6 +81,7 @@ function StackedModalHarness() {
       <Drawer
         open={drawerOpen}
         title="编辑用户"
+        blocked={dialogOpen}
         onClose={() => setDrawerOpen(false)}
       >
         <button type="button">侧栏操作</button>
@@ -274,12 +275,21 @@ describe('Drawer', () => {
     vi.stubGlobal('HTMLDialogElement', undefined)
     render(<StackedModalHarness />)
     const topDialog = screen.getByRole('dialog', { name: '确认操作' })
+    const underlyingDrawer = document.querySelector('.wes-drawer')
     expect(topDialog.tagName).toBe('DIV')
+    expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
+    expect(underlyingDrawer).toHaveAttribute('aria-hidden', 'true')
+    expect(underlyingDrawer).toHaveAttribute('inert')
+    expect(underlyingDrawer).not.toHaveAttribute('aria-modal')
 
     fireEvent.keyDown(topDialog, { key: 'Escape' })
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '确认操作' })).not.toBeInTheDocument())
     expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(underlyingDrawer).not.toHaveAttribute('aria-hidden')
+    expect(underlyingDrawer).not.toHaveAttribute('inert')
+    expect(underlyingDrawer).toHaveAttribute('aria-modal', 'true')
+    expect(underlyingDrawer).toHaveFocus()
   })
 
   test('does not steal Tab or Shift+Tab from a fallback Dialog above the Drawer', () => {
@@ -302,7 +312,7 @@ describe('Drawer', () => {
     vi.stubGlobal('HTMLDialogElement', undefined)
     render(<StackedModalHarness />)
     const interiorControl = screen.getByLabelText('确认备注')
-    const drawerClose = screen.getByRole('button', { name: '关闭编辑用户' })
+    const drawerClose = document.querySelector('.wes-drawer__close')
     interiorControl.focus()
     const event = new KeyboardEvent('keydown', {
       key: 'Tab',

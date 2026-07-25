@@ -67,7 +67,9 @@ describe('UserManagement', () => {
     fireEvent.click(within(editor).getByRole('button', { name: '关闭编辑用户' }))
 
     let discardDialog = screen.getByRole('dialog', { name: '放弃未保存修改' })
-    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
+    expect(editor).toHaveAttribute('aria-hidden', 'true')
+    expect(editor).toHaveAttribute('inert')
     fireEvent.click(discardDialog.parentElement)
     expect(screen.getByRole('dialog', { name: '放弃未保存修改' })).toBeInTheDocument()
 
@@ -210,8 +212,60 @@ describe('UserManagement', () => {
       expect(within(passwordDialog).getByRole('button', { name: '确认重置' })).toBeEnabled()
     })
     expect(within(passwordDialog).getByLabelText('新密码')).toHaveValue('valid-pass-88')
-    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
+    expect(editor).toHaveAttribute('aria-hidden', 'true')
+    expect(editor).toHaveAttribute('inert')
     expect(window.alert).not.toHaveBeenCalled()
+  })
+
+  test('keeps password reset open and owned while the request is pending', async () => {
+    let releasePasswordRequest
+    server.use(
+      http.patch(`${BASE}/auth/users/:userId/password`, async () => {
+        await new Promise((resolve) => {
+          releasePasswordRequest = resolve
+        })
+        return HttpResponse.json(
+          { code: 50031, message: '密码服务暂不可用' },
+          { status: 500 }
+        )
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.click(within(editor).getByRole('button', { name: '重置密码…' }))
+    const passwordDialog = screen.getByRole('dialog', { name: '重置登录密码' })
+    fireEvent.change(within(passwordDialog).getByLabelText('新密码'), {
+      target: { value: 'valid-pass-88' },
+    })
+    fireEvent.change(within(passwordDialog).getByLabelText('确认密码'), {
+      target: { value: 'valid-pass-88' },
+    })
+    fireEvent.click(within(passwordDialog).getByRole('button', { name: '确认重置' }))
+
+    await waitFor(() => {
+      expect(releasePasswordRequest).toEqual(expect.any(Function))
+      expect(within(passwordDialog).getByRole('button', { name: '关闭重置登录密码' }))
+        .toBeDisabled()
+    })
+    const closeButton = within(passwordDialog).getByRole('button', { name: '关闭重置登录密码' })
+    fireEvent.keyDown(passwordDialog, { key: 'Escape' })
+    fireEvent.click(closeButton)
+    fireEvent.click(passwordDialog.parentElement)
+    expect(screen.getByRole('dialog', { name: '重置登录密码' })).toBeInTheDocument()
+
+    releasePasswordRequest()
+
+    await waitFor(() => {
+      expect(within(passwordDialog).getByRole('status')).toHaveTextContent('密码服务暂不可用')
+      expect(closeButton).toBeEnabled()
+    })
+    fireEvent.click(closeButton)
+    expect(screen.queryByRole('dialog', { name: '重置登录密码' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
   })
 
   test('confirms disabling an active user before the serialized status save', async () => {

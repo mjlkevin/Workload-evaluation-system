@@ -27,13 +27,16 @@ export function Drawer({
   footer,
   closeOnBackdrop = true,
   initialFocusRef,
+  blocked = false,
 }) {
   const titleId = useId()
   const descriptionId = useId()
   const surfaceRef = useRef(null)
   const openerRef = useRef(null)
   const onCloseRef = useRef(onClose)
+  const blockedRef = useRef(blocked)
   onCloseRef.current = onClose
+  blockedRef.current = blocked
 
   useEffect(() => {
     if (!open) return undefined
@@ -50,6 +53,7 @@ export function Drawer({
 
     const handleKeyDown = (event) => {
       if (event.defaultPrevented) return
+      if (blockedRef.current) return
 
       const eventModal = event.target instanceof Element
         ? event.target.closest('[aria-modal="true"]')
@@ -98,7 +102,7 @@ export function Drawer({
   if (!open) return null
 
   const handleBackdropClick = (event) => {
-    if (closeOnBackdrop && event.target === event.currentTarget) {
+    if (!blockedRef.current && closeOnBackdrop && event.target === event.currentTarget) {
       onCloseRef.current?.()
     }
   }
@@ -109,7 +113,9 @@ export function Drawer({
         ref={surfaceRef}
         className="wes-drawer"
         role="dialog"
-        aria-modal="true"
+        aria-modal={blocked ? undefined : 'true'}
+        aria-hidden={blocked ? 'true' : undefined}
+        inert={blocked ? '' : undefined}
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
@@ -125,7 +131,10 @@ export function Drawer({
             type="button"
             className="wes-drawer__close"
             aria-label={`关闭${title}`}
-            onClick={onClose}
+            disabled={blocked}
+            onClick={() => {
+              if (!blockedRef.current) onCloseRef.current?.()
+            }}
           >
             ×
           </button>

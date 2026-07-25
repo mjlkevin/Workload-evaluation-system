@@ -338,6 +338,7 @@ export default function UserManagement() {
   }
 
   const cancelPasswordDialog = () => {
+    if (passwordSubmitting) return
     passwordOperationRef.current += 1
     setDialog(null)
     setPasswordForm({ password: '', confirm: '' })
@@ -865,6 +866,7 @@ export default function UserManagement() {
         open={Boolean(editingUser)}
         user={editingUser}
         saving={Boolean(savingUserId) || reloadingEditor}
+        blocked={Boolean(dialog)}
         message={editorMessage}
         onRequestClose={requestEditorClose}
         onRetry={retryEditorReload}
@@ -970,6 +972,7 @@ export default function UserManagement() {
         title="重置登录密码"
         description={editingUser?.username}
         closeOnBackdrop={false}
+        dismissDisabled={passwordSubmitting}
         onClose={cancelPasswordDialog}
       >
         <form onSubmit={submitPasswordReset}>

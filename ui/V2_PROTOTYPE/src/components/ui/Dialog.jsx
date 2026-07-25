@@ -27,6 +27,7 @@ export function Dialog({
   children,
   wide = false,
   closeOnBackdrop = true,
+  dismissDisabled = false,
   initialFocusRef,
 }) {
   const titleId = useId()
@@ -85,6 +86,7 @@ export function Dialog({
   if (!open) return null
 
   const requestClose = () => {
+    if (dismissDisabled) return
     onClose?.()
   }
 
@@ -196,6 +198,7 @@ export function Dialog({
           type="button"
           className="wes-dialog__close"
           aria-label={`关闭${title}`}
+          disabled={dismissDisabled}
           onClick={requestClose}
         >
           ×
