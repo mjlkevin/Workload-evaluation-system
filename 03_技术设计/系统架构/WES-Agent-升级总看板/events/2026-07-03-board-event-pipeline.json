@@ -1,0 +1,61 @@
+{
+  "id": "BE-2026-07-03-board-event-pipeline",
+  "date": "2026-07-03",
+  "type": "process_change",
+  "scope": "Board Event Pipeline MVP",
+  "summary": "新增结构化 Board Event 规范、校验脚本和应用脚本，把高频 changes/testing 看板维护从手写 HTML 转为事件驱动更新。",
+  "status": "已实施 / 自动化通过",
+  "pages": ["changes", "testing", "sources"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "scripts/board-event-lib.js",
+      "summary": "Board Event 校验、渲染和 HTML 应用核心库"
+    },
+    {
+      "kind": "file",
+      "ref": "scripts/board-event-check.js",
+      "summary": "Board Event 校验 CLI"
+    },
+    {
+      "kind": "file",
+      "ref": "scripts/board-event-apply.js",
+      "summary": "Board Event 应用 CLI，当前支持 changes/testing 自动插入"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/events/template.board-event.json",
+      "summary": "后续 Codex/Qoder 可复制的结构化事件模板"
+    },
+    {
+      "kind": "command",
+      "ref": "node --test scripts/board-event.test.js",
+      "result": "pass",
+      "summary": "6/6，覆盖事件校验、敏感信息拒绝、changes/testing 渲染和幂等应用"
+    }
+  ],
+  "next": "后续可扩展 requirements.html 多区域生成器，把需求入池从手写卡片/台账进一步收敛到结构化事件。",
+  "board": {
+    "change": {
+      "stage": "Board Event Pipeline MVP",
+      "result": "已实施 / 可试运行"
+    },
+    "testing": [
+      {
+        "command": "node --test scripts/board-event.test.js",
+        "result": "6 pass",
+        "summary": "覆盖 validateBoardEvent、敏感信息拦截、changes/testing 行渲染和重复 apply 幂等性。"
+      },
+      {
+        "command": "npm run board:event:check -- 03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-07-03-board-event-pipeline.json",
+        "result": "pass",
+        "summary": "本次治理事件符合 Board Event schema。"
+      },
+      {
+        "command": "npm run board:event:apply -- 03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-07-03-board-event-pipeline.json",
+        "result": "pass",
+        "summary": "事件已自动写入 changes/testing 支持区域。"
+      }
+    ]
+  }
+}

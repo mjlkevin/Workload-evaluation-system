@@ -1,0 +1,121 @@
+{
+  "id": "BE-2026-07-14-pg-runtime-security-triage",
+  "date": "2026-07-14",
+  "type": "verification",
+  "scope": "PG 运行态与 P0/P1 安全复核",
+  "summary": "完成 PostgreSQL 运行态文档与集成基线对齐，修复 API 回归夹具、登录近期用户明文密码落地、Shell 退出整页刷新和邀请码可预测随机源，并完成 Qoder P0/P1 审计复核；未关闭需架构或人工验收的剩余风险。",
+  "status": "已实施 / 待人工复核",
+  "pages": ["changes", "testing", "monitoring", "risks", "sources"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "AGENTS.md",
+      "summary": "对齐当前代码事实：传统运行态 store 已接入 PostgreSQL，config JSON 保留为迁移、导入和测试边界。"
+    },
+    {
+      "kind": "file",
+      "ref": "scripts/api-integration-check.js",
+      "summary": "集成 smoke 在空 PG templates/rule_sets 时使用 example JSON 做本地基线 seed。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/Login.jsx",
+      "summary": "近期用户记录只保存 username 与时间戳，不保存密码。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx",
+      "summary": "退出按钮清理 token 后使用 React Router replace 导航到 login。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/utils/helpers.ts",
+      "summary": "邀请码尾段改用 crypto.randomBytes；模块测试禁止 Math.random 依赖。"
+    },
+    {
+      "kind": "file",
+      "ref": "docs/agent-loop/audits/2026-07-14-codex-security-gate-review.md",
+      "summary": "记录 Qoder P0/P1 finding 的关闭、缓解、开放风险和 2026-07-09 Gate 仍需返工的结论。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "V2 前端 116/116。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:modules",
+      "result": "pass",
+      "summary": "API 模块回归 149/149。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:harness -w apps/api",
+      "result": "pass",
+      "summary": "Harness 回归 70/70。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:rules",
+      "result": "pass",
+      "summary": "规则引擎回归 8/8。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:integration",
+      "result": "pass",
+      "summary": "API 集成烟测 1/1。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "API 与 Web 生产构建通过；Web 保留既有 chunk size warning。"
+    }
+  ],
+  "next": "待用户人工复核登录、退出和 PostgreSQL 初始用户数据；CA-FE-002、CA-FE-004、CA-SEC-004、注册竞态、同步文件 I/O、refresh token 与 AI session 留存仍需单独排期；2026-07-09 Codex Gate 继续保持 REWORK_REQUIRED。",
+  "board": {
+    "change": {
+      "stage": "PG 运行态与安全 Gate 复核",
+      "result": "已实施 / 待人工复核"
+    },
+    "testing": [
+      {
+        "command": "npm run test:web",
+        "result": "pass",
+        "summary": "V2 前端全量 116/116 通过，包含登录近期用户与 Shell SPA 退出回归。"
+      },
+      {
+        "command": "npm run test:modules",
+        "result": "pass",
+        "summary": "API 模块回归 149/149 通过，包含邀请码 crypto 随机源回归。"
+      },
+      {
+        "command": "npm run test:harness -w apps/api",
+        "result": "pass",
+        "summary": "Harness usecase 与 routes 70/70 通过。"
+      },
+      {
+        "command": "npm run test:rules",
+        "result": "pass",
+        "summary": "规则引擎 8/8 通过。"
+      },
+      {
+        "command": "npm run test:integration",
+        "result": "pass",
+        "summary": "PG 运行态 API 集成烟测 1/1 通过。"
+      },
+      {
+        "command": "npm run test:board-work-items",
+        "result": "pass",
+        "summary": "Issue-first work-item 治理断言 6/6 通过。"
+      },
+      {
+        "command": "npm run build:api && npm run build:web",
+        "result": "pass",
+        "summary": "API 与 Web 构建通过，Web 仅有既有 chunk size warning。"
+      }
+    ]
+  }
+}

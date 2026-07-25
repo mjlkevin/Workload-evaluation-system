@@ -1,0 +1,122 @@
+{
+  "id": "BE-2026-07-15-agent-context-boundaries",
+  "date": "2026-07-15",
+  "type": "implementation",
+  "scope": "Agent 四类上下文边界收敛",
+  "summary": "完成 RuntimeContext、ModelContext、ToolContext、RunState 与结构化 ContextRef 基线：可信入口创建不可变运行上下文，附件作为不可信证据进入模型，工具执行复核能力、Schema 和可信凭证/幂等约束，AI Session/Harness 只读聚合且 Runtime traceId 贯通响应与 Trace；Agent 路由当前仅开放只读工具，未引入 Graph、新表或虚构 tenant。",
+  "status": "已实施 / 待人工复核",
+  "pages": ["changes", "testing", "monitoring", "risks", "sources", "plan"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/agent/context/",
+      "summary": "四类上下文、结构化引用、可信运行时构造、模型证据边界和 RunState 只读聚合。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/agent/tool-registry.ts",
+      "summary": "工具执行时复核能力并校验 JSON Schema；变更工具要求外部可信确认凭证绑定工具名/参数摘要/幂等键，当前 Agent 路由只开放只读工具并忽略客户端 confirm。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/chat.service.ts",
+      "summary": "AI 工作台普通问答与报告生成的流式/非流式路径使用同一 ModelContext 组装，附件证据不进入 system prompt，并复用 Runtime traceId。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/trace/trace.usecase.ts",
+      "summary": "Trace 接受调用方 traceId，并写入结构化 contextRefDetails；失败/中断时区分全部可用引用与实际提交 Provider 的 modelContextRefs。"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/上下文类型架构审计报告.md",
+      "summary": "记录初审差距、实施后状态、非目标和 Graph/tenant 条件触发边界。"
+    },
+    {
+      "kind": "command",
+      "ref": "npx tsx --test apps/api/src/agent/context/context.test.ts",
+      "result": "pass",
+      "summary": "上下文契约聚焦回归 7/7。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:agent -w apps/api",
+      "result": "pass",
+      "summary": "Agent/Provider/Route 回归 35/35，覆盖 tool_calls 协议、参数校验、可信凭证/幂等门禁及 body confirm 不可授权写工具。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm exec --workspace apps/api -- tsx --test --test-global-setup=./test-setup.mts src/services/ai/chat.service.test.ts",
+      "result": "pass",
+      "summary": "AI 工作台普通/SSE 回归 18/18，包含报告快捷路径证据隔离和模型 Trace。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:modules",
+      "result": "pass",
+      "summary": "API 模块回归 152/152，包含普通/SSE 报告证据隔离、模型 Trace 与失败引用可见性。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm exec --workspace apps/api -- tsx --test --test-global-setup=./test-setup.mts src/modules/trace/trace.test.ts",
+      "result": "pass",
+      "summary": "Trace 脱敏、持久化、owner 隔离、Runtime traceId 与成功/失败模型引用可见性回归 27/27。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:ai",
+      "result": "pass",
+      "summary": "AI、RBAC、DSL 与领域服务回归通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api",
+      "result": "pass",
+      "summary": "API TypeScript 生产构建通过。"
+    }
+  ],
+  "next": "待本地人工验证附件问答、SSE done 与 Trace 查询展示同一 traceId；Agent 写工具须在持久化确认凭证服务落地后另行启用；Graph、tenant 端到端隔离和专用状态表继续按触发条件后置。",
+  "board": {
+    "change": {
+      "stage": "Agent 四类上下文边界",
+      "result": "已实施 / 待人工复核"
+    },
+    "testing": [
+      {
+        "command": "npx tsx --test apps/api/src/agent/context/context.test.ts",
+        "result": "pass",
+        "summary": "Runtime/Model/Tool/RunState/ContextRef 聚焦回归 7/7。"
+      },
+      {
+        "command": "npm run test:agent -w apps/api",
+        "result": "pass",
+        "summary": "Agent 工具上下文、tool_calls 协议、Schema 与可信凭证/幂等门禁 35/35 通过；客户端 confirm 不可授权写工具。"
+      },
+      {
+        "command": "npm exec --workspace apps/api -- tsx --test --test-global-setup=./test-setup.mts src/services/ai/chat.service.test.ts",
+        "result": "pass",
+        "summary": "AI 工作台普通/SSE 18/18 通过，包含报告快捷路径证据隔离和模型 Trace。"
+      },
+      {
+        "command": "npm run test:modules",
+        "result": "pass",
+        "summary": "API 模块 152/152 通过，包含普通/SSE 报告证据隔离、模型 Trace 与失败引用可见性。"
+      },
+      {
+        "command": "npm exec --workspace apps/api -- tsx --test --test-global-setup=./test-setup.mts src/modules/trace/trace.test.ts",
+        "result": "pass",
+        "summary": "Trace 关联、脱敏、Repository、owner 隔离与失败模型引用可见性 27/27 通过。"
+      },
+      {
+        "command": "npm run test:ai",
+        "result": "pass",
+        "summary": "AI、RBAC、DSL 与领域服务回归通过。"
+      },
+      {
+        "command": "npm run build:api",
+        "result": "pass",
+        "summary": "API TypeScript 生产构建通过。"
+      }
+    ]
+  }
+}

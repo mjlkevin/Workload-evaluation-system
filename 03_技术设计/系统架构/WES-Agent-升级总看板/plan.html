@@ -41,7 +41,7 @@
         <span><b>当前阶段</b> Phase 1H-B 交付基线 / Phase 1H-C 待规划</span>
         <span><b>人工测试</b> 1F/1G/1H-A 用例已登记，待执行回填</span>
         <span><b>分支</b> main</span>
-        <span><b>状态</b> 需求池治理口径已统一为 35 项：22 项已交付、11 项待规划/待确认/待验收、2 项暂缓；Phase 1H-B 中 RP-019/RP-020/RP-021/RP-022/RP-023/RP-025 已交付，RP-018 知识库工具 MVP 已交付并等待 MT-1H-B-003 真实 ZHIPU 配置人工验收；Qoder Loop R2-R7 已由 Codex 复核并分流；RP-026 补改与 RP-031 构建基线清理已验证通过；RP-033 clean patch 已验证但待提交集成；RP-029/RP-030 R8 阻断已由 Codex 修复验证通过，下一步按最小 patch 集成；RP-034 已分析待规划，RP-035 AI Native Command Center / AI Workflow Driven 升级已分析待设计；需求池可编辑子页面已移除，后续由 AI 直接维护 <code class="inline">requirements.html</code></span>
+        <span><b>状态</b> 需求池治理口径已统一为 36 项：22 项已交付、12 项待规划/待确认/待验收、2 项暂缓；Phase 1H-B 中 RP-019/RP-020/RP-021/RP-022/RP-023/RP-025 已交付，RP-018 知识库工具 MVP 已交付并等待 MT-1H-B-003 真实 ZHIPU 配置人工验收；Qoder Loop R2-R7 已由 Codex 复核并分流；RP-026 补改与 RP-031 构建基线清理已验证通过；RP-033 clean patch 已验证但待提交集成；RP-029/RP-030 R8 阻断已由 Codex 修复验证通过，下一步按最小 patch 集成；RP-034 已分析待规划，RP-035 AI Native Command Center / AI Workflow Driven 升级已分析待设计；RP-036 已完成登录守卫、保存可信反馈、测试终态与 retrieval_empty 误判修复，自动化通过，等待轮换密钥后人工验收；需求池可编辑子页面已移除，后续由 AI 直接维护 <code class="inline">requirements.html</code></span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">Phase 1E delivered</span>
@@ -82,6 +82,9 @@
       </div>
       <div class="callout ok" style="margin-top:14px">
         <div><b>本轮判断</b>Phase 1H-A 不引入新后端业务域，不做低代码工作流设计器，也不扩展 Skill/审计协议；先把 AI 工作台现有核心体验闭环打磨稳定，为后续 RP-013 通用交互渲染和 RP-001 工作流设计器提供可靠前端基座。</div>
+      </div>
+      <div class="callout" style="margin-top:14px" data-board-event-id="BE-2026-07-25-worktree-convergence:plan">
+        <div><b>2026-07-25 收敛状态</b>Agent worktree 的自动化门禁已恢复绿色，linked worktree 指针已修复，原始反馈入口已统一为 Issue-first。下一步先按主题提交可验证成果，再保护主 checkout 的本地改动并选择集成方式。PostgreSQL 传统运行态仍处于 schema / migration 基线阶段，live migration、repository 切换与人工验收单独排期，不与本轮自动化通过混为完成。</div>
       </div>
       <div class="roadmap">
         <h5>Phase Roadmap</h5>
@@ -482,9 +485,15 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
     <section>
       <div class="h-num">Section 11</div>
       <h2>后续任务池</h2>
-      <p class="lead">以下任务不进入 Phase 1H-A 前端体验闭环；建议作为 Phase 1H-C、Phase 2 或独立候选包，逐项评审。当前需求池统一为 35 项：22 项已交付、11 项待规划/待确认/待验收、2 项暂缓。已交付基线包含 RP-019/RP-020/RP-021/RP-022/RP-023/RP-025 等 AI 工作台与系统配置链路；RP-032 已由 Qoder 回填并经 Codex 复核自动化通过，待人工验收；RP-027/RP-028 clean patch 已由 Codex 修复 timeout retry 缺口并验证通过，待集成与真实配置验收；RP-026 补改已收敛为窄加载 hook 并验证无系统配置副作用，RP-031 重复检索与构建基线已验证通过，RP-033 clean patch 已通过自动化复核但尚未提交/集成，RP-029/RP-030 已修复验证通过但尚待集成；RP-034 已分析待规划；RP-035 AI Native Command Center / AI Workflow Driven 升级已分析待设计；RP-001/RP-012 因架构/MVP 决策未定继续暂缓。</p>
+      <p class="lead">以下任务不进入 Phase 1H-A 前端体验闭环；建议作为 Phase 1H-C、Phase 2 或独立候选包，逐项评审。当前需求池统一为 36 项：22 项已交付、12 项待规划/待确认/待验收、2 项暂缓。已交付基线包含 RP-019/RP-020/RP-021/RP-022/RP-023/RP-025 等 AI 工作台与系统配置链路；RP-032 已由 Qoder 回填并经 Codex 复核自动化通过，待人工验收；RP-027/RP-028 clean patch 已由 Codex 修复 timeout retry 缺口并验证通过，待集成与真实配置验收；RP-026 补改已收敛为窄加载 hook 并验证无系统配置副作用，RP-031 重复检索与构建基线已验证通过，RP-033 clean patch 已通过自动化复核但尚未提交/集成，RP-029/RP-030 已修复验证通过但尚待集成；RP-034 已分析待规划；RP-035 AI Native Command Center / AI Workflow Driven 升级已分析待设计；RP-036 已完成鉴权反馈、测试终态及 retrieval_empty 连通性判定修复，等待使用轮换密钥完成 MT-1H-C-002 人工复测；RP-001/RP-012 因架构/MVP 决策未定继续暂缓。</p>
       <table>
         <tr><th>候选任务</th><th>目标</th><th>启动条件</th><th>第一验收口径</th></tr>
+        <tr>
+          <td>登录态失效后系统配置可信反馈（RP-036）</td>
+          <td>消除失效 JWT 下“保存假成功、测试静默无响应”，让受保护页面和动作始终给出一致、可恢复的鉴权反馈。</td>
+          <td><span class="status warn"><span class="dot"></span>P1 已修复 / 待人工验收</span>：admin-only 路由统一守卫，失效会话跳转登录，连通性测试超时预算为 30 秒；上游 HTTP 200 零命中按连接成功并提示 retrieval_empty；不改变 JWT 与 <code class="inline">system:manage</code> 合同。</td>
+          <td>失效会话不能继续操作系统配置；保存成功只在 PATCH 2xx 后出现；测试按钮立即显示 loading，并在成功、零命中、401、缺配置、网络失败或超时时显示明确结果；轮换密钥后的真实测试通过。</td>
+        </tr>
         <tr>
           <td>AI Native Command Center / AI Workflow Driven 升级（RP-035）</td>
           <td>把首页从文档导航升级为 AI 今天应该做什么的指挥中心，新增 AI Workflow 页面和 AI Pipeline 状态链。</td>
@@ -625,9 +634,9 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         </tr>
         <tr>
           <td>RAG Baseline 与知识库评测闭环（RP-031）</td>
-          <td>为 RP-018 知识库工具建立固定样本、知识库版本、检索参数和质量指标，用于后续 Hybrid Search、Rerank、Query Rewriting 对比。</td>
-          <td><span class="status run"><span class="dot"></span>重复检索修复已验证 / 待真实配置</span>：runner 复用 <code class="inline">trace.chunks</code>，不再二次调用 retrieveKnowledgeChunks；rag-baseline 11/11、knowledge-tool 8/8 通过。<code class="inline">build:api</code> 当前被非 RAG 既有编译错误阻断，需先清理构建基线再做真实 ZHIPU 验收。</td>
-          <td>可查看 baseline 批次、Top-3 命中率、引用准确率、延迟和成本；任何检索策略变更必须带 baseline 前后对比。</td>
+          <td>为 RP-018 知识库工具建立版本化实验合同和生产化演进路径；先固定样本/知识快照/检索参数/Prompt/评分器，再实施 Chunk 后处理、可靠性、质量验证、Provider 与多知识库能力。</td>
+          <td><span class="status warn"><span class="dot"></span>实施分支已回填 / Codex Gate 拒收</span>：7 个提交在候选 worktree 中通过编译和旧回归，但 63 文件/约 6000 行新增没有新增测试，核心 Provider/cache/pipeline/rewrite/routing/monitoring 未接生产主链路；配置 UI、激活验证、审计和敏感配置范围存在阻断。先返工 Phase 0 最小闭环，通过 Gate 后再逐阶段继续。</td>
+          <td>baseline 批次可复现；检索指标包含 Recall@K、Precision@K、MRR、NDCG，回答指标包含引用支撑与拒答正确性；端到端关联、配置激活审计、缓存隔离/失效、断路/限流故障注入和策略回滚均有自动化证据。</td>
         </tr>
         <tr>
           <td>AI 工作台推荐工作流列表可达性与语义优化（RP-032）</td>
@@ -728,7 +737,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 计划与进度 · WES 项目管理 · 2026-06-26
+      <a href="index.html">返回总览</a> · 计划与进度 · WES 项目管理 · 2026-07-23
     </footer>
   </main>
 </body>

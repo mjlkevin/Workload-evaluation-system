@@ -1,0 +1,84 @@
+{
+  "id": "BE-2026-07-04-code-rules-actions",
+  "date": "2026-07-04",
+  "type": "implementation",
+  "scope": "编码规则配置生效禁用按钮无响应缺陷",
+  "summary": "根据用户截图反馈，修复系统管理 / 编码规则页“配置 / 生效 / 禁用”按钮点击后无响应的问题，并按 Issue-first 分流到 DEF-2026-07-04-003。",
+  "status": "已实施 / 待用户本地复核",
+  "pages": ["issues", "defects", "changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "新增 ISS-2026-07-04-005 并分流到 DEF-2026-07-04-003。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js",
+      "summary": "编码规则映射兼容后端 id/moduleCode/sample/effectiveAt，配置/生效/禁用动作使用响应回写并显示成功反馈。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx",
+      "summary": "配置按钮新增可编辑 Dialog，生效和禁用按钮改为传入选中规则 id 并在请求期间禁用。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/SystemManagementCodeRules.test.jsx",
+      "summary": "新增编码规则按钮红绿回归测试，覆盖 id 参数、配置表单 payload 和可见反馈。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- SystemManagementCodeRules.test.jsx",
+      "result": "pass",
+      "summary": "2/2，验证配置、生效、禁用动作不再静默无效。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE",
+      "result": "pass",
+      "summary": "V2 前端全量 110/110 通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:board-work-items",
+      "result": "pass",
+      "summary": "work-item 治理断言 6/6 通过。"
+    }
+  ],
+  "next": "待用户在 http://localhost:3004/system/code-rules 点击“配置 / 生效 / 禁用”复核真实页面反馈。",
+  "board": {
+    "change": {
+      "stage": "编码规则动作缺陷修复",
+      "result": "已实施 / 待用户本地复核"
+    },
+    "testing": [
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE -- SystemManagementCodeRules.test.jsx",
+        "result": "pass",
+        "summary": "编码规则动作聚焦测试 2/2 通过：覆盖配置 Dialog、PATCH payload、id 参数和成功反馈。"
+      },
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE",
+        "result": "pass",
+        "summary": "V2 前端全量 110/110 通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass",
+        "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+      },
+      {
+        "command": "npm run test:board-work-items",
+        "result": "pass",
+        "summary": "work-item 治理断言 6/6 通过。"
+      }
+    ]
+  }
+}

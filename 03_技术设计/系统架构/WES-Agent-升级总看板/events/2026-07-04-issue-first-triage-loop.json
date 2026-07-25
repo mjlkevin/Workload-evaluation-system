@@ -1,0 +1,60 @@
+{
+  "id": "BE-2026-07-04-issue-first-triage-loop",
+  "date": "2026-07-04",
+  "type": "process_change",
+  "scope": "问题池优先与 Codex Intake/Triage Loop 规则",
+  "summary": "将 WES 反馈治理规则从原始反馈直接入需求池调整为统一先入问题池，再由 Codex Intake/Triage Loop 分析归属、标记 disposition，并分流到缺陷池或需求池。",
+  "status": "已实施 / 规则已同步",
+  "pages": ["changes", "sources", "index"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "skills/recording-wes-requirements/SKILL.md",
+      "summary": "升级为 v1.3.0，明确 Issue-first、Codex Intake/Triage Loop、分流状态和禁止越权实现"
+    },
+    {
+      "kind": "file",
+      "ref": "AGENTS.md",
+      "summary": "全局规则改为原始反馈统一先进入问题池，再分析分流到缺陷池或需求池"
+    },
+    {
+      "kind": "file",
+      "ref": "docs/codex-workflows/wes-feedback-intake.md",
+      "summary": "反馈去重模板补充 Codex Intake/Triage Loop 的归属分析与分流边界"
+    },
+    {
+      "kind": "file",
+      "ref": "docs/codex-workflows/external-ai-handoff-template.md",
+      "summary": "外部 AI 回填模板的下一步建议改为入问题池或待 Codex 分流"
+    },
+    {
+      "kind": "file",
+      "ref": "skills/README.md",
+      "summary": "Skill 清单同步 Issue-first、Qoder governance 和多 Agent governance 当前口径"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "命中既有 ISS-2026-07-03-004 / RP-040，补充 2026-07-04 分流规则证据"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:board-work-items",
+      "result": "pass",
+      "summary": "6/6，新增治理断言防止回退到直接进入需求池"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run board:work-items:generate",
+      "result": "pass",
+      "summary": "根据 registry 重新生成 issues.html 和 defects.html"
+    }
+  ],
+  "next": "后续反馈按 Issue-first 执行；Codex 只做问题分流 Loop，不自动实现或标记交付。",
+  "board": {
+    "change": {
+      "stage": "问题分流规则调整",
+      "result": "已实施 / 规则已同步"
+    }
+  }
+}

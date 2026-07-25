@@ -38,11 +38,11 @@
         <div class="crumb">Document Asset Map</div>
         <h1>文档事实源地图</h1>
         <div class="meta">
-          <span>共盘点 <b>52</b> 份文档资产</span>
+          <span>共盘点 <b>55</b> 份文档资产</span>
           <span>事实源 <b>16</b> 份</span>
           <span>项目管理页面 <b>13</b> 个</span>
           <span>历史参考 <b>5</b> 份</span>
-          <span>更新日期 <b>2026-06-30</b></span>
+          <span>更新日期 <b>2026-07-25</b></span>
         </div>
       </div>
     </div>
@@ -256,9 +256,19 @@
             <div class="doc-layer-header">
               <span class="doc-layer-title plan">Implementation Plan</span>
               <span>设计与计划源</span>
-              <div class="doc-layer-count"><b>16</b> specs / plans</div>
+              <div class="doc-layer-count"><b>18</b> specs / plans</div>
             </div>
             <div class="doc-node-grid">
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/specs/2026-07-25-wes-agent-convergence-design.md">2026-07-25-wes-agent-convergence-design.md</a>
+                <small>dirty worktree 成果保留、完成边界与安全集成设计</small>
+                <span class="tag plan">Spec</span>
+              </div>
+              <div class="doc-node">
+                <a href="../../../docs/superpowers/plans/2026-07-25-wes-agent-convergence.md">2026-07-25-wes-agent-convergence.md</a>
+                <small>红灯关闭、分批验证、主题提交与集成计划</small>
+                <span class="tag plan">Plan</span>
+              </div>
               <div class="doc-node">
                 <a href="../../../docs/superpowers/specs/2026-06-17-wes-harness-design.md">2026-06-17-wes-harness-design.md</a>
                 <small>Harness 设计规格</small>
@@ -889,6 +899,16 @@
                 <td>NightOps / All Phases</td>
               </tr>
               <tr>
+                <td>审计证据</td>
+                <td><a href="../../../docs/agent-loop/audits/2026-07-20-codex-RP-031-rag-production-gate.md">2026-07-20-codex-RP-031-rag-production-gate.md</a></td>
+                <td class="mono">docs/agent-loop/audits/2026-07-20-codex-RP-031-rag-production-gate.md</td>
+                <td>RP-031 RAG 生产化候选分支的 Codex 外部 handoff Gate，记录范围、fresh 验证、安全阻断、未接线模块和返工要求</td>
+                <td><span class="status-pill warn">REJECTED</span></td>
+                <td>RP-031 返工复核后追加或替换 Gate</td>
+                <td>否</td>
+                <td>Phase 0-3 / Audit</td>
+              </tr>
+              <tr>
                 <td>当前事实源</td>
                 <td><a href="../../../docs/codex-workflows/wes-feedback-intake.md">wes-feedback-intake.md</a></td>
                 <td class="mono">docs/codex-workflows/wes-feedback-intake.md</td>
@@ -1017,6 +1037,26 @@
                 <td>仅重大架构调整时改</td>
                 <td>否</td>
                 <td>All Phases</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/specs/2026-07-25-wes-agent-convergence-design.md">2026-07-25-wes-agent-convergence-design.md</a></td>
+                <td class="mono">docs/superpowers/specs/2026-07-25-wes-agent-convergence-design.md</td>
+                <td>dirty worktree 成果保留、真实完成边界、路径修复与安全集成设计</td>
+                <td><span class="status-pill warn">Design Source</span></td>
+                <td>收敛边界或集成决策变化时改</td>
+                <td>否</td>
+                <td>Worktree Convergence</td>
+              </tr>
+              <tr>
+                <td>设计与计划源</td>
+                <td><a href="../../../docs/superpowers/plans/2026-07-25-wes-agent-convergence.md">2026-07-25-wes-agent-convergence.md</a></td>
+                <td class="mono">docs/superpowers/plans/2026-07-25-wes-agent-convergence.md</td>
+                <td>红灯关闭、分批验证、主题提交与主 checkout 集成检查清单</td>
+                <td><span class="status-pill warn">Implementation Plan</span></td>
+                <td>收敛步骤、验证结果或集成状态变化时改</td>
+                <td>否</td>
+                <td>Worktree Convergence</td>
               </tr>
               <tr>
                 <td>设计与计划源</td>
@@ -1380,6 +1420,14 @@
             </div>
             <div class="asset-card">
               <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/agent-loop/audits/2026-07-20-codex-RP-031-rag-production-gate.md">RP-031 RAG Production Gate</a></div><span class="asset-path">docs/agent-loop/audits/2026-07-20-codex-RP-031-rag-production-gate.md</span></div>
+                <span class="status-pill warn">REJECTED</span>
+              </div>
+              <div class="asset-body">RP-031 候选生产化分支的范围、fresh 验证、安全阻断、未接线模块和分阶段返工要求。</div>
+              <div class="asset-footer"><span class="status-pill run">Phase 0-3 / Audit</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
                 <div><div class="asset-title"><a href="../../../docs/codex-workflows/wes-feedback-intake.md">wes-feedback-intake.md</a></div><span class="asset-path">docs/codex-workflows/wes-feedback-intake.md</span></div>
                 <span class="status-pill run">Workflow</span>
               </div>
@@ -1489,6 +1537,22 @@
               </div>
               <div class="asset-body">产品技术方案总纲</div>
               <div class="asset-footer"><span class="status-pill run">All Phases</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/specs/2026-07-25-wes-agent-convergence-design.md">2026-07-25-wes-agent-convergence-design.md</a></div><span class="asset-path">docs/superpowers/specs/2026-07-25-wes-agent-convergence-design.md</span></div>
+                <span class="status-pill warn">Design Source</span>
+              </div>
+              <div class="asset-body">dirty worktree 成果保留、真实完成边界、路径修复与安全集成设计</div>
+              <div class="asset-footer"><span class="status-pill run">Worktree Convergence</span><span class="status-pill todo">否</span></div>
+            </div>
+            <div class="asset-card">
+              <div class="asset-head">
+                <div><div class="asset-title"><a href="../../../docs/superpowers/plans/2026-07-25-wes-agent-convergence.md">2026-07-25-wes-agent-convergence.md</a></div><span class="asset-path">docs/superpowers/plans/2026-07-25-wes-agent-convergence.md</span></div>
+                <span class="status-pill warn">Implementation Plan</span>
+              </div>
+              <div class="asset-body">红灯关闭、分批验证、主题提交与主 checkout 集成检查清单</div>
+              <div class="asset-footer"><span class="status-pill run">Worktree Convergence</span><span class="status-pill todo">否</span></div>
             </div>
             <div class="asset-card">
               <div class="asset-head">
@@ -1656,7 +1720,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 文档事实源地图 · 2026-06-30 · 52 份资产 · 5 份历史参考
+      WES 项目管理 · 文档事实源地图 · 2026-07-25 · 55 份资产 · 5 份历史参考
     </footer>
   </main>
 

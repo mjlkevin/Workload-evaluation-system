@@ -1,0 +1,28 @@
+{
+  "id": "BE-2026-07-03-rp-040-board-work-item-split",
+  "date": "2026-07-03",
+  "type": "requirement_intake",
+  "scope": "RP-040 看板问题/缺陷/需求二级页面与反馈分流治理",
+  "summary": "根据用户建议新增 RP-040：原始反馈先进入问题池，经分析后再分流为缺陷或需求，避免当前需求池混杂问题、缺陷、需求和测试证据。",
+  "status": "新增入池 / 已分析待规划",
+  "pages": ["requirements", "plan", "changes", "sources", "index"],
+  "evidence": [
+    {
+      "kind": "user_feedback",
+      "ref": "2026-07-03 conversation",
+      "summary": "用户明确建议分二级页面，问题、缺陷、需求分开；用户原始反馈记录到问题，分析后按实际情况进入缺陷或需求"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/requirements.html",
+      "summary": "当前需求池同时承载需求、技术债、审计项、测试项和缺陷型 RP，需要工作项类型拆分"
+    }
+  ],
+  "next": "后续先设计 Issue/Defect/Requirement 工作项模型、状态流转和二级页面生成规则，再实施 issues.html、defects.html 与 requirements.html 分流。",
+  "board": {
+    "change": {
+      "stage": "RP-040 入池",
+      "result": "新增入池 / 已分析待规划"
+    }
+  }
+}

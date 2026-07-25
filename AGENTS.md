@@ -9,6 +9,7 @@
 ## 1. 事实来源优先级
 
 - Codex 新会话或子代理启动前先读 `codex-project-registry.md`，确认正确项目路径、禁止路径、可写性、默认验证命令和子代理分工。
+- 本机当前活动交付 worktree 为 `/Users/kevin/AI/Workload-evaluation-system-agent`；`/Users/kevin/AI/Workload-evaluation-system` 是同一 Git 仓库的另一 linked checkout，用于分支集成与历史差异核对。两者不是两个独立项目，不得因目录名误判而删除或覆盖任一方的未提交改动。
 - 代码与运行路由优先于历史 V2 文档。实现事实以 `apps/api/src/app.ts`、`apps/api/src/routes/index.ts`、`ui/V2_PROTOTYPE` 为准。
 - 对外契约以 `docs/openapi.yaml` 与 `03_技术设计/系统演进/实现与文档对齐说明.md` 对齐；冲突时先修文档再交付。
 - 涉及历史方案时必须显式标注：`【历史说明，已下线】`。
@@ -81,7 +82,7 @@
 ## 9. 总看板与过程数据沉淀
 
 - 涉及需求、设计、开发、测试、变更、监控、风险、发布、文档资产或项目治理的任务，必须读取并执行 `skills/maintain-wes-command-board/SKILL.md`。
-- 用户消息包含"测试问题""需求""反馈""缺陷""bug""体验调整""功能调整""大方向思考""需求池"等关键词，或通过 UI 截图反馈可用性问题时，必须读取并执行 `skills/recording-wes-requirements/SKILL.md`；先按 `docs/codex-workflows/wes-feedback-intake.md` 去重，已有同类 RP 时只补充证据或范围，不重复入池；非阻塞且信息足够的问题直接进入需求池，信息不足时先追问。
+- 用户消息包含"测试问题""需求""反馈""缺陷""bug""体验调整""功能调整""大方向思考""需求池"等关键词，或通过 UI 截图反馈可用性问题时，必须读取并执行 `skills/recording-wes-requirements/SKILL.md`；原始反馈统一先进入问题池，再由 **Codex Intake/Triage Loop** 按 `docs/codex-workflows/wes-feedback-intake.md` 去重、分类和处置。已有同类 issue / RP / defect 时只补充证据或范围，不重复建项；只有分诊结果为 requirement 或 defect 时才创建或更新对应派生记录，信息不足的 issue 保持 `待补充` 并最小化追问。
 - Codex 不再创建或执行 WES 需求池迭代实现 Loop，也不创建 heartbeat/recurring 自动化来持续跑需求池；WES 实现 Loop 后续交给 Qoder 创建和执行。允许 Codex 在用户批准的 NightOps 协作机制中发布任务包、执行审计 Gate、生成晨间简报，但不得无人值守实现新需求、选择下一条需求执行、合并 main 或标记已交付。用户明确要求 Codex 处理单条需求时，按普通一次性任务执行，不自动调度下一轮。
 - 用户 owner 已显式授权 NightOps 无人值守机制：Qoder / KIMICODE 可在各自平台创建本地定时 Loop，用于按当前 Night Mission Packet 执行或审计，并与 Codex Gate 时间点配合。这不是 Codex 侧需求池实现 Loop，也不授予自选 RP、合并 main、标记已交付或越权改代码的权限；外部 Loop 只能读取任务包、Gate、handoff，并写入 mission 明确指定的 artifact 文件。
 - Qoder 执行 WES 需求池、Loop、实现、验证或回填任务时，必须先读 `QODER.md` 并使用 `skills/wes-qoder-worktree-protocol/SKILL.md`；每次执行需先完成 Worktree Contract ACK，结束时按结构化 handoff 回填，状态只能到“已回填 / 待 Codex 复核”，不得自行宣布需求“已交付”。NightOps 中还必须读取当前 Night Mission Packet 与最新 Codex Gate；若 `mustReworkFirst=true`，先返工当前任务；无 `allowNextTask=true` 不得领取新 RP。

@@ -1,0 +1,60 @@
+{
+  "id": "BE-2026-07-04-roadmap-refresh",
+  "date": "2026-07-04",
+  "type": "process_change",
+  "scope": "项目路标刷新与版本窗口规划",
+  "summary": "扫描当前实现、需求池和总看板状态后，将路标页从初始化占位更新为 6 个版本窗口和 7 条能力路标，并同步计划页与首页摘要。",
+  "status": "已同步 / 待人工确认",
+  "pages": ["index", "plan", "changes"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/roadmap.html",
+      "summary": "更新版本台账、能力路标和 RP-001 ~ RP-040 需求关联池"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/plan.html",
+      "summary": "补充版本窗口到后续任务池的映射，并修正 RP-040 第一批实施状态"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/index.html",
+      "summary": "首页当前阶段摘要改为路标已刷新、Phase 1H-C 收口和后续版本窗口"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/routes/index.ts",
+      "summary": "确认当前后端已挂载 agent、harness、traces 等主线运行路由"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/README.md",
+      "summary": "确认后端 18/18 领域模块化迁移已完成"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统演进/实现与文档对齐说明.md",
+      "summary": "确认 Phase 1G、1H-B 以及 Harness 1A-1F 当前实现事实"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run board:event:check -- 03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-07-04-roadmap-refresh.json",
+      "result": "pass",
+      "summary": "Board Event 校验通过"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run board:check",
+      "result": "pass",
+      "summary": "0 错误 / 0 警告，14 个看板页面通过一致性检查"
+    }
+  ],
+  "next": "人工确认路标排序后，再把 V-2026.07-R1/R2/R3 拆成可执行任务包；RP-001/RP-012 继续等待架构评审，不进入近期版本。",
+  "board": {
+    "change": {
+      "stage": "路标刷新",
+      "result": "已同步 / 待人工确认"
+    }
+  }
+}

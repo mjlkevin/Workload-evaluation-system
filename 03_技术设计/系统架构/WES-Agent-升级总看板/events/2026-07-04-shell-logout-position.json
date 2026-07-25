@@ -1,0 +1,74 @@
+{
+  "id": "BE-2026-07-04-shell-logout-position",
+  "date": "2026-07-04",
+  "type": "implementation",
+  "scope": "侧栏退出按钮位置恢复",
+  "summary": "根据用户截图反馈，修复左侧侧栏底部“退出”按钮继承导航链接整行宽度、偏离用户名旁边的问题，并按 Issue-first 分流到 DEF-2026-07-04-004。",
+  "status": "已实施 / 待用户本地复核",
+  "pages": ["issues", "defects", "changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "新增 ISS-2026-07-04-006 并分流到 DEF-2026-07-04-004。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/layout.css",
+      "summary": "为 .sidebar .user .out 覆盖 width:auto、align-self:center，并让用户信息 row 不换行。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/ShellUserMenu.test.jsx",
+      "summary": "新增 Shell 底部用户区回归测试，固定退出按钮不继承整行宽度。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- ShellUserMenu.test.jsx",
+      "result": "pass",
+      "summary": "1/1，验证退出按钮样式覆盖存在并保持在用户信息区。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE",
+      "result": "pass",
+      "summary": "V2 前端全量 111/111 通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+    },
+    {
+      "kind": "manual",
+      "ref": "browser DOM/CSS verification at http://localhost:3004/",
+      "result": "pass",
+      "summary": "真实页面中退出按钮宽度约 38px，位于用户名右侧，不再撑满底部。"
+    }
+  ],
+  "next": "待用户在 http://localhost:3004/ 复核退出按钮已恢复到用户名旁边。",
+  "board": {
+    "change": {
+      "stage": "Shell 退出按钮布局修复",
+      "result": "已实施 / 待用户本地复核"
+    },
+    "testing": [
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE -- ShellUserMenu.test.jsx",
+        "result": "pass",
+        "summary": "Shell 用户区聚焦测试 1/1 通过：覆盖退出按钮 width:auto 与 align-self:center 样式契约。"
+      },
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE",
+        "result": "pass",
+        "summary": "V2 前端全量 111/111 通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass",
+        "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+      }
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "BE-2026-07-09-plane-cloud-full-sync",
+  "date": "2026-07-09",
+  "type": "process_change",
+  "scope": "Plane Cloud WES 全量执行镜像同步",
+  "summary": "根据当前 WES 总看板，将 42 条 RP、14 条 Issue、11 条 Defect 和 1 条治理快照补充同步到 Plane Cloud；Plane 侧 68 条 WES 镜像记录全部可见，状态、能力路标和版本窗口已按当前治理口径对齐。",
+  "status": "已同步 / 执行镜像试运行",
+  "pages": ["changes", "index", "requirements", "plan", "monitoring", "risks"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/requirements.html",
+      "summary": "提供 42 条 RP 当前口径：29 已交付、11 待规划/待确认/待验收、2 暂缓"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "提供 14 条 Issue、11 条 Defect 及 Issue-first 分流关系"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/roadmap.html",
+      "summary": "提供 6 个版本窗口和 7 条能力路标，用于 Plane Cycle 与 Module 关联"
+    },
+    {
+      "kind": "manual",
+      "ref": "Plane Cloud API full sync readback",
+      "result": "pass",
+      "summary": "Plane 项目中 68/68 条 WES 镜像记录可见；状态分布为 Done 45、In Progress 16、Backlog 5、Cancelled 2；68 条均已关联能力 Module，67 条已关联 Cycle；治理快照因 V-PM-0 在 Plane 已完成而不再追加 Cycle"
+    },
+    {
+      "kind": "manual",
+      "ref": "API secret handling boundary",
+      "result": "pass",
+      "summary": "Plane 令牌仅运行时读取；看板只记录脱敏同步结果，不保存 token、cookie、客户材料全文或运行态 trace 原文"
+    }
+  ],
+  "next": "Plane 继续作为执行镜像试运行；正式切换事实源前，WES 总看板仍是需求、缺陷、验证和风险的权威记录。后续增量同步需继续使用 WES 编号和 external_id 去重，并先确认客户材料、密钥和完整 trace 的数据边界。",
+  "board": {
+    "change": {
+      "stage": "Plane Cloud 全量同步",
+      "result": "已同步 / 执行镜像试运行"
+    }
+  }
+}

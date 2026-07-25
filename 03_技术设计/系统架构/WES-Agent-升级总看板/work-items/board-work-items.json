@@ -1,0 +1,506 @@
+{
+  "updatedAt": "2026-07-15",
+  "issues": [
+    {
+      "id": "ISS-2026-07-02-001",
+      "date": "2026-07-02",
+      "title": "登录态过期刷新后仍进入系统壳子",
+      "source": "user_screenshot",
+      "rawFeedback": "刷新 localhost:3002 后直接进入 AI 工作台，但页面同时提示登录已过期，请重新登录。",
+      "evidence": [
+        "RP-037",
+        "AppAuthGuard.test.jsx",
+        "HomeWorkspace.test.jsx"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-02-001"
+      },
+      "priority": "P1",
+      "next": "已修复并验证，保留来源链路用于后续缺陷统计。"
+    },
+    {
+      "id": "ISS-2026-07-03-001",
+      "date": "2026-07-03",
+      "title": "附件解析场景仍看不到流式返回",
+      "source": "user_screenshot",
+      "rawFeedback": "AI 工作台上传客户需求文件后停留在正在提取文件结构 / 正在调用模型并组织回复，看不到任何流式返回。",
+      "evidence": [
+        "RP-029",
+        "testing.html:RP-029 附件场景人工验收反证"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-03-001"
+      },
+      "priority": "P1",
+      "next": "返工附件解析流式接线与真实 SSE 分块前端回归。"
+    },
+    {
+      "id": "ISS-2026-07-03-002",
+      "date": "2026-07-03",
+      "title": "AI 工作台元问题答非所问",
+      "source": "user_feedback",
+      "rawFeedback": "用户问你是什么模型时，AI 连续回复能力说明列表，没有回答模型信息。",
+      "evidence": [
+        "RP-038",
+        "workbench-intent.service.test.ts",
+        "workbench-dispatch.service.test.ts"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-03-002"
+      },
+      "priority": "P1",
+      "next": "真实会话人工复核模型信息展示口径。"
+    },
+    {
+      "id": "ISS-2026-07-03-003",
+      "date": "2026-07-03",
+      "title": "附件问答紧凑 Markdown 与下一步动作闭环异常",
+      "source": "user_screenshot",
+      "rawFeedback": "session 18ecc6d7 中附件问答回复的业务域表格没有渲染成表格，下一步建议没有变成可交互按钮；二次复核发现概览预览点击后仍未触发报告生成。",
+      "evidence": [
+        "RP-039",
+        "HomeWorkspace.test.jsx",
+        "session:18ecc6d7-e6de-49f5-ad5c-206a77a26a7c"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-03-003"
+      },
+      "priority": "P1",
+      "next": "真实会话人工复核表格、按钮和报告生成动作。"
+    },
+    {
+      "id": "ISS-2026-07-03-004",
+      "date": "2026-07-03",
+      "title": "看板混杂问题、缺陷和需求",
+      "source": "user_feedback",
+      "rawFeedback": "建议分二级页面，问题、缺陷、需求分开；用户的原始反馈记录到问题，然后通过分析后按实际情况进入缺陷或需求。",
+      "evidence": [
+        "RP-040",
+        "BE-2026-07-03-rp-040-board-work-item-split",
+        "2026-07-03 user feedback: 问题池/缺陷池/需求池需要作为一级导航入口",
+        "BE-2026-07-03-rp-040-work-item-pages",
+        "2026-07-04 user decision: 原始反馈先入问题池，由 Codex Intake/Triage Loop 分流",
+        "BE-2026-07-04-issue-first-triage-loop"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "requirement",
+        "ref": "RP-040"
+      },
+      "priority": "P1",
+      "next": "Skill 与全局规则已改为原始反馈先进入问题池；Codex Intake/Triage Loop 分析后标记 disposition 并分流到缺陷池或需求池。"
+    },
+    {
+      "id": "ISS-2026-07-04-001",
+      "date": "2026-07-04",
+      "title": "AI 工作台确认执行写动作后无响应",
+      "source": "user_screenshot",
+      "rawFeedback": "session be9c045e-29d1-4747-8106-4c1f4c0a3a12 中，AI 工作台提示“这是一个写动作请求”并展示“确认执行写动作”按钮，用户点击后界面没有任何响应。",
+      "evidence": [
+        "session:be9c045e-29d1-4747-8106-4c1f4c0a3a12",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx:confirmPendingAction",
+        "ui/V2_PROTOTYPE/src/__tests__/HomeWorkspace.test.jsx"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-04-001"
+      },
+      "priority": "P1",
+      "next": "已补通 generic confirm_write_action 的前端兜底反馈；待用户在真实会话中复核点击后不再静默。"
+    },
+    {
+      "id": "ISS-2026-07-04-002",
+      "date": "2026-07-04",
+      "title": "用户管理邀请成员按钮点击无响应",
+      "source": "user_screenshot",
+      "rawFeedback": "用户在用户管理页面点击“+ 邀请成员”按钮后界面没有任何反应。",
+      "evidence": [
+        "screenshot:codex-clipboard-4121c1d5-913b-4922-9cec-4ac70db3f20d.png",
+        "ui/V2_PROTOTYPE/src/pages/UserManagement.jsx:+ 邀请成员按钮缺少 onClick",
+        "ui/V2_PROTOTYPE/src/__tests__/UserManagement.test.jsx"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-04-002"
+      },
+      "priority": "P1",
+      "next": "已绑定生成邀请码接口并显示成员邀请码弹窗；待用户在本地 V2 页面点击复核。"
+    },
+    {
+      "id": "ISS-2026-07-04-003",
+      "date": "2026-07-04",
+      "title": "管理员用户管理直接新建用户",
+      "source": "user_requirement",
+      "rawFeedback": "用户要求在管理员的用户管理模块工具栏加入新建按钮，并支持管理员直接新建用户。",
+      "evidence": [
+        "ui/V2_PROTOTYPE/src/pages/UserManagement.jsx",
+        "apps/api/src/routes/auth.routes.ts:POST /auth/users",
+        "apps/api/src/modules/auth/auth.usecase.ts:createUser",
+        "docs/superpowers/plans/2026-07-04-admin-create-user.md"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "requirement",
+        "ref": "RP-041"
+      },
+      "priority": "P1",
+      "next": "已实现管理员直建用户弹窗、POST /auth/users 和 PG email 迁移；待用户在本地页面复核新建账号。"
+    },
+    {
+      "id": "ISS-2026-07-04-004",
+      "date": "2026-07-04",
+      "title": "系统管理二级模块改为左侧导航独立页面",
+      "source": "user_requirement_screenshot",
+      "rawFeedback": "用户要求将系统管理页内的“编码规则 / 模型配置 / 知识库 / RateCard / DSL 规则集 / 模板 / 测试结果”等二级模块入口移植到左侧系统导航栏“系统管理”下展开，并给每个二级模块新增独立页面；后续“系统管理”不支持点击进入，不再有独立页面。",
+      "evidence": [
+        "screenshot:codex-clipboard-ca73abc6-39e9-4269-8bf2-b5b8db10e316.png",
+        "ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx",
+        "ui/V2_PROTOTYPE/src/App.jsx",
+        "ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/SystemManagementNavigation.test.jsx"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "requirement",
+        "ref": "RP-042"
+      },
+      "priority": "P1",
+      "next": "已实现 V2 左侧系统管理二级菜单、独立子路由和 /system 默认重定向；待用户在本地页面复核导航体验。"
+    },
+    {
+      "id": "ISS-2026-07-04-005",
+      "date": "2026-07-04",
+      "title": "编码规则配置生效禁用按钮点击无响应",
+      "source": "user_screenshot",
+      "rawFeedback": "用户在系统管理 / 编码规则页面反馈“配置”“生效”“禁用”按钮点击后没有任何反应。",
+      "evidence": [
+        "screenshot:codex-clipboard-5a61d8c1-6a8e-4716-92ef-0a9d4735ca92.png",
+        "ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx:编码规则按钮传递展示 code 而非后端 id",
+        "ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js:configureRule 空 PATCH 且无配置表单",
+        "ui/V2_PROTOTYPE/src/__tests__/SystemManagementCodeRules.test.jsx"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-04-003"
+      },
+      "priority": "P1",
+      "next": "已修复编码规则配置弹窗、id 参数传递和可见成功反馈；待用户在本地 /system/code-rules 页面复核。"
+    },
+    {
+      "id": "ISS-2026-07-04-006",
+      "date": "2026-07-04",
+      "title": "侧栏退出按钮偏离用户名位置",
+      "source": "user_screenshot",
+      "rawFeedback": "用户反馈左侧侧栏底部的“退出”按钮偏离原设计，希望恢复到用户名旁边。",
+      "evidence": [
+        "screenshot:codex-clipboard-1bc4b033-ad78-409d-80ba-de6af080c84d.png",
+        "ui/V2_PROTOTYPE/layout.css:.sidebar a 全局 width:100% 泄漏到 .sidebar .user .out",
+        "ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx:退出链接仍在用户信息 row 内",
+        "ui/V2_PROTOTYPE/src/__tests__/ShellUserMenu.test.jsx"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-04-004"
+      },
+      "priority": "P2",
+      "next": "已恢复退出按钮在用户名旁边的紧凑布局；待用户在本地 V2 页面复核。"
+    },
+    {
+      "id": "ISS-2026-07-04-007",
+      "date": "2026-07-04",
+      "title": "业务用户仍看到管理员菜单",
+      "source": "user_screenshot",
+      "rawFeedback": "当前登录业务用户 kevin，但导航栏依然显示“系统管理 / 用户管理 / API 密钥”菜单；理论上只有管理员账号能看到这些菜单，除此之外任何角色都不应该显示。",
+      "evidence": [
+        "screenshot:codex-clipboard-18dbf643-5d29-44a6-8356-cec422935c46.png",
+        "ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx:系统分组原为静态渲染，未按 user.role 过滤",
+        "ui/V2_PROTOTYPE/src/App.jsx:管理员页面原缺少前端直达路由守卫",
+        "ui/V2_PROTOTYPE/src/components/Layout/WorkspaceTabs.jsx:历史页签原可残留管理员入口",
+        "ui/V2_PROTOTYPE/src/__tests__/ShellUserMenu.test.jsx",
+        "ui/V2_PROTOTYPE/src/__tests__/AppAuthGuard.test.jsx"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-04-005"
+      },
+      "priority": "P1",
+      "next": "已按管理员 role 收紧左侧导航、顶部页签和直达路由；待用户以 kevin 账号在本地页面复核管理员入口不可见。"
+    },
+    {
+      "id": "ISS-2026-07-04-008",
+      "date": "2026-07-04",
+      "title": "AI 会话中断后助手消息消失",
+      "source": "user_feedback_session_id",
+      "rawFeedback": "用户反馈会话 7a8f79a5-ad12-4132-895b-ae39f9cf2148 发消息发一半，AI 的对话消息直接没了。",
+      "evidence": [
+        "session:7a8f79a5-ad12-4132-895b-ae39f9cf2148",
+        "PG ai_sessions 查询显示该会话仅有 3 条 user 消息，无 assistant 消息",
+        "trace 查询显示同一会话 3 条 trace 均为 routingRule=client_aborted 且 hasError=true",
+        "apps/api/src/services/ai/chat.service.ts:catch 分支原只写 failure trace，不追加 assistant 失败/中断消息",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx:finally 原在中断后立即 loadSessions，可能用旧服务端状态覆盖本地停止气泡"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-04-006"
+      },
+      "priority": "P1",
+      "next": "已修复后端流式失败/中断会话可见标记和前端中断后刷新竞态；待用户在原会话或新会话真实重试复核。"
+    },
+    {
+      "id": "ISS-2026-07-04-009",
+      "date": "2026-07-04",
+      "title": "AI 工作台普通问候只返回兜底空内容",
+      "source": "user_screenshot",
+      "rawFeedback": "用户截图反馈：发送“你好”后，AI 工作台显示“AI 已收到，但暂未返回有效内容。”，没有返回正常能力说明。",
+      "evidence": [
+        "screenshot:codex-clipboard-926392da-5a3d-44d4-b02b-0ace8d72f55d.png",
+        "apps/api/src/services/ai/chat.service.ts:homeWorkbenchChatStream 原使用 req.on('close') 判定客户端断开",
+        "真实 curl 复现旧逻辑只收到 ': heartbeat'，未收到 static/done",
+        "ui/V2_PROTOTYPE/src/api/ai.js:reader done 时原未解析尾部残留 SSE buffer",
+        "apps/api/src/modules/ai-sessions/ai-sessions.repository.ts:连续 create/append 消息时 PG delete+insert 持久化原为并发 fire-and-forget，验证时暴露 duplicate key 风险"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-04-007"
+      },
+      "priority": "P1",
+      "next": "已修复 SSE 断开判断与前端尾包解析，并在本地真实接口验证“你好”返回 static/done；待用户刷新页面复核。"
+    },
+    {
+      "id": "ISS-2026-07-15-001",
+      "date": "2026-07-15",
+      "title": "AI 结构化输出缺少统一契约治理",
+      "source": "qoder_audit_codex_review",
+      "rawFeedback": "Qoder 审计指出生产 AI 调用普遍使用 json_object，缺少统一运行时 Schema、结构修复重试、字段语义与人工降级；用户要求 Codex 复核并给出系统性解决方案。",
+      "evidence": [
+        "RP-027",
+        "apps/api/src/ai/provider/model-provider.ts:JsonSchemaResponseFormat",
+        "apps/api/src/ai/provider/tool-calling.test.ts:json_schema passthrough",
+        "apps/api/src/modules/harness/harness.usecase.ts:parseReportV1/parseReportV2",
+        "生产源码可检索到 14 处 responseFormat=json_object 字面量，未发现生产 json_schema 调用",
+        "apps/api/src/ai/contracts/structured-output.ts 与 wes-contracts.ts：统一契约、Ajv 校验、修复和受限格式回退已实施",
+        "2026-07-15：生产源码已无 responseFormat=json_object 结构化调用；test:modules 152/152、test:harness 71/71、test:ai pass"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "requirement",
+        "ref": "RP-027"
+      },
+      "priority": "P1",
+      "next": "RP-027 结构化输出子范围已完成本地实施、自动化门禁与最小真实 Kimi strict json_schema canary；待以代表性业务数据观察 format_fallback、repair 和 needs_user_input 指标并完成页面人工验收。"
+    },
+    {
+      "id": "ISS-2026-07-15-002",
+      "date": "2026-07-15",
+      "title": "企业画像缺失行业时写入固定行业事实",
+      "source": "qoder_audit_codex_review",
+      "rawFeedback": "复核 chat.service.ts 发现模型输出缺少 industry 时，企业画像链路会填入固定的商务服务业分类，并用于前端草稿预填，存在把未知信息写成客户事实的风险。",
+      "evidence": [
+        "apps/api/src/services/ai/chat.service.ts:summarizeCompanyProfileByKimi",
+        "apps/api/src/services/ai/chat.service.ts:companyProfileSummary",
+        "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx:company profile draft prefill",
+        "apps/api/src/services/ai/chat.service.test.ts:未知行业保持空并标记 needs_user_input"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-15-001"
+      },
+      "priority": "P1",
+      "next": "固定行业已移除，缺失值保持空并标记 needs_user_input，字段来源与契约回归已补；待真实企业画像请求人工确认页面不再预填错误行业。"
+    },
+    {
+      "id": "ISS-2026-07-15-003",
+      "date": "2026-07-15",
+      "title": "Harness V2 Schema 失败重试恢复到错误阶段",
+      "source": "qoder_audit_codex_review",
+      "rawFeedback": "复核 Harness 失败恢复流程发现 retryHarnessRun 对所有 failed run 都重置到 evidence_ready；V2 报告在 clarifying 阶段失败后会错误回到 V1 起点，丢失正确恢复语义。",
+      "evidence": [
+        "apps/api/src/modules/harness/harness.usecase.ts:retryHarnessRun",
+        "apps/api/src/modules/harness/harness.types.ts:needs_user_input stage",
+        "npm run test:harness -w apps/api:70/70 当前测试未覆盖 V1/V2 差异化恢复",
+        "npm run test:harness -w apps/api:71/71 已覆盖 V1/V2 needs_user_input 与差异化 resumeStage"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "defect",
+        "ref": "DEF-2026-07-15-002"
+      },
+      "priority": "P1",
+      "next": "已持久化契约失败 metadata/resumeStage，V1/V2 分别恢复 evidence_ready/clarifying，交互运行进入 needs_user_input；待真实交互运行人工复核错误提示与恢复体验。"
+    }
+  ],
+  "defects": [
+    {
+      "id": "DEF-2026-07-02-001",
+      "linkedIssueId": "ISS-2026-07-02-001",
+      "rpId": "RP-037",
+      "title": "登录态过期仍进入系统壳子",
+      "severity": "S2",
+      "status": "fixed",
+      "affectedArea": "V2 前端路由鉴权 / AI 工作台 Shell",
+      "fix": "新增业务路由 AuthGate、JWT exp 预检、/auth/me 校验和过期 token 清理。",
+      "verification": "AppAuthGuard 红绿闭环；HomeWorkspace 登录过期聚焦 1/1；Login 3/3；V2 全量 101/101；build:web pass。",
+      "acceptance": "已验证并关闭，保留缺陷来源用于统计。"
+    },
+    {
+      "id": "DEF-2026-07-03-001",
+      "linkedIssueId": "ISS-2026-07-03-001",
+      "rpId": "RP-029",
+      "title": "附件解析场景流式体验未覆盖",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "AI 工作台附件解析 / parse-basic-info / SSE 展示",
+      "fix": "待补附件解析流式接线、真实 text/event-stream 分块渲染回归和真实 Kimi 人工验收。",
+      "verification": "当前为人工验收反证，chat stream 自动化不足以关闭附件解析流式缺陷。",
+      "acceptance": "待返工 / 待补测。"
+    },
+    {
+      "id": "DEF-2026-07-03-002",
+      "linkedIssueId": "ISS-2026-07-03-002",
+      "rpId": "RP-038",
+      "title": "元问题意图识别缺失导致答非所问",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "workbench-intent.service.ts / workbench-dispatch.service.ts",
+      "fix": "新增 meta_question 意图、META_QUESTION_PATTERNS、模型分类提示词定义和 buildMetaQuestionResponse()。",
+      "verification": "intent + dispatch 聚焦 53/53 通过；build:api pass；test:modules 当前 145/146，剩余失败为既有 RP-029 断连测试。",
+      "acceptance": "真实会话人工复核待回填。"
+    },
+    {
+      "id": "DEF-2026-07-03-003",
+      "linkedIssueId": "ISS-2026-07-03-003",
+      "rpId": "RP-039",
+      "title": "附件问答紧凑 Markdown 和下一步动作闭环缺陷",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "AiHomeWorkbench.jsx Markdown parser / option action inference",
+      "fix": "规范化紧凑管道表格和紧凑下一步建议，并为概览预览 / 需求解析报告 v1 推断 generate_requirement_report 动作。",
+      "verification": "HomeWorkspace.test.jsx 51/51；V2 全量 102/102；build:web pass。",
+      "acceptance": "真实会话人工复核待回填。"
+    },
+    {
+      "id": "DEF-2026-07-04-001",
+      "linkedIssueId": "ISS-2026-07-04-001",
+      "rpId": "RP-039",
+      "title": "generic confirm_write_action 点击无响应",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "AiHomeWorkbench.jsx suggestedActions / confirmPendingAction",
+      "fix": "为非 create_project_evaluation 的确认类写动作增加可见兜底反馈，并让 suggestedActions 中 confirm_write_action / requiresConfirm 进入 confirmPendingAction，避免按钮点击静默无效。",
+      "verification": "HomeWorkspace.test.jsx 新增 generic write-action 红绿回归；聚焦测试 pass。",
+      "acceptance": "待用户在真实 session be9c045e-29d1-4747-8106-4c1f4c0a3a12 复核“确认执行写动作”点击后可见明确反馈。"
+    },
+    {
+      "id": "DEF-2026-07-04-002",
+      "linkedIssueId": "ISS-2026-07-04-002",
+      "rpId": "RP-026",
+      "title": "邀请成员按钮未绑定生成邀请码动作",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "UserManagement.jsx 用户管理工具栏 / 邀请成员",
+      "fix": "为“+ 邀请成员”绑定 /auth/invite-codes/generate，生成中禁用按钮，成功后展示成员邀请码弹窗，失败时展示错误反馈。",
+      "verification": "UserManagement.test.jsx 新增邀请成员红绿回归；聚焦 1/1 与文件内 5/5 通过。",
+      "acceptance": "待用户在 http://localhost:3004/users 点击“+ 邀请成员”复核弹窗和邀请码可见。"
+    },
+    {
+      "id": "DEF-2026-07-04-003",
+      "linkedIssueId": "ISS-2026-07-04-005",
+      "rpId": "RP-042",
+      "title": "编码规则动作按钮参数和配置表单缺失",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "SystemManagement.jsx / useSystemManagement.js 编码规则页面动作",
+      "fix": "编码规则列表改为映射后端 id/moduleCode/sample/effectiveAt；配置按钮打开可编辑 Dialog 并提交 prefix/format；生效和禁用按钮使用规则 id 调用后端并显示成功反馈。",
+      "verification": "SystemManagementCodeRules.test.jsx 2/2；V2 前端全量 110/110；build:web pass，保留既有 chunk size warning。",
+      "acceptance": "待用户在 http://localhost:3004/system/code-rules 点击“配置 / 生效 / 禁用”复核。"
+    },
+    {
+      "id": "DEF-2026-07-04-004",
+      "linkedIssueId": "ISS-2026-07-04-006",
+      "rpId": "RP-042",
+      "title": "侧栏退出按钮继承导航链接整行宽度",
+      "severity": "S3",
+      "status": "fixed_manual_pending",
+      "affectedArea": "V2 Shell 左侧侧栏底部用户信息区",
+      "fix": "在 .sidebar .user .out 上覆盖 width:auto 和 align-self:center，并让用户信息 row 不换行，避免 .sidebar a 的 width:100% 导航样式泄漏到底部退出按钮。",
+      "verification": "ShellUserMenu.test.jsx 1/1；V2 前端全量 111/111；build:web pass；浏览器 DOM/CSS 验证退出按钮宽度约 38px 且位于用户名右侧。",
+      "acceptance": "待用户在 http://localhost:3004/ 复核退出按钮已恢复到用户名旁边。"
+    },
+    {
+      "id": "DEF-2026-07-04-005",
+      "linkedIssueId": "ISS-2026-07-04-007",
+      "rpId": "RP-042",
+      "title": "业务用户可见管理员导航入口",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "V2 Shell 左侧导航 / WorkspaceTabs / 管理员路由",
+      "fix": "新增 admin access 判定；Shell 仅在 user.role === 'admin' 时渲染系统管理、用户管理和 API 密钥入口；WorkspaceTabs 在权限确认后过滤历史管理员页签；/system、/users、/api-keys 及系统子路由增加 AdminOnlyRoute 守卫。",
+      "verification": "ShellUserMenu.test.jsx + AppAuthGuard.test.jsx + SystemManagementNavigation.test.jsx 7/7；V2 前端全量 114/114；build:web pass，保留既有 chunk size warning。浏览器当前为 admin 登录态，管理员菜单可见符合预期；非管理员场景由自动化测试覆盖。",
+      "acceptance": "待用户以 kevin 账号在 http://localhost:3004/ 刷新后复核：左侧和顶部均不显示系统管理、用户管理、API 密钥，直达管理员 URL 会返回 AI 工作台。"
+    },
+    {
+      "id": "DEF-2026-07-04-006",
+      "linkedIssueId": "ISS-2026-07-04-008",
+      "rpId": "RP-029",
+      "title": "client_aborted 后未持久化助手失败状态且前端刷新覆盖本地气泡",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "AI 工作台流式会话持久化 / 停止生成前端刷新",
+      "fix": "后端 homeWorkbenchChatStream 在 catch 分支按 sessionId 追加 assistant 失败/中断消息并写入 streamFailure 元数据；前端 sendMessage 对 stream error、abort、无响应分支不再立即 loadSessions，保留本地错误或停止气泡，避免被旧会话状态覆盖。",
+      "verification": "chat.service.test.ts 新增 provider stream 失败与 client close 后会话消息持久化断言；HomeWorkspace.test.jsx 新增 abort 后不刷新会话覆盖本地停止气泡断言；npm run test:modules 147/147；npm run test:web 114/114；npm run build:api pass；npm run build:web pass。",
+      "acceptance": "待用户在真实 AI 会话中复核：发消息过程中中断或连接失败后，刷新/返回会话时能看到明确的 AI 中断/失败状态，不再表现为助手消息凭空消失。"
+    },
+    {
+      "id": "DEF-2026-07-04-007",
+      "linkedIssueId": "ISS-2026-07-04-009",
+      "rpId": "RP-029",
+      "title": "POST SSE 请求 close 被误判为客户端中断导致 static/done 被跳过",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "AI 工作台流式接口 / SSE 客户端解析",
+      "fix": "后端 homeWorkbenchChatStream 不再使用 req.close 判断 SSE 客户端断开，改用 req.aborted 与 res.close；前端 streamHomeWorkbenchChat 在 reader done 后解析残留 buffer，避免尾包事件缺少空行分隔时丢失；AI session PG 持久化增加串行队列，避免连续 create/append 导致 delete+insert 并发主键冲突。",
+      "verification": "chat.service.test.ts 新增 request close after POST body 不抑制 static/done 回归；client close 改为 res.close 模拟真实响应断开；aiStreamApi.test.js 新增尾部 SSE 事件解析回归；真实 curl “你好”返回 heartbeat + static + done 且日志无 duplicate key；npm run test:modules 148/148；npm run test:web 115/115；npm run build:api pass；npm run build:web pass。",
+      "acceptance": "待用户在 http://localhost:3004/ 刷新后发送“你好”复核：应返回 WES AI 工作台能力说明，不再显示“AI 已收到，但暂未返回有效内容。”"
+    },
+    {
+      "id": "DEF-2026-07-15-001",
+      "linkedIssueId": "ISS-2026-07-15-002",
+      "rpId": "RP-027",
+      "title": "企业画像把未知行业替换为固定行业",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "AI 工作台企业画像提取 / 草稿预填 / 客户事实完整性",
+      "fix": "chat.service.ts 已移除固定行业 fallback；无模型配置与模型缺字段均保持空值，输出 fieldProvenance=needs_user_input；CompanyProfile strict JSON Schema 同时执行本地 Ajv/语义校验。",
+      "verification": "buildCompanyProfileFallback 与 chat.service 回归覆盖未知行业、主体歧义、结构化元数据；npm run test:modules 152/152、npm run build:api 通过。",
+      "acceptance": "自动化验收通过；待真实企业画像请求确认缺失行业在 V2 页面显示待补充且不预填具体分类。"
+    },
+    {
+      "id": "DEF-2026-07-15-002",
+      "linkedIssueId": "ISS-2026-07-15-003",
+      "rpId": "RP-027",
+      "title": "Harness V2 Schema 失败重试错误回到 evidence_ready",
+      "severity": "S2",
+      "status": "fixed_manual_pending",
+      "affectedArea": "Harness Schema 修复 / 失败恢复 / 人工干预",
+      "fix": "Harness v1/v2 已接入 strict JSON Schema + Ajv，完整校验 confidence/evidenceRefs；交互运行修复耗尽进入 needs_user_input 并持久化 resumeStage，V1/V2 重试分别恢复 evidence_ready/clarifying。",
+      "verification": "npm run test:harness 71/71，新增 V1/V2 json_schema 请求、confidence 越界、needs_user_input 与差异化恢复回归；npm run build:api 通过。",
+      "acceptance": "自动化验收通过；待真实交互运行确认用户可见校验错误、手工补充和恢复体验。"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "id": "BE-2026-07-09-plane-cloud-initialization",
+  "date": "2026-07-09",
+  "type": "process_change",
+  "scope": "Plane Cloud 执行层初始化",
+  "summary": "根据当前 WES 总看板，将执行骨架和当前仍需跟踪的部分条目初始化到 Plane Cloud：创建 12 个治理标签、2 个 Work Item Type、5 个能力 Module、4 个版本 Cycle，并创建 16 个带 WES 编号前缀的 Work Item；WES 总看板仍作为事实源，Plane 暂作为执行镜像。",
+  "status": "已初始化 / 待试运行",
+  "pages": ["changes", "monitoring", "risks"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "提供 10 个非关闭缺陷条目和缺陷到 RP 的关联事实"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/roadmap.html",
+      "summary": "提供 V-2026.07-R1/R2/R3 与 V-2026.H2-AI 版本窗口和能力路标"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/plan.html",
+      "summary": "提供 RP-029、RP-035、RP-036、RP-040、RP-041、RP-042 的当前规划口径"
+    },
+    {
+      "kind": "manual",
+      "ref": "Plane Cloud API initialization",
+      "result": "pass",
+      "summary": "Plane 项目中 16 个 WES Work Item 均可见；4 个 WES Cycle 已创建并完成 16 条 Cycle 关联；5 个 WES Module 已完成 16 条 Module 关联；运行过程未输出或写入令牌"
+    }
+  ],
+  "next": "继续导入前先确认 Plane 与 WES 总看板的同步方向、增量规则和关闭口径；在正式切换事实源前，WES 总看板仍是需求、缺陷、验证和风险的权威记录。",
+  "board": {
+    "change": {
+      "stage": "Plane Cloud 初始化",
+      "result": "已初始化 / 待试运行"
+    }
+  }
+}

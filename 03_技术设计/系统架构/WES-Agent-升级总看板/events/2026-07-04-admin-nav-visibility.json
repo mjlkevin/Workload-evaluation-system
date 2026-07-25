@@ -1,0 +1,88 @@
+{
+  "id": "BE-2026-07-04-admin-nav-visibility",
+  "date": "2026-07-04",
+  "type": "implementation",
+  "scope": "管理员导航权限可见性",
+  "summary": "修复业务用户仍能看到系统管理、用户管理和 API 密钥入口的问题，并补齐管理员页面直达路由守卫与历史页签过滤。",
+  "status": "已实施 / 待用户本地复核",
+  "pages": ["issues", "defects", "changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "新增 ISS-2026-07-04-007 并分流到 DEF-2026-07-04-005。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/utils/adminAccess.js",
+      "summary": "新增管理员用户与管理员路径统一判定。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx",
+      "summary": "左侧系统管理、用户管理、API 密钥仅在 user.role === admin 时渲染。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/components/Layout/WorkspaceTabs.jsx",
+      "summary": "权限确认后过滤历史管理员页签，避免非管理员通过顶部页签看到管理入口。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/App.jsx",
+      "summary": "为 /system、/users、/api-keys 及系统子路由增加 AdminOnlyRoute 守卫。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/ShellUserMenu.test.jsx",
+      "summary": "新增业务用户隐藏管理员导航入口回归测试。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/AppAuthGuard.test.jsx",
+      "summary": "新增业务用户直达管理员路由会返回 AI 工作台的回归测试。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- ShellUserMenu.test.jsx AppAuthGuard.test.jsx SystemManagementNavigation.test.jsx",
+      "result": "pass",
+      "summary": "7/7 通过，覆盖非管理员导航隐藏、直达路由守卫和管理员系统管理导航。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE",
+      "result": "pass",
+      "summary": "V2 前端全量 114/114 通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+    }
+  ],
+  "next": "待用户以 kevin 账号在本地页面刷新复核：左侧导航和顶部页签均不显示管理员入口，直达管理员 URL 会返回 AI 工作台。",
+  "board": {
+    "change": {
+      "stage": "管理员导航权限缺陷修复",
+      "result": "已实施 / 待用户本地复核"
+    },
+    "testing": [
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE -- ShellUserMenu.test.jsx AppAuthGuard.test.jsx SystemManagementNavigation.test.jsx",
+        "result": "pass",
+        "summary": "7/7 通过，覆盖非管理员导航隐藏、直达路由守卫和管理员系统管理导航。"
+      },
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE",
+        "result": "pass",
+        "summary": "V2 前端全量 114/114 通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass",
+        "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+      }
+    ]
+  }
+}

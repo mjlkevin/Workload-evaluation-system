@@ -1,0 +1,102 @@
+{
+  "id": "BE-2026-07-25-worktree-convergence",
+  "date": "2026-07-25",
+  "type": "verification",
+  "scope": "WES Agent worktree 收敛",
+  "summary": "修复 linked worktree 搬迁后的 Git 指针，关闭 structured output、AI session、流式取消、系统管理前端和 API 构建阻断，并把原始反馈入口统一收敛为 Issue-first；自动化门禁已恢复绿色，但 PostgreSQL 传统运行态切换和主 checkout 集成仍保持开放。",
+  "status": "自动化通过 / PG 与集成待完成",
+  "pages": ["changes", "testing", "monitoring", "risks", "plan", "sources"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "docs/superpowers/specs/2026-07-25-wes-agent-convergence-design.md",
+      "summary": "定义成果保留、红灯关闭、真实完成边界与安全集成原则。"
+    },
+    {
+      "kind": "file",
+      "ref": "docs/superpowers/plans/2026-07-25-wes-agent-convergence.md",
+      "summary": "记录分批实施、验证与集成检查清单。"
+    },
+    {
+      "kind": "command",
+      "ref": "git worktree repair /Users/kevin/AI/Workload-evaluation-system-agent",
+      "result": "pass",
+      "summary": "活动目录重新注册为主仓库的 linked worktree，分支和文件未移动。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:modules",
+      "result": "pass",
+      "summary": "API 模块回归 143/143。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "V2 前端回归 117/117。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:ai",
+      "result": "pass",
+      "summary": "AI 回归 190/190。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:agent -w apps/api",
+      "result": "pass",
+      "summary": "Provider 与 Agent 回归 26/26。"
+    },
+    {
+      "kind": "command",
+      "ref": "node --test scripts/board-event.test.js scripts/board-work-items.test.js",
+      "result": "pass",
+      "summary": "看板事件与 Issue-first 工作项治理 12/12。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "API 与 Web 构建通过；Web 保留既有 chunk size warning。"
+    }
+  ],
+  "next": "按主题提交已验证成果；主 checkout 的本地改动保护完成前不合并。PostgreSQL schema 与迁移策略已可编译，但传统 JSON repositories 尚未完成运行时替换，须另行完成 live PG 迁移和人工验收。",
+  "board": {
+    "change": {
+      "stage": "WES Agent worktree 收敛",
+      "result": "自动化通过 / PG 与集成待完成"
+    },
+    "testing": [
+      {
+        "command": "npm run test:modules",
+        "result": "pass 143/143",
+        "summary": "API 模块全量通过，ai-sessions 同步 controller 合同恢复。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass 117/117",
+        "summary": "V2 全量通过，覆盖 SSE 客户端、系统管理独立路由、规则配置和鉴权回归。"
+      },
+      {
+        "command": "npm run test:ai",
+        "result": "pass 190/190",
+        "summary": "AI 服务全量通过。"
+      },
+      {
+        "command": "npm run test:agent -w apps/api",
+        "result": "pass 26/26",
+        "summary": "Provider 调用方取消信号与既有工具调用回归通过。"
+      },
+      {
+        "command": "node --test scripts/board-event.test.js scripts/board-work-items.test.js",
+        "result": "pass 12/12",
+        "summary": "看板事件和 Issue-first 工作项治理通过。"
+      },
+      {
+        "command": "npm run build:api && npm run build:web",
+        "result": "pass",
+        "summary": "API 与 Web 生产构建通过；Web 仅保留既有 chunk size warning。"
+      }
+    ]
+  }
+}

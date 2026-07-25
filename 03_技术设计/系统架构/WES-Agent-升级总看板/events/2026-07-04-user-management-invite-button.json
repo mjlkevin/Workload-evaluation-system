@@ -1,0 +1,68 @@
+{
+  "id": "BE-2026-07-04-user-management-invite-button",
+  "date": "2026-07-04",
+  "type": "implementation",
+  "scope": "用户管理邀请成员按钮无响应缺陷",
+  "summary": "根据用户截图反馈，修复用户管理页“+ 邀请成员”按钮点击后没有任何反馈的问题，并按 Issue-first 分流到 DEF-2026-07-04-002。",
+  "status": "已实施 / 待用户本地复核",
+  "pages": ["issues", "defects", "changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "新增 ISS-2026-07-04-002 并分流到 DEF-2026-07-04-002"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/UserManagement.jsx",
+      "summary": "为“+ 邀请成员”绑定生成邀请码接口，成功后显示成员邀请码弹窗，失败时显示错误反馈"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/UserManagement.test.jsx",
+      "summary": "新增邀请成员按钮红绿回归测试"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/UserManagement.test.jsx -t \"generates and displays\"",
+      "result": "pass",
+      "summary": "1/1，验证点击邀请成员会调用生成接口并显示邀请码"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE",
+      "result": "pass",
+      "summary": "104/104，V2 前端全量测试通过"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "V2 前端生产构建通过，保留既有 chunk size warning"
+    }
+  ],
+  "next": "待用户在 http://localhost:3004/users 点击“+ 邀请成员”复核邀请码弹窗可见。",
+  "board": {
+    "change": {
+      "stage": "用户管理邀请成员缺陷修复",
+      "result": "已实施 / 待用户本地复核"
+    },
+    "testing": [
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/UserManagement.test.jsx -t \"generates and displays\"",
+        "result": "pass",
+        "summary": "覆盖邀请成员按钮点击后生成邀请码并显示弹窗"
+      },
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE",
+        "result": "pass",
+        "summary": "V2 前端全量 104/104"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass",
+        "summary": "V2 前端生产构建通过"
+      }
+    ]
+  }
+}

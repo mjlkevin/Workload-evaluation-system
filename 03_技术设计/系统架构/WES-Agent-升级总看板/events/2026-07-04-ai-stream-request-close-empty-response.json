@@ -1,0 +1,127 @@
+{
+  "id": "BE-2026-07-04-ai-stream-request-close-empty-response",
+  "date": "2026-07-04",
+  "type": "implementation",
+  "scope": "AI 工作台普通问候只返回兜底空内容",
+  "summary": "修复 POST + SSE 请求中 req.close 被误判为客户端中断，导致普通问候只收到 heartbeat、static/done 被跳过并显示“暂未返回有效内容”的缺陷。",
+  "status": "已实施 / 待用户本地复核",
+  "pages": ["issues", "defects", "changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "新增 ISS-2026-07-04-009 并分流到 DEF-2026-07-04-007。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/chat.service.ts",
+      "summary": "homeWorkbenchChatStream 不再使用 req.close 判断 SSE 客户端断开，改用 req.aborted 与 res.close。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/chat.service.test.ts",
+      "summary": "新增 request close after POST body 不抑制 static/done 回归，并用 res.close 模拟真正响应断开。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/api/ai.js",
+      "summary": "reader done 后解析残留 SSE buffer，避免尾包事件缺少空行分隔时丢失。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/aiStreamApi.test.js",
+      "summary": "新增尾部 SSE 事件解析回归测试。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/ai-sessions/ai-sessions.repository.ts",
+      "summary": "AI session PG 持久化增加串行队列，避免连续 create/append 触发 delete+insert 并发主键冲突。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm exec -w apps/api -- tsx --test --test-global-setup=./test-setup.mts src/services/ai/chat.service.test.ts",
+      "result": "pass",
+      "summary": "16/16 通过；request close 回归先失败后转绿。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- aiStreamApi.test.js",
+      "result": "pass",
+      "summary": "4/4 通过；尾部 SSE buffer 解析回归先失败后转绿。"
+    },
+    {
+      "kind": "command",
+      "ref": "curl -sN POST /api/v1/ai/home-workbench/chat/stream message=你好",
+      "result": "pass",
+      "summary": "真实接口返回 heartbeat + static + done，done.content 为 WES AI 工作台能力说明；API 日志无 duplicate key。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:modules",
+      "result": "pass",
+      "summary": "148/148 通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "V2 前端全量 115/115 通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api",
+      "result": "pass",
+      "summary": "API TypeScript 构建通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+    }
+  ],
+  "next": "待用户在 http://localhost:3004/ 刷新后发送“你好”复核：应返回 WES AI 工作台能力说明，不再显示“AI 已收到，但暂未返回有效内容。”",
+  "board": {
+    "change": {
+      "stage": "AI SSE 请求 close 误判缺陷修复",
+      "result": "已实施 / 待用户本地复核"
+    },
+    "testing": [
+      {
+        "command": "npm exec -w apps/api -- tsx --test --test-global-setup=./test-setup.mts src/services/ai/chat.service.test.ts",
+        "result": "pass",
+        "summary": "16/16 通过；覆盖 request close 不抑制 static/done、res close 才视为客户端断开。"
+      },
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE -- aiStreamApi.test.js",
+        "result": "pass",
+        "summary": "4/4 通过；覆盖 reader done 后尾部 SSE buffer 解析。"
+      },
+      {
+        "command": "curl -sN POST /api/v1/ai/home-workbench/chat/stream message=你好",
+        "result": "pass",
+        "summary": "真实接口返回 heartbeat + static + done，API 日志无 duplicate key。"
+      },
+      {
+        "command": "npm run test:modules",
+        "result": "pass",
+        "summary": "148/148 通过。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass",
+        "summary": "V2 前端全量 115/115 通过。"
+      },
+      {
+        "command": "npm run build:api",
+        "result": "pass",
+        "summary": "API TypeScript 构建通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass",
+        "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+      }
+    ]
+  }
+}

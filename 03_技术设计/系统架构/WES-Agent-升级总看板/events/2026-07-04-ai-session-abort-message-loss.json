@@ -1,0 +1,116 @@
+{
+  "id": "BE-2026-07-04-ai-session-abort-message-loss",
+  "date": "2026-07-04",
+  "type": "implementation",
+  "scope": "AI 会话中断后助手消息消失",
+  "summary": "修复 AI 工作台流式请求 client_aborted 后只保留用户消息、助手消息刷新后消失的缺陷，并补齐后端会话失败标记与前端中断刷新保护。",
+  "status": "已实施 / 待用户真实会话复核",
+  "pages": ["issues", "defects", "changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "新增 ISS-2026-07-04-008 并分流到 DEF-2026-07-04-006。"
+    },
+    {
+      "kind": "runtime",
+      "ref": "ai_session:7a8f79a5-ad12-4132-895b-ae39f9cf2148",
+      "summary": "PG 查询显示该会话仅有 3 条 user 消息；trace 查询显示 3 条均为 client_aborted。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/chat.service.ts",
+      "summary": "homeWorkbenchChatStream catch 分支追加 assistant 失败/中断消息，并记录 streamFailure code/retryable 元数据。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/chat.service.test.ts",
+      "summary": "新增 provider stream 失败与 client close 后，会话中必须保留 assistant 失败/中断消息的回归断言。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx",
+      "summary": "stream error、abort、无响应分支不再立即 loadSessions，避免旧服务端状态覆盖本地停止/错误气泡。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/HomeWorkspace.test.jsx",
+      "summary": "新增停止生成后不能刷新会话覆盖本地“已停止生成”气泡的回归断言。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm exec -w apps/api -- tsx --test --test-global-setup=./test-setup.mts src/services/ai/chat.service.test.ts",
+      "result": "pass",
+      "summary": "15/15 通过；新增后端会话失败/中断持久化断言先失败后转绿。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- HomeWorkspace.test.jsx",
+      "result": "pass",
+      "summary": "53/53 通过；新增 Abort 后不刷新会话断言先失败后转绿。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:modules",
+      "result": "pass",
+      "summary": "147/147 通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "V2 前端全量 114/114 通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api",
+      "result": "pass",
+      "summary": "API TypeScript 构建通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+    }
+  ],
+  "next": "待用户在真实 AI 会话中复核：发送消息过程中中断或连接失败后，刷新或返回会话时能看到明确的 AI 中断/失败状态，不再表现为助手消息凭空消失。",
+  "board": {
+    "change": {
+      "stage": "AI 流式会话中断持久化缺陷修复",
+      "result": "已实施 / 待用户真实会话复核"
+    },
+    "testing": [
+      {
+        "command": "npm exec -w apps/api -- tsx --test --test-global-setup=./test-setup.mts src/services/ai/chat.service.test.ts",
+        "result": "pass",
+        "summary": "15/15 通过；覆盖 provider stream 失败和 client close 后的 assistant 失败/中断消息持久化。"
+      },
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE -- HomeWorkspace.test.jsx",
+        "result": "pass",
+        "summary": "53/53 通过；覆盖 Abort 后不立即刷新会话覆盖本地停止气泡。"
+      },
+      {
+        "command": "npm run test:modules",
+        "result": "pass",
+        "summary": "147/147 通过。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass",
+        "summary": "V2 前端全量 114/114 通过。"
+      },
+      {
+        "command": "npm run build:api",
+        "result": "pass",
+        "summary": "API TypeScript 构建通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass",
+        "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+      }
+    ]
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "id": "BE-2026-07-04-system-management-subnav",
+  "date": "2026-07-04",
+  "type": "implementation",
+  "scope": "系统管理二级模块左侧导航与独立页面改造",
+  "summary": "根据用户截图需求，将系统管理页内二级模块迁移为左侧系统管理父级下的二级菜单，并为 7 个模块提供独立路由；/system 不再渲染独立页面，仅重定向到默认编码规则页面。",
+  "status": "已实施 / 待用户本地复核",
+  "pages": ["changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "新增 ISS-2026-07-04-004 并分流到 RP-042。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/config/systemManagementSections.js",
+      "summary": "新增系统管理二级模块共享配置，统一路由、标题、图标和副标题。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx",
+      "summary": "将左侧系统管理改为不可跳转父级，并展开 7 个二级模块 NavLink。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/App.jsx",
+      "summary": "新增系统管理 7 个子路由，并让 /system 重定向到 /system/code-rules。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx",
+      "summary": "系统管理页面改为由路由 sectionId 控制当前模块，移除旧顶部横向 system-tabs。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/__tests__/SystemManagementNavigation.test.jsx",
+      "summary": "新增系统管理导航红绿回归测试。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE",
+      "result": "pass",
+      "summary": "V2 前端全量测试 108/108 通过，覆盖系统管理导航子路由回归。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:board-work-items",
+      "result": "pass",
+      "summary": "work-item 生成器与治理断言 6/6 通过。"
+    }
+  ],
+  "next": "待用户在本地 V2 页面点击左侧系统管理二级菜单，复核各模块页面标题、工作区页签和原有配置动作可用。",
+  "board": {
+    "change": {
+      "stage": "系统管理导航改造",
+      "result": "已实施 / 待用户本地复核"
+    },
+    "testing": [
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE -- SystemManagementNavigation.test.jsx",
+        "result": "pass",
+        "summary": "系统管理导航聚焦测试 3/3 通过：覆盖 /system 默认重定向、父级非链接、7 个子模块链接和 DSL 独立页无顶部 tab。"
+      },
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE",
+        "result": "pass",
+        "summary": "V2 前端全量测试 108/108 通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass",
+        "summary": "V2 前端生产构建通过，保留既有 chunk size warning。"
+      },
+      {
+        "command": "npm run test:board-work-items",
+        "result": "pass",
+        "summary": "work-item 生成器与治理断言 6/6 通过。"
+      }
+    ]
+  }
+}

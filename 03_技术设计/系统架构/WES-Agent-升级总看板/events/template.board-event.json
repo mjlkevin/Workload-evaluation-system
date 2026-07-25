@@ -1,0 +1,36 @@
+{
+  "id": "BE-YYYY-MM-DD-short-slug",
+  "date": "YYYY-MM-DD",
+  "type": "implementation",
+  "scope": "Short board-facing scope",
+  "summary": "One concise factual summary for the command board.",
+  "status": "已实施 / 待人工复核",
+  "pages": ["changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "path/to/file",
+      "summary": "What changed or what this file proves"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:example",
+      "result": "pass",
+      "summary": "Relevant result summary"
+    }
+  ],
+  "next": "Remaining manual acceptance, integration, rework, or follow-up.",
+  "board": {
+    "change": {
+      "stage": "Timeline label",
+      "result": "已实施 / 待人工复核"
+    },
+    "testing": [
+      {
+        "command": "npm run test:example",
+        "result": "pass",
+        "summary": "What this command verifies"
+      }
+    ]
+  }
+}

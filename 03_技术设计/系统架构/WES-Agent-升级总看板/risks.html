@@ -38,7 +38,7 @@
       <h1>风险与决策</h1>
       <p class="meta">
         <span><b>目标</b> 把边界和风险显式化</span>
-        <span><b>状态</b> Phase 1F 回写审计已实现；知识库、附件问答轻量审计、formBlock 真实模型输出、引导选项误识别、Harness Regression 评分偏差、需求池 Loop 治理风险、反幻觉防御、RP-026 用户管理能力位治理风险、RP-027/RP-028 Kimi Provider 迁移与稳定性风险、Qoder 回填集成风险、RP-029 流式边界风险与 RP-030 Trace 数据治理/测试隔离风险已入池；Codex 侧 Loop 已删除并由 Qoder 接管持续执行；RP-019 右侧空间挤压、表格可读性和 unsafe link/raw HTML 风险已通过折叠、表格渲染与 sanitize 批次降低</span>
+        <span><b>状态</b> Phase 1F 回写审计已实现；知识库、附件问答轻量审计、formBlock 真实模型输出、引导选项误识别、Harness Regression 评分偏差、需求池 Loop 治理风险、反幻觉防御、RP-026 用户管理能力位治理风险、RP-027/RP-028 Kimi Provider 迁移与稳定性风险、Qoder 回填集成风险、RP-029 流式边界风险、RP-030 Trace 数据治理/测试隔离风险与 RP-036 系统配置可信反馈风险已入池；RP-036 已完成鉴权、动作反馈和 retrieval_empty 误判修复，凭据轮换与人工复测前继续监控；Codex 侧 Loop 已删除并由 Qoder 接管持续执行；RP-019 右侧空间挤压、表格可读性和 unsafe link/raw HTML 风险已通过折叠、表格渲染与 sanitize 批次降低</span>
         <span><b>原则</b> AI 草稿可以自动，正式业务不能绕过确认</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
@@ -222,6 +222,18 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-07-25-worktree-convergence:risks">
+          <td>看板曾把 PostgreSQL schema / migration 基线误写为传统运行态已完成切换。</td>
+          <td>当前传统业务 repository 仍同步读写 JSON；若沿用旧结论，可能在没有 live migration、回滚与真实数据库验收的情况下误判生产就绪。</td>
+          <td>2026-07-25 代码复核将 <code class="inline">runtime-stores.ts</code> 设为显式 fail-closed，未实现 hydration 时直接抛出 <code class="inline">pg_runtime_store_hydration_not_implemented</code>；保留 schema、迁移策略与编译成果，但必须另行完成 repository 替换、真实 PG 迁移、回滚验证和人工验收。此项以当前代码事实为准，修正 2026-07-14 的运行态完成表述。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 禁止误标完成</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-07-25-worktree-convergence:integration-risk">
+          <td>主 checkout 与 Agent worktree 都包含本地改动，直接合并会混入或覆盖未保护成果。</td>
+          <td>跨分支冲突难以区分用户本地工作与本轮收敛成果，并可能破坏可恢复性。</td>
+          <td>先在 Agent 分支按主题形成可审查提交，保留恢复 stash；主 checkout 本地改动保护并确定集成方式前，不执行 merge、rebase、reset 或 clean。</td>
+          <td><span class="status warn"><span class="dot"></span>待安全集成</span></td>
+        </tr>
         <tr>
           <td>普通附件问答 trace 过重或被误认为 Harness Run。</td>
           <td>如果把每次附件追问都创建完整 Harness Run 或保存完整 prompt/raw trace，会带来存储膨胀、隐私暴露和审计语义混乱；如果完全不留 trace，又无法解释模型回答基于哪个附件。</td>
@@ -272,6 +284,11 @@
           <td>AI 知识库工具检索未触发、误引用或把外部模型结果当作正式估算依据。</td>
           <td>模块识别和工作量评估可能被错误产品知识带偏，且用户难以判断答案是否真实来自知识库。</td>
           <td>RP-018 MVP 必须只读、可关闭、可审计；实施计划 <code class="inline">docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md</code> 已把 native fetch、禁用 <code class="inline">prompt_template</code>、<code class="inline">retrievalTriggered</code> 阈值、缺失配置降级、<code class="inline">trace.knowledgeTool</code>、session metadata 和前端 trace chip 纳入门禁；本轮后端服务已实现缺配置、未触发检索、请求失败和空答案低置信降级，并新增 <code class="inline">knowledge_query</code> 意图路由，WES 数据查询、附件问答、报告生成和写动作仍优先于知识库路由；dispatch 已直接调用只读知识库工具并返回 <code class="inline">trace.knowledgeTool</code>，assistant message 已写入 <code class="inline">metadata.knowledgeTool</code>，OpenAPI 已补 <code class="inline">KnowledgeToolTrace</code>，前端已渲染 <code class="inline">知识库参考</code> trace chip；验证覆盖服务测试 5 pass、intent focused 22 pass、dispatch focused 5 pass、session metadata focused 50 pass、当前 HomeWorkspace 43 pass、V2 前端 83 pass、<code class="inline">test:modules</code> 102 pass、<code class="inline">build:api</code> 与 <code class="inline">build:web</code>。剩余风险在真实 ZHIPU 配置人工验收未完成前继续保留；知识库结果只能作为参考上下文，正式估算仍走 Kimi/WES 规则和人工确认。</td>
+        </tr>
+        <tr>
+          <td>登录态失效后系统配置仍可操作，并出现保存假成功或连通性测试静默无响应。</td>
+          <td>管理员会误判凭据已持久化或把无请求误认为上游故障；系统管理、用户管理与 API 密钥页面的权限反馈不一致，降低配置与审计可信度。</td>
+          <td>RP-036 已实现 P1 控制：admin-only 路由统一校验有效会话和当前用户；401/失效 JWT 进入登录恢复，不保留可操作回退页面；保存成功绑定真实 2xx 响应；测试动作具备 loading、30 秒超时和明确终态。第三次用户反馈显示知识库 ID 纠正后仍出现 <code class="inline">retrieval_empty / HTTP 400</code>，诊断确认上游实际 HTTP 200，仅固定测试语句无命中；现已改为成功响应并携带 warning，专项后端 1/1、页面 3/3、build:web 通过。凭据曾暴露，必须立即轮换且禁止继续使用或记录旧凭据；MT-1H-C-002 使用轮换密钥真实复测通过前风险继续保留。完整 test:modules 的 6 项既有无关失败需独立处理。</td>
         </tr>
         <tr>
           <td>Kimi Provider 升级缺少回归样本和成本观测。</td>
@@ -334,6 +351,16 @@
           <td>重复检索风险降为“已缓解”。构建基线已由 Codex 清理并验证 <code class="inline">build:api</code>、<code class="inline">test:modules</code>、<code class="inline">test:ai</code> 通过；剩余门禁为真实 ZHIPU 配置人工验收，验证时不得泄露 API Key 或知识库凭据。</td>
         </tr>
         <tr>
+          <td>RP-031 修订版虽已完成 20/20 修复项映射，但仍把需求映射等同于可执行覆盖：智谱原生快照回滚能力未证实，前端回传 requestId 的链路方向错误，Chunk 缺稳定身份/ACL/向量特征，NDCG 缺分级 qrels，在线命中率缺真实标签。</td>
+          <td>若直接按修订版施工，可能产生无法兑现的回滚承诺、跨租户缓存/检索泄露、客户端伪造关联 ID、MMR 无可用特征、错误 429 重试放大、统计假阳性和不可验收监控指标；管理员可编辑 API Base URL 还会引入 SSRF 风险。</td>
+          <td>设置 Gate 0：先完成智谱能力探针、Provider/错误/取消合同、requestId/traceId/providerRequestId 语义、chunk/qrels schema、缓存命名空间、逻辑 snapshot manifest、路由 DSL/ACL 和统计主指标；未通过前只允许做合同/测试夹具，不进入全量实现。C3 完整回滚仅在源文档可重放或 Provider 具备原生版本能力时升级为已覆盖。</td>
+        </tr>
+        <tr>
+          <td>RP-031 候选实施分支将大量未接线、未测试模块和敏感配置混合提交，并提前在看板声明完成。</td>
+          <td>若直接集成，会形成“代码存在但运行时未使用”的假完成：缓存/断路/ACL/查询改写/路由/监控均不起作用；检索参数 UI 保存无效，任意非空假凭证可通过激活，且敏感凭证可能继续进入 Git 历史。</td>
+          <td>Codex Gate=REJECTED，<code class="inline">allowNextTask=false</code>、<code class="inline">mustReworkFirst=true</code>。移除无关配置并轮换凭证；按 Phase 拆最小生产闭环，每批必须有失败测试、主链路接线、故障/隔离验证和 Gate 后看板更新。</td>
+        </tr>
+        <tr>
           <td>AI 引导选项识别过宽，导致普通编号列表被错误渲染为按钮或误触发发送。</td>
           <td>用户可能把普通报告条目当成下一步动作，或者点击后发送非预期文本，影响对话上下文和意图识别。</td>
           <td>RP-020 仅对显式“选项X：”无条件转交互；编号列表必须有选择/回复/启动/待确认问题等上下文才增强；点击只走普通 chat 发送链路，不触发 Harness 写动作或正式业务落库，仍需 MT-1H-B-001 人工验证真实回复。</td>
@@ -347,7 +374,7 @@
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 风险与决策 · WES 项目管理 · 2026-06-26
+      <a href="index.html">返回总览</a> · 风险与决策 · WES 项目管理 · 2026-07-23
     </footer>
   </main>
 </body>

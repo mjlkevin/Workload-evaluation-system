@@ -41,12 +41,12 @@
           <span><b>当前阶段</b> Phase 1H-B delivery baseline / Phase 1H-C planning</span>
           <span><b>管理范围</b> 升级需求 / 技术债 / 审计项 / 测试项 / 后续候选</span>
           <span><b>页面定位</b> 总看板唯一需求池页面，不是业务系统正式需求模块</span>
-          <span><b>更新日期</b> 2026-06-26</span>
+          <span><b>更新日期</b> 2026-07-23</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">35 已登记需求</span>
+          <span class="pill brand">36 已登记需求</span>
           <span class="pill ok">22 已交付</span>
-          <span class="pill warn">11 待规划/待确认</span>
+          <span class="pill warn">12 待规划/待确认</span>
           <span class="pill">2 暂缓</span>
           <span class="pill ok">可编辑子页面已移除</span>
         </div>
@@ -64,7 +64,7 @@
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">T</span><span>总需求数</span></div>
-            <div class="v">35</div>
+            <div class="v">36</div>
             <div class="lb">已登记需求项</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
@@ -76,7 +76,7 @@
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">W</span><span>进行中 / 待实现</span></div>
-            <div class="v">11</div>
+            <div class="v">12</div>
             <div class="lb">已分析 / 待规划 / 待确认</div>
             <div class="bar"><i style="width:31%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
           </div>
@@ -191,7 +191,7 @@
             </div>
           </div>
           <div class="backlog-column">
-            <h4>待规划 / 待确认 · 10</h4>
+            <h4>待规划 / 待确认 · 11</h4>
             <div class="backlog-card">
               <span class="req-id">RP-024</span>
               <h5>Napkin 视觉生成融合售前解决方案 PPT 页面</h5>
@@ -221,6 +221,16 @@
                 <span class="pill">已分析 / 待设计</span>
               </div>
               <div class="bc-next">保留现有 Project Knowledge Center 作为知识资产层，后续把首页升级为 Vision、Roadmap、Current Goal、AI Commander、AI Pipeline、Knowledge Center，并新增 AI Workflow 页面。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-036</span>
+              <h5>登录态失效后系统配置假成功与连通性测试静默无响应</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">鉴权 / 系统配置</span>
+                <span class="pill">已修复 / 待人工验收</span>
+              </div>
+              <div class="bc-next">已统一受保护路由与动作级鉴权反馈，并修正连通性判定：智谱检索 HTTP 200 但固定测试语句无命中时返回“连接成功 + retrieval_empty 提示”，不再误报 HTTP 400。自动化已通过，等待使用轮换后的密钥完成 MT-1H-C-002 人工复测。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-027</span>
@@ -268,9 +278,9 @@
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
                 <span class="pill">知识库 / 质量评估</span>
-                <span class="pill done">重复检索修复已验证 / 待真实配置</span>
+                <span class="pill">生产化分支已回填 / Codex Gate 拒收</span>
               </div>
-              <div class="bc-next">RAG baseline runner 已改为复用 <code class="inline">trace.chunks</code>，每条样本只调用一次 queryFn，不再额外调用 retrieveKnowledgeChunks；Codex 复核 <code class="inline">rag-baseline-runner.test.ts</code> 11/11、<code class="inline">knowledge-tool.service.test.ts</code> 8/8。<code class="inline">build:api</code> 当前被 kimi-provider/system/dev-assessment 既有编译错误阻断，真实 ZHIPU 配置仍待人工验收。</div>
+              <div class="bc-next">2026-07-20 外部分支 <code class="inline">feature/rp-031-rag-production</code> 回填 7 个提交；Codex Gate 拒收。Fresh 构建与旧回归通过，但约 6000 行新增 RAG 模块没有新增测试且未接入现有知识库/intent/dispatch 主链路；检索参数 UI 无法保存回读，激活门禁不验证真实凭证，候选 patch 还触碰含敏感凭证的无关配置文件。必须先返工，不得合并或标记已交付。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-033</span>
@@ -381,7 +391,7 @@
               <button type="button" id="filter-reset" class="ledger-filter-reset-btn">重置</button>
             </div>
           </div>
-          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">35</b> / 35 条需求</div>
+          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">36</b> / 36 条需求</div>
         </div>
         <div class="table-scroll">
         <table>
@@ -755,10 +765,10 @@
               <td>知识库 / RAG 质量评估</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C / Phase 2</td>
-              <td><span class="status run"><span class="dot"></span>重复检索修复已验证 / 待真实配置</span></td>
-              <td>为知识库问答和模块识别建立固定样本、知识库版本、检索参数、评价指标和对比报告，避免凭主观体验调整 Hybrid Search、Rerank 或 Query Rewriting</td>
-              <td>去重结果：命中 RP-018 知识库工具与 RP-007 Harness Regression 后续，但当前没有独立的 RAG baseline 记录、检索参数矩阵或知识库质量趋势报告；因此新增 RP-031</td>
-              <td>已修复每样本重复检索：queryZhipuKnowledgeBase 在 success / empty_answer / answer_failed 路径回传 trace.chunks，rag-baseline runner 复用 chunks，不再调用 retrieveKnowledgeChunks。Codex 复核 rag-baseline 11/11、knowledge-tool 8/8；build:api 仍被非 RAG 既有编译错误阻断，真实 ZHIPU 配置待人工验收。</td>
+              <td><span class="status warn"><span class="dot"></span>生产化分支已回填 / Codex Gate 拒收</span></td>
+              <td>为知识库问答和模块识别建立可复现 baseline，并把检索配置、Chunk 处理、Prompt、置信度、缓存/断路/限流、质量验证、Trace、配置治理和 Provider/多知识库演进拆成可独立验收的生产化批次</td>
+              <td>2026-07-20 去重结果：命中 RP-031 的 baseline、策略对比与知识库版本方向，并交叉引用 RP-018 知识库工具和 RP-030 Trace；本轮只扩展范围与验收口径，不新增重复 RP</td>
+              <td>P1 重复检索既有修复保持通过；候选生产化分支 fresh 验证为 build:api/web pass、modules 142/142、AI 190/190、Web 96/96、integration 1/1，但这些测试未覆盖新增模块。Provider/cache/pipeline/rewrite/routing/monitoring 仍未接生产主链路，C1/C4/M2/A4/C2 等验收未闭环；安全与范围门禁不通过。</td>
             </tr>
             <tr>
               <td class="mono">RP-033</td>
@@ -795,6 +805,18 @@
               <td>当前首页信息完整但仍偏文档中心，AI 当前任务、当前阶段、当前 Agent、下一步动作、Prompt、Output、Artifact 和 AI 指标尚未成为一等对象</td>
               <td>保留现有 Design / Plan / Requirements / Runtime / Monitoring / Risks / Changes 作为 Knowledge Assets；首页升级为 Vision、Roadmap、Current Goal、AI Command Center、AI Pipeline、Knowledge Center；新增 AI Workflow 页面承载阶段状态链</td>
               <td>验收：首页能回答“AI 今天应该做什么”；AI Workflow 页面展示 AI Analyze → AI Design → Task Breakdown → Coding → Testing → Review → Deploy → Done 的状态、Prompt、Output、Artifact 和 Next Action</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-036</td>
+              <td>登录态失效后系统配置假成功与连通性测试静默无响应</td>
+              <td>2026-07-23 用户在 <code class="inline">localhost:3002/system</code> 的「系统管理 / 知识库」页反馈：点击“保存草稿”收到成功提示，随后点击“测试连通性”无反应；截图与浏览器复现显示侧栏处于用户信息回退态</td>
+              <td>鉴权一致性 / 系统配置可信反馈</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C</td>
+              <td><span class="status run"><span class="dot"></span>已修复 / 待人工验收</span></td>
+              <td>登录态失效后页面仍可见且按钮仍可操作；<code class="inline">useSystemManagement</code> 在 <code class="inline">enabled=false</code> 时让保存请求与测试请求静默跳过，但保存函数仍无条件弹出成功，测试函数返回 <code class="inline">null</code>，造成“假成功 + 无响应”</td>
+              <td>去重结果：RP-018 覆盖知识库工具能力，RP-022 覆盖模型配置保存，两者均未覆盖失效 JWT 下的页面守卫、动作反馈和成功提示可信性，因此新增独立 RP-036，并交叉引用 RP-018/RP-022</td>
+              <td>受保护页面在无有效 JWT 时跳转登录或展示明确的会话失效恢复入口；保存成功只允许在 PATCH 2xx 后出现；测试按钮点击后立即进入 loading，并在超时、401、上游失败和成功时展示可理解结果；不得读取或回显完整 API Key</td>
             </tr>
             <tr>
               <td class="mono">RP-032</td>
@@ -886,10 +908,10 @@
               <td>用固定基准判断知识库检索和回答质量是否真正提升，支撑后续 Hybrid Search、Rerank、Query Rewriting 的取舍</td>
               <td>第一批限定 RP-018 知识库工具的只读检索/问答，不自动影响正式评估工时和业务写入</td>
               <td>监控页或测试结果页展示 baseline 批次、命中率、引用准确率、延迟和成本；AI 工作台继续只显示轻量知识库参考</td>
-              <td>新增 baseline runner 或测试脚本，固定知识库版本、样本、检索参数和评分器；可复用 Harness Regression 样本/评分结构</td>
-              <td>保存评测摘要、知识库版本、检索参数和指标；不保存用户私有原文；真实知识库配置继续走环境变量/系统配置脱敏展示</td>
-              <td>20 条样本 baseline、Top-3 命中率、引用准确率、fallbackReason 覆盖、延迟/成本对比；后续策略必须与 baseline 对比</td>
-              <td>同步知识库工具计划、monitoring 指标、requirements 和 changes；如引入 RAGAS 仅作为辅助指标说明</td>
+              <td>先固定 datasetVersion、knowledgeSnapshot、retrievalConfigVersion、promptVersion 和 scorerVersion，再实施参数调优；Chunk 后处理、缓存、断路/限流和 Provider seam 分批交付</td>
+              <td>保存评测摘要、版本指纹、配置变更审计和脱敏 trace；缓存必须按 owner/知识快照/参数/Prompt 隔离并支持激活失效；不保存 API Key、用户私有原文或高基数 query label</td>
+              <td>至少 20 条分层样本；检索侧覆盖 Recall@K、Precision@K、MRR、NDCG、引用 precision/recall，回答侧覆盖 groundedness、answer relevance、abstention；策略对比给出置信区间、效应量和回退门禁</td>
+              <td>同步知识库工具计划、RP-030 Trace、OpenAPI、monitoring、requirements、risks 和 changes；RAGAS/LLM judge 仅作为辅助，不替代可审计业务 qrels 与人工抽检</td>
             </tr>
             <tr>
               <td class="mono">RP-033</td>
@@ -1130,6 +1152,16 @@
               <td>先复用静态看板文件，后续再评估是否进入数据化存储</td>
               <td>HTML 结构、导航、状态链与人工评审</td>
               <td>路标管理、设计、计划、运行时、监控页同步 AI Workflow Driven 口径</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-036</td>
+              <td>系统配置动作反馈必须与真实鉴权和请求结果一致</td>
+              <td>覆盖 <code class="inline">/system</code> 及其他 admin-only 路由；不改变后端 JWT、角色与知识库调用契约</td>
+              <td>补全 AuthGuard/会话失效态；保存与测试按钮基于鉴权、loading、error 状态渲染；移除无条件成功提示和静默 <code class="inline">return null</code></td>
+              <td>复用现有 <code class="inline">/auth/me</code>、<code class="inline">PATCH /system/knowledge-base-config/draft</code>、<code class="inline">POST /system/knowledge-base-config/test</code>；401 统一转登录恢复，外部测试增加可见超时</td>
+              <td>不新增持久化；继续使用现有配置仓储，密钥不得进入测试输出、看板或日志</td>
+              <td>AuthGuard 路由测试 + Hook disabled/401 测试 + 知识库保存/测试交互测试 + 真实浏览器失效登录态人工回归</td>
+              <td>同步 requirements / plan / testing / risks / changes；实现后按需更新 README 与实现对齐说明</td>
             </tr>
             <tr>
               <td class="mono">RP-014</td>
@@ -2590,11 +2622,23 @@
         <div class="sec-head">
           <div class="num">23 / RP-031 Analysis</div>
           <h2>RP-031 · RAG Baseline 与知识库评测闭环</h2>
-          <p>本需求来自 2026-06-26 对 RAG 深度优化路线的转化。去重结论：RP-018 已交付 AI 可发现知识库工具 MVP，RP-007 已交付 Harness Regression 样本格式与评分规则第一批；但当前还没有固定的知识库 RAG baseline、检索参数矩阵、质量指标和策略对比报告。</p>
+          <p>本需求来自 2026-06-26 对 RAG 深度优化路线的转化。2026-07-20 交叉审计继续命中 RP-031，并确认 RP-018 已交付知识库工具 MVP、RP-007 已交付 Harness Regression 第一批、RP-030 已具备统一 Trace 骨架；本轮扩展 RP-031 的生产化缺口和拆分输入，不新增重复 RP。</p>
         </div>
 
         <div class="callout">
           <div><b>问题</b>知识库检索如果只靠主观体验调参，后续开启 Hybrid Search、Rerank 或 Query Rewriting 时，很难判断质量提升是否抵消了成本和延迟增加。WES 需要先建立 baseline，再做策略优化。</div>
+        </div>
+
+        <div class="callout" style="margin-top:12px">
+          <div><b>2026-07-20 交叉审计</b>20 个缺陷中，P1、P4 已覆盖；A1/A2/P2/P3/Q1/Q2/Q3/C1/M2/M3/M4 部分覆盖；A3/A4/Q4/C2/C3/C4/M1 未覆盖。三档置信度只是展示分桶，不能替代基于分数分布、chunk 数量/多样性、引用支撑度和校准样本的复合置信模型；<code class="inline">query + knowledgeId</code> 也不足以作为安全缓存键。</div>
+        </div>
+
+        <div class="callout" style="margin-top:12px">
+          <div><b>2026-07-20 修订方案 Gate</b>修订版已为 20 项缺陷提供修复项映射，覆盖完整性明显提升，但暂不接受“100% 已覆盖且可直接施工”的结论。Gate 0 必须先固化：可信请求关联模型与智谱 <code class="inline">request_id</code> 映射、Provider 能力/错误合同、稳定 chunk/qrels 标识、检索缓存与回答缓存边界、逻辑知识快照和可回滚能力探针、配置激活安全门禁、路由 DSL/ACL、统计主指标与实用显著性阈值。未完成 Gate 0 前，C3、M2、A3、Q4、M3 仍按部分覆盖管理。</div>
+        </div>
+
+        <div class="callout" style="margin-top:12px">
+          <div><b>2026-07-20 实施分支 Codex Gate：REJECTED</b><code class="inline">/Users/kevin/AI/wes-rp031-rag</code> / <code class="inline">feature/rp-031-rag-production</code> 的 7 个提交已复核。构建和既有回归通过，但新增模块没有新增测试且多数只在模块内部引用，未进入现有知识库、intent、dispatch 和 metrics 主链路；检索参数 UI 保存合同断裂，激活验证接受任意非空假凭证，并触碰含敏感凭证的无关配置。详见 <code class="inline">docs/agent-loop/audits/2026-07-20-codex-RP-031-rag-production-gate.md</code>。</div>
         </div>
 
         <div class="grid-2" style="margin-top:18px">
@@ -2623,9 +2667,9 @@
         <table style="margin-top:18px">
           <tr><th>初步方案</th><th>验收口径</th><th>待规划输入</th></tr>
           <tr>
-            <td>复用 RP-018 知识库工具 trace 和 RP-007 Regression 思路，建立只读 baseline runner；先跑当前配置，再用同一批样本对比 Hybrid Search、Rerank、Query Rewriting。</td>
-            <td>监控页或测试结果页可查看 baseline 批次、知识库版本、参数、Top-3 命中率、引用准确率、延迟和成本；策略变更必须带前后对比。</td>
-            <td>需确认样本来源、是否可使用脱敏真实客户材料、真实 ZHIPU 配置验收完成状态，以及 baseline 结果保存位置。</td>
+            <td>Gate 0 先冻结术语、能力和验收合同；Phase 0A 建立 dataset/qrels、逻辑 knowledge manifest、retrieval config、prompt、scorer 与 request/trace/provider correlation；Phase 0B 再接配置 UI 和 baseline CLI。Phase 1A 建 Provider seam、Chunk pipeline、激活门禁，Phase 1B 做缓存、断路与限流；Phase 2 做 groundedness、完整指标、统计比较和路由治理；Phase 3 扩展查询改写、多 Provider、多知识库与监控 UI。</td>
+            <td>每个批次有独立 schema、迁移默认值、OpenAPI、单元/集成/故障注入测试和可执行回滚条件；策略上线采用预先声明的主指标、配对置信区间和实用提升阈值，延迟、成本、fallback、安全与租户隔离作为非劣化护栏，不要求每个指标逐项绝对提升。</td>
+            <td>需确认样本/qrels 责任人和最小规模、智谱知识与错误码能力探针、源文档是否可重放、缓存单实例或分布式形态、多知识库 ACL/租户边界、管理员可配置 API Base URL 的 SSRF 防护，以及人工抽检与回滚责任人。</td>
           </tr>
         </table>
       </div>
@@ -2733,11 +2777,58 @@
       </div>
     </section>
 
+    <!-- RP-036 需求分析 -->
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">26 / RP-036 Analysis</div>
+          <h2>RP-036 · 登录态失效后系统配置假成功与连通性测试静默无响应</h2>
+          <p>来源为 2026-07-23 用户测试反馈与截图。去重未命中同类 RP：RP-018 负责知识库工具能力，RP-022 负责系统模型配置编辑保存，本条独立覆盖失效 JWT 下受保护页面仍可操作、保存假成功和测试静默无响应，并与两者交叉引用。</p>
+        </div>
+
+        <div class="callout err">
+          <div><b>问题</b>当前 <code class="inline">App.jsx</code> 直接挂载 admin-only 页面，<code class="inline">Shell.jsx</code> 在用户信息不可用时仍显示回退账户；<code class="inline">useSystemManagement</code> 以 <code class="inline">isAuthenticated()</code> 决定是否请求。登录态失效后，动作函数可在 <code class="inline">enabled=false</code> 时静默跳过：保存草稿仍无条件弹出成功，测试连通性返回 <code class="inline">null</code>，按钮没有任何反馈。</div>
+        </div>
+
+        <div class="grid-2" style="margin-top:18px">
+          <div class="panel">
+            <div class="panel-h">影响与范围<span class="right">impact</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>管理员误以为知识库凭据已保存，继续测试时又无法判断按钮、网络还是上游服务出错。</li>
+                <li>失效登录态仍暴露系统管理、用户管理和 API 密钥导航，破坏权限反馈的一致性。</li>
+                <li>本需求覆盖前端路由守卫、当前用户加载、系统配置动作状态和错误反馈；后端继续维持 JWT 与 <code class="inline">system:manage</code> 能力校验。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">已实施方案<span class="right">implemented</span></div>
+            <div class="panel-b">
+              <ul class="list-clean">
+                <li>统一 admin-only 路由守卫：无 token、token 过期或 <code class="inline">/auth/me</code> 失败时进入登录恢复，不渲染可操作的回退页面。</li>
+                <li>保存成功提示必须在真实 PATCH 成功后展示；disabled/401/network error 必须返回显式错误，禁止静默成功。</li>
+                <li>连通性测试点击后立即展示 loading；成功、401、缺配置、上游失败和超时均显示结果，并设置有限超时避免永久等待。</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <table style="margin-top:18px">
+          <tr><th>验收口径</th><th>验证证据</th><th>当前结论</th></tr>
+          <tr>
+            <td>失效登录态访问 <code class="inline">/system</code> 时不能继续编辑；保存草稿只在 PATCH 2xx 后显示成功；测试按钮每次点击都能观察到 loading 和最终结果；重新登录后可继续测试且密钥不明文回显。</td>
+            <td>2026-07-23 新增 AuthGuard、Shell 用户菜单、Hook、API 超时和 SystemManagement 交互回归：RP-036 聚焦 19/19，通过排除 3 个既有无关失败文件后的 V2 套件 107/107，<code class="inline">npm run build:web</code> 通过；本地无会话浏览器访问 <code class="inline">/system</code> 已确认跳转 <code class="inline">/login</code>。第三次截图暴露 <code class="inline">retrieval_empty / HTTP 400</code> 误判后，补充后端判定测试 1/1 与知识库页面测试 3/3，均通过；未记录或回显完整 API Key。</td>
+            <td>实现采用失效会话跳转登录、admin-only 路由守卫和 30 秒连通性测试超时。第二次反馈确认终态链路已恢复并发现字段误填；第三次反馈在知识库 ID 纠正后显示 <code class="inline">retrieval_empty / HTTP 400</code>，代码诊断确认智谱检索已返回 HTTP 200，只是固定测试语句未命中文档。现已把该场景改为 HTTP 200 通过，并携带 <code class="inline">warning=retrieval_empty</code> 供前端显示“连接成功，但固定测试语句未检索到文档”。凭据曾在反馈中暴露，必须先轮换密钥再复测；MT-1H-C-002 保持“待人工验收”。完整 <code class="inline">test:modules</code> 当前 137/143，6 项为 dirty 工作区既有、非 RP-036 失败。</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
     <!-- 排期视图 -->
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">26 / Planning</div>
+          <div class="num">27 / Planning</div>
           <h2>排期视图</h2>
           <p>按 Phase 归属组织需求，避免候选需求混入当前冲刺导致范围失控。</p>
         </div>
@@ -2749,6 +2840,7 @@
               <li><b>Phase 1H-A / 已交付：</b>RP-017 会话恢复、RP-014 自动滚动、RP-015 输入框高度、RP-016 创建后刷新、RP-011 检索主体弹窗化。</li>
               <li><b>Phase 1H-B / 已交付基线：</b>RP-019 AI 工作台布局与 Markdown 渲染、RP-020 引导选项交互、RP-021 编号选项交互、RP-022 系统管理模型配置保存、RP-023 消息复制按钮、RP-025 创建项目意图路由与回归补丁已交付；RP-018 剩余 MT-1H-B-003 真实 ZHIPU 配置人工验收待回填。</li>
               <li><b>Phase 1H-C / 已回填待验收：</b>RP-032 推荐工作流列表可达性第一批已回填，待人工确认桌面/低高度/窄屏体验。</li>
+              <li><b>Phase 1H-C / P1 已修复待验收：</b>RP-036 已闭合路由守卫、保存可信反馈、测试 loading/终态、30 秒超时与 retrieval_empty 连通性误判；原聚焦回归 19/19、调整后 V2 套件 107/107，本批后端专项 1/1、页面 3/3、build:web 通过，等待使用轮换密钥完成 MT-1H-C-002 人工复测后再继续 MT-1H-B-003 真实配置验收。</li>
               <li><b>Phase 1H-C / Codex 复核分流：</b>RP-027/RP-028 Provider 批次自动化通过待最小 patch 集成；RP-026 能力矩阵补改已通过窄加载、无副作用和降级测试；RP-031 RAG Baseline 重复检索与构建基线已验证通过，真实 ZHIPU 配置仍待人工验收；RP-033 clean patch 已通过自动化复核但尚未提交/集成；RP-029 流式 SSE 与 RP-030 Trace 查询入口已由 Codex 修复验证通过，待集成。</li>
               <li><b>Phase 1H-C / 暂缓待评审：</b>RP-001 低代码工作流设计器、RP-012 WES Skill 工作流辅助工具。</li>
               <li><b>Phase 1H 后续候选：</b>RP-004 后续深查子项、RP-005 Harness run 级时间线深化、RP-002 轻量审计统一 schema / retention / 查询入口。</li>
@@ -2789,7 +2881,7 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">25 / Governance</div>
+          <div class="num">28 / Governance</div>
           <h2>维护规则</h2>
           <p>需求池治理约定，确保需求可追溯、范围可控。</p>
         </div>
@@ -2817,7 +2909,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 需求池 · 2026-06-26 · 35 条需求 · 22 delivered · 11 pending · 2 deferred
+      WES 项目管理 · 需求池 · 2026-07-23 · 36 条需求 · 22 delivered · 12 pending · 2 deferred
     </footer>
   </main>
   <script>

@@ -42,19 +42,19 @@
           <div class="pill-row">
             <span class="pill brand">main + Phase 1H-C planning</span>
             <span class="pill ok">PR #2 已合并</span>
-            <span class="pill">2026-06-29</span>
+            <span class="pill">2026-07-23</span>
             <span class="pill ok">Phase 1E 已完成</span>
             <span class="pill ok">Phase 1F 已交付</span>
             <span class="pill ok">Phase 1G 已交付</span>
-            <span class="pill brand">需求池 35 项</span>
+            <span class="pill brand">需求池 36 项</span>
             <span class="pill brand">路标管理已初始化</span>
             <span class="pill ok">22 已交付</span>
           </div>
           <div class="trust">
             <span><b>18/18</b> 后端模块化</span>
             <span><b>65</b> Harness tests pass</span>
-            <span><b>92</b> V2 frontend tests pass</span>
-            <span><b>34</b> 人工测试任务已规划</span>
+            <span><b>107</b> RP-036 排除已知无关失败后的 V2 tests pass</span>
+            <span><b>35</b> 人工测试任务已登记</span>
             <span><b>0</b> 正式业务绕过确认</span>
           </div>
         </div>
@@ -79,8 +79,8 @@
             <div class="fc-head"><b>Verification Snapshot</b><span class="fc-tag">local + CI</span></div>
             <div class="fc-row"><span>apps/api harness</span><b>65 pass</b></div>
             <div class="fc-row"><span>apps/api modules</span><b>102 pass</b></div>
-            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>92 pass</b></div>
-            <div class="fc-row"><span>人工测试</span><b>34 待执行</b></div>
+            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>107 pass / 9 unrelated fail</b></div>
+            <div class="fc-row"><span>人工测试</span><b>1 待复测 / 34 待执行</b></div>
             <div class="fc-row"><span>GitHub Actions</span><b>green</b></div>
           </div>
         </div>
@@ -100,7 +100,7 @@
             <div class="v">1H-C</div>
             <div class="lb">需求池治理后续规划</div>
             <div class="bar"><i style="width:72%"></i></div>
-            <div class="sub">需求池统一为 35 项：22 项已交付、11 项待规划/待确认/待验收、2 项暂缓；RP-026 补改、RP-027/RP-028 clean patch、RP-031 重复检索和构建基线已由 Codex 验证通过，RP-029/RP-030 已在修复分支验证通过，RP-033 clean patch 已验证但待提交集成，RP-034 已入池待规划，RP-035 已分析待设计。</div>
+            <div class="sub">需求池统一为 36 项：22 项已交付、12 项待规划/待确认/待验收、2 项暂缓；RP-026 补改、RP-027/RP-028 clean patch、RP-031 重复检索和构建基线已由 Codex 验证通过，RP-029/RP-030 已在修复分支验证通过，RP-033 clean patch 已验证但待提交集成，RP-034 已入池待规划，RP-035 已分析待设计，RP-036 已完成路由守卫、可信反馈与 retrieval_empty 误判修复，等待轮换密钥后完成 MT-1H-C-002 人工复测。</div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>验证状态</span><span class="live">已修复</span></div>
@@ -137,7 +137,7 @@
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">D</span><span>文档资产</span></div>
-            <div class="v">51</div>
+            <div class="v">55</div>
             <div class="lb">已盘点文档总数</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
@@ -301,7 +301,7 @@
             <span class="ico" style="background:var(--warn-soft);color:var(--warn)">RP</span>
             <h3>需求池</h3>
             <p>升级需求记录、分析、拆解、排期与状态管理；当前只保留只读需求池页面，后续由 AI 直接维护。</p>
-            <div class="preview">34 requirements · 22 delivered · 10 pending/review · 2 deferred</div>
+            <div class="preview">36 requirements · 22 delivered · 12 pending/review · 2 deferred</div>
             <span class="arr">打开需求池 →</span>
           </a>
           <a class="res-card" href="../WES-Agent-产品技术方案.html">
@@ -375,7 +375,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 设计 / 计划 / 监控 · 2026-06-29 · main + Phase 1H-C planning
+      WES 项目管理 · 设计 / 计划 / 监控 · 2026-07-23 · main + Phase 1H-C planning
     </footer>
   </main>
 </body>

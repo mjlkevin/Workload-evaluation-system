@@ -1,0 +1,94 @@
+{
+  "id": "BE-2026-07-04-admin-create-user",
+  "date": "2026-07-04",
+  "type": "implementation",
+  "scope": "管理员用户管理直接新建用户",
+  "summary": "根据用户要求，在用户管理工具栏新增“+ 新建用户”，并实现管理员直接创建用户的前后端闭环，按 Issue-first 分流到 RP-041。",
+  "status": "已实施 / 待用户本地复核",
+  "pages": ["issues", "requirements", "changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "新增 ISS-2026-07-04-003 并分流到 RP-041"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/auth/auth.usecase.ts",
+      "summary": "新增 createUser，校验用户名、密码、重复用户名、角色边界和业务角色后写入 PG-backed 用户存储"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/routes/auth.routes.ts",
+      "summary": "新增 POST /auth/users，仍使用 JWT 与 user:manage 权限"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/drizzle/0013_lucky_captain_cross.sql",
+      "summary": "为 users 表新增 nullable email 字段"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/UserManagement.jsx",
+      "summary": "新增“+ 新建用户”按钮、直建用户弹窗、提交后列表插入和错误反馈"
+    },
+    {
+      "kind": "file",
+      "ref": "docs/openapi.yaml",
+      "summary": "补充 POST /api/v1/auth/users 契约与 users.email 字段"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run db:migrate -w apps/api",
+      "result": "pass",
+      "summary": "PG migration 0013 已应用到本地数据库"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:modules",
+      "result": "pass",
+      "summary": "147/147，覆盖 createUser 后端红绿回归"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE",
+      "result": "pass",
+      "summary": "105/105，覆盖用户管理直建用户前端红绿回归"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "API 与 V2 前端构建通过，build:web 保留既有 chunk size warning"
+    }
+  ],
+  "next": "待用户在 http://localhost:3004/users 点击“+ 新建用户”并用初始密码登录新账号复核。",
+  "board": {
+    "change": {
+      "stage": "管理员直建用户能力实现",
+      "result": "已实施 / 待用户本地复核"
+    },
+    "testing": [
+      {
+        "command": "npm run test:modules",
+        "result": "pass",
+        "summary": "147/147，包含 createUser 后端 handler 回归"
+      },
+      {
+        "command": "npm run test --prefix ui/V2_PROTOTYPE",
+        "result": "pass",
+        "summary": "V2 前端全量 105/105，包含用户管理直建用户回归"
+      },
+      {
+        "command": "npm run build:api",
+        "result": "pass",
+        "summary": "API TypeScript 构建通过"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass",
+        "summary": "V2 前端生产构建通过，保留既有 chunk size warning"
+      }
+    ]
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "id": "BE-2026-07-15-structured-output-audit",
+  "date": "2026-07-15",
+  "type": "requirement_intake",
+  "scope": "Qoder 结构化输出审计复核与 RP-027 重新分流",
+  "summary": "Codex 独立复核 Qoder 结构化输出报告：确认生产调用仍以 json_object 为主、缺少统一运行时契约与结构修复治理；纠正 json_schema 从未使用、全局无重试和 Harness 完整校验等表述，并新增企业画像固定行业与 Harness V2 恢复阶段两项 S2 缺陷。",
+  "status": "已复核 / 待整改",
+  "pages": ["issues", "defects", "requirements", "plan", "testing", "monitoring", "risks", "changes"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/ai/provider/model-provider.ts",
+      "summary": "Provider 合约已定义 JsonSchemaResponseFormat。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/ai/provider/tool-calling.test.ts",
+      "summary": "已有 json_schema 请求透传测试，因此应表述为生产调用未启用，而不是全项目从未使用。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/harness.usecase.ts",
+      "summary": "Harness 有两轮输出修复，但 parseReportV1/V2 仅做部分结构守卫；通用 retry 未区分 V1/V2 恢复阶段。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/chat.service.ts",
+      "summary": "企业画像在行业缺失时写入固定行业分类，构成事实完整性缺陷。"
+    },
+    {
+      "kind": "external",
+      "ref": "https://platform.kimi.ai/docs/api/chat",
+      "summary": "Kimi 当前官方 Chat Completion 文档支持 json_schema Structured Output。"
+    },
+    {
+      "kind": "command",
+      "ref": "npx tsx --test src/ai/provider/tool-calling.test.ts src/ai/extractor/requirement-extractor.test.ts src/services/dev-assessment/dev-assessment-ai.test.ts src/services/change-management/change-submission.test.ts",
+      "result": "pass",
+      "summary": "27/27，覆盖 Provider 传输重试/json_schema 透传、extractor、开发评估与变更 fallback。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:harness -w apps/api",
+      "result": "pass",
+      "summary": "70/70，确认 Harness 当前结构修复、failed_schema_validation、retry 与确认基线。"
+    },
+    {
+      "kind": "command",
+      "ref": "npx tsx --test --test-global-setup=./test-setup.mts src/services/ai/chat.service.test.ts src/services/ai/workbench-intent.service.test.ts src/services/ai/workbench-dispatch.service.test.ts",
+      "result": "pass",
+      "summary": "70/70，覆盖企业画像相关服务、意图 fallback 与 formBlock 白名单/降级基线。"
+    }
+  ],
+  "next": "由用户确认 RP-027 重新打开后的 Phase 0/1 范围；先关闭两项 S2 缺陷，再实施 JSON Schema + Ajv 统一契约层，不由 Codex 自动领取或连续实现后续需求。",
+  "board": {
+    "change": {
+      "stage": "结构化输出审计复核与问题分流",
+      "result": "已复核 / 待整改"
+    },
+    "testing": [
+      {
+        "command": "Provider/extractor/dev/change focused tests",
+        "result": "pass 27/27",
+        "summary": "确认 Provider 传输重试与 json_schema 透传测试存在，并核验多个结构化输出 fallback 基线。"
+      },
+      {
+        "command": "npm run test:harness -w apps/api",
+        "result": "pass 70/70",
+        "summary": "确认 Harness 当前两轮输出修复、失败终态、retry 与人工确认基线。"
+      },
+      {
+        "command": "chat/intent/dispatch focused tests",
+        "result": "pass 70/70",
+        "summary": "确认企业画像、意图规则 fallback 与 formBlock 白名单/纯文本降级当前基线。"
+      }
+    ]
+  }
+}

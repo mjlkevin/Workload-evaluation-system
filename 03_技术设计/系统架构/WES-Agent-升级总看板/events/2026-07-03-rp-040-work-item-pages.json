@@ -1,0 +1,51 @@
+{
+  "id": "BE-2026-07-03-rp-040-work-item-pages",
+  "date": "2026-07-03",
+  "type": "implementation",
+  "scope": "RP-040 问题池 / 缺陷池二级页面与工作项 registry",
+  "summary": "实现 RP-040 第一批：新增 work-item registry、问题池、缺陷池、生成脚本和全局一级导航入口，使原始反馈先进入 Issue，再分流到 Defect 或 Requirement。",
+  "status": "已实施 / 可试运行",
+  "pages": ["issues", "defects", "requirements", "changes", "sources", "index"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json",
+      "summary": "结构化保存 Issue、Defect、RP 分流关系"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/issues.html",
+      "summary": "问题池页面，承载原始反馈和 triage 结论，并在总看板一级导航可进入"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/defects.html",
+      "summary": "缺陷池页面，承载缺陷状态、关联 Issue/RP、验证与验收，并在总看板一级导航可进入"
+    },
+    {
+      "kind": "command",
+      "ref": "node --test scripts/board-work-items.test.js",
+      "result": "pass",
+      "summary": "5/5，覆盖 registry 校验、孤儿缺陷拒绝、分类统计、页面渲染和导航 active 状态"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run board:work-items:generate",
+      "result": "pass",
+      "summary": "由 registry 生成 issues.html 和 defects.html"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run board:check",
+      "result": "pass",
+      "summary": "0 错误 / 0 警告，确认总看板侧栏导航结构一致"
+    }
+  ],
+  "next": "后续可扩展 requirements.html 的 registry 生成视图，把历史 RP 逐步按 kind 迁移，减少手写需求页维护。",
+  "board": {
+    "change": {
+      "stage": "RP-040 实现",
+      "result": "已实施 / 可试运行"
+    }
+  }
+}

@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>每日代码审计 · WES 项目管理</title>
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
+  <style>
+    .audit-empty { color: var(--ink-3); font-style: italic; padding: 18px; background: var(--bg-soft); border-radius: 10px; }
+    .audit-hit { font-family: var(--font-mono); font-size: 12px; background: var(--bg-soft); padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid var(--line-2); }
+    .audit-hit.P0 { border-left-color: var(--err); background: oklch(0.97 0.04 25 / 0.12); }
+    .audit-hit.P1 { border-left-color: var(--warn); background: oklch(0.97 0.04 80 / 0.12); }
+    .audit-hit.P2 { border-left-color: var(--ok); }
+    .audit-section + .audit-section { margin-top: 26px; }
+    .status-healthy { color: var(--ok); }
+    .status-degraded { color: var(--warn); }
+    .status-critical { color: var(--err); }
+    .metric-num { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; }
+    .metric-label { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+  </style>
+</head>
+<body><aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="index.html">
+      <span style="display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--brand-soft);color:var(--brand);font-weight:900;font-size:14px;">W</span>
+      <span>WES 项目管理</span>
+    </a>
+    <nav class="sidebar-nav" aria-label="主导航">
+        <a href="index.html">总览</a>
+        <a href="roadmap.html">路标管理</a>
+        <a href="design.html">设计说明</a>
+        <a href="runtime.html">任务运行时</a>
+        <a href="plan.html">计划与进度</a>
+        <a href="testing.html">测试</a>
+        <a href="monitoring.html">监控与审计</a>
+        <a href="ops-health.html">运维看板</a>
+        <a href="risks.html">风险与决策</a>
+        <a href="changes.html">变更记录</a>
+        <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="issues.html">问题池</a>
+        <a href="defects.html">缺陷池</a>
+        <a href="requirements.html">需求池</a>
+        <a class="active" href="code-audit.html">每日代码审计</a>
+    </nav>
+    <div style="flex:1"></div>
+    <div class="sidebar-pill">
+      <span class="pill brand">WES Project Management</span>
+    </div>
+  </aside>
+  <button class="sidebar-toggle" id="sidebarToggle" aria-label="菜单">☰</button>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <div class="main-content">
+<main>
+    <section class="hero" style="padding-top:34px;padding-bottom:28px">
+      <div class="wrap hero-in">
+        <div>
+          <span class="eyebrow"><span class="dot"></span>Daily Code Audit</span>
+          <h1>每日代码审计报告</h1>
+          <p class="lead">全面、深度审查 WES 前端（ui/V2_PROTOTYPE）与后端（apps/api）代码，覆盖 bug/漏洞、可优化问题、架构健康度、性能/算法可优化性四个维度。</p>
+          <div class="pill-row">
+            <span class="pill brand">agent: qoder</span>
+            <span class="pill">2026-07-02 03:32 (Loop 正式执行)</span>
+            <span class="pill warn">状态：CRITICAL — 6 P0 / 16 P1 发现</span>
+            <span class="pill">WES Daily Code Audit Loop · 52 条发现 · 28 autoFix eligible</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Scores</div>
+          <h2>四维度健康评分</h2>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">B</span><span>Bug / 漏洞</span><span class="live status-degraded">降级</span></div>
+            <div class="v">85</div>
+            <div class="lb">ESLint error + 高危漏洞</div>
+            <div class="bar"><i style="width:85%;background:linear-gradient(90deg,var(--err),var(--warn))"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">O</span><span>可优化问题</span><span class="live status-degraded">降级</span></div>
+            <div class="v">53</div>
+            <div class="lb">ESLint warning + 技术债</div>
+            <div class="bar"><i style="width:53%;background:linear-gradient(90deg,var(--warn),var(--brand))"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">A</span><span>架构健康度</span><span class="live">健康</span></div>
+            <div class="v">82</div>
+            <div class="lb">模块边界 / 主线唯一性</div>
+            <div class="bar"><i style="width:82%;background:linear-gradient(90deg,var(--ok),var(--teal))"></i></div>
+          </div>
+          <div class="kpi">
+            <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">P</span><span>性能 / 算法</span><span class="live">观察</span></div>
+            <div class="v">78</div>
+            <div class="lb">静态反模式 / bundle 体积</div>
+            <div class="bar"><i style="width:78%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Verification</div>
+          <h2>验证命令结果</h2>
+        </div>
+        <table>
+          <tr><th>检查项</th><th>结果</th><th>关键输出</th></tr>
+          <tr><td><code class="inline">npm run build:api</code></td><td><span style="color:var(--ok);font-weight:600">● 通过</span></td><td>tsc 编译通过</td></tr>
+          <tr><td><code class="inline">npm run build:web</code></td><td><span style="color:var(--ok);font-weight:600">● 通过</span></td><td>构建通过；主 bundle 598KB 警告</td></tr>
+          <tr><td><code class="inline">npm run lint -w apps/api</code></td><td><span style="color:var(--err);font-weight:600">● 未通过</span></td><td>237 项问题（1 error / 236 warning）</td></tr>
+          <tr><td><code class="inline">npm audit --json</code></td><td><span style="color:var(--err);font-weight:600">● 未通过</span></td><td>19 个漏洞（6 high / 13 moderate）</td></tr>
+          <tr><td><code class="inline">npm run test:modules -w apps/api</code></td><td><span style="color:var(--ok);font-weight:600">● 通过</span></td><td>142 tests pass</td></tr>
+          <tr><td><code class="inline">npm run test:rules -w apps/api</code></td><td><span style="color:var(--ok);font-weight:600">● 通过</span></td><td>8 tests pass</td></tr>
+          <tr><td><code class="inline">npm run test:integration -w apps/api</code></td><td><span style="color:var(--ok);font-weight:600">● 通过</span></td><td>1 test pass</td></tr>
+          <tr><td><code class="inline">npm run test:ai -w apps/api</code></td><td><span style="color:var(--ok);font-weight:600">● 通过</span></td><td>190 tests pass</td></tr>
+          <tr><td><code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code></td><td><span style="color:var(--ok);font-weight:600">● 通过</span></td><td>96 tests pass；React Router future flag 警告</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Findings</div>
+          <h2>Qoder 审计发现列表</h2>
+          <p>按 P0 / P1 / P2 / P3 分级的问题清单，含文件路径、证据、影响与修复建议。审计报告：<a href="../../../docs/agent-loop/audits/2026-07-02-qoder-daily-code-audit.md">2026-07-02-qoder-daily-code-audit.md</a></p>
+        </div>
+        <div class="audit-section">
+          <h3>P0 发现 <span class="pill warn">6</span></h3>
+          <div class="audit-hit P0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-001] 文件下载路径遍历漏洞</b><span class="pill warn">security · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/modules/exports/exports.usecase.ts:30</div>
+            <div style="margin-bottom:4px"><b>证据：</b>path.resolve(exportDir, fileName) 未验证路径是否在 exportDir 内</div>
+            <div style="margin-bottom:4px"><b>影响：</b>攻击者可构造恶意文件名读取服务器任意文件（CWE-22）</div>
+            <div><b>建议：</b>添加 filePath.startsWith(exportDir) 守卫</div>
+          </div>
+          <div class="audit-hit P0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-002] 密码重置令牌泄露到响应体</b><span class="pill warn">security · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/modules/auth/auth.usecase.ts:174-180</div>
+            <div style="margin-bottom:4px"><b>证据：</b>resetToken: token 在 API 响应中直接返回明文令牌</div>
+            <div style="margin-bottom:4px"><b>影响：</b>任何调用 API 的人可获取有效密码重置令牌（CWE-256）</div>
+            <div><b>建议：</b>生产环境仅通过邮箱发送，响应体条件包裹</div>
+          </div>
+          <div class="audit-hit P0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-001] 前端登录存储密码到 localStorage</b><span class="pill warn">security · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/ (登录逻辑)</div>
+            <div style="margin-bottom:4px"><b>证据：</b>登录时将用户密码明文存储到 localStorage</div>
+            <div style="margin-bottom:4px"><b>影响：</b>XSS 攻击可窃取用户密码</div>
+            <div><b>建议：</b>立即删除密码存储逻辑</div>
+          </div>
+          <div class="audit-hit P0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-002] AI 工作台陈旧闭包</b><span class="pill warn">bug</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx:2071</div>
+            <div style="margin-bottom:4px"><b>证据：</b>async 函数中闭包引用 messages state，await 后使用过期值</div>
+            <div style="margin-bottom:4px"><b>影响：</b>快速连续发送消息时历史上下文过期</div>
+            <div><b>建议：</b>使用 ref 追踪最新消息列表</div>
+          </div>
+          <div class="audit-hit P0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-003] 退出登录整页刷新</b><span class="pill warn">bug · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx:86</div>
+            <div style="margin-bottom:4px"><b>证据：</b>&lt;a href="/login"&gt; 原生跳转导致整页刷新，丢失 React 状态</div>
+            <div style="margin-bottom:4px"><b>影响：</b>WorkspaceTabs、未保存检测等状态丢失</div>
+            <div><b>建议：</b>改用 useNavigate + preventDefault</div>
+          </div>
+          <div class="audit-hit P0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-SEC-002] 空密码哈希用户</b><span class="pill warn">security · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">config/auth/users.json (多处)</div>
+            <div style="margin-bottom:4px"><b>证据：</b>多个测试用户 passwordHash: ""（空字符串）</div>
+            <div style="margin-bottom:4px"><b>影响：</b>空密码哈希可能导致认证绕过</div>
+            <div><b>建议：</b>删除测试用户或设置有效密码哈希</div>
+          </div>
+        </div>
+        <div class="audit-section">
+          <h3>P1 发现 <span class="pill brand">16</span></h3>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-004] API client 未处理非 JSON 响应</b><span class="pill brand">bug · AutoFix R10 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/api/client.js</div>
+            <div><b>修复：</b>res.json() try/catch 包裹，非 JSON 响应抛出类型化 ApiError</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r10</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-005] SSE 流式响应时自动滚动失效</b><span class="pill brand">bug · AutoFix R9 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx</div>
+            <div><b>修复：</b>依赖数组添加 lastMsgContentLen，SSE delta 更新时也触发滚动</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r9</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-021] RichAiMessage Markdown 解析无 useMemo</b><span class="pill brand">performance · AutoFix R8 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx</div>
+            <div><b>修复：</b>parseMarkdownBlocks(text) → useMemo(() => parseMarkdownBlocks(text), [text])</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r8</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-003] 用户注册竞态条件</b><span class="pill brand">bug</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/modules/auth/auth.usecase.ts:66,85-86</div>
+            <div style="margin-bottom:4px"><b>证据：</b>load→modify→save 非原子操作</div>
+            <div><b>建议：</b>引入进程级互斥锁或迁移 PostgreSQL</div>
+          </div>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-004] 邀请码 Math.random() 可预测</b><span class="pill brand">security · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/utils/helpers.ts:65</div>
+            <div style="margin-bottom:4px"><b>证据：</b>Math.random() 非密码学安全 PRNG（CWE-338）</div>
+            <div><b>建议：</b>替换为 crypto.randomBytes</div>
+          </div>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-005] 认证端点无速率限制</b><span class="pill brand">security · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/routes/auth.routes.ts:12-15</div>
+            <div style="margin-bottom:4px"><b>证据：</b>无 rate-limit 中间件（CWE-307）</div>
+            <div><b>建议：</b>引入 express-rate-limit</div>
+          </div>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-006] 同步文件 I/O 阻塞事件循环</b><span class="pill brand">performance</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/middleware/auth.ts:40-63</div>
+            <div style="margin-bottom:4px"><b>证据：</b>readFileSync/writeFileSync 在每个请求认证中使用</div>
+            <div><b>建议：</b>添加内存缓存+TTL 或改 async I/O</div>
+          </div>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-007] AI 会话数据无限增长</b><span class="pill brand">performance · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/modules/ai-sessions/ai-sessions.usecase.ts:90</div>
+            <div style="margin-bottom:4px"><b>证据：</b>无上限检查、无过期清理</div>
+            <div><b>建议：</b>添加会话上限和自动归档</div>
+          </div>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-SEC-004] 无 refresh token 机制</b><span class="pill brand">security</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/middleware/auth.ts</div>
+            <div style="margin-bottom:4px"><b>证据：</b>rememberMe 仅延长 JWT 至 7 天</div>
+            <div><b>建议：</b>实现 refresh token 轮换</div>
+          </div>
+          <div class="audit-hit P1">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-DEP-001] xlsx 依赖高危漏洞</b><span class="pill brand">dependency</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/package.json:39</div>
+            <div style="margin-bottom:4px"><b>证据：</b>xlsx ^0.18.5 存在 Prototype Pollution / ReDoS</div>
+            <div><b>建议：</b>迁移到 exceljs</div>
+          </div>
+        </div>
+        <div class="audit-section">
+          <h3>P2 发现 <span class="pill ok">18</span></h3>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-008] engine.ts 与 helpers.ts 重复函数</b><span class="pill ok">optimization · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/engine.ts + apps/api/src/utils/helpers.ts</div>
+            <div><b>建议：</b>删除重复定义改为 import</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-010] chat.service.ts 905 行过长</b><span class="pill ok">architecture</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/services/ai/chat.service.ts</div>
+            <div><b>建议：</b>拆分为多个职责单一的服务文件</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-013] wbs.routes.ts 双重认证调用</b><span class="pill ok">optimization · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/routes/wbs.routes.ts:75-76</div>
+            <div><b>建议：</b>删除冗余 requireAuth 调用</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-014] auth.ts CJS require 混入 ESM</b><span class="pill ok">bug · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/middleware/auth.ts:44,61</div>
+            <div><b>建议：</b>替换为已导入的 path 模块</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-015] JWT secret 硬编码无启动警告</b><span class="pill ok">security · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/config/env.ts:13-24</div>
+            <div><b>建议：</b>添加启动警告日志</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-SEC-007] Metrics 端点默认无认证</b><span class="pill ok">security · autoFix ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/routes/metrics.routes.ts</div>
+            <div><b>建议：</b>修改默认行为强制认证</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-CFG-001] .env.example 弱密码示例</b><span class="pill brand">config · AutoFix 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">.env.example</div>
+            <div><b>修复：</b>弱密码 → &lt;YOUR_STRONG_*&gt; 占位符 + 安全警告头</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-BE-017] 请求 ID 传播缺失</b><span class="pill brand">architecture · AutoFix R2 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">apps/api/src/middleware/request-logger.ts</div>
+            <div><b>修复：</b>添加 sanitizeRequestId 校验 + X-Correlation-Id 响应头</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r2</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-016] useMock 全局变量生产环境暴露</b><span class="pill brand">optimization · AutoFix R3 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/hooks/useMock.js</div>
+            <div><b>修复：</b>添加 import.meta.env.DEV 环境守卫，生产环境 tree-shaking 移除</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r3</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-023] useLayoutEffect 用于滚动阻塞绘制</b><span class="pill brand">performance · AutoFix R4 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx</div>
+            <div><b>修复：</b>useLayoutEffect → useEffect，避免阻塞渲染</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r4</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-012] 硬编码真实用户名泄漏</b><span class="pill brand">optimization · AutoFix R5 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/pages/UserManagement.jsx</div>
+            <div><b>修复：</b>真实用户名 → 通用占位符（admin_user, user_alpha 等）</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r5</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-008] 静默吞掉持久化错误</b><span class="pill brand">bug · AutoFix R6 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/hooks/useRequirementAiWorkbench.js</div>
+            <div><b>修复：</b>5 处 `.catch(() => {})` → `.catch((e) => console.warn(...))`</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r6</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-009] 会话加载失败静默处理</b><span class="pill brand">bug · AutoFix R7 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx</div>
+            <div><b>修复：</b>loadSessions().catch(() => {}) → .catch((e) => console.warn(...))</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r7</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>+ 1 项更多 P2 发现</b><span class="pill ok">详见审计报告</span></div>
+          <div class="audit-hit P2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><b>[CA-FE-009] 会话加载失败静默处理</b><span class="pill brand">bug · AutoFix R7 已回填 ✓</span></div>
+            <div style="margin-bottom:4px;color:var(--ink-2)">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx</div>
+            <div><b>修复：</b>loadSessions().catch(() =&gt; {}) → .catch((e) =&gt; console.warn(...))</div>
+            <div style="margin-top:4px;"><b>Worktree：</b><code>qoder/code-audit-fix-20260702-r7</code> · <b>状态：</b>待 Codex 复核</div>
+          </div>
+            <div><b>完整列表：</b><a href="../../../docs/agent-loop/audits/2026-07-02-qoder-daily-code-audit.md">查看审计报告</a></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">Architecture</div>
+          <h2>架构健康度</h2>
+        </div>
+        <div class="grid-3">
+          <div class="card"><span class="pill ok">Mainlines</span><h3>前后端主线唯一</h3><p>后端 apps/api，前端 ui/V2_PROTOTYPE；ui/V0_SAAS 为【历史说明，下线中】，apps/web 已删除【历史说明，已下线】。</p></div>
+          <div class="card"><span class="pill ok">Modules</span><h3>18/18 领域已迁移</h3><p>全部领域已完成 controller/usecase/repository 三层拆分；遗留 services/* 仅 barrel re-export。</p></div>
+          <div class="card"><span class="pill ok">Storage</span><h3>存储边界符合规则</h3><p>除 harness 为 PostgreSQL-backed 新业务域外，传统 WES 记录仍为 JSON 文件存储。</p></div>
+          <div class="card"><span class="pill ok">Auth</span><h3>JWT Bearer 鉴权</h3><p>业务接口使用 JWT Bearer；未检出 X-Role 回退；auth.ts 固定 HS256 算法。</p></div>
+          <div class="card"><span class="pill ok">Routes</span><h3>路由聚合正确</h3><p>新增业务路由挂载于 apps/api/src/routes/* 并在 routes/index.ts 聚合。</p></div>
+          <div class="card"><span class="pill warn">Performance</span><h3>性能债务可见</h3><p>前端 bundle 偏大、JSON 文件存储存在并发风险、导出历史未持久化。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="wrap footer">
+      WES 项目管理 · 每日代码审计 · 2026-07-02 · Qoder Daily Code Audit Loop · 52 条发现 · 28 autoFix eligible · AutoFix R1-R10 ✓ · 待 Codex 复核 · ⚠️ 安全 agent 违规修改 7 文件待回退
+    </footer>
+  </main>
+  <script>
+  (function(){
+    var toggle = document.getElementById('sidebarToggle');
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebarOverlay');
+    if (toggle && sidebar) {
+      toggle.addEventListener('click', function() {
+        sidebar.classList.toggle('open');
+        if (overlay) overlay.classList.toggle('open');
+      });
+      if (overlay) overlay.addEventListener('click', function() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('open');
+      });
+    }
+  })();
+  </script>
+  </div>
+</body>
+</html>

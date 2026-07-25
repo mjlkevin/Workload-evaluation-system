@@ -16,12 +16,12 @@
 - Web 主线：`ui/V2_PROTOTYPE`（Vite + React）。
 - 后端主线：`apps/api`（Express + modules）。
 - `ui/V0_SAAS` 为【历史说明，下线中】资产，仅用于迁移核对与历史追溯。
-- `/Users/kevin/AI/Workload-evaluation-system-agent` 是当前 WES 正确工作区。
-- `/Users/kevin/AI/Workload-evaluation-system` 不再作为 WES 当前主线交付路径。
+- `/Users/kevin/AI/Workload-evaluation-system-agent` 是当前 WES 活动交付 worktree。
+- `/Users/kevin/AI/Workload-evaluation-system` 是同一 Git 仓库的另一 linked checkout，用于分支集成与历史差异核对，不是第二套项目。
 
 ## Codex / AI 协作规则
 
-- WES 反馈先按 `docs/codex-workflows/wes-feedback-intake.md` 去重，再决定补证据、入池或立即修复。
+- WES 原始反馈先按 `docs/codex-workflows/wes-feedback-intake.md` 进入问题池并去重，再由 Codex Intake/Triage Loop 决定补证据、派生需求、派生缺陷或立即修复。
 - Qoder 执行 WES 需求池、Loop、实现、验证或回填任务时，先读 `QODER.md`，并使用 `skills/wes-qoder-worktree-protocol/SKILL.md` 完成 worktree contract、验证与结构化回填。
 - 外部 AI 交付使用 `docs/codex-workflows/external-ai-handoff-template.md` 回填。
 - 外部 API 验证使用 `docs/codex-workflows/api-secret-handling.md`，密钥不得进入对话、文档、看板或提交。
