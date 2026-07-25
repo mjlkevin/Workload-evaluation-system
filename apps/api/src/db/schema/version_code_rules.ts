@@ -13,7 +13,7 @@ export const versionCodeRules = pgTable("version_code_rules", {
   prefix: text("prefix").notNull(),
   format: text("format").notNull(),
   sample: text("sample"),
-  status: text("status", { enum: ["active", "disabled"] }).notNull().default("active"),
+  status: text("status", { enum: ["active", "draft", "disabled"] }).notNull().default("active"),
   effectiveAt: timestamp("effective_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
