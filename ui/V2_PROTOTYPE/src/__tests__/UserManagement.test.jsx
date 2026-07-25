@@ -310,9 +310,10 @@ describe('UserManagement', () => {
     ])
   })
 
-  test('does not let a completed save close or overwrite a different editor', async () => {
+  test('serializes saves while preserving a different editor across completion', async () => {
     let releasePatch
     let patchCompleted = false
+    let patchCount = 0
     let getCount = 0
     const users = [
       {
@@ -345,6 +346,7 @@ describe('UserManagement', () => {
         })
       }),
       http.patch(`${BASE}/auth/users/:userId/business-role`, async ({ params, request }) => {
+        patchCount += 1
         const body = await request.json()
         await new Promise((resolve) => {
           releasePatch = resolve
@@ -376,13 +378,20 @@ describe('UserManagement', () => {
       expect(releasePatch).toEqual(expect.any(Function))
     })
     fireEvent.click(within(editor).getByRole('button', { name: '关闭编辑用户' }))
+
+    const editArch = screen.getByRole('button', { name: '编辑 arch' })
+    expect(editArch).toBeDisabled()
+    fireEvent.click(editArch)
+    expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: '编辑 pm' }))
 
     editor = screen.getByRole('dialog', { name: '编辑用户' })
     expect(within(editor).getByText('pm')).toBeInTheDocument()
-    fireEvent.change(within(editor).getByLabelText('业务角色'), {
-      target: { value: 'sales' },
-    })
+    expect(within(editor).getByLabelText('系统角色')).toBeDisabled()
+    expect(within(editor).getByLabelText('业务角色')).toBeDisabled()
+    expect(within(editor).getByRole('button', { name: '保存中…' })).toBeDisabled()
+    expect(patchCount).toBe(1)
 
     releasePatch()
 
@@ -392,8 +401,14 @@ describe('UserManagement', () => {
     })
     editor = screen.getByRole('dialog', { name: '编辑用户' })
     expect(within(editor).getByText('pm')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '编辑 arch' })).toBeEnabled()
     expect(within(editor).getByLabelText('系统角色')).toBeEnabled()
-    expect(within(editor).getByLabelText('业务角色')).toHaveValue('sales')
+    expect(within(editor).getByLabelText('业务角色')).toBeEnabled()
+    fireEvent.change(within(editor).getByLabelText('业务角色'), {
+      target: { value: 'sales' },
+    })
+    expect(within(editor).getByRole('button', { name: '保存变更' })).toBeEnabled()
+    expect(patchCount).toBe(1)
     expect(within(editor).queryByRole('status')).not.toBeInTheDocument()
     expect(screen.queryByText('已保存 arch')).not.toBeInTheDocument()
   })

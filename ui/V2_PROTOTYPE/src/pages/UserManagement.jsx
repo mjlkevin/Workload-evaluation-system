@@ -49,12 +49,14 @@ export default function UserManagement() {
   const [pendingRole, setPendingRole] = useState('')
   const [pendingBusinessRole, setPendingBusinessRole] = useState('')
   const [demoteConfirm, setDemoteConfirm] = useState('')
-  const [savingUser, setSavingUser] = useState(false)
+  const [savingUserId, setSavingUserId] = useState(null)
+  const [reloadingEditor, setReloadingEditor] = useState(false)
   const [editorMessage, setEditorMessage] = useState(null)
   const [pendingSave, setPendingSave] = useState(null)
   const [pageNotice, setPageNotice] = useState(null)
   const editorOperationRef = useRef(0)
   const currentEditingUserIdRef = useRef(null)
+  const saveSequenceRef = useRef(null)
 
   useEffect(() => {
     setUsers(loadedUsers)
@@ -214,15 +216,16 @@ export default function UserManagement() {
     setEditingUserId(null)
     setEditingUserSnapshot(null)
     setEditorMessage(null)
-    setSavingUser(false)
+    setReloadingEditor(false)
   }
 
   const openUserEditor = (user) => {
+    if (saveSequenceRef.current?.userId === user.id) return
     editorOperationRef.current += 1
     currentEditingUserIdRef.current = user.id
     setEditorMessage(null)
     setPageNotice(null)
-    setSavingUser(false)
+    setReloadingEditor(false)
     setEditingUserSnapshot(user)
     setEditingUserId(user.id)
   }
@@ -303,9 +306,7 @@ export default function UserManagement() {
     }
   }
 
-  const performSave = async (payload, operation) => {
-    if (!isEditorOperationActive(operation)) return
-    setSavingUser(true)
+  const performSave = async (payload, operation, saveSequence) => {
     setEditorMessage(null)
     try {
       const result = await persistUserChanges(payload.userId, payload.changes)
@@ -326,8 +327,9 @@ export default function UserManagement() {
         })
       }
     } finally {
-      if (isEditorOperationActive(operation)) {
-        setSavingUser(false)
+      if (saveSequenceRef.current === saveSequence) {
+        saveSequenceRef.current = null
+        setSavingUserId(null)
       }
     }
   }
@@ -336,7 +338,7 @@ export default function UserManagement() {
     const userId = currentEditingUserIdRef.current
     if (!userId) return
     const operation = beginEditorOperation(userId)
-    setSavingUser(true)
+    setReloadingEditor(true)
     setEditorMessage({
       kind: 'info',
       retryable: false,
@@ -362,12 +364,13 @@ export default function UserManagement() {
       })
       .finally(() => {
         if (isEditorOperationActive(operation)) {
-          setSavingUser(false)
+          setReloadingEditor(false)
         }
       })
   }
 
   const requestUserSave = ({ original, draft }) => {
+    if (saveSequenceRef.current) return
     const payload = {
       userId: original.id,
       original,
@@ -380,8 +383,11 @@ export default function UserManagement() {
       return
     }
     setPendingSave(null)
+    const saveSequence = { userId: payload.userId }
+    saveSequenceRef.current = saveSequence
+    setSavingUserId(payload.userId)
     const operation = beginEditorOperation(payload.userId)
-    void performSave(payload, operation)
+    void performSave(payload, operation, saveSequence)
   }
 
   const confirmDemote = () => {
@@ -623,6 +629,7 @@ export default function UserManagement() {
                         type="button"
                         className="btn btn-ghost"
                         aria-label={`编辑 ${u.username}`}
+                        disabled={savingUserId === u.id}
                         style={{ fontSize: 12, padding: '4px 10px', height: 28 }}
                         onClick={(event) => {
                           event.stopPropagation()
@@ -643,7 +650,7 @@ export default function UserManagement() {
       <UserEditorDrawer
         open={Boolean(editingUser)}
         user={editingUser}
-        saving={savingUser}
+        saving={Boolean(savingUserId) || reloadingEditor}
         message={editorMessage}
         onRequestClose={closeUserEditor}
         onRetry={retryEditorReload}
