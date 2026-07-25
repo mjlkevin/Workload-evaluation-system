@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
+import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
 import { getSystemManagementSectionById } from '../config/systemManagementSections.js'
 import useSystemManagement from '../hooks/useSystemManagement.js'
 
@@ -727,9 +728,11 @@ export default function SystemManagement({ sectionId }) {
       </div>
 
       {/* 编码规则配置 dialog */}
-      {dialog === 'rule' && (
-        <DialogBackdrop onClose={() => setDialog(null)}>
-          <DialogCard title="配置编码规则">
+      <Dialog
+        open={dialog === 'rule'}
+        title="配置编码规则"
+        onClose={() => setDialog(null)}
+      >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
                 前缀
@@ -764,14 +767,15 @@ export default function SystemManagement({ sectionId }) {
                 {actionLoading[`configure:${selectedRuleId}`] ? '保存中...' : '保存配置'}
               </button>
             </DialogActions>
-          </DialogCard>
-        </DialogBackdrop>
-      )}
+      </Dialog>
 
       {/* 提示词 dialog */}
-      {dialog === 'prompt' && (
-        <DialogBackdrop onClose={() => setDialog(null)}>
-          <DialogCard title="✎ 提示词管理" wide>
+      <Dialog
+        open={dialog === 'prompt'}
+        title="提示词管理"
+        onClose={() => setDialog(null)}
+        wide
+      >
             <div className="tabs" style={{ marginBottom: 12 }}>
               {PROMPT_TABS.map((t) => (
                 <span
@@ -830,14 +834,15 @@ export default function SystemManagement({ sectionId }) {
                 {actionLoading.savePrompts ? '保存中...' : '保存'}
               </button>
             </DialogActions>
-          </DialogCard>
-        </DialogBackdrop>
-      )}
+      </Dialog>
 
       {/* 模型编辑 dialog */}
-      {editingModel && (
-        <DialogBackdrop onClose={() => setEditingModel(null)}>
-          <DialogCard title={`编辑 ${MODEL_CARDS.find((c) => c.key === editingModel)?.title || ''}`} wide>
+      <Dialog
+        open={Boolean(editingModel)}
+        title={`编辑 ${MODEL_CARDS.find((c) => c.key === editingModel)?.title || ''}`}
+        onClose={() => setEditingModel(null)}
+        wide
+      >
             {editingModel === 'kimiEvaluation' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <FormRow label="启用" full>
@@ -977,14 +982,15 @@ export default function SystemManagement({ sectionId }) {
                 确定
               </button>
             </DialogActions>
-          </DialogCard>
-        </DialogBackdrop>
-      )}
+      </Dialog>
 
       {/* 新建测试结果 dialog */}
-      {testResultDialog && (
-        <DialogBackdrop onClose={() => setTestResultDialog(false)}>
-          <DialogCard title="+ 新建人工测试结果" wide>
+      <Dialog
+        open={testResultDialog}
+        title="新建人工测试结果"
+        onClose={() => setTestResultDialog(false)}
+        wide
+      >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <FormRow label="执行人 *">
                 <input style={{ height: 32, padding: '0 8px', fontSize: 13, border: '1px solid var(--line)', borderRadius: 'var(--r-md)' }} value={testResultForm.executorName} onChange={(e) => setTestResultForm((f) => ({ ...f, executorName: e.target.value }))} />
@@ -1022,9 +1028,7 @@ export default function SystemManagement({ sectionId }) {
                 setTestResultForm({ executorName: '', environment: '', account: '', testCaseKey: '', resultStatus: 'passed', screenshotUrl: '', notes: '' })
               }}>确定</button>
             </DialogActions>
-          </DialogCard>
-        </DialogBackdrop>
-      )}
+      </Dialog>
     </PageShell>
   )
 }
@@ -1038,50 +1042,4 @@ function FormRow({ label, children, full }) {
       {children}
     </div>
   )
-}
-
-// ---- inline Dialog primitives ----
-function DialogBackdrop({ children, onClose }) {
-  return (
-    <div
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15,23,42,0.42)',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 20,
-        zIndex: 50,
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
-function DialogCard({ title, wide, children }) {
-  return (
-    <div
-      role="dialog"
-      aria-label={title}
-      style={{
-        width: wide ? 'min(720px, 100%)' : 'min(480px, 100%)',
-        background: '#fff',
-        borderRadius: 'var(--r-lg)',
-        boxShadow: '0 24px 64px rgba(15,23,42,0.24)',
-        border: '1px solid var(--line)',
-        padding: 18,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <strong style={{ fontSize: 14 }}>{title}</strong>
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function DialogActions({ children }) {
-  return <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>{children}</div>
 }

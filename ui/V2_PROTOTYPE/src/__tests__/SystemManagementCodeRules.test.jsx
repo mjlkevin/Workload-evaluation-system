@@ -81,9 +81,19 @@ describe('SystemManagement code rules actions', () => {
     renderCodeRules()
 
     await screen.findByText('总方案')
-    fireEvent.click(screen.getByRole('button', { name: '配置' }))
+    const trigger = screen.getByRole('button', { name: '配置' })
+    fireEvent.click(trigger)
 
-    const dialog = await screen.findByRole('dialog', { name: '配置编码规则' })
+    let dialog = await screen.findByRole('dialog', { name: '配置编码规则' })
+    expect(dialog).toHaveClass('wes-dialog')
+    await waitFor(() => expect(within(dialog).getByLabelText('前缀')).toHaveFocus())
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '配置编码规则' })).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+
+    fireEvent.click(trigger)
+    dialog = await screen.findByRole('dialog', { name: '配置编码规则' })
+
     fireEvent.change(within(dialog).getByLabelText('前缀'), { target: { value: 'GL-' } })
     fireEvent.change(within(dialog).getByLabelText('格式'), { target: { value: '{PREFIX}{YYYY}{NNN}' } })
     fireEvent.click(within(dialog).getByRole('button', { name: '保存配置' }))
