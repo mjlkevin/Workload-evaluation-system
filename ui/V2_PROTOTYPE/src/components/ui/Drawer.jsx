@@ -1,14 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
 
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button',
-  'input',
-  'select',
-  'textarea',
-  '[tabindex]',
-].join(',')
-
 function isTabbable(element) {
   if (element.tabIndex < 0 || element.matches(':disabled')) return false
   if (element instanceof HTMLInputElement && element.type === 'hidden') return false
@@ -23,7 +14,7 @@ function isTabbable(element) {
 }
 
 function getFocusableElements(container) {
-  return [...container.querySelectorAll(FOCUSABLE_SELECTOR)]
+  return [...container.querySelectorAll('*')]
     .filter(isTabbable)
 }
 

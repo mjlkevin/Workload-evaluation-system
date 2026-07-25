@@ -136,6 +136,36 @@ function ActualTabbabilityHarness() {
   )
 }
 
+function setContentEditableTabbable(node) {
+  if (node) {
+    Object.defineProperty(node, 'tabIndex', {
+      configurable: true,
+      value: 0,
+    })
+  }
+}
+
+function NativeTabbablesHarness() {
+  return (
+    <Drawer open title="编辑用户" onClose={() => {}}>
+      <span ref={disableDrawerClose}>原生可聚焦控件</span>
+      <details>
+        <summary>可展开摘要</summary>
+        <p>摘要内容</p>
+      </details>
+      <button type="button">中间控件</button>
+      <div
+        ref={setContentEditableTabbable}
+        aria-label="可编辑内容"
+        contentEditable="true"
+        suppressContentEditableWarning
+      >
+        可编辑内容
+      </div>
+    </Drawer>
+  )
+}
+
 function NoControlsHarness() {
   return (
     <Drawer open title="编辑用户" onClose={() => {}}>
@@ -268,6 +298,25 @@ describe('Drawer', () => {
     expect(last).toHaveFocus()
   })
 
+  test('ignores unprevented Tab from an interior control of the top Dialog', () => {
+    vi.stubGlobal('HTMLDialogElement', undefined)
+    render(<StackedModalHarness />)
+    const interiorControl = screen.getByLabelText('确认备注')
+    const drawerClose = screen.getByRole('button', { name: '关闭编辑用户' })
+    interiorControl.focus()
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    })
+
+    fireEvent(interiorControl, event)
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(interiorControl).toHaveFocus()
+    expect(drawerClose).not.toHaveFocus()
+  })
+
   test('ignores keyboard events already handled by another owner', () => {
     render(<DrawerHarness />)
     fireEvent.click(screen.getByRole('button', { name: '编辑 arch' }))
@@ -298,6 +347,23 @@ describe('Drawer', () => {
     first.focus()
     fireEvent.keyDown(drawer, { key: 'Tab', shiftKey: true })
     expect(last).toHaveFocus()
+  })
+
+  test('discovers native tabbables without relying on a selector whitelist', async () => {
+    render(<NativeTabbablesHarness />)
+    const drawer = screen.getByRole('dialog')
+    const summary = screen.getByText('可展开摘要')
+    const editable = screen.getByText('可编辑内容')
+    expect(editable).not.toHaveAttribute('tabindex')
+    await waitFor(() => expect(summary).toHaveFocus())
+
+    editable.focus()
+    fireEvent.keyDown(drawer, { key: 'Tab' })
+    expect(summary).toHaveFocus()
+
+    summary.focus()
+    fireEvent.keyDown(drawer, { key: 'Tab', shiftKey: true })
+    expect(editable).toHaveFocus()
   })
 
   test('locks body scrolling and restores the previous overflow value', () => {
