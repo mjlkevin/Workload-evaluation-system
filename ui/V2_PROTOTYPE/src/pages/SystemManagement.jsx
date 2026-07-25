@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
+import { getSystemManagementSectionById } from '../config/systemManagementSections.js'
 import useSystemManagement from '../hooks/useSystemManagement.js'
 
 const PROMPT_TABS = [
@@ -50,7 +51,7 @@ const OUTPUT_STYLE_OPTIONS = [
   { value: 'detailed', label: '详细' },
 ]
 
-export default function SystemManagement() {
+export default function SystemManagement({ sectionId }) {
   const {
     rules, modelConfig, ratecard,
     dslRules, templates, prompts, setPrompts,
@@ -65,7 +66,9 @@ export default function SystemManagement() {
   const [promptTab, setPromptTab] = useState('assessment')
   const [promptResult, setPromptResult] = useState(null)
   const [selectedRuleCode, setSelectedRuleCode] = useState('')
+  const [ruleConfigForm, setRuleConfigForm] = useState({ prefix: '', format: '' })
   const [kbTestResult, setKbTestResult] = useState(null)
+  const [kbSaveResult, setKbSaveResult] = useState(null)
   const [editingModel, setEditingModel] = useState(null)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [extInput, setExtInput] = useState('')
@@ -82,17 +85,38 @@ export default function SystemManagement() {
     { id: 'tpl', label: '模板' },
     { id: 'testResults', label: '测试结果' },
   ]
+  const dedicatedSection = sectionId ? getSystemManagementSectionById(sectionId) : null
+  const activeSectionId = dedicatedSection?.id || tab
   const selectedRule = rules.find((rule) => rule.code === selectedRuleCode) || rules[0]
+  const selectedRuleId = selectedRule?.id || selectedRule?.code || ''
 
   useEffect(() => {
     if (!selectedRuleCode && rules[0]?.code) setSelectedRuleCode(rules[0].code)
   }, [rules, selectedRuleCode])
 
+  const openRuleConfig = () => {
+    setRuleConfigForm({
+      prefix: selectedRule?.prefix || '',
+      format: selectedRule?.format || '',
+    })
+    setDialog('rule')
+  }
+
+  const handleSaveKbDraft = async () => {
+    setKbSaveResult(null)
+    const result = await actions.saveKbDraft()
+    setKbSaveResult(result.success
+      ? { ok: true, message: '知识库配置草稿已保存' }
+      : { ok: false, message: result.error || '知识库配置草稿保存失败' })
+  }
+
   return (
     <PageShell
-      crumb="工作台 / 系统管理"
-      title="系统管理"
-      subtitle="编码规则 / 模型配置 / 知识库 / RateCard / DSL"
+      crumb={dedicatedSection
+        ? [{ label: '工作台', to: '/' }, { label: dedicatedSection.label }]
+        : '工作台 / 系统管理'}
+      title={dedicatedSection?.label || '系统管理'}
+      subtitle={dedicatedSection?.subtitle || '编码规则 / 模型配置 / 知识库 / RateCard / DSL'}
       actions={[
         <button type="button"
           key="prompt"
@@ -104,39 +128,41 @@ export default function SystemManagement() {
         </button>,
       ]}
     >
-      <div className="system-tabs" role="tablist" aria-label="系统管理配置分类">
-        {tabs.map((t) => {
-          const active = tab === t.id
-          return (
-            <button
-              type="button"
-              key={t.id}
-              role="tab"
-              aria-selected={active}
-              className={active ? 'system-tab on' : 'system-tab'}
-              onClick={() => setTab(t.id)}
-            >
-              <span>{t.label}</span>
-              {t.count ? <span className="ct">{t.count}</span> : null}
-            </button>
-          )
-        })}
-      </div>
+      {!dedicatedSection && (
+        <div className="system-tabs" role="tablist" aria-label="系统管理配置分类">
+          {tabs.map((t) => {
+            const active = tab === t.id
+            return (
+              <button
+                type="button"
+                key={t.id}
+                role="tab"
+                aria-selected={active}
+                className={active ? 'system-tab on' : 'system-tab'}
+                onClick={() => setTab(t.id)}
+              >
+                <span>{t.label}</span>
+                {t.count ? <span className="ct">{t.count}</span> : null}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <div style={{ padding: '18px 24px' }}>
-        {tab === 'rules' && (
+        {activeSectionId === 'rules' && (
           <div className="section system-card" style={{ margin: 0 }}>
             <div className="hd">
               <span>版本号编码规则</span>
               <span className="bdg ci" style={{ fontSize: 10, padding: '1px 6px' }}><span className="dot" />当前生效 v3</span>
               <div className="right">
-                <button type="button" className="btn btn-out" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.configureRule(selectedRule?.code || '')}>
+                <button type="button" className="btn btn-out" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={openRuleConfig}>
                   配置
                 </button>
-                <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateRule(selectedRule?.code || '')}>
+                <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateRule(selectedRuleId)}>
                   ⌁ 生效
                 </button>
-                <button type="button" className="btn btn-dan" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.disableRule(selectedRule?.code || '')}>
+                <button type="button" className="btn btn-dan" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.disableRule(selectedRuleId)}>
                   禁用
                 </button>
               </div>
@@ -188,7 +214,7 @@ export default function SystemManagement() {
           </div>
         )}
 
-        {tab === 'model' && (
+        {activeSectionId === 'model' && (
           <div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => { actions.saveModelDraftWithKey(apiKeyInput || undefined); setApiKeyInput('') }} disabled={actionLoading.saveModelDraft}>
@@ -320,16 +346,34 @@ export default function SystemManagement() {
         )}
 
 
-        {tab === 'kb' && (
+        {activeSectionId === 'kb' && (
           <div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.saveKbDraft()} disabled={actionLoading.saveKbDraft || kbLoading}>
-                {actionLoading.saveKbDraft ? '...' : '保存草稿'}
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={handleSaveKbDraft} disabled={actionLoading.saveKbDraft || kbLoading}>
+                {actionLoading.saveKbDraft ? '保存中...' : '保存草稿'}
               </button>
               <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateKbConfig()} disabled={actionLoading.activateKbConfig || kbLoading}>
                 {actionLoading.activateKbConfig ? '...' : '⌁ 生效配置'}
               </button>
             </div>
+
+            {kbSaveResult && (
+              <div
+                role="status"
+                style={{
+                  background: kbSaveResult.ok ? 'var(--ok-soft)' : 'var(--err-soft)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 'var(--r-md)',
+                  color: kbSaveResult.ok ? 'var(--ok)' : 'var(--err)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  marginBottom: 16,
+                  padding: '10px 14px',
+                }}
+              >
+                {kbSaveResult.ok ? '✓ ' : '✗ '}{kbSaveResult.message}
+              </div>
+            )}
 
             {/* 状态卡片 */}
             <div style={{
@@ -443,13 +487,13 @@ export default function SystemManagement() {
                     type="button"
                     className="btn btn-ghost"
                     style={{ fontSize: 12, padding: '6px 14px', height: 32, whiteSpace: 'nowrap' }}
-                    disabled={kbTesting}
+                    disabled={kbTesting || kbLoading}
                     onClick={async () => {
                       setKbTesting(true)
                       setKbTestResult(null)
                       try {
                         const result = await actions.testKbConnectivity()
-                        if (result) setKbTestResult(result)
+                        setKbTestResult(result || { ok: false, error: '连通性测试未返回结果' })
                       } finally {
                         setKbTesting(false)
                       }
@@ -473,12 +517,19 @@ export default function SystemManagement() {
                       <span>{kbTestResult.ok ? '连通性测试通过' : '连通性测试失败'}</span>
                     </div>
                     {kbTestResult.ok ? (
-                      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', color: 'var(--ink-2)' }}>
-                        {kbTestResult.model && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>模型</span><br/><span style={{ fontFamily: 'var(--font-mono)' }}>{kbTestResult.model}</span></div>}
-                        {kbTestResult.knowledgeId && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>知识库 ID</span><br/><span style={{ fontFamily: 'var(--font-mono)' }}>{kbTestResult.knowledgeId}</span></div>}
-                        {kbTestResult.latencyMs !== undefined && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>延迟</span><br/><span style={{ fontFamily: 'var(--font-mono)' }}>{kbTestResult.latencyMs}ms</span></div>}
-                        {kbTestResult.retrievalTriggered !== undefined && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>检索触发</span><br/><span>{kbTestResult.retrievalTriggered ? '是' : '否'}</span></div>}
-                        {kbTestResult.testedSource && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>凭证来源</span><br/><span>{kbTestResult.testedSource === 'draft_store' ? '草稿存储' : kbTestResult.testedSource === 'environment' ? '环境变量' : '请求参数'}</span></div>}
+                      <div>
+                        {kbTestResult.warning === 'retrieval_empty' && (
+                          <div style={{ color: 'var(--warn-ink)', marginBottom: 8 }}>
+                            连接成功，但固定测试语句未检索到文档
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', color: 'var(--ink-2)' }}>
+                          {kbTestResult.model && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>模型</span><br/><span style={{ fontFamily: 'var(--font-mono)' }}>{kbTestResult.model}</span></div>}
+                          {kbTestResult.knowledgeId && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>知识库 ID</span><br/><span style={{ fontFamily: 'var(--font-mono)' }}>{kbTestResult.knowledgeId}</span></div>}
+                          {kbTestResult.latencyMs !== undefined && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>延迟</span><br/><span style={{ fontFamily: 'var(--font-mono)' }}>{kbTestResult.latencyMs}ms</span></div>}
+                          {kbTestResult.retrievalTriggered !== undefined && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>检索触发</span><br/><span>{kbTestResult.retrievalTriggered ? '是' : '否'}</span></div>}
+                          {kbTestResult.testedSource && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>凭证来源</span><br/><span>{kbTestResult.testedSource === 'draft_store' ? '草稿存储' : kbTestResult.testedSource === 'environment' ? '环境变量' : '请求参数'}</span></div>}
+                        </div>
                       </div>
                     ) : (
                       <div>
@@ -493,7 +544,7 @@ export default function SystemManagement() {
           </div>
         )}
 
-        {tab === 'rate' && (
+        {activeSectionId === 'rate' && (
           <div className="section" style={{ margin: 0 }}>
             <div className="hd">
               <span>RateCard · 当前生效</span>
@@ -519,7 +570,7 @@ export default function SystemManagement() {
           </div>
         )}
 
-        {tab === 'dsl' && (
+        {activeSectionId === 'dsl' && (
           <div className="section" style={{ margin: 0 }}>
             <div className="hd">
               <span>DSL 规则集</span>
@@ -571,7 +622,7 @@ export default function SystemManagement() {
           </div>
         )}
 
-        {tab === 'tpl' && (
+        {activeSectionId === 'tpl' && (
           <div className="section" style={{ margin: 0 }}>
             <div className="hd">
               <span>模板管理</span>
@@ -618,7 +669,7 @@ export default function SystemManagement() {
           </div>
         )}
 
-        {tab === 'testResults' && (
+        {activeSectionId === 'testResults' && (
           <div className="section" style={{ margin: 0 }}>
             <div className="hd">
               <span>人工测试结果</span>
@@ -674,6 +725,48 @@ export default function SystemManagement() {
           </div>
         )}
       </div>
+
+      {/* 编码规则配置 dialog */}
+      {dialog === 'rule' && (
+        <DialogBackdrop onClose={() => setDialog(null)}>
+          <DialogCard title="配置编码规则">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+                前缀
+                <input
+                  className="input"
+                  value={ruleConfigForm.prefix}
+                  onChange={(event) => setRuleConfigForm((current) => ({ ...current, prefix: event.target.value }))}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+                格式
+                <input
+                  className="input"
+                  value={ruleConfigForm.format}
+                  onChange={(event) => setRuleConfigForm((current) => ({ ...current, format: event.target.value }))}
+                />
+              </label>
+            </div>
+            <DialogActions>
+              <button type="button" className="btn btn-out" onClick={() => setDialog(null)}>
+                取消
+              </button>
+              <button
+                type="button"
+                className="btn btn-pri"
+                disabled={actionLoading[`configure:${selectedRuleId}`]}
+                onClick={async () => {
+                  const result = await actions.configureRule(selectedRuleId, ruleConfigForm)
+                  if (result.success) setDialog(null)
+                }}
+              >
+                {actionLoading[`configure:${selectedRuleId}`] ? '保存中...' : '保存配置'}
+              </button>
+            </DialogActions>
+          </DialogCard>
+        </DialogBackdrop>
+      )}
 
       {/* 提示词 dialog */}
       {dialog === 'prompt' && (
@@ -970,6 +1063,8 @@ function DialogBackdrop({ children, onClose }) {
 function DialogCard({ title, wide, children }) {
   return (
     <div
+      role="dialog"
+      aria-label={title}
       style={{
         width: wide ? 'min(720px, 100%)' : 'min(480px, 100%)',
         background: '#fff',

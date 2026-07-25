@@ -164,19 +164,22 @@ export default function useSystemManagement({
     finally { setRulesLoading(false) }
   }, [enabled])
 
-  const configureRule = useCallback((ruleId) => withAction(`configure:${ruleId}`, async () => {
-    if (enabled) await apiClient.patch(`/system/version-code-rules/${ruleId}/config`, {})
+  const configureRule = useCallback((ruleId, patch) => withAction(`configure:${ruleId}`, async () => {
+    if (enabled) await apiClient.patch(`/system/version-code-rules/${ruleId}/config`, patch)
+    setRules((prev) => prev.map((rule) => (rule.id === ruleId || rule.code === ruleId ? { ...rule, ...patch, status: 'draft' } : rule)))
     alert('配置已保存')
   }), [enabled, withAction])
 
   const activateRule = useCallback((ruleId) => withAction(`activate:${ruleId}`, async () => {
     if (enabled) await apiClient.post(`/system/version-code-rules/${ruleId}/activate`)
     setRules((prev) => prev.map((r) => r.id === ruleId || r.code === ruleId ? { ...r, status: 'active', activatedAt: new Date().toISOString() } : r))
+    alert('编码规则已生效')
   }), [enabled, withAction])
 
   const disableRule = useCallback((ruleId) => withAction(`disable:${ruleId}`, async () => {
     if (enabled) await apiClient.post(`/system/version-code-rules/${ruleId}/disable`)
     setRules((prev) => prev.map((r) => r.id === ruleId || r.code === ruleId ? { ...r, status: 'draft', activatedAt: null } : r))
+    alert('编码规则已禁用')
   }), [enabled, withAction])
 
   // --- Models ---
@@ -356,8 +359,11 @@ export default function useSystemManagement({
     finally { setKbLoading(false) }
   }, [enabled])
 
-  const saveKbDraft = useCallback(() => withAction('saveKbDraft', async () => {
-    if (enabled) {
+  const saveKbDraft = useCallback(() => {
+    if (!enabled) {
+      return Promise.resolve({ success: false, error: '登录已过期，请重新登录' })
+    }
+    return withAction('saveKbDraft', async () => {
       await apiClient.patch('/system/knowledge-base-config/draft', {
         model: kbConfig.model,
         apiBaseUrl: kbConfig.apiBaseUrl,
@@ -366,9 +372,9 @@ export default function useSystemManagement({
           knowledgeId: kbConfig.knowledgeId || null,
         },
       })
-    }
-    alert('知识库配置草稿已保存')
-  }), [enabled, kbConfig, withAction])
+      alert('知识库配置草稿已保存')
+    })
+  }, [enabled, kbConfig, withAction])
 
   const activateKbConfig = useCallback(() => withAction('activateKbConfig', async () => {
     if (enabled) await apiClient.post('/system/knowledge-base-config/activate')
@@ -376,12 +382,19 @@ export default function useSystemManagement({
   }), [enabled, withAction])
 
   const testKbConnectivity = useCallback(async () => {
-    if (!enabled) return null
+    if (!enabled) {
+      return {
+        ok: false,
+        code: 'UNAUTHORIZED',
+        status: 401,
+        error: '登录已过期，请重新登录',
+      }
+    }
     try {
       const result = await apiClient.post('/system/knowledge-base-config/test', {
         apiKey: kbConfig.apiKey || undefined,
         knowledgeId: kbConfig.knowledgeId || undefined,
-      })
+      }, { timeoutMs: 30000 })
       const data = result?.data || result
       return { ok: true, ...data }
     } catch (e) {

@@ -1,8 +1,11 @@
 import React, { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import WorkspaceTabs from './WorkspaceTabs.jsx'
 import { UnsavedChangesProvider } from '../../hooks/useUnsavedChanges.jsx'
 import useCurrentUser from '../../hooks/useCurrentUser.js'
+import { clearToken, isAuthenticated } from '../../api/auth.js'
+import { SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
+import { isAdminUser } from '../../utils/adminAccess.js'
 
 const navGroups = [
   {
@@ -20,7 +23,15 @@ const navGroups = [
   {
     title: '系统',
     items: [
-      { to: '/system', label: '系统管理', icon: '⚙' },
+      {
+        label: '系统管理',
+        icon: '⚙',
+        children: SYSTEM_MANAGEMENT_SECTIONS.map((section) => ({
+          to: section.route,
+          label: section.label,
+          icon: section.icon,
+        })),
+      },
       { to: '/users', label: '用户管理', icon: '☺' },
       { to: '/api-keys', label: 'API 密钥', icon: '⚿' },
     ],
@@ -35,12 +46,20 @@ function ToggleIcon() {
   )
 }
 
-export default function Shell({ children }) {
+export default function Shell({ children, currentUser = null }) {
   const [collapsed, setCollapsed] = useState(false)
-  const { user } = useCurrentUser()
+  const navigate = useNavigate()
+  const { user: loadedUser } = useCurrentUser({ enabled: !currentUser && isAuthenticated() })
+  const user = currentUser || loadedUser
   const username = user?.username || user?.name || 'mjlkevin'
   const userInitial = String(username).slice(0, 1).toUpperCase() || 'U'
   const roleText = user?.businessRoleLabel || (user?.role === 'admin' ? '超级管理员' : '未设置业务角色')
+  const visibleNavGroups = navGroups.filter((group) => group.title !== '系统' || isAdminUser(user))
+
+  const handleLogout = () => {
+    clearToken()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="shell" style={{ gridTemplateColumns: collapsed ? '64px minmax(0,1fr)' : undefined }}>
@@ -56,23 +75,55 @@ export default function Shell({ children }) {
             <ToggleIcon />
           </button>
         </div>
-        {navGroups.map((g) => (
-          <div className="grp" key={g.title}>
-            <h6>{g.title}</h6>
-            {g.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => (isActive ? 'on' : '')}
-                end={item.to === '/'}
-                title={collapsed ? item.label : undefined}
-              >
-                <span className="ic">{item.icon}</span>
-                {!collapsed && item.label}
-              </NavLink>
-            ))}
-          </div>
-        ))}
+        <nav aria-label="主导航">
+          {visibleNavGroups.map((g) => (
+            <div className="grp" key={g.title}>
+              <h6>{g.title}</h6>
+              {g.items.map((item) => {
+                if (item.children) {
+                  return (
+                    <div className="sidebar-nav-parent" key={item.label}>
+                      <button
+                        type="button"
+                        className="sidebar-nav-parent-label"
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <span className="ic">{item.icon}</span>
+                        {!collapsed && item.label}
+                      </button>
+                      {!collapsed && (
+                        <div className="sidebar-nav-children">
+                          {item.children.map((child) => (
+                            <NavLink
+                              key={child.to}
+                              to={child.to}
+                              className={({ isActive }) => (isActive ? 'on' : '')}
+                            >
+                              <span className="ic">{child.icon}</span>
+                              {child.label}
+                            </NavLink>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) => (isActive ? 'on' : '')}
+                    end={item.to === '/'}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <span className="ic">{item.icon}</span>
+                    {!collapsed && item.label}
+                  </NavLink>
+                )
+              })}
+            </div>
+          ))}
+        </nav>
         <div className="user">
           <div className="row">
             <div className="av">{userInitial}</div>
@@ -80,7 +131,7 @@ export default function Shell({ children }) {
               <div className="nm" title={username}>{username}</div>
               <div className="meta" title={roleText}>{roleText}</div>
             </div>
-            {!collapsed && <a className="out" href="/login" aria-label="退出登录">退出</a>}
+            {!collapsed && <button type="button" className="out" aria-label="退出登录" onClick={handleLogout}>退出</button>}
           </div>
         </div>
       </aside>

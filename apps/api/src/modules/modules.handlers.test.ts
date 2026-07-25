@@ -27,6 +27,7 @@ import {
 } from "./versions/versions.usecase";
 import { patchReviewStatus, postTeam } from "./team/team.controller";
 import { homeWorkbenchChat, kimiAssessmentPreview, parseBasicInfo } from "./ai/ai.usecase";
+import { testKnowledgeBaseConnectivity } from "./system/system.usecase";
 import * as AiSessionsModule from "./ai-sessions/ai-sessions.module";
 import * as ProjectEvaluationsModule from "./project-evaluations/project-evaluations.module";
 import { createConfirmAiAssessmentDraftHandler } from "./project-evaluations/project-evaluations.controller";
@@ -129,6 +130,44 @@ function withFileSnapshotRestore(filePath: string, run: () => void): void {
     }
   }
 }
+
+test("system.usecase: empty retrieval still proves knowledge base connectivity", { concurrency: false }, async () => {
+  const store = loadUsersStore();
+  const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
+  assert.ok(admin, "active admin required");
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new globalThis.Response(
+    JSON.stringify({ code: 200, message: "请求成功", data: [] }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  )) as typeof fetch;
+
+  try {
+    const req = createMockReq({
+      token: signAuthToken(admin),
+      body: {
+        apiKey: "zhipu-unit-test-key",
+        knowledgeId: "knowledge-unit-test-id",
+      },
+    });
+    const res = createMockRes();
+
+    await testKnowledgeBaseConnectivity(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    const body = res.body as {
+      data: {
+        ok: boolean;
+        warning?: string;
+        retrievalTriggered: boolean;
+      };
+    };
+    assert.equal(body.data.ok, true);
+    assert.equal(body.data.warning, "retrieval_empty");
+    assert.equal(body.data.retrievalTriggered, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 async function withFileSnapshotRestoreAsync(filePath: string, run: () => Promise<void>): Promise<void> {
   const existed = fs.existsSync(filePath);

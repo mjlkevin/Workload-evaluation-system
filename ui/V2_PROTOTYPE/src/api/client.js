@@ -3,7 +3,13 @@ import { ApiError, NetworkError } from './errors'
 
 const BASE = '/api/v1'
 
-async function request(method, path, { body, params, formData, suppressUnauthorizedRedirect = false } = {}) {
+async function request(method, path, {
+  body,
+  params,
+  formData,
+  suppressUnauthorizedRedirect = false,
+  timeoutMs = 0,
+} = {}) {
   let url = `${BASE}${path}`
   if (params) {
     const qs = new URLSearchParams()
@@ -25,14 +31,22 @@ async function request(method, path, { body, params, formData, suppressUnauthori
   }
 
   let res
+  const controller = Number.isFinite(timeoutMs) && timeoutMs > 0 ? new AbortController() : null
+  const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null
   try {
     res = await fetch(url, {
       method,
       headers,
       body: formData || (body ? JSON.stringify(body) : undefined),
+      ...(controller ? { signal: controller.signal } : {}),
     })
   } catch (e) {
+    if (e?.name === 'AbortError') {
+      throw new NetworkError('请求超时，请稍后重试', e)
+    }
     throw new NetworkError('网络请求失败', e)
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
   }
 
   if (res.status === 401) {

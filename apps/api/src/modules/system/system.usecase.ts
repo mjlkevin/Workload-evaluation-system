@@ -590,7 +590,13 @@ export async function testKnowledgeBaseConnectivity(req: Request, res: Response)
     });
     const testedSource =
       source === "override" ? "request_body" : source === "draft" ? "draft_store" : "environment";
-    if (trace.confidence === "high" || (trace.confidence === "low" && !trace.fallbackReason)) {
+    const retrievalReachedUpstream =
+      trace.fallbackReason === "retrieval_empty" && trace.statusCode === 200;
+    if (
+      trace.confidence === "high"
+      || (trace.confidence === "low" && !trace.fallbackReason)
+      || retrievalReachedUpstream
+    ) {
       return res.json(
         ok(
           {
@@ -600,6 +606,7 @@ export async function testKnowledgeBaseConnectivity(req: Request, res: Response)
             knowledgeId,
             latencyMs: trace.latencyMs,
             retrievalTriggered: trace.retrievalTriggered,
+            ...(retrievalReachedUpstream ? { warning: "retrieval_empty" } : {}),
           },
           randomUUID(),
         ),

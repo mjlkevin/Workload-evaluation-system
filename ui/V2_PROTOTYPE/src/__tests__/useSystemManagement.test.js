@@ -137,4 +137,57 @@ describe('useSystemManagement', () => {
 
     expect(capturedBody.kimiCredentials.apiKey).toBeNull()
   })
+
+  test('saveKbDraft reports expired login instead of a false success when disabled', async () => {
+    let patchCalls = 0
+    server.use(
+      http.patch(`${BASE}/system/knowledge-base-config/draft`, () => {
+        patchCalls += 1
+        return HttpResponse.json({ success: true, data: {} })
+      })
+    )
+    const { result } = renderHook(() => useSystemManagement({ enabled: false }))
+
+    let actionResult
+    await act(async () => {
+      actionResult = await result.current.actions.saveKbDraft()
+    })
+
+    expect(actionResult).toEqual({ success: false, error: '登录已过期，请重新登录' })
+    expect(patchCalls).toBe(0)
+    expect(window.alert).not.toHaveBeenCalled()
+  })
+
+  test('testKbConnectivity returns an explicit unauthorized result when disabled', async () => {
+    const { result } = renderHook(() => useSystemManagement({ enabled: false }))
+
+    let actionResult
+    await act(async () => {
+      actionResult = await result.current.actions.testKbConnectivity()
+    })
+
+    expect(actionResult).toEqual({
+      ok: false,
+      code: 'UNAUTHORIZED',
+      status: 401,
+      error: '登录已过期，请重新登录',
+    })
+  })
+
+  test('saveKbDraft never shows success when the PATCH fails', async () => {
+    server.use(
+      http.patch(`${BASE}/system/knowledge-base-config/draft`, () =>
+        HttpResponse.json({ code: 'SAVE_FAILED', message: '草稿保存失败' }, { status: 500 })
+      )
+    )
+    const { result } = renderHook(() => useSystemManagement())
+
+    let actionResult
+    await act(async () => {
+      actionResult = await result.current.actions.saveKbDraft()
+    })
+
+    expect(actionResult).toEqual({ success: false, error: '草稿保存失败' })
+    expect(window.alert).not.toHaveBeenCalled()
+  })
 })

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
 import { useUnsavedNavigation } from '../../hooks/useUnsavedChanges.jsx'
 
 const STORAGE_KEY = 'wes-v2-workspace-tabs-v1'
@@ -17,6 +18,7 @@ const STATIC_TITLES = {
   '/system': '系统管理',
   '/users': '用户管理',
   '/api-keys': 'API 密钥',
+  ...Object.fromEntries(SYSTEM_MANAGEMENT_SECTIONS.map((section) => [section.route, section.label])),
 }
 
 const DETAIL_TITLES = [
