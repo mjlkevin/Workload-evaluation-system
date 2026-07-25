@@ -310,7 +310,95 @@ describe('UserManagement', () => {
     ])
   })
 
-  test('stops after a failed patch, reloads users, and keeps the editor open', async () => {
+  test('does not let a completed save close or overwrite a different editor', async () => {
+    let releasePatch
+    let patchCompleted = false
+    let getCount = 0
+    const users = [
+      {
+        id: 'u2',
+        username: 'pm',
+        email: 'pm@wes.local',
+        role: 'sub_admin',
+        businessRole: 'pm',
+        status: 'active',
+        locked: false,
+      },
+      {
+        id: 'u3',
+        username: 'arch',
+        email: 'arch@wes.local',
+        role: 'user',
+        businessRole: 'pre_sales',
+        status: 'active',
+        locked: false,
+      },
+    ]
+
+    server.use(
+      http.get(`${BASE}/auth/users`, () => {
+        getCount += 1
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { users },
+        })
+      }),
+      http.patch(`${BASE}/auth/users/:userId/business-role`, async ({ params, request }) => {
+        const body = await request.json()
+        await new Promise((resolve) => {
+          releasePatch = resolve
+        })
+        patchCompleted = true
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: {
+            user: {
+              ...users.find((user) => user.id === params.userId),
+              businessRole: body.businessRole,
+            },
+          },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    let editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.change(within(editor).getByLabelText('业务角色'), {
+      target: { value: 'pm' },
+    })
+    fireEvent.click(within(editor).getByRole('button', { name: '保存变更' }))
+
+    await waitFor(() => {
+      expect(releasePatch).toEqual(expect.any(Function))
+    })
+    fireEvent.click(within(editor).getByRole('button', { name: '关闭编辑用户' }))
+    fireEvent.click(screen.getByRole('button', { name: '编辑 pm' }))
+
+    editor = screen.getByRole('dialog', { name: '编辑用户' })
+    expect(within(editor).getByText('pm')).toBeInTheDocument()
+    fireEvent.change(within(editor).getByLabelText('业务角色'), {
+      target: { value: 'sales' },
+    })
+
+    releasePatch()
+
+    await waitFor(() => {
+      expect(patchCompleted).toBe(true)
+      expect(getCount).toBeGreaterThanOrEqual(2)
+    })
+    editor = screen.getByRole('dialog', { name: '编辑用户' })
+    expect(within(editor).getByText('pm')).toBeInTheDocument()
+    expect(within(editor).getByLabelText('系统角色')).toBeEnabled()
+    expect(within(editor).getByLabelText('业务角色')).toHaveValue('sales')
+    expect(within(editor).queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByText('已保存 arch')).not.toBeInTheDocument()
+  })
+
+  test('stops after a failed patch, reports failed reconciliation, and retries the reload', async () => {
     let getCount = 0
     let laterPatchCount = 0
     const serverUser = {
@@ -326,6 +414,12 @@ describe('UserManagement', () => {
     server.use(
       http.get(`${BASE}/auth/users`, () => {
         getCount += 1
+        if (getCount === 2) {
+          return HttpResponse.json(
+            { code: 50002, message: '刷新失败' },
+            { status: 500 }
+          )
+        }
         return HttpResponse.json({
           code: 0,
           message: 'ok',
@@ -360,10 +454,97 @@ describe('UserManagement', () => {
 
     await waitFor(() => {
       expect(within(editor).getByRole('status')).toHaveTextContent(/业务角色保存失败/)
+      expect(within(editor).getByRole('status')).toHaveTextContent(
+        /服务器状态刷新失败，当前显示可能过期/
+      )
     })
     expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '编辑 arch' })).toBeInTheDocument()
     expect(getCount).toBeGreaterThanOrEqual(2)
     expect(laterPatchCount).toBe(0)
+
+    fireEvent.click(within(editor).getByRole('button', { name: '重新读取服务器数据' }))
+
+    await waitFor(() => {
+      expect(getCount).toBeGreaterThanOrEqual(3)
+      expect(within(editor).getByRole('status')).toHaveTextContent('服务器数据已重新读取')
+    })
+    expect(within(editor).queryByRole('button', { name: '重新读取服务器数据' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+  })
+
+  test('reports applied fields and stops before status after a partial save failure', async () => {
+    let serverUser = {
+      id: 'u3',
+      username: 'arch',
+      email: 'arch@wes.local',
+      role: 'user',
+      businessRole: 'pre_sales',
+      status: 'disabled',
+      locked: false,
+    }
+    let statusPatchCount = 0
+    const calls = []
+
+    server.use(
+      http.get(`${BASE}/auth/users`, () => HttpResponse.json({
+        code: 0,
+        message: 'ok',
+        data: { users: [serverUser] },
+      })),
+      http.patch(`${BASE}/auth/users/:userId/business-role`, async ({ params, request }) => {
+        const body = await request.json()
+        calls.push({ endpoint: 'businessRole', body })
+        serverUser = { ...serverUser, id: params.userId, businessRole: body.businessRole }
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: serverUser },
+        })
+      }),
+      http.patch(`${BASE}/auth/users/:userId/role`, async ({ request }) => {
+        calls.push({ endpoint: 'role', body: await request.json() })
+        return HttpResponse.json(
+          { code: 50001, message: '保存失败' },
+          { status: 500 }
+        )
+      }),
+      http.patch(`${BASE}/auth/users/:userId/status`, async ({ request }) => {
+        statusPatchCount += 1
+        calls.push({ endpoint: 'status', body: await request.json() })
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: serverUser },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.change(within(editor).getByLabelText('业务角色'), {
+      target: { value: 'pm' },
+    })
+    fireEvent.change(within(editor).getByLabelText('系统角色'), {
+      target: { value: 'sub_admin' },
+    })
+    fireEvent.change(within(editor).getByLabelText('账户状态'), {
+      target: { value: 'active' },
+    })
+    fireEvent.click(within(editor).getByRole('button', { name: '保存变更' }))
+
+    await waitFor(() => {
+      expect(within(editor).getByRole('status')).toHaveTextContent(/系统角色保存失败/)
+      expect(within(editor).getByRole('status')).toHaveTextContent(/已保存：业务角色/)
+    })
+    expect(calls).toEqual([
+      { endpoint: 'businessRole', body: { businessRole: 'pm' } },
+      { endpoint: 'role', body: { role: 'sub_admin' } },
+    ])
+    expect(statusPatchCount).toBe(0)
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
   })
 
   test('displays role capabilities section and expands on click', async () => {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
 import UserEditorDrawer from '../components/UserManagement/UserEditorDrawer.jsx'
 import useUsers, { BUSINESS_ROLES, businessRoleLabel } from '../hooks/useUsers.js'
@@ -53,6 +53,8 @@ export default function UserManagement() {
   const [editorMessage, setEditorMessage] = useState(null)
   const [pendingSave, setPendingSave] = useState(null)
   const [pageNotice, setPageNotice] = useState(null)
+  const editorOperationRef = useRef(0)
+  const currentEditingUserIdRef = useRef(null)
 
   useEffect(() => {
     setUsers(loadedUsers)
@@ -207,17 +209,35 @@ export default function UserManagement() {
   }
 
   const closeUserEditor = () => {
+    editorOperationRef.current += 1
+    currentEditingUserIdRef.current = null
     setEditingUserId(null)
     setEditingUserSnapshot(null)
     setEditorMessage(null)
+    setSavingUser(false)
   }
 
   const openUserEditor = (user) => {
+    editorOperationRef.current += 1
+    currentEditingUserIdRef.current = user.id
     setEditorMessage(null)
     setPageNotice(null)
+    setSavingUser(false)
     setEditingUserSnapshot(user)
     setEditingUserId(user.id)
   }
+
+  const beginEditorOperation = (userId) => {
+    const token = editorOperationRef.current + 1
+    editorOperationRef.current = token
+    currentEditingUserIdRef.current = userId
+    return { token, userId }
+  }
+
+  const isEditorOperationActive = (operation) => (
+    editorOperationRef.current === operation.token
+    && currentEditingUserIdRef.current === operation.userId
+  )
 
   const persistUserChanges = async (userId, changes) => {
     const appliedFields = []
@@ -245,48 +265,106 @@ export default function UserManagement() {
         await step.save(changes[step.field])
         appliedFields.push(step.label)
       } catch (error) {
-        await reload().catch(() => {})
+        let reconciliationFailed = false
+        try {
+          await reload()
+        } catch (_) {
+          reconciliationFailed = true
+        }
         const appliedText = appliedFields.length > 0
           ? `已保存：${appliedFields.join('、')}。`
           : ''
-        setEditorMessage({
-          kind: 'error',
-          text: `${step.label}保存失败；${appliedText}${error?.message || '请稍后重试'}`,
-        })
-        return false
+        const staleWarning = reconciliationFailed
+          ? '。服务器状态刷新失败，当前显示可能过期'
+          : ''
+        return {
+          ok: false,
+          message: {
+            kind: 'error',
+            retryable: reconciliationFailed,
+            text: `${step.label}保存失败；${appliedText}${error?.message || '请稍后重试'}${staleWarning}`,
+          },
+        }
       }
     }
 
     try {
       await reload()
-      return true
+      return { ok: true }
     } catch (error) {
-      setEditorMessage({
-        kind: 'error',
-        text: `变更已提交，但重新读取服务器数据失败。${error?.message || '请稍后重试'}`,
-      })
-      return false
+      return {
+        ok: false,
+        message: {
+          kind: 'error',
+          retryable: true,
+          text: `变更已提交，但重新读取服务器数据失败。服务器状态刷新失败，当前显示可能过期。${error?.message || '请稍后重试'}`,
+        },
+      }
     }
   }
 
-  const performSave = async (payload) => {
+  const performSave = async (payload, operation) => {
+    if (!isEditorOperationActive(operation)) return
     setSavingUser(true)
     setEditorMessage(null)
     try {
-      const saved = await persistUserChanges(payload.userId, payload.changes)
-      if (saved) {
-        closeUserEditor()
+      const result = await persistUserChanges(payload.userId, payload.changes)
+      if (!isEditorOperationActive(operation)) return
+      if (result.ok) {
         setPendingSave(null)
         setPageNotice(`已保存 ${payload.original.username}`)
+        closeUserEditor()
+      } else {
+        setEditorMessage(result.message)
       }
     } catch (error) {
-      setEditorMessage({
-        kind: 'error',
-        text: error?.message || '保存失败，请稍后重试',
-      })
+      if (isEditorOperationActive(operation)) {
+        setEditorMessage({
+          kind: 'error',
+          retryable: false,
+          text: error?.message || '保存失败，请稍后重试',
+        })
+      }
     } finally {
-      setSavingUser(false)
+      if (isEditorOperationActive(operation)) {
+        setSavingUser(false)
+      }
     }
+  }
+
+  const retryEditorReload = () => {
+    const userId = currentEditingUserIdRef.current
+    if (!userId) return
+    const operation = beginEditorOperation(userId)
+    setSavingUser(true)
+    setEditorMessage({
+      kind: 'info',
+      retryable: false,
+      text: '正在重新读取服务器数据…',
+    })
+
+    void reload()
+      .then(() => {
+        if (!isEditorOperationActive(operation)) return
+        setEditorMessage({
+          kind: 'success',
+          retryable: false,
+          text: '服务器数据已重新读取',
+        })
+      })
+      .catch((error) => {
+        if (!isEditorOperationActive(operation)) return
+        setEditorMessage({
+          kind: 'error',
+          retryable: true,
+          text: `服务器状态刷新失败，当前显示可能过期。${error?.message || '请稍后重试'}`,
+        })
+      })
+      .finally(() => {
+        if (isEditorOperationActive(operation)) {
+          setSavingUser(false)
+        }
+      })
   }
 
   const requestUserSave = ({ original, draft }) => {
@@ -302,7 +380,8 @@ export default function UserManagement() {
       return
     }
     setPendingSave(null)
-    void performSave(payload)
+    const operation = beginEditorOperation(payload.userId)
+    void performSave(payload, operation)
   }
 
   const confirmDemote = () => {
@@ -567,6 +646,7 @@ export default function UserManagement() {
         saving={savingUser}
         message={editorMessage}
         onRequestClose={closeUserEditor}
+        onRetry={retryEditorReload}
         onSave={requestUserSave}
       />
 

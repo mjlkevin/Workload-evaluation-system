@@ -28,6 +28,7 @@ export default function UserEditorDrawer({
   saving,
   message,
   onRequestClose,
+  onRetry,
   onSave,
   onResetPassword,
 }) {
@@ -38,7 +39,7 @@ export default function UserEditorDrawer({
     if (open && user) {
       setDraft(draftFromUser(user))
     }
-  }, [open, user])
+  }, [open, user?.id])
 
   const dirty = useMemo(() => Boolean(
     user
@@ -148,7 +149,17 @@ export default function UserEditorDrawer({
 
       {message?.text ? (
         <div className="user-editor__message" data-kind={message.kind} role="status">
-          {message.text}
+          <div>{message.text}</div>
+          {message.retryable && onRetry ? (
+            <button
+              type="button"
+              className="btn btn-out"
+              disabled={saving}
+              onClick={onRetry}
+            >
+              重新读取服务器数据
+            </button>
+          ) : null}
         </div>
       ) : null}
     </Drawer>

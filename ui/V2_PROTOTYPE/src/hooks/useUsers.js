@@ -71,7 +71,6 @@ export default function useUsers({ enabled = isAuthenticated() } = {}) {
     } catch (err) {
       if (requestId === requestIdRef.current) {
         setError(err)
-        setUsers([])
       }
       throw err
     } finally {
