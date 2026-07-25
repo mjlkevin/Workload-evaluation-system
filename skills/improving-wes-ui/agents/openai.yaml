@@ -1,0 +1,4 @@
+interface:
+  display_name: "WES UI Quality Gate"
+  short_description: "审计并改进 WES UI，同时守住现有技术栈与证据门禁"
+  default_prompt: "Use $improving-wes-ui to audit one WES UI surface and propose evidence-backed improvements."

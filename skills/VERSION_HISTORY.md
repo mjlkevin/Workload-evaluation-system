@@ -8,6 +8,7 @@
 
 | 日期 | Skill 名称 | 版本 | 类型 | 说明 |
 |------|-----------|------|------|------|
+| 2026-07-25 | `improving-wes-ui` | v1.0.0 | 🚀 发布 | 新增 WES UI 单业务面质量门禁、证据分类、架构覆盖规则和确定性增量债务检查器 |
 | 2026-06-26 | `wes-qoder-worktree-protocol` | v1.0.0 | 🚀 发布 | 新增 Qoder 在 WES 中使用隔离 worktree 执行需求池/Loop 任务的协议 Skill，要求 Worktree Contract ACK、验证证据和结构化 handoff |
 | 2026-06-24 | `wes-loop` | v1.0.1 | 🧹 退役 | 按用户决策清理 Codex 侧 WES Loop：删除 heartbeat 自动化与仓库内 `skills/wes-loop` 文件，持续 Loop 改由 Qoder 创建和执行 |
 | 2026-06-24 | `wes-loop` | v1.0.0 | 🚀 发布 | 新增 WES Loop Skill，通过 Schedule MCP 每 30 分钟自动唤醒，从需求池选取最高优先级未完成需求，完成分析→设计→实现→测试→看板更新全流程 |
@@ -18,6 +19,20 @@
 ---
 
 ## 详细记录
+
+### 2026-07-25
+
+#### improving-wes-ui v1.0.0 🚀
+
+- **操作类型**：初始发布
+- **来源**：RP-043；基于 `ibelick/ui-skills` 固定提交的适用原则，并按 WES Vite + React、CSS Token、Issue-first 与总看板流程完成项目化覆盖。
+- **变更内容**：
+  - 新增 `skills/improving-wes-ui/SKILL.md`
+  - 新增 UI 质量检查表和上游来源/覆盖规则
+  - 新增只审新增差异的 `check-ui-scope.mjs` 及 3 个测试
+  - 完成技术栈/范围压力和静态证据压力的 RED/GREEN 对比
+- **对应系统版本**：WorkEvolutionSys / RP-043
+- **发布者**：Codex
 
 ### 2026-06-26
 

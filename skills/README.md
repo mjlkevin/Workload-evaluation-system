@@ -16,6 +16,12 @@ skills/
 │   ├── SKILL.md                       #   Skill 正文
 │   └── CHANGELOG.md                   #   该 Skill 的独立变更日志
 │
+├── improving-wes-ui/                  # 【已发布】WES UI 审计、实现与证据门禁
+│   ├── SKILL.md                       #   Skill 正文
+│   ├── agents/openai.yaml             #   Skill UI 元信息
+│   ├── references/                    #   质量清单与上游来源
+│   └── scripts/                       #   UI 增量债务检查器及测试
+│
 ├── recording-wes-requirements/        # 【已发布】测试反馈与需求入池治理
 │   ├── SKILL.md                       #   Skill 正文
 │   └── CHANGELOG.md                   #   该 Skill 的独立变更日志
@@ -118,6 +124,7 @@ ln -sf ../../skills/workload-api-external-agent .kimi/skills/workload-api-extern
 | Skill 名称 | 状态 | 当前版本 | 说明 | 最后更新 |
 |-----------|------|---------|------|---------|
 | `maintain-wes-command-board` | ✅ 已发布 | v1.0.0 | 约束后续模型把需求、设计、开发、测试、变更、监控和风险过程数据同步沉淀到 WES Agent 升级总看板 | 2026-06-23 |
+| `improving-wes-ui` | ✅ 已发布 | v1.0.0 | 以单业务面、三类证据和最多三个根问题约束 WES UI 审计与实现，阻止未经批准的前端技术栈漂移 | 2026-07-25 |
 | `recording-wes-requirements` | ✅ 已发布 | v1.0.0 | 将测试问题、需求、反馈、缺陷和体验调整先分析并规范记录到项目级需求池，支持非阻塞问题直接入池、信息不足先追问 | 2026-06-23 |
 | `wes-qoder-worktree-protocol` | ✅ 已发布 | v1.0.0 | 约束 Qoder 在 WES 中使用隔离 worktree 执行需求池/Loop 任务，并按 Worktree Contract ACK 与 handoff 模板回填 | 2026-06-26 |
 | `workload-api-external-agent` | ✅ 已发布 | v1.0.0 | 外部 Agent（Kimiclaw 等）接入 WES API 的完整配置与演示 | 2026-05-07 |
