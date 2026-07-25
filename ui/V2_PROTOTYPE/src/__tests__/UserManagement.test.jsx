@@ -15,7 +15,7 @@ describe('UserManagement', () => {
     const editArch = await screen.findByRole('button', { name: '编辑 arch' })
 
     expect(screen.queryByText(/已选 0/)).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '+ 邀请成员' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ 邀请成员' })).toBeInTheDocument()
 
     fireEvent.click(editArch)
 
@@ -427,6 +427,7 @@ describe('UserManagement', () => {
   })
 
   test('excludes locked users from shift-range selection and bulk targets', async () => {
+    const statusCalls = []
     server.use(
       http.get(`${BASE}/auth/users`, () => HttpResponse.json({
         success: true,
@@ -437,7 +438,18 @@ describe('UserManagement', () => {
             { id: 'u-omega', username: 'omega', email: 'omega@wes.local', role: 'user', status: 'active', locked: false },
           ],
         },
-      }))
+      })),
+      http.patch(`${BASE}/auth/users/:userId/status`, async ({ params, request }) => {
+        statusCalls.push({
+          userId: params.userId,
+          body: await request.json(),
+        })
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: { id: params.userId } },
+        })
+      })
     )
 
     render(<MemoryRouter><UserManagement /></MemoryRouter>)
@@ -453,9 +465,305 @@ describe('UserManagement', () => {
     expect(lockedRow).not.toHaveStyle({ background: 'var(--brand-soft)' })
 
     fireEvent.click(screen.getByRole('button', { name: '批量禁用' }))
-    expect(within(firstRow).getByText('已禁用')).toBeInTheDocument()
-    expect(within(thirdRow).getByText('已禁用')).toBeInTheDocument()
+    const statusDialog = screen.getByRole('dialog', { name: '批量禁用' })
+    expect(within(statusDialog).getByText('alpha')).toBeInTheDocument()
+    expect(within(statusDialog).getByText('omega')).toBeInTheDocument()
+    fireEvent.click(within(statusDialog).getByRole('button', { name: '确认禁用' }))
+
+    await screen.findByText('批量禁用：成功 2 人')
+    expect(statusCalls).toEqual([
+      { userId: 'u-alpha', body: { status: 'disabled' } },
+      { userId: 'u-omega', body: { status: 'disabled' } },
+    ])
     expect(within(lockedRow).getByText('正常')).toBeInTheDocument()
+  })
+
+  test('persists bulk role changes sequentially and reports partial failures by username', async () => {
+    const users = [
+      { id: 'u1', username: 'admin', role: 'admin', businessRole: 'admin', status: 'active' },
+      { id: 'u2', username: 'pm', role: 'sub_admin', businessRole: 'pm', status: 'active' },
+      { id: 'u3', username: 'arch', role: 'user', businessRole: 'pre_sales', status: 'active' },
+    ]
+    const patched = []
+    let getCount = 0
+    server.use(
+      http.get(`${BASE}/auth/users`, () => {
+        getCount += 1
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { users },
+        })
+      }),
+      http.patch(`${BASE}/auth/users/:userId/role`, async ({ params, request }) => {
+        patched.push({
+          userId: params.userId,
+          body: await request.json(),
+        })
+        if (params.userId === 'u3') {
+          return HttpResponse.json(
+            { code: 50001, message: '模拟失败' },
+            { status: 500 }
+          )
+        }
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: { id: params.userId } },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: '选择 pm' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '选择 arch' }))
+    fireEvent.click(screen.getByRole('button', { name: '改系统角色' }))
+    const roleDialog = screen.getByRole('dialog', { name: '修改系统角色' })
+    fireEvent.click(within(roleDialog).getByRole('radio', { name: '普通用户' }))
+    fireEvent.click(within(roleDialog).getByRole('button', { name: '确认修改' }))
+
+    await screen.findByText('修改系统角色：成功 1 人，失败 1 人：arch')
+    expect(patched).toEqual([
+      { userId: 'u2', body: { role: 'user' } },
+      { userId: 'u3', body: { role: 'user' } },
+    ])
+    expect(getCount).toBe(2)
+    expect(screen.queryByRole('dialog', { name: '修改系统角色' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument()
+  })
+
+  test('uses a stable bulk target snapshot and locks overlapping controls while submitting', async () => {
+    const calls = []
+    let releaseFirstPatch
+    server.use(
+      http.patch(`${BASE}/auth/users/:userId/business-role`, async ({ params, request }) => {
+        calls.push({
+          userId: params.userId,
+          body: await request.json(),
+        })
+        if (params.userId === 'u2') {
+          await new Promise((resolve) => {
+            releaseFirstPatch = resolve
+          })
+        }
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: { id: params.userId } },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    const pmSelection = await screen.findByRole('checkbox', { name: '选择 pm' })
+    const archSelection = screen.getByRole('checkbox', { name: '选择 arch' })
+    fireEvent.click(pmSelection)
+    fireEvent.click(archSelection)
+    fireEvent.click(screen.getByRole('button', { name: '改业务角色' }))
+    const businessRoleDialog = screen.getByRole('dialog', { name: '修改业务角色' })
+    fireEvent.click(within(businessRoleDialog).getByRole('radio', { name: /^销售员/ }))
+    fireEvent.click(within(businessRoleDialog).getByRole('button', { name: '确认修改' }))
+
+    await waitFor(() => {
+      expect(calls).toEqual([
+        { userId: 'u2', body: { businessRole: 'sales' } },
+      ])
+      expect(releaseFirstPatch).toEqual(expect.any(Function))
+    })
+    expect(within(businessRoleDialog).getByRole('button', { name: '关闭修改业务角色' }))
+      .toBeDisabled()
+    expect(within(businessRoleDialog).getByRole('button', { name: '取消' })).toBeDisabled()
+    expect(within(businessRoleDialog).getByRole('button', { name: '修改中…' })).toBeDisabled()
+    expect(pmSelection).toBeDisabled()
+    expect(archSelection).toBeDisabled()
+    expect(screen.getByRole('button', { name: '+ 邀请成员' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '编辑 arch' })).toBeDisabled()
+
+    fireEvent.click(archSelection)
+    releaseFirstPatch()
+
+    await screen.findByText('修改业务角色：成功 2 人')
+    expect(calls).toEqual([
+      { userId: 'u2', body: { businessRole: 'sales' } },
+      { userId: 'u3', body: { businessRole: 'sales' } },
+    ])
+  })
+
+  test('warns when bulk reconciliation fails without erasing the last valid users', async () => {
+    const users = [
+      { id: 'u3', username: 'arch', role: 'user', businessRole: 'pre_sales', status: 'active' },
+    ]
+    let getCount = 0
+    server.use(
+      http.get(`${BASE}/auth/users`, () => {
+        getCount += 1
+        if (getCount === 2) {
+          return HttpResponse.json(
+            { code: 50002, message: '刷新失败' },
+            { status: 500 }
+          )
+        }
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { users },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: '选择 arch' }))
+    fireEvent.click(screen.getByRole('button', { name: '改系统角色' }))
+    const roleDialog = screen.getByRole('dialog', { name: '修改系统角色' })
+    fireEvent.click(within(roleDialog).getByRole('radio', { name: '管理员' }))
+    fireEvent.click(within(roleDialog).getByRole('button', { name: '确认修改' }))
+
+    const notice = await screen.findByRole('status')
+    expect(notice).toHaveTextContent('修改系统角色：成功 1 人')
+    expect(notice).toHaveTextContent('服务器状态刷新失败，当前显示可能过期：刷新失败')
+    expect(screen.getByText('arch')).toBeInTheDocument()
+    expect(getCount).toBe(2)
+  })
+
+  test('summarizes the first three bulk targets and the remaining count', async () => {
+    server.use(
+      http.get(`${BASE}/auth/users`, () => HttpResponse.json({
+        code: 0,
+        message: 'ok',
+        data: {
+          users: [
+            { id: 'u-a', username: 'alpha', role: 'user', status: 'active' },
+            { id: 'u-b', username: 'bravo', role: 'user', status: 'active' },
+            { id: 'u-c', username: 'charlie', role: 'user', status: 'active' },
+            { id: 'u-d', username: 'delta', role: 'user', status: 'active' },
+          ],
+        },
+      }))
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: '选择全部可见用户' }))
+    fireEvent.click(screen.getByRole('button', { name: '批量禁用' }))
+    const statusDialog = screen.getByRole('dialog', { name: '批量禁用' })
+
+    expect(within(statusDialog).getByText('已选 4 人')).toBeInTheDocument()
+    for (const username of ['alpha', 'bravo', 'charlie']) {
+      expect(within(statusDialog).getByText(username)).toBeInTheDocument()
+    }
+    expect(within(statusDialog).queryByText('delta')).not.toBeInTheDocument()
+    expect(within(statusDialog).getByText('还有 1 人')).toBeInTheDocument()
+  })
+
+  test('generates and displays an invite code with copy feedback', async () => {
+    server.use(
+      http.post(`${BASE}/auth/invite-codes/generate`, () => HttpResponse.json({
+        code: 0,
+        message: 'ok',
+        data: {
+          code: {
+            code: 'WES-ABCD',
+            status: 'active',
+            createdAt: '2026-07-26T01:00:00.000Z',
+          },
+        },
+      }))
+    )
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '+ 邀请成员' }))
+    const inviteDialog = await screen.findByRole('dialog', { name: '成员邀请码' })
+    expect(inviteDialog).toHaveTextContent('WES-ABCD')
+    expect(within(inviteDialog).getByText('当前状态：有效')).toBeInTheDocument()
+    expect(within(inviteDialog).getByText(/创建时间/)).toBeInTheDocument()
+    expect(within(inviteDialog).queryByText(/过期/)).not.toBeInTheDocument()
+    fireEvent.click(within(inviteDialog).getByRole('button', { name: '复制邀请码' }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('WES-ABCD'))
+    expect(within(inviteDialog).getByRole('status')).toHaveTextContent('已复制')
+  })
+
+  test('locks invite, editing, selection, and bulk entry points while generating a code', async () => {
+    let releaseInvite
+    let inviteCalls = 0
+    server.use(
+      http.post(`${BASE}/auth/invite-codes/generate`, async () => {
+        inviteCalls += 1
+        await new Promise((resolve) => {
+          releaseInvite = resolve
+        })
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: {
+            code: {
+              code: 'WES-LOCK',
+              status: 'active',
+              createdAt: '2026-07-26T01:00:00.000Z',
+            },
+          },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    const archSelection = await screen.findByRole('checkbox', { name: '选择 arch' })
+    fireEvent.click(archSelection)
+    fireEvent.click(screen.getByRole('button', { name: '+ 邀请成员' }))
+
+    await waitFor(() => {
+      expect(releaseInvite).toEqual(expect.any(Function))
+      expect(screen.getByRole('button', { name: '生成中…' })).toBeDisabled()
+    })
+    expect(archSelection).toBeDisabled()
+    expect(screen.getByRole('button', { name: '改系统角色' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '编辑 arch' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '生成中…' }))
+    expect(inviteCalls).toBe(1)
+
+    releaseInvite()
+    expect(await screen.findByRole('dialog', { name: '成员邀请码' }))
+      .toHaveTextContent('WES-LOCK')
+  })
+
+  test('reports clipboard and invite generation failures without browser alerts', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('clipboard denied'))
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '+ 邀请成员' }))
+    let inviteDialog = await screen.findByRole('dialog', { name: '成员邀请码' })
+    fireEvent.click(within(inviteDialog).getByRole('button', { name: '复制邀请码' }))
+    expect(await within(inviteDialog).findByRole('status'))
+      .toHaveTextContent('复制失败，请手动复制')
+    fireEvent.click(within(inviteDialog).getByRole('button', { name: '关闭' }))
+
+    server.use(
+      http.post(`${BASE}/auth/invite-codes/generate`, () => HttpResponse.json(
+        { code: 50003, message: '邀请码服务失败' },
+        { status: 500 }
+      ))
+    )
+    fireEvent.click(screen.getByRole('button', { name: '+ 邀请成员' }))
+
+    const notice = await screen.findByRole('status')
+    expect(notice).toHaveTextContent('邀请码服务失败')
+    expect(screen.queryByRole('dialog', { name: '成员邀请码' })).not.toBeInTheDocument()
+    expect(window.alert).not.toHaveBeenCalled()
   })
 
   test('disables select-all when only locked users are visible', async () => {
@@ -729,6 +1037,7 @@ describe('UserManagement', () => {
 
     render(<MemoryRouter><UserManagement /></MemoryRouter>)
 
+    fireEvent.click(await screen.findByRole('checkbox', { name: '选择 pm' }))
     fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
     let editor = screen.getByRole('dialog', { name: '编辑用户' })
     fireEvent.change(within(editor).getByLabelText('业务角色'), {
@@ -739,6 +1048,8 @@ describe('UserManagement', () => {
     await waitFor(() => {
       expect(releasePatch).toEqual(expect.any(Function))
     })
+    expect(screen.getByRole('button', { name: '+ 邀请成员' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '改系统角色' })).toBeDisabled()
     fireEvent.click(within(editor).getByRole('button', { name: '关闭编辑用户' }))
     fireEvent.click(
       within(screen.getByRole('dialog', { name: '放弃未保存修改' }))

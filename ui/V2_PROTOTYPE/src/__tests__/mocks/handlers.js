@@ -180,6 +180,17 @@ export const handlers = [
       },
     },
   })),
+  http.post(`${BASE}/auth/invite-codes/generate`, () => HttpResponse.json({
+    code: 0,
+    message: 'ok',
+    data: {
+      code: {
+        code: 'WES-TEST',
+        status: 'active',
+        createdAt: '2026-07-26T01:00:00.000Z',
+      },
+    },
+  })),
   http.post(`${BASE}/ai/parse-basic-info`, () => HttpResponse.json({
     success: true,
     data: {

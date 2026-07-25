@@ -5,6 +5,7 @@ import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
 import useUsers, { BUSINESS_ROLES, businessRoleLabel } from '../hooks/useUsers.js'
 import useRoleCapabilities from '../hooks/useRoleCapabilities.js'
 import {
+  generateInviteCode,
   resetUserPassword,
   updateUserBusinessRole,
   updateUserRole,
@@ -36,6 +37,40 @@ function systemRoleLabel(role) {
 
 function statusLabel(status) {
   return status === 'active' ? '正常' : status === 'disabled' ? '已禁用' : status
+}
+
+function formatDateTime(value) {
+  return value
+    ? new Date(value).toLocaleString('zh-CN', { hour12: false })
+    : '—'
+}
+
+function BulkTargetSummary({ users }) {
+  const visibleUsers = users.slice(0, 3)
+  const remaining = Math.max(0, users.length - visibleUsers.length)
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gap: 8,
+        marginBottom: 14,
+        padding: '10px 12px',
+        border: '1px solid var(--line)',
+        borderRadius: 'var(--r-md)',
+        background: 'var(--bg-soft)',
+        fontSize: 12,
+      }}
+    >
+      <strong>已选 {users.length} 人</strong>
+      <ul style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: 0, padding: 0, listStyle: 'none' }}>
+        {visibleUsers.map((user) => (
+          <li key={user.id} className="tag">{user.username}</li>
+        ))}
+      </ul>
+      {remaining > 0 ? <span style={{ color: 'var(--ink-2)' }}>还有 {remaining} 人</span> : null}
+    </div>
+  )
 }
 
 function requiresTypedRiskPhrase(pendingSave) {
@@ -140,7 +175,9 @@ export default function UserManagement() {
   const [dialog, setDialog] = useState(null)
   const [pendingRole, setPendingRole] = useState('')
   const [pendingBusinessRole, setPendingBusinessRole] = useState('')
-  const [demoteConfirm, setDemoteConfirm] = useState('')
+  const [pendingStatus, setPendingStatus] = useState('')
+  const [bulkSubmitting, setBulkSubmitting] = useState(false)
+  const [bulkTargetSnapshot, setBulkTargetSnapshot] = useState([])
   const [riskPhrase, setRiskPhrase] = useState('')
   const [savingUserId, setSavingUserId] = useState(null)
   const [reloadingEditor, setReloadingEditor] = useState(false)
@@ -150,10 +187,15 @@ export default function UserManagement() {
   const [passwordMessage, setPasswordMessage] = useState(null)
   const [passwordSubmitting, setPasswordSubmitting] = useState(false)
   const [pageNotice, setPageNotice] = useState(null)
+  const [inviteRecord, setInviteRecord] = useState(null)
+  const [inviteSubmitting, setInviteSubmitting] = useState(false)
+  const [inviteCopyMessage, setInviteCopyMessage] = useState('')
   const editorOperationRef = useRef(0)
   const passwordOperationRef = useRef(0)
   const currentEditingUserIdRef = useRef(null)
   const saveSequenceRef = useRef(null)
+  const bulkOperationRef = useRef(false)
+  const inviteOperationRef = useRef(false)
 
   useEffect(() => {
     setUsers(loadedUsers)
@@ -202,7 +244,14 @@ export default function UserManagement() {
   // ---------- PB-R1 标准行选择 ----------
   const handleRowClick = useCallback(
     (e, row, idx) => {
-      if (row.locked) return
+      if (
+        row.locked
+        || saveSequenceRef.current
+        || reloadingEditor
+        || passwordSubmitting
+        || bulkOperationRef.current
+        || inviteOperationRef.current
+      ) return
       const id = row.id
       if (e.shiftKey && anchorId !== null && visibleIds.includes(anchorId)) {
         const a = visibleIds.indexOf(anchorId)
@@ -227,10 +276,17 @@ export default function UserManagement() {
         setAnchorId(id)
       }
     },
-    [anchorId, filtered, visibleIds]
+    [anchorId, filtered, passwordSubmitting, reloadingEditor, visibleIds]
   )
 
   const toggleOne = useCallback((id) => {
+    if (
+      saveSequenceRef.current
+      || reloadingEditor
+      || passwordSubmitting
+      || bulkOperationRef.current
+      || inviteOperationRef.current
+    ) return
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -238,7 +294,7 @@ export default function UserManagement() {
       return next
     })
     setAnchorId(id)
-  }, [])
+  }, [passwordSubmitting, reloadingEditor])
 
   const clearSelection = () => {
     setSelected(new Set())
@@ -250,60 +306,165 @@ export default function UserManagement() {
     () => filtered.filter((u) => selected.has(u.id)),
     [filtered, selected]
   )
+  const bulkDialogTargets = bulkSubmitting ? bulkTargetSnapshot : selectedRows
+  const globalOperationLocked = Boolean(
+    savingUserId
+    || reloadingEditor
+    || passwordSubmitting
+    || bulkSubmitting
+    || inviteSubmitting
+  )
 
   // ---------- 批量操作 ----------
-  const applyStatus = (status) => {
-    setUsers((prev) =>
-      prev.map((u) => (selected.has(u.id) ? { ...u, status } : u))
-    )
+  const hasConflictingOperation = () => Boolean(
+    saveSequenceRef.current
+    || reloadingEditor
+    || passwordSubmitting
+    || bulkOperationRef.current
+    || inviteOperationRef.current
+  )
+
+  const closeBulkDialog = () => {
+    if (bulkOperationRef.current) return
+    setDialog(null)
+    setPendingRole('')
+    setPendingBusinessRole('')
+    setPendingStatus('')
+    setBulkTargetSnapshot([])
+  }
+
+  const runBulkUpdate = async ({ label, run }) => {
+    if (hasConflictingOperation()) return
+    const targetSnapshot = [...selectedRows]
+    if (targetSnapshot.length === 0) return
+
+    bulkOperationRef.current = true
+    setBulkTargetSnapshot(targetSnapshot)
+    setBulkSubmitting(true)
+    setPageNotice(null)
+    const succeeded = []
+    const failed = []
+    let reloadError = null
+
+    try {
+      for (const user of targetSnapshot) {
+        try {
+          await run(user)
+          succeeded.push(user.username)
+        } catch (error) {
+          failed.push({
+            username: user.username,
+            message: error?.message || '请求失败',
+          })
+        }
+      }
+
+      try {
+        await reload()
+      } catch (error) {
+        reloadError = error
+      }
+
+      const resultText = failed.length > 0
+        ? `${label}：成功 ${succeeded.length} 人，失败 ${failed.length} 人：${failed.map((item) => item.username).join('、')}`
+        : `${label}：成功 ${succeeded.length} 人`
+      const reloadWarning = reloadError
+        ? `；服务器状态刷新失败，当前显示可能过期：${reloadError?.message || '请稍后重试'}`
+        : ''
+
+      setPageNotice({
+        kind: failed.length > 0 || reloadError ? 'error' : 'success',
+        text: `${resultText}${reloadWarning}`,
+      })
+      setDialog(null)
+      clearSelection()
+      setPendingRole('')
+      setPendingBusinessRole('')
+      setPendingStatus('')
+    } finally {
+      bulkOperationRef.current = false
+      setBulkSubmitting(false)
+      setBulkTargetSnapshot([])
+    }
   }
 
   const openSystemRoleDialog = () => {
-    if (selCount === 0) return
+    if (selCount === 0 || hasConflictingOperation()) return
     setPendingRole('user')
     setDialog('systemRole')
   }
 
   const openBusinessRoleDialog = () => {
-    if (selCount === 0) return
+    if (selCount === 0 || hasConflictingOperation()) return
     setPendingBusinessRole(selectedRows[0]?.businessRole || 'pre_sales')
     setDialog('businessRole')
   }
 
+  const openStatusDialog = (status) => {
+    if (selCount === 0 || hasConflictingOperation()) return
+    setPendingStatus(status)
+    setDialog('status')
+  }
+
   const confirmRole = () => {
-    const targetRole = pendingRole
-    const hasAdmin = selectedRows.some((u) => u.role === 'admin')
-    if (hasAdmin && targetRole !== 'admin') {
-      setDialog('demote')
-      return
-    }
-    applyRole(targetRole)
+    if (!pendingRole) return
+    void runBulkUpdate({
+      label: '修改系统角色',
+      run: (user) => updateUserRole(user.id, pendingRole),
+    })
   }
 
-  const applyRole = (targetRole) => {
-    setUsers((prev) =>
-      prev.map((u) => (selected.has(u.id) ? { ...u, role: targetRole } : u))
-    )
-    setDialog(null)
-    setPendingRole('')
-    setDemoteConfirm('')
+  const confirmBusinessRole = () => {
+    if (!pendingBusinessRole) return
+    void runBulkUpdate({
+      label: '修改业务角色',
+      run: (user) => updateUserBusinessRole(user.id, pendingBusinessRole),
+    })
   }
 
-  const applyBusinessRole = async () => {
-    const targetRole = pendingBusinessRole
-    const ids = Array.from(selected)
+  const confirmStatus = () => {
+    if (!pendingStatus) return
+    void runBulkUpdate({
+      label: pendingStatus === 'active' ? '批量启用' : '批量禁用',
+      run: (user) => updateUserStatus(user.id, pendingStatus),
+    })
+  }
+
+  const handleInviteMember = async () => {
+    if (hasConflictingOperation()) return
+    inviteOperationRef.current = true
+    setInviteSubmitting(true)
+    setPageNotice(null)
+    setInviteCopyMessage('')
     try {
-      for (const id of ids) {
-        await updateUserBusinessRole(id, targetRole)
-      }
-      setUsers((prev) => prev.map((u) => selected.has(u.id)
-        ? { ...u, businessRole: targetRole, businessRoleLabel: businessRoleLabel(targetRole) }
-        : u
-      ))
-      setDialog(null)
-      setPendingBusinessRole('')
-    } catch (err) {
-      alert(err?.message || '修改业务角色失败')
+      const record = await generateInviteCode()
+      setInviteRecord(record)
+      setDialog('invite')
+    } catch (error) {
+      setPageNotice({
+        kind: 'error',
+        text: error?.message || '生成邀请码失败',
+      })
+    } finally {
+      inviteOperationRef.current = false
+      setInviteSubmitting(false)
+    }
+  }
+
+  const closeInviteDialog = () => {
+    setDialog(null)
+    setInviteRecord(null)
+    setInviteCopyMessage('')
+  }
+
+  const copyInviteCode = async () => {
+    if (!inviteRecord?.code) return
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
+      await navigator.clipboard.writeText(inviteRecord.code)
+      setInviteCopyMessage('已复制')
+    } catch (_) {
+      setInviteCopyMessage('复制失败，请手动复制')
     }
   }
 
@@ -347,7 +508,12 @@ export default function UserManagement() {
   }
 
   const openPasswordDialogForUser = (user) => {
-    if (!user || currentEditingUserIdRef.current !== user.id) return
+    if (
+      !user
+      || currentEditingUserIdRef.current !== user.id
+      || bulkOperationRef.current
+      || inviteOperationRef.current
+    ) return
     passwordOperationRef.current += 1
     setPasswordForm({ password: '', confirm: '' })
     setPasswordMessage(null)
@@ -409,7 +575,11 @@ export default function UserManagement() {
   }
 
   const openUserEditor = (user) => {
-    if (saveSequenceRef.current?.userId === user.id) return
+    if (
+      saveSequenceRef.current?.userId === user.id
+      || bulkOperationRef.current
+      || inviteOperationRef.current
+    ) return
     editorOperationRef.current += 1
     passwordOperationRef.current += 1
     currentEditingUserIdRef.current = user.id
@@ -509,7 +679,10 @@ export default function UserManagement() {
       if (!isEditorOperationActive(operation)) return
       if (result.ok) {
         setPendingSave(null)
-        setPageNotice(`已保存 ${payload.original.username}`)
+        setPageNotice({
+          kind: 'success',
+          text: `已保存 ${payload.original.username}`,
+        })
         closeUserEditor()
       } else {
         setEditorMessage(result.message)
@@ -566,7 +739,11 @@ export default function UserManagement() {
   }
 
   const startUserSave = (payload) => {
-    if (saveSequenceRef.current) return false
+    if (
+      saveSequenceRef.current
+      || bulkOperationRef.current
+      || inviteOperationRef.current
+    ) return false
     const saveSequence = { userId: payload.userId }
     saveSequenceRef.current = saveSequence
     setSavingUserId(payload.userId)
@@ -603,14 +780,6 @@ export default function UserManagement() {
     setPendingSave(null)
     setRiskPhrase('')
     startUserSave(payload)
-  }
-
-  const confirmDemote = () => {
-    if (demoteConfirm !== '我确定') {
-      alert('请输入“我确定”以确认降级操作')
-      return
-    }
-    applyRole(pendingRole)
   }
 
   // ---------- 辅助 ----------
@@ -657,11 +826,25 @@ export default function UserManagement() {
       crumb="工作台 / 用户管理"
       title="用户管理"
       subtitle="用户、角色与状态管理"
-      actions={[]}
+      actions={[
+        <button
+          key="invite"
+          type="button"
+          className="btn btn-pri"
+          disabled={globalOperationLocked}
+          onClick={handleInviteMember}
+        >
+          {inviteSubmitting ? '生成中…' : '+ 邀请成员'}
+        </button>,
+      ]}
     >
       {pageNotice ? (
-        <div className="user-editor__message" data-kind="success" role="status">
-          {pageNotice}
+        <div
+          className="user-editor__message"
+          data-kind={pageNotice.kind || 'success'}
+          role="status"
+        >
+          {pageNotice.text || pageNotice}
         </div>
       ) : null}
       <div className="section" style={{ margin: 0 }}>
@@ -671,6 +854,7 @@ export default function UserManagement() {
             <select
               className="input"
               value={roleFilter}
+              disabled={globalOperationLocked}
               onChange={(event) => setRoleFilter(event.target.value)}
             >
               <option value="all">全部</option>
@@ -684,6 +868,7 @@ export default function UserManagement() {
             <select
               className="input"
               value={statusFilter}
+              disabled={globalOperationLocked}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
               <option value="all">全部</option>
@@ -697,6 +882,7 @@ export default function UserManagement() {
             aria-label="搜索用户"
             placeholder="搜索用户名 / 邮箱"
             value={search}
+            disabled={globalOperationLocked}
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
@@ -708,29 +894,34 @@ export default function UserManagement() {
             aria-label="批量操作"
           >
             <strong>已选 {selCount} 人</strong>
-            <button type="button" className="btn btn-ghost" onClick={clearSelection}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={globalOperationLocked}
+              onClick={clearSelection}
+            >
               清除选择
             </button>
             <button type="button"
               className="btn btn-ghost"
               style={{ height: 28, fontSize: 12, padding: '0 10px' }}
-              disabled={!canBulkEnable}
-              onClick={() => applyStatus('active')}
+              disabled={!canBulkEnable || globalOperationLocked}
+              onClick={() => openStatusDialog('active')}
             >
               批量启用
             </button>
             <button type="button"
               className="btn btn-ghost"
               style={{ height: 28, fontSize: 12, padding: '0 10px', color: 'var(--err)' }}
-              disabled={!canBulkDisable}
-              onClick={() => applyStatus('disabled')}
+              disabled={!canBulkDisable || globalOperationLocked}
+              onClick={() => openStatusDialog('disabled')}
             >
               批量禁用
             </button>
             <button type="button"
               className="btn btn-ghost"
               style={{ height: 28, fontSize: 12, padding: '0 10px' }}
-              disabled={!canChangeRole}
+              disabled={!canChangeRole || globalOperationLocked}
               onClick={openSystemRoleDialog}
             >
               改系统角色
@@ -738,7 +929,7 @@ export default function UserManagement() {
             <button type="button"
               className="btn btn-ghost"
               style={{ height: 28, fontSize: 12, padding: '0 10px' }}
-              disabled={!canChangeRole}
+              disabled={!canChangeRole || globalOperationLocked}
               onClick={openBusinessRoleDialog}
             >
               改业务角色
@@ -758,7 +949,7 @@ export default function UserManagement() {
                     visibleSelectableRows.length > 0
                     && visibleSelectableRows.every((user) => selected.has(user.id))
                   }
-                  disabled={visibleSelectableRows.length === 0}
+                  disabled={visibleSelectableRows.length === 0 || globalOperationLocked}
                   onChange={(e) => {
                     const next = new Set(selected)
                     if (e.target.checked) {
@@ -799,6 +990,7 @@ export default function UserManagement() {
                         type="checkbox"
                         aria-label={`选择 ${u.username}`}
                         checked={isSel}
+                        disabled={globalOperationLocked}
                         onClick={(event) => event.stopPropagation()}
                         onChange={() => toggleOne(u.id)}
                       />
@@ -844,7 +1036,11 @@ export default function UserManagement() {
                         type="button"
                         className="btn btn-ghost"
                         aria-label={`编辑 ${u.username}`}
-                        disabled={savingUserId === u.id}
+                        disabled={
+                          savingUserId === u.id
+                          || bulkSubmitting
+                          || inviteSubmitting
+                        }
                         style={{ fontSize: 12, padding: '4px 10px', height: 28 }}
                         onClick={(event) => {
                           event.stopPropagation()
@@ -1044,9 +1240,11 @@ export default function UserManagement() {
       <Dialog
         open={dialog === 'systemRole'}
         title="修改系统角色"
-        description={`已选 ${selCount} 人`}
-        onClose={() => setDialog(null)}
+        closeOnBackdrop={false}
+        dismissDisabled={bulkSubmitting}
+        onClose={closeBulkDialog}
       >
+        <BulkTargetSummary users={bulkDialogTargets} />
         <div style={{ display: 'grid', gap: 8 }}>
           {ROLES.map((r) => (
             <label
@@ -1066,6 +1264,7 @@ export default function UserManagement() {
                 name="role"
                 value={r.key}
                 checked={pendingRole === r.key}
+                disabled={bulkSubmitting}
                 onChange={() => setPendingRole(r.key)}
                 style={{ marginTop: 4 }}
               />
@@ -1076,11 +1275,23 @@ export default function UserManagement() {
           ))}
         </div>
         <DialogActions>
-          <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+          <button
+            type="button"
+            className="btn btn-out"
+            style={{ height: 30, fontSize: 12, padding: '0 14px' }}
+            disabled={bulkSubmitting}
+            onClick={closeBulkDialog}
+          >
             取消
           </button>
-          <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmRole}>
-            确认修改
+          <button
+            type="button"
+            className="btn btn-pri"
+            style={{ height: 30, fontSize: 12, padding: '0 14px' }}
+            disabled={bulkSubmitting || !pendingRole}
+            onClick={confirmRole}
+          >
+            {bulkSubmitting ? '修改中…' : '确认修改'}
           </button>
         </DialogActions>
       </Dialog>
@@ -1089,9 +1300,11 @@ export default function UserManagement() {
       <Dialog
         open={dialog === 'businessRole'}
         title="修改业务角色"
-        description={`已选 ${selCount} 人`}
-        onClose={() => setDialog(null)}
+        closeOnBackdrop={false}
+        dismissDisabled={bulkSubmitting}
+        onClose={closeBulkDialog}
       >
+        <BulkTargetSummary users={bulkDialogTargets} />
         <div style={{ display: 'grid', gap: 8 }}>
           {BUSINESS_ROLES.map((r) => (
             <label
@@ -1111,6 +1324,7 @@ export default function UserManagement() {
                 name="businessRole"
                 value={r.key}
                 checked={pendingBusinessRole === r.key}
+                disabled={bulkSubmitting}
                 onChange={() => setPendingBusinessRole(r.key)}
                 style={{ marginTop: 4 }}
               />
@@ -1122,69 +1336,100 @@ export default function UserManagement() {
           ))}
         </div>
         <DialogActions>
-          <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+          <button
+            type="button"
+            className="btn btn-out"
+            style={{ height: 30, fontSize: 12, padding: '0 14px' }}
+            disabled={bulkSubmitting}
+            onClick={closeBulkDialog}
+          >
             取消
           </button>
-          <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={applyBusinessRole}>
-            确认修改
+          <button
+            type="button"
+            className="btn btn-pri"
+            style={{ height: 30, fontSize: 12, padding: '0 14px' }}
+            disabled={bulkSubmitting || !pendingBusinessRole}
+            onClick={confirmBusinessRole}
+          >
+            {bulkSubmitting ? '修改中…' : '确认修改'}
           </button>
         </DialogActions>
       </Dialog>
 
-      {/* 降权保护 dialog */}
       <Dialog
-        open={dialog === 'demote'}
-        title="⚠ 降权保护确认"
-        description="超级管理员降级为高风险操作"
+        open={dialog === 'status'}
+        title={pendingStatus === 'active' ? '批量启用' : '批量禁用'}
         closeOnBackdrop={false}
-        onClose={() => {
-          setDialog(null)
-          setDemoteConfirm('')
-        }}
+        dismissDisabled={bulkSubmitting}
+        onClose={closeBulkDialog}
       >
-        <div
-          style={{
-            background: 'var(--err-soft)',
-            border: '1px solid var(--err)',
-            borderRadius: 'var(--r-md)',
-            padding: '12px 14px',
-            marginBottom: 12,
-            fontSize: 13,
-            color: 'var(--err)',
-          }}
-        >
-          你正在将超级管理员降级为较低权限角色。该操作不可逆，可能导致系统管理权限丢失。
-        </div>
-        <label style={{ display: 'grid', gap: 8, fontSize: 13, color: 'var(--ink-2)' }}>
-          <span>输入“我确定”</span>
-          <input
-            className="input"
-            type="text"
-            value={demoteConfirm}
-            onChange={(event) => setDemoteConfirm(event.target.value)}
-            placeholder="我确定"
-          />
-        </label>
+        <BulkTargetSummary users={bulkDialogTargets} />
+        <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 13 }}>
+          {pendingStatus === 'active'
+            ? '确认启用这些用户？完成后他们可以重新登录系统。'
+            : '确认禁用这些用户？完成后他们将无法登录系统。'}
+        </p>
         <DialogActions>
           <button
             type="button"
             className="btn btn-out"
             style={{ height: 30, fontSize: 12, padding: '0 14px' }}
-            onClick={() => {
-              setDialog(null)
-              setDemoteConfirm('')
-            }}
+            disabled={bulkSubmitting}
+            onClick={closeBulkDialog}
           >
             取消
           </button>
           <button
             type="button"
-            className="btn btn-dan"
+            className={pendingStatus === 'disabled' ? 'btn btn-dan' : 'btn btn-pri'}
             style={{ height: 30, fontSize: 12, padding: '0 14px' }}
-            disabled={demoteConfirm !== '我确定'}
-            onClick={confirmDemote}
+            disabled={bulkSubmitting || !pendingStatus}
+            onClick={confirmStatus}
           >
-            确认降级
+            {bulkSubmitting
+              ? '修改中…'
+              : pendingStatus === 'active' ? '确认启用' : '确认禁用'}
+          </button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={dialog === 'invite'}
+        title="成员邀请码"
+        description="发送给待加入成员，注册后该邀请码会被使用"
+        closeOnBackdrop={false}
+        onClose={closeInviteDialog}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gap: 10,
+            padding: '14px',
+            border: '1px solid var(--line)',
+            borderRadius: 'var(--r-md)',
+            background: 'var(--bg-soft)',
+          }}
+        >
+          <code style={{ fontSize: 20, fontWeight: 700 }}>{inviteRecord?.code}</code>
+          <span>当前状态：{inviteRecord?.status === 'active' ? '有效' : '已使用'}</span>
+          <span>创建时间：{formatDateTime(inviteRecord?.createdAt)}</span>
+        </div>
+        {inviteCopyMessage ? (
+          <div
+            className="user-editor__message"
+            data-kind={inviteCopyMessage === '已复制' ? 'success' : 'error'}
+            role="status"
+          >
+            {inviteCopyMessage}
+          </div>
+        ) : null}
+        <DialogActions>
+          <button type="button" className="btn btn-out" onClick={closeInviteDialog}>
+            关闭
+          </button>
+          <button type="button" className="btn btn-pri" onClick={copyInviteCode}>
+            复制邀请码
           </button>
         </DialogActions>
       </Dialog>
