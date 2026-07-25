@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef } from 'react'
 
 const FOCUSABLE_SELECTOR = [
-  'a[href]',
+  'a[href]:not([tabindex="-1"])',
   'button:not([disabled]):not([tabindex="-1"])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
+  'input:not([disabled]):not([tabindex="-1"])',
+  'select:not([disabled]):not([tabindex="-1"])',
+  'textarea:not([disabled]):not([tabindex="-1"])',
+  '[tabindex]:not([disabled]):not([tabindex="-1"])',
 ].join(',')
 
 function getFocusableElements(container) {
@@ -28,30 +28,15 @@ export function Drawer({
   const descriptionId = useId()
   const surfaceRef = useRef(null)
   const openerRef = useRef(null)
-  const lastInteractionRef = useRef(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
-
-  useEffect(() => {
-    if (open) return undefined
-
-    const rememberClickTarget = (event) => {
-      if (event.target instanceof HTMLElement) {
-        lastInteractionRef.current = event.target
-      }
-    }
-    document.addEventListener('click', rememberClickTarget, true)
-    return () => document.removeEventListener('click', rememberClickTarget, true)
-  }, [open])
 
   useEffect(() => {
     if (!open) return undefined
 
     const surface = surfaceRef.current
     const previousOverflow = document.body.style.overflow
-    openerRef.current = document.activeElement === document.body
-      ? lastInteractionRef.current
-      : document.activeElement
+    openerRef.current = document.activeElement
     document.body.style.overflow = 'hidden'
 
     const focusTarget = initialFocusRef?.current

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { describe, expect, test } from 'vitest'
 import { Drawer } from '../components/ui/Drawer.jsx'
 
@@ -32,6 +32,39 @@ function DrawerHarness({ closeOnBackdrop = true }) {
   )
 }
 
+function ProgrammaticDrawerHarness() {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const openDrawer = () => setOpen(true)
+    document.addEventListener('open-programmatic-drawer', openDrawer)
+    return () => document.removeEventListener('open-programmatic-drawer', openDrawer)
+  }, [])
+
+  return (
+    <>
+      <button type="button">陈旧目标</button>
+      <Drawer
+        open={open}
+        title="编辑用户"
+        onClose={() => setOpen(false)}
+      >
+        <button type="button">重置密码</button>
+      </Drawer>
+    </>
+  )
+}
+
+function TabbableControlsHarness() {
+  return (
+    <Drawer open title="编辑用户" onClose={() => {}}>
+      <button type="button">有效控件</button>
+      <input aria-label="忽略的输入" tabIndex={-1} />
+      <button type="button" disabled tabIndex={0}>禁用控件</button>
+    </Drawer>
+  )
+}
+
 describe('Drawer', () => {
   test('opens with modal semantics, associations, close button, and initial focus', async () => {
     render(<DrawerHarness />)
@@ -48,12 +81,26 @@ describe('Drawer', () => {
   test('closes on Escape, unmounts, and restores focus to the opener', async () => {
     render(<DrawerHarness />)
     const opener = screen.getByRole('button', { name: '编辑 arch' })
+    opener.focus()
     fireEvent.click(opener)
 
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(opener).toHaveFocus()
+  })
+
+  test('restores the active body when a drawer opens programmatically', async () => {
+    render(<ProgrammaticDrawerHarness />)
+    fireEvent.click(screen.getByRole('button', { name: '陈旧目标' }))
+    document.body.focus()
+
+    fireEvent(document, new Event('open-programmatic-drawer'))
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(document.body).toHaveFocus()
+    expect(screen.getByRole('button', { name: '陈旧目标' })).not.toHaveFocus()
   })
 
   test('honors backdrop close policy and wraps Tab focus in both directions', () => {
@@ -77,5 +124,20 @@ describe('Drawer', () => {
     rerender(<DrawerHarness closeOnBackdrop />)
     fireEvent.click(screen.getByRole('dialog').parentElement)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  test('skips tabindex-negative and disabled controls when trapping focus', () => {
+    render(<TabbableControlsHarness />)
+    const drawer = screen.getByRole('dialog')
+    const closeButton = screen.getByRole('button', { name: '关闭编辑用户' })
+    const validControl = screen.getByRole('button', { name: '有效控件' })
+
+    validControl.focus()
+    fireEvent.keyDown(drawer, { key: 'Tab' })
+    expect(closeButton).toHaveFocus()
+
+    closeButton.focus()
+    fireEvent.keyDown(drawer, { key: 'Tab', shiftKey: true })
+    expect(validControl).toHaveFocus()
   })
 })
