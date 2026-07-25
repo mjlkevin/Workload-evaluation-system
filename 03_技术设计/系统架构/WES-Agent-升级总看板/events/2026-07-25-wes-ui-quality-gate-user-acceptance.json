@@ -1,0 +1,43 @@
+{
+  "id": "BE-2026-07-25-wes-ui-quality-gate-user-acceptance",
+  "date": "2026-07-25",
+  "type": "verification",
+  "scope": "RP-043 SystemManagement 共享 Dialog 试点用户验收与用户管理扩展设计",
+  "summary": "用户在实际使用后确认 SystemManagement 试点“效果很稳定”，并授权继续推进其他 UI 优化；该反馈记为整体验收通过，不替代 1440px/760px、逐项键盘路径和拖拽边界的独立观察记录。下一批已选定用户管理页面族，当前仅完成真实页面审计和三档方案对比，尚未修改业务代码。",
+  "status": "试点用户验收通过 / 侧栏编辑方向已确认 / 书面规格待复核",
+  "pages": ["requirements", "plan", "testing", "monitoring", "risks", "changes"],
+  "evidence": [
+    {
+      "kind": "user_feedback",
+      "ref": "2026-07-25 当前 Codex 任务",
+      "summary": "用户反馈“没问题，效果很稳定。可以推进到其他的UI优化中”。"
+    },
+    {
+      "kind": "browser",
+      "ref": "http://127.0.0.1:3002/users",
+      "summary": "复用有效管理员会话完成用户管理桌面、选中用户、系统角色弹窗、密码重置弹窗与 760px 窄屏状态审计；未提交任何业务变更。"
+    },
+    {
+      "kind": "dedup",
+      "ref": "ISS-2026-07-25-003 / RP-043",
+      "summary": "本次是 RP-043 既定 D 批“试点通过后扩展其他 Dialog”的下一页面族，不新增重复 Issue 或 RP。"
+    },
+    {
+      "kind": "design_candidate",
+      "ref": "用户管理三档方案：保守迁移 / 任务分层 / 侧栏编辑",
+      "summary": "已确认工具条任务层级混杂、本地弹窗缺少统一语义与键盘能力、关键操作目标用户上下文不足；用户已选择并确认 C 侧栏编辑，边界固定为角色与状态统一保存、高风险动作独立 Dialog、未保存关闭二次确认。"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/superpowers/specs/2026-07-25-wes-user-management-drawer-design.md",
+      "summary": "正式规格已固化页面分层、共享 Drawer、单用户保存状态机、高风险确认、批量操作、邀请行为恢复、OpenAPI 对齐、TDD 与浏览器验收口径；等待用户复核书面规格。"
+    }
+  ],
+  "next": "等待用户复核书面设计规格；明确通过后再编写实施计划，实施计划完成前不修改业务 UI。",
+  "board": {
+    "change": {
+      "stage": "RP-043 用户验收与下一批设计",
+      "result": "试点用户验收通过 / 侧栏编辑规格待复核"
+    }
+  }
+}
