@@ -1,0 +1,33 @@
+{
+  "id": "BE-2026-07-25-wes-ui-quality-gate-design",
+  "date": "2026-07-25",
+  "type": "requirement_intake",
+  "scope": "RP-043 WES UI 质量门禁与系统管理试点设计",
+  "summary": "完成 ibelick/ui-skills 适配评估，将用户批准的 UI 优化方向按 Issue-first 分诊为 RP-043，并形成不迁移技术栈、先建立项目内 Skill、再以系统管理共享 Dialog 试点的书面设计。",
+  "status": "设计完成 / 待用户复核",
+  "pages": ["index", "issues", "requirements", "plan", "risks", "changes", "sources"],
+  "evidence": [
+    {
+      "kind": "artifact",
+      "ref": "docs/superpowers/specs/2026-07-25-wes-ui-quality-gate-design.md",
+      "summary": "记录方案对比、WES 覆盖规则、Skill 架构、系统管理 Dialog 试点、红绿验证和验收口径。"
+    },
+    {
+      "kind": "source",
+      "ref": "https://github.com/ibelick/ui-skills/tree/ae74b58e722abe7ddf5948e07dd220808acce8a9",
+      "summary": "上游评估固定到提交 ae74b58e722abe7ddf5948e07dd220808acce8a9，许可证为 MIT。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/package.json; ui/V2_PROTOTYPE/tokens.css; ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx",
+      "summary": "确认 WES 主线为 Vite + React + 既有 CSS Token，系统管理存在页面内 Dialog helper，试点无需新增 UI 依赖。"
+    }
+  ],
+  "next": "用户复核书面规格；获批后编写实施计划，先完成 Skill RED/GREEN 压力验证，再以测试驱动方式实现共享 Dialog 与 SystemManagement 迁移。",
+  "board": {
+    "change": {
+      "stage": "RP-043 UI 质量门禁设计",
+      "result": "设计完成 / 待用户复核"
+    }
+  }
+}
