@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import UserManagement, * as UserManagementModule from '../pages/UserManagement.jsx'
 import { server } from './mocks/server.js'
 
@@ -269,6 +269,7 @@ describe('UserManagement', () => {
   test('risk confirmation requires the exact phrase for admin demotion', () => {
     const RiskConfirmationDialog = UserManagementModule.RiskConfirmationDialog
     expect(RiskConfirmationDialog).toEqual(expect.any(Function))
+    const onConfirm = vi.fn()
     const pendingSave = {
       userId: 'admin-user',
       original: {
@@ -293,7 +294,7 @@ describe('UserManagement', () => {
           riskPhrase = value
         }}
         onCancel={() => {}}
-        onConfirm={() => {}}
+        onConfirm={onConfirm}
       />
     )
 
@@ -302,7 +303,7 @@ describe('UserManagement', () => {
     expect(within(riskDialog).getByText('超级管理员 → 普通用户')).toBeInTheDocument()
     expect(within(riskDialog).getByRole('button', { name: '确认风险变更' })).toBeDisabled()
 
-    fireEvent.change(phrase, { target: { value: '我确定' } })
+    fireEvent.change(phrase, { target: { value: ' 我确定 ' } })
     rerender(
       <RiskConfirmationDialog
         open
@@ -312,11 +313,52 @@ describe('UserManagement', () => {
           riskPhrase = value
         }}
         onCancel={() => {}}
-        onConfirm={() => {}}
+        onConfirm={onConfirm}
+      />
+    )
+    riskDialog = screen.getByRole('dialog', { name: '确认风险变更' })
+    fireEvent.click(within(riskDialog).getByRole('button', { name: '确认风险变更' }))
+    expect(within(riskDialog).getByRole('button', { name: '确认风险变更' })).toBeDisabled()
+    expect(onConfirm).not.toHaveBeenCalled()
+
+    fireEvent.change(within(riskDialog).getByLabelText('输入“我确定”'), {
+      target: { value: '我确认' },
+    })
+    rerender(
+      <RiskConfirmationDialog
+        open
+        pendingSave={pendingSave}
+        riskPhrase={riskPhrase}
+        onPhraseChange={(value) => {
+          riskPhrase = value
+        }}
+        onCancel={() => {}}
+        onConfirm={onConfirm}
+      />
+    )
+    riskDialog = screen.getByRole('dialog', { name: '确认风险变更' })
+    expect(within(riskDialog).getByRole('button', { name: '确认风险变更' })).toBeDisabled()
+    expect(onConfirm).not.toHaveBeenCalled()
+
+    fireEvent.change(within(riskDialog).getByLabelText('输入“我确定”'), {
+      target: { value: '我确定' },
+    })
+    rerender(
+      <RiskConfirmationDialog
+        open
+        pendingSave={pendingSave}
+        riskPhrase={riskPhrase}
+        onPhraseChange={(value) => {
+          riskPhrase = value
+        }}
+        onCancel={() => {}}
+        onConfirm={onConfirm}
       />
     )
     riskDialog = screen.getByRole('dialog', { name: '确认风险变更' })
     expect(within(riskDialog).getByRole('button', { name: '确认风险变更' })).toBeEnabled()
+    fireEvent.click(within(riskDialog).getByRole('button', { name: '确认风险变更' }))
+    expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
   test('gives search a persistent accessible name', async () => {

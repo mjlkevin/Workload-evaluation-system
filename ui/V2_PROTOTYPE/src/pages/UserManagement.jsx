@@ -110,7 +110,7 @@ export function RiskConfirmationDialog({
         <button
           type="button"
           className="btn btn-dan"
-          disabled={requiresTypedPhrase && riskPhrase.trim() !== '我确定'}
+          disabled={requiresTypedPhrase && riskPhrase !== '我确定'}
           onClick={onConfirm}
         >
           确认风险变更
@@ -596,7 +596,7 @@ export default function UserManagement() {
   const confirmRiskSave = () => {
     const payload = pendingSave
     if (!payload || saveSequenceRef.current) return
-    if (requiresTypedRiskPhrase(payload) && riskPhrase.trim() !== '我确定') return
+    if (requiresTypedRiskPhrase(payload) && riskPhrase !== '我确定') return
 
     setDialog(null)
     setPendingSave(null)
@@ -605,7 +605,7 @@ export default function UserManagement() {
   }
 
   const confirmDemote = () => {
-    if (demoteConfirm.trim() !== '我确定') {
+    if (demoteConfirm !== '我确定') {
       alert('请输入“我确定”以确认降级操作')
       return
     }
@@ -1178,7 +1178,7 @@ export default function UserManagement() {
             type="button"
             className="btn btn-dan"
             style={{ height: 30, fontSize: 12, padding: '0 14px' }}
-            disabled={demoteConfirm.trim() !== '我确定'}
+            disabled={demoteConfirm !== '我确定'}
             onClick={confirmDemote}
           >
             确认降级
