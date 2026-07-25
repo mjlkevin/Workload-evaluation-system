@@ -3,8 +3,8 @@
   "date": "2026-07-25",
   "type": "verification",
   "scope": "RP-043 SystemManagement 共享 Dialog 试点用户验收与用户管理扩展设计",
-  "summary": "用户在实际使用后确认 SystemManagement 试点“效果很稳定”，并授权继续推进其他 UI 优化；该反馈记为整体验收通过，不替代 1440px/760px、逐项键盘路径和拖拽边界的独立观察记录。下一批已选定用户管理页面族，当前仅完成真实页面审计和三档方案对比，尚未修改业务代码。",
-  "status": "试点用户验收通过 / 侧栏编辑方向已确认 / 书面规格待复核",
+  "summary": "用户在实际使用后确认 SystemManagement 试点“效果很稳定”，并授权继续推进其他 UI 优化；该反馈记为整体验收通过，不替代 1440px/760px、逐项键盘路径和拖拽边界的独立观察记录。下一批已选定用户管理页面族，侧栏编辑书面规格已经用户确认，实施计划已完成，尚未修改业务代码。",
+  "status": "试点用户验收通过 / 用户管理侧栏书面规格已通过 / 实施计划完成待执行",
   "pages": ["requirements", "plan", "testing", "monitoring", "risks", "changes"],
   "evidence": [
     {
@@ -30,14 +30,19 @@
     {
       "kind": "spec",
       "ref": "docs/superpowers/specs/2026-07-25-wes-user-management-drawer-design.md",
-      "summary": "正式规格已固化页面分层、共享 Drawer、单用户保存状态机、高风险确认、批量操作、邀请行为恢复、OpenAPI 对齐、TDD 与浏览器验收口径；等待用户复核书面规格。"
+      "summary": "正式规格已固化页面分层、共享 Drawer、单用户保存状态机、高风险确认、批量操作、邀请行为恢复、OpenAPI 对齐、TDD 与浏览器验收口径；用户已明确回复“规格通过”。"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-07-26-wes-user-management-drawer.md",
+      "summary": "实施计划按 7 个可验证任务拆分，覆盖共享 Drawer、页面任务分层、真实持久化、安全确认、批量操作、邀请恢复、OpenAPI 对齐、浏览器验收与总看板回填。"
     }
   ],
-  "next": "等待用户复核书面设计规格；明确通过后再编写实施计划，实施计划完成前不修改业务 UI。",
+  "next": "等待用户选择按子代理驱动或当前任务内联执行；进入执行后严格按 TDD、UI scope checker、浏览器证据和总看板门禁推进。",
   "board": {
     "change": {
       "stage": "RP-043 用户验收与下一批设计",
-      "result": "试点用户验收通过 / 侧栏编辑规格待复核"
+      "result": "试点用户验收通过 / 侧栏编辑规格与实施计划已确认"
     }
   }
 }
