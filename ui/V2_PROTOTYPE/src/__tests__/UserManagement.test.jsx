@@ -38,21 +38,19 @@ describe('UserManagement', () => {
     expect(within(selectionBar).queryByRole('button', { name: /重置密码/ })).not.toBeInTheDocument()
   })
 
-  test('focuses an enabled control when the editor is read-only', async () => {
+  test('focuses the first editable user field', async () => {
     render(<MemoryRouter><UserManagement /></MemoryRouter>)
 
     fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
 
     const editor = screen.getByRole('dialog', { name: '编辑用户' })
-    const closeButton = within(editor).getByRole('button', { name: '关闭编辑用户' })
     const systemRole = within(editor).getByLabelText('系统角色')
 
     await waitFor(() => {
-      expect(closeButton).toHaveFocus()
+      expect(systemRole).toHaveFocus()
     })
-    expect(closeButton).toBeEnabled()
-    expect(systemRole).toBeDisabled()
-    expect(systemRole).not.toHaveFocus()
+    expect(systemRole).toBeEnabled()
+    expect(within(editor).getByRole('button', { name: '保存变更' })).toBeDisabled()
   })
 
   test('gives search a persistent accessible name', async () => {
@@ -161,6 +159,140 @@ describe('UserManagement', () => {
 
     expect(screen.getByRole('checkbox', { name: '选择 arch' })).toBeInTheDocument()
     expect(screen.queryByRole('checkbox', { name: '选择 pm' })).not.toBeInTheDocument()
+  })
+
+  test('persists changed user fields in business-role then role order', async () => {
+    let serverUser = {
+      id: 'u3',
+      username: 'arch',
+      email: 'arch@wes.local',
+      role: 'user',
+      businessRole: 'pre_sales',
+      status: 'active',
+      locked: false,
+    }
+    let getCount = 0
+    let releaseReload
+    const calls = []
+
+    server.use(
+      http.get(`${BASE}/auth/users`, async () => {
+        getCount += 1
+        if (getCount > 1) {
+          await new Promise((resolve) => {
+            releaseReload = resolve
+          })
+        }
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { users: [serverUser] },
+        })
+      }),
+      http.patch(`${BASE}/auth/users/:userId/business-role`, async ({ params, request }) => {
+        const body = await request.json()
+        calls.push({ endpoint: 'businessRole', body })
+        serverUser = { ...serverUser, id: params.userId, businessRole: body.businessRole }
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: serverUser },
+        })
+      }),
+      http.patch(`${BASE}/auth/users/:userId/role`, async ({ params, request }) => {
+        const body = await request.json()
+        calls.push({ endpoint: 'role', body })
+        serverUser = { ...serverUser, id: params.userId, role: body.role }
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: serverUser },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.change(within(editor).getByLabelText('系统角色'), {
+      target: { value: 'sub_admin' },
+    })
+    fireEvent.change(within(editor).getByLabelText('业务角色'), {
+      target: { value: 'pm' },
+    })
+    fireEvent.click(within(editor).getByRole('button', { name: '保存变更' }))
+
+    await waitFor(() => {
+      expect(calls).toEqual([
+        { endpoint: 'businessRole', body: { businessRole: 'pm' } },
+        { endpoint: 'role', body: { role: 'sub_admin' } },
+      ])
+    })
+    await waitFor(() => {
+      expect(releaseReload).toEqual(expect.any(Function))
+    })
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+
+    releaseReload()
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
+    })
+    expect(screen.getByRole('status')).toHaveTextContent('已保存 arch')
+  })
+
+  test('stops after a failed patch, reloads users, and keeps the editor open', async () => {
+    let getCount = 0
+    let laterPatchCount = 0
+    const serverUser = {
+      id: 'u3',
+      username: 'arch',
+      email: 'arch@wes.local',
+      role: 'user',
+      businessRole: 'pre_sales',
+      status: 'active',
+      locked: false,
+    }
+
+    server.use(
+      http.get(`${BASE}/auth/users`, () => {
+        getCount += 1
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { users: [serverUser] },
+        })
+      }),
+      http.patch(`${BASE}/auth/users/:userId/business-role`, () => HttpResponse.json(
+        { code: 50001, message: '保存失败' },
+        { status: 500 }
+      )),
+      http.patch(`${BASE}/auth/users/:userId/role`, () => {
+        laterPatchCount += 1
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: { user: serverUser },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.change(within(editor).getByLabelText('业务角色'), {
+      target: { value: 'pm' },
+    })
+    fireEvent.click(within(editor).getByRole('button', { name: '保存变更' }))
+
+    await waitFor(() => {
+      expect(within(editor).getByRole('status')).toHaveTextContent(/业务角色保存失败/)
+    })
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(getCount).toBeGreaterThanOrEqual(2)
+    expect(laterPatchCount).toBe(0)
   })
 
   test('displays role capabilities section and expands on click', async () => {

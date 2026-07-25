@@ -144,6 +144,30 @@ export const handlers = [
       },
     })
   }),
+  http.patch(`${BASE}/auth/users/:userId/role`, async ({ params, request }) => {
+    const body = await request.json()
+    return HttpResponse.json({
+      success: true,
+      data: {
+        user: {
+          id: params.userId,
+          role: body.role,
+        },
+      },
+    })
+  }),
+  http.patch(`${BASE}/auth/users/:userId/status`, async ({ params, request }) => {
+    const body = await request.json()
+    return HttpResponse.json({
+      success: true,
+      data: {
+        user: {
+          id: params.userId,
+          status: body.status,
+        },
+      },
+    })
+  }),
   http.patch(`${BASE}/auth/users/:userId/password`, ({ params }) => HttpResponse.json({
     success: true,
     data: {

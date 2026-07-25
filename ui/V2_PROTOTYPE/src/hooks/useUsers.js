@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { apiClient } from '../api/client.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { isAuthenticated } from '../api/auth.js'
-import { unwrapUsers } from '../api/utils.js'
+import { listUsers } from '../api/users.js'
 
 export const BUSINESS_ROLES = [
   { key: 'sales', label: '销售员' },
@@ -42,40 +41,52 @@ export function mapUserToVM(user = {}) {
   }
 }
 
-export default function useUsers({ enabled = isAuthenticated(), fallbackData = [] } = {}) {
-  const fallbackUsers = useMemo(() => fallbackData.map(mapUserToVM), [fallbackData])
+export default function useUsers({ enabled = isAuthenticated() } = {}) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(Boolean(enabled))
   const [error, setError] = useState(null)
+  const requestIdRef = useRef(0)
 
-  useEffect(() => {
+  const reload = useCallback(async () => {
+    const requestId = ++requestIdRef.current
+
     if (!enabled) {
-      setUsers([])
-      setLoading(false)
-      return undefined
+      if (requestId === requestIdRef.current) {
+        setUsers([])
+        setLoading(false)
+        setError(null)
+      }
+      return []
     }
 
-    let cancelled = false
     setLoading(true)
     setError(null)
 
-    apiClient.get('/auth/users')
-      .then((payload) => {
-        if (cancelled) return
-        const mapped = unwrapUsers(payload).map(mapUserToVM)
+    try {
+      const mapped = (await listUsers()).map(mapUserToVM)
+      if (requestId === requestIdRef.current) {
         setUsers(mapped)
-      })
-      .catch((err) => {
-        if (cancelled) return
+      }
+      return mapped
+    } catch (err) {
+      if (requestId === requestIdRef.current) {
         setError(err)
         setUsers([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+      }
+      throw err
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setLoading(false)
+      }
+    }
+  }, [enabled])
 
-    return () => { cancelled = true }
-  }, [enabled, fallbackUsers])
+  useEffect(() => {
+    void reload().catch(() => {})
+    return () => {
+      requestIdRef.current += 1
+    }
+  }, [reload])
 
-  return { users, loading, error }
+  return { users, loading, error, reload }
 }

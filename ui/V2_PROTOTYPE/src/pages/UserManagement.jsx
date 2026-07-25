@@ -3,15 +3,11 @@ import PageShell from '../components/Layout/PageShell.jsx'
 import UserEditorDrawer from '../components/UserManagement/UserEditorDrawer.jsx'
 import useUsers, { BUSINESS_ROLES, businessRoleLabel } from '../hooks/useUsers.js'
 import useRoleCapabilities from '../hooks/useRoleCapabilities.js'
-import { apiClient } from '../api/client.js'
-
-const INITIAL_USERS = [
-  { id: 'u1', username: 'mjlkevin', role: 'admin', status: 'active', lastLoginAt: '2026-05-09T14:28:00Z', locked: false },
-  { id: 'u2', username: 'admin', role: 'sub_admin', status: 'active', lastLoginAt: '2026-05-08T09:15:00Z', locked: true },
-  { id: 'u3', username: 'zhangpeng', role: 'user', status: 'active', lastLoginAt: '2026-05-07T18:40:00Z', locked: false },
-  { id: 'u4', username: 'wangmin', role: 'user', status: 'disabled', lastLoginAt: null, locked: false },
-  { id: 'u5', username: 'lichen', role: 'user', status: 'active', lastLoginAt: '2026-05-06T10:20:00Z', locked: false },
-]
+import {
+  updateUserBusinessRole,
+  updateUserRole,
+  updateUserStatus,
+} from '../api/users.js'
 
 const ROLES = [
   { key: 'admin', label: '超级管理员' },
@@ -19,8 +15,21 @@ const ROLES = [
   { key: 'user', label: '普通用户' },
 ]
 
+function collectUserChanges(original, draft) {
+  const changes = {}
+  if (draft.businessRole !== original.businessRole) changes.businessRole = draft.businessRole
+  if (draft.role !== original.role) changes.role = draft.role
+  if (draft.status !== original.status) changes.status = draft.status
+  return changes
+}
+
+function needsRiskConfirmation(original, draft) {
+  return (original.role === 'admin' && draft.role !== 'admin')
+    || (original.status === 'active' && draft.status === 'disabled')
+}
+
 export default function UserManagement() {
-  const { users: loadedUsers } = useUsers({ fallbackData: INITIAL_USERS })
+  const { users: loadedUsers, reload } = useUsers()
   const {
     legacyMapping,
     capabilityLabels,
@@ -35,10 +44,15 @@ export default function UserManagement() {
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [editingUserId, setEditingUserId] = useState(null)
-  const [dialog, setDialog] = useState(null) // 'systemRole' | 'businessRole' | 'demote' | null
+  const [editingUserSnapshot, setEditingUserSnapshot] = useState(null)
+  const [dialog, setDialog] = useState(null) // 'systemRole' | 'businessRole' | 'demote' | 'risk' | null
   const [pendingRole, setPendingRole] = useState('')
   const [pendingBusinessRole, setPendingBusinessRole] = useState('')
   const [demoteConfirm, setDemoteConfirm] = useState('')
+  const [savingUser, setSavingUser] = useState(false)
+  const [editorMessage, setEditorMessage] = useState(null)
+  const [pendingSave, setPendingSave] = useState(null)
+  const [pageNotice, setPageNotice] = useState(null)
 
   useEffect(() => {
     setUsers(loadedUsers)
@@ -63,7 +77,15 @@ export default function UserManagement() {
     () => filtered.filter((user) => !user.locked),
     [filtered]
   )
-  const editingUser = users.find((user) => user.id === editingUserId) || null
+  const loadedEditingUser = users.find((user) => user.id === editingUserId) || null
+  const editingUser = loadedEditingUser
+    || (editingUserSnapshot?.id === editingUserId ? editingUserSnapshot : null)
+
+  useEffect(() => {
+    if (loadedEditingUser) {
+      setEditingUserSnapshot(loadedEditingUser)
+    }
+  }, [loadedEditingUser])
 
   useEffect(() => {
     const visibleIdSet = new Set(visibleIds)
@@ -171,7 +193,7 @@ export default function UserManagement() {
     const ids = Array.from(selected)
     try {
       for (const id of ids) {
-        await apiClient.patch(`/auth/users/${id}/business-role`, { businessRole: targetRole })
+        await updateUserBusinessRole(id, targetRole)
       }
       setUsers((prev) => prev.map((u) => selected.has(u.id)
         ? { ...u, businessRole: targetRole, businessRoleLabel: businessRoleLabel(targetRole) }
@@ -182,6 +204,105 @@ export default function UserManagement() {
     } catch (err) {
       alert(err?.message || '修改业务角色失败')
     }
+  }
+
+  const closeUserEditor = () => {
+    setEditingUserId(null)
+    setEditingUserSnapshot(null)
+    setEditorMessage(null)
+  }
+
+  const openUserEditor = (user) => {
+    setEditorMessage(null)
+    setPageNotice(null)
+    setEditingUserSnapshot(user)
+    setEditingUserId(user.id)
+  }
+
+  const persistUserChanges = async (userId, changes) => {
+    const appliedFields = []
+    const steps = [
+      {
+        field: 'businessRole',
+        label: '业务角色',
+        save: (value) => updateUserBusinessRole(userId, value),
+      },
+      {
+        field: 'role',
+        label: '系统角色',
+        save: (value) => updateUserRole(userId, value),
+      },
+      {
+        field: 'status',
+        label: '账户状态',
+        save: (value) => updateUserStatus(userId, value),
+      },
+    ]
+
+    for (const step of steps) {
+      if (!Object.hasOwn(changes, step.field)) continue
+      try {
+        await step.save(changes[step.field])
+        appliedFields.push(step.label)
+      } catch (error) {
+        await reload().catch(() => {})
+        const appliedText = appliedFields.length > 0
+          ? `已保存：${appliedFields.join('、')}。`
+          : ''
+        setEditorMessage({
+          kind: 'error',
+          text: `${step.label}保存失败；${appliedText}${error?.message || '请稍后重试'}`,
+        })
+        return false
+      }
+    }
+
+    try {
+      await reload()
+      return true
+    } catch (error) {
+      setEditorMessage({
+        kind: 'error',
+        text: `变更已提交，但重新读取服务器数据失败。${error?.message || '请稍后重试'}`,
+      })
+      return false
+    }
+  }
+
+  const performSave = async (payload) => {
+    setSavingUser(true)
+    setEditorMessage(null)
+    try {
+      const saved = await persistUserChanges(payload.userId, payload.changes)
+      if (saved) {
+        closeUserEditor()
+        setPendingSave(null)
+        setPageNotice(`已保存 ${payload.original.username}`)
+      }
+    } catch (error) {
+      setEditorMessage({
+        kind: 'error',
+        text: error?.message || '保存失败，请稍后重试',
+      })
+    } finally {
+      setSavingUser(false)
+    }
+  }
+
+  const requestUserSave = ({ original, draft }) => {
+    const payload = {
+      userId: original.id,
+      original,
+      draft,
+      changes: collectUserChanges(original, draft),
+    }
+    if (needsRiskConfirmation(original, draft)) {
+      setPendingSave(payload)
+      setDialog('risk')
+      return
+    }
+    setPendingSave(null)
+    void performSave(payload)
   }
 
   const confirmDemote = () => {
@@ -238,6 +359,11 @@ export default function UserManagement() {
       subtitle="用户、角色与状态管理"
       actions={[]}
     >
+      {pageNotice ? (
+        <div className="user-editor__message" data-kind="success" role="status">
+          {pageNotice}
+        </div>
+      ) : null}
       <div className="section" style={{ margin: 0 }}>
         <div className="user-management__filters">
           <label>
@@ -421,7 +547,7 @@ export default function UserManagement() {
                         style={{ fontSize: 12, padding: '4px 10px', height: 28 }}
                         onClick={(event) => {
                           event.stopPropagation()
-                          setEditingUserId(u.id)
+                          openUserEditor(u)
                         }}
                       >
                         编辑
@@ -438,7 +564,10 @@ export default function UserManagement() {
       <UserEditorDrawer
         open={Boolean(editingUser)}
         user={editingUser}
-        onRequestClose={() => setEditingUserId(null)}
+        saving={savingUser}
+        message={editorMessage}
+        onRequestClose={closeUserEditor}
+        onSave={requestUserSave}
       />
 
       {/* RP-026: 角色能力矩阵（可折叠） */}
