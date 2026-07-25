@@ -1,17 +1,30 @@
 import { useEffect, useId, useRef } from 'react'
 
 const FOCUSABLE_SELECTOR = [
-  'a[href]:not([tabindex="-1"])',
-  'button:not([disabled]):not([tabindex="-1"])',
-  'input:not([disabled]):not([tabindex="-1"])',
-  'select:not([disabled]):not([tabindex="-1"])',
-  'textarea:not([disabled]):not([tabindex="-1"])',
-  '[tabindex]:not([disabled]):not([tabindex="-1"])',
+  'a[href]',
+  'button',
+  'input',
+  'select',
+  'textarea',
+  '[tabindex]',
 ].join(',')
+
+function isTabbable(element) {
+  if (element.tabIndex < 0 || element.matches(':disabled')) return false
+  if (element instanceof HTMLInputElement && element.type === 'hidden') return false
+
+  for (let current = element; current instanceof HTMLElement; current = current.parentElement) {
+    if (current.hidden || current.hasAttribute('inert')) return false
+    const style = window.getComputedStyle(current)
+    if (style.display === 'none' || style.visibility === 'hidden') return false
+  }
+
+  return true
+}
 
 function getFocusableElements(container) {
   return [...container.querySelectorAll(FOCUSABLE_SELECTOR)]
-    .filter((element) => !element.hasAttribute('hidden'))
+    .filter(isTabbable)
 }
 
 export function Drawer({
@@ -45,6 +58,13 @@ export function Drawer({
     focusTarget?.focus()
 
     const handleKeyDown = (event) => {
+      if (event.defaultPrevented) return
+
+      const eventModal = event.target instanceof Element
+        ? event.target.closest('[aria-modal="true"]')
+        : null
+      if (eventModal && eventModal !== surface) return
+
       if (event.key === 'Escape') {
         event.preventDefault()
         onCloseRef.current?.()
