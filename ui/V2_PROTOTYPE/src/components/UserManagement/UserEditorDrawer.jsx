@@ -60,7 +60,7 @@ export default function UserEditorDrawer({
       open={open}
       title="编辑用户"
       description={user.username}
-      initialFocusRef={systemRoleRef}
+      initialFocusRef={fieldsDisabled ? undefined : systemRoleRef}
       closeOnBackdrop
       onClose={requestClose}
       footer={(

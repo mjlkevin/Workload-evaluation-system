@@ -35,12 +35,9 @@ export default function UserManagement() {
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [editingUserId, setEditingUserId] = useState(null)
-  const [dialog, setDialog] = useState(null) // 'systemRole' | 'businessRole' | 'password' | 'demote' | null
+  const [dialog, setDialog] = useState(null) // 'systemRole' | 'businessRole' | 'demote' | null
   const [pendingRole, setPendingRole] = useState('')
   const [pendingBusinessRole, setPendingBusinessRole] = useState('')
-  const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' })
-  const [passwordMessage, setPasswordMessage] = useState('')
-  const [passwordSubmitting, setPasswordSubmitting] = useState(false)
   const [demoteConfirm, setDemoteConfirm] = useState('')
 
   useEffect(() => {
@@ -62,6 +59,10 @@ export default function UserManagement() {
   }, [roleFilter, search, statusFilter, users])
 
   const visibleIds = useMemo(() => filtered.map((u) => u.id), [filtered])
+  const visibleSelectableRows = useMemo(
+    () => filtered.filter((user) => !user.locked),
+    [filtered]
+  )
   const editingUser = users.find((user) => user.id === editingUserId) || null
 
   useEffect(() => {
@@ -85,7 +86,10 @@ export default function UserManagement() {
         const b = idx
         const [s, t] = a <= b ? [a, b] : [b, a]
         const next = new Set()
-        for (let i = s; i <= t; i++) next.add(visibleIds[i])
+        for (let i = s; i <= t; i++) {
+          const rangeUser = filtered[i]
+          if (!rangeUser.locked) next.add(rangeUser.id)
+        }
         setSelected(next)
       } else if (e.ctrlKey || e.metaKey) {
         setSelected((prev) => {
@@ -100,7 +104,7 @@ export default function UserManagement() {
         setAnchorId(id)
       }
     },
-    [visibleIds, anchorId]
+    [anchorId, filtered, visibleIds]
   )
 
   const toggleOne = useCallback((id) => {
@@ -143,13 +147,6 @@ export default function UserManagement() {
     setDialog('businessRole')
   }
 
-  const openPasswordDialog = () => {
-    if (selectedRows.length !== 1) return
-    setPasswordForm({ password: '', confirm: '' })
-    setPasswordMessage('')
-    setDialog('password')
-  }
-
   const confirmRole = () => {
     const targetRole = pendingRole
     const hasAdmin = selectedRows.some((u) => u.role === 'admin')
@@ -184,32 +181,6 @@ export default function UserManagement() {
       setPendingBusinessRole('')
     } catch (err) {
       alert(err?.message || '修改业务角色失败')
-    }
-  }
-
-  const applyPasswordReset = async () => {
-    const target = selectedRows[0]
-    const password = passwordForm.password.trim()
-    if (!target) return
-    if (password.length < 8) {
-      setPasswordMessage('密码至少 8 位')
-      return
-    }
-    if (password !== passwordForm.confirm.trim()) {
-      setPasswordMessage('两次输入的密码不一致')
-      return
-    }
-
-    setPasswordSubmitting(true)
-    setPasswordMessage('')
-    try {
-      await apiClient.patch(`/auth/users/${target.id}/password`, { password })
-      setPasswordForm({ password: '', confirm: '' })
-      setDialog(null)
-    } catch (err) {
-      setPasswordMessage(err?.message || '重置密码失败')
-    } finally {
-      setPasswordSubmitting(false)
     }
   }
 
@@ -297,6 +268,7 @@ export default function UserManagement() {
           <input
             className="input"
             type="search"
+            aria-label="搜索用户"
             placeholder="搜索用户名 / 邮箱"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -304,7 +276,11 @@ export default function UserManagement() {
         </div>
 
         {selCount > 0 ? (
-          <div className="user-management__selection">
+          <div
+            className="user-management__selection"
+            role="region"
+            aria-label="批量操作"
+          >
             <strong>已选 {selCount} 人</strong>
             <button type="button" className="btn btn-ghost" onClick={clearSelection}>
               清除选择
@@ -352,14 +328,17 @@ export default function UserManagement() {
                 <input
                   type="checkbox"
                   aria-label="选择全部可见用户"
-                  checked={filtered.length > 0 && filtered.every((u) => selected.has(u.id) || u.locked)}
+                  checked={
+                    visibleSelectableRows.length > 0
+                    && visibleSelectableRows.every((user) => selected.has(user.id))
+                  }
+                  disabled={visibleSelectableRows.length === 0}
                   onChange={(e) => {
                     const next = new Set(selected)
-                    const selectable = filtered.filter((u) => !u.locked)
                     if (e.target.checked) {
-                      selectable.forEach((u) => next.add(u.id))
+                      visibleSelectableRows.forEach((user) => next.add(user.id))
                     } else {
-                      selectable.forEach((u) => next.delete(u.id))
+                      visibleSelectableRows.forEach((user) => next.delete(user.id))
                     }
                     setSelected(next)
                   }}
@@ -618,74 +597,6 @@ export default function UserManagement() {
               </button>
               <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={applyBusinessRole}>
                 确认修改
-              </button>
-            </DialogActions>
-          </DialogCard>
-        </DialogBackdrop>
-      )}
-
-      {/* 重置密码 dialog */}
-      {dialog === 'password' && (
-        <DialogBackdrop onClose={() => setDialog(null)}>
-          <DialogCard title="重置登录密码" subtitle={selectedRows[0]?.username || ''}>
-            <div style={{ display: 'grid', gap: 10 }}>
-              <label style={{ display: 'grid', gap: 6, fontSize: 12, color: 'var(--ink-2)' }}>
-                新密码
-                <input
-                  type="password"
-                  value={passwordForm.password}
-                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, password: e.target.value }))}
-                  autoComplete="new-password"
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: '1px solid var(--line)',
-                    borderRadius: 'var(--r-md)',
-                    fontSize: 13,
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                  }}
-                />
-              </label>
-              <label style={{ display: 'grid', gap: 6, fontSize: 12, color: 'var(--ink-2)' }}>
-                确认密码
-                <input
-                  type="password"
-                  value={passwordForm.confirm}
-                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirm: e.target.value }))}
-                  autoComplete="new-password"
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: '1px solid var(--line)',
-                    borderRadius: 'var(--r-md)',
-                    fontSize: 13,
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                  }}
-                />
-              </label>
-              {passwordMessage && (
-                <div
-                  role="status"
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 'var(--r-md)',
-                    background: passwordMessage === '密码已重置' ? 'var(--ok-soft)' : 'var(--err-soft)',
-                    color: passwordMessage === '密码已重置' ? 'var(--ok)' : 'var(--err)',
-                    fontSize: 12,
-                  }}
-                >
-                  {passwordMessage}
-                </div>
-              )}
-            </div>
-            <DialogActions>
-              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
-                取消
-              </button>
-              <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} disabled={passwordSubmitting} onClick={applyPasswordReset}>
-                {passwordSubmitting ? '重置中…' : '确认重置'}
               </button>
             </DialogActions>
           </DialogCard>

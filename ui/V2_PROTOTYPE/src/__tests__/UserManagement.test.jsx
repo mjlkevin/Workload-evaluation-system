@@ -29,13 +29,94 @@ describe('UserManagement', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: '选择 arch' }))
 
     const selectedSummary = screen.getByText('已选 1 人')
-    const selectionBar = selectedSummary.closest('.user-management__selection')
-    expect(selectionBar).not.toBeNull()
+    const selectionBar = screen.getByRole('region', { name: '批量操作' })
+    expect(selectionBar).toContainElement(selectedSummary)
     expect(within(selectionBar).getByRole('button', { name: '清除选择' })).toBeInTheDocument()
     for (const actionName of ['批量启用', '批量禁用', '改系统角色', '改业务角色']) {
       expect(within(selectionBar).getByRole('button', { name: actionName })).toBeInTheDocument()
     }
     expect(within(selectionBar).queryByRole('button', { name: /重置密码/ })).not.toBeInTheDocument()
+  })
+
+  test('focuses an enabled control when the editor is read-only', async () => {
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    const closeButton = within(editor).getByRole('button', { name: '关闭编辑用户' })
+    const systemRole = within(editor).getByLabelText('系统角色')
+
+    await waitFor(() => {
+      expect(closeButton).toHaveFocus()
+    })
+    expect(closeButton).toBeEnabled()
+    expect(systemRole).toBeDisabled()
+    expect(systemRole).not.toHaveFocus()
+  })
+
+  test('gives search a persistent accessible name', async () => {
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    await screen.findByRole('heading', { name: '用户管理' })
+
+    expect(screen.getByRole('searchbox', { name: '搜索用户' })).toHaveAttribute(
+      'placeholder',
+      '搜索用户名 / 邮箱'
+    )
+  })
+
+  test('excludes locked users from shift-range selection and bulk targets', async () => {
+    server.use(
+      http.get(`${BASE}/auth/users`, () => HttpResponse.json({
+        success: true,
+        data: {
+          users: [
+            { id: 'u-alpha', username: 'alpha', email: 'alpha@wes.local', role: 'user', status: 'active', locked: false },
+            { id: 'u-system', username: 'system-lock', email: 'system@wes.local', role: 'user', status: 'active', locked: true },
+            { id: 'u-omega', username: 'omega', email: 'omega@wes.local', role: 'user', status: 'active', locked: false },
+          ],
+        },
+      }))
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    const firstRow = (await screen.findByText('alpha')).closest('tr')
+    const lockedRow = screen.getByText('system-lock').closest('tr')
+    const thirdRow = screen.getByText('omega').closest('tr')
+
+    fireEvent.click(firstRow)
+    fireEvent.click(thirdRow, { shiftKey: true })
+
+    expect(screen.getByRole('region', { name: '批量操作' })).toHaveTextContent('已选 2 人')
+    expect(lockedRow).not.toHaveStyle({ background: 'var(--brand-soft)' })
+
+    fireEvent.click(screen.getByRole('button', { name: '批量禁用' }))
+    expect(within(firstRow).getByText('已禁用')).toBeInTheDocument()
+    expect(within(thirdRow).getByText('已禁用')).toBeInTheDocument()
+    expect(within(lockedRow).getByText('正常')).toBeInTheDocument()
+  })
+
+  test('disables select-all when only locked users are visible', async () => {
+    server.use(
+      http.get(`${BASE}/auth/users`, () => HttpResponse.json({
+        success: true,
+        data: {
+          users: [
+            { id: 'u-system', username: 'system-lock', email: 'system@wes.local', role: 'user', status: 'active', locked: true },
+          ],
+        },
+      }))
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    await screen.findByText('system-lock')
+    const selectAll = screen.getByRole('checkbox', { name: '选择全部可见用户' })
+
+    expect(selectAll).not.toBeChecked()
+    expect(selectAll).toBeDisabled()
   })
 
   test('combines role, status, and text filters and clears hidden selections', async () => {
