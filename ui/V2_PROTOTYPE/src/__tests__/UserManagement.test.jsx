@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test } from 'vitest'
@@ -8,45 +8,59 @@ import { server } from './mocks/server.js'
 const BASE = '/api/v1'
 
 describe('UserManagement', () => {
-  test('allows resetting the selected user login password', async () => {
-    let requestBody
-    let requestedUserId
-
-    server.use(http.patch(`${BASE}/auth/users/:userId/password`, async ({ params, request }) => {
-      requestedUserId = params.userId
-      requestBody = await request.json()
-      return HttpResponse.json({
-        success: true,
-        data: {
-          user: {
-            id: params.userId,
-            username: 'arch',
-            role: 'user',
-            businessRole: 'pre_sales',
-            status: 'active',
-          },
-        },
-      })
-    }))
-
+  test('separates page actions, filters, bulk actions, and row editing', async () => {
     render(<MemoryRouter><UserManagement /></MemoryRouter>)
 
-    fireEvent.click(await screen.findByText('arch'))
-    fireEvent.click(screen.getByRole('button', { name: '重置密码' }))
+    await screen.findByRole('heading', { name: '用户管理' })
+    const editArch = await screen.findByRole('button', { name: '编辑 arch' })
 
-    expect(screen.getByText('重置登录密码')).toBeInTheDocument()
+    expect(screen.queryByText(/已选 0/)).not.toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'NewPass123!' } })
-    fireEvent.change(screen.getByLabelText('确认密码'), { target: { value: 'NewPass123!' } })
-    fireEvent.click(screen.getByRole('button', { name: '确认重置' }))
+    fireEvent.click(editArch)
 
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    expect(within(editor).getByText('arch')).toBeInTheDocument()
+    expect(screen.queryByText('已选 1 人')).not.toBeInTheDocument()
+
+    fireEvent.click(within(editor).getByRole('button', { name: '关闭编辑用户' }))
+    expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: '选择 arch' }))
+
+    const selectedSummary = screen.getByText('已选 1 人')
+    const selectionBar = selectedSummary.closest('.user-management__selection')
+    expect(selectionBar).not.toBeNull()
+    expect(within(selectionBar).getByRole('button', { name: '清除选择' })).toBeInTheDocument()
+    expect(within(selectionBar).queryByRole('button', { name: /重置密码/ })).not.toBeInTheDocument()
+  })
+
+  test('combines role, status, and text filters and clears hidden selections', async () => {
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    await screen.findByRole('heading', { name: '用户管理' })
+    const archSelection = await screen.findByRole('checkbox', { name: '选择 arch' })
+    fireEvent.click(archSelection)
+    expect(screen.getByText('已选 1 人')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('系统角色'), { target: { value: 'sub_admin' } })
+
+    expect(screen.queryByRole('checkbox', { name: '选择 arch' })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: '选择 pm' })).toBeInTheDocument()
     await waitFor(() => {
-      expect(requestedUserId).toBe('u3')
-      expect(requestBody).toEqual({ password: 'NewPass123!' })
+      expect(screen.queryByText('已选 1 人')).not.toBeInTheDocument()
     })
-    await waitFor(() => {
-      expect(screen.queryByText('重置登录密码')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('状态'), { target: { value: 'disabled' } })
+    expect(screen.queryByRole('checkbox', { name: '选择 pm' })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('系统角色'), { target: { value: 'all' } })
+    fireEvent.change(screen.getByLabelText('状态'), { target: { value: 'all' } })
+    fireEvent.change(screen.getByPlaceholderText('搜索用户名 / 邮箱'), {
+      target: { value: 'arch@wes.local' },
     })
+
+    expect(screen.getByRole('checkbox', { name: '选择 arch' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: '选择 pm' })).not.toBeInTheDocument()
   })
 
   test('displays role capabilities section and expands on click', async () => {

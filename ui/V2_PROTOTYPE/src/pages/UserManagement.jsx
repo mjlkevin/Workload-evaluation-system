@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
+import UserEditorDrawer from '../components/UserManagement/UserEditorDrawer.jsx'
 import useUsers, { BUSINESS_ROLES, businessRoleLabel } from '../hooks/useUsers.js'
 import useRoleCapabilities from '../hooks/useRoleCapabilities.js'
 import { apiClient } from '../api/client.js'
@@ -31,6 +32,9 @@ export default function UserManagement() {
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
   const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [editingUserId, setEditingUserId] = useState(null)
   const [dialog, setDialog] = useState(null) // 'systemRole' | 'businessRole' | 'password' | 'demote' | null
   const [pendingRole, setPendingRole] = useState('')
   const [pendingBusinessRole, setPendingBusinessRole] = useState('')
@@ -47,14 +51,29 @@ export default function UserManagement() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return users
-    return users.filter((u) =>
-      u.username.toLowerCase().includes(q) ||
-      (u.email || '').toLowerCase().includes(q)
-    )
-  }, [users, search])
+    return users.filter((user) => {
+      const matchesRole = roleFilter === 'all' || user.role === roleFilter
+      const matchesStatus = statusFilter === 'all' || user.status === statusFilter
+      const matchesSearch = !q
+        || user.username.toLowerCase().includes(q)
+        || (user.email || '').toLowerCase().includes(q)
+      return matchesRole && matchesStatus && matchesSearch
+    })
+  }, [roleFilter, search, statusFilter, users])
 
   const visibleIds = useMemo(() => filtered.map((u) => u.id), [filtered])
+  const editingUser = users.find((user) => user.id === editingUserId) || null
+
+  useEffect(() => {
+    const visibleIdSet = new Set(visibleIds)
+    setSelected((current) => {
+      const next = new Set([...current].filter((id) => visibleIdSet.has(id)))
+      return next.size === current.size ? current : next
+    })
+    setAnchorId((current) => (
+      current && !visibleIdSet.has(current) ? null : current
+    ))
+  }, [visibleIds])
 
   // ---------- PB-R1 标准行选择 ----------
   const handleRowClick = useCallback(
@@ -241,8 +260,6 @@ export default function UserManagement() {
   const canBulkEnable = selectedRows.length > 0 && selectedRows.some((u) => u.status !== 'active')
   const canBulkDisable = selectedRows.length > 0 && selectedRows.some((u) => u.status !== 'disabled')
   const canChangeRole = selectedRows.length > 0
-  const canResetPassword = selectedRows.length === 1
-
   return (
     <PageShell
       crumb="工作台 / 用户管理"
@@ -251,35 +268,47 @@ export default function UserManagement() {
       actions={[]}
     >
       <div className="section" style={{ margin: 0 }}>
-        {/* Toolbar */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexWrap: 'wrap',
-            padding: '10px 18px',
-            background: 'var(--bg-soft)',
-            borderBottom: '1px solid var(--line)',
-            fontSize: 12,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              color: selCount > 0 ? 'var(--brand-ink)' : 'var(--ink-3)',
-              textTransform: 'uppercase',
-              letterSpacing: '.06em',
-              fontWeight: 700,
-              cursor: selCount > 0 ? 'pointer' : 'default',
-            }}
-            onClick={selCount > 0 ? clearSelection : undefined}
-          >
-            已选 {selCount}
-          </span>
+        <div className="user-management__filters">
+          <label>
+            <span>系统角色</span>
+            <select
+              className="input"
+              value={roleFilter}
+              onChange={(event) => setRoleFilter(event.target.value)}
+            >
+              <option value="all">全部</option>
+              {ROLES.map((role) => (
+                <option key={role.key} value={role.key}>{role.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>状态</span>
+            <select
+              className="input"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="all">全部</option>
+              <option value="active">正常</option>
+              <option value="disabled">已禁用</option>
+            </select>
+          </label>
+          <input
+            className="input"
+            type="search"
+            placeholder="搜索用户名 / 邮箱"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
 
-          <div style={{ display: 'flex', gap: 4, paddingRight: 12, borderRight: '1px solid var(--line)' }}>
+        {selCount > 0 ? (
+          <div className="user-management__selection">
+            <strong>已选 {selCount} 人</strong>
+            <button type="button" className="btn btn-ghost" onClick={clearSelection}>
+              清除选择
+            </button>
             <button type="button"
               className="btn btn-ghost"
               style={{ height: 28, fontSize: 12, padding: '0 10px' }}
@@ -312,72 +341,8 @@ export default function UserManagement() {
             >
               改业务角色
             </button>
-            <button type="button"
-              className="btn btn-ghost"
-              style={{ height: 28, fontSize: 12, padding: '0 10px' }}
-              disabled={!canResetPassword}
-              onClick={openPasswordDialog}
-            >
-              重置密码
-            </button>
-            <button type="button" className="btn btn-pri" style={{ height: 28, fontSize: 12, padding: '0 10px' }}>
-              + 邀请成员
-            </button>
           </div>
-
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '3px 8px',
-                borderRadius: 5,
-                background: 'var(--surface)',
-                border: '1px solid var(--line)',
-                fontSize: 11.5,
-                color: 'var(--ink-2)',
-              }}
-            >
-              系统角色：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>全部</b>
-              <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span>
-            </span>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '3px 8px',
-                borderRadius: 5,
-                background: 'var(--surface)',
-                border: '1px solid var(--line)',
-                fontSize: 11.5,
-                color: 'var(--ink-2)',
-              }}
-            >
-              状态：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>全部</b>
-              <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span>
-            </span>
-            <input
-              type="text"
-              placeholder="⌕ 搜索用户名 / 邮箱"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                padding: '6px 10px',
-                borderRadius: 7,
-                background: '#fff',
-                border: '1px solid var(--line)',
-                fontSize: 11.5,
-                color: 'var(--ink)',
-                width: 220,
-                flexShrink: 0,
-                fontFamily: 'inherit',
-                outline: 'none',
-              }}
-            />
-          </div>
-        </div>
+        ) : null}
 
         {/* Table */}
         <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
@@ -386,6 +351,7 @@ export default function UserManagement() {
               <th style={{ width: 40, textAlign: 'center' }}>
                 <input
                   type="checkbox"
+                  aria-label="选择全部可见用户"
                   checked={filtered.length > 0 && filtered.every((u) => selected.has(u.id) || u.locked)}
                   onChange={(e) => {
                     const next = new Set(selected)
@@ -426,7 +392,9 @@ export default function UserManagement() {
                     ) : (
                       <input
                         type="checkbox"
+                        aria-label={`选择 ${u.username}`}
                         checked={isSel}
+                        onClick={(event) => event.stopPropagation()}
                         onChange={() => toggleOne(u.id)}
                       />
                     )}
@@ -467,7 +435,16 @@ export default function UserManagement() {
                     {u.locked ? (
                       <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>— 系统账号 —</span>
                     ) : (
-                      <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px', height: 28 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        aria-label={`编辑 ${u.username}`}
+                        style={{ fontSize: 12, padding: '4px 10px', height: 28 }}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setEditingUserId(u.id)
+                        }}
+                      >
                         编辑
                       </button>
                     )}
@@ -478,6 +455,12 @@ export default function UserManagement() {
           </tbody>
         </table>
       </div>
+
+      <UserEditorDrawer
+        open={Boolean(editingUser)}
+        user={editingUser}
+        onRequestClose={() => setEditingUserId(null)}
+      />
 
       {/* RP-026: 角色能力矩阵（可折叠） */}
       <div className="section" style={{ marginTop: 12 }}>
