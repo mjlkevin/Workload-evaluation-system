@@ -53,6 +53,8 @@
   --shell-radius: 18px;
   --control-height: 36px;
   --table-row-height: 36px;
+  --layer-drawer: 50;
+  --layer-modal: 60;
   --kpi-radius: 14px;
   --dialog-radius: 18px;
   --teal: oklch(0.6 0.12 180);

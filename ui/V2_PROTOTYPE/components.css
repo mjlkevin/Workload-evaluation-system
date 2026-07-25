@@ -66,7 +66,7 @@ code,pre{font-family:var(--font-mono)}
 .dialog .bd{padding:20px}
 .dialog .ft{padding:16px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:var(--bg-soft)}
 
-.wes-dialog-backdrop{position:fixed;inset:0;display:grid;place-items:center;padding:var(--space-6);background:color-mix(in oklch,var(--ink) 32%,transparent)}
+.wes-dialog-backdrop{position:fixed;inset:0;z-index:var(--layer-modal);display:grid;place-items:center;padding:var(--space-6);background:color-mix(in oklch,var(--ink) 32%,transparent)}
 .wes-dialog-backdrop:has(dialog){background:transparent;pointer-events:none}
 .wes-dialog{width:min(560px,calc(100vw - var(--space-7)));max-height:calc(100dvh - var(--space-7));margin:auto;padding:0;border:1px solid var(--line);border-radius:var(--dialog-radius);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-3);overflow:hidden}
 div.wes-dialog,.wes-dialog[open]{display:flex;flex-direction:column}
@@ -83,11 +83,25 @@ div.wes-dialog,.wes-dialog[open]{display:flex;flex-direction:column}
 .wes-dialog__body{min-height:0;padding:var(--space-6);overflow:auto}
 .wes-dialog__actions{position:sticky;bottom:calc(var(--space-6) * -1);display:flex;justify-content:flex-end;gap:var(--space-3);margin:var(--space-6) calc(var(--space-6) * -1) calc(var(--space-6) * -1);padding:var(--space-5) var(--space-6);border-top:1px solid var(--line);background:var(--bg-soft)}
 
+.wes-drawer-backdrop{position:fixed;inset:0;z-index:var(--layer-drawer);display:flex;justify-content:flex-end;background:color-mix(in oklch,var(--ink) 26%,transparent)}
+.wes-drawer{display:flex;flex-direction:column;width:min(440px,100vw);height:100dvh;border-left:1px solid var(--line);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-3);overflow:hidden}
+.wes-drawer__header{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-5);padding:var(--space-5) var(--space-6);border-bottom:1px solid var(--line)}
+.wes-drawer__heading{min-width:0}
+.wes-drawer__title{margin:0;font-size:18px;line-height:1.35}
+.wes-drawer__description{margin:var(--space-2) 0 0;color:var(--ink-2);font-size:12px;line-height:1.5}
+.wes-drawer__close{display:grid;place-items:center;flex:0 0 auto;width:var(--control-height);height:var(--control-height);margin:calc(var(--space-2) * -1);border:0;border-radius:var(--r-md);background:transparent;color:var(--ink-2);font:inherit;font-size:22px;line-height:1;cursor:pointer}
+.wes-drawer__close:hover{background:var(--bg-soft);color:var(--ink)}
+.wes-drawer__close:focus-visible{outline:none;box-shadow:var(--shadow-focus)}
+.wes-drawer__body{min-height:0;flex:1;padding:var(--space-6);overflow:auto}
+.wes-drawer__footer{display:flex;justify-content:flex-end;gap:var(--space-3);padding:var(--space-5) var(--space-6);border-top:1px solid var(--line);background:var(--bg-soft)}
+
 @media (max-width:760px){
   .wes-dialog-backdrop{padding:var(--space-3)}
   .wes-dialog,.wes-dialog--wide{width:calc(100vw - var(--space-5));max-height:calc(100dvh - var(--space-5))}
   .wes-dialog__header,.wes-dialog__body{padding:var(--space-5)}
   .wes-dialog__actions{bottom:calc(var(--space-5) * -1);margin:var(--space-5) calc(var(--space-5) * -1) calc(var(--space-5) * -1);padding:var(--space-4) var(--space-5)}
+  .wes-drawer{width:100vw;border-left:0}
+  .wes-drawer__header,.wes-drawer__body,.wes-drawer__footer{padding:var(--space-5)}
 }
 
 .stack{display:flex;flex-direction:column;gap:var(--space-4)}
