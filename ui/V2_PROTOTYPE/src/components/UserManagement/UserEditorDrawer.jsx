@@ -141,7 +141,12 @@ export default function UserEditorDrawer({
       {onResetPassword ? (
         <section className="user-editor__safety">
           <h3>账户安全</h3>
-          <button type="button" className="btn btn-out" onClick={() => onResetPassword(user)}>
+          <button
+            type="button"
+            className="btn btn-out"
+            disabled={saving}
+            onClick={() => onResetPassword(user)}
+          >
             重置密码…
           </button>
         </section>

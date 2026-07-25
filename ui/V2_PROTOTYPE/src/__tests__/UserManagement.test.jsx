@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test } from 'vitest'
-import UserManagement from '../pages/UserManagement.jsx'
+import UserManagement, * as UserManagementModule from '../pages/UserManagement.jsx'
 import { server } from './mocks/server.js'
 
 const BASE = '/api/v1'
@@ -51,6 +51,272 @@ describe('UserManagement', () => {
     })
     expect(systemRole).toBeEnabled()
     expect(within(editor).getByRole('button', { name: '保存变更' })).toBeDisabled()
+  })
+
+  test('protects dirty editor changes and restores focus after discard', async () => {
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    const editArch = await screen.findByRole('button', { name: '编辑 arch' })
+    editArch.focus()
+    fireEvent.click(editArch)
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.change(within(editor).getByLabelText('业务角色'), {
+      target: { value: 'pm' },
+    })
+
+    fireEvent.click(within(editor).getByRole('button', { name: '关闭编辑用户' }))
+
+    let discardDialog = screen.getByRole('dialog', { name: '放弃未保存修改' })
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    fireEvent.click(discardDialog.parentElement)
+    expect(screen.getByRole('dialog', { name: '放弃未保存修改' })).toBeInTheDocument()
+
+    fireEvent.click(within(discardDialog).getByRole('button', { name: '继续编辑' }))
+    expect(screen.queryByRole('dialog', { name: '放弃未保存修改' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+
+    fireEvent.click(within(editor).getByRole('button', { name: '关闭编辑用户' }))
+    discardDialog = screen.getByRole('dialog', { name: '放弃未保存修改' })
+    fireEvent.click(within(discardDialog).getByRole('button', { name: '放弃修改' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
+    })
+    expect(editArch).toHaveFocus()
+  })
+
+  test('protects dirty editor changes when Escape requests close', async () => {
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.change(within(editor).getByLabelText('业务角色'), {
+      target: { value: 'pm' },
+    })
+
+    fireEvent.keyDown(editor, { key: 'Escape' })
+
+    const discardDialog = screen.getByRole('dialog', { name: '放弃未保存修改' })
+    expect(editor).toBeInTheDocument()
+    fireEvent.keyDown(discardDialog, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: '放弃未保存修改' })).not.toBeInTheDocument()
+    expect(editor).toBeInTheDocument()
+    expect(within(editor).getByLabelText('业务角色')).toHaveValue('pm')
+  })
+
+  test('opens password reset for the editing user and cancels without closing the drawer', async () => {
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.change(within(editor).getByLabelText('业务角色'), {
+      target: { value: 'pm' },
+    })
+    fireEvent.click(within(editor).getByRole('button', { name: '重置密码…' }))
+
+    const passwordDialog = screen.getByRole('dialog', { name: '重置登录密码' })
+    expect(within(passwordDialog).getByText('arch')).toBeInTheDocument()
+    fireEvent.click(within(passwordDialog).getByRole('button', { name: '取消重置' }))
+
+    expect(screen.queryByRole('dialog', { name: '重置登录密码' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(within(editor).getByLabelText('业务角色')).toHaveValue('pm')
+  })
+
+  test('resets the current editing user password with inline validation and contextual success', async () => {
+    const passwordCalls = []
+    server.use(
+      http.patch(`${BASE}/auth/users/:userId/password`, async ({ params, request }) => {
+        passwordCalls.push({
+          userId: params.userId,
+          body: await request.json(),
+        })
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: {
+            user: {
+              id: params.userId,
+              username: 'arch',
+              role: 'user',
+              businessRole: 'pre_sales',
+              status: 'active',
+            },
+          },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: '选择 pm' }))
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.click(within(editor).getByRole('button', { name: '重置密码…' }))
+    const passwordDialog = screen.getByRole('dialog', { name: '重置登录密码' })
+    const password = within(passwordDialog).getByLabelText('新密码')
+    const confirmation = within(passwordDialog).getByLabelText('确认密码')
+    const submit = within(passwordDialog).getByRole('button', { name: '确认重置' })
+
+    fireEvent.change(password, { target: { value: '1234567' } })
+    fireEvent.change(confirmation, { target: { value: '1234567' } })
+    fireEvent.click(submit)
+    expect(within(passwordDialog).getByRole('status')).toHaveTextContent('密码至少需要 8 位')
+    expect(passwordCalls).toEqual([])
+
+    fireEvent.change(password, { target: { value: 'new-pass-88' } })
+    fireEvent.change(confirmation, { target: { value: 'different' } })
+    fireEvent.click(submit)
+    expect(within(passwordDialog).getByRole('status')).toHaveTextContent('两次输入的密码不一致')
+    expect(passwordCalls).toEqual([])
+
+    fireEvent.change(confirmation, { target: { value: 'new-pass-88' } })
+    fireEvent.click(submit)
+
+    await waitFor(() => {
+      expect(passwordCalls).toEqual([
+        { userId: 'u3', body: { password: 'new-pass-88' } },
+      ])
+      expect(screen.queryByRole('dialog', { name: '重置登录密码' })).not.toBeInTheDocument()
+    })
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(within(editor).getByRole('status')).toHaveTextContent('已重置 arch 的登录密码')
+  })
+
+  test('reset failure stays inline and preserves the password form for retry', async () => {
+    server.use(
+      http.patch(`${BASE}/auth/users/:userId/password`, () => HttpResponse.json(
+        { code: 40021, message: '密码策略拒绝' },
+        { status: 400 }
+      ))
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.click(within(editor).getByRole('button', { name: '重置密码…' }))
+    const passwordDialog = screen.getByRole('dialog', { name: '重置登录密码' })
+    fireEvent.change(within(passwordDialog).getByLabelText('新密码'), {
+      target: { value: 'valid-pass-88' },
+    })
+    fireEvent.change(within(passwordDialog).getByLabelText('确认密码'), {
+      target: { value: 'valid-pass-88' },
+    })
+    fireEvent.click(within(passwordDialog).getByRole('button', { name: '确认重置' }))
+
+    await waitFor(() => {
+      expect(within(passwordDialog).getByRole('status')).toHaveTextContent('密码策略拒绝')
+      expect(within(passwordDialog).getByRole('button', { name: '确认重置' })).toBeEnabled()
+    })
+    expect(within(passwordDialog).getByLabelText('新密码')).toHaveValue('valid-pass-88')
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(window.alert).not.toHaveBeenCalled()
+  })
+
+  test('confirms disabling an active user before the serialized status save', async () => {
+    const statusCalls = []
+    server.use(
+      http.patch(`${BASE}/auth/users/:userId/status`, async ({ params, request }) => {
+        const body = await request.json()
+        statusCalls.push({ userId: params.userId, body })
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: {
+            user: {
+              id: params.userId,
+              username: 'arch',
+              role: 'user',
+              businessRole: 'pre_sales',
+              status: body.status,
+            },
+          },
+        })
+      })
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 arch' }))
+    const editor = screen.getByRole('dialog', { name: '编辑用户' })
+    fireEvent.change(within(editor).getByLabelText('账户状态'), {
+      target: { value: 'disabled' },
+    })
+    fireEvent.click(within(editor).getByRole('button', { name: '保存变更' }))
+
+    const riskDialog = screen.getByRole('dialog', { name: '确认风险变更' })
+    expect(within(riskDialog).getByText('arch')).toBeInTheDocument()
+    expect(within(riskDialog).getByText('正常 → 已禁用')).toBeInTheDocument()
+    expect(within(riskDialog).queryByLabelText('输入“我确定”')).not.toBeInTheDocument()
+    expect(statusCalls).toEqual([])
+
+    fireEvent.click(within(riskDialog).getByRole('button', { name: '取消' }))
+    expect(screen.queryByRole('dialog', { name: '确认风险变更' })).not.toBeInTheDocument()
+    expect(within(editor).getByLabelText('账户状态')).toHaveValue('disabled')
+    fireEvent.click(within(editor).getByRole('button', { name: '保存变更' }))
+
+    const reopenedRiskDialog = screen.getByRole('dialog', { name: '确认风险变更' })
+    fireEvent.click(within(reopenedRiskDialog).getByRole('button', { name: '确认风险变更' }))
+
+    await waitFor(() => {
+      expect(statusCalls).toEqual([
+        { userId: 'u3', body: { status: 'disabled' } },
+      ])
+    })
+  })
+
+  test('risk confirmation requires the exact phrase for admin demotion', () => {
+    const RiskConfirmationDialog = UserManagementModule.RiskConfirmationDialog
+    expect(RiskConfirmationDialog).toEqual(expect.any(Function))
+    const pendingSave = {
+      userId: 'admin-user',
+      original: {
+        id: 'admin-user',
+        username: 'root-admin',
+        role: 'admin',
+        status: 'active',
+      },
+      draft: {
+        role: 'user',
+        status: 'active',
+      },
+      changes: { role: 'user' },
+    }
+    let riskPhrase = ''
+    const { rerender } = render(
+      <RiskConfirmationDialog
+        open
+        pendingSave={pendingSave}
+        riskPhrase={riskPhrase}
+        onPhraseChange={(value) => {
+          riskPhrase = value
+        }}
+        onCancel={() => {}}
+        onConfirm={() => {}}
+      />
+    )
+
+    let riskDialog = screen.getByRole('dialog', { name: '确认风险变更' })
+    const phrase = within(riskDialog).getByLabelText('输入“我确定”')
+    expect(within(riskDialog).getByText('超级管理员 → 普通用户')).toBeInTheDocument()
+    expect(within(riskDialog).getByRole('button', { name: '确认风险变更' })).toBeDisabled()
+
+    fireEvent.change(phrase, { target: { value: '我确定' } })
+    rerender(
+      <RiskConfirmationDialog
+        open
+        pendingSave={pendingSave}
+        riskPhrase={riskPhrase}
+        onPhraseChange={(value) => {
+          riskPhrase = value
+        }}
+        onCancel={() => {}}
+        onConfirm={() => {}}
+      />
+    )
+    riskDialog = screen.getByRole('dialog', { name: '确认风险变更' })
+    expect(within(riskDialog).getByRole('button', { name: '确认风险变更' })).toBeEnabled()
   })
 
   test('gives search a persistent accessible name', async () => {
@@ -378,6 +644,10 @@ describe('UserManagement', () => {
       expect(releasePatch).toEqual(expect.any(Function))
     })
     fireEvent.click(within(editor).getByRole('button', { name: '关闭编辑用户' }))
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: '放弃未保存修改' }))
+        .getByRole('button', { name: '放弃修改' })
+    )
 
     const editArch = screen.getByRole('button', { name: '编辑 arch' })
     expect(editArch).toBeDisabled()
@@ -391,6 +661,7 @@ describe('UserManagement', () => {
     expect(within(editor).getByLabelText('系统角色')).toBeDisabled()
     expect(within(editor).getByLabelText('业务角色')).toBeDisabled()
     expect(within(editor).getByRole('button', { name: '保存中…' })).toBeDisabled()
+    expect(within(editor).getByRole('button', { name: '重置密码…' })).toBeDisabled()
     expect(patchCount).toBe(1)
 
     releasePatch()

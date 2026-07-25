@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
 import UserEditorDrawer from '../components/UserManagement/UserEditorDrawer.jsx'
+import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
 import useUsers, { BUSINESS_ROLES, businessRoleLabel } from '../hooks/useUsers.js'
 import useRoleCapabilities from '../hooks/useRoleCapabilities.js'
 import {
+  resetUserPassword,
   updateUserBusinessRole,
   updateUserRole,
   updateUserStatus,
@@ -28,6 +30,96 @@ function needsRiskConfirmation(original, draft) {
     || (original.status === 'active' && draft.status === 'disabled')
 }
 
+function systemRoleLabel(role) {
+  return ROLES.find((item) => item.key === role)?.label || role
+}
+
+function statusLabel(status) {
+  return status === 'active' ? '正常' : status === 'disabled' ? '已禁用' : status
+}
+
+function requiresTypedRiskPhrase(pendingSave) {
+  return Boolean(
+    pendingSave
+    && pendingSave.original.role === 'admin'
+    && pendingSave.draft.role !== 'admin'
+  )
+}
+
+export function RiskConfirmationDialog({
+  open,
+  pendingSave,
+  riskPhrase,
+  onPhraseChange,
+  onCancel,
+  onConfirm,
+}) {
+  const requiresTypedPhrase = requiresTypedRiskPhrase(pendingSave)
+  const transitions = []
+  if (pendingSave && Object.hasOwn(pendingSave.changes, 'role')) {
+    transitions.push(
+      `${systemRoleLabel(pendingSave.original.role)} → ${systemRoleLabel(pendingSave.draft.role)}`
+    )
+  }
+  if (pendingSave && Object.hasOwn(pendingSave.changes, 'status')) {
+    transitions.push(
+      `${statusLabel(pendingSave.original.status)} → ${statusLabel(pendingSave.draft.status)}`
+    )
+  }
+
+  return (
+    <Dialog
+      open={open}
+      title="确认风险变更"
+      description={pendingSave?.original.username}
+      closeOnBackdrop={false}
+      onClose={onCancel}
+    >
+      <div
+        style={{
+          background: 'var(--err-soft)',
+          border: '1px solid var(--err)',
+          borderRadius: 'var(--r-md)',
+          padding: '12px 14px',
+          color: 'var(--err-ink)',
+          fontSize: 13,
+        }}
+      >
+        此变更可能影响用户登录或管理权限，请确认目标与变更内容。
+      </div>
+      <ul style={{ margin: '12px 0 0', paddingLeft: 20, fontSize: 13 }}>
+        {transitions.map((transition) => (
+          <li key={transition}>{transition}</li>
+        ))}
+      </ul>
+      {requiresTypedPhrase ? (
+        <label style={{ display: 'grid', gap: 6, marginTop: 14, fontSize: 13 }}>
+          <span>输入“我确定”</span>
+          <input
+            className="input"
+            type="text"
+            value={riskPhrase}
+            onChange={(event) => onPhraseChange(event.target.value)}
+          />
+        </label>
+      ) : null}
+      <DialogActions>
+        <button type="button" className="btn btn-out" onClick={onCancel}>
+          取消
+        </button>
+        <button
+          type="button"
+          className="btn btn-dan"
+          disabled={requiresTypedPhrase && riskPhrase.trim() !== '我确定'}
+          onClick={onConfirm}
+        >
+          确认风险变更
+        </button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
 export default function UserManagement() {
   const { users: loadedUsers, reload } = useUsers()
   const {
@@ -45,16 +137,21 @@ export default function UserManagement() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [editingUserId, setEditingUserId] = useState(null)
   const [editingUserSnapshot, setEditingUserSnapshot] = useState(null)
-  const [dialog, setDialog] = useState(null) // 'systemRole' | 'businessRole' | 'demote' | 'risk' | null
+  const [dialog, setDialog] = useState(null)
   const [pendingRole, setPendingRole] = useState('')
   const [pendingBusinessRole, setPendingBusinessRole] = useState('')
   const [demoteConfirm, setDemoteConfirm] = useState('')
+  const [riskPhrase, setRiskPhrase] = useState('')
   const [savingUserId, setSavingUserId] = useState(null)
   const [reloadingEditor, setReloadingEditor] = useState(false)
   const [editorMessage, setEditorMessage] = useState(null)
   const [pendingSave, setPendingSave] = useState(null)
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' })
+  const [passwordMessage, setPasswordMessage] = useState(null)
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false)
   const [pageNotice, setPageNotice] = useState(null)
   const editorOperationRef = useRef(0)
+  const passwordOperationRef = useRef(0)
   const currentEditingUserIdRef = useRef(null)
   const saveSequenceRef = useRef(null)
 
@@ -212,20 +309,118 @@ export default function UserManagement() {
 
   const closeUserEditor = () => {
     editorOperationRef.current += 1
+    passwordOperationRef.current += 1
     currentEditingUserIdRef.current = null
     setEditingUserId(null)
     setEditingUserSnapshot(null)
+    setDialog(null)
+    setPendingSave(null)
+    setRiskPhrase('')
+    setPasswordForm({ password: '', confirm: '' })
+    setPasswordMessage(null)
+    setPasswordSubmitting(false)
     setEditorMessage(null)
     setReloadingEditor(false)
+  }
+
+  const requestEditorClose = ({ dirty }) => {
+    if (dirty) {
+      setDialog('discard')
+      return
+    }
+    closeUserEditor()
+  }
+
+  const cancelPendingSave = () => {
+    setDialog(null)
+    setPendingSave(null)
+    setRiskPhrase('')
+  }
+
+  const cancelPasswordDialog = () => {
+    passwordOperationRef.current += 1
+    setDialog(null)
+    setPasswordForm({ password: '', confirm: '' })
+    setPasswordMessage(null)
+    setPasswordSubmitting(false)
+  }
+
+  const openPasswordDialogForUser = (user) => {
+    if (!user || currentEditingUserIdRef.current !== user.id) return
+    passwordOperationRef.current += 1
+    setPasswordForm({ password: '', confirm: '' })
+    setPasswordMessage(null)
+    setPasswordSubmitting(false)
+    setDialog('password')
+  }
+
+  const submitPasswordReset = async (event) => {
+    event.preventDefault()
+    const target = editingUser
+    if (!target || currentEditingUserIdRef.current !== target.id) return
+
+    const password = passwordForm.password.trim()
+    const confirmation = passwordForm.confirm.trim()
+    if (password.length < 8) {
+      setPasswordMessage({ kind: 'error', text: '密码至少需要 8 位' })
+      return
+    }
+    if (password !== confirmation) {
+      setPasswordMessage({ kind: 'error', text: '两次输入的密码不一致' })
+      return
+    }
+
+    const operation = {
+      token: passwordOperationRef.current + 1,
+      userId: target.id,
+    }
+    passwordOperationRef.current = operation.token
+    const isActive = () => (
+      passwordOperationRef.current === operation.token
+      && currentEditingUserIdRef.current === operation.userId
+    )
+
+    setPasswordSubmitting(true)
+    setPasswordMessage(null)
+    try {
+      await resetUserPassword(operation.userId, password)
+      if (!isActive()) return
+      setDialog(null)
+      setPasswordForm({ password: '', confirm: '' })
+      setPasswordMessage(null)
+      setEditorMessage({
+        kind: 'success',
+        retryable: false,
+        text: `已重置 ${target.username} 的登录密码`,
+      })
+    } catch (error) {
+      if (isActive()) {
+        setPasswordMessage({
+          kind: 'error',
+          text: error?.message || '密码重置失败，请稍后重试',
+        })
+      }
+    } finally {
+      if (isActive()) {
+        setPasswordSubmitting(false)
+      }
+    }
   }
 
   const openUserEditor = (user) => {
     if (saveSequenceRef.current?.userId === user.id) return
     editorOperationRef.current += 1
+    passwordOperationRef.current += 1
     currentEditingUserIdRef.current = user.id
     setEditorMessage(null)
     setPageNotice(null)
     setReloadingEditor(false)
+    setDialog(null)
+    setPendingSave(null)
+    setRiskPhrase('')
+    setPasswordForm({ password: '', confirm: '' })
+    setPasswordMessage(null)
+    setPasswordSubmitting(false)
     setEditingUserSnapshot(user)
     setEditingUserId(user.id)
   }
@@ -369,6 +564,16 @@ export default function UserManagement() {
       })
   }
 
+  const startUserSave = (payload) => {
+    if (saveSequenceRef.current) return false
+    const saveSequence = { userId: payload.userId }
+    saveSequenceRef.current = saveSequence
+    setSavingUserId(payload.userId)
+    const operation = beginEditorOperation(payload.userId)
+    void performSave(payload, operation, saveSequence)
+    return true
+  }
+
   const requestUserSave = ({ original, draft }) => {
     if (saveSequenceRef.current) return
     const payload = {
@@ -379,15 +584,24 @@ export default function UserManagement() {
     }
     if (needsRiskConfirmation(original, draft)) {
       setPendingSave(payload)
+      setRiskPhrase('')
       setDialog('risk')
       return
     }
     setPendingSave(null)
-    const saveSequence = { userId: payload.userId }
-    saveSequenceRef.current = saveSequence
-    setSavingUserId(payload.userId)
-    const operation = beginEditorOperation(payload.userId)
-    void performSave(payload, operation, saveSequence)
+    setRiskPhrase('')
+    startUserSave(payload)
+  }
+
+  const confirmRiskSave = () => {
+    const payload = pendingSave
+    if (!payload || saveSequenceRef.current) return
+    if (requiresTypedRiskPhrase(payload) && riskPhrase.trim() !== '我确定') return
+
+    setDialog(null)
+    setPendingSave(null)
+    setRiskPhrase('')
+    startUserSave(payload)
   }
 
   const confirmDemote = () => {
@@ -652,9 +866,10 @@ export default function UserManagement() {
         user={editingUser}
         saving={Boolean(savingUserId) || reloadingEditor}
         message={editorMessage}
-        onRequestClose={closeUserEditor}
+        onRequestClose={requestEditorClose}
         onRetry={retryEditorReload}
         onSave={requestUserSave}
+        onResetPassword={openPasswordDialogForUser}
       />
 
       {/* RP-026: 角色能力矩阵（可折叠） */}
@@ -730,186 +945,246 @@ export default function UserManagement() {
         )}
       </div>
 
-      {/* 改系统角色 dialog */}
-      {dialog === 'systemRole' && (
-        <DialogBackdrop onClose={() => setDialog(null)}>
-          <DialogCard title="修改系统角色" subtitle={`已选 ${selCount} 人`}>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {ROLES.map((r) => (
-                <label
-                  key={r.key}
-                  style={{
-                    display: 'flex',
-                    gap: 10,
-                    padding: '10px 12px',
-                    border: `1px solid ${pendingRole === r.key ? 'var(--brand)' : 'var(--line)'}`,
-                    borderRadius: 10,
-                    background: pendingRole === r.key ? 'var(--brand-soft)' : 'var(--bg-soft)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="role"
-                    value={r.key}
-                    checked={pendingRole === r.key}
-                    onChange={() => setPendingRole(r.key)}
-                    style={{ marginTop: 4 }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{r.label}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <DialogActions>
-              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
-                取消
-              </button>
-              <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmRole}>
-                确认修改
-              </button>
-            </DialogActions>
-          </DialogCard>
-        </DialogBackdrop>
-      )}
+      <Dialog
+        open={dialog === 'discard'}
+        title="放弃未保存修改"
+        description={editingUser?.username}
+        closeOnBackdrop={false}
+        onClose={() => setDialog(null)}
+      >
+        <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 13 }}>
+          当前修改尚未保存。放弃后，这些修改将无法恢复。
+        </p>
+        <DialogActions>
+          <button type="button" className="btn btn-out" onClick={() => setDialog(null)}>
+            继续编辑
+          </button>
+          <button type="button" className="btn btn-dan" onClick={closeUserEditor}>
+            放弃修改
+          </button>
+        </DialogActions>
+      </Dialog>
 
-      {/* 改业务角色 dialog */}
-      {dialog === 'businessRole' && (
-        <DialogBackdrop onClose={() => setDialog(null)}>
-          <DialogCard title="修改业务角色" subtitle={`已选 ${selCount} 人`}>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {BUSINESS_ROLES.map((r) => (
-                <label
-                  key={r.key}
-                  style={{
-                    display: 'flex',
-                    gap: 10,
-                    padding: '10px 12px',
-                    border: `1px solid ${pendingBusinessRole === r.key ? 'var(--brand)' : 'var(--line)'}`,
-                    borderRadius: 10,
-                    background: pendingBusinessRole === r.key ? 'var(--brand-soft)' : 'var(--bg-soft)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="businessRole"
-                    value={r.key}
-                    checked={pendingBusinessRole === r.key}
-                    onChange={() => setPendingBusinessRole(r.key)}
-                    style={{ marginTop: 4 }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{r.label}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>用于首页 AI 工作台提示词与工作流分流</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <DialogActions>
-              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
-                取消
-              </button>
-              <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={applyBusinessRole}>
-                确认修改
-              </button>
-            </DialogActions>
-          </DialogCard>
-        </DialogBackdrop>
-      )}
-
-      {/* 降权保护 dialog */}
-      {dialog === 'demote' && (
-        <DialogBackdrop onClose={() => setDialog(null)}>
-          <DialogCard title="⚠ 降权保护确认" subtitle="超级管理员降级为高风险操作">
+      <Dialog
+        open={dialog === 'password'}
+        title="重置登录密码"
+        description={editingUser?.username}
+        closeOnBackdrop={false}
+        onClose={cancelPasswordDialog}
+      >
+        <form onSubmit={submitPasswordReset}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+              <span>新密码</span>
+              <input
+                className="input"
+                type="password"
+                autoComplete="new-password"
+                value={passwordForm.password}
+                disabled={passwordSubmitting}
+                onChange={(event) => setPasswordForm((current) => ({
+                  ...current,
+                  password: event.target.value,
+                }))}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+              <span>确认密码</span>
+              <input
+                className="input"
+                type="password"
+                autoComplete="new-password"
+                value={passwordForm.confirm}
+                disabled={passwordSubmitting}
+                onChange={(event) => setPasswordForm((current) => ({
+                  ...current,
+                  confirm: event.target.value,
+                }))}
+              />
+            </label>
+          </div>
+          {passwordMessage?.text ? (
             <div
+              className="user-editor__message"
+              data-kind={passwordMessage.kind}
+              role="status"
+            >
+              {passwordMessage.text}
+            </div>
+          ) : null}
+          <DialogActions>
+            <button
+              type="button"
+              className="btn btn-out"
+              disabled={passwordSubmitting}
+              onClick={cancelPasswordDialog}
+            >
+              取消重置
+            </button>
+            <button type="submit" className="btn btn-dan" disabled={passwordSubmitting}>
+              {passwordSubmitting ? '重置中…' : '确认重置'}
+            </button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      <RiskConfirmationDialog
+        open={dialog === 'risk'}
+        pendingSave={pendingSave}
+        riskPhrase={riskPhrase}
+        onPhraseChange={setRiskPhrase}
+        onCancel={cancelPendingSave}
+        onConfirm={confirmRiskSave}
+      />
+
+      {/* 改系统角色 dialog */}
+      <Dialog
+        open={dialog === 'systemRole'}
+        title="修改系统角色"
+        description={`已选 ${selCount} 人`}
+        onClose={() => setDialog(null)}
+      >
+        <div style={{ display: 'grid', gap: 8 }}>
+          {ROLES.map((r) => (
+            <label
+              key={r.key}
               style={{
-                background: 'var(--err-soft)',
-                border: '1px solid var(--err)',
-                borderRadius: 'var(--r-md)',
-                padding: '12px 14px',
-                marginBottom: 12,
-                fontSize: 13,
-                color: 'var(--err)',
+                display: 'flex',
+                gap: 10,
+                padding: '10px 12px',
+                border: `1px solid ${pendingRole === r.key ? 'var(--brand)' : 'var(--line)'}`,
+                borderRadius: 10,
+                background: pendingRole === r.key ? 'var(--brand-soft)' : 'var(--bg-soft)',
+                cursor: 'pointer',
               }}
             >
-              你正在将超级管理员降级为较低权限角色。该操作不可逆，可能导致系统管理权限丢失。
-            </div>
-            <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--ink-2)' }}>
-              请在下方输入「我确定」以继续：
-            </p>
-            <input
-              type="text"
-              value={demoteConfirm}
-              onChange={(e) => setDemoteConfirm(e.target.value)}
-              placeholder="我确定"
+              <input
+                type="radio"
+                name="role"
+                value={r.key}
+                checked={pendingRole === r.key}
+                onChange={() => setPendingRole(r.key)}
+                style={{ marginTop: 4 }}
+              />
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{r.label}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+        <DialogActions>
+          <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+            取消
+          </button>
+          <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmRole}>
+            确认修改
+          </button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 改业务角色 dialog */}
+      <Dialog
+        open={dialog === 'businessRole'}
+        title="修改业务角色"
+        description={`已选 ${selCount} 人`}
+        onClose={() => setDialog(null)}
+      >
+        <div style={{ display: 'grid', gap: 8 }}>
+          {BUSINESS_ROLES.map((r) => (
+            <label
+              key={r.key}
               style={{
-                width: '100%',
-                padding: '8px 10px',
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--r-md)',
-                fontSize: 13,
-                fontFamily: 'inherit',
-                outline: 'none',
+                display: 'flex',
+                gap: 10,
+                padding: '10px 12px',
+                border: `1px solid ${pendingBusinessRole === r.key ? 'var(--brand)' : 'var(--line)'}`,
+                borderRadius: 10,
+                background: pendingBusinessRole === r.key ? 'var(--brand-soft)' : 'var(--bg-soft)',
+                cursor: 'pointer',
               }}
-            />
-            <DialogActions>
-              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
-                取消
-              </button>
-              <button type="button" className="btn btn-dan" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmDemote}>
-                确认降级
-              </button>
-            </DialogActions>
-          </DialogCard>
-        </DialogBackdrop>
-      )}
+            >
+              <input
+                type="radio"
+                name="businessRole"
+                value={r.key}
+                checked={pendingBusinessRole === r.key}
+                onChange={() => setPendingBusinessRole(r.key)}
+                style={{ marginTop: 4 }}
+              />
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{r.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>用于首页 AI 工作台提示词与工作流分流</div>
+              </div>
+            </label>
+          ))}
+        </div>
+        <DialogActions>
+          <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+            取消
+          </button>
+          <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={applyBusinessRole}>
+            确认修改
+          </button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 降权保护 dialog */}
+      <Dialog
+        open={dialog === 'demote'}
+        title="⚠ 降权保护确认"
+        description="超级管理员降级为高风险操作"
+        closeOnBackdrop={false}
+        onClose={() => {
+          setDialog(null)
+          setDemoteConfirm('')
+        }}
+      >
+        <div
+          style={{
+            background: 'var(--err-soft)',
+            border: '1px solid var(--err)',
+            borderRadius: 'var(--r-md)',
+            padding: '12px 14px',
+            marginBottom: 12,
+            fontSize: 13,
+            color: 'var(--err)',
+          }}
+        >
+          你正在将超级管理员降级为较低权限角色。该操作不可逆，可能导致系统管理权限丢失。
+        </div>
+        <label style={{ display: 'grid', gap: 8, fontSize: 13, color: 'var(--ink-2)' }}>
+          <span>输入“我确定”</span>
+          <input
+            className="input"
+            type="text"
+            value={demoteConfirm}
+            onChange={(event) => setDemoteConfirm(event.target.value)}
+            placeholder="我确定"
+          />
+        </label>
+        <DialogActions>
+          <button
+            type="button"
+            className="btn btn-out"
+            style={{ height: 30, fontSize: 12, padding: '0 14px' }}
+            onClick={() => {
+              setDialog(null)
+              setDemoteConfirm('')
+            }}
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            className="btn btn-dan"
+            style={{ height: 30, fontSize: 12, padding: '0 14px' }}
+            disabled={demoteConfirm.trim() !== '我确定'}
+            onClick={confirmDemote}
+          >
+            确认降级
+          </button>
+        </DialogActions>
+      </Dialog>
     </PageShell>
   )
-}
-
-// ---- inline Dialog primitives ----
-function DialogBackdrop({ children, onClose }) {
-  return (
-    <div
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15,23,42,0.42)',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 20,
-        zIndex: 50,
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
-function DialogCard({ title, subtitle, children }) {
-  return (
-    <div
-      style={{
-        width: 'min(480px, 100%)',
-        background: '#fff',
-        borderRadius: 'var(--r-lg)',
-        boxShadow: '0 24px 64px rgba(15,23,42,0.24)',
-        border: '1px solid var(--line)',
-        padding: 18,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <strong style={{ fontSize: 14 }}>{title}</strong>
-        {subtitle && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{subtitle}</span>}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function DialogActions({ children }) {
-  return <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>{children}</div>
 }
