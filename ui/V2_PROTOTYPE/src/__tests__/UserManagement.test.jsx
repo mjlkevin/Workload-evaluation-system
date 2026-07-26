@@ -1064,7 +1064,7 @@ describe('UserManagement', () => {
     ])
   })
 
-  test('serializes saves while preserving a different editor across completion', async () => {
+  test('locks dismissal and user switching while a save is pending', async () => {
     let releasePatch
     let patchCompleted = false
     let patchCount = 0
@@ -1134,25 +1134,20 @@ describe('UserManagement', () => {
     })
     expect(screen.getByRole('button', { name: '+ 邀请成员' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '改系统角色' })).toBeDisabled()
-    fireEvent.click(within(editor).getByRole('button', { name: '关闭编辑用户' }))
-    fireEvent.click(
-      within(screen.getByRole('dialog', { name: '放弃未保存修改' }))
-        .getByRole('button', { name: '放弃修改' })
-    )
-
-    const editArch = screen.getByRole('button', { name: '编辑 arch' })
-    expect(editArch).toBeDisabled()
-    fireEvent.click(editArch)
-    expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: '编辑 pm' }))
-
-    editor = screen.getByRole('dialog', { name: '编辑用户' })
-    expect(within(editor).getByText('pm')).toBeInTheDocument()
+    expect(within(editor).getByRole('button', { name: '关闭编辑用户' })).toBeDisabled()
+    expect(within(editor).getByRole('button', { name: '取消' })).toBeDisabled()
     expect(within(editor).getByLabelText('系统角色')).toBeDisabled()
     expect(within(editor).getByLabelText('业务角色')).toBeDisabled()
     expect(within(editor).getByRole('button', { name: '保存中…' })).toBeDisabled()
     expect(within(editor).getByRole('button', { name: '重置密码…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '编辑 arch' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '编辑 pm' })).toBeDisabled()
+
+    fireEvent.keyDown(editor, { key: 'Escape' })
+    fireEvent.click(editor.parentElement)
+
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '放弃未保存修改' })).not.toBeInTheDocument()
     expect(patchCount).toBe(1)
 
     releasePatch()
@@ -1160,19 +1155,12 @@ describe('UserManagement', () => {
     await waitFor(() => {
       expect(patchCompleted).toBe(true)
       expect(getCount).toBeGreaterThanOrEqual(2)
+      expect(screen.queryByRole('dialog', { name: '编辑用户' })).not.toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent('已保存 arch')
     })
-    editor = screen.getByRole('dialog', { name: '编辑用户' })
-    expect(within(editor).getByText('pm')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '编辑 arch' })).toBeEnabled()
-    expect(within(editor).getByLabelText('系统角色')).toBeEnabled()
-    expect(within(editor).getByLabelText('业务角色')).toBeEnabled()
-    fireEvent.change(within(editor).getByLabelText('业务角色'), {
-      target: { value: 'sales' },
-    })
-    expect(within(editor).getByRole('button', { name: '保存变更' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '编辑 pm' })).toBeEnabled()
     expect(patchCount).toBe(1)
-    expect(within(editor).queryByRole('status')).not.toBeInTheDocument()
-    expect(screen.queryByText('已保存 arch')).not.toBeInTheDocument()
   })
 
   test('stops after a failed patch, reports failed reconciliation, and retries the reload', async () => {

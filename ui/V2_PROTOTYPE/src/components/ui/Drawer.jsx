@@ -28,6 +28,7 @@ export function Drawer({
   closeOnBackdrop = true,
   initialFocusRef,
   blocked = false,
+  dismissDisabled = false,
 }) {
   const titleId = useId()
   const descriptionId = useId()
@@ -35,8 +36,10 @@ export function Drawer({
   const openerRef = useRef(null)
   const onCloseRef = useRef(onClose)
   const blockedRef = useRef(blocked)
+  const dismissDisabledRef = useRef(dismissDisabled)
   onCloseRef.current = onClose
   blockedRef.current = blocked
+  dismissDisabledRef.current = dismissDisabled
 
   useEffect(() => {
     if (!open) return undefined
@@ -61,6 +64,7 @@ export function Drawer({
       if (eventModal && eventModal !== surface) return
 
       if (event.key === 'Escape') {
+        if (dismissDisabledRef.current) return
         event.preventDefault()
         onCloseRef.current?.()
         return
@@ -102,7 +106,12 @@ export function Drawer({
   if (!open) return null
 
   const handleBackdropClick = (event) => {
-    if (!blockedRef.current && closeOnBackdrop && event.target === event.currentTarget) {
+    if (
+      !blockedRef.current
+      && !dismissDisabledRef.current
+      && closeOnBackdrop
+      && event.target === event.currentTarget
+    ) {
       onCloseRef.current?.()
     }
   }
@@ -124,16 +133,18 @@ export function Drawer({
           <div className="wes-drawer__heading">
             <h2 className="wes-drawer__title" id={titleId}>{title}</h2>
             {description ? (
-              <p className="wes-drawer__description" id={descriptionId}>{description}</p>
+              <p className="wes-drawer__description" id={descriptionId} title={description}>
+                {description}
+              </p>
             ) : null}
           </div>
           <button
             type="button"
             className="wes-drawer__close"
             aria-label={`关闭${title}`}
-            disabled={blocked}
+            disabled={blocked || dismissDisabled}
             onClick={() => {
-              if (!blockedRef.current) onCloseRef.current?.()
+              if (!blockedRef.current && !dismissDisabledRef.current) onCloseRef.current?.()
             }}
           >
             ×

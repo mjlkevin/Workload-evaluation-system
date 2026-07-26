@@ -536,6 +536,7 @@ export default function UserManagement() {
   }
 
   const requestEditorClose = ({ dirty }) => {
+    if (saveSequenceRef.current || reloadingEditor || passwordSubmitting) return
     if (dirty) {
       setDialog('discard')
       return
@@ -627,7 +628,7 @@ export default function UserManagement() {
 
   const openUserEditor = (user) => {
     if (
-      saveSequenceRef.current?.userId === user.id
+      saveSequenceRef.current
       || bulkOperationRef.current
       || inviteOperationRef.current
     ) return
@@ -1087,11 +1088,7 @@ export default function UserManagement() {
                         type="button"
                         className="btn btn-ghost"
                         aria-label={`编辑 ${u.username}`}
-                        disabled={
-                          savingUserId === u.id
-                          || bulkSubmitting
-                          || inviteSubmitting
-                        }
+                        disabled={globalOperationLocked}
                         style={{ fontSize: 12, padding: '4px 10px', height: 28 }}
                         onClick={(event) => {
                           event.stopPropagation()

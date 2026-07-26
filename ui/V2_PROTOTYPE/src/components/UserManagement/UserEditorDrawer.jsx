@@ -54,7 +54,9 @@ export default function UserEditorDrawer({
 
   if (!user || !draft) return null
 
-  const requestClose = () => onRequestClose({ dirty })
+  const requestClose = () => {
+    if (!saving) onRequestClose({ dirty })
+  }
   const fieldsDisabled = !onSave || saving
 
   return (
@@ -65,10 +67,11 @@ export default function UserEditorDrawer({
       initialFocusRef={fieldsDisabled ? undefined : systemRoleRef}
       closeOnBackdrop
       blocked={blocked}
+      dismissDisabled={saving}
       onClose={requestClose}
       footer={(
         <>
-          <button type="button" className="btn btn-out" onClick={requestClose}>
+          <button type="button" className="btn btn-out" disabled={saving} onClick={requestClose}>
             取消
           </button>
           {onSave ? (

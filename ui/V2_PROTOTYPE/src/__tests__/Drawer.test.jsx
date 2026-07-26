@@ -10,7 +10,7 @@ import {
 import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
 import { Drawer } from '../components/ui/Drawer.jsx'
 
-function DrawerHarness({ closeOnBackdrop = true }) {
+function DrawerHarness({ closeOnBackdrop = true, dismissDisabled = false }) {
   const [open, setOpen] = useState(false)
   const roleSelectRef = useRef(null)
 
@@ -22,6 +22,7 @@ function DrawerHarness({ closeOnBackdrop = true }) {
         title="编辑用户"
         description="arch"
         closeOnBackdrop={closeOnBackdrop}
+        dismissDisabled={dismissDisabled}
         initialFocusRef={roleSelectRef}
         onClose={() => setOpen(false)}
         footer={<button type="button">保存变更</button>}
@@ -203,7 +204,9 @@ describe('Drawer', () => {
     const drawer = screen.getByRole('dialog', { name: '编辑用户' })
     expect(drawer).toHaveAttribute('aria-modal', 'true')
     expect(document.getElementById(drawer.getAttribute('aria-labelledby'))).toHaveTextContent('编辑用户')
-    expect(document.getElementById(drawer.getAttribute('aria-describedby'))).toHaveTextContent('arch')
+    const description = document.getElementById(drawer.getAttribute('aria-describedby'))
+    expect(description).toHaveTextContent('arch')
+    expect(description).toHaveAttribute('title', 'arch')
     expect(screen.getByRole('button', { name: '关闭编辑用户' })).toBeInTheDocument()
     await waitFor(() => expect(screen.getByLabelText('系统角色')).toHaveFocus())
   })
@@ -254,6 +257,22 @@ describe('Drawer', () => {
     rerender(<DrawerHarness closeOnBackdrop />)
     fireEvent.click(screen.getByRole('dialog').parentElement)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  test('keeps modal semantics while dismissal is disabled', () => {
+    render(<DrawerHarness dismissDisabled />)
+    fireEvent.click(screen.getByRole('button', { name: '编辑 arch' }))
+
+    const drawer = screen.getByRole('dialog', { name: '编辑用户' })
+    const closeButton = screen.getByRole('button', { name: '关闭编辑用户' })
+    expect(drawer).toHaveAttribute('aria-modal', 'true')
+    expect(closeButton).toBeDisabled()
+
+    fireEvent.keyDown(drawer, { key: 'Escape' })
+    fireEvent.click(drawer.parentElement)
+
+    expect(screen.getByRole('dialog', { name: '编辑用户' })).toBeInTheDocument()
+    expect(screen.getByLabelText('系统角色')).toBeEnabled()
   })
 
   test('skips tabindex-negative and disabled controls when trapping focus', () => {
