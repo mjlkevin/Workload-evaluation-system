@@ -1387,103 +1387,50 @@ git commit -m "fix(WES Users): RP-043 · 恢复批量持久化与邀请反馈"
 
 **Files:**
 
-- Modify: `docs/openapi.yaml:2102-2185`
-- Modify: `docs/superpowers/specs/2026-07-25-wes-user-management-drawer-design.md`
+- Modify: `docs/openapi.yaml`
+- Modify: `docs/superpowers/plans/2026-07-26-wes-user-management-drawer.md`
 - Test: existing API module tests and UI tests
 
-- [ ] **Step 1: Add the missing existing API contracts**
+- [ ] **Step 1: Align the existing user-management contracts**
 
-Insert `/api/v1/auth/users/{userId}/business-role` after the role route:
+- Add `/api/v1/auth/users/{userId}/business-role` with the exact
+  `sales | pre_sales | delivery | pm | pmo | dev | admin` enum.
+- Add `/api/v1/auth/users/{userId}/password` with `password.minLength: 8`.
+- Keep role, business-role, status, and password responses aligned to the
+  handler outcomes: `200 / 400 / 401 / 403 / 404`. Because the route-level
+  `user:manage` middleware currently admits only `admin`, describe `403` as
+  `缺少 user:manage 能力`; do not advertise handler branches that cannot be
+  reached through the HTTP route.
+- Reuse one `UserResponse` for `/auth/me` and the four user mutations. These
+  handlers all call `ok(..., randomUUID())`, so `requestId` is required:
 
-```yaml
-  /api/v1/auth/users/{userId}/business-role:
-    patch:
-      tags: [Auth]
-      summary: 修改用户业务角色（admin）
-      operationId: updateUserBusinessRole
-      parameters:
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [businessRole]
-              properties:
-                businessRole:
-                  type: string
-                  enum: [sales, pre_sales, delivery, pm, pmo, dev, admin]
-      responses:
-        "200":
-          description: 更新成功
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MeResponse"
-        "400":
-          description: 参数错误
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: 无权限
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-```
+  ```yaml
+  UserResponse:
+    type: object
+    properties:
+      code:
+        type: integer
+        const: 0
+      message:
+        type: string
+        const: ok
+      requestId:
+        type: string
+      data:
+        type: object
+        properties:
+          user:
+            $ref: "#/components/schemas/PublicUser"
+        required: [user]
+    required: [code, message, data, requestId]
+  ```
 
-Insert the password route after status:
-
-```yaml
-  /api/v1/auth/users/{userId}/password:
-    patch:
-      tags: [Auth]
-      summary: 管理员重置用户密码
-      operationId: updateUserPassword
-      parameters:
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [password]
-              properties:
-                password:
-                  type: string
-                  minLength: 8
-      responses:
-        "200":
-          description: 重置成功
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MeResponse"
-        "400":
-          description: 参数错误
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: 无权限
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-```
+- Keep `PublicUser.businessRole` aligned to the same seven-value enum.
+- Keep invite contracts aligned to the persisted record: no `expiresAt`,
+  statuses are `active | used`, and the optional consumption fields are
+  `usedByUserId`, `usedByUsername`, and `usedAt`.
+- The design specification already states that invite records have no
+  `expiresAt`; do not create a no-op specification diff.
 
 - [ ] **Step 2: Verify route and document alignment**
 
@@ -1492,16 +1439,66 @@ Run:
 ```bash
 rg -n 'users/:userId/(role|business-role|password|status)' apps/api/src/routes/auth.routes.ts
 rg -n '/api/v1/auth/users/\\{userId\\}/(role|business-role|password|status)' docs/openapi.yaml
+
+ruby <<'RUBY'
+require "yaml"
+
+document = YAML.safe_load(File.read("docs/openapi.yaml"), aliases: true)
+abort("missing OpenAPI document roots") unless document["openapi"] && document["paths"] && document.dig("components", "schemas")
+
+http_methods = %w[get put post delete options head patch trace]
+operation_ids = document.fetch("paths").flat_map do |_path, path_item|
+  path_item.map do |method, operation|
+    next unless http_methods.include?(method) && operation.is_a?(Hash)
+    operation["operationId"]
+  end.compact
+end
+operation_counts = operation_ids.each_with_object(Hash.new(0)) { |operation_id, counts| counts[operation_id] += 1 }
+duplicate_operation_ids = operation_counts.select { |_operation_id, count| count > 1 }.keys
+abort("duplicate operationId: #{duplicate_operation_ids.join(', ')}") unless duplicate_operation_ids.empty?
+
+local_refs = []
+walk = lambda do |value|
+  case value
+  when Hash
+    ref = value["$ref"]
+    local_refs << ref if ref.is_a?(String) && ref.start_with?("#/")
+    value.each_value { |child| walk.call(child) }
+  when Array
+    value.each { |child| walk.call(child) }
+  end
+end
+walk.call(document)
+
+unresolved_refs = local_refs.uniq.reject do |ref|
+  begin
+    ref.delete_prefix("#/").split("/").reduce(document) do |node, token|
+      node.fetch(token.gsub("~1", "/").gsub("~0", "~"))
+    end
+    true
+  rescue KeyError, NoMethodError
+    false
+  end
+end
+abort("unresolved local refs: #{unresolved_refs.join(', ')}") unless unresolved_refs.empty?
+
+puts "OpenAPI validation passed: #{operation_ids.size} operationIds unique, #{local_refs.uniq.size} local refs resolved"
+RUBY
+
+(cd apps/api && npx tsx --test --test-global-setup=./test-setup.mts src/modules/modules.handlers.test.ts)
 npm run build:api
 ```
 
-Expected: all four routes appear in both code and OpenAPI; API build passes.
+Expected: all four routes appear in both code and OpenAPI; YAML parsing,
+duplicate `operationId`, and local `$ref` checks pass; the focused module suite
+and API build pass.
 
 - [ ] **Step 3: Run the WES UI scope checker**
 
 ```bash
 node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 13eecc2 -- \
   ui/V2_PROTOTYPE/src/components/ui/Drawer.jsx \
+  ui/V2_PROTOTYPE/src/components/ui/Dialog.jsx \
   ui/V2_PROTOTYPE/src/components/UserManagement/UserEditorDrawer.jsx \
   ui/V2_PROTOTYPE/src/pages/UserManagement.jsx \
   ui/V2_PROTOTYPE/tokens.css \
@@ -1520,8 +1517,8 @@ Expected:
 ```bash
 git add -- \
   docs/openapi.yaml \
-  docs/superpowers/specs/2026-07-25-wes-user-management-drawer-design.md
-git commit -m "docs(WES Users): RP-043 · 对齐用户管理现有 API 契约"
+  docs/superpowers/plans/2026-07-26-wes-user-management-drawer.md
+git commit -m "docs(WES Users): RP-043 · 收紧用户管理契约校验"
 ```
 
 ### Task 7: Full verification, browser evidence, and command-board closure

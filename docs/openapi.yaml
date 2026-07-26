@@ -2053,7 +2053,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MeResponse"
+                $ref: "#/components/schemas/UserResponse"
         "401":
           description: 未登录
           content:
@@ -2133,7 +2133,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MeResponse"
+                $ref: "#/components/schemas/UserResponse"
         "400":
           description: 角色参数非法、禁止最后一个 admin 降权等校验失败
           content:
@@ -2147,7 +2147,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: 缺少 user:manage 能力或违反受保护用户规则
+          description: 缺少 user:manage 能力
           content:
             application/json:
               schema:
@@ -2187,7 +2187,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MeResponse"
+                $ref: "#/components/schemas/UserResponse"
         "400":
           description: 业务角色参数非法
           content:
@@ -2201,7 +2201,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: 缺少 user:manage 能力或违反受保护用户规则
+          description: 缺少 user:manage 能力
           content:
             application/json:
               schema:
@@ -2241,7 +2241,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MeResponse"
+                $ref: "#/components/schemas/UserResponse"
         "400":
           description: 禁止管理员禁用自身等校验失败
           content:
@@ -2255,7 +2255,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: 缺少 user:manage 能力或违反受保护用户规则
+          description: 缺少 user:manage 能力
           content:
             application/json:
               schema:
@@ -2295,7 +2295,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MeResponse"
+                $ref: "#/components/schemas/UserResponse"
         "400":
           description: 密码少于 8 位等参数校验失败
           content:
@@ -2309,7 +2309,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: 缺少 user:manage 能力或违反受保护用户规则
+          description: 缺少 user:manage 能力
           content:
             application/json:
               schema:
@@ -6787,7 +6787,7 @@ components:
           required: [success]
       required: [code, message, data]
 
-    MeResponse:
+    UserResponse:
       type: object
       properties:
         code:
@@ -6796,13 +6796,15 @@ components:
         message:
           type: string
           const: ok
+        requestId:
+          type: string
         data:
           type: object
           properties:
             user:
               $ref: "#/components/schemas/PublicUser"
           required: [user]
-      required: [code, message, data]
+      required: [code, message, data, requestId]
 
     InviteCodeRecord:
       type: object
