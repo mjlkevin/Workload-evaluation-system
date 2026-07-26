@@ -86,7 +86,7 @@
     },
     {
       "kind": "command",
-      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 13eecc2 -- ui/V2_PROTOTYPE/src/components/ui/Drawer.jsx ui/V2_PROTOTYPE/src/components/ui/Dialog.jsx ui/V2_PROTOTYPE/src/components/UserManagement/UserEditorDrawer.jsx ui/V2_PROTOTYPE/src/pages/UserManagement.jsx ui/V2_PROTOTYPE/tokens.css ui/V2_PROTOTYPE/components.css",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 13eecc2 -- ui/V2_PROTOTYPE/src/components/ui/Drawer.jsx ui/V2_PROTOTYPE/src/components/ui/Dialog.jsx ui/V2_PROTOTYPE/src/components/UserManagement/UserEditorDrawer.jsx ui/V2_PROTOTYPE/src/api/users.js ui/V2_PROTOTYPE/src/hooks/useUsers.js ui/V2_PROTOTYPE/src/pages/UserManagement.jsx ui/V2_PROTOTYPE/tokens.css ui/V2_PROTOTYPE/components.css",
       "result": "pass",
       "summary": "确定性 UI scope checker 无新增 finding，仍为一个页面族且没有引入第二组件栈。"
     },

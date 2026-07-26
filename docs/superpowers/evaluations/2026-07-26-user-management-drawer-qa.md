@@ -38,7 +38,7 @@
 | `(cd apps/api && npx tsx --test --test-global-setup=./test-setup.mts src/modules/modules.handlers.test.ts)` | 通过 | API modules handlers 全量回归 52/52，其中包含登录、`me`、业务角色、管理员重置密码、`listUsers` 等用户管理/auth 用例。 |
 | `npm run build:api` | 通过 | API TypeScript 构建通过。 |
 | OpenAPI YAML、`operationId` 与本地 `$ref` 检查 | 通过 | 164 个 `operationId` 唯一；135 个本地引用均可解析。 |
-| `node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 13eecc2 -- ui/V2_PROTOTYPE/src/components/ui/Drawer.jsx ui/V2_PROTOTYPE/src/components/ui/Dialog.jsx ui/V2_PROTOTYPE/src/components/UserManagement/UserEditorDrawer.jsx ui/V2_PROTOTYPE/src/pages/UserManagement.jsx ui/V2_PROTOTYPE/tokens.css ui/V2_PROTOTYPE/components.css` | 通过 | 本批 UI scope checker 无新增 finding。 |
+| `node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 13eecc2 -- ui/V2_PROTOTYPE/src/components/ui/Drawer.jsx ui/V2_PROTOTYPE/src/components/ui/Dialog.jsx ui/V2_PROTOTYPE/src/components/UserManagement/UserEditorDrawer.jsx ui/V2_PROTOTYPE/src/api/users.js ui/V2_PROTOTYPE/src/hooks/useUsers.js ui/V2_PROTOTYPE/src/pages/UserManagement.jsx ui/V2_PROTOTYPE/tokens.css ui/V2_PROTOTYPE/components.css` | 通过 | 本批 UI scope checker 无新增 finding。 |
 
 ## Desktop 1440 × 900
 
