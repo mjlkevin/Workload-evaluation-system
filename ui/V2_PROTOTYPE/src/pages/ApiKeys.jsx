@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
+import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
 import useApiKeys from '../hooks/useApiKeys.js'
 
 const INITIAL_KEYS = [
@@ -26,6 +27,7 @@ export default function ApiKeys() {
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState(null)
   const [dialog, setDialog] = useState(null) // 'new' | null
+  const [revokeTarget, setRevokeTarget] = useState(null) // key object pending revoke confirmation
   const [newName, setNewName] = useState('')
   const [newScope, setNewScope] = useState('read')
   const { keys: apiKeys, loading, error, actions } = useApiKeys({ fallbackData: INITIAL_KEYS })
@@ -51,10 +53,20 @@ export default function ApiKeys() {
   }
 
   const toggleStatus = async (key) => {
-    const result = key.status === 'active'
-      ? await actions.revokeKey(key.id)
-      : await actions.restoreKey(key.id)
-    showToast(result.success ? (key.status === 'active' ? '已撤销' : '已恢复') : result.error)
+    if (key.status === 'active') {
+      // 破坏性动作：先打开确认弹窗，确认后再执行
+      setRevokeTarget(key)
+      return
+    }
+    const result = await actions.restoreKey(key.id)
+    showToast(result.success ? '已恢复' : result.error)
+  }
+
+  const confirmRevoke = async () => {
+    if (!revokeTarget) return
+    const result = await actions.revokeKey(revokeTarget.id)
+    showToast(result.success ? '已撤销' : result.error)
+    setRevokeTarget(null)
   }
 
   const createKey = async () => {
@@ -97,7 +109,7 @@ export default function ApiKeys() {
       actions={[]}
     >
       <div style={{ padding: '18px 24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16 }}>
+        <div className="grid-2-eq">
           {/* API Keys */}
           <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
             <div
@@ -486,116 +498,92 @@ export default function ApiKeys() {
       )}
 
       {/* New Key dialog */}
-      {dialog === 'new' && (
-        <DialogBackdrop onClose={() => setDialog(null)}>
-          <DialogCard title="生成新 API Key">
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4, fontWeight: 600 }}>
-                密钥名称
-              </label>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="如：生产环境主密钥"
+      <Dialog
+        open={dialog === 'new'}
+        title="生成新 API Key"
+        onClose={() => setDialog(null)}
+      >
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4, fontWeight: 600 }}>
+            密钥名称
+          </label>
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="如：生产环境主密钥"
+            style={{
+              width: '100%',
+              padding: '8px 10px',
+              border: '1px solid var(--line)',
+              borderRadius: 'var(--r-md)',
+              fontSize: 13,
+              fontFamily: 'inherit',
+              outline: 'none',
+            }}
+          />
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4, fontWeight: 600 }}>
+            权限范围
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {SCOPES.map((s) => (
+              <label
+                key={s.key}
                 style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--r-md)',
-                  fontSize: 13,
-                  fontFamily: 'inherit',
-                  outline: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: `1px solid ${newScope === s.key ? 'var(--brand)' : 'var(--line)'}`,
+                  background: newScope === s.key ? 'var(--brand-soft)' : 'var(--surface)',
+                  cursor: 'pointer',
+                  fontSize: 12,
                 }}
-              />
-            </div>
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4, fontWeight: 600 }}>
-                权限范围
+              >
+                <input
+                  type="radio"
+                  name="scope"
+                  value={s.key}
+                  checked={newScope === s.key}
+                  onChange={() => setNewScope(s.key)}
+                />
+                {s.label}
               </label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {SCOPES.map((s) => (
-                  <label
-                    key={s.key}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '6px 10px',
-                      borderRadius: 6,
-                      border: `1px solid ${newScope === s.key ? 'var(--brand)' : 'var(--line)'}`,
-                      background: newScope === s.key ? 'var(--brand-soft)' : '#fff',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="scope"
-                      value={s.key}
-                      checked={newScope === s.key}
-                      onChange={() => setNewScope(s.key)}
-                    />
-                    {s.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <DialogActions>
-              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
-                取消
-              </button>
-              <button type="button" className="btn btn-pri" disabled={loading} style={{ height: 30, fontSize: 12, padding: '0 14px', opacity: loading ? 0.72 : 1 }} onClick={createKey}>
-                {loading ? '生成中…' : '确认生成'}
-              </button>
-            </DialogActions>
-          </DialogCard>
-        </DialogBackdrop>
-      )}
+            ))}
+          </div>
+        </div>
+        <DialogActions>
+          <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setDialog(null)}>
+            取消
+          </button>
+          <button type="button" className="btn btn-pri" disabled={loading} style={{ height: 30, fontSize: 12, padding: '0 14px', opacity: loading ? 0.72 : 1 }} onClick={createKey}>
+            {loading ? '生成中…' : '确认生成'}
+          </button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Revoke confirmation dialog */}
+      <Dialog
+        open={revokeTarget !== null}
+        title="撤销密钥"
+        description="撤销后使用该密钥的集成将立即失效，此操作不可逆。"
+        onClose={() => setRevokeTarget(null)}
+      >
+        <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+          确定要撤销密钥 <strong style={{ color: 'var(--ink)' }}>{revokeTarget?.name}</strong> 吗？
+        </div>
+        <DialogActions>
+          <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setRevokeTarget(null)}>
+            取消
+          </button>
+          <button type="button" className="btn btn-dan" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={confirmRevoke}>
+            确认撤销
+          </button>
+        </DialogActions>
+      </Dialog>
     </PageShell>
   )
-}
-
-// ---- inline Dialog primitives ----
-function DialogBackdrop({ children, onClose }) {
-  return (
-    <div
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15,23,42,0.42)',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 20,
-        zIndex: 50,
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
-function DialogCard({ title, children }) {
-  return (
-    <div
-      style={{
-        width: 'min(480px, 100%)',
-        background: '#fff',
-        borderRadius: 'var(--r-lg)',
-        boxShadow: '0 24px 64px rgba(15,23,42,0.24)',
-        border: '1px solid var(--line)',
-        padding: 18,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <strong style={{ fontSize: 14 }}>{title}</strong>
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function DialogActions({ children }) {
-  return <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>{children}</div>
 }
