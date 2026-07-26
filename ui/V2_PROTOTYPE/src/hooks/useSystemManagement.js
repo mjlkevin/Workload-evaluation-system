@@ -213,7 +213,6 @@ export default function useSystemManagement({
     if (!enabled) return
     const { kimiCredentials: _creds, ...rest } = modelConfig
     await apiClient.patch('/system/requirement-settings/draft', rest)
-    alert('草稿已保存')
   }), [enabled, modelConfig, withAction])
 
   const saveModelDraftWithKey = useCallback((apiKeyInput) => withAction('saveModelDraft', async () => {
@@ -225,7 +224,6 @@ export default function useSystemManagement({
     }
     await apiClient.patch('/system/requirement-settings/draft', body)
     await loadModels()
-    alert('草稿已保存')
   }), [enabled, modelConfig, withAction, loadModels])
 
   const clearApiKeyDraft = useCallback(() => withAction('clearApiKey', async () => {
@@ -239,7 +237,6 @@ export default function useSystemManagement({
   const activateModel = useCallback(() => withAction('activateModel', async () => {
     if (enabled) await apiClient.post('/system/requirement-settings/activate')
     await loadModels()
-    alert('配置已生效')
   }), [enabled, withAction, loadModels])
 
   const testApiKey = useCallback((key) => withAction('testApiKey', async () => {

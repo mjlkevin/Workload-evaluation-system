@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
 import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
 import { getSystemManagementSectionById } from '../config/systemManagementSections.js'
@@ -76,6 +76,12 @@ export default function SystemManagement({ sectionId }) {
   const [kbTesting, setKbTesting] = useState(false)
   const [testResultDialog, setTestResultDialog] = useState(false)
   const [testResultForm, setTestResultForm] = useState({ executorName: '', environment: '', account: '', testCaseKey: '', resultStatus: 'passed', screenshotUrl: '', notes: '' })
+  const [modelSaveResult, setModelSaveResult] = useState(null)
+  const [modelDirty, setModelDirty] = useState(false)
+  const [confirmDiscardModel, setConfirmDiscardModel] = useState(false)
+  const [modelSaveError, setModelSaveError] = useState(null)
+  const [modelSaving, setModelSaving] = useState(false)
+  const modelSnapshotRef = useRef(null)
 
   const tabs = [
     { id: 'rules', label: '编码规则', count: rules.length },
@@ -109,6 +115,63 @@ export default function SystemManagement({ sectionId }) {
     setKbSaveResult(result.success
       ? { ok: true, message: '知识库配置草稿已保存' }
       : { ok: false, message: result.error || '知识库配置草稿保存失败' })
+  }
+
+  const handleSaveModelDraft = async () => {
+    setModelSaveResult(null)
+    const result = await actions.saveModelDraftWithKey(apiKeyInput || undefined)
+    setApiKeyInput('')
+    setModelSaveResult(result.success
+      ? { ok: true, message: '草稿已保存' }
+      : { ok: false, message: result.error || '草稿保存失败' })
+  }
+
+  const handleActivateModel = async () => {
+    setModelSaveResult(null)
+    const result = await actions.activateModel()
+    setModelSaveResult(result.success
+      ? { ok: true, message: '配置已生效' }
+      : { ok: false, message: result.error || '配置生效失败' })
+  }
+
+  const handleModelConfigChange = (key, patch) => {
+    actions.updateModelConfig(key, patch) // eslint-disable-line -- internal delegation
+    setModelDirty(true)
+  }
+
+  const requestCloseModelEdit = () => {
+    if (modelSaving) return
+    if (modelDirty) {
+      setConfirmDiscardModel(true)
+    } else {
+      setEditingModel(null)
+    }
+  }
+
+  const confirmDiscard = () => {
+    if (modelSnapshotRef.current) {
+      Object.entries(modelSnapshotRef.current).forEach(([key, value]) => {
+        actions.updateModelConfig(key, value) // eslint-disable-line -- restore snapshot
+      })
+    }
+    setConfirmDiscardModel(false)
+    setModelDirty(false)
+    setModelSaveError(null)
+    setEditingModel(null)
+  }
+
+  const handleModelEditSave = async () => {
+    setModelSaving(true)
+    setModelSaveError(null)
+    const result = await actions.saveModelDraft()
+    setModelSaving(false)
+    if (result.success) {
+      setModelDirty(false)
+      setEditingModel(null)
+      setModelSaveResult({ ok: true, message: '草稿已保存' })
+    } else {
+      setModelSaveError(result.error || '保存失败，请重试')
+    }
   }
 
   return (
@@ -218,20 +281,38 @@ export default function SystemManagement({ sectionId }) {
         {activeSectionId === 'model' && (
           <div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => { actions.saveModelDraftWithKey(apiKeyInput || undefined); setApiKeyInput('') }} disabled={actionLoading.saveModelDraft}>
+              <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraft}>
                 {actionLoading.saveModelDraft ? '...' : '保存草稿'}
               </button>
-              <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateModel()} disabled={actionLoading.activateModel}>
+              <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={handleActivateModel} disabled={actionLoading.activateModel}>
                 {actionLoading.activateModel ? '...' : '⌁ 生效配置'}
               </button>
             </div>
+
+            {modelSaveResult && (
+              <div
+                role="status"
+                style={{
+                  background: modelSaveResult.ok ? 'var(--ok-soft)' : 'var(--err-soft)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 'var(--r-md)',
+                  color: modelSaveResult.ok ? 'var(--ok)' : 'var(--err)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  marginBottom: 12,
+                  padding: '10px 14px',
+                }}
+              >
+                {modelSaveResult.ok ? '✓ ' : '✗ '}{modelSaveResult.message}
+              </div>
+            )}
             <div className="grid-3-eq" style={{ gap: 16 }}>
               {MODEL_CARDS.map((card) => {
                 const cfg = modelConfig[card.key] || {}
                 return (
                   <div
                     key={card.key}
-                    style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16 }}
+                    style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16 }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                       {card.title}
@@ -287,7 +368,7 @@ export default function SystemManagement({ sectionId }) {
                     >
                       <span style={{ flex: 1 }}>{card.desc}</span>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px', height: 30 }} onClick={() => setEditingModel(card.key)}>
+                        <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px', height: 30 }} onClick={() => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setEditingModel(card.key) }}>
                           编辑
                         </button>
                         <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px', height: 30 }} onClick={() => actions.testApiKey()}>
@@ -301,7 +382,7 @@ export default function SystemManagement({ sectionId }) {
             </div>
 
             <div
-              style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16, marginTop: 16 }}
+              style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16, marginTop: 16 }}
             >
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>API Key 管理</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -400,7 +481,7 @@ export default function SystemManagement({ sectionId }) {
             </div>
 
             {/* 配置表单 */}
-            <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16 }}>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>智谱知识库配置</div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -840,46 +921,47 @@ export default function SystemManagement({ sectionId }) {
       <Dialog
         open={Boolean(editingModel)}
         title={`编辑 ${MODEL_CARDS.find((c) => c.key === editingModel)?.title || ''}`}
-        onClose={() => setEditingModel(null)}
+        onClose={requestCloseModelEdit}
         wide
+        dismissDisabled={modelSaving}
       >
             {editingModel === 'kimiEvaluation' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <FormRow label="启用" full>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    <input type="checkbox" checked={modelConfig.kimiEvaluation.enabled} onChange={(e) => actions.updateModelConfig('kimiEvaluation', { enabled: e.target.checked })} />
+                    <input type="checkbox" checked={modelConfig.kimiEvaluation.enabled} onChange={(e) => handleModelConfigChange('kimiEvaluation', { enabled: e.target.checked })} />
                     启用 KIMI 评估模型
                   </label>
                 </FormRow>
                 <FormRow label="模型标识">
-                  <input className="input" value={modelConfig.kimiEvaluation.model} onChange={(e) => actions.updateModelConfig('kimiEvaluation', { model: e.target.value })} />
+                  <input className="input" value={modelConfig.kimiEvaluation.model} onChange={(e) => handleModelConfigChange('kimiEvaluation', { model: e.target.value })} />
                 </FormRow>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="Temperature">
-                    <input className="input" type="number" min="0" max="1" step="0.1" value={modelConfig.kimiEvaluation.temperature} onChange={(e) => actions.updateModelConfig('kimiEvaluation', { temperature: Number(e.target.value) })} />
+                    <input className="input" type="number" min="0" max="1" step="0.1" value={modelConfig.kimiEvaluation.temperature} onChange={(e) => handleModelConfigChange('kimiEvaluation', { temperature: Number(e.target.value) })} />
                   </FormRow>
                   <FormRow label="最大 Tokens">
-                    <input className="input" type="number" min="256" max="32000" value={modelConfig.kimiEvaluation.maxTokens} onChange={(e) => actions.updateModelConfig('kimiEvaluation', { maxTokens: Number(e.target.value) })} />
+                    <input className="input" type="number" min="256" max="32000" value={modelConfig.kimiEvaluation.maxTokens} onChange={(e) => handleModelConfigChange('kimiEvaluation', { maxTokens: Number(e.target.value) })} />
                   </FormRow>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="超时(ms)">
-                    <input className="input" type="number" min="3000" max="120000" value={modelConfig.kimiEvaluation.timeoutMs} onChange={(e) => actions.updateModelConfig('kimiEvaluation', { timeoutMs: Number(e.target.value) })} />
+                    <input className="input" type="number" min="3000" max="120000" value={modelConfig.kimiEvaluation.timeoutMs} onChange={(e) => handleModelConfigChange('kimiEvaluation', { timeoutMs: Number(e.target.value) })} />
                   </FormRow>
                   <FormRow label="回退到规则">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                      <input type="checkbox" checked={modelConfig.kimiEvaluation.fallbackToRule} onChange={(e) => actions.updateModelConfig('kimiEvaluation', { fallbackToRule: e.target.checked })} />
+                      <input type="checkbox" checked={modelConfig.kimiEvaluation.fallbackToRule} onChange={(e) => handleModelConfigChange('kimiEvaluation', { fallbackToRule: e.target.checked })} />
                       启用
                     </label>
                   </FormRow>
                 </div>
                 <FormRow label="Prompt Profile">
-                  <input className="input" value={modelConfig.kimiEvaluation.promptProfile} onChange={(e) => actions.updateModelConfig('kimiEvaluation', { promptProfile: e.target.value })} />
+                  <input className="input" value={modelConfig.kimiEvaluation.promptProfile} onChange={(e) => handleModelConfigChange('kimiEvaluation', { promptProfile: e.target.value })} />
                 </FormRow>
                 <FormRow label="Prompt 模板">
                   <textarea
                     value={modelConfig.kimiEvaluation.promptTemplate}
-                    onChange={(e) => actions.updateModelConfig('kimiEvaluation', { promptTemplate: e.target.value })}
+                    onChange={(e) => handleModelConfigChange('kimiEvaluation', { promptTemplate: e.target.value })}
                     style={{ width: '100%', minHeight: 120, padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontFamily: 'inherit', fontSize: 12, lineHeight: 1.5, outline: 'none', resize: 'vertical' }}
                   />
                 </FormRow>
@@ -889,45 +971,45 @@ export default function SystemManagement({ sectionId }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <FormRow label="启用" full>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    <input type="checkbox" checked={modelConfig.fileParsing.enabled} onChange={(e) => actions.updateModelConfig('fileParsing', { enabled: e.target.checked })} />
+                    <input type="checkbox" checked={modelConfig.fileParsing.enabled} onChange={(e) => handleModelConfigChange('fileParsing', { enabled: e.target.checked })} />
                     启用文件解析模型
                   </label>
                 </FormRow>
                 <FormRow label="模型标识">
-                  <input className="input" value={modelConfig.fileParsing.model} onChange={(e) => actions.updateModelConfig('fileParsing', { model: e.target.value })} />
+                  <input className="input" value={modelConfig.fileParsing.model} onChange={(e) => handleModelConfigChange('fileParsing', { model: e.target.value })} />
                 </FormRow>
                 <FormRow label="允许的扩展名">
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
                     {(modelConfig.fileParsing.allowedExtensions || []).map((ext) => (
                       <span key={ext} className="bdg" style={{ fontSize: 11, padding: '2px 8px', background: 'var(--brand-soft)', color: 'var(--brand-ink)', display: 'flex', alignItems: 'center', gap: 4 }}>
                         {ext}
-                        <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => actions.updateModelConfig('fileParsing', { allowedExtensions: modelConfig.fileParsing.allowedExtensions.filter((e) => e !== ext) })}>×</span>
+                        <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => handleModelConfigChange('fileParsing', { allowedExtensions: modelConfig.fileParsing.allowedExtensions.filter((e) => e !== ext) })}>×</span>
                       </span>
                     ))}
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <input className="input" style={{ flex: 1 }} placeholder="如 .pdf" value={extInput} onChange={(e) => setExtInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && extInput.trim()) { const v = extInput.trim().startsWith('.') ? extInput.trim() : `.${extInput.trim()}`; actions.updateModelConfig('fileParsing', { allowedExtensions: [...new Set([...modelConfig.fileParsing.allowedExtensions, v])] }); setExtInput('') } }} />
-                    <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', height: 28 }} onClick={() => { if (extInput.trim()) { const v = extInput.trim().startsWith('.') ? extInput.trim() : `.${extInput.trim()}`; actions.updateModelConfig('fileParsing', { allowedExtensions: [...new Set([...modelConfig.fileParsing.allowedExtensions, v])] }); setExtInput('') } }}>添加</button>
+                    <input className="input" style={{ flex: 1 }} placeholder="如 .pdf" value={extInput} onChange={(e) => setExtInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && extInput.trim()) { const v = extInput.trim().startsWith('.') ? extInput.trim() : `.${extInput.trim()}`; handleModelConfigChange('fileParsing', { allowedExtensions: [...new Set([...modelConfig.fileParsing.allowedExtensions, v])] }); setExtInput('') } }} />
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', height: 28 }} onClick={() => { if (extInput.trim()) { const v = extInput.trim().startsWith('.') ? extInput.trim() : `.${extInput.trim()}`; handleModelConfigChange('fileParsing', { allowedExtensions: [...new Set([...modelConfig.fileParsing.allowedExtensions, v])] }); setExtInput('') } }}>添加</button>
                   </div>
                 </FormRow>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="最大文件(MB)">
-                    <input className="input" type="number" min="1" max="200" value={modelConfig.fileParsing.maxFileSizeMb} onChange={(e) => actions.updateModelConfig('fileParsing', { maxFileSizeMb: Number(e.target.value) })} />
+                    <input className="input" type="number" min="1" max="200" value={modelConfig.fileParsing.maxFileSizeMb} onChange={(e) => handleModelConfigChange('fileParsing', { maxFileSizeMb: Number(e.target.value) })} />
                   </FormRow>
                   <FormRow label="最大 Sheet 数">
-                    <input className="input" type="number" min="1" max="200" value={modelConfig.fileParsing.maxSheetCount} onChange={(e) => actions.updateModelConfig('fileParsing', { maxSheetCount: Number(e.target.value) })} />
+                    <input className="input" type="number" min="1" max="200" value={modelConfig.fileParsing.maxSheetCount} onChange={(e) => handleModelConfigChange('fileParsing', { maxSheetCount: Number(e.target.value) })} />
                   </FormRow>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="严格模式">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                      <input type="checkbox" checked={modelConfig.fileParsing.strictMode} onChange={(e) => actions.updateModelConfig('fileParsing', { strictMode: e.target.checked })} />
+                      <input type="checkbox" checked={modelConfig.fileParsing.strictMode} onChange={(e) => handleModelConfigChange('fileParsing', { strictMode: e.target.checked })} />
                       启用
                     </label>
                   </FormRow>
                   <FormRow label="OCR">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                      <input type="checkbox" checked={modelConfig.fileParsing.ocrEnabled} onChange={(e) => actions.updateModelConfig('fileParsing', { ocrEnabled: e.target.checked })} />
+                      <input type="checkbox" checked={modelConfig.fileParsing.ocrEnabled} onChange={(e) => handleModelConfigChange('fileParsing', { ocrEnabled: e.target.checked })} />
                       启用
                     </label>
                   </FormRow>
@@ -938,50 +1020,72 @@ export default function SystemManagement({ sectionId }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <FormRow label="启用" full>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    <input type="checkbox" checked={modelConfig.kimiGeneration.enabled} onChange={(e) => actions.updateModelConfig('kimiGeneration', { enabled: e.target.checked })} />
+                    <input type="checkbox" checked={modelConfig.kimiGeneration.enabled} onChange={(e) => handleModelConfigChange('kimiGeneration', { enabled: e.target.checked })} />
                     启用生成模型
                   </label>
                 </FormRow>
                 <FormRow label="模型标识">
-                  <input className="input" value={modelConfig.kimiGeneration.model} onChange={(e) => actions.updateModelConfig('kimiGeneration', { model: e.target.value })} />
+                  <input className="input" value={modelConfig.kimiGeneration.model} onChange={(e) => handleModelConfigChange('kimiGeneration', { model: e.target.value })} />
                 </FormRow>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="Temperature">
-                    <input className="input" type="number" min="0" max="1" step="0.1" value={modelConfig.kimiGeneration.temperature} onChange={(e) => actions.updateModelConfig('kimiGeneration', { temperature: Number(e.target.value) })} />
+                    <input className="input" type="number" min="0" max="1" step="0.1" value={modelConfig.kimiGeneration.temperature} onChange={(e) => handleModelConfigChange('kimiGeneration', { temperature: Number(e.target.value) })} />
                   </FormRow>
                   <FormRow label="最大 Tokens">
-                    <input className="input" type="number" min="256" max="32000" value={modelConfig.kimiGeneration.maxTokens} onChange={(e) => actions.updateModelConfig('kimiGeneration', { maxTokens: Number(e.target.value) })} />
+                    <input className="input" type="number" min="256" max="32000" value={modelConfig.kimiGeneration.maxTokens} onChange={(e) => handleModelConfigChange('kimiGeneration', { maxTokens: Number(e.target.value) })} />
                   </FormRow>
                 </div>
                 <FormRow label="输出风格">
-                  <select className="input" value={modelConfig.kimiGeneration.outputStyle} onChange={(e) => actions.updateModelConfig('kimiGeneration', { outputStyle: e.target.value })}>
+                  <select className="input" value={modelConfig.kimiGeneration.outputStyle} onChange={(e) => handleModelConfigChange('kimiGeneration', { outputStyle: e.target.value })}>
                     {OUTPUT_STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </FormRow>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="风险提示">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                      <input type="checkbox" checked={modelConfig.kimiGeneration.includeRiskHints} onChange={(e) => actions.updateModelConfig('kimiGeneration', { includeRiskHints: e.target.checked })} />
+                      <input type="checkbox" checked={modelConfig.kimiGeneration.includeRiskHints} onChange={(e) => handleModelConfigChange('kimiGeneration', { includeRiskHints: e.target.checked })} />
                       包含
                     </label>
                   </FormRow>
                   <FormRow label="假设说明">
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                      <input type="checkbox" checked={modelConfig.kimiGeneration.includeAssumptions} onChange={(e) => actions.updateModelConfig('kimiGeneration', { includeAssumptions: e.target.checked })} />
+                      <input type="checkbox" checked={modelConfig.kimiGeneration.includeAssumptions} onChange={(e) => handleModelConfigChange('kimiGeneration', { includeAssumptions: e.target.checked })} />
                       包含
                     </label>
                   </FormRow>
                 </div>
               </div>
             )}
+            {modelSaveError && (
+              <div role="alert" style={{ background: 'var(--err-soft)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', color: 'var(--err)', fontSize: 12, fontWeight: 700, padding: '8px 12px', marginBottom: 10 }}>
+                ✗ {modelSaveError}
+              </div>
+            )}
             <DialogActions>
-              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setEditingModel(null)}>
+              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={requestCloseModelEdit} disabled={modelSaving}>
                 取消
               </button>
-              <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => { actions.saveModelDraft(); setEditingModel(null) }}>
-                确定
+              <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={handleModelEditSave} disabled={modelSaving}>
+                {modelSaving ? '保存中...' : '确定'}
               </button>
             </DialogActions>
+      </Dialog>
+
+      {/* 模型编辑脏关闭确认 */}
+      <Dialog
+        open={confirmDiscardModel}
+        title="放弃修改"
+        description="当前编辑内容尚未保存，确认放弃修改吗？"
+        onClose={() => setConfirmDiscardModel(false)}
+      >
+        <DialogActions>
+          <button type="button" className="btn btn-out" onClick={() => setConfirmDiscardModel(false)}>
+            继续编辑
+          </button>
+          <button type="button" className="btn btn-dan" onClick={confirmDiscard}>
+            放弃修改
+          </button>
+        </DialogActions>
       </Dialog>
 
       {/* 新建测试结果 dialog */}
