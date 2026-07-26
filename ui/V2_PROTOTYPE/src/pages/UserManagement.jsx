@@ -45,6 +45,21 @@ function formatDateTime(value) {
     : '—'
 }
 
+function normalizeInviteRecord(record) {
+  if (!record || typeof record !== 'object') return null
+  if (typeof record.code !== 'string' || record.code.trim() === '') return null
+  if (record.status !== 'active' && record.status !== 'used') return null
+  if (
+    typeof record.createdAt !== 'string'
+    || !Number.isFinite(Date.parse(record.createdAt))
+  ) return null
+
+  return {
+    ...record,
+    code: record.code.trim(),
+  }
+}
+
 function BulkTargetSummary({ users }) {
   const visibleUsers = users.slice(0, 3)
   const remaining = Math.max(0, users.length - visibleUsers.length)
@@ -190,12 +205,15 @@ export default function UserManagement() {
   const [inviteRecord, setInviteRecord] = useState(null)
   const [inviteSubmitting, setInviteSubmitting] = useState(false)
   const [inviteCopyMessage, setInviteCopyMessage] = useState('')
+  const [inviteCopySubmitting, setInviteCopySubmitting] = useState(false)
   const editorOperationRef = useRef(0)
   const passwordOperationRef = useRef(0)
   const currentEditingUserIdRef = useRef(null)
   const saveSequenceRef = useRef(null)
   const bulkOperationRef = useRef(false)
   const inviteOperationRef = useRef(false)
+  const inviteCopyTokenRef = useRef(0)
+  const inviteCopyOperationRef = useRef(null)
 
   useEffect(() => {
     setUsers(loadedUsers)
@@ -313,6 +331,7 @@ export default function UserManagement() {
     || passwordSubmitting
     || bulkSubmitting
     || inviteSubmitting
+    || inviteCopySubmitting
   )
 
   // ---------- 批量操作 ----------
@@ -322,6 +341,7 @@ export default function UserManagement() {
     || passwordSubmitting
     || bulkOperationRef.current
     || inviteOperationRef.current
+    || inviteCopyOperationRef.current
   )
 
   const closeBulkDialog = () => {
@@ -432,12 +452,18 @@ export default function UserManagement() {
 
   const handleInviteMember = async () => {
     if (hasConflictingOperation()) return
+    inviteCopyTokenRef.current += 1
+    inviteCopyOperationRef.current = null
     inviteOperationRef.current = true
     setInviteSubmitting(true)
+    setInviteCopySubmitting(false)
     setPageNotice(null)
     setInviteCopyMessage('')
     try {
-      const record = await generateInviteCode()
+      const record = normalizeInviteRecord(await generateInviteCode())
+      if (!record) {
+        throw new Error('邀请码响应不完整，请重试')
+      }
       setInviteRecord(record)
       setDialog('invite')
     } catch (error) {
@@ -452,19 +478,44 @@ export default function UserManagement() {
   }
 
   const closeInviteDialog = () => {
+    if (inviteCopyOperationRef.current) return
+    inviteCopyTokenRef.current += 1
     setDialog(null)
     setInviteRecord(null)
     setInviteCopyMessage('')
+    setInviteCopySubmitting(false)
   }
 
   const copyInviteCode = async () => {
-    if (!inviteRecord?.code) return
+    if (!inviteRecord?.code || inviteCopyOperationRef.current) return
+    const operation = {
+      token: inviteCopyTokenRef.current + 1,
+      code: inviteRecord.code,
+    }
+    inviteCopyTokenRef.current = operation.token
+    inviteCopyOperationRef.current = operation
+    const isActive = () => (
+      inviteCopyTokenRef.current === operation.token
+      && inviteCopyOperationRef.current === operation
+    )
+
+    setInviteCopySubmitting(true)
+    setInviteCopyMessage('')
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
-      await navigator.clipboard.writeText(inviteRecord.code)
-      setInviteCopyMessage('已复制')
+      await navigator.clipboard.writeText(operation.code)
+      if (isActive()) {
+        setInviteCopyMessage(`已复制 ${operation.code}`)
+      }
     } catch (_) {
-      setInviteCopyMessage('复制失败，请手动复制')
+      if (isActive()) {
+        setInviteCopyMessage('复制失败，请手动复制')
+      }
+    } finally {
+      if (isActive()) {
+        inviteCopyOperationRef.current = null
+        setInviteCopySubmitting(false)
+      }
     }
   }
 
@@ -1399,6 +1450,7 @@ export default function UserManagement() {
         title="成员邀请码"
         description="发送给待加入成员，注册后该邀请码会被使用"
         closeOnBackdrop={false}
+        dismissDisabled={inviteCopySubmitting}
         onClose={closeInviteDialog}
       >
         <div
@@ -1418,18 +1470,28 @@ export default function UserManagement() {
         {inviteCopyMessage ? (
           <div
             className="user-editor__message"
-            data-kind={inviteCopyMessage === '已复制' ? 'success' : 'error'}
+            data-kind={inviteCopyMessage.startsWith('已复制') ? 'success' : 'error'}
             role="status"
           >
             {inviteCopyMessage}
           </div>
         ) : null}
         <DialogActions>
-          <button type="button" className="btn btn-out" onClick={closeInviteDialog}>
+          <button
+            type="button"
+            className="btn btn-out"
+            disabled={inviteCopySubmitting}
+            onClick={closeInviteDialog}
+          >
             关闭
           </button>
-          <button type="button" className="btn btn-pri" onClick={copyInviteCode}>
-            复制邀请码
+          <button
+            type="button"
+            className="btn btn-pri"
+            disabled={inviteCopySubmitting}
+            onClick={copyInviteCode}
+          >
+            {inviteCopySubmitting ? '复制中…' : '复制邀请码'}
           </button>
         </DialogActions>
       </Dialog>

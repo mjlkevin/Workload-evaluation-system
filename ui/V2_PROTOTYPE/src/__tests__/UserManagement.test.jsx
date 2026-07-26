@@ -692,6 +692,90 @@ describe('UserManagement', () => {
     expect(within(inviteDialog).getByRole('status')).toHaveTextContent('已复制')
   })
 
+  test('keeps delayed copy feedback owned by the current invite record', async () => {
+    const generatedCodes = ['WES-COPY-A', 'WES-COPY-B']
+    let releaseCopy
+    server.use(
+      http.post(`${BASE}/auth/invite-codes/generate`, () => HttpResponse.json({
+        code: 0,
+        message: 'ok',
+        data: {
+          code: {
+            code: generatedCodes.shift(),
+            status: 'active',
+            createdAt: '2026-07-26T01:00:00.000Z',
+          },
+        },
+      }))
+    )
+    const writeText = vi.fn(() => new Promise((resolve) => {
+      releaseCopy = resolve
+    }))
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '+ 邀请成员' }))
+    let inviteDialog = await screen.findByRole('dialog', { name: '成员邀请码' })
+    expect(inviteDialog).toHaveTextContent('WES-COPY-A')
+    fireEvent.click(within(inviteDialog).getByRole('button', { name: '复制邀请码' }))
+
+    await waitFor(() => {
+      expect(releaseCopy).toEqual(expect.any(Function))
+      expect(within(inviteDialog).getByRole('button', { name: '复制中…' })).toBeDisabled()
+    })
+    const closeButton = within(inviteDialog).getByRole('button', { name: '关闭成员邀请码' })
+    const actionCloseButton = within(inviteDialog).getByRole('button', { name: '关闭' })
+    expect(closeButton).toBeDisabled()
+    expect(actionCloseButton).toBeDisabled()
+    fireEvent.click(closeButton)
+    fireEvent.click(actionCloseButton)
+    fireEvent.keyDown(inviteDialog, { key: 'Escape' })
+    fireEvent.click(inviteDialog.parentElement)
+    expect(screen.getByRole('dialog', { name: '成员邀请码' })).toHaveTextContent('WES-COPY-A')
+
+    releaseCopy()
+
+    await waitFor(() => {
+      const copyStatus = within(inviteDialog).getByRole('status')
+      expect(copyStatus).toHaveTextContent('已复制 WES-COPY-A')
+      expect(copyStatus).toHaveAttribute('data-kind', 'success')
+      expect(closeButton).toBeEnabled()
+    })
+    expect(writeText).toHaveBeenCalledWith('WES-COPY-A')
+    fireEvent.click(closeButton)
+    fireEvent.click(screen.getByRole('button', { name: '+ 邀请成员' }))
+
+    inviteDialog = await screen.findByRole('dialog', { name: '成员邀请码' })
+    expect(inviteDialog).toHaveTextContent('WES-COPY-B')
+    expect(within(inviteDialog).queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  test.each([
+    ['missing code', { status: 'active', createdAt: '2026-07-26T01:00:00.000Z' }],
+    ['invalid status', { code: 'WES-BAD-STATUS', status: 'expired', createdAt: '2026-07-26T01:00:00.000Z' }],
+    ['invalid createdAt', { code: 'WES-BAD-DATE', status: 'active', createdAt: 'not-a-date' }],
+  ])('rejects malformed invite response: %s', async (_, record) => {
+    server.use(
+      http.post(`${BASE}/auth/invite-codes/generate`, () => HttpResponse.json({
+        code: 0,
+        message: 'ok',
+        data: { code: record },
+      }))
+    )
+
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    fireEvent.click(await screen.findByRole('button', { name: '+ 邀请成员' }))
+
+    const notice = await screen.findByRole('status')
+    expect(notice).toHaveTextContent('邀请码响应不完整，请重试')
+    expect(screen.queryByRole('dialog', { name: '成员邀请码' })).not.toBeInTheDocument()
+  })
+
   test('locks invite, editing, selection, and bulk entry points while generating a code', async () => {
     let releaseInvite
     let inviteCalls = 0
