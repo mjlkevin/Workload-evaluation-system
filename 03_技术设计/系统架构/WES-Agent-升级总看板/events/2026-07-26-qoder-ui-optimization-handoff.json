@@ -1,0 +1,43 @@
+{
+  "id": "BE-2026-07-26-qoder-ui-optimization-handoff",
+  "date": "2026-07-26",
+  "type": "process_change",
+  "scope": "RP-043 UI 优化方法总结与 Qoder 执行通道初始化",
+  "summary": "总结两轮 WES UI 优化形成的证据化方法，将后续页面族候选队列与执行合同整理为 Qoder 初始化提示词；Qoder 初始化阶段只注册或人工读取项目 Skills、输出 ACK 和路线图确认，不自动领取实现任务。后续每个页面族仍须由用户或 Codex 单独下发 Work Order，并保持单业务面、最多三个确认根问题、TDD、真实浏览器证据和结构化回填门禁。",
+  "status": "交接启动包已形成 / 待 Qoder 初始化 ACK 与 Codex 复核",
+  "pages": [
+    "plan",
+    "risks",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "artifact",
+      "ref": "docs/codex-workflows/qoder-ui-optimization-bootstrap.md",
+      "summary": "包含两轮优化总结、已完成与后续候选路线图、项目内 Skill 安装或注册方式、只读初始化提示词、Work Order 合同与结构化 handoff 模板。"
+    },
+    {
+      "kind": "source",
+      "ref": "skills/improving-wes-ui/references/upstream-provenance.md",
+      "summary": "固定 ibelick/ui-skills 审阅 commit ae74b58e722abe7ddf5948e07dd220808acce8a9，并明确项目内 Skill 为权威版本，不在运行时跟踪上游 latest。"
+    },
+    {
+      "kind": "cross_reference",
+      "ref": "BE-2026-07-25-wes-ui-quality-gate-implementation; BE-2026-07-26-user-management-drawer-implementation",
+      "summary": "第一轮形成 UI Skill 与共享 Dialog 试点，第二轮完成用户管理任务流、共享 Drawer、真实持久化、安全反馈和桌面/窄屏验收。"
+    },
+    {
+      "kind": "governance",
+      "ref": "QODER.md; skills/wes-qoder-worktree-protocol/SKILL.md; skills/wes-multi-agent-collaboration/SKILL.md",
+      "summary": "Qoder 只在明确 Work Order 下使用隔离 worktree，初始化阶段保持只读，最终状态不得越过“已回填 / 待 Codex 复核”。"
+    }
+  ],
+  "next": "将启动提示词交给 Qoder 并取得 QODER-UI-INIT 的 Worktree Contract ACK、UI Skill ACK 与路线图 ACK；由用户或 Codex 确认后，再单独分派 QODER-UI-003-AUDIT 的 /api-keys 只读审计。未获得明确 Work Order 前，Qoder 不创建实现 worktree、不修改代码，也不自动领取路线图后续页面。",
+  "board": {
+    "change": {
+      "stage": "Qoder UI 优化执行通道初始化",
+      "result": "交接启动包已形成 / 待 Qoder 初始化 ACK 与 Codex 复核"
+    }
+  }
+}
