@@ -1,0 +1,105 @@
+{
+  "id": "BE-2026-07-27-qoder-ui-004-rework-review",
+  "date": "2026-07-27",
+  "type": "verification",
+  "scope": "QODER-UI-004 /system/model-config 返工复核",
+  "summary": "Codex 复核 Qoder amend commit 97db787。上一轮两项 P1 已关闭：放弃修改会恢复编辑前快照；编辑弹窗保存会等待真实结果，失败保留弹窗、输入和 role=alert，成功后关闭并显示页面 role=status，pending 期间锁定全部关闭入口。聚焦测试、Web 全量测试、Web 构建、UI scope checker、1440px 与 760px Chrome 验收全部通过，worktree clean。Gate 为 ACCEPTED_PENDING_INTEGRATION；尚未获得集成授权，不自动开始下一项。",
+  "status": "ACCEPTED_PENDING_INTEGRATION / 自动化与浏览器通过 / 待用户授权集成",
+  "pages": [
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "commit",
+      "ref": "97db787",
+      "summary": "Qoder UI-04 amend 提交，base 90f9838；变更 SystemManagement.jsx、useSystemManagement.js 和 ModelConfig.test.jsx。"
+    },
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-07-27-codex-QODER-UI-004-IMPL-rework-gate.md",
+      "result": "ACCEPTED_PENDING_INTEGRATION",
+      "summary": "记录返工语义复核、自动化复跑、Chrome 1440px/760px/键盘证据、残余风险和集成边界。"
+    },
+    {
+      "kind": "code_review",
+      "ref": "ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx:137-175; ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx:920-1089",
+      "result": "pass",
+      "summary": "快照恢复、async 保存、失败保留、页面内联状态和 dismissDisabled 关闭锁定链路完整。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/ModelConfig.test.jsx",
+      "result": "pass 1 file / 8 tests",
+      "summary": "覆盖保存/生效内联反馈、脏关闭、放弃恢复、失败保留、成功关闭和语义 token。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass 25 files / 177 tests",
+      "summary": "Web 全量回归一次通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass with known warning",
+      "summary": "生产构建通过，保留既有大于 500 kB chunk-size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 90f9838 -- ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js ui/V2_PROTOTYPE/src/__tests__/ModelConfig.test.jsx",
+      "result": "pass",
+      "summary": "No new deterministic UI findings。"
+    },
+    {
+      "kind": "browser",
+      "ref": "/system/model-config Chrome 1440px / 760px / keyboard / success-failure lifecycle",
+      "result": "pass",
+      "summary": "真实 Chrome 加载 97db787 构建产物；隔离 QA API 模拟成功与失败。Escape 放弃恢复、pending 关闭锁定、失败保留、成功内联反馈通过；760px 页面及弹窗无横向溢出，控制台 0 error。"
+    },
+    {
+      "kind": "worktree",
+      "ref": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/ui-004-model-config",
+      "result": "clean",
+      "summary": "复核结束时无 modified 或 untracked 文件，node_modules 临时链接已清理。"
+    }
+  ],
+  "next": "等待用户授权后由 Codex 精确集成 97db787，并在保留主 checkout 无关 dirty changes 的前提下复跑聚焦、Web 全量、构建和 UI scope checker。集成完成前不标记已交付，不自动开始下一项 UI 优化。",
+  "board": {
+    "change": {
+      "stage": "QODER-UI-004 Rework Codex Gate",
+      "result": "ACCEPTED_PENDING_INTEGRATION / 两项 P1 已关闭 / 浏览器验收通过"
+    },
+    "testing": [
+      {
+        "command": "ModelConfig focused regression",
+        "result": "pass 8/8",
+        "summary": "放弃恢复、失败保留、成功关闭和内联反馈回归通过。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass 177/177",
+        "summary": "25 个 Web 测试文件全部通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass / known chunk warning",
+        "summary": "生产构建通过。"
+      },
+      {
+        "command": "UI scope checker",
+        "result": "pass",
+        "summary": "未新增确定性 UI scope finding。"
+      },
+      {
+        "command": "Chrome 1440px + 760px + keyboard",
+        "result": "pass",
+        "summary": "无横向溢出；脏关闭、失败保留、保存锁定和成功状态均通过，控制台 0 error。"
+      }
+    ]
+  }
+}
