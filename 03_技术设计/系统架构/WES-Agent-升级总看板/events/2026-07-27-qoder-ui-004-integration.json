@@ -1,0 +1,100 @@
+{
+  "id": "BE-2026-07-27-qoder-ui-004-integration",
+  "date": "2026-07-27",
+  "type": "implementation",
+  "scope": "QODER-UI-004 /system/model-config 主线集成与集成后验证",
+  "summary": "QODER-UI-004 已由 source commit 97db787 精确 cherry-pick 为 dd82f7a，集成到 codex/role-driven-ai-home-workbench。Codex 核对三个目标文件内容与 97db787 完全一致，提交范围仅 3 files、+365/-38，主 checkout 既有 dirty changes 未进入集成提交。主线聚焦测试 8/8、Web 全量 25 files/180 tests、Web 构建和 UI scope checker 通过。前一 Gate 的 Chrome 1440px、760px、键盘及成功失败生命周期证据适用于该字节一致 patch。状态更新为 INTEGRATED_VERIFIED；不自动清理 worktree，不启动下一项 UI 优化。",
+  "status": "INTEGRATED_VERIFIED / 已集成并验证 / 不自动开始下一项",
+  "pages": [
+    "plan",
+    "testing",
+    "monitoring",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "commit",
+      "ref": "dd82f7a",
+      "result": "integrated",
+      "summary": "业务主线集成提交，父提交 d5bd2db；仅包含 UI-04 三个目标文件。"
+    },
+    {
+      "kind": "source_commit",
+      "ref": "97db787",
+      "result": "identical target content",
+      "summary": "git diff --exit-code 对三个目标文件返回 0，确认 cherry-pick 内容与已验收 Qoder patch 一致。"
+    },
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-07-27-codex-QODER-UI-004-IMPL-integration-gate.md",
+      "result": "INTEGRATED_VERIFIED",
+      "summary": "记录集成范围、patch identity、主线复跑、浏览器证据继承、dirty 保护和 worktree 保留状态。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/ModelConfig.test.jsx",
+      "result": "pass 1 file / 8 tests",
+      "summary": "UI-04 聚焦回归在主线通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass 25 files / 180 tests",
+      "summary": "当前主 checkout 全量 Web 测试通过；相对 Qoder worktree 多出的测试来自既有未提交基线，不属于 dd82f7a。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass with known warning",
+      "summary": "生产构建通过，保留既有大于 500 kB chunk-size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base d5bd2db -- ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js ui/V2_PROTOTYPE/src/__tests__/ModelConfig.test.jsx",
+      "result": "pass",
+      "summary": "No new deterministic UI findings。"
+    },
+    {
+      "kind": "browser",
+      "ref": "docs/agent-loop/audits/2026-07-27-codex-QODER-UI-004-IMPL-rework-gate.md",
+      "result": "pass / exact patch evidence",
+      "summary": "97db787 已完成 Chrome 1440px、760px、键盘、失败保留和成功反馈验收；dd82f7a 三个目标文件内容一致。"
+    },
+    {
+      "kind": "worktree",
+      "ref": ".claude/worktrees/ui-004-model-config",
+      "result": "clean / retained",
+      "summary": "UI-04 worktree 保留，未获清理授权。UI-03 worktree 也保持原状，不在本 Gate 中处置。"
+    }
+  ],
+  "next": "停止本轮。等待用户明确指令后再清理 UI-03/UI-04 worktree、确认 UI-03 集成状态或启动 UI-05/UI-07；不得自动领取下一项。",
+  "board": {
+    "change": {
+      "stage": "QODER-UI-004 Mainline Integration",
+      "result": "INTEGRATED_VERIFIED / dd82f7a"
+    },
+    "testing": [
+      {
+        "command": "ModelConfig focused regression",
+        "result": "pass 8/8",
+        "summary": "主线聚焦测试通过。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass 180/180",
+        "summary": "当前主 checkout 25 个测试文件全部通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass / known chunk warning",
+        "summary": "生产构建通过。"
+      },
+      {
+        "command": "UI scope checker",
+        "result": "pass",
+        "summary": "未新增确定性 UI scope finding。"
+      }
+    ]
+  }
+}
