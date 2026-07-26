@@ -1,0 +1,53 @@
+{
+  "id": "BE-2026-07-26-qoder-ui-initialization-ack",
+  "date": "2026-07-26",
+  "type": "verification",
+  "scope": "QODER-UI-INIT 项目内 UI Skill manual-read 初始化 ACK",
+  "summary": "Qoder 完成 UI 执行通道只读初始化。由于平台不支持从本地目录注册项目 Skill，按既定合同降级为 manual-read；项目根、Web 主线、Skill 来源、固定上游 commit、单业务面与最多三个确认根问题、TDD、真实浏览器证据、第二技术栈禁令和状态权边界均已 ACK。Codex 复核当前分支、HEAD、worktree、dirty 状态及六个必需文件存在性后接受初始化结果；本事件不授权实现，也不允许 Qoder 自动领取下一页。",
+  "status": "初始化 ACK 已通过 / manual-read 生效 / 待分派首张 Work Order",
+  "pages": [
+    "plan",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "external_handoff",
+      "ref": "docs/agent-loop/handoffs/2026-07-26-qoder-QODER-UI-INIT.md",
+      "summary": "保存 Qoder 项目合同、Skill manual-read 状态、UI 质量合同和 Codex Gate 结论。"
+    },
+    {
+      "kind": "command",
+      "ref": "pwd; git status --short --branch; git rev-parse --short HEAD; git rev-parse --show-toplevel; git worktree list --porcelain",
+      "result": "pass",
+      "summary": "当前项目根为 /Users/kevin/AI/Workload-evaluation-system，分支 codex/role-driven-ai-home-workbench，HEAD 6351ae5；主检出目录存在既有 dirty changes，未创建 Qoder 实现 worktree。"
+    },
+    {
+      "kind": "command",
+      "ref": "test -f on six required improving-wes-ui and Qoder collaboration files",
+      "result": "pass 6/6",
+      "summary": "improving-wes-ui Skill、质量清单、上游来源、scope checker、Qoder worktree Skill 和多 Agent Skill 均存在。"
+    },
+    {
+      "kind": "governance",
+      "ref": "QODER.md; skills/wes-qoder-worktree-protocol/SKILL.md; skills/wes-multi-agent-collaboration/SKILL.md",
+      "summary": "manual-read 是 Qoder 无本地 Skill 注册能力时的允许降级；初始化保持只读，后续实现仍须一任务一 worktree 并在编辑前重新 ACK。"
+    }
+  ],
+  "next": "由用户或 Codex 单独发布首张 UI Work Order；建议先分派 QODER-UI-003-AUDIT，对 /api-keys 做不触碰真实密钥的只读审计。未获得明确 Work Order 前，Qoder 不创建实现 worktree、不修改代码，也不自动领取后续页面。",
+  "board": {
+    "change": {
+      "stage": "Qoder UI Skill 初始化 Gate",
+      "result": "初始化 ACK 已通过 / manual-read 生效 / 待分派首张 Work Order"
+    },
+    "testing": [
+      {
+        "command": "QODER-UI-INIT contract and local-file verification",
+        "result": "pass",
+        "summary": "项目身份、dirty 边界、六个必需文件和 manual-read 合同已复核；本轮无产品代码和浏览器功能验收。"
+      }
+    ]
+  }
+}
