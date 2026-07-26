@@ -5,7 +5,7 @@
 | 项目 | 状态 | 结论 |
 |---|---|---|
 | 实现范围 | 通过 | `/users` 的页面动作、筛选、表格、单用户 Drawer、安全 Dialog、邀请流程与真实持久化已进入本地实现。 |
-| 自动化 | 通过 | Web 全量 24 files / 171 tests；Dialog 5 + Drawer 14 + UserManagement 33，共 52/52；API 用户管理相关模块 52/52。 |
+| 自动化 | 通过 | Web 全量 24 files / 171 tests；Dialog 5 + Drawer 14 + UserManagement 33，共 52/52；API modules handlers 全量回归 52/52，其中包含用户管理/auth 用例。 |
 | 本地构建 | 通过 / 已知警告 | Web 与 API 构建通过；Web 仅保留 `>500 kB` chunk-size 已知警告。 |
 | 真实浏览器 | 通过 | Google Chrome 管理员会话完成桌面、760px、键盘、焦点、风险确认、密码目标上下文、邀请与恢复检查。 |
 | 测试数据 | 已恢复 | 测试用户业务角色已恢复；状态变更与密码重置未提交；测试邀请码已精确删除。 |
@@ -35,7 +35,7 @@
 | `npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/Drawer.test.jsx src/__tests__/Dialog.test.jsx src/__tests__/UserManagement.test.jsx` | 通过 | Dialog 5 + Drawer 14 + UserManagement 33，合计 52/52。 |
 | `npm run test:web` | 通过 | 24 files / 171 tests。 |
 | `npm run build:web` | 通过 / 已知警告 | 构建通过；唯一保留项为 `>500 kB` chunk-size warning。 |
-| `(cd apps/api && npx tsx --test --test-global-setup=./test-setup.mts src/modules/modules.handlers.test.ts)` | 通过 | 用户管理相关 auth/module 回归 52/52。 |
+| `(cd apps/api && npx tsx --test --test-global-setup=./test-setup.mts src/modules/modules.handlers.test.ts)` | 通过 | API modules handlers 全量回归 52/52，其中包含登录、`me`、业务角色、管理员重置密码、`listUsers` 等用户管理/auth 用例。 |
 | `npm run build:api` | 通过 | API TypeScript 构建通过。 |
 | OpenAPI YAML、`operationId` 与本地 `$ref` 检查 | 通过 | 164 个 `operationId` 唯一；135 个本地引用均可解析。 |
 | `node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 13eecc2 -- ui/V2_PROTOTYPE/src/components/ui/Drawer.jsx ui/V2_PROTOTYPE/src/components/ui/Dialog.jsx ui/V2_PROTOTYPE/src/components/UserManagement/UserEditorDrawer.jsx ui/V2_PROTOTYPE/src/pages/UserManagement.jsx ui/V2_PROTOTYPE/tokens.css ui/V2_PROTOTYPE/components.css` | 通过 | 本批 UI scope checker 无新增 finding。 |

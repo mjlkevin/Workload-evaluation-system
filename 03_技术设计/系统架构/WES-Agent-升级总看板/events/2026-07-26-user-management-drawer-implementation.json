@@ -40,8 +40,8 @@
     },
     {
       "kind": "commit",
-      "ref": "13eecc2; 284d8ab; 52e2517; 23fec51; 6bd2278; 64236d5; c7a3b69; 7ebf020",
-      "summary": "主要提交覆盖规格、实施计划、Drawer 可聚焦元素、用户页焦点与锁定选择、保存串行化、异步关闭与模态栈、邀请码生命周期和契约校验。"
+      "ref": "13eecc2; 284d8ab; d46de04; 7235e76; 4722f5e; 98e6188; a024070; 904885b; 52e2517; 23fec51; 6bd2278; 64236d5; c7a3b69; 7ebf020",
+      "summary": "提交链覆盖规格、实施计划、共享 Drawer、页面分层、真实 API 持久化、安全 Dialog、批量与邀请、OpenAPI 对齐，以及焦点、串行化、异步生命周期和契约校验等后续加固。"
     },
     {
       "kind": "file",
@@ -70,7 +70,7 @@
       "kind": "command",
       "ref": "(cd apps/api && npx tsx --test --test-global-setup=./test-setup.mts src/modules/modules.handlers.test.ts)",
       "result": "pass 52/52",
-      "summary": "用户管理相关 auth/module 回归通过。"
+      "summary": "API modules handlers 全量回归 52/52，其中包含登录、me、业务角色、管理员重置密码、listUsers 等用户管理/auth 用例。"
     },
     {
       "kind": "command",
@@ -148,9 +148,9 @@
         "summary": "Web 构建通过，仅保留大于 500 kB 的已知 chunk-size warning。"
       },
       {
-        "command": "API auth/module focused regression",
+        "command": "API modules handlers full regression",
         "result": "pass 52/52",
-        "summary": "用户管理相关 API 模块回归通过。"
+        "summary": "API modules handlers 全量回归通过，其中包含用户管理/auth 用例。"
       },
       {
         "command": "npm run build:api",
