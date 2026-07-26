@@ -2083,7 +2083,7 @@ paths:
   /api/v1/auth/users:
     get:
       tags: [Auth]
-      summary: 获取用户列表（admin）
+      summary: 获取用户列表（admin；需 user:manage）
       operationId: listUsers
       responses:
         "200":
@@ -2092,8 +2092,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserListResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: 无权限
+          description: 缺少 user:manage 能力
           content:
             application/json:
               schema:
@@ -2102,7 +2108,7 @@ paths:
   /api/v1/auth/users/{userId}/role:
     patch:
       tags: [Auth]
-      summary: 修改用户角色（admin）
+      summary: 修改用户系统角色（admin；需 user:manage）
       operationId: updateUserRole
       parameters:
         - name: userId
@@ -2129,13 +2135,79 @@ paths:
               schema:
                 $ref: "#/components/schemas/MeResponse"
         "400":
-          description: 参数错误
+          description: 角色参数非法、禁止最后一个 admin 降权等校验失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未登录或凭证失效
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: 无权限
+          description: 缺少 user:manage 能力或违反受保护用户规则
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 用户不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/users/{userId}/business-role:
+    patch:
+      tags: [Auth]
+      summary: 修改用户业务角色（admin；需 user:manage）
+      operationId: updateUserBusinessRole
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [businessRole]
+              properties:
+                businessRole:
+                  type: string
+                  enum: [sales, pre_sales, delivery, pm, pmo, dev, admin]
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "400":
+          description: 业务角色参数非法
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 缺少 user:manage 能力或违反受保护用户规则
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 用户不存在
           content:
             application/json:
               schema:
@@ -2144,7 +2216,7 @@ paths:
   /api/v1/auth/users/{userId}/status:
     patch:
       tags: [Auth]
-      summary: 修改用户状态（admin）
+      summary: 修改用户状态（admin；需 user:manage）
       operationId: updateUserStatus
       parameters:
         - name: userId
@@ -2171,13 +2243,79 @@ paths:
               schema:
                 $ref: "#/components/schemas/MeResponse"
         "400":
-          description: 参数错误
+          description: 禁止管理员禁用自身等校验失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未登录或凭证失效
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: 无权限
+          description: 缺少 user:manage 能力或违反受保护用户规则
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 用户不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/users/{userId}/password:
+    patch:
+      tags: [Auth]
+      summary: 管理员重置用户密码（需 user:manage）
+      operationId: updateUserPassword
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          description: 重置成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "400":
+          description: 密码少于 8 位等参数校验失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 缺少 user:manage 能力或违反受保护用户规则
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 用户不存在
           content:
             application/json:
               schema:
@@ -2195,8 +2333,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InviteCodeListResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: 无权限
+          description: 仅 admin 可查看邀请码
           content:
             application/json:
               schema:
@@ -2214,8 +2358,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InviteCodeResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: 无权限
+          description: 仅 admin 可生成邀请码
           content:
             application/json:
               schema:
@@ -6557,6 +6707,9 @@ components:
         role:
           type: string
           enum: [admin, sub_admin, user]
+        businessRole:
+          type: string
+          enum: [sales, pre_sales, delivery, pm, pmo, dev, admin]
         status:
           type: string
           enum: [active, disabled]
@@ -6566,7 +6719,7 @@ components:
         lastLoginAt:
           type: string
           format: date-time
-      required: [id, username, role, status]
+      required: [id, username, role, businessRole, status]
 
     AuthResponse:
       type: object
@@ -6658,18 +6811,18 @@ components:
           type: string
         status:
           type: string
-          enum: [active, used, expired]
-        createdBy:
-          type: string
+          enum: [active, used]
         createdAt:
           type: string
           format: date-time
-        usedBy:
+        usedByUserId:
+          type: string
+        usedByUsername:
           type: string
         usedAt:
           type: string
           format: date-time
-      required: [code, status]
+      required: [code, status, createdAt]
 
     InviteCodeListResponse:
       type: object
