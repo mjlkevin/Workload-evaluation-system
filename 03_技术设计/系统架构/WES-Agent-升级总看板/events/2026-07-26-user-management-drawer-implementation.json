@@ -1,0 +1,187 @@
+{
+  "id": "BE-2026-07-26-user-management-drawer-implementation",
+  "date": "2026-07-26",
+  "type": "implementation",
+  "scope": "RP-043 用户管理侧栏编辑与操作分层",
+  "summary": "完成用户管理页面动作、筛选、上下文批量操作与单用户 Drawer 分层，将角色、业务角色和状态维护接入真实 API，并补齐脏关闭保护、风险确认、密码目标上下文、邀请反馈和 OpenAPI 对齐；本地自动化、构建与真实 Chrome 管理员验收通过，可恢复测试数据已还原。本事件不声明 CI green、已合并或已发布；因现有总看板 HTML 存在无关未提交修改，已校验事件暂缓 apply。",
+  "status": "已实施 / 本地自动化与浏览器验收通过 / 总看板待安全应用",
+  "pages": [
+    "index",
+    "issues",
+    "defects",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "dedup",
+      "ref": "ISS-2026-07-25-003 / RP-043",
+      "summary": "本批沿用 RP-043 既定用户管理页面族扩展，不新增重复 Issue 或 Requirement。"
+    },
+    {
+      "kind": "cross_reference",
+      "ref": "DEF-2026-07-04-002; RP-041",
+      "summary": "邀请成员行为恢复交叉引用 DEF-2026-07-04-002；管理员直接新建用户仍属于 RP-041 独立范围，本批没有混入或伪造该入口。"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/superpowers/specs/2026-07-25-wes-user-management-drawer-design.md",
+      "summary": "已批准设计固定单页面族、三个已证实根问题、共享 Drawer、真实持久化、安全 Dialog、邀请恢复和浏览器验收边界。"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-07-26-wes-user-management-drawer.md",
+      "summary": "Task 1-7 覆盖 Drawer TDD、页面分层、API owner、关闭保护、批量与邀请、OpenAPI 对齐、真实浏览器证据和总看板回填。"
+    },
+    {
+      "kind": "commit",
+      "ref": "13eecc2; 284d8ab; 52e2517; 23fec51; 6bd2278; 64236d5; c7a3b69; 7ebf020",
+      "summary": "主要提交覆盖规格、实施计划、Drawer 可聚焦元素、用户页焦点与锁定选择、保存串行化、异步关闭与模态栈、邀请码生命周期和契约校验。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/components/ui/Drawer.jsx; ui/V2_PROTOTYPE/src/components/UserManagement/UserEditorDrawer.jsx; ui/V2_PROTOTYPE/src/pages/UserManagement.jsx; ui/V2_PROTOTYPE/src/api/users.js",
+      "summary": "共享 Drawer、单用户编辑表单、页面编排和用户 API 边界构成本批确定性实现 owner。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/Drawer.test.jsx src/__tests__/Dialog.test.jsx src/__tests__/UserManagement.test.jsx",
+      "result": "pass 52/52",
+      "summary": "Dialog 5、Drawer 14、UserManagement 33 项聚焦回归通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass 24 files / 171 tests",
+      "summary": "V2 Web 全量回归通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass with known warning",
+      "summary": "Web 生产构建通过，唯一保留项为大于 500 kB 的既有 chunk-size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "(cd apps/api && npx tsx --test --test-global-setup=./test-setup.mts src/modules/modules.handlers.test.ts)",
+      "result": "pass 52/52",
+      "summary": "用户管理相关 auth/module 回归通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api",
+      "result": "pass",
+      "summary": "API TypeScript 构建通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "OpenAPI YAML + operationId + local ref validation",
+      "result": "pass",
+      "summary": "164 个 operationId 唯一，135 个本地引用均可解析。"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 13eecc2 -- ui/V2_PROTOTYPE/src/components/ui/Drawer.jsx ui/V2_PROTOTYPE/src/components/ui/Dialog.jsx ui/V2_PROTOTYPE/src/components/UserManagement/UserEditorDrawer.jsx ui/V2_PROTOTYPE/src/pages/UserManagement.jsx ui/V2_PROTOTYPE/tokens.css ui/V2_PROTOTYPE/components.css",
+      "result": "pass",
+      "summary": "确定性 UI scope checker 无新增 finding，仍为一个页面族且没有引入第二组件栈。"
+    },
+    {
+      "kind": "browser",
+      "ref": "docs/superpowers/evaluations/2026-07-26-user-management-drawer-qa.md",
+      "result": "pass",
+      "summary": "Google Chrome 管理员视角完成 1440x900、760x900、键盘焦点、脏关闭、风险与密码目标上下文、邀请反馈和数据恢复验收。"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "docs/superpowers/evaluations/2026-07-26-user-management-desktop.jpg; docs/superpowers/evaluations/2026-07-26-user-management-drawer-desktop.jpg",
+      "summary": "桌面用户管理页与正确目标用户 Drawer 的当前浏览器证据。"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "docs/superpowers/evaluations/2026-07-26-user-management-760.jpg; docs/superpowers/evaluations/2026-07-26-user-management-drawer-760.jpg",
+      "summary": "760px 页面纵向到达、表格操作可达和全宽 Drawer/footer 的当前浏览器证据。"
+    },
+    {
+      "kind": "service",
+      "ref": "GET http://127.0.0.1:3000/api/v1/health; GET http://127.0.0.1:3002",
+      "result": "pass",
+      "summary": "API health 正常，Web 返回 HTTP 200。"
+    },
+    {
+      "kind": "data_restore",
+      "ref": "testuser-c350d3b3-fa7b-4586-b3da-3585e21578ba; KD-20260726-1877I9",
+      "result": "restored",
+      "summary": "测试用户业务角色由 pre_sales 改为 pm 并回载后已恢复为 pre_sales；禁用与密码未提交；测试邀请码已从持久化文件精确移除。"
+    },
+    {
+      "kind": "board_state",
+      "ref": "node scripts/board-event-check.js 03_技术设计/系统架构/WES-Agent-升级总看板/events/2026-07-26-user-management-drawer-implementation.json",
+      "result": "validated / apply pending",
+      "summary": "事件结构已校验；目标 board HTML 存在无关 dirty overlap，因此本批不运行 apply/generate，保留可追溯事件等待安全窗口。"
+    }
+  ],
+  "next": "先分离或提交现有总看板 HTML 的无关修改，再由有权限的 Codex/用户应用本事件，更新 Issue/Requirement/Defect 状态、计划、测试、监控、风险、变更、来源和首页摘要并运行一致性检查；在此之前不声明 CI green、已合并、已发布或总看板已同步完成。",
+  "board": {
+    "change": {
+      "stage": "RP-043 用户管理侧栏实现与本地验收",
+      "result": "已实施 / 本地自动化与浏览器验收通过 / 总看板待安全应用"
+    },
+    "testing": [
+      {
+        "command": "Dialog + Drawer + UserManagement focused regression",
+        "result": "pass 52/52",
+        "summary": "Dialog 5、Drawer 14、UserManagement 33，覆盖语义、焦点、关闭保护、保存、风险、密码、批量与邀请。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass 24 files / 171 tests",
+        "summary": "V2 Web 全量回归通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass / known chunk warning",
+        "summary": "Web 构建通过，仅保留大于 500 kB 的已知 chunk-size warning。"
+      },
+      {
+        "command": "API auth/module focused regression",
+        "result": "pass 52/52",
+        "summary": "用户管理相关 API 模块回归通过。"
+      },
+      {
+        "command": "npm run build:api",
+        "result": "pass",
+        "summary": "API TypeScript 构建通过。"
+      },
+      {
+        "command": "OpenAPI contract validation",
+        "result": "pass 164 operationIds / 135 refs",
+        "summary": "operationId 唯一且本地引用全部可解析。"
+      },
+      {
+        "command": "RP-043 UI scope checker",
+        "result": "pass / no new finding",
+        "summary": "未新增 UI 依赖、第二组件栈、页面自建 Dialog primitive 或越界页面族。"
+      },
+      {
+        "command": "Google Chrome desktop acceptance",
+        "result": "pass",
+        "summary": "1440x900 下层级、目标用户、服务端保存回载、脏关闭、安全 Dialog、邀请与焦点恢复通过。"
+      },
+      {
+        "command": "Google Chrome 760px and keyboard acceptance",
+        "result": "pass",
+        "summary": "全宽 Drawer、独立滚动、footer 可达、无页面横向溢出、Tab 环、Escape 策略和焦点恢复通过。"
+      },
+      {
+        "command": "Chrome console from 2026-07-26T05:30:00Z",
+        "result": "pass / 0 warning and 0 error",
+        "summary": "QA 时间窗内无 warning/error；更早的 HMR 瞬态不作为当前缺陷。"
+      }
+    ]
+  }
+}
