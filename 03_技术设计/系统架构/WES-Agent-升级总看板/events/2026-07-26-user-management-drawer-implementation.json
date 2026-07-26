@@ -40,8 +40,8 @@
     },
     {
       "kind": "commit",
-      "ref": "13eecc2; 284d8ab; d46de04; 7235e76; 4722f5e; 98e6188; a024070; 904885b; 52e2517; 23fec51; 6bd2278; 64236d5; c7a3b69; 7ebf020",
-      "summary": "提交链覆盖规格、实施计划、共享 Drawer、页面分层、真实 API 持久化、安全 Dialog、批量与邀请、OpenAPI 对齐，以及焦点、串行化、异步生命周期和契约校验等后续加固。"
+      "ref": "13eecc2; 284d8ab; d46de04; fe3e9a0; 922a32f; 52e2517; 7235e76; 816de5a; 23fec51; 4722f5e; 9aeb6f5; 5b1d012; 6bd2278; 98e6188; 13cef94; 64236d5; a024070; c7a3b69; 904885b; 7ebf020; 78c9aaa; 9fb1f56; 527efd2; 4ba011c",
+      "summary": "完整提交链覆盖规格、实施计划、共享 Drawer、页面分层、真实 API 持久化、安全 Dialog、批量与邀请、OpenAPI、QA 回填，以及焦点、串行化、保存期关闭、异步生命周期和契约校验等加固。"
     },
     {
       "kind": "file",
@@ -51,13 +51,13 @@
     {
       "kind": "command",
       "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/Drawer.test.jsx src/__tests__/Dialog.test.jsx src/__tests__/UserManagement.test.jsx",
-      "result": "pass 52/52",
-      "summary": "Dialog 5、Drawer 14、UserManagement 33 项聚焦回归通过。"
+      "result": "pass 53/53",
+      "summary": "Dialog 5、Drawer 15、UserManagement 33 项聚焦回归通过。"
     },
     {
       "kind": "command",
       "ref": "npm run test:web",
-      "result": "pass 24 files / 171 tests",
+      "result": "pass 24 files / 172 tests",
       "summary": "V2 Web 全量回归通过。"
     },
     {
@@ -94,7 +94,7 @@
       "kind": "browser",
       "ref": "docs/superpowers/evaluations/2026-07-26-user-management-drawer-qa.md",
       "result": "pass",
-      "summary": "Google Chrome 管理员视角完成 1440x900、760x900、键盘焦点、脏关闭、风险与密码目标上下文、邀请反馈和数据恢复验收。"
+      "summary": "Google Chrome 管理员视角完成 1440x900、760x900、批量选择条、键盘焦点、脏关闭、风险与密码目标上下文、邀请反馈和数据恢复验收。"
     },
     {
       "kind": "screenshot",
@@ -105,6 +105,11 @@
       "kind": "screenshot",
       "ref": "docs/superpowers/evaluations/2026-07-26-user-management-760.jpg; docs/superpowers/evaluations/2026-07-26-user-management-drawer-760.jpg",
       "summary": "760px 页面纵向到达、表格操作可达和全宽 Drawer/footer 的当前浏览器证据。"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "docs/superpowers/evaluations/2026-07-26-user-management-bulk-desktop.jpg; docs/superpowers/evaluations/2026-07-26-user-management-bulk-760.jpg",
+      "summary": "选择 2 个测试用户后，桌面与 760px 下批量操作条和全部上下文动作可见、可达且未产生页面横向溢出；验收后选择已清除。"
     },
     {
       "kind": "service",
@@ -134,12 +139,12 @@
     "testing": [
       {
         "command": "Dialog + Drawer + UserManagement focused regression",
-        "result": "pass 52/52",
-        "summary": "Dialog 5、Drawer 14、UserManagement 33，覆盖语义、焦点、关闭保护、保存、风险、密码、批量与邀请。"
+        "result": "pass 53/53",
+        "summary": "Dialog 5、Drawer 15、UserManagement 33，覆盖语义、焦点、关闭保护、保存期关闭锁定、风险、密码、批量与邀请。"
       },
       {
         "command": "npm run test:web",
-        "result": "pass 24 files / 171 tests",
+        "result": "pass 24 files / 172 tests",
         "summary": "V2 Web 全量回归通过。"
       },
       {
@@ -170,12 +175,12 @@
       {
         "command": "Google Chrome desktop acceptance",
         "result": "pass",
-        "summary": "1440x900 下层级、目标用户、服务端保存回载、脏关闭、安全 Dialog、邀请与焦点恢复通过。"
+        "summary": "1440x900 下层级、批量选择条、目标用户、服务端保存回载、脏关闭、安全 Dialog、邀请与焦点恢复通过。"
       },
       {
         "command": "Google Chrome 760px and keyboard acceptance",
         "result": "pass",
-        "summary": "全宽 Drawer、独立滚动、footer 可达、无页面横向溢出、Tab 环、Escape 策略和焦点恢复通过。"
+        "summary": "批量选择条、全宽 Drawer、独立滚动、footer 可达、无页面横向溢出、Tab 环、Escape 策略和焦点恢复通过。"
       },
       {
         "command": "Chrome console from 2026-07-26T05:30:00Z",

@@ -5,7 +5,7 @@
 | 项目 | 状态 | 结论 |
 |---|---|---|
 | 实现范围 | 通过 | `/users` 的页面动作、筛选、表格、单用户 Drawer、安全 Dialog、邀请流程与真实持久化已进入本地实现。 |
-| 自动化 | 通过 | Web 全量 24 files / 171 tests；Dialog 5 + Drawer 14 + UserManagement 33，共 52/52；API modules handlers 全量回归 52/52，其中包含用户管理/auth 用例。 |
+| 自动化 | 通过 | Web 全量 24 files / 172 tests；Dialog 5 + Drawer 15 + UserManagement 33，共 53/53；API modules handlers 全量回归 52/52，其中包含用户管理/auth 用例。 |
 | 本地构建 | 通过 / 已知警告 | Web 与 API 构建通过；Web 仅保留 `>500 kB` chunk-size 已知警告。 |
 | 真实浏览器 | 通过 | Google Chrome 管理员会话完成桌面、760px、键盘、焦点、风险确认、密码目标上下文、邀请与恢复检查。 |
 | 测试数据 | 已恢复 | 测试用户业务角色已恢复；状态变更与密码重置未提交；测试邀请码已精确删除。 |
@@ -32,8 +32,8 @@
 
 | 检查 | 状态 | 结果 |
 |---|---|---|
-| `npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/Drawer.test.jsx src/__tests__/Dialog.test.jsx src/__tests__/UserManagement.test.jsx` | 通过 | Dialog 5 + Drawer 14 + UserManagement 33，合计 52/52。 |
-| `npm run test:web` | 通过 | 24 files / 171 tests。 |
+| `npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/Drawer.test.jsx src/__tests__/Dialog.test.jsx src/__tests__/UserManagement.test.jsx` | 通过 | Dialog 5 + Drawer 15 + UserManagement 33，合计 53/53。 |
+| `npm run test:web` | 通过 | 24 files / 172 tests。 |
 | `npm run build:web` | 通过 / 已知警告 | 构建通过；唯一保留项为 `>500 kB` chunk-size warning。 |
 | `(cd apps/api && npx tsx --test --test-global-setup=./test-setup.mts src/modules/modules.handlers.test.ts)` | 通过 | API modules handlers 全量回归 52/52，其中包含登录、`me`、业务角色、管理员重置密码、`listUsers` 等用户管理/auth 用例。 |
 | `npm run build:api` | 通过 | API TypeScript 构建通过。 |
@@ -52,7 +52,8 @@
 | 禁用风险确认 | 通过 / 未提交 | `active → disabled` 打开风险 Dialog，显示正确目标和“正常 → 已禁用”；选择取消，没有提交状态变更。 |
 | 密码重置上下文 | 通过 / 未提交 | 密码 Dialog 显示正确目标用户；本轮未输入或提交密码。 |
 | 最终焦点恢复 | 通过 | 最终关闭工作流后，焦点恢复到对应用户行的“编辑”按钮。 |
-| 上下文批量操作条 | 自动化通过 | 本次 Chrome 记录不单独声明批量选择条的视觉验收；其零选择隐藏、选择后出现与批量持久化由 UserManagement 自动化覆盖。 |
+| 上下文批量操作条 | 通过 | Chrome 选择 2 个可编辑测试用户后出现“已选 2 人”、清除选择与 4 个批量动作；与页面主动作、筛选和表格形成独立层级。验收后已清除选择，未提交批量变更。 |
+| 保存进行态关闭契约 | 自动化通过 | PATCH 待完成期间关闭、取消、Escape、遮罩和切换用户均被锁定；请求完成后再按服务器结果关闭并显示反馈。 |
 
 ## 邀请流程
 
@@ -75,6 +76,7 @@
 | 页面纵向到达 | 通过 | 文档 `scrollHeight=2027`、`clientHeight=900`，主内容可通过正常纵向滚动到达。 |
 | 页面横向溢出 | 通过 | `scrollWidth=clientWidth=745`，没有页面级横向溢出。 |
 | 表格操作 | 通过 | 表格列在窄屏压缩，行级“编辑”仍可到达。 |
+| 批量操作条 | 通过 | 选择 2 个测试用户后，计数、清除选择与 4 个批量动作均位于视口内；页面保持 `scrollWidth=clientWidth=745`，没有新增横向溢出。 |
 | 响应式 shell | 现有行为 / 流程可达 | 窄屏下 sidebar 位于主内容上方是现有 responsive shell 行为；本轮不把它登记为缺陷，用户管理流程仍可到达。 |
 
 ## Keyboard
@@ -108,8 +110,10 @@
 |---|---|
 | Desktop 用户管理页 | [2026-07-26-user-management-desktop.jpg](./2026-07-26-user-management-desktop.jpg) |
 | Desktop 编辑 Drawer | [2026-07-26-user-management-drawer-desktop.jpg](./2026-07-26-user-management-drawer-desktop.jpg) |
+| Desktop 批量操作条 | [2026-07-26-user-management-bulk-desktop.jpg](./2026-07-26-user-management-bulk-desktop.jpg) |
 | 760px 用户管理页 | [2026-07-26-user-management-760.jpg](./2026-07-26-user-management-760.jpg) |
 | 760px 全宽 Drawer | [2026-07-26-user-management-drawer-760.jpg](./2026-07-26-user-management-drawer-760.jpg) |
+| 760px 批量操作条 | [2026-07-26-user-management-bulk-760.jpg](./2026-07-26-user-management-bulk-760.jpg) |
 
 ## 总看板回填状态
 
