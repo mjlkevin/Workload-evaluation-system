@@ -1,0 +1,100 @@
+{
+  "id": "BE-2026-07-27-qoder-ui-004-review",
+  "date": "2026-07-27",
+  "type": "verification",
+  "scope": "QODER-UI-004 /system/model-config 实现复核",
+  "summary": "Codex 复核 Qoder commit 3f216bf。内联页面反馈和语义 surface token 已形成确定性实现，聚焦测试、二次 Web 全量回归、Web 构建与 UI scope checker 通过；但模型编辑器“放弃修改”未恢复已写入页面状态，编辑弹窗“确定”未等待或检查保存结果，失败时仍关闭且无反馈，构成两项 P1 验收阻断。浏览器验收仍受认证阻断，worktree 另有未跟踪 node_modules 符号链接。因此 Gate 为 REWORK_REQUIRED，不允许集成或开始下一项。",
+  "status": "REWORK_REQUIRED / 自动化主体通过 / 两项行为阻断 / 浏览器待回填",
+  "pages": [
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "commit",
+      "ref": "3f216bf",
+      "summary": "Qoder UI-04 实现提交，base 90f9838；声明变更 3 个文件。"
+    },
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-07-27-codex-QODER-UI-004-IMPL-gate.md",
+      "result": "REWORK_REQUIRED",
+      "summary": "记录两项 P1 行为阻断、worktree 残留、复跑验证、浏览器证据缺口和精确返工提示词。"
+    },
+    {
+      "kind": "code_review",
+      "ref": "ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx:134; ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx:147; ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx:1038",
+      "result": "fail",
+      "summary": "放弃关闭未恢复模型配置；弹窗确定忽略 saveModelDraft 的异步结果并立即关闭。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/ModelConfig.test.jsx",
+      "result": "pass 5/5",
+      "summary": "Qoder 新增聚焦测试通过，但缺少放弃后恢复原值和保存失败保留输入两条关键回归。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass on second full run 25 files / 174 tests",
+      "summary": "第一次全量运行在无关 HomeWorkspace 用例出现间歇失败 173/174；该用例单独复跑通过，第二次全量 174/174。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass with known warning",
+      "summary": "Web 构建通过，保留既有大于 500 kB chunk-size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 90f9838 -- ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js ui/V2_PROTOTYPE/src/__tests__/ModelConfig.test.jsx",
+      "result": "pass",
+      "summary": "No new deterministic UI findings。"
+    },
+    {
+      "kind": "browser",
+      "ref": "/system/model-config 1440px / 760px / keyboard",
+      "result": "not run / authentication blocked",
+      "summary": "当前没有可用浏览器交互证据，不声明视觉、响应式或实际脏关闭路径已验收。"
+    },
+    {
+      "kind": "worktree",
+      "ref": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/ui-004-model-config",
+      "result": "dirty",
+      "summary": "存在未跟踪 ui/V2_PROTOTYPE/node_modules 符号链接；返工 handoff 前应仅移除该 worktree 链接并提供 clean status。"
+    }
+  ],
+  "next": "Qoder 必须先返工 QODER-UI-004：补 RED/GREEN 测试并实现真正的修改回滚、保存失败保留与内联反馈、保存期关闭锁定，清理 worktree 内未跟踪依赖链接，复跑聚焦/全量/构建/scope checker 后重新 handoff。浏览器管理员会话可用后补 1440px、760px 和键盘验收；在此之前不集成 3f216bf，不开始下一页面。",
+  "board": {
+    "change": {
+      "stage": "QODER-UI-004 Codex Gate",
+      "result": "REWORK_REQUIRED / 两项 P1 行为阻断 / 浏览器待回填"
+    },
+    "testing": [
+      {
+        "command": "ModelConfig focused regression",
+        "result": "pass 5/5 but incomplete",
+        "summary": "已有反馈、确认弹窗和 token 测试通过；缺少实际回滚与保存失败生命周期测试。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass 174/174 on second full run",
+        "summary": "第一次出现 1 个无关 HomeWorkspace 间歇失败，单独复跑和第二次全量通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass / known chunk warning",
+        "summary": "生产构建通过。"
+      },
+      {
+        "command": "UI scope checker",
+        "result": "pass",
+        "summary": "未新增确定性 UI scope finding。"
+      }
+    ]
+  }
+}
