@@ -1,0 +1,99 @@
+{
+  "id": "BE-2026-07-27-qoder-ui-005-gate",
+  "date": "2026-07-27",
+  "type": "verification",
+  "scope": "QODER-UI-005 /system/knowledge-base Codex Gate",
+  "summary": "Codex 已复核 Qoder commit a9df870：提交仅包含 useSystemManagement.js、SystemManagement.jsx 与 KnowledgeBaseFeedback.test.jsx 三个声明文件。知识库保存不再双重反馈；生效配置等待真实结果并显示成功/失败内联反馈；连通性成功使用 role=status、失败使用 role=alert。聚焦测试 5/5、Web 全量 27 files/187 tests、Web 构建和 UI scope checker 通过；隔离本地 mock 下完成 1440px 与 760px 浏览器验收，无水平溢出、无原生 alert、无浏览器 console error，且未使用真实 API Key。Gate 结论为 ACCEPTED_PENDING_INTEGRATION；不自动集成、不清理 worktree、不启动下一项。",
+  "status": "ACCEPTED_PENDING_INTEGRATION / 已复核待用户授权集成",
+  "pages": [
+    "plan",
+    "testing",
+    "monitoring",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "source_commit",
+      "ref": "a9df870",
+      "result": "accepted pending integration",
+      "summary": "父提交为 7a2c69b；仅包含 UI-05 声明的 3 个文件、+108/-4。"
+    },
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-07-27-codex-QODER-UI-005-IMPL-gate.md",
+      "result": "ACCEPTED_PENDING_INTEGRATION",
+      "summary": "记录 scope、owner、自动化复跑、浏览器证据、依赖挂载说明和剩余风险。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/KnowledgeBaseFeedback.test.jsx",
+      "result": "pass 1 file / 5 tests",
+      "summary": "保存单反馈、生效成功/失败与连通性 ARIA live region 聚焦回归通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass 27 files / 187 tests",
+      "summary": "Qoder worktree 的完整 Web 测试通过；保留既有非阻断 warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass with known warning",
+      "summary": "生产构建通过，保留既有大于 500 kB chunk-size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 7a2c69b -- ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx ui/V2_PROTOTYPE/src/__tests__/KnowledgeBaseFeedback.test.jsx",
+      "result": "pass",
+      "summary": "No new deterministic UI findings。"
+    },
+    {
+      "kind": "browser",
+      "ref": "isolated local mock / 1440px + 760px",
+      "result": "pass",
+      "summary": "保存单一 status、生效 200/500 内联反馈、连通性 200 status/503 alert、窄屏可达性和零 console error 均通过；无真实密钥。"
+    },
+    {
+      "kind": "worktree",
+      "ref": ".claude/worktrees/ui-005-knowledge-base",
+      "result": "clean / retained",
+      "summary": "验证期间临时依赖链接已移除；最终 worktree clean，未获集成或清理授权。"
+    }
+  ],
+  "next": "等待用户明确授权后，由 Codex 精确集成 a9df870 并执行集成后复核；allowNextTask=false，不自动开始 UI-07 或其他 UI 优化。",
+  "board": {
+    "change": {
+      "stage": "QODER-UI-005 Codex Gate",
+      "result": "ACCEPTED_PENDING_INTEGRATION / a9df870"
+    },
+    "testing": [
+      {
+        "command": "KnowledgeBaseFeedback focused regression",
+        "result": "pass 5/5",
+        "summary": "三个根问题的聚焦行为验证通过。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass 187/187",
+        "summary": "Qoder worktree 27 个测试文件全部通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass / known chunk warning",
+        "summary": "生产构建通过。"
+      },
+      {
+        "command": "UI scope checker",
+        "result": "pass",
+        "summary": "未新增确定性 UI scope finding。"
+      },
+      {
+        "command": "browser gate",
+        "result": "pass / 1440px + 760px",
+        "summary": "成功/失败反馈、ARIA live region 与窄屏可达性通过。"
+      }
+    ]
+  }
+}
