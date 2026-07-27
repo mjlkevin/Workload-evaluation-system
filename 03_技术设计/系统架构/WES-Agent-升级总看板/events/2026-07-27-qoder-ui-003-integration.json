@@ -1,0 +1,105 @@
+{
+  "id": "BE-2026-07-27-qoder-ui-003-integration",
+  "date": "2026-07-27",
+  "type": "implementation",
+  "scope": "QODER-UI-003 /api-keys 主线集成与集成后验证",
+  "summary": "QODER-UI-003 已由 source commit ea4a1ef 精确集成为 7a2c69b，落在 codex/role-driven-ai-home-workbench。Codex 核对两个目标文件与 ea4a1ef 内容完全一致，提交范围仅 2 files、+227/-112，主 checkout 既有 dirty changes 未进入集成提交。主线聚焦测试 5/5、Web 全量 26 files/185 tests、Web 构建和 UI scope checker 通过；隔离本地 mock 下完成 1440px 与 760px 浏览器验收，确认共享 Dialog、Escape 焦点归还、撤销前确认、单次请求、状态反馈、单列折叠和无水平溢出。状态更新为 INTEGRATED_VERIFIED；不清理 worktree，不自动开始下一项 UI 优化。",
+  "status": "INTEGRATED_VERIFIED / 已集成并验证 / 不自动开始下一项",
+  "pages": [
+    "plan",
+    "testing",
+    "monitoring",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "commit",
+      "ref": "7a2c69b",
+      "result": "integrated",
+      "summary": "业务主线 UI-03 集成提交，父提交 16d8519；仅包含 ApiKeys 页面与聚焦测试。"
+    },
+    {
+      "kind": "source_commit",
+      "ref": "ea4a1ef",
+      "result": "identical target content",
+      "summary": "git diff --exit-code 对两个目标文件返回 0，确认集成内容与 Qoder patch 一致。"
+    },
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-07-27-codex-QODER-UI-003-IMPL-integration-gate.md",
+      "result": "INTEGRATED_VERIFIED",
+      "summary": "记录集成范围、patch identity、主线复跑、浏览器证据、dirty 保护和 worktree 保留状态。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/ApiKeys.test.jsx",
+      "result": "pass 1 file / 5 tests",
+      "summary": "UI-03 聚焦回归在主线通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass 26 files / 185 tests",
+      "summary": "当前主 checkout 全量 Web 测试通过；既有未提交测试变化不属于 7a2c69b。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass with known warning",
+      "summary": "生产构建通过，保留既有大于 500 kB chunk-size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 16d8519 -- ui/V2_PROTOTYPE/src/pages/ApiKeys.jsx ui/V2_PROTOTYPE/src/__tests__/ApiKeys.test.jsx",
+      "result": "pass",
+      "summary": "No new deterministic UI findings。"
+    },
+    {
+      "kind": "browser",
+      "ref": "isolated local mock / 1440px + 760px",
+      "result": "pass",
+      "summary": "共享 Dialog、Escape 焦点归还、撤销前零请求、确认后单次请求、状态反馈、窄屏单列和无水平溢出均通过；无真实 API Key，浏览器 console error 为 0。"
+    },
+    {
+      "kind": "worktree",
+      "ref": ".claude/worktrees/ui-003-api-keys + .claude/worktrees/ui-004-model-config",
+      "result": "clean / retained",
+      "summary": "两个 Qoder worktree 均 clean 并保留，未获清理授权。"
+    }
+  ],
+  "next": "停止本轮。等待用户明确指令后再清理 UI-03/UI-04 worktree、启动 UI-05/UI-07，或将 760px 全局 Shell 的首屏滚动距离作为独立任务评估；不得自动领取下一项。",
+  "board": {
+    "change": {
+      "stage": "QODER-UI-003 Mainline Integration",
+      "result": "INTEGRATED_VERIFIED / 7a2c69b"
+    },
+    "testing": [
+      {
+        "command": "ApiKeys focused regression",
+        "result": "pass 5/5",
+        "summary": "主线聚焦测试通过。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass 185/185",
+        "summary": "当前主 checkout 26 个测试文件全部通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass / known chunk warning",
+        "summary": "生产构建通过。"
+      },
+      {
+        "command": "UI scope checker",
+        "result": "pass",
+        "summary": "未新增确定性 UI scope finding。"
+      },
+      {
+        "command": "browser gate",
+        "result": "pass / 1440px + 760px",
+        "summary": "关键交互、焦点归还、危险确认与窄屏布局通过。"
+      }
+    ]
+  }
+}
