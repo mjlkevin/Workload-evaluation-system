@@ -117,6 +117,14 @@ export default function SystemManagement({ sectionId }) {
       : { ok: false, message: result.error || '知识库配置草稿保存失败' })
   }
 
+  const handleActivateKb = async () => {
+    setKbSaveResult(null)
+    const result = await actions.activateKbConfig()
+    setKbSaveResult(result.success
+      ? { ok: true, message: '知识库配置已生效' }
+      : { ok: false, message: result.error || '知识库配置生效失败' })
+  }
+
   const handleSaveModelDraft = async () => {
     setModelSaveResult(null)
     const result = await actions.saveModelDraftWithKey(apiKeyInput || undefined)
@@ -434,7 +442,7 @@ export default function SystemManagement({ sectionId }) {
               <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={handleSaveKbDraft} disabled={actionLoading.saveKbDraft || kbLoading}>
                 {actionLoading.saveKbDraft ? '保存中...' : '保存草稿'}
               </button>
-              <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateKbConfig()} disabled={actionLoading.activateKbConfig || kbLoading}>
+              <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={handleActivateKb} disabled={actionLoading.activateKbConfig || kbLoading}>
                 {actionLoading.activateKbConfig ? '...' : '⌁ 生效配置'}
               </button>
             </div>
@@ -587,7 +595,9 @@ export default function SystemManagement({ sectionId }) {
 
                 {/* 测试结果 */}
                 {kbTestResult && (
-                  <div style={{
+                  <div
+                    role={kbTestResult.ok ? 'status' : 'alert'}
+                    style={{
                     background: kbTestResult.ok ? 'var(--ok-soft)' : 'var(--err-soft)',
                     border: '1px solid var(--line)',
                     borderRadius: 'var(--r-md)',

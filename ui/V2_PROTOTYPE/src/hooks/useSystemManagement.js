@@ -369,13 +369,11 @@ export default function useSystemManagement({
           knowledgeId: kbConfig.knowledgeId || null,
         },
       })
-      alert('知识库配置草稿已保存')
     })
   }, [enabled, kbConfig, withAction])
 
   const activateKbConfig = useCallback(() => withAction('activateKbConfig', async () => {
     if (enabled) await apiClient.post('/system/knowledge-base-config/activate')
-    alert('知识库配置已生效')
   }), [enabled, withAction])
 
   const testKbConnectivity = useCallback(async () => {
