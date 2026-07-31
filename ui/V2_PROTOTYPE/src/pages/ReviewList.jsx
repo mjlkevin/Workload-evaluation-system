@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ListPage from '../components/ListPage.jsx'
 import useReviewList from '../hooks/useReviewList.js'
@@ -6,20 +6,32 @@ import { reviews as mockData } from '../mock/listData.js'
 
 export default function ReviewList() {
   const navigate = useNavigate()
-  const { rows, refetch, create, creating } = useReviewList({ fallbackData: mockData })
+  const [historyNotice, setHistoryNotice] = useState('')
+  const {
+    rows,
+    loading,
+    loadError,
+    createError,
+    refetch,
+    create,
+    creating,
+  } = useReviewList({ fallbackData: mockData })
+
+  const handleCreate = async () => {
+    const result = await create()
+    if (result.ok && result.id) {
+      navigate(`/reviews/${encodeURIComponent(result.id)}`)
+    }
+  }
 
   const handleBulkAction = (actionKey, selectedRows) => {
     const first = selectedRows[0]
-    if ((actionKey === 'preview' || actionKey === 'edit') && first) {
-      navigate(`/reviews/${first.id}`)
+    if (actionKey === 'open' && first) {
+      navigate(`/reviews/${encodeURIComponent(first.id)}`)
       return
     }
     if (actionKey === 'history' && first) {
-      alert(`评审流转记录 · ${first.id}`)
-      return
-    }
-    if (actionKey === 'delete') {
-      alert('评审模块暂不支持删除，请联系管理员手动清理数据')
+      setHistoryNotice(`${first.id} 暂无可展示的评审历史；当前仅支持打开详情查看最新状态。`)
     }
   }
 
@@ -29,9 +41,23 @@ export default function ReviewList() {
       title="评审列表"
       subtitle="方案评审流程与审批追踪"
       data={rows}
+      loading={loading}
+      loadingText="正在加载评审列表…"
+      error={loadError}
+      errorText="加载评审列表失败，请检查网络后重试"
+      onRetry={refetch}
+      feedback={createError
+        ? { role: 'alert', message: '创建评审失败，请稍后重试' }
+        : historyNotice
+          ? { role: 'status', message: historyNotice }
+          : null}
       rowKey="id"
-      onRowClick={(row) => navigate(`/reviews/${row.id}`)}
+      onRowClick={(row) => navigate(`/reviews/${encodeURIComponent(row.id)}`)}
       onBulkAction={handleBulkAction}
+      bulkActions={[
+        { key: 'open', label: '查看详情', mode: 'single' },
+        { key: 'history', label: '历史', mode: 'single' },
+      ]}
       filterTags={[
         { key: 'all', label: '全部' },
         { key: '待评审', label: '待评审' },
@@ -46,9 +72,27 @@ export default function ReviewList() {
         { key: 'deadline', title: '截止时间' },
         { key: 'status', title: '状态', render: (r) => <StatusBadge status={r.status} /> },
         { key: 'updatedAt', title: '更新时间' },
+        {
+          key: 'actions',
+          title: '操作',
+          nowrap: true,
+          render: (r) => (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              aria-label={`查看 ${r.id} 详情`}
+              onClick={(event) => {
+                event.stopPropagation()
+                navigate(`/reviews/${encodeURIComponent(r.id)}`)
+              }}
+            >
+              查看详情
+            </button>
+          ),
+        },
       ]}
       actions={[
-        <button type="button" key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}} disabled={creating} onClick={async () => { const id = await create(); if (id) navigate(`/reviews/${id}`) }}>{creating ? '创建中...' : '+ 新建'}</button>,
+        <button type="button" key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}} disabled={creating} onClick={handleCreate}>{creating ? '创建中...' : '+ 新建'}</button>,
         <button type="button" key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}} onClick={() => refetch()}>⟳ 刷新</button>,
       ]}
     />

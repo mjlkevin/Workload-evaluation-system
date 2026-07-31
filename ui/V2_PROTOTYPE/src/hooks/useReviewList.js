@@ -54,32 +54,32 @@ export default function useReviewList({
   )
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(Boolean(enabled))
-  const [error, setError] = useState(null)
+  const [loadError, setLoadError] = useState(null)
+  const [createError, setCreateError] = useState(null)
   const [fetchId, setFetchId] = useState(0)
   const [creating, setCreating] = useState(false)
   const [localRows, setLocalRows] = useState([])
 
   useEffect(() => {
     if (!enabled) {
-      setRows([...localRows])
+      setRows([...localRows, ...fallbackRows])
       setLoading(false)
       return undefined
     }
 
     let cancelled = false
     setLoading(true)
-    setError(null)
+    setLoadError(null)
 
     apiClient.get('/pm/reviews')
       .then((payload) => {
         if (cancelled) return
         const mapped = unwrapList(payload).map(mapReviewToVM)
-        setRows([...localRows, ...mapped])
+        setRows(mapped)
       })
       .catch((err) => {
         if (cancelled) return
-        setError(err)
-        setRows([...localRows])
+        setLoadError(err)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -94,23 +94,24 @@ export default function useReviewList({
 
   const create = useCallback(async () => {
     setCreating(true)
-    const now = new Date()
-    const local = mapReviewToVM({
-      id: `REV-LOCAL-${String(now.getTime()).slice(-5)}`,
-      status: 'pending',
-      verdict: null,
-      reviewerUsername: 'mjlkevin',
-      versionCode: '待关联版本',
-      deadline: now.toISOString(),
-      updatedAt: now.toISOString(),
-      contextSnapshot: { projectName: '新建评审单' },
-    })
-    setLocalRows((prev) => [local, ...prev])
-    setRows((prev) => [local, ...prev])
+    setCreateError(null)
 
     if (!enabled) {
+      const now = new Date()
+      const local = mapReviewToVM({
+        id: `REV-LOCAL-${String(now.getTime()).slice(-5)}`,
+        status: 'pending',
+        verdict: null,
+        reviewerUsername: 'mjlkevin',
+        versionCode: '待关联版本',
+        deadline: now.toISOString(),
+        updatedAt: now.toISOString(),
+        contextSnapshot: { projectName: '新建评审单' },
+      })
+      setLocalRows((prev) => [local, ...prev])
+      setRows((prev) => [local, ...prev])
       setCreating(false)
-      return local.id
+      return { ok: true, id: local.id }
     }
 
     try {
@@ -125,15 +126,16 @@ export default function useReviewList({
         },
       })
       const record = payload?.data || payload
+      if (!record?.id) throw new Error('创建评审成功但服务端未返回 ID')
       refetch()
-      return record.id || local.id
+      return { ok: true, id: record.id }
     } catch (err) {
-      setError(err)
-      return local.id
+      setCreateError(err)
+      return { ok: false, id: null, error: err }
     } finally {
       setCreating(false)
     }
   }, [enabled, refetch])
 
-  return { rows, loading, error, refetch, create, creating }
+  return { rows, loading, loadError, createError, refetch, create, creating }
 }

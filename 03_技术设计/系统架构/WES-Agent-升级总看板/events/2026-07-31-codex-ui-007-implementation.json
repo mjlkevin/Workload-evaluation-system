@@ -1,0 +1,100 @@
+{
+  "id": "BE-2026-07-31-codex-ui-007-implementation",
+  "date": "2026-07-31",
+  "type": "implementation",
+  "scope": "UI-07 /reviews 评审列表可信状态、真实创建结果与显式操作入口",
+  "summary": "用户将 UI-07 改为由 Codex 直接执行，原 QODER-UI-007 分派被本次实现取代。Codex 在独立 worktree codex/ui-007-reviews-list 中完成 ISS-203 / RP-044 的三个已确认根问题：加载失败与空状态分离并提供重试；创建仅在服务端返回真实 ID 后跳转，失败不再生成 REV-LOCAL 幽灵记录；列表增加显式详情入口、可访问筛选/选择语义，并将批量操作收敛为当前真实支持的详情与内联历史提示。",
+  "status": "IMPLEMENTED_VERIFIED_PENDING_INTEGRATION / 已实施验证待集成",
+  "pages": [
+    "plan",
+    "testing",
+    "monitoring",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "requirement",
+      "ref": "ISS-203 / RP-044",
+      "result": "deduplicated",
+      "summary": "命中既有问题与需求记录，仅补充实现证据，未重复建项。"
+    },
+    {
+      "kind": "worktree",
+      "ref": ".claude/worktrees/ui-007-reviews-list / codex/ui-007-reviews-list / base 910269a",
+      "result": "isolated",
+      "summary": "隔离实现，未覆盖业务主线既有未提交修改。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/hooks/useReviewList.js",
+      "result": "implemented",
+      "summary": "拆分加载与创建错误；认证模式不混入本地回退记录；创建返回显式 ok/id 结果。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/components/ListPage.jsx + ui/V2_PROTOTYPE/src/pages/ReviewList.jsx",
+      "result": "implemented",
+      "summary": "增加 loading/error/retry/feedback 语义区、ARIA 筛选与复选框名称、显式行级详情按钮和收敛后的批量操作。"
+    },
+    {
+      "kind": "tdd",
+      "ref": "ReviewList.test.jsx + ListPage.test.jsx",
+      "result": "RED confirmed / GREEN pass 10 of 10",
+      "summary": "P1/P2 初始 3 个预期失败，P3 初始 5 个预期失败；实现后聚焦回归 3 文件 10 个测试全部通过。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass 28 files / 191 tests",
+      "summary": "完整 Web 回归通过，仅保留既有 React Router future warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass with known chunk warning",
+      "summary": "Vite 生产构建通过，保留既有大于 500 kB chunk-size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "check-ui-scope.mjs --base 910269a -- UI-07 changed UI files",
+      "result": "pass",
+      "summary": "No new deterministic UI findings。"
+    },
+    {
+      "kind": "browser",
+      "ref": "isolated synthetic API / 1440px + 760px",
+      "result": "pass with one harness limitation",
+      "summary": "加载失败重试、创建 500 不跳转且不出现幽灵记录、创建 200 跳转真实 ID、筛选 pressed 状态、具名复选框、内联历史反馈、显式详情入口、无页面级水平溢出与正常态零 console error 均通过；原生按钮焦点可见，浏览器自动化 press 未触发 Enter 路由，按钮行为由聚焦组件测试覆盖。"
+    }
+  ],
+  "next": "等待用户选择本地集成、PR 或保留分支；当前业务主线存在未提交修改，不自动 cherry-pick、不清理 worktree、不领取下一项 UI 优化。",
+  "board": {
+    "change": {
+      "stage": "CODEX-UI-007 实现与验证",
+      "result": "IMPLEMENTED_VERIFIED_PENDING_INTEGRATION"
+    },
+    "testing": [
+      {
+        "command": "focused UI-07 regression",
+        "result": "pass 10/10",
+        "summary": "P1-P3 的加载、创建、操作与可访问性契约通过。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass 191/191",
+        "summary": "28 个 Web 测试文件全部通过。"
+      },
+      {
+        "command": "npm run build:web + UI scope checker",
+        "result": "pass",
+        "summary": "生产构建和 UI 技术栈边界检查通过。"
+      },
+      {
+        "command": "browser acceptance",
+        "result": "pass 1440px + 760px",
+        "summary": "正常、加载失败、创建失败/成功与窄屏可达性完成验证。"
+      }
+    ]
+  }
+}

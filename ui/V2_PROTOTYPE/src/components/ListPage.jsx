@@ -23,6 +23,12 @@ export default function ListPage({
   filterTags,
   columns,
   data = [],
+  loading = false,
+  loadingText = '正在加载…',
+  error = null,
+  errorText = '加载失败，请稍后重试',
+  onRetry,
+  feedback = null,
   emptyText = '暂无数据',
   emptyIcon = '📭',
   emptyAction,
@@ -194,6 +200,7 @@ export default function ListPage({
           {filterTags?.map((tag) => (
             <button type="button"
               key={tag.key}
+              aria-pressed={activeFilter === tag.key}
               onClick={() => setActiveFilter(tag.key)}
               style={{
                 padding: '4px 10px',
@@ -230,8 +237,69 @@ export default function ListPage({
         </div>
       </div>
 
+      {loading && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            padding: '10px 12px',
+            marginBottom: 12,
+            borderRadius: 'var(--r-md)',
+            background: 'var(--info-soft)',
+            color: 'var(--info)',
+            fontSize: 12,
+          }}
+        >
+          {loadingText}
+        </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+            padding: '10px 12px',
+            marginBottom: 12,
+            border: '1px solid var(--err)',
+            borderRadius: 'var(--r-md)',
+            background: 'var(--err-soft)',
+            color: 'var(--err)',
+            fontSize: 12,
+          }}
+        >
+          <span>{errorText}</span>
+          {onRetry && (
+            <button type="button" className="btn btn-out" onClick={onRetry}>
+              重试
+            </button>
+          )}
+        </div>
+      )}
+
+      {feedback?.message && (
+        <div
+          role={feedback.role || 'status'}
+          aria-live={feedback.role === 'alert' ? 'assertive' : 'polite'}
+          style={{
+            padding: '10px 12px',
+            marginBottom: 12,
+            borderRadius: 'var(--r-md)',
+            background: feedback.role === 'alert' ? 'var(--err-soft)' : 'var(--info-soft)',
+            color: feedback.role === 'alert' ? 'var(--err)' : 'var(--info)',
+            fontSize: 12,
+          }}
+        >
+          {feedback.message}
+        </div>
+      )}
+
       {/* table */}
-      {filtered.length === 0 ? (
+      {!loading && !error && filtered.length === 0 ? (
         <div
           style={{
             textAlign: 'center',
@@ -246,7 +314,7 @@ export default function ListPage({
           <div style={{ fontSize: 13, marginBottom: emptyAction ? 12 : 0 }}>{emptyText}</div>
           {emptyAction}
         </div>
-      ) : (
+      ) : filtered.length > 0 ? (
         <div style={{ overflow: 'auto', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)' }}>
           <table
             style={{
@@ -262,6 +330,7 @@ export default function ListPage({
                 <th style={{ width: 40, padding: '10px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)' }}>
                   <input
                     type="checkbox"
+                    aria-label="选择当前结果"
                     checked={filtered.length > 0 && filtered.every((r) => selected.has(r[rowKey]))}
                     onChange={(e) => selectAll(e.target.checked)}
                   />
@@ -311,6 +380,7 @@ export default function ListPage({
                     >
                       <input
                         type="checkbox"
+                        aria-label={`选择 ${row[rowKey]}`}
                         checked={isSel}
                         onChange={() => toggleOne(row[rowKey])}
                       />
@@ -335,10 +405,10 @@ export default function ListPage({
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
       {/* pager */}
-      <div
+      {!loading && !error && <div
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -355,7 +425,7 @@ export default function ListPage({
           <span>1 / 1</span>
           <button type="button" className="btn btn-ghost" style={{ height: 26, padding: '0 8px', fontSize: 12 }}>›</button>
         </span>
-      </div>
+      </div>}
     </PageShell>
   )
 }
