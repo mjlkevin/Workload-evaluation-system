@@ -25,6 +25,7 @@
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
         <a href="collaboration-protocol.html">协作协议</a>
+        <a href="branches.html">分支拓扑</a>
         <a class="active" href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
@@ -2874,6 +2875,17 @@
             <p style="margin-top:12px;color:var(--ink-3);font-size:12px">除非后续明确切阶段，否则不进入当前冲刺。</p>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section data-board-event-id="BE-2026-08-02-rp-045-branch-topology:requirements">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">RP-045 / Git Governance</div>
+          <h2>RP-045 · WES 分支拓扑与 Worktree 看板</h2>
+          <p>来源 <code class="inline">ISS-2026-08-02-001</code>。范围仅覆盖当前 WES 仓库；以只读 Git refs/worktree 为事实源，自动生成运营拓扑和完整台账。</p>
+        </div>
+        <div class="callout"><div><b>验收口径</b>全部本地分支与 Git 集合一致；主线、ancestor/non-ancestor、worktree、重复指针正确；1440px/760px、键盘和 file:// 可用；不提供自动删除、合并或远程同步。</div></div>
       </div>
     </section>
 

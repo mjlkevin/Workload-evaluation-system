@@ -767,6 +767,88 @@ test('board build accepts isolated source and destination directories', () => {
   assert.match(source, /async function main\(\{ boardDir\s*=\s*BOARD_DIR, distDir\s*=\s*path\.join\(boardDir, 'dist'\) \}\s*=\s*\{\}\)/);
 });
 
+test('every supported source board navigation links to branch topology exactly once', () => {
+  const supportedPages = fs.readdirSync(BOARD_DIR)
+    .filter((file) => file.endsWith('.html') && file !== 'branches.html')
+    .sort()
+    .filter((file) => {
+      const html = read(path.join(BOARD_DIR, file));
+      return [...html.matchAll(/<nav\b[^>]*>[\s\S]*?<\/nav>/g)].some((match) => {
+        const nav = match[0];
+        const openingTag = nav.slice(0, nav.indexOf('>') + 1);
+        const classAttribute = /(?:^|\s)class\s*=\s*(["'])([\s\S]*?)\1/.exec(openingTag);
+        const classes = classAttribute ? classAttribute[2].trim().split(/\s+/) : [];
+        return (classes.includes('navlinks') || classes.includes('sidebar-nav'))
+          && /href=(["'])collaboration-protocol\.html\1/.test(nav);
+      });
+    });
+
+  assert.ok(supportedPages.length > 0);
+  for (const file of supportedPages) {
+    const html = read(path.join(BOARD_DIR, file));
+    const navs = [...html.matchAll(/<nav\b[^>]*>[\s\S]*?<\/nav>/g)]
+      .map((match) => match[0])
+      .filter((nav) => {
+        const openingTag = nav.slice(0, nav.indexOf('>') + 1);
+        const classAttribute = /(?:^|\s)class\s*=\s*(["'])([\s\S]*?)\1/.exec(openingTag);
+        const classes = classAttribute ? classAttribute[2].trim().split(/\s+/) : [];
+        return (classes.includes('navlinks') || classes.includes('sidebar-nav'))
+          && /href=(["'])collaboration-protocol\.html\1/.test(nav);
+      });
+    for (const nav of navs) {
+      assert.equal((nav.match(/href=(["'])branches\.html\1/g) || []).length, 1, `${file} navigation`);
+    }
+  }
+});
+
+test('source board modules expose one RP-045 governance record per planned owner', () => {
+  const expected = {
+    'issues.html': [
+      'BE-2026-08-02-rp-045-branch-topology:issues',
+      'ISS-2026-08-02-001',
+      '项目看板缺少主分支与子分支拓扑',
+    ],
+    'requirements.html': [
+      'BE-2026-08-02-rp-045-branch-topology:requirements',
+      'RP-045 · WES 分支拓扑与 Worktree 看板',
+      '全部本地分支与 Git 集合一致',
+    ],
+    'index.html': [
+      'BE-2026-08-02-rp-045-branch-topology:index',
+      '分支拓扑与 Worktree',
+      '查看自动生成的主线、子分支关系',
+    ],
+    'plan.html': [
+      'BE-2026-08-02-rp-045-branch-topology:plan',
+      '实施验证中',
+      '不执行自动删除、合并或远端同步',
+    ],
+    'monitoring.html': [
+      'BE-2026-08-02-rp-045-branch-topology:monitoring',
+      'npm run board:branches:check',
+      '待最终验证',
+    ],
+    'changes.html': [
+      'BE-2026-08-02-rp-045-branch-topology:changes',
+      '新增只读 Git 分支快照生成器',
+      '人工浏览器验收回填',
+    ],
+    'sources.html': [
+      'BE-2026-08-02-rp-045-branch-topology:sources-page',
+      'BE-2026-08-02-rp-045-branch-topology:sources-generator',
+      'BE-2026-08-02-rp-045-branch-topology:sources-spec',
+      'BE-2026-08-02-rp-045-branch-topology:sources-plan',
+    ],
+  };
+
+  for (const [file, fragments] of Object.entries(expected)) {
+    const html = read(path.join(BOARD_DIR, file));
+    for (const fragment of fragments) {
+      assert.equal(html.split(fragment).length - 1, 1, `${file}: ${fragment}`);
+    }
+  }
+});
+
 test('board build centralizes actual branch navigation while preserving its shell and runtime assets', async (t) => {
   const build = require('./board-build');
   const nav = build.generateNav('branches.html');

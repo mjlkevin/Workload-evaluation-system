@@ -25,6 +25,7 @@
         <a href="changes.html">变更记录</a>
         <a href="sources.html">文档事实源</a>
         <a href="collaboration-protocol.html">协作协议</a>
+        <a href="branches.html">分支拓扑</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
@@ -649,6 +650,12 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td>把 AI 需要用户补充信息的 Markdown 问题列表升级为后端可校验的 <code class="inline">formBlock</code> 协议和前端 <code class="inline">InteractiveFormCard</code>。</td>
           <td><span class="status done"><span class="dot"></span>已交付</span>：已固化 <code class="inline">formBlock</code> 协议、会话 metadata、OpenAPI 契约、前端 <code class="inline">InteractiveFormCard</code>、即时响应挂载和 session metadata 回放。</td>
           <td>人工验收 MT-1H-B-002：真实 AI formBlock 输出、填写提交和不触发未确认写动作验证。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-02-rp-045-branch-topology:plan">
+          <td class="mono">RP-045</td>
+          <td>WES 分支拓扑与 Worktree 看板</td>
+          <td><span class="status run"><span class="dot"></span>实施验证中</span></td>
+          <td>Git 集合精确一致；主线/ancestor/non-ancestor/worktree/重复指针正确；1440px、760px、键盘与 file:// 通过；不执行自动删除、合并或远端同步。</td>
         </tr>
       </table>
     </section>

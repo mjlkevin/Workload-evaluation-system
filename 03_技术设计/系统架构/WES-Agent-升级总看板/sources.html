@@ -25,6 +25,7 @@
         <a href="changes.html">变更记录</a>
         <a class="active" href="sources.html">文档事实源</a>
         <a href="collaboration-protocol.html">协作协议</a>
+        <a href="branches.html">分支拓扑</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
@@ -718,6 +719,18 @@
               </tr>
             </thead>
             <tbody>
+              <tr data-board-event-id="BE-2026-08-02-rp-045-branch-topology:sources-page">
+                <td>分支拓扑页面</td><td><a href="branches.html">branches.html</a></td><td colspan="6">自动快照的可视化与完整分支台账。</td>
+              </tr>
+              <tr data-board-event-id="BE-2026-08-02-rp-045-branch-topology:sources-generator">
+                <td>快照生成器</td><td><code class="inline">scripts/generate-branch-board.js</code></td><td colspan="6">只读 Git 采集、校验和原子写入。</td>
+              </tr>
+              <tr data-board-event-id="BE-2026-08-02-rp-045-branch-topology:sources-spec">
+                <td>设计规格</td><td><code class="inline">docs/superpowers/specs/2026-08-02-wes-branch-topology-board-design.md</code></td><td colspan="6">范围、事实模型、交互与验收口径。</td>
+              </tr>
+              <tr data-board-event-id="BE-2026-08-02-rp-045-branch-topology:sources-plan">
+                <td>实施计划</td><td><code class="inline">docs/superpowers/plans/2026-08-02-wes-branch-topology-board.md</code></td><td colspan="6">TDD、集成保护与验证步骤。</td>
+              </tr>
               <tr>
                 <td>总看板交付物</td>
                 <td><a href="index.html">index.html</a></td>
