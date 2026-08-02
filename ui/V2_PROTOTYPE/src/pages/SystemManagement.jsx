@@ -74,6 +74,7 @@ export default function SystemManagement({ sectionId }) {
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [extInput, setExtInput] = useState('')
   const [kbTesting, setKbTesting] = useState(false)
+  const [confirmClearKbKey, setConfirmClearKbKey] = useState(false)
   const [testResultDialog, setTestResultDialog] = useState(false)
   const [testResultForm, setTestResultForm] = useState({ executorName: '', environment: '', account: '', testCaseKey: '', resultStatus: 'passed', screenshotUrl: '', notes: '' })
   const [modelSaveResult, setModelSaveResult] = useState(null)
@@ -120,9 +121,25 @@ export default function SystemManagement({ sectionId }) {
   const handleActivateKb = async () => {
     setKbSaveResult(null)
     const result = await actions.activateKbConfig()
+    const probeReason = result.details?.find?.((item) => item?.field === 'probe')?.reason
+    const gateMessage = probeReason === 'config_changed_after_probe'
+      ? '配置已变更，请重新测试连通性后再生效'
+      : probeReason === 'probe_expired'
+        ? '上次连通性测试已过期，请重新测试后再生效'
+        : result.status === 409
+          ? '请先完成当前配置的连通性测试，再生效配置'
+          : null
     setKbSaveResult(result.success
       ? { ok: true, message: '知识库配置已生效' }
-      : { ok: false, message: result.error || '知识库配置生效失败' })
+      : { ok: false, message: gateMessage || result.error || '知识库配置生效失败' })
+  }
+
+  const handleClearKbKey = async () => {
+    const result = await actions.clearKbApiKeyDraft()
+    setConfirmClearKbKey(false)
+    setKbSaveResult(result.success
+      ? { ok: true, message: '已清除草稿中保存的 API Key；如需影响正在使用的配置，请重新测试并生效' }
+      : { ok: false, message: result.error || '密钥清除失败' })
   }
 
   const handleSaveModelDraft = async () => {
@@ -299,7 +316,7 @@ export default function SystemManagement({ sectionId }) {
 
             {modelSaveResult && (
               <div
-                role="status"
+                role={modelSaveResult.ok ? 'status' : 'alert'}
                 style={{
                   background: modelSaveResult.ok ? 'var(--ok-soft)' : 'var(--err-soft)',
                   border: '1px solid var(--line)',
@@ -449,7 +466,7 @@ export default function SystemManagement({ sectionId }) {
 
             {kbSaveResult && (
               <div
-                role="status"
+                role={kbSaveResult.ok ? 'status' : 'alert'}
                 style={{
                   background: kbSaveResult.ok ? 'var(--ok-soft)' : 'var(--err-soft)',
                   border: '1px solid var(--line)',
@@ -517,6 +534,11 @@ export default function SystemManagement({ sectionId }) {
                         清除
                       </button>
                     )}
+                    {kbConfig.apiHint && !kbConfig.apiKey && (
+                      <button type="button" className="btn btn-dan" style={{ fontSize: 11, padding: '4px 10px', height: 28 }} onClick={() => setConfirmClearKbKey(true)}>
+                        清除已保存密钥
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -558,6 +580,40 @@ export default function SystemManagement({ sectionId }) {
                     />
                   </div>
                 </div>
+
+                <fieldset style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '12px 14px', margin: 0 }}>
+                  <legend style={{ color: 'var(--ink-2)', fontSize: 12, fontWeight: 700, padding: '0 6px' }}>检索参数</legend>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+                      Top K
+                      <input className="input" type="number" min="1" max="50" value={kbConfig.retrievalParams.topK} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, topK: Number(e.target.value) } })} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+                      Top N
+                      <input className="input" type="number" min="1" max="100" value={kbConfig.retrievalParams.topN} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, topN: Number(e.target.value) } })} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+                      召回方式
+                      <select className="input" value={kbConfig.retrievalParams.recallMethod} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, recallMethod: e.target.value } })}>
+                        <option value="mixed">混合检索</option>
+                        <option value="vector">向量检索</option>
+                        <option value="keyword">关键词检索</option>
+                      </select>
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+                      相似度阈值
+                      <input className="input" type="number" min="0" max="1" step="0.05" value={kbConfig.retrievalParams.fractionalThreshold} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, fractionalThreshold: Number(e.target.value) } })} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11, color: 'var(--ink-3)' }}>
+                      重排模型
+                      <input className="input" value={kbConfig.retrievalParams.rerankModel} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, rerankModel: e.target.value } })} />
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-2)', alignSelf: 'end', minHeight: 32 }}>
+                      <input type="checkbox" checked={kbConfig.retrievalParams.rerankStatus === 1} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, rerankStatus: e.target.checked ? 1 : 0 } })} />
+                      启用检索重排
+                    </label>
+                  </div>
+                </fieldset>
 
                 {/* 连通性测试 */}
                 <div style={{
@@ -1094,6 +1150,23 @@ export default function SystemManagement({ sectionId }) {
           </button>
           <button type="button" className="btn btn-dan" onClick={confirmDiscard}>
             放弃修改
+          </button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmClearKbKey}
+        title="清除已保存密钥"
+        description="此操作会从知识库配置草稿中删除 API Key。如要将清除结果正式生效，仍需重新测试连通性并生效配置。"
+        onClose={() => setConfirmClearKbKey(false)}
+        dismissDisabled={actionLoading.clearKbApiKeyDraft}
+      >
+        <DialogActions>
+          <button type="button" className="btn btn-out" onClick={() => setConfirmClearKbKey(false)} disabled={actionLoading.clearKbApiKeyDraft}>
+            取消
+          </button>
+          <button type="button" className="btn btn-dan" onClick={handleClearKbKey} disabled={actionLoading.clearKbApiKeyDraft}>
+            {actionLoading.clearKbApiKeyDraft ? '清除中...' : '确认清除'}
           </button>
         </DialogActions>
       </Dialog>

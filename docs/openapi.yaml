@@ -2935,6 +2935,94 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/system/knowledge-base-config:
+    get:
+      tags: [System]
+      summary: 获取智谱知识库草稿、生效配置与探针状态（admin）
+      operationId: getKnowledgeBaseConfig
+      responses:
+        "200":
+          description: 查询成功；密钥仅返回脱敏 apiHint，不返回明文。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeBaseConfigResponse"
+        "401":
+          description: 未登录或 JWT 无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 非管理员无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/knowledge-base-config/draft:
+    patch:
+      tags: [System]
+      summary: 更新智谱知识库配置草稿（admin）
+      description: credentials.apiKey 省略或空字符串表示保留，非空字符串表示替换，null 表示明确清除。
+      operationId: updateKnowledgeBaseConfigDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeBaseDraftPatch"
+      responses:
+        "200":
+          description: 草稿已保存
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeBaseConfigResponse"
+        "401":
+          description: 未登录或 JWT 无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 非管理员无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/knowledge-base-config/activate:
+    post:
+      tags: [System]
+      summary: 生效已通过真实探针的知识库配置（admin）
+      operationId: activateKnowledgeBaseConfig
+      responses:
+        "200":
+          description: 配置已生效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeBaseConfigResponse"
+        "401":
+          description: 未登录或 JWT 无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 非管理员无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 缺少成功探针、探针已过期，或探针后配置已变更。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/v1/system/knowledge-base-config/test:
     post:
       tags: [System]
@@ -2961,6 +3049,12 @@ paths:
                 $ref: "#/components/schemas/KnowledgeBaseConnectivityTestResponse"
         "400":
           description: 参数错误或上游连接失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 未登录或 JWT 无效
           content:
             application/json:
               schema:
@@ -7008,6 +7102,134 @@ components:
             model:
               type: string
           required: [ok]
+      required: [code, message, data]
+
+    KnowledgeBaseRetrievalParams:
+      type: object
+      properties:
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 50
+        topN:
+          type: integer
+          minimum: 1
+          maximum: 100
+        recallMethod:
+          type: string
+          enum: [mixed, vector, keyword]
+        rerankStatus:
+          type: integer
+          enum: [0, 1]
+        rerankModel:
+          type: string
+        fractionalThreshold:
+          type: number
+          minimum: 0
+          maximum: 1
+      required: [topK, topN, recallMethod, rerankStatus, rerankModel, fractionalThreshold]
+
+    KnowledgeBasePromptProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+      required: [id, version]
+
+    KnowledgeBaseDraftPatch:
+      type: object
+      properties:
+        model:
+          type: string
+        apiBaseUrl:
+          type: string
+          format: uri
+        credentials:
+          type: object
+          properties:
+            apiKey:
+              oneOf:
+                - type: string
+                - type: "null"
+            knowledgeId:
+              oneOf:
+                - type: string
+                - type: "null"
+        retrievalParams:
+          $ref: "#/components/schemas/KnowledgeBaseRetrievalParams"
+        promptProfile:
+          $ref: "#/components/schemas/KnowledgeBasePromptProfile"
+
+    KnowledgeBaseConfigPublic:
+      type: object
+      properties:
+        model:
+          type: string
+        apiBaseUrl:
+          type: string
+          format: uri
+        credentials:
+          type: object
+          properties:
+            apiKey:
+              type: string
+              const: ""
+            apiHint:
+              oneOf:
+                - type: string
+                - type: "null"
+            knowledgeId:
+              type: string
+            resolvedFrom:
+              type: string
+              enum: [store, env, none]
+        retrievalParams:
+          $ref: "#/components/schemas/KnowledgeBaseRetrievalParams"
+        promptProfile:
+          $ref: "#/components/schemas/KnowledgeBasePromptProfile"
+
+    KnowledgeBaseConfigResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            version:
+              type: integer
+            draft:
+              $ref: "#/components/schemas/KnowledgeBaseConfigPublic"
+            active:
+              $ref: "#/components/schemas/KnowledgeBaseConfigPublic"
+            probe:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [success, failure]
+                configHash:
+                  type: string
+                  pattern: "^[0-9a-f]{64}$"
+                checkedAt:
+                  type: string
+                  format: date-time
+                latencyMs:
+                  type: integer
+                warning:
+                  type: string
+                  enum: [retrieval_empty]
+                providerRequestId:
+                  type: string
+                errorCode:
+                  type: string
       required: [code, message, data]
 
     KnowledgeBaseConnectivityTestResponse:

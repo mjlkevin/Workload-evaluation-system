@@ -61,8 +61,8 @@ describe('KnowledgeBase · 生效配置内联反馈', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /生效配置/ }))
 
-    const status = await screen.findByRole('status')
-    expect(status).toHaveTextContent(/Internal Server Error|生效失败/)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/Internal Server Error|生效失败/)
     expect(alertSpy).not.toHaveBeenCalled()
     alertSpy.mockRestore()
   })

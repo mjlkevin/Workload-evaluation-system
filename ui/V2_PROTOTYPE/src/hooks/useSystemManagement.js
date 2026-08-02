@@ -4,6 +4,15 @@ import { isAuthenticated } from '../api/auth.js'
 import { ApiError } from '../api/errors.js'
 import { unwrapList, unwrapSingle } from '../api/utils.js'
 
+const DEFAULT_KB_RETRIEVAL_PARAMS = {
+  topK: 8,
+  topN: 20,
+  recallMethod: 'mixed',
+  rerankStatus: 1,
+  rerankModel: 'rerank',
+  fractionalThreshold: 0.2,
+}
+
 const DEFAULT_RULES = [
   { module: '总方案', code: 'GL', prefix: 'GL-', format: 'GL-NNNNN', example: 'GL-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
   { module: '需求', code: 'RQ', prefix: 'RQ-', format: 'RQ-NNNNN', example: 'RQ-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
@@ -127,7 +136,16 @@ export default function useSystemManagement({
   const [prompts, setPrompts] = useState(fallback.prompts)
 
   // --- 知识库配置 ---
-  const [kbConfig, setKbConfig] = useState({ model: 'glm-4.6', apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', apiKey: '', knowledgeId: '', apiHint: null, resolvedFrom: 'none' })
+  const [kbConfig, setKbConfig] = useState({
+    model: 'glm-4.6',
+    apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    apiKey: '',
+    knowledgeId: '',
+    apiHint: null,
+    resolvedFrom: 'none',
+    retrievalParams: { ...DEFAULT_KB_RETRIEVAL_PARAMS },
+    promptProfile: { id: 'rag-answer', version: 1 },
+  })
   const [kbLoading, setKbLoading] = useState(false)
 
   // --- 人工测试结果 ---
@@ -146,7 +164,13 @@ export default function useSystemManagement({
       await task()
       return { success: true, error: null }
     } catch (error) {
-      return { success: false, error: error?.message || '操作失败' }
+      return {
+        success: false,
+        error: error?.message || '操作失败',
+        status: error?.status,
+        code: error?.code,
+        details: error?.details,
+      }
     } finally {
       setActionLoading((prev) => ({ ...prev, [key]: false }))
     }
@@ -350,6 +374,8 @@ export default function useSystemManagement({
           knowledgeId: draft.credentials?.knowledgeId || creds.knowledgeId || '',
           apiHint: draft.credentials?.apiHint || creds.apiHint || null,
           resolvedFrom: creds.resolvedFrom || 'none',
+          retrievalParams: { ...DEFAULT_KB_RETRIEVAL_PARAMS, ...(draft.retrievalParams || active.retrievalParams || {}) },
+          promptProfile: draft.promptProfile || active.promptProfile || { id: 'rag-answer', version: 1 },
         })
       }
     } catch (_) { /* keep fallback */ }
@@ -361,16 +387,27 @@ export default function useSystemManagement({
       return Promise.resolve({ success: false, error: '登录已过期，请重新登录' })
     }
     return withAction('saveKbDraft', async () => {
+      const credentials = {
+        knowledgeId: kbConfig.knowledgeId || null,
+        ...(kbConfig.apiKey.trim() ? { apiKey: kbConfig.apiKey.trim() } : {}),
+      }
       await apiClient.patch('/system/knowledge-base-config/draft', {
         model: kbConfig.model,
         apiBaseUrl: kbConfig.apiBaseUrl,
-        credentials: {
-          apiKey: kbConfig.apiKey || null,
-          knowledgeId: kbConfig.knowledgeId || null,
-        },
+        credentials,
+        retrievalParams: kbConfig.retrievalParams,
+        promptProfile: kbConfig.promptProfile,
       })
     })
   }, [enabled, kbConfig, withAction])
+
+  const clearKbApiKeyDraft = useCallback(() => withAction('clearKbApiKeyDraft', async () => {
+    if (!enabled) throw new Error('登录已过期，请重新登录')
+    await apiClient.patch('/system/knowledge-base-config/draft', {
+      credentials: { apiKey: null },
+    })
+    setKbConfig((prev) => ({ ...prev, apiKey: '', apiHint: null }))
+  }), [enabled, withAction])
 
   const activateKbConfig = useCallback(() => withAction('activateKbConfig', async () => {
     if (enabled) await apiClient.post('/system/knowledge-base-config/activate')
@@ -456,6 +493,7 @@ export default function useSystemManagement({
       testPrompt,
       savePrompts,
       saveKbDraft,
+      clearKbApiKeyDraft,
       activateKbConfig,
       testKbConnectivity,
       updateKbConfig,

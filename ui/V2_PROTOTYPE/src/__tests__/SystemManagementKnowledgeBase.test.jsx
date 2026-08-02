@@ -22,6 +22,68 @@ async function renderKnowledgeBase() {
 }
 
 describe('SystemManagement knowledge base feedback', () => {
+  test('keeps a stored key on ordinary save and clears it only after explicit confirmation', async () => {
+    const payloads = []
+    server.use(
+      http.get(`${BASE}/system/knowledge-base-config`, () => HttpResponse.json({ success: true, data: {
+        version: 3,
+        draft: {
+          model: 'glm-4.6',
+          apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+          credentials: { apiKey: '', apiHint: '····1234', knowledgeId: 'kb-1' },
+          retrievalParams: { topK: 8, topN: 20, recallMethod: 'mixed', rerankStatus: 1, rerankModel: 'rerank', fractionalThreshold: 0.2 },
+          promptProfile: { id: 'rag-answer', version: 1 },
+        },
+        active: { credentials: { apiKey: '', apiHint: '····1234', knowledgeId: 'kb-1', resolvedFrom: 'store' } },
+      } })),
+      http.patch(`${BASE}/system/knowledge-base-config/draft`, async ({ request }) => {
+        payloads.push(await request.json())
+        return HttpResponse.json({ success: true, data: {} })
+      }),
+    )
+    await renderKnowledgeBase()
+
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }))
+    await waitFor(() => expect(payloads).toHaveLength(1))
+    expect(payloads[0].credentials).not.toHaveProperty('apiKey')
+
+    fireEvent.click(screen.getByRole('button', { name: '清除已保存密钥' }))
+    expect(screen.getByRole('dialog', { name: '清除已保存密钥' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '确认清除' }))
+    await waitFor(() => expect(payloads).toHaveLength(2))
+    expect(payloads[1]).toEqual({ credentials: { apiKey: null } })
+  })
+
+  test('saves configured retrieval parameters in the draft payload', async () => {
+    let payload
+    server.use(
+      http.patch(`${BASE}/system/knowledge-base-config/draft`, async ({ request }) => {
+        payload = await request.json()
+        return HttpResponse.json({ success: true, data: {} })
+      }),
+    )
+    await renderKnowledgeBase()
+    fireEvent.change(screen.getByLabelText('Top K'), { target: { value: '12' } })
+    fireEvent.change(screen.getByLabelText('召回方式'), { target: { value: 'keyword' } })
+    fireEvent.change(screen.getByLabelText('相似度阈值'), { target: { value: '0.35' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }))
+    await waitFor(() => expect(payload).toBeTruthy())
+    expect(payload.retrievalParams).toMatchObject({ topK: 12, recallMethod: 'keyword', fractionalThreshold: 0.35 })
+  })
+
+  test('turns an activation gate conflict into an actionable retest message', async () => {
+    server.use(
+      http.post(`${BASE}/system/knowledge-base-config/activate`, () => HttpResponse.json({
+        code: 40901,
+        message: '知识库配置尚未通过有效连通性验证',
+        details: [{ field: 'probe', reason: 'config_changed_after_probe' }],
+      }, { status: 409 })),
+    )
+    await renderKnowledgeBase()
+    fireEvent.click(screen.getByRole('button', { name: /生效配置/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('配置已变更，请重新测试连通性后再生效')
+  })
+
   test('shows saving state and a terminal success message after PATCH succeeds', async () => {
     server.use(
       http.patch(`${BASE}/system/knowledge-base-config/draft`, async ({ request }) => {
