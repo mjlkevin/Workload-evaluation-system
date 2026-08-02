@@ -116,6 +116,9 @@ export function recordWorkbenchTurnTrace(input: {
         ...(prompt.version ? { promptVersion: prompt.version } : {}),
         ...(prompt.hash ? { promptHash: prompt.hash } : {}),
         ...(kt.retrievalParams ? { retrievalParams: kt.retrievalParams } : {}),
+        ...(kt.knowledgeBaseProfileId ? { knowledgeBaseProfileId: kt.knowledgeBaseProfileId } : {}),
+        ...(kt.knowledgeBaseName ? { knowledgeBaseName: kt.knowledgeBaseName } : {}),
+        ...(kt.route ? { route: kt.route } : {}),
       }),
       tokenUsage: {
         promptTokens: Number(kt.promptTokens) || 0,

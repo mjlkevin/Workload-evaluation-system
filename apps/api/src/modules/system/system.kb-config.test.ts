@@ -132,3 +132,105 @@ test("activation rejects a successful probe older than 24 hours", { concurrency:
   assert.equal(activation.statusCode, 409);
   assert.equal(activation.payload.details[0].reason, "probe_expired");
 });
+
+test("multi knowledge draft rejects duplicate profile and provider ids", { concurrency: false }, async () => {
+  resetStore();
+  const { updateKnowledgeBaseConfigDraft } = await import("./system.usecase");
+  const result = responseCapture();
+  await updateKnowledgeBaseConfigDraft(
+    await adminRequest({
+      credentials: { apiKey: "fixture-key" },
+      knowledgeBases: [
+        { id: "solutions", name: "方案库", knowledgeId: "same", enabled: true, isDefault: true },
+        { id: "solutions", name: "案例库", knowledgeId: "same", enabled: true, isDefault: true },
+      ],
+    }),
+    result.response,
+  );
+
+  assert.equal(result.statusCode, 400);
+  assert.deepEqual(result.payload.details.map((item: any) => item.reason), [
+    "duplicate_profile_id",
+    "duplicate_knowledge_id",
+    "multiple_default_profiles",
+  ]);
+});
+
+test("connectivity tests are stored per selected knowledge base profile", { concurrency: false }, async () => {
+  resetStore();
+  const {
+    testKnowledgeBaseConnectivityWithFetcher,
+    updateKnowledgeBaseConfigDraft,
+  } = await import("./system.usecase");
+  const { loadKnowledgeBaseConfigStore } = await import("./system.repository");
+  await updateKnowledgeBaseConfigDraft(
+    await adminRequest({
+      credentials: { apiKey: "fixture-key" },
+      knowledgeBases: [
+        { id: "solutions", name: "方案库", knowledgeId: "kb-solutions", enabled: true, isDefault: true },
+        { id: "cases", name: "案例库", knowledgeId: "kb-cases", enabled: true },
+      ],
+    }),
+    responseCapture().response,
+  );
+
+  const probe = responseCapture();
+  let requestedKnowledgeIds: string[] = [];
+  await testKnowledgeBaseConnectivityWithFetcher(
+    await adminRequest({ profileId: "cases" }),
+    probe.response,
+    async (_url, init) => {
+      requestedKnowledgeIds = JSON.parse(String(init?.body)).knowledge_ids;
+      return new Response(JSON.stringify({ code: 200, data: [] }), { status: 200 });
+    },
+  );
+
+  assert.equal(probe.statusCode, 200);
+  assert.equal(probe.payload.data.profileId, "cases");
+  assert.deepEqual(requestedKnowledgeIds, ["kb-cases"]);
+  const store = loadKnowledgeBaseConfigStore();
+  assert.equal(store.probes?.cases?.status, "success");
+  assert.equal(store.probes?.solutions, undefined);
+});
+
+test("activation requires a fresh matching probe for every enabled profile", { concurrency: false }, async () => {
+  resetStore();
+  const {
+    activateKnowledgeBaseConfig,
+    testKnowledgeBaseConnectivityWithFetcher,
+    updateKnowledgeBaseConfigDraft,
+  } = await import("./system.usecase");
+  await updateKnowledgeBaseConfigDraft(
+    await adminRequest({
+      credentials: { apiKey: "fixture-key" },
+      knowledgeBases: [
+        { id: "solutions", name: "方案库", knowledgeId: "kb-solutions", enabled: true, isDefault: true },
+        { id: "cases", name: "案例库", knowledgeId: "kb-cases", enabled: true },
+      ],
+    }),
+    responseCapture().response,
+  );
+  const okFetcher = async () => new Response(JSON.stringify({ code: 200, data: [] }), { status: 200 });
+  await testKnowledgeBaseConnectivityWithFetcher(
+    await adminRequest({ profileId: "solutions" }),
+    responseCapture().response,
+    okFetcher,
+  );
+
+  const blocked = responseCapture();
+  await activateKnowledgeBaseConfig(await adminRequest(), blocked.response);
+  assert.equal(blocked.statusCode, 409);
+  assert.deepEqual(blocked.payload.details, [
+    { field: "knowledgeBases.cases.probe", reason: "probe_missing", profileId: "cases" },
+  ]);
+
+  await testKnowledgeBaseConnectivityWithFetcher(
+    await adminRequest({ profileId: "cases" }),
+    responseCapture().response,
+    okFetcher,
+  );
+  const activated = responseCapture();
+  await activateKnowledgeBaseConfig(await adminRequest(), activated.response);
+  assert.equal(activated.statusCode, 200);
+  assert.equal(activated.payload.data.active.knowledgeBases.length, 2);
+});

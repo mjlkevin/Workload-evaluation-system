@@ -19,7 +19,7 @@ export function fail(
   res: Response,
   code: number,
   message: string,
-  details?: Array<{ field: string; reason: string }>
+  details?: Array<{ field: string; reason: string; [key: string]: unknown }>
 ) {
   const status =
     code >= 50300 && code < 50400
@@ -50,7 +50,7 @@ export function unauthorized(
   res: Response,
   code: number,
   message: string,
-  details?: Array<{ field: string; reason: string }>
+  details?: Array<{ field: string; reason: string; [key: string]: unknown }>
 ) {
   return res.status(401).json({
     code,

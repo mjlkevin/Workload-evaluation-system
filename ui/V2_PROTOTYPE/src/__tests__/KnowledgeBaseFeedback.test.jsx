@@ -1,12 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { apiClient } from '../api/client.js'
 import SystemManagement from '../pages/SystemManagement.jsx'
 import { server } from './mocks/server.js'
 
 const BASE = '/api/v1'
+
+afterEach(() => vi.restoreAllMocks())
 
 async function renderKnowledgeBase() {
   render(
@@ -71,11 +73,11 @@ describe('KnowledgeBase · 生效配置内联反馈', () => {
 describe('KnowledgeBase · 连通性测试 ARIA live region', () => {
   test('连通性测试成功结果区域带 role="status"', async () => {
     vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
-      data: { ok: true, testedSource: 'mock', retrievalTriggered: true },
+      data: { ok: true, profileId: 'solutions', testedSource: 'mock', retrievalTriggered: true },
     })
     await renderKnowledgeBase()
 
-    fireEvent.click(screen.getByRole('button', { name: '测试连通性' }))
+    fireEvent.click(screen.getByRole('button', { name: /测试 金蝶解决方案知识库/ }))
 
     const status = await screen.findByRole('status')
     expect(status).toHaveTextContent('连通性测试通过')
@@ -88,7 +90,7 @@ describe('KnowledgeBase · 连通性测试 ARIA live region', () => {
     )
     await renderKnowledgeBase()
 
-    fireEvent.click(screen.getByRole('button', { name: '测试连通性' }))
+    fireEvent.click(screen.getByRole('button', { name: /测试 金蝶解决方案知识库/ }))
 
     await screen.findByText('连通性测试失败')
     expect(screen.getByRole('alert')).toBeInTheDocument()

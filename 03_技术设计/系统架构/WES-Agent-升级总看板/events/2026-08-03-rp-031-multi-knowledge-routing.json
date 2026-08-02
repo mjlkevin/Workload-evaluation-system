@@ -1,0 +1,69 @@
+{
+  "id": "BE-2026-08-03-rp-031-multi-knowledge-routing",
+  "date": "2026-08-03",
+  "type": "implementation",
+  "scope": "RP-031 同一智谱账号多知识库配置与意图路由",
+  "summary": "完成同一智谱账号下的多知识库档案、逐库连通性门禁、业务角色过滤、显式名称与关键词规则优先、授权候选内 AI 分类、安全默认库、仅空检索时一次受控回退和可解释 Trace；知识库配置页可新增、编辑、停用、逐库测试并在窄屏转为卡片布局。旧版单 knowledgeId 自动迁移，不引入第二 Provider、第二前端栈或无差别全库并行检索。",
+  "status": "已实现 / 自动化与双视口通过 / 待集成与第二知识库实测",
+  "pages": ["requirements", "plan", "testing", "monitoring", "risks", "changes"],
+  "evidence": [
+    {
+      "kind": "artifact",
+      "ref": "docs/superpowers/specs/2026-08-03-rp-031-multi-knowledge-routing-design.md; docs/superpowers/plans/2026-08-03-rp-031-multi-knowledge-routing.md",
+      "summary": "固化同 Provider 多库、单主库、ACL 先行、规则优先、AI 兜底和最多一次空检索回退的范围与验收合同。"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/knowledge-base-router.service.ts; apps/api/src/services/ai/workbench-dispatch.service.ts; apps/api/src/modules/system/system.repository.ts; apps/api/src/modules/system/system.usecase.ts",
+      "summary": "多库目录、路由、逐库探针、激活门禁、运行时检索和 Trace 已接入现有生产主链路。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/components/system/KnowledgeBaseProfilesPanel.jsx; ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx; ui/V2_PROTOTYPE/src/index.css",
+      "summary": "系统管理知识库页面完成多档案管理、角色与关键词配置、逐库测试和 760px 响应式卡片布局。"
+    },
+    {
+      "kind": "verification",
+      "ref": "npm run test:modules; npm run test:ai; npm run test:web; npm run test:integration",
+      "result": "pass",
+      "summary": "后端模块 227/227、AI 全量命令 exit 0、Web 29 文件 203/203、集成 1/1。"
+    },
+    {
+      "kind": "verification",
+      "ref": "npm run build:api; npm run build:web; npm run test:security",
+      "result": "pass",
+      "summary": "API/Web 生产构建通过；安全门禁 4/4 且跟踪文件敏感字段扫描为 0。"
+    },
+    {
+      "kind": "verification",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 83468bf -- ui/V2_PROTOTYPE/...",
+      "result": "pass",
+      "summary": "没有新增确定性 UI 范围违规，没有引入第二组件系统。"
+    },
+    {
+      "kind": "verification",
+      "ref": "Chrome 1440px + 760px + keyboard",
+      "result": "pass",
+      "summary": "两视口无横向溢出；760px 表格转卡片；Dialog 位于视口内；Escape 关闭并恢复焦点；控制台无 error。"
+    }
+  ],
+  "next": "Codex 复核并集成当前隔离分支；管理员配置第二个真实智谱 Knowledge ID 后，使用解决方案、资金计划和网上银行样本验证规则路由、AI 歧义路由、角色隔离、空检索单次回退与 Trace。没有第二个真实知识库前，不宣布跨库检索质量已经通过。",
+  "board": {
+    "change": {
+      "stage": "RP-031 多知识库路由第一批",
+      "result": "已实现 / 待集成与真实跨库验收"
+    },
+    "testing": [
+      {
+        "command": "RP-031 multi-knowledge automated gate",
+        "result": "pass",
+        "summary": "modules 227/227、Web 203/203、integration 1/1、安全 4/4、API/Web build 与 UI scope checker 通过。"
+      },
+      {
+        "command": "RP-031 multi-knowledge browser gate",
+        "result": "pass",
+        "summary": "1440px、760px、响应式卡片、Dialog、Escape 焦点恢复和 console error 检查通过。"
+      }
+    ]
+  }
+}

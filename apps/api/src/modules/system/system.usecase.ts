@@ -20,6 +20,7 @@ import { KimiPingFailure, pingKimiChatCompletion } from "../../utils/kimi-ping";
 import {
   buildVersionCodeSample,
   computeKnowledgeBaseConfigHash,
+  computeKnowledgeBaseProfileHash,
   loadImplementationDependencyRulesStore,
   loadKnowledgeBaseConfigStore,
   loadVersionCodeRulesStore,
@@ -36,6 +37,7 @@ import {
   saveKnowledgeBaseConfigStore,
   saveRequirementSystemConfigStore,
   saveVersionCodeRulesStore,
+  validateKnowledgeBaseProfiles,
 } from "./system.repository";
 import { probeKnowledgeBaseAccess } from "./knowledge-base-access-probe";
 import { ROLE_CAPABILITIES } from "../../rbac/permissions";
@@ -401,7 +403,9 @@ function maskKnowledgeBaseApiKeyHint(key: string): string | null {
 
 function toPublicKnowledgeBaseCredentials(store: KnowledgeBaseConfigStore): KnowledgeBaseCredentialsPublic {
   const trimmedKey = store.active.credentials.apiKey.trim();
-  const trimmedKid = store.active.credentials.knowledgeId.trim();
+  const activeProfile = store.active.knowledgeBases.find((profile) => profile.enabled && profile.isDefault)
+    || store.active.knowledgeBases.find((profile) => profile.enabled);
+  const trimmedKid = activeProfile?.knowledgeId.trim() || store.active.credentials.knowledgeId.trim();
   const envOk = Boolean(config.zhipu.apiKey?.trim() && config.zhipu.knowledgeId?.trim());
   return {
     apiKey: "",
@@ -418,6 +422,7 @@ function toPublicKnowledgeBaseConfig(store: KnowledgeBaseConfigStore): Knowledge
     apiBaseUrl: store.active.apiBaseUrl,
     retrievalParams: store.active.retrievalParams,
     promptProfile: store.active.promptProfile,
+    knowledgeBases: store.active.knowledgeBases,
     credentials: toPublicKnowledgeBaseCredentials(store),
   };
 }
@@ -434,6 +439,7 @@ export function getKnowledgeBaseConfig(req: Request, res: Response) {
           apiBaseUrl: store.draft.apiBaseUrl,
           retrievalParams: store.draft.retrievalParams,
           promptProfile: store.draft.promptProfile,
+          knowledgeBases: store.draft.knowledgeBases,
           credentials: {
             apiKey: "",
             apiHint: maskKnowledgeBaseApiKeyHint(store.draft.credentials.apiKey),
@@ -442,6 +448,7 @@ export function getKnowledgeBaseConfig(req: Request, res: Response) {
         },
         active: toPublicKnowledgeBaseConfig(store),
         probe: store.probe,
+        probes: store.probes || {},
         updatedAt: store.updatedAt,
         effectiveAt: store.effectiveAt,
       },
@@ -458,18 +465,26 @@ export function updateKnowledgeBaseConfigDraft(req: Request, res: Response) {
     credentials?: { apiKey?: string | null; knowledgeId?: string | null };
     retrievalParams?: Record<string, unknown>;
     promptProfile?: Record<string, unknown>;
+    knowledgeBases?: unknown[];
   };
   const now = new Date().toISOString();
   const store = loadKnowledgeBaseConfigStore();
   const nextCreds = mergeKnowledgeBaseCredentialsPatch(store.draft.credentials, payload.credentials);
-  store.draft = normalizeKnowledgeBaseConfig({
+  const nextDraft = normalizeKnowledgeBaseConfig({
     ...store.draft,
     model: payload.model ?? store.draft.model,
     apiBaseUrl: payload.apiBaseUrl ?? store.draft.apiBaseUrl,
     credentials: nextCreds,
     retrievalParams: payload.retrievalParams ?? store.draft.retrievalParams,
     promptProfile: payload.promptProfile ?? store.draft.promptProfile,
+    knowledgeBases: payload.knowledgeBases
+      ?? (store.draft.knowledgeBases.length ? store.draft.knowledgeBases : undefined),
   });
+  const validationIssues = validateKnowledgeBaseProfiles(nextDraft.knowledgeBases);
+  if (validationIssues.length) {
+    return fail(res, 40001, "知识库档案配置无效", validationIssues);
+  }
+  store.draft = nextDraft;
   store.updatedAt = now;
   saveKnowledgeBaseConfigStore(store);
   return res.json(
@@ -481,6 +496,7 @@ export function updateKnowledgeBaseConfigDraft(req: Request, res: Response) {
           apiBaseUrl: store.draft.apiBaseUrl,
           retrievalParams: store.draft.retrievalParams,
           promptProfile: store.draft.promptProfile,
+          knowledgeBases: store.draft.knowledgeBases,
           credentials: {
             apiKey: "",
             apiHint: maskKnowledgeBaseApiKeyHint(store.draft.credentials.apiKey),
@@ -498,30 +514,48 @@ export function activateKnowledgeBaseConfig(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   const now = new Date().toISOString();
   const store = loadKnowledgeBaseConfigStore();
-  const effectiveDraft = resolveDraftKnowledgeBaseConfigForTest();
-  const expectedHash = computeKnowledgeBaseConfigHash(normalizeKnowledgeBaseConfig({
-    model: effectiveDraft.model,
-    apiBaseUrl: effectiveDraft.apiBaseUrl,
-    credentials: { apiKey: effectiveDraft.apiKey, knowledgeId: effectiveDraft.knowledgeId },
-    retrievalParams: effectiveDraft.retrievalParams,
-    promptProfile: effectiveDraft.promptProfile,
-  }));
-  const probeAgeMs = store.probe
-    ? Date.now() - Date.parse(store.probe.checkedAt)
-    : Number.POSITIVE_INFINITY;
-  const probeReason = !store.probe
-    ? "probe_missing"
-    : store.probe.status !== "success"
-      ? "probe_failed"
-      : store.probe.configHash !== expectedHash
-        ? "config_changed_after_probe"
-        : probeAgeMs < 0 || probeAgeMs > 24 * 60 * 60 * 1000
-          ? "probe_expired"
-          : "";
-  if (probeReason) {
-    return fail(res, 40901, "知识库配置尚未通过有效连通性验证", [
-      { field: "probe", reason: probeReason },
+  const validationIssues = validateKnowledgeBaseProfiles(store.draft.knowledgeBases);
+  if (validationIssues.length) {
+    return fail(res, 40001, "知识库档案配置无效", validationIssues);
+  }
+  const enabledProfiles = store.draft.knowledgeBases.filter((profile) => profile.enabled);
+  if (!enabledProfiles.length) {
+    return fail(res, 40001, "至少需要启用一个知识库档案", [
+      { field: "knowledgeBases", reason: "no_enabled_profile" },
     ]);
+  }
+  const effectiveDraft = resolveDraftKnowledgeBaseConfigForTest();
+  const effectiveConfig = normalizeKnowledgeBaseConfig({
+    ...store.draft,
+    credentials: { apiKey: effectiveDraft.apiKey, knowledgeId: "" },
+    knowledgeBases: store.draft.knowledgeBases,
+  });
+  const probeIssues = enabledProfiles.flatMap((profile) => {
+    const isLegacySingle = enabledProfiles.length === 1 && profile.id === "legacy-default";
+    const probe = isLegacySingle ? store.probe || store.probes?.[profile.id] : store.probes?.[profile.id];
+    const expectedHash = computeKnowledgeBaseProfileHash(effectiveConfig, profile);
+    const probeAgeMs = probe
+      ? Date.now() - Date.parse(probe.checkedAt)
+      : Number.POSITIVE_INFINITY;
+    const reason = !probe
+      ? "probe_missing"
+      : probe.status !== "success"
+        ? "probe_failed"
+        : probe.configHash !== expectedHash
+          ? "config_changed_after_probe"
+          : probeAgeMs < 0 || probeAgeMs > 24 * 60 * 60 * 1000
+            ? "probe_expired"
+            : "";
+    return reason ? [{
+      field: enabledProfiles.length === 1 && profile.id === "legacy-default"
+        ? "probe"
+        : `knowledgeBases.${profile.id}.probe`,
+      reason,
+      ...(enabledProfiles.length > 1 ? { profileId: profile.id } : {}),
+    }] : [];
+  });
+  if (probeIssues.length) {
+    return fail(res, 40901, "知识库配置尚未通过有效连通性验证", probeIssues);
   }
   store.active = normalizeKnowledgeBaseConfig(store.draft);
   store.version = Number(store.version || 1) + 1;
@@ -615,12 +649,24 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
   fetcher: typeof fetch = globalThis.fetch,
 ) {
   if (!requireAdmin(req, res)) return;
-  const body = (req.body || {}) as { apiKey?: string; knowledgeId?: string };
+  const body = (req.body || {}) as { apiKey?: string; knowledgeId?: string; profileId?: string };
   const explicitApiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
   const explicitKnowledgeId = typeof body.knowledgeId === "string" ? body.knowledgeId.trim() : "";
+  const profileId = typeof body.profileId === "string" ? body.profileId.trim() : "";
+  const store = loadKnowledgeBaseConfigStore();
+  const selectedProfile = profileId
+    ? store.draft.knowledgeBases.find((profile) => profile.id === profileId)
+    : store.draft.knowledgeBases.find((profile) => profile.enabled && profile.isDefault)
+      || store.draft.knowledgeBases.find((profile) => profile.enabled);
+  if (profileId && !selectedProfile) {
+    return fail(res, 40401, "知识库档案不存在", [
+      { field: "profileId", reason: "profile_not_found" },
+    ]);
+  }
   const { apiKey, knowledgeId, model, apiBaseUrl, retrievalParams, promptProfile, source } = resolveDraftKnowledgeBaseConfigForTest(
     explicitApiKey || undefined,
-    explicitKnowledgeId || undefined,
+    explicitKnowledgeId || selectedProfile?.knowledgeId || undefined,
+    selectedProfile?.id,
   );
   if (!apiKey || !knowledgeId) {
     return fail(res, 40001, "未配置可用的 API Key 或知识库 ID", [
@@ -633,15 +679,25 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
     credentials: { apiKey, knowledgeId },
     retrievalParams,
     promptProfile,
+    knowledgeBases: selectedProfile ? [selectedProfile] : undefined,
   });
   const result = await probeKnowledgeBaseAccess(candidate, responseRequestId(res), fetcher);
-  const store = loadKnowledgeBaseConfigStore();
-  store.probe = {
+  const resolvedProfile = selectedProfile || candidate.knowledgeBases[0];
+  const probeRecord = {
     ...result,
-    configHash: computeKnowledgeBaseConfigHash(candidate),
+    ...(resolvedProfile ? { profileId: resolvedProfile.id } : {}),
+    configHash: resolvedProfile
+      ? computeKnowledgeBaseProfileHash(candidate, resolvedProfile)
+      : computeKnowledgeBaseConfigHash(candidate),
     checkedAt: new Date().toISOString(),
   };
-  store.updatedAt = store.probe.checkedAt;
+  if (resolvedProfile) {
+    store.probes = { ...(store.probes || {}), [resolvedProfile.id]: probeRecord };
+  }
+  if (!resolvedProfile || (store.draft.knowledgeBases.length === 1 && resolvedProfile.id === "legacy-default")) {
+    store.probe = probeRecord;
+  }
+  store.updatedAt = probeRecord.checkedAt;
   saveKnowledgeBaseConfigStore(store);
 
   const testedSource =
@@ -652,6 +708,7 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
       testedSource,
       model,
       knowledgeId,
+      ...(resolvedProfile ? { profileId: resolvedProfile.id } : {}),
       latencyMs: result.latencyMs,
       retrievalTriggered: result.warning !== "retrieval_empty",
       ...(result.warning ? { warning: result.warning } : {}),

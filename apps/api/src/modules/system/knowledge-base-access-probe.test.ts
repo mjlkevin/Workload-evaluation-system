@@ -7,6 +7,7 @@ const config = {
   model: "glm-test",
   apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
   credentials: { apiKey: "fixture-key", knowledgeId: "kb-fixture" },
+  knowledgeBases: [],
   retrievalParams: {
     topK: 8,
     topN: 20,

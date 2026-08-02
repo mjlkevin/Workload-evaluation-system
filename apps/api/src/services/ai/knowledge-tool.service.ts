@@ -82,6 +82,22 @@ export type ZhipuKnowledgeToolTrace = {
   configVersion?: number;
   prompt: Pick<RagPromptVersion, "id" | "version" | "hash">;
   retrievalParams: KnowledgeRetrievalParams;
+  knowledgeBaseProfileId?: string;
+  knowledgeBaseName?: string;
+  route?: {
+    mode: "explicit" | "rule" | "model" | "default" | "unresolved";
+    confidence: number;
+    reason: string;
+    primaryProfileId?: string;
+    fallbackProfileId?: string;
+    attempts: Array<{
+      profileId: string;
+      fallbackReason?: KnowledgeToolFallbackReason;
+      chunksCount: number;
+      topScore: number;
+      contextRef?: string;
+    }>;
+  };
 };
 
 const TOOL_ID = "knowledge_base.query_product_knowledge" as const;

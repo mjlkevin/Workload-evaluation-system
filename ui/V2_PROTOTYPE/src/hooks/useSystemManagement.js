@@ -13,6 +13,21 @@ const DEFAULT_KB_RETRIEVAL_PARAMS = {
   fractionalThreshold: 0.2,
 }
 
+function legacyKnowledgeBaseProfile(knowledgeId) {
+  if (!knowledgeId) return []
+  return [{
+    id: 'legacy-default',
+    name: '默认知识库',
+    description: '由旧版单知识库配置自动迁移',
+    knowledgeId,
+    routingKeywords: [],
+    allowedBusinessRoles: [],
+    enabled: true,
+    isDefault: true,
+    priority: 100,
+  }]
+}
+
 const DEFAULT_RULES = [
   { module: '总方案', code: 'GL', prefix: 'GL-', format: 'GL-NNNNN', example: 'GL-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
   { module: '需求', code: 'RQ', prefix: 'RQ-', format: 'RQ-NNNNN', example: 'RQ-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
@@ -141,6 +156,8 @@ export default function useSystemManagement({
     apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     apiKey: '',
     knowledgeId: '',
+    knowledgeBases: [],
+    probes: {},
     apiHint: null,
     resolvedFrom: 'none',
     retrievalParams: { ...DEFAULT_KB_RETRIEVAL_PARAMS },
@@ -367,11 +384,17 @@ export default function useSystemManagement({
         const draft = data.draft || {}
         const active = data.active || {}
         const creds = active.credentials || {}
+        const draftKnowledgeId = draft.credentials?.knowledgeId || creds.knowledgeId || ''
+        const draftProfiles = Array.isArray(draft.knowledgeBases)
+          ? draft.knowledgeBases
+          : legacyKnowledgeBaseProfile(draftKnowledgeId)
         setKbConfig({
           model: draft.model || active.model || 'glm-4.6',
           apiBaseUrl: draft.apiBaseUrl || active.apiBaseUrl || 'https://open.bigmodel.cn/api/paas/v4',
           apiKey: '',
-          knowledgeId: draft.credentials?.knowledgeId || creds.knowledgeId || '',
+          knowledgeId: draftKnowledgeId,
+          knowledgeBases: draftProfiles,
+          probes: data.probes || {},
           apiHint: draft.credentials?.apiHint || creds.apiHint || null,
           resolvedFrom: creds.resolvedFrom || 'none',
           retrievalParams: { ...DEFAULT_KB_RETRIEVAL_PARAMS, ...(draft.retrievalParams || active.retrievalParams || {}) },
@@ -388,13 +411,13 @@ export default function useSystemManagement({
     }
     return withAction('saveKbDraft', async () => {
       const credentials = {
-        knowledgeId: kbConfig.knowledgeId || null,
         ...(kbConfig.apiKey.trim() ? { apiKey: kbConfig.apiKey.trim() } : {}),
       }
       await apiClient.patch('/system/knowledge-base-config/draft', {
         model: kbConfig.model,
         apiBaseUrl: kbConfig.apiBaseUrl,
         credentials,
+        knowledgeBases: kbConfig.knowledgeBases,
         retrievalParams: kbConfig.retrievalParams,
         promptProfile: kbConfig.promptProfile,
       })
@@ -413,7 +436,7 @@ export default function useSystemManagement({
     if (enabled) await apiClient.post('/system/knowledge-base-config/activate')
   }), [enabled, withAction])
 
-  const testKbConnectivity = useCallback(async () => {
+  const testKbConnectivity = useCallback(async (profileId) => {
     if (!enabled) {
       return {
         ok: false,
@@ -425,9 +448,22 @@ export default function useSystemManagement({
     try {
       const result = await apiClient.post('/system/knowledge-base-config/test', {
         apiKey: kbConfig.apiKey || undefined,
-        knowledgeId: kbConfig.knowledgeId || undefined,
+        profileId,
       }, { timeoutMs: 30000 })
       const data = result?.data || result
+      if (data?.profileId) {
+        setKbConfig((prev) => ({
+          ...prev,
+          probes: {
+            ...prev.probes,
+            [data.profileId]: {
+              status: data.ok ? 'success' : 'failure',
+              checkedAt: new Date().toISOString(),
+              warning: data.warning,
+            },
+          },
+        }))
+      }
       return { ok: true, ...data }
     } catch (e) {
       if (e instanceof ApiError) {

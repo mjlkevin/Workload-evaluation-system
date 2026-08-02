@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
 import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
+import KnowledgeBaseProfilesPanel from '../components/system/KnowledgeBaseProfilesPanel.jsx'
 import { getSystemManagementSectionById } from '../config/systemManagementSections.js'
 import useSystemManagement from '../hooks/useSystemManagement.js'
 
@@ -73,7 +74,7 @@ export default function SystemManagement({ sectionId }) {
   const [editingModel, setEditingModel] = useState(null)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [extInput, setExtInput] = useState('')
-  const [kbTesting, setKbTesting] = useState(false)
+  const [kbTestingProfileId, setKbTestingProfileId] = useState('')
   const [confirmClearKbKey, setConfirmClearKbKey] = useState(false)
   const [testResultDialog, setTestResultDialog] = useState(false)
   const [testResultForm, setTestResultForm] = useState({ executorName: '', environment: '', account: '', testCaseKey: '', resultStatus: 'passed', screenshotUrl: '', notes: '' })
@@ -121,13 +122,21 @@ export default function SystemManagement({ sectionId }) {
   const handleActivateKb = async () => {
     setKbSaveResult(null)
     const result = await actions.activateKbConfig()
-    const probeReason = result.details?.find?.((item) => item?.field === 'probe')?.reason
+    const probeIssue = result.details?.find?.((item) => item?.field === 'probe' || item?.field?.endsWith?.('.probe'))
+    const probeReason = probeIssue?.reason
+    const profileName = kbConfig.knowledgeBases.find((profile) => profile.id === probeIssue?.profileId)?.name
     const gateMessage = probeReason === 'config_changed_after_probe'
-      ? '配置已变更，请重新测试连通性后再生效'
+      ? profileName
+        ? `${profileName}配置已变更，请重新测试后再生效`
+        : '配置已变更，请重新测试连通性后再生效'
       : probeReason === 'probe_expired'
-        ? '上次连通性测试已过期，请重新测试后再生效'
+        ? profileName
+          ? `${profileName}的连通性测试已过期，请重新测试后再生效`
+          : '上次连通性测试已过期，请重新测试后再生效'
         : result.status === 409
-          ? '请先完成当前配置的连通性测试，再生效配置'
+          ? profileName
+            ? `请先测试${profileName}的连通性，再生效配置`
+            : '请先完成当前配置的连通性测试，再生效配置'
           : null
     setKbSaveResult(result.success
       ? { ok: true, message: '知识库配置已生效' }
@@ -140,6 +149,17 @@ export default function SystemManagement({ sectionId }) {
     setKbSaveResult(result.success
       ? { ok: true, message: '已清除草稿中保存的 API Key；如需影响正在使用的配置，请重新测试并生效' }
       : { ok: false, message: result.error || '密钥清除失败' })
+  }
+
+  const handleTestKbProfile = async (profileId) => {
+    setKbTestingProfileId(profileId)
+    setKbTestResult(null)
+    try {
+      const result = await actions.testKbConnectivity(profileId)
+      setKbTestResult(result || { ok: false, error: '连通性测试未返回结果' })
+    } finally {
+      setKbTestingProfileId('')
+    }
   }
 
   const handleSaveModelDraft = async () => {
@@ -497,17 +517,19 @@ export default function SystemManagement({ sectionId }) {
               <span style={{ fontSize: 16 }}>{kbConfig.resolvedFrom !== 'none' ? '✓' : '⚠'}</span>
               <div>
                 <div style={{ fontWeight: 700, color: kbConfig.resolvedFrom !== 'none' ? 'var(--ok)' : 'var(--warn-ink)' }}>
-                  {kbConfig.resolvedFrom === 'store' ? '知识库已配置（来自存储）' : kbConfig.resolvedFrom === 'env' ? '知识库已配置（来自环境变量）' : '知识库未配置'}
+                  {kbConfig.resolvedFrom === 'store' ? '知识库接入已配置（来自存储）' : kbConfig.resolvedFrom === 'env' ? '知识库接入已配置（来自环境变量）' : '知识库接入未配置'}
                 </div>
                 <div style={{ color: 'var(--ink-2)', marginTop: 2 }}>
-                  {kbConfig.resolvedFrom !== 'none' ? 'AI 工作台可检索真实知识库文档' : '请在下方填写 API Key 和知识库 ID，保存草稿后点击“生效配置”'}
+                  {kbConfig.resolvedFrom !== 'none'
+                    ? `当前草稿包含 ${kbConfig.knowledgeBases.length} 个知识库档案，其中 ${kbConfig.knowledgeBases.filter((item) => item.enabled).length} 个已启用`
+                    : '请填写共享 API Key，新增知识库档案，保存草稿并逐个测试后再生效'}
                 </div>
               </div>
             </div>
 
             {/* 配置表单 */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>智谱知识库配置</div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>智谱共享接入配置</div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {/* API Key */}
@@ -540,20 +562,6 @@ export default function SystemManagement({ sectionId }) {
                       </button>
                     )}
                   </div>
-                </div>
-
-                {/* Knowledge ID */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>
-                    知识库 ID
-                  </label>
-                  <input
-                    className="input"
-                    style={{ maxWidth: 400 }}
-                    placeholder="输入智谱知识库 ID"
-                    value={kbConfig.knowledgeId}
-                    onChange={(e) => actions.updateKbConfig({ knowledgeId: e.target.value })}
-                  />
                 </div>
 
                 {/* Model */}
@@ -615,39 +623,14 @@ export default function SystemManagement({ sectionId }) {
                   </div>
                 </fieldset>
 
-                {/* 连通性测试 */}
-                <div style={{
-                  background: 'var(--brand-soft)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--r-md)',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  marginTop: 4,
-                }}>
-                  <span style={{ fontSize: 12, color: 'var(--ink-2)', flex: 1 }}>
-                    测试知识库连通性，将使用当前填写的凭证调用智谱 API 进行验证。
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    style={{ fontSize: 12, padding: '6px 14px', height: 32, whiteSpace: 'nowrap' }}
-                    disabled={kbTesting || kbLoading}
-                    onClick={async () => {
-                      setKbTesting(true)
-                      setKbTestResult(null)
-                      try {
-                        const result = await actions.testKbConnectivity()
-                        setKbTestResult(result || { ok: false, error: '连通性测试未返回结果' })
-                      } finally {
-                        setKbTesting(false)
-                      }
-                    }}
-                  >
-                    {kbTesting ? '测试中...' : '测试连通性'}
-                  </button>
-                </div>
+                <KnowledgeBaseProfilesPanel
+                  profiles={kbConfig.knowledgeBases}
+                  probes={kbConfig.probes}
+                  disabled={kbLoading || actionLoading.saveKbDraft || actionLoading.activateKbConfig}
+                  testingProfileId={kbTestingProfileId}
+                  onChange={(knowledgeBases) => actions.updateKbConfig({ knowledgeBases })}
+                  onTest={handleTestKbProfile}
+                />
 
                 {/* 测试结果 */}
                 {kbTestResult && (

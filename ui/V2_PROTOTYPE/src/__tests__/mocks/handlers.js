@@ -579,12 +579,23 @@ export const handlers = [
       model: 'glm-4.6',
       apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
       credentials: { apiKey: '', apiHint: null, knowledgeId: '' },
+      knowledgeBases: [{
+        id: 'solutions', name: '金蝶解决方案知识库', description: '产品方案与实施边界',
+        knowledgeId: 'kb-solutions', routingKeywords: ['产品方案'], allowedBusinessRoles: [],
+        enabled: true, isDefault: true, priority: 100,
+      }],
     },
     active: {
       model: 'glm-4.6',
       apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
       credentials: { apiKey: '', apiHint: null, knowledgeId: '', resolvedFrom: 'none' },
+      knowledgeBases: [{
+        id: 'solutions', name: '金蝶解决方案知识库', description: '产品方案与实施边界',
+        knowledgeId: 'kb-solutions', routingKeywords: ['产品方案'], allowedBusinessRoles: [],
+        enabled: true, isDefault: true, priority: 100,
+      }],
     },
+    probes: {},
     updatedAt: '2026-01-15T08:00:00Z',
     effectiveAt: '2026-01-15T08:00:00Z',
   } })),
@@ -593,7 +604,10 @@ export const handlers = [
     return HttpResponse.json({ success: true, data: { version: 2, draft: body, updatedAt: new Date().toISOString() } })
   }),
   http.post(`${BASE}/system/knowledge-base-config/activate`, () => HttpResponse.json({ success: true, data: { version: 2 } })),
-  http.post(`${BASE}/system/knowledge-base-config/test`, () => HttpResponse.json({ success: true, data: { ok: true, testedSource: 'mock', retrievalTriggered: true } })),
+  http.post(`${BASE}/system/knowledge-base-config/test`, async ({ request }) => {
+    const body = await request.json()
+    return HttpResponse.json({ success: true, data: { ok: true, profileId: body.profileId, testedSource: 'mock', retrievalTriggered: true } })
+  }),
   http.get(`${BASE}/system/implementation-dependency-rules`, () => HttpResponse.json({ success: true, data: mockDslRules })),
   http.get(`${BASE}/harness/test-results`, () => HttpResponse.json({ success: true, data: { items: [] } })),
   http.get(`${BASE}/templates`, () => HttpResponse.json({ success: true, data: [{ templateId: 'T1', templateName: '实施评估标准版', description: '标准模板', tags: ['标准'] }] })),

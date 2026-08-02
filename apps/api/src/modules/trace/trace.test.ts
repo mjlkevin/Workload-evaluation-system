@@ -416,6 +416,19 @@ describe("recordWorkbenchTurnTrace", () => {
           configVersion: 3,
           prompt: { id: "rag-answer", version: 1, hash: "a".repeat(64) },
           retrievalParams: { topK: 8, topN: 20, recallMethod: "mixed" },
+          knowledgeBaseProfileId: "treasury",
+          knowledgeBaseName: "司库与银企知识库",
+          route: {
+            mode: "rule",
+            confidence: 0.9,
+            reason: "keyword_match:网上银行",
+            primaryProfileId: "treasury",
+            fallbackProfileId: "solutions",
+            attempts: [
+              { profileId: "treasury", fallbackReason: "retrieval_empty", chunksCount: 0, topScore: 0 },
+              { profileId: "solutions", chunksCount: 2, topScore: 0.91 },
+            ],
+          },
         },
       },
     });
@@ -427,6 +440,9 @@ describe("recordWorkbenchTurnTrace", () => {
     assert.equal(span.attributes.configVersion, 3);
     assert.equal(span.attributes.promptVersion, 1);
     assert.deepEqual(span.attributes.retrievalParams, { topK: 8, topN: 20, recallMethod: "mixed" });
+    assert.equal(span.attributes.knowledgeBaseProfileId, "treasury");
+    assert.equal((span.attributes.route as any).fallbackProfileId, "solutions");
+    assert.equal((span.attributes.route as any).attempts.length, 2);
   });
 
   it("marks knowledge span as degraded when fallbackReason present", () => {

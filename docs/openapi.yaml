@@ -2938,7 +2938,7 @@ paths:
   /api/v1/system/knowledge-base-config:
     get:
       tags: [System]
-      summary: 获取智谱知识库草稿、生效配置与探针状态（admin）
+      summary: 获取智谱多知识库草稿、生效配置与逐库探针状态（admin）
       operationId: getKnowledgeBaseConfig
       responses:
         "200":
@@ -2963,8 +2963,8 @@ paths:
   /api/v1/system/knowledge-base-config/draft:
     patch:
       tags: [System]
-      summary: 更新智谱知识库配置草稿（admin）
-      description: credentials.apiKey 省略或空字符串表示保留，非空字符串表示替换，null 表示明确清除。
+      summary: 更新智谱多知识库配置草稿（admin）
+      description: credentials.apiKey 省略或空字符串表示保留，非空字符串表示替换，null 表示明确清除。knowledgeBases 是同一智谱账号下的知识库档案目录；旧版 credentials.knowledgeId 仍可读取并自动迁移为默认档案。
       operationId: updateKnowledgeBaseConfigDraft
       requestBody:
         required: true
@@ -2995,7 +2995,7 @@ paths:
   /api/v1/system/knowledge-base-config/activate:
     post:
       tags: [System]
-      summary: 生效已通过真实探针的知识库配置（admin）
+      summary: 生效所有已启用档案均通过真实探针的知识库配置（admin）
       operationId: activateKnowledgeBaseConfig
       responses:
         "200":
@@ -3017,7 +3017,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: 缺少成功探针、探针已过期，或探针后配置已变更。
+          description: 任一已启用知识库缺少成功探针、探针已过期，或探针后配置已变更。
           content:
             application/json:
               schema:
@@ -3026,8 +3026,8 @@ paths:
   /api/v1/system/knowledge-base-config/test:
     post:
       tags: [System]
-      summary: 测试智谱知识库连通性（admin）
-      description: 上游检索接口返回成功但固定测试语句未命中文档时，仍视为连通性通过，并在 data.warning 中返回 retrieval_empty。
+      summary: 测试一个智谱知识库档案的连通性（admin）
+      description: profileId 指向草稿中的一个知识库档案。上游检索接口返回成功但固定测试语句未命中文档时，仍视为连通性通过，并在 data.warning 中返回 retrieval_empty。
       operationId: testKnowledgeBaseConnectivity
       requestBody:
         required: false
@@ -3038,8 +3038,13 @@ paths:
               properties:
                 apiKey:
                   type: string
+                profileId:
+                  type: string
+                  description: WES 知识库档案内部稳定标识。
                 knowledgeId:
                   type: string
+                  deprecated: true
+                  description: 旧版兼容字段；新客户端应传 profileId。
       responses:
         "200":
           description: 连通性测试通过
@@ -5598,7 +5603,7 @@ components:
           enum: [high, low]
         fallbackReason:
           type: string
-          enum: [missing_config, retrieval_not_triggered, request_failed, empty_answer]
+          enum: [missing_config, retrieval_empty, retrieval_failed, answer_failed, empty_answer]
         query:
           type: string
         answer:
@@ -5607,6 +5612,45 @@ components:
           type: string
         knowledgeId:
           type: string
+        knowledgeBaseProfileId:
+          type: string
+        knowledgeBaseName:
+          type: string
+        route:
+          type: object
+          description: 知识库选择与空检索受控回退的可审计路由记录。权限过滤发生在规则和模型选择之前，attempts 最多两项。
+          properties:
+            mode:
+              type: string
+              enum: [explicit, rule, model, default, unresolved]
+            confidence:
+              type: number
+              minimum: 0
+              maximum: 1
+            reason:
+              type: string
+            primaryProfileId:
+              type: string
+            fallbackProfileId:
+              type: string
+            attempts:
+              type: array
+              maxItems: 2
+              items:
+                type: object
+                properties:
+                  profileId:
+                    type: string
+                  fallbackReason:
+                    type: string
+                  chunksCount:
+                    type: integer
+                  topScore:
+                    type: number
+                  contextRef:
+                    type: string
+                required: [profileId, chunksCount, topScore]
+          required: [mode, confidence, reason, attempts]
         promptTokens:
           type: integer
         completionTokens:
@@ -7139,6 +7183,64 @@ components:
           minimum: 1
       required: [id, version]
 
+    KnowledgeBaseProfile:
+      type: object
+      description: 同一智谱账号下的一个可路由知识库档案。路由前先按 allowedBusinessRoles 过滤；空数组表示所有已认证业务角色可用。
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9_-]{1,63}$"
+        name:
+          type: string
+        description:
+          type: string
+        knowledgeId:
+          type: string
+          description: 智谱知识库 ID。
+        routingKeywords:
+          type: array
+          items:
+            type: string
+        allowedBusinessRoles:
+          type: array
+          items:
+            type: string
+            enum: [sales, pre_sales, delivery, pm, pmo, dev, admin]
+        enabled:
+          type: boolean
+        isDefault:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 0
+          description: 数值越小，规则同分和空检索回退时越优先。
+      required: [id, name, description, knowledgeId, routingKeywords, allowedBusinessRoles, enabled, isDefault, priority]
+
+    KnowledgeBaseProbe:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, failure]
+        configHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        checkedAt:
+          type: string
+          format: date-time
+        latencyMs:
+          type: integer
+        profileId:
+          type: string
+        warning:
+          type: string
+          enum: [retrieval_empty]
+        providerRequestId:
+          type: string
+        errorCode:
+          type: string
+      required: [status, configHash, checkedAt, latencyMs]
+
     KnowledgeBaseDraftPatch:
       type: object
       properties:
@@ -7158,6 +7260,11 @@ components:
               oneOf:
                 - type: string
                 - type: "null"
+              deprecated: true
+        knowledgeBases:
+          type: array
+          items:
+            $ref: "#/components/schemas/KnowledgeBaseProfile"
         retrievalParams:
           $ref: "#/components/schemas/KnowledgeBaseRetrievalParams"
         promptProfile:
@@ -7183,9 +7290,15 @@ components:
                 - type: "null"
             knowledgeId:
               type: string
+            envFallbackAvailable:
+              type: boolean
             resolvedFrom:
               type: string
               enum: [store, env, none]
+        knowledgeBases:
+          type: array
+          items:
+            $ref: "#/components/schemas/KnowledgeBaseProfile"
         retrievalParams:
           $ref: "#/components/schemas/KnowledgeBaseRetrievalParams"
         promptProfile:
@@ -7209,27 +7322,15 @@ components:
               $ref: "#/components/schemas/KnowledgeBaseConfigPublic"
             active:
               $ref: "#/components/schemas/KnowledgeBaseConfigPublic"
-            probe:
+            probes:
               type: object
-              properties:
-                status:
-                  type: string
-                  enum: [success, failure]
-                configHash:
-                  type: string
-                  pattern: "^[0-9a-f]{64}$"
-                checkedAt:
-                  type: string
-                  format: date-time
-                latencyMs:
-                  type: integer
-                warning:
-                  type: string
-                  enum: [retrieval_empty]
-                providerRequestId:
-                  type: string
-                errorCode:
-                  type: string
+              additionalProperties:
+                $ref: "#/components/schemas/KnowledgeBaseProbe"
+            probe:
+              allOf:
+                - $ref: "#/components/schemas/KnowledgeBaseProbe"
+              deprecated: true
+              description: 旧版单知识库探针兼容字段。
       required: [code, message, data]
 
     KnowledgeBaseConnectivityTestResponse:
@@ -7252,6 +7353,8 @@ components:
               enum: [request_body, draft_store, environment]
             model:
               type: string
+            profileId:
+              type: string
             knowledgeId:
               type: string
             latencyMs:
@@ -7262,7 +7365,7 @@ components:
               type: string
               enum: [retrieval_empty]
               description: 上游接口可达，但固定测试语句未命中文档。
-          required: [ok, testedSource, model, knowledgeId, latencyMs, retrievalTriggered]
+          required: [ok, testedSource, model, profileId, knowledgeId, latencyMs, retrievalTriggered]
       required: [code, message, data]
 
     ChatResponse:

@@ -4,12 +4,17 @@
 // 返回统一的 WorkbenchDispatchData 结构（包含 intent, answer, suggestedActions, trace）。
 // ============================================================
 
-import type { AuthUser, BusinessRole } from "../../types";
+import type { AuthUser, BusinessRole, KnowledgeBaseProfile } from "../../types";
 import { config } from "../../config/env";
-import { queryZhipuKnowledgeBase, type ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
+import { queryZhipuKnowledgeBase, type ZhipuKnowledgeToolConfig, type ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import { routeWorkbenchIntent, classifyIntentWithModel, type WorkbenchIntent, type ModelClassificationResult } from "./workbench-intent.service";
 import { buildWorkbenchContext, type WorkbenchContext, type WorkbenchAttachmentContext, type WorkbenchHarnessArtifactContext } from "./workbench-context.service";
-import { resolveActiveKnowledgeBaseConfig } from "../../modules/system/system.repository";
+import {
+  resolveActiveKnowledgeBaseCatalog,
+  resolveActiveKnowledgeBaseConfig,
+  type ResolvedActiveKnowledgeBaseCatalog,
+} from "../../modules/system/system.repository";
+import { routeKnowledgeBase, type KnowledgeBaseRouteDecision } from "./knowledge-base-router.service";
 
 export type WorkbenchSuggestedAction = {
   id: string;
@@ -99,7 +104,9 @@ export type WorkbenchDispatchInput = {
   /** 角色预设提示词（可选，用于注入到 system prompt） */
   rolePrompt?: string;
   /** 可注入的知识库查询函数，用于测试和后续工具注册器接入 */
-  knowledgeQuery?: (query: string) => Promise<ZhipuKnowledgeToolTrace>;
+  knowledgeQuery?: (query: string, config?: ZhipuKnowledgeToolConfig) => Promise<ZhipuKnowledgeToolTrace>;
+  /** 测试或受控调用方可注入的已生效知识库目录。 */
+  knowledgeBaseCatalog?: ResolvedActiveKnowledgeBaseCatalog;
   /** RP-029 返工：可选流式 adapter，提供后模型调用路径改为流式输出 */
   streamingAdapter?: StreamingAdapter;
   /** RP-029 返工：可选流式模型调用函数 */
@@ -511,6 +518,7 @@ function buildKnowledgeToolAnswer(trace: ZhipuKnowledgeToolTrace): string {
   const lines = [
     "## 知识库参考",
     "",
+    ...(trace.knowledgeBaseName ? [`来源知识库：${trace.knowledgeBaseName}`, ""] : []),
     trace.answer,
     "",
     [
@@ -526,18 +534,129 @@ function buildKnowledgeToolAnswer(trace: ZhipuKnowledgeToolTrace): string {
   return lines.join("\n");
 }
 
+function createInjectedDefaultProfile(knowledgeId: string): KnowledgeBaseProfile {
+  return {
+    id: "injected-default",
+    name: "默认知识库",
+    description: "测试或兼容调用注入的默认知识库",
+    knowledgeId: knowledgeId || "injected",
+    routingKeywords: [],
+    allowedBusinessRoles: [],
+    enabled: true,
+    isDefault: true,
+    priority: 100,
+  };
+}
+
+function summarizeKnowledgeAttempt(profile: KnowledgeBaseProfile, trace: ZhipuKnowledgeToolTrace) {
+  return {
+    profileId: profile.id,
+    ...(trace.fallbackReason ? { fallbackReason: trace.fallbackReason } : {}),
+    chunksCount: trace.chunksCount,
+    topScore: trace.topScore,
+    ...(trace.contextRef ? { contextRef: trace.contextRef } : {}),
+  };
+}
+
+function attachKnowledgeRoute(
+  trace: ZhipuKnowledgeToolTrace,
+  profile: KnowledgeBaseProfile | undefined,
+  route: KnowledgeBaseRouteDecision,
+  attempts: ReturnType<typeof summarizeKnowledgeAttempt>[],
+): ZhipuKnowledgeToolTrace {
+  return {
+    ...trace,
+    ...(profile ? {
+      knowledgeBaseProfileId: profile.id,
+      knowledgeBaseName: profile.name,
+    } : {}),
+    route: {
+      mode: route.mode,
+      confidence: route.confidence,
+      reason: route.reason,
+      ...(route.primaryProfile ? { primaryProfileId: route.primaryProfile.id } : {}),
+      ...(attempts.length > 1 && route.fallbackProfile ? { fallbackProfileId: route.fallbackProfile.id } : {}),
+      attempts,
+    },
+  };
+}
+
 async function buildKnowledgeQueryResponse(
   intent: { confidence: number; routingRule: string },
   context: WorkbenchContext,
   input: WorkbenchDispatchInput,
 ): Promise<WorkbenchDispatchData> {
-  const kbConf = resolveActiveKnowledgeBaseConfig();
-  const knowledgeQuery = input.knowledgeQuery || ((query: string) => queryZhipuKnowledgeBase(query, {
-    ...kbConf,
+  const legacyConfig = resolveActiveKnowledgeBaseConfig();
+  const resolvedCatalog = input.knowledgeBaseCatalog || resolveActiveKnowledgeBaseCatalog();
+  const catalog: ResolvedActiveKnowledgeBaseCatalog = input.knowledgeQuery && resolvedCatalog.profiles.length === 0
+    ? { ...resolvedCatalog, profiles: [createInjectedDefaultProfile(legacyConfig.knowledgeId)] }
+    : resolvedCatalog;
+  const route = await routeKnowledgeBase({
+    query: input.message,
+    businessRole: input.businessRole,
+    profiles: catalog.profiles,
+    modelSelect: async ({ query, candidates }) => {
+      const modelResult = await input.modelChat({
+        systemPrompt: [
+          "你是 WES 知识库路由器。",
+          "只能从调用方提供、且已按用户角色过滤的候选知识库中选择一个。",
+          "只返回 JSON：{\"knowledgeBaseId\":\"候选ID\",\"confidence\":0到1,\"reason\":\"简短理由\"}。",
+          "不得返回候选目录以外的 ID，不回答用户业务问题。",
+        ].join("\n"),
+        userContent: JSON.stringify({ query, candidates }),
+      });
+      const payload = parseJsonObject(modelResult.answer) || parseJsonObject(modelResult.rawContent);
+      if (!payload) return null;
+      return {
+        knowledgeBaseId: asCleanString(payload.knowledgeBaseId, 64),
+        confidence: Number(payload.confidence),
+        reason: asCleanString(payload.reason, 200),
+      };
+    },
+  });
+  const knowledgeQuery = input.knowledgeQuery || ((query: string, conf?: ZhipuKnowledgeToolConfig) => queryZhipuKnowledgeBase(query, conf || {}));
+  const queryProfile = (profile: KnowledgeBaseProfile) => knowledgeQuery(input.message, {
+    apiKey: catalog.apiKey,
+    knowledgeId: profile.knowledgeId,
+    model: catalog.model,
+    apiBaseUrl: catalog.apiBaseUrl,
+    retrievalParams: catalog.retrievalParams,
+    promptProfile: catalog.promptProfile,
+    configVersion: catalog.configVersion,
     requestId: input.requestId,
-  }));
-  const knowledgeTool = await knowledgeQuery(input.message);
-  const contextRefs = Array.from(new Set([...context.contextRefs, knowledgeTool.contextRef].filter(Boolean)));
+  });
+
+  let selectedProfile = route.primaryProfile;
+  let attempts: ReturnType<typeof summarizeKnowledgeAttempt>[] = [];
+  let rawKnowledgeTool: ZhipuKnowledgeToolTrace;
+  if (route.primaryProfile) {
+    rawKnowledgeTool = await queryProfile(route.primaryProfile);
+    attempts.push(summarizeKnowledgeAttempt(route.primaryProfile, rawKnowledgeTool));
+    if (rawKnowledgeTool.fallbackReason === "retrieval_empty" && route.fallbackProfile) {
+      const fallbackTrace = await queryProfile(route.fallbackProfile);
+      attempts.push(summarizeKnowledgeAttempt(route.fallbackProfile, fallbackTrace));
+      rawKnowledgeTool = fallbackTrace;
+      selectedProfile = route.fallbackProfile;
+    }
+  } else {
+    rawKnowledgeTool = await queryZhipuKnowledgeBase(input.message, {
+      apiKey: "",
+      knowledgeId: "",
+      model: catalog.model,
+      apiBaseUrl: catalog.apiBaseUrl,
+      retrievalParams: catalog.retrievalParams,
+      promptProfile: catalog.promptProfile,
+      configVersion: catalog.configVersion,
+      requestId: input.requestId,
+    });
+  }
+  const knowledgeTool = attachKnowledgeRoute(rawKnowledgeTool, selectedProfile, route, attempts);
+  const routeContextRefs = attempts.map((attempt) => attempt.contextRef).filter((value): value is string => Boolean(value));
+  const contextRefs = Array.from(new Set([
+    ...context.contextRefs,
+    ...routeContextRefs,
+    knowledgeTool.contextRef,
+  ].filter(Boolean)));
 
   // 知识库检索失败或为空时，fallback 到模型通用知识回答
   if (knowledgeTool.fallbackReason) {

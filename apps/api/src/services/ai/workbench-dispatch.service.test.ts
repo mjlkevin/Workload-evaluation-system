@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-import type { AuthUser } from "../../types";
+import type { AuthUser, KnowledgeBaseProfile } from "../../types";
 import { versionsStorePath } from "../../utils";
 import { dispatchHomeWorkbenchTurn } from "./workbench-dispatch.service";
 import type { ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
@@ -40,6 +40,53 @@ function createKnowledgeTrace(overrides: Partial<ZhipuKnowledgeToolTrace> = {}):
     ...overrides,
   };
 }
+
+function knowledgeProfile(overrides: Partial<KnowledgeBaseProfile>): KnowledgeBaseProfile {
+  return {
+    id: "solutions",
+    name: "金蝶解决方案知识库",
+    description: "产品方案与实施边界",
+    knowledgeId: "kb-solutions",
+    routingKeywords: ["产品方案", "标准模块"],
+    allowedBusinessRoles: [],
+    enabled: true,
+    isDefault: true,
+    priority: 100,
+    ...overrides,
+  };
+}
+
+const multiKnowledgeCatalog = {
+  apiKey: "fixture-key",
+  model: "glm-test",
+  apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+  retrievalParams: { topK: 8, topN: 20, recallMethod: "mixed" as const, rerankStatus: 1 as const, rerankModel: "rerank", fractionalThreshold: 0.2 },
+  promptProfile: { id: "rag-answer", version: 1 },
+  configVersion: 4,
+  source: "store" as const,
+  profiles: [
+    knowledgeProfile({}),
+    knowledgeProfile({
+      id: "treasury",
+      name: "司库与银企知识库",
+      description: "资金计划、网上银行、银企直联",
+      knowledgeId: "kb-treasury",
+      routingKeywords: ["资金计划", "网上银行", "网银", "银企"],
+      allowedBusinessRoles: ["pre_sales", "delivery", "pm"],
+      isDefault: false,
+      priority: 10,
+    }),
+    knowledgeProfile({
+      id: "dev-private",
+      name: "研发内部知识库",
+      knowledgeId: "kb-dev",
+      routingKeywords: ["研发规范"],
+      allowedBusinessRoles: ["dev"],
+      isDefault: false,
+      priority: 20,
+    }),
+  ],
+};
 
 async function withVersionsSnapshot(run: () => Promise<void>): Promise<void> {
   const filePath = versionsStorePath();
@@ -334,6 +381,126 @@ test("workbench dispatch falls back to model when knowledge tool has fallbackRea
   assert.equal(result.trace.knowledgeTool?.fallbackReason, "missing_config");
   assert.ok(result.trace.contextRefs.includes("knowledge:unconfigured:unavailable"));
   assert.equal(result.trace.modelRun?.runKind, "knowledge_fallback");
+});
+
+test("workbench dispatch routes a strong keyword to one profile without route-model classification", async () => {
+  let routeModelCalled = false;
+  let selectedKnowledgeId = "";
+  const result = await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "请查询知识库：网上银行实施边界怎么划分？",
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    knowledgeBaseCatalog: multiKnowledgeCatalog,
+    modelChat: async ({ systemPrompt }) => {
+      if (systemPrompt.includes("知识库路由器")) routeModelCalled = true;
+      throw new Error("model_should_not_be_called");
+    },
+    knowledgeQuery: async (query, config?: any) => {
+      selectedKnowledgeId = config?.knowledgeId || "";
+      return createKnowledgeTrace({ query, knowledgeId: selectedKnowledgeId });
+    },
+  });
+
+  assert.equal(routeModelCalled, false);
+  assert.equal(selectedKnowledgeId, "kb-treasury");
+  assert.equal(result.trace.knowledgeTool?.route?.mode, "rule");
+  assert.equal(result.trace.knowledgeTool?.knowledgeBaseProfileId, "treasury");
+});
+
+test("workbench dispatch uses the model router only with authorized candidates", async () => {
+  let routePrompt = "";
+  let selectedKnowledgeId = "";
+  const result = await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "请查询知识库，这个业务边界怎么判断？",
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    knowledgeBaseCatalog: multiKnowledgeCatalog,
+    modelChat: async ({ systemPrompt, userContent }) => {
+      if (systemPrompt.includes("知识库路由器")) {
+        routePrompt = `${systemPrompt}\n${userContent}`;
+        const raw = JSON.stringify({ knowledgeBaseId: "treasury", confidence: 0.88, reason: "涉及司库业务" });
+        return { answer: raw, rawContent: raw };
+      }
+      return { answer: "通用回答", rawContent: "通用回答" };
+    },
+    knowledgeQuery: async (query, config?: any) => {
+      selectedKnowledgeId = config?.knowledgeId || "";
+      return createKnowledgeTrace({ query, knowledgeId: selectedKnowledgeId });
+    },
+  });
+
+  assert.match(routePrompt, /treasury/);
+  assert.doesNotMatch(routePrompt, /dev-private/);
+  assert.equal(selectedKnowledgeId, "kb-treasury");
+  assert.equal(result.trace.knowledgeTool?.route?.mode, "model");
+});
+
+test("workbench dispatch retries exactly one authorized fallback only for empty retrieval", async () => {
+  const calls: string[] = [];
+  const result = await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "请查询知识库：网上银行实施边界怎么划分？",
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    knowledgeBaseCatalog: multiKnowledgeCatalog,
+    modelChat: async () => { throw new Error("model_should_not_be_called"); },
+    knowledgeQuery: async (query, config?: any) => {
+      calls.push(config?.knowledgeId || "");
+      if (config?.knowledgeId === "kb-treasury") {
+        return createKnowledgeTrace({
+          query,
+          knowledgeId: "kb-treasury",
+          answer: "未检索到相关文档。",
+          confidence: "low",
+          fallbackReason: "retrieval_empty",
+          chunksCount: 0,
+          topScore: 0,
+          contextRef: "knowledge:kb-treasury:empty",
+        });
+      }
+      return createKnowledgeTrace({ query, knowledgeId: "kb-solutions" });
+    },
+  });
+
+  assert.deepEqual(calls, ["kb-treasury", "kb-solutions"]);
+  assert.equal(result.trace.knowledgeTool?.knowledgeBaseProfileId, "solutions");
+  assert.equal(result.trace.knowledgeTool?.route?.attempts.length, 2);
+  assert.equal(result.trace.knowledgeTool?.route?.fallbackProfileId, "solutions");
+});
+
+test("workbench dispatch does not fan out on provider failures", async () => {
+  const calls: string[] = [];
+  await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "请查询知识库：网上银行实施边界怎么划分？",
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    knowledgeBaseCatalog: multiKnowledgeCatalog,
+    modelChat: async () => ({ answer: "⚠️ 通用知识", rawContent: "⚠️ 通用知识" }),
+    knowledgeQuery: async (query, config?: any) => {
+      calls.push(config?.knowledgeId || "");
+      return createKnowledgeTrace({
+        query,
+        knowledgeId: config?.knowledgeId,
+        confidence: "low",
+        fallbackReason: "retrieval_failed",
+        chunksCount: 0,
+        topScore: 0,
+      });
+    },
+  });
+
+  assert.deepEqual(calls, ["kb-treasury"]);
 });
 
 test("workbench dispatch summarizes owner scoped project status and pending AI draft review", async () => {
