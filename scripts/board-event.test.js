@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 
 const {
@@ -116,4 +118,39 @@ test('applyBoardEventToHtml inserts testing rows once in the automated baseline 
   assert.equal(twice.changed, false);
   assert.equal((once.html.match(/data-board-event-id=/g) || []).length, 1);
   assert.ok(once.html.indexOf(validEvent.id) < once.html.indexOf('Existing test'));
+});
+
+test('RP-045 implementation event records verified automation without claiming integration or browser acceptance', () => {
+  const eventPath = path.join(
+    __dirname,
+    '..',
+    '03_技术设计',
+    '系统架构',
+    'WES-Agent-升级总看板',
+    'events',
+    '2026-08-02-rp-045-branch-topology.json',
+  );
+  const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+  const result = validateBoardEvent(event);
+  const evidenceText = JSON.stringify(event.evidence);
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(event.type, 'implementation');
+  assert.equal(event.status, '核心实现完成 / 待主线集成与浏览器验证');
+  assert.deepEqual(event.pages, [
+    'index',
+    'issues',
+    'requirements',
+    'plan',
+    'testing',
+    'monitoring',
+    'changes',
+    'sources',
+  ]);
+  assert.match(evidenceText, /npm run board:branches:check/);
+  assert.match(evidenceText, /36\/36/);
+  assert.match(event.next, /主线集成/);
+  assert.match(event.next, /1440px/);
+  assert.match(event.next, /760px/);
+  assert.doesNotMatch(JSON.stringify(event), /用户已验收|已集成并验证|浏览器通过/);
 });

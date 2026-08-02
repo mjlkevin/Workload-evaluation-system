@@ -1,0 +1,81 @@
+{
+  "id": "BE-2026-08-02-rp-045-branch-topology",
+  "date": "2026-08-02",
+  "type": "implementation",
+  "scope": "RP-045 WES 主分支、子分支与 Worktree 拓扑看板",
+  "summary": "RP-045 已在隔离分支完成 Git 分支事实模型、自动快照生成器、运营拓扑、完整分支台账、筛选交互、全局导航同步与静态构建接入。当前核心自动化已通过，尚未集成业务主线，也尚未完成 1440px、760px 与 file:// 浏览器验证。",
+  "status": "核心实现完成 / 待主线集成与浏览器验证",
+  "pages": [
+    "index",
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "requirement",
+      "ref": "ISS-2026-08-02-001 / RP-045",
+      "result": "deduplicated and converted",
+      "summary": "去重未命中同类记录；原始用户需求先登记为 Issue，再分诊为 RP-045。"
+    },
+    {
+      "kind": "design",
+      "ref": "docs/superpowers/specs/2026-08-02-wes-branch-topology-board-design.md",
+      "result": "approved",
+      "summary": "范围限定 WES；刷新方式为脚本；页面采用运营拓扑与完整台账。"
+    },
+    {
+      "kind": "commit",
+      "ref": "89e2034, 6a561ed, 09b6d8c, 551b46b",
+      "result": "implemented on codex/rp-045-branch-board",
+      "summary": "依次完成事实模型、快照生成、静态页面与交互、导航和构建接入；尚未集成 codex/role-driven-ai-home-workbench。"
+    },
+    {
+      "kind": "file",
+      "ref": "03_技术设计/系统架构/WES-Agent-升级总看板/branches.html + assets/branch-topology.js + assets/branch-topology.css + data/branch-snapshot.js",
+      "result": "implemented",
+      "summary": "新增分支拓扑业务表面、完整台账、静态快照与无后端依赖的筛选交互。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run board:branches:check",
+      "result": "pass 36/36",
+      "summary": "分支快照、页面、导航、构建和一致性聚焦回归通过。"
+    },
+    {
+      "kind": "browser",
+      "ref": "branches.html / 1440px + 760px + file://",
+      "result": "pending",
+      "summary": "浏览器视觉、交互、控制台与 file:// 离线访问验证尚待执行。"
+    },
+    {
+      "kind": "integration",
+      "ref": "codex/role-driven-ai-home-workbench",
+      "result": "pending",
+      "summary": "需在保护主 checkout 既有未提交修改的前提下精确集成，并回填可见看板页面。"
+    }
+  ],
+  "next": "Task 7 完成 RP-045 核心提交的业务主线集成并同步可见看板；Task 8 在 1440px、760px 和 file:// 场景完成浏览器验收后回填最终验证状态。",
+  "board": {
+    "change": {
+      "stage": "RP-045 分支拓扑核心实现",
+      "result": "核心实现完成 / 待主线集成与浏览器验证"
+    },
+    "testing": [
+      {
+        "command": "npm run board:branches:check",
+        "result": "pass 36/36",
+        "summary": "分支事实模型、生成器、页面交互、导航同步、构建和一致性检查通过。"
+      },
+      {
+        "command": "browser 1440px + 760px + file://",
+        "result": "pending",
+        "summary": "视觉、响应式、交互和离线访问验证待 Task 8 执行。"
+      }
+    ]
+  }
+}

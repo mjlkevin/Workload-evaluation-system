@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-15",
+  "updatedAt": "2026-08-02",
   "issues": [
     {
       "id": "ISS-2026-07-02-001",
@@ -343,6 +343,24 @@
       },
       "priority": "P1",
       "next": "已持久化契约失败 metadata/resumeStage，V1/V2 分别恢复 evidence_ready/clarifying，交互运行进入 needs_user_input；待真实交互运行人工复核错误提示与恢复体验。"
+    },
+    {
+      "id": "ISS-2026-08-02-001",
+      "date": "2026-08-02",
+      "title": "项目看板缺少主分支与子分支拓扑",
+      "source": "user_requirement",
+      "rawFeedback": "把 WES 当前仓库所有分支情况反馈到项目看板，通过图形和分支形式表达主分支与其他子分支，并由脚本自动刷新。",
+      "evidence": [
+        "docs/superpowers/specs/2026-08-02-wes-branch-topology-board-design.md",
+        "2026-08-02 user decision: WES only / script refresh / operational topology + complete ledger"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "requirement",
+        "ref": "RP-045"
+      },
+      "priority": "P1",
+      "next": "按已确认规格实施自动 Git 快照、branches.html、完整分支台账，并完成 1440px 与 760px 双视口验收。"
     }
   ],
   "defects": [

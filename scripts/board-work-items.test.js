@@ -125,3 +125,28 @@ test('feedback governance instructions require issue-first Codex Loop triage', (
   assert.match(agents, /Codex Intake\/Triage Loop/);
   assert.match(intake, /Codex Intake\/Triage Loop/);
 });
+
+test('RP-045 branch topology intake is registered once with issue-first traceability', () => {
+  const registry = JSON.parse(
+    readProjectFile('03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json'),
+  );
+  const matches = registry.issues.filter((issue) => issue.id === 'ISS-2026-08-02-001');
+
+  assert.equal(registry.updatedAt, '2026-08-02');
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].title, '项目看板缺少主分支与子分支拓扑');
+  assert.equal(matches[0].triageStatus, 'converted');
+  assert.deepEqual(matches[0].disposition, { type: 'requirement', ref: 'RP-045' });
+  assert.equal(matches[0].priority, 'P1');
+  assert.ok(
+    matches[0].evidence.includes(
+      'docs/superpowers/specs/2026-08-02-wes-branch-topology-board-design.md',
+    ),
+  );
+  assert.ok(
+    matches[0].evidence.some((item) =>
+      item.includes('WES only')
+      && item.includes('script')
+      && item.includes('operational topology + complete ledger')),
+  );
+});
