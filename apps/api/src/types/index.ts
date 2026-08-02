@@ -445,11 +445,21 @@ export type KnowledgeBaseCredentialsConfig = {
   knowledgeId: string;
 };
 
+export type KnowledgeRetrievalParams = {
+  topK: number;
+  topN: number;
+  recallMethod: "mixed" | "vector" | "keyword";
+  rerankStatus: 0 | 1;
+  rerankModel: string;
+  fractionalThreshold: number;
+};
+
 /** 知识库配置（含模型与 API 地址） */
 export type KnowledgeBaseConfig = {
   model: string;
   apiBaseUrl: string;
   credentials: KnowledgeBaseCredentialsConfig;
+  retrievalParams: KnowledgeRetrievalParams;
 };
 
 /** 返回给前端的密钥展示 */
@@ -465,10 +475,21 @@ export type KnowledgeBaseConfigPublic = Omit<KnowledgeBaseConfig, "credentials">
   credentials: KnowledgeBaseCredentialsPublic;
 };
 
+export type KnowledgeBaseProbeRecord = {
+  status: "success" | "failure";
+  configHash: string;
+  checkedAt: string;
+  latencyMs: number;
+  warning?: "retrieval_empty";
+  providerRequestId?: string;
+  errorCode?: string;
+};
+
 export type KnowledgeBaseConfigStore = {
   version: number;
   draft: KnowledgeBaseConfig;
   active: KnowledgeBaseConfig;
+  probe?: KnowledgeBaseProbeRecord;
   updatedAt: string;
   effectiveAt: string;
 };

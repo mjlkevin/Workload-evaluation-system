@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import {
   ImplementationDependencyRuleItem,
@@ -8,6 +9,8 @@ import {
   KnowledgeBaseConfig,
   KnowledgeBaseConfigStore,
   KnowledgeBaseCredentialsConfig,
+  KnowledgeBaseProbeRecord,
+  KnowledgeRetrievalParams,
   RequirementKimiCredentialsConfig,
   RequirementSystemConfig,
   RequirementSystemConfigStore,
@@ -796,14 +799,48 @@ export function normalizeImplementationDependencyRulesConfig(input: unknown): Im
 
 // -------------------- 知识库配置 --------------------
 
+export const DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS: KnowledgeRetrievalParams = {
+  topK: 8,
+  topN: 20,
+  recallMethod: "mixed",
+  rerankStatus: 1,
+  rerankModel: "rerank",
+  fractionalThreshold: 0.2,
+};
+
+export function normalizeKnowledgeRetrievalParams(input: unknown): KnowledgeRetrievalParams {
+  const source = (input || {}) as Partial<KnowledgeRetrievalParams>;
+  const topK = Math.trunc(clampNumber(source.topK, 1, 50, DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.topK));
+  const topN = Math.max(
+    topK,
+    Math.trunc(clampNumber(source.topN, 1, 100, DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.topN)),
+  );
+  const recallMethod = source.recallMethod === "vector" || source.recallMethod === "keyword"
+    ? source.recallMethod
+    : "mixed";
+  return {
+    topK,
+    topN,
+    recallMethod,
+    rerankStatus: source.rerankStatus === 0 ? 0 : 1,
+    rerankModel: typeof source.rerankModel === "string" && source.rerankModel.trim()
+      ? source.rerankModel.trim()
+      : DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.rerankModel,
+    fractionalThreshold: clampNumber(
+      source.fractionalThreshold,
+      0,
+      1,
+      DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.fractionalThreshold,
+    ),
+  };
+}
+
 function createDefaultKnowledgeBaseConfig(): KnowledgeBaseConfig {
   return {
     model: "glm-4.6",
     apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-    credentials: {
-      apiKey: "",
-      knowledgeId: "",
-    },
+    credentials: { apiKey: "", knowledgeId: "" },
+    retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS },
   };
 }
 
@@ -815,9 +852,49 @@ export function normalizeKnowledgeBaseConfig(input: unknown): KnowledgeBaseConfi
     model: String(source.model || base.model).trim(),
     apiBaseUrl: String(source.apiBaseUrl || base.apiBaseUrl).trim(),
     credentials: {
-      apiKey: String(credentials.apiKey ?? base.credentials.apiKey ?? "").trim(),
-      knowledgeId: String(credentials.knowledgeId ?? base.credentials.knowledgeId ?? "").trim(),
+      apiKey: String(credentials.apiKey ?? base.credentials.apiKey).trim(),
+      knowledgeId: String(credentials.knowledgeId ?? base.credentials.knowledgeId).trim(),
     },
+    retrievalParams: normalizeKnowledgeRetrievalParams(source.retrievalParams),
+  };
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+export function computeKnowledgeBaseConfigHash(input: KnowledgeBaseConfig): string {
+  const normalized = normalizeKnowledgeBaseConfig(input);
+  return sha256(JSON.stringify({
+    model: normalized.model,
+    apiBaseUrl: normalized.apiBaseUrl,
+    credentials: {
+      apiKeyHash: sha256(normalized.credentials.apiKey),
+      knowledgeId: normalized.credentials.knowledgeId,
+    },
+    retrievalParams: normalized.retrievalParams,
+  }));
+}
+
+function normalizeKnowledgeBaseProbe(input: unknown): KnowledgeBaseProbeRecord | undefined {
+  const source = (input || {}) as Partial<KnowledgeBaseProbeRecord>;
+  const checkedAt = String(source.checkedAt || "");
+  const configHash = String(source.configHash || "");
+  if (
+    (source.status !== "success" && source.status !== "failure")
+    || !/^[0-9a-f]{64}$/i.test(configHash)
+    || !Number.isFinite(Date.parse(checkedAt))
+  ) return undefined;
+  const providerRequestId = String(source.providerRequestId || "").trim();
+  const errorCode = String(source.errorCode || "").trim();
+  return {
+    status: source.status,
+    configHash,
+    checkedAt,
+    latencyMs: Math.max(0, Number(source.latencyMs) || 0),
+    ...(source.warning === "retrieval_empty" ? { warning: source.warning } : {}),
+    ...(providerRequestId ? { providerRequestId: providerRequestId.slice(0, 128) } : {}),
+    ...(errorCode ? { errorCode: errorCode.slice(0, 64) } : {}),
   };
 }
 
@@ -826,10 +903,12 @@ function normalizeKnowledgeBaseStore(input: unknown): KnowledgeBaseConfigStore {
   const now = new Date().toISOString();
   const draft = normalizeKnowledgeBaseConfig(data.draft);
   const active = normalizeKnowledgeBaseConfig(data.active || data.draft);
+  const probe = normalizeKnowledgeBaseProbe(data.probe);
   return {
     version: Number.isFinite(Number(data.version)) ? Math.max(1, Number(data.version)) : 1,
     draft,
     active,
+    ...(probe ? { probe } : {}),
     updatedAt: String(data.updatedAt || now),
     effectiveAt: String(data.effectiveAt || now),
   };
@@ -900,6 +979,8 @@ export function resolveActiveKnowledgeBaseConfig(): {
   knowledgeId: string;
   model: string;
   apiBaseUrl: string;
+  retrievalParams: KnowledgeRetrievalParams;
+  configVersion: number;
   source: "store" | "env" | "none";
 } {
   const store = loadKnowledgeBaseConfigStore();
@@ -911,6 +992,8 @@ export function resolveActiveKnowledgeBaseConfig(): {
       knowledgeId: storeKnowledgeId,
       model: store.active.model,
       apiBaseUrl: store.active.apiBaseUrl,
+      retrievalParams: store.active.retrievalParams,
+      configVersion: store.version,
       source: "store",
     };
   }
@@ -922,10 +1005,12 @@ export function resolveActiveKnowledgeBaseConfig(): {
       knowledgeId: envKnowledgeId,
       model: config.zhipu.model,
       apiBaseUrl: config.zhipu.apiBaseUrl,
+      retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS },
+      configVersion: store.version,
       source: "env",
     };
   }
-  return { apiKey: "", knowledgeId: "", model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "none" };
+  return { apiKey: "", knowledgeId: "", model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, configVersion: store.version, source: "none" };
 }
 
 /** 测试连接：显式传入优先；否则草稿仓库；再否则环境变量 */
@@ -937,21 +1022,22 @@ export function resolveDraftKnowledgeBaseConfigForTest(
   knowledgeId: string;
   model: string;
   apiBaseUrl: string;
+  retrievalParams: KnowledgeRetrievalParams;
   source: "override" | "draft" | "env" | "none";
 } {
   const oKey = overrideApiKey?.trim() || "";
   const oKid = overrideKnowledgeId?.trim() || "";
-  if (oKey && oKid) return { apiKey: oKey, knowledgeId: oKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "override" };
   const store = loadKnowledgeBaseConfigStore();
+  if (oKey && oKid) return { apiKey: oKey, knowledgeId: oKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, retrievalParams: store.draft.retrievalParams, source: "override" };
   const draftKey = store.draft.credentials.apiKey.trim();
   const draftKid = store.draft.credentials.knowledgeId.trim();
   if (draftKey && draftKid) {
-    return { apiKey: oKey || draftKey, knowledgeId: oKid || draftKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, source: "draft" };
+    return { apiKey: oKey || draftKey, knowledgeId: oKid || draftKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, retrievalParams: store.draft.retrievalParams, source: "draft" };
   }
   const envKey = config.zhipu.apiKey.trim();
   const envKid = config.zhipu.knowledgeId.trim();
   if (envKey && envKid) {
-    return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "env" };
+    return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, source: "env" };
   }
-  return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "none" };
+  return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, source: "none" };
 }
