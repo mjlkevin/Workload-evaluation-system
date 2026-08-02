@@ -32,6 +32,7 @@ const HTML_FILES = [
   'changes.html',
   'sources.html',
   'collaboration-protocol.html',
+  'branches.html',
   'requirements.html',
 ];
 
@@ -285,4 +286,6 @@ function run() {
   }
 }
 
-run();
+if (require.main === module) run();
+
+module.exports = { BOARD_DIR, HTML_FILES, main: run, run };

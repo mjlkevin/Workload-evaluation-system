@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { href: 'changes.html', label: '变更记录' },
   { href: 'sources.html', label: '文档事实源' },
   { href: 'collaboration-protocol.html', label: '协作协议' },
+  { href: 'branches.html', label: '分支拓扑' },
   { href: 'requirements.html', label: '需求池' },
 ];
 
@@ -186,7 +187,12 @@ ${navLinks}
   console.log(`✓ ${fileName}`);
 }
 
-// Process all HTML files
-const files = fs.readdirSync(DIR).filter(f => f.endsWith('.html')).sort();
-files.forEach(f => transformFile(path.join(DIR, f)));
-console.log(`\nDone: ${files.length} files processed.`);
+function main() {
+  const files = fs.readdirSync(DIR).filter(f => f.endsWith('.html')).sort();
+  files.forEach(f => transformFile(path.join(DIR, f)));
+  console.log(`\nDone: ${files.length} files processed.`);
+}
+
+if (require.main === module) main();
+
+module.exports = { NAV_ITEMS, buildNavLinks, main, transformFile };

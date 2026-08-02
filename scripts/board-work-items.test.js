@@ -90,6 +90,7 @@ test('renderIssuesPage shows raw feedback and disposition links', () => {
   const html = renderIssuesPage(sampleRegistry);
 
   assert.match(html, /问题池/);
+  assert.match(html, /<a href="branches\.html">分支拓扑<\/a>/);
   assert.match(html, /<a class="active" href="issues\.html">问题池<\/a>/);
   assert.match(html, /<a href="defects\.html">缺陷池<\/a>/);
   assert.match(html, /<a href="requirements\.html">需求池<\/a>/);
@@ -102,6 +103,7 @@ test('renderDefectsPage shows linked issue and RP traceability', () => {
   const html = renderDefectsPage(sampleRegistry);
 
   assert.match(html, /缺陷池/);
+  assert.match(html, /<a href="branches\.html">分支拓扑<\/a>/);
   assert.match(html, /<a href="issues\.html">问题池<\/a>/);
   assert.match(html, /<a class="active" href="defects\.html">缺陷池<\/a>/);
   assert.match(html, /<a href="requirements\.html">需求池<\/a>/);

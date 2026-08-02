@@ -117,6 +117,7 @@ function renderNav(activeHref) {
     ['changes.html', '变更记录'],
     ['sources.html', '文档事实源'],
     ['collaboration-protocol.html', '协作协议'],
+    ['branches.html', '分支拓扑'],
     ['issues.html', '问题池'],
     ['defects.html', '缺陷池'],
     ['requirements.html', '需求池'],

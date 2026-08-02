@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
@@ -11,6 +13,31 @@ const RENDERER_PATH = path.join(BOARD_DIR, 'assets', 'branch-topology.js');
 
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
+}
+
+function createTempDir(t) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wes-branch-board-'));
+  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));
+  return tempDir;
+}
+
+function directoryManifest(directory) {
+  if (!fs.existsSync(directory)) return null;
+  const files = [];
+  function visit(current) {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const entryPath = path.join(current, entry.name);
+      if (entry.isDirectory()) visit(entryPath);
+      else if (entry.isFile()) {
+        files.push([
+          path.relative(directory, entryPath),
+          crypto.createHash('sha256').update(fs.readFileSync(entryPath)).digest('hex'),
+        ]);
+      }
+    }
+  }
+  visit(directory);
+  return files.sort(([left], [right]) => left.localeCompare(right));
 }
 
 function branch(overrides = {}) {
@@ -649,4 +676,150 @@ test('package scripts run generator and page tests while check mode remains non-
   assert.match(pkg.scripts['board:branches:check'], /scripts\/branch-board\.test\.js/);
   assert.match(pkg.scripts['board:branches:check'], /scripts\/branch-board-page\.test\.js/);
   assert.ok(pkg.scripts['board:branches:check'].indexOf('--check') < pkg.scripts['board:branches:check'].indexOf('node --test'));
+});
+
+test('work item and central navigation owners register branch topology immediately after collaboration protocol', () => {
+  const sidebarSource = read(path.join(PROJECT_ROOT, 'scripts', 'board-sidebar-transform.js'));
+  const consistencySource = read(path.join(PROJECT_ROOT, 'scripts', 'board-consistency-check.js'));
+  assert.match(sidebarSource, /if\s*\(require\.main\s*===\s*module\)/);
+  assert.match(sidebarSource, /module\.exports/);
+  assert.match(consistencySource, /if\s*\(require\.main\s*===\s*module\)/);
+  assert.match(consistencySource, /module\.exports/);
+
+  const build = require('./board-build');
+  const sidebar = require('./board-sidebar-transform');
+  const consistency = require('./board-consistency-check');
+  for (const items of [build.NAV_ITEMS, sidebar.NAV_ITEMS]) {
+    const collaboration = items.findIndex((item) => item.href === 'collaboration-protocol.html');
+    assert.deepEqual(items[collaboration + 1], { href: 'branches.html', label: '分支拓扑' });
+  }
+  assert.ok(consistency.HTML_FILES.includes('branches.html'));
+});
+
+test('navigation synchronizer inserts one branch link in supported nav blocks and is idempotent', (t) => {
+  const { syncDirectory } = require('./sync-board-branch-nav');
+  const tempDir = createTempDir(t);
+  const collaboration = '        <a href="collaboration-protocol.html">协作协议</a>';
+  const activeCollaboration = '        <a class="active" href="collaboration-protocol.html">协作协议</a>';
+  const expected = `${collaboration}\n        <a href="branches.html">分支拓扑</a>`;
+  const nav = `<nav class="navlinks" aria-label="主导航">\n${collaboration}\n        <a href="requirements.html">需求池</a>\n      </nav>`;
+  const linkedNav = `<nav class="navlinks">\n${expected}\n      </nav>`;
+  const sidebarNav = `<nav class="sidebar-nav">\n${collaboration}\n      </nav>`;
+
+  fs.writeFileSync(path.join(tempDir, 'index.html'), `<!doctype html><body>${nav}</body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'active.html'), `<!doctype html><body><nav class="navlinks">\n${activeCollaboration}\n      </nav></body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'sidebar.html'), `<!doctype html><body><nav class="sidebar-nav" aria-label="主导航">\n${collaboration}\n      </nav></body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'multi-navlinks.html'), `<!doctype html><body><nav class="foo navlinks bar">\n${collaboration}\n      </nav></body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'multi-sidebar.html'), `<!doctype html><body><nav class="sidebar-nav compact">\n${collaboration}\n      </nav></body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'spaced-equals.html'), `<!doctype html><body><nav class = "navlinks">\n${collaboration}\n      </nav></body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'single-quoted.html'), `<!doctype html><body><nav  class = ' compact sidebar-nav ' >\n${collaboration}\n      </nav></body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'class-not-first.html'), `<!doctype html><body><nav aria-label="主导航" id="fixture-nav" class="navlinks">\n${collaboration}\n      </nav></body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'data-with-exact.html'), `<!doctype html><body><nav data-class="navlinks-extra" class="sidebar-nav">\n${collaboration}\n      </nav></body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'content.html'), `<!doctype html><body>${collaboration}${nav}</body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'content-branch.html'), `<!doctype html><body><a href="branches.html">内容链接</a>${nav}</body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'two-navs.html'), `<!doctype html><body>${nav}${sidebarNav}</body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'first-linked-second-missing.html'), `<!doctype html><body>${linkedNav}${sidebarNav}</body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'both-linked.html'), `<!doctype html><body>${linkedNav}${linkedNav}</body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'branches.html'), `<!doctype html><body>${nav}</body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'already-linked.html'), `<!doctype html><body>${expected}</body>`, 'utf8');
+  const unsupportedNavs = [
+    ['navlinks-extra.html', 'navlinks-extra'],
+    ['foo-navlinks.html', 'foo-navlinks'],
+    ['sidebar-nav-secondary.html', 'sidebar-nav-secondary'],
+    ['data-class.html', 'data-class="navlinks"'],
+  ];
+  for (const [file, className] of unsupportedNavs) {
+    const attribute = className.includes('=') ? className : `class="${className}"`;
+    fs.writeFileSync(path.join(tempDir, file), `<!doctype html><body><nav ${attribute}>\n${collaboration}\n      </nav></body>`, 'utf8');
+  }
+
+  const first = syncDirectory(tempDir);
+  assert.deepEqual(first.map((file) => path.basename(file)), ['active.html', 'class-not-first.html', 'content-branch.html', 'content.html', 'data-with-exact.html', 'first-linked-second-missing.html', 'index.html', 'multi-navlinks.html', 'multi-sidebar.html', 'sidebar.html', 'single-quoted.html', 'spaced-equals.html', 'two-navs.html']);
+  assert.equal((read(path.join(tempDir, 'index.html')).match(/href="branches\.html"/g) || []).length, 1);
+  assert.match(read(path.join(tempDir, 'index.html')), new RegExp(expected));
+  assert.match(read(path.join(tempDir, 'active.html')), new RegExp(`${activeCollaboration}\\n      <a href="branches.html">分支拓扑</a>`));
+  assert.match(read(path.join(tempDir, 'content.html')), new RegExp(`${collaboration}<nav class="navlinks"`));
+  assert.equal((read(path.join(tempDir, 'content-branch.html')).match(/href="branches\.html"/g) || []).length, 2);
+  assert.equal((read(path.join(tempDir, 'two-navs.html')).match(/href="branches\.html"/g) || []).length, 2);
+  assert.equal((read(path.join(tempDir, 'first-linked-second-missing.html')).match(/href="branches\.html"/g) || []).length, 2);
+  assert.equal(read(path.join(tempDir, 'both-linked.html')), `<!doctype html><body>${linkedNav}${linkedNav}</body>`);
+  for (const file of ['class-not-first.html', 'data-with-exact.html', 'single-quoted.html', 'spaced-equals.html']) {
+    assert.match(read(path.join(tempDir, file)), /href="branches\.html"/);
+  }
+  assert.equal(read(path.join(tempDir, 'branches.html')), `<!doctype html><body>${nav}</body>`);
+  assert.equal(read(path.join(tempDir, 'already-linked.html')), `<!doctype html><body>${expected}</body>`);
+  for (const [file, className] of unsupportedNavs) {
+    const attribute = className.includes('=') ? className : `class="${className}"`;
+    assert.equal(read(path.join(tempDir, file)), `<!doctype html><body><nav ${attribute}>\n${collaboration}\n      </nav></body>`);
+  }
+
+  const afterFirstRun = Object.fromEntries(fs.readdirSync(tempDir).map((file) => [file, read(path.join(tempDir, file))]));
+  assert.deepEqual(syncDirectory(tempDir), []);
+  for (const [file, html] of Object.entries(afterFirstRun)) {
+    assert.equal(read(path.join(tempDir, file)), html, `${file} should be unchanged on the second run`);
+  }
+});
+
+test('board build accepts isolated source and destination directories', () => {
+  const source = read(path.join(PROJECT_ROOT, 'scripts', 'board-build.js'));
+  assert.match(source, /function mergeCSS\(boardDir\s*=\s*BOARD_DIR\)/);
+  assert.match(source, /function copyExtraFiles\(destinationDir\s*=\s*DIST_DIR, sourceBoardDir\s*=\s*BOARD_DIR\)/);
+  assert.match(source, /async function main\(\{ boardDir\s*=\s*BOARD_DIR, distDir\s*=\s*path\.join\(boardDir, 'dist'\) \}\s*=\s*\{\}\)/);
+});
+
+test('board build centralizes actual branch navigation while preserving its shell and runtime assets', async (t) => {
+  const build = require('./board-build');
+  const nav = build.generateNav('branches.html');
+  assert.match(nav, /<a class="active" href="branches\.html">分支拓扑<\/a>/);
+  assert.equal((nav.match(/class="active"/g) || []).length, 1);
+  assert.match(nav, /class="mobile-menu-btn"/);
+
+  const fixture = `<!doctype html><head>\n  <link rel="stylesheet" href="assets/base.css" />\n  <link rel="stylesheet" href="assets/components.css" />\n  <link rel="stylesheet" href="assets/pages.css" />\n  <link rel="stylesheet" href="assets/branch-topology.css" />\n</head><body><nav class="navlinks"><a href="index.html">总览</a></nav><button class="mobile-menu-btn">☰</button><script src="data/branch-snapshot.js"></script><script src="assets/branch-topology.js"></script></body>`;
+  const processed = build.processHTML(fixture, 'branches.html');
+  assert.match(processed, /href="assets\/dashboard\.css"/);
+  assert.match(processed, /href="assets\/branch-topology\.css"/);
+  assert.match(processed, /src="data\/branch-snapshot\.js"/);
+  assert.match(processed, /src="assets\/branch-topology\.js"/);
+  assert.match(processed, /<a class="active" href="branches\.html">分支拓扑<\/a>/);
+
+  const branchesSource = read(PAGE_PATH);
+  const processedBranches = build.processHTML(branchesSource, 'branches.html');
+  const branchNav = processedBranches.match(/<nav\b(?=[^>]*\bid="branch-primary-nav")[^>]*>([\s\S]*?)<\/nav>/);
+  assert.ok(branchNav, 'branch nav opening attributes must be retained');
+  assert.deepEqual(
+    [...branchNav[1].matchAll(/href="([^"]+)"/g)].map((match) => match[1]),
+    build.NAV_ITEMS.map((item) => item.href),
+  );
+  assert.equal((branchNav[1].match(/class="active"/g) || []).length, 1);
+  assert.doesNotMatch(branchNav[1], /roadmap\.html/);
+  assert.match(processedBranches, /<nav id="branch-primary-nav" class="navlinks" aria-label="主导航">/);
+  assert.match(processedBranches, /<button type="button" class="mobile-menu-btn" id="branch-mobile-menu" aria-label="打开主导航" aria-expanded="false" aria-controls="branch-primary-nav">☰<\/button>/);
+  assert.match(processedBranches, /href="assets\/branch-topology\.css"/);
+  assert.match(processedBranches, /src="data\/branch-snapshot\.js"/);
+  assert.match(processedBranches, /src="assets\/branch-topology\.js"/);
+
+  const distDir = createTempDir(t);
+  const copied = build.copyExtraFiles(distDir);
+  assert.deepEqual(copied.map((file) => path.relative(distDir, file).split(path.sep).join('/')).sort(), [
+    'assets/branch-topology.css',
+    'assets/branch-topology.js',
+    'data/branch-snapshot.js',
+  ]);
+  for (const relativeFile of copied.map((file) => path.relative(distDir, file))) {
+    assert.equal(read(path.join(distDir, relativeFile)), read(path.join(BOARD_DIR, relativeFile)));
+  }
+
+  const realDistManifest = directoryManifest(path.join(BOARD_DIR, 'dist'));
+  const buildDist = createTempDir(t);
+  const buildResult = await build.main({ boardDir: BOARD_DIR, distDir: buildDist });
+  assert.equal(buildResult.distDir, buildDist);
+  const distBranches = read(path.join(buildDist, 'branches.html'));
+  const distNav = distBranches.match(/<nav\b(?=[^>]*\bid="branch-primary-nav")[^>]*>([\s\S]*?)<\/nav>/);
+  assert.ok(distNav);
+  assert.deepEqual(
+    [...distNav[1].matchAll(/href="([^"]+)"/g)].map((match) => match[1]),
+    build.NAV_ITEMS.map((item) => item.href),
+  );
+  assert.match(distBranches, /<button type="button" class="mobile-menu-btn" id="branch-mobile-menu" aria-label="打开主导航" aria-expanded="false" aria-controls="branch-primary-nav">☰<\/button>/);
+  assert.deepEqual(directoryManifest(path.join(BOARD_DIR, 'dist')), realDistManifest);
 });
