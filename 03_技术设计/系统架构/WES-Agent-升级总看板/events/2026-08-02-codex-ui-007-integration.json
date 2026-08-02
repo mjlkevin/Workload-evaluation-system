@@ -1,0 +1,83 @@
+{
+  "id": "BE-2026-08-02-codex-ui-007-integration",
+  "date": "2026-08-02",
+  "type": "implementation",
+  "scope": "CODEX-UI-007 /reviews 主线集成与集成后验证",
+  "summary": "用户明确选择本地合并后，codex/ui-007-reviews-list 已从主线基线 910269a 精确 fast-forward 集成到 codex/role-driven-ai-home-workbench，集成提交为 f56e68d。合并无冲突，主 checkout 既有未提交修改未被覆盖或纳入提交。主线实际工作区 Web 全量 28 files/194 tests、Web 构建和 UI scope checker 通过；UI-07 功能 worktree 已移除，功能分支已删除。",
+  "status": "INTEGRATED_VERIFIED / 已集成并验证",
+  "pages": [
+    "plan",
+    "testing",
+    "monitoring",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "commit",
+      "ref": "f56e68d",
+      "result": "fast-forward integrated",
+      "summary": "业务主线由 910269a 快进至 UI-07 实现提交；6 files、+460/-40。"
+    },
+    {
+      "kind": "requirement",
+      "ref": "ISS-203 / RP-044",
+      "result": "integrated without duplicate",
+      "summary": "沿用既有问题与需求记录，未重复建项。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass 28 files / 194 tests",
+      "summary": "集成后在当前业务主线实际工作区执行；全部测试通过，仅保留既有 React Router future warning 与 UserManagement act warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass with known chunk warning",
+      "summary": "集成后生产构建通过，保留既有大于 500 kB chunk-size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base 910269a -- UI-07 changed UI files",
+      "result": "pass",
+      "summary": "No new deterministic UI findings。"
+    },
+    {
+      "kind": "dirty_protection",
+      "ref": "codex/role-driven-ai-home-workbench main checkout",
+      "result": "preserved",
+      "summary": "合并前确认 UI-07 的 6 个路径与现有 dirty 文件无路径重叠；采用 --ff-only，未执行 git pull，未清理或暂存用户改动。"
+    },
+    {
+      "kind": "worktree",
+      "ref": ".claude/worktrees/ui-007-reviews-list / codex/ui-007-reviews-list",
+      "result": "cleaned after verified integration",
+      "summary": "worktree 在 clean 状态下移除，git worktree prune 已执行，已合并功能分支已安全删除。"
+    }
+  ],
+  "next": "UI-07 本地集成闭环完成；不自动领取下一项 UI 优化。总看板可视 HTML 当前存在用户未提交修改，本次仅新增结构化集成事件，避免覆盖其在制内容。",
+  "board": {
+    "change": {
+      "stage": "CODEX-UI-007 Mainline Integration",
+      "result": "INTEGRATED_VERIFIED / f56e68d"
+    },
+    "testing": [
+      {
+        "command": "npm run test:web",
+        "result": "pass 194/194",
+        "summary": "集成后当前主 checkout 28 个测试文件全部通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass / known chunk warning",
+        "summary": "集成后 Vite 生产构建通过。"
+      },
+      {
+        "command": "UI scope checker",
+        "result": "pass",
+        "summary": "未新增确定性 UI scope finding。"
+      }
+    ]
+  }
+}
