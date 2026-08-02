@@ -9,6 +9,14 @@ import { randomUUID } from "node:crypto";
 import { logger, childLogger } from "../utils/logger";
 import { httpRequestsTotal, httpRequestDurationSeconds } from "../metrics";
 
+const TRUSTED_REQUEST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function resolveTrustedRequestId(value: unknown): string {
+  return typeof value === "string" && TRUSTED_REQUEST_ID_PATTERN.test(value.trim())
+    ? value.trim()
+    : randomUUID();
+}
+
 // 扩展 Express Request 类型（供内部使用）
 declare global {
   namespace Express {
@@ -26,7 +34,7 @@ declare global {
  * - 上报 Prometheus 指标
  */
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
-  const requestId = (req.headers["x-request-id"] as string) || randomUUID();
+  const requestId = resolveTrustedRequestId(req.headers["x-request-id"]);
   const startAt = process.hrtime.bigint();
 
   res.locals.requestId = requestId;

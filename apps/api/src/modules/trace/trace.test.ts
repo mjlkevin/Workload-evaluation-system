@@ -389,6 +389,46 @@ describe("recordWorkbenchTurnTrace", () => {
     assert.equal(knowledgeSpan.tokenUsage?.totalTokens, 150);
   });
 
+  it("persists request, provider, prompt and config metadata on the knowledge span", () => {
+    const trace = recordWorkbenchTurnTrace({
+      requestId: "00000000-0000-4000-8000-000000000001",
+      ownerUserId: "user-1",
+      ownerUsername: "alice",
+      dispatchTrace: {
+        intentConfidence: 0.9,
+        routingRule: "knowledge_query",
+        contextRefs: ["knowledge:kb-1:test"],
+        knowledgeTool: {
+          toolId: "knowledge_base.query_product_knowledge",
+          available: true,
+          confidence: "high",
+          retrievalTriggered: true,
+          chunksCount: 2,
+          topScore: 0.91,
+          model: "glm-test",
+          promptTokens: 10,
+          completionTokens: 5,
+          totalTokens: 15,
+          contextRef: "knowledge:kb-1:test",
+          requestId: "00000000-0000-4000-8000-000000000001",
+          providerRequestId: "provider-generate-1",
+          retrievalProviderRequestId: "provider-retrieve-1",
+          configVersion: 3,
+          prompt: { id: "rag-answer", version: 1, hash: "a".repeat(64) },
+          retrievalParams: { topK: 8, topN: 20, recallMethod: "mixed" },
+        },
+      },
+    });
+    const span = trace.spans.find((item) => item.spanType === "knowledge_retrieval");
+    assert.ok(span);
+    assert.equal(span.attributes.requestId, "00000000-0000-4000-8000-000000000001");
+    assert.equal(span.attributes.providerRequestId, "provider-generate-1");
+    assert.equal(span.attributes.retrievalProviderRequestId, "provider-retrieve-1");
+    assert.equal(span.attributes.configVersion, 3);
+    assert.equal(span.attributes.promptVersion, 1);
+    assert.deepEqual(span.attributes.retrievalParams, { topK: 8, topN: 20, recallMethod: "mixed" });
+  });
+
   it("marks knowledge span as degraded when fallbackReason present", () => {
     const trace = recordWorkbenchTurnTrace({
       ownerUserId: "user-1",

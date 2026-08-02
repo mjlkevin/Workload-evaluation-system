@@ -417,6 +417,7 @@ function toPublicKnowledgeBaseConfig(store: KnowledgeBaseConfigStore): Knowledge
     model: store.active.model,
     apiBaseUrl: store.active.apiBaseUrl,
     retrievalParams: store.active.retrievalParams,
+    promptProfile: store.active.promptProfile,
     credentials: toPublicKnowledgeBaseCredentials(store),
   };
 }
@@ -432,6 +433,7 @@ export function getKnowledgeBaseConfig(req: Request, res: Response) {
           model: store.draft.model,
           apiBaseUrl: store.draft.apiBaseUrl,
           retrievalParams: store.draft.retrievalParams,
+          promptProfile: store.draft.promptProfile,
           credentials: {
             apiKey: "",
             apiHint: maskKnowledgeBaseApiKeyHint(store.draft.credentials.apiKey),
@@ -455,6 +457,7 @@ export function updateKnowledgeBaseConfigDraft(req: Request, res: Response) {
     apiBaseUrl?: string;
     credentials?: { apiKey?: string | null; knowledgeId?: string | null };
     retrievalParams?: Record<string, unknown>;
+    promptProfile?: Record<string, unknown>;
   };
   const now = new Date().toISOString();
   const store = loadKnowledgeBaseConfigStore();
@@ -465,6 +468,7 @@ export function updateKnowledgeBaseConfigDraft(req: Request, res: Response) {
     apiBaseUrl: payload.apiBaseUrl ?? store.draft.apiBaseUrl,
     credentials: nextCreds,
     retrievalParams: payload.retrievalParams ?? store.draft.retrievalParams,
+    promptProfile: payload.promptProfile ?? store.draft.promptProfile,
   });
   store.updatedAt = now;
   saveKnowledgeBaseConfigStore(store);
@@ -476,6 +480,7 @@ export function updateKnowledgeBaseConfigDraft(req: Request, res: Response) {
           model: store.draft.model,
           apiBaseUrl: store.draft.apiBaseUrl,
           retrievalParams: store.draft.retrievalParams,
+          promptProfile: store.draft.promptProfile,
           credentials: {
             apiKey: "",
             apiHint: maskKnowledgeBaseApiKeyHint(store.draft.credentials.apiKey),
@@ -499,6 +504,7 @@ export function activateKnowledgeBaseConfig(req: Request, res: Response) {
     apiBaseUrl: effectiveDraft.apiBaseUrl,
     credentials: { apiKey: effectiveDraft.apiKey, knowledgeId: effectiveDraft.knowledgeId },
     retrievalParams: effectiveDraft.retrievalParams,
+    promptProfile: effectiveDraft.promptProfile,
   }));
   const probeAgeMs = store.probe
     ? Date.now() - Date.parse(store.probe.checkedAt)
@@ -612,7 +618,7 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
   const body = (req.body || {}) as { apiKey?: string; knowledgeId?: string };
   const explicitApiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
   const explicitKnowledgeId = typeof body.knowledgeId === "string" ? body.knowledgeId.trim() : "";
-  const { apiKey, knowledgeId, model, apiBaseUrl, retrievalParams, source } = resolveDraftKnowledgeBaseConfigForTest(
+  const { apiKey, knowledgeId, model, apiBaseUrl, retrievalParams, promptProfile, source } = resolveDraftKnowledgeBaseConfigForTest(
     explicitApiKey || undefined,
     explicitKnowledgeId || undefined,
   );
@@ -626,6 +632,7 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
     apiBaseUrl,
     credentials: { apiKey, knowledgeId },
     retrievalParams,
+    promptProfile,
   });
   const result = await probeKnowledgeBaseAccess(candidate, responseRequestId(res), fetcher);
   const store = loadKnowledgeBaseConfigStore();

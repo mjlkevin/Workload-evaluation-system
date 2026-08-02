@@ -11,6 +11,7 @@ import {
   KnowledgeBaseCredentialsConfig,
   KnowledgeBaseProbeRecord,
   KnowledgeRetrievalParams,
+  KnowledgePromptProfile,
   RequirementKimiCredentialsConfig,
   RequirementSystemConfig,
   RequirementSystemConfigStore,
@@ -808,6 +809,11 @@ export const DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS: KnowledgeRetrievalParams = {
   fractionalThreshold: 0.2,
 };
 
+export const DEFAULT_KNOWLEDGE_PROMPT_PROFILE: KnowledgePromptProfile = {
+  id: "rag-answer",
+  version: 1,
+};
+
 export function normalizeKnowledgeRetrievalParams(input: unknown): KnowledgeRetrievalParams {
   const source = (input || {}) as Partial<KnowledgeRetrievalParams>;
   const topK = Math.trunc(clampNumber(source.topK, 1, 50, DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.topK));
@@ -835,12 +841,24 @@ export function normalizeKnowledgeRetrievalParams(input: unknown): KnowledgeRetr
   };
 }
 
+export function normalizeKnowledgePromptProfile(input: unknown): KnowledgePromptProfile {
+  const source = (input || {}) as Partial<KnowledgePromptProfile>;
+  const id = typeof source.id === "string" && source.id.trim()
+    ? source.id.trim().slice(0, 64)
+    : DEFAULT_KNOWLEDGE_PROMPT_PROFILE.id;
+  const version = Number.isInteger(Number(source.version)) && Number(source.version) > 0
+    ? Math.trunc(Number(source.version))
+    : DEFAULT_KNOWLEDGE_PROMPT_PROFILE.version;
+  return { id, version };
+}
+
 function createDefaultKnowledgeBaseConfig(): KnowledgeBaseConfig {
   return {
     model: "glm-4.6",
     apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
     credentials: { apiKey: "", knowledgeId: "" },
     retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS },
+    promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE },
   };
 }
 
@@ -856,6 +874,7 @@ export function normalizeKnowledgeBaseConfig(input: unknown): KnowledgeBaseConfi
       knowledgeId: String(credentials.knowledgeId ?? base.credentials.knowledgeId).trim(),
     },
     retrievalParams: normalizeKnowledgeRetrievalParams(source.retrievalParams),
+    promptProfile: normalizeKnowledgePromptProfile(source.promptProfile),
   };
 }
 
@@ -873,6 +892,7 @@ export function computeKnowledgeBaseConfigHash(input: KnowledgeBaseConfig): stri
       knowledgeId: normalized.credentials.knowledgeId,
     },
     retrievalParams: normalized.retrievalParams,
+    promptProfile: normalized.promptProfile,
   }));
 }
 
@@ -980,6 +1000,7 @@ export function resolveActiveKnowledgeBaseConfig(): {
   model: string;
   apiBaseUrl: string;
   retrievalParams: KnowledgeRetrievalParams;
+  promptProfile: KnowledgePromptProfile;
   configVersion: number;
   source: "store" | "env" | "none";
 } {
@@ -993,6 +1014,7 @@ export function resolveActiveKnowledgeBaseConfig(): {
       model: store.active.model,
       apiBaseUrl: store.active.apiBaseUrl,
       retrievalParams: store.active.retrievalParams,
+      promptProfile: normalizeKnowledgePromptProfile(store.active.promptProfile),
       configVersion: store.version,
       source: "store",
     };
@@ -1006,11 +1028,12 @@ export function resolveActiveKnowledgeBaseConfig(): {
       model: config.zhipu.model,
       apiBaseUrl: config.zhipu.apiBaseUrl,
       retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS },
+      promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE },
       configVersion: store.version,
       source: "env",
     };
   }
-  return { apiKey: "", knowledgeId: "", model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, configVersion: store.version, source: "none" };
+  return { apiKey: "", knowledgeId: "", model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE }, configVersion: store.version, source: "none" };
 }
 
 /** 测试连接：显式传入优先；否则草稿仓库；再否则环境变量 */
@@ -1023,21 +1046,22 @@ export function resolveDraftKnowledgeBaseConfigForTest(
   model: string;
   apiBaseUrl: string;
   retrievalParams: KnowledgeRetrievalParams;
+  promptProfile: KnowledgePromptProfile;
   source: "override" | "draft" | "env" | "none";
 } {
   const oKey = overrideApiKey?.trim() || "";
   const oKid = overrideKnowledgeId?.trim() || "";
   const store = loadKnowledgeBaseConfigStore();
-  if (oKey && oKid) return { apiKey: oKey, knowledgeId: oKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, retrievalParams: store.draft.retrievalParams, source: "override" };
+  if (oKey && oKid) return { apiKey: oKey, knowledgeId: oKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, retrievalParams: store.draft.retrievalParams, promptProfile: normalizeKnowledgePromptProfile(store.draft.promptProfile), source: "override" };
   const draftKey = store.draft.credentials.apiKey.trim();
   const draftKid = store.draft.credentials.knowledgeId.trim();
   if (draftKey && draftKid) {
-    return { apiKey: oKey || draftKey, knowledgeId: oKid || draftKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, retrievalParams: store.draft.retrievalParams, source: "draft" };
+    return { apiKey: oKey || draftKey, knowledgeId: oKid || draftKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, retrievalParams: store.draft.retrievalParams, promptProfile: normalizeKnowledgePromptProfile(store.draft.promptProfile), source: "draft" };
   }
   const envKey = config.zhipu.apiKey.trim();
   const envKid = config.zhipu.knowledgeId.trim();
   if (envKey && envKid) {
-    return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, source: "env" };
+    return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE }, source: "env" };
   }
-  return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, source: "none" };
+  return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE }, source: "none" };
 }

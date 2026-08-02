@@ -35,6 +35,8 @@ function createKnowledgeTrace(overrides: Partial<ZhipuKnowledgeToolTrace> = {}):
     contextRef: "knowledge:kb-sales:%E5%AD%98%E8%B4%A7:chunks=5:score=0.92",
     chunksCount: 5,
     topScore: 0.92,
+    prompt: { id: "rag-answer", version: 1, hash: "a".repeat(64) },
+    retrievalParams: { topK: 8, topN: 20, recallMethod: "mixed", rerankStatus: 1, rerankModel: "rerank", fractionalThreshold: 0.2 },
     ...overrides,
   };
 }

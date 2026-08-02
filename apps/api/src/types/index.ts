@@ -454,12 +454,19 @@ export type KnowledgeRetrievalParams = {
   fractionalThreshold: number;
 };
 
+export type KnowledgePromptProfile = {
+  id: string;
+  version: number;
+};
+
 /** 知识库配置（含模型与 API 地址） */
 export type KnowledgeBaseConfig = {
   model: string;
   apiBaseUrl: string;
   credentials: KnowledgeBaseCredentialsConfig;
   retrievalParams: KnowledgeRetrievalParams;
+  /** 旧版持久化数据可缺省，读取时由 repository 补齐。 */
+  promptProfile?: KnowledgePromptProfile;
 };
 
 /** 返回给前端的密钥展示 */

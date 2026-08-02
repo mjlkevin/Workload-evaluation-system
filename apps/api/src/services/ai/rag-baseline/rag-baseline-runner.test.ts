@@ -49,6 +49,8 @@ function makeTrace(overrides: Partial<ZhipuKnowledgeToolTrace> = {}): ZhipuKnowl
     contextRef: "knowledge:kb-test:test:chunks=2:score=0.85",
     chunksCount: 2,
     topScore: 0.85,
+    prompt: { id: "rag-answer", version: 1, hash: "a".repeat(64) },
+    retrievalParams: { topK: 8, topN: 20, recallMethod: "mixed", rerankStatus: 1, rerankModel: "rerank", fractionalThreshold: 0.2 },
     chunks: [
       makeChunk({ docName: "产品手册.docx" }),
       makeChunk({ docName: "报价指南.docx", score: 0.72 }),

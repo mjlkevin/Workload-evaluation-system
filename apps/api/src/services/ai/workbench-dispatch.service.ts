@@ -82,6 +82,8 @@ export type WorkbenchDispatchData = {
 };
 
 export type WorkbenchDispatchInput = {
+  /** 受信任的入站请求 ID，贯穿检索、生成与 trace */
+  requestId?: string;
   user: AuthUser;
   workflowKey: string;
   message: string;
@@ -530,7 +532,10 @@ async function buildKnowledgeQueryResponse(
   input: WorkbenchDispatchInput,
 ): Promise<WorkbenchDispatchData> {
   const kbConf = resolveActiveKnowledgeBaseConfig();
-  const knowledgeQuery = input.knowledgeQuery || ((query: string) => queryZhipuKnowledgeBase(query, kbConf));
+  const knowledgeQuery = input.knowledgeQuery || ((query: string) => queryZhipuKnowledgeBase(query, {
+    ...kbConf,
+    requestId: input.requestId,
+  }));
   const knowledgeTool = await knowledgeQuery(input.message);
   const contextRefs = Array.from(new Set([...context.contextRefs, knowledgeTool.contextRef].filter(Boolean)));
 
