@@ -3,11 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { loadRagBaselineDataset } from "./rag-baseline-dataset";
 
 test("the v1 dataset contains at least 20 valid, unique and sanitized samples", () => {
-  const dataset = loadRagBaselineDataset(path.join(process.cwd(), "config/rag/baseline-samples.v1.json"));
+  const datasetPath = fileURLToPath(new URL("../../../../../../config/rag/baseline-samples.v1.json", import.meta.url));
+  const dataset = loadRagBaselineDataset(datasetPath);
   assert.equal(dataset.version, "rag-baseline-v1");
   assert.ok(dataset.samples.length >= 20);
   assert.equal(new Set(dataset.samples.map((item) => item.id)).size, dataset.samples.length);

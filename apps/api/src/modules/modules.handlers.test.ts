@@ -1635,18 +1635,18 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
           apiKey: "zhipu-unit-test-key",
           model: "glm-4.6",
           knowledgeId: "kb-sales",
-          apiBaseUrl: "https://example.test/api/paas/v4",
+          apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
         };
         fs.writeFileSync(knowledgeBaseConfigStorePath(), JSON.stringify({
           version: 1,
           draft: {
             model: "glm-4.6",
-            apiBaseUrl: "https://example.test/api/paas/v4",
+            apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
             credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
           },
           active: {
             model: "glm-4.6",
-            apiBaseUrl: "https://example.test/api/paas/v4",
+            apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
             credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
           },
           updatedAt: "2026-06-28T00:00:00.000Z",
@@ -1662,6 +1662,7 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
             return {
               ok: true,
               status: 200,
+              headers: { get: () => null },
               json: async () => ({
                 code: 200,
                 data: [
@@ -1675,10 +1676,15 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
             } as unknown;
           }
           assert.ok(urlText.includes("/chat/completions"));
-          assert.equal((payload as Record<string, unknown>).model, "glm-4.6");
+          assert.equal(
+            (payload as Record<string, unknown>).model,
+            "glm-4.6",
+            JSON.stringify(zhipuCalls.map((call) => ({ url: call.url, model: call.payload.model }))),
+          );
           return {
             ok: true,
             status: 200,
+            headers: { get: () => null },
             json: async () => ({
               choices: [{ message: { content: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。" } }],
               usage: { prompt_tokens: 1420, completion_tokens: 48, total_tokens: 1468 },
@@ -1688,7 +1694,7 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
 
         await homeWorkbenchChat(req, res as unknown as Response);
 
-        assert.equal(res.statusCode, 200);
+        assert.equal(res.statusCode, 200, JSON.stringify(res.body));
         const body = res.body as {
           code: number;
           data: {
