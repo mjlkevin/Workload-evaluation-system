@@ -120,7 +120,7 @@ test('applyBoardEventToHtml inserts testing rows once in the automated baseline 
   assert.ok(once.html.indexOf(validEvent.id) < once.html.indexOf('Existing test'));
 });
 
-test('RP-045 implementation event records verified automation without claiming integration or browser acceptance', () => {
+test('RP-045 final event records integrated verification evidence without claiming user acceptance', () => {
   const eventPath = path.join(
     __dirname,
     '..',
@@ -136,7 +136,7 @@ test('RP-045 implementation event records verified automation without claiming i
 
   assert.deepEqual(result.errors, []);
   assert.equal(event.type, 'implementation');
-  assert.equal(event.status, '核心实现完成 / 待主线集成与浏览器验证');
+  assert.equal(event.status, '已实施验证 / 待用户验收');
   assert.deepEqual(event.pages, [
     'index',
     'issues',
@@ -147,10 +147,16 @@ test('RP-045 implementation event records verified automation without claiming i
     'changes',
     'sources',
   ]);
+  assert.match(evidenceText, /codex\/role-driven-ai-home-workbench/);
   assert.match(evidenceText, /npm run board:branches:check/);
-  assert.match(evidenceText, /36\/36/);
-  assert.match(event.next, /主线集成/);
-  assert.match(event.next, /1440px/);
-  assert.match(event.next, /760px/);
-  assert.doesNotMatch(JSON.stringify(event), /用户已验收|已集成并验证|浏览器通过/);
+  assert.match(evidenceText, /38\/38/);
+  assert.match(evidenceText, /14\/14/);
+  assert.match(evidenceText, /1440px/);
+  assert.match(evidenceText, /760px/);
+  assert.match(evidenceText, /file:\/\//);
+  assert.match(evidenceText, /浏览器安全策略/);
+  assert.match(evidenceText, /键盘.*人工验收/);
+  assert.match(event.next, /用户验收/);
+  assert.doesNotMatch(event.next, /主线集成|下一任务/);
+  assert.doesNotMatch(JSON.stringify(event), /用户已验收|file:\/\/.*浏览器通过|键盘浏览器实测通过/);
 });
