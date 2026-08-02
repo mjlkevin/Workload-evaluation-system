@@ -9,6 +9,7 @@
     "board:branches": "node scripts/generate-branch-board.js",
     "board:branches:check": "node scripts/generate-branch-board.js --check && node --test scripts/branch-board.test.js scripts/branch-board-page.test.js",
     "test:board:branches": "node --test scripts/branch-board.test.js scripts/branch-board-page.test.js",
+    "test:security": "node --test scripts/check-tracked-secrets.test.js && npx tsx --test apps/api/src/services/ai/knowledge-base-url-policy.test.ts && node scripts/check-tracked-secrets.js",
     "dev:web": "npm run dev --prefix ui/V2_PROTOTYPE",
     "dev:api": "npm run dev -w apps/api",
     "dev:recover": "bash scripts/recover-dev.sh",
