@@ -816,12 +816,6 @@ test('source board modules expose one RP-045 governance record per planned owner
     'monitoring.html': [
       'BE-2026-08-02-rp-045-branch-topology:monitoring',
       'npm run board:branches:check',
-      '38/38',
-      '14/14',
-      '1440px',
-      '760px',
-      'file:// 静态契约通过',
-      '键盘激活待用户人工验收',
     ],
     'changes.html': [
       'BE-2026-08-02-rp-045-branch-topology:changes',
@@ -847,6 +841,9 @@ test('source board modules expose one RP-045 governance record per planned owner
   const rp045Row = monitoring.match(/<tr data-board-event-id="BE-2026-08-02-rp-045-branch-topology:monitoring">[\s\S]*?<\/tr>/);
   assert.ok(rp045Row, 'monitoring.html must contain the RP-045 verification row');
   assert.doesNotMatch(rp045Row[0], /待最终验证/);
+  for (const fragment of ['38/38', '14/14', '1440px', '760px', 'file:// 静态契约通过', '键盘激活待用户人工验收']) {
+    assert.equal(rp045Row[0].split(fragment).length - 1, 1, `RP-045 monitoring row: ${fragment}`);
+  }
   assert.match(rp045Row[0], /浏览器安全策略阻止直接 file:\/\/ 导航/);
 });
 
