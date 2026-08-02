@@ -228,6 +228,33 @@ describe("RAG Baseline Runner", () => {
       const report = await runRagBaseline(samples, {}, mockQueryFn);
       assert.equal(report.fallbackRate, 0.5);
     });
+
+    it("计算 P95、平均 Token、可回答准确率与版本指纹", async () => {
+      const report = await runRagBaseline([
+        { id: "answerable", question: "q1", expectedKeywords: ["测试回答"], expectAnswer: true },
+        { id: "unanswerable", question: "q2", expectAnswer: false },
+      ], { apiKey: "unit-secret", knowledgeId: "kb-1" }, async (question) => question === "q1"
+        ? makeTrace({ answer: "这是测试回答", latencyMs: 100, totalTokens: 20 })
+        : makeTrace({ answer: "知识库中未检索到相关文档", latencyMs: 500, totalTokens: 40, fallbackReason: "retrieval_empty", confidence: "low" }), {
+        datasetFingerprint: "b".repeat(64),
+        knowledgeFingerprint: "c".repeat(64),
+      });
+      assert.equal(report.p95LatencyMs, 500);
+      assert.equal(report.avgTokens, 30);
+      assert.equal(report.answerableAccuracy, 1);
+      assert.deepEqual(Object.keys(report.fingerprints).sort(), ["config", "dataset", "knowledge", "prompt", "scorer"]);
+      for (const fingerprint of Object.values(report.fingerprints)) assert.match(fingerprint, /^[0-9a-f]{64}$/);
+      assert.doesNotMatch(JSON.stringify(report), /unit-secret/);
+    });
+
+    it("空数据集返回全零指标", async () => {
+      const report = await runRagBaseline([]);
+      assert.equal(report.sampleCount, 0);
+      assert.equal(report.avgLatencyMs, 0);
+      assert.equal(report.p95LatencyMs, 0);
+      assert.equal(report.avgTokens, 0);
+      assert.equal(report.answerableAccuracy, 0);
+    });
   });
 
   describe("评分函数", () => {

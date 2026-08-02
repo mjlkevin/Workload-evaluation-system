@@ -1,0 +1,31 @@
+{
+  "version": "rag-baseline-v1",
+  "description": "金蝶产品知识库脱敏可重复评测集，覆盖产品能力、实施边界、业务场景与无答案问题。",
+  "samples": [
+    { "id": "accounting-01", "question": "智能会计平台的设计理念是什么？", "expectedKeywords": ["智能会计", "设计理念"], "expectedDocs": ["智能会计平台"], "expectAnswer": true },
+    { "id": "accounting-02", "question": "智能会计平台能带来哪些核心价值？", "expectedKeywords": ["核心价值"], "expectedDocs": ["智能会计平台"], "expectAnswer": true },
+    { "id": "accounting-03", "question": "智能会计平台包含哪些主要功能？", "expectedKeywords": ["主要功能"], "expectedDocs": ["智能会计平台"], "expectAnswer": true },
+    { "id": "accounting-04", "question": "什么样的会计业务场景适合使用智能会计平台？", "expectedKeywords": ["会计", "业务场景"], "expectedDocs": ["智能会计平台"], "expectAnswer": true },
+
+    { "id": "fund-plan-01", "question": "资金计划模块解决的主要业务问题是什么？", "expectedKeywords": ["资金计划"], "expectedDocs": ["资金计划"], "expectAnswer": true },
+    { "id": "fund-plan-02", "question": "资金计划通常支持哪些管理流程？", "expectedKeywords": ["资金", "计划"], "expectedDocs": ["资金计划"], "expectAnswer": true },
+    { "id": "fund-plan-03", "question": "实施资金计划时需要明确哪些业务边界？", "expectedKeywords": ["资金计划", "边界"], "expectedDocs": ["资金计划"], "expectAnswer": true },
+    { "id": "fund-plan-04", "question": "资金计划与企业资金管理的关系是什么？", "expectedKeywords": ["资金计划", "资金管理"], "expectedDocs": ["资金计划"], "expectAnswer": true },
+
+    { "id": "financing-01", "question": "融资管理模块的核心功能有哪些？", "expectedKeywords": ["融资管理"], "expectedDocs": ["融资管理"], "expectAnswer": true },
+    { "id": "financing-02", "question": "融资管理覆盖哪些融资业务过程？", "expectedKeywords": ["融资", "管理"], "expectedDocs": ["融资管理"], "expectAnswer": true },
+    { "id": "financing-03", "question": "企业引入融资管理时应关注哪些实施范围？", "expectedKeywords": ["融资管理", "范围"], "expectedDocs": ["融资管理"], "expectAnswer": true },
+    { "id": "financing-04", "question": "融资管理可以帮助管理哪些风险？", "expectedKeywords": ["融资", "风险"], "expectedDocs": ["融资管理"], "expectAnswer": true },
+
+    { "id": "sales-01", "question": "销售管理模块包含哪些主要功能？", "expectedKeywords": ["销售管理"], "expectedDocs": ["销售管理"], "expectAnswer": true },
+    { "id": "sales-02", "question": "销售管理通常支持怎样的业务流程？", "expectedKeywords": ["销售", "流程"], "expectedDocs": ["销售管理"], "expectAnswer": true },
+    { "id": "sales-03", "question": "实施销售管理前需要确认哪些功能边界？", "expectedKeywords": ["销售管理", "边界"], "expectedDocs": ["销售管理"], "expectAnswer": true },
+
+    { "id": "online-bank-01", "question": "网上银行模块的主要能力是什么？", "expectedKeywords": ["网上银行"], "expectedDocs": ["网上银行"], "expectAnswer": true },
+    { "id": "online-bank-02", "question": "网上银行支持哪些资金业务场景？", "expectedKeywords": ["网上银行", "资金"], "expectedDocs": ["网上银行"], "expectAnswer": true },
+    { "id": "online-bank-03", "question": "企业接入网上银行时应关注哪些实施边界？", "expectedKeywords": ["网上银行", "边界"], "expectedDocs": ["网上银行"], "expectAnswer": true },
+
+    { "id": "no-answer-01", "question": "请给出知识库未收录的某量子厨房管理模块的官方功能清单。", "expectedKeywords": ["未找到"], "expectAnswer": false },
+    { "id": "no-answer-02", "question": "请提供知识库中不存在的虚构产品 2099 版本精确上线日期。", "expectedKeywords": ["未找到"], "expectAnswer": false }
+  ]
+}
