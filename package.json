@@ -6,6 +6,9 @@
     "apps/api"
   ],
   "scripts": {
+    "board:branches": "node scripts/generate-branch-board.js",
+    "board:branches:check": "node scripts/generate-branch-board.js --check && node --test scripts/branch-board.test.js",
+    "test:board:branches": "node --test scripts/branch-board.test.js",
     "dev:web": "npm run dev --prefix ui/V2_PROTOTYPE",
     "dev:api": "npm run dev -w apps/api",
     "dev:recover": "bash scripts/recover-dev.sh",
