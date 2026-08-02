@@ -636,7 +636,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <tr>
           <td>RAG Baseline 与知识库评测闭环（RP-031）</td>
           <td>为 RP-018 知识库工具建立版本化实验合同和生产化演进路径；先固定样本/知识快照/检索参数/Prompt/评分器，再实施 Chunk 后处理、可靠性、质量验证、Provider 与多知识库能力。</td>
-          <td><span class="status warn"><span class="dot"></span>实施分支已回填 / Codex Gate 拒收</span>：7 个提交在候选 worktree 中通过编译和旧回归，但 63 文件/约 6000 行新增没有新增测试，核心 Provider/cache/pipeline/rewrite/routing/monitoring 未接生产主链路；配置 UI、激活验证、审计和敏感配置范围存在阻断。先返工 Phase 0 最小闭环，通过 Gate 后再逐阶段继续。</td>
+          <td><span class="status run"><span class="dot"></span>四批实现完成 / 真实评测待回填</span>：2026-08-02 已完成安全基线、真实探针与激活 Gate、检索参数/Prompt/Trace 贯通、20 条样本和单候选比较 CLI；自动化、构建和双视口验收通过。当前无有效智谱凭证，真实外部 20 条跑分与候选决策尚未执行。</td>
           <td>baseline 批次可复现；检索指标包含 Recall@K、Precision@K、MRR、NDCG，回答指标包含引用支撑与拒答正确性；端到端关联、配置激活审计、缓存隔离/失效、断路/限流故障注入和策略回滚均有自动化证据。</td>
         </tr>
         <tr>

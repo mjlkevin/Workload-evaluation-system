@@ -279,9 +279,9 @@
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
                 <span class="pill">知识库 / 质量评估</span>
-                <span class="pill">生产化分支已回填 / Codex Gate 拒收</span>
+                <span class="pill">四批实现完成 / 真实评测待回填</span>
               </div>
-              <div class="bc-next">2026-07-20 外部分支 <code class="inline">feature/rp-031-rag-production</code> 回填 7 个提交；Codex Gate 拒收。Fresh 构建与旧回归通过，但约 6000 行新增 RAG 模块没有新增测试且未接入现有知识库/intent/dispatch 主链路；检索参数 UI 无法保存回读，激活门禁不验证真实凭证，候选 patch 还触碰含敏感凭证的无关配置文件。必须先返工，不得合并或标记已交付。</div>
+              <div class="bc-next">2026-08-02 Codex 已按返工方案完成四批最小闭环：安全与密钥扫描、真实访问探针和 24 小时激活门禁、检索参数/Prompt/请求关联 Trace、20 条版本化样本与单候选比较 CLI。自动化、双视口和构建通过；当前无有效智谱凭证，因此真实 20 条外部评测结果仍待管理员配置后回填，RP-031 暂不标记全部交付。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-033</span>
@@ -766,10 +766,10 @@
               <td>知识库 / RAG 质量评估</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C / Phase 2</td>
-              <td><span class="status warn"><span class="dot"></span>生产化分支已回填 / Codex Gate 拒收</span></td>
+              <td><span class="status run"><span class="dot"></span>四批实现完成 / 自动化通过 / 真实评测待回填</span></td>
               <td>为知识库问答和模块识别建立可复现 baseline，并把检索配置、Chunk 处理、Prompt、置信度、缓存/断路/限流、质量验证、Trace、配置治理和 Provider/多知识库演进拆成可独立验收的生产化批次</td>
-              <td>2026-07-20 去重结果：命中 RP-031 的 baseline、策略对比与知识库版本方向，并交叉引用 RP-018 知识库工具和 RP-030 Trace；本轮只扩展范围与验收口径，不新增重复 RP</td>
-              <td>P1 重复检索既有修复保持通过；候选生产化分支 fresh 验证为 build:api/web pass、modules 142/142、AI 190/190、Web 96/96、integration 1/1，但这些测试未覆盖新增模块。Provider/cache/pipeline/rewrite/routing/monitoring 仍未接生产主链路，C1/C4/M2/A4/C2 等验收未闭环；安全与范围门禁不通过。</td>
+              <td>2026-08-02 返工继续命中 RP-031，不新增重复 RP；范围收敛到现有知识库主链路的可信配置、请求追踪和可重复评测，不引入第二套 Provider、缓存、路由或监控体系</td>
+              <td>四批已落地：tracked secret 扫描与官方 HTTPS URL policy；凭证三态、真实探针、配置 hash 和 24 小时激活 Gate；检索参数、Prompt 版本、request/provider/config 元数据进入生产 Trace；20 条脱敏样本、P95/Token/可回答率、版本指纹、候选比较与脱敏报告 CLI。Fresh 验证：security 4/4、modules 211/211、AI 190/190、integration 1/1、Web 199/199、API/Web build 通过、1440/760 浏览器通过。真实外部 20 条评测因无有效凭证未执行。</td>
             </tr>
             <tr>
               <td class="mono">RP-033</td>
@@ -2640,6 +2640,10 @@
 
         <div class="callout" style="margin-top:12px">
           <div><b>2026-07-20 实施分支 Codex Gate：REJECTED</b><code class="inline">/Users/kevin/AI/wes-rp031-rag</code> / <code class="inline">feature/rp-031-rag-production</code> 的 7 个提交已复核。构建和既有回归通过，但新增模块没有新增测试且多数只在模块内部引用，未进入现有知识库、intent、dispatch 和 metrics 主链路；检索参数 UI 保存合同断裂，激活验证接受任意非空假凭证，并触碰含敏感凭证的无关配置。详见 <code class="inline">docs/agent-loop/audits/2026-07-20-codex-RP-031-rag-production-gate.md</code>。</div>
+        </div>
+
+        <div class="callout" style="margin-top:12px">
+          <div><b>2026-08-02 四批返工执行结果</b>已在 <code class="inline">codex/rp-031-phase0-integration</code> 完成安全基线、真实探针激活、检索/Prompt/Trace 贯通、20 条可重复评测与候选比较闭环；实现复用现有 JSON store、知识库工具和统一 Trace，没有引入第二套运行栈。自动化和 1440/760 浏览器验收通过；真实智谱 20 条跑分仍以有效管理员配置为前置，未生成或伪造质量结论。</div>
         </div>
 
         <div class="grid-2" style="margin-top:18px">
