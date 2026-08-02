@@ -12,7 +12,14 @@ test("writes a sanitized report only inside the ignored runtime report directory
     kind: "baseline",
     apiKey: "unit-secret-value",
     authorization: "Bearer unit-secret-token",
-    nested: { answer: "safe" },
+    accessToken: "another-unit-secret",
+    avgTokens: 321.5,
+    nested: {
+      answer: "safe",
+      promptTokens: 200,
+      completionTokens: 100,
+      totalTokens: 300,
+    },
   };
   const file = saveRagBaselineArtifact(artifact, {
     projectRoot,
@@ -22,8 +29,12 @@ test("writes a sanitized report only inside the ignored runtime report directory
   assert.equal(path.dirname(file), path.join(projectRoot, "data", "rag-baseline-reports"));
   assert.match(path.basename(file), /^rag-baseline-v1-20260802T123456000Z\.json$/);
   const serialized = fs.readFileSync(file, "utf8");
-  assert.doesNotMatch(serialized, /apiKey|authorization|unit-secret/i);
+  assert.doesNotMatch(serialized, /apiKey|authorization|accessToken|unit-secret/i);
   assert.match(serialized, /"answer": "safe"/);
+  assert.match(serialized, /"avgTokens": 321\.5/);
+  assert.match(serialized, /"promptTokens": 200/);
+  assert.match(serialized, /"completionTokens": 100/);
+  assert.match(serialized, /"totalTokens": 300/);
   fs.rmSync(projectRoot, { recursive: true, force: true });
 });
 

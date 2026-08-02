@@ -362,9 +362,9 @@
           <td>Codex Gate=REJECTED，<code class="inline">allowNextTask=false</code>、<code class="inline">mustReworkFirst=true</code>。移除无关配置并轮换凭证；按 Phase 拆最小生产闭环，每批必须有失败测试、主链路接线、故障/隔离验证和 Gate 后看板更新。</td>
         </tr>
         <tr>
-          <td>RP-031 四批最小闭环已通过自动化，但缺少有效智谱配置下的真实 20 条评测结果。</td>
-          <td>若把“评测框架可运行”误写成“知识库质量已经提升”，会形成错误上线结论；无凭证环境也无法验证真实供应商延迟、限流、知识快照内容与候选参数收益。</td>
-          <td>状态保持“已缓解 / 待真实评测”：安全扫描、官方 URL policy、真实探针激活、版本化样本、候选非劣化门禁和脱敏报告已落地；管理员配置并成功探针后，必须用同一 dataset/knowledge/config/prompt/scorer 指纹分别跑 baseline 与单候选，只有质量提升且 P95、Token、fallback 护栏全部满足才允许人工生效。当前不得标记 RP-031 全部交付。</td>
+          <td>RP-031 真实 20 条基线已双跑，但 qrels 使用业务主题名，而 114 个检索片段实际仅来自 2 个文档名；文档召回指标因此固定在 10%。</td>
+          <td>若未校准文档映射就比较候选参数，会把“文件名不匹配”误判为检索质量差；两轮 P95 在 55.162s 与 38.185s 间波动，单次延迟也不足以支持上线结论。</td>
+          <td>状态更新为“真实基线已回填 / 候选决策阻断”：先由知识资产 owner 用实际文档名校准 18 条正样本 expectedDocs，并对两条空检索正样本确认知识覆盖；再用同一 dataset/knowledge/config/prompt/scorer 指纹运行单候选。只有质量改善且 P95、Token、fallback 护栏全部满足才允许人工生效；当前不得标记 RP-031 全部交付。</td>
         </tr>
         <tr>
           <td>AI 引导选项识别过宽，导致普通编号列表被错误渲染为按钮或误触发发送。</td>

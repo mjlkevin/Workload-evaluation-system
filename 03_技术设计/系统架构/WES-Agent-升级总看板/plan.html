@@ -636,7 +636,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <tr>
           <td>RAG Baseline 与知识库评测闭环（RP-031）</td>
           <td>为 RP-018 知识库工具建立版本化实验合同和生产化演进路径；先固定样本/知识快照/检索参数/Prompt/评分器，再实施 Chunk 后处理、可靠性、质量验证、Provider 与多知识库能力。</td>
-          <td><span class="status run"><span class="dot"></span>四批实现完成 / 真实评测待回填</span>：2026-08-02 已完成安全基线、真实探针与激活 Gate、检索参数/Prompt/Trace 贯通、20 条样本和单候选比较 CLI；自动化、构建和双视口验收通过。当前无有效智谱凭证，真实外部 20 条跑分与候选决策尚未执行。</td>
+          <td><span class="status run"><span class="dot"></span>真实基线已回填 / 候选对比待执行</span>：2026-08-02 已完成四批实现、自动化、构建、双视口验收与两轮真实 20 条基线。完整第二轮：关键词 80%、可回答 90%、fallback 20%、平均 20.678s、P95 38.185s、平均 4187.7 Tokens。下一门禁是先用知识库实际 2 个文档名校准 18 条正样本 qrels，再使用相同指纹运行单候选比较。</td>
           <td>baseline 批次可复现；检索指标包含 Recall@K、Precision@K、MRR、NDCG，回答指标包含引用支撑与拒答正确性；端到端关联、配置激活审计、缓存隔离/失效、断路/限流故障注入和策略回滚均有自动化证据。</td>
         </tr>
         <tr>

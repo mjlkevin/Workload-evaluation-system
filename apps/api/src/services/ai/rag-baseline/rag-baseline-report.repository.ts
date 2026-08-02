@@ -1,8 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const SENSITIVE_FIELD_PATTERN = /api[_-]?key|authorization|token|secret|password|cookie|private[_-]?key/i;
 const SENSITIVE_TEXT_PATTERN = /bearer\s+[a-z0-9._~+/=-]+/ig;
+
+function isSensitiveField(key: string): boolean {
+  const normalized = key
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/-/g, "_")
+    .toLowerCase();
+  return /(^|_)(api_key|authorization|token|secret|password|cookie|private_key|credential)($|_)/.test(normalized);
+}
 
 export type SaveRagBaselineArtifactOptions = {
   projectRoot?: string;
@@ -16,7 +23,7 @@ function sanitizeArtifact(input: unknown): unknown {
   if (input && typeof input === "object") {
     const output: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
-      if (SENSITIVE_FIELD_PATTERN.test(key)) continue;
+      if (isSensitiveField(key)) continue;
       output[key] = sanitizeArtifact(value);
     }
     return output;
