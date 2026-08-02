@@ -1,0 +1,78 @@
+{
+  "id": "BE-2026-08-02-rp-047-batch-a-work-order",
+  "date": "2026-08-02",
+  "type": "implementation",
+  "scope": "RP-047-A 持久运行基础",
+  "summary": "用户书面批准 RP-047 多通道检查点架构规格。Codex 已冻结 A-E 五批交付顺序，并发布 Batch A 详细实施计划和 Qoder Work Order；首批只建立 Harness 持久 Run、Attempt、Checkpoint、Event、Output、Outbox、幂等约束与真实 PostgreSQL 测试，不接模型、Worker、API 或前端。",
+  "status": "规格已批准 / Batch A 已派单 / 待 Qoder ACK",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "changes",
+    "sources",
+    "collaboration-protocol"
+  ],
+  "evidence": [
+    {
+      "kind": "user_decision",
+      "ref": "2026-08-02 user instruction: 规格批准",
+      "result": "approved",
+      "summary": "RP-047 的服务端持久任务、离页不取消、跨刷新/关页/重新登录恢复，以及 AI 建议 + Runtime 校验检查点架构获得书面批准。"
+    },
+    {
+      "kind": "design_spec",
+      "ref": "docs/superpowers/specs/2026-08-02-rp-047-durable-multichannel-checkpoint-runtime-design.md @ e1c8961",
+      "result": "approved baseline",
+      "summary": "固定服务端 Harness Run、Worker、lease、混合检查点、幂等恢复、事件/输出重放、outbox 投影和 A-E 分批门禁。"
+    },
+    {
+      "kind": "implementation_plan",
+      "ref": "docs/superpowers/plans/2026-08-02-rp-047-batch-a-durable-run-foundation.md @ c87da77",
+      "result": "published",
+      "summary": "以五个 TDD Task 固定 Batch A schema、migration、repository、迁移兼容和 Codex Gate A 证据。"
+    },
+    {
+      "kind": "work_order",
+      "ref": "docs/agent-loop/work-orders/2026-08-02-qoder-RP-047-A.md @ c87da77",
+      "result": "assigned",
+      "summary": "固定 Qoder 专属 worktree/branch、allowedPaths、Worktree Contract ACK、数据库安全边界、验证矩阵、handoff 和停止条件。"
+    },
+    {
+      "kind": "git_contract",
+      "ref": "c87da773c4e1b8bf9a280939b11acaa49a2d44c3 / qoder/rp-047-a-durable-run-foundation",
+      "result": "assignment commit published",
+      "summary": "Qoder 必须从该提交创建独立 worktree；主 checkout 的其他未提交改动不得复制或覆盖。"
+    }
+  ],
+  "assignment": {
+    "taskId": "RP-047-A",
+    "issue": "ISS-2026-08-02-003",
+    "requirement": "RP-047",
+    "executor": "qoder1",
+    "reviewer": "codex",
+    "projectRoot": "/Users/kevin/AI/Workload-evaluation-system",
+    "baseCommit": "c87da773c4e1b8bf9a280939b11acaa49a2d44c3",
+    "approvedDesignCommit": "e1c8961",
+    "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a-durable-run-foundation",
+    "branch": "qoder/rp-047-a-durable-run-foundation",
+    "allowNextTask": false,
+    "mainMergeAllowed": false,
+    "integrationAuthorized": false,
+    "deliveryStatusAllowed": "已回填 / 待 Codex 复核"
+  },
+  "next": "Qoder 先完整读取指定资料并只输出 Worktree Contract ACK；Codex/用户确认 ACK 后，Qoder 在独立 worktree 按 RED/GREEN 实施 Batch A。完成后仅回填“已回填 / 待 Codex 复核”，不得自动集成、运行真实数据库迁移或领取 Batch B。",
+  "board": {
+    "apply": "visible pages updated by Codex; preserve unrelated dirty changes",
+    "requirement": {
+      "id": "RP-047",
+      "status": "规格已批准 / Batch A 已派单 / 待 Qoder ACK",
+      "owner": "qoder1"
+    },
+    "testing": {
+      "status": "计划已冻结 / 尚未执行",
+      "required": "Testcontainers migration compatibility + queue claim concurrency + event sequence + checkpoint/output/outbox idempotency + modules + API/Web build"
+    }
+  }
+}
