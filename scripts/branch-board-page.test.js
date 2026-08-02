@@ -709,6 +709,7 @@ test('navigation synchronizer inserts one branch link in supported nav blocks an
   fs.writeFileSync(path.join(tempDir, 'index.html'), `<!doctype html><body>${nav}</body>`, 'utf8');
   fs.writeFileSync(path.join(tempDir, 'active.html'), `<!doctype html><body><nav class="navlinks">\n${activeCollaboration}\n      </nav></body>`, 'utf8');
   fs.writeFileSync(path.join(tempDir, 'sidebar.html'), `<!doctype html><body><nav class="sidebar-nav" aria-label="主导航">\n${collaboration}\n      </nav></body>`, 'utf8');
+  fs.writeFileSync(path.join(tempDir, 'top-links.html'), `<!doctype html><body><nav class="top-links" aria-label="总看板导航">\n${collaboration}\n      </nav></body>`, 'utf8');
   fs.writeFileSync(path.join(tempDir, 'multi-navlinks.html'), `<!doctype html><body><nav class="foo navlinks bar">\n${collaboration}\n      </nav></body>`, 'utf8');
   fs.writeFileSync(path.join(tempDir, 'multi-sidebar.html'), `<!doctype html><body><nav class="sidebar-nav compact">\n${collaboration}\n      </nav></body>`, 'utf8');
   fs.writeFileSync(path.join(tempDir, 'spaced-equals.html'), `<!doctype html><body><nav class = "navlinks">\n${collaboration}\n      </nav></body>`, 'utf8');
@@ -734,7 +735,7 @@ test('navigation synchronizer inserts one branch link in supported nav blocks an
   }
 
   const first = syncDirectory(tempDir);
-  assert.deepEqual(first.map((file) => path.basename(file)), ['active.html', 'class-not-first.html', 'content-branch.html', 'content.html', 'data-with-exact.html', 'first-linked-second-missing.html', 'index.html', 'multi-navlinks.html', 'multi-sidebar.html', 'sidebar.html', 'single-quoted.html', 'spaced-equals.html', 'two-navs.html']);
+  assert.deepEqual(first.map((file) => path.basename(file)), ['active.html', 'class-not-first.html', 'content-branch.html', 'content.html', 'data-with-exact.html', 'first-linked-second-missing.html', 'index.html', 'multi-navlinks.html', 'multi-sidebar.html', 'sidebar.html', 'single-quoted.html', 'spaced-equals.html', 'top-links.html', 'two-navs.html']);
   assert.equal((read(path.join(tempDir, 'index.html')).match(/href="branches\.html"/g) || []).length, 1);
   assert.match(read(path.join(tempDir, 'index.html')), new RegExp(expected));
   assert.match(read(path.join(tempDir, 'active.html')), new RegExp(`${activeCollaboration}\\n      <a href="branches.html">分支拓扑</a>`));
@@ -743,7 +744,7 @@ test('navigation synchronizer inserts one branch link in supported nav blocks an
   assert.equal((read(path.join(tempDir, 'two-navs.html')).match(/href="branches\.html"/g) || []).length, 2);
   assert.equal((read(path.join(tempDir, 'first-linked-second-missing.html')).match(/href="branches\.html"/g) || []).length, 2);
   assert.equal(read(path.join(tempDir, 'both-linked.html')), `<!doctype html><body>${linkedNav}${linkedNav}</body>`);
-  for (const file of ['class-not-first.html', 'data-with-exact.html', 'single-quoted.html', 'spaced-equals.html']) {
+  for (const file of ['class-not-first.html', 'data-with-exact.html', 'single-quoted.html', 'spaced-equals.html', 'top-links.html']) {
     assert.match(read(path.join(tempDir, file)), /href="branches\.html"/);
   }
   assert.equal(read(path.join(tempDir, 'branches.html')), `<!doctype html><body>${nav}</body>`);
@@ -773,14 +774,8 @@ test('every supported source board navigation links to branch topology exactly o
     .sort()
     .filter((file) => {
       const html = read(path.join(BOARD_DIR, file));
-      return [...html.matchAll(/<nav\b[^>]*>[\s\S]*?<\/nav>/g)].some((match) => {
-        const nav = match[0];
-        const openingTag = nav.slice(0, nav.indexOf('>') + 1);
-        const classAttribute = /(?:^|\s)class\s*=\s*(["'])([\s\S]*?)\1/.exec(openingTag);
-        const classes = classAttribute ? classAttribute[2].trim().split(/\s+/) : [];
-        return (classes.includes('navlinks') || classes.includes('sidebar-nav'))
-          && /href=(["'])collaboration-protocol\.html\1/.test(nav);
-      });
+      return [...html.matchAll(/<nav\b[^>]*>[\s\S]*?<\/nav>/g)]
+        .some((match) => /href=(["'])collaboration-protocol\.html\1/.test(match[0]));
     });
 
   assert.ok(supportedPages.length > 0);
@@ -788,13 +783,7 @@ test('every supported source board navigation links to branch topology exactly o
     const html = read(path.join(BOARD_DIR, file));
     const navs = [...html.matchAll(/<nav\b[^>]*>[\s\S]*?<\/nav>/g)]
       .map((match) => match[0])
-      .filter((nav) => {
-        const openingTag = nav.slice(0, nav.indexOf('>') + 1);
-        const classAttribute = /(?:^|\s)class\s*=\s*(["'])([\s\S]*?)\1/.exec(openingTag);
-        const classes = classAttribute ? classAttribute[2].trim().split(/\s+/) : [];
-        return (classes.includes('navlinks') || classes.includes('sidebar-nav'))
-          && /href=(["'])collaboration-protocol\.html\1/.test(nav);
-      });
+      .filter((nav) => /href=(["'])collaboration-protocol\.html\1/.test(nav));
     for (const nav of navs) {
       assert.equal((nav.match(/href=(["'])branches\.html\1/g) || []).length, 1, `${file} navigation`);
     }
@@ -812,6 +801,7 @@ test('source board modules expose one RP-045 governance record per planned owner
       'BE-2026-08-02-rp-045-branch-topology:requirements',
       'RP-045 · WES 分支拓扑与 Worktree 看板',
       '全部本地分支与 Git 集合一致',
+      '不提供自动删除、合并或远端同步',
     ],
     'index.html': [
       'BE-2026-08-02-rp-045-branch-topology:index',

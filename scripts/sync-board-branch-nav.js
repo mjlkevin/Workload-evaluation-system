@@ -19,7 +19,7 @@ function syncHtml(html, fileName) {
 
   return html.replace(NAV_BLOCK, (nav) => {
     const classTokens = classTokensForNav(nav);
-    if (!classTokens.includes('navlinks') && !classTokens.includes('sidebar-nav')) return nav;
+    if (!classTokens.includes('navlinks') && !classTokens.includes('sidebar-nav') && !classTokens.includes('top-links')) return nav;
     if (BRANCH_HREF.test(nav)) return nav;
     const collaboration = nav.match(COLLABORATION_LINK);
     if (!collaboration) return nav;
