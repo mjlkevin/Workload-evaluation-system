@@ -1,0 +1,69 @@
+{
+  "id": "BE-2026-08-03-rp-047-a-ack-accepted",
+  "date": "2026-08-03",
+  "type": "implementation",
+  "scope": "RP-047-A Worktree Contract ACK",
+  "summary": "Codex 已核验并接受 Qoder 的 RP-047-A Worktree Contract ACK。独立 worktree、qoder 分支、assignment commit 和批准规格祖先关系均正确，执行授权进入 Batch A TDD；当前尚无业务代码或验证结果。",
+  "status": "ACK 已接受 / Qoder 实施中",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "changes",
+    "collaboration-protocol"
+  ],
+  "evidence": [
+    {
+      "kind": "worktree_ack",
+      "ref": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a-durable-run-foundation",
+      "result": "accepted",
+      "summary": "worktree 干净，分支为 qoder/rp-047-a-durable-run-foundation，HEAD 精确等于 c87da773c4e1b8bf9a280939b11acaa49a2d44c3。"
+    },
+    {
+      "kind": "git_contract",
+      "ref": "git worktree list / git show-ref / git merge-base --is-ancestor",
+      "result": "pass",
+      "summary": "目标 worktree 已登记到正确分支，assignment commit 存在，e1c8961 是其祖先。"
+    },
+    {
+      "kind": "read_only_exception",
+      "ref": "skills/speak-plainly/SKILL.md sha256 ca00c3c35c437107e2266b90cb9010c1d29f26c1b154d83d0cc5507ad744272c",
+      "result": "accepted with boundary",
+      "summary": "该沟通 Skill 未进入 assignment commit，Qoder 从主 checkout 只读获取；不得复制、编辑、提交或把它作为 Batch A 代码依赖，其余执行仍完全基于 c87da77。"
+    },
+    {
+      "kind": "execution_boundary",
+      "ref": "docs/agent-loop/work-orders/2026-08-02-qoder-RP-047-A.md",
+      "result": "active",
+      "summary": "仅允许 Work Order 的 Harness schema、migration、repository 和测试路径；allowNextTask=false，状态最多到已回填 / 待 Codex 复核。"
+    }
+  ],
+  "assignment": {
+    "taskId": "RP-047-A",
+    "executor": "qoder1",
+    "reviewer": "codex",
+    "projectRoot": "/Users/kevin/AI/Workload-evaluation-system",
+    "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a-durable-run-foundation",
+    "branch": "qoder/rp-047-a-durable-run-foundation",
+    "baseCommit": "c87da773c4e1b8bf9a280939b11acaa49a2d44c3",
+    "approvedDesignCommit": "e1c8961",
+    "allowNextTask": false,
+    "mainMergeAllowed": false,
+    "integrationAuthorized": false,
+    "deliveryStatusAllowed": "已回填 / 待 Codex 复核"
+  },
+  "next": "Qoder 按 Batch A 计划依次执行 Task 1-5 和 RED/GREEN，完成后提交结构化 handoff 并停止；Codex 执行 Gate A 后才能决定返工、集成或发布 Batch B。",
+  "board": {
+    "apply": "visible pages updated by Codex; preserve unrelated dirty changes",
+    "requirement": {
+      "id": "RP-047",
+      "status": "ACK 已接受 / Qoder 实施中",
+      "owner": "qoder1"
+    },
+    "testing": {
+      "status": "待 Qoder 执行回填",
+      "required": "RED/GREEN + Testcontainers migration compatibility + queue claim concurrency + idempotency + modules + API/Web build"
+    }
+  }
+}
