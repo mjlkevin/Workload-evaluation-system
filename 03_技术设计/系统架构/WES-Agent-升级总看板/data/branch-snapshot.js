@@ -1,6 +1,6 @@
 window.WES_BRANCH_SNAPSHOT = {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-03T07:19:27.941Z",
+  "generatedAt": "2026-08-03T07:21:30.160Z",
   "repoRoot": "/Users/kevin/AI/Workload-evaluation-system",
   "mainBranch": "codex/role-driven-ai-home-workbench",
   "summary": {
@@ -25,7 +25,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "codex",
       "gitRelation": "non_ancestor",
       "ahead": 1,
-      "behind": 21,
+      "behind": 22,
       "worktreePath": "",
       "worktreeDirty": "",
       "duplicateTipGroup": "",
@@ -34,11 +34,11 @@ window.WES_BRANCH_SNAPSHOT = {
     },
     {
       "branchName": "codex/role-driven-ai-home-workbench",
-      "headFull": "47fe7815b515112b6f1b42b9088b01848e80dac5",
-      "headShort": "47fe781",
-      "committerDate": "2026-08-03T15:15:53+08:00",
+      "headFull": "d4533c3821c721d2b9591302a8960dfd912bf504",
+      "headShort": "d4533c3",
+      "committerDate": "2026-08-03T15:21:04+08:00",
       "author": "kevin",
-      "subject": "fix(WES UI): 修复窄屏侧栏挤占主内容",
+      "subject": "docs(WES RP-031): 记录主线集成、需求关闭与分支清理",
       "upstream": "",
       "upstreamTrack": "",
       "prefix": "codex",
@@ -63,7 +63,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "other",
       "gitRelation": "ancestor",
       "ahead": 0,
-      "behind": 29,
+      "behind": 30,
       "worktreePath": "",
       "worktreeDirty": "",
       "duplicateTipGroup": "",
@@ -82,7 +82,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "qoder",
       "gitRelation": "non_ancestor",
       "ahead": 4,
-      "behind": 25,
+      "behind": 26,
       "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a-durable-run-foundation",
       "worktreeDirty": "clean",
       "duplicateTipGroup": "",
@@ -101,7 +101,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "qoder",
       "gitRelation": "non_ancestor",
       "ahead": 8,
-      "behind": 22,
+      "behind": 23,
       "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a2-durable-run-foundation",
       "worktreeDirty": "clean",
       "duplicateTipGroup": "",
@@ -157,7 +157,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "locked": false,
       "prunable": false,
       "path": "/Users/kevin/AI/Workload-evaluation-system",
-      "headFull": "47fe7815b515112b6f1b42b9088b01848e80dac5"
+      "headFull": "d4533c3821c721d2b9591302a8960dfd912bf504"
     },
     {
       "branchName": "qoder/rp-047-a-durable-run-foundation",
@@ -185,8 +185,8 @@ window.WES_BRANCH_SNAPSHOT = {
   "provenance": {
     "semantics": "as_of_generation",
     "sourceCheckoutBranch": "codex/role-driven-ai-home-workbench",
-    "sourceCheckoutHead": "47fe7815b515112b6f1b42b9088b01848e80dac5",
-    "configuredMainlineHead": "47fe7815b515112b6f1b42b9088b01848e80dac5",
+    "sourceCheckoutHead": "d4533c3821c721d2b9591302a8960dfd912bf504",
+    "configuredMainlineHead": "d4533c3821c721d2b9591302a8960dfd912bf504",
     "observationNote": "This is an as-of-generation observation and can precede the commit containing it."
   }
 };
