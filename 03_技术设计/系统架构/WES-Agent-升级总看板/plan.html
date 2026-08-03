@@ -41,8 +41,8 @@
         <span><b>已完成</b> 阶段 1B / 1C / 1D / 1E / 1F / 1G</span>
         <span><b>当前阶段</b> 阶段 1H-B 已形成交付基线 / 阶段 1H-C 待规划</span>
         <span><b>人工测试</b> 1F/1G/1H-A 用例已登记，待执行回填</span>
-        <span><b>分支</b> 本地 <code class="inline">main</code> 与 <code class="inline">codex/role-driven-ai-home-workbench</code> 同为 <code class="inline">88d32b4</code></span>
-        <span><b>状态</b> 需求池共 40 项：22 项已交付、16 项待规划/待确认/待验收、2 项暂缓；RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-047 A2 候选 <code class="inline">39d5ea9</code> 已通过历史迁移、原子创建、事件/checkpoint 并发和构建门禁；Codex Gate 因 JSON 普通对象校验可绕过、output 并发测试缺失和 handoff 契约偏差要求 A2-R1 同分支最小返工，B-E 未授权。其余已验证能力和人工验收缺口按原记录保留。</span>
+        <span><b>分支</b> 业务主线 <code class="inline">codex/role-driven-ai-home-workbench</code> 当前包含 RP-031 合并提交 <code class="inline">5cc81b9</code></span>
+        <span><b>状态</b> 需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓；RP-031 多知识库路由与 RAG 评测闭环已集成关闭。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-047 A2 候选 <code class="inline">39d5ea9</code> 已通过历史迁移、原子创建、事件/checkpoint 并发和构建门禁；Codex Gate 因 JSON 普通对象校验可绕过、output 并发测试缺失和 handoff 契约偏差要求 A2-R1 同分支最小返工，B-E 未授权。其余已验证能力和人工验收缺口按原记录保留。</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">阶段 1E 已交付</span>
@@ -489,7 +489,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
     <section>
       <div class="h-num">Section 11</div>
       <h2>后续任务池</h2>
-      <p class="lead">以下任务不属于阶段 1H-A 的前端体验闭环，将作为阶段 1H-C、阶段 2 或独立候选任务逐项评审。当前需求池共 40 项：22 项已交付、16 项待规划/待确认/待验收、2 项暂缓。RP-048 已完成通用 Speak Plainly Skill、四个模型入口接入和自动检查，等待用户体验确认。RP-047 的跨会话持续、后台 Worker、混合检查点、幂等恢复和可回放输出规格已获批准；首个 Batch A 候选被 Gate 拒收，A2 必须从全新 worktree 重新实施，后续 B-E 继续锁定。已验证能力和其他人工验收缺口继续按原记录保留。</p>
+      <p class="lead">以下任务不属于阶段 1H-A 的前端体验闭环，将作为阶段 1H-C、阶段 2 或独立候选任务逐项评审。当前需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓。RP-031 已完成主线集成并关闭；资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示作为独立后续优化。RP-048 已完成通用 Speak Plainly Skill、四个模型入口接入和自动检查，等待用户体验确认。RP-047 的跨会话持续、后台 Worker、混合检查点、幂等恢复和可回放输出规格已获批准；首个 Batch A 候选被 Gate 拒收，A2 必须从全新 worktree 重新实施，后续 B-E 继续锁定。已验证能力和其他人工验收缺口继续按原记录保留。</p>
       <table>
         <tr><th>候选任务</th><th>目标</th><th>启动条件</th><th>第一验收口径</th></tr>
         <tr>
@@ -645,8 +645,8 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <tr>
           <td>RAG Baseline 与知识库评测闭环（RP-031）</td>
           <td>为 RP-018 知识库工具建立版本化实验合同和生产化演进路径；先固定样本/知识快照/检索参数/Prompt/评分器，再实施 Chunk 后处理、可靠性、质量验证、Provider 与多知识库能力。</td>
-          <td><span class="status warn"><span class="dot"></span>实施分支已回填 / Codex Gate 拒收</span>：7 个提交在候选 worktree 中通过编译和旧回归，但新增模块未完成生产主链路和失败测试；配置 UI、激活验证、审计和敏感配置范围存在阻断。2026-08-03 新增来源 <code class="inline">ISS-2026-08-03-001</code>：第一个多知识库批次应先完成可管理的知识库注册表、规则优先 + AI 兜底的二级路由、ACL 与可解释 trace，不直接并行搜索所有库。</td>
-          <td>baseline 批次可复现；检索指标包含 Recall@K、Precision@K、MRR、NDCG，回答指标包含引用支撑与拒答正确性；端到端关联、配置激活审计、缓存隔离/失效、断路/限流故障注入和策略回滚均有自动化证据。</td>
+          <td><span class="status done"><span class="dot"></span>已交付 / 主线已集成</span>：2026-08-03 以 <code class="inline">5cc81b9</code> 完成集成。当前主线具备版本化 RAG baseline、评测报告、可管理知识库注册表、逐库连通性门禁、角色过滤、规则优先 + AI 兜底二级路由、一次受控空检索回退和可解释 Trace；配置页面已适配主线新版布局。</td>
+          <td>本需求验收已通过：主线集成态 modules 227/227、AI 190/190、Web 206/206、integration 1/1，API/Web build、安全扫描和 UI scope 全部绿色；真实双知识库显式路由、语义路由、ACL 和空检索回退已验证。更高阶缓存、断路/限流和完整策略回滚按后续独立批次治理。</td>
         </tr>
         <tr>
           <td>AI 工作台推荐工作流列表可达性与语义优化（RP-032）</td>

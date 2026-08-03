@@ -1,0 +1,43 @@
+{
+  "id": "BE-2026-08-03-system-shell-responsive-fix",
+  "date": "2026-08-03",
+  "type": "implementation",
+  "scope": "系统主框架窄屏侧栏布局修复",
+  "summary": "RP-031 主线浏览器复核发现 1180px 以下系统侧栏被排成整屏并把主内容推到第二屏。提交 47fe781 将中窄屏侧栏收敛为 64px 图标栏，主内容与侧栏保持并排；760px 下知识库配置与档案卡片可直接到达且无横向溢出。",
+  "status": "已修复 / 浏览器与自动化通过",
+  "pages": ["testing", "changes"],
+  "evidence": [
+    {
+      "kind": "commit",
+      "ref": "47fe781",
+      "result": "pass",
+      "summary": "只调整主框架 1180px 以下侧栏布局，不引入新的 UI 技术栈。"
+    },
+    {
+      "kind": "verification",
+      "ref": "Chrome 760px",
+      "result": "pass",
+      "summary": "viewport 760px、document scrollWidth 760px、主内容从 y=0 开始，知识库行按卡片显示。"
+    },
+    {
+      "kind": "verification",
+      "ref": "npm run test:web; npm run build:web; check-ui-scope",
+      "result": "pass",
+      "summary": "Web 29 文件 206/206、生产构建和 UI 范围检查通过。"
+    }
+  ],
+  "next": "后续页面在 760px 下复用同一收起侧栏规则；如需真正的抽屉式移动导航，单独进入导航体验设计，不在本修复中扩展。",
+  "board": {
+    "change": {
+      "stage": "系统主框架窄屏修复",
+      "result": "已修复 / 浏览器与自动化通过"
+    },
+    "testing": [
+      {
+        "command": "WES shell 760px responsive gate",
+        "result": "pass",
+        "summary": "Chrome 760px 无横向溢出，侧栏 64px，主内容可见，知识库档案表格转卡片；Web 206/206 与 build 通过。"
+      }
+    ]
+  }
+}

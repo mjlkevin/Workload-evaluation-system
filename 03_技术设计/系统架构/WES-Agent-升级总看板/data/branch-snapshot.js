@@ -1,25 +1,44 @@
 window.WES_BRANCH_SNAPSHOT = {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-02T13:23:28.310Z",
+  "generatedAt": "2026-08-03T07:19:27.941Z",
   "repoRoot": "/Users/kevin/AI/Workload-evaluation-system",
   "mainBranch": "codex/role-driven-ai-home-workbench",
   "summary": {
-    "localBranchCount": 4,
+    "localBranchCount": 5,
     "remoteRefCount": 3,
-    "worktreeCount": 2,
-    "ancestorCount": 2,
-    "nonAncestorCount": 1,
-    "duplicateTipGroupCount": 1,
+    "worktreeCount": 3,
+    "ancestorCount": 1,
+    "nonAncestorCount": 3,
+    "duplicateTipGroupCount": 0,
     "warningCount": 0
   },
   "branches": [
     {
-      "branchName": "codex/role-driven-ai-home-workbench",
-      "headFull": "88d32b42b8d64ad0d380d374d2d7146289135a08",
-      "headShort": "88d32b4",
-      "committerDate": "2026-08-02T18:43:52+08:00",
+      "branchName": "codex/archive-kb-db-experiment-20260803",
+      "headFull": "d1760914489adb0ffd3f1b0b7a99a91073eccad2",
+      "headShort": "d176091",
+      "committerDate": "2026-08-03T14:31:58+08:00",
       "author": "kevin",
-      "subject": "fix(WES Board): RP-045 · 收窄监控证据断言",
+      "subject": "chore(WES archive): 保留知识库 PostgreSQL 双写实验",
+      "upstream": "",
+      "upstreamTrack": "",
+      "prefix": "codex",
+      "gitRelation": "non_ancestor",
+      "ahead": 1,
+      "behind": 21,
+      "worktreePath": "",
+      "worktreeDirty": "",
+      "duplicateTipGroup": "",
+      "duplicateTipGroupId": null,
+      "governanceSuggestion": "待确认集成、返工或归档"
+    },
+    {
+      "branchName": "codex/role-driven-ai-home-workbench",
+      "headFull": "47fe7815b515112b6f1b42b9088b01848e80dac5",
+      "headShort": "47fe781",
+      "committerDate": "2026-08-03T15:15:53+08:00",
+      "author": "kevin",
+      "subject": "fix(WES UI): 修复窄屏侧栏挤占主内容",
       "upstream": "",
       "upstreamTrack": "",
       "prefix": "codex",
@@ -28,47 +47,9 @@ window.WES_BRANCH_SNAPSHOT = {
       "behind": 0,
       "worktreePath": "/Users/kevin/AI/Workload-evaluation-system",
       "worktreeDirty": "dirty",
-      "duplicateTipGroup": "duplicate-88d32b4",
-      "duplicateTipGroupId": "duplicate-88d32b4",
-      "governanceSuggestion": "保留主线"
-    },
-    {
-      "branchName": "codex/rp-031-phase0-integration",
-      "headFull": "88d32b42b8d64ad0d380d374d2d7146289135a08",
-      "headShort": "88d32b4",
-      "committerDate": "2026-08-02T18:43:52+08:00",
-      "author": "kevin",
-      "subject": "fix(WES Board): RP-045 · 收窄监控证据断言",
-      "upstream": "",
-      "upstreamTrack": "",
-      "prefix": "codex",
-      "gitRelation": "ancestor",
-      "ahead": 0,
-      "behind": 0,
-      "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-031-phase0-integration",
-      "worktreeDirty": "clean",
-      "duplicateTipGroup": "duplicate-88d32b4",
-      "duplicateTipGroupId": "duplicate-88d32b4",
-      "governanceSuggestion": "活跃工作区，先复核任务状态"
-    },
-    {
-      "branchName": "codex/rp-031-rag-rework",
-      "headFull": "d3fa0652126066093713679bf7c8284d9799411b",
-      "headShort": "d3fa065",
-      "committerDate": "2026-07-21T00:25:36+08:00",
-      "author": "kevin",
-      "subject": "docs(RAG): RP-031 · Phase 0 Gate · 同步返工状态与证据",
-      "upstream": "",
-      "upstreamTrack": "",
-      "prefix": "codex",
-      "gitRelation": "non_ancestor",
-      "ahead": 9,
-      "behind": 59,
-      "worktreePath": "",
-      "worktreeDirty": "",
       "duplicateTipGroup": "",
       "duplicateTipGroupId": null,
-      "governanceSuggestion": "待确认集成、返工或归档"
+      "governanceSuggestion": "保留主线"
     },
     {
       "branchName": "main",
@@ -82,12 +63,50 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "other",
       "gitRelation": "ancestor",
       "ahead": 0,
-      "behind": 0,
+      "behind": 29,
       "worktreePath": "",
       "worktreeDirty": "",
-      "duplicateTipGroup": "duplicate-88d32b4",
-      "duplicateTipGroupId": "duplicate-88d32b4",
-      "governanceSuggestion": "重复指针组，建议统一处置"
+      "duplicateTipGroup": "",
+      "duplicateTipGroupId": null,
+      "governanceSuggestion": "可评估归档或清理"
+    },
+    {
+      "branchName": "qoder/rp-047-a-durable-run-foundation",
+      "headFull": "fae8a7dbd88d4f8159653abbd50284ad93f2c833",
+      "headShort": "fae8a7d",
+      "committerDate": "2026-08-03T01:06:31+08:00",
+      "author": "kevin",
+      "subject": "feat(WES Agent): RP-047-A · 证明迁移兼容并完善 test:harness 脚本",
+      "upstream": "",
+      "upstreamTrack": "",
+      "prefix": "qoder",
+      "gitRelation": "non_ancestor",
+      "ahead": 4,
+      "behind": 25,
+      "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a-durable-run-foundation",
+      "worktreeDirty": "clean",
+      "duplicateTipGroup": "",
+      "duplicateTipGroupId": null,
+      "governanceSuggestion": "活跃工作区，先复核任务状态"
+    },
+    {
+      "branchName": "qoder/rp-047-a2-durable-run-foundation",
+      "headFull": "d9790fe08e62964e0dacfe103b06647af02de81e",
+      "headShort": "d9790fe",
+      "committerDate": "2026-08-03T14:29:42+08:00",
+      "author": "kevin",
+      "subject": "fix(WES Agent): RP-047-A2-R1 · 收紧普通对象边界并补齐 output 并发回归",
+      "upstream": "",
+      "upstreamTrack": "",
+      "prefix": "qoder",
+      "gitRelation": "non_ancestor",
+      "ahead": 8,
+      "behind": 22,
+      "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a2-durable-run-foundation",
+      "worktreeDirty": "clean",
+      "duplicateTipGroup": "",
+      "duplicateTipGroupId": null,
+      "governanceSuggestion": "活跃工作区，先复核任务状态"
     }
   ],
   "remoteRefs": [
@@ -138,28 +157,26 @@ window.WES_BRANCH_SNAPSHOT = {
       "locked": false,
       "prunable": false,
       "path": "/Users/kevin/AI/Workload-evaluation-system",
-      "headFull": "88d32b42b8d64ad0d380d374d2d7146289135a08"
+      "headFull": "47fe7815b515112b6f1b42b9088b01848e80dac5"
     },
     {
-      "branchName": "codex/rp-031-phase0-integration",
+      "branchName": "qoder/rp-047-a-durable-run-foundation",
       "detached": false,
       "locked": false,
       "prunable": false,
-      "path": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-031-phase0-integration",
-      "headFull": "88d32b42b8d64ad0d380d374d2d7146289135a08"
-    }
-  ],
-  "duplicateTipGroups": [
+      "path": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a-durable-run-foundation",
+      "headFull": "fae8a7dbd88d4f8159653abbd50284ad93f2c833"
+    },
     {
-      "id": "duplicate-88d32b4",
-      "headFull": "88d32b42b8d64ad0d380d374d2d7146289135a08",
-      "branches": [
-        "codex/role-driven-ai-home-workbench",
-        "codex/rp-031-phase0-integration",
-        "main"
-      ]
+      "branchName": "qoder/rp-047-a2-durable-run-foundation",
+      "detached": false,
+      "locked": false,
+      "prunable": false,
+      "path": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a2-durable-run-foundation",
+      "headFull": "d9790fe08e62964e0dacfe103b06647af02de81e"
     }
   ],
+  "duplicateTipGroups": [],
   "warnings": [],
   "governance": {
     "defaultRemote": "origin",
@@ -168,8 +185,8 @@ window.WES_BRANCH_SNAPSHOT = {
   "provenance": {
     "semantics": "as_of_generation",
     "sourceCheckoutBranch": "codex/role-driven-ai-home-workbench",
-    "sourceCheckoutHead": "88d32b42b8d64ad0d380d374d2d7146289135a08",
-    "configuredMainlineHead": "88d32b42b8d64ad0d380d374d2d7146289135a08",
+    "sourceCheckoutHead": "47fe7815b515112b6f1b42b9088b01848e80dac5",
+    "configuredMainlineHead": "47fe7815b515112b6f1b42b9088b01848e80dac5",
     "observationNote": "This is an as-of-generation observation and can precede the commit containing it."
   }
 };

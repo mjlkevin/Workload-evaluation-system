@@ -381,29 +381,29 @@
           <td>风险状态降为“已缓解 / 已集成”。当前业务主线不跟踪运行态 trace-store，2026-08-02 干净回归通过；后续继续以忽略规则和测试 store 隔离防止污染。</td>
         </tr>
         <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup:risks">
-          <td>本地分支已收敛，但远端默认分支与 RP-031 存储边界尚未决策。</td>
-          <td><code class="inline">origin/main</code> 比本地业务主线落后 75 个提交；若直接强推或删除远端旧分支会扩大影响。与此同时，RP-031 rework 的 JSON Repository 方案与主 checkout 中未提交的 PostgreSQL 双写实现冲突，贸然 cherry-pick 可能覆盖用户工作或绕过非 Harness DB 迁移门禁。</td>
-          <td>本轮只完成本地引用清理和本地 main 快进，保留外部工作区备份、34 个已删分支原 tip、RP-031 rework/integration 两个分支。远端同步需另行授权；RP-031 必须先由 owner 决定继续 JSON 还是批准 PostgreSQL 迁移，并关闭 clean-checkout security、Request/Prompt Trace、密钥清除三个 P1。</td>
+          <td>远端默认分支仍落后本地业务主线；RP-031 存储边界冲突已关闭。</td>
+          <td><code class="inline">origin/main</code> 仍可能落后本地业务主线，直接强推或删除远端旧分支会扩大影响。RP-031 已遵循既有 JSON Repository 边界完成集成；PostgreSQL 双写实验归档到独立分支，未进入非 Harness 主存储。</td>
+          <td>远端同步继续等待单独授权，不与本地需求关闭混为一谈。RP-031 的 security、Trace、密钥治理和存储边界门禁已经通过，合并提交为 <code class="inline">5cc81b9</code>。</td>
         </tr>
         <tr>
           <td>RP-031 RAG baseline 曾因每样本二次检索放大成本和延迟。</td>
           <td>已将 <code class="inline">queryZhipuKnowledgeBase</code> 的检索结果通过 <code class="inline">trace.chunks</code> 回传，并让 <code class="inline">rag-baseline-runner</code> 复用该结果；Codex 复核 <code class="inline">rag-baseline-runner.test.ts</code> 11/11 与 <code class="inline">knowledge-tool.service.test.ts</code> 8/8，通过 queryFn 计数证明每样本只查询一次。</td>
-          <td>重复检索风险降为“已缓解”。构建基线已由 Codex 清理并验证 <code class="inline">build:api</code>、<code class="inline">test:modules</code>、<code class="inline">test:ai</code> 通过；剩余门禁为真实 ZHIPU 配置人工验收，验证时不得泄露 API Key 或知识库凭据。</td>
+          <td>重复检索风险已关闭。真实双知识库检索和 WES dispatch 路由矩阵已完成验证，主线集成态全量测试和构建通过；后续验证仍须遵守密钥不入对话、文档、看板或提交的规则。</td>
         </tr>
         <tr>
           <td>RP-031 修订版虽已完成 20/20 修复项映射，但仍把需求映射等同于可执行覆盖：智谱原生快照回滚能力未证实，前端回传 requestId 的链路方向错误，Chunk 缺稳定身份/ACL/向量特征，NDCG 缺分级 qrels，在线命中率缺真实标签。</td>
           <td>若直接按修订版施工，可能产生无法兑现的回滚承诺、跨租户缓存/检索泄露、客户端伪造关联 ID、MMR 无可用特征、错误 429 重试放大、统计假阳性和不可验收监控指标；管理员可编辑 API Base URL 还会引入 SSRF 风险。</td>
-          <td>设置 Gate 0：先完成智谱能力探针、Provider/错误/取消合同、requestId/traceId/providerRequestId 语义、chunk/qrels schema、缓存命名空间、逻辑 snapshot manifest、路由 DSL/ACL 和统计主指标；未通过前只允许做合同/测试夹具，不进入全量实现。C3 完整回滚仅在源文档可重放或 Provider 具备原生版本能力时升级为已覆盖。</td>
+          <td>第一批 Gate 0 已按可执行范围完成：官方 URL 白名单、Provider 错误分类、服务端 request ID、逐库 ACL/探针/激活门禁、路由与 Trace 已进入主线。完整 qrels、缓存命名空间、逻辑快照和高级回滚仍按独立后续能力治理，不再被误写为本批已交付。</td>
         </tr>
         <tr>
           <td>RP-031 候选实施分支将大量未接线、未测试模块和敏感配置混合提交，并提前在看板声明完成。</td>
           <td>若直接集成，会形成“代码存在但运行时未使用”的假完成：缓存/断路/ACL/查询改写/路由/监控均不起作用；检索参数 UI 保存无效，任意非空假凭证可通过激活，且敏感凭证可能继续进入 Git 历史。</td>
-          <td>Codex Gate=REJECTED，<code class="inline">allowNextTask=false</code>、<code class="inline">mustReworkFirst=true</code>。移除无关配置并轮换凭证；按 Phase 拆最小生产闭环，每批必须有失败测试、主链路接线、故障/隔离验证和 Gate 后看板更新。</td>
+          <td>该历史风险已通过返工关闭：未接线模块被剔除或补齐生产接线，凭证退出跟踪配置，安全门禁、失败测试、主链路、角色隔离、真实双库验证和看板回填均已完成；最终以 <code class="inline">5cc81b9</code> 集成。</td>
         </tr>
         <tr>
           <td>多知识库若只依赖 AI 自由选库，可能把解决方案、产品功能、客户案例或内部规范混在一起检索。</td>
           <td>错误路由会造成答非所问、引用来源失真、多余外部调用和成本增加；如果不同知识库存在角色或租户边界，无差别搜索还可能导致跨权暴露。</td>
-          <td>RP-031 第一版采用“显式规则优先、AI 分类兜底、Runtime 执行前校验”；路由输出必须包含目标库、置信度、原因和 fallback，并在检索前校验 active、role/tenant ACL 与配置版本。低置信不自动搜索所有库，而是询问用户或使用管理员指定的安全默认库。</td>
+          <td>控制已实现并验证：显式名称/关键词规则优先，AI 只在授权候选中分类，Runtime 检索前校验 active 与业务角色，低置信使用授权默认库，只有空检索才允许一次受控回退；真实双库矩阵证明未出现无差别全库并行搜索。</td>
         </tr>
         <tr>
           <td>AI 引导选项识别过宽，导致普通编号列表被错误渲染为按钮或误触发发送。</td>

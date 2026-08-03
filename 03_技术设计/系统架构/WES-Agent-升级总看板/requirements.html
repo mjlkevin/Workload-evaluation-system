@@ -46,8 +46,8 @@
         </div>
         <div class="pill-row" style="margin-top:18px">
           <span class="pill brand">40 项已登记需求</span>
-          <span class="pill ok">22 已交付</span>
-          <span class="pill warn">16 项待规划/待确认/待验收</span>
+          <span class="pill ok">23 已交付</span>
+          <span class="pill warn">15 项待规划/待确认/待验收</span>
           <span class="pill">2 暂缓</span>
           <span class="pill ok">可编辑子页面已移除</span>
         </div>
@@ -71,15 +71,15 @@
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>已交付</span></div>
-            <div class="v">22</div>
+            <div class="v">23</div>
             <div class="lb">当前池内已交付</div>
-            <div class="bar"><i style="width:58%;background:var(--ok)"></i></div>
+            <div class="bar"><i style="width:61%;background:var(--ok)"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">W</span><span>进行中 / 待实现</span></div>
-            <div class="v">14</div>
+            <div class="v">13</div>
             <div class="lb">已分析 / 待规划 / 待确认</div>
-            <div class="bar"><i style="width:37%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
+            <div class="bar"><i style="width:34%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">C</span><span>暂缓 / 待评审</span></div>
@@ -299,9 +299,9 @@
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
                 <span class="pill">知识库 / 质量评估</span>
-                <span class="pill">生产化分支已回填 / Codex Gate 拒收</span>
+                <span class="pill ok">已交付 / 主线已集成</span>
               </div>
-              <div class="bc-next">2026-07-20 production 候选分支经 Codex Gate 拒收，2026-08-02 已在保留审计文档后删除其本地引用。<code class="inline">codex/rp-031-rag-rework</code> 与 <code class="inline">codex/rp-031-phase0-integration</code> 保留，新 Gate 发现 clean-checkout security、Request/Prompt Trace、密钥清除三个 P1，并与未提交的知识库 PostgreSQL 迁移发生存储边界冲突。owner 确认存储方案前不得合并或标记已交付。</div>
+              <div class="bc-next">2026-08-03 以 <code class="inline">5cc81b9</code> 集成到 <code class="inline">codex/role-driven-ai-home-workbench</code>。版本化 baseline、评测报告、多知识库档案、逐库门禁、角色/意图路由、单次回退和 Trace 已通过全量验证；对应功能 worktree 与分支将在关闭流程中清理。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-033</span>
@@ -796,10 +796,10 @@
               <td>知识库 / RAG 质量评估</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C / Phase 2</td>
-              <td><span class="status warn"><span class="dot"></span>生产化分支已回填 / Codex Gate 拒收</span></td>
+              <td><span class="status done"><span class="dot"></span>已交付 / 主线已集成 / 需求关闭</span></td>
               <td>为知识库问答和模块识别建立可复现 baseline，并把检索配置、Chunk 处理、Prompt、置信度、缓存/断路/限流、质量验证、Trace、配置治理和 Provider/多知识库演进拆成可独立验收的生产化批次</td>
               <td>2026-07-20 去重结果：命中 RP-031 的 baseline、策略对比与知识库版本方向，并交叉引用 RP-018 知识库工具和 RP-030 Trace；2026-08-03 新问题继续命中已标记未覆盖的 C2 多知识库和 M1 路由治理，不新增重复 RP</td>
-              <td>P1 重复检索既有 baseline 修复保持在业务主线；原 production 分支已拒收并删除本地引用。当前保留 <code class="inline">codex/rp-031-rag-rework</code> 与 <code class="inline">codex/rp-031-phase0-integration</code>，返工继续阻断于 security/Trace/密钥治理和 JSON/PostgreSQL 存储边界冲突。多知识库方向的当前事实是：系统只有一个 active <code class="inline">knowledgeId</code>，意图层只能分流到统一 <code class="inline">knowledge_query</code>，运行时没有知识库注册表、二级路由、ACL 或跨库 fallback。</td>
+              <td>2026-08-03 已通过合并提交 <code class="inline">5cc81b9</code> 集成业务主线：交付版本化 baseline、评测报告、智谱多知识库档案、逐库探针与激活门禁、角色过滤、规则优先与 AI 兜底路由、一次受控空检索回退和可解释 Trace；主线集成态 modules 227/227、AI 190/190、Web 206/206、integration 1/1，API/Web build、安全与 UI scope 全部通过。资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示转独立后续优化，不再阻断 RP-031 关闭。</td>
             </tr>
             <tr>
               <td class="mono">RP-033</td>
@@ -2980,7 +2980,7 @@
               <li><b>Phase 1H-C / 已集成待验收：</b>RP-032 推荐工作流列表可达性第一批已纳入业务主线，待人工确认桌面/低高度/窄屏体验。</li>
               <li><b>Phase 1H-C / P1 已修复待验收：</b>RP-036 已闭合路由守卫、保存可信反馈、测试 loading/终态、30 秒超时与 retrieval_empty 连通性误判；原聚焦回归 19/19、调整后 V2 套件 107/107，本批后端专项 1/1、页面 3/3、build:web 通过，等待使用轮换密钥完成 MT-1H-C-002 人工复测后再继续 MT-1H-B-003 真实配置验收。</li>
               <li><b>Phase 1H-C / P1 已实现待验收：</b>RP-043 已完成 improving-wes-ui Skill、RED/GREEN 压力验证、共享 Dialog 与 SystemManagement 四处迁移；聚焦 13/13、V2 全量 128/128、build:web 通过。管理员认证阻塞真实浏览器进入系统管理，人工证据待回填。</li>
-              <li><b>Phase 1H-C / Codex 复核分流：</b>RP-026、RP-027/RP-028、RP-029/RP-030、RP-032 和 RP-033 的已验证实现已纳入业务主线，2026-08-02 完成历史本地分支与 worktree 清理；真实 Kimi/ZHIPU 配置、运行态审计与低高度滚动人工验收继续待回填。RP-031 baseline 保持在主线，生产化 Gate 未关闭，rework/integration 分支保留待存储边界决策。</li>
+              <li><b>Phase 1H-C / Codex 复核分流：</b>RP-026、RP-027/RP-028、RP-029/RP-030、RP-032 和 RP-033 的已验证实现已纳入业务主线，2026-08-02 完成历史本地分支与 worktree 清理；真实 Kimi/ZHIPU 配置、运行态审计与低高度滚动人工验收继续待回填。RP-031 已完成生产化返工、多知识库真实验证和主线集成，需求关闭；内容覆盖与 qrels 校准转独立后续优化。</li>
               <li><b>Phase 1H-C / 暂缓待评审：</b>RP-001 低代码工作流设计器、RP-012 WES Skill 工作流辅助工具。</li>
               <li><b>Phase 1H 后续候选：</b>RP-004 后续深查子项、RP-005 Harness run 级时间线深化、RP-002 轻量审计统一 schema / retention / 查询入口。</li>
             </ul>
@@ -3108,7 +3108,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 需求池 · 2026-08-03 · 40 条需求 · 22 项已交付 · 16 项待处理 · 2 项暂缓
+      WES 项目管理 · 需求池 · 2026-08-03 · 40 条需求 · 23 项已交付 · 15 项待处理 · 2 项暂缓
     </footer>
   </main>
   <script>
