@@ -1,0 +1,63 @@
+{
+  "id": "BE-2026-08-03-rp-047-a2-gate-rework",
+  "date": "2026-08-03",
+  "type": "verification",
+  "scope": "RP-047-A2 Codex Gate",
+  "summary": "A2 已通过历史迁移、原子创建、20 路事件、checkpoint 并发幂等、Testcontainers 与构建门禁，但 Date/Map 可绕过普通 JSON 对象校验，output 并发版本正式回归测试缺失，handoff 还存在超出 Allowed Paths 与提交身份记录不准确。Gate 结论为同分支最小返工。",
+  "status": "REWORK_REQUIRED / A2-R1 待 ACK",
+  "pages": [
+    "index",
+    "issues",
+    "defects",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources",
+    "collaboration-protocol"
+  ],
+  "evidence": [
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-08-03-codex-RP-047-A2-gate.md",
+      "result": "rework_required",
+      "summary": "正式门禁通过，但普通对象校验、并发 output 回归和 handoff 契约三项阻断集成。"
+    },
+    {
+      "kind": "verification",
+      "ref": "Testcontainers Harness + modules + API/Web builds",
+      "result": "pass",
+      "summary": "Harness 93/93、modules 143/143、build:api/web 通过，无 skip，无新增长期容器。"
+    },
+    {
+      "kind": "verification",
+      "ref": "Codex plain-object probe",
+      "result": "fail",
+      "summary": "Date 与 Map 均进入数据库路径并返回 HARNESS_RUNTIME_INTERNAL，未在输入边界以 HARNESS_RUNTIME_PAYLOAD_INVALID 拒绝。"
+    },
+    {
+      "kind": "scope",
+      "ref": "git diff --name-status 7221503..39d5ea9",
+      "result": "fail",
+      "summary": "实际 16 个文件：15 个实现文件和 1 个原 Allowed Paths 之外的 handoff 文件；回填统计为 15。"
+    },
+    {
+      "kind": "work_order",
+      "ref": "docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2-R1.md",
+      "result": "assigned_waiting_ack",
+      "summary": "R1 仅允许修改 repository、repository test 和现有 handoff 文件。"
+    }
+  ],
+  "gate": {
+    "taskId": "RP-047-A2",
+    "candidateCommit": "39d5ea9b537ce698e07e5195bc7af3d3a39d7306",
+    "verdict": "REWORK_REQUIRED",
+    "allowNextTask": false,
+    "mustReworkFirst": true,
+    "reuseCurrentBranch": true,
+    "nextTask": "RP-047-A2-R1"
+  },
+  "next": "Qoder 在原 A2 worktree 先输出 R1 Contract ACK；ACK 接受后仅修复普通对象校验、补 output 并发回归并更正 handoff。Batch B 继续锁定。"
+}
