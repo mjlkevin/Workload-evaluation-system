@@ -132,7 +132,7 @@ test('RP-045 branch topology intake is registered once with issue-first traceabi
   );
   const matches = registry.issues.filter((issue) => issue.id === 'ISS-2026-08-02-001');
 
-  assert.equal(registry.updatedAt, '2026-08-02');
+  assert.equal(registry.updatedAt, '2026-08-03');
   assert.equal(matches.length, 1);
   assert.equal(matches[0].title, '项目看板缺少主分支与子分支拓扑');
   assert.equal(matches[0].triageStatus, 'converted');
@@ -149,4 +149,18 @@ test('RP-045 branch topology intake is registered once with issue-first traceabi
       && item.includes('script')
       && item.includes('operational topology + complete ledger')),
   );
+});
+
+test('RP-031 multi-knowledge routing intake extends the existing requirement once', () => {
+  const registry = JSON.parse(
+    readProjectFile('03_技术设计/系统架构/WES-Agent-升级总看板/work-items/board-work-items.json'),
+  );
+  const matches = registry.issues.filter((issue) => issue.id === 'ISS-2026-08-03-001');
+
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].title, 'WES 缺少多知识库意图路由能力');
+  assert.equal(matches[0].triageStatus, 'converted');
+  assert.deepEqual(matches[0].disposition, { type: 'requirement', ref: 'RP-031' });
+  assert.equal(matches[0].priority, 'P1');
+  assert.ok(matches[0].evidence.includes('RP-031 C2/M1'));
 });

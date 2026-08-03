@@ -442,7 +442,37 @@ export type ImplementationDependencyRulesStore = {
 /** 智谱知识库凭证配置 */
 export type KnowledgeBaseCredentialsConfig = {
   apiKey: string;
+  /** @deprecated 旧版单知识库字段；读取时迁移到 knowledgeBases。 */
   knowledgeId: string;
+};
+
+export type KnowledgeBaseProfile = {
+  /** WES 内部稳定标识，不等同供应商 Knowledge ID。 */
+  id: string;
+  name: string;
+  description: string;
+  knowledgeId: string;
+  routingKeywords: string[];
+  /** 空数组表示所有已认证业务角色均可访问。 */
+  allowedBusinessRoles: BusinessRole[];
+  enabled: boolean;
+  isDefault: boolean;
+  /** 数值越小，路由同分与回退时越优先。 */
+  priority: number;
+};
+
+export type KnowledgeRetrievalParams = {
+  topK: number;
+  topN: number;
+  recallMethod: "mixed" | "vector" | "keyword";
+  rerankStatus: 0 | 1;
+  rerankModel: string;
+  fractionalThreshold: number;
+};
+
+export type KnowledgePromptProfile = {
+  id: string;
+  version: number;
 };
 
 /** 知识库配置（含模型与 API 地址） */
@@ -450,6 +480,10 @@ export type KnowledgeBaseConfig = {
   model: string;
   apiBaseUrl: string;
   credentials: KnowledgeBaseCredentialsConfig;
+  knowledgeBases: KnowledgeBaseProfile[];
+  retrievalParams: KnowledgeRetrievalParams;
+  /** 旧版持久化数据可缺省，读取时由 repository 补齐。 */
+  promptProfile?: KnowledgePromptProfile;
 };
 
 /** 返回给前端的密钥展示 */
@@ -465,10 +499,24 @@ export type KnowledgeBaseConfigPublic = Omit<KnowledgeBaseConfig, "credentials">
   credentials: KnowledgeBaseCredentialsPublic;
 };
 
+export type KnowledgeBaseProbeRecord = {
+  status: "success" | "failure";
+  configHash: string;
+  checkedAt: string;
+  latencyMs: number;
+  profileId?: string;
+  warning?: "retrieval_empty";
+  providerRequestId?: string;
+  errorCode?: string;
+};
+
 export type KnowledgeBaseConfigStore = {
   version: number;
   draft: KnowledgeBaseConfig;
   active: KnowledgeBaseConfig;
+  probes?: Record<string, KnowledgeBaseProbeRecord>;
+  /** @deprecated 旧版单知识库 probe，读取后仅用于迁移兼容。 */
+  probe?: KnowledgeBaseProbeRecord;
   updatedAt: string;
   effectiveAt: string;
 };

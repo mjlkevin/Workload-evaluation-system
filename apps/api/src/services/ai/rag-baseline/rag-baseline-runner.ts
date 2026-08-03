@@ -9,6 +9,8 @@
 // - 支持注入 query 函数，便于测试验证调用次数
 // ============================================================
 
+import { createHash } from "node:crypto";
+
 import {
   queryZhipuKnowledgeBase,
   type ZhipuKnowledgeToolConfig,
@@ -28,6 +30,8 @@ export type RagBaselineSample = {
   expectedKeywords?: string[];
   /** 期望引用的文档名（用于引用准确率评分） */
   expectedDocs?: string[];
+  /** 该问题在受控知识库中是否应当有答案 */
+  expectAnswer?: boolean;
 };
 
 /** 单条样本评测结果 */
@@ -51,6 +55,16 @@ export type RagBaselineResult = {
   fallbackReason?: string;
   /** 模型使用的 token 数 */
   totalTokens: number;
+  /** 对“应有答案 / 应无答案”的判定是否正确 */
+  answerableCorrect: boolean;
+};
+
+export type RagBaselineFingerprints = {
+  dataset: string;
+  knowledge: string;
+  config: string;
+  prompt: string;
+  scorer: string;
 };
 
 /** 整批评测汇总 */
@@ -61,7 +75,16 @@ export type RagBaselineReport = {
   avgDocRecallRate: number;
   highConfidenceRate: number;
   fallbackRate: number;
+  p95LatencyMs: number;
+  avgTokens: number;
+  answerableAccuracy: number;
+  fingerprints: RagBaselineFingerprints;
   results: RagBaselineResult[];
+};
+
+export type RagBaselineRunMetadata = {
+  datasetFingerprint?: string;
+  knowledgeFingerprint?: string;
 };
 
 // ── 评分工具函数 ─────────────────────────────────────────────
@@ -77,9 +100,33 @@ export function computeKeywordHitRate(answer: string, expectedKeywords: string[]
 /** 计算文档引用召回率 */
 export function computeDocRecallRate(chunks: KnowledgeChunk[], expectedDocs: string[]): number {
   if (expectedDocs.length === 0) return 1;
-  const chunkDocs = new Set(chunks.map((c) => c.docName.toLowerCase()));
-  const hits = expectedDocs.filter((d) => chunkDocs.has(d.toLowerCase()));
+  const chunkDocs = chunks.map((c) => c.docName.toLowerCase());
+  const hits = expectedDocs.filter((d) => {
+    const expected = d.toLowerCase();
+    return chunkDocs.some((actual) => actual === expected || actual.includes(expected) || expected.includes(actual));
+  });
   return hits.length / expectedDocs.length;
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function p95(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)];
+}
+
+function safeConfigFingerprint(config: ZhipuKnowledgeToolConfig): string {
+  return sha256(JSON.stringify({
+    model: config.model || "",
+    apiBaseUrl: config.apiBaseUrl || "",
+    retrievalParams: config.retrievalParams || {},
+    promptProfile: config.promptProfile || {},
+    configVersion: config.configVersion || 0,
+    hasCredential: Boolean(config.apiKey),
+  }));
 }
 
 // ── 查询函数类型（可注入，便于测试） ─────────────────────────
@@ -102,9 +149,11 @@ export type KnowledgeQueryFn = (
 export async function runRagBaseline(
   samples: RagBaselineSample[],
   config: ZhipuKnowledgeToolConfig = {},
-  queryFn: KnowledgeQueryFn = (q, conf) => queryZhipuKnowledgeBase(q, conf)
+  queryFn: KnowledgeQueryFn = (q, conf) => queryZhipuKnowledgeBase(q, conf),
+  metadata: RagBaselineRunMetadata = {},
 ): Promise<RagBaselineReport> {
   const results: RagBaselineResult[] = [];
+  let promptFingerprint = "";
 
   for (const sample of samples) {
     // 每条样本仅调用一次 queryFn（内部已包含检索 + 生成）
@@ -121,6 +170,10 @@ export async function runRagBaseline(
     );
 
     const docRecallRate = computeDocRecallRate(chunks, sample.expectedDocs ?? []);
+    if (!promptFingerprint && trace.prompt?.hash) promptFingerprint = trace.prompt.hash;
+    const answerableCorrect = sample.expectAnswer === false
+      ? trace.fallbackReason === "retrieval_empty" || /未找到|未检索到|没有相关内容/.test(trace.answer)
+      : !trace.fallbackReason && keywordHitRate > 0;
 
     results.push({
       sampleId: sample.id,
@@ -134,17 +187,31 @@ export async function runRagBaseline(
       confidence: trace.confidence,
       fallbackReason: trace.fallbackReason,
       totalTokens: trace.totalTokens,
+      answerableCorrect,
     });
   }
 
-  const n = results.length || 1;
+  const n = results.length;
+  const denominator = n || 1;
+  const datasetFingerprint = metadata.datasetFingerprint || sha256(JSON.stringify(samples));
+  const knowledgeFingerprint = metadata.knowledgeFingerprint || sha256(String(config.knowledgeId || "unconfigured"));
   return {
-    sampleCount: results.length,
-    avgLatencyMs: results.reduce((s, r) => s + r.latencyMs, 0) / n,
-    avgKeywordHitRate: results.reduce((s, r) => s + r.keywordHitRate, 0) / n,
-    avgDocRecallRate: results.reduce((s, r) => s + r.docRecallRate, 0) / n,
-    highConfidenceRate: results.filter((r) => r.confidence === "high").length / n,
-    fallbackRate: results.filter((r) => r.fallbackReason != null).length / n,
+    sampleCount: n,
+    avgLatencyMs: results.reduce((s, r) => s + r.latencyMs, 0) / denominator,
+    avgKeywordHitRate: results.reduce((s, r) => s + r.keywordHitRate, 0) / denominator,
+    avgDocRecallRate: results.reduce((s, r) => s + r.docRecallRate, 0) / denominator,
+    highConfidenceRate: results.filter((r) => r.confidence === "high").length / denominator,
+    fallbackRate: results.filter((r) => r.fallbackReason != null).length / denominator,
+    p95LatencyMs: p95(results.map((item) => item.latencyMs)),
+    avgTokens: results.reduce((sum, item) => sum + item.totalTokens, 0) / denominator,
+    answerableAccuracy: results.filter((item) => item.answerableCorrect).length / denominator,
+    fingerprints: {
+      dataset: datasetFingerprint,
+      knowledge: knowledgeFingerprint,
+      config: safeConfigFingerprint(config),
+      prompt: promptFingerprint || sha256(JSON.stringify(config.promptProfile || { id: "rag-answer", version: 1 })),
+      scorer: sha256("wes-rag-scorer-v1:keyword-doc-answerable-p95-token"),
+    },
     results,
   };
 }

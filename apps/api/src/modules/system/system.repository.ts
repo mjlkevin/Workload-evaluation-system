@@ -1,13 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import {
+  BusinessRole,
   ImplementationDependencyRuleItem,
   ImplementationDependencyRulesConfig,
   ImplementationDependencyRulesStore,
   KnowledgeBaseConfig,
   KnowledgeBaseConfigStore,
   KnowledgeBaseCredentialsConfig,
+  KnowledgeBaseProfile,
+  KnowledgeBaseProbeRecord,
+  KnowledgeRetrievalParams,
+  KnowledgePromptProfile,
   RequirementKimiCredentialsConfig,
   RequirementSystemConfig,
   RequirementSystemConfigStore,
@@ -796,28 +802,236 @@ export function normalizeImplementationDependencyRulesConfig(input: unknown): Im
 
 // -------------------- 知识库配置 --------------------
 
+export const DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS: KnowledgeRetrievalParams = {
+  topK: 8,
+  topN: 20,
+  recallMethod: "mixed",
+  rerankStatus: 1,
+  rerankModel: "rerank",
+  fractionalThreshold: 0.2,
+};
+
+export const DEFAULT_KNOWLEDGE_PROMPT_PROFILE: KnowledgePromptProfile = {
+  id: "rag-answer",
+  version: 1,
+};
+
+const KNOWLEDGE_BASE_BUSINESS_ROLES: BusinessRole[] = [
+  "sales",
+  "pre_sales",
+  "delivery",
+  "pm",
+  "pmo",
+  "dev",
+  "admin",
+];
+
+export function normalizeKnowledgeRetrievalParams(input: unknown): KnowledgeRetrievalParams {
+  const source = (input || {}) as Partial<KnowledgeRetrievalParams>;
+  const topK = Math.trunc(clampNumber(source.topK, 1, 50, DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.topK));
+  const topN = Math.max(
+    topK,
+    Math.trunc(clampNumber(source.topN, 1, 100, DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.topN)),
+  );
+  const recallMethod = source.recallMethod === "vector" || source.recallMethod === "keyword"
+    ? source.recallMethod
+    : "mixed";
+  return {
+    topK,
+    topN,
+    recallMethod,
+    rerankStatus: source.rerankStatus === 0 ? 0 : 1,
+    rerankModel: typeof source.rerankModel === "string" && source.rerankModel.trim()
+      ? source.rerankModel.trim()
+      : DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.rerankModel,
+    fractionalThreshold: clampNumber(
+      source.fractionalThreshold,
+      0,
+      1,
+      DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.fractionalThreshold,
+    ),
+  };
+}
+
+export function normalizeKnowledgePromptProfile(input: unknown): KnowledgePromptProfile {
+  const source = (input || {}) as Partial<KnowledgePromptProfile>;
+  const id = typeof source.id === "string" && source.id.trim()
+    ? source.id.trim().slice(0, 64)
+    : DEFAULT_KNOWLEDGE_PROMPT_PROFILE.id;
+  const version = Number.isInteger(Number(source.version)) && Number(source.version) > 0
+    ? Math.trunc(Number(source.version))
+    : DEFAULT_KNOWLEDGE_PROMPT_PROFILE.version;
+  return { id, version };
+}
+
 function createDefaultKnowledgeBaseConfig(): KnowledgeBaseConfig {
   return {
     model: "glm-4.6",
     apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-    credentials: {
-      apiKey: "",
-      knowledgeId: "",
-    },
+    credentials: { apiKey: "", knowledgeId: "" },
+    knowledgeBases: [],
+    retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS },
+    promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE },
   };
+}
+
+function normalizeKnowledgeBaseProfile(input: unknown, index: number): KnowledgeBaseProfile {
+  const source = (input || {}) as Partial<KnowledgeBaseProfile>;
+  const rawId = String(source.id || `knowledge-base-${index + 1}`).trim().toLowerCase();
+  const id = rawId
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || `knowledge-base-${index + 1}`;
+  const routingKeywords = Array.isArray(source.routingKeywords)
+    ? Array.from(new Set(source.routingKeywords
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)))
+      .slice(0, 30)
+    : [];
+  const allowedBusinessRoles = Array.isArray(source.allowedBusinessRoles)
+    ? Array.from(new Set(source.allowedBusinessRoles.filter(
+      (item): item is BusinessRole => KNOWLEDGE_BASE_BUSINESS_ROLES.includes(item as BusinessRole),
+    )))
+    : [];
+  return {
+    id,
+    name: String(source.name || "").trim().slice(0, 80),
+    description: String(source.description || "").trim().slice(0, 500),
+    knowledgeId: String(source.knowledgeId || "").trim().slice(0, 160),
+    routingKeywords,
+    allowedBusinessRoles,
+    enabled: source.enabled !== false,
+    isDefault: source.isDefault === true,
+    priority: Math.trunc(clampNumber(source.priority, 0, 999, 100)),
+  };
+}
+
+function legacyKnowledgeBaseProfile(knowledgeId: string): KnowledgeBaseProfile {
+  return {
+    id: "legacy-default",
+    name: "默认知识库",
+    description: "由旧版单知识库配置自动迁移",
+    knowledgeId,
+    routingKeywords: [],
+    allowedBusinessRoles: [],
+    enabled: true,
+    isDefault: true,
+    priority: 100,
+  };
+}
+
+export type KnowledgeBaseProfileValidationIssue = {
+  field: string;
+  reason: string;
+  profileId?: string;
+};
+
+export function validateKnowledgeBaseProfiles(
+  profiles: KnowledgeBaseProfile[],
+): KnowledgeBaseProfileValidationIssue[] {
+  const issues: KnowledgeBaseProfileValidationIssue[] = [];
+  const ids = new Set<string>();
+  const knowledgeIds = new Set<string>();
+  for (const profile of profiles) {
+    if (!profile.id) issues.push({ field: "knowledgeBases.id", reason: "profile_id_required" });
+    else if (ids.has(profile.id)) issues.push({ field: "knowledgeBases.id", reason: "duplicate_profile_id", profileId: profile.id });
+    else ids.add(profile.id);
+    if (profile.enabled && !profile.name) {
+      issues.push({ field: "knowledgeBases.name", reason: "profile_name_required", profileId: profile.id });
+    }
+    if (profile.enabled && !profile.knowledgeId) {
+      issues.push({ field: "knowledgeBases.knowledgeId", reason: "knowledge_id_required", profileId: profile.id });
+    } else if (profile.knowledgeId && knowledgeIds.has(profile.knowledgeId)) {
+      issues.push({ field: "knowledgeBases.knowledgeId", reason: "duplicate_knowledge_id", profileId: profile.id });
+    } else if (profile.knowledgeId) {
+      knowledgeIds.add(profile.knowledgeId);
+    }
+  }
+  if (profiles.filter((profile) => profile.enabled && profile.isDefault).length > 1) {
+    issues.push({ field: "knowledgeBases.isDefault", reason: "multiple_default_profiles" });
+  }
+  return issues;
 }
 
 export function normalizeKnowledgeBaseConfig(input: unknown): KnowledgeBaseConfig {
   const base = createDefaultKnowledgeBaseConfig();
   const source = (input || {}) as Partial<KnowledgeBaseConfig>;
   const credentials = (source.credentials || {}) as Partial<KnowledgeBaseCredentialsConfig>;
+  const legacyKnowledgeId = String(credentials.knowledgeId ?? base.credentials.knowledgeId).trim();
+  const knowledgeBases = Array.isArray(source.knowledgeBases)
+    ? source.knowledgeBases.slice(0, 50).map(normalizeKnowledgeBaseProfile)
+    : legacyKnowledgeId
+      ? [legacyKnowledgeBaseProfile(legacyKnowledgeId)]
+      : [];
   return {
     model: String(source.model || base.model).trim(),
     apiBaseUrl: String(source.apiBaseUrl || base.apiBaseUrl).trim(),
     credentials: {
-      apiKey: String(credentials.apiKey ?? base.credentials.apiKey ?? "").trim(),
-      knowledgeId: String(credentials.knowledgeId ?? base.credentials.knowledgeId ?? "").trim(),
+      apiKey: String(credentials.apiKey ?? base.credentials.apiKey).trim(),
+      knowledgeId: legacyKnowledgeId,
     },
+    knowledgeBases,
+    retrievalParams: normalizeKnowledgeRetrievalParams(source.retrievalParams),
+    promptProfile: normalizeKnowledgePromptProfile(source.promptProfile),
+  };
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+export function computeKnowledgeBaseConfigHash(input: KnowledgeBaseConfig): string {
+  const normalized = normalizeKnowledgeBaseConfig(input);
+  return sha256(JSON.stringify({
+    model: normalized.model,
+    apiBaseUrl: normalized.apiBaseUrl,
+    credentials: {
+      apiKeyHash: sha256(normalized.credentials.apiKey),
+      knowledgeId: normalized.credentials.knowledgeId,
+    },
+    knowledgeBases: normalized.knowledgeBases,
+    retrievalParams: normalized.retrievalParams,
+    promptProfile: normalized.promptProfile,
+  }));
+}
+
+export function computeKnowledgeBaseProfileHash(
+  input: KnowledgeBaseConfig,
+  profile: KnowledgeBaseProfile,
+): string {
+  const normalized = normalizeKnowledgeBaseConfig(input);
+  const normalizedProfile = normalizeKnowledgeBaseProfile(profile, 0);
+  return sha256(JSON.stringify({
+    model: normalized.model,
+    apiBaseUrl: normalized.apiBaseUrl,
+    apiKeyHash: sha256(normalized.credentials.apiKey),
+    retrievalParams: normalized.retrievalParams,
+    promptProfile: normalized.promptProfile,
+    profile: normalizedProfile,
+  }));
+}
+
+function normalizeKnowledgeBaseProbe(input: unknown): KnowledgeBaseProbeRecord | undefined {
+  const source = (input || {}) as Partial<KnowledgeBaseProbeRecord>;
+  const checkedAt = String(source.checkedAt || "");
+  const configHash = String(source.configHash || "");
+  if (
+    (source.status !== "success" && source.status !== "failure")
+    || !/^[0-9a-f]{64}$/i.test(configHash)
+    || !Number.isFinite(Date.parse(checkedAt))
+  ) return undefined;
+  const providerRequestId = String(source.providerRequestId || "").trim();
+  const errorCode = String(source.errorCode || "").trim();
+  const profileId = String(source.profileId || "").trim();
+  return {
+    status: source.status,
+    configHash,
+    checkedAt,
+    latencyMs: Math.max(0, Number(source.latencyMs) || 0),
+    ...(profileId ? { profileId: profileId.slice(0, 64) } : {}),
+    ...(source.warning === "retrieval_empty" ? { warning: source.warning } : {}),
+    ...(providerRequestId ? { providerRequestId: providerRequestId.slice(0, 128) } : {}),
+    ...(errorCode ? { errorCode: errorCode.slice(0, 64) } : {}),
   };
 }
 
@@ -826,10 +1040,19 @@ function normalizeKnowledgeBaseStore(input: unknown): KnowledgeBaseConfigStore {
   const now = new Date().toISOString();
   const draft = normalizeKnowledgeBaseConfig(data.draft);
   const active = normalizeKnowledgeBaseConfig(data.active || data.draft);
+  const probe = normalizeKnowledgeBaseProbe(data.probe);
+  const rawProbes = data.probes && typeof data.probes === "object" && !Array.isArray(data.probes)
+    ? data.probes
+    : {};
+  const probes = Object.fromEntries(Object.entries(rawProbes)
+    .map(([profileId, value]) => [profileId, normalizeKnowledgeBaseProbe(value)] as const)
+    .filter((entry): entry is [string, KnowledgeBaseProbeRecord] => Boolean(entry[1])));
   return {
     version: Number.isFinite(Number(data.version)) ? Math.max(1, Number(data.version)) : 1,
     draft,
     active,
+    ...(Object.keys(probes).length ? { probes } : {}),
+    ...(probe ? { probe } : {}),
     updatedAt: String(data.updatedAt || now),
     effectiveAt: String(data.effectiveAt || now),
   };
@@ -900,17 +1123,25 @@ export function resolveActiveKnowledgeBaseConfig(): {
   knowledgeId: string;
   model: string;
   apiBaseUrl: string;
+  retrievalParams: KnowledgeRetrievalParams;
+  promptProfile: KnowledgePromptProfile;
+  configVersion: number;
   source: "store" | "env" | "none";
 } {
   const store = loadKnowledgeBaseConfigStore();
   const storeApiKey = store.active.credentials.apiKey.trim();
-  const storeKnowledgeId = store.active.credentials.knowledgeId.trim();
+  const activeProfile = store.active.knowledgeBases.find((profile) => profile.enabled && profile.isDefault)
+    || store.active.knowledgeBases.find((profile) => profile.enabled);
+  const storeKnowledgeId = activeProfile?.knowledgeId.trim() || store.active.credentials.knowledgeId.trim();
   if (storeApiKey && storeKnowledgeId) {
     return {
       apiKey: storeApiKey,
       knowledgeId: storeKnowledgeId,
       model: store.active.model,
       apiBaseUrl: store.active.apiBaseUrl,
+      retrievalParams: store.active.retrievalParams,
+      promptProfile: normalizeKnowledgePromptProfile(store.active.promptProfile),
+      configVersion: store.version,
       source: "store",
     };
   }
@@ -922,36 +1153,110 @@ export function resolveActiveKnowledgeBaseConfig(): {
       knowledgeId: envKnowledgeId,
       model: config.zhipu.model,
       apiBaseUrl: config.zhipu.apiBaseUrl,
+      retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS },
+      promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE },
+      configVersion: store.version,
       source: "env",
     };
   }
-  return { apiKey: "", knowledgeId: "", model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "none" };
+  return { apiKey: "", knowledgeId: "", model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE }, configVersion: store.version, source: "none" };
+}
+
+export type ResolvedActiveKnowledgeBaseCatalog = {
+  apiKey: string;
+  model: string;
+  apiBaseUrl: string;
+  retrievalParams: KnowledgeRetrievalParams;
+  promptProfile: KnowledgePromptProfile;
+  configVersion: number;
+  profiles: KnowledgeBaseProfile[];
+  source: "store" | "env" | "none";
+};
+
+/** 运行时多知识库目录：共享同一智谱账号与检索参数。 */
+export function resolveActiveKnowledgeBaseCatalog(): ResolvedActiveKnowledgeBaseCatalog {
+  const store = loadKnowledgeBaseConfigStore();
+  const storeApiKey = store.active.credentials.apiKey.trim();
+  const envApiKey = config.zhipu.apiKey.trim();
+  const profiles = store.active.knowledgeBases.filter((profile) => profile.enabled);
+  if (profiles.length && (storeApiKey || envApiKey)) {
+    return {
+      apiKey: storeApiKey || envApiKey,
+      model: store.active.model,
+      apiBaseUrl: store.active.apiBaseUrl,
+      retrievalParams: store.active.retrievalParams,
+      promptProfile: normalizeKnowledgePromptProfile(store.active.promptProfile),
+      configVersion: store.version,
+      profiles,
+      source: storeApiKey ? "store" : "env",
+    };
+  }
+  const envKnowledgeId = config.zhipu.knowledgeId.trim();
+  if (envApiKey && envKnowledgeId) {
+    return {
+      apiKey: envApiKey,
+      model: config.zhipu.model,
+      apiBaseUrl: config.zhipu.apiBaseUrl,
+      retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS },
+      promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE },
+      configVersion: store.version,
+      profiles: [{
+        id: "environment-default",
+        name: "环境变量知识库",
+        description: "由环境变量提供的兼容知识库",
+        knowledgeId: envKnowledgeId,
+        routingKeywords: [],
+        allowedBusinessRoles: [],
+        enabled: true,
+        isDefault: true,
+        priority: 100,
+      }],
+      source: "env",
+    };
+  }
+  return {
+    apiKey: "",
+    model: config.zhipu.model,
+    apiBaseUrl: config.zhipu.apiBaseUrl,
+    retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS },
+    promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE },
+    configVersion: store.version,
+    profiles: [],
+    source: "none",
+  };
 }
 
 /** 测试连接：显式传入优先；否则草稿仓库；再否则环境变量 */
 export function resolveDraftKnowledgeBaseConfigForTest(
   overrideApiKey?: string,
   overrideKnowledgeId?: string,
+  profileId?: string,
 ): {
   apiKey: string;
   knowledgeId: string;
   model: string;
   apiBaseUrl: string;
+  retrievalParams: KnowledgeRetrievalParams;
+  promptProfile: KnowledgePromptProfile;
   source: "override" | "draft" | "env" | "none";
 } {
   const oKey = overrideApiKey?.trim() || "";
   const oKid = overrideKnowledgeId?.trim() || "";
-  if (oKey && oKid) return { apiKey: oKey, knowledgeId: oKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "override" };
   const store = loadKnowledgeBaseConfigStore();
+  if (oKey && oKid) return { apiKey: oKey, knowledgeId: oKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, retrievalParams: store.draft.retrievalParams, promptProfile: normalizeKnowledgePromptProfile(store.draft.promptProfile), source: "override" };
   const draftKey = store.draft.credentials.apiKey.trim();
-  const draftKid = store.draft.credentials.knowledgeId.trim();
+  const selectedProfile = profileId
+    ? store.draft.knowledgeBases.find((profile) => profile.id === profileId)
+    : store.draft.knowledgeBases.find((profile) => profile.enabled && profile.isDefault)
+      || store.draft.knowledgeBases.find((profile) => profile.enabled);
+  const draftKid = selectedProfile?.knowledgeId.trim() || store.draft.credentials.knowledgeId.trim();
   if (draftKey && draftKid) {
-    return { apiKey: oKey || draftKey, knowledgeId: oKid || draftKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, source: "draft" };
+    return { apiKey: oKey || draftKey, knowledgeId: oKid || draftKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, retrievalParams: store.draft.retrievalParams, promptProfile: normalizeKnowledgePromptProfile(store.draft.promptProfile), source: "draft" };
   }
   const envKey = config.zhipu.apiKey.trim();
   const envKid = config.zhipu.knowledgeId.trim();
   if (envKey && envKid) {
-    return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "env" };
+    return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE }, source: "env" };
   }
-  return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, source: "none" };
+  return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE }, source: "none" };
 }

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-02",
+  "updatedAt": "2026-08-03",
   "issues": [
     {
       "id": "ISS-2026-07-02-001",
@@ -361,6 +361,25 @@
       },
       "priority": "P1",
       "next": "按已确认规格实施自动 Git 快照、branches.html、完整分支台账，并完成 1440px 与 760px 双视口验收。"
+    },
+    {
+      "id": "ISS-2026-08-03-001",
+      "date": "2026-08-03",
+      "title": "WES 缺少多知识库意图路由能力",
+      "source": "user_architecture_question",
+      "rawFeedback": "当前只连接金蝶解决方案知识库，资金计划与网上银行问题未命中；需确认 WES 能否管理多个知识库，并由 AI 按用户意图自动选择检索目标。",
+      "evidence": [
+        "RP-031 C2/M1",
+        "docs/superpowers/specs/2026-08-03-rp-031-multi-knowledge-routing-design.md",
+        "apps/api/src/services/ai/knowledge-base-router.service.ts"
+      ],
+      "triageStatus": "converted",
+      "disposition": {
+        "type": "requirement",
+        "ref": "RP-031"
+      },
+      "priority": "P1",
+      "next": "第一批已实现多库配置、权限前置、意图路由、一次受控回退和 Trace；待集成并以第二个真实知识库完成路由质量实测。"
     }
   ],
   "defects": [

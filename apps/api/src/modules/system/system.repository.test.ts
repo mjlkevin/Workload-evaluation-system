@@ -4,7 +4,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { loadRequirementSystemConfigStore } from "./system.repository";
+import {
+  computeKnowledgeBaseConfigHash,
+  computeKnowledgeBaseProfileHash,
+  loadRequirementSystemConfigStore,
+  mergeKnowledgeBaseCredentialsPatch,
+  normalizeKnowledgeBaseConfig,
+  validateKnowledgeBaseProfiles,
+} from "./system.repository";
 
 test("loadRequirementSystemConfigStore: 迁移旧 Kimi 模型到 K2.5 默认模型", () => {
   const originalCwd = process.cwd();
@@ -50,4 +57,166 @@ test("loadRequirementSystemConfigStore: 迁移旧 Kimi 模型到 K2.5 默认模�
     process.chdir(originalCwd);
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
+});
+
+test("knowledge base legacy config receives safe retrieval defaults", () => {
+  const normalized = normalizeKnowledgeBaseConfig({
+    model: "glm-test",
+    credentials: { apiKey: "", knowledgeId: "" },
+  });
+  assert.deepEqual(normalized.retrievalParams, {
+    topK: 8,
+    topN: 20,
+    recallMethod: "mixed",
+    rerankStatus: 1,
+    rerankModel: "rerank",
+    fractionalThreshold: 0.2,
+  });
+});
+
+test("knowledge base retrieval parameters are clamped and internally consistent", () => {
+  const normalized = normalizeKnowledgeBaseConfig({
+    retrievalParams: {
+      topK: 999,
+      topN: 2,
+      recallMethod: "unknown",
+      rerankStatus: 9,
+      rerankModel: "",
+      fractionalThreshold: -1,
+    },
+  });
+  assert.deepEqual(normalized.retrievalParams, {
+    topK: 50,
+    topN: 50,
+    recallMethod: "mixed",
+    rerankStatus: 1,
+    rerankModel: "rerank",
+    fractionalThreshold: 0,
+  });
+});
+
+test("knowledge base credential patch distinguishes keep, replace and clear", () => {
+  const previous = { apiKey: "stored-key", knowledgeId: "stored-kb" };
+  assert.deepEqual(mergeKnowledgeBaseCredentialsPatch(previous, undefined), previous);
+  assert.deepEqual(
+    mergeKnowledgeBaseCredentialsPatch(previous, { apiKey: "", knowledgeId: "" }),
+    previous,
+  );
+  assert.deepEqual(
+    mergeKnowledgeBaseCredentialsPatch(previous, { apiKey: "new-key", knowledgeId: "new-kb" }),
+    { apiKey: "new-key", knowledgeId: "new-kb" },
+  );
+  assert.deepEqual(
+    mergeKnowledgeBaseCredentialsPatch(previous, { apiKey: null, knowledgeId: null }),
+    { apiKey: "", knowledgeId: "" },
+  );
+});
+
+test("knowledge base config hash changes with credentials and retrieval settings", () => {
+  const base = normalizeKnowledgeBaseConfig({
+    model: "glm-test",
+    apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    credentials: { apiKey: "fixture-key", knowledgeId: "kb-one" },
+  });
+  const first = computeKnowledgeBaseConfigHash(base);
+  const changedKnowledge = computeKnowledgeBaseConfigHash({
+    ...base,
+    credentials: { ...base.credentials, knowledgeId: "kb-two" },
+  });
+  const changedRetrieval = computeKnowledgeBaseConfigHash({
+    ...base,
+    retrievalParams: { ...base.retrievalParams, topK: 9 },
+  });
+  assert.match(first, /^[0-9a-f]{64}$/);
+  assert.notEqual(first, changedKnowledge);
+  assert.notEqual(first, changedRetrieval);
+});
+
+test("knowledge base legacy single id migrates into one default profile", () => {
+  const normalized = normalizeKnowledgeBaseConfig({
+    model: "glm-test",
+    credentials: { apiKey: "fixture-key", knowledgeId: "legacy-kb" },
+  });
+
+  assert.equal(normalized.knowledgeBases.length, 1);
+  assert.deepEqual(normalized.knowledgeBases[0], {
+    id: "legacy-default",
+    name: "默认知识库",
+    description: "由旧版单知识库配置自动迁移",
+    knowledgeId: "legacy-kb",
+    routingKeywords: [],
+    allowedBusinessRoles: [],
+    enabled: true,
+    isDefault: true,
+    priority: 100,
+  });
+});
+
+test("knowledge base profiles normalize ids, keywords, roles and a single default", () => {
+  const normalized = normalizeKnowledgeBaseConfig({
+    credentials: { apiKey: "fixture-key", knowledgeId: "" },
+    knowledgeBases: [
+      {
+        id: "  Finance KB  ",
+        name: " 资金方案库 ",
+        description: " 资金、银企方案 ",
+        knowledgeId: " kb-finance ",
+        routingKeywords: ["资金计划", "资金计划", " 网银 "],
+        allowedBusinessRoles: ["pre_sales", "pm", "invalid", "pm"],
+        enabled: true,
+        isDefault: true,
+        priority: -3,
+      },
+    ],
+  });
+
+  assert.deepEqual(normalized.knowledgeBases[0], {
+    id: "finance-kb",
+    name: "资金方案库",
+    description: "资金、银企方案",
+    knowledgeId: "kb-finance",
+    routingKeywords: ["资金计划", "网银"],
+    allowedBusinessRoles: ["pre_sales", "pm"],
+    enabled: true,
+    isDefault: true,
+    priority: 0,
+  });
+});
+
+test("knowledge base profile validation rejects duplicates and multiple defaults", () => {
+  const config = normalizeKnowledgeBaseConfig({
+    credentials: { apiKey: "fixture-key", knowledgeId: "" },
+    knowledgeBases: [
+      { id: "solutions", name: "方案库", knowledgeId: "same", enabled: true, isDefault: true },
+      { id: "solutions", name: "案例库", knowledgeId: "same", enabled: true, isDefault: true },
+    ],
+  });
+
+  assert.deepEqual(validateKnowledgeBaseProfiles(config.knowledgeBases).map((item) => item.reason), [
+    "duplicate_profile_id",
+    "duplicate_knowledge_id",
+    "multiple_default_profiles",
+  ]);
+});
+
+test("knowledge base profile hash binds shared settings and the selected profile only", () => {
+  const config = normalizeKnowledgeBaseConfig({
+    model: "glm-test",
+    apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    credentials: { apiKey: "fixture-key", knowledgeId: "" },
+    knowledgeBases: [
+      { id: "solutions", name: "方案库", knowledgeId: "kb-one", enabled: true, isDefault: true },
+      { id: "cases", name: "案例库", knowledgeId: "kb-two", enabled: true },
+    ],
+  });
+  const first = computeKnowledgeBaseProfileHash(config, config.knowledgeBases[0]);
+  const second = computeKnowledgeBaseProfileHash(config, config.knowledgeBases[1]);
+  const renamedOther = computeKnowledgeBaseProfileHash(
+    { ...config, knowledgeBases: [config.knowledgeBases[0], { ...config.knowledgeBases[1], name: "新案例库" }] },
+    config.knowledgeBases[0],
+  );
+
+  assert.match(first, /^[0-9a-f]{64}$/);
+  assert.notEqual(first, second);
+  assert.equal(first, renamedOther);
 });

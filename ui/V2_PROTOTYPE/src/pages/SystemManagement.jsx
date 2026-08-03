@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PageShell from '../components/Layout/PageShell.jsx'
 import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
+import KnowledgeBaseProfilesPanel from '../components/system/KnowledgeBaseProfilesPanel.jsx'
 import { SYSTEM_MANAGEMENT_SECTIONS, getSystemManagementSectionById } from '../config/systemManagementSections.js'
 import useSystemManagement from '../hooks/useSystemManagement.js'
 import { useToast } from '../hooks/useToast.jsx'
@@ -83,7 +84,8 @@ export default function SystemManagement({ sectionId }) {
   const [editingModel, setEditingModel] = useState(null)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [extInput, setExtInput] = useState('')
-  const [kbTesting, setKbTesting] = useState(false)
+  const [kbTestingProfileId, setKbTestingProfileId] = useState('')
+  const [confirmClearKbKey, setConfirmClearKbKey] = useState(false)
   const [testResultDialog, setTestResultDialog] = useState(false)
   const [testResultForm, setTestResultForm] = useState({ executorName: '', environment: '', account: '', testCaseKey: '', resultStatus: 'passed', screenshotUrl: '', notes: '' })
   const [modelSaveResult, setModelSaveResult] = useState(null)
@@ -121,20 +123,51 @@ export default function SystemManagement({ sectionId }) {
   const handleSaveKbDraft = async () => {
     setKbSaveResult(null)
     const result = await actions.saveKbDraft()
-    if (result.success) {
-      toast.success('知识库配置草稿已保存')
-    } else {
-      toast.error(result.error || '知识库配置草稿保存失败')
-    }
+    setKbSaveResult(result.success
+      ? { ok: true, message: '知识库配置草稿已保存' }
+      : { ok: false, message: result.error || '知识库配置草稿保存失败' })
   }
 
   const handleActivateKb = async () => {
     setKbSaveResult(null)
     const result = await actions.activateKbConfig()
-    if (result.success) {
-      toast.success('知识库配置已生效')
-    } else {
-      toast.error(result.error || '知识库配置生效失败')
+    const probeIssue = result.details?.find?.((item) => item?.field === 'probe' || item?.field?.endsWith?.('.probe'))
+    const probeReason = probeIssue?.reason
+    const profileName = kbConfig.knowledgeBases.find((profile) => profile.id === probeIssue?.profileId)?.name
+    const gateMessage = probeReason === 'config_changed_after_probe'
+      ? profileName
+        ? `${profileName}配置已变更，请重新测试后再生效`
+        : '配置已变更，请重新测试连通性后再生效'
+      : probeReason === 'probe_expired'
+        ? profileName
+          ? `${profileName}的连通性测试已过期，请重新测试后再生效`
+          : '上次连通性测试已过期，请重新测试后再生效'
+        : result.status === 409
+          ? profileName
+            ? `请先测试${profileName}的连通性，再生效配置`
+            : '请先完成当前配置的连通性测试，再生效配置'
+          : null
+    setKbSaveResult(result.success
+      ? { ok: true, message: '知识库配置已生效' }
+      : { ok: false, message: gateMessage || result.error || '知识库配置生效失败' })
+  }
+
+  const handleClearKbKey = async () => {
+    const result = await actions.clearKbApiKeyDraft()
+    setConfirmClearKbKey(false)
+    setKbSaveResult(result.success
+      ? { ok: true, message: '已清除草稿中保存的 API Key；如需影响正在使用的配置，请重新测试并生效' }
+      : { ok: false, message: result.error || '密钥清除失败' })
+  }
+
+  const handleTestKbProfile = async (profileId) => {
+    setKbTestingProfileId(profileId)
+    setKbTestResult(null)
+    try {
+      const result = await actions.testKbConnectivity(profileId)
+      setKbTestResult(result || { ok: false, error: '连通性测试未返回结果' })
+    } finally {
+      setKbTestingProfileId('')
     }
   }
 
@@ -443,26 +476,35 @@ export default function SystemManagement({ sectionId }) {
               </button>
             </div>
 
-            {/* 状态横幅 */}
+            {kbSaveResult && (
+              <div
+                role={kbSaveResult.ok ? 'status' : 'alert'}
+                className={`sys-banner ${kbSaveResult.ok ? 'sys-banner--ok' : 'sys-banner--danger'}`}
+              >
+                <span className="sys-banner__ic">{kbSaveResult.ok ? '✓' : '✗'}</span>
+                <div className="sys-banner__ti">{kbSaveResult.message}</div>
+              </div>
+            )}
+
             <div className={`sys-banner ${kbConfig.resolvedFrom !== 'none' ? 'sys-banner--ok' : 'sys-banner--warn'}`}>
               <span className="sys-banner__ic">{kbConfig.resolvedFrom !== 'none' ? '✓' : '⚠'}</span>
               <div>
                 <div className="sys-banner__ti">
-                  {kbConfig.resolvedFrom === 'store' ? '知识库已配置（来自存储）' : kbConfig.resolvedFrom === 'env' ? '知识库已配置（来自环境变量）' : '知识库未配置'}
+                  {kbConfig.resolvedFrom === 'store' ? '知识库接入已配置（来自存储）' : kbConfig.resolvedFrom === 'env' ? '知识库接入已配置（来自环境变量）' : '知识库接入未配置'}
                 </div>
                 <div className="sys-banner__sub">
-                  {kbConfig.resolvedFrom !== 'none' ? 'AI 工作台可检索真实知识库文档' : '请在下方填写 API Key 和知识库 ID，保存草稿后点击“生效配置”'}
+                  {kbConfig.resolvedFrom !== 'none'
+                    ? `当前草稿包含 ${kbConfig.knowledgeBases.length} 个知识库档案，其中 ${kbConfig.knowledgeBases.filter((item) => item.enabled).length} 个已启用`
+                    : '请填写共享 API Key，新增知识库档案，保存草稿并逐个测试后再生效'}
                 </div>
               </div>
             </div>
 
-            {/* 配置表单 */}
             <div className="sys-card">
               <div className="sys-card__hd">
-                <span className="sys-card__title">智谱知识库配置</span>
+                <span className="sys-card__title">智谱共享接入配置</span>
               </div>
               <div className="sys-card__bd sys-card__bd--col" style={{ paddingTop: 14 }}>
-                {/* API Key */}
                 <div className="sys-field sys-field--loose">
                   <span className="sys-field__lb">API Key</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -482,22 +524,14 @@ export default function SystemManagement({ sectionId }) {
                         清除
                       </button>
                     )}
+                    {kbConfig.apiHint && !kbConfig.apiKey && (
+                      <button type="button" className="btn btn-dan btn-sm" onClick={() => setConfirmClearKbKey(true)}>
+                        清除已保存密钥
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Knowledge ID */}
-                <div className="sys-field sys-field--loose">
-                  <span className="sys-field__lb">知识库 ID</span>
-                  <input
-                    className="input"
-                    style={{ maxWidth: 400 }}
-                    placeholder="输入智谱知识库 ID"
-                    value={kbConfig.knowledgeId}
-                    onChange={(e) => actions.updateKbConfig({ knowledgeId: e.target.value })}
-                  />
-                </div>
-
-                {/* Model + API Base URL */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px,1fr) minmax(240px,2fr)', gap: 12 }}>
                   <div className="sys-field sys-field--loose">
                     <span className="sys-field__lb">模型</span>
@@ -517,45 +551,74 @@ export default function SystemManagement({ sectionId }) {
                   </div>
                 </div>
 
-                {/* 连通性测试 */}
-                <div className="sys-strip">
-                  <span className="sys-strip__tx">
-                    测试知识库连通性，将使用当前填写的凭证调用智谱 API 进行验证。
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    disabled={kbTesting || kbLoading}
-                    onClick={async () => {
-                      setKbTesting(true)
-                      setKbTestResult(null)
-                      try {
-                        const result = await actions.testKbConnectivity()
-                        const r = result || { ok: false, error: '连通性测试未返回结果' }
-                        setKbTestResult(r)
-                        if (r.ok) {
-                          const detail = [
-                            r.model && `模型: ${r.model}`,
-                            r.latencyMs !== undefined && `延迟: ${r.latencyMs}ms`,
-                            r.retrievalTriggered !== undefined && `检索触发: ${r.retrievalTriggered ? '是' : '否'}`,
-                          ].filter(Boolean).join(' · ')
-                          if (r.warning === 'retrieval_empty') {
-                            toast.warn('连通性测试通过，但未检索到文档', { detail, duration: 5000 })
-                          } else {
-                            toast.success('连通性测试通过', { detail, duration: 4000 })
-                          }
-                        } else {
-                          const detail = [r.error, r.status && `HTTP ${r.status}`].filter(Boolean).join(' · ')
-                          toast.error('连通性测试失败', { detail, duration: 6000 })
-                        }
-                      } finally {
-                        setKbTesting(false)
-                      }
-                    }}
-                  >
-                    {kbTesting ? '测试中...' : '测试连通性'}
-                  </button>
-                </div>
+                <fieldset className="kb-retrieval-params">
+                  <legend>检索参数</legend>
+                  <div className="kb-retrieval-params__grid">
+                    <label>
+                      Top K
+                      <input className="input" type="number" min="1" max="50" value={kbConfig.retrievalParams.topK} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, topK: Number(e.target.value) } })} />
+                    </label>
+                    <label>
+                      Top N
+                      <input className="input" type="number" min="1" max="100" value={kbConfig.retrievalParams.topN} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, topN: Number(e.target.value) } })} />
+                    </label>
+                    <label>
+                      召回方式
+                      <select className="input" value={kbConfig.retrievalParams.recallMethod} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, recallMethod: e.target.value } })}>
+                        <option value="mixed">混合检索</option>
+                        <option value="vector">向量检索</option>
+                        <option value="keyword">关键词检索</option>
+                      </select>
+                    </label>
+                    <label>
+                      相似度阈值
+                      <input className="input" type="number" min="0" max="1" step="0.05" value={kbConfig.retrievalParams.fractionalThreshold} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, fractionalThreshold: Number(e.target.value) } })} />
+                    </label>
+                    <label>
+                      重排模型
+                      <input className="input" value={kbConfig.retrievalParams.rerankModel} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, rerankModel: e.target.value } })} />
+                    </label>
+                    <label className="kb-retrieval-params__check">
+                      <input type="checkbox" checked={kbConfig.retrievalParams.rerankStatus === 1} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, rerankStatus: e.target.checked ? 1 : 0 } })} />
+                      启用检索重排
+                    </label>
+                  </div>
+                </fieldset>
+
+                <KnowledgeBaseProfilesPanel
+                  profiles={kbConfig.knowledgeBases}
+                  probes={kbConfig.probes}
+                  disabled={kbLoading || actionLoading.saveKbDraft || actionLoading.activateKbConfig}
+                  testingProfileId={kbTestingProfileId}
+                  onChange={(knowledgeBases) => actions.updateKbConfig({ knowledgeBases })}
+                  onTest={handleTestKbProfile}
+                />
+
+                {kbTestResult && (
+                  <div role={kbTestResult.ok ? 'status' : 'alert'} className={`sys-banner ${kbTestResult.ok ? 'sys-banner--ok' : 'sys-banner--danger'}`}>
+                    <span className="sys-banner__ic">{kbTestResult.ok ? '✓' : '✗'}</span>
+                    <div>
+                      <div className="sys-banner__ti">
+                        {kbTestResult.ok
+                          ? kbTestResult.warning === 'retrieval_empty' ? '连通性测试通过，但未检索到文档' : '连通性测试通过'
+                          : '连通性测试失败'}
+                      </div>
+                      {kbTestResult.ok ? (
+                        <div className="sys-banner__sub">
+                          {[
+                            kbTestResult.model && `模型 ${kbTestResult.model}`,
+                            kbTestResult.knowledgeId && `知识库 ${kbTestResult.knowledgeId}`,
+                            kbTestResult.latencyMs !== undefined && `延迟 ${kbTestResult.latencyMs}ms`,
+                            kbTestResult.retrievalTriggered !== undefined && `检索触发 ${kbTestResult.retrievalTriggered ? '是' : '否'}`,
+                            kbTestResult.testedSource && `凭证来源 ${kbTestResult.testedSource === 'draft_store' ? '草稿存储' : kbTestResult.testedSource === 'environment' ? '环境变量' : '请求参数'}`,
+                          ].filter(Boolean).join(' · ')}
+                        </div>
+                      ) : (
+                        <div className="sys-banner__sub">{[kbTestResult.error || '未知错误', kbTestResult.status && `HTTP ${kbTestResult.status}`].filter(Boolean).join(' · ')}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -992,6 +1055,23 @@ export default function SystemManagement({ sectionId }) {
           </button>
           <button type="button" className="btn btn-dan" onClick={confirmDiscard}>
             放弃修改
+          </button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmClearKbKey}
+        title="清除已保存密钥"
+        description="此操作会从知识库配置草稿中删除 API Key。如要将清除结果正式生效，仍需重新测试连通性并生效配置。"
+        onClose={() => setConfirmClearKbKey(false)}
+        dismissDisabled={actionLoading.clearKbApiKeyDraft}
+      >
+        <DialogActions>
+          <button type="button" className="btn btn-out btn-sm" onClick={() => setConfirmClearKbKey(false)} disabled={actionLoading.clearKbApiKeyDraft}>
+            取消
+          </button>
+          <button type="button" className="btn btn-dan btn-sm" onClick={handleClearKbKey} disabled={actionLoading.clearKbApiKeyDraft}>
+            {actionLoading.clearKbApiKeyDraft ? '清除中...' : '确认清除'}
           </button>
         </DialogActions>
       </Dialog>

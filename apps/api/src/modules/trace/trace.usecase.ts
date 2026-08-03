@@ -35,6 +35,7 @@ import {
  * 将 WorkbenchDispatchData.trace 映射为统一 span 结构。
  */
 export function recordWorkbenchTurnTrace(input: {
+  requestId?: string;
   ownerUserId: string;
   ownerUsername: string;
   aiSessionId?: string;
@@ -55,6 +56,7 @@ export function recordWorkbenchTurnTrace(input: {
     ownerUserId: input.ownerUserId,
     ownerUsername: input.ownerUsername,
     userInputSummary: input.userInputSummary,
+    requestId: input.requestId,
   });
 
   trace.intentResult = {
@@ -84,6 +86,9 @@ export function recordWorkbenchTurnTrace(input: {
   // Span 2: 知识库检索（如有）
   if (input.dispatchTrace.knowledgeTool) {
     const kt = input.dispatchTrace.knowledgeTool;
+    const prompt = kt.prompt && typeof kt.prompt === "object" && !Array.isArray(kt.prompt)
+      ? kt.prompt as Record<string, unknown>
+      : {};
     const knowledgeSpan: TraceSpanData = {
       spanId: createSpanId(),
       parentSpanId: intentSpan.spanId,
@@ -103,6 +108,17 @@ export function recordWorkbenchTurnTrace(input: {
         ...(kt.fallbackReason ? { fallbackReason: kt.fallbackReason } : {}),
         ...(kt.statusCode ? { statusCode: kt.statusCode } : {}),
         ...(kt.errorMessage ? { errorMessage: kt.errorMessage } : {}),
+        ...(kt.requestId ? { requestId: kt.requestId } : {}),
+        ...(kt.providerRequestId ? { providerRequestId: kt.providerRequestId } : {}),
+        ...(kt.retrievalProviderRequestId ? { retrievalProviderRequestId: kt.retrievalProviderRequestId } : {}),
+        ...(kt.configVersion ? { configVersion: kt.configVersion } : {}),
+        ...(prompt.id ? { promptId: prompt.id } : {}),
+        ...(prompt.version ? { promptVersion: prompt.version } : {}),
+        ...(prompt.hash ? { promptHash: prompt.hash } : {}),
+        ...(kt.retrievalParams ? { retrievalParams: kt.retrievalParams } : {}),
+        ...(kt.knowledgeBaseProfileId ? { knowledgeBaseProfileId: kt.knowledgeBaseProfileId } : {}),
+        ...(kt.knowledgeBaseName ? { knowledgeBaseName: kt.knowledgeBaseName } : {}),
+        ...(kt.route ? { route: kt.route } : {}),
       }),
       tokenUsage: {
         promptTokens: Number(kt.promptTokens) || 0,
@@ -157,6 +173,7 @@ export function recordWorkbenchTurnTrace(input: {
 }
 
 export function recordWorkbenchTurnFailureTrace(input: {
+  requestId?: string;
   ownerUserId: string;
   ownerUsername: string;
   aiSessionId?: string;
@@ -171,6 +188,7 @@ export function recordWorkbenchTurnFailureTrace(input: {
     ownerUserId: input.ownerUserId,
     ownerUsername: input.ownerUsername,
     userInputSummary: input.userInputSummary,
+    requestId: input.requestId,
   });
 
   trace.intentResult = {

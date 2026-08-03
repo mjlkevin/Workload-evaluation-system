@@ -441,7 +441,7 @@ function isExplicitReportRequest(text: string): boolean {
 }
 
 export async function homeWorkbenchChat(req: Request, res: Response) {
-  const requestId = randomUUID();
+  const requestId = res.locals?.requestId || randomUUID();
   const user = currentUserFromRequest(req, res);
   if (!user) return;
 
@@ -550,6 +550,7 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
     const modelName = normalizeKimiModelName(config.kimi.model);
 
     const dispatchData = await dispatchHomeWorkbenchTurn({
+      requestId,
       user,
       workflowKey,
       message: userMessage.content,
@@ -592,6 +593,7 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
     // RP-030: 记录 trace（写入失败不影响主响应）
     try {
       recordWorkbenchTurnTrace({
+        requestId,
         ownerUserId: user.id,
         ownerUsername: user.username,
         aiSessionId: session.sessionId,
@@ -631,6 +633,7 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
     const reason = err instanceof Error ? err.message : "home_workbench_chat_failed";
     try {
       recordWorkbenchTurnFailureTrace({
+        requestId,
         ownerUserId: user.id,
         ownerUsername: user.username,
         aiSessionId: traceSessionId,
@@ -661,7 +664,7 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
  * - event: error    data: { code, message }
  */
 export async function homeWorkbenchChatStream(req: Request, res: Response) {
-  const requestId = randomUUID();
+  const requestId = res.locals?.requestId || randomUUID();
   const user = currentUserFromRequest(req, res);
   if (!user) return;
 
@@ -814,6 +817,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
 
     // 调用 dispatchHomeWorkbenchTurn — 复用全部路由逻辑
     const dispatchData = await dispatchHomeWorkbenchTurn({
+      requestId,
       user,
       workflowKey,
       message: userMessage.content,
@@ -861,6 +865,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
     // RP-030: 记录 trace
     try {
       recordWorkbenchTurnTrace({
+        requestId,
         ownerUserId: user.id,
         ownerUsername: user.username,
         aiSessionId: session.sessionId,
@@ -887,6 +892,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
     const reason = err instanceof Error ? err.message : "stream_failed";
     try {
       recordWorkbenchTurnFailureTrace({
+        requestId,
         ownerUserId: user.id,
         ownerUsername: user.username,
         aiSessionId: traceSessionId,

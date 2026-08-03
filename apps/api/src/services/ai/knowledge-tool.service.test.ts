@@ -3,10 +3,10 @@ import test from "node:test";
 
 import { queryZhipuKnowledgeBase, retrieveKnowledgeChunks } from "./knowledge-tool.service";
 
-function createJsonResponse(body: unknown, status = 200): Response {
+function createJsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
   });
 }
 
@@ -38,7 +38,7 @@ test("knowledge tool two-stage: retrieve then generate answer", async () => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const result = await queryZhipuKnowledgeBase(
     "多组织业务往来一般包含哪些模块？",
-    { apiKey: "zhipu-test-key", knowledgeId: "kb-sales", model: "GLM-5V-Turbo", apiBaseUrl: "https://example.test/api/paas/v4" },
+    { apiKey: "zhipu-test-key", knowledgeId: "kb-sales", model: "GLM-5V-Turbo", apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4" },
     async (url, init) => {
       calls.push({ url: String(url), init });
       const urlStr = String(url);
@@ -188,7 +188,7 @@ test("knowledge tool degrades gracefully when answer generation fails", async ()
 test("retrieveKnowledgeChunks parses response correctly", async () => {
   const result = await retrieveKnowledgeChunks(
     "汽配行业痛点",
-    { apiKey: "key", knowledgeId: "kb-1", apiBaseUrl: "https://example.test/api/paas/v4" },
+    { apiKey: "key", knowledgeId: "kb-1", apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4" },
     async () => createJsonResponse({
       data: [
         {
@@ -227,12 +227,98 @@ test("retrieveKnowledgeChunks strips /paas/v4 from base URL", async () => {
   let capturedUrl = "";
   await retrieveKnowledgeChunks(
     "test",
-    { apiKey: "key", knowledgeId: "kb-1", apiBaseUrl: "https://example.test/api/paas/v4" },
+    { apiKey: "key", knowledgeId: "kb-1", apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4" },
     async (url) => {
       capturedUrl = String(url);
       return createJsonResponse({ data: [], code: 200 });
     }
   );
 
-  assert.equal(capturedUrl, "https://example.test/api/llm-application/open/knowledge/retrieve");
+  assert.equal(capturedUrl, "https://open.bigmodel.cn/api/llm-application/open/knowledge/retrieve");
+});
+
+test("retrieveKnowledgeChunks sends configured parameters and trusted request ID", async () => {
+  let body: Record<string, unknown> = {};
+  const result = await retrieveKnowledgeChunks(
+    "configured retrieval",
+    {
+      apiKey: "key",
+      knowledgeId: "kb-1",
+      requestId: "00000000-0000-4000-8000-000000000001",
+      retrievalParams: {
+        topK: 12,
+        topN: 30,
+        recallMethod: "keyword",
+        rerankStatus: 0,
+        rerankModel: "rerank-v2",
+        fractionalThreshold: 0.35,
+      },
+    },
+    async (_url, init) => {
+      body = JSON.parse(String(init?.body || "{}"));
+      return createJsonResponse({ code: 200, data: [] }, 200, { "x-request-id": "provider-retrieve-1" });
+    },
+  );
+  assert.equal(body.top_k, 12);
+  assert.equal(body.top_n, 30);
+  assert.equal(body.recall_method, "keyword");
+  assert.equal(body.rerank_status, 0);
+  assert.equal(body.rerank_model, "rerank-v2");
+  assert.equal(body.fractional_threshold, 0.35);
+  assert.equal(body.request_id, "00000000-0000-4000-8000-000000000001");
+  assert.equal(result.providerRequestId, "provider-retrieve-1");
+});
+
+test("knowledge tool persists request, provider, prompt and config metadata", async () => {
+  const requestId = "00000000-0000-4000-8000-000000000001";
+  const bodies: Array<Record<string, unknown>> = [];
+  const result = await queryZhipuKnowledgeBase(
+    "request correlation",
+    {
+      apiKey: "key",
+      knowledgeId: "kb-1",
+      requestId,
+      configVersion: 3,
+      promptProfile: { id: "rag-answer", version: 1 },
+    },
+    async (url, init) => {
+      bodies.push(JSON.parse(String(init?.body || "{}")));
+      if (String(url).includes("/knowledge/retrieve")) {
+        return createJsonResponse({
+          code: 200,
+          data: [{ text: "fixture", score: 0.9, metadata: { doc_name: "fixture", doc_id: "doc-1" } }],
+        }, 200, { "x-request-id": "provider-retrieve-1" });
+      }
+      return createJsonResponse({
+        id: "provider-generate-1",
+        choices: [{ message: { content: "answer" } }],
+        usage: {},
+      });
+    },
+  );
+  assert.equal(bodies.length, 2);
+  assert.equal(bodies[0].request_id, requestId);
+  assert.equal(bodies[1].request_id, requestId);
+  assert.equal(result.requestId, requestId);
+  assert.equal(result.providerRequestId, "provider-generate-1");
+  assert.equal(result.retrievalProviderRequestId, "provider-retrieve-1");
+  assert.equal(result.configVersion, 3);
+  assert.equal(result.prompt.id, "rag-answer");
+  assert.equal(result.prompt.version, 1);
+  assert.match(result.prompt.hash, /^[0-9a-f]{64}$/);
+});
+
+test("knowledge tool rejects a forbidden production URL before fetch", async () => {
+  let called = false;
+  const result = await queryZhipuKnowledgeBase(
+    "unsafe url",
+    { apiKey: "key", knowledgeId: "kb-1", apiBaseUrl: "http://127.0.0.1:3000" },
+    async () => {
+      called = true;
+      return createJsonResponse({});
+    },
+  );
+  assert.equal(called, false);
+  assert.equal(result.fallbackReason, "retrieval_failed");
+  assert.equal(result.errorMessage, "knowledge_base_url_not_allowed");
 });

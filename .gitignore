@@ -58,6 +58,7 @@ apps/api/.tmp/
 # 本地运行态数据（AI sessions / Trace / password reset tokens）
 data/
 apps/api/data/
+data/rag-baseline-reports/
 config/auth/password-reset-tokens.json
 config/system/knowledge-base-config.json
 

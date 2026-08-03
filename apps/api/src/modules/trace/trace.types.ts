@@ -103,6 +103,8 @@ export type TraceSpanData = {
 
 export type TraceRecord = {
   traceId: string;
+  /** 入站 HTTP 请求关联 ID */
+  requestId?: string;
   /** 来源域 */
   sourceDomain: TraceSourceDomain;
   /** 关联的外部 ID（aiSessionId / harnessRunId 等） */
@@ -207,10 +209,12 @@ export function createTraceRecord(input: {
   ownerUserId: string;
   ownerUsername: string;
   userInputSummary?: string;
+  requestId?: string;
 }): TraceRecord {
   const now = new Date().toISOString();
   return {
     traceId: createTraceId(),
+    ...(input.requestId ? { requestId: input.requestId } : {}),
     sourceDomain: input.sourceDomain,
     sourceId: input.sourceId,
     ownerUserId: input.ownerUserId,

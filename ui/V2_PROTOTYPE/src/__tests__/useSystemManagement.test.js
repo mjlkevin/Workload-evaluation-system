@@ -187,7 +187,13 @@ describe('useSystemManagement', () => {
       actionResult = await result.current.actions.saveKbDraft()
     })
 
-    expect(actionResult).toEqual({ success: false, error: '草稿保存失败' })
+    expect(actionResult).toEqual({
+      success: false,
+      error: '草稿保存失败',
+      status: 500,
+      code: 'SAVE_FAILED',
+      details: undefined,
+    })
     expect(window.alert).not.toHaveBeenCalled()
   })
 })

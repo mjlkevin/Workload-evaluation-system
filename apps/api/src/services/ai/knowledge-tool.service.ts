@@ -5,6 +5,14 @@
 // 阶段二：将检索结果注入 prompt，让模型基于真实文档回答
 // ============================================================
 
+import type { KnowledgePromptProfile, KnowledgeRetrievalParams } from "../../types";
+import {
+  DEFAULT_KNOWLEDGE_PROMPT_PROFILE,
+  normalizeKnowledgeRetrievalParams,
+} from "../../modules/system/system.repository";
+import { assertAllowedZhipuUrl } from "./knowledge-base-url-policy";
+import { renderPrompt, resolvePrompt, type RagPromptVersion } from "./rag-eval/prompt-registry";
+
 export type KnowledgeToolConfidence = "high" | "low";
 
 export type KnowledgeToolFallbackReason =
@@ -19,6 +27,11 @@ export type ZhipuKnowledgeToolConfig = {
   knowledgeId?: string;
   model?: string;
   apiBaseUrl?: string;
+  retrievalParams?: Partial<KnowledgeRetrievalParams>;
+  promptProfile?: Partial<KnowledgePromptProfile>;
+  promptRegistryPath?: string;
+  configVersion?: number;
+  requestId?: string;
 };
 
 /** 知识库检索返回的单个知识片段 */
@@ -37,6 +50,7 @@ export type KnowledgeRetrieveResult = {
   latencyMs: number;
   statusCode: number;
   errorMessage?: string;
+  providerRequestId?: string;
 };
 
 export type ZhipuKnowledgeToolTrace = {
@@ -62,6 +76,28 @@ export type ZhipuKnowledgeToolTrace = {
   topScore: number;
   /** 检索到的知识片段（供 baseline runner 等下游复用，避免重复检索） */
   chunks?: KnowledgeChunk[];
+  requestId?: string;
+  providerRequestId?: string;
+  retrievalProviderRequestId?: string;
+  configVersion?: number;
+  prompt: Pick<RagPromptVersion, "id" | "version" | "hash">;
+  retrievalParams: KnowledgeRetrievalParams;
+  knowledgeBaseProfileId?: string;
+  knowledgeBaseName?: string;
+  route?: {
+    mode: "explicit" | "rule" | "model" | "default" | "unresolved";
+    confidence: number;
+    reason: string;
+    primaryProfileId?: string;
+    fallbackProfileId?: string;
+    attempts: Array<{
+      profileId: string;
+      fallbackReason?: KnowledgeToolFallbackReason;
+      chunksCount: number;
+      topScore: number;
+      contextRef?: string;
+    }>;
+  };
 };
 
 const TOOL_ID = "knowledge_base.query_product_knowledge" as const;
@@ -71,14 +107,6 @@ const DEFAULT_API_BASE_URL = "https://open.bigmodel.cn/api/paas/v4";
 // 检索 API 使用 /api/ 根路径（不含 /paas/v4）
 const RETRIEVE_API_PATH = "/llm-application/open/knowledge/retrieve";
 
-// 检索默认参数
-const DEFAULT_TOP_K = 8;
-const DEFAULT_TOP_N = 20;
-const DEFAULT_RECALL_METHOD = "mixed" as const;
-const DEFAULT_RERANK_STATUS = 1;
-const DEFAULT_RERANK_MODEL = "rerank";
-const DEFAULT_FRACTIONAL_THRESHOLD = 0.2;
-
 function cleanConfigValue(value: string | undefined): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -86,6 +114,21 @@ function cleanConfigValue(value: string | undefined): string {
 function normalizeApiBaseUrl(value: string | undefined): string {
   const raw = cleanConfigValue(value) || DEFAULT_API_BASE_URL;
   return raw.replace(/\/+$/, "");
+}
+
+function normalizePromptProfile(value: Partial<KnowledgePromptProfile> | undefined): KnowledgePromptProfile {
+  const id = typeof value?.id === "string" && value.id.trim()
+    ? value.id.trim()
+    : DEFAULT_KNOWLEDGE_PROMPT_PROFILE.id;
+  const version = Number.isInteger(Number(value?.version)) && Number(value?.version) > 0
+    ? Math.trunc(Number(value?.version))
+    : DEFAULT_KNOWLEDGE_PROMPT_PROFILE.version;
+  return { id, version };
+}
+
+function resolvePromptMetadata(config: ZhipuKnowledgeToolConfig): RagPromptVersion {
+  const profile = normalizePromptProfile(config.promptProfile);
+  return resolvePrompt(profile.id, profile.version, config.promptRegistryPath);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -139,6 +182,16 @@ function extractErrorMessage(payload: unknown): string {
   return asString(asRecord(root.error).message || root.message || root.msg || root.error);
 }
 
+function extractProviderRequestId(response: Response, payload: unknown): string | undefined {
+  const root = asRecord(payload);
+  const data = asRecord(root.data);
+  const fromHeaders = response.headers.get("x-request-id")
+    || response.headers.get("x-zhipu-request-id")
+    || response.headers.get("x-ratelimit-request-id");
+  const value = cleanConfigValue(fromHeaders || asString(root.request_id || root.requestId || root.id || data.request_id));
+  return value ? value.slice(0, 128) : undefined;
+}
+
 async function readJsonSafely(response: Response): Promise<unknown> {
   try {
     return await response.json();
@@ -170,6 +223,12 @@ function lowConfidenceTrace(input: {
   chunksCount?: number;
   topScore?: number;
   chunks?: KnowledgeChunk[];
+  requestId?: string;
+  providerRequestId?: string;
+  retrievalProviderRequestId?: string;
+  configVersion?: number;
+  prompt: Pick<RagPromptVersion, "id" | "version" | "hash">;
+  retrievalParams: KnowledgeRetrievalParams;
 }): ZhipuKnowledgeToolTrace {
   return {
     toolId: TOOL_ID,
@@ -191,6 +250,12 @@ function lowConfidenceTrace(input: {
     chunksCount: input.chunksCount ?? 0,
     topScore: input.topScore ?? 0,
     ...(input.chunks ? { chunks: input.chunks } : {}),
+    ...(input.requestId ? { requestId: input.requestId } : {}),
+    ...(input.providerRequestId ? { providerRequestId: input.providerRequestId } : {}),
+    ...(input.retrievalProviderRequestId ? { retrievalProviderRequestId: input.retrievalProviderRequestId } : {}),
+    ...(input.configVersion ? { configVersion: input.configVersion } : {}),
+    prompt: input.prompt,
+    retrievalParams: input.retrievalParams,
   };
 }
 
@@ -208,6 +273,7 @@ export async function retrieveKnowledgeChunks(
   const apiKey = cleanConfigValue(config.apiKey);
   const knowledgeId = cleanConfigValue(config.knowledgeId);
   const apiBaseUrl = normalizeApiBaseUrl(config.apiBaseUrl);
+  const retrievalParams = normalizeKnowledgeRetrievalParams(config.retrievalParams);
 
   // 检索 API 使用 /api/ 根路径，需要去掉 /paas/v4 后缀
   const retrieveBaseUrl = apiBaseUrl.replace(/\/paas\/v\d+$/, "");
@@ -222,8 +288,11 @@ export async function retrieveKnowledgeChunks(
   }
 
   try {
-    const response = await fetcher(`${retrieveBaseUrl}${RETRIEVE_API_PATH}`, {
+    const retrieveUrl = `${retrieveBaseUrl}${RETRIEVE_API_PATH}`;
+    assertAllowedZhipuUrl(retrieveUrl);
+    const response = await fetcher(retrieveUrl, {
       method: "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
@@ -231,16 +300,18 @@ export async function retrieveKnowledgeChunks(
       body: JSON.stringify({
         query,
         knowledge_ids: [knowledgeId],
-        top_k: DEFAULT_TOP_K,
-        top_n: DEFAULT_TOP_N,
-        recall_method: DEFAULT_RECALL_METHOD,
-        rerank_status: DEFAULT_RERANK_STATUS,
-        rerank_model: DEFAULT_RERANK_MODEL,
-        fractional_threshold: DEFAULT_FRACTIONAL_THRESHOLD,
+        top_k: retrievalParams.topK,
+        top_n: retrievalParams.topN,
+        recall_method: retrievalParams.recallMethod,
+        rerank_status: retrievalParams.rerankStatus,
+        rerank_model: retrievalParams.rerankModel,
+        fractional_threshold: retrievalParams.fractionalThreshold,
+        ...(cleanConfigValue(config.requestId) ? { request_id: cleanConfigValue(config.requestId) } : {}),
       }),
     });
 
     const payload = await readJsonSafely(response);
+    const providerRequestId = extractProviderRequestId(response, payload);
 
     if (!response.ok) {
       return {
@@ -248,6 +319,7 @@ export async function retrieveKnowledgeChunks(
         latencyMs: Date.now() - startedAt,
         statusCode: response.status,
         errorMessage: extractErrorMessage(payload) || response.statusText,
+        ...(providerRequestId ? { providerRequestId } : {}),
       };
     }
 
@@ -260,6 +332,7 @@ export async function retrieveKnowledgeChunks(
         latencyMs: Date.now() - startedAt,
         statusCode: businessCode,
         errorMessage: asString(root.message) || `business_error_${businessCode}`,
+        ...(providerRequestId ? { providerRequestId } : {}),
       };
     }
 
@@ -282,6 +355,7 @@ export async function retrieveKnowledgeChunks(
       chunks,
       latencyMs: Date.now() - startedAt,
       statusCode: response.status,
+      ...(providerRequestId ? { providerRequestId } : {}),
     };
   } catch (error) {
     return {
@@ -302,7 +376,15 @@ async function generateAnswerFromChunks(
   chunks: KnowledgeChunk[],
   config: ZhipuKnowledgeToolConfig,
   fetcher: typeof fetch
-): Promise<{ answer: string; promptTokens: number; completionTokens: number; totalTokens: number; latencyMs: number }> {
+): Promise<{
+  answer: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  latencyMs: number;
+  providerRequestId?: string;
+  prompt: RagPromptVersion;
+}> {
   const startedAt = Date.now();
   const apiKey = cleanConfigValue(config.apiKey);
   const model = cleanConfigValue(config.model) || DEFAULT_MODEL;
@@ -313,19 +395,14 @@ async function generateAnswerFromChunks(
     .map((c, i) => `[文档${i + 1}] ${c.docName}\n${c.text}`)
     .join("\n\n---\n\n");
 
-  const systemPrompt = [
-    "你是产品知识助手。请严格基于以下检索到的文档内容回答用户问题。",
-    "规则：",
-    "1. 如果文档中有相关信息，请综合多个文档给出完整回答，并在引用处标注来源文档编号（如[文档1]）。",
-    "2. 如果文档中没有相关信息，请明确说明'知识库中未找到相关内容'，不要编造答案。",
-    "3. 回答要简洁专业，适合售前顾问参考。",
-    "",
-    "检索到的文档：",
-    contextText,
-  ].join("\n");
+  const prompt = resolvePromptMetadata(config);
+  const systemPrompt = renderPrompt(prompt, { context: contextText });
 
-  const response = await fetcher(`${apiBaseUrl}/chat/completions`, {
+  const answerUrl = `${apiBaseUrl}/chat/completions`;
+  assertAllowedZhipuUrl(answerUrl);
+  const response = await fetcher(answerUrl, {
     method: "POST",
+    redirect: "error",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
@@ -336,6 +413,7 @@ async function generateAnswerFromChunks(
         { role: "system", content: systemPrompt },
         { role: "user", content: query },
       ],
+      ...(cleanConfigValue(config.requestId) ? { request_id: cleanConfigValue(config.requestId) } : {}),
     }),
   });
 
@@ -348,7 +426,16 @@ async function generateAnswerFromChunks(
   const completionTokens = extractCompletionTokens(payload);
   const totalTokens = extractTotalTokens(payload, promptTokens, completionTokens);
 
-  return { answer, promptTokens, completionTokens, totalTokens, latencyMs: Date.now() - startedAt };
+  const providerRequestId = extractProviderRequestId(response, payload);
+  return {
+    answer,
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    latencyMs: Date.now() - startedAt,
+    ...(providerRequestId ? { providerRequestId } : {}),
+    prompt,
+  };
 }
 
 /**
@@ -363,6 +450,35 @@ export async function queryZhipuKnowledgeBase(
   const apiKey = cleanConfigValue(config.apiKey);
   const knowledgeId = cleanConfigValue(config.knowledgeId);
   const model = cleanConfigValue(config.model) || DEFAULT_MODEL;
+  const requestId = cleanConfigValue(config.requestId);
+  const retrievalParams = normalizeKnowledgeRetrievalParams(config.retrievalParams);
+  const promptProfile = normalizePromptProfile(config.promptProfile);
+  let prompt: Pick<RagPromptVersion, "id" | "version" | "hash">;
+  try {
+    const resolved = resolvePromptMetadata(config);
+    prompt = { id: resolved.id, version: resolved.version, hash: resolved.hash };
+  } catch (error) {
+    return lowConfidenceTrace({
+      model,
+      knowledgeId,
+      query,
+      available: Boolean(apiKey && knowledgeId),
+      fallbackReason: "answer_failed",
+      answer: "知识库回答模板不存在，请管理员检查 Prompt 版本配置。",
+      contextRef: `knowledge:${knowledgeId || "unconfigured"}:prompt-unavailable`,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      ...(requestId ? { requestId } : {}),
+      ...(config.configVersion ? { configVersion: config.configVersion } : {}),
+      prompt: { id: promptProfile.id, version: promptProfile.version, hash: "unresolved" },
+      retrievalParams,
+    });
+  }
+  const traceMetadata = {
+    ...(requestId ? { requestId } : {}),
+    ...(config.configVersion ? { configVersion: config.configVersion } : {}),
+    prompt,
+    retrievalParams,
+  };
 
   if (!apiKey || !knowledgeId) {
     return lowConfidenceTrace({
@@ -373,6 +489,7 @@ export async function queryZhipuKnowledgeBase(
       fallbackReason: "missing_config",
       answer: "知识库功能尚未配置（缺少 API Key 或知识库 ID），无法检索真实文档。建议管理员在系统管理 → 知识库中补充配置后重试。",
       contextRef: `knowledge:${knowledgeId || "unconfigured"}:unavailable`,
+      ...traceMetadata,
     });
   }
 
@@ -380,7 +497,8 @@ export async function queryZhipuKnowledgeBase(
   const retrieveResult = await retrieveKnowledgeChunks(query, config, fetcher);
 
   if (retrieveResult.statusCode !== 200 || retrieveResult.chunks.length === 0) {
-    const isServiceError = retrieveResult.statusCode !== 0 && retrieveResult.statusCode !== 200;
+    const isServiceError = Boolean(retrieveResult.errorMessage)
+      || (retrieveResult.statusCode !== 0 && retrieveResult.statusCode !== 200);
     return lowConfidenceTrace({
       model,
       knowledgeId,
@@ -396,6 +514,8 @@ export async function queryZhipuKnowledgeBase(
       errorMessage: retrieveResult.errorMessage,
       chunksCount: 0,
       topScore: 0,
+      ...(retrieveResult.providerRequestId ? { retrievalProviderRequestId: retrieveResult.providerRequestId } : {}),
+      ...traceMetadata,
     });
   }
 
@@ -404,8 +524,9 @@ export async function queryZhipuKnowledgeBase(
 
   // 阶段二：基于检索结果生成回答
   try {
-    const { answer, promptTokens, completionTokens, totalTokens, latencyMs: answerLatency } =
+    const { answer, promptTokens, completionTokens, totalTokens, providerRequestId, prompt: answerPrompt } =
       await generateAnswerFromChunks(query, retrieveResult.chunks, config, fetcher);
+    const answerPromptMetadata = { id: answerPrompt.id, version: answerPrompt.version, hash: answerPrompt.hash };
 
     if (!answer) {
       return lowConfidenceTrace({
@@ -424,6 +545,10 @@ export async function queryZhipuKnowledgeBase(
         chunksCount,
         topScore,
         chunks: retrieveResult.chunks,
+        ...(providerRequestId ? { providerRequestId } : {}),
+        ...(retrieveResult.providerRequestId ? { retrievalProviderRequestId: retrieveResult.providerRequestId } : {}),
+        ...traceMetadata,
+        prompt: answerPromptMetadata,
       });
     }
 
@@ -447,6 +572,10 @@ export async function queryZhipuKnowledgeBase(
       chunksCount,
       topScore,
       chunks: retrieveResult.chunks,
+      ...(providerRequestId ? { providerRequestId } : {}),
+      ...(retrieveResult.providerRequestId ? { retrievalProviderRequestId: retrieveResult.providerRequestId } : {}),
+      ...traceMetadata,
+      prompt: answerPromptMetadata,
     };
   } catch (error) {
     // 检索成功但生成失败：返回检索摘要作为降级回答
@@ -469,6 +598,8 @@ export async function queryZhipuKnowledgeBase(
       chunksCount,
       topScore,
       chunks: retrieveResult.chunks,
+      ...(retrieveResult.providerRequestId ? { retrievalProviderRequestId: retrieveResult.providerRequestId } : {}),
+      ...traceMetadata,
     });
   }
 }

@@ -4,6 +4,30 @@ import { isAuthenticated } from '../api/auth.js'
 import { ApiError } from '../api/errors.js'
 import { unwrapList, unwrapSingle } from '../api/utils.js'
 
+const DEFAULT_KB_RETRIEVAL_PARAMS = {
+  topK: 8,
+  topN: 20,
+  recallMethod: 'mixed',
+  rerankStatus: 1,
+  rerankModel: 'rerank',
+  fractionalThreshold: 0.2,
+}
+
+function legacyKnowledgeBaseProfile(knowledgeId) {
+  if (!knowledgeId) return []
+  return [{
+    id: 'legacy-default',
+    name: '默认知识库',
+    description: '由旧版单知识库配置自动迁移',
+    knowledgeId,
+    routingKeywords: [],
+    allowedBusinessRoles: [],
+    enabled: true,
+    isDefault: true,
+    priority: 100,
+  }]
+}
+
 const DEFAULT_RULES = [
   { module: '总方案', code: 'GL', prefix: 'GL-', format: 'GL-NNNNN', example: 'GL-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
   { module: '需求', code: 'RQ', prefix: 'RQ-', format: 'RQ-NNNNN', example: 'RQ-04001', status: 'active', activatedAt: '2026-01-15T08:00:00Z' },
@@ -127,7 +151,18 @@ export default function useSystemManagement({
   const [prompts, setPrompts] = useState(fallback.prompts)
 
   // --- 知识库配置 ---
-  const [kbConfig, setKbConfig] = useState({ model: 'glm-4.6', apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', apiKey: '', knowledgeId: '', apiHint: null, resolvedFrom: 'none' })
+  const [kbConfig, setKbConfig] = useState({
+    model: 'glm-4.6',
+    apiBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    apiKey: '',
+    knowledgeId: '',
+    knowledgeBases: [],
+    probes: {},
+    apiHint: null,
+    resolvedFrom: 'none',
+    retrievalParams: { ...DEFAULT_KB_RETRIEVAL_PARAMS },
+    promptProfile: { id: 'rag-answer', version: 1 },
+  })
   const [kbLoading, setKbLoading] = useState(false)
 
   // --- 人工测试结果 ---
@@ -148,7 +183,13 @@ export default function useSystemManagement({
         ? { success: true, error: null }
         : { success: true, error: null, data }
     } catch (error) {
-      return { success: false, error: error?.message || '操作失败' }
+      return {
+        success: false,
+        error: error?.message || '操作失败',
+        ...(error?.status != null ? { status: error.status } : {}),
+        ...(error?.code != null ? { code: error.code } : {}),
+        ...(error?.details != null ? { details: error.details } : {}),
+      }
     } finally {
       setActionLoading((prev) => ({ ...prev, [key]: false }))
     }
@@ -344,13 +385,21 @@ export default function useSystemManagement({
         const draft = data.draft || {}
         const active = data.active || {}
         const creds = active.credentials || {}
+        const draftKnowledgeId = draft.credentials?.knowledgeId || creds.knowledgeId || ''
+        const draftProfiles = Array.isArray(draft.knowledgeBases)
+          ? draft.knowledgeBases
+          : legacyKnowledgeBaseProfile(draftKnowledgeId)
         setKbConfig({
           model: draft.model || active.model || 'glm-4.6',
           apiBaseUrl: draft.apiBaseUrl || active.apiBaseUrl || 'https://open.bigmodel.cn/api/paas/v4',
           apiKey: '',
-          knowledgeId: draft.credentials?.knowledgeId || creds.knowledgeId || '',
+          knowledgeId: draftKnowledgeId,
+          knowledgeBases: draftProfiles,
+          probes: data.probes || {},
           apiHint: draft.credentials?.apiHint || creds.apiHint || null,
           resolvedFrom: creds.resolvedFrom || 'none',
+          retrievalParams: { ...DEFAULT_KB_RETRIEVAL_PARAMS, ...(draft.retrievalParams || active.retrievalParams || {}) },
+          promptProfile: draft.promptProfile || active.promptProfile || { id: 'rag-answer', version: 1 },
         })
       }
     } catch (_) { /* keep fallback */ }
@@ -362,22 +411,33 @@ export default function useSystemManagement({
       return Promise.resolve({ success: false, error: '登录已过期，请重新登录' })
     }
     return withAction('saveKbDraft', async () => {
+      const credentials = {
+        ...(kbConfig.apiKey.trim() ? { apiKey: kbConfig.apiKey.trim() } : {}),
+      }
       await apiClient.patch('/system/knowledge-base-config/draft', {
         model: kbConfig.model,
         apiBaseUrl: kbConfig.apiBaseUrl,
-        credentials: {
-          apiKey: kbConfig.apiKey || null,
-          knowledgeId: kbConfig.knowledgeId || null,
-        },
+        credentials,
+        knowledgeBases: kbConfig.knowledgeBases,
+        retrievalParams: kbConfig.retrievalParams,
+        promptProfile: kbConfig.promptProfile,
       })
     })
   }, [enabled, kbConfig, withAction])
+
+  const clearKbApiKeyDraft = useCallback(() => withAction('clearKbApiKeyDraft', async () => {
+    if (!enabled) throw new Error('登录已过期，请重新登录')
+    await apiClient.patch('/system/knowledge-base-config/draft', {
+      credentials: { apiKey: null },
+    })
+    setKbConfig((prev) => ({ ...prev, apiKey: '', apiHint: null }))
+  }), [enabled, withAction])
 
   const activateKbConfig = useCallback(() => withAction('activateKbConfig', async () => {
     if (enabled) await apiClient.post('/system/knowledge-base-config/activate')
   }), [enabled, withAction])
 
-  const testKbConnectivity = useCallback(async () => {
+  const testKbConnectivity = useCallback(async (profileId) => {
     if (!enabled) {
       return {
         ok: false,
@@ -389,9 +449,22 @@ export default function useSystemManagement({
     try {
       const result = await apiClient.post('/system/knowledge-base-config/test', {
         apiKey: kbConfig.apiKey || undefined,
-        knowledgeId: kbConfig.knowledgeId || undefined,
+        profileId,
       }, { timeoutMs: 30000 })
       const data = result?.data || result
+      if (data?.profileId) {
+        setKbConfig((prev) => ({
+          ...prev,
+          probes: {
+            ...prev.probes,
+            [data.profileId]: {
+              status: data.ok ? 'success' : 'failure',
+              checkedAt: new Date().toISOString(),
+              warning: data.warning,
+            },
+          },
+        }))
+      }
       return { ok: true, ...data }
     } catch (e) {
       if (e instanceof ApiError) {
@@ -457,6 +530,7 @@ export default function useSystemManagement({
       testPrompt,
       savePrompts,
       saveKbDraft,
+      clearKbApiKeyDraft,
       activateKbConfig,
       testKbConnectivity,
       updateKbConfig,
