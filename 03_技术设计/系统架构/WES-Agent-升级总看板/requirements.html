@@ -279,9 +279,9 @@
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
                 <span class="pill">知识库 / 质量评估</span>
-                <span class="pill">多知识库第一批已实现 / 待集成与实测</span>
+                <span class="pill">真实双库路由已验证 / 待集成与正式配置</span>
               </div>
-              <div class="bc-next">2026-08-03 继续命中 RP-031 C2/M1，已实现同一智谱账户下的多知识库配置，并以“业务角色权限过滤 → 显式名称/关键词规则 → 模型歧义决策”选择单一主知识库；仅当主库返回 <code class="inline">retrieval_empty</code> 时允许一次受控回退，禁止全库盲查。自动化、双视口与键盘验收已通过；待集成、第二个真实 Knowledge ID 路由实测及既有 qrels 校准。</div>
+              <div class="bc-next">2026-08-03 真实双库验证确认原库为“金蝶解决方案知识库”，第二库为“PLM 领域知识”。PLM 显式路由仅查 PLM 库并命中 8 个片段；AI 语义路由以 0.95 置信度选中 PLM，仅查该库并命中 7 个片段；角色隔离和空检索最多一次回退均通过。资金计划、网上银行在两库仍无片段，需增补司库/银企资料或接入第三库；当前待主线集成、正式配置和 qrels 校准。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-033</span>
@@ -766,10 +766,10 @@
               <td>知识库 / RAG 质量评估</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C / Phase 2</td>
-              <td><span class="status run"><span class="dot"></span>多知识库第一批已实现 / 待集成与实测</span></td>
+              <td><span class="status run"><span class="dot"></span>真实双库路由已验证 / 待集成与正式配置</span></td>
               <td>为知识库问答和模块识别建立可复现 baseline，并把检索配置、Chunk 处理、Prompt、置信度、缓存/断路/限流、质量验证、Trace、配置治理和 Provider/多知识库演进拆成可独立验收的生产化批次</td>
               <td>2026-08-03 问题去重后作为 RP-031 C2/M1 的继续交付，不新增重复 RP；继续复用智谱 Provider、现有 JSON store、知识库工具和统一 Trace，不引入第二套运行栈</td>
-              <td>四批基线能力已落地并完成真实 20 条双跑；本批追加多知识库配置与旧单库迁移、逐库探针/激活 Gate、ACL 前置过滤、显式规则优先+模型歧义决策、单主库与仅 <code class="inline">retrieval_empty</code> 触发的一次受控回退、Trace 路由元数据及同页面管理 UI。Fresh 验证：security 4/4、modules 227/227、AI 190/190、integration 1/1、Web 203/203、API/Web build 通过，1440/760 浏览器与键盘通过。待集成、第二个真实知识库路由实测和 qrels 校准，不宣布 RP-031 全部交付。</td>
+              <td>四批基线能力已落地并完成真实 20 条双跑；本批追加多知识库配置与旧单库迁移、逐库探针/激活 Gate、ACL 前置过滤、显式规则优先+模型歧义决策、单主库与仅 <code class="inline">retrieval_empty</code> 触发的一次受控回退、Trace 路由元数据及同页面管理 UI。Fresh 验证：security 4/4、modules 227/227、AI 190/190、integration 1/1、Web 203/203、API/Web build 通过，1440/760 浏览器与键盘通过。真实双库进一步确认 PLM 显式/语义路由、角色隔离与单次回退通过；资金计划/网上银行两库均空。待主线集成、正式配置、资料覆盖和 qrels 校准，不宣布 RP-031 全部交付。</td>
             </tr>
             <tr>
               <td class="mono">RP-033</td>
@@ -2647,7 +2647,7 @@
         </div>
 
         <div class="callout" style="margin-top:12px" data-board-event-id="BE-2026-08-03-rp-031-multi-knowledge-routing:requirements">
-          <div><b>2026-08-03 多知识库意图路由第一批</b>同一智谱账户可管理多个 Knowledge ID，旧单库配置可自动迁移。运行时先以业务角色 ACL 剪枝，再按明确名称/关键词规则匹配，歧义问题才让模型在已授权候选中决策；每次仅查一个主知识库，且仅主库无检索结果时允许一次受控回退。每个知识库独立探针并进入激活 Gate，路由模式、原因、置信度、主/备库和最多两次尝试已写入 Trace。当前尚缺第二个真实知识库的外部实测，因此状态为“已实现/待集成与实测”，不等同全部交付。</div>
+          <div><b>2026-08-03 多知识库意图路由与真实双库验证</b>同一智谱账户可管理多个 Knowledge ID，旧单库配置可自动迁移。运行时先以业务角色 ACL 剪枝，再按明确名称/关键词规则匹配，歧义问题才让模型在已授权候选中决策；每次仅查一个主知识库，且仅主库无检索结果时允许一次受控回退。真实验证已确认“金蝶解决方案知识库”与“PLM 领域知识”可访问；PLM 显式路由命中 8 片段，AI 语义路由以 0.95 置信度命中 7 片段，角色隔离与空检索最多两次 attempt 通过。资金计划/网上银行在两库均空，需增补司库/银企资料或接入第三库。当前状态为“真实双库已验证/待集成与正式配置”，不等同 RP-031 全部交付。</div>
         </div>
 
         <div class="grid-2" style="margin-top:18px">

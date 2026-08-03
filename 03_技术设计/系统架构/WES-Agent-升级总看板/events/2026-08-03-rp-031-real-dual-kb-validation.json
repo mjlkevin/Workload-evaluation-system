@@ -1,0 +1,54 @@
+{
+  "id": "BE-2026-08-03-rp-031-real-dual-kb-validation",
+  "date": "2026-08-03",
+  "type": "verification",
+  "scope": "RP-031 金蝶解决方案与 PLM 真实双知识库路由验证",
+  "summary": "使用进程内临时凭证调用智谱官方知识库详情、检索与 WES dispatch 主链路；确认原库为金蝶解决方案知识库（13 份文档），第二库为 PLM 领域知识（24 份文档）。PLM 显式问题单库命中 8 个片段，语义问题由模型以 0.95 置信度路由到 PLM 并单库命中 7 个片段；受限角色未查询 PLM，资金计划问题严格限制为主库加一次回退且两库均空。这证明跨库路由和护栏有效，但也确认 PLM 库不能解决资金计划/网上银行的资料覆盖缺口。",
+  "status": "真实双库路由验证通过 / 待主线集成与正式配置",
+  "pages": ["requirements", "plan", "testing", "monitoring", "risks", "changes"],
+  "evidence": [
+    {
+      "kind": "verification",
+      "ref": "GET /api/llm-application/open/knowledge/{id}",
+      "result": "pass",
+      "summary": "两个知识库详情均返回 HTTP 200 / 业务码 200；金蝶解决方案知识库 13 份文档，PLM 领域知识 24 份文档。"
+    },
+    {
+      "kind": "verification",
+      "ref": "POST /api/llm-application/open/knowledge/retrieve",
+      "result": "pass",
+      "summary": "PLM 实施范围、产品生命周期边界、BOM/工程变更三类问题在 PLM 库分别返回 5、1、8 个片段；资金计划和网上银行问题在两库均返回 0 个片段。"
+    },
+    {
+      "kind": "verification",
+      "ref": "dispatchHomeWorkbenchTurn real dual knowledge base matrix",
+      "result": "pass",
+      "summary": "PLM 显式路由仅查 PLM 库并命中 8 个片段；语义路由 mode=model、confidence=0.95，仅查 PLM 库并命中 7 个片段；角色隔离未访问未授权 PLM；资金计划空检索仅尝试两库各一次。"
+    },
+    {
+      "kind": "verification",
+      "ref": "API secret handling runbook",
+      "result": "pass",
+      "summary": "凭证仅从本机 Git ignored 运行配置读取并在进程内使用；未写入文档、看板、新配置、Git 或命令输出。"
+    }
+  ],
+  "next": "精确集成 6d940c8 及本次验证回填后，由管理员在多知识库配置页新增“PLM 领域知识”档案、逐库测试并激活。资金计划和网上银行仍需增加司库/银企资料到现有库，或接入第三个专项知识库；qrels 文档名映射仍待校准。",
+  "board": {
+    "change": {
+      "stage": "RP-031 真实双知识库验证",
+      "result": "路由与护栏通过 / 资金与网银覆盖仍阻断"
+    },
+    "testing": [
+      {
+        "command": "RP-031 real dual knowledge detail + retrieval",
+        "result": "pass",
+        "summary": "两库详情 HTTP 200；PLM 三类问题有检索结果；资金计划与网上银行在两库均无结果。"
+      },
+      {
+        "command": "RP-031 real dispatch route matrix",
+        "result": "pass",
+        "summary": "显式 PLM 单库 8 片段；AI 语义路由 PLM confidence=0.95、单库 7 片段；ACL 未访问未授权 PLM；空检索最多两次尝试。"
+      }
+    ]
+  }
+}

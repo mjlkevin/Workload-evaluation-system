@@ -636,7 +636,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <tr>
           <td>RAG Baseline 与知识库评测闭环（RP-031）</td>
           <td>为 RP-018 知识库工具建立版本化实验合同和生产化演进路径；先固定样本/知识快照/检索参数/Prompt/评分器，再实施 Chunk 后处理、可靠性、质量验证、Provider 与多知识库能力。</td>
-          <td><span class="status run"><span class="dot"></span>多知识库第一批已实现 / 待集成与实测</span>：2026-08-03 已在原四批基线上补齐同 Provider 多库配置、逐库探针/激活、ACL 前置、规则优先+模型歧义决策、单主库、仅空检索触发的一次回退和路由 Trace。下一门禁为集成当前分支、接入第二个真实 Knowledge ID 运行跨库路由样本，并继续用实际文档名校准 qrels。</td>
+          <td><span class="status run"><span class="dot"></span>真实双库路由已验证 / 待集成与正式配置</span>：2026-08-03 已在原四批基线上补齐同 Provider 多库配置、逐库探针/激活、ACL 前置、规则优先+模型歧义决策、单主库、仅空检索触发的一次回退和路由 Trace。金蝶解决方案与 PLM 真实双库已完成显式路由、AI 语义路由、角色隔离和空检索单次回退验证。下一门禁为精确集成当前分支、在正式配置页新增并激活 PLM 档案，为资金/网银增补资料或第三库，并继续用实际文档名校准 qrels。</td>
           <td>baseline 批次可复现；检索指标包含 Recall@K、Precision@K、MRR、NDCG，回答指标包含引用支撑与拒答正确性；端到端关联、配置激活审计、缓存隔离/失效、断路/限流故障注入和策略回滚均有自动化证据。</td>
         </tr>
         <tr>
