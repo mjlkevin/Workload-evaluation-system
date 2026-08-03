@@ -1,14 +1,14 @@
 window.WES_BRANCH_SNAPSHOT = {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-03T07:21:30.160Z",
+  "generatedAt": "2026-08-03T14:35:16.904Z",
   "repoRoot": "/Users/kevin/AI/Workload-evaluation-system",
   "mainBranch": "codex/role-driven-ai-home-workbench",
   "summary": {
-    "localBranchCount": 5,
+    "localBranchCount": 6,
     "remoteRefCount": 3,
-    "worktreeCount": 3,
+    "worktreeCount": 4,
     "ancestorCount": 1,
-    "nonAncestorCount": 3,
+    "nonAncestorCount": 4,
     "duplicateTipGroupCount": 0,
     "warningCount": 0
   },
@@ -25,7 +25,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "codex",
       "gitRelation": "non_ancestor",
       "ahead": 1,
-      "behind": 22,
+      "behind": 37,
       "worktreePath": "",
       "worktreeDirty": "",
       "duplicateTipGroup": "",
@@ -34,11 +34,11 @@ window.WES_BRANCH_SNAPSHOT = {
     },
     {
       "branchName": "codex/role-driven-ai-home-workbench",
-      "headFull": "d4533c3821c721d2b9591302a8960dfd912bf504",
-      "headShort": "d4533c3",
-      "committerDate": "2026-08-03T15:21:04+08:00",
+      "headFull": "21239d9aa9bafcb61eeee9a816d09721cd3100fc",
+      "headShort": "21239d9",
+      "committerDate": "2026-08-03T22:34:33+08:00",
       "author": "kevin",
-      "subject": "docs(WES RP-031): 记录主线集成、需求关闭与分支清理",
+      "subject": "docs(WES RP-047): 记录 A2 主线集成与验证",
       "upstream": "",
       "upstreamTrack": "",
       "prefix": "codex",
@@ -63,7 +63,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "other",
       "gitRelation": "ancestor",
       "ahead": 0,
-      "behind": 30,
+      "behind": 45,
       "worktreePath": "",
       "worktreeDirty": "",
       "duplicateTipGroup": "",
@@ -82,7 +82,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "qoder",
       "gitRelation": "non_ancestor",
       "ahead": 4,
-      "behind": 26,
+      "behind": 41,
       "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a-durable-run-foundation",
       "worktreeDirty": "clean",
       "duplicateTipGroup": "",
@@ -101,8 +101,27 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "qoder",
       "gitRelation": "non_ancestor",
       "ahead": 8,
-      "behind": 23,
+      "behind": 38,
       "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a2-durable-run-foundation",
+      "worktreeDirty": "clean",
+      "duplicateTipGroup": "",
+      "duplicateTipGroupId": null,
+      "governanceSuggestion": "活跃工作区，先复核任务状态"
+    },
+    {
+      "branchName": "qoder/rp-047-a2-integration",
+      "headFull": "35fee259380a46220a1677b11a94b7c5f3d19f22",
+      "headShort": "35fee25",
+      "committerDate": "2026-08-03T21:59:53+08:00",
+      "author": "kevin",
+      "subject": "docs(WES RP-047): 回填 A2 集成候选待 Codex 审计",
+      "upstream": "",
+      "upstreamTrack": "",
+      "prefix": "qoder",
+      "gitRelation": "non_ancestor",
+      "ahead": 9,
+      "behind": 11,
+      "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a2-integration",
       "worktreeDirty": "clean",
       "duplicateTipGroup": "",
       "duplicateTipGroupId": null,
@@ -157,7 +176,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "locked": false,
       "prunable": false,
       "path": "/Users/kevin/AI/Workload-evaluation-system",
-      "headFull": "d4533c3821c721d2b9591302a8960dfd912bf504"
+      "headFull": "21239d9aa9bafcb61eeee9a816d09721cd3100fc"
     },
     {
       "branchName": "qoder/rp-047-a-durable-run-foundation",
@@ -174,6 +193,14 @@ window.WES_BRANCH_SNAPSHOT = {
       "prunable": false,
       "path": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a2-durable-run-foundation",
       "headFull": "d9790fe08e62964e0dacfe103b06647af02de81e"
+    },
+    {
+      "branchName": "qoder/rp-047-a2-integration",
+      "detached": false,
+      "locked": false,
+      "prunable": false,
+      "path": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/rp-047-a2-integration",
+      "headFull": "35fee259380a46220a1677b11a94b7c5f3d19f22"
     }
   ],
   "duplicateTipGroups": [],
@@ -185,8 +212,8 @@ window.WES_BRANCH_SNAPSHOT = {
   "provenance": {
     "semantics": "as_of_generation",
     "sourceCheckoutBranch": "codex/role-driven-ai-home-workbench",
-    "sourceCheckoutHead": "d4533c3821c721d2b9591302a8960dfd912bf504",
-    "configuredMainlineHead": "d4533c3821c721d2b9591302a8960dfd912bf504",
+    "sourceCheckoutHead": "21239d9aa9bafcb61eeee9a816d09721cd3100fc",
+    "configuredMainlineHead": "21239d9aa9bafcb61eeee9a816d09721cd3100fc",
     "observationNote": "This is an as-of-generation observation and can precede the commit containing it."
   }
 };
