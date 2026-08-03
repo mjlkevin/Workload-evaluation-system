@@ -1,0 +1,42 @@
+{
+  "id": "BE-2026-08-03-rp-047-post-a2-execution-plan",
+  "date": "2026-08-03",
+  "type": "process_change",
+  "scope": "RP-047 A2 集成与 Batch B-E 后续执行",
+  "summary": "基于 A2-R1 Gate、当前业务主线和分支差异，形成 A2 最小集成、Batch B Worker/恢复、Batch C 异步 API/SSE、Batch D 多会话前端、Batch E 灰度韧性及最终关闭的串行执行计划。每批独立 worktree、handoff、Codex Gate 和最小 patch 集成。",
+  "status": "PLAN_READY / A2 待授权集成",
+  "pages": [
+    "index",
+    "plan",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "implementation_plan",
+      "ref": "docs/superpowers/plans/2026-08-03-rp-047-post-a2-execution-roadmap.md",
+      "result": "ready",
+      "summary": "固定 A2 集成和 B-E 串行 Gate、角色、分支、验证与关闭标准。"
+    },
+    {
+      "kind": "branch_divergence",
+      "ref": "git rev-list --left-right --count codex/role-driven-ai-home-workbench...qoder/rp-047-a2-durable-run-foundation",
+      "result": "25 / 8",
+      "summary": "证明 A2 不适合整分支 merge，必须从当前主线提取最小已验证 patch。"
+    },
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-08-03-codex-RP-047-A2-R1-gate.md",
+      "result": "ACCEPTED_PENDING_USER",
+      "summary": "A2-R1 已通过独立 Gate，但尚未获得主线集成授权。"
+    }
+  ],
+  "gate": {
+    "taskId": "RP-047",
+    "allowNextTask": false,
+    "mustReworkFirst": false,
+    "mainMergeAllowed": false,
+    "nextOwner": "user-owner"
+  },
+  "next": "等待用户明确授权 A2 最小集成；集成 Gate 通过后再发布 Batch B 详细计划和 Qoder Work Order。"
+}
