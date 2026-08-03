@@ -452,6 +452,84 @@ describeOrSkip("payloads must be plain JSON objects under 1 MiB", { skip: !testD
   assert.equal(rows.length, 0, "invalid payloads must not persist");
 });
 
+describeOrSkip("payloads reject Date, Map and non-plain objects before any transaction", { skip: !testDatabaseUrl }, async () => {
+  const runId = await createTrackedRun();
+
+  class CustomState {
+    marker = "custom-instance";
+  }
+
+  const nonPlainObjects: Array<{ label: string; value: unknown }> = [
+    { label: "Date", value: new Date() },
+    { label: "Map", value: new Map([["a", 1]]) },
+    { label: "Set", value: new Set([1]) },
+    { label: "class instance", value: new CustomState() },
+  ];
+
+  for (const { label, value } of nonPlainObjects) {
+    const checkpointErr = await repo!
+      .commitCheckpoint(makeCheckpointInput(runId, { state: value as never }))
+      .then(() => null, (error: unknown) => error);
+    assert.ok(checkpointErr instanceof HarnessRuntimeError, `${label} checkpoint state must be rejected`);
+    assert.equal(checkpointErr.code, "HARNESS_RUNTIME_PAYLOAD_INVALID", `${label} checkpoint state must map to the fixed payload code`);
+
+    const eventErr = await repo!
+      .appendRunEvent({ runId, eventType: "run_status_changed", payload: value as never })
+      .then(() => null, (error: unknown) => error);
+    assert.ok(eventErr instanceof HarnessRuntimeError, `${label} event payload must be rejected`);
+    assert.equal(eventErr.code, "HARNESS_RUNTIME_PAYLOAD_INVALID", `${label} event payload must map to the fixed payload code`);
+
+    const outputErr = await repo!
+      .upsertRunOutput({ runId, status: "partial", content: value as never, contentHash: `hash-${label}` })
+      .then(() => null, (error: unknown) => error);
+    assert.ok(outputErr instanceof HarnessRuntimeError, `${label} output content must be rejected`);
+    assert.equal(outputErr.code, "HARNESS_RUNTIME_PAYLOAD_INVALID", `${label} output content must map to the fixed payload code`);
+  }
+
+  // 拒绝必须发生在事务之前：不得留下任何检查点/输出行，事件只保留 run_queued
+  const checkpoints = await testDb!.select().from(harnessRunCheckpoints).where(eq(harnessRunCheckpoints.harnessRunId, runId));
+  assert.equal(checkpoints.length, 0, "non-plain state must not persist");
+  const outputs = await testDb!.select().from(harnessRunOutputs).where(eq(harnessRunOutputs.harnessRunId, runId));
+  assert.equal(outputs.length, 0, "non-plain content must not persist");
+  const events = await testDb!.select().from(harnessRunEvents).where(eq(harnessRunEvents.harnessRunId, runId));
+  assert.equal(events.length, 1, "rejected payloads must not reach a database transaction");
+
+  // null-prototype 对象与普通对象必须被接受
+  const nullProto = Object.create(null) as Record<string, unknown>;
+  nullProto.marker = "null-proto";
+  const accepted = await repo!.commitCheckpoint(makeCheckpointInput(runId, { state: nullProto }));
+  assert.equal(accepted.created, true, "null-prototype objects are plain objects");
+  const plain = await repo!.commitCheckpoint(makeCheckpointInput(runId, { state: { marker: "plain" } }));
+  assert.equal(plain.created, true);
+});
+
+describeOrSkip("upsertRunOutput assigns consecutive versions under concurrent distinct hashes", { skip: !testDatabaseUrl }, async () => {
+  const runId = await createTrackedRun();
+  const ways = 10;
+  const results = await Promise.all(
+    Array.from({ length: ways }, (_, i) =>
+      repo!.upsertRunOutput({ runId, status: "partial", content: { ordinal: i }, contentHash: `hash-${randomUUID()}` }),
+    ),
+  );
+  const versions = results.map((row) => row.version).sort((a, b) => a - b);
+  assert.deepEqual(versions, Array.from({ length: ways }, (_, i) => i + 1), "versions must be exactly 1..N with no gaps or duplicates");
+
+  const rows = await testDb!.select().from(harnessRunOutputs).where(eq(harnessRunOutputs.harnessRunId, runId));
+  assert.equal(rows.length, 1, "one run keeps a single output row");
+  assert.equal(rows[0].version, ways, "final version must equal the number of distinct hashes");
+
+  const updatedEvents = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, "output_updated")));
+  assert.equal(updatedEvents.length, ways, "one output_updated event per version bump");
+  const sequences = updatedEvents.map((event) => event.sequence).sort((a, b) => a - b);
+  assert.deepEqual(sequences, Array.from({ length: ways }, (_, i) => 2 + i), "output_updated sequences must be consecutive after run_queued");
+
+  const run = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, runId));
+  assert.equal(run[0].eventSequence, 1 + ways, "run event counter must match persisted events");
+});
+
 describeOrSkip("safe errors never leak SQL params or state", { skip: !testDatabaseUrl }, async () => {
   const sentinel = `sentinel-${randomUUID()}`;
   const input = makeQueuedRunInput();

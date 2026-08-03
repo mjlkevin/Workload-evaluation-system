@@ -210,7 +210,11 @@ async function readDbNow(tx: HarnessTx): Promise<Date> {
 const MAX_PAYLOAD_BYTES = 1024 * 1024;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  // 只接受原型为 Object.prototype 或 null 的对象；Date/Map/Set/类实例
+  // 会被 JSON 序列化为标量或空对象，破坏持久化契约。
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 /** 校验 JSON 载荷：必须是普通对象、可序列化且 UTF-8 JSON 不超过 1 MiB。 */
@@ -230,6 +234,11 @@ function assertSafeJsonObject(value: unknown): void {
   if (Buffer.byteLength(serialized, "utf-8") > MAX_PAYLOAD_BYTES) {
     throw new HarnessRuntimeError("HARNESS_RUNTIME_PAYLOAD_TOO_LARGE", "payload exceeds 1 MiB JSON limit");
   }
+}
+
+/** 校验通过后归一化为标准原型对象，避免 null-prototype 对象在 pg 序列化路径报错。 */
+function normalizeJsonObject(value: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
 }
 
 function assertNonEmptyText(value: unknown, field: string): asserts value is string {
@@ -476,7 +485,8 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
           throw new HarnessRuntimeError("HARNESS_RUNTIME_INPUT_INVALID", "eventType is not a harness run event type");
         }
         assertSafeJsonObject(input.payload ?? {});
-        return await dbInstance.transaction(async (tx) => appendRunEventInTransaction(tx, input));
+        const payload = normalizeJsonObject(input.payload ?? {});
+        return await dbInstance.transaction(async (tx) => appendRunEventInTransaction(tx, { runId: input.runId, eventType: input.eventType, payload }));
       } catch (err) {
         throw toSafeError(err);
       }
@@ -493,6 +503,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
         assertNonEmptyText(input.resumePolicy, "resumePolicy");
         assertSafeJsonObject(input.state);
         assertRuntimeValidation(input.runtimeValidation);
+        const state = normalizeJsonObject(input.state);
         if (input.effectKeys !== undefined) {
           if (!Array.isArray(input.effectKeys) || input.effectKeys.some((key) => typeof key !== "string")) {
             throw new HarnessRuntimeError("HARNESS_RUNTIME_PAYLOAD_INVALID", "effectKeys must be a string array");
@@ -501,6 +512,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
         if (input.aiMilestone !== undefined) {
           assertSafeJsonObject(input.aiMilestone);
         }
+        const aiMilestone = input.aiMilestone !== undefined ? normalizeJsonObject(input.aiMilestone) : null;
 
         return await dbInstance.transaction(async (tx) => {
           // 先锁 Run 行：串行化同一 Run 的检查点写入与序号计算
@@ -548,12 +560,12 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
               workflowVersion: input.workflowVersion,
               stepKey: input.stepKey,
               resumePolicy: input.resumePolicy,
-              state: input.state,
+              state,
               stateHash: input.stateHash,
               inputHash: input.inputHash ?? null,
               effectKeys: input.effectKeys ?? [],
-              aiMilestone: input.aiMilestone ?? null,
-              runtimeValidation: input.runtimeValidation,
+              aiMilestone,
+              runtimeValidation: normalizeJsonObject(input.runtimeValidation) as HarnessRuntimeValidation,
             })
             .returning();
 
@@ -584,6 +596,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
         assertNonEmptyText(input.runId, "runId");
         assertNonEmptyText(input.contentHash, "contentHash");
         assertSafeJsonObject(input.content);
+        const content = normalizeJsonObject(input.content);
 
         return await dbInstance.transaction(async (tx) => {
           await lockRunRow(tx, input.runId);
@@ -603,7 +616,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
                 harnessRunAttemptId: input.attemptId ?? null,
                 status: input.status,
                 version: 1,
-                content: input.content,
+                content,
                 contentHash: input.contentHash,
                 createdAt: now,
                 updatedAt: now,
@@ -638,7 +651,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
             .set({
               status: input.status,
               version: existing.version + 1,
-              content: input.content,
+              content,
               contentHash: input.contentHash,
               harnessRunAttemptId: input.attemptId ?? existing.harnessRunAttemptId,
               updatedAt: now,
@@ -664,6 +677,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
         assertNonEmptyText(input.eventType, "eventType");
         assertNonEmptyText(input.deduplicationKey, "deduplicationKey");
         assertSafeJsonObject(input.payload);
+        const payload = normalizeJsonObject(input.payload);
 
         return await dbInstance.transaction(async (tx) => {
           const run = await lockRunRow(tx, input.runId);
@@ -693,7 +707,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
               aiSessionId: input.aiSessionId,
               eventType: input.eventType,
               deduplicationKey: input.deduplicationKey,
-              payload: input.payload,
+              payload,
               status: "pending",
               attempts: 0,
               availableAt: input.availableAt ?? now,
