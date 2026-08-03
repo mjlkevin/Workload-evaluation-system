@@ -841,9 +841,9 @@
         <tr><th>队列项</th><th>推荐状态载体</th><th>复核重点</th><th>验收证据</th></tr>
         <tr>
           <td>RP-047 Durable Multi-Session Runtime</td>
-          <td><code class="inline">qoder/rp-047-a-durable-run-foundation</code> / Gate REJECTED；<code class="inline">qoder/rp-047-a2-durable-run-foundation</code> / REWORK_REQUIRED</td>
-          <td>A2 候选 <code class="inline">39d5ea9</code> 主体数据库门禁通过，但 JSON 普通对象校验、output 并发回归和 handoff 范围记录需最小返工。R1 复用 A2 worktree/分支，只允许修改 3 个精确路径。</td>
-          <td>Codex 已记录 Testcontainers、历史迁移、原子创建、checkpoint 并发/安全错误和执行越界证据；<code class="inline">allowNextTask=false</code>、<code class="inline">mustReworkFirst=true</code>，Batch B 必须等待 Codex Gate A2。</td>
+          <td><code class="inline">qoder/rp-047-a-durable-run-foundation</code> / Gate REJECTED；<code class="inline">qoder/rp-047-a2-durable-run-foundation</code> / ACCEPTED_PENDING_USER</td>
+          <td>A2-R1 候选 <code class="inline">d9790fe</code> 已关闭 JSON 普通对象校验、output 并发回归和 handoff 范围记录三个阻断项；Codex 已独立复跑完整 Gate，当前只等待 Batch A2 集成决策。</td>
+          <td>Testcontainers Harness 95/95、modules 143/143、API/Web build 通过；<code class="inline">allowNextTask=false</code>、<code class="inline">mustReworkFirst=false</code>，Batch B 必须等待用户授权集成及主线复验。</td>
         </tr>
         <tr>
           <td>RP-027 / RP-028 Kimi Provider</td>
@@ -880,6 +880,6 @@
     </section>
   </main>
 
-  <footer>WES 项目管理 · 多 AI 协作规则 · 2026-08-02</footer>
+  <footer>WES 项目管理 · 多 AI 协作规则 · 2026-08-03</footer>
 </body>
 </html>

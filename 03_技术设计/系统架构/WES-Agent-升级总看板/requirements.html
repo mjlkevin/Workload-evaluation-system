@@ -880,10 +880,10 @@
               <td>AI Runtime / 前端状态</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>阶段 1H-C · Batch A2</td>
-              <td><span class="status block"><span class="dot"></span>Batch A2 Gate 需返工 / R1 待 ACK</span></td>
+              <td><span class="status run"><span class="dot"></span>Batch A2 Gate 通过 / 待集成</span></td>
               <td>将全局 <code class="inline">sending/messages/composer/selectedFile</code> 拆成会话级运行时，实现“同一会话单请求、不同会话可并行”；任务所有权不得绑定 <code class="inline">AiHomeWorkbench</code> 页面，任何异步回调只能按 <code class="inline">sessionId + requestId/taskId</code> 更新所属通道</td>
               <td>去重命中 RP-017（离开页面后恢复活跃会话）和 RP-029（SSE/流式输出），但尚无 per-session runtime、跨会话并行、背景完成指示和响应防串台的工作项，故新增 RP-047</td>
-              <td>正式规格已固定 PostgreSQL-backed Harness Run、独立 Worker、Attempt lease/heartbeat、AI 语义建议 + Runtime 校验检查点、可回放事件/输出、outbox 幂等投影与 Recovery Coordinator。A2 候选 <code class="inline">39d5ea9</code> 的迁移、原子性、事件/checkpoint 并发与构建门禁已通过；当前只返工 JSON 普通对象校验、output 并发回归和 handoff 契约。A2-R1 通过前 B-E 继续锁定</td>
+              <td>正式规格已固定 PostgreSQL-backed Harness Run、独立 Worker、Attempt lease/heartbeat、AI 语义建议 + Runtime 校验检查点、可回放事件/输出、outbox 幂等投影与 Recovery Coordinator。A2-R1 候选 <code class="inline">d9790fe</code> 已通过迁移、原子性、事件/checkpoint/output 并发、普通对象边界、modules 与 API/Web build 门禁；Batch A2 等待用户授权集成，B-E 继续锁定</td>
             </tr>
             <tr>
               <td class="mono">RP-048</td>
@@ -1260,7 +1260,7 @@
               <td>提交端点立即返回 <code class="inline">runId</code>；worker 每完成一个可重放步骤尝试 <code class="inline">commitCheckpoint</code>，且只能提交 completed checkpoint。恢复协调器识别失效 worker lease，选择最近且版本兼容的检查点，从其 nextStep 继续；SSE 只通知状态与检查点进度</td>
               <td>复用 Harness 域 PostgreSQL 主存储，不将运行中任务仅保存在内存或 React state；检查点为追加式事实，必须带输入/上下文/版本哈希和恢复策略，不允许 AI 直接改写历史检查点</td>
               <td>除跨页/登录、A/B 并行、断线重连、owner 隔离和幂等停止外，必须新增：每个允许阶段生成 completed checkpoint；步骤中途失败不得提交；worker 失联从最近检查点恢复；版本/哈希不兼容时拒绝自动恢复；工具副作用和最终消息各只提交一次</td>
-              <td><code class="inline">ISS-2026-08-02-003</code>、<code class="inline">ISS-2026-08-03-002</code>、用户本次架构总结、批准规格、<code class="inline">docs/agent-loop/audits/2026-08-03-codex-RP-047-A-gate.md</code>、<code class="inline">docs/superpowers/plans/2026-08-03-rp-047-batch-a2-durable-run-foundation-reexecution.md</code>、<code class="inline">docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2.md</code>、<code class="inline">AiHomeWorkbench.jsx</code>、<code class="inline">useAiSessions.js</code>、<code class="inline">src/api/ai.js</code></td>
+              <td><code class="inline">ISS-2026-08-02-003</code>、<code class="inline">ISS-2026-08-03-002</code>、用户本次架构总结、批准规格、<code class="inline">docs/agent-loop/audits/2026-08-03-codex-RP-047-A-gate.md</code>、<code class="inline">docs/superpowers/plans/2026-08-03-rp-047-batch-a2-durable-run-foundation-reexecution.md</code>、<code class="inline">docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2.md</code>、<code class="inline">docs/agent-loop/audits/2026-08-03-codex-RP-047-A2-R1-gate.md</code>、<code class="inline">AiHomeWorkbench.jsx</code>、<code class="inline">useAiSessions.js</code>、<code class="inline">src/api/ai.js</code></td>
             </tr>
             <tr>
               <td class="mono">RP-048</td>
@@ -3055,7 +3055,7 @@
           <div class="callout"><div><b>已确认根因</b><code class="inline">AiHomeWorkbench</code> 使用全局 messages/sending/composer/selectedFile；同步 Effect 在 sending 时直接返回；<code class="inline">useAiSessions.upsertSession</code> 还会自动激活被更新的会话，使旧请求完成时可把用户强制切回原会话。</div></div>
           <div class="callout"><div><b>已确认边界</b>切换会话、离开 AI 页、刷新、关闭标签页或退出都不取消任务；原用户重新登录后可恢复进度和结果。AI 页面只是观察与操作入口，不是任务 owner。</div></div>
           <div class="callout err"><div><b>Batch A1 Gate 已拒收</b>候选 <code class="inline">fae8a7d</code> 的表结构方向部分成立，但执行方越过 Testcontainers 停止条件；历史迁移、Run/首事件原子性、checkpoint 并发幂等、Runtime validation 和安全错误均未达到批准标准。被拒分支只保留审计，不作为集成或返工基础。</div></div>
-          <div class="callout warn"><div><b>当前门禁</b>RP-047-A2 已发布，必须从全新 worktree 重新实施，先安装隔离依赖并修复 Node 24 Testcontainers setup，再用随机临时 database 演练历史数据升级。A2 Gate 通过前不启动 Batch B；前端 Batch D 的测试包装与人工验收缺口继续保留。</div></div>
+          <div class="callout"><div><b>当前门禁</b>RP-047-A2-R1 已由 Codex 独立复核通过：Harness 95/95、modules 143/143、API/Web build 通过，三个返工阻断项关闭。当前等待用户授权将 Batch A2 最小 patch 集成业务主线；集成并复跑门禁前不启动 Batch B，前端 Batch D 的测试包装与人工验收缺口继续保留。</div></div>
         </div>
       </div>
     </section>

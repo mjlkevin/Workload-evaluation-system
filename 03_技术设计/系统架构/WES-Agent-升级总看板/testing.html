@@ -658,9 +658,12 @@
       <div class="h-num">Section 08</div>
       <h2>自动化基线</h2>
       <p class="lead">人工测试建立在已通过的自动化基线之上。以下命令不是人工验收的替代品，而是人工测试前应保持绿色的工程底座。</p>
-      <div class="callout warn"><div><b>RP-047 Batch A2 Gate 需 R1 返工</b>正式 Testcontainers Harness 93/93、modules 143/143、API/Web build 已通过，A1 的迁移、原子性、事件/checkpoint 并发问题已关闭。当前阻断是 Date/Map 绕过 JSON 普通对象校验、正式套件缺少 output 并发版本回归，以及 handoff 范围/提交身份记录不准确。R1 只修这三项。</div></div>
+      <div class="callout ok"><div><b>RP-047 Batch A2-R1 Gate 已通过</b>Codex 独立复跑 Testcontainers Harness 95/95、modules 143/143、API/Web build 通过；Date/Map 等非普通对象在事务前拒绝，10 路 output 并发版本与事件序号正式回归通过，handoff 文件统计和提交身份已更正。当前等待用户授权集成，Batch B-E 未启动。</div></div>
       <table>
         <tr><th>命令</th><th>最近结果</th><th>覆盖范围</th></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-r1-gate-accepted:testing:1"><td class="mono">RP-047-A2-R1 Testcontainers Harness</td><td><span class="status done"><span class="dot"></span>95/95 pass · 0 skip</span></td><td>2026-08-03：普通对象边界、历史迁移、原子创建以及事件、checkpoint、output 并发回归全部通过。</td></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-r1-gate-accepted:testing:2"><td class="mono">RP-047-A2-R1 modules</td><td><span class="status done"><span class="dot"></span>143/143 pass</span></td><td>2026-08-03：模块回归通过；已知四个模型字段测试副作用已精确恢复。</td></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-r1-gate-accepted:testing:3"><td class="mono">RP-047-A2-R1 API/Web build</td><td><span class="status done"><span class="dot"></span>pass / pass</span></td><td>2026-08-03：API 与 Web 构建退出 0；Web 仅保留既有 chunk-size warning。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-system-shell-responsive-fix:testing:1"><td class="mono">WES shell 760px responsive gate</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-08-03：Chrome 760px 无横向溢出，侧栏 64px，主内容可见，知识库档案表格转卡片；Web 206/206 与 build 通过。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-031-integrated-closed:testing:1"><td class="mono">RP-031 integrated full gate</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-08-03：modules 227/227、AI 190/190、Web 206/206、integration 1/1、API/Web build、安全和 UI scope 全部通过。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-031-real-dual-kb-validation:testing:1"><td class="mono">RP-031 real dual knowledge detail + retrieval</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-08-03：两库详情 HTTP 200；PLM 三类问题有检索结果；资金计划与网上银行在两库均无结果。</td></tr>
@@ -717,7 +720,7 @@
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 测试 · WES 项目管理 · 2026-07-23
+      <a href="index.html">返回总览</a> · 测试 · WES 项目管理 · 2026-08-03
     </footer>
   </main>
 </body>

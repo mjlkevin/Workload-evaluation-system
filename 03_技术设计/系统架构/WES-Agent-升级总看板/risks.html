@@ -373,7 +373,7 @@
         <tr>
           <td>Durable Run 对 JSON 持久载荷只做“非数组对象”判断，会将 Date、Map 或自定义实例误当成普通对象。</td>
           <td>Date 可落成 JSON 标量，Map 可静默落成空对象；checkpoint/output/event 会丢失结构语义，后续恢复无法信任存储状态。</td>
-          <td>A2 Gate 设为 <code class="inline">REWORK_REQUIRED</code>。R1 必须以对象原型判定普通对象，先补 Date/Map/BigInt/循环引用 RED，再复跑 Harness 93/93、modules 与构建；不允许扩大 schema 或 Batch B。</td>
+          <td>风险已由 A2-R1 <code class="inline">d9790fe</code> 关闭：对象原型门禁拒绝 Date/Map/Set/类实例，BigInt/循环引用继续以固定安全错误拒绝；Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过。集成前仍不允许扩大 schema 或启动 Batch B。</td>
         </tr>
         <tr>
           <td>RP-030 R8 曾提交运行态 trace 数据并让测试污染已跟踪文件。</td>

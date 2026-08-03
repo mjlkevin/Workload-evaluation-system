@@ -1,0 +1,76 @@
+{
+  "id": "BE-2026-08-03-rp-047-a2-r1-gate-accepted",
+  "date": "2026-08-03",
+  "type": "verification",
+  "scope": "RP-047-A2-R1 Codex Gate",
+  "summary": "Codex 独立复核 d9790fe：R1 仅修改三个授权文件，普通对象边界、output 并发正式回归和 handoff 准确性三个阻断项均已关闭；PostgreSQL Harness 95/95、modules 143/143、API/Web build 全部通过。Batch A2 可进入用户集成决策，但 RP-047 整体尚未交付，Batch B-E 继续锁定。",
+  "status": "ACCEPTED_PENDING_USER / 待集成",
+  "pages": [
+    "index",
+    "issues",
+    "defects",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources",
+    "collaboration-protocol"
+  ],
+  "evidence": [
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-08-03-codex-RP-047-A2-R1-gate.md",
+      "result": "accepted_pending_user",
+      "summary": "三个 R1 阻断项全部关闭，允许进入集成决策。"
+    },
+    {
+      "kind": "verification",
+      "ref": "USE_TESTCONTAINERS=true npm run test:harness -w apps/api",
+      "result": "95/95 pass",
+      "summary": "随机数据库迁移、原子创建、并发事件/checkpoint/output、输入边界和安全错误全部通过，无 skip。"
+    },
+    {
+      "kind": "verification",
+      "ref": "npm run test:modules && npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "modules 143/143，API/Web 构建退出 0。"
+    },
+    {
+      "kind": "scope",
+      "ref": "git diff --name-status 39d5ea9..d9790fe",
+      "result": "pass",
+      "summary": "仅三个 Allowed Paths；lockfile 无变化；A2 worktree clean。"
+    }
+  ],
+  "gate": {
+    "taskId": "RP-047-A2-R1",
+    "candidateCommit": "d9790fe08e62964e0dacfe103b06647af02de81e",
+    "verdict": "ACCEPTED_PENDING_USER",
+    "allowNextTask": false,
+    "mustReworkFirst": false,
+    "mainMergeAllowed": false,
+    "nextOwner": "user-owner"
+  },
+  "board": {
+    "testing": [
+      {
+        "command": "RP-047-A2-R1 Testcontainers Harness",
+        "result": "95/95 pass · 0 skip",
+        "summary": "普通对象边界、历史迁移、原子创建以及事件、checkpoint、output 并发回归全部通过。"
+      },
+      {
+        "command": "RP-047-A2-R1 modules",
+        "result": "143/143 pass",
+        "summary": "模块回归通过；已知四个模型字段测试副作用已精确恢复。"
+      },
+      {
+        "command": "RP-047-A2-R1 API/Web build",
+        "result": "pass / pass",
+        "summary": "API 与 Web 构建退出 0；Web 仅保留既有 chunk-size warning。"
+      }
+    ]
+  },
+  "next": "等待用户授权是否将 A2 最小 patch 集成到 codex/role-driven-ai-home-workbench；集成前不启动 Batch B。"
+}

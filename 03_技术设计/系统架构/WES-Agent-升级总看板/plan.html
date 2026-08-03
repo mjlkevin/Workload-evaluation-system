@@ -42,7 +42,7 @@
         <span><b>当前阶段</b> 阶段 1H-B 已形成交付基线 / 阶段 1H-C 待规划</span>
         <span><b>人工测试</b> 1F/1G/1H-A 用例已登记，待执行回填</span>
         <span><b>分支</b> 业务主线 <code class="inline">codex/role-driven-ai-home-workbench</code> 当前包含 RP-031 合并提交 <code class="inline">5cc81b9</code></span>
-        <span><b>状态</b> 需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓；RP-031 多知识库路由与 RAG 评测闭环已集成关闭。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-047 A2 候选 <code class="inline">39d5ea9</code> 已通过历史迁移、原子创建、事件/checkpoint 并发和构建门禁；Codex Gate 因 JSON 普通对象校验可绕过、output 并发测试缺失和 handoff 契约偏差要求 A2-R1 同分支最小返工，B-E 未授权。其余已验证能力和人工验收缺口按原记录保留。</span>
+        <span><b>状态</b> 需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓；RP-031 多知识库路由与 RAG 评测闭环已集成关闭。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-047 A2-R1 候选 <code class="inline">d9790fe</code> 已关闭三个返工阻断项，Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过；Batch A2 待用户授权集成，B-E 未授权。其余已验证能力和人工验收缺口按原记录保留。</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">阶段 1E 已交付</span>
@@ -489,7 +489,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
     <section>
       <div class="h-num">Section 11</div>
       <h2>后续任务池</h2>
-      <p class="lead">以下任务不属于阶段 1H-A 的前端体验闭环，将作为阶段 1H-C、阶段 2 或独立候选任务逐项评审。当前需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓。RP-031 已完成主线集成并关闭；资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示作为独立后续优化。RP-048 已完成通用 Speak Plainly Skill、四个模型入口接入和自动检查，等待用户体验确认。RP-047 的跨会话持续、后台 Worker、混合检查点、幂等恢复和可回放输出规格已获批准；首个 Batch A 候选被 Gate 拒收，A2 必须从全新 worktree 重新实施，后续 B-E 继续锁定。已验证能力和其他人工验收缺口继续按原记录保留。</p>
+      <p class="lead">以下任务不属于阶段 1H-A 的前端体验闭环，将作为阶段 1H-C、阶段 2 或独立候选任务逐项评审。当前需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓。RP-031 已完成主线集成并关闭；资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示作为独立后续优化。RP-048 已完成通用 Speak Plainly Skill、四个模型入口接入和自动检查，等待用户体验确认。RP-047 的跨会话持续、后台 Worker、混合检查点、幂等恢复和可回放输出规格已获批准；A1 已拒收，A2-R1 已通过 Codex Gate 并等待 Batch A2 集成，后续 B-E 继续锁定。已验证能力和其他人工验收缺口继续按原记录保留。</p>
       <table>
         <tr><th>候选任务</th><th>目标</th><th>启动条件</th><th>第一验收口径</th></tr>
         <tr>
@@ -675,7 +675,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <tr>
           <td class="mono">RP-047</td>
           <td>AI 工作台会话级多通道运行时</td>
-          <td><span class="status block"><span class="dot"></span>P1 Batch A2 Gate 需返工 / R1 待 ACK</span>：A2 主体门禁已通过，R1 仅允许修复 JSON 普通对象校验、补 output 并发版本测试和更正 handoff；<code class="inline">docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2-R1.md</code> 为新契约，B-E 尚未授权。</td>
+          <td><span class="status run"><span class="dot"></span>P1 Batch A2 Gate 通过 / 待集成</span>：A2-R1 <code class="inline">d9790fe</code> 已关闭 JSON 普通对象校验、output 并发版本测试和 handoff 三项缺口；Codex Gate 证据见 <code class="inline">docs/agent-loop/audits/2026-08-03-codex-RP-047-A2-R1-gate.md</code>。用户授权集成前 B-E 尚未授权。</td>
           <td>会话 A 请求中可切换并在 B 发送；离开 AI 页、刷新、关页或退出后 A/B 仍继续；原用户重新登录后恢复正确进度和结果；A/B 逆序返回不串台、不抢活跃会话。</td>
         </tr>
         <tr>

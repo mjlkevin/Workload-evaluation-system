@@ -271,11 +271,11 @@
               <td class="mono">RP-047-A2</td>
               <td>Node 24 Testcontainers setup 与 worktree 依赖隔离缺陷阻断 Harness 正式门禁</td>
               <td>S2</td>
-              <td><span class="status block"><span class="dot"></span>A2 Gate 返工 / R1 待 ACK</span></td>
+              <td><span class="status done"><span class="dot"></span>已修复 / Codex Gate 通过</span></td>
               <td>apps/api/test-setup.mts / test:harness / 独立 worktree node_modules</td>
-              <td>A2 将改用 ESM-safe migration 路径，在 worktree 内按 lockfile 安装 root/API/V2 依赖，并以随机临时 database 证明历史 Harness 数据从 0013 升级到 0014。</td>
-              <td>A1 正式命令退出 7；补 Colima socket 后复现 ERR_AMBIGUOUS_MODULE_SYNTAX；安装隔离依赖后 modules 143/143、API/Web build 通过，排除所谓 Ajv 基线故障。</td>
-              <td>验收要求：正式 Testcontainers 命令不 skip、无残留容器，历史 Run/tool/artifact 默认兼容，A2 worktree clean；不得修改机器级 Docker/Colima 配置。</td>
+              <td>A2 使用 ESM-safe migration 路径和 worktree 隔离依赖，以随机临时 database 演练历史迁移；R1 将普通对象校验和 output 并发版本回归纳入正式门禁。</td>
+              <td>Codex 独立复跑 Testcontainers Harness 95/95、modules 143/143、API/Web build 通过；三个 R1 阻断项关闭，worktree clean，无新增 lockfile 或长期容器。</td>
+              <td>缺陷已关闭；Batch A2 仍需用户授权集成，集成后须在业务主线复跑同一门禁。机器级 Docker/Colima 配置继续禁止由任务自动修改。</td>
             </tr>
         </table>
       </div>

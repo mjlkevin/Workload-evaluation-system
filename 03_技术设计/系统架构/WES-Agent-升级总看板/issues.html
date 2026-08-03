@@ -328,9 +328,9 @@
               <td>user_architecture_review</td>
               <td>用户提供完整复现链和代码定位：会话 A 发送中切换到会话 B 时，全局 <code class="inline">sending</code> 阻断 B 的消息同步与发送；A 返回后又可能更新当前视图。期望升级为会话级独立运行通道，允许不同会话并行请求。</td>
               <td><code class="inline">AiHomeWorkbench.jsx:1704-1759,1811-1814,2051-2277</code> <code class="inline">useAiSessions.js:46-53</code> <code class="inline">SessionRail.jsx</code> <code class="inline">src/api/ai.js</code> <code class="inline">RP-017</code> <code class="inline">RP-029</code></td>
-              <td><span class="status block"><span class="dot"></span>A2 Gate 需返工 / R1 待 ACK</span></td>
+              <td><span class="status run"><span class="dot"></span>Batch A2 Gate 通过 / 待集成</span></td>
               <td>转需求 · RP-047</td>
-              <td>已确认任务需跨会话切换、WES 路由切换、页面刷新、关闭标签页和重新登录持续；混合检查点方案已获用户批准。A2 已通过 Harness 93/93、modules 143/143 与 API/Web build，但 Codex Gate 独立复现 Date/Map 绕过 JSON 普通对象校验，并确认 output 并发回归和 handoff 范围记录不完整。已发布 A2-R1 同分支最小返工，Batch B 继续锁定。</td>
+              <td>已确认任务需跨会话切换、WES 路由切换、页面刷新、关闭标签页和重新登录持续；混合检查点方案已获用户批准。A2-R1 提交 <code class="inline">d9790fe</code> 已关闭普通对象边界、output 并发回归和 handoff 准确性三个阻断项；Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过。Batch A2 等待用户授权集成，Batch B-E 继续锁定。</td>
             </tr>
             <tr>
               <td class="mono">ISS-2026-08-02-004</td>
@@ -361,9 +361,9 @@
               <td>codex_external_handoff_gate</td>
               <td>Qoder RP-047-A 回填声称通过等效 PostgreSQL 验证，但正式 Testcontainers 命令退出 7；Node 24 下全局 setup 使用 <code class="inline">__dirname</code> 与 top-level await 冲突，worktree 又未安装自己的 API/V2 依赖，导致错误加载主 checkout Ajv 6 并误报基线故障。</td>
               <td><code class="inline">docs/agent-loop/audits/2026-08-03-codex-RP-047-A-gate.md</code> <code class="inline">apps/api/test-setup.mts:37</code> <code class="inline">apps/api/package.json:test:harness</code> <code class="inline">npm ci 后 modules 143/143、build:api/web pass</code></td>
-              <td><span class="status run"><span class="dot"></span>已分流 / 阻断 A1</span></td>
+              <td><span class="status done"><span class="dot"></span>已修复 / A2 待集成</span></td>
               <td>转缺陷 · DEF-2026-08-03-001 / RP-047-A2</td>
-              <td>在全新 A2 worktree 修复 ESM 路径、安装隔离依赖、用随机临时 database 演练 0000-0013 + 历史数据 + 0014；正式 Testcontainers 命令和全部构建通过后再进 Gate。</td>
+              <td>全新 A2 worktree 已修复 ESM 路径和依赖隔离，并用随机临时 database 证明 0000-0013 历史数据可升级到 0014；R1 进一步关闭普通对象、output 并发和 handoff 缺口。Codex Gate 95/95 通过，缺陷关闭，等待 Batch A2 集成。</td>
             </tr>
         </table>
       </div>

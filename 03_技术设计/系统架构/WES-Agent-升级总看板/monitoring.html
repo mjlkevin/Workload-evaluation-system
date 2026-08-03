@@ -87,6 +87,7 @@
       <h2>验证快照</h2>
       <table>
         <tr><th>命令</th><th>结果</th><th>覆盖范围</th></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-r1-gate-accepted:monitoring"><td class="mono">RP-047-A2-R1 Codex Gate</td><td><span class="status done"><span class="dot"></span>ACCEPTED_PENDING_USER</span></td><td>R1 仅修改三个授权文件；Testcontainers Harness 95/95、modules 143/143、API/Web build 通过，普通对象边界、10 路 output 并发和 handoff 准确性三个阻断项关闭。Batch A2 待集成，Batch B-E 继续锁定。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-047-a2-gate-rework:monitoring"><td class="mono">RP-047-A2 Codex Gate</td><td><span class="status block"><span class="dot"></span>REWORK_REQUIRED</span></td><td>Harness 93/93、modules 143/143、API/Web build 通过；10 路 output 探针得到连续版本 1..10。Date/Map 边界探针失败，且正式套件缺 output 并发回归；handoff 实际 16 文件与回填 15 个不一致。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-047-a-gate-rejected:monitoring"><td class="mono">RP-047-A Codex Gate</td><td><span class="status block"><span class="dot"></span>REJECTED / A2 待 ACK</span></td><td>正式 Testcontainers 命令退出 7；补 Colima socket 后在 Node 24 ESM 路径失败。直连 92/92 不含真实历史迁移演练；Codex 复现 create 返回 sequence 漂移、无效 Runtime validation 被接受、并发 checkpoint 非幂等且错误携带 state。安装 worktree 隔离依赖后 modules 143/143、build:api/web 通过。详见 Gate 审计。</td></tr>
         <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup:monitoring"><td class="mono">WES 分支治理快照</td><td><span class="status warn"><span class="dot"></span>本地收敛完成 / 远端待同步</span></td><td>2026-08-02：本地分支从 37 个收敛为 4 个、worktree 从 5 个收敛为 2 个；本地 <code class="inline">main</code> 与业务主线均为 <code class="inline">88d32b4</code>。干净 worktree 上 build:web、build:api、test:modules 143/143、test:web 196/196、test:ai exit 0、Provider/Trace/RAG 专项 47/47 通过。<code class="inline">origin/main</code> 落后 75 个提交，未 push；RP-031 rework/integration 分支因 3 个 P1 与 JSON/PostgreSQL 存储边界冲突继续保留。</td></tr>
@@ -307,7 +308,7 @@ harness_tool_events
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 监控与审计 · WES 项目管理 · 2026-07-26
+      <a href="index.html">返回总览</a> · 监控与审计 · WES 项目管理 · 2026-08-03
     </footer>
   </main>
 </body>
