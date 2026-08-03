@@ -1,0 +1,54 @@
+{
+  "id": "BE-2026-08-03-rp-047-a2-ack-accepted",
+  "date": "2026-08-03",
+  "type": "implementation",
+  "scope": "RP-047-A2 Worktree Contract ACK",
+  "summary": "Codex 独立复核 RP-047-A2 全新 worktree：路径、分支、HEAD、clean 状态、设计祖先关系与 Work Order 一致，且 Qoder 未提前编辑。ACK 已接受，允许在既定 Allowed Paths 和停止条件内开始实施。",
+  "status": "ACK_ACCEPTED / IN_PROGRESS",
+  "pages": [
+    "index",
+    "issues",
+    "defects",
+    "requirements",
+    "plan",
+    "changes",
+    "collaboration-protocol",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "worktree",
+      "ref": "git worktree list --porcelain",
+      "result": "pass",
+      "summary": "A2 worktree 唯一绑定 qoder/rp-047-a2-durable-run-foundation，HEAD 为 7221503f69bee91f1bd1b87baa114577de466a51。"
+    },
+    {
+      "kind": "verification",
+      "ref": "git -C .claude/worktrees/rp-047-a2-durable-run-foundation status --short --branch",
+      "result": "pass",
+      "summary": "只输出分支标识，无已修改或未跟踪文件，确认 ACK 前工作区干净。"
+    },
+    {
+      "kind": "verification",
+      "ref": "git merge-base --is-ancestor e1c8961 7221503f69bee91f1bd1b87baa114577de466a51",
+      "result": "pass",
+      "summary": "批准设计是 assignment commit 的祖先。"
+    },
+    {
+      "kind": "work_order",
+      "ref": "docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2.md",
+      "result": "ack_accepted",
+      "summary": "Allowed/Forbidden Paths、依赖/Docker 预检、验证命令与停止条件均已确认。"
+    }
+  ],
+  "gate": {
+    "taskId": "RP-047-A2",
+    "assignmentCommit": "7221503f69bee91f1bd1b87baa114577de466a51",
+    "approvedDesignCommit": "e1c8961",
+    "ackAccepted": true,
+    "allowNextTask": false,
+    "mainMergeAllowed": false,
+    "nextOwner": "qoder1"
+  },
+  "next": "Qoder 可开始 RP-047-A2 实施；任一停止条件触发即回填 BLOCKED / WAITING_CODEX。完成后只能回填已回填 / 待 Codex 复核，Batch B 仍未授权。"
+}
