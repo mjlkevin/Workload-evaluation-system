@@ -10,12 +10,21 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-const migrationsFolder = fileURLToPath(new URL("../../../drizzle/", import.meta.url));
+
+/** 兼容 workspace（apps/api）与仓库根两种 cwd 的迁移目录解析。 */
+function resolveMigrationsFolder(): string {
+  const candidates = [path.join(process.cwd(), "drizzle"), path.join(process.cwd(), "apps/api/drizzle")];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error("drizzle migrations folder not found");
+}
+const migrationsFolder = resolveMigrationsFolder();
 
 const HISTORICAL_MIGRATIONS = [
   "0000_spooky_vulcan.sql",
