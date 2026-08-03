@@ -10,9 +10,9 @@ The event file is not a replacement for the visible board. It is the low-cost in
 
 1. Copy `template.board-event.json` to `YYYY-MM-DD-<slug>.json`.
 2. Fill in the required fields.
-3. Run `npm run board:event:check -- <event.json>`.
-4. Run `npm run board:event:apply -- <event.json>` when Codex/user authority allows board updates.
-5. Run `npm run board:check`.
+3. Run `node scripts/board-event-check.js <event.json>`.
+4. Run `node scripts/board-event-apply.js <event.json>` when Codex/user authority allows board updates.
+5. Run `node --test scripts/board-event.test.js scripts/board-work-items.test.js`.
 
 ## Required Fields
 

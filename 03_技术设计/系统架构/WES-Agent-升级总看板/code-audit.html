@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>每日代码审计 · WES 项目管理</title>
+  <title>代码质量检查（2026-07-02 快照）· WES 项目管理</title>
   <link rel="stylesheet" href="assets/fonts/fonts.css" />
   <link rel="stylesheet" href="assets/base.css" />
   <link rel="stylesheet" href="assets/components.css" />
@@ -31,20 +31,20 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="ops-health.html">运维看板</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="issues.html">问题池</a>
         <a href="defects.html">缺陷池</a>
         <a href="requirements.html">需求池</a>
-        <a class="active" href="code-audit.html">每日代码审计</a>
+        <a class="active" href="code-audit.html">代码质量检查</a>
     </nav>
     <div style="flex:1"></div>
     <div class="sidebar-pill">
@@ -59,14 +59,14 @@
     <section class="hero" style="padding-top:34px;padding-bottom:28px">
       <div class="wrap hero-in">
         <div>
-          <span class="eyebrow"><span class="dot"></span>Daily Code Audit</span>
-          <h1>每日代码审计报告</h1>
-          <p class="lead">全面、深度审查 WES 前端（ui/V2_PROTOTYPE）与后端（apps/api）代码，覆盖 bug/漏洞、可优化问题、架构健康度、性能/算法可优化性四个维度。</p>
+          <span class="eyebrow"><span class="dot"></span>2026-07-02 代码质量快照</span>
+          <h1>代码质量检查</h1>
+          <p class="lead">这是 2026-07-02 的历史检查结果，不代表当前代码状态。检查覆盖安全缺陷、可维护性、架构健康和性能四个方面；阅读时先看问题影响与处理状态，再用文件路径和命令结果复核。</p>
           <div class="pill-row">
-            <span class="pill brand">agent: qoder</span>
-            <span class="pill">2026-07-02 03:32 (Loop 正式执行)</span>
-            <span class="pill warn">状态：CRITICAL — 6 P0 / 16 P1 发现</span>
-            <span class="pill">WES Daily Code Audit Loop · 52 条发现 · 28 autoFix eligible</span>
+            <span class="pill brand">执行方：Qoder</span>
+            <span class="pill">检查时间：2026-07-02 03:32</span>
+            <span class="pill warn">当时结论：6 项 P0 / 16 项 P1</span>
+            <span class="pill">共 52 项发现 · 其中 28 项可按规则自动修复</span>
           </div>
         </div>
       </div>
@@ -75,8 +75,8 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">Scores</div>
-          <h2>四维度健康评分</h2>
+          <div class="num">检查评分</div>
+          <h2>四类质量情况</h2>
         </div>
         <div class="kpi-row">
           <div class="kpi">
@@ -110,7 +110,7 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">Verification</div>
+          <div class="num">检查证据</div>
           <h2>验证命令结果</h2>
         </div>
         <table>
@@ -131,9 +131,9 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">Findings</div>
-          <h2>Qoder 审计发现列表</h2>
-          <p>按 P0 / P1 / P2 / P3 分级的问题清单，含文件路径、证据、影响与修复建议。审计报告：<a href="../../../docs/agent-loop/audits/2026-07-02-qoder-daily-code-audit.md">2026-07-02-qoder-daily-code-audit.md</a></p>
+          <div class="num">问题明细</div>
+          <h2>检查发现列表</h2>
+          <p>按影响等级列出问题，并说明证据、业务或系统影响及处理建议。以下内容是历史快照；当前状态需结合后续变更记录和最新验证结果判断。原始报告：<a href="../../../docs/agent-loop/audits/2026-07-02-qoder-daily-code-audit.md">2026-07-02-qoder-daily-code-audit.md</a></p>
         </div>
         <div class="audit-section">
           <h3>P0 发现 <span class="pill warn">6</span></h3>
@@ -349,7 +349,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 每日代码审计 · 2026-07-02 · Qoder Daily Code Audit Loop · 52 条发现 · 28 autoFix eligible · AutoFix R1-R10 ✓ · 待 Codex 复核 · ⚠️ 安全 agent 违规修改 7 文件待回退
+      WES 项目管理 · 代码质量检查历史快照 · 检查日期 2026-07-02 · 52 条发现 · 28 条可按规则自动修复 · 后续状态请以变更记录和最新验证为准
     </footer>
   </main>
   <script>

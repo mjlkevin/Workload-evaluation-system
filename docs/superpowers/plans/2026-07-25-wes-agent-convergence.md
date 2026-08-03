@@ -405,3 +405,117 @@ git log --oneline --left-right --cherry-pick HEAD...codex/wes-dirty-triage-20260
 ```
 
 Expected: report the other checkout’s local changes and divergence. Do not merge until those changes are protected and the user chooses the final integration method.
+
+### Task 11: Finalize the single-worktree operating model
+
+**Files:**
+- Modify: `AGENTS.md`
+- Modify: `codex-project-registry.md`
+- Inspect: Git worktree registry
+
+- [ ] **Step 1: Verify the post-merge worktree fact**
+
+Run:
+
+```bash
+git worktree list --porcelain
+test ! -e /Users/kevin/AI/Workload-evaluation-system-agent
+```
+
+Expected: only `/Users/kevin/AI/Workload-evaluation-system` is registered and the old Agent path does not exist.
+
+- [ ] **Step 2: Update workspace governance**
+
+Replace the obsolete active-Agent-worktree wording with the single active directory `/Users/kevin/AI/Workload-evaluation-system`. Keep the merged historical branch as Git history, not as a second delivery directory.
+
+- [ ] **Step 3: Verify stale active-path instructions are gone**
+
+Run:
+
+```bash
+rg -n '当前活动交付 worktree|WES Agent / WorkEvolutionSys 活动 worktree|WES 集成/对比 checkout' AGENTS.md codex-project-registry.md
+```
+
+Expected: no instruction tells a future agent to use the removed directory.
+
+### Task 12: Restore a deterministic unknown-route fallback
+
+**Files:**
+- Modify: `ui/V2_PROTOTYPE/src/App.jsx`
+- Test: `ui/V2_PROTOTYPE/src/__tests__/AppAuthGuard.test.jsx`
+
+- [ ] **Step 1: Write the failing route test**
+
+Add an authenticated-router test that starts at `/path-that-does-not-exist` and expects the AI 工作台 heading after redirect.
+
+- [ ] **Step 2: Verify RED**
+
+Run:
+
+```bash
+npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/AppAuthGuard.test.jsx
+```
+
+Expected: FAIL because the current route tree has no catch-all child.
+
+- [ ] **Step 3: Add the minimal fallback**
+
+Add `<Route path="*" element={<Navigate to="/" replace />} />` inside the protected route tree.
+
+- [ ] **Step 4: Verify GREEN**
+
+Run the focused test again. Expected: all `AppAuthGuard` tests pass.
+
+### Task 13: Preserve safe username history and restore password focus
+
+**Files:**
+- Modify: `ui/V2_PROTOTYPE/src/pages/Login.jsx`
+- Test: `ui/V2_PROTOTYPE/src/__tests__/Login.test.jsx`
+
+- [ ] **Step 1: Write failing behavior tests**
+
+Add one successful-login assertion that `wes_username_history` contains only the username and not the submitted password. Add one legacy-record migration test that preserves usernames while deleting `wes_recent_users`, including any old plaintext password. Add one preloaded-history interaction test that focuses the username input, selects a history entry, and expects the password input to have focus.
+
+- [ ] **Step 2: Verify RED**
+
+Run:
+
+```bash
+npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/Login.test.jsx
+```
+
+Expected: the normal safe-storage assertion passes against the resolved implementation; legacy cleanup fails because the old key is still retained, and focus fails because the password input is not inside the username wrapper.
+
+- [ ] **Step 3: Implement direct focus ownership**
+
+Create `passwordInputRef`, attach it to the password input, and call `passwordInputRef.current?.focus()` after selecting a username. Migrate only legacy usernames into `wes_username_history`, remove `wes_recent_users`, and never copy legacy passwords.
+
+- [ ] **Step 4: Verify GREEN**
+
+Run the focused Login suite. Expected: all Login tests pass.
+
+### Task 14: Record issue-first evidence and run the final Web gate
+
+**Files:**
+- Modify: `03_技术设计/系统架构/WES-Agent-升级总看板/issues.html`
+- Modify: `03_技术设计/系统架构/WES-Agent-升级总看板/defects.html`
+- Modify: `03_技术设计/系统架构/WES-Agent-升级总看板/testing.html`
+- Modify: `03_技术设计/系统架构/WES-Agent-升级总看板/monitoring.html`
+- Modify: `03_技术设计/系统架构/WES-Agent-升级总看板/changes.html`
+
+- [ ] **Step 1: Record two deduplicated issues and derived defects**
+
+Record the unknown-route fallback gap and username-history focus gap as separate 2026-07-25 source issues. Link each to its derived defect and preserve the user-approved safe-storage decision.
+
+- [ ] **Step 2: Run current verification**
+
+Run:
+
+```bash
+npm run test:web
+npm run build:web
+node --test scripts/board-event.test.js scripts/board-work-items.test.js
+git diff --check
+```
+
+Expected: Web tests and build pass, board governance tests pass, and the diff has no whitespace errors. Preserve the existing Vite chunk-size warning as a non-blocking warning.

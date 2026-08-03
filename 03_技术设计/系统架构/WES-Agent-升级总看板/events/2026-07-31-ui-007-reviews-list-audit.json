@@ -1,0 +1,88 @@
+{
+  "id": "BE-2026-07-31-ui-007-reviews-list-audit",
+  "date": "2026-07-31",
+  "type": "requirement_intake",
+  "scope": "QODER-UI-007 /reviews list audit",
+  "summary": "Codex 已按 improving-wes-ui 对 /reviews 列表完成单业务面审计。1440px 与 760px 下页面无水平溢出，但确认三个根问题：GET /pm/reviews 失败被伪装为“暂无数据”；POST /pm/reviews 失败后仍导航到 REV-LOCAL-* 幽灵详情；列表主动作依赖双击/选择后操作，缺少键盘与筛选/选择语义，历史反馈仍使用原生 alert。去重未命中现有同类 issue/RP，登记 ISS-203，分诊为 requirement，派生 RP-044，状态待用户确认、未授权实现。",
+  "status": "CONFIRMED / READY_FOR_SPEC / 未授权实现",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "changes"
+  ],
+  "evidence": [
+    {
+      "kind": "codex_audit",
+      "ref": "docs/agent-loop/audits/2026-07-31-codex-QODER-UI-007-reviews-list-audit.md",
+      "result": "CONFIRMED / 3 root issues",
+      "summary": "记录 scope contract、根问题三要素、1440px/760px、失败态、创建失败和问题池分诊。"
+    },
+    {
+      "kind": "browser",
+      "ref": "docs/agent-loop/audits/assets/2026-07-31-ui-07-reviews/01-reviews-list-1440.png",
+      "result": "PARTIAL / normal list",
+      "summary": "1440px 正常列表，6 条合成评审数据，无页面级水平溢出。"
+    },
+    {
+      "kind": "browser",
+      "ref": "docs/agent-loop/audits/assets/2026-07-31-ui-07-reviews/02b-reviews-list-760-viewport.png",
+      "result": "PARTIAL / narrow viewport",
+      "summary": "760px 列表无页面级水平溢出；保留既有全局 Shell 纵向堆叠观察，不纳入 UI-07 owner。"
+    },
+    {
+      "kind": "browser",
+      "ref": "docs/agent-loop/audits/assets/2026-07-31-ui-07-reviews/03-reviews-list-load-failure-1440.png",
+      "result": "FAIL / HTTP 503 rendered as empty",
+      "summary": "列表失败后显示暂无数据和 0 条，无 alert/status 或错误文案。"
+    },
+    {
+      "kind": "browser",
+      "ref": "docs/agent-loop/audits/assets/2026-07-31-ui-07-reviews/04-reviews-create-failure-ghost-detail-1440.png",
+      "result": "FAIL / HTTP 500 navigated to ghost detail",
+      "summary": "创建失败后导航到 REV-LOCAL-*，详情仍呈现评审中和审批动作，无失败反馈。"
+    },
+    {
+      "kind": "code_owner",
+      "ref": "ui/V2_PROTOTYPE/src/hooks/useReviewList.js + ui/V2_PROTOTYPE/src/pages/ReviewList.jsx + ui/V2_PROTOTYPE/src/components/ListPage.jsx",
+      "result": "deterministic",
+      "summary": "loading/error 未透传；create catch 返回 local.id；行双击、筛选/选择语义和历史 alert owner 均已定位。"
+    }
+  ],
+  "intake": {
+    "dedup": "未命中同类 issue/RP；命中候选 UI-07 路线图和既有 Shell 窄屏观察",
+    "issue": {
+      "id": "ISS-203",
+      "title": "/reviews 失败状态、创建可信度与操作可达性",
+      "status": "已分诊"
+    },
+    "triage": "requirement",
+    "derivedRequirement": {
+      "id": "RP-044",
+      "title": "UI-07 评审列表可信反馈与显式操作入口",
+      "status": "待用户确认"
+    }
+  },
+  "next": "等待用户明确确认后生成 QODER-UI-007-IMPL Work Order；只处理 /reviews 列表三个已确认根问题，不集成 UI-05、不处理详情布局或全局 Shell，不自动领取下一项。",
+  "board": {
+    "apply": "event only / visible HTML apply blocked by unrelated dirty changes",
+    "requirement": {
+      "id": "RP-044",
+      "status": "待用户确认",
+      "owner": "Qoder after explicit assignment"
+    },
+    "testing": [
+      {
+        "command": "isolated browser audit / 1440px",
+        "result": "partial",
+        "summary": "正常列表与两条失败路径已采集。"
+      },
+      {
+        "command": "isolated browser audit / 760px",
+        "result": "partial",
+        "summary": "目标列表无水平溢出；全局 Shell 观察保持独立。"
+      }
+    ]
+  }
+}

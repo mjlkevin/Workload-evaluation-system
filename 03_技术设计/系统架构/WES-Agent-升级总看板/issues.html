@@ -18,24 +18,24 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="ops-health.html">运维看板</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a class="active" href="issues.html">问题池</a>
         <a href="defects.html">缺陷池</a>
         <a href="requirements.html">需求池</a>
     </nav>
     <div style="flex:1"></div>
     <div class="sidebar-pill">
-      <span class="pill brand">Work Item Triage</span>
-      <span class="pill">Issue → Defect / Requirement</span>
+      <span class="pill brand">反馈分诊</span>
+      <span class="pill">原始问题 → 缺陷或需求</span>
     </div>
   </aside>
   <button class="sidebar-toggle" id="sidebarToggle" aria-label="菜单">☰</button>
@@ -44,18 +44,18 @@
 <main>
     <div class="doc-h">
       <div class="wrap">
-        <div class="crumb">Work Item Triage</div>
+        <div class="crumb">用户反馈与问题分诊</div>
         <h1>问题池</h1>
         <div class="meta">
           <span><b>定位</b> 用户原始反馈、截图、疑问和未定性现象的第一入口</span>
-          <span><b>流转</b> Issue → triage → Defect / Requirement / Risk / Close</span>
-          <span><b>更新日期</b> 2026-07-15</span>
+          <span><b>处理流程</b> 原始问题（Issue）→ 分析分流 → 缺陷 / 需求 / 风险 / 关闭</span>
+          <span><b>更新日期</b> 2026-08-03</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">17 问题</span>
+          <span class="pill brand">26 个问题</span>
           <span class="pill warn">0 待分析</span>
-          <span class="pill warn">13 转缺陷</span>
-          <span class="pill brand">4 转需求</span>
+          <span class="pill warn">16 转缺陷</span>
+          <span class="pill brand">10 个已转为需求</span>
         </div>
       </div>
     </div>
@@ -63,14 +63,14 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">01 / Intake Rule</div>
+          <div class="num">01 / 登记规则</div>
           <h2>问题先行规则</h2>
-          <p>所有原始反馈先记录为 Issue。只有完成 triage 后，才进入缺陷池或需求池，避免把尚未定性的问题直接排期或误标已交付。</p>
+          <p>所有原始反馈先记录为问题（Issue）。完成分析分流后，才能进入缺陷池或需求池，避免把尚未判断清楚的问题直接排期或误写成已交付。</p>
         </div>
         <div class="grid-3">
-          <div class="card"><span class="pill brand">Issue</span><h3>保留原始事实</h3><p>记录用户原文、截图、会话、复现条件、当前影响和证据。</p></div>
-          <div class="card"><span class="pill warn">Triage</span><h3>分析后分流</h3><p>判断是缺陷、需求、风险、测试证据，还是无需处理。</p></div>
-          <div class="card"><span class="pill ok">Trace</span><h3>来源链路不断</h3><p>Defect / Requirement 必须能反查原始 Issue。</p></div>
+          <div class="card"><span class="pill brand">原始问题</span><h3>保留原始事实</h3><p>记录用户原文、截图、会话、复现条件、当前影响和证据。</p></div>
+          <div class="card"><span class="pill warn">分析分流</span><h3>判断后续去向</h3><p>判断它是缺陷、需求、风险、测试证据，还是无需继续处理。</p></div>
+          <div class="card"><span class="pill ok">来源追溯</span><h3>来源链路不断</h3><p>每条缺陷或需求都必须能够反查对应的原始问题。</p></div>
         </div>
       </div>
     </section>
@@ -78,9 +78,9 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">02 / Issue Ledger</div>
+          <div class="num">02 / 问题清单</div>
           <h2>问题台账</h2>
-          <p>本页只承载原始问题和 triage 结论；修复和需求规划分别进入缺陷池或需求池。</p>
+          <p>本页只记录原始问题和分析结论；需要修复的问题进入缺陷池，需要新增或优化能力的事项进入需求池。</p>
         </div>
         <table>
           <tr><th>ID</th><th>日期</th><th>标题</th><th>来源</th><th>原始反馈</th><th>证据</th><th>分析状态</th><th>分流</th><th>下一步</th></tr>
@@ -91,7 +91,7 @@
               <td>user_screenshot</td>
               <td>刷新 localhost:3002 后直接进入 AI 工作台，但页面同时提示登录已过期，请重新登录。</td>
               <td><code class="inline">RP-037</code> <code class="inline">AppAuthGuard.test.jsx</code> <code class="inline">HomeWorkspace.test.jsx</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-02-001</td>
               <td>已修复并验证，保留来源链路用于后续缺陷统计。</td>
             </tr>
@@ -102,7 +102,7 @@
               <td>user_screenshot</td>
               <td>AI 工作台上传客户需求文件后停留在正在提取文件结构 / 正在调用模型并组织回复，看不到任何流式返回。</td>
               <td><code class="inline">RP-029</code> <code class="inline">testing.html:RP-029 附件场景人工验收反证</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-03-001</td>
               <td>返工附件解析流式接线与真实 SSE 分块前端回归。</td>
             </tr>
@@ -113,7 +113,7 @@
               <td>user_feedback</td>
               <td>用户问你是什么模型时，AI 连续回复能力说明列表，没有回答模型信息。</td>
               <td><code class="inline">RP-038</code> <code class="inline">workbench-intent.service.test.ts</code> <code class="inline">workbench-dispatch.service.test.ts</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-03-002</td>
               <td>真实会话人工复核模型信息展示口径。</td>
             </tr>
@@ -124,7 +124,7 @@
               <td>user_screenshot</td>
               <td>session 18ecc6d7 中附件问答回复的业务域表格没有渲染成表格，下一步建议没有变成可交互按钮；二次复核发现概览预览点击后仍未触发报告生成。</td>
               <td><code class="inline">RP-039</code> <code class="inline">HomeWorkspace.test.jsx</code> <code class="inline">session:18ecc6d7-e6de-49f5-ad5c-206a77a26a7c</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-03-003</td>
               <td>真实会话人工复核表格、按钮和报告生成动作。</td>
             </tr>
@@ -135,7 +135,7 @@
               <td>user_feedback</td>
               <td>建议分二级页面，问题、缺陷、需求分开；用户的原始反馈记录到问题，然后通过分析后按实际情况进入缺陷或需求。</td>
               <td><code class="inline">RP-040</code> <code class="inline">BE-2026-07-03-rp-040-board-work-item-split</code> <code class="inline">2026-07-03 user feedback: 问题池/缺陷池/需求池需要作为一级导航入口</code> <code class="inline">BE-2026-07-03-rp-040-work-item-pages</code> <code class="inline">2026-07-04 user decision: 原始反馈先入问题池，由 Codex Intake/Triage Loop 分流</code> <code class="inline">BE-2026-07-04-issue-first-triage-loop</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转需求 · RP-040</td>
               <td>Skill 与全局规则已改为原始反馈先进入问题池；Codex Intake/Triage Loop 分析后标记 disposition 并分流到缺陷池或需求池。</td>
             </tr>
@@ -146,7 +146,7 @@
               <td>user_screenshot</td>
               <td>session be9c045e-29d1-4747-8106-4c1f4c0a3a12 中，AI 工作台提示“这是一个写动作请求”并展示“确认执行写动作”按钮，用户点击后界面没有任何响应。</td>
               <td><code class="inline">session:be9c045e-29d1-4747-8106-4c1f4c0a3a12</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx:confirmPendingAction</code> <code class="inline">ui/V2_PROTOTYPE/src/__tests__/HomeWorkspace.test.jsx</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-04-001</td>
               <td>已补通 generic confirm_write_action 的前端兜底反馈；待用户在真实会话中复核点击后不再静默。</td>
             </tr>
@@ -157,7 +157,7 @@
               <td>user_screenshot</td>
               <td>用户在用户管理页面点击“+ 邀请成员”按钮后界面没有任何反应。</td>
               <td><code class="inline">screenshot:codex-clipboard-4121c1d5-913b-4922-9cec-4ac70db3f20d.png</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/UserManagement.jsx:+ 邀请成员按钮缺少 onClick</code> <code class="inline">ui/V2_PROTOTYPE/src/__tests__/UserManagement.test.jsx</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-04-002</td>
               <td>已绑定生成邀请码接口并显示成员邀请码弹窗；待用户在本地 V2 页面点击复核。</td>
             </tr>
@@ -168,7 +168,7 @@
               <td>user_requirement</td>
               <td>用户要求在管理员的用户管理模块工具栏加入新建按钮，并支持管理员直接新建用户。</td>
               <td><code class="inline">ui/V2_PROTOTYPE/src/pages/UserManagement.jsx</code> <code class="inline">apps/api/src/routes/auth.routes.ts:POST /auth/users</code> <code class="inline">apps/api/src/modules/auth/auth.usecase.ts:createUser</code> <code class="inline">docs/superpowers/plans/2026-07-04-admin-create-user.md</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转需求 · RP-041</td>
               <td>已实现管理员直建用户弹窗、POST /auth/users 和 PG email 迁移；待用户在本地页面复核新建账号。</td>
             </tr>
@@ -179,7 +179,7 @@
               <td>user_requirement_screenshot</td>
               <td>用户要求将系统管理页内的“编码规则 / 模型配置 / 知识库 / RateCard / DSL 规则集 / 模板 / 测试结果”等二级模块入口移植到左侧系统导航栏“系统管理”下展开，并给每个二级模块新增独立页面；后续“系统管理”不支持点击进入，不再有独立页面。</td>
               <td><code class="inline">screenshot:codex-clipboard-ca73abc6-39e9-4269-8bf2-b5b8db10e316.png</code> <code class="inline">ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx</code> <code class="inline">ui/V2_PROTOTYPE/src/App.jsx</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx</code> <code class="inline">ui/V2_PROTOTYPE/src/__tests__/SystemManagementNavigation.test.jsx</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转需求 · RP-042</td>
               <td>已实现 V2 左侧系统管理二级菜单、独立子路由和 /system 默认重定向；待用户在本地页面复核导航体验。</td>
             </tr>
@@ -190,7 +190,7 @@
               <td>user_screenshot</td>
               <td>用户在系统管理 / 编码规则页面反馈“配置”“生效”“禁用”按钮点击后没有任何反应。</td>
               <td><code class="inline">screenshot:codex-clipboard-5a61d8c1-6a8e-4716-92ef-0a9d4735ca92.png</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx:编码规则按钮传递展示 code 而非后端 id</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js:configureRule 空 PATCH 且无配置表单</code> <code class="inline">ui/V2_PROTOTYPE/src/__tests__/SystemManagementCodeRules.test.jsx</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-04-003</td>
               <td>已修复编码规则配置弹窗、id 参数传递和可见成功反馈；待用户在本地 /system/code-rules 页面复核。</td>
             </tr>
@@ -201,7 +201,7 @@
               <td>user_screenshot</td>
               <td>用户反馈左侧侧栏底部的“退出”按钮偏离原设计，希望恢复到用户名旁边。</td>
               <td><code class="inline">screenshot:codex-clipboard-1bc4b033-ad78-409d-80ba-de6af080c84d.png</code> <code class="inline">ui/V2_PROTOTYPE/layout.css:.sidebar a 全局 width:100% 泄漏到 .sidebar .user .out</code> <code class="inline">ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx:退出链接仍在用户信息 row 内</code> <code class="inline">ui/V2_PROTOTYPE/src/__tests__/ShellUserMenu.test.jsx</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-04-004</td>
               <td>已恢复退出按钮在用户名旁边的紧凑布局；待用户在本地 V2 页面复核。</td>
             </tr>
@@ -212,7 +212,7 @@
               <td>user_screenshot</td>
               <td>当前登录业务用户 kevin，但导航栏依然显示“系统管理 / 用户管理 / API 密钥”菜单；理论上只有管理员账号能看到这些菜单，除此之外任何角色都不应该显示。</td>
               <td><code class="inline">screenshot:codex-clipboard-18dbf643-5d29-44a6-8356-cec422935c46.png</code> <code class="inline">ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx:系统分组原为静态渲染，未按 user.role 过滤</code> <code class="inline">ui/V2_PROTOTYPE/src/App.jsx:管理员页面原缺少前端直达路由守卫</code> <code class="inline">ui/V2_PROTOTYPE/src/components/Layout/WorkspaceTabs.jsx:历史页签原可残留管理员入口</code> <code class="inline">ui/V2_PROTOTYPE/src/__tests__/ShellUserMenu.test.jsx</code> <code class="inline">ui/V2_PROTOTYPE/src/__tests__/AppAuthGuard.test.jsx</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-04-005</td>
               <td>已按管理员 role 收紧左侧导航、顶部页签和直达路由；待用户以 kevin 账号在本地页面复核管理员入口不可见。</td>
             </tr>
@@ -223,7 +223,7 @@
               <td>user_feedback_session_id</td>
               <td>用户反馈会话 7a8f79a5-ad12-4132-895b-ae39f9cf2148 发消息发一半，AI 的对话消息直接没了。</td>
               <td><code class="inline">session:7a8f79a5-ad12-4132-895b-ae39f9cf2148</code> <code class="inline">PG ai_sessions 查询显示该会话仅有 3 条 user 消息，无 assistant 消息</code> <code class="inline">trace 查询显示同一会话 3 条 trace 均为 routingRule=client_aborted 且 hasError=true</code> <code class="inline">apps/api/src/services/ai/chat.service.ts:catch 分支原只写 failure trace，不追加 assistant 失败/中断消息</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx:finally 原在中断后立即 loadSessions，可能用旧服务端状态覆盖本地停止气泡</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-04-006</td>
               <td>已修复后端流式失败/中断会话可见标记和前端中断后刷新竞态；待用户在原会话或新会话真实重试复核。</td>
             </tr>
@@ -234,7 +234,7 @@
               <td>user_screenshot</td>
               <td>用户截图反馈：发送“你好”后，AI 工作台显示“AI 已收到，但暂未返回有效内容。”，没有返回正常能力说明。</td>
               <td><code class="inline">screenshot:codex-clipboard-926392da-5a3d-44d4-b02b-0ace8d72f55d.png</code> <code class="inline">apps/api/src/services/ai/chat.service.ts:homeWorkbenchChatStream 原使用 req.on(&#39;close&#39;) 判定客户端断开</code> <code class="inline">真实 curl 复现旧逻辑只收到 &#39;: heartbeat&#39;，未收到 static/done</code> <code class="inline">ui/V2_PROTOTYPE/src/api/ai.js:reader done 时原未解析尾部残留 SSE buffer</code> <code class="inline">apps/api/src/modules/ai-sessions/ai-sessions.repository.ts:连续 create/append 消息时 PG delete+insert 持久化原为并发 fire-and-forget，验证时暴露 duplicate key 风险</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-04-007</td>
               <td>已修复 SSE 断开判断与前端尾包解析，并在本地真实接口验证“你好”返回 static/done；待用户刷新页面复核。</td>
             </tr>
@@ -245,7 +245,7 @@
               <td>qoder_audit_codex_review</td>
               <td>Qoder 审计指出生产 AI 调用普遍使用 json_object，缺少统一运行时 Schema、结构修复重试、字段语义与人工降级；用户要求 Codex 复核并给出系统性解决方案。</td>
               <td><code class="inline">RP-027</code> <code class="inline">apps/api/src/ai/provider/model-provider.ts:JsonSchemaResponseFormat</code> <code class="inline">apps/api/src/ai/provider/tool-calling.test.ts:json_schema passthrough</code> <code class="inline">apps/api/src/modules/harness/harness.usecase.ts:parseReportV1/parseReportV2</code> <code class="inline">生产源码可检索到 14 处 responseFormat=json_object 字面量，未发现生产 json_schema 调用</code> <code class="inline">apps/api/src/ai/contracts/structured-output.ts 与 wes-contracts.ts：统一契约、Ajv 校验、修复和受限格式回退已实施</code> <code class="inline">2026-07-15：生产源码已无 responseFormat=json_object 结构化调用；test:modules 152/152、test:harness 71/71、test:ai pass</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转需求 · RP-027</td>
               <td>RP-027 结构化输出子范围已完成本地实施、自动化门禁与最小真实 Kimi strict json_schema canary；待以代表性业务数据观察 format_fallback、repair 和 needs_user_input 指标并完成页面人工验收。</td>
             </tr>
@@ -256,7 +256,7 @@
               <td>qoder_audit_codex_review</td>
               <td>复核 chat.service.ts 发现模型输出缺少 industry 时，企业画像链路会填入固定的商务服务业分类，并用于前端草稿预填，存在把未知信息写成客户事实的风险。</td>
               <td><code class="inline">apps/api/src/services/ai/chat.service.ts:summarizeCompanyProfileByKimi</code> <code class="inline">apps/api/src/services/ai/chat.service.ts:companyProfileSummary</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx:company profile draft prefill</code> <code class="inline">apps/api/src/services/ai/chat.service.test.ts:未知行业保持空并标记 needs_user_input</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-15-001</td>
               <td>固定行业已移除，缺失值保持空并标记 needs_user_input，字段来源与契约回归已补；待真实企业画像请求人工确认页面不再预填错误行业。</td>
             </tr>
@@ -267,22 +267,110 @@
               <td>qoder_audit_codex_review</td>
               <td>复核 Harness 失败恢复流程发现 retryHarnessRun 对所有 failed run 都重置到 evidence_ready；V2 报告在 clarifying 阶段失败后会错误回到 V1 起点，丢失正确恢复语义。</td>
               <td><code class="inline">apps/api/src/modules/harness/harness.usecase.ts:retryHarnessRun</code> <code class="inline">apps/api/src/modules/harness/harness.types.ts:needs_user_input stage</code> <code class="inline">npm run test:harness -w apps/api:70/70 当前测试未覆盖 V1/V2 差异化恢复</code> <code class="inline">npm run test:harness -w apps/api:71/71 已覆盖 V1/V2 needs_user_input 与差异化 resumeStage</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转缺陷 · DEF-2026-07-15-002</td>
               <td>已持久化契约失败 metadata/resumeStage，V1/V2 分别恢复 evidence_ready/clarifying，交互运行进入 needs_user_input；待真实交互运行人工复核错误提示与恢复体验。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-07-25-001</td>
+              <td>2026-07-25</td>
+              <td>合并冲突后未知前端路径显示空白</td>
+              <td>merge_conflict_review</td>
+              <td>用户要求复核 Agent 成果合并冲突；代码检查发现新版受保护路由保留了登录和管理员守卫，但旧版通配路由未保留，访问不存在的 URL 时没有页面内容。</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/App.jsx</code> <code class="inline">ui/V2_PROTOTYPE/src/__tests__/AppAuthGuard.test.jsx</code> <code class="inline">focused RED: unknown route 无 AI 工作台 heading</code> <code class="inline">focused GREEN: AppAuthGuard 3/3</code></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
+              <td>转缺陷 · DEF-2026-07-25-001</td>
+              <td>已增加受保护路由通配重定向，未知路径统一返回首页。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-07-25-002</td>
+              <td>2026-07-25</td>
+              <td>登录历史选择后焦点失效且旧密码记录可能残留</td>
+              <td>merge_conflict_review</td>
+              <td>用户要求复核登录冲突预期并修复。代码检查确认当前实现只写用户名，但选择历史用户名后通过错误 DOM 层级查找密码框，焦点不会移动；旧版 <code class="inline">wes_recent_users</code> 中可能遗留明文密码。</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/pages/Login.jsx</code> <code class="inline">ui/V2_PROTOTYPE/src/__tests__/Login.test.jsx</code> <code class="inline">focused RED: legacy migration + password focus 2 fail</code> <code class="inline">focused GREEN: Login 5/5</code></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
+              <td>转缺陷 · DEF-2026-07-25-002</td>
+              <td>已改为密码框直接 ref 聚焦，并只迁移旧用户名、删除含密码的旧存储键；“记住 7 天”仍只控制令牌持久化。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-07-25-003</td>
+              <td>2026-07-25</td>
+              <td>采用 ui-skills 方法改进 WES 当前 UI</td>
+              <td>user_request</td>
+              <td>用户先要求评估 <code class="inline">ibelick/ui-skills</code> 是否适合当前项目，确认“方法适配、技术栈不迁移、系统管理先试点”的方向后明确要求开始执行。</td>
+              <td><code class="inline">github.com/ibelick/ui-skills@ae74b58</code> <code class="inline">ui/V2_PROTOTYPE/package.json</code> <code class="inline">ui/V2_PROTOTYPE/tokens.css</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx</code> <code class="inline">docs/superpowers/specs/2026-07-25-wes-ui-quality-gate-design.md</code></td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td>
+              <td>转需求 · RP-043</td>
+              <td>去重结果：RP-032 仅覆盖 AI 工作台列表可达性，RP-042 仅覆盖系统管理导航与局部动作，均不覆盖项目级 UI 质量门禁和共享 Dialog 试点；已形成书面设计，待用户复核后进入实施计划。</td>
             </tr>
             <tr data-board-event-id="BE-2026-08-02-rp-045-branch-topology:issues">
               <td class="mono">ISS-2026-08-02-001</td><td>2026-08-02</td><td>项目看板缺少主分支与子分支拓扑</td><td>user_requirement</td>
               <td>把 WES 当前仓库所有分支情况反馈到项目看板，通过图形和分支形式表达主分支与其他子分支，并由脚本自动刷新。</td>
               <td><code class="inline">RP-045</code> <code class="inline">2026-08-02-wes-branch-topology-board-design.md</code></td>
-              <td><span class="status run"><span class="dot"></span>converted</span></td><td>转需求 · RP-045</td><td>按已确认规格实施并验证。</td>
+              <td><span class="status run"><span class="dot"></span>已分流</span></td><td>转需求 · RP-045</td><td>按已确认规格实施并验证。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-02-002</td>
+              <td>2026-08-02</td>
+              <td>总看板文案偏工程化，业务读者理解成本高</td>
+              <td>user_request</td>
+              <td>用户要求整体优化 WES Agent 总看板文案，把晦涩术语和工程化表达改成产品经理、项目经理和业务用户能够理解的语言。</td>
+              <td><code class="inline">RP-046</code> <code class="inline">docs/superpowers/specs/2026-08-02-wes-command-board-plain-language-design.md</code> <code class="inline">docs/superpowers/plans/2026-08-02-wes-command-board-plain-language.md</code></td>
+              <td><span class="status run"><span class="dot"></span>已分诊</span></td>
+              <td>转需求 · RP-046</td>
+              <td>18 个源页面和发布版已完成改写；HTML、看板一致性、分支功能、工作项治理与差异检查均通过，待用户审阅业务表达。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-02-003</td>
+              <td>2026-08-02</td>
+              <td>AI 工作台单通道请求态导致会话切换冻结与回复串台</td>
+              <td>user_architecture_review</td>
+              <td>用户提供完整复现链和代码定位：会话 A 发送中切换到会话 B 时，全局 <code class="inline">sending</code> 阻断 B 的消息同步与发送；A 返回后又可能更新当前视图。期望升级为会话级独立运行通道，允许不同会话并行请求。</td>
+              <td><code class="inline">AiHomeWorkbench.jsx:1704-1759,1811-1814,2051-2277</code> <code class="inline">useAiSessions.js:46-53</code> <code class="inline">SessionRail.jsx</code> <code class="inline">src/api/ai.js</code> <code class="inline">RP-017</code> <code class="inline">RP-029</code></td>
+              <td><span class="status block"><span class="dot"></span>A2 Gate 需返工 / R1 待 ACK</span></td>
+              <td>转需求 · RP-047</td>
+              <td>已确认任务需跨会话切换、WES 路由切换、页面刷新、关闭标签页和重新登录持续；混合检查点方案已获用户批准。A2 已通过 Harness 93/93、modules 143/143 与 API/Web build，但 Codex Gate 独立复现 Date/Map 绕过 JSON 普通对象校验，并确认 output 并发回归和 handoff 范围记录不完整。已发布 A2-R1 同分支最小返工，Batch B 继续锁定。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-02-004</td>
+              <td>2026-08-02</td>
+              <td>模型任务沟通术语过多且表达不自然</td>
+              <td>user_request</td>
+              <td>用户反馈任务沟通过程中的模型回复包含过多专业术语，表达不自然；要求建立可跨项目复用的 Skill，从产品经理和用户视角解释技术工作，并且只约束任务沟通回复。</td>
+              <td><code class="inline">RP-048</code> <code class="inline">skills/speak-plainly/SKILL.md</code> <code class="inline">docs/superpowers/specs/2026-08-02-speak-plainly-skill-design.md</code></td>
+              <td><span class="status run"><span class="dot"></span>已分诊</span></td>
+              <td>转需求 · RP-048</td>
+              <td>去重结果：RP-046 只改写总看板页面文案，不覆盖模型任务沟通；已创建通用 Speak Plainly Skill 并接入 WES 四个模型入口，自动检查通过，待用户体验确认。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-03-001</td>
+              <td>2026-08-03</td>
+              <td>WES 需要根据用户意图在多个知识库之间自动路由</td>
+              <td>user_architecture_question</td>
+              <td>当前连接的是“金蝶解决方案知识库”；用户由资金计划和网上银行实施边界两条未命中样本，进一步询问 WES 是否能配置多个知识库，并由 AI 根据用户意图选择对应知识库检索。</td>
+              <td><code class="inline">RP-031 C2/M1</code> <code class="inline">KnowledgeBaseConfigStore</code> <code class="inline">routeWorkbenchIntent</code> <code class="inline">buildKnowledgeQueryResponse</code></td>
+              <td><span class="status run"><span class="dot"></span>已分诊</span></td>
+              <td>转需求 · RP-031（扩充范围）</td>
+              <td>去重命中 RP-031 已规划但未实现的多知识库和路由治理，不新建 RP。先确认第一版是“同一智谱账号下多知识库”，还是同时要支持多 Provider/多账号，再完成书面设计。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-03-002</td>
+              <td>2026-08-03</td>
+              <td>RP-047 Harness Testcontainers 门禁不可复现且依赖隔离失效</td>
+              <td>codex_external_handoff_gate</td>
+              <td>Qoder RP-047-A 回填声称通过等效 PostgreSQL 验证，但正式 Testcontainers 命令退出 7；Node 24 下全局 setup 使用 <code class="inline">__dirname</code> 与 top-level await 冲突，worktree 又未安装自己的 API/V2 依赖，导致错误加载主 checkout Ajv 6 并误报基线故障。</td>
+              <td><code class="inline">docs/agent-loop/audits/2026-08-03-codex-RP-047-A-gate.md</code> <code class="inline">apps/api/test-setup.mts:37</code> <code class="inline">apps/api/package.json:test:harness</code> <code class="inline">npm ci 后 modules 143/143、build:api/web pass</code></td>
+              <td><span class="status run"><span class="dot"></span>已分流 / 阻断 A1</span></td>
+              <td>转缺陷 · DEF-2026-08-03-001 / RP-047-A2</td>
+              <td>在全新 A2 worktree 修复 ESM 路径、安装隔离依赖、用随机临时 database 演练 0000-0013 + 历史数据 + 0014；正式 Testcontainers 命令和全部构建通过后再进 Gate。</td>
             </tr>
         </table>
       </div>
     </section>
 </main>
   </div>
-  <footer>问题池 · WES 项目管理 · 2026-07-15</footer>
+  <footer>问题池 · WES 项目管理 · 2026-08-03</footer>
   <script>
     const sidebar = document.getElementById('sidebar');
     const toggle = document.getElementById('sidebarToggle');

@@ -1,0 +1,126 @@
+{
+  "id": "BE-2026-08-02-branch-governance-cleanup",
+  "date": "2026-08-02",
+  "type": "process_change",
+  "scope": "WES 本地分支与 Worktree 收敛",
+  "summary": "按独立 Gate 分两批清理 34 个已集成、已吸收、被修正版取代或已拒收的本地分支引用，移除 4 个已集成 clean worktree，新建 RP-031 Phase 0 集成 worktree，并将本地 main 快进到业务主线 88d32b4。当前保留 main、业务主线、RP-031 rework 和 RP-031 integration 四个本地分支；主工作区未提交修改保持未覆盖。",
+  "status": "LOCAL_CLEANUP_COMPLETE / REMOTE_SYNC_PENDING / RP-031_REWORK",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "collaboration-protocol"
+  ],
+  "evidence": [
+    {
+      "kind": "git",
+      "ref": "37 local branches / 5 worktrees -> 4 local branches / 2 worktrees",
+      "result": "local cleanup complete",
+      "summary": "清理前后均以 Git refs、merge-base、patch-id 和 worktree clean 状态复核；新建一个 RP-031 integration worktree。"
+    },
+    {
+      "kind": "git",
+      "ref": "main 2764fcf -> 88d32b4",
+      "result": "fast-forward",
+      "summary": "本地 main 与 codex/role-driven-ai-home-workbench 收敛到同一已验证提交。"
+    },
+    {
+      "kind": "remote",
+      "ref": "git fetch --prune origin",
+      "result": "origin/main behind local main by 75 commits",
+      "summary": "已刷新本地远端跟踪引用；未 push，未删除远端分支。"
+    },
+    {
+      "kind": "verification",
+      "ref": "build:web + build:api + test:modules + test:web + test:ai",
+      "result": "pass",
+      "summary": "干净 worktree 上 Web/API 构建通过，modules 143/143、Web 196/196 通过，AI 测试命令 exit 0。"
+    },
+    {
+      "kind": "verification",
+      "ref": "Provider + Trace + RAG focused tests",
+      "result": "47/47 pass",
+      "summary": "覆盖 RP-027/028 Provider、RP-029/030 Trace/SSE 和 RP-031 baseline 的当前主线实现。"
+    },
+    {
+      "kind": "gate",
+      "ref": "docs/agent-loop/audits/2026-07-20-codex-RP-031-rag-production-gate.md",
+      "result": "production branch rejected and local ref removed",
+      "summary": "原 production 分支禁止合并；审计证据继续留存于主线。"
+    },
+    {
+      "kind": "gate",
+      "ref": "codex/rp-031-rag-rework @ d3fa065",
+      "result": "retained / rework required",
+      "summary": "新 Gate 发现 clean-checkout security、Request/Prompt Trace、密钥清除三个 P1，且与未提交知识库 DB 迁移发生存储边界冲突，禁止直接 cherry-pick。"
+    }
+  ],
+  "next": "由 owner 确认 RP-031 知识库配置继续采用 JSON Repository 还是批准 PostgreSQL 迁移；在此之前保留 rework 与 integration 分支。另行确认后才允许 push 本地 main 或删除远端旧分支。",
+  "recovery": {
+    "workingTreeBackup": "/Users/kevin/AI/wes-branch-cleanup-backup.T0DlWU",
+    "note": "已删除的本地分支可在 Git GC 前按下列原 tip 重建；主工作区 tracked patch 与 untracked archive 另存于仓库外备份目录。",
+    "deletedRefs": [
+      { "branch": "codex/dirty-safety-20260629-103953", "tip": "d5dac52" },
+      { "branch": "codex/minicrm-migration", "tip": "3f6943b" },
+      { "branch": "codex/rp-045-branch-board", "tip": "88d32b4" },
+      { "branch": "codex/wes-dirty-triage-20260629", "tip": "4f62276" },
+      { "branch": "codex/wes-project-management-roadmap", "tip": "728ae57" },
+      { "branch": "feat/requirement-assessment-list-ux-polish", "tip": "22fea9a" },
+      { "branch": "qoder/streaming-audit-continuation", "tip": "6e88ff4" },
+      { "branch": "qoder/rp-033-clean", "tip": "d5dac52" },
+      { "branch": "qoder/code-audit-fix-20260702", "tip": "84611da" },
+      { "branch": "qoder/code-audit-fix-20260702-r2", "tip": "84611da" },
+      { "branch": "qoder/code-audit-fix-20260702-r3", "tip": "84611da" },
+      { "branch": "qoder/code-audit-fix-20260702-r4", "tip": "84611da" },
+      { "branch": "qoder/code-audit-fix-20260702-r5", "tip": "84611da" },
+      { "branch": "qoder/code-audit-fix-20260702-r6", "tip": "84611da" },
+      { "branch": "qoder/code-audit-fix-20260702-r7", "tip": "84611da" },
+      { "branch": "qoder/code-audit-fix-20260702-r8", "tip": "84611da" },
+      { "branch": "qoder/code-audit-fix-20260702-r9", "tip": "84611da" },
+      { "branch": "qoder/code-audit-fix-20260702-r10", "tip": "84611da" },
+      { "branch": "qoder/nightops-trial-001-rework", "tip": "84611da" },
+      { "branch": "qoder/ui-003-api-keys", "tip": "ea4a1ef" },
+      { "branch": "qoder/ui-004-model-config", "tip": "97db787" },
+      { "branch": "qoder/ui-005-knowledge-base", "tip": "a9df870" },
+      { "branch": "codex/rp-027-028-clean-fix", "tip": "5226deb" },
+      { "branch": "codex/rp-029-030-rework-fixes", "tip": "d023651" },
+      { "branch": "qoder/rp-026-role-capability-matrix", "tip": "195d4f3" },
+      { "branch": "qoder/rp-027-028-clean", "tip": "d5f2246" },
+      { "branch": "qoder/rp-027-028-kimi-provider-upgrade", "tip": "26a9d2e" },
+      { "branch": "qoder/rp-029-030-streaming-trace-rework", "tip": "6e34390" },
+      { "branch": "qoder/rp-029-kimi-streaming-sse", "tip": "263b682" },
+      { "branch": "qoder/rp-030-trace-schema", "tip": "1223fa9" },
+      { "branch": "qoder/rp-031-rag-baseline", "tip": "41882b7" },
+      { "branch": "qoder/rp-032-workflow-accessibility", "tip": "4fc2734" },
+      { "branch": "qoder/rp-033-session-list-scroll", "tip": "5d8456c" },
+      { "branch": "feature/rp-031-rag-production", "tip": "57f1205" }
+    ]
+  },
+  "board": {
+    "change": {
+      "stage": "WES 分支治理收敛",
+      "result": "本地清理完成 / 远端待同步 / RP-031 待返工"
+    },
+    "testing": [
+      {
+        "command": "npm run build:web && npm run build:api",
+        "result": "pass",
+        "summary": "在 88d32b4 干净 worktree 上完成 Web/API 构建。"
+      },
+      {
+        "command": "npm run test:modules && npm run test:web && npm run test:ai",
+        "result": "pass",
+        "summary": "modules 143/143、Web 196/196 通过，AI 测试命令 exit 0。"
+      },
+      {
+        "command": "Provider + Trace + RAG focused tests",
+        "result": "47/47 pass",
+        "summary": "历史分支对应的 Provider、Trace、SSE 和 RAG baseline 当前实现回归通过。"
+      }
+    ]
+  }
+}

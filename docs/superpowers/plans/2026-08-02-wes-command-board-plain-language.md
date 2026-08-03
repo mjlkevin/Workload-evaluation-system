@@ -33,6 +33,8 @@
 **导航与构建：**
 
 - `scripts/board-build.js`
+- `scripts/board-sidebar-transform.js`
+- `scripts/sync-board-branch-nav.js`
 - `scripts/branch-board-page.test.js`（仅在现有断言依赖旧标签时更新断言）
 - `03_技术设计/系统架构/WES-Agent-升级总看板/dist/*.html`（自动生成）
 

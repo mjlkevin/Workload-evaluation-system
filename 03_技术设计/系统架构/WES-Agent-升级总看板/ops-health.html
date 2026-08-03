@@ -49,9 +49,9 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <div class="sidebar-nav-group">
           <a class="active" href="ops-health.html">运维看板</a>
@@ -64,9 +64,9 @@
         </div>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="issues.html">问题池</a>
         <a href="defects.html">缺陷池</a>
         <a href="requirements.html">需求池</a>
@@ -82,17 +82,18 @@
   <div class="main-content">
 <header class="doc-h">
     <div class="doc-wrap">
-      <div class="crumb">WES Agent · Operations Dashboard</div>
-      <h1>运维看板</h1>
+      <div class="crumb">WES Agent · 运行健康记录</div>
+      <h1>运行健康记录</h1>
       <p class="meta">
-        <span><b>巡检频率</b> 每 2 小时自动执行</span>
+        <span><b>页面性质</b> 历史巡检记录，不代表当前实时状态</span>
+        <span><b>原巡检频率</b> 每 2 小时执行一次</span>
         <span><b>覆盖</b> API 后端 · PostgreSQL · 前端 Vite · 系统资源</span>
-        <span><b>策略</b> 异常自主诊断 · 前端可自动重启 · 后端/DB 仅报告</span>
+        <span><b>处理原则</b> 发现异常后记录原因和影响；前端可按既定规则重启，后端与数据库需要人工确认后处理</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
-        <span class="pill" style="background:var(--ok-soft);color:var(--ok)" id="ops-overall-pill">● 全部正常</span>
-        <span class="pill brand">Loop: 2h</span>
-        <span class="pill" id="ops-last-check">最后巡检: 18:04</span>
+        <span class="pill warn" id="ops-overall-pill">历史快照 · 请勿当作实时结论</span>
+        <span class="pill brand">原巡检周期：2 小时</span>
+        <span class="pill" id="ops-last-check">页面最后记录：2026-07-05 18:04</span>
       </div>
     </div>
   </header>
@@ -101,8 +102,8 @@
     <!-- §1 服务健康概览 -->
     <section id="sec-svc">
       <div class="h-num">Section 01</div>
-      <h2>服务健康概览</h2>
-      <p class="lead">4 个核心服务的实时状态，每次 Loop 自动刷新。</p>
+      <h2>最后一次记录的服务状态</h2>
+      <p class="lead">以下是页面最后一次留下的 4 类服务快照，用于回顾当时发生了什么；判断当前服务是否可用，需要重新执行健康检查。</p>
       <div class="health-grid" id="health-detail-grid">
         <div class="health-card" id="detail-api">
           <div class="hc-head"><h3><span class="status-dot ok" id="dot-api"></span>API 后端</h3><span class="badge ok" id="badge-api">正常</span></div>
@@ -151,7 +152,7 @@
     <section id="sec-diag">
       <div class="h-num">Section 02</div>
       <h2>诊断日志</h2>
-      <p class="lead">每次 Loop 巡检的完整记录，保留最近 30 条。状态灯：绿=正常、红=异常、黄=降级。</p>
+      <p class="lead">保留最近的巡检记录，帮助定位服务何时异常、当时采取了什么动作。状态灯：绿=当时正常、红=当时异常、黄=当时降级。</p>
       <table class="diag-table" id="diag-log-table">
         <thead>
           <tr><th>时间</th><th>服务</th><th>状态</th><th>关键指标</th><th>决策动作</th><th>备注</th></tr>
@@ -321,7 +322,7 @@
     </section>
 
     <footer class="doc-wrap footer">
-      WES 运维看板 · 自动巡检每 2 小时 · 异常自主诊断与重启 · 全部决策留痕可审计
+      WES 运行健康历史记录 · 页面最后记录 2026-07-05 18:04 · 当前状态需重新检查 · 异常处理过程保留证据
     </footer>
   </main>
   <script>

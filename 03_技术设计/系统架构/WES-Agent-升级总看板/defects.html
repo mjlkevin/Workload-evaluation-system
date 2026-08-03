@@ -18,24 +18,24 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="ops-health.html">运维看板</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="issues.html">问题池</a>
         <a class="active" href="defects.html">缺陷池</a>
         <a href="requirements.html">需求池</a>
     </nav>
     <div style="flex:1"></div>
     <div class="sidebar-pill">
-      <span class="pill brand">Work Item Triage</span>
-      <span class="pill">Issue → Defect / Requirement</span>
+      <span class="pill brand">反馈分诊</span>
+      <span class="pill">原始问题 → 缺陷或需求</span>
     </div>
   </aside>
   <button class="sidebar-toggle" id="sidebarToggle" aria-label="菜单">☰</button>
@@ -44,18 +44,18 @@
 <main>
     <div class="doc-h">
       <div class="wrap">
-        <div class="crumb">Defect Governance</div>
+        <div class="crumb">已确认缺陷的处理与复验</div>
         <h1>缺陷池</h1>
         <div class="meta">
           <span><b>定位</b> 已分析确认的错误行为、回归和质量缺口</span>
           <span><b>来源</b> 只从问题池或测试失败分流，不直接接收未定性原始反馈</span>
-          <span><b>更新日期</b> 2026-07-15</span>
+          <span><b>更新日期</b> 2026-08-03</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">13 缺陷</span>
-          <span class="pill warn">0 待修复 / 返工</span>
-          <span class="pill ok">13 已修复</span>
-          <span class="pill warn">12 人工待复核</span>
+          <span class="pill brand">16 个缺陷</span>
+          <span class="pill warn">1 待修复 / 返工</span>
+          <span class="pill ok">15 个已完成修复</span>
+          <span class="pill warn">12 个等待人工复核</span>
         </div>
       </div>
     </div>
@@ -63,12 +63,12 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">01 / Defect Lifecycle</div>
+          <div class="num">01 / 缺陷处理流程</div>
           <h2>缺陷生命周期</h2>
-          <p>缺陷必须保留 Issue 来源，按复现、修复、回归、人工复核关闭，不与新能力需求共用同一状态轴。</p>
+          <p>每个缺陷都必须保留原始问题来源，并依次完成复现、修复、回归测试和人工复核；新能力需求使用另一套状态，不与缺陷混在一起。</p>
         </div>
         <div class="lifecycle">
-          <div class="lifecycle-step"><span class="ls-num">01</span><b>来源 Issue</b><small>用户反馈 / 测试失败 / 截图证据</small></div>
+          <div class="lifecycle-step"><span class="ls-num">01</span><b>原始问题</b><small>用户反馈 / 测试失败 / 截图证据</small></div>
           <div class="lifecycle-step"><span class="ls-num">02</span><b>复现</b><small>实际结果、期望结果、影响范围</small></div>
           <div class="lifecycle-step"><span class="ls-num">03</span><b>修复</b><small>最小补丁与边界说明</small></div>
           <div class="lifecycle-step"><span class="ls-num">04</span><b>回归</b><small>自动化和必要人工复核</small></div>
@@ -79,19 +79,19 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">02 / Defect Ledger</div>
+          <div class="num">02 / 缺陷清单</div>
           <h2>缺陷台账</h2>
-          <p>缺陷台账聚焦已有能力不符合预期的事实，不承载新能力设计。</p>
+          <p>这里只记录“已有能力没有达到预期”的问题；需要新增能力的事项进入需求池。</p>
         </div>
         <table>
-          <tr><th>缺陷 ID</th><th>来源 Issue</th><th>关联 RP</th><th>标题</th><th>等级</th><th>状态</th><th>影响范围</th><th>修复口径</th><th>验证</th><th>验收</th></tr>
+          <tr><th>缺陷 ID</th><th>原始问题</th><th>关联需求</th><th>标题</th><th>严重程度</th><th>状态</th><th>影响范围</th><th>修复要求</th><th>自动验证</th><th>人工验收</th></tr>
             <tr>
               <td class="mono">DEF-2026-07-02-001</td>
               <td class="mono">ISS-2026-07-02-001</td>
               <td class="mono">RP-037</td>
               <td>登录态过期仍进入系统壳子</td>
               <td>S2</td>
-              <td><span class="status done"><span class="dot"></span>fixed</span></td>
+              <td><span class="status done"><span class="dot"></span>已修复</span></td>
               <td>V2 前端路由鉴权 / AI 工作台 Shell</td>
               <td>新增业务路由 AuthGate、JWT exp 预检、/auth/me 校验和过期 token 清理。</td>
               <td>AppAuthGuard 红绿闭环；HomeWorkspace 登录过期聚焦 1/1；Login 3/3；V2 全量 101/101；build:web pass。</td>
@@ -103,7 +103,7 @@
               <td class="mono">RP-029</td>
               <td>附件解析场景流式体验未覆盖</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>AI 工作台附件解析 / parse-basic-info / SSE 展示</td>
               <td>待补附件解析流式接线、真实 text/event-stream 分块渲染回归和真实 Kimi 人工验收。</td>
               <td>当前为人工验收反证，chat stream 自动化不足以关闭附件解析流式缺陷。</td>
@@ -115,7 +115,7 @@
               <td class="mono">RP-038</td>
               <td>元问题意图识别缺失导致答非所问</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>workbench-intent.service.ts / workbench-dispatch.service.ts</td>
               <td>新增 meta_question 意图、META_QUESTION_PATTERNS、模型分类提示词定义和 buildMetaQuestionResponse()。</td>
               <td>intent + dispatch 聚焦 53/53 通过；build:api pass；test:modules 当前 145/146，剩余失败为既有 RP-029 断连测试。</td>
@@ -127,7 +127,7 @@
               <td class="mono">RP-039</td>
               <td>附件问答紧凑 Markdown 和下一步动作闭环缺陷</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>AiHomeWorkbench.jsx Markdown parser / option action inference</td>
               <td>规范化紧凑管道表格和紧凑下一步建议，并为概览预览 / 需求解析报告 v1 推断 generate_requirement_report 动作。</td>
               <td>HomeWorkspace.test.jsx 51/51；V2 全量 102/102；build:web pass。</td>
@@ -139,7 +139,7 @@
               <td class="mono">RP-039</td>
               <td>generic confirm_write_action 点击无响应</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>AiHomeWorkbench.jsx suggestedActions / confirmPendingAction</td>
               <td>为非 create_project_evaluation 的确认类写动作增加可见兜底反馈，并让 suggestedActions 中 confirm_write_action / requiresConfirm 进入 confirmPendingAction，避免按钮点击静默无效。</td>
               <td>HomeWorkspace.test.jsx 新增 generic write-action 红绿回归；聚焦测试 pass。</td>
@@ -151,7 +151,7 @@
               <td class="mono">RP-026</td>
               <td>邀请成员按钮未绑定生成邀请码动作</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>UserManagement.jsx 用户管理工具栏 / 邀请成员</td>
               <td>为“+ 邀请成员”绑定 /auth/invite-codes/generate，生成中禁用按钮，成功后展示成员邀请码弹窗，失败时展示错误反馈。</td>
               <td>UserManagement.test.jsx 新增邀请成员红绿回归；聚焦 1/1 与文件内 5/5 通过。</td>
@@ -163,7 +163,7 @@
               <td class="mono">RP-042</td>
               <td>编码规则动作按钮参数和配置表单缺失</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>SystemManagement.jsx / useSystemManagement.js 编码规则页面动作</td>
               <td>编码规则列表改为映射后端 id/moduleCode/sample/effectiveAt；配置按钮打开可编辑 Dialog 并提交 prefix/format；生效和禁用按钮使用规则 id 调用后端并显示成功反馈。</td>
               <td>SystemManagementCodeRules.test.jsx 2/2；V2 前端全量 110/110；build:web pass，保留既有 chunk size warning。</td>
@@ -175,7 +175,7 @@
               <td class="mono">RP-042</td>
               <td>侧栏退出按钮继承导航链接整行宽度</td>
               <td>S3</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>V2 Shell 左侧侧栏底部用户信息区</td>
               <td>在 .sidebar .user .out 上覆盖 width:auto 和 align-self:center，并让用户信息 row 不换行，避免 .sidebar a 的 width:100% 导航样式泄漏到底部退出按钮。</td>
               <td>ShellUserMenu.test.jsx 1/1；V2 前端全量 111/111；build:web pass；浏览器 DOM/CSS 验证退出按钮宽度约 38px 且位于用户名右侧。</td>
@@ -187,7 +187,7 @@
               <td class="mono">RP-042</td>
               <td>业务用户可见管理员导航入口</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>V2 Shell 左侧导航 / WorkspaceTabs / 管理员路由</td>
               <td>新增 admin access 判定；Shell 仅在 user.role === &#39;admin&#39; 时渲染系统管理、用户管理和 API 密钥入口；WorkspaceTabs 在权限确认后过滤历史管理员页签；/system、/users、/api-keys 及系统子路由增加 AdminOnlyRoute 守卫。</td>
               <td>ShellUserMenu.test.jsx + AppAuthGuard.test.jsx + SystemManagementNavigation.test.jsx 7/7；V2 前端全量 114/114；build:web pass，保留既有 chunk size warning。浏览器当前为 admin 登录态，管理员菜单可见符合预期；非管理员场景由自动化测试覆盖。</td>
@@ -199,7 +199,7 @@
               <td class="mono">RP-029</td>
               <td>client_aborted 后未持久化助手失败状态且前端刷新覆盖本地气泡</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>AI 工作台流式会话持久化 / 停止生成前端刷新</td>
               <td>后端 homeWorkbenchChatStream 在 catch 分支按 sessionId 追加 assistant 失败/中断消息并写入 streamFailure 元数据；前端 sendMessage 对 stream error、abort、无响应分支不再立即 loadSessions，保留本地错误或停止气泡，避免被旧会话状态覆盖。</td>
               <td>chat.service.test.ts 新增 provider stream 失败与 client close 后会话消息持久化断言；HomeWorkspace.test.jsx 新增 abort 后不刷新会话覆盖本地停止气泡断言；npm run test:modules 147/147；npm run test:web 114/114；npm run build:api pass；npm run build:web pass。</td>
@@ -211,7 +211,7 @@
               <td class="mono">RP-029</td>
               <td>POST SSE 请求 close 被误判为客户端中断导致 static/done 被跳过</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>AI 工作台流式接口 / SSE 客户端解析</td>
               <td>后端 homeWorkbenchChatStream 不再使用 req.close 判断 SSE 客户端断开，改用 req.aborted 与 res.close；前端 streamHomeWorkbenchChat 在 reader done 后解析残留 buffer，避免尾包事件缺少空行分隔时丢失；AI session PG 持久化增加串行队列，避免连续 create/append 导致 delete+insert 并发主键冲突。</td>
               <td>chat.service.test.ts 新增 request close after POST body 不抑制 static/done 回归；client close 改为 res.close 模拟真实响应断开；aiStreamApi.test.js 新增尾部 SSE 事件解析回归；真实 curl “你好”返回 heartbeat + static + done 且日志无 duplicate key；npm run test:modules 148/148；npm run test:web 115/115；npm run build:api pass；npm run build:web pass。</td>
@@ -223,7 +223,7 @@
               <td class="mono">RP-027</td>
               <td>企业画像把未知行业替换为固定行业</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>AI 工作台企业画像提取 / 草稿预填 / 客户事实完整性</td>
               <td>chat.service.ts 已移除固定行业 fallback；无模型配置与模型缺字段均保持空值，输出 fieldProvenance=needs_user_input；CompanyProfile strict JSON Schema 同时执行本地 Ajv/语义校验。</td>
               <td>buildCompanyProfileFallback 与 chat.service 回归覆盖未知行业、主体歧义、结构化元数据；npm run test:modules 152/152、npm run build:api 通过。</td>
@@ -235,18 +235,54 @@
               <td class="mono">RP-027</td>
               <td>Harness V2 Schema 失败重试错误回到 evidence_ready</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
               <td>Harness Schema 修复 / 失败恢复 / 人工干预</td>
               <td>Harness v1/v2 已接入 strict JSON Schema + Ajv，完整校验 confidence/evidenceRefs；交互运行修复耗尽进入 needs_user_input 并持久化 resumeStage，V1/V2 重试分别恢复 evidence_ready/clarifying。</td>
               <td>npm run test:harness 71/71，新增 V1/V2 json_schema 请求、confidence 越界、needs_user_input 与差异化恢复回归；npm run build:api 通过。</td>
               <td>自动化验收通过；待真实交互运行确认用户可见校验错误、手工补充和恢复体验。</td>
+            </tr>
+            <tr>
+              <td class="mono">DEF-2026-07-25-001</td>
+              <td class="mono">ISS-2026-07-25-001</td>
+              <td class="mono">RP-036</td>
+              <td>未知受保护路由缺少通配兜底</td>
+              <td>S3</td>
+              <td><span class="status done"><span class="dot"></span>已修复</span></td>
+              <td>V2 React Router 受保护页面树</td>
+              <td>在 ProtectedLayout 子路由末尾增加通配路由，未知路径使用 replace 重定向到首页，同时继续复用登录态和当前用户校验。</td>
+              <td>AppAuthGuard 新用例先复现空白页，再验证未知路径显示 AI 工作台；聚焦 3/3。</td>
+              <td>自动化验收完成；用户已授权由 Codex 选择回首页口径。</td>
+            </tr>
+            <tr>
+              <td class="mono">DEF-2026-07-25-002</td>
+              <td class="mono">ISS-2026-07-25-002</td>
+              <td class="mono">RP-036</td>
+              <td>登录历史密码框焦点失效与旧明文密码残留</td>
+              <td>S2</td>
+              <td><span class="status done"><span class="dot"></span>已修复</span></td>
+              <td>V2 登录页用户名历史与本地存储</td>
+              <td>密码输入框改由独立 React ref 管理；旧 <code class="inline">wes_recent_users</code> 只迁移用户名后立即删除，当前 <code class="inline">wes_username_history</code> 禁止写入密码。</td>
+              <td>Login 新增普通登录仅存用户名、旧记录安全迁移、选择用户名后密码框聚焦回归；聚焦 5/5。</td>
+              <td>自动化验收完成；“记住 7 天”只控制登录令牌，不恢复任何密码持久化。</td>
+            </tr>
+            <tr>
+              <td class="mono">DEF-2026-08-03-001</td>
+              <td class="mono">ISS-2026-08-03-002</td>
+              <td class="mono">RP-047-A2</td>
+              <td>Node 24 Testcontainers setup 与 worktree 依赖隔离缺陷阻断 Harness 正式门禁</td>
+              <td>S2</td>
+              <td><span class="status block"><span class="dot"></span>A2 Gate 返工 / R1 待 ACK</span></td>
+              <td>apps/api/test-setup.mts / test:harness / 独立 worktree node_modules</td>
+              <td>A2 将改用 ESM-safe migration 路径，在 worktree 内按 lockfile 安装 root/API/V2 依赖，并以随机临时 database 证明历史 Harness 数据从 0013 升级到 0014。</td>
+              <td>A1 正式命令退出 7；补 Colima socket 后复现 ERR_AMBIGUOUS_MODULE_SYNTAX；安装隔离依赖后 modules 143/143、API/Web build 通过，排除所谓 Ajv 基线故障。</td>
+              <td>验收要求：正式 Testcontainers 命令不 skip、无残留容器，历史 Run/tool/artifact 默认兼容，A2 worktree clean；不得修改机器级 Docker/Colima 配置。</td>
             </tr>
         </table>
       </div>
     </section>
 </main>
   </div>
-  <footer>缺陷池 · WES 项目管理 · 2026-07-15</footer>
+  <footer>缺陷池 · WES 项目管理 · 2026-08-03</footer>
   <script>
     const sidebar = document.getElementById('sidebar');
     const toggle = document.getElementById('sidebarToggle');

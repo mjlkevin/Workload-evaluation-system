@@ -1,0 +1,85 @@
+{
+  "id": "BE-2026-07-25-post-merge-conflict-followup",
+  "date": "2026-07-25",
+  "type": "implementation",
+  "scope": "WES 单工作目录收尾与合并冲突复核修复",
+  "summary": "Agent 分支成果已快进合并到主目录，原 Agent linked worktree 已注销；合并冲突复核确认并修复未知路由空白、登录历史旧密码残留和历史用户名选择后密码框焦点失效，项目后续只使用一个活动目录。",
+  "status": "单目录完成 / 自动化通过",
+  "pages": ["issues", "defects", "plan", "testing", "monitoring", "risks", "changes"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/App.jsx",
+      "summary": "受保护路由树增加未知路径回首页兜底。"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/Login.jsx",
+      "summary": "用户名历史禁止保存密码，旧存储只迁移用户名后删除，密码框由直接 ref 管理焦点。"
+    },
+    {
+      "kind": "file",
+      "ref": "AGENTS.md; CLAUDE.md; codex-project-registry.md",
+      "summary": "项目入口统一为 /Users/kevin/AI/Workload-evaluation-system，历史 Agent 路径不再作为执行入口。"
+    },
+    {
+      "kind": "command",
+      "ref": "git worktree list --porcelain",
+      "result": "pass",
+      "summary": "仅保留 /Users/kevin/AI/Workload-evaluation-system 一个已注册 worktree。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/AppAuthGuard.test.jsx src/__tests__/Login.test.jsx",
+      "result": "pass",
+      "summary": "聚焦回归 8/8，覆盖未知路由、只存用户名、旧记录安全迁移和密码框聚焦。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "V2 Web 全量回归 120/120。"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "Web 生产构建通过，保留既有 chunk size warning。"
+    },
+    {
+      "kind": "command",
+      "ref": "node --test scripts/board-event.test.js scripts/board-work-items.test.js",
+      "result": "pass",
+      "summary": "看板事件与 Issue-first 工作项治理 12/12。"
+    }
+  ],
+  "next": "后续开发只在 /Users/kevin/AI/Workload-evaluation-system 进行；现有未提交本地工作继续保留，不在本次整体提交。PostgreSQL live migration 与人工验收仍按独立计划推进。",
+  "board": {
+    "change": {
+      "stage": "单工作目录收尾与冲突复核",
+      "result": "单目录完成 / 自动化通过"
+    },
+    "testing": [
+      {
+        "command": "AppAuthGuard + Login focused regression",
+        "result": "pass 8/8",
+        "summary": "未知路由、用户名安全存储、旧密码记录迁移清理和密码框焦点全部通过。"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass 120/120",
+        "summary": "V2 Web 全量回归通过。"
+      },
+      {
+        "command": "npm run build:web",
+        "result": "pass",
+        "summary": "生产构建通过，仅保留既有大 chunk 警告。"
+      },
+      {
+        "command": "Board governance tests",
+        "result": "pass 12/12",
+        "summary": "事件结构和 Issue-first 问题/缺陷治理通过。"
+      }
+    ]
+  }
+}

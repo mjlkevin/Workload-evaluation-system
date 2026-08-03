@@ -20,15 +20,15 @@ const DIST_DIR = path.join(BOARD_DIR, 'dist');
 const NAV_ITEMS = [
   { label: '总览', href: 'index.html' },
   { label: '设计说明', href: 'design.html' },
-  { label: '任务运行时', href: 'runtime.html' },
+  { label: 'AI 任务执行', href: 'runtime.html' },
   { label: '计划与进度', href: 'plan.html' },
-  { label: '测试', href: 'testing.html' },
+  { label: '测试与验收', href: 'testing.html' },
   { label: '监控与审计', href: 'monitoring.html' },
   { label: '风险与决策', href: 'risks.html' },
   { label: '变更记录', href: 'changes.html' },
-  { label: '文档事实源', href: 'sources.html' },
-  { label: '协作协议', href: 'collaboration-protocol.html' },
-  { label: '分支拓扑', href: 'branches.html' },
+  { label: '信息来源', href: 'sources.html' },
+  { label: '多 AI 协作', href: 'collaboration-protocol.html' },
+  { label: '开发分支', href: 'branches.html' },
   { label: '需求池', href: 'requirements.html' },
 ];
 

@@ -17,38 +17,38 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a class="active" href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
-      <span class="pill brand">Design</span>
+      <span class="pill brand">产品与技术方案</span>
     </div>
   </header>
 
   <header class="doc-h">
     <div class="doc-wrap">
-      <div class="crumb">WES Agent · Design Specification</div>
+      <div class="crumb">WES Agent · 为什么这样设计</div>
       <h1>设计说明</h1>
       <p class="meta">
         <span><b>定位</b> AI Agent 工作台 + WES 传统记录系统</span>
-        <span><b>事实基线</b> Phase 1H-B 已交付</span>
-        <span><b>当前阶段</b> Phase 1H-C planning</span>
+        <span><b>事实基线</b> 阶段 1H-B 已交付</span>
+        <span><b>当前阶段</b> 阶段 1H-C 规划中</span>
         <span><b>主线</b> ui/V2_PROTOTYPE + apps/api</span>
-        <span><b>更新</b> 2026-06-29</span>
+        <span><b>更新</b> 2026-08-02</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
-        <span class="pill ok">Harness DB-backed</span>
-        <span class="pill brand">L2 Copilot</span>
+        <span class="pill ok">AI 任务底座使用数据库留痕</span>
+        <span class="pill brand">AI 辅助决策，不代替用户</span>
         <span class="pill warn">人在环确认</span>
-        <span class="pill">JWT / owner 边界</span>
+        <span class="pill">登录鉴权 / 按当前用户隔离</span>
       </div>
     </div>
   </header>
@@ -70,26 +70,29 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>产品定义</h2>
-      <p class="lead">WES Agent 不是把传统系统包装成聊天窗口，而是在传统记录系统之外新增一个受控的 AI 工作台。AI 在 Harness 内完成文件理解、报告生成、补充澄清和待确认动作；传统系统承接用户明确确认后的草稿，并在 Phase 1E 中补齐 AI 草稿可见、可跳转、可追溯。Phase 1F 已把传统人工确认结果回写到 Harness 审计链。</p>
+      <p class="lead">WES Agent 不是简单增加一个聊天窗口，而是在传统业务记录之外提供受控的 AI 工作台。AI 任务运行与审计底座（Harness）负责理解文件、生成报告、收集补充信息和提出待确认动作；只有用户明确确认后，传统系统才接收业务草稿。阶段 1E 已让 AI 草稿可见、可跳转、可追溯，阶段 1F 已把人工确认结果写回过程记录。</p>
       <div class="grid-3">
-        <div class="card"><span class="pill brand">AI Workbench</span><h3>AI 工作台</h3><p>面向上传文件、自然语言补充、模型报告和下一步建议，confirm 后可进入传统评估草稿。</p></div>
-        <div class="card"><span class="pill ok">Harness</span><h3>受控编排层</h3><p>沉淀 run、file、evidence、artifact、modelRun、toolEvent，让模型输出可验证、可追溯。</p></div>
-        <div class="card"><span class="pill warn">Legacy WES</span><h3>传统记录系统</h3><p>承接项目、需求、评估、WBS、版本和审批等正式业务记录，并展示 AI 草稿来源，继续保持人工确认链路。</p></div>
+        <div class="card"><span class="pill brand">用户入口</span><h3>AI 工作台</h3><p>用于上传文件、补充业务信息、查看模型报告和选择下一步；用户确认后才会创建传统评估草稿。</p></div>
+        <div class="card"><span class="pill ok">任务留痕</span><h3>AI 任务运行与审计底座</h3><p>记录任务运行、文件、证据、任务产物（Artifact）、模型调用和工具动作，让模型输出可以验证和追溯。</p></div>
+        <div class="card"><span class="pill warn">正式业务</span><h3>传统记录系统</h3><p>保存项目、需求、评估、任务分解（WBS）、版本和审批等正式记录，并继续使用人工确认流程。</p></div>
       </div>
       <div class="callout ok"><div><b>核心边界</b>AI/Harness 可以生成报告、建议动作和传统草稿；正式评估、正式需求、正式项目推进仍必须经用户人工确认/编辑。</div></div>
       <div class="callout warn"><div><b>输入边界</b>WES Harness 第一阶段遵循“上传文件为主”。不连接用户本地工作目录，不开放 bash/命令执行，不做桌面连接器。所有 Excel、Word、PDF、访谈纪要和标准文件都通过上传、绑定、解析和 evidence 留痕进入 Harness。</div></div>
+      <div class="callout" data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:design">
+        <div><b>RP-043 · UI 质量门禁实现</b>已落地项目内 <code class="inline">improving-wes-ui</code> Skill，并保持 <code class="inline">ui/V2_PROTOTYPE</code>、现有 CSS Token、WES Issue-first 与“单页面族/最多三个根问题”边界。共享 <code class="inline">Dialog(open, title, description, onClose, children, wide, closeOnBackdrop, initialFocusRef)</code> 采用原生 <code class="inline">&lt;dialog&gt;</code> 与可访问降级路径，统一标题/描述关联、可见关闭按钮、Escape、初始焦点、Tab 环、关闭后焦点恢复、遮罩策略和视口内顶部拖拽；SystemManagement 四处弹窗已迁移且未新增第三方依赖。自动化通过，真实浏览器人工证据因管理员认证阻塞待回填。</div>
+      </div>
     </section>
 
     <section>
       <div class="h-num">Section 02</div>
       <h2>架构分层</h2>
-      <p class="lead">当前主线以 <code class="inline">ui/V2_PROTOTYPE</code> 作为唯一 Web 前端，以 <code class="inline">apps/api</code> 作为唯一后端入口。Harness 是首个 PostgreSQL-backed 新业务域，其余传统 repository 当前仍以 JSON 文件存储为主。</p>
+      <p class="lead">当前只有一套 Web 主线 <code class="inline">ui/V2_PROTOTYPE</code> 和一个后端入口 <code class="inline">apps/api</code>。AI 任务底座（Harness）因为需要审计、统计和回放，已经使用 PostgreSQL 数据库；其他传统业务模块仍以 JSON 文件为主要存储方式。</p>
       <div class="panel">
-        <div class="panel-h">目标架构视图<span class="right">runtime boundaries</span></div>
+        <div class="panel-h">目标架构视图<span class="right">任务执行边界</span></div>
         <div class="panel-b">
 
           <div class="arch-layer">
-            <div class="arch-layer-label">Frontend Layer</div>
+            <div class="arch-layer-label">用户界面</div>
             <div class="grid-2">
               <div class="card">
                 <span class="pill brand">ui/V2_PROTOTYPE</span>
@@ -98,8 +101,8 @@
               </div>
               <div class="card">
                 <span class="pill">src/api/harness.js</span>
-                <h4>API Client</h4>
-                <p>封装对 <code class="inline">/api/v1/harness/*</code> 的调用</p>
+                <h4>接口调用层（API Client）</h4>
+                <p>统一调用 <code class="inline">/api/v1/harness/*</code>，避免页面直接拼接请求</p>
               </div>
             </div>
           </div>
@@ -110,17 +113,17 @@
           </div>
 
           <div class="arch-layer">
-            <div class="arch-layer-label">API + Harness Layer</div>
+            <div class="arch-layer-label">后端接口与 AI 任务底座</div>
             <div class="grid-2">
               <div class="card">
                 <span class="pill ok">apps/api</span>
                 <h4>routes/harness.routes.ts</h4>
-                <p>Harness 路由层：JWT 鉴权、owner 隔离、参数校验</p>
+                <p>AI 任务接口：验证登录身份、按当前用户隔离（owner）并检查请求参数</p>
               </div>
               <div class="card">
                 <span class="pill ok">apps/api</span>
                 <h4>modules/harness/*</h4>
-                <p>run / file / artifact / toolEvent 生命周期管理</p>
+                <p>管理任务运行、文件、任务产物和工具动作记录的完整过程</p>
               </div>
             </div>
 
@@ -136,12 +139,12 @@
                 <p>harness_runs / harness_files / harness_artifacts / harness_tool_events</p>
               </div>
               <div class="card">
-                <span class="pill brand">AI Services</span>
+                <span class="pill brand">外部 AI 服务</span>
                 <h4>模型服务</h4>
-                <p>model provider / schema validation / report generation</p>
+                <p>外部模型或服务提供方（Provider）/ 格式校验 / 报告生成 / 失败后的备用处理</p>
               </div>
               <div class="card">
-                <span class="pill warn">Traditional</span>
+                <span class="pill warn">传统业务模块</span>
                 <h4>传统模块</h4>
                 <p>project evaluation draft / implementation assessment draft</p>
               </div>
@@ -154,21 +157,21 @@
           </div>
 
           <div class="arch-layer">
-            <div class="arch-layer-label">Legacy Record Layer</div>
+            <div class="arch-layer-label">正式业务记录</div>
             <div class="grid-2">
               <div class="card">
-                <span class="pill warn">Legacy WES</span>
+                <span class="pill warn">传统 WES</span>
                 <h4>config/*.json</h4>
                 <p>传统业务记录存储：项目、需求、评估、WBS、版本、审批</p>
               </div>
               <div class="card">
-                <span class="pill">Formal Workflow</span>
+                <span class="pill">正式业务流程</span>
                 <h4>人工确认链路</h4>
                 <p>草稿查看 → 来源追溯 → 编辑 → 正式发布</p>
                 <p style="margin-top:8px">
-                  <span class="status warn"><span class="dot"></span>draft</span>
-                  <span class="status todo"><span class="dot"></span>manual confirm</span>
-                  <span class="status done"><span class="dot"></span>formal</span>
+                  <span class="status warn"><span class="dot"></span>草稿</span>
+                  <span class="status todo"><span class="dot"></span>人工确认</span>
+                  <span class="status done"><span class="dot"></span>正式记录</span>
                 </p>
               </div>
             </div>
@@ -184,8 +187,8 @@
 
     <section>
       <div class="h-num">Section 03</div>
-      <h2>Harness 主链路</h2>
-      <p class="lead">Phase 1B/1C 把“上传文件后只走普通聊天”修正为“上传文件后进入 Harness”。Phase 1D 把 v2 报告后的确认动作串到传统项目/评估草稿。Phase 1E 让这些 AI 草稿在传统工作台可见、可跳转、可追溯。Phase 1F 进一步处理人工确认后的 Harness 审计回写。</p>
+      <h2>AI 任务从输入到草稿的主流程</h2>
+      <p class="lead">阶段 1B/1C 让上传文件进入 AI 任务底座，而不是只进行普通聊天；阶段 1D 在用户确认后创建传统项目或评估草稿；阶段 1E 让草稿在传统工作台可见、可跳转、可追溯；阶段 1F 再把人工确认结果写回审计记录。</p>
       <div class="flow-steps">
         <div class="flow-step"><span class="num">01</span><b>parse-basic-info</b><small>抽取基础信息，创建文件理解入口。</small></div>
         <div class="flow-step"><span class="num">02</span><b>createHarnessRun</b><small>创建 run，进入 uploaded 阶段。</small></div>
@@ -205,12 +208,12 @@
 
     <section>
       <div class="h-num">Section 04</div>
-      <h2>数据与审计对象</h2>
+      <h2>需要保留的四类过程记录</h2>
       <div class="grid-4">
-        <div class="kpi"><div class="top"><span class="ic">R</span><span>Run</span></div><div class="v">run</div><div class="lb">阶段、owner、metadata</div></div>
-        <div class="kpi"><div class="top"><span class="ic">A</span><span>Artifact</span></div><div class="v">v1/v2</div><div class="lb">file_understanding / reports</div></div>
-        <div class="kpi"><div class="top"><span class="ic">M</span><span>ModelRun</span></div><div class="v">schema</div><div class="lb">模型输入输出与校验</div></div>
-        <div class="kpi"><div class="top"><span class="ic">T</span><span>ToolEvent</span></div><div class="v">audit</div><div class="lb">confirm / failed / output links</div></div>
+        <div class="kpi"><div class="top"><span class="ic">R</span><span>任务运行（Run）</span></div><div class="v">run</div><div class="lb">阶段、负责人和任务信息</div></div>
+        <div class="kpi"><div class="top"><span class="ic">A</span><span>任务产物（Artifact）</span></div><div class="v">v1/v2</div><div class="lb">文件理解和报告结果</div></div>
+        <div class="kpi"><div class="top"><span class="ic">M</span><span>模型调用（ModelRun）</span></div><div class="v">schema</div><div class="lb">模型输入、输出和格式校验</div></div>
+        <div class="kpi"><div class="top"><span class="ic">T</span><span>工具动作（ToolEvent）</span></div><div class="v">audit</div><div class="lb">确认、失败和输出链接</div></div>
       </div>
       <div class="callout"><div><b>schema 约束</b>v1/v2 report schema 数组允许为空，但必须包含 version、sourceFile、project。模型 schema failure 进入 <code class="inline">failed_schema_validation</code>，而不是静默继续。</div></div>
       <div class="callout ok"><div><b>产物格式</b>需求解析报告、澄清摘要、粗评建议等业务产物采用结构化 JSON + 可读 Markdown 双轨保存。JSON 用于渲染、回放和 Regression；Markdown 用于顾问阅读、复制和评审。</div></div>
@@ -219,7 +222,7 @@
     <section>
       <div class="h-num">Section 05</div>
       <h2>传统草稿边界</h2>
-      <p class="lead">Phase 1D 的确认动作只负责创建可人工审核的传统草稿，Phase 1E 负责把草稿送到传统人工工作台视野内；Phase 1F 负责把人工确认结果回写审计链。三个阶段都不能替用户完成未经授权的正式评估发布。</p>
+      <p class="lead">阶段 1D 只创建可供人工审核的传统草稿，阶段 1E 让草稿进入传统工作台，阶段 1F 把人工确认结果写回审计记录。任何阶段都不能替用户发布未经授权的正式评估。</p>
       <table>
         <tr><th>对象</th><th>创建时机</th><th>状态</th><th>后续动作</th></tr>
         <tr><td>项目评估记录草稿</td><td>v2 报告上确认 <code class="inline">enter_formal_estimation</code></td><td><span class="status warn"><span class="dot"></span>draft</span></td><td>传统工作台人工查看、编辑、确认</td></tr>
@@ -296,15 +299,15 @@
           <td>售前解决方案 PPT 页面生成需要先由 WES/AI 产出页面计划并经用户确认，再由 Harness 调用 Napkin、轮询状态、下载文件和记录 ToolEvent；前端只展示 WES 自有产物链接。</td>
         </tr>
         <tr>
-          <td>AI Native</td>
-          <td>下一代项目管理入口从 Documentation Driven 升级为 AI Workflow Driven，但不推倒重来。</td>
-          <td>现有 Design / Plan / Requirements / Runtime / Monitoring / Risks / Changes 作为 Knowledge Assets；首页主角改为 Vision、Roadmap、Current Goal、AI Commander、AI Pipeline、Knowledge Center，并新增 AI Workflow 页面承载 Prompt / Output / Artifact / Status。</td>
+          <td>AI 原生项目管理</td>
+          <td>下一代项目管理入口将从“以文档导航为主”升级为“由 AI 工作流驱动”，但继续复用现有资产，不推倒重来。</td>
+          <td>现有设计、计划、需求、任务执行、监控、风险和变更页面继续作为知识资产；首页逐步突出产品愿景、路线图、当前目标、AI 指挥、任务流程和知识中心，并用 AI 工作流页面展示提示词、输出、任务产物和状态。</td>
         </tr>
       </table>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 设计说明 · WES 项目管理 · 2026-06-29
+      <a href="index.html">返回总览</a> · 设计说明 · WES 项目管理 · 2026-08-02
     </footer>
   </main>
 </body>

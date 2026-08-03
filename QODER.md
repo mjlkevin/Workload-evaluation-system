@@ -6,12 +6,14 @@
 
 Use these skills before editing files:
 
+- `skills/speak-plainly/SKILL.md`（面向用户汇报、提问和交接时使用）
 - `skills/wes-qoder-worktree-protocol/SKILL.md`
 - `skills/wes-multi-agent-collaboration/SKILL.md`
 
 If Qoder supports installing project skills, install or register:
 
 ```text
+skills/speak-plainly
 skills/wes-qoder-worktree-protocol
 skills/wes-multi-agent-collaboration
 ```
@@ -28,11 +30,12 @@ If Qoder does not support skill installation, read and follow the same files man
 1. `AGENTS.md`
 2. `codex-project-registry.md`
 3. `QODER.md`
-4. `skills/wes-qoder-worktree-protocol/SKILL.md`
-5. `skills/wes-qoder-worktree-protocol/references/protocol.md`
-6. `skills/wes-multi-agent-collaboration/SKILL.md`（多 Agent 协作协议）
-7. NightOps 任务必须读取当前 `docs/agent-loop/nightly/YYYY-MM-DD-mission.md`
-8. NightOps 任务必须读取最新 `docs/agent-loop/audits/YYYY-MM-DD-codex-<taskId>-gate.md`（若存在）
+4. `skills/speak-plainly/SKILL.md`
+5. `skills/wes-qoder-worktree-protocol/SKILL.md`
+6. `skills/wes-qoder-worktree-protocol/references/protocol.md`
+7. `skills/wes-multi-agent-collaboration/SKILL.md`（多 Agent 协作协议）
+8. NightOps 任务必须读取当前 `docs/agent-loop/nightly/YYYY-MM-DD-mission.md`
+9. NightOps 任务必须读取最新 `docs/agent-loop/audits/YYYY-MM-DD-codex-<taskId>-gate.md`（若存在）
 
 ## Execution Contract
 

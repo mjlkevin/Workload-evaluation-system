@@ -17,38 +17,38 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a class="active" href="monitoring.html">监控与审计</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
-      <span class="pill brand">Phase 1H-C monitoring</span>
+      <span class="pill brand">1H-C 阶段监控</span>
     </div>
   </header>
 
   <header class="doc-h">
     <div class="doc-wrap">
-      <div class="crumb">WES Agent · Monitoring And Audit</div>
+      <div class="crumb">WES Agent · 运行监控与过程审计</div>
       <h1>监控与审计</h1>
       <p class="meta">
-        <span><b>目标</b> 证明 AI 编排可控、可回放、可追溯</span>
-        <span><b>覆盖</b> 本地验证 / CI / 人工测试 / Harness / 传统草稿</span>
-        <span><b>状态</b> Phase 1F 回写监控已落地；历史需求池迭代 Loop <code class="inline">wes-loop</code> 曾完成 RP-004/RP-005/RP-002/RP-007 与反幻觉批次；Codex 侧 heartbeat 已删除，持续 Loop 改由 Qoder 执行；2026-06-29 Codex 已复核 Qoder 集成的 RP-027/RP-028/RP-029/RP-030/RP-031/RP-026/RP-033，并补 RP-029 知识库 fallback 流式最终内容修复；2026-07-23 RP-036 已完成鉴权反馈、测试终态及 retrieval_empty 连通性判定修复，MT-1H-C-002 等待轮换密钥后人工复测，复测前继续阻断真实配置验收</span>
+        <span><b>这页回答</b> 系统是否稳定、关键动作是否留痕、哪些结果仍待人工确认</span>
+        <span><b>覆盖</b> 本地检查 / 持续集成 / 人工验收 / AI 任务记录 / 传统业务草稿</span>
+        <span><b>当前结论</b> 自动化检查和关键动作留痕已覆盖主要流程；真实知识库配置仍待更换密钥后复测，复测通过前不能视为完成验收</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
-        <span class="pill ok">tests green</span>
+        <span class="pill ok">自动化检查通过</span>
         <span class="pill warn">人工测试已规划</span>
-        <span class="pill ok">Phase 1F audit write-back</span>
-        <span class="pill brand">toolEvent trace</span>
-        <span class="pill">artifact replay</span>
-        <span class="pill warn">Codex loop disabled</span>
+        <span class="pill ok">人工确认结果已留痕</span>
+        <span class="pill brand">关键动作可追溯</span>
+        <span class="pill">任务产物可回看</span>
+        <span class="pill warn">Codex 自动循环已停用</span>
       </div>
     </div>
   </header>
@@ -73,12 +73,12 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>监控目标</h2>
-      <p class="lead">Phase 1D/1E/1F 的监控重点不是模型“看起来聪明”，而是每个写动作和草稿入口都能解释：谁触发、在哪个 run、基于哪个 artifact、是否通过 schema、创建了哪个传统草稿、用户是否能在传统工作台继续人工确认，以及确认后是否回写 Harness 审计。任务运行时视角补充要求：每个 Harness Run 都要能说明来源、执行、产物、交付和知识边界是否完整。</p>
+      <p class="lead">监控重点不是模型“看起来聪明”，而是每个关键动作都说得清：谁发起、基于什么材料、执行是否合规、产生了什么草稿、谁做了人工确认。技术上用 AI 任务运行与审计底座（Harness）保存任务记录、任务产物和关键动作，方便问题发生后还原全过程。</p>
       <div class="grid-4">
-        <div class="kpi"><div class="top"><span class="ic">S</span><span>Schema</span><span class="live">guarded</span></div><div class="v">v1/v2</div><div class="lb">模型输出结构校验</div></div>
-        <div class="kpi"><div class="top"><span class="ic">A</span><span>Audit</span><span class="live">persisted</span></div><div class="v">event</div><div class="lb">confirm ToolEvent 留痕</div></div>
-        <div class="kpi"><div class="top"><span class="ic">I</span><span>Idempotency</span></div><div class="v">1x</div><div class="lb">重复确认不重复建草稿</div></div>
-        <div class="kpi"><div class="top"><span class="ic">H</span><span>Human</span></div><div class="v">gate</div><div class="lb">正式业务人工确认</div></div>
+        <div class="kpi"><div class="top"><span class="ic">结</span><span>结果合规</span><span class="live">已校验</span></div><div class="v">v1/v2</div><div class="lb">模型输出先检查结构，再进入下一步</div></div>
+        <div class="kpi"><div class="top"><span class="ic">记</span><span>动作留痕</span><span class="live">已保存</span></div><div class="v">记录</div><div class="lb">人工确认等关键动作均有过程记录</div></div>
+        <div class="kpi"><div class="top"><span class="ic">重</span><span>防止重复</span></div><div class="v">1 次</div><div class="lb">重复确认不会重复创建草稿</div></div>
+        <div class="kpi"><div class="top"><span class="ic">人</span><span>人工把关</span></div><div class="v">必需</div><div class="lb">正式业务结果必须由人确认</div></div>
       </div>
     </section>
 
@@ -87,6 +87,12 @@
       <h2>验证快照</h2>
       <table>
         <tr><th>命令</th><th>结果</th><th>覆盖范围</th></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-gate-rework:monitoring"><td class="mono">RP-047-A2 Codex Gate</td><td><span class="status block"><span class="dot"></span>REWORK_REQUIRED</span></td><td>Harness 93/93、modules 143/143、API/Web build 通过；10 路 output 探针得到连续版本 1..10。Date/Map 边界探针失败，且正式套件缺 output 并发回归；handoff 实际 16 文件与回填 15 个不一致。</td></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a-gate-rejected:monitoring"><td class="mono">RP-047-A Codex Gate</td><td><span class="status block"><span class="dot"></span>REJECTED / A2 待 ACK</span></td><td>正式 Testcontainers 命令退出 7；补 Colima socket 后在 Node 24 ESM 路径失败。直连 92/92 不含真实历史迁移演练；Codex 复现 create 返回 sequence 漂移、无效 Runtime validation 被接受、并发 checkpoint 非幂等且错误携带 state。安装 worktree 隔离依赖后 modules 143/143、build:api/web 通过。详见 Gate 审计。</td></tr>
+        <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup:monitoring"><td class="mono">WES 分支治理快照</td><td><span class="status warn"><span class="dot"></span>本地收敛完成 / 远端待同步</span></td><td>2026-08-02：本地分支从 37 个收敛为 4 个、worktree 从 5 个收敛为 2 个；本地 <code class="inline">main</code> 与业务主线均为 <code class="inline">88d32b4</code>。干净 worktree 上 build:web、build:api、test:modules 143/143、test:web 196/196、test:ai exit 0、Provider/Trace/RAG 专项 47/47 通过。<code class="inline">origin/main</code> 落后 75 个提交，未 push；RP-031 rework/integration 分支因 3 个 P1 与 JSON/PostgreSQL 存储边界冲突继续保留。</td></tr>
+        <tr><td class="mono">CodeGraph 受控试点验证</td><td><span class="status done"><span class="dot"></span>安装、索引与 MCP 握手通过</span></td><td>2026-07-26：<code class="inline">codegraph --version</code> 为 1.5.0；telemetry disabled；Codex MCP 启用并设置 <code class="inline">CODEGRAPH_NO_UPDATE_CHECK=1</code>、<code class="inline">CODEGRAPH_NO_DOWNLOAD=1</code>、<code class="inline">CODEGRAPH_MCP_TOOLS=codegraph_explore</code>。排除历史 <code class="inline">ui/V0_SAAS</code> 后，<code class="inline">codegraph status --json</code> 为 complete：453 文件、6112 节点、18882 边、pending refs/changes=0、node-sqlite/WAL；stdio MCP initialize 返回 protocol 2024-11-05；精确 auth 文件/符号查询只命中 V2 与 API 主链路。当前任务需新建/重启 Codex task 后加载新 MCP。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:monitoring"><td class="mono">RP-043 UI 质量门禁试点</td><td><span class="status run"><span class="dot"></span>自动化通过 / 人工待回填</span></td><td>2026-07-25：Skill quick_validate 与确定性检查器 3/3、Dialog/SystemManagement 聚焦 13/13、V2 全量 128/128、build:web 通过；浏览器鉴权守卫工作正常且控制台无错误，但无有效管理员会话，真实系统管理 1440px/760px、键盘和拖拽证据仍待回填。证据见 <code class="inline">docs/superpowers/evaluations/2026-07-25-system-management-dialog-qa.md</code>。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-post-merge-conflict-followup:monitoring"><td class="mono">单工作目录与冲突复核验证</td><td><span class="status done"><span class="dot"></span>自动化通过</span></td><td>2026-07-25：<code class="inline">git worktree list --porcelain</code> 仅保留 <code class="inline">/Users/kevin/AI/Workload-evaluation-system</code>；未知路由、登录用户名安全存储、旧密码记录迁移清理和密码框聚焦聚焦回归 8/8；<code class="inline">npm run test:web</code> 120/120、<code class="inline">npm run build:web</code> 通过、看板治理 12/12。Web 构建继续保留既有 chunk size warning；PostgreSQL live migration 不属于本次验证范围。</td></tr>
         <tr data-board-event-id="BE-2026-07-25-worktree-convergence:monitoring"><td class="mono">WES Agent worktree 收敛验证</td><td><span class="status done"><span class="dot"></span>自动化门禁通过</span></td><td>2026-07-25：已修复目录从 <code class="inline">AI-Local</code> 改回 <code class="inline">AI</code> 后的 linked worktree 指针；<code class="inline">test:modules</code> 143/143、<code class="inline">test:web</code> 117/117、<code class="inline">test:ai</code> 190/190、<code class="inline">test:agent</code> 26/26、看板治理 12/12，API/Web build 均通过。此前 structured-output、ai-sessions、abortSignal 与前端系统管理红灯已关闭。真实 PostgreSQL 传统运行态切换、live migration、人工验收及主 checkout 安全集成未完成，不据此声明生产迁移完成。</td></tr>
         <tr><td class="mono">RP-036 retrieval_empty 判定修复</td><td><span class="status run"><span class="dot"></span>后端 1/1 / 页面 3/3 / build:web pass</span></td><td>2026-07-23：第三次用户截图在知识库 ID 纠正后显示 <code class="inline">retrieval_empty / HTTP 400</code>。诊断确认智谱检索接口实际返回 HTTP 200，只是固定测试语句没有命中文档；后端现将其返回为 <code class="inline">ok=true</code>、<code class="inline">warning=retrieval_empty</code>、<code class="inline">retrievalTriggered=false</code>，前端显示“连接成功，但固定测试语句未检索到文档”。专项测试均通过；完整 <code class="inline">test:modules</code> 137/143，6 项为当前 dirty 工作区既有的 ai-sessions / parseBasicInfo 无关失败。未使用或记录用户凭据。</td></tr>
         <tr><td class="mono">RP-036 修复验证</td><td><span class="status run"><span class="dot"></span>聚焦 19/19 / 调整后 V2 107/107 / build:web pass</span></td><td>2026-07-23：覆盖过期 JWT、<code class="inline">/auth/me</code> 失败、admin-only 路由、普通用户导航、SPA 退出、保存鉴权错误、保存真实成功、连通性终态和 30 秒超时；本地无会话浏览器访问 <code class="inline">/system</code> 已确认跳转 <code class="inline">/login</code> 并显示登录界面。完整 V2 套件为 107 pass / 9 fail，9 个失败均来自 3 个本轮前已存在且与 RP-036 无关的未跟踪测试文件；<code class="inline">build:api</code> 被当前 dirty 工作区中 structured-output metrics、JSON→PG migration/runtime-store exports、extractor abortSignal 等既有 TypeScript 错误阻断。</td></tr>
@@ -209,11 +215,15 @@ harness_tool_events
         <div class="card"><span class="pill warn">Workflow</span><h3>草稿确认转化率</h3><p>v2 报告生成后，用户点击 nextAction、进入草稿、完成确认的漏斗。</p></div>
         <div class="card"><span class="pill ok">Audit</span><h3>追溯完整率</h3><p>抽样检查 ToolEvent output 与传统草稿链接是否可互相追溯。</p></div>
         <div class="card"><span class="pill brand">Runtime</span><h3>边界完整率</h3><p>抽样检查 Harness Run 是否具备 source、execution、artifact、delivery 和 knowledge reference 的最小闭环。</p></div>
+        <div class="card"><span class="pill warn">RP-047 Queue</span><h3>后台任务可用性</h3><p>观察队列深度、最老等待时间、活跃 Worker、lease 过期和 outbox 积压，防止关页后任务静默停滞。</p></div>
+        <div class="card"><span class="pill brand">RP-047 Recovery</span><h3>检查点恢复质量</h3><p>观察检查点成功率、自动恢复成功率、恢复耗时、重复副作用拦截和不兼容检查点失败。</p></div>
         <div class="card"><span class="pill warn">Model Cost</span><h3>Kimi 调用成本与失败分类</h3><p>按模型、场景、cache key、thinking 策略和失败类型统计 token、缓存命中、JSON fallback 与上游错误。</p></div>
       </div>
       <table style="margin-top:18px">
         <tr><th>指标</th><th>含义</th><th>用途</th></tr>
         <tr><td>任务运行时边界完整率</td><td>每个 Run 是否可明确关联来源文件、用户补充、模型执行、产物、草稿链接和人工确认回写。</td><td>防止 AI 工作台退化为不可复盘的普通聊天；详见 <a href="runtime.html">任务运行时</a>。</td></tr>
+        <tr><td>RP-047 后台队列健康度</td><td>queue depth、最老 queued Run 等待时间、active worker、lease expiry 和 outbox backlog。</td><td>发现任务虽然已提交但无人执行、Worker 失联或会话消息未投影的问题；实现前仅为计划指标。</td></tr>
+        <tr><td>RP-047 自动恢复质量</td><td>checkpoint 写入成功率、恢复次数/成功率/耗时、effectKey 重复拦截和 checkpoint incompatibility。</td><td>判断服务重启或错误后是否真正从安全检查点继续，而不是重复业务动作或静默从头重跑。</td></tr>
         <tr><td>LLM 调用完成率</td><td>上传文件后是否真实创建 modelRun，并得到 schema 校验后的 artifact。</td><td>防止 AI 工作台退化成纯代码拼装的“秒回假分析”。</td></tr>
         <tr><td>人工答案覆盖率</td><td>v1 缺失项中有多少被用户补充并进入 v2 answeredQuestions。</td><td>衡量高交互式工作流是否有效。</td></tr>
         <tr><td>模块/需求匹配度</td><td>模型识别出的模块和需求与人工标准答案的匹配比例。</td><td>作为 Harness Regression 的核心质量指标。</td></tr>
@@ -294,7 +304,7 @@ harness_tool_events
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 监控与审计 · WES 项目管理 · 2026-07-23
+      <a href="index.html">返回总览</a> · 监控与审计 · WES 项目管理 · 2026-07-26
     </footer>
   </main>
 </body>

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Speak Plainly"
+  short_description: "Turn technical task updates into clear, natural language"
+  default_prompt: "Use $speak-plainly to rewrite this task update for a business audience while preserving technical evidence."

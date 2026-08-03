@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>测试 · WES 项目管理</title>
+  <title>测试与验收 · WES 项目管理</title>
   <link rel="stylesheet" href="assets/fonts/fonts.css" />
   <link rel="stylesheet" href="assets/base.css" />
   <link rel="stylesheet" href="assets/components.css" />
@@ -17,37 +17,37 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a class="active" href="testing.html">测试</a>
+        <a class="active" href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
-      <span class="pill brand">Phase 1H-C test plan</span>
+      <span class="pill brand">1H-C 阶段验收计划</span>
     </div>
   </header>
 
   <header class="doc-h">
     <div class="doc-wrap">
-      <div class="crumb">WES Agent · 人工测试看板</div>
-      <h1>测试</h1>
+      <div class="crumb">WES Agent · 测试与验收</div>
+      <h1>测试与验收</h1>
       <p class="meta">
-        <span><b>目标</b> 管理人工测试任务与结果反馈</span>
-        <span><b>范围</b> Phase 1E 基线 + Phase 1F 回写扩展 + Phase 1G 意图路由 + Phase 1H-A 工作台体验闭环 + Phase 1H-B 引导选项交互 + RP-013 结构化表单 + RP-018 知识库工具 + RP-036 系统配置鉴权反馈 + RP-019 Markdown 渲染安全 + RP-004 WES 数据查询扩展 + RP-005 产物工作区时间线 + RP-002 附件问答轻量审计 + RP-007 Harness Regression 评分规则 + RP-025 AI 工作台项目创建确认回归 + RP-032 工作流模板可达性 + Qoder Loop R2-R8 Codex 复核</span>
-        <span><b>状态</b> 1H-A / 1H-B / 1H-C 用例已登记；2026-07-23 RP-036 已完成鉴权反馈与连通性语义修复：失效会话不再保留可操作页面，保存与测试均提供真实终态，智谱 HTTP 200 零命中返回“连接成功 + retrieval_empty 提示”；MT-1H-C-002 等待使用轮换后的密钥人工复测，继续阻断 MT-1H-B-003 后续真实配置验收</span>
-        <span><b>更新</b> 2026-07-23</span>
+        <span><b>这页回答</b> 哪些业务场景需要人工验收、目前是否通过、失败后如何处理</span>
+        <span><b>验收范围</b> AI 工作台主流程、权限边界、知识库配置、附件问答、报告生成、草稿确认与过程追溯；具体需求编号保留在下方用例中</span>
+        <span><b>当前结论</b> 共 35 项人工用例：34 项待执行，1 项待更换密钥后复测；在关键用例通过前，不能据此宣布相关功能完成验收</span>
+        <span><b>最近更新</b> 2026-08-02</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill err">P0 主链路</span>
         <span class="pill warn">P1 边界</span>
-        <span class="pill brand">反馈台账</span>
-        <span class="pill">人工门禁</span>
+        <span class="pill brand">结果留痕</span>
+        <span class="pill">通过后才能关闭</span>
       </div>
     </div>
   </header>
@@ -78,7 +78,7 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>测试策略</h2>
-      <p class="lead">人工测试不重复自动化测试的断言，而是验证真实用户在浏览器中能否完成从 AI 工作台到传统草稿处理的业务闭环，并确认边界提示足够清楚：AI 只生成草稿，正式业务仍由人确认。</p>
+      <p class="lead">自动化检查回答“程序是否按规则运行”，人工验收回答“真实用户是否看得懂、做得完、不会被误导”。本页重点验证从 AI 工作台到草稿确认的完整业务流程，并坚持：AI 可以生成建议和草稿，正式业务结果仍需人工确认。</p>
       <div class="kpi-row">
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">P0</span><span>主链路任务</span></div>
@@ -88,7 +88,7 @@
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">P1</span><span>边界任务</span></div>
           <div class="v">18</div>
-          <div class="lb">权限 / fallback / 不自动正式化 / 滚动 / 输入 / 弹窗 / formBlock / 知识库工具 / 工作流模板</div>
+          <div class="lb">权限 / 备用处理 / 不自动正式化 / 滚动 / 输入 / 弹窗 / 结构化表单 / 知识库工具 / 工作流模板</div>
         </div>
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">P2</span><span>巡检任务</span></div>
@@ -103,7 +103,7 @@
       </div>
       <div class="grid-3" style="margin-top:22px">
         <div class="card"><span class="pill brand">准备</span><h3>测试数据</h3><p>使用 1 份真实或脱敏的需求附件，包含项目背景、需求清单和至少一个需用户补充的信息缺口。</p></div>
-        <div class="card"><span class="pill warn">环境</span><h3>执行环境</h3><p>使用本地或集成环境的 <code class="inline">ui/V2_PROTOTYPE</code> 与 <code class="inline">apps/api</code>，以普通用户登录验证 owner 边界。</p></div>
+        <div class="card"><span class="pill warn">环境</span><h3>执行环境</h3><p>使用本地或集成环境的 <code class="inline">ui/V2_PROTOTYPE</code> 与 <code class="inline">apps/api</code>，以普通用户登录，确认只能看到和操作自己的数据。</p></div>
         <div class="card"><span class="pill ok">证据</span><h3>反馈证据</h3><p>每条失败或疑问都需要记录页面、操作步骤、实际结果、截图路径和建议处理优先级。</p></div>
       </div>
     </section>
@@ -566,29 +566,29 @@
       <h2>结果反馈模板</h2>
       <div class="grid-2">
         <div class="panel">
-          <div class="panel-h">单条反馈字段<span class="right">copy format</span></div>
+          <div class="panel-h">单条反馈字段<span class="right">统一填写格式</span></div>
           <div class="panel-b">
-<pre>Task ID:
-Tester:
-Date:
-Environment:
-Result: Pass / Fail / Blocked / Waived
-Actual:
-Expected:
-Evidence:
-Severity: P0 / P1 / P2
-Owner:
-Decision:</pre>
+<pre>用例编号：
+执行人：
+执行日期：
+测试环境：
+结果：通过 / 未通过 / 受阻 / 豁免
+实际结果：
+预期结果：
+证据：
+影响等级：P0 / P1 / P2
+负责人：
+处理结论：</pre>
           </div>
         </div>
         <div class="panel">
-          <div class="panel-h">回填规则<span class="right">ledger rule</span></div>
+          <div class="panel-h">回填规则<span class="right">结果登记要求</span></div>
           <div class="panel-b">
             <ul class="list-clean">
-              <li>Pass：填写执行人、日期、环境和关键截图。</li>
-              <li>Fail：必须写清复现步骤、实际结果和缺陷等级。</li>
-              <li>Blocked：记录阻断原因和需要谁解除阻断。</li>
-              <li>Waived：必须有明确业务或技术决策依据。</li>
+              <li>通过：填写执行人、日期、环境和关键截图。</li>
+              <li>未通过：必须写清复现步骤、实际结果和缺陷等级。</li>
+              <li>受阻：记录阻断原因和需要谁解除阻断。</li>
+              <li>豁免：必须有明确业务或技术决策依据。</li>
             </ul>
           </div>
         </div>
@@ -629,12 +629,12 @@ Decision:</pre>
       <div class="h-num">Section 06</div>
       <h2>关闭标准</h2>
       <div class="callout warn">
-        <div><b>人工测试关闭条件</b>所有 P0 用例必须 Pass；P1 用例必须 Pass 或有明确延期决策；所有失败、阻断和豁免都需要在本页、风险页或变更页留下可追溯记录。</div>
+        <div><b>人工验收关闭条件</b>所有 P0 用例必须通过；P1 用例必须通过或有明确延期决定；所有未通过、受阻和豁免项都需要在本页、风险页或变更页留下可追溯记录。</div>
       </div>
       <div class="grid-3">
-        <div class="card"><span class="pill ok">Must Pass</span><h3>P0 全部通过</h3><p>上传、v2、confirm、AI 草稿列表、详情来源追溯不能失败。</p></div>
-        <div class="card"><span class="pill warn">Decision</span><h3>P1 有处理结论</h3><p>权限、fallback、跳转、正式化边界出现问题时必须明确修复或延期。</p></div>
-        <div class="card"><span class="pill brand">Trace</span><h3>证据可追溯</h3><p>人工测试结果需要能反向定位到任务 ID、页面、截图和变更记录。</p></div>
+        <div class="card"><span class="pill ok">必须通过</span><h3>P0 全部通过</h3><p>上传、报告升级、人工确认、AI 草稿列表和详情来源追溯不能失败。</p></div>
+        <div class="card"><span class="pill warn">需要决定</span><h3>P1 有处理结论</h3><p>权限、备用处理、跳转和正式化边界出现问题时，必须明确修复或延期。</p></div>
+        <div class="card"><span class="pill brand">保留证据</span><h3>结果可追溯</h3><p>人工测试结果需要能反向定位到用例编号、页面、截图和变更记录。</p></div>
       </div>
     </section>
 
@@ -658,8 +658,22 @@ Decision:</pre>
       <div class="h-num">Section 08</div>
       <h2>自动化基线</h2>
       <p class="lead">人工测试建立在已通过的自动化基线之上。以下命令不是人工验收的替代品，而是人工测试前应保持绿色的工程底座。</p>
+      <div class="callout warn"><div><b>RP-047 Batch A2 Gate 需 R1 返工</b>正式 Testcontainers Harness 93/93、modules 143/143、API/Web build 已通过，A1 的迁移、原子性、事件/checkpoint 并发问题已关闭。当前阻断是 Date/Map 绕过 JSON 普通对象校验、正式套件缺少 output 并发版本回归，以及 handoff 范围/提交身份记录不准确。R1 只修这三项。</div></div>
       <table>
         <tr><th>命令</th><th>最近结果</th><th>覆盖范围</th></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-gate-rework:testing:1"><td class="mono">RP-047-A2 Testcontainers Harness</td><td><span class="status done"><span class="dot"></span>93/93 pass · 0 skip</span></td><td>随机 database 历史迁移、repository、usecase、routes、原子创建、事件/checkpoint 并发幂等。</td></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-gate-rework:testing:2"><td class="mono">Codex JSON boundary probe</td><td><span class="status block"><span class="dot"></span>fail</span></td><td>Date/Map 未以 <code class="inline">HARNESS_RUNTIME_PAYLOAD_INVALID</code> 在输入边界拒绝，已进入 A2-R1。</td></tr>
+        <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup:testing:1"><td class="mono">npm run build:web &amp;&amp; npm run build:api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-08-02：在 88d32b4 干净 worktree 上完成 Web/API 构建。</td></tr>
+        <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup:testing:2"><td class="mono">npm run test:modules &amp;&amp; npm run test:web &amp;&amp; npm run test:ai</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-08-02：modules 143/143、Web 196/196 通过，AI 测试命令 exit 0。</td></tr>
+        <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup:testing:3"><td class="mono">Provider + Trace + RAG focused tests</td><td><span class="status done"><span class="dot"></span>47/47 pass</span></td><td>2026-08-02：历史分支对应的 Provider、Trace、SSE 和 RAG baseline 当前实现回归通过。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:testing:1"><td class="mono">improving-wes-ui Skill validation</td><td><span class="status done"><span class="dot"></span>quick_validate pass / checker 3/3</span></td><td>2026-07-25：Skill 结构通过验证；确定性范围检查覆盖新增 UI 依赖、页面内重复 Dialog helper 和不受控内联样式候选。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:testing:2"><td class="mono">Dialog + SystemManagement focused regression</td><td><span class="status done"><span class="dot"></span>pass 13/13</span></td><td>2026-07-25：覆盖 Dialog 语义、标题/描述、关闭按钮、Escape、初始与恢复焦点、Tab 环、遮罩策略、拖拽，以及 SystemManagement 四处弹窗和既有规则动作。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:testing:3"><td class="mono">npm run test:web / npm run build:web</td><td><span class="status done"><span class="dot"></span>128/128 / build pass</span></td><td>2026-07-25：V2 Web 全量回归通过；生产构建转换 114 个模块，仅保留既有 606.21 kB 大 chunk 警告。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:testing:4"><td class="mono">RP-043 browser acceptance</td><td><span class="status warn"><span class="dot"></span>认证阻塞 / 人工待回填</span></td><td>2026-07-25：Chrome 与应用内浏览器访问系统管理均正确跳转登录页且无控制台错误；缺少有效管理员会话，尚未取得 1440px/760px、键盘焦点路径与拖拽边界人工证据。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-post-merge-conflict-followup:testing:1"><td class="mono">AppAuthGuard + Login focused regression</td><td><span class="status done"><span class="dot"></span>pass 8/8</span></td><td>2026-07-25：未知路由、用户名安全存储、旧密码记录迁移清理和密码框焦点全部通过。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-post-merge-conflict-followup:testing:2"><td class="mono">npm run test:web</td><td><span class="status done"><span class="dot"></span>pass 120/120</span></td><td>2026-07-25：V2 Web 全量回归通过。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-post-merge-conflict-followup:testing:3"><td class="mono">npm run build:web</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-07-25：生产构建通过，仅保留既有大 chunk 警告。</td></tr>
+        <tr data-board-event-id="BE-2026-07-25-post-merge-conflict-followup:testing:4"><td class="mono">Board governance tests</td><td><span class="status done"><span class="dot"></span>pass 12/12</span></td><td>2026-07-25：事件结构和 Issue-first 问题/缺陷治理通过。</td></tr>
         <tr data-board-event-id="BE-2026-07-25-worktree-convergence:testing:1"><td class="mono">npm run test:modules</td><td><span class="status done"><span class="dot"></span>pass 143/143</span></td><td>2026-07-25：API 模块全量通过，ai-sessions 同步 controller 合同恢复。</td></tr>
         <tr data-board-event-id="BE-2026-07-25-worktree-convergence:testing:2"><td class="mono">npm run test:web</td><td><span class="status done"><span class="dot"></span>pass 117/117</span></td><td>2026-07-25：V2 全量通过，覆盖 SSE 客户端、系统管理独立路由、规则配置和鉴权回归。</td></tr>
         <tr data-board-event-id="BE-2026-07-25-worktree-convergence:testing:3"><td class="mono">npm run test:ai</td><td><span class="status done"><span class="dot"></span>pass 190/190</span></td><td>2026-07-25：AI 服务全量通过。</td></tr>

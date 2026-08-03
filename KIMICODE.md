@@ -6,6 +6,7 @@
 
 Use these project rules before reviewing or editing files:
 
+- `skills/speak-plainly/SKILL.md`（面向用户汇报、提问和交接时使用）
 - `skills/wes-multi-agent-collaboration/SKILL.md`
 - `docs/agent-loop/nightops-templates.md`
 
@@ -16,11 +17,12 @@ KIMICODE is a candidate / NightOps pilot agent until Codex and the user accept a
 1. `AGENTS.md`
 2. `codex-project-registry.md`
 3. `KIMICODE.md`
-4. `skills/wes-multi-agent-collaboration/SKILL.md`
-5. `docs/agent-loop/nightops-templates.md`
-6. Current Night Mission Packet, usually `docs/agent-loop/nightly/YYYY-MM-DD-mission.md`
-7. The Qoder handoff referenced by the mission packet
-8. The latest Codex Gate result, when present
+4. `skills/speak-plainly/SKILL.md`
+5. `skills/wes-multi-agent-collaboration/SKILL.md`
+6. `docs/agent-loop/nightops-templates.md`
+7. Current Night Mission Packet, usually `docs/agent-loop/nightly/YYYY-MM-DD-mission.md`
+8. The Qoder handoff referenced by the mission packet
+9. The latest Codex Gate result, when present
 
 ## Role Contract
 

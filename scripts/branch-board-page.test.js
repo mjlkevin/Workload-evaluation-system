@@ -349,7 +349,7 @@ function representativeSnapshot() {
 test('branches page provides the complete static board shell and accessible mount targets', () => {
   const html = read(PAGE_PATH);
 
-  assert.match(html, /<a\s+class="active"\s+href="branches\.html">分支拓扑<\/a>/);
+  assert.match(html, /<a\s+class="active"\s+href="branches\.html">开发分支<\/a>/);
   assert.match(html, /<nav[^>]*id="branch-primary-nav"[^>]*class="navlinks"[^>]*aria-label="主导航"/);
   assert.match(html, /<button[^>]*type="button"[^>]*class="mobile-menu-btn"[^>]*id="branch-mobile-menu"[^>]*aria-label="打开主导航"[^>]*aria-expanded="false"[^>]*aria-controls="branch-primary-nav"[^>]*>☰<\/button>/);
   assert.match(html, /id="branch-status"[^>]*role="status"[^>]*aria-live="polite"/);
@@ -382,8 +382,8 @@ test('branches page provides the complete static board shell and accessible moun
   const rendererIndex = html.indexOf('assets/branch-topology.js');
   assert.ok(snapshotIndex >= 0 && rendererIndex > snapshotIndex, 'snapshot must load before renderer');
   assert.match(html, /href="assets\/branch-topology\.css"/);
-  assert.match(html, /本地 Git refs[^<]*worktree/i);
-  assert.match(html, /LOCAL REMOTE-TRACKING SNAPSHOT/);
+  assert.match(html, /本地分支[^<]*独立开发目录（worktree）/i);
+  assert.match(html, /本地远端跟踪快照/);
   assert.match(html, /npm run board:branches/);
 });
 
@@ -691,7 +691,7 @@ test('work item and central navigation owners register branch topology immediate
   const consistency = require('./board-consistency-check');
   for (const items of [build.NAV_ITEMS, sidebar.NAV_ITEMS]) {
     const collaboration = items.findIndex((item) => item.href === 'collaboration-protocol.html');
-    assert.deepEqual(items[collaboration + 1], { href: 'branches.html', label: '分支拓扑' });
+    assert.deepEqual(items[collaboration + 1], { href: 'branches.html', label: '开发分支' });
   }
   assert.ok(consistency.HTML_FILES.includes('branches.html'));
 });
@@ -701,7 +701,7 @@ test('navigation synchronizer inserts one branch link in supported nav blocks an
   const tempDir = createTempDir(t);
   const collaboration = '        <a href="collaboration-protocol.html">协作协议</a>';
   const activeCollaboration = '        <a class="active" href="collaboration-protocol.html">协作协议</a>';
-  const expected = `${collaboration}\n        <a href="branches.html">分支拓扑</a>`;
+  const expected = `${collaboration}\n        <a href="branches.html">开发分支</a>`;
   const nav = `<nav class="navlinks" aria-label="主导航">\n${collaboration}\n        <a href="requirements.html">需求池</a>\n      </nav>`;
   const linkedNav = `<nav class="navlinks">\n${expected}\n      </nav>`;
   const sidebarNav = `<nav class="sidebar-nav">\n${collaboration}\n      </nav>`;
@@ -738,7 +738,7 @@ test('navigation synchronizer inserts one branch link in supported nav blocks an
   assert.deepEqual(first.map((file) => path.basename(file)), ['active.html', 'class-not-first.html', 'content-branch.html', 'content.html', 'data-with-exact.html', 'first-linked-second-missing.html', 'index.html', 'multi-navlinks.html', 'multi-sidebar.html', 'sidebar.html', 'single-quoted.html', 'spaced-equals.html', 'top-links.html', 'two-navs.html']);
   assert.equal((read(path.join(tempDir, 'index.html')).match(/href="branches\.html"/g) || []).length, 1);
   assert.match(read(path.join(tempDir, 'index.html')), new RegExp(expected));
-  assert.match(read(path.join(tempDir, 'active.html')), new RegExp(`${activeCollaboration}\\n      <a href="branches.html">分支拓扑</a>`));
+  assert.match(read(path.join(tempDir, 'active.html')), new RegExp(`${activeCollaboration}\\n      <a href="branches.html">开发分支</a>`));
   assert.match(read(path.join(tempDir, 'content.html')), new RegExp(`${collaboration}<nav class="navlinks"`));
   assert.equal((read(path.join(tempDir, 'content-branch.html')).match(/href="branches\.html"/g) || []).length, 2);
   assert.equal((read(path.join(tempDir, 'two-navs.html')).match(/href="branches\.html"/g) || []).length, 2);
@@ -805,8 +805,8 @@ test('source board modules expose one RP-045 governance record per planned owner
     ],
     'index.html': [
       'BE-2026-08-02-rp-045-branch-topology:index',
-      '分支拓扑与 Worktree',
-      '查看自动生成的主线、子分支关系',
+      '开发分支与独立开发目录',
+      '查看当前主线、其他开发分支',
     ],
     'plan.html': [
       'BE-2026-08-02-rp-045-branch-topology:plan',
@@ -850,7 +850,7 @@ test('source board modules expose one RP-045 governance record per planned owner
 test('board build centralizes actual branch navigation while preserving its shell and runtime assets', async (t) => {
   const build = require('./board-build');
   const nav = build.generateNav('branches.html');
-  assert.match(nav, /<a class="active" href="branches\.html">分支拓扑<\/a>/);
+  assert.match(nav, /<a class="active" href="branches\.html">开发分支<\/a>/);
   assert.equal((nav.match(/class="active"/g) || []).length, 1);
   assert.match(nav, /class="mobile-menu-btn"/);
 
@@ -860,7 +860,7 @@ test('board build centralizes actual branch navigation while preserving its shel
   assert.match(processed, /href="assets\/branch-topology\.css"/);
   assert.match(processed, /src="data\/branch-snapshot\.js"/);
   assert.match(processed, /src="assets\/branch-topology\.js"/);
-  assert.match(processed, /<a class="active" href="branches\.html">分支拓扑<\/a>/);
+  assert.match(processed, /<a class="active" href="branches\.html">开发分支<\/a>/);
 
   const branchesSource = read(PAGE_PATH);
   const processedBranches = build.processHTML(branchesSource, 'branches.html');

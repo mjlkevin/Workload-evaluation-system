@@ -1,0 +1,76 @@
+{
+  "id": "BE-2026-07-31-qoder-ui-007-work-order",
+  "date": "2026-07-31",
+  "type": "process_change",
+  "scope": "QODER-UI-007-IMPL /reviews list P1-P3",
+  "summary": "用户已授权继续优化 UI-07 审计确认的三个根问题。Codex 发布 QODER-UI-007-IMPL Work Order，分派 qoder1 在 base 910269a 上创建独立 worktree .claude/worktrees/ui-007-reviews-list 与分支 qoder/ui-007-reviews-list。范围只包括列表加载失败反馈、新建失败幽灵记录、显式且键盘可达的列表动作与语义；不集成 UI-05、不修改评审详情布局、全局 Shell、后端或总看板 HTML。",
+  "status": "ASSIGNED / WAITING_QODER_ACK",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "user_decision",
+      "ref": "2026-07-31 user instruction: 继续优化P1-P3",
+      "result": "implementation authorized",
+      "summary": "授权范围解释为 UI-07 审计中的三个确认根问题，不扩大到详情页或其他 UI 页面。"
+    },
+    {
+      "kind": "work_order",
+      "ref": "docs/agent-loop/work-orders/2026-07-31-qoder-QODER-UI-007-IMPL.md",
+      "result": "published",
+      "summary": "包含 Worktree Contract ACK、allowed paths、P1-P3 contract、TDD、浏览器验收、验证命令、handoff 与 stop conditions。"
+    },
+    {
+      "kind": "implementation_plan",
+      "ref": "docs/superpowers/plans/2026-07-31-ui-07-reviews-list.md",
+      "result": "published",
+      "summary": "将 P1-P3 拆为测试骨架、状态 owner、显式操作、回归验证与单提交回填五个顺序任务。"
+    },
+    {
+      "kind": "source_audit",
+      "ref": "docs/agent-loop/audits/2026-07-31-codex-QODER-UI-007-reviews-list-audit.md",
+      "result": "CONFIRMED / 3 root issues",
+      "summary": "ISS-203 / RP-044 的合同、运行可达性、owner 和 1440px/760px/失败态证据。"
+    },
+    {
+      "kind": "git_contract",
+      "ref": "base 910269a / qoder/ui-007-reviews-list",
+      "result": "worktree path and branch available",
+      "summary": "分派时确认目标 worktree 路径与分支名未占用；Qoder 仍须在 ACK 前复检。"
+    }
+  ],
+  "assignment": {
+    "taskId": "QODER-UI-007-IMPL",
+    "issue": "ISS-203",
+    "requirement": "RP-044",
+    "executor": "qoder1",
+    "reviewer": "codex",
+    "projectRoot": "/Users/kevin/AI/Workload-evaluation-system",
+    "baseCommit": "910269a",
+    "worktreePath": "/Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/ui-007-reviews-list",
+    "branch": "qoder/ui-007-reviews-list",
+    "allowNextTask": false,
+    "mainMergeAllowed": false,
+    "integrationAuthorized": false,
+    "deliveryStatusAllowed": "已回填 / 待 Codex 复核"
+  },
+  "next": "Qoder 先完整读取规定文件并输出 Worktree Contract ACK；Codex/用户确认 ACK 后，Qoder 在独立 worktree 按 RED/GREEN 实现并回填结构化 handoff。不得自动集成或领取下一项。",
+  "board": {
+    "apply": "event only / visible HTML apply blocked by unrelated dirty changes",
+    "requirement": {
+      "id": "RP-044",
+      "status": "已授权 / 待 Qoder ACK",
+      "owner": "qoder1"
+    },
+    "testing": {
+      "status": "待执行",
+      "required": "focused RED/GREEN + test:web + build:web + scope checker + 1440/760/keyboard"
+    }
+  }
+}

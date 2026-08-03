@@ -17,37 +17,37 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a class="active" href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
-      <span class="pill brand">Backlog governance</span>
+      <span class="pill brand">需求管理</span>
     </div>
   </header>
 
   <main>
     <div class="doc-h">
       <div class="wrap">
-        <div class="crumb">Backlog Governance</div>
+        <div class="crumb">需求记录、评审与交付跟踪</div>
         <h1>需求池</h1>
         <div class="meta">
-          <span><b>当前阶段</b> Phase 1H-B delivery baseline / Phase 1H-C planning</span>
+          <span><b>当前阶段</b> 阶段 1H-B 已形成交付基线 / 阶段 1H-C 规划中</span>
           <span><b>管理范围</b> 升级需求 / 技术债 / 审计项 / 测试项 / 后续候选</span>
           <span><b>页面定位</b> 总看板唯一需求池页面，不是业务系统正式需求模块</span>
-          <span><b>更新日期</b> 2026-07-23</span>
+          <span><b>更新日期</b> 2026-08-03</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">36 已登记需求</span>
+          <span class="pill brand">40 项已登记需求</span>
           <span class="pill ok">22 已交付</span>
-          <span class="pill warn">12 待规划/待确认</span>
+          <span class="pill warn">16 项待规划/待确认/待验收</span>
           <span class="pill">2 暂缓</span>
           <span class="pill ok">可编辑子页面已移除</span>
         </div>
@@ -58,14 +58,14 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">01 / Overview</div>
-          <h2>KPI 总览</h2>
-          <p>当前需求池整体状态一览。</p>
+          <div class="num">01 / 数量概览</div>
+          <h2>需求总体状态</h2>
+          <p>用数量快速了解已经交付、仍待处理和暂缓评审的需求。</p>
         </div>
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">T</span><span>总需求数</span></div>
-            <div class="v">36</div>
+            <div class="v">38</div>
             <div class="lb">已登记需求项</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
@@ -73,19 +73,19 @@
             <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>已交付</span></div>
             <div class="v">22</div>
             <div class="lb">当前池内已交付</div>
-            <div class="bar"><i style="width:67%;background:var(--ok)"></i></div>
+            <div class="bar"><i style="width:58%;background:var(--ok)"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">W</span><span>进行中 / 待实现</span></div>
-            <div class="v">12</div>
+            <div class="v">14</div>
             <div class="lb">已分析 / 待规划 / 待确认</div>
-            <div class="bar"><i style="width:31%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
+            <div class="bar"><i style="width:37%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">C</span><span>暂缓 / 待评审</span></div>
             <div class="v">2</div>
             <div class="lb">需人工架构评审</div>
-            <div class="bar"><i style="width:6%;background:linear-gradient(90deg,var(--warn),var(--accent))"></i></div>
+            <div class="bar"><i style="width:5%;background:linear-gradient(90deg,var(--warn),var(--accent))"></i></div>
           </div>
         </div>
       </div>
@@ -95,44 +95,44 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">02 / Lifecycle</div>
+          <div class="num">02 / 处理流程</div>
           <h2>需求生命周期</h2>
           <p>每条需求从记录到归档经历七个节点，确保可追溯、可验收。</p>
         </div>
         <div class="lifecycle">
           <div class="lifecycle-step">
             <span class="ls-num">01</span>
-            <b>记录 Intake</b>
+            <b>登记</b>
             <small>来源、背景、触发人、原始描述</small>
           </div>
           <div class="lifecycle-step">
             <span class="ls-num">02</span>
-            <b>分析 Analysis</b>
+            <b>分析</b>
             <small>业务价值、边界、影响范围、风险</small>
           </div>
           <div class="lifecycle-step">
             <span class="ls-num">03</span>
-            <b>拆解 Breakdown</b>
+            <b>拆解</b>
             <small>前端、后端、文档、测试、审计</small>
           </div>
           <div class="lifecycle-step">
             <span class="ls-num">04</span>
-            <b>排期 Planning</b>
+            <b>排期</b>
             <small>归属 Phase、优先级、依赖</small>
           </div>
           <div class="lifecycle-step">
             <span class="ls-num">05</span>
-            <b>实施 Delivery</b>
+            <b>实施</b>
             <small>关联文件、PR、commit、负责人</small>
           </div>
           <div class="lifecycle-step">
             <span class="ls-num">06</span>
-            <b>验收 Validation</b>
+            <b>验收</b>
             <small>自动化/人工测试、审计提示词、结果</small>
           </div>
           <div class="lifecycle-step">
             <span class="ls-num">07</span>
-            <b>归档 Archive</b>
+            <b>归档</b>
             <small>完成事实、交付证据、后续项</small>
           </div>
         </div>
@@ -143,13 +143,13 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">03 / Status Board</div>
+          <div class="num">03 / 按状态查看</div>
           <h2>需求状态看板</h2>
           <p>按状态分列展示当前需求池，卡片包含关键信息与下一步。</p>
         </div>
         <div class="backlog-board">
-          <div class="backlog-column">
-            <h4>已交付 · 22</h4>
+          <div class="backlog-column col-delivered">
+            <h4><span class="col-dot"></span>已交付 · 22</h4>
             <div class="backlog-card">
               <span class="req-id">RP-002 / 004 / 005 / 007 / 018</span>
               <h5>运行时与审计基础</h5>
@@ -188,11 +188,11 @@
                 <span class="pill">Phase 1H-B</span>
                 <span class="pill">已交付</span>
               </div>
-              <div class="bc-next">布局与 Markdown、引导选项、编号选项、模型配置保存、消息复制按钮和“创建项目”意图路由/权限回归补丁已交付。</div>
+              <div class="bc-next">布局与 Markdown、引导选项、编号选项、模型配置保存、消息复制按钮和“创建项目”意图路由/权限回归补丁已交付。2026-08-02 复制按钮 UI 优化：从气泡右上角绝对定位移至消息底部操作栏，采用现代 ghost icon button 设计（SVG 图标 + 文字标签），悬停浮现 + focus-within 键盘可达，符合 baseline-ui 规范。2026-08-02 UI 全面审计（improve-ui + baseline-ui skill）：Composer 输入区重构为 focus-within 品牌边框 + shadow-focus 反馈；消息气泡去除边框改用 shadow 层次；AI 头像去除渐变符合规范；发送按钮 SVG 图标 + hover scale 微交互；工作流模板按钮添加 hover 过渡。build:web pass。</div>
             </div>
           </div>
-          <div class="backlog-column">
-            <h4>待规划 / 待确认 · 11</h4>
+          <div class="backlog-column col-planning">
+            <h4><span class="col-dot"></span>待规划 / 待确认 · 12</h4>
             <div class="backlog-card">
               <span class="req-id">RP-024</span>
               <h5>Napkin 视觉生成融合售前解决方案 PPT 页面</h5>
@@ -239,9 +239,9 @@
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
                 <span class="pill">AI Provider</span>
-                <span class="pill">Codex 修复验证通过 / 待集成</span>
+                <span class="pill">已纳入业务主线 / 人工验收待回填</span>
               </div>
-              <div class="bc-next">Qoder clean 分支 <code class="inline">qoder/rp-027-028-clean</code> 已收敛为 5 个 Kimi Provider 核心文件；Codex 在 <code class="inline">codex/rp-027-028-clean-fix</code> 修复 timeout 标记 retryable 但未进入 retry loop 的缺口，并补 K2 参数、usage、quota、stream reasoning 专项断言。验证：provider 10/10、build:api、test:ai 189/189、test:modules 66/66。</div>
+              <div class="bc-next">Qoder clean 与 Codex fix 曾完成 Kimi Provider 最小修复，包含 timeout retry loop、K2 参数、usage、quota 和 stream reasoning 专项断言；当前实现已由聚合提交纳入业务主线，2026-08-02 主线 Provider/Trace/RAG 专项 47/47 通过，相关本地历史分支已清理。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-028</span>
@@ -249,7 +249,7 @@
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
                 <span class="pill">AI Provider</span>
-                <span class="pill">Codex 修复验证通过 / 待集成</span>
+                <span class="pill">已纳入业务主线 / 人工验收待回填</span>
               </div>
               <div class="bc-next">与 RP-027 合并回填：非流式超时 300s、timeout 纳入指数退避重试、usage 提取、quota 分类和 stream reasoning 覆盖已补专项测试。剩余验收为真实 Kimi 配置下的人工/运行态审计展示确认，验证时不得泄露 API Key。</div>
             </div>
@@ -259,9 +259,29 @@
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
                 <span class="pill">AI 能力</span>
-                <span class="pill">Codex 修复验证通过 / 待集成</span>
+                <span class="pill">已纳入业务主线 / 后续 UX 待规划</span>
               </div>
-              <div class="bc-next">Codex 在 <code class="inline">codex/rp-029-030-rework-fixes</code> 修复 R8 阻断：流式接口继续复用 dispatchHomeWorkbenchTurn，新增真实流式成功、provider 失败、client abort 三类 SSE/trace 测试；<code class="inline">npm run build -w apps/api</code>、<code class="inline">test:modules</code> 137/137、<code class="inline">test:ai</code> 189/189、<code class="inline">test:agent</code> 21/21、<code class="inline">test:harness</code> 62/62 通过。待集成到主线后再启动前端逐字渲染。</div>
+              <div class="bc-next">流式接口复用 dispatchHomeWorkbenchTurn，并覆盖真实流式成功、provider 失败、client abort 三类 SSE/trace 测试；实现已纳入当前业务主线，2026-08-02 modules 143/143 与专项回归通过。前端逐字渲染和停止按钮仍作为后续 UX 候选项。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-047</span>
+              <h5>AI 工作台会话级多通道运行时</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">AI Runtime / 前端状态</span>
+                <span class="pill">Batch A · Qoder 实施中</span>
+              </div>
+              <div class="bc-next">Worktree Contract ACK 已于 2026-08-03 通过 Codex 核验：Qoder 使用 <code class="inline">qoder/rp-047-a-durable-run-foundation</code> 和 <code class="inline">c87da77</code> 基线，现按 Task 1-5 执行 Harness 持久运行基础 TDD；完成后只能回填“待 Codex 复核”。</div>
+            </div>
+            <div class="backlog-card">
+              <span class="req-id">RP-048</span>
+              <h5>Speak Plainly 通用任务沟通 Skill</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">项目治理 / 沟通质量</span>
+                <span class="pill">已实现 / 自动化通过 / 待体验确认</span>
+              </div>
+              <div class="bc-next">通用 Skill 已创建，并接入 AGENTS、Claude、Qoder 和 KIMICODE 入口；下一步由用户在实际任务沟通中确认术语解释和自然表达是否符合预期。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-030</span>
@@ -269,9 +289,9 @@
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
                 <span class="pill">Runtime / 监控审计</span>
-                <span class="pill">Codex 修复验证通过 / 待集成</span>
+                <span class="pill">已纳入业务主线 / 运行态验收待回填</span>
               </div>
-              <div class="bc-next">Codex 修复 trace 数据治理与异常闭环：trace repository 支持 <code class="inline">WES_TRACE_STORE_PATH</code> 测试隔离，运行态 trace-store JSON 已从提交中删除并加入 <code class="inline">.gitignore</code>；homeWorkbenchChat / stream 的失败和 client abort 会写入 failed/cancelled trace；RBAC 断言已按 PRE_SALES 当前能力矩阵校准。待最小 patch 集成。</div>
+              <div class="bc-next">Trace repository 支持 <code class="inline">WES_TRACE_STORE_PATH</code> 测试隔离，运行态 trace-store JSON 不进入版本库；homeWorkbenchChat / stream 的失败和 client abort 会写入 failed/cancelled trace，RBAC 按当前能力矩阵校准。实现已纳入业务主线，历史修复分支已清理。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-031</span>
@@ -281,7 +301,7 @@
                 <span class="pill">知识库 / 质量评估</span>
                 <span class="pill">生产化分支已回填 / Codex Gate 拒收</span>
               </div>
-              <div class="bc-next">2026-07-20 外部分支 <code class="inline">feature/rp-031-rag-production</code> 回填 7 个提交；Codex Gate 拒收。Fresh 构建与旧回归通过，但约 6000 行新增 RAG 模块没有新增测试且未接入现有知识库/intent/dispatch 主链路；检索参数 UI 无法保存回读，激活门禁不验证真实凭证，候选 patch 还触碰含敏感凭证的无关配置文件。必须先返工，不得合并或标记已交付。</div>
+              <div class="bc-next">2026-07-20 production 候选分支经 Codex Gate 拒收，2026-08-02 已在保留审计文档后删除其本地引用。<code class="inline">codex/rp-031-rag-rework</code> 与 <code class="inline">codex/rp-031-phase0-integration</code> 保留，新 Gate 发现 clean-checkout security、Request/Prompt Trace、密钥清除三个 P1，并与未提交的知识库 PostgreSQL 迁移发生存储边界冲突。owner 确认存储方案前不得合并或标记已交付。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-033</span>
@@ -289,9 +309,9 @@
               <div class="bc-meta">
                 <span class="pill priority-p2">P2</span>
                 <span class="pill">前端体验</span>
-                <span class="pill">clean patch 已验证 / 待提交集成</span>
+                <span class="pill">已纳入业务主线 / 人工验收待回填</span>
               </div>
-              <div class="bc-next">Qoder clean worktree <code class="inline">.worktrees/rp-033-clean</code> 已收敛为 3 文件 patch：SessionRail.jsx、index.css、HomeWorkspace.test.jsx。Codex 复核 diff scope 通过，<code class="inline">HomeWorkspace.test.jsx</code> 25/25、V2 全量 65/65、<code class="inline">build:web</code> pass；当前 patch 未提交，集成前需提交或抽取最小 patch，并做人工低高度滚动验收。</div>
+              <div class="bc-next">SessionRail 会话列表滚动、隐藏原生滚动条和聚焦回归已纳入业务主线；2026-08-02 Web 全量 196/196 与 build:web 通过，历史 clean worktree/分支已清理。低高度滚动人工验收继续待回填。</div>
             </div>
             <div class="backlog-card">
               <span class="req-id">RP-032</span>
@@ -299,13 +319,23 @@
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
                 <span class="pill">前端体验 / 可达性</span>
-                <span class="pill">已回填 / 待人工验收</span>
+                <span class="pill">已纳入业务主线 / 待人工验收</span>
               </div>
-              <div class="bc-next">Qoder 已回填第一批：标题改为“工作流模板”、列表独立滚动、隐藏原生滚动条、选中态圆点与 aria-label/title；Codex 复核前端测试 92 pass、build:web pass，仍需桌面/窄屏人工验收。</div>
+              <div class="bc-next">标题“工作流模板”、列表独立滚动、选中态与 aria-label/title 已纳入当前业务主线；2026-08-02 Web 196/196 与 build:web 通过，历史 Qoder 分支已清理。仍需桌面/低高度/窄屏人工验收。</div>
+            </div>
+            <div class="backlog-card" data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:requirements">
+              <span class="req-id">RP-043</span>
+              <h5>WES UI 质量门禁与系统管理共享 Dialog 试点</h5>
+              <div class="bc-meta">
+                <span class="pill priority-p1">P1</span>
+                <span class="pill">前端治理 / 可访问性</span>
+                <span class="pill">已实现 / 自动化通过 / 人工待回填</span>
+              </div>
+              <div class="bc-next">项目内 improving-wes-ui Skill、共享可访问 Dialog 与 SystemManagement 四处迁移已完成；聚焦 13/13、V2 全量 128/128、build:web 通过。真实浏览器受管理员认证阻塞，1440px/760px、键盘与拖拽证据待回填。</div>
             </div>
           </div>
-          <div class="backlog-column">
-            <h4>暂缓 / 待人工评审 · 2</h4>
+          <div class="backlog-column col-paused">
+            <h4><span class="col-dot"></span>暂缓 / 待人工评审 · 2</h4>
             <div class="backlog-card">
               <span class="req-id">RP-001</span>
               <h5>Phase 1H 低代码 AI 工作流设计器</h5>
@@ -335,9 +365,9 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">04 / Ledger</div>
-          <h2>需求台账表格</h2>
-          <p>全字段台账视图，便于快速检索和审计追溯。</p>
+          <div class="num">04 / 完整清单</div>
+          <h2>需求完整台账</h2>
+          <p>集中查看需求来源、价值、状态、影响范围、验收证据和下一步安排。</p>
         </div>
         <!-- 筛选栏 -->
         <div class="ledger-filter-bar">
@@ -392,7 +422,7 @@
               <button type="button" id="filter-reset" class="ledger-filter-reset-btn">重置</button>
             </div>
           </div>
-          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">36</b> / 36 条需求</div>
+          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">40</b> / 40 条需求</div>
         </div>
         <div class="table-scroll">
         <table>
@@ -718,10 +748,10 @@
               <td>AI Provider / 模型治理 / 成本优化</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C / Phase 2</td>
-              <td><span class="status done"><span class="dot"></span>Codex 修复验证通过 / 待集成</span></td>
+              <td><span class="status done"><span class="dot"></span>已纳入业务主线 / 人工验收待回填</span></td>
               <td>升级默认 Kimi 模型并修复 Provider 协议适配，降低评估成本、提升 JSON 输出稳定性，并为复杂评估引入 thinking 分级与批量评估调度能力</td>
               <td>代码事实：<code class="inline">config/system/requirement-settings.json</code> 仍存在 <code class="inline">kimi-k2-turbo-preview</code>；<code class="inline">system.repository.ts</code> 默认仍含 <code class="inline">moonshot-v1-128k</code>；<code class="inline">kimi-provider.ts</code> 尚未透传 <code class="inline">prompt_cache_key</code>、<code class="inline">json_schema</code>、partial assistant prefill、thinking 或 reasoning_content；官方 Kimi 文档确认 Chat Completion、模型参数与 Batch API 能力</td>
-              <td>Qoder clean 分支已剔除 ZHIPU env/file utils 旁路改动；Codex 修复 timeout retry loop 缺口并补 provider 契约测试。验证：tool-calling 10/10、build:api、test:ai 189/189、test:modules 66/66；待集成与真实 Kimi 配置人工验收</td>
+              <td>已纳入业务主线；2026-08-02 Provider/Trace/RAG 专项 47/47 通过，历史分支已清理；真实 Kimi 配置人工验收继续待回填</td>
             </tr>
             <tr>
               <td class="mono">RP-028</td>
@@ -730,7 +760,7 @@
               <td>AI Provider / 成本监控</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C</td>
-              <td><span class="status done"><span class="dot"></span>Codex 修复验证通过 / 待集成</span></td>
+              <td><span class="status done"><span class="dot"></span>已纳入业务主线 / 人工验收待回填</span></td>
               <td>提升非流式超时上限至 300s、将 timeout 错误标记为可重试、提取并记录 usage Token 消耗，降低网络瞬断和超时导致的评估失败率</td>
               <td>代码事实：<code class="inline">kimi-provider.ts</code> MAX_TIMEOUT_MS=120000、fetchAbort 的 retryable=false、parseSuccess 未提取 usage；官方文档 stream=false 超时为 2 小时</td>
               <td>与 RP-027 clean patch 合并回填；Codex 修复 timeout retryable 未实际重试问题，并新增 usage、quota、stream reasoning 断言。后续需确认 usage 字段进入模型运行审计或监控展示</td>
@@ -742,10 +772,10 @@
               <td>AI 能力 / 前端体验</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C / Phase 2</td>
-              <td><span class="status run"><span class="dot"></span>Codex 修复验证通过 / 待集成</span></td>
+              <td><span class="status done"><span class="dot"></span>已纳入业务主线 / 后续 UX 待规划</span></td>
               <td>后端 SSE 流式接口、前端逐字渲染组件、AI 工作台流式交互适配，让用户实时看到模型生成过程，提升交互体验</td>
               <td>代码事实：当前 <code class="inline">kimi-provider.ts</code> 已有 streamChatCompletion 实现但仅限内部使用；AI 工作台 chat 接口全部走非流式 chatCompletion；前端无逐字渲染组件</td>
-              <td>Codex 修复分支 <code class="inline">codex/rp-029-030-rework-fixes</code> 已补真实流式成功、provider 失败、client abort SSE/trace 集成测试；<code class="inline">build</code>、<code class="inline">test:modules</code>、<code class="inline">test:ai</code>、<code class="inline">test:agent</code>、<code class="inline">test:harness</code> 均通过。待集成后再推进前端逐字渲染与停止按钮。</td>
+              <td>SSE/dispatch/trace 实现已纳入业务主线，并覆盖流式成功、provider 失败与 client abort；前端逐字渲染与停止按钮仍是后续 UX 候选项。</td>
             </tr>
             <tr>
               <td class="mono">RP-030</td>
@@ -754,22 +784,22 @@
               <td>监控审计 / Runtime 治理</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C / Phase 2</td>
-              <td><span class="status run"><span class="dot"></span>Codex 修复验证通过 / 待集成</span></td>
+              <td><span class="status done"><span class="dot"></span>已纳入业务主线 / 运行态验收待回填</span></td>
               <td>统一记录用户请求、意图路由、知识库检索、模型调用、工具调用、Artifact 生成、人工确认和降级原因，形成可查询的 trace 链路与留存策略</td>
               <td>去重结果：命中 RP-002 轻量审计、RP-005 Artifact Workspace 后续，但两者未覆盖统一 schema、span 父子关系、查询入口和 retention 策略；因此新增独立 RP-030，并与 RP-002/RP-005 交叉引用</td>
-              <td>Codex 已移除运行态 trace-store 提交并补 <code class="inline">.gitignore</code>；trace repository 支持测试 store 注入，失败/abort 写入 failed/cancelled trace，PRE_SALES RBAC 断言已按当前权限模型校准。验证命令全通过，待最小 patch 集成。</td>
+              <td>Codex 已移除运行态 trace-store 提交并补 <code class="inline">.gitignore</code>；trace repository 支持测试 store 注入，失败/abort 写入 failed/cancelled trace，PRE_SALES RBAC 断言已按当前权限模型校准。实现已纳入业务主线，历史修复分支已清理；运行态人工验收继续待回填。</td>
             </tr>
             <tr>
               <td class="mono">RP-031</td>
               <td>RAG Baseline 与知识库评测闭环</td>
-              <td>2026-06-26 用户基于 Dify/ReAct/LangFuse/RAGAS/RAG 优化路线要求沉淀需求；去重后确认 RP-018 已交付知识库工具 MVP，但缺少固定 baseline 与策略对比评测</td>
+              <td>2026-06-26 用户基于 Dify/ReAct/LangFuse/RAGAS/RAG 优化路线要求沉淀需求；去重后确认 RP-018 已交付知识库工具 MVP，但缺少固定 baseline 与策略对比评测；2026-08-03 用户进一步提出多知识库配置与 AI 意图路由，来源问题为 <code class="inline">ISS-2026-08-03-001</code></td>
               <td>知识库 / RAG 质量评估</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C / Phase 2</td>
               <td><span class="status warn"><span class="dot"></span>生产化分支已回填 / Codex Gate 拒收</span></td>
               <td>为知识库问答和模块识别建立可复现 baseline，并把检索配置、Chunk 处理、Prompt、置信度、缓存/断路/限流、质量验证、Trace、配置治理和 Provider/多知识库演进拆成可独立验收的生产化批次</td>
-              <td>2026-07-20 去重结果：命中 RP-031 的 baseline、策略对比与知识库版本方向，并交叉引用 RP-018 知识库工具和 RP-030 Trace；本轮只扩展范围与验收口径，不新增重复 RP</td>
-              <td>P1 重复检索既有修复保持通过；候选生产化分支 fresh 验证为 build:api/web pass、modules 142/142、AI 190/190、Web 96/96、integration 1/1，但这些测试未覆盖新增模块。Provider/cache/pipeline/rewrite/routing/monitoring 仍未接生产主链路，C1/C4/M2/A4/C2 等验收未闭环；安全与范围门禁不通过。</td>
+              <td>2026-07-20 去重结果：命中 RP-031 的 baseline、策略对比与知识库版本方向，并交叉引用 RP-018 知识库工具和 RP-030 Trace；2026-08-03 新问题继续命中已标记未覆盖的 C2 多知识库和 M1 路由治理，不新增重复 RP</td>
+              <td>P1 重复检索既有 baseline 修复保持在业务主线；原 production 分支已拒收并删除本地引用。当前保留 <code class="inline">codex/rp-031-rag-rework</code> 与 <code class="inline">codex/rp-031-phase0-integration</code>，返工继续阻断于 security/Trace/密钥治理和 JSON/PostgreSQL 存储边界冲突。多知识库方向的当前事实是：系统只有一个 active <code class="inline">knowledgeId</code>，意图层只能分流到统一 <code class="inline">knowledge_query</code>，运行时没有知识库注册表、二级路由、ACL 或跨库 fallback。</td>
             </tr>
             <tr>
               <td class="mono">RP-033</td>
@@ -778,10 +808,10 @@
               <td>前端体验</td>
               <td><span class="pill priority-p2">P2</span></td>
               <td>Phase 1H-C</td>
-              <td><span class="status run"><span class="dot"></span>clean patch 已验证 / 待提交集成</span></td>
+              <td><span class="status done"><span class="dot"></span>已纳入业务主线 / 人工验收待回填</span></td>
               <td>SessionRail 会话列表容器缺少 maxHeight + overflowY 滚动能力，会话数量超出容器高度时底部会话被外层 overflow:hidden 裁剪遮挡</td>
               <td>SessionRail.jsx 会话列表容器添加 maxHeight + overflowY:auto + 隐藏原生滚动条（::-webkit-scrollbar display:none）；纯前端改动，不涉及后端</td>
-              <td>clean worktree <code class="inline">.worktrees/rp-033-clean</code> 已收敛为 3 文件未提交 patch；Codex 复核 <code class="inline">HomeWorkspace.test.jsx</code> 25/25、<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 65/65、<code class="inline">npm run build:web</code> pass。待提交/集成后人工验收低高度滚动。</td>
+              <td>会话列表滚动实现已纳入业务主线，2026-08-02 Web 196/196 与 build:web 通过，历史 worktree/分支已清理；低高度滚动人工验收继续待回填。</td>
             </tr>
             <tr>
               <td class="mono">RP-034</td>
@@ -819,6 +849,54 @@
               <td>去重结果：RP-018 覆盖知识库工具能力，RP-022 覆盖模型配置保存，两者均未覆盖失效 JWT 下的页面守卫、动作反馈和成功提示可信性，因此新增独立 RP-036，并交叉引用 RP-018/RP-022</td>
               <td>受保护页面在无有效 JWT 时跳转登录或展示明确的会话失效恢复入口；保存成功只允许在 PATCH 2xx 后出现；测试按钮点击后立即进入 loading，并在超时、401、上游失败和成功时展示可理解结果；不得读取或回显完整 API Key</td>
             </tr>
+            <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:requirements:ledger">
+              <td class="mono">RP-043</td>
+              <td>WES UI 质量门禁与系统管理共享 Dialog 试点</td>
+              <td>2026-07-25 用户评估 <code class="inline">ibelick/ui-skills</code> 后批准按“方法适配、技术栈不迁移、系统管理先试点”开始执行；来源 Issue 为 ISS-2026-07-25-003</td>
+              <td>前端治理 / 可访问性</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>Phase 1H-C</td>
+              <td><span class="status run"><span class="dot"></span>已实现 / 自动化通过 / 人工待回填</span></td>
+              <td>项目缺少可重复触发的 UI 审计门禁；系统管理存在页面内重复 Dialog helper，原生语义、初始焦点、关闭后焦点恢复、Escape 和统一拖拽边界尚未由共享 owner 管理</td>
+              <td>去重结果：RP-032 仅覆盖 AI 工作台推荐工作流列表，RP-042 仅覆盖系统管理子导航与局部动作；均未覆盖项目级 UI 质量门禁、上游规则适配和共享 Dialog owner，因此新增 RP-043</td>
+              <td>Skill RED/GREEN、Dialog 自动化、系统管理迁移、Web 全量测试与构建已通过；浏览器确认鉴权守卫有效，但缺少有效管理员会话，桌面/窄屏、键盘与拖拽人工验收仍待回填</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-046</td>
+              <td>WES Agent 总看板业务化文案改写</td>
+              <td>2026-08-02 用户要求整体优化总看板文案；来源问题为 <code class="inline">ISS-2026-08-02-002</code></td>
+              <td>项目治理 / 信息表达</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>阶段 1H-C</td>
+              <td><span class="status done"><span class="dot"></span>已实现 / 自动化通过 / 待用户确认</span></td>
+              <td>18 个总看板源页面的标题、摘要、状态说明、风险、行动建议和必要历史说明</td>
+              <td>业务用户能识别页面用途、当前状态、风险和下一步；编号、状态、路径、命令和技术标识保持可追溯</td>
+              <td>18 个源页面和发布版已完成；HTML 解析、看板一致性检查、分支看板 38/38、工作项治理 14/14 与差异检查通过；下一步由用户确认表达是否符合业务阅读习惯</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-047</td>
+              <td>AI 工作台会话级多通道运行时</td>
+              <td>2026-08-02 用户提供单通道现状、复现路径和多通道改造方向；来源问题为 <code class="inline">ISS-2026-08-02-003</code></td>
+              <td>AI Runtime / 前端状态</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>阶段 1H-C · Batch A2</td>
+              <td><span class="status block"><span class="dot"></span>Batch A2 Gate 需返工 / R1 待 ACK</span></td>
+              <td>将全局 <code class="inline">sending/messages/composer/selectedFile</code> 拆成会话级运行时，实现“同一会话单请求、不同会话可并行”；任务所有权不得绑定 <code class="inline">AiHomeWorkbench</code> 页面，任何异步回调只能按 <code class="inline">sessionId + requestId/taskId</code> 更新所属通道</td>
+              <td>去重命中 RP-017（离开页面后恢复活跃会话）和 RP-029（SSE/流式输出），但尚无 per-session runtime、跨会话并行、背景完成指示和响应防串台的工作项，故新增 RP-047</td>
+              <td>正式规格已固定 PostgreSQL-backed Harness Run、独立 Worker、Attempt lease/heartbeat、AI 语义建议 + Runtime 校验检查点、可回放事件/输出、outbox 幂等投影与 Recovery Coordinator。A2 候选 <code class="inline">39d5ea9</code> 的迁移、原子性、事件/checkpoint 并发与构建门禁已通过；当前只返工 JSON 普通对象校验、output 并发回归和 handoff 契约。A2-R1 通过前 B-E 继续锁定</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-048</td>
+              <td>Speak Plainly 通用任务沟通 Skill</td>
+              <td>2026-08-02 用户反馈模型任务沟通术语过多且表达不自然；来源问题为 <code class="inline">ISS-2026-08-02-004</code></td>
+              <td>项目治理 / 沟通质量</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>阶段 1H-C</td>
+              <td><span class="status run"><span class="dot"></span>已实现 / 自动化通过 / 待体验确认</span></td>
+              <td>创建可跨项目复用的 <code class="inline">speak-plainly</code> Skill；只约束模型面向用户的任务沟通，不自动改写文档、代码、命令、日志和原始报错</td>
+              <td>去重结果：RP-046 只覆盖总看板页面文案，与本需求目标相关但范围不同；因此新增 RP-048，并保留关联</td>
+              <td>Skill 结构、触发范围、表达规则、项目无关性、界面元数据和四个模型入口共 6 项测试通过；Skill Creator 格式校验通过；四类代表场景完成规则自检；等待用户通过实际沟通体验确认</td>
+            </tr>
             <tr>
               <td class="mono">RP-032</td>
               <td>AI 工作台推荐工作流列表可达性与语义优化</td>
@@ -826,9 +904,9 @@
               <td>前端体验 / 可达性</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>Phase 1H-C</td>
-              <td><span class="status run"><span class="dot"></span>已回填 / 待人工验收</span></td>
+              <td><span class="status done"><span class="dot"></span>已纳入业务主线 / 待人工验收</span></td>
               <td>左侧工作流入口既承担业务角色默认任务模板选择，又会影响 activeWorkflowKey、输入框预填、后续 workflowKey 和沉淀结果；当前命名像静态推荐内容，且截图显示列表底部被视口裁切，用户无法完整访问最后的工作流按钮</td>
-              <td>Qoder branch <code class="inline">qoder/rp-032-workflow-accessibility</code>；<code class="inline">AiHomeWorkbench.jsx</code>、<code class="inline">index.css</code>、<code class="inline">HomeWorkspace.test.jsx</code> 已回填；Codex 在相同文件状态下复跑 <code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 92 pass、<code class="inline">npm run build:web</code> pass</td>
+              <td><code class="inline">AiHomeWorkbench.jsx</code>、<code class="inline">index.css</code>、<code class="inline">HomeWorkspace.test.jsx</code> 对应能力已纳入业务主线；历史 Qoder 分支已清理。2026-08-02 干净主线 <code class="inline">test:web</code> 196/196、<code class="inline">build:web</code> pass。</td>
               <td>人工验收：桌面视口管理视角 4 个工作流均可滚动访问，选中态圆点和 aria-label/title 符合预期；窄屏响应式折叠未纳入本轮，后续单独补小任务或扩展 RP-032。</td>
             </tr>
             <tr>
@@ -865,8 +943,8 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">05 / Breakdown Matrix</div>
-          <h2>需求拆解矩阵</h2>
+          <div class="num">05 / 影响拆解</div>
+          <h2>需求影响范围</h2>
           <p>每条需求按用户价值、业务边界和各技术域影响进行拆解。</p>
         </div>
         <div class="table-scroll">
@@ -1163,6 +1241,36 @@
               <td>不新增持久化；继续使用现有配置仓储，密钥不得进入测试输出、看板或日志</td>
               <td>AuthGuard 路由测试 + Hook disabled/401 测试 + 知识库保存/测试交互测试 + 真实浏览器失效登录态人工回归</td>
               <td>同步 requirements / plan / testing / risks / changes；实现后按需更新 README 与实现对齐说明</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-043</td>
+              <td>用可复现、证据化的 UI 质量门禁持续改善 WES，并先在系统管理验证共享 Dialog 的可访问性与复用价值</td>
+              <td>仅覆盖 <code class="inline">ui/V2_PROTOTYPE</code>；第一批限定 <code class="inline">/system/code-rules</code>、<code class="inline">/system/model-config</code> 和 SystemManagement Dialog，不改变 API、JWT、权限与配置保存语义</td>
+              <td>新增项目内 <code class="inline">improving-wes-ui</code> Skill；新增无第三方依赖的共享 Dialog owner；迁移 SystemManagement 内联 Dialog helper，保留现有 Token 与业务动作</td>
+              <td>无后端改动</td>
+              <td>无新增持久化；上游来源固定到提交 <code class="inline">ae74b58e</code>，正式门禁不运行时动态拉取远端 Skill 内容</td>
+              <td>Skill RED/GREEN 压力验证；Dialog 语义、Escape、遮罩策略、初始/恢复焦点自动化；系统管理聚焦回归；test:web、build:web；1440px/760px 与键盘路径人工验收</td>
+              <td><code class="inline">docs/superpowers/specs/2026-07-25-wes-ui-quality-gate-design.md</code>、<code class="inline">docs/superpowers/plans/2026-07-25-wes-ui-quality-gate.md</code>、<code class="inline">docs/superpowers/evaluations/2026-07-25-improving-wes-ui-red-green.md</code>、<code class="inline">docs/superpowers/evaluations/2026-07-25-system-management-dialog-qa.md</code></td>
+            </tr>
+            <tr>
+              <td class="mono">RP-047</td>
+              <td>让用户在多个 AI 会话之间自由切换并并行等待；刷新页面、关闭标签页或退出后，任务仍由服务端继续，原用户重新登录可恢复进度和结果</td>
+              <td>覆盖 AI 会话、持久 Run、后台执行 worker、状态/输出恢复、事件订阅、显式停止和前端会话级状态；不改 JWT、owner 隔离、Harness 写动作确认门禁和传统评估流程</td>
+              <td><code class="inline">ai_sessions</code> 保存对话和业务上下文；<code class="inline">harness_runs</code> 保存任务事实；候选 <code class="inline">harness_run_checkpoints</code> 按 runId + sequence 保存已提交阶段、语义标签、安全恢复输入、上下文/提示词/工作流版本、产物/工具结果引用与幂等键；不保存密钥或未脱敏完整 prompt</td>
+              <td>提交端点立即返回 <code class="inline">runId</code>；worker 每完成一个可重放步骤尝试 <code class="inline">commitCheckpoint</code>，且只能提交 completed checkpoint。恢复协调器识别失效 worker lease，选择最近且版本兼容的检查点，从其 nextStep 继续；SSE 只通知状态与检查点进度</td>
+              <td>复用 Harness 域 PostgreSQL 主存储，不将运行中任务仅保存在内存或 React state；检查点为追加式事实，必须带输入/上下文/版本哈希和恢复策略，不允许 AI 直接改写历史检查点</td>
+              <td>除跨页/登录、A/B 并行、断线重连、owner 隔离和幂等停止外，必须新增：每个允许阶段生成 completed checkpoint；步骤中途失败不得提交；worker 失联从最近检查点恢复；版本/哈希不兼容时拒绝自动恢复；工具副作用和最终消息各只提交一次</td>
+              <td><code class="inline">ISS-2026-08-02-003</code>、<code class="inline">ISS-2026-08-03-002</code>、用户本次架构总结、批准规格、<code class="inline">docs/agent-loop/audits/2026-08-03-codex-RP-047-A-gate.md</code>、<code class="inline">docs/superpowers/plans/2026-08-03-rp-047-batch-a2-durable-run-foundation-reexecution.md</code>、<code class="inline">docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2.md</code>、<code class="inline">AiHomeWorkbench.jsx</code>、<code class="inline">useAiSessions.js</code>、<code class="inline">src/api/ai.js</code></td>
+            </tr>
+            <tr>
+              <td class="mono">RP-048</td>
+              <td>让产品经理、业务用户和其他非技术读者无需自行翻译工程术语，也能理解任务结果、影响、状态和下一步</td>
+              <td>只覆盖模型面向用户的任务沟通；不自动改写项目文档、代码、接口、命令、日志和原始报错</td>
+              <td>通用 Skill 负责结论先行、读者视角、术语随用随解释、状态准确和技术证据保留；项目入口只负责触发，不复制规则</td>
+              <td>无接口或后端改动</td>
+              <td>无数据结构或持久化改动</td>
+              <td>RED 基线确认 Skill 缺失时 6 项检查失败；GREEN 后 6/6 通过，Skill Creator 格式校验通过</td>
+              <td><code class="inline">skills/speak-plainly/SKILL.md</code>、<code class="inline">scripts/speak-plainly-skill.test.js</code>、<code class="inline">docs/superpowers/evaluations/2026-08-02-speak-plainly-scenarios.md</code>、设计规格和实施计划</td>
             </tr>
             <tr>
               <td class="mono">RP-014</td>
@@ -2631,6 +2739,10 @@
         </div>
 
         <div class="callout" style="margin-top:12px">
+          <div><b>2026-08-03 多知识库问题分诊</b>用户确认当前接入的是“金蝶解决方案知识库”，因此两条实施边界未命中不能直接归因为检索参数差，也可能是知识资产类型不匹配。去重命中 RP-031 的 C2/M1，推荐在候选调参前先引入知识库注册表和二级路由决策；第一版不做无差别全库搜索，以减少成本、错误引用和跨权检索。</div>
+        </div>
+
+        <div class="callout" style="margin-top:12px">
           <div><b>2026-07-20 交叉审计</b>20 个缺陷中，P1、P4 已覆盖；A1/A2/P2/P3/Q1/Q2/Q3/C1/M2/M3/M4 部分覆盖；A3/A4/Q4/C2/C3/C4/M1 未覆盖。三档置信度只是展示分桶，不能替代基于分数分布、chunk 数量/多样性、引用支撑度和校准样本的复合置信模型；<code class="inline">query + knowledgeId</code> 也不足以作为安全缓存键。</div>
         </div>
 
@@ -2825,11 +2937,36 @@
       </div>
     </section>
 
+    <!-- RP-043 需求分析 -->
+    <section data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:requirements:analysis">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">27 / RP-043 Analysis</div>
+          <h2>RP-043 · WES UI 质量门禁与系统管理共享 Dialog 试点</h2>
+          <p>本需求来自 2026-07-25 用户对 <code class="inline">ibelick/ui-skills</code> 的评估与执行确认。分诊命中 RP-032、RP-042 的局部相关方向，但二者没有覆盖项目级门禁、上游规则适配和共享 Dialog owner，因此保留交叉引用并新增独立 RP-043。</p>
+        </div>
+        <div class="grid-2">
+          <div class="callout">
+            <div><b>采用决策</b>吸收“基于现有设计证据、一次聚焦一个业务表面、优先可访问性与可验证修正”的方法；不安装动态上游 CLI，不引入 Tailwind、Radix、Motion 或第二套组件系统。</div>
+          </div>
+          <div class="callout">
+            <div><b>试点边界</b>第一批仅处理系统管理页面族和共享 Dialog。其他页面的内联样式、弹窗与视觉问题只登记为候选，不自动扩大成全站重构。</div>
+          </div>
+          <div class="callout ok">
+            <div><b>验收证据</b>Skill 需完成 RED/GREEN 压力验证；产品改动需完成 Dialog 与系统管理自动化、V2 全量测试、Web 构建、桌面/窄屏截图和键盘路径验证。</div>
+          </div>
+          <div class="callout warn">
+            <div><b>当前门禁</b>Skill 与产品试点已完成，确定性检查器 3/3、聚焦测试 13/13、V2 全量 128/128、build:web 通过。真实浏览器因缺少有效管理员会话停在登录页；1440px/760px、键盘焦点路径与拖拽边界证据补齐前，保持“人工待回填”且不扩展其他 Dialog。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 排期视图 -->
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">27 / Planning</div>
+          <div class="num">28 / 排期安排</div>
           <h2>排期视图</h2>
           <p>按 Phase 归属组织需求，避免候选需求混入当前冲刺导致范围失控。</p>
         </div>
@@ -2840,9 +2977,10 @@
             <ul class="list-clean" style="margin-top:12px">
               <li><b>Phase 1H-A / 已交付：</b>RP-017 会话恢复、RP-014 自动滚动、RP-015 输入框高度、RP-016 创建后刷新、RP-011 检索主体弹窗化。</li>
               <li><b>Phase 1H-B / 已交付基线：</b>RP-019 AI 工作台布局与 Markdown 渲染、RP-020 引导选项交互、RP-021 编号选项交互、RP-022 系统管理模型配置保存、RP-023 消息复制按钮、RP-025 创建项目意图路由与回归补丁已交付；RP-018 剩余 MT-1H-B-003 真实 ZHIPU 配置人工验收待回填。</li>
-              <li><b>Phase 1H-C / 已回填待验收：</b>RP-032 推荐工作流列表可达性第一批已回填，待人工确认桌面/低高度/窄屏体验。</li>
+              <li><b>Phase 1H-C / 已集成待验收：</b>RP-032 推荐工作流列表可达性第一批已纳入业务主线，待人工确认桌面/低高度/窄屏体验。</li>
               <li><b>Phase 1H-C / P1 已修复待验收：</b>RP-036 已闭合路由守卫、保存可信反馈、测试 loading/终态、30 秒超时与 retrieval_empty 连通性误判；原聚焦回归 19/19、调整后 V2 套件 107/107，本批后端专项 1/1、页面 3/3、build:web 通过，等待使用轮换密钥完成 MT-1H-C-002 人工复测后再继续 MT-1H-B-003 真实配置验收。</li>
-              <li><b>Phase 1H-C / Codex 复核分流：</b>RP-027/RP-028 Provider 批次自动化通过待最小 patch 集成；RP-026 能力矩阵补改已通过窄加载、无副作用和降级测试；RP-031 RAG Baseline 重复检索与构建基线已验证通过，真实 ZHIPU 配置仍待人工验收；RP-033 clean patch 已通过自动化复核但尚未提交/集成；RP-029 流式 SSE 与 RP-030 Trace 查询入口已由 Codex 修复验证通过，待集成。</li>
+              <li><b>Phase 1H-C / P1 已实现待验收：</b>RP-043 已完成 improving-wes-ui Skill、RED/GREEN 压力验证、共享 Dialog 与 SystemManagement 四处迁移；聚焦 13/13、V2 全量 128/128、build:web 通过。管理员认证阻塞真实浏览器进入系统管理，人工证据待回填。</li>
+              <li><b>Phase 1H-C / Codex 复核分流：</b>RP-026、RP-027/RP-028、RP-029/RP-030、RP-032 和 RP-033 的已验证实现已纳入业务主线，2026-08-02 完成历史本地分支与 worktree 清理；真实 Kimi/ZHIPU 配置、运行态审计与低高度滚动人工验收继续待回填。RP-031 baseline 保持在主线，生产化 Gate 未关闭，rework/integration 分支保留待存储边界决策。</li>
               <li><b>Phase 1H-C / 暂缓待评审：</b>RP-001 低代码工作流设计器、RP-012 WES Skill 工作流辅助工具。</li>
               <li><b>Phase 1H 后续候选：</b>RP-004 后续深查子项、RP-005 Harness run 级时间线深化、RP-002 轻量审计统一 schema / retention / 查询入口。</li>
             </ul>
@@ -2889,11 +3027,60 @@
       </div>
     </section>
 
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">RP-046 / Plain Language</div>
+          <h2>RP-046 · WES Agent 总看板业务化文案改写</h2>
+          <p>来源 <code class="inline">ISS-2026-08-02-002</code>。本需求只优化用户可见表达，不改变项目事实、状态、编号、证据、页面结构或技术实现。</p>
+        </div>
+        <div class="grid-2">
+          <div class="callout"><div><b>用户问题</b>总看板大量使用 Phase、Gate、Loop、Harness、Trace、worktree 和 pass/Done 等工程术语，产品经理和业务用户难以快速判断当前进展、风险和下一步。</div></div>
+          <div class="callout"><div><b>处理方式</b>标题、摘要、状态和行动建议使用业务语言；必须保留的技术名称采用“中文含义（技术名称）”，路径、命令、ID 和接口继续作为追溯证据。</div></div>
+          <div class="callout ok"><div><b>验收标准</b>18 个源页面均能直接回答“管理什么、进展如何、关注什么、下一步做什么”；业务状态与技术证据可同时识别。</div></div>
+          <div class="callout warn"><div><b>范围边界</b>不调整布局、样式、交互、事件 JSON、分支快照和业务代码；不把待执行或待回填内容改写成已通过。</div></div>
+          <div class="callout ok"><div><b>实施结果</b>18 个源页面与发布版均已生成；页面解析、导航、需求数量、分支功能和工作项治理检查全部通过。当前状态为“已实现 / 自动化通过 / 待用户确认”，不占用“已交付”数量。</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">RP-047 / Analysis</div>
+          <h2>RP-047 · AI 工作台会话级多通道运行时</h2>
+          <p>目标不是单纯把 <code class="inline">sending</code> 改成 Map，而是建立明确的会话事实、会话运行时、当前选择和请求资源四层边界，使切换只改变渲染源，不改变其他会话的执行状态。</p>
+        </div>
+        <div class="grid-2">
+          <div class="callout"><div><b>已确认根因</b><code class="inline">AiHomeWorkbench</code> 使用全局 messages/sending/composer/selectedFile；同步 Effect 在 sending 时直接返回；<code class="inline">useAiSessions.upsertSession</code> 还会自动激活被更新的会话，使旧请求完成时可把用户强制切回原会话。</div></div>
+          <div class="callout"><div><b>已确认边界</b>切换会话、离开 AI 页、刷新、关闭标签页或退出都不取消任务；原用户重新登录后可恢复进度和结果。AI 页面只是观察与操作入口，不是任务 owner。</div></div>
+          <div class="callout err"><div><b>Batch A1 Gate 已拒收</b>候选 <code class="inline">fae8a7d</code> 的表结构方向部分成立，但执行方越过 Testcontainers 停止条件；历史迁移、Run/首事件原子性、checkpoint 并发幂等、Runtime validation 和安全错误均未达到批准标准。被拒分支只保留审计，不作为集成或返工基础。</div></div>
+          <div class="callout warn"><div><b>当前门禁</b>RP-047-A2 已发布，必须从全新 worktree 重新实施，先安装隔离依赖并修复 Node 24 Testcontainers setup，再用随机临时 database 演练历史数据升级。A2 Gate 通过前不启动 Batch B；前端 Batch D 的测试包装与人工验收缺口继续保留。</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="num">RP-048 / Communication Quality</div>
+          <h2>RP-048 · Speak Plainly 通用任务沟通 Skill</h2>
+          <p>来源 <code class="inline">ISS-2026-08-02-004</code>。该 Skill 面向所有项目复用，WES 只是首个接入项目。</p>
+        </div>
+        <div class="grid-2">
+          <div class="callout"><div><b>用户问题</b>模型回复堆叠专业术语，表达像工程记录，产品经理和业务用户需要自行翻译才能理解。</div></div>
+          <div class="callout"><div><b>处理方式</b>先说明结果、影响、状态和下一步；无法避免的术语解释其实际作用，精确路径、命令、接口和报错继续作为证据保留。</div></div>
+          <div class="callout ok"><div><b>通用边界</b>Skill 本体不包含 WES 专属词汇或路径；其他项目复制或安装后可以直接使用。</div></div>
+          <div class="callout warn"><div><b>当前状态</b>自动检查已通过，尚未把“用户体验确认”写成已交付；需通过后续真实任务沟通观察表达是否自然。</div></div>
+        </div>
+      </div>
+    </section>
+
     <!-- 维护规则 -->
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">28 / Governance</div>
+          <div class="num">29 / 维护规则</div>
           <h2>维护规则</h2>
           <p>需求池治理约定，确保需求可追溯、范围可控。</p>
         </div>
@@ -2921,7 +3108,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 需求池 · 2026-07-23 · 36 条需求 · 22 delivered · 12 pending · 2 deferred
+      WES 项目管理 · 需求池 · 2026-08-03 · 40 条需求 · 22 项已交付 · 16 项待处理 · 2 项暂缓
     </footer>
   </main>
   <script>

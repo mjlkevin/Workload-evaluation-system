@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WES Agent 目标架构视图</title>
+  <title>WES Agent 目标架构与业务边界</title>
   <style>
     :root {
       --c-bg: #f8fafc;
@@ -283,36 +283,36 @@
     <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
     <a href="design.html">设计说明</a>
-    <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
     <a href="plan.html">计划与进度</a>
-    <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
     <a href="monitoring.html">监控与审计</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="requirements.html">需求池</a>
   </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
   <div class="diagram-canvas">
     <div class="diagram-header">
-      <h1 class="diagram-title">WES Agent 目标架构视图</h1>
-      <p class="diagram-subtitle">Runtime Boundaries · Target Architecture</p>
+      <h1 class="diagram-title">WES Agent 目标架构与业务边界</h1>
+      <p class="diagram-subtitle">业务流程、系统职责与技术追溯关系</p>
     </div>
 
     <!-- Layer 1: Frontend -->
     <div class="layer">
-      <div class="layer-label">Frontend Layer</div>
+      <div class="layer-label">用户界面</div>
       <div class="layer-title">ui/V2_PROTOTYPE</div>
       <div class="row">
         <div class="node">
           <div class="node-title">AiHomeWorkbench.jsx</div>
-          <div class="node-meta">AI 工作台入口：文件上传、自然语言补充、报告展示、下一步建议</div>
+          <div class="node-meta">AI 工作台观察与操作入口：不拥有任务生命周期，页面卸载不等于取消</div>
         </div>
         <div class="node">
-          <div class="node-title">src/api/harness.js</div>
-          <div class="node-meta">前端 Harness API 客户端，封装对 <span class="mono">/api/v1/harness/*</span> 的调用</div>
+          <div class="node-title">AI Run 订阅层（RP-047 规格已批准）</div>
+          <div class="node-meta">前端只提交任务、按 sessionId + runId 订阅/恢复状态并显式停止；浏览器生命周期不影响执行</div>
         </div>
       </div>
     </div>
@@ -325,16 +325,16 @@
 
     <!-- Layer 2: API + Harness -->
     <div class="layer">
-      <div class="layer-label">API + Harness Layer</div>
+      <div class="layer-label">后端接口与 AI 任务底座</div>
       <div class="layer-title">apps/api</div>
       <div class="row">
         <div class="node">
           <div class="node-title">routes/harness.routes.ts</div>
-          <div class="node-meta">Harness 路由层：JWT 鉴权、owner 隔离、参数校验</div>
+          <div class="node-meta">验证登录身份、按当前用户隔离（owner）并检查请求参数</div>
         </div>
         <div class="node">
           <div class="node-title">modules/harness/*</div>
-          <div class="node-meta">Harness 业务模块：run / file / artifact / toolEvent 生命周期管理</div>
+          <div class="node-meta">管理任务运行、产物和工具动作；RP-047 规格已批准，Batch A 先建立 Durable Queue、Attempt、Checkpoint、Event、Output 与 Outbox 基础，Worker、Session Projector 与 Recovery Coordinator 仍由后续批次实现</div>
         </div>
       </div>
 
@@ -349,6 +349,10 @@
           <div class="node-title">PostgreSQL</div>
           <div class="node-list">
             harness_runs<br>
+            harness_run_attempts<br>
+            harness_run_checkpoints<br>
+            harness_run_events / outputs<br>
+            harness_session_outbox<br>
             harness_files<br>
             harness_artifacts<br>
             harness_tool_events
@@ -356,16 +360,16 @@
         </div>
         <div class="flow-arrow">→</div>
         <div class="node">
-          <div class="node-title">AI Services</div>
+          <div class="node-title">外部 AI 服务</div>
           <div class="node-list">
-            model provider<br>
-            schema validation<br>
-            report generation
+            外部模型或服务提供方（Provider）<br>
+            输出格式校验<br>
+            报告生成与备用处理
           </div>
         </div>
         <div class="flow-arrow">→</div>
         <div class="node">
-          <div class="node-title">Traditional Modules</div>
+          <div class="node-title">传统业务模块</div>
           <div class="node-list">
             project evaluation draft<br>
             implementation assessment draft
@@ -381,8 +385,8 @@
     <div class="connector-label">uploaded files / standard versions / evidence</div>
 
     <div class="layer">
-      <div class="layer-label">Knowledge + Evidence Layer</div>
-      <div class="layer-title">controlled harness context</div>
+      <div class="layer-label">任务资料与证据</div>
+      <div class="layer-title">受控进入 AI 任务的上下文</div>
       <div class="row">
         <div class="node">
           <div class="node-title">Uploaded Project Files</div>
@@ -407,20 +411,20 @@
 
     <!-- Layer 3: Traditional WES -->
     <div class="layer">
-      <div class="layer-label">Legacy Record Layer</div>
-      <div class="layer-title">traditional WES records</div>
+      <div class="layer-label">正式业务记录</div>
+      <div class="layer-title">传统 WES 记录</div>
       <div class="row">
         <div class="node">
           <div class="node-title">config/*.json</div>
           <div class="node-meta">传统业务记录存储：项目、需求、评估、WBS、版本、审批</div>
         </div>
         <div class="node">
-          <div class="node-title">Formal Workflow</div>
+          <div class="node-title">正式业务流程</div>
           <div class="node-meta">人工确认链路：草稿查看 → 来源追溯 → 编辑 → 正式发布</div>
           <div class="node-list">
-            <span class="badge badge--warn">draft</span>
-            <span class="badge badge--ok">manual confirm</span>
-            <span class="badge badge--filled">formal</span>
+            <span class="badge badge--warn">草稿</span>
+            <span class="badge badge--ok">人工确认</span>
+            <span class="badge badge--filled">正式记录</span>
           </div>
         </div>
       </div>
@@ -448,7 +452,7 @@
     </div>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 设计架构 · WES 项目管理 · 2026-06-29
+      <a href="index.html">返回总览</a> · 设计架构 · WES 项目管理 · 2026-08-02
     </footer>
   </div>
 </body>

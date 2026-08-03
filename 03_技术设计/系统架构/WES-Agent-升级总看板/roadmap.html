@@ -17,35 +17,35 @@
         <a href="index.html">总览</a>
         <a class="active" href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
-      <span class="pill brand">Roadmap</span>
+      <span class="pill brand">版本与路标</span>
     </div>
   </header>
 
   <header class="doc-h">
     <div class="doc-wrap">
-      <div class="crumb">WES Project Management · Version And Roadmap</div>
+      <div class="crumb">WES 项目管理 · 版本与产品方向</div>
       <h1>路标管理</h1>
       <p class="meta">
         <span><b>目标</b> 管理版本、路标与需求池需求的关联</span>
         <span><b>初始化</b> 2026-06-30</span>
-        <span><b>当前范围</b> 先建模型和入口，后续再规划已有 RP 需求</span>
+        <span><b>当前状态</b> 管理框架已建立，现有需求尚未全部分配到版本和路标</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
-        <span class="pill ok">V-PM-0 initialized</span>
-        <span class="pill brand">RM-PM-0 active</span>
-        <span class="pill warn">RP backlog pending allocation</span>
+        <span class="pill ok">V-PM-0 已建立</span>
+        <span class="pill brand">RM-PM-0 已启用</span>
+        <span class="pill warn">需求池待逐项分配</span>
       </div>
     </div>
   </header>
@@ -67,13 +67,13 @@
       <h2>模块定位</h2>
       <p class="lead">路标管理承接需求池与实施计划之间的治理层：需求池记录“要不要做”，路标回答“围绕什么产品方向做”，版本回答“在哪个交付窗口做”。</p>
       <div class="callout ok">
-        <div><b>初始化原则</b>本页先建立版本、路标、需求池关联模型。已有 RP-001 ~ RP-034 暂不在本轮强制排期，后续逐条规划到版本和路标；本次看板改名与路标模块初始化作为治理变更记录，不占用可视需求池已存在的 RP 编号。RP-035 作为 AI Native Command Center 战略升级候选，先关联路标、不进入具体版本。</div>
+        <div><b>如何阅读</b>本页先建立“需求—产品方向—交付版本”的关联框架。初始化时仅登记 RP-001 至 RP-035，尚未覆盖当前全部 40 项需求，因此这里的数量是初始化快照，不代表需求池的最新状态。RP-035 作为 AI 原生指挥中心候选方向，先关联路标，暂不承诺具体版本。</div>
       </div>
       <div class="kpi-row">
         <div class="kpi"><div class="top"><span class="ic">V</span><span>版本</span></div><div class="v">3</div><div class="lb">1 个初始化版本，2 个规划容器</div></div>
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">R</span><span>路标</span></div><div class="v">5</div><div class="lb">项目治理、AI OS、AI 能力、运行时质量、协同</div></div>
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">L</span><span>已关联需求</span></div><div class="v">1</div><div class="lb">RP-035 已关联候选路标</div></div>
-        <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">P</span><span>待规划需求</span></div><div class="v">34</div><div class="lb">RP-001 ~ RP-034 后续分配版本/路标</div></div>
+        <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">P</span><span>初始化时待规划</span></div><div class="v">34</div><div class="lb">RP-001 至 RP-034 尚未分配版本或路标；当前总数以需求池为准</div></div>
       </div>
     </section>
 
@@ -114,7 +114,7 @@
       <h2>路标台账</h2>
       <div class="grid-2">
         <div class="panel">
-          <div class="panel-h">RM-PM-0 项目治理与路标管理<span class="right">active</span></div>
+          <div class="panel-h">RM-PM-0 项目治理与路标管理<span class="right">已启用</span></div>
           <div class="panel-b">
             <p>目标：把原升级总看板升级为 WES 项目管理入口，并建立版本、路标、需求池的关联模型。</p>
             <table>
@@ -126,9 +126,9 @@
           </div>
         </div>
         <div class="panel">
-          <div class="panel-h">RM-AIOS-2 AI Native Command Center<span class="right">candidate</span></div>
+          <div class="panel-h">RM-AIOS-2 AI 原生指挥中心<span class="right">候选</span></div>
           <div class="panel-b">
-            <p>目标：把首页从文档导航升级为 AI Workflow Driven 指挥中心，新增 AI Workflow 页面，形成 Vision、Roadmap、Current Goal、AI Commander、AI Pipeline、Knowledge Center 的主结构。</p>
+            <p>目标：把首页从资料导航升级为由 AI 工作流驱动的指挥中心，集中展示产品愿景、路线图、当前目标、AI 指挥、任务流程和知识中心。</p>
             <table>
               <tr><th>字段</th><th>值</th></tr>
               <tr><td>关联版本</td><td>待设计后规划</td></tr>
@@ -138,9 +138,9 @@
           </div>
         </div>
         <div class="panel">
-          <div class="panel-h">RM-AI-1 AI 工作台深化<span class="right">candidate</span></div>
+          <div class="panel-h">RM-AI-1 AI 工作台深化<span class="right">候选</span></div>
           <div class="panel-b">
-            <p>目标：围绕 Kimi Provider、流式响应、工作台交互和 AI 生成链路继续演进。</p>
+            <p>目标：继续提升外部模型服务（Kimi Provider）的稳定性、实时响应体验、工作台操作和 AI 内容生成流程。</p>
             <table>
               <tr><th>字段</th><th>值</th></tr>
               <tr><td>关联版本</td><td>待规划</td></tr>
@@ -150,9 +150,9 @@
           </div>
         </div>
         <div class="panel">
-          <div class="panel-h">RM-RUNTIME-1 Runtime Trace 与 RAG 质量<span class="right">candidate</span></div>
+          <div class="panel-h">RM-RUNTIME-1 AI 任务追溯与知识检索质量<span class="right">候选</span></div>
           <div class="panel-b">
-            <p>目标：建设统一 Trace Schema、查询入口、RAG baseline 与知识库评测闭环，支撑 Agent Runtime 可观测和质量回放。</p>
+            <p>目标：统一 AI 任务过程记录、查询入口和知识检索评测基准，让任务执行过程可以查看、比较和复盘；技术范围包括 Trace Schema 与 RAG baseline。</p>
             <table>
               <tr><th>字段</th><th>值</th></tr>
               <tr><td>关联版本</td><td>待规划</td></tr>
@@ -162,7 +162,7 @@
           </div>
         </div>
         <div class="panel">
-          <div class="panel-h">RM-COLLAB-1 协同与 WBS<span class="right">candidate</span></div>
+          <div class="panel-h">RM-COLLAB-1 协同与任务分解<span class="right">候选</span></div>
           <div class="panel-b">
             <p>目标：推进团队协同、角色能力治理、评审流转和多 Agent 协作协议落地。</p>
             <table>
@@ -209,14 +209,14 @@
       <div class="h-num">Section 05</div>
       <h2>治理规则</h2>
       <div class="grid-3">
-        <div class="card"><span class="pill brand">Version</span><h3>版本必须有目标</h3><p>每个版本至少包含版本目标、纳入需求、排除项、验收证据和状态，不用版本号堆砌临时任务。</p></div>
-        <div class="card"><span class="pill warn">Roadmap</span><h3>路标必须有方向</h3><p>路标按产品能力方向组织，不按单个文件或单次会话组织；同一路标可跨多个版本演进。</p></div>
-        <div class="card"><span class="pill ok">Requirement</span><h3>需求必须可追溯</h3><p>纳入版本前必须能追溯到需求池 RP 编号、来源、状态、验收口径和后续验证证据。</p></div>
+        <div class="card"><span class="pill brand">交付版本</span><h3>版本必须有目标</h3><p>每个版本至少包含版本目标、纳入需求、排除项、验收证据和状态，不用版本号堆砌临时任务。</p></div>
+        <div class="card"><span class="pill warn">产品路标</span><h3>路标必须有方向</h3><p>路标按产品能力方向组织，不按单个文件或单次会话组织；同一路标可跨多个版本演进。</p></div>
+        <div class="card"><span class="pill ok">需求来源</span><h3>需求必须可追溯</h3><p>纳入版本前必须能追溯到需求池 RP 编号、来源、状态、验收口径和后续验证证据。</p></div>
       </div>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 路标管理 · WES 项目管理 · 2026-06-30
+      <a href="index.html">返回总览</a> · 路标管理 · WES 项目管理 · 2026-08-02
     </footer>
   </main>
 </body>

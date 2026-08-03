@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>分支拓扑 · WES 项目管理</title>
+  <title>开发分支 · WES 项目管理</title>
   <link rel="stylesheet" href="assets/base.css" />
   <link rel="stylesheet" href="assets/components.css" />
   <link rel="stylesheet" href="assets/pages.css" />
@@ -17,28 +17,28 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a class="active" href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a class="active" href="branches.html">开发分支</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button type="button" class="mobile-menu-btn" id="branch-mobile-menu" aria-label="打开主导航" aria-expanded="false" aria-controls="branch-primary-nav">☰</button>
-      <span class="pill brand">Local Git Snapshot</span>
+      <span class="pill brand">本地 Git 快照</span>
     </div>
   </header>
 
   <header class="doc-h branch-doc-header">
     <div class="doc-wrap">
-      <div class="crumb">WES Agent · Local Branch Operations</div>
-      <h1>分支拓扑与完整台账</h1>
-      <p class="lead">本页展示生成时刻的本地 Git refs 与 worktree 快照。远端引用仅表示 <strong>LOCAL REMOTE-TRACKING SNAPSHOT</strong>，不是远端仓库的实时状态。</p>
-      <p class="branch-safety-note">只读事实面板：不发起 fetch、merge、rebase、delete、cleanup 或 remote sync。刷新本地快照请在仓库运行 <code class="inline">npm run board:branches</code>。</p>
+      <div class="crumb">WES Agent · 本地开发分支管理</div>
+      <h1>开发分支与独立开发目录</h1>
+      <p class="lead">这页回答当前代码主线在哪里、哪些工作仍在独立分支、是否存在待合并或待返工内容。页面展示生成时刻的本地分支和独立开发目录（worktree）快照；远端记录只是本机最后一次看到的结果，不是远端仓库实时状态。</p>
+      <p class="branch-safety-note">本页只读，不会自动拉取、合并、变基、删除或同步远端。刷新本地快照请在仓库运行 <code class="inline">npm run board:branches</code>。</p>
       <div id="branch-status" class="branch-primary-status" role="status" aria-live="polite">正在读取本地分支快照……</div>
     </div>
   </header>
@@ -47,28 +47,28 @@
     <noscript><div class="branch-alert">此页面需要 JavaScript 渲染本地快照。请启用 JavaScript；若数据过期，先运行 npm run board:branches 后重新打开本文件。</div></noscript>
 
     <section aria-labelledby="snapshot-title">
-      <div class="h-num">Snapshot</div>
+      <div class="h-num">快照说明</div>
       <h2 id="snapshot-title">快照口径</h2>
       <div id="snapshot-header" class="branch-snapshot-header" aria-label="主线与快照来源"></div>
     </section>
 
     <section aria-labelledby="kpi-title">
-      <div class="h-num">Operating Facts</div>
-      <h2 id="kpi-title">当前运营事实</h2>
+      <div class="h-num">当前情况</div>
+      <h2 id="kpi-title">当前开发分支概况</h2>
       <div id="branch-kpis" class="branch-kpi-grid"></div>
     </section>
 
     <section aria-labelledby="topology-title">
-      <div class="h-num">Topology</div>
-      <h2 id="topology-title">运营拓扑</h2>
-      <p class="lead">主线单独作为根节点；活跃工作区默认展开，其余未汇入主线的分支按前缀聚合。祖先/历史与重复指针作为摘要收起。</p>
+      <div class="h-num">关系图</div>
+      <h2 id="topology-title">分支关系</h2>
+      <p class="lead">主线单独显示；正在使用的独立开发目录默认展开，尚未汇入主线的分支按名称归类。已经成为历史或指向同一提交的分支会收起显示。</p>
       <div id="branch-topology" class="branch-topology" aria-label="本地分支运营拓扑"></div>
     </section>
 
     <section aria-labelledby="ledger-title">
-      <div class="h-num">Full Local Ledger</div>
+      <div class="h-num">完整清单</div>
       <h2 id="ledger-title">完整本地分支台账</h2>
-      <p class="lead">本地分支总数不包含 remote-tracking refs。筛选只改变下表可见行，不改变快照事实或 KPI。</p>
+      <p class="lead">本地分支总数不包含远端跟踪记录。筛选只改变下表的显示结果，不会改变快照统计。</p>
       <div class="branch-filter-grid" aria-label="分支台账筛选">
         <div class="branch-field">
           <label for="branch-search">搜索分支、提交、作者或 SHA</label>
@@ -96,20 +96,20 @@
     </section>
 
     <section aria-labelledby="remote-title">
-      <div class="h-num">Local Observation Only</div>
-      <h2 id="remote-title">Remote-tracking refs</h2>
-      <p class="branch-local-label"><strong>LOCAL REMOTE-TRACKING SNAPSHOT</strong>：这些记录来自本地 refs/remotes，不代表已执行远端同步，也不参与本地分支总数。</p>
+      <div class="h-num">仅为本地观察</div>
+      <h2 id="remote-title">本机记录的远端分支</h2>
+      <p class="branch-local-label"><strong>本地远端跟踪快照</strong>：这些记录来自本机最后保存的远端引用，不代表刚刚完成远端同步，也不计入本地分支总数。</p>
       <div id="remote-refs"></div>
     </section>
 
     <section aria-labelledby="warnings-title">
-      <div class="h-num">Snapshot Status</div>
+      <div class="h-num">数据提醒</div>
       <h2 id="warnings-title">快照警告</h2>
       <div id="snapshot-warnings" class="branch-warning-list" role="status" aria-live="polite"></div>
     </section>
   </main>
 
-  <footer>WES 项目管理 · 本地 Git 分支拓扑 · 只读 as-of-generation 快照</footer>
+  <footer>WES 项目管理 · 开发分支只读快照 · 以页面生成时刻为准 · 2026-08-02</footer>
   <script src="data/branch-snapshot.js"></script>
   <script src="assets/branch-topology.js"></script>
 </body>

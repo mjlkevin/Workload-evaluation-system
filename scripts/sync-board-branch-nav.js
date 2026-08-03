@@ -3,9 +3,9 @@ const fs = require('fs');
 const path = require('path');
 
 const BOARD_DIR = path.resolve(__dirname, '..', '03_技术设计', '系统架构', 'WES-Agent-升级总看板');
-const BRANCH_LINK = '<a href="branches.html">分支拓扑</a>';
+const BRANCH_LINK = '<a href="branches.html">开发分支</a>';
 const NAV_BLOCK = /<nav\b[^>]*>[\s\S]*?<\/nav>/g;
-const COLLABORATION_LINK = /<a\b[^>]*\bhref=(["'])collaboration-protocol\.html\1[^>]*>协作协议<\/a>/;
+const COLLABORATION_LINK = /<a\b[^>]*\bhref=(["'])collaboration-protocol\.html\1[^>]*>(?:协作协议|多 AI 协作)<\/a>/;
 const BRANCH_HREF = /\bhref=(["'])branches\.html\1/;
 
 function classTokensForNav(nav) {

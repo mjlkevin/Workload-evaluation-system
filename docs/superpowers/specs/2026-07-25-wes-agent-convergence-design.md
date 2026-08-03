@@ -23,7 +23,7 @@
 3. **保护既有成果。** 不清理、不还原、不格式化与本次红灯无关的 dirty changes；恢复用 stash `89a428f2e19735777b8a95d07c52911651ae4b66` 保留。
 4. **issue-first。** 原始反馈先进入问题池；只有完成分类、去重和确认后，才进入需求或缺陷对象。
 5. **证据分级。** 自动化测试通过、构建通过、真实 PostgreSQL 验证和人工验收分别记录，互不替代。
-6. **路径以当前 Git 事实为准。** 当前活动工作区统一为 `/Users/kevin/AI/Workload-evaluation-system-agent`；主目录用于分支集成和历史核对。目录搬迁后必须使用 `git worktree repair` 更新 Git 双向指针。
+6. **路径以当前 Git 事实为准。** 收敛实施阶段使用 `/Users/kevin/AI/Workload-evaluation-system-agent`；完成本地合并后，用户决定移除该 linked worktree，后续唯一活动目录为 `/Users/kevin/AI/Workload-evaluation-system`。目录结构再次变化时必须先核对 `git worktree list`，禁止根据历史目录名推断当前工作区。
 
 ## 收敛工作流
 
@@ -83,3 +83,14 @@
 - 主目录自身未提交改动已单独保护，并明确采用 merge、rebase 或暂不集成。
 
 真实 PostgreSQL 迁移或人工业务验收如缺少环境，不阻塞代码收敛，但会阻止“已上线/已交付”的结论。
+
+## 合并后冲突复核决策
+
+2026-07-25 完成本地快进合并后，用户确认只保留 `/Users/kevin/AI/Workload-evaluation-system`，原 `-agent` worktree 已注销并将残留移入废纸篓。冲突复核采用以下产品口径：
+
+1. 未知前端路径属于内部工作台导航异常，统一重定向到首页；不在本轮新增独立 404 页面。
+2. 登录历史只在 `localStorage` 保存用户名，禁止保存明文密码；“记住 7 天”只决定登录令牌落在 `localStorage` 还是 `sessionStorage`。若浏览器仍有旧版 `wes_recent_users` 数据，则只迁移其中的用户名并删除整个旧键，确保历史明文密码不再残留。
+3. 用户从历史记录选择用户名后，密码输入框应立即获得焦点；实现使用密码框自身的 React ref，不依赖父子 DOM 结构查询。
+4. AI 工作台悬浮标签、会话右键复制和其余冲突合并结果已由用户确认，无需继续调整。
+
+验收证据必须包含未知路径重定向测试、用户名历史不含密码测试、历史用户名选择后焦点测试、Web 全量测试和生产构建。现有未提交本地工作不得因本轮修复被清理或整体提交。

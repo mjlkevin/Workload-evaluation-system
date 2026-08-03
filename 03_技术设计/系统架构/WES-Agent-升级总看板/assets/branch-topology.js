@@ -13,19 +13,27 @@
     ['subject', '提交主题'],
     ['author', '作者'],
     ['committerDate', '提交时间'],
-    ['gitRelation', 'Git 关系'],
-    ['ahead', 'Ahead'],
-    ['behind', 'Behind'],
-    ['worktreePath', 'Worktree 路径'],
-    ['worktreeDirty', 'Worktree 状态'],
-    ['upstream', 'Upstream'],
-    ['upstreamTrack', 'Upstream Track'],
+    ['gitRelation', '与主线的关系'],
+    ['ahead', '领先主线的提交数'],
+    ['behind', '落后主线的提交数'],
+    ['worktreePath', '独立开发目录路径'],
+    ['worktreeDirty', '独立开发目录状态'],
+    ['upstream', '对应远端分支'],
+    ['upstreamTrack', '远端同步差异'],
     ['duplicateTipGroup', '重复指针组'],
     ['governanceSuggestion', '治理建议'],
   ];
 
   function text(value) {
     return value === undefined || value === null || value === '' ? '—' : String(value);
+  }
+
+  function businessValue(key, value) {
+    var relationLabels = { current: '当前主线', ancestor: '已包含在主线中', non_ancestor: '尚未汇入主线' };
+    var worktreeLabels = { clean: '无未提交修改', dirty: '有未提交修改', unknown: '状态未知' };
+    if (key === 'gitRelation') return relationLabels[value] || text(value);
+    if (key === 'worktreeDirty') return worktreeLabels[value] || text(value);
+    return text(value);
   }
 
   function element(documentRef, tagName, className, value) {
@@ -99,13 +107,13 @@
       return branch.branchName === snapshot.mainBranch;
     });
     var facts = [
-      ['Configured mainline', snapshot.mainBranch],
-      ['Mainline HEAD', (snapshot.provenance && snapshot.provenance.configuredMainlineHead) || (mainline && mainline.headFull)],
-      ['Repository root', snapshot.repoRoot],
-      ['Generated at', snapshot.generatedAt],
-      ['As-of provenance', (snapshot.provenance && snapshot.provenance.semantics) || 'as_of_generation'],
-      ['Source checkout', snapshot.provenance && snapshot.provenance.sourceCheckoutBranch],
-      ['Observation note', snapshot.provenance && snapshot.provenance.observationNote],
+      ['配置的主线分支', snapshot.mainBranch],
+      ['主线当前提交', (snapshot.provenance && snapshot.provenance.configuredMainlineHead) || (mainline && mainline.headFull)],
+      ['项目根目录', snapshot.repoRoot],
+      ['快照生成时间', snapshot.generatedAt],
+      ['数据时点口径', (snapshot.provenance && snapshot.provenance.semantics) || '以生成时刻为准'],
+      ['生成快照时所在分支', snapshot.provenance && snapshot.provenance.sourceCheckoutBranch],
+      ['观察说明', snapshot.provenance && snapshot.provenance.observationNote],
     ];
     facts.forEach(function (fact) {
       var dl = element(documentRef, 'dl', 'branch-fact');
@@ -138,9 +146,9 @@
   function renderBranchNode(documentRef, branch) {
     var node = element(documentRef, 'div', 'branch-node');
     node.appendChild(element(documentRef, 'span', 'branch-name', branch.branchName));
-    node.appendChild(element(documentRef, 'small', '', text(branch.headShort) + ' · ' + text(branch.gitRelation)));
+    node.appendChild(element(documentRef, 'small', '', text(branch.headShort) + ' · ' + businessValue('gitRelation', branch.gitRelation)));
     if (branch.worktreePath) {
-      node.appendChild(element(documentRef, 'small', '', '工作区：' + text(branch.worktreeDirty) + ' · ' + branch.worktreePath));
+      node.appendChild(element(documentRef, 'small', '', '独立开发目录：' + businessValue('worktreeDirty', branch.worktreeDirty) + ' · ' + branch.worktreePath));
     } else {
       node.appendChild(element(documentRef, 'small', '', '治理建议：' + text(branch.governanceSuggestion)));
     }
@@ -186,10 +194,10 @@
       .sort(function (left, right) { return left.branchName.localeCompare(right.branchName, 'en'); });
     var grid = element(documentRef, 'div', 'branch-topology-grid');
     var rootNode = element(documentRef, 'div', 'branch-mainline');
-    rootNode.appendChild(element(documentRef, 'span', 'pill brand', 'MAINLINE ROOT · current'));
+    rootNode.appendChild(element(documentRef, 'span', 'pill brand', '当前主线'));
     rootNode.appendChild(element(documentRef, 'span', 'branch-name', mainline && mainline.branchName));
     rootNode.appendChild(element(documentRef, 'small', '', 'HEAD ' + text(mainline && mainline.headFull)));
-    rootNode.appendChild(element(documentRef, 'small', '', '工作区状态：' + text(mainline && mainline.worktreeDirty)));
+    rootNode.appendChild(element(documentRef, 'small', '', '独立开发目录状态：' + businessValue('worktreeDirty', mainline && mainline.worktreeDirty)));
     grid.appendChild(rootNode);
     grid.appendChild(element(documentRef, 'div', 'branch-connector'));
     var groups = element(documentRef, 'div', 'branch-group-stack');
@@ -226,7 +234,7 @@
       rows.forEach(function (row) {
         var tr = documentRef.createElement('tr');
         columns.forEach(function (column) {
-          tr.appendChild(element(documentRef, 'td', '', row[column[0]]));
+          tr.appendChild(element(documentRef, 'td', '', businessValue(column[0], row[column[0]])));
         });
         body.appendChild(tr);
       });

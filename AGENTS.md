@@ -9,7 +9,7 @@
 ## 1. 事实来源优先级
 
 - Codex 新会话或子代理启动前先读 `codex-project-registry.md`，确认正确项目路径、禁止路径、可写性、默认验证命令和子代理分工。
-- 本机当前活动交付 worktree 为 `/Users/kevin/AI/Workload-evaluation-system-agent`；`/Users/kevin/AI/Workload-evaluation-system` 是同一 Git 仓库的另一 linked checkout，用于分支集成与历史差异核对。两者不是两个独立项目，不得因目录名误判而删除或覆盖任一方的未提交改动。
+- 本机当前唯一活动交付目录为 `/Users/kevin/AI/Workload-evaluation-system`。原 `/Users/kevin/AI/Workload-evaluation-system-agent` linked worktree 已在 2026-07-25 完成本地合并后注销；后续不得再把该历史路径当作项目入口。执行前仍须检查当前分支与既有未提交改动，禁止覆盖用户本地工作。
 - 代码与运行路由优先于历史 V2 文档。实现事实以 `apps/api/src/app.ts`、`apps/api/src/routes/index.ts`、`ui/V2_PROTOTYPE` 为准。
 - 对外契约以 `docs/openapi.yaml` 与 `03_技术设计/系统演进/实现与文档对齐说明.md` 对齐；冲突时先修文档再交付。
 - 涉及历史方案时必须显式标注：`【历史说明，已下线】`。
@@ -81,6 +81,8 @@
 
 ## 9. 总看板与过程数据沉淀
 
+- 面向用户进行进度汇报、问题分析、风险说明、方案建议、澄清提问、交付总结或协作交接时，必须先读取并执行 `skills/speak-plainly/SKILL.md`；先说明业务结果、影响和下一步，再补技术依据。该 Skill 只约束任务沟通回复，不自动改写项目文档、代码、命令、日志或原始报错。
+- 涉及 `ui/V2_PROTOTYPE` 的页面、组件、样式、响应式、弹窗、可访问性或视觉优化时，必须先读取并执行 `skills/improving-wes-ui/SKILL.md`；单次限定一个业务表面和最多三个已证实根问题，未经独立架构决策不得引入新的 UI 技术栈或组件系统。
 - 涉及需求、设计、开发、测试、变更、监控、风险、发布、文档资产或项目治理的任务，必须读取并执行 `skills/maintain-wes-command-board/SKILL.md`。
 - 用户消息包含"测试问题""需求""反馈""缺陷""bug""体验调整""功能调整""大方向思考""需求池"等关键词，或通过 UI 截图反馈可用性问题时，必须读取并执行 `skills/recording-wes-requirements/SKILL.md`；原始反馈统一先进入问题池，再由 **Codex Intake/Triage Loop** 按 `docs/codex-workflows/wes-feedback-intake.md` 去重、分类和处置。已有同类 issue / RP / defect 时只补充证据或范围，不重复建项；只有分诊结果为 requirement 或 defect 时才创建或更新对应派生记录，信息不足的 issue 保持 `待补充` 并最小化追问。
 - Codex 不再创建或执行 WES 需求池迭代实现 Loop，也不创建 heartbeat/recurring 自动化来持续跑需求池；WES 实现 Loop 后续交给 Qoder 创建和执行。允许 Codex 在用户批准的 NightOps 协作机制中发布任务包、执行审计 Gate、生成晨间简报，但不得无人值守实现新需求、选择下一条需求执行、合并 main 或标记已交付。用户明确要求 Codex 处理单条需求时，按普通一次性任务执行，不自动调度下一轮。
@@ -110,10 +112,11 @@
 5. `00_项目治理/里程碑与计划/项目进展总结与后续规划.md` — 当前开发阶段与里程碑
 6. `ui/V2_PROTOTYPE/README.md` — Phase B 组件进度与 Web 主线状态
 7. `apps/api/src/modules/README.md` — 后端模块化重构进度
-8. `skills/maintain-wes-command-board/SKILL.md` — 总看板过程数据沉淀与项目管理门禁
-9. `skills/recording-wes-requirements/SKILL.md` — 测试反馈、需求与问题入池治理规则
-10. `QODER.md`、`KIMICODE.md`、`skills/wes-qoder-worktree-protocol/SKILL.md` 与 `skills/wes-multi-agent-collaboration/SKILL.md` — Qoder / KIMICODE / Codex 多 Agent 协作、worktree 执行、peer audit、回填与复核协议
-11. `docs/codex-workflows/` 与 `docs/agent-loop/nightops-templates.md` — 需求去重、外部 AI 回填、长文档检查、API 密钥验证与 NightOps 交接模板
+8. `skills/speak-plainly/SKILL.md` — 面向用户的任务沟通表达规则
+9. `skills/maintain-wes-command-board/SKILL.md` — 总看板过程数据沉淀与项目管理门禁
+10. `skills/recording-wes-requirements/SKILL.md` — 测试反馈、需求与问题入池治理规则
+11. `QODER.md`、`KIMICODE.md`、`skills/wes-qoder-worktree-protocol/SKILL.md` 与 `skills/wes-multi-agent-collaboration/SKILL.md` — Qoder / KIMICODE / Codex 多 Agent 协作、worktree 执行、peer audit、回填与复核协议
+12. `docs/codex-workflows/` 与 `docs/agent-loop/nightops-templates.md` — 需求去重、外部 AI 回填、长文档检查、API 密钥验证与 NightOps 交接模板
 
 ## 12. 禁止事项
 

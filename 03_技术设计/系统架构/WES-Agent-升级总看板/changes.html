@@ -17,15 +17,15 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="risks.html">风险与决策</a>
         <a class="active" href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
@@ -35,24 +35,24 @@
 
   <header class="doc-h">
     <div class="doc-wrap">
-      <div class="crumb">WES Agent · Session Retrospective</div>
+      <div class="crumb">WES Agent · 项目变更与结果回顾</div>
       <h1>变更记录</h1>
       <p class="meta">
-        <span><b>本轮目标</b> Phase 1H-A AI 工作台体验闭环规划 + Codex 协作治理收敛</span>
-        <span><b>当前基线</b> main + Phase 1H-B 交付基线 + 需求池 36 项中 22 项已交付 + 12 项待规划/待确认/待验收 + RP-001/RP-012 暂缓待人工评审 + Qoder Loop R2-R8 Codex 复核记录 + 本地 A2A / 多 Agent 协作协议模块 + NightOps 三 AI 无人值守机制载体 + 路标管理初始化</span>
-        <span><b>状态</b> 需求池治理口径已统一：<code class="inline">requirements.html</code> 为唯一需求池页面，可编辑子页面已移除；Phase 1H-B RP-019/RP-020/RP-021/RP-022/RP-023/RP-025 已交付，RP-018 知识库工具 MVP 已交付并等待 MT-1H-B-003 人工验收；Qoder Loop R2-R7 已复核并分流；RP-026/RP-027/RP-028/RP-029/RP-030/RP-031/RP-033 已由 Qoder 集成到 main dirty changes，Codex 于 2026-06-29 复核并补 RP-029 知识库 fallback 流式最终内容修复，完整自动化验证通过；本地 A2A 协作协议已扩展为多 Agent 团队注册表，Qoder 与 KIMICODE 已完成 NightOps v0.3 onboarding ACK，KIMICODE 当前仍为 NightOps peer audit pilot / candidate，Claude Code 仍为 candidate / 未介入；<code class="inline">wes-multi-agent-collaboration</code> Skill 已升到 v0.3 草案，覆盖 Night Mission Packet、Qoder handoff、KIMICODE peer audit、Codex Gate、返工/拒收、验证矩阵和冲突规则，已完成 Codex 本地安装与 Qoder 项目级上下文注入；Codex 侧 <code class="inline">wes-loop</code> heartbeat 已删除，持续实现 Loop 改由 Qoder 执行，Codex 仅保留 NightOps 任务包与审计 Gate 职责；<b>2026-07-19 Streaming 架构审计续作</b>：Qoder 在隔离 worktree <code class="inline">qoder/streaming-audit-continuation</code> 中完成 P0-4（error-handler SSE 分支）、P1-2（背压感知 onToken async）、P1-6（error retryable 字段）、P2-1（streaming 结构化日志）、P2-3（流式分支 formBlock 提取）、P2-4（StreamingChunk 类型对齐）、P3-1（数组 join 替代字符串拼接），验证 <code class="inline">build:api</code> pass、<code class="inline">test:modules</code> 142/142、<code class="inline">test:ai</code> 190/190</span>
-        <span><b>更新</b> 2026-07-23</span>
+        <span><b>这页回答</b> 最近做了什么、结果如何、依据是什么、还有哪些事项未关闭</span>
+        <span><b>当前基线</b> 需求池共 40 项：22 项已交付、16 项待规划/待确认/待验收、2 项暂缓；已验证能力进入业务主线，未完成人工验收的事项仍保持开放</span>
+        <span><b>本轮重点</b> 完成本地分支治理，并按 RP-046 将 18 个总看板源页面改写为“业务主表达 + 技术证据保留”</span>
+        <span><b>最近更新</b> 2026-08-02</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
-        <span class="pill ok">Phase 1E verified</span>
-        <span class="pill ok">Phase 1F delivered</span>
-        <span class="pill ok">Phase 1H-A implemented</span>
-        <span class="pill brand">Runtime view added</span>
-        <span class="pill brand">Board governance skill</span>
-        <span class="pill warn">Codex Loop disabled</span>
+        <span class="pill ok">1E 阶段已验证</span>
+        <span class="pill ok">1F 阶段已交付</span>
+        <span class="pill ok">1H-A 阶段已实现</span>
+        <span class="pill brand">AI 任务执行视图已建立</span>
+        <span class="pill brand">总看板治理规则已建立</span>
+        <span class="pill warn">Codex 定期实施流程已关闭</span>
         <span class="pill warn">人工测试已规划</span>
-        <span class="pill">branch main</span>
-        <span class="pill warn">worktree has unrelated runtime files</span>
+        <span class="pill">当前本地主线：main</span>
+        <span class="pill warn">主目录含其他未提交修改</span>
       </div>
     </div>
   </header>
@@ -61,7 +61,7 @@
     <div class="toc">
       <h5>导航</h5>
       <ol>
-        <li><b>§1</b> Session 总结</li>
+        <li><b>§1</b> 当前变更总结</li>
         <li><b>§2</b> Git 与合并</li>
         <li><b>§3</b> 代码工作内容</li>
         <li><b>§4</b> 验证记录</li>
@@ -72,17 +72,41 @@
 
     <section>
       <div class="h-num">Section 01</div>
-      <h2>Session 总结</h2>
-      <p class="lead">本页保留 Phase 1D/1E/1F/1G 的历史变更脉络，并记录 Phase 1H-A 规划与实现事实：本轮从需求池提取 AI 工作台高频体验闭环需求，完成计划页、需求池状态、测试用例、文档事实源和施工提示词同步；当前需求池治理口径为 36 项中 22 项已交付、12 项待规划/待确认/待验收、2 项暂缓；RP-019/RP-020/RP-021/RP-022/RP-023/RP-025 已完成 Phase 1H-B 交付，RP-018 已完成知识库工具 MVP 且 MT-1H-B-003 待人工验收；Qoder Loop R2-R8 已由 Codex 复核并分流，RP-029/RP-030 R8 阻断已转入 Codex 修复验证通过、待集成；RP-034 根据 AI 工作台需求解析报告按钮/消息不执行截图反馈入池；RP-035 根据用户战略评审进入 AI Native Command Center 候选；RP-036 已完成系统管理知识库配置鉴权反馈、测试终态与 retrieval_empty 连通性判定修复，等待轮换密钥后人工复测；Codex 侧需求池迭代 Loop 已清理，后续持续 Loop 由 Qoder 创建和执行。</p>
+      <h2>当前变更总结</h2>
+      <p class="lead">当前需求池共 40 项：22 项已交付、16 项待规划/待确认/待验收、2 项暂缓。RP-048 等待用户体验确认。RP-047 A2 已通过主体数据库门禁，但 Codex Gate 发现 JSON 普通对象校验、output 并发回归和 handoff 契约缺口；已发布 A2-R1 同分支最小返工，Batch B 未授权。其他进行中与人工验收项保持原状态。</p>
       <div class="timeline-card">
-        <h5>Work Timeline</h5>
+        <h5>近期工作时间线</h5>
         <table>
           <tr><th>阶段</th><th>工作内容</th><th>结果</th></tr>
+          <tr data-board-event-id="BE-2026-08-03-rp-047-a2-gate-rework"><td class="mono">RP-047-A2 Codex Gate</td><td>2026-08-03：独立复跑 Testcontainers Harness 93/93、modules 143/143、API/Web build 全部通过，迁移、Run/首事件原子性、20 路事件和 checkpoint 并发幂等成立。但独立探针证明 Date/Map 可绕过普通 JSON 对象校验；正式测试漏掉 output 并发版本；handoff 实际 16 文件却报告 15 个且 headCommit 不是最终 HEAD。已发布 A2-R1 最小返工。</td><td><span class="status block"><span class="dot"></span>REWORK_REQUIRED / R1 待 ACK</span></td></tr>
+          <tr data-board-event-id="BE-2026-08-03-rp-047-a2-ack-accepted"><td class="mono">RP-047-A2 Worktree ACK</td><td>2026-08-03：Codex 独立复核 <code class="inline">qoder/rp-047-a2-durable-run-foundation</code>；worktree 干净，HEAD 精确等于 assignment commit <code class="inline">7221503</code>，批准设计 <code class="inline">e1c8961</code> 为其祖先，分支、路径、Allowed/Forbidden Paths、验证命令和停止条件与 A2 Work Order 一致。已允许 Qoder 开始 A2 实施；<code class="inline">allowNextTask=false</code>，Batch B 仍锁定。</td><td><span class="status run"><span class="dot"></span>ACK ACCEPTED / IN PROGRESS</span></td></tr>
+          <tr data-board-event-id="BE-2026-08-03-rp-047-a-gate-rejected"><td class="mono">RP-047-A Codex Gate</td><td>2026-08-03：独立复核候选 <code class="inline">fae8a7d</code>。14 个代码路径和 additive migration 范围正确，worktree 隔离依赖后 modules 143/143、API/Web build 通过，20 路 event probe 连续；但正式 Testcontainers 失败，历史迁移测试未按设计执行，Run 首事件不原子，checkpoint 并发重放与 Runtime validation 不合格，底层错误可能回显 state。Qoder 还在停止条件触发后安装并配置本机 Colima/Docker。A1 分支只保留审计，不集成；已发布 RP-047-A2 全新计划和 Work Order。</td><td><span class="status block"><span class="dot"></span>REJECTED / A2 待 ACK</span></td></tr>
+          <tr><td class="mono">RP-031 多知识库路由分诊</td><td>2026-08-03：用户确认当前连接的是金蝶解决方案知识库，并询问 WES 是否可配置多知识库、由 AI 按意图自动路由。当前代码核对确认系统只支持一个 active knowledgeId，<code class="inline">knowledge_query</code> 只能把问题送到唯一已生效知识库。去重命中 RP-031 C2 多知识库与 M1 路由治理，新增来源 <code class="inline">ISS-2026-08-03-001</code>，不创建重复 RP。推荐第一版先实现知识库注册表、规则优先 + AI 兜底的二级路由、ACL/Runtime 校验和可解释 trace；等用户确认同 Provider 多库还是多 Provider 范围后再进入书面设计。</td><td><span class="status run"><span class="dot"></span>已分诊 / 待范围确认</span></td></tr>
+          <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup"><td class="mono">WES 分支治理收敛</td><td>2026-08-02：按独立 Gate 分两批清理 34 个已集成、已吸收、被修正版取代或已拒收的本地分支引用，移除 4 个已集成 clean worktree，新建 RP-031 Phase 0 集成 worktree，并将本地 main 快进到业务主线 88d32b4。当前保留 main、业务主线、RP-031 rework 和 RP-031 integration 四个本地分支；主工作区未提交修改保持未覆盖。 证据：<code class="inline">37 local branches / 5 worktrees -&gt; 4 local branches / 2 worktrees</code>（local cleanup complete）：清理前后均以 Git refs、merge-base、patch-id 和 worktree clean 状态复核；新建一个 RP-031 integration worktree。；<code class="inline">main 2764fcf -&gt; 88d32b4</code>（fast-forward）：本地 main 与 codex/role-driven-ai-home-workbench 收敛到同一已验证提交。；<code class="inline">git fetch --prune origin</code>（origin/main behind local main by 75 commits）：已刷新本地远端跟踪引用；未 push，未删除远端分支。；<code class="inline">build:web + build:api + test:modules + test:web + test:ai</code>（pass）：干净 worktree 上 Web/API 构建通过，modules 143/143、Web 196/196 通过，AI 测试命令 exit 0。；<code class="inline">Provider + Trace + RAG focused tests</code>（47/47 pass）：覆盖 RP-027/028 Provider、RP-029/030 Trace/SSE 和 RP-031 baseline 的当前主线实现。；<code class="inline">docs/agent-loop/audits/2026-07-20-codex-RP-031-rag-production-gate.md</code>（production branch rejected and local ref removed）：原 production 分支禁止合并；审计证据继续留存于主线。；<code class="inline">codex/rp-031-rag-rework @ d3fa065</code>（retained / rework required）：新 Gate 发现 clean-checkout security、Request/Prompt Trace、密钥清除三个 P1，且与未提交知识库 DB 迁移发生存储边界冲突，禁止直接 cherry-pick。。 下一步：由 owner 确认 RP-031 知识库配置继续采用 JSON Repository 还是批准 PostgreSQL 迁移；在此之前保留 rework 与 integration 分支。另行确认后才允许 push 本地 main 或删除远端旧分支。</td><td><span class="status warn"><span class="dot"></span>本地清理完成 / 远端待同步 / RP-031 待返工</span></td></tr>
           <tr data-board-event-id="BE-2026-08-02-rp-045-branch-topology:changes">
             <td>2026-08-02</td>
             <td class="mono">RP-045</td>
             <td>新增只读 Git 分支快照生成器、运营拓扑、完整台账、筛选搜索、worktree/重复指针提示与看板导航；最终命令证据和人工浏览器验收回填到 monitoring 与事件记录。</td>
           </tr>
+          <tr>
+            <td>2026-08-02</td>
+            <td class="mono">RP-046</td>
+            <td>用户确认采用“业务主表达 + 技术证据保留”的双层写法；已完成问题分诊、设计说明、实施计划、18 个源页面和发布版改写。HTML 解析、看板一致性、分支看板 38/38、工作项治理 14/14 与差异检查通过；状态为“已实现 / 自动化通过 / 待用户确认”。</td>
+          </tr>
+          <tr>
+            <td>2026-08-02</td>
+            <td class="mono">RP-047</td>
+            <td>去重命中 <code class="inline">ISS-2026-08-02-003</code> / RP-047，不新增重复项。用户已批准 <code class="inline">e1c8961</code> 定稿的服务端持久 Run、独立 Worker、Attempt lease/heartbeat、AI 语义建议 + Runtime 校验检查点、可回放事件/输出、outbox 幂等投影、异常恢复与前端后台任务恢复。<code class="inline">c87da77</code> 已发布 Batch A 详细计划和 Qoder Work Order；2026-08-03 Codex 核验 worktree、分支、HEAD 和祖先关系后接受 ACK，Qoder 获准实施。当前仍无业务代码 handoff、无 RED/GREEN 或构建结果，未标记实现完成或交付。</td>
+          </tr>
+          <tr>
+            <td>2026-08-02</td>
+            <td class="mono">RP-048</td>
+            <td>用户反馈模型任务沟通术语过多且表达不自然。去重确认 RP-046 只处理总看板页面文案，因此新增 <code class="inline">ISS-2026-08-02-004</code> 和 RP-048。已创建可跨项目复用的 <code class="inline">skills/speak-plainly/SKILL.md</code>，并在 AGENTS、Claude、Qoder、KIMICODE 入口统一触发；Skill 6/6 聚焦测试和格式校验通过，四类代表场景完成规则自检。同步时发现问题池汇总少计 1 条，已按实际台账修正为 24 个问题、9 个转需求。当前状态为“已实现 / 自动化通过 / 待用户体验确认”，不计入已交付。</td>
+          </tr>
+          <tr><td class="mono">CodeGraph 受控试点安装</td><td>2026-07-26：按评估建议固定安装 <code class="inline">@colbymchenry/codegraph@1.5.0</code>，仅为 Codex 注册 stdio MCP，不运行会改写全局 AGENTS 指令的自动安装器；关闭 telemetry、更新检查和运行时下载，仅暴露 <code class="inline">codegraph_explore</code>。WES 首次索引发现已下线 <code class="inline">ui/V0_SAAS</code> 污染登录链路排序，随后新增根级 <code class="inline">codegraph.json</code> 排除该目录并重建。验证：索引 complete，453 文件、6112 节点、18882 边，pending refs/changes 均为 0；node-sqlite/WAL 正常；MCP initialize 握手通过；精确文件/符号查询可还原 V2 登录页 → auth route/controller/usecase/store/token 链路。宽泛自然语言查询仍会混入无关符号，因此当前只作为跨模块结构与影响分析试点，不替代小改动的直接搜索与测试。</td><td><span class="status run"><span class="dot"></span>已安装 / 受控试点中</span></td></tr>
+          <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation"><td class="mono">RP-043 UI 质量门禁实施</td><td>2026-07-25：新增项目内 <code class="inline">improving-wes-ui</code> Skill、确定性范围检查器与 3 项测试，RED/GREEN 压力证明确认其能阻止第二技术栈、全站重构和把静态候选误报为已证实缺陷；新增无第三方依赖的共享 Dialog，并迁移 SystemManagement 四处弹窗，统一语义、焦点、Escape、遮罩与视口内拖拽。验证：Skill quick_validate、检查器 3/3、聚焦 13/13、V2 全量 128/128、build:web 通过。Chrome 与应用内浏览器均被正确重定向到登录页且无控制台错误，但缺少有效管理员会话，1440px/760px、键盘与拖拽人工证据待回填；完成前不扩展其他 Dialog。</td><td><span class="status run"><span class="dot"></span>已实现 / 自动化通过 / 人工待回填</span></td></tr>
+          <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-design"><td class="mono">RP-043 UI 质量门禁设计</td><td>2026-07-25：完成 <code class="inline">ibelick/ui-skills</code> 适配评估；按 Issue-first 将用户批准的方向登记为 ISS-2026-07-25-003 并分诊为 RP-043。设计固定上游提交 <code class="inline">ae74b58e</code>，采用项目内 WES 适配 Skill，不动态安装外部 CLI、不迁移 Tailwind/Radix/Motion；首批限定系统管理共享 Dialog，规划 Skill RED/GREEN、产品 TDD、桌面/窄屏与键盘验收。用户已明确“规格通过”，实施计划已落地到 <code class="inline">docs/superpowers/plans/2026-07-25-wes-ui-quality-gate.md</code>；当前先执行 Skill RED 基线，尚未修改业务 UI。</td><td><span class="status run"><span class="dot"></span>规格已批准 / 实施计划中</span></td></tr>
+          <tr data-board-event-id="BE-2026-07-25-post-merge-conflict-followup"><td class="mono">单工作目录收尾与冲突复核</td><td>2026-07-25：Agent 分支成果已快进合并到主目录，原 Agent linked worktree 已注销；合并冲突复核确认并修复未知路由空白、登录历史旧密码残留和历史用户名选择后密码框焦点失效，项目后续只使用一个活动目录。 证据：<code class="inline">ui/V2_PROTOTYPE/src/App.jsx</code>：受保护路由树增加未知路径回首页兜底。；<code class="inline">ui/V2_PROTOTYPE/src/pages/Login.jsx</code>：用户名历史禁止保存密码，旧存储只迁移用户名后删除，密码框由直接 ref 管理焦点。；<code class="inline">AGENTS.md; CLAUDE.md; codex-project-registry.md</code>：项目入口统一为 /Users/kevin/AI/Workload-evaluation-system，历史 Agent 路径不再作为执行入口。；<code class="inline">git worktree list --porcelain</code>（pass）：仅保留 /Users/kevin/AI/Workload-evaluation-system 一个已注册 worktree。；<code class="inline">npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/AppAuthGuard.test.jsx src/__tests__/Login.test.jsx</code>（pass）：聚焦回归 8/8，覆盖未知路由、只存用户名、旧记录安全迁移和密码框聚焦。；<code class="inline">npm run test:web</code>（pass）：V2 Web 全量回归 120/120。；<code class="inline">npm run build:web</code>（pass）：Web 生产构建通过，保留既有 chunk size warning。；<code class="inline">node --test scripts/board-event.test.js scripts/board-work-items.test.js</code>（pass）：看板事件与 Issue-first 工作项治理 12/12。。 下一步：后续开发只在 /Users/kevin/AI/Workload-evaluation-system 进行；现有未提交本地工作继续保留，不在本次整体提交。PostgreSQL live migration 与人工验收仍按独立计划推进。</td><td><span class="status done"><span class="dot"></span>单目录完成 / 自动化通过</span></td></tr>
           <tr data-board-event-id="BE-2026-07-25-worktree-convergence"><td class="mono">WES Agent worktree 收敛</td><td>2026-07-25：修复 linked worktree 搬迁后的 Git 指针，关闭 structured output、AI session、流式取消、系统管理前端和 API 构建阻断，并把原始反馈入口统一收敛为 Issue-first；自动化门禁已恢复绿色，但 PostgreSQL 传统运行态切换和主 checkout 集成仍保持开放。 证据：<code class="inline">docs/superpowers/specs/2026-07-25-wes-agent-convergence-design.md</code>：定义成果保留、红灯关闭、真实完成边界与安全集成原则。；<code class="inline">docs/superpowers/plans/2026-07-25-wes-agent-convergence.md</code>：记录分批实施、验证与集成检查清单。；<code class="inline">git worktree repair /Users/kevin/AI/Workload-evaluation-system-agent</code>（pass）：活动目录重新注册为主仓库的 linked worktree，分支和文件未移动。；<code class="inline">npm run test:modules</code>（pass）：API 模块回归 143/143。；<code class="inline">npm run test:web</code>（pass）：V2 前端回归 117/117。；<code class="inline">npm run test:ai</code>（pass）：AI 回归 190/190。；<code class="inline">npm run test:agent -w apps/api</code>（pass）：Provider 与 Agent 回归 26/26。；<code class="inline">node --test scripts/board-event.test.js scripts/board-work-items.test.js</code>（pass）：看板事件与 Issue-first 工作项治理 12/12。；<code class="inline">npm run build:api &amp;&amp; npm run build:web</code>（pass）：API 与 Web 构建通过；Web 保留既有 chunk size warning。。 下一步：按主题提交已验证成果；主 checkout 的本地改动保护完成前不合并。PostgreSQL schema 与迁移策略已可编译，但传统 JSON repositories 尚未完成运行时替换，须另行完成 live PG 迁移和人工验收。</td><td><span class="status warn"><span class="dot"></span>自动化通过 / PG 与集成待完成</span></td></tr>
           <tr><td class="mono">RP-036 retrieval_empty 修复</td><td>2026-07-23 第三次用户截图在知识库 ID 纠正为数字值后显示 <code class="inline">retrieval_empty / HTTP 400</code>。去重继续命中 RP-036，不新增需求。代码诊断确认智谱检索接口已返回 HTTP 200，但固定测试语句没有命中文档；后端不应把语义零命中判为网络不通。现改为 HTTP 200 成功响应，携带 <code class="inline">warning=retrieval_empty</code> 与 <code class="inline">retrievalTriggered=false</code>，前端展示连接成功但未检索到文档的提示；OpenAPI 与实现对齐说明同步更新。验证：后端专项 1/1、知识库页面 3/3、build:web pass；完整 test:modules 137/143，6 项为 dirty 工作区既有无关失败。未使用、记录或回显用户凭据。</td><td><span class="status run"><span class="dot"></span>语义判定已修复 / 轮换密钥后待复测</span></td></tr>
           <tr><td class="mono">RP-036 用户复测</td><td>2026-07-23 第二次知识库连通性测试已显示明确的 <code class="inline">retrieval_failed / HTTP 400</code>，确认此前“点击无响应”已消除。截图诊断发现知识库 ID 字段误填为凭据格式而非数字 ID；同时外部凭据已在用户测试反馈中暴露，Codex 未使用该凭据发起请求、未写入命令/文件/看板，并要求立即在供应商控制台撤销、生成新密钥，再按正确字段保存和复测。去重命中 RP-036，不新增需求。</td><td><span class="status run"><span class="dot"></span>终态反馈通过 / 密钥轮换与真实连通性待复测</span></td></tr>
@@ -200,7 +224,7 @@
         <tr><td>Merge commit</td><td class="mono">14cc86a</td><td><code class="inline">feat(harness): 接入 Phase 1D Agent 工作台闭环 (#2)</code></td></tr>
         <tr><td>CI fix commit</td><td class="mono">3974204</td><td><code class="inline">fix(ci): 清理集成测试子进程</code></td></tr>
         <tr><td>Idempotency fix</td><td class="mono">cbcbcda</td><td><code class="inline">fix(harness): 防止确认重试重复生成草稿</code></td></tr>
-        <tr><td>当前分支</td><td class="mono">main</td><td>HEAD 基线为总看板提交 <code class="inline">4bf4bcb</code>；Phase 1E/1F 代码变更仍在本地 worktree，待后续精确 stage/commit。</td></tr>
+        <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup:changes-current"><td>当前分支</td><td class="mono">codex/role-driven-ai-home-workbench</td><td>当前主 checkout 与本地 <code class="inline">main</code> 均指向 <code class="inline">88d32b4</code>；checkout 中既有未提交修改完整保留，未纳入本次分支治理提交。<code class="inline">origin/main</code> 仍落后 75 个提交，本轮未 push、未删除远端引用。</td></tr>
         <tr><td>Feature branch</td><td><span class="status done"><span class="dot"></span>cleaned</span></td><td><code class="inline">feat/agent-workbench</code> 本地与远端已清理。</td></tr>
       </table>
     </section>
@@ -326,17 +350,17 @@
     <section>
       <div class="h-num">Section 06</div>
       <h2>后续维护规则</h2>
-      <div class="callout"><div><b>维护原则</b>后续每次 Phase 变更至少同步更新三处：总览页的状态/KPI，计划页的任务进度，变更页的审计记录。涉及权限、幂等、数据边界时同步更新风险页。</div></div>
+      <div class="callout"><div><b>维护原则</b>后续每次阶段变更至少同步更新三处：总览页的状态与关键数字、计划页的任务进度、变更页的结果记录。涉及权限、防止重复和数据边界时，同步更新风险页。</div></div>
       <div class="grid-3">
-        <div class="card"><span class="pill brand">Status</span><h3>状态更新</h3><p>更新首页 KPI、当前阶段、下一步入口和 main commit。</p></div>
-        <div class="card"><span class="pill warn">Plan</span><h3>计划更新</h3><p>新增或关闭任务时，更新计划页的任务表和验收门禁。</p></div>
-        <div class="card"><span class="pill ok">Audit</span><h3>审计更新</h3><p>新增写动作、模型输出或传统记录链接时，同步监控与风险页。</p></div>
-        <div class="card"><span class="pill brand">Source</span><h3>事实源更新</h3><p>新增或迁移文档资产时，同步更新 sources.html 的分层图与矩阵；首页 KPI 随之调整。</p></div>
+        <div class="card"><span class="pill brand">状态</span><h3>更新项目现状</h3><p>更新首页关键数字、当前阶段、下一步入口和主线提交。</p></div>
+        <div class="card"><span class="pill warn">计划</span><h3>更新任务进度</h3><p>新增或关闭任务时，更新计划页的任务表和验收条件。</p></div>
+        <div class="card"><span class="pill ok">留痕</span><h3>更新验证证据</h3><p>新增写动作、模型输出或传统记录链接时，同步监控与风险页。</p></div>
+        <div class="card"><span class="pill brand">来源</span><h3>更新信息来源</h3><p>新增或迁移项目资料时，同步更新信息来源页的分层图与清单；首页关键数字随之调整。</p></div>
       </div>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 变更记录 · WES 项目管理 · 2026-07-23
+      <a href="index.html">返回总览</a> · 变更记录 · WES 项目管理 · 2026-08-03
     </footer>
   </main>
 </body>

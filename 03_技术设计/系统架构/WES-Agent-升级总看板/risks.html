@@ -17,35 +17,36 @@
         <a href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a class="active" href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
-      <span class="pill brand">Phase 1H-C risks</span>
+      <span class="pill brand">1H-C 阶段风险</span>
     </div>
   </header>
 
   <header class="doc-h">
     <div class="doc-wrap">
-      <div class="crumb">WES Agent · Risk And Decisions</div>
+      <div class="crumb">WES Agent · 风险与决策</div>
       <h1>风险与决策</h1>
       <p class="meta">
-        <span><b>目标</b> 把边界和风险显式化</span>
-        <span><b>状态</b> Phase 1F 回写审计已实现；知识库、附件问答轻量审计、formBlock 真实模型输出、引导选项误识别、Harness Regression 评分偏差、需求池 Loop 治理风险、反幻觉防御、RP-026 用户管理能力位治理风险、RP-027/RP-028 Kimi Provider 迁移与稳定性风险、Qoder 回填集成风险、RP-029 流式边界风险、RP-030 Trace 数据治理/测试隔离风险与 RP-036 系统配置可信反馈风险已入池；RP-036 已完成鉴权、动作反馈和 retrieval_empty 误判修复，凭据轮换与人工复测前继续监控；Codex 侧 Loop 已删除并由 Qoder 接管持续执行；RP-019 右侧空间挤压、表格可读性和 unsafe link/raw HTML 风险已通过折叠、表格渲染与 sanitize 批次降低</span>
+        <span><b>这页回答</b> 哪些事情可能影响交付、会造成什么后果、什么情况下需要暂停或改方案</span>
+        <span><b>当前结论</b> 没有 P0 阻断项；17 类风险仍在跟踪，重点是人工验收缺口、外部模型与知识库稳定性、权限和数据隔离、多 AI 交付质量，以及本地与远端分支不同步</span>
+        <span><b>阅读方式</b> 先看风险影响和当前状态；需求编号、分支名、命令和技术字段作为复核证据保留</span>
         <span><b>原则</b> AI 草稿可以自动，正式业务不能绕过确认</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
-        <span class="pill err">formal write guarded</span>
-        <span class="pill warn">idempotency required</span>
-        <span class="pill brand">owner boundary</span>
+        <span class="pill err">正式写入必须受控</span>
+        <span class="pill warn">重复操作不得重复建单</span>
+        <span class="pill brand">用户数据必须隔离</span>
       </div>
     </div>
   </header>
@@ -70,8 +71,8 @@
       <h2>风险总览</h2>
       <div class="kpi-row">
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">P0</span><span>阻断风险</span></div><div class="v">0</div><div class="lb">Phase 1D 合并前已处理</div></div>
-        <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">1F</span><span>当前风险</span></div><div class="v">14</div><div class="lb">人工测试 / 运行时边界 / 知识库工具 / 附件问答轻量审计 / Markdown 边界 / formBlock 真实输出 / 引导选项 / Regression 评分 / Loop 治理 / 反幻觉 / 权限治理 / Qoder 集成 / 流式边界 / Trace 鉴权</div></div>
-        <div class="kpi"><div class="top"><span class="ic">B</span><span>边界</span></div><div class="v">5</div><div class="lb">权限、阶段、schema、幂等、正式写</div></div>
+        <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">跟</span><span>跟踪中风险</span></div><div class="v">17</div><div class="lb">人工验收 / AI 任务边界 / 知识库 / 附件问答 / 内容展示 / 表单与引导选项 / 评分准确性 / 定期任务治理 / 防止编造 / 权限 / 多 AI 集成 / 数据留痕 / 分支与存储边界</div></div>
+        <div class="kpi"><div class="top"><span class="ic">边</span><span>必须守住的边界</span></div><div class="v">5</div><div class="lb">权限、流程阶段、结果格式、防止重复、正式写入</div></div>
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>决策</span></div><div class="v">9</div><div class="lb">当前主线决策可追溯</div></div>
       </div>
     </section>
@@ -109,19 +110,19 @@
       <h2>架构边界</h2>
       <div class="grid-2">
         <div class="panel">
-          <div class="panel-h">必须保持<span class="right">guardrails</span></div>
+          <div class="panel-h">必须守住<span class="right">底线规则</span></div>
           <div class="panel-b">
             <ul class="list-clean">
-              <li>AI/Harness 可以创建草稿和待确认动作。</li>
+              <li>AI 任务运行与审计底座（Harness）可以创建草稿和待确认动作。</li>
               <li>传统业务正式落库必须有明确人工确认链路。</li>
-              <li>所有写动作要能从 Harness ToolEvent 追溯。</li>
-              <li>不得绕过 JWT/owner 权限。</li>
-              <li>Harness 域可 DB-backed；其他传统域未触发迁移条件前不改主存储。</li>
+              <li>所有写动作都要留下可复核的关键动作记录（ToolEvent）。</li>
+              <li>不得绕过登录鉴权，也不得查看或操作其他用户的数据。</li>
+              <li>AI 任务域使用 PostgreSQL；其他传统业务未满足迁移条件前，不改变现有主存储。</li>
             </ul>
           </div>
         </div>
         <div class="panel">
-          <div class="panel-h">暂不扩大<span class="right">scope control</span></div>
+          <div class="panel-h">本阶段暂不扩大<span class="right">范围控制</span></div>
           <div class="panel-b">
             <ul class="list-clean">
               <li>不引入向量库。</li>
@@ -223,6 +224,24 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr>
+          <td>CodeGraph 是全局 Codex MCP，宽泛查询、历史目录或不可信仓库可能造成上下文污染，并扩大跨项目与符号链接读取边界。</td>
+          <td>错误排序可能把已下线实现当成主线；无差别使用会增加上下文、延迟和供应链暴露，且不能替代测试证明。</td>
+          <td>固定 1.5.0；关闭 telemetry、更新检查和运行时下载；仅暴露 <code class="inline">codegraph_explore</code>，不写全局 AGENTS 指令；WES 根级配置排除 <code class="inline">ui/V0_SAAS</code>。仅在可信仓库的跨模块架构/影响分析中使用，并以文件路径和符号名构造精确查询；小改动继续优先直接搜索和测试，5 个代表性任务 A/B 未通过前不扩大使用范围。</td>
+          <td><span class="status warn"><span class="dot"></span>已缓解 / 试点观察</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-design:risks">
+          <td>直接安装或动态运行外部 UI Skill，可能把上游规则漂移、Tailwind/Radix/Motion 等第二技术栈和无证据全站重构带入 WES。</td>
+          <td>破坏 <code class="inline">ui/V2_PROTOTYPE</code> 现有 CSS Token 主线，扩大依赖、回归和供应链范围；静态代码差异也可能被误判为真实 UX 缺陷。</td>
+          <td>RP-043 固定上游提交 <code class="inline">ae74b58e</code>，只把适用原则改写为项目内可版本化 Skill；正式门禁不动态拉取远端内容，不增加 UI 依赖；单次限定一个页面族和最多三个已证实根问题，首批仅试点 SystemManagement 共享 Dialog，并要求自动化、截图与键盘路径证据。</td>
+          <td><span class="status done"><span class="dot"></span>架构漂移风险已关闭</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:risks">
+          <td>RP-043 真实浏览器没有有效管理员会话，受保护系统管理路由只能验证到登录守卫，无法完成 Dialog 的桌面、窄屏、键盘与拖拽人工验收。</td>
+          <td>自动化可证明组件合同与回归基线，但不能替代真实页面布局和交互证据；若误标通过，会让后续 Dialog 扩展缺少视觉门禁。</td>
+          <td>保留浏览器登录页和脱敏阻塞截图，在 QA 记录中明确未执行项；取得有效管理员会话后再补 1440px/760px、焦点路径、Escape、遮罩和拖拽边界，完成前不扩展其他 Dialog。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 人工待回填</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-07-25-worktree-convergence:risks">
           <td>看板曾把 PostgreSQL schema / migration 基线误写为传统运行态已完成切换。</td>
           <td>当前传统业务 repository 仍同步读写 JSON；若沿用旧结论，可能在没有 live migration、回滚与真实数据库验收的情况下误判生产就绪。</td>
@@ -230,10 +249,10 @@
           <td><span class="status warn"><span class="dot"></span>开放 / 禁止误标完成</span></td>
         </tr>
         <tr data-board-event-id="BE-2026-07-25-worktree-convergence:integration-risk">
-          <td>主 checkout 与 Agent worktree 都包含本地改动，直接合并会混入或覆盖未保护成果。</td>
-          <td>跨分支冲突难以区分用户本地工作与本轮收敛成果，并可能破坏可恢复性。</td>
-          <td>先在 Agent 分支按主题形成可审查提交，保留恢复 stash；主 checkout 本地改动保护并确定集成方式前，不执行 merge、rebase、reset 或 clean。</td>
-          <td><span class="status warn"><span class="dot"></span>待安全集成</span></td>
+          <td>主 checkout 与 Agent worktree 的本地改动在集成时存在混入或覆盖风险。</td>
+          <td>跨分支冲突可能难以区分用户本地工作与 Agent 收敛成果，并破坏可恢复性。</td>
+          <td>2026-07-25 已先保护主目录改动，再快进合并 Agent 分支；冲突逐文件复核，原本地快照继续保留在 stash。用户确认后注销 Agent worktree，项目只保留主目录。</td>
+          <td><span class="status done"><span class="dot"></span>已关闭 / 可恢复</span></td>
         </tr>
         <tr>
           <td>普通附件问答 trace 过重或被误认为 Harness Run。</td>
@@ -339,12 +358,32 @@
         <tr>
           <td>RP-029 R8 流式接口结构修复后曾缺少可验收的成功/失败/断连闭环。</td>
           <td>Codex 修复分支已在 <code class="inline">homeWorkbenchChatStream</code> 保持复用 <code class="inline">dispatchHomeWorkbenchTurn</code>，并新增真实 modelChatStream 成功、provider 失败、client abort 后不发送 done 且写 cancelled trace 的测试；<code class="inline">test:modules</code> 与 <code class="inline">test:ai</code> 已恢复通过。</td>
-          <td>风险状态降为“已缓解 / 待集成”。前端逐字渲染、停止按钮与窄屏体验仍应等 RP-029/RP-030 最小 patch 合入主线后再推进。</td>
+          <td>风险状态降为“已缓解 / 已集成”。SSE/dispatch/trace 能力已纳入业务主线并通过 2026-08-02 干净回归；前端逐字渲染、停止按钮与窄屏体验仍作为后续独立 UX 候选。</td>
+        </tr>
+        <tr>
+          <td>AI 工作台多会话若只把 <code class="inline">sending</code> 换成 Map，仍可能出现旧响应串台、活跃会话被抢回和上游请求无法真正停止。</td>
+          <td>错误会话视图可显示他会话回复，用户不能信任当前上下文；同时多个模型请求可增加限流和成本压力。当前后端 SSE 虽能识别 client abort 并记录 cancelled trace，但 handler 尚未把 AbortSignal 透传到 Provider fetch。</td>
+          <td>RP-047 正式规格要求以 <code class="inline">sessionId + runId</code> 作为唯一更新目标，同一会话保持 single-flight。执行权归 PostgreSQL-backed Harness Run 与后台 worker，SSE 只订阅且断线不取消。AI 只能给出语义里程碑建议，Runtime 必须校验完整性、owner、版本哈希、工具副作用幂等键与 nextStep 后才能追加 completed checkpoint。若无兼容检查点则转人工重试，不猜测恢复；模型调用中途只能从调用前检查点重启该步。设计证据：<code class="inline">docs/superpowers/specs/2026-08-02-rp-047-durable-multichannel-checkpoint-runtime-design.md</code>。</td>
+        </tr>
+        <tr>
+          <td>外部执行方在验证环境缺失时自行安装或重配本机运行时，会扩大任务权限并让测试结果不可复现。</td>
+          <td>RP-047-A 在 Testcontainers 失败后安装 Colima/Lima、修改 Docker DNS/代理并改用长期容器直连；这既违反停止条件，也把机器状态变化混入代码交付。遗留容器持续占用 5433，后续自动清理还可能误删用户仍需的环境。</td>
+          <td>Gate 已拒收 A1。A2 禁止任何 Homebrew、Colima、Docker daemon/context/profile 修改；Docker 或依赖不可用即停止。只允许进程级 socket 环境变量和 Testcontainers 自动清理；现有 Colima 与 <code class="inline">rp047-pg17</code> 仅记录，不由 Codex 自动删除。</td>
+        </tr>
+        <tr>
+          <td>Durable Run 对 JSON 持久载荷只做“非数组对象”判断，会将 Date、Map 或自定义实例误当成普通对象。</td>
+          <td>Date 可落成 JSON 标量，Map 可静默落成空对象；checkpoint/output/event 会丢失结构语义，后续恢复无法信任存储状态。</td>
+          <td>A2 Gate 设为 <code class="inline">REWORK_REQUIRED</code>。R1 必须以对象原型判定普通对象，先补 Date/Map/BigInt/循环引用 RED，再复跑 Harness 93/93、modules 与构建；不允许扩大 schema 或 Batch B。</td>
         </tr>
         <tr>
           <td>RP-030 R8 曾提交运行态 trace 数据并让测试污染已跟踪文件。</td>
           <td>Codex 已从修复分支删除 <code class="inline">data/traces/trace-store.json</code> 与 <code class="inline">apps/api/data/traces/trace-store.json</code>，补充 <code class="inline">.gitignore</code>，并让 trace repository 支持 <code class="inline">WES_TRACE_STORE_PATH</code> 测试隔离。失败和 client abort 会写 failed/cancelled trace。</td>
-          <td>风险状态降为“已缓解 / 待集成”。集成前需确认最小 patch 不带回任何运行态数据文件。</td>
+          <td>风险状态降为“已缓解 / 已集成”。当前业务主线不跟踪运行态 trace-store，2026-08-02 干净回归通过；后续继续以忽略规则和测试 store 隔离防止污染。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup:risks">
+          <td>本地分支已收敛，但远端默认分支与 RP-031 存储边界尚未决策。</td>
+          <td><code class="inline">origin/main</code> 比本地业务主线落后 75 个提交；若直接强推或删除远端旧分支会扩大影响。与此同时，RP-031 rework 的 JSON Repository 方案与主 checkout 中未提交的 PostgreSQL 双写实现冲突，贸然 cherry-pick 可能覆盖用户工作或绕过非 Harness DB 迁移门禁。</td>
+          <td>本轮只完成本地引用清理和本地 main 快进，保留外部工作区备份、34 个已删分支原 tip、RP-031 rework/integration 两个分支。远端同步需另行授权；RP-031 必须先由 owner 决定继续 JSON 还是批准 PostgreSQL 迁移，并关闭 clean-checkout security、Request/Prompt Trace、密钥清除三个 P1。</td>
         </tr>
         <tr>
           <td>RP-031 RAG baseline 曾因每样本二次检索放大成本和延迟。</td>
@@ -362,6 +401,11 @@
           <td>Codex Gate=REJECTED，<code class="inline">allowNextTask=false</code>、<code class="inline">mustReworkFirst=true</code>。移除无关配置并轮换凭证；按 Phase 拆最小生产闭环，每批必须有失败测试、主链路接线、故障/隔离验证和 Gate 后看板更新。</td>
         </tr>
         <tr>
+          <td>多知识库若只依赖 AI 自由选库，可能把解决方案、产品功能、客户案例或内部规范混在一起检索。</td>
+          <td>错误路由会造成答非所问、引用来源失真、多余外部调用和成本增加；如果不同知识库存在角色或租户边界，无差别搜索还可能导致跨权暴露。</td>
+          <td>RP-031 第一版采用“显式规则优先、AI 分类兜底、Runtime 执行前校验”；路由输出必须包含目标库、置信度、原因和 fallback，并在检索前校验 active、role/tenant ACL 与配置版本。低置信不自动搜索所有库，而是询问用户或使用管理员指定的安全默认库。</td>
+        </tr>
+        <tr>
           <td>AI 引导选项识别过宽，导致普通编号列表被错误渲染为按钮或误触发发送。</td>
           <td>用户可能把普通报告条目当成下一步动作，或者点击后发送非预期文本，影响对话上下文和意图识别。</td>
           <td>RP-020 仅对显式“选项X：”无条件转交互；编号列表必须有选择/回复/启动/待确认问题等上下文才增强；点击只走普通 chat 发送链路，不触发 Harness 写动作或正式业务落库，仍需 MT-1H-B-001 人工验证真实回复。</td>
@@ -375,7 +419,7 @@
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 风险与决策 · WES 项目管理 · 2026-07-23
+      <a href="index.html">返回总览</a> · 风险与决策 · WES 项目管理 · 2026-08-03
     </footer>
   </main>
 </body>

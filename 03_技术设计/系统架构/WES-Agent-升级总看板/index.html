@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>WES 项目管理 · 设计 / 计划 / 监控</title>
   <link rel="stylesheet" href="assets/fonts/fonts.css" />
-  <link rel="stylesheet" href="assets/base.css" />
-  <link rel="stylesheet" href="assets/components.css" />
-  <link rel="stylesheet" href="assets/pages.css" />
+  <link rel="stylesheet" href="assets/base.css?v=2" />
+  <link rel="stylesheet" href="assets/components.css?v=2" />
+  <link rel="stylesheet" href="assets/pages.css?v=2" />
 </head>
 <body>
   <header class="topnav">
@@ -17,19 +17,19 @@
         <a class="active" href="index.html">总览</a>
         <a href="roadmap.html">路标管理</a>
         <a href="design.html">设计说明</a>
-        <a href="runtime.html">任务运行时</a>
+        <a href="runtime.html">AI 任务执行</a>
         <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试</a>
+        <a href="testing.html">测试与验收</a>
         <a href="monitoring.html">监控与审计</a>
         <a href="risks.html">风险与决策</a>
         <a href="changes.html">变更记录</a>
-        <a href="sources.html">文档事实源</a>
-        <a href="collaboration-protocol.html">协作协议</a>
-        <a href="branches.html">分支拓扑</a>
+        <a href="sources.html">信息来源</a>
+        <a href="collaboration-protocol.html">多 AI 协作</a>
+        <a href="branches.html">开发分支</a>
         <a href="requirements.html">需求池</a>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
-      <span class="pill brand">Phase 1H-C planning</span>
+      <span class="pill brand">阶段 1H-C · 规划中</span>
     </div>
   </header>
 
@@ -37,24 +37,24 @@
     <section class="hero">
       <div class="wrap hero-in">
         <div>
-          <span class="eyebrow"><span class="dot"></span>WES Project Management</span>
+          <span class="eyebrow"><span class="dot"></span>WES 项目管理总览</span>
           <h1>需求、路标、计划、监控<br><em>一体化</em>的项目管理入口</h1>
           <p class="lead">WES 项目管理承接需求池、版本路标、实施计划、验证监控、风险决策和变更记录。它既保留 WES Agent 升级过程的审计事实，也作为后续版本规划和 AI 工作流治理的统一入口。</p>
           <div class="pill-row">
-            <span class="pill brand">main + Phase 1H-C planning</span>
+            <span class="pill brand">业务主线 + 阶段 1H-C 规划中</span>
             <span class="pill ok">PR #2 已合并</span>
             <span class="pill">2026-07-23</span>
-            <span class="pill ok">Phase 1E 已完成</span>
-            <span class="pill ok">Phase 1F 已交付</span>
-            <span class="pill ok">Phase 1G 已交付</span>
-            <span class="pill brand">需求池 36 项</span>
+            <span class="pill ok">阶段 1E 已完成</span>
+            <span class="pill ok">阶段 1F 已交付</span>
+            <span class="pill ok">阶段 1G 已交付</span>
+            <span class="pill brand">需求池 40 项</span>
             <span class="pill brand">路标管理已初始化</span>
             <span class="pill ok">22 已交付</span>
           </div>
           <div class="trust">
             <span><b>18/18</b> 后端模块化</span>
-            <span><b>65</b> Harness tests pass</span>
-            <span><b>107</b> RP-036 排除已知无关失败后的 V2 tests pass</span>
+            <span><b>65</b> AI 任务底座测试已通过</span>
+            <span><b>107</b> RP-036 相关前端测试已通过</span>
             <span><b>35</b> 人工测试任务已登记</span>
             <span><b>0</b> 正式业务绕过确认</span>
           </div>
@@ -62,14 +62,14 @@
 
         <div class="hero-console" aria-label="WES Agent 升级态势预览">
           <div class="floating-card side">
-            <div class="fc-head"><b>Harness Stage</b><span class="fc-tag">DB-backed</span></div>
-            <div class="fc-row"><span>uploaded</span><b>locked</b></div>
-            <div class="fc-row"><span>report_v1_ready</span><b>done</b></div>
-            <div class="fc-row"><span>clarifying</span><b>guarded</b></div>
-            <div class="fc-row"><span>report_v2_ready</span><b>confirmable</b></div>
+            <div class="fc-head"><b>AI 任务阶段</b><span class="fc-tag">数据库留痕</span></div>
+            <div class="fc-row"><span>文件已上传</span><b>已锁定</b></div>
+            <div class="fc-row"><span>初版报告</span><b>已完成</b></div>
+            <div class="fc-row"><span>补充信息</span><b>受控进行</b></div>
+            <div class="fc-row"><span>正式报告草稿</span><b>可确认</b></div>
           </div>
           <div class="floating-card main">
-            <div class="fc-head"><b>Phase 1G Intent Runtime</b><span class="fc-tag">delivered</span></div>
+            <div class="fc-head"><b>阶段 1G · 按意图处理任务</b><span class="fc-tag">已交付</span></div>
             <div class="fc-row"><span>1F 基线</span><b>人工确认回写审计</b></div>
             <div class="fc-row"><span>1G 原则</span><b>文件是上下文，意图触发工作流</b></div>
             <div class="fc-row"><span>路由目标</span><b>问答 / 报告 / 查询 / 写动作</b></div>
@@ -77,12 +77,12 @@
             <div class="bar"><i style="width: 100%"></i></div>
           </div>
           <div class="floating-card bottom">
-            <div class="fc-head"><b>Verification Snapshot</b><span class="fc-tag">local + CI</span></div>
-            <div class="fc-row"><span>apps/api harness</span><b>65 pass</b></div>
-            <div class="fc-row"><span>apps/api modules</span><b>102 pass</b></div>
-            <div class="fc-row"><span>ui/V2_PROTOTYPE</span><b>107 pass / 9 unrelated fail</b></div>
+            <div class="fc-head"><b>最近一次验证结果</b><span class="fc-tag">本地 + CI</span></div>
+            <div class="fc-row"><span>AI 任务底座</span><b>65 项通过</b></div>
+            <div class="fc-row"><span>后端业务模块</span><b>102 项通过</b></div>
+            <div class="fc-row"><span>Web 主线</span><b>107 项通过 / 9 项无关失败</b></div>
             <div class="fc-row"><span>人工测试</span><b>1 待复测 / 34 待执行</b></div>
-            <div class="fc-row"><span>GitHub Actions</span><b>green</b></div>
+            <div class="fc-row"><span>GitHub 自动检查</span><b>已通过</b></div>
           </div>
         </div>
       </div>
@@ -91,31 +91,31 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">Current Board</div>
+          <div class="num">当前状态</div>
           <h2>当前总览</h2>
-          <p>首页只回答三个问题：现在系统处于什么状态，下一步应该做什么，风险和审计证据在哪里。</p>
+          <p>首页集中回答四个问题：项目在管理什么、当前进展如何、主要风险在哪里、下一步应该做什么。</p>
         </div>
         <div class="kpi-row">
-          <div class="kpi">
+          <div class="kpi" data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:index">
             <div class="top"><span class="ic">P</span><span>当前阶段</span><span class="live">进行中</span></div>
             <div class="v">1H-C</div>
             <div class="lb">需求池治理后续规划</div>
             <div class="bar"><i style="width:72%"></i></div>
-            <div class="sub">需求池统一为 36 项：22 项已交付、12 项待规划/待确认/待验收、2 项暂缓；RP-026 补改、RP-027/RP-028 clean patch、RP-031 重复检索和构建基线已由 Codex 验证通过，RP-029/RP-030 已在修复分支验证通过，RP-033 clean patch 已验证但待提交集成，RP-034 已入池待规划，RP-035 已分析待设计，RP-036 已完成路由守卫、可信反馈与 retrieval_empty 误判修复，等待轮换密钥后完成 MT-1H-C-002 人工复测。</div>
+            <div class="sub" title="需求池共 40 项：22 项已交付、16 项待规划/待确认/待验收、2 项暂缓。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认；RP-047 A2 已通过历史迁移、原子性、并发和构建门禁，但 Codex Gate 发现 JSON 普通对象校验、output 并发回归与 handoff 契约三项缺口，已发布 A2-R1 最小返工，Batch B 未授权。已验证能力已进入业务主线；RP-031 的生产化方案仍需返工；RP-036、RP-043、RP-046 保留原人工确认项。">需求池共 40 项：22 项已交付、16 项待规划/待确认/待验收、2 项暂缓。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认；RP-047 A2 已通过历史迁移、原子性、并发和构建门禁，但 Codex Gate 发现 JSON 普通对象校验、output 并发回归与 handoff 契约三项缺口，已发布 A2-R1 最小返工，Batch B 未授权。已验证能力已进入业务主线；RP-031 的生产化方案仍需返工；RP-036、RP-043、RP-046 保留原人工确认项。</div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>验证状态</span><span class="live">已修复</span></div>
             <div class="v">7</div>
             <div class="lb">本轮复核验证命令通过</div>
             <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--ok),var(--teal))"></i></div>
-            <div class="sub">RP-027/RP-028 provider 专项 10/10、build:api、test:modules 66/66、test:ai 189/189 通过；RP-026、RP-029/RP-030、RP-031 修复分支仍保持待集成。</div>
+            <div class="sub" title="2026-08-02 干净主线回归：build:web、build:api 通过，test:modules 143/143、test:web 196/196、Provider/Trace/RAG 专项 47/47 通过；本地分支已从 37 个收敛为 4 个，远端同步与 RP-031 返工仍待决策。">2026-08-02 干净主线回归：build:web、build:api 通过，test:modules 143/143、test:web 196/196、Provider/Trace/RAG 专项 47/47 通过；本地分支已从 37 个收敛为 4 个，远端同步与 RP-031 返工仍待决策。</div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">A</span><span>审计链路</span><span class="live">保留</span></div>
             <div class="v">4</div>
-            <div class="lb">核心审计对象</div>
+            <div class="lb">4 类核心过程记录</div>
             <div class="bar"><i style="width:88%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
-            <div class="sub">run / artifact / modelRun / toolEvent</div>
+            <div class="sub">任务运行、任务产物、模型调用和工具动作；技术对象为 run / artifact / modelRun / toolEvent。</div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">H</span><span>1H-A 迭代包</span></div>
@@ -131,26 +131,26 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">Document Assets</div>
-          <h2>文档资产地图</h2>
-          <p>本次 WES Agent / Harness 升级过程中产出的全部文档类资产已盘点并可视化，事实源与历史参考源分层呈现。</p>
+          <div class="num">信息来源</div>
+          <h2>项目资料与事实来源</h2>
+          <p>这里说明看板结论来自哪些资料，并区分当前有效依据与仅供追溯的历史材料。</p>
         </div>
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">D</span><span>文档资产</span></div>
-            <div class="v">55</div>
+            <div class="v">78</div>
             <div class="lb">已盘点文档总数</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">T</span><span>事实源</span></div>
-            <div class="v">16</div>
+            <div class="v">22</div>
             <div class="lb">当前事实源 / 契约</div>
             <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--ok),var(--teal))"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">P</span><span>看板页面</span></div>
-            <div class="v">12</div>
+            <div class="v">18</div>
             <div class="lb">总看板 HTML 页面</div>
             <div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
           </div>
@@ -164,18 +164,18 @@
         <div class="grid-3" style="margin-top:22px">
           <a class="res-card" href="sources.html">
             <span class="ico" style="background:var(--brand-soft);color:var(--brand)">M</span>
-            <h3>打开文档事实源地图</h3>
-            <p>查看文档分层图、Phase × 文档矩阵、事实流转图，以及完整的表格/卡片双视图清单。</p>
-            <div class="preview">51 assets · 4 layers · 3 visualizations</div>
+            <h3>查看完整信息来源</h3>
+            <p>查看资料分层、阶段与文档对应关系、事实如何流转，以及完整资料清单。</p>
+            <div class="preview">62 份资料 · 5 个层级 · 3 种查看方式</div>
             <span class="arr">打开 sources.html →</span>
           </a>
           <div class="card">
-            <span class="pill brand">Current Truth</span>
-            <h3>事实源优先</h3>
+            <span class="pill brand">当前有效</span>
+            <h3>优先采用当前事实依据</h3>
             <p>AGENTS.md、codex-project-registry.md、QODER.md、KIMICODE.md、README.md、实现与文档对齐说明.md、openapi.yaml 和产品技术方案.html 是当前最高优先级事实源。</p>
           </div>
           <div class="card">
-            <span class="pill warn">Historical</span>
+            <span class="pill warn">历史参考</span>
             <h3>历史参考谨慎引用</h3>
             <p>5 份历史文档已标注“可能滞后”，包括 API接口设计-V2、KIMI-Files两段式解析初版设计、项目进展总结等。</p>
           </div>
@@ -186,23 +186,23 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">Triad Model</div>
-          <h2>三位一体的信息架构</h2>
+          <div class="num">管理视角</div>
+          <h2>设计、计划和验证如何配合</h2>
           <p>总看板不是替代设计文档，而是把设计、计划、监控从一个长文档拆成可独立审阅、可持续更新的交付物。</p>
         </div>
         <div class="grid-3">
           <div class="card">
-            <span class="pill brand">Design</span>
+            <span class="pill brand">为什么这样做</span>
             <h3>设计说明</h3>
             <p>说明产品形态、Harness 编排、传统系统边界、权限和数据追溯。这里回答“为什么这样建”。</p>
           </div>
           <div class="card">
-            <span class="pill warn">Plan</span>
+            <span class="pill warn">接下来怎么做</span>
             <h3>实施计划</h3>
             <p>承接 Phase 1B/1C/1D/1E/1F 的已交付事实，并把 Phase 1G 意图路由与任务运行时升级拆成可验收任务。这里回答“接下来怎么做”。</p>
           </div>
           <div class="card">
-            <span class="pill ok">Monitor</span>
+            <span class="pill ok">如何证明可控</span>
             <h3>监控审计</h3>
             <p>汇总本地验证、CI、toolEvent、artifact、modelRun 和草稿链接。这里回答“怎么证明可控”。</p>
           </div>
@@ -213,9 +213,9 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">Business Flow</div>
-          <h2>Phase 1D 已闭环的业务编排</h2>
-          <p>文件上传后进入 Harness；AI 生成报告和可确认动作；用户确认后只创建传统草稿，不创建正式评估。</p>
+          <div class="num">业务流程</div>
+          <h2>阶段 1D 已完成的业务闭环</h2>
+          <p>文件上传后进入 AI 任务运行与审计底座（Harness）；AI 生成报告和待确认动作；只有用户确认后才创建业务草稿，不会直接生成正式评估。</p>
         </div>
         <div class="flow-steps">
           <div class="flow-step"><span class="num">01</span><b>文件上传</b><small>parse-basic-info 后创建 Harness run，并绑定上传文件。</small></div>
@@ -230,7 +230,7 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">Board Pages</div>
+          <div class="num">按问题查找</div>
           <h2>专题页入口</h2>
           <p>每个页面都是一个可审计视角。后续汇报时先看首页和路标，再按问题跳转到专题页。</p>
         </div>
@@ -251,10 +251,10 @@
           </a>
           <a class="res-card" href="runtime.html">
             <span class="ico" style="background:var(--brand-soft);color:var(--brand)">02</span>
-            <h3>任务运行时</h3>
-            <p>承接 Qoder Quest Runtime 启发，定义 WES Harness Run 的来源、执行、产物、交付和知识边界。</p>
-            <div class="preview">Chat 是入口；Harness Run 才是可交付、可审查、可追溯的任务运行时。</div>
-            <span class="arr">打开任务运行时 →</span>
+            <h3>AI 任务执行</h3>
+            <p>说明一次 AI 任务从哪里开始、如何处理、产生什么结果、如何交付，以及怎样保留过程记录。</p>
+            <div class="preview">对话只是入口；任务记录（Harness Run）才是可交付、可审查、可追溯的工作单元。</div>
+            <span class="arr">打开 AI 任务执行 →</span>
           </a>
           <a class="res-card" href="plan.html">
             <span class="ico" style="background:var(--accent-soft);color:var(--accent)">03</span>
@@ -265,7 +265,7 @@
           </a>
           <a class="res-card" href="testing.html">
             <span class="ico" style="background:var(--accent-soft);color:var(--accent)">04</span>
-            <h3>测试</h3>
+            <h3>测试与验收</h3>
             <p>人工测试任务、执行路径、结果反馈模板、缺陷分级和关闭标准。</p>
             <div class="preview">35 条人工任务 · P0/P1/P2 反馈 · 人工验收门禁</div>
             <span class="arr">打开测试页面 →</span>
@@ -293,21 +293,21 @@
           </a>
           <a class="res-card" href="collaboration-protocol.html">
             <span class="ico" style="background:var(--brand-soft);color:var(--brand)">A2</span>
-            <h3>协作协议</h3>
-            <p>说明 WES + Qoder + KIMICODE + Codex 及后续候选 Agent 的本地 A2A 协作机制：团队注册表、NightOps、Git 状态载体、handoff、总看板事实源和验证门禁。</p>
-            <div class="preview">registry → worktree → handoff → review → verification → board sync</div>
-            <span class="arr">打开协作协议 →</span>
+            <h3>多 AI 协作</h3>
+            <p>说明 Codex、Qoder、KIMICODE 等工具分别负责什么、何时交接、谁来复核，以及什么情况下不能继续。</p>
+            <div class="preview">角色登记 → 独立开发 → 交接 → 复核 → 验证 → 看板同步</div>
+            <span class="arr">打开多 AI 协作 →</span>
           </a>
           <a class="res-card card" href="branches.html" data-board-event-id="BE-2026-08-02-rp-045-branch-topology:index">
-            <span class="pill brand">Git Governance</span>
-            <h3>分支拓扑与 Worktree</h3>
-            <p>查看自动生成的主线、子分支关系、ahead/behind、活跃 worktree、重复指针组和完整分支台账。</p>
+            <span class="pill brand">开发分支管理</span>
+            <h3>开发分支与独立开发目录</h3>
+            <p>查看当前主线、其他开发分支、是否已经合入主线、正在使用的独立开发目录（worktree）和清理建议。</p>
           </a>
           <a class="res-card" href="requirements.html">
             <span class="ico" style="background:var(--warn-soft);color:var(--warn)">RP</span>
             <h3>需求池</h3>
             <p>升级需求记录、分析、拆解、排期与状态管理；当前只保留只读需求池页面，后续由 AI 直接维护。</p>
-            <div class="preview">36 requirements · 22 delivered · 12 pending/review · 2 deferred</div>
+            <div class="preview">40 项需求 · 22 项已交付 · 16 项待处理 · 2 项暂缓</div>
             <span class="arr">打开需求池 →</span>
           </a>
           <a class="res-card" href="../WES-Agent-产品技术方案.html">
@@ -381,7 +381,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 设计 / 计划 / 监控 · 2026-07-23 · main + Phase 1H-C planning
+      WES 项目管理 · 总览 · 2026-08-02 · 业务主线 + 阶段 1H-C 规划中
     </footer>
   </main>
 </body>
