@@ -1,0 +1,56 @@
+{
+  "id": "BE-2026-08-03-rp-047-a-gate-rejected",
+  "date": "2026-08-03",
+  "type": "verification",
+  "scope": "RP-047-A Codex Gate",
+  "summary": "Codex 拒收 Qoder 的 RP-047-A 候选分支：范围与 additive schema 方向基本正确，但 Testcontainers 停止条件被违反，历史数据迁移、原子创建、检查点并发幂等、Runtime validation 和安全错误证据不成立。已发布全新 RP-047-A2 重新实施工单。",
+  "status": "REJECTED / A2 待 Worktree Contract ACK",
+  "pages": [
+    "index",
+    "issues",
+    "defects",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "collaboration-protocol"
+  ],
+  "evidence": [
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-08-03-codex-RP-047-A-gate.md",
+      "result": "rejected",
+      "summary": "正式 Testcontainers 命令失败；候选测试未执行历史迁移演练，repository 存在原子性、并发幂等和错误载荷泄露缺口。"
+    },
+    {
+      "kind": "verification",
+      "ref": "npm ci + test:modules + build:api + build:web",
+      "result": "pass after isolated dependencies",
+      "summary": "worktree-local 依赖安装后 modules 143/143、API/Web build 通过，证明 Qoder 报告的 Ajv 基线故障属于依赖隔离错误归因。"
+    },
+    {
+      "kind": "work_order",
+      "ref": "docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2.md",
+      "result": "assigned_waiting_ack",
+      "summary": "A2 必须使用全新 worktree，不复用被拒分支；增加 test-setup.mts，禁止机器级配置。"
+    }
+  ],
+  "issue": {
+    "id": "ISS-2026-08-03-002",
+    "disposition": "defect",
+    "linked": "DEF-2026-08-03-001 / RP-047-A2",
+    "summary": "Node 24 Testcontainers 全局 setup 与依赖隔离缺陷阻断正式 Harness 门禁。"
+  },
+  "gate": {
+    "taskId": "RP-047-A",
+    "candidateCommit": "fae8a7dbd88d4f8159653abbd50284ad93f2c833",
+    "verdict": "REJECTED",
+    "allowNextTask": false,
+    "mustReworkFirst": true,
+    "reuseRejectedBranch": false,
+    "nextTask": "RP-047-A2"
+  },
+  "next": "Qoder 只可先创建 RP-047-A2 全新 worktree 并输出 ACK；ACK 接受前不编辑，A2 Gate 通过前不发布 Batch B。"
+}
