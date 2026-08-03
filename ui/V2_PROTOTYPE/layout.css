@@ -124,7 +124,28 @@
 .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-@media (max-width: 1180px){.shell{grid-template-columns:1fr}.sidebar{position:relative;height:auto;top:auto}.grid-4,.grid-3,.grid-2{grid-template-columns:1fr 1fr}}
+@media (max-width: 1180px){
+  .shell{grid-template-columns:64px minmax(0,1fr)}
+  .sidebar{position:sticky;top:0;width:64px;height:100vh;align-items:center}
+  .sidebar .brand{justify-content:center;gap:0;padding:18px 0}
+  .sidebar .brand div:not(.l),
+  .sidebar .grp h6,
+  .sidebar .user .account,
+  .sidebar .user .out,
+  .sidebar-nav-parent-text,
+  .sidebar-nav-chevron{display:none}
+  .sidebar .grp{width:100%}
+  .sidebar .grp a,
+  .sidebar-nav-parent-label{justify-content:center;gap:0;padding:10px 0;border-left:0;font-size:0}
+  .sidebar .grp a .ic,
+  .sidebar-nav-parent-label .ic{width:20px;height:20px;margin:0;font-size:12px}
+  .sidebar .grp a.on{border-left:0;box-shadow:inset 2px 0 0 var(--accent)}
+  .sidebar-nav-children a{padding-left:0}
+  .sidebar .user{width:100%;padding:14px 0}
+  .sidebar .user .row{justify-content:center}
+  .sidebar .toggle-btn{display:none}
+  .grid-4,.grid-3,.grid-2{grid-template-columns:1fr 1fr}
+}
 @media (max-width: 760px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr}}
 
 /* ---- params strip (§6.5) ---- */
