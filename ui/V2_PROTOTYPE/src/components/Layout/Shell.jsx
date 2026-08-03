@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import WorkspaceTabs from './WorkspaceTabs.jsx'
 import { UnsavedChangesProvider } from '../../hooks/useUnsavedChanges.jsx'
@@ -12,6 +12,7 @@ const navGroups = [
     title: '工作台',
     items: [
       { to: '/', label: 'AI 工作台', icon: '●' },
+      { to: '/projects', label: '项目', icon: '▤' },
       { to: '/requirements', label: '需求', icon: '✎' },
       { to: '/assessments', label: '实施评估', icon: '▣' },
       { to: '/dev-assessments', label: '开发评估', icon: '◆' },
@@ -46,8 +47,26 @@ function ToggleIcon() {
   )
 }
 
+function ChevronIcon({ expanded }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="sidebar-nav-chevron"
+      style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+      aria-hidden="true"
+    >
+      <path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 export default function Shell({ children, currentUser = null }) {
   const [collapsed, setCollapsed] = useState(false)
+  const [expandedParents, setExpandedParents] = useState(() => new Set(['系统管理']))
   const navigate = useNavigate()
   const { user: loadedUser } = useCurrentUser({ enabled: !currentUser && isAuthenticated() })
   const user = currentUser || loadedUser
@@ -55,6 +74,15 @@ export default function Shell({ children, currentUser = null }) {
   const userInitial = String(username).slice(0, 1).toUpperCase() || 'U'
   const roleText = user?.businessRoleLabel || (user?.role === 'admin' ? '超级管理员' : '未设置业务角色')
   const visibleNavGroups = navGroups.filter((group) => group.title !== '系统' || isAdminUser(user))
+
+  const toggleParent = useCallback((label) => {
+    setExpandedParents((prev) => {
+      const next = new Set(prev)
+      if (next.has(label)) next.delete(label)
+      else next.add(label)
+      return next
+    })
+  }, [])
 
   const handleLogout = () => {
     clearToken()
@@ -81,28 +109,41 @@ export default function Shell({ children, currentUser = null }) {
               <h6>{g.title}</h6>
               {g.items.map((item) => {
                 if (item.children) {
+                  const isExpanded = expandedParents.has(item.label)
                   return (
                     <div className="sidebar-nav-parent" key={item.label}>
                       <button
                         type="button"
-                        className="sidebar-nav-parent-label"
+                        className={`sidebar-nav-parent-label${isExpanded ? ' sidebar-nav-parent-label--expanded' : ''}`}
                         title={collapsed ? item.label : undefined}
+                        aria-expanded={isExpanded}
+                        aria-controls={`nav-children-${item.label}`}
+                        onClick={() => !collapsed && toggleParent(item.label)}
                       >
                         <span className="ic">{item.icon}</span>
-                        {!collapsed && item.label}
+                        {!collapsed && <span className="sidebar-nav-parent-text">{item.label}</span>}
+                        {!collapsed && <ChevronIcon expanded={isExpanded} />}
                       </button>
                       {!collapsed && (
-                        <div className="sidebar-nav-children">
-                          {item.children.map((child) => (
-                            <NavLink
-                              key={child.to}
-                              to={child.to}
-                              className={({ isActive }) => (isActive ? 'on' : '')}
-                            >
-                              <span className="ic">{child.icon}</span>
-                              {child.label}
-                            </NavLink>
-                          ))}
+                        <div
+                          id={`nav-children-${item.label}`}
+                          className={`sidebar-nav-children${isExpanded ? ' sidebar-nav-children--open' : ' sidebar-nav-children--closed'}`}
+                          role="group"
+                          aria-label={item.label}
+                        >
+                          <div className="sidebar-nav-children-inner">
+                            {item.children.map((child) => (
+                              <NavLink
+                                key={child.to}
+                                to={child.to}
+                                className={({ isActive }) => (isActive ? 'on' : '')}
+                                tabIndex={isExpanded ? 0 : -1}
+                              >
+                                <span className="ic">{child.icon}</span>
+                                {child.label}
+                              </NavLink>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -138,7 +179,9 @@ export default function Shell({ children, currentUser = null }) {
       <UnsavedChangesProvider>
         <main className="content" style={{ flex: 1, minWidth: 0 }}>
           <WorkspaceTabs />
-          {children}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+            {children}
+          </div>
         </main>
       </UnsavedChangesProvider>
     </div>

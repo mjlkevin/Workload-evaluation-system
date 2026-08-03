@@ -9,7 +9,7 @@ const PROJECT_ACTIONS = [
   { key: 'delete', label: '🗑 删除', mode: 'select-any', danger: true },
 ]
 
-export default function TraditionalHomeDashboard({ embedded = false }) {
+export default function TraditionalHomeDashboard() {
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
   const [dialog, setDialog] = useState(null) // 'new' | 'guide' | 'er' | null
@@ -24,7 +24,7 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
     template: '',
   })
 
-  const { kpi, plans, feed, refetch, remove, create } = useHomeDashboard()
+  const { kpi, plans, refetch, remove, create } = useHomeDashboard()
   const filteredPlans = plans.filter((plan) => {
     const q = planSearch.trim().toLowerCase()
     if (!q) return true
@@ -118,8 +118,7 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
 
   const content = (
     <>
-      <div className="home-grid">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* KPI */}
           <div className="home-kpi">
             {kpi.map((k, i) => (
@@ -130,7 +129,6 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ok)', marginLeft: 'auto' }} />
                 </div>
                 <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono)', lineHeight: 1.05, marginBottom: 4 }}>{k.num}</div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', letterSpacing: '.08em', textTransform: 'uppercase' }}>{k.lb}</div>
                 <div style={{ height: 4, borderRadius: 999, background: 'var(--bg-soft)', marginTop: 10, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: k.bar, borderRadius: 999, background: `linear-gradient(90deg,${k.icCo || 'var(--brand)'},var(--accent))` }} />
                 </div>
@@ -142,7 +140,7 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
           {/* Plan list with VCS 9-toolbar (§6.3.1) */}
           <div className="section" style={{ margin: 0 }}>
             <div className="hd">
-              <span>项目评估方案列表</span>
+              <span>项目列表</span>
               <span className="bdg ci" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />草稿 {plans.filter((p) => p.status === '草稿').length}</span>
               <span className="bdg co" style={{ fontSize: 10.5, padding: '1px 6px' }}><span className="dot" />进行中 {plans.filter((p) => p.status === '进行中').length}</span>
               <div className="right"><span style={{ fontSize: 11 }}>共 {plans.length} 条 · 已选 {selected.size}</span></div>
@@ -250,39 +248,9 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
           </div>
           {filteredPlans.length === 0 && (
             <div style={{ padding: '18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, borderTop: '1px solid var(--line)' }}>
-              未找到匹配的项目评估
+              未找到匹配的项目
             </div>
           )}
-        </div>
-
-        {/* Side */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-1)' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', fontSize: 13, fontWeight: 700 }}>快速操作</div>
-            {[
-              { t: '新建项目评估', dlg: 'new' },
-              { t: '导入需求访谈纪要', dlg: null },
-              { t: '发起评审', dlg: null },
-              { t: '查看 ER 关联图', dlg: 'er' },
-            ].map((q) => (
-              <a key={q.t} href="#" onClick={(e) => { e.preventDefault(); q.dlg && setDialog(q.dlg) }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', color: 'var(--ink)', textDecoration: 'none', fontSize: 12.5, borderBottom: '1px solid var(--line)' }}>
-                {q.t}<span style={{ color: 'var(--ink-3)', fontSize: 11 }}>→</span>
-              </a>
-            ))}
-          </div>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-1)' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', fontSize: 13, fontWeight: 700 }}>最近动态</div>
-            {feed.map((f, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--line)' }}>
-                <div style={{ width: 22, height: 22, borderRadius: '50%', background: f.accent ? 'var(--accent-soft)' : 'var(--brand-soft)', color: f.accent ? 'var(--accent-ink)' : 'var(--brand-ink)', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{f.name[0]}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>
-                  <b style={{ color: 'var(--ink)' }}>{f.name}</b> {f.action}
-                  <span style={{ display: 'block', fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{f.time}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* 3 Dialogs · §6.3 D1/D2/D3 */}
@@ -339,12 +307,11 @@ export default function TraditionalHomeDashboard({ embedded = false }) {
     </>
   )
 
-  if (embedded) return content
-
   return (
     <PageShell
-      crumb="工作台 / 主页"
-      title="主页"
+      crumb="工作台 / 项目列表"
+      title="项目列表"
+      subtitle="查看项目概览与评估管理"
       actions={pageActions}
     >
       {content}

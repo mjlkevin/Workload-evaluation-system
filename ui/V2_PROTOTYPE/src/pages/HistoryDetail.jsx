@@ -23,7 +23,6 @@ export default function HistoryDetail() {
     <PageShell
       crumb="工作台 / 历史项目库 / 历史项目详情"
       title={`历史项目详情 · ${detail?.projectName || '—'}`}
-      subtitle={`${detail?.version || '—'} · ${detail?.industry || '—'} · ${detail?.scale || '—'}`}
       actions={[
         <button type="button" key="clone" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }}>克隆此方案为新评估</button>,
       ]}

@@ -1,7 +1,10 @@
 import React from 'react'
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import Shell from './components/Layout/Shell.jsx'
+import ToastContainer from './components/ui/ToastContainer.jsx'
+import { ToastProvider } from './hooks/useToast.jsx'
 import HomePage from './pages/HomePage.jsx'
+import TraditionalHomeDashboard from './pages/TraditionalHomeDashboard.jsx'
 import AssessmentList from './pages/AssessmentList.jsx'
 import AssessmentDetail from './pages/AssessmentDetail.jsx'
 import RequirementList from './pages/RequirementList.jsx'
@@ -53,11 +56,14 @@ function ProtectedLayout() {
 
 export default function App() {
   return (
-    <Routes>
+    <ToastProvider>
+      <ToastContainer />
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<ProtectedLayout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/projects" element={<TraditionalHomeDashboard />} />
         <Route path="/assessments" element={<AssessmentList />} />
         <Route path="/assessments/:id" element={<AssessmentDetail />} />
         <Route path="/requirements" element={<RequirementList />} />
@@ -82,7 +88,9 @@ export default function App() {
         ))}
         <Route path="/users" element={<UserManagement />} />
         <Route path="/api-keys" element={<ApiKeys />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
-    </Routes>
+      </Routes>
+    </ToastProvider>
   )
 }

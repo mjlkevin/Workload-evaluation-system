@@ -46,6 +46,36 @@ describe('Login', () => {
       expect(requestBody).toEqual({ username: 'demo', password: 'Password123!', rememberMe: false })
       expect(sessionStorage.getItem('wes_token')).toBe('short-token')
       expect(localStorage.getItem('wes_token')).toBeNull()
+      expect(JSON.parse(localStorage.getItem('wes_username_history'))).toEqual(['demo'])
+      expect(localStorage.getItem('wes_username_history')).not.toContain('Password123!')
+    })
+  })
+
+  test('migrates legacy recent usernames without retaining stored passwords', async () => {
+    localStorage.setItem('wes_recent_users', JSON.stringify([
+      { username: 'legacy-user', password: 'LegacyPassword123!', ts: 1 },
+    ]))
+
+    renderAuthRoutes()
+
+    fireEvent.focus(screen.getByPlaceholderText('用户名'))
+
+    expect(await screen.findByText('legacy-user')).toBeInTheDocument()
+    expect(localStorage.getItem('wes_recent_users')).toBeNull()
+    expect(JSON.parse(localStorage.getItem('wes_username_history'))).toEqual(['legacy-user'])
+    expect(localStorage.getItem('wes_username_history')).not.toContain('LegacyPassword123!')
+  })
+
+  test('focuses the password field after selecting a recent username', async () => {
+    localStorage.setItem('wes_username_history', JSON.stringify(['recent-user']))
+
+    renderAuthRoutes()
+
+    fireEvent.focus(screen.getByPlaceholderText('用户名'))
+    fireEvent.click(await screen.findByText('recent-user'))
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('密码')).toHaveFocus()
     })
   })
 

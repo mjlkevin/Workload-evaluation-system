@@ -3,6 +3,8 @@ import { delay, http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test, vi } from 'vitest'
 import { apiClient } from '../api/client.js'
+import ToastContainer from '../components/ui/ToastContainer.jsx'
+import { ToastProvider } from '../hooks/useToast.jsx'
 import SystemManagement from '../pages/SystemManagement.jsx'
 import { server } from './mocks/server.js'
 
@@ -10,11 +12,13 @@ const BASE = '/api/v1'
 
 async function renderKnowledgeBase() {
   render(
-    <MemoryRouter>
-      <SystemManagement />
-    </MemoryRouter>
+    <ToastProvider>
+      <ToastContainer />
+      <MemoryRouter>
+        <SystemManagement sectionId="kb" />
+      </MemoryRouter>
+    </ToastProvider>
   )
-  fireEvent.click(screen.getByRole('tab', { name: '知识库' }))
   await waitFor(() => {
     expect(screen.getByRole('button', { name: '保存草稿' })).toBeEnabled()
     expect(screen.getByRole('button', { name: '测试连通性' })).toBeEnabled()
@@ -66,7 +70,6 @@ describe('SystemManagement knowledge base feedback', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '测试连通性' }))
 
-    expect(await screen.findByText('连通性测试通过')).toBeInTheDocument()
-    expect(screen.getByText('连接成功，但固定测试语句未检索到文档')).toBeInTheDocument()
+    expect(await screen.findByText(/连通性测试通过.*未检索到文档/)).toBeInTheDocument()
   })
 })

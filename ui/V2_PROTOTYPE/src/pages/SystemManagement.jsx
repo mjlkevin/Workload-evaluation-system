@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import PageShell from '../components/Layout/PageShell.jsx'
 import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
-import { getSystemManagementSectionById } from '../config/systemManagementSections.js'
+import { SYSTEM_MANAGEMENT_SECTIONS, getSystemManagementSectionById } from '../config/systemManagementSections.js'
 import useSystemManagement from '../hooks/useSystemManagement.js'
+import { useToast } from '../hooks/useToast.jsx'
 
 const PROMPT_TABS = [
   { key: 'assessment', label: '评估提示词' },
@@ -52,6 +54,13 @@ const OUTPUT_STYLE_OPTIONS = [
   { value: 'detailed', label: '详细' },
 ]
 
+const TEST_RESULT_STATUS = {
+  passed: { cls: 'ci', label: '通过' },
+  failed: { cls: 'lock', label: '失败' },
+  blocked: { cls: 'warn', label: '阻塞' },
+  skipped: { cls: 'muted', label: '跳过' },
+}
+
 export default function SystemManagement({ sectionId }) {
   const {
     rules, modelConfig, ratecard,
@@ -62,14 +71,15 @@ export default function SystemManagement({ sectionId }) {
     actions,
   } = useSystemManagement()
 
-  const [tab, setTab] = useState('rules')
-  const [dialog, setDialog] = useState(null) // 'prompt' | null
+  const navigate = useNavigate()
+  const [dialog, setDialog] = useState(null) // 'prompt' | 'rule' | null
   const [promptTab, setPromptTab] = useState('assessment')
   const [promptResult, setPromptResult] = useState(null)
   const [selectedRuleCode, setSelectedRuleCode] = useState('')
   const [ruleConfigForm, setRuleConfigForm] = useState({ prefix: '', format: '' })
   const [kbTestResult, setKbTestResult] = useState(null)
   const [kbSaveResult, setKbSaveResult] = useState(null)
+  const toast = useToast()
   const [editingModel, setEditingModel] = useState(null)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [extInput, setExtInput] = useState('')
@@ -83,17 +93,13 @@ export default function SystemManagement({ sectionId }) {
   const [modelSaving, setModelSaving] = useState(false)
   const modelSnapshotRef = useRef(null)
 
-  const tabs = [
-    { id: 'rules', label: '编码规则', count: rules.length },
-    { id: 'model', label: '模型配置' },
-    { id: 'kb', label: '知识库' },
-    { id: 'rate', label: 'RateCard' },
-    { id: 'dsl', label: 'DSL 规则集' },
-    { id: 'tpl', label: '模板' },
-    { id: 'testResults', label: '测试结果' },
-  ]
   const dedicatedSection = sectionId ? getSystemManagementSectionById(sectionId) : null
-  const activeSectionId = dedicatedSection?.id || tab
+  const activeSection = dedicatedSection || SYSTEM_MANAGEMENT_SECTIONS[0]
+  const activeSectionId = activeSection.id
+  const tabs = SYSTEM_MANAGEMENT_SECTIONS.map((section) => ({
+    ...section,
+    count: section.id === 'rules' ? rules.length : undefined,
+  }))
   const selectedRule = rules.find((rule) => rule.code === selectedRuleCode) || rules[0]
   const selectedRuleId = selectedRule?.id || selectedRule?.code || ''
 
@@ -101,10 +107,13 @@ export default function SystemManagement({ sectionId }) {
     if (!selectedRuleCode && rules[0]?.code) setSelectedRuleCode(rules[0].code)
   }, [rules, selectedRuleCode])
 
-  const openRuleConfig = () => {
+  const openRuleConfig = (rule) => {
+    const target = rule || selectedRule
+    if (!target) return
+    setSelectedRuleCode(target.code)
     setRuleConfigForm({
-      prefix: selectedRule?.prefix || '',
-      format: selectedRule?.format || '',
+      prefix: target.prefix || '',
+      format: target.format || '',
     })
     setDialog('rule')
   }
@@ -112,34 +121,42 @@ export default function SystemManagement({ sectionId }) {
   const handleSaveKbDraft = async () => {
     setKbSaveResult(null)
     const result = await actions.saveKbDraft()
-    setKbSaveResult(result.success
-      ? { ok: true, message: '知识库配置草稿已保存' }
-      : { ok: false, message: result.error || '知识库配置草稿保存失败' })
+    if (result.success) {
+      toast.success('知识库配置草稿已保存')
+    } else {
+      toast.error(result.error || '知识库配置草稿保存失败')
+    }
   }
 
   const handleActivateKb = async () => {
     setKbSaveResult(null)
     const result = await actions.activateKbConfig()
-    setKbSaveResult(result.success
-      ? { ok: true, message: '知识库配置已生效' }
-      : { ok: false, message: result.error || '知识库配置生效失败' })
+    if (result.success) {
+      toast.success('知识库配置已生效')
+    } else {
+      toast.error(result.error || '知识库配置生效失败')
+    }
   }
 
   const handleSaveModelDraft = async () => {
     setModelSaveResult(null)
     const result = await actions.saveModelDraftWithKey(apiKeyInput || undefined)
     setApiKeyInput('')
-    setModelSaveResult(result.success
-      ? { ok: true, message: '草稿已保存' }
-      : { ok: false, message: result.error || '草稿保存失败' })
+    if (result.success) {
+      toast.success('模型配置草稿已保存')
+    } else {
+      toast.error(result.error || '模型配置草稿保存失败')
+    }
   }
 
   const handleActivateModel = async () => {
     setModelSaveResult(null)
     const result = await actions.activateModel()
-    setModelSaveResult(result.success
-      ? { ok: true, message: '配置已生效' }
-      : { ok: false, message: result.error || '配置生效失败' })
+    if (result.success) {
+      toast.success('模型配置已生效')
+    } else {
+      toast.error(result.error || '模型配置生效失败')
+    }
   }
 
   const handleModelConfigChange = (key, patch) => {
@@ -177,6 +194,7 @@ export default function SystemManagement({ sectionId }) {
       setModelDirty(false)
       setEditingModel(null)
       setModelSaveResult({ ok: true, message: '草稿已保存' })
+      toast.success('模型配置草稿已保存')
     } else {
       setModelSaveError(result.error || '保存失败，请重试')
     }
@@ -184,252 +202,229 @@ export default function SystemManagement({ sectionId }) {
 
   return (
     <PageShell
-      crumb={dedicatedSection
-        ? [{ label: '工作台', to: '/' }, { label: dedicatedSection.label }]
-        : '工作台 / 系统管理'}
-      title={dedicatedSection?.label || '系统管理'}
-      subtitle={dedicatedSection?.subtitle || '编码规则 / 模型配置 / 知识库 / RateCard / DSL'}
+      crumb={[{ label: '工作台', to: '/' }, { label: '系统管理' }]}
+      title={activeSection.label}
+      subtitle={activeSection.subtitle}
       actions={[
         <button type="button"
           key="prompt"
-          className="btn btn-ghost"
-          style={{ height: 32, fontSize: 12, padding: '0 12px' }}
+          className="btn btn-ghost btn-sm"
           onClick={() => setDialog('prompt')}
         >
           ✎ 提示词
         </button>,
       ]}
     >
-      {!dedicatedSection && (
-        <div className="system-tabs" role="tablist" aria-label="系统管理配置分类">
-          {tabs.map((t) => {
-            const active = tab === t.id
-            return (
-              <button
-                type="button"
-                key={t.id}
-                role="tab"
-                aria-selected={active}
-                className={active ? 'system-tab on' : 'system-tab'}
-                onClick={() => setTab(t.id)}
-              >
-                <span>{t.label}</span>
-                {t.count ? <span className="ct">{t.count}</span> : null}
-              </button>
-            )
-          })}
-        </div>
-      )}
+      <div className="system-tabs" role="tablist" aria-label="系统管理配置分类">
+        {tabs.map((t) => {
+          const active = activeSectionId === t.id
+          return (
+            <button
+              type="button"
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              className={active ? 'system-tab on' : 'system-tab'}
+              onClick={() => { if (!active) navigate(t.route) }}
+            >
+              <span>{t.label}</span>
+              {t.count ? <span className="ct">{t.count}</span> : null}
+            </button>
+          )
+        })}
+      </div>
 
       <div style={{ padding: '18px 24px' }}>
         {activeSectionId === 'rules' && (
-          <div className="section system-card" style={{ margin: 0 }}>
-            <div className="hd">
-              <span>版本号编码规则</span>
-              <span className="bdg ci" style={{ fontSize: 10, padding: '1px 6px' }}><span className="dot" />当前生效 v3</span>
-              <div className="right">
-                <button type="button" className="btn btn-out" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={openRuleConfig}>
-                  配置
-                </button>
-                <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateRule(selectedRuleId)}>
-                  ⌁ 生效
-                </button>
-                <button type="button" className="btn btn-dan" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.disableRule(selectedRuleId)}>
-                  禁用
-                </button>
-              </div>
+          <div>
+            <div className="sys-toolbar">
+              <span className="meta">共 {rules.length} 条编码规则 · 点击卡片选中后可配置 / 生效 / 禁用</span>
+              <button type="button" className="btn btn-out btn-sm" onClick={() => openRuleConfig()}>配置</button>
+              <button type="button" className="btn btn-pri btn-sm" onClick={async () => { const r = await actions.activateRule(selectedRuleId); r.success ? toast.success('编码规则已生效') : toast.error(r.error || '操作失败') }}>
+                ⌁ 生效
+              </button>
+              <button type="button" className="btn btn-dan btn-sm" onClick={async () => { const r = await actions.disableRule(selectedRuleId); r.success ? toast.success('编码规则已禁用') : toast.error(r.error || '操作失败') }}>
+                禁用
+              </button>
             </div>
-            <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
-              <thead>
-                <tr>
-                  <th>模块</th>
-                  <th>编码</th>
-                  <th>前缀</th>
-                  <th>格式</th>
-                  <th>示例</th>
-                  <th>状态</th>
-                  <th>生效时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rules.map((r, i) => {
-                  const selected = selectedRule?.code === r.code
-                  return (
-                  <tr
-                    key={i}
-                    className={selected ? 'row-selected' : ''}
-                    onClick={() => setSelectedRuleCode(r.code)}
+            <div className="sys-grid">
+              {rules.map((r) => {
+                const selected = selectedRule?.code === r.code
+                return (
+                  <div
+                    key={r.id || r.code}
+                    role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedRuleCode(r.code) }}
-                    aria-selected={selected}
-                    style={{ cursor: 'pointer' }}
+                    aria-pressed={selected}
+                    className={selected ? 'sys-card sys-card--selected' : 'sys-card'}
+                    onClick={() => setSelectedRuleCode(r.code)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedRuleCode(r.code) } }}
                   >
-                    <td>{r.module}</td>
-                    <td className="mono">{r.code}</td>
-                    <td className="mono">{r.prefix}</td>
-                    <td className="mono">{r.format}</td>
-                    <td className="mono">{r.example}</td>
-                    <td>
-                      <span className={`bdg ${r.status === 'active' ? 'ci' : 'draft'}`} style={{ fontSize: 10.5, padding: '1px 6px' }}>
+                    <div className="sys-card__hd">
+                      <span className="sys-card__title">{r.module}</span>
+                      <span className={`bdg ${r.status === 'active' ? 'ci' : 'draft'}`}>
                         <span className="dot" />
                         {r.status === 'active' ? '生效中' : '已禁用'}
                       </span>
-                    </td>
-                    <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                      {r.activatedAt ? r.activatedAt.replace('T', ' ').replace('Z', '') : '—'}
-                    </td>
-                  </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                      <span className="sys-card__code mono">{r.code}</span>
+                    </div>
+                    <div className="sys-card__bd">
+                      <div className="sys-field">
+                        <span className="sys-field__lb">前缀</span>
+                        <span className="sys-field__v mono">{r.prefix}</span>
+                      </div>
+                      <div className="sys-field">
+                        <span className="sys-field__lb">格式</span>
+                        <span className="sys-field__v mono">{r.format}</span>
+                      </div>
+                      <div className="sys-field">
+                        <span className="sys-field__lb">示例</span>
+                        <span className="sys-field__v mono">{r.example}</span>
+                      </div>
+                      <div className="sys-field">
+                        <span className="sys-field__lb">生效时间</span>
+                        <span className="sys-field__v sys-field__v--dim mono">
+                          {r.activatedAt ? r.activatedAt.replace('T', ' ').replace('Z', '') : '—'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="sys-card__ft" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" className="btn btn-out btn-sm" onClick={() => openRuleConfig(r)}>配置</button>
+                      <button type="button" className="btn btn-pri btn-sm" onClick={async () => { const res = await actions.activateRule(r.id || r.code); res.success ? toast.success('编码规则已生效') : toast.error(res.error || '操作失败') }}>⌁ 生效</button>
+                      <button type="button" className="btn btn-dan btn-sm" onClick={async () => { const res = await actions.disableRule(r.id || r.code); res.success ? toast.success('编码规则已禁用') : toast.error(res.error || '操作失败') }}>禁用</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 
         {activeSectionId === 'model' && (
           <div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraft}>
+            <div className="sys-toolbar">
+              <span className="meta">KIMI 评估 / 文件解析 / 生成模型 · 修改后先保存草稿再生效</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraft}>
                 {actionLoading.saveModelDraft ? '...' : '保存草稿'}
               </button>
-              <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={handleActivateModel} disabled={actionLoading.activateModel}>
+              <button type="button" className="btn btn-pri btn-sm" onClick={handleActivateModel} disabled={actionLoading.activateModel}>
                 {actionLoading.activateModel ? '...' : '⌁ 生效配置'}
               </button>
             </div>
 
-            {modelSaveResult && (
-              <div
-                role="status"
-                style={{
-                  background: modelSaveResult.ok ? 'var(--ok-soft)' : 'var(--err-soft)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--r-md)',
-                  color: modelSaveResult.ok ? 'var(--ok)' : 'var(--err)',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  marginBottom: 12,
-                  padding: '10px 14px',
-                }}
-              >
-                {modelSaveResult.ok ? '✓ ' : '✗ '}{modelSaveResult.message}
-              </div>
-            )}
-            <div className="grid-3-eq" style={{ gap: 16 }}>
+            <div className="sys-grid">
               {MODEL_CARDS.map((card) => {
                 const cfg = modelConfig[card.key] || {}
                 return (
-                  <div
-                    key={card.key}
-                    style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16 }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {card.title}
-                      <span
-                        className="bdg"
-                        style={{
-                          fontSize: 10,
-                          padding: '1px 6px',
-                          background: cfg.enabled ? 'var(--ok-soft)' : 'var(--err-soft)',
-                          color: cfg.enabled ? 'var(--ok)' : 'var(--err)',
-                        }}
-                      >
-                        <span className="dot" style={{ background: cfg.enabled ? 'var(--ok)' : 'var(--err)' }} />
+                  <div key={card.key} className="sys-card">
+                    <div className="sys-card__hd">
+                      <span className="sys-card__title">{card.title}</span>
+                      <span className={`bdg ${cfg.enabled ? 'ci' : 'draft'}`}>
+                        <span className="dot" />
                         {cfg.enabled ? '已启用' : '已禁用'}
                       </span>
                     </div>
-                    <div className="grid-2-eq" style={{ marginTop: 10 }}>
+                    <div className="sys-card__bd">
                       {card.summaryFields.map((f) => {
                         let val = cfg[f.path]
                         if (f.type === 'bool') val = val ? '是' : '否'
                         return (
-                          <div key={f.path} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <label
-                              style={{
-                                fontSize: 11,
-                                color: 'var(--ink-3)',
-                                fontFamily: 'var(--font-mono)',
-                                textTransform: 'uppercase',
-                                letterSpacing: '.06em',
-                                fontWeight: 700,
-                              }}
-                            >
-                              {f.label}
-                            </label>
-                            <div style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 600 }}>{String(val ?? '—')}</div>
+                          <div key={f.path} className="sys-field">
+                            <span className="sys-field__lb">{f.label}</span>
+                            <span className="sys-field__v">{String(val ?? '—')}</span>
                           </div>
                         )
                       })}
                     </div>
-                    <div
-                      style={{
-                        background: 'var(--brand-soft)',
-                        border: '1px solid var(--line)',
-                        borderRadius: 'var(--r-md)',
-                        padding: '12px 14px',
-                        marginTop: 14,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        fontSize: 12,
-                        color: 'var(--ink-2)',
-                      }}
-                    >
-                      <span style={{ flex: 1 }}>{card.desc}</span>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px', height: 30 }} onClick={() => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setEditingModel(card.key) }}>
-                          编辑
-                        </button>
-                        <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '5px 12px', height: 30 }} onClick={() => actions.testApiKey()}>
-                          {actionLoading.testApiKey ? '...' : '测试连通性'}
-                        </button>
-                      </div>
+                    <p className="sys-card__desc">{card.desc}</p>
+                    <div className="sys-card__ft">
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setEditingModel(card.key) }}>
+                        编辑
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={async () => {
+                        const r = await actions.testApiKey(undefined, cfg.model)
+                        if (r.success) {
+                          const d = r.data || {}
+                          const detail = [
+                            d.requestedModel && `请求模型: ${d.requestedModel}`,
+                            d.respondedModel && `响应模型: ${d.respondedModel}`,
+                            d.modelMatch === false && '⚠ 模型不匹配',
+                            d.latencyMs != null && `延迟: ${d.latencyMs}ms`,
+                          ].filter(Boolean).join(' · ')
+                          if (d.modelMatch === false) {
+                            toast.warn('连通性通过，但模型名不匹配', { detail, duration: 6000 })
+                          } else {
+                            toast.success('连接测试通过', { detail, duration: 5000 })
+                          }
+                        } else {
+                          toast.error(r.error || '连接测试失败')
+                        }
+                      }}>
+                        {actionLoading.testApiKey ? '...' : '测试连通性'}
+                      </button>
                     </div>
                   </div>
                 )
               })}
             </div>
 
-            <div
-              style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16, marginTop: 16 }}
-            >
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>API Key 管理</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 13,
-                    color: 'var(--ink)',
-                    background: 'var(--bg-soft)',
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    letterSpacing: '.04em',
-                  }}
-                >
-                  {modelConfig.kimiCredentials.hint
-                    ? `已配置 ${modelConfig.kimiCredentials.hint}`
-                    : modelConfig.kimiCredentials.resolvedFrom === 'env'
-                      ? '来自环境变量 KIMI_API_KEY'
-                      : '（未配置）'}
-                </span>
-                <input
-                  className="input"
-                  type="password"
-                  style={{ flex: 1, minWidth: 200, maxWidth: 360 }}
-                  placeholder="输入新 API Key（留空则不修改）"
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                />
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.testApiKey(apiKeyInput)}>
-                  测试连接
-                </button>
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => { setApiKeyInput(''); actions.clearApiKeyDraft() }}>
-                  清除密钥
-                </button>
+            <div className="sys-card" style={{ marginTop: 14 }}>
+              <div className="sys-card__hd">
+                <span className="sys-card__title">API Key 管理</span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
-                {modelConfig.kimiCredentials.resolvedFrom === 'store' ? '当前使用仓库存储密钥'
-                  : modelConfig.kimiCredentials.resolvedFrom === 'env' ? '当前使用环境变量'
-                  : '未配置可用密钥，保存草稿后生效'}
+              <div className="sys-card__bd sys-card__bd--col" style={{ paddingTop: 14 }}>
+                <div className="sys-field sys-field--loose">
+                  <span className="sys-field__lb">当前密钥来源</span>
+                  <span className="sys-field__v mono">
+                    {modelConfig.kimiCredentials.hint
+                      ? `已配置 ${modelConfig.kimiCredentials.hint}`
+                      : modelConfig.kimiCredentials.resolvedFrom === 'env'
+                        ? '来自环境变量 KIMI_API_KEY'
+                        : '（未配置）'}
+                  </span>
+                </div>
+                <div className="sys-field sys-field--loose">
+                  <span className="sys-field__lb">更新密钥</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      className="input"
+                      type="password"
+                      style={{ flex: 1, minWidth: 200, maxWidth: 360 }}
+                      placeholder="输入新 API Key（留空则不修改）"
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                    />
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={async () => {
+                      const r = await actions.testApiKey(apiKeyInput, modelConfig.kimiEvaluation?.model)
+                      if (r.success) {
+                        const d = r.data || {}
+                        const detail = [
+                          d.requestedModel && `请求模型: ${d.requestedModel}`,
+                          d.respondedModel && `响应模型: ${d.respondedModel}`,
+                          d.modelMatch === false && '⚠ 模型不匹配',
+                          d.latencyMs != null && `延迟: ${d.latencyMs}ms`,
+                        ].filter(Boolean).join(' · ')
+                        if (d.modelMatch === false) {
+                          toast.warn('连通性通过，但模型名不匹配', { detail, duration: 6000 })
+                        } else {
+                          toast.success('连接测试通过', { detail, duration: 5000 })
+                        }
+                      } else {
+                        toast.error(r.error || '连接测试失败')
+                      }
+                    }}>
+                      测试连接
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setApiKeyInput(''); actions.clearApiKeyDraft() }}>
+                      清除密钥
+                    </button>
+                  </div>
+                </div>
+                <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>
+                  {modelConfig.kimiCredentials.resolvedFrom === 'store' ? '当前使用仓库存储密钥'
+                    : modelConfig.kimiCredentials.resolvedFrom === 'env' ? '当前使用环境变量'
+                    : '未配置可用密钥，保存草稿后生效'}
+                </span>
               </div>
             </div>
           </div>
@@ -438,71 +433,41 @@ export default function SystemManagement({ sectionId }) {
 
         {activeSectionId === 'kb' && (
           <div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16, justifyContent: 'flex-end' }}>
-              <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={handleSaveKbDraft} disabled={actionLoading.saveKbDraft || kbLoading}>
+            <div className="sys-toolbar">
+              <span className="meta">智谱知识库接入与连通性验证</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveKbDraft} disabled={actionLoading.saveKbDraft || kbLoading}>
                 {actionLoading.saveKbDraft ? '保存中...' : '保存草稿'}
               </button>
-              <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={handleActivateKb} disabled={actionLoading.activateKbConfig || kbLoading}>
+              <button type="button" className="btn btn-pri btn-sm" onClick={handleActivateKb} disabled={actionLoading.activateKbConfig || kbLoading}>
                 {actionLoading.activateKbConfig ? '...' : '⌁ 生效配置'}
               </button>
             </div>
 
-            {kbSaveResult && (
-              <div
-                role="status"
-                style={{
-                  background: kbSaveResult.ok ? 'var(--ok-soft)' : 'var(--err-soft)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--r-md)',
-                  color: kbSaveResult.ok ? 'var(--ok)' : 'var(--err)',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  marginBottom: 16,
-                  padding: '10px 14px',
-                }}
-              >
-                {kbSaveResult.ok ? '✓ ' : '✗ '}{kbSaveResult.message}
-              </div>
-            )}
-
-            {/* 状态卡片 */}
-            <div style={{
-              background: kbConfig.resolvedFrom !== 'none' ? 'var(--ok-soft)' : 'var(--warn-soft)',
-              border: '1px solid var(--line)',
-              borderRadius: 'var(--r-lg)',
-              padding: '12px 16px',
-              marginBottom: 16,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              fontSize: 12,
-            }}>
-              <span style={{ fontSize: 16 }}>{kbConfig.resolvedFrom !== 'none' ? '✓' : '⚠'}</span>
+            {/* 状态横幅 */}
+            <div className={`sys-banner ${kbConfig.resolvedFrom !== 'none' ? 'sys-banner--ok' : 'sys-banner--warn'}`}>
+              <span className="sys-banner__ic">{kbConfig.resolvedFrom !== 'none' ? '✓' : '⚠'}</span>
               <div>
-                <div style={{ fontWeight: 700, color: kbConfig.resolvedFrom !== 'none' ? 'var(--ok)' : 'var(--warn-ink)' }}>
+                <div className="sys-banner__ti">
                   {kbConfig.resolvedFrom === 'store' ? '知识库已配置（来自存储）' : kbConfig.resolvedFrom === 'env' ? '知识库已配置（来自环境变量）' : '知识库未配置'}
                 </div>
-                <div style={{ color: 'var(--ink-2)', marginTop: 2 }}>
+                <div className="sys-banner__sub">
                   {kbConfig.resolvedFrom !== 'none' ? 'AI 工作台可检索真实知识库文档' : '请在下方填写 API Key 和知识库 ID，保存草稿后点击“生效配置”'}
                 </div>
               </div>
             </div>
 
             {/* 配置表单 */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>智谱知识库配置</div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="sys-card">
+              <div className="sys-card__hd">
+                <span className="sys-card__title">智谱知识库配置</span>
+              </div>
+              <div className="sys-card__bd sys-card__bd--col" style={{ paddingTop: 14 }}>
                 {/* API Key */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>
-                    API Key
-                  </label>
+                <div className="sys-field sys-field--loose">
+                  <span className="sys-field__lb">API Key</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     {kbConfig.apiHint && !kbConfig.apiKey && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)', background: 'var(--bg-soft)', padding: '5px 8px', borderRadius: 4 }}>
-                        {kbConfig.apiHint}
-                      </span>
+                      <span className="bdg muted">{kbConfig.apiHint}</span>
                     )}
                     <input
                       className="input"
@@ -513,7 +478,7 @@ export default function SystemManagement({ sectionId }) {
                       onChange={(e) => actions.updateKbConfig({ apiKey: e.target.value })}
                     />
                     {kbConfig.apiKey && (
-                      <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', height: 28 }} onClick={() => actions.updateKbConfig({ apiKey: '' })}>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => actions.updateKbConfig({ apiKey: '' })}>
                         清除
                       </button>
                     )}
@@ -521,10 +486,8 @@ export default function SystemManagement({ sectionId }) {
                 </div>
 
                 {/* Knowledge ID */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>
-                    知识库 ID
-                  </label>
+                <div className="sys-field sys-field--loose">
+                  <span className="sys-field__lb">知识库 ID</span>
                   <input
                     className="input"
                     style={{ maxWidth: 400 }}
@@ -534,23 +497,18 @@ export default function SystemManagement({ sectionId }) {
                   />
                 </div>
 
-                {/* Model */}
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 180 }}>
-                    <label style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>
-                      模型
-                    </label>
+                {/* Model + API Base URL */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px,1fr) minmax(240px,2fr)', gap: 12 }}>
+                  <div className="sys-field sys-field--loose">
+                    <span className="sys-field__lb">模型</span>
                     <input
                       className="input"
-                      style={{ maxWidth: 200 }}
                       value={kbConfig.model}
                       onChange={(e) => actions.updateKbConfig({ model: e.target.value })}
                     />
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 2, minWidth: 240 }}>
-                    <label style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>
-                      API Base URL
-                    </label>
+                  <div className="sys-field sys-field--loose">
+                    <span className="sys-field__lb">API Base URL</span>
                     <input
                       className="input"
                       value={kbConfig.apiBaseUrl}
@@ -560,30 +518,36 @@ export default function SystemManagement({ sectionId }) {
                 </div>
 
                 {/* 连通性测试 */}
-                <div style={{
-                  background: 'var(--brand-soft)',
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--r-md)',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  marginTop: 4,
-                }}>
-                  <span style={{ fontSize: 12, color: 'var(--ink-2)', flex: 1 }}>
+                <div className="sys-strip">
+                  <span className="sys-strip__tx">
                     测试知识库连通性，将使用当前填写的凭证调用智谱 API 进行验证。
                   </span>
                   <button
                     type="button"
-                    className="btn btn-ghost"
-                    style={{ fontSize: 12, padding: '6px 14px', height: 32, whiteSpace: 'nowrap' }}
+                    className="btn btn-ghost btn-sm"
                     disabled={kbTesting || kbLoading}
                     onClick={async () => {
                       setKbTesting(true)
                       setKbTestResult(null)
                       try {
                         const result = await actions.testKbConnectivity()
-                        setKbTestResult(result || { ok: false, error: '连通性测试未返回结果' })
+                        const r = result || { ok: false, error: '连通性测试未返回结果' }
+                        setKbTestResult(r)
+                        if (r.ok) {
+                          const detail = [
+                            r.model && `模型: ${r.model}`,
+                            r.latencyMs !== undefined && `延迟: ${r.latencyMs}ms`,
+                            r.retrievalTriggered !== undefined && `检索触发: ${r.retrievalTriggered ? '是' : '否'}`,
+                          ].filter(Boolean).join(' · ')
+                          if (r.warning === 'retrieval_empty') {
+                            toast.warn('连通性测试通过，但未检索到文档', { detail, duration: 5000 })
+                          } else {
+                            toast.success('连通性测试通过', { detail, duration: 4000 })
+                          }
+                        } else {
+                          const detail = [r.error, r.status && `HTTP ${r.status}`].filter(Boolean).join(' · ')
+                          toast.error('连通性测试失败', { detail, duration: 6000 })
+                        }
                       } finally {
                         setKbTesting(false)
                       }
@@ -592,228 +556,172 @@ export default function SystemManagement({ sectionId }) {
                     {kbTesting ? '测试中...' : '测试连通性'}
                   </button>
                 </div>
-
-                {/* 测试结果 */}
-                {kbTestResult && (
-                  <div
-                    role={kbTestResult.ok ? 'status' : 'alert'}
-                    style={{
-                    background: kbTestResult.ok ? 'var(--ok-soft)' : 'var(--err-soft)',
-                    border: '1px solid var(--line)',
-                    borderRadius: 'var(--r-md)',
-                    padding: '12px 14px',
-                    fontSize: 12,
-                  }}>
-                    <div style={{ fontWeight: 700, color: kbTestResult.ok ? 'var(--ok)' : 'var(--err)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>{kbTestResult.ok ? '✓' : '✗'}</span>
-                      <span>{kbTestResult.ok ? '连通性测试通过' : '连通性测试失败'}</span>
-                    </div>
-                    {kbTestResult.ok ? (
-                      <div>
-                        {kbTestResult.warning === 'retrieval_empty' && (
-                          <div style={{ color: 'var(--warn-ink)', marginBottom: 8 }}>
-                            连接成功，但固定测试语句未检索到文档
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', color: 'var(--ink-2)' }}>
-                          {kbTestResult.model && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>模型</span><br/><span style={{ fontFamily: 'var(--font-mono)' }}>{kbTestResult.model}</span></div>}
-                          {kbTestResult.knowledgeId && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>知识库 ID</span><br/><span style={{ fontFamily: 'var(--font-mono)' }}>{kbTestResult.knowledgeId}</span></div>}
-                          {kbTestResult.latencyMs !== undefined && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>延迟</span><br/><span style={{ fontFamily: 'var(--font-mono)' }}>{kbTestResult.latencyMs}ms</span></div>}
-                          {kbTestResult.retrievalTriggered !== undefined && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>检索触发</span><br/><span>{kbTestResult.retrievalTriggered ? '是' : '否'}</span></div>}
-                          {kbTestResult.testedSource && <div><span style={{ color: 'var(--ink-3)', fontSize: 11 }}>凭证来源</span><br/><span>{kbTestResult.testedSource === 'draft_store' ? '草稿存储' : kbTestResult.testedSource === 'environment' ? '环境变量' : '请求参数'}</span></div>}
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div style={{ color: 'var(--err)', fontWeight: 600 }}>{kbTestResult.error || '未知错误'}</div>
-                        {kbTestResult.status && <div style={{ color: 'var(--ink-3)', fontSize: 11, marginTop: 4, fontFamily: 'var(--font-mono)' }}>HTTP {kbTestResult.status}</div>}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </div>
         )}
 
         {activeSectionId === 'rate' && (
-          <div className="section" style={{ margin: 0 }}>
-            <div className="hd">
-              <span>RateCard · 当前生效</span>
-              <div className="right">
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }}>
-                  编辑
-                </button>
-              </div>
+          <div>
+            <div className="sys-toolbar">
+              <span className="meta">RateCard · 当前生效 · 共 {ratecard.length} 个角色基准</span>
+              <button type="button" className="btn btn-ghost btn-sm">
+                编辑
+              </button>
             </div>
-            <div className="bd">
-              <div className="grid-3-eq">
-                {ratecard.map((r) => (
-                  <div
-                    key={r.role}
-                    style={{ background: 'var(--bg-soft)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px' }}
-                  >
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{r.role}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>{r.price}</div>
+            <div className="sys-grid">
+              {ratecard.map((r) => (
+                <div key={r.role} className="sys-card">
+                  <div className="sys-card__hd">
+                    <span className="sys-card__title">{r.role}</span>
                   </div>
-                ))}
-              </div>
+                  <div className="sys-card__bd sys-card__bd--col">
+                    <div className="sys-field">
+                      <span className="sys-field__lb">人天单价</span>
+                      <span className="sys-field__v" style={{ fontSize: 16, fontWeight: 800 }}>{r.price}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
         {activeSectionId === 'dsl' && (
-          <div className="section" style={{ margin: 0 }}>
-            <div className="hd">
-              <span>DSL 规则集</span>
-              <div className="right">
-                <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.saveDslDraft()}>
-                  保存草稿
-                </button>
-                <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => actions.activateDsl()}>
-                  ⌁ 生效
-                </button>
-              </div>
+          <div>
+            <div className="sys-toolbar">
+              <span className="meta">共 {dslRules.length} 条实施评估依赖规则</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={async () => { const r = await actions.saveDslDraft(); r.success ? toast.success('DSL 草稿已保存') : toast.error(r.error || '保存失败') }}>
+                保存草稿
+              </button>
+              <button type="button" className="btn btn-pri btn-sm" onClick={async () => { const r = await actions.activateDsl(); r.success ? toast.success('DSL 规则已生效') : toast.error(r.error || '操作失败') }}>
+                ⌁ 生效
+              </button>
             </div>
-            <div className="bd" style={{ padding: 0 }}>
-              <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 60 }}>启用</th>
-                    <th>规则 ID</th>
-                    <th>类型</th>
-                    <th>说明</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dslRules.map((r) => (
-                    <tr key={r.id}>
-                      <td style={{ textAlign: 'center' }}>
-                        <input type="checkbox" checked={r.enabled} onChange={() => actions.toggleDsl(r.id)} />
-                      </td>
-                      <td className="mono" style={{ fontSize: 12 }}>{r.id}</td>
-                      <td>
-                        <span
-                          className="bdg"
-                          style={{
-                            fontSize: 10.5,
-                            padding: '1px 6px',
-                            background: r.type === 'blocking' ? 'var(--err-soft)' : 'var(--warn-soft)',
-                            color: r.type === 'blocking' ? 'var(--err)' : 'var(--warn-ink)',
-                          }}
-                        >
-                          {r.type === 'blocking' ? '阻断' : '警告'}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>{r.message}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="sys-grid">
+              {dslRules.map((r) => (
+                <div key={r.id} className="sys-card">
+                  <div className="sys-card__hd">
+                    <span className="sys-card__title mono">{r.id}</span>
+                    <span className={`bdg ${r.type === 'blocking' ? 'lock' : 'warn'}`}>
+                      <span className="dot" />
+                      {r.type === 'blocking' ? '阻断' : '警告'}
+                    </span>
+                  </div>
+                  <div className="sys-card__bd sys-card__bd--col">
+                    <div className="sys-field">
+                      <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500, lineHeight: 1.6 }}>{r.message}</span>
+                    </div>
+                  </div>
+                  <div className="sys-card__ft">
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-2)', cursor: 'pointer' }}>
+                      <input type="checkbox" className="sys-check" checked={r.enabled} onChange={() => actions.toggleDsl(r.id)} />
+                      {r.enabled ? '已启用' : '已停用'}
+                    </label>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
         {activeSectionId === 'tpl' && (
-          <div className="section" style={{ margin: 0 }}>
-            <div className="hd">
-              <span>模板管理</span>
+          <div>
+            <div className="sys-toolbar">
+              <span className="meta">共 {templates.length} 个评估模板与复用资产</span>
             </div>
-            <div className="bd">
-              <div className="grid-3-eq">
-                {templates.map((t) => (
-                  <div
-                    key={t.id}
-                    style={{
-                      background: 'var(--bg-soft)',
-                      border: '1px solid var(--line)',
-                      borderRadius: 'var(--r-lg)',
-                      padding: 16,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>{t.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6, flex: 1 }}>{t.desc}</div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {t.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="bdg"
-                          style={{ fontSize: 10, padding: '1px 6px', background: 'var(--brand-soft)', color: 'var(--brand-ink)' }}
-                        >
-                          {tag}
-                        </span>
-                      ))}
+            <div className="sys-grid">
+              {templates.map((t) => (
+                <div key={t.id} className="sys-card">
+                  <div className="sys-card__hd">
+                    <span className="sys-card__title">{t.name}</span>
+                  </div>
+                  <div className="sys-card__bd sys-card__bd--col">
+                    <div className="sys-field">
+                      <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500, lineHeight: 1.6 }}>{t.desc}</span>
                     </div>
+                    <div className="sys-field">
+                      <span className="sys-field__lb">标签</span>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {t.tags.map((tag) => (
+                          <span key={tag} className="bdg brd">{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="sys-card__ft">
+                    <span className="sp" />
                     <button type="button"
-                      className="btn btn-pri"
-                      style={{ height: 30, fontSize: 12, padding: '0 12px', marginTop: 4 }}
-                      onClick={() => actions.useTemplate(t.name)}
+                      className="btn btn-pri btn-sm"
+                      onClick={() => { const name = actions.useTemplate(t.name); toast.success(`已使用模板「${name}」`) }}
                     >
                       使用
                     </button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
         {activeSectionId === 'testResults' && (
-          <div className="section" style={{ margin: 0 }}>
-            <div className="hd">
-              <span>人工测试结果</span>
-              <div className="right">
-                <button type="button" className="btn btn-pri" style={{ fontSize: 12, padding: '6px 12px', height: 32 }} onClick={() => setTestResultDialog(true)}>+ 新建</button>
-              </div>
+          <div>
+            <div className="sys-toolbar">
+              <span className="meta">共 {testResults.length} 条人工测试结果登记</span>
+              <button type="button" className="btn btn-pri btn-sm" onClick={() => setTestResultDialog(true)}>+ 新建</button>
             </div>
-            <div className="bd">
-              {testResultsLoading ? (
-                <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>加载中...</div>
-              ) : testResults.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>暂无测试结果记录</div>
-              ) : (
-                <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
-                  <thead>
-                    <tr>
-                      <th>用例编号</th>
-                      <th>执行人</th>
-                      <th>环境</th>
-                      <th>账号</th>
-                      <th>状态</th>
-                      <th>截图</th>
-                      <th>备注</th>
-                      <th>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {testResults.map((r) => (
-                      <tr key={r.manualTestResultId}>
-                        <td className="mono" style={{ fontSize: 12 }}>{r.testCaseKey || '—'}</td>
-                        <td style={{ fontSize: 12 }}>{r.executorName}</td>
-                        <td style={{ fontSize: 12 }}>{r.environment}</td>
-                        <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>{r.account || '—'}</td>
-                        <td>
-                          <span className={`bdg ${r.resultStatus === 'passed' ? 'ci' : r.resultStatus === 'failed' ? 'draft' : ''}`} style={{ fontSize: 10.5, padding: '1px 6px' }}>
-                            <span className="dot" />
-                            {r.resultStatus === 'passed' ? '通过' : r.resultStatus === 'failed' ? '失败' : r.resultStatus === 'blocked' ? '阻塞' : '跳过'}
+            {testResultsLoading ? (
+              <div className="sys-empty">加载中...</div>
+            ) : testResults.length === 0 ? (
+              <div className="sys-empty">暂无测试结果记录</div>
+            ) : (
+              <div className="sys-grid">
+                {testResults.map((r) => {
+                  const st = TEST_RESULT_STATUS[r.resultStatus] || TEST_RESULT_STATUS.skipped
+                  return (
+                    <div key={r.manualTestResultId} className="sys-card">
+                      <div className="sys-card__hd">
+                        <span className="sys-card__title mono">{r.testCaseKey || '—'}</span>
+                        <span className={`bdg ${st.cls}`}>
+                          <span className="dot" />
+                          {st.label}
+                        </span>
+                      </div>
+                      <div className="sys-card__bd">
+                        <div className="sys-field">
+                          <span className="sys-field__lb">执行人</span>
+                          <span className="sys-field__v">{r.executorName}</span>
+                        </div>
+                        <div className="sys-field">
+                          <span className="sys-field__lb">环境</span>
+                          <span className="sys-field__v">{r.environment}</span>
+                        </div>
+                        <div className="sys-field">
+                          <span className="sys-field__lb">账号</span>
+                          <span className="sys-field__v sys-field__v--dim">{r.account || '—'}</span>
+                        </div>
+                        <div className="sys-field">
+                          <span className="sys-field__lb">截图</span>
+                          <span className="sys-field__v">
+                            {r.screenshotUrl ? <a href={r.screenshotUrl} target="_blank" rel="noreferrer">查看</a> : '—'}
                           </span>
-                        </td>
-                        <td style={{ fontSize: 12 }}>
-                          {r.screenshotUrl ? <a href={r.screenshotUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--brand)' }}>查看</a> : '—'}
-                        </td>
-                        <td style={{ fontSize: 12, color: 'var(--ink-2)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.notes || '—'}</td>
-                        <td>
-                          <button type="button" className="btn btn-dan" style={{ height: 24, fontSize: 11, padding: '0 8px' }} onClick={async () => { if (confirm('确认删除？')) await actions.deleteTestResult(r.harnessRunId, r.manualTestResultId) }}>删除</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                        </div>
+                        {r.notes && (
+                          <div className="sys-field sys-field--full">
+                            <span className="sys-field__lb">备注</span>
+                            <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500 }}>{r.notes}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="sys-card__ft">
+                        <span className="sp" />
+                        <button type="button" className="btn btn-dan btn-sm" onClick={async () => { if (confirm('确认删除？')) await actions.deleteTestResult(r.harnessRunId, r.manualTestResultId) }}>删除</button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -852,7 +760,7 @@ export default function SystemManagement({ sectionId }) {
                 disabled={actionLoading[`configure:${selectedRuleId}`]}
                 onClick={async () => {
                   const result = await actions.configureRule(selectedRuleId, ruleConfigForm)
-                  if (result.success) setDialog(null)
+                  if (result.success) { setDialog(null); toast.success('编码规则配置已保存') } else { toast.error(result.error || '保存失败') }
                 }}
               >
                 {actionLoading[`configure:${selectedRuleId}`] ? '保存中...' : '保存配置'}
@@ -880,22 +788,12 @@ export default function SystemManagement({ sectionId }) {
               ))}
             </div>
             <textarea
+              className="input"
               value={prompts[promptTab]}
               onChange={(e) =>
                 setPrompts((prev) => ({ ...prev, [promptTab]: e.target.value }))
               }
-              style={{
-                width: '100%',
-                minHeight: 200,
-                padding: '10px 12px',
-                border: '1px solid var(--line)',
-                borderRadius: 'var(--r-md)',
-                fontFamily: 'inherit',
-                fontSize: 13,
-                lineHeight: 1.6,
-                outline: 'none',
-                resize: 'vertical',
-              }}
+              style={{ height: 'auto', minHeight: 200, padding: '10px 12px', lineHeight: 1.6, resize: 'vertical' }}
             />
             {promptResult && (
               <div style={{marginBottom:12,padding:12,background:'var(--bg-soft)',border:'1px solid var(--line)',borderRadius:'var(--r-md)',maxHeight:200,overflowY:'auto'}}>
@@ -903,18 +801,17 @@ export default function SystemManagement({ sectionId }) {
               </div>
             )}
             <DialogActions>
-              <button type="button" className="btn btn-ghost" style={{ height: 30, fontSize: 12, padding: '0 14px' }} disabled={actionLoading.testPrompt} onClick={async () => {
+              <button type="button" className="btn btn-ghost btn-sm" disabled={actionLoading.testPrompt} onClick={async () => {
                 const r = await actions.testPrompt(prompts[promptTab])
                 if (r) setPromptResult(r)
               }}>
                 {actionLoading.testPrompt ? '测试中...' : '测试'}
               </button>
-              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => { setDialog(null); setPromptResult(null) }}>
+              <button type="button" className="btn btn-out btn-sm" onClick={() => { setDialog(null); setPromptResult(null) }}>
                 取消
               </button>
               <button type="button"
-                className="btn btn-pri"
-                style={{ height: 30, fontSize: 12, padding: '0 14px' }}
+                className="btn btn-pri btn-sm"
                 disabled={actionLoading.savePrompts}
                 onClick={async () => {
                   await actions.savePrompts()
@@ -937,7 +834,7 @@ export default function SystemManagement({ sectionId }) {
       >
             {editingModel === 'kimiEvaluation' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <FormRow label="启用" full>
+                <FormRow label="启用">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                     <input type="checkbox" checked={modelConfig.kimiEvaluation.enabled} onChange={(e) => handleModelConfigChange('kimiEvaluation', { enabled: e.target.checked })} />
                     启用 KIMI 评估模型
@@ -970,16 +867,17 @@ export default function SystemManagement({ sectionId }) {
                 </FormRow>
                 <FormRow label="Prompt 模板">
                   <textarea
+                    className="input"
                     value={modelConfig.kimiEvaluation.promptTemplate}
                     onChange={(e) => handleModelConfigChange('kimiEvaluation', { promptTemplate: e.target.value })}
-                    style={{ width: '100%', minHeight: 120, padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontFamily: 'inherit', fontSize: 12, lineHeight: 1.5, outline: 'none', resize: 'vertical' }}
+                    style={{ height: 'auto', minHeight: 120, padding: '8px 10px', fontSize: 12, lineHeight: 1.5, resize: 'vertical' }}
                   />
                 </FormRow>
               </div>
             )}
             {editingModel === 'fileParsing' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <FormRow label="启用" full>
+                <FormRow label="启用">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                     <input type="checkbox" checked={modelConfig.fileParsing.enabled} onChange={(e) => handleModelConfigChange('fileParsing', { enabled: e.target.checked })} />
                     启用文件解析模型
@@ -991,7 +889,7 @@ export default function SystemManagement({ sectionId }) {
                 <FormRow label="允许的扩展名">
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
                     {(modelConfig.fileParsing.allowedExtensions || []).map((ext) => (
-                      <span key={ext} className="bdg" style={{ fontSize: 11, padding: '2px 8px', background: 'var(--brand-soft)', color: 'var(--brand-ink)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span key={ext} className="bdg brd">
                         {ext}
                         <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => handleModelConfigChange('fileParsing', { allowedExtensions: modelConfig.fileParsing.allowedExtensions.filter((e) => e !== ext) })}>×</span>
                       </span>
@@ -999,7 +897,7 @@ export default function SystemManagement({ sectionId }) {
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <input className="input" style={{ flex: 1 }} placeholder="如 .pdf" value={extInput} onChange={(e) => setExtInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && extInput.trim()) { const v = extInput.trim().startsWith('.') ? extInput.trim() : `.${extInput.trim()}`; handleModelConfigChange('fileParsing', { allowedExtensions: [...new Set([...modelConfig.fileParsing.allowedExtensions, v])] }); setExtInput('') } }} />
-                    <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', height: 28 }} onClick={() => { if (extInput.trim()) { const v = extInput.trim().startsWith('.') ? extInput.trim() : `.${extInput.trim()}`; handleModelConfigChange('fileParsing', { allowedExtensions: [...new Set([...modelConfig.fileParsing.allowedExtensions, v])] }); setExtInput('') } }}>添加</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { if (extInput.trim()) { const v = extInput.trim().startsWith('.') ? extInput.trim() : `.${extInput.trim()}`; handleModelConfigChange('fileParsing', { allowedExtensions: [...new Set([...modelConfig.fileParsing.allowedExtensions, v])] }); setExtInput('') } }}>添加</button>
                   </div>
                 </FormRow>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1028,7 +926,7 @@ export default function SystemManagement({ sectionId }) {
             )}
             {editingModel === 'kimiGeneration' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <FormRow label="启用" full>
+                <FormRow label="启用">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                     <input type="checkbox" checked={modelConfig.kimiGeneration.enabled} onChange={(e) => handleModelConfigChange('kimiGeneration', { enabled: e.target.checked })} />
                     启用生成模型
@@ -1072,10 +970,10 @@ export default function SystemManagement({ sectionId }) {
               </div>
             )}
             <DialogActions>
-              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={requestCloseModelEdit} disabled={modelSaving}>
+              <button type="button" className="btn btn-out btn-sm" onClick={requestCloseModelEdit} disabled={modelSaving}>
                 取消
               </button>
-              <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={handleModelEditSave} disabled={modelSaving}>
+              <button type="button" className="btn btn-pri btn-sm" onClick={handleModelEditSave} disabled={modelSaving}>
                 {modelSaving ? '保存中...' : '确定'}
               </button>
             </DialogActions>
@@ -1107,19 +1005,19 @@ export default function SystemManagement({ sectionId }) {
       >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <FormRow label="执行人 *">
-                <input style={{ height: 32, padding: '0 8px', fontSize: 13, border: '1px solid var(--line)', borderRadius: 'var(--r-md)' }} value={testResultForm.executorName} onChange={(e) => setTestResultForm((f) => ({ ...f, executorName: e.target.value }))} />
+                <input className="input" value={testResultForm.executorName} onChange={(e) => setTestResultForm((f) => ({ ...f, executorName: e.target.value }))} />
               </FormRow>
               <FormRow label="环境 *">
-                <input style={{ height: 32, padding: '0 8px', fontSize: 13, border: '1px solid var(--line)', borderRadius: 'var(--r-md)' }} value={testResultForm.environment} onChange={(e) => setTestResultForm((f) => ({ ...f, environment: e.target.value }))} />
+                <input className="input" value={testResultForm.environment} onChange={(e) => setTestResultForm((f) => ({ ...f, environment: e.target.value }))} />
               </FormRow>
               <FormRow label="账号">
-                <input style={{ height: 32, padding: '0 8px', fontSize: 13, border: '1px solid var(--line)', borderRadius: 'var(--r-md)' }} value={testResultForm.account} onChange={(e) => setTestResultForm((f) => ({ ...f, account: e.target.value }))} />
+                <input className="input" value={testResultForm.account} onChange={(e) => setTestResultForm((f) => ({ ...f, account: e.target.value }))} />
               </FormRow>
               <FormRow label="用例编号">
-                <input style={{ height: 32, padding: '0 8px', fontSize: 13, border: '1px solid var(--line)', borderRadius: 'var(--r-md)' }} value={testResultForm.testCaseKey} onChange={(e) => setTestResultForm((f) => ({ ...f, testCaseKey: e.target.value }))} />
+                <input className="input" value={testResultForm.testCaseKey} onChange={(e) => setTestResultForm((f) => ({ ...f, testCaseKey: e.target.value }))} />
               </FormRow>
               <FormRow label="结果状态 *">
-                <select style={{ height: 32, padding: '0 8px', fontSize: 13, border: '1px solid var(--line)', borderRadius: 'var(--r-md)' }} value={testResultForm.resultStatus} onChange={(e) => setTestResultForm((f) => ({ ...f, resultStatus: e.target.value }))}>
+                <select className="input" value={testResultForm.resultStatus} onChange={(e) => setTestResultForm((f) => ({ ...f, resultStatus: e.target.value }))}>
                   <option value="passed">通过</option>
                   <option value="failed">失败</option>
                   <option value="blocked">阻塞</option>
@@ -1127,16 +1025,16 @@ export default function SystemManagement({ sectionId }) {
                 </select>
               </FormRow>
               <FormRow label="截图 URL">
-                <input style={{ height: 32, padding: '0 8px', fontSize: 13, border: '1px solid var(--line)', borderRadius: 'var(--r-md)' }} value={testResultForm.screenshotUrl} onChange={(e) => setTestResultForm((f) => ({ ...f, screenshotUrl: e.target.value }))} />
+                <input className="input" value={testResultForm.screenshotUrl} onChange={(e) => setTestResultForm((f) => ({ ...f, screenshotUrl: e.target.value }))} />
               </FormRow>
-              <FormRow label="备注" full>
-                <textarea style={{ width: '100%', minHeight: 60, padding: '6px 8px', fontSize: 13, border: '1px solid var(--line)', borderRadius: 'var(--r-md)', resize: 'vertical', fontFamily: 'inherit' }} value={testResultForm.notes} onChange={(e) => setTestResultForm((f) => ({ ...f, notes: e.target.value }))} />
+              <FormRow label="备注" className="sys-field--full">
+                <textarea className="input" style={{ height: 'auto', minHeight: 64, padding: '6px 10px', resize: 'vertical' }} value={testResultForm.notes} onChange={(e) => setTestResultForm((f) => ({ ...f, notes: e.target.value }))} />
               </FormRow>
             </div>
             <DialogActions>
-              <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={() => setTestResultDialog(false)}>取消</button>
-              <button type="button" className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={async () => {
-                if (!testResultForm.executorName || !testResultForm.environment) { alert('执行人和环境必填'); return }
+              <button type="button" className="btn btn-out btn-sm" onClick={() => setTestResultDialog(false)}>取消</button>
+              <button type="button" className="btn btn-pri btn-sm" onClick={async () => {
+                if (!testResultForm.executorName || !testResultForm.environment) { toast.warn('执行人和环境必填'); return }
                 await actions.createTestResult(testResultForm)
                 setTestResultDialog(false)
                 setTestResultForm({ executorName: '', environment: '', account: '', testCaseKey: '', resultStatus: 'passed', screenshotUrl: '', notes: '' })
@@ -1147,12 +1045,10 @@ export default function SystemManagement({ sectionId }) {
   )
 }
 
-function FormRow({ label, children, full }) {
+function FormRow({ label, children, className }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, ...(full ? {} : {}) }}>
-      <label style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>
-        {label}
-      </label>
+    <div className={`sys-field sys-field--loose${className ? ` ${className}` : ''}`}>
+      <span className="sys-field__lb">{label}</span>
       {children}
     </div>
   )

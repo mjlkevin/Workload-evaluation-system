@@ -29,85 +29,41 @@ const panel = {
 const WORKSPACE_PANEL_COLLAPSED_KEY = 'wes-ai-workspace-panel-collapsed'
 
 /* ── Copy Session ID Icon ── */
-function CopySessionIdButton({ sessionId }) {
-  const [copied, setCopied] = useState(false)
-  if (!sessionId) return null
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(sessionId)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch {
-      /* clipboard API not available */
-    }
-  }
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      title={copied ? '已复制 Session ID' : '复制 Session ID（用于问题反馈）'}
-      aria-label="复制 Session ID"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 22,
-        height: 22,
-        border: '1px solid var(--line)',
-        borderRadius: 4,
-        background: copied ? 'var(--ok-soft)' : 'transparent',
-        color: copied ? 'var(--ok)' : 'var(--ink-3)',
-        cursor: 'pointer',
-        fontSize: 12,
-        padding: 0,
-        transition: 'all 0.15s ease',
-      }}
-    >
-      {copied ? '✓' : ''}
-    </button>
-  )
-}
-
 function CopyMessageButton({ text }) {
   const [copied, setCopied] = useState(false)
   if (!text) return null
-  const handleCopy = async () => {
+  const handleCopy = async (e) => {
+    e.stopPropagation()
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      setTimeout(() => setCopied(false), 2000)
     } catch {
       /* clipboard API not available */
     }
   }
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className="ai-copy-btn"
-      title={copied ? '已复制' : '复制消息'}
-      aria-label="复制消息"
-      style={{
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 24,
-        height: 24,
-        border: '1px solid var(--line)',
-        borderRadius: 4,
-        background: copied ? 'var(--ok-soft)' : 'var(--bg-soft)',
-        color: copied ? 'var(--ok)' : 'var(--ink-3)',
-        cursor: 'pointer',
-        fontSize: 12,
-        padding: 0,
-        zIndex: 1,
-      }}
-    >
-      {copied ? '✓' : '⧉'}
-    </button>
+    <div className="ai-msg-actions">
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="ai-msg-action-btn"
+        title={copied ? '已复制' : '复制'}
+        aria-label="复制消息"
+      >
+        {copied ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        )}
+        <span className="ai-msg-action-label">{copied ? '已复制' : '复制'}</span>
+      </button>
+    </div>
   )
 }
 
@@ -123,11 +79,57 @@ function RoleBadge({ children }) {
   return <span className="bdg brd" style={{ fontSize: 11, padding: '2px 8px' }}><span className="dot" />{children}</span>
 }
 
+function HoverBadge({ label, tooltip, variant = 'brd' }) {
+  const [show, setShow] = useState(false)
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-flex' }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <span className={`bdg ${variant}`} style={{ fontSize: 11, padding: '2px 8px', cursor: 'default' }}>
+        <span className="dot" />{label}
+      </span>
+      {show && tooltip && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            zIndex: 90,
+            maxWidth: 320,
+            padding: '8px 12px',
+            borderRadius: 8,
+            background: 'var(--ink)',
+            color: '#fff',
+            fontSize: 11.5,
+            lineHeight: 1.6,
+            boxShadow: '0 4px 12px rgba(0,0,0,.18)',
+            whiteSpace: 'normal',
+            pointerEvents: 'none',
+            animation: 'ai-badge-fade-in .15s ease',
+          }}
+        >
+          {tooltip}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function ResultCard({ title, children }) {
   return (
-    <section style={{ ...panel, overflow: 'hidden' }}>
-      <h3 style={{ margin: 0, padding: '12px 14px', borderBottom: '1px solid var(--line)', fontSize: 13 }}>{title}</h3>
-      <div style={{ padding: 14, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>{children}</div>
+    <section className="ai-result-card">
+      <div className="ai-result-card__head">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+        <span>{title}</span>
+      </div>
+      <div className="ai-result-card__body">{children}</div>
     </section>
   )
 }
@@ -135,39 +137,49 @@ function ResultCard({ title, children }) {
 function getWorkflowOutputs(workflow) {
   if (!workflow) {
     return {
-      title: '沉淀结果',
-      empty: '对话开始后，这里会沉淀项目草稿、需求包、待确认问题和评估输入。',
+      title: '预期产出',
+      activeTitle: '已沉淀资产',
+      empty: '对话开始后，AI 将自动沉淀项目草稿、需求包、待确认问题和评估输入，供你审阅和推送到下游系统。',
+      activeDesc: '本轮对话已沉淀以下结构化资产，可继续补充问题或推送到下游页面。',
       outputs: ['需求包草稿', '待确认问题', '实施评估输入', '风险假设'],
     }
   }
 
   if (workflow.key.includes('question')) {
     return {
-      title: '待确认问题',
-      empty: '将沉淀客户回问清单、缺失资料和影响评估口径的关键假设。',
+      title: '预期产出',
+      activeTitle: '待确认问题',
+      empty: 'AI 将沉淀客户回问清单、缺失资料和影响评估口径的关键假设。',
+      activeDesc: '以下问题需客户或 PM 确认后，方可推进评估。',
       outputs: ['客户回问清单', '缺失资料', '范围假设', '风险提示'],
     }
   }
 
   if (workflow.key.includes('assessment') || workflow.key.includes('scope')) {
     return {
-      title: '实施评估输入',
-      empty: '将沉淀模块建议、实施范围、复杂度和风险假设，便于进入实施评估。',
+      title: '预期产出',
+      activeTitle: '实施评估输入',
+      empty: 'AI 将沉淀模块建议、实施范围、复杂度和风险假设，便于直接进入实施评估。',
+      activeDesc: '以下评估输入已就绪，可推送到实施评估模块。',
       outputs: ['模块建议', '范围边界', '复杂度依据', '风险假设'],
     }
   }
 
   if (workflow.key.includes('file') || workflow.key.includes('project')) {
     return {
-      title: '需求包草稿',
-      empty: '将沉淀业务主题、需求条目、待确认问题和下游评估入口。',
+      title: '预期产出',
+      activeTitle: '需求包草稿',
+      empty: 'AI 将沉淀业务主题、需求条目、待确认问题和下游评估入口。',
+      activeDesc: '需求包草稿已生成，可继续补充或推送到需求管理。',
       outputs: ['业务主题', '需求条目', '待确认问题', '评估入口'],
     }
   }
 
   return {
-    title: workflow.title,
-    empty: `将围绕「${workflow.title}」沉淀可接力的结构化结果。`,
+    title: '预期产出',
+    activeTitle: workflow.title,
+    empty: `AI 将围绕「${workflow.title}」沉淀可接力的结构化结果。`,
+    activeDesc: `「${workflow.title}」已生成初步结果，可继续追问或进入下游页面。`,
     outputs: ['关键结论', '待办动作', '下游入口', '风险提示'],
   }
 }
@@ -1696,6 +1708,7 @@ export default function AiHomeWorkbench({ currentUser }) {
     loadSessions,
     createSession,
     deleteSession,
+    renameSession,
     upsertSession,
     setActiveSession,
   } = useAiSessions()
@@ -2304,27 +2317,21 @@ export default function AiHomeWorkbench({ currentUser }) {
   }
 
   return (
-    <div className={`ai-home-workbench${workspacePanelCollapsed ? ' ai-home-workbench--inspector-collapsed' : ''}`} data-testid="ai-home-workbench" style={{ display: 'grid', gap: 12, height: '100%', minHeight: 0, overflow: 'hidden' }}>
-      <aside className="ai-home-rail" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0, minHeight: 0, overflowY: 'auto' }}>
-        <section style={{ ...panel, padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <RoleBadge>{preset.label}</RoleBadge>
-            <h2 style={{ margin: 0, fontSize: 14, lineHeight: 1.35, fontWeight: 700 }}>{preset.headline}</h2>
-          </div>
-          <p style={{ margin: '6px 0 0', color: 'var(--ink-3)', fontSize: 11.5, lineHeight: 1.6 }}>{preset.emptyHint}</p>
-        </section>
-
+    <div className={`ai-home-workbench${workspacePanelCollapsed ? ' ai-home-workbench--inspector-collapsed' : ''}`} data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
+      <h1 className="sr-only">AI 工作台</h1>
+      <aside className="ai-home-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
         <SessionRail
           sessions={sessions}
           activeSessionId={activeSession?.sessionId}
           onSelect={selectSession}
           onNew={startNewSession}
           onDelete={requestDeleteSession}
+          onRename={renameSession}
         />
 
         <section style={{ ...panel, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--line)', fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', flexShrink: 0 }}>工作流模板</div>
-          <div className="ai-workflow-list" style={{ padding: 8, display: 'grid', gap: 6, maxHeight: 220, overflowY: 'auto', minHeight: 0 }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', fontSize: 12, fontWeight: 800, color: 'var(--ink-2)', flexShrink: 0 }}>工作流模板</div>
+          <div className="ai-workflow-list" style={{ padding: 10, display: 'grid', gap: 8, maxHeight: 220, overflowY: 'auto', minHeight: 0 }}>
             {preset.workflows.map((workflow) => {
               const isActive = activeWorkflowKey === workflow.key
               return (
@@ -2359,9 +2366,9 @@ export default function AiHomeWorkbench({ currentUser }) {
       </aside>
 
       <section style={{ ...panel, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
-        <div style={{ minHeight: 44, padding: '8px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <RoleBadge>AI 工作台</RoleBadge>
-          <CopySessionIdButton sessionId={activeSession?.sessionId} />
+        <div style={{ minHeight: 48, padding: '12px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <HoverBadge label="AI 工作台" tooltip={preset.systemPrompt} />
+          <HoverBadge label={preset.label} tooltip={<><b style={{ display: 'block', marginBottom: 4 }}>{preset.headline}</b>{preset.emptyHint}</>} />
           {loadingSessions && <span className="tag" style={{ marginLeft: 'auto' }}>加载会话</span>}
           {sessionsError && (
             <div role="alert" style={{ marginLeft: 'auto', color: 'var(--err)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2371,18 +2378,31 @@ export default function AiHomeWorkbench({ currentUser }) {
           )}
         </div>
 
-        <div ref={messagePaneRef} data-testid="ai-home-message-pane" style={{ flex: 1, minHeight: 0, padding: 18, overflowY: 'auto', background: 'linear-gradient(180deg,#fff,var(--bg-soft))' }}>
+        <div ref={messagePaneRef} data-testid="ai-home-message-pane" style={{ flex: 1, minHeight: 0, padding: '24px 28px', overflowY: 'auto', background: '#fff' }}>
           {!messages.length && (
-            <div style={{ border: '1px dashed var(--line)', borderRadius: 12, padding: 28, background: '#fff' }}>
+            <div className="ai-empty-state">
+              <div className="ai-empty-state__icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  <line x1="9" y1="9" x2="15" y2="9" />
+                  <line x1="9" y1="13" x2="13" y2="13" />
+                </svg>
+              </div>
               {activeWorkflow && <RoleBadge>当前工作流：{activeWorkflow.title}</RoleBadge>}
-              <h2 style={{ margin: activeWorkflow ? '12px 0 8px' : '0 0 8px', fontSize: 22 }}>{centerTitle}</h2>
-              <p style={{ margin: '0 0 16px', color: 'var(--ink-2)', fontSize: 13, lineHeight: 1.8 }}>{centerHint}</p>
+              <h2 className="ai-empty-state__title">{centerTitle}</h2>
+              <p className="ai-empty-state__desc">{centerHint}</p>
               {activeWorkflow && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                <div className="ai-empty-state__tags">
                   {outputState.outputs.map((item) => <span key={item} className="tag brd">{item}</span>)}
                 </div>
               )}
-              <button className="btn btn-pri" type="button" onClick={chooseFile}>选择文件</button>
+              <div className="ai-empty-state__actions">
+                <button className="btn btn-pri" type="button" onClick={chooseFile}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+                  选择文件开始
+                </button>
+                <span className="ai-empty-state__hint">或直接输入问题</span>
+              </div>
             </div>
           )}
 
@@ -2392,11 +2412,8 @@ export default function AiHomeWorkbench({ currentUser }) {
               const hasArtifacts = !isUser && !message.error && pickArray(message.artifacts).length > 0
               return (
                 <article key={message.id || `${message.role}-${index}`} style={{ display: 'flex', gap: 10, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
-                  {!isUser && <div style={{ width: 34, height: 34, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,var(--brand),var(--accent))', color: '#fff', fontWeight: 800 }}>AI</div>}
-                  <div className="ai-bubble-wrap" style={{ width: hasArtifacts ? 'min(100%, 1080px)' : undefined, maxWidth: hasArtifacts ? 'calc(100% - 44px)' : '76%', padding: 14, borderRadius: 12, border: message.error ? '1px solid color-mix(in oklab, var(--err) 28%, var(--line))' : '1px solid var(--line)', background: isUser ? 'var(--brand)' : message.error ? '#fff7f7' : '#fff', color: isUser ? '#fff' : message.error ? 'var(--err)' : 'var(--ink)', boxShadow: 'var(--shadow-1)', position: 'relative' }}>
-                    {!isUser && !message.loading && !message.error && message.text && (
-                      <CopyMessageButton text={message.text} />
-                    )}
+                  {!isUser && <div className="ai-avatar ai-avatar--bot" aria-hidden="true">AI</div>}
+                  <div className={`ai-bubble-wrap${isUser ? ' ai-bubble--user' : message.error ? ' ai-bubble--error' : ' ai-bubble--ai'}`} style={{ width: hasArtifacts ? 'min(100%, 1080px)' : undefined, maxWidth: hasArtifacts ? 'calc(100% - 44px)' : '76%', padding: 14, borderRadius: 12, position: 'relative' }}>
                     {message.loading ? (
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.7 }}>{message.text}</div>
@@ -2488,20 +2505,25 @@ export default function AiHomeWorkbench({ currentUser }) {
                         <button className="btn btn-out" type="button" onClick={copyDraft} style={{ height: 30 }}>复制草稿</button>
                       </div>
                     )}
+                    {!isUser && !message.loading && !message.error && message.text && (
+                      <CopyMessageButton text={message.text} />
+                    )}
                   </div>
-                  {isUser && <div style={{ width: 34, height: 34, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--brand-soft)', color: 'var(--brand-ink)', fontWeight: 800 }}>我</div>}
+                  {isUser && <div className="ai-avatar ai-avatar--user" aria-hidden="true">我</div>}
                 </article>
               )
             })}
           </div>
         </div>
 
-        <div style={{ padding: 14, borderTop: '1px solid var(--line)', background: '#fff' }}>
-          <div style={{ display: 'grid', gap: 8, border: '1px solid var(--line)', borderRadius: 12, padding: 8 }}>
+        <div className="ai-composer">
+          <div className="ai-composer__inner">
             {selectedFile && <AttachmentCard file={selectedFile} onRemove={removeSelectedFile} />}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, minHeight: 54 }}>
+            <div className="ai-composer__row">
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.pdf,.docx,.txt" style={{ display: 'none' }} onChange={(event) => attachFile(event.target.files?.[0] || null)} />
-              <button className="btn btn-out" type="button" onClick={chooseFile} aria-label={selectedFile ? '替换附件' : '附加文件'} title={selectedFile ? '替换附件' : '附加文件'} style={{ height: 36, minWidth: 40 }}>＋</button>
+              <button className="ai-composer__attach" type="button" onClick={chooseFile} aria-label={selectedFile ? '替换附件' : '附加文件'} title={selectedFile ? '替换附件' : '附加文件'}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+              </button>
               <textarea
                 rows="3"
                 aria-label="AI 工作台输入"
@@ -2509,56 +2531,42 @@ export default function AiHomeWorkbench({ currentUser }) {
                 onChange={(event) => setComposer(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
                 placeholder={preset.placeholder}
-                style={{ flex: 1, border: 0, outline: 'none', resize: 'vertical', minHeight: 54, maxHeight: 180, padding: '8px 4px', fontFamily: 'inherit', fontSize: 13, lineHeight: '18px', overflowY: 'auto' }}
+                className="ai-composer__textarea"
               />
-              <button className="btn btn-pri" type="button" onClick={sendMessage} disabled={sending} aria-label="发送消息" title="发送消息" style={{ height: 36, minWidth: 44 }}>{sending ? '…' : '➤'}</button>
+              <button className="ai-composer__send" type="button" onClick={sendMessage} disabled={sending} aria-label="发送消息" title="发送消息">
+                {sending ? (
+                  <span className="ai-composer__sending">···</span>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+                )}
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      <aside className="ai-home-inspector" role="complementary" aria-label="AI 工作区" aria-expanded={!workspacePanelCollapsed}>
+      <aside className={`ai-home-inspector${workspacePanelCollapsed ? ' ai-home-inspector--collapsed' : ''}`} role="complementary" aria-label="AI 工作区" aria-expanded={!workspacePanelCollapsed}>
         <div className="ai-home-inspector__bar">
           {!workspacePanelCollapsed && <b>工作区</b>}
           <button
-            className="ai-home-inspector__toggle"
+            className={`ai-home-inspector__toggle${workspacePanelCollapsed ? ' ai-home-inspector__toggle--collapsed' : ''}`}
             type="button"
             aria-label={workspacePanelCollapsed ? '展开工作区' : '折叠工作区'}
             title={workspacePanelCollapsed ? '展开工作区' : '折叠工作区'}
             onClick={() => setWorkspacePanelCollapsed((value) => !value)}
           >
-            <span aria-hidden="true">{workspacePanelCollapsed ? '<' : '>'}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6" /></svg>
           </button>
         </div>
-        {!workspacePanelCollapsed && (
-          <>
-            <ArtifactPanel session={activeSession} onConfirmAction={confirmPendingAction} confirmingActionId={confirmingActionId} />
-            <ResultCard title={outputState.title}>
-              {messages.length ? '当前对话已生成初步工作流结果，可继续补充问题或进入下游页面。' : outputState.empty}
-              <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
-                {outputState.outputs.map((item) => <span key={item} className="tag">{item}</span>)}
-              </div>
-            </ResultCard>
-            <ResultCard title={selectedFile ? '当前文件' : '快捷入口'}>
-              {selectedFile ? (
-                <>
-                  <AttachmentCard file={selectedFile} compact />
-                  <div style={{ display: 'grid', gap: 6, marginTop: 10 }}>
-                    <Link className="btn btn-out" to="/requirements" style={{ fontSize: 12 }}>需求列表</Link>
-                    <Link className="btn btn-out" to="/assessments" style={{ fontSize: 12 }}>实施评估</Link>
-                    {preset.key === 'admin' && <Link className="btn btn-out" to="/users" style={{ fontSize: 12 }}>用户管理</Link>}
-                  </div>
-                </>
-              ) : (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <Link className="btn btn-out" to="/requirements">需求列表</Link>
-                  <Link className="btn btn-out" to="/assessments">实施评估</Link>
-                  {preset.key === 'admin' && <Link className="btn btn-out" to="/users">用户管理</Link>}
-                </div>
-              )}
-            </ResultCard>
-          </>
-        )}
+        <div className={`ai-home-inspector__content${workspacePanelCollapsed ? ' ai-home-inspector__content--hidden' : ''}`}>
+          <ArtifactPanel session={activeSession} sending={sending} onConfirmAction={confirmPendingAction} confirmingActionId={confirmingActionId} />
+          <ResultCard title={messages.length ? outputState.activeTitle : outputState.title}>
+            {messages.length ? outputState.activeDesc : outputState.empty}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+              {outputState.outputs.map((item) => <span key={item} className="tag wes-output-tag">{item}</span>)}
+            </div>
+          </ResultCard>
+        </div>
       </aside>
       {deleteTargetSession && (
         <ConfirmDialog

@@ -1,17 +1,52 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { apiClient } from '../api/client.js'
 import { unwrap } from '../api/utils.js'
 import useAuth from '../hooks/useAuth.js'
 
-const RECENT_USERS_KEY = 'wes_recent_users'
-const MAX_RECENT = 5
+const USERNAME_HISTORY_KEY = 'wes_username_history'
+const LEGACY_RECENT_USERS_KEY = 'wes_recent_users'
+const MAX_HISTORY = 8
 
-function loadRecentUsers() {
-  try { return JSON.parse(localStorage.getItem(RECENT_USERS_KEY)) || [] } catch { return [] }
+function getUsernameHistory() {
+  let history = []
+  try {
+    const raw = localStorage.getItem(USERNAME_HISTORY_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    history = Array.isArray(parsed) ? parsed.filter((name) => typeof name === 'string' && name) : []
+  } catch {
+    history = []
+  }
+
+  try {
+    const legacyRaw = localStorage.getItem(LEGACY_RECENT_USERS_KEY)
+    if (!legacyRaw) return history
+
+    const legacyUsers = JSON.parse(legacyRaw)
+    const legacyNames = Array.isArray(legacyUsers)
+      ? legacyUsers
+        .map((entry) => (typeof entry === 'string' ? entry : entry?.username))
+        .filter((name) => typeof name === 'string' && name)
+      : []
+    const migratedHistory = [...new Set([...history, ...legacyNames])].slice(0, MAX_HISTORY)
+    localStorage.setItem(USERNAME_HISTORY_KEY, JSON.stringify(migratedHistory))
+    localStorage.removeItem(LEGACY_RECENT_USERS_KEY)
+    return migratedHistory
+  } catch {
+    try {
+      localStorage.removeItem(LEGACY_RECENT_USERS_KEY)
+    } catch {
+      // Ignore unavailable storage; login remains usable without history.
+    }
+    return history
+  }
 }
-function saveRecentUsers(list) {
-  localStorage.setItem(RECENT_USERS_KEY, JSON.stringify(list))
+
+function saveUsernameHistory(name) {
+  if (!name) return
+  const list = getUsernameHistory().filter((u) => u !== name)
+  list.unshift(name)
+  localStorage.setItem(USERNAME_HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)))
 }
 
 export default function Login() {
@@ -25,50 +60,52 @@ export default function Login() {
   const [resetLoading, setResetLoading] = useState(false)
   const [resetMessage, setResetMessage] = useState('')
   const [resetLink, setResetLink] = useState('')
-  const [recentUsers, setRecentUsers] = useState([])
-  const [showDropdown, setShowDropdown] = useState(false)
-  const dropdownRef = useRef(null)
+  const [showUsernameDropdown, setShowUsernameDropdown] = useState(false)
+  const [usernameHistory, setUsernameHistory] = useState(getUsernameHistory)
   const usernameInputRef = useRef(null)
+  const passwordInputRef = useRef(null)
+  const dropdownRef = useRef(null)
   const { login, register, loading, error } = useAuth()
 
+  // Close dropdown on outside click
   useEffect(() => {
-    setRecentUsers(loadRecentUsers())
-  }, [])
-
-  useEffect(() => {
-    if (!showDropdown) return
-    const handler = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setShowDropdown(false)
+    function handleClickOutside(e) {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target) &&
+        usernameInputRef.current && !usernameInputRef.current.contains(e.target)
+      ) {
+        setShowUsernameDropdown(false)
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showDropdown])
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
-  const addRecentUser = (uname, pwd) => {
-    const filtered = recentUsers.filter((u) => u.username !== uname)
-    const entry = { username: uname, password: pwd || null, ts: Date.now() }
-    const next = [entry, ...filtered].slice(0, MAX_RECENT)
-    setRecentUsers(next)
-    saveRecentUsers(next)
-  }
+  const handleUsernameFocus = useCallback(() => {
+    const history = getUsernameHistory()
+    setUsernameHistory(history)
+    if (history.length > 0) setShowUsernameDropdown(true)
+  }, [])
 
-  const removeRecentUser = (uname) => {
-    const next = recentUsers.filter((u) => u.username !== uname)
-    setRecentUsers(next)
-    saveRecentUsers(next)
-  }
+  const handleSelectUsername = useCallback((name) => {
+    setUsername(name)
+    setShowUsernameDropdown(false)
+    passwordInputRef.current?.focus()
+  }, [])
 
-  const clearRecentUsers = () => {
-    setRecentUsers([])
-    saveRecentUsers([])
-  }
+  const handleRemoveUsername = useCallback((e, name) => {
+    e.stopPropagation()
+    const updated = getUsernameHistory().filter((u) => u !== name)
+    localStorage.setItem(USERNAME_HISTORY_KEY, JSON.stringify(updated))
+    setUsernameHistory(updated)
+    if (updated.length === 0) setShowUsernameDropdown(false)
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const trimmedUsername = username.trim()
     if (mode !== 'login') {
-      const result = await register(username.trim(), password, email.trim(), inviteCode.trim())
+      const result = await register(trimmedUsername, password, email.trim(), inviteCode.trim())
       if (result.success) {
         setMode('login')
         setPassword('')
@@ -76,20 +113,12 @@ export default function Login() {
       }
       return
     }
-    const result = await login(username.trim(), password, rememberMe)
-    if (result.success) {
-      addRecentUser(username.trim(), rememberMe ? password : null)
-    }
-  }
 
-  const handleSelectUser = (entry) => {
-    setUsername(entry.username)
-    if (entry.password) {
-      setPassword(entry.password)
-      setRememberMe(true)
+    const result = await login(trimmedUsername, password, rememberMe)
+    if (result.success) {
+      saveUsernameHistory(trimmedUsername)
+      setUsernameHistory(getUsernameHistory())
     }
-    setShowDropdown(false)
-    if (usernameInputRef.current) usernameInputRef.current.focus()
   }
 
   const requestReset = async () => {
@@ -128,11 +157,11 @@ export default function Login() {
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, display: mode === 'register' ? 'block' : 'none' }}>使用邀请码激活账号</h3>
         <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 20 }}>请输入账号信息以继续</p>
 
-        <form style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={handleSubmit}>
+        <form style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={handleSubmit} onKeyDown={(e) => { if (e.altKey && e.key.toLowerCase() === 'a') { e.preventDefault(); e.target.select?.() } }}>
           {mode === 'register' && (
             <input className="input" type="email" placeholder="邮箱" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
           )}
-          <div ref={dropdownRef} style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }}>
             <input
               ref={usernameInputRef}
               className="input"
@@ -141,40 +170,51 @@ export default function Login() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              onFocus={() => { if (recentUsers.length > 0) setShowDropdown(true) }}
+              onFocus={handleUsernameFocus}
               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }}
             />
-            {showDropdown && recentUsers.length > 0 && (
-              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: '#fff', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', boxShadow: 'var(--shadow-3)', zIndex: 10, overflow: 'hidden' }}>
-                {recentUsers.map((u) => (
+            {showUsernameDropdown && usernameHistory.length > 0 && (
+              <div
+                ref={dropdownRef}
+                style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+                  marginTop: 4, background: '#fff', border: '1px solid var(--line)',
+                  borderRadius: 'var(--r-md)', boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                  maxHeight: 220, overflowY: 'auto', padding: '4px 0'
+                }}
+              >
+                <div style={{ padding: '4px 12px 6px', fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, letterSpacing: 0.3 }}>
+                  最近使用
+                </div>
+                {usernameHistory.map((name) => (
                   <div
-                    key={u.username}
-                    onClick={() => handleSelectUser(u)}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--ink-1)', transition: 'background .15s' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--brand-soft)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    key={name}
+                    onClick={() => handleSelectUsername(name)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '8px 12px', cursor: 'pointer', fontSize: 13.5, color: 'var(--ink-1)',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--brand-soft)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                   >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.username}</span>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); removeRecentUser(u.username) }}
-                      style={{ border: 0, background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
-                      title="移除"
-                    >×</button>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      {name}
+                    </span>
+                    <span
+                      onClick={(e) => handleRemoveUsername(e, name)}
+                      title="移除此记录"
+                      style={{ fontSize: 16, color: 'var(--ink-3)', lineHeight: 1, padding: '2px 4px', borderRadius: 4, cursor: 'pointer' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--err)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ink-3)' }}
+                    >×</span>
                   </div>
                 ))}
-                {recentUsers.length > 1 && (
-                  <div
-                    onClick={clearRecentUsers}
-                    style={{ borderTop: '1px solid var(--line)', padding: '6px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', transition: 'background .15s' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--brand-soft)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  >清除全部记录</div>
-                )}
               </div>
             )}
           </div>
-          <input className="input" type="password" placeholder="密码" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14, borderColor: 'var(--brand)', boxShadow: 'var(--shadow-focus)' }} />
+          <input ref={passwordInputRef} className="input" type="password" placeholder="密码" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14, borderColor: 'var(--brand)', boxShadow: 'var(--shadow-focus)' }} />
           {mode === 'register' && (
             <input className="input" type="text" placeholder="邀请码（必填）" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
           )}

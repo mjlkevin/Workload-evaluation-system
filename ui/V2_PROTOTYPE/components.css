@@ -18,6 +18,8 @@ code,pre{font-family:var(--font-mono)}
 .btn-ghost:hover{background:var(--bg-soft);color:var(--ink)}
 .btn-dan{background:#fff;color:var(--err);border-color:var(--err)}
 .btn-dan:hover{background:var(--err);color:#fff}
+.btn-sm{height:28px;padding:0 10px;font-size:12px;border-radius:8px}
+.btn-xs{height:24px;padding:0 8px;font-size:11px;border-radius:7px}
 
 .input{width:100%;height:var(--control-height);padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-md);background:#fff;font:inherit;font-size:13px;outline:none;transition:border-color .15s, box-shadow .15s;color:var(--ink)}
 .input:focus{border-color:var(--brand);box-shadow:var(--shadow-focus)}
@@ -39,6 +41,7 @@ code,pre{font-family:var(--font-mono)}
 .bdg.lock{background:var(--err-soft);color:var(--err)} .bdg.lock .dot{background:var(--err)}
 .bdg.muted{background:var(--bg-soft);color:var(--ink-3)} .bdg.muted .dot{background:var(--ink-3)}
 .bdg.brd{background:var(--brand-soft);color:var(--brand-ink)} .bdg.brd .dot{background:var(--brand)}
+.bdg.warn{background:var(--warn-soft);color:var(--warn-ink)} .bdg.warn .dot{background:var(--warn)}
 
 .kpi{background:#fff;border:1px solid var(--line);border-radius:var(--kpi-radius);padding:16px;box-shadow:var(--shadow-1)}
 .kpi .lb{font-size:11px;font-family:var(--font-mono);color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase}

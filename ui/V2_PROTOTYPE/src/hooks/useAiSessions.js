@@ -107,6 +107,17 @@ export function useAiSessions() {
     return true
   }, [])
 
+  const renameSession = useCallback(async (sessionId, newTitle) => {
+    if (!sessionId || !newTitle?.trim()) return null
+    const payload = await apiClient.patch(`/ai-sessions/${sessionId}`, { title: newTitle.trim() }, { suppressUnauthorizedRedirect: true })
+    const session = unwrap(payload)?.session
+    if (session) {
+      setSessions((prev) => prev.map((item) => item.sessionId === session.sessionId ? session : item))
+      setActiveSession((current) => current?.sessionId === session.sessionId ? session : current)
+    }
+    return session
+  }, [])
+
   return {
     sessions,
     activeSession,
@@ -116,6 +127,7 @@ export function useAiSessions() {
     loadSessions,
     createSession,
     deleteSession,
+    renameSession,
     upsertSession,
     setActiveSession: selectActiveSession,
   }

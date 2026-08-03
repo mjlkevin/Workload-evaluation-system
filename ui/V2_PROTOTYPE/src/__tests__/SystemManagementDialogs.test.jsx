@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test } from 'vitest'
+import ToastContainer from '../components/ui/ToastContainer.jsx'
+import { ToastProvider } from '../hooks/useToast.jsx'
 import SystemManagement from '../pages/SystemManagement.jsx'
 import { server } from './mocks/server.js'
 
@@ -9,9 +11,12 @@ const BASE = '/api/v1'
 
 function renderSection(sectionId = 'rules') {
   return render(
-    <MemoryRouter>
-      <SystemManagement sectionId={sectionId} />
-    </MemoryRouter>
+    <ToastProvider>
+      <ToastContainer />
+      <MemoryRouter>
+        <SystemManagement sectionId={sectionId} />
+      </MemoryRouter>
+    </ToastProvider>
   )
 }
 

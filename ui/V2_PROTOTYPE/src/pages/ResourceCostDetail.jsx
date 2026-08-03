@@ -28,7 +28,6 @@ export default function ResourceCostDetail() {
     <PageShell
       crumb="工作台 / 资源人天及成本 / 详情"
       title="资源人天及成本"
-      subtitle={`${detail.resourceVersion || detail.code || '—'} · ${detail.status || '—'}`}
       actions={[
         // 全套 VCS（决策 A）—— 当前 RS-04001 已检出态：检出 disabled / 检入 pri / 撤销+解锁可用
         <button type="button" key="hist" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={async () => { setHistoryOpen(true); setHistoryLoading(true); try { const payload = await apiClient.get('/versions', { type: 'resource' }); const list = unwrapList(payload).filter(r => r.baseCode === (detail.globalVersion || detail.code || id)); setHistoryRows(list.map(r => ({ version: r.versionCode || r.version || '', status: mapVcsStatus(r), owner: r.checkedOutByUsername || r.updatedByUsername || '—', updatedAt: (r.updatedAt || '').slice(0, 10) }))); } catch (err) { alert('加载历史失败: ' + err.message); } finally { setHistoryLoading(false); } }}>⏱ 历史</button>,

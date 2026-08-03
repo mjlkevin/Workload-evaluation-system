@@ -50,7 +50,6 @@ export default function AssessmentDetail() {
     <PageShell
       crumb="工作台 / 实施评估 / 详情"
       title="实施评估详情"
-      subtitle={`${vm.assessmentVersion || vm.versionCode || '—'} · ${vm.globalVersion || vm.context?.globalVersion || '—'} · ${vm.vcs?.isReadonly ? '已检入' : '已检出'}${vm.loading ? ' · 加载中' : ''}${vm.error ? ' · 加载失败' : ''}`}
       actions={[
         <button type="button" key="hist" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={async () => { setHistoryOpen(true); setHistoryLoading(true); try { const payload = await apiClient.get('/versions', { type: 'assessment' }); const list = unwrapList(payload).filter(r => r.baseCode === (vm.globalVersion || id)); setHistoryRows(list.map(r => ({ version: r.versionCode || r.version || '', status: mapVcsStatus(r), owner: r.checkedOutByUsername || r.updatedByUsername || '—', updatedAt: (r.updatedAt || '').slice(0, 10) }))); } catch (err) { alert('加载历史失败: ' + err.message); } finally { setHistoryLoading(false); } }}>🕘 历史</button>,
         <button type="button" key="export" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => downloadJSON(vm, `assessment-${vm.versionCode || id}.json`)}>↓ 导出</button>,

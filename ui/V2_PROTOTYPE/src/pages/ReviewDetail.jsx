@@ -85,7 +85,6 @@ export default function ReviewDetail() {
     <PageShell
       crumb="工作台 / 评审 / 评审详情"
       title="评审"
-      subtitle={`${reviewStatus === 'approved' ? '已通过' : reviewStatus === 'rejected' ? '驳回' : '评审中'} · 还剩 ${header.remainingDays} 天${loading ? ' · 加载中' : ''}${error ? ' · 使用本地数据' : ''}`}
       actions={[
         <Link key="jump" to={relatedDocs[0]?.to || '#'} className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 12px', display: 'inline-flex', alignItems: 'center' }}>↗ 跳转方案</Link>,
         <button type="button" key="reject" className="btn btn-dan" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => setRejectOpen(true)} disabled={actionLoading.rejectReview}>✕ 驳回</button>,

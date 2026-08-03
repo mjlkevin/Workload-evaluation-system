@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ListPage from '../components/ListPage.jsx'
 import useReviewList from '../hooks/useReviewList.js'
@@ -16,6 +16,19 @@ export default function ReviewList() {
     create,
     creating,
   } = useReviewList({ fallbackData: mockData })
+
+  const kpiCards = useMemo(() => {
+    const total = rows.length
+    const pending = rows.filter((r) => r.status === '待评审' || r.status === '评审中').length
+    const passed = rows.filter((r) => r.status === '已通过').length
+    const rejected = rows.filter((r) => r.status === '驳回').length
+    return [
+      { ic: '✓', lb: '评审总数', num: total, pct: 100, barColor: 'var(--brand)', sub: `共 ${total} 条评审` },
+      { ic: '◎', lb: '待评审', num: pending, pct: total ? Math.round(pending / total * 100) : 0, barColor: 'var(--warn, #d97706)', sub: '等待审批' },
+      { ic: '✓', lb: '已通过', num: passed, pct: total ? Math.round(passed / total * 100) : 0, barColor: 'var(--ok)', sub: '审批通过' },
+      { ic: '✗', lb: '已驳回', num: rejected, pct: total ? Math.round(rejected / total * 100) : 0, barColor: 'var(--err, #dc2626)', sub: '需要修改' },
+    ]
+  }, [rows])
 
   const handleCreate = async () => {
     const result = await create()
@@ -52,6 +65,7 @@ export default function ReviewList() {
           ? { role: 'status', message: historyNotice }
           : null}
       rowKey="id"
+      kpiCards={kpiCards}
       onRowClick={(row) => navigate(`/reviews/${encodeURIComponent(row.id)}`)}
       onBulkAction={handleBulkAction}
       bulkActions={[

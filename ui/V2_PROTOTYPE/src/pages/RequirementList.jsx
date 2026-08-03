@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ListPage from '../components/ListPage.jsx'
 import useRequirementList from '../hooks/useRequirementList.js'
@@ -7,6 +7,19 @@ import { requirements as mockData } from '../mock/listData.js'
 export default function RequirementList() {
   const navigate = useNavigate()
   const { rows, creating, refetch, create, remove } = useRequirementList({ fallbackData: mockData })
+
+  const kpiCards = useMemo(() => {
+    const total = rows.length
+    const inProgress = rows.filter((r) => r.status === '进行中' || r.status === '评审中').length
+    const published = rows.filter((r) => r.status === '已发布' || r.status === '已通过').length
+    const customers = new Set(rows.map((r) => r.customer).filter(Boolean)).size
+    return [
+      { ic: '✎', lb: '需求总数', num: total, pct: 100, barColor: 'var(--brand)', sub: `共 ${total} 条需求` },
+      { ic: '◎', lb: '进行中', num: inProgress, pct: total ? Math.round(inProgress / total * 100) : 0, barColor: 'var(--info)', sub: '待完成的需求' },
+      { ic: '✓', lb: '已发布', num: published, pct: total ? Math.round(published / total * 100) : 0, barColor: 'var(--ok)', sub: '已完成发布' },
+      { ic: '☺', lb: '客户数', num: customers, pct: 100, barColor: 'var(--accent)', sub: `涉及 ${customers} 个客户` },
+    ]
+  }, [rows])
 
   const handleBulkAction = async (actionKey, selectedRows) => {
     const first = selectedRows[0]
@@ -34,8 +47,10 @@ export default function RequirementList() {
     <ListPage
       crumb="工作台 / 需求管理"
       title="需求管理列表"
+      subtitle="查看需求概览与版本管理"
       data={rows}
       rowKey="id"
+      kpiCards={kpiCards}
       onRowClick={(row) => navigate(`/requirements/${row.id}`)}
       onBulkAction={handleBulkAction}
       bulkActions={[

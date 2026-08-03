@@ -56,7 +56,6 @@ export default function DevAssessmentDetail() {
     <PageShell
       crumb="工作台 / 开发评估 / 开发评估详情"
       title="开发评估详情"
-      subtitle={`${detail.code || '—'} · ${detail.version || '—'} · ${detail.status || '—'}`}
       actions={[
         // 角色切换（开发测试）
         <select

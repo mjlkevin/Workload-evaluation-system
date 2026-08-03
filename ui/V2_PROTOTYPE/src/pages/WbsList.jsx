@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import ListPage from '../components/ListPage.jsx'
 import useWbsList from '../hooks/useWbsList.js'
 import { wbsItems as mockData } from '../mock/listData.js'
@@ -6,6 +6,19 @@ import { wbsItems as mockData } from '../mock/listData.js'
 export default function WbsList() {
   // WBS 详情页 PB-R3 待建；列表行不导航避免 404
   const { rows, refetch } = useWbsList({ fallbackData: mockData })
+
+  const kpiCards = useMemo(() => {
+    const total = rows.length
+    const completed = rows.filter((r) => r.status === '已完成').length
+    const inProgress = rows.filter((r) => r.status === '进行中').length
+    const avgProgress = total ? Math.round(rows.reduce((s, r) => s + (r.progress || 0), 0) / total) : 0
+    return [
+      { ic: '☷', lb: 'WBS 任务', num: total, pct: 100, barColor: 'var(--brand)', sub: `共 ${total} 条任务` },
+      { ic: '✓', lb: '已完成', num: completed, pct: total ? Math.round(completed / total * 100) : 0, barColor: 'var(--ok)', sub: '已完成任务' },
+      { ic: '◎', lb: '进行中', num: inProgress, pct: total ? Math.round(inProgress / total * 100) : 0, barColor: 'var(--info)', sub: '执行中任务' },
+      { ic: '◔', lb: '平均进度', num: `${avgProgress}%`, pct: avgProgress, barColor: 'var(--accent)', sub: '整体完成率' },
+    ]
+  }, [rows])
 
   const handleBulkAction = (actionKey, selectedRows) => {
     const first = selectedRows[0]
@@ -29,6 +42,7 @@ export default function WbsList() {
       subtitle="工作分解结构与任务进度跟踪"
       data={rows}
       rowKey="id"
+      kpiCards={kpiCards}
       onRowClick={(row) => alert('WBS 详情页 · PB-R3 待建')}
       onBulkAction={handleBulkAction}
       filterTags={[

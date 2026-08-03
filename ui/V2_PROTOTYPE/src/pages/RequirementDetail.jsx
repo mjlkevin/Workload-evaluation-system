@@ -58,7 +58,7 @@ export default function RequirementDetail() {
   const vcsEn=m=>m==='always'||(m==='checked-out'&&isCo)||(m==='checked-in'&&!isCo)
 
   return (
-    <PageShell crumb="工作台 / 需求 / 需求详情" title="需求详情" subtitle={`${detail.code || ''} · ${detail.version || ''} · 模型 kimi-k2.5`}
+    <PageShell crumb="工作台 / 需求 / 需求详情" title="需求详情"
       actions={[
         <Link key="ai-evaluation" className="btn btn-pri" to={`/requirements/${id}/ai-evaluation`} style={{height:32,fontSize:12,padding:'0 12px'}}>AI 评估台</Link>,
         ...vcsBtn.map(b=>{
@@ -98,7 +98,7 @@ export default function RequirementDetail() {
             </div>
           </Panel>
 
-          <Panel rail="BASIC" title="基本情况" meta={<Badge type="ci">{detail.completionStats?.fields ? `已填 ${detail.completionStats.fields.current}/${detail.completionStats.fields.total}` : '—'}</Badge>} right="▾ 折叠">
+          <Panel rail="BASIC" title="基本情况" meta={<Badge type="ci">{detail.completionStats?.fields ? `已填 ${detail.completionStats.fields.current}/${detail.completionStats.fields.total}` : '—'}</Badge>} right="▾">
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:14,padding:'16px 16px 10px'}}>
               {(detail.basicFields || []).map(f=><Field key={f.label} {...f} editable={isCo} onChange={(value) => actions?.updateBasicField?.(f.label, value)}/>)}
             </div>
@@ -108,7 +108,7 @@ export default function RequirementDetail() {
             </div>
           </Panel>
 
-          <Panel rail="VALUE" title="价值主张" meta={<span style={{color:'var(--ink-3)',fontSize:11,fontFamily:'var(--font-mono)'}}>{detail.completionStats?.valueItems ?? (detail.valueItems || []).length} 项</span>} right="▾ 折叠">
+          <Panel rail="VALUE" title="价值主张" meta={<span style={{color:'var(--ink-3)',fontSize:11,fontFamily:'var(--font-mono)'}}>{detail.completionStats?.valueItems ?? (detail.valueItems || []).length} 项</span>} right="▾">
             <div style={{display:'flex',flexDirection:'column',gap:10,padding:16,fontSize:13}}>
               {(detail.valueItems || []).map(item=><ValueLine key={item.label} {...item}/>)}
             </div>
@@ -181,7 +181,7 @@ export default function RequirementDetail() {
             </div>
           </div>
 
-          <SidePanel title="版本时间轴">
+          <SidePanel title="时间轴">
             <div style={{position:'relative',padding:'6px 0 2px'}}>
               <div style={{position:'absolute',left:7,top:8,bottom:8,width:2,background:'var(--line)'}}/>
               {(detail.versionTimeline || []).length ? (detail.versionTimeline || []).map(item=><TimelineItem key={`${item.version}-${item.time}`} {...item}/>) : (

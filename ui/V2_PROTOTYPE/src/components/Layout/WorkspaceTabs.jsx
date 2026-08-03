@@ -8,6 +8,7 @@ const STORAGE_KEY = 'wes-v2-workspace-tabs-v1'
 
 const STATIC_TITLES = {
   '/': 'AI 工作台',
+  '/projects': '项目',
   '/requirements': '需求',
   '/assessments': '实施评估',
   '/dev-assessments': '开发评估',

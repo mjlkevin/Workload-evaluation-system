@@ -14,7 +14,7 @@ export function mapProjectEvaluationToPlan(record = {}) {
     projectName: record.projectName || record.customerName || '未命名项目',
     customerName: record.customerName || '',
     industry: record.industry || '',
-    globalVersion: record.sourceGlobalVersionRecordId || (projectId ? `PROJECT-${projectId}` : ''),
+    globalVersion: record.versionCode || record.sourceGlobalVersionRecordId || (projectId ? `PROJECT-${projectId}` : ''),
     status: record.status === 'published' ? '已发布' : record.status === 'reviewing' ? '待评审' : record.status === 'active' ? '进行中' : '草稿',
     mandays: Number(record.totalDays ?? record.mandays ?? 0),
     updatedAt: sliceDate(record.updatedAt),

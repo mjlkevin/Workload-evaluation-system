@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, test } from 'vitest'
+import ToastContainer from '../components/ui/ToastContainer.jsx'
+import { ToastProvider } from '../hooks/useToast.jsx'
 import SystemManagement from '../pages/SystemManagement.jsx'
 import { server } from './mocks/server.js'
 
@@ -33,9 +35,12 @@ const codeRules = [
 
 function renderCodeRules() {
   return render(
-    <MemoryRouter>
-      <SystemManagement sectionId="rules" />
-    </MemoryRouter>
+    <ToastProvider>
+      <ToastContainer />
+      <MemoryRouter>
+        <SystemManagement sectionId="rules" />
+      </MemoryRouter>
+    </ToastProvider>
   )
 }
 
@@ -57,13 +62,15 @@ describe('SystemManagement code rules actions', () => {
     renderCodeRules()
 
     await screen.findByText('总方案')
-    fireEvent.click(screen.getByRole('button', { name: /生效/ }))
+    const toolbar = document.querySelector('.sys-toolbar')
+    fireEvent.click(within(toolbar).getByRole('button', { name: /生效/ }))
     await waitFor(() => expect(called).toContain('activate:rule-global'))
-    expect(window.alert).toHaveBeenLastCalledWith('编码规则已生效')
+    expect(await screen.findByRole('status')).toHaveTextContent('编码规则已生效')
+    fireEvent.click(screen.getByRole('button', { name: '关闭提示' }))
 
-    fireEvent.click(screen.getByRole('button', { name: '禁用' }))
+    fireEvent.click(within(toolbar).getByRole('button', { name: '禁用' }))
     await waitFor(() => expect(called).toContain('disable:rule-global'))
-    expect(window.alert).toHaveBeenLastCalledWith('编码规则已禁用')
+    expect(await screen.findByRole('status')).toHaveTextContent('编码规则已禁用')
   })
 
   test('opens a configuration dialog and saves prefix and format with rule id', async () => {
@@ -81,7 +88,7 @@ describe('SystemManagement code rules actions', () => {
     renderCodeRules()
 
     await screen.findByText('总方案')
-    const trigger = screen.getByRole('button', { name: '配置' })
+    const trigger = within(document.querySelector('.sys-toolbar')).getByRole('button', { name: '配置' })
     fireEvent.click(trigger)
 
     let dialog = await screen.findByRole('dialog', { name: '配置编码规则' })
@@ -100,6 +107,6 @@ describe('SystemManagement code rules actions', () => {
 
     await waitFor(() => expect(capturedRuleId).toBe('rule-global'))
     expect(capturedBody).toEqual({ prefix: 'GL-', format: '{PREFIX}{YYYY}{NNN}' })
-    expect(window.alert).toHaveBeenLastCalledWith('配置已保存')
+    expect(await screen.findByRole('status')).toHaveTextContent('编码规则配置已保存')
   })
 })

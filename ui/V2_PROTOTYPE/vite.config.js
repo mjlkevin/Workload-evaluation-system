@@ -18,6 +18,15 @@ export default defineConfig({
       '/api/': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+        // 禁用代理缓冲，确保 SSE 流式事件实时转发到前端
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+              proxyRes.headers['cache-control'] = 'no-cache';
+              proxyRes.headers['x-accel-buffering'] = 'no';
+            }
+          });
+        },
       },
     },
   },

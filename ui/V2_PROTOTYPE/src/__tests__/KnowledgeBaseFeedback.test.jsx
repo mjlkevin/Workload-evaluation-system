@@ -3,6 +3,8 @@ import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test, vi } from 'vitest'
 import { apiClient } from '../api/client.js'
+import ToastContainer from '../components/ui/ToastContainer.jsx'
+import { ToastProvider } from '../hooks/useToast.jsx'
 import SystemManagement from '../pages/SystemManagement.jsx'
 import { server } from './mocks/server.js'
 
@@ -10,11 +12,13 @@ const BASE = '/api/v1'
 
 async function renderKnowledgeBase() {
   render(
-    <MemoryRouter>
-      <SystemManagement />
-    </MemoryRouter>
+    <ToastProvider>
+      <ToastContainer />
+      <MemoryRouter>
+        <SystemManagement sectionId="kb" />
+      </MemoryRouter>
+    </ToastProvider>
   )
-  fireEvent.click(screen.getByRole('tab', { name: '知识库' }))
   await waitFor(() => {
     expect(screen.getByRole('button', { name: '保存草稿' })).toBeEnabled()
   })
@@ -61,8 +65,8 @@ describe('KnowledgeBase · 生效配置内联反馈', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /生效配置/ }))
 
-    const status = await screen.findByRole('status')
-    expect(status).toHaveTextContent(/Internal Server Error|生效失败/)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/Internal Server Error|生效失败/)
     expect(alertSpy).not.toHaveBeenCalled()
     alertSpy.mockRestore()
   })

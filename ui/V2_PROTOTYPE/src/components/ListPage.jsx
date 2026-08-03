@@ -41,6 +41,8 @@ export default function ListPage({
     { key: 'delete', label: '🗑 删除', mode: 'multi', danger: true },
   ],
   onBulkAction,
+  kpiCards = null,
+  sidebar = null,
 }) {
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
@@ -135,6 +137,28 @@ export default function ListPage({
 
   return (
     <PageShell crumb={crumb} title={title} subtitle={subtitle} actions={actions}>
+      <div className={sidebar ? 'home-grid' : undefined}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+      {/* KPI Cards */}
+      {kpiCards && kpiCards.length > 0 && (
+        <div className="home-kpi">
+          {kpiCards.map((k, i) => (
+            <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 14, boxShadow: 'var(--shadow-1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 26, height: 26, borderRadius: 6, background: k.icBg || 'var(--brand-soft)', color: k.icCo || 'var(--brand-ink)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{k.ic}</span>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{k.lb}</span>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ok)', marginLeft: 'auto' }} />
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono)', lineHeight: 1.05, marginBottom: 4 }}>{k.num}</div>
+              <div style={{ height: 4, borderRadius: 999, background: 'var(--bg-soft)', marginTop: 10, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${k.pct ?? 0}%`, borderRadius: 999, background: k.barColor || 'var(--brand)', transition: 'width .4s ease' }} />
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4 }}>{k.sub || '加载中...'}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* toolbar — 单行：左 sel-count + bulk actions / 右 filter + search */}
       <div
         className="toolbar-row"
@@ -426,6 +450,15 @@ export default function ListPage({
           <button type="button" className="btn btn-ghost" style={{ height: 26, padding: '0 8px', fontSize: 12 }}>›</button>
         </span>
       </div>}
+      </div>
+
+      {/* Sidebar */}
+      {sidebar && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+          {sidebar}
+        </div>
+      )}
+      </div>
     </PageShell>
   )
 }

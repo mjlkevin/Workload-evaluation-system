@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import ToastContainer from '../components/ui/ToastContainer.jsx'
+import { ToastProvider } from '../hooks/useToast.jsx'
 import HomeWorkspace from '../pages/HomeWorkspace.jsx'
 import { server } from './mocks/server.js'
 
@@ -12,6 +14,21 @@ function doubleClickInlineField(button) {
   fireEvent.click(button, { detail: 2 })
 }
 
+function renderHomeWorkspace() {
+  return render(
+    <ToastProvider>
+      <ToastContainer />
+      <MemoryRouter><HomeWorkspace /></MemoryRouter>
+    </ToastProvider>
+  )
+}
+
+function requestSessionDelete(title) {
+  const sessionCard = screen.getByText(title).closest('[role="button"]')
+  fireEvent.contextMenu(sessionCard, { clientX: 40, clientY: 40 })
+  fireEvent.click(screen.getByRole('button', { name: '删除会话' }))
+}
+
 describe('HomeWorkspace', () => {
   beforeEach(() => {
     localStorage.removeItem('wes_home_view')
@@ -20,34 +37,34 @@ describe('HomeWorkspace', () => {
   })
 
   test('defaults to AI workbench', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'AI 工作台' })).toBeInTheDocument())
     expect(screen.queryByText(/按登录账号业务角色预置对话工作流/)).not.toBeInTheDocument()
   })
 
   test('collapses AI workspace panel and remembers the preference', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     await screen.findByRole('complementary', { name: 'AI 工作区' })
-    expect(screen.getByText('沉淀结果')).toBeInTheDocument()
+    expect(screen.getByText('预期产出')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '折叠工作区' }))
 
-    expect(screen.queryByText('沉淀结果')).not.toBeInTheDocument()
+    expect(screen.getByText('预期产出').closest('.ai-home-inspector__content')).toHaveClass('ai-home-inspector__content--hidden')
     expect(screen.getByRole('button', { name: '展开工作区' })).toBeInTheDocument()
     expect(localStorage.getItem('wes-ai-workspace-panel-collapsed')).toBe('true')
   })
 
   test('switches to traditional dashboard', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     fireEvent.click(screen.getByRole('button', { name: '传统工作台' }))
-    await waitFor(() => expect(screen.getByText('项目评估方案列表')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { name: '项目列表' })).toBeInTheDocument())
   })
 
   test('updates page identity when switching to traditional dashboard', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     fireEvent.click(screen.getByRole('button', { name: '传统工作台' }))
 
@@ -57,18 +74,18 @@ describe('HomeWorkspace', () => {
   })
 
   test('selected workflow reshapes the central empty state and composer context', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     fireEvent.click(await screen.findByRole('button', { name: /生成待确认问题/ }))
 
     expect(screen.getByRole('heading', { level: 2, name: '生成待确认问题' })).toBeInTheDocument()
     expect(screen.getAllByText(/提炼售前需要回问客户的问题/).length).toBeGreaterThan(0)
     expect(screen.getByText('当前工作流：生成待确认问题')).toBeInTheDocument()
-    expect(screen.getByText('待确认问题')).toBeInTheDocument()
+    expect(screen.getAllByText('客户回问清单').length).toBeGreaterThan(0)
   })
 
   test('RP-032: workflow list section uses "工作流模板" label and supports scrolling', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     // Section header renamed from "推荐工作流" to "工作流模板"
     expect(await screen.findByText('工作流模板')).toBeInTheDocument()
@@ -82,7 +99,7 @@ describe('HomeWorkspace', () => {
   })
 
   test('RP-032: selected workflow button shows current-task indicator and aria-label', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const workflowButton = await screen.findByRole('button', { name: /生成待确认问题/ })
     fireEvent.click(workflowButton)
@@ -94,18 +111,18 @@ describe('HomeWorkspace', () => {
   })
 
   test('RP-033: session list container supports scrolling with hidden scrollbar', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     // Session list container has scroll class and correct properties
     const sessionList = await screen.findByText('会话')
     const sessionListContainer = sessionList.closest('section')?.querySelector('.ai-session-list')
     expect(sessionListContainer).toBeInTheDocument()
-    expect(sessionListContainer.style.maxHeight).toBe('240px')
+    expect(sessionListContainer.style.flex).toBe('1 1 0%')
     expect(sessionListContainer.style.overflowY).toBe('auto')
   })
 
   test('sends AI home message to backend and renders model answer', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '请分析这份需求材料' } })
@@ -133,7 +150,7 @@ describe('HomeWorkspace', () => {
         },
       }))
     )
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '请输出模块建议表' } })
@@ -164,7 +181,7 @@ describe('HomeWorkspace', () => {
         },
       }))
     )
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '请返回链接' } })
@@ -200,7 +217,7 @@ describe('HomeWorkspace', () => {
         })
       })
     )
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '请给我下一步选项' } })
@@ -235,7 +252,7 @@ describe('HomeWorkspace', () => {
         })
       })
     )
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '下一步做什么' } })
@@ -265,7 +282,7 @@ describe('HomeWorkspace', () => {
         })
       )
     )
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '项目步骤' } })
@@ -329,7 +346,7 @@ describe('HomeWorkspace', () => {
       })
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '请生成可评估需求包' } })
@@ -405,7 +422,7 @@ describe('HomeWorkspace', () => {
       })
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const form = await screen.findByRole('group', { name: '补充项目边界' })
     fireEvent.change(within(form).getByLabelText('项目范围'), { target: { value: '覆盖采购、库存、财务' } })
@@ -464,7 +481,7 @@ describe('HomeWorkspace', () => {
       http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: [loadedSession] } }))
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const traceChip = await screen.findByLabelText('知识库参考')
     expect(within(traceChip).getByText('知识库参考')).toBeInTheDocument()
@@ -520,7 +537,7 @@ describe('HomeWorkspace', () => {
       http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: [loadedSession] } }))
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const traceChip = await screen.findByLabelText('知识库参考')
     expect(within(traceChip).getByText('retrievalTriggered=false')).toBeInTheDocument()
@@ -590,7 +607,7 @@ describe('HomeWorkspace', () => {
       })
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '请粗评这个项目' } })
@@ -642,7 +659,7 @@ describe('HomeWorkspace', () => {
       })
     )
 
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
     const input = await screen.findByRole('textbox')
     const fileInput = container.querySelector('input[type="file"]')
     const file = new File(['demo'], '客户需求说明.pdf', { type: 'application/pdf' })
@@ -703,7 +720,7 @@ describe('HomeWorkspace', () => {
       })
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     expect(await screen.findByText('已有需求材料')).toBeInTheDocument()
     const input = screen.getByRole('textbox')
@@ -741,10 +758,10 @@ describe('HomeWorkspace', () => {
         return HttpResponse.json({ success: true, data: { deletedSessionId: params.sessionId } })
       })
     )
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     expect(await screen.findByText('待删除会话')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '删除会话：待删除会话' }))
+    requestSessionDelete('待删除会话')
     expect(screen.getByRole('dialog', { name: '删除会话' })).toBeInTheDocument()
     expect(screen.getByText('确定要彻底删除这个 AI 会话吗？')).toBeInTheDocument()
 
@@ -753,7 +770,7 @@ describe('HomeWorkspace', () => {
     expect(screen.queryByRole('dialog', { name: '删除会话' })).not.toBeInTheDocument()
     expect(screen.getByText('待删除会话')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '删除会话：待删除会话' }))
+    requestSessionDelete('待删除会话')
     fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
     await waitFor(() => expect(screen.queryByText('待删除会话')).not.toBeInTheDocument())
     expect(deleteCalled).toBe(1)
@@ -804,7 +821,7 @@ describe('HomeWorkspace', () => {
       })
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     expect(await screen.findByText('XX制造 WMS 粗评')).toBeInTheDocument()
     expect(screen.getByText('粗评报告')).toBeInTheDocument()
@@ -847,7 +864,7 @@ describe('HomeWorkspace', () => {
       }, { status: 403 }))
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '帮我创建广州波达通信项目' } })
@@ -895,13 +912,13 @@ describe('HomeWorkspace', () => {
       }))
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
-    const timeline = await screen.findByRole('list', { name: 'AI 运行时间线' })
-    expect(within(timeline).getByText('来源')).toBeInTheDocument()
-    expect(within(timeline).getByText('执行')).toBeInTheDocument()
-    expect(within(timeline).getByText('产物')).toBeInTheDocument()
-    expect(within(timeline).getByText('交付')).toBeInTheDocument()
+    const timeline = await screen.findByRole('list', { name: 'AI 会话执行链路' })
+    expect(within(timeline).getByText('输入来源')).toBeInTheDocument()
+    expect(within(timeline).getByText('AI 执行')).toBeInTheDocument()
+    expect(within(timeline).getByText('结构化产物')).toBeInTheDocument()
+    expect(within(timeline).getByText('交付与关联')).toBeInTheDocument()
     expect(within(timeline).getByText('XX制造需求.xlsx')).toBeInTheDocument()
     expect(within(timeline).getByText('粗评报告')).toBeInTheDocument()
     expect(within(timeline).getByText('创建项目评估方案')).toBeInTheDocument()
@@ -935,10 +952,10 @@ describe('HomeWorkspace', () => {
         return HttpResponse.json({ success: true, data: { deletedSessionId: params.sessionId } })
       })
     )
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     expect(await screen.findByText('待删除会话')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '删除会话：待删除会话' }))
+    requestSessionDelete('待删除会话')
     expect(screen.getByRole('dialog', { name: '删除会话' })).toBeInTheDocument()
     expect(screen.getByText('确定要彻底删除这个 AI 会话吗？')).toBeInTheDocument()
 
@@ -947,7 +964,7 @@ describe('HomeWorkspace', () => {
     expect(screen.queryByRole('dialog', { name: '删除会话' })).not.toBeInTheDocument()
     expect(screen.getByText('待删除会话')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '删除会话：待删除会话' }))
+    requestSessionDelete('待删除会话')
     fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
     await waitFor(() => expect(screen.queryByText('待删除会话')).not.toBeInTheDocument())
     expect(deleteCalled).toBe(1)
@@ -999,7 +1016,7 @@ describe('HomeWorkspace', () => {
       }))
     )
 
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
 
     fireEvent.click(await screen.findByRole('button', { name: /更新评估标准/ }))
     const fileInput = container.querySelector('input[type="file"]')
@@ -1012,7 +1029,7 @@ describe('HomeWorkspace', () => {
   })
 
   test('shows attached AI home file as a removable composer card', async () => {
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
     await screen.findByRole('textbox')
 
     const fileInput = container.querySelector('input[type="file"]')
@@ -1033,7 +1050,7 @@ describe('HomeWorkspace', () => {
   })
 
   test('moves attached AI home file into sent message and clears pending card', async () => {
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     const fileInput = container.querySelector('input[type="file"]')
@@ -1151,7 +1168,7 @@ describe('HomeWorkspace', () => {
       })
     )
 
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
     const input = await screen.findByRole('textbox')
     const fileInput = container.querySelector('input[type="file"]')
     const file = new File(['demo'], '实施工作量评估申请240616-V1.0.xlsx', {
@@ -1321,7 +1338,7 @@ describe('HomeWorkspace', () => {
       }),
     )
 
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
     const input = await screen.findByRole('textbox')
     const fileInput = container.querySelector('input[type="file"]')
     const file = new File(['demo'], '味可达-ERP系统功能需求清单(0616）.xlsx', {
@@ -1410,7 +1427,7 @@ describe('HomeWorkspace', () => {
       }),
     )
 
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
     const input = await screen.findByRole('textbox')
     const fileInput = container.querySelector('input[type="file"]')
     const file = new File(['demo'], '实施工作量评估申请240616-V1.0.xlsx', {
@@ -1472,7 +1489,7 @@ describe('HomeWorkspace', () => {
       })),
     )
 
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
     const input = await screen.findByRole('textbox')
     const fileInput = container.querySelector('input[type="file"]')
     const file = new File(['demo'], '实施工作量评估申请240616-V1.0.xlsx', {
@@ -1538,7 +1555,7 @@ describe('HomeWorkspace', () => {
       })
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '请解析这个文件并生成需求解析报告' } })
@@ -1559,7 +1576,7 @@ describe('HomeWorkspace', () => {
       message: '登录已过期，请重新登录',
     }, { status: 401 })))
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '请保留这份草稿' } })
@@ -1585,7 +1602,7 @@ describe('HomeWorkspace', () => {
       })
     }))
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '帮我看看' } })
@@ -1610,7 +1627,7 @@ describe('HomeWorkspace', () => {
       },
     })))
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '你好' } })
@@ -1624,7 +1641,7 @@ describe('HomeWorkspace', () => {
   })
 
   test('keeps AI workbench scrolling inside the message pane', async () => {
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
 
     const pageHeader = container.querySelector('.pg-hd')
     const workbench = await screen.findByTestId('ai-home-workbench')
@@ -1637,13 +1654,13 @@ describe('HomeWorkspace', () => {
     expect(workbench.style.minHeight).toBe('0px')
     expect(messagePane.style.overflowY).toBe('auto')
     expect(messagePane.style.minHeight).toBe('0px')
-    expect(composer.style.overflowY).toBe('auto')
+    expect(composer).toHaveClass('ai-composer__textarea')
     expect(screen.getByRole('button', { name: '附加文件' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '发送消息' })).toBeInTheDocument()
   })
 
   test('pressing Enter sends AI home message', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '你好' } })
@@ -1653,7 +1670,7 @@ describe('HomeWorkspace', () => {
   })
 
   test('pressing Shift Enter does not send AI home message', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '第一行' } })
@@ -1711,7 +1728,7 @@ describe('HomeWorkspace', () => {
       }),
     )
 
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
     const input = await screen.findByRole('textbox')
     const fileInput = container.querySelector('input[type="file"]')
     const file = new File(['demo'], '客户需求.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -1737,7 +1754,7 @@ describe('HomeWorkspace', () => {
   })
 
   test('Phase 1G: capability discovery returns capability list', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '你能做什么？' } })
@@ -1748,7 +1765,7 @@ describe('HomeWorkspace', () => {
   })
 
   test('Phase 1G: WES data query returns project list', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '我之前创建过哪些项目？' } })
@@ -1793,18 +1810,18 @@ describe('HomeWorkspace', () => {
     localStorage.setItem('wes-ai-active-session-id', 'session-last')
     server.use(http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: sessions } })))
 
-    const { unmount } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { unmount } = renderHomeWorkspace()
     expect(await screen.findByText('上一轮回答')).toBeInTheDocument()
 
     unmount()
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
     expect(await screen.findByText('上一轮回答')).toBeInTheDocument()
   })
 
   test('shows a visible error when AI sessions fail to load', async () => {
     server.use(http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: false, message: 'sessions failed' }, { status: 500 })))
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     expect(await screen.findByText(/AI 会话加载失败/)).toBeInTheDocument()
   })
@@ -1812,7 +1829,7 @@ describe('HomeWorkspace', () => {
   test('scrolls the AI message pane to bottom after sending and receiving messages', async () => {
     const scrollTo = vi.fn()
     Element.prototype.scrollTo = scrollTo
-    const { container } = render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    const { container } = renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox')
     fireEvent.change(input, { target: { value: '请解释这个风险' } })
@@ -1826,12 +1843,12 @@ describe('HomeWorkspace', () => {
   })
 
   test('keeps composer controls visible for long text input', async () => {
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     const input = await screen.findByRole('textbox', { name: 'AI 工作台输入' })
     fireEvent.change(input, { target: { value: Array.from({ length: 12 }, (_, index) => `第 ${index + 1} 行需求说明`).join('\n') } })
 
-    expect(input).toHaveStyle({ resize: 'vertical' })
+    expect(input).toHaveClass('ai-composer__textarea')
     expect(screen.getByRole('button', { name: '发送消息' })).toBeVisible()
     expect(screen.getByRole('button', { name: '附加文件' })).toBeVisible()
   })
@@ -1885,7 +1902,7 @@ describe('HomeWorkspace', () => {
       })
     )
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     expect(await screen.findByText('XX制造 WMS 粗评')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '确认执行' }))
@@ -1913,7 +1930,7 @@ describe('HomeWorkspace', () => {
       },
     })))
 
-    render(<MemoryRouter><HomeWorkspace /></MemoryRouter>)
+    renderHomeWorkspace()
 
     // 通过能力发现触发 suggestedAction 中的"检索客户主体"
     const input = await screen.findByRole('textbox')

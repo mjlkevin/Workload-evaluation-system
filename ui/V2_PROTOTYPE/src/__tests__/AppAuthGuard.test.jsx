@@ -35,4 +35,14 @@ describe('App auth guard', () => {
     expect(await screen.findByRole('heading', { name: 'AI 工作台' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '用户管理' })).not.toBeInTheDocument()
   })
+
+  test('redirects unknown authenticated routes to the home workbench', async () => {
+    render(
+      <MemoryRouter initialEntries={['/path-that-does-not-exist']}>
+        <App />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByRole('heading', { name: 'AI 工作台' })).toBeInTheDocument()
+  })
 })

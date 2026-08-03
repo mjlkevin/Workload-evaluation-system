@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ListPage from '../components/ListPage.jsx'
 import useResourceCostList from '../hooks/useResourceCostList.js'
@@ -7,6 +7,19 @@ import { resourceCosts as mockData } from '../mock/listData.js'
 export default function ResourceCostList() {
   const navigate = useNavigate()
   const { rows, creating, refetch, create, remove } = useResourceCostList({ fallbackData: mockData })
+
+  const kpiCards = useMemo(() => {
+    const total = rows.length
+    const checkedOut = rows.filter((r) => r.status === '已检出').length
+    const checkedIn = rows.filter((r) => r.status === '已检入').length
+    const totalDays = rows.reduce((s, r) => s + (r.totalDays || 0), 0)
+    return [
+      { ic: '$', lb: '成本方案', num: total, pct: 100, barColor: 'var(--brand)', sub: `共 ${total} 条` },
+      { ic: '✎', lb: '已检出', num: checkedOut, pct: total ? Math.round(checkedOut / total * 100) : 0, barColor: 'var(--accent)', sub: '正在编辑' },
+      { ic: '✓', lb: '已检入', num: checkedIn, pct: total ? Math.round(checkedIn / total * 100) : 0, barColor: 'var(--ok)', sub: '已提交' },
+      { ic: '◔', lb: '总人天', num: totalDays.toFixed(1), pct: 100, barColor: 'var(--teal, #0d9488)', sub: '累计资源人天' },
+    ]
+  }, [rows])
 
   const handleBulkAction = async (actionKey, selectedRows) => {
     const first = selectedRows[0]
@@ -30,8 +43,10 @@ export default function ResourceCostList() {
     <ListPage
       crumb="工作台 / 资源成本"
       title="资源及人天成本"
+      subtitle="查看资源成本概览与版本管理"
       data={rows}
       rowKey="id"
+      kpiCards={kpiCards}
       onRowClick={(row) => navigate(`/resource-costs/${row.id}`)}
       onBulkAction={handleBulkAction}
       filterTags={[

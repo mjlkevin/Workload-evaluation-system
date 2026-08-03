@@ -143,8 +143,10 @@ export default function useSystemManagement({
   const withAction = useCallback(async (key, task) => {
     setActionLoading((prev) => ({ ...prev, [key]: true }))
     try {
-      await task()
-      return { success: true, error: null }
+      const data = await task()
+      return data == null
+        ? { success: true, error: null }
+        : { success: true, error: null, data }
     } catch (error) {
       return { success: false, error: error?.message || '操作失败' }
     } finally {
@@ -167,19 +169,16 @@ export default function useSystemManagement({
   const configureRule = useCallback((ruleId, patch) => withAction(`configure:${ruleId}`, async () => {
     if (enabled) await apiClient.patch(`/system/version-code-rules/${ruleId}/config`, patch)
     setRules((prev) => prev.map((rule) => (rule.id === ruleId || rule.code === ruleId ? { ...rule, ...patch, status: 'draft' } : rule)))
-    alert('配置已保存')
   }), [enabled, withAction])
 
   const activateRule = useCallback((ruleId) => withAction(`activate:${ruleId}`, async () => {
     if (enabled) await apiClient.post(`/system/version-code-rules/${ruleId}/activate`)
     setRules((prev) => prev.map((r) => r.id === ruleId || r.code === ruleId ? { ...r, status: 'active', activatedAt: new Date().toISOString() } : r))
-    alert('编码规则已生效')
   }), [enabled, withAction])
 
   const disableRule = useCallback((ruleId) => withAction(`disable:${ruleId}`, async () => {
     if (enabled) await apiClient.post(`/system/version-code-rules/${ruleId}/disable`)
     setRules((prev) => prev.map((r) => r.id === ruleId || r.code === ruleId ? { ...r, status: 'draft', activatedAt: null } : r))
-    alert('编码规则已禁用')
   }), [enabled, withAction])
 
   // --- Models ---
@@ -239,11 +238,15 @@ export default function useSystemManagement({
     await loadModels()
   }), [enabled, withAction, loadModels])
 
-  const testApiKey = useCallback((key) => withAction('testApiKey', async () => {
+  const testApiKey = useCallback((key, model) => withAction('testApiKey', async () => {
     if (enabled) {
-      await apiClient.post('/system/requirement-settings/kimi-api-key/test', { apiKey: key || undefined })
+      const payload = {}
+      if (key) payload.apiKey = key
+      if (model) payload.model = model
+      const res = await apiClient.post('/system/requirement-settings/kimi-api-key/test', Object.keys(payload).length ? payload : undefined)
+      return res?.data || res
     }
-    alert('连接测试通过')
+    return null
   }), [enabled, withAction])
 
   // --- DSL ---
@@ -264,12 +267,10 @@ export default function useSystemManagement({
 
   const saveDslDraft = useCallback(() => withAction('saveDslDraft', async () => {
     if (enabled) await apiClient.patch('/system/implementation-dependency-rules/draft', { rules: dslRules })
-    alert('DSL 草稿已保存')
   }), [enabled, dslRules, withAction])
 
   const activateDsl = useCallback(() => withAction('activateDsl', async () => {
     if (enabled) await apiClient.post('/system/implementation-dependency-rules/activate')
-    alert('DSL 规则已生效')
   }), [enabled, withAction])
 
   // --- Templates ---
@@ -285,7 +286,7 @@ export default function useSystemManagement({
   }, [enabled])
 
   const useTemplate = useCallback((templateName) => {
-    alert(`已使用模板「${templateName}」`)
+    return templateName
   }, [])
 
   const importTemplate = useCallback((formData) => withAction('importTemplate', async () => {

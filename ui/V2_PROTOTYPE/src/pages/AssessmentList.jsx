@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ListPage from '../components/ListPage.jsx'
 import useAssessmentList from '../hooks/useAssessmentList.js'
@@ -7,6 +7,20 @@ import { assessments as mockData } from '../mock/listData.js'
 export default function AssessmentList() {
   const navigate = useNavigate()
   const { rows, creating, refetch, create, remove } = useAssessmentList({ fallbackData: mockData })
+
+  const kpiCards = useMemo(() => {
+    const total = rows.length
+    const checkedOut = rows.filter((r) => r.status === '已检出').length
+    const checkedIn = rows.filter((r) => r.status === '已检入').length
+    const totalDays = rows.reduce((s, r) => s + (r.totalDays || 0), 0)
+    return [
+      { ic: '▣', lb: '评估总数', num: total, pct: 100, barColor: 'var(--brand)', sub: `共 ${total} 条评估` },
+      { ic: '✎', lb: '已检出', num: checkedOut, pct: total ? Math.round(checkedOut / total * 100) : 0, barColor: 'var(--accent)', sub: '正在编辑中' },
+      { ic: '✓', lb: '已检入', num: checkedIn, pct: total ? Math.round(checkedIn / total * 100) : 0, barColor: 'var(--ok)', sub: '已提交锁定' },
+      { ic: '◔', lb: '总人天', num: totalDays.toFixed(1), pct: 100, barColor: 'var(--teal, #0d9488)', sub: '累计评估人天' },
+    ]
+  }, [rows])
+
   const openDetail = (row) => {
     const id = row?.id || row?.raw?.versionRecordId || row?.raw?.id || row?.raw?.versionCode || row?.assessmentVersion
     if (!id) {
@@ -38,8 +52,10 @@ export default function AssessmentList() {
     <ListPage
       crumb="工作台 / 实施评估"
       title="实施评估列表"
+      subtitle="查看评估概览与版本管理"
       data={rows}
       rowKey="id"
+      kpiCards={kpiCards}
       onRowClick={openDetail}
       onBulkAction={handleBulkAction}
       filterTags={[

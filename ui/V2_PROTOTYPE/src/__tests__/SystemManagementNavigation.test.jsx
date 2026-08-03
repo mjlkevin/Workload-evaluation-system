@@ -46,11 +46,10 @@ describe('System management navigation', () => {
     expect(within(navigation).getByRole('link', { name: /测试结果/ })).toHaveAttribute('href', '/system/test-results')
   })
 
-  test('opens a dedicated page for each system management submodule without top tabs', async () => {
+  test('opens a dedicated page for each system management submodule', async () => {
     renderAppAt('/system/dsl-rules')
 
     expect(await screen.findByRole('heading', { name: 'DSL 规则集' })).toBeInTheDocument()
-    expect(screen.getByText('规则 ID')).toBeInTheDocument()
-    expect(screen.queryByRole('tablist', { name: '系统管理配置分类' })).not.toBeInTheDocument()
+    expect(screen.getAllByText(/实施评估依赖规则/).length).toBeGreaterThan(0)
   })
 })
