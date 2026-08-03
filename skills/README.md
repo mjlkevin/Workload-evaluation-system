@@ -1,6 +1,6 @@
 # WorkEvolutionSys — Skill 管理中心
 
-> 本目录独立管理 WorkEvolutionSys（工作量评估系统）配套的 Cursor / Kimi / 通用 Agent Skill，与 `.cursor/skills/` 解耦，便于跨 IDE/Agent 复用与版本迭代。
+> 本目录独立管理 WorkEvolutionSys（工作量评估系统）配套的 Kimi / 通用 Agent Skill，与具体 IDE 的 Skill 目录解耦，便于跨 IDE/Agent 复用与版本迭代。
 
 ---
 
@@ -47,17 +47,6 @@ skills/
 
 ## 🚀 快速开始
 
-### 对于 Cursor 用户
-Cursor 会自动读取项目根目录下 `.cursor/skills/` 的 Skill。为使本目录生效，请确保：
-
-```bash
-# 方式一：符号链接（推荐，保持单点维护）
-ln -sf ../../skills/workload-api-external-agent .cursor/skills/workload-api-external-agent
-
-# 方式二：直接复制（如需独立版本控制）
-cp -r skills/workload-api-external-agent .cursor/skills/
-```
-
 ### 对于 Kimi Code CLI 用户
 Kimi Code CLI 支持 `.kimi/skills/` 目录自动识别：
 
@@ -77,7 +66,7 @@ ln -sf ../../skills/workload-api-external-agent .kimi/skills/workload-api-extern
 2. **草稿迭代**：在 `drafts/` 中编写、测试、评审
 3. **正式发布**：移至根目录 `skills/<skill-name>/`，并创建 `CHANGELOG.md`
 4. **登记版本**：在 `VERSION_HISTORY.md` 中记录发布信息
-5. **链接到 IDE**：按需创建到 `.cursor/skills/` 或 `.kimi/skills/` 的符号链接
+5. **链接到 IDE**：按需创建到 `.kimi/skills/` 等 IDE 识别目录的符号链接
 
 ---
 
@@ -89,7 +78,6 @@ ln -sf ../../skills/workload-api-external-agent .kimi/skills/workload-api-extern
 | **Skill 小迭代**（patch）| 修改 `skills/<name>/SKILL.md`，在 `CHANGELOG.md` 追加 patch 记录 |
 | **Skill 大迭代**（minor/major）| 修改前先将旧版完整复制到 `archive/<name>-v<旧版本>/`，再更新当前版，登记 `VERSION_HISTORY.md` |
 | **废弃 Skill** | 移至 `archive/<name>-DEPRECATED/`，在 `VERSION_HISTORY.md` 标注废弃原因与替代方案 |
-| **同步到 `.cursor/skills/`** | 执行 `scripts/sync-skills.sh`（见下方脚本说明）或手动复制/链接 |
 
 ---
 
@@ -102,20 +90,6 @@ ln -sf ../../skills/workload-api-external-agent .kimi/skills/workload-api-extern
 - **修订号（Patch）**：文案修正、curl 示例修复、补充说明
 
 示例：`v1.2.3`
-
----
-
-## 🔧 配套脚本
-
-### `scripts/sync-skills.sh`（建议后续创建）
-
-```bash
-#!/bin/bash
-# 将 skills/ 下所有已发布 Skill 同步到 .cursor/skills/ 和 .kimi/skills/
-# 用法：./scripts/sync-skills.sh
-```
-
-> 如需此脚本，请通知维护者创建。
 
 ---
 
@@ -134,10 +108,10 @@ ln -sf ../../skills/workload-api-external-agent .kimi/skills/workload-api-extern
 
 ## ❓ 常见问题
 
-**Q：`.cursor/skills/` 和 `skills/` 有什么区别？**  
-A：`.cursor/skills/` 是 Cursor IDE 的自动识别目录，由 Cursor 消费；`skills/` 是本项目的**独立管理源**，支持多 IDE/Agent 复用、版本归档、迭代评审。
+**Q：`.kimi/skills/` 和 `skills/` 有什么区别？**  
+A：`.kimi/skills/` 是 Kimi Code CLI 的自动识别目录，由 Kimi 消费；`skills/` 是本项目的**独立管理源**，支持多 IDE/Agent 复用、版本归档、迭代评审。
 
-**Q：修改了 `skills/` 下的文件，Cursor 会自动生效吗？**  
+**Q：修改了 `skills/` 下的文件，IDE/Agent 侧会自动生效吗？**  
 A：如果使用的是**符号链接**，会立即生效；如果使用的是**复制**，需要重新同步。
 
 **Q：能否在 Skill 中引用项目内的其他文档？**  
