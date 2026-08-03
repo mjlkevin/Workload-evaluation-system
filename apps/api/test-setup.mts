@@ -7,7 +7,7 @@
 //
 // 清理：通过 process.on('beforeExit') 在测试全部结束后自动 stop container。
 
-import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -34,7 +34,7 @@ if (USE_TC) {
   // Run migrations
   const pool = new Pool({ connectionString: connectionUri, max: 1 });
   const db = drizzle(pool);
-  const migrationsFolder = path.resolve(__dirname, "drizzle");
+  const migrationsFolder = fileURLToPath(new URL("./drizzle/", import.meta.url));
 
   console.log(`[test:setup] Running migrations from ${migrationsFolder}...`);
   await migrate(db, { migrationsFolder });
