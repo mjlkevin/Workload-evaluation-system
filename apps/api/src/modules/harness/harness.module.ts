@@ -4,6 +4,7 @@
 // 领域 barrel：统一导出 controller、repository、types、usecase，
 // 供路由层按 `../modules/harness/harness.module` 引用。
 
+export * from "./harness-runtime.repository";
 export * from "./harness-runtime.types";
 export * from "./harness.controller";
 export * from "./harness.regression";
