@@ -1,0 +1,47 @@
+{
+  "id": "BE-2026-08-03-rp-047-a2-integration-work-order",
+  "date": "2026-08-03",
+  "type": "process_change",
+  "scope": "RP-047-A2-INT Qoder 集成候选工单",
+  "summary": "用户授权按 Qoder 施工、Codex 审计推进 RP-047。Codex 发布 A2 集成候选工单：Qoder 从包含工单的业务主线提交创建独立 worktree，按固定顺序移植 8 个已审核提交，只处理 17 个 Allowed Paths，完成完整验证后回填；Codex 负责独立审计和最终主线集成。",
+  "status": "ASSIGNED / 待 Qoder ACK",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "changes",
+    "sources",
+    "collaboration-protocol"
+  ],
+  "evidence": [
+    {
+      "kind": "work_order",
+      "ref": "docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2-INT.md",
+      "result": "assigned",
+      "summary": "固定 Assignment Commit、Qoder worktree、来源提交、Allowed Paths、验证、停止条件和 Codex 审计合同。"
+    },
+    {
+      "kind": "source_candidate",
+      "ref": "qoder/rp-047-a2-durable-run-foundation @ d9790fe08e62964e0dacfe103b06647af02de81e",
+      "result": "ACCEPTED_PENDING_USER",
+      "summary": "A2-R1 三个阻断项已关闭，作为本工单唯一来源候选。"
+    },
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-08-03-codex-RP-047-A2-R1-gate.md",
+      "result": "95/95 Harness, modules and builds pass",
+      "summary": "证明来源候选可进入集成施工，但不等于主线集成或 RP-047 交付。"
+    }
+  ],
+  "gate": {
+    "taskId": "RP-047-A2-INT",
+    "executor": "qoder1",
+    "reviewer": "codex",
+    "allowNextTask": false,
+    "mustReworkFirst": false,
+    "mainMergeAllowed": false,
+    "nextOwner": "qoder1"
+  },
+  "next": "Qoder 读取工单并输出 Worktree Contract ACK；形成集成候选和 handoff 后由 Codex 独立审计。"
+}

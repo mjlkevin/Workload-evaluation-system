@@ -880,10 +880,10 @@
               <td>AI Runtime / 前端状态</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>阶段 1H-C · Batch A2</td>
-              <td><span class="status run"><span class="dot"></span>Batch A2 Gate 通过 / 待集成</span></td>
+              <td><span class="status run"><span class="dot"></span>Batch A2 Gate 通过 / 集成工单已发布 / 待 Qoder ACK</span></td>
               <td>将全局 <code class="inline">sending/messages/composer/selectedFile</code> 拆成会话级运行时，实现“同一会话单请求、不同会话可并行”；任务所有权不得绑定 <code class="inline">AiHomeWorkbench</code> 页面，任何异步回调只能按 <code class="inline">sessionId + requestId/taskId</code> 更新所属通道</td>
               <td>去重命中 RP-017（离开页面后恢复活跃会话）和 RP-029（SSE/流式输出），但尚无 per-session runtime、跨会话并行、背景完成指示和响应防串台的工作项，故新增 RP-047</td>
-              <td>正式规格已固定 PostgreSQL-backed Harness Run、独立 Worker、Attempt lease/heartbeat、AI 语义建议 + Runtime 校验检查点、可回放事件/输出、outbox 幂等投影与 Recovery Coordinator。A2-R1 候选 <code class="inline">d9790fe</code> 已通过迁移、原子性、事件/checkpoint/output 并发、普通对象边界、modules 与 API/Web build 门禁；Batch A2 等待用户授权集成，B-E 继续锁定</td>
+              <td>正式规格已固定 PostgreSQL-backed Harness Run、独立 Worker、Attempt lease/heartbeat、AI 语义建议 + Runtime 校验检查点、可回放事件/输出、outbox 幂等投影与 Recovery Coordinator。A2-R1 候选 <code class="inline">d9790fe</code> 已通过迁移、原子性、事件/checkpoint/output 并发、普通对象边界、modules 与 API/Web build 门禁；用户已授权 Qoder 形成集成候选、Codex 独立审计，工单 <code class="inline">docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2-INT.md</code> 等待 Qoder ACK，B-E 继续锁定</td>
             </tr>
             <tr>
               <td class="mono">RP-048</td>
@@ -3055,7 +3055,7 @@
           <div class="callout"><div><b>已确认根因</b><code class="inline">AiHomeWorkbench</code> 使用全局 messages/sending/composer/selectedFile；同步 Effect 在 sending 时直接返回；<code class="inline">useAiSessions.upsertSession</code> 还会自动激活被更新的会话，使旧请求完成时可把用户强制切回原会话。</div></div>
           <div class="callout"><div><b>已确认边界</b>切换会话、离开 AI 页、刷新、关闭标签页或退出都不取消任务；原用户重新登录后可恢复进度和结果。AI 页面只是观察与操作入口，不是任务 owner。</div></div>
           <div class="callout err"><div><b>Batch A1 Gate 已拒收</b>候选 <code class="inline">fae8a7d</code> 的表结构方向部分成立，但执行方越过 Testcontainers 停止条件；历史迁移、Run/首事件原子性、checkpoint 并发幂等、Runtime validation 和安全错误均未达到批准标准。被拒分支只保留审计，不作为集成或返工基础。</div></div>
-          <div class="callout"><div><b>当前门禁</b>RP-047-A2-R1 已由 Codex 独立复核通过：Harness 95/95、modules 143/143、API/Web build 通过，三个返工阻断项关闭。当前等待用户授权将 Batch A2 最小 patch 集成业务主线；集成并复跑门禁前不启动 Batch B，前端 Batch D 的测试包装与人工验收缺口继续保留。</div></div>
+          <div class="callout" data-board-event-id="BE-2026-08-03-rp-047-a2-integration-work-order:requirements"><div><b>当前门禁</b>RP-047-A2-R1 已由 Codex 独立复核通过：Harness 95/95、modules 143/143、API/Web build 通过，三个返工阻断项关闭。用户已授权按“Qoder 施工、Codex 审计”形成主线集成候选；Qoder 工单已发布，当前等待 Worktree Contract ACK。Codex 审计与主线复验通过前不启动 Batch B，前端 Batch D 的测试包装与人工验收缺口继续保留。</div></div>
         </div>
       </div>
     </section>

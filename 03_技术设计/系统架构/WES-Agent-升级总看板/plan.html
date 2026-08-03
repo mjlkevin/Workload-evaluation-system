@@ -42,7 +42,7 @@
         <span><b>当前阶段</b> 阶段 1H-B 已形成交付基线 / 阶段 1H-C 待规划</span>
         <span><b>人工测试</b> 1F/1G/1H-A 用例已登记，待执行回填</span>
         <span><b>分支</b> 业务主线 <code class="inline">codex/role-driven-ai-home-workbench</code> 当前包含 RP-031 合并提交 <code class="inline">5cc81b9</code></span>
-        <span><b>状态</b> 需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓；RP-031 多知识库路由与 RAG 评测闭环已集成关闭。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-047 A2-R1 候选 <code class="inline">d9790fe</code> 已关闭三个返工阻断项，Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过；后续执行路线已固化为 A2 最小集成 → B Worker/恢复 → C 异步 API → D 多会话前端 → E 灰度韧性，当前仍待用户授权 A2 集成，B-E 未启动。其余已验证能力和人工验收缺口按原记录保留。</span>
+        <span><b>状态</b> 需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓；RP-031 多知识库路由与 RAG 评测闭环已集成关闭。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-047 A2-R1 候选 <code class="inline">d9790fe</code> 已关闭三个返工阻断项，Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过；用户已授权 Qoder 形成 A2 集成候选、Codex 负责独立审计，工单已发布并等待 ACK，B-E 未启动。其余已验证能力和人工验收缺口按原记录保留。</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">阶段 1E 已交付</span>
@@ -489,18 +489,18 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
     <section>
       <div class="h-num">Section 11</div>
       <h2>后续任务池</h2>
-      <p class="lead">以下任务不属于阶段 1H-A 的前端体验闭环，将作为阶段 1H-C、阶段 2 或独立候选任务逐项评审。当前需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓。RP-031 已完成主线集成并关闭；资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示作为独立后续优化。RP-048 已完成通用 Speak Plainly Skill、四个模型入口接入和自动检查，等待用户体验确认。RP-047 的跨会话持续、后台 Worker、混合检查点、幂等恢复和可回放输出规格已获批准；A1 已拒收，A2-R1 已通过 Codex Gate。后续执行计划已形成，但 A2 仍待用户授权集成，B-E 继续锁定。已验证能力和其他人工验收缺口继续按原记录保留。</p>
+      <p class="lead">以下任务不属于阶段 1H-A 的前端体验闭环，将作为阶段 1H-C、阶段 2 或独立候选任务逐项评审。当前需求池共 40 项：23 项已交付、15 项待规划/待确认/待验收、2 项暂缓。RP-031 已完成主线集成并关闭；资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示作为独立后续优化。RP-048 已完成通用 Speak Plainly Skill、四个模型入口接入和自动检查，等待用户体验确认。RP-047 的跨会话持续、后台 Worker、混合检查点、幂等恢复和可回放输出规格已获批准；A1 已拒收，A2-R1 已通过 Codex Gate。用户已授权 Qoder 施工、Codex 审计，A2 集成候选工单已发布并等待 ACK，B-E 继续锁定。已验证能力和其他人工验收缺口继续按原记录保留。</p>
       <div class="timeline-card" data-board-event-id="BE-2026-08-03-rp-047-post-a2-execution-plan" style="margin-bottom:18px">
         <h5>RP-047 后续执行路线</h5>
         <table>
           <tr><th>顺序</th><th>业务结果</th><th>进入条件</th><th>验收门禁</th></tr>
-          <tr><td class="mono">A2 集成</td><td>把已通过 Gate 的持久 Run 数据基础以最小 patch 落到业务主线。</td><td>用户明确授权；从当前主线创建独立集成 worktree，不整分支 merge。</td><td>Harness 0 skip、modules/AI/integration、API/Web build 全部通过；运行态 JSON 不进入 diff。</td></tr>
+          <tr data-board-event-id="BE-2026-08-03-rp-047-a2-integration-work-order:plan"><td class="mono">A2 集成</td><td>Qoder 把已通过 Gate 的持久 Run 数据基础移植到最新主线的独立集成候选；Codex 独立审计后才允许进入业务主线。</td><td><span class="status run"><span class="dot"></span>工单已发布 / 待 Qoder ACK</span>；分支固定为 <code class="inline">qoder/rp-047-a2-integration</code>，不得整分支 merge 或直接改主 checkout。</td><td>Harness 0 skip、modules/AI/integration/Web、安全扫描和 API/Web build 全部通过；运行态 JSON 不进入 diff。</td></tr>
           <tr><td class="mono">Batch B</td><td>后台 Worker 可领取、心跳、检查点续跑和幂等投影。</td><td>A2 主线集成 Gate 通过。</td><td>输入后、工具后、模型中、消息投影前后崩溃均可恢复且不重复副作用。</td></tr>
           <tr><td class="mono">Batch C</td><td>提供 HTTP 202、Run 查询、SSE 回放、取消、补充输入和重试。</td><td>Gate B 通过。</td><td>JWT/owner 404 隔离、重复提交、断线重连、取消和删除冲突集成测试通过。</td></tr>
           <tr><td class="mono">Batch D</td><td>会话 A/B 并行，离页、刷新、关页和重新登录后仍可恢复。</td><td>Gate C 通过。</td><td>前端 focused/Web build、1440px、760px、键盘和明确停止人工验收通过。</td></tr>
           <tr><td class="mono">Batch E</td><td>完成故障演练、灰度开关、旧路径回滚和运维证据。</td><td>Gate D 通过。</td><td>API 重启、Worker 硬退出、模型流中断、迁移演练和用户验收均有记录。</td></tr>
         </table>
-        <div class="callout warn" style="margin-top:12px"><div><b>当前动作</b>详细计划见 <a href="../../../docs/superpowers/plans/2026-08-03-rp-047-post-a2-execution-roadmap.md">2026-08-03-rp-047-post-a2-execution-roadmap.md</a>。本轮只完成计划编排，没有合并 A2、发布 Batch B 工单或改变 <code class="inline">allowNextTask=false</code>。</div></div>
+        <div class="callout warn" style="margin-top:12px"><div><b>当前动作</b>详细路线见 <a href="../../../docs/superpowers/plans/2026-08-03-rp-047-post-a2-execution-roadmap.md">后续执行计划</a>，Qoder 当前施工工单见 <a href="../../../docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2-INT.md">RP-047-A2-INT</a>。Qoder 只形成集成候选并回填，Codex 负责独立审计和最终主线集成；<code class="inline">allowNextTask=false</code>，Batch B 未发布。</div></div>
       </div>
       <table>
         <tr><th>候选任务</th><th>目标</th><th>启动条件</th><th>第一验收口径</th></tr>
@@ -687,7 +687,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <tr data-board-event-id="BE-2026-08-03-rp-047-post-a2-execution-plan:rp-row">
           <td class="mono">RP-047</td>
           <td>AI 工作台会话级多通道运行时</td>
-          <td><span class="status run"><span class="dot"></span>P1 Batch A2 Gate 通过 / 后续计划已形成 / 待集成</span>：A2-R1 <code class="inline">d9790fe</code> 已关闭 JSON 普通对象校验、output 并发版本测试和 handoff 三项缺口；Codex Gate 证据见 <code class="inline">docs/agent-loop/audits/2026-08-03-codex-RP-047-A2-R1-gate.md</code>，后续 A2 集成与 B-E 串行门禁见 <code class="inline">docs/superpowers/plans/2026-08-03-rp-047-post-a2-execution-roadmap.md</code>。用户授权集成前 B-E 尚未授权。</td>
+          <td><span class="status run"><span class="dot"></span>P1 Batch A2 Gate 通过 / Qoder 集成工单已发布 / 待 ACK</span>：A2-R1 <code class="inline">d9790fe</code> 已关闭 JSON 普通对象校验、output 并发版本测试和 handoff 三项缺口；用户已授权 Qoder 施工、Codex 审计。Qoder 工单为 <code class="inline">docs/agent-loop/work-orders/2026-08-03-qoder-RP-047-A2-INT.md</code>，只允许形成集成候选；Codex 审计与主线复验前 B-E 尚未授权。</td>
           <td>会话 A 请求中可切换并在 B 发送；离开 AI 页、刷新、关页或退出后 A/B 仍继续；原用户重新登录后恢复正确进度和结果；A/B 逆序返回不串台、不抢活跃会话。</td>
         </tr>
         <tr>

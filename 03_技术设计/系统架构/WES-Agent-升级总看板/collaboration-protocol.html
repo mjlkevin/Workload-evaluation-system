@@ -839,11 +839,11 @@
       <h2>当前队列映射</h2>
       <table>
         <tr><th>队列项</th><th>推荐状态载体</th><th>复核重点</th><th>验收证据</th></tr>
-        <tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-integration-work-order:collaboration">
           <td>RP-047 Durable Multi-Session Runtime</td>
-          <td><code class="inline">qoder/rp-047-a-durable-run-foundation</code> / Gate REJECTED；<code class="inline">qoder/rp-047-a2-durable-run-foundation</code> / ACCEPTED_PENDING_USER</td>
-          <td>A2-R1 候选 <code class="inline">d9790fe</code> 已关闭 JSON 普通对象校验、output 并发回归和 handoff 范围记录三个阻断项；Codex 已独立复跑完整 Gate，当前只等待 Batch A2 集成决策。</td>
-          <td>Testcontainers Harness 95/95、modules 143/143、API/Web build 通过；<code class="inline">allowNextTask=false</code>、<code class="inline">mustReworkFirst=false</code>，Batch B 必须等待用户授权集成及主线复验。</td>
+          <td><code class="inline">qoder/rp-047-a-durable-run-foundation</code> / Gate REJECTED；<code class="inline">qoder/rp-047-a2-durable-run-foundation @ d9790fe</code> / Gate 通过；<code class="inline">RP-047-A2-INT</code> / ASSIGNED_WAITING_QODER_ACK</td>
+          <td>A2-R1 已关闭三个阻断项。用户已授权 Qoder 形成主线集成候选、Codex 负责独立审计；工单固定 <code class="inline">qoder/rp-047-a2-integration</code> 独立 worktree、17 个 Allowed Paths、8 个来源提交和完整验证矩阵。</td>
+          <td>Qoder 只能回填“已回填 / 待 Codex 复核”，不得合并主线。<code class="inline">allowNextTask=false</code>、<code class="inline">mainMergeAllowed=false</code>；Codex 审计和主线复验通过前不发布 Batch B。</td>
         </tr>
         <tr>
           <td>RP-027 / RP-028 Kimi Provider</td>
