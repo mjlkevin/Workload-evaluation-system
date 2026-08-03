@@ -9,6 +9,7 @@ export type ProjectEvaluationPlan = {
   status: ProjectEvaluationStatus;
   ownerUserId: string;
   ownerUsername: string;
+  versionCode: string;
   participantUserIds: string[];
   currentRequirementVersionId?: string;
   currentAssessmentVersionId?: string;

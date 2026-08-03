@@ -9,6 +9,7 @@ router.get("/", requireCapability("estimates:read"), AiSessionsModule.listSessio
 router.post("/", requireCapability("estimates:read"), AiSessionsModule.createSession);
 router.get("/:sessionId", requireCapability("estimates:read"), AiSessionsModule.getSession);
 router.delete("/:sessionId", requireCapability("estimates:read"), AiSessionsModule.deleteSession);
+router.patch("/:sessionId", requireCapability("estimates:read"), AiSessionsModule.renameSession);
 router.post("/:sessionId/events", requireCapability("estimates:read"), AiSessionsModule.appendSessionEvent);
 router.post("/:sessionId/standard-drafts", requireCapability("system:manage"), AiSessionsModule.createStandardDraft);
 

@@ -3,7 +3,7 @@
   "draft": {
     "kimiEvaluation": {
       "enabled": true,
-      "model": "kimi-k2-turbo-preview",
+      "model": "kimi-k3",
       "temperature": 0.3,
       "maxTokens": 4000,
       "timeoutMs": 120000,
@@ -13,7 +13,7 @@
     },
     "fileParsing": {
       "enabled": true,
-      "model": "kimi-k2-turbo-preview",
+      "model": "kimi-k2.6",
       "allowedExtensions": [
         ".xlsx",
         ".xls",
@@ -26,7 +26,7 @@
     },
     "kimiGeneration": {
       "enabled": true,
-      "model": "kimi-k2.5",
+      "model": "kimi-k3",
       "temperature": 0.5,
       "maxTokens": 6000,
       "outputStyle": "balanced",
@@ -34,13 +34,13 @@
       "includeAssumptions": true
     },
     "kimiCredentials": {
-      "apiKey": "sk-wYVmxOTyTtNdbg4WtKMT7ZPvXZKKGZdl2E88GqNqMVrJqkh0"
+      "apiKey": ""
     }
   },
   "active": {
     "kimiEvaluation": {
       "enabled": true,
-      "model": "kimi-k2-turbo-preview",
+      "model": "kimi-k2.5",
       "temperature": 0.3,
       "maxTokens": 4000,
       "timeoutMs": 120000,
@@ -50,7 +50,7 @@
     },
     "fileParsing": {
       "enabled": true,
-      "model": "kimi-k2-turbo-preview",
+      "model": "kimi-k2.6",
       "allowedExtensions": [
         ".xlsx",
         ".xls",
@@ -71,9 +71,9 @@
       "includeAssumptions": true
     },
     "kimiCredentials": {
-      "apiKey": "sk-wYVmxOTyTtNdbg4WtKMT7ZPvXZKKGZdl2E88GqNqMVrJqkh0"
+      "apiKey": ""
     }
   },
-  "updatedAt": "2026-04-18T15:35:32.744Z",
+  "updatedAt": "2026-08-02T09:40:01.894Z",
   "effectiveAt": "2026-04-18T15:35:32.744Z"
 }

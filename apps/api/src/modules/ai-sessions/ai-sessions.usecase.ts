@@ -106,6 +106,22 @@ export function getAiSession(user: AuthUser, sessionId: string): AiSessionRecord
   return loadAiSessionsStore().sessions.find((session) => session.ownerUserId === user.id && session.sessionId === sessionId) || null;
 }
 
+export function renameAiSession(user: AuthUser, sessionId: string, newTitle: unknown): AiSessionRecord | null {
+  const id = asString(sessionId);
+  if (!id) return null;
+  const rawTitle = asString(newTitle).trim();
+  if (!rawTitle) return null;
+  // 标题长度限制：1~80 字符，去除首尾空白
+  const title = rawTitle.slice(0, 80);
+  const store = loadAiSessionsStore();
+  const session = store.sessions.find((item) => item.ownerUserId === user.id && item.sessionId === id);
+  if (!session) return null;
+  session.title = title;
+  session.updatedAt = new Date().toISOString();
+  saveAiSessionsStore(store);
+  return session;
+}
+
 export function deleteAiSession(user: AuthUser, sessionId: string): boolean {
   const id = asString(sessionId);
   if (!id) return false;

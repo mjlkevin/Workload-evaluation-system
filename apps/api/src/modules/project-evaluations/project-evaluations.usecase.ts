@@ -2,10 +2,44 @@ import { randomUUID } from "node:crypto";
 
 import type { AuthUser, VersionRecord } from "../../types";
 import { asString } from "../../utils";
+import { applyVersionCodeFormat, formatHasSequenceToken } from "../../utils/version-code-format";
+import { loadVersionCodeRulesStore } from "../system/system.repository";
+import { loadVersionsStore } from "../versions/versions.repository";
 import type { HarnessRequirementReportV2Content } from "../harness/harness.types";
 import { createHarnessRepository, type HarnessRepository } from "../harness/harness.repository";
 import { PROJECT_EVALUATION_RECORD_KIND, findHarnessDraftRecords, findProjectRecordByAssessmentDraft, listProjectRecords, mapGlobalVersionToProject, saveProjectRecord, saveProjectRecords } from "./project-evaluations.repository";
 import type { AiAssessmentDraftManualConfirmResult, AiDraftManualConfirmation, ProjectEvaluationDraftBundle, ProjectEvaluationPlan } from "./project-evaluations.types";
+
+/**
+ * 按「总方案」编码规则生成项目版本号。
+ * 若规则不存在或未生效，回退到 PROJECT-{uuid} 保证不阻断创建。
+ */
+function generateProjectVersionCode(ownerUserId: string): string {
+  const rulesStore = loadVersionCodeRulesStore();
+  const rule = rulesStore.rules.find((r) => r.moduleKey === "global" && r.status === "active");
+  if (!rule) return `PROJECT-${randomUUID()}`;
+
+  const format = rule.format || "{PREFIX}-{YYYYMMDD}-{NNN}";
+  const hasSeq = formatHasSequenceToken(format);
+  const now = new Date();
+  const store = loadVersionsStore();
+
+  for (let seq = 1; seq <= 9999; seq += 1) {
+    if (!hasSeq && seq > 1) break;
+    const candidate = applyVersionCodeFormat(format, {
+      prefix: rule.prefix,
+      moduleCode: rule.moduleCode,
+      globalCode: "GL000",
+      seq,
+      now,
+    });
+    const conflict = store.records.some(
+      (r) => r.ownerUserId === ownerUserId && r.type === "global" && r.versionCode === candidate
+    );
+    if (!conflict) return candidate;
+  }
+  return `PROJECT-${randomUUID()}`;
+}
 
 export function listProjectEvaluationsForUser(user: AuthUser, query: { q?: unknown } = {}): ProjectEvaluationPlan[] {
   const keyword = asString(query.q).toLowerCase();
@@ -32,7 +66,7 @@ export function createProjectEvaluationForUser(user: AuthUser, input: Record<str
   const currentStage = asString(input.currentStage) || "project_discovery";
   const createdFromSessionId = asString(input.createdFromSessionId);
   const recordId = randomUUID();
-  const versionCode = `PROJECT-${recordId}`;
+  const versionCode = generateProjectVersionCode(user.id);
   const payload: Record<string, unknown> = {
     recordKind: PROJECT_EVALUATION_RECORD_KIND,
     projectName,
@@ -162,7 +196,7 @@ export function createProjectAndAssessmentDraftsFromHarness(
   const industry = asString(project.industry);
 
   const projectRecordId = randomUUID();
-  const projectVersionCode = `PROJECT-${projectRecordId}`;
+  const projectVersionCode = generateProjectVersionCode(user.id);
   const assessmentRecordId = randomUUID();
   const assessmentVersionCode = buildAiDraftVersionCode("IA", assessmentRecordId);
   const assessmentPayload: Record<string, unknown> = {

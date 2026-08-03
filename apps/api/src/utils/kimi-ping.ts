@@ -41,17 +41,26 @@ function classifyPingFailure(status: number, msg: string): KimiPingFailureKind {
   ) {
     return "overload";
   }
-  if (status === 400 && (t.includes("model") && (t.includes("not found") || t.includes("invalid")))) {
+  if ((status === 400 || status === 404) && (t.includes("model") && (t.includes("not found") || t.includes("invalid") || t.includes("not exist") || t.includes("permission denied")))) {
     return "model_not_found";
   }
   return "unknown";
+}
+
+export interface KimiPingResult {
+  /** API 响应体中返回的实际模型名 */
+  respondedModel: string;
+  /** 请求耗时（ms） */
+  latencyMs: number;
+  /** HTTP 状态码 */
+  httpStatus: number;
 }
 
 export async function pingKimiChatCompletion(params: {
   apiUrl: string;
   apiKey: string;
   model: string;
-}): Promise<void> {
+}): Promise<KimiPingResult> {
   const baseUrl = String(params.apiUrl || "").replace(/\/+$/, "");
   if (!baseUrl) throw new Error("apiUrl 为空");
 
@@ -65,6 +74,7 @@ export async function pingKimiChatCompletion(params: {
       ...(temperature === undefined ? {} : { temperature }),
     });
 
+  const startedAt = Date.now();
   let res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -99,4 +109,16 @@ export async function pingKimiChatCompletion(params: {
     const kind = classifyPingFailure(res.status, msg);
     throw new KimiPingFailure(kind, res.status, msg);
   }
+
+  // 解析响应体获取实际模型名
+  const latencyMs = Date.now() - startedAt;
+  let respondedModel = "";
+  try {
+    const json = (await res.json()) as { model?: string };
+    respondedModel = json?.model || "";
+  } catch {
+    /* 响应体解析失败不影响连通性判定 */
+  }
+
+  return { respondedModel, latencyMs, httpStatus: res.status };
 }

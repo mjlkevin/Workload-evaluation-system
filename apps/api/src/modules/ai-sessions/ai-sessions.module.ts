@@ -1,2 +1,2 @@
-export { appendSessionEvent, createSession, createStandardDraft, deleteSession, getSession, listSessions } from "./ai-sessions.controller";
-export { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, listAiSessions } from "./ai-sessions.usecase";
+export { appendSessionEvent, createSession, createStandardDraft, deleteSession, getSession, listSessions, renameSession } from "./ai-sessions.controller";
+export { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, listAiSessions, renameAiSession } from "./ai-sessions.usecase";

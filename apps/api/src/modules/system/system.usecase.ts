@@ -302,14 +302,25 @@ export async function testRequirementKimiApiKey(req: Request, res: Response) {
   const model =
     explicitModel || store.draft.kimiEvaluation?.model?.trim() || config.kimi.model;
   try {
-    await pingKimiChatCompletion({
+    const pingResult = await pingKimiChatCompletion({
       apiUrl: config.kimi.apiBaseUrl,
       apiKey,
       model,
     });
     const testedSource =
       source === "override" ? "request_body" : source === "draft" ? "draft_store" : "environment";
-    return res.json(ok({ ok: true, testedSource, model }, randomUUID()));
+    const modelMatch = pingResult.respondedModel
+      ? pingResult.respondedModel.toLowerCase() === model.toLowerCase()
+      : null;
+    return res.json(ok({
+      ok: true,
+      testedSource,
+      requestedModel: model,
+      respondedModel: pingResult.respondedModel || null,
+      modelMatch,
+      latencyMs: pingResult.latencyMs,
+      httpStatus: pingResult.httpStatus,
+    }, randomUUID()));
   } catch (e) {
     if (e instanceof KimiPingFailure) {
       if (e.kind === "overload") {

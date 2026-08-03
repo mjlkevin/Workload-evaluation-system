@@ -12,6 +12,11 @@ function looksLikeUnexpandedTemplate(versionCode: string): boolean {
   return /\{[A-Za-z0-9]+\}/.test(versionCode);
 }
 
+/** 项目创建时绕过编码规则引擎写入的 PROJECT-{uuid} 脏数据 */
+function looksLikeRawProjectUuid(versionCode: string): boolean {
+  return /^PROJECT-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(versionCode);
+}
+
 /**
  * 将仍含 {TOKEN} 的总方案版本号按当前「总方案」编码规则重写为真实码，并持久化。
  * 仅在启动加载时运行一次，避免历史脏数据一直显示为模板串。
@@ -27,7 +32,7 @@ function repairGlobalPlaceholderVersionCodes(records: VersionRecord[]): { record
 
   for (let i = 0; i < working.length; i += 1) {
     const record = working[i];
-    if (record.type !== "global" || !looksLikeUnexpandedTemplate(record.versionCode)) continue;
+    if (record.type !== "global" || (!looksLikeUnexpandedTemplate(record.versionCode) && !looksLikeRawProjectUuid(record.versionCode))) continue;
 
     const now = new Date(record.createdAt || Date.now());
     const hasSeq = formatHasSequenceToken(format);

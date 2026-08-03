@@ -382,6 +382,7 @@ test("POST /harness/runs/:id/actions/:actionId/confirm creates project and asses
         status: "draft",
         ownerUserId: user.id,
         ownerUsername: user.username,
+        versionCode: "GL-08-001",
         participantUserIds: [],
         currentAssessmentVersionId: "assessment-route-1",
         createdFromSessionId: undefined,

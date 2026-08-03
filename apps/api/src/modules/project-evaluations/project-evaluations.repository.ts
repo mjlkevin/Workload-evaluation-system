@@ -29,6 +29,7 @@ export function mapGlobalVersionToProject(record: VersionRecord): ProjectEvaluat
     status: normalizeProjectStatus(payload.projectStatus),
     ownerUserId: record.ownerUserId,
     ownerUsername: record.createdByUsername,
+    versionCode: record.versionCode,
     participantUserIds: asStringArray(payload.participantUserIds),
     currentRequirementVersionId: asString(payload.currentRequirementVersionId) || undefined,
     currentAssessmentVersionId: asString(payload.currentAssessmentVersionId) || undefined,
