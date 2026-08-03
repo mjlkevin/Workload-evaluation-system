@@ -30,7 +30,7 @@
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
       <span class="pill ok">AI 任务执行能力已交付</span>
-      <span class="pill brand">RP-047 A2-R1 Gate 通过 · 待集成</span>
+      <span class="pill brand">RP-047 Batch A2 已集成 · Batch B 未启动</span>
     </div>
   </header>
 
@@ -73,7 +73,7 @@
       <h2>核心判断</h2>
       <p class="lead">Qoder 带来的核心启发不是三栏界面，而是把每次对话变成可管理的 AI 任务。WES 不会在上传文件后强制进入固定报告流程，而是根据用户当前意图选择业务问答、附件问答、报告生成、WES 数据查询或写入确认。</p>
       <div class="callout ok"><div><b>业务定义</b>一次任务运行（Harness Run）代表一项可追溯的 AI 业务任务。对话负责输入和澄清，意图识别器（Intent Router）选择处理路径，任务执行过程负责记录任务归属、使用的文件和知识、当前阶段、任务产物（Artifact）、人工确认动作和最终交付结果。</div></div>
-      <div class="callout ok"><div><b>RP-047 Batch A2-R1 Gate 已通过</b>A2 已证明历史数据可升级，Run/首事件原子提交，事件、checkpoint 和 output 并发幂等；R1 又关闭 Date/Map 等普通对象边界与 handoff 记录缺口。Codex 独立复跑 Testcontainers Harness 95/95、modules 143/143、API/Web build 通过。当前等待 Batch A2 集成，不代表 Worker、API、AI Session 或前端恢复能力已经交付。</div></div>
+      <div class="callout ok"><div><b>RP-047 Batch A2 已集成业务主线</b>A2 已证明历史数据可升级，Run/首事件原子提交，事件、checkpoint 和 output 并发幂等；R1 关闭了 Date/Map 等普通对象边界与 handoff 记录缺口。Codex 在最终组合分支复跑 Testcontainers Harness 95/95、modules 227/227、AI 190/190、integration 1/1、Web 206/206、API/Web build 与安全扫描，全部通过。当前只交付持久运行数据底座，不代表 Worker、异步 API、AI Session 投影或前端恢复能力已经交付。</div></div>
       <div class="grid-3">
         <div class="card"><span class="pill brand">不是聊天增强</span><h3>对话只是入口</h3><p>用户上传文件、补充说明、业务追问和选择下一步动作，都应进入可追溯的任务记录。</p></div>
         <div class="card"><span class="pill ok">不是自动落库</span><h3>任务过程控制边界</h3><p>AI 可以生成报告、草稿和建议动作；正式业务仍必须经过传统系统人工确认。</p></div>
@@ -171,7 +171,7 @@ knowledge feedback
           <td>任务边界</td>
           <td>Run 卡片化、Run Timeline、多 Run 并行、历史 Run 恢复</td>
           <td>让一次 AI 评估或问答成为可后台持续、可恢复、可复盘、可交接的任务，而不是一段依赖浏览器连接的聊天记录。</td>
-          <td><span class="status run"><span class="dot"></span>RP-047 规格已批准 / Batch A2 Gate 通过 / 待集成</span></td>
+          <td><span class="status run"><span class="dot"></span>RP-047 规格已批准 / Batch A2 已集成 / Batch B 未启动</span></td>
         </tr>
         <tr>
           <td>执行边界</td>

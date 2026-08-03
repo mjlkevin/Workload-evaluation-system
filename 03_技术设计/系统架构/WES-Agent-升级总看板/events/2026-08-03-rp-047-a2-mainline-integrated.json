@@ -1,0 +1,43 @@
+{
+  "id": "BE-2026-08-03-rp-047-a2-mainline-integrated",
+  "date": "2026-08-03",
+  "type": "implementation",
+  "scope": "RP-047 Batch A2 主线集成",
+  "summary": "用户授权后，Codex 将已通过独立 Gate 的 A2 固定提交链移植到当前业务主线，在最终组合分支复跑 Testcontainers Harness、modules、AI、integration、Web、API/Web build 与安全扫描，并以 fast-forward 方式集成。A2 数据底座已进入主线；RP-047 尚未交付，Batch B-E 未启动。",
+  "status": "INTEGRATED_VERIFIED / Batch B 未启动",
+  "pages": [
+    "requirements",
+    "testing",
+    "monitoring"
+  ],
+  "evidence": [
+    {
+      "kind": "mainline_commit",
+      "ref": "codex/role-driven-ai-home-workbench @ 88054d53f67a7dad6a61276ab5b73323b5df8835",
+      "result": "fast-forward integrated",
+      "summary": "A2 的 16 个实现/过程文件与 1 个集成 handoff 已进入业务主线；既有未提交修改未被覆盖。"
+    },
+    {
+      "kind": "integration_record",
+      "ref": "docs/agent-loop/audits/2026-08-03-codex-RP-047-A2-mainline-integration.md",
+      "result": "INTEGRATED_VERIFIED",
+      "summary": "记录主线前后提交、最小范围、完整验证矩阵、保留边界与后续批次门禁。"
+    },
+    {
+      "kind": "verification_matrix",
+      "ref": "test:harness; test:modules; test:ai; test:integration; test:web; build:api; build:web; test:security",
+      "result": "95/95; 227/227; 190/190; 1/1; 206/206; pass; pass; pass",
+      "summary": "Testcontainers 0 skip 且容器停止；两个 lockfile 无变化；安全扫描无 tracked secret。"
+    }
+  ],
+  "gate": {
+    "taskId": "RP-047-A2-MAINLINE",
+    "executor": "codex",
+    "reviewer": "codex",
+    "allowNextTask": false,
+    "mustReworkFirst": false,
+    "mainMergeAllowed": true,
+    "nextOwner": "user-owner"
+  },
+  "next": "Batch A2 已完成主线集成；不标记 RP-047 已交付，不自动发布 Batch B 工单，等待用户后续明确指令。"
+}
