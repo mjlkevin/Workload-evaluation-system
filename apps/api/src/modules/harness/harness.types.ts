@@ -27,7 +27,16 @@ export const HARNESS_RUN_STAGES = [
 ] as const;
 export type HarnessRunStage = (typeof HARNESS_RUN_STAGES)[number];
 
-export const HARNESS_RUN_STATUSES = ["running", "waiting", "completed", "failed", "cancelled"] as const;
+export const HARNESS_RUN_STATUSES = [
+  "queued",
+  "running",
+  "waiting",
+  "recovering",
+  "cancelling",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
 export type HarnessRunStatus = (typeof HARNESS_RUN_STATUSES)[number];
 
 export const HARNESS_SOURCE_TYPES = ["attachment", "standard_file"] as const;
