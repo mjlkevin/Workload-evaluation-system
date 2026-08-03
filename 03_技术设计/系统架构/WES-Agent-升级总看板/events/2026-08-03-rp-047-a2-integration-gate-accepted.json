@@ -1,0 +1,48 @@
+{
+  "id": "BE-2026-08-03-rp-047-a2-integration-gate-accepted",
+  "date": "2026-08-03",
+  "type": "verification",
+  "scope": "RP-047-A2-INT Codex 集成候选审计",
+  "summary": "Codex 独立复核 Qoder A2 集成候选：固定 8 个来源提交、17 个 Allowed Paths、additive migration、owner 与 JSON 边界、事件/checkpoint/output 并发和安全错误均通过；完整 Harness、modules、AI、integration、Web、build 与安全扫描通过。候选可进入主线集成，但尚未合并，Batch B 继续锁定。",
+  "status": "ACCEPTED_FOR_MAINLINE_INTEGRATION / 待用户授权集成",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources"
+  ],
+  "evidence": [
+    {
+      "kind": "codex_gate",
+      "ref": "docs/agent-loop/audits/2026-08-03-codex-RP-047-A2-INT-gate.md",
+      "result": "ACCEPTED_FOR_MAINLINE_INTEGRATION",
+      "summary": "候选身份、提交链、文件范围、实现边界与完整验证矩阵均通过独立审计。"
+    },
+    {
+      "kind": "candidate_commit",
+      "ref": "qoder/rp-047-a2-integration @ 35fee259380a46220a1677b11a94b7c5f3d19f22",
+      "result": "17 allowed paths / clean worktree",
+      "summary": "A2 16 个文件与集成 handoff 组成候选；无运行态 JSON、lockfile 或无关文件。"
+    },
+    {
+      "kind": "verification_matrix",
+      "ref": "test:harness; test:modules; test:ai; test:integration; test:web; build:api; build:web; test:security",
+      "result": "95/95; 227/227; 190/190; 1/1; 206/206; pass; pass; pass",
+      "summary": "Testcontainers 0 skip 且容器停止；两个 lockfile 无变化；安全扫描无 tracked secret。"
+    }
+  ],
+  "gate": {
+    "taskId": "RP-047-A2-INT",
+    "executor": "qoder1",
+    "reviewer": "codex",
+    "allowNextTask": false,
+    "mustReworkFirst": false,
+    "mainMergeAllowed": false,
+    "nextOwner": "user-owner -> codex integrator"
+  },
+  "next": "等待用户明确授权 Codex 将 A2 最小验证 patch 集成业务主线；集成前不发布 Batch B 工单、不标记 RP-047 已交付。"
+}
