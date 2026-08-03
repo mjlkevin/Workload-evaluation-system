@@ -72,6 +72,19 @@ function makeRepo(): HarnessRepository {
         createdAt: now,
         updatedAt: now,
         completedAt: null,
+        runKind: "file_analysis",
+        workflowId: "legacy_file_analysis",
+        workflowVersion: "v1",
+        currentStepKey: null,
+        submissionKey: null,
+        eventSequence: 0,
+        availableAt: now,
+        recoveryCount: 0,
+        cancelRequestedAt: null,
+        cancelRequestedBy: null,
+        lastCheckpointId: null,
+        executionConfig: {},
+        retryOfRunId: null,
       } satisfies HarnessRunRow;
       runs.push(row);
       return row;

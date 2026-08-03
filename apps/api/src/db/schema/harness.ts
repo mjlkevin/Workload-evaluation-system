@@ -5,6 +5,7 @@
 // 模型运行轨迹、评分与回归样本。按设计草案，Harness 作为新业务域进入
 // PostgreSQL 主存储，传统 WES JSON 存储暂不迁移。
 
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -14,6 +15,7 @@ import {
   real,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -25,7 +27,9 @@ export const harnessRuns = pgTable(
     ownerUsername: text("owner_username").notNull(),
     mode: text("mode", { enum: ["interactive", "replay", "regression"] }).notNull(),
     stage: text("stage").notNull(),
-    status: text("status", { enum: ["running", "waiting", "completed", "failed", "cancelled"] }).notNull(),
+    status: text("status", {
+      enum: ["queued", "running", "waiting", "recovering", "cancelling", "completed", "failed", "cancelled"],
+    }).notNull(),
     title: text("title").notNull(),
     aiSessionId: text("ai_session_id"),
     projectEvaluationId: text("project_evaluation_id"),
@@ -41,12 +45,167 @@ export const harnessRuns = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    runKind: text("run_kind", { enum: ["workbench_chat", "file_analysis", "replay", "regression"] })
+      .default("file_analysis")
+      .notNull(),
+    workflowId: text("workflow_id").default("legacy_file_analysis").notNull(),
+    workflowVersion: text("workflow_version").default("v1").notNull(),
+    currentStepKey: text("current_step_key"),
+    submissionKey: text("submission_key"),
+    eventSequence: integer("event_sequence").default(0).notNull(),
+    availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
+    recoveryCount: integer("recovery_count").default(0).notNull(),
+    cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }),
+    cancelRequestedBy: text("cancel_requested_by"),
+    lastCheckpointId: uuid("last_checkpoint_id"),
+    executionConfig: jsonb("execution_config").default({}).notNull(),
+    retryOfRunId: uuid("retry_of_run_id"),
   },
   (table) => ({
     ownerIdx: index("harness_runs_owner_idx").on(table.ownerUserId),
     sessionIdx: index("harness_runs_ai_session_idx").on(table.aiSessionId),
     statusIdx: index("harness_runs_status_idx").on(table.status, table.stage),
     createdIdx: index("harness_runs_created_idx").on(table.createdAt),
+    queueIdx: index("harness_runs_queue_idx").on(table.status, table.availableAt, table.createdAt),
+    ownerSubmissionUnique: uniqueIndex("harness_runs_owner_submission_unique").on(table.ownerUserId, table.submissionKey),
+    activeWorkbenchSessionUnique: uniqueIndex("harness_runs_active_workbench_session_unique")
+      .on(table.aiSessionId)
+      .where(
+        sql`${table.aiSessionId} is not null and ${table.runKind} = 'workbench_chat' and ${table.status} in ('queued', 'running', 'waiting', 'recovering', 'cancelling')`,
+      ),
+  }),
+);
+
+export const harnessRunAttempts = pgTable(
+  "harness_run_attempts",
+  {
+    harnessRunAttemptId: uuid("harness_run_attempt_id").primaryKey(),
+    harnessRunId: uuid("harness_run_id")
+      .notNull()
+      .references(() => harnessRuns.harnessRunId, { onDelete: "cascade" }),
+    attemptNo: integer("attempt_no").notNull(),
+    workerId: text("worker_id").notNull(),
+    status: text("status", { enum: ["claimed", "running", "succeeded", "failed", "orphaned", "cancelled"] }).notNull(),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }).notNull(),
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }).notNull(),
+    resumeCheckpointId: uuid("resume_checkpoint_id"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata").default({}).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    runAttemptUnique: uniqueIndex("harness_run_attempts_run_attempt_unique").on(table.harnessRunId, table.attemptNo),
+    activeRunUnique: uniqueIndex("harness_run_attempts_active_run_unique")
+      .on(table.harnessRunId)
+      .where(sql`${table.status} in ('claimed', 'running')`),
+    leaseIdx: index("harness_run_attempts_lease_idx").on(table.status, table.leaseExpiresAt),
+  }),
+);
+
+export const harnessRunCheckpoints = pgTable(
+  "harness_run_checkpoints",
+  {
+    harnessRunCheckpointId: uuid("harness_run_checkpoint_id").primaryKey(),
+    harnessRunId: uuid("harness_run_id")
+      .notNull()
+      .references(() => harnessRuns.harnessRunId, { onDelete: "cascade" }),
+    harnessRunAttemptId: uuid("harness_run_attempt_id").references(() => harnessRunAttempts.harnessRunAttemptId, {
+      onDelete: "set null",
+    }),
+    sequence: integer("sequence").notNull(),
+    checkpointKey: text("checkpoint_key").notNull(),
+    checkpointKind: text("checkpoint_kind", { enum: ["structural", "semantic", "combined"] }).notNull(),
+    workflowId: text("workflow_id").notNull(),
+    workflowVersion: text("workflow_version").notNull(),
+    stepKey: text("step_key").notNull(),
+    resumePolicy: text("resume_policy", { enum: ["resume_next", "restart_step", "manual"] }).notNull(),
+    state: jsonb("state").notNull(),
+    stateHash: text("state_hash").notNull(),
+    inputHash: text("input_hash"),
+    effectKeys: jsonb("effect_keys").default([]).notNull(),
+    aiMilestone: jsonb("ai_milestone"),
+    runtimeValidation: jsonb("runtime_validation").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    runSequenceUnique: uniqueIndex("harness_run_checkpoints_run_sequence_unique").on(table.harnessRunId, table.sequence),
+    runKeyUnique: uniqueIndex("harness_run_checkpoints_run_key_unique").on(table.harnessRunId, table.checkpointKey),
+    runCreatedIdx: index("harness_run_checkpoints_run_created_idx").on(table.harnessRunId, table.createdAt),
+  }),
+);
+
+export const harnessRunEvents = pgTable(
+  "harness_run_events",
+  {
+    harnessRunEventId: uuid("harness_run_event_id").primaryKey(),
+    harnessRunId: uuid("harness_run_id")
+      .notNull()
+      .references(() => harnessRuns.harnessRunId, { onDelete: "cascade" }),
+    sequence: integer("sequence").notNull(),
+    eventType: text("event_type").notNull(),
+    payload: jsonb("payload").default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    runSequenceUnique: uniqueIndex("harness_run_events_run_sequence_unique").on(table.harnessRunId, table.sequence),
+    runCreatedIdx: index("harness_run_events_run_created_idx").on(table.harnessRunId, table.createdAt),
+  }),
+);
+
+export const harnessRunOutputs = pgTable(
+  "harness_run_outputs",
+  {
+    harnessRunOutputId: uuid("harness_run_output_id").primaryKey(),
+    harnessRunId: uuid("harness_run_id")
+      .notNull()
+      .references(() => harnessRuns.harnessRunId, { onDelete: "cascade" }),
+    harnessRunAttemptId: uuid("harness_run_attempt_id").references(() => harnessRunAttempts.harnessRunAttemptId, {
+      onDelete: "set null",
+    }),
+    status: text("status", { enum: ["partial", "final"] }).notNull(),
+    version: integer("version").default(1).notNull(),
+    content: jsonb("content").notNull(),
+    contentHash: text("content_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    runUnique: uniqueIndex("harness_run_outputs_run_unique").on(table.harnessRunId),
+  }),
+);
+
+export const harnessSessionOutbox = pgTable(
+  "harness_session_outbox",
+  {
+    harnessSessionOutboxId: uuid("harness_session_outbox_id").primaryKey(),
+    harnessRunId: uuid("harness_run_id")
+      .notNull()
+      .references(() => harnessRuns.harnessRunId, { onDelete: "cascade" }),
+    aiSessionId: text("ai_session_id").notNull(),
+    eventType: text("event_type").notNull(),
+    deduplicationKey: text("deduplication_key").notNull(),
+    payload: jsonb("payload").notNull(),
+    status: text("status", { enum: ["pending", "processing", "published", "failed"] }).default("pending").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
+    lockedBy: text("locked_by"),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    sessionDedupeUnique: uniqueIndex("harness_session_outbox_session_dedupe_unique").on(
+      table.aiSessionId,
+      table.deduplicationKey,
+    ),
+    pendingIdx: index("harness_session_outbox_pending_idx").on(table.status, table.availableAt),
+    runIdx: index("harness_session_outbox_run_idx").on(table.harnessRunId),
   }),
 );
 
@@ -114,11 +273,13 @@ export const harnessToolEvents = pgTable(
     errorMessage: text("error_message"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    effectKey: text("effect_key"),
   },
   (table) => ({
     runIdx: index("harness_tool_events_run_idx").on(table.harnessRunId),
     actionIdx: index("harness_tool_events_action_idx").on(table.actionId),
     runActionIdx: index("harness_tool_events_run_action_idx").on(table.harnessRunId, table.actionId),
+    runEffectUnique: uniqueIndex("harness_tool_events_run_effect_unique").on(table.harnessRunId, table.effectKey),
   }),
 );
 
@@ -164,11 +325,13 @@ export const harnessArtifacts = pgTable(
     modelRunId: uuid("model_run_id").references(() => harnessModelRuns.harnessModelRunId, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    artifactKey: text("artifact_key"),
   },
   (table) => ({
     runIdx: index("harness_artifacts_run_idx").on(table.harnessRunId),
     typeIdx: index("harness_artifacts_type_idx").on(table.artifactType),
     runTypeIdx: index("harness_artifacts_run_type_idx").on(table.harnessRunId, table.artifactType),
+    runArtifactUnique: uniqueIndex("harness_artifacts_run_artifact_unique").on(table.harnessRunId, table.artifactKey),
   }),
 );
 
@@ -269,3 +432,13 @@ export type HarnessExpectedAnswerRow = typeof harnessExpectedAnswers.$inferSelec
 export type HarnessExpectedAnswerInsert = typeof harnessExpectedAnswers.$inferInsert;
 export type HarnessManualTestResultRow = typeof harnessManualTestResults.$inferSelect;
 export type HarnessManualTestResultInsert = typeof harnessManualTestResults.$inferInsert;
+export type HarnessRunAttemptRow = typeof harnessRunAttempts.$inferSelect;
+export type HarnessRunAttemptInsert = typeof harnessRunAttempts.$inferInsert;
+export type HarnessRunCheckpointRow = typeof harnessRunCheckpoints.$inferSelect;
+export type HarnessRunCheckpointInsert = typeof harnessRunCheckpoints.$inferInsert;
+export type HarnessRunEventRow = typeof harnessRunEvents.$inferSelect;
+export type HarnessRunEventInsert = typeof harnessRunEvents.$inferInsert;
+export type HarnessRunOutputRow = typeof harnessRunOutputs.$inferSelect;
+export type HarnessRunOutputInsert = typeof harnessRunOutputs.$inferInsert;
+export type HarnessSessionOutboxRow = typeof harnessSessionOutbox.$inferSelect;
+export type HarnessSessionOutboxInsert = typeof harnessSessionOutbox.$inferInsert;

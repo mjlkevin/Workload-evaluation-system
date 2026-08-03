@@ -99,6 +99,13 @@
       "when": 1784982517000,
       "tag": "0013_lucky_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785730513652,
+      "tag": "0014_talented_deathstrike",
+      "breakpoints": true
     }
   ]
 }
