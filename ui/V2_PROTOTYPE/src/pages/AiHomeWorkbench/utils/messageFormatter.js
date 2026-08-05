@@ -1,0 +1,126 @@
+import { pickObject } from './harnessPayload.js'
+
+/**
+ * 清理消息文本中残留的 formBlock JSON 代码块。
+ * 当后端未能成功提取 formBlock 或会话数据为历史存储时，
+ * 防止 JSON 以代码块形式渲染到前端。
+ */
+export function stripFormBlockJson(text) {
+  if (!text) return text
+  let cleaned = text
+  // 移除包含 formBlock 的 fenced code block（```json ... ``` 或 ``` ... ```）
+  cleaned = cleaned.replace(/```(?:json)?\s*\n?\s*\{[\s\S]*?"formBlock"[\s\S]*?\}\s*\n?\s*```/gi, '')
+  // 处理截断无闭合 ``` 的情况：从 {"formBlock": 开始到文本末尾
+  const formBlockStart = cleaned.search(/\{\s*"formBlock"\s*:/)
+  if (formBlockStart >= 0) {
+    cleaned = cleaned.slice(0, formBlockStart)
+  }
+  return cleaned.trim()
+}
+
+export function normalizeClientFormBlock(value) {
+  const formBlock = pickObject(value)
+  return formBlock.blockId && formBlock.title && Array.isArray(formBlock.fields) ? formBlock : undefined
+}
+
+export function normalizeKnowledgeTool(value) {
+  const knowledgeTool = pickObject(value)
+  if (knowledgeTool.toolId !== 'knowledge_base.query_product_knowledge') return undefined
+  return {
+    ...knowledgeTool,
+    model: knowledgeTool.model || '',
+    available: knowledgeTool.available === true,
+    confidence: knowledgeTool.confidence === 'high' ? 'high' : 'low',
+    retrievalTriggered: knowledgeTool.retrievalTriggered === true,
+    fallbackReason: knowledgeTool.fallbackReason || '',
+    contextRef: knowledgeTool.contextRef || '',
+  }
+}
+
+export function mapSessionMessages(session) {
+  if (!Array.isArray(session?.messages)) return []
+  const attachmentsById = new Map((Array.isArray(session.attachments) ? session.attachments : [])
+    .filter((attachment) => attachment?.attachmentId && attachment?.name)
+    .map((attachment) => [attachment.attachmentId, attachment]))
+  const artifactsById = new Map((Array.isArray(session.artifacts) ? session.artifacts : [])
+    .filter((artifact) => artifact?.artifactId)
+    .map((artifact) => [artifact.artifactId, artifact]))
+  return session.messages
+    .filter((message) => message?.role === 'user' || message?.role === 'assistant')
+    .map((message, index) => {
+      const file = (Array.isArray(message.attachmentIds) ? message.attachmentIds : [])
+        .map((attachmentId) => attachmentsById.get(attachmentId))
+        .find(Boolean)
+      const artifacts = (Array.isArray(message.artifactIds) ? message.artifactIds : [])
+        .map((artifactId) => artifactsById.get(artifactId))
+        .filter(Boolean)
+      const metadata = pickObject(message.metadata)
+      const formBlock = pickObject(metadata.formBlock)
+      const knowledgeTool = normalizeKnowledgeTool(metadata.knowledgeTool)
+      return {
+        id: message.messageId || `${session.sessionId}-${index}`,
+        role: message.role,
+        text: stripFormBlockJson(message.content || ''),
+        file: file ? { name: file.name, size: file.size, type: file.type } : undefined,
+        artifacts,
+        formBlock: formBlock.blockId ? formBlock : undefined,
+        knowledgeTool,
+      }
+    })
+    .filter((message) => message.text)
+}
+
+export function attachFormBlockToLatestAssistant(messages, formBlock) {
+  const normalized = normalizeClientFormBlock(formBlock)
+  if (!normalized) return messages
+  const assistantIndex = [...messages].reverse().findIndex((message) => message.role === 'assistant' && !message.loading && !message.error)
+  if (assistantIndex < 0) return messages
+  const targetIndex = messages.length - 1 - assistantIndex
+  return messages.map((message, index) => (
+    index === targetIndex ? { ...message, formBlock: normalized } : message
+  ))
+}
+
+export function attachKnowledgeToolToLatestAssistant(messages, knowledgeTool) {
+  const normalized = normalizeKnowledgeTool(knowledgeTool)
+  if (!normalized) return messages
+  const assistantIndex = [...messages].reverse().findIndex((message) => message.role === 'assistant' && !message.loading && !message.error)
+  if (assistantIndex < 0) return messages
+  const targetIndex = messages.length - 1 - assistantIndex
+  return messages.map((message, index) => (
+    index === targetIndex ? { ...message, knowledgeTool: normalized } : message
+  ))
+}
+
+export function sameMessageList(left, right) {
+  if (left.length !== right.length) return false
+  return left.every((message, index) => (
+    message.role === right[index]?.role &&
+    message.text === right[index]?.text &&
+    message.file?.name === right[index]?.file?.name &&
+    message.file?.size === right[index]?.file?.size &&
+    message.file?.type === right[index]?.file?.type &&
+    message.file?.parsedSummary === right[index]?.file?.parsedSummary &&
+    message.formBlock?.blockId === right[index]?.formBlock?.blockId &&
+    message.knowledgeTool?.contextRef === right[index]?.knowledgeTool?.contextRef &&
+    (message.artifacts || []).map((artifact) => artifact.artifactId).join(',') === (right[index]?.artifacts || []).map((artifact) => artifact.artifactId).join(',')
+  ))
+}
+
+export function withCurrentUserFile(sessionMessages, userMessage) {
+  if (!userMessage?.file) return sessionMessages
+  const lastUserIndex = sessionMessages.map((message) => message.role).lastIndexOf('user')
+  if (lastUserIndex < 0) return sessionMessages
+  return sessionMessages.map((message, index) => (
+    index === lastUserIndex && message.text === userMessage.text
+      ? { ...message, file: userMessage.file }
+      : message
+  ))
+}
+
+export function mergePreservedLocalFileMessages(previousMessages, sessionMessages) {
+  const preserved = previousMessages.filter((message) => (
+    message.file?.name && !sessionMessages.some((item) => item.file?.name === message.file.name && item.text === message.text)
+  ))
+  return preserved.length ? [...preserved, ...sessionMessages] : sessionMessages
+}
