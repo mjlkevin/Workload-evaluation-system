@@ -26,6 +26,38 @@ test("pingKimiChatCompletion: K2 模型不发送 temperature，使用 max_comple
   }
 });
 
+test("pingKimiChatCompletion: 上游挂起时在限期內中止并抛 timeout", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) =>
+    new Promise<Response>((_resolve, reject) => {
+      const signal = (init as RequestInit | undefined)?.signal;
+      if (!signal) return;
+      if (signal.aborted) reject(new DOMException("aborted", "AbortError"));
+      signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    });
+
+  try {
+    const startedAt = Date.now();
+    await assert.rejects(
+      () =>
+        pingKimiChatCompletion({
+          apiUrl: "https://api.moonshot.cn/v1",
+          apiKey: "test-key",
+          model: "kimi-k3",
+          timeoutMs: 300,
+        }),
+      (err) => {
+        assert.ok(err instanceof KimiPingFailure);
+        assert.equal(err.kind, "timeout");
+        return true;
+      },
+    );
+    assert.ok(Date.now() - startedAt < 3000, "应由超时切断，而非无限挂起");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("pingKimiChatCompletion: 余额不足分类为 quota_exceeded", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>

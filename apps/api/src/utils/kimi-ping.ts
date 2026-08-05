@@ -2,7 +2,7 @@
 
 import { isKimiTemperatureMustBeOneError, resolveKimiCompletionTemperatureParam } from "./kimi-completion-params";
 
-export type KimiPingFailureKind = "overload" | "rate_limited" | "quota_exceeded" | "auth" | "model_not_found" | "unknown";
+export type KimiPingFailureKind = "overload" | "rate_limited" | "quota_exceeded" | "auth" | "model_not_found" | "timeout" | "unknown";
 
 export class KimiPingFailure extends Error {
   readonly kind: KimiPingFailureKind;
@@ -60,6 +60,8 @@ export async function pingKimiChatCompletion(params: {
   apiUrl: string;
   apiKey: string;
   model: string;
+  /** 整体超时（ms），默认 30000；超时抛 KimiPingFailure(kind=timeout)，避免连通性测试无限等待 */
+  timeoutMs?: number;
 }): Promise<KimiPingResult> {
   const baseUrl = String(params.apiUrl || "").replace(/\/+$/, "");
   if (!baseUrl) throw new Error("apiUrl 为空");
@@ -74,51 +76,60 @@ export async function pingKimiChatCompletion(params: {
       ...(temperature === undefined ? {} : { temperature }),
     });
 
-  const startedAt = Date.now();
-  let res = await fetch(`${baseUrl}/chat/completions`, {
+  const timeoutMs = Math.max(1000, Number(params.timeoutMs ?? 30_000) || 30_000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const fetchInit = () => ({
     method: "POST",
     headers: {
       Authorization: `Bearer ${params.apiKey}`,
       "Content-Type": "application/json",
     },
     body: payload(),
+    signal: controller.signal,
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    if (isKimiTemperatureMustBeOneError(res.status, text) && temperature !== 1) {
-      temperature = 1;
-      res = await fetch(`${baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${params.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: payload(),
-      });
-    } else {
+  const startedAt = Date.now();
+  try {
+    let res = await fetch(`${baseUrl}/chat/completions`, fetchInit());
+
+    if (!res.ok) {
+      const text = await res.text();
+      if (isKimiTemperatureMustBeOneError(res.status, text) && temperature !== 1) {
+        temperature = 1;
+        res = await fetch(`${baseUrl}/chat/completions`, fetchInit());
+      } else {
+        const msg = extractErrorMessage(text, res.status);
+        const kind = classifyPingFailure(res.status, msg);
+        throw new KimiPingFailure(kind, res.status, msg);
+      }
+    }
+
+    if (!res.ok) {
+      const text = await res.text();
       const msg = extractErrorMessage(text, res.status);
       const kind = classifyPingFailure(res.status, msg);
       throw new KimiPingFailure(kind, res.status, msg);
     }
-  }
 
-  if (!res.ok) {
-    const text = await res.text();
-    const msg = extractErrorMessage(text, res.status);
-    const kind = classifyPingFailure(res.status, msg);
-    throw new KimiPingFailure(kind, res.status, msg);
-  }
+    // 解析响应体获取实际模型名
+    const latencyMs = Date.now() - startedAt;
+    let respondedModel = "";
+    try {
+      const json = (await res.json()) as { model?: string };
+      respondedModel = json?.model || "";
+    } catch {
+      /* 响应体解析失败不影响连通性判定 */
+    }
 
-  // 解析响应体获取实际模型名
-  const latencyMs = Date.now() - startedAt;
-  let respondedModel = "";
-  try {
-    const json = (await res.json()) as { model?: string };
-    respondedModel = json?.model || "";
-  } catch {
-    /* 响应体解析失败不影响连通性判定 */
+    return { respondedModel, latencyMs, httpStatus: res.status };
+  } catch (e) {
+    if (e instanceof KimiPingFailure) throw e;
+    if (controller.signal.aborted) {
+      throw new KimiPingFailure("timeout", 0, `连接测试超时（${timeoutMs}ms 内无响应）`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-
-  return { respondedModel, latencyMs, httpStatus: res.status };
 }

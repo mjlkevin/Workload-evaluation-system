@@ -83,6 +83,7 @@ export default function SystemManagement({ sectionId }) {
   const toast = useToast()
   const [editingModel, setEditingModel] = useState(null)
   const [apiKeyInput, setApiKeyInput] = useState('')
+  const [apiKeyTestResult, setApiKeyTestResult] = useState(null) // {kind:'success'|'warn'|'error'|'info', text}
   const [extInput, setExtInput] = useState('')
   const [kbTestingProfileId, setKbTestingProfileId] = useState('')
   const [confirmClearKbKey, setConfirmClearKbKey] = useState(false)
@@ -374,7 +375,7 @@ export default function SystemManagement({ sectionId }) {
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setEditingModel(card.key) }}>
                         编辑
                       </button>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={async () => {
+                      <button type="button" className="btn btn-ghost btn-sm" disabled={actionLoading.testApiKey} onClick={async () => {
                         const r = await actions.testApiKey(undefined, cfg.model)
                         if (r.success) {
                           const d = r.data || {}
@@ -427,31 +428,61 @@ export default function SystemManagement({ sectionId }) {
                       value={apiKeyInput}
                       onChange={(e) => setApiKeyInput(e.target.value)}
                     />
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={async () => {
-                      const r = await actions.testApiKey(apiKeyInput, modelConfig.kimiEvaluation?.model)
-                      if (r.success) {
-                        const d = r.data || {}
-                        const detail = [
-                          d.requestedModel && `请求模型: ${d.requestedModel}`,
-                          d.respondedModel && `响应模型: ${d.respondedModel}`,
-                          d.modelMatch === false && '⚠ 模型不匹配',
-                          d.latencyMs != null && `延迟: ${d.latencyMs}ms`,
-                        ].filter(Boolean).join(' · ')
-                        if (d.modelMatch === false) {
-                          toast.warn('连通性通过，但模型名不匹配', { detail, duration: 6000 })
-                        } else {
-                          toast.success('连接测试通过', { detail, duration: 5000 })
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      disabled={actionLoading.testApiKey}
+                      onClick={async () => {
+                        const key = apiKeyInput.trim()
+                        if (!key) {
+                          setApiKeyTestResult({ kind: 'warn', text: '请先输入要测试的 API Key' })
+                          toast.warn('请先输入要测试的 API Key')
+                          return
                         }
-                      } else {
-                        toast.error(r.error || '连接测试失败')
-                      }
-                    }}>
-                      测试连接
+                        setApiKeyTestResult({ kind: 'info', text: '正在测试连接…' })
+                        const r = await actions.testApiKey(key, modelConfig.kimiEvaluation?.model)
+                        if (r.success) {
+                          const d = r.data || {}
+                          const detail = [
+                            d.requestedModel && `请求模型: ${d.requestedModel}`,
+                            d.respondedModel && `响应模型: ${d.respondedModel}`,
+                            d.modelMatch === false && '⚠ 模型不匹配',
+                            d.latencyMs != null && `延迟: ${d.latencyMs}ms`,
+                          ].filter(Boolean).join(' · ')
+                          if (d.modelMatch === false) {
+                            setApiKeyTestResult({ kind: 'warn', text: `连通性通过，但模型名不匹配${detail ? `（${detail}）` : ''}` })
+                            toast.warn('连通性通过，但模型名不匹配', { detail, duration: 6000 })
+                          } else {
+                            setApiKeyTestResult({ kind: 'success', text: `连接测试通过${detail ? `（${detail}）` : ''}` })
+                            toast.success('连接测试通过', { detail, duration: 5000 })
+                          }
+                        } else {
+                          setApiKeyTestResult({ kind: 'error', text: r.error || '连接测试失败' })
+                          toast.error(r.error || '连接测试失败')
+                        }
+                      }}
+                    >
+                      {actionLoading.testApiKey ? '测试中…' : '测试连接'}
                     </button>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setApiKeyInput(''); actions.clearApiKeyDraft() }}>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setApiKeyInput(''); setApiKeyTestResult(null); actions.clearApiKeyDraft() }}>
                       清除密钥
                     </button>
                   </div>
+                  {apiKeyTestResult && (
+                    <span
+                      className="sys-field__v"
+                      style={{
+                        fontSize: 12,
+                        color:
+                          apiKeyTestResult.kind === 'success' ? 'var(--ok-ink, #1a7f37)'
+                          : apiKeyTestResult.kind === 'warn' ? 'var(--warn-ink, #9a6700)'
+                          : apiKeyTestResult.kind === 'error' ? 'var(--err-ink, #cf222e)'
+                          : 'var(--mut, #667085)',
+                      }}
+                    >
+                      {apiKeyTestResult.text}
+                    </span>
+                  )}
                 </div>
                 <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>
                   {modelConfig.kimiCredentials.resolvedFrom === 'store' ? '当前使用仓库存储密钥'

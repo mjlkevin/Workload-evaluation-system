@@ -345,6 +345,11 @@ export async function testRequirementKimiApiKey(req: Request, res: Response) {
       if (e.kind === "model_not_found") {
         return fail(res, 40001, "模型不可用或名称错误", [{ field: "model", reason: e.message }]);
       }
+      if (e.kind === "timeout") {
+        return fail(res, 50401, "连接测试超时：KIMI 服务长时间无响应，请检查网络或稍后重试", [
+          { field: "apiKey", reason: e.message },
+        ]);
+      }
     }
     const msg = e instanceof Error ? e.message : "ping_failed";
     return fail(res, 40001, "调用 KIMI 失败", [{ field: "apiKey", reason: msg }]);
