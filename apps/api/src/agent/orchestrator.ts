@@ -4,6 +4,7 @@ import type {
   ChatMessage,
 } from "../ai/provider/model-provider";
 import type { AgentEvent, AgentUser } from "./agent.types";
+import type { RuntimeContext } from "./context/context.types";
 import type { ToolRegistry } from "./tool-registry";
 
 /** 编排只依赖 chatCompletion，便于测试注入假 Provider */
@@ -21,6 +22,8 @@ export interface RunAgentParams {
   confirm: (name: string, args: Record<string, unknown>) => Promise<boolean>;
   systemPrompt?: string;
   maxTurns?: number;
+  /** 可信运行上下文（O2 · A4）：透传给工具执行，用于会话来源等可信字段 */
+  runtimeContext?: RuntimeContext;
 }
 
 const DEFAULT_MAX_TURNS = 12;
@@ -51,7 +54,7 @@ export async function runAgent(params: RunAgentParams): Promise<string> {
 
         onEvent({ kind: "tool_call", name: call.name, arguments: call.arguments });
         try {
-          const data = await registry.execute(call.name, call.arguments, user);
+          const data = await registry.execute(call.name, call.arguments, user, params.runtimeContext);
           onEvent({ kind: "tool_result", name: call.name, ok: true, data });
           messages.push(toolResultMessage(call.id, call.name, { ok: true, data }));
         } catch (err) {

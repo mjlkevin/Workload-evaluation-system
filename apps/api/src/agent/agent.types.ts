@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "../ai/provider/model-provider";
 import type { Capability } from "../rbac/permissions";
+import type { RuntimeContext } from "./context/context.types";
 
 /** 当前用户上下文（编排循环透传，用于权限与数据隔离） */
 export interface AgentUser {
@@ -17,8 +18,8 @@ export interface AgentTool {
   capability: Capability;
   /** 是否写操作（true 需用户确认） */
   mutates: boolean;
-  /** 真正执行：调用底层 usecase */
-  execute(args: Record<string, unknown>, user: AgentUser): Promise<unknown>;
+  /** 真正执行：调用底层 usecase；runtime 为可信运行上下文（O2 · A4 注入） */
+  execute(args: Record<string, unknown>, user: AgentUser, runtime?: RuntimeContext): Promise<unknown>;
 }
 
 /** 工具执行结果（回填给 LLM） */

@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "../ai/provider/model-provider";
 import { type AgentTool, type AgentUser, toToolDefinition } from "./agent.types";
+import type { RuntimeContext } from "./context/context.types";
 
 export class ToolRegistry {
   private readonly tools = new Map<string, AgentTool>();
@@ -21,12 +22,17 @@ export class ToolRegistry {
       .map(toToolDefinition);
   }
 
-  async execute(name: string, args: Record<string, unknown>, user: AgentUser): Promise<unknown> {
+  async execute(
+    name: string,
+    args: Record<string, unknown>,
+    user: AgentUser,
+    runtime?: RuntimeContext,
+  ): Promise<unknown> {
     const tool = this.tools.get(name);
     if (!tool) throw new Error(`未注册工具: ${name}`);
     if (!user.capabilities.includes(tool.capability)) {
       throw new Error(`无权限调用工具 ${name}（需 ${tool.capability}）`);
     }
-    return tool.execute(args, user);
+    return tool.execute(args, user, runtime);
   }
 }

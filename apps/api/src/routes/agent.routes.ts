@@ -2,10 +2,10 @@ import { Router } from "express";
 
 import { runAgent, type ChatRunner } from "../agent/orchestrator";
 import type { AgentEvent, AgentUser } from "../agent/agent.types";
-import { ToolRegistry } from "../agent/tool-registry";
-import { buildEstimateTool } from "../agent/tools/presales.tools";
+import type { ToolRegistry } from "../agent/tool-registry";
+import { createDefaultRegistry } from "../agent/default-registry";
+import { createRuntimeContext } from "../agent/context/runtime-context";
 import { defaultProviderRegistry } from "../ai/provider";
-import { calculateEstimateOnly } from "../modules/estimates/estimates.module";
 import { requireAuthenticated } from "../rbac/middleware";
 import { getCombinedCapabilities } from "../rbac/permissions";
 import { asString } from "../utils/helpers";
@@ -39,12 +39,34 @@ export function createAgentRouter(deps: AgentRouterDeps = {}) {
       return;
     }
 
-    const registry = deps.registry ?? createDefaultRegistry();
+    const authUser = req.user;
+    if (!authUser) {
+      res.status(401).json({
+        code: 40101,
+        message: "未登录",
+        data: null,
+      });
+      return;
+    }
+
     const events: Array<Record<string, unknown>> = [];
+    const capabilities = getCombinedCapabilities(req.v2Roles ?? []);
     const user: AgentUser = {
-      id: req.user?.id ?? "",
-      capabilities: getCombinedCapabilities(req.v2Roles ?? []),
+      id: authUser.id,
+      capabilities,
     };
+    // O2 · A4：可信运行上下文注入编排循环（用户身份来自 JWT，非模型入参）
+    const runtimeContext = createRuntimeContext({
+      actor: {
+        userId: authUser.id,
+        username: authUser.username,
+        roles: req.v2Roles ?? [],
+        capabilities,
+      },
+      channel: "api",
+      workflowKey: "agent_chat",
+    });
+    const registry = deps.registry ?? createDefaultRegistry(authUser, runtimeContext);
 
     try {
       const result = await runAgent({
@@ -54,6 +76,7 @@ export function createAgentRouter(deps: AgentRouterDeps = {}) {
         runner,
         onEvent: (event) => events.push(toApiEvent(event)),
         confirm: async () => req.body?.confirm === true,
+        runtimeContext,
       });
       res.json({
         code: 0,
@@ -72,12 +95,6 @@ export function createAgentRouter(deps: AgentRouterDeps = {}) {
   });
 
   return router;
-}
-
-function createDefaultRegistry(): ToolRegistry {
-  const registry = new ToolRegistry();
-  registry.register(buildEstimateTool((body) => calculateEstimateOnly(body as Parameters<typeof calculateEstimateOnly>[0])));
-  return registry;
 }
 
 function toApiEvent(event: AgentEvent): Record<string, unknown> {
