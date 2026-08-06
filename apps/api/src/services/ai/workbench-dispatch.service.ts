@@ -925,6 +925,10 @@ function buildUnsupportedResponse(
   };
 }
 
+// RP-049 Batch A: 分类兜底采纳白名单——仅采纳超范围拦截意图，
+// 其余分类结果（capability/wes_data/write/knowledge 等）一律保持 domain_qa 模型自然回复
+const ADOPTABLE_INTENTS = new Set<WorkbenchIntent>(["unsupported_or_out_of_scope"]);
+
 /**
  * 分发一次 AI 工作台用户输入。
  * 根据 intent 路由结果选择执行路径，返回统一的 WorkbenchDispatchData。
@@ -938,19 +942,22 @@ export async function dispatchHomeWorkbenchTurn(input: WorkbenchDispatchInput): 
   });
 
   // RP-003: 规则兜底时调用模型二次分类
+  // RP-049 Batch A: 只采纳超范围拦截意图且阈值提高到 0.85；分类结果无论是否采纳都写入 trace
   let modelClassification: ModelClassificationResult | undefined;
   if (intent.routingRule === "default_domain_qa") {
     const classification = await classifyIntentWithModel(input.message, input.modelChat);
-    if (classification && classification.confidence >= 0.6) {
-      modelClassification = classification;
-      intent = {
-        intent: classification.intent as WorkbenchIntent,
-        confidence: classification.confidence,
-        routingRule: "model_classification_fallback",
-      };
-    } else if (classification) {
-      // 低置信度，记录但不替换
-      modelClassification = classification;
+    if (classification) {
+      modelClassification = classification; // 始终记录到 trace，保证可观测
+      if (
+        ADOPTABLE_INTENTS.has(classification.intent as WorkbenchIntent) &&
+        classification.confidence >= 0.85
+      ) {
+        intent = {
+          intent: classification.intent as WorkbenchIntent,
+          confidence: classification.confidence,
+          routingRule: "model_classification_fallback",
+        };
+      }
     }
   }
 

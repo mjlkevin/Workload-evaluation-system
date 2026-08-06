@@ -707,3 +707,124 @@ test("workbench dispatch does not call model classification when rule matches", 
   assert.equal(result.trace.routingRule, "capability_keywords");
   assert.equal(result.trace.modelClassification, undefined);
 });
+
+// ── RP-049 Batch A: 分类兜底采纳条件收紧（白名单 + 0.85 阈值）────────────────────────────────
+
+test("RP-049: capability classification at 0.9 is not adopted, stays domain_qa with model answer and trace record", async () => {
+  const result = await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "我需要发什么类型的文件给你", // 不命中任何关键词规则，兜底到 default_domain_qa
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    modelChat: async ({ systemPrompt }) => {
+      if (systemPrompt.includes("意图分类器")) {
+        return {
+          answer: JSON.stringify({ intent: "capability_discovery", confidence: 0.9, reason: "询问可上传的文件类型" }),
+          rawContent: "",
+        };
+      }
+      return { answer: "你可以上传需求说明书、SOW 或 Excel 需求清单，我会基于文件内容协助解析。", rawContent: "" };
+    },
+  });
+
+  // capability 不在采纳白名单：不替换意图，保持 domain_qa 模型自然回复
+  assert.equal(result.intent, "domain_qa");
+  assert.equal(result.trace.routingRule, "default_domain_qa");
+  assert.notEqual(result.model, "rule-static");
+  assert.match(result.answer, /需求说明书/);
+  // 分类结果未采纳也写入 trace
+  assert.ok(result.trace.modelClassification);
+  assert.equal(result.trace.modelClassification?.intent, "capability_discovery");
+  assert.equal(result.trace.modelClassification?.confidence, 0.9);
+});
+
+test("RP-049: unsupported classification at 0.9 is adopted and returns static out-of-scope rejection", async () => {
+  const result = await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "帮我写一首诗",
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    modelChat: async ({ systemPrompt }) => {
+      if (systemPrompt.includes("意图分类器")) {
+        return {
+          answer: JSON.stringify({ intent: "unsupported_or_out_of_scope", confidence: 0.9, reason: "创作请求与系统能力无关" }),
+          rawContent: "",
+        };
+      }
+      throw new Error("model_should_not_be_called_after_unsupported_adoption");
+    },
+  });
+
+  // 白名单内且 ≥ 0.85：采纳，返回超范围静态拒绝
+  assert.equal(result.intent, "unsupported_or_out_of_scope");
+  assert.equal(result.trace.routingRule, "model_classification_fallback");
+  assert.equal(result.model, "rule-static");
+  assert.match(result.answer, /超出了我的能力范围/);
+  assert.ok(result.trace.modelClassification);
+  assert.equal(result.trace.modelClassification?.confidence, 0.9);
+});
+
+test("RP-049: unsupported classification below 0.85 threshold is not adopted, stays domain_qa", async () => {
+  const result = await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "今天心情不错",
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    modelChat: async ({ systemPrompt }) => {
+      if (systemPrompt.includes("意图分类器")) {
+        return {
+          answer: JSON.stringify({ intent: "unsupported_or_out_of_scope", confidence: 0.7, reason: "疑似闲聊但置信不足" }),
+          rawContent: "",
+        };
+      }
+      return { answer: "我可以协助需求解析、工作量评估与项目管理相关问题。", rawContent: "" };
+    },
+  });
+
+  // 低于 0.85 阈值：不采纳，保持 domain_qa 模型回复
+  assert.equal(result.intent, "domain_qa");
+  assert.equal(result.trace.routingRule, "default_domain_qa");
+  assert.notEqual(result.model, "rule-static");
+  assert.match(result.answer, /需求解析/);
+  // 分类结果未采纳也写入 trace
+  assert.ok(result.trace.modelClassification);
+  assert.equal(result.trace.modelClassification?.intent, "unsupported_or_out_of_scope");
+  assert.equal(result.trace.modelClassification?.confidence, 0.7);
+});
+
+test("RP-049: wes_data_query and write_action_request classifications are never adopted regardless of confidence", async () => {
+  for (const classifiedIntent of ["wes_data_query", "write_action_request"] as const) {
+    const result = await dispatchHomeWorkbenchTurn({
+      user,
+      workflowKey: "free_chat",
+      message: "这个说法准确吗",
+      businessRole: "pre_sales",
+      roleLabel: "售前顾问",
+      model: "kimi-test",
+      modelChat: async ({ systemPrompt }) => {
+        if (systemPrompt.includes("意图分类器")) {
+          return {
+            answer: JSON.stringify({ intent: classifiedIntent, confidence: 0.9, reason: "mock 分类结果" }),
+            rawContent: "",
+          };
+        }
+        return { answer: "模型自然回复：需要结合具体来源判断。", rawContent: "" };
+      },
+    });
+
+    // 白名单外：任何置信度均不采纳，保持 domain_qa 模型自然回复
+    assert.equal(result.intent, "domain_qa", `${classifiedIntent} 不应被采纳`);
+    assert.equal(result.trace.routingRule, "default_domain_qa", `${classifiedIntent} 不应替换路由规则`);
+    assert.notEqual(result.model, "rule-static");
+    assert.match(result.answer, /模型自然回复/);
+    // 分类结果未采纳也写入 trace
+    assert.ok(result.trace.modelClassification, `${classifiedIntent} 分类结果应写入 trace`);
+    assert.equal(result.trace.modelClassification?.intent, classifiedIntent);
+  }
+});
