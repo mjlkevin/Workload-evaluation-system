@@ -151,7 +151,8 @@ function run() {
 
   // ─── 检查 1：顶部 pill Phase 一致性 ───
   console.log(`${BOLD}── 检查 1：顶部 Phase pill 一致性 ──${RESET}`);
-  const indexPill = pages['index.html']?.pills.find(p => p.text.includes('Phase 1H-C'));
+  // 术语业务化后 pill 可能写作「阶段 1H-C（Phase 1H-C）」或「阶段 1H-C」
+  const indexPill = pages['index.html']?.pills.find(p => /(Phase|阶段)\s*1H-C/.test(p.text));
   if (indexPill) {
     info(`基准：index.html → "${indexPill.text}"`);
   }
@@ -163,8 +164,8 @@ function run() {
     if (topnavPill) {
       // 检查是否包含过时的 Phase 标记（低于当前 Phase 1H-C）
       const stalePatterns = [
-        /Phase 1[A-E][^F-GH]/i,  // 1A-1E（不含 F 以后）
-        /Phase 1F\b/i,           // 1F（不是最新）
+        /(Phase|阶段)\s*1[A-E][^F-GH]/i,  // 1A-1E（不含 F 以后）
+        /(Phase|阶段)\s*1F\b/i,           // 1F（不是最新）
       ];
       const isStale = stalePatterns.some(re => re.test(topnavPill.text));
       if (isStale && !topnavPill.text.includes('1H')) {

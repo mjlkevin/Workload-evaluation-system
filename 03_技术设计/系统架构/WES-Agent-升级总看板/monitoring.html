@@ -15,18 +15,39 @@
       <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
-        <a href="roadmap.html">路标管理</a>
-        <a href="design.html">设计说明</a>
-        <a href="runtime.html">AI 任务执行</a>
-        <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试与验收</a>
-        <a class="active" href="monitoring.html">监控与审计</a>
-        <a href="risks.html">风险与决策</a>
-        <a href="changes.html">变更记录</a>
-        <a href="sources.html">信息来源</a>
-        <a href="collaboration-protocol.html">多 AI 协作</a>
-        <a href="branches.html">开发分支</a>
-        <a href="requirements.html">需求池</a>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">计划与设计<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="roadmap.html">路标管理</a>
+          <a href="design.html">设计说明</a>
+          <a href="plan.html">计划与进度</a>
+          <a href="requirements.html">需求池</a>
+          </div>
+        </div>
+        <div class="nav-group has-active">
+          <button type="button" class="nav-group-btn" aria-expanded="false">质量与监控<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="testing.html">测试与验收</a>
+          <a class="active" href="monitoring.html">监控与审计</a>
+          <a href="risks.html">风险与决策</a>
+          <a href="changes.html">变更记录</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">AI 与协作<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="runtime.html">AI 任务执行</a>
+          <a href="collaboration-protocol.html">多 AI 协作</a>
+          <a href="branches.html">开发分支</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="sources.html">信息来源</a>
+          <a href="github-radar.html">开源工具雷达</a>
+          </div>
+        </div>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
       <span class="pill brand">1H-C 阶段监控</span>
@@ -60,13 +81,13 @@
         <li><b>§1</b> 监控目标</li>
         <li><b>§2</b> 验证快照</li>
         <li><b>§3</b> 人工测试反馈</li>
-        <li><b>§4</b> Phase 1F 回写监控</li>
+        <li><b>§4</b> 阶段 1F（Phase 1F） 回写监控</li>
         <li><b>§5</b> CI 状态</li>
         <li><b>§6</b> Harness 审计链</li>
         <li><b>§7</b> 草稿追溯</li>
         <li><b>§8</b> 后续指标</li>
         <li><b>§9</b> Trace 留存策略</li>
-        <li><b>§10</b> 需求池 Loop 监控</li>
+        <li><b>§10</b> 需求池 循环（Loop） 监控</li>
       </ol>
     </div>
 
@@ -88,10 +109,10 @@
       <table>
         <tr><th>命令</th><th>结果</th><th>覆盖范围</th></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-047-a2-mainline-integrated:monitoring"><td class="mono">RP-047 Batch A2 主线集成</td><td><span class="status done"><span class="dot"></span>INTEGRATED_VERIFIED</span></td><td>A2 已进入业务主线 <code class="inline">88054d5</code>；最终组合分支完整回归、安全扫描、lockfile 与迁移边界全部通过。当前只完成数据底座，RP-047 未交付，Batch B-E 未启动。</td></tr>
-        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-integration-gate-accepted:monitoring"><td class="mono">RP-047-A2-INT Codex Gate</td><td><span class="status done"><span class="dot"></span>ACCEPTED_FOR_MAINLINE_INTEGRATION</span></td><td>候选 <code class="inline">35fee25</code> 的 8 个来源提交、17 个 Allowed Paths、additive migration、owner/JSON/并发/安全边界与完整验证矩阵全部通过；尚未合并，Batch B-E 继续锁定。</td></tr>
-        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-r1-gate-accepted:monitoring"><td class="mono">RP-047-A2-R1 Codex Gate</td><td><span class="status done"><span class="dot"></span>ACCEPTED_PENDING_USER</span></td><td>R1 仅修改三个授权文件；Testcontainers Harness 95/95、modules 143/143、API/Web build 通过，普通对象边界、10 路 output 并发和 handoff 准确性三个阻断项关闭。Batch A2 待集成，Batch B-E 继续锁定。</td></tr>
-        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-gate-rework:monitoring"><td class="mono">RP-047-A2 Codex Gate</td><td><span class="status block"><span class="dot"></span>REWORK_REQUIRED</span></td><td>Harness 93/93、modules 143/143、API/Web build 通过；10 路 output 探针得到连续版本 1..10。Date/Map 边界探针失败，且正式套件缺 output 并发回归；handoff 实际 16 文件与回填 15 个不一致。</td></tr>
-        <tr data-board-event-id="BE-2026-08-03-rp-047-a-gate-rejected:monitoring"><td class="mono">RP-047-A Codex Gate</td><td><span class="status block"><span class="dot"></span>REJECTED / A2 待 ACK</span></td><td>正式 Testcontainers 命令退出 7；补 Colima socket 后在 Node 24 ESM 路径失败。直连 92/92 不含真实历史迁移演练；Codex 复现 create 返回 sequence 漂移、无效 Runtime validation 被接受、并发 checkpoint 非幂等且错误携带 state。安装 worktree 隔离依赖后 modules 143/143、build:api/web 通过。详见 Gate 审计。</td></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-integration-gate-accepted:monitoring"><td class="mono">RP-047-A2-INT Codex 关卡（Gate）</td><td><span class="status done"><span class="dot"></span>ACCEPTED_FOR_MAINLINE_INTEGRATION</span></td><td>候选 <code class="inline">35fee25</code> 的 8 个来源提交、17 个 Allowed Paths、additive migration、owner/JSON/并发/安全边界与完整验证矩阵全部通过；尚未合并，Batch B-E 继续锁定。</td></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-r1-gate-accepted:monitoring"><td class="mono">RP-047-A2-R1 Codex 关卡</td><td><span class="status done"><span class="dot"></span>ACCEPTED_PENDING_USER</span></td><td>R1 仅修改三个授权文件；Testcontainers Harness 95/95、modules 143/143、API/Web build 通过，普通对象边界、10 路 output 并发和 handoff 准确性三个阻断项关闭。Batch A2 待集成，Batch B-E 继续锁定。</td></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a2-gate-rework:monitoring"><td class="mono">RP-047-A2 Codex 关卡</td><td><span class="status block"><span class="dot"></span>REWORK_REQUIRED</span></td><td>Harness 93/93、modules 143/143、API/Web build 通过；10 路 output 探针得到连续版本 1..10。Date/Map 边界探针失败，且正式套件缺 output 并发回归；handoff 实际 16 文件与回填 15 个不一致。</td></tr>
+        <tr data-board-event-id="BE-2026-08-03-rp-047-a-gate-rejected:monitoring"><td class="mono">RP-047-A Codex 关卡</td><td><span class="status block"><span class="dot"></span>REJECTED / A2 待 ACK</span></td><td>正式 Testcontainers 命令退出 7；补 Colima socket 后在 Node 24 ESM 路径失败。直连 92/92 不含真实历史迁移演练；Codex 复现 create 返回 sequence 漂移、无效 Runtime validation 被接受、并发 checkpoint 非幂等且错误携带 state。安装 worktree 隔离依赖后 modules 143/143、build:api/web 通过。详见 关卡 审计。</td></tr>
         <tr data-board-event-id="BE-2026-08-02-branch-governance-cleanup:monitoring"><td class="mono">WES 分支治理快照</td><td><span class="status warn"><span class="dot"></span>本地收敛完成 / 远端待同步</span></td><td>2026-08-02：本地分支从 37 个收敛为 4 个、worktree 从 5 个收敛为 2 个；本地 <code class="inline">main</code> 与业务主线均为 <code class="inline">88d32b4</code>。干净 worktree 上 build:web、build:api、test:modules 143/143、test:web 196/196、test:ai exit 0、Provider/Trace/RAG 专项 47/47 通过。<code class="inline">origin/main</code> 落后 75 个提交，未 push；RP-031 rework/integration 分支因 3 个 P1 与 JSON/PostgreSQL 存储边界冲突继续保留。</td></tr>
         <tr><td class="mono">CodeGraph 受控试点验证</td><td><span class="status done"><span class="dot"></span>安装、索引与 MCP 握手通过</span></td><td>2026-07-26：<code class="inline">codegraph --version</code> 为 1.5.0；telemetry disabled；Codex MCP 启用并设置 <code class="inline">CODEGRAPH_NO_UPDATE_CHECK=1</code>、<code class="inline">CODEGRAPH_NO_DOWNLOAD=1</code>、<code class="inline">CODEGRAPH_MCP_TOOLS=codegraph_explore</code>。排除历史 <code class="inline">ui/V0_SAAS</code> 后，<code class="inline">codegraph status --json</code> 为 complete：453 文件、6112 节点、18882 边、pending refs/changes=0、node-sqlite/WAL；stdio MCP initialize 返回 protocol 2024-11-05；精确 auth 文件/符号查询只命中 V2 与 API 主链路。当前任务需新建/重启 Codex task 后加载新 MCP。</td></tr>
         <tr data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:monitoring"><td class="mono">RP-043 UI 质量门禁试点</td><td><span class="status run"><span class="dot"></span>自动化通过 / 人工待回填</span></td><td>2026-07-25：Skill quick_validate 与确定性检查器 3/3、Dialog/SystemManagement 聚焦 13/13、V2 全量 128/128、build:web 通过；浏览器鉴权守卫工作正常且控制台无错误，但无有效管理员会话，真实系统管理 1440px/760px、键盘和拖拽证据仍待回填。证据见 <code class="inline">docs/superpowers/evaluations/2026-07-25-system-management-dialog-qa.md</code>。</td></tr>
@@ -101,7 +122,7 @@
         <tr><td class="mono">RP-036 修复验证</td><td><span class="status run"><span class="dot"></span>聚焦 19/19 / 调整后 V2 107/107 / build:web pass</span></td><td>2026-07-23：覆盖过期 JWT、<code class="inline">/auth/me</code> 失败、admin-only 路由、普通用户导航、SPA 退出、保存鉴权错误、保存真实成功、连通性终态和 30 秒超时；本地无会话浏览器访问 <code class="inline">/system</code> 已确认跳转 <code class="inline">/login</code> 并显示登录界面。完整 V2 套件为 107 pass / 9 fail，9 个失败均来自 3 个本轮前已存在且与 RP-036 无关的未跟踪测试文件；<code class="inline">build:api</code> 被当前 dirty 工作区中 structured-output metrics、JSON→PG migration/runtime-store exports、extractor abortSignal 等既有 TypeScript 错误阻断。</td></tr>
         <tr><td class="mono">MT-1H-C-002 / RP-036 第二次用户复测</td><td><span class="status run"><span class="dot"></span>终态反馈通过 / 真实连通性未通过</span></td><td>2026-07-23：页面明确显示 <code class="inline">retrieval_failed / HTTP 400</code>，证明测试按钮已发出请求并呈现最终错误，不再静默。截图证据显示知识库 ID 字段为凭据格式而非数字 ID，这是本次上游 400 的直接输入原因；凭据同时已在测试反馈中暴露，按密钥处理 Runbook 停止继续调用，要求先在供应商控制台撤销并生成新密钥，再以正确字段复测。仅记录脱敏错误类型和状态，未把完整凭据写入看板、文件或命令。</td></tr>
         <tr><td class="mono">MT-1H-C-002 / RP-036 浏览器诊断</td><td><span class="status block"><span class="dot"></span>失败 / 请求未发出</span></td><td>2026-07-23：用户截图与当前 Chrome 页面显示系统管理 / 知识库配置控件仍可操作，但侧栏处于用户信息回退态；代码核对确认 <code class="inline">useSystemManagement</code> 在 <code class="inline">enabled=false</code> 时保存动作跳过 PATCH 仍提示成功，测试动作返回 <code class="inline">null</code>。无 loading、无结果、后端无对应知识库测试请求；未将完整 API Key 写入看板或发送至外部服务。</td></tr>
-        <tr><td class="mono">RP-031 RAG 生产化外部 handoff Gate</td><td><span class="status warn"><span class="dot"></span>REJECTED / mustReworkFirst</span></td><td>2026-07-20：候选范围 <code class="inline">6e88ff4..57f1205</code> 共 63 文件、约 6026 行新增。Fresh 构建与既有测试绿色，但新模块无测试、无生产主链路引用；激活探针用明显无效凭证仍返回 valid=true，检索参数 UI 无法持久化回读，候选 patch 触碰含敏感凭证的配置文件。禁止直接合并；详见 Codex Gate 审计文档。</td></tr>
+        <tr><td class="mono">RP-031 RAG 生产化外部 handoff 关卡</td><td><span class="status warn"><span class="dot"></span>REJECTED / mustReworkFirst</span></td><td>2026-07-20：候选范围 <code class="inline">6e88ff4..57f1205</code> 共 63 文件、约 6026 行新增。Fresh 构建与既有测试绿色，但新模块无测试、无生产主链路引用；激活探针用明显无效凭证仍返回 valid=true，检索参数 UI 无法持久化回读，候选 patch 触碰含敏感凭证的配置文件。禁止直接合并；详见 Codex 关卡 审计文档。</td></tr>
         <tr><td class="mono">RP-031 四批返工执行</td><td><span class="status run"><span class="dot"></span>真实基线已回填 / 候选对比待执行</span></td><td>2026-08-02：使用进程级临时凭证完成两轮真实 20 条评测；未写入配置、Git、报告或看板。完整第二轮：关键词 80%、可回答 90%、高置信 75%、fallback 20%、平均 20.678s、P95 38.185s、平均 4187.7 Tokens；16/20 样本有检索片段，2 条反例均正确拒答。两轮 fallback 稳定 20%，但 P95 从 55.162s 变化到 38.185s；文档召回均 10%，114 个片段仅来自 2 个实际文档名，与业务主题 qrels 不匹配。脱敏报告位于 Git ignored <code class="inline">data/rag-baseline-reports/</code>，候选对比前必须先校准 qrels。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-031-multi-knowledge-routing:monitoring"><td class="mono">RP-031 多知识库意图路由</td><td><span class="status run"><span class="dot"></span>真实双库路由已验证 / 待集成与正式配置</span></td><td>2026-08-03：生产 dispatch 现按业务角色 ACL 过滤候选，优先使用显式知识库名与关键词规则，歧义才交给模型从已授权候选中选择；单请求默认仅检索一个主库，且仅 <code class="inline">retrieval_empty</code> 允许一次受控回退，Trace 最多两次 attempt。Fresh 自动化验证：modules 227/227、AI 190/190、integration 1/1、security 4/4、Web 203/203、API/Web build，UI scope checker 及 1440/760+键盘通过。真实外部双库验证已确认显式 PLM 单库 8 片段、AI 语义路由 PLM confidence=0.95 且单库 7 片段、ACL 不访问未授权 PLM、空检索最多两次尝试。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-031-real-dual-kb-validation:monitoring"><td class="mono">RP-031 真实双库检索覆盖</td><td><span class="status warn"><span class="dot"></span>PLM 通过 / 资金与网银仍无内容</span></td><td>2026-08-03：智谱官方详情接口确认金蝶解决方案知识库含 13 份文档，PLM 领域库含 24 份文档。PLM 实施范围、产品生命周期边界、BOM/工程变更在 PLM 库分别返回 5、1、8 个片段；资金计划和网上银行在两库均为 0。凭证仅在进程内使用，未落盘、未写入看板或 Git。</td></tr>
@@ -113,7 +134,7 @@
         <tr><td class="mono">npm run build:api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>RP-018 知识库服务、RP-004 WES 数据查询扩展、RP-002 trace.modelRun 轻量审计、RP-007 Harness regression 评分模块、意图路由、dispatch trace、session metadata、RP-013 后端协议、OpenAPI 对齐后的 API TypeScript 编译。</td></tr>
         <tr><td class="mono">npm run build -w apps/api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>后端 TypeScript 构建。</td></tr>
         <tr><td class="mono">npm run test:agent -w apps/api</td><td><span class="status done"><span class="dot"></span>25 pass</span></td><td>Agent 工具调用、权限过滤、Provider tool calling 与路由行为。</td></tr>
-        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>96 pass</span></td><td>AI Home、AI 草稿列表/详情、登录、用户管理、业务 hook、Phase 1H-B 布局优化、RP-020 引导选项、RP-013 formBlock 交互、RP-018 knowledgeTool trace chip、RP-019 右侧工作区折叠/Markdown 安全渲染、RP-032 工作流模板可达性、RP-033 会话列表滚动，以及 RP-005 产物工作区时间线回归。</td></tr>
+        <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>96 pass</span></td><td>AI Home、AI 草稿列表/详情、登录、用户管理、业务 hook、阶段 1H-B 布局优化、RP-020 引导选项、RP-013 formBlock 交互、RP-018 knowledgeTool trace chip、RP-019 右侧工作区折叠/Markdown 安全渲染、RP-032 工作流模板可达性、RP-033 会话列表滚动，以及 RP-005 产物工作区时间线回归。</td></tr>
         <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE -- HomeWorkspace.test.jsx</td><td><span class="status done"><span class="dot"></span>49 pass</span></td><td>RP-018 前端 trace chip、RP-019 右侧工作区折叠/Markdown 表格/sanitize、RP-032 工作流模板标签/滚动容器/选中态 aria-label、RP-033 会话列表滚动与 RP-005 产物工作区时间线聚焦测试。</td></tr>
         <tr><td class="mono">RP-025 回归补丁验证</td><td><span class="status done"><span class="dot"></span>通过</span></td><td>覆盖 PRE_SALES <code class="inline">estimates:create</code>、项目创建路由 <code class="inline">estimates:create/write</code> 任一放行、AI 工作台 suggested action 403 可见错误、简短问候 <code class="inline">greeting_keywords</code> 本地路由。证据：targeted API 77 pass、HomeWorkspace 46 pass、test:ai 190 pass、test:web 90 pass、build:api/web pass；<code class="inline">test:modules</code> 仍有 RP-018 知识库工具既有失败 5 项。</td></tr>
         <tr><td class="mono">npm run build --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>Vite 构建；仍有既有 chunk size warning。</td></tr>
@@ -135,13 +156,13 @@
         <tr><td>待复测反馈</td><td><span class="status run"><span class="dot"></span>1</span></td><td>RP-036 终态反馈链路与 retrieval_empty 判定已完成修复；凭据轮换并由用户完成真实连通性复测前，MT-1H-C-002 仍阻断 MT-1H-B-003 验收。</td><td><a href="testing.html">MT-1H-C-002</a></td></tr>
       </table>
       <div class="callout warn">
-        <div><b>监控口径</b>自动化测试绿色只能证明工程底座通过；人工测试未执行前，不把 Phase 1E 的真实业务体验标记为人工验收完成。</div>
+        <div><b>监控口径</b>自动化测试绿色只能证明工程底座通过；人工测试未执行前，不把 阶段 1E 的真实业务体验标记为人工验收完成。</div>
       </div>
     </section>
 
     <section>
       <div class="h-num">Section 04</div>
-      <h2>Phase 1F 回写监控</h2>
+      <h2>阶段 1F 回写监控</h2>
       <p class="lead">1F 交付后，监控重点从“AI 草稿是否可见”推进到“人工确认是否回写 Harness 审计链”。当前自动化已覆盖成功回写与重复确认幂等，人工测试需要继续确认真实页面操作与审计回查体验。</p>
       <table>
         <tr><th>监控点</th><th>目标记录</th><th>当前状态</th></tr>
@@ -209,7 +230,7 @@ harness_tool_events
         <tr><td>传统列表展示</td><td>草稿来源 Harness、runId、draft_from_ai 状态</td><td><span class="status done"><span class="dot"></span>已完成</span></td></tr>
         <tr><td>AI 工作台跳转</td><td>confirm 成功后进入草稿详情或实施评估列表</td><td><span class="status done"><span class="dot"></span>已完成</span></td></tr>
         <tr><td>草稿详情来源</td><td>Harness Run ID、Action ID、assessmentVersionCode</td><td><span class="status done"><span class="dot"></span>已完成</span></td></tr>
-        <tr><td>人工确认回写</td><td>确认人、确认时间、ToolEvent ID、传统草稿状态变化</td><td><span class="status done"><span class="dot"></span>Phase 1F delivered</span></td></tr>
+        <tr><td>人工确认回写</td><td>确认人、确认时间、ToolEvent ID、传统草稿状态变化</td><td><span class="status done"><span class="dot"></span>阶段 1F delivered</span></td></tr>
       </table>
     </section>
 
@@ -252,14 +273,14 @@ harness_tool_events
 
     <section>
       <div class="h-num">Section 10</div>
-      <h2>需求池 Loop 监控（Codex 已停用）</h2>
-      <p class="lead">Codex heartbeat 自动化 <code class="inline">wes-loop</code> 已删除；本页保留历史执行证据，并记录后续持续 Loop 转交 Qoder。Qoder 已安装 <code class="inline">wes-qoder-worktree-protocol</code>，监控重点从“唤醒次数”转为“每个外部 Loop 是否先给出任务级 Worktree Contract ACK，并在结束时回填目标、文件、验证、风险和看板同步证据”。</p>
+      <h2>需求池 循环 监控（Codex 已停用）</h2>
+      <p class="lead">Codex heartbeat 自动化 <code class="inline">wes-loop</code> 已删除；本页保留历史执行证据，并记录后续持续 循环 转交 Qoder。Qoder 已安装 <code class="inline">wes-qoder-worktree-protocol</code>，监控重点从“唤醒次数”转为“每个外部 循环 是否先给出任务级 Worktree Contract ACK，并在结束时回填目标、文件、验证、风险和看板同步证据”。</p>
       <table>
         <tr><th>监控点</th><th>目标记录</th><th>当前状态</th></tr>
         <tr>
           <td>自动化 ID</td>
           <td><code class="inline">wes-loop</code></td>
-          <td><span class="status done"><span class="dot"></span>deleted / Qoder 接管持续 Loop；协议 Skill 已安装，等待首个任务级 Worktree ACK</span></td>
+          <td><span class="status done"><span class="dot"></span>deleted / Qoder 接管持续 循环；协议 Skill 已安装，等待首个任务级 Worktree ACK</span></td>
         </tr>
         <tr>
           <td>Qoder 协议安装</td>
@@ -267,12 +288,12 @@ harness_tool_events
           <td><span class="status done"><span class="dot"></span>2026-06-26：Qoder 回执 <code class="inline">status=installed</code>，承诺一任务一 worktree、ACK 前置、结构化 handoff、仅回填到“待 Codex 复核”。</span></td>
         </tr>
         <tr>
-          <td>Qoder Loop 第 1 轮</td>
+          <td>Qoder 循环 第 1 轮</td>
           <td>RP-032 · AI 工作台推荐工作流列表可达性与语义优化；worktree <code class="inline">/Users/kevin/AI/wes-rp032-workflow-accessibility</code>；branch <code class="inline">qoder/rp-032-workflow-accessibility</code></td>
           <td><span class="status run"><span class="dot"></span>已回填 / Codex 复核自动化通过 / 待人工验收：Qoder worktree 缺少 node_modules，Codex 在相同文件状态主 checkout 复跑 <code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 92 pass、<code class="inline">npm run build:web</code> pass；整 commit 含较多既有工作台变更，集成时需拆最小 patch 或基于当前 main 文件状态。</span></td>
         </tr>
         <tr>
-          <td>Qoder Loop R2-R7 复核</td>
+          <td>Qoder 循环 R2-R7 复核</td>
           <td>RP-033 / RP-026 / RP-027+028 / RP-029 / RP-030 / RP-031；worktree 分别为 <code class="inline">/Users/kevin/AI/wes-rp033-session-scroll</code>、<code class="inline">/Users/kevin/AI/wes-rp026-role-capability</code>、<code class="inline">/Users/kevin/AI/wes-rp027-028-kimi-provider</code>、<code class="inline">/Users/kevin/AI/wes-rp029-kimi-streaming</code>、<code class="inline">/Users/kevin/AI/wes-rp030-trace-schema</code>、<code class="inline">/Users/kevin/AI/wes-rp031-rag-baseline</code></td>
           <td><span class="status warn"><span class="dot"></span>Codex 复核完成：RP-027/RP-028 原分支 <code class="inline">build:api</code> pass + <code class="inline">test:ai</code> 189/189，后续已由 clean patch 与 Codex 修复分支取代；RP-031 重复检索修复已验证，rag-baseline 11/11、knowledge-tool 8/8，但当前 <code class="inline">build:api</code> 被非 RAG 既有编译错误阻断；RP-033 原分支核心通过但叠加范围过大，后续 clean worktree 已收敛为 3 文件 patch 且通过 V2 全量 65/65 + build:web；RP-026 需补 mock/收敛加载副作用；RP-029/RP-030 已另行修复验证通过。RP-033 clean patch 当前未提交，集成前需提交或抽取最小 patch。</span></td>
         </tr>
@@ -289,7 +310,7 @@ harness_tool_events
         <tr>
           <td>每轮选择依据</td>
           <td>RP-ID、优先级、Phase、是否可独立验收、依赖关系。</td>
-          <td><span class="status done"><span class="dot"></span>2026-06-24：反幻觉四层防御批次；P1；Phase 1H-B；针对 Kimi 编造知识库文档的根因，实施显式知识库查询意图路由、fallback 文案重写、systemPrompt 反幻觉约束和前端来源区分；本轮完成 intent+knowledge focused 31 pass、V2 build pass</span></td>
+          <td><span class="status done"><span class="dot"></span>2026-06-24：反幻觉四层防御批次；P1；阶段 1H-B；针对 Kimi 编造知识库文档的根因，实施显式知识库查询意图路由、fallback 文案重写、systemPrompt 反幻觉约束和前端来源区分；本轮完成 intent+knowledge focused 31 pass、V2 build pass</span></td>
         </tr>
         <tr>
           <td>验证证据</td>
@@ -313,5 +334,6 @@ harness_tool_events
       <a href="index.html">返回总览</a> · 监控与审计 · WES 项目管理 · 2026-08-03
     </footer>
   </main>
+  <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

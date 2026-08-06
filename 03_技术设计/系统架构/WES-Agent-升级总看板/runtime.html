@@ -15,18 +15,39 @@
       <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
-        <a href="roadmap.html">路标管理</a>
-        <a href="design.html">设计说明</a>
-        <a class="active" href="runtime.html">AI 任务执行</a>
-        <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试与验收</a>
-        <a href="monitoring.html">监控与审计</a>
-        <a href="risks.html">风险与决策</a>
-        <a href="changes.html">变更记录</a>
-        <a href="sources.html">信息来源</a>
-        <a href="collaboration-protocol.html">多 AI 协作</a>
-        <a href="branches.html">开发分支</a>
-        <a href="requirements.html">需求池</a>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">计划与设计<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="roadmap.html">路标管理</a>
+          <a href="design.html">设计说明</a>
+          <a href="plan.html">计划与进度</a>
+          <a href="requirements.html">需求池</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">质量与监控<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="testing.html">测试与验收</a>
+          <a href="monitoring.html">监控与审计</a>
+          <a href="risks.html">风险与决策</a>
+          <a href="changes.html">变更记录</a>
+          </div>
+        </div>
+        <div class="nav-group has-active">
+          <button type="button" class="nav-group-btn" aria-expanded="false">AI 与协作<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a class="active" href="runtime.html">AI 任务执行</a>
+          <a href="collaboration-protocol.html">多 AI 协作</a>
+          <a href="branches.html">开发分支</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="sources.html">信息来源</a>
+          <a href="github-radar.html">开源工具雷达</a>
+          </div>
+        </div>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
       <span class="pill ok">AI 任务执行能力已交付</span>
@@ -93,7 +114,7 @@
         </tr>
         <tr>
           <td>Intent Router</td>
-          <td>Phase 1G 意图路由 / Tool Planner</td>
+          <td>阶段 1G（Phase 1G） 意图路由 / Tool Planner</td>
           <td>区分能力发现、业务问答、附件问答、报告生成、数据查询和写动作确认。</td>
         </tr>
         <tr>
@@ -132,7 +153,7 @@
         <div class="flow-step"><span class="num">02</span><b>意图边界</b><small>普通追问、附件问答、报告生成、WES 数据查询和写动作请求走不同路径。</small></div>
         <div class="flow-step"><span class="num">03</span><b>执行边界</b><small>阶段机决定是否可 parse、generate v1/v2、confirm；RP-047 目标中，需后台持续的普通问答也创建轻量 Run，并保留 modelRun 摘要。</small></div>
         <div class="flow-step"><span class="num">04</span><b>产物边界</b><small>artifact、回答、待确认动作和关联记录已在右侧时间线集中展示；evidence/modelRun 细粒度追溯后续补齐。</small></div>
-        <div class="flow-step"><span class="num">05</span><b>交付边界</b><small>AI 草稿进入传统 WES；正式业务动作必须人工确认，Phase 1F 回写 Harness 审计。</small></div>
+        <div class="flow-step"><span class="num">05</span><b>交付边界</b><small>AI 草稿进入传统 WES；正式业务动作必须人工确认，阶段 1F 回写 Harness 审计。</small></div>
         <div class="flow-step"><span class="num">06</span><b>知识边界</b><small>知识按用户、团队、项目、标准、任务引用分层；回答和报告都应说明采用了哪些上下文。</small></div>
       </div>
       <div class="panel" style="margin-top:18px">
@@ -175,7 +196,7 @@ knowledge feedback
         </tr>
         <tr>
           <td>执行边界</td>
-          <td>Phase 1F 人工确认回写、ToolEvent 幂等、Run metadata 回写、统一 stage 状态</td>
+          <td>阶段 1F 人工确认回写、ToolEvent 幂等、Run metadata 回写、统一 stage 状态</td>
           <td>保证用户准备交付时，不会出现确认错 run、重复写、审计链断裂。</td>
           <td><span class="status done"><span class="dot"></span>1F delivered</span></td>
         </tr>
@@ -226,9 +247,9 @@ knowledge feedback
           <div class="panel-h">近期可做<span class="right">当前优先</span></div>
           <div class="panel-b">
             <ul class="list-clean">
-              <li><b>Phase 1G 已交付</b>：建立 Intent Router，拆分能力发现、业务问答、附件问答、报告生成、WES 查询和写动作确认。</li>
-              <li><b>Phase 1G 已交付</b>：修正 v1 后普通追问自动生成 v2 的路径，卡片提交和明确报告意图才推进 v2。</li>
-              <li><b>Phase 1H 第一批已交付</b>：Run Timeline 与 Artifact Workspace 初版，复用 AI session 数据集中展示来源、执行、产物、待确认动作和关联记录；后续补 Harness run 级证据链。</li>
+              <li><b>阶段 1G 已交付</b>：建立 Intent Router，拆分能力发现、业务问答、附件问答、报告生成、WES 查询和写动作确认。</li>
+              <li><b>阶段 1G 已交付</b>：修正 v1 后普通追问自动生成 v2 的路径，卡片提交和明确报告意图才推进 v2。</li>
+              <li><b>阶段 1H 第一批已交付</b>：Run Timeline 与 Artifact Workspace 初版，复用 AI session 数据集中展示来源、执行、产物、待确认动作和关联记录；后续补 Harness run 级证据链。</li>
             </ul>
           </div>
         </div>
@@ -266,5 +287,6 @@ knowledge feedback
       <a href="index.html">返回总览</a> · AI 任务执行 · WES 项目管理 · 2026-08-03
     </footer>
   </main>
+  <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

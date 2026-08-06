@@ -866,12 +866,13 @@ test('board build centralizes actual branch navigation while preserving its shel
   const processedBranches = build.processHTML(branchesSource, 'branches.html');
   const branchNav = processedBranches.match(/<nav\b(?=[^>]*\bid="branch-primary-nav")[^>]*>([\s\S]*?)<\/nav>/);
   assert.ok(branchNav, 'branch nav opening attributes must be retained');
+  // 分支拓扑页使用分组导航的全量扁平视图（含 roadmap 与 github-radar 两个分组新增页）
+  const fullNavHrefs = build.NAV_ITEMS.map((item) => item.href);
   assert.deepEqual(
     [...branchNav[1].matchAll(/href="([^"]+)"/g)].map((match) => match[1]),
-    build.NAV_ITEMS.map((item) => item.href),
+    fullNavHrefs,
   );
   assert.equal((branchNav[1].match(/class="active"/g) || []).length, 1);
-  assert.doesNotMatch(branchNav[1], /roadmap\.html/);
   assert.match(processedBranches, /<nav id="branch-primary-nav" class="navlinks" aria-label="主导航">/);
   assert.match(processedBranches, /<button type="button" class="mobile-menu-btn" id="branch-mobile-menu" aria-label="打开主导航" aria-expanded="false" aria-controls="branch-primary-nav">☰<\/button>/);
   assert.match(processedBranches, /href="assets\/branch-topology\.css"/);
@@ -881,6 +882,7 @@ test('board build centralizes actual branch navigation while preserving its shel
   const distDir = createTempDir(t);
   const copied = build.copyExtraFiles(distDir);
   assert.deepEqual(copied.map((file) => path.relative(distDir, file).split(path.sep).join('/')).sort(), [
+    'assets/board-ui.js',
     'assets/branch-topology.css',
     'assets/branch-topology.js',
     'data/branch-snapshot.js',
@@ -898,7 +900,7 @@ test('board build centralizes actual branch navigation while preserving its shel
   assert.ok(distNav);
   assert.deepEqual(
     [...distNav[1].matchAll(/href="([^"]+)"/g)].map((match) => match[1]),
-    build.NAV_ITEMS.map((item) => item.href),
+    fullNavHrefs,
   );
   assert.match(distBranches, /<button type="button" class="mobile-menu-btn" id="branch-mobile-menu" aria-label="打开主导航" aria-expanded="false" aria-controls="branch-primary-nav">☰<\/button>/);
   assert.deepEqual(directoryManifest(path.join(BOARD_DIR, 'dist')), realDistManifest);

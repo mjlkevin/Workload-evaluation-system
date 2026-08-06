@@ -20,7 +20,6 @@
   align-items: center;
   gap: 28px;
   min-width: 0;
-  overflow: hidden;
 }
 .brand {
   display: inline-flex;
@@ -49,12 +48,7 @@
   gap: 4px;
   flex: 1;
   min-width: 0;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent 100%);
+  align-items: center;
   padding-right: 8px;
 }
 .navlinks::-webkit-scrollbar { display: none; }
@@ -65,11 +59,216 @@
   font-size: 13px;
   white-space: nowrap;
   font-weight: 500;
+  transition: color .18s ease, background .18s ease;
 }
 .navlinks a:hover,
 .navlinks a.active {
   color: var(--ink);
   background: var(--bg-soft);
+}
+
+/* ── Nav Groups（2 级分组导航）── */
+.nav-group { position: relative; }
+.nav-group-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .18s ease, background .18s ease;
+}
+.nav-group-btn:hover { color: var(--ink); background: var(--bg-soft); }
+.nav-group.has-active > .nav-group-btn { color: var(--brand-ink); font-weight: 600; }
+.nav-group-btn .caret {
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: .55;
+  transition: transform .2s ease;
+}
+.nav-group:hover .nav-group-btn .caret,
+.nav-group.open .nav-group-btn .caret { transform: rotate(180deg); }
+.nav-drop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 184px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  /* visibility 不参与插值：关闭时延迟隐藏，打开时立即可见（兼容部分渲染器） */
+  transition: opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
+}
+.nav-group:hover .nav-drop,
+.nav-group.open .nav-drop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity .18s ease, transform .18s ease, visibility 0s;
+}
+.nav-drop a { display: block; padding: 8px 12px; }
+.nav-drop a.active { color: var(--brand-ink); background: var(--brand-soft); font-weight: 600; }
+
+/* ── 技术细节折叠（业务表达默认可见，技术证据默认收起）── */
+.tech-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 10px 16px;
+  border: 1px dashed var(--line-2);
+  border-radius: 10px;
+  background: var(--bg-soft);
+}
+.tech-toolbar .tt-note { color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+.tech-toolbar .tt-actions { display: flex; gap: 8px; }
+.tech-toolbar .tt-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .18s ease, color .18s ease, background .18s ease;
+}
+.tech-toolbar .tt-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+.tech-detail {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow-1);
+}
+.tech-detail summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--bg-soft);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background .18s ease, color .18s ease;
+}
+.tech-detail summary::-webkit-details-marker { display: none; }
+.tech-detail summary:hover { color: var(--ink); background: color-mix(in oklab, var(--brand-soft) 60%, var(--bg-soft)); }
+.tech-detail[open] summary { border-radius: 12px 12px 0 0; border-bottom: 1px solid var(--line); }
+.tech-detail .td-caret {
+  width: 0;
+  height: 0;
+  flex-shrink: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  opacity: .6;
+  transition: transform .2s ease;
+}
+.tech-detail[open] .td-caret { transform: rotate(180deg); }
+.tech-detail .td-hint {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.tech-detail-body { padding: 18px 16px 8px; }
+.tech-detail-body > :last-child { margin-bottom: 10px; }
+.tech-detail[open] .tech-detail-body { animation: td-open .28s ease; }
+@keyframes td-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── 进场动效（仅 JS 可用时由 board-ui.js 添加 reveal-pending）── */
+.reveal-pending { opacity: 0; transform: translateY(14px); }
+.reveal-pending.in {
+  opacity: 1;
+  transform: none;
+  transition: opacity .5s ease, transform .5s cubic-bezier(.22, .61, .36, 1);
+}
+.kpi-row .reveal-pending.in:nth-child(2),
+.grid-3 .reveal-pending.in:nth-child(2),
+.res-grid .reveal-pending.in:nth-child(2) { transition-delay: .05s; }
+.kpi-row .reveal-pending.in:nth-child(3),
+.grid-3 .reveal-pending.in:nth-child(3),
+.res-grid .reveal-pending.in:nth-child(3) { transition-delay: .1s; }
+.kpi-row .reveal-pending.in:nth-child(4),
+.res-grid .reveal-pending.in:nth-child(4) { transition-delay: .15s; }
+.res-grid .reveal-pending.in:nth-child(5) { transition-delay: .2s; }
+.res-grid .reveal-pending.in:nth-child(6) { transition-delay: .25s; }
+
+/* ── KPI / 卡片 hover 增强 ── */
+.kpi { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.kpi:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-2);
+}
+.card { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-2);
+}
+tbody tr { transition: background .15s ease; }
+tbody tr:hover { background: color-mix(in oklab, var(--bg-soft) 70%, #fff); }
+
+/* ── 键盘可访问性：focus-visible ── */
+.navlinks a:focus-visible,
+.nav-group-btn:focus-visible,
+.tech-detail summary:focus-visible,
+.tech-toolbar .tt-btn:focus-visible,
+.mobile-menu-btn:focus-visible,
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ── 降级动效偏好 ── */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .reveal-pending { opacity: 1 !important; transform: none !important; }
 }
 
 /* ── Pills ── */
@@ -705,6 +904,7 @@ th.mono { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
     backdrop-filter: saturate(160%) blur(14px);
     -webkit-backdrop-filter: saturate(160%) blur(14px);
     flex-direction: column;
+    align-items: stretch;
     padding: 20px 24px;
     z-index: 100;
     gap: 2px;
@@ -720,6 +920,34 @@ th.mono { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
     border-radius: 0;
   }
   .navlinks a:last-child { border-bottom: none; }
+  /* 移动端：分组渲染为标签 + 常驻链接列表，避免二级点按 */
+  .nav-group { display: block; }
+  .nav-group-btn {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 16px 16px 6px;
+    color: var(--ink-3);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    pointer-events: none;
+  }
+  .nav-group-btn .caret { display: none; }
+  .nav-drop {
+    position: static;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+  .nav-drop a { border-bottom: 1px solid var(--line); }
+  .tech-detail .td-hint { display: none; }
 }
 
 /* ─ Responsive: 680px ── */

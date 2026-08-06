@@ -227,6 +227,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       ...(dispatchData.formBlock ? { formBlock: dispatchData.formBlock } : {}),
       ...(dispatchData.trace.knowledgeTool ? { knowledgeTool: dispatchData.trace.knowledgeTool } : {}),
       ...(dispatchData.trace.modelRun ? { modelRun: dispatchData.trace.modelRun } : {}),
+      ...(dispatchData.suggestedActions?.length ? { suggestedActions: dispatchData.suggestedActions, intent: dispatchData.intent } : {}),
     };
     const updatedSession = appendAiSessionEvent(user, session.sessionId, {
       message: {

@@ -34,7 +34,7 @@
 ## 前端与重构说明（2026-03 起）
 
 - **Web 前端主线**：[`ui/V2_PROTOTYPE`](ui/V2_PROTOTYPE)（Vite + React，端口 `3002`，代理 `/api` 到 API `3000`）。根目录 `npm run dev:web` / `npm run build:web` 指向此处；Phase B 组件库与 18 页面全量集成已完成。详见 [`ui/V2_PROTOTYPE/README.md`](ui/V2_PROTOTYPE/README.md)。
-- **【历史说明，下线中】V0 资产**：[`ui/V0_SAAS`](ui/V0_SAAS)（Next.js + TypeScript）已进入 V1 下线范围，待资产迁移门禁通过后删除；相关引用仅用于迁移核对与历史追溯。
+- **【历史说明，已下线】V0 资产**：`ui/V0_SAAS`（Next.js + TypeScript）已于 2026-08-06 清理删除；如需追溯请查看 Git 历史或 `99_归档/` 目录。
 - **后端**：[`apps/api`](apps/api) 10/17 核心域已迁至 `apps/api/src/modules/*`（含 auth、versions、ai、templates、rules、estimates、exports、sessions、system、team），路由聚合于 [`apps/api/src/routes/index.ts`](apps/api/src/routes/index.ts)。
 
 ## 质量回归（建议每次发布前执行）
@@ -79,7 +79,6 @@ npm run build -w apps/api
 ## 目录结构
 
 - `ui/V2_PROTOTYPE`：当前唯一 Web 前端主线（Vite + React，Phase B）
-- `ui/V0_SAAS`：【历史说明，下线中】V1 下线范围内的旧 Next.js 资产，待资产迁移门禁通过后删除
 - `apps/api`：后端 API 服务
 - `config/templates`：模板配置
 - `config/rules`：规则配置

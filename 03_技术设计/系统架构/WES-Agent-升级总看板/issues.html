@@ -31,6 +31,7 @@
         <a class="active" href="issues.html">问题池</a>
         <a href="defects.html">缺陷池</a>
         <a href="requirements.html">需求池</a>
+        <a href="github-radar.html">开源工具雷达</a>
     </nav>
     <div style="flex:1"></div>
     <div class="sidebar-pill">
@@ -49,13 +50,13 @@
         <div class="meta">
           <span><b>定位</b> 用户原始反馈、截图、疑问和未定性现象的第一入口</span>
           <span><b>处理流程</b> 原始问题（Issue）→ 分析分流 → 缺陷 / 需求 / 风险 / 关闭</span>
-          <span><b>更新日期</b> 2026-08-03</span>
+          <span><b>更新日期</b> 2026-08-06</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">26 个问题</span>
+          <span class="pill brand">31 个问题</span>
           <span class="pill warn">0 待分析</span>
-          <span class="pill warn">16 转缺陷</span>
-          <span class="pill brand">10 个已转为需求</span>
+          <span class="pill warn">18 转缺陷</span>
+          <span class="pill brand">13 个已转为需求</span>
         </div>
       </div>
     </div>
@@ -137,7 +138,7 @@
               <td><code class="inline">RP-040</code> <code class="inline">BE-2026-07-03-rp-040-board-work-item-split</code> <code class="inline">2026-07-03 user feedback: 问题池/缺陷池/需求池需要作为一级导航入口</code> <code class="inline">BE-2026-07-03-rp-040-work-item-pages</code> <code class="inline">2026-07-04 user decision: 原始反馈先入问题池，由 Codex Intake/Triage Loop 分流</code> <code class="inline">BE-2026-07-04-issue-first-triage-loop</code></td>
               <td><span class="status run"><span class="dot"></span>已分流</span></td>
               <td>转需求 · RP-040</td>
-              <td>Skill 与全局规则已改为原始反馈先进入问题池；Codex Intake/Triage Loop 分析后标记 disposition 并分流到缺陷池或需求池。</td>
+              <td>Skill 与全局规则已改为原始反馈先进入问题池；Codex Intake/Triage 循环（Loop） 分析后标记 disposition 并分流到缺陷池或需求池。</td>
             </tr>
             <tr>
               <td class="mono">ISS-2026-07-04-001</td>
@@ -328,7 +329,7 @@
               <td>user_architecture_review</td>
               <td>用户提供完整复现链和代码定位：会话 A 发送中切换到会话 B 时，全局 <code class="inline">sending</code> 阻断 B 的消息同步与发送；A 返回后又可能更新当前视图。期望升级为会话级独立运行通道，允许不同会话并行请求。</td>
               <td><code class="inline">AiHomeWorkbench.jsx:1704-1759,1811-1814,2051-2277</code> <code class="inline">useAiSessions.js:46-53</code> <code class="inline">SessionRail.jsx</code> <code class="inline">src/api/ai.js</code> <code class="inline">RP-017</code> <code class="inline">RP-029</code></td>
-              <td><span class="status run"><span class="dot"></span>Batch A2 Gate 通过 / 待集成</span></td>
+              <td><span class="status run"><span class="dot"></span>Batch A2 关卡（Gate） 通过 / 待集成</span></td>
               <td>转需求 · RP-047</td>
               <td>已确认任务需跨会话切换、WES 路由切换、页面刷新、关闭标签页和重新登录持续；混合检查点方案已获用户批准。A2-R1 提交 <code class="inline">d9790fe</code> 已关闭普通对象边界、output 并发回归和 handoff 准确性三个阻断项；Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过。Batch A2 等待用户授权集成，Batch B-E 继续锁定。</td>
             </tr>
@@ -363,14 +364,80 @@
               <td><code class="inline">docs/agent-loop/audits/2026-08-03-codex-RP-047-A-gate.md</code> <code class="inline">apps/api/test-setup.mts:37</code> <code class="inline">apps/api/package.json:test:harness</code> <code class="inline">npm ci 后 modules 143/143、build:api/web pass</code></td>
               <td><span class="status done"><span class="dot"></span>已修复 / A2 待集成</span></td>
               <td>转缺陷 · DEF-2026-08-03-001 / RP-047-A2</td>
-              <td>全新 A2 worktree 已修复 ESM 路径和依赖隔离，并用随机临时 database 证明 0000-0013 历史数据可升级到 0014；R1 进一步关闭普通对象、output 并发和 handoff 缺口。Codex Gate 95/95 通过，缺陷关闭，等待 Batch A2 集成。</td>
+              <td>全新 A2 worktree 已修复 ESM 路径和依赖隔离，并用随机临时 database 证明 0000-0013 历史数据可升级到 0014；R1 进一步关闭普通对象、output 并发和 handoff 缺口。Codex 关卡 95/95 通过，缺陷关闭，等待 Batch A2 集成。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-05-001</td>
+              <td>2026-08-05</td>
+              <td>模型配置 API 密钥在服务重启后“丢失”，AI 工作台报未配置密钥</td>
+              <td>user_feedback</td>
+              <td>用户询问“模型配置的 API 密钥当前还是存本地 JSON？服务一重启就没了？”，并附 AI 工作台截图显示“AI 服务未配置 API 密钥，请联系管理员在系统管理中配置”。只读诊断确认：密钥设计存储于本地 JSON（<code class="inline">config/system/requirement-settings.json</code>，draft/active 两层，每次请求读文件、无内存缓存），纯重启本身不会清键；但该文件被 git 跟踪且历史提交曾含真实密钥，git checkout/reset/merge 可把界面录入的密钥覆盖回仓库空版本；环境变量兜底 KIMI_API_KEY 仅根目录 <code class="inline">.env.local</code> 有，而 dev:api 以 apps/api 为 cwd 启动时不加载；草稿未点击“生效”也不会进入业务调用。当前磁盘文件两层 apiKey 均为空。</td>
+              <td><code class="inline">config/system/requirement-settings.json</code> <code class="inline">apps/api/src/config/env.ts</code> <code class="inline">apps/api/src/modules/system/system.repository.ts</code> <code class="inline">.gitignore</code> <code class="inline">RP-036（范围不同，仅交叉引用）</code></td>
+              <td><span class="status block"><span class="dot"></span>已分诊 / 阻断 AI 主流程 / 待修复决策</span></td>
+              <td>转缺陷 · DEF-2026-08-05-001</td>
+              <td>去重结果：未命中同类 issue（RP-036 仅覆盖权限反馈与连通性判定）。密钥曾入 git 历史，须轮换；修复方案与是否立即实施待用户决策。2026-08-05 用户追加方向性问题：密钥长期是否入库（PostgreSQL）；候选方向为“凭据域 DB-backed（加密落库+变更审计）”或“文件加固（gitignore+加密）”，待决策。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-05-002</td>
+              <td>2026-08-05</td>
+              <td>系统管理页 API Key“测试连接”点击后无任何反应或反馈</td>
+              <td>user_feedback</td>
+              <td>用户报告在系统管理-模型配置页重新输入 API 密钥后点击“测试连接”，页面无任何反应或反馈（附截图）。诊断确认三重叠加根因：① 后端 <code class="inline">kimi-ping.ts</code> 的 fetch 无任何超时控制，上游挂起时请求无限等待（日志存在 9.7s 慢请求佐证）；② API Key 卡测试按钮无 loading 状态，等待期间零视觉反馈，用户误以为点击无效；③ 测试结果仅依赖全局 toast，容易错过且无页面内持久展示。与 ISS-2026-08-05-001（密钥存储丢失）为不同缺陷，仅同页相关。</td>
+              <td><code class="inline">apps/api/src/utils/kimi-ping.ts</code> <code class="inline">apps/api/src/modules/system/system.usecase.ts</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx</code></td>
+              <td><span class="status done"><span class="dot"></span>已分诊 / 修复已合入主线</span></td>
+              <td>转缺陷 · DEF-2026-08-05-002</td>
+              <td>去重结果：未命中同类 issue。修复已在独立 worktree <code class="inline">iss-2026-08-05-002-apikey-test-feedback</code>（分支 qoder/fix-apikey-test-feedback）完成：后端增加 30s 超时切断并映射 50401/HTTP 504；前端增加按钮 loading、页面内联结果行与空输入守卫。验证：kimi-ping 3/3、聚焦测试 3/3、前端全量 226/226、test:modules 245/245、build:web/build:api 通过。2026-08-06 用户批准直接合并，提交 <code class="inline">eba90b4</code> fast-forward 合入 main，dev 服务已重启生效。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-06-001</td>
+              <td>2026-08-06</td>
+              <td>AI 工作台对正常提问返回模板化静态能力回复，回应僵硬不自然</td>
+              <td>user_feedback_session_id</td>
+              <td>用户反馈会话 a4d3d9de-d793-48a2-ba87-e3606c165385 中提问“我需要发什么类型的文件给你”，系统返回固定 7 条能力清单模板（含“当前角色：mjlkevin（admin）”内部口径），未直接回答“可以发什么类型文件”，表达僵硬。只读根因分析：① 该问法未命中 routeWorkbenchIntent 任何关键词规则，落入 default_domain_qa；② RP-003 模型二次分类以置信度≥0.6 将意图替换为 capability_discovery（routingRule=model_classification_fallback）；③ capability_discovery 恒由 buildCapabilityResponse 返回 rule-static 模板，完全不调用模型，且模板不感知用户具体问题。会话中留存的 assistant 回复与模板逐字一致。trace 库 13 条记录中 9 条走 model_classification_fallback，说明多数常规提问进入该链路，替换后可能落入 capability_discovery / wes_data_query / write_action_request / unsupported 的静态回复。次级观察：该会话 13:26 的用户消息无 assistant 回复留存，16:04 重发后才获得回复，失败原因待查。</td>
+              <td><code class="inline">session:a4d3d9de-d793-48a2-ba87-e3606c165385</code> <code class="inline">data/ai-sessions.json:assistant 回复与 buildCapabilityResponse 模板逐字一致</code> <code class="inline">apps/api/src/services/ai/workbench-intent.service.ts:routeWorkbenchIntent / classifyIntentWithModel（采纳阈值 0.6）</code> <code class="inline">apps/api/src/services/ai/workbench-dispatch.service.ts:RP-003 替换逻辑与 buildCapabilityResponse（model=rule-static）</code> <code class="inline">data/traces/trace-store.json:9/13 条走 model_classification_fallback</code> <code class="inline">ISS-2026-07-04-009（同域不同症状，仅交叉引用）</code></td>
+              <td><span class="status run"><span class="dot"></span>已分诊</span></td>
+              <td>转需求 · RP-049</td>
+              <td>去重结果：未命中。ISS-2026-07-04-009 为同域问候空内容的 SSE 缺陷，已修复且症状不同；ISS-2026-08-02-004 为 Agent 任务沟通措辞（speak-plainly），非工作台对话链路。改进方向见 RP-049：收窄分类替换白名单、提高采纳阈值、能力回复改为模型辅助/上下文感知、移除内部角色口径、补回归样本。是否实施与排期待用户决策，本次未改代码。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-06-002</td>
+              <td>2026-08-06</td>
+              <td>AI 工作台意图识别与路由架构 Skill 层解耦方向性思考</td>
+              <td>user_architecture_idea</td>
+              <td>用户提出大方向思考：将现有意图识别与路由层解耦，扩展一个 skill 层封装路由规则。要点：① 系统级提示词只保留核心边界说明（不回答无关内容），避免过度复杂的规则硬编码；② 用户各类意图（快速询问、信息查询、上传附件生成需求分析等触发工作流）统一通过 skill 层处理；③ 预置多套业务场景 skill，每个 skill 对应特定业务场景与处理流程；④ 后端按 skill 规范执行并提供工具支持；⑤ 核心是通过 skill 完成整个业务过程，而非复杂的意图分类与路由逻辑。可行性分析结论：方向可行且与 Phase 1G 预留的 Capability Registry（intent/requiredCapabilities/allowedTools/confirmPolicy）及业界 semantic-kernel plugin+filter、Rasa CALM flows 模式同向；O4 已落地的 WORKBENCH_HANDLERS 注册表即 skill 层执行引擎底座，10 类意图可逐一映射为 skill 清单。但必须修正为级联形态：路由知识沉淀为 skill manifest（数据而非代码），匹配器按"确定性层（clientAction/问候）→ 清单规则层 → LLM 结构化选择层（枚举+none+置信度门控）"级联，报告生成显式闸门、写动作确认、权限校验等边界由后端代码强制而非 manifest 解释；不可全盘交给 LLM 自由裁量，否则会在更大范围重演 RP-049 三层叠加的"分类替换过激"故障并威胁"文件是上下文、意图才触发工作流"硬口径。</td>
+              <td><code class="inline">apps/api/src/services/ai/workbench-intent.service.ts（routeWorkbenchIntent 规则路由）</code> <code class="inline">apps/api/src/services/ai/workbench-dispatch.service.ts（WORKBENCH_HANDLERS 注册表 L123-172）</code> <code class="inline">apps/api/src/services/ai/handlers/（7 个意图 handler + handler.types.ts 契约）</code> <code class="inline">docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md（Capability Registry 预留）</code> <code class="inline">RP-012（Skill 工作流辅助工具，相关但独立）</code> <code class="inline">RP-049 / O10（同域在途，顺序约束）</code> <code class="inline">O4（handler 化执行底座，已交付 251b73d）</code></td>
+              <td><span class="status run"><span class="dot"></span>已分诊</span></td>
+              <td>转需求 · RP-050</td>
+              <td>去重结果：RP-012 为相关但独立（RP-012 是售前制造业业务 Skill 能力层，含 manifest/resolver 初步定义；本项是路由架构本身的 skill 化改造，二者 manifest schema 应统一设计避免两套），新增 ISS-2026-08-06-002 并交叉引用。用户明确"先详细登记，后续统一梳理规划"，故本项详细登记但不排期；迁移路径建议为 P1 清单化（规则入 manifest 行为零变更）→ P2 LLM 结构化选择层（feature flag）→ P3 场景驱动扩展，严格排在 O10 Batch B/C 之后（同文件约束）。本次未改业务代码。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-06-003</td>
+              <td>2026-08-06</td>
+              <td>AI 会话删除功能未按 RP-047 规范保护活跃 Run</td>
+              <td>codex_architecture_review</td>
+              <td>Codex 代码审查发现：当前 AI 会话删除为 JSON 文件硬删除，无任何 Harness Run 状态检查；与 RP-047 11.3 Session 删除规则冲突——存在非终态 Run 时应返回 409 SESSION_HAS_ACTIVE_RUN。根因：deleteAiSession usecase 仅做 Array.filter 物理移除，不查询 harness_runs；controller 只返回 40404 或成功，无 409 错误码；前端无"停止任务"入口。</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/components/AiWorkbench/SessionRail.jsx:handleDeleteSession</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useAiSessions.js:deleteSession</code> <code class="inline">apps/api/src/modules/ai-sessions/ai-sessions.controller.ts:deleteSession</code> <code class="inline">apps/api/src/modules/ai-sessions/ai-sessions.usecase.ts:deleteAiSession</code> <code class="inline">apps/api/src/modules/ai-sessions/ai-sessions.repository.ts:saveAiSessionsStore</code> <code class="inline">docs/superpowers/specs/2026-08-02-rp-047-durable-multichannel-checkpoint-runtime-design.md:§11.3</code></td>
+              <td><span class="status run"><span class="dot"></span>已分析 / 待规划</span></td>
+              <td>转需求 · RP-047 Batch D 前置 / 待统一规划</td>
+              <td>当前实现为硬删除，无软删除/归档/级联清理；RP-047 Batch B/C 尚未启动，Batch D 前端多会话体验才涉及 SessionRail Run 状态显示与停止入口。建议：① Batch D 前在 ai-sessions.usecase.ts 补 Run 状态检查；② 或作为独立小修在 Batch D 前实施。用户明确"先记录到看板，后续统一规划"，本次未改代码。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-06-004</td>
+              <td>2026-08-06</td>
+              <td>WES 构建 Electron 桌面端可行性</td>
+              <td>user_architecture_idea</td>
+              <td>用户提出分析当前项目构建 Electron 桌面端的可行性（技术栈、资源要求等多维度）。可行性分析结论：技术上完全可行且兼容性高——React SPA（ui/V2_PROTOTYPE）+ Express 纯 JS 后端（apps/api），全部依赖纯 JS 无原生模块，属 Electron 封装教科书场景，前端可零改动载入、后端可在主进程或子进程启动，SSE 流式兼容。两大障碍：① Harness 域 PostgreSQL 依赖——桌面端无法假定数据库环境，须在内嵌 PG、换 SQLite、功能降级间选型；② resolveRootDir/loadJsonFile 依赖 process.cwd() 定位 config/*，需适配 userData 数据目录（改动点集中在 utils/file.ts）。另有代码签名、公证、自动更新与三平台回归等长期运营成本。Tauri 需以 Rust 重写后端不可行，Electron 是唯一现实桌面路线。资源估算：MVP 约 2–3 周、全功能版约 4–6 周；安装包每平台 90–120MB、运行内存约 300–500MB。</td>
+              <td><code class="inline">apps/api/package.json（全纯 JS 依赖）</code> <code class="inline">ui/V2_PROTOTYPE/package.json（Vite+React SPA）</code> <code class="inline">apps/api/src/utils/file.ts:resolveRootDir（cwd 依赖路径）</code> <code class="inline">apps/api/src/app.ts:createApp（可内嵌启动工厂）</code> <code class="inline">ui/V2_PROTOTYPE/src/api/client.js（相对路径 /api/v1）</code> <code class="inline">docker-compose.yml（postgres:17 依赖）</code></td>
+              <td><span class="status run"><span class="dot"></span>已分析 / 待决策</span></td>
+              <td>转需求 · RP-051</td>
+              <td>去重结果：未命中（全仓库无 Electron/桌面端/Tauri 记录）。已详细登记不排期；待用户决策产品定位（单机离线工具 vs 连接远程服务器的客户端）与数据库选型后再立项。</td>
             </tr>
         </table>
       </div>
     </section>
 </main>
   </div>
-  <footer>问题池 · WES 项目管理 · 2026-08-03</footer>
+  <footer>问题池 · WES 项目管理 · 2026-08-06</footer>
   <script>
     const sidebar = document.getElementById('sidebar');
     const toggle = document.getElementById('sidebarToggle');
@@ -380,5 +447,6 @@
       overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
     }
   </script>
+  <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

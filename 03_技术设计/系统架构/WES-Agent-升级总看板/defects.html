@@ -31,6 +31,7 @@
         <a href="issues.html">问题池</a>
         <a class="active" href="defects.html">缺陷池</a>
         <a href="requirements.html">需求池</a>
+        <a href="github-radar.html">开源工具雷达</a>
     </nav>
     <div style="flex:1"></div>
     <div class="sidebar-pill">
@@ -271,11 +272,35 @@
               <td class="mono">RP-047-A2</td>
               <td>Node 24 Testcontainers setup 与 worktree 依赖隔离缺陷阻断 Harness 正式门禁</td>
               <td>S2</td>
-              <td><span class="status done"><span class="dot"></span>已修复 / Codex Gate 通过</span></td>
+              <td><span class="status done"><span class="dot"></span>已修复 / Codex 关卡（Gate） 通过</span></td>
               <td>apps/api/test-setup.mts / test:harness / 独立 worktree node_modules</td>
               <td>A2 使用 ESM-safe migration 路径和 worktree 隔离依赖，以随机临时 database 演练历史迁移；R1 将普通对象校验和 output 并发版本回归纳入正式门禁。</td>
               <td>Codex 独立复跑 Testcontainers Harness 95/95、modules 143/143、API/Web build 通过；三个 R1 阻断项关闭，worktree clean，无新增 lockfile 或长期容器。</td>
               <td>缺陷已关闭；Batch A2 仍需用户授权集成，集成后须在业务主线复跑同一门禁。机器级 Docker/Colima 配置继续禁止由任务自动修改。</td>
+            </tr>
+            <tr>
+              <td class="mono">DEF-2026-08-05-001</td>
+              <td class="mono">ISS-2026-08-05-001</td>
+              <td class="mono">—</td>
+              <td>模型配置密钥存储文件被 git 跟踪且 env 兜底按 cwd 加载失效，密钥在重启/同步后“丢失”</td>
+              <td>S2</td>
+              <td><span class="status block"><span class="dot"></span>已分析 / 待修复决策</span></td>
+              <td>config/system/requirement-settings.json / apps/api/src/config/env.ts / .gitignore / 系统管理-模型配置页</td>
+              <td>三重根因：① <code class="inline">requirement-settings.json</code> 未入 .gitignore（<code class="inline">knowledge-base-config.json</code> 已有忽略先例），密钥随版本控制进出，历史提交曾含真实密钥，且 checkout/reset/merge 会把界面录入的密钥覆盖回仓库空版本；② <code class="inline">env.ts</code> 以 process.cwd() 解析 .env.local/.env，dev:api（npm run dev -w apps/api）cwd 为 apps/api，根目录 .env.local 的 KIMI_API_KEY 不加载，apps/api/.env.local 仅含 PORT/DATABASE_URL/DATABASE_POOL_MAX；③ draft/active 两层语义提示不足，保存草稿未“生效”时业务调用（resolveActiveRequirementKimiApiKey）取不到键。修复方向：密钥文件入 .gitignore 并 git rm --cached；env 加载改用根目录解析（对齐 resolveRootDir 候选逻辑）；模型配置页对“草稿需生效后才进入业务调用”增加明确提示；泄露密钥在供应商控制台轮换。</td>
+              <td>验收口径：UI 录入并生效后重启服务，AI 调用 source=store 可用；store 为空时根目录 .env.local 兜底 source=env 可用；git status 不再出现密钥文件改动；旧密钥已在控制台撤销。</td>
+              <td>待用户决策是否立即修复；修复前 AI 主流程依赖重新录入密钥，泄露密钥轮换为安全必办项。</td>
+            </tr>
+            <tr>
+              <td class="mono">DEF-2026-08-05-002</td>
+              <td class="mono">ISS-2026-08-05-002</td>
+              <td class="mono">—</td>
+              <td>API Key 测试连接点击无反馈：上游挂起时无超时切断 + 按钮无 loading + 结果仅靠 toast</td>
+              <td>S2</td>
+              <td><span class="status done"><span class="dot"></span>已修复 / 已合入主线</span></td>
+              <td>apps/api/src/utils/kimi-ping.ts / system.usecase.ts / response.ts / ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx</td>
+              <td>三重根因：① <code class="inline">kimi-ping.ts</code> 裸 fetch 无 AbortController，KIMI 上游挂起时 HTTP 请求无限等待，前端表现为点击无响应；② API Key 卡测试按钮无 disabled/loading 状态，等待期零视觉反馈；③ 测试结果仅经全局 toast 呈现，无页面内持久展示。修复：后端 ping 增加 30s 超时（AbortController，可配 timeoutMs，下限 1s），超时抛 kind="timeout"，usecase 映射 50401，fail() 新增 50400-50500→HTTP 504 段；前端按钮加 disabled+“测试中…”文案、页面内联结果行（成功/警告/错误/进行中四态，颜色走 tokens 带 hex 兜底）、空输入直接提示不发请求、清除密钥同步清结果，模型卡连通性按钮同步加 disabled。</td>
+              <td>kimi-ping 测试 3/3（含上游挂起超时中止用例）；新增 SystemManagementApiKeyTest 聚焦 3/3（失败内联、成功内联+明细、空输入守卫）；前端全量 vitest 226/226；test:modules 245/245；build:web/build:api 通过。</td>
+              <td>修复位于独立 worktree（分支 qoder/fix-apikey-test-feedback）；2026-08-06 用户批准直接合并，提交 eba90b4 fast-forward 合入 main，dev 服务已重启生效，待用户浏览器验收。</td>
             </tr>
         </table>
       </div>
@@ -292,5 +317,6 @@
       overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
     }
   </script>
+  <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

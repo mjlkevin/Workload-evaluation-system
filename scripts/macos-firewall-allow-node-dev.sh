@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# macOS：为开发用的 Node 进程允许「传入连接」，使局域网可访问本机 3000/3001（由 npm run dev:api / dev:web 监听）。
+# macOS：为开发用的 Node 进程允许「传入连接」，使局域网可访问本机 3000/3002（由 npm run dev:api / dev:web 监听）。
 # 说明：系统防火墙按「应用」放行，不能单独只开两个端口；放行 Node 后，所有由该 node 二进制监听的端口均可被访问。
 #
 # 使用：在项目根目录执行

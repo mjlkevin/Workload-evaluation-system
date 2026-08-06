@@ -17,24 +17,52 @@ const BOARD_DIR = path.resolve(__dirname, '..', '03_技术设计', '系统架构
 const DIST_DIR = path.join(BOARD_DIR, 'dist');
 
 // ── Navigation Configuration ──
-const NAV_ITEMS = [
-  { label: '总览', href: 'index.html' },
-  { label: '设计说明', href: 'design.html' },
-  { label: 'AI 任务执行', href: 'runtime.html' },
-  { label: '计划与进度', href: 'plan.html' },
-  { label: '测试与验收', href: 'testing.html' },
-  { label: '监控与审计', href: 'monitoring.html' },
-  { label: '风险与决策', href: 'risks.html' },
-  { label: '变更记录', href: 'changes.html' },
-  { label: '信息来源', href: 'sources.html' },
-  { label: '多 AI 协作', href: 'collaboration-protocol.html' },
-  { label: '开发分支', href: 'branches.html' },
-  { label: '需求池', href: 'requirements.html' },
+// 分组导航（2 级结构）：一级为分组入口，二级为页面链接。
+// NAV_GROUPS 内链接顺序即扁平 NAV_ITEMS 顺序（测试与分支页导航依赖此顺序）。
+const NAV_GROUPS = [
+  { label: '总览', items: [{ label: '总览', href: 'index.html' }] },
+  {
+    label: '计划与设计',
+    items: [
+      { label: '路标管理', href: 'roadmap.html' },
+      { label: '设计说明', href: 'design.html' },
+      { label: '计划与进度', href: 'plan.html' },
+      { label: '需求池', href: 'requirements.html' },
+    ],
+  },
+  {
+    label: '质量与监控',
+    items: [
+      { label: '测试与验收', href: 'testing.html' },
+      { label: '监控与审计', href: 'monitoring.html' },
+      { label: '风险与决策', href: 'risks.html' },
+      { label: '变更记录', href: 'changes.html' },
+    ],
+  },
+  {
+    label: 'AI 与协作',
+    items: [
+      { label: 'AI 任务执行', href: 'runtime.html' },
+      { label: '多 AI 协作', href: 'collaboration-protocol.html' },
+      { label: '开发分支', href: 'branches.html' },
+    ],
+  },
+  {
+    label: '资料资产',
+    items: [
+      { label: '信息来源', href: 'sources.html' },
+      { label: '开源工具雷达', href: 'github-radar.html' },
+    ],
+  },
 ];
+
+// 扁平视图（向后兼容：测试、分支页导航校验依赖该导出）
+const NAV_ITEMS = NAV_GROUPS.flatMap((group) => group.items);
 
 const EXTRA_FILES = [
   'assets/branch-topology.css',
   'assets/branch-topology.js',
+  'assets/board-ui.js',
   'data/branch-snapshot.js',
 ];
 
@@ -45,8 +73,33 @@ function generateNavLinks(activePage) {
   }).join('\n');
 }
 
-function generateNav(activePage) {
-  const links = generateNavLinks(activePage);
+// 分组导航内部结构：单链接分组直接平铺；多链接分组渲染为下拉。
+// 激活页面所在分组用 has-active 标记（避免与链接的 active 类冲突计数）。
+function generateGroupedNavLinks(activePage) {
+  return NAV_GROUPS.map(group => {
+    const links = group.items.map(item => {
+      const isActive = item.href === activePage ? ' class="active"' : '';
+      return `          <a${isActive} href="${item.href}">${item.label}</a>`;
+    }).join('\n');
+    if (group.items.length === 1) {
+      return group.items.map(item => {
+        const isActive = item.href === activePage ? ' class="active"' : '';
+        return `        <a${isActive} href="${item.href}">${item.label}</a>`;
+      }).join('\n');
+    }
+    const hasActive = group.items.some(item => item.href === activePage);
+    const groupClass = hasActive ? 'nav-group has-active' : 'nav-group';
+    return `        <div class="${groupClass}">
+          <button type="button" class="nav-group-btn" aria-expanded="false">${group.label}<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+${links}
+          </div>
+        </div>`;
+  }).join('\n');
+}
+
+function generateNav(activePage, { grouped = true } = {}) {
+  const links = grouped ? generateGroupedNavLinks(activePage) : generateNavLinks(activePage);
   return `<nav class="navlinks" aria-label="主导航">
 ${links}
       </nav>
@@ -62,7 +115,10 @@ function replaceNavigationLinks(html, activePage) {
   return html.replace(/(<nav\b[^>]*>)([\s\S]*?)(<\/nav>)/g, (nav, openingTag, inner, closingTag) => {
     if (!classTokensForOpeningTag(openingTag).includes('navlinks')) return nav;
     const closingIndent = inner.match(/\n([ \t]*)$/)?.[1] || '';
-    return `${openingTag}\n${generateNavLinks(activePage)}\n${closingIndent}${closingTag}`;
+    const links = /id="branch-primary-nav"/.test(openingTag)
+      ? generateNavLinks(activePage)
+      : generateGroupedNavLinks(activePage);
+    return `${openingTag}\n${links}\n${closingIndent}${closingTag}`;
   });
 }
 
@@ -103,9 +159,14 @@ function processHTML(htmlContent, activePage) {
 
   // Update CSS references: replace split CSS with merged dashboard.css
   result = result.replace(
-    /<link rel="stylesheet" href="assets\/base\.css" \/>[\s\n]*<link rel="stylesheet" href="assets\/components\.css" \/>[\s\n]*<link rel="stylesheet" href="assets\/pages\.css" \/>/,
+    /<link rel="stylesheet" href="assets\/base\.css(?:\?[^"\s]*)?" \/>[\s\n]*<link rel="stylesheet" href="assets\/components\.css(?:\?[^"\s]*)?" \/>[\s\n]*<link rel="stylesheet" href="assets\/pages\.css(?:\?[^"\s]*)?" \/>/,
     '<link rel="stylesheet" href="assets/dashboard.css" />'
   );
+
+  // Ensure the progressive-enhancement script is present before </body>
+  if (!/assets\/board-ui\.js/.test(result) && /<\/body>/.test(result)) {
+    result = result.replace(/<\/body>/, '  <script src="assets/board-ui.js" defer></script>\n</body>');
+  }
 
   return result;
 }
@@ -183,4 +244,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { NAV_ITEMS, copyExtraFiles, generateNav, generateNavLinks, main, mergeCSS, processHTML, replaceNavigationLinks };
+module.exports = { NAV_GROUPS, NAV_ITEMS, copyExtraFiles, generateNav, generateNavLinks, generateGroupedNavLinks, main, mergeCSS, processHTML, replaceNavigationLinks };

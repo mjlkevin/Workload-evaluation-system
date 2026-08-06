@@ -37,6 +37,25 @@ export function normalizeKnowledgeTool(value) {
   }
 }
 
+/**
+ * 归一会话消息 metadata 中的 suggestedActions：
+ * 仅保留具备 actionType 或 label 的有效动作，确保写动作确认按钮
+ * 在页面刷新 / 会话切换后仍能恢复渲染。
+ */
+export function normalizeSuggestedActions(value) {
+  if (!Array.isArray(value)) return undefined
+  const actions = value
+    .filter((action) => action && typeof action === 'object' && (action.actionType || action.label))
+    .map((action) => ({
+      id: action.id || action.actionId || action.actionType,
+      label: action.label || action.actionType,
+      actionType: action.actionType,
+      requiresConfirm: action.requiresConfirm === true,
+      ...(action.payload && typeof action.payload === 'object' ? { payload: action.payload } : {}),
+    }))
+  return actions.length ? actions : undefined
+}
+
 export function mapSessionMessages(session) {
   if (!Array.isArray(session?.messages)) return []
   const attachmentsById = new Map((Array.isArray(session.attachments) ? session.attachments : [])
@@ -57,6 +76,8 @@ export function mapSessionMessages(session) {
       const metadata = pickObject(message.metadata)
       const formBlock = pickObject(metadata.formBlock)
       const knowledgeTool = normalizeKnowledgeTool(metadata.knowledgeTool)
+      const suggestedActions = normalizeSuggestedActions(metadata.suggestedActions)
+      const intent = typeof metadata.intent === 'string' && metadata.intent ? metadata.intent : undefined
       return {
         id: message.messageId || `${session.sessionId}-${index}`,
         role: message.role,
@@ -65,6 +86,8 @@ export function mapSessionMessages(session) {
         artifacts,
         formBlock: formBlock.blockId ? formBlock : undefined,
         knowledgeTool,
+        suggestedActions,
+        intent,
       }
     })
     .filter((message) => message.text)
@@ -103,8 +126,13 @@ export function sameMessageList(left, right) {
     message.file?.parsedSummary === right[index]?.file?.parsedSummary &&
     message.formBlock?.blockId === right[index]?.formBlock?.blockId &&
     message.knowledgeTool?.contextRef === right[index]?.knowledgeTool?.contextRef &&
+    suggestedActionKey(message) === suggestedActionKey(right[index]) &&
     (message.artifacts || []).map((artifact) => artifact.artifactId).join(',') === (right[index]?.artifacts || []).map((artifact) => artifact.artifactId).join(',')
   ))
+}
+
+function suggestedActionKey(message) {
+  return (message?.suggestedActions || []).map((action) => action.id || action.actionType).join(',')
 }
 
 export function withCurrentUserFile(sessionMessages, userMessage) {

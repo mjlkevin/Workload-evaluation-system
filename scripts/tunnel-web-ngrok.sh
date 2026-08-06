@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ngrok → 本机 Next（默认 3001）。先 dev:web，再 npm run tunnel:web:ngrok
+# ngrok → 本机 Vite Dev Server（默认 3002）。先 dev:web，再 npm run tunnel:web:ngrok
 #
 # 安装与 token 同 scripts/tunnel-api-ngrok.sh
-PORT="${WEB_PORT:-3001}"
+PORT="${WEB_PORT:-3002}"
 
 if ! command -v ngrok >/dev/null 2>&1; then
   echo "未找到 ngrok。安装与 token 见 scripts/tunnel-api-ngrok.sh"

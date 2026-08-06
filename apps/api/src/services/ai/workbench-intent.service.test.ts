@@ -63,6 +63,24 @@ test("routes pending WES action questions to data query", () => {
   assert.equal(result.routingRule, "wes_data_keywords");
 });
 
+// 查询句式回归：显式查询动词 / 疑问句式不得落入兜底 domain_qa 或被误判为写动作
+test("routes '查询我建立的项目' to wes_data_query", () => {
+  const result = routeWorkbenchIntent({ message: "查询我建立的项目", hasAttachment: false, hasLatestV1Artifact: false });
+  assert.equal(result.intent, "wes_data_query");
+  assert.equal(result.routingRule, "wes_data_keywords");
+});
+
+test("routes interrogative '我创建了什么项目' to wes_data_query instead of write_action", () => {
+  const result = routeWorkbenchIntent({ message: "我创建了什么项目", hasAttachment: false, hasLatestV1Artifact: false });
+  assert.equal(result.intent, "wes_data_query");
+  assert.equal(result.routingRule, "wes_data_keywords");
+});
+
+test("routes '我建了哪些项目' to wes_data_query", () => {
+  const result = routeWorkbenchIntent({ message: "我建了哪些项目", hasAttachment: false, hasLatestV1Artifact: false });
+  assert.equal(result.intent, "wes_data_query");
+});
+
 test("routes product knowledge questions to knowledge query", () => {
   const result = routeWorkbenchIntent({ message: "智能会计平台是什么，可以支持哪些模块？", hasAttachment: false, hasLatestV1Artifact: false });
   assert.equal(result.intent, "knowledge_query");

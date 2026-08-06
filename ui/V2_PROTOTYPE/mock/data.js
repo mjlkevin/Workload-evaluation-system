@@ -1,6 +1,6 @@
 /**
  * V2_PROTOTYPE mock data
- * 字段对齐 apps/api/src/types + ui/V0_SAAS/lib/workload-types.ts
+ * 字段对齐 apps/api/src/types
  * 状态覆盖： drafting / reviewed / 评审中 / DSL 违反 / 系统账号
  */
 // FROZEN @ 2026-05-09 W3 done. 后续 3 路并行 agent 只读不写。

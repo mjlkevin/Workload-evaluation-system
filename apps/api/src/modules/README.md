@@ -8,7 +8,7 @@
 - 先迁移高变更域（auth / versions / ai），再迁移核心评估域。
 - 每个域迁移后必须通过契约回归。
 
-## 当前进度 — 全部 18 个领域已完成迁移
+## 当前进度 — 全部 21 个领域已完成迁移
 
 - [x] `auth` 已迁移到 `modules/auth`（阶段3：controller/usecase/repository 已拆分）。
 - [x] `versions` 已迁移到 `modules/versions`（阶段3：controller/usecase/repository 已拆分）。
@@ -28,8 +28,11 @@
 - [x] `pm-workbench` 已迁移到 `modules/pm-workbench`（阶段3：controller/usecase/repository 已拆分）。
 - [x] `presales` 已迁移到 `modules/presales`（阶段3：controller/usecase/repository 已拆分）。
 - [x] `harness` 已新增到 `modules/harness`（WES Harness Phase 1A；controller/usecase/repository 已拆分，PostgreSQL-backed 新业务域）。
+- [x] `ai-sessions` 已迁移到 `modules/ai-sessions`（AI 会话域：controller/usecase/repository 已拆分）。
+- [x] `project-evaluations` 已迁移到 `modules/project-evaluations`（项目评估域：controller/usecase/repository 已拆分）。
+- [x] `trace` 已迁移到 `modules/trace`（Trace 观测域：controller/usecase/repository 已拆分）。
 
-全部 18/18 领域已完成迁移（100%）。
+全部 21/21 领域已完成迁移（100%）。
 
 ## 后续建议结构
 

@@ -15,18 +15,39 @@
       <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
-        <a href="roadmap.html">路标管理</a>
-        <a class="active" href="design.html">设计说明</a>
-        <a href="runtime.html">AI 任务执行</a>
-        <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试与验收</a>
-        <a href="monitoring.html">监控与审计</a>
-        <a href="risks.html">风险与决策</a>
-        <a href="changes.html">变更记录</a>
-        <a href="sources.html">信息来源</a>
-        <a href="collaboration-protocol.html">多 AI 协作</a>
-        <a href="branches.html">开发分支</a>
-        <a href="requirements.html">需求池</a>
+        <div class="nav-group has-active">
+          <button type="button" class="nav-group-btn" aria-expanded="false">计划与设计<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="roadmap.html">路标管理</a>
+          <a class="active" href="design.html">设计说明</a>
+          <a href="plan.html">计划与进度</a>
+          <a href="requirements.html">需求池</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">质量与监控<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="testing.html">测试与验收</a>
+          <a href="monitoring.html">监控与审计</a>
+          <a href="risks.html">风险与决策</a>
+          <a href="changes.html">变更记录</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">AI 与协作<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="runtime.html">AI 任务执行</a>
+          <a href="collaboration-protocol.html">多 AI 协作</a>
+          <a href="branches.html">开发分支</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="sources.html">信息来源</a>
+          <a href="github-radar.html">开源工具雷达</a>
+          </div>
+        </div>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
       <span class="pill brand">产品与技术方案</span>
@@ -227,7 +248,7 @@
         <tr><th>对象</th><th>创建时机</th><th>状态</th><th>后续动作</th></tr>
         <tr><td>项目评估记录草稿</td><td>v2 报告上确认 <code class="inline">enter_formal_estimation</code></td><td><span class="status warn"><span class="dot"></span>draft</span></td><td>传统工作台人工查看、编辑、确认</td></tr>
         <tr><td>实施评估版本草稿</td><td>同一次确认动作内生成</td><td><span class="status warn"><span class="dot"></span>draft_from_ai</span></td><td>人工确认后回写 Harness，再按传统流程补齐参数、检入、升版或发布</td></tr>
-        <tr><td>正式需求/正式评估</td><td>不由 Phase 1D 自动创建</td><td><span class="status todo"><span class="dot"></span>manual</span></td><td>保留传统人工确认链路</td></tr>
+        <tr><td>正式需求/正式评估</td><td>不由 阶段 1D（Phase 1D） 自动创建</td><td><span class="status todo"><span class="dot"></span>manual</span></td><td>保留传统人工确认链路</td></tr>
       </table>
     </section>
 
@@ -310,5 +331,6 @@
       <a href="index.html">返回总览</a> · 设计说明 · WES 项目管理 · 2026-08-02
     </footer>
   </main>
+  <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

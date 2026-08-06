@@ -246,7 +246,7 @@ export default function AgentManagement() {
       {tab === 'scenario' && (
         <div>
           {/* 统计概览 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
             {[
               { label: '总场景数', value: stats.total, color: 'var(--ink)' },
               { label: '已实现', value: stats.done, color: 'var(--ok)' },
@@ -254,7 +254,7 @@ export default function AgentManagement() {
               { label: '待强化', value: stats.rework, color: '#dc2626' },
             ].map((s) => (
               <div key={s.label} style={{ background: 'var(--bg-2)', borderRadius: 10, padding: '14px 16px' }}>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>{s.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>{s.label}</div>
                 <div style={{ fontSize: 28, fontWeight: 700, color: s.color }}>{s.value}</div>
               </div>
             ))}
@@ -262,11 +262,12 @@ export default function AgentManagement() {
 
           {/* 风险梯度条 */}
           <div style={{ marginBottom: 20, padding: '12px 16px', background: 'var(--bg-2)', borderRadius: 10 }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 8, fontWeight: 600 }}>自动化风险梯度</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8, fontWeight: 600 }}>自动化风险梯度</div>
             <div style={{ display: 'flex', gap: 4, height: 8, borderRadius: 4, overflow: 'hidden' }}>
               {SCENARIO_CATEGORIES.map((cat) => (
                 <div
                   key={cat.id}
+                  title={`${cat.label} · ${cat.riskLevel}`}
                   style={{
                     flex: 1,
                     background: cat.riskBg,
@@ -277,9 +278,9 @@ export default function AgentManagement() {
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-              <span style={{ fontSize: 10, color: 'var(--ok)' }}>低风险</span>
-              <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>自动化风险逐步升高 →</span>
-              <span style={{ fontSize: 10, color: '#dc2626' }}>高风险</span>
+              <span style={{ fontSize: 11, color: 'var(--ok)' }}>低风险</span>
+              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>自动化风险逐步升高 →</span>
+              <span style={{ fontSize: 11, color: 'var(--err)' }}>高风险</span>
             </div>
           </div>
 
@@ -305,7 +306,11 @@ export default function AgentManagement() {
                 {/* 分类头部 */}
                 <button
                   type="button"
+                  aria-expanded={isExpanded}
+                  aria-controls={`agent-scenario-panel-${cat.id}`}
                   onClick={() => setExpandedCategory(isExpanded ? null : cat.id)}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -316,6 +321,7 @@ export default function AgentManagement() {
                     border: 'none',
                     cursor: 'pointer',
                     textAlign: 'left',
+                    transition: 'background .15s',
                   }}
                 >
                   <span style={{
@@ -333,10 +339,10 @@ export default function AgentManagement() {
                     {cat.id}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 14 }}>{cat.label}</span>
                       <span style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         padding: '2px 8px',
                         borderRadius: 10,
                         background: cat.riskBg,
@@ -345,9 +351,9 @@ export default function AgentManagement() {
                       }}>
                         {cat.riskLevel}
                       </span>
-                      <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{cat.description}</span>
+                      <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{cat.description}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
                       {catDone}/{catTotal} 已实现 · {progress}%
                     </div>
                   </div>
@@ -360,8 +366,8 @@ export default function AgentManagement() {
 
                 {/* 展开的场景列表 */}
                 {isExpanded && (
-                  <div style={{ padding: '0 16px 14px' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <div id={`agent-scenario-panel-${cat.id}`} style={{ padding: '0 16px 14px', overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 640 }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid var(--line)' }}>
                           <th style={{ textAlign: 'left', padding: '8px 8px', color: 'var(--ink-3)', fontWeight: 600, width: 160 }}>场景</th>
@@ -410,7 +416,7 @@ export default function AgentManagement() {
           {/* 改进建议 */}
           <div style={{ marginTop: 20, padding: 16, background: 'var(--bg-2)', borderRadius: 12, border: '1px solid var(--line)' }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>未完善场景汇总与改进方向</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
               {[
                 { title: 'Category 3 · 7 个模块查询未接入', desc: 'change-management、sales-briefing、dev-assessment、collab、wbs、templates、rules 模块已有后端实现，但尚未封装为 Agent Tools。', tag: '待实现', tagColor: 'var(--warn)' },
                 { title: 'Category 4 · 3 个写动作未接入', desc: '导出操作、变更管理提交、团队邀请/权限变更已有后端 API，但未在 Agent 层提供确认式交互入口。', tag: '待实现', tagColor: 'var(--warn)' },
@@ -444,7 +450,7 @@ export default function AgentManagement() {
           </div>
 
           {/* 四角色卡片 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 20 }}>
             {ROLE_BOUNDARIES.map((r) => (
               <div
                 key={r.role}
@@ -484,12 +490,12 @@ export default function AgentManagement() {
                     </span>
                   </div>
                 </div>
-                <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+                <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.7 }}>
                   {r.details.map((d, idx) => (
                     <li key={idx}>{d}</li>
                   ))}
                 </ul>
-                <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono, monospace)' }}>
+                <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono, monospace)' }}>
                    {r.codeRef}
                 </div>
               </div>
@@ -557,7 +563,8 @@ export default function AgentManagement() {
           {/* 安全规则清单 */}
           <div style={{ padding: 16, background: 'var(--bg-2)', borderRadius: 12, border: '1px solid var(--line)' }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>安全规则执行清单</div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 560 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--line)' }}>
                   <th style={{ textAlign: 'left', padding: '8px 8px', color: 'var(--ink-3)', fontWeight: 600 }}>安全规则</th>
@@ -593,6 +600,7 @@ export default function AgentManagement() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

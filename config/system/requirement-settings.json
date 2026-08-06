@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "draft": {
     "kimiEvaluation": {
       "enabled": true,
@@ -34,13 +34,13 @@
       "includeAssumptions": true
     },
     "kimiCredentials": {
-      "apiKey": ""
+      "apiKey": "sk-QCaRu2uyRoxzJXZCZVQRWAyigf7lAUpgWO6tLMcg49K7uKHO"
     }
   },
   "active": {
     "kimiEvaluation": {
       "enabled": true,
-      "model": "kimi-k2.5",
+      "model": "kimi-k3",
       "temperature": 0.3,
       "maxTokens": 4000,
       "timeoutMs": 120000,
@@ -63,7 +63,7 @@
     },
     "kimiGeneration": {
       "enabled": true,
-      "model": "kimi-k2.5",
+      "model": "kimi-k3",
       "temperature": 0.5,
       "maxTokens": 6000,
       "outputStyle": "balanced",
@@ -71,9 +71,9 @@
       "includeAssumptions": true
     },
     "kimiCredentials": {
-      "apiKey": ""
+      "apiKey": "sk-QCaRu2uyRoxzJXZCZVQRWAyigf7lAUpgWO6tLMcg49K7uKHO"
     }
   },
-  "updatedAt": "2026-08-02T09:40:01.894Z",
-  "effectiveAt": "2026-04-18T15:35:32.744Z"
+  "updatedAt": "2026-08-05T16:04:33.334Z",
+  "effectiveAt": "2026-08-05T16:04:33.334Z"
 }

@@ -15,18 +15,39 @@
       <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
-        <a href="roadmap.html">路标管理</a>
-        <a href="design.html">设计说明</a>
-        <a href="runtime.html">AI 任务执行</a>
-        <a href="plan.html">计划与进度</a>
-        <a class="active" href="testing.html">测试与验收</a>
-        <a href="monitoring.html">监控与审计</a>
-        <a href="risks.html">风险与决策</a>
-        <a href="changes.html">变更记录</a>
-        <a href="sources.html">信息来源</a>
-        <a href="collaboration-protocol.html">多 AI 协作</a>
-        <a href="branches.html">开发分支</a>
-        <a href="requirements.html">需求池</a>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">计划与设计<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="roadmap.html">路标管理</a>
+          <a href="design.html">设计说明</a>
+          <a href="plan.html">计划与进度</a>
+          <a href="requirements.html">需求池</a>
+          </div>
+        </div>
+        <div class="nav-group has-active">
+          <button type="button" class="nav-group-btn" aria-expanded="false">质量与监控<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a class="active" href="testing.html">测试与验收</a>
+          <a href="monitoring.html">监控与审计</a>
+          <a href="risks.html">风险与决策</a>
+          <a href="changes.html">变更记录</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">AI 与协作<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="runtime.html">AI 任务执行</a>
+          <a href="collaboration-protocol.html">多 AI 协作</a>
+          <a href="branches.html">开发分支</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="sources.html">信息来源</a>
+          <a href="github-radar.html">开源工具雷达</a>
+          </div>
+        </div>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
       <span class="pill brand">1H-C 阶段验收计划</span>
@@ -58,10 +79,10 @@
       <ol>
         <li><b>§1</b> 测试策略</li>
         <li><b>§2</b> 测试任务台账</li>
-        <li><b>§3</b> Phase 1F 扩展用例</li>
-        <li><b>§3.5</b> Phase 1G 意图路由用例</li>
-        <li><b>§3.6</b> Phase 1H-A 工作台体验用例</li>
-        <li><b>§3.7</b> Phase 1H-B 引导选项用例</li>
+        <li><b>§3</b> 阶段 1F（Phase 1F） 扩展用例</li>
+        <li><b>§3.5</b> 阶段 1G 意图路由用例</li>
+        <li><b>§3.6</b> 阶段 1H-A 工作台体验用例</li>
+        <li><b>§3.7</b> 阶段 1H-B 引导选项用例</li>
         <li><b>§3.8</b> RP-013 通用交互用例</li>
         <li><b>§3.9</b> RP-018 / RP-036 知识库工具与配置反馈用例</li>
         <li><b>§3.10</b> RP-005 产物工作区时间线用例</li>
@@ -225,10 +246,10 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03</div>
-      <h2>Phase 1F 扩展用例</h2>
-      <p class="lead">Phase 1F 已实现人工确认回写链路，以下用例进入人工验收队列。当前状态是“待执行”，不计入 1E 已建立的 12 条人工测试结果。</p>
+      <h2>阶段 1F 扩展用例</h2>
+      <p class="lead">阶段 1F 已实现人工确认回写链路，以下用例进入人工验收队列。当前状态是“待执行”，不计入 1E 已建立的 12 条人工测试结果。</p>
       <table>
         <tr><th>ID</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>反馈记录</th></tr>
         <tr>
@@ -270,10 +291,10 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03.5</div>
-      <h2>Phase 1G 意图路由用例</h2>
-      <p class="lead">Phase 1G 已实现 AI 工作台意图路由与任务运行时升级，以下用例进入人工验收队列。</p>
+      <h2>阶段 1G 意图路由用例</h2>
+      <p class="lead">阶段 1G 已实现 AI 工作台意图路由与任务运行时升级，以下用例进入人工验收队列。</p>
       <table>
         <tr><th>ID</th><th>场景</th><th>优先级</th><th>输入材料</th><th>期望结果</th><th>状态</th><th>证据</th></tr>
         <tr>
@@ -351,10 +372,10 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03.6</div>
-      <h2>Phase 1H-A 工作台体验用例</h2>
-      <p class="lead">Phase 1H-A 已从需求池提取 RP-011 / RP-014 / RP-015 / RP-016 / RP-017。以下用例用于实现后人工验收；当前只登记计划，不声明通过。</p>
+      <h2>阶段 1H-A 工作台体验用例</h2>
+      <p class="lead">阶段 1H-A 已从需求池提取 RP-011 / RP-014 / RP-015 / RP-016 / RP-017。以下用例用于实现后人工验收；当前只登记计划，不声明通过。</p>
       <table>
         <tr><th>ID</th><th>关联需求</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>证据</th></tr>
         <tr>
@@ -410,19 +431,19 @@
         <tr>
           <td class="mono">MT-1H-A-006</td>
           <td class="mono">回归</td>
-          <td>Phase 1G 意图路由不回退</td>
+          <td>阶段 1G 意图路由不回退</td>
           <td><span class="status warn"><span class="dot"></span>P1</span></td>
           <td>执行一条 v1 后普通追问、一条明确报告生成请求和一条结构化补充生成 v2。</td>
-          <td>普通追问不生成 v2；明确报告请求和结构化补充仍按 Phase 1G 口径进入对应链路。</td>
+          <td>普通追问不生成 v2；明确报告请求和结构化补充仍按 阶段 1G 口径进入对应链路。</td>
           <td><span class="status todo"><span class="dot"></span>待执行</span></td>
           <td>执行人 / 日期 / 结果 / 证据待填。</td>
         </tr>
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03.7</div>
-      <h2>Phase 1H-B 引导选项用例</h2>
+      <h2>阶段 1H-B 引导选项用例</h2>
       <p class="lead">RP-020 已完成自动化覆盖；人工测试用于验证真实 AI 回复中的引导选项是否足够明显、不会误导用户，并确认普通 Markdown 编号列表不会被错误转成按钮。</p>
       <table>
         <tr><th>ID</th><th>关联需求</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>证据</th></tr>
@@ -439,7 +460,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03.8</div>
       <h2>RP-013 通用交互用例</h2>
       <p class="lead">RP-013 当前已完成后端 formBlock 协议、session metadata 批次与前端 InteractiveFormCard 接入。以下用例用于真实 AI 输出场景人工验收；自动化通过不替代人工结果。</p>
@@ -458,7 +479,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03.9</div>
       <h2>RP-018 / RP-036 知识库工具与系统配置反馈用例</h2>
       <p class="lead">RP-018 当前已完成知识库工具能力自动化验证；RP-036 记录真实配置验收前置链路中的鉴权反馈缺陷。缺少有效登录态或 ZHIPU 配置时必须显示明确原因，不能出现保存假成功、按钮静默无响应或伪装为知识库命中。</p>
@@ -487,7 +508,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03.10</div>
       <h2>RP-005 产物工作区时间线用例</h2>
       <p class="lead">RP-005 第一批已把 AI 工作台右侧 ArtifactPanel 从分散卡片升级为“来源 / 执行 / 产物 / 交付”的只读运行时间线。以下用例用于人工确认真实会话中的信息组织是否清晰，不替代后续 Harness run 级 evidence/modelRun/toolEvent 追溯。</p>
@@ -506,7 +527,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03.11</div>
       <h2>RP-002 附件问答轻量审计用例</h2>
       <p class="lead">RP-002 第一批已让普通附件问答返回并持久化 <code class="inline">trace.modelRun</code> 轻量摘要。以下用例用于人工确认真实附件问答可追溯，但不会被误认为创建了 Harness Run。</p>
@@ -525,7 +546,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03.12</div>
       <h2>RP-007 Harness Regression 评分规则</h2>
       <p class="lead">RP-007 第一批为后续固定样本回放奠定可测试基础：本批只覆盖样本格式、默认样本和评分规则，不新增人工测试任务、不新增路由或数据库写入。</p>
@@ -542,7 +563,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 03.13</div>
       <h2>RP-032 工作流模板可达性用例</h2>
       <p class="lead">RP-032 第一批已由 Qoder 回填并经 Codex 复核自动化通过。以下人工用例只验证真实浏览器中的视觉与可达性表现，不把自动化结果等同于人工通过。</p>
@@ -561,7 +582,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="模板明细">
       <div class="h-num">Section 04</div>
       <h2>结果反馈模板</h2>
       <div class="grid-2">
@@ -602,7 +623,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="分级标准">
       <div class="h-num">Section 05</div>
       <h2>缺陷分级</h2>
       <table>
@@ -625,7 +646,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="标准明细">
       <div class="h-num">Section 06</div>
       <h2>关闭标准</h2>
       <div class="callout warn">
@@ -638,7 +659,7 @@
       </div>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="用例明细">
       <div class="h-num">Section 07</div>
       <h2>RP-024 Napkin API Smoke Test</h2>
       <p class="lead">RP-024 当前尚未进入 WES 代码实现。本节只记录外部 Napkin API 最小可用性验证，不代表 WES 已完成 Napkin 集成。</p>
@@ -654,7 +675,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="自动化明细">
       <div class="h-num">Section 08</div>
       <h2>自动化基线</h2>
       <p class="lead">人工测试建立在已通过的自动化基线之上。以下命令不是人工验收的替代品，而是人工测试前应保持绿色的工程底座。</p>
@@ -695,7 +716,7 @@
         <tr data-board-event-id="BE-2026-07-25-worktree-convergence:testing:4"><td class="mono">npm run test:agent -w apps/api</td><td><span class="status done"><span class="dot"></span>pass 26/26</span></td><td>2026-07-25：Provider 调用方取消信号与既有工具调用回归通过。</td></tr>
         <tr data-board-event-id="BE-2026-07-25-worktree-convergence:testing:5"><td class="mono">node --test scripts/board-event.test.js scripts/board-work-items.test.js</td><td><span class="status done"><span class="dot"></span>pass 12/12</span></td><td>2026-07-25：看板事件和 Issue-first 工作项治理通过。</td></tr>
         <tr data-board-event-id="BE-2026-07-25-worktree-convergence:testing:6"><td class="mono">npm run build:api &amp;&amp; npm run build:web</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-07-25：API 与 Web 生产构建通过；Web 仅保留既有 chunk size warning。</td></tr>
-        <tr><td class="mono">RP-031 RAG 生产化分支 Codex Gate</td><td><span class="status warn"><span class="dot"></span>旧基线通过 / 新能力未覆盖 / Gate 拒收</span></td><td>2026-07-20 fresh 复跑 <code class="inline">npx tsc --noEmit -p apps/api/tsconfig.json</code>、build:api、build:web、modules 142/142、AI 190/190、Web 96/96、integration 1/1 均通过；但 <code class="inline">6e88ff4..57f1205</code> 没有新增任何 test/spec 文件，新增 Provider、缓存、Pipeline、韧性、评测、路由、监控均无生产接线与聚焦故障测试，不能据此证明 Gate 0→Phase 3 完成。</td></tr>
+        <tr><td class="mono">RP-031 RAG 生产化分支 Codex 关卡（Gate）</td><td><span class="status warn"><span class="dot"></span>旧基线通过 / 新能力未覆盖 / 关卡 拒收</span></td><td>2026-07-20 fresh 复跑 <code class="inline">npx tsc --noEmit -p apps/api/tsconfig.json</code>、build:api、build:web、modules 142/142、AI 190/190、Web 96/96、integration 1/1 均通过；但 <code class="inline">6e88ff4..57f1205</code> 没有新增任何 test/spec 文件，新增 Provider、缓存、Pipeline、韧性、评测、路由、监控均无生产接线与聚焦故障测试，不能据此证明 关卡 0→Phase 3 完成。</td></tr>
         <tr><td class="mono">Codex 复核 · Qoder RP-027~033 集成验证矩阵</td><td><span class="status done"><span class="dot"></span>全量通过</span></td><td>2026-06-29：<code class="inline">chat.service.test.ts</code> 15/15、<code class="inline">trace.test.ts</code> 25/25、RAG/knowledge focused 19/19、Provider/Kimi ping focused 12/12、<code class="inline">build:api</code> pass、<code class="inline">test:modules</code> 142/142、<code class="inline">test:ai</code> 190/190、<code class="inline">test:agent</code> 25/25、<code class="inline">test:harness</code> 70/70、V2 96/96、<code class="inline">build:web</code> pass。Codex 同步补 RP-029 知识库 fallback 流式最终内容修复，确保 session/done 内容以 dispatch answer 为准。</td></tr>
         <tr><td class="mono">npm run test:harness -w apps/api</td><td><span class="status done"><span class="dot"></span>70 pass</span></td><td>Harness 状态机、confirm、幂等、传统草稿追溯、人工确认回写、并发确认锁、人工测试结果接口，以及 RP-007 regression sample schema 与 requirement_match_v1 评分规则。</td></tr>
         <tr><td class="mono">npm run test:modules</td><td><span class="status done"><span class="dot"></span>142 pass</span></td><td>后端模块级回归，含 RP-013 formBlock、RP-018 knowledge service、knowledge_query 意图路由、RP-029 流式最终内容、RP-030 trace、RP-031 RAG baseline、dispatch trace、homeWorkbenchChat 响应与 session metadata，以及 RP-004 WES 数据查询 owner-scoped 状态汇总、RP-002 附件问答 trace.modelRun。</td></tr>
@@ -722,6 +743,8 @@
         <tr><td class="mono">RP-031 RAG duplicate retrieval checks</td><td><span class="status done"><span class="dot"></span>通过 / 真实配置待验收</span></td><td>2026-06-28：复核重复检索修复，<code class="inline">rag-baseline-runner.test.ts</code> 11/11 pass，覆盖 2 样本只调用 2 次 queryFn、3 样本只调用 3 次 queryFn、retrieveCallCount=0；<code class="inline">knowledge-tool.service.test.ts</code> 8/8 pass，覆盖 trace.chunks 与 answer_failed 降级。随后清理非 RAG 构建阻断与工作台测试基线：<code class="inline">build:api</code> pass，<code class="inline">test:modules</code> 134/134 pass，<code class="inline">test:ai</code> 190/190 pass。</td></tr>
         <tr><td class="mono">RP-033 clean branch Codex checks</td><td><span class="status done"><span class="dot"></span>通过 / 待提交集成</span></td><td>2026-06-28：复核 <code class="inline">.worktrees/rp-033-clean</code> / <code class="inline">qoder/rp-033-clean</code>，diff scope 仅 3 文件且 <code class="inline">git diff --check</code> 通过；<code class="inline">npm run test --prefix ui/V2_PROTOTYPE -- HomeWorkspace.test.jsx</code> 25/25 pass；<code class="inline">npm run test --prefix ui/V2_PROTOTYPE</code> 65/65 pass；<code class="inline">npm run build:web</code> pass。注意：patch 当前未提交。</td></tr>
         <tr><td class="mono">Qoder R8 RP-029/RP-030 Codex rework checks</td><td><span class="status done"><span class="dot"></span>Codex 修复通过 / 待集成</span></td><td>2026-06-28：Codex 在 <code class="inline">codex/rp-029-030-rework-fixes</code> 修复 R8 阻断并复跑验证：<code class="inline">npm run build -w apps/api</code> pass；<code class="inline">npm run test:modules -w apps/api</code> 137/137 pass；<code class="inline">npm run test:ai -w apps/api</code> 189/189 pass；<code class="inline">npm run test:agent -w apps/api</code> 21/21 pass；<code class="inline">npm run test:harness -w apps/api</code> 62/62 pass。已移除提交中的 <code class="inline">trace-store.json</code> 运行态数据，并补测试 store 隔离、流式成功/失败/abort trace 覆盖。</td></tr>
+        <tr data-board-event-id="BE-2026-08-06-o4-regression-baseline"><td class="mono">O4 handler 化重构：意图路由快照回归基线入库</td><td><span class="status done"><span class="dot"></span>通过 / 项已关闭（冒烟 8 样本）</span></td><td>2026-08-06：O4 重构前先落 18 条意图路由 + 闸门快照（workbench-routing.snapshot.test.ts，7 类意图全覆盖 + 文件上传不触发工作流守护 + O10 Batch A 四条行为锁定 + isExplicitReportRequest 闸门 2 条）与 8 条 handler 直接单测（handlers/handlers.unit.test.ts），均挂入 test:ai。重构后独立复跑全绿：test:ai 237/237、test:modules 249/249、build:api pass；buildCapabilityResponse 搬迁前后逐字节一致。快照集从此作为意图路由行为的常驻回归基线，后续任何 dispatch/handler 改动必须先过此集。同日用户实测冒烟 8 样本通过：你好/你能做什么静态秒回、项目查询带跳转按钮、创建项目先确认、报告生成只建议、附件提问不启动工作流、知识库问答、O10-A 自然回复不回归、写诗礼貌拒绝。O4 关闭，Sprint 2 收官。</td></tr>
+        <tr data-board-event-id="BE-2026-08-06-o10-batch-a-accepted"><td class="mono">O10 Batch A（RP-049 兖底分类采纳收紧）自动化 + 人工验收</td><td><span class="status done"><span class="dot"></span>通过 / 项已关闭</span></td><td>2026-08-06：合入 e20e2c6 后独立复跑 test:ai 211/211（含 4 类采纳用例：capability@0.9 不采纳、unsupported@0.9 采纳、unsupported@0.7 不采纳、wes_data/write@0.9 不采纳）、test:modules 249/249、build:api pass。人工验收 6 样本（发什么文件/特朗普是谁/你能做什么/你好/写诗/创建过哪些项目）用户实测冒烟通过：常规提问回归模型自然回复、超范围礼貌拒绝、问候与能力介绍保持原设计。O10 Batch A 关闭；Batch B/C 待另行批准。</td></tr>
       </table>
     </section>
 
@@ -729,5 +752,6 @@
       <a href="index.html">返回总览</a> · 测试 · WES 项目管理 · 2026-08-03
     </footer>
   </main>
+  <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

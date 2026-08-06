@@ -237,18 +237,39 @@
       <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
-        <a href="roadmap.html">路标管理</a>
-        <a href="design.html">设计说明</a>
-        <a href="runtime.html">AI 任务执行</a>
-        <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试与验收</a>
-        <a href="monitoring.html">监控与审计</a>
-        <a href="risks.html">风险与决策</a>
-        <a href="changes.html">变更记录</a>
-        <a href="sources.html">信息来源</a>
-        <a class="active" href="collaboration-protocol.html">多 AI 协作</a>
-        <a href="branches.html">开发分支</a>
-        <a href="requirements.html">需求池</a>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">计划与设计<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="roadmap.html">路标管理</a>
+          <a href="design.html">设计说明</a>
+          <a href="plan.html">计划与进度</a>
+          <a href="requirements.html">需求池</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">质量与监控<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="testing.html">测试与验收</a>
+          <a href="monitoring.html">监控与审计</a>
+          <a href="risks.html">风险与决策</a>
+          <a href="changes.html">变更记录</a>
+          </div>
+        </div>
+        <div class="nav-group has-active">
+          <button type="button" class="nav-group-btn" aria-expanded="false">AI 与协作<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="runtime.html">AI 任务执行</a>
+          <a class="active" href="collaboration-protocol.html">多 AI 协作</a>
+          <a href="branches.html">开发分支</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="sources.html">信息来源</a>
+          <a href="github-radar.html">开源工具雷达</a>
+          </div>
+        </div>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
       <span class="pill brand">本地多 AI 协作规则</span>
@@ -321,7 +342,7 @@
           <div class="node strong">
             <span class="badge filled">USER</span>
             <h3>任务意图与验收权</h3>
-            <p>给出需求、优先级、Loop 指令或单条任务；决定最终是否集成、是否标记已交付。</p>
+            <p>给出需求、优先级、循环（Loop） 指令或单条任务；决定最终是否集成、是否标记已交付。</p>
             <span class="mono-line">authority: final acceptance</span>
           </div>
           <div class="connector"><span>1</span></div>
@@ -429,22 +450,22 @@
           <td>Kevin / 用户</td>
           <td><span class="status done"><span class="dot"></span>active</span></td>
           <td>Owner、优先级设定、用户级干预标识、最终验收。</td>
-          <td>决定是否启动 Loop、是否集成、是否标记已交付。</td>
+          <td>决定是否启动 循环、是否集成、是否标记已交付。</td>
           <td>保留最终产品判断和人工验收权。</td>
         </tr>
         <tr>
           <td>Codex</td>
           <td><span class="status done"><span class="dot"></span>active</span></td>
           <td>Reviewer、Fixer、Integrator、Board steward。</td>
-          <td>复核外部 handoff、补最小修复、跑验证、同步总看板；NightOps 中发布任务包并执行 Audit Gate，但不创建需求池实现 Loop。</td>
-          <td>使用 <code class="inline">codex/*</code> 分支；不得还原无关 dirty changes；审计 Gate 不等同于无人值守实现。</td>
+          <td>复核外部 handoff、补最小修复、跑验证、同步总看板；NightOps 中发布任务包并执行 Audit 关卡（Gate），但不创建需求池实现 循环。</td>
+          <td>使用 <code class="inline">codex/*</code> 分支；不得还原无关 dirty changes；审计 关卡 不等同于无人值守实现。</td>
         </tr>
         <tr>
           <td>Qoder1</td>
           <td><span class="status done"><span class="dot"></span>active</span></td>
-          <td>Executor、Loop runner、NightOps primary executor。</td>
+          <td>Executor、循环 runner、NightOps primary executor。</td>
           <td>一任务一 worktree，按 Qoder worktree protocol 实现、测试、回填 handoff；夜间默认承担高吞吐执行。</td>
-          <td>只能把需求推进到“已回填 / 待 Codex 复核”；夜间不得跳过 peer audit 与 Codex Gate。</td>
+          <td>只能把需求推进到“已回填 / 待 Codex 复核”；夜间不得跳过 peer audit 与 Codex 关卡。</td>
         </tr>
         <tr>
           <td>KIMICODE</td>
@@ -478,7 +499,7 @@
           <div class="node strong">
             <span class="badge filled">ACTIVE</span>
             <h3>Qoder1</h3>
-            <p>需求池 Loop 执行代理。产出隔离 worktree、commit 和 handoff。</p>
+            <p>需求池 循环 执行代理。产出隔离 worktree、commit 和 handoff。</p>
             <span class="mono-line">branch: qoder/*</span>
           </div>
           <div class="connector"><span>+</span></div>
@@ -515,7 +536,7 @@
           </ul>
         </div>
         <div class="card">
-          <span class="pill ok">Assignment Gate</span>
+          <span class="pill ok">Assignment 关卡</span>
           <h3>任务分派前置门禁</h3>
           <ul>
             <li>只有 active Agent 可以承接正式任务。</li>
@@ -568,8 +589,8 @@
       <p class="lead">NightOps 是北京时间 00:00-09:30 的夜间协作窗口。Codex 先发布任务包并限定范围，Qoder 实施，KIMICODE 做交叉检查，最后由 Codex 复核。夜间最多推进到“已回填 / 待复核”或“返工完成 / 待复核”，不能自行标记已交付、合并主线，也不能处理需要用户决定的架构事项。共享模板见 <a href="../../../docs/agent-loop/nightops-templates.md">docs/agent-loop/nightops-templates.md</a>。</p>
       <div class="grid-3">
         <div class="card"><span class="pill brand">Commander</span><h3>Codex 发布任务包</h3><p>在固定时间点生成 Night Mission Packet，定义任务、执行者、审计者、allowedPaths、stopConditions、验证命令和 handoff/audit 路径。</p></div>
-        <div class="card"><span class="pill ok">Executor</span><h3>Qoder 主执行</h3><p>读取任务包和上一轮 Codex Gate，按一任务一 worktree 实现、测试并输出 handoff；如存在返工指令，先返工再谈新任务。</p></div>
-        <div class="card"><span class="pill warn">Peer Audit</span><h3>KIMICODE 交叉审计</h3><p>检查范围污染、权限边界、测试缺口、架构风险和 handoff 完整性；必要时只做受控小修，不替代 Codex 最终 Gate。</p></div>
+        <div class="card"><span class="pill ok">Executor</span><h3>Qoder 主执行</h3><p>读取任务包和上一轮 Codex 关卡，按一任务一 worktree 实现、测试并输出 handoff；如存在返工指令，先返工再谈新任务。</p></div>
+        <div class="card"><span class="pill warn">Peer Audit</span><h3>KIMICODE 交叉审计</h3><p>检查范围污染、权限边界、测试缺口、架构风险和 handoff 完整性；必要时只做受控小修，不替代 Codex 最终 关卡。</p></div>
       </div>
       <table>
         <tr><th>时间段（北京时间）</th><th>负责方</th><th>动作</th><th>输出物</th><th>硬限制</th></tr>
@@ -606,14 +627,14 @@
           <td>KIMICODE</td>
           <td>复核返工结果，标注剩余风险和建议结论。</td>
           <td>peer re-audit</td>
-          <td>仍不能替代 Codex Gate。</td>
+          <td>仍不能替代 Codex 关卡。</td>
         </tr>
         <tr>
           <td class="mono">08:00-09:00</td>
           <td>Codex</td>
-          <td>执行 Audit Gate，复核 Qoder + KIMICODE 证据，给出结论。</td>
-          <td>Codex Gate Result</td>
-          <td>审计 Gate 不是需求池实现 Loop，不自动写新需求代码。</td>
+          <td>执行 Audit 关卡，复核 Qoder + KIMICODE 证据，给出结论。</td>
+          <td>Codex 关卡 Result</td>
+          <td>审计 关卡 不是需求池实现 循环，不自动写新需求代码。</td>
         </tr>
         <tr>
           <td class="mono">09:00-09:30</td>
@@ -625,7 +646,7 @@
       </table>
       <div class="diagram-canvas" aria-label="NightOps 三 AI 无人值守闭环">
         <div class="diagram-header">
-          <h2 class="diagram-title">NightOps 3AI Closed Loop</h2>
+          <h2 class="diagram-title">NightOps 3AI Closed 循环</h2>
           <p class="diagram-subtitle">CODEX COMMANDER · QODER EXECUTOR · KIMICODE PEER AUDITOR · USER FINAL ACCEPTANCE</p>
         </div>
         <div class="diagram-row">
@@ -674,12 +695,12 @@
         </div>
       </div>
       <table>
-        <tr><th>Gate 结论</th><th>含义</th><th>Qoder 下一步</th><th>KIMICODE 下一步</th><th>用户是否介入</th></tr>
+        <tr><th>关卡 结论</th><th>含义</th><th>Qoder 下一步</th><th>KIMICODE 下一步</th><th>用户是否介入</th></tr>
         <tr><td class="mono">ACCEPTED_PENDING_USER</td><td>自动化和审计证据足够，但仍待人工验收或集成判断。</td><td>等待，不拿新任务。</td><td>等待。</td><td>是。</td></tr>
         <tr><td class="mono">REWORK_REQUIRED</td><td>方向正确但存在可修复缺口。</td><td>先返工当前任务。</td><td>返工后复核。</td><td>通常否。</td></tr>
         <tr><td class="mono">REJECTED</td><td>越权、污染范围、绕过边界或证据不可用。</td><td>停止沿用结果。</td><td>记录阻断证据。</td><td>视情况。</td></tr>
         <tr><td class="mono">USER_DECISION_REQUIRED</td><td>涉及架构、权限、DB、外部密钥或产品方向。</td><td>停止。</td><td>停止。</td><td>是。</td></tr>
-        <tr><td class="mono">ALLOW_NEXT</td><td>当前任务可封存，允许进入下一条低风险任务。</td><td>下一轮先读 Gate 再执行。</td><td>按任务包审计。</td><td>否，但晨间可覆盖。</td></tr>
+        <tr><td class="mono">ALLOW_NEXT</td><td>当前任务可封存，允许进入下一条低风险任务。</td><td>下一轮先读 关卡 再执行。</td><td>按任务包审计。</td><td>否，但晨间可覆盖。</td></tr>
       </table>
       <div class="callout warn"><div><b>无人值守硬边界</b>NightOps 不允许无人值守合并 main、标记“已交付”、触碰真实 API Key、推进架构变更、执行 DB 迁移、绕过 JWT/owner 隔离/人工确认，也不允许 Qoder 在没有 Codex <code class="inline">allowNextTask=true</code> 的情况下领取新 RP。</div></div>
     </section>
@@ -721,12 +742,12 @@
           <td><span class="status run"><span class="dot"></span>PEER_AUDIT_POSTED</span></td>
           <td>KIMICODE 完成对 Qoder handoff 的交叉审计。</td>
           <td>peer audit、finding、required rework、residual risk。</td>
-          <td>Qoder 返工或进入 Codex Gate。</td>
-          <td>KIMICODE / Codex Gate 复核</td>
+          <td>Qoder 返工或进入 Codex 关卡。</td>
+          <td>KIMICODE / Codex 关卡 复核</td>
         </tr>
         <tr>
           <td><span class="status warn"><span class="dot"></span>CODEX_GATE_POSTED</span></td>
-          <td>Codex 审计 Qoder + KIMICODE 证据后发布 Gate 结论。</td>
+          <td>Codex 审计 Qoder + KIMICODE 证据后发布 关卡 结论。</td>
           <td>verdict、allowNextTask、mustReworkFirst、nextOwner。</td>
           <td>返工、等待用户、或允许下一轮。</td>
           <td>Codex</td>
@@ -755,17 +776,17 @@
         <tr><th>槽位</th><th>能做什么</th><th>不能做什么</th><th>当前承担者</th><th>关键输出</th></tr>
         <tr>
           <td>Owner / Acceptor</td>
-          <td>设定目标、优先级、最终验收口径；决定是否启动 Qoder Loop 或让 Codex 一次性执行。</td>
+          <td>设定目标、优先级、最终验收口径；决定是否启动 Qoder 循环 或让 Codex 一次性执行。</td>
           <td>不需要直接维护内部状态文件。</td>
           <td>用户</td>
           <td>任务目标、验收反馈、是否继续下一项。</td>
         </tr>
         <tr>
           <td>Planner / Commander</td>
-          <td>发布任务包、设置执行/审计角色、限定路径、设置 Gate 结论和下一步。</td>
+          <td>发布任务包、设置执行/审计角色、限定路径、设置 关卡 结论和下一步。</td>
           <td>不得在无人值守窗口自行实现新需求；不得跳过用户最终验收。</td>
           <td>Codex</td>
-          <td>Night Mission Packet、Codex Gate Result、晨间简报。</td>
+          <td>Night Mission Packet、Codex 关卡 Result、晨间简报。</td>
         </tr>
         <tr>
           <td>Executor</td>
@@ -777,14 +798,14 @@
         <tr>
           <td>Peer Auditor</td>
           <td>交叉审计执行结果、验证证据、范围污染、权限和架构边界。</td>
-          <td>不得替代 Codex Gate；不得标记已交付；不得扩大返工范围。</td>
+          <td>不得替代 Codex 关卡；不得标记已交付；不得扩大返工范围。</td>
           <td>KIMICODE pilot；Codex 兜底</td>
           <td>peer audit、finding、返工建议。</td>
         </tr>
         <tr>
           <td>Reviewer / Fixer</td>
           <td>复核 Qoder 交付、跑验证、补最小修复、同步总看板、给出合并建议。</td>
-          <td>不得创建 WES 持续 Loop；不得还原用户或其他工具的无关 dirty changes。</td>
+          <td>不得创建 WES 持续 循环；不得还原用户或其他工具的无关 dirty changes。</td>
           <td>Codex；KIMICODE / Claude Code 候选</td>
           <td>复核结论、修复分支、验证证据、看板同步。</td>
         </tr>
@@ -841,7 +862,7 @@
         <tr><th>队列项</th><th>推荐状态载体</th><th>复核重点</th><th>验收证据</th></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-047-a2-integration-work-order:collaboration">
           <td>RP-047 Durable Multi-Session Runtime</td>
-          <td><code class="inline">qoder/rp-047-a-durable-run-foundation</code> / Gate REJECTED；<code class="inline">qoder/rp-047-a2-durable-run-foundation @ d9790fe</code> / Gate 通过；<code class="inline">RP-047-A2-INT</code> / ASSIGNED_WAITING_QODER_ACK</td>
+          <td><code class="inline">qoder/rp-047-a-durable-run-foundation</code> / 关卡 REJECTED；<code class="inline">qoder/rp-047-a2-durable-run-foundation @ d9790fe</code> / 关卡 通过；<code class="inline">RP-047-A2-INT</code> / ASSIGNED_WAITING_QODER_ACK</td>
           <td>A2-R1 已关闭三个阻断项。用户已授权 Qoder 形成主线集成候选、Codex 负责独立审计；工单固定 <code class="inline">qoder/rp-047-a2-integration</code> 独立 worktree、17 个 Allowed Paths、8 个来源提交和完整验证矩阵。</td>
           <td>Qoder 只能回填“已回填 / 待 Codex 复核”，不得合并主线。<code class="inline">allowNextTask=false</code>、<code class="inline">mainMergeAllowed=false</code>；Codex 审计和主线复验通过前不发布 Batch B。</td>
         </tr>
@@ -876,10 +897,11 @@
           <td>HomeWorkspace focused、V2 全量、build:web、人工低高度视觉验收。</td>
         </tr>
       </table>
-      <div class="callout warn" data-board-event-id="BE-2026-08-02-branch-governance-cleanup:collaboration"><div><b>当前集成原则</b>RP-026、RP-027/028、RP-029/030、RP-032、RP-033 已在业务主线，历史分支不再作为状态载体。RP-031 继续按独立 Phase 0 返工处理；发现范围叠加、存储边界冲突或验证缺口时，回到 Gate，不得扩大 cherry-pick 范围。远端 main 同步和远端分支删除需另行授权。</div></div>
+      <div class="callout warn" data-board-event-id="BE-2026-08-02-branch-governance-cleanup:collaboration"><div><b>当前集成原则</b>RP-026、RP-027/028、RP-029/030、RP-032、RP-033 已在业务主线，历史分支不再作为状态载体。RP-031 继续按独立 Phase 0 返工处理；发现范围叠加、存储边界冲突或验证缺口时，回到 关卡，不得扩大 cherry-pick 范围。远端 main 同步和远端分支删除需另行授权。</div></div>
     </section>
   </main>
 
   <footer>WES 项目管理 · 多 AI 协作规则 · 2026-08-03</footer>
+  <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

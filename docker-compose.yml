@@ -52,9 +52,8 @@ services:
       retries: 3
       start_period: 10s
 
-  # web service 已下线（apps/web W4 Vue 工作台已删除）
-  # 旧前端 ui/V0_SAAS（Next.js）暂用 host 模式启动，未容器化
-  # 新前端待基于 V0_SAAS 重建，详见 docs/TODO_V0_SAAS_FRONTEND.md
+  # web service 已下线（apps/web W4 Vue 工作台已删除；ui/V0_SAAS 旧 Next.js 前端已清理）
+  # 当前 Web 前端为 ui/V2_PROTOTYPE（Vite + React），开发期用 host 模式启动，未容器化
 
 volumes:
   pg_data:

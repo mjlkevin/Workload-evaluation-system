@@ -356,7 +356,7 @@
 /* ── Backlog / Requirements Board ─ */
 .backlog-board {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: start;
   gap: 20px;
   margin: 24px 0;
@@ -404,9 +404,11 @@
   flex-shrink: 0;
 }
 .col-delivered h4 .col-dot { background: var(--ok); }
+.col-delivery h4 .col-dot { background: var(--warn); }
 .col-planning h4 .col-dot { background: var(--accent); }
 .col-paused h4 .col-dot { background: var(--ink-3); }
 .col-delivered { border-top: 3px solid var(--ok); }
+.col-delivery { border-top: 3px solid var(--warn); }
 .col-planning { border-top: 3px solid var(--accent); }
 .col-paused { border-top: 3px solid var(--line-2); }
 .backlog-column .backlog-card:first-of-type { margin-top: 14px; }
@@ -464,6 +466,7 @@
   border-top: 1px solid var(--line);
 }
 .col-delivered .backlog-card { border-left: 3px solid color-mix(in oklab, var(--ok) 40%, var(--line)); }
+.col-delivery .backlog-card { border-left: 3px solid color-mix(in oklab, var(--warn) 40%, var(--line)); }
 .col-planning .backlog-card { border-left: 3px solid color-mix(in oklab, var(--accent) 40%, var(--line)); }
 .col-paused .backlog-card { border-left: 3px solid var(--line-2); }
 .priority-p0 { color: var(--err); background: var(--err-soft); border-color: color-mix(in oklab, var(--err) 35%, var(--line)); }

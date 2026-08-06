@@ -26,6 +26,7 @@ export default function useChatMessages(workbench) {
   const fileInputRef = useRef(null)
   const messagePaneRef = useRef(null)
   const harnessRef = useRef(null)
+  const prevSessionIdRef = useRef('')
 
   function bindHarness(harness) {
     harnessRef.current = harness
@@ -45,6 +46,7 @@ export default function useChatMessages(workbench) {
 
   function resetMessages() {
     setMessages([])
+    prevSessionIdRef.current = ''
   }
 
   useLayoutEffect(() => {
@@ -55,8 +57,17 @@ export default function useChatMessages(workbench) {
 
   useEffect(() => {
     if (sending || !workbench.activeSession) return
+    const currentSessionId = workbench.activeSession?.sessionId || ''
+    const isSessionSwitch = prevSessionIdRef.current !== '' && prevSessionIdRef.current !== currentSessionId
+    prevSessionIdRef.current = currentSessionId
+
     const sessionMessages = mapSessionMessages(workbench.activeSession)
     setMessages((prev) => {
+      // 会话切换时：无条件用目标会话消息替换，不受旧会话 error/loading 阻断
+      if (isSessionSwitch) {
+        return sessionMessages.length > 0 ? sessionMessages : []
+      }
+      // 同一会话内：保留原有守卫逻辑
       if (prev.some((message) => message.loading || message.error || message.action)) return prev
       if (sessionMessages.length === 0 && prev.length > 0) return prev
       const mergedMessages = mergePreservedLocalFileMessages(prev, sessionMessages)

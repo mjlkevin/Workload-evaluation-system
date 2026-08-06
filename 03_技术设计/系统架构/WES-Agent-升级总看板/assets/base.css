@@ -9,7 +9,7 @@
   --surface: #fff;
   --ink: oklch(0.21 0.03 260);
   --ink-2: oklch(0.42 0.02 260);
-  --ink-3: oklch(0.62 0.012 260);
+  --ink-3: oklch(0.55 0.015 260);
   --line: oklch(0.92 0.008 255);
   --line-2: oklch(0.86 0.012 255);
   --brand: oklch(0.42 0.14 262);
@@ -39,10 +39,11 @@ body {
   color: var(--ink);
   background: var(--bg);
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.65;
+  font-size: 15px;
+  line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "ss01", "cv11";
+  text-rendering: optimizeLegibility;
 }
 a { color: var(--brand); text-decoration: none; }
 code, pre { font-family: var(--font-mono); }
@@ -100,7 +101,7 @@ p.lead,
   max-width: 720px;
   margin: 0 0 24px;
   color: var(--ink-2);
-  font-size: 14.5px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.75;
 }
-.sec-head p { margin: 0 auto; font-size: 15px; }
+.sec-head p { margin: 0 auto; font-size: 15.5px; }

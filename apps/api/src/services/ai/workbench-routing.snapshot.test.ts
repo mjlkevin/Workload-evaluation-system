@@ -121,6 +121,16 @@ test("snapshot: 查询自己的项目 → wes_data_query / wes_data_keywords（�
   assert.equal(result.suggestedActions[0]?.actionType, "open_project_list");
 });
 
+test("snapshot: 疑问句“我创建了什么项目”→ wes_data_query，不误判为写动作", async () => {
+  const result = await dispatchHomeWorkbenchTurn(baseInput({
+    message: "我创建了什么项目",
+    modelChat: STATIC_MODEL_CHAT,
+  }));
+  assert.equal(result.intent, "wes_data_query");
+  assert.equal(result.trace.routingRule, "wes_data_keywords");
+  assert.equal(result.suggestedActions[0]?.actionType, "open_project_list");
+});
+
 // ── 3. write-action handler（写动作确认 + stage 校验防护）─────────────────
 
 test("snapshot: 带项目名的创建请求 → write_action_request，仅返回待确认动作", async () => {

@@ -15,18 +15,39 @@
       <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
       <nav class="navlinks" aria-label="主导航">
         <a href="index.html">总览</a>
-        <a href="roadmap.html">路标管理</a>
-        <a href="design.html">设计说明</a>
-        <a href="runtime.html">AI 任务执行</a>
-        <a href="plan.html">计划与进度</a>
-        <a href="testing.html">测试与验收</a>
-        <a href="monitoring.html">监控与审计</a>
-        <a class="active" href="risks.html">风险与决策</a>
-        <a href="changes.html">变更记录</a>
-        <a href="sources.html">信息来源</a>
-        <a href="collaboration-protocol.html">多 AI 协作</a>
-        <a href="branches.html">开发分支</a>
-        <a href="requirements.html">需求池</a>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">计划与设计<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="roadmap.html">路标管理</a>
+          <a href="design.html">设计说明</a>
+          <a href="plan.html">计划与进度</a>
+          <a href="requirements.html">需求池</a>
+          </div>
+        </div>
+        <div class="nav-group has-active">
+          <button type="button" class="nav-group-btn" aria-expanded="false">质量与监控<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="testing.html">测试与验收</a>
+          <a href="monitoring.html">监控与审计</a>
+          <a class="active" href="risks.html">风险与决策</a>
+          <a href="changes.html">变更记录</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">AI 与协作<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="runtime.html">AI 任务执行</a>
+          <a href="collaboration-protocol.html">多 AI 协作</a>
+          <a href="branches.html">开发分支</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="sources.html">信息来源</a>
+          <a href="github-radar.html">开源工具雷达</a>
+          </div>
+        </div>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
       <span class="pill brand">1H-C 阶段风险</span>
@@ -59,8 +80,8 @@
         <li><b>§2</b> 阻断风险处理</li>
         <li><b>§3</b> 架构边界</li>
         <li><b>§4</b> 关键决策</li>
-        <li><b>§5</b> Phase 1E 基线风险</li>
-        <li><b>§6</b> Phase 1F 风险</li>
+        <li><b>§5</b> 阶段 1E（Phase 1E） 基线风险</li>
+        <li><b>§6</b> 阶段 1F 风险</li>
         <li><b>§7</b> 决策触发器</li>
         <li><b>§8</b> 新增风险池</li>
       </ol>
@@ -70,7 +91,7 @@
       <div class="h-num">Section 01</div>
       <h2>风险总览</h2>
       <div class="kpi-row">
-        <div class="kpi"><div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">P0</span><span>阻断风险</span></div><div class="v">0</div><div class="lb">Phase 1D 合并前已处理</div></div>
+        <div class="kpi"><div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">P0</span><span>阻断风险</span></div><div class="v">0</div><div class="lb">阶段 1D 合并前已处理</div></div>
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">跟</span><span>跟踪中风险</span></div><div class="v">17</div><div class="lb">人工验收 / AI 任务边界 / 知识库 / 附件问答 / 内容展示 / 表单与引导选项 / 评分准确性 / 定期任务治理 / 防止编造 / 权限 / 多 AI 集成 / 数据留痕 / 分支与存储边界</div></div>
         <div class="kpi"><div class="top"><span class="ic">边</span><span>必须守住的边界</span></div><div class="v">5</div><div class="lb">权限、流程阶段、结果格式、防止重复、正式写入</div></div>
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>决策</span></div><div class="v">9</div><div class="lb">当前主线决策可追溯</div></div>
@@ -105,7 +126,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="边界明细">
       <div class="h-num">Section 03</div>
       <h2>架构边界</h2>
       <div class="grid-2">
@@ -136,7 +157,7 @@
       </div>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="决策明细">
       <div class="h-num">Section 04</div>
       <h2>关键决策</h2>
       <table>
@@ -145,7 +166,7 @@
         <tr><td>前端主线</td><td><code class="inline">ui/V2_PROTOTYPE</code> 是唯一 Web 主线。</td><td>Agent 工作台和后续体验都在 V2 演进。</td></tr>
         <tr><td>后端主线</td><td><code class="inline">apps/api</code> 是唯一服务入口。</td><td>继续沿 modules/routes 模式扩展。</td></tr>
         <tr><td>Harness 存储</td><td>Harness 作为首个 PostgreSQL-backed 新业务域。</td><td>审计、统计、权限追溯与模型回放需求已触发 DB 迁移条件。</td></tr>
-        <tr><td>Phase 1D confirm</td><td>只创建传统草稿，不创建正式评估。</td><td>保留传统系统人工确认和版本流程。</td></tr>
+        <tr><td>阶段 1D confirm</td><td>只创建传统草稿，不创建正式评估。</td><td>保留传统系统人工确认和版本流程。</td></tr>
         <tr><td>v1 nextActions</td><td>保持 disabled。</td><td>v1 只是初步报告，不能引导正式动作。</td></tr>
         <tr><td>v2 fallback nextActions</td><td>没有真实 nextActions 时按钮 disabled。</td><td>避免用兜底按钮制造不可追溯动作。</td></tr>
         <tr><td>legacy report</td><td>标记为历史产物，非 Harness 生成。</td><td>避免新旧报告混淆。</td></tr>
@@ -157,9 +178,9 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="历史风险明细">
       <div class="h-num">Section 05</div>
-      <h2>Phase 1E 基线风险</h2>
+      <h2>阶段 1E 基线风险</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
         <tr>
@@ -183,9 +204,9 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="历史风险明细">
       <div class="h-num">Section 06</div>
-      <h2>Phase 1F 风险</h2>
+      <h2>阶段 1F 风险</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
         <tr>
@@ -209,7 +230,7 @@
       </table>
     </section>
 
-    <section>
+    <section data-tech-collapse data-tech-label="触发器明细">
       <div class="h-num">Section 07</div>
       <h2>决策触发器</h2>
       <p class="lead">以下条件出现时，应该先更新设计/计划/风险页，再实施对应技术迁移或范围扩大。</p>
@@ -224,6 +245,18 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr>
+          <td>AI 会话删除未检查活跃 Run 状态，可能误删正在执行任务的会话。</td>
+          <td>用户删除会话后，后台 Harness Run 仍在执行，但会话消息和上下文已不可恢复；恢复协调器可能因找不到 session 投影目标而失败，或产生孤儿 Run 记录。</td>
+          <td>RP-047 Batch D 实施前，在 ai-sessions.usecase.ts 补非终态 Run 检查；或作为独立小修提前实施。规范要求：存在 queued/running/recovering/cancelling/waiting 状态时返回 409 SESSION_HAS_ACTIVE_RUN，引导用户先明确停止任务。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待 RP-047 Batch D 或独立小修</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-05-o2-handoff-verified:risks">
+          <td>ajv 依赖版本环境分叉：主 checkout 存在 gitignored 的 <code class="inline">apps/api/node_modules/ajv@8.20.0</code> 支撑编译，而干净环境（如新 worktree）向上解析到根级 <code class="inline">ajv@6.15.0</code>，导致 <code class="inline">ai/contracts/structured-output.ts</code> 报 3 个既有类型错误。</td>
+          <td>新 worktree / 干净 CI 环境上 build:api 失败，与代码质量无关的环境性失败会干扰复核与关卡判断；O2 验证期间靠指向主 checkout 的临时符号链接（gitignored）绕过。</td>
+          <td>已如实登记并在 O2 handoff 中声明；建议把 ajv 版本收敛写入 lockfile 治理（属依赖治理任务，需单独评审后实施）；集成复核时注意 worktree 内临时符号链接的存在；新 worktree 验证遇到同类报错先排查此项再归因代码。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待依赖治理</span></td>
+        </tr>
         <tr>
           <td>CodeGraph 是全局 Codex MCP，宽泛查询、历史目录或不可信仓库可能造成上下文污染，并扩大跨项目与符号链接读取边界。</td>
           <td>错误排序可能把已下线实现当成主线；无差别使用会增加上下文、延迟和供应链暴露，且不能替代测试证明。</td>
@@ -282,7 +315,7 @@
         </tr>
         <tr>
           <td>过早部署独立向量库带来运维复杂度。</td>
-          <td>主线资源被检索基础设施消耗，Phase 1E 草稿闭环被拖慢。</td>
+          <td>主线资源被检索基础设施消耗，阶段 1E 草稿闭环被拖慢。</td>
           <td>向量库后置；先评估 pgvector 或托管方案，embedding 厂商另行确定。</td>
         </tr>
         <tr>
@@ -346,9 +379,9 @@
           <td>RP-013 已规范化 <code class="inline">formBlock</code>：字段类型白名单、字段/选项数量上限、无效协议降级为普通 Markdown，并写入 <code class="inline">metadata.formBlock</code>；前端 <code class="inline">InteractiveFormCard</code> 只生成普通 chat 消息并复用现有发送链路，不直接触发 Harness 写动作、版本升版或正式业务落库。剩余风险为真实模型是否稳定输出合规 formBlock，纳入 MT-1H-B-002 人工验收。</td>
         </tr>
         <tr>
-          <td>需求池 Loop 为追求“全部迭代完毕”而扩大范围、跳过设计或误标已交付。</td>
+          <td>需求池 循环（Loop） 为追求“全部迭代完毕”而扩大范围、跳过设计或误标已交付。</td>
           <td>多个需求可能被混入同一批次，导致回归面过大、验收不可追溯，或在测试/人工验收缺失时错误推进状态。</td>
-          <td>Codex 侧 heartbeat 自动化 <code class="inline">wes-loop</code> 已删除，仓库内 <code class="inline">skills/wes-loop</code> 入口已移除；持续需求池 Loop 后续由 Qoder 创建和执行。Codex 仅在用户明确要求时处理单条需求，不再自动创建下一轮 heartbeat；单条需求仍必须先去重、再设计/实现/测试/看板同步。</td>
+          <td>Codex 侧 heartbeat 自动化 <code class="inline">wes-loop</code> 已删除，仓库内 <code class="inline">skills/wes-loop</code> 入口已移除；持续需求池 循环 后续由 Qoder 创建和执行。Codex 仅在用户明确要求时处理单条需求，不再自动创建下一轮 heartbeat；单条需求仍必须先去重、再设计/实现/测试/看板同步。</td>
         </tr>
         <tr>
           <td>Qoder 回填分支混入既有工作台变更，直接整 commit 合并可能扩大集成范围。</td>
@@ -368,7 +401,7 @@
         <tr>
           <td>外部执行方在验证环境缺失时自行安装或重配本机运行时，会扩大任务权限并让测试结果不可复现。</td>
           <td>RP-047-A 在 Testcontainers 失败后安装 Colima/Lima、修改 Docker DNS/代理并改用长期容器直连；这既违反停止条件，也把机器状态变化混入代码交付。遗留容器持续占用 5433，后续自动清理还可能误删用户仍需的环境。</td>
-          <td>Gate 已拒收 A1。A2 禁止任何 Homebrew、Colima、Docker daemon/context/profile 修改；Docker 或依赖不可用即停止。只允许进程级 socket 环境变量和 Testcontainers 自动清理；现有 Colima 与 <code class="inline">rp047-pg17</code> 仅记录，不由 Codex 自动删除。</td>
+          <td>关卡（Gate） 已拒收 A1。A2 禁止任何 Homebrew、Colima、Docker daemon/context/profile 修改；Docker 或依赖不可用即停止。只允许进程级 socket 环境变量和 Testcontainers 自动清理；现有 Colima 与 <code class="inline">rp047-pg17</code> 仅记录，不由 Codex 自动删除。</td>
         </tr>
         <tr>
           <td>Durable Run 对 JSON 持久载荷只做“非数组对象”判断，会将 Date、Map 或自定义实例误当成普通对象。</td>
@@ -393,7 +426,7 @@
         <tr>
           <td>RP-031 修订版虽已完成 20/20 修复项映射，但仍把需求映射等同于可执行覆盖：智谱原生快照回滚能力未证实，前端回传 requestId 的链路方向错误，Chunk 缺稳定身份/ACL/向量特征，NDCG 缺分级 qrels，在线命中率缺真实标签。</td>
           <td>若直接按修订版施工，可能产生无法兑现的回滚承诺、跨租户缓存/检索泄露、客户端伪造关联 ID、MMR 无可用特征、错误 429 重试放大、统计假阳性和不可验收监控指标；管理员可编辑 API Base URL 还会引入 SSRF 风险。</td>
-          <td>第一批 Gate 0 已按可执行范围完成：官方 URL 白名单、Provider 错误分类、服务端 request ID、逐库 ACL/探针/激活门禁、路由与 Trace 已进入主线。完整 qrels、缓存命名空间、逻辑快照和高级回滚仍按独立后续能力治理，不再被误写为本批已交付。</td>
+          <td>第一批 关卡 0 已按可执行范围完成：官方 URL 白名单、Provider 错误分类、服务端 request ID、逐库 ACL/探针/激活门禁、路由与 Trace 已进入主线。完整 qrels、缓存命名空间、逻辑快照和高级回滚仍按独立后续能力治理，不再被误写为本批已交付。</td>
         </tr>
         <tr>
           <td>RP-031 候选实施分支将大量未接线、未测试模块和敏感配置混合提交，并提前在看板声明完成。</td>
@@ -415,6 +448,11 @@
           <td>用户可能将编造内容当作真实产品知识依据，导致实施规划或工作量评估失真；sessionId <code class="inline">ef70ba00</code> 已出现 Kimi 编造完整文档标题和版本号的案例。</td>
           <td>反幻觉四层防御：(1) <code class="inline">EXPLICIT_KNOWLEDGE_QUERY_PATTERNS</code> 显式知识库查询路由，避免用户明确提到知识库时走通用问答；(2) <code class="inline">knowledge-tool.service</code> 4 处 fallback 文案明确告知无法检索真实文档，不再暗示有真实检索；(3) <code class="inline">workbench-dispatch.service</code> systemPrompt 新增反幻觉约束段落，禁止编造文档名称/版本号/案例/数据；(4) 前端 <code class="inline">KnowledgeTraceChip</code> 区分“知识库参考”“模型通用知识”“知识库未配置”“检索未命中”四种状态。验证：intent focused 26 pass（含 4 条新增显式知识库查询路由测试），knowledge-tool 5 pass，V2 build pass。剩余风险：真实 ZHIPU 配置下检索质量仍需 MT-1H-B-003 人工验收。</td>
         </tr>
+        <tr>
+          <td>模型配置密钥曾进入 Git 历史，且密钥存储文件仍被 git 跟踪，存在泄露与本地配置被 git 操作覆盖的双重风险。</td>
+          <td>历史提交曾包含真实 Kimi 密钥（现已从文件移除），任何能访问仓库历史者均可取回；<code class="inline">config/system/requirement-settings.json</code> 未入 .gitignore，checkout/reset/merge 会把界面录入的密钥覆盖回仓库空版本，表现为“服务重启后密钥丢失”，AI 工作台与全部 Kimi 依赖功能不可用，直至重新录入。</td>
+          <td>ISS-2026-08-05-001 / DEF-2026-08-05-001 处置：泄露密钥须在供应商控制台轮换并作废旧键；将 <code class="inline">config/system/requirement-settings.json</code> 加入 .gitignore 并移出索引（对齐 knowledge-base-config.json 既有处理）；env 兜底改为根目录解析；修复完成前该风险保持 open，AI 主流程依赖重新录入密钥。</td>
+        </tr>
       </table>
     </section>
 
@@ -422,5 +460,6 @@
       <a href="index.html">返回总览</a> · 风险与决策 · WES 项目管理 · 2026-08-03
     </footer>
   </main>
+  <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

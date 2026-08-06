@@ -16,7 +16,7 @@
 
 ## 2. 架构边界
 
-- **前端**：唯一 Web 主线为 `ui/V2_PROTOTYPE`（Vite + React，Phase B 组件库）；`ui/V0_SAAS` 为 V1 下线范围，不再作为主线交付。禁止恢复 `apps/web`（已删除的 Vue 3 工作台）。
+- **前端**：唯一 Web 主线为 `ui/V2_PROTOTYPE`（Vite + React，Phase B 组件库）；`ui/V0_SAAS` 已于 2026-08-06 清理删除。禁止恢复 `apps/web`（已删除的 Vue 3 工作台）。
 - **后端**：唯一服务入口 `apps/api`（Express + modules 模式）；新增接口挂 `apps/api/src/routes/*` 并在 `routes/index.ts` 聚合。
 - **持久化**：传统 WES 记录仍以文件存储 `config/*`（JSON）为主；修改 JSON 数据结构需提供迁移兼容或默认值补齐。Harness 域因审计、统计、权限追溯与模型回放需求明显增加，已触发 DB 迁移条件，作为首个 DB-backed 新业务域接入 PostgreSQL；除已声明的 Harness 域外，DB 迁移触发器未满足前不引入数据库作为其他模块主路径。
 - **Repository 边界**：业务层不可直接依赖 JSON 文件结构（字段路径、文件名、读写细节）。
@@ -43,24 +43,24 @@
 
 ## 5. 后端模块迁移状态
 
-`apps/api/src/modules/` 已完成全部 17 个领域迁移（controller/usecase/repository 三层）：
+`apps/api/src/modules/` 已完成全部 21 个领域迁移（controller/usecase/repository 三层）：
 
-| 已迁移（18/18） |
+| 已迁移（21/21） |
 |--------|
-| auth, versions, ai, templates, rules, estimates, exports, sessions, system, team, presales, pm-workbench, collab, dev-assessment, change-management, history, sales-briefing, harness |
+| auth, versions, ai, ai-sessions, templates, rules, estimates, exports, sessions, system, team, presales, pm-workbench, collab, dev-assessment, change-management, history, sales-briefing, harness, project-evaluations, trace |
 
 遗留 `services/*/index.ts` 仅保留为 barrel re-export（向后兼容），实际实现已全部落在 `modules/*`；新代码应直接 import `modules/<域>/<域>.module`。AI 模块（`modules/ai/`）是 facade — 实际实现在 `services/ai/`。除 **harness** 作为新业务域已进入 PostgreSQL 主存储外，其余 repository 当前仍使用 JSON 文件存储。`src/db/` 已建 PostgreSQL schema 并为 Harness 生成迁移。
 
 ## 6. 前端主线现状
 
-| | V2_PROTOTYPE（Web 主线） | V0_SAAS（下线中资产） |
+| | V2_PROTOTYPE（Web 主线） | V0_SAAS（已下线） |
 |---|---|---|
 | 框架 | Vite 5 + React 18.3 + react-router-dom 6 | Next.js 16 + shadcn/ui + Tailwind |
-| 端口 | 3002（代理 `/api` → 3000） | 3001 |
-| 页面 | 18 页面 + 12 Assessment 组件 | 16 个 dashboard 页面 |
-| 状态 | 当前唯一 Web 前端主线 | 【历史说明，下线中】待资产迁移门禁通过后删除 |
+| 端口 | 3002（代理 `/api` → 3000） | 3001（已停用） |
+| 页面 | 18 页面 + 12 Assessment 组件 | 16 个 dashboard 页面（已删除） |
+| 状态 | 当前唯一 Web 前端主线 | 【历史说明，已下线】2026-08-06 清理删除 |
 
-**框架决策**：Vite + React 已升级为 Web 主线；V0 仅保留迁移核对与历史追溯用途。
+**框架决策**：Vite + React 已升级为 Web 主线；V0_SAAS 已于 2026-08-06 清理删除。
 
 ## 7. 前端实现约定
 
@@ -85,6 +85,9 @@
 - 涉及 `ui/V2_PROTOTYPE` 的页面、组件、样式、响应式、弹窗、可访问性或视觉优化时，必须先读取并执行 `skills/improving-wes-ui/SKILL.md`；单次限定一个业务表面和最多三个已证实根问题，未经独立架构决策不得引入新的 UI 技术栈或组件系统。
 - 涉及需求、设计、开发、测试、变更、监控、风险、发布、文档资产或项目治理的任务，必须读取并执行 `skills/maintain-wes-command-board/SKILL.md`。
 - 用户消息包含"测试问题""需求""反馈""缺陷""bug""体验调整""功能调整""大方向思考""需求池"等关键词，或通过 UI 截图反馈可用性问题时，必须读取并执行 `skills/recording-wes-requirements/SKILL.md`；原始反馈统一先进入问题池，再由 **Codex Intake/Triage Loop** 按 `docs/codex-workflows/wes-feedback-intake.md` 去重、分类和处置。已有同类 issue / RP / defect 时只补充证据或范围，不重复建项；只有分诊结果为 requirement 或 defect 时才创建或更新对应派生记录，信息不足的 issue 保持 `待补充` 并最小化追问。
+- 进行安全审查、漏洞扫描、JWT/auth 边界审计、或合并涉及鉴权/路由/文件上传/外部 API 的变更前，必须读取并执行 `skills/wes-security-review/SKILL.md`；按 WES 专属攻击面（JWT、Excel 上传、AI API、文件导出、版本控制、Harness PostgreSQL）执行六步安全审计流程。
+- 审查代码变更（包括 Qoder handoff、PR、或其他 Agent 交付结果）前，必须读取并执行 `skills/wes-code-review/SKILL.md`；按五轴框架（正确性、可读性、架构、安全、性能）进行审查，变更超 1000 行需要求拆分。
+- 实现新功能、修复缺陷或重构代码时，必须读取并执行 `skills/wes-tdd/SKILL.md`；遵循 RED-GREEN-REFACTOR 循环，先写失败测试，再写最小实现，最后重构，每次变更后运行 `npm run test:modules` 验证。
 - Codex 不再创建或执行 WES 需求池迭代实现 Loop，也不创建 heartbeat/recurring 自动化来持续跑需求池；WES 实现 Loop 后续交给 Qoder 创建和执行。允许 Codex 在用户批准的 NightOps 协作机制中发布任务包、执行审计 Gate、生成晨间简报，但不得无人值守实现新需求、选择下一条需求执行、合并 main 或标记已交付。用户明确要求 Codex 处理单条需求时，按普通一次性任务执行，不自动调度下一轮。
 - 用户 owner 已显式授权 NightOps 无人值守机制：Qoder / KIMICODE 可在各自平台创建本地定时 Loop，用于按当前 Night Mission Packet 执行或审计，并与 Codex Gate 时间点配合。这不是 Codex 侧需求池实现 Loop，也不授予自选 RP、合并 main、标记已交付或越权改代码的权限；外部 Loop 只能读取任务包、Gate、handoff，并写入 mission 明确指定的 artifact 文件。
 - Qoder 执行 WES 需求池、Loop、实现、验证或回填任务时，必须先读 `QODER.md` 并使用 `skills/wes-qoder-worktree-protocol/SKILL.md`；每次执行需先完成 Worktree Contract ACK，结束时按结构化 handoff 回填，状态只能到“已回填 / 待 Codex 复核”，不得自行宣布需求“已交付”。NightOps 中还必须读取当前 Night Mission Packet 与最新 Codex Gate；若 `mustReworkFirst=true`，先返工当前任务；无 `allowNextTask=true` 不得领取新 RP。
@@ -115,7 +118,10 @@
 8. `skills/speak-plainly/SKILL.md` — 面向用户的任务沟通表达规则
 9. `skills/maintain-wes-command-board/SKILL.md` — 总看板过程数据沉淀与项目管理门禁
 10. `skills/recording-wes-requirements/SKILL.md` — 测试反馈、需求与问题入池治理规则
-11. `QODER.md`、`KIMICODE.md`、`skills/wes-qoder-worktree-protocol/SKILL.md` 与 `skills/wes-multi-agent-collaboration/SKILL.md` — Qoder / KIMICODE / Codex 多 Agent 协作、worktree 执行、peer audit、回填与复核协议
+11. `skills/wes-security-review/SKILL.md` — WES 安全审查与漏洞审计规则
+12. `skills/wes-code-review/SKILL.md` — WES 代码审查与质量门禁规则
+13. `skills/wes-tdd/SKILL.md` — WES 测试驱动开发规范（RED-GREEN-REFACTOR）
+14. `QODER.md`、`KIMICODE.md`、`skills/wes-qoder-worktree-protocol/SKILL.md` 与 `skills/wes-multi-agent-collaboration/SKILL.md` — Qoder / KIMICODE / Codex 多 Agent 协作、worktree 执行、peer audit、回填与复核协议
 12. `docs/codex-workflows/` 与 `docs/agent-loop/nightops-templates.md` — 需求去重、外部 AI 回填、长文档检查、API 密钥验证与 NightOps 交接模板
 
 ## 12. 禁止事项

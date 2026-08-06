@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>开源工具雷达 · WES 项目管理</title>
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-in">
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
+      <nav class="navlinks" aria-label="主导航">
+        <a href="index.html">总览</a>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">计划与设计<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="roadmap.html">路标管理</a>
+          <a href="design.html">设计说明</a>
+          <a href="plan.html">计划与进度</a>
+          <a href="requirements.html">需求池</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">质量与监控<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="testing.html">测试与验收</a>
+          <a href="monitoring.html">监控与审计</a>
+          <a href="risks.html">风险与决策</a>
+          <a href="changes.html">变更记录</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">AI 与协作<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="runtime.html">AI 任务执行</a>
+          <a href="collaboration-protocol.html">多 AI 协作</a>
+          <a href="branches.html">开发分支</a>
+          </div>
+        </div>
+        <div class="nav-group has-active">
+          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="sources.html">信息来源</a>
+          <a class="active" href="github-radar.html">开源工具雷达</a>
+          </div>
+        </div>
+      </nav>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill brand">GitHub 启发性工具收录</span>
+    </div>
+  </header>
+
+  <header class="doc-h">
+    <div class="doc-wrap">
+      <div class="crumb">WES Agent · 每日定时任务成果沉淀</div>
+      <h1>开源工具雷达</h1>
+      <p class="meta">
+        <span><b>定位</b> 收录每日 GitHub 雷达中有启发性的开源工具，作为项目架构优化迭代的基础</span>
+        <span><b>收录来源</b> 每日 GitHub 开源项目搜寻定时任务（搜寻 → 核验 → 分析 → 报告）</span>
+        <span><b>收录口径</b> 必须完成与 WES 的代码级结合点论证，三维评级（启发性 / 优化价值 / 架构改进）</span>
+        <span><b>当前收录</b> 2 项（DeepEval、Langfuse）</span>
+        <span><b>更新</b> 2026-08-04</span>
+      </p>
+      <div class="pill-row" style="margin-top:18px">
+        <span class="pill brand">收录 ≠ 引入</span>
+        <span class="pill ok">结合点已经过代码核验</span>
+        <span class="pill warn">引入需过架构边界与 DB 迁移触发器评审</span>
+        <span class="pill">Star / Fork 为收录时点快照</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="doc-wrap">
+    <div class="toc">
+      <h5>导航</h5>
+      <ol>
+        <li><b>§1</b> 模块定位与收录口径</li>
+        <li><b>§2</b> 收录总览</li>
+        <li><b>§3</b> DeepEval · LLM 评估框架</li>
+        <li><b>§4</b> Langfuse · LLM 工程平台</li>
+        <li><b>§5</b> 架构优化候选映射</li>
+        <li><b>§6</b> 维护规则</li>
+      </ol>
+    </div>
+
+    <section>
+      <div class="h-num">Section 01</div>
+      <h2>模块定位与收录口径</h2>
+      <p class="lead">项目每天通过定时任务搜寻 GitHub 上与 WES 相关的开源项目。搜寻结果如果只留在对话或日报里，很快就会丢失。本页把其中真正有启发性的工具沉淀下来：每个工具都要对照 WES 当前代码做结合点论证，说明它能改进哪个模块、怎么落地、风险是什么，作为后续架构优化迭代的候选基础。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">入口</span><h3>定时任务产出</h3><p>每日 GitHub 雷达按“搜寻 → 核验 → 分析 → 报告”运行；本页只收录通过核验且与 WES 有具体结合点的工具，其余候选留在日报中。</p></div>
+        <div class="card"><span class="pill ok">论证</span><h3>代码级结合点</h3><p>每条结合点必须指向仓库内真实存在的模块、文件或命令（如 modules/trace、test:ai、data/traces），不接受泛泛的“可能有价值”。</p></div>
+        <div class="card"><span class="pill warn">边界</span><h3>收录不等于引入</h3><p>收录只是沉淀候选。实际引入必须遵守 AGENTS.md 的架构边界：不引入第二前后端主实现、满足 DB 迁移触发器才接入数据库、密钥不进文档与看板。</p></div>
+      </div>
+      <div class="callout"><div><b>三维评级口径</b>启发性 = 方法论/模型对 WES 思路的启发程度；优化价值 = 对现有模块质量、效率、可观测性的直接改进空间；架构改进 = 对未来架构演进方向的影响深度。五星为上限。</div></div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 02</div>
+      <h2>收录总览</h2>
+      <p class="lead">当前收录 2 项，均来自 2026-08-03 定时任务报告，并于 2026-08-04 完成代码级结合点论证后入库。同期候选中 univer（在线电子表格）与 lowdb（JSON 数据库）暂未收录，待补充论证。</p>
+      <div class="panel">
+        <div class="panel-h">收录台账<span class="right">快照日期 2026-08-03</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>#</th><th>工具</th><th>领域</th><th>技术栈 / 许可</th><th>Star / Fork</th><th>活跃度</th><th>启发性</th><th>优化价值</th><th>架构改进</th><th>状态</th></tr>
+            <tr>
+              <td class="mono">GT-001</td>
+              <td><a href="https://github.com/confident-ai/deepeval" target="_blank" rel="noreferrer">confident-ai/deepeval</a></td>
+              <td>LLM 评估框架</td>
+              <td>Python · Apache-2.0</td>
+              <td>⭐ 17,369 / 1,752</td>
+              <td>当日有推送，极活跃</td>
+              <td>★★★★★</td><td>★★★★☆</td><td>★★★☆☆</td>
+              <td><span class="status done"><span class="dot"></span>已收录</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-002</td>
+              <td><a href="https://github.com/langfuse/langfuse" target="_blank" rel="noreferrer">langfuse/langfuse</a></td>
+              <td>LLM 可观测性 + Prompt 管理</td>
+              <td>TypeScript · MIT（核心）+ 企业版条款</td>
+              <td>⭐ 32,428 / 3,483</td>
+              <td>当日有推送，极活跃；已并入 ClickHouse 团队</td>
+              <td>★★★★★</td><td>★★★★☆</td><td>★★★★★</td>
+              <td><span class="status done"><span class="dot"></span>已收录</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03</div>
+      <h2>GT-001 · DeepEval（confident-ai/deepeval）</h2>
+      <p class="lead">类 Pytest 的 LLM 单元测试框架，内置 G-Eval（LLM-as-a-judge）、Answer Relevancy、Hallucination、JSON Correctness、Task Completion 等 40+ 指标，支持任意 LLM 作为裁判模型。对 WES 的直接意义是：AI 评估输出（工作量估算、售前简报、销售简报）第一次有了可参照的“输出质量回归”方法论。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">核心价值</span><h3>把 LLM 输出变成可断言对象</h3><p>像写单元测试一样校验模型输出：JSON 结构正确性、答案相关性、幻觉检测、任务完成度，并支持固定数据集回归。</p></div>
+        <div class="card"><span class="pill ok">许可与栈</span><h3>Apache-2.0 · Python</h3><p>许可友好；但与 WES 的 Node/TypeScript 主栈异构，完整框架引入需要独立 CI 步骤，不建议侵入主栈。</p></div>
+        <div class="card"><span class="pill warn">成本约束</span><h3>LLM-as-judge 消耗 token</h3><p>裁判模型调用有真实成本，只应在关键回归集启用，不进入每次提交的默认测试。</p></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">与 WES 的结合点论证（2026-08-04 代码核验）<span class="right">已核实</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>结合点</th><th>仓库现状（已核验事实）</th><th>DeepEval 带来的改进</th></tr>
+            <tr>
+              <td>npm run test:ai</td>
+              <td><code class="inline">apps/api/package.json</code> 的 test:ai 用 tsx --test 运行约 20 个测试文件（extractor、presales、sales-briefing、dev-assessment、change-management、dsl rules、rbac 等），全部为确定性功能断言；另有 <code class="inline">test:ai:cc</code> Testcontainers 变体。当前没有针对真实模型输出质量的回归线。</td>
+              <td>对标其指标体系补一条“输出质量回归”：固定样本输入（SOW/需求文档）→ 校验输出 JSON 结构、字段完整性、结论稳定性；并可覆盖提示词漂移（prompt drifting）场景。</td>
+            </tr>
+            <tr>
+              <td>结构化输出契约</td>
+              <td><code class="inline">apps/api/src/ai/contracts/</code>（wes-contracts.ts、structured-output.ts 及配套测试）已对 AI 结构化输出做 schema 级校验。</td>
+              <td>JSON Correctness 方法论可把现有校验从“结构能解析”升级为“字段语义完整 + 关键结论稳定”，在契约层建立质量基线。</td>
+            </tr>
+            <tr>
+              <td>规则引擎回归</td>
+              <td><code class="inline">config/rules/example-rule-set.json</code> 带 ruleVersion / pipelineVersion 版本化；<code class="inline">scripts/rule-regression-check.js</code>（rules:regression）守护确定性管线。</td>
+              <td>规则配置调整后，确定性管线已有回归，但 LLM 参与环节（抽取器、AI 兜底路由）的输出质量目前无监控——这是 DeepEval 思路最直接的补位点。</td>
+            </tr>
+            <tr>
+              <td>评估核心</td>
+              <td>modules/ai 为 facade，实际实现在 services/ai（assessment、extractor、workbench-dispatch 等）；产出工作量评估、售前简报、销售简报、开发评估等。</td>
+              <td>为每类评估产物建立固定样本基线 + 指标断言，防止模型升级或提示词调整导致质量无声退化。</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout ok"><div><b>实施建议</b>第一步仅借鉴指标方法论：用 TypeScript 在 test:ai 中实现轻量版（G-Eval 评分标准 + JSON Correctness 断言），零依赖引入；若后续需要完整框架，在 CI 以独立 Python 步骤运行，不侵入 Node 主栈。前置条件是建立固定样本基线（可复用 docs/ 下 SOW 标准版样本）。</div></div>
+      <div class="callout warn"><div><b>风险</b>① LLM-as-judge 有 token 成本，只对关键回归集启用；② Python 生态与 Node 主栈异构，完整引入需权衡维护成本；③ 质量基线本身需要人工标定期望值，初期投入不可省略。</div></div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 04</div>
+      <h2>GT-002 · Langfuse（langfuse/langfuse）</h2>
+      <p class="lead">开源 LLM 工程平台：调用链路追踪（tracing）、Prompt 版本管理、评估数据集、Playground、LLM-as-judge 评估一体，提供 TS SDK 与 OpenAPI，docker compose 自托管。对 WES 的直接意义是：自研 trace / 会话 JSON 结构演进到平台级可观测性时，它是成熟参照系。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">核心价值</span><h3>trace/span + Prompt 版本管理</h3><p>统一的调用链模型、Prompt 版本与缓存、评估数据集和回放能力，覆盖 AI 可观测性的完整生命周期。</p></div>
+        <div class="card"><span class="pill ok">许可与栈</span><h3>TypeScript · MIT 核心</h3><p>核心 MIT 许可、TS 技术栈与 WES 同构；但企业版（EE）条款有边界，自托管需确认使用范围落在核心许可内。</p></div>
+        <div class="card"><span class="pill warn">部署重量</span><h3>ClickHouse / Postgres / Redis</h3><p>完整自托管组件栈较重，已并入 ClickHouse 团队。按 AGENTS.md DB 迁移触发器原则，当前应“借鉴数据模型”而非全量引入。</p></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">与 WES 的结合点论证（2026-08-04 代码核验）<span class="right">已核实 · 含一处口径修正</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>结合点</th><th>仓库现状（已核验事实）</th><th>Langfuse 带来的改进 / 参照</th></tr>
+            <tr>
+              <td>统一 Trace 模型</td>
+              <td>RP-030 已在 <code class="inline">apps/api/src/modules/trace/trace.types.ts</code> 定义 TraceRecord / TraceSpanData：8 类 span（intent_routing、knowledge_retrieval、model_call、tool_call、artifact_generation、user_confirmation、write_action、degradation），含 tokenUsage、modelInfo 与 redactSensitiveFields 脱敏。</td>
+              <td>WES 自研模型与 Langfuse trace/span 结构同构，方向正确；差距在平台能力（可视化、评估数据集、回放）。可将 Langfuse 作为该模型演进的对标基准。</td>
+            </tr>
+            <tr>
+              <td>trace 存储瓶颈</td>
+              <td>trace repository 当前为 JSON 文件存储（<code class="inline">data/traces/trace-store.json</code>，WES_TRACE_STORE_PATH 可覆盖）；PostgreSQL 的 <code class="inline">traces</code> 表已在 <code class="inline">apps/api/src/db/schema/json_runtime.ts</code> 定义。</td>
+              <td>随 Harness 审计/统计增长，先按 DB 迁移触发器把 trace 迁入已定义的 PostgreSQL 表；之后若需要平台级查询与回放，再评估 Langfuse 自托管承接，避免一步跳到重组件栈。</td>
+            </tr>
+            <tr>
+              <td>会话持久化</td>
+              <td><code class="inline">data/ai-sessions.json</code> 以 messages + metadata（modelRun / knowledgeTool）记录会话，随使用量单文件持续增长。</td>
+              <td>与 trace 同理：短期保持文件 + 备份定位，中期参照 Langfuse 的 observation 分层把会话观测与业务消息解耦。</td>
+            </tr>
+            <tr>
+              <td>Prompt 版本管理</td>
+              <td>口径修正：config/templates 实为 Excel 导入层级模板，不是提示词模板；真正的提示词资产是 <code class="inline">config/rag/prompts.json</code>，且 knowledge span 已记录 <code class="inline">prompt { id, version, hash }</code>。</td>
+              <td>Langfuse 的 Prompt 版本管理 + 缓存机制，是 WES 提示词 id/version/hash 机制下一步演进（发布流程、灰度、效果对比）的直接参照。</td>
+            </tr>
+            <tr>
+              <td>Harness 域</td>
+              <td>Harness 已是 DB-backed（PostgreSQL），审计对象为 run / artifact / modelRun / toolEvent。</td>
+              <td>若未来需要模型回放与统计，可评估以 Langfuse 自托管实例承接 AI 可观测性部分；必须满足 DB 迁移触发器并遵守脱敏红线（API Key / token 不进 trace）。</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout ok"><div><b>实施建议</b>短期：借鉴数据模型，输出 WES trace/span 与 Langfuse observation 的映射表；本地 docker compose up 试跑，将 services/ai 的一次 Kimi 调用接入 TS SDK 做 PoC，对比自研 trace 的信息完整度。中期：若 PoC 通过，把 AI 会话观测迁入 Langfuse，data/ai-sessions.json 降级为备份。</div></div>
+      <div class="callout warn"><div><b>风险</b>① ClickHouse / Postgres / Redis 组件较重，须先满足 AGENTS.md DB 迁移触发器再考虑全量引入；② 注意 EE 条款边界，自托管前确认所需功能均在 MIT 核心范围；③ Langfuse 接入后仍须执行与自研 trace 相同的脱敏策略，密钥与敏感原文不得进入观测数据。</div></div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 05</div>
+      <h2>架构优化候选映射</h2>
+      <p class="lead">收录的目的是转化为迭代。下表把两个工具的方法论映射到 WES 的架构优化候选项；候选项尚未立项，立项时按需求池分诊流程走（记录 issue → 分类 → 创建 RP），不跳过治理。</p>
+      <div class="panel">
+        <div class="panel-h">工具 → 优化候选<span class="right">待立项</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>来源工具</th><th>可借鉴方法论</th><th>WES 优化候选</th><th>建议优先级</th><th>关联看板页</th><th>状态</th></tr>
+            <tr>
+              <td class="mono">GT-001 DeepEval</td>
+              <td>G-Eval 评分标准、JSON Correctness 断言、固定数据集回归</td>
+              <td>AI 输出质量回归基线：在 test:ai 增加结构化输出完整性与结论稳定性断言，覆盖规则/提示词调整后的漂移检测</td>
+              <td>中（先用 TS 轻量版验证）</td>
+              <td>监控与审计 · 测试与验收</td>
+              <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-002 Langfuse</td>
+              <td>trace/span 观测模型、Prompt 版本管理、评估数据集</td>
+              <td>AI 可观测性演进：trace 先按触发器迁入 PostgreSQL；Prompt id/version/hash 机制向发布/对比演进；平台化前以数据模型对标为主</td>
+              <td>中低（先借鉴模型，PoC 再决策）</td>
+              <td>监控与审计 · 设计说明 · 风险与决策</td>
+              <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout"><div><b>推进规则</b>候选项要进入实施，必须先在本页补充“立项依据”，再按 skills/recording-wes-requirements 分诊进入需求池；涉及数据库主路径变化的，先核对 AGENTS.md 的 DB 迁移触发器并在风险与决策页登记。</div></div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 06</div>
+      <h2>维护规则</h2>
+      <div class="grid-2">
+        <div class="card"><span class="pill brand">收录要求</span><h3>新增条目的必备字段</h3><p>仓库链接、快照日期（Star/Fork/活跃度）、技术栈与许可、三维评级、代码级结合点论证（指向真实模块/文件/命令）、分阶段实施建议、风险说明。</p></div>
+        <div class="card"><span class="pill warn">边界约束</span><h3>什么不做</h3><p>不实时同步 Star 数据；不把收录当作引入决策；不在本页存放任何 API Key、token 或敏感配置；与需求池已有同类项时只补证据，不重复建项。</p></div>
+      </div>
+    </section>
+
+    <footer class="wrap footer">
+      WES 项目管理 · 开源工具雷达 · 2026-08-04 · 收录 2 项（GT-001 DeepEval / GT-002 Langfuse）
+    </footer>
+  </main>
+  <script src="assets/board-ui.js" defer></script>
+</body>
+</html>

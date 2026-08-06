@@ -44,6 +44,7 @@
         <a href="issues.html">问题池</a>
         <a href="defects.html">缺陷池</a>
         <a href="requirements.html">需求池</a>
+        <a href="github-radar.html">开源工具雷达</a>
         <a class="active" href="code-audit.html">代码质量检查</a>
     </nav>
     <div style="flex:1"></div>
@@ -339,7 +340,7 @@
         </div>
         <div class="grid-3">
           <div class="card"><span class="pill ok">Mainlines</span><h3>前后端主线唯一</h3><p>后端 apps/api，前端 ui/V2_PROTOTYPE；ui/V0_SAAS 为【历史说明，下线中】，apps/web 已删除【历史说明，已下线】。</p></div>
-          <div class="card"><span class="pill ok">Modules</span><h3>18/18 领域已迁移</h3><p>全部领域已完成 controller/usecase/repository 三层拆分；遗留 services/* 仅 barrel re-export。</p></div>
+          <div class="card"><span class="pill ok">Modules</span><h3>21/21 领域已迁移</h3><p>全部领域已完成 controller/usecase/repository 三层拆分；遗留 services/* 仅 barrel re-export。</p></div>
           <div class="card"><span class="pill ok">Storage</span><h3>存储边界符合规则</h3><p>除 harness 为 PostgreSQL-backed 新业务域外，传统 WES 记录仍为 JSON 文件存储。</p></div>
           <div class="card"><span class="pill ok">Auth</span><h3>JWT Bearer 鉴权</h3><p>业务接口使用 JWT Bearer；未检出 X-Role 回退；auth.ts 固定 HS256 算法。</p></div>
           <div class="card"><span class="pill ok">Routes</span><h3>路由聚合正确</h3><p>新增业务路由挂载于 apps/api/src/routes/* 并在 routes/index.ts 聚合。</p></div>
@@ -370,5 +371,6 @@
   })();
   </script>
   </div>
+  <script src="assets/board-ui.js" defer></script>
 </body>
 </html>

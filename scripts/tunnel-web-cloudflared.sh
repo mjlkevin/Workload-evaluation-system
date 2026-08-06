@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Cloudflare Quick Tunnel。用法：npm run tunnel:web（须先 dev:web；页面 /api 由 Next 反代至本机 API）
+# Cloudflare Quick Tunnel。用法：npm run tunnel:web（须先 dev:web；页面 /api 由 Vite 代理至本机 API）
 #
-# 浏览器访问公网页时，请求 /api/*、/downloads/* 由 Next rewrites 转到本机 API（见 ui/V0_SAAS/next.config.mjs），
+# 浏览器访问公网页时，请求 /api/*、/downloads/* 由 Vite 代理配置转到本机 API（见 ui/V2_PROTOTYPE/vite.config.js），
 # 一般只需映射前端即可联调页面；直连 API 再开一条 API 隧道。
 #
-# 若 Webpack HMR 在公网域名下异常，可重启 dev:web 前设置：
-#   NEXT_ALLOWED_DEV_ORIGINS=<trycloudflare 子域，不含 https://>
+# 若 HMR 在公网域名下异常，可重启 dev:web 前设置：
+#   VITE_ALLOWED_DEV_ORIGINS=<trycloudflare 子域，不含 https://>
 #
 # DNS / Error 1033 说明同 scripts/tunnel-api-cloudflared.sh
 
-PORT="${WEB_PORT:-3001}"
+PORT="${WEB_PORT:-3002}"
 TARGET="http://127.0.0.1:${PORT}"
 
 if ! command -v cloudflared >/dev/null 2>&1; then
