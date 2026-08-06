@@ -12,7 +12,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-import { harnessRuns, harnessRunEvents, harnessRunCheckpoints, harnessRunOutputs, harnessSessionOutbox } from "../../db/schema";
+import { harnessRuns, harnessRunAttempts, harnessRunEvents, harnessRunCheckpoints, harnessRunOutputs, harnessSessionOutbox, harnessToolEvents } from "../../db/schema";
 import {
   HarnessRuntimeError,
   createHarnessRuntimeRepository,
@@ -565,4 +565,329 @@ describeOrSkip("safe errors never leak SQL params or state", { skip: !testDataba
     assert.ok(!text.includes(sentinel), "error must not echo state content");
     assert.ok(!text.includes("INSERT INTO"), "error must not echo SQL");
   }
+});
+
+// ============================================================
+// RP-047 Batch B：Worker/Recovery/Projector repository 扩展（R1–R11）
+// ============================================================
+
+async function makeClaimedRun(leaseMs = 300_000) {
+  const created = await repo!.createQueuedRun(makeQueuedRunInput());
+  track(created.run.harnessRunId);
+  const claimed = await repo!.claimNextQueuedRun({ workerId: "worker-batch-b", leaseMs });
+  assert.ok(claimed, "claim must succeed for a freshly queued run");
+  return claimed;
+}
+
+async function backdateLease(attemptId: string, msAgo: number): Promise<void> {
+  await testDb!
+    .update(harnessRunAttempts)
+    .set({ leaseExpiresAt: new Date(Date.now() - msAgo) })
+    .where(eq(harnessRunAttempts.harnessRunAttemptId, attemptId));
+}
+
+describeOrSkip("R1 findRunsWithExpiredActiveLease returns only runs whose active lease expired", { skip: !testDatabaseUrl }, async () => {
+  const expired = await makeClaimedRun(1_000);
+  const healthy = await makeClaimedRun(300_000);
+  const queuedOnly = await repo!.createQueuedRun(makeQueuedRunInput());
+  track(queuedOnly.run.harnessRunId);
+  await backdateLease(expired.attempt.harnessRunAttemptId, 10_000);
+
+  const found = await repo!.findRunsWithExpiredActiveLease({});
+  const ids = found.map((row) => row.run.harnessRunId);
+  assert.ok(ids.includes(expired.run.harnessRunId), "expired lease run must be found");
+  assert.ok(!ids.includes(healthy.run.harnessRunId), "healthy lease run must not be found");
+  assert.ok(!ids.includes(queuedOnly.run.harnessRunId), "queued run without attempt must not be found");
+  const match = found.find((row) => row.run.harnessRunId === expired.run.harnessRunId);
+  assert.equal(match?.attempt.harnessRunAttemptId, expired.attempt.harnessRunAttemptId);
+});
+
+describeOrSkip("R2 claimNextQueuedRun picks recovering runs only after backoff elapses", { skip: !testDatabaseUrl }, async () => {
+  const created = await repo!.createQueuedRun(makeQueuedRunInput());
+  track(created.run.harnessRunId);
+  await testDb!
+    .update(harnessRuns)
+    .set({ status: "recovering", availableAt: new Date(Date.now() + 60_000) })
+    .where(eq(harnessRuns.harnessRunId, created.run.harnessRunId));
+  const early = await repo!.claimNextQueuedRun({ workerId: "w-early", leaseMs: 1_000 });
+  assert.equal(early, null, "recovering run before backoff must not be claimable");
+
+  await testDb!
+    .update(harnessRuns)
+    .set({ availableAt: new Date(Date.now() - 1_000) })
+    .where(eq(harnessRuns.harnessRunId, created.run.harnessRunId));
+  const claimed = await repo!.claimNextQueuedRun({ workerId: "w-after", leaseMs: 1_000 });
+  assert.ok(claimed, "recovering run after backoff must be claimable");
+  assert.equal(claimed.run.status, "running");
+});
+
+describeOrSkip("R3 scheduleRunRecovery orphans attempt, applies backoff and appends recovery event", { skip: !testDatabaseUrl }, async () => {
+  const claimed = await makeClaimedRun(1_000);
+  await backdateLease(claimed.attempt.harnessRunAttemptId, 10_000);
+  const result = await repo!.scheduleRunRecovery({
+    runId: claimed.run.harnessRunId,
+    maxAutoRecoveries: 3,
+    backoffMs: [2_000, 10_000, 30_000],
+  });
+  assert.equal(result.outcome, "scheduled");
+
+  const [run] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, claimed.run.harnessRunId));
+  assert.equal(run.status, "recovering");
+  assert.equal(run.recoveryCount, 1);
+  const backoffDelta = run.availableAt.getTime() - Date.now();
+  assert.ok(backoffDelta > 500 && backoffDelta <= 2_500, `first backoff must be ~2000ms, got ${backoffDelta}`);
+
+  const [attempt] = await testDb!
+    .select()
+    .from(harnessRunAttempts)
+    .where(eq(harnessRunAttempts.harnessRunAttemptId, claimed.attempt.harnessRunAttemptId));
+  assert.equal(attempt.status, "orphaned");
+
+  const events = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, claimed.run.harnessRunId), eq(harnessRunEvents.eventType, "recovery_started")));
+  assert.equal(events.length, 1, "exactly one recovery_started event");
+});
+
+describeOrSkip("R3 scheduleRunRecovery enforces RECOVERY_LIMIT_EXCEEDED at the recovery cap", { skip: !testDatabaseUrl }, async () => {
+  const claimed = await makeClaimedRun(1_000);
+  await backdateLease(claimed.attempt.harnessRunAttemptId, 10_000);
+  await testDb!
+    .update(harnessRuns)
+    .set({ recoveryCount: 3 })
+    .where(eq(harnessRuns.harnessRunId, claimed.run.harnessRunId));
+  const result = await repo!.scheduleRunRecovery({
+    runId: claimed.run.harnessRunId,
+    maxAutoRecoveries: 3,
+    backoffMs: [2_000, 10_000, 30_000],
+  });
+  assert.equal(result.outcome, "limit_exceeded");
+
+  const [run] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, claimed.run.harnessRunId));
+  assert.equal(run.status, "failed");
+  assert.equal(run.errorCode, "RECOVERY_LIMIT_EXCEEDED");
+
+  const [attempt] = await testDb!
+    .select()
+    .from(harnessRunAttempts)
+    .where(eq(harnessRunAttempts.harnessRunAttemptId, claimed.attempt.harnessRunAttemptId));
+  assert.equal(attempt.status, "orphaned");
+
+  const events = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, claimed.run.harnessRunId), eq(harnessRunEvents.eventType, "run_failed")));
+  assert.equal(events.length, 1);
+});
+
+describeOrSkip("R3 scheduleRunRecovery honors pending cancel before scheduling recovery", { skip: !testDatabaseUrl }, async () => {
+  const claimed = await makeClaimedRun(1_000);
+  await backdateLease(claimed.attempt.harnessRunAttemptId, 10_000);
+  const cancel = await repo!.requestRunCancel({ runId: claimed.run.harnessRunId, requestedBy: "tester" });
+  assert.equal(cancel.changed, true);
+  const result = await repo!.scheduleRunRecovery({
+    runId: claimed.run.harnessRunId,
+    maxAutoRecoveries: 3,
+    backoffMs: [2_000, 10_000, 30_000],
+  });
+  assert.equal(result.outcome, "cancelled", "cancel request must win over recovery scheduling");
+
+  const [run] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, claimed.run.harnessRunId));
+  assert.equal(run.status, "cancelled");
+  assert.equal(run.recoveryCount, 0, "cancel path must not consume recovery budget");
+
+  const cancelledEvents = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, claimed.run.harnessRunId), eq(harnessRunEvents.eventType, "run_cancelled")));
+  assert.equal(cancelledEvents.length, 1);
+});
+
+describeOrSkip("R4 listCheckpointsForRun returns checkpoints newest first", { skip: !testDatabaseUrl }, async () => {
+  const created = await repo!.createQueuedRun(makeQueuedRunInput());
+  track(created.run.harnessRunId);
+  await repo!.commitCheckpoint(makeCheckpointInput(created.run.harnessRunId, { stepKey: "step-1" }));
+  await repo!.commitCheckpoint(makeCheckpointInput(created.run.harnessRunId, { stepKey: "step-2" }));
+  const list = await repo!.listCheckpointsForRun({ runId: created.run.harnessRunId });
+  assert.equal(list.length, 2);
+  assert.equal(list[0].stepKey, "step-2", "newest checkpoint must come first");
+  assert.equal(list[1].stepKey, "step-1");
+});
+
+describeOrSkip("R5 setAttemptResumeCheckpoint persists the resume pointer", { skip: !testDatabaseUrl }, async () => {
+  const claimed = await makeClaimedRun(1_000);
+  const committed = await repo!.commitCheckpoint(makeCheckpointInput(claimed.run.harnessRunId));
+  const updated = await repo!.setAttemptResumeCheckpoint({
+    attemptId: claimed.attempt.harnessRunAttemptId,
+    checkpointId: committed.checkpoint.harnessRunCheckpointId,
+  });
+  assert.ok(updated);
+  const [attempt] = await testDb!
+    .select()
+    .from(harnessRunAttempts)
+    .where(eq(harnessRunAttempts.harnessRunAttemptId, claimed.attempt.harnessRunAttemptId));
+  assert.equal(attempt.resumeCheckpointId, committed.checkpoint.harnessRunCheckpointId);
+});
+
+describeOrSkip("R6 recordToolEffectOnce dedupes side effects by (runId, effectKey)", { skip: !testDatabaseUrl }, async () => {
+  const claimed = await makeClaimedRun(1_000);
+  const runId = claimed.run.harnessRunId;
+  const effectKey = `${runId}:s3:fake.tool:1`;
+  const first = await repo!.recordToolEffectOnce({
+    runId,
+    attemptId: claimed.attempt.harnessRunAttemptId,
+    effectKey,
+    toolName: "fake.tool",
+    input: { query: "x" },
+    output: { value: 1 },
+  });
+  assert.equal(first.created, true);
+  const second = await repo!.recordToolEffectOnce({
+    runId,
+    attemptId: null,
+    effectKey,
+    toolName: "fake.tool",
+    input: { query: "x" },
+    output: { value: 999 },
+  });
+  assert.equal(second.created, false, "replay must not create a second effect record");
+  assert.equal(second.toolEvent.harnessToolEventId, first.toolEvent.harnessToolEventId);
+  assert.deepEqual(second.toolEvent.output, { value: 1 }, "recorded output of the first execution wins");
+
+  const found = await repo!.findToolEffectByKey({ runId, effectKey });
+  assert.equal(found?.harnessToolEventId, first.toolEvent.harnessToolEventId);
+
+  const rows = await testDb!.select().from(harnessToolEvents).where(eq(harnessToolEvents.harnessRunId, runId));
+  assert.equal(rows.length, 1, "exactly one tool event row per effect key");
+});
+
+describeOrSkip("R7/R8 session outbox claim, publish, retry and exhaustion lifecycle", { skip: !testDatabaseUrl }, async () => {
+  const claimed = await makeClaimedRun(1_000);
+  const runId = claimed.run.harnessRunId;
+  const sessionId = claimed.run.aiSessionId!;
+  await repo!.enqueueSessionOutbox({ runId, aiSessionId: sessionId, eventType: "user_message", deduplicationKey: `dk-${randomUUID()}`, payload: { a: 1 } });
+  const second = await repo!.enqueueSessionOutbox({ runId, aiSessionId: sessionId, eventType: "final_response", deduplicationKey: `dk-${randomUUID()}`, payload: { b: 2 } });
+
+  const claimedRows = await repo!.claimPendingSessionOutbox({ lockerId: "projector-1", limit: 10, lockMs: 30_000 });
+  assert.equal(claimedRows.length, 2);
+  assert.ok(claimedRows.every((row) => row.status === "processing" && row.lockedBy === "projector-1"));
+  const again = await repo!.claimPendingSessionOutbox({ lockerId: "projector-2", limit: 10, lockMs: 30_000 });
+  assert.equal(again.length, 0, "locked rows must not be claimed twice");
+
+  const target = claimedRows.find((row) => row.harnessSessionOutboxId === second.outbox.harnessSessionOutboxId)!;
+  const published = await repo!.markSessionOutboxPublished({ outboxId: target.harnessSessionOutboxId, lockerId: "projector-1" });
+  assert.equal(published?.status, "published");
+  assert.ok(published?.publishedAt);
+
+  const retryable = claimedRows.find((row) => row.harnessSessionOutboxId !== target.harnessSessionOutboxId)!;
+  const failedOnce = await repo!.markSessionOutboxFailed({
+    outboxId: retryable.harnessSessionOutboxId,
+    lockerId: "projector-1",
+    errorCode: "SINK_UNAVAILABLE",
+    retryAfterMs: 60_000,
+    maxAttempts: 2,
+  });
+  assert.equal(failedOnce?.status, "pending", "first failure returns the row to pending");
+  assert.equal(failedOnce?.attempts, 1);
+  assert.ok(failedOnce!.availableAt.getTime() > Date.now(), "retry must be delayed");
+  assert.equal(failedOnce?.lastError, "SINK_UNAVAILABLE");
+
+  await testDb!
+    .update(harnessSessionOutbox)
+    .set({ availableAt: new Date(Date.now() - 1_000) })
+    .where(eq(harnessSessionOutbox.harnessSessionOutboxId, retryable.harnessSessionOutboxId));
+  const reclaimed = await repo!.claimPendingSessionOutbox({ lockerId: "projector-1", limit: 10, lockMs: 30_000 });
+  assert.equal(reclaimed.length, 1);
+  const exhausted = await repo!.markSessionOutboxFailed({
+    outboxId: retryable.harnessSessionOutboxId,
+    lockerId: "projector-1",
+    errorCode: "SINK_UNAVAILABLE",
+    retryAfterMs: 60_000,
+    maxAttempts: 2,
+  });
+  assert.equal(exhausted?.status, "failed", "reaching maxAttempts marks the outbox row failed");
+  assert.equal(exhausted?.attempts, 2);
+});
+
+describeOrSkip("R9 completeAttemptAndRun finalizes attempt and run exactly once", { skip: !testDatabaseUrl }, async () => {
+  const claimed = await makeClaimedRun(1_000);
+  const runId = claimed.run.harnessRunId;
+  const first = await repo!.completeAttemptAndRun({
+    attemptId: claimed.attempt.harnessRunAttemptId,
+    runId,
+    outcome: "succeeded",
+  });
+  assert.equal(first.changed, true);
+  const second = await repo!.completeAttemptAndRun({
+    attemptId: claimed.attempt.harnessRunAttemptId,
+    runId,
+    outcome: "succeeded",
+  });
+  assert.equal(second.changed, false, "terminal transition must be idempotent");
+
+  const [run] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, runId));
+  assert.equal(run.status, "completed");
+  assert.ok(run.completedAt);
+  const [attempt] = await testDb!
+    .select()
+    .from(harnessRunAttempts)
+    .where(eq(harnessRunAttempts.harnessRunAttemptId, claimed.attempt.harnessRunAttemptId));
+  assert.equal(attempt.status, "succeeded");
+  assert.ok(attempt.finishedAt);
+
+  const events = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, "run_completed")));
+  assert.equal(events.length, 1, "terminal event must be appended exactly once");
+});
+
+describeOrSkip("R10 requestRunCancel marks cancelling and never touches terminal runs", { skip: !testDatabaseUrl }, async () => {
+  const claimed = await makeClaimedRun(1_000);
+  const runId = claimed.run.harnessRunId;
+  const cancel = await repo!.requestRunCancel({ runId, requestedBy: "tester" });
+  assert.equal(cancel.changed, true);
+  const [run] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, runId));
+  assert.equal(run.status, "cancelling");
+  assert.equal(run.cancelRequestedBy, "tester");
+  assert.ok(run.cancelRequestedAt);
+  const cancelEvents = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, "cancel_requested")));
+  assert.equal(cancelEvents.length, 1);
+
+  const completed = await makeClaimedRun(1_000);
+  await repo!.completeAttemptAndRun({ attemptId: completed.attempt.harnessRunAttemptId, runId: completed.run.harnessRunId, outcome: "succeeded" });
+  const late = await repo!.requestRunCancel({ runId: completed.run.harnessRunId, requestedBy: "tester" });
+  assert.equal(late.changed, false, "terminal run must reject cancel");
+  const [terminalRun] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, completed.run.harnessRunId));
+  assert.equal(terminalRun.status, "completed");
+});
+
+describeOrSkip("R11 releaseAttemptForShutdown requeues the run or completes a pending cancel", { skip: !testDatabaseUrl }, async () => {
+  const claimed = await makeClaimedRun(1_000);
+  const released = await repo!.releaseAttemptForShutdown({
+    attemptId: claimed.attempt.harnessRunAttemptId,
+    runId: claimed.run.harnessRunId,
+  });
+  assert.equal(released.outcome, "requeued");
+  const [run] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, claimed.run.harnessRunId));
+  assert.equal(run.status, "queued");
+  const [attempt] = await testDb!
+    .select()
+    .from(harnessRunAttempts)
+    .where(eq(harnessRunAttempts.harnessRunAttemptId, claimed.attempt.harnessRunAttemptId));
+  assert.equal(attempt.status, "cancelled");
+
+  const claimedCancel = await makeClaimedRun(1_000);
+  await repo!.requestRunCancel({ runId: claimedCancel.run.harnessRunId, requestedBy: "tester" });
+  const cancelled = await repo!.releaseAttemptForShutdown({
+    attemptId: claimedCancel.attempt.harnessRunAttemptId,
+    runId: claimedCancel.run.harnessRunId,
+  });
+  assert.equal(cancelled.outcome, "cancelled", "shutdown with pending cancel completes the cancellation");
+  const [cancelledRun] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, claimedCancel.run.harnessRunId));
+  assert.equal(cancelledRun.status, "cancelled");
 });

@@ -97,7 +97,46 @@ export type WorkbenchDispatchInput = {
   streamingAdapter?: StreamingAdapter;
   /** RP-029 返工：可选流式模型调用函数 */
   modelChatStream?: (params: { systemPrompt: string; userContent: string }) => AsyncIterable<StreamingChunk>;
+  /** RP-047 Batch B：可选服务端取消信号；中止后在安全边界拒绝，取消后零副作用 */
+  abortSignal?: AbortSignal;
 };
+
+/** RP-047 Batch B：dispatch 取消错误，供调用方区分取消与真实模型故障。 */
+export class WorkbenchDispatchCancelledError extends Error {
+  constructor(message?: string) {
+    super(message ?? "workbench dispatch cancelled");
+    this.name = "WorkbenchDispatchCancelledError";
+  }
+}
+
+function raceWithDispatchAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(new WorkbenchDispatchCancelledError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new WorkbenchDispatchCancelledError());
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (err) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      },
+    );
+  });
+}
+
+async function* streamWithDispatchAbort(
+  stream: AsyncIterable<StreamingChunk>,
+  signal: AbortSignal,
+): AsyncGenerator<StreamingChunk> {
+  for await (const chunk of stream) {
+    // 取消安全边界：中止后不再向 adapter 投递任何 chunk
+    if (signal.aborted) throw new WorkbenchDispatchCancelledError();
+    yield chunk;
+  }
+}
 
 /** RP-029 返工：流式 chunk */
 export type StreamingChunk = {
@@ -136,18 +175,40 @@ const WORKBENCH_HANDLERS: WorkbenchIntentHandler[] = [
  * 根据 intent 路由结果选择执行路径，返回统一的 WorkbenchDispatchData。
  */
 export async function dispatchHomeWorkbenchTurn(input: WorkbenchDispatchInput): Promise<WorkbenchDispatchData> {
+  // RP-047 Batch B：取消信号包装 — 预中止立即拒绝；模型调用（含分类兜底）
+  // 统一经 race/流式边界检查，中止后不再投递 chunk、不再采纳迟到回复。
+  const abortSignal = input.abortSignal;
+  if (abortSignal?.aborted) throw new WorkbenchDispatchCancelledError();
+  const effectiveInput: WorkbenchDispatchInput = abortSignal
+    ? {
+        ...input,
+        modelChat: (params) => {
+          if (abortSignal.aborted) return Promise.reject(new WorkbenchDispatchCancelledError());
+          return raceWithDispatchAbort(input.modelChat(params), abortSignal);
+        },
+        ...(input.modelChatStream
+          ? {
+              modelChatStream: (params: { systemPrompt: string; userContent: string }) => {
+                if (abortSignal.aborted) throw new WorkbenchDispatchCancelledError();
+                return streamWithDispatchAbort(input.modelChatStream!(params), abortSignal);
+              },
+            }
+          : {}),
+      }
+    : input;
+
   let intent = routeWorkbenchIntent({
-    message: input.message,
-    hasAttachment: Boolean(input.attachment),
-    hasLatestV1Artifact: input.latestHarnessArtifact?.artifactType === "requirement_report_v1",
-    clientAction: input.clientAction,
+    message: effectiveInput.message,
+    hasAttachment: Boolean(effectiveInput.attachment),
+    hasLatestV1Artifact: effectiveInput.latestHarnessArtifact?.artifactType === "requirement_report_v1",
+    clientAction: effectiveInput.clientAction,
   });
 
   // RP-003: 规则兜底时调用模型二次分类
   // RP-049 Batch A: 只采纳超范围拦截意图且阈值提高到 0.85；分类结果无论是否采纳都写入 trace
   let modelClassification: ModelClassificationResult | undefined;
   if (intent.routingRule === "default_domain_qa") {
-    const classification = await classifyIntentWithModel(input.message, input.modelChat);
+    const classification = await classifyIntentWithModel(effectiveInput.message, effectiveInput.modelChat);
     if (classification) {
       modelClassification = classification; // 始终记录到 trace，保证可观测
       if (
@@ -164,11 +225,11 @@ export async function dispatchHomeWorkbenchTurn(input: WorkbenchDispatchInput): 
   }
 
   const context = buildWorkbenchContext({
-    user: input.user,
-    attachment: input.attachment,
-    latestHarnessArtifact: input.latestHarnessArtifact,
+    user: effectiveInput.user,
+    attachment: effectiveInput.attachment,
+    latestHarnessArtifact: effectiveInput.latestHarnessArtifact,
   });
 
   const handler = WORKBENCH_HANDLERS.find((candidate) => candidate.intents.includes(intent.intent)) ?? domainQaHandler;
-  return handler.handle({ intent, context, input, modelClassification });
+  return handler.handle({ intent, context, input: effectiveInput, modelClassification });
 }

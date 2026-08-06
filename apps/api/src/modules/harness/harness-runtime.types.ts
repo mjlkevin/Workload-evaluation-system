@@ -41,6 +41,10 @@ export const HARNESS_RUN_EVENT_TYPES = [
   "cancel_requested",
   "run_completed",
   "run_failed",
+  // RP-047 Batch B（扩展项 E1，additive）：恢复与取消终态事件
+  "recovery_started",
+  "recovery_completed",
+  "run_cancelled",
 ] as const;
 export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
 
@@ -58,3 +62,59 @@ export function isActiveHarnessRunStatus(status: HarnessRunStatus): boolean {
 export function createHarnessEffectKey(input: HarnessEffectKeyInput): string {
   return `${input.runId}:${input.stepKey}:${input.effectName}:${input.ordinal}`;
 }
+
+// ============================================================
+// RP-047 Batch B：Worker / Recovery Coordinator / Projector 时序契约
+// ============================================================
+// 生产默认常量冻结 roadmap Task 2 口径：45s lease、15s heartbeat、
+// 10s 恢复扫描、最多 3 次自动恢复、2/10/30s 退避。全部可注入，
+// 故障注入测试以小值覆盖，默认常量由类型测试守护。
+
+export type HarnessWorkerTiming = {
+  leaseMs: number;
+  heartbeatIntervalMs: number;
+  claimPollIntervalMs: number;
+  concurrency: number;
+};
+
+export const HARNESS_WORKER_TIMING_DEFAULTS: HarnessWorkerTiming = {
+  leaseMs: 45_000,
+  heartbeatIntervalMs: 15_000,
+  claimPollIntervalMs: 2_000,
+  concurrency: 1,
+};
+
+export type HarnessRecoveryTiming = {
+  scanIntervalMs: number;
+  maxAutoRecoveries: number;
+  backoffMs: readonly number[];
+};
+
+export const HARNESS_RECOVERY_TIMING_DEFAULTS: HarnessRecoveryTiming = {
+  scanIntervalMs: 10_000,
+  maxAutoRecoveries: 3,
+  backoffMs: [2_000, 10_000, 30_000],
+};
+
+export type HarnessProjectorTiming = {
+  pollIntervalMs: number;
+  lockMs: number;
+  maxAttempts: number;
+  retryAfterMs: number;
+};
+
+export const HARNESS_PROJECTOR_TIMING_DEFAULTS: HarnessProjectorTiming = {
+  pollIntervalMs: 5_000,
+  lockMs: 30_000,
+  maxAttempts: 5,
+  retryAfterMs: 10_000,
+};
+
+/** checkpoint runtimeValidation 的 validatorVersion 固定值。 */
+export const HARNESS_WORKER_VALIDATOR_VERSION = "harness-worker/v1";
+
+/** 自动恢复次数超限后的 Run 失败码（roadmap Task 2 原文）。 */
+export const HARNESS_RECOVERY_LIMIT_ERROR_CODE = "RECOVERY_LIMIT_EXCEEDED";
+
+/** 没有任何兼容检查点时的 Run 失败码（设计稿 §8.3）。 */
+export const HARNESS_RECOVERY_INCOMPATIBLE_ERROR_CODE = "RECOVERY_CHECKPOINT_INCOMPATIBLE";

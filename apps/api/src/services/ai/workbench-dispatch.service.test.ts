@@ -828,3 +828,107 @@ test("RP-049: wes_data_query and write_action_request classifications are never 
     assert.equal(result.trace.modelClassification?.intent, classifiedIntent);
   }
 });
+
+// ── RP-047 Batch B: 服务端 AbortSignal 取消安全边界 ────────────────
+
+test("RP-047-B: pre-aborted signal rejects before any model call", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let modelCalled = false;
+
+  await assert.rejects(
+    dispatchHomeWorkbenchTurn({
+      user,
+      workflowKey: "free_chat",
+      message: "这个风险是什么意思",
+      businessRole: "pre_sales",
+      roleLabel: "售前顾问",
+      model: "kimi-test",
+      abortSignal: controller.signal,
+      modelChat: async () => {
+        modelCalled = true;
+        return { answer: "不应到达", rawContent: "" };
+      },
+    }),
+    (err: unknown) => err instanceof Error && err.name === "WorkbenchDispatchCancelledError",
+  );
+  assert.equal(modelCalled, false, "pre-aborted dispatch must never invoke the model");
+});
+
+test("RP-047-B: abort during streaming stops chunk consumption at the boundary", async () => {
+  const controller = new AbortController();
+  const receivedTokens: string[] = [];
+  let onCompleteCalled = false;
+
+  await assert.rejects(
+    dispatchHomeWorkbenchTurn({
+      user,
+      workflowKey: "free_chat",
+      message: "这个风险是什么意思",
+      businessRole: "pre_sales",
+      roleLabel: "售前顾问",
+      model: "kimi-test",
+      abortSignal: controller.signal,
+      modelChat: async ({ systemPrompt }) => {
+        // 分类阶段：信号未中止，正常返回低置信分类
+        if (systemPrompt.includes("意图分类器")) {
+          return {
+            answer: JSON.stringify({ intent: "domain_qa", confidence: 0.4, reason: "不确定" }),
+            rawContent: "",
+          };
+        }
+        throw new Error("streaming path must not fall back to modelChat");
+      },
+      streamingAdapter: {
+        onToken: (chunk) => {
+          receivedTokens.push(chunk.contentDelta);
+          controller.abort(); // 第一个 chunk 到达后请求取消
+        },
+        onComplete: () => {
+          onCompleteCalled = true;
+        },
+      },
+      modelChatStream: async function* () {
+        yield { contentDelta: "chunk-1" };
+        yield { contentDelta: "chunk-2" };
+        yield { contentDelta: "chunk-3" };
+      },
+    }),
+    (err: unknown) => err instanceof Error && err.name === "WorkbenchDispatchCancelledError",
+  );
+
+  assert.deepEqual(receivedTokens, ["chunk-1"], "no chunk may be delivered after the abort boundary");
+  assert.equal(onCompleteCalled, false, "onComplete must not fire after cancellation");
+});
+
+test("RP-047-B: abort racing a pending non-streaming model call rejects as cancelled", async () => {
+  const controller = new AbortController();
+
+  await assert.rejects(
+    (async () => {
+      const pending = dispatchHomeWorkbenchTurn({
+        user,
+        workflowKey: "free_chat",
+        message: "这个风险是什么意思", // 兜底 domain_qa，必经模型调用
+        businessRole: "pre_sales",
+        roleLabel: "售前顾问",
+        model: "kimi-test",
+        abortSignal: controller.signal,
+        modelChat: async ({ systemPrompt }) => {
+          // 模型迟迟不返回；取消应立即获胜，否则 dispatch 最终会正常完成
+          await new Promise((resolve) => setTimeout(resolve, 2_000));
+          if (systemPrompt.includes("意图分类器")) {
+            return {
+              answer: JSON.stringify({ intent: "domain_qa", confidence: 0.4, reason: "不确定" }),
+              rawContent: "",
+            };
+          }
+          return { answer: "迟到的模型回复", rawContent: "" };
+        },
+      });
+      controller.abort();
+      return pending;
+    })(),
+    (err: unknown) => err instanceof Error && err.name === "WorkbenchDispatchCancelledError",
+  );
+});

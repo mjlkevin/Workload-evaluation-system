@@ -9,7 +9,7 @@
 // 绝不原样穿透给调用方。
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, type Database } from "../../db/client";
 import {
@@ -19,15 +19,19 @@ import {
   harnessRunOutputs,
   harnessRuns,
   harnessSessionOutbox,
+  harnessToolEvents,
   type HarnessRunAttemptRow,
   type HarnessRunCheckpointRow,
   type HarnessRunEventRow,
   type HarnessRunOutputRow,
   type HarnessRunRow,
   type HarnessSessionOutboxRow,
+  type HarnessToolEventRow,
 } from "../../db/schema";
 import {
+  HARNESS_RECOVERY_LIMIT_ERROR_CODE,
   HARNESS_RUN_EVENT_TYPES,
+  HARNESS_RUN_TERMINAL_STATUSES,
   type HarnessCheckpointKind,
   type HarnessOutputStatus,
   type HarnessResumePolicy,
@@ -134,6 +138,75 @@ export type EnqueueHarnessSessionOutboxInput = {
   availableAt?: Date;
 };
 
+// ============================================================
+// RP-047 Batch B：Worker / Recovery / Projector 扩展输入类型
+// ============================================================
+
+export type FindRunsWithExpiredActiveLeaseInput = {
+  now?: Date;
+  limit?: number;
+};
+
+export type OrphanHarnessAttemptInput = {
+  attemptId: string;
+  now?: Date;
+};
+
+export type ScheduleHarnessRunRecoveryInput = {
+  runId: string;
+  maxAutoRecoveries: number;
+  backoffMs: readonly number[];
+  now?: Date;
+};
+
+export type HarnessRunRecoveryOutcome = "scheduled" | "limit_exceeded" | "cancelled" | "not_active";
+
+export type RecordHarnessToolEffectInput = {
+  runId: string;
+  attemptId?: string | null;
+  effectKey: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  output?: Record<string, unknown>;
+};
+
+export type ClaimPendingSessionOutboxInput = {
+  lockerId: string;
+  limit: number;
+  lockMs: number;
+  now?: Date;
+};
+
+export type MarkSessionOutboxFailedInput = {
+  outboxId: string;
+  lockerId: string;
+  errorCode: string;
+  retryAfterMs: number;
+  maxAttempts: number;
+  now?: Date;
+};
+
+export type CompleteHarnessAttemptAndRunInput = {
+  attemptId: string;
+  runId: string;
+  outcome: "succeeded" | "failed" | "cancelled";
+  errorCode?: string;
+  errorMessage?: string;
+  now?: Date;
+};
+
+export type RequestHarnessRunCancelInput = {
+  runId: string;
+  requestedBy: string;
+  now?: Date;
+};
+
+export type ReleaseHarnessAttemptForShutdownInput = {
+  attemptId: string;
+  runId: string;
+  now?: Date;
+};
+
 export interface HarnessRuntimeRepository {
   createQueuedRun(input: CreateQueuedHarnessRunInput): Promise<{ run: HarnessRunRow; created: boolean }>;
   findRunForOwner(runId: string, ownerUserId: string): Promise<HarnessRunRow | null>;
@@ -147,6 +220,35 @@ export interface HarnessRuntimeRepository {
   enqueueSessionOutbox(
     input: EnqueueHarnessSessionOutboxInput,
   ): Promise<{ outbox: HarnessSessionOutboxRow; created: boolean }>;
+  findRunsWithExpiredActiveLease(
+    input: FindRunsWithExpiredActiveLeaseInput,
+  ): Promise<Array<{ run: HarnessRunRow; attempt: HarnessRunAttemptRow }>>;
+  orphanAttempt(input: OrphanHarnessAttemptInput): Promise<HarnessRunAttemptRow | null>;
+  scheduleRunRecovery(
+    input: ScheduleHarnessRunRecoveryInput,
+  ): Promise<{ outcome: HarnessRunRecoveryOutcome; run: HarnessRunRow }>;
+  listCheckpointsForRun(input: { runId: string }): Promise<HarnessRunCheckpointRow[]>;
+  setAttemptResumeCheckpoint(input: {
+    attemptId: string;
+    checkpointId: string;
+  }): Promise<HarnessRunAttemptRow | null>;
+  recordToolEffectOnce(
+    input: RecordHarnessToolEffectInput,
+  ): Promise<{ toolEvent: HarnessToolEventRow; created: boolean }>;
+  findToolEffectByKey(input: { runId: string; effectKey: string }): Promise<HarnessToolEventRow | null>;
+  claimPendingSessionOutbox(input: ClaimPendingSessionOutboxInput): Promise<HarnessSessionOutboxRow[]>;
+  markSessionOutboxPublished(input: {
+    outboxId: string;
+    lockerId: string;
+  }): Promise<HarnessSessionOutboxRow | null>;
+  markSessionOutboxFailed(input: MarkSessionOutboxFailedInput): Promise<HarnessSessionOutboxRow | null>;
+  completeAttemptAndRun(
+    input: CompleteHarnessAttemptAndRunInput,
+  ): Promise<{ changed: boolean; run: HarnessRunRow }>;
+  requestRunCancel(input: RequestHarnessRunCancelInput): Promise<{ changed: boolean; run: HarnessRunRow }>;
+  releaseAttemptForShutdown(
+    input: ReleaseHarnessAttemptForShutdownInput,
+  ): Promise<{ outcome: "requeued" | "cancelled" | "noop"; run: HarnessRunRow }>;
 }
 
 type HarnessTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -394,7 +496,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
           const picked = await tx.execute(sql`
             SELECT harness_run_id
             FROM harness_runs
-            WHERE status = 'queued' AND available_at <= ${now}
+            WHERE status IN ('queued', 'recovering') AND available_at <= ${now}
             ORDER BY available_at ASC, created_at ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
@@ -723,6 +825,476 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
           });
 
           return { outbox, created: true };
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    // ========================================================
+    // RP-047 Batch B：Worker / Recovery / Projector 扩展实现
+    // ========================================================
+
+    async findRunsWithExpiredActiveLease(input) {
+      try {
+        const now = input.now ?? new Date();
+        const limit = input.limit ?? 50;
+        const attempts = await dbInstance
+          .select()
+          .from(harnessRunAttempts)
+          .where(
+            and(
+              inArray(harnessRunAttempts.status, ["claimed", "running"]),
+              lt(harnessRunAttempts.leaseExpiresAt, now),
+            ),
+          )
+          .orderBy(harnessRunAttempts.leaseExpiresAt)
+          .limit(limit);
+        if (attempts.length === 0) return [];
+        const runIds = attempts.map((attempt) => attempt.harnessRunId);
+        const runs = await dbInstance
+          .select()
+          .from(harnessRuns)
+          .where(
+            and(
+              inArray(harnessRuns.harnessRunId, runIds),
+              inArray(harnessRuns.status, ["running", "recovering", "cancelling"]),
+            ),
+          );
+        const runById = new Map(runs.map((run) => [run.harnessRunId, run]));
+        return attempts
+          .filter((attempt) => runById.has(attempt.harnessRunId))
+          .map((attempt) => ({ run: runById.get(attempt.harnessRunId)!, attempt }));
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async orphanAttempt(input) {
+      try {
+        const now = input.now ?? new Date();
+        const rows = await dbInstance
+          .update(harnessRunAttempts)
+          .set({ status: "orphaned", finishedAt: now, updatedAt: now })
+          .where(
+            and(
+              eq(harnessRunAttempts.harnessRunAttemptId, input.attemptId),
+              inArray(harnessRunAttempts.status, ["claimed", "running"]),
+            ),
+          )
+          .returning();
+        return rows[0] ?? null;
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async scheduleRunRecovery(input) {
+      try {
+        return await dbInstance.transaction(async (tx) => {
+          const run = await lockRunRow(tx, input.runId);
+          const now = input.now ?? (await readDbNow(tx));
+          if ((HARNESS_RUN_TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
+            return { outcome: "not_active" as const, run };
+          }
+
+          const activeAttempts = await tx
+            .select()
+            .from(harnessRunAttempts)
+            .where(
+              and(
+                eq(harnessRunAttempts.harnessRunId, input.runId),
+                inArray(harnessRunAttempts.status, ["claimed", "running"]),
+              ),
+            );
+          for (const attempt of activeAttempts) {
+            await tx
+              .update(harnessRunAttempts)
+              .set({ status: "orphaned", finishedAt: now, updatedAt: now })
+              .where(eq(harnessRunAttempts.harnessRunAttemptId, attempt.harnessRunAttemptId));
+          }
+
+          if (run.cancelRequestedAt) {
+            const [cancelled] = await tx
+              .update(harnessRuns)
+              .set({ status: "cancelled", completedAt: now, updatedAt: now })
+              .where(eq(harnessRuns.harnessRunId, input.runId))
+              .returning();
+            await appendRunEventInTransaction(tx, {
+              runId: input.runId,
+              eventType: "run_cancelled",
+              payload: { reason: "cancel_requested_during_recovery", recoveryCount: run.recoveryCount },
+            });
+            return { outcome: "cancelled" as const, run: cancelled };
+          }
+
+          if (run.recoveryCount >= input.maxAutoRecoveries) {
+            const [failed] = await tx
+              .update(harnessRuns)
+              .set({
+                status: "failed",
+                errorCode: HARNESS_RECOVERY_LIMIT_ERROR_CODE,
+                errorMessage: "automatic recovery limit exceeded",
+                completedAt: now,
+                updatedAt: now,
+              })
+              .where(eq(harnessRuns.harnessRunId, input.runId))
+              .returning();
+            await appendRunEventInTransaction(tx, {
+              runId: input.runId,
+              eventType: "run_failed",
+              payload: { errorCode: HARNESS_RECOVERY_LIMIT_ERROR_CODE, recoveryCount: run.recoveryCount },
+            });
+            return { outcome: "limit_exceeded" as const, run: failed };
+          }
+
+          const backoffIndex = Math.min(run.recoveryCount, Math.max(input.backoffMs.length - 1, 0));
+          const backoffMs = input.backoffMs[backoffIndex] ?? 0;
+          const nextRecoveryCount = run.recoveryCount + 1;
+          const [recovering] = await tx
+            .update(harnessRuns)
+            .set({
+              status: "recovering",
+              recoveryCount: nextRecoveryCount,
+              availableAt: new Date(now.getTime() + backoffMs),
+              updatedAt: now,
+            })
+            .where(eq(harnessRuns.harnessRunId, input.runId))
+            .returning();
+          await appendRunEventInTransaction(tx, {
+            runId: input.runId,
+            eventType: "recovery_started",
+            payload: {
+              recoveryCount: nextRecoveryCount,
+              backoffMs,
+              orphanedAttemptIds: activeAttempts.map((attempt) => attempt.harnessRunAttemptId),
+            },
+          });
+          return { outcome: "scheduled" as const, run: recovering };
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async listCheckpointsForRun(input) {
+      try {
+        return await dbInstance
+          .select()
+          .from(harnessRunCheckpoints)
+          .where(eq(harnessRunCheckpoints.harnessRunId, input.runId))
+          .orderBy(desc(harnessRunCheckpoints.sequence));
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async setAttemptResumeCheckpoint(input) {
+      try {
+        const rows = await dbInstance
+          .update(harnessRunAttempts)
+          .set({ resumeCheckpointId: input.checkpointId, updatedAt: new Date() })
+          .where(
+            and(
+              eq(harnessRunAttempts.harnessRunAttemptId, input.attemptId),
+              inArray(harnessRunAttempts.status, ["claimed", "running"]),
+            ),
+          )
+          .returning();
+        return rows[0] ?? null;
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async recordToolEffectOnce(input) {
+      try {
+        assertNonEmptyText(input.runId, "runId");
+        assertNonEmptyText(input.effectKey, "effectKey");
+        assertNonEmptyText(input.toolName, "toolName");
+        assertSafeJsonObject(input.input);
+        if (input.output !== undefined) assertSafeJsonObject(input.output);
+        const effectInput = normalizeJsonObject(input.input);
+        const effectOutput = input.output !== undefined ? normalizeJsonObject(input.output) : null;
+
+        return await dbInstance.transaction(async (tx) => {
+          await lockRunRow(tx, input.runId);
+          const existing = await tx
+            .select()
+            .from(harnessToolEvents)
+            .where(and(eq(harnessToolEvents.harnessRunId, input.runId), eq(harnessToolEvents.effectKey, input.effectKey)));
+          if (existing.length > 0) {
+            return { toolEvent: existing[0], created: false };
+          }
+          const now = await readDbNow(tx);
+          const inserted = await tx
+            .insert(harnessToolEvents)
+            .values({
+              harnessToolEventId: randomUUID(),
+              harnessRunId: input.runId,
+              toolName: input.toolName,
+              eventType: "tool_effect",
+              status: "succeeded",
+              input: effectInput,
+              output: effectOutput,
+              effectKey: input.effectKey,
+              createdAt: now,
+              resolvedAt: now,
+            })
+            .onConflictDoNothing()
+            .returning();
+          if (inserted.length > 0) {
+            return { toolEvent: inserted[0], created: true };
+          }
+          // 并发竞态：其他执行者已登记同一 effectKey，回读其结果复用
+          const raced = await tx
+            .select()
+            .from(harnessToolEvents)
+            .where(and(eq(harnessToolEvents.harnessRunId, input.runId), eq(harnessToolEvents.effectKey, input.effectKey)));
+          if (raced.length === 0) {
+            throw new HarnessRuntimeError("HARNESS_RUNTIME_INTERNAL", "tool effect insert raced without a winner");
+          }
+          return { toolEvent: raced[0], created: false };
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async findToolEffectByKey(input) {
+      try {
+        const rows = await dbInstance
+          .select()
+          .from(harnessToolEvents)
+          .where(and(eq(harnessToolEvents.harnessRunId, input.runId), eq(harnessToolEvents.effectKey, input.effectKey)));
+        return rows[0] ?? null;
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async claimPendingSessionOutbox(input) {
+      try {
+        assertNonEmptyText(input.lockerId, "lockerId");
+        return await dbInstance.transaction(async (tx) => {
+          const now = input.now ?? (await readDbNow(tx));
+          const lockCutoff = new Date(now.getTime() - input.lockMs);
+          const picked = await tx.execute(sql`
+            SELECT harness_session_outbox_id
+            FROM harness_session_outbox
+            WHERE (status = 'pending' AND available_at <= ${now})
+               OR (status = 'processing' AND locked_at < ${lockCutoff})
+            ORDER BY available_at ASC
+            LIMIT ${input.limit}
+            FOR UPDATE SKIP LOCKED
+          `);
+          const ids = (picked.rows as Array<{ harness_session_outbox_id: string }>).map(
+            (row) => row.harness_session_outbox_id,
+          );
+          if (ids.length === 0) return [];
+          return await tx
+            .update(harnessSessionOutbox)
+            .set({ status: "processing", lockedBy: input.lockerId, lockedAt: now, updatedAt: now })
+            .where(inArray(harnessSessionOutbox.harnessSessionOutboxId, ids))
+            .returning();
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async markSessionOutboxPublished(input) {
+      try {
+        const rows = await dbInstance
+          .update(harnessSessionOutbox)
+          .set({ status: "published", publishedAt: new Date(), updatedAt: new Date() })
+          .where(
+            and(
+              eq(harnessSessionOutbox.harnessSessionOutboxId, input.outboxId),
+              eq(harnessSessionOutbox.lockedBy, input.lockerId),
+              eq(harnessSessionOutbox.status, "processing"),
+            ),
+          )
+          .returning();
+        return rows[0] ?? null;
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async markSessionOutboxFailed(input) {
+      try {
+        assertNonEmptyText(input.errorCode, "errorCode");
+        return await dbInstance.transaction(async (tx) => {
+          const rows = await tx
+            .select()
+            .from(harnessSessionOutbox)
+            .where(
+              and(
+                eq(harnessSessionOutbox.harnessSessionOutboxId, input.outboxId),
+                eq(harnessSessionOutbox.lockedBy, input.lockerId),
+                eq(harnessSessionOutbox.status, "processing"),
+              ),
+            );
+          const row = rows[0];
+          if (!row) return null;
+          const now = input.now ?? (await readDbNow(tx));
+          const attempts = row.attempts + 1;
+          const exhausted = attempts >= input.maxAttempts;
+          const [updated] = await tx
+            .update(harnessSessionOutbox)
+            .set({
+              status: exhausted ? "failed" : "pending",
+              attempts,
+              lastError: input.errorCode,
+              lockedBy: exhausted ? row.lockedBy : null,
+              lockedAt: exhausted ? row.lockedAt : null,
+              availableAt: exhausted ? row.availableAt : new Date(now.getTime() + input.retryAfterMs),
+              updatedAt: now,
+            })
+            .where(eq(harnessSessionOutbox.harnessSessionOutboxId, input.outboxId))
+            .returning();
+          return updated;
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async completeAttemptAndRun(input) {
+      try {
+        return await dbInstance.transaction(async (tx) => {
+          const run = await lockRunRow(tx, input.runId);
+          if ((HARNESS_RUN_TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
+            return { changed: false, run };
+          }
+          const now = input.now ?? (await readDbNow(tx));
+          const attemptRows = await tx
+            .select()
+            .from(harnessRunAttempts)
+            .where(eq(harnessRunAttempts.harnessRunAttemptId, input.attemptId));
+          const attempt = attemptRows[0];
+          if (!attempt || attempt.harnessRunId !== input.runId) {
+            throw new HarnessRuntimeError("HARNESS_ATTEMPT_NOT_FOUND", "attempt does not belong to the run");
+          }
+          if ((["claimed", "running"] as const).includes(attempt.status as "claimed" | "running")) {
+            await tx
+              .update(harnessRunAttempts)
+              .set({
+                status: input.outcome,
+                finishedAt: now,
+                updatedAt: now,
+                ...(input.outcome === "failed" ? { errorCode: input.errorCode ?? null, errorMessage: input.errorMessage ?? null } : {}),
+              })
+              .where(eq(harnessRunAttempts.harnessRunAttemptId, input.attemptId));
+          }
+          const runStatus = input.outcome === "succeeded" ? "completed" : input.outcome === "failed" ? "failed" : "cancelled";
+          const eventType = input.outcome === "succeeded" ? "run_completed" : input.outcome === "failed" ? "run_failed" : "run_cancelled";
+          const [updated] = await tx
+            .update(harnessRuns)
+            .set({
+              status: runStatus,
+              completedAt: now,
+              updatedAt: now,
+              ...(input.outcome === "failed"
+                ? { errorCode: input.errorCode ?? null, errorMessage: input.errorMessage ?? null }
+                : {}),
+            })
+            .where(eq(harnessRuns.harnessRunId, input.runId))
+            .returning();
+          await appendRunEventInTransaction(tx, {
+            runId: input.runId,
+            eventType,
+            payload: {
+              attemptId: input.attemptId,
+              ...(input.outcome === "failed" ? { errorCode: input.errorCode ?? "WORKER_STEP_FAILED" } : {}),
+            },
+          });
+          return { changed: true, run: updated };
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async requestRunCancel(input) {
+      try {
+        assertNonEmptyText(input.requestedBy, "requestedBy");
+        return await dbInstance.transaction(async (tx) => {
+          const run = await lockRunRow(tx, input.runId);
+          if ((HARNESS_RUN_TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
+            return { changed: false, run };
+          }
+          if (run.cancelRequestedAt) {
+            return { changed: false, run };
+          }
+          const now = input.now ?? (await readDbNow(tx));
+          const [updated] = await tx
+            .update(harnessRuns)
+            .set({
+              status: "cancelling",
+              cancelRequestedAt: now,
+              cancelRequestedBy: input.requestedBy,
+              updatedAt: now,
+            })
+            .where(eq(harnessRuns.harnessRunId, input.runId))
+            .returning();
+          await appendRunEventInTransaction(tx, {
+            runId: input.runId,
+            eventType: "cancel_requested",
+            payload: { requestedBy: input.requestedBy },
+          });
+          return { changed: true, run: updated };
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async releaseAttemptForShutdown(input) {
+      try {
+        return await dbInstance.transaction(async (tx) => {
+          const run = await lockRunRow(tx, input.runId);
+          if ((HARNESS_RUN_TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
+            return { outcome: "noop" as const, run };
+          }
+          const now = input.now ?? (await readDbNow(tx));
+          await tx
+            .update(harnessRunAttempts)
+            .set({ status: "cancelled", finishedAt: now, updatedAt: now })
+            .where(
+              and(
+                eq(harnessRunAttempts.harnessRunAttemptId, input.attemptId),
+                eq(harnessRunAttempts.harnessRunId, input.runId),
+                inArray(harnessRunAttempts.status, ["claimed", "running"]),
+              ),
+            );
+
+          if (run.cancelRequestedAt) {
+            const [cancelled] = await tx
+              .update(harnessRuns)
+              .set({ status: "cancelled", completedAt: now, updatedAt: now })
+              .where(eq(harnessRuns.harnessRunId, input.runId))
+              .returning();
+            await appendRunEventInTransaction(tx, {
+              runId: input.runId,
+              eventType: "run_cancelled",
+              payload: { reason: "worker_shutdown_with_pending_cancel", attemptId: input.attemptId },
+            });
+            return { outcome: "cancelled" as const, run: cancelled };
+          }
+
+          const [requeued] = await tx
+            .update(harnessRuns)
+            .set({ status: "queued", availableAt: now, updatedAt: now })
+            .where(eq(harnessRuns.harnessRunId, input.runId))
+            .returning();
+          await appendRunEventInTransaction(tx, {
+            runId: input.runId,
+            eventType: "run_status_changed",
+            payload: { to: "queued", reason: "worker_shutdown", attemptId: input.attemptId },
+          });
+          return { outcome: "requeued" as const, run: requeued };
         });
       } catch (err) {
         throw toSafeError(err);
