@@ -35,6 +35,7 @@ tags:
   - name: Wbs
   - name: Agent
   - name: Harness
+  - name: AIRuns
   - name: ProjectEvaluations
   - name: System
   - name: Presales
@@ -662,6 +663,388 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GenericOkResponse"
+
+  # ------------------------------------------------------------
+  # AI Runs — 异步 Run API（RP-047 Batch C）
+  # ------------------------------------------------------------
+  # 受 feature flag `WES_AI_DURABLE_RUNS_ENABLED` 控制（默认关闭）：
+  # 关闭时以下全部端点返回 503 { code: "ASYNC_RUNS_DISABLED" }，
+  # 且 Session 删除不启用 409 活跃 Run 检查（保持旧行为）。
+  # submissionKey 为提交幂等主键（DB 唯一）；clientMessageId 随 run
+  # metadata 承载并可原样回读，供前端乐观 UI 对齐，不承担 DB 层去重语义。
+
+  /api/v1/ai-sessions/{sessionId}/runs:
+    post:
+      tags: [AIRuns]
+      summary: 提交异步 Run（202 + submissionKey 幂等）
+      description: >
+        将一条会话消息提交为后台 Run，立即返回 202。重复 submissionKey
+        返回同一 runId（幂等重放）。session 不属于当前用户时返回 404
+        （不泄露存在性）；该 session 已存在活跃工作台 Run 时返回
+        409 SESSION_HAS_ACTIVE_RUN。
+      operationId: submitAiRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiRunSubmitRequest"
+      responses:
+        "202":
+          description: 任务已进入后台执行
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunSubmitEnvelope"
+        "404":
+          description: Session 不存在或非 owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 该 Session 已有活跃 Run（code=SESSION_HAS_ACTIVE_RUN）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsConflictResponse"
+        "422":
+          description: 参数校验失败（code=42200）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
+
+  /api/v1/ai-runs:
+    get:
+      tags: [AIRuns]
+      summary: 当前用户活跃 Run 列表
+      description: 仅返回当前 owner 处于非终态的 Run（供前端 Shell 恢复）。
+      operationId: listActiveAiRuns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [active]
+      responses:
+        "200":
+          description: data.items 为活跃 Run 摘要数组
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
+
+  /api/v1/ai-runs/{runId}:
+    get:
+      tags: [AIRuns]
+      summary: Run snapshot（run + attempt + checkpoint + output）
+      description: 非 owner 与不存在同为 404，不泄露资源存在性。
+      operationId: getAiRunSnapshot
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run 聚合快照
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunSnapshotEnvelope"
+        "404":
+          description: Run 不存在或非 owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
+
+  /api/v1/ai-runs/{runId}/events:
+    get:
+      tags: [AIRuns]
+      summary: Run 事件流（可回放 SSE）
+      description: >
+        游标为事件 sequence：after 查询参数指定起点，Last-Event-ID 请求头
+        优先于 after；每 15s 发送心跳 comment 保活，单次回放批量上限 200 条；
+        Run 到达终态且事件排空后主动关闭流。客户端断线只释放连接，
+        不会取消 Run，重连可从上次游标继续回放。非 owner 在握手阶段
+        返回 404（JSON），不建立事件流。
+      operationId: streamAiRunEvents
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+        - name: after
+          in: query
+          required: false
+          description: 从该 sequence 之后开始回放（0 表示从头）
+          schema:
+            type: integer
+        - name: Last-Event-ID
+          in: header
+          required: false
+          description: 断线重连游标，优先于 after 参数
+          schema:
+            type: string
+      responses:
+        "200":
+          description: text/event-stream（id 为事件 sequence）
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          description: Run 不存在或非 owner（握手阶段 JSON 返回）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
+
+  /api/v1/ai-runs/{runId}/cancel:
+    post:
+      tags: [AIRuns]
+      summary: 取消 Run
+      description: 仅活跃 Run 可取消（202）；已终态返回 409 RUN_ALREADY_TERMINAL。
+      operationId: cancelAiRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: 取消请求已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: Run 不存在或非 owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Run 已终态（code=RUN_ALREADY_TERMINAL）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsConflictResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
+
+  /api/v1/ai-runs/{runId}/inputs:
+    post:
+      tags: [AIRuns]
+      summary: 为 waiting Run 提交补充信息并续跑
+      description: >
+        仅 waiting 状态可提交（事务内 append run_inputs_submitted 事件并
+        waiting→queued）；非 waiting 返回 409 RUN_NOT_WAITING；input 必须为
+        非空对象，否则 422。
+      operationId: submitAiRunInputs
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: object
+                  additionalProperties: true
+              required: [input]
+      responses:
+        "202":
+          description: 补充信息已受理，Run 恢复排队
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: Run 不存在或非 owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Run 非 waiting 状态（code=RUN_NOT_WAITING）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsConflictResponse"
+        "422":
+          description: input 缺失或非法（code=42200）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
+
+  /api/v1/ai-runs/{runId}/actions/{actionId}/confirm:
+    post:
+      tags: [AIRuns]
+      summary: 确认 Run 动作闸门（幂等）
+      description: >
+        首次确认返回 202 并 append run_action_confirmed 事件 + waiting→queued；
+        重复确认同一 actionId 返回 200 且不重复写事件；非 waiting 返回
+        409 RUN_NOT_WAITING。
+      operationId: confirmAiRunAction
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: actionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 幂等重放（此前已确认过该 actionId）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "202":
+          description: 首次确认已受理
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: Run 不存在或非 owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Run 非 waiting 状态（code=RUN_NOT_WAITING）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsConflictResponse"
+        "422":
+          description: actionId 缺失或非法（code=42200）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
+
+  /api/v1/ai-runs/{runId}/retry:
+    post:
+      tags: [AIRuns]
+      summary: 重试 failed Run
+      description: >
+        仅终态 failed 可重试：新建带 retryOfRunId 的 Run（新 submissionKey），
+        原 Run 行保持不可变；非 failed 返回 409 RUN_NOT_FAILED，无法定位
+        原 session 返回 409 RUN_NOT_RETRYABLE。
+      operationId: retryAiRun
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: 重试 Run 已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: Run 不存在或非 owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 非 failed 终态或不可重试（code=RUN_NOT_FAILED/RUN_NOT_RETRYABLE）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsConflictResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
 
   /api/v1/project-evaluations:
     get:
@@ -5492,6 +5875,124 @@ components:
               reason:
                 type: string
             required: [field, reason]
+      required: [code, message, details, requestId]
+
+    # AI Runs（RP-047 Batch C） ----------------------------------
+    AiRunSubmitRequest:
+      type: object
+      properties:
+        submissionKey:
+          type: string
+          description: 提交幂等主键（DB 唯一）；重复提交返回同一 runId
+        clientMessageId:
+          type: string
+          description: 前端消息对齐标识；随 run metadata 承载回读，不承担去重语义
+        content:
+          type: string
+          description: 用户消息内容（非空）
+        attachmentIds:
+          type: array
+          items:
+            type: string
+        workflowHint:
+          type: string
+      required: [submissionKey, content]
+
+    AiRunSubmitEnvelope:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: 任务已进入后台执行
+        requestId:
+          type: string
+        data:
+          $ref: "#/components/schemas/AiRunSubmitData"
+      required: [code, message, data]
+
+    AiRunSubmitData:
+      type: object
+      properties:
+        runId:
+          type: string
+        sessionId:
+          type: string
+        status:
+          type: string
+          example: queued
+        eventCursor:
+          type: integer
+          description: SSE 回放起始游标（事件 sequence）
+      required: [runId, sessionId, status, eventCursor]
+
+    AiRunSnapshotEnvelope:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+        requestId:
+          type: string
+        data:
+          type: object
+          description: run 行 + 当前 attempt + 最近 checkpoint + output（可空字段）
+          properties:
+            run:
+              type: object
+              additionalProperties: true
+            attempt:
+              type: object
+              additionalProperties: true
+              nullable: true
+            checkpoint:
+              type: object
+              additionalProperties: true
+              nullable: true
+            output:
+              type: object
+              additionalProperties: true
+              nullable: true
+          required: [run, attempt, checkpoint, output]
+      required: [code, message, data]
+
+    AiRunsConflictResponse:
+      type: object
+      description: >
+        409 业务冲突；code 为字符串业务码：SESSION_HAS_ACTIVE_RUN /
+        RUN_ALREADY_TERMINAL / RUN_NOT_WAITING / RUN_NOT_FAILED / RUN_NOT_RETRYABLE
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+        requestId:
+          type: string
+      required: [code, message, details, requestId]
+
+    AiRunsDisabledResponse:
+      type: object
+      description: feature flag WES_AI_DURABLE_RUNS_ENABLED 关闭时的统一 503 响应
+      properties:
+        code:
+          type: string
+          const: ASYNC_RUNS_DISABLED
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+        requestId:
+          type: string
       required: [code, message, details, requestId]
 
     HomeWorkbenchChatResponse:

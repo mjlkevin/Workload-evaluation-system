@@ -9,7 +9,7 @@
 // 绝不原样穿透给调用方。
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gt, inArray, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lt } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, type Database } from "../../db/client";
 import {
@@ -30,6 +30,7 @@ import {
 } from "../../db/schema";
 import {
   HARNESS_RECOVERY_LIMIT_ERROR_CODE,
+  HARNESS_RUN_ACTIVE_STATUSES,
   HARNESS_RUN_EVENT_TYPES,
   HARNESS_RUN_TERMINAL_STATUSES,
   type HarnessCheckpointKind,
@@ -71,6 +72,8 @@ export type CreateQueuedHarnessRunInput = {
   workflowVersion: string;
   executionConfig?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  // RP-047 Batch C（additive）：retry 动作创建新 Run 时指向原 failed Run
+  retryOfRunId?: string;
 };
 
 export type ClaimNextHarnessRunInput = {
@@ -207,6 +210,35 @@ export type ReleaseHarnessAttemptForShutdownInput = {
   now?: Date;
 };
 
+// ============================================================
+// RP-047 Batch C：AI Runs API 读取与动作输入类型（additive）
+// ============================================================
+
+export type HarnessRunSnapshot = {
+  run: HarnessRunRow;
+  attempt: HarnessRunAttemptRow | null;
+  checkpoint: HarnessRunCheckpointRow | null;
+  output: HarnessRunOutputRow | null;
+};
+
+export type ListHarnessRunEventsAfterInput = {
+  runId: string;
+  afterSequence: number;
+  limit: number;
+};
+
+export type SubmitHarnessRunInputInput = {
+  runId: string;
+  input: Record<string, unknown>;
+  requestedBy: string;
+};
+
+export type ConfirmHarnessRunActionInput = {
+  runId: string;
+  actionId: string;
+  confirmedBy: string;
+};
+
 export interface HarnessRuntimeRepository {
   createQueuedRun(input: CreateQueuedHarnessRunInput): Promise<{ run: HarnessRunRow; created: boolean }>;
   findRunForOwner(runId: string, ownerUserId: string): Promise<HarnessRunRow | null>;
@@ -249,6 +281,15 @@ export interface HarnessRuntimeRepository {
   releaseAttemptForShutdown(
     input: ReleaseHarnessAttemptForShutdownInput,
   ): Promise<{ outcome: "requeued" | "cancelled" | "noop"; run: HarnessRunRow }>;
+  // RP-047 Batch C（additive）：AI Runs API 读取与动作方法
+  listActiveRunsForOwner(ownerUserId: string): Promise<HarnessRunRow[]>;
+  getRunSnapshot(runId: string): Promise<HarnessRunSnapshot | null>;
+  hasActiveRunForSession(aiSessionId: string): Promise<boolean>;
+  listRunEventsAfter(input: ListHarnessRunEventsAfterInput): Promise<HarnessRunEventRow[]>;
+  submitRunInput(input: SubmitHarnessRunInputInput): Promise<{ run: HarnessRunRow; event: HarnessRunEventRow }>;
+  confirmRunAction(
+    input: ConfirmHarnessRunActionInput,
+  ): Promise<{ created: boolean; run: HarnessRunRow; event: HarnessRunEventRow | null }>;
 }
 
 type HarnessTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -437,6 +478,8 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
               submissionKey: input.submissionKey,
               executionConfig: input.executionConfig ?? {},
               metadata: input.metadata ?? {},
+              // RP-047 Batch C（additive）：retry 血缘，缺省为 null
+              retryOfRunId: input.retryOfRunId ?? null,
             })
             .onConflictDoNothing()
             .returning();
@@ -1295,6 +1338,167 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
             payload: { to: "queued", reason: "worker_shutdown", attemptId: input.attemptId },
           });
           return { outcome: "requeued" as const, run: requeued };
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    // ============================================================
+    // RP-047 Batch C（additive）：AI Runs API 读取与动作方法
+    // ============================================================
+
+    async listActiveRunsForOwner(ownerUserId) {
+      try {
+        assertNonEmptyText(ownerUserId, "ownerUserId");
+        return await dbInstance
+          .select()
+          .from(harnessRuns)
+          .where(
+            and(
+              eq(harnessRuns.ownerUserId, ownerUserId),
+              inArray(harnessRuns.status, [...HARNESS_RUN_ACTIVE_STATUSES]),
+            ),
+          )
+          .orderBy(desc(harnessRuns.createdAt));
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async getRunSnapshot(runId) {
+      try {
+        assertNonEmptyText(runId, "runId");
+        const [run] = await dbInstance.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, runId));
+        if (!run) return null;
+        const [attempt] = await dbInstance
+          .select()
+          .from(harnessRunAttempts)
+          .where(eq(harnessRunAttempts.harnessRunId, runId))
+          .orderBy(desc(harnessRunAttempts.attemptNo))
+          .limit(1);
+        const [checkpoint] = await dbInstance
+          .select()
+          .from(harnessRunCheckpoints)
+          .where(eq(harnessRunCheckpoints.harnessRunId, runId))
+          .orderBy(desc(harnessRunCheckpoints.sequence))
+          .limit(1);
+        const [output] = await dbInstance
+          .select()
+          .from(harnessRunOutputs)
+          .where(eq(harnessRunOutputs.harnessRunId, runId))
+          .limit(1);
+        return { run, attempt: attempt ?? null, checkpoint: checkpoint ?? null, output: output ?? null };
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async hasActiveRunForSession(aiSessionId) {
+      try {
+        assertNonEmptyText(aiSessionId, "aiSessionId");
+        const rows = await dbInstance
+          .select({ harnessRunId: harnessRuns.harnessRunId })
+          .from(harnessRuns)
+          .where(
+            and(
+              eq(harnessRuns.aiSessionId, aiSessionId),
+              inArray(harnessRuns.status, [...HARNESS_RUN_ACTIVE_STATUSES]),
+            ),
+          )
+          .limit(1);
+        return rows.length > 0;
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async listRunEventsAfter(input) {
+      try {
+        assertNonEmptyText(input.runId, "runId");
+        const afterSequence = Number.isFinite(input.afterSequence) && input.afterSequence > 0 ? Math.floor(input.afterSequence) : 0;
+        const limit = Number.isFinite(input.limit) ? Math.min(Math.max(Math.floor(input.limit), 1), 1000) : 200;
+        return await dbInstance
+          .select()
+          .from(harnessRunEvents)
+          .where(
+            and(
+              eq(harnessRunEvents.harnessRunId, input.runId),
+              gt(harnessRunEvents.sequence, afterSequence),
+            ),
+          )
+          .orderBy(asc(harnessRunEvents.sequence))
+          .limit(limit);
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async submitRunInput(input) {
+      try {
+        assertNonEmptyText(input.requestedBy, "requestedBy");
+        assertSafeJsonObject(input.input);
+        const payloadInput = normalizeJsonObject(input.input);
+        return await dbInstance.transaction(async (tx) => {
+          const run = await lockRunRow(tx, input.runId);
+          if (run.status !== "waiting") {
+            throw new HarnessRuntimeError("HARNESS_RUN_NOT_WAITING", "run inputs are only accepted while waiting");
+          }
+          const event = await appendRunEventInTransaction(tx, {
+            runId: input.runId,
+            eventType: "run_inputs_submitted",
+            payload: { input: payloadInput, requestedBy: input.requestedBy },
+          });
+          const now = await readDbNow(tx);
+          const [updated] = await tx
+            .update(harnessRuns)
+            .set({ status: "queued", availableAt: now, updatedAt: now })
+            .where(eq(harnessRuns.harnessRunId, input.runId))
+            .returning();
+          return { run: updated, event };
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async confirmRunAction(input) {
+      try {
+        assertNonEmptyText(input.actionId, "actionId");
+        assertNonEmptyText(input.confirmedBy, "confirmedBy");
+        return await dbInstance.transaction(async (tx) => {
+          const run = await lockRunRow(tx, input.runId);
+          // 幂等：同一 actionId 已确认过则直接回放既有事件，不改状态不追加事件
+          const existing = await tx
+            .select()
+            .from(harnessRunEvents)
+            .where(
+              and(
+                eq(harnessRunEvents.harnessRunId, input.runId),
+                eq(harnessRunEvents.eventType, "run_action_confirmed"),
+                sql`${harnessRunEvents.payload}->>'actionId' = ${input.actionId}`,
+              ),
+            )
+            .orderBy(asc(harnessRunEvents.sequence))
+            .limit(1);
+          if (existing.length > 0) {
+            return { created: false, run, event: existing[0] };
+          }
+          if (run.status !== "waiting") {
+            throw new HarnessRuntimeError("HARNESS_RUN_NOT_WAITING", "run actions can only be confirmed while waiting");
+          }
+          const event = await appendRunEventInTransaction(tx, {
+            runId: input.runId,
+            eventType: "run_action_confirmed",
+            payload: { actionId: input.actionId, confirmedBy: input.confirmedBy },
+          });
+          const now = await readDbNow(tx);
+          const [updated] = await tx
+            .update(harnessRuns)
+            .set({ status: "queued", availableAt: now, updatedAt: now })
+            .where(eq(harnessRuns.harnessRunId, input.runId))
+            .returning();
+          return { created: true, run: updated, event };
         });
       } catch (err) {
         throw toSafeError(err);

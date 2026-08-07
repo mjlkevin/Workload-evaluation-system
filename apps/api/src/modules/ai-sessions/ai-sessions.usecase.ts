@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { AuthUser } from "../../types";
 import { resolveBusinessRole } from "../../middleware/auth";
 import { asString } from "../../utils";
+import { AiRunsConflictError } from "../harness/harness-runtime.usecase";
 import { loadAiSessionsStore, saveAiSessionsStore } from "./ai-sessions.repository";
 import type {
   AiArtifact,
@@ -122,7 +123,44 @@ export function renameAiSession(user: AuthUser, sessionId: string, newTitle: unk
   return session;
 }
 
-export function deleteAiSession(user: AuthUser, sessionId: string): boolean {
+export type DeleteAiSessionDeps = {
+  /** RP-047 Batch C（D5）：可选活跃 Run 检查器；存在活跃 Run 时删除被 409 拦截 */
+  activeRunChecker?: (sessionId: string) => Promise<boolean>;
+};
+
+/**
+ * 删除会话。缺省（无 checker）保持同步布尔语义，既有调用方零改动；
+ * 注入 activeRunChecker 时返回 Promise，命中活跃 Run 抛
+ * AiRunsConflictError(SESSION_HAS_ACTIVE_RUN) 且不删除会话（规格 §11.3）。
+ */
+export function deleteAiSession(user: AuthUser, sessionId: string): boolean;
+export function deleteAiSession(
+  user: AuthUser,
+  sessionId: string,
+  deps: DeleteAiSessionDeps,
+): Promise<boolean>;
+export function deleteAiSession(
+  user: AuthUser,
+  sessionId: string,
+  deps?: DeleteAiSessionDeps,
+): boolean | Promise<boolean> {
+  const checker = deps?.activeRunChecker;
+  if (!checker) return deleteAiSessionSync(user, sessionId);
+  return (async () => {
+    const id = asString(sessionId);
+    if (!id) return false;
+    // 先确认归属，保持与同步路径一致的 not-found 语义
+    const store = loadAiSessionsStore();
+    const exists = store.sessions.some((session) => session.ownerUserId === user.id && session.sessionId === id);
+    if (!exists) return false;
+    if (await checker(id)) {
+      throw new AiRunsConflictError("SESSION_HAS_ACTIVE_RUN", "会话存在进行中的异步任务，无法删除");
+    }
+    return deleteAiSessionSync(user, id);
+  })();
+}
+
+function deleteAiSessionSync(user: AuthUser, sessionId: string): boolean {
   const id = asString(sessionId);
   if (!id) return false;
   const store = loadAiSessionsStore();

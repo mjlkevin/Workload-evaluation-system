@@ -10,7 +10,8 @@ import templatesRoutes from "./templates.routes";
 import rulesRoutes from "./rules.routes";
 import estimatesRoutes from "./estimates.routes";
 import aiRoutes from "./ai.routes";
-import aiSessionsRoutes from "./ai-sessions.routes";
+import { createAiSessionsRouter } from "./ai-sessions.routes";
+import { createAiRunsRouter } from "./ai-runs.routes";
 import projectEvaluationsRoutes from "./project-evaluations.routes";
 import sessionsRoutes from "./sessions.routes";
 import exportsRoutes from "./exports.routes";
@@ -29,8 +30,16 @@ import harnessRoutes from "./harness.routes";
 import traceRoutes from "./trace.routes";
 
 import { notFoundHandler } from "../middleware/error-handler";
+import { isDurableRunsEnabledFromEnv } from "../modules/harness/harness-runtime.usecase";
+import { createHarnessRuntimeRepository } from "../modules/harness/harness-runtime.repository";
 
 const router = Router();
+
+// RP-047 Batch C：异步 Run API 接线（flag 读取点收敛于此，D2）
+const durableRunsEnabled = isDurableRunsEnabledFromEnv();
+const harnessRuntimeRepo = createHarnessRuntimeRepository();
+const aiSessionsRoutes = createAiSessionsRouter({ repo: harnessRuntimeRepo, enabled: durableRunsEnabled });
+const aiRunsRoutes = createAiRunsRouter({ repo: harnessRuntimeRepo, enabled: durableRunsEnabled });
 
 // 业务路由
 router.use("/auth", authRoutes);
@@ -40,6 +49,7 @@ router.use("/rule-sets", rulesRoutes);
 router.use("/estimates", estimatesRoutes);
 router.use("/ai", aiRoutes);
 router.use("/ai-sessions", aiSessionsRoutes);
+router.use("/ai-runs", aiRunsRoutes);
 router.use("/project-evaluations", projectEvaluationsRoutes);
 router.use("/sessions", sessionsRoutes);
 router.use("/exports", exportsRoutes);

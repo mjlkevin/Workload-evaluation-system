@@ -45,6 +45,9 @@ export const HARNESS_RUN_EVENT_TYPES = [
   "recovery_started",
   "recovery_completed",
   "run_cancelled",
+  // RP-047 Batch C（扩展项 E1，additive）：补充信息与确认闸门事件
+  "run_inputs_submitted",
+  "run_action_confirmed",
 ] as const;
 export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
 

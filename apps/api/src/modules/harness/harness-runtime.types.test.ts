@@ -80,7 +80,30 @@ test("Batch B adds recovery and cancellation event types additively (E1)", () =>
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("recovery_started"));
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("recovery_completed"));
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_cancelled"));
-  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 12, "只允许 additive 新增 3 类事件");
+  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 14, "Batch B 词汇 12 类 + Batch C additive 追加 2 类 = 14");
+});
+
+test("Batch C adds inputs and confirmation event types additively (E1)", () => {
+  const bFrozen = [
+    "run_queued",
+    "run_claimed",
+    "run_status_changed",
+    "checkpoint_committed",
+    "output_updated",
+    "outbox_enqueued",
+    "cancel_requested",
+    "run_completed",
+    "run_failed",
+    "recovery_started",
+    "recovery_completed",
+    "run_cancelled",
+  ];
+  for (const type of bFrozen) {
+    assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes(type), `A2/B 事件类型 ${type} 不得移除`);
+  }
+  assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_inputs_submitted"));
+  assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_action_confirmed"));
+  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 14, "Batch C 只允许 additive 追加 2 类事件");
 });
 
 test("Batch B validator version and recovery error codes are frozen", () => {
