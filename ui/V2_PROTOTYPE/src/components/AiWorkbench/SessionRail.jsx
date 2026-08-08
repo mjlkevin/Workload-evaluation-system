@@ -1,6 +1,28 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useToast } from '../../hooks/useToast.jsx'
+import { useSessionViews } from '../../hooks/useSessionRuntimeStore.js'
+
+// RP-047 Batch D（Step 5）：会话运行状态七态徽标（文本+图标+颜色三通道，不只依赖颜色）
+const RUN_STATUS_BADGE = {
+  queued: { label: '排队中', icon: '◌', className: 'ai-session-badge ai-session-badge--queued' },
+  running: { label: '执行中', icon: '▶', className: 'ai-session-badge ai-session-badge--running' },
+  recovering: { label: '恢复中', icon: '↻', className: 'ai-session-badge ai-session-badge--recovering' },
+  waiting: { label: '等待确认', icon: '!', className: 'ai-session-badge ai-session-badge--waiting' },
+  // cancelling 为过渡态（等待安全边界停止），并入执行中展示
+  cancelling: { label: '执行中', icon: '▶', className: 'ai-session-badge ai-session-badge--running' },
+  failed: { label: '失败', icon: '✕', className: 'ai-session-badge ai-session-badge--failed' },
+  cancelled: { label: '已取消', icon: '⊘', className: 'ai-session-badge ai-session-badge--cancelled' },
+}
+
+function getSessionBadge(view) {
+  const status = view?.runStatus
+  if (status && RUN_STATUS_BADGE[status]) return RUN_STATUS_BADGE[status]
+  if (status === 'completed' && view?.unread) {
+    return { label: '已完成未读', icon: '●', className: 'ai-session-badge ai-session-badge--unread' }
+  }
+  return null
+}
 
 /** 格式化会话发起时间为简短可读格式 */
 function formatSessionTime(isoStr) {
@@ -21,7 +43,7 @@ function formatSessionTime(isoStr) {
   return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${time}`
 }
 
-export default function SessionRail({ sessions = [], activeSessionId, onSelect, onNew, onDelete, onRename }) {
+export default function SessionRail({ sessions = [], activeSessionId, onSelect, onNew, onDelete, onRename, sessionRuns = {}, onStop }) {
   const [ctxMenu, setCtxMenu] = useState(null) // { sessionId, session, x, y }
   const [renameTarget, setRenameTarget] = useState(null) // session object or null
   const [renameValue, setRenameValue] = useState('')
@@ -29,6 +51,7 @@ export default function SessionRail({ sessions = [], activeSessionId, onSelect, 
   const menuRef = useRef(null)
   const renameInputRef = useRef(null)
   const toast = useToast()
+  const sessionViews = useSessionViews()
 
   const closeMenu = useCallback(() => setCtxMenu(null), [])
 
@@ -150,6 +173,9 @@ export default function SessionRail({ sessions = [], activeSessionId, onSelect, 
         {sessions.length ? sessions.map((session) => {
           const active = activeSessionId === session.sessionId
           const title = session.title || '未命名会话'
+          // G4：会话有活跃 Run 时行内出现“停止”入口（唯一 cancel 路径的第一步）
+          const run = sessionRuns[session.sessionId]
+          const badge = getSessionBadge(sessionViews[session.sessionId])
           return (
             <div
               key={session.sessionId}
@@ -176,11 +202,47 @@ export default function SessionRail({ sessions = [], activeSessionId, onSelect, 
                 flexShrink: 0,
               }}
             >
-              <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.4 }}>{title}</span>
-              {session.createdAt && (
-                <span style={{ display: 'block', marginTop: 3, fontSize: 10.5, color: 'var(--ink-3)', lineHeight: 1.3, letterSpacing: '0.01em' }}>
-                  {formatSessionTime(session.createdAt)}
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.4 }}>{title}</span>
+                {run && (
+                  <button
+                    type="button"
+                    aria-label={`停止后台任务：${run.title || run.runId}`}
+                    title="停止后台任务"
+                    onClick={(e) => { e.stopPropagation(); onStop?.(session) }}
+                    style={{
+                      flexShrink: 0,
+                      height: 20,
+                      padding: '0 8px',
+                      border: '1px solid var(--err, #dc2626)',
+                      borderRadius: 6,
+                      background: 'var(--err-soft, #fef2f2)',
+                      color: 'var(--err, #dc2626)',
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      lineHeight: 1,
+                    }}
+                  >
+                    停止
+                  </button>
+                )}
+              </div>
+              {(session.createdAt || badge) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, minWidth: 0 }}>
+                  {session.createdAt && (
+                    <span style={{ fontSize: 10.5, color: 'var(--ink-3)', lineHeight: 1.3, letterSpacing: '0.01em' }}>
+                      {formatSessionTime(session.createdAt)}
+                    </span>
+                  )}
+                  {badge && (
+                    <span className={badge.className}>
+                      <span aria-hidden="true">{badge.icon}</span>
+                      <span>{badge.label}</span>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           )

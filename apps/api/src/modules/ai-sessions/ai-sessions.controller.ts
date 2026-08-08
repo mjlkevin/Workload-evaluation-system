@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { Request, Response } from "express";
+import { Request, Response, RequestHandler } from "express";
 
 import { requireAuth } from "../../middleware/auth";
 import { asString } from "../../utils";
 import { fail, ok } from "../../utils/response";
+import { AiRunsConflictError } from "../harness/harness-runtime.usecase";
 import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, listAiSessions, renameAiSession } from "./ai-sessions.usecase";
 
 export function createSession(req: Request, res: Response) {
@@ -35,6 +36,40 @@ export function deleteSession(req: Request, res: Response) {
     return fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
   }
   return res.json(ok({ deletedSessionId: sessionId }, randomUUID()));
+}
+
+// RP-047 Batch D（E1）：旧 DELETE 端点接入活跃 Run 守护。
+// 注入 activeRunChecker 时命中活跃 Run 返回 409 SESSION_HAS_ACTIVE_RUN
+// 且不删除；未注入时保持 deleteSession 同步语义，既有调用方零改动。
+export function createGuardedDeleteSessionHandler(
+  deps: { activeRunChecker?: (sessionId: string) => Promise<boolean> } = {},
+): RequestHandler {
+  return async (req, res) => {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    const sessionId = asString(req.params.sessionId);
+    try {
+      const checker = deps.activeRunChecker;
+      let deleted: boolean;
+      if (checker) {
+        deleted = await deleteAiSession(auth.user, sessionId, { activeRunChecker: checker });
+      } else {
+        deleted = deleteAiSession(auth.user, sessionId);
+      }
+      if (!deleted) {
+        fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
+        return;
+      }
+      res.json(ok({ deletedSessionId: sessionId }, randomUUID()));
+    } catch (err) {
+      if (err instanceof AiRunsConflictError) {
+        // 与 Batch C harness-runtime.controller 的 409 映射同形（业务码为字符串）
+        res.status(409).json({ code: err.code, message: err.message, details: [], requestId: randomUUID() });
+        return;
+      }
+      throw err;
+    }
+  };
 }
 
 export function renameSession(req: Request, res: Response) {

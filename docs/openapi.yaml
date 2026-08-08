@@ -668,10 +668,50 @@ paths:
   # AI Runs — 异步 Run API（RP-047 Batch C）
   # ------------------------------------------------------------
   # 受 feature flag `WES_AI_DURABLE_RUNS_ENABLED` 控制（默认关闭）：
-  # 关闭时以下全部端点返回 503 { code: "ASYNC_RUNS_DISABLED" }，
-  # 且 Session 删除不启用 409 活跃 Run 检查（保持旧行为）。
+  # 关闭时以下全部端点返回 503 { code: "ASYNC_RUNS_DISABLED" }。
+  # Session 删除的 409 活跃 Run 检查在 flag 开启与关闭分支均生效
+  # （RP-047 Batch D · E1：关闭分支复用 repo.hasActiveRunForSession）。
   # submissionKey 为提交幂等主键（DB 唯一）；clientMessageId 随 run
   # metadata 承载并可原样回读，供前端乐观 UI 对齐，不承担 DB 层去重语义。
+
+  /api/v1/ai-sessions/{sessionId}:
+    delete:
+      tags: [AIRuns]
+      summary: 删除 AI 会话（带活跃 Run 409 守护，RP-047 Batch D · E1）
+      description: >
+        删除当前用户的 AI 会话。无论 feature flag 开启与否，删除前均检查
+        该会话是否存在活跃 Run：命中时返回 409 SESSION_HAS_ACTIVE_RUN
+        且不删除（前端冻结文案：该会话仍有后台任务运行中，请先停止任务。），
+        会话不存在或非 owner 返回 404（不泄露存在性）。
+        本条为 Batch D 契约增补，不回填其他旧域端点。
+      operationId: deleteAiSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 删除成功（data.deletedSessionId 为被删会话 ID）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: Session 不存在或非 owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 该 Session 仍有活跃 Run（code=SESSION_HAS_ACTIVE_RUN）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsConflictResponse"
 
   /api/v1/ai-sessions/{sessionId}/runs:
     post:

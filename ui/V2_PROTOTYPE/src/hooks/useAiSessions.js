@@ -1,8 +1,15 @@
 import { useCallback, useState } from 'react'
 import { apiClient } from '../api/client.js'
 import { unwrap } from '../api/utils.js'
+import { sessionRuntimeStore } from './useSessionRuntimeStore.js'
 
 const ACTIVE_SESSION_STORAGE_KEY = 'wes-ai-active-session-id'
+
+// E1 删除守护：旧 DELETE 端点命中活动 Run（409 SESSION_HAS_ACTIVE_RUN）时的冻结文案（工单 §6）
+const SESSION_HAS_ACTIVE_RUN_MESSAGE = '该会话仍有后台任务运行中，请先停止任务。'
+
+// 终态 Run 状态：进入会话查看后清除徽标（已完成未读/失败/已取消为待阅信号）
+const TERMINAL_RUN_STATUSES = ['completed', 'failed', 'cancelled']
 
 function readStoredActiveSessionId() {
   try {
@@ -36,6 +43,14 @@ export function useAiSessions() {
 
   const selectActiveSession = useCallback((session) => {
     writeStoredActiveSessionId(session?.sessionId || '')
+    if (session?.sessionId) {
+      // 进入会话即视为已阅：清除未读标记与终态徽标（spec §12.2）
+      sessionRuntimeStore.markSessionUnread(session.sessionId, false)
+      const runStatus = sessionRuntimeStore.getSessionView(session.sessionId)?.runStatus
+      if (TERMINAL_RUN_STATUSES.includes(runStatus)) {
+        sessionRuntimeStore.setSessionRunStatus(session.sessionId, '')
+      }
+    }
     setActiveSession(session || null)
   }, [])
 
@@ -43,13 +58,14 @@ export function useAiSessions() {
     setSessionsError('')
   }, [])
 
-  const upsertSession = useCallback((session) => {
+  // RP-047 Batch D：跨会话迟到响应只更新列表不抢占当前渲染源（activate=false）。
+  const upsertSession = useCallback((session, { activate = true } = {}) => {
     if (!session?.sessionId) return
     setSessions((prev) => {
       const next = prev.filter((item) => item.sessionId !== session.sessionId)
       return [session, ...next]
     })
-    selectActiveSession(session)
+    if (activate) selectActiveSession(session)
   }, [selectActiveSession])
 
   const loadSessions = useCallback(async (params = {}) => {
@@ -95,7 +111,17 @@ export function useAiSessions() {
 
   const deleteSession = useCallback(async (sessionId) => {
     if (!sessionId) return false
-    await apiClient.delete(`/ai-sessions/${sessionId}`, { suppressUnauthorizedRedirect: true })
+    try {
+      await apiClient.delete(`/ai-sessions/${sessionId}`, { suppressUnauthorizedRedirect: true })
+    } catch (err) {
+      // E1：活动 Run 删除冲突收敛为冻结文案，由删除确认弹窗展示
+      // （旧端点 409 语义单一：SESSION_HAS_ACTIVE_RUN，见 E1 后端接线）
+      if (err?.status === 409) {
+        throw new Error(SESSION_HAS_ACTIVE_RUN_MESSAGE)
+      }
+      throw err
+    }
+    sessionRuntimeStore.clearSessionView(sessionId)
     setSessions((prev) => prev.filter((item) => item.sessionId !== sessionId))
     setActiveSession((current) => {
       if (current?.sessionId === sessionId) {

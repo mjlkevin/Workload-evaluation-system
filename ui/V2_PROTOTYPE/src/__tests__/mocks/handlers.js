@@ -32,6 +32,9 @@ export const handlers = [
   http.get(`${BASE}/auth/users`, () => HttpResponse.json({ success: true, data: { users: mockUsers } })),
   http.get(`${BASE}/auth/me`, () => HttpResponse.json({ success: true, data: { user: mockUsers[2] } })),
   http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: mockAiSessions } })),
+  // RP-047 Batch D：默认无活跃异步任务；场景测试用 server.use 覆盖。
+  // 消除 Shell 层 BackgroundRunProvider 在既有测试中的 unhandled-request 噪音。
+  http.get(`${BASE}/ai-runs`, () => HttpResponse.json({ success: true, data: { items: [] } })),
   http.get(`${BASE}/project-evaluations`, () => HttpResponse.json({ success: true, data: { items: mockProjectEvaluations } })),
   http.post(`${BASE}/project-evaluations`, async ({ request }) => {
     const body = await request.json()
@@ -488,6 +491,9 @@ export const handlers = [
               messageId: 'msg-assistant',
               role: 'assistant',
               content: answer,
+              // 与真实后端 workbench-chat.handler.ts 对齐：suggestedActions 持久化进消息 metadata，
+              // 否则前端会话同步重映射（mapSessionMessages）会丢弃建议动作按钮。
+              ...(suggestedActions.length ? { metadata: { suggestedActions, intent } } : {}),
               createdAt: '2026-06-14T00:00:01.000Z',
             },
           ],

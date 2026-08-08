@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { summarizeCompanyProfile } from '../../../api/ai.js'
 import { useAiSessions } from '../../../hooks/useAiSessions.js'
+import { sessionRuntimeStore } from '../../../hooks/useSessionRuntimeStore.js'
 import { getAiHomePreset } from '../../aiHomePresets.js'
 import { pickArray, stripPendingMarker } from '../utils/harnessPayload.js'
 import { getWorkflowOutputs } from '../utils/workflowOutputs.js'
@@ -26,6 +27,13 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
   const sessionsApi = useAiSessions()
   const { activeSession, loadSessions, setActiveSession } = sessionsApi
   const [composer, setComposer] = useState('')
+  // RP-047 Batch D（G1）：composer 草稿按 wes-ai-composer-draft:<userId>:<sessionId> 键控，
+  // 切换会话时旧草稿落盘、新草稿载入；未落库新会话（无 sessionId）草稿仅驻留内存。
+  const composerUserId = currentUser?.id || currentUser?.userId || ''
+  const composerSessionId = activeSession?.sessionId || ''
+  const composerRef = useRef(composer)
+  composerRef.current = composer
+  const prevComposerSessionIdRef = useRef(null)
   const [draftBeforeLogin, setDraftBeforeLogin] = useState('')
   const [selectedFile, setSelectedFile] = useState(null)
   const [activeWorkflowKey, setActiveWorkflowKey] = useState('')
@@ -46,6 +54,23 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
   useEffect(() => {
     loadSessions().catch(() => {})
   }, [loadSessions])
+
+  useEffect(() => {
+    const previousSessionId = prevComposerSessionIdRef.current
+    if (previousSessionId === null) {
+      prevComposerSessionIdRef.current = composerSessionId
+      if (composerSessionId) setComposer(sessionRuntimeStore.readComposerDraft(composerUserId, composerSessionId))
+      return
+    }
+    if (previousSessionId === composerSessionId) return
+    if (previousSessionId) sessionRuntimeStore.writeComposerDraft(composerUserId, previousSessionId, composerRef.current)
+    prevComposerSessionIdRef.current = composerSessionId
+    setComposer(composerSessionId ? sessionRuntimeStore.readComposerDraft(composerUserId, composerSessionId) : '')
+  }, [composerSessionId, composerUserId])
+
+  function clearComposerDraft() {
+    if (composerSessionId) sessionRuntimeStore.writeComposerDraft(composerUserId, composerSessionId, '')
+  }
 
   useEffect(() => {
     try {
@@ -151,6 +176,7 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
     ...sessionsApi,
     composer,
     setComposer,
+    clearComposerDraft,
     draftBeforeLogin,
     setDraftBeforeLogin,
     selectedFile,

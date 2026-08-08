@@ -29,6 +29,8 @@ import { patchReviewStatus, postTeam } from "./team/team.controller";
 import { homeWorkbenchChat, kimiAssessmentPreview, parseBasicInfo } from "./ai/ai.usecase";
 import { testKnowledgeBaseConnectivity } from "./system/system.usecase";
 import * as AiSessionsModule from "./ai-sessions/ai-sessions.module";
+import { createAiSession } from "./ai-sessions/ai-sessions.usecase";
+import { loadAiSessionsStore, saveAiSessionsStore } from "./ai-sessions/ai-sessions.repository";
 import * as ProjectEvaluationsModule from "./project-evaluations/project-evaluations.module";
 import { createConfirmAiAssessmentDraftHandler } from "./project-evaluations/project-evaluations.controller";
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
@@ -2104,4 +2106,72 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
     config.kimi.apiKey = originalApiKey;
     _resetAiBootstrapForTest();
   }
+});
+
+// ============================================================
+// delete-guard：E1 会话删除 409 守护接旧 DELETE 端点（RP-047 Batch D）
+// mock activeRunChecker，不依赖 DB。
+// ============================================================
+
+test("delete-guard: 旧删除端点注入 checker 命中活跃 Run 时返回 409 SESSION_HAS_ACTIVE_RUN 且不删除", async () => {
+  const user = getActiveUser();
+  const session = createAiSession(user, { title: "E1 守护会话" });
+  try {
+    const handler = AiSessionsModule.createGuardedDeleteSessionHandler({
+      activeRunChecker: async (sessionId: string) => sessionId === session.sessionId,
+    });
+    const req = createMockReq({ token: getActiveUserToken(), params: { sessionId: session.sessionId } });
+    const res = createMockRes();
+    await handler(req, res as unknown as Response, noopNext);
+    assert.equal(res.statusCode, 409);
+    assert.equal((res.body as { code: string }).code, "SESSION_HAS_ACTIVE_RUN");
+    assert.equal(
+      loadAiSessionsStore().sessions.some((item) => item.sessionId === session.sessionId),
+      true,
+      "冲突时不得删除会话",
+    );
+  } finally {
+    const store = loadAiSessionsStore();
+    store.sessions = store.sessions.filter((item) => item.sessionId !== session.sessionId);
+    saveAiSessionsStore(store);
+  }
+});
+
+test("delete-guard: 旧删除端点注入 checker 且无活跃 Run 时正常删除", async () => {
+  const user = getActiveUser();
+  const session = createAiSession(user, { title: "E1 可删会话" });
+  try {
+    const handler = AiSessionsModule.createGuardedDeleteSessionHandler({
+      activeRunChecker: async () => false,
+    });
+    const req = createMockReq({ token: getActiveUserToken(), params: { sessionId: session.sessionId } });
+    const res = createMockRes();
+    await handler(req, res as unknown as Response, noopNext);
+    assert.equal(res.statusCode, 200);
+    assert.equal((res.body as { code: number }).code, 0);
+    assert.equal(
+      loadAiSessionsStore().sessions.some((item) => item.sessionId === session.sessionId),
+      false,
+    );
+  } finally {
+    const store = loadAiSessionsStore();
+    store.sessions = store.sessions.filter((item) => item.sessionId !== session.sessionId);
+    saveAiSessionsStore(store);
+  }
+});
+
+test("delete-guard: 无 checker 的旧同步 deleteSession 行为保持不变", () => {
+  const user = getActiveUser();
+  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+    const session = createAiSession(user, { title: "E1 旧行为会话" });
+    const req = createMockReq({ token: getActiveUserToken(), params: { sessionId: session.sessionId } });
+    const res = createMockRes();
+    AiSessionsModule.deleteSession(req, res as unknown as Response);
+    assert.equal(res.statusCode, 200);
+    assert.equal((res.body as { code: number }).code, 0);
+    assert.equal(
+      loadAiSessionsStore().sessions.some((item) => item.sessionId === session.sessionId),
+      false,
+    );
+  });
 });

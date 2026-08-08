@@ -2,7 +2,7 @@
  * 前后端口径一致性单测（O1 硬口径约束）。
  *
  * 「文件是上下文，用户意图才触发工作流」：前端 AiHomeWorkbench 的
- * isExplicitReportRequest 闸门必须与后端 chat.service.ts 的同名闸门
+ * isExplicitReportRequest 闸门必须与后端 handlers/workbench-shared.ts 的同名闸门
  * 对同一组样例文案给出完全一致的判定。
  *
  * 实现方式：直接从后端源码文件中提取 isExplicitReportRequest 的两条
@@ -17,12 +17,12 @@ import { isExplicitReportRequest } from '../pages/AiHomeWorkbench/utils/reportPa
 
 const BACKEND_SOURCE_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../../../../apps/api/src/services/ai/chat.service.ts',
+  '../../../../apps/api/src/services/ai/handlers/workbench-shared.ts',
 )
 
 function extractBackendGate(source) {
   const fnMatch = source.match(/function isExplicitReportRequest\(text: string\): boolean \{\s*return\s+([^;]+);/)
-  expect(fnMatch, '后端 chat.service.ts 必须保留 isExplicitReportRequest 闸门函数').toBeTruthy()
+  expect(fnMatch, '后端 workbench-shared.ts 必须保留 isExplicitReportRequest 闸门函数').toBeTruthy()
   const regexLiterals = [...fnMatch[1].matchAll(/\/((?:[^/\\]|\\.)+)\/([a-z]*)/g)]
   expect(regexLiterals.length, '后端闸门应由两条正则字面量组成').toBe(2)
   const [verb, noun] = regexLiterals.map((match) => new RegExp(match[1], match[2]))

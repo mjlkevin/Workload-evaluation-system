@@ -4,8 +4,10 @@
 // RP-047 Batch C 改造为工厂模式（D2/D5）：
 //   - flag 开启且注入 repo 时挂载 POST /:sessionId/runs（异步提交，202）
 //     与带活跃 Run 409 保护的 DELETE /:sessionId；
-//   - flag 关闭时提交端点仍挂载但统一 503 ASYNC_RUNS_DISABLED，
-//     DELETE 保持既有同步行为（G4）；
+//   - flag 关闭时提交端点仍挂载但统一 503 ASYNC_RUNS_DISABLED；
+//   - Batch D（E1）：flag 关闭分支的 DELETE 同样注入 activeRunChecker
+//     （复用 repo.hasActiveRunForSession），命中活跃 Run 返回 409
+//     SESSION_HAS_ACTIVE_RUN 且不删除；无活跃 Run 时行为与旧同步删除一致；
 //   - default 导出保持 Router 实例兼容既有注册方式。
 
 import { Router } from "express";
@@ -57,7 +59,14 @@ export function createAiSessionsRouter(deps: AiSessionsRouterDeps = {}): Router 
   if (enabled) {
     router.delete("/:sessionId", createDeleteSessionHandler({ repo }));
   } else {
-    router.delete("/:sessionId", requireCapability("estimates:read"), AiSessionsModule.deleteSession);
+    // E1：旧分支同样接入活跃 Run 守护，避免绕过 enabled 分支的 409 保护
+    router.delete(
+      "/:sessionId",
+      requireCapability("estimates:read"),
+      AiSessionsModule.createGuardedDeleteSessionHandler({
+        activeRunChecker: (sessionId) => repo.hasActiveRunForSession(sessionId),
+      }),
+    );
   }
 
   return router;

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { apiClient } from '../../../api/client.js'
 import { unwrap } from '../../../api/utils.js'
+import { sessionRuntimeStore } from '../../../hooks/useSessionRuntimeStore.js'
 import { pickArray } from '../utils/harnessPayload.js'
 import { buildAttachmentUnderstanding, isExplicitReportRequest, summarizeHomeParsedFile } from '../utils/reportParser.js'
 import {
@@ -22,11 +23,34 @@ import {
  */
 export default function useChatMessages(workbench) {
   const [messages, setMessages] = useState([])
-  const [sending, setSending] = useState(false)
+  // RP-047 Batch D（G1）：sending 按会话键控，A 进行中不阻塞 B 发送；
+  // 对外暴露的 sending 仅反映当前激活会话，旧链路行为不变。
+  const [sendingSessionKeys, setSendingSessionKeys] = useState([])
   const fileInputRef = useRef(null)
   const messagePaneRef = useRef(null)
   const harnessRef = useRef(null)
   const prevSessionIdRef = useRef('')
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  const workbenchRef = useRef(workbench)
+  workbenchRef.current = workbench
+
+  const activeSessionKey = workbench.activeSession?.sessionId || ''
+  const sending = sendingSessionKeys.includes(activeSessionKey)
+
+  function markSending(sessionKey, value) {
+    setSendingSessionKeys((prev) => {
+      const has = prev.includes(sessionKey)
+      if (value && !has) return [...prev, sessionKey]
+      if (!value && has) return prev.filter((key) => key !== sessionKey)
+      return prev
+    })
+  }
+
+  // 兼容旧调用方（useHarnessRun 等）：作用于当前激活会话。
+  function setSending(value) {
+    markSending(workbenchRef.current?.activeSession?.sessionId || '', value)
+  }
 
   function bindHarness(harness) {
     harnessRef.current = harness
@@ -56,18 +80,24 @@ export default function useChatMessages(workbench) {
   }, [messages.length, sending])
 
   useEffect(() => {
-    if (sending || !workbench.activeSession) return
+    if (!workbench.activeSession) return
     const currentSessionId = workbench.activeSession?.sessionId || ''
-    const isSessionSwitch = prevSessionIdRef.current !== '' && prevSessionIdRef.current !== currentSessionId
+    const previousSessionId = prevSessionIdRef.current
+    // G1：会话切换——先快照离开会话的当前视图（含进行中 loading/error）进 store，
+    // 再恢复目标会话视图（store 优先，保留迟到响应与进行中状态）。
+    if (previousSessionId && previousSessionId !== currentSessionId) {
+      sessionRuntimeStore.setSessionMessages(previousSessionId, messagesRef.current)
+      prevSessionIdRef.current = currentSessionId
+      const storedMessages = sessionRuntimeStore.getSessionMessages(currentSessionId)
+      sessionRuntimeStore.markSessionUnread(currentSessionId, false)
+      setMessages(storedMessages || mapSessionMessages(workbench.activeSession))
+      return
+    }
     prevSessionIdRef.current = currentSessionId
-
+    // 同一会话发送中不做重映射，避免覆盖 loading 消息（旧守卫保留）。
+    if (sending) return
     const sessionMessages = mapSessionMessages(workbench.activeSession)
     setMessages((prev) => {
-      // 会话切换时：无条件用目标会话消息替换，不受旧会话 error/loading 阻断
-      if (isSessionSwitch) {
-        return sessionMessages.length > 0 ? sessionMessages : []
-      }
-      // 同一会话内：保留原有守卫逻辑
       if (prev.some((message) => message.loading || message.error || message.action)) return prev
       if (sessionMessages.length === 0 && prev.length > 0) return prev
       const mergedMessages = mergePreservedLocalFileMessages(prev, sessionMessages)
@@ -118,6 +148,8 @@ export default function useChatMessages(workbench) {
     const text = (typeof messageOverride === 'string' ? messageOverride : workbench.composer).trim()
     const selectedFile = workbench.selectedFile
     if ((!text && !selectedFile) || sending) return
+    // G1：发送时捕获归属会话键（空串代表未落库的新会话），响应到达后按键写归属。
+    let sendKey = workbench.activeSession?.sessionId || ''
     const fileSnapshot = selectedFile
       ? { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type }
       : null
@@ -144,9 +176,10 @@ export default function useChatMessages(workbench) {
 
     setMessages((prev) => [...prev, userMessage, loadingMessage])
     workbench.setComposer('')
+    workbench.clearComposerDraft?.()
     removeSelectedFile()
     workbench.setDraftBeforeLogin(text)
-    setSending(true)
+    markSending(sendKey, true)
     try {
       let outboundFile = fileSnapshot
       if (selectedFile) {
@@ -189,6 +222,12 @@ export default function useChatMessages(workbench) {
         workflowKey,
         status: workflowKey === 'free_chat' ? 'temporary_chat' : 'rough_estimate',
       })
+      // 会话落库后将发送标记迁移到真实会话键。
+      if (session?.sessionId && session.sessionId !== sendKey) {
+        markSending(sendKey, false)
+        sendKey = session.sessionId
+        markSending(sendKey, true)
+      }
       const payload = await apiClient.post('/ai/home-workbench/chat', {
         sessionId: session?.sessionId,
         workflowKey,
@@ -196,7 +235,11 @@ export default function useChatMessages(workbench) {
       }, { suppressUnauthorizedRedirect: true })
       const data = unwrap(payload) || {}
       if (data.session) {
-        workbench.upsertSession(data.session)
+        // G1：迟到响应到达时若用户已切走，只写归属会话视图并标 unread，
+        // 不抢回当前渲染源；仍在当前会话时保持旧链路行为。
+        const targetId = data.session.sessionId || sendKey
+        const arrivedInActiveSession = (workbenchRef.current?.activeSession?.sessionId || '') === targetId
+        workbench.upsertSession(data.session, { activate: arrivedInActiveSession })
         let sessionMessages = withCurrentUserFile(mapSessionMessages(data.session), userMessage)
         sessionMessages = attachFormBlockToLatestAssistant(sessionMessages, data.formBlock)
         sessionMessages = attachKnowledgeToolToLatestAssistant(sessionMessages, data.trace?.knowledgeTool)
@@ -209,13 +252,19 @@ export default function useChatMessages(workbench) {
           }
         }
         if (sessionMessages.length) {
-          setMessages((prev) => {
-            const mergedMessages = mergePreservedLocalFileMessages(prev, sessionMessages)
-            return sameMessageList(prev, mergedMessages) ? prev : mergedMessages
-          })
+          if (arrivedInActiveSession) {
+            const prevView = messagesRef.current
+            const mergedMessages = mergePreservedLocalFileMessages(prevView, sessionMessages)
+            const nextView = sameMessageList(prevView, mergedMessages) ? prevView : mergedMessages
+            setMessages(nextView)
+            sessionRuntimeStore.setSessionMessages(targetId, nextView)
+          } else {
+            sessionRuntimeStore.setSessionMessages(targetId, sessionMessages)
+            sessionRuntimeStore.markSessionUnread(targetId, true)
+          }
         }
       } else {
-        replaceMessage(loadingId, {
+        const answerMessage = {
           id: loadingId,
           role: 'assistant',
           text: stripFormBlockJson(data.answer || 'AI 已收到，但暂未返回有效内容。'),
@@ -224,7 +273,8 @@ export default function useChatMessages(workbench) {
           intent: data.intent,
           formBlock: normalizeClientFormBlock(data.formBlock),
           knowledgeTool: normalizeKnowledgeTool(data.trace?.knowledgeTool),
-        })
+        }
+        writeArrivalMessage(sendKey, loadingId, answerMessage)
       }
     } catch (err) {
       // RP-025: 从 API 响应 details 中提取真实错误原因
@@ -236,15 +286,39 @@ export default function useChatMessages(workbench) {
           : apiReason === 'required_or_env_missing'
             ? 'AI 服务未配置 API 密钥，请联系管理员在系统管理中配置。'
             : `AI 对话暂未完成：${err.message || '请求失败'}`
-      replaceMessage(loadingId, {
+      const errorMessage = {
         id: loadingId,
         role: 'assistant',
         text: errorText,
         error: true,
         action: err.status === 401 ? 'login_required' : undefined,
-      })
+      }
+      writeArrivalMessage(sendKey, loadingId, errorMessage)
     } finally {
-      setSending(false)
+      markSending(sendKey, false)
+    }
+  }
+
+  /**
+   * G1：迟到消息（无 session 的应答或错误）按归属会话键写入。
+   * 仍在当前会话（或新会话未落库）时走旧 replaceMessage；
+   * 用户已切走时替换归属会话 store 视图中的 loading 消息并标 unread。
+   */
+  function writeArrivalMessage(ownerSessionId, loadingId, message) {
+    const arrivedInActiveSession = ownerSessionId !== ''
+      && (workbenchRef.current?.activeSession?.sessionId || '') === ownerSessionId
+    if (arrivedInActiveSession || !ownerSessionId) {
+      replaceMessage(loadingId, message)
+      if (arrivedInActiveSession) sessionRuntimeStore.setSessionMessages(ownerSessionId, messagesRef.current)
+      return
+    }
+    const ownerView = sessionRuntimeStore.getSessionMessages(ownerSessionId) || []
+    if (ownerView.some((item) => item.id === loadingId)) {
+      sessionRuntimeStore.setSessionMessages(
+        ownerSessionId,
+        ownerView.map((item) => (item.id === loadingId ? message : item)),
+      )
+      sessionRuntimeStore.markSessionUnread(ownerSessionId, true)
     }
   }
 

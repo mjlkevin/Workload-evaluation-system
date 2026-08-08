@@ -55,6 +55,8 @@
   --table-row-height: 36px;
   --layer-drawer: 50;
   --layer-modal: 60;
+  /* RP-047 Batch D · B1 返工：浮层通知/指示器层（tabs 30 之上，drawer/modal 之下） */
+  --layer-float: 40;
   --kpi-radius: 14px;
   --dialog-radius: 18px;
   --teal: oklch(0.6 0.12 180);

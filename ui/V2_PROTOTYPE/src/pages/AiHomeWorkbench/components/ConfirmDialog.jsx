@@ -1,4 +1,18 @@
-export default function ConfirmDialog({ title, message, detail, error = '', confirmLabel = '确认', cancelLabel = '取消', confirming = false, onCancel, onConfirm }) {
+import { useEffect, useRef } from 'react'
+
+export default function ConfirmDialog({ title, message, detail, error = '', confirmLabel = '确认', cancelLabel = '取消', warning = '删除后不可恢复。', busyLabel = '删除中…', confirming = false, onCancel, onConfirm }) {
+  // Step 6 键盘路径：aria-modal 弹窗需可 Esc 关闭且初始焦点落在弹窗内
+  const dialogRef = useRef(null)
+  const cancelRef = useRef(null)
+  useEffect(() => {
+    cancelRef.current?.focus()
+    function handleKeyDown(event) {
+      if (event.key === 'Escape' && !confirming) onCancel?.()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [confirming, onCancel])
+
   return (
     <div
       role="presentation"
@@ -14,6 +28,7 @@ export default function ConfirmDialog({ title, message, detail, error = '', conf
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-home-confirm-title"
@@ -57,7 +72,7 @@ export default function ConfirmDialog({ title, message, detail, error = '', conf
               {detail}
             </div>
           )}
-          <p style={{ margin: 0, color: 'var(--err)', fontSize: 12 }}>删除后不可恢复。</p>
+          {warning && <p style={{ margin: 0, color: 'var(--err)', fontSize: 12 }}>{warning}</p>}
           {error && (
             <div role="alert" style={{
               padding: '9px 11px',
@@ -73,11 +88,11 @@ export default function ConfirmDialog({ title, message, detail, error = '', conf
           )}
         </div>
         <div style={{ padding: '14px 18px', borderTop: '1px solid var(--line)', background: 'var(--bg-soft)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={onCancel} disabled={confirming}>
+          <button ref={cancelRef} type="button" className="btn btn-out" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={onCancel} disabled={confirming}>
             {cancelLabel}
           </button>
           <button type="button" className="btn btn-dan" style={{ height: 30, fontSize: 12, padding: '0 14px' }} onClick={onConfirm} disabled={confirming}>
-            {confirming ? '删除中…' : confirmLabel}
+            {confirming ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

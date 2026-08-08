@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import WorkspaceTabs from './WorkspaceTabs.jsx'
 import { UnsavedChangesProvider } from '../../hooks/useUnsavedChanges.jsx'
+import { BackgroundRunProvider, useBackgroundRuns } from '../../hooks/useBackgroundRuns.jsx'
+import { sessionRuntimeStore } from '../../hooks/useSessionRuntimeStore.js'
 import useCurrentUser from '../../hooks/useCurrentUser.js'
 import { clearToken, isAuthenticated } from '../../api/auth.js'
 import { SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
@@ -64,6 +66,31 @@ function ChevronIcon({ expanded }) {
   )
 }
 
+/** 后台任务指示器 + aria-live 通知区（常驻 Shell 层，跨页面存活）。 */
+function ShellBackgroundRuns() {
+  const { activeCount, notifications, dismissNotification } = useBackgroundRuns()
+  return (
+    <div className="shell-background-runs">
+      <div className="shell-background-runs-indicator">后台任务 {activeCount}</div>
+      <div className="shell-background-runs-notifications" role="region" aria-label="后台任务通知" aria-live="polite">
+        {notifications.map((item) => (
+          <div key={item.id} className={`background-run-notification background-run-notification--${item.kind}`}>
+            <span className="background-run-notification-text">{item.text}</span>
+            <button
+              type="button"
+              className="background-run-notification-dismiss"
+              aria-label={`关闭通知：${item.text}`}
+              onClick={() => dismissNotification(item.id)}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Shell({ children, currentUser = null }) {
   const [collapsed, setCollapsed] = useState(false)
   const [expandedParents, setExpandedParents] = useState(() => new Set(['系统管理']))
@@ -85,6 +112,8 @@ export default function Shell({ children, currentUser = null }) {
   }, [])
 
   const handleLogout = () => {
+    // G3/G4：登出清敏感运行缓存（cursor/草稿/活跃会话键），绝不触发 cancel
+    sessionRuntimeStore.clearSensitiveRuntimeCache()
     clearToken()
     navigate('/login', { replace: true })
   }
@@ -176,14 +205,17 @@ export default function Shell({ children, currentUser = null }) {
           </div>
         </div>
       </aside>
-      <UnsavedChangesProvider>
-        <main className="content" style={{ flex: 1, minWidth: 0 }}>
-          <WorkspaceTabs />
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-            {children}
-          </div>
-        </main>
-      </UnsavedChangesProvider>
+      <BackgroundRunProvider>
+        <UnsavedChangesProvider>
+          <main className="content" style={{ flex: 1, minWidth: 0 }}>
+            <WorkspaceTabs />
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+              {children}
+            </div>
+          </main>
+        </UnsavedChangesProvider>
+        <ShellBackgroundRuns />
+      </BackgroundRunProvider>
     </div>
   )
 }
