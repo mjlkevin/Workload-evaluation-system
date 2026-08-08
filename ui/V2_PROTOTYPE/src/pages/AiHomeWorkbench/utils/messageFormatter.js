@@ -82,7 +82,10 @@ export function mapSessionMessages(session) {
         id: message.messageId || `${session.sessionId}-${index}`,
         role: message.role,
         text: stripFormBlockJson(message.content || ''),
-        file: file ? { name: file.name, size: file.size, type: file.type } : undefined,
+        // ISS-2026-08-08-001: 带出会话附件的 parsedSummary（存在才带），保证水合后出站消息仍携带解析上下文
+        file: file
+          ? { name: file.name, size: file.size, type: file.type, ...(file.parsedSummary ? { parsedSummary: file.parsedSummary } : {}) }
+          : undefined,
         artifacts,
         formBlock: formBlock.blockId ? formBlock : undefined,
         knowledgeTool,
@@ -147,8 +150,17 @@ export function withCurrentUserFile(sessionMessages, userMessage) {
 }
 
 export function mergePreservedLocalFileMessages(previousMessages, sessionMessages) {
+  // ISS-2026-08-08-001 双保险：存量会话（后端尚未持久化 parsedSummary）回显时，
+  // 若本地副本同名同文本且带 parsedSummary，把本地 file 合并进会话消息，避免解析上下文丢失。
+  const enrichedSessionMessages = sessionMessages.map((item) => {
+    if (!item.file?.name || item.file.parsedSummary) return item
+    const localMatch = previousMessages.find((message) => (
+      message.file?.name === item.file.name && message.text === item.text && message.file.parsedSummary
+    ))
+    return localMatch ? { ...item, file: localMatch.file } : item
+  })
   const preserved = previousMessages.filter((message) => (
-    message.file?.name && !sessionMessages.some((item) => item.file?.name === message.file.name && item.text === message.text)
+    message.file?.name && !enrichedSessionMessages.some((item) => item.file?.name === message.file.name && item.text === message.text)
   ))
-  return preserved.length ? [...preserved, ...sessionMessages] : sessionMessages
+  return preserved.length ? [...preserved, ...enrichedSessionMessages] : enrichedSessionMessages
 }

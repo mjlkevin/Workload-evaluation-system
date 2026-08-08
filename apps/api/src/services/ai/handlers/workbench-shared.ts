@@ -119,6 +119,21 @@ export function latestParsedHomeAttachment(messages: HomeMessageInput[]): HomeAt
   return null;
 }
 
+// ISS-2026-08-08-001: 会话级附件回退——请求未携带 parsedSummary 时，从已落库会话附件中取最近一个带解析上下文的附件
+export function latestSessionAttachmentWithSummary(session: AiSessionRecord | null | undefined): HomeAttachmentInput | null {
+  if (!session || !Array.isArray(session.attachments)) return null;
+  for (const attachment of [...session.attachments].reverse()) {
+    if (!asString(attachment.parsedSummary)) continue;
+    return {
+      name: attachment.name,
+      size: attachment.size,
+      type: attachment.type,
+      parsedSummary: attachment.parsedSummary,
+    };
+  }
+  return null;
+}
+
 // RP-006: 收集所有带 parsedSummary 的附件（跨消息去重）
 export function allParsedHomeAttachments(messages: HomeMessageInput[]): HomeAttachmentInput[] {
   const seen = new Set<string>();

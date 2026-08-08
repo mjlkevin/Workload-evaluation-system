@@ -29,7 +29,7 @@ import { patchReviewStatus, postTeam } from "./team/team.controller";
 import { homeWorkbenchChat, kimiAssessmentPreview, parseBasicInfo } from "./ai/ai.usecase";
 import { testKnowledgeBaseConnectivity } from "./system/system.usecase";
 import * as AiSessionsModule from "./ai-sessions/ai-sessions.module";
-import { createAiSession } from "./ai-sessions/ai-sessions.usecase";
+import { appendAiSessionEvent, createAiSession } from "./ai-sessions/ai-sessions.usecase";
 import { loadAiSessionsStore, saveAiSessionsStore } from "./ai-sessions/ai-sessions.repository";
 import * as ProjectEvaluationsModule from "./project-evaluations/project-evaluations.module";
 import { createConfirmAiAssessmentDraftHandler } from "./project-evaluations/project-evaluations.controller";
@@ -113,10 +113,14 @@ function getActiveUserRole(): AuthUser["role"] {
 }
 
 function getNonAdminUserToken(): string {
+  return signAuthToken(getNonAdminUser());
+}
+
+function getNonAdminUser(): AuthUser {
   const store = loadUsersStore();
   const user = store.users.find((x) => x.status === "active" && x.role !== "admin");
   assert.ok(user, "non-admin active user required for handler tests");
-  return signAuthToken(user);
+  return user;
 }
 
 function withFileSnapshotRestore(filePath: string, run: () => void): void {
@@ -1934,6 +1938,193 @@ test("ai.usecase: homeWorkbenchChat asks the model to analyze parsed attachments
       assert.equal(body.data.session.pendingActions[0].actionType, "supplement_requirement_report");
       assert.equal(body.data.session.messages[1].role, "assistant");
       assert.equal(body.data.session.messages[1].artifactIds?.length, 1);
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = originalFetch;
+      config.kimi.apiKey = originalApiKey;
+      _resetAiBootstrapForTest();
+    }
+  });
+});
+
+// ============================================================
+// ISS-2026-08-08-001：会话级附件上下文回退（非流式闸门）
+// ① 会话已有带 parsedSummary 附件 + 显式报告请求（请求无附件）→ 生成报告
+// ② 会话与请求均无附件 + 显式请求 → 静态引导文案（优雅降级）
+// ③ 有附件但无显式意图 → 不生成报告（硬口径回归）
+// ============================================================
+
+function mockReportAnalysisFetch() {
+  (globalThis as { fetch?: unknown }).fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            answer: "已完成 AI 深度需求分析，并生成《需求解析报告 v1》。",
+            projectName: "会话回退项目",
+            customerName: "会话回退客户",
+            industry: "制造业",
+            needs: ["存量需求一"],
+            modules: ["财务云 / 总账"],
+            missingItems: ["实施组织范围"],
+            risks: ["范围未锁定"],
+            nextActions: ["补充项目信息"],
+          }),
+        },
+      }],
+    }),
+  }) as unknown;
+}
+
+test("ai.usecase: homeWorkbenchChat generates report from session-level attachment when request carries none", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+    const user = getNonAdminUser();
+    const session = createAiSession(user, { title: "存量附件会话", workflowKey: "parse_requirement_file" });
+    appendAiSessionEvent(user, session.sessionId, {
+      message: { role: "user", content: "帮我看看这个文件" },
+      attachments: [{
+        name: "存量需求.xlsx",
+        size: 1200,
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        parsedSummary: "项目：会话回退项目\n客户：会话回退客户\n行业：制造业\n业务需求：\n1. 存量需求一",
+      }],
+    });
+
+    const req = createMockReq({
+      token: getNonAdminUserToken(),
+      body: {
+        sessionId: session.sessionId,
+        workflowKey: "parse_requirement_file",
+        // 显式报告请求，但请求级消息不携带附件（模拟刷新/切换会话后重发）
+        messages: [{ role: "user", content: "请基于当前附件生成需求解析报告" }],
+      },
+    });
+    const res = createMockRes();
+    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+    const originalApiKey = config.kimi.apiKey;
+    try {
+      config.kimi.apiKey = "unit-test-key";
+      bootstrapAiProviders();
+      mockReportAnalysisFetch();
+
+      await homeWorkbenchChat(req, res as unknown as Response);
+
+      assert.equal(res.statusCode, 200);
+      const body = res.body as {
+        code: number;
+        data: {
+          intent: string;
+          answer: string;
+          session: {
+            artifacts: Array<{ type: string; title: string; content: { sourceFile?: string } }>;
+            pendingActions: Array<{ actionType: string }>;
+          };
+        };
+      };
+      assert.equal(body.code, 0);
+      assert.equal(body.data.intent, "harness_report_generation");
+      assert.match(body.data.answer, /AI 深度需求分析/);
+      assert.equal(body.data.session.artifacts.length, 1);
+      assert.equal(body.data.session.artifacts[0].type, "requirement_analysis_report");
+      assert.equal(body.data.session.artifacts[0].title, "需求解析报告 v1");
+      assert.equal(body.data.session.artifacts[0].content.sourceFile, "存量需求.xlsx");
+      assert.equal(body.data.session.pendingActions[0].actionType, "supplement_requirement_report");
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = originalFetch;
+      config.kimi.apiKey = originalApiKey;
+      _resetAiBootstrapForTest();
+    }
+  });
+});
+
+test("ai.usecase: homeWorkbenchChat keeps upload guidance when neither session nor request has attachment", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+    const req = createMockReq({
+      token: getNonAdminUserToken(),
+      body: {
+        workflowKey: "parse_requirement_file",
+        messages: [{ role: "user", content: "生成需求解析报告" }],
+      },
+    });
+    const res = createMockRes();
+    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+    const originalApiKey = config.kimi.apiKey;
+    try {
+      config.kimi.apiKey = "unit-test-key";
+      bootstrapAiProviders();
+      (globalThis as { fetch?: unknown }).fetch = async () => {
+        throw new Error("static route should not call model");
+      };
+
+      await homeWorkbenchChat(req, res as unknown as Response);
+
+      assert.equal(res.statusCode, 200);
+      const body = res.body as {
+        code: number;
+        data: { intent: string; answer: string; suggestedActions: Array<{ actionType: string }> };
+      };
+      assert.equal(body.code, 0);
+      assert.equal(body.data.intent, "harness_report_generation");
+      assert.match(body.data.answer, /请上传需求文件/);
+      assert.equal(body.data.suggestedActions[0].actionType, "generate_requirement_report");
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = originalFetch;
+      config.kimi.apiKey = originalApiKey;
+      _resetAiBootstrapForTest();
+    }
+  });
+});
+
+test("ai.usecase: homeWorkbenchChat does not generate report when session attachment lacks explicit intent", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+    const user = getNonAdminUser();
+    const session = createAiSession(user, { title: "存量附件会话2", workflowKey: "parse_requirement_file" });
+    appendAiSessionEvent(user, session.sessionId, {
+      message: { role: "user", content: "帮我看看这个文件" },
+      attachments: [{
+        name: "存量需求2.xlsx",
+        parsedSummary: "项目：会话回退项目\n客户：会话回退客户\n业务需求：\n1. 存量需求一",
+      }],
+    });
+
+    const req = createMockReq({
+      token: getNonAdminUserToken(),
+      body: {
+        sessionId: session.sessionId,
+        workflowKey: "parse_requirement_file",
+        // 有会话附件但无显式报告意图：只做附件问答，不得创建报告
+        messages: [{ role: "user", content: "帮我看看这个附件有哪些风险" }],
+      },
+    });
+    const res = createMockRes();
+    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+    const originalApiKey = config.kimi.apiKey;
+    try {
+      config.kimi.apiKey = "unit-test-key";
+      bootstrapAiProviders();
+      (globalThis as { fetch?: unknown }).fetch = async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "主要风险是范围未锁定。" }, finish_reason: "stop" }],
+        }),
+      }) as unknown;
+
+      await homeWorkbenchChat(req, res as unknown as Response);
+
+      assert.equal(res.statusCode, 200);
+      const body = res.body as {
+        code: number;
+        data: {
+          intent: string;
+          answer: string;
+          session: { artifacts: Array<{ type: string }>; pendingActions: Array<{ actionType: string }> };
+        };
+      };
+      assert.equal(body.code, 0);
+      assert.notEqual(body.data.intent, "harness_report_generation");
+      assert.equal(body.data.intent, "attachment_qa");
+      assert.equal(body.data.session.artifacts.filter((artifact) => artifact.type === "requirement_analysis_report").length, 0);
+      assert.equal(body.data.session.pendingActions.filter((action) => action.actionType === "supplement_requirement_report").length, 0);
     } finally {
       (globalThis as { fetch?: unknown }).fetch = originalFetch;
       config.kimi.apiKey = originalApiKey;

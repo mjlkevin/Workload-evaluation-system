@@ -25,10 +25,11 @@ import {
   getKimiProvider,
   isExplicitReportRequest,
   latestParsedHomeAttachment,
+  latestSessionAttachmentWithSummary,
   latestUserMessage,
   normalizeHomeMessages,
 } from "./workbench-shared";
-import { analyzeMultipleAttachmentsByKimi, analyzeRequirementAttachmentByKimi } from "./report-analysis";
+import { runExplicitHomeReportFlow } from "./report-flow";
 
 export async function homeWorkbenchChat(req: Request, res: Response) {
   const requestId = res.locals?.requestId || randomUUID();
@@ -56,81 +57,24 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
       message: userMessage,
       attachments: userMessage.attachments,
     }) || session;
-    const parsedAttachment = latestParsedHomeAttachment(messages);
+    // ISS-2026-08-08-001: 请求级附件优先，缺失时回退到已落库会话附件（覆盖刷新/切换会话场景）
+    const parsedAttachment = latestParsedHomeAttachment(messages) ?? latestSessionAttachmentWithSummary(sessionWithUserTurn);
     const allAttachments = allParsedHomeAttachments(messages);
     traceContextRefs = parsedAttachment ? [`attachment:${parsedAttachment.name}`] : [];
 
     // Phase 1G: 有附件 + 明确报告生成请求 → 报告生成路径
-    if (parsedAttachment && isExplicitReportRequest(userMessage.content)) {
-      const { apiKey } = resolveActiveRequirementKimiApiKey();
-      if (!apiKey) return fail(res, 40001, "参数错误", [{ field: "apiKey", reason: "required_or_env_missing" }]);
-      const artifactId = randomUUID();
-
-      // RP-006: 多附件走合并分析路径
-      const useMulti = allAttachments.length > 1;
-      const analysis = useMulti
-        ? await analyzeMultipleAttachmentsByKimi({
-            apiUrl: config.kimi.apiBaseUrl,
-            apiKey,
-            model: config.kimi.model,
-            user,
-            workflowKey,
-            attachments: allAttachments,
-          })
-        : await analyzeRequirementAttachmentByKimi({
-            apiUrl: config.kimi.apiBaseUrl,
-            apiKey,
-            model: config.kimi.model,
-            user,
-            workflowKey,
-            attachment: parsedAttachment,
-          });
-      const { answer, report } = analysis;
-      const sourceFiles: string[] = useMulti
-        ? allAttachments.map((a) => a.name)
-        : [parsedAttachment.name];
-      const updatedSession = appendAiSessionEvent(user, session.sessionId, {
-        message: { role: "assistant", content: answer, artifactIds: [artifactId] },
-        artifact: {
-          artifactId,
-          type: "requirement_analysis_report",
-          title: useMulti ? `需求解析报告 v1（${allAttachments.length} 文件合并）` : "需求解析报告 v1",
-          content: report,
-          status: "generated",
-        },
-        pendingAction: {
-          actionType: "supplement_requirement_report",
-          title: "补充需求解析报告缺失信息",
-          riskLevel: "low",
-          payload: {
-            artifactId,
-            sourceFile: sourceFiles[0],
-            sourceFiles,
-            missingItems: report.missingItems,
-          },
-        },
-      }) || getAiSession(user, session.sessionId) || sessionWithUserTurn;
-      // RP-008: 报告生成后，若提取到客户名称，自动添加“检索主体”建议动作
-      const reportSuggestedActions: Array<{ id: string; label: string; actionType: string; payload?: Record<string, string> }> = [];
-      if (report.customerName && report.customerName !== "待补充") {
-        reportSuggestedActions.push({
-          id: `company_lookup_${randomUUID().slice(0, 8)}`,
-          label: `检索主体：${report.customerName}`,
-          actionType: "company_lookup",
-          payload: { customerName: report.customerName },
-        });
-      }
-      return res.json(ok({
-        intent: "harness_report_generation",
-        answer,
-        businessRole: resolveBusinessRole(user),
-        roleLabel: HOME_ROLE_PRESETS[resolveBusinessRole(user)].label,
-        model: normalizeKimiModelName(config.kimi.model),
-        rawContent: analysis.rawContent,
-        session: updatedSession,
-        suggestedActions: reportSuggestedActions,
-        trace: { intentConfidence: 1, routingRule: useMulti ? "explicit_report_multi_attachment" : "explicit_report_with_attachment", contextRefs: sourceFiles.map((n) => `attachment:${n}`) },
-      }, requestId));
+    // ISS-2026-08-08-001: 闸门追加 clientAction 条件，与建议动作按钮口径对齐；闸门语义（isExplicitReportRequest）零变更
+    if (parsedAttachment && (isExplicitReportRequest(userMessage.content) || asString(body.clientAction) === "generate_requirement_report")) {
+      const flowResult = await runExplicitHomeReportFlow({
+        user,
+        workflowKey,
+        session,
+        sessionWithUserTurn,
+        parsedAttachment,
+        allAttachments,
+      });
+      if (!flowResult.ok) return fail(res, 40001, "参数错误", [{ field: "apiKey", reason: "required_or_env_missing" }]);
+      return res.json(ok(flowResult.body, requestId));
     }
 
     // Phase 1G: 通过意图分发器路由（普通问答、附件问答、能力发现、数据查询、写动作等）。

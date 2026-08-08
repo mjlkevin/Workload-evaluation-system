@@ -64,6 +64,7 @@ export type AiAttachment = {
   name: string;
   size?: number;
   type?: string;
+  parsedSummary?: string;
   createdAt: string;
 };
 

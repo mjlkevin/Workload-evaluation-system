@@ -13,9 +13,14 @@ import type { WorkbenchIntentHandler } from "./handler.types";
  */
 function buildReportGenerationResponse(intent: { intent: WorkbenchIntent; confidence: number; routingRule: string }, context: WorkbenchContext, input: WorkbenchDispatchInput): WorkbenchDispatchData {
   const isV2 = intent.intent === "harness_answer_submission";
+  // ISS-2026-08-08-001: 会话已有附件时不再要求重新上传，改为引导显式确认后直接生成
+  const attachmentRef = (context.contextRefs || []).find((ref) => typeof ref === "string" && ref.startsWith("attachment:"));
+  const attachmentName = attachmentRef ? attachmentRef.slice("attachment:".length) : "";
   const answer = isV2
     ? "检测到你希望基于已有 v1 报告补充信息并生成 v2。请通过结构化卡片提交补充信息，或在卡片中填写后点击「提交补充并生成 v2」。"
-    : "检测到你希望生成需求解析报告。请上传需求文件后点击下方按钮启动报告生成流程。";
+    : attachmentName
+      ? `检测到会话已有附件《${attachmentName}》。请明确回复“生成需求解析报告”，我将直接基于该附件生成。`
+      : "检测到你希望生成需求解析报告。请上传需求文件后点击下方按钮启动报告生成流程。";
   return {
     intent: intent.intent,
     answer,

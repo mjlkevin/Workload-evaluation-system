@@ -16,15 +16,19 @@ import { dispatchHomeWorkbenchTurn, type StreamingAdapter, type StreamingChunk }
 import { recordWorkbenchTurnFailureTrace, recordWorkbenchTurnTrace } from "../../../modules/trace/trace.usecase";
 import {
   HOME_ROLE_PRESETS,
+  allParsedHomeAttachments,
   buildHomeMessageContentForModel,
   currentUserFromRequest,
   ensureHomeAiSession,
   getKimiProvider,
+  isExplicitReportRequest,
   latestParsedHomeAttachment,
+  latestSessionAttachmentWithSummary,
   latestUserMessage,
   normalizeHomeMessages,
   resolveWorkbenchStreamFinalContent,
 } from "./workbench-shared";
+import { runExplicitHomeReportFlow } from "./report-flow";
 
 /**
  * RP-029 返工：AI 工作台流式对话接口（SSE）
@@ -89,16 +93,45 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
     traceSessionId = session.sessionId;
 
     // 记录用户消息到 session
-    appendAiSessionEvent(user, session.sessionId, {
+    const sessionWithUserTurn = appendAiSessionEvent(user, session.sessionId, {
       message: userMessage,
       attachments: userMessage.attachments,
-    });
+    }) || session;
 
-    const parsedAttachment = latestParsedHomeAttachment(messages);
+    // ISS-2026-08-08-001: 请求级附件优先，缺失时回退到已落库会话附件（与非流式对齐）
+    const parsedAttachment = latestParsedHomeAttachment(messages) ?? latestSessionAttachmentWithSummary(sessionWithUserTurn);
+    const allAttachments = allParsedHomeAttachments(messages);
     traceContextRefs = parsedAttachment ? [`attachment:${parsedAttachment.name}`] : [];
     const businessRole = resolveBusinessRole(user);
     const roleLabel = HOME_ROLE_PRESETS[businessRole].label;
     const modelName = normalizeKimiModelName(config.kimi.model);
+
+    // ISS-2026-08-08-001: 显式报告闸门与非流式对齐——命中时走共享报告流程，结果以 done 事件一次性下发
+    if (parsedAttachment && (isExplicitReportRequest(userMessage.content) || asString(body.clientAction) === "generate_requirement_report")) {
+      const flowResult = await runExplicitHomeReportFlow({
+        user,
+        workflowKey,
+        session,
+        sessionWithUserTurn,
+        parsedAttachment,
+        allAttachments,
+      });
+      if (!flowResult.ok) {
+        sendSseEvent("error", { code: flowResult.reason, message: "AI 服务未配置 API 密钥" });
+        res.end();
+        return;
+      }
+      sendSseEvent("done", {
+        content: flowResult.body.answer,
+        model: flowResult.body.model,
+        intent: flowResult.body.intent,
+        session: flowResult.body.session,
+        trace: flowResult.body.trace,
+        suggestedActions: flowResult.body.suggestedActions,
+      });
+      res.end();
+      return;
+    }
 
     // 构建流式 adapter — 收集 chunks 并通过 SSE 发送
     const streamedChunks: StreamingChunk[] = [];
