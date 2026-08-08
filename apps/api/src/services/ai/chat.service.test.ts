@@ -7,6 +7,8 @@ import type { Request, Response } from "express";
 import { config } from "../../config/env";
 import { defaultProviderRegistry, type ModelProvider } from "../../ai/provider";
 import { aiSessionsStorePath } from "../../utils";
+import type { AuthUser } from "../../types";
+import { appendAiSessionEvent, createAiSession } from "../../modules/ai-sessions/ai-sessions.usecase";
 import { queryTraces } from "../../modules/trace/trace.repository";
 import {
   allParsedHomeAttachments,
@@ -406,4 +408,71 @@ test("resolveWorkbenchStreamFinalContent: 流式最终内容以 dispatch answer 
 
   assert.equal(result.hasStreaming, true);
   assert.equal(result.content, "知识库参考\n\n---\n\n第一段第二段");
+});
+
+// ─── ISS-2026-08-08-001: 流式显式报告闸门与会话附件回退对齐 ───────────────────────────
+
+test("homeWorkbenchChatStream: 显式报告请求回退会话附件后直接生成报告（与非流式对齐）", async () => {
+  await withChatServiceIsolation(async () => {
+    registerFakeKimiProvider({
+      chatAnswer: JSON.stringify({
+        answer: "已完成 AI 深度需求分析，并生成《需求解析报告 v1》。",
+        projectName: "流式回退项目",
+        customerName: "流式回退客户",
+        industry: "制造业",
+        needs: ["存量需求一"],
+        modules: ["财务云 / 总账"],
+        missingItems: ["实施组织范围"],
+        risks: ["范围未锁定"],
+        nextActions: ["补充项目信息"],
+      }),
+    });
+
+    const streamUser: AuthUser = {
+      id: "test-user-1",
+      username: "tester",
+      passwordHash: "test-hash",
+      role: "user",
+      businessRole: "pre_sales",
+      status: "active",
+      createdAt: "2026-08-08T00:00:00.000Z",
+      lastLoginAt: "2026-08-08T00:00:00.000Z",
+    };
+    const session = createAiSession(streamUser, { title: "流式存量附件会话", workflowKey: "parse_requirement_file" });
+    appendAiSessionEvent(streamUser, session.sessionId, {
+      message: { role: "user", content: "帮我看看这个文件" },
+      attachments: [{
+        name: "流式存量需求.xlsx",
+        parsedSummary: "项目：流式回退项目\n客户：流式回退客户\n行业：制造业\n业务需求：\n1. 存量需求一",
+      }],
+    });
+
+    const { req, res, getSseEvents } = createMockReqRes({
+      body: {
+        sessionId: session.sessionId,
+        workflowKey: "parse_requirement_file",
+        // 显式报告请求，但请求级消息不携带附件
+        messages: [{ role: "user", content: "请基于当前附件生成需求解析报告" }],
+      },
+    });
+
+    await homeWorkbenchChatStream(req, res);
+
+    const events = getSseEvents();
+    const done = events.find((event) => event.event === "done");
+    assert.ok(done, "应发送 done 事件并携带报告结果");
+    const doneData = done.data as {
+      content?: string;
+      intent?: string;
+      session?: { artifacts?: Array<{ type?: string; title?: string }> };
+    };
+    assert.equal(doneData.intent, "harness_report_generation");
+    assert.match(doneData.content || "", /AI 深度需求分析/);
+    assert.ok(
+      (doneData.session?.artifacts || []).some((artifact) => artifact.type === "requirement_analysis_report"),
+      "done 事件的 session 应包含 requirement_analysis_report artifact",
+    );
+    const allPayload = JSON.stringify(events);
+    assert.ok(!allPayload.includes("请上传需求文件"), "会话已有附件时不应再出现上传引导文案");
+  });
 });

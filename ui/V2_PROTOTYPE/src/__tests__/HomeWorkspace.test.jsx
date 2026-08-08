@@ -1945,4 +1945,178 @@ describe('HomeWorkspace', () => {
     fireEvent.click(screen.getByText('蓝海制造有限公司'))
     expect(await screen.findByText(/已选择客户主体：蓝海制造有限公司/)).toBeInTheDocument()
   })
+
+  test('ISS-2026-08-08-001: second turn carries parsedSummary when session echo persists it', async () => {
+    const chatRequests = []
+    let turn = 0
+    const parsedSummary = 'AI 已完成文件解析摘要：\n文件：客户需求.xlsx\n项目：多组织项目\n业务需求：\n1. 多组织业务协同'
+    const sessionBase = {
+      sessionId: 'session-echo-summary',
+      title: '附件问答',
+      domain: 'business_evaluation',
+      workflowKey: 'parse_requirement_file',
+      businessRole: 'pre_sales',
+      status: 'rough_estimate',
+      summary: '',
+      messages: [],
+      attachments: [],
+      artifacts: [],
+      pendingActions: [],
+      linkedRecords: {},
+      createdAt: '2026-08-08T00:00:00.000Z',
+      updatedAt: '2026-08-08T00:00:01.000Z',
+    }
+    server.use(
+      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: [sessionBase] } })),
+      http.post(`${BASE}/ai/home-workbench/chat`, async ({ request }) => {
+        const body = await request.json()
+        chatRequests.push(body)
+        turn += 1
+        const latest = body.messages?.at?.(-1)?.content || ''
+        if (turn === 1) {
+          // 后端已持久化附件 parsedSummary 的会话回声
+          return HttpResponse.json({
+            success: true,
+            data: {
+              intent: 'attachment_qa',
+              answer: '模型回复：多组织业务往来一般包含哪些模块？',
+              businessRole: 'pre_sales',
+              roleLabel: '售前顾问',
+              model: 'kimi-k2.5',
+              suggestedActions: [{ id: 'generate_requirement_report', label: '生成需求解析报告', actionType: 'generate_requirement_report', requiresConfirm: false }],
+              session: {
+                ...sessionBase,
+                messages: [
+                  { messageId: 'm-user-1', role: 'user', content: '多组织业务往来一般包含哪些模块？', attachmentIds: ['att-echo'], createdAt: '2026-08-08T00:00:00.000Z' },
+                  { messageId: 'm-ai-1', role: 'assistant', content: '模型回复：多组织业务往来一般包含哪些模块？', metadata: { intent: 'attachment_qa', suggestedActions: [{ id: 'generate_requirement_report', label: '生成需求解析报告', actionType: 'generate_requirement_report', requiresConfirm: false }] }, createdAt: '2026-08-08T00:00:01.000Z' },
+                ],
+                attachments: [{ attachmentId: 'att-echo', name: '客户需求.xlsx', size: 4200, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', parsedSummary, createdAt: '2026-08-08T00:00:00.000Z' }],
+                updatedAt: '2026-08-08T00:00:01.000Z',
+              },
+            },
+          })
+        }
+        return HttpResponse.json({
+          success: true,
+          data: {
+            intent: 'harness_report_generation',
+            answer: `模型回复：${latest}`,
+            businessRole: 'pre_sales',
+            roleLabel: '售前顾问',
+            model: 'kimi-k2.5',
+          },
+        })
+      }),
+    )
+    localStorage.setItem('wes-ai-active-session-id', 'session-echo-summary')
+
+    const { container } = renderHomeWorkspace()
+    const input = await screen.findByRole('textbox')
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(['demo'], '客户需求.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+    fireEvent.change(fileInput, { target: { files: [file] } })
+    fireEvent.change(input, { target: { value: '多组织业务往来一般包含哪些模块？' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+    await waitFor(() => expect(chatRequests.length).toBe(1))
+    await waitFor(() => expect(screen.getByText(/模型回复：多组织业务往来/)).toBeInTheDocument())
+
+    // 点击建议动作后发送显式报告请求：会话回声已持久化 parsedSummary，
+    // 第二轮回声重建后出站消息仍应携带 parsedSummary
+    fireEvent.click(screen.getByText('生成需求解析报告'))
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+    await waitFor(() => expect(chatRequests.length).toBe(2))
+    expect(chatRequests[1].messages.some((message) => (
+      (message.attachments || []).some((attachment) => (
+        attachment.name === '客户需求.xlsx' && /多组织业务协同/.test(attachment.parsedSummary || '')
+      ))
+    ))).toBe(true)
+  })
+
+  test('ISS-2026-08-08-001: explicit report request after refresh hydration goes to report generation', async () => {
+    const parsedSummary = 'AI 已完成文件解析摘要：\n文件：存量需求.xlsx\n项目：水合项目\n客户：水合客户\n业务需求：\n1. 存量需求'
+    const hydratedSession = {
+      sessionId: 'session-hydrated-attachment',
+      title: '存量附件会话',
+      domain: 'business_evaluation',
+      workflowKey: 'parse_requirement_file',
+      businessRole: 'pre_sales',
+      status: 'rough_estimate',
+      summary: '',
+      messages: [
+        { messageId: 'm-user-1', role: 'user', content: '帮我看看这个需求文件', attachmentIds: ['att-hydrate'], createdAt: '2026-08-08T00:00:00.000Z' },
+        { messageId: 'm-ai-1', role: 'assistant', content: '已解析完成，可随时生成需求解析报告。', createdAt: '2026-08-08T00:00:01.000Z' },
+      ],
+      attachments: [{ attachmentId: 'att-hydrate', name: '存量需求.xlsx', size: 5200, type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', parsedSummary, createdAt: '2026-08-08T00:00:00.000Z' }],
+      artifacts: [],
+      pendingActions: [],
+      linkedRecords: {},
+      createdAt: '2026-08-08T00:00:00.000Z',
+      updatedAt: '2026-08-08T00:00:01.000Z',
+    }
+    let chatBody
+    server.use(
+      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: [hydratedSession] } })),
+      http.post(`${BASE}/ai/home-workbench/chat`, async ({ request }) => {
+        chatBody = await request.json()
+        return HttpResponse.json({
+          success: true,
+          data: {
+            intent: 'harness_report_generation',
+            answer: '已完成 AI 深度需求分析，并生成《需求解析报告 v1》。',
+            businessRole: 'pre_sales',
+            roleLabel: '售前顾问',
+            model: 'kimi-k2.5',
+            session: {
+              ...hydratedSession,
+              messages: [
+                ...hydratedSession.messages,
+                { messageId: 'm-user-2', role: 'user', content: '请基于当前附件生成需求解析报告', createdAt: '2026-08-08T00:00:02.000Z' },
+                { messageId: 'm-ai-2', role: 'assistant', content: '已完成 AI 深度需求分析，并生成《需求解析报告 v1》。', artifactIds: ['art-hydrate-report'], createdAt: '2026-08-08T00:00:03.000Z' },
+              ],
+              artifacts: [{
+                artifactId: 'art-hydrate-report',
+                type: 'requirement_analysis_report',
+                title: '需求解析报告 v1',
+                status: 'generated',
+                createdAt: '2026-08-08T00:00:03.000Z',
+                content: {
+                  sourceFile: '存量需求.xlsx',
+                  projectName: '水合项目',
+                  customerName: '水合客户',
+                  industry: '制造业',
+                  needs: ['存量需求'],
+                  missingItems: ['实施组织范围'],
+                  risks: ['范围未锁定'],
+                },
+              }],
+              updatedAt: '2026-08-08T00:00:03.000Z',
+            },
+          },
+        })
+      }),
+    )
+    localStorage.setItem('wes-ai-active-session-id', 'session-hydrated-attachment')
+
+    renderHomeWorkspace()
+
+    // 模拟刷新：仅从 session 数据水合历史消息
+    expect(await screen.findByText('已解析完成，可随时生成需求解析报告。')).toBeInTheDocument()
+
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: '请基于当前附件生成需求解析报告' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+
+    await waitFor(() => expect(chatBody).toBeTruthy())
+    expect(chatBody.sessionId).toBe('session-hydrated-attachment')
+    // 水合后的出站消息应携带会话级 persisted parsedSummary
+    expect(chatBody.messages.some((message) => (
+      (message.attachments || []).some((attachment) => (
+        attachment.name === '存量需求.xlsx' && /水合项目/.test(attachment.parsedSummary || '')
+      ))
+    ))).toBe(true)
+    // 走报告生成路径，而非静态上传引导
+    await waitFor(() => expect(screen.getAllByText('需求解析报告 v1').length).toBeGreaterThan(0))
+    expect(screen.queryByText(/请上传需求文件/)).not.toBeInTheDocument()
+  })
 })

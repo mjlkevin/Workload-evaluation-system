@@ -33,6 +33,7 @@ const VALID_STATUSES: AiSessionStatus[] = [
 const VALID_MESSAGE_ROLES: AiMessageRole[] = ["user", "assistant", "system", "tool"];
 const VALID_ARTIFACT_STATUSES: AiArtifactStatus[] = ["generated", "accepted", "linked", "superseded", "discarded"];
 const VALID_RISK_LEVELS: AiRiskLevel[] = ["low", "high"];
+const PARSED_SUMMARY_MAX_LENGTH = 8000;
 
 function normalizeDomain(value: unknown): AiSessionDomain {
   const domain = asString(value) as AiSessionDomain;
@@ -189,11 +190,18 @@ export function appendAiSessionEvent(
         const name = asString(attachmentInput.name);
         if (!name) return "";
         const attachmentId = asString(attachmentInput.attachmentId) || randomUUID();
+        const parsedSummaryRaw = asString(attachmentInput.parsedSummary);
+        const parsedSummary = parsedSummaryRaw
+          ? parsedSummaryRaw.length > PARSED_SUMMARY_MAX_LENGTH
+            ? `${parsedSummaryRaw.slice(0, PARSED_SUMMARY_MAX_LENGTH)}…[truncated]`
+            : parsedSummaryRaw
+          : undefined;
         session.attachments.push({
           attachmentId,
           name,
           size: typeof attachmentInput.size === "number" ? attachmentInput.size : undefined,
           type: asString(attachmentInput.type) || undefined,
+          ...(parsedSummary ? { parsedSummary } : {}),
           createdAt: asString(attachmentInput.createdAt) || nowIso,
         });
         return attachmentId;

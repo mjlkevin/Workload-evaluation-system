@@ -190,3 +190,31 @@ test("unsupportedHandler: 超范围静态拦截 + modelClassification 入 trace"
   assert.match(result.answer, /超出了我的能力范围/);
   assert.deepEqual(result.trace.modelClassification, MODEL_CLASSIFICATION);
 });
+
+// ─── ISS-2026-08-08-001: 静态报告 handler 文案上下文感知 ─────────────────────────
+
+test("harnessReportHandler: 会话已有附件上下文时 v1 文案不再要求重新上传", async () => {
+  const result = await harnessReportHandler.handle(
+    paramsFor(
+      { intent: "harness_report_generation", confidence: 0.9, routingRule: "report_generation_keywords" },
+      makeInput(),
+      makeContext({ contextRefs: ["attachment:存量附件.xlsx"] }),
+    ),
+  );
+  assert.match(result.answer, /检测到会话已有附件《存量附件.xlsx》/);
+  assert.match(result.answer, /生成需求解析报告/);
+  assert.ok(!result.answer.includes("请上传需求文件"), "有附件上下文时不得再要求上传需求文件");
+  assert.equal(result.suggestedActions[0]?.actionType, "generate_requirement_report");
+});
+
+test("harnessReportHandler: 无附件上下文时保留原上传引导文案", async () => {
+  const result = await harnessReportHandler.handle(
+    paramsFor(
+      { intent: "harness_report_generation", confidence: 0.9, routingRule: "report_generation_keywords" },
+      makeInput(),
+      makeContext({ contextRefs: [] }),
+    ),
+  );
+  assert.match(result.answer, /请上传需求文件/);
+  assert.equal(result.suggestedActions[0]?.actionType, "generate_requirement_report");
+});
