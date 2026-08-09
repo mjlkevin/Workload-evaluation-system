@@ -81,8 +81,11 @@ export function useAiSessions() {
       setActiveSession((current) => {
         const storedId = readStoredActiveSessionId()
         const restored = items.find((item) => item.sessionId === storedId)
+        // ISS-2026-08-09-003 C1（离页返回旧缓存渲染、AI 回复不显示）：当前会话仍在
+        // 新列表时换用本次重拉的同 id 对象——旧对象 messages 停在发送时刻，会把
+        // 后端新写入的 assistant 回复挡在渲染源之外；后端最新数据为准。
         const next = current && items.some((item) => item.sessionId === current.sessionId)
-          ? current
+          ? items.find((item) => item.sessionId === current.sessionId)
           : (restored || items[0] || null)
         writeStoredActiveSessionId(next?.sessionId || '')
         return next

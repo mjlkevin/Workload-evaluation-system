@@ -142,4 +142,20 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     // 当前用户只能看到自己的会话
     expect(await screen.findByText('u3 专属会话')).toBeInTheDocument()
   })
+
+  // ISS-2026-08-09-003（离页返回旧缓存渲染）C3 回归：
+  // 「后台任务」角标接入统一视图 runs 的活跃/已完成计数（O5 接口已一次取齐 runs）。
+  test('unified-view: 后台任务角标按统一视图 runs 展示活跃/已完成计数', async () => {
+    setupUnifiedView({
+      view: buildUnifiedView({
+        runs: [
+          { id: 'run-1', sessionId: 'session-a', status: 'running', latestEventKind: 'run_status_changed' },
+          { id: 'run-2', sessionId: 'session-b', status: 'completed', latestEventKind: 'run_completed' },
+        ],
+      }),
+    })
+    renderWorkbench()
+
+    expect(await screen.findByText('后台任务 进行中 1 · 已完成 1')).toBeInTheDocument()
+  })
 })
