@@ -415,7 +415,11 @@
         <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE -- HomeWorkspace.test.jsx</td><td><span class="status done"><span class="dot"></span>43 pass</span></td><td>RP-018 前端 trace chip、RP-019 右侧工作区折叠/Markdown 表格/sanitize，以及 RP-005 Artifact Workspace 时间线聚焦测试。</td></tr>
         <tr><td class="mono">npm run test --prefix ui/V2_PROTOTYPE</td><td><span class="status done"><span class="dot"></span>83 pass</span></td><td>V2 前端全量回归，包含 RP-005 右侧运行时间线、RP-018 knowledgeTool trace chip 与 RP-019 右侧工作区折叠、Markdown 表格渲染和 unsafe link/raw HTML 防护用例。</td></tr>
         <tr><td class="mono">npm run build:web</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>Vite 构建通过，保留既有 chunk-size warning。</td></tr>
-        <tr><td class="mono">npm run test:harness --prefix apps/api</td><td><span class="status done"><span class="dot"></span>65 pass</span></td><td>RP-007 新增用例先因缺少 <code class="inline">./harness.regression</code> 见红；实现后覆盖 deterministic sample schema 与 requirement_match_v1 评分。</td></tr>
+        <tr><td class="mono">npm run test:modules (SP-2026-007 MS1)</td><td><span class="status done"><span class="dot"></span>307 pass</span></td><td>SP-2026-007 MS1 知识库中文混合检索基线：7 个 knowledge 域新增测试 + 既有模块全量回归全部通过。</td></tr>
+        <tr><td class="mono">npm run build:api (SP-2026-007 MS1)</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>TypeScript 构建通过，含 @node-rs/jieba 原生依赖。</td></tr>
+        <tr><td class="mono">npm run build:web (SP-2026-007 MS1)</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>Vite 构建通过，保留既有 chunk-size warning。</td></tr>
+        <tr><td class="mono">npm test --prefix ui/V2_PROTOTYPE (SP-2026-007 MS1)</td><td><span class="status done"><span class="dot"></span>267 pass</span></td><td>前端全量回归通过，含新增「检索诊断」页签组件。</td></tr>
+        <tr><td class="mono">Codex 代码审查 (SP-2026-007 MS1)</td><td><span class="status done"><span class="dot"></span>Approve</span></td><td>五轴审查通过，无 Critical/Required 问题，Nit 一项（索引实时重建为已知预留项）。</td></tr>
         <tr><td class="mono">npm run build:api</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>RP-007 新增 Harness regression 模块与 barrel 导出后的 API TypeScript 编译通过。</td></tr>
       </table>
     </section>

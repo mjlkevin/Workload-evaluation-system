@@ -1,0 +1,28 @@
+{
+  "version": "knowledge-retrieval-samples-v1",
+  "description": "SP-2026-007 MS1（M1 中文混合检索基线）验收样例：20 条中文术语查询 + 2 条无答案查询。验收口径：可回答样例 BM25 路 Top-5 命中率 ≥ 80%。",
+  "samples": [
+    { "id": "qs-01", "question": "售前估算怎么做", "expectedEntryIds": ["k-presales-estimate"], "expectAnswer": true },
+    { "id": "qs-02", "question": "实施评估人天口径是什么", "expectedEntryIds": ["k-effort-assessment"], "expectAnswer": true },
+    { "id": "qs-03", "question": "工作量评估要考虑哪些因素", "expectedEntryIds": ["k-effort-assessment", "k-dev-assessment"], "expectAnswer": true },
+    { "id": "qs-04", "question": "需求分析的步骤", "expectedEntryIds": ["k-requirement-analysis"], "expectAnswer": true },
+    { "id": "qs-05", "question": "SOW 工作说明书包含什么", "expectedEntryIds": ["k-sow"], "expectAnswer": true },
+    { "id": "qs-06", "question": "规则引擎怎么执行估算", "expectedEntryIds": ["k-rules-engine"], "expectAnswer": true },
+    { "id": "qs-07", "question": "Excel 模板层级结构", "expectedEntryIds": ["k-excel-template"], "expectAnswer": true },
+    { "id": "qs-08", "question": "WBS 分解的作用", "expectedEntryIds": ["k-wbs"], "expectAnswer": true },
+    { "id": "qs-09", "question": "版本检出检入规则", "expectedEntryIds": ["k-version-control"], "expectAnswer": true },
+    { "id": "qs-10", "question": "JWT 鉴权失败怎么办", "expectedEntryIds": ["k-jwt-auth"], "expectAnswer": true },
+    { "id": "qs-11", "question": "RBAC 能力位如何拦截路由", "expectedEntryIds": ["k-rbac-capability"], "expectAnswer": true },
+    { "id": "qs-12", "question": "AI 工作台会话并行", "expectedEntryIds": ["k-ai-workbench"], "expectAnswer": true },
+    { "id": "qs-13", "question": "知识库检索命中率", "expectedEntryIds": ["k-knowledge-base"], "expectAnswer": true },
+    { "id": "qs-14", "question": "导出评估报告", "expectedEntryIds": ["k-export-report"], "expectAnswer": true },
+    { "id": "qs-15", "question": "变更管理流程", "expectedEntryIds": ["k-change-management"], "expectAnswer": true },
+    { "id": "qs-16", "question": "回归验证要求", "expectedEntryIds": ["k-testing-regression"], "expectAnswer": true },
+    { "id": "qs-17", "question": "部署回滚预案", "expectedEntryIds": ["k-deploy-rollback"], "expectAnswer": true },
+    { "id": "qs-18", "question": "会议纪要沉淀", "expectedEntryIds": ["k-collab"], "expectAnswer": true },
+    { "id": "qs-19", "question": "项目经理进度视图", "expectedEntryIds": ["k-pm-workbench"], "expectAnswer": true },
+    { "id": "qs-20", "question": "销售简报商机材料", "expectedEntryIds": ["k-sales-briefing"], "expectAnswer": true },
+    { "id": "qs-na-01", "question": "量子厨房管理模块的官方功能清单", "expectedEntryIds": [], "expectAnswer": false },
+    { "id": "qs-na-02", "question": "2099 版本精确上线日期", "expectedEntryIds": [], "expectAnswer": false }
+  ]
+}
