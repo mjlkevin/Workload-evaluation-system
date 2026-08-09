@@ -102,7 +102,7 @@ export default function AiHomeWorkbench({ currentUser }) {
         />
       </aside>
 
-      <ChatArea preset={workbench.preset} workbench={workbench} chat={chat} harness={harness} />
+      <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={chat} harness={harness} />
 
       <WorkspacePanel
         collapsed={workbench.workspacePanelCollapsed}

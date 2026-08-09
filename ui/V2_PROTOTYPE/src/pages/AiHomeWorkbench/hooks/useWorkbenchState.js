@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getWorkbenchView } from '../../../api/workbenchView.js'
 import { summarizeCompanyProfile } from '../../../api/ai.js'
 import { useAiSessions } from '../../../hooks/useAiSessions.js'
 import { sessionRuntimeStore } from '../../../hooks/useSessionRuntimeStore.js'
@@ -20,6 +21,9 @@ function readWorkspacePanelCollapsed() {
  * 收敛 AI 工作台分散的 useState：预设/工作流、会话列表、输入草稿、
  * 附件选择、工作区折叠、会话删除确认、客户主体检索。
  * callbacks.onActiveSessionDeleted 用于删除当前会话后清空消息区。
+ *
+ * O5 Sprint 3A：首屏与刷新时机接入统一视图（GET /ai/home-workbench/view），
+ * 聚合 sessions + runs + tasks + artifacts + failedRuns；既有 useAiSessions 保持可用。
  */
 export default function useWorkbenchState(currentUser, callbacks = {}) {
   const preset = useMemo(() => getAiHomePreset(currentUser?.businessRole), [currentUser?.businessRole])
@@ -46,14 +50,37 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
   const [workbenchCompanyCandidates, setWorkbenchCompanyCandidates] = useState([])
   const [workbenchCompanyLookupError, setWorkbenchCompanyLookupError] = useState('')
 
+  // O5：统一视图状态（渐进替换，不一把删旧 API）
+  const [unifiedView, setUnifiedView] = useState(null)
+  const [unifiedViewLoading, setUnifiedViewLoading] = useState(false)
+  const [unifiedViewError, setUnifiedViewError] = useState('')
+
   const activeWorkflow = workflowsByKey.get(activeWorkflowKey)
   const centerTitle = activeWorkflow?.title || preset.headline
   const centerHint = activeWorkflow?.desc || preset.emptyHint
   const outputState = getWorkflowOutputs(activeWorkflow)
 
+  // O5：首屏加载统一视图；失败时静默降级（不阻塞既有 loadSessions 链路）
+  const loadUnifiedView = useCallback(async () => {
+    setUnifiedViewLoading(true)
+    setUnifiedViewError('')
+    try {
+      const view = await getWorkbenchView()
+      setUnifiedView(view)
+      return view
+    } catch (err) {
+      setUnifiedViewError(err?.message || '统一视图加载失败')
+      return null
+    } finally {
+      setUnifiedViewLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
+    // 首屏：统一视图与会话列表并行加载；统一视图失败不阻塞会话列表
+    loadUnifiedView().catch(() => {})
     loadSessions().catch(() => {})
-  }, [loadSessions])
+  }, [loadUnifiedView, loadSessions])
 
   useEffect(() => {
     const previousSessionId = prevComposerSessionIdRef.current
@@ -174,6 +201,11 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
     centerHint,
     outputState,
     ...sessionsApi,
+    // O5：统一视图数据（渐进消费）
+    unifiedView,
+    unifiedViewLoading,
+    unifiedViewError,
+    refreshUnifiedView: loadUnifiedView,
     composer,
     setComposer,
     clearComposerDraft,

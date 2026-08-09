@@ -19,6 +19,7 @@ export default function MessageBubble({
   onSuggestedAction,
   goLogin,
   copyDraft,
+  onToggleThought,
 }) {
   const isUser = message.role === 'user'
   const hasArtifacts = !isUser && !message.error && pickArray(message.artifacts).length > 0
@@ -38,6 +39,46 @@ export default function MessageBubble({
           isUser || message.error
             ? <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
             : <RichAiMessage text={message.text} optionDisabled={sending} onOptionSelect={onOptionSelect} />
+        )}
+        {!isUser && !message.error && Array.isArray(message.thoughts) && message.thoughts.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            {message.thoughts.map((thought, idx) => (
+              <div key={`thought-${idx}`} style={{ marginBottom: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => onToggleThought?.(message.id, idx)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    color: 'var(--ink-3)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <span>{thought.collapsed ? '▶' : '▼'}</span>
+                  <span>思考过程 {idx + 1}</span>
+                </button>
+                {!thought.collapsed && (
+                  <div style={{
+                    marginTop: 4,
+                    padding: '8px 10px',
+                    background: 'var(--accent-soft)',
+                    borderRadius: 6,
+                    fontSize: 12,
+                    color: 'var(--ink-2)',
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {thought.text}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
         {!isUser && !message.error && message.knowledgeTool && (
           <ModelRunTrace knowledgeTool={message.knowledgeTool} />

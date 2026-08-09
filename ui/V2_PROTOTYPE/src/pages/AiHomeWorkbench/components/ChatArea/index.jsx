@@ -24,7 +24,13 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
     onSuggestedAction: chat.handleSuggestedAction,
     goLogin: chat.goLogin,
     copyDraft: chat.copyDraft,
+    onToggleThought: chat.toggleThought,
   }
+
+  // O8：当前活跃 Run（用于停止按钮）
+  const activeRun = workbench.unifiedView?.runs?.find(
+    (run) => run.sessionId === workbench.activeSession?.sessionId && ['running', 'queued', 'recovering'].includes(run.status),
+  ) || null
 
   return (
     <section style={{ ...panel, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
@@ -62,6 +68,8 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
         onAttachFile={chat.attachFile}
         onRemoveFile={chat.removeSelectedFile}
         onSend={chat.sendMessage}
+        onStop={() => activeRun && workbench.backgroundRuns?.cancelRun?.(activeRun.id)}
+        activeRun={activeRun}
       />
     </section>
   )
