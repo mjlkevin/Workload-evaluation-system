@@ -550,6 +550,11 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td><span class="status done"><span class="dot"></span>Batch A 已交付关闭（e20e2c6，人工验收 6 样本冒烟通过）</span>；<span class="status done"><span class="dot"></span>Batch B/C 已合入 main（26623c6，合并 7825c5c，用户批准）/ O10 全部批次交付关闭；独立复跑全绿（ai 244 / modules 265 / web 255 / build×2）；观察项：回填验证报告不完整（审计时补装依赖后复跑全绿），测试文件路径轻微越位已接受；6 条人工验收样本待用户验收</span>。</td>
           <td>test:ai / test:modules / build:api 全绿（独立复跑 211/211、249/249）；4 类分类采纳用例断言通过；人工验收 6 样本回填 testing.html；硬口径：isExplicitReportRequest 闸门、附件路由、报告/v2 路径零变更。</td>
         </tr>
+        <tr data-board-event-id="BE-2026-08-09-sprint3-kickoff:plan">
+          <td>Sprint 3 开工：两张工单派单（3A=O5+O8 串行，3B=O6 独立，并行）</td>
+          <td>2026-08-09：用户指令「Sprint 3 开工」。工单 ① <a href="../../../docs/agent-loop/work-orders/2026-08-09-qoder-sprint3-A.md">sprint3-A</a>（O5 统一视图接口 11h → O8 逐字呈现/思考折叠/停止按钮 6h，串行，分支 qoder/sprint3-unified-view-streaming，base=4c28116）；工单 ② <a href="../../../docs/agent-loop/work-orders/2026-08-09-qoder-sprint3-B.md">sprint3-B</a>（O6 质量基线 RP-048 骨架 15h，固定样本≥12 条+确定性断言，本批不接 LLM 裁判，分支 qoder/sprint3-quality-baseline）。两批文件零交集可并行；硬口径：Run 状态机/G-E2/G-E4/409-503/数据隔离/旧同步入口零回退，O6 只读观测不改业务代码；吸取 O10 B/C 教训，回填必须附每项验证命令实际输出摘要。</td>
+          <td><span class="status run"><span class="dot"></span>已派单 / 执行中</span>。</td>
+        </tr>
         <tr>
           <td>CodeGraph 受控试点 A/B</td>
           <td>验证代码图在 WES 跨模块链路追踪和影响分析中的增益，同时量化无关上下文、耗时和边界风险。</td>
