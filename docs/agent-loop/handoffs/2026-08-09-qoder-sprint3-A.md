@@ -109,7 +109,7 @@
 
 | 命令 | 实际结果 | 期望值算式 |
 |------|----------|------------|
-| `npm run test:modules` | 265 pass, 0 fail | 265（基线）+ 0（本批未新增 modules 测试）= 265 |
+| `npm run test:modules` | 274 pass, 0 fail | 265（基线）+ 9（统一视图用例）= 274 |
 | `npm run test:ai` | 244 pass, 0 fail | 244（基线，本批不动 ai）= 244 |
 | `npm run test:harness` | 173 pass, 0 fail | 173（基线，colima 运行中）= 173 |
 | `npx vitest run` (test:web) | 272 pass, 0 fail | 255（历史基线）+ 17（主分支新增测试）+ 8（本批新增）≈ 272 |
@@ -134,8 +134,10 @@
 ## 5. 提交记录
 
 ```
-$ git log --oneline -3
-05523d8 (HEAD -> qoder/sprint3-unified-view-streaming) feat(harness+web): Sprint 3A · 统一视图接口与前端流式 UX
+$ git log --oneline -4
+2b1e9ed (HEAD -> qoder/sprint3-unified-view-streaming) fix(test): Sprint 3A · 统一视图用例挂入 test:modules 清单
+2ab97e6 docs(handoff): Sprint 3A 返工回填 · 清理污染+提交闭环+干净复验
+05523d8 feat(harness+web): Sprint 3A · 统一视图接口与前端流式 UX
 4c28116 docs(总看板): O10 全批次交付关闭——B/C 合入 main（7825c5c），台账剩 5 项 未开工
 7825c5c merge(WES AI 工作台): O10 Batch B+C 合入主线（独立复审通过，用户批准）
 ```
