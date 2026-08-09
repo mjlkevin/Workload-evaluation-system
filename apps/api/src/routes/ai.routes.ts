@@ -8,6 +8,7 @@ import multer from "multer";
 import * as AiModule from "../modules/ai/ai.module";
 import * as SystemModule from "../modules/system/system.module";
 import { requireCapability } from "../rbac/middleware";
+import { createWorkbenchViewRouter } from "./workbench-view.routes";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -53,5 +54,9 @@ router.post("/kimi-api-key/test", requireCapability("system:manage"), SystemModu
 router.post("/chat", requireCapability("estimates:read"), AiModule.chat);
 router.post("/home-workbench/chat", requireCapability("estimates:read"), AiModule.homeWorkbenchChat);
 router.post("/home-workbench/chat/stream", requireCapability("estimates:read"), streamRateLimiter, AiModule.homeWorkbenchChatStream);
+
+// O5 Sprint 3A：统一视图接口挂载在 /ai/home-workbench 下，
+// 与旧同步入口 /ai/home-workbench/chat 同前缀，便于前端统一代理
+router.use("/home-workbench", createWorkbenchViewRouter());
 
 export default router;

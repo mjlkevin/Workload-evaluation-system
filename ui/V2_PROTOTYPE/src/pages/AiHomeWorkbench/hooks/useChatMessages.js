@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { apiClient } from '../../../api/client.js'
 import { unwrap } from '../../../api/utils.js'
 import { submitRun } from '../../../api/aiRuns.js'
+import { useRunEventStream } from '../../../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../../../hooks/useSessionRuntimeStore.js'
 import { pickArray } from '../utils/harnessPayload.js'
 import { buildAttachmentUnderstanding, isExplicitReportRequest, summarizeHomeParsedFile } from '../utils/reportParser.js'
@@ -17,10 +18,24 @@ import {
   withCurrentUserFile,
 } from '../utils/messageFormatter.js'
 
+// O8 Sprint 3A：流式事件类型（前端映射，后端事件流底座已就绪）
+const STREAM_EVENT_TYPES = {
+  TEXT_DELTA: 'text.delta',
+  THOUGHT: 'thought',
+  RUN_COMPLETED: 'run_completed',
+  RUN_FAILED: 'run_failed',
+  RUN_CANCELLED: 'run_cancelled',
+}
+
 /**
  * 消息列表与发送逻辑。Harness v1 显式报告流程由 useHarnessRun 提供，
  * 通过 bindHarness 注入；「文件是上下文，用户意图才触发工作流」闸门
  * （isExplicitReportRequest）保持不变。
+ *
+ * O8 Sprint 3A：新增 SSE 流式消费——
+ * - text.delta：逐字追加到当前 assistant 消息
+ * - thought：渲染为可折叠思考区块（默认收起）
+ * - run_completed/run_failed/run_cancelled：终态事件清理 sending 状态
  */
 export default function useChatMessages(workbench) {
   // RP-047 Batch E：模块级缓存，避免每条消息重复探测 503
@@ -37,6 +52,11 @@ export default function useChatMessages(workbench) {
   messagesRef.current = messages
   const workbenchRef = useRef(workbench)
   workbenchRef.current = workbench
+
+  // O8：当前活跃 Run 的流式消息 ID（用于 delta 追加）
+  const streamingMessageIdRef = useRef(null)
+  // O8：已处理的事件序号（幂等去重）
+  const processedSequencesRef = useRef(new Set())
 
   const activeSessionKey = workbench.activeSession?.sessionId || ''
   const sending = sendingSessionKeys.includes(activeSessionKey)
@@ -108,6 +128,95 @@ export default function useChatMessages(workbench) {
     })
   }, [workbench.activeSession, sending])
 
+  // O8：获取当前会话关联的活跃 Run ID（用于 SSE 订阅）
+  const activeRunId = workbench.unifiedView?.runs?.find(
+    (run) => run.sessionId === activeSessionKey && ['running', 'queued', 'recovering'].includes(run.status),
+  )?.id || ''
+
+  // O8：SSE 流式事件处理（逐字呈现 + 思考折叠）
+  const handleStreamEvent = useCallback((event) => {
+    const seq = event.sequence
+    // 幂等：同一序号只处理一次
+    if (seq !== null && seq !== undefined) {
+      if (processedSequencesRef.current.has(seq)) return
+      processedSequencesRef.current.add(seq)
+    }
+
+    const eventType = event.eventType
+    const payload = event.payload || {}
+
+    switch (eventType) {
+      case STREAM_EVENT_TYPES.TEXT_DELTA: {
+        const delta = payload.delta || payload.text || ''
+        if (!delta) return
+        setMessages((prev) => {
+          const streamingId = streamingMessageIdRef.current
+          if (streamingId && prev.some((m) => m.id === streamingId && m.role === 'assistant')) {
+            // 追加到现有流式消息
+            return prev.map((m) => (m.id === streamingId ? { ...m, text: m.text + delta, streaming: true } : m))
+          }
+          // 创建新的流式消息（替换 loading）
+          const loadingMsg = prev.find((m) => m.loading && m.role === 'assistant')
+          if (loadingMsg) {
+            streamingMessageIdRef.current = loadingMsg.id
+            return prev.map((m) => (m.id === loadingMsg.id ? { ...m, text: delta, loading: false, streaming: true } : m))
+          }
+          // 无 loading 时追加新消息
+          const newId = `ai-stream-${Date.now()}`
+          streamingMessageIdRef.current = newId
+          return [...prev, { id: newId, role: 'assistant', text: delta, streaming: true }]
+        })
+        break
+      }
+      case STREAM_EVENT_TYPES.THOUGHT: {
+        const thoughtText = payload.text || payload.content || ''
+        if (!thoughtText) return
+        setMessages((prev) => {
+          const streamingId = streamingMessageIdRef.current
+          if (streamingId && prev.some((m) => m.id === streamingId)) {
+            return prev.map((m) => {
+              if (m.id !== streamingId) return m
+              const thoughts = Array.isArray(m.thoughts) ? m.thoughts : []
+              return { ...m, thoughts: [...thoughts, { text: thoughtText, collapsed: true }] }
+            })
+          }
+          return prev
+        })
+        break
+      }
+      case STREAM_EVENT_TYPES.RUN_COMPLETED:
+      case STREAM_EVENT_TYPES.RUN_FAILED:
+      case STREAM_EVENT_TYPES.RUN_CANCELLED: {
+        // 终态事件：清理 sending 状态与流式标记
+        const sessionId = payload.sessionId || activeSessionKey
+        if (sessionId) markSending(sessionId, false)
+        setMessages((prev) => {
+          const streamingId = streamingMessageIdRef.current
+          if (streamingId && prev.some((m) => m.id === streamingId)) {
+            return prev.map((m) => (m.id === streamingId ? { ...m, streaming: false } : m))
+          }
+          return prev
+        })
+        streamingMessageIdRef.current = null
+        break
+      }
+      default:
+        break
+    }
+  }, [activeSessionKey])
+
+  // O8：订阅当前会话的 Run 事件流
+  useRunEventStream(activeRunId, {
+    onEvent: handleStreamEvent,
+    onClose: () => {
+      // 连接关闭时清理流式标记（不清理 sending，等待终态事件或超时）
+      streamingMessageIdRef.current = null
+    },
+    onError: () => {
+      // 错误时静默降级，不阻塞用户
+    },
+  })
+
   function chooseFile() {
     fileInputRef.current?.click()
   }
@@ -176,6 +285,10 @@ export default function useChatMessages(workbench) {
         content: message.text,
         attachments: message.file ? [message.file] : [],
       }))
+
+    // O8：重置流式状态
+    streamingMessageIdRef.current = null
+    processedSequencesRef.current.clear()
 
     setMessages((prev) => [...prev, userMessage, loadingMessage])
     workbench.setComposer('')
@@ -365,6 +478,17 @@ export default function useChatMessages(workbench) {
     }
   }
 
+  // O8：切换思考区块折叠状态
+  const toggleThought = useCallback((messageId, thoughtIndex) => {
+    setMessages((prev) => prev.map((m) => {
+      if (m.id !== messageId || !Array.isArray(m.thoughts)) return m
+      return {
+        ...m,
+        thoughts: m.thoughts.map((t, i) => (i === thoughtIndex ? { ...t, collapsed: !t.collapsed } : t)),
+      }
+    }))
+  }, [])
+
   function handleInteractiveOptionSelect(optionText) {
     if (!optionText || sending) return
     workbench.setComposer(optionText)
@@ -427,5 +551,7 @@ export default function useChatMessages(workbench) {
     handleSuggestedAction,
     copyDraft,
     goLogin,
+    // O8：流式 UX 暴露
+    toggleThought,
   }
 }

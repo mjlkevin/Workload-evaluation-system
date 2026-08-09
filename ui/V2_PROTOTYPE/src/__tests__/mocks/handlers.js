@@ -509,6 +509,19 @@ export const handlers = [
     })
   }),
 
+  // O5 Sprint 3A：统一视图接口 mock——默认返回空视图
+  http.get(`${BASE}/ai/home-workbench/view`, () => HttpResponse.json({
+    code: 0,
+    message: 'ok',
+    data: {
+      sessions: [],
+      runs: [],
+      tasks: [],
+      artifacts: [],
+      failedRuns: [],
+    },
+  })),
+
   http.get(`${BASE}/versions/:id`, ({ params }) => {
     const data = String(params.id).startsWith('RC') ? mockResourceCost : mockAssessmentVersion
     return HttpResponse.json({ success: true, data })
