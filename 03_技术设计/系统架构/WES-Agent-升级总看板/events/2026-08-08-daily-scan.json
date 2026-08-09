@@ -1,0 +1,34 @@
+{
+  "id": "BE-2026-08-08-daily-scan",
+  "date": "2026-08-08",
+  "type": "verification",
+  "scope": "每日定时扫描与看板更新（2026-08-08）",
+  "summary": "每日定时扫描：基线 main @ e53ffcb（领先 origin/main 14 提交），较上次快照 1bd8477 新增 3 提交（RP-047-C 异步 Run API 合入 + Batch C/D 计划工单落盘），21 文件 +3950/−15 行，apps/api harness 域净增约 2900 行（实现:测试约 1:1.3），openapi.yaml 同步 +501 行契约。依赖版本零漂移，仅 apps/api test:harness 脚本扩容纳入 Batch C 三个测试文件。build:api 与 build:web 均通过。全仓源码/文档 1080 文件 303805 行（口径修正：本次起排除 .claude 等隐藏目录，与昨日总数不可直接对比）。工作区 23 项未提交改动均为看板/文档/Skill 过程资产，无业务代码脏改动；昨日待办 skill.html 导航接入已在工作区解决。状态日报已落盘 docs/PROJECT_STATUS_日报/project-status-2026-08-08.md。",
+  "status": "已完成 / 自动化扫描通过",
+  "pages": ["changes"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "docs/PROJECT_STATUS_日报/project-status-2026-08-08.md",
+      "summary": "本次扫描生成的项目状态日报（结构概览、RP-047-C 变更统计、健康度评估）"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "双端构建健康检查通过（tsc exit 0；vite build 579ms）"
+    },
+    {
+      "kind": "file",
+      "ref": "data/board-daily-scan-state.json",
+      "summary": "状态指纹快照已更新（HEAD e53ffcb + 工作区摘要 + 配置哈希），供下次运行智能跳过比对"
+    }
+  ],
+  "next": "RP-047 Batch D（多会话 UI）工单待执行；本地 main 领先 origin/main 14 提交，推送时机由用户决定。",
+  "board": {
+    "change": {
+      "stage": "每日扫描 · 2026-08-08",
+      "result": "已完成 / 构建健康 / 日报已落盘"
+    }
+  }
+}

@@ -20,6 +20,7 @@
           <div class="nav-drop">
           <a href="roadmap.html">路标管理</a>
           <a href="design.html">设计说明</a>
+          <a href="design-architecture.html">架构设计</a>
           <a href="plan.html">计划与进度</a>
           <a href="requirements.html">需求池</a>
           </div>
@@ -31,6 +32,10 @@
           <a href="monitoring.html">监控与审计</a>
           <a class="active" href="risks.html">风险与决策</a>
           <a href="changes.html">变更记录</a>
+          <a href="issues.html">问题池</a>
+          <a href="defects.html">缺陷池</a>
+          <a href="ops-health.html">运维看板</a>
+          <a href="code-audit.html">代码审计</a>
           </div>
         </div>
         <div class="nav-group">
@@ -39,10 +44,11 @@
           <a href="runtime.html">AI 任务执行</a>
           <a href="collaboration-protocol.html">多 AI 协作</a>
           <a href="branches.html">开发分支</a>
+          <a href="skill.html">Skill 体系</a>
           </div>
         </div>
         <div class="nav-group">
-          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <button type="button" class="nav-group-btn" aria-expanded="false">资料资产<span class="caret" aria-hidden="true"></span></button>
           <div class="nav-drop">
           <a href="sources.html">信息来源</a>
           <a href="github-radar.html">开源工具雷达</a>
@@ -80,7 +86,7 @@
         <li><b>§2</b> 阻断风险处理</li>
         <li><b>§3</b> 架构边界</li>
         <li><b>§4</b> 关键决策</li>
-        <li><b>§5</b> 阶段 1E（Phase 1E） 基线风险</li>
+        <li><b>§5</b> 阶段 1E（阶段 1E（阶段 1E（Phase 1E））） 基线风险</li>
         <li><b>§6</b> 阶段 1F 风险</li>
         <li><b>§7</b> 决策触发器</li>
         <li><b>§8</b> 新增风险池</li>
@@ -94,7 +100,7 @@
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">P0</span><span>阻断风险</span></div><div class="v">0</div><div class="lb">阶段 1D 合并前已处理</div></div>
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">跟</span><span>跟踪中风险</span></div><div class="v">17</div><div class="lb">人工验收 / AI 任务边界 / 知识库 / 附件问答 / 内容展示 / 表单与引导选项 / 评分准确性 / 定期任务治理 / 防止编造 / 权限 / 多 AI 集成 / 数据留痕 / 分支与存储边界</div></div>
         <div class="kpi"><div class="top"><span class="ic">边</span><span>必须守住的边界</span></div><div class="v">5</div><div class="lb">权限、流程阶段、结果格式、防止重复、正式写入</div></div>
-        <div class="kpi"><div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>决策</span></div><div class="v">9</div><div class="lb">当前主线决策可追溯</div></div>
+        <div class="kpi"><div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>决策</span></div><div class="v">14</div><div class="lb">当前主线决策可追溯</div></div>
       </div>
     </section>
 
@@ -175,6 +181,7 @@
         <tr><td>模型职责</td><td>文件业务理解必须真实调用 LLM。</td><td>代码抽取只负责证据整理，不能代替业务理解和风险判断。</td></tr>
         <tr><td>formBlock 交互协议</td><td>结构化表单必须先经过后端白名单校验，再由前端渲染；提交仍是普通用户 chat 消息。</td><td>后端协议、session metadata 与前端 InteractiveFormCard 已实现；提交复用 <code class="inline">sendMessage(messageOverride)</code>，避免 LLM 直接驱动写动作。</td></tr>
         <tr><td>低置信度粗评</td><td>规则缺失时允许生成低置信度粗评，并生成待补标准动作。</td><td>不阻断内部讨论，但必须暴露假设和依据缺口。</td></tr>
+        <tr><td>Electron 桌面端定位（RP-051）</td><td>桌面端定位为连接共享服务器的客户端，不做单机离线；数据库留在服务器端部署（应用与数据库分离），桌面端不内嵌任何数据库。</td><td>用户 2026-08-06 拍板；该定位同时消除内嵌 PG 与本地数据目录两大障碍，桌面范围收敛为客户端壳；前置条件是服务器端需部署 V2 前端静态托管（当前 docker-compose 无 web 服务）。</td></tr>
       </table>
     </section>
 
@@ -248,14 +255,32 @@
         <tr>
           <td>AI 会话删除未检查活跃 Run 状态，可能误删正在执行任务的会话。</td>
           <td>用户删除会话后，后台 Harness Run 仍在执行，但会话消息和上下文已不可恢复；恢复协调器可能因找不到 session 投影目标而失败，或产生孤儿 Run 记录。</td>
-          <td>RP-047 Batch D 实施前，在 ai-sessions.usecase.ts 补非终态 Run 检查；或作为独立小修提前实施。规范要求：存在 queued/running/recovering/cancelling/waiting 状态时返回 409 SESSION_HAS_ACTIVE_RUN，引导用户先明确停止任务。</td>
-          <td><span class="status warn"><span class="dot"></span>开放 / 待 RP-047 Batch D 或独立小修</span></td>
+          <td>RP-047 Batch C（70e78b1）已落地 usecase 层守护：deleteAiSession 带 activeRunChecker 重载，命中非终态 Run 抛 409 SESSION_HAS_ACTIVE_RUN；但接线仅挂在新 harness-runtime.controller（异步 Run 路由），旧 ai-sessions.controller DELETE 端点（L34）仍为同步无检查路径。Batch D 需把 checker 接入旧端点或在 flag 开启后收敛入口；规范要求：存在 queued/running/recovering/cancelling/waiting 状态时返回 409，引导用户先明确停止任务。</td>
+          <td><span class="status warn"><span class="dot"></span>部分落地（Batch C usecase 守护）/ 待 Batch D 接旧端点</span></td>
         </tr>
         <tr data-board-event-id="BE-2026-08-05-o2-handoff-verified:risks">
           <td>ajv 依赖版本环境分叉：主 checkout 存在 gitignored 的 <code class="inline">apps/api/node_modules/ajv@8.20.0</code> 支撑编译，而干净环境（如新 worktree）向上解析到根级 <code class="inline">ajv@6.15.0</code>，导致 <code class="inline">ai/contracts/structured-output.ts</code> 报 3 个既有类型错误。</td>
           <td>新 worktree / 干净 CI 环境上 build:api 失败，与代码质量无关的环境性失败会干扰复核与关卡判断；O2 验证期间靠指向主 checkout 的临时符号链接（gitignored）绕过。</td>
           <td>已如实登记并在 O2 handoff 中声明；建议把 ajv 版本收敛写入 lockfile 治理（属依赖治理任务，需单独评审后实施）；集成复核时注意 worktree 内临时符号链接的存在；新 worktree 验证遇到同类报错先排查此项再归因代码。</td>
           <td><span class="status warn"><span class="dot"></span>开放 / 待依赖治理</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-06-o3b-gateb-audited:risks">
+          <td>RP-047 Batch B 的 Worker/Recovery Coordinator/Session Projector 尚无生产接入点（异步 Run API 属 Batch C），端到端人工验收缺口：本次仅验证到模块级行为。</td>
+          <td>真实 chat → Run → 崩溃恢复 → Session 投影全链路未经人工走通；Batch C 端点接入前，恢复与投影链路对用户不可见，问题可能延迟到接入后才暴露。</td>
+          <td>handoff 风险节已明示；Batch C 已于 2026-08-07 合入（70e78b1，异步 Run API/SSE replay/cancel·inputs·confirm·retry），但 flag WES_AI_DURABLE_RUNS_ENABLED 默认关闭且前端未接入，端到端人工验收顺延至 Batch D/E：真实对话触发 Run、模拟崩溃观察恢复、核对 Session 投影不重复。关卡（Gate） B/C 审计结论均已登记该缺口，不作为阻断项。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / Batch C 已接入，待 flag 开启与前端接入（Batch D/E）后验收</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-07-o3c-merged:risks">
+          <td>关卡 C 审计发现 F1：openapi.yaml AiRunSubmitRequest 声明 attachmentIds/workflowHint 字段，但实现（harness-runtime.usecase）未消费，静默忽略。</td>
+          <td>契约与实现存在声明性缺口：调用方按契约传入附件/工作流提示不产生任何效果；不构成 关卡 C 阻断（真实消费属 Batch D/E 范围），但若不标注会被误认为已支持。</td>
+          <td>两选一：在实现与文档对齐说明.md 标注为预留字段；或 Batch D 工单中补 metadata 承载（clientMessageId 同款零 DB 列方案）。已在合入事件行与 testing 基线行登记。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待对齐说明标注或 Batch D 承载</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-06-o3b-gateb-audited:risks">
+          <td>Worker/Coordinator/Projector 的 <code class="inline">start()</code> 长循环仅有单发语义测试覆盖（runNextAttempt/scanOnce/projectOnce），未做长时浸泡；多进程 Coordinator 互斥仅覆盖单进程内并发 scanOnce。</td>
+          <td>长时间运行的 lease 续租漂移、扫描风暴、多实例部署下的重复认领等问题当前无浸泡证据；多实例场景（DB 迁移触发器 3）到来前风险保持低位。</td>
+          <td>多进程互斥依赖 repository 行锁 + <code class="inline">not_active</code> 守卫（R 系真实 PG 测试覆盖）；建议在 Batch C/D 联调阶段安排一次长时浸泡（真实时序、多轮扫描），多实例部署立项时补跨进程并发测试。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 浸泡与多进程验证待后续批次</span></td>
         </tr>
         <tr>
           <td>CodeGraph 是全局 Codex MCP，宽泛查询、历史目录或不可信仓库可能造成上下文污染，并扩大跨项目与符号链接读取边界。</td>

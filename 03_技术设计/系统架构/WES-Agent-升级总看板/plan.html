@@ -20,6 +20,7 @@
           <div class="nav-drop">
           <a href="roadmap.html">路标管理</a>
           <a href="design.html">设计说明</a>
+          <a href="design-architecture.html">架构设计</a>
           <a class="active" href="plan.html">计划与进度</a>
           <a href="requirements.html">需求池</a>
           </div>
@@ -31,6 +32,10 @@
           <a href="monitoring.html">监控与审计</a>
           <a href="risks.html">风险与决策</a>
           <a href="changes.html">变更记录</a>
+          <a href="issues.html">问题池</a>
+          <a href="defects.html">缺陷池</a>
+          <a href="ops-health.html">运维看板</a>
+          <a href="code-audit.html">代码审计</a>
           </div>
         </div>
         <div class="nav-group">
@@ -39,10 +44,11 @@
           <a href="runtime.html">AI 任务执行</a>
           <a href="collaboration-protocol.html">多 AI 协作</a>
           <a href="branches.html">开发分支</a>
+          <a href="skill.html">Skill 体系</a>
           </div>
         </div>
         <div class="nav-group">
-          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <button type="button" class="nav-group-btn" aria-expanded="false">资料资产<span class="caret" aria-hidden="true"></span></button>
           <div class="nav-drop">
           <a href="sources.html">信息来源</a>
           <a href="github-radar.html">开源工具雷达</a>
@@ -63,7 +69,7 @@
         <span><b>当前阶段</b> 阶段 1H-B 已形成交付基线 / 阶段 1H-C 待规划</span>
         <span><b>人工测试</b> 1F/1G/1H-A 用例已登记，待执行回填</span>
         <span><b>分支</b> 业务主线 <code class="inline">codex/role-driven-ai-home-workbench</code> 当前包含 RP-031 合并提交 <code class="inline">5cc81b9</code></span>
-        <span><b>状态</b> 需求池共 43 项（主台账口径）：22 项已交付（验收完成）、8 项已交付·待验收回填、11 项待规划/待确认/待验收、2 项暂缓；RP-031 多知识库路由与 RAG 评测闭环已集成关闭。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-049（AI 工作台兕底路由与静态回复策略优化，来源 ISS-2026-08-06-001）新增待规划，实施与排期待用户决策。RP-050（AI 工作台意图路由架构 Skill 层解耦，来源 ISS-2026-08-06-002）新增已分析/待统一规划，不排期不进 Sprint。RP-051（Electron 桌面端可行性验证，来源 ISS-2026-08-06-004）新增已分析/待决策，产品定位与数据库选型待用户拍板，不排期。RP-047 A2-R1 候选 <code class="inline">d9790fe</code> 已关闭三个返工阻断项，Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过；用户已授权 Qoder 形成 A2 集成候选、Codex 负责独立审计，工单已发布并等待 ACK，B-E 未启动。其余已验证能力和人工验收缺口按原记录保留。</span>
+        <span><b>状态</b> 需求池共 43 项（主台账口径）：22 项已交付（验收完成）、8 项已交付·待验收回填、11 项待规划/待确认/待验收、2 项暂缓；RP-031 多知识库路由与 RAG 评测闭环已集成关闭。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-049（AI 工作台兜底路由与静态回复策略优化，来源 ISS-2026-08-06-001）新增待规划，实施与排期待用户决策。RP-050（AI 工作台意图路由架构 Skill 层解耦，来源 ISS-2026-08-06-002）新增已分析/待统一规划，不排期不进 Sprint。RP-051（Electron 桌面端可行性验证，来源 ISS-2026-08-06-004）决策已收到：用户拍板定位为连接共享服务器的客户端、数据库留服务器端部署（桌面不内嵌 DB），PG 与路径模型两大障碍消除，待细化设计（加载方式选型），不排期。RP-047 A2-R1 候选 <code class="inline">d9790fe</code> 已关闭三个返工阻断项，Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过；用户已授权 Qoder 形成 A2 集成候选、Codex 负责独立审计，工单已发布并等待 ACK，B-E 未启动。其余已验证能力和人工验收缺口按原记录保留。</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill ok">阶段 1E 已交付</span>
@@ -82,7 +88,7 @@
       <ol>
         <li><b>§1</b> 总体路线</li>
         <li><b>§2</b> 已完成工作</li>
-        <li><b>§3</b> 阶段 1E（Phase 1E） 完成基线</li>
+        <li><b>§3</b> 阶段 1E（阶段 1E（阶段 1E（Phase 1E））） 完成基线</li>
         <li><b>§4</b> 阶段 1F 目标</li>
         <li><b>§5</b> 阶段 1F 任务拆解</li>
         <li><b>§6</b> 人工测试计划</li>
@@ -510,7 +516,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
     <section data-tech-collapse data-tech-label="任务池明细">
       <div class="h-num">Section 11</div>
       <h2>后续任务池</h2>
-      <p class="lead">以下任务不属于阶段 1H-A 的前端体验闭环，将作为阶段 1H-C、阶段 2 或独立候选任务逐项评审。当前需求池共 42 项（主台账口径）：22 项已交付（验收完成）、8 项已交付·待验收回填、10 项待规划/待确认/待验收、2 项暂缓。RP-031 已完成主线集成并关闭；资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示作为独立后续优化。RP-048 已完成通用 Speak Plainly Skill、四个模型入口接入和自动检查，等待用户体验确认。RP-047 的跨会话持续、后台 Worker、混合检查点、幂等恢复和可回放输出规格已获批准；A1 已拒收，A2-R1 已通过 Codex 关卡（Gate）。用户已授权 Qoder 施工、Codex 审计，A2 集成候选工单已发布并等待 ACK，B-E 继续锁定。已验证能力和其他人工验收缺口继续按原记录保留。</p>
+      <p class="lead">以下任务不属于阶段 1H-A 的前端体验闭环，将作为阶段 1H-C、阶段 2 或独立候选任务逐项评审。当前需求池共 43 项（主台账口径）：22 项已交付（验收完成）、8 项已交付·待验收回填、11 项待规划/待确认/待验收、2 项暂缓。RP-031 已完成主线集成并关闭；资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示作为独立后续优化。RP-048 已完成通用 Speak Plainly Skill、四个模型入口接入和自动检查，等待用户体验确认。RP-051（Electron 桌面端可行性验证，来源 ISS-2026-08-06-004）决策已收到：用户拍板定位为连接共享服务器的客户端、数据库留服务器端部署（桌面不内嵌 DB），PG 与路径模型两大障碍消除，待细化设计（加载方式选型），不排期。RP-047 的跨会话持续、后台 Worker、混合检查点、幂等恢复和可回放输出规格已获批准；A1 已拒收，A2-R1 已通过 Codex 关卡（Gate）。用户已授权 Qoder 施工、Codex 审计，A2 集成候选工单已发布并等待 ACK，B-E 继续锁定。已验证能力和其他人工验收缺口继续按原记录保留。</p>
       <div class="timeline-card" data-board-event-id="BE-2026-08-03-rp-047-post-a2-execution-plan" style="margin-bottom:18px">
         <h5>RP-047 后续执行路线</h5>
         <table>
@@ -533,9 +539,9 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         </tr>
         <tr data-board-event-id="BE-2026-08-06-w2-precheck-o3-batchc:plan">
           <td>W2 执行（O4 服务层 handler 化 / O3 重定义为 Batch B+C）</td>
-          <td>2026-08-06 前置核对确认 Batch C 覆盖原 O3 通道；用户同日决策将 Batch B→C 完整范围并入 O3，计划文档 §5.3 已重写为“持久执行引擎 + 异步事件通道”（粗估 50–65h，Gate 驱动串行）。详见 <a href="integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> §5.3。</td>
-          <td><span class="status done"><span class="dot"></span>O4 已交付关闭（251b73d，冒烟 8 样本通过，Sprint 2 收官）</span>；<span class="status run"><span class="dot"></span>O3-B 工单与实施计划已提交主线（89b10a8）/ 已派单 KIMI-K3 执行中（RED 先行 + Gate B）</span></td>
-          <td>O3-B：四类崩溃可恢复、工具与消息无重复、Gate B 验收（Testcontainers 故障注入）；O3-C：Gate C 验收（异步契约、owner 安全、SSE 回放、断线不取消）；串行推进，allowNextTask 默认 false；O4 先建快照测试集再动刀（R3），且快照基线须建立在 O10 修复后的行为上。</td>
+          <td>2026-08-06 前置核对确认 Batch C 覆盖原 O3 通道；用户同日决策将 Batch B→C 完整范围并入 O3，计划文档 §5.3 已重写为“持久执行引擎 + 异步事件通道”（粗估 50–65h，关卡（Gate） 驱动串行）。详见 <a href="integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> §5.3。</td>
+          <td><span class="status done"><span class="dot"></span>O4 已交付关闭（251b73d，冒烟 8 样本通过，Sprint 2 收官）</span>；<span class="status done"><span class="dot"></span>O3-B Batch B 已合入 main（1bd8477）/ 关卡 B 关闭</span>；<span class="status done"><span class="dot"></span>O3-C Batch C 已合入 main（70e78b1）/ 关卡 C 关闭</span>；<span class="status done"><span class="dot"></span>O3-D Batch D 已合入 main（81a7839）/ 关卡 D 关闭（B1 返工复审通过；缓办两项登记 Batch E 前收尾）</span>；<span class="status done"><span class="dot"></span>Gate D 人工验收通过（2026-08-09）/ 临时 flag 已移除</span>；<span class="status run"><span class="dot"></span>O3-E Batch E 工单已编制（2026-08-09-qoder-RP-047-E.md）/ 待用户批准派单（workflow 适配器 + boot 接线 + 前端 Run 化 + F 组复活 + 灰度演练）</span></td>
+          <td>O3-B：四类崩溃可恢复、工具与消息无重复、关卡 B 验收（Testcontainers 故障注入）；O3-C：关卡 C 验收（异步契约、owner 安全、SSE 回放、断线不取消）；串行推进，allowNextTask 默认 false；O4 先建快照测试集再动刀（R3），且快照基线须建立在 O10 修复后的行为上。</td>
         </tr>
         <tr data-board-event-id="BE-2026-08-06-o10-scheduled:plan">
           <td>O10 兜底路由与静态回复优化纳入排期（RP-049）</td>

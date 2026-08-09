@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="assets/base.css" />
   <link rel="stylesheet" href="assets/components.css" />
   <link rel="stylesheet" href="assets/pages.css" />
+  <style>
+    .arch-diagram { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; }
+    .arch-diagram svg { display: block; width: 100%; height: auto; }
+  </style>
 </head>
 <body>
   <header class="topnav">
@@ -20,6 +24,7 @@
           <div class="nav-drop">
           <a href="roadmap.html">路标管理</a>
           <a class="active" href="design.html">设计说明</a>
+          <a href="design-architecture.html">架构设计</a>
           <a href="plan.html">计划与进度</a>
           <a href="requirements.html">需求池</a>
           </div>
@@ -31,6 +36,10 @@
           <a href="monitoring.html">监控与审计</a>
           <a href="risks.html">风险与决策</a>
           <a href="changes.html">变更记录</a>
+          <a href="issues.html">问题池</a>
+          <a href="defects.html">缺陷池</a>
+          <a href="ops-health.html">运维看板</a>
+          <a href="code-audit.html">代码审计</a>
           </div>
         </div>
         <div class="nav-group">
@@ -39,10 +48,11 @@
           <a href="runtime.html">AI 任务执行</a>
           <a href="collaboration-protocol.html">多 AI 协作</a>
           <a href="branches.html">开发分支</a>
+          <a href="skill.html">Skill 体系</a>
           </div>
         </div>
         <div class="nav-group">
-          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <button type="button" class="nav-group-btn" aria-expanded="false">资料资产<span class="caret" aria-hidden="true"></span></button>
           <div class="nav-drop">
           <a href="sources.html">信息来源</a>
           <a href="github-radar.html">开源工具雷达</a>
@@ -108,97 +118,232 @@
       <div class="h-num">Section 02</div>
       <h2>架构分层</h2>
       <p class="lead">当前只有一套 Web 主线 <code class="inline">ui/V2_PROTOTYPE</code> 和一个后端入口 <code class="inline">apps/api</code>。AI 任务底座（Harness）因为需要审计、统计和回放，已经使用 PostgreSQL 数据库；其他传统业务模块仍以 JSON 文件为主要存储方式。</p>
-      <div class="panel">
+            <div class="panel">
         <div class="panel-h">目标架构视图<span class="right">任务执行边界</span></div>
         <div class="panel-b">
+          <div class="arch-diagram">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1160" width="1280" height="1160">
+              <defs>
+                <filter id="shadow-soft" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#3a352e" flood-opacity="0.10"/>
+                </filter>
+                <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M0,0 L10,5 L0,10 z" fill="#6b665e"/>
+                </marker>
+              </defs>
 
-          <div class="arch-layer">
-            <div class="arch-layer-label">用户界面</div>
-            <div class="grid-2">
-              <div class="card">
-                <span class="pill brand">ui/V2_PROTOTYPE</span>
-                <h4>AiHomeWorkbench.jsx</h4>
-                <p>AI 工作台入口：文件上传、自然语言补充、报告展示、下一步建议和草稿跳转</p>
-              </div>
-              <div class="card">
-                <span class="pill">src/api/harness.js</span>
-                <h4>接口调用层（API Client）</h4>
-                <p>统一调用 <code class="inline">/api/v1/harness/*</code>，避免页面直接拼接请求</p>
-              </div>
-            </div>
+              <!-- Background -->
+              <rect width="1280" height="1160" fill="#f8f6f3"/>
+
+              <!-- Title -->
+              <text x="640" y="42" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="20" font-weight="800" fill="#3a352e">WES 系统架构分层图（细化版）</text>
+              <text x="640" y="62" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="11" fill="#8a847b">Architecture Layering · Detailed  v2.0  |  Claude 官方风格 · 正交路由</text>
+
+              <!-- ══ Layer 1 · 用户界面 ══ -->
+              <text x="100" y="98" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="11" font-weight="700" fill="#8a847b" letter-spacing="1">Layer 1 · 用户界面  ui/V2_PROTOTYPE</text>
+
+              <g class="arch-node">
+                <rect x="100" y="110" width="560" height="150" rx="12" fill="#9dd4c7" stroke="#6fb3a5" stroke-width="2" filter="url(#shadow-soft)"/>
+                <text x="380" y="134" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="12.5" font-weight="700" fill="#2e4b44">AiHomeWorkbench.jsx · AI 工作台入口</text>
+                <rect x="120" y="148" width="255" height="48" rx="6" fill="#fffdf9" stroke="#6fb3a5" stroke-width="1"/>
+                <text x="247" y="167" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2e4b44">ChatArea</text>
+                <text x="247" y="184" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4d6b62">对话交互 · 自然语言补充</text>
+                <rect x="385" y="148" width="255" height="48" rx="6" fill="#fffdf9" stroke="#6fb3a5" stroke-width="1"/>
+                <text x="512" y="167" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2e4b44">WorkspacePanel</text>
+                <text x="512" y="184" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4d6b62">文件上传 · evidence 留痕</text>
+                <rect x="120" y="204" width="255" height="48" rx="6" fill="#fffdf9" stroke="#6fb3a5" stroke-width="1"/>
+                <text x="247" y="223" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2e4b44">StatusPanel</text>
+                <text x="247" y="240" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4d6b62">运行状态 · 报告展示 · 下一步建议</text>
+                <rect x="385" y="204" width="255" height="48" rx="6" fill="#fffdf9" stroke="#6fb3a5" stroke-width="1"/>
+                <text x="512" y="223" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2e4b44">ConfirmDialog</text>
+                <text x="512" y="240" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4d6b62">人工确认弹窗 · 草稿跳转</text>
+              </g>
+
+              <g class="arch-node">
+                <rect x="760" y="110" width="420" height="150" rx="12" fill="#9dd4c7" stroke="#6fb3a5" stroke-width="2" filter="url(#shadow-soft)"/>
+                <text x="970" y="134" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="12.5" font-weight="700" fill="#2e4b44">src/api/harness.js · API Client</text>
+                <rect x="780" y="148" width="380" height="30" rx="6" fill="#fffdf9" stroke="#6fb3a5" stroke-width="1"/>
+                <text x="970" y="167" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" fill="#3d5a52">请求封装 · 统一调用 /api/v1/harness/* · 页面不直拼请求</text>
+                <rect x="780" y="184" width="380" height="30" rx="6" fill="#fffdf9" stroke="#6fb3a5" stroke-width="1"/>
+                <text x="970" y="203" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" fill="#3d5a52">令牌携带 · Authorization: Bearer（JWT 鉴权）</text>
+                <rect x="780" y="220" width="380" height="30" rx="6" fill="#fffdf9" stroke="#6fb3a5" stroke-width="1"/>
+                <text x="970" y="239" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" fill="#3d5a52">错误归一化 · { code, message, data } 响应结构</text>
+              </g>
+
+              <path d="M660,185 H754" fill="none" stroke="#6b665e" stroke-width="1.6" marker-end="url(#arrow)"/>
+              <text x="707" y="177" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="10" fill="#6b665e" stroke="#f8f6f3" stroke-width="4" paint-order="stroke">入口调用</text>
+
+              <!-- L1 → L2 -->
+              <path d="M970,260 V310 H310 V354" fill="none" stroke="#6b665e" stroke-width="1.6" marker-end="url(#arrow)"/>
+              <text x="640" y="302" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#6b665e" stroke="#f8f6f3" stroke-width="4" paint-order="stroke">/api/v1/harness/*</text>
+
+              <!-- ══ Layer 2 · 后端接口与 AI 任务底座 ══ -->
+              <text x="100" y="348" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="11" font-weight="700" fill="#8a847b" letter-spacing="1">Layer 2 · 后端接口与 AI 任务底座  apps/api</text>
+
+              <g class="arch-node">
+                <rect x="100" y="360" width="420" height="140" rx="12" fill="#a8c5e6" stroke="#7fa3cc" stroke-width="2" filter="url(#shadow-soft)"/>
+                <text x="310" y="384" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="12.5" font-weight="700" fill="#2c405c">routes/harness.routes.ts · AI 任务接口</text>
+                <rect x="120" y="398" width="122" height="44" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="181" y="425" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" font-weight="600" fill="#3a4f6e">JWT 鉴权</text>
+                <rect x="250" y="398" width="122" height="44" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="311" y="425" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" font-weight="600" fill="#3a4f6e">owner 隔离</text>
+                <rect x="380" y="398" width="122" height="44" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="441" y="425" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" font-weight="600" fill="#3a4f6e">参数校验</text>
+                <text x="310" y="472" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" fill="#4a5f7e">请求入口：验证登录身份 → 按当前用户隔离 → 检查参数 → 调度</text>
+              </g>
+
+              <g class="arch-node">
+                <rect x="620" y="360" width="560" height="280" rx="12" fill="#a8c5e6" stroke="#7fa3cc" stroke-width="2" filter="url(#shadow-soft)"/>
+                <text x="900" y="384" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="12.5" font-weight="700" fill="#2c405c">modules/harness · 三层结构 + 持久运行时</text>
+                <rect x="640" y="394" width="520" height="22" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="900" y="409" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#3a4f6e">状态机 waiting → running → succeeded / failed / cancelled · report_v2_ready 闸门</text>
+                <rect x="640" y="428" width="250" height="52" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="765" y="449" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2c405c">harness.controller</text>
+                <text x="765" y="467" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4a5f7e">请求 → 响应</text>
+                <rect x="640" y="490" width="250" height="52" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="765" y="511" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2c405c">harness.usecase</text>
+                <text x="765" y="529" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4a5f7e">业务编排 · 工具动作</text>
+                <rect x="640" y="552" width="250" height="52" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="765" y="573" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2c405c">harness.repository</text>
+                <text x="765" y="591" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4a5f7e">持久化访问</text>
+                <rect x="910" y="428" width="250" height="52" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="1035" y="449" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2c405c">runtime.worker</text>
+                <text x="1035" y="467" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4a5f7e">异步任务执行</text>
+                <rect x="910" y="490" width="250" height="52" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="1035" y="511" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2c405c">runtime.recovery</text>
+                <text x="1035" y="529" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4a5f7e">崩溃检查点恢复</text>
+                <rect x="910" y="552" width="250" height="52" rx="6" fill="#fffdf9" stroke="#7fa3cc" stroke-width="1"/>
+                <text x="1035" y="573" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#2c405c">session-projector</text>
+                <text x="1035" y="591" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#4a5f7e">SSE 回放投影</text>
+                <path d="M765,480 V488" fill="none" stroke="#6b665e" stroke-width="1.2" marker-end="url(#arrow)"/>
+                <path d="M765,542 V550" fill="none" stroke="#6b665e" stroke-width="1.2" marker-end="url(#arrow)"/>
+                <path d="M890,516 H908" fill="none" stroke="#6b665e" stroke-width="1.2" marker-end="url(#arrow)"/>
+                <path d="M1035,480 V488" fill="none" stroke="#6b665e" stroke-width="1.2" marker-end="url(#arrow)"/>
+                <path d="M1035,542 V550" fill="none" stroke="#6b665e" stroke-width="1.2" marker-end="url(#arrow)"/>
+              </g>
+
+              <path d="M520,430 H614" fill="none" stroke="#6b665e" stroke-width="1.6" marker-end="url(#arrow)"/>
+              <text x="567" y="422" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="10" fill="#6b665e" stroke="#f8f6f3" stroke-width="4" paint-order="stroke">任务调度</text>
+
+              <!-- ══ Layer 3 · 存储与外部依赖 ══ -->
+              <text x="100" y="700" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="11" font-weight="700" fill="#8a847b" letter-spacing="1">Layer 3 · 存储与外部依赖</text>
+
+              <path d="M700,640 V680 H270 V714" fill="none" stroke="#6b665e" stroke-width="1.6" marker-end="url(#arrow)"/>
+              <text x="485" y="672" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#6b665e" stroke="#f8f6f3" stroke-width="4" paint-order="stroke">persist</text>
+              <path d="M900,640 V690 H660 V714" fill="none" stroke="#6b665e" stroke-width="1.6" marker-end="url(#arrow)"/>
+              <text x="780" y="682" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#6b665e" stroke="#f8f6f3" stroke-width="4" paint-order="stroke">call</text>
+              <path d="M1100,640 V714" fill="none" stroke="#6b665e" stroke-width="1.6" marker-end="url(#arrow)"/>
+              <text x="1112" y="676" font-family="'JetBrains Mono', monospace" font-size="10" fill="#6b665e" stroke="#f8f6f3" stroke-width="4" paint-order="stroke">draft</text>
+
+              <g class="arch-node">
+                <rect x="100" y="720" width="340" height="120" rx="12" fill="#e8e6e3" stroke="#b9b3a9" stroke-width="2" filter="url(#shadow-soft)"/>
+                <text x="270" y="744" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700" fill="#453f37">PostgreSQL · 持久化</text>
+                <rect x="120" y="756" width="145" height="28" rx="6" fill="#fffdf9" stroke="#b9b3a9" stroke-width="1"/>
+                <text x="192" y="774" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#57514a">harness_runs</text>
+                <rect x="275" y="756" width="145" height="28" rx="6" fill="#fffdf9" stroke="#b9b3a9" stroke-width="1"/>
+                <text x="347" y="774" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#57514a">harness_files</text>
+                <rect x="120" y="790" width="145" height="28" rx="6" fill="#fffdf9" stroke="#b9b3a9" stroke-width="1"/>
+                <text x="192" y="808" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#57514a">harness_artifacts</text>
+                <rect x="275" y="790" width="145" height="28" rx="6" fill="#fffdf9" stroke="#b9b3a9" stroke-width="1"/>
+                <text x="347" y="808" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#57514a">harness_tool_events</text>
+              </g>
+
+              <g class="arch-node">
+                <rect x="490" y="720" width="340" height="120" rx="12" fill="#e8e6e3" stroke="#b9b3a9" stroke-width="2" filter="url(#shadow-soft)"/>
+                <text x="660" y="744" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700" fill="#453f37">外部 AI 服务 · services/ai</text>
+                <rect x="510" y="756" width="145" height="28" rx="6" fill="#fffdf9" stroke="#b9b3a9" stroke-width="1"/>
+                <text x="582" y="774" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#57514a">chat.service 对话</text>
+                <rect x="665" y="756" width="145" height="28" rx="6" fill="#fffdf9" stroke="#b9b3a9" stroke-width="1"/>
+                <text x="737" y="774" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#57514a">extractor 抽取</text>
+                <rect x="510" y="790" width="145" height="28" rx="6" fill="#fffdf9" stroke="#b9b3a9" stroke-width="1"/>
+                <text x="582" y="808" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#57514a">dispatch 调度</text>
+                <rect x="665" y="790" width="145" height="28" rx="6" fill="#fffdf9" stroke="#b9b3a9" stroke-width="1"/>
+                <text x="737" y="808" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#57514a">Provider 兜底</text>
+              </g>
+
+              <g class="arch-node">
+                <rect x="880" y="720" width="300" height="120" rx="12" fill="#f4e4c1" stroke="#d9c49a" stroke-width="2" filter="url(#shadow-soft)"/>
+                <text x="1030" y="744" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="12" font-weight="700" fill="#5c4a26">传统业务模块 · 草稿</text>
+                <rect x="900" y="756" width="260" height="28" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="1030" y="774" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#6e5a33">project-evaluations draft</text>
+                <rect x="900" y="790" width="260" height="28" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="1030" y="808" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="8.5" fill="#6e5a33">dev-assessment draft</text>
+              </g>
+
+              <!-- ══ Layer 4 · 正式业务记录 ══ -->
+              <text x="100" y="908" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="11" font-weight="700" fill="#8a847b" letter-spacing="1">Layer 4 · 正式业务记录  传统 WES</text>
+
+              <path d="M1030,840 V890 H970 V922" fill="none" stroke="#6b665e" stroke-width="1.6" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+              <text x="1000" y="882" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="10" fill="#6b665e" stroke="#f8f6f3" stroke-width="4" paint-order="stroke">explicit confirm only</text>
+
+              <g class="arch-node">
+                <rect x="260" y="928" width="420" height="120" rx="12" fill="#f4e4c1" stroke="#d9c49a" stroke-width="2" filter="url(#shadow-soft)"/>
+                <text x="470" y="952" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="700" fill="#5c4a26">config/*.json · 正式业务记录</text>
+                <rect x="280" y="964" width="125" height="30" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="342" y="983" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#6e5a33">项目</text>
+                <rect x="413" y="964" width="125" height="30" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="475" y="983" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#6e5a33">需求</text>
+                <rect x="546" y="964" width="125" height="30" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="608" y="983" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#6e5a33">评估</text>
+                <rect x="280" y="1000" width="125" height="30" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="342" y="1019" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#6e5a33">WBS</text>
+                <rect x="413" y="1000" width="125" height="30" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="475" y="1019" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#6e5a33">版本</text>
+                <rect x="546" y="1000" width="125" height="30" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="608" y="1019" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9" fill="#6e5a33">审批</text>
+              </g>
+
+              <g class="arch-node">
+                <rect x="760" y="928" width="420" height="120" rx="12" fill="#f4e4c1" stroke="#d9c49a" stroke-width="2" filter="url(#shadow-soft)"/>
+                <text x="970" y="952" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="12" font-weight="700" fill="#5c4a26">人工确认链路</text>
+                <rect x="780" y="964" width="120" height="36" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="840" y="986" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" fill="#6e5a33">草稿查看</text>
+                <rect x="910" y="964" width="120" height="36" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="970" y="986" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" fill="#6e5a33">来源追溯</text>
+                <rect x="1040" y="964" width="120" height="36" rx="6" fill="#fffdf9" stroke="#d9c49a" stroke-width="1"/>
+                <text x="1100" y="986" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="9.5" fill="#6e5a33">编辑发布</text>
+                <path d="M900,982 H908" fill="none" stroke="#6b665e" stroke-width="1.2" marker-end="url(#arrow)"/>
+                <path d="M1030,982 H1038" fill="none" stroke="#6b665e" stroke-width="1.2" marker-end="url(#arrow)"/>
+                <text x="970" y="1024" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="9" fill="#7d6a42">enter_formal_estimation · 仅 report_v2_ready 阶段 · 按 run/action 幂等</text>
+              </g>
+
+              <path d="M760,988 H686" fill="none" stroke="#6b665e" stroke-width="1.6" marker-end="url(#arrow)"/>
+              <text x="723" y="980" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="10" fill="#6b665e" stroke="#f8f6f3" stroke-width="4" paint-order="stroke">正式写入</text>
+
+              <!-- 核心边界 -->
+              <text x="640" y="1078" text-anchor="middle" font-family="Inter, 'Noto Sans SC', sans-serif" font-size="11" fill="#6b665e">核心边界：AI/Harness 可生成报告、建议动作与草稿；正式评估 / 需求 / 项目推进必须人工确认（enter_formal_estimation · 仅 report_v2_ready 阶段 · 幂等）</text>
+
+              <!-- Legend -->
+              <g font-family="Inter, 'Noto Sans SC', sans-serif" font-size="10" fill="#6b665e">
+                <rect x="100" y="1096" width="470" height="40" rx="8" fill="#fffdf9" stroke="#e3ded6"/>
+                <rect x="114" y="1106" width="14" height="10" rx="3" fill="#9dd4c7" stroke="#6fb3a5"/>
+                <text x="134" y="1115">用户界面</text>
+                <rect x="190" y="1106" width="14" height="10" rx="3" fill="#a8c5e6" stroke="#7fa3cc"/>
+                <text x="210" y="1115">后端 / Harness</text>
+                <rect x="296" y="1106" width="14" height="10" rx="3" fill="#e8e6e3" stroke="#b9b3a9"/>
+                <text x="316" y="1115">存储 / 外部</text>
+                <rect x="386" y="1106" width="14" height="10" rx="3" fill="#f4e4c1" stroke="#d9c49a"/>
+                <text x="406" y="1115">草稿 / 正式</text>
+                <rect x="470" y="1106" width="14" height="10" rx="3" fill="#fffdf9" stroke="#b9b3a9"/>
+                <text x="490" y="1115">子组件</text>
+                <path d="M114,1126 h20" stroke="#6b665e" stroke-width="1.6" marker-end="url(#arrow)"/>
+                <text x="142" y="1130">主流程 / 内部调用</text>
+                <path d="M250,1126 h20" stroke="#6b665e" stroke-width="1.6" stroke-dasharray="5,3"/>
+                <text x="278" y="1130">人工确认闸门</text>
+              </g>
+
+              <!-- Info block -->
+              <g font-family="'JetBrains Mono', monospace">
+                <rect x="1000" y="1096" width="180" height="40" rx="8" fill="#fffdf9" stroke="#e3ded6"/>
+                <text x="1090" y="1112" text-anchor="middle" font-size="9" font-weight="700" fill="#4a453e">WES ARCHITECTURE</text>
+                <text x="1090" y="1126" text-anchor="middle" font-size="8" fill="#8a847b">Style: Claude Official · v2.0 · 2026-08-08</text>
+              </g>
+            </svg>
           </div>
+        </div>
+      </div>
 
-          <div class="arch-connector">
-            <div class="arch-arrow-down"></div>
-            <span class="mono">/api/v1/harness/*</span>
-          </div>
-
-          <div class="arch-layer">
-            <div class="arch-layer-label">后端接口与 AI 任务底座</div>
-            <div class="grid-2">
-              <div class="card">
-                <span class="pill ok">apps/api</span>
-                <h4>routes/harness.routes.ts</h4>
-                <p>AI 任务接口：验证登录身份、按当前用户隔离（owner）并检查请求参数</p>
-              </div>
-              <div class="card">
-                <span class="pill ok">apps/api</span>
-                <h4>modules/harness/*</h4>
-                <p>管理任务运行、文件、任务产物和工具动作记录的完整过程</p>
-              </div>
-            </div>
-
-            <div class="arch-connector">
-              <div class="arch-arrow-down"></div>
-              <span class="mono">persist / call / draft</span>
-            </div>
-
-            <div class="grid-3">
-              <div class="card">
-                <span class="pill">PostgreSQL</span>
-                <h4>持久化</h4>
-                <p>harness_runs / harness_files / harness_artifacts / harness_tool_events</p>
-              </div>
-              <div class="card">
-                <span class="pill brand">外部 AI 服务</span>
-                <h4>模型服务</h4>
-                <p>外部模型或服务提供方（Provider）/ 格式校验 / 报告生成 / 失败后的备用处理</p>
-              </div>
-              <div class="card">
-                <span class="pill warn">传统业务模块</span>
-                <h4>传统模块</h4>
-                <p>project evaluation draft / implementation assessment draft</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="arch-connector">
-            <div class="arch-arrow-down"></div>
-            <span class="mono">explicit confirm only</span>
-          </div>
-
-          <div class="arch-layer">
-            <div class="arch-layer-label">正式业务记录</div>
-            <div class="grid-2">
-              <div class="card">
-                <span class="pill warn">传统 WES</span>
-                <h4>config/*.json</h4>
-                <p>传统业务记录存储：项目、需求、评估、WBS、版本、审批</p>
-              </div>
-              <div class="card">
-                <span class="pill">正式业务流程</span>
-                <h4>人工确认链路</h4>
-                <p>草稿查看 → 来源追溯 → 编辑 → 正式发布</p>
-                <p style="margin-top:8px">
-                  <span class="status warn"><span class="dot"></span>草稿</span>
-                  <span class="status todo"><span class="dot"></span>人工确认</span>
-                  <span class="status done"><span class="dot"></span>正式记录</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="callout ok" style="margin-top:20px">
+      <div class="callout ok" style="margin-top:20px">
             <div><b>核心边界</b>AI/Harness 可以生成报告、建议动作和传统草稿；正式评估、正式需求、正式项目推进必须经用户人工确认/编辑。确认动作通过 <code class="inline">enter_formal_estimation</code> 触发，且仅在 <code class="inline">report_v2_ready</code> 阶段允许执行，按 run/action 幂等返回既有结果。</div>
           </div>
 
@@ -248,7 +393,7 @@
         <tr><th>对象</th><th>创建时机</th><th>状态</th><th>后续动作</th></tr>
         <tr><td>项目评估记录草稿</td><td>v2 报告上确认 <code class="inline">enter_formal_estimation</code></td><td><span class="status warn"><span class="dot"></span>draft</span></td><td>传统工作台人工查看、编辑、确认</td></tr>
         <tr><td>实施评估版本草稿</td><td>同一次确认动作内生成</td><td><span class="status warn"><span class="dot"></span>draft_from_ai</span></td><td>人工确认后回写 Harness，再按传统流程补齐参数、检入、升版或发布</td></tr>
-        <tr><td>正式需求/正式评估</td><td>不由 阶段 1D（Phase 1D） 自动创建</td><td><span class="status todo"><span class="dot"></span>manual</span></td><td>保留传统人工确认链路</td></tr>
+        <tr><td>正式需求/正式评估</td><td>不由 阶段 1D（阶段 1D（阶段 1D（Phase 1D））） 自动创建</td><td><span class="status todo"><span class="dot"></span>manual</span></td><td>保留传统人工确认链路</td></tr>
       </table>
     </section>
 

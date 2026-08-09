@@ -20,6 +20,7 @@
           <div class="nav-drop">
           <a href="roadmap.html">路标管理</a>
           <a href="design.html">设计说明</a>
+          <a href="design-architecture.html">架构设计</a>
           <a href="plan.html">计划与进度</a>
           <a href="requirements.html">需求池</a>
           </div>
@@ -31,6 +32,10 @@
           <a href="monitoring.html">监控与审计</a>
           <a href="risks.html">风险与决策</a>
           <a href="changes.html">变更记录</a>
+          <a href="issues.html">问题池</a>
+          <a href="defects.html">缺陷池</a>
+          <a href="ops-health.html">运维看板</a>
+          <a href="code-audit.html">代码审计</a>
           </div>
         </div>
         <div class="nav-group">
@@ -39,10 +44,11 @@
           <a href="runtime.html">AI 任务执行</a>
           <a href="collaboration-protocol.html">多 AI 协作</a>
           <a href="branches.html">开发分支</a>
+          <a href="skill.html">Skill 体系</a>
           </div>
         </div>
         <div class="nav-group">
-          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <button type="button" class="nav-group-btn" aria-expanded="false">资料资产<span class="caret" aria-hidden="true"></span></button>
           <div class="nav-drop">
           <a href="sources.html">信息来源</a>
           <a href="github-radar.html">开源工具雷达</a>
@@ -68,7 +74,7 @@
             <span class="pill ok">阶段 1E 已完成</span>
             <span class="pill ok">阶段 1F 已交付</span>
             <span class="pill ok">阶段 1G 已交付</span>
-            <span class="pill brand">需求池 42 项</span>
+            <span class="pill brand">需求池 43 项</span>
             <span class="pill brand">路标管理已初始化</span>
             <span class="pill ok">22 已交付（验收完成）</span>
           </div>
@@ -220,7 +226,7 @@
           <div class="card">
             <span class="pill warn">接下来怎么做</span>
             <h3>实施计划</h3>
-            <p>承接 阶段 1B（Phase 1B）/1C/1D/1E/1F 的已交付事实，并把 阶段 1G 意图路由与任务运行时升级拆成可验收任务。这里回答“接下来怎么做”。</p>
+            <p>承接 阶段 1B（阶段 1B（阶段 1B（Phase 1B）））/1C/1D/1E/1F 的已交付事实，并把 阶段 1G 意图路由与任务运行时升级拆成可验收任务。这里回答“接下来怎么做”。</p>
           </div>
           <div class="card">
             <span class="pill ok">如何证明可控</span>
@@ -319,6 +325,13 @@
             <div class="preview">角色登记 → 独立开发 → 交接 → 复核 → 验证 → 看板同步</div>
             <span class="arr">打开多 AI 协作 →</span>
           </a>
+          <a class="res-card" href="skill.html">
+            <span class="ico" style="background:var(--err-soft);color:var(--err)">SK</span>
+            <h3>Skill 体系</h3>
+            <p>9 个活跃 Skill 的分层架构、依赖关系与 AGENTS.md 触发映射。含安全审查、代码审查、TDD 等质量保障层 Skill。</p>
+            <div class="preview">5 层架构 · 11 条依赖 · 9 个触发映射</div>
+            <span class="arr">打开 Skill 体系 →</span>
+          </a>
           <a class="res-card card" href="branches.html" data-board-event-id="BE-2026-08-02-rp-045-branch-topology:index">
             <span class="pill brand">开发分支管理</span>
             <h3>开发分支与独立开发目录</h3>
@@ -328,7 +341,7 @@
             <span class="ico" style="background:var(--warn-soft);color:var(--warn)">RP</span>
             <h3>需求池</h3>
             <p>升级需求记录、分析、拆解、排期与状态管理；当前只保留只读需求池页面，后续由 AI 直接维护。</p>
-            <div class="preview">42 项需求 · 22 项已交付（验收完成） · 18 项待验收/待处理 · 2 项暂缓</div>
+            <div class="preview">43 项需求 · 22 项已交付（验收完成） · 19 项待验收/待处理 · 2 项暂缓</div>
             <span class="arr">打开需求池 →</span>
           </a>
           <a class="res-card" href="github-radar.html">

@@ -1,0 +1,34 @@
+{
+  "id": "BE-2026-08-07-daily-scan-first-run",
+  "date": "2026-08-07",
+  "type": "verification",
+  "scope": "每日定时扫描与看板更新（首次运行）",
+  "summary": "每日定时扫描任务首次运行：基线 main @ 1bd8477（领先 origin/main 11 提交，含 RP-047 Batch B 合入与 V0_SAAS 下线清理，308 文件 +17402/−36943）；全仓源码/文档 3304 文件 904021 行（apps/api 368 文件 / ui/V2_PROTOTYPE 196 文件）；依赖版本零漂移，仅 apps/api 测试脚本扩容；build:api 与 build:web 均通过；工作区 20 项未提交改动均为看板/文档/Skill 过程资产，无业务代码脏改动。识别一项一致性待办：总看板新页面 skill.html 尚未纳入 board-build.js 导航配置。状态日报已落盘 docs/PROJECT_STATUS_日报/project-status-2026-08-07.md，状态快照写入 data/board-daily-scan-state.json 供后续运行智能跳过比对。",
+  "status": "已完成 / 自动化扫描通过",
+  "pages": ["changes"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "docs/PROJECT_STATUS_日报/project-status-2026-08-07.md",
+      "summary": "本次扫描生成的项目状态日报（结构概览、变更统计、健康度评估）"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "双端构建健康检查通过（tsc exit 0；vite build 571ms）"
+    },
+    {
+      "kind": "file",
+      "ref": "data/board-daily-scan-state.json",
+      "summary": "状态指纹快照（HEAD + 工作区摘要 + 配置哈希），用于下次运行无变化跳过判定"
+    }
+  ],
+  "next": "后续每日运行按指纹比对自动跳过无变化日；skill.html 导航接入随该页面任务收口处理。",
+  "board": {
+    "change": {
+      "stage": "每日扫描 · 首次运行",
+      "result": "已完成 / 构建健康 / 日报已落盘"
+    }
+  }
+}

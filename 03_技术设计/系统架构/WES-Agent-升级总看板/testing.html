@@ -20,6 +20,7 @@
           <div class="nav-drop">
           <a href="roadmap.html">路标管理</a>
           <a href="design.html">设计说明</a>
+          <a href="design-architecture.html">架构设计</a>
           <a href="plan.html">计划与进度</a>
           <a href="requirements.html">需求池</a>
           </div>
@@ -31,6 +32,10 @@
           <a href="monitoring.html">监控与审计</a>
           <a href="risks.html">风险与决策</a>
           <a href="changes.html">变更记录</a>
+          <a href="issues.html">问题池</a>
+          <a href="defects.html">缺陷池</a>
+          <a href="ops-health.html">运维看板</a>
+          <a href="code-audit.html">代码审计</a>
           </div>
         </div>
         <div class="nav-group">
@@ -39,10 +44,11 @@
           <a href="runtime.html">AI 任务执行</a>
           <a href="collaboration-protocol.html">多 AI 协作</a>
           <a href="branches.html">开发分支</a>
+          <a href="skill.html">Skill 体系</a>
           </div>
         </div>
         <div class="nav-group">
-          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <button type="button" class="nav-group-btn" aria-expanded="false">资料资产<span class="caret" aria-hidden="true"></span></button>
           <div class="nav-drop">
           <a href="sources.html">信息来源</a>
           <a href="github-radar.html">开源工具雷达</a>
@@ -79,7 +85,7 @@
       <ol>
         <li><b>§1</b> 测试策略</li>
         <li><b>§2</b> 测试任务台账</li>
-        <li><b>§3</b> 阶段 1F（Phase 1F） 扩展用例</li>
+        <li><b>§3</b> 阶段 1F（阶段 1F（阶段 1F（Phase 1F））） 扩展用例</li>
         <li><b>§3.5</b> 阶段 1G 意图路由用例</li>
         <li><b>§3.6</b> 阶段 1H-A 工作台体验用例</li>
         <li><b>§3.7</b> 阶段 1H-B 引导选项用例</li>
@@ -745,6 +751,8 @@
         <tr><td class="mono">Qoder R8 RP-029/RP-030 Codex rework checks</td><td><span class="status done"><span class="dot"></span>Codex 修复通过 / 待集成</span></td><td>2026-06-28：Codex 在 <code class="inline">codex/rp-029-030-rework-fixes</code> 修复 R8 阻断并复跑验证：<code class="inline">npm run build -w apps/api</code> pass；<code class="inline">npm run test:modules -w apps/api</code> 137/137 pass；<code class="inline">npm run test:ai -w apps/api</code> 189/189 pass；<code class="inline">npm run test:agent -w apps/api</code> 21/21 pass；<code class="inline">npm run test:harness -w apps/api</code> 62/62 pass。已移除提交中的 <code class="inline">trace-store.json</code> 运行态数据，并补测试 store 隔离、流式成功/失败/abort trace 覆盖。</td></tr>
         <tr data-board-event-id="BE-2026-08-06-o4-regression-baseline"><td class="mono">O4 handler 化重构：意图路由快照回归基线入库</td><td><span class="status done"><span class="dot"></span>通过 / 项已关闭（冒烟 8 样本）</span></td><td>2026-08-06：O4 重构前先落 18 条意图路由 + 闸门快照（workbench-routing.snapshot.test.ts，7 类意图全覆盖 + 文件上传不触发工作流守护 + O10 Batch A 四条行为锁定 + isExplicitReportRequest 闸门 2 条）与 8 条 handler 直接单测（handlers/handlers.unit.test.ts），均挂入 test:ai。重构后独立复跑全绿：test:ai 237/237、test:modules 249/249、build:api pass；buildCapabilityResponse 搬迁前后逐字节一致。快照集从此作为意图路由行为的常驻回归基线，后续任何 dispatch/handler 改动必须先过此集。同日用户实测冒烟 8 样本通过：你好/你能做什么静态秒回、项目查询带跳转按钮、创建项目先确认、报告生成只建议、附件提问不启动工作流、知识库问答、O10-A 自然回复不回归、写诗礼貌拒绝。O4 关闭，Sprint 2 收官。</td></tr>
         <tr data-board-event-id="BE-2026-08-06-o10-batch-a-accepted"><td class="mono">O10 Batch A（RP-049 兖底分类采纳收紧）自动化 + 人工验收</td><td><span class="status done"><span class="dot"></span>通过 / 项已关闭</span></td><td>2026-08-06：合入 e20e2c6 后独立复跑 test:ai 211/211（含 4 类采纳用例：capability@0.9 不采纳、unsupported@0.9 采纳、unsupported@0.7 不采纳、wes_data/write@0.9 不采纳）、test:modules 249/249、build:api pass。人工验收 6 样本（发什么文件/特朗普是谁/你能做什么/你好/写诗/创建过哪些项目）用户实测冒烟通过：常规提问回归模型自然回复、超范围礼貌拒绝、问候与能力介绍保持原设计。O10 Batch A 关闭；Batch B/C 待另行批准。</td></tr>
+        <tr data-board-event-id="BE-2026-08-07-o3c-merged:testing"><td class="mono">RP-047 Batch C（异步 Run API/SSE replay/cancel·inputs·confirm·retry）：harness 套件 128→173，关卡（Gate） C 四条硬口径证据入库</td><td><span class="status done"><span class="dot"></span>关卡 C 独立复跑全绿 / 合入后 main 复验全绿</span></td><td>2026-08-07：关卡 C 对 worktree 分支 qoder/rp-047-c-async-run-api（473a513 + handoff a42357a）独立复跑 §12 全量：test:harness 173/173（0 fail 0 skip，新增 45 条 = usecase 15 + controller 7 + routes 22 条 Testcontainers PG 集成 + types 1）、test:modules 255/255、test:ai 242/242、test:integration 1/1、build:api/build:web 退出 0、双 lockfile 与 drizzle 零变更。关卡 C 四条证据常驻回归：G1 状态码矩阵（202/404/409/422/503 全端点覆盖）、G2 owner 安全（跨 owner 404 含 SSE 握手前校验）、G3 断线不取消（真实 socket destroy 三重断言：状态仍 queued/cancelRequestedAt null/零 cancel 事件 + Last-Event-ID 重连续传）、G4 flag 双态（WES_AI_DURABLE_RUNS_ENABLED 关闭时 POST runs 503 ASYNC_RUNS_DISABLED、旧同步路径零变更）。45 条新测试已挂入 test:harness 枚举，后续异步 Run 链路改动必须过此集。合入后（squash 提交 70e78b1）main 全量复验：test:harness 173/173、test:modules 255/255、test:ai 242/242、test:integration 1/1、build:api/build:web 退出 0。审计发现 F1（非阻塞）：openapi 声明 attachmentIds/workflowHint 但实现未消费，属 Batch D/E 范围，待对齐说明标注预留或 Batch D 补 metadata 承载；端到端人工验收缺口待 Batch E、SSE 未压测。</td></tr>
+        <tr data-board-event-id="BE-2026-08-06-o3b-gateb-audited:testing"><td class="mono">RP-047 Batch B（Worker/恢复协调器/Session 投影仪）：harness 套件 95→128，四类崩溃 + 取消安全边界证据入库</td><td><span class="status done"><span class="dot"></span>关卡 B 独立复跑全绿 / 合入后 main 复验全绿</span></td><td>2026-08-06：关卡 B 对 worktree 分支 qoder/rp-047-b-worker-recovery（39b0568 + handoff 3705f44）独立复跑 §12 全量：test:harness 128/128（0 fail 0 skip，新增 18 条故障注入测试 = worker 8 + recovery 6 + projector 4）、test:modules 252/252、test:ai 240/240、test:integration 1/1、build:api/build:web 退出 0、双 lockfile 与 drizzle 零变更。四类崩溃恢复证据常驻回归：C1 输入后崩（T3 input_committed 恢复、用户消息 outbox 恰 1 行）、C2 工具成功后崩（T4 effectKey 跨 attempt 副作用恰一次）、C3 模型流中断（T5 从 model_input_ready 重放不拼接文本）、C4a 硬退出（T2b 真实时序 lease 过期）/ C4b outbox 未确认（T9b 来源键幂等吸收重放）。取消边界：dispatch 3 条取消测试 RED→GREEN（21pass/3fail→24/24）、T11 取消后零写入、T7b 取消优先不耗恢复预算、T1b lease 失效禁写。18 条故障注入测试已挂入 test:harness 枚举（E2），后续 Harness Runtime 改动必须过此集。合入后（squash 提交 1bd8477）main 全量复验：test:harness 128/128、test:modules 255/255、test:ai 242/242（比 worktree 基线各多 3 条，来自主干 4dbfc2d 基线变化）、test:integration 1/1、build:api/build:web 退出 0。</td></tr>
       </table>
     </section>
 

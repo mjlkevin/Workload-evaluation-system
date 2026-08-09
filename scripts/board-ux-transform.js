@@ -4,7 +4,7 @@
  *
  * 功能：
  * 1. 将所有根目录看板页面的 <nav class="navlinks"> 替换为分组导航
- *    （branch-primary-nav 保持扁平，供分支拓扑页专用）
+ *    （含分支拓扑页 branch-primary-nav，全看板统一分组结构）
  * 2. 在 </body> 前注入 assets/board-ui.js 渐进增强脚本
  * 3. 术语业务化：Phase → 阶段、Gate → 关卡、Loop → 循环
  *    - 每页首个出现处保留英文原名作为括号补充（如「关卡（Gate）」）
@@ -70,7 +70,7 @@ function transformFile(file) {
   let html = fs.readFileSync(filePath, 'utf-8');
   const original = html;
 
-  // 1. 分组导航（board-build 内部对 branch-primary-nav 保留扁平链接）
+  // 1. 分组导航（全看板统一，含 branch-primary-nav）
   html = replaceNavigationLinks(html, file);
 
   // 2. 注入渐进增强脚本

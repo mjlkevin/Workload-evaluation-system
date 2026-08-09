@@ -950,6 +950,122 @@ th.mono { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
   .tech-detail .td-hint { display: none; }
 }
 
+/* ── 三池表格增强（.tbl-*，依据 open-design/shadcn 规范映射看板 tokens）──
+   留白优先于边框 · 150–250ms 过渡 · hover/focus/disabled 显式呈现 */
+.tbl-block { margin: 14px 0; }
+.tbl-block .table-scroll { margin: 0; }
+.tbl-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.tbl-search,
+.tbl-filter {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-family: inherit;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.tbl-search { width: 240px; max-width: 100%; }
+.tbl-search::placeholder { color: var(--ink-3); }
+.tbl-search:hover,
+.tbl-filter:hover { border-color: var(--ink-3); }
+.tbl-search:focus,
+.tbl-filter:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.tbl-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.tbl-pager { display: flex; align-items: center; gap: 8px; }
+.tbl-page-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, color .18s ease;
+}
+.tbl-page-btn:hover:not(:disabled) {
+  background: var(--bg-soft);
+  border-color: var(--ink-3);
+  color: var(--ink);
+}
+.tbl-page-btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.tbl-page-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+.tbl-page-info {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+/* 表头排序（full 与 sort 模式共用） */
+th.th-sortable {
+  position: relative;
+  padding-right: 24px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: color .18s ease;
+}
+th.th-sortable:hover { color: var(--ink); }
+th.th-sortable:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent-soft);
+}
+th.th-sortable::after {
+  content: '↕';
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  opacity: .35;
+  transition: opacity .18s ease;
+}
+th.th-sortable.sort-asc,
+th.th-sortable.sort-desc { color: var(--ink); }
+th.th-sortable.sort-asc::after { content: '↑'; opacity: 1; color: var(--accent); }
+th.th-sortable.sort-desc::after { content: '↓'; opacity: 1; color: var(--accent); }
+/* 行 hover（shadcn hover 态） */
+.tbl-block tbody tr,
+table[data-board-table] tbody tr { transition: background .18s ease; }
+.tbl-block tbody tr:hover,
+table[data-board-table] tbody tr:hover { background: var(--bg-soft); }
+
+@media (max-width: 680px) {
+  .tbl-tools { flex-direction: column; align-items: stretch; }
+  .tbl-search { width: 100%; }
+  .tbl-count { margin-left: 0; }
+  .tbl-pager { justify-content: flex-end; }
+}
+
 /* ─ Responsive: 680px ── */
 @media (max-width: 680px) {
   .wrap,
@@ -963,11 +1079,12 @@ th.mono { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
   .rm-timeline { display: grid; gap: 18px; }
   .rm-track,
   .rm-track-fill { display: none; }
-  table {
+  table:not([data-board-table]) {
     display: block;
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
   }
-  table thead, table tbody { display: table; width: 100%; }
+  table:not([data-board-table]) thead,
+  table:not([data-board-table]) tbody { display: table; width: 100%; }
 }

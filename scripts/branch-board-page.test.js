@@ -882,9 +882,11 @@ test('board build centralizes actual branch navigation while preserving its shel
   const distDir = createTempDir(t);
   const copied = build.copyExtraFiles(distDir);
   assert.deepEqual(copied.map((file) => path.relative(distDir, file).split(path.sep).join('/')).sort(), [
+    'assets/board-table.js',
     'assets/board-ui.js',
     'assets/branch-topology.css',
     'assets/branch-topology.js',
+    'assets/vendor/list.min.js',
     'data/branch-snapshot.js',
   ]);
   for (const relativeFile of copied.map((file) => path.relative(distDir, file))) {

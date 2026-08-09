@@ -20,6 +20,7 @@
           <div class="nav-drop">
           <a href="roadmap.html">路标管理</a>
           <a href="design.html">设计说明</a>
+          <a href="design-architecture.html">架构设计</a>
           <a href="plan.html">计划与进度</a>
           <a href="requirements.html">需求池</a>
           </div>
@@ -31,6 +32,10 @@
           <a href="monitoring.html">监控与审计</a>
           <a href="risks.html">风险与决策</a>
           <a href="changes.html">变更记录</a>
+          <a href="issues.html">问题池</a>
+          <a href="defects.html">缺陷池</a>
+          <a href="ops-health.html">运维看板</a>
+          <a href="code-audit.html">代码审计</a>
           </div>
         </div>
         <div class="nav-group">
@@ -39,10 +44,11 @@
           <a href="runtime.html">AI 任务执行</a>
           <a href="collaboration-protocol.html">多 AI 协作</a>
           <a href="branches.html">开发分支</a>
+          <a href="skill.html">Skill 体系</a>
           </div>
         </div>
         <div class="nav-group has-active">
-          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <button type="button" class="nav-group-btn" aria-expanded="false">资料资产<span class="caret" aria-hidden="true"></span></button>
           <div class="nav-drop">
           <a href="sources.html">信息来源</a>
           <a class="active" href="github-radar.html">开源工具雷达</a>
@@ -62,8 +68,8 @@
         <span><b>定位</b> 收录每日 GitHub 雷达中有启发性的开源工具，作为项目架构优化迭代的基础</span>
         <span><b>收录来源</b> 每日 GitHub 开源项目搜寻定时任务（搜寻 → 核验 → 分析 → 报告）</span>
         <span><b>收录口径</b> 必须完成与 WES 的代码级结合点论证，三维评级（启发性 / 优化价值 / 架构改进）</span>
-        <span><b>当前收录</b> 2 项（DeepEval、Langfuse）</span>
-        <span><b>更新</b> 2026-08-04</span>
+        <span><b>当前收录</b> 5 项（DeepEval、Langfuse、React Hook Form、TanStack Table、XState）</span>
+        <span><b>更新</b> 2026-08-06</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill brand">收录 ≠ 引入</span>
@@ -82,8 +88,11 @@
         <li><b>§2</b> 收录总览</li>
         <li><b>§3</b> DeepEval · LLM 评估框架</li>
         <li><b>§4</b> Langfuse · LLM 工程平台</li>
-        <li><b>§5</b> 架构优化候选映射</li>
-        <li><b>§6</b> 维护规则</li>
+        <li><b>§5</b> React Hook Form · 表单管理</li>
+        <li><b>§6</b> TanStack Table · Headless 表格</li>
+        <li><b>§7</b> XState · 状态机形式化</li>
+        <li><b>§8</b> 架构优化候选映射</li>
+        <li><b>§9</b> 维护规则</li>
       </ol>
     </div>
 
@@ -102,12 +111,45 @@
     <section>
       <div class="h-num">Section 02</div>
       <h2>收录总览</h2>
-      <p class="lead">当前收录 2 项，均来自 2026-08-03 定时任务报告，并于 2026-08-04 完成代码级结合点论证后入库。同期候选中 univer（在线电子表格）与 lowdb（JSON 数据库）暂未收录，待补充论证。</p>
+      <p class="lead">当前收录 5 项。GT-001/002 来自 2026-08-03 定时任务报告，GT-003/004/005 来自 2026-08-06 定时任务报告，均完成代码级结合点论证后入库。收录标准：五维加权评分 ≥ 7.0，且结合点指向仓库内真实模块/文件。</p>
       <div class="panel">
-        <div class="panel-h">收录台账<span class="right">快照日期 2026-08-03</span></div>
+        <div class="panel-h">收录台账<span class="right">快照日期 2026-08-06</span></div>
         <div class="panel-b">
           <table>
-            <tr><th>#</th><th>工具</th><th>领域</th><th>技术栈 / 许可</th><th>Star / Fork</th><th>活跃度</th><th>启发性</th><th>优化价值</th><th>架构改进</th><th>状态</th></tr>
+            <tr><th>#</th><th>工具</th><th>领域</th><th>技术栈 / 许可</th><th>Star / Fork</th><th>活跃度</th><th>启发性</th><th>优化价值</th><th>架构改进</th><th>总评分</th><th>状态</th></tr>
+            <tr>
+              <td class="mono">GT-003</td>
+              <td><a href="https://github.com/react-hook-form/react-hook-form" target="_blank" rel="noreferrer">react-hook-form/react-hook-form</a></td>
+              <td>React 表单状态管理 + 验证</td>
+              <td>TypeScript · MIT</td>
+              <td>⭐ 44,811 / 2,463</td>
+              <td>2026-08-05 有推送，极活跃</td>
+              <td>★★★★☆</td><td>★★★★★</td><td>★★★☆☆</td>
+              <td class="mono"><b>8.65</b></td>
+              <td><span class="status done"><span class="dot"></span>已收录</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-004</td>
+              <td><a href="https://github.com/TanStack/table" target="_blank" rel="noreferrer">TanStack/table</a></td>
+              <td>Headless 表格 / 数据网格</td>
+              <td>TypeScript · MIT</td>
+              <td>⭐ 28,278 / 3,559</td>
+              <td>2026-08-04 有推送，极活跃</td>
+              <td>★★★★☆</td><td>★★★★★</td><td>★★★★☆</td>
+              <td class="mono"><b>8.65</b></td>
+              <td><span class="status done"><span class="dot"></span>已收录</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-005</td>
+              <td><a href="https://github.com/statelyai/xstate" target="_blank" rel="noreferrer">statelyai/xstate</a></td>
+              <td>状态机 / 状态图 / Actor 模型</td>
+              <td>TypeScript · MIT</td>
+              <td>⭐ 29,967 / 1,377</td>
+              <td>2026-08-05 有推送，极活跃</td>
+              <td>★★★★★</td><td>★★★☆☆</td><td>★★★★☆</td>
+              <td class="mono"><b>8.40</b></td>
+              <td><span class="status done"><span class="dot"></span>已收录</span></td>
+            </tr>
             <tr>
               <td class="mono">GT-001</td>
               <td><a href="https://github.com/confident-ai/deepeval" target="_blank" rel="noreferrer">confident-ai/deepeval</a></td>
@@ -116,6 +158,7 @@
               <td>⭐ 17,369 / 1,752</td>
               <td>当日有推送，极活跃</td>
               <td>★★★★★</td><td>★★★★☆</td><td>★★★☆☆</td>
+              <td class="mono">—（手动收录）</td>
               <td><span class="status done"><span class="dot"></span>已收录</span></td>
             </tr>
             <tr>
@@ -126,6 +169,7 @@
               <td>⭐ 32,428 / 3,483</td>
               <td>当日有推送，极活跃；已并入 ClickHouse 团队</td>
               <td>★★★★★</td><td>★★★★☆</td><td>★★★★★</td>
+              <td class="mono">—（手动收录）</td>
               <td><span class="status done"><span class="dot"></span>已收录</span></td>
             </tr>
           </table>
@@ -222,8 +266,116 @@
 
     <section>
       <div class="h-num">Section 05</div>
+      <h2>GT-003 · React Hook Form（react-hook-form/react-hook-form）</h2>
+      <p class="lead">React 非受控表单管理库，通过 register 将输入注册到 ref 而非 state，避免受控组件每次按键触发整个表单重渲染。原生支持 Zod/Yup/AJV 等验证库通过 resolver 一行接入。对 WES 的直接意义是：前端表单从“原生 form + 手写 handleSubmit”升级到统一验证 + 错误状态 + 性能优化体系。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">核心价值</span><h3>非受控架构，极致渲染性能</h3><p>register 将输入注册到 ref，表单状态变更不触发组件树重渲染；44,811 stars、仅 13 open issues，维护质量极高。</p></div>
+        <div class="card"><span class="pill ok">许可与栈</span><h3>MIT · TypeScript · 零依赖</h3><p>与 WES 前端 Vite + React 18 完全同构；core 体积极小，无外部依赖。</p></div>
+        <div class="card"><span class="pill warn">成本约束</span><h3>渐进式迁移成本极低</h3><p>新旧表单可共存（RHF 不影响现有原生 form），npm install 即可用，API 学习曲线平缓。</p></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">与 WES 的结合点论证（2026-08-06 代码核验）<span class="right">已核实</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>结合点</th><th>仓库现状（已核验事实）</th><th>RHF 带来的改进</th></tr>
+            <tr>
+              <td>登录表单</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/pages/Login.jsx</code> 第 104 行用原生 <code class="inline">&lt;form onSubmit={handleSubmit}&gt;</code>，验证逻辑手写在 handleSubmit 中。</td>
+              <td>用 useForm + Zod resolver 统一用户名/密码验证，formState.errors 驱动错误展示，消除手写验证逻辑。</td>
+            </tr>
+            <tr>
+              <td>AI 工作台表单</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/components/AiWorkbench/InteractiveFormCard.jsx</code> 第 96 行同样用原生 form + 手写 handleSubmit。</td>
+              <td>RHF 统一交互式输入表单的状态管理和验证，减少重复代码。</td>
+            </tr>
+            <tr>
+              <td>弹窗编辑表单</td>
+              <td>AGENTS.md 约定“表格行级编辑操作默认使用弹窗（Dialog）”，多个页面（ApiKeys、UserManagement 等）有弹窗编辑表单。</td>
+              <td>为 Dialog 编辑表单封装 useForm + Zod schema 标准模板，所有弹窗编辑复用，统一验证体系。</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout ok"><div><b>实施建议</b>第一步：Login 页面试点（成本最低），用 RHF + Zod resolver 替换原生 form；第二步：为 Dialog 弹窗编辑封装 useForm 标准模板；第三步：逐步迁移 InteractiveFormCard、系统管理表单等。引入成本极低：npm install react-hook-form @hookform/resolvers zod。</div></div>
+      <div class="callout warn"><div><b>风险</b>迁移应渐进式进行，新旧表单可共存避免一次性全量重构；Zod 作为验证 resolver 引入后需与后端 API 契约对齐，避免前后端验证规则不一致。</div></div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 06</div>
+      <h2>GT-004 · TanStack Table（TanStack/table）</h2>
+      <p class="lead">Headless 表格库 v8/v9，不提供任何 UI 组件，只提供表格逻辑（排序、过滤、分页、分组、行选择、虚拟化、服务端模式），开发者完全掌控标记和样式。与 WES 已用的 TanStack/query 形成“获取 + 展示”统一 TanStack 生态。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">核心价值</span><h3>Headless 架构，UI 与逻辑解耦</h3><p>不提供 UI 组件，只提供表格逻辑层；WES 现有 <code class="inline">&lt;table className="table"&gt;</code> 样式可完全保留，仅接入排序/过滤/分页逻辑。</p></div>
+        <div class="card"><span class="pill ok">生态协同</span><h3>与 TanStack/query 同生态</h3><p>WES 已用 TanStack/query（GT 收录 2026-08-04，评分 8.3）做异步状态管理；引入 Table 后形成“获取（Query）+ 展示（Table）”统一数据层。</p></div>
+        <div class="card"><span class="pill warn">成本约束</span><h3>列定义初始投入</h3><p>Headless API 需要定义列（accessor、元数据），对数据密集型表格收益最大；简单展示表格可能过度工程化。</p></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">与 WES 的结合点论证（2026-08-06 代码核验）<span class="right">已核实</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>结合点</th><th>仓库现状（已核验事实）</th><th>TanStack Table 带来的改进</th></tr>
+            <tr>
+              <td>详情页表格</td>
+              <td>10+ 页面使用原生 <code class="inline">&lt;table className="table"&gt;</code>：RequirementDetail（3 处）、AssessmentDetail（3 处 + SkuTable）、DevAssessmentDetail（2 处）、ApiKeys（2 处）、AgentManagement（2 处）、ReviewDetail、UserManagement、TraditionalHomeDashboard、ResourceCostDetail 等。</td>
+              <td>Headless 逻辑层注入排序/过滤/分页，保留现有 CSS 样式不变，仅增强表格能力。</td>
+            </tr>
+            <tr>
+              <td>通用列表组件</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/components/ListPage.jsx</code> 第 343 行有通用列表表格，作为多个列表页的基础。</td>
+              <td>改造为 Headless Table 后所有列表页自动获得排序/分页能力。</td>
+            </tr>
+            <tr>
+              <td>大数据量表格</td>
+              <td>SkuTable、ApiKeys、UserManagement 等表格随数据增长可能出现性能瓶颈。</td>
+              <td>行虚拟化（配合 @tanstack/react-virtual）和服务端分页保障大数据量性能。</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout ok"><div><b>实施建议</b>第一步：封装 <code class="inline">&lt;DataTable&gt;</code> 基础组件，基于 @tanstack/react-table + WES 现有 table 样式；第二步：ListPage 接入验证；第三步：按 SkuTable → ApiKeys → UserManagement → AgentManagement 顺序逐页迁移。npm install @tanstack/react-table。</div></div>
+      <div class="callout warn"><div><b>风险</b>Headless API 有学习曲线（列定义、状态管理）；简单展示表格（如 KnowledgeBaseProfilesPanel）可能不需要 Headless 化，应优先改造数据密集型表格。</div></div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 07</div>
+      <h2>GT-005 · XState（statelyai/xstate）</h2>
+      <p class="lead">状态机 + 状态图 + Actor 模型的完整形式化方案，基于 SCXML 规范。声明式定义状态、事件和迁移规则，状态流转合法性由机器定义保证，而非靠散落在各处的 if/else 检查。Stately Studio 可视化编辑器可在编码前验证状态设计完整性。对 WES 的直接意义是：版本机制（检出/检入/升版）的状态流转从分散 if/else 升级为形式化状态机定义。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">核心价值</span><h3>状态机形式化，杜绝非法迁移</h3><p>声明式定义 states + events + transitions，状态合法性由机器保证；Stately Studio 可视化编辑；@xstate/store 提供 <1kb 轻量 store。</p></div>
+        <div class="card"><span class="pill ok">许可与栈</span><h3>MIT · TypeScript · 零依赖</h3><p>与 WES 后端 Express + TS、前端 Vite + React 完全同构；@xstate/react 提供 React 绑定。</p></div>
+        <div class="card"><span class="pill warn">成本约束</span><h3>学习曲线 + 重构成本</h3><p>需学习状态机/状态图/Actor 概念；版本机制已稳定运行，重构需评估回归风险，建议在测试覆盖充分时进行。</p></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">与 WES 的结合点论证（2026-08-06 代码核验）<span class="right">已核实</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>结合点</th><th>仓库现状（已核验事实）</th><th>XState 带来的改进</th></tr>
+            <tr>
+              <td>版本状态管理</td>
+              <td><code class="inline">apps/api/src/modules/versions/versions.usecase.ts</code> 用 <code class="inline">checkoutStatus</code>（“checked_in”/“checked_out”）+ <code class="inline">versionDocStatus</code>（“drafting”/“reviewed”）+ <code class="inline">isHistoricalArchive</code> 三字段组合管理状态，逻辑分散在 checkoutVersion（第 287 行）、saveCheckedOutDraft（第 332 行）、checkinVersion（第 371 行）等多个导出函数中。</td>
+              <td>用 XState 集中定义版本状态机（checked_in ↔ checked_out），guards 检查 isHistoricalArchive/isReviewedReadonly，actions 更新字段；状态迁移规则集中而非分散。</td>
+            </tr>
+            <tr>
+              <td>非法状态防护</td>
+              <td>每个函数手写 if/else 检查前置条件（如 checkoutVersion 第 308 行检查 checkoutStatus === “checked_out”），三字段组合状态空间大，仅靠 if/else 难以穷举非法组合。</td>
+              <td>状态机自动拒绝非法迁移（如从 checked_in 直接到 checkin），新增操作只需在机器中添加迁移定义。</td>
+            </tr>
+            <tr>
+              <td>前后端状态共享</td>
+              <td>前端版本操作按钮（检出/检入/升版）的 enabled/disabled 逻辑与后端条件检查各自实现，可能不一致。</td>
+              <td>前后端共享同一状态机定义，前端用 @xstate/react 驱动按钮状态，保证一致性。</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout ok"><div><b>实施建议</b>第一步：用 XState 定义版本机制完整状态机（checked_in → CHECKOUT → checked_out → CHECKIN/UNDO/UPGRADE → checked_in），配合 guards 和 actions；第二步：替换 versions.usecase.ts 中的 if/else 链为状态机 transition 调用；第三步：前后端共享状态定义驱动 UI。npm install xstate。</div></div>
+      <div class="callout warn"><div><b>风险</b>① 学习曲线较陡（状态机/状态图/Actor 模型）；② 当前版本机制已稳定运行，重构需充分测试覆盖；③ 建议先在新增审批流等功能时引入，而非立即重构已稳定逻辑。</div></div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 08</div>
       <h2>架构优化候选映射</h2>
-      <p class="lead">收录的目的是转化为迭代。下表把两个工具的方法论映射到 WES 的架构优化候选项；候选项尚未立项，立项时按需求池分诊流程走（记录 issue → 分类 → 创建 RP），不跳过治理。</p>
+      <p class="lead">收录的目的是转化为迭代。下表把五个工具的方法论映射到 WES 的架构优化候选项；候选项尚未立项，立项时按需求池分诊流程走（记录 issue → 分类 → 创建 RP），不跳过治理。</p>
       <div class="panel">
         <div class="panel-h">工具 → 优化候选<span class="right">待立项</span></div>
         <div class="panel-b">
@@ -245,6 +397,30 @@
               <td>监控与审计 · 设计说明 · 风险与决策</td>
               <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
             </tr>
+            <tr>
+              <td class="mono">GT-003 React Hook Form</td>
+              <td>非受控表单架构、Zod/Yup 验证 resolver、formState 错误状态管理</td>
+              <td>前端表单统一验证体系：Login 试点 → Dialog 弹窗表单模板 → 全局表单迁移，与 Zod schema 配合实现前后端验证单一事实源</td>
+              <td>高（成本低、即时收益）</td>
+              <td>设计说明 · 需求池</td>
+              <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-004 TanStack Table</td>
+              <td>Headless 表格逻辑层、排序/过滤/分页/虚拟化、与 TanStack/query 同生态</td>
+              <td>表格交互层统一：封装 DataTable 基础组件 → ListPage 接入 → 逐页迁移，与 TanStack/query 形成“获取+展示”统一数据层</td>
+              <td>中高（先改造数据密集型表格）</td>
+              <td>设计说明 · 需求池</td>
+              <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-005 XState</td>
+              <td>状态机形式化、状态图可视化、guards/actions、前后端状态共享</td>
+              <td>版本机制状态流转形式化：定义版本状态机 → 替换 if/else 链 → 前后端共享状态定义驱动 UI，防止非法状态迁移</td>
+              <td>中（建议在新增审批流时引入）</td>
+              <td>设计说明 · 风险与决策</td>
+              <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
+            </tr>
           </table>
         </div>
       </div>
@@ -252,7 +428,7 @@
     </section>
 
     <section>
-      <div class="h-num">Section 06</div>
+      <div class="h-num">Section 09</div>
       <h2>维护规则</h2>
       <div class="grid-2">
         <div class="card"><span class="pill brand">收录要求</span><h3>新增条目的必备字段</h3><p>仓库链接、快照日期（Star/Fork/活跃度）、技术栈与许可、三维评级、代码级结合点论证（指向真实模块/文件/命令）、分阶段实施建议、风险说明。</p></div>
@@ -261,7 +437,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 开源工具雷达 · 2026-08-04 · 收录 2 项（GT-001 DeepEval / GT-002 Langfuse）
+      WES 项目管理 · 开源工具雷达 · 2026-08-06 · 收录 5 项（GT-001 DeepEval / GT-002 Langfuse / GT-003 React Hook Form / GT-004 TanStack Table / GT-005 XState）
     </footer>
   </main>
   <script src="assets/board-ui.js" defer></script>

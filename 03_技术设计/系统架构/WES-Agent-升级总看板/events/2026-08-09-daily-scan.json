@@ -1,0 +1,34 @@
+{
+  "id": "BE-2026-08-09-daily-scan",
+  "date": "2026-08-09",
+  "type": "verification",
+  "scope": "每日定时扫描与看板更新（2026-08-09）",
+  "summary": "每日定时扫描：基线 main @ 7a939c8（领先 origin/main 17 提交），较上次快照 e53ffcb 新增 3 提交（RP-047-D 多会话 UI 合入 81a7839 + ISS-2026-08-08-001 附件上下文回退修复合入），39 文件 +3406/−137 行。变更集中在 ui/V2_PROTOTYPE（21 文件：aiRuns.js/useBackgroundRuns/useSessionRuntimeStore 三个新前端能力 + 6 个新测试文件约 1200 行）与 apps/api（15 文件：AI handlers 报告流重构 report-flow.ts + 附件回退修复），openapi.yaml 同步 +44 行契约。依赖版本零漂移，仅 apps/api test:modules 脚本扩容纳入 ai-sessions.usecase.test.ts。build:api 与 build:web 均通过。全仓源码/文档 1097 文件 308913 行（较昨日净增 17 文件 / 约 5108 行）。工作区 42 项未提交改动均为看板/文档/Skill 过程资产与运行时数据，无业务代码脏改动；过程资产堆积量较昨日 23 项上升，建议择机整批提交。RP-047 Batch E 工单已出现在工作区待执行。状态日报已落盘 docs/PROJECT_STATUS_日报/project-status-2026-08-09.md。",
+  "status": "已完成 / 自动化扫描通过",
+  "pages": ["changes"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "docs/PROJECT_STATUS_日报/project-status-2026-08-09.md",
+      "summary": "本次扫描生成的项目状态日报（结构概览、RP-047-D 变更统计、健康度评估）"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "双端构建健康检查通过（tsc exit 0；vite build 600ms）"
+    },
+    {
+      "kind": "file",
+      "ref": "data/board-daily-scan-state.json",
+      "summary": "状态指纹快照已更新（HEAD 7a939c8 + 工作区摘要 + 配置哈希），供下次运行智能跳过比对"
+    }
+  ],
+  "next": "RP-047 Batch E 工单待执行（docs/agent-loop/work-orders/2026-08-09-qoder-RP-047-E.md）；本地 main 领先 origin/main 17 提交且工作区过程资产 42 项，推送与整批提交时机由用户决定。",
+  "board": {
+    "change": {
+      "stage": "每日扫描 · 2026-08-09",
+      "result": "已完成 / 构建健康 / 日报已落盘"
+    }
+  }
+}

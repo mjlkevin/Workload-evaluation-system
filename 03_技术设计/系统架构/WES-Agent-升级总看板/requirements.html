@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>需求池 · WES 项目管理</title>
-  <link rel="stylesheet" href="assets/fonts/fonts.css" />
-  <link rel="stylesheet" href="assets/base.css" />
-  <link rel="stylesheet" href="assets/components.css" />
-  <link rel="stylesheet" href="assets/pages.css" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css?v=20260808" />
+  <link rel="stylesheet" href="assets/base.css?v=20260808" />
+  <link rel="stylesheet" href="assets/components.css?v=20260808" />
+  <link rel="stylesheet" href="assets/pages.css?v=20260808" />
 </head>
 <body>
   <header class="topnav">
@@ -20,6 +20,7 @@
           <div class="nav-drop">
           <a href="roadmap.html">路标管理</a>
           <a href="design.html">设计说明</a>
+          <a href="design-architecture.html">架构设计</a>
           <a href="plan.html">计划与进度</a>
           <a class="active" href="requirements.html">需求池</a>
           </div>
@@ -31,6 +32,10 @@
           <a href="monitoring.html">监控与审计</a>
           <a href="risks.html">风险与决策</a>
           <a href="changes.html">变更记录</a>
+          <a href="issues.html">问题池</a>
+          <a href="defects.html">缺陷池</a>
+          <a href="ops-health.html">运维看板</a>
+          <a href="code-audit.html">代码审计</a>
           </div>
         </div>
         <div class="nav-group">
@@ -39,10 +44,11 @@
           <a href="runtime.html">AI 任务执行</a>
           <a href="collaboration-protocol.html">多 AI 协作</a>
           <a href="branches.html">开发分支</a>
+          <a href="skill.html">Skill 体系</a>
           </div>
         </div>
         <div class="nav-group">
-          <button type="button" class="nav-group-btn" aria-expanded="false">知识库<span class="caret" aria-hidden="true"></span></button>
+          <button type="button" class="nav-group-btn" aria-expanded="false">资料资产<span class="caret" aria-hidden="true"></span></button>
           <div class="nav-drop">
           <a href="sources.html">信息来源</a>
           <a href="github-radar.html">开源工具雷达</a>
@@ -178,7 +184,7 @@
               <h5>运行时与审计基础</h5>
               <div class="bc-meta">
                 <span class="pill priority-p1">P1</span>
-                <span class="pill">阶段 1H-B（Phase 1H-B）</span>
+                <span class="pill">阶段 1H-B（阶段 1H-B（阶段 1H-B（Phase 1H-B）））</span>
                 <span class="pill">第一批/MVP 已交付</span>
               </div>
               <div class="bc-next">附件问答轻量审计、WES 数据查询、Artifact Workspace、Regression 样本规则、知识库工具 MVP 已进入交付基线；RP-018 仍保留真实 ZHIPU 配置人工验收回填项。</div>
@@ -468,10 +474,10 @@
               <button type="button" id="filter-reset" class="ledger-filter-reset-btn">重置</button>
             </div>
           </div>
-          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">42</b> / 42 条需求</div>
+          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">43</b> / 43 条需求</div>
         </div>
         <div class="table-scroll">
-        <table>
+        <table id="tbl-requirements" data-board-table data-mode="sort" data-page-size="10" data-filter-col="4">
           <colgroup>
             <col style="width:6%">
             <col style="width:12%">
@@ -977,7 +983,7 @@
               <td><span class="status run"><span class="dot"></span>已分析 / 待统一规划</span></td>
               <td>将 routeWorkbenchIntent 硬编码规则与 RP-003 模型分类改造为 skill manifest 驱动的级联匹配：① 路由知识（触发词/示例话术/工具白名单/确认策略/响应策略）沉淀为 config 层 manifest（数据而非代码）；② 匹配器级联：确定性层（clientAction/问候额度保护）→ 清单规则层 → LLM 结构化选择层（枚举+none+置信度门控，替换 classifyIntentWithModel）；③ 10 类意图逐一映射为 skill，执行引擎复用 O4 已交付的 WORKBENCH_HANDLERS 注册表（零改动）；④ 边界由后端 BoundaryPolicy 代码强制：isExplicitReportRequest 闸门、requiresConfirm、JWT/owner/能力位校验不因 manifest 配置可绕过；⑤ 响应策略入 manifest：model_assisted + 场景 facts 泛化（CAPABILITY_FACTS 模式），静态仅限问候额度保护。</td>
               <td>去重结果：RP-012 相关但独立（RP-012 为售前制造业业务 Skill 能力层，本项为路由架构层 skill 化，manifest schema 应统一设计避免两套）；O4 已交付 handler 注册表即执行底座；与 O10/RP-049 同文件，须严格排在其 Batch B/C 之后</td>
-              <td>已完成可行性分析（技术可行性/三层叠加问题解法/实现路径/边界控制/可维护性/风险六维），结论：方向可行但必须是级联形态而非 LLM 自由裁量；迁移建议 P1 清单化（行为零变更）→ P2 LLM 选择层（feature flag）→ P3 场景驱动扩展。用户明确"先详细登记，后续统一梳理规划"，故不排期不进 Sprint；待统一梳理时与 RP-012、Phase 1H Capability Registry、O10/O4 现状统一对齐后立项。</td>
+              <td>已完成可行性分析（技术可行性/三层叠加问题解法/实现路径/边界控制/可维护性/风险六维），结论：方向可行但必须是级联形态而非 LLM 自由裁量；迁移建议 P1 清单化（行为零变更）→ P2 LLM 选择层（feature flag）→ P3 场景驱动扩展。用户明确"先详细登记，后续统一梳理规划"，故不排期不进 Sprint；待统一梳理时与 RP-012、阶段 1H Capability Registry、O10/O4 现状统一对齐后立项。</td>
             </tr>
             <tr>
               <td class="mono">RP-051</td>
@@ -985,11 +991,11 @@
               <td>2026-08-06 用户提出分析当前项目构建 Electron 桌面端的可行性；来源问题为 <code class="inline">ISS-2026-08-06-004</code></td>
               <td>产品形态 / 架构演进</td>
               <td><span class="pill priority-p2">P2</span></td>
-              <td>待规划 / 待决策</td>
-              <td><span class="status run"><span class="dot"></span>已分析 / 待决策</span></td>
-              <td>将现有 Express 后端（createApp 工厂）与 V2 React 前端封装进 Electron 壳：数据目录适配（userData + 首启种子复制，改造 resolveRootDir）、密钥管理改 safeStorage、数据库选型（内嵌 PG / 换 SQLite / Harness 域降级）、打包签名与自动更新；支持“单机离线”与“连接远程服务器”两种形态</td>
-              <td>去重结果：未命中（全仓库无 Electron、桌面端或 Tauri 记录）。可行性结论：技术上完全可行（依赖全纯 JS、无原生模块、无需重编译）；两大障碍为 PG 依赖与 cwd 路径模型；MVP 约 2–3 周、全功能版约 4–6 周；安装包每平台 90–120MB、运行内存 300–500MB；长期成本含 Apple Developer ID、Windows 签名证书与自动更新托管。Tauri 需 Rust 重写后端不可行</td>
-              <td>待用户决策两项后再立项排期：① 产品定位（单机离线工具 vs 连接远程服务器的客户端；team/collab 协作特性在单机形态下失效）；② 数据库选型（建议先用降级版验证桌面端产品价值，再决定是否投入内嵌 PG）。不排期不进 Sprint。</td>
+              <td>待规划 / 决策已收到</td>
+              <td><span class="status run"><span class="dot"></span>已分析 / 待细化设计</span></td>
+              <td>2026-08-06 用户拍板：桌面端定位为连接共享服务器的客户端，数据库留服务器端部署（应用/数据库分离），桌面不内嵌任何 DB。桌面范围收敛为客户端壳：服务器地址配置与连接管理、页面加载（A 直连服务器页面 vs B 打包前端 dist 两种加载方式待选）、连接状态提示、打包签名与自动更新</td>
+              <td>去重结果：未命中（全仓库无 Electron、桌面端或 Tauri 记录）。可行性结论：技术上完全可行（依赖全纯 JS、无原生模块、无需重编译）；决策后原两大障碍（PG 依赖、cwd 路径模型）同时消除；Tauri 需 Rust 重写后端不可行。决策后估算：方案 A（直连）约 1 周、方案 B（打包前端）约 2–3 周；安装包每平台 90–120MB、运行内存 300–500MB；长期成本含 Apple Developer ID、Windows 签名证书与自动更新托管</td>
+              <td>决策已收到：① 产品定位为连接共享服务器的客户端（非单机离线）；② 数据库留服务器端部署。剩余待细化设计后再立项排期：① 加载方式选型（A 直连服务器页面，推荐先行；B 打包前端）；② 前置缺口：服务器端需部署 V2 前端静态托管（当前 docker-compose 无 web 服务）。不排期不进 Sprint。</td>
             </tr>
             <tr>
               <td class="mono">RP-032</td>
@@ -3176,9 +3182,9 @@
         <div class="sec-head">
           <div class="num">RP-050 / Skill Routing Architecture</div>
           <h2>RP-050 · AI 工作台意图路由架构 Skill 层解耦</h2>
-          <p>来源 <code class="inline">ISS-2026-08-06-002</code>。将“确定性规则路由 + 模型二次分类 + 意图分派 handler”的五段式链路，改造为 skill manifest 驱动的级联匹配架构；与 RP-012（业务 Skill 能力层）、Phase 1H Capability Registry 预留、O4 handler 注册表、O10/RP-049 交叉引用。当前仅详细登记，待用户统一梳理规划。</p>
+          <p>来源 <code class="inline">ISS-2026-08-06-002</code>。将“确定性规则路由 + 模型二次分类 + 意图分派 handler”的五段式链路，改造为 skill manifest 驱动的级联匹配架构；与 RP-012（业务 Skill 能力层）、阶段 1H Capability Registry 预留、O4 handler 注册表、O10/RP-049 交叉引用。当前仅详细登记，待用户统一梳理规划。</p>
         </div>
-        <div class="callout ok" style="margin-bottom:14px"><div><b>可行性结论</b>方向可行：与 Phase 1G 预留的 Capability Registry（intent/requiredCapabilities/allowedTools/confirmPolicy）及业界 semantic-kernel plugin+filter、Rasa CALM flows 模式同向；O4 已交付的 WORKBENCH_HANDLERS 注册表即执行引擎底座。但必须修正为级联形态：不可全盘交给 LLM 自由裁量，否则会在更大范围重演 RP-049“分类替换过激”故障，并威胁“文件是上下文、意图才触发工作流”硬口径。</div></div>
+        <div class="callout ok" style="margin-bottom:14px"><div><b>可行性结论</b>方向可行：与 阶段 1G 预留的 Capability Registry（intent/requiredCapabilities/allowedTools/confirmPolicy）及业界 semantic-kernel plugin+filter、Rasa CALM flows 模式同向；O4 已交付的 WORKBENCH_HANDLERS 注册表即执行引擎底座。但必须修正为级联形态：不可全盘交给 LLM 自由裁量，否则会在更大范围重演 RP-049“分类替换过激”故障，并威胁“文件是上下文、意图才触发工作流”硬口径。</div></div>
         <div class="grid-2">
           <div class="callout"><div><b>用户原始想法</b>① 系统提示词只留核心边界（不回答无关内容）；② 各类意图统一经 skill 层处理；③ 预置多套业务场景 skill；④ 后端按 skill 规范执行并提供工具；⑤ 用 skill 完成业务过程，而非复杂意图分类与路由逻辑。</div></div>
           <div class="callout"><div><b>对三层叠加缺陷的解法</b>规则硬编码覆盖窄→触发知识入 manifest（keywords+示例话术，可升级 embedding 匹配），加场景=加清单不发版；分类采纳过激→LLM 只能在已注册 skillId 枚举+none 中选择，置信度门控+默认 skill 兜底；静态模板不感知→响应策略入 manifest，model_assisted+场景 facts 泛化，静态仅限问候额度保护。</div></div>
@@ -3194,10 +3200,10 @@
           <tr><td>Trace/Eval 扩展</td><td>intent span 增 skill.id/match.layer/accepted 属性；manifest examples 即回归集种子（与 O6 协同）</td><td>data/traces 与 test:ai 回归集</td></tr>
         </table>
         <div class="grid-2" style="margin-top:14px">
-          <div class="callout"><div><b>迁移路径（渐进、不推翻重来）</b>P0 现状（O4 执行引擎已就绪，先完成 O10 Batch B/C，同文件既定顺序）；P1 清单化（manifest schema + 10+1 场景 1:1 包装，routeWorkbenchIntent 改为消费 manifest，行为零变更，O4 快照测试全绿）；P2 LLM 选择层（feature flag 下替换 classifyIntentWithModel，trace A/B 对比采纳率/误判）；P3 场景驱动（新场景只加 manifest+handler，company-profile 为试点，对接 Phase 1H 设计器）。</div></div>
+          <div class="callout"><div><b>迁移路径（渐进、不推翻重来）</b>P0 现状（O4 执行引擎已就绪，先完成 O10 Batch B/C，同文件既定顺序）；P1 清单化（manifest schema + 10+1 场景 1:1 包装，routeWorkbenchIntent 改为消费 manifest，行为零变更，O4 快照测试全绿）；P2 LLM 选择层（feature flag 下替换 classifyIntentWithModel，trace A/B 对比采纳率/误判）；P3 场景驱动（新场景只加 manifest+handler，company-profile 为试点，对接 阶段 1H 设计器）。</div></div>
           <div class="callout err"><div><b>风险与应对</b>LLM 误选→枚举+none+门控+默认 skill+回归集；每轮模型调用增量→级联让 L0/L1 吃高确定流量、问候静态保留、trace 监控 L2 占比；双源漂移→manifest 单一事实源+启动校验；与在途 O10/O4 冲突→严格排序 O10 B/C→P1→P2；过度抽象→P1 先交付规则配置化独立价值，L2/embedding 按 trace 数据决策；命名混淆→命名 workbench skills、路径 config/workbench-skills。</div></div>
         </div>
-        <div class="callout warn" style="margin-top:14px"><div><b>当前状态</b>已分析 / 待统一规划。用户明确“先详细登记，后续统一梳理规划”：本项不排期、不进 Sprint、不标实施中。待统一梳理时需对齐：① RP-012 manifest schema 统一设计（避免业务 Skill 与路由 Skill 两套）；② Phase 1H Capability Registry 预留方向（RP-001）；③ O10 Batch B/C 交付后的基线；④ O9 facade 迁移完成后 skill 引擎归位 modules/ai。验收口径（未来实现后）：现有 10+1 场景行为快照零回归；硬口径四处防护（isExplicitReportRequest、附件路由、报告/v2 路径、写确认）不变；新场景接入无需修改路由代码；trace 可输出各匹配层流量与误判分布。</div></div>
+        <div class="callout warn" style="margin-top:14px"><div><b>当前状态</b>已分析 / 待统一规划。用户明确“先详细登记，后续统一梳理规划”：本项不排期、不进 Sprint、不标实施中。待统一梳理时需对齐：① RP-012 manifest schema 统一设计（避免业务 Skill 与路由 Skill 两套）；② 阶段 1H Capability Registry 预留方向（RP-001）；③ O10 Batch B/C 交付后的基线；④ O9 facade 迁移完成后 skill 引擎归位 modules/ai。验收口径（未来实现后）：现有 10+1 场景行为快照零回归；硬口径四处防护（isExplicitReportRequest、附件路由、报告/v2 路径、写确认）不变；新场景接入无需修改路由代码；trace 可输出各匹配层流量与误判分布。</div></div>
       </div>
     </section>
 
@@ -3207,8 +3213,9 @@
         <div class="sec-head">
           <div class="num">RP-051 / Electron Desktop Feasibility</div>
           <h2>RP-051 · Electron 桌面端可行性验证</h2>
-          <p>来源 <code class="inline">ISS-2026-08-06-004</code>。用户大方向思考：WES 是否构建 Electron 桌面端。本会话基于当前代码基线（apps/api 依赖清单、ui/V2_PROTOTYPE 前端形态、文件路径模型、docker-compose 数据库依赖）完成多维可行性分析。当前仅详细登记，待用户决策，不排期。</p>
+          <p>来源 <code class="inline">ISS-2026-08-06-004</code>。用户大方向思考：WES 是否构建 Electron 桌面端。本会话基于当前代码基线（apps/api 依赖清单、ui/V2_PROTOTYPE 前端形态、文件路径模型、docker-compose 数据库依赖）完成多维可行性分析。2026-08-06 用户拍板定位决策（连接共享服务器的客户端、数据库留服务器端），剩余待细化设计，不排期。</p>
         </div>
+        <div class="callout ok" style="margin-bottom:14px"><div><b>决策更新（2026-08-06）</b>用户拍板两项决策：① 产品定位为<b>连接共享服务器的客户端</b>，不做单机离线；② 数据库留在服务器端部署（应用与数据库分离），桌面端<b>不内嵌任何数据库</b>。直接影响：PG 依赖与 cwd 路径模型两大障碍同时消除（业务数据与 config/* 全部留在服务器端，userData 适配与内嵌 PG/SQLite 选型均不再需要），桌面范围收敛为客户端壳，工作量大幅下降（加载方式 A 约 1 周、B 约 2–3 周）。剩余待细化设计：加载方式选型（A 直接 loadURL 加载服务器页面，前端零改动、随服务器发版，推荐先行；B 打包前端 dist 随应用分发，需 API base 可配置与服务器 CORS 支持，存在前端/服务端版本漂移风险）；前置缺口：<b>服务器端当前无 V2 前端静态托管</b>（docker-compose 的 web 服务已下线），连服务器形态需先部署 nginx 或 Express 静态托管。</div></div>
         <div class="callout ok" style="margin-bottom:14px"><div><b>可行性结论</b>技术上完全可行且兼容性高：当前系统是“React SPA + Node/Express 后端 + 纯 JS 依赖”组合，属 Electron 封装教科书场景，几乎不需重写业务代码；全部依赖（express/pg/exceljs/pdfkit/bcryptjs/jszip/multer/drizzle）均为纯 JS 无原生模块，跨平台打包无需重编译。真正障碍在两点：PostgreSQL 依赖（Harness 域）与文件路径模型（resolveRootDir 依赖 process.cwd()）。此外打包签名、自动更新、三平台回归测试是长期运营成本，比一次性开发更重。</div></div>
         <div class="grid-2">
           <div class="callout"><div><b>高度契合点</b>前端 ui/V2_PROTOTYPE（Vite 5 + React 18.3）纯 SPA、API 走相对路径 /api/v1，可零改动载入 Electron 渲染进程；后端 createApp() 工厂模式，可在 Electron 主进程或 fork 子进程启动；SSE 流式在同进程通信下完全兼容；JWT 鉴权可原样保留（成本几乎为零），也天然支持桌面壳连接远程服务器的第二形态。</div></div>
@@ -3219,13 +3226,13 @@
           <tr><td>A. 内嵌 PostgreSQL</td><td>embedded-postgres 类方案随包分发 PG 二进制，首启初始化</td><td>功能 100% 保留、后端零改动；包体 +50–100MB、三平台二进制维护成本高、偶发安装目录权限问题</td></tr>
           <tr><td>B. 桌面版换 SQLite</td><td>Harness 域用 better-sqlite3 + drizzle 适配</td><td>纯文件、零运维、包体小；需方言适配与回归测试，与 AGENTS.md“PG 迁移触发器”口径冲突，需先更新项目计划</td></tr>
           <tr><td>C. 桌面版功能降级</td><td>桌面版只跑 JSON 域，Harness 功能仅服务器版可用</td><td>最快落地（2–3 周）；功能分叉，长期需维护两套能力边界</td></tr>
-          <tr><td>D. 瘦客户端壳</td><td>桌面壳只连远程服务器（现有 Docker 部署）</td><td>几天可完成、零架构风险；不解决离线/本地数据诉求，桌面端价值大打折扣</td></tr>
+          <tr><td>D. 瘦客户端壳</td><td>桌面壳只连远程服务器（现有 Docker 部署）</td><td><b>2026-08-06 决策选定方向</b>：桌面端定位为连接共享服务器的客户端，明确不做离线；数据库随服务器部署，方案 A/B/C 均不再需要</td></tr>
         </table>
         <div class="grid-2" style="margin-top:14px">
           <div class="callout"><div><b>资源要求</b>开发投入（1 名熟悉本项目的全栈工程师）：MVP 壳 + 路径改造 + 密钥管理 + 打包约 2–3 周；全功能版（含数据库方案与自动更新）约 4–6 周。产物：安装包每平台 90–120MB（内嵌 PG 再加 50–100MB）；运行内存 300–500MB。持续成本：Apple Developer ID（$99/年，macOS 公证必需）、Windows 代码签名证书（约 $100–400/年）、自动更新文件托管、三平台回归测试。</div></div>
-          <div class="callout err"><div><b>风险与未决项</b>① 产品定位先于技术：team/collab 协作特性在单机桌面版天然失效，需先回答桌面版是“单人顾问离线工具”还是“连接共享服务器的客户端”；② 多用户数据模型在单机下冗余但无害；③ 签名/公证/自动更新是持续性运营负担，需持续维护人力预算；④ Tauri 包体更小但需以 Rust 重写 Node/Express 后端，不可行，Electron 是唯一现实桌面路线。建议路径：先以 C（降级版）或 D（瘦客户端）验证桌面端产品价值，再决定是否投入 A（内嵌 PG）。</div></div>
+          <div class="callout warn"><div><b>剩余未决项与风险</b>① 加载方式选型：A 直连服务器页面（推荐先行，前端零改动、随服务器发版）vs B 打包前端 dist（需 API base 可配置 + 服务器 CORS 支持，存在前端/服务端版本漂移风险）；② 前置缺口：服务器端无 V2 前端静态托管（docker-compose web 服务已下线），需先部署 nginx 或等效托管；③ 签名/公证/自动更新是持续性运营负担，需持续维护人力预算；④ 桌面壳长连接（SSE）需处理服务器超时与断线重连提示；⑤ Tauri 需以 Rust 重写 Node/Express 后端，不可行，Electron 是唯一现实桌面路线。</div></div>
         </div>
-        <div class="callout warn" style="margin-top:14px"><div><b>当前状态</b>已分析 / 待决策。用户仅要求将想法与分析记录到看板：本项不排期、不进 Sprint、不标实施中。立项前需两项决策：① 产品定位（单机离线 vs 服务器连接）；② 数据库选型。验收口径（未来实现后）：桌面端可离线完整启动后端与前端；JSON 域数据写入 userData 且应用升级不丢失；密钥经 OS 钥匙串管理；所选数据库方案通过 Harness/模块回归。</div></div>
+        <div class="callout warn" style="margin-top:14px"><div><b>当前状态</b>决策已收到 / 待细化设计。用户 2026-08-06 拍板：连接共享服务器的客户端、数据库留服务器端。本项仍不排期、不进 Sprint、不标实施中；待加载方式选型与服务器端静态托管方案细化后再立项。验收口径（未来实现后）：桌面端可配置并连接指定服务器地址，完成登录与完整使用链路；服务器不可达时有明确引导提示；支持切换服务器地址（多环境）；自动更新通道可用。</div></div>
       </div>
     </section>
 
@@ -3479,6 +3486,8 @@
     filterReset.addEventListener('click', resetFilters);
   })();
   </script>
-  <script src="assets/board-ui.js" defer></script>
+  <script src="assets/board-ui.js?v=20260808" defer></script>
+  <script src="assets/vendor/list.min.js?v=20260808" defer></script>
+  <script src="assets/board-table.js?v=20260808" defer></script>
 </body>
 </html>

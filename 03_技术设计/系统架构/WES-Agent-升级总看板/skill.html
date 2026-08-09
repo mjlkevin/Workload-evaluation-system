@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Skill 体系 · WES 项目管理</title>
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
+  <style>
+    /* ── 架构图嵌入：SVG 原样保留，外层仅做响应式适配 ── */
+    .skill-diagram {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .skill-diagram svg { display: block; width: 100%; height: auto; }
+
+    /* ── 图例色点（与 SVG 节点色系一致）── */
+    .lg { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 2px; }
+    .lg-core { background: #9dd4c7; }
+    .lg-gov { background: #a8c5e6; }
+    .lg-quality { background: #f4e4c1; box-shadow: inset 0 0 0 1px #e8dcb8; }
+    .lg-frontend { background: #e8e6e3; }
+    .lg-external { background: #fff; box-shadow: inset 0 0 0 1.5px #b9b3a9; }
+
+    /* ── Skill 工作区：清单 + 详情 ── */
+    .skill-workspace {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 18px;
+      align-items: start;
+    }
+    .skill-side { display: flex; flex-direction: column; gap: 18px; }
+    #skill-list { display: flex; flex-direction: column; gap: 10px; }
+    .skill-item {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+    .skill-item:hover { border-color: var(--line-2); box-shadow: var(--shadow-1); }
+    .skill-item.active {
+      border-color: color-mix(in oklab, var(--brand) 40%, var(--line));
+      background: var(--brand-soft);
+    }
+    .skill-item .skill-name {
+      margin-bottom: 3px;
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+    .skill-item .skill-desc { margin-bottom: 8px; color: var(--ink-2); font-size: 12.5px; }
+    .skill-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .skill-tag {
+      display: inline-block;
+      padding: 1px 8px;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .tag-core { color: oklch(0.42 0.09 195); background: var(--teal-soft); border-color: color-mix(in oklab, var(--teal) 35%, var(--line)); }
+    .tag-governance { color: var(--brand-ink); background: var(--brand-soft); border-color: color-mix(in oklab, var(--brand) 35%, var(--line)); }
+    .tag-security { color: var(--err); background: var(--err-soft); border-color: color-mix(in oklab, var(--err) 35%, var(--line)); }
+    .tag-quality { color: oklch(0.5 0.16 65); background: var(--warn-soft); border-color: color-mix(in oklab, var(--warn) 45%, var(--line)); }
+    .tag-frontend { color: oklch(0.4 0.13 152); background: var(--ok-soft); border-color: color-mix(in oklab, var(--ok) 35%, var(--line)); }
+    .tag-external { color: var(--ink-3); background: var(--bg-soft); border-color: var(--line-2); }
+
+    /* ── 详情面板 ── */
+    .detail-content { color: var(--ink-2); font-size: 13px; }
+    .detail-content h4 { margin: 14px 0 6px; color: var(--ink); font-size: 13px; }
+    .detail-content h4:first-child {
+      margin-top: 0;
+      color: var(--brand-ink);
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+    }
+    .detail-content p { margin: 0 0 8px; line-height: 1.7; }
+    .detail-content ul { margin: 4px 0 10px; padding-left: 18px; }
+    .detail-content li { margin-bottom: 3px; }
+    .detail-content .highlight {
+      padding: 1px 5px;
+      border-radius: 4px;
+      color: var(--brand-ink);
+      background: var(--brand-soft);
+      font-weight: 600;
+    }
+
+    /* ── Agent 状态 ── */
+    .agent-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    @media (max-width: 1040px) {
+      .skill-workspace { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topnav">
+    <div class="topnav-in">
+      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
+      <nav class="navlinks" aria-label="主导航">
+        <a href="index.html">总览</a>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">计划与设计<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="roadmap.html">路标管理</a>
+          <a href="design.html">设计说明</a>
+          <a href="design-architecture.html">架构设计</a>
+          <a href="plan.html">计划与进度</a>
+          <a href="requirements.html">需求池</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">质量与监控<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="testing.html">测试与验收</a>
+          <a href="monitoring.html">监控与审计</a>
+          <a href="risks.html">风险与决策</a>
+          <a href="changes.html">变更记录</a>
+          <a href="issues.html">问题池</a>
+          <a href="defects.html">缺陷池</a>
+          <a href="ops-health.html">运维看板</a>
+          <a href="code-audit.html">代码审计</a>
+          </div>
+        </div>
+        <div class="nav-group has-active">
+          <button type="button" class="nav-group-btn" aria-expanded="false">AI 与协作<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="runtime.html">AI 任务执行</a>
+          <a href="collaboration-protocol.html">多 AI 协作</a>
+          <a href="branches.html">开发分支</a>
+          <a class="active" href="skill.html">Skill 体系</a>
+          </div>
+        </div>
+        <div class="nav-group">
+          <button type="button" class="nav-group-btn" aria-expanded="false">资料资产<span class="caret" aria-hidden="true"></span></button>
+          <div class="nav-drop">
+          <a href="sources.html">信息来源</a>
+          <a href="github-radar.html">开源工具雷达</a>
+          </div>
+        </div>
+      </nav>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
+      <span class="pill brand">AI 协作与 Skill 治理</span>
+    </div>
+  </header>
+
+  <header class="doc-h">
+    <div class="doc-wrap">
+      <div class="crumb">WES Agent · Skill 集成关系</div>
+      <h1>Skill 体系</h1>
+      <p class="meta">
+        <span><b>图表版本</b> v2.0 · 正交路由</span>
+        <span><b>风格基线</b> Claude 官方风格</span>
+        <span><b>生成工具</b> fireworks-tech-graph v1.2.0</span>
+        <span><b>更新</b> 2026-08-07</span>
+      </p>
+      <div class="pill-row" style="margin-top:18px">
+        <span class="pill"><i class="lg lg-core"></i>核心协作 (3)</span>
+        <span class="pill"><i class="lg lg-gov"></i>治理看板 (2)</span>
+        <span class="pill"><i class="lg lg-quality"></i>质量保障 (3)</span>
+        <span class="pill"><i class="lg lg-frontend"></i>前端专用 (1)</span>
+        <span class="pill"><i class="lg lg-external"></i>外部插件 (1)</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="doc-wrap">
+    <div class="toc">
+      <h5>导航</h5>
+      <ol>
+        <li><b>§1</b> 集成关系架构图</li>
+        <li><b>§2</b> Skill 清单与详情</li>
+        <li><b>§3</b> 层级说明与治理边界</li>
+      </ol>
+    </div>
+
+    <section>
+      <div class="h-num">Section 01</div>
+      <h2>集成关系架构图</h2>
+      <p class="lead">WES Skill 体系以 wes-multi-agent-collaboration 为核心枢纽，串联核心协作、治理看板、质量保障、前端专用四层共 10 个 Skill 与 1 个外部插件。点击图中任意节点，可在下方 Skill 详情面板联动查看其职责与触发条件。</p>
+      <div class="panel">
+        <div class="panel-h">Skill 集成关系架构图<span class="right">v2.0 · 正交路由 · 点击节点联动</span></div>
+        <div class="panel-b">
+          <div class="skill-diagram">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1000" width="1280" height="1000" id="architecture-svg">
+                    <defs>
+                      <!-- Arrow Marker -->
+                      <marker id="arrow-claude" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                        <polygon points="0 0, 8 4, 0 8" fill="#5a5a5a"/>
+                      </marker>
+            
+                      <!-- Soft Shadow -->
+                      <filter id="shadow-soft" x="-10%" y="-10%" width="120%" height="130%">
+                        <feDropShadow dx="0" dy="3" stdDeviation="8" flood-color="#000000" flood-opacity="0.06"/>
+                      </filter>
+            
+                      <!-- Glow for active -->
+                      <filter id="glow-claude" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="4" result="blur"/>
+                        <feMerge>
+                          <feMergeNode in="blur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
+            
+                    <!-- Warm Cream Background -->
+                    <rect width="1280" height="1000" fill="#f8f6f3"/>
+            
+                    <!-- Title -->
+                    <text x="640" y="45" text-anchor="middle" fill="#1a1a1a" font-size="24" font-weight="700"
+                          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+                      WES 系统 Skill 集成关系架构图
+                    </text>
+                    <text x="640" y="70" text-anchor="middle" fill="#6a6a6a" font-size="13"
+                          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+                      Skill Integration Architecture  v2.0  |  Claude 官方风格 · 正交路由
+                    </text>
+            
+                    <!-- ===== AGENTS ROW (Top) ===== -->
+                    <g id="agents">
+                      <text x="60" y="127" fill="#6a6a6a" font-size="14" font-weight="600"
+                            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">Agents</text>
+            
+                      <!-- Codex -->
+                      <g transform="translate(170, 100)">
+                        <rect width="110" height="44" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="55" y="28" text-anchor="middle" fill="#1a1a1a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">Codex</text>
+                      </g>
+            
+                      <!-- Qoder -->
+                      <g transform="translate(330, 100)">
+                        <rect width="110" height="44" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="55" y="28" text-anchor="middle" fill="#1a1a1a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">Qoder</text>
+                      </g>
+            
+                      <!-- KIMICODE -->
+                      <g transform="translate(490, 100)">
+                        <rect width="120" height="44" rx="12" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="60" y="28" text-anchor="middle" fill="#1a1a1a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">KIMICODE</text>
+                      </g>
+            
+                      <!-- Claude Code -->
+                      <g transform="translate(660, 100)">
+                        <rect width="130" height="44" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2" stroke-dasharray="6,3" filter="url(#shadow-soft)"/>
+                        <text x="65" y="28" text-anchor="middle" fill="#6a6a6a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">Claude Code</text>
+                      </g>
+            
+                      <!-- User Owner -->
+                      <g transform="translate(840, 100)">
+                        <rect width="130" height="44" rx="12" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="65" y="28" text-anchor="middle" fill="#1a1a1a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">User Owner</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== LAYER 1: 核心协作层 ===== -->
+                    <g id="layer-core">
+                      <text x="60" y="232" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">Layer 1 · 核心协作</text>
+            
+                      <!-- Core Hub: wes-multi-agent-collaboration -->
+                      <g transform="translate(400, 190)" class="skill-node" data-skill="wes-multi-agent-collaboration">
+                        <rect width="480" height="85" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2.5" filter="url(#shadow-soft)"/>
+                        <text x="240" y="32" text-anchor="middle" fill="#1a1a1a" font-size="17" font-weight="700"
+                              font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">wes-multi-agent-collaboration</text>
+                        <text x="240" y="55" text-anchor="middle" fill="#4a4a4a" font-size="13"
+                              font-family="-apple-system, sans-serif">多 Agent 协作协议  任务分配  NightOps 3AI 循环（Loop）</text>
+                        <text x="240" y="74" text-anchor="middle" fill="#2a8a6a" font-size="12" font-weight="600"
+                              font-family="-apple-system, sans-serif">核心枢纽</text>
+                      </g>
+            
+                      <!-- wes-qoder-worktree-protocol -->
+                      <g transform="translate(180, 330)" class="skill-node" data-skill="wes-qoder-worktree-protocol">
+                        <rect width="300" height="75" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="150" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">wes-qoder-worktree-protocol</text>
+                        <text x="150" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">Worktree 隔离  结构化 Handoff</text>
+                        <text x="150" y="68" text-anchor="middle" fill="#6a6a6a" font-size="11"
+                              font-family="-apple-system, sans-serif">ACK  验证矩阵  不可协商铁律</text>
+                      </g>
+            
+                      <!-- speak-plainly -->
+                      <g transform="translate(800, 330)" class="skill-node" data-skill="speak-plainly">
+                        <rect width="220" height="75" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="110" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, sans-serif">speak-plainly</text>
+                        <text x="110" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">任务沟通  结果汇报</text>
+                        <text x="110" y="68" text-anchor="middle" fill="#6a6a6a" font-size="11"
+                              font-family="-apple-system, sans-serif">Outcome  Impact  Status</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== LAYER 2: 治理看板层 ===== -->
+                    <g id="layer-governance">
+                      <text x="140" y="418" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">Layer 2 · 治理看板</text>
+            
+                      <!-- maintain-wes-command-board -->
+                      <g transform="translate(140, 460)" class="skill-node" data-skill="maintain-wes-command-board">
+                        <rect width="280" height="75" rx="12" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">maintain-wes-command-board</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">总看板同步  过程数据沉淀</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#6a6a6a" font-size="11"
+                              font-family="-apple-system, sans-serif">index  requirements  plan  risks</text>
+                      </g>
+            
+                      <!-- recording-wes-requirements -->
+                      <g transform="translate(140, 575)" class="skill-node" data-skill="recording-wes-requirements">
+                        <rect width="280" height="75" rx="12" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">recording-wes-requirements</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">反馈分诊  需求入池  Issue 治理</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#6a6a6a" font-size="11"
+                              font-family="-apple-system, sans-serif">去重  分类  关联 RP/defect</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== LAYER 3: 质量保障层 ===== -->
+                    <g id="layer-quality">
+                      <text x="860" y="418" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">Layer 3 · 质量保障</text>
+            
+                      <!-- wes-security-review -->
+                      <g transform="translate(860, 460)" class="skill-node" data-skill="wes-security-review">
+                        <rect width="280" height="75" rx="12" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">wes-security-review</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">安全审查  JWT/Auth 审计  漏洞扫描</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a6a3a" font-size="11"
+                              font-family="-apple-system, sans-serif">六步审计流程  CRITICAL/HIGH/MEDIUM</text>
+                      </g>
+            
+                      <!-- wes-code-review -->
+                      <g transform="translate(860, 575)" class="skill-node" data-skill="wes-code-review">
+                        <rect width="280" height="75" rx="12" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">wes-code-review</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">五轴代码审查  质量门禁</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a6a3a" font-size="11"
+                              font-family="-apple-system, sans-serif">Correctness  Readability  Architecture</text>
+                      </g>
+            
+                      <!-- wes-tdd -->
+                      <g transform="translate(860, 690)" class="skill-node" data-skill="wes-tdd">
+                        <rect width="280" height="75" rx="12" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, sans-serif">wes-tdd</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">RED-GREEN-REFACTOR  测试驱动开发</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a6a3a" font-size="11"
+                              font-family="-apple-system, sans-serif">test:modules  test:integration  test:ai</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== LAYER 4: 前端专用层 ===== -->
+                    <g id="layer-frontend">
+                      <text x="140" y="678" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">Layer 4 · 前端专用</text>
+            
+                      <g transform="translate(140, 690)" class="skill-node" data-skill="improving-wes-ui">
+                        <rect width="280" height="75" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2" stroke-dasharray="6,3" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">improving-wes-ui</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">UI 审计  组件优化  V2_PROTOTYPE</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a8a8a" font-size="11"
+                              font-family="-apple-system, sans-serif">单次一个表面  最多三个根问题</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== EXTERNAL: 外部插件 ===== -->
+                    <g id="layer-external">
+                      <text x="500" y="797" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">External · 外部插件</text>
+            
+                      <g transform="translate(500, 805)" class="skill-node" data-skill="fireworks-tech-graph">
+                        <rect width="280" height="75" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2.5" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">fireworks-tech-graph</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">技术图表生成  SVG/PNG/GIF</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a8a8a" font-size="11"
+                              font-family="-apple-system, sans-serif">v1.2.0  MIT  yizhiyanhua-ai</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== CONNECTIONS (orthogonal routing, no crossings) ===== -->
+                    <g id="connections" fill="none" stroke="#5a5a5a">
+                      <!-- Agents to Core Hub: elbow fan-in, layered horizontal channels -->
+                      <path d="M225,144 V176 H520 V190" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M385,144 V168 H580 V190" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M550,144 V160 H640 V190" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+                      <path d="M725,144 V158 H700 V190" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+                      <path d="M905,144 V176 H760 V190" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Core internal -->
+                      <path d="M480,275 L330,330" stroke-width="2" marker-end="url(#arrow-claude)"/>
+                      <path d="M800,275 L910,330" stroke-width="2" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Core to Governance (left column, routed outside nodes) -->
+                      <path d="M540,275 V442 H280 V460" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M520,275 V430 H100 V612 H140" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Core to Frontend (center channel, enters right edge) -->
+                      <path d="M560,275 V727 H420" stroke-width="1" stroke-dasharray="4,3" opacity="0.6" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Core to Quality (right column, routed outside nodes) -->
+                      <path d="M760,275 V430 H1000 V460" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M740,275 V612 H860" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M720,275 V727 H860" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Vertical chain links -->
+                      <path d="M1000,535 V575" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M1000,650 V690" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M280,535 V575" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                    </g>
+            
+                    <!-- Edge labels with cream halo (paint-order stroke) -->
+                    <g id="edge-labels" fill="#6a6a6a" font-size="11" font-family="-apple-system, sans-serif"
+                       stroke="#f8f6f3" stroke-width="4" paint-order="stroke">
+                      <text x="300" y="171" text-anchor="middle">assign</text>
+                      <text x="482" y="163" text-anchor="middle">execute</text>
+                      <text x="595" y="155" text-anchor="middle">audit</text>
+                      <text x="832" y="171" text-anchor="middle">accept</text>
+                      <text x="405" y="297" text-anchor="middle">worktree</text>
+                      <text x="855" y="297" text-anchor="middle">report</text>
+                      <text x="400" y="456" text-anchor="middle">sync</text>
+                      <text x="300" y="425" text-anchor="middle">intake</text>
+                      <text x="572" y="600">ui scope</text>
+                      <text x="880" y="444" text-anchor="middle">audit</text>
+                      <text x="752" y="500">review</text>
+                      <text x="732" y="640">test</text>
+                      <text x="1012" y="559">security gate</text>
+                    </g>
+            
+                    <!-- ===== LEGEND ===== -->
+                    <g id="legend" transform="translate(80, 910)">
+                      <rect width="540" height="65" rx="12" fill="#ffffff" stroke="#4a4a4a" stroke-width="1.5" filter="url(#shadow-soft)"/>
+                      <text x="15" y="22" fill="#1a1a1a" font-size="13" font-weight="700" font-family="-apple-system, sans-serif">Legend</text>
+            
+                      <rect x="80" y="10" width="18" height="14" rx="4" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="1.5"/>
+                      <text x="105" y="22" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">核心协作</text>
+            
+                      <rect x="175" y="10" width="18" height="14" rx="4" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="1.5"/>
+                      <text x="200" y="22" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">治理看板</text>
+            
+                      <rect x="270" y="10" width="18" height="14" rx="4" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="1.5"/>
+                      <text x="295" y="22" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">质量保障</text>
+            
+                      <rect x="365" y="10" width="18" height="14" rx="4" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="1.5" stroke-dasharray="3,2"/>
+                      <text x="390" y="22" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">前端/外部</text>
+            
+                      <line x1="15" y1="42" x2="45" y2="42" stroke="#5a5a5a" stroke-width="2" marker-end="url(#arrow-claude)"/>
+                      <text x="52" y="46" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">Primary flow</text>
+            
+                      <line x1="140" y1="42" x2="170" y2="42" stroke="#5a5a5a" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+                      <text x="177" y="46" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">Trigger / Scope</text>
+            
+                      <line x1="285" y1="42" x2="315" y2="42" stroke="#5a5a5a" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrow-claude)"/>
+                      <text x="322" y="46" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">Cross-layer</text>
+                    </g>
+            
+                    <!-- ===== INFO BLOCK (Bottom Right) ===== -->
+                    <g id="info-block" transform="translate(1000, 910)">
+                      <rect width="200" height="65" rx="12" fill="#ffffff" stroke="#4a4a4a" stroke-width="1.5" filter="url(#shadow-soft)"/>
+                      <text x="100" y="22" text-anchor="middle" fill="#1a1a1a" font-size="11" font-weight="700" font-family="-apple-system, sans-serif">WES SKILL ARCHITECTURE</text>
+                      <text x="100" y="42" text-anchor="middle" fill="#6a6a6a" font-size="12" font-family="-apple-system, sans-serif">Style: Claude Official</text>
+                      <text x="100" y="58" text-anchor="middle" fill="#9a9a9a" font-size="10" font-family="-apple-system, sans-serif">v2.0  |  2026-08-07</text>
+                    </g>
+            
+                    <!-- Subtle border -->
+                    <rect x="10" y="10" width="1260" height="980" rx="16" fill="none" stroke="#d0cec9" stroke-width="1"/>
+                  </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 02</div>
+      <h2>Skill 清单与详情</h2>
+      <p class="lead">点击清单中的 Skill 或上方架构图节点，联动展示其职责、触发条件与协作关系。</p>
+      <div class="skill-workspace">
+        <div class="panel">
+          <div class="panel-h">Skill 清单 (10)<span class="right">10 skills · 可点击</span></div>
+          <div class="panel-b" id="skill-list">
+            <div class="skill-item active" data-skill="wes-multi-agent-collaboration">
+              <div class="skill-name">wes-multi-agent-collaboration</div>
+              <div class="skill-desc">多 Agent 协作协议 | 任务分配 | NightOps 3AI 循环</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-core">核心</span>
+                <span class="skill-tag tag-core">协作</span>
+              </div>
+            </div>
+            <div class="skill-item" data-skill="wes-qoder-worktree-protocol">
+              <div class="skill-name">wes-qoder-worktree-protocol</div>
+              <div class="skill-desc">Worktree 隔离 | 结构化 Handoff</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-core">核心</span>
+              </div>
+            </div>
+            <div class="skill-item" data-skill="speak-plainly">
+              <div class="skill-name">speak-plainly</div>
+              <div class="skill-desc">任务沟通 | 结果汇报 | 清晰表达</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-core">核心</span>
+              </div>
+            </div>
+            <div class="skill-item" data-skill="maintain-wes-command-board">
+              <div class="skill-name">maintain-wes-command-board</div>
+              <div class="skill-desc">总看板同步 | 过程数据沉淀</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-governance">治理</span>
+              </div>
+            </div>
+            <div class="skill-item" data-skill="recording-wes-requirements">
+              <div class="skill-name">recording-wes-requirements</div>
+              <div class="skill-desc">反馈分诊 | 需求入池 | Issue 治理</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-governance">治理</span>
+              </div>
+            </div>
+            <div class="skill-item" data-skill="wes-security-review">
+              <div class="skill-name">wes-security-review</div>
+              <div class="skill-desc">安全审查 | JWT/Auth 审计 | 漏洞扫描</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-security">安全</span>
+              </div>
+            </div>
+            <div class="skill-item" data-skill="wes-code-review">
+              <div class="skill-name">wes-code-review</div>
+              <div class="skill-desc">五轴代码审查 | 质量门禁</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-quality">质量</span>
+              </div>
+            </div>
+            <div class="skill-item" data-skill="wes-tdd">
+              <div class="skill-name">wes-tdd</div>
+              <div class="skill-desc">RED-GREEN-REFACTOR | 测试驱动开发</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-quality">质量</span>
+              </div>
+            </div>
+            <div class="skill-item" data-skill="improving-wes-ui">
+              <div class="skill-name">improving-wes-ui</div>
+              <div class="skill-desc">UI 审计 | 组件优化 | V2_PROTOTYPE</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-frontend">前端</span>
+              </div>
+            </div>
+            <div class="skill-item" data-skill="fireworks-tech-graph">
+              <div class="skill-name">fireworks-tech-graph</div>
+              <div class="skill-desc">技术图表生成 | SVG/PNG/GIF</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-external">外部</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="skill-side">
+          <div class="panel">
+            <div class="panel-h">Skill 详情<span class="right">detail</span></div>
+            <div class="panel-b">
+              <div id="skill-detail" class="detail-content">
+                <h4>wes-multi-agent-collaboration</h4>
+                <p>多 Agent 协作协议是 WES 系统的<span class="highlight">核心枢纽 Skill</span>，负责协调 Codex、Qoder、KIMICODE 等多个 AI Agent 之间的工作分配与协作。</p>
+
+                <h4>核心职责</h4>
+                <ul>
+                  <li>任务分类与 Agent 分配</li>
+                  <li>NightOps 3AI 循环 协作流程</li>
+                  <li>结构化 Handoff 与验收</li>
+                  <li>Agent 注册表管理</li>
+                </ul>
+
+                <h4>触发条件</h4>
+                <ul>
+                  <li>跨 Agent 任务协调</li>
+                  <li>NightOps 无人值守执行</li>
+                  <li>外部 AI Handoff 审查</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h">Agent 状态<span class="right">agents</span></div>
+            <div class="panel-b">
+              <div class="agent-list">
+                <span class="status run"><span class="dot"></span>Codex · active</span>
+                <span class="status run"><span class="dot"></span>Qoder · active</span>
+                <span class="status warn"><span class="dot"></span>KIMICODE · candidate</span>
+                <span class="status todo"><span class="dot"></span>Claude Code · pending</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="h-num">Section 03</div>
+      <h2>层级说明与治理边界</h2>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">Layer 1</span><h3>核心协作层</h3><p>wes-multi-agent-collaboration、wes-qoder-worktree-protocol、speak-plainly：负责任务分配、Worktree 隔离执行与结构化验收，并统一任务沟通表达规范。</p></div>
+        <div class="card"><span class="pill brand">Layer 2</span><h3>治理看板层</h3><p>maintain-wes-command-board、recording-wes-requirements：关键过程事实沉淀到总看板，反馈先入问题池再分诊处置，避免重复建项。</p></div>
+        <div class="card"><span class="pill warn">Layer 3</span><h3>质量保障层</h3><p>wes-security-review、wes-code-review、wes-tdd：安全审查、五轴代码审查与测试驱动开发构成合并前的三道质量门禁。</p></div>
+        <div class="card"><span class="pill ok">Layer 4</span><h3>前端专用层</h3><p>improving-wes-ui：仅限 ui/V2_PROTOTYPE 主线，单次限定一个业务表面与最多三个已证实根问题，未经独立架构决策不引入新 UI 技术栈。</p></div>
+        <div class="card"><span class="pill">External</span><h3>外部插件</h3><p>fireworks-tech-graph：负责生成 SVG/HTML 技术图表等视觉资产，本页架构图即由其产出。</p></div>
+      </div>
+      <div class="callout"><div><b>治理边界</b>Skill 调用遵循 AGENTS.md 约束：治理类 Skill 是对应任务的强制前置，质量类 Skill 按门禁顺序串行执行，外部插件仅产出视觉资产、不参与业务决策。</div></div>
+    </section>
+
+    <footer class="footer">
+      <a href="index.html">返回总览</a> · Skill 体系 · WES 项目管理 · Generated by fireworks-tech-graph v1.2.0 · 2026-08-07
+    </footer>
+  </main>
+  <script src="assets/board-ui.js" defer></script>
+<script>
+    // Skill detail data
+    const skillDetails = {
+      'wes-multi-agent-collaboration': {
+        title: 'wes-multi-agent-collaboration',
+        content: `
+          <p>多 Agent 协作协议是 WES 系统的<span class="highlight">核心枢纽 Skill</span>，负责协调 Codex、Qoder、KIMICODE 等多个 AI Agent 之间的工作分配与协作。</p>
+          <h4>核心职责</h4>
+          <ul>
+            <li>任务分类与 Agent 分配</li>
+            <li>NightOps 3AI Loop 协作流程</li>
+            <li>结构化 Handoff 与验收</li>
+            <li>Agent 注册表管理</li>
+          </ul>
+          <h4>触发条件</h4>
+          <ul>
+            <li>跨 Agent 任务协调</li>
+            <li>NightOps 无人值守执行</li>
+            <li>外部 AI Handoff 审查</li>
+          </ul>
+        `
+      },
+      'wes-qoder-worktree-protocol': {
+        title: 'wes-qoder-worktree-protocol',
+        content: `
+          <p>Qoder Worktree 协议确保 Qoder 执行任务的<span class="highlight">隔离性、可审查性和可恢复性</span>。</p>
+          <h4>核心机制</h4>
+          <ul>
+            <li>强制启动流程（Worktree Contract ACK）</li>
+            <li>不可协商铁律（禁止直接编辑主分支）</li>
+            <li>结构化 Handoff 格式</li>
+            <li>验证矩阵与常见失败模式</li>
+          </ul>
+          <h4>约束</h4>
+          <ul>
+            <li>一个任务一个隔离 worktree</li>
+            <li>不得声明需求"已交付"</li>
+            <li>状态只能到"已回填 / 待 Codex 复核"</li>
+          </ul>
+        `
+      },
+      'speak-plainly': {
+        title: 'speak-plainly',
+        content: `
+          <p>面向非技术受众的<span class="highlight">任务沟通 Skill</span>，确保业务结果优先于技术细节。</p>
+          <h4>核心模式</h4>
+          <ul>
+            <li>Outcome（结果）→ Impact（影响）→ Status（状态）→ Evidence（证据）→ Next move（下一步）</li>
+          </ul>
+          <h4>使用场景</h4>
+          <ul>
+            <li>进度汇报</li>
+            <li>问题分析</li>
+            <li>风险说明</li>
+            <li>交付总结</li>
+          </ul>
+        `
+      },
+      'maintain-wes-command-board': {
+        title: 'maintain-wes-command-board',
+        content: `
+          <p>WES 总看板过程数据沉淀 Skill，确保<span class="highlight">关键过程事实不留在对话或临时文档中</span>。</p>
+          <h4>看板模块</h4>
+          <ul>
+            <li>index.html - 总览与 KPI</li>
+            <li>requirements.html - 需求池</li>
+            <li>plan.html - 计划与路线图</li>
+            <li>testing.html - 测试状态</li>
+            <li>monitoring.html - 监控快照</li>
+            <li>risks.html - 风险与控制</li>
+            <li>changes.html - 变更记录</li>
+            <li>sources.html - 文档资产</li>
+          </ul>
+        `
+      },
+      'recording-wes-requirements': {
+        title: 'recording-wes-requirements',
+        content: `
+          <p>反馈分诊记录 Skill，将用户反馈转化为<span class="highlight">受治理的问题记录</span>。</p>
+          <h4>核心规则</h4>
+          <ul>
+            <li>原始反馈统一先进入问题池</li>
+            <li>去重后再分类为 requirement/defect/question</li>
+            <li>信息不足时保持"待补充"</li>
+          </ul>
+          <h4>触发词</h4>
+          <ul>
+            <li>测试问题、需求、反馈、缺陷、bug、体验调整</li>
+          </ul>
+        `
+      },
+      'wes-security-review': {
+        title: 'wes-security-review',
+        content: `
+          <p>WES 专属<span class="highlight">安全审查 Skill</span>，覆盖六步安全审计流程。</p>
+          <h4>攻击面</h4>
+          <ul>
+            <li>JWT Auth（alg:none、弱密钥）</li>
+            <li>Excel 上传（路径遍历、恶意宏）</li>
+            <li>AI API（Prompt 注入、密钥泄露）</li>
+            <li>文件导出（SSRF、信息泄露）</li>
+            <li>版本控制（BOLA、未授权操作）</li>
+            <li>Harness PostgreSQL（SQL 注入）</li>
+          </ul>
+        `
+      },
+      'wes-code-review': {
+        title: 'wes-code-review',
+        content: `
+          <p>五轴代码审查 Skill，确保变更<span class="highlight">提升整体代码健康度</span>。</p>
+          <h4>五轴框架</h4>
+          <ul>
+            <li>Correctness（正确性）</li>
+            <li>Readability & Simplicity（可读性）</li>
+            <li>Architecture（架构）</li>
+            <li>Security（安全）</li>
+            <li>Performance（性能）</li>
+          </ul>
+          <h4>变更大小限制</h4>
+          <ul>
+            <li>~100 行：良好</li>
+            <li>~300 行：可接受</li>
+            <li>~1000 行：要求拆分</li>
+          </ul>
+        `
+      },
+      'wes-tdd': {
+        title: 'wes-tdd',
+        content: `
+          <p>测试驱动开发 Skill，强制执行<span class="highlight">RED-GREEN-REFACTOR</span>循环。</p>
+          <h4>测试命令</h4>
+          <ul>
+            <li>npm run test:modules（模块测试）</li>
+            <li>npm run test:integration（集成测试）</li>
+            <li>npm run test:ai（AI 服务测试）</li>
+            <li>npm run test:rules（规则引擎测试）</li>
+          </ul>
+          <h4>覆盖率目标</h4>
+          <ul>
+            <li>Usecase: 90%</li>
+            <li>Repository: 80%</li>
+            <li>Controller: 70%</li>
+          </ul>
+        `
+      },
+      'improving-wes-ui': {
+        title: 'improving-wes-ui',
+        content: `
+          <p>前端 UI 优化专用 Skill，<span class="highlight">仅作用于 ui/V2_PROTOTYPE</span>。</p>
+          <h4>约束</h4>
+          <ul>
+            <li>单次限定一个业务表面</li>
+            <li>最多三个已证实根问题</li>
+            <li>禁止引入新 UI 技术栈</li>
+            <li>Issue-first 治理</li>
+          </ul>
+          <h4>禁止项</h4>
+          <ul>
+            <li>Tailwind、Radix、Motion、Base UI</li>
+            <li>CSS-in-JS、MUI、Chakra、Ant Design</li>
+          </ul>
+        `
+      },
+      'fireworks-tech-graph': {
+        title: 'fireworks-tech-graph',
+        content: `
+          <p><span class="highlight">外部插件</span>，用于生成技术架构图、数据流图、时序图等。</p>
+          <h4>功能</h4>
+          <ul>
+            <li>12 种视觉风格</li>
+            <li>14 种图类型</li>
+            <li>输出 SVG、PNG、GIF 动效</li>
+            <li>离线交互 HTML</li>
+          </ul>
+          <h4>来源</h4>
+          <ul>
+            <li>GitHub: yizhiyanhua-ai/fireworks-tech-graph</li>
+            <li>版本: v1.2.0</li>
+            <li>许可证: MIT</li>
+          </ul>
+        `
+      }
+    };
+    
+    // Interactive handlers
+    const skillItems = document.querySelectorAll('.skill-item');
+    const skillNodes = document.querySelectorAll('.skill-node');
+    const detailPanel = document.getElementById('skill-detail');
+    
+    function selectSkill(skillName) {
+      // Update sidebar active state
+      skillItems.forEach(item => {
+        item.classList.toggle('active', item.dataset.skill === skillName);
+      });
+      
+      // Update SVG node highlight
+      skillNodes.forEach(node => {
+        const rect = node.querySelector('rect');
+        if (node.dataset.skill === skillName) {
+          rect.setAttribute('stroke-width', '3.5');
+          rect.setAttribute('filter', 'url(#glow-claude)');
+        } else {
+          rect.setAttribute('stroke-width', rect.getAttribute('stroke-width') > '2' ? '2.5' : '2');
+          rect.setAttribute('filter', 'url(#shadow-soft)');
+        }
+      });
+      
+      // Update detail panel
+      const detail = skillDetails[skillName];
+      if (detail) {
+        detailPanel.innerHTML = `<h4>${detail.title}</h4>${detail.content}`;
+      }
+    }
+    
+    // Sidebar click handlers
+    skillItems.forEach(item => {
+      item.addEventListener('click', () => {
+        selectSkill(item.dataset.skill);
+      });
+    });
+    
+    // SVG node click handlers
+    skillNodes.forEach(node => {
+      node.style.cursor = 'pointer';
+      node.addEventListener('click', () => {
+        selectSkill(node.dataset.skill);
+      });
+    });
+  </script>
+</body>
+</html>

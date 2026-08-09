@@ -26,6 +26,7 @@ const NAV_GROUPS = [
     items: [
       { label: '路标管理', href: 'roadmap.html' },
       { label: '设计说明', href: 'design.html' },
+      { label: '架构设计', href: 'design-architecture.html' },
       { label: '计划与进度', href: 'plan.html' },
       { label: '需求池', href: 'requirements.html' },
     ],
@@ -37,6 +38,10 @@ const NAV_GROUPS = [
       { label: '监控与审计', href: 'monitoring.html' },
       { label: '风险与决策', href: 'risks.html' },
       { label: '变更记录', href: 'changes.html' },
+      { label: '问题池', href: 'issues.html' },
+      { label: '缺陷池', href: 'defects.html' },
+      { label: '运维看板', href: 'ops-health.html' },
+      { label: '代码审计', href: 'code-audit.html' },
     ],
   },
   {
@@ -45,6 +50,7 @@ const NAV_GROUPS = [
       { label: 'AI 任务执行', href: 'runtime.html' },
       { label: '多 AI 协作', href: 'collaboration-protocol.html' },
       { label: '开发分支', href: 'branches.html' },
+      { label: 'Skill 体系', href: 'skill.html' },
     ],
   },
   {
@@ -63,6 +69,8 @@ const EXTRA_FILES = [
   'assets/branch-topology.css',
   'assets/branch-topology.js',
   'assets/board-ui.js',
+  'assets/board-table.js',
+  'assets/vendor/list.min.js',
   'data/branch-snapshot.js',
 ];
 
@@ -115,9 +123,7 @@ function replaceNavigationLinks(html, activePage) {
   return html.replace(/(<nav\b[^>]*>)([\s\S]*?)(<\/nav>)/g, (nav, openingTag, inner, closingTag) => {
     if (!classTokensForOpeningTag(openingTag).includes('navlinks')) return nav;
     const closingIndent = inner.match(/\n([ \t]*)$/)?.[1] || '';
-    const links = /id="branch-primary-nav"/.test(openingTag)
-      ? generateNavLinks(activePage)
-      : generateGroupedNavLinks(activePage);
+    const links = generateGroupedNavLinks(activePage);
     return `${openingTag}\n${links}\n${closingIndent}${closingTag}`;
   });
 }
