@@ -13,7 +13,7 @@
 
 - 新写内容：单元格文本 ≤ 120 字；超出部分进详情折叠层或证据链接（`<code>`/`<a>` 指向 handoff、工单、日报）。
 - 存量长文本：由 `assets/board-ui.js` 的 `initCellClamp()` 通用增强——超 120 字单元格默认收起 3 行，点击/回车展开（含 `aria-expanded`、focus-visible）。
-- 表格统一 `data-board-table`：分页（board-table.js）、sticky 表头（top: 64px）、斑马行由 `components.css` 提供。
+- 表格统一 `data-board-table`：分页（board-table.js）、斑马行由 `components.css` 提供；sticky 表头于 2026-08-09 因与表格圆角裁切冲突回退（表头被下压 64px 沉入数据行，见 changes.html BE-2026-08-09-board-table-thead-sticky-rollback），表头当前默认定位。
 
 ## 3. 数字单一来源
 

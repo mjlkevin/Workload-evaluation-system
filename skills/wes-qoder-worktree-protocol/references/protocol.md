@@ -29,7 +29,7 @@ Print this before editing files:
 
 ```markdown
 ## Worktree Contract ACK
-projectRoot: /Users/kevin/AI/Workload-evaluation-system-agent
+projectRoot: /Users/kevin/AI/Workload-evaluation-system
 worktreePath: <absolute path>
 branch: qoder/<task-id>-<short-topic>
 baseCommit: <short sha>
@@ -40,7 +40,8 @@ allowedPaths:
 - <path 2>
 forbidden:
 - no apps/web revival
-- no ui/V0_SAAS as current mainline
+- no ui/V0_SAAS restoration (deleted 2026-08-06)
+- no use of retired path /Users/kevin/AI/Workload-evaluation-system-agent as project entry
 - no broad reset/clean/restore/formatting
 - no secrets in chat/docs/board/commits
 - no unrelated board finalization unless assigned
@@ -72,8 +73,8 @@ Default current WES mainlines:
 Historical or restricted:
 
 - `apps/web` is deleted and must not be restored.
-- `ui/V0_SAAS` is historical/downline and not current Web mainline.
-- `/Users/kevin/AI/Workload-evaluation-system` is legacy WES worktree for historical comparison only.
+- `ui/V0_SAAS` was deleted on 2026-08-06 and must not be restored; it is not the current Web mainline.
+- `/Users/kevin/AI/Workload-evaluation-system-agent` is a retired linked worktree (merged and deregistered on 2026-07-25). Never use it as the project entry; the only active delivery directory is `/Users/kevin/AI/Workload-evaluation-system`.
 
 Stop and request confirmation before touching:
 
@@ -90,7 +91,7 @@ Run the smallest relevant set and report exact pass/fail status.
 
 | Change type | Typical verification |
 |---|---|
-| Frontend React only | `npm run test --prefix ui/V2_PROTOTYPE`; `npm run build:web` |
+| Frontend React only | `npm run test:web`; `npm run build:web` |
 | API/backend contract | `npm run test:modules`; `npm run build:api` |
 | Harness backend | `npm run test:harness -w apps/api` if available; otherwise nearest harness route/module tests |
 | AI service behavior | `npm run test:ai` or targeted AI service tests |

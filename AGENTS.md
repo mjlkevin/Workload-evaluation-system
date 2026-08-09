@@ -82,17 +82,17 @@
 ## 9. 总看板与过程数据沉淀
 
 - 面向用户进行进度汇报、问题分析、风险说明、方案建议、澄清提问、交付总结或协作交接时，必须先读取并执行 `skills/speak-plainly/SKILL.md`；先说明业务结果、影响和下一步，再补技术依据。该 Skill 只约束任务沟通回复，不自动改写项目文档、代码、命令、日志或原始报错。
-- 涉及 `ui/V2_PROTOTYPE` 的页面、组件、样式、响应式、弹窗、可访问性或视觉优化时，必须先读取并执行 `skills/improving-wes-ui/SKILL.md`；单次限定一个业务表面和最多三个已证实根问题，未经独立架构决策不得引入新的 UI 技术栈或组件系统。
+- 涉及 `ui/V2_PROTOTYPE` 的页面、组件、样式、响应式、弹窗、可访问性或视觉优化时，必须先执行 `npx ui-skills start` 启动 UI 技能服务，然后读取并执行 `skills/improving-wes-ui/SKILL.md`；单次限定一个业务表面和最多三个已证实根问题，未经独立架构决策不得引入新的 UI 技术栈或组件系统。违反此前置规范的代码提交不予接受。
 - 涉及需求、设计、开发、测试、变更、监控、风险、发布、文档资产或项目治理的任务，必须读取并执行 `skills/maintain-wes-command-board/SKILL.md`。
 - 用户消息包含"测试问题""需求""反馈""缺陷""bug""体验调整""功能调整""大方向思考""需求池"等关键词，或通过 UI 截图反馈可用性问题时，必须读取并执行 `skills/recording-wes-requirements/SKILL.md`；原始反馈统一先进入问题池，再由 **Codex Intake/Triage Loop** 按 `docs/codex-workflows/wes-feedback-intake.md` 去重、分类和处置。已有同类 issue / RP / defect 时只补充证据或范围，不重复建项；只有分诊结果为 requirement 或 defect 时才创建或更新对应派生记录，信息不足的 issue 保持 `待补充` 并最小化追问。
 - 进行安全审查、漏洞扫描、JWT/auth 边界审计、或合并涉及鉴权/路由/文件上传/外部 API 的变更前，必须读取并执行 `skills/wes-security-review/SKILL.md`；按 WES 专属攻击面（JWT、Excel 上传、AI API、文件导出、版本控制、Harness PostgreSQL）执行六步安全审计流程。
 - 审查代码变更（包括 Qoder handoff、PR、或其他 Agent 交付结果）前，必须读取并执行 `skills/wes-code-review/SKILL.md`；按五轴框架（正确性、可读性、架构、安全、性能）进行审查，变更超 1000 行需要求拆分。
 - 实现新功能、修复缺陷或重构代码时，必须读取并执行 `skills/wes-tdd/SKILL.md`；遵循 RED-GREEN-REFACTOR 循环，先写失败测试，再写最小实现，最后重构，每次变更后运行 `npm run test:modules` 验证。
-- Codex 不再创建或执行 WES 需求池迭代实现 Loop，也不创建 heartbeat/recurring 自动化来持续跑需求池；WES 实现 Loop 后续交给 Qoder 创建和执行。允许 Codex 在用户批准的 NightOps 协作机制中发布任务包、执行审计 Gate、生成晨间简报，但不得无人值守实现新需求、选择下一条需求执行、合并 main 或标记已交付。用户明确要求 Codex 处理单条需求时，按普通一次性任务执行，不自动调度下一轮。
-- 用户 owner 已显式授权 NightOps 无人值守机制：Qoder / KIMICODE 可在各自平台创建本地定时 Loop，用于按当前 Night Mission Packet 执行或审计，并与 Codex Gate 时间点配合。这不是 Codex 侧需求池实现 Loop，也不授予自选 RP、合并 main、标记已交付或越权改代码的权限；外部 Loop 只能读取任务包、Gate、handoff，并写入 mission 明确指定的 artifact 文件。
-- Qoder 执行 WES 需求池、Loop、实现、验证或回填任务时，必须先读 `QODER.md` 并使用 `skills/wes-qoder-worktree-protocol/SKILL.md`；每次执行需先完成 Worktree Contract ACK，结束时按结构化 handoff 回填，状态只能到“已回填 / 待 Codex 复核”，不得自行宣布需求“已交付”。NightOps 中还必须读取当前 Night Mission Packet 与最新 Codex Gate；若 `mustReworkFirst=true`，先返工当前任务；无 `allowNextTask=true` 不得领取新 RP。
-- KIMICODE 参与 NightOps、审计或受控小修前，必须先读 `KIMICODE.md`、`skills/wes-multi-agent-collaboration/SKILL.md` 与 `docs/agent-loop/nightops-templates.md`；在完成 onboarding、ACK、试运行与 Codex 复核前，只能作为 candidate / peer audit pilot，不得独立接收正式 RP 或替代 Codex Gate。即使创建 KIMICODE peer audit 定时 Loop，也只能按 mission 审计 Qoder handoff；`kimicodeCanPatch=false` 时不得修改任何业务或看板文件。
-- 接收 Qoder/Kimi/Codex 等外部 AI 交付结果时，使用 `docs/codex-workflows/external-ai-handoff-template.md` 的回填格式核验目标、文件、验证、风险、看板同步和下一步。
+- Codex 不再创建或执行 WES 需求池迭代实现 Loop，也不创建 heartbeat/recurring 自动化来持续跑需求池；WES 实现 Loop 后续交给 Qoder 创建和执行。用户明确要求 Codex 处理单条需求时，按普通一次性任务执行，不自动调度下一轮。
+- 【历史说明，已下线】NightOps 无人值守三 AI 协作机制已于 2026-08-09 整体下线：相关模板（nightops-templates.md）、mission/brief/TRIAL 产物与 KIMICODE peer audit Loop 脚本已删除。禁止重新创建无人值守实现/审计 Loop；如需恢复夜间自动化，须经用户重新授权并重建协议。
+- Qoder 执行 WES 需求池、Loop、实现、验证或回填任务时，必须先读 `QODER.md` 并使用 `skills/wes-qoder-worktree-protocol/SKILL.md`；每次执行需先完成 Worktree Contract ACK，结束时按结构化 handoff 回填，状态只能到“已回填 / 待 Codex 复核”，不得自行宣布需求“已交付”。
+- 【历史说明，已下线】KIMICODE 已于 2026-08-09 整体退出本项目开发，`KIMICODE.md` 仅作历史入口存档；不得再向 KIMICODE 分派任务或为其创建定时 Loop。Claude Code 同样不参与本项目开发，注册表与看板中的候选槽位已移除。
+- 接收 Qoder/Codex 等外部 AI 交付结果时，使用 `docs/codex-workflows/external-ai-handoff-template.md` 的回填格式核验目标、文件、验证、风险、看板同步和下一步。
 - 验证 Napkin、智谱、Kimi 等外部 API 时，使用 `docs/codex-workflows/api-secret-handling.md`；API Key、token、cookie、私钥不得进入对话、文档、看板或提交。
 - 关键过程事实不得只停留在对话、临时计划、测试输出或 commit 中；应按 Skill 映射同步更新 `03_技术设计/系统架构/WES-Agent-升级总看板/` 下的对应页面。
 - 若本次任务不产生可沉淀的项目过程事实，最终回复必须说明“本次无需更新总看板”的理由。
@@ -121,8 +121,8 @@
 11. `skills/wes-security-review/SKILL.md` — WES 安全审查与漏洞审计规则
 12. `skills/wes-code-review/SKILL.md` — WES 代码审查与质量门禁规则
 13. `skills/wes-tdd/SKILL.md` — WES 测试驱动开发规范（RED-GREEN-REFACTOR）
-14. `QODER.md`、`KIMICODE.md`、`skills/wes-qoder-worktree-protocol/SKILL.md` 与 `skills/wes-multi-agent-collaboration/SKILL.md` — Qoder / KIMICODE / Codex 多 Agent 协作、worktree 执行、peer audit、回填与复核协议
-12. `docs/codex-workflows/` 与 `docs/agent-loop/nightops-templates.md` — 需求去重、外部 AI 回填、长文档检查、API 密钥验证与 NightOps 交接模板
+14. `QODER.md`、`skills/wes-qoder-worktree-protocol/SKILL.md` 与 `skills/wes-multi-agent-collaboration/SKILL.md` — Qoder / Codex 多 Agent 协作、worktree 执行、回填与复核协议
+15. `docs/codex-workflows/` — 需求去重、外部 AI 回填、长文档检查与 API 密钥验证流程
 
 ## 12. 禁止事项
 
@@ -130,4 +130,5 @@
 - 禁止在未标注历史说明的情况下引用已下线路径/脚本（`apps/web`、`apple-ui-preview` 等）。
 - 禁止跳过权限校验、数据隔离与版本引用完整性约束。
 - 禁止在未更新项目计划文档的情况下，实施偏离当前计划的需求或迭代。
-- 禁止在 Codex 中重新创建 WES 实现 Loop 自动化；NightOps 例外仅限任务包、审计 Gate 与晨间简报，不得由 Codex 无人值守实现需求或调度下一条实现任务。
+- 禁止在 Codex 中重新创建 WES 实现 Loop 自动化；不得由 Codex 无人值守实现需求或调度下一条实现任务。
+- 禁止恢复已下线的 NightOps 无人值守机制或为已退出的 Agent（KIMICODE、Claude Code）重新创建入口与定时 Loop。

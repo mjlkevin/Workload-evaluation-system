@@ -1,0 +1,33 @@
+{
+  "name": "fireworks-tech-graph",
+  "displayName": "Fireworks Tech Graph - 技术图表生成",
+  "version": "1.2.0",
+  "description": "Generate geometry-checked SVG technical diagrams, high-resolution PNG, validated SVG-to-GIF semantic motion, and offline interactive HTML.",
+  "descriptionZh": "生成经过几何校验的 SVG 技术图表、高分辨率 PNG、经过验证的 SVG 转 GIF 语义动效与离线交互 HTML。",
+  "author": {
+    "name": "yizhiyanhua-ai",
+    "url": "https://github.com/yizhiyanhua-ai"
+  },
+  "homepage": "https://github.com/yizhiyanhua-ai/fireworks-tech-graph",
+  "repository": "https://github.com/yizhiyanhua-ai/fireworks-tech-graph.git",
+  "license": "MIT",
+  "logo": "./skills/fireworks-tech-graph/assets/avatar.svg",
+  "keywords": [
+    "qoder-plugin",
+    "skill",
+    "diagram",
+    "svg",
+    "png",
+    "gif",
+    "architecture",
+    "uml",
+    "technical-diagram"
+  ],
+  "category": "developer-tools",
+  "tags": [
+    "skill",
+    "diagram",
+    "visualization"
+  ],
+  "skills": "./skills/"
+}

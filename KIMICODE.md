@@ -1,6 +1,8 @@
 # WES KIMICODE Entry
 
-> KIMICODE 在 WorkEvolutionSys 中默认作为 NightOps peer audit / controlled-fix agent。执行审计、返工复核或受控小修前，必须先读本文件。
+> 【历史说明，已下线】KIMICODE 已于 2026-08-09 整体退出 WorkEvolutionSys 项目开发，本文件仅作历史入口存档。其依托的 NightOps 无人值守机制已同步下线，相关模板（nightops-templates.md）与 peer audit Loop 脚本已删除。不得再向 KIMICODE 分派任务、创建定时 Loop 或按本文件执行审计；如未来需重新接入，必须按 `skills/wes-multi-agent-collaboration/SKILL.md` 的 onboarding 流程重新登记。
+
+> 【以下为历史内容】KIMICODE 在 WorkEvolutionSys 中默认作为 NightOps peer audit / controlled-fix agent。执行审计、返工复核或受控小修前，必须先读本文件。
 
 ## Required Skills
 

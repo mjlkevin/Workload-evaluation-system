@@ -267,9 +267,13 @@ test('collectSnapshot contains exactly every local branch in the repository', ()
     cwd: projectRoot,
     encoding: 'utf8',
   }).trim().split('\n').filter(Boolean).sort();
+  const currentMain = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+    cwd: projectRoot,
+    encoding: 'utf8',
+  }).trim();
   const snapshot = collectSnapshot({
     projectRoot,
-    mainBranch: 'codex/role-driven-ai-home-workbench',
+    mainBranch: currentMain,
     now: '2026-08-02T03:00:00.000Z',
   });
   assert.deepEqual(snapshot.branches.map((branch) => branch.branchName).sort(), expected);
