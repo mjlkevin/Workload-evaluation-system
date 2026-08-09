@@ -553,7 +553,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <tr data-board-event-id="BE-2026-08-09-sprint3-kickoff:plan">
           <td>Sprint 3 开工：两张工单派单（3A=O5+O8 串行，3B=O6 独立，并行）</td>
           <td>2026-08-09：用户指令「Sprint 3 开工」。工单 ① <a href="../../../docs/agent-loop/work-orders/2026-08-09-qoder-sprint3-A.md">sprint3-A</a>（O5 统一视图接口 11h → O8 逐字呈现/思考折叠/停止按钮 6h，串行，分支 qoder/sprint3-unified-view-streaming，base=4c28116）；工单 ② <a href="../../../docs/agent-loop/work-orders/2026-08-09-qoder-sprint3-B.md">sprint3-B</a>（O6 质量基线 RP-048 骨架 15h，固定样本≥12 条+确定性断言，本批不接 LLM 裁判，分支 qoder/sprint3-quality-baseline）。两批文件零交集可并行；硬口径：Run 状态机/G-E2/G-E4/409-503/数据隔离/旧同步入口零回退，O6 只读观测不改业务代码；吸取 O10 B/C 教训，回填必须附每项验证命令实际输出摘要。</td>
-          <td><span class="status run"><span class="dot"></span>3A 执行中</span>；<span class="status done"><span class="dot"></span>3B（AI 回答质量考卷）已合入 main（09c4c6d，O6 交付关闭）</span>。</td>
+          <td><span class="status done"><span class="dot"></span>3A（页面一次取齐接口 + 回复逐字呈现）三轮返工后合入 main（05523d8/f0346f9，合并 b7e3692，O5/O8 交付关闭）</span>；<span class="status done"><span class="dot"></span>3B（AI 回答质量考卷）已合入 main（09c4c6d，O6 交付关闭）</span>。Sprint 3 全部完成。</td>
         </tr>
         <tr>
           <td>CodeGraph 受控试点 A/B</td>
