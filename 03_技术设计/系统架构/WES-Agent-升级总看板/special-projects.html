@@ -229,7 +229,7 @@
               <td class="mono">SP-2026-008</td>
               <td><b>Harness 持久执行全链路韧性与灰度（RP-047 Batch E）</b></td>
               <td><span class="pill brand">架构优化</span></td>
-              <td title="补齐三大缺口：workbench_chat_v1 workflow 注册、worker/projector 生产 boot 接线、前端 Run 化；Gate E 五条硬口径（提交闭环 / flag-off 字节级回退 / 恰好一次 / 停止边界 / 旧同步入口保留）+ 灰度开关、PG 迁移演练与运维指标快照。用户已批准单批 Step 0→6 派单（提交 7851396），待执行会话回填与主会话 Gate E 审计">workflow 注册 + boot 接线 + 前端 Run 化 + 灰度回滚演练（Gate E 五口径）...</td>
+              <td>workflow 注册 + boot 接线 + 前端 Run 化 + 灰度回滚演练（Gate E 五口径）</td>
               <td class="mono">2026-08-09 → 待定</td>
               <td>Qoder 执行会话（主会话审计）</td>
               <td><span class="status warn"><span class="dot"></span>返工中 · 待回填复审</span></td>
@@ -257,9 +257,9 @@
             </tr>
             <tr data-type="外部参考借鉴" data-status="进行中">
               <td class="mono">SP-2026-003</td>
-              <td><b>引入 Langfuse 可观测性方案</b></td>
+              <td><b>Trace 观测演进映射（O7 · Langfuse 借鉴 GT-002）</b></td>
               <td><span class="pill warn">外部参考借鉴</span></td>
-              <td title="参考 Langfuse 开源方案，建立 AI 调用链路追踪、成本统计和性能监控能力">参考 Langfuse 开源方案...</td>
+              <td title="综合优化计划 O7 承接专项：不部署 Langfuse 平台；完成自研 trace（8 类 span）↔ Langfuse 模型映射表 + trace 存储 JSON→PG traces 表迁移 PoC + Prompt 版本管理最小方案，为 RP-030 后续演进定方向">trace↔Langfuse 映射表 + PG 迁移 PoC（不部署平台）...</td>
               <td class="mono">2026-08-08 → 2026-08-25</td>
               <td>王丽</td>
               <td><span class="status run"><span class="dot"></span>进行中</span></td>
@@ -287,9 +287,9 @@
             </tr>
             <tr data-type="外部参考借鉴" data-status="待启动">
               <td class="mono">SP-2026-006</td>
-              <td><b>DeepEval 评估框架集成</b></td>
+              <td><b>AI 输出质量回归基线（O6 · DeepEval 方法论借鉴 GT-001）</b></td>
               <td><span class="pill warn">外部参考借鉴</span></td>
-              <td title="引入 DeepEval 开源框架，建立 LLM 输出质量评估基线和回归测试能力">引入 DeepEval 开源框架...</td>
+              <td title="综合优化计划 O6 承接专项：为工作量评估、售前简报、需求解析报告三类核心产物建立固定样本→结构断言+语义评分的回归线；TS 轻量版零依赖实现，不引入 Python/DeepEval 框架；待决策：RP 补登记 + 裁判模型选型">三类 AI 产物固定样本回归线（TS 轻量版，不引入框架）...</td>
               <td class="mono">2026-08-15 → 2026-08-30</td>
               <td>周涛</td>
               <td><span class="status todo"><span class="dot"></span>待启动</span></td>
@@ -303,8 +303,34 @@
               <td class="mono">2026-08-18 → 2026-10-30</td>
               <td>用户（Kevin）</td>
               <td><span class="status todo"><span class="dot"></span>待启动</span></td>
-              <td><a href="agent-memory-borrowing-plan-2026-08-09.md">借鉴优化方案</a> · <a href="github-radar.html">雷达 GT-009</a></td>
+              <td><a href="archive-md/agent-memory-borrowing-plan-2026-08-09.md">借鉴优化方案</a> · <a href="github-radar.html">雷达 GT-009</a></td>
             </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- §2.5 O1–O10 综合优化计划全量状态表 -->
+    <section>
+      <div class="h-num">Section 03</div>
+      <h2>O1–O10 综合优化计划全量状态表</h2>
+      <p class="lead">WES AI 工作台综合优化计划（integrated-optimization-plan-2026-08-04，总估 160–175h）的权威状态台账。任一 O 项状态变更（开工 / 交付 / 合入 / 返工 / 关闭）必须同步更新本表。已交付 5 项、部分交付 1 项（O10 仅 Batch A）、未开工 4 项；实际完成约 105–120h（约 65–70%）。</p>
+      <div class="table-scroll">
+        <table data-board-table id="o10-status-table">
+          <thead>
+            <tr><th>编号</th><th>优化项</th><th>优先级</th><th>估时</th><th>当前状态</th><th>交付证据 / 去向</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">O1</td><td>前端组件拆分（工作台 2602 行大文件拆成目录化结构，硬闸门 isExplicitReportRequest 保留）</td><td><span class="pill brand">P0</span></td><td class="mono">19h</td><td><span class="status done"><span class="dot"></span>已交付 · 已合入 main</span></td><td class="mono">80af6de（用户批准）+ 916e859 清理</td></tr>
+            <tr><td class="mono">O2</td><td>Agent 工具扩展（AI 可用工具 1→8 个，写操作强制确认）</td><td><span class="pill brand">P0</span></td><td class="mono">15h</td><td><span class="status done"><span class="dot"></span>已交付 · 已合入 main</span></td><td class="mono">RP-047 A2（88054d5）</td></tr>
+            <tr><td class="mono">O3</td><td>Harness 持久执行与异步事件通道（并入 RP-047 Batch B–E：后台续跑、崩溃可恢复、异步提交、事件可回放）</td><td><span class="pill brand">P1</span></td><td class="mono">50–65h</td><td><span class="status warn"><span class="dot"></span>进行中 · 收尾返工（≈90%）</span></td><td>B/C/D 已合入（1bd8477 / 70e78b1 / 81a7839）；E 返工中，见 SP-2026-008</td></tr>
+            <tr><td class="mono">O4</td><td>AI 服务层 handler 化重构（911/1002 行大文件拆为 7 个意图 handler）</td><td><span class="pill brand">P1</span></td><td class="mono">15h</td><td><span class="status done"><span class="dot"></span>已交付关闭（Sprint 2 收官）</span></td><td class="mono">251b73d，冒烟 8 样本通过</td></tr>
+            <tr><td class="mono">O5</td><td>AI 会话 × Harness 统一视图（一个接口返回会话+任务+产物，消除前端四套状态拼装；RP-035 数据地基）</td><td><span class="pill brand">P1</span></td><td class="mono">11h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 3）</span></td><td>待 Batch E 收口后排期</td></tr>
+            <tr><td class="mono">O6</td><td>AI 输出质量回归基线（固定样本+结构断言+语义评分，借鉴 DeepEval 方法论，零依赖 TS 轻量版）</td><td><span class="pill brand">P1</span></td><td class="mono">8h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 3）</span></td><td>映射 SP-2026-006；待决策 RP 登记 + 裁判模型选型</td></tr>
+            <tr><td class="mono">O7</td><td>Trace 观测演进映射（自研 trace ↔ Langfuse 模型映射表 + PG 迁移 PoC，不部署平台）</td><td><span class="pill">P2</span></td><td class="mono">10h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 4）</span></td><td>映射 SP-2026-003；Sprint 4 可选批次</td></tr>
+            <tr><td class="mono">O8</td><td>SSE 前端流式 UX（回复逐字呈现 + 思考折叠 + 中断按钮，后端底座已随 Batch C 交付）</td><td><span class="pill">P2</span></td><td class="mono">6h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 3）</span></td><td>RP-029 批次 2 前端闭环</td></tr>
+            <tr><td class="mono">O9</td><td>AI 模块 facade 落地迁移（消除 modules/ai 仅 re-export 违例，契约零变更）</td><td><span class="pill">P2</span></td><td class="mono">10h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 4）</span></td><td>前置依赖 O4 已满足</td></tr>
+            <tr><td class="mono">O10</td><td>兜底路由与静态回复优化（RP-049：常规提问回归模型自然回复，静态模板仅留问候/超范围两类）</td><td><span class="pill brand">P1</span></td><td class="mono">16h</td><td><span class="status run"><span class="dot"></span>部分交付（Batch A 完成）</span></td><td class="mono">A 已合入（e20e2c6）；B/C 工单已编制待批准派单</td></tr>
           </tbody>
         </table>
       </div>
@@ -312,7 +338,7 @@
 
     <!-- §3 统计分析 -->
     <section>
-      <div class="h-num">Section 03</div>
+      <div class="h-num">Section 04</div>
       <h2>专项统计分析</h2>
       <p class="lead">专项治理的整体完成率、平均执行周期、成功率等关键指标。</p>
 
@@ -399,7 +425,7 @@
 
     <!-- §4 专项档案 -->
     <section>
-      <div class="h-num">Section 04</div>
+      <div class="h-num">Section 05</div>
       <h2>专项档案</h2>
       <p class="lead">归档已完成的专项项目，便于回溯和经验总结。</p>
 
@@ -474,7 +500,7 @@
                 <li><b>M5</b> 评测闭环与观测对标（P2，约 18h）· 关联 RP-030</li>
               </ul>
               <div style="margin-top:12px;font-size:12px;color:var(--ink-3)">状态：方案草案已成型，待用户批准后走分诊建 RP；排期 MS1–MS5 为 2026-08-18 → 2026-10-30，排在 RP-047 Batch E 收口后；仅借鉴不整体引入，全部落在 Express + TS + PG(Harness) + React 现有栈内</div>
-              <div style="margin-top:10px;font-size:12px"><a href="agent-memory-borrowing-plan-2026-08-09.md">借鉴优化方案文档 →</a> · <a href="github-radar.html">雷达详情 GT-009 →</a></div>
+              <div style="margin-top:10px;font-size:12px"><a href="archive-md/agent-memory-borrowing-plan-2026-08-09.md">借鉴优化方案文档 →</a> · <a href="github-radar.html">雷达详情 GT-009 →</a></div>
             </div>
           </div>
         </div>
