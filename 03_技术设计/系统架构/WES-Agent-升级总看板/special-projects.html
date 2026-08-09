@@ -107,14 +107,14 @@
         </div>
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">A</span><span>进行中</span></div>
-          <div class="v" id="kpi-active">4</div>
-          <div class="lb">当前活跃（含 1 项 Gate E 返工中，待回填后复审）</div>
+          <div class="v" id="kpi-active">3</div>
+          <div class="lb">当前活跃</div>
           <div class="bar"><i style="width:50%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
         </div>
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>已完成</span></div>
-          <div class="v" id="kpi-done">2</div>
-          <div class="lb">已验收通过</div>
+          <div class="v" id="kpi-done">3</div>
+          <div class="lb">已验收通过（完成率 38%）</div>
           <div class="bar"><i style="width:25%;background:linear-gradient(90deg,var(--ok),var(--teal))"></i></div>
         </div>
         <div class="kpi">
@@ -143,10 +143,10 @@
             <td><b>Harness 持久执行全链路韧性与灰度（RP-047 Batch E）</b></td>
             <td><span class="pill brand">架构优化</span></td>
             <td>Qoder 执行会话</td>
-            <td><span class="status warn"><span class="dot"></span>返工中 · 待回填复审</span></td>
+            <td><span class="status done"><span class="dot"></span>已验收 · 交付合入（7142df0）</span></td>
             <td>
-              <div class="bar" style="height:6px;width:120px;display:inline-block;vertical-align:middle"><i style="width:10%"></i></div>
-              <span style="margin-left:8px;font-family:var(--font-mono);font-size:11px;color:var(--ink-3)">10%</span>
+              <div class="bar" style="height:6px;width:120px;display:inline-block;vertical-align:middle"><i style="width:100%"></i></div>
+              <span style="margin-left:8px;font-family:var(--font-mono);font-size:11px;color:var(--ink-3)">100%</span>
             </td>
           </tr>
           <tr>
@@ -232,7 +232,7 @@
               <td>workflow 注册 + boot 接线 + 前端 Run 化 + 灰度回滚演练（Gate E 五口径）</td>
               <td class="mono">2026-08-09 → 待定</td>
               <td>Qoder 执行会话（主会话审计）</td>
-              <td><span class="status warn"><span class="dot"></span>返工中 · 待回填复审</span></td>
+              <td><span class="status done"><span class="dot"></span>已验收 · 交付合入（7142df0）</span></td>
               <td><a href="../../../docs/agent-loop/work-orders/2026-08-09-qoder-RP-047-E.md">Batch E 工单</a> · <a href="plan.html">计划</a></td>
             </tr>
             <tr data-type="架构优化" data-status="进行中">
@@ -314,7 +314,7 @@
     <section>
       <div class="h-num">Section 03</div>
       <h2>O1–O10 综合优化计划全量状态表</h2>
-      <p class="lead">WES AI 工作台综合优化计划（integrated-optimization-plan-2026-08-04，总估 160–175h）的权威状态台账。任一 O 项状态变更（开工 / 交付 / 合入 / 返工 / 关闭）必须同步更新本表。已交付 5 项、部分交付 1 项（O10 仅 Batch A）、未开工 4 项；实际完成约 105–120h（约 65–70%）。</p>
+      <p class="lead">WES AI 工作台综合优化计划（integrated-optimization-plan-2026-08-04，总估 160–175h）的权威状态台账。任一 O 项状态变更（开工 / 交付 / 合入 / 返工 / 关闭）必须同步更新本表。已交付 6 项、部分交付 1 项（O10 仅 Batch A）、未开工 3 项；实际完成约 115–130h（约 70–80%）。</p>
       <div class="table-scroll">
         <table data-board-table id="o10-status-table">
           <thead>
@@ -323,7 +323,7 @@
           <tbody>
             <tr><td class="mono">O1</td><td>前端组件拆分（工作台 2602 行大文件拆成目录化结构，硬闸门 isExplicitReportRequest 保留）</td><td><span class="pill brand">P0</span></td><td class="mono">19h</td><td><span class="status done"><span class="dot"></span>已交付 · 已合入 main</span></td><td class="mono">80af6de（用户批准）+ 916e859 清理</td></tr>
             <tr><td class="mono">O2</td><td>Agent 工具扩展（AI 可用工具 1→8 个，写操作强制确认）</td><td><span class="pill brand">P0</span></td><td class="mono">15h</td><td><span class="status done"><span class="dot"></span>已交付 · 已合入 main</span></td><td class="mono">RP-047 A2（88054d5）</td></tr>
-            <tr><td class="mono">O3</td><td>Harness 持久执行与异步事件通道（并入 RP-047 Batch B–E：后台续跑、崩溃可恢复、异步提交、事件可回放）</td><td><span class="pill brand">P1</span></td><td class="mono">50–65h</td><td><span class="status warn"><span class="dot"></span>进行中 · 收尾返工（≈90%）</span></td><td>B/C/D 已合入（1bd8477 / 70e78b1 / 81a7839）；E 返工中，见 SP-2026-008</td></tr>
+            <tr><td class="mono">O3</td><td>Harness 持久执行与异步事件通道（并入 RP-047 Batch B–E：后台续跑、崩溃可恢复、异步提交、事件可回放）</td><td><span class="pill brand">P1</span></td><td class="mono">50–65h</td><td><span class="status done"><span class="dot"></span>已交付 · 关闭</span></td><td>B/C/D/E 全部合入（1bd8477 / 70e78b1 / 81a7839 / 768312c，合并 7142df0），Gate E 五口径复审通过</td></tr>
             <tr><td class="mono">O4</td><td>AI 服务层 handler 化重构（911/1002 行大文件拆为 7 个意图 handler）</td><td><span class="pill brand">P1</span></td><td class="mono">15h</td><td><span class="status done"><span class="dot"></span>已交付关闭（Sprint 2 收官）</span></td><td class="mono">251b73d，冒烟 8 样本通过</td></tr>
             <tr><td class="mono">O5</td><td>AI 会话 × Harness 统一视图（一个接口返回会话+任务+产物，消除前端四套状态拼装；RP-035 数据地基）</td><td><span class="pill brand">P1</span></td><td class="mono">11h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 3）</span></td><td>待 Batch E 收口后排期</td></tr>
             <tr><td class="mono">O6</td><td>AI 输出质量回归基线（固定样本+结构断言+语义评分，借鉴 DeepEval 方法论，零依赖 TS 轻量版）</td><td><span class="pill brand">P1</span></td><td class="mono">8h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 3）</span></td><td>映射 SP-2026-006；待决策 RP 登记 + 裁判模型选型</td></tr>
@@ -441,7 +441,7 @@
                 <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;background:var(--brand-soft);font-size:12px"><span style="width:20px;height:20px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:10px;font-weight:700">Q</span>Qoder 执行会话 · 施工回填</span>
                 <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;background:var(--bg-soft);font-size:12px"><span style="width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:10px;font-weight:700">主</span>主会话 · Gate E 审计</span>
               </div>
-              <div style="margin-top:12px;font-size:12px;color:var(--ink-3)">最近更新：2026-08-09 回填 1feda52 后主会话 Gate E 独立审计：基线复跑全绿（web 263 / modules 265 / ai 244 / harness 172＋1 既有 flake / integration 1，build×2），但发现两项阻断——B1 boot 注入的 dispatch 为抛错占位，main.ts 未接真实分发，flag-on 时 run 必失败（G-E1 不成立）；B2 前端 409 静默回退旧同步路径无文案（F4 未落地）；另登记 Drill 3/4 为模拟断言、人工验收指引缺失两项观察。待用户裁决退回返工</div>
+              <div style="margin-top:12px;font-size:12px;color:var(--ink-3)">最近更新：2026-08-09 返工回填 768312c，主会话 Gate E 第二轮复审通过：B1 boot 已接真实 dispatch（共享组装 + 真实 modelChat + G-E1 守护）、B2 409 文案拦截不回退（守护测试）；独立复跑全绿（web 264 / modules 265 / ai 244 / harness 173 / build×2），T7a 时序 flake 单文件重跑全过；用户批准合入 main（7142df0）。专项收官，待登记 T7a flake 为独立 issue</div>
             </div>
             <div class="card">
               <span class="pill brand">SP-2026-001</span>
