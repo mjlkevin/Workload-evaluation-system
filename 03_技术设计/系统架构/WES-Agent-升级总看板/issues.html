@@ -488,6 +488,17 @@
               <td class="tc-7">待分诊 · 候选转需求（UX 即时反馈优化）</td>
               <td class="tc-8">去重结果：未命中同类 issue/需求/缺陷（RP-047 为多通道请求态、RP-033 为列表滚动，症状与根因均不同）。候选初步方案：① 发送时立即在 SessionRail 顶部插入乐观会话占位项（临时标题+“创建中”态），createSession 返回后对账（成功替换为真实记录、失败移除占位并提示）；② 或将 createSession 提前到文件解析之前，缩短空白窗口。验收口径：首句发送后左侧列表近即时（&lt;100ms）出现新会话项，创建完成后标题/时间/徽标与后端返回一致，失败场景无残留占位。正式分流由 Codex Intake/Triage Loop 完成；本次仅记录，未改代码。</td>
             </tr>
+            <tr>
+              <td class="mono tc-0">ISS-2026-08-09-002</td>
+              <td class="tc-1">2026-08-09</td>
+              <td class="tc-2">GT-009 借鉴优化方案获用户批准，要求专项立项并入池</td>
+              <td class="tc-3">user_decision_plan_approval</td>
+              <td class="tc-4">用户批准《WES Agent 记忆层借鉴优化方案（基于 TencentDB-Agent-Memory）》（archive-md/agent-memory-borrowing-plan-2026-08-09.md）并专项立项 SP-2026-007：M1 中文混合检索基线（P1/24h）、M2 会话记忆分层蒸馏（P1/48h）、M3 工具发现两段式接口（P1/16h）、M4 记忆资产治理模型（P2/20h）、M5 评测闭环与观测对标（P2/18h），共约 126h，排期 MS1–MS5（2026-08-18 → 2026-10-30），排在 RP-047 Batch E 收口后。口径：仅借鉴设计模式不整体引入，全部落在 Express+TS+PG(Harness)+React 现有栈内。</td>
+              <td class="tc-5"><code class="inline">archive-md/agent-memory-borrowing-plan-2026-08-09.md（M1–M5 措施表、里程碑、风险矩阵、验收标准）</code> <code class="inline">github-radar.html GT-009 详情节（五维评分 7.10，仅借鉴结论）</code> <code class="inline">special-projects.html SP-2026-007</code> <code class="inline">data/ai-sessions.json（平铺会话无蒸馏层）</code> <code class="inline">apps/api/src/agent/tool-registry.ts（工具全量注入无发现接口）</code> <code class="inline">config/rag/（检索策略配置现状）</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已分诊 / 转需求</span></td>
+              <td class="tc-7">分诊结果 requirement：新建 RP-052（M2）；M1/M3/M4/M5 命中现有 RP-031/RP-018/RP-012/RP-030，按同族补充范围不重复建项</td>
+              <td class="tc-8">去重结果：M1 命中 RP-031（RAG baseline 后续批次，RP-031 主体已关闭，M1 作为其后续批次登记）；M3 命中 RP-018（知识库工具 MVP 已交付，M3 为工具发现接口范围扩展）；M4 命中 RP-012（Skill 治理方向复用，暂缓状态不改，待 MS4 启动时再激活）；M5 命中 RP-030（Trace 范围扩展）；M2 未命中任何现有记录（跨会话记忆蒸馏属空白）故新建 RP-052。验收口径见方案文档第六节：同项目二次 run 上下文重建 0 轮、术语查询 Top-5 命中率 ≥80%、默认注入工具数降 ≥50%、注入体积 ≤6000 字符。本次仅入池登记，未改业务代码。</td>
+            </tr>
         </tbody>
         </table>
         </div>

@@ -222,6 +222,15 @@ async function main({ boardDir = BOARD_DIR, distDir = path.join(boardDir, 'dist'
   const extraFiles = copyExtraFiles(distDir, boardDir);
   console.log(` 复制分支拓扑资源 → ${extraFiles.length} 个文件\n`);
 
+  // Copy archive-md/ (archived markdown docs referenced by board pages)
+  const archiveSrc = path.join(boardDir, 'archive-md');
+  if (fs.existsSync(archiveSrc)) {
+    const archiveDest = path.join(distDir, 'archive-md');
+    fs.cpSync(archiveSrc, archiveDest, { recursive: true });
+    const archiveFiles = fs.readdirSync(archiveDest).filter(f => f.endsWith('.md'));
+    console.log(` 复制 archive-md 文档 → ${archiveFiles.length} 个文件\n`);
+  }
+
   // Process HTML files
   console.log('📄 处理 HTML 页面...');
   const htmlFiles = fs.readdirSync(boardDir).filter(f => f.endsWith('.html'));

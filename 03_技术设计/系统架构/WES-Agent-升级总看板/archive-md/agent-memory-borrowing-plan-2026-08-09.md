@@ -1,7 +1,7 @@
 # WES Agent 记忆层借鉴优化方案（基于 TencentDB-Agent-Memory）
 
 > **制定日期**: 2026-08-09
-> **状态**: 已专项立项 **SP-2026-007**（专项计划页：special-projects.html）/ 方案草案待批准
+> **状态**: ✅ **已批准**（2026-08-09 用户批准）· 专项 SP-2026-007 进行中 · 分诊入池：新建 RP-052（M2），M1/M3/M4/M5 命中 RP-031/RP-018/RP-012/RP-030 补充范围（ISS-2026-08-09-002）
 > **输入来源**: ① 开源工具雷达 GT-009（github-radar.html，TencentCloud/TencentDB-Agent-Memory，五维评分 7.10）② WES Agent 产品技术方案（03_技术设计/系统架构/WES-Agent-产品技术方案.html）③ 需求池（RP-018 / RP-030 / RP-031 / RP-012）
 > **架构约束**: 严格遵循 AGENTS.md 架构边界（§2 存储边界与 DB 迁移触发器、§3 权限、§5 modules 模式、§7 前端约定、§12 禁止事项）
 > **核心口径**: **仅借鉴设计模式，不整体引入该框架**（收录 ≠ 引入）。全部措施落在现有 Express + TypeScript + PostgreSQL（Harness 域）+ React 技术栈内，不新增第二套存储、服务或前端。

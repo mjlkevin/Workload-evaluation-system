@@ -74,10 +74,10 @@
           <span><b>更新日期</b> 2026-08-06</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">43 项已登记需求</span>
+          <span class="pill brand">44 项已登记需求</span>
           <span class="pill ok">22 已交付（验收完成）</span>
           <span class="pill warn">8 已交付 · 待验收回填</span>
-          <span class="pill warn">11 待规划/待确认/待验收</span>
+          <span class="pill warn">12 待规划/待确认/待验收</span>
           <span class="pill">2 暂缓</span>
           <span class="pill ok">可编辑子页面已移除</span>
         </div>
@@ -475,7 +475,7 @@
               <button type="button" id="filter-reset" class="ledger-filter-reset-btn">重置</button>
             </div>
           </div>
-          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">43</b> / 43 条需求</div>
+          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">44</b> / 44 条需求</div>
         </div>
         <div class="table-scroll">
         <table id="tbl-requirements" data-board-table data-mode="sort" data-page-size="10" data-filter-col="4">
@@ -648,7 +648,7 @@
               <td><span class="status run"><span class="dot"></span>暂缓 / 待架构决策</span></td>
               <td>把行业背调、客户画像、问题清单回复、工具白名单与产物 schema 封装为可治理 Skill 包</td>
               <td>本页 RP-012 专题分析已记录</td>
-              <td>阶段性需求池规划时确定 MVP、数据源边界和 Skill 治理方式</td>
+              <td>阶段性需求池规划时确定 MVP、数据源边界和 Skill 治理方式；2026-08-09 SP-2026-007 批准后，M4 记忆资产治理模型（owner/版本/状态/可见性资产元数据，P2/20h）复用本 RP 的 Skill 治理方向，排入 MS4（2026-10-06 → 10-16），暂缓状态不改，MS4 启动时再激活</td>
             </tr>
             <tr>
               <td class="mono">RP-014</td>
@@ -720,7 +720,7 @@
               <td><span class="status run"><span class="dot"></span>已纳入主线 / 人工验收待回填</span></td>
               <td>将智谱知识库检索封装为 Agent Tool Registry 可发现、只读、可审计的知识查询工具，辅助模块识别和工作量评估</td>
               <td>本页 RP-018 专题分析 + docs/智谱AI知识库集成指南.md + docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md + apps/api/src/services/ai/knowledge-tool.service.ts + apps/api/src/services/ai/workbench-intent.service.ts + apps/api/src/services/ai/workbench-dispatch.service.ts + apps/api/src/services/ai/chat.service.ts + ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench.jsx + ui/V2_PROTOTYPE/src/__tests__/HomeWorkspace.test.jsx + docs/openapi.yaml</td>
-              <td>MVP 已完成：后端 service、5 条服务测试、knowledge_query 意图路由、dispatch trace、session metadata、OpenAPI 契约与前端知识库参考 trace chip；当前自动化基线已推进到 HomeWorkspace 43 pass、V2 前端 83 pass、test:modules 100 pass、build:web/build:api pass；MT-1H-B-003 真实 ZHIPU 配置人工验收待回填</td>
+              <td>MVP 已完成：后端 service、5 条服务测试、knowledge_query 意图路由、dispatch trace、session metadata、OpenAPI 契约与前端知识库参考 trace chip；当前自动化基线已推进到 HomeWorkspace 43 pass、V2 前端 83 pass、test:modules 100 pass、build:web/build:api pass；MT-1H-B-003 真实 ZHIPU 配置人工验收待回填。2026-08-09 SP-2026-007 批准：M3 工具发现两段式接口（tools/list 发现 + tools/call 调用，tool-registry 加 category/discoverable + 内置 list_tools 工具，P1/16h）作为本 RP 范围扩展排入 MS3（2026-09-22 → 10-02），保留全量注入回退开关</td>
             </tr>
             <tr>
               <td class="mono">RP-021</td>
@@ -840,7 +840,7 @@
               <td><span class="status run"><span class="dot"></span>已纳入业务主线 / 运行态验收待回填</span></td>
               <td>统一记录用户请求、意图路由、知识库检索、模型调用、工具调用、Artifact 生成、人工确认和降级原因，形成可查询的 trace 链路与留存策略</td>
               <td>去重结果：命中 RP-002 轻量审计、RP-005 Artifact Workspace 后续，但两者未覆盖统一 schema、span 父子关系、查询入口和 retention 策略；因此新增独立 RP-030，并与 RP-002/RP-005 交叉引用</td>
-              <td>Codex 已移除运行态 trace-store 提交并补 <code class="inline">.gitignore</code>；trace repository 支持测试 store 注入，失败/abort 写入 failed/cancelled trace，PRE_SALES RBAC 断言已按当前权限模型校准。实现已纳入业务主线，历史修复分支已清理；运行态人工验收继续待回填。</td>
+              <td>Codex 已移除运行态 trace-store 提交并补 <code class="inline">.gitignore</code>；trace repository 支持测试 store 注入，失败/abort 写入 failed/cancelled trace，PRE_SALES RBAC 断言已按当前权限模型校准。实现已纳入业务主线，历史修复分支已清理；运行态人工验收继续待回填。2026-08-09 SP-2026-007 批准：M5 评测闭环与观测对标（30 组评测样本 + test:ai 评测套件 + 统一 Trace Schema 草案覆盖记忆蒸馏事件，P2/18h）作为本 RP 范围扩展排入 MS5（2026-10-19 → 10-30），对标 PersonaMem 基准方法论</td>
             </tr>
             <tr>
               <td class="mono">RP-031</td>
@@ -852,7 +852,7 @@
               <td><span class="status done"><span class="dot"></span>已交付 / 主线已集成 / 需求关闭</span></td>
               <td>为知识库问答和模块识别建立可复现 baseline，并把检索配置、Chunk 处理、Prompt、置信度、缓存/断路/限流、质量验证、Trace、配置治理和 Provider/多知识库演进拆成可独立验收的生产化批次</td>
               <td>2026-07-20 去重结果：命中 RP-031 的 baseline、策略对比与知识库版本方向，并交叉引用 RP-018 知识库工具和 RP-030 Trace；2026-08-03 新问题继续命中已标记未覆盖的 C2 多知识库和 M1 路由治理，不新增重复 RP</td>
-              <td>2026-08-03 已通过合并提交 <code class="inline">5cc81b9</code> 集成业务主线：交付版本化 baseline、评测报告、智谱多知识库档案、逐库探针与激活门禁、角色过滤、规则优先与 AI 兜底路由、一次受控空检索回退和可解释 Trace；主线集成态 modules 227/227、AI 190/190、Web 206/206、integration 1/1，API/Web build、安全与 UI scope 全部通过。资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示转独立后续优化，不再阻断 RP-031 关闭。</td>
+              <td>2026-08-03 已通过合并提交 <code class="inline">5cc81b9</code> 集成业务主线：交付版本化 baseline、评测报告、智谱多知识库档案、逐库探针与激活门禁、角色过滤、规则优先与 AI 兜底路由、一次受控空检索回退和可解释 Trace；主线集成态 modules 227/227、AI 190/190、Web 206/206、integration 1/1，API/Web build、安全与 UI scope 全部通过。资金计划/网上银行资料覆盖、qrels 校准和未授权知识库显式提示转独立后续优化，不再阻断 RP-031 关闭。2026-08-09 SP-2026-007 批准：M1 中文混合检索基线（@node-rs/jieba + 进程内 TS BM25 + 向量 + RRF + 条目数/字符预算/超时三重护栏，新增 modules/knowledge/，P1/24h）作为本 RP 关闭后的后续批次登记，排入 MS1（2026-08-18 → 08-29）；pgvector 拆为阶段 2 后置（属 DB 迁移触发器范畴，启动前需先更新项目计划），RP-031 关闭状态不改</td>
             </tr>
             <tr>
               <td class="mono">RP-033</td>
@@ -997,6 +997,18 @@
               <td>2026-08-06 用户拍板：桌面端定位为连接共享服务器的客户端，数据库留服务器端部署（应用/数据库分离），桌面不内嵌任何 DB。桌面范围收敛为客户端壳：服务器地址配置与连接管理、页面加载（A 直连服务器页面 vs B 打包前端 dist 两种加载方式待选）、连接状态提示、打包签名与自动更新</td>
               <td>去重结果：未命中（全仓库无 Electron、桌面端或 Tauri 记录）。可行性结论：技术上完全可行（依赖全纯 JS、无原生模块、无需重编译）；决策后原两大障碍（PG 依赖、cwd 路径模型）同时消除；Tauri 需 Rust 重写后端不可行。决策后估算：方案 A（直连）约 1 周、方案 B（打包前端）约 2–3 周；安装包每平台 90–120MB、运行内存 300–500MB；长期成本含 Apple Developer ID、Windows 签名证书与自动更新托管</td>
               <td>决策已收到：① 产品定位为连接共享服务器的客户端（非单机离线）；② 数据库留服务器端部署。剩余待细化设计后再立项排期：① 加载方式选型（A 直连服务器页面，推荐先行；B 打包前端）；② 前置缺口：服务器端需部署 V2 前端静态托管（当前 docker-compose 无 web 服务）。不排期不进 Sprint。</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-052</td>
+              <td>AI 工作台会话记忆分层蒸馏（跨会话记忆底座）</td>
+              <td>2026-08-09 用户批准 SP-2026-007 GT-009 借鉴优化方案；来源问题为 <code class="inline">ISS-2026-08-09-002</code>（方案措施 M2，去重未命中现有记录新建）</td>
+              <td>AI Runtime / 记忆层</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>SP-2026-007 · MS2（2026-09-01 → 09-19）</td>
+              <td><span class="status run"><span class="dot"></span>已批准 / 已排期 / 待启动</span></td>
+              <td>借鉴 GT-009 L0→L1→L2 蒸馏管线：会话对话异步蒸馏为原子事实与场景知识，落 Harness PG 域新增 memory_atoms/memory_scenes 两表 + modules/memory/ 模块；蒸馏产物 draft → 用户确认 → active，注入沿用 M1 护栏（8 条/6000 字符/3s）；依赖 M1 先行</td>
+              <td>去重结果：未命中（RP-017/RP-047 覆盖会话内运行时恢复，跨会话记忆蒸馏属空白）；交叉引用 RP-031（M1 检索护栏）、RP-030（M5 蒸馏过程 Trace）；符合 DB 迁移触发器（审计/统计需求），落 Harness PG 域不新增第二套存储</td>
+              <td>验收口径：同项目二次 run 上下文重建 0 轮（记忆自动注入）；蒸馏产物在 UI 可见、可确认、可撤回；draft 未经确认不注入。排期：排在 RP-047 Batch E 收口后，MS2 实施前需先完成 M1（MS1）。</td>
             </tr>
             <tr>
               <td class="mono">RP-032</td>
@@ -3269,7 +3281,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 需求池 · 2026-08-06 · 43 条需求 · 22 项已交付（验收完成） · 8 项待验收回填 · 11 项待处理 · 2 项暂缓
+      WES 项目管理 · 需求池 · 2026-08-09 · 44 条需求 · 22 项已交付（验收完成） · 8 项待验收回填 · 12 项待处理 · 2 项暂缓
     </footer>
   </main>
   <script>
