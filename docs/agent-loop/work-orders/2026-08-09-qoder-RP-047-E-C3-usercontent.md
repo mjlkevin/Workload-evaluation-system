@@ -33,7 +33,7 @@ if (safeMessages.length > 0) {
 - **执行前置**：必须先读 `QODER.md` 与 `skills/wes-qoder-worktree-protocol/SKILL.md`，完成 Worktree Contract ACK；worktree 初始化后、编辑任何文件前，先执行 `npm install`（本单不涉及前端验证，无需 ui/V2_PROTOTYPE 二次安装）
 - **worktree**：`.claude/worktrees/rp-047-e-c3-usercontent`
 - **分支**：`qoder/rp-047-e-c3-usercontent`
-- **base**：`9b41061`（main，Batch E 二次返工合入 + 看板收官后）
+- **base**：`8d0b757`（main，统一视图测试挂线恢复后）
 
 ## 4. Allowed Paths（只许改这些）
 
@@ -53,7 +53,7 @@ if (safeMessages.length > 0) {
 | `npm run test:integration` | 1/1 |
 | `npm run test:harness`（colima 环境变量） | 174 例，允许 T6/T7a 既有环境 flake（单文件重跑须过） |
 | `npm run build:api` + `npm run build:web` | 零错误 |
-| `git diff --stat 9b41061 -- package-lock.json apps/api/drizzle/ ui/` | 零输出 |
+| `git diff --stat 8d0b757 -- package-lock.json apps/api/drizzle/ ui/` | 零输出 |
 
 **RED 先行**：新增用例断言「messages 为空数组时，modelChat 发出的请求包含 role=user 且 content=userContent」，先红后绿。
 
