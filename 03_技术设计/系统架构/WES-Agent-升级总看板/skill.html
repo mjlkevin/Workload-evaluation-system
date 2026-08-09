@@ -113,6 +113,7 @@
           <a href="design-architecture.html">架构设计</a>
           <a href="plan.html">计划与进度</a>
           <a href="requirements.html">需求池</a>
+          <a href="special-projects.html">专项计划</a>
           </div>
         </div>
         <div class="nav-group">
@@ -155,17 +156,17 @@
       <div class="crumb">WES Agent · Skill 集成关系</div>
       <h1>Skill 体系</h1>
       <p class="meta">
-        <span><b>图表版本</b> v2.0 · 正交路由</span>
+        <span><b>图表版本</b> v2.1 · 正交路由</span>
         <span><b>风格基线</b> Claude 官方风格</span>
         <span><b>生成工具</b> fireworks-tech-graph v1.2.0</span>
-        <span><b>更新</b> 2026-08-07</span>
+        <span><b>更新</b> 2026-08-09</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill"><i class="lg lg-core"></i>核心协作 (3)</span>
         <span class="pill"><i class="lg lg-gov"></i>治理看板 (2)</span>
         <span class="pill"><i class="lg lg-quality"></i>质量保障 (3)</span>
         <span class="pill"><i class="lg lg-frontend"></i>前端专用 (1)</span>
-        <span class="pill"><i class="lg lg-external"></i>外部插件 (1)</span>
+        <span class="pill"><i class="lg lg-external"></i>外部插件 (2)</span>
       </div>
     </div>
   </header>
@@ -183,9 +184,9 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>集成关系架构图</h2>
-      <p class="lead">WES Skill 体系以 wes-multi-agent-collaboration 为核心枢纽，串联核心协作、治理看板、质量保障、前端专用四层共 10 个 Skill 与 1 个外部插件。点击图中任意节点，可在下方 Skill 详情面板联动查看其职责与触发条件。</p>
+      <p class="lead">WES Skill 体系以 wes-multi-agent-collaboration 为核心枢纽，串联核心协作、治理看板、质量保障、前端专用四层共 9 个内部 Skill 与 2 个外部插件（fireworks-tech-graph、i-have-adhd）。点击图中任意节点，可在下方 Skill 详情面板联动查看其职责与触发条件。</p>
       <div class="panel">
-        <div class="panel-h">Skill 集成关系架构图<span class="right">v2.0 · 正交路由 · 点击节点联动</span></div>
+        <div class="panel-h">Skill 集成关系架构图<span class="right">v2.1 · 正交路由 · 点击节点联动</span></div>
         <div class="panel-b">
           <div class="skill-diagram">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1000" width="1280" height="1000" id="architecture-svg">
@@ -220,7 +221,7 @@
                     </text>
                     <text x="640" y="70" text-anchor="middle" fill="#6a6a6a" font-size="13"
                           font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
-                      Skill Integration Architecture  v2.0  |  Claude 官方风格 · 正交路由
+                      Skill Integration Architecture  v2.1  |  Claude 官方风格 · 正交路由
                     </text>
             
                     <!-- ===== AGENTS ROW (Top) ===== -->
@@ -400,6 +401,16 @@
                         <text x="140" y="68" text-anchor="middle" fill="#8a8a8a" font-size="11"
                               font-family="-apple-system, sans-serif">v1.2.0  MIT  yizhiyanhua-ai</text>
                       </g>
+
+                      <g transform="translate(810, 805)" class="skill-node" data-skill="i-have-adhd">
+                        <rect width="280" height="75" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2.5" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">i-have-adhd</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">ADHD 友好输出塑形  行动前置</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a8a8a" font-size="11"
+                              font-family="-apple-system, sans-serif">MIT  ayghri  /i-have-adhd 手动唤起</text>
+                      </g>
                     </g>
             
                     <!-- ===== CONNECTIONS (orthogonal routing, no crossings) ===== -->
@@ -483,7 +494,7 @@
                       <rect width="200" height="65" rx="12" fill="#ffffff" stroke="#4a4a4a" stroke-width="1.5" filter="url(#shadow-soft)"/>
                       <text x="100" y="22" text-anchor="middle" fill="#1a1a1a" font-size="11" font-weight="700" font-family="-apple-system, sans-serif">WES SKILL ARCHITECTURE</text>
                       <text x="100" y="42" text-anchor="middle" fill="#6a6a6a" font-size="12" font-family="-apple-system, sans-serif">Style: Claude Official</text>
-                      <text x="100" y="58" text-anchor="middle" fill="#9a9a9a" font-size="10" font-family="-apple-system, sans-serif">v2.0  |  2026-08-07</text>
+                      <text x="100" y="58" text-anchor="middle" fill="#9a9a9a" font-size="10" font-family="-apple-system, sans-serif">v2.1  |  2026-08-09</text>
                     </g>
             
                     <!-- Subtle border -->
@@ -500,7 +511,7 @@
       <p class="lead">点击清单中的 Skill 或上方架构图节点，联动展示其职责、触发条件与协作关系。</p>
       <div class="skill-workspace">
         <div class="panel">
-          <div class="panel-h">Skill 清单 (10)<span class="right">10 skills · 可点击</span></div>
+          <div class="panel-h">Skill 清单 (11)<span class="right">11 skills · 可点击</span></div>
           <div class="panel-b" id="skill-list">
             <div class="skill-item active" data-skill="wes-multi-agent-collaboration">
               <div class="skill-name">wes-multi-agent-collaboration</div>
@@ -573,6 +584,13 @@
                 <span class="skill-tag tag-external">外部</span>
               </div>
             </div>
+            <div class="skill-item" data-skill="i-have-adhd">
+              <div class="skill-name">i-have-adhd</div>
+              <div class="skill-desc">ADHD 友好输出塑形 | 行动前置 | 状态复述</div>
+              <div class="skill-tags">
+                <span class="skill-tag tag-external">外部</span>
+              </div>
+            </div>
           </div>
         </div>
         <div class="skill-side">
@@ -623,13 +641,13 @@
         <div class="card"><span class="pill brand">Layer 2</span><h3>治理看板层</h3><p>maintain-wes-command-board、recording-wes-requirements：关键过程事实沉淀到总看板，反馈先入问题池再分诊处置，避免重复建项。</p></div>
         <div class="card"><span class="pill warn">Layer 3</span><h3>质量保障层</h3><p>wes-security-review、wes-code-review、wes-tdd：安全审查、五轴代码审查与测试驱动开发构成合并前的三道质量门禁。</p></div>
         <div class="card"><span class="pill ok">Layer 4</span><h3>前端专用层</h3><p>improving-wes-ui：仅限 ui/V2_PROTOTYPE 主线，单次限定一个业务表面与最多三个已证实根问题，未经独立架构决策不引入新 UI 技术栈。</p></div>
-        <div class="card"><span class="pill">External</span><h3>外部插件</h3><p>fireworks-tech-graph：负责生成 SVG/HTML 技术图表等视觉资产，本页架构图即由其产出。</p></div>
+        <div class="card"><span class="pill">External</span><h3>外部插件</h3><p>fireworks-tech-graph：负责生成 SVG/HTML 技术图表等视觉资产，本页架构图即由其产出。i-have-adhd：为 ADHD 读者塑形 Agent 输出（行动前置、步骤编号、状态复述），由 /i-have-adhd 手动唤起，不参与业务决策。</p></div>
       </div>
-      <div class="callout"><div><b>治理边界</b>Skill 调用遵循 AGENTS.md 约束：治理类 Skill 是对应任务的强制前置，质量类 Skill 按门禁顺序串行执行，外部插件仅产出视觉资产、不参与业务决策。</div></div>
+      <div class="callout"><div><b>治理边界</b>Skill 调用遵循 AGENTS.md 约束：治理类 Skill 是对应任务的强制前置，质量类 Skill 按门禁顺序串行执行，外部插件（图表生成、输出塑形）仅辅助产出，不参与业务决策。</div></div>
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · Skill 体系 · WES 项目管理 · Generated by fireworks-tech-graph v1.2.0 · 2026-08-07
+      <a href="index.html">返回总览</a> · Skill 体系 · WES 项目管理 · Generated by fireworks-tech-graph v1.2.0 · 2026-08-09
     </footer>
   </main>
   <script src="assets/board-ui.js" defer></script>
@@ -812,6 +830,29 @@
             <li>GitHub: yizhiyanhua-ai/fireworks-tech-graph</li>
             <li>版本: v1.2.0</li>
             <li>许可证: MIT</li>
+          </ul>
+        `
+      },
+      'i-have-adhd': {
+        title: 'i-have-adhd',
+        content: `
+          <p><span class="highlight">外部插件</span>，为 ADHD 读者塑形 Agent 输出，让结论与下一步动作可直接执行。</p>
+          <h4>核心规则</h4>
+          <ul>
+            <li>下一步行动前置，多步骤任务编号</li>
+            <li>每轮复述任务状态，抑制跑题</li>
+            <li>给出具体时间估算，已完成成果可见</li>
+            <li>列表上限 5 项，无开场白与收尾客套</li>
+          </ul>
+          <h4>调用方式</h4>
+          <ul>
+            <li>/i-have-adhd 手动唤起，会话内持续生效</li>
+            <li>stop adhd mode / normal mode 关闭</li>
+          </ul>
+          <h4>来源</h4>
+          <ul>
+            <li>GitHub: ayghri/i-have-adhd</li>
+            <li>许可证: MIT · 安装于 .qoder/skills/i-have-adhd</li>
           </ul>
         `
       }

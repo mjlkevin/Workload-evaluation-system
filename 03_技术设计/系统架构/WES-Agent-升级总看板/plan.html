@@ -23,6 +23,7 @@
           <a href="design-architecture.html">架构设计</a>
           <a class="active" href="plan.html">计划与进度</a>
           <a href="requirements.html">需求池</a>
+          <a href="special-projects.html">专项计划</a>
           </div>
         </div>
         <div class="nav-group">
@@ -540,7 +541,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <tr data-board-event-id="BE-2026-08-06-w2-precheck-o3-batchc:plan">
           <td>W2 执行（O4 服务层 handler 化 / O3 重定义为 Batch B+C）</td>
           <td>2026-08-06 前置核对确认 Batch C 覆盖原 O3 通道；用户同日决策将 Batch B→C 完整范围并入 O3，计划文档 §5.3 已重写为“持久执行引擎 + 异步事件通道”（粗估 50–65h，关卡（Gate） 驱动串行）。详见 <a href="integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> §5.3。</td>
-          <td><span class="status done"><span class="dot"></span>O4 已交付关闭（251b73d，冒烟 8 样本通过，Sprint 2 收官）</span>；<span class="status done"><span class="dot"></span>O3-B Batch B 已合入 main（1bd8477）/ 关卡 B 关闭</span>；<span class="status done"><span class="dot"></span>O3-C Batch C 已合入 main（70e78b1）/ 关卡 C 关闭</span>；<span class="status done"><span class="dot"></span>O3-D Batch D 已合入 main（81a7839）/ 关卡 D 关闭（B1 返工复审通过；缓办两项登记 Batch E 前收尾）</span>；<span class="status done"><span class="dot"></span>Gate D 人工验收通过（2026-08-09）/ 临时 flag 已移除</span>；<span class="status run"><span class="dot"></span>O3-E Batch E 工单已编制（2026-08-09-qoder-RP-047-E.md）/ 待用户批准派单（workflow 适配器 + boot 接线 + 前端 Run 化 + F 组复活 + 灰度演练）</span></td>
+          <td><span class="status done"><span class="dot"></span>O4 已交付关闭（251b73d，冒烟 8 样本通过，Sprint 2 收官）</span>；<span class="status done"><span class="dot"></span>O3-B Batch B 已合入 main（1bd8477）/ 关卡 B 关闭</span>；<span class="status done"><span class="dot"></span>O3-C Batch C 已合入 main（70e78b1）/ 关卡 C 关闭</span>；<span class="status done"><span class="dot"></span>O3-D Batch D 已合入 main（81a7839）/ 关卡 D 关闭（B1 返工复审通过；缓办两项登记 Batch E 前收尾）</span>；<span class="status done"><span class="dot"></span>Gate D 人工验收通过（2026-08-09）/ 临时 flag 已移除</span>；<span class="status run"><span class="dot"></span>O3-E Batch E 已回填（1feda52）/ Gate E 审计不通过：阻断 B1 boot 真实 dispatch 未接线（flag-on 链路必失败，G-E1 不成立）+ 阻断 B2 前端 409 静默回退无文案（F4 未落地）；用户已裁决退回返工，返工工单 2026-08-09-qoder-RP-047-E-REWORK.md 已编制（同分支 baseCommit=1feda52），待批准派单</span></td>
           <td>O3-B：四类崩溃可恢复、工具与消息无重复、关卡 B 验收（Testcontainers 故障注入）；O3-C：关卡 C 验收（异步契约、owner 安全、SSE 回放、断线不取消）；串行推进，allowNextTask 默认 false；O4 先建快照测试集再动刀（R3），且快照基线须建立在 O10 修复后的行为上。</td>
         </tr>
         <tr data-board-event-id="BE-2026-08-06-o10-scheduled:plan">

@@ -23,6 +23,7 @@
           <a href="design-architecture.html">架构设计</a>
           <a href="plan.html">计划与进度</a>
           <a href="requirements.html">需求池</a>
+          <a href="special-projects.html">专项计划</a>
           </div>
         </div>
         <div class="nav-group">
@@ -68,8 +69,8 @@
         <span><b>定位</b> 收录每日 GitHub 雷达中有启发性的开源工具，作为项目架构优化迭代的基础</span>
         <span><b>收录来源</b> 每日 GitHub 开源项目搜寻定时任务（搜寻 → 核验 → 分析 → 报告）</span>
         <span><b>收录口径</b> 必须完成与 WES 的代码级结合点论证，三维评级（启发性 / 优化价值 / 架构改进）</span>
-        <span><b>当前收录</b> 5 项（DeepEval、Langfuse、React Hook Form、TanStack Table、XState）</span>
-        <span><b>更新</b> 2026-08-06</span>
+        <span><b>当前收录</b> 8 项（GT-001~008）</span>
+        <span><b>更新</b> 2026-08-09</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill brand">收录 ≠ 引入</span>
@@ -91,8 +92,11 @@
         <li><b>§5</b> React Hook Form · 表单管理</li>
         <li><b>§6</b> TanStack Table · Headless 表格</li>
         <li><b>§7</b> XState · 状态机形式化</li>
-        <li><b>§8</b> 架构优化候选映射</li>
-        <li><b>§9</b> 维护规则</li>
+        <li><b>§8</b> OpenAPI TypeScript · 类型生成</li>
+        <li><b>§9</b> BullMQ · 分布式任务队列</li>
+        <li><b>§10</b> jsondiffpatch · JSON Diff/Patch</li>
+        <li><b>§11</b> 架构优化候选映射</li>
+        <li><b>§12</b> 维护规则</li>
       </ol>
     </div>
 
@@ -111,12 +115,56 @@
     <section>
       <div class="h-num">Section 02</div>
       <h2>收录总览</h2>
-      <p class="lead">当前收录 5 项。GT-001/002 来自 2026-08-03 定时任务报告，GT-003/004/005 来自 2026-08-06 定时任务报告，均完成代码级结合点论证后入库。收录标准：五维加权评分 ≥ 7.0，且结合点指向仓库内真实模块/文件。</p>
+      <p class="lead">当前收录 9 项。GT-001/002 来自 2026-08-03 手动收录，GT-003~005 来自 2026-08-06 定时任务报告，GT-006~008 来自 2026-08-09 定时任务报告，GT-009 来自 2026-08-09 用户指定深度分析。均完成代码级结合点论证后入库。收录标准：五维加权评分 ≥ 7.0，且结合点指向仓库内真实模块/文件。</p>
       <div class="panel">
-        <div class="panel-h">收录台账<span class="right">快照日期 2026-08-06</span></div>
+        <div class="panel-h">收录台账<span class="right">快照日期 2026-08-09</span></div>
         <div class="panel-b">
           <table>
             <tr><th>#</th><th>工具</th><th>领域</th><th>技术栈 / 许可</th><th>Star / Fork</th><th>活跃度</th><th>启发性</th><th>优化价值</th><th>架构改进</th><th>总评分</th><th>状态</th></tr>
+            <tr>
+              <td class="mono">GT-009</td>
+              <td><a href="https://github.com/TencentCloud/TencentDB-Agent-Memory" target="_blank" rel="noreferrer">TencentCloud/TencentDB-Agent-Memory</a></td>
+              <td>Agent 团队记忆中枢（Chat Memory / Skill / Wiki / CodeGraph）</td>
+              <td>TypeScript · MIT</td>
+              <td>⭐ 18,266 / 1,642</td>
+              <td>2026-08-06 有推送，极活跃（Beta）</td>
+              <td>★★★★☆</td><td>★★★☆☆</td><td>★★★★★</td>
+              <td class="mono"><b>7.10</b></td>
+              <td><span class="status done"><span class="dot"></span>已收录 · 仅借鉴</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-006</td>
+              <td><a href="https://github.com/openapi-ts/openapi-typescript" target="_blank" rel="noreferrer">openapi-ts/openapi-typescript</a></td>
+              <td>OpenAPI → TypeScript 类型生成</td>
+              <td>TypeScript · MIT</td>
+              <td>⭐ 8,290 / 660</td>
+              <td>2026-08-03 有推送，活跃</td>
+              <td>★★★★☆</td><td>★★★★★</td><td>★★★★☆</td>
+              <td class="mono"><b>8.20</b></td>
+              <td><span class="status done"><span class="dot"></span>已收录</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-007</td>
+              <td><a href="https://github.com/taskforcesh/bullmq" target="_blank" rel="noreferrer">taskforcesh/bullmq</a></td>
+              <td>Redis 分布式任务队列</td>
+              <td>TypeScript · MIT</td>
+              <td>⭐ 9,262 / 662</td>
+              <td>2026-08-08 有推送，极活跃</td>
+              <td>★★★☆☆</td><td>★★★★★</td><td>★★★★☆</td>
+              <td class="mono"><b>7.80</b></td>
+              <td><span class="status done"><span class="dot"></span>已收录</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-008</td>
+              <td><a href="https://github.com/benjamine/jsondiffpatch" target="_blank" rel="noreferrer">benjamine/jsondiffpatch</a></td>
+              <td>JSON Diff / Patch / 版本差异</td>
+              <td>TypeScript · MIT</td>
+              <td>⭐ 5,331 / 495</td>
+              <td>2026-05-14 有推送，稳定维护</td>
+              <td>★★★★☆</td><td>★★★★☆</td><td>★★★★☆</td>
+              <td class="mono"><b>7.75</b></td>
+              <td><span class="status done"><span class="dot"></span>已收录</span></td>
+            </tr>
             <tr>
               <td class="mono">GT-003</td>
               <td><a href="https://github.com/react-hook-form/react-hook-form" target="_blank" rel="noreferrer">react-hook-form/react-hook-form</a></td>
@@ -374,13 +422,247 @@
 
     <section>
       <div class="h-num">Section 08</div>
+      <h2>GT-006 · OpenAPI TypeScript（openapi-ts/openapi-typescript）</h2>
+      <p class="lead">从 OpenAPI 3.x 规范自动生成 TypeScript 类型声明的 CLI 工具与 Node API。零运行时依赖，生成的类型文件为纯 `.d.ts`，bundle size 影响为零。配套 `openapi-fetch` 提供类型安全的 fetch wrapper。对 WES 的直接意义是：让已有的 `docs/openapi.yaml` 从"文档装饰"升级为前后端类型的单一事实源，消除 21 模块接口变更后前端类型人工同步的痛点。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">核心价值</span><h3>单一事实源：OpenAPI → TS 类型</h3><p>一条命令从 YAML/JSON spec 生成完整 TS 类型定义；前端 API 层无需手写 interface，后端接口变更自动同步到前端。</p></div>
+        <div class="card"><span class="pill ok">许可与栈</span><h3>MIT · TypeScript · 零运行时依赖</h3><p>与 WES 前端 Vite + React 18、后端 Express + TypeScript 完全同构；生成类型零运行时开销。</p></div>
+        <div class="card"><span class="pill warn">前置条件</span><h3>openapi.yaml 必须与路由对齐</h3><p>当前 `docs/openapi.yaml` 与 21 模块路由存在已知差距，需先做 API 契约审计再生成类型，否则生成类型会暴露不一致。</p></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">与 WES 的结合点论证（2026-08-09 代码核验）<span class="right">已核实</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>结合点</th><th>仓库现状（已核验事实）</th><th>OpenAPI TypeScript 带来的改进</th></tr>
+            <tr>
+              <td>前端 API 类型层</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/api/*</code> 的 API 访问层完全手写类型定义（如 `auth.js`、`versions.js` 等），21 模块接口变更后需人工同步前端类型。</td>
+              <td>从 `docs/openapi.yaml` 自动生成 `api.d.ts`，前端直接 import 生成类型，消除人工同步；接口变更时构建失败即暴露不一致。</td>
+            </tr>
+            <tr>
+              <td>OpenAPI 契约对齐</td>
+              <td><code class="inline">docs/openapi.yaml</code> 作为 API 契约文档存在，但 `03_技术设计/系统演进/实现与文档对齐说明.md` 已识别其与实际实现的差距。</td>
+              <td>将类型生成纳入 CI（`build:web` 前置步骤），强制 `openapi.yaml` 与路由实现保持同步，否则构建失败。</td>
+            </tr>
+            <tr>
+              <td>前后端类型一致性</td>
+              <td>当前前后端类型各自维护，无统一来源；`apps/api/src/modules/*` 的 DTO/响应类型与前端 API 层类型可能不同步。</td>
+              <td>`openapi.yaml` 成为单一事实源，前后端共享同一份契约；配合已入选的 colinhacks/zod（2026-08-07 收录），可在后端用 Zod schema 驱动 OpenAPI 生成。</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">五维评分详情<span class="right">2026-08-09</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>维度</th><th>权重</th><th>评分</th><th>加权分</th><th>评分依据</th></tr>
+            <tr><td>技术创新性</td><td>20%</td><td>7</td><td>1.40</td><td>从 OpenAPI 生成 TS 类型不是新概念，但 openapi-typescript 在生态成熟度、零运行时开销、与 Vite 工具链兼容性上做到了业界最佳</td></tr>
+            <tr><td>WES 适用性</td><td>30%</td><td>9</td><td>2.70</td><td>WES 已有 openapi.yaml 但仅用于文档，前端 API 层完全手写类型，痛点明确且直接可解；与 Zod 配合可形成"schema → OpenAPI → TS 类型"完整链路</td></tr>
+            <tr><td>项目活跃度与社区支持</td><td>20%</td><td>8</td><td>1.60</td><td>8,290 Star，660 Fork，2026-08-03 有推送，openapi-ts 组织维护，社区活跃</td></tr>
+            <tr><td>代码质量与文档完整性</td><td>15%</td><td>9</td><td>1.35</td><td>文档覆盖 CLI、Node API、配置选项、常见模式；TypeScript 类型完整；测试覆盖充分</td></tr>
+            <tr><td>与 WES 技术栈兼容性</td><td>15%</td><td>9</td><td>1.35</td><td>TypeScript 原生、Vite 兼容、Express 无关（纯类型生成）、MIT 许可</td></tr>
+            <tr><td><b>总分</b></td><td>100%</td><td>—</td><td><b>8.20</b></td><td>—</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout ok"><div><b>实施建议</b>① `npm i -D openapi-typescript`；② 补充 `scripts/gen-api-types.ts` 脚本，调用 CLI 生成 `ui/V2_PROTOTYPE/src/types/api.d.ts`；③ 在 `build:web` 前置步骤自动运行；④ 逐步将 `src/api/*` 的手写类型替换为生成类型。引入成本极低，收益即时可见。</div></div>
+      <div class="callout warn"><div><b>风险</b>① 需先确保 `docs/openapi.yaml` 与 21 模块路由完全对齐，否则生成类型会暴露不一致问题；② 建议先做一次 API 契约审计再生成；③ 复杂泛型或自定义序列化场景可能需要手动覆盖。</div></div>
+    </section>
+    
+    <section>
+      <div class="h-num">Section 09</div>
+      <h2>GT-007 · BullMQ（taskforcesh/bullmq）</h2>
+      <p class="lead">Node.js 最成熟的 Redis 分布式任务队列，支持优先级队列、延迟任务、重复任务（cron）、任务依赖（flow）、并发控制、失败重试与死信队列。TypeScript-first，内置 Bull Board Web UI 可视化监控。新增 PostgreSQL 后端（实验性），与 WES Harness 域 PostgreSQL 架构天然兼容。对 WES 的直接意义是：AI 评估（Kimi 调用）从同步 HTTP 模式升级为异步队列模式，解决超时、阻塞和进度追踪问题。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">核心价值</span><h3>Redis 分布式任务队列</h3><p>优先级、延迟、重复、依赖、并发控制、重试、死信队列全覆盖；Bull Board Web UI 实时监控任务状态、进度、失败率。</p></div>
+        <div class="card"><span class="pill ok">许可与栈</span><h3>MIT · TypeScript · 支持 PostgreSQL 后端</h3><p>与 WES 后端 Express + TypeScript 同构；PostgreSQL 后端实验性功能与 Harness 域数据库架构兼容。</p></div>
+        <div class="card"><span class="pill warn">成本约束</span><h3>需 Redis 实例或 PostgreSQL 后端</h3><p>引入 Redis 增加运维复杂度；建议先在 AI 评估单场景试点，验证稳定后再扩展。</p></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">与 WES 的结合点论证（2026-08-09 代码核验）<span class="right">已核实</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>结合点</th><th>仓库现状（已核验事实）</th><th>BullMQ 带来的改进</th></tr>
+            <tr>
+              <td>AI 评估异步化</td>
+              <td><code class="inline">apps/api/src/modules/ai/</code> 为 facade，实际实现在 <code class="inline">services/ai/</code>（assessment、extractor、workbench-dispatch 等），当前采用同步 HTTP 请求模式调用 Kimi API，数秒到数十秒的响应时间。</td>
+              <td>将 Kimi 调用封装为 BullMQ Job，支持后台执行、进度回调、自动重试（API 抖动场景）、超时取消；前端从"等待转圈"升级为"提交→进度条→完成通知"。</td>
+            </tr>
+            <tr>
+              <td>Harness 持久运行时</td>
+              <td><code class="inline">apps/api/src/modules/harness/</code> 为 DB-backed 新业务域（PostgreSQL），审计对象为 run / artifact / modelRun / toolEvent。</td>
+              <td>与已入选的 trigger.dev（2026-08-05 收录）互补：BullMQ 提供底层队列能力，trigger.dev 提供上层 DAG 编排；harness runtime 的 AI session 执行可建模为 BullMQ Flow（多步骤任务链）。</td>
+            </tr>
+            <tr>
+              <td>Excel 批量导出</td>
+              <td><code class="inline">apps/api/src/modules/exports/</code> 处理 Excel 报表导出，大批量导出可能面临 HTTP 超时。</td>
+              <td>大批量导出任务异步化，用户通过 UI 轮询或 WebSocket 获取导出进度，避免 HTTP 超时。</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">五维评分详情<span class="right">2026-08-09</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>维度</th><th>权重</th><th>评分</th><th>加权分</th><th>评分依据</th></tr>
+            <tr><td>技术创新性</td><td>20%</td><td>6</td><td>1.20</td><td>任务队列是成熟领域，BullMQ 在 Redis 队列中做到了最佳，但无突破性架构创新</td></tr>
+            <tr><td>WES 适用性</td><td>30%</td><td>9</td><td>2.70</td><td>AI 评估同步超时、Excel 批量导出阻塞是 WES 当前明确痛点；BullMQ 直接解决，且 PostgreSQL 后端与 Harness 域兼容</td></tr>
+            <tr><td>项目活跃度与社区支持</td><td>20%</td><td>8</td><td>1.60</td><td>9,262 Star，662 Fork，2026-08-08 当日有推送，极活跃；Taskforce.sh 商业团队维护</td></tr>
+            <tr><td>代码质量与文档完整性</td><td>15%</td><td>9</td><td>1.35</td><td>TypeScript 类型完整，文档覆盖队列/Worker/Flow/Scheduler/Board；测试覆盖充分</td></tr>
+            <tr><td>与 WES 技术栈兼容性</td><td>15%</td><td>7</td><td>1.05</td><td>TypeScript 原生、Express 兼容；但需引入 Redis（或实验性 PostgreSQL 后端），增加运维复杂度</td></tr>
+            <tr><td><b>总分</b></td><td>100%</td><td>—</td><td><b>7.80</b></td><td>—</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout ok"><div><b>实施建议</b>① 部署 Redis 实例（或 docker-compose 新增 Redis 服务）；② `npm i bullmq`；③ 在 `modules/ai/` 新增 `ai-evaluation.queue.ts`；④ Worker 进程在 `apps/api/src/workers/` 独立目录；⑤ 前端增加任务状态轮询 API。建议先在 AI 评估单场景试点。</div></div>
+      <div class="callout warn"><div><b>风险</b>① 引入 Redis 增加运维复杂度（需持久化、监控、备份）；② PostgreSQL 后端为实验性功能，生产环境建议优先使用 Redis；③ 需评估 Worker 进程与 Express 主进程的协调（内存/CPU 隔离）。</div></div>
+    </section>
+    
+    <section>
+      <div class="h-num">Section 10</div>
+      <h2>GT-008 · jsondiffpatch（benjamine/jsondiffpatch）</h2>
+      <p class="lead">结构化 JSON Diff/Patch 引擎，深度遍历 JSON 对象树，精确识别新增、删除、修改、数组移动等操作，生成最小化 delta 对象。支持 diff → patch → reverse 完整操作链，内置 HTML formatter 可直接生成人类可读的差异对比视图。对 WES 的直接意义是：版本机制（检出/检入/升版）从"状态快照"升级为"增量差异"，实现字段级精确变更审计与可视化对比。</p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">核心价值</span><h3>结构化 Diff/Patch，可逆操作</h3><p>深度遍历 JSON 树，精确识别字段级变更；delta 对象最小化存储；支持 patch 和 reverse，天然适合版本控制系统。</p></div>
+        <div class="card"><span class="pill ok">许可与栈</span><h3>MIT · TypeScript · 零外部依赖</h3><p>与 WES 前端 Vite + React 18、后端 Express + TypeScript 完全同构；零依赖，体积极小。</p></div>
+        <div class="card"><span class="pill warn">成本约束</span><h3>大型 JSON diff 计算耗时</h3><p>大型对象 diff 可能耗时 >100ms，建议后台异步执行；大数组对比需配置合理的匹配策略。</p></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">与 WES 的结合点论证（2026-08-09 代码核验）<span class="right">已核实</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>结合点</th><th>仓库现状（已核验事实）</th><th>jsondiffpatch 带来的改进</th></tr>
+            <tr>
+              <td>版本 Diff 能力</td>
+              <td><code class="inline">apps/api/src/modules/versions/</code> 实现了检出/检入/升版的状态管理，但版本间内容差异对比能力较弱，升版后用户难以快速识别"改了什么"。</td>
+              <td>检入时自动计算新版本与上一版本的 JSON diff，存储 delta 而非完整快照，减少存储空间；升版时展示精确变更摘要。</td>
+            </tr>
+            <tr>
+              <td>变更审计追踪</td>
+              <td><code class="inline">apps/api/src/modules/history/</code> 记录操作历史，但仅保存快照，缺少精确的增量变更记录。</td>
+              <td>将每次操作的变更 delta 持久化，支持任意两个版本间的差异对比和变更回放，审计粒度从"操作级"提升到"字段级"。</td>
+            </tr>
+            <tr>
+              <td>前端版本对比 UI</td>
+              <td>前端版本操作按钮（检出/检入/升版）的 enabled/disabled 逻辑与后端条件检查各自实现，版本差异无可视化展示。</td>
+              <td>利用 HTML formatter 在评估详情页内嵌版本差异可视化对比面板，高亮显示字段级变更，提升用户体验。</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">五维评分详情<span class="right">2026-08-09</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>维度</th><th>权重</th><th>评分</th><th>加权分</th><th>评分依据</th></tr>
+            <tr><td>技术创新性</td><td>20%</td><td>7</td><td>1.40</td><td>JSON diff 是经典问题，jsondiffpatch 在可逆操作、HTML formatter、数组移动检测上做到了成熟稳定</td></tr>
+            <tr><td>WES 适用性</td><td>30%</td><td>8</td><td>2.40</td><td>WES 版本机制缺 diff 能力、history 模块缺增量追踪、评估数据缺变更审计，痛点明确；与现有 JSON 文件存储天然契合</td></tr>
+            <tr><td>项目活跃度与社区支持</td><td>20%</td><td>7</td><td>1.40</td><td>5,331 Star，495 Fork；最近推送 2026-05-14（3 个月前），更新频率偏低但核心 API 稳定、issue 响应及时</td></tr>
+            <tr><td>代码质量与文档完整性</td><td>15%</td><td>8</td><td>1.20</td><td>文档覆盖 diff/patch/reverse/formatter 全功能；TypeScript 类型完整；测试覆盖核心路径</td></tr>
+            <tr><td>与 WES 技术栈兼容性</td><td>15%</td><td>9</td><td>1.35</td><td>TypeScript 原生、零依赖、Express/React 无关（纯数据处理）、MIT 许可</td></tr>
+            <tr><td><b>总分</b></td><td>100%</td><td>—</td><td><b>7.75</b></td><td>—</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout ok"><div><b>实施建议</b>① `npm i jsondiffpatch`；② 在 `modules/versions/` 检入逻辑中增加 `diff()` 调用；③ 设计 delta 存储结构（在现有 JSON 文件中增加 `_deltas` 字段）；④ 前端新增 `<VersionDiff />` 组件，使用 HTML formatter 渲染。引入成本极低，可渐进式引入。</div></div>
+      <div class="callout warn"><div><b>风险</b>① 大型 JSON 对象 diff 计算可能耗时较长，建议后台异步执行；② 大数组对比需配置合理的 `arrays.diff` 策略（按 ID 匹配而非索引）；③ 更新频率偏低（3 个月），但核心 API 稳定，issue 响应及时。</div></div>
+    </section>
+    
+    <section>
+      <div class="h-num">Section 11</div>
+      <h2>GT-009 · TencentDB Agent Memory（TencentCloud/TencentDB-Agent-Memory）</h2>
+      <p class="lead">腾讯开源的 Agent 团队级记忆中枢：把对话、文档、代码转化为 Chat Memory / Skill / LLM-Wiki / Code-Graph 四类可治理、可共享、可装备的记忆资产。核心机制是 L0 对话 → L1 原子事实 → L2 场景知识 → L3 人格画像的异步蒸馏管线，配合 BM25（jieba 中文分词）+ 向量 + RRF 的混合检索与字符预算护栏。对 WES 的直接意义是：AI 工作台的跨会话记忆缺口第一次有了完整的参照系。<b>收录口径：仅借鉴设计模式，不整体引入（Beta v2.0.0-beta.1、SQLite 存储、Docker 三服务独立部署，与 WES 的 PostgreSQL 主路径和 Express 内嵌形态冲突）。</b></p>
+      <div class="grid-3">
+        <div class="card"><span class="pill brand">核心价值</span><h3>分层记忆蒸馏 + 资产治理</h3><p>会话逐层蒸馏为可复用资产；资产带 Owner、版本、状态、可见性（private/team/restricted/agent）与 Agent 绑定元数据；PersonaMem 基准 48% → 76%。</p></div>
+        <div class="card"><span class="pill ok">许可与栈</span><h3>MIT · TypeScript · Node ≥ 22.16</h3><p>语言同源（TypeScript），本机 Node v24 满足；但存储为 SQLite + sqlite-vec（无 PostgreSQL 后端），LLM 层用 Vercel AI SDK，与 WES 自研 ModelProvider 异构。</p></div>
+        <div class="card"><span class="pill warn">成本约束</span><h3>Beta 快速迭代 · 多服务部署</h3><p>默认分支 feat/server_team，Open Issues 573；部署需 memory-core + hub + proxy 三服务与两套 LLM Key；整体引入会分裂 WES 的 Harness 审计事实源。</p></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">与 WES 的结合点论证（2026-08-09 代码核验）· 借鉴点已标记<span class="right">已核实</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>借鉴点</th><th>仓库现状（已核验事实）</th><th>借鉴后的改进</th></tr>
+            <tr>
+              <td>① 分层记忆蒸馏（L0→L3）</td>
+              <td><code class="inline">data/ai-sessions.json</code> 与 <code class="inline">modules/ai-sessions/</code> 仅平铺保存会话事件；每个 Harness run 从零重建上下文，历史估算结论、客户偏好、已澄清口径不跨会话沉淀。</td>
+              <td>在 Harness PG 域新增项目记忆表，run 结束后异步蒸馏 L1 原子事实（口径/约束/偏好）与 L2 场景块（项目级上下文），新 run 冷启动注入。</td>
+            </tr>
+            <tr>
+              <td>② 中文混合检索</td>
+              <td>RP-031 RAG Baseline 未立项，<code class="inline">config/rag/</code> 仅有基础配置；知识库检索无 BM25/向量融合与预算护栏设计。</td>
+              <td>采纳 BM25（@node-rs/jieba 中文分词）+ 向量 + RRF 融合，加条目数/字符预算/超时三重护栏；直接作为 RP-031 的检索方案基线。</td>
+            </tr>
+            <tr>
+              <td>③ 团队记忆治理</td>
+              <td><code class="inline">modules/versions/</code> 有检出/检入状态但缺 Owner/可见性语义；skills/ 治理靠 Skill 生命周期规范，无资产级元数据。</td>
+              <td>复用其资产元数据模型（Owner/版本/状态/可见性/绑定关系）到知识库资产与 Skill 资产，与 WES 版本机制同构扩展。</td>
+            </tr>
+            <tr>
+              <td>④ SDK 集成模式</td>
+              <td><code class="inline">apps/api/src/agent/tool-registry.ts</code> 工具清单静态注入；RP-018 AI 可发现知识库资源工具未落地。</td>
+              <td>借鉴 /v3/tools/list 能力发现 + /v3/tools/call 按需调用的两段式接口，让 Agent 先发现后调用，控制上下文体积；SDK 与运行时解耦的边界设计用于未来外部 Agent 接入。</td>
+            </tr>
+            <tr>
+              <td>⑤ 开源社区生态实践</td>
+              <td><code class="inline">modules/trace/</code> 与 RP-030 统一 Trace Schema 未立项；WES AI 输出缺基准评测闭环（GT-001 DeepEval 同源问题）。</td>
+              <td>借鉴其 OpenTelemetry 全链路埋点与 PersonaMem 式基准评测方法：建立 WES 记忆/检索质量的回归基线，用数据证明每次迭代有效。</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">五维评分详情<span class="right">2026-08-09</span></div>
+        <div class="panel-b">
+          <table>
+            <tr><th>维度</th><th>权重</th><th>评分</th><th>加权分</th><th>评分依据</th></tr>
+            <tr><td>WES 适用性</td><td>30%</td><td>7</td><td>2.10</td><td>跨会话记忆是 WES Agent 真实缺口，但当前主线聚焦估算闭环与 RP-047，记忆层属战略性补位而非即时刚需</td></tr>
+            <tr><td>技术创新性</td><td>20%</td><td>8</td><td>1.60</td><td>L0→L3 分层蒸馏 + 资产治理 + 装备模型是完整的 Agent 记忆方法论，PersonaMem 提升 59% 有基准佐证</td></tr>
+            <tr><td>项目活跃度与社区支持</td><td>20%</td><td>8</td><td>1.60</td><td>18,266 Star / 1,642 Fork，2026-08-06 仍在推送；扣分项：Beta 版本、默认分支非 main、Open Issues 573</td></tr>
+            <tr><td>代码质量与文档完整性</td><td>15%</td><td>7</td><td>1.05</td><td>双语安装文档、vitest 覆盖、kubb 从 OpenAPI 生成客户端；Beta 阶段接口稳定性未证明</td></tr>
+            <tr><td>与 WES 技术栈兼容性</td><td>15%</td><td>5</td><td>0.75</td><td>TypeScript 同源、Node 门槛满足；但 SQLite≠PostgreSQL、插件/独立服务形态无法嵌入 Express、需两套 LLM Key</td></tr>
+            <tr><td><b>总分</b></td><td>100%</td><td>—</td><td><b>7.10</b></td><td>达到收录线 ≥ 7.0</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout ok"><div><b>实施建议（仅借鉴，不引入）</b>① 借鉴设计落 WES 自研实现，全部挂在现有 Express + PostgreSQL（Harness 域）+ React 技术栈内，不新增第二套存储或服务；② 五个借鉴点的完整落地计划见 <a href="agent-memory-borrowing-plan-2026-08-09.md">agent-memory-borrowing-plan-2026-08-09.md</a>（已专项立项 <a href="special-projects.html">SP-2026-007</a>，方案草案待批准）；③ 如需直观体验可单独 clone 按 INSTALL 在 8125 端口试玩，与 WES 3000/3002 端口无冲突；④ 持续观察其合入 main 与稳定版发布，届时再评估 Sidecar 对接。</div></div>
+      <div class="callout warn"><div><b>风险</b>① Beta 接口易变（573 open issues、默认分支 feat/server_team），任何依赖其 API 的实现都会被拖累；② 整体引入会造成审计事实源分裂（WES Harness 是唯一审计真源）；③ 会话数据进入第三方记忆组件存在数据主权与合规问题；④ 其向量检索依赖 sqlite-vec，若照搬到 PG 需改走 pgvector，属 DB 迁移触发器范畴，需先更新项目计划再推进。</div></div>
+    </section>
+    
+    <section>
+      <div class="h-num">Section 12</div>
       <h2>架构优化候选映射</h2>
-      <p class="lead">收录的目的是转化为迭代。下表把五个工具的方法论映射到 WES 的架构优化候选项；候选项尚未立项，立项时按需求池分诊流程走（记录 issue → 分类 → 创建 RP），不跳过治理。</p>
+      <p class="lead">收录的目的是转化为迭代。下表把九个工具的方法论映射到 WES 的架构优化候选项；候选项尚未立项，立项时按需求池分诊流程走（记录 issue → 分类 → 创建 RP），不跳过治理。</p>
       <div class="panel">
         <div class="panel-h">工具 → 优化候选<span class="right">待立项</span></div>
         <div class="panel-b">
           <table>
             <tr><th>来源工具</th><th>可借鉴方法论</th><th>WES 优化候选</th><th>建议优先级</th><th>关联看板页</th><th>状态</th></tr>
+            <tr>
+              <td class="mono">GT-006 OpenAPI TS</td>
+              <td>OpenAPI 3.x → TypeScript 类型生成、零运行时依赖、CI 集成</td>
+              <td>API 契约单一事实源：从 openapi.yaml 自动生成前端 API 类型，消除 21 模块接口变更后的人工同步；配合 Zod 形成 schema → OpenAPI → TS 类型完整链路</td>
+              <td>高（成本低、即时收益）</td>
+              <td>设计说明 · 需求池</td>
+              <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-007 BullMQ</td>
+              <td>Redis 分布式任务队列、优先级/延迟/重复任务、Bull Board 监控、PostgreSQL 后端</td>
+              <td>AI 评估与导出异步化：Kimi 调用封装为队列 Job，支持后台执行、进度追踪、自动重试；Excel 批量导出异步化；Harness runtime 多步骤任务链建模</td>
+              <td>中高（需 Redis 基础设施）</td>
+              <td>设计说明 · 风险与决策 · AI 任务执行</td>
+              <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GT-008 jsondiffpatch</td>
+              <td>结构化 JSON diff/patch/reverse、delta 最小化存储、HTML formatter 可视化</td>
+              <td>版本机制增量差异化：检入时计算 delta 替代全量快照；history 模块记录字段级变更；前端内嵌版本差异可视化对比面板</td>
+              <td>中（成本低，需设计 delta 存储结构）</td>
+              <td>设计说明 · 需求池</td>
+              <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
+            </tr>
             <tr>
               <td class="mono">GT-001 DeepEval</td>
               <td>G-Eval 评分标准、JSON Correctness 断言、固定数据集回归</td>
@@ -408,7 +690,7 @@
             <tr>
               <td class="mono">GT-004 TanStack Table</td>
               <td>Headless 表格逻辑层、排序/过滤/分页/虚拟化、与 TanStack/query 同生态</td>
-              <td>表格交互层统一：封装 DataTable 基础组件 → ListPage 接入 → 逐页迁移，与 TanStack/query 形成“获取+展示”统一数据层</td>
+              <td>表格交互层统一：封装 DataTable 基础组件 → ListPage 接入 → 逐页迁移，与 TanStack/query 形成"获取+展示"统一数据层</td>
               <td>中高（先改造数据密集型表格）</td>
               <td>设计说明 · 需求池</td>
               <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
@@ -421,14 +703,22 @@
               <td>设计说明 · 风险与决策</td>
               <td><span class="status todo"><span class="dot"></span>候选 / 未立项</span></td>
             </tr>
+            <tr>
+              <td class="mono">GT-009 TencentDB Agent Memory</td>
+              <td>五大借鉴点：① 分层记忆蒸馏（L0→L3）② 中文混合检索（BM25/jieba + 向量 + RRF + 预算护栏）③ 团队记忆治理（Owner/版本/状态/可见性资产模型）④ SDK 集成模式（tools/list 发现 + tools/call 调用 + SDK 解耦）⑤ 开源社区生态（基准评测驱动 + 冷启动导入 + 贡献实践）</td>
+              <td>WES Agent 记忆层补齐：会话记忆蒸馏入 Harness PG 域、知识库混合检索支撑 RP-031、资产元数据模型复用到版本/Skill 治理、工具发现模式支撑 RP-018、评测闭环对标 PersonaMem 方法论。明确不整体引入该框架（Beta、SQLite、独立三服务）</td>
+              <td>中高（P1 混合检索先行，记忆蒸馏次之）</td>
+              <td>设计说明 · 需求池 · <a href="agent-memory-borrowing-plan-2026-08-09.md">借鉴优化方案</a></td>
+              <td><span class="status run"><span class="dot"></span>已专项立项 SP-2026-007 · 待批准</span></td>
+            </tr>
           </table>
         </div>
       </div>
-      <div class="callout"><div><b>推进规则</b>候选项要进入实施，必须先在本页补充“立项依据”，再按 skills/recording-wes-requirements 分诊进入需求池；涉及数据库主路径变化的，先核对 AGENTS.md 的 DB 迁移触发器并在风险与决策页登记。</div></div>
+      <div class="callout"><div><b>推进规则</b>候选项要进入实施，必须先在本页补充"立项依据"，再按 skills/recording-wes-requirements 分诊进入需求池；涉及数据库主路径变化的，先核对 AGENTS.md 的 DB 迁移触发器并在风险与决策页登记。</div></div>
     </section>
-
+    
     <section>
-      <div class="h-num">Section 09</div>
+      <div class="h-num">Section 13</div>
       <h2>维护规则</h2>
       <div class="grid-2">
         <div class="card"><span class="pill brand">收录要求</span><h3>新增条目的必备字段</h3><p>仓库链接、快照日期（Star/Fork/活跃度）、技术栈与许可、三维评级、代码级结合点论证（指向真实模块/文件/命令）、分阶段实施建议、风险说明。</p></div>
@@ -437,7 +727,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 开源工具雷达 · 2026-08-06 · 收录 5 项（GT-001 DeepEval / GT-002 Langfuse / GT-003 React Hook Form / GT-004 TanStack Table / GT-005 XState）
+      WES 项目管理 · 开源工具雷达 · 2026-08-09 · 收录 9 项（GT-001 DeepEval / GT-002 Langfuse / GT-003 React Hook Form / GT-004 TanStack Table / GT-005 XState / GT-006 OpenAPI TypeScript / GT-007 BullMQ / GT-008 jsondiffpatch / GT-009 TencentDB Agent Memory）
     </footer>
   </main>
   <script src="assets/board-ui.js" defer></script>

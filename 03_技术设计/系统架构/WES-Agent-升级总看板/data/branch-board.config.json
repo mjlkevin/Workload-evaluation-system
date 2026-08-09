@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "mainBranch": "codex/role-driven-ai-home-workbench",
+  "mainBranch": "main",
   "defaultRemote": "origin",
   "staleAfterDays": 30
 }
