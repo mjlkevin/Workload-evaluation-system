@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { apiClient } from '../../../api/client.js'
 import { unwrap } from '../../../api/utils.js'
+import { submitRun } from '../../../api/aiRuns.js'
 import { sessionRuntimeStore } from '../../../hooks/useSessionRuntimeStore.js'
 import { pickArray } from '../utils/harnessPayload.js'
 import { buildAttachmentUnderstanding, isExplicitReportRequest, summarizeHomeParsedFile } from '../utils/reportParser.js'
@@ -22,6 +23,8 @@ import {
  * （isExplicitReportRequest）保持不变。
  */
 export default function useChatMessages(workbench) {
+  // RP-047 Batch E：模块级缓存，避免每条消息重复探测 503
+  const runsDisabledRef = useRef(false)
   const [messages, setMessages] = useState([])
   // RP-047 Batch D（G1）：sending 按会话键控，A 进行中不阻塞 B 发送；
   // 对外暴露的 sending 仅反映当前激活会话，旧链路行为不变。
@@ -228,6 +231,34 @@ export default function useChatMessages(workbench) {
         sendKey = session.sessionId
         markSending(sendKey, true)
       }
+      // RP-047 Batch E：尝试 Run 提交；503 回退旧同步路径
+      let runSubmitted = false
+      if (!runsDisabledRef.current && session?.sessionId) {
+        try {
+          const runResult = await submitRun(session.sessionId, {
+            submissionKey: userMessage.id,
+            clientMessageId: userMessage.id,
+            content: userMessage.text,
+          })
+          if (runResult?.runId) {
+            runSubmitted = true
+            // Run 已入队：loading 消息保持，后续 assistant 消息经 SSE 到达
+            // 由 useBackgroundRuns 消费事件流并更新会话视图
+          }
+        } catch (err) {
+          if (err?.status === 503 || err?.code === 'ASYNC_RUNS_DISABLED') {
+            runsDisabledRef.current = true
+          }
+          // 其他错误（409/404/网络等）静默回退旧同步路径，不抛错
+        }
+      }
+
+      // flag off 或 Run 提交失败时回退旧同步路径（行为逐字不变）
+      if (runSubmitted) {
+        // Run 已提交：不执行旧同步路径，等待 SSE 事件
+        return
+      }
+
       const payload = await apiClient.post('/ai/home-workbench/chat', {
         sessionId: session?.sessionId,
         workflowKey,
