@@ -129,7 +129,7 @@ ae74b58e722abe7ddf5948e07dd220808acce8a9
 12. docs/codex-workflows/qoder-ui-optimization-bootstrap.md
 13. docs/codex-workflows/external-ai-handoff-template.md
 
-只有 NightOps 任务才额外读取当前 Night Mission Packet、最新 Codex Gate 和 docs/agent-loop/nightops-templates.md。这个初始化任务不是 NightOps 实现任务。
+【历史说明，已下线】NightOps 无人值守机制已于 2026-08-09 整体下线，相关模板与任务包不再存在；本初始化任务按普通一次性任务执行。
 
 【只读预检】
 在 projectRoot 执行并记录摘要：

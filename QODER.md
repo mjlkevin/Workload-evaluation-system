@@ -22,8 +22,7 @@ If Qoder does not support skill installation, read and follow the same files man
 
 - `skills/wes-qoder-worktree-protocol/SKILL.md`
 - `skills/wes-qoder-worktree-protocol/references/protocol.md`
-- `skills/wes-multi-agent-collaboration/SKILL.md`（多 Agent 协作协议，v0.3.0-draft）
-- `docs/agent-loop/nightops-templates.md`（仅 NightOps / 无人值守任务需要）
+- `skills/wes-multi-agent-collaboration/SKILL.md`（多 Agent 协作协议，v0.4.0）
 
 ## Mandatory Reading Order
 
@@ -34,8 +33,6 @@ If Qoder does not support skill installation, read and follow the same files man
 5. `skills/wes-qoder-worktree-protocol/SKILL.md`
 6. `skills/wes-qoder-worktree-protocol/references/protocol.md`
 7. `skills/wes-multi-agent-collaboration/SKILL.md`（多 Agent 协作协议）
-8. NightOps 任务必须读取当前 `docs/agent-loop/nightly/YYYY-MM-DD-mission.md`
-9. NightOps 任务必须读取最新 `docs/agent-loop/audits/YYYY-MM-DD-codex-<taskId>-gate.md`（若存在）
 
 ## Execution Contract
 
@@ -49,15 +46,6 @@ If Qoder does not support skill installation, read and follow the same files man
 
 Qoder may report `已回填 / 待 Codex 复核`; Codex/user decide whether a WES requirement is `已交付`.
 
-## NightOps Execution Contract
+## 历史说明（已下线）
 
-When the task is part of the Beijing-time 00:00-09:30 NightOps window:
-
-- The user owner has explicitly authorized a Qoder platform-local NightOps executor Loop. This loop may only act on the latest Night Mission Packet and latest Codex Gate.
-- Read the Night Mission Packet before creating or editing a worktree.
-- Read the latest Codex Gate result before starting. If `mustReworkFirst=true`, repair that task first.
-- Do not claim a new RP unless the latest Codex Gate explicitly sets `allowNextTask=true`.
-- Use one worktree/branch for the assigned task only; do not carry unrelated dirty changes.
-- Write the handoff to the mission's `qoderHandoffPath` when requested, using `docs/agent-loop/nightops-templates.md`.
-- Stop when the task needs user acceptance, real API secrets, architecture changes, DB migration, auth/owner-model changes, mainline merge, or delivery status closure.
-- NightOps output status is still limited to `已回填 / 待 Codex 复核`; Codex Gate and user acceptance decide the rest.
+【历史说明，已下线】原 NightOps Execution Contract（北京时间 00:00-09:30 无人值守执行窗口）已于 2026-08-09 随 NightOps 机制整体下线删除；Qoder 不再创建或参与无人值守 Loop，所有任务按上述普通 Execution Contract 执行。
