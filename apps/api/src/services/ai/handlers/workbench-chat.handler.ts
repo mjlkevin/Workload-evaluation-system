@@ -20,6 +20,7 @@ import {
   HOME_ROLE_PRESETS,
   allParsedHomeAttachments,
   buildHomeMessageContentForModel,
+  buildWorkbenchChatDispatchInput,
   currentUserFromRequest,
   ensureHomeAiSession,
   getKimiProvider,
@@ -83,18 +84,8 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
     const roleLabel = HOME_ROLE_PRESETS[businessRole].label;
     const modelName = normalizeKimiModelName(config.kimi.model);
 
-    const dispatchData = await dispatchHomeWorkbenchTurn({
-      requestId,
-      user,
-      workflowKey,
-      message: userMessage.content,
-      attachment: parsedAttachment ? { name: parsedAttachment.name, size: parsedAttachment.size, type: parsedAttachment.type, parsedSummary: parsedAttachment.parsedSummary } : null,
-      latestHarnessArtifact: null,
-      clientAction: asString(body.clientAction),
-      businessRole,
-      roleLabel,
-      model: modelName,
-      rolePrompt: HOME_ROLE_PRESETS[businessRole].prompt,
+    const dispatchInput = buildWorkbenchChatDispatchInput(user, userMessage.content, {
+      messages,
       modelChat: async ({ systemPrompt, userContent }) => {
         const { apiKey } = resolveActiveRequirementKimiApiKey();
         if (!apiKey) throw new Error("required_or_env_missing");
@@ -120,6 +111,21 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
           finishReason: completion.finishReason,
         };
       },
+    });
+
+    const dispatchData = await dispatchHomeWorkbenchTurn({
+      requestId,
+      user: dispatchInput.user,
+      workflowKey,
+      message: dispatchInput.message,
+      attachment: parsedAttachment ? { name: parsedAttachment.name, size: parsedAttachment.size, type: parsedAttachment.type, parsedSummary: parsedAttachment.parsedSummary } : null,
+      latestHarnessArtifact: null,
+      clientAction: asString(body.clientAction),
+      businessRole: dispatchInput.businessRole,
+      roleLabel: dispatchInput.roleLabel,
+      model: dispatchInput.model,
+      rolePrompt: dispatchInput.rolePrompt,
+      modelChat: dispatchInput.modelChat,
     });
     traceContextRefs = dispatchData.trace.contextRefs;
     traceRoutingRule = dispatchData.trace.routingRule;

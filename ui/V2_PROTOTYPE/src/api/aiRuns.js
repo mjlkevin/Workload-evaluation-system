@@ -42,6 +42,20 @@ export async function cancelRun(runId) {
 }
 
 /**
+ * 提交 Run（RP-047 Batch E · Step 3）。
+ * POST /ai-sessions/:sessionId/runs，返回 { runId, status, eventCursor }。
+ * 503 ASYNC_RUNS_DISABLED 抛错供调用方回退旧同步路径。
+ */
+export async function submitRun(sessionId, { submissionKey, clientMessageId, content }) {
+  const payload = await apiClient.post(
+    `/ai-sessions/${sessionId}/runs`,
+    { submissionKey, clientMessageId, content },
+    { suppressUnauthorizedRedirect: true },
+  )
+  return unwrap(payload)
+}
+
+/**
  * 订阅 Run 事件流（SSE 回放）。自含 fetch + Bearer + 解析：
  * - `Last-Event-ID` 头与 `after` 参数同值下发（服务端头优先，契约 D6）；
  * - 注释帧（心跳 `: heartbeat`）静默忽略；
