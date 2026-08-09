@@ -13,6 +13,7 @@ import { createWorkbenchChatWorkflow } from "./workbench-chat.workflow";
 import { createHarnessWorkflowRegistry } from "./harness-runtime.worker";
 import { dispatchHomeWorkbenchTurn } from "../../services/ai/workbench-dispatch.service";
 import { buildWorkbenchChatDispatchInput, getKimiProvider } from "../../services/ai/handlers/workbench-shared";
+import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.repository";
 import type { AuthUser } from "../../types";
 import { config } from "../../config/env";
 import { resolveActiveRequirementKimiApiKey } from "../system/system.repository";
@@ -66,6 +67,9 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
         modelChat: dispatchInput.modelChat,
       });
     },
+    // Batch E 二次返工（新通道消息落库）C2：用户消息幂等落库生产接线，
+    // 与投影 sink 同款 API，默认会话存储路径（data/ai-sessions.json）。
+    appendSessionMessage: (input) => appendAiSessionMessageIdempotent(input),
   });
   const registry = createHarnessWorkflowRegistry([workflow]);
 

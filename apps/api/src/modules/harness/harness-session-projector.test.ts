@@ -22,11 +22,12 @@ import {
   type CreateQueuedHarnessRunInput,
   type HarnessRuntimeRepository,
 } from "./harness-runtime.repository";
-import { HarnessFaultInjectedError } from "./harness-runtime.worker";
+import { HarnessFaultInjectedError, type HarnessWorkflowStepContext } from "./harness-runtime.worker";
 import {
   createHarnessSessionProjector,
   type HarnessSessionMessageSink,
 } from "./harness-session-projector";
+import { createWorkbenchChatWorkflow } from "./workbench-chat.workflow";
 import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.repository";
 import type { AiMessage, AiSessionsStore } from "../ai-sessions/ai-sessions.types";
 
@@ -308,4 +309,120 @@ test("T9c sink failures retry with backoff and exhaust into failed", { skip: !te
   assert.equal(exhausted.status, "failed");
   assert.equal(exhausted.attempts, 2);
   assert.equal(readStore(storePath).sessions[0].messages.length, 0, "failed projection never writes the session");
+});
+
+// ============================================================
+// Batch E 二次返工（新通道消息落库双缺陷修复）
+// T-E1 focused 端到端守护：真实 workflow 执行 → 用户消息落库 +
+// outbox 投影 → 会话 assistant 消息内容非空且与 answer 一致；
+// 恢复重放不产生重复消息。
+// ============================================================
+
+function makeWorkflowStepContext(run: HarnessRunRow, content: string): HarnessWorkflowStepContext {
+  return {
+    run,
+    attempt: {
+      harnessRunAttemptId: `attempt-${randomUUID()}`,
+      harnessRunId: run.harnessRunId,
+      workerId: "test-worker",
+      attemptNo: 1,
+      status: "running",
+      startedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as HarnessWorkflowStepContext["attempt"],
+    stepKey: "chat",
+    state: {},
+    resumeFrom: null,
+    abortSignal: new AbortController().signal,
+    makeEffectKey: (effectName, ordinal) => `${run.harnessRunId}:${effectName}:${ordinal}`,
+    recordToolEffectOnce: async (effect) => ({ output: await effect.execute(), created: true }),
+  } as HarnessWorkflowStepContext;
+}
+
+test("T-E1 Batch E 二次返工（新通道消息落库）端到端：workflow → 用户消息落库 + outbox 投影 assistant 内容完整", { skip: !testDatabaseUrl }, async () => {
+  const ANSWER = "利润中心是承担损益责任的组织单元（端到端守护回复）";
+  const QUESTION = "利润中心是什么";
+
+  const input: CreateQueuedHarnessRunInput = {
+    ownerUserId: `owner-${randomUUID()}`,
+    ownerUsername: "projector-tester",
+    aiSessionId: `session-${randomUUID()}`,
+    submissionKey: `submission-${randomUUID()}`,
+    title: QUESTION,
+    workflowId: "workbench_chat_v1",
+    workflowVersion: "1.0.0",
+    executionConfig: { content: QUESTION },
+    metadata: {},
+  };
+  const created = await repo!.createQueuedRun(input);
+  createdRunIds.push(created.run.harnessRunId);
+  const run = created.run;
+  const storePath = makeSessionStore(run.aiSessionId!, run.ownerUserId);
+
+  // 真实 workflow 适配器 + stub dispatch（不真实调用模型）；
+  // appendSessionMessage 指向临时会话存储（与生产 sink 同款幂等 API）。
+  const workflow = createWorkbenchChatWorkflow({
+    dispatch: async () =>
+      ({
+        intent: "domain_qa",
+        answer: ANSWER,
+        businessRole: "pre_sales",
+        roleLabel: "售前顾问",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+      }) as never,
+    appendSessionMessage: (appendInput) =>
+      appendAiSessionMessageIdempotent({ ...appendInput, storePath }),
+  });
+
+  // 1) worker 执行 workflow：用户消息先落库（缺陷 B 守护）
+  const outcome = await workflow.executeStep("chat", makeWorkflowStepContext(run, QUESTION));
+  const storeAfterStep = readStore(storePath);
+  assert.equal(storeAfterStep.sessions[0].messages.length, 1, "执行完成后即可从会话存储读到本轮 user 消息");
+  assert.equal(storeAfterStep.sessions[0].messages[0].role, "user");
+  assert.equal(storeAfterStep.sessions[0].messages[0].content, QUESTION);
+
+  // 2) worker 持久化 outbox（与 harness-runtime.worker.ts 提交链路同款调用）
+  assert.equal(outcome.outbox!.length, 1);
+  assert.equal(outcome.outbox![0].deduplicationKey, `${run.harnessRunId}:assistant:1`, "G-E3 deduplicationKey 冻结口径");
+  for (const entry of outcome.outbox!) {
+    await repo!.enqueueSessionOutbox({
+      runId: run.harnessRunId,
+      aiSessionId: run.aiSessionId!,
+      eventType: entry.eventType,
+      deduplicationKey: entry.deduplicationKey,
+      payload: entry.payload,
+    });
+  }
+
+  // 3) projector 投影：assistant 消息内容非空且与 answer 一致（缺陷 A 守护）
+  const projector = makeProjector(makeSink(storePath, { remaining: 0 }));
+  const results = await projector.projectOnce();
+  assert.deepEqual(results.map((r) => r.outcome), ["published"]);
+
+  const storeAfterProjection = readStore(storePath);
+  const messages = storeAfterProjection.sessions[0].messages;
+  assert.equal(messages.length, 2, "user + assistant 各一条，顺序 user 在前");
+  assert.equal(messages[0].role, "user");
+  assert.equal(messages[1].role, "assistant");
+  assert.ok(messages[1].content.length > 0, "assistant 消息不得落成空内容（缺陷 A）");
+  assert.equal(messages[1].content, ANSWER, "投影内容必须与 answer 一致");
+
+  // 4) 恢复重放：同 step 重执行 + 重 enqueue + 重投影，不产生重复消息
+  const replayOutcome = await workflow.executeStep("chat", makeWorkflowStepContext(run, QUESTION));
+  for (const entry of replayOutcome.outbox!) {
+    const requeued = await repo!.enqueueSessionOutbox({
+      runId: run.harnessRunId,
+      aiSessionId: run.aiSessionId!,
+      eventType: entry.eventType,
+      deduplicationKey: entry.deduplicationKey,
+      payload: entry.payload,
+    });
+    assert.equal(requeued.created, false, "重放 enqueue 必须被 deduplicationKey 幂等吸收");
+  }
+  const replayResults = await projector.projectOnce();
+  assert.equal(replayResults.length, 0, "已 published 的行不得被再次投影");
+  const finalMessages = readStore(storePath).sessions[0].messages;
+  assert.equal(finalMessages.length, 2, "重放后仍只有 user + assistant 各一条");
 });
