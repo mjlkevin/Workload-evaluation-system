@@ -222,9 +222,11 @@ export function buildWorkbenchChatModelChat(
       : "";
 
     const safeMessages = messages.slice(-12).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
-    // 覆盖最后一条用户消息的 system prompt
+    // 覆盖最后一条用户消息的 system prompt；异步通道不传历史时补推 userContent，避免模型只看到 system prompt（C3）
     if (safeMessages.length > 0) {
       safeMessages[safeMessages.length - 1] = { role: "user", content: userContent };
+    } else {
+      safeMessages.push({ role: "user", content: userContent });
     }
 
     const finalSystemPrompt = memoryPrompt

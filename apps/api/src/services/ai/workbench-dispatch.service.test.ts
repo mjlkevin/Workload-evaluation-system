@@ -3,9 +3,12 @@ import fs from "node:fs";
 import test from "node:test";
 
 import type { AuthUser, KnowledgeBaseProfile } from "../../types";
-import { versionsStorePath } from "../../utils";
+import { versionsStorePath, requirementSystemConfigStorePath } from "../../utils";
 import { dispatchHomeWorkbenchTurn } from "./workbench-dispatch.service";
 import type { ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
+import { buildWorkbenchChatModelChat, type HomeMessageInput } from "./handlers/workbench-shared";
+import { defaultProviderRegistry, type ModelProvider, type ChatCompletionRequest, type ChatCompletionResponse } from "../../ai/provider";
+import { loadRequirementSystemConfigStore, saveRequirementSystemConfigStore } from "../../modules/system/system.repository";
 
 const user: AuthUser = {
   id: "user-rp-013",
@@ -931,4 +934,80 @@ test("RP-047-B: abort racing a pending non-streaming model call rejects as cance
     })(),
     (err: unknown) => err instanceof Error && err.name === "WorkbenchDispatchCancelledError",
   );
+});
+
+// ── RP-047 Batch E · C3（异步通道漏带用户问题）：modelChat 工厂消息组装 ────────────────
+// 缺陷：异步通道（harness workflow）不传会话历史，safeMessages 为空数组时
+// userContent 从未进入发给模型的 messages，意图分类器与回答模型只看到 system prompt。
+
+function createCapturingKimiProvider(): ModelProvider & { lastRequest?: ChatCompletionRequest } {
+  return {
+    name: "kimi",
+    defaultModel: "mock",
+    isAvailable: () => true,
+    async chatCompletion(req): Promise<ChatCompletionResponse> {
+      this.lastRequest = req;
+      return { content: "mock-answer", rawContent: "mock-answer", model: "mock", provider: "kimi", attempts: 1 };
+    },
+  };
+}
+
+/** 快照需求系统配置 store 与 provider 注册表，注入测试 apiKey 与 mock provider，结束后原样恢复 */
+async function withModelChatSandbox(run: (provider: ModelProvider & { lastRequest?: ChatCompletionRequest }) => Promise<void>): Promise<void> {
+  const storePath = requirementSystemConfigStorePath();
+  const existed = fs.existsSync(storePath);
+  const before = existed ? fs.readFileSync(storePath, "utf-8") : "";
+  const previousProvider = defaultProviderRegistry.get("kimi");
+  const mockProvider = createCapturingKimiProvider();
+  defaultProviderRegistry.register(mockProvider, { asDefault: true });
+  try {
+    const store = loadRequirementSystemConfigStore();
+    store.active.kimiCredentials = { apiKey: "test-fixture-key" };
+    saveRequirementSystemConfigStore(store);
+    await run(mockProvider);
+  } finally {
+    if (existed) {
+      fs.writeFileSync(storePath, before, "utf-8");
+    } else if (fs.existsSync(storePath)) {
+      fs.unlinkSync(storePath);
+    }
+    defaultProviderRegistry.unregister("kimi");
+    if (previousProvider) defaultProviderRegistry.register(previousProvider);
+  }
+}
+
+test("C3（异步通道漏带用户问题）: 空会话历史时 modelChat 发出的请求必须包含 role=user 且 content=userContent", async () => {
+  await withModelChatSandbox(async (provider) => {
+    // 异步通道（harness workflow）不传 messages —— 复现缺陷场景
+    const modelChat = buildWorkbenchChatModelChat(user, {});
+    await modelChat({ systemPrompt: "你是意图分类器。", userContent: "利润中心是什么" });
+
+    const request = provider.lastRequest;
+    assert.ok(request, "mock provider 应收到一次 chatCompletion 请求");
+    const userMessages = request!.messages.filter((message) => message.role === "user");
+    assert.equal(userMessages.length, 1, "messages 为空数组时也必须带上用户问题，否则模型只看到 system prompt");
+    assert.equal(userMessages[0].content, "利润中心是什么");
+    assert.equal(request!.messages[0].role, "system");
+  });
+});
+
+test("C3（异步通道漏带用户问题）守护: 同步通道带会话历史时最后一条用户消息仍被 userContent 覆盖", async () => {
+  await withModelChatSandbox(async (provider) => {
+    const history: HomeMessageInput[] = [
+      { role: "user", content: "上一轮问题", attachments: [] },
+      { role: "assistant", content: "上一轮回答", attachments: [] },
+      { role: "user", content: "本轮原始消息", attachments: [] },
+    ];
+    const modelChat = buildWorkbenchChatModelChat(user, { messages: history });
+    await modelChat({ systemPrompt: "你是回答模型。", userContent: "本轮含附件上下文的完整问题" });
+
+    const request = provider.lastRequest;
+    assert.ok(request);
+    // system + 3 条历史，最后一条被 userContent 覆盖（同步通道行为零变化）
+    assert.equal(request!.messages.length, 4);
+    assert.equal(request!.messages[0].role, "system");
+    const last = request!.messages[request!.messages.length - 1];
+    assert.equal(last.role, "user");
+    assert.equal(last.content, "本轮含附件上下文的完整问题");
+  });
 });
