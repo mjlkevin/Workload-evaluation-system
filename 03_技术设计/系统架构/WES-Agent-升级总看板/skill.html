@@ -156,7 +156,7 @@
       <div class="crumb">WES Agent · Skill 集成关系</div>
       <h1>Skill 体系</h1>
       <p class="meta">
-        <span><b>图表版本</b> v2.1 · 正交路由</span>
+        <span><b>图表版本</b> v2.3 · 正交路由</span>
         <span><b>风格基线</b> Claude 官方风格</span>
         <span><b>生成工具</b> fireworks-tech-graph v1.2.0</span>
         <span><b>更新</b> 2026-08-09</span>
@@ -184,9 +184,9 @@
     <section>
       <div class="h-num">Section 01</div>
       <h2>集成关系架构图</h2>
-      <p class="lead">WES Skill 体系以 wes-multi-agent-collaboration 为核心枢纽，串联核心协作、治理看板、质量保障、前端专用四层共 9 个内部 Skill 与 2 个外部插件（fireworks-tech-graph、i-have-adhd）。点击图中任意节点，可在下方 Skill 详情面板联动查看其职责与触发条件。</p>
+      <p class="lead">WES Skill 体系以 wes-multi-agent-collaboration 为核心枢纽，串联核心协作、治理看板、质量保障、前端专用四层共 9 个内部 Skill 与 2 个外部插件（fireworks-tech-graph、ui-skills）。原外部插件 i-have-adhd 的 ADHD 友好输出塑形规则已于 2026-08-09 合并入 speak-plainly（新增 Shape for Action 章节）并随其自动触发，插件本体已移除。点击图中任意节点，可在下方 Skill 详情面板联动查看其职责与触发条件。</p>
       <div class="panel">
-        <div class="panel-h">Skill 集成关系架构图<span class="right">v2.1 · 正交路由 · 点击节点联动</span></div>
+        <div class="panel-h">Skill 集成关系架构图<span class="right">v2.3 · 正交路由 · 点击节点联动</span></div>
         <div class="panel-b">
           <div class="skill-diagram">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1000" width="1280" height="1000" id="architecture-svg">
@@ -221,7 +221,7 @@
                     </text>
                     <text x="640" y="70" text-anchor="middle" fill="#6a6a6a" font-size="13"
                           font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
-                      Skill Integration Architecture  v2.1  |  Claude 官方风格 · 正交路由
+                      Skill Integration Architecture  v2.3  |  Claude 官方风格 · 正交路由
                     </text>
             
                     <!-- ===== AGENTS ROW (Top) ===== -->
@@ -243,18 +243,18 @@
                               font-family="-apple-system, sans-serif">Qoder</text>
                       </g>
             
-                      <!-- KIMICODE -->
+                      <!-- KIMICODE（已退出） -->
                       <g transform="translate(490, 100)">
-                        <rect width="120" height="44" rx="12" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
-                        <text x="60" y="28" text-anchor="middle" fill="#1a1a1a" font-size="14" font-weight="600"
-                              font-family="-apple-system, sans-serif">KIMICODE</text>
+                        <rect width="120" height="44" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2" stroke-dasharray="6,3" filter="url(#shadow-soft)"/>
+                        <text x="60" y="28" text-anchor="middle" fill="#6a6a6a" font-size="13" font-weight="600"
+                              font-family="-apple-system, sans-serif">KIMICODE·已退出</text>
                       </g>
             
-                      <!-- Claude Code -->
+                      <!-- Claude Code（已移除） -->
                       <g transform="translate(660, 100)">
                         <rect width="130" height="44" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2" stroke-dasharray="6,3" filter="url(#shadow-soft)"/>
-                        <text x="65" y="28" text-anchor="middle" fill="#6a6a6a" font-size="14" font-weight="600"
-                              font-family="-apple-system, sans-serif">Claude Code</text>
+                        <text x="65" y="28" text-anchor="middle" fill="#6a6a6a" font-size="13" font-weight="600"
+                              font-family="-apple-system, sans-serif">Claude Code·已移除</text>
                       </g>
             
                       <!-- User Owner -->
@@ -276,7 +276,7 @@
                         <text x="240" y="32" text-anchor="middle" fill="#1a1a1a" font-size="17" font-weight="700"
                               font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">wes-multi-agent-collaboration</text>
                         <text x="240" y="55" text-anchor="middle" fill="#4a4a4a" font-size="13"
-                              font-family="-apple-system, sans-serif">多 Agent 协作协议  任务分配  NightOps 3AI 循环（Loop）</text>
+                              font-family="-apple-system, sans-serif">多 Agent 协作协议  任务分配  Handoff 复核（NightOps 已下线）</text>
                         <text x="240" y="74" text-anchor="middle" fill="#2a8a6a" font-size="12" font-weight="600"
                               font-family="-apple-system, sans-serif">核心枢纽</text>
                       </g>
@@ -389,10 +389,10 @@
             
                     <!-- ===== EXTERNAL: 外部插件 ===== -->
                     <g id="layer-external">
-                      <text x="500" y="797" fill="#6a6a6a" font-size="13" font-weight="600"
+                      <text x="140" y="797" fill="#6a6a6a" font-size="13" font-weight="600"
                             font-family="-apple-system, sans-serif">External · 外部插件</text>
             
-                      <g transform="translate(500, 805)" class="skill-node" data-skill="fireworks-tech-graph">
+                      <g transform="translate(140, 805)" class="skill-node" data-skill="fireworks-tech-graph">
                         <rect width="280" height="75" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2.5" filter="url(#shadow-soft)"/>
                         <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
                               font-family="-apple-system, 'PingFang SC', sans-serif">fireworks-tech-graph</text>
@@ -402,14 +402,14 @@
                               font-family="-apple-system, sans-serif">v1.2.0  MIT  yizhiyanhua-ai</text>
                       </g>
 
-                      <g transform="translate(810, 805)" class="skill-node" data-skill="i-have-adhd">
+                      <g transform="translate(450, 805)" class="skill-node" data-skill="ui-skills">
                         <rect width="280" height="75" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2.5" filter="url(#shadow-soft)"/>
                         <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
-                              font-family="-apple-system, 'PingFang SC', sans-serif">i-have-adhd</text>
+                              font-family="-apple-system, 'PingFang SC', sans-serif">ui-skills</text>
                         <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
-                              font-family="-apple-system, sans-serif">ADHD 友好输出塑形  行动前置</text>
+                              font-family="-apple-system, sans-serif">UI 技能路由  improve-ui  无障碍</text>
                         <text x="140" y="68" text-anchor="middle" fill="#8a8a8a" font-size="11"
-                              font-family="-apple-system, sans-serif">MIT  ayghri  /i-have-adhd 手动唤起</text>
+                              font-family="-apple-system, sans-serif">MIT  ibelick  npx ui-skills start</text>
                       </g>
                     </g>
             
@@ -494,7 +494,7 @@
                       <rect width="200" height="65" rx="12" fill="#ffffff" stroke="#4a4a4a" stroke-width="1.5" filter="url(#shadow-soft)"/>
                       <text x="100" y="22" text-anchor="middle" fill="#1a1a1a" font-size="11" font-weight="700" font-family="-apple-system, sans-serif">WES SKILL ARCHITECTURE</text>
                       <text x="100" y="42" text-anchor="middle" fill="#6a6a6a" font-size="12" font-family="-apple-system, sans-serif">Style: Claude Official</text>
-                      <text x="100" y="58" text-anchor="middle" fill="#9a9a9a" font-size="10" font-family="-apple-system, sans-serif">v2.1  |  2026-08-09</text>
+                      <text x="100" y="58" text-anchor="middle" fill="#9a9a9a" font-size="10" font-family="-apple-system, sans-serif">v2.3  |  2026-08-09</text>
                     </g>
             
                     <!-- Subtle border -->
@@ -515,7 +515,7 @@
           <div class="panel-b" id="skill-list">
             <div class="skill-item active" data-skill="wes-multi-agent-collaboration">
               <div class="skill-name">wes-multi-agent-collaboration</div>
-              <div class="skill-desc">多 Agent 协作协议 | 任务分配 | NightOps 3AI 循环</div>
+              <div class="skill-desc">多 Agent 协作协议 | 任务分配 | Handoff 复核</div>
               <div class="skill-tags">
                 <span class="skill-tag tag-core">核心</span>
                 <span class="skill-tag tag-core">协作</span>
@@ -530,7 +530,7 @@
             </div>
             <div class="skill-item" data-skill="speak-plainly">
               <div class="skill-name">speak-plainly</div>
-              <div class="skill-desc">任务沟通 | 结果汇报 | 清晰表达</div>
+              <div class="skill-desc">任务沟通 | 结果汇报 | 行动导向塑形（已并入 ADHD 规则）</div>
               <div class="skill-tags">
                 <span class="skill-tag tag-core">核心</span>
               </div>
@@ -584,9 +584,9 @@
                 <span class="skill-tag tag-external">外部</span>
               </div>
             </div>
-            <div class="skill-item" data-skill="i-have-adhd">
-              <div class="skill-name">i-have-adhd</div>
-              <div class="skill-desc">ADHD 友好输出塑形 | 行动前置 | 状态复述</div>
+            <div class="skill-item" data-skill="ui-skills">
+              <div class="skill-name">ui-skills</div>
+              <div class="skill-desc">UI 技能路由 | improve-ui | 无障碍与动效性能</div>
               <div class="skill-tags">
                 <span class="skill-tag tag-external">外部</span>
               </div>
@@ -599,21 +599,21 @@
             <div class="panel-b">
               <div id="skill-detail" class="detail-content">
                 <h4>wes-multi-agent-collaboration</h4>
-                <p>多 Agent 协作协议是 WES 系统的<span class="highlight">核心枢纽 Skill</span>，负责协调 Codex、Qoder、KIMICODE 等多个 AI Agent 之间的工作分配与协作。</p>
+                <p>多 Agent 协作协议是 WES 系统的<span class="highlight">核心枢纽 Skill</span>，负责协调 Codex、Qoder 等 AI Agent 之间的工作分配与协作（KIMICODE 已于 2026-08-09 退出，NightOps 已下线）。</p>
 
                 <h4>核心职责</h4>
                 <ul>
                   <li>任务分类与 Agent 分配</li>
-                  <li>NightOps 3AI 循环 协作流程</li>
-                  <li>结构化 Handoff 与验收</li>
+                  <li>结构化 Handoff 与验收/返工/拒收</li>
                   <li>Agent 注册表管理</li>
+                  <li>冲突与权责规则</li>
                 </ul>
 
                 <h4>触发条件</h4>
                 <ul>
                   <li>跨 Agent 任务协调</li>
-                  <li>NightOps 无人值守执行</li>
                   <li>外部 AI Handoff 审查</li>
+                  <li>新 Agent onboarding</li>
                 </ul>
               </div>
             </div>
@@ -624,8 +624,7 @@
               <div class="agent-list">
                 <span class="status run"><span class="dot"></span>Codex · active</span>
                 <span class="status run"><span class="dot"></span>Qoder · active</span>
-                <span class="status warn"><span class="dot"></span>KIMICODE · candidate</span>
-                <span class="status todo"><span class="dot"></span>Claude Code · pending</span>
+                <span class="status todo"><span class="dot"></span>KIMICODE · retired（2026-08-09）</span>
               </div>
             </div>
           </div>
@@ -641,9 +640,9 @@
         <div class="card"><span class="pill brand">Layer 2</span><h3>治理看板层</h3><p>maintain-wes-command-board、recording-wes-requirements：关键过程事实沉淀到总看板，反馈先入问题池再分诊处置，避免重复建项。</p></div>
         <div class="card"><span class="pill warn">Layer 3</span><h3>质量保障层</h3><p>wes-security-review、wes-code-review、wes-tdd：安全审查、五轴代码审查与测试驱动开发构成合并前的三道质量门禁。</p></div>
         <div class="card"><span class="pill ok">Layer 4</span><h3>前端专用层</h3><p>improving-wes-ui：仅限 ui/V2_PROTOTYPE 主线，单次限定一个业务表面与最多三个已证实根问题，未经独立架构决策不引入新 UI 技术栈。</p></div>
-        <div class="card"><span class="pill">External</span><h3>外部插件</h3><p>fireworks-tech-graph：负责生成 SVG/HTML 技术图表等视觉资产，本页架构图即由其产出。i-have-adhd：为 ADHD 读者塑形 Agent 输出（行动前置、步骤编号、状态复述），由 /i-have-adhd 手动唤起，不参与业务决策。</p></div>
+        <div class="card"><span class="pill">External</span><h3>外部插件</h3><p>fireworks-tech-graph：负责生成 SVG/HTML 技术图表等视觉资产，本页架构图即由其产出。ui-skills：UI 技能集与路由层（improve-ui、fixing-accessibility 等 6 个子技能），由 npx ui-skills start 唤起，是 improving-wes-ui 门禁的强制前置，仅提供技能上下文与审计规则，不替代项目内 WES Skill 决策。【已移除】i-have-adhd：其 ADHD 友好输出塑形规则已于 2026-08-09 合并入 speak-plainly（Shape for Action 章节）随日常汇报自动生效，插件本体已删除。</p></div>
       </div>
-      <div class="callout"><div><b>治理边界</b>Skill 调用遵循 AGENTS.md 约束：治理类 Skill 是对应任务的强制前置，质量类 Skill 按门禁顺序串行执行，外部插件（图表生成、输出塑形）仅辅助产出，不参与业务决策。</div></div>
+      <div class="callout"><div><b>治理边界</b>Skill 调用遵循 AGENTS.md 约束：治理类 Skill 是对应任务的强制前置，质量类 Skill 按门禁顺序串行执行，外部插件（图表生成、UI 技能路由）仅辅助产出，不参与业务决策；输出塑形能力已内化为 speak-plainly 的日常规则。</div></div>
     </section>
 
     <footer class="footer">
@@ -657,19 +656,19 @@
       'wes-multi-agent-collaboration': {
         title: 'wes-multi-agent-collaboration',
         content: `
-          <p>多 Agent 协作协议是 WES 系统的<span class="highlight">核心枢纽 Skill</span>，负责协调 Codex、Qoder、KIMICODE 等多个 AI Agent 之间的工作分配与协作。</p>
+          <p>多 Agent 协作协议是 WES 系统的<span class="highlight">核心枢纽 Skill</span>，负责协调 Codex、Qoder 等 AI Agent 之间的工作分配与协作（KIMICODE 已于 2026-08-09 退出，NightOps 已下线）。</p>
           <h4>核心职责</h4>
           <ul>
             <li>任务分类与 Agent 分配</li>
-            <li>NightOps 3AI Loop 协作流程</li>
-            <li>结构化 Handoff 与验收</li>
+            <li>结构化 Handoff 与验收/返工/拒收</li>
             <li>Agent 注册表管理</li>
+            <li>冲突与权责规则</li>
           </ul>
           <h4>触发条件</h4>
           <ul>
             <li>跨 Agent 任务协调</li>
-            <li>NightOps 无人值守执行</li>
             <li>外部 AI Handoff 审查</li>
+            <li>新 Agent onboarding</li>
           </ul>
         `
       },
@@ -695,10 +694,16 @@
       'speak-plainly': {
         title: 'speak-plainly',
         content: `
-          <p>面向非技术受众的<span class="highlight">任务沟通 Skill</span>，确保业务结果优先于技术细节。</p>
+          <p>面向非技术受众的<span class="highlight">任务沟通 Skill</span>，确保业务结果优先于技术细节；2026-08-09 已合并原外部插件 i-have-adhd 的输出塑形规则（Shape for Action）为日常默认。</p>
           <h4>核心模式</h4>
           <ul>
             <li>Outcome（结果）→ Impact（影响）→ Status（状态）→ Evidence（证据）→ Next move（下一步）</li>
+          </ul>
+          <h4>行动导向塑形（并入自 i-have-adhd）</h4>
+          <ul>
+            <li>多步骤编号、每轮复述状态、抑制跑题</li>
+            <li>具体时间估算、已完成成果可见、列表上限 5 项</li>
+            <li>无开场白与收尾客套，错误平铺直叙</li>
           </ul>
           <h4>使用场景</h4>
           <ul>
@@ -833,26 +838,27 @@
           </ul>
         `
       },
-      'i-have-adhd': {
-        title: 'i-have-adhd',
+      'ui-skills': {
+        title: 'ui-skills',
         content: `
-          <p><span class="highlight">外部插件</span>，为 ADHD 读者塑形 Agent 输出，让结论与下一步动作可直接执行。</p>
-          <h4>核心规则</h4>
+          <p><span class="highlight">外部插件</span>，面向 UI 任务的技能集与路由层，为 Agent 加载最小可用的 UI 技能上下文。</p>
+          <h4>子技能（6）</h4>
           <ul>
-            <li>下一步行动前置，多步骤任务编号</li>
-            <li>每轮复述任务状态，抑制跑题</li>
-            <li>给出具体时间估算，已完成成果可见</li>
-            <li>列表上限 5 项，无开场白与收尾客套</li>
+            <li>ui-skills-root：路由层，按任务选分类与最窄技能</li>
+            <li>improve-ui：界面审计与改进计划（只读源码）</li>
+            <li>baseline-ui：UI 基线约束</li>
+            <li>fixing-accessibility / fixing-motion-performance / fixing-metadata</li>
+            <li>create-design-md：生成 DESIGN.md</li>
           </ul>
           <h4>调用方式</h4>
           <ul>
-            <li>/i-have-adhd 手动唤起，会话内持续生效</li>
-            <li>stop adhd mode / normal mode 关闭</li>
+            <li>npx ui-skills start（路由入口，AGENTS.md 强制前置）</li>
+            <li>npx ui-skills categories / list / get &lt;slug&gt;</li>
           </ul>
           <h4>来源</h4>
           <ul>
-            <li>GitHub: ayghri/i-have-adhd</li>
-            <li>许可证: MIT · 安装于 .qoder/skills/i-have-adhd</li>
+            <li>GitHub: ibelick/ui-skills</li>
+            <li>许可证: MIT · 安装于 skills/ui-skills（项目级）</li>
           </ul>
         `
       }

@@ -9,8 +9,28 @@ Improve one WES business surface with traceable evidence while preserving the Vi
 
 Read [references/quality-checklist.md](references/quality-checklist.md) for the detailed audit and verification criteria. Read [references/upstream-provenance.md](references/upstream-provenance.md) before applying a rule derived from `ibelick/ui-skills` or proposing an upstream refresh.
 
+## Mandatory prerequisite
+
+Before any UI change, optimization, adjustment, or refactoring, the developer **must** first run:
+
+```bash
+npx ui-skills start
+```
+
+This command starts the UI skills service and ensures the UI quality gate and design specifications are loaded. This requirement applies to **all** frontend-related changes, including but not limited to:
+
+- Adding or modifying UI components
+- Adjusting CSS styles, layouts, or visual design
+- Optimizing user interaction experience
+- Fixing UI-related bugs
+- Performing frontend performance optimization
+- Any change that affects the user interface appearance or behavior
+
+Code submissions that violate this specification will not be accepted.
+
 ## Required workflow
 
+0. Run `npx ui-skills start` to activate the UI skills service. Do not proceed to subsequent steps until the service is confirmed running.
 1. Read the repository `AGENTS.md`, `codex-project-registry.md`, the target route and component, `ui/V2_PROTOTYPE/tokens.css`, the relevant shared CSS, `skills/recording-wes-requirements/SKILL.md`, and `skills/maintain-wes-command-board/SKILL.md`.
 2. Declare one business surface for the run. Do not expand into another page family, design-system migration, or opportunistic business fix.
 3. Inspect static code and label its observations **candidates**. Confirm hierarchy, density, reachability, responsiveness, focus, and interaction findings only with current rendered or browser evidence.

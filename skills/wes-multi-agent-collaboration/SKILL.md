@@ -1,6 +1,6 @@
 ---
 name: wes-multi-agent-collaboration
-description: Use when coordinating WES tasks across Codex, Qoder, KIMICODE, Claude Code, or future agents; assigning requirements, running NightOps handoffs, onboarding agents, reviewing external AI handoffs, resolving collaboration conflicts, or syncing collaboration facts to the WES command board.
+description: Use when coordinating WES tasks across Codex, Qoder, or future agents; assigning requirements, reviewing external AI handoffs, onboarding agents, resolving collaboration conflicts, or syncing collaboration facts to the WES command board.
 ---
 
 # WES 多 Agent 协作
@@ -21,7 +21,6 @@ Before assigning or reviewing WES work, read these files from the project root:
 - `codex-project-registry.md`
 - `skills/maintain-wes-command-board/SKILL.md`
 - `docs/codex-workflows/external-ai-handoff-template.md`
-- `docs/agent-loop/nightops-templates.md`
 - `03_技术设计/系统架构/WES-Agent-升级总看板/collaboration-protocol.html`
 
 When the work is a Qoder worktree task, also read:
@@ -30,11 +29,7 @@ When the work is a Qoder worktree task, also read:
 - `skills/wes-qoder-worktree-protocol/SKILL.md`
 - `skills/wes-qoder-worktree-protocol/references/protocol.md`
 
-When the work involves KIMICODE, also read:
-
-- `KIMICODE.md`
-
-When the work is a NightOps task, also read the current Night Mission Packet and latest Codex Gate result if present.
+【历史说明，已下线】NightOps 无人值守机制（nightops-templates.md、mission/gate/brief 产物）与 KIMICODE（KIMICODE.md）已于 2026-08-09 整体下线/退出，不再作为本 Skill 的必读上下文。
 
 ## Agent Registry
 
@@ -59,10 +54,11 @@ Represent every collaborator as a registry entry. Do not infer authority from th
 | Agent | Status | Default role slots | Current use |
 |------|--------|--------------------|-------------|
 | `user-owner` | active | `owner`, `acceptor`, `priority-setter` | Defines goals, priorities, user intervention flags, and final acceptance. |
-| `codex` | active | `planner`, `commander`, `reviewer`, `fixer`, `integrator`, `audit-gate`, `board-steward` | Reviews handoffs, runs verification, makes scoped repairs, updates the command board, and publishes NightOps mission/gate artifacts. Codex does not create or run WES demand-pool implementation Loop automations. |
-| `qoder1` | active | `executor`, `loop-runner`, `nightops-primary-executor` | Executes WES demand-pool Loop tasks in isolated worktrees and returns structured handoffs for Codex review. |
-| `kimicode` | candidate / NightOps pilot | `peer-auditor`, `controlled-fixer` | Reviews Qoder handoffs during NightOps and may perform controlled small fixes only when the mission explicitly allows it. Full production assignment still requires onboarding ACK and trial acceptance. |
-| `claude-code` | candidate | pending | Not yet onboarded. Reserve as a review/refactor/test-audit slot only after registry entry, ACK, branch policy, and handoff profile are confirmed. |
+| `codex` | active | `planner`, `commander`, `reviewer`, `fixer`, `integrator`, `audit-gate`, `board-steward` | Reviews handoffs, runs verification, makes scoped repairs, and updates the command board. Codex does not create or run WES demand-pool implementation Loop automations. |
+| `qoder1` | active | `executor`, `loop-runner` | Executes WES demand-pool Loop tasks in isolated worktrees and returns structured handoffs for Codex review. |
+| `kimicode` | retired（2026-08-09） | 原 `peer-auditor`, `controlled-fixer` | 已整体退出本项目开发；历史 NightOps peer audit pilot 记录仅供追溯，不得再分派任务。 |
+
+【历史说明，已下线】Claude Code 候选槽位已于 2026-08-09 移除：该 Agent 不再参与本项目开发，后续如需接入须重新走 onboarding 流程。
 
 Add future agents by adding rows; do not rewrite the protocol around a fixed two-agent team.
 
@@ -73,9 +69,6 @@ Classify the work before assigning it.
 | Task class | Default owner | Required evidence |
 |------------|---------------|-------------------|
 | Demand-pool Loop execution | `qoder1` | One RP per worktree, ACK, handoff, targeted tests, board-sync recommendation. |
-| NightOps mission planning | `codex` | Night Mission Packet with task, roles, allowed paths, stop conditions, required verification, and artifact paths. |
-| NightOps peer audit | `kimicode` pilot or active reviewer | Audit ACK, verdict, scope/security/test findings, required rework, residual risk. |
-| NightOps Codex Gate | `codex` | Gate verdict, `allowNextTask`, `mustReworkFirst`, next owner, user-decision needs. |
 | One-off implementation requested for Codex | `codex` | Scoped diff, relevant tests/builds, board update or no-update reason. |
 | External handoff review | `codex` or active `reviewer` | Diff scope inspection, reproduced commands where practical, accept/rework decision. |
 | Minimal repair after review | `codex` or assigned `fixer` | Failing evidence, minimal patch, focused regression test. |
@@ -108,16 +101,14 @@ Pass every gate before work begins:
 | ACK | Assignee reports project root, worktree path, branch, base commit, task id, allowed paths, forbidden actions, and read rules. |
 | Verification | Required commands are known before editing; `not run` must be justified in handoff. |
 | Board | The owning board pages are identified before delivery. |
-| NightOps | For unattended tasks, a current mission packet exists and `allowNextTask` defaults to false. |
 
 Rules:
 
 - Assign demand-pool Loop execution to Qoder unless the user explicitly directs a one-off Codex task.
 - Assign review, minimal repair, integration advice, and board synchronization to Codex unless another active reviewer is registered.
-- Do not assign production work to candidate agents except explicitly bounded onboarding trials or NightOps peer audit pilot tasks.
+- Do not assign production work to candidate agents except explicitly bounded onboarding trials.
 - Do not let an execution agent mark a task as `已交付`; only Codex/user acceptance can close it.
 - Do not allow any agent to bypass JWT, owner isolation, human confirmation, secrets policy, dispatch boundaries, or repository boundaries.
-- In NightOps, Qoder must read the latest Codex Gate before work. If `mustReworkFirst=true`, rework first. If `allowNextTask=true` is absent, do not start a new RP.
 
 ## Collaboration Modes
 
@@ -128,63 +119,10 @@ Rules:
 | Review escalation | Handoff has risk, missing tests, or scope ambiguity. | Reviewer records blocker and returns a rework prompt. |
 | Integration queue | Several verified patches are waiting for mainline. | Integrate one scoped patch at a time and rerun matching verification. |
 | Board-only governance | The task changes process facts but not code. | Update board/sources/skills without pretending code was delivered. |
-| NightOps unattended loop | Beijing 00:00-09:30 needs execution plus peer audit before the user returns. | Codex mission packet, Qoder handoff, KIMICODE peer audit, Codex Gate, no auto delivery. |
 
-## NightOps 3AI Loop
+## NightOps（已下线）
 
-NightOps is a local unattended collaboration protocol, not a Codex implementation automation.
-
-Use one shared skill and local artifacts; each platform can run its own loop entry. The shared state lives in Git, handoff files, audit files, and the command board.
-
-The user owner has explicitly authorized platform-local NightOps loops for Qoder executor, KIMICODE peer audit, and Codex Gate. This authorization does not expand task authority: loops may only act on the latest mission packet, latest gate file, and mission-specified artifact paths. They may not self-select RPs, merge main, mark delivery, touch secrets, or edit outside the mission scope.
-
-### Default Roles
-
-| Role | Default agent | Responsibility |
-|------|---------------|----------------|
-| Commander / Audit Gate | `codex` | Publish mission packet, set scope and stop conditions, review Qoder + KIMICODE evidence, produce gate verdict and morning brief. |
-| Primary executor | `qoder1` | Execute the assigned task in one isolated worktree, run required verification, and write structured handoff. |
-| Peer auditor | `kimicode` | Review scope, diff, tests, security boundaries, and handoff completeness; request rework or pass to Codex Gate. |
-| Final acceptor | `user-owner` | Decide final acceptance, integration, priority changes, or user-level intervention flags. |
-
-### Artifact Contract
-
-Use `docs/agent-loop/nightops-templates.md` for exact templates and paths:
-
-- `docs/agent-loop/nightly/YYYY-MM-DD-mission.md`
-- `docs/agent-loop/handoffs/YYYY-MM-DD-qoder-<taskId>.md`
-- `docs/agent-loop/audits/YYYY-MM-DD-kimicode-<taskId>-audit.md`
-- `docs/agent-loop/audits/YYYY-MM-DD-codex-<taskId>-gate.md`
-- `docs/agent-loop/briefs/YYYY-MM-DD-morning-brief.md`
-
-### Sequence
-
-1. Codex publishes a Night Mission Packet before the window. Set `allowNextTask=false` by default.
-2. Qoder reads `QODER.md`, this skill, the mission packet, and the latest Codex Gate before editing.
-3. Qoder executes one task, writes a handoff, and stops at `已回填 / 待 Codex 复核`.
-4. KIMICODE reads `KIMICODE.md`, this skill, the mission packet, and Qoder's handoff; then writes a peer audit.
-5. If KIMICODE returns `REWORK_REQUIRED`, Qoder repairs the same task first and writes a rework handoff.
-6. Codex reads all evidence and posts a Gate verdict.
-7. Codex writes a morning brief when user attention is needed.
-
-### Gate Verdicts
-
-| Verdict | Meaning |
-|---------|---------|
-| `ACCEPTED_PENDING_USER` | Evidence is enough for user/integration decision, but not auto-delivery. |
-| `REWORK_REQUIRED` | Direction is valid, but Qoder must repair bounded gaps before any new task. |
-| `REJECTED` | Scope pollution, authority breach, broken evidence, or invalid architecture boundary. |
-| `USER_DECISION_REQUIRED` | Requires product, architecture, secret, DB, auth, or acceptance judgment. |
-| `ALLOW_NEXT` | Current task may be sealed and next low-risk task may be assigned in a future mission. |
-
-### NightOps Hard Boundaries
-
-- No unattended `main` merge, release, push, or `已交付` status closure.
-- No real API keys, tokens, cookies, private keys, or raw production logs.
-- No architecture changes, DB migrations, auth/owner-model changes, or repository-boundary changes.
-- No bypass of JWT, owner isolation, human confirmation, dispatch boundaries, or WES frontend/backend mainline rules.
-- No broad reset, restore, clean, rebase, or unrelated formatting.
-- No new RP after rework unless the latest Codex Gate explicitly sets `allowNextTask=true`.
+【历史说明，已下线】NightOps 无人值守三 AI 协作机制（Codex mission packet + Qoder 执行 + KIMICODE peer audit + Codex Gate，北京时间 00:00-09:30 窗口）已于 2026-08-09 整体下线。相关模板 `docs/agent-loop/nightops-templates.md`、mission/brief/TRIAL 产物与 KIMICODE peer audit Loop 脚本均已删除。禁止重新创建无人值守实现或审计 Loop；如未来需恢复夜间自动化，须经用户重新授权并重建协议。
 
 ## Parallel Work Rules
 
@@ -209,7 +147,9 @@ Every non-user agent handoff must include:
 - Known risks, unimplemented scope, and manual acceptance needs.
 - Board synchronization recommendation.
 - Next recommended owner: same agent, reviewer, integrator, or user.
-- For NightOps: `missionId`, referenced mission packet, handoff path, audit path, and latest Codex Gate path when available.
+- Reporting rule: handoff 与所有面向 user-owner 的任务汇报禁止只出任务代号（O1、Sprint 3B、RP-048、Batch E、SP-… 等），代号首次出现必须附带主题括号注释，例：「Sprint 3B（AI 回答质量考卷：固定考题 + 自动判卷）」；执行方不遵守时，复审方应在返工提示中要求补注释。
+
+Note: Qoder 的 handoff 格式是 `external-ai-handoff-template.md` 的扩展（增加 worktree 元数据与 `not run` 验证状态），见 `skills/wes-qoder-worktree-protocol/references/protocol.md`；复核时以扩展格式为准。
 
 ## Acceptance, Rework, And Reject Rules
 
@@ -235,7 +175,7 @@ Use the narrowest command set that proves the touched boundary.
 
 | Boundary | Typical verification |
 |----------|----------------------|
-| V2 frontend | Focused component/page test, `npm run test --prefix ui/V2_PROTOTYPE`, `npm run build:web` when build surface changes. |
+| V2 frontend | Focused component/page test, `npm run test:web`, `npm run build:web` when build surface changes. |
 | API module/routes | Focused module test, `npm run build:api`, `npm run test:modules` when shared contracts change. |
 | AI/provider/dispatch | Focused AI tests plus `npm run test:ai`; include stream/trace tests when touching SSE or dispatch. |
 | Harness | Focused Harness tests plus `npm run test:harness -w apps/api` when Harness state/audit changes. |
@@ -256,7 +196,7 @@ Do not mark CI or manual acceptance as passed unless there is current evidence. 
 
 ## Onboarding Checklist For New Agents
 
-Before enabling KIMICODE, Claude Code, or any future agent:
+Before enabling any future agent:
 
 1. Add a registry entry with `agentId`, status `candidate`, role slots, allowed scopes, forbidden scopes, branch prefix, and handoff profile.
 2. Provide the agent with `AGENTS.md`, `codex-project-registry.md`, this skill, and any platform-specific entry file.
@@ -276,16 +216,18 @@ Before enabling KIMICODE, Claude Code, or any future agent:
 - Use `collaboration-protocol.html` for team status, role slots, workflow rules, and collaboration state.
 - Use `changes.html` for collaboration process changes and handoff review events.
 - Use `sources.html` when adding or changing workflow docs, skills, entry files, or protocol pages.
-- Use `docs/agent-loop/nightops-templates.md` for NightOps mission, handoff, peer audit, Codex Gate, and morning brief artifacts.
 - Use `requirements.html` and `plan.html` only when the collaboration change affects a concrete RP or phase.
+- 看板事件行与汇报文案中的任务代号（O×、Sprint ×、RP-×、Batch ×、SP-×等）必须伴随主题括号注释，面向 user-owner 的输出禁止只出编号（见 `skills/speak-plainly/SKILL.md`）。
 - Do not store API keys, tokens, cookies, private keys, raw production logs, or temporary command output in the board.
 
 ## System Prompt Summary
 
-Use `wes-multi-agent-collaboration` to coordinate WES tasks across active and future coding agents: classify the task, choose an active role slot, pass the assignment gate, run NightOps with mission packet + Qoder handoff + KIMICODE peer audit + Codex Gate when needed, require isolated worktrees and structured handoffs, review against acceptance/rework/reject rules, integrate only verified minimal patches, resolve conflicts by authority rules, and synchronize durable facts to the WES command board.
+Use `wes-multi-agent-collaboration` to coordinate WES tasks across active and future coding agents: classify the task, choose an active role slot, pass the assignment gate, require isolated worktrees and structured handoffs, review against acceptance/rework/reject rules, integrate only verified minimal patches, resolve conflicts by authority rules, and synchronize durable facts to the WES command board.
 
 ---
 
-*本 Skill 版本：v0.3.0-draft*
-*对应系统版本：WES Agent 升级总看板 · 本地 A2A 协作协议 + NightOps 三 AI 协作机制*
-*最后更新：2026-06-29*
+*本 Skill 版本：v0.5.0*
+*对应系统版本：WES Agent 升级总看板 · 本地 A2A 协作协议*
+*最后更新：2026-08-09*
+
+变更摘要（v0.5.0）：新增汇报表达约定——handoff、看板事件行与所有面向 user-owner 的任务汇报中，任务代号（O×/Sprint×/RP-×/Batch×/SP-×等）必须附带主题括号注释，禁止只出编号（与 speak-plainly Skill 同步）。v0.4.0：删除已下线的 NightOps 三 AI 循环章节与相关必读/分级/门禁条目；KIMICODE 标记 retired，Claude Code 候选槽位移除；验证命令统一 `npm run test:web`；明确 Qoder handoff 与外部回填模板的扩展关系。

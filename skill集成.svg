@@ -1,0 +1,321 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1000" width="1280" height="1000" id="architecture-svg">
+                    <defs>
+                      <!-- Arrow Marker -->
+                      <marker id="arrow-claude" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                        <polygon points="0 0, 8 4, 0 8" fill="#5a5a5a"/>
+                      </marker>
+            
+                      <!-- Soft Shadow -->
+                      <filter id="shadow-soft" x="-10%" y="-10%" width="120%" height="130%">
+                        <feDropShadow dx="0" dy="3" stdDeviation="8" flood-color="#000000" flood-opacity="0.06"/>
+                      </filter>
+            
+                      <!-- Glow for active -->
+                      <filter id="glow-claude" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="4" result="blur"/>
+                        <feMerge>
+                          <feMergeNode in="blur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
+            
+                    <!-- Warm Cream Background -->
+                    <rect width="1280" height="1000" fill="#f8f6f3"/>
+            
+                    <!-- Title -->
+                    <text x="640" y="45" text-anchor="middle" fill="#1a1a1a" font-size="24" font-weight="700"
+                          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+                      WES 系统 Skill 集成关系架构图
+                    </text>
+                    <text x="640" y="70" text-anchor="middle" fill="#6a6a6a" font-size="13"
+                          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+                      Skill Integration Architecture  v2.2  |  Claude 官方风格 · 正交路由
+                    </text>
+            
+                    <!-- ===== AGENTS ROW (Top) ===== -->
+                    <g id="agents">
+                      <text x="60" y="127" fill="#6a6a6a" font-size="14" font-weight="600"
+                            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">Agents</text>
+            
+                      <!-- Codex -->
+                      <g transform="translate(170, 100)">
+                        <rect width="110" height="44" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="55" y="28" text-anchor="middle" fill="#1a1a1a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">Codex</text>
+                      </g>
+            
+                      <!-- Qoder -->
+                      <g transform="translate(330, 100)">
+                        <rect width="110" height="44" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="55" y="28" text-anchor="middle" fill="#1a1a1a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">Qoder</text>
+                      </g>
+            
+                      <!-- KIMICODE -->
+                      <g transform="translate(490, 100)">
+                        <rect width="120" height="44" rx="12" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="60" y="28" text-anchor="middle" fill="#1a1a1a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">KIMICODE</text>
+                      </g>
+            
+                      <!-- Claude Code -->
+                      <g transform="translate(660, 100)">
+                        <rect width="130" height="44" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2" stroke-dasharray="6,3" filter="url(#shadow-soft)"/>
+                        <text x="65" y="28" text-anchor="middle" fill="#6a6a6a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">Claude Code</text>
+                      </g>
+            
+                      <!-- User Owner -->
+                      <g transform="translate(840, 100)">
+                        <rect width="130" height="44" rx="12" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="65" y="28" text-anchor="middle" fill="#1a1a1a" font-size="14" font-weight="600"
+                              font-family="-apple-system, sans-serif">User Owner</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== LAYER 1: 核心协作层 ===== -->
+                    <g id="layer-core">
+                      <text x="60" y="232" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">Layer 1 · 核心协作</text>
+            
+                      <!-- Core Hub: wes-multi-agent-collaboration -->
+                      <g transform="translate(400, 190)" class="skill-node" data-skill="wes-multi-agent-collaboration">
+                        <rect width="480" height="85" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2.5" filter="url(#shadow-soft)"/>
+                        <text x="240" y="32" text-anchor="middle" fill="#1a1a1a" font-size="17" font-weight="700"
+                              font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">wes-multi-agent-collaboration</text>
+                        <text x="240" y="55" text-anchor="middle" fill="#4a4a4a" font-size="13"
+                              font-family="-apple-system, sans-serif">多 Agent 协作协议  任务分配  NightOps 3AI 循环（Loop）</text>
+                        <text x="240" y="74" text-anchor="middle" fill="#2a8a6a" font-size="12" font-weight="600"
+                              font-family="-apple-system, sans-serif">核心枢纽</text>
+                      </g>
+            
+                      <!-- wes-qoder-worktree-protocol -->
+                      <g transform="translate(180, 330)" class="skill-node" data-skill="wes-qoder-worktree-protocol">
+                        <rect width="300" height="75" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="150" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">wes-qoder-worktree-protocol</text>
+                        <text x="150" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">Worktree 隔离  结构化 Handoff</text>
+                        <text x="150" y="68" text-anchor="middle" fill="#6a6a6a" font-size="11"
+                              font-family="-apple-system, sans-serif">ACK  验证矩阵  不可协商铁律</text>
+                      </g>
+            
+                      <!-- speak-plainly -->
+                      <g transform="translate(800, 330)" class="skill-node" data-skill="speak-plainly">
+                        <rect width="220" height="75" rx="12" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="110" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, sans-serif">speak-plainly</text>
+                        <text x="110" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">任务沟通  结果汇报</text>
+                        <text x="110" y="68" text-anchor="middle" fill="#6a6a6a" font-size="11"
+                              font-family="-apple-system, sans-serif">Outcome  Impact  Status</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== LAYER 2: 治理看板层 ===== -->
+                    <g id="layer-governance">
+                      <text x="140" y="418" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">Layer 2 · 治理看板</text>
+            
+                      <!-- maintain-wes-command-board -->
+                      <g transform="translate(140, 460)" class="skill-node" data-skill="maintain-wes-command-board">
+                        <rect width="280" height="75" rx="12" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">maintain-wes-command-board</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">总看板同步  过程数据沉淀</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#6a6a6a" font-size="11"
+                              font-family="-apple-system, sans-serif">index  requirements  plan  risks</text>
+                      </g>
+            
+                      <!-- recording-wes-requirements -->
+                      <g transform="translate(140, 575)" class="skill-node" data-skill="recording-wes-requirements">
+                        <rect width="280" height="75" rx="12" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">recording-wes-requirements</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">反馈分诊  需求入池  Issue 治理</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#6a6a6a" font-size="11"
+                              font-family="-apple-system, sans-serif">去重  分类  关联 RP/defect</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== LAYER 3: 质量保障层 ===== -->
+                    <g id="layer-quality">
+                      <text x="860" y="418" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">Layer 3 · 质量保障</text>
+            
+                      <!-- wes-security-review -->
+                      <g transform="translate(860, 460)" class="skill-node" data-skill="wes-security-review">
+                        <rect width="280" height="75" rx="12" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">wes-security-review</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">安全审查  JWT/Auth 审计  漏洞扫描</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a6a3a" font-size="11"
+                              font-family="-apple-system, sans-serif">六步审计流程  CRITICAL/HIGH/MEDIUM</text>
+                      </g>
+            
+                      <!-- wes-code-review -->
+                      <g transform="translate(860, 575)" class="skill-node" data-skill="wes-code-review">
+                        <rect width="280" height="75" rx="12" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">wes-code-review</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">五轴代码审查  质量门禁</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a6a3a" font-size="11"
+                              font-family="-apple-system, sans-serif">Correctness  Readability  Architecture</text>
+                      </g>
+            
+                      <!-- wes-tdd -->
+                      <g transform="translate(860, 690)" class="skill-node" data-skill="wes-tdd">
+                        <rect width="280" height="75" rx="12" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="2" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, sans-serif">wes-tdd</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">RED-GREEN-REFACTOR  测试驱动开发</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a6a3a" font-size="11"
+                              font-family="-apple-system, sans-serif">test:modules  test:integration  test:ai</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== LAYER 4: 前端专用层 ===== -->
+                    <g id="layer-frontend">
+                      <text x="140" y="678" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">Layer 4 · 前端专用</text>
+            
+                      <g transform="translate(140, 690)" class="skill-node" data-skill="improving-wes-ui">
+                        <rect width="280" height="75" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2" stroke-dasharray="6,3" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">improving-wes-ui</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">UI 审计  组件优化  V2_PROTOTYPE</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a8a8a" font-size="11"
+                              font-family="-apple-system, sans-serif">单次一个表面  最多三个根问题</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== EXTERNAL: 外部插件 ===== -->
+                    <g id="layer-external">
+                      <text x="140" y="797" fill="#6a6a6a" font-size="13" font-weight="600"
+                            font-family="-apple-system, sans-serif">External · 外部插件</text>
+            
+                      <g transform="translate(140, 805)" class="skill-node" data-skill="fireworks-tech-graph">
+                        <rect width="280" height="75" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2.5" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">fireworks-tech-graph</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">技术图表生成  SVG/PNG/GIF</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a8a8a" font-size="11"
+                              font-family="-apple-system, sans-serif">v1.2.0  MIT  yizhiyanhua-ai</text>
+                      </g>
+
+                      <g transform="translate(450, 805)" class="skill-node" data-skill="i-have-adhd">
+                        <rect width="280" height="75" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2.5" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">i-have-adhd</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">ADHD 友好输出塑形  行动前置</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a8a8a" font-size="11"
+                              font-family="-apple-system, sans-serif">MIT  ayghri  /i-have-adhd 手动唤起</text>
+                      </g>
+
+                      <g transform="translate(760, 805)" class="skill-node" data-skill="ui-skills">
+                        <rect width="280" height="75" rx="12" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="2.5" filter="url(#shadow-soft)"/>
+                        <text x="140" y="30" text-anchor="middle" fill="#1a1a1a" font-size="15" font-weight="600"
+                              font-family="-apple-system, 'PingFang SC', sans-serif">ui-skills</text>
+                        <text x="140" y="52" text-anchor="middle" fill="#5a5a5a" font-size="12"
+                              font-family="-apple-system, sans-serif">UI 技能路由  improve-ui  无障碍</text>
+                        <text x="140" y="68" text-anchor="middle" fill="#8a8a8a" font-size="11"
+                              font-family="-apple-system, sans-serif">MIT  ibelick  npx ui-skills start</text>
+                      </g>
+                    </g>
+            
+                    <!-- ===== CONNECTIONS (orthogonal routing, no crossings) ===== -->
+                    <g id="connections" fill="none" stroke="#5a5a5a">
+                      <!-- Agents to Core Hub: elbow fan-in, layered horizontal channels -->
+                      <path d="M225,144 V176 H520 V190" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M385,144 V168 H580 V190" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M550,144 V160 H640 V190" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+                      <path d="M725,144 V158 H700 V190" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+                      <path d="M905,144 V176 H760 V190" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Core internal -->
+                      <path d="M480,275 L330,330" stroke-width="2" marker-end="url(#arrow-claude)"/>
+                      <path d="M800,275 L910,330" stroke-width="2" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Core to Governance (left column, routed outside nodes) -->
+                      <path d="M540,275 V442 H280 V460" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M520,275 V430 H100 V612 H140" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Core to Frontend (center channel, enters right edge) -->
+                      <path d="M560,275 V727 H420" stroke-width="1" stroke-dasharray="4,3" opacity="0.6" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Core to Quality (right column, routed outside nodes) -->
+                      <path d="M760,275 V430 H1000 V460" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M740,275 V612 H860" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M720,275 V727 H860" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+            
+                      <!-- Vertical chain links -->
+                      <path d="M1000,535 V575" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M1000,650 V690" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                      <path d="M280,535 V575" stroke-width="1.5" marker-end="url(#arrow-claude)"/>
+                    </g>
+            
+                    <!-- Edge labels with cream halo (paint-order stroke) -->
+                    <g id="edge-labels" fill="#6a6a6a" font-size="11" font-family="-apple-system, sans-serif"
+                       stroke="#f8f6f3" stroke-width="4" paint-order="stroke">
+                      <text x="300" y="171" text-anchor="middle">assign</text>
+                      <text x="482" y="163" text-anchor="middle">execute</text>
+                      <text x="595" y="155" text-anchor="middle">audit</text>
+                      <text x="832" y="171" text-anchor="middle">accept</text>
+                      <text x="405" y="297" text-anchor="middle">worktree</text>
+                      <text x="855" y="297" text-anchor="middle">report</text>
+                      <text x="400" y="456" text-anchor="middle">sync</text>
+                      <text x="300" y="425" text-anchor="middle">intake</text>
+                      <text x="572" y="600">ui scope</text>
+                      <text x="880" y="444" text-anchor="middle">audit</text>
+                      <text x="752" y="500">review</text>
+                      <text x="732" y="640">test</text>
+                      <text x="1012" y="559">security gate</text>
+                    </g>
+            
+                    <!-- ===== LEGEND ===== -->
+                    <g id="legend" transform="translate(80, 910)">
+                      <rect width="540" height="65" rx="12" fill="#ffffff" stroke="#4a4a4a" stroke-width="1.5" filter="url(#shadow-soft)"/>
+                      <text x="15" y="22" fill="#1a1a1a" font-size="13" font-weight="700" font-family="-apple-system, sans-serif">Legend</text>
+            
+                      <rect x="80" y="10" width="18" height="14" rx="4" fill="#9dd4c7" stroke="#4a4a4a" stroke-width="1.5"/>
+                      <text x="105" y="22" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">核心协作</text>
+            
+                      <rect x="175" y="10" width="18" height="14" rx="4" fill="#a8c5e6" stroke="#4a4a4a" stroke-width="1.5"/>
+                      <text x="200" y="22" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">治理看板</text>
+            
+                      <rect x="270" y="10" width="18" height="14" rx="4" fill="#f4e4c1" stroke="#4a4a4a" stroke-width="1.5"/>
+                      <text x="295" y="22" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">质量保障</text>
+            
+                      <rect x="365" y="10" width="18" height="14" rx="4" fill="#e8e6e3" stroke="#4a4a4a" stroke-width="1.5" stroke-dasharray="3,2"/>
+                      <text x="390" y="22" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">前端/外部</text>
+            
+                      <line x1="15" y1="42" x2="45" y2="42" stroke="#5a5a5a" stroke-width="2" marker-end="url(#arrow-claude)"/>
+                      <text x="52" y="46" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">Primary flow</text>
+            
+                      <line x1="140" y1="42" x2="170" y2="42" stroke="#5a5a5a" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow-claude)"/>
+                      <text x="177" y="46" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">Trigger / Scope</text>
+            
+                      <line x1="285" y1="42" x2="315" y2="42" stroke="#5a5a5a" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arrow-claude)"/>
+                      <text x="322" y="46" fill="#5a5a5a" font-size="11" font-family="-apple-system, sans-serif">Cross-layer</text>
+                    </g>
+            
+                    <!-- ===== INFO BLOCK (Bottom Right) ===== -->
+                    <g id="info-block" transform="translate(1000, 910)">
+                      <rect width="200" height="65" rx="12" fill="#ffffff" stroke="#4a4a4a" stroke-width="1.5" filter="url(#shadow-soft)"/>
+                      <text x="100" y="22" text-anchor="middle" fill="#1a1a1a" font-size="11" font-weight="700" font-family="-apple-system, sans-serif">WES SKILL ARCHITECTURE</text>
+                      <text x="100" y="42" text-anchor="middle" fill="#6a6a6a" font-size="12" font-family="-apple-system, sans-serif">Style: Claude Official</text>
+                      <text x="100" y="58" text-anchor="middle" fill="#9a9a9a" font-size="10" font-family="-apple-system, sans-serif">v2.2  |  2026-08-09</text>
+                    </g>
+            
+                    <!-- Subtle border -->
+                    <rect x="10" y="10" width="1260" height="980" rx="16" fill="none" stroke="#d0cec9" stroke-width="1"/>
+                  </svg>
