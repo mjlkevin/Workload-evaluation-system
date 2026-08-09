@@ -197,6 +197,8 @@ export type HarnessRuntimeWorkerOptions = {
   timing?: Partial<HarnessWorkerTiming>;
   sleepMs?: (ms: number) => Promise<void>;
   faultInjector?: (stepKey: string, phase: "beforeStep" | "afterStepCommit") => void;
+  /** SP-2026-007 MS2：Run 终态后异步蒸馏记忆钩子 */
+  onRunTerminal?: (run: HarnessRunRow, outcome: "completed" | "failed" | "cancelled") => Promise<void>;
 };
 
 export type HarnessRuntimeWorker = {
@@ -415,6 +417,8 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
       }
 
       await repository.completeAttemptAndRun({ attemptId, runId, outcome: "succeeded" });
+      // SP-2026-007 MS2：终态后触发异步蒸馏（不阻塞、不抛错）
+      void options.onRunTerminal?.(run, "completed").catch(() => {});
     } catch (err) {
       if (leaseLost) return; // 租约已失：一切写入禁止，等待扫描接管。
       if (err instanceof HarnessFaultInjectedError) return; // 模拟死进程。
@@ -425,6 +429,8 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
         err instanceof HarnessStepBoundaryAbort
       ) {
         await repository.completeAttemptAndRun({ attemptId, runId, outcome: "cancelled" });
+        // SP-2026-007 MS2：终态后触发异步蒸馏（不阻塞、不抛错）
+        void options.onRunTerminal?.(run, "cancelled").catch(() => {});
         return;
       }
       await repository.completeAttemptAndRun({
@@ -434,6 +440,8 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
         errorCode: WORKER_STEP_FAILED_ERROR_CODE,
         errorMessage: err instanceof Error ? err.message.slice(0, 200) : "worker step failed",
       });
+      // SP-2026-007 MS2：终态后触发异步蒸馏（不阻塞、不抛错）
+      void options.onRunTerminal?.(run, "failed").catch(() => {});
     } finally {
       clearInterval(heartbeat);
     }

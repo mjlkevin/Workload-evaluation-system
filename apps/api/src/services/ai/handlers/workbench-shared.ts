@@ -15,6 +15,8 @@ import type { AiSessionRecord } from "../../../modules/ai-sessions/ai-sessions.t
 import type { AuthUser, BusinessRole } from "../../../types";
 import { defaultProviderRegistry, type ModelProvider } from "../../../ai/provider";
 import type { StreamingChunk } from "../workbench-dispatch.service";
+import { createMemoryUsecase, getMemoryRepository } from "../../../modules/memory/memory.module";
+import type { MemoryContextBlock } from "../../../modules/memory/memory.usecase";
 
 export function getKimiProvider(): ModelProvider {
   const provider = defaultProviderRegistry.get("kimi");
@@ -190,6 +192,7 @@ export function buildWorkbenchChatModelChat(
   options: {
     messages?: HomeMessageInput[];
     modelName?: string;
+    projectId?: string;
   },
 ): ModelChatFactory {
   const messages = options.messages ?? [];
@@ -197,18 +200,44 @@ export function buildWorkbenchChatModelChat(
   return async ({ systemPrompt, userContent }) => {
     const { apiKey } = resolveActiveRequirementKimiApiKey();
     if (!apiKey) throw new Error("required_or_env_missing");
+
+    // SP-2026-007 MS2：按 projectId 拉取 active 记忆上下文
+    let memoryBlock: MemoryContextBlock | null = null;
+    if (options.projectId) {
+      try {
+        const memoryUsecase = createMemoryUsecase({ repo: getMemoryRepository() });
+        memoryBlock = await memoryUsecase.buildMemoryContext({
+          ownerUserId: user.id,
+          projectId: options.projectId,
+          maxScenes: 3,
+          maxAtoms: 5,
+        });
+      } catch {
+        // 记忆注入失败降级为无记忆模式，不阻塞主链路
+      }
+    }
+
+    const memoryPrompt = memoryBlock
+      ? buildMemoryPrompt(memoryBlock)
+      : "";
+
     const safeMessages = messages.slice(-12).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
     // 覆盖最后一条用户消息的 system prompt
     if (safeMessages.length > 0) {
       safeMessages[safeMessages.length - 1] = { role: "user", content: userContent };
     }
+
+    const finalSystemPrompt = memoryPrompt
+      ? `${systemPrompt}\n\n${memoryPrompt}`
+      : systemPrompt;
+
     const completion = await getKimiProvider().chatCompletion({
       model: config.kimi.model,
       temperature: 0.3,
       promptCacheKey: "home-workbench-dispatch-v1",
       timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
       credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
-      messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
+      messages: [{ role: "system", content: finalSystemPrompt }, ...safeMessages],
     });
     return {
       answer: completion.content,
@@ -263,4 +292,23 @@ export function buildWorkbenchChatDispatchInput(user: AuthUser, content: string,
 // O4 快照测试需要直接锁定闸门判定，导出不代表行为变更
 export function isExplicitReportRequest(text: string): boolean {
   return /生成|输出|创建|启动/.test(text || '') && /需求解析报告|需求包|评估输入|评估草稿|报告/.test(text || '');
+}
+
+// SP-2026-007 MS2：将记忆上下文组装为 system prompt 片段
+function buildMemoryPrompt(block: MemoryContextBlock): string {
+  const lines = ["【历史记忆上下文】"];
+  if (block.scenes.length > 0) {
+    lines.push("相关场景：");
+    for (const scene of block.scenes) {
+      lines.push(`- ${scene.title}：${scene.summary}`);
+    }
+  }
+  if (block.atoms.length > 0) {
+    lines.push("已知事实：");
+    for (const atom of block.atoms) {
+      lines.push(`- ${atom.factKey}：${atom.factText}`);
+    }
+  }
+  lines.push("请基于以上记忆上下文继续推进，避免重复确认已明确的信息。");
+  return lines.join("\n");
 }

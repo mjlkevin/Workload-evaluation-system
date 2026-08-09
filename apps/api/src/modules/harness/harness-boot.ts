@@ -12,8 +12,12 @@ import { createHarnessSessionSink } from "./harness-session-sink";
 import { createWorkbenchChatWorkflow } from "./workbench-chat.workflow";
 import { createHarnessWorkflowRegistry } from "./harness-runtime.worker";
 import { dispatchHomeWorkbenchTurn } from "../../services/ai/workbench-dispatch.service";
-import { buildWorkbenchChatDispatchInput } from "../../services/ai/handlers/workbench-shared";
+import { buildWorkbenchChatDispatchInput, getKimiProvider } from "../../services/ai/handlers/workbench-shared";
 import type { AuthUser } from "../../types";
+import { config } from "../../config/env";
+import { resolveActiveRequirementKimiApiKey } from "../system/system.repository";
+import { distillRunMemory } from "../memory/memory.distiller";
+import { getMemoryRepository } from "../memory/memory.module";
 
 export type HarnessRuntimeBootOptions = {
   repo: HarnessRuntimeRepository;
@@ -65,9 +69,49 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
   });
   const registry = createHarnessWorkflowRegistry([workflow]);
 
+  // SP-2026-007 MS2：Run 终态后异步蒸馏记忆钩子
+  const onRunTerminal = async (run: any, outcome: "completed" | "failed" | "cancelled") => {
+    if (outcome !== "completed") return;
+    try {
+      const snapshot = await options.repo.getRunSnapshot(run.harnessRunId);
+      const outputContent = snapshot?.output?.content as Record<string, unknown> | undefined;
+      const answer = typeof outputContent?.answer === "string" ? outputContent.answer : "";
+      const userMessage = run.title || "";
+      if (!userMessage && !answer) return;
+
+      const { apiKey } = resolveActiveRequirementKimiApiKey();
+      if (!apiKey) return; // 无 API Key 时静默跳过
+
+      await distillRunMemory(
+        {
+          repo: getMemoryRepository(),
+          provider: getKimiProvider(),
+          model: config.kimi.model,
+          apiKey,
+          apiBaseUrl: config.kimi.apiBaseUrl,
+          timeoutMs: 60000,
+        },
+        {
+          ownerUserId: run.ownerUserId,
+          projectId: run.projectEvaluationId || run.metadata?.projectId || "default",
+          harnessRunId: run.harnessRunId,
+          runTitle: run.title,
+          messages: [
+            { role: "user", content: userMessage },
+            { role: "assistant", content: answer },
+          ],
+        },
+      );
+    } catch (distillErr) {
+      // 蒸馏失败不阻塞主链路，降级为无记忆模式并留可追溯日志
+      const msg = distillErr instanceof Error ? distillErr.message : String(distillErr);
+      console.error(`[memory-distill] run=${run.harnessRunId} outcome=${outcome} error=${msg.slice(0, 200)}`);
+    }
+  };
+
   const worker = options.createWorker
     ? options.createWorker({ repo: options.repo, registry })
-    : createHarnessRuntimeWorker({ repository: options.repo, registry, workerId: "wes-worker-1" });
+    : createHarnessRuntimeWorker({ repository: options.repo, registry, workerId: "wes-worker-1", onRunTerminal });
 
   const projector = options.createProjector
     ? options.createProjector({ repo: options.repo })

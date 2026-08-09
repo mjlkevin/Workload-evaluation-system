@@ -24,4 +24,5 @@ export * from "./history_projects";
 export * from "./users";
 export * from "./version_code_rules";
 export * from "./harness";
+export * from "./memory";
 export * from "./json_runtime";
