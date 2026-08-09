@@ -1088,3 +1088,15 @@ table[data-board-table] tbody tr:hover { background: var(--bg-soft); }
   table:not([data-board-table]) thead,
   table:not([data-board-table]) tbody { display: table; width: 100%; }
 }
+
+/* ── B5 试点：KPI 卡折叠明细（F2）与表格可读性（F5） ── */
+.kpi-detail { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.kpi-detail summary { cursor: pointer; font-size: 12px; color: var(--muted); user-select: none; }
+.kpi-detail summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.kpi-detail p { margin: 6px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); text-wrap: pretty; }
+table[data-board-table] tbody tr:nth-child(even) { background: var(--bg-soft); }
+table[data-board-table] tbody tr:hover { background: color-mix(in oklab, var(--bg-soft) 55%, #fff); }
+table[data-board-table] thead th { position: sticky; top: 64px; z-index: 5; background: #fff; box-shadow: 0 1px 0 var(--line); }
+td.cell-clamp { max-height: 4.9em; overflow: hidden; cursor: pointer; }
+td.cell-clamp.cell-open { max-height: none; overflow: visible; }
+td.cell-clamp:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

@@ -243,6 +243,32 @@
     }
   }
 
+  // B5 试点 F1：行内文本上限 —— 看板表格超 120 字单元格默认收起到 3 行，点击/回车展开
+  function initCellClamp() {
+    function toggle(td) {
+      var open = td.classList.toggle('cell-open');
+      td.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    document.querySelectorAll('table[data-board-table] tbody td').forEach(function (td) {
+      var text = (td.textContent || '').trim();
+      if (text.length <= 120 || td.querySelector('table, ul, ol, details')) return;
+      td.classList.add('cell-clamp');
+      td.setAttribute('tabindex', '0');
+      td.setAttribute('role', 'button');
+      td.setAttribute('aria-expanded', 'false');
+      td.title = '点击展开/收起';
+    });
+    document.addEventListener('click', function (e) {
+      var td = e.target.closest('td.cell-clamp');
+      if (td) toggle(td);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var td = e.target.closest ? e.target.closest('td.cell-clamp') : null;
+      if (td) { e.preventDefault(); toggle(td); }
+    });
+  }
+
   function ready(fn) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', fn);
@@ -255,6 +281,7 @@
     initNavGroups();
     initMobileNav();
     initTechCollapse();
+    initCellClamp();
     initReveal();
     initKpiMotion();
   });

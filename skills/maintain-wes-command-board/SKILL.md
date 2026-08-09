@@ -25,6 +25,8 @@ When a historical page or old plan conflicts with code/current docs, use current
 
 For detailed page ownership and fields, read `references/board-module-map.md`.
 
+For information density and readability rules (one-line conclusion first, 120-char cell cap, no long `title` duplication, single-source numbers, phase-label sync, monthly archive), read `references/board-readability-spec.md`. Every board edit must pass its acceptance gate.
+
 ## Trigger Decision
 
 Use the board update workflow when any of these are true:
@@ -74,6 +76,8 @@ If a page is not updated, be able to explain why its owned fact did not change.
 - Do not mark manual testing as passed unless the user or an actual test record provides the result. Use `待执行` or `待回填` when not executed.
 - Do not claim CI is green unless current CI evidence or a cited local equivalent exists.
 - Do not inflate document/test counts without adding or removing the corresponding rows/cards.
+- Numbers have a single source: requirement counts from `requirements.html` main ledger, test counts from the current command run, special-project counts from `special-projects.html`. After updating any number, grep the whole board for the stale value and sync every copy.
+- `changes.html` rows older than one month are archived by `scripts/board-archive-changes.js` into `archive-md/changes-YYYY-MM.md`; never hand-delete rows.
 - Do not hide risks by moving them only to prose; risk/control/status belongs in `risks.html`.
 - Do not introduce a second frontend/backend path. The Web mainline remains `ui/V2_PROTOTYPE`; backend entry remains `apps/api`.
 - Do not overwrite unrelated dirty worktree changes. Read the target page and patch only the intended section.
@@ -116,6 +120,6 @@ or:
 
 ---
 
-*本 Skill 版本：v1.0.0*  
+*本 Skill 版本：v2.0.0*  
 *对应系统版本：WorkEvolutionSys / WES Agent command board*  
-*最后更新：2026-06-23*
+*最后更新：2026-08-09（v2：挂接可读性规范、数字单一来源、changes 月度归档规则）*

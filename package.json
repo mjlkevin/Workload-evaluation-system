@@ -7,6 +7,9 @@
   ],
   "scripts": {
     "board:branches": "node scripts/generate-branch-board.js",
+    "board:build": "node scripts/board-build.js",
+    "board:check": "node scripts/board-consistency-check.js",
+    "board:archive": "node scripts/board-archive-changes.js",
     "board:branches:check": "node scripts/generate-branch-board.js --check && node --test scripts/branch-board.test.js scripts/branch-board-page.test.js",
     "test:board:branches": "node --test scripts/branch-board.test.js scripts/branch-board-page.test.js",
     "test:security": "node --test scripts/check-tracked-secrets.test.js && npx tsx --test apps/api/src/services/ai/knowledge-base-url-policy.test.ts && node scripts/check-tracked-secrets.js",
