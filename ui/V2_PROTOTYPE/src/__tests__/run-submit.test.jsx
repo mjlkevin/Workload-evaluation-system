@@ -54,6 +54,9 @@ function setupRunSubmitScenario({ runStatus = 202 } = {}) {
       if (runStatus === 503) {
         return HttpResponse.json({ code: 'ASYNC_RUNS_DISABLED', message: '异步任务已关闭' }, { status: 503 })
       }
+      if (runStatus === 409) {
+        return HttpResponse.json({ code: 'SESSION_HAS_ACTIVE_RUN', message: '该会话存在进行中的异步任务' }, { status: 409 })
+      }
       return HttpResponse.json({
         success: true,
         data: { runId: 'run-1', sessionId: 'session-a', status: 'queued', eventCursor: 1 },
@@ -131,5 +134,21 @@ describe('run-submit: Step 3 前端发送路径 Run 化', () => {
 
     // 模型回复到达
     expect(await screen.findByText('模型回复')).toBeInTheDocument()
+  })
+
+  test('run-submit: 409 时呈现文案且不回退旧同步路径', async () => {
+    const counters = setupRunSubmitScenario({ runStatus: 409 })
+    renderWorkbench()
+
+    await screen.findByText('你好，有什么可以帮你的？')
+    await sendFromComposer('我的问题')
+
+    // Run 提交被调用
+    await waitFor(() => expect(counters.runSubmitCount).toBe(1))
+    // 旧同步路径不应被调用（409 不回退）
+    expect(counters.chatCount).toBe(0)
+
+    // 用户可见文案呈现
+    expect(await screen.findByText(/该会话存在进行中的任务/)).toBeInTheDocument()
   })
 })

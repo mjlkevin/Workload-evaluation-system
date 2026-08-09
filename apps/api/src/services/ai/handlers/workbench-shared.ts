@@ -5,9 +5,11 @@
 
 import { Request, Response } from "express";
 
+import { config } from "../../../config/env";
 import { asString } from "../../../utils/helpers";
+import { normalizeKimiModelName } from "../../../utils/model-name";
 import { requireAuth, resolveBusinessRole } from "../../../middleware/auth";
-import { loadRequirementSystemConfigStore } from "../../../modules/system/system.repository";
+import { loadRequirementSystemConfigStore, resolveActiveRequirementKimiApiKey } from "../../../modules/system/system.repository";
 import { createAiSession, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import type { AiSessionRecord } from "../../../modules/ai-sessions/ai-sessions.types";
 import type { AuthUser, BusinessRole } from "../../../types";
@@ -171,6 +173,91 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
     messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
   });
   return { answer: completion.content, rawContent: completion.rawContent, businessRole, roleLabel: preset.label };
+}
+
+// ============================================================
+// RP-047 Batch E 返工 · B1：共享 dispatch 入参组装
+// ============================================================
+// 供同步 handler 与 harness workflow boot 共用；modelChat 可注入以支持测试。
+
+export type ModelChatFactory = (params: {
+  systemPrompt: string;
+  userContent: string;
+}) => Promise<{ answer: string; rawContent: string; provider?: string; model?: string; attempts?: number; finishReason?: string }>;
+
+export function buildWorkbenchChatModelChat(
+  user: AuthUser,
+  options: {
+    messages?: HomeMessageInput[];
+    modelName?: string;
+  },
+): ModelChatFactory {
+  const messages = options.messages ?? [];
+  const modelName = options.modelName ?? normalizeKimiModelName(config.kimi.model);
+  return async ({ systemPrompt, userContent }) => {
+    const { apiKey } = resolveActiveRequirementKimiApiKey();
+    if (!apiKey) throw new Error("required_or_env_missing");
+    const safeMessages = messages.slice(-12).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
+    // 覆盖最后一条用户消息的 system prompt
+    if (safeMessages.length > 0) {
+      safeMessages[safeMessages.length - 1] = { role: "user", content: userContent };
+    }
+    const completion = await getKimiProvider().chatCompletion({
+      model: config.kimi.model,
+      temperature: 0.3,
+      promptCacheKey: "home-workbench-dispatch-v1",
+      timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
+      credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+      messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
+    });
+    return {
+      answer: completion.content,
+      rawContent: completion.rawContent,
+      provider: completion.provider,
+      model: completion.model,
+      attempts: completion.attempts,
+      finishReason: completion.finishReason,
+    };
+  };
+}
+
+export function buildWorkbenchChatDispatchInput(user: AuthUser, content: string, options?: {
+  modelChat?: ModelChatFactory;
+  messages?: HomeMessageInput[];
+}): {
+  user: AuthUser;
+  workflowKey: string;
+  message: string;
+  attachment: null;
+  latestHarnessArtifact: null;
+  clientAction: string;
+  businessRole: BusinessRole;
+  roleLabel: string;
+  model: string;
+  rolePrompt: string;
+  modelChat: ModelChatFactory;
+} {
+  const businessRole = resolveBusinessRole(user);
+  const roleLabel = HOME_ROLE_PRESETS[businessRole].label;
+  const modelName = normalizeKimiModelName(config.kimi.model);
+  const modelChat = options?.modelChat ?? buildWorkbenchChatModelChat(user, {
+    messages: options?.messages,
+    modelName,
+  });
+
+  return {
+    user,
+    workflowKey: "free_chat",
+    message: content,
+    attachment: null,
+    latestHarnessArtifact: null,
+    clientAction: "",
+    businessRole,
+    roleLabel,
+    model: modelName,
+    rolePrompt: HOME_ROLE_PRESETS[businessRole].prompt,
+    modelChat,
+  };
 }
 
 // O4 快照测试需要直接锁定闸门判定，导出不代表行为变更

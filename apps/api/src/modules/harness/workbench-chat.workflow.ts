@@ -53,10 +53,6 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
             message: content,
             user: { id: run.ownerUserId, username: run.ownerUsername, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" },
             workflowKey: "free_chat",
-            businessRole: "pre_sales",
-            roleLabel: "售前顾问",
-            model: "kimi-k2.5",
-            modelChat: async () => ({ answer: "", rawContent: "" }),
           });
           return {
             answer: result.answer,

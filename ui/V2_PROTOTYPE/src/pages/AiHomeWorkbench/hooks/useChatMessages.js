@@ -248,8 +248,20 @@ export default function useChatMessages(workbench) {
         } catch (err) {
           if (err?.status === 503 || err?.code === 'ASYNC_RUNS_DISABLED') {
             runsDisabledRef.current = true
+            // 503 回退旧同步路径
+          } else if (err?.status === 409 || err?.code === 'SESSION_HAS_ACTIVE_RUN') {
+            // 409：呈现用户可见文案，直接 return，不回退旧同步路径
+            const errorMessage = {
+              id: loadingId,
+              role: 'assistant',
+              text: '该会话存在进行中的任务，请等待完成后再发送',
+              error: true,
+            }
+            writeArrivalMessage(sendKey, loadingId, errorMessage)
+            markSending(sendKey, false)
+            return
           }
-          // 其他错误（409/404/网络等）静默回退旧同步路径，不抛错
+          // 其他错误（404/网络等）静默回退旧同步路径，不抛错
         }
       }
 
