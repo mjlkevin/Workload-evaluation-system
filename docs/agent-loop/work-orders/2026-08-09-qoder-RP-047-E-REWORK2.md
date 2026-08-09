@@ -37,7 +37,7 @@
 
 - 执行位置：**新建 worktree** `.claude/worktrees/rp-047-e-rework-msg-landing`，
   分支 `qoder/rp-047-e-rework-msg-landing`。
-- baseCommit：`cb5875d`（当前 main HEAD）。
+- baseCommit：`12e8d35`（当前 main HEAD；工单编制时为 cb5875d，后因知识库检索提交与 Sprint 3A 合入刷新）。
 - 初始化硬步骤（协议已固化）：worktree 建好后先执行仓库根 `npm install`；
   验证涉及前端时另在 `ui/V2_PROTOTYPE/` 执行 `npm install`；两步 exit=0 方可开工。
 - 状态权威：handoff 原文件 `docs/agent-loop/handoffs/2026-08-09-qoder-RP-047-E.md`
@@ -75,10 +75,10 @@
 
 ## 4. 基线事实（开工前必须复现，按实际计数报告）
 
-| 套件 | 参考计数（main HEAD cb5875d） |
+| 套件 | 参考计数（main HEAD 12e8d35，2026-08-09 主会话实测） |
 |---|---|
-| test:web | 264 |
-| test:modules | 265 |
+| test:web | 272 |
+| test:modules | 316 |
 | test:ai | 256 |
 | test:harness | 173（遇既有 DB 串行隔离 flake 以单文件重跑为准） |
 | test:integration | 1 |
@@ -124,7 +124,7 @@ TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
 USE_TESTCONTAINERS=true npm run test:harness
 
 # 守护 diff（依赖与 schema 零变更）
-git diff --stat cb5875d -- package-lock.json apps/api/drizzle/
+git diff --stat 12e8d35 -- package-lock.json apps/api/drizzle/
 # 预期：零输出
 ```
 
@@ -155,7 +155,7 @@ git diff --stat cb5875d -- package-lock.json apps/api/drizzle/
    （docs/agent-loop/work-orders/2026-08-09-qoder-RP-047-E-REWORK2.md）、
    既有 handoff（docs/agent-loop/handoffs/2026-08-09-qoder-RP-047-E.md）。
 2. 新建 worktree .claude/worktrees/rp-047-e-rework-msg-landing
-   （分支同名，base=cb5875d）；初始化后必须先 npm install（根目录 +
+   （分支同名，base=12e8d35）；初始化后必须先 npm install（根目录 +
    ui/V2_PROTOTYPE），两步成功才开工；输出 Worktree Contract ACK。
 3. 复现 §1 两个缺陷（DB 查询 + 文件核对），复跑 §4 基线；不符即停止回填疑点。
 4. RED 先行实施 C1 → C2，C3 只出结论；严守 §6 Allowed Paths 与 §9 停止条件；
