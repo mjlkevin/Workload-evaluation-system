@@ -57,7 +57,7 @@
         </div>
       </nav>
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
-      <span class="pill brand">RP-047 Batch E · 进行中 / 1H-C 规划中</span>
+      <span class="pill brand">RP-047 Batch E · 返工进行中 / 1H-C 规划中</span>
     </div>
   </header>
 
@@ -67,7 +67,7 @@
       <h1>实施计划与进度</h1>
       <p class="meta">
         <span><b>已完成</b> 阶段 1B / 1C / 1D / 1E / 1F / 1G</span>
-        <span><b>当前阶段</b> RP-047 Batch E 进行中 / 阶段 1H-B 已形成交付基线 / 阶段 1H-C 待规划</span>
+        <span><b>当前阶段</b> RP-047 Batch E 返工进行中 / 阶段 1H-B 已形成交付基线 / 阶段 1H-C 待规划</span>
         <span><b>人工测试</b> 1F/1G/1H-A 用例已登记，待执行回填</span>
         <span><b>分支</b> 业务主线 <code class="inline">codex/role-driven-ai-home-workbench</code> 当前包含 RP-031 合并提交 <code class="inline">5cc81b9</code></span>
         <span><b>状态</b> 需求池共 43 项（主台账口径）：22 项已交付（验收完成）、8 项已交付·待验收回填、11 项待规划/待确认/待验收、2 项暂缓；RP-031 多知识库路由与 RAG 评测闭环已集成关闭。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-049（AI 工作台兜底路由与静态回复策略优化，来源 ISS-2026-08-06-001）新增待规划，实施与排期待用户决策。RP-050（AI 工作台意图路由架构 Skill 层解耦，来源 ISS-2026-08-06-002）新增已分析/待统一规划，不排期不进 Sprint。RP-051（Electron 桌面端可行性验证，来源 ISS-2026-08-06-004）决策已收到：用户拍板定位为连接共享服务器的客户端、数据库留服务器端部署（桌面不内嵌 DB），PG 与路径模型两大障碍消除，待细化设计（加载方式选型），不排期。RP-047 A2-R1 候选 <code class="inline">d9790fe</code> 已关闭三个返工阻断项，Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过；用户已授权 Qoder 形成 A2 集成候选、Codex 负责独立审计，工单已发布并等待 ACK，B-E 未启动。其余已验证能力和人工验收缺口按原记录保留。</span>
@@ -76,7 +76,7 @@
         <span class="pill ok">阶段 1E 已交付</span>
         <span class="pill ok">阶段 1F 已交付</span>
         <span class="pill ok">阶段 1G 已交付</span>
-        <span class="pill brand">RP-047 Batch E · 进行中 / 1H-C 规划中</span>
+        <span class="pill brand">RP-047 Batch E · 返工进行中 / 1H-C 规划中</span>
         <span class="pill brand">工作台体验</span>
         <span class="pill warn">Codex 定期实现流程已关闭</span>
       </div>
@@ -382,7 +382,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
       <h2>阶段 1G 交付状态</h2>
       <p class="lead">阶段 1G 已解决 AI 工作台被固定 Harness 评估流水线过度收窄的问题。新的产品口径是“文件是上下文，用户意图才触发工作流”：用户可以上传附件后直接提业务问题，也可以只聊天询问模块关系、查询历史项目，只有明确要求生成报告或点击结构化提交时才推进 v1/v2 或写动作链路。</p>
       <div class="callout ok">
-        <div><b>交付事实源</b>正式设计文档已创建：<a href="../../../docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md">2026-06-22-wes-agent-phase-1g-intent-runtime-design.md</a>。实施计划已输出到 <a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1g-intent-runtime.md">2026-06-23-wes-agent-phase-1g-intent-runtime.md</a>，KIMI/Codex 实现提示词已输出到 <a href="phase-1g-implementation-prompt.md">phase-1g-implementation-prompt.md</a>，实现已通过后端与前端自动化回归。</div>
+        <div><b>交付事实源</b>正式设计文档已创建：<a href="../../../docs/superpowers/specs/2026-06-22-wes-agent-phase-1g-intent-runtime-design.md">2026-06-22-wes-agent-phase-1g-intent-runtime-design.md</a>。实施计划已输出到 <a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1g-intent-runtime.md">2026-06-23-wes-agent-phase-1g-intent-runtime.md</a>，KIMI/Codex 实现提示词已输出到 <a href="archive-md/phase-1g-implementation-prompt.md">phase-1g-implementation-prompt.md</a>，实现已通过后端与前端自动化回归。</div>
       </div>
       <div class="grid-3">
         <div class="card"><span class="pill brand">识别用户意图</span><h3>选择正确处理方式</h3><p>区分能力介绍、业务问答、附件问答、报告生成、WES 数据查询和写入请求，避免所有消息都错误进入同一报告流程。</p></div>
@@ -438,7 +438,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <div><b>本轮交付目标</b>用户在 AI 工作台完成“发起会话 → 长文本输入 → 发送消息 → 检索客户主体 → 创建项目 → 切换页面再返回”的连续操作时，状态不丢、视图不滞后、输入区可控、反馈可见，并保留 阶段 1G 意图路由和 Harness 报告生成边界。</div>
       </div>
       <div class="callout" style="margin-top:14px">
-        <div><b>施工材料</b>实施计划已输出到 <a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1h-a-workbench-ux.md">2026-06-23-wes-agent-phase-1h-a-workbench-ux.md</a>；KIMI/Codex 施工提示词已输出到 <a href="phase-1h-a-implementation-prompt.md">phase-1h-a-implementation-prompt.md</a>。</div>
+        <div><b>施工材料</b>实施计划已输出到 <a href="../../../docs/superpowers/plans/2026-06-23-wes-agent-phase-1h-a-workbench-ux.md">2026-06-23-wes-agent-phase-1h-a-workbench-ux.md</a>；KIMI/Codex 施工提示词已输出到 <a href="archive-md/phase-1h-a-implementation-prompt.md">phase-1h-a-implementation-prompt.md</a>。</div>
       </div>
       <table style="margin-top:18px">
         <tr><th>需求 ID</th><th>标题</th><th>本轮处理口径</th><th>主要改动区域</th><th>验收口径</th></tr>
@@ -534,20 +534,20 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         <tr><th>候选任务</th><th>目标</th><th>启动条件</th><th>第一验收口径</th></tr>
         <tr data-board-event-id="BE-2026-08-05-o2-handoff-verified:plan">
           <td>综合优化计划 W1 执行（O1 前端拆分 / O2 Agent 工具扩展）</td>
-          <td>按已批准的 <a href="integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> 执行 P0 两项：AiHomeWorkbench 2602 行拆分与 Agent 工具 1→8。</td>
+          <td>按已批准的 <a href="archive-md/integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> 执行 P0 两项：AiHomeWorkbench 2602 行拆分与 Agent 工具 1→8。</td>
           <td><span class="status done"><span class="dot"></span>O2 已交付 / 已合并 main（1757065，用户批准）</span>；<span class="status done"><span class="dot"></span>O1 已交付 / 已合并 main（80af6de，用户批准）/ ArtifactPanel 清理完成（916e859）</span>：W1 双会话全部闭环，均经独立复核后用户批准集成。</td>
           <td>O2：注册工具 ≥8、写工具 need_confirm、能力位过滤，build:api / test:modules / test:agent / test:security 全绿（已独立复跑，合并后集成态复验通过）；O1：入口 ≤100 行、子组件 ≤200 行、前后端报告闸门口径一致性单测、build:web + test:web 全绿，集成前不得宣布交付。</td>
         </tr>
         <tr data-board-event-id="BE-2026-08-06-w2-precheck-o3-batchc:plan">
           <td>W2 执行（O4 服务层 handler 化 / O3 重定义为 Batch B+C）</td>
-          <td>2026-08-06 前置核对确认 Batch C 覆盖原 O3 通道；用户同日决策将 Batch B→C 完整范围并入 O3，计划文档 §5.3 已重写为“持久执行引擎 + 异步事件通道”（粗估 50–65h，关卡（Gate） 驱动串行）。详见 <a href="integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> §5.3。</td>
+          <td>2026-08-06 前置核对确认 Batch C 覆盖原 O3 通道；用户同日决策将 Batch B→C 完整范围并入 O3，计划文档 §5.3 已重写为“持久执行引擎 + 异步事件通道”（粗估 50–65h，关卡（Gate） 驱动串行）。详见 <a href="archive-md/integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> §5.3。</td>
           <td><span class="status done"><span class="dot"></span>O4 已交付关闭（251b73d，冒烟 8 样本通过，Sprint 2 收官）</span>；<span class="status done"><span class="dot"></span>O3-B Batch B 已合入 main（1bd8477）/ 关卡 B 关闭</span>；<span class="status done"><span class="dot"></span>O3-C Batch C 已合入 main（70e78b1）/ 关卡 C 关闭</span>；<span class="status done"><span class="dot"></span>O3-D Batch D 已合入 main（81a7839）/ 关卡 D 关闭（B1 返工复审通过；缓办两项登记 Batch E 前收尾）</span>；<span class="status done"><span class="dot"></span>Gate D 人工验收通过（2026-08-09）/ 临时 flag 已移除</span>；<span class="status run"><span class="dot"></span>O3-E Batch E 已回填（1feda52）/ Gate E 审计不通过：阻断 B1 boot 真实 dispatch 未接线（flag-on 链路必失败，G-E1 不成立）+ 阻断 B2 前端 409 静默回退无文案（F4 未落地）；用户已裁决退回返工，返工工单 2026-08-09-qoder-RP-047-E-REWORK.md 已派单（同分支 baseCommit=1feda52），返工中，待回填后主会话复审</span></td>
           <td>O3-B：四类崩溃可恢复、工具与消息无重复、关卡 B 验收（Testcontainers 故障注入）；O3-C：关卡 C 验收（异步契约、owner 安全、SSE 回放、断线不取消）；串行推进，allowNextTask 默认 false；O4 先建快照测试集再动刀（R3），且快照基线须建立在 O10 修复后的行为上。</td>
         </tr>
         <tr data-board-event-id="BE-2026-08-06-o10-scheduled:plan">
           <td>O10 兜底路由与静态回复优化纳入排期（RP-049）</td>
-          <td>2026-08-06：RP-049 实现计划纳入综合优化计划为 O10（P1，16h）：Batch A 分类替换收紧 4h（只采纳 unsupported_or_out_of_scope、阈值 0.85，可独立先行交付）、Batch B 能力回复自然化 8h（CAPABILITY_FACTS + 模型辅助，降级如实标注）、Batch C 回归加固 4h（9 类用例 + 6 条人工验收样本）。排期决策：Sprint 2 严格排在 O4 之前（同文件依赖：workbench-dispatch/intent.service）；O6 顺移至 Sprint 3（O5+O8+O6 = 25h）；总工时 144–159h → 160–175h。详见 <a href="integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> §5.10。</td>
-          <td><span class="status done"><span class="dot"></span>Batch A 已交付关闭（e20e2c6，人工验收 6 样本冒烟通过）</span>；Batch B/C 待另行批准。</td>
+          <td>2026-08-06：RP-049 实现计划纳入综合优化计划为 O10（P1，16h）：Batch A 分类替换收紧 4h（只采纳 unsupported_or_out_of_scope、阈值 0.85，可独立先行交付）、Batch B 能力回复自然化 8h（CAPABILITY_FACTS + 模型辅助，降级如实标注）、Batch C 回归加固 4h（9 类用例 + 6 条人工验收样本）。排期决策：Sprint 2 严格排在 O4 之前（同文件依赖：workbench-dispatch/intent.service）；O6 顺移至 Sprint 3（O5+O8+O6 = 25h）；总工时 144–159h → 160–175h。详见 <a href="archive-md/integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> §5.10。</td>
+          <td><span class="status done"><span class="dot"></span>Batch A 已交付关闭（e20e2c6，人工验收 6 样本冒烟通过）</span>；<span class="status run"><span class="dot"></span>Batch B/C 已批准派单（工单 2026-08-09-qoder-O10-BC.md，单批串行，与 Batch E 返工并行）</span>。</td>
           <td>test:ai / test:modules / build:api 全绿（独立复跑 211/211、249/249）；4 类分类采纳用例断言通过；人工验收 6 样本回填 testing.html；硬口径：isExplicitReportRequest 闸门、附件路由、报告/v2 路径零变更。</td>
         </tr>
         <tr>
