@@ -8,6 +8,25 @@
   <link rel="stylesheet" href="assets/base.css?v=2" />
   <link rel="stylesheet" href="assets/components.css?v=3" />
   <link rel="stylesheet" href="assets/pages.css?v=2" />
+  <style>
+    /* §2.5 O1–O10 状态表：列宽按内容自适应（覆盖全局 table-layout:fixed 等宽与 min-width:1400px） */
+    #o10-status-table { table-layout: auto; min-width: 0; }
+    /* 短列收缩到内容宽度、不换行：编号 / 优先级 / 估时 */
+    #o10-status-table th:nth-child(1), #o10-status-table td:nth-child(1),
+    #o10-status-table th:nth-child(3), #o10-status-table td:nth-child(3),
+    #o10-status-table th:nth-child(4), #o10-status-table td:nth-child(4) {
+      width: 1%;
+      white-space: nowrap;
+    }
+    /* 状态列保持单行，避免状态文案被竖向挤压 */
+    #o10-status-table th:nth-child(5), #o10-status-table td:nth-child(5) {
+      width: 1%;
+      white-space: nowrap;
+    }
+    /* 两个长文本列（优化项 / 交付证据）弹性分配剩余宽度，正常换行 */
+    #o10-status-table th:nth-child(2), #o10-status-table td:nth-child(2) { min-width: 220px; }
+    #o10-status-table th:nth-child(6), #o10-status-table td:nth-child(6) { min-width: 260px; }
+  </style>
 </head>
 <body>
   <header class="topnav">
@@ -341,7 +360,7 @@
             <tr><td class="mono">O7</td><td>Trace 观测演进映射（自研 trace ↔ Langfuse 模型映射表 + PG 迁移 PoC，不部署平台）</td><td><span class="pill">P2</span></td><td class="mono">10h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 4）</span></td><td>映射 SP-2026-003；Sprint 4 可选批次</td></tr>
             <tr><td class="mono">O8</td><td>SSE 前端流式 UX（回复逐字呈现 + 思考折叠 + 中断按钮，后端底座已随 Batch C 交付）</td><td><span class="pill">P2</span></td><td class="mono">6h</td><td><span class="status done"><span class="dot"></span>已交付 · 关闭</span></td><td>随 3A 同批合入：text.delta 逐字呈现 + 思考折叠 + 停止按钮（调 cancelRun）；守护测试 8 用例全绿，web 272/272</td></tr>
             <tr><td class="mono">O9</td><td>AI 模块 facade 落地迁移（消除 modules/ai 仅 re-export 违例，契约零变更）</td><td><span class="pill">P2</span></td><td class="mono">10h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 4）</span></td><td>前置依赖 O4 已满足</td></tr>
-            <tr><td class="mono">O10</td><td>兜底路由与静态回复优化（RP-049：常规提问回归模型自然回复，静态模板仅留问候/超范围两类）</td><td><span class="pill brand">P1</span></td><td class="mono">16h</td><td><span class="status done"><span class="dot"></span>已交付 · 关闭</span></td><td>A/B/C 全部合入（e20e2c6 / 26623c6，合并 7825c5c）；6 条人工验收样本待用户验收</td></tr>
+            <tr><td class="mono">O10</td><td>兜底路由与静态回复优化（RP-049：常规提问回归模型自然回复，静态模板仅留问候/超范围两类）</td><td><span class="pill brand">P1</span></td><td class="mono">16h</td><td><span class="status done"><span class="dot"></span>已交付 · 关闭</span></td><td>A/B/C 全部合入（e20e2c6 / 26623c6，合并 7825c5c）；6 样本人工验收全过（2026-08-10 用户确认）</td></tr>
           </tbody>
         </table>
       </div>
