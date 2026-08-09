@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PageShell from '../components/Layout/PageShell.jsx'
 import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
+import AiSessionAuditPanel from '../components/system/AiSessionAuditPanel.jsx'
 import KnowledgeBaseProfilesPanel from '../components/system/KnowledgeBaseProfilesPanel.jsx'
 import { SYSTEM_MANAGEMENT_SECTIONS, getSystemManagementSectionById } from '../config/systemManagementSections.js'
 import useSystemManagement from '../hooks/useSystemManagement.js'
@@ -817,6 +818,10 @@ export default function SystemManagement({ sectionId }) {
               </div>
             )}
           </div>
+        )}
+
+        {activeSectionId === 'sessions' && (
+          <AiSessionAuditPanel />
         )}
       </div>
 

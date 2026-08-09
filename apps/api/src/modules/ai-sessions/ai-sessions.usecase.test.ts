@@ -8,10 +8,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 
 import type { AuthUser } from "../../types";
 import { aiSessionsStorePath } from "../../utils";
-import { appendAiSessionEvent, createAiSession, getAiSession } from "./ai-sessions.usecase";
+import { appendAiSessionEvent, createAiSession, getAiSession, listAllAiSessionsForAdmin } from "./ai-sessions.usecase";
 
 const testUser: AuthUser = {
   id: "user-attachment-summary-test",
@@ -25,14 +28,16 @@ const testUser: AuthUser = {
 };
 
 async function withSessionStoreIsolation(run: () => Promise<void>): Promise<void> {
-  const storePath = aiSessionsStorePath();
-  const existed = existsSync(storePath);
-  const before = existed ? readFileSync(storePath, "utf-8") : "";
+  // 通过 WES_AI_SESSIONS_STORE_PATH 指向临时文件，避免读写真实 data/ai-sessions.json
+  const previousOverride = process.env.WES_AI_SESSIONS_STORE_PATH;
+  const tempPath = join(tmpdir(), `wes-ai-sessions-test-${randomUUID()}.json`);
+  process.env.WES_AI_SESSIONS_STORE_PATH = tempPath;
   try {
     await run();
   } finally {
-    if (existed) writeFileSync(storePath, before, "utf-8");
-    else if (existsSync(storePath)) rmSync(storePath, { force: true });
+    if (previousOverride === undefined) delete process.env.WES_AI_SESSIONS_STORE_PATH;
+    else process.env.WES_AI_SESSIONS_STORE_PATH = previousOverride;
+    if (existsSync(tempPath)) rmSync(tempPath, { force: true });
   }
 }
 
@@ -76,6 +81,79 @@ test("ai-sessions.usecase: parsedSummary 超 8000 字符时截断并加标记", 
     assert.ok(persisted.startsWith("需".repeat(8000)), "应保留前 8000 字符");
     assert.ok(persisted.endsWith("…[truncated]"), "截断应带 …[truncated] 标记");
     assert.ok(!persisted.includes("需".repeat(8001)), "不应保留超限内容");
+  });
+});
+
+test("ai-sessions.usecase: listAllAiSessionsForAdmin 跨用户聚合并输出审计摘要", async () => {
+  await withSessionStoreIsolation(async () => {
+    const alice = createAiSession(testUser, { title: "Alice 业务评估", status: "rough_estimate" });
+    appendAiSessionEvent(testUser, alice.sessionId, {
+      message: { role: "user", content: "首轮输入内容" },
+    });
+    appendAiSessionEvent(testUser, alice.sessionId, {
+      message: { role: "assistant", content: "最终输出内容" },
+    });
+    const bobUser: AuthUser = { ...testUser, id: "user-bob-audit", username: "bob" };
+    createAiSession(bobUser, { title: "Bob 标准治理", domain: "standard_governance", status: "standard_review" });
+
+    const items = listAllAiSessionsForAdmin({});
+    assert.equal(items.length, 2, "应聚合所有用户的会话");
+
+    const aliceSummary = items.find((item) => item.sessionId === alice.sessionId);
+    assert.ok(aliceSummary, "应包含 Alice 的会话");
+    assert.equal(aliceSummary.ownerUsername, testUser.username);
+    assert.equal(aliceSummary.ownerUserId, testUser.id);
+    assert.equal(aliceSummary.domain, "business_evaluation");
+    assert.equal(aliceSummary.status, "rough_estimate");
+    assert.equal(aliceSummary.turnCount, 1, "轮次应统计 user 消息数");
+    assert.equal(aliceSummary.messageCount, 2);
+    assert.equal(aliceSummary.firstUserMessage, "首轮输入内容");
+    assert.equal(aliceSummary.lastAssistantMessage, "最终输出内容");
+    assert.equal("messages" in aliceSummary, false, "审计摘要不得携带消息原文数组");
+  });
+});
+
+test("ai-sessions.usecase: listAllAiSessionsForAdmin 支持 q/status/domain/时间范围过滤并按最后活动倒序", async () => {
+  await withSessionStoreIsolation(async () => {
+    const bobUser: AuthUser = { ...testUser, id: "user-bob-filter", username: "bob" };
+    const older = createAiSession(testUser, { title: "金蝶云星空评估会话", status: "temporary_chat" });
+    const newer = createAiSession(bobUser, { title: "标准治理会话", domain: "standard_governance", status: "standard_review" });
+    // 让 older 会话的最后活动晚于 newer，验证排序依据为 updatedAt（跨毫秒确保时间戳差异）
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    appendAiSessionEvent(testUser, older.sessionId, {
+      message: { role: "user", content: "追加一轮" },
+    });
+
+    const all = listAllAiSessionsForAdmin({});
+    assert.equal(all.length, 2);
+    assert.equal(all[0].sessionId, older.sessionId, "应按 updatedAt 倒序");
+
+    const byStatus = listAllAiSessionsForAdmin({ status: "standard_review" });
+    assert.equal(byStatus.length, 1);
+    assert.equal(byStatus[0].sessionId, newer.sessionId);
+
+    const byDomain = listAllAiSessionsForAdmin({ domain: "standard_governance" });
+    assert.equal(byDomain.length, 1);
+    assert.equal(byDomain[0].sessionId, newer.sessionId);
+
+    const byUsername = listAllAiSessionsForAdmin({ q: "BOB" });
+    assert.equal(byUsername.length, 1, "q 应大小写不敏感匹配用户名");
+    assert.equal(byUsername[0].sessionId, newer.sessionId);
+
+    const byTitle = listAllAiSessionsForAdmin({ q: "星空" });
+    assert.equal(byTitle.length, 1, "q 应匹配标题");
+    assert.equal(byTitle[0].sessionId, older.sessionId);
+
+    const bySessionId = listAllAiSessionsForAdmin({ q: newer.sessionId.slice(0, 8) });
+    assert.equal(bySessionId.length, 1, "q 应匹配会话ID");
+
+    const fromFuture = listAllAiSessionsForAdmin({ from: "2099-01-01" });
+    assert.equal(fromFuture.length, 0, "from 晚于全部活动时应无结果");
+    const toFuture = listAllAiSessionsForAdmin({ to: "2099-01-01" });
+    assert.equal(toFuture.length, 2, "to 为日期时应包含当天及之前全部记录");
+
+    const limited = listAllAiSessionsForAdmin({ limit: 1 });
+    assert.equal(limited.length, 1, "limit 应生效");
   });
 });
 

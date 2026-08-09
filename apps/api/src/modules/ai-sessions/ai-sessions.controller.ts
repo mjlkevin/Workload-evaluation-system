@@ -5,7 +5,7 @@ import { requireAuth } from "../../middleware/auth";
 import { asString } from "../../utils";
 import { fail, ok } from "../../utils/response";
 import { AiRunsConflictError } from "../harness/harness-runtime.usecase";
-import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, listAiSessions, renameAiSession } from "./ai-sessions.usecase";
+import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, listAiSessions, listAllAiSessionsForAdmin, renameAiSession } from "./ai-sessions.usecase";
 
 export function createSession(req: Request, res: Response) {
   const auth = requireAuth(req, res);
@@ -18,6 +18,13 @@ export function listSessions(req: Request, res: Response) {
   const auth = requireAuth(req, res);
   if (!auth) return;
   return res.json(ok({ items: listAiSessions(auth.user, req.query || {}) }, randomUUID()));
+}
+
+// 管理员审计视图：跨用户聚合全部 AI 会话摘要，仅挂载在 system:manage 能力位路由下
+export function listAllSessionsForAdmin(req: Request, res: Response) {
+  const auth = requireAuth(req, res);
+  if (!auth) return;
+  return res.json(ok({ items: listAllAiSessionsForAdmin(req.query || {}) }, randomUUID()));
 }
 
 export function getSession(req: Request, res: Response) {

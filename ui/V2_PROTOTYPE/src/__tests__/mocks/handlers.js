@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import {
+  mockAdminAiSessions,
   mockAssessmentVersion,
   mockAiSessions,
   mockComments,
@@ -615,6 +616,20 @@ export const handlers = [
     return HttpResponse.json({ success: true, data: { ok: true, profileId: body.profileId, testedSource: 'mock', retrievalTriggered: true } })
   }),
   http.get(`${BASE}/system/implementation-dependency-rules`, () => HttpResponse.json({ success: true, data: mockDslRules })),
+  http.get(`${BASE}/system/ai-sessions`, ({ request }) => {
+    const url = new URL(request.url)
+    const status = url.searchParams.get('status')
+    const domain = url.searchParams.get('domain')
+    const q = (url.searchParams.get('q') || '').toLowerCase()
+    const items = mockAdminAiSessions
+      .filter((session) => !status || session.status === status)
+      .filter((session) => !domain || session.domain === domain)
+      .filter((session) => !q
+        || [session.sessionId, session.title, session.ownerUsername, session.workflowKey]
+          .some((value) => String(value || '').toLowerCase().includes(q)))
+      .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)))
+    return HttpResponse.json({ success: true, data: { items } })
+  }),
   http.get(`${BASE}/harness/test-results`, () => HttpResponse.json({ success: true, data: { items: [] } })),
   http.get(`${BASE}/templates`, () => HttpResponse.json({ success: true, data: [{ templateId: 'T1', templateName: '实施评估标准版', description: '标准模板', tags: ['标准'] }] })),
   http.post(`${BASE}/system/version-code-rules/:id/activate`, () => HttpResponse.json({ success: true, data: {} })),

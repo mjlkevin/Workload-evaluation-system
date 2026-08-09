@@ -1,4 +1,5 @@
 import { Router } from "express";
+import * as AiSessionsModule from "../modules/ai-sessions/ai-sessions.module";
 import * as SystemModule from "../modules/system/system.module";
 import { requireCapability, requireAnyCapability } from "../rbac/middleware";
 
@@ -20,5 +21,7 @@ router.patch("/knowledge-base-config/draft", requireCapability("system:manage"),
 router.post("/knowledge-base-config/activate", requireCapability("system:manage"), SystemModule.activateKnowledgeBaseConfig);
 router.post("/knowledge-base-config/test", requireCapability("system:manage"), SystemModule.testKnowledgeBaseConnectivity);
 router.get("/role-capabilities", requireCapability("system:manage"), SystemModule.getRoleCapabilitiesMatrix);
+// 会话管理：管理员审计全量用户 AI 会话
+router.get("/ai-sessions", requireCapability("system:manage"), AiSessionsModule.listAllSessionsForAdmin);
 
 export default router;

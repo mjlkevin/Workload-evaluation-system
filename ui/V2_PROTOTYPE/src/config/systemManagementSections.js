@@ -6,6 +6,7 @@ export const SYSTEM_MANAGEMENT_SECTIONS = [
   { id: 'dsl', route: '/system/dsl-rules', label: 'DSL 规则集', icon: 'D', subtitle: '实施评估依赖规则管理' },
   { id: 'tpl', route: '/system/templates', label: '模板', icon: 'T', subtitle: '评估模板与复用资产管理' },
   { id: 'testResults', route: '/system/test-results', label: '测试结果', icon: '✓', subtitle: '人工测试结果登记与追踪' },
+  { id: 'sessions', route: '/system/sessions', label: '会话管理', icon: 'S', subtitle: '全量用户 AI 会话审计与跟踪' },
 ]
 
 export const DEFAULT_SYSTEM_MANAGEMENT_ROUTE = SYSTEM_MANAGEMENT_SECTIONS[0].route

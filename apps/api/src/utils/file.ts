@@ -84,6 +84,8 @@ export function versionsStorePath(): string {
  * AI 会话存储路径
  */
 export function aiSessionsStorePath(): string {
+  const override = process.env.WES_AI_SESSIONS_STORE_PATH?.trim();
+  if (override) return override;
   return path.resolve(resolveRootDir(), "data/ai-sessions.json");
 }
 
