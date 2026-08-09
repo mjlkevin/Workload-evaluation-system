@@ -314,7 +314,7 @@
     <section>
       <div class="h-num">Section 03</div>
       <h2>O1–O10 综合优化计划全量状态表</h2>
-      <p class="lead">WES AI 工作台综合优化计划（integrated-optimization-plan-2026-08-04，总估 160–175h）的权威状态台账。任一 O 项状态变更（开工 / 交付 / 合入 / 返工 / 关闭）必须同步更新本表。已交付 6 项、部分交付 1 项（O10 仅 Batch A）、未开工 3 项；实际完成约 115–130h（约 70–80%）。</p>
+      <p class="lead">WES AI 工作台综合优化计划（integrated-optimization-plan-2026-08-04，总估 160–175h）的权威状态台账。任一 O 项状态变更（开工 / 交付 / 合入 / 返工 / 关闭）必须同步更新本表。已交付 5 项（O1/O2/O3/O4/O10 全部批次）、未开工 5 项（Sprint 3：O5/O6/O8；Sprint 4：O7/O9）；实际完成约 115–130h（约 70–80%）。</p>
       <div class="table-scroll">
         <table data-board-table id="o10-status-table">
           <thead>
@@ -330,7 +330,7 @@
             <tr><td class="mono">O7</td><td>Trace 观测演进映射（自研 trace ↔ Langfuse 模型映射表 + PG 迁移 PoC，不部署平台）</td><td><span class="pill">P2</span></td><td class="mono">10h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 4）</span></td><td>映射 SP-2026-003；Sprint 4 可选批次</td></tr>
             <tr><td class="mono">O8</td><td>SSE 前端流式 UX（回复逐字呈现 + 思考折叠 + 中断按钮，后端底座已随 Batch C 交付）</td><td><span class="pill">P2</span></td><td class="mono">6h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 3）</span></td><td>RP-029 批次 2 前端闭环</td></tr>
             <tr><td class="mono">O9</td><td>AI 模块 facade 落地迁移（消除 modules/ai 仅 re-export 违例，契约零变更）</td><td><span class="pill">P2</span></td><td class="mono">10h</td><td><span class="status todo"><span class="dot"></span>未开工（Sprint 4）</span></td><td>前置依赖 O4 已满足</td></tr>
-            <tr><td class="mono">O10</td><td>兜底路由与静态回复优化（RP-049：常规提问回归模型自然回复，静态模板仅留问候/超范围两类）</td><td><span class="pill brand">P1</span></td><td class="mono">16h</td><td><span class="status run"><span class="dot"></span>部分交付（Batch A 完成）</span></td><td class="mono">A 已合入（e20e2c6）；B/C 已批准派单（单批串行，与 Batch E 返工并行）</td></tr>
+            <tr><td class="mono">O10</td><td>兜底路由与静态回复优化（RP-049：常规提问回归模型自然回复，静态模板仅留问候/超范围两类）</td><td><span class="pill brand">P1</span></td><td class="mono">16h</td><td><span class="status done"><span class="dot"></span>已交付 · 关闭</span></td><td>A/B/C 全部合入（e20e2c6 / 26623c6，合并 7825c5c）；6 条人工验收样本待用户验收</td></tr>
           </tbody>
         </table>
       </div>

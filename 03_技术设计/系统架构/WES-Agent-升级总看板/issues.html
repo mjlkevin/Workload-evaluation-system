@@ -69,11 +69,11 @@
         <div class="meta">
           <span><b>定位</b> 用户原始反馈、截图、疑问和未定性现象的第一入口</span>
           <span><b>处理流程</b> 原始问题（Issue）→ 分析分流 → 缺陷 / 需求 / 风险 / 关闭</span>
-          <span><b>更新日期</b> 2026-08-06</span>
+          <span><b>更新日期</b> 2026-08-09</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">31 个问题</span>
-          <span class="pill warn">0 待分析</span>
+          <span class="pill brand">34 个问题</span>
+          <span class="pill warn">1 待分诊</span>
           <span class="pill warn">18 转缺陷</span>
           <span class="pill brand">13 个已转为需求</span>
         </div>
@@ -477,6 +477,17 @@
               <td class="tc-7">Qoder 已在隔离 worktree（分支 qoder/fix-attachment-report-loop）按 TDD 完成会话级附件上下文回退：持久化层补存 parsedSummary（8000 字截断）、非流式/流式报告闸门接入会话附件回退与 clientAction 条件、共享报告流程 report-flow.ts、静态文案上下文感知、前端水合带出 parsedSummary。验证全绿：test:modules 265/265、test:ai 244/244、test:web 255/255、build:api/build:web 通过。2026-08-09 Qoder peer review 五轴通过（无 Critical/必改项），经用户确认以 --no-ff 合入 main（merge 7a939c8），合并后全量复验再次全绿，前后端服务已按新构建重启。2026-08-09 用户人工验收四场景通过，issue 关闭；存量会话上下文感知文案项已在验收时登记，如仍需要另行处置。2026-08-09 验收发现：存量会话（附件在修复部署前上传，如 session 73560909-33ea-43a4-8744-ba9dc04851a5，上传 16:25Z 早于新 API 启动 16:30Z）落库无 parsedSummary，回退取空落入降级分支，且降级文案与旧文案相同，体验上等同未修复；绕行=重传一次文件；体验缺口修复（存量会话上下文感知文案）待用户确认后执行。</td>
               <td class="tc-8">根因链（置信度高）：附件解析上下文 parsedSummary 为请求级瞬态数据 → 首轮响应会话回声后前端内存副本被丢弃（mapSessionMessages 仅重建 name/size/type；mergePreservedLocalFileMessages 同名同文本不保留本地版）→ 持久化层本就不存 parsedSummary → 第二轮报告闸门 parsedAttachment=null 落入 harness_report_generation 静态回复 → 文案与 suggestedAction 不感知会话已有附件，形成死循环；绕行方式为重新上传同一文件（有绕行成本）。次级观察：workbench-chat-stream.handler.ts 无显式报告闸门（推断，待验证流式调用方影响面）。修复方向候选：① 会话附件持久化 parsedSummary 或摘要引用；② 报告闸门与 harnessReportHandler 回退会话最近附件；③ 静态文案改上下文感知；④ 前端按钮携带 clientAction 与会话附件引用。本次仅分析与记录，未改代码。</td>
             </tr>
+            <tr>
+              <td class="mono tc-0">ISS-2026-08-09-001</td>
+              <td class="tc-1">2026-08-09</td>
+              <td class="tc-2">AI 工作台首句发送后会话列表未即时显示新会话记录</td>
+              <td class="tc-3">user_feedback_screenshot_code_analysis</td>
+              <td class="tc-4">用户在 AI 工作台发送第一条消息（首句对话，尤其带附件场景）后，左侧会话列表（SessionRail）没有立即创建并显示对应的新会话记录块；会话要等 useChatMessages.js 中 createSession 调用完成后才出现，未预先创建占位符，存在体验延迟感。期望行为：发送首句时左侧列表立即显示新会话项（可先以临时/占位状态展示），正式创建后更新为完整记录；或在消息发送前预先创建会话占位符。</td>
+              <td class="tc-5"><code class="inline">screenshot:带附件场景停留“正在提取文件结构”且左侧无新会话（task-fce/e53iubgp-c9ff0b46.png）</code> <code class="inline">useChatMessages.js:150-233（sendMessage 先渲染 user/loading 消息，带附件时先 await /ai/parse-basic-info 上传解析，L223 才 await createSession）</code> <code class="inline">useAiSessions.js:100-110（createSession 在后端 POST /ai-sessions 返回后才 upsert 进列表状态）</code> <code class="inline">SessionRail.jsx:46,172-249（纯渲染 sessions prop，无乐观占位机制）</code> <code class="inline">useHarnessRun.js:26（报告流程同样在解析后才创建会话）</code> <code class="inline">ISS-2026-08-02-003/RP-047、RP-033（症状不同，仅交叉引用）</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已分析 / 待分诊</span></td>
+              <td class="tc-7">待分诊 · 候选转需求（UX 即时反馈优化）</td>
+              <td class="tc-8">去重结果：未命中同类 issue/需求/缺陷（RP-047 为多通道请求态、RP-033 为列表滚动，症状与根因均不同）。候选初步方案：① 发送时立即在 SessionRail 顶部插入乐观会话占位项（临时标题+“创建中”态），createSession 返回后对账（成功替换为真实记录、失败移除占位并提示）；② 或将 createSession 提前到文件解析之前，缩短空白窗口。验收口径：首句发送后左侧列表近即时（&lt;100ms）出现新会话项，创建完成后标题/时间/徽标与后端返回一致，失败场景无残留占位。正式分流由 Codex Intake/Triage Loop 完成；本次仅记录，未改代码。</td>
+            </tr>
         </tbody>
         </table>
         </div>
@@ -484,7 +495,7 @@
       </div>
     </section>
 </main>
-  <footer>问题池 · WES 项目管理 · 2026-08-08</footer>
+  <footer>问题池 · WES 项目管理 · 2026-08-09</footer>
   <script src="assets/board-ui.js?v=20260808" defer></script>
   <script src="assets/vendor/list.min.js?v=20260808" defer></script>
   <script src="assets/board-table.js?v=20260808" defer></script>
