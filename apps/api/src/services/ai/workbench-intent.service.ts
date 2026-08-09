@@ -30,7 +30,7 @@ export type WorkbenchIntentResult = {
 };
 
 // 能力发现关键词
-const CAPABILITY_PATTERNS = /你能做什么|能做什么|你可以做什么|帮助|你能帮我什么|你有哪些功能|你有什么能力/;
+const CAPABILITY_PATTERNS = /你会干什么|你能帮我干啥|支持哪些操作|你能做什么|能做什么|你可以做什么|帮助|你能帮我什么|你有哪些功能|你有什么能力/;
 const GREETING_PATTERNS = /^(你好|您好|hello|hi|嗨|在吗)[!！。,.，\s]*$/i;
 
 // WES 数据查询关键词
