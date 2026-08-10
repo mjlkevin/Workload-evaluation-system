@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import CompanyLookupDialog from '../../components/AiWorkbench/CompanyLookupDialog.jsx'
 import SessionRail from '../../components/AiWorkbench/SessionRail.jsx'
 import { useBackgroundRuns } from '../../hooks/useBackgroundRuns.jsx'
+import { sessionRuntimeStore } from '../../hooks/useSessionRuntimeStore.js'
 import useChatMessages from './hooks/useChatMessages.js'
 import useHarnessRun from './hooks/useHarnessRun.js'
 import useWorkbenchState from './hooks/useWorkbenchState.js'
@@ -49,16 +50,33 @@ export default function AiHomeWorkbench({ currentUser }) {
   // ISS-2026-08-09-003 C3：离页期间完成的 run（由活跃转 completed，或从活跃列表消失）
   // 在统一视图刷新后触发 C2 对账重拉——后端 messages 为准补回迟到回复。
   const prevRunStatusesRef = useRef(new Map())
+  // ISS-2026-08-10-001（ISS-003 复验残留）：「重挂载对账」一次性窗口——
+  // 本挂载周期内完成首次评估即关闭，不依赖卸载前 ref（重挂载后 ref 已清空）。
+  const remountReconcileCheckedRef = useRef(false)
   useEffect(() => {
     const runs = workbench.unifiedView?.runs || []
     const previous = prevRunStatusesRef.current
-    const next = new Map(runs.map((run) => [run.id, run.status]))
+    // ISS-2026-08-10-001：run 键兼容统一视图的 runId（后端真实字段）与 id（既有 mock），
+    // 原 run.id 单键在真实数据下全为 undefined，会把跨 run 状态误判为同一 run 迁移。
+    const runKey = (run) => run.runId || run.id
+    const next = new Map(runs.map((run) => [runKey(run), run.status]))
     const wasActive = (status) => ['queued', 'running', 'recovering', 'waiting'].includes(status)
-    const completedInBackground = runs.some((run) => wasActive(previous.get(run.id)) && run.status === 'completed')
+    const completedInBackground = runs.some((run) => wasActive(previous.get(runKey(run))) && run.status === 'completed')
       || [...previous.entries()].some(([id, status]) => wasActive(status) && !next.has(id))
     prevRunStatusesRef.current = next
     if (completedInBackground) workbench.loadSessions?.().catch(() => {})
-  }, [workbench.unifiedView?.runs])
+    // ISS-2026-08-10-001：重挂载后统一视图已含近期已完成 run（后端增补数据源），
+    // 本地存在该会话未完成进行中占位（卸载快照）时触发一次 loadSessions 对账。
+    const activeSessionId = workbench.activeSession?.sessionId || ''
+    if (!remountReconcileCheckedRef.current && runs.length && activeSessionId) {
+      remountReconcileCheckedRef.current = true
+      const storedMessages = sessionRuntimeStore.getSessionMessages(activeSessionId) || []
+      const hasUnfinishedLocal = storedMessages.some((message) => message.loading || message.streaming)
+      if (hasUnfinishedLocal && runs.some((run) => run.status === 'completed')) {
+        workbench.loadSessions?.().catch(() => {})
+      }
+    }
+  }, [workbench.unifiedView?.runs, workbench.activeSession?.sessionId])
 
   function requestStopRun(run) {
     if (!run) return

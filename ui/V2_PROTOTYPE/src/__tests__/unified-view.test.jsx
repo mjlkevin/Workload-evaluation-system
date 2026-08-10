@@ -73,12 +73,15 @@ function setupUnifiedView({ view, fail = false } = {}) {
         data: resolvedView,
       })
     }),
-    http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({
-      success: true,
-      data: {
-        items: resolvedView.sessions || [],
-      },
-    })),
+    http.get(`${BASE}/ai-sessions`, () => {
+      calls.push('ai-sessions')
+      return HttpResponse.json({
+        success: true,
+        data: {
+          items: resolvedView.sessions || [],
+        },
+      })
+    }),
   )
   return { calls }
 }
@@ -157,5 +160,35 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     renderWorkbench()
 
     expect(await screen.findByText('后台任务 进行中 1 · 已完成 1')).toBeInTheDocument()
+  })
+
+  // ISS-2026-08-10-001（ISS-003 复验残留：后台任务角标不显示 + 未完成占位不恢复）回归：
+  // 重挂载后统一视图 runs 含已完成 run（ISS-2026-08-10-001 后端增补近期已完成数据源），
+  // 且本地 store 存在该会话未完成进行中占位（卸载快照）时——
+  // 1) 角标「已完成」计数 ≥ 1（仅已完成 run 也渲染角标，修正永远 0 缺陷的前端契约）；
+  // 2) 未完成进行中占位经卸载快照对账恢复渲染（后端尚无 assistant）；
+  // 3) completedInBackground 不依赖卸载前 ref，触发一次 loadSessions 对账重拉
+  //    （挂载首次 + 对账重拉各一次）。
+  test('unified-view: 重挂载后 runs 含已完成且本地有未完成占位时恢复占位并触发一次对账重拉', async () => {
+    sessionRuntimeStore.setSessionMessages('session-a', [
+      { id: 'local-user-1', role: 'user', text: '利润中心是什么？' },
+      { id: 'local-loading-1', role: 'assistant', text: '正在理解你的问题', loading: true },
+    ])
+    const { calls } = setupUnifiedView({
+      view: buildUnifiedView({
+        runs: [
+          { id: 'run-1', sessionId: 'session-a', status: 'completed', latestEventKind: 'run_completed' },
+        ],
+      }),
+    })
+    renderWorkbench()
+
+    // 角标仅已完成 run 也渲染（进行中 0 · 已完成 1）
+    expect(await screen.findByText('后台任务 进行中 0 · 已完成 1')).toBeInTheDocument()
+    // 未完成进行中占位恢复快照渲染（后端尚无 assistant）
+    expect(await screen.findByText('正在理解你的问题')).toBeInTheDocument()
+    expect(screen.getByText('利润中心是什么？')).toBeInTheDocument()
+    // 触发一次对账重拉：mount 首次 + 重挂载对账各一次
+    await waitFor(() => expect(calls.filter((call) => call === 'ai-sessions').length).toBeGreaterThanOrEqual(2))
   })
 })

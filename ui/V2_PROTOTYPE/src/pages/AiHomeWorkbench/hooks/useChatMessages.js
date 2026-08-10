@@ -65,6 +65,18 @@ function reconcileWithBackendMessages(backendMessages, localMessages) {
 }
 
 /**
+ * ISS-2026-08-10-001（回复未完成时返回占位不恢复）：重挂载恢复快照的闸门——
+ * 仅当快照尾部存在未完成进行中占位（loading / streaming / error / action）时
+ * 才以快照参与对账；已完结的快照不恢复（后端为准），避免陈旧本地消息在
+ * 重挂载后与新生成的同文消息重复出图。
+ */
+function hasUnfinishedSnapshotTail(messages) {
+  if (!messages?.length) return false
+  const last = messages[messages.length - 1]
+  return Boolean(last?.loading || last?.streaming || last?.error || last?.action)
+}
+
+/**
  * 消息列表与发送逻辑。Harness v1 显式报告流程由 useHarnessRun 提供，
  * 通过 bindHarness 注入；「文件是上下文，用户意图才触发工作流」闸门
  * （isExplicitReportRequest）保持不变。
@@ -168,10 +180,31 @@ export default function useChatMessages(workbench) {
     setMessages((prev) => {
       // ISS-2026-08-09-003 C2：L124 守卫细化——本地残留 loading 占位不再无条件
       // 阻断后端最新数据；仅保留仍未完成的进行中尾部，其余以后端为准。
-      const reconciled = reconcileWithBackendMessages(sessionMessages, prev)
+      // ISS-2026-08-10-001（回复未完成时返回占位不恢复）：重挂载首帧本地为空
+      // 且该会话离页快照存在未完成进行中占位时，以快照作为本地视图参与同一对账
+      // ——后端为准、仅保留未完成进行中占位（与 ISS-003 C2 同一合并语义）；
+      // 已完结快照不恢复，避免陈旧本地消息重复出图。
+      const storedMessages = prev.length
+        ? undefined
+        : sessionRuntimeStore.getSessionMessages(currentSessionId)
+      const localBase = hasUnfinishedSnapshotTail(storedMessages) ? storedMessages : prev
+      const reconciled = reconcileWithBackendMessages(sessionMessages, localBase)
       return sameMessageList(prev, reconciled) ? prev : reconciled
     })
   }, [workbench.activeSession, sending])
+
+  // ISS-2026-08-10-001（回复未完成时返回占位不恢复）：离开工作台页面（组件
+  // 卸载）时把当前会话视图（含进行中 loading 占位）写入快照——G1 快照此前只在
+  // 会话切换与迟到回填点写入，离页即丢占位；重挂载经上方对账路径恢复。
+  useEffect(() => {
+    return () => {
+      const sessionId = workbenchRef.current?.activeSession?.sessionId || ''
+      const currentMessages = messagesRef.current
+      if (sessionId && currentMessages.length) {
+        sessionRuntimeStore.setSessionMessages(sessionId, currentMessages)
+      }
+    }
+  }, [])
 
   // ISS-2026-08-09-003 C2（离页返回旧缓存渲染）：页签切回触发会话数据重拉——
   // 离页期间无 SSE 订阅的迟到结果，经 C1 新对象 + 对账合并补回渲染源。

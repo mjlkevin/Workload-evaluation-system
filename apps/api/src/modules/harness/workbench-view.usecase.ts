@@ -95,6 +95,8 @@ export type WorkbenchUnifiedView = {
 
 export type WorkbenchViewRepoPort = {
   listActiveRunsForOwner(ownerUserId: string): Promise<Array<Record<string, unknown>>>;
+  // ISS-2026-08-10-001（后台任务角标数据源）：近期已完成 Run 查询。
+  listRecentlyCompletedRunsForOwner(ownerUserId: string, limit?: number): Promise<Array<Record<string, unknown>>>;
   getRunSnapshot(runId: string): Promise<{
     run: Record<string, unknown>;
     attempt: Record<string, unknown> | null;
@@ -115,6 +117,8 @@ export type WorkbenchViewUsecase = ReturnType<typeof createWorkbenchViewUsecase>
 
 const TERMINAL_STATUSES: readonly string[] = ["completed", "failed", "cancelled"];
 const FAILED_STATUS = "failed";
+// ISS-2026-08-10-001：统一视图携带的近期已完成 Run 上限（角标计数窗口）。
+const RECENTLY_COMPLETED_RUNS_LIMIT = 10;
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -165,11 +169,27 @@ export function createWorkbenchViewUsecase(deps: WorkbenchViewUsecaseDeps) {
     // 2. 拉取本人活跃 Run（PostgreSQL，已做 owner 隔离）
     const activeRuns = await repo.listActiveRunsForOwner(user.id);
 
+    // 2b. ISS-2026-08-10-001（后台任务角标不显示）：增补本人近期已完成 Run——
+    // Run 进入 completed 终态后立即从活跃查询消失，曾导致角标「已完成」永远计 0；
+    // 合并进同一 runs 视图（按 runId 去重），前端按 status 计数即可。
+    const recentlyCompletedRuns = await repo.listRecentlyCompletedRunsForOwner(
+      user.id,
+      RECENTLY_COMPLETED_RUNS_LIMIT,
+    );
+    const seenRunIds = new Set<string>();
+    const viewRuns: Array<Record<string, unknown>> = [];
+    for (const run of [...activeRuns, ...recentlyCompletedRuns]) {
+      const runId = safeRunString(run, "harnessRunId");
+      if (runId && seenRunIds.has(runId)) continue;
+      if (runId) seenRunIds.add(runId);
+      viewRuns.push(run);
+    }
+
     // 3. 构建 Run 视图项
     const runViewItems: WorkbenchRunViewItem[] = [];
     const failedRunItems: WorkbenchFailedRunItem[] = [];
 
-    for (const run of activeRuns) {
+    for (const run of viewRuns) {
       const status = safeRunString(run, "status");
       const runId = safeRunString(run, "harnessRunId");
       const sessionId = run.aiSessionId === null || run.aiSessionId === undefined
