@@ -1,6 +1,6 @@
 # 工单 · ISS-2026-08-10-004：AI 工作台异步通道对话区收敛 + 逐字流式（runId 字段错配 & 异步流式事件接入）
 
-> 状态：**已派发 KIMIK3（2026-08-10 用户批准，编制与派发一并批准）**
+> 状态：**已回填 / 待 Codex 复核（KIMIK3 2026-08-10 回填，合入须用户批准 --no-ff）**
 > 类型：defect（P1 高频核心流）· 来源：用户实测截图 3 张（2026-08-10，两次反馈同题合并）
 > 交叉引用：ISS-2026-08-09-003（读取侧对账兜底，不同题）/ ISS-2026-08-10-003（提交后刷新时机，已合入 ee547a5，相关但独立）/ ISS-2026-08-10-001、002（角标链路，已验收关闭，**不得触碰**）
 > base：`8bcbd91`（main HEAD，派发时实填；含本工单文档，handoff 回填在分支内完成）
@@ -100,3 +100,70 @@
 3. 完成后会话行徽标 / 右下角通知正常不回退（ISS-001/002 验收口径不回归）；
 4. 切会话再切回内容与流式结果一致（ISS-2026-08-09-003 C2 兜底不回归）；
 5. **ISS-2026-08-10-003 复测第 2 项（逐字流式及时开始）并入本单第 1 项一并复测**；003 第 1/3/4 项可先行独立复测。
+
+---
+
+## Handoff 回填（KIMIK3 · 2026-08-10）
+
+### 状态
+已回填 / 待 Codex 复核。分支 `qoder/iss-2026-08-10-004-runid-mismatch-async-streaming`，修复提交 `d3940d3`（base `caf45e6` worktree 执行，主检出零接触）。
+
+### 目标
+修复 AI 工作台异步通道两层叠加缺陷：层 1 前端 runId 字段错配（对话区不收敛、停止按钮失效、mock 假绿洞）；层 2 后端异步通道从不发射 text.delta/thought 流式事件（无逐字、无思考）。
+
+### 变更文件（对照 §4 Allowed Paths，8/8 全部落界）
+- `ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js`：`activeRunId` 改取 `run.runId || run.id`（契约为主、兼容兜底），页面级 SSE 订阅恢复建立。
+- `ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/index.jsx`：停止按钮 `cancelRun(activeRun.runId || activeRun.id)`。
+- `ui/V2_PROTOTYPE/src/__tests__/unified-view.test.jsx`：全部 run mock 修为后端契约形状（`runId`，移除假 `id`）堵假绿；新增停止按钮 cancelRun 契约字段用例。
+- `apps/api/src/modules/harness/harness-runtime.types.ts`：`HARNESS_RUN_EVENT_TYPES` additive 追加 `text.delta`、`thought`（14 → 16）。
+- `apps/api/src/modules/harness/harness-runtime.types.test.ts`：新增 ISS-004 additive 断言；两条既有 length 冻结断言 14 → 16（additive 必然结果）。
+- `apps/api/src/modules/harness/workbench-chat.workflow.ts`：deps 新增 `appendRunEvent`（可选，见风险 2）；`execute` 内 dispatch 注入 `streamingAdapter`，`onToken` 逐 chunk 写事件（`contentDelta` → `text.delta({delta})`，`reasoningContentDelta` → `thought({text})`），写链串行化保序、execute 返回前冲刷；`onComplete/onError` 不另写事件。
+- `apps/api/src/modules/harness/workbench-chat.workflow.test.ts`：新增流式事件写入与恢复重放幂等 2 条守护；既有构造点补 no-op dep。
+- `apps/api/src/modules/harness/harness-boot.ts`：接线 `appendRunEvent`（复用 runtime repository）；dispatch 闭包转发 `streamingAdapter` 并补 `modelChatStream`（见风险 1）。
+
+### RED 先红证据（修复前实跑输出）
+- 前端（契约 mock 下 `vitest run unified-view`，2 failed / 9 passed）：
+  1. `发问后统一视图刷新发现新 run，O8 页面级流式订阅建立并逐字呈现（ISS-2026-08-10-003）` × —— mock 改契约形状后假绿洞暴露，`activeRunId` 恒 `''`，`流式字` 不渲染；
+  2. `对话区停止按钮以 runId 契约字段调用 cancelRun（ISS-2026-08-10-004）` × —— cancel 请求落 `/ai-runs/undefined/cancel`，`cancelCalls` 不含 `run-1`。
+- 后端（`tsx --test` 直跑两文件，修复前）：
+  3. `ISS-004 层 2：dispatch 入参携带 streamingAdapter…` × —— `dispatch 入参必须携带 streamingAdapter`，actual `undefined`；
+  4. `ISS-2026-08-10-004 adds streaming text.delta/thought event types additively` × —— `逐字流式事件类型必须入白名单`；
+  5. （加分项）`恢复重放跳过 execute，流式事件不重复发射` × —— `首次执行发射 1 条 text.delta`，0 !== 1。
+
+### 验证命令与结果（修复后）
+- `npm run test:web`：pass，42 文件 288/288（≥287 ✓，含 unified-view 11/11）
+- `npm run test:modules`：pass，321/321（≥321 ✓）
+- `npm run build:web`：pass，零错误（仅既有 chunk size 警告）
+- `npm run build:api`：pass，`tsc` 零错误
+- `npx tsx --test workbench-chat.workflow.test.ts harness-runtime.types.test.ts`：pass，15/15
+- `git diff 8bcbd91 -- apps/ package-lock.json`：5 个变更文件全部落在 Allowed Paths（package-lock.json 零变更）
+- 主检出零接触：全程在 `/Users/kevin/AI/wes-worktrees/iss-2026-08-10-004` 执行；`config/auth/users.json` 测试污染已还原未提交
+
+### 风险与范围外观察
+1. **工单 §3 层 2 未覆盖的必要接线（已在界内补齐）**：dispatch 流式闸门（`model-answer.ts` L51）要求 `streamingAdapter` + `modelChatStream` 同时存在，缺一则静默回退非流式。仅按工单字面注入 adapter 验收 §9.1 逐字流式不会发生；已在 `harness-boot.ts`（Allowed Paths「仅接线」）补 `modelChatStream`，参数与同步 SSE 路径同款（异步通道无历史消息，直推当前 userContent）。同步路径 `workbench-chat-stream.handler.ts` 零改动。
+2. **`appendRunEvent` dep 调整为可选**：工单 §3 给的签名为必填，但 `harness-session-projector.test.ts` L365 存在另一 `createWorkbenchChatWorkflow` 构造点且不在 Allowed Paths，必填会破坏 `build:api`。可选保持 additive 不破坏既有契约；生产 boot 始终注入，未注入时流式事件静默跳过不影响主链路。
+3. **`workbench-chat.workflow.test.ts` 未挂在任何 npm 测试脚本**（pre-existing 缺口，test:modules/test:harness 清单均无）：本单经 `npx tsx --test` 直跑验证；`apps/api/package.json` 不在 Allowed Paths 未改，建议后续单独立项挂入脚本。
+4. `test:harness`（testcontainers/PostgreSQL）本机 Docker 不可用未执行；types 测试已单跑 15/15 验证，建议复核环境补跑。
+5. 逐 chunk 直发未做 coalescing（工单明确范围外）：高频 token 下 run 事件行数较多，记录为后续优化项。
+6. 流式事件单条写失败仅 `console.error` 不阻断模型主链路；最终答案仍以 outbox assistant 消息落库为准，对话区收敛不依赖逐字事件全部成功。
+
+### 是否需看板同步
+是。建议页面：
+- requirements：ISS-2026-08-10-004 状态流转「已回填 / 待 Codex 复核」；
+- testing：新增 5 条守护用例（前端 2 + 后端 3）与验证矩阵结果；
+- changes：提交 `d3940d3` 两层修复证据。
+
+```text
+type=implementation
+date=2026-08-10
+scope=ISS-2026-08-10-004 异步通道对话区收敛+逐字流式（runId 错配 & 流式事件接入）两层修复
+evidence=commit d3940d3；test:web 288/288；test:modules 321/321；build:web/build:api 零错误
+pages=requirements,testing,changes
+status=待验证
+next=人工验收 §9 五项（含 ISS-2026-08-10-003 复测第 2 项并入），用户批准后 --no-ff 合入
+```
+
+### 下一步建议
+- 等待人工验收（§9 五项：2s 内逐字替换占位/思考块可见、停止可取消、徽标与通知不回归、切会话一致、003 第 2 项并入复测）；
+- 合入须用户批准，`--no-ff`；
+- 后续优化项入池：流式事件 coalescing；workflow 测试挂入 npm 脚本。
