@@ -148,8 +148,8 @@
           <td><span class="status block"><span class="dot"></span>P0</span></td>
           <td>开异步开关在 AI 工作台发一句问题 → 未完成时切走页签再返回；再发一句，等完成后切走再返回。</td>
           <td>未完成离页返回：问题气泡 + 进行中占位 + 角标「进行中 ≥1」可见；已完成返回：完整回复可见 + 角标「已完成 ≥1」。</td>
-          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
-          <td>自动化已锁定：unified-view +3（已完成 run 进视图 / 去重 / limit 边界）、session-isolation +1（卸载快照恢复占位）+ 角标已完成计数回归，test:web 280/280、test:modules 321/321；已合入主线（af1f250），按工单 §5 口径人工复验。执行人 / 日期 / 结果 / 证据待填。</td>
+          <td><span class="status run"><span class="dot"></span>部分通过 / 缺陷剥离 ISS-2026-08-10-002</span></td>
+          <td>2026-08-10 验收实测（会话 87c73939）：占位恢复 + 顶栏角标通过；右下角全局角标恒 0，缺陷剥离为 ISS-2026-08-10-002（新工单待派发），完成后返回场景待 ISS-002 修复后复测。自动化已锁定：unified-view +3、session-isolation +1 + 角标已完成计数回归，test:web 280/280、test:modules 321/321；已合入主线（af1f250）。</td>
         </tr>
         <tr>
           <td class="mono">MT-1E-001</td>
