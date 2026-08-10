@@ -5,7 +5,7 @@
 import { Router, type Request } from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import multer from "multer";
-import * as AiModule from "../modules/ai/ai.module";
+import { aiController } from "../modules/ai/ai.module";
 import * as SystemModule from "../modules/system/system.module";
 import { requireCapability } from "../rbac/middleware";
 import { createWorkbenchViewRouter } from "./workbench-view.routes";
@@ -42,18 +42,18 @@ const streamRateLimiter = rateLimit({
   }
 });
 
-router.post("/parse-basic-info", upload.single("file"), requireCapability("extractor:trigger"), AiModule.parseBasicInfo);
-router.post("/parse-basic-info/stream", upload.single("file"), requireCapability("extractor:trigger"), streamRateLimiter, AiModule.parseBasicInfoStream);
-router.post("/company-profile-summary", requireCapability("requirement:upload"), AiModule.companyProfileSummary);
-router.post("/kimi-assessment/preview", requireCapability("assessment:create"), AiModule.kimiAssessmentPreview);
-router.post("/kimi-assessment/export-markdown", requireCapability("assessment:create"), AiModule.exportKimiAssessmentMarkdown);
-router.post("/kimi-assessment/export-pdf", requireCapability("assessment:create"), AiModule.exportKimiAssessmentPdf);
+router.post("/parse-basic-info", upload.single("file"), requireCapability("extractor:trigger"), aiController.parseBasicInfo);
+router.post("/parse-basic-info/stream", upload.single("file"), requireCapability("extractor:trigger"), streamRateLimiter, aiController.parseBasicInfoStream);
+router.post("/company-profile-summary", requireCapability("requirement:upload"), aiController.companyProfileSummary);
+router.post("/kimi-assessment/preview", requireCapability("assessment:create"), aiController.kimiAssessmentPreview);
+router.post("/kimi-assessment/export-markdown", requireCapability("assessment:create"), aiController.exportKimiAssessmentMarkdown);
+router.post("/kimi-assessment/export-pdf", requireCapability("assessment:create"), aiController.exportKimiAssessmentPdf);
 
 /** 与 `POST /api/v1/system/requirement-settings/kimi-api-key/test` 相同处理函数，便于网关只放行 `/ai/*` 的环境 */
 router.post("/kimi-api-key/test", requireCapability("system:manage"), SystemModule.testRequirementKimiApiKey);
-router.post("/chat", requireCapability("estimates:read"), AiModule.chat);
-router.post("/home-workbench/chat", requireCapability("estimates:read"), AiModule.homeWorkbenchChat);
-router.post("/home-workbench/chat/stream", requireCapability("estimates:read"), streamRateLimiter, AiModule.homeWorkbenchChatStream);
+router.post("/chat", requireCapability("estimates:read"), aiController.chat);
+router.post("/home-workbench/chat", requireCapability("estimates:read"), aiController.homeWorkbenchChat);
+router.post("/home-workbench/chat/stream", requireCapability("estimates:read"), streamRateLimiter, aiController.homeWorkbenchChatStream);
 
 // O5 Sprint 3A：统一视图接口挂载在 /ai/home-workbench 下，
 // 与旧同步入口 /ai/home-workbench/chat 同前缀，便于前端统一代理
