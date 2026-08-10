@@ -521,6 +521,17 @@
               <td class="tc-7">分诊结果 defect（P1）：右下角 Shell 全局角标数据源（BackgroundRunProvider）独立于顶栏统一视图，且缺「新 run 创建」刷新触发——provider 仅挂载/终态事件/取消/失败重试四时机刷新，用户提交创建 run 后无人通知，runs 停留挂载时空数组，角标恒 0 且不建 SSE 订阅、终态通知亦缺。修复（KIMIK3，分支 qoder/iss-2026-08-10-002-shell-badge-refresh，base 64b8398，提交 ce098cb + 91058a7）：context 暴露节流入口 notifyRunsChanged（1.5s leading+trailing、mounted 守卫），工作台提交成功与统一视图发现新 runId 时各调一次；RED 3 例先红后绿，web 283/modules 321/双构建零错误，主会话独立复审一次通过，2026-08-10 用户批准合入主线（1c8b909）。零 cancel 硬口径不变。</td>
               <td class="tc-8">根因（置信度高）：刷新时机缺口（非数据源缺口——后端 listActiveRuns 提交后即返回真实 run）。影响面：右下角角标 + 终态通知 + SessionRail 行级徽标（均依赖 provider runs）。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-004-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-10-004</td>
+              <td class="tc-1">2026-08-10</td>
+              <td class="tc-2">AI 工作台：异步任务在当前页完成后对话区仍停「正在理解你的问题」，切会话再切回才出回复；停止按钮同因失效</td>
+              <td class="tc-3">user_acceptance_screenshot</td>
+              <td class="tc-4">用户 2026-08-10 实测（2 截图）：会话行已标「已完成未读」、右下角弹「已完成」，对话区仍为占位；切会话再切回后完整回复出现。顶栏「进行中 1」期间正常。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js L222-224（activeRunId 取 ?.id，后端统一视图 runs 字段为 runId，恒空→页面级 SSE 订阅永不建立）</code> <code class="inline">ChatArea/index.jsx L71（停止按钮 cancelRun(activeRun.id) 同因传 undefined）</code> <code class="inline">src/__tests__/unified-view.test.jsx（mock 用 id 字段，与后端契约不符致假绿）</code> <code class="inline">交叉引用 ISS-2026-08-09-003 / ISS-2026-08-10-003</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已分析 / 待派发拍板（defect P1）</span></td>
+              <td class="tc-7">分诊结果 defect（P1 高频核心流）：字段名错配（前端 .id / 后端 runId）使 O8 页面级逐字流式、占位替换、停止按钮三处全失效；provider 链路（右下角角标/通知/会话行徽标）不受影响；8-09-003 C2 读取侧对账成唯一兜底（故切会话才见回复）。不阻塞（有兜底）但异步通道每次发问必现。</td>
+              <td class="tc-8">修复方向：前端两处改兼容取 runId || id（useChatMessages L224 / ChatArea L71），同步把 unified-view.test.jsx mock 修为后端契约形状（runId）堵假绿；后端契约不动。与 ISS-2026-08-10-003（提交后刷新时机）相关但独立：003 保证视图及时刷新，004 保证刷新后字段取得到。工单编制与派发待用户拍板。</td>
+            </tr>
             <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-003-intake:issues">
               <td class="mono tc-0">ISS-2026-08-10-003</td>
               <td class="tc-1">2026-08-10</td>
