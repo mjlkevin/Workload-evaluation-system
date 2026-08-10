@@ -34,7 +34,7 @@
       "includeAssumptions": true
     },
     "kimiCredentials": {
-      "apiKey": "sk-QCaRu2uyRoxzJXZCZVQRWAyigf7lAUpgWO6tLMcg49K7uKHO"
+      "apiKey": ""
     }
   },
   "active": {
@@ -71,7 +71,7 @@
       "includeAssumptions": true
     },
     "kimiCredentials": {
-      "apiKey": "sk-QCaRu2uyRoxzJXZCZVQRWAyigf7lAUpgWO6tLMcg49K7uKHO"
+      "apiKey": ""
     }
   },
   "updatedAt": "2026-08-05T16:04:33.334Z",

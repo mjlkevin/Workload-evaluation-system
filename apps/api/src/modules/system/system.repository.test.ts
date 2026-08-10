@@ -11,7 +11,17 @@ import {
   mergeKnowledgeBaseCredentialsPatch,
   normalizeKnowledgeBaseConfig,
   validateKnowledgeBaseProfiles,
+  saveRequirementSystemConfigStore,
+  resolveActiveRequirementKimiApiKey,
+  resolveDraftKimiApiKeyForTest,
+  _resetKimiImportCheck,
 } from "./system.repository";
+import {
+  resetCredentialCache,
+  getCachedApiKey,
+  setCachedApiKey,
+  KIMI_SCOPE,
+} from "./credentials.store";
 
 test("loadRequirementSystemConfigStore: 迁移旧 Kimi 模型到 K2.5 默认模型", () => {
   const originalCwd = process.cwd();
@@ -219,4 +229,172 @@ test("knowledge base profile hash binds shared settings and the selected profile
   assert.match(first, /^[0-9a-f]{64}$/);
   assert.notEqual(first, second);
   assert.equal(first, renamedOther);
+});
+
+// -------------------- 凭据域 DB 化测试 — ISS-2026-08-05-001 --------------------
+
+test("loadRequirementSystemConfigStore: 文件有 apiKey 时清空文件并填充缓存", () => {
+  const originalCwd = process.cwd();
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-cred-import-"));
+  const configDir = path.join(tmpDir, "config/system");
+  fs.mkdirSync(configDir, { recursive: true });
+  const configPath = path.join(configDir, "requirement-settings.json");
+  const testApiKey = "sk-test-import-key-12345";
+
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify(
+      {
+        version: 1,
+        draft: { kimiCredentials: { apiKey: testApiKey } },
+        active: { kimiCredentials: { apiKey: testApiKey } },
+      },
+      null,
+      2,
+    ),
+    "utf-8",
+  );
+
+  _resetKimiImportCheck();
+  resetCredentialCache();
+
+  try {
+    process.chdir(tmpDir);
+    const store = loadRequirementSystemConfigStore();
+
+    // 文件 apiKey 应被清空
+    const fileContent = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    assert.equal(fileContent.draft.kimiCredentials.apiKey, "");
+    assert.equal(fileContent.active.kimiCredentials.apiKey, "");
+
+    // 缓存应被填充
+    assert.equal(getCachedApiKey(KIMI_SCOPE), testApiKey);
+
+    // 返回的 store 中 apiKey 也应为空（真实密钥在 DB/缓存）
+    assert.equal(store.draft.kimiCredentials.apiKey, "");
+    assert.equal(store.active.kimiCredentials.apiKey, "");
+  } finally {
+    process.chdir(originalCwd);
+    _resetKimiImportCheck();
+    resetCredentialCache();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("loadRequirementSystemConfigStore: 文件无 apiKey 时不触发导入", () => {
+  const originalCwd = process.cwd();
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-cred-noop-"));
+  const configDir = path.join(tmpDir, "config/system");
+  fs.mkdirSync(configDir, { recursive: true });
+  const configPath = path.join(configDir, "requirement-settings.json");
+
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify(
+      {
+        version: 1,
+        draft: { kimiCredentials: { apiKey: "" } },
+        active: { kimiCredentials: { apiKey: "" } },
+      },
+      null,
+      2,
+    ),
+    "utf-8",
+  );
+
+  _resetKimiImportCheck();
+  resetCredentialCache();
+
+  try {
+    process.chdir(tmpDir);
+    loadRequirementSystemConfigStore();
+
+    // 缓存应仍为空（未触发导入）
+    assert.equal(getCachedApiKey(KIMI_SCOPE), null);
+  } finally {
+    process.chdir(originalCwd);
+    _resetKimiImportCheck();
+    resetCredentialCache();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("saveRequirementSystemConfigStore: 即使 store 有 apiKey 也写空串到文件", () => {
+  const originalCwd = process.cwd();
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-cred-save-"));
+  const configDir = path.join(tmpDir, "config/system");
+  fs.mkdirSync(configDir, { recursive: true });
+  const configPath = path.join(configDir, "requirement-settings.json");
+
+  fs.writeFileSync(
+    configPath,
+    JSON.stringify(
+      {
+        version: 1,
+        draft: { kimiCredentials: { apiKey: "" } },
+        active: { kimiCredentials: { apiKey: "" } },
+      },
+      null,
+      2,
+    ),
+    "utf-8",
+  );
+
+  _resetKimiImportCheck();
+
+  try {
+    process.chdir(tmpDir);
+    const store = loadRequirementSystemConfigStore();
+
+    // 模拟 mergeKimiCredentialsPatch 后 store 有非空 apiKey
+    store.draft.kimiCredentials.apiKey = "sk-should-not-persist";
+    store.active.kimiCredentials.apiKey = "sk-should-not-persist";
+    saveRequirementSystemConfigStore(store);
+
+    // 文件 apiKey 应为空串
+    const fileContent = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    assert.equal(fileContent.draft.kimiCredentials.apiKey, "");
+    assert.equal(fileContent.active.kimiCredentials.apiKey, "");
+  } finally {
+    process.chdir(originalCwd);
+    _resetKimiImportCheck();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("resolveActiveRequirementKimiApiKey: 从 DB 缓存读取密钥", () => {
+  resetCredentialCache();
+
+  // 无缓存 → env 或 none
+  const before = resolveActiveRequirementKimiApiKey();
+  assert.ok(before.source === "env" || before.source === "none");
+
+  // 设置缓存 → 从 store 读取
+  setCachedApiKey(KIMI_SCOPE, "sk-from-cache-67890");
+  const after = resolveActiveRequirementKimiApiKey();
+  assert.equal(after.apiKey, "sk-from-cache-67890");
+  assert.equal(after.source, "store");
+
+  resetCredentialCache();
+});
+
+test("resolveDraftKimiApiKeyForTest: 从 DB 缓存读取草稿密钥", () => {
+  resetCredentialCache();
+
+  // override 优先
+  const override = resolveDraftKimiApiKeyForTest("sk-override-key");
+  assert.equal(override.apiKey, "sk-override-key");
+  assert.equal(override.source, "override");
+
+  // 无 override、无缓存 → env 或 none
+  const noCache = resolveDraftKimiApiKeyForTest();
+  assert.ok(noCache.source === "env" || noCache.source === "none");
+
+  // 有缓存 → draft
+  setCachedApiKey(KIMI_SCOPE, "sk-draft-from-cache");
+  const fromCache = resolveDraftKimiApiKeyForTest();
+  assert.equal(fromCache.apiKey, "sk-draft-from-cache");
+  assert.equal(fromCache.source, "draft");
+
+  resetCredentialCache();
 });

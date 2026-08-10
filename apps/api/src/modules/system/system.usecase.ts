@@ -31,6 +31,7 @@ import {
   normalizeKnowledgeBaseConfig,
   normalizeRequirementSystemConfig,
   resolveActiveKnowledgeBaseConfig,
+  resolveActiveRequirementKimiApiKey,
   resolveDraftKimiApiKeyForTest,
   resolveDraftKnowledgeBaseConfigForTest,
   saveImplementationDependencyRulesStore,
@@ -38,6 +39,8 @@ import {
   saveRequirementSystemConfigStore,
   saveVersionCodeRulesStore,
   validateKnowledgeBaseProfiles,
+  persistKimiApiKey,
+  clearKimiApiKey,
 } from "./system.repository";
 import { probeKnowledgeBaseAccess } from "./knowledge-base-access-probe";
 import { ROLE_CAPABILITIES } from "../../rbac/permissions";
@@ -55,21 +58,20 @@ function responseRequestId(res: Response): string {
   return typeof value === "string" && value ? value : randomUUID();
 }
 
-function toPublicKimiCredentials(storedKey: string): RequirementKimiCredentialsPublic {
-  const trimmed = storedKey.trim();
-  const envOk = Boolean(config.kimi.apiKey?.trim());
+function toPublicKimiCredentials(): RequirementKimiCredentialsPublic {
+  const { apiKey, source } = resolveActiveRequirementKimiApiKey();
   return {
     apiKey: "",
-    hint: maskKimiApiKeyHint(trimmed),
-    envFallbackAvailable: envOk,
-    resolvedFrom: trimmed ? "store" : envOk ? "env" : "none",
+    hint: maskKimiApiKeyHint(apiKey),
+    envFallbackAvailable: Boolean(config.kimi.apiKey?.trim()),
+    resolvedFrom: source,
   };
 }
 
 function toPublicRequirementConfig(cfg: RequirementSystemConfig): RequirementSystemConfigPublic {
   return {
     ...cfg,
-    kimiCredentials: toPublicKimiCredentials(cfg.kimiCredentials.apiKey),
+    kimiCredentials: toPublicKimiCredentials(),
   };
 }
 
@@ -241,8 +243,10 @@ export function getRequirementSystemConfig(req: Request, res: Response) {
   );
 }
 
-export function updateRequirementSystemConfigDraft(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function updateRequirementSystemConfigDraft(req: Request, res: Response) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const actor = auth.user.username;
   const payload = (req.body || {}) as Partial<RequirementSystemConfig> & {
     kimiCredentials?: { apiKey?: string | null };
   };
@@ -255,6 +259,19 @@ export function updateRequirementSystemConfigDraft(req: Request, res: Response) 
   const now = new Date().toISOString();
   const store = loadRequirementSystemConfigStore();
   const nextCreds = mergeKimiCredentialsPatch(store.draft.kimiCredentials, credsPatch);
+
+  // 密钥写入 DB（加密 + 审计）
+  try {
+    if (credsPatch?.apiKey === null) {
+      await clearKimiApiKey(actor);
+    } else if (typeof credsPatch?.apiKey === "string" && credsPatch.apiKey.trim()) {
+      await persistKimiApiKey(credsPatch.apiKey.trim(), actor);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "credential_store_error";
+    return fail(res, 50001, "密钥存储失败", [{ field: "apiKey", reason: msg }]);
+  }
+
   store.draft = normalizeRequirementSystemConfig({
     ...store.draft,
     kimiEvaluation: { ...store.draft.kimiEvaluation, ...(kimiEvaluationPatch || {}) },

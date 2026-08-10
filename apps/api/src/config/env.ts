@@ -50,6 +50,9 @@ export const config = {
     poolMax: Number(process.env.DATABASE_POOL_MAX || 10),
   },
 
+  /** 凭据加密 KEK（AES-256-GCM），base64 编码 32 字节。生成方式：node -e "console.log(require('crypto').randomBytes(32).toString('base64'))" */
+  credentialKek: process.env.CREDENTIAL_KEK || "",
+
   // 常量配置
   constants: {
     EXPORT_IDEMPOTENCY_TTL_MS: 10 * 60 * 1000,
