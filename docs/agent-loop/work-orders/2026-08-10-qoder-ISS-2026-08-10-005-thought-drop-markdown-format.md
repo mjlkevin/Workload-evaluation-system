@@ -115,3 +115,60 @@
 3. 切会话再切回内容与流式结果一致；刷新页面后历史消息渲染同样正确；
 4. 停止按钮可取消、右下角角标/通知、顶栏角标不回归（ISS-2026-08-10-001/002/003/004 既有口径）；
 5. **ISS-2026-08-10-004 复测第 1 项「思考块可见」随本单一并复测**；004 第 3/4 项与 003 第 1/3/4 项保持可独立复测状态。
+
+---
+
+# Handoff 回填（KIMIK3 · 2026-08-10）· 状态：已回填 / 待 Codex 复核
+
+## 目标
+ISS-2026-08-10-005（流式回答无思考块 + Markdown 格式散乱）：三项修复全部落地——
+① 思考是思考（THOUGHT 空窗兜底挂 loading 占位零丢失 + 多事件聚合单块 + 终态自动折叠 + 思考块移到回答上方）；
+② 提示词排版规范（model-answer 与 knowledge-fallback 两路系统提示词补【输出排版规范】段）；
+③ 解析器容错（## 无空格 / 行内 ## 分段 / -** 紧凑列表，服装行业落库原文夹具端到端验证）。
+边界守住：004 流式管道、角标/通知链路、503 回退路径、submitRun 提交流程零改动；零新 npm 依赖；未重启后端；主检出零接触。
+
+## Worktree
+- projectRoot: /Users/kevin/AI/Workload-evaluation-system
+- worktreePath: /Users/kevin/AI/wes-worktrees/iss-2026-08-10-005
+- branch: qoder/iss-2026-08-10-005-thought-drop-markdown-format
+- baseCommit: dc879f7（worktree HEAD 3a8426d 仅多 base 实填一行）
+- taskId: ISS-2026-08-10-005 / DEF-2026-08-10-001
+- fix commit: 2f2d8c6
+
+## 变更文件（对照 Allowed Paths：8/8 全部在清单内，lockfile 零变更）
+- ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js：THOUGHT 分支空窗兜底（ref 为空时挂当前 loading 占位并建立 ref）+ 聚合为单一思考块（流式 collapsed:false）+ 终态事件置 collapsed:true；TEXT_DELTA 首个增量遇 loading 占位时替换占位文案（修复中实测发现的连带缺陷：兜底建立 ref 后旧逻辑会把回答追加到「正在理解你的问题」之后）。
+- ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx：思考块移到回答正文上方；折叠态「已思考」（可点开）、流式「思考中…」、非流式展开「思考过程」。
+- ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/markdownBlocks.js：新增围栏感知预展开 expandCompactSegments（行内 #{2,6} 后紧跟数字/中英文切 heading、行内 -** 切列表项）；行首标题 # 后空格可选；无序列表标记空格可选但排除 ---/*** 纯标记行。普通连字符（设计-打样-采购、提前6-12个月、Color-SizeMatrix）实测不误伤。
+- ui/V2_PROTOTYPE/src/__tests__/streaming-ux.test.jsx：新增 5 用例（空窗兜底零丢失 / 单块聚合 / 终态折叠 / MessageBubble 顺序与「已思考」/ 流式「思考中…」）；hook 级测试经 vi.mock(importOriginal) 仅拦截 useRunEventStream 捕获 onEvent，其余导出原样，页面级旧用例不受影响。
+- ui/V2_PROTOTYPE/src/__tests__/markdown-blocks.test.jsx（新建）：服装行业落库原文紧凑单行夹具（data/ai-sessions.json 实样提取，紧凑段 1055 字符）端到端分块 + 误伤守护 + 标准写法不回归，共 4 用例。
+- apps/api/src/services/ai/handlers/model-answer.ts：仅系统提示词字符串追加【输出排版规范】4 行。
+- apps/api/src/services/ai/handlers/knowledge-query.handler.ts：仅知识库兜底系统提示词字符串追加同款 4 行。
+- apps/api/src/services/ai/workbench-dispatch.service.test.ts：仅新增 2 条 systemPrompt 排版规范断言（domain_qa 路 + knowledge fallback 路）。
+
+## RED 先红证据（修复前实跑，9 个新用例全红）
+- `npx vitest run src/__tests__/markdown-blocks.test.jsx src/__tests__/streaming-ux.test.jsx`：Test Files 2 failed；Tests 7 failed | 6 passed——红：行首标题宽容、服装样本端到端、空窗兜底、单块聚合、终态折叠、思考块位置/已思考、思考中…（既有 6 个页面级用例全绿未回归）。
+- `npx tsx --test --test-name-pattern='ISS-005' workbench-dispatch.service.test.ts`：fail 2 / pass 0——两路 systemPrompt 均无【输出排版规范】段（红输出含完整提示词原文佐证）。
+
+## 验证命令与结果（修复后 worktree 内实跑）
+- `npm run test:web`: pass——Test Files 43 passed (43)，Tests 297 passed (297)（≥288 ✓，含 9 个新用例）。
+- `npm run test:modules`: pass——tests 323 / pass 323 / fail 0（≥321 ✓；首轮 300s 超时被杀，重跑 EXIT=0 全绿，日志 /tmp/wes-test-modules.log）。
+- `npm run test:ai`: pass——tests 260 / pass 260 / fail 0（EXIT=0，日志 /tmp/wes-test-ai.log）。
+- `npm run build:web`: pass——✓ built in 666ms，EXIT=0。
+- `npm run build:api`: pass——tsc 零错误，EXIT=0。
+- UI 范围门禁 `node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base dc879f7 -- <5 个变更 ui 文件>`: pass——「No new deterministic UI findings.」EXIT=0。
+- `git diff dc879f7 --name-only -- apps/ ui/ package-lock.json`: 8 个路径全部落 Allowed Paths，package-lock.json 不在 diff 中（零变更 ✓）。
+
+## 风险
+- 人工验收缺口：思考块流式可见/终态折叠、服装类问题排版复测（MT-ISS0810-005-001 五项）需用户在浏览器实机复测；本次为 jsdom 行为级证据，未做 1440/760 视口截图（行为修复无视觉样式变更，样式沿用既有 inline style 与 token）。
+- 兼容：行首 `#` 无空格即判 heading（如 `#tag` 行文开头会被视为一级标题）——容错取舍，业务回答场景实测无此行文；`---` 分隔线与普通连字符已显式守护。
+- 后端提示词变更合入后须由指挥方重启后端生效（tsx 无 watch，本单未重启进程）。
+- 范围外观察（不处理，仅申报）：① 落库样本中知识库未配置（missing_config）导致回答走通用知识兜底，与 004 复测环境一致，非本单范围；② 行内 `##` 容错对 `##实施建议` 后无标点的长尾文本会整体并入 heading 文案，渲染仍优于整段裸显，如后续模型仍高频紧凑输出可再细化切分规则。
+
+## 是否需看板同步
+是（建议由 Codex/用户终审后落板，本单不直接改看板）。建议页面：
+- defects.html：DEF-2026-08-10-001 状态建议更新为「已回填 / 待 Codex 复核」，挂 fix commit 2f2d8c6 与验证证据。
+- testing.html：登记 9 个新自动化用例（streaming-ux 5 + markdown-blocks 4 + dispatch 2）与 MT-ISS0810-005-001 待人工复测。
+- changes.html：登记本单三项修复与验证矩阵结果。
+
+## 下一步建议
+- 待 Codex 复核（diff 范围 / RED 证据 / 验证矩阵可重放）→ 用户批准 --no-ff 合入 → 指挥方重启后端 → 用户按 MT-ISS0810-005-001 人工复测（含 004 第 1 项一并复测）。
