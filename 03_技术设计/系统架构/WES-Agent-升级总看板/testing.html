@@ -68,7 +68,7 @@
       <p class="meta">
         <span><b>这页回答</b> 哪些业务场景需要人工验收、目前是否通过、失败后如何处理</span>
         <span><b>验收范围</b> AI 工作台主流程、权限边界、知识库配置、附件问答、报告生成、草稿确认与过程追溯；具体需求编号保留在下方用例中</span>
-        <span><b>当前结论</b> 共 36 项人工用例：35 项待执行，1 项待更换密钥后复测；在关键用例通过前，不能据此宣布相关功能完成验收</span>
+        <span><b>当前结论</b> 共 37 项人工用例：36 项待执行，1 项待更换密钥后复测；在关键用例通过前，不能据此宣布相关功能完成验收</span>
         <span><b>最近更新</b> 2026-08-10</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
@@ -125,8 +125,8 @@
         </div>
         <div class="kpi">
           <div class="top"><span class="ic" style="background:var(--bg-soft);color:var(--ink-3)">R</span><span>当前结果</span></div>
-          <div class="v">0/36</div>
-          <div class="lb">1 待复测 / 35 待执行</div>
+          <div class="v">0/37</div>
+          <div class="lb">1 待复测 / 36 待执行</div>
         </div>
       </div>
       <div class="grid-3" style="margin-top:22px">
@@ -142,6 +142,15 @@
       <div class="callout warn"><div><b>超期预警</b>以下 MT-1E / MT-1F / MT-1H-A / MT-1H-B 人工测试自登记以来已超过 2 周未执行。P0 测试应在人工验收窗口优先完成；超期未执行的测试将在监控页标红。如需延期，请在 changes.html 记录决策。</div></div>
       <table>
         <tr><th>ID</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>反馈记录</th></tr>
+        <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-003-merged:testing:mt">
+          <td class="mono">MT-ISS0810-003-001</td>
+          <td>ISS-2026-08-10-003 · 发问后顶栏角标即时性与逐字流式及时性</td>
+          <td><span class="status block"><span class="dot"></span>P2</span></td>
+          <td>开异步开关在工作台发一句问题并留在当前页；再关闭异步开关回退同步路径发一句；全程观察右下角角标。</td>
+          <td>① 顶栏「进行中 ≥1」2 秒内出现（无需切走页签）；② AI 回复逐字流式及时开始；③ 右下角角标不回退（ISS-002 口径：2s 内 ≥1 / 完成收敛+通知）；④ 同步回退路径行为与修复前逐字一致。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行</span></td>
+          <td>已合入主线（ee547a5，生产代码仅 1 行 fire-and-forget 刷新）。自动化已锁定：unified-view +4（刷新请求计数 / 角标 2s 内出现 / 流式发现 / 同步回退守护），test:web 287/287、test:modules 321/321；RED 阶段 base 版恰 3 failed，主会话独立复现核实。执行人 / 日期 / 结果 / 证据待填。</td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:testing:mt">
           <td class="mono">MT-ISS001-001</td>
           <td>ISS-2026-08-10-001 · 离页返回进行中占位可见性与角标已完成计数</td>
@@ -700,6 +709,8 @@
         <tr><th>命令</th><th>最近结果</th><th>覆盖范围</th></tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:testing:1"><td class="mono">ISS-2026-08-10-001 修复分支前端回归</td><td><span class="status done"><span class="dot"></span>280/280 pass</span></td><td>2026-08-10：test:web 280/280（基线 278 + 新增 2：卸载快照恢复进行中占位 / 角标已完成计数）；RED 阶段 2 新用例先红后绿，主会话独立复现核实。</td></tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:testing:2"><td class="mono">ISS-2026-08-10-001 修复分支后端回归 + 双构建</td><td><span class="status done"><span class="dot"></span>321/321 pass · build×2 零错误</span></td><td>2026-08-10：test:modules 321/321（基线 318 + 新增 3：已完成 run 进统一视图 / 去重 / limit 边界，RED 3 例先红后绿）；build:api / build:web 零错误；diff 8 文件全在工单 Allowed Paths。</td></tr>
+        <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-003-merged:testing:1"><td class="mono">ISS-2026-08-10-003 修复分支前端回归</td><td><span class="status done"><span class="dot"></span>287/287 pass</span></td><td>2026-08-10：test:web 287/287（基线 283 + 新增 4：提交后统一视图刷新请求计数 / 顶栏角标 2s 内出现用户症状复现 / 流式发现闸门 / 同步回退路径守护）；RED 阶段 3 红 1 绿，主会话独立复现核实（base 版恰 3 failed）。</td></tr>
+        <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-003-merged:testing:2"><td class="mono">ISS-2026-08-10-003 修复分支后端复验 + 双构建</td><td><span class="status done"><span class="dot"></span>321/321 pass · build×2 零错误</span></td><td>2026-08-10：test:modules 321/321（后端零改动复验）；build:api / build:web 零错误；git diff e727bc5 -- apps/ package-lock.json 零输出；diff 恰 3 文件全在工单 Allowed Paths，生产代码仅 1 行。</td></tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-002-merged:testing:1"><td class="mono">ISS-2026-08-10-002 修复分支前端回归</td><td><span class="status done"><span class="dot"></span>283/283 pass</span></td><td>2026-08-10：test:web 283/283（基线 280 + 新增 3：notifyRunsChanged 入口计数建 SSE / 节流 leading 不放大请求 / 提交后 2s 内角标 ≥1 用户症状复现）；RED 阶段 3 新用例先红后绿，主会话独立复现核实（base 版恰 3 failed）。</td></tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-002-merged:testing:2"><td class="mono">ISS-2026-08-10-002 修复分支后端复验 + 双构建</td><td><span class="status done"><span class="dot"></span>321/321 pass · build×2 零错误</span></td><td>2026-08-10：test:modules 321/321（后端零改动复验）；build:api / build:web 零错误；git diff 64b8398 -- apps/ package-lock.json 零输出；diff 4 文件全在工单 Allowed Paths。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-047-a2-mainline-integrated:testing:1"><td class="mono">RP-047-A2 主线 Testcontainers Harness</td><td><span class="status done"><span class="dot"></span>95/95 pass · 0 skip</span></td><td>基于当前主线组合完成历史迁移、原子创建、owner、lease、普通对象、事件/checkpoint/output 并发、outbox 和安全错误验证。</td></tr>
