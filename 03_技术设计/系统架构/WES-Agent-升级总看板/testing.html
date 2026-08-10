@@ -148,8 +148,8 @@
           <td><span class="status block"><span class="dot"></span>P1</span></td>
           <td>开异步开关在工作台发问（建议「服装行业的特性功能有哪些」同类问题）留在当前页观察：先看思考流、再看回答渲染；执行中点停止验证可取消；切会话再切回比对；刷新页面看历史消息渲染。</td>
           <td>① 思考块先于回答出现：流式期间展开滚动显示，回答开始后折叠为回答上方「已思考」（可点开）；② 回答标题/列表正确分块，不再裸显 ##1. 不再整段挤行；③ 切会话往返一致、刷新后历史渲染正确；④ 停止/右下角角标/顶栏角标不回归；⑤ ISS-004 复测第 1 项「思考块可见」并入本项通过。</td>
-          <td><span class="status todo"><span class="dot"></span>待执行（合入后）</span></td>
-          <td>KIMIK3 回填（2f2d8c6 + 7b909e6）经指挥方五核独立复审一次通过：9/9 文件落 Allowed Paths、lockfile 零变更；复跑矩阵 test:web 297/297、test:modules 323/323、test:ai 260/260、双构建零错误、UI 门禁零发现；RED 独立复现回退生产码恰 9 红（前端 7 + 后端 2）、恢复全绿；主检出零接触。自动化已锁定：streaming-ux +5（空窗兜底/聚合/终态折叠/位置文案 ×2）、markdown-blocks +4（含 2 守护）、dispatch 提示词断言 +2。待用户批准 --no-ff 合入 + 指挥方重启后端后执行。执行人 / 日期 / 结果 / 证据待填。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行（已合入可测）</span></td>
+          <td>KIMIK3 回填（2f2d8c6 + 7b909e6）经指挥方五核独立复审一次通过：9/9 文件落 Allowed Paths、lockfile 零变更；复跑矩阵 test:web 297/297、test:modules 323/323、test:ai 260/260、双构建零错误、UI 门禁零发现；RED 独立复现回退生产码恰 9 红（前端 7 + 后端 2）、恢复全绿；主检出零接触。自动化已锁定：streaming-ux +5（空窗兜底/聚合/终态折叠/位置文案 ×2）、markdown-blocks +4（含 2 守护）、dispatch 提示词断言 +2。待用户批准 --no-ff 合入 + 指挥方重启后端后执行。2026-08-10 19:07 用户批准合入：8a419db 已入主线，主线冒烟全绿（web 296/297 唯一失败为用户 WIP 既有基线），后端已重启（PID 22793，harnessEnabled: true，提示词生效）——已具备浏览器实机复测条件。执行人 / 日期 / 结果 / 证据待填。</td>
         </tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-004-merged:testing:mt">
           <td class="mono">MT-ISS0810-004-001</td>

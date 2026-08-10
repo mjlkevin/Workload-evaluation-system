@@ -342,11 +342,11 @@
               <td class="mono tc-2">—</td>
               <td class="tc-3">流式回答思考块不可见（前端首批 thought 事件被丢弃；模型侧已实证有 reasoning 流）且回答 Markdown 格式散乱</td>
               <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status run"><span class="dot"></span>已复审通过 / 待批准合入</span></td>
+              <td class="tc-5"><span class="status run"><span class="dot"></span>已合入主线 / 待人工复测</span></td>
               <td class="tc-6">ui/V2_PROTOTYPE useChatMessages.js（THOUGHT 分支）/ MessageBubble.jsx（思考块位置与折叠）/ markdownBlocks.js（解析器）/ apps/api model-answer.ts、knowledge-query.handler.ts 系统提示词</td>
               <td class="tc-7">双根因（A 已修正）：A 思考侧——原判定「kimi-k2.5 无 reasoning 流」经 PostgreSQL 实证证伪（harness_run_events：thought 817 条 / text.delta 1616 条，kimi-k2.5 默认思考模式、004 管道正常）；唯一根因为前端 THOUGHT 分支依赖 streamingMessageIdRef，思考事件早于首个 text.delta 到达时静默丢弃。B 格式侧——① 落库原文证实模型输出本体为单行紧凑 pseudo-markdown（##1. 无空格、列表无换行），提示词无排版规范；② 前端自研逐行解析器要求标题 #+空格+独立行，单行输出整体降级为一段落。修复方向：前端 thought 事件挂 loading 消息兜底 + 思考块置于回答上方流式展开完成后自动折叠（官方口径 thinking 推荐 temperature=1.0 作可调项）；提示词补排版规范 + 渲染层评估成熟流式 Markdown 渲染器。</td>
               <td class="tc-8">验收口径：发问后思考块先于回答出现且完成后可折叠为「已思考」摘要；回答标题/列表/表格正确分块渲染（含模型紧凑输出口径）；切会话往返内容一致；停止按钮、角标、落库内容不回归。</td>
-              <td class="tc-9">KIMIK3 回填经指挥方五核独立复审一次通过（2f2d8c6 + 7b909e6，矩阵全绿、RED 恰 9 红独立复现、主检出零接触）；待用户批准 --no-ff 合入，合入后指挥方重启后端使提示词生效，再按 MT-ISS0810-005-001 五项人工复测（含 ISS-004 第 1 项「思考块可见」并入）。</td>
+              <td class="tc-9">KIMIK3 回填经指挥方五核独立复审一次通过（2f2d8c6 + 7b909e6，矩阵全绿、RED 恰 9 红独立复现、主检出零接触）；2026-08-10 19:07 用户批准 --no-ff 合入（8a419db），主线冒烟 web 296/297（唯一失败为用户 WIP 既有基线）、modules 323/323、双构建零错误；后端已重启（PID 22793，harnessEnabled: true，提示词生效）。复测指引：按 MT-ISS0810-005-001 五项执行（含 ISS-004 第 1 项「思考块可见」并入），通过后推送远端并关闭本 defect 与 ISS-2026-08-10-005。</td>
             </tr>
         </tbody>
         </table>
