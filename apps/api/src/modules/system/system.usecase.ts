@@ -43,6 +43,15 @@ import {
   clearKimiApiKey,
 } from "./system.repository";
 import { probeKnowledgeBaseAccess } from "./knowledge-base-access-probe";
+import { getAuditLog, resolveKek, KIMI_SCOPE } from "./credentials.store";
+import {
+  buildEffectiveModelConfig,
+  loadModelVerifyStatus,
+  resolveScenarioModel,
+  saveScenarioVerifyRecord,
+  type CredentialsHealth,
+  type ModelScenarioKey,
+} from "./system-effective";
 import { ROLE_CAPABILITIES } from "../../rbac/permissions";
 import { legacyRoleToV2Roles, V2_ROLES } from "../../rbac/roles";
 
@@ -368,6 +377,128 @@ export async function testRequirementKimiApiKey(req: Request, res: Response) {
         ]);
       }
     }
+    const msg = e instanceof Error ? e.message : "ping_failed";
+    return fail(res, 40001, "调用 KIMI 失败", [{ field: "apiKey", reason: msg }]);
+  }
+}
+
+// -------------------- T2：生效状态（Effective State） --------------------
+
+async function buildCredentialsHealth(): Promise<CredentialsHealth> {
+  const { apiKey, source } = resolveActiveRequirementKimiApiKey();
+  const kekReady = resolveKek() !== null;
+  let lastAudit: CredentialsHealth["lastAudit"] = null;
+  try {
+    const logs = await getAuditLog(KIMI_SCOPE, undefined, 1);
+    const latest = logs[0];
+    if (latest) {
+      lastAudit = { action: String(latest.action), actor: String(latest.actor), at: String(latest.at) };
+    }
+  } catch {
+    // DB 不可用时审计为空，不影响生效状态主信息
+    lastAudit = null;
+  }
+  return { configured: Boolean(apiKey), source, kekReady, lastAudit };
+}
+
+/** GET /requirement-settings/effective：每场景生效模型/来源/接线参数 + 凭据健康（T2） */
+export async function getRequirementSettingsEffective(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const active = loadRequirementSystemConfigStore().active;
+  const credentials = await buildCredentialsHealth();
+  const lastVerified = loadModelVerifyStatus();
+  const effective = buildEffectiveModelConfig(active, config.kimi.model, credentials, lastVerified);
+  return res.json(ok(effective, randomUUID()));
+}
+
+const MODEL_SCENARIO_KEYS: ModelScenarioKey[] = ["assessment", "fileParsing", "generation"];
+
+// -------------------- T4：验证此场景（用生效模型发最小真实请求） --------------------
+
+/** POST /requirement-settings/scenario-test { scenario, apiKey? } */
+export async function testScenarioModel(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const body = (req.body || {}) as { scenario?: string; apiKey?: string };
+  const scenario = String(body.scenario || "").trim() as ModelScenarioKey;
+  if (!MODEL_SCENARIO_KEYS.includes(scenario)) {
+    return fail(res, 40001, "参数错误", [{ field: "scenario", reason: "unknown_scenario" }]);
+  }
+  if (scenario === "generation") {
+    return fail(res, 40001, "该场景尚未接入业务链路（规划中），暂不支持验证", [
+      { field: "scenario", reason: "scenario_not_wired" },
+    ]);
+  }
+
+  const active = loadRequirementSystemConfigStore().active;
+  const resolution = resolveScenarioModel(active, scenario, config.kimi.model);
+  const explicit = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+  const { apiKey, source } = resolveDraftKimiApiKeyForTest(explicit || undefined);
+  if (!apiKey) {
+    return fail(res, 40001, "未配置可用的 API Key", [{ field: "apiKey", reason: "missing_in_store_and_env" }]);
+  }
+
+  const startedAt = Date.now();
+  const recordFailure = (reason: string) => {
+    saveScenarioVerifyRecord(scenario, {
+      at: new Date().toISOString(),
+      ok: false,
+      model: resolution.model,
+      elapsedMs: Date.now() - startedAt,
+      reason,
+    });
+  };
+
+  try {
+    const pingResult = await pingKimiChatCompletion({
+      apiUrl: config.kimi.apiBaseUrl,
+      apiKey,
+      model: resolution.model,
+    });
+    const respondedModel = pingResult.respondedModel || null;
+    saveScenarioVerifyRecord(scenario, {
+      at: new Date().toISOString(),
+      ok: true,
+      model: respondedModel || resolution.model,
+      elapsedMs: pingResult.latencyMs,
+    });
+    const modelMatch = respondedModel
+      ? respondedModel.toLowerCase() === resolution.model.toLowerCase()
+      : null;
+    return res.json(ok({
+      ok: true,
+      scenario,
+      resolvedModel: resolution.model,
+      modelSource: resolution.source,
+      keySource: source === "override" ? "request_body" : source === "draft" ? "draft_store" : "environment",
+      respondedModel,
+      modelMatch,
+      latencyMs: pingResult.latencyMs,
+      httpStatus: pingResult.httpStatus,
+    }, randomUUID()));
+  } catch (e) {
+    if (e instanceof KimiPingFailure) {
+      recordFailure(e.kind);
+      if (e.kind === "overload") {
+        return fail(res, 50301, "KIMI 服务端繁忙，请稍后重试（多由官方引擎限流/过载引起，不代表 API Key 一定错误）", [
+          { field: "provider", reason: e.message },
+        ]);
+      }
+      if (e.kind === "rate_limited") {
+        return fail(res, 42901, "请求过于频繁，请稍后再试", [{ field: "provider", reason: e.message }]);
+      }
+      if (e.kind === "auth") {
+        return fail(res, 40001, "API Key 无效或未授权", [{ field: "apiKey", reason: e.message }]);
+      }
+      if (e.kind === "model_not_found") {
+        return fail(res, 40001, "模型不可用或名称错误", [{ field: "model", reason: e.message }]);
+      }
+      if (e.kind === "timeout") {
+        return fail(res, 50401, "连接测试超时：KIMI 服务长时间无响应，请检查网络或稍后重试", [
+          { field: "apiKey", reason: e.message },
+        ]);
+      }
+    }
+    recordFailure("unknown");
     const msg = e instanceof Error ? e.message : "ping_failed";
     return fail(res, 40001, "调用 KIMI 失败", [{ field: "apiKey", reason: msg }]);
   }

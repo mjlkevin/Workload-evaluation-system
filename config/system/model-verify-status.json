@@ -1,0 +1,14 @@
+{
+  "assessment": {
+    "at": "2026-08-10T16:12:16.030Z",
+    "ok": true,
+    "model": "kimi-k3",
+    "elapsedMs": 2024
+  },
+  "fileParsing": {
+    "at": "2026-08-10T16:12:16.561Z",
+    "ok": true,
+    "model": "kimi-k2.6",
+    "elapsedMs": 516
+  }
+}

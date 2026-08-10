@@ -104,6 +104,13 @@ export function requirementSystemConfigStorePath(): string {
 }
 
 /**
+ * 系统管理-模型场景最近验证状态存储路径
+ */
+export function modelVerifyStatusPath(): string {
+  return path.resolve(resolveRootDir(), "config/system/model-verify-status.json");
+}
+
+/**
  * 系统管理-实施评估依赖规则存储路径
  */
 export function implementationDependencyRulesStorePath(): string {

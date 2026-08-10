@@ -58,6 +58,61 @@ const OUTPUT_STYLE_OPTIONS = [
   { value: 'detailed', label: '详细' },
 ]
 
+// --- T3：模型配置表格化（RP-053）场景映射与展示辅助 ---
+const SCENARIO_KEY_BY_CONFIG = {
+  kimiEvaluation: 'assessment',
+  fileParsing: 'fileParsing',
+  kimiGeneration: 'generation',
+}
+
+const SOURCE_BADGE = {
+  ui: { cls: 'ok', label: '界面配置' },
+  evaluation_fallback: { cls: 'warn', label: '评估配置兜底' },
+  env_fallback: { cls: 'warn', label: '环境变量兜底' },
+}
+
+function formatRelativeTime(iso) {
+  const t = Date.parse(iso || '')
+  if (!Number.isFinite(t)) return '—'
+  const diffMs = Date.now() - t
+  if (diffMs < 60_000) return '刚刚'
+  if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)} 分钟前`
+  if (diffMs < 86_400_000) return `${Math.floor(diffMs / 3_600_000)} 小时前`
+  return `${Math.floor(diffMs / 86_400_000)} 天前`
+}
+
+function formatConfigValue(value) {
+  if (typeof value === 'boolean') return value ? '是' : '否'
+  if (Array.isArray(value)) return value.join(' ')
+  if (value == null || value === '') return '—'
+  return String(value)
+}
+
+/** 关键参数摘要：只展示真实接线的参数（铁律：不渲染无消费方字段） */
+function buildParamSummary(configKey, cfg) {
+  if (!cfg) return '—'
+  if (configKey === 'kimiEvaluation') {
+    return `maxTokens ${cfg.maxTokens ?? '—'} · 超时 ${Math.round((cfg.timeoutMs ?? 0) / 1000)}s`
+  }
+  if (configKey === 'fileParsing') return '仅模型参数接线'
+  return '—'
+}
+
+/** 草稿 vs 生效 diff：返回 [{field, from, to}] */
+function buildScenarioDiff(draftCfg, activeCfg) {
+  if (!draftCfg || !activeCfg) return []
+  const keys = new Set([...Object.keys(draftCfg), ...Object.keys(activeCfg)])
+  const diffs = []
+  for (const key of keys) {
+    const d = JSON.stringify(draftCfg[key] ?? null)
+    const a = JSON.stringify(activeCfg[key] ?? null)
+    if (d !== a) {
+      diffs.push({ field: key, from: formatConfigValue(activeCfg[key]), to: formatConfigValue(draftCfg[key]) })
+    }
+  }
+  return diffs
+}
+
 const TEST_RESULT_STATUS = {
   passed: { cls: 'ci', label: '通过' },
   failed: { cls: 'lock', label: '失败' },
@@ -67,7 +122,7 @@ const TEST_RESULT_STATUS = {
 
 export default function SystemManagement({ sectionId }) {
   const {
-    rules, modelConfig, ratecard,
+    rules, modelConfig, modelActiveConfig, effectiveConfig, effectiveLoading, ratecard,
     dslRules, templates, prompts, setPrompts,
     kbConfig, kbLoading,
     testResults, testResultsLoading,
@@ -97,6 +152,7 @@ export default function SystemManagement({ sectionId }) {
   const [confirmDiscardModel, setConfirmDiscardModel] = useState(false)
   const [modelSaveError, setModelSaveError] = useState(null)
   const [modelSaving, setModelSaving] = useState(false)
+  const [expandedScenario, setExpandedScenario] = useState(null)
   const modelSnapshotRef = useRef(null)
 
   const dedicatedSection = sectionId ? getSystemManagementSectionById(sectionId) : null
@@ -349,60 +405,159 @@ export default function SystemManagement({ sectionId }) {
               </button>
             </div>
 
-            <div className="sys-grid">
-              {MODEL_CARDS.map((card) => {
-                const cfg = modelConfig[card.key] || {}
-                return (
-                  <div key={card.key} className="sys-card">
-                    <div className="sys-card__hd">
-                      <span className="sys-card__title">{card.title}</span>
-                      <span className={`bdg ${cfg.enabled ? 'ci' : 'draft'}`}>
-                        <span className="dot" />
-                        {cfg.enabled ? '已启用' : '已禁用'}
-                      </span>
-                    </div>
-                    <div className="sys-card__bd">
-                      {card.summaryFields.map((f) => {
-                        let val = cfg[f.path]
-                        if (f.type === 'bool') val = val ? '是' : '否'
-                        return (
-                          <div key={f.path} className="sys-field">
-                            <span className="sys-field__lb">{f.label}</span>
-                            <span className="sys-field__v">{String(val ?? '—')}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <p className="sys-card__desc">{card.desc}</p>
-                    <div className="sys-card__ft">
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setEditingModel(card.key) }}>
-                        编辑
-                      </button>
-                      <button type="button" className="btn btn-ghost btn-sm" disabled={actionLoading.testApiKey} onClick={async () => {
-                        const r = await actions.testApiKey(undefined, cfg.model)
-                        if (r.success) {
-                          const d = r.data || {}
-                          const detail = [
-                            d.requestedModel && `请求模型: ${d.requestedModel}`,
-                            d.respondedModel && `响应模型: ${d.respondedModel}`,
-                            d.modelMatch === false && '⚠ 模型不匹配',
-                            d.latencyMs != null && `延迟: ${d.latencyMs}ms`,
-                          ].filter(Boolean).join(' · ')
-                          if (d.modelMatch === false) {
-                            toast.warn('连通性通过，但模型名不匹配', { detail, duration: 6000 })
-                          } else {
-                            toast.success('连接测试通过', { detail, duration: 5000 })
-                          }
-                        } else {
-                          toast.error(r.error || '连接测试失败')
-                        }
-                      }}>
-                        {actionLoading.testApiKey ? '...' : '测试连通性'}
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
+            {effectiveConfig?.credentials && (!effectiveConfig.credentials.configured || !effectiveConfig.credentials.kekReady) && (
+              <div className="sys-alert" role="alert">
+                {!effectiveConfig.credentials.configured
+                  ? '未配置可用的 API Key：AI 调用当前不可用，请在下方 API Key 管理中配置。'
+                  : 'CREDENTIAL_KEK 未配置：密钥将无法加密保存，请在后端环境变量中配置后重启服务。'}
+              </div>
+            )}
+
+            <div className="sys-table-wrap">
+              <table className="table sys-model-table">
+                <thead>
+                  <tr>
+                    <th>场景</th>
+                    <th>生效模型</th>
+                    <th>来源</th>
+                    <th>关键参数</th>
+                    <th>最近验证</th>
+                    <th>状态</th>
+                    <th style={{ textAlign: 'right' }}>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {MODEL_CARDS.map((card) => {
+                    const scenarioKey = SCENARIO_KEY_BY_CONFIG[card.key]
+                    const scenario = effectiveConfig?.scenarios?.find((s) => s.key === scenarioKey) || null
+                    const activeCfg = modelActiveConfig?.[card.key] || null
+                    const draftCfg = modelConfig[card.key] || {}
+                    const diffs = buildScenarioDiff(draftCfg, activeCfg)
+                    const wired = scenario ? scenario.wired : card.key !== 'kimiGeneration'
+                    const resolvedModel = scenario?.resolvedModel || activeCfg?.model || draftCfg.model || '—'
+                    const source = scenario?.source || 'ui'
+                    const sourceBadge = SOURCE_BADGE[source] || SOURCE_BADGE.ui
+                    const lastVerified = scenario?.lastVerified || null
+                    const expanded = expandedScenario === card.key
+                    const verifyLoading = Boolean(actionLoading[`testScenario:${scenarioKey}`])
+                    return (
+                      <React.Fragment key={card.key}>
+                        <tr
+                          className={`sys-model-row${expanded ? ' row-selected' : ''}${wired ? '' : ' sys-model-row--off'}`}
+                          onClick={() => setExpandedScenario(expanded ? null : card.key)}
+                        >
+                          <td>
+                            <div className="sys-model-scene">
+                              <span className="sys-model-scene__name">{card.title}</span>
+                              <span className="sys-model-scene__purpose">{card.desc}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="mono">{resolvedModel}</span>
+                            {scenario && !scenario.wired ? null : null}
+                          </td>
+                          <td><span className={`tag ${sourceBadge.cls}`}>{sourceBadge.label}</span></td>
+                          <td className="sys-model-params">{wired ? buildParamSummary(card.key, activeCfg || draftCfg) : '—'}</td>
+                          <td>
+                            {lastVerified ? (
+                              <span className={`sys-model-verify ${lastVerified.ok ? 'ok' : 'err'}`}>
+                                {lastVerified.ok ? '✓' : '✗'} {formatRelativeTime(lastVerified.at)}
+                                <span className="sys-model-verify__model mono">{lastVerified.model}</span>
+                              </span>
+                            ) : '—'}
+                          </td>
+                          <td>
+                            {!wired ? (
+                              <span className="bdg draft"><span className="dot" />规划中</span>
+                            ) : diffs.length ? (
+                              <span className="bdg warn"><span className="dot" />有草稿待生效</span>
+                            ) : (
+                              <span className="bdg ci"><span className="dot" />已生效</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                            <div className="sys-model-actions">
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                disabled={!wired}
+                                title={wired ? '' : '该场景尚未接入业务链路（规划中）'}
+                                onClick={() => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setEditingModel(card.key) }}
+                              >
+                                编辑
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                disabled={!wired || verifyLoading || (effectiveConfig ? !effectiveConfig.credentials.configured : false)}
+                                title={!wired ? '该场景尚未接入业务链路（规划中）' : effectiveConfig && !effectiveConfig.credentials.configured ? '未配置 API Key' : '用生效模型发最小真实请求'}
+                                onClick={async () => {
+                                  const r = await actions.testScenario(scenarioKey)
+                                  if (r.success) {
+                                    const d = r.data || {}
+                                    const detail = [
+                                      d.resolvedModel && `生效模型: ${d.resolvedModel}`,
+                                      d.respondedModel && `响应模型: ${d.respondedModel}`,
+                                      d.latencyMs != null && `延迟: ${d.latencyMs}ms`,
+                                    ].filter(Boolean).join(' · ')
+                                    if (d.modelMatch === false) {
+                                      toast.warn('验证通过，但模型名不匹配', { detail, duration: 6000 })
+                                    } else {
+                                      toast.success(`${card.title} 验证通过`, { detail, duration: 5000 })
+                                    }
+                                  } else {
+                                    toast.error(r.error || `${card.title} 验证失败`)
+                                  }
+                                }}
+                              >
+                                {verifyLoading ? '验证中…' : '验证此场景'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {expanded && (
+                          <tr className="sys-model-detail">
+                            <td colSpan={7}>
+                              <div className="sys-model-detail__grid">
+                                <div>
+                                  <div className="sys-model-detail__hd">接线参数</div>
+                                  {scenario && scenario.wiredParams.length ? (
+                                    <div className="sys-model-chips">
+                                      {scenario.wiredParams.map((p) => <span key={p} className="sys-model-chip mono">{p}</span>)}
+                                    </div>
+                                  ) : (
+                                    <span className="sys-model-detail__mut">该场景暂无接线参数</span>
+                                  )}
+                                  {scenario?.notes?.length ? (
+                                    <ul className="sys-model-notes">
+                                      {scenario.notes.map((n) => <li key={n}>{n}</li>)}
+                                    </ul>
+                                  ) : null}
+                                </div>
+                                <div>
+                                  <div className="sys-model-detail__hd">草稿 vs 生效</div>
+                                  {diffs.length ? (
+                                    <ul className="sys-model-diff">
+                                      {diffs.map((d) => (
+                                        <li key={d.field}>
+                                          <span className="mono">{d.field}</span>
+                                          <span className="sys-model-diff__change">{d.from} → <b>{d.to}</b></span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span className="sys-model-detail__mut">草稿与生效一致</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
 
             <div className="sys-card" style={{ marginTop: 14 }}>
@@ -420,6 +575,28 @@ export default function SystemManagement({ sectionId }) {
                         : '（未配置）'}
                   </span>
                 </div>
+                {effectiveConfig?.credentials && (
+                  <div className="sys-field sys-field--loose">
+                    <span className="sys-field__lb">凭据托管</span>
+                    <span className="sys-field__v" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span className={`tag ${effectiveConfig.credentials.source === 'store' ? 'ok' : effectiveConfig.credentials.source === 'env' ? 'warn' : 'err'}`}>
+                        {effectiveConfig.credentials.source === 'store' ? '凭据域托管（加密落库）'
+                          : effectiveConfig.credentials.source === 'env' ? '环境变量兜底'
+                          : '未配置'}
+                      </span>
+                      <span className={`tag ${effectiveConfig.credentials.kekReady ? 'ok' : 'err'}`}>
+                        KEK {effectiveConfig.credentials.kekReady ? '就绪' : '未配置'}
+                      </span>
+                      {effectiveConfig.credentials.lastAudit && (
+                        <span className="sys-field__v--dim" style={{ fontSize: 11 }}>
+                          最近变更：{effectiveConfig.credentials.lastAudit.action === 'set' ? '设置密钥' : effectiveConfig.credentials.lastAudit.action === 'clear' ? '清除密钥' : effectiveConfig.credentials.lastAudit.action}
+                          {' · '}{effectiveConfig.credentials.lastAudit.actor}
+                          {' · '}{formatRelativeTime(effectiveConfig.credentials.lastAudit.at)}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
                 <div className="sys-field sys-field--loose">
                   <span className="sys-field__lb">更新密钥</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -488,7 +665,7 @@ export default function SystemManagement({ sectionId }) {
                   )}
                 </div>
                 <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>
-                  {modelConfig.kimiCredentials.resolvedFrom === 'store' ? '当前使用仓库存储密钥'
+                  {modelConfig.kimiCredentials.resolvedFrom === 'store' ? '凭据域托管（AES-256-GCM 加密落库 + 变更审计）'
                     : modelConfig.kimiCredentials.resolvedFrom === 'env' ? '当前使用环境变量'
                     : '未配置可用密钥，保存草稿后生效'}
                 </span>

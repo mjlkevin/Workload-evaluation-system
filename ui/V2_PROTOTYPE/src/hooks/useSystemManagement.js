@@ -140,6 +140,13 @@ export default function useSystemManagement({
   const [modelConfig, setModelConfig] = useState(fallback.modelConfig)
   const [modelsLoading, setModelsLoading] = useState(false)
 
+  // --- T3：生效（active）配置视图，供模型配置表格与草稿 diff 使用 ---
+  const [modelActiveConfig, setModelActiveConfig] = useState(null)
+
+  // --- T2：模型配置生效状态（Effective State） ---
+  const [effectiveConfig, setEffectiveConfig] = useState(null)
+  const [effectiveLoading, setEffectiveLoading] = useState(false)
+
   const [ratecard, setRatecard] = useState(fallback.ratecard)
 
   const [dslRules, setDslRules] = useState(fallback.dslRules)
@@ -238,6 +245,14 @@ export default function useSystemManagement({
           kimiCredentials: d.kimiCredentials || DEFAULT_MODEL_CONFIG.kimiCredentials,
         })
       }
+      if (data?.active) {
+        const a = data.active
+        setModelActiveConfig({
+          kimiEvaluation: { ...DEFAULT_MODEL_CONFIG.kimiEvaluation, ...a.kimiEvaluation },
+          fileParsing: { ...DEFAULT_MODEL_CONFIG.fileParsing, ...a.fileParsing },
+          kimiGeneration: { ...DEFAULT_MODEL_CONFIG.kimiGeneration, ...a.kimiGeneration },
+        })
+      }
     } catch (_) { /* keep fallback */ }
     finally { setModelsLoading(false) }
   }, [enabled])
@@ -248,6 +263,30 @@ export default function useSystemManagement({
       [key]: { ...prev[key], ...patch },
     }))
   }, [])
+
+  // --- T2：生效状态加载 ---
+  const loadEffective = useCallback(async () => {
+    if (!enabled) return
+    setEffectiveLoading(true)
+    try {
+      const payload = await apiClient.get('/system/requirement-settings/effective')
+      const data = unwrapSingle(payload)
+      if (data?.scenarios) setEffectiveConfig(data)
+    } catch (_) { /* 保留旧值：接口不可用时表格退回草稿视图 */ }
+    finally { setEffectiveLoading(false) }
+  }, [enabled])
+
+  // --- T4：验证此场景（用生效模型发最小真实请求，结果写回最近验证） ---
+  const testScenario = useCallback((scenario) => {
+    if (!enabled) {
+      return Promise.resolve({ success: false, error: '登录已过期，请重新登录' })
+    }
+    return withAction(`testScenario:${scenario}`, async () => {
+      const res = await apiClient.post('/system/requirement-settings/scenario-test', { scenario })
+      await loadEffective()
+      return res?.data || res
+    })
+  }, [enabled, withAction, loadEffective])
 
   const saveModelDraft = useCallback(() => withAction('saveModelDraft', async () => {
     if (!enabled) return
@@ -267,8 +306,9 @@ export default function useSystemManagement({
       }
       await apiClient.patch('/system/requirement-settings/draft', body)
       await loadModels()
+      await loadEffective()
     })
-  }, [enabled, modelConfig, withAction, loadModels])
+  }, [enabled, modelConfig, withAction, loadModels, loadEffective])
 
   const clearApiKeyDraft = useCallback(() => withAction('clearApiKey', async () => {
     if (!enabled) return
@@ -281,7 +321,8 @@ export default function useSystemManagement({
   const activateModel = useCallback(() => withAction('activateModel', async () => {
     if (enabled) await apiClient.post('/system/requirement-settings/activate')
     await loadModels()
-  }), [enabled, withAction, loadModels])
+    await loadEffective()
+  }), [enabled, withAction, loadModels, loadEffective])
 
   const testApiKey = useCallback((key, model) => withAction('testApiKey', async () => {
     if (enabled) {
@@ -493,17 +534,22 @@ export default function useSystemManagement({
     if (!enabled) return
     loadRules()
     loadModels()
+    loadEffective()
     loadDsl()
     loadTemplates()
     loadKbConfig()
     loadTestResults()
-  }, [enabled, loadRules, loadModels, loadDsl, loadTemplates, loadKbConfig, loadTestResults])
+  }, [enabled, loadRules, loadModels, loadEffective, loadDsl, loadTemplates, loadKbConfig, loadTestResults])
 
   return {
     rules,
     rulesLoading,
     modelConfig,
     modelsLoading,
+    modelActiveConfig,
+    effectiveConfig,
+    effectiveLoading,
+    loadEffective,
     ratecard,
     dslRules,
     dslLoading,
@@ -526,6 +572,7 @@ export default function useSystemManagement({
       updateModelConfig,
       activateModel,
       testApiKey,
+      testScenario,
       toggleDsl,
       saveDslDraft,
       activateDsl,

@@ -593,6 +593,42 @@ export const handlers = [
     const body = await request.json()
     return HttpResponse.json({ success: true, data: { version: 2, draft: body, updatedAt: new Date().toISOString() } })
   }),
+  http.get(`${BASE}/system/requirement-settings/effective`, () => HttpResponse.json({ success: true, data: {
+    scenarios: [
+      {
+        key: 'assessment', label: 'KIMI 评估', purpose: '用于实施评估与开发评估的自动打标与摘要生成。',
+        resolvedModel: 'kimi-k2.5', source: 'ui', wired: true,
+        wiredParams: ['model', 'maxTokens', 'timeoutMs', 'promptProfile', 'promptTemplate'],
+        notes: ['temperature 配置暂不生效（评估链路当前硬编码 0.1，P2 接通）', 'K2 系列模型采样参数由平台固定，temperature 不会发送'],
+        lastVerified: { at: '2026-08-10T12:00:00.000Z', ok: true, model: 'kimi-k2.5', elapsedMs: 800 },
+      },
+      {
+        key: 'fileParsing', label: '文件解析', purpose: '用于 Excel/Word/PDF 的结构化提取与内容解析。',
+        resolvedModel: 'kimi-k2.6', source: 'ui', wired: true,
+        wiredParams: ['model'],
+        notes: ['allowedExtensions / maxFileSizeMb / maxSheetCount / strictMode / ocrEnabled 配置暂不生效（P2 接通上传链路）'],
+        lastVerified: null,
+      },
+      {
+        key: 'generation', label: '生成模型', purpose: '用于方案生成、五段叙事与 SOW 草稿自动撰写。',
+        resolvedModel: 'kimi-k2.5', source: 'ui', wired: false,
+        wiredParams: [], notes: ['该场景尚未接入业务链路，配置暂不生效（规划中）'],
+        lastVerified: null,
+      },
+    ],
+    credentials: { configured: true, source: 'store', kekReady: true, lastAudit: { action: 'set', actor: 'kevin', at: '2026-08-10T11:00:00.000Z' } },
+    generatedAt: '2026-08-10T12:30:00.000Z',
+  } })),
+  http.post(`${BASE}/system/requirement-settings/scenario-test`, async ({ request }) => {
+    const body = await request.json()
+    if (body.scenario === 'generation') {
+      return HttpResponse.json({ code: 40001, message: '该场景尚未接入业务链路（规划中），暂不支持验证' }, { status: 400 })
+    }
+    return HttpResponse.json({ success: true, data: {
+      ok: true, scenario: body.scenario, resolvedModel: 'kimi-k2.5', modelSource: 'ui', keySource: 'draft_store',
+      respondedModel: 'kimi-k2.5', modelMatch: true, latencyMs: 800, httpStatus: 200,
+    } })
+  }),
   http.get(`${BASE}/system/knowledge-base-config`, () => HttpResponse.json({ success: true, data: {
     version: 1,
     draft: {

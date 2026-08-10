@@ -7,6 +7,8 @@ export {
   updateRequirementSystemConfigDraft,
   activateRequirementSystemConfig,
   testRequirementKimiApiKey,
+  getRequirementSettingsEffective,
+  testScenarioModel,
   getImplementationDependencyRules,
   updateImplementationDependencyRulesDraft,
   activateImplementationDependencyRules,

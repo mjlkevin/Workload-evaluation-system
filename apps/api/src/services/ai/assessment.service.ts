@@ -35,9 +35,11 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
   const fallbackCloudSku = buildCloudSkuModuleItemsFromSnapshot(snapshot, fallbackDraft);
   const fallbackDraftAligned: KimiAssessmentDraft = { ...fallbackDraft, moduleItems: mergeDevTotalModuleItem(fallbackCloudSku.items, snapshot) };
   const { apiKey } = resolveActiveRequirementKimiApiKey();
-  const model = config.kimi.model;
-  const modelForClient = normalizeKimiModelName(model);
   const requirementSettings = loadRequirementSystemConfigStore().active;
+  // T1：评估主链路模型以界面配置为准（kimiEvaluation.model），env KIMI_MODEL 仅作兜底，
+  // 消除"界面显示 kimi-k3 实际跑 env 模型"的配置契约破口。
+  const model = requirementSettings.kimiEvaluation.model?.trim() || config.kimi.model;
+  const modelForClient = normalizeKimiModelName(model);
   const promptProfile = asString(asModelObject(body.ruleContext).promptProfile) || asString(requirementSettings.kimiEvaluation.promptProfile) || "assessment_default_v1";
   const promptTemplate = asString(requirementSettings.kimiEvaluation.promptTemplate) || "你是资深项目经理 + 资深实施顾问。你不是做简单 SKU 对照，而是要基于需求全量信息做综合实施评估。必须只返回 JSON。";
   const startedAt = Date.now();
