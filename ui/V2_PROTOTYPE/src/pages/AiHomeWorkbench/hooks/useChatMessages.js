@@ -470,6 +470,11 @@ export default function useChatMessages(workbench) {
 
       // flag off 或 Run 提交失败时回退旧同步路径（行为逐字不变）
       if (runSubmitted) {
+        // ISS-2026-08-10-003（发问后顶栏角标不即时 + O8 逐字流式延迟）：提交成功后
+        // 立即触发一次统一视图刷新（与页签切回同款 fire-and-forget）——顶栏角标数据源
+        // 即时更新，activeRunId 经渲染重算成立，O8 页面级 SSE 订阅随之建立；
+        // 仅异步成功路径，503/409/flag 关闭回退路径不触发。
+        workbenchRef.current?.refreshUnifiedView?.().catch(() => {})
         // Run 已提交：不执行旧同步路径，等待 SSE 事件
         return
       }
