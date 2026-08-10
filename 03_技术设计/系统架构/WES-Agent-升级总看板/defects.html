@@ -348,6 +348,18 @@
               <td class="tc-8">验收口径：发问后思考块先于回答出现且完成后可折叠为「已思考」摘要；回答标题/列表/表格正确分块渲染（含模型紧凑输出口径）；切会话往返内容一致；停止按钮、角标、落库内容不回归。</td>
               <td class="tc-9">KIMIK3 回填经指挥方五核独立复审一次通过（2f2d8c6 + 7b909e6，矩阵全绿、RED 恰 9 红独立复现、主检出零接触）；2026-08-10 19:07 用户批准 --no-ff 合入（8a419db），主线冒烟 web 296/297（唯一失败为用户 WIP 既有基线）、modules 323/323、双构建零错误；后端已重启（PID 22793，harnessEnabled: true，提示词生效）。复测指引：按 MT-ISS0810-005-001 五项执行（含 ISS-004 第 1 项「思考块可见」并入），通过后推送远端并关闭本 defect 与 ISS-2026-08-10-005。2026-08-10 19:42 用户复测五项全部通过，30 个挂起提交已推送远端（ece7ac2），本 defect 验收关闭。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-08-11-def-2026-08-10-002-derived:defects">
+              <td class="mono tc-0">DEF-2026-08-10-002</td>
+              <td class="mono tc-1">ISS-2026-08-10-008</td>
+              <td class="mono tc-2">—</td>
+              <td class="tc-3">凭据缓存重启冷启动：服务重启后 DB 中的 API 密钥不预热进内存缓存，读取侧静默回落 env（ISS-2026-08-05-001「重启密钥丢失」修复的回潮缺口）</td>
+              <td class="tc-4">S2</td>
+              <td class="tc-5"><span class="status run"><span class="dot"></span>已登记 / 待用户决策修复</span></td>
+              <td class="tc-6">apps/api/src/modules/system/credentials.store.ts（缓存填充路径）/ apps/api/src/main.ts（启动引导缺 warm）/ AI 全链路密钥解析（resolveActiveRequirementKimiApiKey 同步只读缓存）</td>
+              <td class="tc-7">根因：凭据域 DB 化后，内存缓存仅在两个时机填充——同进程 setApiKey（用户界面录入）与旧文件迁移导入；服务重启后缓存为空，同步读取函数 resolveActiveRequirementKimiApiKey() 无法 await 取 DB，直接回落 env。实证（2026-08-10 23:59，临时全新进程 PORT=3100）：GET /effective credentials.source=「env」而 DB 已有用户 22:34 录入的有效密钥；scenario-test 用 env 旧密钥 401，用 DB 密钥 override 双场景连通 modelMatch=true。当前运行后端因同进程录入密钥未暴露，重启即触发。修复方向：main.ts 启动引导 KEK 校验后 warm（getApiKey 成功填入缓存，失败降级警告不阻断启动）。</td>
+              <td class="tc-8">验收口径：重启后 GET /requirement-settings/effective credentials.source=「db_cache」；AI 评估链路重启后首轮调用即用 DB 密钥（无 401）；KEK 缺失或 DB 无记录时启动警告可见、服务正常启动；补回潮 RED 测试（全新进程无 setApiKey 直接 resolve 命中 DB 密钥）。</td>
+              <td class="tc-9">2026-08-11 由模型配置契约闭环 P1 真实环境验证自发现并登记（changes BE-2026-08-11-model-config-p1-delivered）；按规范未自行修复（偏离已批准计划须用户批准），建议作为 0.5–1h 小修复随下一批次或独立工单执行。</td>
+            </tr>
         </tbody>
         </table>
         </div>

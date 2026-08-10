@@ -1017,9 +1017,9 @@
               <td>前端体验 / 系统管理</td>
               <td><span class="pill priority-p2">P2</span></td>
               <td>模型配置契约闭环 · P1</td>
-              <td><span class="status run"><span class="dot"></span>已分析 / 待用户批准开工</span></td>
+              <td><span class="status done"><span class="dot"></span>已交付·待验收（分支 60018c9）</span></td>
               <td>三卡片横排改为场景配置表：列=场景/生效模型/来源/关键参数摘要/凭据健康/最近验证/状态/操作；行内展开只读详情（全参数 + 草稿 vs 生效 diff + 最近审计）；编辑走 Dialog 且参数区按 supportedParams 动态渲染；API Key 区并入表格体系；死配置行置灰"规划中"</td>
-              <td>验收口径：三场景一屏可对比；每行可见生效模型与来源（env 兜底黄色标示）；KEK 缺失/未配置表格内可见预警；编辑弹窗失败不清空输入；窄屏横向滚动首列固定；test:web 299 基线零回归 + build:web 通过</td>
+              <td>验收口径：三场景一屏可对比；每行可见生效模型与来源（env 兜底黄色标示）；KEK 缺失/未配置表格内可见预警；编辑弹窗失败不清空输入；窄屏横向滚动首列固定；test:web 299 基线零回归 + build:web 通过。2026-08-11 P1 交付：表格七列 + 行内展开详情 + 凭据健康 inline 预警 + API Key 凭据托管行随 60018c9 提交（16 文件 +1077/-63）；test:modules 337/337、前端 304/305（唯一失败为用户 WIP 既有基线零触碰）含新增 ModelConfigTable 6/6、双构建零错误、UI 门禁零发现；真实密钥双场景连通 modelMatch=true（kimi-k3 / kimi-k2.6）。待用户浏览器人工验收表格形态后关闭。</td>
             </tr>
             <tr>
               <td class="mono">RP-032</td>

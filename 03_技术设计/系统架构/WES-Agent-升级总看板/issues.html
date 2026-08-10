@@ -572,9 +572,20 @@
               <td class="tc-3">user_feedback</td>
               <td class="tc-4">2026-08-10 23:01 用户明确指示："模型配置页面，我不想再用这种卡片了，请你帮我改成表格+行数据详情的模式，并结合外部最佳实践给出更多前端建议"（附当前三卡片页面截图）。截图同时确认：API Key 已配置（hint ····epCz），凭据域落地后密钥录入已完成。</td>
               <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx 模型配置页签（三卡片横排 + 编辑弹窗 L948-1069）</code> <code class="inline">docs/superpowers/plans/2026-08-10-model-config-contract-closure-plan.md（契约闭环计划，本项为其 P1 前端形态决策）</code> <code class="inline">截图：API Key 管理区显示"已配置 ····epCz"</code></td>
-              <td class="tc-6"><span class="status run"><span class="dot"></span>已分析 / 待规划</span></td>
+              <td class="tc-6"><span class="status done"><span class="dot"></span>已交付·待验收（分支 60018c9）</span></td>
               <td class="tc-7">分诊结果 requirement（P2 体验调整）：卡片布局信息密度低、无法横向对比三个场景、无生效状态/凭据健康可见性——与模型配置契约闭环计划（plan.html 后续任务池 BE-2026-08-10-model-config-contract-closure）根因同源，不重复建项，本 issue 作为其前端形态的用户决策输入。派生 RP-053。不阻塞主流程。</td>
-              <td class="tc-8">处置：并入模型配置契约闭环 P1 前端批次——表格（场景/生效模型/来源/关键参数/凭据健康/最近验证/状态/操作）+ 行内展开只读详情（草稿 vs 生效 diff、审计）+ 编辑走 Dialog（项目约定）；参数区按 supportedParams 动态渲染。验收口径：三场景一屏可对比；每行可见生效模型与来源；KEK 缺失/未配置在表格内可见预警；编辑仍走弹窗且失败不清空输入；test:web 299 基线零回归。另确认新事实：用户已录入新密钥（····epCz），T4 真实连通验证解除阻塞。</td>
+              <td class="tc-8">处置：并入模型配置契约闭环 P1 前端批次——表格（场景/生效模型/来源/关键参数/凭据健康/最近验证/状态/操作）+ 行内展开只读详情（草稿 vs 生效 diff、审计）+ 编辑走 Dialog（项目约定）；参数区按 supportedParams 动态渲染。验收口径：三场景一屏可对比；每行可见生效模型与来源；KEK 缺失/未配置在表格内可见预警；编辑仍走弹窗且失败不清空输入；test:web 299 基线零回归。另确认新事实：用户已录入新密钥（····epCz），T4 真实连通验证解除阻塞。2026-08-11 P1 已交付：表格化重构随 60018c9 提交（16 文件 +1077/-63），test:modules 337/337、前端 304/305（唯一失败为用户 WIP 既有基线）、真实密钥双场景连通 modelMatch=true（kimi-k3 / kimi-k2.6）；待用户浏览器人工验收表格形态后关闭。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-10-008-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-10-008</td>
+              <td class="tc-1">2026-08-10</td>
+              <td class="tc-2">系统管理 / 凭据域：服务重启后 DB 中的 API 密钥不预热进内存缓存，读取侧回落 env（ISS-2026-08-05-001「重启密钥丢失」修复回潮）</td>
+              <td class="tc-3">agent_finding（P1 真实环境验证自发现）</td>
+              <td class="tc-4">2026-08-10 23:59 模型配置契约闭环 P1 真实环境验证（临时后端 PORT=3100，全新进程）发现：GET /requirement-settings/effective 返回 credentials.source=「env」，而 DB credentials 表已有用户 22:34 录入的新密钥（lastAudit action=set 可证）；POST scenario-test（assessment）用回落的 env 旧密钥返回 401 Invalid Authentication，改用 DB 真实密钥 override 后双场景（kimi-k3 / kimi-k2.6）连通 modelMatch=true——证实 DB 密钥有效、冷启动读取路径有缺陷。</td>
+              <td class="tc-5"><code class="inline">apps/api/src/modules/system/credentials.store.ts（缓存仅在 setApiKey 同进程写入或旧文件导入时填充）</code> <code class="inline">apps/api/src/main.ts（启动引导仅 KEK 检查，无 warm 调用）</code> <code class="inline">resolveActiveRequirementKimiApiKey()（同步函数，只读内存缓存，冷启动回落 env）</code> <code class="inline">全仓 grep 确认无 warm 调用点</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已分析 / 待用户决策修复</span></td>
+              <td class="tc-7">分诊结果 defect（P1）：凭据域 DB 化（ISS-2026-08-05-001，已合入 85b8248）修复了「重启密钥丢失」，但缓存预热缺口使该缺陷在下次重启后回潮——重启后 DB 密钥不进内存缓存，业务读取静默回落 env；若 env 无有效密钥（.env.local 仅存 KEK 时），AI 评估/文件解析链路 401。当前运行中的用户后端（PID 88638，22:34 同进程录入密钥）未暴露此缺口，重启即触发。派生 DEF-2026-08-10-002。本批次只登记不修复（偏离已批准计划须用户批准）。</td>
+              <td class="tc-8">修复方向（约 0.5–1h）：main.ts 启动引导在 KEK 校验后加 credentials warm——KIMI_SCOPE getApiKey 成功即填入内存缓存，失败降级为启动警告不阻断；补 RED 测试（全新进程无 setApiKey 直接 resolve 命中 DB 密钥）。验收口径：重启后 GET /effective credentials.source=「db_cache」；AI 评估链路重启后首轮调用即用 DB 密钥；KEK 缺失时启动警告可见、服务仍可启动。</td>
             </tr>
         </tbody>
         </table>
