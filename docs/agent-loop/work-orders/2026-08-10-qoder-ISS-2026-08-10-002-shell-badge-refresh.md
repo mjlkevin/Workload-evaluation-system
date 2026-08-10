@@ -1,6 +1,6 @@
 # 工单 ISS-2026-08-10-002 · 右下角全局「后台任务」角标不计数（Shell provider 缺新 run 刷新触发）
 
-> 状态：待用户拍板派发 · 分诊 defect P1 · 来源：MT-ISS001-001 验收实测（会话 87c73939-a03e-4bda-87c7-6f148a639213）
+> 状态：已派发 KIMIK3（2026-08-10 用户批准） · 分诊 defect P1 · 来源：MT-ISS001-001 验收实测（会话 87c73939-a03e-4bda-87c7-6f148a639213）
 > 交叉引用：ISS-2026-08-10-001（顶栏角标数据源，已合入 af1f250）、ISS-2026-08-09-003（读取侧对账，已合入）
 
 ## 1. 背景与症状
@@ -31,7 +31,7 @@
 
 ## 4. Worktree Contract
 
-- base：main 当前 HEAD（派发时以 `git rev-parse main` 实填，预期 461badf 或更新）
+- base：main HEAD = 64b8398（2026-08-10 派发时实填）
 - 分支：`qoder/iss-2026-08-10-002-shell-badge-refresh`
 - 初始化双 npm install（根 + ui/V2_PROTOTYPE），exit 0 才可开工
 - 状态上限「已回填 / 待主会话复审」，不得自宣交付
