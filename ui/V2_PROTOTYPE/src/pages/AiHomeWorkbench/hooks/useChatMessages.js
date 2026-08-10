@@ -219,9 +219,13 @@ export default function useChatMessages(workbench) {
   }, [])
 
   // O8：获取当前会话关联的活跃 Run ID（用于 SSE 订阅）
-  const activeRunId = workbench.unifiedView?.runs?.find(
+  // ISS-2026-08-10-004（层 1）：统一视图 runs 契约字段为 runId（后端无 id）——
+  // 此前取 .id 恒为 undefined，activeRunId 恒 ''，页面级 SSE 订阅永不建立；
+  // runId 为主、id 兜底兼容，不得反向（后端契约不得新增 id 别名）。
+  const activeRun = workbench.unifiedView?.runs?.find(
     (run) => run.sessionId === activeSessionKey && ['running', 'queued', 'recovering'].includes(run.status),
-  )?.id || ''
+  )
+  const activeRunId = activeRun?.runId || activeRun?.id || ''
 
   // O8：SSE 流式事件处理（逐字呈现 + 思考折叠）
   const handleStreamEvent = useCallback((event) => {

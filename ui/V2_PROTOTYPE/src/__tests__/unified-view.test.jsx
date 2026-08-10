@@ -45,7 +45,9 @@ function buildUnifiedView(overrides = {}) {
       buildSession('session-b', '会话 B'),
     ],
     runs: [
-      { id: 'run-1', sessionId: 'session-a', status: 'running', latestEventKind: 'run_status_changed' },
+      // ISS-2026-08-10-004：统一视图 runs 契约字段为 runId（后端无 id 字段）——
+      // mock 此前用假 id 字段致流式发现用例在生产坏时仍绿（假绿洞，本单封堵）。
+      { runId: 'run-1', sessionId: 'session-a', status: 'running', latestEventKind: 'run_status_changed' },
     ],
     tasks: [],
     artifacts: [
@@ -117,7 +119,7 @@ describe('unified-view: O5 统一视图首屏接入', () => {
   test('unified-view: 统一视图返回 runs 与 artifacts 数据不阻塞渲染', async () => {
     setupUnifiedView({
       view: buildUnifiedView({
-        runs: [{ id: 'run-1', sessionId: 'session-a', status: 'running', latestEventKind: 'run_status_changed' }],
+        runs: [{ runId: 'run-1', sessionId: 'session-a', status: 'running', latestEventKind: 'run_status_changed' }],
         artifacts: [{ artifactId: 'art-1', sessionId: 'session-a', type: 'report', title: '报告 1', status: 'ready' }],
       }),
     })
@@ -153,8 +155,8 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     setupUnifiedView({
       view: buildUnifiedView({
         runs: [
-          { id: 'run-1', sessionId: 'session-a', status: 'running', latestEventKind: 'run_status_changed' },
-          { id: 'run-2', sessionId: 'session-b', status: 'completed', latestEventKind: 'run_completed' },
+          { runId: 'run-1', sessionId: 'session-a', status: 'running', latestEventKind: 'run_status_changed' },
+          { runId: 'run-2', sessionId: 'session-b', status: 'completed', latestEventKind: 'run_completed' },
         ],
       }),
     })
@@ -178,7 +180,7 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     const { calls } = setupUnifiedView({
       view: buildUnifiedView({
         runs: [
-          { id: 'run-1', sessionId: 'session-a', status: 'completed', latestEventKind: 'run_completed' },
+          { runId: 'run-1', sessionId: 'session-a', status: 'completed', latestEventKind: 'run_completed' },
         ],
       }),
     })
@@ -200,7 +202,8 @@ describe('unified-view: O5 统一视图首屏接入', () => {
   const SUBMIT_RUN_ID = 'run-new-1'
 
   function buildSubmittedRun() {
-    return { id: SUBMIT_RUN_ID, sessionId: 'session-new', status: 'running', latestEventKind: 'run_status_changed' }
+    // ISS-2026-08-10-004：契约形状 runId（无 id 字段），与后端统一视图一致
+    return { runId: SUBMIT_RUN_ID, sessionId: 'session-new', status: 'running', latestEventKind: 'run_status_changed' }
   }
 
   function buildViewWithRuns(runs) {
@@ -369,5 +372,63 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     // 同步回退不得触发额外统一视图刷新：应答完成后窗口内仍只有挂载首拉一次
     await new Promise((resolve) => setTimeout(resolve, 300))
     expect(viewCalls).toHaveLength(1)
+  })
+
+  // ISS-2026-08-10-004（层 1：runId 字段错配，停止按钮失效）RED：
+  // 统一视图 runs 为后端契约形状（runId，无 id）时，对话区停止按钮必须以
+  // runId 调 cancelRun；错配实现下 cancelRun 收到 undefined，请求落到
+  // /ai-runs/undefined/cancel（用户实测「停止按钮点击无反应」）。
+  test('unified-view: 对话区停止按钮以 runId 契约字段调用 cancelRun（ISS-2026-08-10-004）', async () => {
+    const cancelCalls = []
+    let resolveSubmit
+    server.use(
+      http.get(`${BASE}/ai/home-workbench/view`, () => HttpResponse.json({
+        code: 0,
+        message: 'ok',
+        data: buildUnifiedView({
+          runs: [{ runId: 'run-1', sessionId: 'session-a', status: 'running', latestEventKind: 'run_status_changed' }],
+        }),
+      })),
+      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({
+        success: true,
+        data: { items: [buildSession('session-a', '会话 A'), buildSession('session-b', '会话 B')] },
+      })),
+      // provider 轮询链路（cancelRun 后 refresh 也走此 handler）
+      http.get(`${BASE}/ai-runs`, () => HttpResponse.json({ success: true, data: { items: [] } })),
+      http.post(`${BASE}/ai-sessions/session-a/runs`, () => new Promise((resolve) => {
+        // submitRun 保持未决，sending 维持 true，停止按钮可持续点击
+        resolveSubmit = resolve
+      })),
+      http.post(`${BASE}/ai-runs/:runId/cancel`, ({ params }) => {
+        cancelCalls.push(params.runId)
+        return HttpResponse.json({ success: true, data: { runId: params.runId, status: 'cancelling' } })
+      }),
+    )
+    // cancelRun 经 BackgroundRunProvider context 到达，必须挂 provider（否则为 no-op 兜底）
+    render(
+      <ToastProvider>
+        <ToastContainer />
+        <MemoryRouter>
+          <BackgroundRunProvider>
+            <HomeWorkspace />
+          </BackgroundRunProvider>
+        </MemoryRouter>
+      </ToastProvider>,
+    )
+
+    // 激活会话 A（统一视图含其进行中 run）
+    fireEvent.click(await screen.findByText('会话 A'))
+
+    submitQuestion('停止按钮验证')
+
+    // activeRun（running）&& sending → 停止按钮渲染
+    const stopButton = await screen.findByRole('button', { name: '停止生成' })
+    fireEvent.click(stopButton)
+
+    // 验收口径：cancel 请求必须落在契约 runId 上（不得为 undefined）
+    await waitFor(() => expect(cancelCalls).toContain('run-1'))
+
+    // 清理悬挂的 submitRun 请求，避免用例间泄漏
+    resolveSubmit?.(HttpResponse.json({ success: true, data: { runId: 'run-2', status: 'queued', eventCursor: 0 } }))
   })
 })

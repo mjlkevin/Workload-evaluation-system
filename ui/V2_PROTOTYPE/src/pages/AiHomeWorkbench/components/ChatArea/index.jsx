@@ -68,7 +68,7 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
         onAttachFile={chat.attachFile}
         onRemoveFile={chat.removeSelectedFile}
         onSend={chat.sendMessage}
-        onStop={() => activeRun && workbench.backgroundRuns?.cancelRun?.(activeRun.id)}
+        onStop={() => activeRun && workbench.backgroundRuns?.cancelRun?.(activeRun.runId || activeRun.id)}
         activeRun={activeRun}
       />
     </section>

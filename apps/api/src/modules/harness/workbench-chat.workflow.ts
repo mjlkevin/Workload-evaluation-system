@@ -35,6 +35,19 @@ export type WorkbenchChatWorkflowDeps = {
    * 生产接线见 harness-boot.ts；测试可注入指向临时存储的实现。
    */
   appendSessionMessage(input: Omit<AppendAiSessionMessageIdempotentInput, "storePath">): AppendAiSessionMessageIdempotentResult;
+  /**
+   * ISS-2026-08-10-004（层 2）：流式事件写入 run 事件流（additive）。
+   * 生产接线复用 harness runtime repository 的 appendRunEvent（白名单校验后落库，
+   * SSE 端点原样透传）；payload 形状对齐前端消费侧：
+   * text.delta → { delta }，thought → { text }。
+   * 可选以保持 additive 不破坏既有构造点（如 projector 测试 stub）；
+   * 未注入时流式事件静默跳过，不影响 dispatch 主链路。
+   */
+  appendRunEvent?(input: {
+    runId: string;
+    eventType: "text.delta" | "thought";
+    payload: Record<string, unknown>;
+  }): Promise<unknown>;
 };
 
 export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): HarnessWorkflow {
@@ -87,11 +100,41 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         toolName: "workbench_chat_dispatch",
         input: { content, sessionId: run.aiSessionId },
         execute: async () => {
+          // ISS-2026-08-10-004（层 2）：异步通道接入逐字流式——dispatch 入参携带
+          // streamingAdapter，onToken 逐 chunk 直发写 run 事件流（不做 coalescing）：
+          // contentDelta → text.delta({ delta })，reasoningContentDelta → thought({ text })；
+          // onComplete/onError 不另写事件（终态事件由 runtime 既有链路发射）。
+          // 副作用位于 execute 内，恢复重放经 recordToolEffectOnce 跳过，幂等天然成立；
+          // 写链串行化保持事件时序，单条写失败不阻断模型主链路。
+          let streamEventChain: Promise<unknown> = Promise.resolve();
+          const appendStreamEvent = (eventType: "text.delta" | "thought", payload: Record<string, unknown>) => {
+            if (!deps.appendRunEvent) return; // 未注入（兼容构造点）时静默跳过
+            const append = deps.appendRunEvent;
+            streamEventChain = streamEventChain
+              .then(() => append({ runId: run.harnessRunId, eventType, payload }))
+              .catch((err) => {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.error(`[workbench-chat] appendRunEvent ${eventType} run=${run.harnessRunId} failed: ${msg.slice(0, 200)}`);
+              });
+          };
+          const streamingAdapter = {
+            onToken: (chunk: { contentDelta?: string; reasoningContentDelta?: string }) => {
+              if (chunk.reasoningContentDelta) {
+                appendStreamEvent("thought", { text: chunk.reasoningContentDelta });
+              }
+              if (chunk.contentDelta) {
+                appendStreamEvent("text.delta", { delta: chunk.contentDelta });
+              }
+            },
+          };
           const result = await deps.dispatch({
             message: content,
             user: { id: run.ownerUserId, username: run.ownerUsername, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" },
             workflowKey: "free_chat",
+            streamingAdapter,
           });
+          // execute 返回前冲刷写链，避免流式事件丢失在游离 promise 中
+          await streamEventChain;
           return {
             answer: result.answer,
             intent: result.intent,

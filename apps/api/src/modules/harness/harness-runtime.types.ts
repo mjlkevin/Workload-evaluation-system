@@ -48,6 +48,11 @@ export const HARNESS_RUN_EVENT_TYPES = [
   // RP-047 Batch C（扩展项 E1，additive）：补充信息与确认闸门事件
   "run_inputs_submitted",
   "run_action_confirmed",
+  // ISS-2026-08-10-004（additive）：逐字流式与模型思考事件——
+  // 前端消费侧（useChatMessages STREAM_EVENT_TYPES）与 SSE 透传链路已就绪，
+  // 异步 worker 经 streamingAdapter.onToken 逐 chunk 写入 run 事件流。
+  "text.delta",
+  "thought",
 ] as const;
 export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
 

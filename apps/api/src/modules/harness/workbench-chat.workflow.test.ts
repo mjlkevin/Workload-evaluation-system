@@ -65,6 +65,11 @@ function makeNoOpAppendSessionMessage(): WorkbenchChatWorkflowDeps["appendSessio
   return (input) => ({ found: true, created: false, message: input.message });
 }
 
+/** 不关心流式事件的用例使用的 no-op dep（ISS-2026-08-10-004 层 2 接线后 deps 必填）。 */
+function makeNoOpAppendRunEvent(): WorkbenchChatWorkflowDeps["appendRunEvent"] {
+  return async (input) => input;
+}
+
 type FakeEffect = {
   effectKey: string;
   toolName: string;
@@ -122,7 +127,7 @@ function makeFakeCtx(overrides: {
 }
 
 test("workbench_chat_v1 workflow 元数据冻结", () => {
-  const wf = createWorkbenchChatWorkflow({ dispatch: async () => ({ answer: "ok" } as any), appendSessionMessage: makeNoOpAppendSessionMessage() });
+  const wf = createWorkbenchChatWorkflow({ dispatch: async () => ({ answer: "ok" } as any), appendSessionMessage: makeNoOpAppendSessionMessage(), appendRunEvent: makeNoOpAppendRunEvent() });
   assert.equal(wf.workflowId, "workbench_chat_v1");
   assert.equal(wf.workflowVersion, "1.0.0");
   assert.equal(wf.firstStepKey, "chat");
@@ -144,6 +149,7 @@ test("executeStep 从 executionConfig.content 取输入并 dispatch", async () =
       } as any;
     },
     appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeNoOpAppendRunEvent(),
   });
 
   const ctx = makeFakeCtx();
@@ -171,6 +177,7 @@ test("recordToolEffectOnce 幂等：重复执行不产生第二次 AI 调用", a
       trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
     } as any),
     appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeNoOpAppendRunEvent(),
   });
 
   const recordToolEffectOnce = async (effect: FakeEffect) => {
@@ -206,6 +213,7 @@ test("outbox deduplicationKey 冻结为 ${runId}:assistant:1", async () => {
       trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
     } as any),
     appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeNoOpAppendRunEvent(),
   });
 
   const ctx = makeFakeCtx();
@@ -230,6 +238,7 @@ test("C1 缺陷 A：outbox payload 携带 projector 契约 message（内容非�
         trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
       }) as any,
     appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeNoOpAppendRunEvent(),
   });
 
   const outcome = await wf.executeStep("chat", makeFakeCtx());
@@ -272,6 +281,7 @@ test("C2 缺陷 B：用户消息在 dispatch 前幂等落库，恢复重放不�
         sequence.push("append-user");
         return appendAiSessionMessageIdempotent({ ...input, storePath });
       },
+      appendRunEvent: makeNoOpAppendRunEvent(),
     });
 
     const ctx = makeFakeCtx();
@@ -292,4 +302,96 @@ test("C2 缺陷 B：用户消息在 dispatch 前幂等落库，恢复重放不�
   } finally {
     cleanup();
   }
+});
+
+// ============================================================
+// ISS-2026-08-10-004（层 2：异步通道接入流式事件）RED 守护
+// ============================================================
+// 根因：异步 worker 调 deps.dispatch 未传 streamingAdapter，run 事件流
+// 从无 text.delta/thought → 前端订阅建立也无逐字/思考内容。
+// 修复契约：execute 内 dispatch 入参携带 streamingAdapter；onToken 逐 chunk
+// 经 deps.appendRunEvent 写事件——contentDelta → text.delta（payload.delta），
+// reasoningContentDelta → thought（payload.text）；onComplete/onError 不写事件
+// （终态事件由 runtime 既有链路发射）。
+
+test("ISS-004 层 2：dispatch 入参携带 streamingAdapter，onToken 逐 chunk 写 text.delta/thought 事件", async () => {
+  const appended: Array<{ runId: string; eventType: string; payload: Record<string, unknown> }> = [];
+  let seenAdapter: { onToken: (chunk: Record<string, unknown>) => void } | undefined;
+
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      seenAdapter = input.streamingAdapter as typeof seenAdapter;
+      // 模拟生产模型流式路径回调（model-answer 在 adapter + modelChatStream 齐备时逐 chunk 触发）
+      input.streamingAdapter?.onToken({ contentDelta: "你好", reasoningContentDelta: "" });
+      input.streamingAdapter?.onToken({ contentDelta: "", reasoningContentDelta: "先拆解问题" });
+      input.streamingAdapter?.onToken({ contentDelta: "世界" });
+      return {
+        intent: "domain_qa",
+        answer: "你好世界",
+        businessRole: "pre_sales",
+        roleLabel: "售前顾问",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+      } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: async (event) => {
+      appended.push(event as (typeof appended)[number]);
+      return event;
+    },
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+
+  assert.ok(seenAdapter, "dispatch 入参必须携带 streamingAdapter（异步通道逐字流式前提）");
+  assert.deepEqual(
+    appended.map((event) => [event.runId, event.eventType, event.payload]),
+    [
+      ["run-1", "text.delta", { delta: "你好" }],
+      ["run-1", "thought", { text: "先拆解问题" }],
+      ["run-1", "text.delta", { delta: "世界" }],
+    ],
+    "contentDelta → text.delta(payload.delta)，reasoningContentDelta → thought(payload.text)，空增量不写事件",
+  );
+});
+
+test("ISS-004 层 2：恢复重放跳过 execute，流式事件不重复发射（幂等天然成立）", async () => {
+  const appended: Array<{ runId: string; eventType: string; payload: Record<string, unknown> }> = [];
+  const recordedEffects: string[] = [];
+
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      input.streamingAdapter?.onToken({ contentDelta: "逐字" });
+      return {
+        intent: "domain_qa",
+        answer: "逐字",
+        businessRole: "pre_sales",
+        roleLabel: "售前顾问",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+      } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: async (event) => {
+      appended.push(event as (typeof appended)[number]);
+      return event;
+    },
+  });
+
+  const recordToolEffectOnce = async (effect: FakeEffect) => {
+    if (recordedEffects.includes(effect.effectKey)) {
+      return { output: { answer: "cached" }, created: false };
+    }
+    recordedEffects.push(effect.effectKey);
+    const output = await effect.execute();
+    return { output, created: true };
+  };
+  const ctx = makeFakeCtx({ recordToolEffectOnce: recordToolEffectOnce as any });
+
+  await wf.executeStep("chat", ctx);
+  assert.equal(appended.length, 1, "首次执行发射 1 条 text.delta");
+
+  // 恢复重放：recordToolEffectOnce 命中缓存跳过 execute，流式副作用不得重放
+  await wf.executeStep("chat", ctx);
+  assert.equal(appended.length, 1, "恢复重放不得重复发射流式事件");
 });
