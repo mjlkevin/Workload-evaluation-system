@@ -3,7 +3,7 @@
 > 状态：**已派发 KIMIK3（2026-08-10 用户批准，编制与派发一并批准）**
 > 类型：defect（P1 高频核心流）· 来源：用户实测截图 3 张（2026-08-10，两次反馈同题合并）
 > 交叉引用：ISS-2026-08-09-003（读取侧对账兜底，不同题）/ ISS-2026-08-10-003（提交后刷新时机，已合入 ee547a5，相关但独立）/ ISS-2026-08-10-001、002（角标链路，已验收关闭，**不得触碰**）
-> base：`c0bcd14`（main HEAD，派发时实填）
+> base：`8bcbd91`（main HEAD，派发时实填；含本工单文档，handoff 回填在分支内完成）
 
 ## 1. 业务症状
 
@@ -79,12 +79,12 @@
 - `npm run test:web` ≥287 全绿；
 - `npm run test:modules` ≥321 全绿；
 - `npm run build:web`、`npm run build:api` 零错误；
-- `git diff c0bcd14 -- apps/ package-lock.json` 输出路径全部落在 Allowed Paths；
+- `git diff 8bcbd91 -- apps/ package-lock.json` 输出路径全部落在 Allowed Paths；
 - 主检出零接触：执行全程在 worktree 内，不碰 main 工作区脏页。
 
 ## 7. 分支与提交
 
-- 分支：`qoder/iss-2026-08-10-004-runid-mismatch-async-streaming`，从 main HEAD `c0bcd14` 开 worktree；
+- 分支：`qoder/iss-2026-08-10-004-runid-mismatch-async-streaming`，从 main HEAD `8bcbd91` 开 worktree；
 - 提交规范：`type(scope): 中文描述`，聚焦「为什么」；
 - 合入须用户批准，一律 `--no-ff`；
 - 回填状态只允许「已回填 / 待 Codex 复核」，不得自行宣布「已交付」。
