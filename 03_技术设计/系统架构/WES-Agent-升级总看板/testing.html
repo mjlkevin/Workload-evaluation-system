@@ -149,7 +149,7 @@
           <td>开异步开关在 AI 工作台发一句问题 → 未完成时切走页签再返回；再发一句，等完成后切走再返回。</td>
           <td>未完成离页返回：问题气泡 + 进行中占位 + 角标「进行中 ≥1」可见；已完成返回：完整回复可见 + 角标「已完成 ≥1」。</td>
           <td><span class="status run"><span class="dot"></span>部分通过 / 缺陷剥离 ISS-2026-08-10-002</span></td>
-          <td>2026-08-10 验收实测（会话 87c73939）：占位恢复 + 顶栏角标通过；右下角全局角标恒 0，缺陷剥离为 ISS-2026-08-10-002（新工单待派发），完成后返回场景待 ISS-002 修复后复测。自动化已锁定：unified-view +3、session-isolation +1 + 角标已完成计数回归，test:web 280/280、test:modules 321/321；已合入主线（af1f250）。</td>
+          <td>2026-08-10 验收实测（会话 87c73939）：占位恢复 + 顶栏角标通过；右下角全局角标恒 0，缺陷剥离为 ISS-2026-08-10-002 并已修复合入（1c8b909）。待复测项：发问 2s 内右下角角标 ≥1 / 完成后收敛并弹「已完成」通知 / 切走再返回数字一致 / SessionRail 行级徽标同步。自动化已锁定：unified-view +3、session-isolation +1、角标已完成计数回归、background-runs +3（notifyRunsChanged 入口/节流/用户症状 2s 复现），test:web 283/283、test:modules 321/321；已合入主线（af1f250 + 1c8b909）。</td>
         </tr>
         <tr>
           <td class="mono">MT-1E-001</td>
@@ -700,6 +700,8 @@
         <tr><th>命令</th><th>最近结果</th><th>覆盖范围</th></tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:testing:1"><td class="mono">ISS-2026-08-10-001 修复分支前端回归</td><td><span class="status done"><span class="dot"></span>280/280 pass</span></td><td>2026-08-10：test:web 280/280（基线 278 + 新增 2：卸载快照恢复进行中占位 / 角标已完成计数）；RED 阶段 2 新用例先红后绿，主会话独立复现核实。</td></tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:testing:2"><td class="mono">ISS-2026-08-10-001 修复分支后端回归 + 双构建</td><td><span class="status done"><span class="dot"></span>321/321 pass · build×2 零错误</span></td><td>2026-08-10：test:modules 321/321（基线 318 + 新增 3：已完成 run 进统一视图 / 去重 / limit 边界，RED 3 例先红后绿）；build:api / build:web 零错误；diff 8 文件全在工单 Allowed Paths。</td></tr>
+        <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-002-merged:testing:1"><td class="mono">ISS-2026-08-10-002 修复分支前端回归</td><td><span class="status done"><span class="dot"></span>283/283 pass</span></td><td>2026-08-10：test:web 283/283（基线 280 + 新增 3：notifyRunsChanged 入口计数建 SSE / 节流 leading 不放大请求 / 提交后 2s 内角标 ≥1 用户症状复现）；RED 阶段 3 新用例先红后绿，主会话独立复现核实（base 版恰 3 failed）。</td></tr>
+        <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-002-merged:testing:2"><td class="mono">ISS-2026-08-10-002 修复分支后端复验 + 双构建</td><td><span class="status done"><span class="dot"></span>321/321 pass · build×2 零错误</span></td><td>2026-08-10：test:modules 321/321（后端零改动复验）；build:api / build:web 零错误；git diff 64b8398 -- apps/ package-lock.json 零输出；diff 4 文件全在工单 Allowed Paths。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-047-a2-mainline-integrated:testing:1"><td class="mono">RP-047-A2 主线 Testcontainers Harness</td><td><span class="status done"><span class="dot"></span>95/95 pass · 0 skip</span></td><td>基于当前主线组合完成历史迁移、原子创建、owner、lease、普通对象、事件/checkpoint/output 并发、outbox 和安全错误验证。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-047-a2-mainline-integrated:testing:2"><td class="mono">RP-047-A2 主线全量回归</td><td><span class="status done"><span class="dot"></span>227 + 190 + 1 + 206 pass</span></td><td>modules 227/227、AI 190/190、integration 1/1、Web 29 文件 206/206，均 0 fail。</td></tr>
         <tr data-board-event-id="BE-2026-08-03-rp-047-a2-mainline-integrated:testing:3"><td class="mono">RP-047-A2 主线 build / security / cleanliness</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>API/Web build、安全扫描、diff check、lockfile 与迁移 destructive SQL 扫描全部通过；Web 仅既有 chunk-size warning。</td></tr>

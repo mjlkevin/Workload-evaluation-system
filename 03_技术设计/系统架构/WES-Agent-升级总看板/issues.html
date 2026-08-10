@@ -517,9 +517,20 @@
               <td class="tc-3">user_acceptance_screenshot</td>
               <td class="tc-4">MT-ISS001-001 验收实测（会话 87c73939-a03e-4bda-87c7-6f148a639213）：顶栏「进行中 1 · 已完成 0」正确、占位恢复通过；右下角悬浮角标恒 0，切走返回不变。</td>
               <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/hooks/useBackgroundRuns.jsx（refresh 仅挂载/终态/取消/重试四时机，context 未暴露 refresh）</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/index.jsx（提交流程无刷新触发）</code> <code class="inline">apps/api f-group 测试（提交后 listActiveRuns 返回真实 run，后端端点可用）</code> <code class="inline">用户截图 3 张（顶栏 1 vs 右下角 0）</code> <code class="inline">交叉引用 ISS-2026-08-10-001 / ISS-2026-08-09-003</code></td>
-              <td class="tc-6"><span class="status run"><span class="dot"></span>已分析 / 待工单派发拍板</span></td>
-              <td class="tc-7">分诊结果 defect（P1）：右下角 Shell 全局角标数据源（BackgroundRunProvider）独立于顶栏统一视图，且缺「新 run 创建」刷新触发——provider 仅挂载/终态事件/取消/失败重试四时机刷新，用户提交创建 run 后无人通知，runs 停留挂载时空数组，角标恒 0 且不建 SSE 订阅、终态通知亦缺。ISS-001/003 修复均落在顶栏角标，用户原始症状对象（右下角）从未被修复。修复方向：context 暴露节流 refresh 供工作台提交后调用，或 store 派发全局事件由 provider 监听；遵循零 cancel 硬口径。</td>
+              <td class="tc-6"><span class="status done"><span class="dot"></span>已合入 / 待人工复测（MT-ISS001-001）</span></td>
+              <td class="tc-7">分诊结果 defect（P1）：右下角 Shell 全局角标数据源（BackgroundRunProvider）独立于顶栏统一视图，且缺「新 run 创建」刷新触发——provider 仅挂载/终态事件/取消/失败重试四时机刷新，用户提交创建 run 后无人通知，runs 停留挂载时空数组，角标恒 0 且不建 SSE 订阅、终态通知亦缺。修复（KIMIK3，分支 qoder/iss-2026-08-10-002-shell-badge-refresh，base 64b8398，提交 ce098cb + 91058a7）：context 暴露节流入口 notifyRunsChanged（1.5s leading+trailing、mounted 守卫），工作台提交成功与统一视图发现新 runId 时各调一次；RED 3 例先红后绿，web 283/modules 321/双构建零错误，主会话独立复审一次通过，2026-08-10 用户批准合入主线（1c8b909）。零 cancel 硬口径不变。</td>
               <td class="tc-8">根因（置信度高）：刷新时机缺口（非数据源缺口——后端 listActiveRuns 提交后即返回真实 run）。影响面：右下角角标 + 终态通知 + SessionRail 行级徽标（均依赖 provider runs）。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-003-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-10-003</td>
+              <td class="tc-1">2026-08-10</td>
+              <td class="tc-2">AI 工作台：提交后顶栏角标即时性与 O8 页面级流式呈现均依赖统一视图下一次重拉（同源不同面）</td>
+              <td class="tc-3">agent_observation_triaged</td>
+              <td class="tc-4">ISS-2026-08-10-002 修复回填中 KIMIK3 范围外观察两项（handoff 风险节），主会话复审裁定为同一根因的两个面，2026-08-10 用户拍板入需求池。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js（submitRun 成功后不主动 refreshUnifiedView）</code> <code class="inline">统一视图重拉时机仅挂载与 visibilitychange（页签切回）</code> <code class="inline">交叉引用 ISS-2026-08-10-002 / ISS-2026-08-09-003</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已入池 / 待排期（requirement P2）</span></td>
+              <td class="tc-7">分诊结果 requirement（P2 体验改进）：提交成功后统一视图不主动重拉——① 顶栏「进行中 1」的即时出现依赖重挂载/页签返回；② O8 页面级流式 activeRunId 取自统一视图 runs，逐字流式呈现可能延迟到下次重拉。ISS-2026-08-10-002 已保证右下角角标 2s 内计数，本项对齐顶栏侧即时性与流式发现。</td>
+              <td class="tc-8">与 ISS-2026-08-09-003（另一会话登记的 8-09 前端对账）不同题，无编号冲突。尚未编制工单；排期与优先级由用户后续拍板。修复方向候选：submitRun 成功后主动 refreshUnifiedView 一次（节流保护）。</td>
             </tr>
         </tbody>
         </table>
