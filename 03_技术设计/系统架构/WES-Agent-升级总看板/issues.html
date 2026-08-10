@@ -528,9 +528,9 @@
               <td class="tc-3">user_acceptance_screenshot</td>
               <td class="tc-4">用户 2026-08-10 实测（3 截图）：会话行已标「已完成未读」、右下角弹「已完成」，对话区仍为占位；切会话再切回后完整回复出现。顶栏「进行中 1」期间正常。追加实测：执行期间对话区全程无逐字流式、无思考过程可见，恒停留占位；会话行「执行中」与顶栏停止条正常。</td>
               <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js L222-224（activeRunId 取 ?.id，后端统一视图 runs 字段为 runId，恒空→页面级 SSE 订阅永不建立）</code> <code class="inline">ChatArea/index.jsx L71（停止按钮 cancelRun(activeRun.id) 同因传 undefined）</code> <code class="inline">src/__tests__/unified-view.test.jsx（mock 用 id 字段，与后端契约不符致假绿）</code> <code class="inline">交叉引用 ISS-2026-08-09-003 / ISS-2026-08-10-003</code></td>
-              <td class="tc-6"><span class="status run"><span class="dot"></span>已分析 / 待派发拍板（defect P1）</span></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>工单已编制 / 已派发 KIMIK3（defect P1）</span></td>
               <td class="tc-7">分诊结果 defect（P1 高频核心流），根因两层：① 字段名错配（前端 .id / 后端 runId）使页面级 SSE 订阅永不建立，占位替换/停止按钮失效；② 后端异步通道 worker 调 dispatch 未接 streamingAdapter（仅同步 SSE 路径接），run 事件流从无 text.delta/thought 事件——订阅建立也无逐字内容。provider 链路（右下角角标/通知/会话行徽标）不受影响；8-09-003 C2 读取侧对账成唯一兜底（故切会话才见回复）。不阻塞（有兜底）但异步通道每次发问必现。</td>
-              <td class="tc-8">修复方向两层：层 1 前端两处改兼容取 runId || id（useChatMessages L224 / ChatArea L71）+ unified-view.test.jsx mock 修后端契约形状堵假绿；层 2 后端异步 worker 将模型流式 chunks 以 additive 事件写入 run 事件流（前端 handleStreamEvent 的 TEXT_DELTA/THOUGHT 消费分支已就绪可复用），同步路径逐字不变。与 ISS-2026-08-10-003 相关但独立：003 保证视图及时刷新，004 保证刷新后字段取得到 + 事件流有内容。工单编制与派发待用户拍板。</td>
+              <td class="tc-8">修复方向两层：层 1 前端两处改兼容取 runId || id（useChatMessages L224 / ChatArea L71）+ unified-view.test.jsx mock 修后端契约形状堵假绿；层 2 后端异步 worker 将模型流式 chunks 以 additive 事件写入 run 事件流（前端 handleStreamEvent 的 TEXT_DELTA/THOUGHT 消费分支已就绪可复用），同步路径逐字不变。与 ISS-2026-08-10-003 相关但独立：003 保证视图及时刷新，004 保证刷新后字段取得到 + 事件流有内容。工单已编制并派发 KIMIK3（2026-08-10 用户批准）。</td>
             </tr>
             <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-003-intake:issues">
               <td class="mono tc-0">ISS-2026-08-10-003</td>
