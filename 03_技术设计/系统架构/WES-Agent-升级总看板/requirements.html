@@ -74,10 +74,10 @@
           <span><b>更新日期</b> 2026-08-10</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">45 项已登记需求</span>
+          <span class="pill brand">46 项已登记需求</span>
           <span class="pill ok">22 已交付（验收完成）</span>
           <span class="pill warn">12 已交付 · 待验收回填</span>
-          <span class="pill warn">9 待规划/待确认/待验收</span>
+          <span class="pill warn">10 待规划/待确认/待验收</span>
           <span class="pill">2 暂缓</span>
           <span class="pill ok">可编辑子页面已移除</span>
         </div>
@@ -95,7 +95,7 @@
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">T</span><span>总需求数</span></div>
-            <div class="v">45</div>
+            <div class="v">46</div>
             <div class="lb">已登记需求项（主台账口径）</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
@@ -113,8 +113,8 @@
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">W</span><span>待处理（含暂缓）</span></div>
-            <div class="v">11</div>
-            <div class="lb">9 项待规划/待确认/待验收 + 2 项暂缓待评审</div>
+            <div class="v">12</div>
+            <div class="lb">10 项待规划/待确认/待验收 + 2 项暂缓待评审</div>
             <div class="bar"><i style="width:25%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
           </div>
         </div>
@@ -475,7 +475,7 @@
               <button type="button" id="filter-reset" class="ledger-filter-reset-btn">重置</button>
             </div>
           </div>
-          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">45</b> / 45 条需求</div>
+          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">46</b> / 46 条需求</div>
         </div>
         <div class="table-scroll">
         <table id="tbl-requirements" data-board-table data-mode="sort" data-page-size="10" data-filter-col="4">
@@ -1020,6 +1020,17 @@
               <td><span class="status done"><span class="dot"></span>已交付·待验收（分支 60018c9）</span></td>
               <td>三卡片横排改为场景配置表：列=场景/生效模型/来源/关键参数摘要/凭据健康/最近验证/状态/操作；行内展开只读详情（全参数 + 草稿 vs 生效 diff + 最近审计）；编辑走 Dialog 且参数区按 supportedParams 动态渲染；API Key 区并入表格体系；死配置行置灰"规划中"</td>
               <td>验收口径：三场景一屏可对比；每行可见生效模型与来源（env 兜底黄色标示）；KEK 缺失/未配置表格内可见预警；编辑弹窗失败不清空输入；窄屏横向滚动首列固定；test:web 299 基线零回归 + build:web 通过。2026-08-11 P1 交付：表格七列 + 行内展开详情 + 凭据健康 inline 预警 + API Key 凭据托管行随 60018c9 提交（16 文件 +1077/-63）；test:modules 337/337、前端 304/305（唯一失败为用户 WIP 既有基线零触碰）含新增 ModelConfigTable 6/6、双构建零错误、UI 门禁零发现；真实密钥双场景连通 modelMatch=true（kimi-k3 / kimi-k2.6）。待用户浏览器人工验收表格形态后关闭。</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-054</td>
+              <td>AI 输出质量回归基线升级（LLM 裁判 + 三类产物样本 + 记忆/检索评测资产）</td>
+              <td>2026-08-11 用户拍板 SP-2026-006（O6 · DeepEval 借鉴 GT-001）转为内部消化、不经外部排期，与 SP-2026-007 MS5 评测资产合并派单；承接 RP-048 骨架（14 样本 + 6 类确定性断言）</td>
+              <td>AI Runtime / 质量基线</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>SP-2026-006 · 工单 2026-08-11-qoder-SP006-eval-baseline</td>
+              <td><span class="status run"><span class="dot"></span>已批准 / 已派单（待 Qoder ACK）</span></td>
+              <td>在 eval 骨架上扩 LLM 裁判语义评分通道（失败降级为仅结构断言 + judge_degraded 标记，不阻塞 CI）+ 三类产物（工作量评估/售前简报/需求解析报告）样本各 ≥5 组 + MS5 三十组记忆/检索样本与三指标（召回命中率/注入体积/引用正确率）共用同一 runner 与 JSON 报告格式；裁判选型为 Step 0 交付对比文档并先行落地推荐值</td>
+              <td>验收口径：骨架 14 样本与 6 类断言零回归；结构断言两次运行一致；降级路径有测试；零新增依赖（package.json 仅限 test:ai 挂线）；零前端改动。边界：Trace Schema 草案与前端报告面板留 SP-2026-007 MS5 收口。去重结果：命中 RP-048 骨架作为其升级批次，不重复建 runner；合并 MS5 评测资产消除与 SP-007 的重叠建设。</td>
             </tr>
             <tr>
               <td class="mono">RP-032</td>
@@ -3292,7 +3303,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 需求池 · 2026-08-10 · 45 条需求 · 22 项已交付（验收完成） · 12 项待验收回填 · 9 项待处理 · 2 项暂缓
+      WES 项目管理 · 需求池 · 2026-08-11 · 46 条需求 · 22 项已交付（验收完成） · 12 项待验收回填 · 10 项待处理 · 2 项暂缓
     </footer>
   </main>
   <script>

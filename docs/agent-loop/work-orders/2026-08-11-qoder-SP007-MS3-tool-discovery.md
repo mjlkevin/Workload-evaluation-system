@@ -39,7 +39,7 @@
 2. **禁止触碰另一会话在途 P1 批次文件**：`apps/api/src/modules/system/*`、`apps/api/src/routes/system.routes.ts`、`apps/api/src/services/ai/assessment.service.ts`、`apps/api/src/utils/file.ts`、`apps/api/package.json`、`ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx`、`ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js`、`ui/V2_PROTOTYPE/layout.css`、`ui/V2_PROTOTYPE/src/__tests__/mocks/handlers.js`、`config/system/*`；
 3. 「工具注入模式」系统管理前端入口**不在本批**（SystemManagement.jsx 在途冲突），本批只交付后端配置项 + 读取接口；前端入口拆后续小单；
 4. 禁止碰凭据域、流式通道（workbench-chat-stream/workflow）、看板页；
-5. 禁止引入新 npm 依赖（`package.json` 零变更）。
+5. 禁止引入新 npm 依赖（dependencies/devDependencies 零变更）；**新增测试文件必须挂入 `apps/api/package.json` 对应 test 脚本清单**——这是允许的唯一 package.json 改动（防「测试写了没挂线」第三次发生）；若与并行的 SP-006 评测工单（`qoder/sp006-eval-baseline`）在同行冲突，按 08-09 先例逐行比对双方新增、禁止整块选边。
 
 ## 3. Allowed Paths
 
@@ -63,12 +63,12 @@
 
 ## 5. 验证矩阵
 
-- `npm run test:modules`：≥328 不下降 + 新增用例全过
-- `npm run test:ai`：≥256 不下降；RP-025 类意图路由回归用例全过
-- `npm run test --prefix ui/V2_PROTOTYPE`：≥299 不下降 + 新增组件测试全过
+- `npm run test:modules`：新增用例全过，基线不下降（base 746fb5e 口径 328；合入时若目标分支基线已涨，以合入时实跑不下降为准）
+- `npm run test:ai`：基线不下降（base 口径 256）；RP-025 类意图路由回归用例全过
+- `npm run test --prefix ui/V2_PROTOTYPE`：基线不下降（base 口径 299）+ 新增组件测试全过
 - `npm run build:api`、`npm run build:web`：零错误
 - 前端渲染证据：trace chip / 提示条 / 引用记忆标记在 1440px 与 760px 两档浏览器证据（截图或脚本断言）
-- `git diff 746fb5e --stat`：全部落 §3 Allowed Paths；`apps/api/package.json` 零变更
+- `git diff 746fb5e --stat`：全部落 §3 Allowed Paths；`apps/api/package.json` 依赖零变更、diff 仅限 test 脚本挂线行
 
 ## 6. 分支 / Handoff / 验收
 
