@@ -528,9 +528,9 @@
               <td class="tc-3">agent_observation_triaged</td>
               <td class="tc-4">ISS-2026-08-10-002 修复回填中 KIMIK3 范围外观察两项（handoff 风险节），主会话复审裁定为同一根因的两个面，2026-08-10 用户拍板入需求池。</td>
               <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js（submitRun 成功后不主动 refreshUnifiedView）</code> <code class="inline">统一视图重拉时机仅挂载与 visibilitychange（页签切回）</code> <code class="inline">交叉引用 ISS-2026-08-10-002 / ISS-2026-08-09-003</code></td>
-              <td class="tc-6"><span class="status run"><span class="dot"></span>已入池 / 待排期（requirement P2）</span></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>工单已编制 / 待派发拍板（requirement P2）</span></td>
               <td class="tc-7">分诊结果 requirement（P2 体验改进）：提交成功后统一视图不主动重拉——① 顶栏「进行中 1」的即时出现依赖重挂载/页签返回；② O8 页面级流式 activeRunId 取自统一视图 runs，逐字流式呈现可能延迟到下次重拉。ISS-2026-08-10-002 已保证右下角角标 2s 内计数，本项对齐顶栏侧即时性与流式发现。</td>
-              <td class="tc-8">与 ISS-2026-08-09-003（另一会话登记的 8-09 前端对账）不同题，无编号冲突。尚未编制工单；排期与优先级由用户后续拍板。修复方向候选：submitRun 成功后主动 refreshUnifiedView 一次（节流保护）。</td>
+              <td class="tc-8">与 ISS-2026-08-09-003（另一会话登记的 8-09 前端对账）不同题，无编号冲突。工单已编制（docs/agent-loop/work-orders/2026-08-10-qoder-ISS-2026-08-10-003-unified-view-refresh-after-submit.md，base 78245d3）；派发与排期由用户拍板。修复方向：submitRun 成功后主动 refreshUnifiedView 一次（fire-and-forget，同步回退路径逐字不变）。</td>
             </tr>
         </tbody>
         </table>
