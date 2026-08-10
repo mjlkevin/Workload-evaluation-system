@@ -82,32 +82,81 @@ function buildChatPayload(sessionId, body, answerText) {
 /**
  * 安装双会话 MSW 场景：会话 A 的 chat 响应被延迟门控，
  * 会话 B 的 chat 响应即时返回。
+ *
+ * ISS-2026-08-09-003（离页返回旧缓存渲染）：mock 升级为有状态持久化——
+ * chat 请求到达即落库用户消息、响应放行时追加 assistant，GET /ai-sessions
+ * 始终反映后端最新状态，以支撑「会话切回触发重拉、后端 messages 为准对账」
+ * 的回归路径（真实后端在异步通道下本就会落库，见工单根因取证）。
  */
 function setupDualSessions() {
   const chatRequests = []
   let resolveAGate
   const aGate = new Promise((resolve) => { resolveAGate = resolve })
+  const histories = {
+    'session-a': [{ role: 'user', content: '你好 A' }, { role: 'assistant', content: 'A 的历史回复' }],
+    'session-b': [{ role: 'user', content: '你好 B' }, { role: 'assistant', content: 'B 的历史回复' }],
+  }
   server.use(
     http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({
       success: true,
       data: {
         items: [
-          buildSession('session-a', '会话 A', [{ role: 'user', content: '你好 A' }, { role: 'assistant', content: 'A 的历史回复' }]),
-          buildSession('session-b', '会话 B', [{ role: 'user', content: '你好 B' }, { role: 'assistant', content: 'B 的历史回复' }]),
+          buildSession('session-a', '会话 A', histories['session-a']),
+          buildSession('session-b', '会话 B', histories['session-b']),
         ],
       },
     })),
     http.post(`${BASE}/ai/home-workbench/chat`, async ({ request }) => {
       const body = await request.json()
       chatRequests.push(body.sessionId)
-      if (body.sessionId === 'session-a') {
-        await aGate
-        return HttpResponse.json(buildChatPayload('session-a', body, `模型回复：A-${body.messages.at(-1)?.content || ''}`))
-      }
-      return HttpResponse.json(buildChatPayload('session-b', body, `模型回复：B-${body.messages.at(-1)?.content || ''}`))
+      const sessionId = body.sessionId === 'session-a' ? 'session-a' : 'session-b'
+      histories[sessionId] = (body.messages || []).map((message) => ({ role: message.role, content: message.content }))
+      if (sessionId === 'session-a') await aGate
+      const answerText = `模型回复：${sessionId === 'session-a' ? 'A' : 'B'}-${body.messages.at(-1)?.content || ''}`
+      histories[sessionId] = [...histories[sessionId], { role: 'assistant', content: answerText }]
+      return HttpResponse.json(buildChatPayload(sessionId, body, answerText))
     }),
   )
-  return { chatRequests, resolveAGate }
+  return { chatRequests, resolveAGate, histories }
+}
+
+/**
+ * ISS-2026-08-09-003（离页返回旧缓存渲染）异步通道场景：
+ * Run 提交即在后端落库用户消息；completeRun 模拟离页期间后台完成、
+ * assistant 完整回复落库（工单根因取证：23:43:43 用户消息 / 23:44:00 回复均已落库）。
+ */
+function setupAsyncChannel() {
+  const histories = {
+    'session-a': [{ role: 'user', content: '你好 A' }, { role: 'assistant', content: 'A 的历史回复' }],
+    'session-b': [{ role: 'user', content: '你好 B' }, { role: 'assistant', content: 'B 的历史回复' }],
+  }
+  const runSubmissions = []
+  server.use(
+    http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({
+      success: true,
+      data: {
+        items: [
+          buildSession('session-a', '会话 A', histories['session-a']),
+          buildSession('session-b', '会话 B', histories['session-b']),
+        ],
+      },
+    })),
+    http.post(`${BASE}/ai-sessions/:sessionId/runs`, async ({ params, request }) => {
+      const body = await request.json()
+      runSubmissions.push(params.sessionId)
+      histories[params.sessionId] = [...(histories[params.sessionId] || []), { role: 'user', content: body.content }]
+      return HttpResponse.json({
+        success: true,
+        data: { runId: 'run-async-1', sessionId: params.sessionId, status: 'queued', eventCursor: 1 },
+      })
+    }),
+  )
+  return {
+    runSubmissions,
+    completeRun(sessionId, answerText) {
+      histories[sessionId] = [...histories[sessionId], { role: 'assistant', content: answerText }]
+    },
+  }
 }
 
 function renderWorkbench() {
@@ -272,5 +321,67 @@ describe('session-isolation: G1 会话隔离', () => {
     clickSessionCard('会话 B')
     await screen.findByText('B 的历史回复')
     await waitFor(() => expect(screen.queryByText('已完成未读')).not.toBeInTheDocument())
+  })
+
+  // ISS-2026-08-09-003（离页返回旧缓存渲染、AI 回复不显示）RED 回归 ①：
+  // 异步通道发送后切走，后台完成后切回会话——后端已落库的 assistant 回复必须渲染。
+  test('ISS-2026-08-09-003: 异步通道完成后切回会话，assistant 回复必须渲染', async () => {
+    const asyncChannel = setupAsyncChannel()
+    renderWorkbench()
+
+    await screen.findByText('A 的历史回复')
+    await sendFromComposer('利润中心是什么？')
+    await screen.findByText('正在理解你的问题')
+    expect(asyncChannel.runSubmissions).toContain('session-a')
+
+    // 切走：用户在后台执行期间离开会话（离页期间无 SSE 订阅，迟到结果进不了本地快照）
+    clickSessionCard('会话 B')
+    await screen.findByText('B 的历史回复')
+
+    // 离页期间后台完成：后端落库 assistant 完整切题回复（工单根因取证 23:44:00）
+    asyncChannel.completeRun('session-a', '利润中心是承载独立损益核算的最小经营单元。')
+
+    // 切回会话：必须以后端 messages 为准渲染迟到回复，并清除已过期的 loading 占位
+    clickSessionCard('会话 A')
+    expect(await screen.findByText('利润中心是承载独立损益核算的最小经营单元。')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('正在理解你的问题')).not.toBeInTheDocument())
+  })
+
+  // ISS-2026-08-09-003（离页返回旧缓存渲染、AI 回复不显示）RED 回归 ②：
+  // 会话切换时本地残留 loading 占位不得阻断目标会话消息刷新（历史同款 ISS 先例，记忆 3ad0df16）。
+  test('ISS-2026-08-09-003: 会话切换时本地残留 loading 占位不得阻断目标会话消息刷新', async () => {
+    // 目标会话 B：后端已有完整问答；本地 store 残留离页瞬间的「进行中」快照
+    const histories = {
+      'session-a': [{ role: 'user', content: '你好 A' }, { role: 'assistant', content: 'A 的历史回复' }],
+      'session-b': [
+        { role: 'user', content: '你好 B' },
+        { role: 'assistant', content: 'B 的历史回复' },
+        { role: 'user', content: '问题 B' },
+        { role: 'assistant', content: 'B 的最新回复' },
+      ],
+    }
+    server.use(
+      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({
+        success: true,
+        data: {
+          items: [
+            buildSession('session-a', '会话 A', histories['session-a']),
+            buildSession('session-b', '会话 B', histories['session-b']),
+          ],
+        },
+      })),
+    )
+    sessionRuntimeStore.setSessionMessages('session-b', [
+      { id: 'local-user-1', role: 'user', text: '问题 B' },
+      { id: 'local-loading-1', role: 'assistant', text: '正在理解你的问题', loading: true },
+    ])
+    renderWorkbench()
+
+    await screen.findByText('A 的历史回复')
+    clickSessionCard('会话 B')
+
+    // 后端已覆盖该轮问答：后端消息必须刷新渲染，残留 loading 占位不得阻断也不得残留
+    expect(await screen.findByText('B 的最新回复')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('正在理解你的问题')).not.toBeInTheDocument())
   })
 })

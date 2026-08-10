@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CompanyLookupDialog from '../../components/AiWorkbench/CompanyLookupDialog.jsx'
 import SessionRail from '../../components/AiWorkbench/SessionRail.jsx'
 import { useBackgroundRuns } from '../../hooks/useBackgroundRuns.jsx'
@@ -35,6 +35,30 @@ export default function AiHomeWorkbench({ currentUser }) {
   const [stopTargetRun, setStopTargetRun] = useState(null)
   const [stoppingRun, setStoppingRun] = useState(false)
   const [stopError, setStopError] = useState('')
+
+  // ISS-2026-08-09-003 C3（离页返回旧缓存渲染、AI 回复不显示）：「后台任务」角标
+  // 接入统一视图 runs 的活跃/已完成计数——O5 接口已一次取齐 runs，不再只看活跃数。
+  const runCounts = useMemo(() => {
+    const runs = workbench.unifiedView?.runs || []
+    return {
+      active: runs.filter((run) => ['queued', 'running', 'recovering', 'waiting'].includes(run.status)).length,
+      completed: runs.filter((run) => run.status === 'completed').length,
+    }
+  }, [workbench.unifiedView?.runs])
+
+  // ISS-2026-08-09-003 C3：离页期间完成的 run（由活跃转 completed，或从活跃列表消失）
+  // 在统一视图刷新后触发 C2 对账重拉——后端 messages 为准补回迟到回复。
+  const prevRunStatusesRef = useRef(new Map())
+  useEffect(() => {
+    const runs = workbench.unifiedView?.runs || []
+    const previous = prevRunStatusesRef.current
+    const next = new Map(runs.map((run) => [run.id, run.status]))
+    const wasActive = (status) => ['queued', 'running', 'recovering', 'waiting'].includes(status)
+    const completedInBackground = runs.some((run) => wasActive(previous.get(run.id)) && run.status === 'completed')
+      || [...previous.entries()].some(([id, status]) => wasActive(status) && !next.has(id))
+    prevRunStatusesRef.current = next
+    if (completedInBackground) workbench.loadSessions?.().catch(() => {})
+  }, [workbench.unifiedView?.runs])
 
   function requestStopRun(run) {
     if (!run) return
@@ -79,6 +103,15 @@ export default function AiHomeWorkbench({ currentUser }) {
     <div className={`ai-home-workbench${workbench.workspacePanelCollapsed ? ' ai-home-workbench--inspector-collapsed' : ''}`} data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
       <h1 className="sr-only">AI 工作台</h1>
       <aside className="ai-home-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
+        {(runCounts.active > 0 || runCounts.completed > 0) && (
+          <div
+            className="ai-home-runs-badge"
+            role="status"
+            style={{ display: 'flex', alignItems: 'center', minHeight: 34, padding: '6px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg-2)', fontSize: 12, color: 'var(--ink-2)' }}
+          >
+            {`后台任务 进行中 ${runCounts.active} · 已完成 ${runCounts.completed}`}
+          </div>
+        )}
         {activeRun && (
           <div className="ai-home-stop-bar" role="status">
             <span className="ai-home-stop-bar-text">后台任务执行中：{activeRun.title || activeRun.runId}</span>

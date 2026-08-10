@@ -28,6 +28,43 @@ const STREAM_EVENT_TYPES = {
 }
 
 /**
+ * ISS-2026-08-09-003 C2（离页返回旧缓存渲染、AI 回复不显示）：后端 messages 为准的对账合并。
+ * - 后端为空时保留本地视图（沿用旧守卫语义，避免空响应清屏）；
+ * - 仅保留本地尾部仍未完成的占位（loading / streaming / error / action）及其前方
+ *   尚未落库的用户消息；
+ * - 后端已应答该轮（用户消息在库且其后有 assistant 回复）时，过期的
+ *   loading / streaming 占位丢弃，error / action 反馈仍保留。
+ */
+function reconcileWithBackendMessages(backendMessages, localMessages) {
+  if (!localMessages?.length) return backendMessages
+  if (!backendMessages.length) return localMessages
+  const base = mergePreservedLocalFileMessages(localMessages, backendMessages)
+  const tail = []
+  for (let i = localMessages.length - 1; i >= 0; i -= 1) {
+    const message = localMessages[i]
+    if (message.loading || message.streaming || message.error || message.action) {
+      tail.unshift(message)
+      continue
+    }
+    break
+  }
+  if (!tail.length) return base
+  const anchor = localMessages[localMessages.length - 1 - tail.length]
+  const anchorIsPendingUser = anchor?.role === 'user'
+  const anchorOnBackend = !anchorIsPendingUser
+    || base.some((message) => message.role === 'user' && message.text === anchor.text)
+  const mergedTail = [...tail]
+  if (anchorIsPendingUser && !anchorOnBackend) mergedTail.unshift(anchor)
+  const lastBackendUserIndex = base.map((message) => message.role).lastIndexOf('user')
+  const backendAnswered = anchorOnBackend && lastBackendUserIndex >= 0
+    && base.slice(lastBackendUserIndex + 1).some((message) => message.role === 'assistant' && !message.loading)
+  const finalTail = backendAnswered
+    ? mergedTail.filter((message) => message.error || message.action)
+    : mergedTail
+  return finalTail.length ? [...base, ...finalTail] : base
+}
+
+/**
  * 消息列表与发送逻辑。Harness v1 显式报告流程由 useHarnessRun 提供，
  * 通过 bindHarness 注入；「文件是上下文，用户意图才触发工作流」闸门
  * （isExplicitReportRequest）保持不变。
@@ -107,13 +144,21 @@ export default function useChatMessages(workbench) {
     const currentSessionId = workbench.activeSession?.sessionId || ''
     const previousSessionId = prevSessionIdRef.current
     // G1：会话切换——先快照离开会话的当前视图（含进行中 loading/error）进 store，
-    // 再恢复目标会话视图（store 优先，保留迟到响应与进行中状态）。
+    // 再恢复目标会话视图。
     if (previousSessionId && previousSessionId !== currentSessionId) {
       sessionRuntimeStore.setSessionMessages(previousSessionId, messagesRef.current)
       prevSessionIdRef.current = currentSessionId
       const storedMessages = sessionRuntimeStore.getSessionMessages(currentSessionId)
       sessionRuntimeStore.markSessionUnread(currentSessionId, false)
-      setMessages(storedMessages || mapSessionMessages(workbench.activeSession))
+      // ISS-2026-08-09-003 C2（离页返回旧缓存渲染）：会话切换以后端 messages 为准
+      // 与 G1 快照对账合并——快照只捕获离页瞬间本地视图，不再整体短路后端最新数据；
+      // 仅保留本地仍未完成的进行中占位。
+      setMessages(reconcileWithBackendMessages(mapSessionMessages(workbench.activeSession), storedMessages))
+      // ISS-2026-08-09-003 C2：存在离页快照的会话切回才触发重拉——快照意味着
+      // 本地视图可能停在离页瞬间，需 C1 新对象经同会话路径完成后端对账；
+      // 无快照（新会话、刚经响应 upsert 的会话）直接以列表对象为准，避免
+      // 全量重拉把尚未进入列表快照的新会话顶掉。
+      if (storedMessages) workbenchRef.current?.loadSessions?.().catch(() => {})
       return
     }
     prevSessionIdRef.current = currentSessionId
@@ -121,12 +166,24 @@ export default function useChatMessages(workbench) {
     if (sending) return
     const sessionMessages = mapSessionMessages(workbench.activeSession)
     setMessages((prev) => {
-      if (prev.some((message) => message.loading || message.error || message.action)) return prev
-      if (sessionMessages.length === 0 && prev.length > 0) return prev
-      const mergedMessages = mergePreservedLocalFileMessages(prev, sessionMessages)
-      return sameMessageList(prev, mergedMessages) ? prev : mergedMessages
+      // ISS-2026-08-09-003 C2：L124 守卫细化——本地残留 loading 占位不再无条件
+      // 阻断后端最新数据；仅保留仍未完成的进行中尾部，其余以后端为准。
+      const reconciled = reconcileWithBackendMessages(sessionMessages, prev)
+      return sameMessageList(prev, reconciled) ? prev : reconciled
     })
   }, [workbench.activeSession, sending])
+
+  // ISS-2026-08-09-003 C2（离页返回旧缓存渲染）：页签切回触发会话数据重拉——
+  // 离页期间无 SSE 订阅的迟到结果，经 C1 新对象 + 对账合并补回渲染源。
+  useEffect(() => {
+    function handleVisibilityReturn() {
+      if (typeof document === 'undefined' || document.hidden) return
+      workbenchRef.current?.loadSessions?.().catch(() => {})
+      workbenchRef.current?.refreshUnifiedView?.().catch(() => {})
+    }
+    document.addEventListener('visibilitychange', handleVisibilityReturn)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityReturn)
+  }, [])
 
   // O8：获取当前会话关联的活跃 Run ID（用于 SSE 订阅）
   const activeRunId = workbench.unifiedView?.runs?.find(
