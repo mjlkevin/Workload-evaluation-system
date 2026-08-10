@@ -28,6 +28,14 @@ import {
   versionCodeRulesStorePath,
 } from "../../utils";
 import { applyVersionCodeFormat } from "../../utils/version-code-format";
+import {
+  KIMI_SCOPE,
+  getCachedApiKey,
+  setCachedApiKey,
+  setApiKey as dbSetApiKey,
+  clearApiKey as dbClearApiKey,
+  importApiKeyIfAbsent,
+} from "./credentials.store";
 
 const EMPTY_TIME = "--";
 const DEFAULT_KIMI_EVALUATION_MODEL = "kimi-k2.5";
@@ -287,6 +295,14 @@ function normalizeRequirementStore(input: unknown): RequirementSystemConfigStore
   };
 }
 
+/** 一次性导入标记：首次 loadRequirementSystemConfigStore 时检查文件密钥 → DB */
+let _kimiImportChecked = false;
+
+/** 重置一次性导入标记（测试用） */
+export function _resetKimiImportCheck(): void {
+  _kimiImportChecked = false;
+}
+
 export function loadRequirementSystemConfigStore(): RequirementSystemConfigStore {
   const filePath = requirementSystemConfigStorePath();
   if (!fs.existsSync(filePath)) {
@@ -306,6 +322,26 @@ export function loadRequirementSystemConfigStore(): RequirementSystemConfigStore
   try {
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
     const normalized = normalizeRequirementStore(parsed);
+
+    // 一次性导入：文件有 apiKey → 导入 DB + 立即清文件
+    if (!_kimiImportChecked) {
+      _kimiImportChecked = true;
+      const fileApiKey = (
+        normalized.active.kimiCredentials?.apiKey ||
+        normalized.draft.kimiCredentials?.apiKey ||
+        ""
+      ).trim();
+      if (fileApiKey) {
+        // 立即填充缓存，保证同步读取可用
+        setCachedApiKey(KIMI_SCOPE, fileApiKey);
+        // 幂等导入 DB（fire-and-forget，缓存已就绪）
+        importApiKeyIfAbsent(KIMI_SCOPE, fileApiKey, "system-import").catch(() => {});
+      }
+    }
+
+    // 文件 apiKey 永久写空串（真实密钥存 DB）
+    normalized.draft.kimiCredentials.apiKey = "";
+    normalized.active.kimiCredentials.apiKey = "";
     fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
     return normalized;
   } catch {
@@ -328,6 +364,18 @@ export function saveRequirementSystemConfigStore(store: RequirementSystemConfigS
   const filePath = requirementSystemConfigStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const normalized = normalizeRequirementStore(store);
+  // 兼容：store 中有非空 apiKey 时填充缓存（生产路径由 persistKimiApiKey 先行写入，此处为直接调用场景）
+  const effectiveKey = (
+    normalized.active.kimiCredentials?.apiKey ||
+    normalized.draft.kimiCredentials?.apiKey ||
+    ""
+  ).trim();
+  if (effectiveKey) {
+    setCachedApiKey(KIMI_SCOPE, effectiveKey);
+  }
+  // 文件 apiKey 永久写空串（真实密钥存 DB）
+  normalized.draft.kimiCredentials.apiKey = "";
+  normalized.active.kimiCredentials.apiKey = "";
   fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
 }
 
@@ -350,32 +398,40 @@ export function mergeKimiCredentialsPatch(
   return prev;
 }
 
-/** 需求侧 KIMI 实际调用：已生效配置中的密钥优先，否则环境变量 */
+/** 需求侧 KIMI 实际调用：DB 缓存优先，否则环境变量 */
 export function resolveActiveRequirementKimiApiKey(): {
   apiKey: string;
   source: "store" | "env" | "none";
 } {
-  const store = loadRequirementSystemConfigStore();
-  const fromStore = store.active.kimiCredentials?.apiKey?.trim() || "";
-  if (fromStore) return { apiKey: fromStore, source: "store" };
+  const fromCache = getCachedApiKey(KIMI_SCOPE);
+  if (fromCache) return { apiKey: fromCache, source: "store" };
   const env = config.kimi.apiKey.trim();
   if (env) return { apiKey: env, source: "env" };
   return { apiKey: "", source: "none" };
 }
 
-/** 测试连接：显式传入优先；否则草稿仓库密钥；再否则环境变量 */
+/** 测试连接：显式传入优先；DB 缓存密钥；再否则环境变量 */
 export function resolveDraftKimiApiKeyForTest(override?: string): {
   apiKey: string;
   source: "override" | "draft" | "env" | "none";
 } {
   const o = override?.trim() || "";
   if (o) return { apiKey: o, source: "override" };
-  const store = loadRequirementSystemConfigStore();
-  const draftKey = store.draft.kimiCredentials?.apiKey?.trim() || "";
-  if (draftKey) return { apiKey: draftKey, source: "draft" };
+  const fromCache = getCachedApiKey(KIMI_SCOPE);
+  if (fromCache) return { apiKey: fromCache, source: "draft" };
   const env = config.kimi.apiKey.trim();
   if (env) return { apiKey: env, source: "env" };
   return { apiKey: "", source: "none" };
+}
+
+/** 写入 KIMI API 密钥到 DB（加密 + 审计） */
+export async function persistKimiApiKey(plaintext: string, actor: string): Promise<void> {
+  await dbSetApiKey(KIMI_SCOPE, plaintext, actor);
+}
+
+/** 清除 KIMI API 密钥（DB + 审计） */
+export async function clearKimiApiKey(actor: string): Promise<void> {
+  await dbClearApiKey(KIMI_SCOPE, actor);
 }
 
 function normalizeStringList(input: unknown): string[] {

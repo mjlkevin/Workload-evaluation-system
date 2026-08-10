@@ -93,3 +93,72 @@
 3. `requirement-settings.json` 的 `kimiCredentials.apiKey` 恒为空串，非密钥配置不受影响；
 4. 新提交 `git grep` 无密钥明文；
 5. MT「待更换密钥后复测」项解锁并由用户复测通过（用户侧轮换 Moonshot 密钥为业务动作，系统侧不依赖）。
+
+---
+
+## Handoff Envelope — Qoder ISS-2026-08-05-001（凭据域 DB 化）
+
+> 代号：Qoder-ISS-2026-08-05-001-credentials-db-backed（主题：API 密钥从明文 JSON 迁移到 PostgreSQL 加密落库 + 变更审计）
+> 回填时间：2026-08-10 · base：`93da3ae` · 分支：`qoder/iss-2026-08-05-001-credentials-db-backed`
+
+### 状态
+
+**已回填 / 待 Codex 复核**
+
+### 目标
+
+修复 API 密钥重启后「丢失」缺陷：将密钥存储从 git 跟踪的明文 JSON 迁移到 PostgreSQL 加密落库（AES-256-GCM）+ 变更审计，文件 apiKey 永久写空串，读取优先级改为 DB 缓存 → env。
+
+### 变更文件对照 §4
+
+| 文件 | 类型 | Allowed Path | 说明 |
+|---|---|---|---|
+| `db/schema/credentials.ts` | 新增 | #1 | credentials + credential_audit schema |
+| `drizzle/0016_credentials.sql` | 新增 | #1 配套 | 迁移 SQL |
+| `drizzle/meta/_journal.json` | 修改 | #1 配套 | 迁移 journal 注册 |
+| `db/schema/index.ts` | 修改 | #1 配套 | barrel export |
+| `credentials.store.ts` | 新增 | #2 | encrypt/decrypt/get/set/rotate/clear/import + 审计 + 内存缓存 |
+| `system.repository.ts` | 修改 | #3 | 读取走缓存；文件 apiKey 永久写空；一次性导入；save 兼容缓存 |
+| `system.usecase.ts` | 修改 | #4 | async + 传 actor；toPublicKimiCredentials 读取源变更 |
+| `config/env.ts` | 修改 | #5 | 新增 credentialKek |
+| `.env.example` | 修改 | #6 | CREDENTIAL_KEK= 占位 + 生成说明 |
+| `credentials.store.test.ts` | 新增 | #7 | 9 测试（4 加密 + 5 DB skip） |
+| `system.repository.test.ts` | 修改 | #8 | +5 凭据域测试 |
+| `requirement-settings.json` | 修改 | #9 | draft/active apiKey 清空 |
+
+全落 Allowed Paths 及其直接配套（Drizzle 迁移 journal + barrel export）。主检出零接触。
+
+### RED 证据
+
+先写测试后实现，实跑确认失败：`Error: Cannot find module './credentials.store'`。三项 RED：重启留存（base 无 DB 表）、密文+审计（base 无表无审计）、导入幂等（base 无 importApiKeyIfAbsent）——全红 ✅
+
+### 验证矩阵输出
+
+| 验证项 | 结果 |
+|---|---|
+| test:modules | ✅ 328 tests, 0 fail（基线 321 + 7 新增） |
+| build:api | ✅ 零错误 |
+| build:web | ✅ 零错误（159 modules） |
+| 凭据域直跑 | ✅ 23 tests, 18 pass, 5 skip（无 DB）, 0 fail |
+| diff 93da3ae | ✅ 全落 Allowed Paths |
+| 安全 grep | ✅ 仅测试假密钥 + .env.example 空占位 |
+
+DB 测试 5 项因 worktree 无 TEST_DATABASE_URL 跳过，需 Codex 复核时在有 DB 环境下补验。
+
+### 风险与范围外观察
+
+1. usecase.ts 变更含 toPublicKimiCredentials 读取源变更（非仅 actor 传递），否则文件清空后 UI hint 退化为 none——属读取侧必需；
+2. saveRequirementSystemConfigStore 兼容缓存填充：store 有非空 apiKey 时先填缓存再清文件——兼容 workbench-dispatch.service.test.ts 直接设 store.apiKey 场景（不可修改该测试）；生产路径幂等；
+3. 一次性导入为 fire-and-forget：立即填缓存 + 异步导入 DB，导入失败时缓存已就绪 + env 兜底；
+4. DB 测试未实跑：需有 DB 环境补验。
+
+### 是否需看板同步
+
+是。issues 页（状态更新）、changes 页（变更记录）、testing 页（DB 测试补验）。
+
+### 下一步建议
+
+1. Codex 五核复审：落点 / 矩阵 / RED / 主检出零接触 / 口径偏差；
+2. DB 测试补验：USE_TESTCONTAINERS=true 环境下运行；
+3. 合入前：用户在 .env.local 生成真实 CREDENTIAL_KEK；
+4. 合入后：用户轮换 Moonshot 密钥 + MT 复测项解锁。
