@@ -71,13 +71,13 @@
           <span><b>管理范围</b> 升级需求 / 技术债 / 审计项 / 测试项 / 后续候选</span>
           <span><b>页面定位</b> 总看板唯一需求池页面，不是业务系统正式需求模块</span>
           <span><b>统计口径</b> 已交付 = 实施证据 + 验收证据齐备；「已交付 · 待验收回填」「待处理」单独计</span>
-          <span><b>更新日期</b> 2026-08-06</span>
+          <span><b>更新日期</b> 2026-08-10</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">44 项已登记需求</span>
+          <span class="pill brand">45 项已登记需求</span>
           <span class="pill ok">22 已交付（验收完成）</span>
-          <span class="pill warn">8 已交付 · 待验收回填</span>
-          <span class="pill warn">12 待规划/待确认/待验收</span>
+          <span class="pill warn">12 已交付 · 待验收回填</span>
+          <span class="pill warn">9 待规划/待确认/待验收</span>
           <span class="pill">2 暂缓</span>
           <span class="pill ok">可编辑子页面已移除</span>
         </div>
@@ -95,7 +95,7 @@
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">T</span><span>总需求数</span></div>
-            <div class="v">43</div>
+            <div class="v">45</div>
             <div class="lb">已登记需求项（主台账口径）</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
@@ -107,14 +107,14 @@
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">A</span><span>已交付 · 待验收回填</span></div>
-            <div class="v">8</div>
+            <div class="v">12</div>
             <div class="lb">代码已入主线，人工/运行态验收待回填</div>
             <div class="bar"><i style="width:20%;background:linear-gradient(90deg,var(--warn),var(--accent))"></i></div>
           </div>
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--accent-soft);color:var(--accent)">W</span><span>待处理（含暂缓）</span></div>
-            <div class="v">13</div>
-            <div class="lb">11 项待规划/待确认/待验收 + 2 项暂缓待评审</div>
+            <div class="v">11</div>
+            <div class="lb">9 项待规划/待确认/待验收 + 2 项暂缓待评审</div>
             <div class="bar"><i style="width:25%;background:linear-gradient(90deg,var(--accent),var(--brand))"></i></div>
           </div>
         </div>
@@ -475,7 +475,7 @@
               <button type="button" id="filter-reset" class="ledger-filter-reset-btn">重置</button>
             </div>
           </div>
-          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">44</b> / 44 条需求</div>
+          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">45</b> / 45 条需求</div>
         </div>
         <div class="table-scroll">
         <table id="tbl-requirements" data-board-table data-mode="sort" data-page-size="10" data-filter-col="4">
@@ -1004,11 +1004,11 @@
               <td>2026-08-09 用户批准 SP-2026-007 GT-009 借鉴优化方案；来源问题为 <code class="inline">ISS-2026-08-09-002</code>（方案措施 M2，去重未命中现有记录新建）</td>
               <td>AI Runtime / 记忆层</td>
               <td><span class="pill priority-p1">P1</span></td>
-              <td>SP-2026-007 · MS2（2026-09-01 → 09-19）</td>
-              <td><span class="status run"><span class="dot"></span>已批准 / 已排期 / 待启动</span></td>
+              <td>SP-2026-007 · MS2 已提前完成（合入 main：24d48b7 + 挂线修复 8d0b757）</td>
+              <td><span class="status run"><span class="dot"></span>后端已合入 / 待人工验收 · UI 可见性待 MS2-PATCH</span></td>
               <td>借鉴 GT-009 L0→L1→L2 蒸馏管线：会话对话异步蒸馏为原子事实与场景知识，落 Harness PG 域新增 memory_atoms/memory_scenes 两表 + modules/memory/ 模块；蒸馏产物 draft → 用户确认 → active，注入沿用 M1 护栏（8 条/6000 字符/3s）；依赖 M1 先行</td>
               <td>去重结果：未命中（RP-017/RP-047 覆盖会话内运行时恢复，跨会话记忆蒸馏属空白）；交叉引用 RP-031（M1 检索护栏）、RP-030（M5 蒸馏过程 Trace）；符合 DB 迁移触发器（审计/统计需求），落 Harness PG 域不新增第二套存储</td>
-              <td>验收口径：同项目二次 run 上下文重建 0 轮（记忆自动注入）；蒸馏产物在 UI 可见、可确认、可撤回；draft 未经确认不注入。排期：排在 RP-047 Batch E 收口后，MS2 实施前需先完成 M1（MS1）。</td>
+              <td>验收口径：同项目二次 run 上下文重建 0 轮（记忆自动注入）；蒸馏产物在 UI 可见、可确认、可撤回；draft 未经确认不注入。实施：MS1/MS2 均提前完成并合入 main（32e9e1d / 24d48b7）；UI 可见性条目由 MS2-PATCH 承接（待用户批准开工）。</td>
             </tr>
             <tr>
               <td class="mono">RP-053</td>
@@ -3292,7 +3292,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 需求池 · 2026-08-09 · 44 条需求 · 22 项已交付（验收完成） · 8 项待验收回填 · 12 项待处理 · 2 项暂缓
+      WES 项目管理 · 需求池 · 2026-08-10 · 45 条需求 · 22 项已交付（验收完成） · 12 项待验收回填 · 9 项待处理 · 2 项暂缓
     </footer>
   </main>
   <script>
