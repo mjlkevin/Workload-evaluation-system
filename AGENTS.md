@@ -18,7 +18,7 @@
 
 - **前端**：唯一 Web 主线为 `ui/V2_PROTOTYPE`（Vite + React，Phase B 组件库）；`ui/V0_SAAS` 已于 2026-08-06 清理删除。禁止恢复 `apps/web`（已删除的 Vue 3 工作台）。
 - **后端**：唯一服务入口 `apps/api`（Express + modules 模式）；新增接口挂 `apps/api/src/routes/*` 并在 `routes/index.ts` 聚合。
-- **持久化**：传统 WES 记录仍以文件存储 `config/*`（JSON）为主；修改 JSON 数据结构需提供迁移兼容或默认值补齐。Harness 域因审计、统计、权限追溯与模型回放需求明显增加，已触发 DB 迁移条件，作为首个 DB-backed 新业务域接入 PostgreSQL；除已声明的 Harness 域外，DB 迁移触发器未满足前不引入数据库作为其他模块主路径。
+- **持久化**：传统 WES 记录仍以文件存储 `config/*`（JSON）为主；修改 JSON 数据结构需提供迁移兼容或默认值补齐。Harness 域因审计、统计、权限追溯与模型回放需求明显增加，已触发 DB 迁移条件，作为首个 DB-backed 新业务域接入 PostgreSQL；凭据域（API 密钥等敏感凭据：git 跟踪明文文件存储已造成覆盖丢失与历史泄露事故，变更审计需求明确，2026-08-10 用户决策）作为第二个 DB-backed 域接入（加密落库 + 变更审计）；除已声明的 Harness 与凭据域外，DB 迁移触发器未满足前不引入数据库作为其他模块主路径。
 - **Repository 边界**：业务层不可直接依赖 JSON 文件结构（字段路径、文件名、读写细节）。
 
 ### DB 迁移触发器
