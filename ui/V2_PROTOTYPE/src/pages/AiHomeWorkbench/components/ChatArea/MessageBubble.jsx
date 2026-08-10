@@ -27,21 +27,10 @@ export default function MessageBubble({
     <article style={{ display: 'flex', gap: 10, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
       {!isUser && <div className="ai-avatar ai-avatar--bot" aria-hidden="true">AI</div>}
       <div className={`ai-bubble-wrap${isUser ? ' ai-bubble--user' : message.error ? ' ai-bubble--error' : ' ai-bubble--ai'}`} style={{ width: hasArtifacts ? 'min(100%, 1080px)' : undefined, maxWidth: hasArtifacts ? 'calc(100% - 44px)' : '76%', padding: 14, borderRadius: 12, position: 'relative' }}>
-        {message.loading ? (
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.7 }}>{message.text}</div>
-            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-3)', fontSize: 12 }}>
-              <LoadingDots />
-              <span>正在调用模型并组织回复</span>
-            </div>
-          </div>
-        ) : (
-          isUser || message.error
-            ? <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
-            : <RichAiMessage text={message.text} optionDisabled={sending} onOptionSelect={onOptionSelect} />
-        )}
+        {/* ISS-2026-08-10-005：思考块移到回答正文上方（对标业内：思考在上、回答在下）；
+            折叠态「已思考」（可点开），流式期间「思考中…」并实时展开。 */}
         {!isUser && !message.error && Array.isArray(message.thoughts) && message.thoughts.length > 0 && (
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginBottom: 10 }}>
             {message.thoughts.map((thought, idx) => (
               <div key={`thought-${idx}`} style={{ marginBottom: 6 }}>
                 <button
@@ -60,7 +49,7 @@ export default function MessageBubble({
                   }}
                 >
                   <span>{thought.collapsed ? '▶' : '▼'}</span>
-                  <span>思考过程 {idx + 1}</span>
+                  <span>{thought.collapsed ? '已思考' : (message.streaming ? '思考中…' : '思考过程')}</span>
                 </button>
                 {!thought.collapsed && (
                   <div style={{
@@ -79,6 +68,19 @@ export default function MessageBubble({
               </div>
             ))}
           </div>
+        )}
+        {message.loading ? (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.7 }}>{message.text}</div>
+            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-3)', fontSize: 12 }}>
+              <LoadingDots />
+              <span>正在调用模型并组织回复</span>
+            </div>
+          </div>
+        ) : (
+          isUser || message.error
+            ? <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
+            : <RichAiMessage text={message.text} optionDisabled={sending} onOptionSelect={onOptionSelect} />
         )}
         {!isUser && !message.error && message.knowledgeTool && (
           <ModelRunTrace knowledgeTool={message.knowledgeTool} />

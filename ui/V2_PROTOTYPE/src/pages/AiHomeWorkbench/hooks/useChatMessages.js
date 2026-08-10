@@ -247,7 +247,13 @@ export default function useChatMessages(workbench) {
           const streamingId = streamingMessageIdRef.current
           if (streamingId && prev.some((m) => m.id === streamingId && m.role === 'assistant')) {
             // 追加到现有流式消息
-            return prev.map((m) => (m.id === streamingId ? { ...m, text: m.text + delta, streaming: true } : m))
+            return prev.map((m) => {
+              if (m.id !== streamingId) return m
+              // ISS-2026-08-10-005：ref 可能已被 THOUGHT 空窗兜底提前建立——首个
+              // text.delta 到达时消息仍是 loading 占位，须替换占位文案而非追加。
+              if (m.loading) return { ...m, text: delta, loading: false, streaming: true }
+              return { ...m, text: m.text + delta, streaming: true }
+            })
           }
           // 创建新的流式消息（替换 loading）
           const loadingMsg = prev.find((m) => m.loading && m.role === 'assistant')
@@ -266,15 +272,27 @@ export default function useChatMessages(workbench) {
         const thoughtText = payload.text || payload.content || ''
         if (!thoughtText) return
         setMessages((prev) => {
-          const streamingId = streamingMessageIdRef.current
-          if (streamingId && prev.some((m) => m.id === streamingId)) {
-            return prev.map((m) => {
-              if (m.id !== streamingId) return m
-              const thoughts = Array.isArray(m.thoughts) ? m.thoughts : []
-              return { ...m, thoughts: [...thoughts, { text: thoughtText, collapsed: true }] }
-            })
+          // ISS-2026-08-10-005（思考块空窗丢弃）：思考流天然先于回答流到达，
+          // streamingMessageIdRef 仅在首个 text.delta 才建立——空窗期兜底挂到
+          // 当前 loading 占位消息（与 TEXT_DELTA 同款查找逻辑）并把 ref 指向它，
+          // 思考事件零丢失。
+          let targetId = streamingMessageIdRef.current
+          if (!targetId || !prev.some((m) => m.id === targetId)) {
+            const loadingMsg = prev.find((m) => m.loading && m.role === 'assistant')
+            if (!loadingMsg) return prev
+            targetId = loadingMsg.id
+            streamingMessageIdRef.current = targetId
           }
-          return prev
+          return prev.map((m) => {
+            if (m.id !== targetId) return m
+            const thoughts = Array.isArray(m.thoughts) ? m.thoughts : []
+            // ISS-2026-08-10-005：聚合为单一思考块（不再每条事件一个 block），
+            // 流式期间保持展开（实时可见），终态事件统一折叠。
+            const merged = thoughts.length
+              ? [{ ...thoughts[0], text: thoughts[0].text + thoughtText, collapsed: false }]
+              : [{ text: thoughtText, collapsed: false }]
+            return { ...m, thoughts: merged }
+          })
         })
         break
       }
@@ -287,7 +305,15 @@ export default function useChatMessages(workbench) {
         setMessages((prev) => {
           const streamingId = streamingMessageIdRef.current
           if (streamingId && prev.some((m) => m.id === streamingId)) {
-            return prev.map((m) => (m.id === streamingId ? { ...m, streaming: false } : m))
+            // ISS-2026-08-10-005：终态自动折叠——清理流式标记的同时把聚合
+            // 思考块置为 collapsed（折叠态「已思考」，用户可点开回看）。
+            return prev.map((m) => {
+              if (m.id !== streamingId) return m
+              const thoughts = Array.isArray(m.thoughts) && m.thoughts.length
+                ? m.thoughts.map((t, i) => (i === 0 ? { ...t, collapsed: true } : t))
+                : m.thoughts
+              return { ...m, streaming: false, ...(thoughts ? { thoughts } : {}) }
+            })
           }
           return prev
         })

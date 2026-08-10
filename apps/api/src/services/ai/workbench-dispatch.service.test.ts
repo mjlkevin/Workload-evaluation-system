@@ -1011,3 +1011,72 @@ test("C3（异步通道漏带用户问题）守护: 同步通道带会话历史�
     assert.equal(last.content, "本轮含附件上下文的完整问题");
   });
 });
+
+// ── ISS-2026-08-10-005（回答 Markdown 格式散乱）：系统提示词排版规范 ──────────────
+// 缺陷实证：落库原文为单行紧凑 pseudo-markdown（## 无空格、列表无换行），
+// 两个 handler 的系统提示词仅要求「简洁回答」、无排版规范。提示词是劝导、解析器是兜底。
+
+test("ISS-005: domain_qa 路径（model-answer）systemPrompt 含输出排版规范", async () => {
+  let answerPrompt = "";
+  await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "这个风险是什么意思", // 兜底 domain_qa
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    modelChat: async ({ systemPrompt }) => {
+      if (systemPrompt.includes("意图分类器")) {
+        return {
+          answer: JSON.stringify({ intent: "domain_qa", confidence: 0.4, reason: "不确定" }),
+          rawContent: "",
+        };
+      }
+      answerPrompt = systemPrompt;
+      return { answer: "这是业务风险解释", rawContent: "" };
+    },
+  });
+
+  assert.ok(answerPrompt, "domain_qa 回答模型应被调用");
+  assert.match(answerPrompt, /【输出排版规范】/);
+  assert.match(answerPrompt, /# 后必须有空格/);
+  assert.match(answerPrompt, /列表项各自独占一行/);
+});
+
+test("ISS-005: knowledge fallback 路径（knowledge-query.handler）systemPrompt 含输出排版规范", async () => {
+  let fallbackPrompt = "";
+  await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "智能会计平台是什么？",
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    modelChat: async ({ systemPrompt }) => {
+      fallbackPrompt = systemPrompt;
+      return {
+        answer: "⚠️ 知识库未检索到相关文档，以下为模型通用知识。智能会计平台是...",
+        rawContent: "⚠️ 知识库未检索到相关文档，以下为模型通用知识。智能会计平台是...",
+      };
+    },
+    knowledgeQuery: async (query) => createKnowledgeTrace({
+      available: false,
+      query,
+      answer: "智谱知识库配置不完整，当前无法读取知识库。",
+      confidence: "low",
+      retrievalTriggered: false,
+      fallbackReason: "missing_config",
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      contextRef: "knowledge:unconfigured:unavailable",
+      chunksCount: 0,
+      topScore: 0,
+    }),
+  });
+
+  assert.ok(fallbackPrompt, "knowledge fallback 回答模型应被调用");
+  assert.match(fallbackPrompt, /【输出排版规范】/);
+  assert.match(fallbackPrompt, /# 后必须有空格/);
+  assert.match(fallbackPrompt, /列表项各自独占一行/);
+});
