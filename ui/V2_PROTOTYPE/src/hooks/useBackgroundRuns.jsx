@@ -2,6 +2,7 @@
  * BackgroundRunProvider（RP-047 Batch D · Step 2，G2 后台继续）。
  * 常驻 Shell 层（仅登录态挂载）：
  * - 维护活跃 Run 摘要列表（listActiveRuns 刷新 + 失败指数退避 5s→60s）；
+ * - ISS-2026-08-10-002：context 暴露节流刷新入口 notifyRunsChanged（新 run 创建时由页面侧触发）；
  * - 每个活跃 Run 一条 provider 级 SSE 订阅；事件写 cursor、状态变更同步摘要；
  * - 终态事件触发一次性通知（notifiedRef 去重）并刷新列表；
  * - 卸载/离页只 abort 本地连接，绝不发起 cancel（G2/G4 硬口径）。
@@ -14,6 +15,9 @@ const BackgroundRunsContext = createContext(null)
 
 const RETRY_BASE_MS = 5000
 const RETRY_MAX_MS = 60000
+
+// ISS-2026-08-10-002：notifyRunsChanged 节流窗口（leading + 至多一次 trailing）
+const NOTIFY_THROTTLE_MS = 1500
 
 const TERMINAL_KIND = {
   run_completed: 'completed',
@@ -45,6 +49,8 @@ export function BackgroundRunProvider({ children }) {
   const notifiedRef = useRef(new Set())     // `${runId}:${eventType}` 一次性通知去重
   const retryDelayRef = useRef(RETRY_BASE_MS)
   const timersRef = useRef([])
+  const lastRunsNotifyRef = useRef(0)
+  const trailingNotifyPendingRef = useRef(false)
 
   const scheduleTimer = useCallback((fn, delay) => {
     if (!mountedRef.current) return
@@ -70,6 +76,30 @@ export function BackgroundRunProvider({ children }) {
       retryDelayRef.current = RETRY_BASE_MS
     }
   }, [scheduleTimer])
+
+  /**
+   * ISS-2026-08-10-002（右下角全局角标不计数）：新 run 创建通知入口（方案 A）。
+   * 工作台提交成功 / 统一视图发现新 runId 时调用一次；1.5s 节流（leading 立即刷新 +
+   * 窗口期内至多一次 trailing，调用不丢）+ mounted 守卫，复用现有 refresh（含失败退避）。
+   * 只触发列表刷新，绝不发起 cancel（G2/G4 硬口径不变）。
+   */
+  const notifyRunsChanged = useCallback(() => {
+    if (!mountedRef.current) return
+    const now = Date.now()
+    const elapsed = now - lastRunsNotifyRef.current
+    if (elapsed >= NOTIFY_THROTTLE_MS) {
+      lastRunsNotifyRef.current = now
+      refresh()
+      return
+    }
+    if (trailingNotifyPendingRef.current) return
+    trailingNotifyPendingRef.current = true
+    scheduleTimer(() => {
+      trailingNotifyPendingRef.current = false
+      lastRunsNotifyRef.current = Date.now()
+      refresh()
+    }, NOTIFY_THROTTLE_MS - elapsed)
+  }, [refresh, scheduleTimer])
 
   const handleEvent = useCallback((runId, event) => {
     if (event.sequence) sessionRuntimeStore.writeRunCursor(runId, event.sequence)
@@ -210,7 +240,8 @@ export function BackgroundRunProvider({ children }) {
     dismissNotification,
     cancelRun,
     addRunEventListener,
-  }), [runs, notifications, enabled, dismissNotification, cancelRun, addRunEventListener])
+    notifyRunsChanged,
+  }), [runs, notifications, enabled, dismissNotification, cancelRun, addRunEventListener, notifyRunsChanged])
 
   return (
     <BackgroundRunsContext.Provider value={value}>
@@ -222,7 +253,7 @@ export function BackgroundRunProvider({ children }) {
 export function useBackgroundRuns() {
   const context = useContext(BackgroundRunsContext)
   if (!context) {
-    return { runs: [], activeCount: 0, notifications: [], enabled: false, dismissNotification: () => {}, cancelRun: async () => {}, addRunEventListener: () => () => {} }
+    return { runs: [], activeCount: 0, notifications: [], enabled: false, dismissNotification: () => {}, cancelRun: async () => {}, addRunEventListener: () => () => {}, notifyRunsChanged: () => {} }
   }
   return context
 }

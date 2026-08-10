@@ -5,7 +5,7 @@
  * 2) Shell 层 provider 仍持有 Run 摘要与活跃数量；
  * 3) 完成事件触发一次性通知（aria-live polite）。
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -15,6 +15,9 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import Shell from '../components/Layout/Shell.jsx'
 import { useBackgroundRuns, useRunEventStream } from '../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
+import HomeWorkspace from '../pages/HomeWorkspace.jsx'
+import ToastContainer from '../components/ui/ToastContainer.jsx'
+import { ToastProvider } from '../hooks/useToast.jsx'
 import { server } from './mocks/server.js'
 
 const BASE = '/api/v1'
@@ -255,5 +258,138 @@ describe('background-runs: G2 后台继续', () => {
     pusher.pushFrame({ sequence: 8, eventType: 'run_completed', payload: {}, createdAt: '2026-08-07T00:00:08.000Z' })
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(liveRegion.querySelectorAll('.background-run-notification')).toHaveLength(1)
+  })
+
+  // ISS-2026-08-10-002（右下角全局「后台任务」角标不计数）：
+  // provider 缺「新 run 创建」刷新触发——context 需暴露节流刷新入口 notifyRunsChanged，
+  // 由工作台提交成功 / 统一视图发现新 runId 时调用；零 cancel 硬口径不变。
+  test('background-runs: 新 run 创建经 context 刷新入口计数变 1 并建立 SSE 消费终态（ISS-2026-08-10-002）', async () => {
+    const { cancelCalls, pusher } = setupBackgroundRuns({
+      listResponses: [[], [buildActiveRun()], []],
+      eventFrames: [],
+      keepOpen: true,
+    })
+    // 恢复序列会读 run-1 快照：补默认快照 handler，避免 MSW unhandled 噪音
+    server.use(
+      http.get(`${BASE}/ai-runs/run-1`, () => HttpResponse.json({
+        success: true,
+        data: { run: { ...buildActiveRun() } },
+      })),
+    )
+    let contextApi = null
+    function ContextProbe() {
+      contextApi = useBackgroundRuns()
+      return null
+    }
+    render(
+      <MemoryRouter initialEntries={['/other']}>
+        <Shell currentUser={TEST_USER}>
+          <Routes>
+            <Route path="/other" element={<><ContextProbe /><OtherPageProbe /></>} />
+          </Routes>
+        </Shell>
+      </MemoryRouter>,
+    )
+
+    // 挂载首拉返回空列表：角标为 0（用户症状起点）
+    expect(await screen.findByText('其他页面 · 活跃任务 0')).toBeInTheDocument()
+
+    // 后端随后出现新活跃 run（如工作台提交成功）：调用 context 暴露的节流刷新入口
+    expect(typeof contextApi.notifyRunsChanged).toBe('function')
+    await act(async () => { contextApi.notifyRunsChanged() })
+
+    // activeCount 变 1 → 订阅协调 effect 为新 run 建立 provider 级 SSE
+    expect(await screen.findByText('其他页面 · 活跃任务 1')).toBeInTheDocument()
+
+    // SSE 已建立的直接证据：终态帧被消费 → 一次性通知 + 列表收敛归零
+    pusher.pushFrame({ sequence: 3, eventType: 'run_completed', payload: {}, createdAt: '2026-08-07T00:00:03.000Z' })
+    const liveRegion = await screen.findByRole('region', { name: '后台任务通知' })
+    await waitFor(() => expect(liveRegion).toHaveTextContent(/后台任务 A.*已完成/))
+    await waitFor(() => expect(screen.getByText('其他页面 · 活跃任务 0')).toBeInTheDocument())
+    expect(cancelCalls).toHaveLength(0)
+  })
+
+  test('background-runs: 刷新入口节流——窗口期多次调用仅 leading 一次列表请求（ISS-2026-08-10-002）', async () => {
+    let listCalls = 0
+    server.use(
+      http.get(`${BASE}/ai-runs`, () => {
+        listCalls += 1
+        return HttpResponse.json({ success: true, data: { items: [] } })
+      }),
+    )
+    let contextApi = null
+    function ContextProbe() {
+      contextApi = useBackgroundRuns()
+      return null
+    }
+    render(
+      <MemoryRouter initialEntries={['/other']}>
+        <Shell currentUser={TEST_USER}>
+          <Routes>
+            <Route path="/other" element={<ContextProbe />} />
+          </Routes>
+        </Shell>
+      </MemoryRouter>,
+    )
+    // 挂载首拉恰好一次
+    await waitFor(() => expect(listCalls).toBe(1))
+
+    expect(typeof contextApi.notifyRunsChanged).toBe('function')
+    await act(async () => {
+      contextApi.notifyRunsChanged()
+      contextApi.notifyRunsChanged()
+      contextApi.notifyRunsChanged()
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    // 三连调用在节流窗口内：leading 恰好追加一次，不放大请求量
+    expect(listCalls).toBe(2)
+  })
+
+  test('background-runs: 工作台提交成功后右下角角标 2s 内计数为 1（ISS-2026-08-10-002 用户症状复现）', async () => {
+    let listCalls = 0
+    server.use(
+      http.get(`${BASE}/ai/home-workbench/view`, () => HttpResponse.json({
+        code: 0,
+        message: 'ok',
+        data: { sessions: [], runs: [], tasks: [], artifacts: [], failedRuns: [] },
+      })),
+      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: [] } })),
+      http.post(`${BASE}/ai-sessions/session-new/runs`, () => HttpResponse.json({
+        success: true,
+        data: { runId: 'run-1', status: 'queued', eventCursor: 0 },
+      })),
+      http.get(`${BASE}/ai-runs`, () => {
+        listCalls += 1
+        // 挂载首拉为空；提交成功触发刷新后返回真实活跃 run（后端无数据源缺口）
+        const items = listCalls >= 2 ? [buildActiveRun()] : []
+        return HttpResponse.json({ success: true, data: { items } })
+      }),
+      http.get(`${BASE}/ai-runs/run-1`, () => HttpResponse.json({
+        success: true,
+        data: { run: { ...buildActiveRun() } },
+      })),
+      http.get(`${BASE}/ai-runs/run-1/events`, () => sseResponse([])),
+    )
+    render(
+      <MemoryRouter initialEntries={['/ai']}>
+        <Shell currentUser={TEST_USER}>
+          <Routes>
+            <Route path="/ai" element={<ToastProvider><ToastContainer /><HomeWorkspace /></ToastProvider>} />
+            <Route path="/login" element={<div>登录页</div>} />
+          </Routes>
+        </Shell>
+      </MemoryRouter>,
+    )
+
+    // 发问前：右下角全局角标 0
+    expect(await screen.findByText('后台任务 0')).toBeInTheDocument()
+
+    // 用户发问：createSession → submitRun 成功创建 run（异步开关开）
+    fireEvent.change(screen.getByLabelText('AI 工作台输入'), { target: { value: '帮我评估这个项目' } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+
+    // 验收口径：发问后 2s 内右下角角标 ≥1（提交成功回调触发 provider 刷新）
+    expect(await screen.findByText('后台任务 1', {}, { timeout: 2000 })).toBeInTheDocument()
+    expect(listCalls).toBeGreaterThanOrEqual(2)
   })
 })

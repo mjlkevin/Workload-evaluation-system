@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CompanyLookupDialog from '../../components/AiWorkbench/CompanyLookupDialog.jsx'
 import SessionRail from '../../components/AiWorkbench/SessionRail.jsx'
 import { useBackgroundRuns } from '../../hooks/useBackgroundRuns.jsx'
@@ -78,6 +78,28 @@ export default function AiHomeWorkbench({ currentUser }) {
     }
   }, [workbench.unifiedView?.runs, workbench.activeSession?.sessionId])
 
+  // ISS-2026-08-10-002（右下角全局「后台任务」角标不计数）：Shell 层 provider 缺
+  // 「新 run 创建」刷新触发——提交成功后经 context 节流入口 notifyRunsChanged 通知一次，
+  // provider 刷新活跃列表并为新 run 建立 SSE，角标计数 / 终态通知 / SessionRail 徽标
+  // 链路随之恢复；只触发列表刷新，零 cancel 硬口径不变。
+  const sendMessageWithRunsNotify = useCallback(async (...args) => {
+    const result = await chat.sendMessage(...args)
+    backgroundRuns.notifyRunsChanged?.()
+    return result
+  }, [chat, backgroundRuns])
+
+  // ISS-2026-08-10-002：统一视图发现新 runId（挂载首拉 / 页签返回重拉 / 对账重拉）时
+  // 同步通知 provider——顶栏与右下角两个独立数据源对账，避免顶栏有计数、右下角恒 0。
+  const knownUnifiedRunIdsRef = useRef(new Set())
+  useEffect(() => {
+    const runs = workbench.unifiedView?.runs || []
+    const next = new Set(runs.map((run) => run.runId || run.id).filter(Boolean))
+    let discoveredNew = false
+    next.forEach((runId) => { if (!knownUnifiedRunIdsRef.current.has(runId)) discoveredNew = true })
+    knownUnifiedRunIdsRef.current = next
+    if (discoveredNew) backgroundRuns.notifyRunsChanged?.()
+  }, [workbench.unifiedView?.runs, backgroundRuns])
+
   function requestStopRun(run) {
     if (!run) return
     setStopError('')
@@ -153,7 +175,7 @@ export default function AiHomeWorkbench({ currentUser }) {
         />
       </aside>
 
-      <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={chat} harness={harness} />
+      <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={{ ...chat, sendMessage: sendMessageWithRunsNotify }} harness={harness} />
 
       <WorkspacePanel
         collapsed={workbench.workspacePanelCollapsed}
