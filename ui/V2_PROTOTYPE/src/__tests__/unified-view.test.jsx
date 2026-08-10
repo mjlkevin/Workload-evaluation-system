@@ -5,11 +5,12 @@
  * 2) 统一视图数据正确注入状态；
  * 3) 统一视图失败时静默降级，不阻塞既有会话列表加载。
  */
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test } from 'vitest'
 import ToastContainer from '../components/ui/ToastContainer.jsx'
+import { BackgroundRunProvider } from '../hooks/useBackgroundRuns.jsx'
 import { ToastProvider } from '../hooks/useToast.jsx'
 import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
 import HomeWorkspace from '../pages/HomeWorkspace.jsx'
@@ -190,5 +191,183 @@ describe('unified-view: O5 统一视图首屏接入', () => {
     expect(screen.getByText('利润中心是什么？')).toBeInTheDocument()
     // 触发一次对账重拉：mount 首次 + 重挂载对账各一次
     await waitFor(() => expect(calls.filter((call) => call === 'ai-sessions').length).toBeGreaterThanOrEqual(2))
+  })
+
+  // ISS-2026-08-10-003（发问后顶栏角标不即时 + O8 逐字流式延迟）：
+  // submitRun 成功（异步通道）后须立即触发一次统一视图刷新——顶栏角标数据源
+  // （unifiedView.runs）即时更新、activeRunId 经渲染重算成立（O8 页面级流式发现前提）；
+  // 503 同步回退 / flag 关闭路径零刷新、行为逐字不变。仅追加用例，不改既有断言。
+  const SUBMIT_RUN_ID = 'run-new-1'
+
+  function buildSubmittedRun() {
+    return { id: SUBMIT_RUN_ID, sessionId: 'session-new', status: 'running', latestEventKind: 'run_status_changed' }
+  }
+
+  function buildViewWithRuns(runs) {
+    return { sessions: [], runs, tasks: [], artifacts: [], failedRuns: [] }
+  }
+
+  /**
+   * 「提交成功后统一视图返回新 run」场景：挂载首拉 runs 为空，
+   * 第二次起返回绑定新会话的活跃 run；submitRun 成功（异步通道开）。
+   */
+  function setupSubmitRefreshView() {
+    const viewCalls = []
+    server.use(
+      http.get(`${BASE}/ai/home-workbench/view`, () => {
+        viewCalls.push('unified-view')
+        return HttpResponse.json({
+          code: 0,
+          message: 'ok',
+          data: buildViewWithRuns(viewCalls.length >= 2 ? [buildSubmittedRun()] : []),
+        })
+      }),
+      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: [] } })),
+      http.post(`${BASE}/ai-sessions/session-new/runs`, () => HttpResponse.json({
+        success: true,
+        data: { runId: SUBMIT_RUN_ID, status: 'queued', eventCursor: 0 },
+      })),
+    )
+    return { viewCalls }
+  }
+
+  function submitQuestion(text) {
+    fireEvent.change(screen.getByLabelText('AI 工作台输入'), { target: { value: text } })
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }))
+  }
+
+  test('unified-view: 发问 submitRun 成功后立即追加一次统一视图刷新请求（ISS-2026-08-10-003）', async () => {
+    const { viewCalls } = setupSubmitRefreshView()
+    renderWorkbench()
+
+    // 挂载首拉恰好一次（空 runs）；计数全 0 时角标按既有契约不渲染
+    await waitFor(() => expect(viewCalls).toHaveLength(1))
+    expect(screen.queryByText(/后台任务 进行中/)).not.toBeInTheDocument()
+
+    submitQuestion('帮我评估这个项目')
+
+    // 验收口径：发问后 2s 内统一视图再次拉取（顶栏角标与 activeRunId 数据源即时更新）
+    await waitFor(() => expect(viewCalls.length).toBeGreaterThanOrEqual(2), { timeout: 2000 })
+  })
+
+  test('unified-view: 发问后顶栏「后台任务 进行中」角标 2s 内由无到 1（ISS-2026-08-10-003 用户症状复现）', async () => {
+    const { viewCalls } = setupSubmitRefreshView()
+    renderWorkbench()
+
+    // 发问前：统一视图 runs 为空，角标不渲染（用户症状起点）
+    await waitFor(() => expect(viewCalls).toHaveLength(1))
+    expect(screen.queryByText(/后台任务 进行中/)).not.toBeInTheDocument()
+
+    submitQuestion('帮我评估这个项目')
+
+    expect(await screen.findByText('后台任务 进行中 1 · 已完成 0', {}, { timeout: 2000 })).toBeInTheDocument()
+  })
+
+  test('unified-view: 发问后统一视图刷新发现新 run，O8 页面级流式订阅建立并逐字呈现（ISS-2026-08-10-003）', async () => {
+    const { viewCalls } = setupSubmitRefreshView()
+    const providerRun = {
+      runId: SUBMIT_RUN_ID,
+      sessionId: 'session-new',
+      title: '后台任务 X',
+      status: 'running',
+      eventCursor: 0,
+      createdAt: '2026-08-10T00:00:00.000Z',
+      updatedAt: '2026-08-10T00:00:01.000Z',
+    }
+    let listCalls = 0
+    let sseCalls = 0
+    const encoder = new TextEncoder()
+    const pusher = { pushFrame: () => {} }
+    server.use(
+      http.get(`${BASE}/ai-runs`, () => {
+        listCalls += 1
+        // provider 挂载首拉为空；提交成功经 ISS-002 通知刷新后返回真实活跃 run
+        const items = listCalls >= 2 ? [{ ...providerRun }] : []
+        return HttpResponse.json({ success: true, data: { items } })
+      }),
+      http.get(`${BASE}/ai-runs/${SUBMIT_RUN_ID}`, () => HttpResponse.json({
+        success: true,
+        data: { run: { ...providerRun } },
+      })),
+      http.get(`${BASE}/ai-runs/${SUBMIT_RUN_ID}/events`, () => {
+        sseCalls += 1
+        let ctrl = null
+        const stream = new ReadableStream({
+          start(controller) {
+            ctrl = controller
+            controller.enqueue(encoder.encode(': heartbeat\n\n'))
+          },
+        })
+        pusher.pushFrame = (frame) => {
+          if (ctrl) {
+            ctrl.enqueue(encoder.encode(
+              `id: ${frame.sequence}\nevent: ${frame.eventType}\ndata: ${JSON.stringify(frame)}\n\n`,
+            ))
+          }
+        }
+        return new HttpResponse(stream, {
+          headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
+        })
+      }),
+    )
+    render(
+      <ToastProvider>
+        <ToastContainer />
+        <MemoryRouter>
+          <BackgroundRunProvider>
+            <HomeWorkspace />
+          </BackgroundRunProvider>
+        </MemoryRouter>
+      </ToastProvider>,
+    )
+
+    // 挂载首拉完成（空 runs），角标按既有契约不渲染
+    await waitFor(() => expect(viewCalls).toHaveLength(1))
+    expect(screen.queryByText(/后台任务 进行中/)).not.toBeInTheDocument()
+
+    submitQuestion('流式发现验证')
+
+    // 统一视图刷新完成（activeRunId 重算成立）+ provider 为新 run 建立 SSE，两链路就绪后再推帧
+    await waitFor(() => expect(viewCalls.length).toBeGreaterThanOrEqual(2), { timeout: 2000 })
+    await waitFor(() => expect(sseCalls).toBeGreaterThanOrEqual(1), { timeout: 2000 })
+
+    // 页面级监听器经 activeRunId 注册后，text.delta 逐字呈现（替换 loading 占位）
+    pusher.pushFrame({ sequence: 1, eventType: 'text.delta', payload: { delta: '流式字' }, createdAt: '2026-08-10T00:00:02.000Z' })
+    expect(await screen.findByText('流式字')).toBeInTheDocument()
+  })
+
+  test('unified-view: 503 同步回退路径零影响——不追加统一视图刷新、同步应答照常（ISS-2026-08-10-003）', async () => {
+    const viewCalls = []
+    let chatCalls = 0
+    server.use(
+      http.get(`${BASE}/ai/home-workbench/view`, () => {
+        viewCalls.push('unified-view')
+        return HttpResponse.json({ code: 0, message: 'ok', data: buildViewWithRuns([]) })
+      }),
+      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({ success: true, data: { items: [] } })),
+      http.post(`${BASE}/ai-sessions/session-new/runs`, () => HttpResponse.json(
+        { success: false, code: 'ASYNC_RUNS_DISABLED', message: 'async runs disabled' },
+        { status: 503 },
+      )),
+      http.post(`${BASE}/ai/home-workbench/chat`, async () => {
+        chatCalls += 1
+        return HttpResponse.json({
+          success: true,
+          data: { answer: '模型回复：同步回退验证' },
+        })
+      }),
+    )
+    renderWorkbench()
+
+    await waitFor(() => expect(viewCalls).toHaveLength(1))
+
+    submitQuestion('同步回退验证')
+
+    // 同步路径照常应答（行为逐字不变的直接证据）
+    expect(await screen.findByText('模型回复：同步回退验证')).toBeInTheDocument()
+    expect(chatCalls).toBe(1)
+    // 同步回退不得触发额外统一视图刷新：应答完成后窗口内仍只有挂载首拉一次
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(viewCalls).toHaveLength(1)
   })
 })
