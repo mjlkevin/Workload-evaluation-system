@@ -58,6 +58,20 @@ function isMarkdownTableSeparator(line, expectedCells) {
   return cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s/g, '')))
 }
 
+/**
+ * ISS-2026-08-10-005（回答 Markdown 格式散乱）：模型紧凑输出容错预处理。
+ * 提示词是劝导、解析器是兜底——代码块外的行内 pseudo-markdown 切分为虚拟行：
+ * 1) 行内 #{2,6} 后紧跟数字/中文/英文且不在行首 → 切分为新 heading 行；
+ * 2) 行内 -** 紧凑列表标记（紧邻前文）→ 切分为独立列表项行。
+ * 普通连字符（设计-打样-采购、提前6-12个月、Color-SizeMatrix）不匹配，不误伤。
+ */
+function expandCompactSegments(line) {
+  return line
+    .replace(/(?<!^)(?<!#)(#{2,6})(?=[\p{Script=Han}\w])/gu, '\n$1')
+    .replace(/(?<=\S)-(?=\*\*)/g, '\n-')
+    .split('\n')
+}
+
 export function parseMarkdownBlocks(text) {
   const blocks = []
   const paragraphLines = []
@@ -88,7 +102,22 @@ export function parseMarkdownBlocks(text) {
     currentOptions = null
   }
 
-  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  const rawLines = text.replace(/\r\n/g, '\n').split('\n')
+  // ISS-2026-08-10-005：围栏感知的紧凑输出预展开——代码块内的行（含 ``` 行）原样保留
+  const lines = []
+  let fenceOpen = false
+  for (const rawLine of rawLines) {
+    if (/^```/.test(rawLine)) {
+      fenceOpen = !fenceOpen
+      lines.push(rawLine)
+      continue
+    }
+    if (fenceOpen) {
+      lines.push(rawLine)
+      continue
+    }
+    lines.push(...expandCompactSegments(rawLine))
+  }
   for (let index = 0; index < lines.length; index += 1) {
     const rawLine = lines[index]
     /* Fenced code block toggle */
@@ -148,8 +177,8 @@ export function parseMarkdownBlocks(text) {
       continue
     }
 
-    /* Headings: # ... ###### */
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
+    /* Headings: # ... ######（ISS-2026-08-10-005 容错：# 后无空格也解析，如 ##1.商品） */
+    const headingMatch = line.match(/^(#{1,6})\s*(.+)$/)
     if (headingMatch) {
       flushParagraph()
       flushList()
@@ -159,7 +188,9 @@ export function parseMarkdownBlocks(text) {
     }
 
     const orderedMatch = line.match(/^\d+\.\s+(.+)$/)
-    const unorderedMatch = line.match(/^[-*]\s+(.+)$/)
+    // ISS-2026-08-10-005 容错：-** 紧邻标记（无空格）也解析为列表项；
+    // 纯标记行（---、*** 分隔线）排除在外，不误伤。
+    const unorderedMatch = /^[-*\s]+$/.test(line) ? null : line.match(/^[-*]\s*(.+)$/)
     const listType = orderedMatch ? 'orderedList' : unorderedMatch ? 'unorderedList' : null
 
     if (listType) {
