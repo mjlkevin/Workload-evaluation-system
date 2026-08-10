@@ -1,6 +1,6 @@
 # 工单 · ISS-2026-08-10-003：提交成功后统一视图即时刷新（顶栏角标即时性 + O8 流式发现）
 
-> 状态：**已编制 / 待用户拍板派发**
+> 状态：**已派发 KIMIK3（2026-08-10 用户批准）**
 > 类型：requirement（P2 体验改进）· 来源：ISS-2026-08-10-002 修复回填的两项范围外观察，主会话裁定同源合并，2026-08-10 用户拍板入池并编制本工单
 > 交叉引用：ISS-2026-08-10-002（右下角角标，已验收关闭）/ ISS-2026-08-10-001（已验收关闭）/ ISS-2026-08-09-003（另一会话 8-09 前端对账，不同题）
 
@@ -53,7 +53,7 @@ workbenchRef.current?.refreshUnifiedView?.().catch(() => {})
 
 - 执行前必读 `QODER.md` 与 `skills/wes-qoder-worktree-protocol/SKILL.md`，完成 Worktree Contract ACK；
 - 分支：`qoder/iss-2026-08-10-003-unified-view-refresh-after-submit`；
-- base：main `78245d3`（编制时 HEAD；派发时若 main 已前进，以派发时 main HEAD 为准并回填实值）；
+- base：main `e727bc5`（派发时实填；与编制时 78245d3 代码面零差异，期间两提交均为 docs）；
 - worktree 由执行方按协议新建，初始化执行根目录与 `ui/V2_PROTOTYPE` 两次 `npm install`；
 - 主检出存在用户未提交工作（看板页、UserManagement 等），**全程零接触**。
 
