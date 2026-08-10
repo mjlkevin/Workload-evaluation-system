@@ -407,9 +407,9 @@
               <td class="tc-3">user_feedback</td>
               <td class="tc-4">用户询问“模型配置的 API 密钥当前还是存本地 JSON？服务一重启就没了？”，并附 AI 工作台截图显示“AI 服务未配置 API 密钥，请联系管理员在系统管理中配置”。只读诊断确认：密钥设计存储于本地 JSON（<code class="inline">config/system/requirement-settings.json</code>，draft/active 两层，每次请求读文件、无内存缓存），纯重启本身不会清键；但该文件被 git 跟踪且历史提交曾含真实密钥，git checkout/reset/merge 可把界面录入的密钥覆盖回仓库空版本；环境变量兜底 KIMI_API_KEY 仅根目录 <code class="inline">.env.local</code> 有，而 dev:api 以 apps/api 为 cwd 启动时不加载；草稿未点击“生效”也不会进入业务调用。当前磁盘文件两层 apiKey 均为空。</td>
               <td class="tc-5"><code class="inline">config/system/requirement-settings.json</code> <code class="inline">apps/api/src/config/env.ts</code> <code class="inline">apps/api/src/modules/system/system.repository.ts</code> <code class="inline">.gitignore</code> <code class="inline">RP-036（范围不同，仅交叉引用）</code></td>
-              <td class="tc-6"><span class="status block"><span class="dot"></span>已分诊 / 阻断 AI 主流程 / 待修复决策</span></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已决策 / 工单编制并派发（defect P1 阻断级）</span></td>
               <td class="tc-7">转缺陷 · DEF-2026-08-05-001</td>
-              <td class="tc-8">去重结果：未命中同类 issue（RP-036 仅覆盖权限反馈与连通性判定）。密钥曾入 git 历史，须轮换；修复方案与是否立即实施待用户决策。2026-08-05 用户追加方向性问题：密钥长期是否入库（PostgreSQL）；候选方向为“凭据域 DB-backed（加密落库+变更审计）”或“文件加固（gitignore+加密）”，待决策。</td>
+              <td class="tc-8">去重结果：未命中同类 issue（RP-036 仅覆盖权限反馈与连通性判定）。密钥曾入 git 历史，须轮换；修复方案与是否立即实施待用户决策。2026-08-05 用户追加方向性问题：密钥长期是否入库（PostgreSQL）；候选方向为“凭据域 DB-backed（加密落库+变更审计）”或“文件加固（gitignore+加密）”，待决策。2026-08-10 用户拍板 B 方向凭据域 DB 化（否决 A 文件加固）；工单编制并派发 KIMIK3（base 8425210，分支 qoder/iss-2026-08-05-001-credentials-db-backed）；AGENTS.md §2 与项目进展总结 §九 同步声明凭据域为第二个 DB-backed 域；合入后解锁 MT「待更换密钥后复测」项。</td>
             </tr>
             <tr>
               <td class="mono tc-0">ISS-2026-08-05-002</td>
