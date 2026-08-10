@@ -532,6 +532,12 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
       </div>
       <table>
         <tr><th>候选任务</th><th>目标</th><th>启动条件</th><th>第一验收口径</th></tr>
+        <tr data-board-event-id="BE-2026-08-10-model-config-contract-closure:plan">
+          <td>模型配置契约闭环（三层契约：模型目录 × 场景绑定 × 生效状态）</td>
+          <td>消除"界面旋钮不生效"：评估链路改读配置模型、生效状态条、验证此场景、死配置下架；P2 建模型目录与参数动态渲染；**前端形态用户已拍板（ISS-2026-08-10-007 / RP-053）：卡片改表格 + 行数据详情**；详见 <a href="../../../docs/superpowers/plans/2026-08-10-model-config-contract-closure-plan.md">优化计划</a>。</td>
+          <td><span class="status run"><span class="dot"></span>P1~P3 全部解锁 / 待用户批准开工</span>：凭据工单 ISS-2026-08-05-001 已合入 main（85b8248），双线修改风险解除；计划已于 2026-08-10 晚按合入后代码重锚（基线 e84c727、modules 328）；T4 真实连通验证待用户录入新 Moonshot 密钥后补。</td>
+          <td>配置模型与实际调用模型一致（meta.model 可验证）；env 兜底时卡片有可见提示；UI 不再出现无消费方字段；maxFileSizeMb 与 multer 实际上限一致；test:modules / build:web 全绿。</td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-05-o2-handoff-verified:plan">
           <td>综合优化计划 W1 执行（O1 前端拆分 / O2 Agent 工具扩展）</td>
           <td>按已批准的 <a href="archive-md/integrated-optimization-plan-2026-08-04.md">integrated-optimization-plan-2026-08-04.md</a> 执行 P0 两项：AiHomeWorkbench 2602 行拆分与 Agent 工具 1→8。</td>

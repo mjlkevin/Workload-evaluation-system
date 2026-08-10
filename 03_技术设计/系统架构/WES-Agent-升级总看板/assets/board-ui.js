@@ -277,6 +277,61 @@
     }
   }
 
+  /* ── 7. 表格列宽自适应（2026-08-10）──
+     全局 table-layout:auto 已按内容分配列宽，但 Chromium 会把「内容很短」的列
+     压到 min-content（word-break:break-word 下为 1 个字符），导致 "O10"、
+     "50–65h"、短日期等被断行；而手写 nowrap/width:1% 提示在长文本列上又会
+     顶破容器或扭曲分配。因此这里按内容实测：临时强制单行读取每列最大宽度，
+     ≤ MAX_FIT_PX 的短列加 .col-fit（收缩单行），长列保持弹性换行。
+     - 有 colgroup 的表视为作者已声明列宽意图，跳过；
+     - 含 colspan/rowspan 的表列索引不可靠，跳过；
+     - 折叠块（details.tech-detail）内表格不可见时测得 0，展开时重测。 */
+  var COL_FIT_MAX_PX = 180;    // 约 15 个汉字：编号/日期/估时/短状态标签
+  var COL_FIT_SAMPLE_ROWS = 40; // 大表抽样行数上限
+
+  function measureColumnFit(table) {
+    if (table.querySelector('colgroup')) return;
+    if (table.querySelector('[colspan], [rowspan]')) return;
+    var allRows = Array.prototype.slice.call(table.rows);
+    if (!allRows.length) return;
+    var rows = allRows.slice(0, COL_FIT_SAMPLE_ROWS);
+    var colCount = 0;
+    rows.forEach(function (r) { colCount = Math.max(colCount, r.cells.length); });
+    if (!colCount) return;
+    table.classList.add('col-fit-measure');
+    var maxW = new Array(colCount).fill(0);
+    rows.forEach(function (r) {
+      for (var i = 0; i < r.cells.length; i++) {
+        var w = r.cells[i].getBoundingClientRect().width;
+        if (w > maxW[i]) maxW[i] = w;
+      }
+    });
+    table.classList.remove('col-fit-measure');
+    // 先清后加，保证折叠块展开/排序后重测结果收敛
+    allRows.forEach(function (r) {
+      for (var i = 0; i < r.cells.length; i++) r.cells[i].classList.remove('col-fit');
+    });
+    if (!maxW.some(function (w) { return w > 0; })) return; // 表格当前不可见
+    allRows.forEach(function (r) {
+      for (var i = 0; i < r.cells.length; i++) {
+        if (maxW[i] > 0 && maxW[i] <= COL_FIT_MAX_PX) r.cells[i].classList.add('col-fit');
+      }
+    });
+  }
+
+  function initColumnFit() {
+    function run(scope) {
+      (scope || document).querySelectorAll('table').forEach(measureColumnFit);
+    }
+    // 等字体与渐进增强（折叠/分页）就绪后再实测，避免字体 swap 前后的宽度误差
+    if (document.readyState === 'complete') run();
+    else window.addEventListener('load', function () { run(); });
+    // 折叠块展开后其内表格才可见，展开瞬间重测该块内的表格
+    document.addEventListener('toggle', function (e) {
+      if (e.target.open) run(e.target);
+    }, true);
+  }
+
   ready(function () {
     initNavGroups();
     initMobileNav();
@@ -284,5 +339,6 @@
     initCellClamp();
     initReveal();
     initKpiMotion();
+    initColumnFit();
   });
 })();

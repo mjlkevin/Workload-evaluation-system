@@ -15,7 +15,7 @@ export default function PathBreadcrumb({ path }) {
   const layers = [
     { key: 'quote', label: '报价模式', value: selectedQuote || quoteMode, color: 'var(--brand)' },
     { key: 'preset', label: '预置', value: selectedPreset || preset, color: 'var(--brand)' },
-    { key: 'cloud', label: '云产品', value: selectedClouds.join(' + '), color: 'var(--accent)' },
+    { key: 'cloud', label: '云产品', value: selectedClouds.join(' + ') || '未选择', color: 'var(--accent)' },
   ]
 
   const MAX_VISIBLE = 12
@@ -67,9 +67,12 @@ export default function PathBreadcrumb({ path }) {
                 border: 0,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
+                maxWidth: '100%',
               }}
             >
-              {layer.label} · <b>{layer.value}</b> <span style={{ fontSize: 10 }}>▾</span>
+              <span style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>{layer.label} · </span>
+              <b style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{layer.value}</b>
+              <span style={{ fontSize: 10, flexShrink: 0 }}>▾</span>
             </button>
           </React.Fragment>
         ))}

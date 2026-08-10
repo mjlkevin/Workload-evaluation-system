@@ -565,6 +565,17 @@
               <td class="tc-7">已分诊为 defect。根因确认：后端 CREDENTIAL_KEK 缺失导致 persistKimiApiKey 抛 50001；前端无条件清空输入框 + action key 共享造成状态冲突。修复：credentials.store.ts 添加 dev 环境 KEK 缺失警告；main.ts 启动验证 KEK；SystemManagement.jsx 仅成功时清空输入框；useSystemManagement.js action key 分离。合入 d6a9cfa，test:modules 328/328、test:web 299/299 零回归；用户验收通过（2026-08-10）。</td>
               <td class="tc-8">根因已确认：A 前端——saveModelDraftWithKey 与 saveModelDraft 共用 action key 'saveModelDraft'，导致 loading 状态冲突；handleSaveModelDraft 保存后无条件清空 apiKeyInput，失败时需重新输入。B 后端——updateRequirementSystemConfigDraft 调用 persistKimiApiKey → setApiKey，CREDENTIAL_KEK 未配置时抛 Error 返回 50001；测试连接不依赖 KEK，故「测试通过但保存失败」。C 状态——enabled=false 时 withAction 返回假成功（RP-036 已修复页面级守卫）。修复合入 d6a9cfa（6 文件 +118/-14）：KEK dev 警告 + 启动验证 + 前端失败不清空 + action key 分离 + 5 项新测试。DB 表缺失（0016_credentials.sql 未执行）已手动补齐。用户验收通过。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-007-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-10-007</td>
+              <td class="tc-1">2026-08-10</td>
+              <td class="tc-2">系统管理 / 模型配置：卡片式布局改表格 + 行数据详情（体验调整）</td>
+              <td class="tc-3">user_feedback</td>
+              <td class="tc-4">2026-08-10 23:01 用户明确指示："模型配置页面，我不想再用这种卡片了，请你帮我改成表格+行数据详情的模式，并结合外部最佳实践给出更多前端建议"（附当前三卡片页面截图）。截图同时确认：API Key 已配置（hint ····epCz），凭据域落地后密钥录入已完成。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx 模型配置页签（三卡片横排 + 编辑弹窗 L948-1069）</code> <code class="inline">docs/superpowers/plans/2026-08-10-model-config-contract-closure-plan.md（契约闭环计划，本项为其 P1 前端形态决策）</code> <code class="inline">截图：API Key 管理区显示"已配置 ····epCz"</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已分析 / 待规划</span></td>
+              <td class="tc-7">分诊结果 requirement（P2 体验调整）：卡片布局信息密度低、无法横向对比三个场景、无生效状态/凭据健康可见性——与模型配置契约闭环计划（plan.html 后续任务池 BE-2026-08-10-model-config-contract-closure）根因同源，不重复建项，本 issue 作为其前端形态的用户决策输入。派生 RP-053。不阻塞主流程。</td>
+              <td class="tc-8">处置：并入模型配置契约闭环 P1 前端批次——表格（场景/生效模型/来源/关键参数/凭据健康/最近验证/状态/操作）+ 行内展开只读详情（草稿 vs 生效 diff、审计）+ 编辑走 Dialog（项目约定）；参数区按 supportedParams 动态渲染。验收口径：三场景一屏可对比；每行可见生效模型与来源；KEK 缺失/未配置在表格内可见预警；编辑仍走弹窗且失败不清空输入；test:web 299 基线零回归。另确认新事实：用户已录入新密钥（····epCz），T4 真实连通验证解除阻塞。</td>
+            </tr>
         </tbody>
         </table>
         </div>

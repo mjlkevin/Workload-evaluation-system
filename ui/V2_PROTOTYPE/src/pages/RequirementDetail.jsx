@@ -116,8 +116,8 @@ export default function RequirementDetail() {
 
           <Panel rail="SCOPE" title="业务需求及问题" meta={<><Badge type="ci">{detail.completionStats?.totalCount ?? 0} 条</Badge>{detail.completionStats?.dslViolations ? <Badge type="co">{detail.completionStats.dslViolations} 规则违反</Badge> : null}</>} right="行高 36 · ⊞ 视图">
             <div style={{overflowX:'auto'}}>
-              <table className="table" style={{minWidth:640,border:0,borderRadius:0}}>
-                <thead><tr><th>分类</th><th>条目</th><th className="num">优先级</th><th>负责人</th><th>状态</th></tr></thead>
+              <table className="table" style={{minWidth:720,border:0,borderRadius:0}}>
+                <thead><tr><th>分类</th><th>条目</th><th className="num">优先级</th><th>负责人</th><th style={{minWidth:90}}>状态</th></tr></thead>
                 <tbody>
                   {(detail.scopeRows || []).map((r,i)=>r.type==='group'
                     ? <tr key={r.label} className="group"><td colSpan="5">{r.label}</td></tr>
@@ -233,12 +233,12 @@ function VersionHistoryPanel({ rows, currentId, onInspect, onExport }) {
       </div>
       {rows.length ? (
         <div style={{overflowX:'auto',border:'1px solid var(--line)',borderRadius:10}}>
-          <table className="table" style={{border:0,borderRadius:0,minWidth:760}}>
+          <table className="table" style={{border:0,borderRadius:0,minWidth:820}}>
             <thead>
               <tr>
-                <th>版本号</th>
-                <th>单据状态</th>
-                <th>检出状态</th>
+                <th style={{minWidth:80}}>版本号</th>
+                <th style={{minWidth:80}}>单据状态</th>
+                <th style={{minWidth:80}}>检出状态</th>
                 <th>操作人</th>
                 <th>更新时间</th>
                 <th>说明</th>

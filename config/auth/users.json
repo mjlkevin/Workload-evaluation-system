@@ -7,7 +7,7 @@
       "role": "admin",
       "status": "active",
       "createdAt": "2026-03-28T10:23:51.881Z",
-      "lastLoginAt": "2026-08-06T13:13:40.634Z"
+      "lastLoginAt": "2026-08-10T14:20:57.752Z"
     },
     {
       "id": "b4de9eca-fe62-4210-964e-7e59b74ab715",
@@ -89,6 +89,168 @@
       "status": "active",
       "createdAt": "2026-05-11T05:10:52.990Z",
       "lastLoginAt": "2026-05-11T06:05:22.096Z"
+    },
+    {
+      "id": "knowledge-route-user-9fcacc48-39ff-40e5-b4ba-43165a6b0053",
+      "username": "knowledge-route-9fcacc48-39ff-40e5-b4ba-43165a6b0053",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-09T15:07:59.828Z",
+      "lastLoginAt": "2026-08-09T15:07:59.828Z"
+    },
+    {
+      "id": "knowledge-route-user-1d4c0840-22ba-4814-853e-43877adab457",
+      "username": "knowledge-route-1d4c0840-22ba-4814-853e-43877adab457",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-09T15:07:59.995Z",
+      "lastLoginAt": "2026-08-09T15:07:59.995Z"
+    },
+    {
+      "id": "knowledge-route-user-95bd7832-5d27-4193-9e0a-96d4d3fec45f",
+      "username": "knowledge-route-95bd7832-5d27-4193-9e0a-96d4d3fec45f",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-09T15:07:59.999Z",
+      "lastLoginAt": "2026-08-09T15:07:59.999Z"
+    },
+    {
+      "id": "knowledge-route-user-d989aa20-8ac5-4b46-930b-0aec45d3f47d",
+      "username": "knowledge-route-d989aa20-8ac5-4b46-930b-0aec45d3f47d",
+      "role": "admin",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-09T15:08:00.004Z",
+      "lastLoginAt": "2026-08-09T15:08:00.004Z"
+    },
+    {
+      "id": "knowledge-route-user-ce229939-61ac-4cf4-a673-08153a98b7b9",
+      "username": "knowledge-route-ce229939-61ac-4cf4-a673-08153a98b7b9",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-09T15:08:00.018Z",
+      "lastLoginAt": "2026-08-09T15:08:00.018Z"
+    },
+    {
+      "id": "knowledge-route-user-f0f7c360-54e8-427e-8c6d-680a723d6730",
+      "username": "knowledge-route-f0f7c360-54e8-427e-8c6d-680a723d6730",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-09T16:47:37.960Z",
+      "lastLoginAt": "2026-08-09T16:47:37.960Z"
+    },
+    {
+      "id": "knowledge-route-user-53d3b193-8f04-4cd8-b437-cb9d785a9340",
+      "username": "knowledge-route-53d3b193-8f04-4cd8-b437-cb9d785a9340",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-09T16:47:38.269Z",
+      "lastLoginAt": "2026-08-09T16:47:38.269Z"
+    },
+    {
+      "id": "knowledge-route-user-6e4c9771-43be-43f9-b1f9-4e4357e3d0b2",
+      "username": "knowledge-route-6e4c9771-43be-43f9-b1f9-4e4357e3d0b2",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T04:58:29.725Z",
+      "lastLoginAt": "2026-08-10T04:58:29.725Z"
+    },
+    {
+      "id": "knowledge-route-user-c61e4253-aba2-4caf-a545-76ea17d2b9d9",
+      "username": "knowledge-route-c61e4253-aba2-4caf-a545-76ea17d2b9d9",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T04:58:29.851Z",
+      "lastLoginAt": "2026-08-10T04:58:29.851Z"
+    },
+    {
+      "id": "knowledge-route-user-adbe6c02-5925-4646-a344-092ed51df05a",
+      "username": "knowledge-route-adbe6c02-5925-4646-a344-092ed51df05a",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T04:58:29.856Z",
+      "lastLoginAt": "2026-08-10T04:58:29.856Z"
+    },
+    {
+      "id": "knowledge-route-user-36a5d7ff-a6f7-411e-808d-2775ca4f2ef4",
+      "username": "knowledge-route-36a5d7ff-a6f7-411e-808d-2775ca4f2ef4",
+      "role": "admin",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T04:58:29.861Z",
+      "lastLoginAt": "2026-08-10T04:58:29.861Z"
+    },
+    {
+      "id": "knowledge-route-user-7d0f1663-1ca1-49a5-80b6-fd9de0f50f10",
+      "username": "knowledge-route-7d0f1663-1ca1-49a5-80b6-fd9de0f50f10",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T04:58:29.878Z",
+      "lastLoginAt": "2026-08-10T04:58:29.878Z"
+    },
+    {
+      "id": "knowledge-route-user-3e55d022-3da2-41fc-8d54-8636b6e96169",
+      "username": "knowledge-route-3e55d022-3da2-41fc-8d54-8636b6e96169",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T06:02:41.195Z",
+      "lastLoginAt": "2026-08-10T06:02:41.195Z"
+    },
+    {
+      "id": "project-eval-route-user-b2734b80-7ad3-48a2-83ce-5c388dd0f639",
+      "username": "project-eval-route-b2734b80-7ad3-48a2-83ce-5c388dd0f639",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T13:54:48.341Z",
+      "lastLoginAt": "2026-08-10T13:54:48.341Z"
+    },
+    {
+      "id": "knowledge-route-user-e85cc25a-0a94-4175-90be-194a625b71f1",
+      "username": "knowledge-route-e85cc25a-0a94-4175-90be-194a625b71f1",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T14:01:30.397Z",
+      "lastLoginAt": "2026-08-10T14:01:30.397Z"
+    },
+    {
+      "id": "knowledge-route-user-fc7ede98-71c1-4ff6-97ac-cafd42a19d55",
+      "username": "knowledge-route-fc7ede98-71c1-4ff6-97ac-cafd42a19d55",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T14:01:30.569Z",
+      "lastLoginAt": "2026-08-10T14:01:30.569Z"
+    },
+    {
+      "id": "knowledge-route-user-f07b44ca-c526-4e68-a48e-9314847a61d6",
+      "username": "knowledge-route-f07b44ca-c526-4e68-a48e-9314847a61d6",
+      "role": "user",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T14:01:30.574Z",
+      "lastLoginAt": "2026-08-10T14:01:30.574Z"
+    },
+    {
+      "id": "knowledge-route-user-fdc01c93-cb57-4479-9de6-a52fa21b92af",
+      "username": "knowledge-route-fdc01c93-cb57-4479-9de6-a52fa21b92af",
+      "role": "admin",
+      "status": "active",
+      "passwordHash": "",
+      "createdAt": "2026-08-10T14:01:30.581Z",
+      "lastLoginAt": "2026-08-10T14:01:30.581Z"
     }
   ]
 }

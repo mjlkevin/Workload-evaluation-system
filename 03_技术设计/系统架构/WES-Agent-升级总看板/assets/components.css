@@ -795,7 +795,9 @@ tr.user-flag-cancelled td:first-child { box-shadow: inset 3px 0 0 var(--err); }
   margin: 0;
   border: none;
   border-radius: 0;
-  min-width: 1400px;
+  /* 原为 min-width:1400px —— 强制所有表格横向滚动，即使是 3~6 列窄表。
+     2026-08-10 改为贴合容器宽度；内容确实超宽时由 .table-scroll 的 overflow-x:auto 自然滚动。 */
+  min-width: 100%;
 }
 table {
   width: 100%;
@@ -807,7 +809,9 @@ table {
   overflow: hidden;
   background: #fff;
   font-size: 12.5px;
-  table-layout: fixed;
+  /* 原为 table-layout:fixed —— 所有列等宽，长文本列被挤压、短内容列浪费宽度。
+     2026-08-10 改为 auto：浏览器按内容分配列宽，配合下方短列收缩规则全局自适应。 */
+  table-layout: auto;
 }
 th, td {
   padding: 10px 12px;
@@ -829,7 +833,27 @@ th {
 }
 tr:last-child td { border-bottom: none; }
 td.mono,
-th.mono { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+th.mono { font-family: var(--font-mono); font-size: 11px; }
+/* 注：mono 曾有 white-space:nowrap，2026-08-10 移除 —— fixed 布局下长 mono 文本靠
+   overflow-wrap:break-word 兜底不断行溢出；auto 布局下 nowrap 会把 min-content 撑满
+   整行文本宽度，挤死同排其他列（changes.html 时间线表实测翻车）。 */
+
+/* ── 全局表格列宽自适应（2026-08-10）──
+   table-layout:auto 让浏览器按内容分配列宽：短内容列（编号、日期、估时、P0/P1 标签）
+   的 min-content 天然很小，自动收缩贴合；长文本列按 max-content 比例分到更多宽度。
+   换行与断词由上方 th,td 的 overflow-wrap/word-break 兜底；
+   内容整体超宽时由 .table-scroll 横向滚动兜底，超长单元格由 board-ui.js cell-clamp 收起。
+   新建表格无需任何额外样式即可获得该行为；如需恢复等宽，给表格加 style="table-layout:fixed"。 */
+
+/* 短列贴合（board-ui.js initColumnFit 实测加注）：
+   不手写 nowrap/width:1% 提示 —— 实测百分比宽度提示会扭曲 Chromium 剩余宽度分配
+   （长状态列吞掉几乎全部余量、正文列被压成竖排），统一 nowrap 会把长文本列顶出容器。
+   因此由 JS 实测每列单行最大宽度，仅对 ≤180px 的短列加 .col-fit。 */
+td.col-fit,
+th.col-fit { width: 1%; white-space: nowrap; }
+/* 测量态：强制单行读取内容自然宽度，测完即移除 */
+table.col-fit-measure > * > tr > th,
+table.col-fit-measure > * > tr > td { white-space: nowrap !important; }
 
 /* ── Callout ── */
 .callout {

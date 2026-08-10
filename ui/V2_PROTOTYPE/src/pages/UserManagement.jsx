@@ -939,55 +939,55 @@ export default function UserManagement() {
           />
         </div>
 
-        {selCount > 0 ? (
-          <div
-            className="user-management__selection"
-            role="region"
-            aria-label="批量操作"
+        <div
+          className="user-management__selection"
+          role="region"
+          aria-label="批量操作"
+        >
+          <span style={{ color: 'var(--ink-2)', fontSize: 12, minWidth: 70 }}>
+            {selCount > 0 ? `已选 ${selCount} 人` : '未选择'}
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={globalOperationLocked}
+            onClick={clearSelection}
           >
-            <strong>已选 {selCount} 人</strong>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={globalOperationLocked}
-              onClick={clearSelection}
-            >
-              清除选择
-            </button>
-            <button type="button"
-              className="btn btn-ghost"
-              style={{ height: 28, fontSize: 12, padding: '0 10px' }}
-              disabled={!canBulkEnable || globalOperationLocked}
-              onClick={() => openStatusDialog('active')}
-            >
-              批量启用
-            </button>
-            <button type="button"
-              className="btn btn-ghost"
-              style={{ height: 28, fontSize: 12, padding: '0 10px', color: 'var(--err)' }}
-              disabled={!canBulkDisable || globalOperationLocked}
-              onClick={() => openStatusDialog('disabled')}
-            >
-              批量禁用
-            </button>
-            <button type="button"
-              className="btn btn-ghost"
-              style={{ height: 28, fontSize: 12, padding: '0 10px' }}
-              disabled={!canChangeRole || globalOperationLocked}
-              onClick={openSystemRoleDialog}
-            >
-              改系统角色
-            </button>
-            <button type="button"
-              className="btn btn-ghost"
-              style={{ height: 28, fontSize: 12, padding: '0 10px' }}
-              disabled={!canChangeRole || globalOperationLocked}
-              onClick={openBusinessRoleDialog}
-            >
-              改业务角色
-            </button>
-          </div>
-        ) : null}
+            清除选择
+          </button>
+          <button type="button"
+            className="btn btn-ghost"
+            style={{ height: 28, fontSize: 12, padding: '0 10px' }}
+            disabled={!canBulkEnable || globalOperationLocked}
+            onClick={() => openStatusDialog('active')}
+          >
+            批量启用
+          </button>
+          <button type="button"
+            className="btn btn-ghost"
+            style={{ height: 28, fontSize: 12, padding: '0 10px', color: 'var(--err)' }}
+            disabled={!canBulkDisable || globalOperationLocked}
+            onClick={() => openStatusDialog('disabled')}
+          >
+            批量禁用
+          </button>
+          <button type="button"
+            className="btn btn-ghost"
+            style={{ height: 28, fontSize: 12, padding: '0 10px' }}
+            disabled={!canChangeRole || globalOperationLocked}
+            onClick={openSystemRoleDialog}
+          >
+            改系统角色
+          </button>
+          <button type="button"
+            className="btn btn-ghost"
+            style={{ height: 28, fontSize: 12, padding: '0 10px' }}
+            disabled={!canChangeRole || globalOperationLocked}
+            onClick={openBusinessRoleDialog}
+          >
+            改业务角色
+          </button>
+        </div>
 
         {/* Table */}
         <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
@@ -1013,12 +1013,12 @@ export default function UserManagement() {
                   }}
                 />
               </th>
-              <th>用户</th>
-              <th>系统角色</th>
-              <th>业务角色</th>
-              <th>状态</th>
-              <th>最后登录</th>
-              <th>操作</th>
+              <th style={{ minWidth: 160 }}>用户</th>
+              <th style={{ minWidth: 100 }}>系统角色</th>
+              <th style={{ minWidth: 120 }}>业务角色</th>
+              <th style={{ minWidth: 80 }}>状态</th>
+              <th style={{ minWidth: 140 }}>最后登录</th>
+              <th style={{ minWidth: 70 }}>操作</th>
             </tr>
           </thead>
           <tbody>

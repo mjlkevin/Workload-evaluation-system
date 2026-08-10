@@ -93,7 +93,7 @@ function ShellBackgroundRuns() {
 
 export default function Shell({ children, currentUser = null }) {
   const [collapsed, setCollapsed] = useState(false)
-  const [expandedParents, setExpandedParents] = useState(() => new Set(['系统管理']))
+  const [expandedParents, setExpandedParents] = useState(() => new Set([]))
   const navigate = useNavigate()
   const { user: loadedUser } = useCurrentUser({ enabled: !currentUser && isAuthenticated() })
   const user = currentUser || loadedUser
