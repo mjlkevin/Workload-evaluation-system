@@ -499,6 +499,17 @@
               <td class="tc-7">分诊结果 requirement：新建 RP-052（M2）；M1/M3/M4/M5 命中现有 RP-031/RP-018/RP-012/RP-030，按同族补充范围不重复建项</td>
               <td class="tc-8">去重结果：M1 命中 RP-031（RAG baseline 后续批次，RP-031 主体已关闭，M1 作为其后续批次登记）；M3 命中 RP-018（知识库工具 MVP 已交付，M3 为工具发现接口范围扩展）；M4 命中 RP-012（Skill 治理方向复用，暂缓状态不改，待 MS4 启动时再激活）；M5 命中 RP-030（Trace 范围扩展）；M2 未命中任何现有记录（跨会话记忆蒸馏属空白）故新建 RP-052。验收口径见方案文档第六节：同项目二次 run 上下文重建 0 轮、术语查询 Top-5 命中率 ≥80%、默认注入工具数降 ≥50%、注入体积 ≤6000 字符。本次仅入池登记，未改业务代码。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:issues">
+              <td class="mono tc-0">ISS-2026-08-10-001</td>
+              <td class="tc-1">2026-08-10</td>
+              <td class="tc-2">AI 工作台：问题进行中离页返回不恢复进行中占位，后台任务角标「已完成」永远计 0</td>
+              <td class="tc-3">user_feedback_code_analysis</td>
+              <td class="tc-4">ISS-2026-08-09-003 后续：① AI 还在回答时切走再返回，进行中占位与问题气泡不恢复；② 任务完成后角标只查活跃 run，「已完成」永远计 0。</td>
+              <td class="tc-5"><code class="inline">apps/api/src/modules/harness/workbench-view.usecase.ts（统一视图 runs 只查 listActiveRunsForOwner，run 进 completed 即消失）</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js（组件卸载不写 G1 快照，占位无恢复依据）</code> <code class="inline">docs/agent-loop/work-orders/2026-08-10-qoder-ISS-2026-08-10-001-badge-and-unmount-snapshot.md</code> <code class="inline">docs/agent-loop/handoffs/2026-08-10-qoder-ISS-2026-08-10-001.md</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已合入 / 待人工验收（MT-ISS001-001）</span></td>
+              <td class="tc-7">分诊结果 defect：2026-08-10 执行会话（KIMIK3，Qoder worktree 协议）在分支 qoder/iss-2026-08-10-001-badge-and-unmount-snapshot（base e589fc2，提交 ff235bb + 9e6c9c0）完成修复：角标数据源补近期 10 条已完成 run（owner 隔离 + 去重 + limit 夹取），卸载写快照、重挂载仅当快照末条未完成时恢复占位。RED→GREEN 5 例（web 280=278+2、modules 321=318+3、双构建零错误），主会话独立复审一次通过（RED 独立复现 + 全矩阵复跑），2026-08-10 用户批准合入主线（af1f250）</td>
+              <td class="tc-8">根因链（置信度高）：A 角标侧——统一视图 runs 仅查活跃态（HARNESS_RUN_ACTIVE_STATUSES），run 进 completed 即从视图消失，角标「已完成」永远计 0；B 占位侧——useChatMessages 卸载不写 G1 快照，离页后进行中占位无恢复依据。修复：数据源补 completed 查询并合并去重（run 级终态就是 completed，succeeded/claimed 属 attempt 表）；卸载写快照 + hasUnfinishedSnapshotTail 闸门只恢复未完成尾部，已完结快照不复现（后端为准，防同文重复出图）。范围外观察两项已登记 risks.html（cancelling 未计入进行中 / failedRuns 永不返回）</td>
+            </tr>
         </tbody>
         </table>
         </div>

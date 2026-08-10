@@ -253,6 +253,18 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:risks:1">
+          <td>后台任务角标「进行中」计数不含 cancelling 状态的 run（ISS-2026-08-10-001 复审范围外观察）。</td>
+          <td>用户取消任务后，角标计数可能与真实状态短暂不符（既不计进行中、也不计已完成）。</td>
+          <td>已如实登记；建议入问题池待分诊，确认后将 cancelling 纳入角标统计口径。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待入池分诊</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:risks:2">
+          <td>统一视图 failedRuns 永不返回（查询仅覆盖活跃态 + 近期 completed，ISS-2026-08-10-001 复审范围外观察）。</td>
+          <td>失败的 run 在统一视图中不可见，用户可能察觉不到已失败任务。</td>
+          <td>已如实登记；建议入问题池待分诊，评估是否补 failed 状态可见性。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待入池分诊</span></td>
+        </tr>
         <tr>
           <td>AI 会话删除未检查活跃 Run 状态，可能误删正在执行任务的会话。</td>
           <td>用户删除会话后，后台 Harness Run 仍在执行，但会话消息和上下文已不可恢复；恢复协调器可能因找不到 session 投影目标而失败，或产生孤儿 Run 记录。</td>
