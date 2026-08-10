@@ -62,6 +62,61 @@ test("decrypt with wrong KEK: 解密失败抛错", () => {
   assert.throws(() => decryptCredential(encrypted, kek2), /decrypt|auth|tag/i);
 });
 
+// -------------------- resolveKek 测试（ISS-2026-08-10-006） --------------------
+
+test("resolveKek: 环境变量未配置时返回 null 且 dev 环境输出警告", () => {
+  const savedKek = process.env.CREDENTIAL_KEK;
+  const savedNodeEnv = process.env.NODE_ENV;
+  delete process.env.CREDENTIAL_KEK;
+  delete process.env.NODE_ENV; // 非 production → dev 路径
+
+  const warns: string[] = [];
+  const originalWarn = console.warn;
+  console.warn = (msg: string) => warns.push(msg);
+
+  try {
+    const result = resolveKek();
+    assert.equal(result, null, "KEK 未配置时应返回 null");
+    assert.ok(warns.length > 0, "dev 环境应输出警告");
+    assert.ok(
+      warns[0].includes("CREDENTIAL_KEK"),
+      "警告信息应包含 CREDENTIAL_KEK",
+    );
+  } finally {
+    if (savedKek) process.env.CREDENTIAL_KEK = savedKek;
+    if (savedNodeEnv) process.env.NODE_ENV = savedNodeEnv;
+    console.warn = originalWarn;
+  }
+});
+
+test("resolveKek: 非 32 字节的 KEK 抛出格式错误", () => {
+  const savedKek = process.env.CREDENTIAL_KEK;
+  // "short" base64 解码后只有 5 字节，不等于 32
+  process.env.CREDENTIAL_KEK = "short";
+  try {
+    assert.throws(
+      () => resolveKek(),
+      /CREDENTIAL_KEK must be base64-encoded 32 bytes/,
+    );
+  } finally {
+    if (savedKek) process.env.CREDENTIAL_KEK = savedKek;
+    else delete process.env.CREDENTIAL_KEK;
+  }
+});
+
+test("resolveKek: 正确的 32 字节 base64 KEK 返回 Buffer", () => {
+  const savedKek = process.env.CREDENTIAL_KEK;
+  process.env.CREDENTIAL_KEK = randomBytes(32).toString("base64");
+  try {
+    const result = resolveKek();
+    assert.ok(Buffer.isBuffer(result), "应返回 Buffer");
+    assert.equal(result!.length, 32, "应为 32 字节");
+  } finally {
+    if (savedKek) process.env.CREDENTIAL_KEK = savedKek;
+    else delete process.env.CREDENTIAL_KEK;
+  }
+});
+
 // -------------------- DB 持久化测试（需要 TEST_DATABASE_URL） --------------------
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;

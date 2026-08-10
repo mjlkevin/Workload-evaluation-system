@@ -43,10 +43,16 @@ export function setCachedApiKey(scope: string, plaintext: string): void {
 
 // -------------------- 纯加密函数 --------------------
 
-/** 从环境变量解析 KEK，缺失返回 null */
+/** 从环境变量解析 KEK，缺失返回 null（dev 环境输出警告） */
 export function resolveKek(): Buffer | null {
   const raw = process.env.CREDENTIAL_KEK || config.credentialKek;
-  if (!raw) return null;
+  if (!raw) {
+    // dev 环境：输出一次性警告，不阻塞读取路径
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[credentials] CREDENTIAL_KEK not configured: credential writes will fail");
+    }
+    return null;
+  }
   const kek = Buffer.from(raw, "base64");
   if (kek.length !== 32) {
     throw new Error("CREDENTIAL_KEK must be base64-encoded 32 bytes");
