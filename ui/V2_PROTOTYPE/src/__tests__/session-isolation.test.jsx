@@ -384,4 +384,28 @@ describe('session-isolation: G1 会话隔离', () => {
     expect(await screen.findByText('B 的最新回复')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('正在理解你的问题')).not.toBeInTheDocument())
   })
+
+  // ISS-2026-08-10-001（ISS-003 复验残留：回复未完成时返回占位不恢复）RED 回归：
+  // 异步通道回复未完成时直接离开工作台页面（组件卸载，未切换会话）再进入——
+  // 卸载瞬间的本地进行中占位必须写入快照并参与重挂载对账：问题气泡与
+  // 「正在理解你的问题」占位均恢复渲染（后端尚无 assistant，后端消息为准、
+  // 仅保留未完成进行中占位，与 ISS-003 C2 同一合并语义）。
+  test('ISS-2026-08-10-001: 回复未完成时离页再返回，问题气泡与进行中占位均恢复渲染', async () => {
+    const asyncChannel = setupAsyncChannel()
+    const firstRender = renderWorkbench()
+
+    await screen.findByText('A 的历史回复')
+    await sendFromComposer('利润中心是什么？')
+    await screen.findByText('正在理解你的问题')
+    expect(asyncChannel.runSubmissions).toContain('session-a')
+
+    // 回复未完成时离开工作台页面（整个工作台组件卸载）
+    firstRender.unmount()
+
+    // 重新进入工作台：后端此刻只有用户消息（assistant 未写完），
+    // 问题气泡与进行中占位都必须从卸载快照对账恢复。
+    renderWorkbench()
+    expect(await screen.findByText('利润中心是什么？')).toBeInTheDocument()
+    expect(await screen.findByText('正在理解你的问题')).toBeInTheDocument()
+  })
 })

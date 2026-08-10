@@ -21,6 +21,7 @@ import {
 function fakeRepo(overrides: Partial<WorkbenchViewRepoPort> = {}): WorkbenchViewRepoPort {
   return {
     listActiveRunsForOwner: async () => [],
+    listRecentlyCompletedRunsForOwner: async () => [],
     getRunSnapshot: async () => null,
     ...overrides,
   };
@@ -206,6 +207,82 @@ describe("workbench-view.usecase", () => {
 
       assert.strictEqual(view.runs[0].failedReason, undefined);
       assert.strictEqual(view.failedRuns[0].error, "未知错误");
+    });
+
+    // ============================================================
+    // ISS-2026-08-10-001（ISS-003 复验残留：后台任务角标不显示）：
+    // 统一视图 runs 增补近期已完成 Run——Run 进入 completed 终态后不再
+    // 从视图消失，前端角标「已完成」计数才有数据源（修正永远 0 缺陷）。
+    // ============================================================
+
+    it("应将近期已完成 Run 合并进统一视图 runs 且 status 透传", async () => {
+      const repo = fakeRepo({
+        listRecentlyCompletedRunsForOwner: async () => [
+          {
+            harnessRunId: "run-completed-1",
+            aiSessionId: "session-1",
+            title: "已完成 Run",
+            status: "completed",
+            createdAt: new Date("2026-08-10T09:00:00Z"),
+            updatedAt: new Date("2026-08-10T09:05:00Z"),
+          },
+        ],
+      });
+      const usecase = createWorkbenchViewUsecase({ repo });
+      const view = await usecase.getUnifiedView(fakeUser());
+
+      assert.strictEqual(view.runs.length, 1);
+      assert.strictEqual(view.runs[0].runId, "run-completed-1");
+      assert.strictEqual(view.runs[0].status, "completed");
+      assert.strictEqual(view.runs[0].latestEventKind, "run_completed");
+      // 已完成 Run 不进入失败列表
+      assert.strictEqual(view.failedRuns.length, 0);
+    });
+
+    it("应同时返回活跃 Run 与近期已完成 Run", async () => {
+      const repo = fakeRepo({
+        listActiveRunsForOwner: async () => [
+          {
+            harnessRunId: "run-active-1",
+            aiSessionId: "session-1",
+            title: "活跃 Run",
+            status: "running",
+            createdAt: new Date("2026-08-10T09:00:00Z"),
+            updatedAt: new Date("2026-08-10T09:01:00Z"),
+          },
+        ],
+        listRecentlyCompletedRunsForOwner: async () => [
+          {
+            harnessRunId: "run-completed-1",
+            aiSessionId: "session-2",
+            title: "已完成 Run",
+            status: "completed",
+            createdAt: new Date("2026-08-10T08:00:00Z"),
+            updatedAt: new Date("2026-08-10T08:30:00Z"),
+          },
+        ],
+      });
+      const usecase = createWorkbenchViewUsecase({ repo });
+      const view = await usecase.getUnifiedView(fakeUser());
+
+      const statuses = view.runs.map((run) => run.status).sort();
+      assert.deepStrictEqual(statuses, ["completed", "running"]);
+    });
+
+    it("数据隔离：近期已完成 Run 查询按 ownerUserId 透传且 limit 不超过 10", async () => {
+      const calls: Array<{ ownerUserId: string; limit?: number }> = [];
+      const repo = fakeRepo({
+        listRecentlyCompletedRunsForOwner: async (ownerUserId: string, limit?: number) => {
+          calls.push({ ownerUserId, limit });
+          return [];
+        },
+      });
+      const usecase = createWorkbenchViewUsecase({ repo });
+      await usecase.getUnifiedView(fakeUser("user-9"));
+
+      assert.strictEqual(calls.length, 1);
+      assert.strictEqual(calls[0].ownerUserId, "user-9");
+      assert.ok((calls[0].limit ?? 0) <= 10);
     });
   });
 });

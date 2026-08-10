@@ -283,6 +283,9 @@ export interface HarnessRuntimeRepository {
   ): Promise<{ outcome: "requeued" | "cancelled" | "noop"; run: HarnessRunRow }>;
   // RP-047 Batch C（additive）：AI Runs API 读取与动作方法
   listActiveRunsForOwner(ownerUserId: string): Promise<HarnessRunRow[]>;
+  // ISS-2026-08-10-001（后台任务角标数据源）：近期已完成 Run 查询，
+  // 供统一视图合并——Run 进入 completed 终态后不再从视图立即消失。
+  listRecentlyCompletedRunsForOwner(ownerUserId: string, limit?: number): Promise<HarnessRunRow[]>;
   getRunSnapshot(runId: string): Promise<HarnessRunSnapshot | null>;
   hasActiveRunForSession(aiSessionId: string): Promise<boolean>;
   listRunEventsAfter(input: ListHarnessRunEventsAfterInput): Promise<HarnessRunEventRow[]>;
@@ -1361,6 +1364,31 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
             ),
           )
           .orderBy(desc(harnessRuns.createdAt));
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    // ISS-2026-08-10-001（后台任务角标数据源）：近期已完成 Run——
+    // status='completed' 按 updatedAt 倒序，limit  clamp 到 ≤10；
+    // 与活跃查询同为 owner 隔离，仅读取不改状态机。
+    async listRecentlyCompletedRunsForOwner(ownerUserId, limit = 10) {
+      try {
+        assertNonEmptyText(ownerUserId, "ownerUserId");
+        const safeLimit = Number.isFinite(limit)
+          ? Math.min(Math.max(Math.floor(limit), 1), 10)
+          : 10;
+        return await dbInstance
+          .select()
+          .from(harnessRuns)
+          .where(
+            and(
+              eq(harnessRuns.ownerUserId, ownerUserId),
+              eq(harnessRuns.status, "completed"),
+            ),
+          )
+          .orderBy(desc(harnessRuns.updatedAt))
+          .limit(safeLimit);
       } catch (err) {
         throw toSafeError(err);
       }
