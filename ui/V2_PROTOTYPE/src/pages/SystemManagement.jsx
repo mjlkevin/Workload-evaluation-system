@@ -178,8 +178,8 @@ export default function SystemManagement({ sectionId }) {
   const handleSaveModelDraft = async () => {
     setModelSaveResult(null)
     const result = await actions.saveModelDraftWithKey(apiKeyInput || undefined)
-    setApiKeyInput('')
     if (result.success) {
+      setApiKeyInput('')
       toast.success('模型配置草稿已保存')
     } else {
       toast.error(result.error || '模型配置草稿保存失败')
@@ -341,8 +341,8 @@ export default function SystemManagement({ sectionId }) {
           <div>
             <div className="sys-toolbar">
               <span className="meta">KIMI 评估 / 文件解析 / 生成模型 · 修改后先保存草稿再生效</span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraft}>
-                {actionLoading.saveModelDraft ? '...' : '保存草稿'}
+              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraftWithKey}>
+                {actionLoading.saveModelDraftWithKey ? '...' : '保存草稿'}
               </button>
               <button type="button" className="btn btn-pri btn-sm" onClick={handleActivateModel} disabled={actionLoading.activateModel}>
                 {actionLoading.activateModel ? '...' : '⌁ 生效配置'}

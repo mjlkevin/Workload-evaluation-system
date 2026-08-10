@@ -120,6 +120,35 @@ describe('useSystemManagement', () => {
     expect(capturedBody.models).toBeUndefined()
   })
 
+  test('saveModelDraftWithKey uses independent action key from saveModelDraft', async () => {
+    server.use(
+      http.patch(`${BASE}/system/requirement-settings/draft`, () =>
+        HttpResponse.json({ success: true, data: { version: 2, draft: MOCK_DRAFT, updatedAt: new Date().toISOString() } })),
+    )
+    const { result } = renderHook(() => useSystemManagement())
+    await waitFor(() => expect(result.current.modelConfig.kimiEvaluation).toBeDefined())
+
+    await act(async () => {
+      await result.current.actions.saveModelDraftWithKey('sk-test-key')
+    })
+
+    // saveModelDraftWithKey 完成后使用独立 key
+    expect(result.current.actionLoading.saveModelDraftWithKey).toBe(false)
+    // saveModelDraft key 不应被 saveModelDraftWithKey 设置
+    expect(result.current.actionLoading.saveModelDraft).toBeUndefined()
+  })
+
+  test('saveModelDraftWithKey returns failure instead of false success when disabled', async () => {
+    const { result } = renderHook(() => useSystemManagement({ enabled: false }))
+
+    let actionResult
+    await act(async () => {
+      actionResult = await result.current.actions.saveModelDraftWithKey('sk-test-key')
+    })
+
+    expect(actionResult).toEqual({ success: false, error: '登录已过期，请重新登录' })
+  })
+
   test('clearApiKeyDraft sends null apiKey', async () => {
     let capturedBody = null
     server.use(

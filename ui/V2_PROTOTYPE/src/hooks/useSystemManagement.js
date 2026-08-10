@@ -255,16 +255,20 @@ export default function useSystemManagement({
     await apiClient.patch('/system/requirement-settings/draft', rest)
   }), [enabled, modelConfig, withAction])
 
-  const saveModelDraftWithKey = useCallback((apiKeyInput) => withAction('saveModelDraft', async () => {
-    if (!enabled) return
-    const { kimiCredentials: _creds, ...rest } = modelConfig
-    const body = { ...rest }
-    if (apiKeyInput) {
-      body.kimiCredentials = { apiKey: apiKeyInput }
+  const saveModelDraftWithKey = useCallback((apiKeyInput) => {
+    if (!enabled) {
+      return Promise.resolve({ success: false, error: '登录已过期，请重新登录' })
     }
-    await apiClient.patch('/system/requirement-settings/draft', body)
-    await loadModels()
-  }), [enabled, modelConfig, withAction, loadModels])
+    return withAction('saveModelDraftWithKey', async () => {
+      const { kimiCredentials: _creds, ...rest } = modelConfig
+      const body = { ...rest }
+      if (apiKeyInput) {
+        body.kimiCredentials = { apiKey: apiKeyInput }
+      }
+      await apiClient.patch('/system/requirement-settings/draft', body)
+      await loadModels()
+    })
+  }, [enabled, modelConfig, withAction, loadModels])
 
   const clearApiKeyDraft = useCallback(() => withAction('clearApiKey', async () => {
     if (!enabled) return

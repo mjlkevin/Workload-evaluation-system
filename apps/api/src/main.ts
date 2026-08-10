@@ -9,6 +9,7 @@ import { logger } from "./utils/logger";
 import { startHarnessRuntime } from "./modules/harness/harness-boot";
 import { createHarnessRuntimeRepository } from "./modules/harness/harness-runtime.repository";
 import { isDurableRunsEnabledFromEnv } from "./modules/harness/harness-runtime.usecase";
+import { resolveKek } from "./modules/system/credentials.store";
 
 const shouldRunIntegrityCheck = process.env.CONFIG_INTEGRITY_ON_STARTUP !== "false";
 if (shouldRunIntegrityCheck) {
@@ -19,6 +20,15 @@ if (shouldRunIntegrityCheck) {
       `[api] config integrity check found ${integrity.issues.length} issue(s), see logs/data-anomaly-repair.log`
     );
   }
+}
+
+// KEK 状态验证（仅 warn，不阻塞启动）
+const kek = resolveKek();
+if (!kek) {
+  logger.warn(
+    { event: "startup" },
+    "[api] CREDENTIAL_KEK not configured: model config credential storage unavailable",
+  );
 }
 
 const app = createApp();
