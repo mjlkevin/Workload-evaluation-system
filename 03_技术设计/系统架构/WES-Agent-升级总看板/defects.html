@@ -354,7 +354,7 @@
               <td class="mono tc-2">—</td>
               <td class="tc-3">凭据缓存重启冷启动：服务重启后 DB 中的 API 密钥不预热进内存缓存，读取侧静默回落 env（ISS-2026-08-05-001「重启密钥丢失」修复的回潮缺口）</td>
               <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status run"><span class="dot"></span>已登记 / 待用户决策修复</span></td>
+              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复（2b08487，并入 RP-055 批 1）/ 待重启复验关闭</span></td>
               <td class="tc-6">apps/api/src/modules/system/credentials.store.ts（缓存填充路径）/ apps/api/src/main.ts（启动引导缺 warm）/ AI 全链路密钥解析（resolveActiveRequirementKimiApiKey 同步只读缓存）</td>
               <td class="tc-7">根因：凭据域 DB 化后，内存缓存仅在两个时机填充——同进程 setApiKey（用户界面录入）与旧文件迁移导入；服务重启后缓存为空，同步读取函数 resolveActiveRequirementKimiApiKey() 无法 await 取 DB，直接回落 env。实证（2026-08-10 23:59，临时全新进程 PORT=3100）：GET /effective credentials.source=「env」而 DB 已有用户 22:34 录入的有效密钥；scenario-test 用 env 旧密钥 401，用 DB 密钥 override 双场景连通 modelMatch=true。当前运行后端因同进程录入密钥未暴露，重启即触发。修复方向：main.ts 启动引导 KEK 校验后 warm（getApiKey 成功填入缓存，失败降级警告不阻断启动）。</td>
               <td class="tc-8">验收口径：重启后 GET /requirement-settings/effective credentials.source=「db_cache」；AI 评估链路重启后首轮调用即用 DB 密钥（无 401）；KEK 缺失或 DB 无记录时启动警告可见、服务正常启动；补回潮 RED 测试（全新进程无 setApiKey 直接 resolve 命中 DB 密钥）。</td>
