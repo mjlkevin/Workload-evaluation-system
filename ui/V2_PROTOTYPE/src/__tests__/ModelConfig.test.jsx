@@ -16,6 +16,14 @@ function renderAppAtModelConfig() {
   )
 }
 
+// RP-055：供应商表与场景表均有「编辑」按钮，必须限定场景模型绑定表
+async function openFirstScenarioEditor() {
+  const scenarioTable = await screen.findByRole('table', { name: '场景模型绑定' })
+  const editButtons = within(scenarioTable).getAllByRole('button', { name: '编辑' })
+  fireEvent.click(editButtons[0])
+  return screen.findByRole('dialog', { name: /编辑 实施评估/ })
+}
+
 describe('ModelConfig · 保存/生效内联反馈', () => {
   beforeEach(() => {
     server.use(
@@ -69,14 +77,11 @@ describe('ModelConfig · 编辑弹窗脏关闭保护', () => {
     renderAppAtModelConfig()
 
     // 打开编辑弹窗
-    const editButtons = await screen.findAllByRole('button', { name: '编辑' })
-    fireEvent.click(editButtons[0])
+    const dialog = await openFirstScenarioEditor()
 
-    const dialog = await screen.findByRole('dialog', { name: /编辑 KIMI 评估/ })
-
-    // 修改模型标识字段使其变脏
-    const modelInput = within(dialog).getByDisplayValue('kimi-k2.5')
-    fireEvent.change(modelInput, { target: { value: 'kimi-k3.0' } })
+    // 修改 Prompt Profile 字段使其变脏（模型标识已改为目录下拉，自由输入用 Prompt Profile）
+    const profileInput = within(dialog).getByDisplayValue('default')
+    fireEvent.change(profileInput, { target: { value: 'custom-profile' } })
 
     // 按 Escape 尝试关闭
     fireEvent.keyDown(dialog, { key: 'Escape' })
@@ -88,55 +93,47 @@ describe('ModelConfig · 编辑弹窗脏关闭保护', () => {
     // 点击取消，编辑弹窗仍在
     fireEvent.click(within(confirmDialog).getByRole('button', { name: '继续编辑' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /放弃修改/ })).not.toBeInTheDocument())
-    expect(screen.getByRole('dialog', { name: /编辑 KIMI 评估/ })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /编辑 实施评估/ })).toBeInTheDocument()
   })
 
   test('确认放弃后编辑弹窗关闭', async () => {
     renderAppAtModelConfig()
 
-    const editButtons = await screen.findAllByRole('button', { name: '编辑' })
-    fireEvent.click(editButtons[0])
-
-    const dialog = await screen.findByRole('dialog', { name: /编辑 KIMI 评估/ })
-    const modelInput = within(dialog).getByDisplayValue('kimi-k2.5')
-    fireEvent.change(modelInput, { target: { value: 'kimi-k3.0' } })
+    const dialog = await openFirstScenarioEditor()
+    const profileInput = within(dialog).getByDisplayValue('default')
+    fireEvent.change(profileInput, { target: { value: 'custom-profile' } })
 
     fireEvent.keyDown(dialog, { key: 'Escape' })
     const confirmDialog = await screen.findByRole('dialog', { name: /放弃修改/ })
 
     fireEvent.click(within(confirmDialog).getByRole('button', { name: '放弃修改' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: /编辑 KIMI 评估/ })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /编辑 实施评估/ })).not.toBeInTheDocument())
   })
 
-  test('放弃修改后模型卡片仍显示原始值，重新打开弹窗也是原值', async () => {
+  test('放弃修改后页面仍显示原始值，重新打开弹窗也是原值', async () => {
     renderAppAtModelConfig()
 
-    // 等待模型卡片加载，确认原始值
+    // 等待页面加载，确认生效模型原始值
     await screen.findByRole('heading', { name: '模型配置' })
     expect(screen.getAllByText('kimi-k2.5').length).toBeGreaterThanOrEqual(1)
 
-    const editButtons = await screen.findAllByRole('button', { name: '编辑' })
-    fireEvent.click(editButtons[0])
-
-    const dialog = await screen.findByRole('dialog', { name: /编辑 KIMI 评估/ })
-    const modelInput = within(dialog).getByDisplayValue('kimi-k2.5')
-    fireEvent.change(modelInput, { target: { value: 'kimi-k3.0' } })
+    const dialog = await openFirstScenarioEditor()
+    const profileInput = within(dialog).getByDisplayValue('default')
+    fireEvent.change(profileInput, { target: { value: 'custom-profile' } })
 
     // 放弃修改
     fireEvent.keyDown(dialog, { key: 'Escape' })
     const confirmDialog = await screen.findByRole('dialog', { name: /放弃修改/ })
     fireEvent.click(within(confirmDialog).getByRole('button', { name: '放弃修改' }))
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: /编辑 KIMI 评估/ })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /编辑 实施评估/ })).not.toBeInTheDocument())
 
-    // 卡片摘要应仍显示原始值
+    // 页面应仍显示原始值
     expect(screen.getAllByText('kimi-k2.5').length).toBeGreaterThanOrEqual(1)
-    expect(screen.queryByText('kimi-k3.0')).not.toBeInTheDocument()
+    expect(screen.queryByDisplayValue('custom-profile')).not.toBeInTheDocument()
 
     // 重新打开弹窗，输入仍为原值
-    const editButtons2 = screen.getAllByRole('button', { name: '编辑' })
-    fireEvent.click(editButtons2[0])
-    const dialog2 = await screen.findByRole('dialog', { name: /编辑 KIMI 评估/ })
-    expect(within(dialog2).getByDisplayValue('kimi-k2.5')).toBeInTheDocument()
+    const dialog2 = await openFirstScenarioEditor()
+    expect(within(dialog2).getByDisplayValue('default')).toBeInTheDocument()
   })
 })
 
@@ -154,21 +151,18 @@ describe('ModelConfig · 编辑弹窗保存失败', () => {
     )
     renderAppAtModelConfig()
 
-    const editButtons = await screen.findAllByRole('button', { name: '编辑' })
-    fireEvent.click(editButtons[0])
-
-    const dialog = await screen.findByRole('dialog', { name: /编辑 KIMI 评估/ })
-    const modelInput = within(dialog).getByDisplayValue('kimi-k2.5')
-    fireEvent.change(modelInput, { target: { value: 'kimi-k3.0' } })
+    const dialog = await openFirstScenarioEditor()
+    const profileInput = within(dialog).getByDisplayValue('default')
+    fireEvent.change(profileInput, { target: { value: 'custom-profile' } })
 
     // 点击确定保存
     fireEvent.click(within(dialog).getByRole('button', { name: '确定' }))
 
     // 弹窗仍然打开
-    await waitFor(() => expect(screen.getByRole('dialog', { name: /编辑 KIMI 评估/ })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('dialog', { name: /编辑 实施评估/ })).toBeInTheDocument())
 
     // 输入保留
-    expect(within(dialog).getByDisplayValue('kimi-k3.0')).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue('custom-profile')).toBeInTheDocument()
 
     // 显示错误信息（role="alert" 归属于该保存动作）
     const alert = within(dialog).getByRole('alert')
@@ -183,14 +177,11 @@ describe('ModelConfig · 编辑弹窗保存失败', () => {
     )
     renderAppAtModelConfig()
 
-    const editButtons = await screen.findAllByRole('button', { name: '编辑' })
-    fireEvent.click(editButtons[0])
-
-    const dialog = await screen.findByRole('dialog', { name: /编辑 KIMI 评估/ })
+    const dialog = await openFirstScenarioEditor()
     fireEvent.click(within(dialog).getByRole('button', { name: '确定' }))
 
     // 弹窗关闭
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: /编辑 KIMI 评估/ })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /编辑 实施评估/ })).not.toBeInTheDocument())
 
     // 页面显示内联成功状态
     const status = await screen.findByRole('status')
@@ -205,7 +196,7 @@ describe('ModelConfig · 语义色彩 token', () => {
     )
   })
 
-  test('模型卡片和 API Key 面板不使用 raw 白色，使用 var(--surface)', async () => {
+  test('模型配置页不使用 raw 白色，使用 var(--surface)', async () => {
     const { container } = renderAppAtModelConfig()
 
     await screen.findByRole('heading', { name: '模型配置' })

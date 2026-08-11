@@ -56,6 +56,9 @@ const DEFAULT_MODEL_CONFIG = {
   kimiCredentials: {
     apiKey: '', hint: null, envFallbackAvailable: false, resolvedFrom: 'none',
   },
+  // ISS-2026-08-11-001：多模型供应商目录 + 场景绑定（草稿态，随 PATCH 持久化）
+  modelProviders: [],
+  scenarioBindings: {},
 }
 
 const DEFAULT_RATECARD = [
@@ -243,6 +246,8 @@ export default function useSystemManagement({
           fileParsing: { ...DEFAULT_MODEL_CONFIG.fileParsing, ...d.fileParsing },
           kimiGeneration: { ...DEFAULT_MODEL_CONFIG.kimiGeneration, ...d.kimiGeneration },
           kimiCredentials: d.kimiCredentials || DEFAULT_MODEL_CONFIG.kimiCredentials,
+          modelProviders: Array.isArray(d.modelProviders) ? d.modelProviders : [],
+          scenarioBindings: d.scenarioBindings && typeof d.scenarioBindings === 'object' ? d.scenarioBindings : {},
         })
       }
       if (data?.active) {
@@ -260,7 +265,8 @@ export default function useSystemManagement({
   const updateModelConfig = useCallback((key, patch) => {
     setModelConfig((prev) => ({
       ...prev,
-      [key]: { ...prev[key], ...patch },
+      // 数组/空值整体替换（modelProviders 为数组）；对象走浅合并（scenarioBindings / 场景配置）
+      [key]: Array.isArray(patch) || patch == null ? patch : { ...prev[key], ...patch },
     }))
   }, [])
 
@@ -288,9 +294,12 @@ export default function useSystemManagement({
     })
   }, [enabled, withAction, loadEffective])
 
-  const saveModelDraft = useCallback(() => withAction('saveModelDraft', async () => {
+  const saveModelDraft = useCallback((overrides) => withAction('saveModelDraft', async () => {
     if (!enabled) return
-    const { kimiCredentials: _creds, ...rest } = modelConfig
+    const merged = overrides && typeof overrides === 'object' && !Array.isArray(overrides)
+      ? { ...modelConfig, ...overrides }
+      : modelConfig
+    const { kimiCredentials: _creds, ...rest } = merged
     await apiClient.patch('/system/requirement-settings/draft', rest)
   }), [enabled, modelConfig, withAction])
 
@@ -333,6 +342,28 @@ export default function useSystemManagement({
       return res?.data || res
     }
     return null
+  }), [enabled, withAction])
+
+  // --- ISS-2026-08-11-001：供应商级 API Key（凭据域 scope=provider:{id}，moonshot 复用 kimi） ---
+  const setProviderApiKey = useCallback((providerId, apiKey) => withAction(`setProviderKey:${providerId}`, async () => {
+    if (!enabled) throw new Error('登录已过期，请重新登录')
+    await apiClient.put(`/system/requirement-settings/providers/${providerId}/api-key`, { apiKey })
+    await loadEffective()
+  }), [enabled, withAction, loadEffective])
+
+  const clearProviderApiKey = useCallback((providerId) => withAction(`clearProviderKey:${providerId}`, async () => {
+    if (!enabled) throw new Error('登录已过期，请重新登录')
+    await apiClient.delete(`/system/requirement-settings/providers/${providerId}/api-key`)
+    await loadEffective()
+  }), [enabled, withAction, loadEffective])
+
+  const testProviderApiKey = useCallback((providerId, { apiKey, model } = {}) => withAction(`testProviderKey:${providerId}`, async () => {
+    if (!enabled) return null
+    const payload = {}
+    if (apiKey) payload.apiKey = apiKey
+    if (model) payload.model = model
+    const res = await apiClient.post(`/system/requirement-settings/providers/${providerId}/api-key/test`, payload)
+    return res?.data || res
   }), [enabled, withAction])
 
   // --- DSL ---
@@ -572,6 +603,9 @@ export default function useSystemManagement({
       updateModelConfig,
       activateModel,
       testApiKey,
+      setProviderApiKey,
+      clearProviderApiKey,
+      testProviderApiKey,
       testScenario,
       toggleDsl,
       saveDslDraft,

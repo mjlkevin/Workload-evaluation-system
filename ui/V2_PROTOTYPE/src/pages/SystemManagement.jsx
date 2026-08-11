@@ -19,7 +19,7 @@ const PROMPT_TABS = [
 const MODEL_CARDS = [
   {
     key: 'kimiEvaluation',
-    title: 'KIMI 评估',
+    title: '实施评估',
     desc: '用于实施评估与开发评估的自动打标与摘要生成。',
     summaryFields: [
       { label: '模型', path: 'model' },
@@ -41,7 +41,7 @@ const MODEL_CARDS = [
   },
   {
     key: 'kimiGeneration',
-    title: '生成模型',
+    title: '内容生成',
     desc: '用于方案生成、五段叙事与 SOW 草案自动撰写。',
     summaryFields: [
       { label: '模型', path: 'model' },
@@ -66,6 +66,8 @@ const SCENARIO_KEY_BY_CONFIG = {
 }
 
 const SOURCE_BADGE = {
+  binding: { cls: 'ok', label: '界面绑定' },
+  legacy_ui: { cls: 'ok', label: '界面配置' },
   ui: { cls: 'ok', label: '界面配置' },
   evaluation_fallback: { cls: 'warn', label: '评估配置兜底' },
   env_fallback: { cls: 'warn', label: '环境变量兜底' },
@@ -140,8 +142,6 @@ export default function SystemManagement({ sectionId }) {
   const [kbSaveResult, setKbSaveResult] = useState(null)
   const toast = useToast()
   const [editingModel, setEditingModel] = useState(null)
-  const [apiKeyInput, setApiKeyInput] = useState('')
-  const [apiKeyTestResult, setApiKeyTestResult] = useState(null) // {kind:'success'|'warn'|'error'|'info', text}
   const [extInput, setExtInput] = useState('')
   const [kbTestingProfileId, setKbTestingProfileId] = useState('')
   const [confirmClearKbKey, setConfirmClearKbKey] = useState(false)
@@ -153,6 +153,14 @@ export default function SystemManagement({ sectionId }) {
   const [modelSaveError, setModelSaveError] = useState(null)
   const [modelSaving, setModelSaving] = useState(false)
   const [expandedScenario, setExpandedScenario] = useState(null)
+  // ISS-2026-08-11-001：供应商新增/编辑弹窗 + 弹窗内嵌 Key 块状态
+  const [providerDialog, setProviderDialog] = useState(null) // { mode:'create' } | { mode:'edit', id }
+  const [providerForm, setProviderForm] = useState({ name: '', baseUrl: '', enabled: true, models: [] })
+  const [providerModelInput, setProviderModelInput] = useState('')
+  const [providerSaving, setProviderSaving] = useState(false)
+  const [providerSaveError, setProviderSaveError] = useState(null)
+  const [keyInput, setKeyInput] = useState('')
+  const [keyTestResult, setKeyTestResult] = useState(null) // {kind:'success'|'warn'|'error'|'info', text}
   const modelSnapshotRef = useRef(null)
 
   const dedicatedSection = sectionId ? getSystemManagementSectionById(sectionId) : null
@@ -233,9 +241,8 @@ export default function SystemManagement({ sectionId }) {
 
   const handleSaveModelDraft = async () => {
     setModelSaveResult(null)
-    const result = await actions.saveModelDraftWithKey(apiKeyInput || undefined)
+    const result = await actions.saveModelDraft()
     if (result.success) {
-      setApiKeyInput('')
       toast.success('模型配置草稿已保存')
     } else {
       toast.error(result.error || '模型配置草稿保存失败')
@@ -291,6 +298,238 @@ export default function SystemManagement({ sectionId }) {
     } else {
       setModelSaveError(result.error || '保存失败，请重试')
     }
+  }
+
+  // --- ISS-2026-08-11-001：供应商管理与场景绑定 ---
+  const effectiveProvidersById = (effectiveConfig?.providers || []).reduce((acc, p) => { acc[p.id] = p; return acc }, {})
+  const draftProviders = modelConfig.modelProviders || []
+
+  const openCreateProvider = () => {
+    setProviderForm({ name: '', baseUrl: '', enabled: true, models: [] })
+    setProviderModelInput('')
+    setProviderSaveError(null)
+    setKeyInput('')
+    setKeyTestResult(null)
+    setProviderDialog({ mode: 'create' })
+  }
+
+  const openEditProvider = (provider) => {
+    setProviderForm({
+      name: provider.name || '',
+      baseUrl: provider.baseUrl || '',
+      enabled: provider.enabled !== false,
+      models: (provider.models || []).map((m) => m.id),
+    })
+    setProviderModelInput('')
+    setProviderSaveError(null)
+    setKeyInput('')
+    setKeyTestResult(null)
+    setProviderDialog({ mode: 'edit', id: provider.id })
+  }
+
+  const addProviderModel = () => {
+    const id = providerModelInput.trim()
+    if (!id) return
+    setProviderForm((f) => (f.models.includes(id) ? f : { ...f, models: [...f.models, id] }))
+    setProviderModelInput('')
+  }
+
+  const handleProviderSave = async () => {
+    const name = providerForm.name.trim()
+    const baseUrl = providerForm.baseUrl.trim()
+    if (!name || !baseUrl) {
+      setProviderSaveError('供应商名称与 Base URL 必填')
+      return
+    }
+    // 输入框里已键入但未点「添加」的模型 ID 一并收录
+    const modelIds = [...providerForm.models]
+    const pendingModel = providerModelInput.trim()
+    if (pendingModel && !modelIds.includes(pendingModel)) modelIds.push(pendingModel)
+    const now = new Date().toISOString()
+    const existing = providerDialog?.mode === 'edit'
+      ? draftProviders.find((p) => p.id === providerDialog.id)
+      : null
+    const models = modelIds.map((id) => existing?.models?.find?.((m) => m.id === id)
+      || { id, label: id, capabilities: ['chat'], supportedParams: [] })
+    let nextProviders
+    if (existing) {
+      nextProviders = draftProviders.map((p) => (p.id === existing.id
+        ? { ...p, name, baseUrl, enabled: providerForm.enabled, models, updatedAt: now }
+        : p))
+    } else {
+      nextProviders = [...draftProviders, {
+        id: `p-${Date.now().toString(36)}`,
+        name, protocol: 'openai-compatible', baseUrl, enabled: providerForm.enabled,
+        models, createdAt: now, updatedAt: now,
+      }]
+    }
+    setProviderSaving(true)
+    setProviderSaveError(null)
+    actions.updateModelConfig('modelProviders', nextProviders) // eslint-disable-line -- 本地草稿态同步
+    const result = await actions.saveModelDraft({ modelProviders: nextProviders })
+    setProviderSaving(false)
+    if (result.success) {
+      setProviderDialog(null)
+      toast.success(existing ? '供应商配置已更新（草稿）' : '供应商已新增（草稿），生效配置后正式启用')
+    } else {
+      setProviderSaveError(result.error || '供应商保存失败，请重试')
+    }
+  }
+
+  const handleScenarioBindingChange = (configKey, scenarioKey, providerId, modelId) => {
+    actions.updateModelConfig('scenarioBindings', { [scenarioKey]: { providerId, modelId } }) // eslint-disable-line -- internal delegation
+    actions.updateModelConfig(configKey, { model: modelId }) // eslint-disable-line -- 同步旧场景字段，保持双写一致
+    setModelDirty(true)
+  }
+
+  const handleTestProviderKey = async (providerId, model) => {
+    setKeyTestResult({ kind: 'info', text: '正在测试连接…' })
+    const r = await actions.testProviderApiKey(providerId, { apiKey: keyInput.trim() || undefined, model })
+    if (r.success) {
+      const d = r.data || {}
+      const detail = [
+        d.requestedModel && `请求模型: ${d.requestedModel}`,
+        d.respondedModel && `响应模型: ${d.respondedModel}`,
+        d.latencyMs != null && `延迟: ${d.latencyMs}ms`,
+      ].filter(Boolean).join(' · ')
+      setKeyTestResult({ kind: 'success', text: `连接测试通过${detail ? `（${detail}）` : ''}` })
+    } else {
+      setKeyTestResult({ kind: 'error', text: r.error || '连接测试失败' })
+    }
+  }
+
+  const handleSaveProviderKey = async (providerId) => {
+    const key = keyInput.trim()
+    if (!key) {
+      setKeyTestResult({ kind: 'warn', text: '请先输入要保存的 API Key' })
+      return
+    }
+    const r = await actions.setProviderApiKey(providerId, key)
+    if (r.success) {
+      setKeyInput('')
+      setKeyTestResult({ kind: 'success', text: '密钥已加密保存到凭据域' })
+      toast.success('API Key 已保存')
+    } else {
+      setKeyTestResult({ kind: 'error', text: r.error || '密钥保存失败' })
+    }
+  }
+
+  const handleClearProviderKey = async (providerId) => {
+    const r = await actions.clearProviderApiKey(providerId)
+    if (r.success) {
+      setKeyInput('')
+      setKeyTestResult({ kind: 'info', text: '已清除该供应商保存的 API Key' })
+    } else {
+      setKeyTestResult({ kind: 'error', text: r.error || '密钥清除失败' })
+    }
+  }
+
+  const renderProviderKeyBlock = (provider, model) => {
+    if (!provider) return null
+    const eff = effectiveProvidersById[provider.id] || null
+    const testing = Boolean(actionLoading[`testProviderKey:${provider.id}`])
+    const savingKey = Boolean(actionLoading[`setProviderKey:${provider.id}`])
+    return (
+      <FormRow label={`API Key（${provider.name}）`}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span className="sys-field__v" style={{ fontSize: 12 }}>
+            {eff?.keyConfigured
+              ? <>当前密钥：<span className="mono">已配置 {eff.keyHint}</span>{eff.keySource === 'store' ? '（凭据域托管）' : eff.keySource === 'env' ? '（环境变量）' : ''}</>
+              : '当前密钥：未配置'}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              className="input"
+              type="password"
+              style={{ flex: 1, minWidth: 200 }}
+              placeholder="输入新 API Key（留空则不修改）"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+            />
+            <button type="button" className="btn btn-ghost btn-sm" disabled={testing} onClick={() => handleTestProviderKey(provider.id, model)}>
+              {testing ? '测试中…' : '测试连接'}
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={savingKey || !keyInput.trim()} onClick={() => handleSaveProviderKey(provider.id)}>
+              {savingKey ? '保存中…' : '保存密钥'}
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={!eff?.keyConfigured} onClick={() => handleClearProviderKey(provider.id)}>
+              清除密钥
+            </button>
+          </div>
+          {keyTestResult && (
+            <span
+              className="sys-field__v"
+              style={{
+                fontSize: 12,
+                color:
+                  keyTestResult.kind === 'success' ? 'var(--ok-ink)'
+                  : keyTestResult.kind === 'warn' ? 'var(--warn-ink)'
+                  : keyTestResult.kind === 'error' ? 'var(--err-ink)'
+                  : 'var(--ink-3)',
+              }}
+            >
+              {keyTestResult.text}
+            </span>
+          )}
+          <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>
+            密钥经 KEK 加密后存入凭据域并记录变更审计；保存后立即生效，无需再点「生效配置」。
+          </span>
+        </div>
+      </FormRow>
+    )
+  }
+
+  const renderScenarioBinding = (configKey) => {
+    const scenarioKey = SCENARIO_KEY_BY_CONFIG[configKey]
+    const binding = modelConfig.scenarioBindings?.[scenarioKey] || {}
+    const boundProviderId = binding.providerId || draftProviders[0]?.id || ''
+    const boundProvider = draftProviders.find((p) => p.id === boundProviderId) || null
+    const catalogModels = boundProvider?.models || []
+    const currentModel = modelConfig[configKey]?.model || binding.modelId || ''
+    if (!draftProviders.length) {
+      return (
+        <div className="sys-alert" role="alert" style={{ marginBottom: 12 }}>
+          暂无模型供应商，请先在「模型供应商」区新增供应商。
+        </div>
+      )
+    }
+    const modelOptions = currentModel && !catalogModels.some((m) => m.id === currentModel)
+      ? [...catalogModels, { id: currentModel, label: `${currentModel}（目录外）` }]
+      : catalogModels
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 14, marginBottom: 2, borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <FormRow label="模型供应商">
+            <select
+              className="input"
+              value={boundProviderId}
+              onChange={(e) => {
+                const pid = e.target.value
+                const prov = draftProviders.find((p) => p.id === pid)
+                const firstModel = prov?.models?.[0]?.id || currentModel
+                handleScenarioBindingChange(configKey, scenarioKey, pid, firstModel)
+              }}
+            >
+              {draftProviders.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}{p.enabled === false ? '（已停用）' : ''}</option>
+              ))}
+            </select>
+          </FormRow>
+          <FormRow label="模型">
+            <select
+              className="input"
+              value={currentModel}
+              onChange={(e) => handleScenarioBindingChange(configKey, scenarioKey, boundProviderId, e.target.value)}
+            >
+              {modelOptions.map((m) => (
+                <option key={m.id} value={m.id}>{m.label && m.label !== m.id ? `${m.label}（${m.id}）` : m.id}</option>
+              ))}
+            </select>
+          </FormRow>
+        </div>
+        {boundProvider ? renderProviderKeyBlock(boundProvider, currentModel) : null}
+      </div>
+    )
   }
 
   return (
@@ -396,9 +635,9 @@ export default function SystemManagement({ sectionId }) {
         {activeSectionId === 'model' && (
           <div>
             <div className="sys-toolbar">
-              <span className="meta">KIMI 评估 / 文件解析 / 生成模型 · 修改后先保存草稿再生效</span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraftWithKey}>
-                {actionLoading.saveModelDraftWithKey ? '...' : '保存草稿'}
+              <span className="meta">模型供应商与场景绑定 · 修改后先保存草稿再生效</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraft}>
+                {actionLoading.saveModelDraft ? '...' : '保存草稿'}
               </button>
               <button type="button" className="btn btn-pri btn-sm" onClick={handleActivateModel} disabled={actionLoading.activateModel}>
                 {actionLoading.activateModel ? '...' : '⌁ 生效配置'}
@@ -408,13 +647,99 @@ export default function SystemManagement({ sectionId }) {
             {effectiveConfig?.credentials && (!effectiveConfig.credentials.configured || !effectiveConfig.credentials.kekReady) && (
               <div className="sys-alert" role="alert">
                 {!effectiveConfig.credentials.configured
-                  ? '未配置可用的 API Key：AI 调用当前不可用，请在下方 API Key 管理中配置。'
+                  ? '未配置可用的 API Key：AI 调用当前不可用，请在下方「模型供应商」区对应供应商的编辑弹窗中配置。'
                   : 'CREDENTIAL_KEK 未配置：密钥将无法加密保存，请在后端环境变量中配置后重启服务。'}
               </div>
             )}
 
+            <div className="sys-toolbar" style={{ marginTop: 4 }}>
+              <span className="meta">模型供应商 · 凭据按供应商加密托管</span>
+              <button type="button" className="btn btn-pri btn-sm" onClick={openCreateProvider}>+ 新增供应商</button>
+            </div>
+            <div className="sys-table-wrap" style={{ marginBottom: 14 }}>
+              <table className="table sys-model-table" aria-label="模型供应商">
+                <thead>
+                  <tr>
+                    <th>供应商</th>
+                    <th>Base URL</th>
+                    <th>模型</th>
+                    <th>API Key</th>
+                    <th>状态</th>
+                    <th style={{ textAlign: 'right' }}>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {draftProviders.map((provider) => {
+                    const eff = effectiveProvidersById[provider.id] || null
+                    return (
+                      <tr key={provider.id} className="sys-model-row">
+                        <td>
+                          <div className="sys-model-scene">
+                            <span className="sys-model-scene__name">{provider.name}</span>
+                            <span className="sys-model-scene__purpose mono">{provider.protocol || 'openai-compatible'}</span>
+                          </div>
+                        </td>
+                        <td><span className="mono" style={{ fontSize: 12 }}>{provider.baseUrl || '—'}</span></td>
+                        <td>
+                          <div className="sys-model-chips">
+                            {(provider.models || []).map((m) => <span key={m.id} className="sys-model-chip mono">{m.id}</span>)}
+                            {!provider.models?.length ? <span className="sys-model-detail__mut">—</span> : null}
+                          </div>
+                        </td>
+                        <td>
+                          {eff ? (
+                            eff.keyConfigured ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span className="mono" style={{ fontSize: 12 }}>已配置 {eff.keyHint}</span>
+                                <span className={`tag ${eff.keySource === 'store' ? 'ok' : 'warn'}`}>{eff.keySource === 'store' ? '凭据托管' : '环境变量'}</span>
+                              </span>
+                            ) : <span className="tag err">未配置</span>
+                          ) : '—'}
+                        </td>
+                        <td>
+                          <span className={`bdg ${provider.enabled !== false ? 'ci' : 'draft'}`}>
+                            <span className="dot" />
+                            {provider.enabled !== false ? '启用' : '停用'}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => openEditProvider(provider)}>编辑</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {!draftProviders.length ? (
+                    <tr><td colSpan={6} className="sys-model-detail__mut" style={{ textAlign: 'center', padding: 16 }}>暂无供应商，点击右上角「新增供应商」接入第一家模型服务</td></tr>
+                  ) : null}
+                </tbody>
+              </table>
+              {effectiveConfig?.credentials ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '10px 2px 0', fontSize: 11, color: 'var(--ink-3)' }}>
+                  <span>凭据域状态：</span>
+                  <span className={`tag ${effectiveConfig.credentials.source === 'store' ? 'ok' : effectiveConfig.credentials.source === 'env' ? 'warn' : 'err'}`}>
+                    {effectiveConfig.credentials.source === 'store' ? '凭据域托管（加密落库）'
+                      : effectiveConfig.credentials.source === 'env' ? '环境变量兜底'
+                      : '凭据未配置'}
+                  </span>
+                  <span className={`tag ${effectiveConfig.credentials.kekReady ? 'ok' : 'err'}`}>
+                    KEK {effectiveConfig.credentials.kekReady ? '就绪' : '未配置'}
+                  </span>
+                  {effectiveConfig.credentials.lastAudit ? (
+                    <span>
+                      最近变更：{effectiveConfig.credentials.lastAudit.action === 'set' ? '设置密钥' : effectiveConfig.credentials.lastAudit.action === 'clear' ? '清除密钥' : effectiveConfig.credentials.lastAudit.action}
+                      {' · '}{effectiveConfig.credentials.lastAudit.actor}
+                      {' · '}{formatRelativeTime(effectiveConfig.credentials.lastAudit.at)}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="sys-toolbar" style={{ marginTop: 4 }}>
+              <span className="meta">场景模型绑定 · 点击行查看接线与差异</span>
+            </div>
             <div className="sys-table-wrap">
-              <table className="table sys-model-table">
+              <table className="table sys-model-table" aria-label="场景模型绑定">
                 <thead>
                   <tr>
                     <th>场景</th>
@@ -435,8 +760,8 @@ export default function SystemManagement({ sectionId }) {
                     const diffs = buildScenarioDiff(draftCfg, activeCfg)
                     const wired = scenario ? scenario.wired : card.key !== 'kimiGeneration'
                     const resolvedModel = scenario?.resolvedModel || activeCfg?.model || draftCfg.model || '—'
-                    const source = scenario?.source || 'ui'
-                    const sourceBadge = SOURCE_BADGE[source] || SOURCE_BADGE.ui
+                    const source = scenario?.source || 'binding'
+                    const sourceBadge = SOURCE_BADGE[source] || SOURCE_BADGE.binding
                     const lastVerified = scenario?.lastVerified || null
                     const expanded = expandedScenario === card.key
                     const verifyLoading = Boolean(actionLoading[`testScenario:${scenarioKey}`])
@@ -454,7 +779,7 @@ export default function SystemManagement({ sectionId }) {
                           </td>
                           <td>
                             <span className="mono">{resolvedModel}</span>
-                            {scenario && !scenario.wired ? null : null}
+                            {scenario?.providerName ? <div className="sys-model-detail__mut" style={{ fontSize: 11 }}>{scenario.providerName}</div> : null}
                           </td>
                           <td><span className={`tag ${sourceBadge.cls}`}>{sourceBadge.label}</span></td>
                           <td className="sys-model-params">{wired ? buildParamSummary(card.key, activeCfg || draftCfg) : '—'}</td>
@@ -482,7 +807,7 @@ export default function SystemManagement({ sectionId }) {
                                 className="btn btn-ghost btn-sm"
                                 disabled={!wired}
                                 title={wired ? '' : '该场景尚未接入业务链路（规划中）'}
-                                onClick={() => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setEditingModel(card.key) }}
+                                onClick={() => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setKeyInput(''); setKeyTestResult(null); setEditingModel(card.key) }}
                               >
                                 编辑
                               </button>
@@ -560,117 +885,6 @@ export default function SystemManagement({ sectionId }) {
               </table>
             </div>
 
-            <div className="sys-card" style={{ marginTop: 14 }}>
-              <div className="sys-card__hd">
-                <span className="sys-card__title">API Key 管理</span>
-              </div>
-              <div className="sys-card__bd sys-card__bd--col" style={{ paddingTop: 14 }}>
-                <div className="sys-field sys-field--loose">
-                  <span className="sys-field__lb">当前密钥来源</span>
-                  <span className="sys-field__v mono">
-                    {modelConfig.kimiCredentials.hint
-                      ? `已配置 ${modelConfig.kimiCredentials.hint}`
-                      : modelConfig.kimiCredentials.resolvedFrom === 'env'
-                        ? '来自环境变量 KIMI_API_KEY'
-                        : '（未配置）'}
-                  </span>
-                </div>
-                {effectiveConfig?.credentials && (
-                  <div className="sys-field sys-field--loose">
-                    <span className="sys-field__lb">凭据托管</span>
-                    <span className="sys-field__v" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span className={`tag ${effectiveConfig.credentials.source === 'store' ? 'ok' : effectiveConfig.credentials.source === 'env' ? 'warn' : 'err'}`}>
-                        {effectiveConfig.credentials.source === 'store' ? '凭据域托管（加密落库）'
-                          : effectiveConfig.credentials.source === 'env' ? '环境变量兜底'
-                          : '未配置'}
-                      </span>
-                      <span className={`tag ${effectiveConfig.credentials.kekReady ? 'ok' : 'err'}`}>
-                        KEK {effectiveConfig.credentials.kekReady ? '就绪' : '未配置'}
-                      </span>
-                      {effectiveConfig.credentials.lastAudit && (
-                        <span className="sys-field__v--dim" style={{ fontSize: 11 }}>
-                          最近变更：{effectiveConfig.credentials.lastAudit.action === 'set' ? '设置密钥' : effectiveConfig.credentials.lastAudit.action === 'clear' ? '清除密钥' : effectiveConfig.credentials.lastAudit.action}
-                          {' · '}{effectiveConfig.credentials.lastAudit.actor}
-                          {' · '}{formatRelativeTime(effectiveConfig.credentials.lastAudit.at)}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                )}
-                <div className="sys-field sys-field--loose">
-                  <span className="sys-field__lb">更新密钥</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <input
-                      className="input"
-                      type="password"
-                      style={{ flex: 1, minWidth: 200, maxWidth: 360 }}
-                      placeholder="输入新 API Key（留空则不修改）"
-                      value={apiKeyInput}
-                      onChange={(e) => setApiKeyInput(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      disabled={actionLoading.testApiKey}
-                      onClick={async () => {
-                        const key = apiKeyInput.trim()
-                        if (!key) {
-                          setApiKeyTestResult({ kind: 'warn', text: '请先输入要测试的 API Key' })
-                          toast.warn('请先输入要测试的 API Key')
-                          return
-                        }
-                        setApiKeyTestResult({ kind: 'info', text: '正在测试连接…' })
-                        const r = await actions.testApiKey(key, modelConfig.kimiEvaluation?.model)
-                        if (r.success) {
-                          const d = r.data || {}
-                          const detail = [
-                            d.requestedModel && `请求模型: ${d.requestedModel}`,
-                            d.respondedModel && `响应模型: ${d.respondedModel}`,
-                            d.modelMatch === false && '⚠ 模型不匹配',
-                            d.latencyMs != null && `延迟: ${d.latencyMs}ms`,
-                          ].filter(Boolean).join(' · ')
-                          if (d.modelMatch === false) {
-                            setApiKeyTestResult({ kind: 'warn', text: `连通性通过，但模型名不匹配${detail ? `（${detail}）` : ''}` })
-                            toast.warn('连通性通过，但模型名不匹配', { detail, duration: 6000 })
-                          } else {
-                            setApiKeyTestResult({ kind: 'success', text: `连接测试通过${detail ? `（${detail}）` : ''}` })
-                            toast.success('连接测试通过', { detail, duration: 5000 })
-                          }
-                        } else {
-                          setApiKeyTestResult({ kind: 'error', text: r.error || '连接测试失败' })
-                          toast.error(r.error || '连接测试失败')
-                        }
-                      }}
-                    >
-                      {actionLoading.testApiKey ? '测试中…' : '测试连接'}
-                    </button>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setApiKeyInput(''); setApiKeyTestResult(null); actions.clearApiKeyDraft() }}>
-                      清除密钥
-                    </button>
-                  </div>
-                  {apiKeyTestResult && (
-                    <span
-                      className="sys-field__v"
-                      style={{
-                        fontSize: 12,
-                        color:
-                          apiKeyTestResult.kind === 'success' ? 'var(--ok-ink, #1a7f37)'
-                          : apiKeyTestResult.kind === 'warn' ? 'var(--warn-ink, #9a6700)'
-                          : apiKeyTestResult.kind === 'error' ? 'var(--err-ink, #cf222e)'
-                          : 'var(--mut, #667085)',
-                      }}
-                    >
-                      {apiKeyTestResult.text}
-                    </span>
-                  )}
-                </div>
-                <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>
-                  {modelConfig.kimiCredentials.resolvedFrom === 'store' ? '凭据域托管（AES-256-GCM 加密落库 + 变更审计）'
-                    : modelConfig.kimiCredentials.resolvedFrom === 'env' ? '当前使用环境变量'
-                    : '未配置可用密钥，保存草稿后生效'}
-                </span>
-              </div>
-            </div>
           </div>
         )}
 
@@ -1118,16 +1332,14 @@ export default function SystemManagement({ sectionId }) {
         wide
         dismissDisabled={modelSaving}
       >
+            {editingModel ? renderScenarioBinding(editingModel) : null}
             {editingModel === 'kimiEvaluation' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <FormRow label="启用">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                     <input type="checkbox" checked={modelConfig.kimiEvaluation.enabled} onChange={(e) => handleModelConfigChange('kimiEvaluation', { enabled: e.target.checked })} />
-                    启用 KIMI 评估模型
+                    启用实施评估场景
                   </label>
-                </FormRow>
-                <FormRow label="模型标识">
-                  <input className="input" value={modelConfig.kimiEvaluation.model} onChange={(e) => handleModelConfigChange('kimiEvaluation', { model: e.target.value })} />
                 </FormRow>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="Temperature">
@@ -1166,11 +1378,8 @@ export default function SystemManagement({ sectionId }) {
                 <FormRow label="启用">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                     <input type="checkbox" checked={modelConfig.fileParsing.enabled} onChange={(e) => handleModelConfigChange('fileParsing', { enabled: e.target.checked })} />
-                    启用文件解析模型
+                    启用文件解析场景
                   </label>
-                </FormRow>
-                <FormRow label="模型标识">
-                  <input className="input" value={modelConfig.fileParsing.model} onChange={(e) => handleModelConfigChange('fileParsing', { model: e.target.value })} />
                 </FormRow>
                 <FormRow label="允许的扩展名">
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
@@ -1215,11 +1424,8 @@ export default function SystemManagement({ sectionId }) {
                 <FormRow label="启用">
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                     <input type="checkbox" checked={modelConfig.kimiGeneration.enabled} onChange={(e) => handleModelConfigChange('kimiGeneration', { enabled: e.target.checked })} />
-                    启用生成模型
+                    启用内容生成场景
                   </label>
-                </FormRow>
-                <FormRow label="模型标识">
-                  <input className="input" value={modelConfig.kimiGeneration.model} onChange={(e) => handleModelConfigChange('kimiGeneration', { model: e.target.value })} />
                 </FormRow>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="Temperature">
@@ -1263,6 +1469,76 @@ export default function SystemManagement({ sectionId }) {
                 {modelSaving ? '保存中...' : '确定'}
               </button>
             </DialogActions>
+      </Dialog>
+
+      {/* 供应商新增/编辑 dialog（ISS-2026-08-11-001） */}
+      <Dialog
+        open={Boolean(providerDialog)}
+        title={providerDialog?.mode === 'edit' ? `编辑供应商 · ${providerForm.name || ''}` : '新增供应商'}
+        onClose={() => { if (!providerSaving) setProviderDialog(null) }}
+        wide
+        dismissDisabled={providerSaving}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <FormRow label="供应商名称">
+              <input className="input" placeholder="如 OpenAI" value={providerForm.name} onChange={(e) => setProviderForm((f) => ({ ...f, name: e.target.value }))} />
+            </FormRow>
+            <FormRow label="Base URL">
+              <input className="input mono" placeholder="https://api.openai.com/v1" value={providerForm.baseUrl} onChange={(e) => setProviderForm((f) => ({ ...f, baseUrl: e.target.value }))} />
+            </FormRow>
+          </div>
+          <FormRow label="模型目录">
+            <div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                {providerForm.models.map((id) => (
+                  <span key={id} className="bdg brd">
+                    {id}
+                    <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setProviderForm((f) => ({ ...f, models: f.models.filter((m) => m !== id) }))}>×</span>
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  className="input"
+                  style={{ flex: 1 }}
+                  placeholder="如 gpt-4o"
+                  value={providerModelInput}
+                  onChange={(e) => setProviderModelInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addProviderModel() } }}
+                />
+                <button type="button" className="btn btn-ghost btn-sm" onClick={addProviderModel}>添加</button>
+              </div>
+            </div>
+          </FormRow>
+          <FormRow label="启用">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={providerForm.enabled} onChange={(e) => setProviderForm((f) => ({ ...f, enabled: e.target.checked }))} />
+              启用该供应商（停用后新绑定不可选，存量绑定仍按原配置运行）
+            </label>
+          </FormRow>
+          {providerDialog?.mode === 'edit' ? (
+            renderProviderKeyBlock(
+              draftProviders.find((p) => p.id === providerDialog.id) || null,
+              providerForm.models[0] || '',
+            )
+          ) : (
+            <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>
+              保存供应商后可配置 API Key；密钥按供应商独立托管（加密落库 + 变更审计）。
+            </span>
+          )}
+          {providerSaveError && (
+            <div role="alert" style={{ background: 'var(--err-soft)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', color: 'var(--err)', fontSize: 12, fontWeight: 700, padding: '8px 12px' }}>
+              ✗ {providerSaveError}
+            </div>
+          )}
+        </div>
+        <DialogActions>
+          <button type="button" className="btn btn-out btn-sm" onClick={() => setProviderDialog(null)} disabled={providerSaving}>取消</button>
+          <button type="button" className="btn btn-pri btn-sm" onClick={handleProviderSave} disabled={providerSaving}>
+            {providerSaving ? '保存中...' : '保存供应商'}
+          </button>
+        </DialogActions>
       </Dialog>
 
       {/* 模型编辑脏关闭确认 */}

@@ -579,12 +579,44 @@ export const handlers = [
       fileParsing: { enabled: true, model: 'kimi-k2.6', allowedExtensions: ['.xlsx', '.xls', '.csv'], maxFileSizeMb: 20, maxSheetCount: 20, strictMode: false, ocrEnabled: false },
       kimiGeneration: { enabled: true, model: 'kimi-k2.5', temperature: 0.5, maxTokens: 6000, outputStyle: 'balanced', includeRiskHints: true, includeAssumptions: true },
       kimiCredentials: { apiKey: '', hint: null, envFallbackAvailable: false, resolvedFrom: 'none' },
+      modelProviders: [
+        { id: 'moonshot', name: 'Moonshot（月之暗面）', protocol: 'openai-compatible', baseUrl: 'https://api.moonshot.cn/v1', enabled: true,
+          models: [
+            { id: 'kimi-k3', label: 'Kimi K3', capabilities: ['chat'], supportedParams: [] },
+            { id: 'kimi-k2.6', label: 'Kimi K2.6', capabilities: ['chat'], supportedParams: [] },
+          ] },
+        { id: 'zhipu', name: '智谱 GLM', protocol: 'openai-compatible', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', enabled: true,
+          models: [
+            { id: 'glm-4.6', label: 'GLM 4.6', capabilities: ['chat'], supportedParams: [] },
+          ] },
+      ],
+      scenarioBindings: {
+        assessment: { providerId: 'moonshot', modelId: 'kimi-k2.5' },
+        fileParsing: { providerId: 'moonshot', modelId: 'kimi-k2.6' },
+        generation: { providerId: 'moonshot', modelId: 'kimi-k2.5' },
+      },
     },
     active: {
       kimiEvaluation: { enabled: true, model: 'kimi-k2.5', temperature: 0.3, maxTokens: 4000, timeoutMs: 120000, fallbackToRule: true, promptProfile: 'default', promptTemplate: '' },
       fileParsing: { enabled: true, model: 'kimi-k2.6', allowedExtensions: ['.xlsx', '.xls', '.csv'], maxFileSizeMb: 20, maxSheetCount: 20, strictMode: false, ocrEnabled: false },
       kimiGeneration: { enabled: true, model: 'kimi-k2.5', temperature: 0.5, maxTokens: 6000, outputStyle: 'balanced', includeRiskHints: true, includeAssumptions: true },
       kimiCredentials: { apiKey: '', hint: null, envFallbackAvailable: false, resolvedFrom: 'none' },
+      modelProviders: [
+        { id: 'moonshot', name: 'Moonshot（月之暗面）', protocol: 'openai-compatible', baseUrl: 'https://api.moonshot.cn/v1', enabled: true,
+          models: [
+            { id: 'kimi-k3', label: 'Kimi K3', capabilities: ['chat'], supportedParams: [] },
+            { id: 'kimi-k2.6', label: 'Kimi K2.6', capabilities: ['chat'], supportedParams: [] },
+          ] },
+        { id: 'zhipu', name: '智谱 GLM', protocol: 'openai-compatible', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', enabled: true,
+          models: [
+            { id: 'glm-4.6', label: 'GLM 4.6', capabilities: ['chat'], supportedParams: [] },
+          ] },
+      ],
+      scenarioBindings: {
+        assessment: { providerId: 'moonshot', modelId: 'kimi-k2.5' },
+        fileParsing: { providerId: 'moonshot', modelId: 'kimi-k2.6' },
+        generation: { providerId: 'moonshot', modelId: 'kimi-k2.5' },
+      },
     },
     updatedAt: '2026-01-15T08:00:00Z',
     effectiveAt: '2026-01-15T08:00:00Z',
@@ -596,25 +628,32 @@ export const handlers = [
   http.get(`${BASE}/system/requirement-settings/effective`, () => HttpResponse.json({ success: true, data: {
     scenarios: [
       {
-        key: 'assessment', label: 'KIMI 评估', purpose: '用于实施评估与开发评估的自动打标与摘要生成。',
-        resolvedModel: 'kimi-k2.5', source: 'ui', wired: true,
+        key: 'assessment', label: '实施评估', purpose: '用于实施评估与开发评估的自动打标与摘要生成。',
+        resolvedModel: 'kimi-k2.5', source: 'binding', wired: true,
+        providerId: 'moonshot', providerName: 'Moonshot（月之暗面）', baseUrl: 'https://api.moonshot.cn/v1', credentialScope: 'kimi',
         wiredParams: ['model', 'maxTokens', 'timeoutMs', 'promptProfile', 'promptTemplate'],
         notes: ['temperature 配置暂不生效（评估链路当前硬编码 0.1，P2 接通）', 'K2 系列模型采样参数由平台固定，temperature 不会发送'],
         lastVerified: { at: '2026-08-10T12:00:00.000Z', ok: true, model: 'kimi-k2.5', elapsedMs: 800 },
       },
       {
         key: 'fileParsing', label: '文件解析', purpose: '用于 Excel/Word/PDF 的结构化提取与内容解析。',
-        resolvedModel: 'kimi-k2.6', source: 'ui', wired: true,
+        resolvedModel: 'kimi-k2.6', source: 'binding', wired: true,
+        providerId: 'moonshot', providerName: 'Moonshot（月之暗面）', baseUrl: 'https://api.moonshot.cn/v1', credentialScope: 'kimi',
         wiredParams: ['model'],
         notes: ['allowedExtensions / maxFileSizeMb / maxSheetCount / strictMode / ocrEnabled 配置暂不生效（P2 接通上传链路）'],
         lastVerified: null,
       },
       {
-        key: 'generation', label: '生成模型', purpose: '用于方案生成、五段叙事与 SOW 草稿自动撰写。',
-        resolvedModel: 'kimi-k2.5', source: 'ui', wired: false,
+        key: 'generation', label: '内容生成', purpose: '用于方案生成、五段叙事与 SOW 草稿自动撰写。',
+        resolvedModel: 'kimi-k2.5', source: 'binding', wired: false,
+        providerId: 'moonshot', providerName: 'Moonshot（月之暗面）', baseUrl: 'https://api.moonshot.cn/v1', credentialScope: 'kimi',
         wiredParams: [], notes: ['该场景尚未接入业务链路，配置暂不生效（规划中）'],
         lastVerified: null,
       },
+    ],
+    providers: [
+      { id: 'moonshot', name: 'Moonshot（月之暗面）', protocol: 'openai-compatible', baseUrl: 'https://api.moonshot.cn/v1', enabled: true, models: ['kimi-k3', 'kimi-k2.6'], credentialScope: 'kimi', keyConfigured: true, keySource: 'store', keyHint: '····epCz' },
+      { id: 'zhipu', name: '智谱 GLM', protocol: 'openai-compatible', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', enabled: true, models: ['glm-4.6'], credentialScope: 'provider:zhipu', keyConfigured: false, keySource: 'none', keyHint: null },
     ],
     credentials: { configured: true, source: 'store', kekReady: true, lastAudit: { action: 'set', actor: 'kevin', at: '2026-08-10T11:00:00.000Z' } },
     generatedAt: '2026-08-10T12:30:00.000Z',
@@ -625,8 +664,25 @@ export const handlers = [
       return HttpResponse.json({ code: 40001, message: '该场景尚未接入业务链路（规划中），暂不支持验证' }, { status: 400 })
     }
     return HttpResponse.json({ success: true, data: {
-      ok: true, scenario: body.scenario, resolvedModel: 'kimi-k2.5', modelSource: 'ui', keySource: 'draft_store',
+      ok: true, scenario: body.scenario, resolvedModel: 'kimi-k2.5', modelSource: 'binding', keySource: 'draft_store',
       respondedModel: 'kimi-k2.5', modelMatch: true, latencyMs: 800, httpStatus: 200,
+    } })
+  }),
+  // ISS-2026-08-11-001：供应商级 API Key 管理（凭据域 scope=provider:{id}，moonshot 复用 kimi scope）
+  http.put(`${BASE}/system/requirement-settings/providers/:providerId/api-key`, async ({ params, request }) => {
+    const body = await request.json()
+    if (!body?.apiKey) return HttpResponse.json({ code: 40001, message: 'apiKey 必填' }, { status: 400 })
+    return HttpResponse.json({ success: true, data: { providerId: params.providerId, keySource: 'store', keyHint: '····wxyz' } })
+  }),
+  http.delete(`${BASE}/system/requirement-settings/providers/:providerId/api-key`, ({ params }) => HttpResponse.json({
+    success: true, data: { providerId: params.providerId, cleared: true },
+  })),
+  http.post(`${BASE}/system/requirement-settings/providers/:providerId/api-key/test`, async ({ params, request }) => {
+    const body = await request.json().catch(() => ({}))
+    const requestedModel = body?.model || 'kimi-k3'
+    return HttpResponse.json({ success: true, data: {
+      ok: true, providerId: params.providerId, requestedModel, respondedModel: requestedModel,
+      modelMatch: true, latencyMs: 600, httpStatus: 200,
     } })
   }),
   http.get(`${BASE}/system/knowledge-base-config`, () => HttpResponse.json({ success: true, data: {
