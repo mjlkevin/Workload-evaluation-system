@@ -609,6 +609,17 @@
               <td class="tc-7">分诊结果 defect（P1）。阻断 RP-052（蒸馏记忆 UI 确认）人工验收：后端蒸馏落 PG 正常（harness-boot 12 用例守护），但读取侧两缺口叠加使面板恒空。去重：listMemory / 记忆面板无既有 issue / RP / defect 记录，未命中。派生 DEF-2026-08-11-001。交叉引用 RP-052、ISS-2026-08-10-008（同为读取侧缺口类缺陷）。2026-08-11 19:31 用户拍板修复，与 chip 活数据链路合并一张工单。</td>
               <td class="tc-8">修复方向：① memory.usecase.listMemory 缺 projectId 时改返回 owner 全量或默认 default 项目（与其他 harness 读取口径对齐）；② MemoryManagementPanel 读取 location query 初始化 status filter，提示条跳转后自动筛选 draft；③ 补 RED 测试（listMemory 无 projectId 非空 + 面板 query 初始化用例）。验收口径：面板真实数据非空可确认、MS2-PATCH 提示条跳转自动筛选 draft 生效、test:modules / test:harness 计数不下降。工单 <code class="inline">docs/agent-loop/work-orders/2026-08-11-qoder-memory-panel-chip-live-link.md</code>（base e521fcb）已编制，待派发。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-003-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-003</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">系统管理 / 模型配置：场景编辑弹窗内点「保存密钥」报 apiClient.put is not a function，供应商 Key 无法保存（RP-055 批 2 验收反馈）</td>
+              <td class="tc-3">user_feedback（RP-055 批 2 人工验收）</td>
+              <td class="tc-4">2026-08-11 21:21 用户验收批 2 时反馈（截图）：测试连接通过后点「保存密钥」，内联错误提示「apiClient.put is not a function」。截图同时实证批 2 内联错误展示路径工作正常（错误未静默、未仅依赖 toast）。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/api/client.js（缺 put 封装）</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js（setProviderApiKey 调 apiClient.put）</code></td>
+              <td class="tc-6"><span class="status done"><span class="dot"></span>已修复（7a9c559）/ 待用户复验</span></td>
+              <td class="tc-7">分诊结果 defect（P1，阻断批 2 验收核心动作）。根因：批 2 新增 setProviderApiKey 调用 apiClient.put，但 client.js 从未封装 put 方法（仅 get/post/patch/delete/upload）；批 2 测试只覆盖「未输入时按钮禁用不发 PUT」与测试连接，保存成功路径无用例导致漏网。去重：保存密钥 / apiClient.put 无既有记录，未命中。派生 DEF-2026-08-11-002，关联 RP-055。</td>
+              <td class="tc-8">修复：client.js 补 put 封装（1 行）+ RED 测试先行（复现原始报错 → 转绿，断言 PUT 调用与 body.apiKey）。验收口径：输入新 Key 点「保存密钥」→ PUT /providers/:id/api-key 成功、内联「密钥已加密保存到凭据域」、keyHint 刷新。验证：前端 311/312（唯一失败 UserManagement 既有基线）、build:web 零错误。待用户复验后关闭 DEF。</td>
+            </tr>
         </tbody>
         </table>
         </div>

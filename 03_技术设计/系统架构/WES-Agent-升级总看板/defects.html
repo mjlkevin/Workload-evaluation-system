@@ -372,6 +372,18 @@
               <td class="tc-8">验收口径：① 面板真实数据非空，draft 记忆可见可确认；② MS2-PATCH 蒸馏成功提示条「去确认」跳转后自动筛选 draft；③ 补 RED 测试（listMemory 无 projectId 非空 + 面板 query 初始化）；④ test:modules / test:harness 计数不下降。</td>
               <td class="tc-9">2026-08-11 Codex MS3 回填复核时登记（Qoder handoff 自发现，代码事实复核确认）。2026-08-11 19:31 用户拍板修复：与 chip 活数据链路合并一张工单 <code class="inline">docs/agent-loop/work-orders/2026-08-11-qoder-memory-panel-chip-live-link.md</code>（base e521fcb，RED≥4），待派发 Qoder。与 ISS-2026-08-10-008（凭据读取侧冷启动）同属「写入侧已闭环、读取侧缺口」类缺陷。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-08-11-def-2026-08-11-002-derived:defects">
+              <td class="mono tc-0">DEF-2026-08-11-002</td>
+              <td class="mono tc-1">ISS-2026-08-11-003</td>
+              <td class="mono tc-2">RP-055</td>
+              <td class="tc-3">供应商 Key 保存报 apiClient.put is not a function——apiClient 缺 put 封装，setProviderApiKey 必然失败</td>
+              <td class="tc-4">S2</td>
+              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复（7a9c559）/ 待用户复验关闭</span></td>
+              <td class="tc-6">ui/V2_PROTOTYPE/src/api/client.js（缺 put 封装）/ ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js（setProviderApiKey）</td>
+              <td class="tc-7">根因：批 2 hook 新 action 调用了不存在的方法；client.js 自始只有 get/post/patch/delete/upload 五封装。测试盲区：批 2 用例覆盖「未输入时按钮禁用不发 PUT」与测试连接，但保存成功路径无用例，MSW mock 的 PUT 端点从未被真实调用。用户影响：批 2 验收关键动作（保存供应商 Key）100% 失败，阻断自定义供应商接入。</td>
+              <td class="tc-8">验收口径：保存密钥 → PUT 200 + 内联成功 + effective keyHint 刷新；补回潮 RED 用例（PUT 调用次数与 body 断言）；前端基线不下降。</td>
+              <td class="tc-9">2026-08-11 21:21 用户验收反馈（截图），TDD 修复当批完成（RED 复现原始报错 → 补 put → 转绿），提交 <code class="inline">7a9c559</code>（2 文件 +24）。教训登记：新增 apiClient 方法调用须先确认封装存在，Key 写路径须配成功用例。</td>
+            </tr>
         </tbody>
         </table>
         </div>
