@@ -1033,6 +1033,18 @@
               <td>验收口径：骨架 14 样本与 6 类断言零回归；结构断言两次运行一致；降级路径有测试；零新增依赖（package.json 仅限 test:ai 挂线）；零前端改动。边界：Trace Schema 草案与前端报告面板留 SP-2026-007 MS5 收口。去重结果：命中 RP-048 骨架作为其升级批次，不重复建 runner；合并 MS5 评测资产消除与 SP-007 的重叠建设。</td>
             </tr>
             <tr>
+              <td class="mono">RP-055</td>
+              <td>模型配置多供应商化（Provider × 模型目录 × 场景绑定三层契约）+ API Key 嵌入编辑弹窗 + 去 KIMI 文案</td>
+              <td>2026-08-11 用户指示（截图红框标注 API Key 独立区）：Key 嵌入模型编辑弹窗、提供新增模型配置按钮、消除 KIMI 固有文案支持更多模型接入；来源问题 <code class="inline">ISS-2026-08-11-001</code>（去重未命中，契约闭环 P2 范围升级）</td>
+              <td>系统管理 / 模型配置 + 凭据域</td>
+              <td><span class="pill priority-p1">P1</span></td>
+              <td>模型配置契约闭环 · P2 升级版（批 1 后端契约 / 批 2 前端 / 批 3 参数动态渲染+真实多模型验证）</td>
+              <td><span class="status run"><span class="dot"></span>已分析 / 设计已汇报 · 待用户批准开工</span></td>
+              <td>三层契约：Provider（名称/openai-compatible 协议/baseUrl/凭据 scope=provider:{id}/启用态）→ Model 目录（ID+能力+supportedParams）→ ScenarioBinding（场景→providerId+modelId+参数覆盖，保留草稿/生效双轨）；旧 kimi* 迁移为内置 moonshot 供应商；编辑弹窗内嵌供应商 Key 状态/录入/测试连接；独立 API Key 区下线；P2 原 T6/T7/T8/T11 并入；ISS-2026-08-10-008 凭据 warm 并入批 1</td>
+              <td>去重结果：未命中（RP-053 为表格化已交付，本项为架构升级）；交叉引用 RP-053（表格形态基座）、ISS-2026-08-10-008（凭据 warm 并入）、ISS-2026-08-05-001（凭据域基座）。业界对标：Dify/LobeChat/Cherry Studio 的供应商-模型-场景绑定范式，协议层先仅支持 openai-compatible。</td>
+              <td>验收口径：可新增自定义供应商（名称/baseUrl/Key）并在其下添加模型 ID；场景可绑定任意供应商模型且真实调用走该供应商端点与 Key；编辑弹窗内完成 Key 录入与连通测试（失败不清空输入）；全页面无 KIMI 固有文案（业务名：实施评估/文件解析/内容生成）；旧配置迁移后三场景生效态不回归；重启后凭据来源 db_cache（warm 生效）；test:modules / test:web 基线零回归 + 双构建零错误。</td>
+            </tr>
+            <tr>
               <td class="mono">RP-032</td>
               <td>AI 工作台推荐工作流列表可达性与语义优化</td>
               <td>2026-06-26 用户截图反馈：AI 工作台左侧“推荐工作流”区域作用不清，且无法滚动查看最下方内容；去重后确认 RP-019 已覆盖推荐工作流定位不清，但未覆盖列表底部可达性</td>
