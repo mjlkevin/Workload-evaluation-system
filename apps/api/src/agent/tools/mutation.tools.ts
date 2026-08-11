@@ -57,6 +57,8 @@ export function buildCreateProjectTool(createProject: CreateProjectFn): AgentToo
     },
     capability: "estimates:create",
     mutates: true,
+    category: "project",
+    discoverable: true,
     async execute(args, _user, runtime?: RuntimeContext) {
       const projectName = asString(args.projectName);
       if (!projectName) throw new Error("create_project 需要 projectName 参数");
@@ -80,6 +82,8 @@ export function buildGenerateWbsTool(generateWbs: GenerateWbsFn): AgentTool {
     parameters: { type: "object", properties: {} },
     capability: "estimates:write",
     mutates: true,
+    category: "wbs",
+    discoverable: true,
     async execute() {
       return generateWbs();
     },
@@ -102,6 +106,8 @@ export function buildExportReportTool(exportReport: ExportReportFn): AgentTool {
     },
     capability: "estimates:write",
     mutates: true,
+    category: "export",
+    discoverable: true,
     async execute(args) {
       if (!Array.isArray(args.items)) throw new Error("export_report 需要 items 数组参数");
       const body: Record<string, unknown> = {
