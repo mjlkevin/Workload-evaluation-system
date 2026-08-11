@@ -658,7 +658,7 @@ export default function SystemManagement({ sectionId }) {
         {activeSectionId === 'model' && (
           <div>
             <div className="sys-toolbar">
-              <span className="meta">模型供应商与场景绑定 · 修改后先保存草稿再生效</span>
+              <span className="meta">修改后先保存草稿再生效</span>
               <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraft}>
                 {actionLoading.saveModelDraft ? '...' : '保存草稿'}
               </button>
@@ -675,9 +675,36 @@ export default function SystemManagement({ sectionId }) {
               </div>
             )}
 
-            <div className="sys-toolbar" style={{ marginTop: 4 }}>
-              <span className="meta">模型供应商 · 凭据按供应商加密托管</span>
-              <button type="button" className="btn btn-pri btn-sm" onClick={openCreateProvider}>+ 新增供应商</button>
+            {/* RP-057：区段标题范式——标题 + 单行描述 + 右侧操作/状态，替代孤儿 caption 与表尾状态行 */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', margin: '10px 0 8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>模型供应商</h3>
+                <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>
+                  凭据按供应商加密托管
+                  {effectiveConfig?.credentials?.lastAudit ? (
+                    <>
+                      {' · '}最近变更：{effectiveConfig.credentials.lastAudit.action === 'set' ? '设置密钥' : effectiveConfig.credentials.lastAudit.action === 'clear' ? '清除密钥' : effectiveConfig.credentials.lastAudit.action}
+                      {' · '}{effectiveConfig.credentials.lastAudit.actor}
+                      {' · '}{formatRelativeTime(effectiveConfig.credentials.lastAudit.at)}
+                    </>
+                  ) : null}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {effectiveConfig?.credentials ? (
+                  <>
+                    <span className={`tag ${effectiveConfig.credentials.source === 'store' ? 'ok' : effectiveConfig.credentials.source === 'env' ? 'warn' : 'err'}`}>
+                      {effectiveConfig.credentials.source === 'store' ? '凭据域托管（加密落库）'
+                        : effectiveConfig.credentials.source === 'env' ? '环境变量兜底'
+                        : '凭据未配置'}
+                    </span>
+                    <span className={`tag ${effectiveConfig.credentials.kekReady ? 'ok' : 'err'}`}>
+                      KEK {effectiveConfig.credentials.kekReady ? '就绪' : '未配置'}
+                    </span>
+                  </>
+                ) : null}
+                <button type="button" className="btn btn-pri btn-sm" onClick={openCreateProvider}>+ 新增供应商</button>
+              </div>
             </div>
             <div className="sys-table-wrap" style={{ marginBottom: 14 }}>
               <table className="table sys-model-table" aria-label="模型供应商">
@@ -736,30 +763,11 @@ export default function SystemManagement({ sectionId }) {
                   ) : null}
                 </tbody>
               </table>
-              {effectiveConfig?.credentials ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '10px 2px 0', fontSize: 11, color: 'var(--ink-3)' }}>
-                  <span>凭据域状态：</span>
-                  <span className={`tag ${effectiveConfig.credentials.source === 'store' ? 'ok' : effectiveConfig.credentials.source === 'env' ? 'warn' : 'err'}`}>
-                    {effectiveConfig.credentials.source === 'store' ? '凭据域托管（加密落库）'
-                      : effectiveConfig.credentials.source === 'env' ? '环境变量兜底'
-                      : '凭据未配置'}
-                  </span>
-                  <span className={`tag ${effectiveConfig.credentials.kekReady ? 'ok' : 'err'}`}>
-                    KEK {effectiveConfig.credentials.kekReady ? '就绪' : '未配置'}
-                  </span>
-                  {effectiveConfig.credentials.lastAudit ? (
-                    <span>
-                      最近变更：{effectiveConfig.credentials.lastAudit.action === 'set' ? '设置密钥' : effectiveConfig.credentials.lastAudit.action === 'clear' ? '清除密钥' : effectiveConfig.credentials.lastAudit.action}
-                      {' · '}{effectiveConfig.credentials.lastAudit.actor}
-                      {' · '}{formatRelativeTime(effectiveConfig.credentials.lastAudit.at)}
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
 
-            <div className="sys-toolbar" style={{ marginTop: 4 }}>
-              <span className="meta">场景模型绑定 · 点击行查看接线与差异</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '4px 0 8px' }}>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>场景模型绑定</h3>
+              <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>点击行查看接线与差异</span>
             </div>
             <div className="sys-table-wrap">
               <table className="table sys-model-table" aria-label="场景模型绑定">

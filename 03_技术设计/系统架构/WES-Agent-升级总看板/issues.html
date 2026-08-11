@@ -620,6 +620,28 @@
               <td class="tc-7">分诊结果 defect（P1，阻断批 2 验收核心动作）。根因：批 2 新增 setProviderApiKey 调用 apiClient.put，但 client.js 从未封装 put 方法（仅 get/post/patch/delete/upload）；批 2 测试只覆盖「未输入时按钮禁用不发 PUT」与测试连接，保存成功路径无用例导致漏网。去重：保存密钥 / apiClient.put 无既有记录，未命中。派生 DEF-2026-08-11-002，关联 RP-055。</td>
               <td class="tc-8">修复：client.js 补 put 封装（1 行）+ RED 测试先行（复现原始报错 → 转绿，断言 PUT 调用与 body.apiKey）。验收口径：输入新 Key 点「保存密钥」→ PUT /providers/:id/api-key 成功、内联「密钥已加密保存到凭据域」、keyHint 刷新。验证：前端 311/312（唯一失败 UserManagement 既有基线）、build:web 零错误。待用户复验后关闭 DEF。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-004-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-004</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">AI 工作台 / 消息区：复制控件移到气泡外右下 + 消息时间戳 + 用户消息侧补齐复制与时间（功能调整）</td>
+              <td class="tc-3">user_feedback</td>
+              <td class="tc-4">2026-08-11 21:42 用户截图（AI 回复气泡内左下角「复制」控件红框标注）指示：① 复制控件移到会话框右下角、设计在消息框外；② 保持鼠标悬浮消息区域显隐；③ 复制控件右侧打印每条消息回复时间（同款悬浮显隐）；④ 用户消息侧目前没有复制控件，按同一规则补齐复制与时间。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx（原气泡内底部渲染 CopyMessageButton）</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageBits.jsx（CopyMessageButton / 新增 formatMessageTime + MessageTimestamp）</code> <code class="inline">ui/V2_PROTOTYPE/src/index.css（RP-023 气泡内 .ai-msg-actions 规则 → .ai-msg-row 悬浮 .ai-msg-meta）</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/messageFormatter.js（mapSessionMessages 补 createdAt）</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已实现 / 自动化通过 / 待用户悬浮复验</span></td>
+              <td class="tc-7">分诊结果 requirement（P2 体验调整）。去重：命中 RP-023（AI 消息气泡悬停复制按钮，已交付）——本条为其位置与信息维度扩展（气泡外 + 时间 + 用户侧），属同一根因的 broader scope，不重复建 RP-023，交叉引用并派生 RP-056。现状事实：复制控件渲染于 .ai-bubble-wrap 内部末尾、仅 AI 消息有；消息对象本地无 createdAt 字段（后端落库有，mapSessionMessages 丢弃）。用户影响：气泡内控件占用正文空间、无时间无法确认消息时效、用户侧无法一键复制自己的提问。</td>
+              <td class="tc-8">实现（TDD，未提交待验收后合入）：MessageBubble 重构 .ai-msg-row &gt; .ai-msg-col（气泡）+ .ai-msg-meta（复制 + time，气泡外右对齐、min-height 预留防抖、.ai-msg-row:hover/focus-within 显隐）；formatMessageTime 当天 HH:MM / 跨天 MM-DD HH:MM；时间链路：mapSessionMessages 带出后端 createdAt，本地全部消息创建点（useChatMessages / useHarnessRun / index.jsx，含 error 与 loading 占位）补 createdAt；error/loading 不渲染操作栏。验收口径：悬浮 AI/用户消息区域→气泡外右下出现「复制 + 时间」、移出消失；复制按钮复制对应消息文本；时间在复制右侧；error/loading 无操作栏；RED 4 用例先红后绿、streaming-ux 9/9 零回归、build:web 零错误、UI 门禁 0 findings。遗留：浏览器悬浮视觉证据待用户复验。同轮附带：管理视角输入框占位文案清除（admin placeholder 置空）。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-005-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-005</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">系统管理 / 模型配置：页面细碎说明文案杂乱——副标题/三条工具条 caption/表尾凭据状态行重复表达且无层级（体验调整）</td>
+              <td class="tc-3">user_feedback（截图绿框标注）</td>
+              <td class="tc-4">2026-08-11 22:21 用户截图（绿框 ×4）指出"框出来的这些细碎的文案很乱"：① 页签副标题「模型供应商、场景绑定与生成参数配置」；② 工具条 caption「模型供应商与场景绑定 · 修改后先保存草稿再生效」；③ 工具条 caption「模型供应商 · 凭据按供应商加密托管」；④ 供应商表尾「凭据域状态：…最近变更…」+「场景模型绑定 · 点击行查看接线与差异」。五处文案重复表达同一主题、措辞不一、无信息层级。要求用前端设计 Skill 重新设计。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx（L661/L679/L741/L762 孤儿 meta caption + 表尾凭据状态行）</code> <code class="inline">ui/V2_PROTOTYPE/src/config/systemManagementSections.js（页签副标题）</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已分诊 / 实现中（用户当轮指示重设计）</span></td>
+              <td class="tc-7">分诊结果 requirement（P2 体验调整）。去重：未命中（RP-055 为多供应商架构、RP-053 为表格化，本条为同一页面的信息层级与文案治理，独立根因），交叉引用 RP-055，派生 RP-057。确诊根问题（≤3，截图即渲染证据）：R1 三条孤儿 meta caption 与副标题重复表达、措辞不一；R2 凭据域状态挂在供应商表尾行、视觉无归属；R3 流程提示「先保存草稿再生效」带冗余前缀且与操作区语义割裂。</td>
+              <td class="tc-8">重设计方向（对标 Dify/Linear 区段标题范式，复用现有 tokens 与 tag 组件，零新依赖）：① 两区段改为「区段标题（h3 语义）+ 单行 dim 描述」——模型供应商（描述：凭据按供应商加密托管 · 最近变更…）/ 场景模型绑定（描述：点击行查看接线与差异）；② 凭据域状态标签组（托管态/KEK）从表尾上移至供应商区段标题行右侧；③ 顶部工具条 caption 精简为「修改后先保存草稿再生效」，旧前缀删除。验收口径：区段标题 heading 语义可查询、凭据标签在供应商表格之前渲染、四条旧文案全移除、ModelConfigTable 凭据徽标断言零回归、UI 门禁 0 findings、build:web 零错误。</td>
+            </tr>
         </tbody>
         </table>
         </div>

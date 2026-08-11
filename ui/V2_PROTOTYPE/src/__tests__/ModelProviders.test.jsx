@@ -167,4 +167,25 @@ describe('ModelProviders · 多供应商管理（ISS-2026-08-11-001 / RP-055）'
       expect(input).toBeEnabled()
     })
   })
+
+  test('页面信息层级：区段标题 + 单行描述，凭据状态上移，旧碎碎念文案移除（ISS-2026-08-11-005 / RP-057）', async () => {
+    renderAppAtModelConfig()
+    const providerTable = await screen.findByRole('table', { name: '模型供应商' })
+
+    // 两区段使用 heading 语义的区段标题
+    expect(screen.getByRole('heading', { name: '模型供应商' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '场景模型绑定' })).toBeInTheDocument()
+
+    // 凭据域状态标签组上移至供应商表格之前（区段头部），不再挂表尾
+    const kekTag = screen.getByText(/KEK 就绪/)
+    expect(kekTag.compareDocumentPosition(providerTable) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // 旧碎碎念文案全移除
+    expect(screen.queryByText('模型供应商与场景绑定 · 修改后先保存草稿再生效')).not.toBeInTheDocument()
+    expect(screen.queryByText('模型供应商 · 凭据按供应商加密托管')).not.toBeInTheDocument()
+    expect(screen.queryByText('场景模型绑定 · 点击行查看接线与差异')).not.toBeInTheDocument()
+    expect(screen.queryByText('凭据域状态：')).not.toBeInTheDocument()
+    // 流程提示保留精简版
+    expect(screen.getByText('修改后先保存草稿再生效')).toBeInTheDocument()
+  })
 })
