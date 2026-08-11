@@ -52,6 +52,21 @@ export type WorkbenchLightweightModelRunTrace = {
   finishReason?: string;
 };
 
+/**
+ * 工单 2026-08-11（memory-panel-chip-live-link）· MS3 chip 活数据链路：
+ * dispatch trace additive 字段。仅新增、可选；缺数据时字段缺省，
+ * 既有字段语义与事件契约零变更，前端缺数据时保持 MS3 静默降级。
+ */
+export type WorkbenchToolCallTrace = {
+  name: string;
+  source?: string;
+};
+
+export type WorkbenchMemoryRefTrace = {
+  scenesCount: number;
+  atomsCount: number;
+};
+
 export type WorkbenchDispatchData = {
   intent: WorkbenchIntent;
   answer: string;
@@ -69,6 +84,10 @@ export type WorkbenchDispatchData = {
     knowledgeTool?: ZhipuKnowledgeToolTrace;
     modelRun?: WorkbenchLightweightModelRunTrace;
     modelClassification?: ModelClassificationResult;
+    /** additive：工具发现/执行结果（MS3 工具调用 chip 数据源） */
+    toolCalls?: WorkbenchToolCallTrace[];
+    /** additive：本轮注入的 active 记忆计数（MS2-PATCH 引用记忆 chip 数据源） */
+    memoryRef?: WorkbenchMemoryRefTrace;
   };
 };
 
@@ -81,8 +100,8 @@ export type WorkbenchDispatchInput = {
   attachment?: WorkbenchAttachmentContext | null;
   latestHarnessArtifact?: WorkbenchHarnessArtifactContext | null;
   clientAction?: string;
-  /** 由调用方提供的模型回复函数 */
-  modelChat: (params: { systemPrompt: string; userContent: string }) => Promise<{ answer: string; rawContent: string; provider?: string; model?: string; attempts?: number; finishReason?: string }>;
+  /** 由调用方提供的模型回复函数；toolCalls/memoryRef 为 additive 返回字段（chip 数据通路，缺省即无） */
+  modelChat: (params: { systemPrompt: string; userContent: string }) => Promise<{ answer: string; rawContent: string; provider?: string; model?: string; attempts?: number; finishReason?: string; toolCalls?: WorkbenchToolCallTrace[]; memoryRef?: WorkbenchMemoryRefTrace }>;
   /** 由调用方提供的角色标签 */
   businessRole: BusinessRole;
   roleLabel: string;
@@ -231,5 +250,43 @@ export async function dispatchHomeWorkbenchTurn(input: WorkbenchDispatchInput): 
   });
 
   const handler = WORKBENCH_HANDLERS.find((candidate) => candidate.intents.includes(intent.intent)) ?? domainQaHandler;
-  return handler.handle({ intent, context, input: effectiveInput, modelClassification });
+
+  // MS3 chip 活数据链路（additive）：包装 handler 阶段的 modelChat，
+  // 捕获实现方返回的 toolCalls / memoryRef 并透传进 dispatch trace。
+  // 无数据时字段缺省，既有 trace 字段语义零变更。
+  const capturedToolCalls: WorkbenchToolCallTrace[] = [];
+  const seenToolCalls = new Set<string>();
+  let capturedMemoryRef: WorkbenchMemoryRefTrace | undefined;
+  const capturingModelChat: WorkbenchDispatchInput["modelChat"] = async (params) => {
+    const result = await effectiveInput.modelChat(params);
+    if (Array.isArray(result.toolCalls)) {
+      for (const call of result.toolCalls) {
+        if (!call || typeof call.name !== "string" || !call.name) continue;
+        const key = `${call.name}${typeof call.source === "string" && call.source ? `:${call.source}` : ""}`;
+        if (seenToolCalls.has(key)) continue;
+        seenToolCalls.add(key);
+        capturedToolCalls.push({
+          name: call.name,
+          ...(typeof call.source === "string" && call.source ? { source: call.source } : {}),
+        });
+      }
+    }
+    const memoryRef = result.memoryRef;
+    if (memoryRef && typeof memoryRef === "object") {
+      capturedMemoryRef = {
+        scenesCount: Number(memoryRef.scenesCount) || 0,
+        atomsCount: Number(memoryRef.atomsCount) || 0,
+      };
+    }
+    return result;
+  };
+
+  const data = await handler.handle({ intent, context, input: { ...effectiveInput, modelChat: capturingModelChat }, modelClassification });
+  if (capturedToolCalls.length > 0) {
+    data.trace.toolCalls = capturedToolCalls;
+  }
+  if (capturedMemoryRef) {
+    data.trace.memoryRef = capturedMemoryRef;
+  }
+  return data;
 }

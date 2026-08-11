@@ -82,8 +82,13 @@ export default function MessageBubble({
             ? <div style={{ fontSize: 13, lineHeight: 1.7 }}>{message.text}</div>
             : <RichAiMessage text={message.text} optionDisabled={sending} onOptionSelect={onOptionSelect} />
         )}
-        {!isUser && !message.error && message.knowledgeTool && (
-          <ModelRunTrace knowledgeTool={message.knowledgeTool} />
+        {/* MS3 chip 活数据链路：knowledgeTool / toolCalls / memoryRef 任一存在即渲染 trace 区 */}
+        {!isUser && !message.error && (message.knowledgeTool || message.toolCalls?.length || message.memoryRef) && (
+          <ModelRunTrace
+            knowledgeTool={message.knowledgeTool}
+            toolCalls={message.toolCalls}
+            memoryRef={message.memoryRef}
+          />
         )}
         {!isUser && !message.error && message.formBlock && (
           <InteractiveFormCard

@@ -16,12 +16,24 @@ export type CreateMemoryRouterDeps = {
   repo: MemoryRepository;
 };
 
+// DEF-2026-08-11-001 关联根因：requireAuth 是普通函数（返回 user 或 null），
+// 直接挂为 Express middleware 时成功分支既不调 next() 也不写 req.user，
+// 导致有效 JWT 请求永远挂起（记忆面板生产恒空的第三层原因）。
+// 最小修复：薄包装为真正的 middleware——失败分支沿用 requireAuth 原有 401 响应，
+// 成功分支写 req.user 并 next()，鉴权语义零变更。
+function requireAuthMiddleware(req: Parameters<typeof requireAuth>[0], res: Parameters<typeof requireAuth>[1], next: () => void) {
+  const result = requireAuth(req, res);
+  if (!result) return;
+  req.user = result.user;
+  next();
+}
+
 export function createMemoryRouter(deps: CreateMemoryRouterDeps): Router {
   const router = Router();
   const usecase = createMemoryUsecase({ repo: deps.repo });
 
   // GET /memory?projectId=xxx&status=draft&page=1&pageSize=20
-  router.get("/", requireAuth, async (req, res) => {
+  router.get("/", requireAuthMiddleware, async (req, res) => {
     const user = req.user!;
     const parse = validateListMemoryQuery(req.query);
     if (!parse.success) {
@@ -32,7 +44,7 @@ export function createMemoryRouter(deps: CreateMemoryRouterDeps): Router {
   });
 
   // POST /memory/atoms/confirm
-  router.post("/atoms/confirm", requireAuth, async (req, res) => {
+  router.post("/atoms/confirm", requireAuthMiddleware, async (req, res) => {
     const user = req.user!;
     const parse = validateMemoryIdsInput(req.body);
     if (!parse.success) {
@@ -43,7 +55,7 @@ export function createMemoryRouter(deps: CreateMemoryRouterDeps): Router {
   });
 
   // POST /memory/scenes/confirm
-  router.post("/scenes/confirm", requireAuth, async (req, res) => {
+  router.post("/scenes/confirm", requireAuthMiddleware, async (req, res) => {
     const user = req.user!;
     const parse = validateMemoryIdsInput(req.body);
     if (!parse.success) {
@@ -54,7 +66,7 @@ export function createMemoryRouter(deps: CreateMemoryRouterDeps): Router {
   });
 
   // POST /memory/atoms/archive
-  router.post("/atoms/archive", requireAuth, async (req, res) => {
+  router.post("/atoms/archive", requireAuthMiddleware, async (req, res) => {
     const user = req.user!;
     const parse = validateMemoryIdsInput(req.body);
     if (!parse.success) {
@@ -65,7 +77,7 @@ export function createMemoryRouter(deps: CreateMemoryRouterDeps): Router {
   });
 
   // POST /memory/scenes/archive
-  router.post("/scenes/archive", requireAuth, async (req, res) => {
+  router.post("/scenes/archive", requireAuthMiddleware, async (req, res) => {
     const user = req.user!;
     const parse = validateMemoryIdsInput(req.body);
     if (!parse.success) {

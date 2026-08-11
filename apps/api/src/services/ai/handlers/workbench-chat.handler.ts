@@ -12,18 +12,15 @@ import { asString } from "../../../utils/helpers";
 import { normalizeKimiModelName } from "../../../utils/model-name";
 import { ok, fail } from "../../../utils/response";
 import { resolveBusinessRole } from "../../../middleware/auth";
-import { resolveActiveRequirementKimiApiKey, loadRequirementSystemConfigStore } from "../../../modules/system/system.repository";
 import { appendAiSessionEvent, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import { dispatchHomeWorkbenchTurn } from "../workbench-dispatch.service";
 import { recordWorkbenchTurnFailureTrace, recordWorkbenchTurnTrace } from "../../../modules/trace/trace.usecase";
 import {
   HOME_ROLE_PRESETS,
   allParsedHomeAttachments,
-  buildHomeMessageContentForModel,
   buildWorkbenchChatDispatchInput,
   currentUserFromRequest,
   ensureHomeAiSession,
-  getKimiProvider,
   isExplicitReportRequest,
   latestParsedHomeAttachment,
   latestSessionAttachmentWithSummary,
@@ -86,31 +83,9 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
 
     const dispatchInput = buildWorkbenchChatDispatchInput(user, userMessage.content, {
       messages,
-      modelChat: async ({ systemPrompt, userContent }) => {
-        const { apiKey } = resolveActiveRequirementKimiApiKey();
-        if (!apiKey) throw new Error("required_or_env_missing");
-        const safeMessages = messages.slice(-12).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
-        // 覆盖最后一条用户消息的 system prompt
-        if (safeMessages.length > 0) {
-          safeMessages[safeMessages.length - 1] = { role: "user", content: userContent };
-        }
-        const completion = await getKimiProvider().chatCompletion({
-          model: config.kimi.model,
-          temperature: 0.3,
-          promptCacheKey: "home-workbench-dispatch-v1",
-          timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
-          credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
-          messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
-        });
-        return {
-          answer: completion.content,
-          rawContent: completion.rawContent,
-          provider: completion.provider,
-          model: completion.model,
-          attempts: completion.attempts,
-          finishReason: completion.finishReason,
-        };
-      },
+      // DEF-2026-08-11-001 关联：同步通道启用记忆注入——工作台会话蒸馏产物落 default 项目
+      // （harness-boot 蒸馏钩子口径），注入计数经 memoryRef additive 字段透出给 chip。
+      projectId: "default",
     });
 
     const dispatchData = await dispatchHomeWorkbenchTurn({
@@ -149,6 +124,9 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
       ...(dispatchData.formBlock ? { formBlock: dispatchData.formBlock } : {}),
       ...(dispatchData.trace.knowledgeTool ? { knowledgeTool: dispatchData.trace.knowledgeTool } : {}),
       ...(dispatchData.trace.modelRun ? { modelRun: dispatchData.trace.modelRun } : {}),
+      // MS3 chip 活数据链路（additive）：trace 携带工具调用 / 引用记忆数据时写入消息 metadata
+      ...(dispatchData.trace.toolCalls?.length ? { toolCalls: dispatchData.trace.toolCalls } : {}),
+      ...(dispatchData.trace.memoryRef ? { memoryRef: dispatchData.trace.memoryRef } : {}),
       ...(dispatchData.suggestedActions?.length ? { suggestedActions: dispatchData.suggestedActions, intent: dispatchData.intent } : {}),
     };
     const updatedSession = appendAiSessionEvent(user, session.sessionId, {

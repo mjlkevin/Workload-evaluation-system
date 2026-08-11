@@ -37,6 +37,30 @@ export function normalizeKnowledgeTool(value) {
   }
 }
 
+// MS3 chip 活数据链路（additive）：工具调用 / 引用记忆 trace 归一。
+// 非法载荷一律归一为 undefined，缺数据时组件保持静默降级。
+export function normalizeToolCalls(value) {
+  if (!Array.isArray(value)) return undefined
+  const calls = value
+    .filter((call) => call && typeof call === 'object' && typeof call.name === 'string' && call.name)
+    .map((call) => ({
+      name: call.name,
+      ...(typeof call.source === 'string' && call.source ? { source: call.source } : {}),
+    }))
+  return calls.length ? calls : undefined
+}
+
+export function normalizeMemoryRef(value) {
+  const ref = pickObject(value)
+  const scenesCount = Number(ref.scenesCount)
+  const atomsCount = Number(ref.atomsCount)
+  if (!Number.isFinite(scenesCount) && !Number.isFinite(atomsCount)) return undefined
+  return {
+    scenesCount: Number.isFinite(scenesCount) ? scenesCount : 0,
+    atomsCount: Number.isFinite(atomsCount) ? atomsCount : 0,
+  }
+}
+
 /**
  * 归一会话消息 metadata 中的 suggestedActions：
  * 仅保留具备 actionType 或 label 的有效动作，确保写动作确认按钮
@@ -76,6 +100,8 @@ export function mapSessionMessages(session) {
       const metadata = pickObject(message.metadata)
       const formBlock = pickObject(metadata.formBlock)
       const knowledgeTool = normalizeKnowledgeTool(metadata.knowledgeTool)
+      const toolCalls = normalizeToolCalls(metadata.toolCalls)
+      const memoryRef = normalizeMemoryRef(metadata.memoryRef)
       const suggestedActions = normalizeSuggestedActions(metadata.suggestedActions)
       const intent = typeof metadata.intent === 'string' && metadata.intent ? metadata.intent : undefined
       return {
@@ -89,6 +115,8 @@ export function mapSessionMessages(session) {
         artifacts,
         formBlock: formBlock.blockId ? formBlock : undefined,
         knowledgeTool,
+        toolCalls,
+        memoryRef,
         suggestedActions,
         intent,
       }
@@ -118,6 +146,21 @@ export function attachKnowledgeToolToLatestAssistant(messages, knowledgeTool) {
   ))
 }
 
+// MS3 chip 活数据链路：本轮 run 的 trace 携带 toolCalls / memoryRef 时附加到最后一条助手消息
+export function attachTraceChipsToLatestAssistant(messages, trace) {
+  const toolCalls = normalizeToolCalls(trace?.toolCalls)
+  const memoryRef = normalizeMemoryRef(trace?.memoryRef)
+  if (!toolCalls && !memoryRef) return messages
+  const assistantIndex = [...messages].reverse().findIndex((message) => message.role === 'assistant' && !message.loading && !message.error)
+  if (assistantIndex < 0) return messages
+  const targetIndex = messages.length - 1 - assistantIndex
+  return messages.map((message, index) => (
+    index === targetIndex
+      ? { ...message, ...(toolCalls ? { toolCalls } : {}), ...(memoryRef ? { memoryRef } : {}) }
+      : message
+  ))
+}
+
 export function sameMessageList(left, right) {
   if (left.length !== right.length) return false
   return left.every((message, index) => (
@@ -129,6 +172,8 @@ export function sameMessageList(left, right) {
     message.file?.parsedSummary === right[index]?.file?.parsedSummary &&
     message.formBlock?.blockId === right[index]?.formBlock?.blockId &&
     message.knowledgeTool?.contextRef === right[index]?.knowledgeTool?.contextRef &&
+    JSON.stringify(message.toolCalls || null) === JSON.stringify(right[index]?.toolCalls || null) &&
+    JSON.stringify(message.memoryRef || null) === JSON.stringify(right[index]?.memoryRef || null) &&
     suggestedActionKey(message) === suggestedActionKey(right[index]) &&
     (message.artifacts || []).map((artifact) => artifact.artifactId).join(',') === (right[index]?.artifacts || []).map((artifact) => artifact.artifactId).join(',')
   ))

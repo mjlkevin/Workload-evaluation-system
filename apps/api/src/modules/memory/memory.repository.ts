@@ -24,6 +24,14 @@ export type ListMemoryForProjectInput = {
   offset?: number;
 };
 
+/** DEF-2026-08-11-001：owner 全量读取（记忆管理面板默认口径）；ownerUserId 隔离不变 */
+export type ListMemoryForOwnerInput = {
+  ownerUserId: string;
+  status?: MemoryStatus;
+  limit?: number;
+  offset?: number;
+};
+
 export type MemoryListResult = {
   atoms: MemoryAtomRow[];
   scenes: MemorySceneRow[];
@@ -34,6 +42,7 @@ export type MemoryListResult = {
 export interface MemoryRepository {
   saveDistilledMemory(input: SaveDistilledMemoryInput): Promise<{ atoms: MemoryAtomRow[]; scenes: MemorySceneRow[] }>;
   listMemoryForProject(input: ListMemoryForProjectInput): Promise<MemoryListResult>;
+  listMemoryForOwner(input: ListMemoryForOwnerInput): Promise<MemoryListResult>;
   confirmMemoryAtom(atomId: string, ownerUserId: string): Promise<MemoryAtomRow | null>;
   confirmMemoryScene(sceneId: string, ownerUserId: string): Promise<MemorySceneRow | null>;
   archiveMemoryAtom(atomId: string, ownerUserId: string): Promise<MemoryAtomRow | null>;
@@ -43,6 +52,62 @@ export interface MemoryRepository {
 }
 
 export function createMemoryRepository(dbInstance: Database = db): MemoryRepository {
+  // listMemoryForProject / listMemoryForOwner 共用实现：projectId 缺省时仅按 owner 过滤
+  async function listMemory(input: { ownerUserId: string; projectId?: string; status?: MemoryStatus; limit?: number; offset?: number }): Promise<MemoryListResult> {
+    const limit = Math.min(Math.max(input.limit ?? 20, 1), 100);
+    const offset = Math.max(input.offset ?? 0, 0);
+    const baseWhere: SQL[] = [eq(memoryAtoms.ownerUserId, input.ownerUserId)];
+    if (input.projectId) {
+      baseWhere.push(eq(memoryAtoms.projectId, input.projectId));
+    }
+    if (input.status) {
+      baseWhere.push(eq(memoryAtoms.status, input.status));
+    }
+
+    const atoms = await dbInstance
+      .select()
+      .from(memoryAtoms)
+      .where(and(...baseWhere))
+      .orderBy(desc(memoryAtoms.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const atomCountResult = await dbInstance
+      .select({ count: sql<number>`count(*)::int` })
+      .from(memoryAtoms)
+      .where(and(...baseWhere));
+    const totalAtoms = Number(atomCountResult[0]?.count ?? 0);
+
+    const sceneWhere: SQL[] = [eq(memoryScenes.ownerUserId, input.ownerUserId)];
+    if (input.projectId) {
+      sceneWhere.push(eq(memoryScenes.projectId, input.projectId));
+    }
+    if (input.status) {
+      sceneWhere.push(eq(memoryScenes.status, input.status));
+    }
+
+    const scenes = await dbInstance
+      .select()
+      .from(memoryScenes)
+      .where(and(...sceneWhere))
+      .orderBy(desc(memoryScenes.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const sceneCountResult = await dbInstance
+      .select({ count: sql<number>`count(*)::int` })
+      .from(memoryScenes)
+      .where(and(...sceneWhere));
+    const totalScenes = Number(sceneCountResult[0]?.count ?? 0);
+
+    return {
+      atoms,
+      scenes,
+      totalAtoms,
+      totalScenes,
+    };
+  }
+
   return {
     async saveDistilledMemory(input: SaveDistilledMemoryInput): Promise<{ atoms: MemoryAtomRow[]; scenes: MemorySceneRow[] }> {
       return await dbInstance.transaction(async (tx) => {
@@ -104,58 +169,11 @@ export function createMemoryRepository(dbInstance: Database = db): MemoryReposit
     },
 
     async listMemoryForProject(input: ListMemoryForProjectInput): Promise<MemoryListResult> {
-      const limit = Math.min(Math.max(input.limit ?? 20, 1), 100);
-      const offset = Math.max(input.offset ?? 0, 0);
-      const baseWhere: SQL[] = [
-        eq(memoryAtoms.ownerUserId, input.ownerUserId),
-        eq(memoryAtoms.projectId, input.projectId),
-      ];
-      if (input.status) {
-        baseWhere.push(eq(memoryAtoms.status, input.status));
-      }
+      return await listMemory(input);
+    },
 
-      const atoms = await dbInstance
-        .select()
-        .from(memoryAtoms)
-        .where(and(...baseWhere))
-        .orderBy(desc(memoryAtoms.createdAt))
-        .limit(limit)
-        .offset(offset);
-
-      const atomCountResult = await dbInstance
-        .select({ count: sql<number>`count(*)::int` })
-        .from(memoryAtoms)
-        .where(and(...baseWhere));
-      const totalAtoms = Number(atomCountResult[0]?.count ?? 0);
-
-      const sceneWhere: SQL[] = [
-        eq(memoryScenes.ownerUserId, input.ownerUserId),
-        eq(memoryScenes.projectId, input.projectId),
-      ];
-      if (input.status) {
-        sceneWhere.push(eq(memoryScenes.status, input.status));
-      }
-
-      const scenes = await dbInstance
-        .select()
-        .from(memoryScenes)
-        .where(and(...sceneWhere))
-        .orderBy(desc(memoryScenes.createdAt))
-        .limit(limit)
-        .offset(offset);
-
-      const sceneCountResult = await dbInstance
-        .select({ count: sql<number>`count(*)::int` })
-        .from(memoryScenes)
-        .where(and(...sceneWhere));
-      const totalScenes = Number(sceneCountResult[0]?.count ?? 0);
-
-      return {
-        atoms,
-        scenes,
-        totalAtoms,
-        totalScenes,
-      };
+    async listMemoryForOwner(input: ListMemoryForOwnerInput): Promise<MemoryListResult> {
+      return await listMemory(input);
     },
 
     async confirmMemoryAtom(atomId: string, ownerUserId: string): Promise<MemoryAtomRow | null> {
