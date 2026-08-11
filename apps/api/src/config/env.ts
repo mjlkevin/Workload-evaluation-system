@@ -53,6 +53,15 @@ export const config = {
   /** 凭据加密 KEK（AES-256-GCM），base64 编码 32 字节。生成方式：node -e "console.log(require('crypto').randomBytes(32).toString('base64'))" */
   credentialKek: process.env.CREDENTIAL_KEK || "",
 
+  // SP-2026-007 MS3：Agent 工具注入模式。
+  // discovery（默认）：核心工具 + list_tools，其余按需发现；
+  // full：全量注入回退（WES_AGENT_TOOL_INJECTION=full，旧行为逐字节一致）。
+  agent: {
+    toolInjection: (process.env.WES_AGENT_TOOL_INJECTION === "full" ? "full" : "discovery") as
+      | "full"
+      | "discovery",
+  },
+
   // 常量配置
   constants: {
     EXPORT_IDEMPOTENCY_TTL_MS: 10 * 60 * 1000,

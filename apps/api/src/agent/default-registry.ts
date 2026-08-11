@@ -13,6 +13,7 @@ import {
   buildExportReportTool,
   buildGenerateWbsTool,
 } from "./tools/mutation.tools";
+import { buildListToolsTool } from "./tools/list-tools.tools";
 import { calculateEstimateOnly, listExportHistoryByOwner } from "../modules/estimates/estimates.module";
 import { calculateAndExportEstimate } from "../modules/estimates/estimates.usecase";
 import {
@@ -74,6 +75,10 @@ export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext):
       ),
     ),
   );
+
+  // ---- SP-2026-007 MS3：内置发现工具（注册在最后，全量回退时按 category=discovery 排除，
+  //      保证旧 8 工具注入顺序逐字节一致；按需发现模式下常驻核心注入集） ----
+  registry.register(buildListToolsTool(registry));
 
   return registry;
 }

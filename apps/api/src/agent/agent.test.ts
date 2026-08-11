@@ -105,6 +105,114 @@ test("runAgent: 超过最大轮数抛错", async () => {
   );
 });
 
+// ============================================================
+// SP-2026-007 MS3：编排循环默认注入收敛（按需发现）
+// ============================================================
+
+const ALL_CAPS = ["estimates:read", "estimates:create", "estimates:write"] as const;
+
+function ms3Registry(): ToolRegistry {
+  const reg = new ToolRegistry();
+  reg.register(fakeTool({ name: "core_a", category: "estimate", discoverable: false }));
+  reg.register(fakeTool({ name: "core_b", category: "project", discoverable: false }));
+  reg.register(fakeTool({
+    name: "list_tools",
+    category: "discovery",
+    discoverable: false,
+    execute: async () => ({ tools: [{ name: "kb", description: "知识库", category: "knowledge", mutates: false, parameters: {} }] }),
+  }));
+  reg.register(fakeTool({ name: "kb", category: "knowledge", discoverable: true, execute: async () => ({ hits: 1 }) }));
+  reg.register(fakeTool({ name: "disc_c", category: "export", discoverable: true, capability: "estimates:write" }));
+  reg.register(fakeTool({ name: "disc_d", category: "rule", discoverable: true }));
+  reg.register(fakeTool({ name: "disc_e", category: "estimate", discoverable: true }));
+  return reg;
+}
+
+function recordingRunner(seq: Partial<ChatCompletionResponse>[]): { runner: ChatRunner; calls: Array<string[]> } {
+  const calls: Array<string[]> = [];
+  let i = 0;
+  return {
+    calls,
+    runner: {
+      async chatCompletion(req) {
+        calls.push((req.tools ?? []).map((t) => t.function.name));
+        const r = seq[Math.min(i, seq.length - 1)];
+        i += 1;
+        return {
+          content: r.content ?? "",
+          rawContent: r.content ?? "",
+          model: "fake",
+          provider: "fake",
+          attempts: 1,
+          toolCalls: r.toolCalls,
+        };
+      },
+    },
+  };
+}
+
+test("MS3: 默认（按需发现）首轮注入 = 核心工具 + list_tools，较全量下降 ≥50%", async () => {
+  const reg = ms3Registry();
+  const { runner, calls } = recordingRunner([{ content: "done" }]);
+
+  await runAgent({
+    userMessage: "hi",
+    user: { id: "u1", capabilities: [...ALL_CAPS] },
+    registry: reg,
+    runner,
+    onEvent: () => {},
+    confirm: async () => true,
+    toolInjectionMode: "discovery",
+  });
+
+  const injected = calls[0];
+  const fullCount = reg.listFullToolsFor({ id: "u1", capabilities: [...ALL_CAPS] }).length;
+  assert.ok(injected.includes("list_tools"));
+  assert.ok(!injected.includes("kb"), "discoverable 工具不应默认注入");
+  assert.ok(injected.length <= fullCount / 2, `注入 ${injected.length} 应 ≤ 全量 ${fullCount} 的 50%`);
+});
+
+test("MS3: list_tools 发现后，命中的 discoverable 工具进入当轮后续 tools 参数", async () => {
+  const reg = ms3Registry();
+  const { runner, calls } = recordingRunner([
+    { toolCalls: [{ id: "c1", name: "list_tools", arguments: { intent: "知识" } }] },
+    { toolCalls: [{ id: "c2", name: "kb", arguments: { query: "x" } }] },
+    { content: "答案" },
+  ]);
+
+  const out = await runAgent({
+    userMessage: "查一下知识库",
+    user: { id: "u1", capabilities: [...ALL_CAPS] },
+    registry: reg,
+    runner,
+    onEvent: () => {},
+    confirm: async () => true,
+    toolInjectionMode: "discovery",
+  });
+
+  assert.equal(out, "答案");
+  assert.ok(!calls[0].includes("kb"), "首轮不应注入 kb");
+  assert.ok(calls[1].includes("kb"), "list_tools 命中后应注入 kb");
+  assert.ok(calls[1].includes("list_tools"), "list_tools 常驻");
+});
+
+test("MS3: 全量回退模式下注入行为与旧版一致（全部业务工具、无 list_tools）", async () => {
+  const reg = ms3Registry();
+  const { runner, calls } = recordingRunner([{ content: "done" }]);
+
+  await runAgent({
+    userMessage: "hi",
+    user: { id: "u1", capabilities: [...ALL_CAPS] },
+    registry: reg,
+    runner,
+    onEvent: () => {},
+    confirm: async () => true,
+    toolInjectionMode: "full",
+  });
+
+  assert.deepEqual(calls[0], ["core_a", "core_b", "kb", "disc_c", "disc_d", "disc_e"]);
+});
+
 function fakeTool(overrides: Partial<AgentTool> = {}): AgentTool {
   return {
     name: "read_tool",

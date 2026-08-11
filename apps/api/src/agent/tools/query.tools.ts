@@ -30,6 +30,8 @@ export function buildProjectListTool(listProjects: ProjectListFn): AgentTool {
     },
     capability: "estimates:read",
     mutates: false,
+    category: "project",
+    discoverable: false,
     async execute(args) {
       const keyword = asString(args.keyword);
       return listProjects({ ...(keyword ? { keyword } : {}) });
@@ -51,6 +53,8 @@ export function buildEstimateHistoryTool(listHistory: EstimateHistoryFn): AgentT
     },
     capability: "estimates:read",
     mutates: false,
+    category: "estimate",
+    discoverable: true,
     async execute(args) {
       const page = Number(args.page) > 0 ? Math.trunc(Number(args.page)) : 1;
       const pageSize = Number(args.pageSize) > 0 ? Math.min(Math.trunc(Number(args.pageSize)), 50) : 10;
@@ -73,6 +77,8 @@ export function buildKnowledgeQueryTool(queryKnowledge: KnowledgeQueryFn): Agent
     },
     capability: "estimates:read",
     mutates: false,
+    category: "knowledge",
+    discoverable: true,
     async execute(args) {
       const query = asString(args.query);
       if (!query) throw new Error("knowledge_query 需要 query 参数");
@@ -89,6 +95,8 @@ export function buildRuleLookupTool(loadRules: RuleLookupFn): AgentTool {
     parameters: { type: "object", properties: {} },
     capability: "estimates:read",
     mutates: false,
+    category: "rule",
+    discoverable: true,
     async execute() {
       return loadRules();
     },

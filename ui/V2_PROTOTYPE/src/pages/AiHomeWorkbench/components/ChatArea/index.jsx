@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { HoverBadge } from './MessageBits.jsx'
 import MessageList from './MessageList.jsx'
 import Composer from './Composer.jsx'
+import { apiClient } from '../../../../api/client.js'
 
 const panel = {
   border: '1px solid var(--line)',
@@ -10,10 +13,39 @@ const panel = {
 }
 
 /**
+ * SP-2026-007 MS2-PATCH：拉取当前用户 draft 态记忆条数。
+ * 工作台会话蒸馏产物默认落 projectId=default（见 harness-boot 蒸馏钩子映射）。
+ * 失败静默降级为不提示，不阻塞对话主链路。
+ */
+async function fetchDraftMemoryCount() {
+  const res = await apiClient.get('/memory', { projectId: 'default', status: 'draft', page: 1, pageSize: 50 })
+  const data = res?.data || {}
+  const atoms = Number.isFinite(data.totalAtoms) ? data.totalAtoms : (data.atoms || []).length
+  const scenes = Number.isFinite(data.totalScenes) ? data.totalScenes : (data.scenes || []).length
+  return atoms + scenes
+}
+
+/**
  * 中间对话区：头部徽标栏 + 消息列表 + 输入区。
  * workbench/chat/harness 为页面级 hook 返回值，本页私有组件直接消费。
  */
 export default function ChatArea({ preset, workbench, chat, harness }) {
+  // MS2-PATCH：run 终态（sending true→false）后若存在 draft 记忆，出提示条
+  const [draftMemoryCount, setDraftMemoryCount] = useState(0)
+  const sending = chat.sending
+  useEffect(() => {
+    if (sending) return
+    let cancelled = false
+    fetchDraftMemoryCount()
+      .then((count) => {
+        if (!cancelled) setDraftMemoryCount(count)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [sending])
+
   const bubbleProps = {
     sending: chat.sending,
     confirmingActionId: harness.confirmingActionId,
@@ -56,6 +88,30 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
         onChooseFile={chat.chooseFile}
         bubbleProps={bubbleProps}
       />
+
+      {draftMemoryCount > 0 && (
+        <div
+          role="status"
+          aria-label="待确认记忆提示"
+          style={{
+            margin: '0 20px',
+            padding: '8px 12px',
+            border: '1px solid color-mix(in oklab, var(--warn) 40%, var(--line))',
+            borderRadius: 8,
+            background: 'var(--warn-soft)',
+            color: 'var(--ink-2)',
+            fontSize: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <span>本次会话产生了 {draftMemoryCount} 条待确认记忆</span>
+          <Link to="/system/memory?status=draft" style={{ marginLeft: 'auto', color: 'var(--brand)', fontWeight: 700 }}>
+            去确认 →
+          </Link>
+        </div>
+      )}
 
       <Composer
         composer={workbench.composer}

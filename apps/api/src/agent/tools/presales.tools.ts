@@ -17,6 +17,8 @@ export function buildEstimateTool(calculate: EstimateFn): AgentTool {
     },
     capability: "estimates:create",
     mutates: false,
+    category: "estimate",
+    discoverable: false,
     async execute(args) {
       return calculate(args);
     },

@@ -10,7 +10,9 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startHarnessRuntime } from "./harness-boot";
+import { startHarnessRuntime, createRunTerminalMemoryHook } from "./harness-boot";
+import { createMemoryUsecase } from "../memory/memory.usecase";
+import type { distillRunMemory } from "../memory/memory.distiller";
 
 test("boot: enabled=true 启动 worker 与 projector 各恰 1 次", async () => {
   let workerStarted = 0;
@@ -241,4 +243,157 @@ test("boot: G-E1 focused 端到端——stub modelChat 注入后被调用", asyn
   await runtime.stop();
 
   assert.equal(modelChatCalled, true, "G-E1：stub modelChat 应被调用，证明注入通道有效");
+});
+
+// ============================================================
+// SP-2026-007 MS2 补测：Run 终态蒸馏钩子集成测试
+// 覆盖：终态触发蒸馏 / 非 completed 不触发 / 失败路径断言留痕 /
+//       无 API Key 静默跳过 / draft 未确认不进入注入通道
+// ============================================================
+
+type DistillCall = {
+  deps: Record<string, unknown>;
+  input: {
+    ownerUserId: string;
+    projectId: string;
+    harnessRunId: string;
+    runTitle?: string;
+    messages: Array<{ role: string; content: string }>;
+  };
+};
+
+function makeDistillHook(overrides: {
+  distillImpl?: (deps: unknown, input: unknown) => Promise<unknown>;
+  apiKey?: string;
+  snapshotAnswer?: string;
+  onError?: (info: { harnessRunId: string; outcome: string; error: string }) => void;
+}) {
+  const distillCalls: DistillCall[] = [];
+  const errors: Array<{ harnessRunId: string; outcome: string; error: string }> = [];
+  const hook = createRunTerminalMemoryHook({
+    repo: {
+      getRunSnapshot: async () => ({
+        output: { content: { answer: overrides.snapshotAnswer ?? "这是 AI 回答" } },
+      }),
+    } as never,
+    resolveApiKey: () => ({ apiKey: overrides.apiKey ?? "test-key" }),
+    getProvider: () => ({}) as never,
+    getMemoryRepo: () => ({}) as never,
+    distill: (async (deps: unknown, input: unknown) => {
+      distillCalls.push({ deps: deps as Record<string, unknown>, input: input as DistillCall["input"] });
+      if (overrides.distillImpl) return overrides.distillImpl(deps, input);
+      return { success: true, atomsCount: 1, scenesCount: 1 };
+    }) as typeof distillRunMemory,
+    model: "test-model",
+    apiBaseUrl: "https://example.test",
+    timeoutMs: 1000,
+    onError: overrides.onError ?? ((info) => errors.push(info)),
+  });
+  return { hook, distillCalls, errors };
+}
+
+const fakeTerminalRun = {
+  harnessRunId: "run-001",
+  ownerUserId: "u-1",
+  title: "帮我评估这个项目",
+  projectEvaluationId: "proj-9",
+  metadata: {},
+};
+
+test("MS2 补测：run 进入 completed 终态触发蒸馏钩子，入参映射正确", async () => {
+  const { hook, distillCalls, errors } = makeDistillHook({});
+
+  await hook(fakeTerminalRun as never, "completed");
+
+  assert.equal(distillCalls.length, 1, "completed 终态应触发一次蒸馏");
+  const input = distillCalls[0].input;
+  assert.equal(input.ownerUserId, "u-1");
+  assert.equal(input.projectId, "proj-9");
+  assert.equal(input.harnessRunId, "run-001");
+  assert.deepEqual(input.messages, [
+    { role: "user", content: "帮我评估这个项目" },
+    { role: "assistant", content: "这是 AI 回答" },
+  ]);
+  assert.equal(errors.length, 0);
+});
+
+test("MS2 补测：failed / cancelled 终态不触发蒸馏", async () => {
+  const { hook, distillCalls } = makeDistillHook({});
+
+  await hook(fakeTerminalRun as never, "failed");
+  await hook(fakeTerminalRun as never, "cancelled");
+
+  assert.equal(distillCalls.length, 0);
+});
+
+test("MS2 补测：蒸馏失败路径有断言留痕（onError 捕获 run id 与错误，不得仅 console.error 静默）", async () => {
+  const { hook, errors } = makeDistillHook({
+    distillImpl: async () => {
+      throw new Error("distill boom");
+    },
+  });
+
+  await hook(fakeTerminalRun as never, "completed");
+
+  assert.equal(errors.length, 1, "蒸馏失败必须经 onError 留痕");
+  assert.equal(errors[0].harnessRunId, "run-001");
+  assert.equal(errors[0].outcome, "completed");
+  assert.match(errors[0].error, /distill boom/);
+});
+
+test("MS2 补测：蒸馏返回 success=false 同样留痕", async () => {
+  const { hook, errors } = makeDistillHook({
+    distillImpl: async () => ({ success: false, atomsCount: 0, scenesCount: 0, error: "distill_response_not_json" }),
+  });
+
+  await hook(fakeTerminalRun as never, "completed");
+
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].error, /distill_response_not_json/);
+});
+
+test("MS2 补测：无 API Key 时静默跳过（不蒸馏、不留错误）", async () => {
+  const { hook, distillCalls, errors } = makeDistillHook({ apiKey: "" });
+
+  await hook(fakeTerminalRun as never, "completed");
+
+  assert.equal(distillCalls.length, 0);
+  assert.equal(errors.length, 0);
+});
+
+test("MS2 补测：用户消息与回答均为空时不触发蒸馏", async () => {
+  const { hook, distillCalls } = makeDistillHook({ snapshotAnswer: "" });
+
+  await hook({ ...fakeTerminalRun, title: "" } as never, "completed");
+
+  assert.equal(distillCalls.length, 0);
+});
+
+test("MS2 补测：注入通道只读 active 记忆（draft 未确认不注入）", async () => {
+  const called: string[] = [];
+  const repo = {
+    getActiveScenesForProject: async () => {
+      called.push("getActiveScenesForProject");
+      return [];
+    },
+    getActiveAtomsForProject: async () => {
+      called.push("getActiveAtomsForProject");
+      return [];
+    },
+    listMemoryForProject: async () => {
+      called.push("listMemoryForProject");
+      return { atoms: [], scenes: [], totalAtoms: 3, totalScenes: 2 };
+    },
+  };
+  const usecase = createMemoryUsecase({ repo: repo as never });
+
+  const ctx = await usecase.buildMemoryContext({ ownerUserId: "u-1", projectId: "default" });
+
+  assert.deepEqual(ctx, { scenes: [], atoms: [] });
+  assert.ok(called.includes("getActiveScenesForProject"));
+  assert.ok(called.includes("getActiveAtomsForProject"));
+  assert.ok(
+    !called.includes("listMemoryForProject"),
+    "注入通道不得读取含 draft 的列表通道",
+  );
 });

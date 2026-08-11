@@ -36,6 +36,75 @@ export type HarnessRuntimeBootResult = {
   stop(): Promise<void>;
 };
 
+// ============================================================
+// SP-2026-007 MS2 补测：Run 终态蒸馏钩子（可注入工厂）
+// 生产默认装配真实依赖；测试注入 distill/onError 替身，
+// 失败路径必须经 onError 留痕（不得仅 console.error 静默）。
+// ============================================================
+
+export type RunTerminalOutcome = "completed" | "failed" | "cancelled";
+
+export type RunTerminalMemoryHookDeps = {
+  repo: HarnessRuntimeRepository;
+  resolveApiKey: () => { apiKey: string };
+  getProvider: () => ReturnType<typeof getKimiProvider>;
+  getMemoryRepo: () => ReturnType<typeof getMemoryRepository>;
+  distill: typeof distillRunMemory;
+  model: string;
+  apiBaseUrl: string;
+  timeoutMs: number;
+  onError: (info: { harnessRunId: string; outcome: string; error: string }) => void;
+};
+
+export function createRunTerminalMemoryHook(deps: RunTerminalMemoryHookDeps) {
+  return async (run: any, outcome: RunTerminalOutcome): Promise<void> => {
+    if (outcome !== "completed") return;
+    try {
+      const snapshot = await deps.repo.getRunSnapshot(run.harnessRunId);
+      const outputContent = snapshot?.output?.content as Record<string, unknown> | undefined;
+      const answer = typeof outputContent?.answer === "string" ? outputContent.answer : "";
+      const userMessage = run.title || "";
+      if (!userMessage && !answer) return;
+
+      const { apiKey } = deps.resolveApiKey();
+      if (!apiKey) return; // 无 API Key 时静默跳过
+
+      const result = await deps.distill(
+        {
+          repo: deps.getMemoryRepo(),
+          provider: deps.getProvider(),
+          model: deps.model,
+          apiKey,
+          apiBaseUrl: deps.apiBaseUrl,
+          timeoutMs: deps.timeoutMs,
+        },
+        {
+          ownerUserId: run.ownerUserId,
+          projectId: run.projectEvaluationId || run.metadata?.projectId || "default",
+          harnessRunId: run.harnessRunId,
+          runTitle: run.title,
+          messages: [
+            { role: "user", content: userMessage },
+            { role: "assistant", content: answer },
+          ],
+        },
+      );
+      // 蒸馏返回 success=false 属于业务失败，同样必须留痕（此前静默）
+      if (result && result.success === false) {
+        deps.onError({
+          harnessRunId: run.harnessRunId,
+          outcome,
+          error: String(result.error || "distill_failed").slice(0, 200),
+        });
+      }
+    } catch (distillErr) {
+      // 蒸馏失败不阻塞主链路，降级为无记忆模式并留可追溯日志
+      const msg = distillErr instanceof Error ? distillErr.message : String(distillErr);
+      deps.onError({ harnessRunId: run.harnessRunId, outcome, error: msg.slice(0, 200) });
+    }
+  };
+}
+
 export function startHarnessRuntime(options: HarnessRuntimeBootOptions): HarnessRuntimeBootResult {
   if (!options.enabled) {
     return {
@@ -109,45 +178,21 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
   });
   const registry = createHarnessWorkflowRegistry([workflow]);
 
-  // SP-2026-007 MS2：Run 终态后异步蒸馏记忆钩子
-  const onRunTerminal = async (run: any, outcome: "completed" | "failed" | "cancelled") => {
-    if (outcome !== "completed") return;
-    try {
-      const snapshot = await options.repo.getRunSnapshot(run.harnessRunId);
-      const outputContent = snapshot?.output?.content as Record<string, unknown> | undefined;
-      const answer = typeof outputContent?.answer === "string" ? outputContent.answer : "";
-      const userMessage = run.title || "";
-      if (!userMessage && !answer) return;
-
-      const { apiKey } = resolveActiveRequirementKimiApiKey();
-      if (!apiKey) return; // 无 API Key 时静默跳过
-
-      await distillRunMemory(
-        {
-          repo: getMemoryRepository(),
-          provider: getKimiProvider(),
-          model: config.kimi.model,
-          apiKey,
-          apiBaseUrl: config.kimi.apiBaseUrl,
-          timeoutMs: 60000,
-        },
-        {
-          ownerUserId: run.ownerUserId,
-          projectId: run.projectEvaluationId || run.metadata?.projectId || "default",
-          harnessRunId: run.harnessRunId,
-          runTitle: run.title,
-          messages: [
-            { role: "user", content: userMessage },
-            { role: "assistant", content: answer },
-          ],
-        },
-      );
-    } catch (distillErr) {
-      // 蒸馏失败不阻塞主链路，降级为无记忆模式并留可追溯日志
-      const msg = distillErr instanceof Error ? distillErr.message : String(distillErr);
-      console.error(`[memory-distill] run=${run.harnessRunId} outcome=${outcome} error=${msg.slice(0, 200)}`);
-    }
-  };
+  // SP-2026-007 MS2：Run 终态后异步蒸馏记忆钩子（工厂装配真实依赖；
+  // 失败留痕走 onError → console.error，与此前口径一致并补 success=false 留痕）
+  const onRunTerminal = createRunTerminalMemoryHook({
+    repo: options.repo,
+    resolveApiKey: () => resolveActiveRequirementKimiApiKey(),
+    getProvider: () => getKimiProvider(),
+    getMemoryRepo: () => getMemoryRepository(),
+    distill: distillRunMemory,
+    model: config.kimi.model,
+    apiBaseUrl: config.kimi.apiBaseUrl,
+    timeoutMs: 60000,
+    onError: ({ harnessRunId, outcome, error }) => {
+      console.error(`[memory-distill] run=${harnessRunId} outcome=${outcome} error=${error}`);
+    },
+  });
 
   const worker = options.createWorker
     ? options.createWorker({ repo: options.repo, registry })
