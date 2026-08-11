@@ -366,11 +366,11 @@
               <td class="mono tc-2">RP-052</td>
               <td class="tc-3">记忆管理面板恒空：listMemory 缺 projectId 恒返回空 + 面板请求从不带 projectId + 不读 ?status=draft query，MS2「UI 可见可确认」验收口径不成立</td>
               <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status run"><span class="dot"></span>已修复 / 复核通过待用户批准合入</span></td>
+              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复 / 已合入主线，待人工验收关闭</span></td>
               <td class="tc-6">apps/api/src/modules/memory/memory.controller.ts（requireAuth 误挂 middleware 薄包装修复，范围偏差已裁决接受）/ memory.repository.ts（owner 全量读取，共用实现去重）/ memory.usecase.ts（口径透传）/ ui/V2_PROTOTYPE/src/components/system/MemoryManagementPanel.jsx（query 初始化 + 带 projectId）/ dispatch 链路 additive 字段（workbench-dispatch.service / workbench-shared / workbench-chat.handler）</td>
               <td class="tc-7">根因（2026-08-11 Qoder 回填时修正为三层，原登记两层不完整）：① <strong>requireAuth 挂起</strong>——普通函数（返回 user 或 null、失败自写 401）被直接挂为 Express middleware，成功分支不调 next() 不写 req.user，有效 JWT 请求永远挂起，5 条记忆路由（list/confirm×2/archive×2）全部死路（MS2 引入的预置缺陷）；② memory.usecase.listMemory 缺 projectId 恒返回空；③ MemoryManagementPanel 请求不带 projectId 且不读 ?status=draft query。三层任一不修面板都亮不起来。后端蒸馏落 PG 链路正常（harness-boot 12 用例守护）。修复后实证：面板展示「皓吉达 OA+PLM 集成场景」等待确认记忆，确认/归档可用，1440px/760px 正常。</td>
               <td class="tc-8">验收口径：① 面板真实数据非空，draft 记忆可见可确认；② MS2-PATCH 蒸馏成功提示条「去确认」跳转后自动筛选 draft；③ 补 RED 测试（listMemory 无 projectId 非空 + 面板 query 初始化）；④ test:modules / test:harness 计数不下降。</td>
-              <td class="tc-9">2026-08-11 Codex MS3 回填复核时登记（Qoder handoff 自发现，代码事实复核确认）。2026-08-11 19:31 用户拍板修复：与 chip 活数据链路合并一张工单 <code class="inline">docs/agent-loop/work-orders/2026-08-11-qoder-memory-panel-chip-live-link.md</code>。2026-08-11 Qoder 回填（9409b5d，16 文件 +549/-100）：三层根因全修 + chip 同步链路打通；Codex 复核通过（矩阵全绿 + RED 独立复现 + controller 范围偏差裁决接受），待用户批准合入 main，合入后本 defect 流转关闭、RP-052 进入人工验收。遗留：流式通道（workbench-chat-stream/workflow）chip 不生效（工单禁区），如需流式 chip 另起工单。</td>
+              <td class="tc-9">2026-08-11 Codex MS3 回填复核时登记（Qoder handoff 自发现，代码事实复核确认）。2026-08-11 19:31 用户拍板修复：与 chip 活数据链路合并一张工单 <code class="inline">docs/agent-loop/work-orders/2026-08-11-qoder-memory-panel-chip-live-link.md</code>。2026-08-11 Qoder 回填（9409b5d，16 文件 +549/-100）：三层根因全修 + chip 同步链路打通；Codex 复核通过（矩阵全绿 + RED 独立复现 + controller 范围偏差裁决接受）。2026-08-11 23:22 用户批准合入 main（318f3bd），RP-052 人工验收解锁；待用户真实环境验收（draft 记忆可见/可确认/可归档 + 提示条跳转自动筛选 draft）后本 defect 关闭。遗留：流式通道（workbench-chat-stream/workflow）chip 不生效（工单禁区），如需流式 chip 另起工单。</td>
             </tr>
             <tr data-board-event-id="BE-2026-08-11-def-2026-08-11-002-derived:defects">
               <td class="mono tc-0">DEF-2026-08-11-002</td>
