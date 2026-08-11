@@ -1067,6 +1067,17 @@
               <td>验收口径：区段标题 heading 语义可查询（模型供应商 / 场景模型绑定）；凭据标签（凭据域托管/KEK/最近变更）在供应商表格之前渲染；四条旧文案（模型供应商与场景绑定 ·…/模型供应商 · 凭据…/凭据域状态：/场景模型绑定 ·…）全移除；ModelConfigTable 凭据徽标断言零回归；RED 先行、前端 vitest 基线零回归、build:web 零错误、UI 门禁 0 findings。</td>
             </tr>
             <tr>
+              <td class="mono">RP-058</td>
+              <td>后台任务控件与通知交互优化（清单气泡 + 完成通知 5s 自消 + 点击跳转会话并清未读）</td>
+              <td>2026-08-11 22:40 用户截图指示三点：指示器点击弹气泡清单（失焦消失）；已完成通知 5 秒自动消失；点击已完成通知跳转对应会话详情页并触发会话列表【已完成未读】消失；来源问题 <code class="inline">ISS-2026-08-11-006</code>（去重未命中，交叉引用 RP-047）</td>
+              <td>前端体验 / 全局 Shell 后台任务区</td>
+              <td><span class="pill priority-p2">P2</span></td>
+              <td>用户当轮直接指示实现，无独立排期</td>
+              <td><span class="status run"><span class="dot"></span>已分诊 / 实现中</span></td>
+              <td>指示器改 button + 气泡清单（控件上方绝对定位、活跃 Run 标题+状态、空态文案、外部点击/Esc 关闭）；completed 通知 5s 定时自消（failed/cancelled 保持手动）；通知负载补 sessionId，点击文本 → primeStoredActiveSessionId + markSessionUnread(false) + dismiss + navigate('/')；约束：index.css 与 AiHomeWorkbench/** 为他人 WIP 不触碰，样式走内联 + tokens</td>
+              <td>验收口径：气泡点击开/外部点击关（失焦消失）；completed 通知 5s 自动消失、failed/cancelled 不自消；点击已完成通知后 localStorage 预置活跃会话 + store 未读清除（【已完成未读】徽标消失）+ 跳转 '/'；RED 先行、background-runs 既有用例零回归、build:web 零错误、UI 门禁 0 findings。</td>
+            </tr>
+            <tr>
               <td class="mono">RP-032</td>
               <td>AI 工作台推荐工作流列表可达性与语义优化</td>
               <td>2026-06-26 用户截图反馈：AI 工作台左侧“推荐工作流”区域作用不清，且无法滚动查看最下方内容；去重后确认 RP-019 已覆盖推荐工作流定位不清，但未覆盖列表底部可达性</td>

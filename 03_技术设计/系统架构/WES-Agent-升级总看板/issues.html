@@ -642,6 +642,17 @@
               <td class="tc-7">分诊结果 requirement（P2 体验调整）。去重：未命中（RP-055 为多供应商架构、RP-053 为表格化，本条为同一页面的信息层级与文案治理，独立根因），交叉引用 RP-055，派生 RP-057。确诊根问题（≤3，截图即渲染证据）：R1 三条孤儿 meta caption 与副标题重复表达、措辞不一；R2 凭据域状态挂在供应商表尾行、视觉无归属；R3 流程提示「先保存草稿再生效」带冗余前缀且与操作区语义割裂。</td>
               <td class="tc-8">重设计方向（对标 Dify/Linear 区段标题范式，复用现有 tokens 与 tag 组件，零新依赖）：① 两区段改为「区段标题（h3 语义）+ 单行 dim 描述」——模型供应商（描述：凭据按供应商加密托管 · 最近变更…）/ 场景模型绑定（描述：点击行查看接线与差异）；② 凭据域状态标签组（托管态/KEK）从表尾上移至供应商区段标题行右侧；③ 顶部工具条 caption 精简为「修改后先保存草稿再生效」，旧前缀删除。验收口径：区段标题 heading 语义可查询、凭据标签在供应商表格之前渲染、四条旧文案全移除、ModelConfigTable 凭据徽标断言零回归、UI 门禁 0 findings、build:web 零错误。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-006-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-006</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">全局 / 后台任务控件与通知：① 指示器点击弹出任务清单气泡（失焦消失）；② 已完成通知 5 秒自动消失；③ 点击已完成通知跳转对应会话并清除【已完成未读】徽标（功能调整）</td>
+              <td class="tc-3">user_feedback（截图：右下角「后台任务 0」+「…已完成」通知）</td>
+              <td class="tc-4">2026-08-11 22:40 用户截图指示三点优化：1）后台任务控件点击后在控件附近弹出气泡状详情界面显示后台任务清单，鼠标失焦后消失；2）后台任务已完成的消息默认显示 5 秒后消失；3）点击已完成通知内容直接跳转到对应的会话详情页，跳转成功后触发会话列表中【已完成未读】消失。现状事实：指示器为纯展示 div 无交互；通知仅有手动 × 关闭、无自动消失；通知负载只带 runId 无 sessionId，无跳转能力。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx（ShellBackgroundRuns 指示器 + 通知区）</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useBackgroundRuns.jsx（终态通知负载缺 sessionId）</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useAiSessions.js（active session localStorage 恢复链）</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useSessionRuntimeStore.js（markSessionUnread 徽标数据源）</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已分诊 / 实现中（用户当轮指示实现）</span></td>
+              <td class="tc-7">分诊结果 requirement（P2 体验调整）。去重：未命中（RP-047 Batch D 为后台任务基建、ISS-2026-08-10-002 为角标计数刷新，本条为控件交互与通知生命周期优化，独立根因），交叉引用 RP-047，派生 RP-058。约束：index.css 为他人 WIP 脏文件不可触碰，气泡样式走内联 + 现有 tokens；pages/AiHomeWorkbench/** 同为 WIP 不可触碰，跳转采用 localStorage 预置活跃会话 + navigate('/') + store 清未读三件套，不新增工作台侧代码。</td>
+              <td class="tc-8">方案：① 指示器改 button，点击切换气泡（绝对定位于控件上方，列出活跃 Run 标题 + 状态，空态「暂无进行中的后台任务」），document mousedown  Outside 关闭 + Esc 关闭；② completed 通知挂 5s 定时自动 dismiss（仅 completed 类，failed/cancelled 保留手动关闭）；③ 终态通知负载补 sessionId，点击通知文本 → primeStoredActiveSessionId（useAiSessions 导出助手复用同一 storage key）→ markSessionUnread(sessionId, false)（徽标即消）→ dismiss 该通知 → navigate('/')（工作台挂载恢复该会话）。验收口径：气泡点击开/外部点击关；completed 通知 5s 自动消失；点击通知后 localStorage 预置 + 未读清除 + 跳转 '/'；RED 先行、background-runs 既有 9 用例零回归、build:web 零错误、UI 门禁 0 findings。</td>
+            </tr>
         </tbody>
         </table>
         </div>

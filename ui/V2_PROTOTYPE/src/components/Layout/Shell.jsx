@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import WorkspaceTabs from './WorkspaceTabs.jsx'
 import { UnsavedChangesProvider } from '../../hooks/useUnsavedChanges.jsx'
 import { BackgroundRunProvider, useBackgroundRuns } from '../../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../../hooks/useSessionRuntimeStore.js'
+import { primeStoredActiveSessionId } from '../../hooks/useAiSessions.js'
 import useCurrentUser from '../../hooks/useCurrentUser.js'
 import { clearToken, isAuthenticated } from '../../api/auth.js'
 import { SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
@@ -66,25 +67,136 @@ function ChevronIcon({ expanded }) {
   )
 }
 
-/** 后台任务指示器 + aria-live 通知区（常驻 Shell 层，跨页面存活）。 */
-function ShellBackgroundRuns() {
-  const { activeCount, notifications, dismissNotification } = useBackgroundRuns()
+/** RP-058：completed 通知 5s 自动消失（failed/cancelled 保留手动关闭，避免错误被错过）。 */
+const COMPLETED_AUTO_DISMISS_MS = 5000
+
+const RUN_STATUS_LABEL = {
+  running: '进行中',
+  queued: '排队中',
+  waiting: '等待中',
+  cancelling: '取消中',
+}
+
+/** 单条后台任务通知：completed 类挂自动消失定时器，可跳转的文本渲染为按钮。 */
+function BackgroundRunNotification({ item, onDismiss, onOpen }) {
+  useEffect(() => {
+    if (item.kind !== 'completed') return undefined
+    const timer = setTimeout(() => onDismiss(item.id), COMPLETED_AUTO_DISMISS_MS)
+    return () => clearTimeout(timer)
+  }, [item.id, item.kind, onDismiss])
+
+  const canOpen = item.kind === 'completed' && Boolean(item.sessionId)
   return (
-    <div className="shell-background-runs">
-      <div className="shell-background-runs-indicator">后台任务 {activeCount}</div>
+    <div className={`background-run-notification background-run-notification--${item.kind}`}>
+      {canOpen ? (
+        <button
+          type="button"
+          className="background-run-notification-text"
+          aria-label={`查看会话：${item.text}`}
+          title="点击查看对应会话"
+          style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+          onClick={() => onOpen(item)}
+        >
+          {item.text}
+        </button>
+      ) : (
+        <span className="background-run-notification-text">{item.text}</span>
+      )}
+      <button
+        type="button"
+        className="background-run-notification-dismiss"
+        aria-label={`关闭通知：${item.text}`}
+        onClick={() => onDismiss(item.id)}
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+/** 后台任务指示器 + 清单气泡 + aria-live 通知区（常驻 Shell 层，跨页面存活）。 */
+function ShellBackgroundRuns() {
+  const { runs, activeCount, notifications, dismissNotification } = useBackgroundRuns()
+  const [listOpen, setListOpen] = useState(false)
+  const containerRef = useRef(null)
+  const navigate = useNavigate()
+
+  // RP-058：气泡失焦消失——点击控件外任意处或按 Esc 关闭
+  useEffect(() => {
+    if (!listOpen) return undefined
+    const onPointerDown = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) setListOpen(false)
+    }
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setListOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [listOpen])
+
+  // RP-058：点击已完成通知 → 预置活跃会话 + 清未读（已完成未读徽标即消）+ 跳转会话
+  const handleOpenSession = useCallback((item) => {
+    if (!item.sessionId) return
+    primeStoredActiveSessionId(item.sessionId)
+    sessionRuntimeStore.markSessionUnread(item.sessionId, false)
+    dismissNotification(item.id)
+    navigate('/')
+  }, [dismissNotification, navigate])
+
+  return (
+    <div className="shell-background-runs" ref={containerRef}>
+      <button
+        type="button"
+        className="shell-background-runs-indicator"
+        aria-expanded={listOpen}
+        aria-label={`后台任务 ${activeCount}`}
+        style={{ cursor: 'pointer', fontFamily: 'inherit' }}
+        onClick={() => setListOpen((open) => !open)}
+      >
+        后台任务 {activeCount}
+      </button>
+      {listOpen ? (
+        <div
+          role="dialog"
+          aria-label="后台任务清单"
+          style={{
+            position: 'absolute',
+            bottom: '100%',
+            right: 0,
+            marginBottom: 8,
+            minWidth: 260,
+            maxWidth: 340,
+            background: 'var(--surface-elevated)',
+            border: '1px solid var(--line)',
+            borderRadius: 'var(--r-lg)',
+            boxShadow: 'var(--shadow-2)',
+            padding: '10px 12px',
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
+            后台任务（{activeCount}）
+          </div>
+          {runs.length ? (
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {runs.map((run) => (
+                <li key={run.runId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 12 }}>
+                  <span style={{ color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.title || run.runId}</span>
+                  <span className="tag brd">{RUN_STATUS_LABEL[run.status] || run.status || '进行中'}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '6px 0' }}>暂无进行中的后台任务</div>
+          )}
+        </div>
+      ) : null}
       <div className="shell-background-runs-notifications" role="region" aria-label="后台任务通知" aria-live="polite">
         {notifications.map((item) => (
-          <div key={item.id} className={`background-run-notification background-run-notification--${item.kind}`}>
-            <span className="background-run-notification-text">{item.text}</span>
-            <button
-              type="button"
-              className="background-run-notification-dismiss"
-              aria-label={`关闭通知：${item.text}`}
-              onClick={() => dismissNotification(item.id)}
-            >
-              ×
-            </button>
-          </div>
+          <BackgroundRunNotification key={item.id} item={item} onDismiss={dismissNotification} onOpen={handleOpenSession} />
         ))}
       </div>
     </div>
