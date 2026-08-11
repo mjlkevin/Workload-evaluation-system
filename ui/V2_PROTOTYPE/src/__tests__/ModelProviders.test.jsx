@@ -115,4 +115,56 @@ describe('ModelProviders · 多供应商管理（ISS-2026-08-11-001 / RP-055）'
     expect(created.baseUrl).toBe('https://api.openai.com/v1')
     expect(created.models.map((m) => m.id)).toContain('gpt-4o')
   })
+
+  test('场景编辑弹窗按模型 supportedParams 动态锁定采样参数（RP-055 批 3）', async () => {
+    const draft = {
+      kimiEvaluation: { enabled: true, model: 'kimi-k3', temperature: 0.3, maxTokens: 4000, timeoutMs: 120000, fallbackToRule: true, promptProfile: 'default', promptTemplate: '' },
+      fileParsing: { enabled: true, model: 'kimi-k2.6', allowedExtensions: ['.xlsx'], maxFileSizeMb: 20, maxSheetCount: 20, strictMode: false, ocrEnabled: false },
+      kimiGeneration: { enabled: true, model: 'kimi-k3', temperature: 0.5, maxTokens: 6000, outputStyle: 'balanced', includeRiskHints: true, includeAssumptions: true },
+      kimiCredentials: { apiKey: '', hint: null, envFallbackAvailable: false, resolvedFrom: 'none' },
+      modelProviders: [
+        { id: 'moonshot', name: 'Moonshot（月之暗面）', protocol: 'openai-compatible', baseUrl: 'https://api.moonshot.cn/v1', enabled: true,
+          models: [
+            { id: 'kimi-k3', label: 'Kimi K3', capabilities: ['chat'], supportedParams: ['maxTokens'] },
+            { id: 'kimi-k2.6', label: 'Kimi K2.6', capabilities: ['chat'], supportedParams: ['maxTokens'] },
+          ] },
+        { id: 'zhipu', name: '智谱 GLM', protocol: 'openai-compatible', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', enabled: true,
+          models: [{ id: 'glm-4.6', label: 'GLM 4.6', capabilities: ['chat'], supportedParams: ['temperature', 'maxTokens'] }] },
+      ],
+      scenarioBindings: {
+        assessment: { providerId: 'moonshot', modelId: 'kimi-k3' },
+        fileParsing: { providerId: 'moonshot', modelId: 'kimi-k2.6' },
+        generation: { providerId: 'moonshot', modelId: 'kimi-k3' },
+      },
+    }
+    server.use(
+      http.get(`${BASE}/system/requirement-settings`, () => HttpResponse.json({ success: true, data: {
+        version: 1,
+        draft,
+        active: JSON.parse(JSON.stringify(draft)),
+        updatedAt: '2026-01-15T08:00:00Z',
+        effectiveAt: '2026-01-15T08:00:00Z',
+      } })),
+    )
+
+    renderAppAtModelConfig()
+    const scenarioTable = await screen.findByRole('table', { name: '场景模型绑定' })
+    fireEvent.click(within(scenarioTable).getAllByRole('button', { name: '编辑' })[0])
+
+    const dialog = await screen.findByRole('dialog', { name: /编辑 实施评估/ })
+    // kimi-k3 声明 supportedParams=['maxTokens']：Temperature 锁定并给出提示；最大 Tokens 可配
+    const tempInput = within(dialog).getByText('Temperature').closest('.sys-field').querySelector('input')
+    expect(tempInput).toBeDisabled()
+    expect(within(dialog).getByText(/固定采样参数/)).toBeInTheDocument()
+    const tokensInput = within(dialog).getByText('最大 Tokens').closest('.sys-field').querySelector('input')
+    expect(tokensInput).toBeEnabled()
+
+    // 切换到智谱 GLM（glm-4.6 声明支持 temperature）：Temperature 恢复可配
+    const providerSelect = within(dialog).getAllByRole('combobox')[0]
+    fireEvent.change(providerSelect, { target: { value: 'zhipu' } })
+    await waitFor(() => {
+      const input = within(dialog).getByText('Temperature').closest('.sys-field').querySelector('input')
+      expect(input).toBeEnabled()
+    })
+  })
 })

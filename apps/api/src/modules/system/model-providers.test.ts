@@ -280,3 +280,56 @@ test("RP-055 deriveBindingsFromLegacy：三场景从旧字段原样映射到内�
     generation: { providerId: "moonshot", modelId: "kimi-k2.5" },
   });
 });
+
+// -------------------- 5. RP-055 批 3：内置模型参数矩阵（supportedParams 种子与回填） --------------------
+
+test("RP-055 批 3：迁移合成内置 moonshot 时 kimi-k3/kimi-k2.6 种子 supportedParams=['maxTokens']（K2 采样平台固定）", () => {
+  const provider = createBuiltinMoonshotProvider(ENV.baseUrl, ["kimi-k3", "kimi-k2.6", "moonshot-v1-128k"]);
+  const byId = Object.fromEntries(provider.models.map((m) => [m.id, m.supportedParams]));
+  assert.deepEqual(byId["kimi-k3"], ["maxTokens"]);
+  assert.deepEqual(byId["kimi-k2.6"], ["maxTokens"]);
+  // 未声明约束的旧模型保持空（空 = 不约束，向后兼容）
+  assert.deepEqual(byId["moonshot-v1-128k"], []);
+});
+
+test("RP-055 批 3：存量内置供应商（supportedParams 为空）读取归一化时按内置矩阵回填", () => {
+  const existingMoonshot: ModelProvider = {
+    id: "moonshot",
+    name: "Moonshot",
+    protocol: "openai-compatible",
+    baseUrl: "https://api.moonshot.cn/v1",
+    enabled: true,
+    models: [
+      { id: "kimi-k3", label: "", capabilities: ["chat"], supportedParams: [] },
+      { id: "kimi-k2.6", label: "", capabilities: ["chat"], supportedParams: [] },
+    ],
+    createdAt: "2026-08-11T00:00:00.000Z",
+    updatedAt: "2026-08-11T00:00:00.000Z",
+  };
+  const normalized = normalizeRequirementSystemConfig(makeLegacyConfig({ modelProviders: [existingMoonshot] }));
+  const moonshot = (normalized.modelProviders || []).find((p) => p.id === "moonshot");
+  const byId = Object.fromEntries((moonshot?.models || []).map((m) => [m.id, m.supportedParams]));
+  assert.deepEqual(byId["kimi-k3"], ["maxTokens"], "存量空矩阵应按内置矩阵回填");
+  assert.deepEqual(byId["kimi-k2.6"], ["maxTokens"]);
+});
+
+test("RP-055 批 3：显式声明的 supportedParams 不被内置矩阵覆盖；自定义供应商空矩阵不回填", () => {
+  const customMoonshot: ModelProvider = {
+    id: "moonshot",
+    name: "Moonshot",
+    protocol: "openai-compatible",
+    baseUrl: "https://api.moonshot.cn/v1",
+    enabled: true,
+    models: [{ id: "kimi-k3", label: "", capabilities: ["chat"], supportedParams: ["temperature", "maxTokens"] }],
+    createdAt: "2026-08-11T00:00:00.000Z",
+    updatedAt: "2026-08-11T00:00:00.000Z",
+  };
+  const normalized = normalizeRequirementSystemConfig(
+    makeLegacyConfig({ modelProviders: [customMoonshot, makeDeepseekProvider()] }),
+  );
+  const providers = normalized.modelProviders || [];
+  const moonshot = providers.find((p) => p.id === "moonshot");
+  assert.deepEqual(moonshot?.models[0]?.supportedParams, ["temperature", "maxTokens"], "显式声明优先");
+  const deepseek = providers.find((p) => p.id === "deepseek");
+  assert.deepEqual(deepseek?.models[0]?.supportedParams, [], "自定义供应商空矩阵保持未声明（不约束）");
+});

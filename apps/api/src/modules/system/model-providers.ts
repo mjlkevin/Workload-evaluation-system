@@ -20,6 +20,21 @@ import { KIMI_SCOPE } from "./credentials.store";
 export const BUILTIN_MOONSHOT_PROVIDER_ID = "moonshot";
 const PROTOCOL = "openai-compatible";
 
+/**
+ * RP-055 批 3：内置 moonshot 模型参数矩阵（supportedParams 种子）。
+ * 事实来源：K2 系列模型采样参数由平台固定（temperature 不会发送，见 effective notes）。
+ * 语义：非空数组 = 白名单（仅列出的模型参数可配）；空 = 未声明约束（不限制，向后兼容）。
+ * 仅约束「模型采样参数」能力面；timeoutMs / promptProfile 等 WES 侧配置不受其约束。
+ */
+const BUILTIN_MODEL_SUPPORTED_PARAMS: Record<string, string[]> = {
+  "kimi-k3": ["maxTokens"],
+  "kimi-k2.6": ["maxTokens"],
+};
+
+function builtinSupportedParams(modelId: string): string[] {
+  return BUILTIN_MODEL_SUPPORTED_PARAMS[modelId] || [];
+}
+
 /** 凭据 scope 映射：内置 moonshot 沿用 kimi（历史 DB 记录/审计零迁移），其余 provider:{id} */
 export function credentialScopeForProvider(providerId: string): string {
   return providerId === BUILTIN_MOONSHOT_PROVIDER_ID ? KIMI_SCOPE : `provider:${providerId}`;
@@ -47,9 +62,13 @@ function normalizeProvider(input: unknown, now: string): ModelProvider | null {
   const baseUrl = String(raw.baseUrl || "").trim().replace(/\/+$/, "");
   if (!id || !baseUrl) return null;
   if (raw.protocol !== PROTOCOL) return null;
-  const models = (Array.isArray(raw.models) ? raw.models : [])
+  const rawModels = (Array.isArray(raw.models) ? raw.models : [])
     .map(normalizeProviderModel)
     .filter((m): m is ModelProviderModel => Boolean(m));
+  // 内置 moonshot：存量空矩阵按内置参数矩阵回填（显式声明优先，不被覆盖）
+  const models = id === BUILTIN_MOONSHOT_PROVIDER_ID
+    ? rawModels.map((m) => (m.supportedParams.length ? m : { ...m, supportedParams: builtinSupportedParams(m.id) }))
+    : rawModels;
   return {
     id,
     name: String(raw.name || "").trim() || id,
@@ -72,7 +91,7 @@ export function createBuiltinMoonshotProvider(baseUrl: string, modelIds: string[
     protocol: PROTOCOL,
     baseUrl: String(baseUrl || "").trim().replace(/\/+$/, ""),
     enabled: true,
-    models: ids.map((id) => ({ id, label: "", capabilities: ["chat"], supportedParams: [] })),
+    models: ids.map((id) => ({ id, label: "", capabilities: ["chat"], supportedParams: builtinSupportedParams(id) })),
     createdAt: now,
     updatedAt: now,
   };

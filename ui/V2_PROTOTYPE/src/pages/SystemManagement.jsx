@@ -382,6 +382,29 @@ export default function SystemManagement({ sectionId }) {
     setModelDirty(true)
   }
 
+  // RP-055 批 3：当前场景绑定模型的参数白名单（supportedParams 非空=白名单；空/目录外=不约束，向后兼容）
+  const scenarioParamMatrix = (configKey) => {
+    const scenarioKey = SCENARIO_KEY_BY_CONFIG[configKey]
+    const binding = modelConfig.scenarioBindings?.[scenarioKey] || {}
+    const boundProviderId = binding.providerId || draftProviders[0]?.id || ''
+    const boundProvider = draftProviders.find((p) => p.id === boundProviderId) || null
+    const currentModel = modelConfig[configKey]?.model || binding.modelId || ''
+    const meta = (boundProvider?.models || []).find((m) => m.id === currentModel)
+    const list = meta?.supportedParams
+    return Array.isArray(list) && list.length ? new Set(list) : null
+  }
+  const isModelParamLocked = (configKey, param) => {
+    const matrix = scenarioParamMatrix(configKey)
+    return matrix ? !matrix.has(param) : false
+  }
+  const renderLockedParamHint = (configKey) => (
+    (isModelParamLocked(configKey, 'temperature') || isModelParamLocked(configKey, 'maxTokens')) ? (
+      <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>
+        当前模型按平台声明使用固定采样参数，未声明的参数不会发送，已锁定。
+      </span>
+    ) : null
+  )
+
   const handleTestProviderKey = async (providerId, model) => {
     setKeyTestResult({ kind: 'info', text: '正在测试连接…' })
     const r = await actions.testProviderApiKey(providerId, { apiKey: keyInput.trim() || undefined, model })
@@ -1343,12 +1366,13 @@ export default function SystemManagement({ sectionId }) {
                 </FormRow>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="Temperature">
-                    <input className="input" type="number" min="0" max="1" step="0.1" value={modelConfig.kimiEvaluation.temperature} onChange={(e) => handleModelConfigChange('kimiEvaluation', { temperature: Number(e.target.value) })} />
+                    <input className="input" type="number" min="0" max="1" step="0.1" value={modelConfig.kimiEvaluation.temperature} disabled={isModelParamLocked('kimiEvaluation', 'temperature')} onChange={(e) => handleModelConfigChange('kimiEvaluation', { temperature: Number(e.target.value) })} />
                   </FormRow>
                   <FormRow label="最大 Tokens">
-                    <input className="input" type="number" min="256" max="32000" value={modelConfig.kimiEvaluation.maxTokens} onChange={(e) => handleModelConfigChange('kimiEvaluation', { maxTokens: Number(e.target.value) })} />
+                    <input className="input" type="number" min="256" max="32000" value={modelConfig.kimiEvaluation.maxTokens} disabled={isModelParamLocked('kimiEvaluation', 'maxTokens')} onChange={(e) => handleModelConfigChange('kimiEvaluation', { maxTokens: Number(e.target.value) })} />
                   </FormRow>
                 </div>
+                {renderLockedParamHint('kimiEvaluation')}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="超时(ms)">
                     <input className="input" type="number" min="3000" max="120000" value={modelConfig.kimiEvaluation.timeoutMs} onChange={(e) => handleModelConfigChange('kimiEvaluation', { timeoutMs: Number(e.target.value) })} />
@@ -1429,12 +1453,13 @@ export default function SystemManagement({ sectionId }) {
                 </FormRow>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FormRow label="Temperature">
-                    <input className="input" type="number" min="0" max="1" step="0.1" value={modelConfig.kimiGeneration.temperature} onChange={(e) => handleModelConfigChange('kimiGeneration', { temperature: Number(e.target.value) })} />
+                    <input className="input" type="number" min="0" max="1" step="0.1" value={modelConfig.kimiGeneration.temperature} disabled={isModelParamLocked('kimiGeneration', 'temperature')} onChange={(e) => handleModelConfigChange('kimiGeneration', { temperature: Number(e.target.value) })} />
                   </FormRow>
                   <FormRow label="最大 Tokens">
-                    <input className="input" type="number" min="256" max="32000" value={modelConfig.kimiGeneration.maxTokens} onChange={(e) => handleModelConfigChange('kimiGeneration', { maxTokens: Number(e.target.value) })} />
+                    <input className="input" type="number" min="256" max="32000" value={modelConfig.kimiGeneration.maxTokens} disabled={isModelParamLocked('kimiGeneration', 'maxTokens')} onChange={(e) => handleModelConfigChange('kimiGeneration', { maxTokens: Number(e.target.value) })} />
                   </FormRow>
                 </div>
+                {renderLockedParamHint('kimiGeneration')}
                 <FormRow label="输出风格">
                   <select className="input" value={modelConfig.kimiGeneration.outputStyle} onChange={(e) => handleModelConfigChange('kimiGeneration', { outputStyle: e.target.value })}>
                     {OUTPUT_STYLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

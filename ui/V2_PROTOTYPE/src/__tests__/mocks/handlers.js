@@ -582,12 +582,12 @@ export const handlers = [
       modelProviders: [
         { id: 'moonshot', name: 'Moonshot（月之暗面）', protocol: 'openai-compatible', baseUrl: 'https://api.moonshot.cn/v1', enabled: true,
           models: [
-            { id: 'kimi-k3', label: 'Kimi K3', capabilities: ['chat'], supportedParams: [] },
-            { id: 'kimi-k2.6', label: 'Kimi K2.6', capabilities: ['chat'], supportedParams: [] },
+            { id: 'kimi-k3', label: 'Kimi K3', capabilities: ['chat'], supportedParams: ['maxTokens'] },
+            { id: 'kimi-k2.6', label: 'Kimi K2.6', capabilities: ['chat'], supportedParams: ['maxTokens'] },
           ] },
         { id: 'zhipu', name: '智谱 GLM', protocol: 'openai-compatible', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', enabled: true,
           models: [
-            { id: 'glm-4.6', label: 'GLM 4.6', capabilities: ['chat'], supportedParams: [] },
+            { id: 'glm-4.6', label: 'GLM 4.6', capabilities: ['chat'], supportedParams: ['temperature', 'maxTokens'] },
           ] },
       ],
       scenarioBindings: {
@@ -604,12 +604,12 @@ export const handlers = [
       modelProviders: [
         { id: 'moonshot', name: 'Moonshot（月之暗面）', protocol: 'openai-compatible', baseUrl: 'https://api.moonshot.cn/v1', enabled: true,
           models: [
-            { id: 'kimi-k3', label: 'Kimi K3', capabilities: ['chat'], supportedParams: [] },
-            { id: 'kimi-k2.6', label: 'Kimi K2.6', capabilities: ['chat'], supportedParams: [] },
+            { id: 'kimi-k3', label: 'Kimi K3', capabilities: ['chat'], supportedParams: ['maxTokens'] },
+            { id: 'kimi-k2.6', label: 'Kimi K2.6', capabilities: ['chat'], supportedParams: ['maxTokens'] },
           ] },
         { id: 'zhipu', name: '智谱 GLM', protocol: 'openai-compatible', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', enabled: true,
           models: [
-            { id: 'glm-4.6', label: 'GLM 4.6', capabilities: ['chat'], supportedParams: [] },
+            { id: 'glm-4.6', label: 'GLM 4.6', capabilities: ['chat'], supportedParams: ['temperature', 'maxTokens'] },
           ] },
       ],
       scenarioBindings: {
