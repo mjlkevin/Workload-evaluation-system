@@ -74,9 +74,9 @@
           <span><b>更新日期</b> 2026-08-10</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">46 项已登记需求</span>
+          <span class="pill brand">47 项已登记需求</span>
           <span class="pill ok">22 已交付（验收完成）</span>
-          <span class="pill warn">12 已交付 · 待验收回填</span>
+          <span class="pill warn">13 已交付 · 待验收回填</span>
           <span class="pill warn">10 待规划/待确认/待验收</span>
           <span class="pill">2 暂缓</span>
           <span class="pill ok">可编辑子页面已移除</span>
@@ -95,7 +95,7 @@
         <div class="kpi-row">
           <div class="kpi">
             <div class="top"><span class="ic" style="background:var(--brand-soft);color:var(--brand)">T</span><span>总需求数</span></div>
-            <div class="v">46</div>
+            <div class="v">47</div>
             <div class="lb">已登记需求项（主台账口径）</div>
             <div class="bar"><i style="width:100%"></i></div>
           </div>
@@ -475,7 +475,7 @@
               <button type="button" id="filter-reset" class="ledger-filter-reset-btn">重置</button>
             </div>
           </div>
-          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">46</b> / 46 条需求</div>
+          <div class="ledger-filter-summary">显示 <b id="filter-visible-count">47</b> / 47 条需求</div>
         </div>
         <div class="table-scroll">
         <table id="tbl-requirements" data-board-table data-mode="sort" data-page-size="10" data-filter-col="4">
@@ -1039,10 +1039,21 @@
               <td>系统管理 / 模型配置 + 凭据域</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>模型配置契约闭环 · P2 升级版（批 1 后端契约 / 批 2 前端 / 批 3 参数动态渲染+真实多模型验证）</td>
-              <td><span class="status run"><span class="dot"></span>批 1+批 2 已交付并通过用户验收（DeepSeek 真实接入实证）/ 批 3 待排期</span></td>
+              <td><span class="status run"><span class="dot"></span>批 1+批 2 已用户验收 / 批 3 已交付（58f50c3）待场景级真实验证</span></td>
               <td>三层契约：Provider（名称/openai-compatible 协议/baseUrl/凭据 scope=provider:{id}/启用态）→ Model 目录（ID+能力+supportedParams）→ ScenarioBinding（场景→providerId+modelId+参数覆盖，保留草稿/生效双轨）；旧 kimi* 迁移为内置 moonshot 供应商；编辑弹窗内嵌供应商 Key 状态/录入/测试连接；独立 API Key 区下线；P2 原 T6/T7/T8/T11 并入；ISS-2026-08-10-008 凭据 warm 并入批 1</td>
               <td>去重结果：未命中（RP-053 为表格化已交付，本项为架构升级）；交叉引用 RP-053（表格形态基座）、ISS-2026-08-10-008（凭据 warm 并入）、ISS-2026-08-05-001（凭据域基座）。业界对标：Dify/LobeChat/Cherry Studio 的供应商-模型-场景绑定范式，协议层先仅支持 openai-compatible。</td>
               <td>验收口径：可新增自定义供应商（名称/baseUrl/Key）并在其下添加模型 ID；场景可绑定任意供应商模型且真实调用走该供应商端点与 Key；编辑弹窗内完成 Key 录入与连通测试（失败不清空输入）；全页面无 KIMI 固有文案（业务名：实施评估/文件解析/内容生成）；旧配置迁移后三场景生效态不回归；重启后凭据来源 db_cache（warm 生效）；test:modules / test:web 基线零回归 + 双构建零错误。</td>
+            </tr>
+            <tr>
+              <td class="mono">RP-056</td>
+              <td>AI 工作台消息复制控件重构（气泡外右下 + 消息时间戳 + 用户消息侧补齐）</td>
+              <td>2026-08-11 用户截图指示（红框标注气泡内「复制」控件）：控件移到消息框外右下、保持悬浮显隐、右侧加消息时间、用户消息侧同款补齐；来源问题 <code class="inline">ISS-2026-08-11-004</code>（去重命中 RP-023 为其范围扩展，交叉引用）</td>
+              <td>前端体验 / AI 工作台消息区</td>
+              <td><span class="pill priority-p2">P2</span></td>
+              <td>用户当轮直接指示实现，无独立排期</td>
+              <td><span class="status run"><span class="dot"></span>已实现 / 自动化通过 / 待用户悬浮复验</span></td>
+              <td>MessageBubble 重构 .ai-msg-row &gt; .ai-msg-col（气泡）+ .ai-msg-meta（复制 + time，气泡外右对齐、悬浮显隐、min-height 防抖）；formatMessageTime 当天 HH:MM / 跨天 MM-DD HH:MM；时间链路 mapSessionMessages 带后端 createdAt + 本地全部消息创建点补齐；error/loading 无操作栏；同轮附带管理视角输入框占位文案清除</td>
+              <td>验收口径：悬浮 AI/用户消息区域→气泡外右下出现「复制 + 时间」、移出消失；复制按钮复制对应消息文本；时间在复制控件右侧；error/loading 无操作栏；RED 4 用例先红后绿、streaming-ux 9/9 零回归、前端 315/316（唯一失败 UserManagement 既有预置基线）、build:web 零错误、UI 门禁 0 findings。遗留：浏览器悬浮视觉证据待用户复验后关闭。</td>
             </tr>
             <tr>
               <td class="mono">RP-032</td>
@@ -3315,7 +3326,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 需求池 · 2026-08-11 · 46 条需求 · 22 项已交付（验收完成） · 12 项待验收回填 · 10 项待处理 · 2 项暂缓
+      WES 项目管理 · 需求池 · 2026-08-11 · 47 条需求 · 22 项已交付（验收完成） · 13 项待验收回填 · 10 项待处理 · 2 项暂缓
     </footer>
   </main>
   <script>
