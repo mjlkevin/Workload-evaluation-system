@@ -28,6 +28,8 @@ import {
 import { patchReviewStatus, postTeam } from "./team/team.controller";
 import { homeWorkbenchChat, kimiAssessmentPreview, parseBasicInfo } from "./ai/ai.usecase";
 import { testKnowledgeBaseConnectivity } from "./system/system.usecase";
+import { loadRequirementSystemConfigStore, saveRequirementSystemConfigStore } from "./system/system.repository";
+import { BUILTIN_MOONSHOT_PROVIDER_ID } from "./system/model-providers";
 import * as AiSessionsModule from "./ai-sessions/ai-sessions.module";
 import { appendAiSessionEvent, createAiSession } from "./ai-sessions/ai-sessions.usecase";
 import { loadAiSessionsStore, saveAiSessionsStore } from "./ai-sessions/ai-sessions.repository";
@@ -121,6 +123,35 @@ function getNonAdminUser(): AuthUser {
   const user = store.users.find((x) => x.status === "active" && x.role !== "admin");
   assert.ok(user, "non-admin active user required for handler tests");
   return user;
+}
+
+/**
+ * 测试债修复（RP-055 批 3）：parseBasicInfo 用例原先隐式依赖真实
+ * requirement-settings.json 的 fileParsing 场景绑定指向内置 moonshot
+ * （credentialScope=kimi → env 兜底读取 config.kimi.apiKey）。
+ * 用户在验收中把 fileParsing 绑到自定义供应商后，凭据 scope 变为 provider:*
+ * 且无缓存/无 env 兜底，用例退化为 api_key_missing。这里显式把 fileParsing
+ * 绑定钉到内置 moonshot 并在结束后恢复，使用例与环境配置解耦。
+ * 返回恢复函数，须在 finally 中调用。
+ */
+function pinFileParsingBindingToBuiltinMoonshot(): () => void {
+  const store = loadRequirementSystemConfigStore();
+  const snapshot = JSON.parse(JSON.stringify(store)) as typeof store;
+  const builtinBinding = { providerId: BUILTIN_MOONSHOT_PROVIDER_ID, modelId: "kimi-k3" };
+  saveRequirementSystemConfigStore({
+    ...store,
+    active: {
+      ...store.active,
+      scenarioBindings: {
+        assessment: store.active.scenarioBindings?.assessment ?? builtinBinding,
+        generation: store.active.scenarioBindings?.generation ?? builtinBinding,
+        fileParsing: builtinBinding,
+      },
+    },
+  });
+  return () => {
+    saveRequirementSystemConfigStore(snapshot);
+  };
 }
 
 function withFileSnapshotRestore(filePath: string, run: () => void): void {
@@ -2144,6 +2175,7 @@ test("ai.usecase: parseBasicInfo fails instead of returning rule fallback when m
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
+  const restoreBinding = pinFileParsingBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -2162,6 +2194,7 @@ test("ai.usecase: parseBasicInfo fails instead of returning rule fallback when m
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
+    restoreBinding();
     _resetAiBootstrapForTest();
   }
 });
@@ -2178,6 +2211,7 @@ test("ai.usecase: parseBasicInfo can return local workbook fallback when explici
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
+  const restoreBinding = pinFileParsingBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -2205,6 +2239,7 @@ test("ai.usecase: parseBasicInfo can return local workbook fallback when explici
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
+    restoreBinding();
     _resetAiBootstrapForTest();
   }
 });

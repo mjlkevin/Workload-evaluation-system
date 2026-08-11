@@ -28,6 +28,14 @@ function writeStoredActiveSessionId(sessionId) {
   }
 }
 
+/**
+ * RP-058：跨页预置活跃会话（Shell 层通知跳转用）。
+ * 复用同一 storage key，工作台挂载恢复序列（loadSessions）据此选中对应会话。
+ */
+export function primeStoredActiveSessionId(sessionId) {
+  if (sessionId) writeStoredActiveSessionId(sessionId)
+}
+
 function normalizeSessions(payload) {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.items)) return payload.items

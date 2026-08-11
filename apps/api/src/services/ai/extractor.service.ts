@@ -10,8 +10,9 @@ import { ok, fail } from "../../utils/response";
 import { openSse, writeSse, createAbortBridge, type AbortGuard } from "../../utils/sse";
 import {
   loadRequirementSystemConfigStore,
-  resolveActiveRequirementKimiApiKey,
+  resolveActiveApiKeyForScope,
 } from "../../modules/system/system.repository";
+import { resolveScenarioConfig } from "../../modules/system/model-providers";
 import {
   buildWorkbookPreviewText,
   getSheetRows,
@@ -356,9 +357,14 @@ export async function parseBasicInfo(req: Request, res: Response) {
     const workbookText = buildWorkbookPreviewText(workbook);
     const workbookBasicInfo = parseBasicInfoFromWorkbook(workbook);
     const workbookRequirementData = parseRequirementImportFromWorkbook(workbook);
-    const { apiKey } = resolveActiveRequirementKimiApiKey();
     const requirementSettings = loadRequirementSystemConfigStore().active;
-    const model = requirementSettings.fileParsing.model?.trim() || requirementSettings.kimiEvaluation.model?.trim() || config.kimi.model;
+    // T7（RP-055）：文件解析链路统一走场景绑定解析（供应商/模型/baseUrl/凭据 scope）
+    const scenarioCfg = resolveScenarioConfig(requirementSettings, "fileParsing", {
+      model: config.kimi.model,
+      baseUrl: config.kimi.apiBaseUrl,
+    });
+    const { apiKey } = resolveActiveApiKeyForScope(scenarioCfg.credentialScope);
+    const model = scenarioCfg.model;
     const modelForClient = normalizeKimiModelName(model);
     const allowLocalFallback = allowsLocalWorkbookFallback(req);
 
@@ -378,7 +384,7 @@ export async function parseBasicInfo(req: Request, res: Response) {
     let parsed: Awaited<ReturnType<typeof parseRequirementImportByKimi>>;
     try {
       parsed = await parseRequirementImportByKimi({
-        apiUrl: config.kimi.apiBaseUrl,
+        apiUrl: scenarioCfg.baseUrl,
         apiKey,
         model,
         workbookText,
@@ -432,9 +438,14 @@ export async function parseBasicInfoStream(req: Request, res: Response) {
     }, abortGuard);
     abortGuard.resetIdleTimer();
 
-    const { apiKey } = resolveActiveRequirementKimiApiKey();
     const requirementSettings = loadRequirementSystemConfigStore().active;
-    const model = requirementSettings.fileParsing.model?.trim() || requirementSettings.kimiEvaluation.model?.trim() || config.kimi.model;
+    // T7（RP-055）：文件解析链路统一走场景绑定解析（供应商/模型/baseUrl/凭据 scope）
+    const scenarioCfg = resolveScenarioConfig(requirementSettings, "fileParsing", {
+      model: config.kimi.model,
+      baseUrl: config.kimi.apiBaseUrl,
+    });
+    const { apiKey } = resolveActiveApiKeyForScope(scenarioCfg.credentialScope);
+    const model = scenarioCfg.model;
     const modelForClient = normalizeKimiModelName(model);
 
     if (!apiKey) {
@@ -453,7 +464,7 @@ export async function parseBasicInfoStream(req: Request, res: Response) {
     let parsed: Awaited<ReturnType<typeof parseRequirementImportByKimiStream>>;
     try {
       parsed = await parseRequirementImportByKimiStream({
-        apiUrl: config.kimi.apiBaseUrl,
+        apiUrl: scenarioCfg.baseUrl,
         apiKey,
         model,
         workbookText,

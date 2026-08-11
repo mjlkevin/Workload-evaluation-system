@@ -5,7 +5,7 @@ import ReportViewer from '../WorkspacePanel/ReportViewer.jsx'
 import DraftLinker from '../WorkspacePanel/DraftLinker.jsx'
 import AttachmentCard from './AttachmentCard.jsx'
 import RichAiMessage from './RichAiMessage.jsx'
-import { CopyMessageButton, LoadingDots } from './MessageBits.jsx'
+import { CopyMessageButton, LoadingDots, MessageTimestamp } from './MessageBits.jsx'
 
 export default function MessageBubble({
   message,
@@ -23,10 +23,13 @@ export default function MessageBubble({
 }) {
   const isUser = message.role === 'user'
   const hasArtifacts = !isUser && !message.error && pickArray(message.artifacts).length > 0
+  // RP-056：复制控件 + 时间戳移出气泡，置于气泡下方右侧（悬浮消息行显隐）
+  const showMetaBar = !message.loading && !message.error && Boolean(message.text)
   return (
-    <article style={{ display: 'flex', gap: 10, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+    <article className="ai-msg-row" style={{ display: 'flex', gap: 10, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
       {!isUser && <div className="ai-avatar ai-avatar--bot" aria-hidden="true">AI</div>}
-      <div className={`ai-bubble-wrap${isUser ? ' ai-bubble--user' : message.error ? ' ai-bubble--error' : ' ai-bubble--ai'}`} style={{ width: hasArtifacts ? 'min(100%, 1080px)' : undefined, maxWidth: hasArtifacts ? 'calc(100% - 44px)' : '76%', padding: 14, borderRadius: 12, position: 'relative' }}>
+      <div className="ai-msg-col" style={{ width: hasArtifacts ? 'min(100%, 1080px)' : undefined, maxWidth: hasArtifacts ? 'calc(100% - 44px)' : '76%' }}>
+      <div className={`ai-bubble-wrap${isUser ? ' ai-bubble--user' : message.error ? ' ai-bubble--error' : ' ai-bubble--ai'}`} style={{ padding: 14, borderRadius: 12, position: 'relative' }}>
         {/* ISS-2026-08-10-005：思考块移到回答正文上方（对标业内：思考在上、回答在下）；
             折叠态「已思考」（可点开），流式期间「思考中…」并实时展开。 */}
         {!isUser && !message.error && Array.isArray(message.thoughts) && message.thoughts.length > 0 && (
@@ -136,9 +139,13 @@ export default function MessageBubble({
             <button className="btn btn-out" type="button" onClick={copyDraft} style={{ height: 30 }}>复制草稿</button>
           </div>
         )}
-        {!isUser && !message.loading && !message.error && message.text && (
+      </div>
+      {showMetaBar && (
+        <div className="ai-msg-meta">
           <CopyMessageButton text={message.text} />
-        )}
+          <MessageTimestamp createdAt={message.createdAt} />
+        </div>
+      )}
       </div>
       {isUser && <div className="ai-avatar ai-avatar--user" aria-hidden="true">我</div>}
     </article>

@@ -44,13 +44,14 @@ describe('SystemManagement shared dialogs', () => {
     )
     renderSection('model')
 
-    const editButtons = await screen.findAllByRole('button', { name: '编辑' })
+    const scenarioTable = await screen.findByRole('table', { name: '场景模型绑定' })
+    const editButtons = within(scenarioTable).getAllByRole('button', { name: '编辑' })
     fireEvent.click(editButtons[0])
-    const dialog = await screen.findByRole('dialog', { name: '编辑 KIMI 评估' })
+    const dialog = await screen.findByRole('dialog', { name: '编辑 实施评估' })
     expect(dialog).toHaveClass('wes-dialog', 'wes-dialog--wide')
     fireEvent.click(within(dialog).getByRole('button', { name: '取消' }))
 
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: '编辑 KIMI 评估' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '编辑 实施评估' })).not.toBeInTheDocument())
     expect(saveCalls).toBe(0)
   })
 

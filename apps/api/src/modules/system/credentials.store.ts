@@ -292,6 +292,25 @@ export async function getAuditLog(
   }));
 }
 
+/**
+ * 启动预热（ISS-2026-08-10-008）：把 DB 中已存在的密钥提前解密填入内存缓存，
+ * 避免重启后同步读取链（resolveActiveRequirementKimiApiKey 等）静默回落 env。
+ * 单个 scope 失败只跳过不抛错（DB 未就绪/KEK 缺失均不得阻断启动）。
+ * 返回成功预热的 scope 列表。
+ */
+export async function warmCredentialScopes(scopes: string[], poolOverride?: Pool): Promise<string[]> {
+  const warmed: string[] = [];
+  for (const scope of scopes) {
+    try {
+      const result = await getApiKey(scope, poolOverride);
+      if (result.apiKey) warmed.push(scope);
+    } catch {
+      /* 降级：预热失败不阻断启动，读取链回落 env 兜底 */
+    }
+  }
+  return warmed;
+}
+
 // -------------------- 便捷导出 --------------------
 
 /** Kimi scope 常量，供 system.repository.ts 使用 */

@@ -375,11 +375,55 @@ export type RequirementKimiCredentialsConfig = {
   apiKey: string;
 };
 
+// -------------------- RP-055：多供应商模型配置（Provider × 模型目录 × 场景绑定） --------------------
+
+/** 首期仅支持 OpenAI 兼容协议（Moonshot/DeepSeek/GLM/OpenAI/vLLM 等均可接入） */
+export type ModelProviderProtocol = "openai-compatible";
+
+export type ModelProviderModel = {
+  /** 模型 ID（供应商侧真实标识，如 kimi-k3、deepseek-chat） */
+  id: string;
+  /** 展示名（空则回退 id） */
+  label: string;
+  /** 能力标签，首期固定 ["chat"] */
+  capabilities: string[];
+  /** 参数支持矩阵（批 3 动态渲染用，如 ["temperature","maxTokens","timeoutMs"]） */
+  supportedParams: string[];
+};
+
+export type ModelProvider = {
+  /** 稳定 ID：内置为 "moonshot"，自定义为可读 slug */
+  id: string;
+  /** 用户自定义名称 */
+  name: string;
+  protocol: ModelProviderProtocol;
+  baseUrl: string;
+  enabled: boolean;
+  models: ModelProviderModel[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ScenarioModelBinding = {
+  providerId: string;
+  modelId: string;
+};
+
+export type ScenarioModelBindings = {
+  assessment: ScenarioModelBinding;
+  fileParsing: ScenarioModelBinding;
+  generation: ScenarioModelBinding;
+};
+
 export type RequirementSystemConfig = {
   kimiEvaluation: RequirementKimiEvaluationConfig;
   fileParsing: RequirementFileParsingConfig;
   kimiGeneration: RequirementKimiGenerationConfig;
   kimiCredentials: RequirementKimiCredentialsConfig;
+  /** RP-055：供应商目录；normalize 保证落库后恒存在（旧配置自动迁移出内置 moonshot） */
+  modelProviders?: ModelProvider[];
+  /** RP-055：场景绑定；normalize 保证落库后恒存在（旧配置自动从 kimi* 字段推导） */
+  scenarioBindings?: ScenarioModelBindings;
 };
 
 /** 返回给前端的密钥展示（永不下发明文） */

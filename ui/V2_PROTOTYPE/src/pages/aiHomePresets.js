@@ -82,7 +82,7 @@ export const AI_HOME_PRESETS = {
     label: '管理视角',
     headline: '查看全局队列、异常流程与系统治理建议',
     systemPrompt: '你是管理员的 AI 工作助手。帮助用户查看全局项目队列、异常流程、角色配置和系统治理建议。',
-    placeholder: '询问全局项目状态、异常流程、角色配置或系统治理建议。',
+    placeholder: '',
     emptyHint: '可以查看全局待办、异常项目和用户角色配置情况。',
     workflows: [
       { key: 'global_queue', title: '查看全局待办', desc: '汇总各角色待处理事项' },

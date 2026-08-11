@@ -56,6 +56,9 @@ const DEFAULT_MODEL_CONFIG = {
   kimiCredentials: {
     apiKey: '', hint: null, envFallbackAvailable: false, resolvedFrom: 'none',
   },
+  // ISS-2026-08-11-001：多模型供应商目录 + 场景绑定（草稿态，随 PATCH 持久化）
+  modelProviders: [],
+  scenarioBindings: {},
 }
 
 const DEFAULT_RATECARD = [
@@ -139,6 +142,13 @@ export default function useSystemManagement({
 
   const [modelConfig, setModelConfig] = useState(fallback.modelConfig)
   const [modelsLoading, setModelsLoading] = useState(false)
+
+  // --- T3：生效（active）配置视图，供模型配置表格与草稿 diff 使用 ---
+  const [modelActiveConfig, setModelActiveConfig] = useState(null)
+
+  // --- T2：模型配置生效状态（Effective State） ---
+  const [effectiveConfig, setEffectiveConfig] = useState(null)
+  const [effectiveLoading, setEffectiveLoading] = useState(false)
 
   const [ratecard, setRatecard] = useState(fallback.ratecard)
 
@@ -236,6 +246,16 @@ export default function useSystemManagement({
           fileParsing: { ...DEFAULT_MODEL_CONFIG.fileParsing, ...d.fileParsing },
           kimiGeneration: { ...DEFAULT_MODEL_CONFIG.kimiGeneration, ...d.kimiGeneration },
           kimiCredentials: d.kimiCredentials || DEFAULT_MODEL_CONFIG.kimiCredentials,
+          modelProviders: Array.isArray(d.modelProviders) ? d.modelProviders : [],
+          scenarioBindings: d.scenarioBindings && typeof d.scenarioBindings === 'object' ? d.scenarioBindings : {},
+        })
+      }
+      if (data?.active) {
+        const a = data.active
+        setModelActiveConfig({
+          kimiEvaluation: { ...DEFAULT_MODEL_CONFIG.kimiEvaluation, ...a.kimiEvaluation },
+          fileParsing: { ...DEFAULT_MODEL_CONFIG.fileParsing, ...a.fileParsing },
+          kimiGeneration: { ...DEFAULT_MODEL_CONFIG.kimiGeneration, ...a.kimiGeneration },
         })
       }
     } catch (_) { /* keep fallback */ }
@@ -245,13 +265,41 @@ export default function useSystemManagement({
   const updateModelConfig = useCallback((key, patch) => {
     setModelConfig((prev) => ({
       ...prev,
-      [key]: { ...prev[key], ...patch },
+      // 数组/空值整体替换（modelProviders 为数组）；对象走浅合并（scenarioBindings / 场景配置）
+      [key]: Array.isArray(patch) || patch == null ? patch : { ...prev[key], ...patch },
     }))
   }, [])
 
-  const saveModelDraft = useCallback(() => withAction('saveModelDraft', async () => {
+  // --- T2：生效状态加载 ---
+  const loadEffective = useCallback(async () => {
     if (!enabled) return
-    const { kimiCredentials: _creds, ...rest } = modelConfig
+    setEffectiveLoading(true)
+    try {
+      const payload = await apiClient.get('/system/requirement-settings/effective')
+      const data = unwrapSingle(payload)
+      if (data?.scenarios) setEffectiveConfig(data)
+    } catch (_) { /* 保留旧值：接口不可用时表格退回草稿视图 */ }
+    finally { setEffectiveLoading(false) }
+  }, [enabled])
+
+  // --- T4：验证此场景（用生效模型发最小真实请求，结果写回最近验证） ---
+  const testScenario = useCallback((scenario) => {
+    if (!enabled) {
+      return Promise.resolve({ success: false, error: '登录已过期，请重新登录' })
+    }
+    return withAction(`testScenario:${scenario}`, async () => {
+      const res = await apiClient.post('/system/requirement-settings/scenario-test', { scenario })
+      await loadEffective()
+      return res?.data || res
+    })
+  }, [enabled, withAction, loadEffective])
+
+  const saveModelDraft = useCallback((overrides) => withAction('saveModelDraft', async () => {
+    if (!enabled) return
+    const merged = overrides && typeof overrides === 'object' && !Array.isArray(overrides)
+      ? { ...modelConfig, ...overrides }
+      : modelConfig
+    const { kimiCredentials: _creds, ...rest } = merged
     await apiClient.patch('/system/requirement-settings/draft', rest)
   }), [enabled, modelConfig, withAction])
 
@@ -267,8 +315,9 @@ export default function useSystemManagement({
       }
       await apiClient.patch('/system/requirement-settings/draft', body)
       await loadModels()
+      await loadEffective()
     })
-  }, [enabled, modelConfig, withAction, loadModels])
+  }, [enabled, modelConfig, withAction, loadModels, loadEffective])
 
   const clearApiKeyDraft = useCallback(() => withAction('clearApiKey', async () => {
     if (!enabled) return
@@ -281,7 +330,8 @@ export default function useSystemManagement({
   const activateModel = useCallback(() => withAction('activateModel', async () => {
     if (enabled) await apiClient.post('/system/requirement-settings/activate')
     await loadModels()
-  }), [enabled, withAction, loadModels])
+    await loadEffective()
+  }), [enabled, withAction, loadModels, loadEffective])
 
   const testApiKey = useCallback((key, model) => withAction('testApiKey', async () => {
     if (enabled) {
@@ -292,6 +342,28 @@ export default function useSystemManagement({
       return res?.data || res
     }
     return null
+  }), [enabled, withAction])
+
+  // --- ISS-2026-08-11-001：供应商级 API Key（凭据域 scope=provider:{id}，moonshot 复用 kimi） ---
+  const setProviderApiKey = useCallback((providerId, apiKey) => withAction(`setProviderKey:${providerId}`, async () => {
+    if (!enabled) throw new Error('登录已过期，请重新登录')
+    await apiClient.put(`/system/requirement-settings/providers/${providerId}/api-key`, { apiKey })
+    await loadEffective()
+  }), [enabled, withAction, loadEffective])
+
+  const clearProviderApiKey = useCallback((providerId) => withAction(`clearProviderKey:${providerId}`, async () => {
+    if (!enabled) throw new Error('登录已过期，请重新登录')
+    await apiClient.delete(`/system/requirement-settings/providers/${providerId}/api-key`)
+    await loadEffective()
+  }), [enabled, withAction, loadEffective])
+
+  const testProviderApiKey = useCallback((providerId, { apiKey, model } = {}) => withAction(`testProviderKey:${providerId}`, async () => {
+    if (!enabled) return null
+    const payload = {}
+    if (apiKey) payload.apiKey = apiKey
+    if (model) payload.model = model
+    const res = await apiClient.post(`/system/requirement-settings/providers/${providerId}/api-key/test`, payload)
+    return res?.data || res
   }), [enabled, withAction])
 
   // --- DSL ---
@@ -493,17 +565,22 @@ export default function useSystemManagement({
     if (!enabled) return
     loadRules()
     loadModels()
+    loadEffective()
     loadDsl()
     loadTemplates()
     loadKbConfig()
     loadTestResults()
-  }, [enabled, loadRules, loadModels, loadDsl, loadTemplates, loadKbConfig, loadTestResults])
+  }, [enabled, loadRules, loadModels, loadEffective, loadDsl, loadTemplates, loadKbConfig, loadTestResults])
 
   return {
     rules,
     rulesLoading,
     modelConfig,
     modelsLoading,
+    modelActiveConfig,
+    effectiveConfig,
+    effectiveLoading,
+    loadEffective,
     ratecard,
     dslRules,
     dslLoading,
@@ -526,6 +603,10 @@ export default function useSystemManagement({
       updateModelConfig,
       activateModel,
       testApiKey,
+      setProviderApiKey,
+      clearProviderApiKey,
+      testProviderApiKey,
+      testScenario,
       toggleDsl,
       saveDslDraft,
       activateDsl,

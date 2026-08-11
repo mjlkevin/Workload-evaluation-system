@@ -267,7 +267,7 @@ export default function useChatMessages(workbench) {
           // 无 loading 时追加新消息
           const newId = `ai-stream-${Date.now()}`
           streamingMessageIdRef.current = newId
-          return [...prev, { id: newId, role: 'assistant', text: delta, streaming: true }]
+          return [...prev, { id: newId, role: 'assistant', text: delta, streaming: true, createdAt: new Date().toISOString() }]
         })
         break
       }
@@ -369,6 +369,7 @@ export default function useChatMessages(workbench) {
           role: 'assistant',
           text: `标准文件解析暂未完成：${err.message || '请求失败'}`,
           error: true,
+          createdAt: new Date().toISOString(),
         }])
       })
     }
@@ -393,6 +394,7 @@ export default function useChatMessages(workbench) {
       role: 'user',
       text: text || '请解析这个文件并启动工作流。',
       file: fileSnapshot,
+      createdAt: new Date().toISOString(),
     }
     const loadingId = `ai-loading-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const loadingMessage = {
@@ -400,6 +402,7 @@ export default function useChatMessages(workbench) {
       role: 'assistant',
       text: selectedFile ? '正在解析文件并调用 AI 深度分析' : '正在理解你的问题',
       loading: true,
+      createdAt: new Date().toISOString(),
     }
     const baseOutboundMessages = messages
       .filter((message) => !message.loading && !message.error)
@@ -492,6 +495,7 @@ export default function useChatMessages(workbench) {
               role: 'assistant',
               text: '该会话存在进行中的任务，请等待完成后再发送',
               error: true,
+              createdAt: new Date().toISOString(),
             }
             writeArrivalMessage(sendKey, loadingId, errorMessage)
             markSending(sendKey, false)
@@ -561,6 +565,7 @@ export default function useChatMessages(workbench) {
           knowledgeTool: normalizeKnowledgeTool(data.trace?.knowledgeTool),
           toolCalls: normalizeToolCalls(data.trace?.toolCalls),
           memoryRef: normalizeMemoryRef(data.trace?.memoryRef),
+          createdAt: new Date().toISOString(),
         }
         writeArrivalMessage(sendKey, loadingId, answerMessage)
       }
@@ -580,6 +585,7 @@ export default function useChatMessages(workbench) {
         text: errorText,
         error: true,
         action: err.status === 401 ? 'login_required' : undefined,
+        createdAt: new Date().toISOString(),
       }
       writeArrivalMessage(sendKey, loadingId, errorMessage)
     } finally {

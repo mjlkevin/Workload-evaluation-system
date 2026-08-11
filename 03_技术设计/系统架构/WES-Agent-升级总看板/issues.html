@@ -572,9 +572,86 @@
               <td class="tc-3">user_feedback</td>
               <td class="tc-4">2026-08-10 23:01 用户明确指示："模型配置页面，我不想再用这种卡片了，请你帮我改成表格+行数据详情的模式，并结合外部最佳实践给出更多前端建议"（附当前三卡片页面截图）。截图同时确认：API Key 已配置（hint ····epCz），凭据域落地后密钥录入已完成。</td>
               <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx 模型配置页签（三卡片横排 + 编辑弹窗 L948-1069）</code> <code class="inline">docs/superpowers/plans/2026-08-10-model-config-contract-closure-plan.md（契约闭环计划，本项为其 P1 前端形态决策）</code> <code class="inline">截图：API Key 管理区显示"已配置 ····epCz"</code></td>
-              <td class="tc-6"><span class="status run"><span class="dot"></span>已分析 / 待规划</span></td>
+              <td class="tc-6"><span class="status done"><span class="dot"></span>已交付·待验收（分支 60018c9）</span></td>
               <td class="tc-7">分诊结果 requirement（P2 体验调整）：卡片布局信息密度低、无法横向对比三个场景、无生效状态/凭据健康可见性——与模型配置契约闭环计划（plan.html 后续任务池 BE-2026-08-10-model-config-contract-closure）根因同源，不重复建项，本 issue 作为其前端形态的用户决策输入。派生 RP-053。不阻塞主流程。</td>
-              <td class="tc-8">处置：并入模型配置契约闭环 P1 前端批次——表格（场景/生效模型/来源/关键参数/凭据健康/最近验证/状态/操作）+ 行内展开只读详情（草稿 vs 生效 diff、审计）+ 编辑走 Dialog（项目约定）；参数区按 supportedParams 动态渲染。验收口径：三场景一屏可对比；每行可见生效模型与来源；KEK 缺失/未配置在表格内可见预警；编辑仍走弹窗且失败不清空输入；test:web 299 基线零回归。另确认新事实：用户已录入新密钥（····epCz），T4 真实连通验证解除阻塞。</td>
+              <td class="tc-8">处置：并入模型配置契约闭环 P1 前端批次——表格（场景/生效模型/来源/关键参数/凭据健康/最近验证/状态/操作）+ 行内展开只读详情（草稿 vs 生效 diff、审计）+ 编辑走 Dialog（项目约定）；参数区按 supportedParams 动态渲染。验收口径：三场景一屏可对比；每行可见生效模型与来源；KEK 缺失/未配置在表格内可见预警；编辑仍走弹窗且失败不清空输入；test:web 299 基线零回归。另确认新事实：用户已录入新密钥（····epCz），T4 真实连通验证解除阻塞。2026-08-11 P1 已交付：表格化重构随 60018c9 提交（16 文件 +1077/-63），test:modules 337/337、前端 304/305（唯一失败为用户 WIP 既有基线）、真实密钥双场景连通 modelMatch=true（kimi-k3 / kimi-k2.6）；待用户浏览器人工验收表格形态后关闭。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-10-008-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-10-008</td>
+              <td class="tc-1">2026-08-10</td>
+              <td class="tc-2">系统管理 / 凭据域：服务重启后 DB 中的 API 密钥不预热进内存缓存，读取侧回落 env（ISS-2026-08-05-001「重启密钥丢失」修复回潮）</td>
+              <td class="tc-3">agent_finding（P1 真实环境验证自发现）</td>
+              <td class="tc-4">2026-08-10 23:59 模型配置契约闭环 P1 真实环境验证（临时后端 PORT=3100，全新进程）发现：GET /requirement-settings/effective 返回 credentials.source=「env」，而 DB credentials 表已有用户 22:34 录入的新密钥（lastAudit action=set 可证）；POST scenario-test（assessment）用回落的 env 旧密钥返回 401 Invalid Authentication，改用 DB 真实密钥 override 后双场景（kimi-k3 / kimi-k2.6）连通 modelMatch=true——证实 DB 密钥有效、冷启动读取路径有缺陷。</td>
+              <td class="tc-5"><code class="inline">apps/api/src/modules/system/credentials.store.ts（缓存仅在 setApiKey 同进程写入或旧文件导入时填充）</code> <code class="inline">apps/api/src/main.ts（启动引导仅 KEK 检查，无 warm 调用）</code> <code class="inline">resolveActiveRequirementKimiApiKey()（同步函数，只读内存缓存，冷启动回落 env）</code> <code class="inline">全仓 grep 确认无 warm 调用点</code></td>
+              <td class="tc-6"><span class="status done"><span class="dot"></span>已修复（2b08487，并入 RP-055 批 1）/ 真实环境实证 credSource=store</span></td>
+              <td class="tc-7">分诊结果 defect（P1）：凭据域 DB 化（ISS-2026-08-05-001，已合入 85b8248）修复了「重启密钥丢失」，但缓存预热缺口使该缺陷在下次重启后回潮——重启后 DB 密钥不进内存缓存，业务读取静默回落 env；若 env 无有效密钥（.env.local 仅存 KEK 时），AI 评估/文件解析链路 401。当前运行中的用户后端（PID 88638，22:34 同进程录入密钥）未暴露此缺口，重启即触发。派生 DEF-2026-08-10-002。2026-08-11 修复（RP-055 批 1，提交 2b08487）：main.ts 启动 warmCredentialScopes（kimi + 全部供应商 scope，失败降级不阻断启动），真实环境实证——tsx watch 重启后 GET /effective credSource=store、keyHint ····epCz 命中 DB 密钥，不再回落 env。</td>
+              <td class="tc-8">修复方向（约 0.5–1h）：main.ts 启动引导在 KEK 校验后加 credentials warm——KIMI_SCOPE getApiKey 成功即填入内存缓存，失败降级为启动警告不阻断；补 RED 测试（全新进程无 setApiKey 直接 resolve 命中 DB 密钥）。验收口径：重启后 GET /effective credentials.source=「db_cache」；AI 评估链路重启后首轮调用即用 DB 密钥；KEK 缺失时启动警告可见、服务仍可启动。2026-08-11 更新：用户拍板多供应商化设计（ISS-2026-08-11-001 / RP-055）后，本项建议并入其批 1（凭据多 scope + warm 一并施工）。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-001-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-001</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">系统管理 / 模型配置：API Key 嵌入模型编辑弹窗 + 新增模型配置入口 + 消除 KIMI 固有文案支持多供应商接入（功能调整）</td>
+              <td class="tc-3">user_feedback</td>
+              <td class="tc-4">2026-08-11 18:37 用户截图（P1 表格已生效，「API Key 管理」独立区红框标注）指示：「将 API Key 配置嵌入到具体的模型配置编辑页面中，并且提供新增按钮，支持新增模型配置；消除 KIMI 相关的固有属性文案，支持更多的模型接入。先分析设计，然后汇报」。截图同时确认 P1 表格真实渲染正常（kimi-k3/kimi-k2.6 已生效、验证 18 小时前可见）、凭据来源显示「环境变量兜底」（ISS-2026-08-10-008 冷启动现象实锤）。</td>
+              <td class="tc-5"><code class="inline">apps/api/src/modules/system/system.repository.ts（schema 键名 kimiEvaluation/kimiGeneration/kimiCredentials + DEFAULT_KIMI_* 常量 + normalizeKimiConfiguredModel）</code> <code class="inline">apps/api/src/modules/system/credentials.store.ts（单 scope "kimi"，credentials 表 scope 为自由字符串、零 schema 变更即可多 scope）</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx L565（API Key 管理独立区）/ L1115-1260（编辑弹窗按三固定 key 硬编码分节）</code> <code class="inline">docs/superpowers/plans/2026-08-10-model-config-contract-closure-plan.md（P2 T6/T7/T8/T11 与本需求同源并入）</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已派生 RP-055 · 批 1+批 2 已交付 / 批 3 待排期</span></td>
+              <td class="tc-7">分诊结果 requirement（P1 架构升级）。去重：未命中——ISS-2026-08-10-007/RP-053 为卡片改表格体验调整（已交付），本条为配置模型架构升级，属契约闭环 P2 的范围扩展，不重复建项、派生 RP-055。现状耦合事实：① schema 三键名与默认值常量全部 KIMI 前缀；② 凭据仅单 scope "kimi"（一个 Key 全局复用）；③ 前端三固定场景卡片/弹窗硬编码分节 + 独立 API Key 区；④ 模型名归一化为黑名单式（仅弃用两个旧模型）。用户影响：接非 Moonshot 模型（DeepSeek/GLM/OpenAI 兼容端点等）当前无任何入口；Key 与模型分离管理认知成本高。</td>
+              <td class="tc-8">设计方向（三层契约升级版）：Provider（自定义名称/协议 openai-compatible/baseUrl/凭据 scope=provider:{id}/启用态）→ Model 目录（模型 ID + 能力标签 + supportedParams 矩阵）→ ScenarioBinding（assessment/fileParsing/generation → providerId+modelId+参数覆盖，保留草稿/生效双轨与 VCS）。迁移兼容：旧 kimi* 配置迁移为内置 moonshot 供应商 + 场景绑定（读取侧保留一个版本 fallback）；env KIMI_* 作内置供应商种子值；凭据域零表结构变更。前端：场景绑定表保留（P1 成果），编辑弹窗内嵌供应商选择 + 该供应商 Key 状态/录入/测试连接；新增「供应商与模型目录」管理区 + 新增供应商/添加模型按钮；独立「API Key 管理」区下线；去 KIMI 文案（卡片名改业务名：实施评估/文件解析/内容生成）。P2 原 T6/T7/T8/T11 全部并入；ISS-2026-08-10-008 凭据 warm 建议并入批 1 施工。估时 3–4 天分三批（后端契约 1.5d / 前端 1.5d / 参数动态渲染+多模型真实验证 0.5–1d）。详细设计已汇报，待用户批准后 RP-055 排期开工。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-002-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-002</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">系统管理 / 记忆管理面板：listMemory 缺 projectId 恒返回空 + 面板请求从不带 projectId → 生产面板很可能恒空（预置缺陷，MS3 复核发现）</td>
+              <td class="tc-3">agent_finding（MS3 工单 Qoder 审计自发现）</td>
+              <td class="tc-4">MS2-PATCH 交付的蒸馏成功提示条「去确认」跳转 /system?tab=memory&status=draft 不生效：MemoryManagementPanel 不读取 ?status=draft query 初始化筛选，仅提示跳转落地后无自动筛选。进一步走查发现更深的恒空缺陷：后端 memory.usecase.listMemory 查询未传 projectId（多项目隔离字段缺失，恒返回空集），且面板请求自始至终不携带 projectId——两者叠加，生产环境记忆面板很可能恒空，MS2「UI 可见可确认」人工验收口径不成立。</td>
+              <td class="tc-5"><code class="inline">apps/api/src/modules/harness/memory.usecase.ts（listMemory 缺 projectId）</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement/MemoryManagementPanel.jsx（请求不带 projectId + 不读 ?status=draft query）</code> <code class="inline">Qoder SP-2026-007 MS3 handoff 风险节</code></td>
+              <td class="tc-6"><span class="status done"><span class="dot"></span>已修复 / 已合入主线（318f3bd）</span></td>
+              <td class="tc-7">分诊结果 defect（P1）。阻断 RP-052（蒸馏记忆 UI 确认）人工验收：后端蒸馏落 PG 正常（harness-boot 12 用例守护），但读取侧缺口使面板恒空。去重：listMemory / 记忆面板无既有 issue / RP / defect 记录，未命中。派生 DEF-2026-08-11-001。交叉引用 RP-052、ISS-2026-08-10-008（同为读取侧缺口类缺陷）。2026-08-11 19:31 用户拍板修复，与 chip 活数据链路合并一张工单。2026-08-11 Qoder 回填（9409b5d）：<strong>根因修正为三层</strong>——最底层为 requireAuth 普通函数误挂 Express middleware 致 5 条记忆路由全部挂起（MS2 引入预置缺陷），叠加 listMemory 口径与面板 query 两层；Codex 复核通过，待用户批准合入。</td>
+              <td class="tc-8">修复方向：① memory.usecase.listMemory 缺 projectId 时改返回 owner 全量或默认 default 项目（与其他 harness 读取口径对齐）；② MemoryManagementPanel 读取 location query 初始化 status filter，提示条跳转后自动筛选 draft；③ 补 RED 测试（listMemory 无 projectId 非空 + 面板 query 初始化用例）。验收口径：面板真实数据非空可确认、MS2-PATCH 提示条跳转自动筛选 draft 生效、test:modules / test:harness 计数不下降。工单 <code class="inline">docs/agent-loop/work-orders/2026-08-11-qoder-memory-panel-chip-live-link.md</code>（base e521fcb）已编制，待派发。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-003-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-003</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">系统管理 / 模型配置：场景编辑弹窗内点「保存密钥」报 apiClient.put is not a function，供应商 Key 无法保存（RP-055 批 2 验收反馈）</td>
+              <td class="tc-3">user_feedback（RP-055 批 2 人工验收）</td>
+              <td class="tc-4">2026-08-11 21:21 用户验收批 2 时反馈（截图）：测试连接通过后点「保存密钥」，内联错误提示「apiClient.put is not a function」。截图同时实证批 2 内联错误展示路径工作正常（错误未静默、未仅依赖 toast）。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/api/client.js（缺 put 封装）</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js（setProviderApiKey 调 apiClient.put）</code></td>
+              <td class="tc-6"><span class="status done"><span class="dot"></span>已关闭（2026-08-11 21:34 用户复验通过）</span></td>
+              <td class="tc-7">分诊结果 defect（P1，阻断批 2 验收核心动作）。根因：批 2 新增 setProviderApiKey 调用 apiClient.put，但 client.js 从未封装 put 方法（仅 get/post/patch/delete/upload）；批 2 测试只覆盖「未输入时按钮禁用不发 PUT」与测试连接，保存成功路径无用例导致漏网。去重：保存密钥 / apiClient.put 无既有记录，未命中。派生 DEF-2026-08-11-002，关联 RP-055。</td>
+              <td class="tc-8">修复：client.js 补 put 封装（1 行）+ RED 测试先行（复现原始报错 → 转绿，断言 PUT 调用与 body.apiKey）。验收口径：输入新 Key 点「保存密钥」→ PUT /providers/:id/api-key 成功、内联「密钥已加密保存到凭据域」、keyHint 刷新。验证：前端 311/312（唯一失败 UserManagement 既有基线）、build:web 零错误。待用户复验后关闭 DEF。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-004-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-004</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">AI 工作台 / 消息区：复制控件移到气泡外右下 + 消息时间戳 + 用户消息侧补齐复制与时间（功能调整）</td>
+              <td class="tc-3">user_feedback</td>
+              <td class="tc-4">2026-08-11 21:42 用户截图（AI 回复气泡内左下角「复制」控件红框标注）指示：① 复制控件移到会话框右下角、设计在消息框外；② 保持鼠标悬浮消息区域显隐；③ 复制控件右侧打印每条消息回复时间（同款悬浮显隐）；④ 用户消息侧目前没有复制控件，按同一规则补齐复制与时间。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx（原气泡内底部渲染 CopyMessageButton）</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageBits.jsx（CopyMessageButton / 新增 formatMessageTime + MessageTimestamp）</code> <code class="inline">ui/V2_PROTOTYPE/src/index.css（RP-023 气泡内 .ai-msg-actions 规则 → .ai-msg-row 悬浮 .ai-msg-meta）</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/messageFormatter.js（mapSessionMessages 补 createdAt）</code></td>
+              <td class="tc-6"><span class="status done"><span class="dot"></span>已交付（0518306）/ 用户验收通过（2026-08-11 23:08）</span></td>
+              <td class="tc-7">分诊结果 requirement（P2 体验调整）。去重：命中 RP-023（AI 消息气泡悬停复制按钮，已交付）——本条为其位置与信息维度扩展（气泡外 + 时间 + 用户侧），属同一根因的 broader scope，不重复建 RP-023，交叉引用并派生 RP-056。现状事实：复制控件渲染于 .ai-bubble-wrap 内部末尾、仅 AI 消息有；消息对象本地无 createdAt 字段（后端落库有，mapSessionMessages 丢弃）。用户影响：气泡内控件占用正文空间、无时间无法确认消息时效、用户侧无法一键复制自己的提问。</td>
+              <td class="tc-8">实现（TDD，未提交待验收后合入）：MessageBubble 重构 .ai-msg-row &gt; .ai-msg-col（气泡）+ .ai-msg-meta（复制 + time，气泡外右对齐、min-height 预留防抖、.ai-msg-row:hover/focus-within 显隐）；formatMessageTime 当天 HH:MM / 跨天 MM-DD HH:MM；时间链路：mapSessionMessages 带出后端 createdAt，本地全部消息创建点（useChatMessages / useHarnessRun / index.jsx，含 error 与 loading 占位）补 createdAt；error/loading 不渲染操作栏。验收口径：悬浮 AI/用户消息区域→气泡外右下出现「复制 + 时间」、移出消失；复制按钮复制对应消息文本；时间在复制右侧；error/loading 无操作栏；RED 4 用例先红后绿、streaming-ux 9/9 零回归、build:web 零错误、UI 门禁 0 findings。2026-08-11 23:08 用户浏览器悬浮复验通过（「测试通过，可以合入」），代码随 0518306 合入关闭。同轮附带：管理视角输入框占位文案清除（admin placeholder 置空）。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-005-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-005</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">系统管理 / 模型配置：页面细碎说明文案杂乱——副标题/三条工具条 caption/表尾凭据状态行重复表达且无层级（体验调整）</td>
+              <td class="tc-3">user_feedback（截图绿框标注）</td>
+              <td class="tc-4">2026-08-11 22:21 用户截图（绿框 ×4）指出"框出来的这些细碎的文案很乱"：① 页签副标题「模型供应商、场景绑定与生成参数配置」；② 工具条 caption「模型供应商与场景绑定 · 修改后先保存草稿再生效」；③ 工具条 caption「模型供应商 · 凭据按供应商加密托管」；④ 供应商表尾「凭据域状态：…最近变更…」+「场景模型绑定 · 点击行查看接线与差异」。五处文案重复表达同一主题、措辞不一、无信息层级。要求用前端设计 Skill 重新设计。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx（L661/L679/L741/L762 孤儿 meta caption + 表尾凭据状态行）</code> <code class="inline">ui/V2_PROTOTYPE/src/config/systemManagementSections.js（页签副标题）</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已分诊 / 实现中（用户当轮指示重设计）</span></td>
+              <td class="tc-7">分诊结果 requirement（P2 体验调整）。去重：未命中（RP-055 为多供应商架构、RP-053 为表格化，本条为同一页面的信息层级与文案治理，独立根因），交叉引用 RP-055，派生 RP-057。确诊根问题（≤3，截图即渲染证据）：R1 三条孤儿 meta caption 与副标题重复表达、措辞不一；R2 凭据域状态挂在供应商表尾行、视觉无归属；R3 流程提示「先保存草稿再生效」带冗余前缀且与操作区语义割裂。</td>
+              <td class="tc-8">重设计方向（对标 Dify/Linear 区段标题范式，复用现有 tokens 与 tag 组件，零新依赖）：① 两区段改为「区段标题（h3 语义）+ 单行 dim 描述」——模型供应商（描述：凭据按供应商加密托管 · 最近变更…）/ 场景模型绑定（描述：点击行查看接线与差异）；② 凭据域状态标签组（托管态/KEK）从表尾上移至供应商区段标题行右侧；③ 顶部工具条 caption 精简为「修改后先保存草稿再生效」，旧前缀删除。验收口径：区段标题 heading 语义可查询、凭据标签在供应商表格之前渲染、四条旧文案全移除、ModelConfigTable 凭据徽标断言零回归、UI 门禁 0 findings、build:web 零错误。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-iss-2026-08-11-006-intake:issues">
+              <td class="mono tc-0">ISS-2026-08-11-006</td>
+              <td class="tc-1">2026-08-11</td>
+              <td class="tc-2">全局 / 后台任务控件与通知：① 指示器点击弹出任务清单气泡（失焦消失）；② 已完成通知 5 秒自动消失；③ 点击已完成通知跳转对应会话并清除【已完成未读】徽标（功能调整）</td>
+              <td class="tc-3">user_feedback（截图：右下角「后台任务 0」+「…已完成」通知）</td>
+              <td class="tc-4">2026-08-11 22:40 用户截图指示三点优化：1）后台任务控件点击后在控件附近弹出气泡状详情界面显示后台任务清单，鼠标失焦后消失；2）后台任务已完成的消息默认显示 5 秒后消失；3）点击已完成通知内容直接跳转到对应的会话详情页，跳转成功后触发会话列表中【已完成未读】消失。现状事实：指示器为纯展示 div 无交互；通知仅有手动 × 关闭、无自动消失；通知负载只带 runId 无 sessionId，无跳转能力。</td>
+              <td class="tc-5"><code class="inline">ui/V2_PROTOTYPE/src/components/Layout/Shell.jsx（ShellBackgroundRuns 指示器 + 通知区）</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useBackgroundRuns.jsx（终态通知负载缺 sessionId）</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useAiSessions.js（active session localStorage 恢复链）</code> <code class="inline">ui/V2_PROTOTYPE/src/hooks/useSessionRuntimeStore.js（markSessionUnread 徽标数据源）</code></td>
+              <td class="tc-6"><span class="status run"><span class="dot"></span>已分诊 / 实现中（用户当轮指示实现）</span></td>
+              <td class="tc-7">分诊结果 requirement（P2 体验调整）。去重：未命中（RP-047 Batch D 为后台任务基建、ISS-2026-08-10-002 为角标计数刷新，本条为控件交互与通知生命周期优化，独立根因），交叉引用 RP-047，派生 RP-058。约束：index.css 为他人 WIP 脏文件不可触碰，气泡样式走内联 + 现有 tokens；pages/AiHomeWorkbench/** 同为 WIP 不可触碰，跳转采用 localStorage 预置活跃会话 + navigate('/') + store 清未读三件套，不新增工作台侧代码。</td>
+              <td class="tc-8">方案：① 指示器改 button，点击切换气泡（绝对定位于控件上方，列出活跃 Run 标题 + 状态，空态「暂无进行中的后台任务」），document mousedown  Outside 关闭 + Esc 关闭；② completed 通知挂 5s 定时自动 dismiss（仅 completed 类，failed/cancelled 保留手动关闭）；③ 终态通知负载补 sessionId，点击通知文本 → primeStoredActiveSessionId（useAiSessions 导出助手复用同一 storage key）→ markSessionUnread(sessionId, false)（徽标即消）→ dismiss 该通知 → navigate('/')（工作台挂载恢复该会话）。验收口径：气泡点击开/外部点击关；completed 通知 5s 自动消失；点击通知后 localStorage 预置 + 未读清除 + 跳转 '/'；RED 先行、background-runs 既有 9 用例零回归、build:web 零错误、UI 门禁 0 findings。</td>
             </tr>
         </tbody>
         </table>

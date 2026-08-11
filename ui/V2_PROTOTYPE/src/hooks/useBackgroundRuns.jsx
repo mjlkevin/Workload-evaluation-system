@@ -126,6 +126,8 @@ export function BackgroundRunProvider({ children }) {
       setNotifications((prev) => [...prev, {
         id: notifyKey,
         runId,
+        // RP-058：携带 sessionId 供通知点击跳转对应会话
+        sessionId: run?.sessionId || '',
         kind: TERMINAL_KIND[event.eventType],
         text: TERMINAL_TEXT[event.eventType](title),
       }])

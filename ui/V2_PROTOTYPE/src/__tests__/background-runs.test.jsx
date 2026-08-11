@@ -11,7 +11,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import Shell from '../components/Layout/Shell.jsx'
 import { useBackgroundRuns, useRunEventStream } from '../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
@@ -391,5 +391,73 @@ describe('background-runs: G2 后台继续', () => {
     // 验收口径：发问后 2s 内右下角角标 ≥1（提交成功回调触发 provider 刷新）
     expect(await screen.findByText('后台任务 1', {}, { timeout: 2000 })).toBeInTheDocument()
     expect(listCalls).toBeGreaterThanOrEqual(2)
+  })
+
+  test('background-runs: 指示器点击弹出任务清单气泡，外部点击失焦后消失（RP-058）', async () => {
+    setupBackgroundRuns({ listResponses: [[buildActiveRun()]], eventFrames: [], keepOpen: true })
+    renderShellApp()
+
+    // 指示器为可点击控件，点击后附近弹出气泡清单
+    const indicator = await screen.findByRole('button', { name: /后台任务 1/ })
+    fireEvent.click(indicator)
+    const popover = await screen.findByRole('dialog', { name: '后台任务清单' })
+    expect(popover).toHaveTextContent('后台任务 A')
+
+    // 鼠标失焦（点击气泡外）后气泡消失
+    fireEvent.mouseDown(document.body)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '后台任务清单' })).not.toBeInTheDocument())
+  })
+
+  test('background-runs: 已完成通知默认 5 秒后自动消失（RP-058）', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      setupBackgroundRuns({
+        listResponses: [[buildActiveRun()], []],
+        eventFrames: [
+          { sequence: 1, eventType: 'run_completed', payload: {}, createdAt: '2026-08-07T00:00:01.000Z' },
+        ],
+      })
+      renderShellApp()
+      const liveRegion = await screen.findByRole('region', { name: '后台任务通知' })
+      await waitFor(() => expect(liveRegion).toHaveTextContent(/后台任务 A.*已完成/))
+
+      // 推进 5 秒：completed 通知自动消失（无需手动点 ×）
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+      expect(liveRegion.querySelectorAll('.background-run-notification')).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('background-runs: 点击已完成通知跳转对应会话并触发【已完成未读】消失（RP-058）', async () => {
+    setupBackgroundRuns({
+      listResponses: [[buildActiveRun()], []],
+      eventFrames: [
+        { sequence: 2, eventType: 'run_completed', payload: {}, createdAt: '2026-08-07T00:00:02.000Z' },
+      ],
+    })
+    render(
+      <MemoryRouter initialEntries={['/other']}>
+        <Shell currentUser={TEST_USER}>
+          <Routes>
+            <Route path="/" element={<div>AI 工作台首页</div>} />
+            <Route path="/other" element={<OtherPageProbe />} />
+            <Route path="/login" element={<div>登录页</div>} />
+          </Routes>
+        </Shell>
+      </MemoryRouter>,
+    )
+    const liveRegion = await screen.findByRole('region', { name: '后台任务通知' })
+    await waitFor(() => expect(liveRegion).toHaveTextContent(/后台任务 A.*已完成/))
+    // 前置事实：终态已写入未读（SessionRail 已完成未读徽标数据源）
+    expect(sessionRuntimeStore.getSessionView('session-a')?.unread).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: /查看会话：后台任务 A 已完成/ }))
+
+    // 跳转对应会话（工作台首页）+ 预置活跃会话 + 未读清除（徽标消失）+ 通知自身消失
+    expect(await screen.findByText('AI 工作台首页')).toBeInTheDocument()
+    expect(localStorage.getItem('wes-ai-active-session-id')).toBe('session-a')
+    expect(sessionRuntimeStore.getSessionView('session-a')?.unread).toBe(false)
+    expect(liveRegion.querySelectorAll('.background-run-notification')).toHaveLength(0)
   })
 })

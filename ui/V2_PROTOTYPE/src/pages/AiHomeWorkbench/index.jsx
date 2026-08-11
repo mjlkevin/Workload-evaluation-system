@@ -136,6 +136,7 @@ export default function AiHomeWorkbench({ currentUser }) {
       id: `company-selected-${Date.now()}`,
       role: 'assistant',
       text: `已选择客户主体：${displayName}`,
+      createdAt: new Date().toISOString(),
     })
   }
 

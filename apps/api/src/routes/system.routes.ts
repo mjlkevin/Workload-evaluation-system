@@ -13,6 +13,11 @@ router.get("/requirement-settings", requireAnyCapability("system:manage", "requi
 router.patch("/requirement-settings/draft", requireCapability("system:manage"), SystemModule.updateRequirementSystemConfigDraft);
 router.post("/requirement-settings/activate", requireCapability("system:manage"), SystemModule.activateRequirementSystemConfig);
 router.post("/requirement-settings/kimi-api-key/test", requireCapability("system:manage"), SystemModule.testRequirementKimiApiKey);
+router.get("/requirement-settings/effective", requireCapability("system:manage"), SystemModule.getRequirementSettingsEffective);
+router.post("/requirement-settings/scenario-test", requireCapability("system:manage"), SystemModule.testScenarioModel);
+router.put("/requirement-settings/providers/:providerId/api-key", requireCapability("system:manage"), SystemModule.setProviderApiKey);
+router.delete("/requirement-settings/providers/:providerId/api-key", requireCapability("system:manage"), SystemModule.clearProviderApiKey);
+router.post("/requirement-settings/providers/:providerId/api-key/test", requireCapability("system:manage"), SystemModule.testProviderApiKey);
 router.get("/implementation-dependency-rules", requireAnyCapability("system:manage", "rule:manage"), SystemModule.getImplementationDependencyRules);
 router.patch("/implementation-dependency-rules/draft", requireAnyCapability("system:manage", "rule:manage"), SystemModule.updateImplementationDependencyRulesDraft);
 router.post("/implementation-dependency-rules/activate", requireAnyCapability("system:manage", "rule:manage"), SystemModule.activateImplementationDependencyRules);

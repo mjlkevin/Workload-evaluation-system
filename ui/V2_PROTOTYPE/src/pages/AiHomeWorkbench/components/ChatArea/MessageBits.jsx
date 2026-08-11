@@ -1,5 +1,29 @@
 import { useState } from 'react'
 
+/**
+ * ISS-2026-08-11-004 / RP-056：消息时间格式化——
+ * 当天消息显示 HH:MM；跨天显示 MM-DD HH:MM。
+ */
+export function formatMessageTime(createdAt) {
+  if (!createdAt) return ''
+  const date = new Date(createdAt)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  const hhmm = `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  const now = new Date()
+  const sameDay = date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate()
+  return sameDay ? hhmm : `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${hhmm}`
+}
+
+/* RP-056：消息时间戳（复制控件右侧，随悬浮操作栏一并显隐） */
+export function MessageTimestamp({ createdAt }) {
+  const label = formatMessageTime(createdAt)
+  if (!label) return null
+  return <time className="ai-msg-time" dateTime={createdAt}>{label}</time>
+}
+
 /* ── Copy Session ID Icon ── */
 export function CopyMessageButton({ text }) {
   const [copied, setCopied] = useState(false)
