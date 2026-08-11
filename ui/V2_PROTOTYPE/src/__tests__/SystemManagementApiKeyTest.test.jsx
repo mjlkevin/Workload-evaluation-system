@@ -69,6 +69,29 @@ describe('SystemManagement 供应商 API Key 测试连接反馈（内嵌场景�
     expect(detailHits.length).toBeGreaterThanOrEqual(1)
   })
 
+  test('输入新密钥后点「保存密钥」调用 PUT 并内联提示已保存（DEF-2026-08-11-002）', async () => {
+    let putCalls = 0
+    let putBody = null
+    server.use(
+      http.put(`${BASE}/system/requirement-settings/providers/:providerId/api-key`, async ({ request }) => {
+        putCalls += 1
+        putBody = await request.json()
+        return HttpResponse.json({ success: true, data: { providerId: 'moonshot', keySource: 'store', keyHint: '····wxyz' } })
+      }),
+    )
+    renderModelSection()
+    const dialog = await openScenarioEditDialog()
+
+    const input = within(dialog).getByPlaceholderText(INPUT_PLACEHOLDER)
+    fireEvent.change(input, { target: { value: 'sk-new-key' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存密钥' }))
+
+    const hits = await within(dialog).findAllByText('密钥已加密保存到凭据域')
+    expect(hits.length).toBeGreaterThanOrEqual(1)
+    expect(putCalls).toBe(1)
+    expect(putBody.apiKey).toBe('sk-new-key')
+  })
+
   test('未输入新密钥时「保存密钥」按钮禁用，不发请求', async () => {
     let putCalls = 0
     server.use(
