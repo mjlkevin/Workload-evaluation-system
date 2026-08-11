@@ -15,6 +15,7 @@ function makeFakeRepo(overrides?: Partial<MemoryRepository>): MemoryRepository {
   return {
     saveDistilledMemory: async () => ({ atoms: [] as MemoryAtomRow[], scenes: [] as MemorySceneRow[] }),
     listMemoryForProject: async () => ({ atoms: [], scenes: [], totalAtoms: 0, totalScenes: 0 }) as MemoryListResult,
+    listMemoryForOwner: async () => ({ atoms: [], scenes: [], totalAtoms: 0, totalScenes: 0 }) as MemoryListResult,
     confirmMemoryAtom: noop as MemoryRepository["confirmMemoryAtom"],
     confirmMemoryScene: noop as MemoryRepository["confirmMemoryScene"],
     archiveMemoryAtom: noop as MemoryRepository["archiveMemoryAtom"],
@@ -66,11 +67,24 @@ describe("memory.usecase", () => {
     assert.equal(result.page, 1);
   });
 
-  test("should return empty when projectId is missing", async () => {
-    let called = false;
+  // DEF-2026-08-11-001：缺 projectId 时面板恒空 —— 改为 owner 全量口径
+  // （ownerUserId 隔离不变；projectId 仍为可选收窄过滤，显式传 projectId 的调用方行为不变）
+  test("should list owner-wide memory when projectId is missing", async () => {
+    let ownerCalled = false;
+    let projectCalled = false;
     const repo = makeFakeRepo({
+      listMemoryForOwner: async (input) => {
+        ownerCalled = true;
+        assert.equal(input.ownerUserId, ownerUserId);
+        return {
+          atoms: [{ memoryAtomId: "a1" } as MemoryAtomRow, { memoryAtomId: "a2" } as MemoryAtomRow],
+          scenes: [{ memorySceneId: "s1" } as MemorySceneRow],
+          totalAtoms: 2,
+          totalScenes: 1,
+        };
+      },
       listMemoryForProject: async () => {
-        called = true;
+        projectCalled = true;
         return { atoms: [], scenes: [], totalAtoms: 0, totalScenes: 0 };
       },
     });
@@ -78,9 +92,27 @@ describe("memory.usecase", () => {
 
     const result = await usecase.listMemory({ ownerUserId, page: 1, pageSize: 10 } as any);
 
-    assert.equal(result.atoms.length, 0);
-    assert.equal(result.totalAtoms, 0);
-    assert.equal(called, false);
+    assert.equal(ownerCalled, true, "缺 projectId 时应走 owner 全量查询");
+    assert.equal(projectCalled, false, "缺 projectId 时不应走项目过滤查询");
+    assert.equal(result.atoms.length, 2);
+    assert.equal(result.scenes.length, 1);
+    assert.equal(result.totalAtoms, 2);
+    assert.equal(result.totalScenes, 1);
+  });
+
+  test("should pass status filter through on owner-wide listing", async () => {
+    let seenStatus: string | undefined;
+    const repo = makeFakeRepo({
+      listMemoryForOwner: async (input) => {
+        seenStatus = input.status;
+        return { atoms: [], scenes: [], totalAtoms: 0, totalScenes: 0 };
+      },
+    });
+    const usecase = createMemoryUsecase({ repo });
+
+    await usecase.listMemory({ ownerUserId, status: "draft", page: 1, pageSize: 10 } as any);
+
+    assert.equal(seenStatus, "draft", "owner 全量查询应透传 status 过滤");
   });
 
   test("should confirm atoms", async () => {

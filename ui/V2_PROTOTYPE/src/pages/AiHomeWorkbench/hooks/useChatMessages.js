@@ -9,10 +9,13 @@ import { buildAttachmentUnderstanding, isExplicitReportRequest, summarizeHomePar
 import {
   attachFormBlockToLatestAssistant,
   attachKnowledgeToolToLatestAssistant,
+  attachTraceChipsToLatestAssistant,
   mapSessionMessages,
   mergePreservedLocalFileMessages,
   normalizeClientFormBlock,
   normalizeKnowledgeTool,
+  normalizeMemoryRef,
+  normalizeToolCalls,
   sameMessageList,
   stripFormBlockJson,
   withCurrentUserFile,
@@ -524,6 +527,8 @@ export default function useChatMessages(workbench) {
         let sessionMessages = withCurrentUserFile(mapSessionMessages(data.session), userMessage)
         sessionMessages = attachFormBlockToLatestAssistant(sessionMessages, data.formBlock)
         sessionMessages = attachKnowledgeToolToLatestAssistant(sessionMessages, data.trace?.knowledgeTool)
+        // MS3 chip 活数据链路：trace 携带 toolCalls / memoryRef 时附加到最后一条助手消息
+        sessionMessages = attachTraceChipsToLatestAssistant(sessionMessages, data.trace)
         // Phase 1G: 附加 suggestedActions 到最后一条助手消息
         if (data.suggestedActions?.length && sessionMessages.length) {
           const lastAssistantIndex = [...sessionMessages].reverse().findIndex((m) => m.role === 'assistant')
@@ -554,6 +559,8 @@ export default function useChatMessages(workbench) {
           intent: data.intent,
           formBlock: normalizeClientFormBlock(data.formBlock),
           knowledgeTool: normalizeKnowledgeTool(data.trace?.knowledgeTool),
+          toolCalls: normalizeToolCalls(data.trace?.toolCalls),
+          memoryRef: normalizeMemoryRef(data.trace?.memoryRef),
         }
         writeArrivalMessage(sendKey, loadingId, answerMessage)
       }

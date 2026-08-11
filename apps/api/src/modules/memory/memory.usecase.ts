@@ -37,8 +37,16 @@ export function createMemoryUsecase(deps: MemoryUsecaseDeps) {
 
     async listMemory(query: ListMemoryQuery & { ownerUserId: string }) {
       const { ownerUserId, projectId, status, page, pageSize } = query;
+      // DEF-2026-08-11-001：缺 projectId 时返回 owner 全量（面板默认口径），
+      // 与 harness 读取侧一致保持 ownerUserId 隔离；显式传 projectId 的调用方行为不变。
       if (!projectId) {
-        return { atoms: [], scenes: [], totalAtoms: 0, totalScenes: 0, page, pageSize };
+        const result = await repo.listMemoryForOwner({
+          ownerUserId,
+          status,
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+        });
+        return { ...result, page, pageSize };
       }
       const result = await repo.listMemoryForProject({
         ownerUserId,

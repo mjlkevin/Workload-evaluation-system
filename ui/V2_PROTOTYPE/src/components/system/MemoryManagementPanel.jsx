@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { apiClient } from '../../api/client.js'
 import { useToast } from '../../hooks/useToast.jsx'
 
@@ -8,18 +9,26 @@ const STATUS_MAP = {
   archived: { label: '已归档', cls: 'muted' },
 }
 
+const VALID_FILTERS = new Set(['draft', 'active', 'archived'])
+
 export default function MemoryManagementPanel() {
   const [atoms, setAtoms] = useState([])
   const [scenes, setScenes] = useState([])
   const [loading, setLoading] = useState(false)
-  const [filter, setFilter] = useState('all')
+  // DEF-2026-08-11-001：读取 location query 初始化筛选——
+  // MS2-PATCH 提示条「去确认」跳转 /system/memory?status=draft 后自动筛选 draft；
+  // projectId 经 query 传入时作为当前项目上下文携带（缺省走后端 owner 全量口径）。
+  const [searchParams] = useSearchParams()
+  const initialStatus = searchParams.get('status')
+  const projectId = searchParams.get('projectId') || undefined
+  const [filter, setFilter] = useState(VALID_FILTERS.has(initialStatus) ? initialStatus : 'all')
   const toast = useToast()
 
   const fetchMemory = async () => {
     setLoading(true)
     try {
       const status = filter === 'all' ? undefined : filter
-      const res = await apiClient.get('/memory', { status, page: 1, pageSize: 50 })
+      const res = await apiClient.get('/memory', { projectId, status, page: 1, pageSize: 50 })
       const data = res?.data || {}
       setAtoms(data.atoms || [])
       setScenes(data.scenes || [])

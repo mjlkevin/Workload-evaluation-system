@@ -185,7 +185,18 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
 export type ModelChatFactory = (params: {
   systemPrompt: string;
   userContent: string;
-}) => Promise<{ answer: string; rawContent: string; provider?: string; model?: string; attempts?: number; finishReason?: string }>;
+}) => Promise<{
+  answer: string;
+  rawContent: string;
+  provider?: string;
+  model?: string;
+  attempts?: number;
+  finishReason?: string;
+  /** additive：本轮模型调用产生的工具调用记录（MS3 工具调用 chip 数据源） */
+  toolCalls?: { name: string; source?: string }[];
+  /** additive：本轮注入的 active 记忆计数（MS2-PATCH 引用记忆 chip 数据源） */
+  memoryRef?: { scenesCount: number; atomsCount: number };
+}>;
 
 export function buildWorkbenchChatModelChat(
   user: AuthUser,
@@ -248,6 +259,11 @@ export function buildWorkbenchChatModelChat(
       model: completion.model,
       attempts: completion.attempts,
       finishReason: completion.finishReason,
+      // additive：记忆注入透明度——注入成功（含 0 条）即携带计数，
+      // 前端仅在计数 > 0 时渲染「引用记忆」chip，缺省保持静默降级
+      ...(memoryBlock
+        ? { memoryRef: { scenesCount: memoryBlock.scenes.length, atomsCount: memoryBlock.atoms.length } }
+        : {}),
     };
   };
 }
@@ -255,6 +271,8 @@ export function buildWorkbenchChatModelChat(
 export function buildWorkbenchChatDispatchInput(user: AuthUser, content: string, options?: {
   modelChat?: ModelChatFactory;
   messages?: HomeMessageInput[];
+  /** 记忆注入项目上下文（缺省不注入，行为与旧版一致）；工作台会话蒸馏落 default 项目 */
+  projectId?: string;
 }): {
   user: AuthUser;
   workflowKey: string;
@@ -274,6 +292,7 @@ export function buildWorkbenchChatDispatchInput(user: AuthUser, content: string,
   const modelChat = options?.modelChat ?? buildWorkbenchChatModelChat(user, {
     messages: options?.messages,
     modelName,
+    projectId: options?.projectId,
   });
 
   return {

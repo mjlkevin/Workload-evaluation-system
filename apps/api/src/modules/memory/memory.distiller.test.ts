@@ -16,6 +16,7 @@ function makeFakeRepo(saveFn?: (...args: any[]) => Promise<any>): MemoryReposito
   return {
     saveDistilledMemory: saveFn ?? (async () => ({ atoms: [] as MemoryAtomRow[], scenes: [] as MemorySceneRow[] })),
     listMemoryForProject: async () => ({ atoms: [], scenes: [], totalAtoms: 0, totalScenes: 0 }) as MemoryListResult,
+    listMemoryForOwner: async () => ({ atoms: [], scenes: [], totalAtoms: 0, totalScenes: 0 }) as MemoryListResult,
     confirmMemoryAtom: noop as MemoryRepository["confirmMemoryAtom"],
     confirmMemoryScene: noop as MemoryRepository["confirmMemoryScene"],
     archiveMemoryAtom: noop as MemoryRepository["archiveMemoryAtom"],
