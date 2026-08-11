@@ -810,18 +810,42 @@ input, button, select, textarea { font-family: inherit; }
 }
 
 /* RP-023: AI 消息气泡悬停操作栏 */
-.ai-bubble-wrap .ai-msg-actions {
+/* RP-056（2026-08-11）：操作栏移出气泡，置于气泡下方右侧；
+   复制控件 + 时间戳随悬浮整条消息行（.ai-msg-row）一并显隐。 */
+.ai-msg-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.ai-msg-col .ai-bubble-wrap {
+  width: 100%;
+}
+.ai-msg-meta {
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin-top: 8px;
-  padding-top: 6px;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 22px;
+  padding: 0 4px;
   opacity: 0;
   transition: opacity 0.15s ease-out;
 }
-.ai-bubble-wrap:hover .ai-msg-actions,
-.ai-bubble-wrap:focus-within .ai-msg-actions {
+.ai-msg-row:hover .ai-msg-meta,
+.ai-msg-row:focus-within .ai-msg-meta {
   opacity: 1;
+}
+.ai-msg-meta .ai-msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.ai-msg-time {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-3);
+  letter-spacing: 0.01em;
+  user-select: none;
 }
 .ai-msg-action-btn {
   display: inline-flex;

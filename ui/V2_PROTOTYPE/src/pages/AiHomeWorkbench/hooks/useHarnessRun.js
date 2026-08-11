@@ -63,6 +63,7 @@ export default function useHarnessRun(workbench, chat) {
       text: '已生成《需求解析报告 v1》，请先补充关键缺失信息。',
       artifacts: reportArtifact ? [reportArtifact] : [],
       model: pickArray(reportDetail?.modelRuns).at(-1)?.model,
+      createdAt: new Date().toISOString(),
     }
     chat.replaceMessage(loadingId, assistantMessage)
     if (session) {
@@ -140,6 +141,7 @@ export default function useHarnessRun(workbench, chat) {
         role: 'assistant',
         text: successText,
         actions,
+        createdAt: new Date().toISOString(),
       })
     } catch (err) {
       chat.appendMessage({
@@ -147,6 +149,7 @@ export default function useHarnessRun(workbench, chat) {
         role: 'assistant',
         text: `动作确认失败：${err.message || '请求失败'}`,
         error: true,
+        createdAt: new Date().toISOString(),
       })
     } finally {
       setConfirmingActionId('')
@@ -163,6 +166,7 @@ export default function useHarnessRun(workbench, chat) {
       role: 'assistant',
       text: '正在保存卡片补充信息并生成需求解析报告 v2',
       loading: true,
+      createdAt: new Date().toISOString(),
     })
     try {
       await submitHarnessAnswers(runId, { answers })
@@ -175,6 +179,7 @@ export default function useHarnessRun(workbench, chat) {
         text: '已基于卡片补充信息生成《需求解析报告 v2》。',
         artifacts: v2Artifact ? [v2Artifact] : [],
         model: pickArray(reportDetail?.modelRuns).at(-1)?.model,
+        createdAt: new Date().toISOString(),
       }
       chat.replaceMessage(loadingId, assistantMessage)
       if (workbench.activeSession) {
@@ -216,6 +221,7 @@ export default function useHarnessRun(workbench, chat) {
         role: 'assistant',
         text: `卡片补充暂未完成：${err.message || '请求失败'}`,
         error: true,
+        createdAt: new Date().toISOString(),
       })
       throw err
     } finally {
@@ -257,6 +263,7 @@ export default function useHarnessRun(workbench, chat) {
         id: `project-created-${Date.now()}`,
         role: 'assistant',
         text: `项目已创建并关联：${project.projectName || project.projectId}`,
+        createdAt: new Date().toISOString(),
       })
       window.dispatchEvent(new CustomEvent('wes-project-evaluation-created', { detail: { project } }))
     } catch (err) {
@@ -271,6 +278,7 @@ export default function useHarnessRun(workbench, chat) {
         role: 'assistant',
         text: errorText,
         error: true,
+        createdAt: new Date().toISOString(),
       })
     } finally {
       setConfirmingActionId('')

@@ -82,6 +82,8 @@ export function mapSessionMessages(session) {
         id: message.messageId || `${session.sessionId}-${index}`,
         role: message.role,
         text: stripFormBlockJson(message.content || ''),
+        // RP-056：带出后端落库时间，供气泡外时间戳展示
+        createdAt: message.createdAt || undefined,
         // ISS-2026-08-08-001: 带出会话附件的 parsedSummary（存在才带），保证水合后出站消息仍携带解析上下文
         file: file
           ? { name: file.name, size: file.size, type: file.type, ...(file.parsedSummary ? { parsedSummary: file.parsedSummary } : {}) }
