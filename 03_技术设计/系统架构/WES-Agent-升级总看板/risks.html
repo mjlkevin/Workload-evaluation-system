@@ -253,6 +253,18 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-08-11-sp007-ms3-review:risks:1">
+          <td>MS3 工具发现 trace chip 活数据链路缺口：chip 组件已交付（MS3 回填 0b97951），但 dispatch 链路不过编排器，无生产数据通路。</td>
+          <td>用户在真实对话中看不到工具发现过程的 chip 呈现，MS3 前端交付的用户价值暂时不可见；属设计性缺口而非回归。</td>
+          <td>已如实登记；建议出后续小单：dispatch trace 增加 additive 字段 + 前端透传（估小批量）。合入评审不作为阻断项。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待后续小单</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-11-sp007-ms3-review:risks:2">
+          <td>记忆管理面板恒空预置缺陷（listMemory 缺 projectId + 面板请求不带 projectId + 不读 ?status=draft query）阻断 RP-052「UI 可见可确认」人工验收。</td>
+          <td>RP-052 记忆蒸馏的后端能力已就位且有 12 用例守护，但用户无法在 UI 看到并确认 draft 记忆，人工验收口径不成立。</td>
+          <td>已派生 DEF-2026-08-11-001（S2，待用户决策修复，估 1–2h + 测试）；修复前 RP-052 保持「待人工验收」不关闭。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待用户决策修复（DEF-2026-08-11-001）</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:risks:1">
           <td>后台任务角标「进行中」计数不含 cancelling 状态的 run（ISS-2026-08-10-001 复审范围外观察）。</td>
           <td>用户取消任务后，角标计数可能与真实状态短暂不符（既不计进行中、也不计已完成）。</td>
