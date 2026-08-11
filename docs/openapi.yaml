@@ -3358,6 +3358,163 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/system/requirement-settings/effective:
+    get:
+      tags: [System]
+      summary: 获取各业务场景的生效模型、供应商与凭据健康状态（admin）
+      operationId: getRequirementSettingsEffective
+      responses:
+        "200":
+          description: 查询成功；凭据仅返回配置状态与脱敏尾号，不返回明文。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequirementSettingsEffectiveResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/requirement-settings/scenario-test:
+    post:
+      tags: [System]
+      summary: 使用生效供应商、模型与凭据验证业务场景（admin）
+      operationId: testRequirementScenarioModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequirementScenarioTestRequest"
+      responses:
+        "200":
+          description: 验证成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequirementScenarioTestResponse"
+        "400":
+          description: 场景、模型或凭据无效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/requirement-settings/providers/{providerId}/api-key:
+    parameters:
+      - $ref: "#/components/parameters/ModelProviderId"
+    put:
+      tags: [System]
+      summary: 加密保存指定模型供应商的 API Key（admin）
+      operationId: setModelProviderApiKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelProviderApiKeyRequest"
+      responses:
+        "200":
+          description: 保存成功；仅返回脱敏尾号。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelProviderApiKeyResponse"
+        "400":
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 供应商不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [System]
+      summary: 清除指定模型供应商的 API Key（admin）
+      operationId: clearModelProviderApiKey
+      responses:
+        "200":
+          description: 清除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelProviderApiKeyClearResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 供应商不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/system/requirement-settings/providers/{providerId}/api-key/test:
+    post:
+      tags: [System]
+      summary: 测试指定模型供应商的 API Key 与模型连通性（admin）
+      operationId: testModelProviderApiKey
+      parameters:
+        - $ref: "#/components/parameters/ModelProviderId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiKey:
+                  type: string
+                  writeOnly: true
+                model:
+                  type: string
+      responses:
+        "200":
+          description: 测试成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelProviderTestResponse"
+        "400":
+          description: 测试失败
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 供应商不存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/v1/system/knowledge-base-config:
     get:
       tags: [System]
@@ -5878,6 +6035,14 @@ components:
       schema:
         type: string
       description: 导出接口幂等键。相同 payload + 相同 key 会复用结果。
+    ModelProviderId:
+      name: providerId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]*$"
+      description: 模型供应商标识。
 
   schemas:
     GenericOkResponse:
@@ -7687,6 +7852,267 @@ components:
             model:
               type: string
           required: [ok]
+      required: [code, message, data]
+
+    RequirementSettingsEffectiveResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            scenarios:
+              type: array
+              items:
+                type: object
+                properties:
+                  key:
+                    type: string
+                    enum: [assessment, fileParsing, generation]
+                  label:
+                    type: string
+                  purpose:
+                    type: string
+                  resolvedModel:
+                    type: string
+                  source:
+                    type: string
+                    enum: [binding, legacy_ui, evaluation_fallback, env_fallback]
+                  providerId:
+                    type: string
+                  providerName:
+                    type: string
+                  baseUrl:
+                    type: string
+                    format: uri
+                  credentialScope:
+                    type: string
+                  wired:
+                    type: boolean
+                  wiredParams:
+                    type: array
+                    items:
+                      type: string
+                  notes:
+                    type: array
+                    items:
+                      type: string
+                  lastVerified:
+                    nullable: true
+                    type: object
+                required: [key, resolvedModel, source, providerId, providerName, baseUrl, credentialScope, wired, wiredParams, notes]
+            credentials:
+              type: object
+              properties:
+                configured:
+                  type: boolean
+                source:
+                  type: string
+                  enum: [store, env, none]
+                kekReady:
+                  type: boolean
+                lastAudit:
+                  nullable: true
+                  type: object
+              required: [configured, source, kekReady]
+            providers:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  protocol:
+                    type: string
+                    enum: [openai-compatible]
+                  baseUrl:
+                    type: string
+                    format: uri
+                  enabled:
+                    type: boolean
+                  models:
+                    type: array
+                    items:
+                      type: string
+                  credentialScope:
+                    type: string
+                  keyConfigured:
+                    type: boolean
+                  keySource:
+                    type: string
+                    enum: [store, env, none]
+                  keyHint:
+                    type: string
+                    nullable: true
+                required: [id, name, protocol, baseUrl, enabled, models, credentialScope, keyConfigured, keySource]
+            generatedAt:
+              type: string
+              format: date-time
+          required: [scenarios, credentials, providers, generatedAt]
+      required: [code, message, data]
+
+    RequirementScenarioTestRequest:
+      type: object
+      properties:
+        scenario:
+          type: string
+          enum: [assessment, fileParsing, generation]
+        apiKey:
+          type: string
+          writeOnly: true
+      required: [scenario]
+
+    RequirementScenarioTestResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            ok:
+              type: boolean
+              const: true
+            scenario:
+              type: string
+              enum: [assessment, fileParsing]
+            resolvedModel:
+              type: string
+            modelSource:
+              type: string
+            providerId:
+              type: string
+            providerName:
+              type: string
+            baseUrl:
+              type: string
+              format: uri
+            keySource:
+              type: string
+              enum: [request_body, credential_store, environment]
+            respondedModel:
+              type: string
+              nullable: true
+            modelMatch:
+              type: boolean
+              nullable: true
+            latencyMs:
+              type: integer
+              minimum: 0
+            httpStatus:
+              type: integer
+          required: [ok, scenario, resolvedModel, modelSource, providerId, providerName, baseUrl, keySource, latencyMs, httpStatus]
+      required: [code, message, data]
+
+    ModelProviderApiKeyRequest:
+      type: object
+      properties:
+        apiKey:
+          type: string
+          writeOnly: true
+      required: [apiKey]
+
+    ModelProviderApiKeyResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            providerId:
+              type: string
+            credentialScope:
+              type: string
+            keyHint:
+              type: string
+          required: [providerId, credentialScope, keyHint]
+      required: [code, message, data]
+
+    ModelProviderApiKeyClearResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            providerId:
+              type: string
+            credentialScope:
+              type: string
+            cleared:
+              type: boolean
+              const: true
+          required: [providerId, credentialScope, cleared]
+      required: [code, message, data]
+
+    ModelProviderTestResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        requestId:
+          type: string
+        data:
+          type: object
+          properties:
+            ok:
+              type: boolean
+              const: true
+            providerId:
+              type: string
+            baseUrl:
+              type: string
+              format: uri
+            requestedModel:
+              type: string
+            respondedModel:
+              type: string
+              nullable: true
+            modelMatch:
+              type: boolean
+              nullable: true
+            keySource:
+              type: string
+              enum: [request_body, credential_store, environment]
+            latencyMs:
+              type: integer
+              minimum: 0
+            httpStatus:
+              type: integer
+          required: [ok, providerId, baseUrl, requestedModel, keySource, latencyMs, httpStatus]
       required: [code, message, data]
 
     KnowledgeBaseRetrievalParams:

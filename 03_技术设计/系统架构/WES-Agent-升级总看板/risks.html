@@ -67,7 +67,7 @@
       <h1>风险与决策</h1>
       <p class="meta">
         <span><b>这页回答</b> 哪些事情可能影响交付、会造成什么后果、什么情况下需要暂停或改方案</span>
-        <span><b>当前结论</b> 没有 P0 阻断项；17 类风险仍在跟踪，重点是人工验收缺口、外部模型与知识库稳定性、权限和数据隔离、多 AI 交付质量，以及本地与远端分支不同步</span>
+        <span><b>当前结论</b> 没有 P0 阻断项；19 类风险仍在跟踪，重点是人工验收缺口、外部模型访问边界、依赖漏洞、权限和数据隔离，以及本地与远端分支不同步</span>
         <span><b>阅读方式</b> 先看风险影响和当前状态；需求编号、分支名、命令和技术字段作为复核证据保留</span>
         <span><b>原则</b> AI 草稿可以自动，正式业务不能绕过确认</span>
       </p>
@@ -99,7 +99,7 @@
       <h2>风险总览</h2>
       <div class="kpi-row">
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--err-soft);color:var(--err)">P0</span><span>阻断风险</span></div><div class="v">0</div><div class="lb">阶段 1D 合并前已处理</div></div>
-        <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">跟</span><span>跟踪中风险</span></div><div class="v">17</div><div class="lb">人工验收 / AI 任务边界 / 知识库 / 附件问答 / 内容展示 / 表单与引导选项 / 评分准确性 / 定期任务治理 / 防止编造 / 权限 / 多 AI 集成 / 数据留痕 / 分支与存储边界</div></div>
+        <div class="kpi"><div class="top"><span class="ic" style="background:var(--warn-soft);color:var(--warn)">跟</span><span>跟踪中风险</span></div><div class="v">19</div><div class="lb">人工验收 / AI 任务边界 / 外部模型访问 / 依赖安全 / 知识库 / 权限 / 数据隔离 / 多 AI 集成 / 数据留痕 / 分支与存储边界</div></div>
         <div class="kpi"><div class="top"><span class="ic">边</span><span>必须守住的边界</span></div><div class="v">5</div><div class="lb">权限、流程阶段、结果格式、防止重复、正式写入</div></div>
         <div class="kpi"><div class="top"><span class="ic" style="background:var(--ok-soft);color:var(--ok)">D</span><span>决策</span></div><div class="v">14</div><div class="lb">当前主线决策可追溯</div></div>
       </div>
@@ -253,6 +253,18 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-08-12-model-config-branch-security:risks:1">
+          <td>RP-055 自定义供应商 baseUrl 只校验非空，管理员可让服务端向私网或非 HTTPS 地址发起 POST。</td>
+          <td>被利用时可形成有权限前置的盲 SSRF，触达宿主可访问的内部服务。</td>
+          <td>下个安全批次增加 HTTPS 和公网 IP 校验，DNS 解析及重定向后重校验；当前不宣称零风险。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待安全治理</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-12-model-config-branch-security:risks:2">
+          <td>npm audit 报告 21 个既有依赖漏洞（8 高、13 中），包含 multer、express 依赖链与 xlsx。</td>
+          <td>可能造成 DoS、路径/头注入或原型污染；本次分支未修改 lockfile，不是新引入。</td>
+          <td>单独做依赖升级与回归；不盲目运行 npm audit fix --force，避免引入破坏性降级。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待依赖治理</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-11-memory-panel-chip-review:risks:1">
           <td>流式通道 chip 缺口：本次 chip 活数据链路仅打通同步 dispatch 路径；流式通道（workbench-chat-stream/workflow，工单禁区）下 toolCalls / memoryRef chip 不生效。</td>
           <td>用户走流式对话时看不到工具调用 / 引用记忆 chip，与同步路径体验不一致。</td>

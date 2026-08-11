@@ -5,6 +5,7 @@ import test from "node:test";
 import { requirementSystemConfigStorePath } from "../../utils";
 import { kimiAssessmentPreview } from "./assessment.service";
 import { defaultProviderRegistry, type ModelProvider, type ChatCompletionRequest, type ChatCompletionResponse } from "../../ai/provider";
+import { getCachedApiKey, KIMI_SCOPE, resetCredentialCache, setCachedApiKey } from "../../modules/system/credentials.store";
 import { loadRequirementSystemConfigStore, saveRequirementSystemConfigStore } from "../../modules/system/system.repository";
 
 function createCapturingKimiProvider(): ModelProvider & { lastRequest?: ChatCompletionRequest } {
@@ -42,8 +43,10 @@ async function withAssessmentSandbox(
   const existed = fs.existsSync(storePath);
   const before = existed ? fs.readFileSync(storePath, "utf-8") : "";
   const previousProvider = defaultProviderRegistry.get("kimi");
+  const previousApiKey = getCachedApiKey(KIMI_SCOPE);
   const mockProvider = createCapturingKimiProvider();
   defaultProviderRegistry.register(mockProvider, { asDefault: true });
+  setCachedApiKey(KIMI_SCOPE, "sk-assessment-test-only");
   try {
     const store = loadRequirementSystemConfigStore();
     mutate(store);
@@ -57,6 +60,8 @@ async function withAssessmentSandbox(
     }
     defaultProviderRegistry.unregister("kimi");
     if (previousProvider) defaultProviderRegistry.register(previousProvider);
+    if (previousApiKey) setCachedApiKey(KIMI_SCOPE, previousApiKey);
+    else resetCredentialCache();
   }
 }
 
