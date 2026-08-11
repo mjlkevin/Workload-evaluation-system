@@ -10,6 +10,7 @@ import path from "node:path";
 import type { RequirementSystemConfig } from "../../types";
 import { modelVerifyStatusPath } from "../../utils";
 import { isKimiK2Model } from "../../utils/kimi-completion-params";
+import { resolveScenarioConfig, type ScenarioConfigResolution } from "./model-providers";
 
 export type ModelScenarioKey = "assessment" | "fileParsing" | "generation";
 
@@ -38,7 +39,13 @@ export interface EffectiveScenario {
   label: string;
   purpose: string;
   resolvedModel: string;
-  source: ScenarioModelResolution["source"];
+  /** RP-055：binding=场景绑定 / legacy_ui=旧场景字段 / evaluation_fallback / env_fallback */
+  source: ScenarioConfigResolution["modelSource"];
+  /** RP-055：生效供应商信息（绑定或归口内置供应商） */
+  providerId: string;
+  providerName: string;
+  baseUrl: string;
+  credentialScope: string;
   /** 该场景是否已接入业务链路（false = 规划中，配置暂不生效） */
   wired: boolean;
   /** 真实接线的配置项（前端只渲染这些） */
@@ -56,7 +63,7 @@ export interface EffectiveModelConfig {
 
 const SCENARIO_META: Record<ModelScenarioKey, { label: string; purpose: string }> = {
   assessment: {
-    label: "KIMI 评估",
+    label: "实施评估",
     purpose: "用于实施评估与开发评估的自动打标与摘要生成。",
   },
   fileParsing: {
@@ -64,7 +71,7 @@ const SCENARIO_META: Record<ModelScenarioKey, { label: string; purpose: string }
     purpose: "用于 Excel/Word/PDF 的结构化提取与内容解析。",
   },
   generation: {
-    label: "生成模型",
+    label: "内容生成",
     purpose: "用于方案生成、五段叙事与 SOW 草稿自动撰写。",
   },
 };
@@ -125,17 +132,23 @@ export function buildEffectiveModelConfig(
   envModel: string,
   credentials: CredentialsHealth,
   lastVerified: Partial<Record<ModelScenarioKey, ScenarioVerifyRecord>>,
+  envBaseUrl: string = "",
 ): EffectiveModelConfig {
   const keys: ModelScenarioKey[] = ["assessment", "fileParsing", "generation"];
+  const env = { model: envModel, baseUrl: envBaseUrl };
   const scenarios: EffectiveScenario[] = keys.map((key) => {
-    const resolution = resolveScenarioModel(active, key, envModel);
+    const resolution = resolveScenarioConfig(active, key, env);
     const wired = key !== "generation";
     return {
       key,
       label: SCENARIO_META[key].label,
       purpose: SCENARIO_META[key].purpose,
       resolvedModel: resolution.model,
-      source: resolution.source,
+      source: resolution.modelSource,
+      providerId: resolution.providerId,
+      providerName: resolution.providerName,
+      baseUrl: resolution.baseUrl,
+      credentialScope: resolution.credentialScope,
       wired,
       wiredParams: SCENARIO_WIRED_PARAMS[key],
       notes: buildScenarioNotes(key, resolution.model),

@@ -6,7 +6,8 @@ import { config } from "../../config/env";
 import { asString, round1 } from "../../utils/helpers";
 import { normalizeKimiModelName } from "../../utils/model-name";
 import { ok, fail } from "../../utils/response";
-import { loadRequirementSystemConfigStore, resolveActiveRequirementKimiApiKey } from "../../modules/system/system.repository";
+import { loadRequirementSystemConfigStore, resolveActiveApiKeyForScope } from "../../modules/system/system.repository";
+import { resolveScenarioConfig } from "../../modules/system/model-providers";
 import { buildKimiAssessmentDraftMarkdown } from "../../utils/kimi-assessment-markdown";
 import {
   estimateFallbackAssessmentDraft,
@@ -34,17 +35,21 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
   const fallbackDraft = estimateFallbackAssessmentDraft(snapshot);
   const fallbackCloudSku = buildCloudSkuModuleItemsFromSnapshot(snapshot, fallbackDraft);
   const fallbackDraftAligned: KimiAssessmentDraft = { ...fallbackDraft, moduleItems: mergeDevTotalModuleItem(fallbackCloudSku.items, snapshot) };
-  const { apiKey } = resolveActiveRequirementKimiApiKey();
   const requirementSettings = loadRequirementSystemConfigStore().active;
-  // T1：评估主链路模型以界面配置为准（kimiEvaluation.model），env KIMI_MODEL 仅作兜底，
-  // 消除"界面显示 kimi-k3 实际跑 env 模型"的配置契约破口。
-  const model = requirementSettings.kimiEvaluation.model?.trim() || config.kimi.model;
+  // T7（RP-055）：评估链路统一走场景绑定解析——供应商/模型/baseUrl/凭据 scope 一处决定，
+  // 旧配置经迁移后解析结果与 T1 语义一致（绑定模型 == kimiEvaluation.model）。
+  const scenarioCfg = resolveScenarioConfig(requirementSettings, "assessment", {
+    model: config.kimi.model,
+    baseUrl: config.kimi.apiBaseUrl,
+  });
+  const model = scenarioCfg.model;
+  const { apiKey } = resolveActiveApiKeyForScope(scenarioCfg.credentialScope);
   const modelForClient = normalizeKimiModelName(model);
   const promptProfile = asString(asModelObject(body.ruleContext).promptProfile) || asString(requirementSettings.kimiEvaluation.promptProfile) || "assessment_default_v1";
   const promptTemplate = asString(requirementSettings.kimiEvaluation.promptTemplate) || "你是资深项目经理 + 资深实施顾问。你不是做简单 SKU 对照，而是要基于需求全量信息做综合实施评估。必须只返回 JSON。";
   const startedAt = Date.now();
   if (!apiKey) return fail(res, 40001, "参数错误", [{ field: "apiKey", reason: "required_or_env_missing" }]);
-  try { const result = await generateAssessmentDraftByKimi({ apiUrl: config.kimi.apiBaseUrl, apiKey, model, promptTemplate, payload: body, fallback: fallbackDraftAligned, timeoutMs: requirementSettings.kimiEvaluation.timeoutMs || 120000, maxTokens: requirementSettings.kimiEvaluation.maxTokens }); const alignedCloudSku = buildCloudSkuModuleItemsFromSnapshot(snapshot, result.draft); const alignedDraft: KimiAssessmentDraft = { ...result.draft, moduleItems: mergeDevTotalModuleItem(alignedCloudSku.items, snapshot) }; return res.json(ok({ meta: { model: modelForClient, generatedAt: new Date().toISOString(), confidence: 0.78, promptVersion: promptProfile, ruleSetId: "assessment-rules-v1", mode: "model", fallbackReason: "", elapsedMs: Date.now() - startedAt, rawContent: result.rawContent, coarseFilteredCount: alignedCloudSku.coarseFilteredCount }, source: { globalVersionCode, requirementVersionCode }, assessmentDraft: alignedDraft }, requestId)); } catch (err) { return fail(res, 40001, "参数错误", [{ field: "model", reason: err instanceof Error ? err.message : "model_generate_failed" }]); }
+  try { const result = await generateAssessmentDraftByKimi({ apiUrl: scenarioCfg.baseUrl, apiKey, model, promptTemplate, payload: body, fallback: fallbackDraftAligned, timeoutMs: requirementSettings.kimiEvaluation.timeoutMs || 120000, maxTokens: requirementSettings.kimiEvaluation.maxTokens }); const alignedCloudSku = buildCloudSkuModuleItemsFromSnapshot(snapshot, result.draft); const alignedDraft: KimiAssessmentDraft = { ...result.draft, moduleItems: mergeDevTotalModuleItem(alignedCloudSku.items, snapshot) }; return res.json(ok({ meta: { model: modelForClient, generatedAt: new Date().toISOString(), confidence: 0.78, promptVersion: promptProfile, ruleSetId: "assessment-rules-v1", mode: "model", fallbackReason: "", elapsedMs: Date.now() - startedAt, rawContent: result.rawContent, coarseFilteredCount: alignedCloudSku.coarseFilteredCount }, source: { globalVersionCode, requirementVersionCode }, assessmentDraft: alignedDraft }, requestId)); } catch (err) { return fail(res, 40001, "参数错误", [{ field: "model", reason: err instanceof Error ? err.message : "model_generate_failed" }]); }
 }
 
 export async function exportKimiAssessmentMarkdown(req: Request, res: Response) {

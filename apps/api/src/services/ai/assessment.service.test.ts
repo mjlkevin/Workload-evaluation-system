@@ -71,11 +71,17 @@ function createMockRes() {
   return { res: res as never, captured };
 }
 
-// T1（评估链路改读配置模型）：评估主链路必须使用 kimiEvaluation.model，env KIMI_MODEL 仅作兜底
-test("T1: 评估主链路使用 kimiEvaluation.model 作为实际调用模型", async () => {
+// T1（评估链路改读配置模型）：评估主链路必须使用配置模型，env KIMI_MODEL 仅作兜底
+// RP-055 契约演进：权威源升级为场景绑定（scenarioBindings.assessment），
+// 旧字段补丁经 syncBindingsWithLegacyPatch 联动同步，两者保持一致。
+test("T1: 评估主链路使用配置模型作为实际调用模型（场景绑定权威源）", async () => {
   await withAssessmentSandbox(
     (store) => {
       store.active.kimiEvaluation.model = "kimi-k9-config-test";
+      store.active.scenarioBindings = {
+        ...store.active.scenarioBindings!,
+        assessment: { providerId: "moonshot", modelId: "kimi-k9-config-test" },
+      };
     },
     async (provider) => {
       const req = { body: { requirementSnapshot: { projectName: "测试项目" } } } as never;
@@ -87,7 +93,7 @@ test("T1: 评估主链路使用 kimiEvaluation.model 作为实际调用模型", 
       assert.equal(
         request!.model,
         "kimi-k9-config-test",
-        "评估调用模型必须来自 kimiEvaluation.model，而不是 env KIMI_MODEL",
+        "评估调用模型必须来自配置（场景绑定），而不是 env KIMI_MODEL",
       );
       const payload = captured.jsonPayload as { code: number };
       assert.equal(payload.code, 0, "评估草稿应成功返回");
@@ -95,10 +101,14 @@ test("T1: 评估主链路使用 kimiEvaluation.model 作为实际调用模型", 
   );
 });
 
-test("T1 守护: kimiEvaluation.model 为空时回退 env KIMI_MODEL", async () => {
+test("T1 守护: 配置模型为空时回退 env KIMI_MODEL", async () => {
   await withAssessmentSandbox(
     (store) => {
       store.active.kimiEvaluation.model = "";
+      store.active.scenarioBindings = {
+        ...store.active.scenarioBindings!,
+        assessment: { providerId: "moonshot", modelId: "" },
+      };
     },
     async (provider) => {
       const req = { body: { requirementSnapshot: { projectName: "测试项目" } } } as never;

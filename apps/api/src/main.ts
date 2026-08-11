@@ -9,7 +9,7 @@ import { logger } from "./utils/logger";
 import { startHarnessRuntime } from "./modules/harness/harness-boot";
 import { createHarnessRuntimeRepository } from "./modules/harness/harness-runtime.repository";
 import { isDurableRunsEnabledFromEnv } from "./modules/harness/harness-runtime.usecase";
-import { resolveKek } from "./modules/system/credentials.store";
+import { resolveKek, warmCredentialScopes } from "./modules/system/credentials.store";
 
 const shouldRunIntegrityCheck = process.env.CONFIG_INTEGRITY_ON_STARTUP !== "false";
 if (shouldRunIntegrityCheck) {
@@ -29,6 +29,31 @@ if (!kek) {
     { event: "startup" },
     "[api] CREDENTIAL_KEK not configured: model config credential storage unavailable",
   );
+}
+
+// ISS-2026-08-10-008：启动预热凭据缓存（fire-and-forget，失败降级不阻断启动）。
+// 预热范围 = 内置 kimi scope + 配置中全部供应商 scope（RP-055 多供应商）。
+if (kek) {
+  void (async () => {
+    try {
+      const { loadRequirementSystemConfigStore } = await import("./modules/system/system.repository");
+      const { credentialScopeForProvider } = await import("./modules/system/model-providers");
+      const store = loadRequirementSystemConfigStore();
+      const scopes = new Set<string>(["kimi"]);
+      for (const p of store.active.modelProviders || []) {
+        scopes.add(credentialScopeForProvider(p.id));
+      }
+      const warmed = await warmCredentialScopes(Array.from(scopes));
+      if (warmed.length > 0) {
+        logger.info(
+          { event: "startup", warmedScopes: warmed.length },
+          `[api] credential cache warmed for ${warmed.length} scope(s)`,
+        );
+      }
+    } catch {
+      logger.warn({ event: "startup" }, "[api] credential cache warm skipped (store or DB unavailable)");
+    }
+  })();
 }
 
 const app = createApp();

@@ -36,6 +36,7 @@ import {
   clearApiKey as dbClearApiKey,
   importApiKeyIfAbsent,
 } from "./credentials.store";
+import { normalizeModelProviders, normalizeScenarioBindings } from "./model-providers";
 
 const EMPTY_TIME = "--";
 const DEFAULT_KIMI_EVALUATION_MODEL = "kimi-k2.5";
@@ -269,7 +270,29 @@ function normalizeRequirementConfig(input: unknown): RequirementSystemConfig {
     kimiCredentials: {
       apiKey: String(kimiCredentials.apiKey ?? base.kimiCredentials.apiKey ?? "").trim(),
     },
+    // RP-055：多供应商目录 + 场景绑定（旧配置自动迁移：合成内置 moonshot 供应商 + 从 kimi* 字段推导绑定）
+    ...buildProviderAndBindingFields(source, {
+      assessmentModel: normalizeKimiConfiguredModel(kimiEvaluation.model, base.kimiEvaluation.model),
+      fileParsingModel: normalizeKimiConfiguredModel(fileParsing.model, base.fileParsing.model),
+      generationModel: normalizeKimiConfiguredModel(kimiGeneration.model, base.kimiGeneration.model),
+    }),
   };
+}
+
+/** RP-055：归一化供应商目录与场景绑定；seed 模型 ID 取三场景旧字段（迁移收集用） */
+function buildProviderAndBindingFields(
+  source: Partial<RequirementSystemConfig>,
+  legacyModels: { assessmentModel: string; fileParsingModel: string; generationModel: string },
+): Pick<RequirementSystemConfig, "modelProviders" | "scenarioBindings"> {
+  const legacyIds = [legacyModels.assessmentModel, legacyModels.fileParsingModel, legacyModels.generationModel].filter(
+    (m) => m && m.trim(),
+  );
+  const modelProviders = normalizeModelProviders(source.modelProviders, {
+    baseUrl: config.kimi.apiBaseUrl,
+    modelIds: legacyIds,
+  });
+  const scenarioBindings = normalizeScenarioBindings(source.scenarioBindings, legacyModels, modelProviders);
+  return { modelProviders, scenarioBindings };
 }
 
 function normalizeKimiConfiguredModel(value: unknown, fallback: string): string {
@@ -403,10 +426,20 @@ export function resolveActiveRequirementKimiApiKey(): {
   apiKey: string;
   source: "store" | "env" | "none";
 } {
-  const fromCache = getCachedApiKey(KIMI_SCOPE);
+  return resolveActiveApiKeyForScope(KIMI_SCOPE);
+}
+
+/** RP-055：按凭据 scope 的同步取密钥（业务链路用）：缓存优先，仅内置 kimi scope 回落 env */
+export function resolveActiveApiKeyForScope(scope: string): {
+  apiKey: string;
+  source: "store" | "env" | "none";
+} {
+  const fromCache = getCachedApiKey(scope);
   if (fromCache) return { apiKey: fromCache, source: "store" };
-  const env = config.kimi.apiKey.trim();
-  if (env) return { apiKey: env, source: "env" };
+  if (scope === KIMI_SCOPE) {
+    const env = config.kimi.apiKey.trim();
+    if (env) return { apiKey: env, source: "env" };
+  }
   return { apiKey: "", source: "none" };
 }
 

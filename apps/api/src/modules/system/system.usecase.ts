@@ -43,7 +43,12 @@ import {
   clearKimiApiKey,
 } from "./system.repository";
 import { probeKnowledgeBaseAccess } from "./knowledge-base-access-probe";
-import { getAuditLog, resolveKek, KIMI_SCOPE } from "./credentials.store";
+import { getAuditLog, resolveKek, KIMI_SCOPE, getCachedApiKey, setApiKey as dbSetProviderApiKey, clearApiKey as dbClearProviderApiKey } from "./credentials.store";
+import {
+  BUILTIN_MOONSHOT_PROVIDER_ID,
+  credentialScopeForProvider,
+  resolveScenarioConfig,
+} from "./model-providers";
 import {
   buildEffectiveModelConfig,
   loadModelVerifyStatus,
@@ -264,6 +269,8 @@ export async function updateRequirementSystemConfigDraft(req: Request, res: Resp
     kimiEvaluation: kimiEvaluationPatch,
     fileParsing: fileParsingPatch,
     kimiGeneration: kimiGenerationPatch,
+    modelProviders: modelProvidersPatch,
+    scenarioBindings: scenarioBindingsPatch,
   } = payload;
   const now = new Date().toISOString();
   const store = loadRequirementSystemConfigStore();
@@ -287,6 +294,11 @@ export async function updateRequirementSystemConfigDraft(req: Request, res: Resp
     fileParsing: { ...store.draft.fileParsing, ...(fileParsingPatch || {}) },
     kimiGeneration: { ...store.draft.kimiGeneration, ...(kimiGenerationPatch || {}) },
     kimiCredentials: nextCreds,
+    // RP-055：供应商目录与场景绑定支持草稿 PATCH（未传则保留现值）
+    ...(modelProvidersPatch !== undefined ? { modelProviders: modelProvidersPatch } : {}),
+    ...(scenarioBindingsPatch !== undefined
+      ? { scenarioBindings: scenarioBindingsPatch }
+      : { scenarioBindings: syncBindingsWithLegacyPatch(store.draft, { kimiEvaluationPatch, fileParsingPatch, kimiGenerationPatch }) }),
   });
   store.updatedAt = now;
   saveRequirementSystemConfigStore(store);
@@ -401,21 +413,88 @@ async function buildCredentialsHealth(): Promise<CredentialsHealth> {
   return { configured: Boolean(apiKey), source, kekReady, lastAudit };
 }
 
-/** GET /requirement-settings/effective：每场景生效模型/来源/接线参数 + 凭据健康（T2） */
+/** GET /requirement-settings/effective：每场景生效模型/来源/接线参数 + 凭据健康（T2） + 供应商目录摘要（RP-055） */
 export async function getRequirementSettingsEffective(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   const active = loadRequirementSystemConfigStore().active;
   const credentials = await buildCredentialsHealth();
   const lastVerified = loadModelVerifyStatus();
-  const effective = buildEffectiveModelConfig(active, config.kimi.model, credentials, lastVerified);
-  return res.json(ok(effective, randomUUID()));
+  const effective = buildEffectiveModelConfig(active, config.kimi.model, credentials, lastVerified, config.kimi.apiBaseUrl);
+  return res.json(ok({ ...effective, providers: buildProvidersSummary(active) }, randomUUID()));
+}
+
+/** RP-055：供应商目录摘要（永不下发明文，hint 只留尾 4 位） */
+function buildProvidersSummary(active: RequirementSystemConfig) {
+  return (active.modelProviders || []).map((p) => {
+    const scope = credentialScopeForProvider(p.id);
+    const cached = getCachedApiKey(scope);
+    const envAvailable = p.id === BUILTIN_MOONSHOT_PROVIDER_ID && Boolean(config.kimi.apiKey.trim());
+    return {
+      id: p.id,
+      name: p.name,
+      protocol: p.protocol,
+      baseUrl: p.baseUrl,
+      enabled: p.enabled,
+      models: p.models.map((m) => m.id),
+      credentialScope: scope,
+      keyConfigured: Boolean(cached) || envAvailable,
+      keySource: cached ? "store" : envAvailable ? "env" : "none",
+      keyHint: cached ? maskKimiApiKeyHint(cached) : null,
+    };
+  });
 }
 
 const MODEL_SCENARIO_KEYS: ModelScenarioKey[] = ["assessment", "fileParsing", "generation"];
 
+/**
+ * RP-055：旧场景字段补丁联动同步场景绑定——仅当绑定仍指向内置供应商时跟随旧字段，
+ * 已指向自定义供应商的绑定不受旧字段补丁影响（单一权威源 = 绑定）。
+ */
+function syncBindingsWithLegacyPatch(
+  draft: RequirementSystemConfig,
+  patches: {
+    kimiEvaluationPatch?: Partial<RequirementSystemConfig["kimiEvaluation"]>;
+    fileParsingPatch?: Partial<RequirementSystemConfig["fileParsing"]>;
+    kimiGenerationPatch?: Partial<RequirementSystemConfig["kimiGeneration"]>;
+  },
+): RequirementSystemConfig["scenarioBindings"] {
+  const current = draft.scenarioBindings;
+  if (!current) return current;
+  const follow = (
+    scenario: ModelScenarioKey,
+    patchModel: string | undefined,
+  ) => {
+    const binding = current[scenario];
+    if (patchModel === undefined) return binding;
+    if (binding.providerId !== BUILTIN_MOONSHOT_PROVIDER_ID) return binding;
+    return { providerId: binding.providerId, modelId: String(patchModel || "").trim() };
+  };
+  return {
+    assessment: follow("assessment", patches.kimiEvaluationPatch?.model),
+    fileParsing: follow("fileParsing", patches.fileParsingPatch?.model),
+    generation: follow("generation", patches.kimiGenerationPatch?.model),
+  };
+}
+
+/** RP-055：按凭据 scope 解析测试密钥：显式传入 → scope 缓存 →（仅内置 kimi scope）env 兜底 */
+function resolveScenarioApiKeyForTest(
+  scope: string,
+  override?: string,
+): { apiKey: string; source: "override" | "store" | "env" | "none" } {
+  const o = override?.trim() || "";
+  if (o) return { apiKey: o, source: "override" };
+  const cached = getCachedApiKey(scope);
+  if (cached) return { apiKey: cached, source: "store" };
+  if (scope === KIMI_SCOPE) {
+    const env = config.kimi.apiKey.trim();
+    if (env) return { apiKey: env, source: "env" };
+  }
+  return { apiKey: "", source: "none" };
+}
+
 // -------------------- T4：验证此场景（用生效模型发最小真实请求） --------------------
 
-/** POST /requirement-settings/scenario-test { scenario, apiKey? } */
+/** POST /requirement-settings/scenario-test { scenario, apiKey? }（RP-055：走场景绑定解析供应商/模型/凭据 scope） */
 export async function testScenarioModel(req: Request, res: Response) {
   if (!requireAdmin(req, res)) return;
   const body = (req.body || {}) as { scenario?: string; apiKey?: string };
@@ -430,9 +509,12 @@ export async function testScenarioModel(req: Request, res: Response) {
   }
 
   const active = loadRequirementSystemConfigStore().active;
-  const resolution = resolveScenarioModel(active, scenario, config.kimi.model);
+  const resolution = resolveScenarioConfig(active, scenario, {
+    model: config.kimi.model,
+    baseUrl: config.kimi.apiBaseUrl,
+  });
   const explicit = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
-  const { apiKey, source } = resolveDraftKimiApiKeyForTest(explicit || undefined);
+  const { apiKey, source } = resolveScenarioApiKeyForTest(resolution.credentialScope, explicit || undefined);
   if (!apiKey) {
     return fail(res, 40001, "未配置可用的 API Key", [{ field: "apiKey", reason: "missing_in_store_and_env" }]);
   }
@@ -450,7 +532,7 @@ export async function testScenarioModel(req: Request, res: Response) {
 
   try {
     const pingResult = await pingKimiChatCompletion({
-      apiUrl: config.kimi.apiBaseUrl,
+      apiUrl: resolution.baseUrl,
       apiKey,
       model: resolution.model,
     });
@@ -468,8 +550,11 @@ export async function testScenarioModel(req: Request, res: Response) {
       ok: true,
       scenario,
       resolvedModel: resolution.model,
-      modelSource: resolution.source,
-      keySource: source === "override" ? "request_body" : source === "draft" ? "draft_store" : "environment",
+      modelSource: resolution.modelSource,
+      providerId: resolution.providerId,
+      providerName: resolution.providerName,
+      baseUrl: resolution.baseUrl,
+      keySource: source === "override" ? "request_body" : source === "store" ? "credential_store" : "environment",
       respondedModel,
       modelMatch,
       latencyMs: pingResult.latencyMs,
@@ -501,6 +586,127 @@ export async function testScenarioModel(req: Request, res: Response) {
     recordFailure("unknown");
     const msg = e instanceof Error ? e.message : "ping_failed";
     return fail(res, 40001, "调用 KIMI 失败", [{ field: "apiKey", reason: msg }]);
+  }
+}
+
+// -------------------- RP-055：供应商级 API Key 管理（凭据域多 scope） --------------------
+
+/** 在 draft/active 目录中查找供应商；找不到返回 null 并已响应 404 */
+function findProviderOr404(res: Response, providerIdRaw: string) {
+  const providerId = String(providerIdRaw || "").trim().toLowerCase();
+  const store = loadRequirementSystemConfigStore();
+  const provider =
+    (store.draft.modelProviders || []).find((p) => p.id === providerId) ||
+    (store.active.modelProviders || []).find((p) => p.id === providerId);
+  if (!provider) {
+    fail(res, 40401, "供应商不存在", [{ field: "providerId", reason: "not_found" }]);
+    return null;
+  }
+  return { providerId, provider };
+}
+
+/** PUT /requirement-settings/providers/:providerId/api-key { apiKey }：写入该供应商密钥（加密落库 + 审计） */
+export async function setProviderApiKey(req: Request, res: Response) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const found = findProviderOr404(res, String(req.params.providerId || ""));
+  if (!found) return;
+  const apiKey = String((req.body || {}).apiKey || "").trim();
+  if (!apiKey) {
+    return fail(res, 40001, "apiKey 不能为空", [{ field: "apiKey", reason: "required" }]);
+  }
+  const scope = credentialScopeForProvider(found.providerId);
+  try {
+    await dbSetProviderApiKey(scope, apiKey, auth.user.username);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "credential_store_error";
+    return fail(res, 50001, "密钥存储失败", [{ field: "apiKey", reason: msg }]);
+  }
+  return res.json(ok({
+    providerId: found.providerId,
+    credentialScope: scope,
+    keyHint: maskKimiApiKeyHint(apiKey),
+  }, randomUUID()));
+}
+
+/** DELETE /requirement-settings/providers/:providerId/api-key：清除该供应商密钥（DB + 审计） */
+export async function clearProviderApiKey(req: Request, res: Response) {
+  const auth = requireAdmin(req, res);
+  if (!auth) return;
+  const found = findProviderOr404(res, String(req.params.providerId || ""));
+  if (!found) return;
+  const scope = credentialScopeForProvider(found.providerId);
+  try {
+    await dbClearProviderApiKey(scope, auth.user.username);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "credential_store_error";
+    return fail(res, 50001, "密钥清除失败", [{ field: "apiKey", reason: msg }]);
+  }
+  return res.json(ok({ providerId: found.providerId, credentialScope: scope, cleared: true }, randomUUID()));
+}
+
+/** POST /requirement-settings/providers/:providerId/api-key/test { apiKey?, model? }：用该供应商 baseUrl 发最小真实请求 */
+export async function testProviderApiKey(req: Request, res: Response) {
+  if (!requireAdmin(req, res)) return;
+  const found = findProviderOr404(res, String(req.params.providerId || ""));
+  if (!found) return;
+  const body = (req.body || {}) as { apiKey?: string; model?: string };
+  const explicit = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+  const scope = credentialScopeForProvider(found.providerId);
+  const { apiKey, source } = resolveScenarioApiKeyForTest(scope, explicit || undefined);
+  if (!apiKey) {
+    return fail(res, 40001, "未配置可用的 API Key", [{ field: "apiKey", reason: "missing_in_store_and_env" }]);
+  }
+  const explicitModel = typeof body.model === "string" ? body.model.trim() : "";
+  const model = explicitModel || found.provider.models[0]?.id || "";
+  if (!model) {
+    return fail(res, 40001, "该供应商目录下暂无模型，请先添加模型后再测试", [{ field: "model", reason: "no_model_in_catalog" }]);
+  }
+  try {
+    const pingResult = await pingKimiChatCompletion({
+      apiUrl: found.provider.baseUrl,
+      apiKey,
+      model,
+    });
+    const respondedModel = pingResult.respondedModel || null;
+    const modelMatch = respondedModel
+      ? respondedModel.toLowerCase() === model.toLowerCase()
+      : null;
+    return res.json(ok({
+      ok: true,
+      providerId: found.providerId,
+      baseUrl: found.provider.baseUrl,
+      requestedModel: model,
+      respondedModel,
+      modelMatch,
+      keySource: source === "override" ? "request_body" : source === "store" ? "credential_store" : "environment",
+      latencyMs: pingResult.latencyMs,
+      httpStatus: pingResult.httpStatus,
+    }, randomUUID()));
+  } catch (e) {
+    if (e instanceof KimiPingFailure) {
+      if (e.kind === "overload") {
+        return fail(res, 50301, "供应商服务繁忙，请稍后重试（多由官方引擎限流/过载引起，不代表 API Key 一定错误）", [
+          { field: "provider", reason: e.message },
+        ]);
+      }
+      if (e.kind === "rate_limited") {
+        return fail(res, 42901, "请求过于频繁，请稍后再试", [{ field: "provider", reason: e.message }]);
+      }
+      if (e.kind === "auth") {
+        return fail(res, 40001, "API Key 无效或未授权", [{ field: "apiKey", reason: e.message }]);
+      }
+      if (e.kind === "model_not_found") {
+        return fail(res, 40001, "模型不可用或名称错误", [{ field: "model", reason: e.message }]);
+      }
+      if (e.kind === "timeout") {
+        return fail(res, 50401, "连接测试超时：供应商服务长时间无响应，请检查网络或稍后重试", [
+          { field: "apiKey", reason: e.message },
+        ]);
+      }
+    }
+    const msg = e instanceof Error ? e.message : "ping_failed";
+    return fail(res, 40001, "调用供应商接口失败", [{ field: "apiKey", reason: msg }]);
   }
 }
 
