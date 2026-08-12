@@ -530,7 +530,11 @@ describe('UserManagement', () => {
     ])
     expect(getCount).toBe(2)
     expect(screen.queryByRole('dialog', { name: '修改系统角色' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: '批量操作' })).not.toBeInTheDocument()
+    const selectionBar = screen.getByRole('region', { name: '批量操作' })
+    expect(selectionBar).toHaveTextContent('未选择')
+    for (const actionName of ['批量启用', '批量禁用', '改系统角色', '改业务角色']) {
+      expect(within(selectionBar).getByRole('button', { name: actionName })).toBeDisabled()
+    }
   })
 
   test('uses a stable bulk target snapshot and locks overlapping controls while submitting', async () => {
