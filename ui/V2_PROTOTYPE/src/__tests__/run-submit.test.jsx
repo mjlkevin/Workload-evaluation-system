@@ -39,7 +39,7 @@ function buildSession(sessionId, title) {
 }
 
 function setupRunSubmitScenario({ runStatus = 202 } = {}) {
-  const counters = { runSubmitCount: 0, chatCount: 0 }
+  const counters = { runSubmitCount: 0, chatCount: 0, runBodies: [] }
   server.use(
     http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({
       success: true,
@@ -49,8 +49,9 @@ function setupRunSubmitScenario({ runStatus = 202 } = {}) {
       success: true,
       data: { session: buildSession('session-a', '会话 A') },
     })),
-    http.post(`${BASE}/ai-sessions/:sessionId/runs`, () => {
+    http.post(`${BASE}/ai-sessions/:sessionId/runs`, async ({ request }) => {
       counters.runSubmitCount += 1
+      counters.runBodies.push(await request.json())
       if (runStatus === 503) {
         return HttpResponse.json({ code: 'ASYNC_RUNS_DISABLED', message: '异步任务已关闭' }, { status: 503 })
       }
@@ -117,6 +118,30 @@ describe('run-submit: Step 3 前端发送路径 Run 化', () => {
     // Run 提交被调用
     await waitFor(() => expect(counters.runSubmitCount).toBe(1))
     // 旧同步路径不应被调用
+    expect(counters.chatCount).toBe(0)
+  })
+
+  test('ISS-2026-08-11-007: Run 提交携带当前附件及解析摘要', async () => {
+    const counters = setupRunSubmitScenario({ runStatus: 202 })
+    const { container } = renderWorkbench()
+
+    await screen.findByText('你好，有什么可以帮你的？')
+    const fileInput = container.querySelector('input[type="file"]')
+    const file = new File(['demo'], '客户需求.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    fireEvent.change(fileInput, { target: { files: [file] } })
+    await sendFromComposer('多组织业务往来一般包含哪些模块？')
+
+    await waitFor(() => expect(counters.runBodies).toHaveLength(1))
+    expect(counters.runBodies[0].attachments).toEqual([
+      expect.objectContaining({
+        name: '客户需求.xlsx',
+        size: 4,
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        parsedSummary: expect.stringMatching(/测试项目|测试需求|测试模块线索/),
+      }),
+    ])
     expect(counters.chatCount).toBe(0)
   })
 

@@ -304,6 +304,66 @@ test("C2 缺陷 B：用户消息在 dispatch 前幂等落库，恢复重放不�
   }
 });
 
+test("ISS-2026-08-11-007: 附件写入会话并作为模型上下文 dispatch", async () => {
+  const { storePath, cleanup } = makeTempSessionStore("session-1", "user-1");
+  try {
+    let dispatchedAttachment: Record<string, unknown> | null | undefined;
+    const wf = createWorkbenchChatWorkflow({
+      dispatch: async (input) => {
+        dispatchedAttachment = input.attachment as Record<string, unknown> | null | undefined;
+        return {
+          intent: "attachment_qa",
+          answer: "多组织业务通常涉及组织间交易与结算。",
+          businessRole: "pre_sales",
+          roleLabel: "售前顾问",
+          suggestedActions: [],
+          trace: { intentConfidence: 0.9, routingRule: "attachment_context", contextRefs: ["attachment:客户需求.xlsx"] },
+        } as any;
+      },
+      appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
+      appendRunEvent: makeNoOpAppendRunEvent(),
+    });
+    const ctx = makeFakeCtx({
+      run: {
+        executionConfig: {
+          content: "多组织业务往来一般包含哪些模块？",
+          attachments: [{
+            name: "客户需求.xlsx",
+            size: 4096,
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
+          }],
+        },
+      },
+    });
+
+    await wf.executeStep("chat", ctx);
+
+    assert.deepEqual(dispatchedAttachment, {
+      name: "客户需求.xlsx",
+      size: 4096,
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
+    });
+    const store = readStoreFile(storePath);
+    assert.equal(store.sessions[0].attachments.length, 1, "附件实体必须持久化，切换会话后才能回显");
+    assert.equal(store.sessions[0].attachments[0].name, "客户需求.xlsx");
+    assert.equal(store.sessions[0].attachments[0].parsedSummary, "项目：蓝海制造\n需求：多组织业务协同");
+    assert.deepEqual(
+      store.sessions[0].messages[0].attachmentIds,
+      [store.sessions[0].attachments[0].attachmentId],
+      "用户消息必须引用已持久化附件",
+    );
+
+    await wf.executeStep("chat", ctx);
+    const replayedStore = readStoreFile(storePath);
+    assert.equal(replayedStore.sessions[0].messages.length, 1, "恢复重放不得重复用户消息");
+    assert.equal(replayedStore.sessions[0].attachments.length, 1, "恢复重放不得重复附件实体");
+  } finally {
+    cleanup();
+  }
+});
+
 // ============================================================
 // ISS-2026-08-10-004（层 2：异步通道接入流式事件）RED 守护
 // ============================================================

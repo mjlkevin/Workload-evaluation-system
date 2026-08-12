@@ -247,6 +247,43 @@ test("workbench dispatch extracts a valid formBlock and strips protocol JSON fro
   assert.match(capturedSystemPrompt, /formBlock/);
 });
 
+test("ISS-2026-08-11-007: streaming dispatch extracts formBlock instead of returning protocol JSON as answer", async () => {
+  const streamedAnswer = [
+    "请补充关键项目信息。",
+    "",
+    "```json",
+    JSON.stringify({
+      formBlock: {
+        blockId: "stream-project-clarification",
+        title: "补充项目信息",
+        submitLabel: "提交补充",
+        fields: [{ id: "scope", label: "实施范围", type: "textarea" }],
+      },
+    }),
+    "```",
+  ].join("\n");
+  const received: string[] = [];
+
+  const result = await dispatchHomeWorkbenchTurn({
+    user,
+    workflowKey: "free_chat",
+    message: "请结合附件继续澄清",
+    attachment: { name: "客户需求.xlsx", parsedSummary: "项目：蓝海制造" },
+    businessRole: "pre_sales",
+    roleLabel: "售前顾问",
+    model: "kimi-test",
+    modelChat: async () => { throw new Error("streaming path must not call modelChat"); },
+    streamingAdapter: { onToken: (chunk) => received.push(chunk.contentDelta) },
+    modelChatStream: async function* () {
+      yield { contentDelta: streamedAnswer, model: "kimi-test", finishReason: "stop" };
+    },
+  });
+
+  assert.equal(received.join(""), streamedAnswer, "传输层仍接收原始 token，结构化在终态结果完成");
+  assert.equal(result.answer, "请补充关键项目信息。");
+  assert.equal(result.formBlock?.blockId, "stream-project-clarification");
+});
+
 test("workbench dispatch downgrades invalid formBlock protocol and strips residual JSON from answer", async () => {
   const rawAnswer = [
     "先确认上线时间。",

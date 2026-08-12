@@ -121,6 +121,7 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
       const content = input.message;
       const dispatchInput = buildWorkbenchChatDispatchInput(user, content, {
         modelChat: options.createModelChat ? options.createModelChat(user, content) : undefined,
+        attachment: input.attachment ?? null,
       });
       // ISS-2026-08-10-004（层 2）：workflow 注入 streamingAdapter 时接线流式模型调用——
       // dispatch 流式闸门（model-answer）要求 streamingAdapter + modelChatStream 同时

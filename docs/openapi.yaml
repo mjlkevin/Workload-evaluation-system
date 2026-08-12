@@ -6095,13 +6095,33 @@ components:
         content:
           type: string
           description: 用户消息内容（非空）
-        attachmentIds:
+        attachments:
           type: array
+          maxItems: 5
           items:
-            type: string
+            $ref: "#/components/schemas/AiRunAttachment"
         workflowHint:
           type: string
       required: [submissionKey, content]
+
+    AiRunAttachment:
+      type: object
+      description: 当前用户消息携带的附件解析结果；由服务端限长后写入 Run 配置和会话附件。
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        size:
+          type: integer
+          minimum: 0
+          maximum: 10485760
+        type:
+          type: string
+          maxLength: 255
+        parsedSummary:
+          type: string
+          maxLength: 8000
+      required: [name]
 
     AiRunSubmitEnvelope:
       type: object

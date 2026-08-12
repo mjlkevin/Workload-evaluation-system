@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname } from "node:path";
 
 import { aiSessionsStorePath } from "../../utils";
-import type { AiMessage, AiSessionsStore } from "./ai-sessions.types";
+import type { AiAttachment, AiMessage, AiSessionsStore } from "./ai-sessions.types";
 
 function emptyStore(): AiSessionsStore {
   return { sessions: [] };
@@ -41,6 +41,7 @@ export type AiSessionProjectionSource = {
 export type AppendAiSessionMessageIdempotentInput = {
   sessionId: string;
   message: AiMessage;
+  attachments?: AiAttachment[];
   source: AiSessionProjectionSource;
   storePath?: string;
 };
@@ -71,6 +72,14 @@ export function appendAiSessionMessageIdempotent(
     ...input.message,
     metadata: { ...(input.message.metadata ?? {}), projectionSource: input.source },
   };
+  const sessionAttachments = Array.isArray(session.attachments)
+    ? session.attachments
+    : (session.attachments = []);
+  for (const attachment of input.attachments ?? []) {
+    if (!sessionAttachments.some((item) => item.attachmentId === attachment.attachmentId)) {
+      sessionAttachments.push(attachment);
+    }
+  }
   session.messages.push(stored);
   session.updatedAt = new Date().toISOString();
   saveAiSessionsStore(store, input.storePath);

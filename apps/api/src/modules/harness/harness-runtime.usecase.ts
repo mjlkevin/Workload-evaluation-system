@@ -120,6 +120,7 @@ export type AiRunsSubmitInput = {
   submissionKey?: unknown;
   clientMessageId?: unknown;
   content?: unknown;
+  attachments?: unknown;
 };
 
 export type AiRunsSubmitResult = {
@@ -136,6 +137,12 @@ export type AiRunsUsecase = ReturnType<typeof createAiRunsUsecase>;
 const TERMINAL_STATUSES: readonly string[] = ["completed", "failed", "cancelled"];
 const WORKBENCH_WORKFLOW_ID = "workbench_chat_v1";
 const WORKBENCH_WORKFLOW_VERSION = "1.0.0";
+const MAX_RUN_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_NAME_LENGTH = 255;
+const MAX_ATTACHMENT_TYPE_LENGTH = 255;
+const MAX_PARSED_SUMMARY_LENGTH = 8_000;
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+const ATTACHMENT_TRUNCATION_SUFFIX = "…[truncated]";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
@@ -145,6 +152,32 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function asText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeRunAttachments(value: unknown): Array<{
+  name: string;
+  size?: number;
+  type?: string;
+  parsedSummary?: string;
+}> {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, MAX_RUN_ATTACHMENTS).flatMap((item) => {
+    if (!isPlainObject(item)) return [];
+    const name = asText(item.name).slice(0, MAX_ATTACHMENT_NAME_LENGTH);
+    if (!name) return [];
+    const size = typeof item.size === "number" && Number.isFinite(item.size)
+      && item.size >= 0 && item.size <= MAX_ATTACHMENT_SIZE
+      ? item.size
+      : undefined;
+    const type = asText(item.type).slice(0, MAX_ATTACHMENT_TYPE_LENGTH) || undefined;
+    const summary = asText(item.parsedSummary);
+    const parsedSummary = summary
+      ? summary.length > MAX_PARSED_SUMMARY_LENGTH
+        ? `${summary.slice(0, MAX_PARSED_SUMMARY_LENGTH - ATTACHMENT_TRUNCATION_SUFFIX.length)}${ATTACHMENT_TRUNCATION_SUFFIX}`
+        : summary
+      : undefined;
+    return [{ name, ...(size !== undefined ? { size } : {}), ...(type ? { type } : {}), ...(parsedSummary ? { parsedSummary } : {}) }];
+  });
 }
 
 function toRepo(deps: AiRunsUsecaseDeps): AiRunsRepoPort {
@@ -193,6 +226,7 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
     if (!submissionKey) throw new AiRunsValidationError("submissionKey 必填");
     const content = asText(input.content);
     if (!content) throw new AiRunsValidationError("content 不能为空");
+    const attachments = normalizeRunAttachments(input.attachments);
 
     const session = await deps.findSession(user, sessionId);
     if (!session) throw new AiRunsNotFoundError("会话不存在");
@@ -210,7 +244,7 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
         title: content.slice(0, 80),
         workflowId: WORKBENCH_WORKFLOW_ID,
         workflowVersion: WORKBENCH_WORKFLOW_VERSION,
-        executionConfig: { content },
+        executionConfig: { content, ...(attachments.length ? { attachments } : {}) },
         metadata,
       }),
     );

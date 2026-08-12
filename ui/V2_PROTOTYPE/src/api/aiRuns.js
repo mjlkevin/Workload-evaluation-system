@@ -46,10 +46,10 @@ export async function cancelRun(runId) {
  * POST /ai-sessions/:sessionId/runs，返回 { runId, status, eventCursor }。
  * 503 ASYNC_RUNS_DISABLED 抛错供调用方回退旧同步路径。
  */
-export async function submitRun(sessionId, { submissionKey, clientMessageId, content }) {
+export async function submitRun(sessionId, { submissionKey, clientMessageId, content, attachments = [] }) {
   const payload = await apiClient.post(
     `/ai-sessions/${sessionId}/runs`,
-    { submissionKey, clientMessageId, content },
+    { submissionKey, clientMessageId, content, attachments },
     { suppressUnauthorizedRedirect: true },
   )
   return unwrap(payload)

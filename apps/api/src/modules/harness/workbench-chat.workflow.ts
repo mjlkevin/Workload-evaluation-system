@@ -23,6 +23,8 @@ import type {
   AppendAiSessionMessageIdempotentInput,
   AppendAiSessionMessageIdempotentResult,
 } from "../ai-sessions/ai-sessions.repository";
+import type { AiAttachment } from "../ai-sessions/ai-sessions.types";
+import { normalizeHomeAttachments } from "../../services/ai/handlers/workbench-shared";
 
 export type WorkbenchChatWorkflowDeps = {
   /**
@@ -74,6 +76,13 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       if (!aiSessionId) {
         throw new Error("run.aiSessionId is required for workbench chat");
       }
+      const attachments = normalizeHomeAttachments(executionConfig.attachments).slice(0, 5);
+      const storedAttachments: AiAttachment[] = attachments.map((attachment) => ({
+        attachmentId: `att-${randomUUID()}`,
+        ...attachment,
+        createdAt: new Date().toISOString(),
+      }));
+      const dispatchAttachment = attachments.find((attachment) => attachment.parsedSummary) ?? attachments[0] ?? null;
 
       // C2 缺陷 B：用户消息先于 dispatch 幂等落库（旧同步路径同款结构）；
       // 来源键 run 维度 deduplicationKey，恢复重放由去重吸收，不重复。
@@ -84,7 +93,9 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
           role: "user",
           content,
           createdAt: new Date().toISOString(),
+          attachmentIds: storedAttachments.map((attachment) => attachment.attachmentId),
         },
+        attachments: storedAttachments,
         source: {
           deduplicationKey: `${run.harnessRunId}:user:1`,
           runId: run.harnessRunId,
@@ -129,6 +140,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
           };
           const result = await deps.dispatch({
             message: content,
+            attachment: dispatchAttachment,
             user: { id: run.ownerUserId, username: run.ownerUsername, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" },
             workflowKey: "free_chat",
             streamingAdapter,
@@ -140,12 +152,23 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
             intent: result.intent,
             suggestedActions: result.suggestedActions,
             trace: result.trace,
+            formBlock: result.formBlock,
           };
         },
       });
 
       const output = effectResult.output ?? { answer: "" };
       const answer = String(output.answer ?? "");
+      const intent = String((output as any).intent ?? "domain_qa");
+      const suggestedActions = (output as any).suggestedActions ?? [];
+      const trace = (output as any).trace ?? {};
+      const formBlock = (output as any).formBlock;
+      const messageMetadata = {
+        intent,
+        suggestedActions,
+        trace,
+        ...(formBlock ? { formBlock } : {}),
+      };
 
       return {
         nextStepKey: null, // 单步 workflow，执行后直接终态
@@ -155,11 +178,12 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
             deduplicationKey: `${run.harnessRunId}:assistant:1`,
             payload: {
               // C1 缺陷 A：projector 契约字段，投影落库的正文来源
-              message: { role: "assistant", content: answer },
+              message: { role: "assistant", content: answer, metadata: messageMetadata },
               answer,
-              intent: String((output as any).intent ?? "domain_qa"),
-              suggestedActions: (output as any).suggestedActions ?? [],
-              trace: (output as any).trace ?? {},
+              intent,
+              suggestedActions,
+              trace,
+              ...(formBlock ? { formBlock } : {}),
             },
           },
         ],

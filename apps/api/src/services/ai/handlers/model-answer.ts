@@ -71,8 +71,9 @@ export async function answerWithModelAndContext(
       throw error;
     }
     const latencyMs = Math.max(0, Date.now() - startedAt);
+    const parsedOutput = extractFormBlockFromModelOutput(fullContent, fullContent);
     modelResult = {
-      answer: fullContent,
+      answer: parsedOutput.answer,
       rawContent: fullContent,
       provider: lastChunk?.model ? "kimi" : undefined,
       model: lastChunk?.model,
@@ -101,11 +102,12 @@ export async function answerWithModelAndContext(
     }
     return {
       intent: intent.intent,
-      answer: fullContent,
+      answer: parsedOutput.answer,
       businessRole: input.businessRole,
       roleLabel: input.roleLabel,
       model: input.model,
       rawContent: fullContent,
+      formBlock: parsedOutput.formBlock,
       suggestedActions,
       trace: {
         intentConfidence: intent.confidence,

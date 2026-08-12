@@ -254,20 +254,35 @@ export default function useChatMessages(workbench) {
               if (m.id !== streamingId) return m
               // ISS-2026-08-10-005：ref 可能已被 THOUGHT 空窗兜底提前建立——首个
               // text.delta 到达时消息仍是 loading 占位，须替换占位文案而非追加。
-              if (m.loading) return { ...m, text: delta, loading: false, streaming: true }
-              return { ...m, text: m.text + delta, streaming: true }
+              const rawText = `${m.loading ? '' : (m.streamRawText ?? m.text)}${delta}`
+              return {
+                ...m,
+                text: stripFormBlockJson(rawText),
+                streamRawText: rawText,
+                loading: false,
+                streaming: true,
+              }
             })
           }
           // 创建新的流式消息（替换 loading）
           const loadingMsg = prev.find((m) => m.loading && m.role === 'assistant')
           if (loadingMsg) {
             streamingMessageIdRef.current = loadingMsg.id
-            return prev.map((m) => (m.id === loadingMsg.id ? { ...m, text: delta, loading: false, streaming: true } : m))
+            return prev.map((m) => (m.id === loadingMsg.id
+              ? { ...m, text: stripFormBlockJson(delta), streamRawText: delta, loading: false, streaming: true }
+              : m))
           }
           // 无 loading 时追加新消息
           const newId = `ai-stream-${Date.now()}`
           streamingMessageIdRef.current = newId
-          return [...prev, { id: newId, role: 'assistant', text: delta, streaming: true, createdAt: new Date().toISOString() }]
+          return [...prev, {
+            id: newId,
+            role: 'assistant',
+            text: stripFormBlockJson(delta),
+            streamRawText: delta,
+            streaming: true,
+            createdAt: new Date().toISOString(),
+          }]
         })
         break
       }
@@ -315,7 +330,8 @@ export default function useChatMessages(workbench) {
               const thoughts = Array.isArray(m.thoughts) && m.thoughts.length
                 ? m.thoughts.map((t, i) => (i === 0 ? { ...t, collapsed: true } : t))
                 : m.thoughts
-              return { ...m, streaming: false, ...(thoughts ? { thoughts } : {}) }
+              const { streamRawText: _streamRawText, ...visibleMessage } = m
+              return { ...visibleMessage, streaming: false, ...(thoughts ? { thoughts } : {}) }
             })
           }
           return prev
@@ -478,6 +494,7 @@ export default function useChatMessages(workbench) {
             submissionKey: userMessage.id,
             clientMessageId: userMessage.id,
             content: userMessage.text,
+            attachments: outboundFile ? [outboundFile] : [],
           })
           if (runResult?.runId) {
             runSubmitted = true

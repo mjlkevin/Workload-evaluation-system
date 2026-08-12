@@ -302,6 +302,18 @@ describe('streaming-ux: ISS-2026-08-10-005 思考块空窗兜底与聚合', () =
     expect(target.thoughts[0].collapsed).toBe(true)
     expect(target.streaming).toBe(false)
   })
+
+  test('ISS-2026-08-11-007: text.delta 不把 formBlock 协议 JSON 渲染为回复正文', () => {
+    const { result } = renderChatHookWithLoading()
+    const protocol = '\n\n```json\n{"formBlock":{"blockId":"b1","title":"补充信息","submitLabel":"提交","fields":[]}}\n```'
+
+    emitStreamEvent({ sequence: 1, eventType: 'text.delta', payload: { delta: '请补充关键项目信息。' } })
+    emitStreamEvent({ sequence: 2, eventType: 'text.delta', payload: { delta: protocol } })
+
+    const target = result.current.messages.find((m) => m.id === 'loading-1')
+    expect(target.text).toBe('请补充关键项目信息。')
+    expect(target.text).not.toContain('formBlock')
+  })
 })
 
 describe('streaming-ux: ISS-2026-08-10-005 MessageBubble 思考块位置与文案', () => {

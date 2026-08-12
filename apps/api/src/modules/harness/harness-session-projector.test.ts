@@ -177,6 +177,26 @@ test("appendAiSessionMessageIdempotent dedupes by projection source key", () => 
   assert.equal(metadata.projectionSource?.deduplicationKey, source.deduplicationKey);
 });
 
+test("ISS-2026-08-11-007: attachment projection supplies a default for legacy sessions", () => {
+  const sessionId = `session-${randomUUID()}`;
+  const storePath = makeSessionStore(sessionId, "owner-1");
+  const legacyStore = readStore(storePath) as unknown as { sessions: Array<Record<string, unknown>> };
+  delete legacyStore.sessions[0].attachments;
+  writeFileSync(storePath, JSON.stringify(legacyStore, null, 2), "utf-8");
+
+  const createdAt = new Date().toISOString();
+  const result = appendAiSessionMessageIdempotent({
+    sessionId,
+    message: { messageId: "m-legacy-attachment", role: "user", content: "请分析", createdAt, attachmentIds: ["att-1"] },
+    attachments: [{ attachmentId: "att-1", name: "需求.xlsx", parsedSummary: "需求摘要", createdAt }],
+    source: { deduplicationKey: "run:r1:user:legacy", runId: "r1", eventType: "user_message" },
+    storePath,
+  });
+
+  assert.equal(result.created, true);
+  assert.equal(readStore(storePath).sessions[0].attachments[0].attachmentId, "att-1");
+});
+
 // ============================================================
 // T9a 投影投递：pending → published，消息恰好一次
 // ============================================================

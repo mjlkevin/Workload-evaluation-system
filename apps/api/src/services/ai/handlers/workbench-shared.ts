@@ -15,6 +15,7 @@ import type { AiSessionRecord } from "../../../modules/ai-sessions/ai-sessions.t
 import type { AuthUser, BusinessRole } from "../../../types";
 import { defaultProviderRegistry, type ModelProvider } from "../../../ai/provider";
 import type { StreamingChunk } from "../workbench-dispatch.service";
+import type { WorkbenchAttachmentContext } from "../workbench-context.service";
 import { createMemoryUsecase, getMemoryRepository } from "../../../modules/memory/memory.module";
 import type { MemoryContextBlock } from "../../../modules/memory/memory.usecase";
 
@@ -273,11 +274,12 @@ export function buildWorkbenchChatDispatchInput(user: AuthUser, content: string,
   messages?: HomeMessageInput[];
   /** 记忆注入项目上下文（缺省不注入，行为与旧版一致）；工作台会话蒸馏落 default 项目 */
   projectId?: string;
+  attachment?: WorkbenchAttachmentContext | null;
 }): {
   user: AuthUser;
   workflowKey: string;
   message: string;
-  attachment: null;
+  attachment: WorkbenchAttachmentContext | null;
   latestHarnessArtifact: null;
   clientAction: string;
   businessRole: BusinessRole;
@@ -299,7 +301,7 @@ export function buildWorkbenchChatDispatchInput(user: AuthUser, content: string,
     user,
     workflowKey: "free_chat",
     message: content,
-    attachment: null,
+    attachment: options?.attachment ?? null,
     latestHarnessArtifact: null,
     clientAction: "",
     businessRole,

@@ -215,6 +215,56 @@ test("submitRun returns 202 payload with queued status and eventCursor", async (
   assert.ok(result.data.runId);
 });
 
+test("ISS-2026-08-11-007: submitRun persists normalized attachments in executionConfig", async () => {
+  const deps = makeDeps();
+  const user = makeUser();
+  const session = makeSession(user);
+  deps.sessions.set(session.sessionId, session);
+  const usecase = createAiRunsUsecase(deps);
+
+  const result = await usecase.submitRun(user, session.sessionId, {
+    submissionKey: randomUUID(),
+    content: "请分析附件",
+    attachments: [{
+      name: "客户需求.xlsx",
+      size: 4096,
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
+    }],
+  } as any);
+
+  const run = deps.repo.runs.find((item: Record<string, unknown>) => item.harnessRunId === result.data.runId);
+  assert.deepEqual((run?.executionConfig as Record<string, unknown>)?.attachments, [{
+    name: "客户需求.xlsx",
+    size: 4096,
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
+  }]);
+});
+
+test("ISS-2026-08-11-007: submitRun bounds attachment count and parsed summary length", async () => {
+  const deps = makeDeps();
+  const user = makeUser();
+  const session = makeSession(user);
+  deps.sessions.set(session.sessionId, session);
+  const usecase = createAiRunsUsecase(deps);
+
+  const result = await usecase.submitRun(user, session.sessionId, {
+    submissionKey: randomUUID(),
+    content: "请分析附件",
+    attachments: Array.from({ length: 6 }, (_, index) => ({
+      name: `附件-${index + 1}.txt`,
+      parsedSummary: "需".repeat(9_000),
+    })),
+  } as any);
+
+  const run = deps.repo.runs.find((item: Record<string, unknown>) => item.harnessRunId === result.data.runId);
+  const attachments = (run?.executionConfig as { attachments?: Array<{ parsedSummary?: string }> })?.attachments ?? [];
+  assert.equal(attachments.length, 5);
+  assert.equal(attachments[0].parsedSummary?.length, 8_000);
+  assert.match(attachments[0].parsedSummary ?? "", /…\[truncated\]$/);
+});
+
 test("submitRun replays the same runId for a duplicate submissionKey", async () => {
   const deps = makeDeps();
   const user = makeUser();
