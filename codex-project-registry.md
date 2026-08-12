@@ -1,6 +1,6 @@
 # Codex Project Registry
 
-> 用途：Codex 新会话或子代理启动前先读本表，确认正确工作区、禁止路径、验证命令和协作分工。事实已于 2026-08-12 复核；每次执行前仍需运行对应预检命令确认分支和 dirty 状态。
+> 用途：Codex 新会话或子代理启动前先读本表，确认正确工作区、禁止路径、验证命令和协作分工。事实已于 2026-08-13 复核；每次执行前仍需运行对应预检命令确认分支和 dirty 状态。
 
 ## 使用规则
 
@@ -13,7 +13,7 @@
 
 | 项目 | 正确路径 | 禁止/谨慎路径 | 当前主线与状态 | 默认预检 | 推荐验证 | 可写性 | 子代理分工 |
 |---|---|---|---|---|---|---|---|
-| WorkEvolutionSys / WES 唯一活动交付目录 | `/Users/kevin/AI/Workload-evaluation-system` | 原 `-agent` linked worktree 已注销，不得再将历史路径作为入口；`/Users/kevin/AI/wes-worktrees/merge-main` 仅为当前主线集成与验收 worktree；不得覆盖任一目录的既有未提交改动 | Web 主线 `ui/V2_PROTOTYPE`；后端主线 `apps/api`；交付分支 `main`，2026-08-12 已整合 RP-055~058 与 DEF-2026-08-11-003 | `pwd && git status --short --branch && git worktree list --porcelain` | `npm run build:web`; `npm run build:api`; `npm run test:modules`; `npm run test:web`; `npm run test:ai`; `npm run test:agent -w apps/api`; `npm run test:harness -w apps/api` | 可写，但必须精确保护无关 dirty changes | 入口/边界审计、issue-first 分诊、代码实现、总看板同步、验证复核 |
+| WorkEvolutionSys / WES 唯一活动交付目录 | `/Users/kevin/AI/Workload-evaluation-system` | 原 `-agent` linked worktree 已注销，不得再将历史路径作为入口；`/Users/kevin/AI/wes-worktrees/merge-main` 为 detached 的运行验收基线，不是活动交付入口；不得覆盖任一目录的既有未提交改动 | Web 主线 `ui/V2_PROTOTYPE`；后端主线 `apps/api`；活动目录已回归 `main` 并与 `origin/main` 同步；旧分支 `codex/model-config-contract-closure-p1` 已于 2026-08-13 清理 | `pwd && git status --short --branch && git worktree list --porcelain` | `npm run build:web`; `npm run build:api`; `npm run test:modules`; `npm run test:web`; `npm run test:ai`; `npm run test:agent -w apps/api`; `npm run test:harness -w apps/api` | 可写，但必须精确保护无关 dirty changes | 入口/边界审计、issue-first 分诊、代码实现、总看板同步、验证复核 |
 | MiniCRM-Sys | `/Users/kevin/AI/MiniCRM-Sys` | 不要套用 WES 架构边界；MiniCRM 是独立产品 | 当前观察为 `main` 且有既有 dirty changes | `pwd && git status --short --branch` | `pnpm build`; `pnpm lint`; `pnpm db:migrate` 按任务选择 | 可写，先确认业务目标 | 前端实现、数据/迁移审计、验证命令审计 |
 | 项目交付 Skill 套件 | `/Users/kevin/Library/Mobile Documents/com~apple~CloudDocs/AI-project/Resource/Skill Hub/项目交付skill套件/项目交付skill套件(V10.0.0）` | 上级 `项目交付skill套件` 不是 git worktree；目录名 V10.0.0 与 `SKILL.md` 元信息 `version: 11.0.0` 并存，需显式说明 | 金蝶实施方法论 Skill 套件；当前以文件资产为主 | `ls && sed -n '1,80p' SKILL.md` | 使用 `docs/codex-workflows/long-doc-skill-review-template.md` 做交叉检查；如有脚本再按本地说明执行 | 谨慎写；先确认版本目标 | 结构一致性、版本/配置一致性、Markdown/YAML 格式、业务语义检查 |
 | 行业深度分析报告 Skill | `/Users/kevin/Library/Mobile Documents/com~apple~CloudDocs/AI-project/Resource/Skill Hub/研究分析/行业深度分析报告技能/kingdee-industry-report` | 上级目录不是 git worktree | 金蝶行业研究报告 Skill；含 `scripts/regression-check.mjs` | `find . -maxdepth 2 -type f | sort | sed -n '1,80p'` | `node scripts/regression-check.mjs`（如依赖可用） | 谨慎写；优先模板化输出 | 事实源采集、报告结构审查、回归脚本审计 |
