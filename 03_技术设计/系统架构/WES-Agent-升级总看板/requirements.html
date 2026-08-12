@@ -1005,10 +1005,10 @@
               <td>AI Runtime / 记忆层</td>
               <td><span class="pill priority-p1">P1</span></td>
               <td>SP-2026-007 · MS2 已提前完成（合入 main：24d48b7 + 挂线修复 8d0b757）</td>
-              <td><span class="status run"><span class="dot"></span>后端已合入 / 待人工验收 · UI 可见性待 MS2-PATCH</span></td>
+              <td><span class="status run"><span class="dot"></span>真实环境自动交互复验通过 / 待用户最终确认</span></td>
               <td>借鉴 GT-009 L0→L1→L2 蒸馏管线：会话对话异步蒸馏为原子事实与场景知识，落 Harness PG 域新增 memory_atoms/memory_scenes 两表 + modules/memory/ 模块；蒸馏产物 draft → 用户确认 → active，注入沿用 M1 护栏（8 条/6000 字符/3s）；依赖 M1 先行</td>
               <td>去重结果：未命中（RP-017/RP-047 覆盖会话内运行时恢复，跨会话记忆蒸馏属空白）；交叉引用 RP-031（M1 检索护栏）、RP-030（M5 蒸馏过程 Trace）；符合 DB 迁移触发器（审计/统计需求），落 Harness PG 域不新增第二套存储</td>
-              <td>验收口径：同项目二次 run 上下文重建 0 轮（记忆自动注入）；蒸馏产物在 UI 可见、可确认、可撤回；draft 未经确认不注入。实施：MS1/MS2 均提前完成并合入 main（32e9e1d / 24d48b7）；UI 可见性条目由 MS2-PATCH 承接（2026-08-11 已批准随 MS3 派单，已合入 main e521fcb；ISS-2026-08-11-002 面板恒空修复已合入 main 318f3bd，进入人工验收）。</td>
+              <td>验收口径：同项目二次 run 上下文重建 0 轮（记忆自动注入）；蒸馏产物在 UI 可见、可确认、可撤回；draft 未经确认不注入。实施：MS1/MS2 与 UI 修复均已合入 main（32e9e1d / 24d48b7 / e521fcb / 318f3bd）。2026-08-12 修复真实环境迁移账本漂移并补执行 0015，从原用户真实 PLM 会话恢复 14 条 draft 原子事实 + 4 个 draft 场景；API 200、两档布局、确认/归档、状态筛选及提示条跳转自动筛选 draft 已自动交互复验通过。当前只待用户本人最终确认后关闭 RP-052。</td>
             </tr>
             <tr>
               <td class="mono">RP-053</td>

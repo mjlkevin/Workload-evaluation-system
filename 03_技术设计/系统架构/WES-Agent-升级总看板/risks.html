@@ -284,10 +284,10 @@
           <td><span class="status done"><span class="dot"></span>已关闭（同步路径已合入）</span></td>
         </tr>
         <tr data-board-event-id="BE-2026-08-11-sp007-ms3-review:risks:2">
-          <td>记忆管理面板恒空预置缺陷（listMemory 缺 projectId + 面板请求不带 projectId + 不读 ?status=draft query）阻断 RP-052「UI 可见可确认」人工验收。</td>
-          <td>RP-052 记忆蒸馏的后端能力已就位且有 12 用例守护，但用户无法在 UI 看到并确认 draft 记忆，人工验收口径不成立。</td>
-          <td>已修复合入 main（318f3bd）：三层根因（requireAuth 挂起 + listMemory 口径 + 面板 query）全修，面板实证非空；RP-052 进入人工验收，验收通过后本风险随 DEF-2026-08-11-001 一并关闭。</td>
-          <td><span class="status done"><span class="dot"></span>已修复合入 / 待人工验收</span></td>
+          <td>记忆管理面板恒空阻断 RP-052 验收：代码三层缺陷之外，真实环境还存在旧分支进程未重启与 PostgreSQL 迁移账本漂移，导致 0015 未执行、memory 两表缺失。</td>
+          <td>即使修复代码已合入 main，运行态与 schema 未同步仍会让用户看到空面板；若只依据合并矩阵判定可验，将遗漏部署与数据恢复风险。</td>
+          <td>2026-08-12 已完成迁移事务演练、账本对齐、0015 执行和标准 db:migrate；API/Web 切到 main，原用户真实 PLM 会话恢复 14+4 条 draft 记忆。API 与 1440/760 交互链路均通过，待用户本人最终确认后随 DEF-2026-08-11-001 一并关闭。</td>
+          <td><span class="status done"><span class="dot"></span>代码与环境已恢复 / 待用户最终确认</span></td>
         </tr>
         <tr data-board-event-id="BE-2026-08-10-iss-2026-08-10-001-merged:risks:1">
           <td>后台任务角标「进行中」计数不含 cancelling 状态的 run（ISS-2026-08-10-001 复审范围外观察）。</td>
