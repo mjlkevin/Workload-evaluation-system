@@ -69,13 +69,13 @@
         <div class="meta">
           <span><b>定位</b> 已分析确认的错误行为、回归和质量缺口</span>
           <span><b>来源</b> 只从问题池或测试失败分流，不直接接收未定性原始反馈</span>
-          <span><b>更新日期</b> 2026-08-03</span>
+          <span><b>更新日期</b> 2026-08-12</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">16 个缺陷</span>
+          <span class="pill brand">23 个缺陷</span>
           <span class="pill warn">1 待修复 / 返工</span>
-          <span class="pill ok">15 个已完成修复</span>
-          <span class="pill warn">12 个等待人工复核</span>
+          <span class="pill ok">16 个已完成修复</span>
+          <span class="pill warn">13 个等待人工复核</span>
         </div>
       </div>
     </div>
@@ -383,6 +383,18 @@
               <td class="tc-7">根因：批 2 hook 新 action 调用了不存在的方法；client.js 自始只有 get/post/patch/delete/upload 五封装。测试盲区：批 2 用例覆盖「未输入时按钮禁用不发 PUT」与测试连接，但保存成功路径无用例，MSW mock 的 PUT 端点从未被真实调用。用户影响：批 2 验收关键动作（保存供应商 Key）100% 失败，阻断自定义供应商接入。</td>
               <td class="tc-8">验收口径：保存密钥 → PUT 200 + 内联成功 + effective keyHint 刷新；补回潮 RED 用例（PUT 调用次数与 body 断言）；前端基线不下降。</td>
               <td class="tc-9">2026-08-11 21:21 用户验收反馈（截图），TDD 修复当批完成（RED 复现原始报错 → 补 put → 转绿），提交 <code class="inline">7a9c559</code>（2 文件 +24）。教训登记：新增 apiClient 方法调用须先确认封装存在，Key 写路径须配成功用例。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-08-11-def-2026-08-11-003-derived:defects">
+              <td class="mono tc-0">DEF-2026-08-11-003</td>
+              <td class="mono tc-1">ISS-2026-08-11-007</td>
+              <td class="mono tc-2">RP-047</td>
+              <td class="tc-3">异步 Run 通道附件全链路丢失：submitRun 载荷无附件 → 落库无 attachmentIds → 切界面/刷新后附件气泡消失、模型收不到附件答非所问、回复裸出 formBlock JSON</td>
+              <td class="tc-4">S2</td>
+              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复 / 待人工验收</span></td>
+              <td class="tc-6">ui/V2_PROTOTYPE/src/api/aiRuns.js（submitRun 载荷）/ ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js（Run 提交不带 attachments）/ apps/api/src/modules/harness/harness-runtime.usecase.ts（submitRun 仅取 content）/ apps/api/src/modules/harness/workbench-chat.workflow.ts（落库与 dispatch 无附件、formBlock 不抽取）/ ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/messageFormatter.js（回显依赖 attachmentIds、流式不裁剪 formBlock JSON）</td>
+              <td class="tc-7">2026-08-12 已闭合四段链路：Run 提交携带附件解析结果；后端限量限长写入 executionConfig；worker 幂等写入 session.attachments 与消息 attachmentIds 并把 parsedSummary 传给模型；流式终态抽取 formBlock，前端增量展示隐藏协议 JSON。重放仍按 run 来源键去重，不重复消息或附件。</td>
+              <td class="tc-8">TDD 证据：前端聚焦 14/14；后端聚焦 57 pass / 4 DB skip / 0 fail；Harness 101 pass / 75 DB skip / 0 fail；integration 1/1；API/Web build 通过；安全门禁通过。全量已知非本单红灯：AI 285/287（模型配置沙箱 2 项）、Web 322/323（UserManagement 1 项）、modules 350/355（同一模型配置域 5 项）。人工仍需复验原场景。</td>
+              <td class="tc-9">人工验收：重新上传附件发送，切换页面并刷新后确认附件气泡与解析摘要仍在；答复须引用附件内容且不出现裸 formBlock JSON。自动化已完成，状态推进到待人工验收；交叉引用 ISS-2026-08-08-001、ISS-2026-08-09-002、ISS-2026-08-09-003。</td>
             </tr>
         </tbody>
         </table>

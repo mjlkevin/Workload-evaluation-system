@@ -191,6 +191,12 @@
       <h2>阶段 1E 基线风险</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-08-12-iss-2026-08-11-007-fixed:risks-security">
+          <td>仓库依赖审计仍有 21 项已知漏洞（13 moderate、8 high），涉及 multer、express/qs、undici、xlsx 等；本次附件链路未新增依赖。</td>
+          <td>部分条目涉及上传 DoS、请求解析和开发工具链；若不做版本治理，风险与本次业务修复并存。</td>
+          <td>本单已用附件数量、字段长度、声明大小上限和 JWT owner 隔离收窄新增入口，secret scan 通过；依赖升级需独立工单评估 breaking change，禁止在本缺陷补丁中直接 npm audit fix。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待依赖治理</span></td>
+        </tr>
         <tr>
           <td>传统列表展示不清晰，用户误以为草稿已经正式生效。</td>
           <td>业务误判，绕过人工确认。</td>

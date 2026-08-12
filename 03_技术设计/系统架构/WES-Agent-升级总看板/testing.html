@@ -142,6 +142,15 @@
       <div class="callout warn"><div><b>超期预警</b>以下 MT-1E / MT-1F / MT-1H-A / MT-1H-B 人工测试自登记以来已超过 2 周未执行。P0 测试应在人工验收窗口优先完成；超期未执行的测试将在监控页标红。如需延期，请在 changes.html 记录决策。</div></div>
       <table>
         <tr><th>ID</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>反馈记录</th></tr>
+        <tr data-board-event-id="BE-2026-08-12-iss-2026-08-11-007-fixed:testing-manual">
+          <td class="mono">MT-ISS0811-007-001</td>
+          <td>异步 Run 附件持久化、模型上下文与 formBlock 清理</td>
+          <td><span class="status block"><span class="dot"></span>P0</span></td>
+          <td>上传带可识别内容的附件并发送 → 等待回答 → 切换页面再返回 → 刷新会话。</td>
+          <td>附件气泡和解析摘要持续可见；回答引用附件内容；流式与刷新后正文均无裸 formBlock JSON，合法表单以卡片显示。</td>
+          <td><span class="status todo"><span class="dot"></span>待人工复验</span></td>
+          <td>自动化已覆盖附件提交、限长持久化、重放幂等、模型 dispatch、formBlock 提取和流式正文裁剪；原问题 session 为 7e0395bb-bb0f-4ded-a892-7d639233b626。</td>
+        </tr>
         <tr>
           <td class="mono">MT-ISS003-001</td>
           <td>ISS-2026-08-09-003 · 异步通道离页返回 AI 回复可见性与后台任务角标</td>
@@ -701,6 +710,7 @@
         <tr data-board-event-id="BE-2026-08-12-model-config-branch-merged:testing"><td class="mono">e29a984 合入后复核矩阵</td><td><span class="status warn"><span class="dot"></span>modules 371/371；web 336/337</span></td><td>规则 8/8、集成 1/1、AI 退出 0、RP-056 4/4、API/Web 构建通过；Web 唯一失败为既有 UserManagement 用例。</td></tr>
         <tr data-board-event-id="BE-2026-08-12-model-config-branch-security:testing"><td class="mono">安全与依赖复核</td><td><span class="status warn"><span class="dot"></span>密钥扫描通过 / 风险待治理</span></td><td>密钥门禁 4/4；npm audit 报 8 高+13 中既有漏洞；自定义供应商 baseUrl 缺少私网/协议限制，已入风险池。</td></tr>
         <tr data-board-event-id="BE-2026-08-12-rp052-runtime-recovery:testing"><td class="mono">RP-052 真实环境自动交互复验</td><td><span class="status done"><span class="dot"></span>API 200 · 14+4 draft · 1440/760 与状态流转通过</span></td><td>事务演练回滚后受控修复迁移账本并补执行 0015，标准 db:migrate 成功；原用户保留 14 条 draft 原子事实与 4 个 draft 场景。API list 不再挂起并返回 200。1440×900 为三列、760×900 为单列，文档均无横向溢出；确认后场景 4→3、归档后 3→2，active/archived 筛选各显示对应记录；AI 工作台提示 16 条待确认记忆，「去确认」跳转到 /system/memory?status=draft 且筛选为待确认。临时账号与复制数据清理完成。此为自动交互复验，不替代用户本人最终确认。</td></tr>
+        <tr data-board-event-id="BE-2026-08-12-iss-2026-08-11-007-fixed:testing"><td class="mono">DEF-2026-08-11-003 · 异步 Run 附件链路 TDD 验证</td><td><span class="status done"><span class="dot"></span>聚焦全绿 / 全量既有红灯已隔离</span></td><td>2026-08-12：RED 精确复现附件载荷缺失、session 无附件引用、dispatch 无附件、流式裸 formBlock；GREEN 后前端 14/14、后端 57 pass/4 DB skip/0 fail，Harness 101 pass/75 DB skip/0 fail，integration 1/1，API/Web build、UI scope、安全门禁通过。全量 modules 350/355、AI 285/287 的失败均来自既有模型配置沙箱；Web 322/323 唯一失败为 UserManagement 既有基线。本单人工用例 MT-ISS0811-007-001 待执行。</td></tr>
         <tr data-board-event-id="BE-2026-08-11-memory-panel-chip-merged:testing"><td class="mono">记忆面板恒空 + chip 链路主线合入（318f3bd）</td><td><span class="status done"><span class="dot"></span>树一致 · 复核矩阵直接有效</span></td><td>2026-08-11：--no-ff 合入 main（318f3bd）；main 未越过 base e521fcb，合并树与复核复跑的 9409b5d 逐字节一致（git diff 为空），复核矩阵（modules 345/ai 260/harness 112·75skip/web 314·1 预置败/双构建零错误）对主线直接有效。RP-052 记忆面板人工验收待用户真实环境执行（确认 draft 记忆可见、可确认、可归档 + 提示条跳转自动筛选 draft）。</td></tr>
         <tr data-board-event-id="BE-2026-08-11-memory-panel-chip-review:testing"><td class="mono">记忆面板恒空 + chip 链路工单回填复核矩阵</td><td><span class="status done"><span class="dot"></span>345+260+112+314 pass · web 1 预置败</span></td><td>2026-08-11 Codex 独立复跑（qoder/memory-panel-chip-live-link worktree，9409b5d）：test:modules 345/0（基线 335 + 挂线 2 新文件 10 例）、test:ai 260/0、test:harness 112 pass/75 skipped（base 口径一致）、test:web 314/1（唯一失败 UserManagement「persists bulk role changes」预置，与 base 同）、build:api tsc 零错误 / build:web 通过。RED 独立复现：回退 memory.usecase+repository 恰 2 红、回退 messageFormatter+MemoryManagementPanel 恰 3 红，恢复全绿。RP-052 记忆面板人工验收待用户真实环境执行。</td></tr>
         <tr data-board-event-id="BE-2026-08-11-sp007-ms3-merged:testing"><td class="mono">SP-2026-007 MS3 主线合入（e521fcb）</td><td><span class="status done"><span class="dot"></span>树一致 · 复核矩阵直接有效</span></td><td>2026-08-11：--no-ff 合入 main（e521fcb）；因 main 未越过 base 746fb5e，合并树与复核复跑的 38353f5 逐字节一致（git diff 为空），MS3 复核验证矩阵（modules 335/agent 51/ai 260/harness 187/web 306·1 预置败/双构建零错误）对主线直接有效，不重复烧。记忆面板/chip 链路修复工单已编制待派发，修复合入后 RP-052 进入人工验收。</td></tr>
