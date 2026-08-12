@@ -125,7 +125,7 @@
 
 **决策记录**：Kevin 于 2026-05-09 选择 **B 方案**——接受 W5 为基础版，将 assessment-detail v3 严格对齐作为 Phase B 首项，而非回退 W5 阻塞 Phase A 收官。
 
-**决策记录**：Kevin 选择 **Vite + React** 作为 Phase B 及后续前端框架。原因：更轻量，不需要 Next.js 的服务端渲染能力；V0_SAAS 的 SSR/API Routes 对评估工具场景属于过度设计。V0_SAAS 现有功能（评估页、需求导入等）后续按需逐页迁移到 V2_PROTOTYPE 基座。
+**决策记录**：Kevin 选择 **Vite + React** 作为 Phase B 及后续唯一 Web 主线。原因：更轻量，不需要 Next.js 的服务端渲染能力；【历史说明，已下线】`ui/V0_SAAS` 已于 2026-08-06 删除，禁止恢复第二前端主线。
 
 ---
 

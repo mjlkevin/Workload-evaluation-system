@@ -390,11 +390,11 @@
               <td class="mono tc-2">RP-047</td>
               <td class="tc-3">异步 Run 通道附件全链路丢失：submitRun 载荷无附件 → 落库无 attachmentIds → 切界面/刷新后附件气泡消失、模型收不到附件答非所问、回复裸出 formBlock JSON</td>
               <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复 / 待人工验收</span></td>
+              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复 / Codex 主线实测通过 / 待用户最终确认</span></td>
               <td class="tc-6">ui/V2_PROTOTYPE/src/api/aiRuns.js（submitRun 载荷）/ ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js（Run 提交不带 attachments）/ apps/api/src/modules/harness/harness-runtime.usecase.ts（submitRun 仅取 content）/ apps/api/src/modules/harness/workbench-chat.workflow.ts（落库与 dispatch 无附件、formBlock 不抽取）/ ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/messageFormatter.js（回显依赖 attachmentIds、流式不裁剪 formBlock JSON）</td>
               <td class="tc-7">2026-08-12 已闭合四段链路：Run 提交携带附件解析结果；后端限量限长写入 executionConfig；worker 幂等写入 session.attachments 与消息 attachmentIds 并把 parsedSummary 传给模型；流式终态抽取 formBlock，前端增量展示隐藏协议 JSON。重放仍按 run 来源键去重，不重复消息或附件。</td>
-              <td class="tc-8">TDD 证据：前端聚焦 14/14；后端聚焦 57 pass / 4 DB skip / 0 fail；Harness 101 pass / 75 DB skip / 0 fail；integration 1/1；API/Web build 通过；安全门禁通过。全量已知非本单红灯：AI 285/287（模型配置沙箱 2 项）、Web 322/323（UserManagement 1 项）、modules 350/355（同一模型配置域 5 项）。人工仍需复验原场景。</td>
-              <td class="tc-9">人工验收：重新上传附件发送，切换页面并刷新后确认附件气泡与解析摘要仍在；答复须引用附件内容且不出现裸 formBlock JSON。自动化已完成，状态推进到待人工验收；交叉引用 ISS-2026-08-08-001、ISS-2026-08-09-002、ISS-2026-08-09-003。</td>
+              <td class="tc-8">TDD 证据：前端聚焦 14/14；后端聚焦 57 pass / 4 DB skip / 0 fail。合入 main 后全量 modules 372、AI 287、Web 339、Agent 51、规则 8、集成 1 均零失败；Harness 115 pass / 75 DB skip / 0 fail；API/Web build、安全门禁、UI scope 与 board:check 通过。</td>
+              <td class="tc-9">2026-08-12 Codex 使用合成附件摘要完成真实异步 Run：首次加载、刷新、切换项目页再返回后附件气泡持续可见；模型准确引用客户、项目和核心需求；正文无裸 formBlock JSON。验收会话已删除且 GET 404，未上传客户资料。保留待用户本人最终确认后关闭；交叉引用 ISS-2026-08-08-001、ISS-2026-08-09-002、ISS-2026-08-09-003。</td>
             </tr>
         </tbody>
         </table>

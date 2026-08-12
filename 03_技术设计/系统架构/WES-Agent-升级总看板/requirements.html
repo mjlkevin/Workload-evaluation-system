@@ -67,11 +67,11 @@
         <div class="crumb">需求记录、评审与交付跟踪</div>
         <h1>需求池</h1>
         <div class="meta">
-          <span><b>当前阶段</b> RP-047 Batch E 已交付合入 / 阶段 1H-B 已形成交付基线 / 阶段 1H-C 规划中</span>
+          <span><b>当前阶段</b> 主线整合与自动化验收通过 / SP-2026-007 进入 M4/M5 / RP-052 与 RP-055 保留真实场景确认</span>
           <span><b>管理范围</b> 升级需求 / 技术债 / 审计项 / 测试项 / 后续候选</span>
           <span><b>页面定位</b> 总看板唯一需求池页面，不是业务系统正式需求模块</span>
           <span><b>统计口径</b> 已交付 = 实施证据 + 验收证据齐备；「已交付 · 待验收回填」「待处理」单独计</span>
-          <span><b>更新日期</b> 2026-08-10</span>
+          <span><b>更新日期</b> 2026-08-12</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
           <span class="pill brand">47 项已登记需求</span>
@@ -1062,7 +1062,7 @@
               <td>前端体验 / 系统管理 · 模型配置</td>
               <td><span class="pill priority-p2">P2</span></td>
               <td>用户当轮直接指示实现，无独立排期</td>
-              <td><span class="status run"><span class="dot"></span>已分诊 / 实现中</span></td>
+              <td><span class="status run"><span class="dot"></span>已交付并合入 main（7630cde）/ 待用户目视确认</span></td>
               <td>三确诊根问题：R1 三条孤儿 meta caption 与副标题重复表达措辞不一；R2 凭据域状态挂供应商表尾无归属；R3 流程提示带冗余前缀。重设计：两区段改「h3 区段标题 + 单行 dim 描述」（模型供应商 / 场景模型绑定），凭据状态标签组上移至供应商区段标题行，顶部 caption 精简为「修改后先保存草稿再生效」；复用现有 tokens 与 tag 组件，零新依赖</td>
               <td>验收口径：区段标题 heading 语义可查询（模型供应商 / 场景模型绑定）；凭据标签（凭据域托管/KEK/最近变更）在供应商表格之前渲染；四条旧文案（模型供应商与场景绑定 ·…/模型供应商 · 凭据…/凭据域状态：/场景模型绑定 ·…）全移除；ModelConfigTable 凭据徽标断言零回归；RED 先行、前端 vitest 基线零回归、build:web 零错误、UI 门禁 0 findings。</td>
             </tr>
@@ -1073,7 +1073,7 @@
               <td>前端体验 / 全局 Shell 后台任务区</td>
               <td><span class="pill priority-p2">P2</span></td>
               <td>用户当轮直接指示实现，无独立排期</td>
-              <td><span class="status run"><span class="dot"></span>已分诊 / 实现中</span></td>
+              <td><span class="status run"><span class="dot"></span>已交付并合入 main（f8609df）/ 待用户目视确认</span></td>
               <td>指示器改 button + 气泡清单（控件上方绝对定位、活跃 Run 标题+状态、空态文案、外部点击/Esc 关闭）；completed 通知 5s 定时自消（failed/cancelled 保持手动）；通知负载补 sessionId，点击文本 → primeStoredActiveSessionId + markSessionUnread(false) + dismiss + navigate('/')；约束：index.css 与 AiHomeWorkbench/** 为他人 WIP 不触碰，样式走内联 + tokens</td>
               <td>验收口径：气泡点击开/外部点击关（失焦消失）；completed 通知 5s 自动消失、failed/cancelled 不自消；点击已完成通知后 localStorage 预置活跃会话 + store 未读清除（【已完成未读】徽标消失）+ 跳转 '/'；RED 先行、background-runs 既有用例零回归、build:web 零错误、UI 门禁 0 findings。</td>
             </tr>
