@@ -93,7 +93,7 @@ describe('ThinkingTrace', () => {
     expect(screen.queryByLabelText('引用记忆')).not.toBeInTheDocument()
   })
 
-  test('四类数据同时存在时按 推理→工具调用→知识检索→记忆引用 顺序渲染', () => {
+  test('四类数据同时存在时按 推理→知识检索→工具调用→记忆引用 顺序渲染', () => {
     const { container } = render(
       <ThinkingTrace
         messageId="m8"

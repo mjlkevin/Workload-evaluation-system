@@ -15,7 +15,7 @@ export default function AttachmentCard({ file, state = 'pending', onRemove, comp
         alignItems: 'center',
         gap: 10,
         padding: compact ? '8px 10px' : '9px 10px',
-        border: '1px solid var(--line)',
+        border: '1px solid var(--line-2)',
         borderRadius: 10,
         background: 'var(--bg-soft)',
         minWidth: 0,
