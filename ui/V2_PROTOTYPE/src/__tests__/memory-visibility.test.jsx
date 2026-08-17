@@ -1,7 +1,7 @@
 // SP-2026-007 MS2-PATCH + MS3：AI 工作台记忆可见性与工具调用 trace
 // ① 待确认记忆提示条（draft > 0 渲染 + 跳转 /system/memory?status=draft）
-// ② ModelRunTrace 通用「工具调用」chip（list_tools 发现后可折叠展示）
-// ③ ModelRunTrace「引用记忆」标记（与工具调用 chip 统一设计语言）
+// ② ThinkingTrace 通用「工具调用」chip（list_tools 发现后可折叠展示）
+// ③ ThinkingTrace「引用记忆」标记（与工具调用 chip 统一设计语言）
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
@@ -150,7 +150,7 @@ describe('待确认记忆提示条（MS2-PATCH）', () => {
   })
 })
 
-// ---------- ModelRunTrace 扩展 chip ----------
+// ---------- ThinkingTrace 扩展 chip ----------
 
 const knowledgeToolFixture = {
   toolId: 'knowledge_base.query_product_knowledge',
