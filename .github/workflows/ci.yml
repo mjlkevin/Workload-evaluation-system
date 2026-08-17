@@ -102,8 +102,10 @@ jobs:
 
       # test:integration 归位到本 job：集成检查脚本会 spawn 真实 API 服务，
       # 依赖 DATABASE_URL（postgres service）与 db:migrate 已先执行。
+      # 直接调用 npx tsx 避免「node dist 不存在 → MODULE_NOT_FOUND 假报错再 || 兜底」的
+      # 信号噪音：真实迁移失败时真报错不能被假报错掩埋。
       - name: DB migrate
-        run: cd apps/api && npm run db:migrate
+        run: cd apps/api && npx tsx src/db/migrate.ts
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 

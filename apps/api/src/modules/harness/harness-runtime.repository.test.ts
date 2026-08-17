@@ -10,9 +10,10 @@ import { after, afterEach, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { eq, and, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 import { harnessRuns, harnessRunAttempts, harnessRunEvents, harnessRunCheckpoints, harnessRunOutputs, harnessSessionOutbox, harnessToolEvents } from "../../db/schema";
+import * as schema from "../../db/schema";
 import {
   HarnessRuntimeError,
   createHarnessRuntimeRepository,
@@ -66,6 +67,22 @@ function makeQueuedRunInput(overrides: Partial<CreateQueuedHarnessRunInput> = {}
 function track(runId: string): string {
   createdRunIds.push(runId);
   return runId;
+}
+
+/**
+ * 在「事务开始时刻的毫秒内微秒余数落在 [100, 900) 安全窗口」处开启事务，必要时重试。
+ * 用途：钉死 BEGIN 时刻的微秒余数远离 0，使「毫秒截断比较」与「微秒直比」的
+ * 差异必然可观测——回归用例的断言结果不依赖执行时序碰运气。
+ */
+async function beginInSafeMicrosecondWindow(client: PoolClient, maxAttempts = 10): Promise<void> {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    await client.query("BEGIN");
+    const { rows } = await client.query("SELECT (extract(microseconds FROM now()))::bigint % 1000 AS r");
+    const r = Number((rows[0] as { r: string }).r);
+    if (r >= 100 && r < 900) return;
+    await client.query("ROLLBACK");
+  }
+  throw new Error("unable to begin transaction in a safe microsecond window");
 }
 
 describeOrSkip("createQueuedRun returns the same run for one owner and submission key", { skip: !testDatabaseUrl }, async () => {
@@ -142,6 +159,41 @@ describeOrSkip("claim rejects lease outside the 1s..300s window", { skip: !testD
   await assert.rejects(repo!.claimNextQueuedRun({ workerId: "worker-a", leaseMs: 10 }), HarnessRuntimeError);
   await assert.rejects(repo!.claimNextQueuedRun({ workerId: "worker-a", leaseMs: 300_001 }), HarnessRuntimeError);
 });
+
+describeOrSkip(
+  "claimNextQueuedRun picks a run whose available_at carries microsecond precision (DB clock comparison regression)",
+  { skip: !testDatabaseUrl },
+  async () => {
+    // 回归保护：available_at 由 PG now()（微秒精度）写入，队列筛选必须用数据库时钟直比。
+    // 历史缺陷：比较值经 readDbNow 的 JS Date 中转被截断到毫秒，同一毫秒内 create → claim
+    // 会把刚入队的 Run 误判为未到期而漏认领（间歇性，任务卡队列）。
+    // 确定性构造：将「写 available_at」与「claim」放进同一个手动事务——PG 事务内 now() 恒定，
+    // available_at == claim 事务 now() 恒成立，SQL now() 直比必然认领；
+    // JS Date 毫秒截断版在 BEGIN 微秒余数非零（由 beginInSafeMicrosecondWindow 保证）时必然漏认领。
+    const created = await repo!.createQueuedRun(makeQueuedRunInput());
+    track(created.run.harnessRunId);
+
+    const client = await pool!.connect();
+    try {
+      await beginInSafeMicrosecondWindow(client);
+      // 事务内 now() 恒定：available_at 被显式写为 BEGIN 时刻的微秒值
+      await client.query("UPDATE harness_runs SET available_at = now() WHERE harness_run_id = $1", [
+        created.run.harnessRunId,
+      ]);
+
+      // 连接级 drizzle：claim 内部 dbInstance.transaction 的 begin 会被 PG 以 WARNING 忽略，
+      // claim 的 now() 与 available_at 因此共享同一事务时钟。
+      // cast：连接级 drizzle 的 $client 是 PoolClient，与工厂参数的 Pool 类型签名不同（运行时无差异）
+      const connRepo = createHarnessRuntimeRepository(drizzle(client, { schema }) as unknown as NonNullable<typeof testDb>);
+      const claimed = await connRepo.claimNextQueuedRun({ workerId: "worker-same-txn", leaseMs: 30_000 });
+      assert.ok(claimed, "same-millisecond enqueue must be claimable via DB clock comparison");
+      assert.equal(claimed.run.harnessRunId, created.run.harnessRunId);
+    } finally {
+      // claim 成功路径会 commit 整个手动事务，失败路径会 rollback；这里只负责释放连接。
+      client.release();
+    }
+  },
+);
 
 describeOrSkip("heartbeat extends lease for the owning worker only", { skip: !testDatabaseUrl }, async () => {
   const created = await repo!.createQueuedRun(makeQueuedRunInput());

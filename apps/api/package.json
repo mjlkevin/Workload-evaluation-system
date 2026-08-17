@@ -20,7 +20,6 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node dist/db/migrate.js || tsx src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "migration:v1-to-v2": "tsx src/migration/migrate-v1-to-v2.ts",
     "lint": "eslint src"
   },
   "dependencies": {
