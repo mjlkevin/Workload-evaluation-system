@@ -847,7 +847,7 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
       <p class="lead">2026-08-17 用户下达阶段 0 清单（9 事项，约 2 周）：Qoder 完成逐项复核并开 9 条独立分支（<code class="inline">qoder/stage0-01</code> ~ <code class="inline">stage0-09</code>）；同日用户复核反馈拍板：事项 2 策略更正为「删除迁移器」、事项 6 精确缺失 34 张表、事项 7 扩容为 admin + 基础配置播种。计划文档：<code class="inline">00_项目治理/里程碑与计划/阶段0-前置与解障-修复行动计划.md</code>。</p>
       <table>
         <tr><th>事项</th><th>定稿动作</th><th>估时</th><th>分支</th></tr>
-        <tr><td>1 · express-async-errors 兜底</td><td>安装依赖 + app.ts 顶部 import + async-500 回归测试（整迁移的第一次提交）</td><td>0.5d</td><td class="mono">stage0-01</td></tr>
+        <tr><td>1 · express-async-errors 兜底</td><td>安装依赖 + app.ts 顶部 import + async-500 回归测试（整迁移的第一次提交） <span class="status done"><span class="dot"></span>已完成 2026-08-17</span></td><td>0.5d</td><td class="mono">stage0-01</td></tr>
         <tr><td>2 · 删除迁移器（策略更正）</td><td>先搬 4 类配置 upsert 进 db/seed.ts，再删 json-to-pg-migrator / plan / policy.test / migrate-v1-to-v2 + migrators/validators/ + 脚本</td><td>0.5d</td><td class="mono">stage0-02</td></tr>
         <tr><td>3 · 版本记录目标表</td><td>version_records 已建好；决策记录：versions 域读写 version_records，assessment_versions 归评估版本域自用，不再混用</td><td>0.5d</td><td class="mono">stage0-03</td></tr>
         <tr><td>4 · 范围边界</td><td>已拍板：阶段 0 只做基建，不切换任何业务域存储</td><td>0.5d</td><td class="mono">stage0-04</td></tr>
