@@ -8,7 +8,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { server } from './mocks/server.js'
 import ChatArea from '../pages/AiHomeWorkbench/components/ChatArea/index.jsx'
-import ModelRunTrace from '../pages/AiHomeWorkbench/components/StatusPanel/ModelRunTrace.jsx'
+import ThinkingTrace from '../pages/AiHomeWorkbench/components/ChatArea/ThinkingTrace.jsx'
 
 // ---------- ChatArea 提示条 ----------
 
@@ -162,9 +162,9 @@ const knowledgeToolFixture = {
   contextRef: 'ctx-1',
 }
 
-describe('ModelRunTrace 通用 chip（MS3 工具发现 + MS2-PATCH 引用记忆）', () => {
+describe('ThinkingTrace 通用 chip（MS3 工具发现 + MS2-PATCH 引用记忆）', () => {
   it('既有知识库 chip 行为保持不变', () => {
-    render(<ModelRunTrace knowledgeTool={knowledgeToolFixture} />)
+    render(<ThinkingTrace messageId="t1" knowledgeTool={knowledgeToolFixture} />)
 
     expect(screen.getByLabelText('知识库参考')).toBeInTheDocument()
     expect(screen.getByText('知识库参考')).toBeInTheDocument()
@@ -174,7 +174,8 @@ describe('ModelRunTrace 通用 chip（MS3 工具发现 + MS2-PATCH 引用记忆�
 
   it('工具发现 trace chip：默认折叠，展开可见经 list_tools 选中的工具', () => {
     render(
-      <ModelRunTrace
+      <ThinkingTrace
+        messageId="t2"
         knowledgeTool={knowledgeToolFixture}
         toolCalls={[
           { name: 'knowledge_query', source: 'list_tools' },
@@ -185,7 +186,6 @@ describe('ModelRunTrace 通用 chip（MS3 工具发现 + MS2-PATCH 引用记忆�
 
     const chip = screen.getByLabelText('工具调用')
     expect(chip).toBeInTheDocument()
-    // 默认折叠：工具名不可见
     expect(screen.queryByText('knowledge_query')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /工具调用/ }))
@@ -194,7 +194,7 @@ describe('ModelRunTrace 通用 chip（MS3 工具发现 + MS2-PATCH 引用记忆�
   })
 
   it('仅有工具调用数据（无知识库 trace）时也应渲染 chip', () => {
-    render(<ModelRunTrace toolCalls={[{ name: 'estimate_history', source: 'list_tools' }]} />)
+    render(<ThinkingTrace messageId="t3" toolCalls={[{ name: 'estimate_history', source: 'list_tools' }]} />)
 
     expect(screen.getByLabelText('工具调用')).toBeInTheDocument()
     expect(screen.queryByLabelText('知识库参考')).not.toBeInTheDocument()
@@ -202,7 +202,8 @@ describe('ModelRunTrace 通用 chip（MS3 工具发现 + MS2-PATCH 引用记忆�
 
   it('引用记忆标记：与工具调用 chip 统一设计语言', () => {
     render(
-      <ModelRunTrace
+      <ThinkingTrace
+        messageId="t4"
         knowledgeTool={knowledgeToolFixture}
         memoryRef={{ scenesCount: 2, atomsCount: 3 }}
       />,
@@ -217,7 +218,8 @@ describe('ModelRunTrace 通用 chip（MS3 工具发现 + MS2-PATCH 引用记忆�
 
   it('引用记忆计数为 0 时不渲染标记', () => {
     render(
-      <ModelRunTrace
+      <ThinkingTrace
+        messageId="t5"
         knowledgeTool={knowledgeToolFixture}
         memoryRef={{ scenesCount: 0, atomsCount: 0 }}
       />,
