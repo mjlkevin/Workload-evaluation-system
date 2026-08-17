@@ -15,7 +15,7 @@ services:
     volumes:
       - ./apps/api:/repo/apps/api
       - ./config:/repo/config
-      - ./drizzle:/repo/drizzle
+      - ./apps/api/drizzle:/repo/apps/api/drizzle
     environment:
       NODE_ENV: development
       CONFIG_INTEGRITY_ON_STARTUP: "false"

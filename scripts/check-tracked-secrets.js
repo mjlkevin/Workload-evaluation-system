@@ -14,6 +14,15 @@ const SECRET_KEYS = new Set([
   'privatekey',
   'private_key',
   'cookie',
+  'passwordhash',
+])
+
+// 显式白名单：已知含密字段的文件级豁免（文件仍参与扫描，仅豁免指定字段）。
+// 到期条件（阶段 2 必须执行，勿遗忘）：users 存储切换 PG 后，
+// 从 git 移除 config/auth/users.json 并删除本白名单条目。
+// 在此之前保留 passwordHash 扫描键——任何新增文件若含该键会立即暴露。
+const FIELD_ALLOWLIST = new Map([
+  ['config/auth/users.json', new Set(['passwordhash'])],
 ])
 
 function isMeaningfulSecret(value) {
@@ -52,8 +61,12 @@ function scanFiles(paths, cwd = process.cwd()) {
     const filePath = path.isAbsolute(candidate) ? candidate : path.resolve(cwd, candidate)
     if (!fs.existsSync(filePath)) continue
     const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+    const relative = path.relative(cwd, filePath) || path.basename(filePath)
+    const allowedKeys = FIELD_ALLOWLIST.get(relative)
     for (const fieldPath of collectSecretPaths(parsed)) {
-      findings.push({ file: path.relative(cwd, filePath) || path.basename(filePath), fieldPath })
+      const leafKey = fieldPath.split('.').pop().toLowerCase()
+      if (allowedKeys && allowedKeys.has(leafKey)) continue
+      findings.push({ file: relative, fieldPath })
     }
   }
   return findings

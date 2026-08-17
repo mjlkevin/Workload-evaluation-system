@@ -289,6 +289,18 @@
           <td>已修复 lint 既有 2 error（require-yield / prefer-const）；口径沉淀：CI 绿 = lint / tsc / 四套件全部 success 且 skip 计数逐项说明（已写入计划文档 §6 风险 10）。</td>
           <td><span class="status done"><span class="dot"></span>已修复 / 口径已沉淀</span></td>
         </tr>
+        <tr data-board-event-id="BE-2026-08-17-stage0-pool-max:risks:6">
+          <td>DATABASE_POOL_MAX=1 自锁死（记录 3，2026-08-17）。runMigrations 先从连接池取 1 条连接持 advisory lock，migrate(db) 再取第 2 条；若 DATABASE_POOL_MAX=1（如未来为迁移专用容器精简配置），启动即自锁死。</td>
+          <td>API 启动挂死；迁移专用容器或资源受限部署无法启动。</td>
+          <td>已三处标注最小值 2：apps/api/src/db/migrate.ts 头注释、.env.example、部署指南-R1.md；默认值 10 远高于下限，现实风险低。</td>
+          <td><span class="status done"><span class="dot"></span>已标注 / 约束已留痕（记录 3）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-17-stage0-db-fail-impact:risks:7">
+          <td>过渡期 DB 故障影响面扩大（记录 4，2026-08-17）。迁移移入启动路径且失败即退出后，DB 不可用 API 完全无法启动；而登录/模板/估算/版本等读取路径仍指向 JSON 文件——阶段 1 至阶段 2 过渡期（约三个月）内 DB 故障连带打死这些本不依赖 DB 的功能。</td>
+          <td>DB 故障恢复前，本可降级运行的 JSON 读取功能一并不可用；过渡期可用性对 DB 的依赖提前。</td>
+          <td>已确认属 D4 本意（统一 fail-fast，而非默认继承）：以单一失败模式换取部署简化，不引入 SKIP_MIGRATE_ON_STARTUP 开关与降级路径；运维面保持「起不来 = 迁移失败或 DB 不可用」单一原因模型。过渡期监控以 DB 健康为 API 可用性前置指标；阶段 2 各存储切换后本影响面自然收敛。</td>
+          <td><span class="status done"><span class="dot"></span>可接受 / D4 补注已留痕（记录 4）</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-12-model-config-branch-security:risks:1">
           <td>RP-055 自定义供应商 baseUrl 只校验非空，管理员可让服务端向私网或非 HTTPS 地址发起 POST。</td>
           <td>被利用时可形成有权限前置的盲 SSRF，触达宿主可访问的内部服务。</td>
