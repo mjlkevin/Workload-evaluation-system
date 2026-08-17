@@ -154,6 +154,34 @@ function pinFileParsingBindingToBuiltinMoonshot(): () => void {
   };
 }
 
+/**
+ * 测试债修复（阶段 0 事项 5 前置）：kimiAssessmentPreview 用例与
+ * pinFileParsingBindingToBuiltinMoonshot 同类问题——用户在验收中把
+ * assessment 场景绑定改到自定义供应商（deepseek）后，凭据 scope 变为
+ * provider:* 且无缓存/无 env 兜底，用例退化为 api_key_missing。
+ * 这里显式把 assessment 绑定钉到内置 moonshot 并在结束后恢复，
+ * 使用例与环境配置解耦。返回恢复函数，须在 finally 中调用。
+ */
+function pinAssessmentBindingToBuiltinMoonshot(): () => void {
+  const store = loadRequirementSystemConfigStore();
+  const snapshot = JSON.parse(JSON.stringify(store)) as typeof store;
+  const builtinBinding = { providerId: BUILTIN_MOONSHOT_PROVIDER_ID, modelId: "kimi-k3" };
+  saveRequirementSystemConfigStore({
+    ...store,
+    active: {
+      ...store.active,
+      scenarioBindings: {
+        assessment: builtinBinding,
+        generation: store.active.scenarioBindings?.generation ?? builtinBinding,
+        fileParsing: store.active.scenarioBindings?.fileParsing ?? builtinBinding,
+      },
+    },
+  });
+  return () => {
+    saveRequirementSystemConfigStore(snapshot);
+  };
+}
+
 function withFileSnapshotRestore(filePath: string, run: () => void): void {
   const existed = fs.existsSync(filePath);
   const before = existed ? fs.readFileSync(filePath, "utf-8") : "";
@@ -1445,6 +1473,7 @@ test("ai.usecase: kimiAssessmentPreview returns model result on valid response",
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
+  const restoreBinding = pinAssessmentBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -1491,6 +1520,7 @@ test("ai.usecase: kimiAssessmentPreview returns model result on valid response",
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
     _resetAiBootstrapForTest();
+    restoreBinding();
   }
 });
 
@@ -2265,6 +2295,7 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
+  const restoreBinding = pinAssessmentBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -2284,6 +2315,7 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
     _resetAiBootstrapForTest();
+    restoreBinding();
   }
 });
 
@@ -2308,6 +2340,7 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
+  const restoreBinding = pinAssessmentBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -2331,6 +2364,7 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
     _resetAiBootstrapForTest();
+    restoreBinding();
   }
 });
 
