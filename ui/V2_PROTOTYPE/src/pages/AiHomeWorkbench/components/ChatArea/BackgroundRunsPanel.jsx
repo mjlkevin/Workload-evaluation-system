@@ -27,8 +27,8 @@ export default function BackgroundRunsPanel({ runs, runCounts, onStopRun }) {
   const hiddenCount = activeRuns.length - visibleRuns.length
 
   return (
-    <div role="status" className="flex flex-col gap-1.5 rounded-[10px] border border-line bg-bg-2 px-3 py-1.5 text-xs text-ink-2">
-      <span>{`后台任务 进行中 ${runCounts.active} · 已完成 ${runCounts.completed}`}</span>
+    <div className="flex flex-col gap-1.5 rounded-[10px] border border-line bg-bg-2 px-3 py-1.5 text-xs text-ink-2">
+      <span role="status">{`后台任务 进行中 ${runCounts.active} · 已完成 ${runCounts.completed}`}</span>
       {visibleRuns.map((run, idx) => (
         <div
           key={run.runId}

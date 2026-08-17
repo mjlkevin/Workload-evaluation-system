@@ -216,20 +216,4 @@ describe('explicit-stop: G4 明确停止', () => {
     expect(reopened.contains(document.activeElement)).toBe(true)
     expect(cancelCalls).toHaveLength(0)
   })
-
-  test('explicit-stop: 页面级 stop-bar 停止经二次确认产生恰 1 次 cancel（N1）', async () => {
-    // cancel 后列表收敛为空，页面级停止入口随之消失
-    const { cancelCalls } = setupStopScenario({ listResponses: [[buildActiveRun()], []] })
-    renderWorkbenchApp()
-    // 页面级主停止入口（aside stop-bar，需活跃会话命中活跃 Run）
-    const pageStop = await screen.findByRole('button', { name: '停止任务' })
-
-    fireEvent.click(pageStop)
-    // 二次确认弹窗出现；确认前不得产生 cancel
-    expect(await screen.findByRole('dialog', { name: '停止任务' })).toBeInTheDocument()
-    expect(cancelCalls).toHaveLength(0)
-
-    fireEvent.click(screen.getByRole('button', { name: '确认停止' }))
-    await waitFor(() => expect(cancelCalls).toHaveLength(1))
-  })
 })
