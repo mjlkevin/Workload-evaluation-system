@@ -105,7 +105,7 @@ jobs:
       # 直接调用 npx tsx 避免「node dist 不存在 → MODULE_NOT_FOUND 假报错再 || 兜底」的
       # 信号噪音：真实迁移失败时真报错不能被假报错掩埋。
       - name: DB migrate
-        run: cd apps/api && npx tsx src/db/migrate.ts
+        run: cd apps/api && npx tsx src/db/migrate.cli.ts
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 

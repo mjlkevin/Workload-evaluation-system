@@ -21,7 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "./client";
 import { ruleSets, systemConfigs, templates, users, versionCodeRules } from "./schema";
@@ -42,6 +42,12 @@ export type SeedAdminResult = {
 
 type SeedBaseConfigOptions = {
   rootDir?: string;
+  /**
+   * 强制覆盖（db:seed --force）：先删除源文件对应的既有行再插入。
+   * 仅限非生产环境（生产环境直接拒绝）；modelVerifyStatus 属运行时 key，不参与覆盖。
+   * 背景：缺失才插口径下，PG 中一旦存在该行，修改仓库 JSON 源文件不再自动生效（记录 1）。
+   */
+  force?: boolean;
 };
 
 type SeedAdminOptions = {
@@ -94,6 +100,19 @@ function loadSeedSources(rootDir: string) {
 export async function seedBaseConfig(options: SeedBaseConfigOptions = {}): Promise<SeedBaseConfigResult> {
   const rootDir = options.rootDir || resolveRootDir();
   const sources = loadSeedSources(rootDir);
+
+  if (options.force) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("--force 仅限非生产环境使用（生产环境禁止覆盖既有配置行）");
+    }
+    // 只覆盖源文件派生的行：三张整表 + system_configs 的三个源 key。
+    // modelVerifyStatus 是运行时状态 key（由 saveScenarioVerifyRecord 写入），不随 force 重置。
+    const sourceKeys = sources.systemConfigs.filter(([, store]) => store !== null && store !== undefined).map(([key]) => key);
+    await db.delete(systemConfigs).where(inArray(systemConfigs.configKey, sourceKeys));
+    await db.delete(templates);
+    await db.delete(ruleSets);
+    await db.delete(versionCodeRules);
+  }
 
   const insertedRules = await db
     .insert(versionCodeRules)
