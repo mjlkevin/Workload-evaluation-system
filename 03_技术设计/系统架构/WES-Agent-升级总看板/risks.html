@@ -262,14 +262,14 @@
         <tr data-board-event-id="BE-2026-08-17-stage0-config-seed:risks:1">
           <td>配置播种缺失导致版本号与估算不可用（高）。若 db:seed 未覆盖 version_code_rules / templates / rule_sets / system_configs，切换后系统可启动但无法出版本号、无法计算估算。</td>
           <td>版本号生成链路（GL/AS/DV/RI/RS 前缀规则）、估算引擎（414KB 模板）、需求解析与实施评估配置全空，核心业务链路中断。</td>
-          <td>事项 7 空库验收用例：db:seed 连跑两次幂等（四类配置行数不变）；空库后 GET /api/v1/rule-sets/active 与 /api/v1/templates 有返回。</td>
-          <td><span class="status warn"><span class="dot"></span>部分缓解（2026-08-17）：seed 模块已随事项 2 就位（seedBaseConfig smoke 首播 6/1/1/4、二次全 0 幂等）；脚本接线与空库验收待事项 7</span></td>
+          <td>事项 7 空库验收用例（DB 层四项，D12 更正后）：db:seed 连跑两次幂等（第二次插入计数全 0）；SQL 直查 version_code_rules 6/active 6、templates groups/items/sheets 205/585/3、rule_sets pipeline 4 段、system_configs 4 key 且 modelVerifyStatus 空 store、admin bcrypt 校验；API 层验收顺延至阶段 2 各存储切换时。</td>
+          <td><span class="status done"><span class="dot"></span>已缓解（2026-08-17 事项 7 收口）：db:seed 接线 + 启动 migrate 已合入（ff001dd），空库 DB 层四项验收全过；残余风险窗口仅为切换前生产配置漂移</span></td>
         </tr>
         <tr data-board-event-id="BE-2026-08-17-stage0-login-chain:risks:2">
           <td>切换后登录链条中断（高）。users 与 invite codes 均不迁移，admin seed 是唯一入口。</td>
           <td>seed 不到位就是切完没人能进系统；40 个存量账号与 4 个邀请码全部失效后无法恢复。</td>
-          <td>seed 幂等性 + 生产环境密码强制校验（缺显式密码拒绝启动）；空库后 WES_ADMIN_USERNAME/PASSWORD 登录成功用例。</td>
-          <td><span class="status warn"><span class="dot"></span>部分缓解（2026-08-17）：ensureAdminSeed 已随事项 2 就位（存在性查重 + 生产缺密码拒绝启动）；db:seed 接线与登录验收待事项 7</span></td>
+          <td>seed 幂等性 + 生产环境密码强制校验（缺显式密码拒绝启动）+ NODE_ENV=production 无 WES_ADMIN_PASSWORD 时 seed 拒绝执行（实测 exit 1）；空库后 admin 行 password_hash 能被 bcrypt 用 WES_ADMIN_PASSWORD 校验通过（实测 true）。</td>
+          <td><span class="status done"><span class="dot"></span>已缓解（2026-08-17 事项 7 收口）：ensureAdminSeed + 生产保护已合入（ff001dd），空库验收通过；登录链路整体验收顺延阶段 2（D12，auth 读取路径仍走 JSON 文件）</span></td>
         </tr>
         <tr data-board-event-id="BE-2026-08-17-stage0-test-db-migrate:risks:3">
           <td>本地测试库迁移前置（2026-08-17 实测）。truncate 补全 53 表后，本地 workload_eval_test 库若未跑 db:migrate，test:ai 会批量报 42P01（relation does not exist）。</td>
