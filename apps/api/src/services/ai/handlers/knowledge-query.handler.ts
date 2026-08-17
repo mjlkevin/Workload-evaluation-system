@@ -129,7 +129,7 @@ async function buildKnowledgeQueryResponse(
   });
 
   let selectedProfile = route.primaryProfile;
-  let attempts: ReturnType<typeof summarizeKnowledgeAttempt>[] = [];
+  const attempts: ReturnType<typeof summarizeKnowledgeAttempt>[] = [];
   let rawKnowledgeTool: ZhipuKnowledgeToolTrace;
   if (route.primaryProfile) {
     rawKnowledgeTool = await queryProfile(route.primaryProfile);

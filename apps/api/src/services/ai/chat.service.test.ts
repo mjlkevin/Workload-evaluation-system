@@ -342,9 +342,16 @@ test("homeWorkbenchChatStream: dispatch 流式成功后发送 delta/done 并写�
 test("homeWorkbenchChatStream: provider stream 失败时发送 error 并写 failed trace", async () => {
   await withChatServiceIsolation(async () => {
     registerFakeKimiProvider({
-      stream: async function* () {
-        throw new Error("upstream_stream_failed");
-      },
+      // 非生成器形式：首次拉取即抛错（async generator 无 yield 会触发 require-yield）
+      stream: () => ({
+        [Symbol.asyncIterator]() {
+          return {
+            async next() {
+              throw new Error("upstream_stream_failed");
+            },
+          };
+        },
+      }),
     });
 
     const { req, res, getSseEvents } = createMockReqRes({
