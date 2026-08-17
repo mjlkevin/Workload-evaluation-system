@@ -70,12 +70,6 @@ jobs:
       - name: Test rules (no DB)
         run: npm run test:rules
 
-      # TODO(W5-C): test:integration 需要启动 API 服务器，而 API 服务器当前需要 DATABASE_URL。
-      # 先 continue-on-error，等 W5-C merge 后接入 Postgres service 再改为强制通过。
-      - name: Test integration (no DB)
-        run: npm run test:integration
-        continue-on-error: true
-
   test-with-db:
     needs: tsc
     runs-on: ubuntu-latest
@@ -106,23 +100,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # TODO(W5-C): test-helpers/db.ts 硬编码了连接串，当前 CI 中无法直接连通。
-      # 先 continue-on-error，等 W5-C merge（testcontainers / 动态连接串）后补完。
+      # test:integration 归位到本 job：集成检查脚本会 spawn 真实 API 服务，
+      # 依赖 DATABASE_URL（postgres service）与 db:migrate 已先执行。
       - name: DB migrate
         run: cd apps/api && npm run db:migrate
-        continue-on-error: true
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
       - name: Test AI
         run: cd apps/api && npm run test:ai
-        continue-on-error: true
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
       - name: Test modules
         run: cd apps/api && npm run test:modules
-        continue-on-error: true
+        env:
+          DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
+
+      - name: Test integration
+        run: cd apps/api && npm run test:integration
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
@@ -130,8 +126,8 @@ jobs:
     needs: [test-non-db, test-with-db]
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # 只在主干或当前开发分支构建镜像
-    if: github.ref == 'refs/heads/kimi/w5-b-ci' || github.ref == 'refs/heads/feat/requirement-assessment-list-ux-polish' || github.ref == 'refs/heads/main'
+    # 只在主干构建镜像（过期分支条件已清理；docker-build 指向 apps/api/Dockerfile 属事项 9）
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
