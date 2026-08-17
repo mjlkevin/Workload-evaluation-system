@@ -138,7 +138,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build API image
-        run: docker build -t wes-api -f docker/Dockerfile.api .
+        run: docker build -t wes-api -f apps/api/Dockerfile .
 
       # Web image build 已暂停（apps/web 已删除）
       # ui/V0_SAAS 有自己的 Dockerfile，待新前端规划后接入 CI

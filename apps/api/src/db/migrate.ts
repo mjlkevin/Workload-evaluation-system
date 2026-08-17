@@ -15,6 +15,12 @@
 //   PG advisory lock（session 级，连接断开自动释放，无死锁残留风险），
 //   串行化全部副本；后续副本获得锁时清单已更新，自然 no-op。
 //   选择理由与备选方案对比见计划文档 §5 D13。
+//
+// 连接池下限约束（记录 3，2026-08-17）：
+//   runMigrations 先从连接池取 1 条连接持有 advisory lock，migrate(db) 再取
+//   第 2 条连接执行 DDL。若 DATABASE_POOL_MAX=1 将发生自锁死（持锁连接等待
+//   空闲连接，永不释放）。因此 DATABASE_POOL_MAX 最小值为 2，
+//   已在 .env.example 与部署文档标注。
 
 import path from "node:path";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
