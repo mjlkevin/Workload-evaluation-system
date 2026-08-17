@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom'
 export default function DraftLinker({ actions }) {
   if (!actions?.length) return null
   return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+    <div className="mt-2.5 flex flex-wrap gap-2">
       {actions.map((action) => (
         <Link
           key={action.label}
