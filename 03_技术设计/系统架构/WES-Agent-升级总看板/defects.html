@@ -396,6 +396,7 @@
               <td class="tc-8">TDD 证据：前端聚焦 14/14；后端聚焦 57 pass / 4 DB skip / 0 fail。合入 main 后全量 modules 372、AI 287、Web 339、Agent 51、规则 8、集成 1 均零失败；Harness 115 pass / 75 DB skip / 0 fail；API/Web build、安全门禁、UI scope 与 board:check 通过。</td>
               <td class="tc-9">2026-08-12 Codex 使用合成附件摘要完成真实异步 Run：首次加载、刷新、切换项目页再返回后附件气泡持续可见；模型准确引用客户、项目和核心需求；正文无裸 formBlock JSON。验收会话已删除且 GET 404，未上传客户资料。保留待用户本人最终确认后关闭；交叉引用 ISS-2026-08-08-001、ISS-2026-08-09-002、ISS-2026-08-09-003。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-08-13-def-2026-08-13-001-derived:defects"><td class="mono tc-0">DEF-2026-08-13-001</td><td class="mono tc-1">ISS-2026-08-13-001</td><td class="mono tc-2">—</td><td class="tc-3">AI 工作台异步 Run 完成态未收敛：消息区 loading、左侧完成未读、切回后的 unread 清除存在竞态；用户文本空白表现待证实</td><td class="tc-4">S2</td><td class="tc-5"><span class="status run"><span class="dot"></span>已修复 / 待人工验收</span></td><td class="tc-6">ui/V2_PROTOTYPE/src/hooks/useBackgroundRuns.jsx / ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js / ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/messageFormatter.js</td><td class="tc-7">修复三层状态收敛：终态先写 runtime store 再广播页面事件；当前会话收到终态时重拉 sessions/unified view 并清除 unread；用户消息历史回显 trimEnd。保留 assistant 换行，不改变 Markdown 内容。</td><td class="tc-8">聚焦测试 28/28；build:web 通过；UI scope 0 findings。待用户按“你好→等待完成→切走/切回→刷新”人工验收，确认 loading 消失、回复可见、未读徽标稳定清除且文本无非预期尾随空白。</td><td class="tc-9">2026-08-13 已完成代码修复，未改 API 合同。交叉引用 ISS-2026-08-09-003、ISS-2026-08-10-003、ISS-2026-08-10-004。</td></tr>
         </tbody>
         </table>
         </div>
