@@ -58,9 +58,15 @@
 | 框架 | Vite 5 + React 18.3 + react-router-dom 6 | Next.js 16 + shadcn/ui + Tailwind |
 | 端口 | 3002（代理 `/api` → 3000） | 3001（已停用） |
 | 页面 | 18 页面 + 12 Assessment 组件 | 16 个 dashboard 页面（已删除） |
+| 样式方案 | 存量：`tokens.css`/`components.css`/`layout.css`（OKLCH 变量 + BEM 类名 + 内联 style）；新代码：Tailwind v4（2026-08-17 起） | Tailwind（已停用） |
 | 状态 | 当前唯一 Web 前端主线 | 【历史说明，已下线】2026-08-06 清理删除 |
 
 **框架决策**：Vite + React 已升级为 Web 主线；V0_SAAS 已于 2026-08-06 清理删除。
+
+**样式方案决策（2026-08-17）**：V2_PROTOTYPE 引入 Tailwind v4（`@tailwindcss/vite`），仅启用 `theme` + `utilities` 两层、**关闭 preflight**，避免与存量的 `tokens.css`/`components.css`/`layout.css` 全局 reset 冲突。`src/tailwind.css` 的 `@theme` 块把既有 OKLCH 设计变量（`--ink`/`--brand`/`--r-md` 等）桥接为 Tailwind 语义化类名（`bg-ink`、`text-ink-3`、`rounded-md` 等），新组件应优先使用桥接后的类名而非硬编码颜色值。策略是纯增量迁移：
+- 新组件默认用 Tailwind utility class 写样式（内联 style 只用于运行时动态值，如逐元素 animationDelay）。
+- 存量文件（973 处 `className` + 1389 处内联 style，截至迁移启动时）不强制改造，顺手迁移即可，不单独排期。
+- 不安排 `components.css`/`layout.css` 的全量退役；如需要，需单独立项评估。
 
 ## 7. 前端实现约定
 

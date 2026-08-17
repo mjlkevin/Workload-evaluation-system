@@ -5,7 +5,8 @@ import ReportViewer from '../WorkspacePanel/ReportViewer.jsx'
 import DraftLinker from '../WorkspacePanel/DraftLinker.jsx'
 import AttachmentCard from './AttachmentCard.jsx'
 import RichAiMessage from './RichAiMessage.jsx'
-import { CopyMessageButton, LoadingDots, MessageTimestamp } from './MessageBits.jsx'
+import LoadingState from './LoadingState.jsx'
+import { CopyMessageButton, MessageTimestamp } from './MessageBits.jsx'
 
 export default function MessageBubble({
   message,
@@ -75,9 +76,8 @@ export default function MessageBubble({
         {message.loading ? (
           <div>
             <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.7 }}>{message.text}</div>
-            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-3)', fontSize: 12 }}>
-              <LoadingDots />
-              <span>正在调用模型并组织回复</span>
+            <div style={{ marginTop: 6 }}>
+              <LoadingState />
             </div>
           </div>
         ) : (

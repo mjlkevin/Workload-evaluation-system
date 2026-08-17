@@ -47,6 +47,16 @@ input, button, select, textarea { font-family: inherit; }
   }
 }
 
+@keyframes ai-pixel-on {
+  0%, 100% { opacity: .15; }
+  50% { opacity: .9; }
+}
+
+@keyframes ai-shimmer-text {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 .ai-message-rich {
   font-size: 13px;
   line-height: 1.75;
