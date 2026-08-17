@@ -98,7 +98,7 @@ export default function MessageBubble({
         {!isUser && !message.error && message.actions && (
           <DraftLinker actions={message.actions} />
         )}
-        {message.file && <div style={{ marginTop: 10 }}><AttachmentCard file={message.file} state="sent" compact inverted={isUser} /></div>}
+        {message.file && <div style={{ marginTop: 10 }}><AttachmentCard file={message.file} state="sent" compact /></div>}
         {message.action === 'login_required' && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             <button className="btn btn-pri" type="button" onClick={goLogin} style={{ height: 30 }}>重新登录</button>

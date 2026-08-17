@@ -1,6 +1,6 @@
 import { fileKind, fileSizeLabel } from '../../utils/harnessPayload.js'
 
-export default function AttachmentCard({ file, state = 'pending', onRemove, compact = false, inverted = false }) {
+export default function AttachmentCard({ file, state = 'pending', onRemove, compact = false }) {
   if (!file?.name) return null
   const kind = fileKind(file)
   const size = fileSizeLabel(file.size)
@@ -15,9 +15,9 @@ export default function AttachmentCard({ file, state = 'pending', onRemove, comp
         alignItems: 'center',
         gap: 10,
         padding: compact ? '8px 10px' : '9px 10px',
-        border: inverted ? '1px solid rgba(255,255,255,.28)' : '1px solid var(--line)',
+        border: '1px solid var(--line)',
         borderRadius: 10,
-        background: inverted ? 'rgba(255,255,255,.14)' : 'var(--bg-soft)',
+        background: 'var(--bg-soft)',
         minWidth: 0,
       }}
     >
@@ -28,9 +28,9 @@ export default function AttachmentCard({ file, state = 'pending', onRemove, comp
           borderRadius: 8,
           display: 'grid',
           placeItems: 'center',
-          background: inverted ? 'rgba(255,255,255,.18)' : '#fff',
-          border: inverted ? '1px solid rgba(255,255,255,.26)' : '1px solid var(--line)',
-          color: inverted ? '#fff' : 'var(--brand)',
+          background: '#fff',
+          border: '1px solid var(--line)',
+          color: 'var(--brand)',
           fontFamily: 'var(--font-mono)',
           fontSize: 10,
           fontWeight: 850,
@@ -39,10 +39,10 @@ export default function AttachmentCard({ file, state = 'pending', onRemove, comp
         {kind}
       </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 750, color: inverted ? '#fff' : 'var(--ink)' }}>
+        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 750, color: 'var(--ink)' }}>
           {file.name}
         </div>
-        <div style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, color: inverted ? 'rgba(255,255,255,.78)' : 'var(--ink-3)' }}>
+        <div style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11.5, color: 'var(--ink-3)' }}>
           {meta}
         </div>
       </div>
