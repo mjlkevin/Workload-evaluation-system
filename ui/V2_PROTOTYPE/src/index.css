@@ -245,9 +245,9 @@ input, button, select, textarea { font-family: inherit; }
   gap: 12px;
   margin: 12px 0 2px;
   padding: 12px;
-  border: 1px solid color-mix(in oklab, var(--brand, #4f46e5) 18%, var(--line, #e5e7eb));
+  border: 1px solid var(--line, #e5e7eb);
   border-radius: 8px;
-  background: linear-gradient(180deg, #fff, color-mix(in oklab, var(--brand-soft, #eef2ff) 22%, #fff));
+  background: transparent;
 }
 
 .ai-form-card__head {
