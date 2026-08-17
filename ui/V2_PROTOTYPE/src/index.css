@@ -153,9 +153,6 @@ input, button, select, textarea { font-family: inherit; }
   max-width: 100%;
   overflow-x: auto;
   margin: 10px 0 14px;
-  border: 1px solid var(--line, #e5e7eb);
-  border-radius: 8px;
-  background: #fff;
 }
 
 .ai-md-table {
@@ -170,15 +167,9 @@ input, button, select, textarea { font-family: inherit; }
 .ai-md-table td {
   padding: 8px 10px;
   border-bottom: 1px solid var(--line, #e5e7eb);
-  border-right: 1px solid var(--line, #e5e7eb);
   text-align: left;
   vertical-align: top;
   color: var(--ink-2, #4b5563);
-}
-
-.ai-md-table th:last-child,
-.ai-md-table td:last-child {
-  border-right: 0;
 }
 
 .ai-md-table tr:last-child td {
