@@ -376,30 +376,6 @@ input, button, select, textarea { font-family: inherit; }
   grid-template-columns: 260px minmax(0, 1fr) 44px;
 }
 
-/* RP-047 Batch D（G4）：当前会话有后台任务时的页面级停止入口条 */
-.ai-home-stop-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  border-radius: 10px;
-  background: var(--bg-soft);
-  flex-shrink: 0;
-}
-.ai-home-stop-bar-text {
-  flex: 1;
-  min-width: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* RP-047 Batch D（Step 5）：SessionRail 会话运行状态七态徽标（文本+图标+颜色三通道） */
 .ai-session-badge {
   display: inline-flex;

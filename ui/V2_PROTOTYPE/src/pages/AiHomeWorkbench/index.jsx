@@ -7,6 +7,7 @@ import useChatMessages from './hooks/useChatMessages.js'
 import useHarnessRun from './hooks/useHarnessRun.js'
 import useWorkbenchState from './hooks/useWorkbenchState.js'
 import ChatArea from './components/ChatArea/index.jsx'
+import BackgroundRunsPanel from './components/ChatArea/BackgroundRunsPanel.jsx'
 import WorkflowTemplates from './components/ChatArea/WorkflowTemplates.jsx'
 import ConfirmDialog from './components/ConfirmDialog.jsx'
 import WorkspacePanel from './components/WorkspacePanel/index.jsx'
@@ -32,7 +33,6 @@ export default function AiHomeWorkbench({ currentUser }) {
     backgroundRuns.runs.forEach((run) => { if (run.sessionId) map[run.sessionId] = run })
     return map
   }, [backgroundRuns.runs])
-  const activeRun = workbench.activeSession ? sessionRuns[workbench.activeSession.sessionId] : null
   const [stopTargetRun, setStopTargetRun] = useState(null)
   const [stoppingRun, setStoppingRun] = useState(false)
   const [stopError, setStopError] = useState('')
@@ -144,21 +144,7 @@ export default function AiHomeWorkbench({ currentUser }) {
     <div className={`ai-home-workbench${workbench.workspacePanelCollapsed ? ' ai-home-workbench--inspector-collapsed' : ''}`} data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
       <h1 className="sr-only">AI 工作台</h1>
       <aside className="ai-home-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
-        {(runCounts.active > 0 || runCounts.completed > 0) && (
-          <div
-            className="ai-home-runs-badge"
-            role="status"
-            style={{ display: 'flex', alignItems: 'center', minHeight: 34, padding: '6px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg-2)', fontSize: 12, color: 'var(--ink-2)' }}
-          >
-            {`后台任务 进行中 ${runCounts.active} · 已完成 ${runCounts.completed}`}
-          </div>
-        )}
-        {activeRun && (
-          <div className="ai-home-stop-bar" role="status">
-            <span className="ai-home-stop-bar-text">后台任务执行中：{activeRun.title || activeRun.runId}</span>
-            <button type="button" className="btn btn-out" style={{ height: 26, padding: '0 12px', fontSize: 12, flexShrink: 0 }} onClick={() => requestStopRun(activeRun)}>停止任务</button>
-          </div>
-        )}
+        <BackgroundRunsPanel runs={backgroundRuns.runs} runCounts={runCounts} onStopRun={requestStopRun} />
         <SessionRail
           sessions={workbench.sessions}
           activeSessionId={workbench.activeSession?.sessionId}
