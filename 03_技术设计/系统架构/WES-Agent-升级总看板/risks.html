@@ -271,6 +271,12 @@
           <td>seed 幂等性 + 生产环境密码强制校验（缺显式密码拒绝启动）；空库后 WES_ADMIN_USERNAME/PASSWORD 登录成功用例。</td>
           <td><span class="status warn"><span class="dot"></span>开放 / 缓解已列入事项 7 验收</span></td>
         </tr>
+        <tr data-board-event-id="BE-2026-08-17-stage0-test-db-migrate:risks:3">
+          <td>本地测试库迁移前置（2026-08-17 实测）。truncate 补全 53 表后，本地 workload_eval_test 库若未跑 db:migrate，test:ai 会批量报 42P01（relation does not exist）。</td>
+          <td>本地开发环境误判测试失败为回归；CI 不受影响（testcontainers 自动迁移）。</td>
+          <td>环境前置记录：本地跑 DB 测试套件前先对测试库执行 npm run db:migrate -w apps/api（已写入计划文档 §6 风险 9）；本地仓库已执行并验证 287/287。</td>
+          <td><span class="status done"><span class="dot"></span>已处置 / 前置条件已记录</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-12-model-config-branch-security:risks:1">
           <td>RP-055 自定义供应商 baseUrl 只校验非空，管理员可让服务端向私网或非 HTTPS 地址发起 POST。</td>
           <td>被利用时可形成有权限前置的盲 SSRF，触达宿主可访问的内部服务。</td>
