@@ -2,6 +2,10 @@
 // Express 应用配置 - 负责组装中间件和路由
 // ============================================================
 
+// 事项 1：async 路由 handler 抛错兜底。Express 4 不自动捕获 async rejection，
+// 未装配时请求会静默挂起；此包 monkey-patch Express 把 rejection 转发给
+// errorHandler，必须最先 import（先于 express 加载）才能保证 patch 生效。
+import "express-async-errors";
 import express, { Express } from "express";
 import multer from "multer";
 
