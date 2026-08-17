@@ -286,11 +286,12 @@ git commit -m "feat(V2_PROTOTYPE): 新建 ThinkingTrace 统一思考轨迹组件
 
 ---
 
-### Task 2: 迁移 memory-visibility 测试到 ThinkingTrace，删除 ModelRunTrace
+### Task 2: 迁移 memory-visibility 测试到 ThinkingTrace（删除 ModelRunTrace 挪到 Task 3）
+
+> **2026-08-17 计划修正**：原计划在本任务里删除 `ModelRunTrace.jsx`，但它此时仍被 `MessageBubble.jsx` 实际引用（Task 3 才会把 `MessageBubble.jsx` 改成引用 `ThinkingTrace`）。`memory-visibility.test.jsx` 自身又通过 `ChatArea/index.jsx` 间接加载 `MessageBubble.jsx`，如果这里先删除 `ModelRunTrace.jsx`，整个测试文件（包括本任务不该动的"待确认记忆提示条"那个 describe 块）会因为模块解析失败而直接挂掉。因此删除动作改为在 **Task 3** 完成 `MessageBubble.jsx` 改造之后再做（Task 3 已相应补充 Step 6）。本任务只做测试迁移，不删文件。
 
 **Files:**
 - Modify: `ui/V2_PROTOTYPE/src/__tests__/memory-visibility.test.jsx:11,165-228`
-- Delete: `ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/StatusPanel/ModelRunTrace.jsx`
 
 - [ ] **Step 1: 修改 memory-visibility.test.jsx 的 import 与渲染调用**
 
@@ -374,33 +375,28 @@ describe('ThinkingTrace 通用 chip（MS3 工具发现 + MS2-PATCH 引用记忆�
 })
 ```
 
-- [ ] **Step 2: 删除 ModelRunTrace.jsx**
-
-```bash
-cd /Users/kevin/AI/Workload-evaluation-system/ui/V2_PROTOTYPE
-rm src/pages/AiHomeWorkbench/components/StatusPanel/ModelRunTrace.jsx
-```
-
-- [ ] **Step 3: 运行测试确认通过**
+- [ ] **Step 2: 运行测试确认通过**
 
 Run: `cd ui/V2_PROTOTYPE && npx vitest run src/__tests__/memory-visibility.test.jsx`
-Expected: PASS，全部用例通过（包括 Step 1 未改动的"待确认记忆提示条"部分）
+Expected: PASS，全部用例通过（包括 Step 1 未改动的"待确认记忆提示条"部分）。此时 `ModelRunTrace.jsx` 仍然存在于磁盘上且仍被 `MessageBubble.jsx` 引用，不要删除它——删除动作已挪到 Task 3。
 
-- [ ] **Step 4: 提交**
+- [ ] **Step 3: 提交（只提交测试迁移，不动 ModelRunTrace.jsx）**
 
 ```bash
-cd /Users/kevin/AI/Workload-evaluation-system
+cd /Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/feat+ai-workbench-ui-modernization
 git add ui/V2_PROTOTYPE/src/__tests__/memory-visibility.test.jsx
-git rm ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/StatusPanel/ModelRunTrace.jsx
-git commit -m "refactor(V2_PROTOTYPE): 迁移 memory-visibility 测试到 ThinkingTrace，废弃 ModelRunTrace"
+git commit -m "refactor(V2_PROTOTYPE): 迁移 memory-visibility 测试到 ThinkingTrace（ModelRunTrace 删除挪至 Task 3）"
 ```
 
 ---
 
 ### Task 3: 在 MessageBubble 接入 ThinkingTrace，去头像/气泡，重做错误态与 meta 栏
 
+> **2026-08-17 计划修正**：本任务新增 Step 6——`MessageBubble.jsx` 改为引用 `ThinkingTrace` 后，`ModelRunTrace.jsx` 才真正没有生产代码引用它，这时才能安全删除（原本安排在 Task 2 删除，但 Task 2 执行时发现 `memory-visibility.test.jsx` 通过 `ChatArea/index.jsx` 间接加载 `MessageBubble.jsx`，过早删除会导致模块解析失败、整个测试文件挂掉，已改为在此处删除）。
+
 **Files:**
 - Modify: `ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx`
+- Delete: `ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/StatusPanel/ModelRunTrace.jsx`（本任务 Step 6，不在 Task 2 做）
 
 - [ ] **Step 1: 运行既有测试确认当前基线全绿（作为改动前后对照基准）**
 
@@ -553,10 +549,30 @@ Expected: PASS 全部通过。如果有断言依赖 `.ai-avatar` 或旧的 `ai-m
 - [ ] **Step 5: 提交**
 
 ```bash
-cd /Users/kevin/AI/Workload-evaluation-system
+cd /Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/feat+ai-workbench-ui-modernization
 git add ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx
 git commit -m "feat(V2_PROTOTYPE): MessageBubble 去头像/气泡，接入 ThinkingTrace，错误态改左侧竖线"
 ```
+
+- [ ] **Step 6: 删除 ModelRunTrace.jsx（挪自 Task 2）**
+
+此时 `MessageBubble.jsx` 已经不再引用 `ModelRunTrace`，是它在生产代码里的唯一调用方。先确认没有任何文件还在引用：
+
+Run: `cd ui/V2_PROTOTYPE && grep -rln "ModelRunTrace" src`
+Expected: 无输出
+
+确认无输出后执行：
+
+```bash
+cd /Users/kevin/AI/Workload-evaluation-system/.claude/worktrees/feat+ai-workbench-ui-modernization
+git rm ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/StatusPanel/ModelRunTrace.jsx
+git commit -m "refactor(V2_PROTOTYPE): 删除 ModelRunTrace（已被 ThinkingTrace 完全取代）"
+```
+
+再跑一次 Task 2 迁移过的测试，确认它现在也能完整通过（此前 Task 2 阶段这个文件因为 `ModelRunTrace.jsx` 还在被引用而无法在删除后验证）：
+
+Run: `cd ui/V2_PROTOTYPE && npx vitest run src/__tests__/memory-visibility.test.jsx`
+Expected: PASS，全部用例通过
 
 ---
 
@@ -623,7 +639,7 @@ git commit -m "feat(V2_PROTOTYPE): MessageBubble 去头像/气泡，接入 Think
 先确认没有其他文件引用：
 
 Run: `cd ui/V2_PROTOTYPE && grep -rln "ai-message-trace" src --include="*.jsx"`
-Expected: 无输出（Task 2 已删除唯一使用者 `ModelRunTrace.jsx`）
+Expected: 无输出（Task 3 已删除唯一使用者 `ModelRunTrace.jsx`）
 
 确认无输出后，删除 `src/index.css` 第 124-158 行（`.ai-code-block code` 规则之后、`.ai-md-h1` 系列规则之前）：
 
