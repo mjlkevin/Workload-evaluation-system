@@ -208,7 +208,14 @@ test("T7a concurrent scans recover the same run exactly once", { skip: !testData
   const coordinator = makeCoordinator();
   const [a, b] = await Promise.all([coordinator.scanOnce(), coordinator.scanOnce()]);
   const outcomes = [...a, ...b].map((r) => r.outcome).sort();
-  assert.deepEqual(outcomes, ["scheduled", "skipped"], "only one recovery actor may win per run");
+  // 两种合法交错，核心不变量是「只恢复一次」：
+  // - 两个 scan 都观察到过期 run：一个 scheduled，另一个被 in-flight 集合或行锁挡下 → skipped
+  // - 第二个 scan 在第一个完成调度后才查询：run 已进入 recovering 退避、不再过期 → 空结果
+  assert.ok(
+    (outcomes.length === 2 && outcomes[0] === "scheduled" && outcomes[1] === "skipped") ||
+      (outcomes.length === 1 && outcomes[0] === "scheduled"),
+    `only one recovery actor may win per run, got ${JSON.stringify(outcomes)}`,
+  );
 
   const row = await getRun(run.harnessRunId);
   assert.equal(row.recoveryCount, 1, "recovery budget consumed exactly once");

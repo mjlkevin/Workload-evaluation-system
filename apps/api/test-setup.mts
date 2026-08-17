@@ -8,9 +8,16 @@
 // 清理：通过 process.on('beforeExit') 在测试全部结束后自动 stop container。
 
 import { fileURLToPath } from "node:url";
+import { globalAgent } from "node:http";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
+
+// supertest/superagent 默认复用进程级 globalAgent 的 keep-alive 连接；
+// server.close() 会半关闭池中连接，下一个测试文件复用即报
+// ECONNRESET「socket hang up」（间歇性）。禁用 keep-alive 让每个
+// 请求使用全新连接，消除跨文件半死连接复用。
+(globalAgent as unknown as { keepAlive?: boolean }).keepAlive = false;
 
 
 const USE_TC = process.env.USE_TESTCONTAINERS === "true" || process.env.CI === "true";

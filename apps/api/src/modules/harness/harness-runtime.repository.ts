@@ -539,10 +539,14 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
       try {
         return await dbInstance.transaction(async (tx) => {
           const now = input.now ?? (await readDbNow(tx));
+          // 队列筛选必须用数据库时钟直接比较：available_at 由 PG now()（微秒精度）写入，
+          // 经 JS Date 中转会截断到毫秒，同一毫秒内 create → claim 时
+          // 「available_at <= now」被误判为 false，导致刚入队的 Run 被漏认领。
+          // input.now 仅用于测试注入确定性时钟，生产路径不传。
           const picked = await tx.execute(sql`
             SELECT harness_run_id
             FROM harness_runs
-            WHERE status IN ('queued', 'recovering') AND available_at <= ${now}
+            WHERE status IN ('queued', 'recovering') AND available_at <= ${input.now ? sql`${input.now}` : sql`now()`}
             ORDER BY available_at ASC, created_at ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
