@@ -38,6 +38,12 @@ declare global {
 // ------------------------------------------------------------------
 // 中间件工厂
 // ------------------------------------------------------------------
+// 阶段 1：四个工厂返回的闭包改为 async（Promise<void>），为后续
+// requireAuth 异步化预留形态；当前 requireAuth 仍为同步实现，
+// await 同步返回值不改变行为。
+// Express 4 不会 await 中间件返回的 Promise，因此闭包内部必须
+// 自行 catch rejection 并转交 next(err)，不能依赖 Express 转发。
+// ------------------------------------------------------------------
 
 /**
  * 仅要求调用方已认证（JWT 有效 + 用户存在且活跃）。
@@ -45,14 +51,18 @@ declare global {
  * 用于 /auth/me、/auth/logout 等仅需登录态的端点。
  */
 export function requireAuthenticated() {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const auth = requireAuth(req, res);
-    if (!auth) {
-      return; // requireAuth 已写 401 响应
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return; // requireAuth 已写 401 响应
+      }
+      req.user = auth.user;
+      req.v2Roles = legacyRoleToV2Roles(auth.user.role);
+      next();
+    } catch (err) {
+      next(err);
     }
-    req.user = auth.user;
-    req.v2Roles = legacyRoleToV2Roles(auth.user.role);
-    next();
   };
 }
 
@@ -61,35 +71,39 @@ export function requireAuthenticated() {
  * 返回 Express 中间件函数。
  */
 export function requireCapability(capability: Capability) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const auth = requireAuth(req, res);
-    if (!auth) {
-      return; // requireAuth 已写 401 响应
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return; // requireAuth 已写 401 响应
+      }
+
+      req.user = auth.user;
+      const v2Roles = legacyRoleToV2Roles(auth.user.role);
+      req.v2Roles = v2Roles;
+
+      if (!anyRoleHasCapability(v2Roles, capability)) {
+        res.status(403).json({
+          code: 40301,
+          message: "权限不足",
+          details: [
+            {
+              field: "capability",
+              reason: `缺少能力位: ${capability}`,
+              required: capability,
+              userLegacyRole: auth.user.role,
+              userV2Roles: v2Roles,
+            },
+          ],
+          requestId: randomUUID(),
+        });
+        return;
+      }
+
+      next();
+    } catch (err) {
+      next(err);
     }
-
-    req.user = auth.user;
-    const v2Roles = legacyRoleToV2Roles(auth.user.role);
-    req.v2Roles = v2Roles;
-
-    if (!anyRoleHasCapability(v2Roles, capability)) {
-      res.status(403).json({
-        code: 40301,
-        message: "权限不足",
-        details: [
-          {
-            field: "capability",
-            reason: `缺少能力位: ${capability}`,
-            required: capability,
-            userLegacyRole: auth.user.role,
-            userV2Roles: v2Roles,
-          },
-        ],
-        requestId: randomUUID(),
-      });
-      return;
-    }
-
-    next();
   };
 }
 
@@ -97,34 +111,38 @@ export function requireCapability(capability: Capability) {
  * 要求调用方拥有指定能力位中的**任意一个**（OR 关系）。
  */
 export function requireAnyCapability(...capabilities: Capability[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const auth = requireAuth(req, res);
-    if (!auth) return;
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) return;
 
-    req.user = auth.user;
-    const v2Roles = legacyRoleToV2Roles(auth.user.role);
-    req.v2Roles = v2Roles;
+      req.user = auth.user;
+      const v2Roles = legacyRoleToV2Roles(auth.user.role);
+      req.v2Roles = v2Roles;
 
-    const hasAny = capabilities.some((c) => anyRoleHasCapability(v2Roles, c));
-    if (!hasAny) {
-      res.status(403).json({
-        code: 40301,
-        message: "权限不足",
-        details: [
-          {
-            field: "capability",
-            reason: `需要以下能力位之一: ${capabilities.join(", ")}`,
-            required: capabilities,
-            userLegacyRole: auth.user.role,
-            userV2Roles: v2Roles,
-          },
-        ],
-        requestId: randomUUID(),
-      });
-      return;
+      const hasAny = capabilities.some((c) => anyRoleHasCapability(v2Roles, c));
+      if (!hasAny) {
+        res.status(403).json({
+          code: 40301,
+          message: "权限不足",
+          details: [
+            {
+              field: "capability",
+              reason: `需要以下能力位之一: ${capabilities.join(", ")}`,
+              required: capabilities,
+              userLegacyRole: auth.user.role,
+              userV2Roles: v2Roles,
+            },
+          ],
+          requestId: randomUUID(),
+        });
+        return;
+      }
+
+      next();
+    } catch (err) {
+      next(err);
     }
-
-    next();
   };
 }
 
@@ -133,33 +151,37 @@ export function requireAnyCapability(...capabilities: Capability[]) {
  * 注意：旧角色 user/sub_admin/admin 仍先映射到 v2，再匹配。
  */
 export function requireV2Role(...allowedRoles: V2Role[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const auth = requireAuth(req, res);
-    if (!auth) return;
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) return;
 
-    req.user = auth.user;
-    const v2Roles = legacyRoleToV2Roles(auth.user.role);
-    req.v2Roles = v2Roles;
+      req.user = auth.user;
+      const v2Roles = legacyRoleToV2Roles(auth.user.role);
+      req.v2Roles = v2Roles;
 
-    const matched = v2Roles.some((r) => allowedRoles.includes(r));
-    if (!matched) {
-      res.status(403).json({
-        code: 40301,
-        message: "权限不足",
-        details: [
-          {
-            field: "role",
-            reason: `需要以下角色之一: ${allowedRoles.join(", ")}`,
-            required: allowedRoles,
-            userLegacyRole: auth.user.role,
-            userV2Roles: v2Roles,
-          },
-        ],
-        requestId: randomUUID(),
-      });
-      return;
+      const matched = v2Roles.some((r) => allowedRoles.includes(r));
+      if (!matched) {
+        res.status(403).json({
+          code: 40301,
+          message: "权限不足",
+          details: [
+            {
+              field: "role",
+              reason: `需要以下角色之一: ${allowedRoles.join(", ")}`,
+              required: allowedRoles,
+              userLegacyRole: auth.user.role,
+              userV2Roles: v2Roles,
+            },
+          ],
+          requestId: randomUUID(),
+        });
+        return;
+      }
+
+      next();
+    } catch (err) {
+      next(err);
     }
-
-    next();
   };
 }
