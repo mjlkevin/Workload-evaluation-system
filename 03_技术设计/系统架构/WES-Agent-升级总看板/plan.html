@@ -67,7 +67,7 @@
       <h1>实施计划与进度</h1>
       <p class="meta">
         <span><b>已完成</b> 阶段 1B / 1C / 1D / 1E / 1F / 1G</span>
-        <span><b>当前阶段</b> RP-047 Batch E 返工进行中 / 阶段 1H-B 已形成交付基线 / 阶段 1H-C 待规划</span>
+        <span><b>当前阶段</b> RP-047 Batch E 返工进行中 / 阶段 1H-B 已形成交付基线 / 阶段 1H-C 待规划 / 阶段 0（JSON→PG 基建）计划已定稿待开工</span>
         <span><b>人工测试</b> 1F/1G/1H-A 用例已登记，待执行回填</span>
         <span><b>分支</b> 业务主线 <code class="inline">codex/role-driven-ai-home-workbench</code> 当前包含 RP-031 合并提交 <code class="inline">5cc81b9</code></span>
         <span><b>状态</b> 需求池共 47 项（主台账口径）：23 项已交付（验收完成）、12 项已交付·待验收回填、10 项待规划/待确认/待验收、2 项暂缓；RP-031 多知识库路由与 RAG 评测闭环已集成关闭。RP-048 通用任务沟通 Skill 已实现并通过自动检查，等待用户体验确认。RP-049（AI 工作台兜底路由与静态回复策略优化，来源 ISS-2026-08-06-001）新增待规划，实施与排期待用户决策。RP-050（AI 工作台意图路由架构 Skill 层解耦，来源 ISS-2026-08-06-002）新增已分析/待统一规划，不排期不进 Sprint。RP-051（Electron 桌面端可行性验证，来源 ISS-2026-08-06-004）决策已收到：用户拍板定位为连接共享服务器的客户端、数据库留服务器端部署（桌面不内嵌 DB），PG 与路径模型两大障碍消除，待细化设计（加载方式选型），不排期。RP-047 A2-R1 候选 <code class="inline">d9790fe</code> 已关闭三个返工阻断项，Codex 独立复跑 Harness 95/95、modules 143/143 与 API/Web build 通过；用户已授权 Qoder 形成 A2 集成候选、Codex 负责独立审计，工单已发布并等待 ACK，B-E 未启动。其余已验证能力和人工验收缺口按原记录保留。</span>
@@ -77,6 +77,7 @@
         <span class="pill ok">阶段 1F 已交付</span>
         <span class="pill ok">阶段 1G 已交付</span>
         <span class="pill brand">RP-047 Batch E · 已交付合入 / 1H-C 规划中</span>
+        <span class="pill brand">阶段 0 基建 · 9 分支待开工</span>
         <span class="pill brand">工作台体验</span>
         <span class="pill warn">Codex 定期实现流程已关闭</span>
       </div>
@@ -99,6 +100,7 @@
         <li><b>§10</b> 阶段 1H-A 本轮迭代</li>
         <li><b>§11</b> 后续任务池</li>
         <li><b>§12</b> 需求池迭代 循环（Loop）</li>
+        <li><b>§13</b> 阶段 0（JSON→PG 迁移基建）</li>
       </ol>
     </div>
 
@@ -837,6 +839,27 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td>所有需求已交付，或被明确拆分、暂缓、冻结并记录原因后，循环 建议暂停。</td>
         </tr>
       </table>
+    </section>
+
+    <section data-tech-collapse data-tech-label="阶段0基建明细">
+      <div class="h-num">Section 13</div>
+      <h2>阶段 0 —— 前置与解障（JSON→PG 迁移基建）</h2>
+      <p class="lead">2026-08-17 用户下达阶段 0 清单（9 事项，约 2 周）：Qoder 完成逐项复核并开 9 条独立分支（<code class="inline">qoder/stage0-01</code> ~ <code class="inline">stage0-09</code>）；同日用户复核反馈拍板：事项 2 策略更正为「删除迁移器」、事项 6 精确缺失 34 张表、事项 7 扩容为 admin + 基础配置播种。计划文档：<code class="inline">00_项目治理/里程碑与计划/阶段0-前置与解障-修复行动计划.md</code>。</p>
+      <table>
+        <tr><th>事项</th><th>定稿动作</th><th>估时</th><th>分支</th></tr>
+        <tr><td>1 · express-async-errors 兜底</td><td>安装依赖 + app.ts 顶部 import + async-500 回归测试（整迁移的第一次提交）</td><td>0.5d</td><td class="mono">stage0-01</td></tr>
+        <tr><td>2 · 删除迁移器（策略更正）</td><td>先搬 4 类配置 upsert 进 db/seed.ts，再删 json-to-pg-migrator / plan / policy.test / migrate-v1-to-v2 + migrators/validators/ + 脚本</td><td>0.5d</td><td class="mono">stage0-02</td></tr>
+        <tr><td>3 · 版本记录目标表</td><td>version_records 已建好；决策记录：versions 域读写 version_records，assessment_versions 归评估版本域自用，不再混用</td><td>0.5d</td><td class="mono">stage0-03</td></tr>
+        <tr><td>4 · 范围边界</td><td>已拍板：阶段 0 只做基建，不切换任何业务域存储</td><td>0.5d</td><td class="mono">stage0-04</td></tr>
+        <tr><td>5 · CI 收口</td><td>移除 4 个 continue-on-error + 3 脚本补 --test-global-setup + 集成测试归位 + 过期分支条件（postgres service 已存在，ci.yml:83-88）</td><td>2d</td><td class="mono">stage0-05</td></tr>
+        <tr><td>6 · truncate 补表</td><td>53 张 pgTable 缺 34 张全量补齐 + 防漂移测试（schema pgTable 数量 == truncate 列表长度）</td><td>0.5d</td><td class="mono">stage0-06</td></tr>
+        <tr><td>7 · db:seed</td><td>ensureAdminSeed + seedBaseConfig（version_code_rules / templates / rule_sets / system_configs×3 + modelVerifyStatus 只建 key）+ 启动 migrate</td><td>2.5d</td><td class="mono">stage0-07</td></tr>
+        <tr><td>8 · 密钥扫描</td><td>SECRET_KEYS 补 passwordhash + users.json 移出 git 跟踪</td><td>0.2d</td><td class="mono">stage0-08</td></tr>
+        <tr><td>9 · Dockerfile 收拢</td><td>保留 apps/api/Dockerfile + 4 项修复 + dev compose 挂载修正；删除 docker/Dockerfile.api</td><td>1d</td><td class="mono">stage0-09</td></tr>
+      </table>
+      <div class="callout warn" style="margin-top:14px">
+        <div><b>执行顺序</b>步骤 0 落定主线 19 项未提交改动（提交或 stash）→ 事项 1 → 事项 2（先搬后删）→ 事项 7 → 事项 6 → 事项 5；3 / 4 / 8 / 9 插空。事项 1 合入后知会运维：原本挂死的端点会开始正常返回 500，日志出现一批新错误属预期收益而非回归。总工时约 8.5-9 个工作日。</div>
+      </div>
     </section>
 
     <footer class="footer">

@@ -259,6 +259,18 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-08-17-stage0-config-seed:risks:1">
+          <td>配置播种缺失导致版本号与估算不可用（高）。若 db:seed 未覆盖 version_code_rules / templates / rule_sets / system_configs，切换后系统可启动但无法出版本号、无法计算估算。</td>
+          <td>版本号生成链路（GL/AS/DV/RI/RS 前缀规则）、估算引擎（414KB 模板）、需求解析与实施评估配置全空，核心业务链路中断。</td>
+          <td>事项 7 空库验收用例：db:seed 连跑两次幂等（四类配置行数不变）；空库后 GET /api/v1/rule-sets/active 与 /api/v1/templates 有返回。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 缓解已列入事项 7 验收</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-17-stage0-login-chain:risks:2">
+          <td>切换后登录链条中断（高）。users 与 invite codes 均不迁移，admin seed 是唯一入口。</td>
+          <td>seed 不到位就是切完没人能进系统；40 个存量账号与 4 个邀请码全部失效后无法恢复。</td>
+          <td>seed 幂等性 + 生产环境密码强制校验（缺显式密码拒绝启动）；空库后 WES_ADMIN_USERNAME/PASSWORD 登录成功用例。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 缓解已列入事项 7 验收</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-12-model-config-branch-security:risks:1">
           <td>RP-055 自定义供应商 baseUrl 只校验非空，管理员可让服务端向私网或非 HTTPS 地址发起 POST。</td>
           <td>被利用时可形成有权限前置的盲 SSRF，触达宿主可访问的内部服务。</td>
