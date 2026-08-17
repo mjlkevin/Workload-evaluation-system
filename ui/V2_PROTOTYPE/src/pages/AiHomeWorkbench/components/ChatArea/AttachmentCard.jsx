@@ -18,7 +18,6 @@ export default function AttachmentCard({ file, state = 'pending', onRemove, comp
         border: inverted ? '1px solid rgba(255,255,255,.28)' : '1px solid var(--line)',
         borderRadius: 10,
         background: inverted ? 'rgba(255,255,255,.14)' : 'var(--bg-soft)',
-        boxShadow: compact || inverted ? 'none' : '0 1px 0 rgba(15,23,42,.03)',
         minWidth: 0,
       }}
     >
