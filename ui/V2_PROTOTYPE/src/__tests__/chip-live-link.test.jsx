@@ -1,6 +1,6 @@
 // 工单 2026-08-11-qoder-memory-panel-chip-live-link · RED→GREEN
 // MS3 chip 活数据链路（前端段）：
-// ① MessageBubble 把 message.toolCalls / message.memoryRef 透传给 ModelRunTrace ——
+// ① MessageBubble 把 message.toolCalls / message.memoryRef 透传给 ThinkingTrace ——
 //    真实 dispatch run 下 chip 可见；
 // ② mapSessionMessages 从会话 metadata 归一 toolCalls / memoryRef ——
 //    刷新 / 切换会话后 chip 仍可渲染。

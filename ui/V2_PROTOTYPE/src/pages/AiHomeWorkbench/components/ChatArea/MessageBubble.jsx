@@ -28,7 +28,7 @@ export default function MessageBubble({
   const showMetaBar = !message.loading && !message.error && Boolean(message.text)
   const metaAlign = isUser ? 'justify-end' : 'justify-start'
   return (
-    <article className="ai-msg-row" style={{ display: 'flex', gap: 10, justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+    <article className="ai-msg-row" style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
       <div className="ai-msg-col" style={{ width: hasArtifacts ? 'min(100%, 1080px)' : undefined, maxWidth: hasArtifacts ? '100%' : (isUser ? '70%' : '76%') }}>
       <div
         className={`ai-bubble-wrap ${isUser ? 'text-right font-medium' : 'text-left font-normal'}${message.error ? ' border-l-2 border-err pl-2.5' : ''}`}
