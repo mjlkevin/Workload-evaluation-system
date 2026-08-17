@@ -63,6 +63,14 @@ describe('MessageBubble chip 透传（MS3 活数据链路）', () => {
 })
 
 describe('mapSessionMessages chip metadata 归一', () => {
+  test('DEF-2026-08-13-001: 用户消息回显去除非预期尾随空白', () => {
+    const messages = mapSessionMessages({
+      sessionId: 'session-whitespace',
+      messages: [{ messageId: 'u1', role: 'user', content: '你好  \n' }],
+    })
+    expect(messages[0].text).toBe('你好')
+  })
+
   test('assistant metadata.toolCalls / metadata.memoryRef 映射到消息字段', () => {
     const session = {
       sessionId: 's-1',

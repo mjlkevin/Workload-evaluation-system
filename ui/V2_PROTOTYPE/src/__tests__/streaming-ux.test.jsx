@@ -9,7 +9,7 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 import ToastContainer from '../components/ui/ToastContainer.jsx'
 import { ToastProvider } from '../hooks/useToast.jsx'
 import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
@@ -358,5 +358,159 @@ describe('streaming-ux: ISS-2026-08-10-005 MessageBubble 思考块位置与文�
     expect(screen.getByRole('button', { name: /思考中…/ })).toBeInTheDocument()
     // 展开态实时可见思考内容
     expect(screen.getByText('正在梳理思路')).toBeInTheDocument()
+  })
+})
+
+// ============================================================
+// ISS-2026-08-16-001（RUN_COMPLETED 竞态：回复不直接显示）RED 守护
+// ============================================================
+// 根因：projector 投影有 5s 轮询延迟，RUN_COMPLETED 事件到达时后端会话
+// 可能尚未包含 assistant 回复。loadSessions 立即返回的 activeSession 无新消息，
+// 对账合并后 loading 占位被保留或消息为空，用户需切页面才能看到回复。
+// 修复契约：终态事件到达时，采用「延迟重试」策略——立即重拉一次，若未取到
+// 回复则延迟 1s 后重试，最多 3 次，确保 projector 投影完成后消息能收敛。
+
+describe('streaming-ux: ISS-2026-08-16-001 RUN_COMPLETED 竞态修复', () => {
+  beforeEach(() => {
+    sessionRuntimeStore.resetAllSessionViews()
+    capturedStreamHandlers = null
+  })
+
+  test('RUN_COMPLETED 到达时若后端无 assistant 回复，应延迟重试 loadSessions', async () => {
+    // 场景：projector 投影延迟，RUN_COMPLETED 到达时后端会话尚无 assistant 回复
+    const workbench = createHookWorkbench()
+    let loadSessionsCallCount = 0
+    workbench.loadSessions = async () => {
+      loadSessionsCallCount += 1
+      // 前两次调用返回无 assistant 回复的会话（投影未完成）
+      if (loadSessionsCallCount <= 2) {
+        workbench.activeSession = {
+          ...workbench.activeSession,
+          messages: [
+            { messageId: 'msg-u1', role: 'user', content: '请解析这个文件并启动工作流。', createdAt: '2026-08-16T00:00:01.000Z' },
+          ],
+        }
+      } else {
+        // 第三次调用返回包含 assistant 回复的会话（投影完成）
+        workbench.activeSession = {
+          ...workbench.activeSession,
+          messages: [
+            { messageId: 'msg-u1', role: 'user', content: '请解析这个文件并启动工作流。', createdAt: '2026-08-16T00:00:01.000Z' },
+            { messageId: 'msg-a1', role: 'assistant', content: '已解析文件并启动工作流，正在处理...', createdAt: '2026-08-16T00:00:02.000Z' },
+          ],
+        }
+      }
+    }
+    const hook = renderHook(() => useChatMessages(workbench))
+    act(() => {
+      hook.result.current.appendMessage({ id: 'u1', role: 'user', text: '请解析这个文件并启动工作流。' })
+      hook.result.current.appendMessage({ id: 'loading-1', role: 'assistant', text: '正在理解你的问题', loading: true })
+    })
+
+    // 模拟 RUN_COMPLETED 到达
+    emitStreamEvent({ sequence: 1, eventType: 'run_completed', payload: { sessionId: 'session-hook' } })
+
+    // 立即调用一次 loadSessions
+    expect(loadSessionsCallCount).toBe(1)
+
+    // 等待 1.5s 后应触发第二次调用（延迟重试）
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(loadSessionsCallCount).toBe(2)
+
+    // 再等待 1.5s 后应触发第三次调用（投影完成，停止重试）
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(loadSessionsCallCount).toBe(3)
+
+    // 再等待 1.5s 不应再调用（已取到回复，停止重试）
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(loadSessionsCallCount).toBe(3)
+  })
+
+  test('RUN_COMPLETED 到达时若后端已有 assistant 回复，不应重试', async () => {
+    // 场景：projector 投影已完成，RUN_COMPLETED 到达时后端会话已包含 assistant 回复
+    const workbench = createHookWorkbench()
+    let loadSessionsCallCount = 0
+    workbench.loadSessions = async () => {
+      loadSessionsCallCount += 1
+      workbench.activeSession = {
+        ...workbench.activeSession,
+        messages: [
+          { messageId: 'msg-u1', role: 'user', content: '请解析这个文件并启动工作流。', createdAt: '2026-08-16T00:00:01.000Z' },
+          { messageId: 'msg-a1', role: 'assistant', content: '已解析文件并启动工作流，正在处理...', createdAt: '2026-08-16T00:00:02.000Z' },
+        ],
+      }
+    }
+    const hook = renderHook(() => useChatMessages(workbench))
+    act(() => {
+      hook.result.current.appendMessage({ id: 'u1', role: 'user', text: '请解析这个文件并启动工作流。' })
+      hook.result.current.appendMessage({ id: 'loading-1', role: 'assistant', text: '正在理解你的问题', loading: true })
+    })
+
+    // 模拟 RUN_COMPLETED 到达
+    emitStreamEvent({ sequence: 1, eventType: 'run_completed', payload: { sessionId: 'session-hook' } })
+
+    // 立即调用一次 loadSessions
+    expect(loadSessionsCallCount).toBe(1)
+
+    // 等待 1.5s 后不应再调用（已取到回复，停止重试）
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(loadSessionsCallCount).toBe(1)
+  })
+
+  test('ISS-2026-08-16-003: 多轮会话旧回复不得视为投影完成（应继续重试）', async () => {
+    // 场景实证（session 574e9040）：会话已有第一轮回复，第二轮 RUN_COMPLETED
+    // 到达时投影未完成。旧终止条件「任意 assistant 回复」恒为 true，重试立即
+    // 终止，loading 占位滞留直到切页。新口径以「本轮已应答」为终止条件。
+    const workbench = createHookWorkbench()
+    let loadSessionsCallCount = 0
+    workbench.loadSessions = async () => {
+      loadSessionsCallCount += 1
+      const base = [
+        { messageId: 'msg-u0', role: 'user', content: '第一轮问题', createdAt: '2026-08-16T00:00:01.000Z' },
+        { messageId: 'msg-a0', role: 'assistant', content: '第一轮回复', createdAt: '2026-08-16T00:00:02.000Z' },
+        { messageId: 'msg-u1', role: 'user', content: '请基于当前附件生成需求解析报告', createdAt: '2026-08-16T00:00:03.000Z' },
+      ]
+      workbench.activeSession = {
+        ...workbench.activeSession,
+        messages: loadSessionsCallCount === 1
+          ? base
+          : [...base, { messageId: 'msg-a1', role: 'assistant', content: '报告已生成', createdAt: '2026-08-16T00:00:04.000Z' }],
+      }
+    }
+    const hook = renderHook(() => useChatMessages(workbench))
+    act(() => {
+      hook.result.current.appendMessage({ id: 'u1', role: 'user', text: '请基于当前附件生成需求解析报告' })
+      hook.result.current.appendMessage({ id: 'loading-1', role: 'assistant', text: '正在理解你的问题', loading: true })
+    })
+
+    emitStreamEvent({ sequence: 1, eventType: 'run_completed', payload: { sessionId: 'session-hook' } })
+    expect(loadSessionsCallCount).toBe(1)
+
+    // 旧代码在此处不会重试（第一轮回复已存在）；新代码应延迟重试
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(loadSessionsCallCount).toBe(2)
+
+    // 第二次已取到本轮回复，停止重试
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(loadSessionsCallCount).toBe(2)
+  })
+
+  test('RUN_COMPLETED 到达时 streaming 消息应正常清理（不破坏既有流式路径）', () => {
+    const hook = renderHook(() => useChatMessages(createHookWorkbench()))
+    act(() => {
+      hook.result.current.appendMessage({ id: 'u1', role: 'user', text: '你好' })
+      hook.result.current.appendMessage({ id: 'loading-1', role: 'assistant', text: '正在理解你的问题', loading: true })
+    })
+
+    // 先有 text.delta 建立 streaming 状态
+    emitStreamEvent({ sequence: 1, eventType: 'text.delta', payload: { delta: '你好' } })
+    // RUN_COMPLETED 到达
+    emitStreamEvent({ sequence: 2, eventType: 'run_completed', payload: { sessionId: 'session-hook' } })
+
+    const target = hook.result.current.messages.find((m) => m.id === 'loading-1')
+    expect(target).toBeTruthy()
+    expect(target.streaming).toBe(false)
+    expect(target.loading).toBe(false)
+    expect(target.text).toBe('你好')
   })
 })

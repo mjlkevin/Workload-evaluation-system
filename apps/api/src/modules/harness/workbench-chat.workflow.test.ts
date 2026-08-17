@@ -455,3 +455,231 @@ test("ISS-004 层 2：恢复重放跳过 execute，流式事件不重复发射�
   await wf.executeStep("chat", ctx);
   assert.equal(appended.length, 1, "恢复重放不得重复发射流式事件");
 });
+
+// ============================================================
+// ISS-2026-08-16-002（异步通道附件回退缺失）RED 守护
+// ============================================================
+// 根因：workbench-chat.workflow.ts L79-85 的 dispatchAttachment 仅从
+// executionConfig.attachments（即 submitRun 请求体）取附件，无会话级回退。
+// 用户第二轮发送纯文本时 attachments 为空 → dispatchAttachment=null →
+// contextRefs 无 attachment: → harnessReportHandler 走"请上传需求文件"分支。
+// 修复契约：dispatchAttachment 构建逻辑增加会话级回退——请求级附件优先，
+// 缺失时从已落库会话附件中取最近一个带 parsedSummary 的附件（与同步路径
+// workbench-chat.handler.ts L59 的 latestSessionAttachmentWithSummary 同款语义）。
+
+test("ISS-2026-08-16-002：第二轮无附件请求时，dispatchAttachment 从会话存储回退取附件", async () => {
+  // 场景：第一轮用户带附件发送，附件已落库；第二轮用户发送纯文本（无附件），
+  // workflow 应从会话存储回退取附件，而非 dispatchAttachment=null。
+  const { storePath, cleanup } = makeTempSessionStore("session-1", "user-1");
+  try {
+    // 预置：会话中已有一个带 parsedSummary 的附件（模拟第一轮已落库）
+    const store = readStoreFile(storePath);
+    store.sessions[0].attachments.push({
+      attachmentId: "att-existing",
+      name: "PLM工作量评估申请表V1.0-251013.xlsx",
+      size: 10240,
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      parsedSummary: "项目：哈希温控\n需求：PLM 系统实施\n模块：项目管理、变更管理",
+      createdAt: new Date().toISOString(),
+    });
+    writeFileSync(storePath, JSON.stringify(store, null, 2), "utf-8");
+
+    let dispatchedAttachment: Record<string, unknown> | null | undefined;
+    const wf = createWorkbenchChatWorkflow({
+      dispatch: async (input) => {
+        dispatchedAttachment = input.attachment as Record<string, unknown> | null | undefined;
+        return {
+          intent: "harness_report_generation",
+          answer: "检测到会话已有附件，正在生成需求解析报告...",
+          businessRole: "pre_sales",
+          roleLabel: "售前顾问",
+          suggestedActions: [],
+          trace: {
+            intentConfidence: 0.95,
+            routingRule: "report_generation_keywords",
+            contextRefs: ["attachment:PLM工作量评估申请表V1.0-251013.xlsx"],
+          },
+        } as any;
+      },
+      appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
+      appendRunEvent: makeNoOpAppendRunEvent(),
+      getSessionRecord: (sessionId, ownerUserId) => {
+        const store = readStoreFile(storePath);
+        return store.sessions.find((s) => s.sessionId === sessionId && s.ownerUserId === ownerUserId) ?? null;
+      },
+    });
+
+    // 第二轮：用户发送纯文本，无附件（executionConfig.attachments 为空）
+    const ctx = makeFakeCtx({
+      run: {
+        executionConfig: {
+          content: "请基于当前附件生成需求解析报告",
+          attachments: [], // 第二轮无附件
+        },
+      },
+    });
+
+    await wf.executeStep("chat", ctx);
+
+    // 断言：dispatchAttachment 应从会话存储回退取到附件，而非 null
+    assert.ok(dispatchedAttachment, "dispatchAttachment 不应为 null——应从会话存储回退取附件");
+    assert.equal(dispatchedAttachment!.name, "PLM工作量评估申请表V1.0-251013.xlsx");
+    assert.equal(
+      dispatchedAttachment!.parsedSummary,
+      "项目：哈希温控\n需求：PLM 系统实施\n模块：项目管理、变更管理",
+      "回退附件必须携带 parsedSummary（报告生成流程依赖）",
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+test("ISS-2026-08-16-002：请求级附件优先于会话级回退（不覆盖新上传附件）", async () => {
+  // 场景：用户第二轮上传了新附件，请求级附件应优先，会话级回退不生效。
+  const { storePath, cleanup } = makeTempSessionStore("session-1", "user-1");
+  try {
+    // 预置：会话中已有旧附件
+    const store = readStoreFile(storePath);
+    store.sessions[0].attachments.push({
+      attachmentId: "att-old",
+      name: "旧需求文档.xlsx",
+      size: 5120,
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      parsedSummary: "旧项目：旧需求",
+      createdAt: new Date().toISOString(),
+    });
+    writeFileSync(storePath, JSON.stringify(store, null, 2), "utf-8");
+
+    let dispatchedAttachment: Record<string, unknown> | null | undefined;
+    const wf = createWorkbenchChatWorkflow({
+      dispatch: async (input) => {
+        dispatchedAttachment = input.attachment as Record<string, unknown> | null | undefined;
+        return {
+          intent: "attachment_qa",
+          answer: "基于新附件回答",
+          businessRole: "pre_sales",
+          roleLabel: "售前顾问",
+          suggestedActions: [],
+          trace: { intentConfidence: 0.9, routingRule: "attachment_context", contextRefs: ["attachment:新需求文档.xlsx"] },
+        } as any;
+      },
+      appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
+      appendRunEvent: makeNoOpAppendRunEvent(),
+      getSessionRecord: (sessionId, ownerUserId) => {
+        const store = readStoreFile(storePath);
+        return store.sessions.find((s) => s.sessionId === sessionId && s.ownerUserId === ownerUserId) ?? null;
+      },
+    });
+
+    // 第二轮：用户上传了新附件
+    const ctx = makeFakeCtx({
+      run: {
+        executionConfig: {
+          content: "请解析这个新文件",
+          attachments: [{
+            name: "新需求文档.xlsx",
+            size: 8192,
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            parsedSummary: "新项目：新需求",
+          }],
+        },
+      },
+    });
+
+    await wf.executeStep("chat", ctx);
+
+    // 断言：请求级附件优先，不覆盖新上传附件
+    assert.ok(dispatchedAttachment);
+    assert.equal(dispatchedAttachment!.name, "新需求文档.xlsx", "请求级附件必须优先于会话级回退");
+    assert.equal(dispatchedAttachment!.parsedSummary, "新项目：新需求");
+  } finally {
+    cleanup();
+  }
+});
+
+test("ISS-2026-08-16-004：显式报告闸门——附件存在且消息为「生成需求解析报告」时走报告流程", async () => {
+  const sessionId = "session-report-gate";
+  const ownerUserId = "user-report-gate";
+  const { storePath, cleanup } = makeTempSessionStore(sessionId, ownerUserId);
+  try {
+    // 预置会话附件（带 parsedSummary）
+    const store = readStoreFile(storePath);
+    store.sessions[0].attachments.push({
+      attachmentId: "att-report-1",
+      name: "需求文档.xlsx",
+      size: 4096,
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      parsedSummary: "已解析：客户=测试客户，需求=ERP 实施",
+      createdAt: new Date().toISOString(),
+    });
+    writeFileSync(storePath, JSON.stringify(store, null, 2), "utf-8");
+
+    let dispatchCalled = false;
+    const wf = createWorkbenchChatWorkflow({
+      dispatch: async () => {
+        dispatchCalled = true;
+        return {
+          intent: "domain_qa",
+          answer: "不应走到这里",
+          businessRole: "pre_sales",
+          roleLabel: "售前顾问",
+          suggestedActions: [],
+          trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+        } as any;
+      },
+      appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
+      appendRunEvent: makeNoOpAppendRunEvent(),
+      getSessionRecord: (sid, uid) => {
+        const s = readStoreFile(storePath);
+        return s.sessions.find((x) => x.sessionId === sid && x.ownerUserId === uid) ?? null;
+      },
+    });
+
+    const ctx = makeFakeCtx({
+      run: {
+        executionConfig: { content: "生成需求解析报告" },
+      },
+    });
+
+    const outcome = await wf.executeStep("chat", ctx);
+
+    // 断言：测试环境无 API Key，runExplicitHomeReportFlow 返回 ok: false，
+    // 闸门回退到普通 dispatch（与同步路径 40001 降级行为对齐）。
+    assert.equal(dispatchCalled, true, "API Key 缺失时应回退到普通 dispatch");
+    assert.equal(outcome.nextStepKey, null);
+    assert.equal(outcome.outbox!.length, 1, "回退后应经 outbox 投影");
+  } finally {
+    cleanup();
+  }
+});
+
+test("ISS-2026-08-16-004：显式报告闸门——无附件时不触发（走普通 dispatch）", async () => {
+  let dispatchCalled = false;
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async () => {
+      dispatchCalled = true;
+      return {
+        intent: "domain_qa",
+        answer: "普通问答回复",
+        businessRole: "pre_sales",
+        roleLabel: "售前顾问",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+      } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+  });
+
+  const ctx = makeFakeCtx({
+    run: {
+      executionConfig: { content: "生成需求解析报告" },
+    },
+  });
+
+  const outcome = await wf.executeStep("chat", ctx);
+
+  // 断言：无附件时闸门不命中，走普通 dispatch
+  assert.equal(dispatchCalled, true, "无附件时应走普通 dispatch");
+  assert.equal(outcome.outbox!.length, 1, "普通 dispatch 应经 outbox 投影");
+});

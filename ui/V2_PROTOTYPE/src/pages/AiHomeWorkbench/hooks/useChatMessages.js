@@ -320,6 +320,40 @@ export default function useChatMessages(workbench) {
         // 终态事件：清理 sending 状态与流式标记
         const sessionId = payload.sessionId || activeSessionKey
         if (sessionId) markSending(sessionId, false)
+        // 终态可能先于最后一条 assistant 消息的 hydrate 到达（尤其是
+        // 没有 text.delta 的同步落库/重连场景）。先重拉会话与统一视图，
+        // 让当前消息区从后端最终消息收敛，而不是长期保留 loading 占位。
+        // ISS-2026-08-16-001：projector 投影有 5s 轮询延迟，终态事件到达时
+        // 后端会话可能尚未包含 assistant 回复。采用「延迟重试」策略：
+        // 立即重拉一次，若未取到回复则延迟 1s 后重试，最多 3 次。
+        if (sessionId === workbenchRef.current?.activeSession?.sessionId) {
+          const loadWithRetry = async (attempt = 0) => {
+            try {
+              await workbenchRef.current?.loadSessions?.()
+              // ISS-2026-08-16-003：终止条件为「后端已应答本轮」——最后一条 user
+              // 消息之后存在 assistant 回复（与 reconcile 的 backendAnswered 同语义）。
+              // 旧口径「任意 assistant 回复」在多轮会话恒为 true，重试立即终止，
+              // 首轮 loadSessions 先于投影返回时 loading 占位长期滞留。
+              // 重试窗口 8s 覆盖 projector 5s 轮询延迟。
+              const backendMessages = workbenchRef.current?.activeSession?.messages ?? []
+              const lastUserIndex = backendMessages.map((m) => m.role).lastIndexOf('user')
+              const currentRoundAnswered = lastUserIndex >= 0
+                && backendMessages.slice(lastUserIndex + 1).some(
+                  (m) => m.role === 'assistant' && m.content && m.content.trim()
+                )
+              if (!currentRoundAnswered && attempt < 8) {
+                // 投影未完成，延迟 1s 后重试
+                setTimeout(() => loadWithRetry(attempt + 1), 1000)
+              }
+            } catch {
+              // 静默失败，不阻断主链路
+            }
+          }
+          loadWithRetry()
+          workbenchRef.current?.refreshUnifiedView?.().catch(() => {})
+          // 当前会话正在可见，不应被终态通知重新标为未读。
+          sessionRuntimeStore.markSessionUnread(sessionId, false)
+        }
         setMessages((prev) => {
           const streamingId = streamingMessageIdRef.current
           if (streamingId && prev.some((m) => m.id === streamingId)) {

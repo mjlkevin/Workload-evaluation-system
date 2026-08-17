@@ -107,7 +107,9 @@ export function mapSessionMessages(session) {
       return {
         id: message.messageId || `${session.sessionId}-${index}`,
         role: message.role,
-        text: stripFormBlockJson(message.content || ''),
+        // 用户输入在发送入口虽已 trim，但异步回显/历史数据仍需清理尾随空白；
+        // assistant 内容保留原始换行，避免破坏 Markdown 排版。
+        text: stripFormBlockJson(message.role === 'user' ? (message.content || '').trimEnd() : (message.content || '')),
         // RP-056：带出后端落库时间，供气泡外时间戳展示
         createdAt: message.createdAt || undefined,
         // ISS-2026-08-08-001: 带出会话附件的 parsedSummary（存在才带），保证水合后出站消息仍携带解析上下文

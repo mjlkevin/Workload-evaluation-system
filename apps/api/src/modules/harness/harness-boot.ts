@@ -15,6 +15,7 @@ import { dispatchHomeWorkbenchTurn } from "../../services/ai/workbench-dispatch.
 import type { StreamingChunk } from "../../services/ai/workbench-dispatch.service";
 import { buildWorkbenchChatDispatchInput, getKimiProvider } from "../../services/ai/handlers/workbench-shared";
 import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.repository";
+import { getAiSession } from "../ai-sessions/ai-sessions.usecase";
 import type { AuthUser } from "../../types";
 import { config } from "../../config/env";
 import { loadRequirementSystemConfigStore, resolveActiveRequirementKimiApiKey } from "../system/system.repository";
@@ -176,6 +177,12 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
     // ISS-2026-08-10-004（层 2）：流式事件写 run 事件流，复用 runtime repository
     // （白名单校验 + 序号分配 + SSE 透传均走既有链路）。
     appendRunEvent: (input) => options.repo.appendRunEvent(input),
+    // ISS-2026-08-16-002：会话级附件回退——请求未携带附件时，从已落库会话
+    // 记录中取最近一个带 parsedSummary 的附件（与同步路径同一口径）。
+    getSessionRecord: (sessionId, ownerUserId) => {
+      const user: AuthUser = { id: ownerUserId, username: "", role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" };
+      return getAiSession(user, sessionId);
+    },
   });
   const registry = createHarnessWorkflowRegistry([workflow]);
 

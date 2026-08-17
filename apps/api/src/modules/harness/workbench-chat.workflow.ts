@@ -23,8 +23,9 @@ import type {
   AppendAiSessionMessageIdempotentInput,
   AppendAiSessionMessageIdempotentResult,
 } from "../ai-sessions/ai-sessions.repository";
-import type { AiAttachment } from "../ai-sessions/ai-sessions.types";
-import { normalizeHomeAttachments } from "../../services/ai/handlers/workbench-shared";
+import type { AiAttachment, AiSessionRecord } from "../ai-sessions/ai-sessions.types";
+import { normalizeHomeAttachments, latestSessionAttachmentWithSummary, isExplicitReportRequest } from "../../services/ai/handlers/workbench-shared";
+import { runExplicitHomeReportFlow } from "../../services/ai/handlers/report-flow";
 
 export type WorkbenchChatWorkflowDeps = {
   /**
@@ -50,6 +51,14 @@ export type WorkbenchChatWorkflowDeps = {
     eventType: "text.delta" | "thought";
     payload: Record<string, unknown>;
   }): Promise<unknown>;
+  /**
+   * ISS-2026-08-16-002：会话级附件回退——请求未携带附件时，从已落库会话
+   * 记录中取最近一个带 parsedSummary 的附件作为 dispatch 上下文（与同步
+   * 路径 workbench-chat.handler.ts L59 同一口径）。
+   * 生产接线见 harness-boot.ts（复用 ai-sessions usecase）；测试注入临时存储实现。
+   * 可选以保持 additive 不破坏既有构造点；未注入时回退静默跳过（行为同修复前）。
+   */
+  getSessionRecord?(sessionId: string, ownerUserId: string): AiSessionRecord | null;
 };
 
 export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): HarnessWorkflow {
@@ -82,7 +91,11 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         ...attachment,
         createdAt: new Date().toISOString(),
       }));
-      const dispatchAttachment = attachments.find((attachment) => attachment.parsedSummary) ?? attachments[0] ?? null;
+      // ISS-2026-08-16-002：请求级附件优先，缺失时经 getSessionRecord 回退到
+      // 已落库会话附件（与同步路径 workbench-chat.handler.ts L59 同一口径）——
+      // 覆盖「同一会话第二轮无附件请求」场景（如先传附件解析，再发"生成报告"）。
+      const dispatchAttachment = attachments.find((attachment) => attachment.parsedSummary) ?? attachments[0]
+        ?? latestSessionAttachmentWithSummary(deps.getSessionRecord?.(aiSessionId, run.ownerUserId) ?? null);
 
       // C2 缺陷 B：用户消息先于 dispatch 幂等落库（旧同步路径同款结构）；
       // 来源键 run 维度 deduplicationKey，恢复重放由去重吸收，不重复。
@@ -102,6 +115,35 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
           eventType: "user_message",
         },
       });
+
+      // ISS-2026-08-16-004：显式报告闸门——当 dispatchAttachment 存在且用户消息
+      // 是「生成需求解析报告」时，直接调用 runExplicitHomeReportFlow 生成报告，
+      // 而不是走 dispatchHomeWorkbenchTurn 的意图分发（后者路由到静态文案）。
+      // 与同步路径 workbench-chat.handler.ts L65 同一口径。
+      if (dispatchAttachment && isExplicitReportRequest(content)) {
+        const sessionWithUserTurn = deps.getSessionRecord?.(aiSessionId, run.ownerUserId) ?? null;
+        if (!sessionWithUserTurn) {
+          throw new Error(`session not found: ${aiSessionId}`);
+        }
+        const flowResult = await runExplicitHomeReportFlow({
+          user: { id: run.ownerUserId, username: run.ownerUsername, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" },
+          workflowKey: "free_chat",
+          session: sessionWithUserTurn,
+          sessionWithUserTurn,
+          parsedAttachment: dispatchAttachment,
+          allAttachments: [dispatchAttachment],
+        });
+        if (flowResult.ok) {
+          // runExplicitHomeReportFlow 已直接落库 assistant 消息 + artifact + pendingAction，
+          // 返回空 outbox 避免双写（projector 不再投影）。
+          return {
+            nextStepKey: null,
+            outbox: [],
+          };
+        }
+        // API Key 缺失时回退到普通 dispatch（与同步路径行为对齐：同步路径返回 40001，
+        // 异步路径降级为普通问答，由意图分发器路由到静态文案）。
+      }
 
       // effectKey 冻结口径：workbench_chat_answer
       const effectKey = ctx.makeEffectKey("workbench_chat_answer", 1);

@@ -103,10 +103,6 @@ export function BackgroundRunProvider({ children }) {
 
   const handleEvent = useCallback((runId, event) => {
     if (event.sequence) sessionRuntimeStore.writeRunCursor(runId, event.sequence)
-    // 广播给页面级监听器（useRunEventStream）；连接归属 provider，cursor 单源推进
-    const listeners = eventListenersRef.current.get(runId)
-    if (listeners) listeners.forEach((listener) => listener.onEvent?.(event))
-
     if (event.eventType === 'run_status_changed' && event.payload?.status) {
       const nextStatus = event.payload.status
       setRuns((prev) => prev.map((run) => (run.runId === runId ? { ...run, status: nextStatus } : run)))
@@ -133,6 +129,11 @@ export function BackgroundRunProvider({ children }) {
       }])
       refresh()
     }
+
+    // 广播给页面级监听器（useRunEventStream）；终态先写入 runtime store，
+    // 再通知消息区对账，避免当前会话的 unread 清除被终态写入覆盖。
+    const listeners = eventListenersRef.current.get(runId)
+    if (listeners) listeners.forEach((listener) => listener.onEvent?.(event))
   }, [refresh])
 
   const handleEventRef = useRef(handleEvent)
