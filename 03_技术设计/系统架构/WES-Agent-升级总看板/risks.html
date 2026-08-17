@@ -263,13 +263,13 @@
           <td>配置播种缺失导致版本号与估算不可用（高）。若 db:seed 未覆盖 version_code_rules / templates / rule_sets / system_configs，切换后系统可启动但无法出版本号、无法计算估算。</td>
           <td>版本号生成链路（GL/AS/DV/RI/RS 前缀规则）、估算引擎（414KB 模板）、需求解析与实施评估配置全空，核心业务链路中断。</td>
           <td>事项 7 空库验收用例：db:seed 连跑两次幂等（四类配置行数不变）；空库后 GET /api/v1/rule-sets/active 与 /api/v1/templates 有返回。</td>
-          <td><span class="status warn"><span class="dot"></span>开放 / 缓解已列入事项 7 验收</span></td>
+          <td><span class="status warn"><span class="dot"></span>部分缓解（2026-08-17）：seed 模块已随事项 2 就位（seedBaseConfig smoke 首播 6/1/1/4、二次全 0 幂等）；脚本接线与空库验收待事项 7</span></td>
         </tr>
         <tr data-board-event-id="BE-2026-08-17-stage0-login-chain:risks:2">
           <td>切换后登录链条中断（高）。users 与 invite codes 均不迁移，admin seed 是唯一入口。</td>
           <td>seed 不到位就是切完没人能进系统；40 个存量账号与 4 个邀请码全部失效后无法恢复。</td>
           <td>seed 幂等性 + 生产环境密码强制校验（缺显式密码拒绝启动）；空库后 WES_ADMIN_USERNAME/PASSWORD 登录成功用例。</td>
-          <td><span class="status warn"><span class="dot"></span>开放 / 缓解已列入事项 7 验收</span></td>
+          <td><span class="status warn"><span class="dot"></span>部分缓解（2026-08-17）：ensureAdminSeed 已随事项 2 就位（存在性查重 + 生产缺密码拒绝启动）；db:seed 接线与登录验收待事项 7</span></td>
         </tr>
         <tr data-board-event-id="BE-2026-08-17-stage0-test-db-migrate:risks:3">
           <td>本地测试库迁移前置（2026-08-17 实测）。truncate 补全 53 表后，本地 workload_eval_test 库若未跑 db:migrate，test:ai 会批量报 42P01（relation does not exist）。</td>
