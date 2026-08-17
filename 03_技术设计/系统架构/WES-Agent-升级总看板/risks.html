@@ -277,6 +277,18 @@
           <td>环境前置记录：本地跑 DB 测试套件前先对测试库执行 npm run db:migrate -w apps/api（已写入计划文档 §6 风险 9）；本地仓库已执行并验证 287/287。</td>
           <td><span class="status done"><span class="dot"></span>已处置 / 前置条件已记录</span></td>
         </tr>
+        <tr data-board-event-id="BE-2026-08-17-stage0-requirement-settings-binding:risks:4">
+          <td>运行时可变状态入 git 现场发作（D11，2026-08-17）：config/system/requirement-settings.json 的 assessment / fileParsing 场景曾被验收活动绑到自定义供应商 p-msoou5zw（提交 96df4be），自定义供应商凭据只存目标环境 PG，不在仓库内。</td>
+          <td>任何人从 main 部署，只要目标环境 PG 无 provider:p-msoou5zw 凭据，实施评估与文件解析两场景即报 apiKey required_or_env_missing。</td>
+          <td>已判定为验收残留并回退内置 moonshot（提交 0506b05）。长期：PG 全面迁移完成后该文件退为只读 seed 自然消解；在此之前此类文件提交需人工判断，不能当普通 chore 提交（第一轮体检「运行时可变状态入 git」债的第二次现场发作）。</td>
+          <td><span class="status done"><span class="dot"></span>已回退 / 判定留痕 D11</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-17-stage0-lint-gate-lesson:risks:5">
+          <td>lint 门禁阻塞教训（2026-08-17 事项 5 实测）：CI 门禁链 lint → tsc → test-non-db / test-with-db，lint 存在既有 error 时下游测试 job 全部 skip，四个测试套件实际不会跑。</td>
+          <td>「CI 绿」的误判：只看测试步骤结论会漏掉被 skip 的套件；继续加严后的阶段 1 准入第 1 条（skip 计数核对）要求 lint/tsc 同绿。</td>
+          <td>已修复 lint 既有 2 error（require-yield / prefer-const）；口径沉淀：CI 绿 = lint / tsc / 四套件全部 success 且 skip 计数逐项说明（已写入计划文档 §6 风险 10）。</td>
+          <td><span class="status done"><span class="dot"></span>已修复 / 口径已沉淀</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-12-model-config-branch-security:risks:1">
           <td>RP-055 自定义供应商 baseUrl 只校验非空，管理员可让服务端向私网或非 HTTPS 地址发起 POST。</td>
           <td>被利用时可形成有权限前置的盲 SSRF，触达宿主可访问的内部服务。</td>
