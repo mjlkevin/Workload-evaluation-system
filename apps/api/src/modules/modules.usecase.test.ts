@@ -201,7 +201,8 @@ test("exports.usecase: resolveDownloadFile returns owned file and 404 when missi
   }
 });
 
-function withTeamStoreIsolation(fn: () => void) {
+// 阶段 1 批 4：支持 async 回调（versions accessor 异步化级联），同步回调仍可传入
+async function withTeamStoreIsolation(fn: () => Promise<void> | void): Promise<void> {
   const root = resolveRootDir();
   const storePath = path.resolve(root, "config/teams/store.json");
   const backupPath = `${storePath}.ut.bak`;
@@ -212,7 +213,7 @@ function withTeamStoreIsolation(fn: () => void) {
   }
   try {
     if (fs.existsSync(storePath)) fs.unlinkSync(storePath);
-    fn();
+    await fn();
   } finally {
     if (fs.existsSync(storePath)) fs.unlinkSync(storePath);
     if (existed && fs.existsSync(backupPath)) {
@@ -222,8 +223,8 @@ function withTeamStoreIsolation(fn: () => void) {
   }
 }
 
-test("team.usecase: manager can add member and create review/comment", () => {
-  withTeamStoreIsolation(() => {
+test("team.usecase: manager can add member and create review/comment", async () => {
+  await withTeamStoreIsolation(() => {
     const manager = { id: "team-manager-ut" };
     const member = { id: "team-member-ut" };
     const created = createTeam(manager, { name: "UT Team" });
@@ -242,8 +243,8 @@ test("team.usecase: manager can add member and create review/comment", () => {
   });
 });
 
-test("team.usecase: non-manager cannot close review", () => {
-  withTeamStoreIsolation(() => {
+test("team.usecase: non-manager cannot close review", async () => {
+  await withTeamStoreIsolation(() => {
     const manager = { id: "team-manager-ut-2" };
     const member = { id: "team-member-ut-2" };
     const created = createTeam(manager, { name: "UT Team 2" });
@@ -265,9 +266,9 @@ test("team.usecase: non-manager cannot close review", () => {
   });
 });
 
-test("team.usecase: team plan visibility blocks cross-team user", () => {
-  withTeamStoreIsolation(() => {
-    const store = loadVersionsStore();
+test("team.usecase: team plan visibility blocks cross-team user", async () => {
+  await withTeamStoreIsolation(async () => {
+    const store = await loadVersionsStore();
     const snapshot = JSON.parse(JSON.stringify(store));
     const ownerA = "team-owner-a-ut";
     const ownerB = "team-owner-b-ut";
@@ -293,18 +294,18 @@ test("team.usecase: team plan visibility blocks cross-team user", () => {
       baseCode: "GL-UT-03",
       isHistoricalArchive: false
     });
-    saveVersionsStore(store);
+    await saveVersionsStore(store);
 
     try {
       const team = createTeam({ id: ownerA }, { name: "Owner A Team" });
       assert.equal(team.ok, true);
       if (!team.ok) return;
 
-      const denied = getTeamPlans({ id: ownerB }, team.data.teamId);
+      const denied = await getTeamPlans({ id: ownerB }, team.data.teamId);
       assert.equal(denied.ok, false);
       if (!denied.ok) assert.equal(denied.error.code, 40301);
     } finally {
-      saveVersionsStore(snapshot);
+      await saveVersionsStore(snapshot);
     }
   });
 });

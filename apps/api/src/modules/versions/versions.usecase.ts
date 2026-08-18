@@ -102,7 +102,7 @@ export async function getVersion(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
   if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
 
@@ -120,7 +120,7 @@ export async function listVersions(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "type", reason: "invalid" }]);
   }
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   const items = store.records
     .filter((record) => record.ownerUserId === auth.user.id)
     .filter((record) => record.type === type)
@@ -156,7 +156,7 @@ export async function createVersion(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "status", reason: "invalid" }]);
   }
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   if (!versionCode) {
     const generated = generateVersionCodeByRule(store, {
       ownerUserId: auth.user.id,
@@ -212,7 +212,7 @@ export async function createVersion(req: Request, res: Response) {
   }
 
   store.records.push(record);
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
 
   return res.json(ok({ record: toPublicVersionRecord(record) }, randomUUID()));
 }
@@ -231,7 +231,7 @@ export async function updateVersionStatus(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "status", reason: "invalid" }]);
   }
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   const target = store.records.find((record) => record.id === recordId && record.ownerUserId === auth.user.id);
 
   if (!target) {
@@ -248,7 +248,7 @@ export async function updateVersionStatus(req: Request, res: Response) {
     target.reviewedByUserId = auth.user.id;
   }
 
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
   return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
 }
 
@@ -291,7 +291,7 @@ export async function checkoutVersion(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
   if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
 
@@ -322,7 +322,7 @@ export async function checkoutVersion(req: Request, res: Response) {
   // 保留当前检入快照，用于必要时撤销恢复
   target.lastCheckinPayload = target.payload ? { ...target.payload } : {};
 
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
   return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
 }
 
@@ -342,7 +342,7 @@ export async function saveCheckedOutDraft(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "payload", reason: "required" }]);
   }
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
   if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
 
@@ -363,7 +363,7 @@ export async function saveCheckedOutDraft(req: Request, res: Response) {
   target.updatedByUserId = auth.user.id;
   target.updatedByUsername = auth.user.username;
 
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
   return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
 }
 
@@ -378,7 +378,7 @@ export async function checkinVersion(req: Request, res: Response) {
   const body = req.body as { payload?: Record<string, unknown> };
   const newPayload = body.payload && typeof body.payload === "object" ? body.payload : null;
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
   if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
 
@@ -416,7 +416,7 @@ export async function checkinVersion(req: Request, res: Response) {
     target.lastCheckinPayload = target.payload ? { ...target.payload } : {};
   }
 
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
   return res.json(ok({ record: toPublicVersionRecord(target), versionCode: newVersionCode }, randomUUID()));
 }
 
@@ -428,7 +428,7 @@ export async function undoCheckout(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
   if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
 
@@ -454,7 +454,7 @@ export async function undoCheckout(req: Request, res: Response) {
   target.updatedByUserId = auth.user.id;
   target.updatedByUsername = auth.user.username;
 
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
   return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
 }
 
@@ -466,7 +466,7 @@ export async function promoteVersion(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
   if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
 
@@ -523,7 +523,7 @@ export async function promoteVersion(req: Request, res: Response) {
   };
 
   store.records.push(newRecord);
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
   return res.json(ok({ archived: toPublicVersionRecord(target), newRecord: toPublicVersionRecord(newRecord) }, randomUUID()));
 }
 
@@ -535,7 +535,7 @@ export async function forceUnlockVersion(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   // 管理员可解锁任意用户的记录
   const target = store.records.find((r) => r.id === recordId);
   if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
@@ -555,7 +555,7 @@ export async function forceUnlockVersion(req: Request, res: Response) {
   target.updatedByUserId = auth.user.id;
   target.updatedByUsername = auth.user.username;
 
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
   return res.json(ok({ record: toPublicVersionRecord(target), unlockedBy: auth.user.username }, randomUUID()));
 }
 
@@ -574,7 +574,7 @@ export async function deleteVersion(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "versionCode", reason: "required" }]);
   }
 
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
   const targetIdx = store.records.findIndex(
     (record) =>
       record.ownerUserId === auth.user.id &&
@@ -601,7 +601,7 @@ export async function deleteVersion(req: Request, res: Response) {
   }
 
   const [removed] = store.records.splice(targetIdx, 1);
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
 
   return res.json(ok({ deleted: true, record: toPublicVersionRecord(removed) }, randomUUID()));
 }

@@ -75,7 +75,7 @@ export async function deleteTeamMember(req: Request, res: Response) {
 export async function getPlans(req: Request, res: Response) {
   const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
-  return handleResult(res, getTeamPlans(auth.user, String(req.params.teamId || "")));
+  return handleResult(res, await getTeamPlans(auth.user, String(req.params.teamId || "")));
 }
 
 export async function patchPlanBinding(req: Request, res: Response) {
@@ -83,7 +83,7 @@ export async function patchPlanBinding(req: Request, res: Response) {
   if (!auth) return;
   return handleResult(
     res,
-    updateTeamPlanBinding(auth.user, String(req.params.teamId || ""), String(req.params.globalVersionCode || ""), req.body || {})
+    await updateTeamPlanBinding(auth.user, String(req.params.teamId || ""), String(req.params.globalVersionCode || ""), req.body || {})
   );
 }
 

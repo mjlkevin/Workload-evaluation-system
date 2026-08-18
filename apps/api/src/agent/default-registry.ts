@@ -59,8 +59,9 @@ export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext):
     buildCreateProjectTool((input) => createProjectEvaluationForUser(user, { ...input })),
   );
   registry.register(
-    buildGenerateWbsTool(() => ({
-      items: buildDerivedWbsItemsForUser({ id: user.id, username: user.username }),
+    // 阶段 1 批 4：buildDerivedWbsItemsForUser 级联改 async，回调 await 后返回（工具类型已兼容 Promise）
+    buildGenerateWbsTool(async () => ({
+      items: await buildDerivedWbsItemsForUser({ id: user.id, username: user.username }),
       generatedAt: new Date().toISOString(),
       // 当前 WBS 域为派生只读，无持久化层；草稿不落存储，是否补持久化待评审
       persisted: false,

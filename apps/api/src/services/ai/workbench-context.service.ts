@@ -41,12 +41,13 @@ export type WorkbenchContext = {
 /**
  * 构建 AI 工作台上下文。
  * WES 数据查询复用 listProjectEvaluationsForUser，保证 owner 隔离。
+ * 阶段 1 批 4：级联改 async（listProjectEvaluationsForUser 异步化），实现不动。
  */
-export function buildWorkbenchContext(input: {
+export async function buildWorkbenchContext(input: {
   user: AuthUser;
   attachment?: WorkbenchAttachmentContext | null;
   latestHarnessArtifact?: WorkbenchHarnessArtifactContext | null;
-}): WorkbenchContext {
+}): Promise<WorkbenchContext> {
   const contextRefs: string[] = [];
 
   if (input.attachment?.name) {
@@ -60,7 +61,7 @@ export function buildWorkbenchContext(input: {
   // 查询 owner 可见项目（listProjectEvaluationsForUser 已按 user.id 过滤）
   let visibleProjects: WorkbenchProjectSummary[] = [];
   try {
-    visibleProjects = listProjectEvaluationsForUser(input.user)
+    visibleProjects = (await listProjectEvaluationsForUser(input.user))
       .slice(0, 8)
       .map((project) => ({
         projectId: project.projectId,

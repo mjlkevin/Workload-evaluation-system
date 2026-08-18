@@ -50,15 +50,17 @@ export function mapGlobalVersionToProject(record: VersionRecord): ProjectEvaluat
   };
 }
 
-export function listProjectRecords(ownerUserId: string): VersionRecord[] {
-  return loadVersionsStore().records.filter((record) => isProjectEvaluationRecord(record) && record.ownerUserId === ownerUserId);
+/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+export async function listProjectRecords(ownerUserId: string): Promise<VersionRecord[]> {
+  return (await loadVersionsStore()).records.filter((record) => isProjectEvaluationRecord(record) && record.ownerUserId === ownerUserId);
 }
 
-export function findHarnessDraftRecords(ownerUserId: string, harnessRunId: string, actionId: string): {
+/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+export async function findHarnessDraftRecords(ownerUserId: string, harnessRunId: string, actionId: string): Promise<{
   projectRecord: VersionRecord;
   assessmentRecord: VersionRecord;
-} | null {
-  const records = loadVersionsStore().records;
+} | null> {
+  const records = (await loadVersionsStore()).records;
   const projectRecord = records.find((record) =>
     isProjectEvaluationRecord(record)
     && record.ownerUserId === ownerUserId
@@ -79,11 +81,12 @@ export function findHarnessDraftRecords(ownerUserId: string, harnessRunId: strin
   return { projectRecord, assessmentRecord };
 }
 
-export function findProjectRecordByAssessmentDraft(ownerUserId: string, assessmentRecordId: string): {
+/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+export async function findProjectRecordByAssessmentDraft(ownerUserId: string, assessmentRecordId: string): Promise<{
   projectRecord: VersionRecord;
   assessmentRecord: VersionRecord;
-} | null {
-  const records = loadVersionsStore().records;
+} | null> {
+  const records = (await loadVersionsStore()).records;
   const projectRecord = records.find((record) =>
     isProjectEvaluationRecord(record)
     && record.ownerUserId === ownerUserId
@@ -106,20 +109,22 @@ export function isProjectEvaluationRecord(record: VersionRecord): boolean {
     );
 }
 
-export function saveProjectRecord(record: VersionRecord): void {
-  const store = loadVersionsStore();
+/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+export async function saveProjectRecord(record: VersionRecord): Promise<void> {
+  const store = await loadVersionsStore();
   const index = store.records.findIndex((item) => item.id === record.id);
   if (index >= 0) store.records[index] = record;
   else store.records.push(record);
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
 }
 
-export function saveProjectRecords(records: VersionRecord[]): void {
-  const store = loadVersionsStore();
+/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+export async function saveProjectRecords(records: VersionRecord[]): Promise<void> {
+  const store = await loadVersionsStore();
   for (const record of records) {
     const index = store.records.findIndex((item) => item.id === record.id);
     if (index >= 0) store.records[index] = record;
     else store.records.push(record);
   }
-  saveVersionsStore(store);
+  await saveVersionsStore(store);
 }

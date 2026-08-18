@@ -14,20 +14,20 @@ export type ProjectEvaluationsControllerDeps = {
 export async function listProjectEvaluations(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
-  return res.json(ok({ items: listProjectEvaluationsForUser(auth.user, req.query || {}) }, randomUUID()));
+  return res.json(ok({ items: await listProjectEvaluationsForUser(auth.user, req.query || {}) }, randomUUID()));
 }
 
 export async function createProjectEvaluation(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
-  return res.json(ok({ project: createProjectEvaluationForUser(auth.user, req.body || {}) }, randomUUID()));
+  return res.json(ok({ project: await createProjectEvaluationForUser(auth.user, req.body || {}) }, randomUUID()));
 }
 
 export async function getProjectEvaluation(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
   const projectId = asString(req.params.projectId);
-  const project = getProjectEvaluationForUser(auth.user, projectId);
+  const project = await getProjectEvaluationForUser(auth.user, projectId);
   if (!project) {
     return fail(res, 40404, "项目评估不存在", [{ field: "projectId", reason: "not_found" }]);
   }

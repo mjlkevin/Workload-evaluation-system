@@ -23,8 +23,9 @@ type WbsItem = {
 
 const router = Router();
 
-export function buildDerivedWbsItemsForUser(user: { id: string; username: string }): WbsItem[] {
-  const store = loadVersionsStore();
+/** 阶段 1 批 4：级联改 async（loadVersionsStore 异步化），实现不动。 */
+export async function buildDerivedWbsItemsForUser(user: { id: string; username: string }): Promise<WbsItem[]> {
+  const store = await loadVersionsStore();
   const globals = store.records
     .filter((record) => record.ownerUserId === user.id && record.type === "global")
     .filter((record) => !isProjectEvaluationRecord(record))
@@ -76,7 +77,7 @@ router.get("/", requireCapability("estimates:read"), async (req, res) => {
   const auth = await requireAuth(req, res);
   if (!auth) return;
 
-  return res.json(ok(buildDerivedWbsItemsForUser(auth.user)));
+  return res.json(ok(await buildDerivedWbsItemsForUser(auth.user)));
 });
 
 export default router;
