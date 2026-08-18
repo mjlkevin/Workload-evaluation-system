@@ -13,8 +13,10 @@ import type { AiAssessmentDraftManualConfirmResult, AiDraftManualConfirmation, P
 /**
  * 按「总方案」编码规则生成项目版本号。
  * 若规则不存在或未生效，回退到 PROJECT-{uuid} 保证不阻断创建。
+ * 阶段 1 批 4：级联改 async（loadVersionsStore 异步化）；
+ * loadVersionCodeRulesStore 属 system 域（批 5 范围），本批保持同步调用不动。
  */
-function generateProjectVersionCode(ownerUserId: string): string {
+async function generateProjectVersionCode(ownerUserId: string): Promise<string> {
   const rulesStore = loadVersionCodeRulesStore();
   const rule = rulesStore.rules.find((r) => r.moduleKey === "global" && r.status === "active");
   if (!rule) return `PROJECT-${randomUUID()}`;
@@ -22,7 +24,7 @@ function generateProjectVersionCode(ownerUserId: string): string {
   const format = rule.format || "{PREFIX}-{YYYYMMDD}-{NNN}";
   const hasSeq = formatHasSequenceToken(format);
   const now = new Date();
-  const store = loadVersionsStore();
+  const store = await loadVersionsStore();
 
   for (let seq = 1; seq <= 9999; seq += 1) {
     if (!hasSeq && seq > 1) break;
@@ -41,9 +43,10 @@ function generateProjectVersionCode(ownerUserId: string): string {
   return `PROJECT-${randomUUID()}`;
 }
 
-export function listProjectEvaluationsForUser(user: AuthUser, query: { q?: unknown } = {}): ProjectEvaluationPlan[] {
+/** 阶段 1 批 4：级联改 async（project-evaluations repository 异步化），实现不动。 */
+export async function listProjectEvaluationsForUser(user: AuthUser, query: { q?: unknown } = {}): Promise<ProjectEvaluationPlan[]> {
   const keyword = asString(query.q).toLowerCase();
-  return listProjectRecords(user.id)
+  return (await listProjectRecords(user.id))
     .map(mapGlobalVersionToProject)
     .filter((project) => {
       if (!keyword) return true;
@@ -52,13 +55,15 @@ export function listProjectEvaluationsForUser(user: AuthUser, query: { q?: unkno
     .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)));
 }
 
-export function getProjectEvaluationForUser(user: AuthUser, projectId: string): ProjectEvaluationPlan | null {
-  const record = listProjectRecords(user.id).find((item) => item.id === projectId);
+/** 阶段 1 批 4：级联改 async（project-evaluations repository 异步化），实现不动。 */
+export async function getProjectEvaluationForUser(user: AuthUser, projectId: string): Promise<ProjectEvaluationPlan | null> {
+  const record = (await listProjectRecords(user.id)).find((item) => item.id === projectId);
   if (!record) return null;
   return mapGlobalVersionToProject(record);
 }
 
-export function createProjectEvaluationForUser(user: AuthUser, input: Record<string, unknown>): ProjectEvaluationPlan {
+/** 阶段 1 批 4：级联改 async（generateProjectVersionCode / saveProjectRecord 异步化），实现不动。 */
+export async function createProjectEvaluationForUser(user: AuthUser, input: Record<string, unknown>): Promise<ProjectEvaluationPlan> {
   const nowIso = new Date().toISOString();
   const projectName = asString(input.projectName) || "新项目评估";
   const customerName = asString(input.customerName);
@@ -66,7 +71,7 @@ export function createProjectEvaluationForUser(user: AuthUser, input: Record<str
   const currentStage = asString(input.currentStage) || "project_discovery";
   const createdFromSessionId = asString(input.createdFromSessionId);
   const recordId = randomUUID();
-  const versionCode = generateProjectVersionCode(user.id);
+  const versionCode = await generateProjectVersionCode(user.id);
   const payload: Record<string, unknown> = {
     recordKind: PROJECT_EVALUATION_RECORD_KIND,
     projectName,
@@ -100,7 +105,7 @@ export function createProjectEvaluationForUser(user: AuthUser, input: Record<str
     lastCheckinPayload: {},
   };
 
-  saveProjectRecord(record);
+  await saveProjectRecord(record);
   return mapGlobalVersionToProject(record);
 }
 
@@ -162,7 +167,8 @@ function readOutputAssessmentDraftId(output: unknown): string {
   return asString(asRecord(asRecord(output).assessmentDraft).recordId);
 }
 
-export function createProjectAndAssessmentDraftsFromHarness(
+/** 阶段 1 批 4：级联改 async（findHarnessDraftRecords / generateProjectVersionCode / saveProjectRecords 异步化），实现不动。 */
+export async function createProjectAndAssessmentDraftsFromHarness(
   user: AuthUser,
   input: {
     harnessRunId: string;
@@ -170,8 +176,8 @@ export function createProjectAndAssessmentDraftsFromHarness(
     aiSessionId?: string | null;
     report: HarnessRequirementReportV2Content;
   },
-): ProjectEvaluationDraftBundle {
-  const existingDraft = findHarnessDraftRecords(user.id, input.harnessRunId, input.actionId);
+): Promise<ProjectEvaluationDraftBundle> {
+  const existingDraft = await findHarnessDraftRecords(user.id, input.harnessRunId, input.actionId);
   if (existingDraft) {
     return {
       project: mapGlobalVersionToProject(existingDraft.projectRecord),
@@ -196,7 +202,7 @@ export function createProjectAndAssessmentDraftsFromHarness(
   const industry = asString(project.industry);
 
   const projectRecordId = randomUUID();
-  const projectVersionCode = generateProjectVersionCode(user.id);
+  const projectVersionCode = await generateProjectVersionCode(user.id);
   const assessmentRecordId = randomUUID();
   const assessmentVersionCode = buildAiDraftVersionCode("IA", assessmentRecordId);
   const assessmentPayload: Record<string, unknown> = {
@@ -333,7 +339,7 @@ export function createProjectAndAssessmentDraftsFromHarness(
     lastCheckinPayload: {},
   };
 
-  saveProjectRecords([assessmentRecord, projectRecord]);
+  await saveProjectRecords([assessmentRecord, projectRecord]);
 
   return {
     project: mapGlobalVersionToProject(projectRecord),
@@ -352,7 +358,7 @@ export async function confirmAiAssessmentDraftForUser(
   input: { note?: unknown } = {},
   repo: HarnessRepository = createHarnessRepository(),
 ): Promise<AiAssessmentDraftManualConfirmResult | null> {
-  const pair = findProjectRecordByAssessmentDraft(user.id, assessmentRecordId);
+  const pair = await findProjectRecordByAssessmentDraft(user.id, assessmentRecordId);
   if (!pair) return null;
 
   const { projectRecord, assessmentRecord } = pair;
@@ -381,7 +387,7 @@ async function confirmAiAssessmentDraftForUserCore(
   input: { note?: unknown },
   repo: HarnessRepository,
 ): Promise<AiAssessmentDraftManualConfirmResult | null> {
-  const pair = findProjectRecordByAssessmentDraft(user.id, assessmentRecordId);
+  const pair = await findProjectRecordByAssessmentDraft(user.id, assessmentRecordId);
   if (!pair) return null;
 
   const { projectRecord, assessmentRecord } = pair;
@@ -483,7 +489,7 @@ async function confirmAiAssessmentDraftForUserCore(
     updatedByUserId: user.id,
     updatedByUsername: user.username,
   };
-  saveProjectRecords([nextAssessmentRecord, nextProjectRecord]);
+  await saveProjectRecords([nextAssessmentRecord, nextProjectRecord]);
 
   const runMetadata = asRecord(run.metadata);
   const links = asRecord(runMetadata.links);

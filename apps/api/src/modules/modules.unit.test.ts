@@ -13,11 +13,12 @@ import {
 import { cleanupExpiredSessions, getSession, saveSession } from "./sessions/sessions.repository";
 import { isVersionReferencedByGlobal, saveVersionsStore } from "./versions/versions.repository";
 
-function withFileSnapshotRestore(filePath: string, run: () => void): void {
+// 阶段 1 批 4：支持 async 回调（versions accessor 异步化级联）
+async function withFileSnapshotRestore(filePath: string, run: () => Promise<void>): Promise<void> {
   const existed = fs.existsSync(filePath);
   const snapshot = existed ? fs.readFileSync(filePath, "utf-8") : "";
   try {
-    run();
+    await run();
   } finally {
     if (existed) fs.writeFileSync(filePath, snapshot, "utf-8");
     else if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -109,9 +110,9 @@ test("versions.repository: isVersionReferencedByGlobal returns true when referen
   assert.equal(isVersionReferencedByGlobal(store, "u1", "default", "assessment", "A02"), false);
 });
 
-test("versions.repository: saveVersionsStore writes through a temp file before rename", () => {
+test("versions.repository: saveVersionsStore writes through a temp file before rename", async () => {
   const filePath = versionsStorePath();
-  withFileSnapshotRestore(filePath, () => {
+  await withFileSnapshotRestore(filePath, async () => {
     const originalWriteFileSync = fs.writeFileSync;
     const originalRenameSync = fs.renameSync;
     const writes: string[] = [];
@@ -126,7 +127,7 @@ test("versions.repository: saveVersionsStore writes through a temp file before r
         return originalRenameSync.call(fs, oldPath, newPath);
       };
 
-      saveVersionsStore({ records: [] });
+      await saveVersionsStore({ records: [] });
 
       assert.equal(renames.length, 1);
       assert.equal(renames[0][1], filePath);

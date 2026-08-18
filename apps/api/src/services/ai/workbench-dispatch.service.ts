@@ -243,7 +243,7 @@ export async function dispatchHomeWorkbenchTurn(input: WorkbenchDispatchInput): 
     }
   }
 
-  const context = buildWorkbenchContext({
+  const context = await buildWorkbenchContext({
     user: effectiveInput.user,
     attachment: effectiveInput.attachment,
     latestHarnessArtifact: effectiveInput.latestHarnessArtifact,

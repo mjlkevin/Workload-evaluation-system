@@ -169,13 +169,14 @@ function ensureGlobalPlanOwner(record: VersionRecord, currentUserId: string): bo
   return record.type === "global" && !isProjectEvaluationRecord(record) && record.ownerUserId === currentUserId;
 }
 
-export function getTeamPlans(currentUser: CurrentUser, teamId: string) {
+/** 阶段 1 批 4：级联改 async（loadVersionsStore 异步化），实现不动。 */
+export async function getTeamPlans(currentUser: CurrentUser, teamId: string) {
   const teamStore = loadTeamStore();
   const team = teamStore.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
   if (!ensureTeamMember(team, currentUser.id)) return fail(40301, "权限不足", "teamId", "not_team_member");
 
-  const versionStore = loadVersionsStore();
+  const versionStore = await loadVersionsStore();
   const items = versionStore.records
     .filter((x) => x.type === "global")
     .filter((x) => !isProjectEvaluationRecord(x))
@@ -201,7 +202,8 @@ export function getTeamPlans(currentUser: CurrentUser, teamId: string) {
   return ok({ items });
 }
 
-export function updateTeamPlanBinding(
+/** 阶段 1 批 4：级联改 async（loadVersionsStore / saveVersionsStore 异步化），实现不动。 */
+export async function updateTeamPlanBinding(
   currentUser: CurrentUser,
   teamId: string,
   globalVersionCode: string,
@@ -217,7 +219,7 @@ export function updateTeamPlanBinding(
   if (!team || !targetTeam) return fail(40401, "团队不存在", "teamId", "not_found");
   if (!ensureManager(team, currentUser.id)) return fail(40301, "权限不足", "role", "manager_required");
 
-  const versions = loadVersionsStore();
+  const versions = await loadVersionsStore();
   const global = versions.records.find((x) => x.type === "global" && !isProjectEvaluationRecord(x) && x.versionCode === globalVersionCode);
   if (!global) return fail(40401, "总方案不存在", "globalVersionCode", "not_found");
 
@@ -243,7 +245,7 @@ export function updateTeamPlanBinding(
   });
   const conflict = persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
-  saveVersionsStore(versions);
+  await saveVersionsStore(versions);
   return ok({ updated: true });
 }
 

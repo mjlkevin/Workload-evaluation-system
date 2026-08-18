@@ -1353,7 +1353,7 @@ test("project-evaluations: project containers do not replace latest formal globa
       body: { projectName: "最新项目容器", customerName: "XX制造" },
     }), createMockRes() as unknown as Response);
 
-    const items = buildDerivedWbsItemsForUser(user);
+    const items = await buildDerivedWbsItemsForUser(user);
     assert.equal(items[0].sourceGlobalVersionCode, "GL-FORMAL");
     assert.match(items[0].taskName, /正式总方案/);
 

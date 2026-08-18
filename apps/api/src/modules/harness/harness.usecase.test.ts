@@ -1090,8 +1090,8 @@ test("harness.usecase: formal estimation rejects mismatched action id and type",
   assert.equal((await repo.listToolEvents(created.harnessRunId)).length, 0);
 });
 
-test("project-evaluations: harness draft creation persists project and assessment in one atomic store commit", () => {
-  withFileSnapshotRestore(versionsStorePath(), () => {
+test("project-evaluations: harness draft creation persists project and assessment in one atomic store commit", async () => {
+  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
     const originalWriteFileSync = fs.writeFileSync;
     const originalRenameSync = fs.renameSync;
@@ -1107,7 +1107,7 @@ test("project-evaluations: harness draft creation persists project and assessmen
         return originalRenameSync.call(fs, oldPath, newPath);
       };
 
-      const result = createProjectAndAssessmentDraftsFromHarness(activeHarnessUser(), {
+      const result = await createProjectAndAssessmentDraftsFromHarness(activeHarnessUser(), {
         harnessRunId: "run-atomic",
         actionId: "enter_formal_estimation",
         aiSessionId: "session-atomic",
@@ -1128,7 +1128,7 @@ test("project-evaluations: harness draft creation persists project and assessmen
 
       assert.equal(tempWrites, 1);
       assert.equal(commits, 1);
-      const records = loadVersionsStore().records;
+      const records = (await loadVersionsStore()).records;
       assert.ok(records.some((record) => record.id === result.project.projectId && record.payload.createdFromHarnessRunId === "run-atomic"));
       assert.ok(records.some((record) => record.id === result.assessmentDraft.recordId && record.payload.harnessActionId === "enter_formal_estimation"));
     } finally {
@@ -1138,8 +1138,8 @@ test("project-evaluations: harness draft creation persists project and assessmen
   });
 });
 
-test("project-evaluations: harness draft creation is idempotent by run and action", () => {
-  withFileSnapshotRestore(versionsStorePath(), () => {
+test("project-evaluations: harness draft creation is idempotent by run and action", async () => {
+  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
     const user = activeHarnessUser();
     const input = {
@@ -1161,22 +1161,22 @@ test("project-evaluations: harness draft creation is idempotent by run and actio
       },
     } satisfies Parameters<typeof createProjectAndAssessmentDraftsFromHarness>[1];
 
-    const first = createProjectAndAssessmentDraftsFromHarness(user, input);
-    const second = createProjectAndAssessmentDraftsFromHarness(user, input);
+    const first = await createProjectAndAssessmentDraftsFromHarness(user, input);
+    const second = await createProjectAndAssessmentDraftsFromHarness(user, input);
 
     assert.equal(second.project.projectId, first.project.projectId);
     assert.equal(second.assessmentDraft.recordId, first.assessmentDraft.recordId);
-    const records = loadVersionsStore().records;
+    const records = (await loadVersionsStore()).records;
     assert.equal(records.filter((record) => record.payload?.createdFromHarnessRunId === "run-idempotent").length, 1);
     assert.equal(records.filter((record) => record.payload?.harnessRunId === "run-idempotent").length, 1);
   });
 });
 
-test("project-evaluations: list and detail expose harness trace fields for ai drafts", () => {
-  withFileSnapshotRestore(versionsStorePath(), () => {
+test("project-evaluations: list and detail expose harness trace fields for ai drafts", async () => {
+  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
     const user = activeHarnessUser();
-    const result = createProjectAndAssessmentDraftsFromHarness(user, {
+    const result = await createProjectAndAssessmentDraftsFromHarness(user, {
       harnessRunId: "run-trace",
       actionId: "enter_formal_estimation",
       aiSessionId: "session-trace",
@@ -1195,14 +1195,14 @@ test("project-evaluations: list and detail expose harness trace fields for ai dr
       },
     });
 
-    const list = listProjectEvaluationsForUser(user);
+    const list = await listProjectEvaluationsForUser(user);
     const fromList = list.find((item) => item.projectId === result.project.projectId);
     assert.ok(fromList, "ai draft project should appear in list");
     assert.equal(fromList?.createdFromHarnessRunId, "run-trace");
     assert.equal(fromList?.createdFromHarnessActionId, "enter_formal_estimation");
     assert.equal(fromList?.assessmentVersionCode, result.assessmentDraft.versionCode);
 
-    const fromDetail = getProjectEvaluationForUser(user, result.project.projectId);
+    const fromDetail = await getProjectEvaluationForUser(user, result.project.projectId);
     assert.ok(fromDetail, "ai draft project should be fetchable by detail");
     assert.equal(fromDetail?.createdFromHarnessRunId, "run-trace");
     assert.equal(fromDetail?.createdFromHarnessActionId, "enter_formal_estimation");
@@ -1218,7 +1218,7 @@ test("project-evaluations: list and detail expose harness trace fields for ai dr
       lastLoginAt: new Date().toISOString(),
       permissions: [],
     } as AuthUser;
-    assert.equal(getProjectEvaluationForUser(otherUser, result.project.projectId), null, "non-owner should not access ai draft");
+    assert.equal((await getProjectEvaluationForUser(otherUser, result.project.projectId)), null, "non-owner should not access ai draft");
   });
 });
 
@@ -1237,7 +1237,7 @@ test("project-evaluations: manual confirmation of ai assessment draft writes bac
       aiSessionId: "session-manual-confirm",
       metadata: { links: { aiSessionId: "session-manual-confirm" } },
     });
-    const draft = createProjectAndAssessmentDraftsFromHarness(user, {
+    const draft = await createProjectAndAssessmentDraftsFromHarness(user, {
       harnessRunId: run.harnessRunId,
       actionId: "enter_formal_estimation",
       aiSessionId: "session-manual-confirm",
@@ -1271,7 +1271,7 @@ test("project-evaluations: manual confirmation of ai assessment draft writes bac
     assert.equal(events[0].actionId, "enter_formal_estimation");
     assert.equal((events[0].output as { assessmentDraft?: { recordId?: string } })?.assessmentDraft?.recordId, draft.assessmentDraft.recordId);
 
-    const store = loadVersionsStore();
+    const store = await loadVersionsStore();
     const assessmentRecord = store.records.find((record) => record.id === draft.assessmentDraft.recordId);
     const projectRecord = store.records.find((record) => record.id === draft.project.projectId);
     assert.equal((assessmentRecord?.payload?.aiDraftReview as { status?: string } | undefined)?.status, "confirmed");
@@ -1309,7 +1309,7 @@ test("project-evaluations: concurrent manual confirmation creates one audit even
       aiSessionId: "session-manual-confirm-concurrent",
       metadata: { links: { aiSessionId: "session-manual-confirm-concurrent" } },
     });
-    const draft = createProjectAndAssessmentDraftsFromHarness(user, {
+    const draft = await createProjectAndAssessmentDraftsFromHarness(user, {
       harnessRunId: run.harnessRunId,
       actionId: "enter_formal_estimation",
       aiSessionId: "session-manual-confirm-concurrent",
@@ -1336,7 +1336,7 @@ test("project-evaluations: concurrent manual confirmation creates one audit even
     assert.equal(first?.harness.toolEventId, second?.harness.toolEventId);
     const events = await repo.listToolEvents(run.harnessRunId);
     assert.equal(events.filter((event) => event.toolName === "manual_confirm_ai_draft").length, 1);
-    const store = loadVersionsStore();
+    const store = await loadVersionsStore();
     const assessmentRecord = store.records.find((record) => record.id === draft.assessmentDraft.recordId);
     assert.equal((assessmentRecord?.payload?.aiDraftReview as { note?: string } | undefined)?.note, "第一次确认");
   });
