@@ -3,10 +3,12 @@ import { loadJsonFile, saveJsonFile } from "../../utils/file";
 
 const TEMPLATE_PATH = "config/templates/example-template.json";
 
-export function loadTemplate(): Template {
+/** 阶段 1 批 6：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+export async function loadTemplate(): Promise<Template> {
   return loadJsonFile<Template>(TEMPLATE_PATH);
 }
 
-export function saveTemplate(template: Template): void {
+/** 阶段 1 批 6：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+export async function saveTemplate(template: Template): Promise<void> {
   saveJsonFile(TEMPLATE_PATH, template);
 }

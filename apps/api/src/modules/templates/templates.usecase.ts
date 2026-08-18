@@ -150,7 +150,7 @@ export async function listTemplates(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
 
-  const template = loadTemplate();
+  const template = await loadTemplate();
   res.json(
     ok({
       list: [
@@ -168,7 +168,7 @@ export async function getTemplate(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
 
-  const template = loadTemplate();
+  const template = await loadTemplate();
   if (req.params.templateId !== template.templateId) {
     return fail(res, 40401, "资源不存在", [{ field: "templateId", reason: "not_found" }]);
   }
@@ -185,7 +185,7 @@ export async function importTemplateJson(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "template", reason: "invalid_structure" }]);
   }
 
-  saveTemplate(input);
+  await saveTemplate(input);
   res.json(
     ok(
       {
@@ -218,7 +218,7 @@ export async function importTemplateExcel(req: Request, res: Response) {
       parsed.templateId = asString(req.body.templateId);
     }
 
-    saveTemplate(parsed);
+    await saveTemplate(parsed);
     res.json(
       ok(
         {

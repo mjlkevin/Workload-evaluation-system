@@ -37,8 +37,9 @@ function ok<T>(data: T) {
   return { ok: true as const, data };
 }
 
-function persistWithVersionGuard(store: TeamStore, expectedVersion: number) {
-  const saved = saveTeamStoreWithExpectedVersion(store, expectedVersion);
+/** 阶段 1 批 6：因内部调用 saveTeamStoreWithExpectedVersion（已异步化）级联改 async，实现不动。 */
+async function persistWithVersionGuard(store: TeamStore, expectedVersion: number) {
+  const saved = await saveTeamStoreWithExpectedVersion(store, expectedVersion);
   if (!saved.ok) {
     return fail(40909, "数据版本冲突，请重试", "storeVersion", "conflict");
   }
@@ -46,11 +47,12 @@ function persistWithVersionGuard(store: TeamStore, expectedVersion: number) {
   return null;
 }
 
-export function createTeam(currentUser: CurrentUser, body: { name?: string }) {
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function createTeam(currentUser: CurrentUser, body: { name?: string }) {
   const name = asString(body.name);
   if (!name) return fail(42201, "参数错误", "name", "required");
 
-  const store = loadTeamStore();
+  const store = await loadTeamStore();
   const expectedVersion = store.version;
   const now = new Date().toISOString();
   const team: TeamRecord = {
@@ -69,26 +71,28 @@ export function createTeam(currentUser: CurrentUser, body: { name?: string }) {
     targetType: "team",
     targetId: team.teamId
   });
-  const conflict = persistWithVersionGuard(store, expectedVersion);
+  const conflict = await persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   return ok(team);
 }
 
-export function getTeam(currentUser: CurrentUser, teamId: string) {
-  const store = loadTeamStore();
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function getTeam(currentUser: CurrentUser, teamId: string) {
+  const store = await loadTeamStore();
   const team = store.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
   if (!ensureTeamMember(team, currentUser.id)) return fail(40301, "权限不足", "teamId", "not_team_member");
   return ok(team);
 }
 
-export function addTeamMember(currentUser: CurrentUser, teamId: string, body: { userId?: string; role?: string }) {
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function addTeamMember(currentUser: CurrentUser, teamId: string, body: { userId?: string; role?: string }) {
   const userId = asString(body.userId);
   const role = asString(body.role);
   if (!userId) return fail(42201, "参数错误", "userId", "required");
   if (!isTeamRole(role)) return fail(42201, "参数错误", "role", "invalid");
 
-  const store = loadTeamStore();
+  const store = await loadTeamStore();
   const expectedVersion = store.version;
   const team = store.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
@@ -106,12 +110,13 @@ export function addTeamMember(currentUser: CurrentUser, teamId: string, body: { 
     targetType: "user",
     targetId: userId
   });
-  const conflict = persistWithVersionGuard(store, expectedVersion);
+  const conflict = await persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   return ok(team);
 }
 
-export function updateTeamMemberRole(
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function updateTeamMemberRole(
   currentUser: CurrentUser,
   teamId: string,
   userId: string,
@@ -119,7 +124,7 @@ export function updateTeamMemberRole(
 ) {
   const role = asString(body.role);
   if (!isTeamRole(role)) return fail(42201, "参数错误", "role", "invalid");
-  const store = loadTeamStore();
+  const store = await loadTeamStore();
   const expectedVersion = store.version;
   const team = store.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
@@ -136,13 +141,14 @@ export function updateTeamMemberRole(
     targetType: "user",
     targetId: userId
   });
-  const conflict = persistWithVersionGuard(store, expectedVersion);
+  const conflict = await persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   return ok(team);
 }
 
-export function removeTeamMember(currentUser: CurrentUser, teamId: string, userId: string) {
-  const store = loadTeamStore();
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function removeTeamMember(currentUser: CurrentUser, teamId: string, userId: string) {
+  const store = await loadTeamStore();
   const expectedVersion = store.version;
   const team = store.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
@@ -160,7 +166,7 @@ export function removeTeamMember(currentUser: CurrentUser, teamId: string, userI
     targetType: "user",
     targetId: userId
   });
-  const conflict = persistWithVersionGuard(store, expectedVersion);
+  const conflict = await persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   return ok({ deleted: true });
 }
@@ -169,9 +175,9 @@ function ensureGlobalPlanOwner(record: VersionRecord, currentUserId: string): bo
   return record.type === "global" && !isProjectEvaluationRecord(record) && record.ownerUserId === currentUserId;
 }
 
-/** 阶段 1 批 4：级联改 async（loadVersionsStore 异步化），实现不动。 */
+/** 阶段 1 批 6：loadTeamStore 已异步化，下方调用补 await（跨批级联真正生效）。 */
 export async function getTeamPlans(currentUser: CurrentUser, teamId: string) {
-  const teamStore = loadTeamStore();
+  const teamStore = await loadTeamStore();
   const team = teamStore.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
   if (!ensureTeamMember(team, currentUser.id)) return fail(40301, "权限不足", "teamId", "not_team_member");
@@ -212,7 +218,7 @@ export async function updateTeamPlanBinding(
   const targetTeamId = asString(body.targetTeamId);
   if (!targetTeamId) return fail(42201, "参数错误", "targetTeamId", "required");
 
-  const store = loadTeamStore();
+  const store = await loadTeamStore();
   const expectedVersion = store.version;
   const team = store.teams.find((x) => x.teamId === teamId);
   const targetTeam = store.teams.find((x) => x.teamId === targetTeamId);
@@ -243,13 +249,14 @@ export async function updateTeamPlanBinding(
     targetType: "global_plan",
     targetId: globalVersionCode
   });
-  const conflict = persistWithVersionGuard(store, expectedVersion);
+  const conflict = await persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   await saveVersionsStore(versions);
   return ok({ updated: true });
 }
 
-export function createReview(
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function createReview(
   currentUser: CurrentUser,
   teamId: string,
   body: { globalVersionCode?: string; title?: string }
@@ -258,7 +265,7 @@ export function createReview(
   if (!globalVersionCode) return fail(42201, "参数错误", "globalVersionCode", "required");
   const title = asString(body.title) || `Review for ${globalVersionCode}`;
 
-  const store = loadTeamStore();
+  const store = await loadTeamStore();
   const expectedVersion = store.version;
   const team = store.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
@@ -282,13 +289,14 @@ export function createReview(
     targetType: "review",
     targetId: review.reviewId
   });
-  const conflict = persistWithVersionGuard(store, expectedVersion);
+  const conflict = await persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   return ok(review);
 }
 
-export function listReviews(currentUser: CurrentUser, teamId: string) {
-  const store = loadTeamStore();
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function listReviews(currentUser: CurrentUser, teamId: string) {
+  const store = await loadTeamStore();
   const team = store.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
   if (!ensureTeamMember(team, currentUser.id)) return fail(40301, "权限不足", "teamId", "not_team_member");
@@ -300,7 +308,8 @@ export function listReviews(currentUser: CurrentUser, teamId: string) {
   return ok({ items });
 }
 
-export function updateReviewStatus(
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function updateReviewStatus(
   currentUser: CurrentUser,
   teamId: string,
   reviewId: string,
@@ -309,7 +318,7 @@ export function updateReviewStatus(
   const status = ensureReviewStatus(asString(body.status));
   if (!status) return fail(42201, "参数错误", "status", "invalid");
 
-  const store = loadTeamStore();
+  const store = await loadTeamStore();
   const expectedVersion = store.version;
   const team = store.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
@@ -326,13 +335,14 @@ export function updateReviewStatus(
     targetType: "review",
     targetId: reviewId
   });
-  const conflict = persistWithVersionGuard(store, expectedVersion);
+  const conflict = await persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   return ok(review);
 }
 
-export function listReviewComments(currentUser: CurrentUser, teamId: string, reviewId: string) {
-  const store = loadTeamStore();
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function listReviewComments(currentUser: CurrentUser, teamId: string, reviewId: string) {
+  const store = await loadTeamStore();
   const expectedVersion = store.version;
   const team = store.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
@@ -347,7 +357,8 @@ export function listReviewComments(currentUser: CurrentUser, teamId: string, rev
   return ok({ items });
 }
 
-export function createReviewComment(
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function createReviewComment(
   currentUser: CurrentUser,
   teamId: string,
   reviewId: string,
@@ -356,7 +367,7 @@ export function createReviewComment(
   const content = asString(body.content);
   if (!content) return fail(42201, "参数错误", "content", "required");
 
-  const store = loadTeamStore();
+  const store = await loadTeamStore();
   const expectedVersion = store.version;
   const team = store.teams.find((x) => x.teamId === teamId);
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
@@ -380,13 +391,14 @@ export function createReviewComment(
     targetType: "review",
     targetId: reviewId
   });
-  const conflict = persistWithVersionGuard(store, expectedVersion);
+  const conflict = await persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
   return ok(comment);
 }
 
-export function listUserTeams(currentUser: CurrentUser) {
-  const store = loadTeamStore();
+/** 阶段 1 批 6：因内部调用 loadTeamStore（已异步化）级联改 async，实现不动。 */
+export async function listUserTeams(currentUser: CurrentUser) {
+  const store = await loadTeamStore();
   const teams = listTeamsByUserId(store, currentUser.id);
   return ok({ items: teams });
 }

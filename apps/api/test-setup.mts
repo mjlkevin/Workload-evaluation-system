@@ -20,7 +20,8 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 (globalAgent as unknown as { keepAlive?: boolean }).keepAlive = false;
 
 
-const USE_TC = process.env.USE_TESTCONTAINERS === "true" || process.env.CI === "true";
+const USE_TC = (process.env.USE_TESTCONTAINERS === "true" || process.env.CI === "true")
+  && !process.env.TEST_DATABASE_URL && !process.env.DATABASE_URL;
 
 if (USE_TC) {
   console.log("[test:setup] testcontainers mode enabled");

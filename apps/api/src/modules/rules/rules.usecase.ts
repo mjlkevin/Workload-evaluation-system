@@ -10,7 +10,7 @@ export async function getActiveRuleSet(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
 
-  const ruleSet = loadRuleSet();
+  const ruleSet = await loadRuleSet();
   res.json(ok(ruleSet));
 }
 
@@ -18,7 +18,7 @@ export async function getRuleSetMeta(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
 
-  const ruleSet = loadRuleSet();
+  const ruleSet = await loadRuleSet();
   const meta: RuleSetMeta = {
     grouping: ["group by groupId from template.items"],
     itemRule: ["included ? standardDays : 0"],
@@ -39,7 +39,7 @@ export async function importRuleSetJson(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "ruleSet", reason: "invalid_structure" }]);
   }
 
-  saveRuleSet(input);
+  await saveRuleSet(input);
   res.json(
     ok(
       {

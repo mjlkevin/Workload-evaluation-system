@@ -36,25 +36,25 @@ function handleResult(res: Response, result: UsecaseResult) {
 export async function postTeam(req: Request, res: Response) {
   const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
-  return handleResult(res, createTeam(auth.user, req.body || {}));
+  return handleResult(res, await createTeam(auth.user, req.body || {}));
 }
 
 export async function getUserTeams(req: Request, res: Response) {
   const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
-  return handleResult(res, listUserTeams(auth.user));
+  return handleResult(res, await listUserTeams(auth.user));
 }
 
 export async function getTeamDetail(req: Request, res: Response) {
   const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
-  return handleResult(res, getTeam(auth.user, String(req.params.teamId || "")));
+  return handleResult(res, await getTeam(auth.user, String(req.params.teamId || "")));
 }
 
 export async function postTeamMember(req: Request, res: Response) {
   const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
-  return handleResult(res, addTeamMember(auth.user, String(req.params.teamId || ""), req.body || {}));
+  return handleResult(res, await addTeamMember(auth.user, String(req.params.teamId || ""), req.body || {}));
 }
 
 export async function patchTeamMemberRole(req: Request, res: Response) {
@@ -62,14 +62,14 @@ export async function patchTeamMemberRole(req: Request, res: Response) {
   if (!auth) return;
   return handleResult(
     res,
-    updateTeamMemberRole(auth.user, String(req.params.teamId || ""), String(req.params.userId || ""), req.body || {})
+    await updateTeamMemberRole(auth.user, String(req.params.teamId || ""), String(req.params.userId || ""), req.body || {})
   );
 }
 
 export async function deleteTeamMember(req: Request, res: Response) {
   const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
-  return handleResult(res, removeTeamMember(auth.user, String(req.params.teamId || ""), String(req.params.userId || "")));
+  return handleResult(res, await removeTeamMember(auth.user, String(req.params.teamId || ""), String(req.params.userId || "")));
 }
 
 export async function getPlans(req: Request, res: Response) {
@@ -90,13 +90,13 @@ export async function patchPlanBinding(req: Request, res: Response) {
 export async function postReview(req: Request, res: Response) {
   const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
-  return handleResult(res, createReview(auth.user, String(req.params.teamId || ""), req.body || {}));
+  return handleResult(res, await createReview(auth.user, String(req.params.teamId || ""), req.body || {}));
 }
 
 export async function getReviews(req: Request, res: Response) {
   const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
-  return handleResult(res, listReviews(auth.user, String(req.params.teamId || "")));
+  return handleResult(res, await listReviews(auth.user, String(req.params.teamId || "")));
 }
 
 export async function patchReviewStatus(req: Request, res: Response) {
@@ -104,14 +104,14 @@ export async function patchReviewStatus(req: Request, res: Response) {
   if (!auth) return;
   return handleResult(
     res,
-    updateReviewStatus(auth.user, String(req.params.teamId || ""), String(req.params.reviewId || ""), req.body || {})
+    await updateReviewStatus(auth.user, String(req.params.teamId || ""), String(req.params.reviewId || ""), req.body || {})
   );
 }
 
 export async function getReviewComments(req: Request, res: Response) {
   const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
-  return handleResult(res, listReviewComments(auth.user, String(req.params.teamId || ""), String(req.params.reviewId || "")));
+  return handleResult(res, await listReviewComments(auth.user, String(req.params.teamId || ""), String(req.params.reviewId || "")));
 }
 
 export async function postReviewComment(req: Request, res: Response) {
@@ -119,6 +119,6 @@ export async function postReviewComment(req: Request, res: Response) {
   if (!auth) return;
   return handleResult(
     res,
-    createReviewComment(auth.user, String(req.params.teamId || ""), String(req.params.reviewId || ""), req.body || {})
+    await createReviewComment(auth.user, String(req.params.teamId || ""), String(req.params.reviewId || ""), req.body || {})
   );
 }

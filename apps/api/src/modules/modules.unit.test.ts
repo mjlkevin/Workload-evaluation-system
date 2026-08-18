@@ -52,12 +52,12 @@ test("estimates.repository: idempotency map set/get/delete works", () => {
   assert.equal(getIdempotencyRecord(key), undefined);
 });
 
-test("sessions.repository: save/get and cleanupExpiredSessions", () => {
+test("sessions.repository: save/get and cleanupExpiredSessions", async () => {
   const now = Date.now();
   const expiredId = `expired-${now}`;
   const activeId = `active-${now}`;
 
-  saveSession({
+  await saveSession({
     sessionId: expiredId,
     templateId: "t1",
     ruleSetId: "r1",
@@ -65,7 +65,7 @@ test("sessions.repository: save/get and cleanupExpiredSessions", () => {
     createdAt: now - 1000,
     expiresAt: now - 1
   });
-  saveSession({
+  await saveSession({
     sessionId: activeId,
     templateId: "t1",
     ruleSetId: "r1",
@@ -74,9 +74,9 @@ test("sessions.repository: save/get and cleanupExpiredSessions", () => {
     expiresAt: now + 60_000
   });
 
-  cleanupExpiredSessions(now);
-  assert.equal(getSession(expiredId), undefined);
-  assert.ok(getSession(activeId));
+  await cleanupExpiredSessions(now);
+  assert.equal(await getSession(expiredId), undefined);
+  assert.ok(await getSession(activeId));
 });
 
 test("versions.repository: isVersionReferencedByGlobal returns true when referenced", () => {

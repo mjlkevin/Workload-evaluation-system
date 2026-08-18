@@ -68,6 +68,9 @@ jobs:
       - name: Test rules (no DB)
         run: npm run test:rules
 
+      - name: Test agent (no DB)
+        run: npm run test:agent
+
   # 前端门禁（阶段 1 合并排期裁决）：V2_PROTOTYPE 是当前唯一 Web 主线，
   # 其 356 个 vitest 用例与生产构建从未接入 CI（阶段 0 第 0 批清单第 5 项遗留）。
   # 前端不依赖数据库，独立 job，不挂 test-with-db。
@@ -138,16 +141,27 @@ jobs:
         run: cd apps/api && npm run test:ai
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
+          TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
       - name: Test modules
         run: cd apps/api && npm run test:modules
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
+          TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
       - name: Test integration
         run: cd apps/api && npm run test:integration
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
+          TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
+
+      # 阶段 1 D16：test:harness(191 用例) 接入 CI，填补架构侧漏项。
+      # 包含全部 durable-run 并发用例、确定性 claim 回归、退避序列与恢复上限。
+      - name: Test harness
+        run: cd apps/api && npm run test:harness
+        env:
+          DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
+          TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
   docker-build:
     needs: [test-non-db, test-with-db]

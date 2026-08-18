@@ -36,6 +36,8 @@ export type HarnessRecoveryCoordinatorOptions = {
   timing?: Partial<HarnessRecoveryTiming>;
   batchSize?: number;
   sleepMs?: (ms: number) => Promise<void>;
+  /** T6 fix：注入确定性时钟，避免测试依赖宿主/DB 墙钟差异。默认 () => new Date()。 */
+  now?: () => Date;
 };
 
 export type HarnessRecoveryCoordinator = {
@@ -57,6 +59,7 @@ export function createHarnessRecoveryCoordinator(
   const sleepMs = options.sleepMs ?? defaultSleep;
   const inFlight = new Set<string>();
   let stopping = false;
+  const nowFn = options.now ?? (() => new Date());
 
   async function scanOnce(): Promise<HarnessRecoveryScanResult[]> {
     const expired = await options.repository.findRunsWithExpiredActiveLease({ limit: batchSize });
@@ -75,6 +78,7 @@ export function createHarnessRecoveryCoordinator(
             runId,
             maxAutoRecoveries: timing.maxAutoRecoveries,
             backoffMs: timing.backoffMs,
+            now: nowFn(),
           });
           results.push({ runId, outcome: "cancelled" });
           continue;
@@ -105,6 +109,7 @@ export function createHarnessRecoveryCoordinator(
           runId,
           maxAutoRecoveries: timing.maxAutoRecoveries,
           backoffMs: timing.backoffMs,
+          now: nowFn(),
         });
         if (scheduled.outcome === "scheduled") {
           results.push({ runId, outcome: "scheduled" });
