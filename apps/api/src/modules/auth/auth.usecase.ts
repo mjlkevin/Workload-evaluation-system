@@ -217,20 +217,20 @@ export async function confirmPasswordReset(req: Request, res: Response) {
   res.json(ok({ success: true }, requestId));
 }
 
-export function me(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function me(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   res.json(ok({ user: toPublicUser(auth.user) }, randomUUID()));
 }
 
-export function logout(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function logout(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   res.json(ok({ success: true }, randomUUID()));
 }
 
-export function listUsers(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function listUsers(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   if (!canManageUsers(auth.user)) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
@@ -243,8 +243,8 @@ export function listUsers(req: Request, res: Response) {
   res.json(ok({ users }, randomUUID()));
 }
 
-export function updateUserStatus(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function updateUserStatus(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   if (!canManageUsers(auth.user)) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
@@ -275,8 +275,8 @@ export function updateUserStatus(req: Request, res: Response) {
   res.json(ok({ user: toPublicUser(target) }, randomUUID()));
 }
 
-export function updateUserRole(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function updateUserRole(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   if (!canManageUsers(auth.user)) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
@@ -320,8 +320,8 @@ export function updateUserRole(req: Request, res: Response) {
   res.json(ok({ user: toPublicUser(target) }, randomUUID()));
 }
 
-export function updateUserBusinessRole(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function updateUserBusinessRole(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   if (!canManageUsers(auth.user)) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
@@ -352,7 +352,7 @@ export function updateUserBusinessRole(req: Request, res: Response) {
 }
 
 export async function updateUserPassword(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   if (!canManageUsers(auth.user)) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
@@ -382,8 +382,8 @@ export async function updateUserPassword(req: Request, res: Response) {
   res.json(ok({ user: toPublicUser(target) }, randomUUID()));
 }
 
-export function listInviteCodes(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function listInviteCodes(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   if (!isAdminUser(auth.user)) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "admin_required" }]);
@@ -394,8 +394,8 @@ export function listInviteCodes(req: Request, res: Response) {
   res.json(ok({ codes }, randomUUID()));
 }
 
-export function generateInviteCodeHandler(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function generateInviteCodeHandler(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   if (!isAdminUser(auth.user)) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "admin_required" }]);

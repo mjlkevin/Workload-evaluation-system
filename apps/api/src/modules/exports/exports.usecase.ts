@@ -35,8 +35,8 @@ export function resolveDownloadFile(fileName: string, userId: string):
   return { ok: true, data: { rawFileName, filePath } };
 }
 
-export function downloadFile(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function downloadFile(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
 
   const fileName = String(req.params.fileName || req.params.file || "");

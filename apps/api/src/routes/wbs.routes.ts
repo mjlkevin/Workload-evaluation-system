@@ -72,8 +72,8 @@ export function buildDerivedWbsItemsForUser(user: { id: string; username: string
   }));
 }
 
-router.get("/", requireCapability("estimates:read"), (req, res) => {
-  const auth = requireAuth(req, res);
+router.get("/", requireCapability("estimates:read"), async (req, res) => {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
 
   return res.json(ok(buildDerivedWbsItemsForUser(auth.user)));

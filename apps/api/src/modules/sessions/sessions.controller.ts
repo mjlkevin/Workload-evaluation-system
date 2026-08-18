@@ -5,8 +5,8 @@ import { CalculateRequest } from "../../types";
 import { fail, ok } from "../../utils/response";
 import { calculateBySession, startEstimateSession } from "./sessions.usecase";
 
-export function startSession(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function startSession(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const result = startEstimateSession(auth.user.id, (req.body || {}) as { templateId?: string; ruleSetId?: string });
@@ -16,8 +16,8 @@ export function startSession(req: Request, res: Response) {
   return res.json(ok(result.data));
 }
 
-export function calculateInSession(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function calculateInSession(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const sessionId = String(req.params.sessionId || "");

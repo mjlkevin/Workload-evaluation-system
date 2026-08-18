@@ -56,7 +56,7 @@ function failModelGeneration(res: Response, message: string, err: unknown) {
 
 export function createRunHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const run = await createHarnessRun(auth.user, req.body || {}, repoFrom(deps));
     res.json(ok({ run }, randomUUID()));
@@ -65,7 +65,7 @@ export function createRunHandler(deps: HarnessControllerDeps = {}) {
 
 export function listRunsHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const items = await listHarnessRuns(auth.user, req.query || {}, repoFrom(deps));
     res.json(ok({ items }, randomUUID()));
@@ -74,7 +74,7 @@ export function listRunsHandler(deps: HarnessControllerDeps = {}) {
 
 export function getRunHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const detail = await getHarnessRunDetail(auth.user, asString(req.params.runId), repoFrom(deps));
     if (!detail) return fail(res, 40404, "Harness Run 不存在", [{ field: "runId", reason: "not_found" }]);
@@ -84,7 +84,7 @@ export function getRunHandler(deps: HarnessControllerDeps = {}) {
 
 export function bindFileHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const body = req.body || {};
     const attachmentId = asString(body.attachmentId);
@@ -113,7 +113,7 @@ export function bindFileHandler(deps: HarnessControllerDeps = {}) {
 
 export function submitAnswersHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     try {
       const run = await submitHarnessAnswers(auth.user, asString(req.params.runId), req.body || {}, repoFrom(deps));
@@ -128,7 +128,7 @@ export function submitAnswersHandler(deps: HarnessControllerDeps = {}) {
 
 export function submitParseResultHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     try {
       const detail = await submitHarnessParseResult(auth.user, asString(req.params.runId), req.body || {}, repoFrom(deps));
@@ -143,7 +143,7 @@ export function submitParseResultHandler(deps: HarnessControllerDeps = {}) {
 
 export function generateReportV1Handler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     try {
       const detail = await generateHarnessRequirementReportV1(auth.user, asString(req.params.runId), req.body || {}, repoFrom(deps), deps.modelRunner);
@@ -157,7 +157,7 @@ export function generateReportV1Handler(deps: HarnessControllerDeps = {}) {
 
 export function generateReportV2Handler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     try {
       const detail = await generateHarnessRequirementReportV2(auth.user, asString(req.params.runId), req.body || {}, repoFrom(deps), deps.modelRunner);
@@ -171,7 +171,7 @@ export function generateReportV2Handler(deps: HarnessControllerDeps = {}) {
 
 export function confirmActionHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     try {
       const result = await confirmHarnessAction(auth.user, asString(req.params.runId), asString(req.params.actionId), req.body || {}, repoFrom(deps), deps.formalEstimationDraftWriter);
@@ -186,7 +186,7 @@ export function confirmActionHandler(deps: HarnessControllerDeps = {}) {
 
 export function retryRunHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     try {
       const run = await retryHarnessRun(auth.user, asString(req.params.runId), repoFrom(deps));
@@ -201,7 +201,7 @@ export function retryRunHandler(deps: HarnessControllerDeps = {}) {
 
 export function reanalyzeRunHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     try {
       const run = await reanalyzeHarnessRun(auth.user, asString(req.params.runId), repoFrom(deps));
@@ -216,7 +216,7 @@ export function reanalyzeRunHandler(deps: HarnessControllerDeps = {}) {
 
 export function eventsHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const detail = await getHarnessRunDetail(auth.user, asString(req.params.runId), repoFrom(deps));
     if (!detail) return fail(res, 40404, "Harness Run 不存在", [{ field: "runId", reason: "not_found" }]);
@@ -234,7 +234,7 @@ export function eventsHandler(deps: HarnessControllerDeps = {}) {
 
 export function createManualTestResultHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const body = req.body || {};
     const executorName = asString(body.executorName);
@@ -263,7 +263,7 @@ export function createManualTestResultHandler(deps: HarnessControllerDeps = {}) 
 
 export function listManualTestResultsHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const runId = asString(req.params.runId) || null;
     const status = asString(req.query.status) || undefined;
@@ -276,7 +276,7 @@ export function listManualTestResultsHandler(deps: HarnessControllerDeps = {}) {
 
 export function getManualTestResultHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const result = await repoFrom(deps).getManualTestResult(asString(req.params.resultId));
     if (!result) return fail(res, 40404, "测试结果不存在", [{ field: "resultId", reason: "not_found" }]);
@@ -286,7 +286,7 @@ export function getManualTestResultHandler(deps: HarnessControllerDeps = {}) {
 
 export function updateManualTestResultHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const body = req.body || {};
     const resultStatus = asString(body.resultStatus) as ManualTestResultStatus | undefined;
@@ -311,7 +311,7 @@ export function updateManualTestResultHandler(deps: HarnessControllerDeps = {}) 
 
 export function deleteManualTestResultHandler(deps: HarnessControllerDeps = {}) {
   return async (req: Request, res: Response) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const deleted = await repoFrom(deps).deleteManualTestResult(asString(req.params.resultId));
     if (!deleted) return fail(res, 40404, "测试结果不存在", [{ field: "resultId", reason: "not_found" }]);

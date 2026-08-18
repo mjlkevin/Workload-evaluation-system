@@ -6,16 +6,16 @@ import { ok, fail } from "../../utils/response";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { loadRuleSet, saveRuleSet } from "./rules.repository";
 
-export function getActiveRuleSet(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function getActiveRuleSet(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
 
   const ruleSet = loadRuleSet();
   res.json(ok(ruleSet));
 }
 
-export function getRuleSetMeta(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function getRuleSetMeta(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
 
   const ruleSet = loadRuleSet();
@@ -29,8 +29,8 @@ export function getRuleSetMeta(req: Request, res: Response) {
   res.json(ok(meta));
 }
 
-export function importRuleSetJson(req: Request, res: Response) {
-  if (!requireRole(req, res, ["admin"])) return;
+export async function importRuleSetJson(req: Request, res: Response) {
+  if (!(await requireRole(req, res, ["admin"]))) return;
 
   const requestId = randomUUID();
   const input = req.body;

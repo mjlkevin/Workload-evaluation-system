@@ -146,8 +146,8 @@ function parseTemplateFromWorkbook(
   };
 }
 
-export function listTemplates(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function listTemplates(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
 
   const template = loadTemplate();
@@ -164,8 +164,8 @@ export function listTemplates(req: Request, res: Response) {
   );
 }
 
-export function getTemplate(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function getTemplate(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
 
   const template = loadTemplate();
@@ -175,8 +175,8 @@ export function getTemplate(req: Request, res: Response) {
   res.json(ok(template));
 }
 
-export function importTemplateJson(req: Request, res: Response) {
-  if (!requireRole(req, res, ["admin"])) return;
+export async function importTemplateJson(req: Request, res: Response) {
+  if (!(await requireRole(req, res, ["admin"]))) return;
 
   const requestId = randomUUID();
   const input = req.body;
@@ -199,8 +199,8 @@ export function importTemplateJson(req: Request, res: Response) {
   );
 }
 
-export function importTemplateExcel(req: Request, res: Response) {
-  if (!requireRole(req, res, ["admin"])) return;
+export async function importTemplateExcel(req: Request, res: Response) {
+  if (!(await requireRole(req, res, ["admin"]))) return;
 
   const requestId = randomUUID();
   if (!req.file) {

@@ -7,36 +7,36 @@ import { fail, ok } from "../../utils/response";
 import { AiRunsConflictError } from "../harness/harness-runtime.usecase";
 import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, listAiSessions, listAllAiSessionsForAdmin, renameAiSession } from "./ai-sessions.usecase";
 
-export function createSession(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function createSession(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   const session = createAiSession(auth.user, req.body || {});
   return res.json(ok({ session }, randomUUID()));
 }
 
-export function listSessions(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function listSessions(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   return res.json(ok({ items: listAiSessions(auth.user, req.query || {}) }, randomUUID()));
 }
 
 // 管理员审计视图：跨用户聚合全部 AI 会话摘要，仅挂载在 system:manage 能力位路由下
-export function listAllSessionsForAdmin(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function listAllSessionsForAdmin(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   return res.json(ok({ items: listAllAiSessionsForAdmin(req.query || {}) }, randomUUID()));
 }
 
-export function getSession(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function getSession(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   const session = getAiSession(auth.user, asString(req.params.sessionId));
   if (!session) return fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
   return res.json(ok({ session }, randomUUID()));
 }
 
-export function deleteSession(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function deleteSession(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   const sessionId = asString(req.params.sessionId);
   if (!deleteAiSession(auth.user, sessionId)) {
@@ -52,7 +52,7 @@ export function createGuardedDeleteSessionHandler(
   deps: { activeRunChecker?: (sessionId: string) => Promise<boolean> } = {},
 ): RequestHandler {
   return async (req, res) => {
-    const auth = requireAuth(req, res);
+    const auth = await requireAuth(req, res);
     if (!auth) return;
     const sessionId = asString(req.params.sessionId);
     try {
@@ -79,8 +79,8 @@ export function createGuardedDeleteSessionHandler(
   };
 }
 
-export function renameSession(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function renameSession(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   const sessionId = asString(req.params.sessionId);
   const title = (req.body || {}).title;
@@ -89,16 +89,16 @@ export function renameSession(req: Request, res: Response) {
   return res.json(ok({ session }, randomUUID()));
 }
 
-export function appendSessionEvent(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function appendSessionEvent(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   const session = appendAiSessionEvent(auth.user, asString(req.params.sessionId), req.body || {});
   if (!session) return fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
   return res.json(ok({ session }, randomUUID()));
 }
 
-export function createStandardDraft(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+export async function createStandardDraft(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return;
   const sessionId = asString(req.params.sessionId);
   const body = (req.body || {}) as { fileName?: unknown; fileSize?: unknown; fileType?: unknown };
