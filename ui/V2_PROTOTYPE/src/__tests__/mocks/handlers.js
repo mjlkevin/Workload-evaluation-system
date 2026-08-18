@@ -36,6 +36,26 @@ export const handlers = [
   // RP-047 Batch D：默认无活跃异步任务；场景测试用 server.use 覆盖。
   // 消除 Shell 层 BackgroundRunProvider 在既有测试中的 unhandled-request 噪音。
   http.get(`${BASE}/ai-runs`, () => HttpResponse.json({ success: true, data: { items: [] } })),
+  // ISS-2026-08-18-001（MSW 门禁修复）：ChatArea draft 记忆徽标拉取（SP-2026-007 MS2-PATCH）。
+  // AI 工作台挂载与 run 终态后均会触发 fetchDraftMemoryCount；基线默认空库（徽标 0），
+  // 需要徽标展示的场景测试用 server.use 覆盖。
+  http.get(`${BASE}/memory`, () => HttpResponse.json({
+    success: true,
+    data: { totalAtoms: 0, totalScenes: 0, atoms: [], scenes: [] },
+  })),
+  // ISS-2026-08-18-001：异步 Run 通道基线默认关闭（后端契约 503 ASYNC_RUNS_DISABLED）。
+  // 此前未匹配请求依赖应用层吞错静默回退旧同步路径（行为不确定且依赖 .catch(() => {})）；
+  // 现显式返回契约回退信号，发送链路确定性地走旧同步路径；异步通道场景测试用 server.use 覆盖。
+  http.post(`${BASE}/ai-sessions/:sessionId/runs`, () => HttpResponse.json(
+    { success: false, code: 'ASYNC_RUNS_DISABLED', message: '测试基线默认关闭异步 Run 通道' },
+    { status: 503 },
+  )),
+  // ISS-2026-08-18-001：Run 详情轮询兜底快照。场景 handler 被 resetHandlers 移除后
+  // 残留的轮询请求返回终态快照使其停止；异步通道场景测试用 server.use 覆盖。
+  http.get(`${BASE}/ai-runs/:runId`, ({ params }) => HttpResponse.json({
+    success: true,
+    data: { run: { runId: params.runId, status: 'completed' }, attempt: null, checkpoint: null, output: null },
+  })),
   http.get(`${BASE}/project-evaluations`, () => HttpResponse.json({ success: true, data: { items: mockProjectEvaluations } })),
   http.post(`${BASE}/project-evaluations`, async ({ request }) => {
     const body = await request.json()
