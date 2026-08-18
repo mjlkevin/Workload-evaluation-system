@@ -14,10 +14,10 @@ import type { AiAssessmentDraftManualConfirmResult, AiDraftManualConfirmation, P
  * 按「总方案」编码规则生成项目版本号。
  * 若规则不存在或未生效，回退到 PROJECT-{uuid} 保证不阻断创建。
  * 阶段 1 批 4：级联改 async（loadVersionsStore 异步化）；
- * loadVersionCodeRulesStore 属 system 域（批 5 范围），本批保持同步调用不动。
+ * 阶段 1 批 5：loadVersionCodeRulesStore 已异步化，下方调用补 await（跨批依赖点真正生效）。
  */
 async function generateProjectVersionCode(ownerUserId: string): Promise<string> {
-  const rulesStore = loadVersionCodeRulesStore();
+  const rulesStore = await loadVersionCodeRulesStore();
   const rule = rulesStore.rules.find((r) => r.moduleKey === "global" && r.status === "active");
   if (!rule) return `PROJECT-${randomUUID()}`;
 

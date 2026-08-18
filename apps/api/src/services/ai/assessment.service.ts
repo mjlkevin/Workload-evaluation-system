@@ -35,7 +35,7 @@ export async function kimiAssessmentPreview(req: Request, res: Response) {
   const fallbackDraft = estimateFallbackAssessmentDraft(snapshot);
   const fallbackCloudSku = buildCloudSkuModuleItemsFromSnapshot(snapshot, fallbackDraft);
   const fallbackDraftAligned: KimiAssessmentDraft = { ...fallbackDraft, moduleItems: mergeDevTotalModuleItem(fallbackCloudSku.items, snapshot) };
-  const requirementSettings = loadRequirementSystemConfigStore().active;
+  const requirementSettings = (await loadRequirementSystemConfigStore()).active;
   // T7（RP-055）：评估链路统一走场景绑定解析——供应商/模型/baseUrl/凭据 scope 一处决定，
   // 旧配置经迁移后解析结果与 T1 语义一致（绑定模型 == kimiEvaluation.model）。
   const scenarioCfg = resolveScenarioConfig(requirementSettings, "assessment", {

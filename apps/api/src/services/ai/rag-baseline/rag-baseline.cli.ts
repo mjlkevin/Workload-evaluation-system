@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   const datasetPath = path.resolve(projectRoot, valueAfter(args, "--dataset") || "config/rag/baseline-samples.v1.json");
   const candidateArg = valueAfter(args, "--candidate");
   const dataset = loadRagBaselineDataset(datasetPath);
-  const active = resolveActiveKnowledgeBaseConfig();
+  const active = await resolveActiveKnowledgeBaseConfig();
   if (!active.apiKey || !active.knowledgeId) throw new Error("active_knowledge_base_credentials_missing");
 
   const metadata = { datasetFingerprint: dataset.fingerprint };

@@ -123,10 +123,11 @@ test("activation rejects a successful probe older than 24 hours", { concurrency:
     responseCapture().response,
     async () => new Response(JSON.stringify({ code: 200, data: [] }), { status: 200 }),
   );
-  const store = loadKnowledgeBaseConfigStore();
+  // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
+  const store = await loadKnowledgeBaseConfigStore();
   assert.ok(store.probe);
   store.probe.checkedAt = "2026-07-01T00:00:00.000Z";
-  saveKnowledgeBaseConfigStore(store);
+  await saveKnowledgeBaseConfigStore(store);
   const activation = responseCapture();
   await activateKnowledgeBaseConfig(await adminRequest(), activation.response);
   assert.equal(activation.statusCode, 409);
@@ -188,7 +189,8 @@ test("connectivity tests are stored per selected knowledge base profile", { conc
   assert.equal(probe.statusCode, 200);
   assert.equal(probe.payload.data.profileId, "cases");
   assert.deepEqual(requestedKnowledgeIds, ["kb-cases"]);
-  const store = loadKnowledgeBaseConfigStore();
+  // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
+  const store = await loadKnowledgeBaseConfigStore();
   assert.equal(store.probes?.cases?.status, "success");
   assert.equal(store.probes?.solutions, undefined);
 });

@@ -359,7 +359,7 @@ async function defaultHarnessModelRunner(input: {
   const { apiKey } = resolveActiveRequirementKimiApiKey();
   if (!apiKey) throw new Error("model_not_configured");
   const provider = getKimiProvider();
-  const timeoutMs = loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000;
+  const timeoutMs = (await loadRequirementSystemConfigStore()).active.kimiEvaluation.timeoutMs || 120000;
   const completion = await provider.chatCompletion({
     model: config.kimi.model,
     temperature: 0.2,

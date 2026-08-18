@@ -133,11 +133,13 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
         if (!apiKey) throw new Error("required_or_env_missing");
         const provider = getKimiProvider();
         if (!provider.streamChatCompletion) throw new Error("stream_not_supported");
+        // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
+        const requirementSystemConfig = await loadRequirementSystemConfigStore();
         const stream = provider.streamChatCompletion({
           model: config.kimi.model,
           temperature: 0.3,
           promptCacheKey: "home-workbench-dispatch-v1",
-          timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
+          timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
           credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
           messages: [
             { role: "system", content: params.systemPrompt },

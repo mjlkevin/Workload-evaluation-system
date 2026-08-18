@@ -14,7 +14,7 @@ export async function calculate(req: Request, res: Response) {
   if (!(await requireRole(req, res, ["admin", "operator"]))) return;
 
   const body = req.body as CalculateRequest;
-  const result = calculateEstimateOnly(body);
+  const result = await calculateEstimateOnly(body);
   if (!result.ok) {
     return fail(res, result.code, result.message, result.details);
   }
@@ -72,6 +72,6 @@ export async function listExportHistory(req: Request, res: Response) {
 
 export async function getActiveDependencyRules(req: Request, res: Response) {
   if (!(await requireRole(req, res, ["admin", "operator"]))) return;
-  const data = getActiveImplementationDependencyRules();
+  const data = await getActiveImplementationDependencyRules();
   return res.json(ok(data));
 }

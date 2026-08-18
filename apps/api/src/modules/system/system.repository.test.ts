@@ -23,7 +23,7 @@ import {
   KIMI_SCOPE,
 } from "./credentials.store";
 
-test("loadRequirementSystemConfigStore: 迁移旧 Kimi 模型到 K2.5 默认模型", () => {
+test("loadRequirementSystemConfigStore: 迁移旧 Kimi 模型到 K2.5 默认模型", async () => {
   const originalCwd = process.cwd();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-kimi-config-"));
   const configDir = path.join(tmpDir, "config/system");
@@ -55,7 +55,8 @@ test("loadRequirementSystemConfigStore: 迁移旧 Kimi 模型到 K2.5 默认模�
 
   try {
     process.chdir(tmpDir);
-    const store = loadRequirementSystemConfigStore();
+    // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
+    const store = await loadRequirementSystemConfigStore();
 
     assert.equal(store.draft.kimiEvaluation.model, "kimi-k2.5");
     assert.equal(store.draft.fileParsing.model, "kimi-k2.6");
@@ -233,7 +234,7 @@ test("knowledge base profile hash binds shared settings and the selected profile
 
 // -------------------- 凭据域 DB 化测试 — ISS-2026-08-05-001 --------------------
 
-test("loadRequirementSystemConfigStore: 文件有 apiKey 时清空文件并填充缓存", () => {
+test("loadRequirementSystemConfigStore: 文件有 apiKey 时清空文件并填充缓存", async () => {
   const originalCwd = process.cwd();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-cred-import-"));
   const configDir = path.join(tmpDir, "config/system");
@@ -260,7 +261,8 @@ test("loadRequirementSystemConfigStore: 文件有 apiKey 时清空文件并填�
 
   try {
     process.chdir(tmpDir);
-    const store = loadRequirementSystemConfigStore();
+    // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
+    const store = await loadRequirementSystemConfigStore();
 
     // 文件 apiKey 应被清空
     const fileContent = JSON.parse(fs.readFileSync(configPath, "utf-8"));
@@ -281,7 +283,7 @@ test("loadRequirementSystemConfigStore: 文件有 apiKey 时清空文件并填�
   }
 });
 
-test("loadRequirementSystemConfigStore: 文件无 apiKey 时不触发导入", () => {
+test("loadRequirementSystemConfigStore: 文件无 apiKey 时不触发导入", async () => {
   const originalCwd = process.cwd();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-cred-noop-"));
   const configDir = path.join(tmpDir, "config/system");
@@ -307,7 +309,7 @@ test("loadRequirementSystemConfigStore: 文件无 apiKey 时不触发导入", ()
 
   try {
     process.chdir(tmpDir);
-    loadRequirementSystemConfigStore();
+    await loadRequirementSystemConfigStore();
 
     // 缓存应仍为空（未触发导入）
     assert.equal(getCachedApiKey(KIMI_SCOPE), null);
@@ -319,7 +321,7 @@ test("loadRequirementSystemConfigStore: 文件无 apiKey 时不触发导入", ()
   }
 });
 
-test("saveRequirementSystemConfigStore: 即使 store 有 apiKey 也写空串到文件", () => {
+test("saveRequirementSystemConfigStore: 即使 store 有 apiKey 也写空串到文件", async () => {
   const originalCwd = process.cwd();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-cred-save-"));
   const configDir = path.join(tmpDir, "config/system");
@@ -344,12 +346,13 @@ test("saveRequirementSystemConfigStore: 即使 store 有 apiKey 也写空串到�
 
   try {
     process.chdir(tmpDir);
-    const store = loadRequirementSystemConfigStore();
+    // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
+    const store = await loadRequirementSystemConfigStore();
 
     // 模拟 mergeKimiCredentialsPatch 后 store 有非空 apiKey
     store.draft.kimiCredentials.apiKey = "sk-should-not-persist";
     store.active.kimiCredentials.apiKey = "sk-should-not-persist";
-    saveRequirementSystemConfigStore(store);
+    await saveRequirementSystemConfigStore(store);
 
     // 文件 apiKey 应为空串
     const fileContent = JSON.parse(fs.readFileSync(configPath, "utf-8"));

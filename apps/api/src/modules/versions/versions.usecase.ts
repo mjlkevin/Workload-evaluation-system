@@ -31,7 +31,8 @@ function mapTypeToRuleModuleKey(type: VersionType): VersionCodeRuleModuleKey {
   return "wbs";
 }
 
-function generateVersionCodeByRule(
+/** 阶段 1 批 5：因内部调用 loadVersionCodeRulesStore（已异步化）级联改 async，实现不动。 */
+async function generateVersionCodeByRule(
   store: { records: VersionRecord[] },
   input: {
     ownerUserId: string;
@@ -39,9 +40,9 @@ function generateVersionCodeByRule(
     templateId: string;
     payload: Record<string, unknown>;
   }
-): { versionCode: string } | { errorCode: number; message: string; field: string; reason: string } {
+): Promise<{ versionCode: string } | { errorCode: number; message: string; field: string; reason: string }> {
   const moduleKey = mapTypeToRuleModuleKey(input.type);
-  const rulesStore = loadVersionCodeRulesStore();
+  const rulesStore = await loadVersionCodeRulesStore();
   const rule = rulesStore.rules.find((item) => item.moduleKey === moduleKey);
   if (!rule) {
     return {
@@ -158,7 +159,7 @@ export async function createVersion(req: Request, res: Response) {
 
   const store = await loadVersionsStore();
   if (!versionCode) {
-    const generated = generateVersionCodeByRule(store, {
+    const generated = await generateVersionCodeByRule(store, {
       ownerUserId: auth.user.id,
       type,
       templateId,

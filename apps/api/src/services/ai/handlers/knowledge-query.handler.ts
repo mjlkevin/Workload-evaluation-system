@@ -88,8 +88,8 @@ async function buildKnowledgeQueryResponse(
   context: WorkbenchContext,
   input: WorkbenchDispatchInput,
 ): Promise<WorkbenchDispatchData> {
-  const legacyConfig = resolveActiveKnowledgeBaseConfig();
-  const resolvedCatalog = input.knowledgeBaseCatalog || resolveActiveKnowledgeBaseCatalog();
+  const legacyConfig = await resolveActiveKnowledgeBaseConfig();
+  const resolvedCatalog = input.knowledgeBaseCatalog || await resolveActiveKnowledgeBaseCatalog();
   const catalog: ResolvedActiveKnowledgeBaseCatalog = input.knowledgeQuery && resolvedCatalog.profiles.length === 0
     ? { ...resolvedCatalog, profiles: [createInjectedDefaultProfile(legacyConfig.knowledgeId)] }
     : resolvedCatalog;

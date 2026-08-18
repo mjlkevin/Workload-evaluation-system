@@ -168,11 +168,13 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
     "当用户上传附件且消息中包含【附件解析上下文】时，必须基于解析出的客户、项目、业务需求、模块线索和工作表信息推进需求识别、粗评建议和待确认问题；不要声称无法接收附件。",
   ].join("\n");
   const safeMessages = params.messages.slice(-12).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
+  // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
+  const requirementSystemConfig = await loadRequirementSystemConfigStore();
   const completion = await getKimiProvider().chatCompletion({
     model: params.model,
     temperature: 0.3,
     promptCacheKey: "home-workbench-chat-v1",
-    timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
+    timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
     credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl },
     messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
   });
@@ -246,11 +248,13 @@ export function buildWorkbenchChatModelChat(
       ? `${systemPrompt}\n\n${memoryPrompt}`
       : systemPrompt;
 
+    // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
+    const requirementSystemConfig = await loadRequirementSystemConfigStore();
     const completion = await getKimiProvider().chatCompletion({
       model: config.kimi.model,
       temperature: 0.3,
       promptCacheKey: "home-workbench-dispatch-v1",
-      timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
+      timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
       credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
       messages: [{ role: "system", content: finalSystemPrompt }, ...safeMessages],
     });

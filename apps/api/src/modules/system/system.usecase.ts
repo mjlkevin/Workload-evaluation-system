@@ -142,7 +142,7 @@ export async function listVersionCodeRules(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "status", reason: "invalid_status" }]);
   }
 
-  const store = loadVersionCodeRulesStore();
+  const store = await loadVersionCodeRulesStore();
   const items = store.rules
     .map(sanitizeRule)
     .filter((item) => {
@@ -182,7 +182,7 @@ export async function updateVersionCodeRuleConfig(req: Request, res: Response) {
   }
 
   const now = new Date().toISOString();
-  const store = loadVersionCodeRulesStore();
+  const store = await loadVersionCodeRulesStore();
   const target = store.rules.find((item) => item.id === ruleId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "ruleId", reason: "not_found" }]);
@@ -193,7 +193,7 @@ export async function updateVersionCodeRuleConfig(req: Request, res: Response) {
   target.status = target.status === "disabled" ? "draft" : target.status;
   target.updatedAt = now;
   target.sample = buildVersionCodeSample(target.format, target.prefix, target.moduleCode);
-  saveVersionCodeRulesStore(store);
+  await saveVersionCodeRulesStore(store);
 
   return res.json(ok({ item: sanitizeRule(target) }, randomUUID()));
 }
@@ -205,7 +205,7 @@ export async function activateVersionCodeRule(req: Request, res: Response) {
   if (!ruleId) return fail(res, 40001, "参数错误", [{ field: "ruleId", reason: "required" }]);
 
   const now = new Date().toISOString();
-  const store = loadVersionCodeRulesStore();
+  const store = await loadVersionCodeRulesStore();
   const target = store.rules.find((item) => item.id === ruleId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "ruleId", reason: "not_found" }]);
@@ -215,7 +215,7 @@ export async function activateVersionCodeRule(req: Request, res: Response) {
   target.effectiveAt = now;
   target.updatedAt = now;
   target.sample = buildVersionCodeSample(target.format, target.prefix, target.moduleCode);
-  saveVersionCodeRulesStore(store);
+  await saveVersionCodeRulesStore(store);
 
   return res.json(ok({ item: sanitizeRule(target) }, randomUUID()));
 }
@@ -227,7 +227,7 @@ export async function disableVersionCodeRule(req: Request, res: Response) {
   if (!ruleId) return fail(res, 40001, "参数错误", [{ field: "ruleId", reason: "required" }]);
 
   const now = new Date().toISOString();
-  const store = loadVersionCodeRulesStore();
+  const store = await loadVersionCodeRulesStore();
   const target = store.rules.find((item) => item.id === ruleId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "ruleId", reason: "not_found" }]);
@@ -236,14 +236,14 @@ export async function disableVersionCodeRule(req: Request, res: Response) {
   target.status = "disabled";
   target.updatedAt = now;
   target.sample = buildVersionCodeSample(target.format, target.prefix, target.moduleCode);
-  saveVersionCodeRulesStore(store);
+  await saveVersionCodeRulesStore(store);
 
   return res.json(ok({ item: sanitizeRule(target) }, randomUUID()));
 }
 
 export async function getRequirementSystemConfig(req: Request, res: Response) {
   if (!(await requireAdmin(req, res))) return;
-  const store = loadRequirementSystemConfigStore();
+  const store = await loadRequirementSystemConfigStore();
   return res.json(
     ok(
       {
@@ -274,7 +274,7 @@ export async function updateRequirementSystemConfigDraft(req: Request, res: Resp
     scenarioBindings: scenarioBindingsPatch,
   } = payload;
   const now = new Date().toISOString();
-  const store = loadRequirementSystemConfigStore();
+  const store = await loadRequirementSystemConfigStore();
   const nextCreds = mergeKimiCredentialsPatch(store.draft.kimiCredentials, credsPatch);
 
   // 密钥写入 DB（加密 + 审计）
@@ -302,7 +302,7 @@ export async function updateRequirementSystemConfigDraft(req: Request, res: Resp
       : { scenarioBindings: syncBindingsWithLegacyPatch(store.draft, { kimiEvaluationPatch, fileParsingPatch, kimiGenerationPatch }) }),
   });
   store.updatedAt = now;
-  saveRequirementSystemConfigStore(store);
+  await saveRequirementSystemConfigStore(store);
   return res.json(
     ok(
       {
@@ -318,12 +318,12 @@ export async function updateRequirementSystemConfigDraft(req: Request, res: Resp
 export async function activateRequirementSystemConfig(req: Request, res: Response) {
   if (!(await requireAdmin(req, res))) return;
   const now = new Date().toISOString();
-  const store = loadRequirementSystemConfigStore();
+  const store = await loadRequirementSystemConfigStore();
   store.active = normalizeRequirementSystemConfig(store.draft);
   store.version = Number(store.version || 1) + 1;
   store.effectiveAt = now;
   store.updatedAt = now;
-  saveRequirementSystemConfigStore(store);
+  await saveRequirementSystemConfigStore(store);
   return res.json(
     ok(
       {
@@ -345,7 +345,7 @@ export async function testRequirementKimiApiKey(req: Request, res: Response) {
   if (!apiKey) {
     return fail(res, 40001, "未配置可用的 API Key", [{ field: "apiKey", reason: "missing_in_store_and_env" }]);
   }
-  const store = loadRequirementSystemConfigStore();
+  const store = await loadRequirementSystemConfigStore();
   const model =
     explicitModel || store.draft.kimiEvaluation?.model?.trim() || config.kimi.model;
   try {
@@ -417,7 +417,7 @@ async function buildCredentialsHealth(): Promise<CredentialsHealth> {
 /** GET /requirement-settings/effective：每场景生效模型/来源/接线参数 + 凭据健康（T2） + 供应商目录摘要（RP-055） */
 export async function getRequirementSettingsEffective(req: Request, res: Response) {
   if (!(await requireAdmin(req, res))) return;
-  const active = loadRequirementSystemConfigStore().active;
+  const active = (await loadRequirementSystemConfigStore()).active;
   const credentials = await buildCredentialsHealth();
   const lastVerified = loadModelVerifyStatus();
   const effective = buildEffectiveModelConfig(active, config.kimi.model, credentials, lastVerified, config.kimi.apiBaseUrl);
@@ -509,7 +509,7 @@ export async function testScenarioModel(req: Request, res: Response) {
     ]);
   }
 
-  const active = loadRequirementSystemConfigStore().active;
+  const active = (await loadRequirementSystemConfigStore()).active;
   const resolution = resolveScenarioConfig(active, scenario, {
     model: config.kimi.model,
     baseUrl: config.kimi.apiBaseUrl,
@@ -592,10 +592,10 @@ export async function testScenarioModel(req: Request, res: Response) {
 
 // -------------------- RP-055：供应商级 API Key 管理（凭据域多 scope） --------------------
 
-/** 在 draft/active 目录中查找供应商；找不到返回 null 并已响应 404 */
-function findProviderOr404(res: Response, providerIdRaw: string) {
+/** 在 draft/active 目录中查找供应商；找不到返回 null 并已响应 404。阶段 1 批 5：因内部调用 loadRequirementSystemConfigStore（已异步化）级联改 async，实现不动。 */
+async function findProviderOr404(res: Response, providerIdRaw: string) {
   const providerId = String(providerIdRaw || "").trim().toLowerCase();
-  const store = loadRequirementSystemConfigStore();
+  const store = await loadRequirementSystemConfigStore();
   const provider =
     (store.draft.modelProviders || []).find((p) => p.id === providerId) ||
     (store.active.modelProviders || []).find((p) => p.id === providerId);
@@ -610,7 +610,7 @@ function findProviderOr404(res: Response, providerIdRaw: string) {
 export async function setProviderApiKey(req: Request, res: Response) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
-  const found = findProviderOr404(res, String(req.params.providerId || ""));
+  const found = await findProviderOr404(res, String(req.params.providerId || ""));
   if (!found) return;
   const apiKey = String((req.body || {}).apiKey || "").trim();
   if (!apiKey) {
@@ -634,7 +634,7 @@ export async function setProviderApiKey(req: Request, res: Response) {
 export async function clearProviderApiKey(req: Request, res: Response) {
   const auth = await requireAdmin(req, res);
   if (!auth) return;
-  const found = findProviderOr404(res, String(req.params.providerId || ""));
+  const found = await findProviderOr404(res, String(req.params.providerId || ""));
   if (!found) return;
   const scope = credentialScopeForProvider(found.providerId);
   try {
@@ -649,7 +649,7 @@ export async function clearProviderApiKey(req: Request, res: Response) {
 /** POST /requirement-settings/providers/:providerId/api-key/test { apiKey?, model? }：用该供应商 baseUrl 发最小真实请求 */
 export async function testProviderApiKey(req: Request, res: Response) {
   if (!(await requireAdmin(req, res))) return;
-  const found = findProviderOr404(res, String(req.params.providerId || ""));
+  const found = await findProviderOr404(res, String(req.params.providerId || ""));
   if (!found) return;
   const body = (req.body || {}) as { apiKey?: string; model?: string };
   const explicit = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
@@ -713,7 +713,7 @@ export async function testProviderApiKey(req: Request, res: Response) {
 
 export async function getImplementationDependencyRules(req: Request, res: Response) {
   if (!(await requireAdmin(req, res))) return;
-  const store = loadImplementationDependencyRulesStore();
+  const store = await loadImplementationDependencyRulesStore();
   return res.json(
     ok(
       {
@@ -732,25 +732,25 @@ export async function updateImplementationDependencyRulesDraft(req: Request, res
   if (!(await requireAdmin(req, res))) return;
   const payload = (req.body || {}) as Partial<ImplementationDependencyRulesConfig>;
   const now = new Date().toISOString();
-  const store = loadImplementationDependencyRulesStore();
+  const store = await loadImplementationDependencyRulesStore();
   store.draft = normalizeImplementationDependencyRulesConfig({
     ...store.draft,
     ...payload,
   });
   store.updatedAt = now;
-  saveImplementationDependencyRulesStore(store);
+  await saveImplementationDependencyRulesStore(store);
   return res.json(ok({ version: store.version, draft: store.draft, updatedAt: store.updatedAt }, randomUUID()));
 }
 
 export async function activateImplementationDependencyRules(req: Request, res: Response) {
   if (!(await requireAdmin(req, res))) return;
   const now = new Date().toISOString();
-  const store = loadImplementationDependencyRulesStore();
+  const store = await loadImplementationDependencyRulesStore();
   store.active = normalizeImplementationDependencyRulesConfig(store.draft);
   store.version = Number(store.version || 1) + 1;
   store.effectiveAt = now;
   store.updatedAt = now;
-  saveImplementationDependencyRulesStore(store);
+  await saveImplementationDependencyRulesStore(store);
   return res.json(
     ok(
       {
@@ -800,7 +800,7 @@ function toPublicKnowledgeBaseConfig(store: KnowledgeBaseConfigStore): Knowledge
 
 export async function getKnowledgeBaseConfig(req: Request, res: Response) {
   if (!(await requireAdmin(req, res))) return;
-  const store = loadKnowledgeBaseConfigStore();
+  const store = await loadKnowledgeBaseConfigStore();
   return res.json(
     ok(
       {
@@ -839,7 +839,7 @@ export async function updateKnowledgeBaseConfigDraft(req: Request, res: Response
     knowledgeBases?: unknown[];
   };
   const now = new Date().toISOString();
-  const store = loadKnowledgeBaseConfigStore();
+  const store = await loadKnowledgeBaseConfigStore();
   const nextCreds = mergeKnowledgeBaseCredentialsPatch(store.draft.credentials, payload.credentials);
   const nextDraft = normalizeKnowledgeBaseConfig({
     ...store.draft,
@@ -857,7 +857,7 @@ export async function updateKnowledgeBaseConfigDraft(req: Request, res: Response
   }
   store.draft = nextDraft;
   store.updatedAt = now;
-  saveKnowledgeBaseConfigStore(store);
+  await saveKnowledgeBaseConfigStore(store);
   return res.json(
     ok(
       {
@@ -884,7 +884,7 @@ export async function updateKnowledgeBaseConfigDraft(req: Request, res: Response
 export async function activateKnowledgeBaseConfig(req: Request, res: Response) {
   if (!(await requireAdmin(req, res))) return;
   const now = new Date().toISOString();
-  const store = loadKnowledgeBaseConfigStore();
+  const store = await loadKnowledgeBaseConfigStore();
   const validationIssues = validateKnowledgeBaseProfiles(store.draft.knowledgeBases);
   if (validationIssues.length) {
     return fail(res, 40001, "知识库档案配置无效", validationIssues);
@@ -895,7 +895,7 @@ export async function activateKnowledgeBaseConfig(req: Request, res: Response) {
       { field: "knowledgeBases", reason: "no_enabled_profile" },
     ]);
   }
-  const effectiveDraft = resolveDraftKnowledgeBaseConfigForTest();
+  const effectiveDraft = await resolveDraftKnowledgeBaseConfigForTest();
   const effectiveConfig = normalizeKnowledgeBaseConfig({
     ...store.draft,
     credentials: { apiKey: effectiveDraft.apiKey, knowledgeId: "" },
@@ -932,7 +932,7 @@ export async function activateKnowledgeBaseConfig(req: Request, res: Response) {
   store.version = Number(store.version || 1) + 1;
   store.effectiveAt = now;
   store.updatedAt = now;
-  saveKnowledgeBaseConfigStore(store);
+  await saveKnowledgeBaseConfigStore(store);
   return res.json(
     ok(
       {
@@ -1024,7 +1024,7 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
   const explicitApiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
   const explicitKnowledgeId = typeof body.knowledgeId === "string" ? body.knowledgeId.trim() : "";
   const profileId = typeof body.profileId === "string" ? body.profileId.trim() : "";
-  const store = loadKnowledgeBaseConfigStore();
+  const store = await loadKnowledgeBaseConfigStore();
   const selectedProfile = profileId
     ? store.draft.knowledgeBases.find((profile) => profile.id === profileId)
     : store.draft.knowledgeBases.find((profile) => profile.enabled && profile.isDefault)
@@ -1034,7 +1034,7 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
       { field: "profileId", reason: "profile_not_found" },
     ]);
   }
-  const { apiKey, knowledgeId, model, apiBaseUrl, retrievalParams, promptProfile, source } = resolveDraftKnowledgeBaseConfigForTest(
+  const { apiKey, knowledgeId, model, apiBaseUrl, retrievalParams, promptProfile, source } = await resolveDraftKnowledgeBaseConfigForTest(
     explicitApiKey || undefined,
     explicitKnowledgeId || selectedProfile?.knowledgeId || undefined,
     selectedProfile?.id,
@@ -1069,7 +1069,7 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
     store.probe = probeRecord;
   }
   store.updatedAt = probeRecord.checkedAt;
-  saveKnowledgeBaseConfigStore(store);
+  await saveKnowledgeBaseConfigStore(store);
 
   const testedSource =
     source === "override" ? "request_body" : source === "draft" ? "draft_store" : "environment";

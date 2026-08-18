@@ -167,9 +167,9 @@ async function summarizeCompanyProfileByKimi(params: {
 class AiUsecase {
   // === 数据访问（通过 repository） ===
 
-  /** 加载需求评估配置 */
-  getRequirementSettings() {
-    return aiRepository.loadRequirementSettings().active;
+  /** 加载需求评估配置。阶段 1 批 5：因 repository 返回 Promise 级联改 async，实现不动。 */
+  async getRequirementSettings() {
+    return (await aiRepository.loadRequirementSettings()).active;
   }
 
   /** 解析 API Key（代理 repository，不持有明文） */
@@ -253,7 +253,7 @@ class AiUsecase {
     }
 
     try {
-      const requirementSettings = this.getRequirementSettings();
+      const requirementSettings = await this.getRequirementSettings();
       const parsed = await summarizeCompanyProfileByKimi({
         apiUrl: config.kimi.apiBaseUrl,
         apiKey,
@@ -315,7 +315,7 @@ class AiUsecase {
     const { apiKey } = this.getApiKey();
     const model = config.kimi.model;
     const modelForClient = normalizeKimiModelName(model);
-    const requirementSettings = this.getRequirementSettings();
+    const requirementSettings = await this.getRequirementSettings();
     const promptProfile = asString(asModelObject(input.ruleContext).promptProfile)
       || asString(requirementSettings.kimiEvaluation.promptProfile)
       || "assessment_default_v1";

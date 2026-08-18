@@ -60,17 +60,19 @@ function buildCalculateRequestWithIncludedItems(includedIds: string[]): Calculat
   };
 }
 
-test("estimates.usecase: calculateEstimateOnly returns success for valid request", () => {
+test("estimates.usecase: calculateEstimateOnly returns success for valid request", async () => {
+  // 阶段 1 批 5：calculateEstimateOnly 已异步化，补 await（断言不变）。
   const body = buildValidCalculateRequest();
-  const result = calculateEstimateOnly(body);
+  const result = await calculateEstimateOnly(body);
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(typeof result.data.totalDays, "number");
   }
 });
 
-test("estimates.usecase: dependency check only triggers when the dependent module is selected", () => {
-  const purchaseOnly = calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-66"]));
+test("estimates.usecase: dependency check only triggers when the dependent module is selected", async () => {
+  // 阶段 1 批 5：calculateEstimateOnly 已异步化，补 await（断言不变）。
+  const purchaseOnly = await calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-66"]));
   if (!purchaseOnly.ok) {
     assert.ok(
       purchaseOnly.details?.every((detail) => !detail.reason.includes("滚动采购管理")),
@@ -78,13 +80,13 @@ test("estimates.usecase: dependency check only triggers when the dependent modul
     );
   }
 
-  const rollingPurchaseWithoutVmi = calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-73"]));
+  const rollingPurchaseWithoutVmi = await calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-73"]));
   assert.equal(rollingPurchaseWithoutVmi.ok, false);
   if (!rollingPurchaseWithoutVmi.ok) {
     assert.ok(rollingPurchaseWithoutVmi.details?.some((detail) => /滚动采购管理/.test(detail.reason)));
   }
 
-  const rollingPurchaseWithVmi = calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-72", "item-73"]));
+  const rollingPurchaseWithVmi = await calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-72", "item-73"]));
   assert.equal(rollingPurchaseWithVmi.ok, true);
 });
 

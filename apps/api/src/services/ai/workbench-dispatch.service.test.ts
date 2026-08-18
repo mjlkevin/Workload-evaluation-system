@@ -998,9 +998,10 @@ async function withModelChatSandbox(run: (provider: ModelProvider & { lastReques
   const mockProvider = createCapturingKimiProvider();
   defaultProviderRegistry.register(mockProvider, { asDefault: true });
   try {
-    const store = loadRequirementSystemConfigStore();
+    // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
+    const store = await loadRequirementSystemConfigStore();
     store.active.kimiCredentials = { apiKey: "test-fixture-key" };
-    saveRequirementSystemConfigStore(store);
+    await saveRequirementSystemConfigStore(store);
     await run(mockProvider);
   } finally {
     if (existed) {
