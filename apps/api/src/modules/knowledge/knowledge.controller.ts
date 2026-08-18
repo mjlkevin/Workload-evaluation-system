@@ -11,7 +11,8 @@ import { searchKnowledge } from "./knowledge.usecase";
 
 /** handler 工厂：路由层注入 repo，便于测试替换存储 */
 export function createKnowledgeHandlers(repo: KnowledgeRepository) {
-  function searchHandler(req: Request, res: Response): void {
+  /** 阶段 1 批 7：因 searchKnowledge 异步化级联改 async，实现不动。 */
+  async function searchHandler(req: Request, res: Response): Promise<void> {
     const q = typeof req.query.q === "string" ? req.query.q : "";
     if (!q.trim()) {
       res.status(400).json({ code: 40001, message: "缺少查询参数 q", data: null });
@@ -19,19 +20,21 @@ export function createKnowledgeHandlers(repo: KnowledgeRepository) {
     }
     const limitRaw = typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : NaN;
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 && limitRaw <= 20 ? limitRaw : undefined;
-    const result = searchKnowledge(repo, q, limit ? { limit } : {});
+    const result = await searchKnowledge(repo, q, limit ? { limit } : {});
     res.json({ code: 0, message: "ok", data: result });
   }
 
-  function listEntriesHandler(_req: Request, res: Response): void {
-    const items = repo.list();
+  /** 阶段 1 批 7：因 repo.list 异步化级联改 async，实现不动。 */
+  async function listEntriesHandler(_req: Request, res: Response): Promise<void> {
+    const items = await repo.list();
     res.json({ code: 0, message: "ok", data: { items, total: items.length } });
   }
 
-  function createEntryHandler(req: Request, res: Response): void {
+  /** 阶段 1 批 7：因 repo.create 异步化级联改 async，实现不动。 */
+  async function createEntryHandler(req: Request, res: Response): Promise<void> {
     const { title, content, category, tags, id } = (req.body ?? {}) as Record<string, unknown>;
     try {
-      const entry = repo.create({
+      const entry = await repo.create({
         id: typeof id === "string" ? id : undefined,
         title: typeof title === "string" ? title : "",
         content: typeof content === "string" ? content : "",
@@ -44,22 +47,23 @@ export function createKnowledgeHandlers(repo: KnowledgeRepository) {
     }
   }
 
-  function archiveEntryHandler(req: Request, res: Response): void {
+  /** 阶段 1 批 7：因 repo.archive 异步化级联改 async，实现不动。 */
+  async function archiveEntryHandler(req: Request, res: Response): Promise<void> {
     const entryId = typeof req.params.entryId === "string" ? req.params.entryId : "";
     try {
-      const entry = repo.archive(entryId);
+      const entry = await repo.archive(entryId);
       res.json({ code: 0, message: "ok", data: { entry } });
     } catch (err) {
       res.status(404).json({ code: 40401, message: err instanceof Error ? err.message : "条目不存在", data: null });
     }
   }
 
-  /** 检索诊断（admin 可见）：返回语料规模、护栏口径与样例查询表现 */
-  function diagnoseHandler(req: Request, res: Response): void {
+  /** 阶段 1 批 7：因 repo.list + searchKnowledge 异步化级联改 async，实现不动。 */
+  async function diagnoseHandler(req: Request, res: Response): Promise<void> {
     const q = typeof req.query.q === "string" && req.query.q.trim() ? req.query.q : "售前估算";
-    const entries = repo.list();
+    const entries = await repo.list();
     const active = entries.filter((entry) => entry.status === "active");
-    const result = searchKnowledge(repo, q, { limit: 5 });
+    const result = await searchKnowledge(repo, q, { limit: 5 });
     res.json({
       code: 0,
       message: "ok",

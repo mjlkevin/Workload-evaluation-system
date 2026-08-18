@@ -110,30 +110,30 @@ test("T2 buildEffectiveModelConfig: K2 模型附加平台固定采样说明；�
 });
 
 // T2/T4：验证状态存储——按场景持久化最近验证结果
-test("T2 verify status store: saveScenarioVerifyRecord 与 loadModelVerifyStatus 往返一致", () => {
+test("T2 verify status store: saveScenarioVerifyRecord 与 loadModelVerifyStatus 往返一致", async () => {
   const storePath = modelVerifyStatusPath();
   const existed = fs.existsSync(storePath);
   const before = existed ? fs.readFileSync(storePath, "utf-8") : "";
   try {
-    saveScenarioVerifyRecord("assessment", {
+    await saveScenarioVerifyRecord("assessment", {
       at: "2026-08-10T14:00:00.000Z",
       ok: true,
       model: "kimi-k2.6",
       elapsedMs: 1234,
     });
-    const loaded = loadModelVerifyStatus();
+    const loaded = await loadModelVerifyStatus();
     assert.equal(loaded.assessment?.ok, true);
     assert.equal(loaded.assessment?.model, "kimi-k2.6");
     assert.equal(loaded.assessment?.elapsedMs, 1234);
 
-    saveScenarioVerifyRecord("fileParsing", {
+    await saveScenarioVerifyRecord("fileParsing", {
       at: "2026-08-10T14:01:00.000Z",
       ok: false,
       model: "kimi-k2.6",
       elapsedMs: 30000,
       reason: "timeout",
     });
-    const loaded2 = loadModelVerifyStatus();
+    const loaded2 = await loadModelVerifyStatus();
     assert.equal(loaded2.assessment?.ok, true, "其他场景记录应保留");
     assert.equal(loaded2.fileParsing?.ok, false);
     assert.equal(loaded2.fileParsing?.reason, "timeout");

@@ -27,11 +27,12 @@ export interface SearchKnowledgeOptions {
  * 阶段 1：BM25 单路走 RRF 融合器（为阶段 2 向量路预留）；
  * 结果经条目数/字符预算护栏截断，留痕返回。
  */
-export function searchKnowledge(
+/** 阶段 1 批 7：因内部调用 repo.list（已异步化）级联改 async，实现不动。 */
+export async function searchKnowledge(
   repo: KnowledgeRepository,
   query: string,
   options: SearchKnowledgeOptions = {},
-): KnowledgeSearchResult {
+): Promise<KnowledgeSearchResult> {
   const startedAt = Date.now();
   const guardOptions: GuardOptions = { ...DEFAULT_GUARD, ...(options.guard ?? {}) };
   const limit = options.limit ?? guardOptions.maxItems;
@@ -43,7 +44,7 @@ export function searchKnowledge(
     return { query: query ?? "", tokens: [], items: [], guard: emptyGuard, durationMs: Date.now() - startedAt };
   }
 
-  const entries = repo.list();
+  const entries = await repo.list();
   const entryById = new Map<string, KnowledgeEntry>(entries.map((entry) => [entry.id, entry]));
 
   const index = buildBm25Index(entries);

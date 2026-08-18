@@ -34,7 +34,8 @@ import {
  * 从 AI 工作台一次对话 turn 创建 trace。
  * 将 WorkbenchDispatchData.trace 映射为统一 span 结构。
  */
-export function recordWorkbenchTurnTrace(input: {
+/** 阶段 1 批 7：因内部调用 insertTraceRecord（已异步化）级联改 async，实现不动。 */
+export async function recordWorkbenchTurnTrace(input: {
   requestId?: string;
   ownerUserId: string;
   ownerUsername: string;
@@ -49,7 +50,7 @@ export function recordWorkbenchTurnTrace(input: {
     modelClassification?: Record<string, unknown>;
   };
   model?: string;
-}): TraceRecord {
+}): Promise<TraceRecord> {
   const trace = createTraceRecord({
     sourceDomain: "ai_session",
     sourceId: input.aiSessionId,
@@ -169,10 +170,11 @@ export function recordWorkbenchTurnTrace(input: {
     appendTraceSpan(trace, modelSpan);
   }
 
-  return insertTraceRecord(trace);
+  return await insertTraceRecord(trace);
 }
 
-export function recordWorkbenchTurnFailureTrace(input: {
+/** 阶段 1 批 7：因内部调用 insertTraceRecord（已异步化）级联改 async，实现不动。 */
+export async function recordWorkbenchTurnFailureTrace(input: {
   requestId?: string;
   ownerUserId: string;
   ownerUsername: string;
@@ -181,7 +183,7 @@ export function recordWorkbenchTurnFailureTrace(input: {
   routingRule?: string;
   contextRefs?: string[];
   error: { code: string; message: string; retryable: boolean };
-}): TraceRecord {
+}): Promise<TraceRecord> {
   const trace = createTraceRecord({
     sourceDomain: "ai_session",
     sourceId: input.aiSessionId,
@@ -212,14 +214,11 @@ export function recordWorkbenchTurnFailureTrace(input: {
     error: input.error,
   });
 
-  return insertTraceRecord(trace);
+  return await insertTraceRecord(trace);
 }
 
-/**
- * 从 Harness ToolEvent / ModelRun 创建 trace span。
- * 适用于 Harness 流水线中已有 traceId 的场景，追加 span 到已有 trace。
- */
-export function appendHarnessSpan(input: {
+/** 阶段 1 批 7：因内部调用 findTraceById + updateTraceRecord（已异步化）级联改 async，实现不动。 */
+export async function appendHarnessSpan(input: {
   traceId: string;
   spanType: TraceSpanType;
   name: string;
@@ -229,8 +228,8 @@ export function appendHarnessSpan(input: {
   tokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number };
   modelInfo?: { provider: string; model: string; finishReason?: string; attempts?: number };
   error?: { code: string; message: string; retryable: boolean };
-}): TraceRecord | null {
-  const trace = findTraceById(input.traceId);
+}): Promise<TraceRecord | null> {
+  const trace = await findTraceById(input.traceId);
   if (!trace) return null;
 
   const span: TraceSpanData = {
@@ -247,7 +246,7 @@ export function appendHarnessSpan(input: {
     ...(input.error ? { error: input.error } : {}),
   };
 
-  return updateTraceRecord(input.traceId, {
+  return await updateTraceRecord(input.traceId, {
     spans: [...trace.spans, span],
     summary: {
       ...trace.summary,
@@ -261,25 +260,29 @@ export function appendHarnessSpan(input: {
 
 // ─── 查询入口 ────────────────────────────────────────────────
 
-export function getTraceById(traceId: string, ownerUserId: string): TraceRecord | null {
-  const trace = findTraceById(traceId);
+/** 阶段 1 批 7：因内部调用 findTraceById（已异步化）级联改 async，实现不动。 */
+export async function getTraceById(traceId: string, ownerUserId: string): Promise<TraceRecord | null> {
+  const trace = await findTraceById(traceId);
   if (!trace) return null;
   // Owner 隔离
   if (trace.ownerUserId !== ownerUserId) return null;
   return trace;
 }
 
-export function queryUserTraces(filter: TraceQueryFilter): { traces: TraceRecord[]; total: number; limit: number; offset: number } {
-  return queryTraces(filter);
+/** 阶段 1 批 7：因内部调用 queryTraces（已异步化）级联改 async，实现不动。 */
+export async function queryUserTraces(filter: TraceQueryFilter): Promise<{ traces: TraceRecord[]; total: number; limit: number; offset: number }> {
+  return await queryTraces(filter);
 }
 
-export function purgeOldTraces(isoDate: string): number {
-  return purgeTracesOlderThan(isoDate);
+/** 阶段 1 批 7：因内部调用 purgeTracesOlderThan（已异步化）级联改 async，实现不动。 */
+export async function purgeOldTraces(isoDate: string): Promise<number> {
+  return await purgeTracesOlderThan(isoDate);
 }
 
 // ─── HTTP Handler ────────────────────────────────────────────
 
-export function listTracesHandler(req: Request, res: Response) {
+/** 阶段 1 批 7：因内部调用 queryUserTraces（已异步化）级联改 async，实现不动。 */
+export async function listTracesHandler(req: Request, res: Response) {
   // req.user 由 requireCapability 中间件挂载
   const user = req.user;
   if (!user) {
@@ -304,11 +307,12 @@ export function listTracesHandler(req: Request, res: Response) {
     offset: req.query.offset ? Number(req.query.offset) : 0,
   };
 
-  const result = queryUserTraces(filter);
+  const result = await queryUserTraces(filter);
   res.json({ code: 0, message: "ok", data: result });
 }
 
-export function getTraceHandler(req: Request, res: Response) {
+/** 阶段 1 批 7：因内部调用 getTraceById + findTraceById（已异步化）级联改 async，实现不动。 */
+export async function getTraceHandler(req: Request, res: Response) {
   // req.user 由 requireCapability 中间件挂载
   const user = req.user;
   if (!user) {
@@ -317,12 +321,12 @@ export function getTraceHandler(req: Request, res: Response) {
   }
 
   const traceId = String(req.params.traceId || "");
-  const trace = getTraceById(traceId, user.id);
+  const trace = await getTraceById(traceId, user.id);
 
   // admin 可查看任意 trace；普通用户只能看自己的
   if (!trace) {
     const isAdmin = user.role === "admin";
-    const adminTrace = isAdmin ? findTraceById(traceId) : null;
+    const adminTrace = isAdmin ? await findTraceById(traceId) : null;
     if (!adminTrace) {
       res.status(404).json({ code: 40401, message: "Trace 不存在或无权访问", data: null });
       return;

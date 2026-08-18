@@ -419,7 +419,7 @@ export async function getRequirementSettingsEffective(req: Request, res: Respons
   if (!(await requireAdmin(req, res))) return;
   const active = (await loadRequirementSystemConfigStore()).active;
   const credentials = await buildCredentialsHealth();
-  const lastVerified = loadModelVerifyStatus();
+  const lastVerified = await loadModelVerifyStatus();
   const effective = buildEffectiveModelConfig(active, config.kimi.model, credentials, lastVerified, config.kimi.apiBaseUrl);
   return res.json(ok({ ...effective, providers: buildProvidersSummary(active) }, randomUUID()));
 }
@@ -521,8 +521,9 @@ export async function testScenarioModel(req: Request, res: Response) {
   }
 
   const startedAt = Date.now();
-  const recordFailure = (reason: string) => {
-    saveScenarioVerifyRecord(scenario, {
+  /** 阶段 1 批 7：因 saveScenarioVerifyRecord 异步化级联改 async，实现不动。 */
+  const recordFailure = async (reason: string) => {
+    await saveScenarioVerifyRecord(scenario, {
       at: new Date().toISOString(),
       ok: false,
       model: resolution.model,
@@ -538,7 +539,7 @@ export async function testScenarioModel(req: Request, res: Response) {
       model: resolution.model,
     });
     const respondedModel = pingResult.respondedModel || null;
-    saveScenarioVerifyRecord(scenario, {
+    await saveScenarioVerifyRecord(scenario, {
       at: new Date().toISOString(),
       ok: true,
       model: respondedModel || resolution.model,
@@ -563,7 +564,7 @@ export async function testScenarioModel(req: Request, res: Response) {
     }, randomUUID()));
   } catch (e) {
     if (e instanceof KimiPingFailure) {
-      recordFailure(e.kind);
+      await recordFailure(e.kind);
       if (e.kind === "overload") {
         return fail(res, 50301, "KIMI 服务端繁忙，请稍后重试（多由官方引擎限流/过载引起，不代表 API Key 一定错误）", [
           { field: "provider", reason: e.message },
@@ -584,7 +585,7 @@ export async function testScenarioModel(req: Request, res: Response) {
         ]);
       }
     }
-    recordFailure("unknown");
+    await recordFailure("unknown");
     const msg = e instanceof Error ? e.message : "ping_failed";
     return fail(res, 40001, "调用 KIMI 失败", [{ field: "apiKey", reason: msg }]);
   }

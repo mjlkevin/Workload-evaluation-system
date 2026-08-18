@@ -202,25 +202,25 @@ describe("trace repository", () => {
     cleanTestStore();
   });
 
-  it("inserts and finds a trace by ID", () => {
+  it("inserts and finds a trace by ID", async () => {
     const trace = createTraceRecord({
       sourceDomain: "ai_session",
       ownerUserId: "user-1",
       ownerUsername: "testuser",
     });
-    insertTraceRecord(trace, TEST_STORE_PATH);
+    await insertTraceRecord(trace, TEST_STORE_PATH);
 
-    const found = findTraceById(trace.traceId, TEST_STORE_PATH);
+    const found = await findTraceById(trace.traceId, TEST_STORE_PATH);
     assert.ok(found);
     assert.equal(found.traceId, trace.traceId);
   });
 
-  it("returns null for non-existent trace", () => {
-    const found = findTraceById("non-existent-id", TEST_STORE_PATH);
+  it("returns null for non-existent trace", async () => {
+    const found = await findTraceById("non-existent-id", TEST_STORE_PATH);
     assert.equal(found, null);
   });
 
-  it("queries traces with owner isolation", () => {
+  it("queries traces with owner isolation", async () => {
     const trace1 = createTraceRecord({
       sourceDomain: "ai_session",
       ownerUserId: "user-1",
@@ -231,15 +231,15 @@ describe("trace repository", () => {
       ownerUserId: "user-2",
       ownerUsername: "bob",
     });
-    insertTraceRecord(trace1, TEST_STORE_PATH);
-    insertTraceRecord(trace2, TEST_STORE_PATH);
+    await insertTraceRecord(trace1, TEST_STORE_PATH);
+    await insertTraceRecord(trace2, TEST_STORE_PATH);
 
-    const result = queryTraces({ ownerUserId: "user-1" }, TEST_STORE_PATH);
+    const result = await queryTraces({ ownerUserId: "user-1" }, TEST_STORE_PATH);
     assert.equal(result.total, 1);
     assert.equal(result.traces[0].ownerUserId, "user-1");
   });
 
-  it("queries traces with sourceDomain filter", () => {
+  it("queries traces with sourceDomain filter", async () => {
     const trace1 = createTraceRecord({
       sourceDomain: "ai_session",
       ownerUserId: "user-1",
@@ -250,47 +250,47 @@ describe("trace repository", () => {
       ownerUserId: "user-1",
       ownerUsername: "alice",
     });
-    insertTraceRecord(trace1, TEST_STORE_PATH);
-    insertTraceRecord(trace2, TEST_STORE_PATH);
+    await insertTraceRecord(trace1, TEST_STORE_PATH);
+    await insertTraceRecord(trace2, TEST_STORE_PATH);
 
-    const result = queryTraces({ ownerUserId: "user-1", sourceDomain: "harness_run" }, TEST_STORE_PATH);
+    const result = await queryTraces({ ownerUserId: "user-1", sourceDomain: "harness_run" }, TEST_STORE_PATH);
     assert.equal(result.total, 1);
     assert.equal(result.traces[0].sourceDomain, "harness_run");
   });
 
-  it("updates a trace record", () => {
+  it("updates a trace record", async () => {
     const trace = createTraceRecord({
       sourceDomain: "ai_session",
       ownerUserId: "user-1",
       ownerUsername: "alice",
     });
-    insertTraceRecord(trace, TEST_STORE_PATH);
+    await insertTraceRecord(trace, TEST_STORE_PATH);
 
-    const updated = updateTraceRecord(trace.traceId, { userInputSummary: "updated" }, TEST_STORE_PATH);
+    const updated = await updateTraceRecord(trace.traceId, { userInputSummary: "updated" }, TEST_STORE_PATH);
     assert.ok(updated);
     assert.equal(updated.userInputSummary, "updated");
   });
 
-  it("purges old traces", () => {
+  it("purges old traces", async () => {
     const oldTrace = createTraceRecord({
       sourceDomain: "ai_session",
       ownerUserId: "user-1",
       ownerUsername: "alice",
     });
     oldTrace.createdAt = "2020-01-01T00:00:00.000Z";
-    insertTraceRecord(oldTrace, TEST_STORE_PATH);
+    await insertTraceRecord(oldTrace, TEST_STORE_PATH);
 
     const newTrace = createTraceRecord({
       sourceDomain: "ai_session",
       ownerUserId: "user-1",
       ownerUsername: "alice",
     });
-    insertTraceRecord(newTrace, TEST_STORE_PATH);
+    await insertTraceRecord(newTrace, TEST_STORE_PATH);
 
-    const removed = purgeTracesOlderThan("2023-01-01T00:00:00.000Z", TEST_STORE_PATH);
+    const removed = await purgeTracesOlderThan("2023-01-01T00:00:00.000Z", TEST_STORE_PATH);
     assert.equal(removed, 1);
 
-    const remaining = queryTraces({ ownerUserId: "user-1" }, TEST_STORE_PATH);
+    const remaining = await queryTraces({ ownerUserId: "user-1" }, TEST_STORE_PATH);
     assert.equal(remaining.total, 1);
   });
 });
@@ -309,9 +309,9 @@ describe("recordWorkbenchTurnTrace", () => {
   });
 
   it("creates a trace with intent routing span in the configured test store", async () => {
-    await withTraceStoreEnv(() => {
+    await withTraceStoreEnv(async () => {
       const defaultExistedBefore = existsSync(DEFAULT_STORE_PATH);
-      const trace = recordWorkbenchTurnTrace({
+      const trace = await recordWorkbenchTurnTrace({
         ownerUserId: "user-1",
         ownerUsername: "alice",
         aiSessionId: "session-1",
@@ -329,15 +329,15 @@ describe("recordWorkbenchTurnTrace", () => {
       assert.ok(trace.spans.length >= 1);
       assert.equal(trace.spans[0].spanType, "intent_routing");
 
-      const stored = findTraceById(trace.traceId, TEST_STORE_PATH);
+      const stored = await findTraceById(trace.traceId, TEST_STORE_PATH);
       assert.equal(stored?.traceId, trace.traceId);
       assert.equal(existsSync(DEFAULT_STORE_PATH), defaultExistedBefore);
     });
   });
 
   it("records failed workbench turns as failed traces", async () => {
-    await withTraceStoreEnv(() => {
-      const trace = recordWorkbenchTurnFailureTrace({
+    await withTraceStoreEnv(async () => {
+      const trace = await recordWorkbenchTurnFailureTrace({
         ownerUserId: "user-1",
         ownerUsername: "alice",
         aiSessionId: "session-failed",
@@ -350,13 +350,13 @@ describe("recordWorkbenchTurnTrace", () => {
       assert.equal(trace.summary.hasError, true);
       assert.equal(trace.spans[0].status, "failed");
       assert.equal(trace.spans[0].error?.code, "stream_failed");
-      const stored = findTraceById(trace.traceId, TEST_STORE_PATH);
+      const stored = await findTraceById(trace.traceId, TEST_STORE_PATH);
       assert.equal(stored?.summary.hasError, true);
     });
   });
 
-  it("creates knowledge retrieval span when knowledgeTool is present", () => {
-    const trace = recordWorkbenchTurnTrace({
+  it("creates knowledge retrieval span when knowledgeTool is present", async () => {
+    const trace = await recordWorkbenchTurnTrace({
       ownerUserId: "user-1",
       ownerUsername: "alice",
       dispatchTrace: {
@@ -389,8 +389,8 @@ describe("recordWorkbenchTurnTrace", () => {
     assert.equal(knowledgeSpan.tokenUsage?.totalTokens, 150);
   });
 
-  it("persists request, provider, prompt and config metadata on the knowledge span", () => {
-    const trace = recordWorkbenchTurnTrace({
+  it("persists request, provider, prompt and config metadata on the knowledge span", async () => {
+    const trace = await recordWorkbenchTurnTrace({
       requestId: "00000000-0000-4000-8000-000000000001",
       ownerUserId: "user-1",
       ownerUsername: "alice",
@@ -445,8 +445,8 @@ describe("recordWorkbenchTurnTrace", () => {
     assert.equal((span.attributes.route as any).attempts.length, 2);
   });
 
-  it("marks knowledge span as degraded when fallbackReason present", () => {
-    const trace = recordWorkbenchTurnTrace({
+  it("marks knowledge span as degraded when fallbackReason present", async () => {
+    const trace = await recordWorkbenchTurnTrace({
       ownerUserId: "user-1",
       ownerUsername: "alice",
       dispatchTrace: {
@@ -498,10 +498,10 @@ describe("recordWorkbenchTurnTrace", () => {
 });
 
 describe("getTraceById (owner isolation)", () => {
-  it("returns null when trace belongs to different user", () => {
+  it("returns null when trace belongs to different user", async () => {
     // getTraceById 使用默认 store path，这里只测试逻辑
     // 在真实场景中，owner 隔离确保用户只能看到自己的 trace
-    const result = getTraceById("non-existent", "user-1");
+    const result = await getTraceById("non-existent", "user-1");
     assert.equal(result, null);
   });
 });
@@ -536,38 +536,38 @@ function createMockReqRes(overrides: {
 }
 
 describe("listTracesHandler (RP-030 auth fix)", () => {
-  it("returns 401 when req.user is missing", () => {
+  it("returns 401 when req.user is missing", async () => {
     const { req, res, getStatusCode, getResponseBody } = createMockReqRes({ user: null });
-    listTracesHandler(req, res);
+    await listTracesHandler(req, res);
     assert.equal(getStatusCode(), 401);
     assert.equal((getResponseBody() as Record<string, unknown>).code, 40101);
   });
 
-  it("returns 200 for authenticated user", () => {
+  it("returns 200 for authenticated user", async () => {
     const { req, res, getStatusCode } = createMockReqRes({
       user: { id: "user-1", username: "alice", role: "user" },
     });
-    listTracesHandler(req, res);
+    await listTracesHandler(req, res);
     assert.equal(getStatusCode(), 200);
   });
 });
 
 describe("getTraceHandler (RP-030 auth fix)", () => {
-  it("returns 401 when req.user is missing", () => {
+  it("returns 401 when req.user is missing", async () => {
     const { req, res, getStatusCode } = createMockReqRes({
       user: null,
       params: { traceId: "t-1" },
     });
-    getTraceHandler(req, res);
+    await getTraceHandler(req, res);
     assert.equal(getStatusCode(), 401);
   });
 
-  it("returns 404 for non-existent trace", () => {
+  it("returns 404 for non-existent trace", async () => {
     const { req, res, getStatusCode } = createMockReqRes({
       user: { id: "user-1", username: "alice", role: "user" },
       params: { traceId: "non-existent-id" },
     });
-    getTraceHandler(req, res);
+    await getTraceHandler(req, res);
     assert.equal(getStatusCode(), 404);
   });
 });

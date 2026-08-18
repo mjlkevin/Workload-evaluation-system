@@ -46,7 +46,8 @@ function writeStore(storePath: string, store: TraceStore): void {
 
 // ─── 写入 ────────────────────────────────────────────────────
 
-export function insertTraceRecord(record: TraceRecord, storePath?: string): TraceRecord {
+/** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+export async function insertTraceRecord(record: TraceRecord, storePath?: string): Promise<TraceRecord> {
   const path = storePath ?? resolveStorePath();
   const store = readStore(path);
   store.traces.unshift(record); // 最新的在前
@@ -54,7 +55,8 @@ export function insertTraceRecord(record: TraceRecord, storePath?: string): Trac
   return record;
 }
 
-export function updateTraceRecord(traceId: string, patch: Partial<TraceRecord>, storePath?: string): TraceRecord | null {
+/** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+export async function updateTraceRecord(traceId: string, patch: Partial<TraceRecord>, storePath?: string): Promise<TraceRecord | null> {
   const path = storePath ?? resolveStorePath();
   const store = readStore(path);
   const idx = store.traces.findIndex((t) => t.traceId === traceId);
@@ -66,13 +68,15 @@ export function updateTraceRecord(traceId: string, patch: Partial<TraceRecord>, 
 
 // ─── 查询 ────────────────────────────────────────────────────
 
-export function findTraceById(traceId: string, storePath?: string): TraceRecord | null {
+/** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync），阶段 2 替换实现。 */
+export async function findTraceById(traceId: string, storePath?: string): Promise<TraceRecord | null> {
   const path = storePath ?? resolveStorePath();
   const store = readStore(path);
   return store.traces.find((t) => t.traceId === traceId) ?? null;
 }
 
-export function queryTraces(filter: TraceQueryFilter, storePath?: string): TraceQueryResult {
+/** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync），阶段 2 替换实现。 */
+export async function queryTraces(filter: TraceQueryFilter, storePath?: string): Promise<TraceQueryResult> {
   const path = storePath ?? resolveStorePath();
   const store = readStore(path);
   const limit = filter.limit ?? 20;
@@ -116,14 +120,16 @@ export function queryTraces(filter: TraceQueryFilter, storePath?: string): Trace
   return { traces, total, limit, offset };
 }
 
-export function listTracesForOwner(ownerUserId: string, opts?: { limit?: number; offset?: number }, storePath?: string): TraceRecord[] {
-  const result = queryTraces({ ownerUserId, ...opts }, storePath);
+/** 阶段 1 批 7：签名改 async（含内部 queryTraces 级联），实现不动（仍为 readFileSync），阶段 2 替换实现。 */
+export async function listTracesForOwner(ownerUserId: string, opts?: { limit?: number; offset?: number }, storePath?: string): Promise<TraceRecord[]> {
+  const result = await queryTraces({ ownerUserId, ...opts }, storePath);
   return result.traces;
 }
 
 // ─── 清理（retention） ───────────────────────────────────────
 
-export function purgeTracesOlderThan(isoDate: string, storePath?: string): number {
+/** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+export async function purgeTracesOlderThan(isoDate: string, storePath?: string): Promise<number> {
   const path = storePath ?? resolveStorePath();
   const store = readStore(path);
   const cutoff = new Date(isoDate).getTime();

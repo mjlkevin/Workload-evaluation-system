@@ -186,7 +186,8 @@ function normalizeVerifyRecord(input: unknown): ScenarioVerifyRecord | null {
   };
 }
 
-export function loadModelVerifyStatus(): VerifyStatusStore {
+/** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync），阶段 2 替换实现。 */
+export async function loadModelVerifyStatus(): Promise<VerifyStatusStore> {
   const filePath = modelVerifyStatusPath();
   if (!fs.existsSync(filePath)) return {};
   try {
@@ -204,9 +205,10 @@ export function loadModelVerifyStatus(): VerifyStatusStore {
   }
 }
 
-export function saveScenarioVerifyRecord(scenario: ModelScenarioKey, record: ScenarioVerifyRecord): void {
+/** 阶段 1 批 7：签名改 async（含内部 loadModelVerifyStatus 级联），实现不动（仍为 writeFileSync），阶段 2 替换实现。 */
+export async function saveScenarioVerifyRecord(scenario: ModelScenarioKey, record: ScenarioVerifyRecord): Promise<void> {
   const filePath = modelVerifyStatusPath();
-  const current = loadModelVerifyStatus();
+  const current = await loadModelVerifyStatus();
   const next: VerifyStatusStore = { ...current, [scenario]: record };
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(next, null, 2), "utf-8");

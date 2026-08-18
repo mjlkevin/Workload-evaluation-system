@@ -35,17 +35,19 @@ export class KnowledgeRepository {
     this.storePath = storePath ?? path.resolve(resolveRootDir(), DEFAULT_STORE_RELATIVE);
   }
 
-  /** 读取全部条目（含 archived，供管理页签展示；检索侧自行过滤） */
-  list(): KnowledgeEntry[] {
+  /** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync），阶段 2 替换实现。 */
+  async list(): Promise<KnowledgeEntry[]> {
     const store = this.load();
     return store.entries.map((entry, index) => this.normalize(entry, index));
   }
 
-  get(id: string): KnowledgeEntry | null {
-    return this.list().find((entry) => entry.id === id) ?? null;
+  /** 阶段 1 批 7：签名改 async（含内部 list 级联），实现不动，阶段 2 替换实现。 */
+  async get(id: string): Promise<KnowledgeEntry | null> {
+    return (await this.list()).find((entry) => entry.id === id) ?? null;
   }
 
-  create(input: CreateEntryInput): KnowledgeEntry {
+  /** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+  async create(input: CreateEntryInput): Promise<KnowledgeEntry> {
     if (!input.title || !input.title.trim()) {
       throw new Error("Knowledge entry title is required");
     }
@@ -73,7 +75,8 @@ export class KnowledgeRepository {
     return entry;
   }
 
-  update(id: string, patch: Partial<Pick<KnowledgeEntry, "title" | "content" | "category" | "tags" | "status">>): KnowledgeEntry {
+  /** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+  async update(id: string, patch: Partial<Pick<KnowledgeEntry, "title" | "content" | "category" | "tags" | "status">>): Promise<KnowledgeEntry> {
     const store = this.load();
     const raw = store.entries.find((entry) => entry.id === id);
     if (!raw) {
@@ -97,8 +100,8 @@ export class KnowledgeRepository {
     return updated;
   }
 
-  /** 归档（单向）：archived 后检索不再命中，且不可再修改 */
-  archive(id: string): KnowledgeEntry {
+  /** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+  async archive(id: string): Promise<KnowledgeEntry> {
     const store = this.load();
     const raw = store.entries.find((entry) => entry.id === id);
     if (!raw) {
