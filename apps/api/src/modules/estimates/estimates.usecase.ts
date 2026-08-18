@@ -94,8 +94,8 @@ function collectSelectedLabels(body: CalculateRequest, template: Template): Set<
   return labels;
 }
 
-function validateImplementationDependencies(body: CalculateRequest, template: Template): FailedResult | null {
-  const store = loadImplementationDependencyRulesStore();
+async function validateImplementationDependencies(body: CalculateRequest, template: Template): Promise<FailedResult | null> {
+  const store = await loadImplementationDependencyRulesStore();
   const activeRules: ImplementationDependencyRulesConfig | null = store.active || null;
   if (!activeRules || !Array.isArray(activeRules.rules) || activeRules.rules.length === 0) return null;
 
@@ -179,9 +179,10 @@ function validateImplementationDependencies(body: CalculateRequest, template: Te
   };
 }
 
-export function calculateEstimateOnly(body: CalculateRequest): EstimateValidationResult {
+/** 阶段 1 批 5：因内部 validateImplementationDependencies（已异步化）级联改 async，实现不动。 */
+export async function calculateEstimateOnly(body: CalculateRequest): Promise<EstimateValidationResult> {
   const { template, ruleSet } = loadEstimateContext();
-  const dependencyValidation = validateImplementationDependencies(body, template);
+  const dependencyValidation = await validateImplementationDependencies(body, template);
   if (dependencyValidation) return dependencyValidation;
   const validation = validateCalculateRequest(body, template, ruleSet);
   if (!validation.ok) {
@@ -206,7 +207,7 @@ export async function calculateAndExportEstimate(
   idempotencyKey?: string
 ): Promise<EstimateUsecaseResult<{ totalDays: number; downloadUrl: string; expireAt: string }>> {
   const { template, ruleSet } = loadEstimateContext();
-  const dependencyValidation = validateImplementationDependencies(body, template);
+  const dependencyValidation = await validateImplementationDependencies(body, template);
   if (dependencyValidation) return dependencyValidation;
   const validation = validateCalculateRequest(body, template, ruleSet);
   if (!validation.ok) {
@@ -283,8 +284,9 @@ export function listExportHistoryByOwner(ownerUserId: string, page: number, page
   return getExportHistoryList(ownerUserId, page, pageSize);
 }
 
-export function getActiveImplementationDependencyRules() {
-  const store = loadImplementationDependencyRulesStore();
+/** 阶段 1 批 5：因内部调用 loadImplementationDependencyRulesStore（已异步化）级联改 async，实现不动。 */
+export async function getActiveImplementationDependencyRules() {
+  const store = await loadImplementationDependencyRulesStore();
   return {
     version: store.version,
     effectiveAt: store.effectiveAt,

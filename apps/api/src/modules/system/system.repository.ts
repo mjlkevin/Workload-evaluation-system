@@ -143,7 +143,8 @@ function normalizeStore(input: unknown): VersionCodeRulesStore {
   return { rules: normalized };
 }
 
-export function loadVersionCodeRulesStore(): VersionCodeRulesStore {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+export async function loadVersionCodeRulesStore(): Promise<VersionCodeRulesStore> {
   const filePath = versionCodeRulesStorePath();
   if (!fs.existsSync(filePath)) {
     const initStore: VersionCodeRulesStore = { rules: createDefaultRules() };
@@ -164,7 +165,8 @@ export function loadVersionCodeRulesStore(): VersionCodeRulesStore {
   }
 }
 
-export function saveVersionCodeRulesStore(store: VersionCodeRulesStore): void {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync），阶段 2 替换实现。 */
+export async function saveVersionCodeRulesStore(store: VersionCodeRulesStore): Promise<void> {
   const filePath = versionCodeRulesStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const normalized = normalizeStore(store);
@@ -326,7 +328,8 @@ export function _resetKimiImportCheck(): void {
   _kimiImportChecked = false;
 }
 
-export function loadRequirementSystemConfigStore(): RequirementSystemConfigStore {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+export async function loadRequirementSystemConfigStore(): Promise<RequirementSystemConfigStore> {
   const filePath = requirementSystemConfigStorePath();
   if (!fs.existsSync(filePath)) {
     const now = new Date().toISOString();
@@ -383,7 +386,8 @@ export function loadRequirementSystemConfigStore(): RequirementSystemConfigStore
   }
 }
 
-export function saveRequirementSystemConfigStore(store: RequirementSystemConfigStore): void {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync），阶段 2 替换实现。 */
+export async function saveRequirementSystemConfigStore(store: RequirementSystemConfigStore): Promise<void> {
   const filePath = requirementSystemConfigStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const normalized = normalizeRequirementStore(store);
@@ -841,7 +845,8 @@ function normalizeImplementationDependencyStore(input: unknown): ImplementationD
   };
 }
 
-export function loadImplementationDependencyRulesStore(): ImplementationDependencyRulesStore {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+export async function loadImplementationDependencyRulesStore(): Promise<ImplementationDependencyRulesStore> {
   const filePath = implementationDependencyRulesStorePath();
   if (!fs.existsSync(filePath)) {
     const now = new Date().toISOString();
@@ -878,7 +883,8 @@ export function loadImplementationDependencyRulesStore(): ImplementationDependen
   }
 }
 
-export function saveImplementationDependencyRulesStore(store: ImplementationDependencyRulesStore): void {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync），阶段 2 替换实现。 */
+export async function saveImplementationDependencyRulesStore(store: ImplementationDependencyRulesStore): Promise<void> {
   const filePath = implementationDependencyRulesStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const normalized = normalizeImplementationDependencyStore(store);
@@ -1147,7 +1153,8 @@ function normalizeKnowledgeBaseStore(input: unknown): KnowledgeBaseConfigStore {
   };
 }
 
-export function loadKnowledgeBaseConfigStore(): KnowledgeBaseConfigStore {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
+export async function loadKnowledgeBaseConfigStore(): Promise<KnowledgeBaseConfigStore> {
   const filePath = knowledgeBaseConfigStorePath();
   if (!fs.existsSync(filePath)) {
     const now = new Date().toISOString();
@@ -1184,7 +1191,8 @@ export function loadKnowledgeBaseConfigStore(): KnowledgeBaseConfigStore {
   }
 }
 
-export function saveKnowledgeBaseConfigStore(store: KnowledgeBaseConfigStore): void {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync），阶段 2 替换实现。 */
+export async function saveKnowledgeBaseConfigStore(store: KnowledgeBaseConfigStore): Promise<void> {
   const filePath = knowledgeBaseConfigStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const normalized = normalizeKnowledgeBaseStore(store);
@@ -1206,8 +1214,11 @@ export function mergeKnowledgeBaseCredentialsPatch(
   return { apiKey, knowledgeId };
 }
 
-/** 知识库实际调用：已生效配置中的凭证优先，否则环境变量 */
-export function resolveActiveKnowledgeBaseConfig(): {
+/**
+ * 知识库实际调用：已生效配置中的凭证优先，否则环境变量
+ * 阶段 1 批 5：因内部调用 loadKnowledgeBaseConfigStore（已异步化）级联改 async，实现不动。
+ */
+export async function resolveActiveKnowledgeBaseConfig(): Promise<{
   apiKey: string;
   knowledgeId: string;
   model: string;
@@ -1216,8 +1227,8 @@ export function resolveActiveKnowledgeBaseConfig(): {
   promptProfile: KnowledgePromptProfile;
   configVersion: number;
   source: "store" | "env" | "none";
-} {
-  const store = loadKnowledgeBaseConfigStore();
+}> {
+  const store = await loadKnowledgeBaseConfigStore();
   const storeApiKey = store.active.credentials.apiKey.trim();
   const activeProfile = store.active.knowledgeBases.find((profile) => profile.enabled && profile.isDefault)
     || store.active.knowledgeBases.find((profile) => profile.enabled);
@@ -1262,9 +1273,12 @@ export type ResolvedActiveKnowledgeBaseCatalog = {
   source: "store" | "env" | "none";
 };
 
-/** 运行时多知识库目录：共享同一智谱账号与检索参数。 */
-export function resolveActiveKnowledgeBaseCatalog(): ResolvedActiveKnowledgeBaseCatalog {
-  const store = loadKnowledgeBaseConfigStore();
+/**
+ * 运行时多知识库目录：共享同一智谱账号与检索参数。
+ * 阶段 1 批 5：因内部调用 loadKnowledgeBaseConfigStore（已异步化）级联改 async，实现不动。
+ */
+export async function resolveActiveKnowledgeBaseCatalog(): Promise<ResolvedActiveKnowledgeBaseCatalog> {
+  const store = await loadKnowledgeBaseConfigStore();
   const storeApiKey = store.active.credentials.apiKey.trim();
   const envApiKey = config.zhipu.apiKey.trim();
   const profiles = store.active.knowledgeBases.filter((profile) => profile.enabled);
@@ -1315,12 +1329,15 @@ export function resolveActiveKnowledgeBaseCatalog(): ResolvedActiveKnowledgeBase
   };
 }
 
-/** 测试连接：显式传入优先；否则草稿仓库；再否则环境变量 */
-export function resolveDraftKnowledgeBaseConfigForTest(
+/**
+ * 测试连接：显式传入优先；否则草稿仓库；再否则环境变量
+ * 阶段 1 批 5：因内部调用 loadKnowledgeBaseConfigStore（已异步化）级联改 async，实现不动。
+ */
+export async function resolveDraftKnowledgeBaseConfigForTest(
   overrideApiKey?: string,
   overrideKnowledgeId?: string,
   profileId?: string,
-): {
+): Promise<{
   apiKey: string;
   knowledgeId: string;
   model: string;
@@ -1328,10 +1345,10 @@ export function resolveDraftKnowledgeBaseConfigForTest(
   retrievalParams: KnowledgeRetrievalParams;
   promptProfile: KnowledgePromptProfile;
   source: "override" | "draft" | "env" | "none";
-} {
+}> {
   const oKey = overrideApiKey?.trim() || "";
   const oKid = overrideKnowledgeId?.trim() || "";
-  const store = loadKnowledgeBaseConfigStore();
+  const store = await loadKnowledgeBaseConfigStore();
   if (oKey && oKid) return { apiKey: oKey, knowledgeId: oKid, model: store.draft.model, apiBaseUrl: store.draft.apiBaseUrl, retrievalParams: store.draft.retrievalParams, promptProfile: normalizeKnowledgePromptProfile(store.draft.promptProfile), source: "override" };
   const draftKey = store.draft.credentials.apiKey.trim();
   const selectedProfile = profileId

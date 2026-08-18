@@ -11,7 +11,7 @@ import {
 } from "../system/system.repository";
 
 class AiRepository {
-  /** 加载需求系统配置（非密钥部分：评估参数、超时、prompt 等） */
+  /** 加载需求系统配置（非密钥部分：评估参数、超时、prompt 等）。阶段 1 批 5：因内部调用已异步化，返回 Promise，实现不动。 */
   loadRequirementSettings() {
     return loadRequirementSystemConfigStore();
   }

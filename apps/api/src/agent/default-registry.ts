@@ -86,7 +86,7 @@ export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext):
 
 /** 知识库查询接线：复用生效知识库目录，未配置时由底层返回降级说明 */
 async function queryKnowledgeBase(query: string, runtime?: RuntimeContext) {
-  const catalog = resolveActiveKnowledgeBaseCatalog();
+  const catalog = await resolveActiveKnowledgeBaseCatalog();
   const profile = catalog.profiles[0];
   return queryZhipuKnowledgeBase(query, {
     apiKey: catalog.apiKey,

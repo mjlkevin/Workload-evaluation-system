@@ -153,12 +153,14 @@ export async function analyzeMultipleAttachmentsByKimi(params: {
     "请将以上多份分析合并为一份统一报告。",
   ].join("\n");
 
+  // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
+  const requirementSystemConfig = await loadRequirementSystemConfigStore();
   const completion = await getKimiProvider().chatCompletion({
     model: params.model,
     temperature: 0.2,
     responseFormat: "json_object",
     promptCacheKey: "home-workbench-multi-attachment-merge-v1",
-    timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
+    timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
     credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl },
     messages: [
       { role: "system", content: mergeSystemPrompt },
@@ -214,12 +216,14 @@ export async function analyzeRequirementAttachmentByKimi(params: {
   const businessRole = resolveBusinessRole(params.user);
   const preset = HOME_ROLE_PRESETS[businessRole];
   const parsedSeed = buildRequirementAnalysisReport(params.attachment);
+  // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
+  const requirementSystemConfig = await loadRequirementSystemConfigStore();
   const completion = await getKimiProvider().chatCompletion({
     model: params.model,
     temperature: 0.2,
     responseFormat: "json_object",
     promptCacheKey: "home-workbench-attachment-analysis-v1",
-    timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
+    timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
     credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl },
     messages: [
       {

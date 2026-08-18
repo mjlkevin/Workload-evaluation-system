@@ -134,11 +134,12 @@ async function getNonAdminUser(): Promise<AuthUser> {
  * 绑定钉到内置 moonshot 并在结束后恢复，使用例与环境配置解耦。
  * 返回恢复函数，须在 finally 中调用。
  */
-function pinFileParsingBindingToBuiltinMoonshot(): () => void {
-  const store = loadRequirementSystemConfigStore();
+async function pinFileParsingBindingToBuiltinMoonshot(): Promise<() => Promise<void>> {
+  // 阶段 1 批 5：store accessor 已异步化，测试辅助函数级联 async（断言不变）。
+  const store = await loadRequirementSystemConfigStore();
   const snapshot = JSON.parse(JSON.stringify(store)) as typeof store;
   const builtinBinding = { providerId: BUILTIN_MOONSHOT_PROVIDER_ID, modelId: "kimi-k3" };
-  saveRequirementSystemConfigStore({
+  await saveRequirementSystemConfigStore({
     ...store,
     active: {
       ...store.active,
@@ -149,8 +150,8 @@ function pinFileParsingBindingToBuiltinMoonshot(): () => void {
       },
     },
   });
-  return () => {
-    saveRequirementSystemConfigStore(snapshot);
+  return async () => {
+    await saveRequirementSystemConfigStore(snapshot);
   };
 }
 
@@ -162,11 +163,12 @@ function pinFileParsingBindingToBuiltinMoonshot(): () => void {
  * 这里显式把 assessment 绑定钉到内置 moonshot 并在结束后恢复，
  * 使用例与环境配置解耦。返回恢复函数，须在 finally 中调用。
  */
-function pinAssessmentBindingToBuiltinMoonshot(): () => void {
-  const store = loadRequirementSystemConfigStore();
+async function pinAssessmentBindingToBuiltinMoonshot(): Promise<() => Promise<void>> {
+  // 阶段 1 批 5：store accessor 已异步化，测试辅助函数级联 async（断言不变）。
+  const store = await loadRequirementSystemConfigStore();
   const snapshot = JSON.parse(JSON.stringify(store)) as typeof store;
   const builtinBinding = { providerId: BUILTIN_MOONSHOT_PROVIDER_ID, modelId: "kimi-k3" };
-  saveRequirementSystemConfigStore({
+  await saveRequirementSystemConfigStore({
     ...store,
     active: {
       ...store.active,
@@ -177,8 +179,8 @@ function pinAssessmentBindingToBuiltinMoonshot(): () => void {
       },
     },
   });
-  return () => {
-    saveRequirementSystemConfigStore(snapshot);
+  return async () => {
+    await saveRequirementSystemConfigStore(snapshot);
   };
 }
 
@@ -1493,7 +1495,7 @@ test("ai.usecase: kimiAssessmentPreview returns model result on valid response",
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
-  const restoreBinding = pinAssessmentBindingToBuiltinMoonshot();
+  const restoreBinding = await pinAssessmentBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -1540,7 +1542,7 @@ test("ai.usecase: kimiAssessmentPreview returns model result on valid response",
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
     _resetAiBootstrapForTest();
-    restoreBinding();
+    await restoreBinding();
   }
 });
 
@@ -2225,7 +2227,7 @@ test("ai.usecase: parseBasicInfo fails instead of returning rule fallback when m
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
-  const restoreBinding = pinFileParsingBindingToBuiltinMoonshot();
+  const restoreBinding = await pinFileParsingBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -2244,7 +2246,7 @@ test("ai.usecase: parseBasicInfo fails instead of returning rule fallback when m
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
-    restoreBinding();
+    await restoreBinding();
     _resetAiBootstrapForTest();
   }
 });
@@ -2261,7 +2263,7 @@ test("ai.usecase: parseBasicInfo can return local workbook fallback when explici
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
-  const restoreBinding = pinFileParsingBindingToBuiltinMoonshot();
+  const restoreBinding = await pinFileParsingBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -2289,7 +2291,7 @@ test("ai.usecase: parseBasicInfo can return local workbook fallback when explici
   } finally {
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
-    restoreBinding();
+    await restoreBinding();
     _resetAiBootstrapForTest();
   }
 });
@@ -2315,7 +2317,7 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
-  const restoreBinding = pinAssessmentBindingToBuiltinMoonshot();
+  const restoreBinding = await pinAssessmentBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -2335,7 +2337,7 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
     _resetAiBootstrapForTest();
-    restoreBinding();
+    await restoreBinding();
   }
 });
 
@@ -2360,7 +2362,7 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
   const res = createMockRes();
   const originalFetch = (globalThis as { fetch?: unknown }).fetch;
   const originalApiKey = config.kimi.apiKey;
-  const restoreBinding = pinAssessmentBindingToBuiltinMoonshot();
+  const restoreBinding = await pinAssessmentBindingToBuiltinMoonshot();
   try {
     config.kimi.apiKey = "unit-test-key";
     bootstrapAiProviders();
@@ -2384,7 +2386,7 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
     (globalThis as { fetch?: unknown }).fetch = originalFetch;
     config.kimi.apiKey = originalApiKey;
     _resetAiBootstrapForTest();
-    restoreBinding();
+    await restoreBinding();
   }
 });
 

@@ -48,7 +48,7 @@ async function bootstrap(): Promise<void> {
       try {
         const { loadRequirementSystemConfigStore } = await import("./modules/system/system.repository");
         const { credentialScopeForProvider } = await import("./modules/system/model-providers");
-        const store = loadRequirementSystemConfigStore();
+        const store = await loadRequirementSystemConfigStore();
         const scopes = new Set<string>(["kimi"]);
         for (const p of store.active.modelProviders || []) {
           scopes.add(credentialScopeForProvider(p.id));

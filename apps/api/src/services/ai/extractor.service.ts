@@ -357,7 +357,7 @@ export async function parseBasicInfo(req: Request, res: Response) {
     const workbookText = buildWorkbookPreviewText(workbook);
     const workbookBasicInfo = parseBasicInfoFromWorkbook(workbook);
     const workbookRequirementData = parseRequirementImportFromWorkbook(workbook);
-    const requirementSettings = loadRequirementSystemConfigStore().active;
+    const requirementSettings = (await loadRequirementSystemConfigStore()).active;
     // T7（RP-055）：文件解析链路统一走场景绑定解析（供应商/模型/baseUrl/凭据 scope）
     const scenarioCfg = resolveScenarioConfig(requirementSettings, "fileParsing", {
       model: config.kimi.model,
@@ -438,7 +438,7 @@ export async function parseBasicInfoStream(req: Request, res: Response) {
     }, abortGuard);
     abortGuard.resetIdleTimer();
 
-    const requirementSettings = loadRequirementSystemConfigStore().active;
+    const requirementSettings = (await loadRequirementSystemConfigStore()).active;
     // T7（RP-055）：文件解析链路统一走场景绑定解析（供应商/模型/baseUrl/凭据 scope）
     const scenarioCfg = resolveScenarioConfig(requirementSettings, "fileParsing", {
       model: config.kimi.model,

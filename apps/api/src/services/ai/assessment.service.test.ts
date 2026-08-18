@@ -36,7 +36,8 @@ function createCapturingKimiProvider(): ModelProvider & { lastRequest?: ChatComp
 
 /** 快照需求系统配置 store 与 provider 注册表，注入 mock provider，结束后原样恢复 */
 async function withAssessmentSandbox(
-  mutate: (store: ReturnType<typeof loadRequirementSystemConfigStore>) => void,
+  // 阶段 1 批 5：accessor 已异步化，ReturnType 需 Awaited 解包（断言不变）。
+  mutate: (store: Awaited<ReturnType<typeof loadRequirementSystemConfigStore>>) => void,
   run: (provider: ModelProvider & { lastRequest?: ChatCompletionRequest }) => Promise<void>,
 ): Promise<void> {
   const storePath = requirementSystemConfigStorePath();
@@ -48,9 +49,9 @@ async function withAssessmentSandbox(
   defaultProviderRegistry.register(mockProvider, { asDefault: true });
   setCachedApiKey(KIMI_SCOPE, "sk-assessment-test-only");
   try {
-    const store = loadRequirementSystemConfigStore();
+    const store = await loadRequirementSystemConfigStore();
     mutate(store);
-    saveRequirementSystemConfigStore(store);
+    await saveRequirementSystemConfigStore(store);
     await run(mockProvider);
   } finally {
     if (existed) {

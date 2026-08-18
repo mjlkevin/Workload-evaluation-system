@@ -17,8 +17,9 @@ describe("aiRepository", () => {
     assert.equal(typeof aiRepository.resolveApiKey, "function", "resolveApiKey must be a function");
   });
 
-  it("loadRequirementSettings returns a store with .active property", () => {
-    const store = aiRepository.loadRequirementSettings();
+  it("loadRequirementSettings returns a store with .active property", async () => {
+    // 阶段 1 批 5：loadRequirementSettings 已返回 Promise，补 await（断言不变）。
+    const store = await aiRepository.loadRequirementSettings();
     assert.ok(store, "store must be truthy");
     assert.ok(store.active, "store.active must exist");
     assert.ok(store.active.kimiEvaluation, "store.active.kimiEvaluation must exist");

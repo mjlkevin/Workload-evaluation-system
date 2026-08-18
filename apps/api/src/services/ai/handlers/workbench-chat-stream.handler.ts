@@ -172,11 +172,13 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
         throw new Error("stream_not_supported");
       }
 
+      // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
+      const requirementSystemConfig = await loadRequirementSystemConfigStore();
       const stream = provider.streamChatCompletion({
         model: config.kimi.model,
         temperature: 0.3,
         promptCacheKey: "home-workbench-stream-v1",
-        timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
+        timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
         credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
         messages: [{ role: "system", content: params.systemPrompt }, ...safeMessages],
       });
@@ -204,11 +206,13 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       if (safeMessages.length > 0) {
         safeMessages[safeMessages.length - 1] = { role: "user", content: userContent };
       }
+      // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
+      const requirementSystemConfig = await loadRequirementSystemConfigStore();
       const completion = await getKimiProvider().chatCompletion({
         model: config.kimi.model,
         temperature: 0.3,
         promptCacheKey: "home-workbench-dispatch-v1",
-        timeoutMs: loadRequirementSystemConfigStore().active.kimiEvaluation.timeoutMs || 120000,
+        timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
         credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
         messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
       });
