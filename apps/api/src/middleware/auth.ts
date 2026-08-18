@@ -37,7 +37,11 @@ export function resolveBusinessRole(user: Pick<AuthUser, "role" | "businessRole"
     : defaultBusinessRoleForSystemRole(user.role);
 }
 
-export function loadUsersStore(): UsersStore {
+/**
+ * 阶段 1 批 3：签名改 async（Promise<UsersStore>），函数体一字未动——
+ * 仍走 JSON 文件同步 I/O，换实现属阶段 2。
+ */
+export async function loadUsersStore(): Promise<UsersStore> {
   const filePath = usersStorePath();
   if (!fs.existsSync(filePath)) {
     const initStore: UsersStore = { users: [] };
@@ -56,7 +60,10 @@ export function loadUsersStore(): UsersStore {
   }
 }
 
-export function saveUsersStore(store: UsersStore): void {
+/**
+ * 阶段 1 批 3：签名改 async（Promise<void>），函数体一字未动。
+ */
+export async function saveUsersStore(store: UsersStore): Promise<void> {
   const filePath = usersStorePath();
   fs.mkdirSync(require("path").dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(store, null, 2), "utf-8");
@@ -131,8 +138,8 @@ export function resolveApiRoleFromUser(user: AuthUser): "admin" | "operator" {
 /**
  * 要求认证（返回用户信息或 null）
  *
- * 阶段 1 批 2：签名改 async（Promise<...|null>），函数体一字未动——
- * 内部仍同步调用 loadUsersStore（其异步化属批 3），await 同步返回值不改变行为。
+ * 阶段 1 批 2：签名改 async（Promise<...|null>），函数体一字未动。
+ * 阶段 1 批 3：内部 loadUsersStore 已异步化，补 await 调用。
  */
 export async function requireAuth(
   req: Request,
@@ -158,7 +165,7 @@ export async function requireAuth(
     });
     return null;
   }
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const user = store.users.find((x) => x.id === payload.sub && x.username === payload.username);
   if (!user || user.status !== "active") {
     res.status(401).json({

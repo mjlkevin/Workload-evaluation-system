@@ -33,7 +33,7 @@ function miniApp(confirmHandler: (req: Request, res: Response) => void) {
   return app;
 }
 
-function createTempUser(overrides: Partial<AuthUser> = {}): AuthUser {
+async function createTempUser(overrides: Partial<AuthUser> = {}): Promise<AuthUser> {
   const now = new Date().toISOString();
   const uniqueId = randomUUID();
   const user: AuthUser = {
@@ -47,9 +47,9 @@ function createTempUser(overrides: Partial<AuthUser> = {}): AuthUser {
     ...overrides,
   };
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   store.users.push(user);
-  saveUsersStore(store);
+  await saveUsersStore(store);
   return user;
 }
 
@@ -72,7 +72,7 @@ test("POST /project-evaluations/assessment-drafts/:assessmentId/confirm requires
 });
 
 test("POST /project-evaluations/assessment-drafts/:assessmentId/confirm requires estimates write capability", async () => {
-  const token = createTokenForUser(createTempUser({ role: "user" }));
+  const token = createTokenForUser(await createTempUser({ role: "user" }));
   let reached = false;
 
   const response = await supertest(miniApp((_req, res) => {
@@ -90,7 +90,7 @@ test("POST /project-evaluations/assessment-drafts/:assessmentId/confirm requires
 });
 
 test("POST /project-evaluations/assessment-drafts/:assessmentId/confirm reaches confirm handler for writers", async () => {
-  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const token = createTokenForUser(await createTempUser({ role: "admin" }));
   let reachedAssessmentId = "";
 
   const response = await supertest(miniApp((req, res) => {
@@ -118,7 +118,7 @@ test("POST /project-evaluations/assessment-drafts/:assessmentId/confirm reaches 
 });
 
 test("POST /project-evaluations lets legacy user create project evaluations", async () => {
-  const token = createTokenForUser(createTempUser({ role: "user" }));
+  const token = createTokenForUser(await createTempUser({ role: "user" }));
   let reached = false;
 
   const response = await supertest(miniApp((_req, res) => {

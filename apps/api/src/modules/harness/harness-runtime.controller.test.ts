@@ -26,9 +26,9 @@ let originalUsersJson = "";
 let user: AuthUser | null = null;
 let token = "";
 
-test.before(() => {
+test.before(async () => {
   originalUsersJson = fs.readFileSync(USERS_JSON, "utf8");
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   user = {
     id: `ai-runs-controller-user-${Date.now()}`,
     username: `ai-runs-controller-${Date.now()}`,
@@ -39,7 +39,7 @@ test.before(() => {
     lastLoginAt: new Date().toISOString(),
   };
   store.users.push(user);
-  saveUsersStore(store);
+  await saveUsersStore(store);
   token = signAuthToken(user);
 });
 

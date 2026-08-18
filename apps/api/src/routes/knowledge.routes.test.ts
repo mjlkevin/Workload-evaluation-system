@@ -48,7 +48,7 @@ function setupApp() {
   return supertest(app);
 }
 
-function createTempUser(role: "admin" | "user"): { token: string } {
+async function createTempUser(role: "admin" | "user"): Promise<{ token: string }> {
   const uniqueId = randomUUID();
   const now = new Date().toISOString();
   const user: AuthUser = {
@@ -60,9 +60,9 @@ function createTempUser(role: "admin" | "user"): { token: string } {
     createdAt: now,
     lastLoginAt: now,
   };
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   store.users.push(user);
-  saveUsersStore(store);
+  await saveUsersStore(store);
   return { token: signAuthToken(user) };
 }
 
@@ -74,7 +74,7 @@ test("GET /knowledge/search 未带 token 返回 401", async () => {
 
 test("GET /knowledge/search 带 token 返回 { code:0, data.items }", async () => {
   const request = setupApp();
-  const { token } = createTempUser("user");
+  const { token } = await createTempUser("user");
   const res = await request
     .get("/knowledge/search")
     .query({ q: "售前估算" })
@@ -88,14 +88,14 @@ test("GET /knowledge/search 带 token 返回 { code:0, data.items }", async () =
 
 test("GET /knowledge/search 缺 q 参数返回非零 code", async () => {
   const request = setupApp();
-  const { token } = createTempUser("user");
+  const { token } = await createTempUser("user");
   const res = await request.get("/knowledge/search").set("Authorization", `Bearer ${token}`);
   assert.notEqual(res.body.code, 0, "缺 q 应报错");
 });
 
 test("GET /knowledge/entries 返回条目列表", async () => {
   const request = setupApp();
-  const { token } = createTempUser("user");
+  const { token } = await createTempUser("user");
   const res = await request.get("/knowledge/entries").set("Authorization", `Bearer ${token}`);
   assert.equal(res.status, 200);
   assert.equal(res.body.code, 0);
@@ -105,7 +105,7 @@ test("GET /knowledge/entries 返回条目列表", async () => {
 test("POST /knowledge/entries admin 可创建，普通 user 返回 403", async () => {
   const request = setupApp();
 
-  const admin = createTempUser("admin");
+  const admin = await createTempUser("admin");
   const okRes = await request
     .post("/knowledge/entries")
     .set("Authorization", `Bearer ${admin.token}`)
@@ -114,7 +114,7 @@ test("POST /knowledge/entries admin 可创建，普通 user 返回 403", async (
   assert.equal(okRes.body.code, 0);
   assert.ok(okRes.body.data.entry.id, "应返回创建条目 id");
 
-  const plainUser = createTempUser("user");
+  const plainUser = await createTempUser("user");
   const deniedRes = await request
     .post("/knowledge/entries")
     .set("Authorization", `Bearer ${plainUser.token}`)
