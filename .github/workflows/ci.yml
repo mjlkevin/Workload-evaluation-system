@@ -27,7 +27,6 @@ jobs:
 
       - name: Lint API
         run: cd apps/api && npm run lint
-      # Lint Web 已暂停（apps/web W4 Vue 工作台已删除，新前端待基于 ui/V0_SAAS 重建）
 
   tsc:
     needs: lint
@@ -48,7 +47,6 @@ jobs:
 
       - name: Type-check API
         run: cd apps/api && npx tsc --noEmit
-      # Type-check Web 已暂停（apps/web 已删除）
 
   test-non-db:
     needs: tsc
@@ -69,6 +67,33 @@ jobs:
 
       - name: Test rules (no DB)
         run: npm run test:rules
+
+  # 前端门禁（阶段 1 合并排期裁决）：V2_PROTOTYPE 是当前唯一 Web 主线，
+  # 其 356 个 vitest 用例与生产构建从未接入 CI（阶段 0 第 0 批清单第 5 项遗留）。
+  # 前端不依赖数据库，独立 job，不挂 test-with-db。
+  test-web:
+    needs: tsc
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ui/V2_PROTOTYPE/package-lock.json
+
+      - name: Install web dependencies
+        run: cd ui/V2_PROTOTYPE && npm ci
+
+      - name: Test Web (V2_PROTOTYPE)
+        run: npm run test:web
+
+      - name: Build Web (V2_PROTOTYPE)
+        run: npm run build:web
 
   test-with-db:
     needs: tsc
@@ -139,6 +164,3 @@ jobs:
 
       - name: Build API image
         run: docker build -t wes-api -f apps/api/Dockerfile .
-
-      # Web image build 已暂停（apps/web 已删除）
-      # ui/V0_SAAS 有自己的 Dockerfile，待新前端规划后接入 CI
