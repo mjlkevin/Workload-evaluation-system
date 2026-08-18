@@ -10,12 +10,13 @@ import type { HarnessSessionMessageSink, HarnessProjectionSource, HarnessSession
 
 export function createHarnessSessionSink(): HarnessSessionMessageSink {
   return {
-    append(input: {
+    // 阶段 1 批 8：append 改 async（内部 await 已异步化的幂等 API），实现 不动。
+    async append(input: {
       sessionId: string;
       message: HarnessSessionProjectionMessage;
       source: HarnessProjectionSource;
     }): Promise<{ created: boolean; messageId: string }> {
-      const result = appendAiSessionMessageIdempotent({
+      const result = await appendAiSessionMessageIdempotent({
         sessionId: input.sessionId,
         message: {
           messageId: input.message.messageId ?? "",
@@ -30,10 +31,10 @@ export function createHarnessSessionSink(): HarnessSessionMessageSink {
           eventType: input.source.eventType,
         },
       });
-      return Promise.resolve({
+      return {
         created: result.created,
         messageId: (result.message as any)?.messageId ?? "",
-      });
+      };
     },
   };
 }

@@ -164,7 +164,7 @@ export function createWorkbenchViewUsecase(deps: WorkbenchViewUsecaseDeps) {
    */
   async function getUnifiedView(user: AuthUser): Promise<WorkbenchUnifiedView> {
     // 1. 拉取本人所有会话（JSON 文件存储，已做 owner 隔离）
-    const sessions = listAiSessions(user);
+    const sessions = await listAiSessions(user);
 
     // 2. 拉取本人活跃 Run（PostgreSQL，已做 owner 隔离）
     const activeRuns = await repo.listActiveRunsForOwner(user.id);

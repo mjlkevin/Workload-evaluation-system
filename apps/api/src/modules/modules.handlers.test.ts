@@ -2062,8 +2062,8 @@ function mockReportAnalysisFetch() {
 test("ai.usecase: homeWorkbenchChat generates report from session-level attachment when request carries none", async () => {
   await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
     const user = await getNonAdminUser();
-    const session = createAiSession(user, { title: "存量附件会话", workflowKey: "parse_requirement_file" });
-    appendAiSessionEvent(user, session.sessionId, {
+    const session = await createAiSession(user, { title: "存量附件会话", workflowKey: "parse_requirement_file" });
+    await appendAiSessionEvent(user, session.sessionId, {
       message: { role: "user", content: "帮我看看这个文件" },
       attachments: [{
         name: "存量需求.xlsx",
@@ -2161,8 +2161,8 @@ test("ai.usecase: homeWorkbenchChat keeps upload guidance when neither session n
 test("ai.usecase: homeWorkbenchChat does not generate report when session attachment lacks explicit intent", async () => {
   await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
     const user = await getNonAdminUser();
-    const session = createAiSession(user, { title: "存量附件会话2", workflowKey: "parse_requirement_file" });
-    appendAiSessionEvent(user, session.sessionId, {
+    const session = await createAiSession(user, { title: "存量附件会话2", workflowKey: "parse_requirement_file" });
+    await appendAiSessionEvent(user, session.sessionId, {
       message: { role: "user", content: "帮我看看这个文件" },
       attachments: [{
         name: "存量需求2.xlsx",
@@ -2397,7 +2397,7 @@ test("ai.usecase: kimiAssessmentPreview fails instead of returning rule fallback
 
 test("delete-guard: 旧删除端点注入 checker 命中活跃 Run 时返回 409 SESSION_HAS_ACTIVE_RUN 且不删除", async () => {
   const user = await getActiveUser();
-  const session = createAiSession(user, { title: "E1 守护会话" });
+  const session = await createAiSession(user, { title: "E1 守护会话" });
   try {
     const handler = AiSessionsModule.createGuardedDeleteSessionHandler({
       activeRunChecker: async (sessionId: string) => sessionId === session.sessionId,
@@ -2408,20 +2408,20 @@ test("delete-guard: 旧删除端点注入 checker 命中活跃 Run 时返回 409
     assert.equal(res.statusCode, 409);
     assert.equal((res.body as { code: string }).code, "SESSION_HAS_ACTIVE_RUN");
     assert.equal(
-      loadAiSessionsStore().sessions.some((item) => item.sessionId === session.sessionId),
+      (await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId),
       true,
       "冲突时不得删除会话",
     );
   } finally {
-    const store = loadAiSessionsStore();
+    const store = await loadAiSessionsStore();
     store.sessions = store.sessions.filter((item) => item.sessionId !== session.sessionId);
-    saveAiSessionsStore(store);
+    await saveAiSessionsStore(store);
   }
 });
 
 test("delete-guard: 旧删除端点注入 checker 且无活跃 Run 时正常删除", async () => {
   const user = await getActiveUser();
-  const session = createAiSession(user, { title: "E1 可删会话" });
+  const session = await createAiSession(user, { title: "E1 可删会话" });
   try {
     const handler = AiSessionsModule.createGuardedDeleteSessionHandler({
       activeRunChecker: async () => false,
@@ -2432,27 +2432,27 @@ test("delete-guard: 旧删除端点注入 checker 且无活跃 Run 时正常删�
     assert.equal(res.statusCode, 200);
     assert.equal((res.body as { code: number }).code, 0);
     assert.equal(
-      loadAiSessionsStore().sessions.some((item) => item.sessionId === session.sessionId),
+      (await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId),
       false,
     );
   } finally {
-    const store = loadAiSessionsStore();
+    const store = await loadAiSessionsStore();
     store.sessions = store.sessions.filter((item) => item.sessionId !== session.sessionId);
-    saveAiSessionsStore(store);
+    await saveAiSessionsStore(store);
   }
 });
 
 test("delete-guard: 无 checker 的旧同步 deleteSession 行为保持不变", async () => {
   const user = await getActiveUser();
   await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const session = createAiSession(user, { title: "E1 旧行为会话" });
+    const session = await createAiSession(user, { title: "E1 旧行为会话" });
     const req = createMockReq({ token: await getActiveUserToken(), params: { sessionId: session.sessionId } });
     const res = createMockRes();
     await AiSessionsModule.deleteSession(req, res as unknown as Response);
     assert.equal(res.statusCode, 200);
     assert.equal((res.body as { code: number }).code, 0);
     assert.equal(
-      loadAiSessionsStore().sessions.some((item) => item.sessionId === session.sessionId),
+      (await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId),
       false,
     );
   });

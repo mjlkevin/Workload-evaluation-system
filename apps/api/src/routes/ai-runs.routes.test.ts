@@ -122,8 +122,8 @@ function makeApp(opts: { enabled: boolean; sse?: { heartbeatMs?: number; pollMs?
   return app;
 }
 
-function makeSession(owner: AuthUser, title = "集成测试会话"): string {
-  return createAiSession(owner, { title }).sessionId;
+async function makeSession(owner: AuthUser, title = "集成测试会话"): Promise<string> {
+  return (await createAiSession(owner, { title })).sessionId;
 }
 
 async function submitValidRun(token: string, sessionId: string, app: express.Express) {
@@ -312,7 +312,7 @@ function listen(app: express.Express): Promise<{ port: number; close: () => Prom
 
 test("flag off: submit returns 503 ASYNC_RUNS_DISABLED", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: false });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const response = await submitValidRun(aliceToken, sessionId, app);
   assert.equal(response.status, 503);
   assert.equal(response.body.code, "ASYNC_RUNS_DISABLED");
@@ -320,7 +320,7 @@ test("flag off: submit returns 503 ASYNC_RUNS_DISABLED", { skip: !testDatabaseUr
 
 test("flag off: ai-runs endpoints return 503 and session delete keeps legacy behavior", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: false });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
 
   const list = await request(app).get("/ai-runs").set("Authorization", `Bearer ${aliceToken}`);
   assert.equal(list.status, 503);
@@ -340,7 +340,7 @@ test("flag off: ai-runs endpoints return 503 and session delete keeps legacy beh
 
 test("submit returns HTTP 202 with the frozen envelope", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submissionKey = randomUUID();
   const clientMessageId = randomUUID();
   const response = await request(app)
@@ -361,7 +361,7 @@ test("submit returns HTTP 202 with the frozen envelope", { skip: !testDatabaseUr
 
 test("duplicate submissionKey returns the same runId idempotently", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submissionKey = randomUUID();
   const first = await request(app)
     .post(`/ai-sessions/${sessionId}/runs`)
@@ -379,7 +379,7 @@ test("duplicate submissionKey returns the same runId idempotently", { skip: !tes
 
 test("submit rejects invalid parameters with 422", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const missingKey = await request(app)
     .post(`/ai-sessions/${sessionId}/runs`)
     .set("Authorization", `Bearer ${aliceToken}`)
@@ -394,7 +394,7 @@ test("submit rejects invalid parameters with 422", { skip: !testDatabaseUrl }, a
 
 test("submit to a foreign session returns 404 without leaking existence", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const response = await submitValidRun(bobToken, sessionId, app);
   assert.equal(response.status, 404);
   const ghost = await submitValidRun(aliceToken, `ghost-${randomUUID()}`, app);
@@ -403,7 +403,7 @@ test("submit to a foreign session returns 404 without leaking existence", { skip
 
 test("submit without JWT returns 401", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const response = await request(app).post(`/ai-sessions/${sessionId}/runs`).send({ submissionKey: randomUUID(), content: "匿名" });
   assert.equal(response.status, 401);
 });
@@ -414,8 +414,8 @@ test("submit without JWT returns 401", { skip: !testDatabaseUrl }, async () => {
 
 test("active runs list is owner-isolated between two users", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const aliceSession = makeSession(alice!);
-  const bobSession = makeSession(bob!);
+  const aliceSession = await makeSession(alice!);
+  const bobSession = await makeSession(bob!);
   const aliceSubmit = await submitValidRun(aliceToken, aliceSession, app);
   const bobSubmit = await submitValidRun(bobToken, bobSession, app);
   track(aliceSubmit.body.data.runId);
@@ -435,7 +435,7 @@ test("active runs list is owner-isolated between two users", { skip: !testDataba
 
 test("snapshot returns run aggregate for owner and 404 for non-owner", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submitted = await submitValidRun(aliceToken, sessionId, app);
   const runId = submitted.body.data.runId as string;
   track(runId);
@@ -459,7 +459,7 @@ test("snapshot returns run aggregate for owner and 404 for non-owner", { skip: !
 
 test("delete session with an active run returns 409 SESSION_HAS_ACTIVE_RUN", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submitted = await submitValidRun(aliceToken, sessionId, app);
   track(submitted.body.data.runId);
 
@@ -473,7 +473,7 @@ test("delete session with an active run returns 409 SESSION_HAS_ACTIVE_RUN", { s
 
 test("delete succeeds once the run reaches a terminal status", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submitted = await submitValidRun(aliceToken, sessionId, app);
   const runId = submitted.body.data.runId as string;
   track(runId);
@@ -487,7 +487,7 @@ test("delete succeeds once the run reaches a terminal status", { skip: !testData
 
 test("rename does not affect the active run", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submitted = await submitValidRun(aliceToken, sessionId, app);
   track(submitted.body.data.runId);
 
@@ -508,7 +508,7 @@ test("rename does not affect the active run", { skip: !testDatabaseUrl }, async 
 
 test("all action endpoints return 404 for a non-owner", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submitted = await submitValidRun(aliceToken, sessionId, app);
   const runId = submitted.body.data.runId as string;
   track(runId);
@@ -532,7 +532,7 @@ test("all action endpoints return 404 for a non-owner", { skip: !testDatabaseUrl
 
 test("cancel accepts an active run and rejects terminal runs with 409", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submitted = await submitValidRun(aliceToken, sessionId, app);
   const runId = submitted.body.data.runId as string;
   track(runId);
@@ -551,7 +551,7 @@ test("cancel accepts an active run and rejects terminal runs with 409", { skip: 
 
 test("inputs rejects non-waiting runs with 409 and resumes waiting runs to queued", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const queuedSubmit = await submitValidRun(aliceToken, sessionId, app);
   track(queuedSubmit.body.data.runId);
   const rejected = await request(app)
@@ -601,7 +601,7 @@ test("confirm is idempotent: second confirmation appends no duplicate event", { 
 
 test("confirm rejects non-waiting runs with 409", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submitted = await submitValidRun(aliceToken, sessionId, app);
   track(submitted.body.data.runId);
   const rejected = await request(app)
@@ -613,7 +613,7 @@ test("confirm rejects non-waiting runs with 409", { skip: !testDatabaseUrl }, as
 test("retry only allows failed terminal runs, carries retryOfRunId and keeps the original immutable", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
 
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const queuedSubmit = await submitValidRun(aliceToken, sessionId, app);
   track(queuedSubmit.body.data.runId);
   const queuedRetry = await request(app).post(`/ai-runs/${queuedSubmit.body.data.runId}/retry`).set("Authorization", `Bearer ${aliceToken}`);
@@ -644,7 +644,7 @@ test("retry only allows failed terminal runs, carries retryOfRunId and keeps the
 
 test("SSE handshake rejects non-owner with 404 before opening the stream", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true, sse: { pollMs: 50, heartbeatMs: 3_000 } });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submitted = await submitValidRun(aliceToken, sessionId, app);
   track(submitted.body.data.runId);
   const server = await listen(app);
@@ -720,7 +720,7 @@ test("Last-Event-ID takes precedence over the after query parameter", { skip: !t
 
 test("client disconnect does not cancel the run and replay can resume", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true, sse: { pollMs: 50, heartbeatMs: 3_000 } });
-  const sessionId = makeSession(alice!);
+  const sessionId = await makeSession(alice!);
   const submitted = await submitValidRun(aliceToken, sessionId, app);
   const runId = submitted.body.data.runId as string;
   track(runId);

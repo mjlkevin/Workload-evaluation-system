@@ -10,27 +10,27 @@ import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, l
 export async function createSession(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
-  const session = createAiSession(auth.user, req.body || {});
+  const session = await createAiSession(auth.user, req.body || {});
   return res.json(ok({ session }, randomUUID()));
 }
 
 export async function listSessions(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
-  return res.json(ok({ items: listAiSessions(auth.user, req.query || {}) }, randomUUID()));
+  return res.json(ok({ items: await listAiSessions(auth.user, req.query || {}) }, randomUUID()));
 }
 
 // 管理员审计视图：跨用户聚合全部 AI 会话摘要，仅挂载在 system:manage 能力位路由下
 export async function listAllSessionsForAdmin(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
-  return res.json(ok({ items: listAllAiSessionsForAdmin(req.query || {}) }, randomUUID()));
+  return res.json(ok({ items: await listAllAiSessionsForAdmin(req.query || {}) }, randomUUID()));
 }
 
 export async function getSession(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
-  const session = getAiSession(auth.user, asString(req.params.sessionId));
+  const session = await getAiSession(auth.user, asString(req.params.sessionId));
   if (!session) return fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
   return res.json(ok({ session }, randomUUID()));
 }
@@ -39,7 +39,7 @@ export async function deleteSession(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
   const sessionId = asString(req.params.sessionId);
-  if (!deleteAiSession(auth.user, sessionId)) {
+  if (!(await deleteAiSession(auth.user, sessionId))) {
     return fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
   }
   return res.json(ok({ deletedSessionId: sessionId }, randomUUID()));
@@ -61,7 +61,7 @@ export function createGuardedDeleteSessionHandler(
       if (checker) {
         deleted = await deleteAiSession(auth.user, sessionId, { activeRunChecker: checker });
       } else {
-        deleted = deleteAiSession(auth.user, sessionId);
+        deleted = await deleteAiSession(auth.user, sessionId);
       }
       if (!deleted) {
         fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
@@ -84,7 +84,7 @@ export async function renameSession(req: Request, res: Response) {
   if (!auth) return;
   const sessionId = asString(req.params.sessionId);
   const title = (req.body || {}).title;
-  const session = renameAiSession(auth.user, sessionId, title);
+  const session = await renameAiSession(auth.user, sessionId, title);
   if (!session) return fail(res, 40404, "会话不存在或标题无效", [{ field: "sessionId", reason: "not_found_or_invalid_title" }]);
   return res.json(ok({ session }, randomUUID()));
 }
@@ -92,7 +92,7 @@ export async function renameSession(req: Request, res: Response) {
 export async function appendSessionEvent(req: Request, res: Response) {
   const auth = await requireAuth(req, res);
   if (!auth) return;
-  const session = appendAiSessionEvent(auth.user, asString(req.params.sessionId), req.body || {});
+  const session = await appendAiSessionEvent(auth.user, asString(req.params.sessionId), req.body || {});
   if (!session) return fail(res, 40404, "会话不存在", [{ field: "sessionId", reason: "not_found" }]);
   return res.json(ok({ session }, randomUUID()));
 }
@@ -103,7 +103,7 @@ export async function createStandardDraft(req: Request, res: Response) {
   const sessionId = asString(req.params.sessionId);
   const body = (req.body || {}) as { fileName?: unknown; fileSize?: unknown; fileType?: unknown };
   const fileName = asString(body.fileName) || "金蝶官方评估文件";
-  const session = appendAiSessionEvent(auth.user, sessionId, {
+  const session = await appendAiSessionEvent(auth.user, sessionId, {
     artifact: {
       type: "standard_draft",
       title: "标准差异草稿",

@@ -445,8 +445,8 @@ test("homeWorkbenchChatStream: 显式报告请求回退会话附件后直接生�
       createdAt: "2026-08-08T00:00:00.000Z",
       lastLoginAt: "2026-08-08T00:00:00.000Z",
     };
-    const session = createAiSession(streamUser, { title: "流式存量附件会话", workflowKey: "parse_requirement_file" });
-    appendAiSessionEvent(streamUser, session.sessionId, {
+    const session = await createAiSession(streamUser, { title: "流式存量附件会话", workflowKey: "parse_requirement_file" });
+    await appendAiSessionEvent(streamUser, session.sessionId, {
       message: { role: "user", content: "帮我看看这个文件" },
       attachments: [{
         name: "流式存量需求.xlsx",

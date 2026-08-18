@@ -50,9 +50,9 @@ function readStoredSession(sessionId: string): { attachments: Array<{ name: stri
 
 test("ai-sessions.usecase: appendAiSessionEvent 持久化附件 parsedSummary 到存储文件", async () => {
   await withSessionStoreIsolation(async () => {
-    const session = createAiSession(testUser, { title: "附件会话", workflowKey: "parse_requirement_file" });
+    const session = await createAiSession(testUser, { title: "附件会话", workflowKey: "parse_requirement_file" });
     const summary = "项目：存量项目\n客户：存量客户\n业务需求：\n1. 存量需求";
-    appendAiSessionEvent(testUser, session.sessionId, {
+    await appendAiSessionEvent(testUser, session.sessionId, {
       message: { role: "user", content: "帮我看看这个文件" },
       attachments: [{ name: "存量附件.xlsx", size: 1200, type: "application/xlsx", parsedSummary: summary }],
     });
@@ -67,9 +67,9 @@ test("ai-sessions.usecase: appendAiSessionEvent 持久化附件 parsedSummary �
 
 test("ai-sessions.usecase: parsedSummary 超 8000 字符时截断并加标记", async () => {
   await withSessionStoreIsolation(async () => {
-    const session = createAiSession(testUser, { title: "超长摘要会话", workflowKey: "parse_requirement_file" });
+    const session = await createAiSession(testUser, { title: "超长摘要会话", workflowKey: "parse_requirement_file" });
     const longSummary = "需".repeat(9000);
-    appendAiSessionEvent(testUser, session.sessionId, {
+    await appendAiSessionEvent(testUser, session.sessionId, {
       message: { role: "user", content: "帮我看看这个文件" },
       attachments: [{ name: "超长附件.xlsx", parsedSummary: longSummary }],
     });
@@ -86,17 +86,17 @@ test("ai-sessions.usecase: parsedSummary 超 8000 字符时截断并加标记", 
 
 test("ai-sessions.usecase: listAllAiSessionsForAdmin 跨用户聚合并输出审计摘要", async () => {
   await withSessionStoreIsolation(async () => {
-    const alice = createAiSession(testUser, { title: "Alice 业务评估", status: "rough_estimate" });
-    appendAiSessionEvent(testUser, alice.sessionId, {
+    const alice = await createAiSession(testUser, { title: "Alice 业务评估", status: "rough_estimate" });
+    await appendAiSessionEvent(testUser, alice.sessionId, {
       message: { role: "user", content: "首轮输入内容" },
     });
-    appendAiSessionEvent(testUser, alice.sessionId, {
+    await appendAiSessionEvent(testUser, alice.sessionId, {
       message: { role: "assistant", content: "最终输出内容" },
     });
     const bobUser: AuthUser = { ...testUser, id: "user-bob-audit", username: "bob" };
-    createAiSession(bobUser, { title: "Bob 标准治理", domain: "standard_governance", status: "standard_review" });
+    await createAiSession(bobUser, { title: "Bob 标准治理", domain: "standard_governance", status: "standard_review" });
 
-    const items = listAllAiSessionsForAdmin({});
+    const items = await listAllAiSessionsForAdmin({});
     assert.equal(items.length, 2, "应聚合所有用户的会话");
 
     const aliceSummary = items.find((item) => item.sessionId === alice.sessionId);
@@ -116,43 +116,43 @@ test("ai-sessions.usecase: listAllAiSessionsForAdmin 跨用户聚合并输出审
 test("ai-sessions.usecase: listAllAiSessionsForAdmin 支持 q/status/domain/时间范围过滤并按最后活动倒序", async () => {
   await withSessionStoreIsolation(async () => {
     const bobUser: AuthUser = { ...testUser, id: "user-bob-filter", username: "bob" };
-    const older = createAiSession(testUser, { title: "金蝶云星空评估会话", status: "temporary_chat" });
-    const newer = createAiSession(bobUser, { title: "标准治理会话", domain: "standard_governance", status: "standard_review" });
+    const older = await createAiSession(testUser, { title: "金蝶云星空评估会话", status: "temporary_chat" });
+    const newer = await createAiSession(bobUser, { title: "标准治理会话", domain: "standard_governance", status: "standard_review" });
     // 让 older 会话的最后活动晚于 newer，验证排序依据为 updatedAt（跨毫秒确保时间戳差异）
     await new Promise((resolve) => setTimeout(resolve, 5));
-    appendAiSessionEvent(testUser, older.sessionId, {
+    await appendAiSessionEvent(testUser, older.sessionId, {
       message: { role: "user", content: "追加一轮" },
     });
 
-    const all = listAllAiSessionsForAdmin({});
+    const all = await listAllAiSessionsForAdmin({});
     assert.equal(all.length, 2);
     assert.equal(all[0].sessionId, older.sessionId, "应按 updatedAt 倒序");
 
-    const byStatus = listAllAiSessionsForAdmin({ status: "standard_review" });
+    const byStatus = await listAllAiSessionsForAdmin({ status: "standard_review" });
     assert.equal(byStatus.length, 1);
     assert.equal(byStatus[0].sessionId, newer.sessionId);
 
-    const byDomain = listAllAiSessionsForAdmin({ domain: "standard_governance" });
+    const byDomain = await listAllAiSessionsForAdmin({ domain: "standard_governance" });
     assert.equal(byDomain.length, 1);
     assert.equal(byDomain[0].sessionId, newer.sessionId);
 
-    const byUsername = listAllAiSessionsForAdmin({ q: "BOB" });
+    const byUsername = await listAllAiSessionsForAdmin({ q: "BOB" });
     assert.equal(byUsername.length, 1, "q 应大小写不敏感匹配用户名");
     assert.equal(byUsername[0].sessionId, newer.sessionId);
 
-    const byTitle = listAllAiSessionsForAdmin({ q: "星空" });
+    const byTitle = await listAllAiSessionsForAdmin({ q: "星空" });
     assert.equal(byTitle.length, 1, "q 应匹配标题");
     assert.equal(byTitle[0].sessionId, older.sessionId);
 
-    const bySessionId = listAllAiSessionsForAdmin({ q: newer.sessionId.slice(0, 8) });
+    const bySessionId = await listAllAiSessionsForAdmin({ q: newer.sessionId.slice(0, 8) });
     assert.equal(bySessionId.length, 1, "q 应匹配会话ID");
 
-    const fromFuture = listAllAiSessionsForAdmin({ from: "2099-01-01" });
+    const fromFuture = await listAllAiSessionsForAdmin({ from: "2099-01-01" });
     assert.equal(fromFuture.length, 0, "from 晚于全部活动时应无结果");
-    const toFuture = listAllAiSessionsForAdmin({ to: "2099-01-01" });
+    const toFuture = await listAllAiSessionsForAdmin({ to: "2099-01-01" });
     assert.equal(toFuture.length, 2, "to 为日期时应包含当天及之前全部记录");
 
-    const limited = listAllAiSessionsForAdmin({ limit: 1 });
+    const limited = await listAllAiSessionsForAdmin({ limit: 1 });
     assert.equal(limited.length, 1, "limit 应生效");
   });
 });
@@ -182,12 +182,12 @@ test("ai-sessions.usecase: 缺失 parsedSummary 的旧附件数据读取兼容",
       }],
     }), "utf-8");
 
-    const session = getAiSession(testUser, "legacy-attachment-session");
+    const session = await getAiSession(testUser, "legacy-attachment-session");
     assert.ok(session, "旧格式会话应可读取");
     assert.equal(session.attachments[0].parsedSummary, undefined, "旧数据缺省 parsedSummary 应为 undefined");
 
     // 旧会话继续追加事件不报错，且不影响既有附件
-    const updated = appendAiSessionEvent(testUser, "legacy-attachment-session", {
+    const updated = await appendAiSessionEvent(testUser, "legacy-attachment-session", {
       message: { role: "user", content: "继续追问" },
     });
     assert.ok(updated, "旧会话应可继续追加事件");

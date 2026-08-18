@@ -8,7 +8,8 @@ function emptyStore(): AiSessionsStore {
   return { sessions: [] };
 }
 
-export function loadAiSessionsStore(filePath: string = aiSessionsStorePath()): AiSessionsStore {
+/** 阶段 1 批 8：签名改 async，实现 不动（仍为 readFileSync），阶段 2 替换实现。 */
+export async function loadAiSessionsStore(filePath: string = aiSessionsStorePath()): Promise<AiSessionsStore> {
   if (!existsSync(filePath)) {
     return emptyStore();
   }
@@ -17,7 +18,8 @@ export function loadAiSessionsStore(filePath: string = aiSessionsStorePath()): A
   return { sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [] };
 }
 
-export function saveAiSessionsStore(store: AiSessionsStore, filePath: string = aiSessionsStorePath()): void {
+/** 阶段 1 批 8：签名改 async，实现 不动（仍为 writeFileSync/renameSync），阶段 2 替换实现。 */
+export async function saveAiSessionsStore(store: AiSessionsStore, filePath: string = aiSessionsStorePath()): Promise<void> {
   mkdirSync(dirname(filePath), { recursive: true });
   const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   writeFileSync(tempPath, JSON.stringify(store, null, 2), "utf8");
@@ -52,10 +54,11 @@ export type AppendAiSessionMessageIdempotentResult = {
   message: AiMessage;
 };
 
-export function appendAiSessionMessageIdempotent(
+/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动，阶段 2 随 accessor 替换。 */
+export async function appendAiSessionMessageIdempotent(
   input: AppendAiSessionMessageIdempotentInput,
-): AppendAiSessionMessageIdempotentResult {
-  const store = loadAiSessionsStore(input.storePath);
+): Promise<AppendAiSessionMessageIdempotentResult> {
+  const store = await loadAiSessionsStore(input.storePath);
   const session = store.sessions.find((item) => item.sessionId === input.sessionId);
   if (!session) {
     return { found: false, created: false, message: input.message };
@@ -82,6 +85,6 @@ export function appendAiSessionMessageIdempotent(
   }
   session.messages.push(stored);
   session.updatedAt = new Date().toISOString();
-  saveAiSessionsStore(store, input.storePath);
+  await saveAiSessionsStore(store, input.storePath);
   return { found: true, created: true, message: stored };
 }
