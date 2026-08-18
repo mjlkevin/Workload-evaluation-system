@@ -28,10 +28,11 @@ function loadEstimateContext(): { template: Template; ruleSet: RuleSet } {
   };
 }
 
-export function startEstimateSession(
+/** 阶段 1 批 6：因内部调用 cleanupExpiredSessions / saveSession（已异步化）级联改 async，实现不动。 */
+export async function startEstimateSession(
   ownerUserId: string,
   payload: { templateId?: string; ruleSetId?: string }
-): SessionUsecaseResult<{ sessionId: string; templateId: string; ruleSetId: string; expiresAt: string }> {
+): Promise<SessionUsecaseResult<{ sessionId: string; templateId: string; ruleSetId: string; expiresAt: string }>> {
   const { templateId, ruleSetId } = payload;
   const { template, ruleSet } = loadEstimateContext();
 
@@ -56,7 +57,7 @@ export function startEstimateSession(
     };
   }
 
-  cleanupExpiredSessions();
+  await cleanupExpiredSessions();
 
   const now = Date.now();
   const sessionId = randomUUID();
@@ -68,7 +69,7 @@ export function startEstimateSession(
     createdAt: now,
     expiresAt: now + config.constants.SESSION_TTL_MS
   };
-  saveSession(ctx);
+  await saveSession(ctx);
 
   return {
     ok: true,
@@ -81,14 +82,15 @@ export function startEstimateSession(
   };
 }
 
-export function calculateBySession(
+/** 阶段 1 批 6：因内部调用 cleanupExpiredSessions / getSession（已异步化）级联改 async，实现不动。 */
+export async function calculateBySession(
   ownerUserId: string,
   sessionId: string,
   payload: Omit<CalculateRequest, "templateId" | "ruleSetId">
-): SessionUsecaseResult<ReturnType<typeof calculateEstimate> & { sessionId: string }> {
-  cleanupExpiredSessions();
+): Promise<SessionUsecaseResult<ReturnType<typeof calculateEstimate> & { sessionId: string }>> {
+  await cleanupExpiredSessions();
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) {
     return {
       ok: false,

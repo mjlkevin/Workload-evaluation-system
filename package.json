@@ -33,6 +33,7 @@
     "test:modules": "npm run test:modules -w apps/api",
     "test:rules": "npm run test:rules -w apps/api",
     "test:integration": "npm run test:integration -w apps/api",
+    "test:agent": "npm run test:agent -w apps/api",
     "test:web": "npm run test --prefix ui/V2_PROTOTYPE",
     "test:bundle": "bash scripts/run-test-bundle.sh",
     "ops:backup:config": "node scripts/backup-config.js",

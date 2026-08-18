@@ -123,18 +123,18 @@ test("estimates.usecase: calculateAndExportEstimate returns idempotency replay",
   }
 });
 
-test("sessions.usecase: startEstimateSession and calculateBySession succeed", () => {
+test("sessions.usecase: startEstimateSession and calculateBySession succeed", async () => {
   const body = buildValidCalculateRequest();
   const ownerUserId = "ut-user";
 
-  const started = startEstimateSession(ownerUserId, {
+  const started = await startEstimateSession(ownerUserId, {
     templateId: body.templateId,
     ruleSetId: body.ruleSetId
   });
   assert.equal(started.ok, true);
   if (!started.ok) return;
 
-  const calc = calculateBySession(ownerUserId, started.data.sessionId, {
+  const calc = await calculateBySession(ownerUserId, started.data.sessionId, {
     userCount: body.userCount,
     difficultyFactor: body.difficultyFactor,
     orgCount: body.orgCount,
@@ -148,16 +148,16 @@ test("sessions.usecase: startEstimateSession and calculateBySession succeed", ()
   }
 });
 
-test("sessions.usecase: calculateBySession blocks cross user access", () => {
+test("sessions.usecase: calculateBySession blocks cross user access", async () => {
   const body = buildValidCalculateRequest();
-  const started = startEstimateSession("owner-A", {
+  const started = await startEstimateSession("owner-A", {
     templateId: body.templateId,
     ruleSetId: body.ruleSetId
   });
   assert.equal(started.ok, true);
   if (!started.ok) return;
 
-  const calc = calculateBySession("owner-B", started.data.sessionId, {
+  const calc = await calculateBySession("owner-B", started.data.sessionId, {
     userCount: body.userCount,
     difficultyFactor: body.difficultyFactor,
     orgCount: body.orgCount,
@@ -226,41 +226,41 @@ async function withTeamStoreIsolation(fn: () => Promise<void> | void): Promise<v
 }
 
 test("team.usecase: manager can add member and create review/comment", async () => {
-  await withTeamStoreIsolation(() => {
+  await withTeamStoreIsolation(async () => {
     const manager = { id: "team-manager-ut" };
     const member = { id: "team-member-ut" };
-    const created = createTeam(manager, { name: "UT Team" });
+    const created = await createTeam(manager, { name: "UT Team" });
     assert.equal(created.ok, true);
     if (!created.ok) return;
 
-    const add = addTeamMember(manager, created.data.teamId, { userId: member.id, role: "implementer" });
+    const add = await addTeamMember(manager, created.data.teamId, { userId: member.id, role: "implementer" });
     assert.equal(add.ok, true);
 
-    const review = createReview(member, created.data.teamId, { globalVersionCode: "GL-UT-01", title: "UT Review" });
+    const review = await createReview(member, created.data.teamId, { globalVersionCode: "GL-UT-01", title: "UT Review" });
     assert.equal(review.ok, true);
     if (!review.ok) return;
 
-    const comment = createReviewComment(member, created.data.teamId, review.data.reviewId, { content: "looks good" });
+    const comment = await createReviewComment(member, created.data.teamId, review.data.reviewId, { content: "looks good" });
     assert.equal(comment.ok, true);
   });
 });
 
 test("team.usecase: non-manager cannot close review", async () => {
-  await withTeamStoreIsolation(() => {
+  await withTeamStoreIsolation(async () => {
     const manager = { id: "team-manager-ut-2" };
     const member = { id: "team-member-ut-2" };
-    const created = createTeam(manager, { name: "UT Team 2" });
+    const created = await createTeam(manager, { name: "UT Team 2" });
     assert.equal(created.ok, true);
     if (!created.ok) return;
 
-    const add = addTeamMember(manager, created.data.teamId, { userId: member.id, role: "sales" });
+    const add = await addTeamMember(manager, created.data.teamId, { userId: member.id, role: "sales" });
     assert.equal(add.ok, true);
 
-    const review = createReview(manager, created.data.teamId, { globalVersionCode: "GL-UT-02" });
+    const review = await createReview(manager, created.data.teamId, { globalVersionCode: "GL-UT-02" });
     assert.equal(review.ok, true);
     if (!review.ok) return;
 
-    const closeByMember = updateReviewStatus(member, created.data.teamId, review.data.reviewId, { status: "closed" });
+    const closeByMember = await updateReviewStatus(member, created.data.teamId, review.data.reviewId, { status: "closed" });
     assert.equal(closeByMember.ok, false);
     if (!closeByMember.ok) {
       assert.equal(closeByMember.error.code, 40301);
@@ -299,7 +299,7 @@ test("team.usecase: team plan visibility blocks cross-team user", async () => {
     await saveVersionsStore(store);
 
     try {
-      const team = createTeam({ id: ownerA }, { name: "Owner A Team" });
+      const team = await createTeam({ id: ownerA }, { name: "Owner A Team" });
       assert.equal(team.ok, true);
       if (!team.ok) return;
 

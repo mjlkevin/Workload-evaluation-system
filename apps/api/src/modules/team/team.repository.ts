@@ -17,7 +17,10 @@ function writeJsonAtomic(filePath: string, value: unknown): void {
   fs.renameSync(tempPath, filePath);
 }
 
-export function loadTeamStore(): TeamStore {
+/**
+ * 阶段 1 批 6：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。
+ */
+export async function loadTeamStore(): Promise<TeamStore> {
   const filePath = teamStorePath();
   if (!fs.existsSync(filePath)) {
     const initStore: TeamStore = {
@@ -46,17 +49,25 @@ export function loadTeamStore(): TeamStore {
   }
 }
 
-export function saveTeamStore(store: TeamStore): void {
+/**
+ * 阶段 1 批 6：签名改 async，实现不动（仍为 writeFileSync），阶段 2 替换实现。
+ */
+export async function saveTeamStore(store: TeamStore): Promise<void> {
   const filePath = teamStorePath();
   writeJsonAtomic(filePath, store);
 }
 
-export function saveTeamStoreWithExpectedVersion(
+/**
+ * 阶段 1 批 6：签名改 async（含内部 loadTeamStore 级联），实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。
+ * 乐观并发语义：读取版本与写入之间为同步顺序执行（readFileSync + writeFileSync），
+ * 补 await 不在二者之间插入新的让出点——loadTeamStore 仍是同步文件读（仅签名包 Promise）。
+ */
+export async function saveTeamStoreWithExpectedVersion(
   store: TeamStore,
   expectedVersion: number
-): { ok: true; savedVersion: number } | { ok: false; currentVersion: number } {
+): Promise<{ ok: true; savedVersion: number } | { ok: false; currentVersion: number }> {
   const filePath = teamStorePath();
-  const current = loadTeamStore();
+  const current = await loadTeamStore();
   if (current.version !== expectedVersion) {
     return { ok: false, currentVersion: current.version };
   }

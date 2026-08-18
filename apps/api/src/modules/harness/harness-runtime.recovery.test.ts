@@ -111,11 +111,12 @@ async function getRun(runId: string): Promise<HarnessRunRow> {
   return row;
 }
 
-function makeCoordinator() {
+function makeCoordinator(nowFn?: () => Date) {
   return createHarnessRecoveryCoordinator({
     repository: repo!,
     registry,
     timing: { scanIntervalMs: 10_000, maxAutoRecoveries: 3, backoffMs: [100, 200, 300] },
+    now: nowFn,
   });
 }
 
@@ -154,7 +155,9 @@ test("T6 scan schedules recovery with the 2/10/30s backoff sequence", { skip: !t
   const run = await makeRun();
   await claimAndExpire(run.harnessRunId);
 
-  const coordinator = makeCoordinator();
+  // T6 fix：注入确定性时钟，断言精确值而非容差窗，消除宿主/VM/DB 时钟漂移。
+  const injectedNow = new Date();
+  const coordinator = makeCoordinator(() => injectedNow);
   const first = await coordinator.scanOnce();
   assert.deepEqual(
     first.map((r) => r.outcome),
@@ -163,21 +166,29 @@ test("T6 scan schedules recovery with the 2/10/30s backoff sequence", { skip: !t
   let row = await getRun(run.harnessRunId);
   assert.equal(row.status, "recovering");
   assert.equal(row.recoveryCount, 1);
-  const firstDelta = row.availableAt.getTime() - Date.now();
-  assert.ok(firstDelta > 0 && firstDelta <= 150, `first backoff must be ~100ms (scaled 2s), got ${firstDelta}`);
+  assert.equal(
+    row.availableAt.getTime(),
+    injectedNow.getTime() + 100,
+    `first backoff must be exactly 100ms from injected now`,
+  );
 
   // 第三次恢复使用 30s 档（测试注入 300ms）
+  const injectedNow2 = new Date();
   await testDb!
     .update(harnessRuns)
     .set({ status: "queued", availableAt: new Date(Date.now() - 1_000), recoveryCount: 2 })
     .where(eq(harnessRuns.harnessRunId, run.harnessRunId));
   await claimAndExpire(run.harnessRunId);
-  const third = await coordinator.scanOnce();
+  const coordinator2 = makeCoordinator(() => injectedNow2);
+  const third = await coordinator2.scanOnce();
   assert.equal(third[0].outcome, "scheduled");
   row = await getRun(run.harnessRunId);
   assert.equal(row.recoveryCount, 3);
-  const thirdDelta = row.availableAt.getTime() - Date.now();
-  assert.ok(thirdDelta > 150 && thirdDelta <= 400, `third backoff must be ~300ms (scaled 30s), got ${thirdDelta}`);
+  assert.equal(
+    row.availableAt.getTime(),
+    injectedNow2.getTime() + 300,
+    `third backoff must be exactly 300ms from injected now`,
+  );
 });
 
 test("T6b fourth loss triggers RECOVERY_LIMIT_EXCEEDED and fails the run", { skip: !testDatabaseUrl }, async () => {
