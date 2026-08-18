@@ -332,7 +332,7 @@ test("homeWorkbenchChatStream: dispatch 流式成功后发送 delta/done 并写�
     assert.deepEqual(events.map((event) => event.event), ["delta", "delta", "done"]);
     assert.equal((events[2].data as Record<string, unknown>).content, "第一段第二段");
 
-    const traces = queryTraces({ ownerUserId: "test-user-1" }, TEST_TRACE_STORE_PATH);
+    const traces = await queryTraces({ ownerUserId: "test-user-1" }, TEST_TRACE_STORE_PATH);
     assert.equal(traces.total, 1);
     assert.equal(traces.traces[0].summary.hasError, false);
     assert.equal(traces.traces[0].spans.some((span) => span.spanType === "model_call"), true);
@@ -369,7 +369,7 @@ test("homeWorkbenchChatStream: provider stream 失败时发送 error 并写 fail
 
     const events = getSseEvents();
     assert.equal(events.some((event) => event.event === "error"), true);
-    const traces = queryTraces({ ownerUserId: "test-user-1" }, TEST_TRACE_STORE_PATH);
+    const traces = await queryTraces({ ownerUserId: "test-user-1" }, TEST_TRACE_STORE_PATH);
     assert.equal(traces.total, 1);
     assert.equal(traces.traces[0].summary.hasError, true);
     assert.equal(traces.traces[0].spans[0].error?.code, "upstream_stream_failed");
@@ -400,7 +400,7 @@ test("homeWorkbenchChatStream: client close 后不发送 done，并写 cancelled
 
     const events = getSseEvents();
     assert.deepEqual(events.map((event) => event.event), ["delta"]);
-    const traces = queryTraces({ ownerUserId: "test-user-1" }, TEST_TRACE_STORE_PATH);
+    const traces = await queryTraces({ ownerUserId: "test-user-1" }, TEST_TRACE_STORE_PATH);
     assert.equal(traces.total, 1);
     assert.equal(traces.traces[0].summary.hasError, true);
     assert.equal(traces.traces[0].spans[0].error?.code, "client_aborted");

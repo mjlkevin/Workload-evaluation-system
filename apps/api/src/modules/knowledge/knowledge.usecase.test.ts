@@ -24,9 +24,9 @@ const seed = [
   { id: "k2", title: "版本机制", content: "版本机制支持检出、检入与升版。" },
 ];
 
-test("searchKnowledge：返回结构含 query/tokens/items/guard/durationMs", () => {
+test("searchKnowledge：返回结构含 query/tokens/items/guard/durationMs", async () => {
   const repo = tempRepoWithSeed(seed);
-  const result = searchKnowledge(repo, "售前估算");
+  const result = await searchKnowledge(repo, "售前估算");
   assert.equal(result.query, "售前估算");
   assert.ok(Array.isArray(result.tokens) && result.tokens.length > 0, "应返回分词结果");
   assert.ok(Array.isArray(result.items), "items 为数组");
@@ -36,29 +36,29 @@ test("searchKnowledge：返回结构含 query/tokens/items/guard/durationMs", ()
   assert.ok(typeof result.durationMs === "number", "应返回耗时");
 });
 
-test("searchKnowledge：items 按分数降序且附带来源", () => {
+test("searchKnowledge：items 按分数降序且附带来源", async () => {
   const repo = tempRepoWithSeed(seed);
-  const result = searchKnowledge(repo, "售前估算人天");
+  const result = await searchKnowledge(repo, "售前估算人天");
   for (let i = 1; i < result.items.length; i++) {
     assert.ok(result.items[i].score <= result.items[i - 1].score, "应按分数降序");
   }
   assert.equal(result.items[0].source, "bm25", "阶段 1 来源标记为 bm25");
 });
 
-test("searchKnowledge：空查询返回空 items 不抛错", () => {
+test("searchKnowledge：空查询返回空 items 不抛错", async () => {
   const repo = tempRepoWithSeed(seed);
-  const result = searchKnowledge(repo, "   ");
+  const result = await searchKnowledge(repo, "   ");
   assert.deepEqual(result.items, []);
 });
 
-test("searchKnowledge：默认护栏生效（items ≤ 8）", () => {
+test("searchKnowledge：默认护栏生效（items ≤ 8）", async () => {
   const many = Array.from({ length: 20 }, (_, i) => ({
     id: `m${i}`,
     title: `估算条目${i}`,
     content: `售前估算口径说明第${i}条，涉及人天与工作量评估。`,
   }));
   const repo = tempRepoWithSeed(many);
-  const result = searchKnowledge(repo, "售前估算人天工作量评估");
+  const result = await searchKnowledge(repo, "售前估算人天工作量评估");
   assert.ok(result.items.length <= 8, `默认护栏最多 8 条，实际 ${result.items.length}`);
 });
 
@@ -71,7 +71,7 @@ interface EvalSample {
   expectAnswer: boolean;
 }
 
-test("验收：种子语料 × 20 条术语样例，BM25 路 Top-5 命中率 ≥ 80%", () => {
+test("验收：种子语料 × 20 条术语样例，BM25 路 Top-5 命中率 ≥ 80%", async () => {
   const store = loadJsonFile<{ entries: Array<Record<string, unknown>> }>("config/knowledge/store.json");
   const samplesFile = loadJsonFile<{ samples: EvalSample[] }>("config/rag/knowledge-retrieval-samples.v1.json");
 
@@ -85,7 +85,7 @@ test("验收：种子语料 × 20 条术语样例，BM25 路 Top-5 命中率 ≥
   let hits = 0;
   const misses: string[] = [];
   for (const sample of answerable) {
-    const result = searchKnowledge(repo, sample.question, { limit: 5 });
+    const result = await searchKnowledge(repo, sample.question, { limit: 5 });
     const topIds = result.items.map((item) => item.entry.id);
     const hit = sample.expectedEntryIds.some((expected) => topIds.includes(expected));
     if (hit) hits += 1;
@@ -99,7 +99,7 @@ test("验收：种子语料 × 20 条术语样例，BM25 路 Top-5 命中率 ≥
   );
 });
 
-test("验收：无答案查询可返回空或低分结果，不抛错", () => {
+test("验收：无答案查询可返回空或低分结果，不抛错", async () => {
   const store = loadJsonFile<{ entries: Array<Record<string, unknown>> }>("config/knowledge/store.json");
   const samplesFile = loadJsonFile<{ samples: EvalSample[] }>("config/rag/knowledge-retrieval-samples.v1.json");
   const storePath = path.join(os.tmpdir(), `wes-knowledge-na-${Date.now()}.json`);
@@ -108,7 +108,7 @@ test("验收：无答案查询可返回空或低分结果，不抛错", () => {
 
   const noAnswer = samplesFile.samples.filter((s) => !s.expectAnswer);
   for (const sample of noAnswer) {
-    const result = searchKnowledge(repo, sample.question, { limit: 5 });
+    const result = await searchKnowledge(repo, sample.question, { limit: 5 });
     assert.ok(Array.isArray(result.items), `${sample.id} 不得抛错`);
   }
 });
