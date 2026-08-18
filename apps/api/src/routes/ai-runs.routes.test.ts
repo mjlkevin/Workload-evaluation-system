@@ -52,7 +52,7 @@ before(async () => {
   const sessionsPath = aiSessionsStorePath();
   originalAiSessionsJson = fs.existsSync(sessionsPath) ? fs.readFileSync(sessionsPath, "utf8") : null;
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const stamp = randomUUID();
   alice = {
     id: `ai-runs-alice-${stamp}`,
@@ -73,7 +73,7 @@ before(async () => {
     lastLoginAt: new Date().toISOString(),
   };
   store.users.push(alice, bob);
-  saveUsersStore(store);
+  await saveUsersStore(store);
   aliceToken = signAuthToken(alice);
   bobToken = signAuthToken(bob);
 });

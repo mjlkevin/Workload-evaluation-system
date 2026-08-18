@@ -32,7 +32,7 @@ test("POST /agent/chat: 未登录返回 401", async () => {
 });
 
 test("POST /agent/chat: 登录后返回统一 JSON 事件数组", async () => {
-  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const res = await supertest(
     miniApp(
       fakeRunner([
@@ -55,7 +55,7 @@ test("POST /agent/chat: 登录后返回统一 JSON 事件数组", async () => {
 });
 
 test("POST /agent/chat: 事件 type 只来自白名单", async () => {
-  const token = createTokenForUser(createTempUser({ role: "admin" }));
+  const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const res = await supertest(miniApp(fakeRunner([{ content: "ok" }])))
     .post("/agent/chat")
     .set("Authorization", `Bearer ${token}`)
@@ -99,7 +99,7 @@ function fakeRunner(seq: Array<{ content?: string; toolCalls?: Array<{ id: strin
   };
 }
 
-function createTempUser(overrides: Partial<AuthUser> = {}): AuthUser {
+async function createTempUser(overrides: Partial<AuthUser> = {}): Promise<AuthUser> {
   const now = new Date().toISOString();
   const uniqueId = randomUUID();
   const user: AuthUser = {
@@ -113,9 +113,9 @@ function createTempUser(overrides: Partial<AuthUser> = {}): AuthUser {
     ...overrides,
   };
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   store.users.push(user);
-  saveUsersStore(store);
+  await saveUsersStore(store);
   return user;
 }
 

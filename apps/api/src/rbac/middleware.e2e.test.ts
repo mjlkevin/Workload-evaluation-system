@@ -36,7 +36,7 @@ after(() => {
 // 测试辅助：创建临时用户 + 生成 token
 // ------------------------------------------------------------------
 
-function createTempUser(overrides: Partial<AuthUser> = {}): AuthUser {
+async function createTempUser(overrides: Partial<AuthUser> = {}): Promise<AuthUser> {
   const now = new Date().toISOString();
   // 用 randomUUID 避免 Date.now() 同毫秒冲突 (修：DEV 测试因 admin 用户被前序 sub_admin 覆盖而 403)
   const uniqueId = randomUUID();
@@ -51,9 +51,9 @@ function createTempUser(overrides: Partial<AuthUser> = {}): AuthUser {
     ...overrides,
   };
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   store.users.push(user);
-  saveUsersStore(store);
+  await saveUsersStore(store);
 
   return user;
 }
@@ -93,7 +93,7 @@ test("RBAC e2e: 错误 token → 401", async () => {
 });
 
 test("RBAC e2e: 正确 token + 错误能力位 → 403（含详情字段）", async () => {
-  const user = createTempUser({ role: "user" }); // user → PRE_SALES
+  const user = await createTempUser({ role: "user" }); // user → PRE_SALES
   const token = createTokenForUser(user);
 
   const app = express();
@@ -116,7 +116,7 @@ test("RBAC e2e: 正确 token + 错误能力位 → 403（含详情字段）", as
 });
 
 test("RBAC e2e: 正确 token + 正确能力位 → 200", async () => {
-  const user = createTempUser({ role: "user" }); // user → PRE_SALES
+  const user = await createTempUser({ role: "user" }); // user → PRE_SALES
   const token = createTokenForUser(user);
 
   const app = express();
@@ -136,7 +136,7 @@ test("RBAC e2e: 正确 token + 正确能力位 → 200", async () => {
 });
 
 test("RBAC e2e: requireAnyCapability 任一通过 → 200", async () => {
-  const user = createTempUser({ role: "sub_admin" }); // sub_admin → PM
+  const user = await createTempUser({ role: "sub_admin" }); // sub_admin → PM
   const token = createTokenForUser(user);
 
   const app = express();
@@ -151,7 +151,7 @@ test("RBAC e2e: requireAnyCapability 任一通过 → 200", async () => {
 });
 
 test("RBAC e2e: requireV2Role 角色不在白名单 → 403", async () => {
-  const user = createTempUser({ role: "user" }); // user → PRE_SALES
+  const user = await createTempUser({ role: "user" }); // user → PRE_SALES
   const token = createTokenForUser(user);
 
   const app = express();
@@ -168,7 +168,7 @@ test("RBAC e2e: requireV2Role 角色不在白名单 → 403", async () => {
 });
 
 test("RBAC e2e: legacy user/PRE_SALES → estimates:create 通过", async () => {
-  const user = createTempUser({ id: "sales-001", username: "sales001", role: "user" });
+  const user = await createTempUser({ id: "sales-001", username: "sales001", role: "user" });
   const token = createTokenForUser(user);
 
   const app = express();
@@ -186,7 +186,7 @@ test("RBAC e2e: legacy user/PRE_SALES → estimates:create 通过", async () => 
 });
 
 test("RBAC e2e: ADMIN 角色 → 所有能力位通过", async () => {
-  const user = createTempUser({ role: "admin" });
+  const user = await createTempUser({ role: "admin" });
   const token = createTokenForUser(user);
 
   const app = express();
@@ -204,7 +204,7 @@ test("RBAC e2e: ADMIN 角色 → 所有能力位通过", async () => {
 });
 
 test("RBAC e2e: requireAuthenticated 仅认证不检查能力 → 200", async () => {
-  const user = createTempUser({ role: "user" });
+  const user = await createTempUser({ role: "user" });
   const token = createTokenForUser(user);
 
   const app = express();
@@ -223,7 +223,7 @@ test("RBAC e2e: requireAuthenticated 仅认证不检查能力 → 200", async ()
 });
 
 test("RBAC e2e: req.user 在 handler 中可拿到 id 和 role", async () => {
-  const user = createTempUser({ role: "sub_admin" });
+  const user = await createTempUser({ role: "sub_admin" });
   const token = createTokenForUser(user);
 
   const app = express();
@@ -251,7 +251,7 @@ test("RBAC e2e: req.user 在 handler 中可拿到 id 和 role", async () => {
 // ------------------------------------------------------------------
 
 test("RBAC e2e: 角色覆盖 - SALES (通过 admin 模拟 estimates:create)", async () => {
-  const user = createTempUser({ role: "admin" });
+  const user = await createTempUser({ role: "admin" });
   const token = createTokenForUser(user);
 
   const app = express();
@@ -266,7 +266,7 @@ test("RBAC e2e: 角色覆盖 - SALES (通过 admin 模拟 estimates:create)", as
 });
 
 test("RBAC e2e: 角色覆盖 - PRE_SALES (extractor:trigger)", async () => {
-  const user = createTempUser({ role: "user" });
+  const user = await createTempUser({ role: "user" });
   const token = createTokenForUser(user);
 
   const app = express();
@@ -283,7 +283,7 @@ test("RBAC e2e: 角色覆盖 - PRE_SALES (extractor:trigger)", async () => {
 test("RBAC e2e: 角色覆盖 - IMPL (assessment:create)", async () => {
   // IMPL 需要通过自定义用户或直接测试能力位
   // 这里用 admin 模拟（ADMIN 拥有 IMPL 的所有能力）
-  const user = createTempUser({ role: "admin" });
+  const user = await createTempUser({ role: "admin" });
   const token = createTokenForUser(user);
 
   const app = express();
@@ -298,7 +298,7 @@ test("RBAC e2e: 角色覆盖 - IMPL (assessment:create)", async () => {
 });
 
 test("RBAC e2e: 角色覆盖 - PM (assessment:handoff)", async () => {
-  const user = createTempUser({ role: "sub_admin" });
+  const user = await createTempUser({ role: "sub_admin" });
   const token = createTokenForUser(user);
 
   const app = express();
@@ -313,7 +313,7 @@ test("RBAC e2e: 角色覆盖 - PM (assessment:handoff)", async () => {
 });
 
 test("RBAC e2e: 角色覆盖 - DEV (dev:write)", async () => {
-  const user = createTempUser({ role: "admin" }); // ADMIN 有 dev:write
+  const user = await createTempUser({ role: "admin" }); // ADMIN 有 dev:write
   const token = createTokenForUser(user);
 
   const app = express();
@@ -328,7 +328,7 @@ test("RBAC e2e: 角色覆盖 - DEV (dev:write)", async () => {
 });
 
 test("RBAC e2e: 角色覆盖 - PMO (deliverable:review)", async () => {
-  const user = createTempUser({ role: "admin" }); // ADMIN 有 deliverable:review
+  const user = await createTempUser({ role: "admin" }); // ADMIN 有 deliverable:review
   const token = createTokenForUser(user);
 
   const app = express();
@@ -343,7 +343,7 @@ test("RBAC e2e: 角色覆盖 - PMO (deliverable:review)", async () => {
 });
 
 test("RBAC e2e: 角色覆盖 - ADMIN (system:manage)", async () => {
-  const user = createTempUser({ role: "admin" });
+  const user = await createTempUser({ role: "admin" });
   const token = createTokenForUser(user);
 
   const app = express();

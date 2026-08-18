@@ -49,7 +49,7 @@ export async function register(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "inviteCode", reason: "required" }]);
   }
 
-  const inviteStore = loadInviteCodesStore();
+  const inviteStore = await loadInviteCodesStore();
   const inviteRecord = inviteStore.codes.find((item) => item.code.toUpperCase() === inviteCode);
   if (!inviteRecord || inviteRecord.status !== "active") {
     return fail(res, 40001, "参数错误", [{ field: "inviteCode", reason: "invalid_invite_code" }]);
@@ -63,7 +63,7 @@ export async function register(req: Request, res: Response) {
   }
 
   const normalizedUsername = username.toLowerCase();
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const exists = store.users.some((user) => user.username.toLowerCase() === normalizedUsername);
   if (exists) {
     return fail(res, 40001, "参数错误", [{ field: "username", reason: "already_exists" }]);
@@ -83,13 +83,13 @@ export async function register(req: Request, res: Response) {
   };
 
   store.users.push(user);
-  saveUsersStore(store);
+  await saveUsersStore(store);
 
   inviteRecord.status = "used";
   inviteRecord.usedAt = nowIso;
   inviteRecord.usedByUserId = user.id;
   inviteRecord.usedByUsername = user.username;
-  saveInviteCodesStore(inviteStore);
+  await saveInviteCodesStore(inviteStore);
 
   const token = signAuthToken(user);
   res.json(ok({ token, user: toPublicUser(user) }, requestId));
@@ -105,7 +105,7 @@ export async function login(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "username/password", reason: "required" }]);
   }
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const user = store.users.find((x) => x.username.toLowerCase() === username.toLowerCase());
   if (!user) {
     return fail(res, 40001, "参数错误", [{ field: "username/password", reason: "invalid_credentials" }]);
@@ -120,7 +120,7 @@ export async function login(req: Request, res: Response) {
   }
 
   user.lastLoginAt = new Date().toISOString();
-  saveUsersStore(store);
+  await saveUsersStore(store);
 
   const expiresIn = rememberMe ? REMEMBER_ME_EXPIRES_IN : undefined;
   const token = signAuthToken(user, expiresIn ? { expiresIn } : {});
@@ -139,7 +139,7 @@ export async function requestPasswordReset(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "username", reason: "required" }]);
   }
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const user = store.users.find((x) => x.username.toLowerCase() === username.toLowerCase());
   if (!user || user.status !== "active") {
     return res.json(ok({
@@ -152,7 +152,7 @@ export async function requestPasswordReset(req: Request, res: Response) {
   const token = createResetToken();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + PASSWORD_RESET_EXPIRES_MINUTES * 60 * 1000);
-  const resetStore = loadPasswordResetTokensStore();
+  const resetStore = await loadPasswordResetTokensStore();
   for (const item of resetStore.tokens) {
     if (item.userId === user.id && item.status === "active") {
       item.status = "used";
@@ -169,7 +169,7 @@ export async function requestPasswordReset(req: Request, res: Response) {
     expiresAt: expiresAt.toISOString(),
   };
   resetStore.tokens.push(record);
-  savePasswordResetTokensStore(resetStore);
+  await savePasswordResetTokensStore(resetStore);
 
   res.json(ok({
     accepted: true,
@@ -191,28 +191,28 @@ export async function confirmPasswordReset(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "password", reason: "min_length_8" }]);
   }
 
-  const resetStore = loadPasswordResetTokensStore();
+  const resetStore = await loadPasswordResetTokensStore();
   const tokenHash = hashResetToken(token);
   const record = resetStore.tokens.find((item) => item.tokenHash === tokenHash);
   if (!record || record.status !== "active" || Number(new Date(record.expiresAt)) <= Date.now()) {
     return fail(res, 40001, "参数错误", [{ field: "token", reason: "invalid_or_expired" }]);
   }
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const user = store.users.find((item) => item.id === record.userId && item.status === "active");
   if (!user) {
     record.status = "used";
     record.usedAt = new Date().toISOString();
-    savePasswordResetTokensStore(resetStore);
+    await savePasswordResetTokensStore(resetStore);
     return fail(res, 40001, "参数错误", [{ field: "token", reason: "invalid_or_expired" }]);
   }
 
   user.passwordHash = await bcrypt.hash(password, 10);
-  saveUsersStore(store);
+  await saveUsersStore(store);
 
   record.status = "used";
   record.usedAt = new Date().toISOString();
-  savePasswordResetTokensStore(resetStore);
+  await savePasswordResetTokensStore(resetStore);
 
   res.json(ok({ success: true }, requestId));
 }
@@ -236,7 +236,7 @@ export async function listUsers(req: Request, res: Response) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
   }
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const users = [...store.users]
     .sort((a, b) => Number(new Date(b.createdAt)) - Number(new Date(a.createdAt)))
     .map((user) => toPublicUser(user));
@@ -260,7 +260,7 @@ export async function updateUserStatus(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "status", reason: "cannot_disable_self" }]);
   }
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const target = store.users.find((user) => user.id === userId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
@@ -271,7 +271,7 @@ export async function updateUserStatus(req: Request, res: Response) {
   }
 
   target.status = nextStatus;
-  saveUsersStore(store);
+  await saveUsersStore(store);
   res.json(ok({ user: toPublicUser(target) }, randomUUID()));
 }
 
@@ -293,7 +293,7 @@ export async function updateUserRole(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "role", reason: "invalid" }]);
   }
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const target = store.users.find((u) => u.id === userId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
@@ -316,7 +316,7 @@ export async function updateUserRole(req: Request, res: Response) {
   }
 
   target.role = nextRole;
-  saveUsersStore(store);
+  await saveUsersStore(store);
   res.json(ok({ user: toPublicUser(target) }, randomUUID()));
 }
 
@@ -336,7 +336,7 @@ export async function updateUserBusinessRole(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "businessRole", reason: "invalid" }]);
   }
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const target = store.users.find((u) => u.id === userId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
@@ -347,7 +347,7 @@ export async function updateUserBusinessRole(req: Request, res: Response) {
   }
 
   target.businessRole = rawBusinessRole;
-  saveUsersStore(store);
+  await saveUsersStore(store);
   res.json(ok({ user: toPublicUser(target) }, randomUUID()));
 }
 
@@ -367,7 +367,7 @@ export async function updateUserPassword(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "password", reason: "min_length_8" }]);
   }
 
-  const store = loadUsersStore();
+  const store = await loadUsersStore();
   const target = store.users.find((u) => u.id === userId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
@@ -378,7 +378,7 @@ export async function updateUserPassword(req: Request, res: Response) {
   }
 
   target.passwordHash = await bcrypt.hash(password, 10);
-  saveUsersStore(store);
+  await saveUsersStore(store);
   res.json(ok({ user: toPublicUser(target) }, randomUUID()));
 }
 
@@ -389,7 +389,7 @@ export async function listInviteCodes(req: Request, res: Response) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "admin_required" }]);
   }
 
-  const store = loadInviteCodesStore();
+  const store = await loadInviteCodesStore();
   const codes = [...store.codes].sort((a, b) => Number(new Date(b.createdAt)) - Number(new Date(a.createdAt)));
   res.json(ok({ codes }, randomUUID()));
 }
@@ -401,7 +401,7 @@ export async function generateInviteCodeHandler(req: Request, res: Response) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "admin_required" }]);
   }
 
-  const store = loadInviteCodesStore();
+  const store = await loadInviteCodesStore();
   const existing = new Set(store.codes.map((item) => item.code.toUpperCase()));
   const code = generateInviteCode(existing);
 
@@ -412,6 +412,6 @@ export async function generateInviteCodeHandler(req: Request, res: Response) {
   };
 
   store.codes.push(record);
-  saveInviteCodesStore(store);
+  await saveInviteCodesStore(store);
   res.json(ok({ code: record }, randomUUID()));
 }

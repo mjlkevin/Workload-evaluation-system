@@ -104,9 +104,9 @@ test("真实端点：POST /api/v1/auth/login async 抛错走统一 500 而非挂
       createdAt: new Date().toISOString(),
       lastLoginAt: new Date().toISOString(),
     };
-    const store = loadUsersStore();
+    const store = await loadUsersStore();
     store.users.push(tempUser as never);
-    saveUsersStore(store);
+    await saveUsersStore(store);
 
     // mock bcrypt.compare 抛错——与 auth.usecase 共享同一 CJS 模块实例
     const originalCompare = bcrypt.compare;
@@ -128,9 +128,9 @@ test("真实端点：POST /api/v1/auth/login async 抛错走统一 500 而非挂
       assert.ok(!JSON.stringify(res.body).includes("boom-bcrypt-internal"));
     } finally {
       bcrypt.compare = originalCompare;
-      const s = loadUsersStore();
+      const s = await loadUsersStore();
       s.users = s.users.filter((u) => u.id !== tempUser.id);
-      saveUsersStore(s);
+      await saveUsersStore(s);
     }
   } finally {
     process.chdir(originalCwd);

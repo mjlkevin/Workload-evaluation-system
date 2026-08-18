@@ -4,7 +4,10 @@ import path from "node:path";
 import { InviteCodesStore, PasswordResetTokensStore } from "../../types";
 import { inviteCodesStorePath, passwordResetTokensStorePath } from "../../utils";
 
-export function loadInviteCodesStore(): InviteCodesStore {
+/**
+ * 阶段 1 批 3：签名改 async（Promise<InviteCodesStore>），函数体一字未动。
+ */
+export async function loadInviteCodesStore(): Promise<InviteCodesStore> {
   const filePath = inviteCodesStorePath();
   if (!fs.existsSync(filePath)) {
     const initStore: InviteCodesStore = { codes: [] };
@@ -23,13 +26,19 @@ export function loadInviteCodesStore(): InviteCodesStore {
   }
 }
 
-export function saveInviteCodesStore(store: InviteCodesStore): void {
+/**
+ * 阶段 1 批 3：签名改 async（Promise<void>），函数体一字未动。
+ */
+export async function saveInviteCodesStore(store: InviteCodesStore): Promise<void> {
   const filePath = inviteCodesStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(store, null, 2), "utf-8");
 }
 
-export function loadPasswordResetTokensStore(): PasswordResetTokensStore {
+/**
+ * 阶段 1 批 3：签名改 async（Promise<PasswordResetTokensStore>），函数体一字未动。
+ */
+export async function loadPasswordResetTokensStore(): Promise<PasswordResetTokensStore> {
   const filePath = passwordResetTokensStorePath();
   if (!fs.existsSync(filePath)) {
     const initStore: PasswordResetTokensStore = { tokens: [] };
@@ -48,7 +57,10 @@ export function loadPasswordResetTokensStore(): PasswordResetTokensStore {
   }
 }
 
-export function savePasswordResetTokensStore(store: PasswordResetTokensStore): void {
+/**
+ * 阶段 1 批 3：签名改 async（Promise<void>），函数体一字未动。
+ */
+export async function savePasswordResetTokensStore(store: PasswordResetTokensStore): Promise<void> {
   const filePath = passwordResetTokensStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(store, null, 2), "utf-8");
