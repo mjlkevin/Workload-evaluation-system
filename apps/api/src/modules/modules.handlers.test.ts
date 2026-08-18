@@ -267,6 +267,26 @@ function withFilesSnapshotRestore(filePaths: string[], run: () => void): void {
   }
 }
 
+// 阶段 1 批 2：多文件快照恢复的 async 版，供含 async handler 调用的测试使用。
+async function withFilesSnapshotRestoreAsync(filePaths: string[], run: () => Promise<void>): Promise<void> {
+  const snapshots = filePaths.map((filePath) => ({
+    filePath,
+    existed: fs.existsSync(filePath),
+    content: fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "",
+  }));
+  try {
+    await run();
+  } finally {
+    for (const item of snapshots) {
+      if (item.existed) {
+        fs.writeFileSync(item.filePath, item.content, "utf-8");
+      } else if (fs.existsSync(item.filePath)) {
+        fs.unlinkSync(item.filePath);
+      }
+    }
+  }
+}
+
 test("auth.usecase: login returns required error when username/password missing", async () => {
   const req = createMockReq({ body: {} });
   const res = createMockRes();
@@ -310,28 +330,28 @@ test("auth.usecase: login can issue a remembered 7-day token", async () => {
   });
 });
 
-test("auth.usecase: me returns 401 without token", () => {
+test("auth.usecase: me returns 401 without token", async () => {
   const req = createMockReq({});
   const res = createMockRes();
-  me(req, res as unknown as Response);
+  await me(req, res as unknown as Response);
   assert.equal(res.statusCode, 401);
   assert.equal((res.body as { code?: number }).code, 40101);
 });
 
-test("auth.usecase: me returns user with valid token", () => {
+test("auth.usecase: me returns user with valid token", async () => {
   const req = createMockReq({ token: getActiveUserToken() });
   const res = createMockRes();
-  me(req, res as unknown as Response);
+  await me(req, res as unknown as Response);
   assert.equal(res.statusCode, 200);
   const body = res.body as { code: number; data: { user: { id: string } } };
   assert.equal(body.code, 0);
   assert.ok(body.data.user.id);
 });
 
-test("auth.usecase: me returns businessRole with valid token", () => {
+test("auth.usecase: me returns businessRole with valid token", async () => {
   const req = createMockReq({ token: getActiveUserToken() });
   const res = createMockRes();
-  me(req, res as unknown as Response);
+  await me(req, res as unknown as Response);
 
   assert.equal(res.statusCode, 200);
   const body = res.body as { code: number; data: { user: { businessRole?: string } } };
@@ -339,21 +359,21 @@ test("auth.usecase: me returns businessRole with valid token", () => {
   assert.ok(body.data.user.businessRole);
 });
 
-test("auth.usecase: updateUserBusinessRole changes only business role", () => {
+test("auth.usecase: updateUserBusinessRole changes only business role", async () => {
   const store = loadUsersStore();
   const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
   const target = store.users.find((x) => x.status === "active" && x.role !== "admin");
   assert.ok(admin, "active admin required");
   assert.ok(target, "active non-admin target required");
 
-  withFileSnapshotRestore(usersStorePath(), () => {
+  await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
     const req = createMockReq({
       token: signAuthToken(admin),
       params: { userId: target.id },
       body: { businessRole: "sales" },
     });
     const res = createMockRes();
-    updateUserBusinessRole(req, res as unknown as Response);
+    await updateUserBusinessRole(req, res as unknown as Response);
 
     assert.equal(res.statusCode, 200);
     const body = res.body as { code: number; data: { user: { role: string; businessRole: string } } };
@@ -363,7 +383,7 @@ test("auth.usecase: updateUserBusinessRole changes only business role", () => {
   });
 });
 
-test("auth.usecase: updateUserBusinessRole rejects invalid role", () => {
+test("auth.usecase: updateUserBusinessRole rejects invalid role", async () => {
   const store = loadUsersStore();
   const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
   const target = store.users.find((x) => x.status === "active");
@@ -376,7 +396,7 @@ test("auth.usecase: updateUserBusinessRole rejects invalid role", () => {
     body: { businessRole: "bad_role" },
   });
   const res = createMockRes();
-  updateUserBusinessRole(req, res as unknown as Response);
+  await updateUserBusinessRole(req, res as unknown as Response);
 
   assert.equal(res.statusCode, 400);
   assert.equal((res.body as { code?: number }).code, 40001);
@@ -491,10 +511,10 @@ test("auth.usecase: password reset request and confirm update password once", as
   });
 });
 
-test("auth.usecase: listUsers follows role branch", () => {
+test("auth.usecase: listUsers follows role branch", async () => {
   const req = createMockReq({ token: getActiveUserToken() });
   const res = createMockRes();
-  listUsers(req, res as unknown as Response);
+  await listUsers(req, res as unknown as Response);
 
   const role = getActiveUserRole();
   if (role === "admin" || role === "sub_admin") {
@@ -508,47 +528,47 @@ test("auth.usecase: listUsers follows role branch", () => {
   }
 });
 
-test("rules.usecase: getRuleSetMeta returns 401 without token", () => {
+test("rules.usecase: getRuleSetMeta returns 401 without token", async () => {
   const req = createMockReq({});
   const res = createMockRes();
-  getRuleSetMeta(req, res as unknown as Response);
+  await getRuleSetMeta(req, res as unknown as Response);
   assert.equal(res.statusCode, 401);
   assert.equal((res.body as { code?: number }).code, 40101);
 });
 
-test("rules.usecase: getRuleSetMeta returns metadata with valid token", () => {
+test("rules.usecase: getRuleSetMeta returns metadata with valid token", async () => {
   const req = createMockReq({ token: getActiveUserToken() });
   const res = createMockRes();
-  getRuleSetMeta(req, res as unknown as Response);
+  await getRuleSetMeta(req, res as unknown as Response);
   assert.equal(res.statusCode, 200);
   const body = res.body as { code: number; data: { pipeline: string[] } };
   assert.equal(body.code, 0);
   assert.ok(Array.isArray(body.data.pipeline));
 });
 
-test("templates.usecase: getTemplate returns not_found code for wrong templateId", () => {
+test("templates.usecase: getTemplate returns not_found code for wrong templateId", async () => {
   const req = createMockReq({
     token: getActiveUserToken(),
     params: { templateId: "non-existent-template-id" }
   });
   const res = createMockRes();
-  getTemplate(req, res as unknown as Response);
+  await getTemplate(req, res as unknown as Response);
   assert.equal(res.statusCode, 404);
   assert.equal((res.body as { code?: number }).code, 40401);
 });
 
-test("versions.usecase: listVersions returns invalid type error", () => {
+test("versions.usecase: listVersions returns invalid type error", async () => {
   const req = createMockReq({
     token: getActiveUserToken(),
     query: { type: "invalid-type" }
   });
   const res = createMockRes();
-  listVersions(req, res as unknown as Response);
+  await listVersions(req, res as unknown as Response);
   assert.equal(res.statusCode, 400);
   assert.equal((res.body as { code?: number }).code, 40001);
 });
 
-test("versions.usecase: createVersion returns invalid status error", () => {
+test("versions.usecase: createVersion returns invalid status error", async () => {
   const req = createMockReq({
     token: getActiveUserToken(),
     body: {
@@ -558,37 +578,37 @@ test("versions.usecase: createVersion returns invalid status error", () => {
     }
   });
   const res = createMockRes();
-  createVersion(req, res as unknown as Response);
+  await createVersion(req, res as unknown as Response);
   assert.equal(res.statusCode, 400);
   assert.equal((res.body as { code?: number }).code, 40001);
 });
 
-test("versions.usecase: updateVersionStatus returns recordId required", () => {
+test("versions.usecase: updateVersionStatus returns recordId required", async () => {
   const req = createMockReq({
     token: getActiveUserToken(),
     params: { recordId: "" },
     body: { status: "draft" }
   });
   const res = createMockRes();
-  updateVersionStatus(req, res as unknown as Response);
+  await updateVersionStatus(req, res as unknown as Response);
   assert.equal(res.statusCode, 400);
   assert.equal((res.body as { code?: number }).code, 40001);
 });
 
-test("versions.usecase: deleteVersion returns type invalid", () => {
+test("versions.usecase: deleteVersion returns type invalid", async () => {
   const req = createMockReq({
     token: getActiveUserToken(),
     params: { type: "bad-type", versionCode: "V00" }
   });
   const res = createMockRes();
-  deleteVersion(req, res as unknown as Response);
+  await deleteVersion(req, res as unknown as Response);
   assert.equal(res.statusCode, 400);
   assert.equal((res.body as { code?: number }).code, 40001);
 });
 
-test("versions.usecase: create -> update -> delete lifecycle works", { concurrency: false }, () => {
+test("versions.usecase: create -> update -> delete lifecycle works", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
-  withFileSnapshotRestore(versionsPath, () => {
+  await withFileSnapshotRestoreAsync(versionsPath, async () => {
     const versionCode = `UT-LC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
     const createReq = createMockReq({
@@ -602,7 +622,7 @@ test("versions.usecase: create -> update -> delete lifecycle works", { concurren
       }
     });
     const createRes = createMockRes();
-    createVersion(createReq, createRes as unknown as Response);
+    await createVersion(createReq, createRes as unknown as Response);
     assert.equal(createRes.statusCode, 200);
     const created = createRes.body as { code: number; data: { record: { id: string; versionCode: string } } };
     assert.equal(created.code, 0);
@@ -614,7 +634,7 @@ test("versions.usecase: create -> update -> delete lifecycle works", { concurren
       body: { status: "reviewed" }
     });
     const updateRes = createMockRes();
-    updateVersionStatus(updateReq, updateRes as unknown as Response);
+    await updateVersionStatus(updateReq, updateRes as unknown as Response);
     assert.equal(updateRes.statusCode, 200);
     const updated = updateRes.body as { code: number; data: { record: { status: string } } };
     assert.equal(updated.code, 0);
@@ -626,7 +646,7 @@ test("versions.usecase: create -> update -> delete lifecycle works", { concurren
       query: { templateId: "default" }
     });
     const deleteRes = createMockRes();
-    deleteVersion(deleteReq, deleteRes as unknown as Response);
+    await deleteVersion(deleteReq, deleteRes as unknown as Response);
     assert.equal(deleteRes.statusCode, 200);
     const deleted = deleteRes.body as { code: number; data: { deleted: boolean } };
     assert.equal(deleted.code, 0);
@@ -634,10 +654,10 @@ test("versions.usecase: create -> update -> delete lifecycle works", { concurren
   });
 });
 
-test("versions.usecase: createVersion generates versionCode by active rule when omitted", { concurrency: false }, () => {
+test("versions.usecase: createVersion generates versionCode by active rule when omitted", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
   const rulesPath = versionCodeRulesStorePath();
-  withFilesSnapshotRestore([versionsPath, rulesPath], () => {
+  await withFilesSnapshotRestoreAsync([versionsPath, rulesPath], async () => {
     fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
     fs.writeFileSync(
       rulesPath,
@@ -674,7 +694,7 @@ test("versions.usecase: createVersion generates versionCode by active rule when 
       },
     });
     const res = createMockRes();
-    createVersion(req, res as unknown as Response);
+    await createVersion(req, res as unknown as Response);
     assert.equal(res.statusCode, 200);
     const body = res.body as { code: number; data: { record: { versionCode: string } } };
     assert.equal(body.code, 0);
@@ -682,10 +702,10 @@ test("versions.usecase: createVersion generates versionCode by active rule when 
   });
 });
 
-test("versions.usecase: createVersion increments sequence on conflict under active rule", { concurrency: false }, () => {
+test("versions.usecase: createVersion increments sequence on conflict under active rule", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
   const rulesPath = versionCodeRulesStorePath();
-  withFilesSnapshotRestore([versionsPath, rulesPath], () => {
+  await withFilesSnapshotRestoreAsync([versionsPath, rulesPath], async () => {
     fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
     fs.writeFileSync(
       rulesPath,
@@ -717,7 +737,7 @@ test("versions.usecase: createVersion increments sequence on conflict under acti
       body: { type: "assessment", templateId: "default", status: "draft", payload: {} },
     });
     const res1 = createMockRes();
-    createVersion(req1, res1 as unknown as Response);
+    await createVersion(req1, res1 as unknown as Response);
     assert.equal(res1.statusCode, 200);
     const versionCode1 = (res1.body as { data: { record: { versionCode: string } } }).data.record.versionCode;
     assert.equal(versionCode1, "IA-01");
@@ -727,17 +747,17 @@ test("versions.usecase: createVersion increments sequence on conflict under acti
       body: { type: "assessment", templateId: "default", status: "draft", payload: {} },
     });
     const res2 = createMockRes();
-    createVersion(req2, res2 as unknown as Response);
+    await createVersion(req2, res2 as unknown as Response);
     assert.equal(res2.statusCode, 200);
     const versionCode2 = (res2.body as { data: { record: { versionCode: string } } }).data.record.versionCode;
     assert.equal(versionCode2, "IA-02");
   });
 });
 
-test("versions.usecase: createVersion fails when rule is not active", { concurrency: false }, () => {
+test("versions.usecase: createVersion fails when rule is not active", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
   const rulesPath = versionCodeRulesStorePath();
-  withFilesSnapshotRestore([versionsPath, rulesPath], () => {
+  await withFilesSnapshotRestoreAsync([versionsPath, rulesPath], async () => {
     fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
     fs.writeFileSync(
       rulesPath,
@@ -769,16 +789,16 @@ test("versions.usecase: createVersion fails when rule is not active", { concurre
       body: { type: "assessment", templateId: "default", status: "draft", payload: {} },
     });
     const res = createMockRes();
-    createVersion(req, res as unknown as Response);
+    await createVersion(req, res as unknown as Response);
     assert.equal(res.statusCode, 409);
     assert.equal((res.body as { code?: number }).code, 40902);
   });
 });
 
-test("versions.usecase: createVersion fails when active rule lacks sequence placeholder and conflicts", { concurrency: false }, () => {
+test("versions.usecase: createVersion fails when active rule lacks sequence placeholder and conflicts", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
   const rulesPath = versionCodeRulesStorePath();
-  withFilesSnapshotRestore([versionsPath, rulesPath], () => {
+  await withFilesSnapshotRestoreAsync([versionsPath, rulesPath], async () => {
     const owner = getActiveUser();
     const now = new Date().toISOString();
     fs.writeFileSync(
@@ -844,15 +864,15 @@ test("versions.usecase: createVersion fails when active rule lacks sequence plac
       body: { type: "assessment", templateId: "default", status: "draft", payload: {} },
     });
     const res = createMockRes();
-    createVersion(req, res as unknown as Response);
+    await createVersion(req, res as unknown as Response);
     assert.equal(res.statusCode, 409);
     assert.equal((res.body as { code?: number }).code, 40901);
   });
 });
 
-test("versions.usecase: checkout -> checkin updates lock and version code", { concurrency: false }, () => {
+test("versions.usecase: checkout -> checkin updates lock and version code", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
-  withFileSnapshotRestore(versionsPath, () => {
+  await withFileSnapshotRestoreAsync(versionsPath, async () => {
     const versionCode = `UT-VCS-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: getActiveUserToken(),
@@ -865,14 +885,14 @@ test("versions.usecase: checkout -> checkin updates lock and version code", { co
       }
     });
     const createRes = createMockRes();
-    createVersion(createReq, createRes as unknown as Response);
+    await createVersion(createReq, createRes as unknown as Response);
     assert.equal(createRes.statusCode, 200);
     const created = createRes.body as { data: { record: { id: string } } };
     const recordId = created.data.record.id;
 
     const checkoutReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
     const checkoutRes = createMockRes();
-    checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
+    await checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
     assert.equal(checkoutRes.statusCode, 200);
     const checkedOut = checkoutRes.body as { data: { record: { checkoutStatus: string; checkedOutByUserId?: string } } };
     assert.equal(checkedOut.data.record.checkoutStatus, "checked_out");
@@ -884,7 +904,7 @@ test("versions.usecase: checkout -> checkin updates lock and version code", { co
       body: { payload: { a: 2 } }
     });
     const checkinRes = createMockRes();
-    checkinVersion(checkinReq, checkinRes as unknown as Response);
+    await checkinVersion(checkinReq, checkinRes as unknown as Response);
     assert.equal(checkinRes.statusCode, 200);
     const checkedIn = checkinRes.body as { data: { record: { checkoutStatus: string; versionCode: string; payload: { a: number } } } };
     assert.equal(checkedIn.data.record.checkoutStatus, "checked_in");
@@ -893,9 +913,9 @@ test("versions.usecase: checkout -> checkin updates lock and version code", { co
   });
 });
 
-test("versions.usecase: save-draft updates payload while staying checked out", { concurrency: false }, () => {
+test("versions.usecase: save-draft updates payload while staying checked out", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
-  withFileSnapshotRestore(versionsPath, () => {
+  await withFileSnapshotRestoreAsync(versionsPath, async () => {
     const versionCode = `UT-DRAFT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: getActiveUserToken(),
@@ -908,13 +928,13 @@ test("versions.usecase: save-draft updates payload while staying checked out", {
       },
     });
     const createRes = createMockRes();
-    createVersion(createReq, createRes as unknown as Response);
+    await createVersion(createReq, createRes as unknown as Response);
     assert.equal(createRes.statusCode, 200);
     const recordId = (createRes.body as { data: { record: { id: string } } }).data.record.id;
 
     const checkoutReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
     const checkoutRes = createMockRes();
-    checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
+    await checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
     assert.equal(checkoutRes.statusCode, 200);
 
     const draftReq = createMockReq({
@@ -923,7 +943,7 @@ test("versions.usecase: save-draft updates payload while staying checked out", {
       body: { payload: { a: 99 } },
     });
     const draftRes = createMockRes();
-    saveCheckedOutDraft(draftReq, draftRes as unknown as Response);
+    await saveCheckedOutDraft(draftReq, draftRes as unknown as Response);
     assert.equal(draftRes.statusCode, 200);
     const body = draftRes.body as {
       data: { record: { checkoutStatus: string; versionCode: string; payload: { a: number } } };
@@ -934,9 +954,9 @@ test("versions.usecase: save-draft updates payload while staying checked out", {
   });
 });
 
-test("versions.usecase: undo-checkout restores last checkin payload", { concurrency: false }, () => {
+test("versions.usecase: undo-checkout restores last checkin payload", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
-  withFileSnapshotRestore(versionsPath, () => {
+  await withFileSnapshotRestoreAsync(versionsPath, async () => {
     const versionCode = `UT-UNDO-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: getActiveUserToken(),
@@ -949,12 +969,12 @@ test("versions.usecase: undo-checkout restores last checkin payload", { concurre
       }
     });
     const createRes = createMockRes();
-    createVersion(createReq, createRes as unknown as Response);
+    await createVersion(createReq, createRes as unknown as Response);
     const recordId = (createRes.body as { data: { record: { id: string } } }).data.record.id;
 
     const checkoutReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
     const checkoutRes = createMockRes();
-    checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
+    await checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
     assert.equal(checkoutRes.statusCode, 200);
 
     const store = JSON.parse(fs.readFileSync(versionsPath, "utf-8")) as {
@@ -967,7 +987,7 @@ test("versions.usecase: undo-checkout restores last checkin payload", { concurre
 
     const undoReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
     const undoRes = createMockRes();
-    undoCheckout(undoReq, undoRes as unknown as Response);
+    await undoCheckout(undoReq, undoRes as unknown as Response);
     assert.equal(undoRes.statusCode, 200);
     const body = undoRes.body as { data: { record: { checkoutStatus: string; payload: { name: string } } } };
     assert.equal(body.data.record.checkoutStatus, "checked_in");
@@ -975,9 +995,9 @@ test("versions.usecase: undo-checkout restores last checkin payload", { concurre
   });
 });
 
-test("versions.usecase: promote archives current record and creates checked_out record", { concurrency: false }, () => {
+test("versions.usecase: promote archives current record and creates checked_out record", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
-  withFileSnapshotRestore(versionsPath, () => {
+  await withFileSnapshotRestoreAsync(versionsPath, async () => {
     const versionCode = `UT-PM-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: getActiveUserToken(),
@@ -990,12 +1010,12 @@ test("versions.usecase: promote archives current record and creates checked_out 
       }
     });
     const createRes = createMockRes();
-    createVersion(createReq, createRes as unknown as Response);
+    await createVersion(createReq, createRes as unknown as Response);
     const recordId = (createRes.body as { data: { record: { id: string } } }).data.record.id;
 
     const promoteReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
     const promoteRes = createMockRes();
-    promoteVersion(promoteReq, promoteRes as unknown as Response);
+    await promoteVersion(promoteReq, promoteRes as unknown as Response);
     assert.equal(promoteRes.statusCode, 200);
     const body = promoteRes.body as {
       data: {
@@ -1009,9 +1029,9 @@ test("versions.usecase: promote archives current record and creates checked_out 
   });
 });
 
-test("versions.usecase: force-unlock requires admin and unlocks checked out record", { concurrency: false }, () => {
+test("versions.usecase: force-unlock requires admin and unlocks checked out record", { concurrency: false }, async () => {
   const versionsPath = versionsStorePath();
-  withFileSnapshotRestore(versionsPath, () => {
+  await withFileSnapshotRestoreAsync(versionsPath, async () => {
     const versionCode = `UT-FU-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: getActiveUserToken(),
@@ -1024,50 +1044,50 @@ test("versions.usecase: force-unlock requires admin and unlocks checked out reco
       }
     });
     const createRes = createMockRes();
-    createVersion(createReq, createRes as unknown as Response);
+    await createVersion(createReq, createRes as unknown as Response);
     const recordId = (createRes.body as { data: { record: { id: string } } }).data.record.id;
 
     const checkoutReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
     const checkoutRes = createMockRes();
-    checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
+    await checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
     assert.equal(checkoutRes.statusCode, 200);
 
     const nonAdminReq = createMockReq({ token: getNonAdminUserToken(), params: { id: recordId } });
     const nonAdminRes = createMockRes();
-    forceUnlockVersion(nonAdminReq, nonAdminRes as unknown as Response);
+    await forceUnlockVersion(nonAdminReq, nonAdminRes as unknown as Response);
     assert.equal(nonAdminRes.statusCode, 403);
     assert.equal((nonAdminRes.body as { code?: number }).code, 40301);
 
     const adminReq = createMockReq({ token: getActiveUserToken(), params: { id: recordId } });
     const adminRes = createMockRes();
-    forceUnlockVersion(adminReq, adminRes as unknown as Response);
+    await forceUnlockVersion(adminReq, adminRes as unknown as Response);
     assert.equal(adminRes.statusCode, 200);
     const unlocked = adminRes.body as { data: { record: { checkoutStatus: string } } };
     assert.equal(unlocked.data.record.checkoutStatus, "checked_in");
   });
 });
 
-test("team.controller: postTeam returns 401 without token", () => {
+test("team.controller: postTeam returns 401 without token", async () => {
   const req = createMockReq({ body: { name: "UT Team" } });
   const res = createMockRes();
-  postTeam(req, res as unknown as Response);
+  await postTeam(req, res as unknown as Response);
   assert.equal(res.statusCode, 401);
   assert.equal((res.body as { code?: number }).code, 40101);
 });
 
-test("team.controller: patchReviewStatus returns 401 without token", () => {
+test("team.controller: patchReviewStatus returns 401 without token", async () => {
   const req = createMockReq({
     params: { teamId: "t1", reviewId: "r1" },
     body: { status: "closed" }
   });
   const res = createMockRes();
-  patchReviewStatus(req, res as unknown as Response);
+  await patchReviewStatus(req, res as unknown as Response);
   assert.equal(res.statusCode, 401);
   assert.equal((res.body as { code?: number }).code, 40101);
 });
 
-test("ai-sessions: creates and lists a persistent session", () => {
-  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+test("ai-sessions: creates and lists a persistent session", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
     const token = getActiveUserToken();
     const createReq = createMockReq({
       token,
@@ -1079,7 +1099,7 @@ test("ai-sessions: creates and lists a persistent session", () => {
       },
     });
     const createRes = createMockRes();
-    AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+    await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
 
     assert.equal(createRes.statusCode, 200);
     const created = createRes.body as { code: number; data: { session: { sessionId: string; title: string; status: string } } };
@@ -1089,7 +1109,7 @@ test("ai-sessions: creates and lists a persistent session", () => {
 
     const listReq = createMockReq({ token, query: { domain: "business_evaluation" } });
     const listRes = createMockRes();
-    AiSessionsModule.listSessions(listReq, listRes as unknown as Response);
+    await AiSessionsModule.listSessions(listReq, listRes as unknown as Response);
 
     assert.equal(listRes.statusCode, 200);
     const listed = listRes.body as { code: number; data: { items: Array<{ sessionId: string }> } };
@@ -1097,15 +1117,15 @@ test("ai-sessions: creates and lists a persistent session", () => {
   });
 });
 
-test("ai-sessions: appends messages and creates pending action", () => {
-  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+test("ai-sessions: appends messages and creates pending action", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
     const token = getActiveUserToken();
     const createReq = createMockReq({
       token,
       body: { title: "创建项目确认", domain: "business_evaluation", workflowKey: "project_discovery" },
     });
     const createRes = createMockRes();
-    AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+    await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
     const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
 
     const appendReq = createMockReq({
@@ -1123,7 +1143,7 @@ test("ai-sessions: appends messages and creates pending action", () => {
       },
     });
     const appendRes = createMockRes();
-    AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
+    await AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
 
     assert.equal(appendRes.statusCode, 200);
     const body = appendRes.body as { code: number; data: { session: { messages: unknown[]; artifacts: unknown[]; pendingActions: Array<{ status: string }> } } };
@@ -1134,20 +1154,20 @@ test("ai-sessions: appends messages and creates pending action", () => {
   });
 });
 
-test("ai-sessions: deletes an owned session permanently", () => {
-  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+test("ai-sessions: deletes an owned session permanently", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
     const token = getActiveUserToken();
     const createReq = createMockReq({
       token,
       body: { title: "待删除会话", domain: "business_evaluation", workflowKey: "free_chat" },
     });
     const createRes = createMockRes();
-    AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+    await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
     const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
 
     const deleteReq = createMockReq({ token, params: { sessionId } });
     const deleteRes = createMockRes();
-    AiSessionsModule.deleteSession(deleteReq, deleteRes as unknown as Response);
+    await AiSessionsModule.deleteSession(deleteReq, deleteRes as unknown as Response);
 
     assert.equal(deleteRes.statusCode, 200);
     const body = deleteRes.body as { code: number; data: { deletedSessionId: string } };
@@ -1156,20 +1176,20 @@ test("ai-sessions: deletes an owned session permanently", () => {
 
     const getReq = createMockReq({ token, params: { sessionId } });
     const getRes = createMockRes();
-    AiSessionsModule.getSession(getReq, getRes as unknown as Response);
+    await AiSessionsModule.getSession(getReq, getRes as unknown as Response);
     assert.equal(getRes.statusCode, 404);
   });
 });
 
-test("ai-sessions: normalizes invalid event fields and ignores blank events", () => {
-  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+test("ai-sessions: normalizes invalid event fields and ignores blank events", async () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
     const token = getActiveUserToken();
     const createReq = createMockReq({
       token,
       body: { title: "事件规范化", domain: "business_evaluation", workflowKey: "free_chat" },
     });
     const createRes = createMockRes();
-    AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+    await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
     const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
 
     const appendReq = createMockReq({
@@ -1182,7 +1202,7 @@ test("ai-sessions: normalizes invalid event fields and ignores blank events", ()
       },
     });
     const appendRes = createMockRes();
-    AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
+    await AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
 
     const body = appendRes.body as {
       data: {
@@ -1215,7 +1235,7 @@ test("ai-sessions: normalizes invalid event fields and ignores blank events", ()
       },
     });
     const blankRes = createMockRes();
-    AiSessionsModule.appendSessionEvent(blankReq, blankRes as unknown as Response);
+    await AiSessionsModule.appendSessionEvent(blankReq, blankRes as unknown as Response);
     const blankBody = blankRes.body as { data: { session: { messages: unknown[]; artifacts: unknown[]; pendingActions: unknown[]; updatedAt: string } } };
 
     assert.equal(blankBody.data.session.messages.length, 1);
@@ -1225,8 +1245,8 @@ test("ai-sessions: normalizes invalid event fields and ignores blank events", ()
   });
 });
 
-test("project-evaluations: creates project plan from ai session", () => {
-  withFileSnapshotRestore(versionsStorePath(), () => {
+test("project-evaluations: creates project plan from ai session", async () => {
+  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     const token = getActiveUserToken();
     const req = createMockReq({
       token,
@@ -1238,7 +1258,7 @@ test("project-evaluations: creates project plan from ai session", () => {
       },
     });
     const res = createMockRes();
-    ProjectEvaluationsModule.createProjectEvaluation(req, res as unknown as Response);
+    await ProjectEvaluationsModule.createProjectEvaluation(req, res as unknown as Response);
 
     assert.equal(res.statusCode, 200);
     const body = res.body as { code: number; data: { project: { projectId: string; projectName: string; customerName: string; createdFromSessionId: string } } };
@@ -1256,17 +1276,17 @@ test("project-evaluations: creates project plan from ai session", () => {
   });
 });
 
-test("project-evaluations: lists project plans", () => {
-  withFileSnapshotRestore(versionsStorePath(), () => {
+test("project-evaluations: lists project plans", async () => {
+  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     const token = getActiveUserToken();
-    ProjectEvaluationsModule.createProjectEvaluation(createMockReq({
+    await ProjectEvaluationsModule.createProjectEvaluation(createMockReq({
       token,
       body: { projectName: "XX制造 WMS 项目", customerName: "XX制造", industry: "制造业" },
     }), createMockRes() as unknown as Response);
 
     const req = createMockReq({ token, query: { q: "XX制造" } });
     const res = createMockRes();
-    ProjectEvaluationsModule.listProjectEvaluations(req, res as unknown as Response);
+    await ProjectEvaluationsModule.listProjectEvaluations(req, res as unknown as Response);
 
     assert.equal(res.statusCode, 200);
     const body = res.body as { code: number; data: { items: Array<{ projectName: string }> } };
@@ -1276,7 +1296,7 @@ test("project-evaluations: lists project plans", () => {
 });
 
 test("project-evaluations: project containers do not replace latest formal global plan for WBS", async () => {
-  withFileSnapshotRestore(versionsStorePath(), () => {
+  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     const user = getActiveUser();
     const token = signAuthToken(user);
     fs.writeFileSync(versionsStorePath(), JSON.stringify({
@@ -1328,7 +1348,7 @@ test("project-evaluations: project containers do not replace latest formal globa
       ],
     }, null, 2), "utf-8");
 
-    ProjectEvaluationsModule.createProjectEvaluation(createMockReq({
+    await ProjectEvaluationsModule.createProjectEvaluation(createMockReq({
       token,
       body: { projectName: "最新项目容器", customerName: "XX制造" },
     }), createMockRes() as unknown as Response);
@@ -1338,7 +1358,7 @@ test("project-evaluations: project containers do not replace latest formal globa
     assert.match(items[0].taskName, /正式总方案/);
 
     const listRes = createMockRes();
-    ProjectEvaluationsModule.listProjectEvaluations(createMockReq({ token, query: { q: "遗留" } }), listRes as unknown as Response);
+    await ProjectEvaluationsModule.listProjectEvaluations(createMockReq({ token, query: { q: "遗留" } }), listRes as unknown as Response);
     const listBody = listRes.body as { data: { items: Array<{ projectName: string }> } };
     assert.ok(listBody.data.items.some((item) => item.projectName === "遗留项目容器"));
   });
@@ -2420,13 +2440,13 @@ test("delete-guard: 旧删除端点注入 checker 且无活跃 Run 时正常删�
   }
 });
 
-test("delete-guard: 无 checker 的旧同步 deleteSession 行为保持不变", () => {
+test("delete-guard: 无 checker 的旧同步 deleteSession 行为保持不变", async () => {
   const user = getActiveUser();
-  withFileSnapshotRestore(aiSessionsStorePath(), () => {
+  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
     const session = createAiSession(user, { title: "E1 旧行为会话" });
     const req = createMockReq({ token: getActiveUserToken(), params: { sessionId: session.sessionId } });
     const res = createMockRes();
-    AiSessionsModule.deleteSession(req, res as unknown as Response);
+    await AiSessionsModule.deleteSession(req, res as unknown as Response);
     assert.equal(res.statusCode, 200);
     assert.equal((res.body as { code: number }).code, 0);
     assert.equal(

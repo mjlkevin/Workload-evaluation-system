@@ -10,8 +10,8 @@ import {
   listExportHistoryByOwner,
 } from "./estimates.usecase";
 
-export function calculate(req: Request, res: Response) {
-  if (!requireRole(req, res, ["admin", "operator"])) return;
+export async function calculate(req: Request, res: Response) {
+  if (!(await requireRole(req, res, ["admin", "operator"]))) return;
 
   const body = req.body as CalculateRequest;
   const result = calculateEstimateOnly(body);
@@ -22,7 +22,7 @@ export function calculate(req: Request, res: Response) {
 }
 
 export async function calculateAndExport(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const body = req.body as CalculateRequest & { exportType?: "excel" | "pdf" };
@@ -35,7 +35,7 @@ export async function calculateAndExport(req: Request, res: Response) {
 }
 
 export async function exportExcel(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const body = req.body as CalculateRequest;
@@ -48,7 +48,7 @@ export async function exportExcel(req: Request, res: Response) {
 }
 
 export async function exportPdf(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const body = req.body as CalculateRequest;
@@ -60,8 +60,8 @@ export async function exportPdf(req: Request, res: Response) {
   return res.json(ok(result.data, result.requestId));
 }
 
-export function listExportHistory(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function listExportHistory(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const page = Math.max(1, Number(req.query.page || 1));
@@ -70,8 +70,8 @@ export function listExportHistory(req: Request, res: Response) {
   return res.json(ok({ page, pageSize, ...data }));
 }
 
-export function getActiveDependencyRules(req: Request, res: Response) {
-  if (!requireRole(req, res, ["admin", "operator"])) return;
+export async function getActiveDependencyRules(req: Request, res: Response) {
+  if (!(await requireRole(req, res, ["admin", "operator"]))) return;
   const data = getActiveImplementationDependencyRules();
   return res.json(ok(data));
 }

@@ -106,8 +106,9 @@ function isValidStatus(value: string): value is VersionCodeRuleStatus {
   return ["active", "draft", "disabled"].includes(value);
 }
 
-function requireAdmin(req: Request, res: Response) {
-  const auth = requireAuth(req, res);
+// 阶段 1 批 2：签名改 async；内部 await requireAuth（requireAuth 本身仍同步读 users.json，await 同步值不改变行为）。
+async function requireAdmin(req: Request, res: Response) {
+  const auth = await requireAuth(req, res);
   if (!auth) return null;
   if (!isAdminUser(auth.user)) {
     fail(res, 40301, "权限不足", [{ field: "role", reason: "admin_required" }]);
@@ -127,8 +128,8 @@ function sanitizeRule(rule: VersionCodeRule): VersionCodeRule {
   };
 }
 
-export function listVersionCodeRules(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function listVersionCodeRules(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
 
   const moduleKey = String(req.query.moduleKey || "").trim();
   const keyword = String(req.query.keyword || "").trim().toLowerCase();
@@ -160,8 +161,8 @@ export function listVersionCodeRules(req: Request, res: Response) {
   return res.json(ok({ items }, randomUUID()));
 }
 
-export function updateVersionCodeRuleConfig(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function updateVersionCodeRuleConfig(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
 
   const ruleId = String(req.params.ruleId || "").trim();
   const prefix = String(req.body?.prefix || "").trim().toUpperCase();
@@ -197,8 +198,8 @@ export function updateVersionCodeRuleConfig(req: Request, res: Response) {
   return res.json(ok({ item: sanitizeRule(target) }, randomUUID()));
 }
 
-export function activateVersionCodeRule(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function activateVersionCodeRule(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
 
   const ruleId = String(req.params.ruleId || "").trim();
   if (!ruleId) return fail(res, 40001, "参数错误", [{ field: "ruleId", reason: "required" }]);
@@ -219,8 +220,8 @@ export function activateVersionCodeRule(req: Request, res: Response) {
   return res.json(ok({ item: sanitizeRule(target) }, randomUUID()));
 }
 
-export function disableVersionCodeRule(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function disableVersionCodeRule(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
 
   const ruleId = String(req.params.ruleId || "").trim();
   if (!ruleId) return fail(res, 40001, "参数错误", [{ field: "ruleId", reason: "required" }]);
@@ -240,8 +241,8 @@ export function disableVersionCodeRule(req: Request, res: Response) {
   return res.json(ok({ item: sanitizeRule(target) }, randomUUID()));
 }
 
-export function getRequirementSystemConfig(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function getRequirementSystemConfig(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
   const store = loadRequirementSystemConfigStore();
   return res.json(
     ok(
@@ -258,7 +259,7 @@ export function getRequirementSystemConfig(req: Request, res: Response) {
 }
 
 export async function updateRequirementSystemConfigDraft(req: Request, res: Response) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const actor = auth.user.username;
   const payload = (req.body || {}) as Partial<RequirementSystemConfig> & {
@@ -314,8 +315,8 @@ export async function updateRequirementSystemConfigDraft(req: Request, res: Resp
   );
 }
 
-export function activateRequirementSystemConfig(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function activateRequirementSystemConfig(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
   const now = new Date().toISOString();
   const store = loadRequirementSystemConfigStore();
   store.active = normalizeRequirementSystemConfig(store.draft);
@@ -336,7 +337,7 @@ export function activateRequirementSystemConfig(req: Request, res: Response) {
 }
 
 export async function testRequirementKimiApiKey(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const body = (req.body || {}) as { apiKey?: string; model?: string };
   const explicit = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
   const explicitModel = typeof body.model === "string" ? body.model.trim() : "";
@@ -415,7 +416,7 @@ async function buildCredentialsHealth(): Promise<CredentialsHealth> {
 
 /** GET /requirement-settings/effective：每场景生效模型/来源/接线参数 + 凭据健康（T2） + 供应商目录摘要（RP-055） */
 export async function getRequirementSettingsEffective(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const active = loadRequirementSystemConfigStore().active;
   const credentials = await buildCredentialsHealth();
   const lastVerified = loadModelVerifyStatus();
@@ -496,7 +497,7 @@ function resolveScenarioApiKeyForTest(
 
 /** POST /requirement-settings/scenario-test { scenario, apiKey? }（RP-055：走场景绑定解析供应商/模型/凭据 scope） */
 export async function testScenarioModel(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const body = (req.body || {}) as { scenario?: string; apiKey?: string };
   const scenario = String(body.scenario || "").trim() as ModelScenarioKey;
   if (!MODEL_SCENARIO_KEYS.includes(scenario)) {
@@ -607,7 +608,7 @@ function findProviderOr404(res: Response, providerIdRaw: string) {
 
 /** PUT /requirement-settings/providers/:providerId/api-key { apiKey }：写入该供应商密钥（加密落库 + 审计） */
 export async function setProviderApiKey(req: Request, res: Response) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const found = findProviderOr404(res, String(req.params.providerId || ""));
   if (!found) return;
@@ -631,7 +632,7 @@ export async function setProviderApiKey(req: Request, res: Response) {
 
 /** DELETE /requirement-settings/providers/:providerId/api-key：清除该供应商密钥（DB + 审计） */
 export async function clearProviderApiKey(req: Request, res: Response) {
-  const auth = requireAdmin(req, res);
+  const auth = await requireAdmin(req, res);
   if (!auth) return;
   const found = findProviderOr404(res, String(req.params.providerId || ""));
   if (!found) return;
@@ -647,7 +648,7 @@ export async function clearProviderApiKey(req: Request, res: Response) {
 
 /** POST /requirement-settings/providers/:providerId/api-key/test { apiKey?, model? }：用该供应商 baseUrl 发最小真实请求 */
 export async function testProviderApiKey(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const found = findProviderOr404(res, String(req.params.providerId || ""));
   if (!found) return;
   const body = (req.body || {}) as { apiKey?: string; model?: string };
@@ -710,8 +711,8 @@ export async function testProviderApiKey(req: Request, res: Response) {
   }
 }
 
-export function getImplementationDependencyRules(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function getImplementationDependencyRules(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
   const store = loadImplementationDependencyRulesStore();
   return res.json(
     ok(
@@ -727,8 +728,8 @@ export function getImplementationDependencyRules(req: Request, res: Response) {
   );
 }
 
-export function updateImplementationDependencyRulesDraft(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function updateImplementationDependencyRulesDraft(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
   const payload = (req.body || {}) as Partial<ImplementationDependencyRulesConfig>;
   const now = new Date().toISOString();
   const store = loadImplementationDependencyRulesStore();
@@ -741,8 +742,8 @@ export function updateImplementationDependencyRulesDraft(req: Request, res: Resp
   return res.json(ok({ version: store.version, draft: store.draft, updatedAt: store.updatedAt }, randomUUID()));
 }
 
-export function activateImplementationDependencyRules(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function activateImplementationDependencyRules(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
   const now = new Date().toISOString();
   const store = loadImplementationDependencyRulesStore();
   store.active = normalizeImplementationDependencyRulesConfig(store.draft);
@@ -797,8 +798,8 @@ function toPublicKnowledgeBaseConfig(store: KnowledgeBaseConfigStore): Knowledge
   };
 }
 
-export function getKnowledgeBaseConfig(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function getKnowledgeBaseConfig(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
   const store = loadKnowledgeBaseConfigStore();
   return res.json(
     ok(
@@ -827,8 +828,8 @@ export function getKnowledgeBaseConfig(req: Request, res: Response) {
   );
 }
 
-export function updateKnowledgeBaseConfigDraft(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function updateKnowledgeBaseConfigDraft(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
   const payload = (req.body || {}) as {
     model?: string;
     apiBaseUrl?: string;
@@ -880,8 +881,8 @@ export function updateKnowledgeBaseConfigDraft(req: Request, res: Response) {
   );
 }
 
-export function activateKnowledgeBaseConfig(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function activateKnowledgeBaseConfig(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
   const now = new Date().toISOString();
   const store = loadKnowledgeBaseConfigStore();
   const validationIssues = validateKnowledgeBaseProfiles(store.draft.knowledgeBases);
@@ -985,8 +986,8 @@ const LEGACY_ROLE_LABELS: Record<string, string> = {
   user: "普通用户",
 };
 
-export function getRoleCapabilitiesMatrix(req: Request, res: Response) {
-  if (!requireAdmin(req, res)) return;
+export async function getRoleCapabilitiesMatrix(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
 
   const matrix = V2_ROLES.map((role) => ({
     role,
@@ -1018,7 +1019,7 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
   res: Response,
   fetcher: typeof fetch = globalThis.fetch,
 ) {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const body = (req.body || {}) as { apiKey?: string; knowledgeId?: string; profileId?: string };
   const explicitApiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
   const explicitKnowledgeId = typeof body.knowledgeId === "string" ? body.knowledgeId.trim() : "";

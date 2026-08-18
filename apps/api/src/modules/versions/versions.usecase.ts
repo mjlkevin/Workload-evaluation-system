@@ -95,8 +95,8 @@ function generateVersionCodeByRule(
   };
 }
 
-export function getVersion(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function getVersion(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const recordId = asString(req.params.id);
@@ -109,8 +109,8 @@ export function getVersion(req: Request, res: Response) {
   return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
 }
 
-export function listVersions(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function listVersions(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const type = asString(req.query.type);
@@ -131,8 +131,8 @@ export function listVersions(req: Request, res: Response) {
   return res.json(ok({ items }, randomUUID()));
 }
 
-export function createVersion(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function createVersion(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const body = req.body as {
@@ -217,8 +217,8 @@ export function createVersion(req: Request, res: Response) {
   return res.json(ok({ record: toPublicVersionRecord(record) }, randomUUID()));
 }
 
-export function updateVersionStatus(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function updateVersionStatus(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const recordId = asString(req.params.recordId);
@@ -284,8 +284,8 @@ function nextMajorLetter(letter: string): string {
 }
 
 /** POST /api/v1/versions/:id/checkout — 显式检出（排他锁） */
-export function checkoutVersion(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function checkoutVersion(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const recordId = asString(req.params.id);
@@ -329,8 +329,8 @@ export function checkoutVersion(req: Request, res: Response) {
 /**
  * PATCH /api/v1/versions/:id/save-draft — 检出态下保存草稿（仅更新 payload，不递增版本号、不检入）
  */
-export function saveCheckedOutDraft(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function saveCheckedOutDraft(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const recordId = asString(req.params.id);
@@ -368,8 +368,8 @@ export function saveCheckedOutDraft(req: Request, res: Response) {
 }
 
 /** POST /api/v1/versions/:id/checkin — 检入（释放锁，版本号自然数+1） */
-export function checkinVersion(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function checkinVersion(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const recordId = asString(req.params.id);
@@ -421,8 +421,8 @@ export function checkinVersion(req: Request, res: Response) {
 }
 
 /** POST /api/v1/versions/:id/undo-checkout — 撤销检出（丢弃修改，恢复到上次检入状态） */
-export function undoCheckout(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function undoCheckout(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const recordId = asString(req.params.id);
@@ -459,8 +459,8 @@ export function undoCheckout(req: Request, res: Response) {
 }
 
 /** POST /api/v1/versions/:id/promote — 升版（当前版本归档，创建新版本 VX1） */
-export function promoteVersion(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function promoteVersion(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const recordId = asString(req.params.id);
@@ -528,8 +528,8 @@ export function promoteVersion(req: Request, res: Response) {
 }
 
 /** PATCH /api/v1/versions/:id/force-unlock — 管理员强制解锁 */
-export function forceUnlockVersion(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin"]);
+export async function forceUnlockVersion(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin"]);
   if (!auth) return;
 
   const recordId = asString(req.params.id);
@@ -559,8 +559,8 @@ export function forceUnlockVersion(req: Request, res: Response) {
   return res.json(ok({ record: toPublicVersionRecord(target), unlockedBy: auth.user.username }, randomUUID()));
 }
 
-export function deleteVersion(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function deleteVersion(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
 
   const type = asString(req.params.type);

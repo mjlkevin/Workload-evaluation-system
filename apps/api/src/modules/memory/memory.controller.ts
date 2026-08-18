@@ -21,8 +21,14 @@ export type CreateMemoryRouterDeps = {
 // 导致有效 JWT 请求永远挂起（记忆面板生产恒空的第三层原因）。
 // 最小修复：薄包装为真正的 middleware——失败分支沿用 requireAuth 原有 401 响应，
 // 成功分支写 req.user 并 next()，鉴权语义零变更。
-function requireAuthMiddleware(req: Parameters<typeof requireAuth>[0], res: Parameters<typeof requireAuth>[1], next: () => void) {
-  const result = requireAuth(req, res);
+// 阶段 1 批 2：requireAuth 签名变异步，包装同步变异步；成功分支仍在微任务内
+// 写 req.user 后调 next()，Express 4 中间件语义零变更。
+async function requireAuthMiddleware(
+  req: Parameters<typeof requireAuth>[0],
+  res: Parameters<typeof requireAuth>[1],
+  next: () => void,
+) {
+  const result = await requireAuth(req, res);
   if (!result) return;
   req.user = result.user;
   next();

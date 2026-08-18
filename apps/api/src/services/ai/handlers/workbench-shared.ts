@@ -71,9 +71,10 @@ export function normalizeHomeMessages(value: unknown): HomeMessageInput[] {
     .filter((item) => item.content);
 }
 
-export function currentUserFromRequest(req: Request, res: Response): AuthUser | null {
+// 阶段 1 批 2：签名改 async；内部 await requireAuth（requireAuth 仍同步读 users.json，await 同步值不改变行为）。
+export async function currentUserFromRequest(req: Request, res: Response): Promise<AuthUser | null> {
   if (req.user) return req.user;
-  return requireAuth(req, res)?.user || null;
+  return (await requireAuth(req, res))?.user || null;
 }
 
 export function latestUserMessage(messages: HomeMessageInput[]): { role: "user"; content: string; attachments: HomeAttachmentInput[] } | null {

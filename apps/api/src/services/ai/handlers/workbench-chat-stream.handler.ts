@@ -43,7 +43,7 @@ import { runExplicitHomeReportFlow } from "./report-flow";
  */
 export async function homeWorkbenchChatStream(req: Request, res: Response) {
   const requestId = res.locals?.requestId || randomUUID();
-  const user = currentUserFromRequest(req, res);
+  const user = await currentUserFromRequest(req, res);
   if (!user) return;
 
   // 设置 SSE 头

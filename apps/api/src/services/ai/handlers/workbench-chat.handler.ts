@@ -31,7 +31,7 @@ import { runExplicitHomeReportFlow } from "./report-flow";
 
 export async function homeWorkbenchChat(req: Request, res: Response) {
   const requestId = res.locals?.requestId || randomUUID();
-  const user = currentUserFromRequest(req, res);
+  const user = await currentUserFromRequest(req, res);
   if (!user) return;
 
   const body = (req.body || {}) as { messages?: unknown; workflowKey?: unknown; sessionId?: unknown; clientAction?: unknown };

@@ -33,32 +33,32 @@ function handleResult(res: Response, result: UsecaseResult) {
   });
 }
 
-export function postTeam(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function postTeam(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, createTeam(auth.user, req.body || {}));
 }
 
-export function getUserTeams(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function getUserTeams(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, listUserTeams(auth.user));
 }
 
-export function getTeamDetail(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function getTeamDetail(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, getTeam(auth.user, String(req.params.teamId || "")));
 }
 
-export function postTeamMember(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function postTeamMember(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, addTeamMember(auth.user, String(req.params.teamId || ""), req.body || {}));
 }
 
-export function patchTeamMemberRole(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function patchTeamMemberRole(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(
     res,
@@ -66,20 +66,20 @@ export function patchTeamMemberRole(req: Request, res: Response) {
   );
 }
 
-export function deleteTeamMember(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function deleteTeamMember(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, removeTeamMember(auth.user, String(req.params.teamId || ""), String(req.params.userId || "")));
 }
 
-export function getPlans(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function getPlans(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, getTeamPlans(auth.user, String(req.params.teamId || "")));
 }
 
-export function patchPlanBinding(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function patchPlanBinding(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(
     res,
@@ -87,20 +87,20 @@ export function patchPlanBinding(req: Request, res: Response) {
   );
 }
 
-export function postReview(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function postReview(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, createReview(auth.user, String(req.params.teamId || ""), req.body || {}));
 }
 
-export function getReviews(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function getReviews(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, listReviews(auth.user, String(req.params.teamId || "")));
 }
 
-export function patchReviewStatus(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function patchReviewStatus(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(
     res,
@@ -108,14 +108,14 @@ export function patchReviewStatus(req: Request, res: Response) {
   );
 }
 
-export function getReviewComments(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function getReviewComments(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(res, listReviewComments(auth.user, String(req.params.teamId || ""), String(req.params.reviewId || "")));
 }
 
-export function postReviewComment(req: Request, res: Response) {
-  const auth = requireRoleWithAuth(req, res, ["admin", "operator"]);
+export async function postReviewComment(req: Request, res: Response) {
+  const auth = await requireRoleWithAuth(req, res, ["admin", "operator"]);
   if (!auth) return;
   return handleResult(
     res,

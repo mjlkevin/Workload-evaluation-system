@@ -130,8 +130,14 @@ export function resolveApiRoleFromUser(user: AuthUser): "admin" | "operator" {
 
 /**
  * 要求认证（返回用户信息或 null）
+ *
+ * 阶段 1 批 2：签名改 async（Promise<...|null>），函数体一字未动——
+ * 内部仍同步调用 loadUsersStore（其异步化属批 3），await 同步返回值不改变行为。
  */
-export function requireAuth(req: Request, res: Response): { payload: AuthJwtPayload; user: AuthUser } | null {
+export async function requireAuth(
+  req: Request,
+  res: Response
+): Promise<{ payload: AuthJwtPayload; user: AuthUser } | null> {
   const token = readBearerToken(req);
   if (!token) {
     res.status(401).json({
@@ -168,9 +174,10 @@ export function requireAuth(req: Request, res: Response): { payload: AuthJwtPayl
 
 /**
  * 要求特定角色
+ * 阶段 1 批 2：签名改 async；内部 await requireAuth。
  */
-export function requireRole(req: Request, res: Response, allowed: Array<"admin" | "operator">): boolean {
-  const auth = requireAuth(req, res);
+export async function requireRole(req: Request, res: Response, allowed: Array<"admin" | "operator">): Promise<boolean> {
+  const auth = await requireAuth(req, res);
   if (!auth) {
     return false;
   }
@@ -189,13 +196,14 @@ export function requireRole(req: Request, res: Response, allowed: Array<"admin" 
 
 /**
  * 要求特定角色并返回用户信息
+ * 阶段 1 批 2：签名改 async；内部 await requireAuth。
  */
-export function requireRoleWithAuth(
+export async function requireRoleWithAuth(
   req: Request,
   res: Response,
   allowed: Array<"admin" | "operator">
-): { payload: AuthJwtPayload; user: AuthUser } | null {
-  const auth = requireAuth(req, res);
+): Promise<{ payload: AuthJwtPayload; user: AuthUser } | null> {
+  const auth = await requireAuth(req, res);
   if (!auth) return null;
   const role = resolveApiRoleFromUser(auth.user);
   if (!allowed.includes(role)) {
