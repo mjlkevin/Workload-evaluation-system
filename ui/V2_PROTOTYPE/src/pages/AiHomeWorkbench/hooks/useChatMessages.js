@@ -30,6 +30,14 @@ const STREAM_EVENT_TYPES = {
   RUN_CANCELLED: 'run_cancelled',
 }
 
+// 前端插批（项二）：SSE 关闭后未收到终态事件的超时兜底阈值。
+// 基准是「连接关闭后未收到终态事件的时长」而非任务总时长：
+// 后台 Run 可能长时间运行，只要连接存活就不计时，不误杀长任务。
+// 取 10s：连接关闭后终态事件仍可能经 provider 重建订阅（退避基数 5s）
+// 从 cursor 重新投递，10s 覆盖一个重建周期；超时后只解锁前端状态
+// （清理 sending + 可见提示），绝不发起 cancel（G2/G4 硬口径不变）。
+const STREAM_CLOSE_TIMEOUT_MS = 10000
+
 /**
  * ISS-2026-08-09-003 C2（离页返回旧缓存渲染、AI 回复不显示）：后端 messages 为准的对账合并。
  * - 后端为空时保留本地视图（沿用旧守卫语义，避免空响应清屏）；
@@ -112,6 +120,13 @@ export default function useChatMessages(workbench) {
 
   const activeSessionKey = workbench.activeSession?.sessionId || ''
   const sending = sendingSessionKeys.includes(activeSessionKey)
+  // 前端插批（项二）：供 onClose/onError 回调与定时器读取最新状态的 ref
+  const activeSessionKeyRef = useRef(activeSessionKey)
+  activeSessionKeyRef.current = activeSessionKey
+  const sendingKeysRef = useRef(sendingSessionKeys)
+  sendingKeysRef.current = sendingSessionKeys
+  const streamCloseTimerRef = useRef(null)
+  const streamErrorNotifiedRef = useRef(false)
 
   function markSending(sessionKey, value) {
     setSendingSessionKeys((prev) => {
@@ -317,7 +332,13 @@ export default function useChatMessages(workbench) {
       case STREAM_EVENT_TYPES.RUN_COMPLETED:
       case STREAM_EVENT_TYPES.RUN_FAILED:
       case STREAM_EVENT_TYPES.RUN_CANCELLED: {
-        // 终态事件：清理 sending 状态与流式标记
+        // 终态事件：清理 sending 状态与流式标记；
+        // 前端插批（项二）：终态已收敛，撤销关闭超时兜底与错误提示闸门
+        if (streamCloseTimerRef.current) {
+          clearTimeout(streamCloseTimerRef.current)
+          streamCloseTimerRef.current = null
+        }
+        streamErrorNotifiedRef.current = false
         const sessionId = payload.sessionId || activeSessionKey
         if (sessionId) markSending(sessionId, false)
         // 终态可能先于最后一条 assistant 消息的 hydrate 到达（尤其是
@@ -382,13 +403,64 @@ export default function useChatMessages(workbench) {
   useRunEventStream(activeRunId, {
     onEvent: handleStreamEvent,
     onClose: () => {
-      // 连接关闭时清理流式标记（不清理 sending，等待终态事件或超时）
+      // 连接关闭时清理流式标记（不清理 sending，等待终态事件或下方超时兜底）
       streamingMessageIdRef.current = null
+      // 前端插批（项二）：实现注释承诺的超时兜底——连接关闭且未收到
+      // 终态事件时，经 STREAM_CLOSE_TIMEOUT_MS 自动清理 sending（输入框
+      // 恢复可用）并给出可见提示；期间终态事件到达会在上方终态分支
+      // 撤销定时器。窗口内不解锁，避免误清正在重建订阅重投递的终态。
+      if (streamCloseTimerRef.current) clearTimeout(streamCloseTimerRef.current)
+      const sessionKey = activeSessionKeyRef.current
+      if (!sessionKey || !sendingKeysRef.current.includes(sessionKey)) return
+      streamCloseTimerRef.current = setTimeout(() => {
+        streamCloseTimerRef.current = null
+        // 双保险：窗口内 sending 可能已被终态事件/旧链路清理
+        if (!sendingKeysRef.current.includes(sessionKey)) return
+        markSending(sessionKey, false)
+        setMessages((prev) => {
+          const finalized = prev.map((m) => ((m.loading || m.streaming)
+            ? { ...m, loading: false, streaming: false }
+            : m))
+          return [...finalized, {
+            id: `stream-interrupted-${Date.now()}`,
+            role: 'assistant',
+            text: '实时连接已中断，本轮结果未能接收。任务可能仍在后台运行，可稍后回到会话查看最新结果；如需继续对话可直接重新发送。',
+            error: true,
+            createdAt: new Date().toISOString(),
+          }]
+        })
+        sessionRuntimeStore.markSessionUnread(sessionKey, false)
+        // 重拉后端最新状态，让已落库的结果尽快收敛到消息区
+        workbenchRef.current?.loadSessions?.().catch(() => {})
+      }, STREAM_CLOSE_TIMEOUT_MS)
     },
     onError: () => {
-      // 错误时静默降级，不阻塞用户
+      // 前端插批（项二）：不再静默降级——发送中连接出错时给用户
+      // 可见的失败感知提示（同一次发送周期内只提示一次，闸门在
+      // sendMessage 起点与终态事件处重置）。
+      const sessionKey = activeSessionKeyRef.current
+      if (!sessionKey || !sendingKeysRef.current.includes(sessionKey)) return
+      if (streamErrorNotifiedRef.current) return
+      streamErrorNotifiedRef.current = true
+      setMessages((prev) => [...prev, {
+        id: `stream-error-${Date.now()}`,
+        role: 'assistant',
+        text: 'AI 任务实时连接异常，正在等待恢复；若长时间无响应，可尝试重新发送。',
+        error: true,
+        createdAt: new Date().toISOString(),
+      }])
     },
   })
+
+  // 前端插批（项二）：卸载时清理关闭超时定时器
+  useEffect(() => {
+    return () => {
+      if (streamCloseTimerRef.current) {
+        clearTimeout(streamCloseTimerRef.current)
+        streamCloseTimerRef.current = null
+      }
+    }
+  }, [])
 
   function chooseFile() {
     fileInputRef.current?.click()
@@ -465,6 +537,8 @@ export default function useChatMessages(workbench) {
     // O8：重置流式状态
     streamingMessageIdRef.current = null
     processedSequencesRef.current.clear()
+    // 前端插批（项二）：新发送周期重置错误提示闸门
+    streamErrorNotifiedRef.current = false
 
     setMessages((prev) => [...prev, userMessage, loadingMessage])
     workbench.setComposer('')
