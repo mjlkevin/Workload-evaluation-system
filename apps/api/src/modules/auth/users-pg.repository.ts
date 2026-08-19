@@ -17,11 +17,15 @@
 //  - 冷启动首次读全表（users 规模 ~40 行）填充；其后全部读路径命中缓存，
 //    认证请求零 DB 往返。
 //  - 失效时机：任何写路径（状态/角色/业务角色/密码/lastLogin/新增用户）
-//    落库成功后立即写穿更新缓存——进程内不存在失效窗口；
+//    落库成功后立即写穿更新缓存——本副本内不存在失效窗口；
 //    resetUsersCache() 供测试与运维强制回源。
-//  - 多副本部署：缓存为进程级，副本间无主动失效（写副本立即一致，其余
-//    副本滞留至重启）。当前单副本部署可接受；多副本前须补 LISTEN/NOTIFY
-//    或 TTL（已作为未来项随 handoff 登记）。
+//  - 有界 TTL（防御性改造，架构侧 2026-08-19 建议）：缓存满 cacheTtlMs
+//    （缺省 60s）后下一次读回源重建。代价为每进程每 TTL 一次全表查询
+//    （~40 行，毫秒级），把多副本失效模式从「永久分歧」降级为「短暂陈旧」。
+//    TTL 判定用主机时钟（非持久化用途，不违反范式 #4——该范式只约束落库时间）。
+//  - 多副本部署：写副本立即一致，其余副本最长滞后一个 TTL（≤60s）后自愈；
+//    旧版本无 TTL 时是永久分歧（副本 B 注册的用户在副本 A 永远查不到，
+//    直至重启）。部署约束已同步写入 docs/DEPLOYMENT.md。
 
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
@@ -109,9 +113,13 @@ class UsernameConflictSentinel extends Error {
   }
 }
 
-export function createUsersPgRepository(dbInstance: Database = db): UsersPgRepository {
-  // 写穿缓存：null = 冷（未加载）；非 null = 热（读路径不再回源）
+/** 缓存 TTL 缺省值：每进程每 60s 最多一次全表回源 */
+export const USERS_CACHE_TTL_MS = 60_000;
+
+export function createUsersPgRepository(dbInstance: Database = db, cacheTtlMs: number = USERS_CACHE_TTL_MS): UsersPgRepository {
+  // 写穿缓存：null = 冷（未加载）；非 null = 热（读路径不再回源，直至 TTL 到期）
   let cache: Map<string, AuthUser> | null = null;
+  let cacheLoadedAt = 0;
 
   function writeThrough(user: AuthUser): void {
     cache?.set(user.id, user);
@@ -122,11 +130,12 @@ export function createUsersPgRepository(dbInstance: Database = db): UsersPgRepos
     const rows = await dbInstance.select().from(users);
     const loaded = rows.map(toAuthUser);
     cache = new Map(loaded.map((user) => [user.id, user]));
+    cacheLoadedAt = Date.now(); // 主机时钟仅用于 TTL 判定，不落库
     return loaded;
   }
 
   async function ensureLoaded(): Promise<Map<string, AuthUser>> {
-    if (!cache) await loadAll();
+    if (!cache || Date.now() - cacheLoadedAt >= cacheTtlMs) await loadAll();
     return cache!;
   }
 
