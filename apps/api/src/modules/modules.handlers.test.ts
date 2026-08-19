@@ -5,11 +5,12 @@ import XLSX from "xlsx";
 import bcrypt from "bcryptjs";
 
 import { NextFunction, Request, Response } from "express";
+import { Pool } from "pg";
 
 import { AuthUser } from "../types";
 import { config } from "../config/env";
 import { loadUsersStore, saveUsersStore, signAuthToken, verifyAuthToken } from "../middleware/auth";
-import { aiSessionsStorePath, knowledgeBaseConfigStorePath, passwordResetTokensStorePath, usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
+import { aiSessionsStorePath, knowledgeBaseConfigStorePath, usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
 import { confirmPasswordReset, listUsers, login, me, requestPasswordReset, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
@@ -451,9 +452,15 @@ test("auth.usecase: updateUserPassword lets an admin reset login password", asyn
   });
 });
 
-test("auth.usecase: password reset request and confirm update password once", async () => {
-  await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
-    await withFileSnapshotRestoreAsync(passwordResetTokensStorePath(), async () => {
+test("auth.usecase: password reset request and confirm update password once", { skip: !process.env.TEST_DATABASE_URL }, async () => {
+  // 阶段 2 批 1 第 4 步：重置令牌已切 PG（JSON 读写路径删除），文件快照改为
+  // PG 行级清理（同 auth-pg.repository.test 约定）；users 域未迁移，快照保留。
+  const cleanupPool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const cleanupTokens = () =>
+    cleanupPool.query("DELETE FROM password_reset_tokens WHERE username = 'ut-password-reset-target'");
+  await cleanupTokens();
+  try {
+    await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
       const target: AuthUser = {
         id: "ut-password-reset-target",
         username: "ut-password-reset-target",
@@ -510,7 +517,10 @@ test("auth.usecase: password reset request and confirm update password once", as
       assert.equal(reuseRes.statusCode, 400);
       assert.equal((reuseRes.body as { code?: number }).code, 40001);
     });
-  });
+  } finally {
+    await cleanupTokens();
+    await cleanupPool.end();
+  }
 });
 
 test("auth.usecase: listUsers follows role branch", async () => {

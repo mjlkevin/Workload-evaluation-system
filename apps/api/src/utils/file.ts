@@ -59,19 +59,8 @@ export function usersStorePath(): string {
   return path.resolve(resolveRootDir(), "config/auth/users.json");
 }
 
-/**
- * 邀请码存储路径
- */
-export function inviteCodesStorePath(): string {
-  return path.resolve(resolveRootDir(), "config/auth/invite-codes.json");
-}
-
-/**
- * 密码重置令牌存储路径
- */
-export function passwordResetTokensStorePath(): string {
-  return path.resolve(resolveRootDir(), "config/auth/password-reset-tokens.json");
-}
+// 阶段 2 批 1 第 4 步：inviteCodesStorePath / passwordResetTokensStorePath
+// 已随 JSON 读写路径删除（邀请码与重置令牌切 PG）。
 
 /**
  * 版本存储路径

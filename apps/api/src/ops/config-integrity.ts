@@ -27,11 +27,8 @@ const REQUIRED_FILES: Array<{
     validate: (value) => typeof value === "object" && value !== null && Array.isArray((value as { users?: unknown[] }).users),
     fallback: { users: [] },
   },
-  {
-    relativePath: "config/auth/invite-codes.json",
-    validate: (value) => typeof value === "object" && value !== null && Array.isArray((value as { codes?: unknown[] }).codes),
-    fallback: { codes: [] },
-  },
+  // 阶段 2 批 1 第 4 步：invite-codes.json 已切 PG 并归档，不再列入完整性检查
+  // （否则 fallback 会重建空文件，形成误导性双源）。
   {
     relativePath: "config/versions/records.json",
     validate: (value) => typeof value === "object" && value !== null && Array.isArray((value as { records?: unknown[] }).records),

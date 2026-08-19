@@ -224,9 +224,8 @@ export type InviteCodeRecord = {
   usedByUsername?: string;
 };
 
-export type InviteCodesStore = {
-  codes: InviteCodeRecord[];
-};
+// 阶段 2 批 1 第 4 步：InviteCodesStore / PasswordResetTokensStore 整存结构
+// 已随 JSON 读写路径删除（邀请码与重置令牌切 PG，行级记录类型保留）。
 
 export type PasswordResetTokenRecord = {
   id: string;
@@ -237,10 +236,6 @@ export type PasswordResetTokenRecord = {
   createdAt: string;
   expiresAt: string;
   usedAt?: string;
-};
-
-export type PasswordResetTokensStore = {
-  tokens: PasswordResetTokenRecord[];
 };
 
 export type AuthJwtPayload = {
