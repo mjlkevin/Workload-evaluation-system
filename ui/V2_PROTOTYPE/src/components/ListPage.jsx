@@ -7,9 +7,20 @@ import PageShell from './Layout/PageShell.jsx'
  * 行交互（PB-R1 标准）:
  *  - 单击：单选当前行（清除其他）
  *  - ⌘/Ctrl + 单击：toggle 当前行
- *  - Shift + 单击：从锚点区间选择
+ *  - Shift + 单击：从锚点区间选择（限当前页可见行）
  *  - 双击：onRowClick(row) — 通常用于跳转详情
  *  - checkbox 点击：toggle 单条（不影响其他）
+ *
+ * 分页契约（前端插批，替代原 12 行硬截断）:
+ *  - 客户端分页，默认每页 pageSize=10，无虚拟滚动：列表数据为
+ *    用户创建的业务记录（几十至几百条），页内全量渲染代价可忽略；
+ *    且四种选择交互依赖 DOM 行稳定存在，虚拟滚动会使 Shift 范围选择
+ *    与可访问性复杂化，收益不成立。
+ *  - 底部始终显示「共 N 条 · 显示 a-b」，让用户知道数据存在。
+ *  - 跨页选择结论：**切页保留选中**。selected 以行键集合跨页存活，
+ *    工具栏计数与批量操作（onBulkAction 收到全部选中行）跨页累计；
+ *    表头全选 checkbox 只作用于当前页；搜索/筛选使结果集缩小导致
+ *    当前页越界时自动钳制回有效页。
  *
  * filterTags:
  *  - { key, label, predicate?(row): bool }
@@ -33,6 +44,7 @@ export default function ListPage({
   emptyIcon = '📭',
   emptyAction,
   rowKey = 'id',
+  pageSize = 10,
   onRowClick,
   bulkActions = [
     { key: 'preview', label: '👁 预览', mode: 'single' },
@@ -48,6 +60,7 @@ export default function ListPage({
   const [anchorId, setAnchorId] = useState(null)
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   // ---------- filter + search ----------
   const filtered = useMemo(() => {
@@ -66,15 +79,25 @@ export default function ListPage({
         })
       )
     }
-    return rows.slice(0, 12)
+    return rows
   }, [data, search, columns, activeFilter, filterTags])
 
-  // ---------- selection (PB-R1 标准) ----------
+  // ---------- 分页（前端插批：去除 slice(0, 12) 硬截断） ----------
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  // 结果集缩小（搜索/筛选/外部删除）导致越界时钳制回有效页
+  const currentPage = Math.min(page, totalPages)
+  const pageRows = useMemo(
+    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filtered, currentPage, pageSize]
+  )
+
+  // ---------- selection (PB-R1 标准；跨页保留选中) ----------
   const handleRowClick = useCallback(
     (e, row, idx) => {
       // checkbox 自身的 onClick 已 stopPropagation，这里只处理 cell click
       const id = row[rowKey]
-      const visibleIds = filtered.map((r) => r[rowKey])
+      // Shift 范围选择限当前页可见行
+      const visibleIds = pageRows.map((r) => r[rowKey])
 
       if (e.shiftKey && anchorId !== null && visibleIds.includes(anchorId)) {
         const a = visibleIds.indexOf(anchorId)
@@ -96,7 +119,7 @@ export default function ListPage({
         setAnchorId(id)
       }
     },
-    [filtered, anchorId, rowKey]
+    [pageRows, anchorId, rowKey]
   )
 
   const toggleOne = useCallback(
@@ -113,8 +136,16 @@ export default function ListPage({
   )
 
   const selectAll = (checked) => {
-    setSelected(new Set(checked ? filtered.map((r) => r[rowKey]) : []))
-    setAnchorId(checked && filtered.length ? filtered[0][rowKey] : null)
+    // 全选只作用于当前页；跨页已选不受影响
+    setSelected((prev) => {
+      const next = new Set(prev)
+      pageRows.forEach((r) => {
+        if (checked) next.add(r[rowKey])
+        else next.delete(r[rowKey])
+      })
+      return next
+    })
+    setAnchorId(checked && pageRows.length ? pageRows[0][rowKey] : null)
   }
 
   const clearSelection = () => {
@@ -125,6 +156,7 @@ export default function ListPage({
   // ---------- bulk action handler ----------
   const triggerBulk = (action) => {
     if (onBulkAction) {
+      // 跨页选择保留：批量操作覆盖全部选中行，不限当前页
       const rows = filtered.filter((r) => selected.has(r[rowKey]))
       onBulkAction(action.key, rows)
     } else {
@@ -134,6 +166,8 @@ export default function ListPage({
 
   const selCount = selected.size
   const showFloat = selCount > 0
+  const rangeStart = filtered.length ? (currentPage - 1) * pageSize + 1 : 0
+  const rangeEnd = Math.min(currentPage * pageSize, filtered.length)
 
   return (
     <PageShell crumb={crumb} title={title} subtitle={subtitle} actions={actions}>
@@ -355,7 +389,7 @@ export default function ListPage({
                   <input
                     type="checkbox"
                     aria-label="选择当前结果"
-                    checked={filtered.length > 0 && filtered.every((r) => selected.has(r[rowKey]))}
+                    checked={pageRows.length > 0 && pageRows.every((r) => selected.has(r[rowKey]))}
                     onChange={(e) => selectAll(e.target.checked)}
                   />
                 </th>
@@ -381,7 +415,7 @@ export default function ListPage({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row, idx) => {
+              {pageRows.map((row, idx) => {
                 const isSel = selected.has(row[rowKey])
                 return (
                   <tr
@@ -431,7 +465,7 @@ export default function ListPage({
         </div>
       ) : null}
 
-      {/* pager */}
+      {/* pager — 前端插批：真实分页控件，始终显示总数 */}
       {!loading && !error && <div
         style={{
           display: 'flex',
@@ -443,12 +477,28 @@ export default function ListPage({
           color: 'var(--ink-3)',
         }}
       >
-        <span>共 {data.length} 条 · 显示 {filtered.length}{showFloat && ` · 已选 ${selCount}`}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button type="button" className="btn btn-ghost" style={{ height: 26, padding: '0 8px', fontSize: 12 }}>‹</button>
-          <span>1 / 1</span>
-          <button type="button" className="btn btn-ghost" style={{ height: 26, padding: '0 8px', fontSize: 12 }}>›</button>
+        <span>
+          共 {data.length} 条{filtered.length < data.length && `（筛选后 ${filtered.length} 条）`} · 显示 {rangeStart}-{rangeEnd}{showFloat && ` · 已选 ${selCount}`}
         </span>
+        {filtered.length > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {totalPages > 1 && <button
+            type="button"
+            aria-label="上一页"
+            className="btn btn-ghost"
+            style={{ height: 26, padding: '0 8px', fontSize: 12 }}
+            disabled={currentPage <= 1}
+            onClick={() => setPage(currentPage - 1)}
+          >‹</button>}
+          <span>{currentPage} / {totalPages}</span>
+          {totalPages > 1 && <button
+            type="button"
+            aria-label="下一页"
+            className="btn btn-ghost"
+            style={{ height: 26, padding: '0 8px', fontSize: 12 }}
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage(currentPage + 1)}
+          >›</button>}
+        </span>}
       </div>}
       </div>
 
