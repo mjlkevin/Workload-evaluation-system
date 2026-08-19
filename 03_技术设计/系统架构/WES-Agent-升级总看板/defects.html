@@ -4,78 +4,58 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>缺陷池 · WES 项目管理</title>
-  <link rel="stylesheet" href="assets/fonts/fonts.css?v=20260808" />
-  <link rel="stylesheet" href="assets/base.css?v=20260808" />
-  <link rel="stylesheet" href="assets/components.css?v=20260808" />
-  <link rel="stylesheet" href="assets/pages.css?v=20260808" />
+  <link rel="stylesheet" href="assets/fonts/fonts.css" />
+  <link rel="stylesheet" href="assets/base.css" />
+  <link rel="stylesheet" href="assets/components.css" />
+  <link rel="stylesheet" href="assets/pages.css" />
 </head>
-<body>  <header class="topnav">
-    <div class="topnav-in">
-      <a class="brand" href="index.html"><span class="logo">W</span><span>WES 项目管理</span></a>
-      <nav class="navlinks" aria-label="主导航">
+<body><aside class="sidebar" id="sidebar">
+    <a class="sidebar-brand" href="index.html">
+      <span style="display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--brand-soft);color:var(--brand);font-weight:900;font-size:14px;">W</span>
+      <span>WES 项目管理</span>
+    </a>
+    <nav class="sidebar-nav" aria-label="主导航">
         <a href="index.html">总览</a>
-        <div class="nav-group">
-          <button type="button" class="nav-group-btn" aria-expanded="false">计划与设计<span class="caret" aria-hidden="true"></span></button>
-          <div class="nav-drop">
-          <a href="roadmap.html">路标管理</a>
-          <a href="design.html">设计说明</a>
-          <a href="design-architecture.html">架构设计</a>
-          <a href="plan.html">计划与进度</a>
-          <a href="requirements.html">需求池</a>
-          <a href="special-projects.html">专项计划</a>
-          </div>
-        </div>
-        <div class="nav-group has-active">
-          <button type="button" class="nav-group-btn" aria-expanded="false">质量与监控<span class="caret" aria-hidden="true"></span></button>
-          <div class="nav-drop">
-          <a href="testing.html">测试与验收</a>
-          <a href="monitoring.html">监控与审计</a>
-          <a href="risks.html">风险与决策</a>
-          <a href="changes.html">变更记录</a>
-          <a href="issues.html">问题池</a>
-          <a class="active" href="defects.html">缺陷池</a>
-          <a href="ops-health.html">运维看板</a>
-          <a href="code-audit.html">代码审计</a>
-          </div>
-        </div>
-        <div class="nav-group">
-          <button type="button" class="nav-group-btn" aria-expanded="false">AI 与协作<span class="caret" aria-hidden="true"></span></button>
-          <div class="nav-drop">
-          <a href="runtime.html">AI 任务执行</a>
-          <a href="collaboration-protocol.html">多 AI 协作</a>
-          <a href="branches.html">开发分支</a>
-          <a href="skill.html">Skill 体系</a>
-          </div>
-        </div>
-        <div class="nav-group">
-          <button type="button" class="nav-group-btn" aria-expanded="false">资料资产<span class="caret" aria-hidden="true"></span></button>
-          <div class="nav-drop">
-          <a href="sources.html">信息来源</a>
-          <a href="github-radar.html">开源工具雷达</a>
-          </div>
-        </div>
-            </nav>
-            <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
-      <span class="pill brand">RP-047 Batch E · 已交付合入 / 1H-C 规划中</span>
+        <a href="roadmap.html">路标管理</a>
+        <a href="design.html">设计说明</a>
+        <a href="runtime.html">任务运行时</a>
+        <a href="plan.html">计划与进度</a>
+        <a href="testing.html">测试</a>
+        <a href="monitoring.html">监控与审计</a>
+        <a href="ops-health.html">运维看板</a>
+        <a href="risks.html">风险与决策</a>
+        <a href="changes.html">变更记录</a>
+        <a href="sources.html">文档事实源</a>
+        <a href="collaboration-protocol.html">协作协议</a>
+        <a href="branches.html">分支拓扑</a>
+        <a href="issues.html">问题池</a>
+        <a class="active" href="defects.html">缺陷池</a>
+        <a href="requirements.html">需求池</a>
+    </nav>
+    <div style="flex:1"></div>
+    <div class="sidebar-pill">
+      <span class="pill brand">Work Item Triage</span>
+      <span class="pill">Issue → Defect / Requirement</span>
     </div>
-  </header>
-<button class="sidebar-toggle" id="sidebarToggle" aria-label="菜单">☰</button>
+  </aside>
+  <button class="sidebar-toggle" id="sidebarToggle" aria-label="菜单">☰</button>
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="main-content">
 <main>
     <div class="doc-h">
       <div class="wrap">
-        <div class="crumb">已确认缺陷的处理与复验</div>
+        <div class="crumb">Defect Governance</div>
         <h1>缺陷池</h1>
         <div class="meta">
           <span><b>定位</b> 已分析确认的错误行为、回归和质量缺口</span>
           <span><b>来源</b> 只从问题池或测试失败分流，不直接接收未定性原始反馈</span>
-          <span><b>更新日期</b> 2026-08-12</span>
+          <span><b>更新日期</b> 2026-08-19</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">23 个缺陷</span>
+          <span class="pill brand">17 缺陷</span>
           <span class="pill warn">1 待修复 / 返工</span>
-          <span class="pill ok">16 个已完成修复</span>
-          <span class="pill warn">13 个等待人工复核</span>
+          <span class="pill ok">16 已修复</span>
+          <span class="pill warn">13 人工待复核</span>
         </div>
       </div>
     </div>
@@ -83,12 +63,12 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">01 / 缺陷处理流程</div>
+          <div class="num">01 / Defect Lifecycle</div>
           <h2>缺陷生命周期</h2>
-          <p>每个缺陷都必须保留原始问题来源，并依次完成复现、修复、回归测试和人工复核；新能力需求使用另一套状态，不与缺陷混在一起。</p>
+          <p>缺陷必须保留 Issue 来源，按复现、修复、回归、人工复核关闭，不与新能力需求共用同一状态轴。</p>
         </div>
         <div class="lifecycle">
-          <div class="lifecycle-step"><span class="ls-num">01</span><b>原始问题</b><small>用户反馈 / 测试失败 / 截图证据</small></div>
+          <div class="lifecycle-step"><span class="ls-num">01</span><b>来源 Issue</b><small>用户反馈 / 测试失败 / 截图证据</small></div>
           <div class="lifecycle-step"><span class="ls-num">02</span><b>复现</b><small>实际结果、期望结果、影响范围</small></div>
           <div class="lifecycle-step"><span class="ls-num">03</span><b>修复</b><small>最小补丁与边界说明</small></div>
           <div class="lifecycle-step"><span class="ls-num">04</span><b>回归</b><small>自动化和必要人工复核</small></div>
@@ -99,314 +79,230 @@
     <section>
       <div class="wrap">
         <div class="sec-head">
-          <div class="num">02 / 缺陷清单</div>
+          <div class="num">02 / Defect Ledger</div>
           <h2>缺陷台账</h2>
-          <p>这里只记录“已有能力没有达到预期”的问题；需要新增能力的事项进入需求池。</p>
+          <p>缺陷台账聚焦已有能力不符合预期的事实，不承载新能力设计。</p>
         </div>
-        <div class="tbl-block">
-        <div class="tbl-tools">
-          <input class="tbl-search" type="search" placeholder="搜索 ID / 标题 / 内容…" aria-label="搜索表格" />
-          <select class="tbl-filter" aria-label="按状态筛选"><option value="">全部状态</option></select>
-          <span class="tbl-count" aria-live="polite"></span>
-          <nav class="tbl-pager" aria-label="表格分页">
-            <button type="button" class="tbl-page-btn" data-pg="prev" aria-label="上一页">‹</button>
-            <span class="tbl-page-info">1 / 1</span>
-            <button type="button" class="tbl-page-btn" data-pg="next" aria-label="下一页">›</button>
-          </nav>
-        </div>
-        <div class="table-scroll">
-        <table id="tbl-defects" data-board-table data-mode="full" data-page-size="10" data-filter-col="5">
-          <thead>
-            <tr><th>缺陷 ID</th><th>原始问题</th><th>关联需求</th><th>标题</th><th>严重程度</th><th>状态</th><th>影响范围</th><th>修复要求</th><th>自动验证</th><th>人工验收</th></tr>
-          </thead>
-          <tbody class="tbody">
+        <table>
+          <tr><th>缺陷 ID</th><th>来源 Issue</th><th>关联 RP</th><th>标题</th><th>等级</th><th>状态</th><th>影响范围</th><th>修复口径</th><th>验证</th><th>验收</th></tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-02-001</td>
-              <td class="mono tc-1">ISS-2026-07-02-001</td>
-              <td class="mono tc-2">RP-037</td>
-              <td class="tc-3">登录态过期仍进入系统壳子</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复</span></td>
-              <td class="tc-6">V2 前端路由鉴权 / AI 工作台 Shell</td>
-              <td class="tc-7">新增业务路由 AuthGate、JWT exp 预检、/auth/me 校验和过期 token 清理。</td>
-              <td class="tc-8">AppAuthGuard 红绿闭环；HomeWorkspace 登录过期聚焦 1/1；Login 3/3；V2 全量 101/101；build:web pass。</td>
-              <td class="tc-9">已验证并关闭，保留缺陷来源用于统计。</td>
+              <td class="mono">DEF-2026-07-02-001</td>
+              <td class="mono">ISS-2026-07-02-001</td>
+              <td class="mono">RP-037</td>
+              <td>登录态过期仍进入系统壳子</td>
+              <td>S2</td>
+              <td><span class="status done"><span class="dot"></span>fixed</span></td>
+              <td>V2 前端路由鉴权 / AI 工作台 Shell</td>
+              <td>新增业务路由 AuthGate、JWT exp 预检、/auth/me 校验和过期 token 清理。</td>
+              <td>AppAuthGuard 红绿闭环；HomeWorkspace 登录过期聚焦 1/1；Login 3/3；V2 全量 101/101；build:web pass。</td>
+              <td>已验证并关闭，保留缺陷来源用于统计。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-03-001</td>
-              <td class="mono tc-1">ISS-2026-07-03-001</td>
-              <td class="mono tc-2">RP-029</td>
-              <td class="tc-3">附件解析场景流式体验未覆盖</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">AI 工作台附件解析 / parse-basic-info / SSE 展示</td>
-              <td class="tc-7">待补附件解析流式接线、真实 text/event-stream 分块渲染回归和真实 Kimi 人工验收。</td>
-              <td class="tc-8">当前为人工验收反证，chat stream 自动化不足以关闭附件解析流式缺陷。</td>
-              <td class="tc-9">待返工 / 待补测。</td>
+              <td class="mono">DEF-2026-07-03-001</td>
+              <td class="mono">ISS-2026-07-03-001</td>
+              <td class="mono">RP-029</td>
+              <td>附件解析场景流式体验未覆盖</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>AI 工作台附件解析 / parse-basic-info / SSE 展示</td>
+              <td>待补附件解析流式接线、真实 text/event-stream 分块渲染回归和真实 Kimi 人工验收。</td>
+              <td>当前为人工验收反证，chat stream 自动化不足以关闭附件解析流式缺陷。</td>
+              <td>待返工 / 待补测。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-03-002</td>
-              <td class="mono tc-1">ISS-2026-07-03-002</td>
-              <td class="mono tc-2">RP-038</td>
-              <td class="tc-3">元问题意图识别缺失导致答非所问</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">workbench-intent.service.ts / workbench-dispatch.service.ts</td>
-              <td class="tc-7">新增 meta_question 意图、META_QUESTION_PATTERNS、模型分类提示词定义和 buildMetaQuestionResponse()。</td>
-              <td class="tc-8">intent + dispatch 聚焦 53/53 通过；build:api pass；test:modules 当前 145/146，剩余失败为既有 RP-029 断连测试。</td>
-              <td class="tc-9">真实会话人工复核待回填。</td>
+              <td class="mono">DEF-2026-07-03-002</td>
+              <td class="mono">ISS-2026-07-03-002</td>
+              <td class="mono">RP-038</td>
+              <td>元问题意图识别缺失导致答非所问</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>workbench-intent.service.ts / workbench-dispatch.service.ts</td>
+              <td>新增 meta_question 意图、META_QUESTION_PATTERNS、模型分类提示词定义和 buildMetaQuestionResponse()。</td>
+              <td>intent + dispatch 聚焦 53/53 通过；build:api pass；test:modules 当前 145/146，剩余失败为既有 RP-029 断连测试。</td>
+              <td>真实会话人工复核待回填。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-03-003</td>
-              <td class="mono tc-1">ISS-2026-07-03-003</td>
-              <td class="mono tc-2">RP-039</td>
-              <td class="tc-3">附件问答紧凑 Markdown 和下一步动作闭环缺陷</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">AiHomeWorkbench.jsx Markdown parser / option action inference</td>
-              <td class="tc-7">规范化紧凑管道表格和紧凑下一步建议，并为概览预览 / 需求解析报告 v1 推断 generate_requirement_report 动作。</td>
-              <td class="tc-8">HomeWorkspace.test.jsx 51/51；V2 全量 102/102；build:web pass。</td>
-              <td class="tc-9">真实会话人工复核待回填。</td>
+              <td class="mono">DEF-2026-07-03-003</td>
+              <td class="mono">ISS-2026-07-03-003</td>
+              <td class="mono">RP-039</td>
+              <td>附件问答紧凑 Markdown 和下一步动作闭环缺陷</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>AiHomeWorkbench.jsx Markdown parser / option action inference</td>
+              <td>规范化紧凑管道表格和紧凑下一步建议，并为概览预览 / 需求解析报告 v1 推断 generate_requirement_report 动作。</td>
+              <td>HomeWorkspace.test.jsx 51/51；V2 全量 102/102；build:web pass。</td>
+              <td>真实会话人工复核待回填。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-04-001</td>
-              <td class="mono tc-1">ISS-2026-07-04-001</td>
-              <td class="mono tc-2">RP-039</td>
-              <td class="tc-3">generic confirm_write_action 点击无响应</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">AiHomeWorkbench.jsx suggestedActions / confirmPendingAction</td>
-              <td class="tc-7">为非 create_project_evaluation 的确认类写动作增加可见兜底反馈，并让 suggestedActions 中 confirm_write_action / requiresConfirm 进入 confirmPendingAction，避免按钮点击静默无效。</td>
-              <td class="tc-8">HomeWorkspace.test.jsx 新增 generic write-action 红绿回归；聚焦测试 pass。</td>
-              <td class="tc-9">待用户在真实 session be9c045e-29d1-4747-8106-4c1f4c0a3a12 复核“确认执行写动作”点击后可见明确反馈。</td>
+              <td class="mono">DEF-2026-07-04-001</td>
+              <td class="mono">ISS-2026-07-04-001</td>
+              <td class="mono">RP-039</td>
+              <td>generic confirm_write_action 点击无响应</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>AiHomeWorkbench.jsx suggestedActions / confirmPendingAction</td>
+              <td>为非 create_project_evaluation 的确认类写动作增加可见兜底反馈，并让 suggestedActions 中 confirm_write_action / requiresConfirm 进入 confirmPendingAction，避免按钮点击静默无效。</td>
+              <td>HomeWorkspace.test.jsx 新增 generic write-action 红绿回归；聚焦测试 pass。</td>
+              <td>待用户在真实 session be9c045e-29d1-4747-8106-4c1f4c0a3a12 复核“确认执行写动作”点击后可见明确反馈。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-04-002</td>
-              <td class="mono tc-1">ISS-2026-07-04-002</td>
-              <td class="mono tc-2">RP-026</td>
-              <td class="tc-3">邀请成员按钮未绑定生成邀请码动作</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">UserManagement.jsx 用户管理工具栏 / 邀请成员</td>
-              <td class="tc-7">为“+ 邀请成员”绑定 /auth/invite-codes/generate，生成中禁用按钮，成功后展示成员邀请码弹窗，失败时展示错误反馈。</td>
-              <td class="tc-8">UserManagement.test.jsx 新增邀请成员红绿回归；聚焦 1/1 与文件内 5/5 通过。</td>
-              <td class="tc-9">待用户在 http://localhost:3004/users 点击“+ 邀请成员”复核弹窗和邀请码可见。</td>
+              <td class="mono">DEF-2026-07-04-002</td>
+              <td class="mono">ISS-2026-07-04-002</td>
+              <td class="mono">RP-026</td>
+              <td>邀请成员按钮未绑定生成邀请码动作</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>UserManagement.jsx 用户管理工具栏 / 邀请成员</td>
+              <td>为“+ 邀请成员”绑定 /auth/invite-codes/generate，生成中禁用按钮，成功后展示成员邀请码弹窗，失败时展示错误反馈。</td>
+              <td>UserManagement.test.jsx 新增邀请成员红绿回归；聚焦 1/1 与文件内 5/5 通过。</td>
+              <td>待用户在 http://localhost:3004/users 点击“+ 邀请成员”复核弹窗和邀请码可见。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-04-003</td>
-              <td class="mono tc-1">ISS-2026-07-04-005</td>
-              <td class="mono tc-2">RP-042</td>
-              <td class="tc-3">编码规则动作按钮参数和配置表单缺失</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">SystemManagement.jsx / useSystemManagement.js 编码规则页面动作</td>
-              <td class="tc-7">编码规则列表改为映射后端 id/moduleCode/sample/effectiveAt；配置按钮打开可编辑 Dialog 并提交 prefix/format；生效和禁用按钮使用规则 id 调用后端并显示成功反馈。</td>
-              <td class="tc-8">SystemManagementCodeRules.test.jsx 2/2；V2 前端全量 110/110；build:web pass，保留既有 chunk size warning。</td>
-              <td class="tc-9">待用户在 http://localhost:3004/system/code-rules 点击“配置 / 生效 / 禁用”复核。</td>
+              <td class="mono">DEF-2026-07-04-003</td>
+              <td class="mono">ISS-2026-07-04-005</td>
+              <td class="mono">RP-042</td>
+              <td>编码规则动作按钮参数和配置表单缺失</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>SystemManagement.jsx / useSystemManagement.js 编码规则页面动作</td>
+              <td>编码规则列表改为映射后端 id/moduleCode/sample/effectiveAt；配置按钮打开可编辑 Dialog 并提交 prefix/format；生效和禁用按钮使用规则 id 调用后端并显示成功反馈。</td>
+              <td>SystemManagementCodeRules.test.jsx 2/2；V2 前端全量 110/110；build:web pass，保留既有 chunk size warning。</td>
+              <td>待用户在 http://localhost:3004/system/code-rules 点击“配置 / 生效 / 禁用”复核。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-04-004</td>
-              <td class="mono tc-1">ISS-2026-07-04-006</td>
-              <td class="mono tc-2">RP-042</td>
-              <td class="tc-3">侧栏退出按钮继承导航链接整行宽度</td>
-              <td class="tc-4">S3</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">V2 Shell 左侧侧栏底部用户信息区</td>
-              <td class="tc-7">在 .sidebar .user .out 上覆盖 width:auto 和 align-self:center，并让用户信息 row 不换行，避免 .sidebar a 的 width:100% 导航样式泄漏到底部退出按钮。</td>
-              <td class="tc-8">ShellUserMenu.test.jsx 1/1；V2 前端全量 111/111；build:web pass；浏览器 DOM/CSS 验证退出按钮宽度约 38px 且位于用户名右侧。</td>
-              <td class="tc-9">待用户在 http://localhost:3004/ 复核退出按钮已恢复到用户名旁边。</td>
+              <td class="mono">DEF-2026-07-04-004</td>
+              <td class="mono">ISS-2026-07-04-006</td>
+              <td class="mono">RP-042</td>
+              <td>侧栏退出按钮继承导航链接整行宽度</td>
+              <td>S3</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>V2 Shell 左侧侧栏底部用户信息区</td>
+              <td>在 .sidebar .user .out 上覆盖 width:auto 和 align-self:center，并让用户信息 row 不换行，避免 .sidebar a 的 width:100% 导航样式泄漏到底部退出按钮。</td>
+              <td>ShellUserMenu.test.jsx 1/1；V2 前端全量 111/111；build:web pass；浏览器 DOM/CSS 验证退出按钮宽度约 38px 且位于用户名右侧。</td>
+              <td>待用户在 http://localhost:3004/ 复核退出按钮已恢复到用户名旁边。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-04-005</td>
-              <td class="mono tc-1">ISS-2026-07-04-007</td>
-              <td class="mono tc-2">RP-042</td>
-              <td class="tc-3">业务用户可见管理员导航入口</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">V2 Shell 左侧导航 / WorkspaceTabs / 管理员路由</td>
-              <td class="tc-7">新增 admin access 判定；Shell 仅在 user.role === &#39;admin&#39; 时渲染系统管理、用户管理和 API 密钥入口；WorkspaceTabs 在权限确认后过滤历史管理员页签；/system、/users、/api-keys 及系统子路由增加 AdminOnlyRoute 守卫。</td>
-              <td class="tc-8">ShellUserMenu.test.jsx + AppAuthGuard.test.jsx + SystemManagementNavigation.test.jsx 7/7；V2 前端全量 114/114；build:web pass，保留既有 chunk size warning。浏览器当前为 admin 登录态，管理员菜单可见符合预期；非管理员场景由自动化测试覆盖。</td>
-              <td class="tc-9">待用户以 kevin 账号在 http://localhost:3004/ 刷新后复核：左侧和顶部均不显示系统管理、用户管理、API 密钥，直达管理员 URL 会返回 AI 工作台。</td>
+              <td class="mono">DEF-2026-07-04-005</td>
+              <td class="mono">ISS-2026-07-04-007</td>
+              <td class="mono">RP-042</td>
+              <td>业务用户可见管理员导航入口</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>V2 Shell 左侧导航 / WorkspaceTabs / 管理员路由</td>
+              <td>新增 admin access 判定；Shell 仅在 user.role === &#39;admin&#39; 时渲染系统管理、用户管理和 API 密钥入口；WorkspaceTabs 在权限确认后过滤历史管理员页签；/system、/users、/api-keys 及系统子路由增加 AdminOnlyRoute 守卫。</td>
+              <td>ShellUserMenu.test.jsx + AppAuthGuard.test.jsx + SystemManagementNavigation.test.jsx 7/7；V2 前端全量 114/114；build:web pass，保留既有 chunk size warning。浏览器当前为 admin 登录态，管理员菜单可见符合预期；非管理员场景由自动化测试覆盖。</td>
+              <td>待用户以 kevin 账号在 http://localhost:3004/ 刷新后复核：左侧和顶部均不显示系统管理、用户管理、API 密钥，直达管理员 URL 会返回 AI 工作台。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-04-006</td>
-              <td class="mono tc-1">ISS-2026-07-04-008</td>
-              <td class="mono tc-2">RP-029</td>
-              <td class="tc-3">client_aborted 后未持久化助手失败状态且前端刷新覆盖本地气泡</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">AI 工作台流式会话持久化 / 停止生成前端刷新</td>
-              <td class="tc-7">后端 homeWorkbenchChatStream 在 catch 分支按 sessionId 追加 assistant 失败/中断消息并写入 streamFailure 元数据；前端 sendMessage 对 stream error、abort、无响应分支不再立即 loadSessions，保留本地错误或停止气泡，避免被旧会话状态覆盖。</td>
-              <td class="tc-8">chat.service.test.ts 新增 provider stream 失败与 client close 后会话消息持久化断言；HomeWorkspace.test.jsx 新增 abort 后不刷新会话覆盖本地停止气泡断言；npm run test:modules 147/147；npm run test:web 114/114；npm run build:api pass；npm run build:web pass。</td>
-              <td class="tc-9">待用户在真实 AI 会话中复核：发消息过程中中断或连接失败后，刷新/返回会话时能看到明确的 AI 中断/失败状态，不再表现为助手消息凭空消失。</td>
+              <td class="mono">DEF-2026-07-04-006</td>
+              <td class="mono">ISS-2026-07-04-008</td>
+              <td class="mono">RP-029</td>
+              <td>client_aborted 后未持久化助手失败状态且前端刷新覆盖本地气泡</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>AI 工作台流式会话持久化 / 停止生成前端刷新</td>
+              <td>后端 homeWorkbenchChatStream 在 catch 分支按 sessionId 追加 assistant 失败/中断消息并写入 streamFailure 元数据；前端 sendMessage 对 stream error、abort、无响应分支不再立即 loadSessions，保留本地错误或停止气泡，避免被旧会话状态覆盖。</td>
+              <td>chat.service.test.ts 新增 provider stream 失败与 client close 后会话消息持久化断言；HomeWorkspace.test.jsx 新增 abort 后不刷新会话覆盖本地停止气泡断言；npm run test:modules 147/147；npm run test:web 114/114；npm run build:api pass；npm run build:web pass。</td>
+              <td>待用户在真实 AI 会话中复核：发消息过程中中断或连接失败后，刷新/返回会话时能看到明确的 AI 中断/失败状态，不再表现为助手消息凭空消失。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-04-007</td>
-              <td class="mono tc-1">ISS-2026-07-04-009</td>
-              <td class="mono tc-2">RP-029</td>
-              <td class="tc-3">POST SSE 请求 close 被误判为客户端中断导致 static/done 被跳过</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">AI 工作台流式接口 / SSE 客户端解析</td>
-              <td class="tc-7">后端 homeWorkbenchChatStream 不再使用 req.close 判断 SSE 客户端断开，改用 req.aborted 与 res.close；前端 streamHomeWorkbenchChat 在 reader done 后解析残留 buffer，避免尾包事件缺少空行分隔时丢失；AI session PG 持久化增加串行队列，避免连续 create/append 导致 delete+insert 并发主键冲突。</td>
-              <td class="tc-8">chat.service.test.ts 新增 request close after POST body 不抑制 static/done 回归；client close 改为 res.close 模拟真实响应断开；aiStreamApi.test.js 新增尾部 SSE 事件解析回归；真实 curl “你好”返回 heartbeat + static + done 且日志无 duplicate key；npm run test:modules 148/148；npm run test:web 115/115；npm run build:api pass；npm run build:web pass。</td>
-              <td class="tc-9">待用户在 http://localhost:3004/ 刷新后发送“你好”复核：应返回 WES AI 工作台能力说明，不再显示“AI 已收到，但暂未返回有效内容。”</td>
+              <td class="mono">DEF-2026-07-04-007</td>
+              <td class="mono">ISS-2026-07-04-009</td>
+              <td class="mono">RP-029</td>
+              <td>POST SSE 请求 close 被误判为客户端中断导致 static/done 被跳过</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>AI 工作台流式接口 / SSE 客户端解析</td>
+              <td>后端 homeWorkbenchChatStream 不再使用 req.close 判断 SSE 客户端断开，改用 req.aborted 与 res.close；前端 streamHomeWorkbenchChat 在 reader done 后解析残留 buffer，避免尾包事件缺少空行分隔时丢失；AI session PG 持久化增加串行队列，避免连续 create/append 导致 delete+insert 并发主键冲突。</td>
+              <td>chat.service.test.ts 新增 request close after POST body 不抑制 static/done 回归；client close 改为 res.close 模拟真实响应断开；aiStreamApi.test.js 新增尾部 SSE 事件解析回归；真实 curl “你好”返回 heartbeat + static + done 且日志无 duplicate key；npm run test:modules 148/148；npm run test:web 115/115；npm run build:api pass；npm run build:web pass。</td>
+              <td>待用户在 http://localhost:3004/ 刷新后发送“你好”复核：应返回 WES AI 工作台能力说明，不再显示“AI 已收到，但暂未返回有效内容。”</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-15-001</td>
-              <td class="mono tc-1">ISS-2026-07-15-002</td>
-              <td class="mono tc-2">RP-027</td>
-              <td class="tc-3">企业画像把未知行业替换为固定行业</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">AI 工作台企业画像提取 / 草稿预填 / 客户事实完整性</td>
-              <td class="tc-7">chat.service.ts 已移除固定行业 fallback；无模型配置与模型缺字段均保持空值，输出 fieldProvenance=needs_user_input；CompanyProfile strict JSON Schema 同时执行本地 Ajv/语义校验。</td>
-              <td class="tc-8">buildCompanyProfileFallback 与 chat.service 回归覆盖未知行业、主体歧义、结构化元数据；npm run test:modules 152/152、npm run build:api 通过。</td>
-              <td class="tc-9">自动化验收通过；待真实企业画像请求确认缺失行业在 V2 页面显示待补充且不预填具体分类。</td>
+              <td class="mono">DEF-2026-07-15-001</td>
+              <td class="mono">ISS-2026-07-15-002</td>
+              <td class="mono">RP-027</td>
+              <td>企业画像把未知行业替换为固定行业</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>AI 工作台企业画像提取 / 草稿预填 / 客户事实完整性</td>
+              <td>chat.service.ts 已移除固定行业 fallback；无模型配置与模型缺字段均保持空值，输出 fieldProvenance=needs_user_input；CompanyProfile strict JSON Schema 同时执行本地 Ajv/语义校验。</td>
+              <td>buildCompanyProfileFallback 与 chat.service 回归覆盖未知行业、主体歧义、结构化元数据；npm run test:modules 152/152、npm run build:api 通过。</td>
+              <td>自动化验收通过；待真实企业画像请求确认缺失行业在 V2 页面显示待补充且不预填具体分类。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-15-002</td>
-              <td class="mono tc-1">ISS-2026-07-15-003</td>
-              <td class="mono tc-2">RP-027</td>
-              <td class="tc-3">Harness V2 Schema 失败重试错误回到 evidence_ready</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status warn"><span class="dot"></span>已修复 / 待人工复核</span></td>
-              <td class="tc-6">Harness Schema 修复 / 失败恢复 / 人工干预</td>
-              <td class="tc-7">Harness v1/v2 已接入 strict JSON Schema + Ajv，完整校验 confidence/evidenceRefs；交互运行修复耗尽进入 needs_user_input 并持久化 resumeStage，V1/V2 重试分别恢复 evidence_ready/clarifying。</td>
-              <td class="tc-8">npm run test:harness 71/71，新增 V1/V2 json_schema 请求、confidence 越界、needs_user_input 与差异化恢复回归；npm run build:api 通过。</td>
-              <td class="tc-9">自动化验收通过；待真实交互运行确认用户可见校验错误、手工补充和恢复体验。</td>
+              <td class="mono">DEF-2026-07-15-002</td>
+              <td class="mono">ISS-2026-07-15-003</td>
+              <td class="mono">RP-027</td>
+              <td>Harness V2 Schema 失败重试错误回到 evidence_ready</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>fixed_manual_pending</span></td>
+              <td>Harness Schema 修复 / 失败恢复 / 人工干预</td>
+              <td>Harness v1/v2 已接入 strict JSON Schema + Ajv，完整校验 confidence/evidenceRefs；交互运行修复耗尽进入 needs_user_input 并持久化 resumeStage，V1/V2 重试分别恢复 evidence_ready/clarifying。</td>
+              <td>npm run test:harness 71/71，新增 V1/V2 json_schema 请求、confidence 越界、needs_user_input 与差异化恢复回归；npm run build:api 通过。</td>
+              <td>自动化验收通过；待真实交互运行确认用户可见校验错误、手工补充和恢复体验。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-25-001</td>
-              <td class="mono tc-1">ISS-2026-07-25-001</td>
-              <td class="mono tc-2">RP-036</td>
-              <td class="tc-3">未知受保护路由缺少通配兜底</td>
-              <td class="tc-4">S3</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复</span></td>
-              <td class="tc-6">V2 React Router 受保护页面树</td>
-              <td class="tc-7">在 ProtectedLayout 子路由末尾增加通配路由，未知路径使用 replace 重定向到首页，同时继续复用登录态和当前用户校验。</td>
-              <td class="tc-8">AppAuthGuard 新用例先复现空白页，再验证未知路径显示 AI 工作台；聚焦 3/3。</td>
-              <td class="tc-9">自动化验收完成；用户已授权由 Codex 选择回首页口径。</td>
+              <td class="mono">DEF-2026-08-19-001</td>
+              <td class="mono">ISS-2026-08-19-001</td>
+              <td class="mono">前端插批-2026-08-19</td>
+              <td>ListPage 12 行硬截断：第 13 条记录永久不可见且无总数提示（7 个列表页共用）</td>
+              <td>S2</td>
+              <td><span class="status done"><span class="dot"></span>fixed</span></td>
+              <td>ui/V2_PROTOTYPE/src/components/ListPage.jsx（评估/需求/开发评估/资源成本/评审/WBS/历史 7 个列表页）</td>
+              <td>去除 slice(0,12)，客户端分页 pageSize=10 + 「共 N 条 · 显示 a-b」总数显示；跨页保留选中、全选仅当前页、Shift 范围限当前页、越界自动钳制写入文档注释；四种既有选择交互契约不变（fb4621c）。</td>
+              <td>ListPage.test.jsx 3→10 用例（第 13 条翻页可达/总数与范围/四种选择交互/跨页保留/全选限当前页）；浏览器视觉验收「共 15 条 · 显示 1-10 / 11-15」、尾页禁用正确；test:web 52 文件 369 用例全绿。</td>
+              <td>自动化与人工视觉验收均通过（2026-08-19）。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-07-25-002</td>
-              <td class="mono tc-1">ISS-2026-07-25-002</td>
-              <td class="mono tc-2">RP-036</td>
-              <td class="tc-3">登录历史密码框焦点失效与旧明文密码残留</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复</span></td>
-              <td class="tc-6">V2 登录页用户名历史与本地存储</td>
-              <td class="tc-7">密码输入框改由独立 React ref 管理；旧 <code class="inline">wes_recent_users</code> 只迁移用户名后立即删除，当前 <code class="inline">wes_username_history</code> 禁止写入密码。</td>
-              <td class="tc-8">Login 新增普通登录仅存用户名、旧记录安全迁移、选择用户名后密码框聚焦回归；聚焦 5/5。</td>
-              <td class="tc-9">自动化验收完成；“记住 7 天”只控制登录令牌，不恢复任何密码持久化。</td>
+              <td class="mono">DEF-2026-08-19-002</td>
+              <td class="mono">ISS-2026-08-19-001</td>
+              <td class="mono">前端插批-2026-08-19</td>
+              <td>SSE 未收终态断开时 sending 无超时兜底：会话输入框永久禁用且用户不知原因</td>
+              <td>S2</td>
+              <td><span class="status done"><span class="dot"></span>fixed</span></td>
+              <td>ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js（onClose/onError）</td>
+              <td>连接关闭后 10s 未收终态自动清理 sending、finalize 占位并追加可见中断提示（基准为连接关闭后时长，不误杀后台长任务）；onError 发送中给出一次性失败感知；定时器 4 处清除；只解锁前端状态绝不 cancel（0b44e8d）。</td>
+              <td>sending-timeout.test.jsx 新增 7 守护用例（窗口内保持/超时清理+提示/窗口内终态零噪声/非发送零噪声/onError 可见）；test:web 全绿、CI run 32212286137 test-web 52/52 369/369 实取。</td>
+              <td>自动化验收通过（2026-08-19）；真实 SSE 断连场景留待后续线上观察。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-08-03-001</td>
-              <td class="mono tc-1">ISS-2026-08-03-002</td>
-              <td class="mono tc-2">RP-047-A2</td>
-              <td class="tc-3">Node 24 Testcontainers setup 与 worktree 依赖隔离缺陷阻断 Harness 正式门禁</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复 / Codex 关卡（Gate） 通过</span></td>
-              <td class="tc-6">apps/api/test-setup.mts / test:harness / 独立 worktree node_modules</td>
-              <td class="tc-7">A2 使用 ESM-safe migration 路径和 worktree 隔离依赖，以随机临时 database 演练历史迁移；R1 将普通对象校验和 output 并发版本回归纳入正式门禁。</td>
-              <td class="tc-8">Codex 独立复跑 Testcontainers Harness 95/95、modules 143/143、API/Web build 通过；三个 R1 阻断项关闭，worktree clean，无新增 lockfile 或长期容器。</td>
-              <td class="tc-9">缺陷已关闭；Batch A2 仍需用户授权集成，集成后须在业务主线复跑同一门禁。机器级 Docker/Colima 配置继续禁止由任务自动修改。</td>
+              <td class="mono">DEF-2026-08-19-003</td>
+              <td class="mono">ISS-2026-08-19-001</td>
+              <td class="mono">前端插批-2026-08-19</td>
+              <td>无路由懒加载与打包切分：登录页须先下载整个应用（单 chunk 745KB）</td>
+              <td>S2</td>
+              <td><span class="status done"><span class="dot"></span>fixed</span></td>
+              <td>ui/V2_PROTOTYPE/src/App.jsx + vite.config.js</td>
+              <td>18 个路由 React.lazy + Suspense 加载态（Login/ResetPassword/HomePage/Shell/ProtectedLayout 首屏路径保持 eager）；manualChunks 函数式分离 react/react-dom/scheduler 与 react-router 生态（d0d098d）。</td>
+              <td>build:web 通过；首屏 JS 745,042 字节单 chunk → index 170.38 + vendor-react 142.22 + vendor-router 23.33 = 335.93 kB（-52.9%，gzip -47.8%），JS chunk 1 → 27；直接 import App 的既有测试全过。</td>
+              <td>自动化验收通过（2026-08-19）；懒加载切换流畅无报错。</td>
             </tr>
             <tr>
-              <td class="mono tc-0">DEF-2026-08-05-001</td>
-              <td class="mono tc-1">ISS-2026-08-05-001</td>
-              <td class="mono tc-2">—</td>
-              <td class="tc-3">模型配置密钥存储文件被 git 跟踪且 env 兜底按 cwd 加载失效，密钥在重启/同步后“丢失”</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status block"><span class="dot"></span>已分析 / 待修复决策</span></td>
-              <td class="tc-6">config/system/requirement-settings.json / apps/api/src/config/env.ts / .gitignore / 系统管理-模型配置页</td>
-              <td class="tc-7">三重根因：① <code class="inline">requirement-settings.json</code> 未入 .gitignore（<code class="inline">knowledge-base-config.json</code> 已有忽略先例），密钥随版本控制进出，历史提交曾含真实密钥，且 checkout/reset/merge 会把界面录入的密钥覆盖回仓库空版本；② <code class="inline">env.ts</code> 以 process.cwd() 解析 .env.local/.env，dev:api（npm run dev -w apps/api）cwd 为 apps/api，根目录 .env.local 的 KIMI_API_KEY 不加载，apps/api/.env.local 仅含 PORT/DATABASE_URL/DATABASE_POOL_MAX；③ draft/active 两层语义提示不足，保存草稿未“生效”时业务调用（resolveActiveRequirementKimiApiKey）取不到键。修复方向：密钥文件入 .gitignore 并 git rm --cached；env 加载改用根目录解析（对齐 resolveRootDir 候选逻辑）；模型配置页对“草稿需生效后才进入业务调用”增加明确提示；泄露密钥在供应商控制台轮换。</td>
-              <td class="tc-8">验收口径：UI 录入并生效后重启服务，AI 调用 source=store 可用；store 为空时根目录 .env.local 兜底 source=env 可用；git status 不再出现密钥文件改动；旧密钥已在控制台撤销。</td>
-              <td class="tc-9">待用户决策是否立即修复；修复前 AI 主流程依赖重新录入密钥，泄露密钥轮换为安全必办项。</td>
+              <td class="mono">DEF-2026-08-19-004</td>
+              <td class="mono">ISS-2026-08-19-001</td>
+              <td class="mono">待分诊</td>
+              <td>窄视口下「后台任务」固定浮层遮挡列表分页器，翻页点击被拦截</td>
+              <td>S3</td>
+              <td><span class="status warn"><span class="dot"></span>open</span></td>
+              <td>ui/V2_PROTOTYPE Shell 右下角后台任务指示器 × ListPage 分页器（约 480px 窄视口）</td>
+              <td></td>
+              <td></td>
+              <td>2026-08-19 前端插批视觉验收发现（视口 480×1318）：shell-background-runs-indicator 与分页栏重叠，hit-test 命中指示器、真实点击被拦截；待分诊排期（z-order/布局避让），不属前端插批范围。</td>
             </tr>
-            <tr>
-              <td class="mono tc-0">DEF-2026-08-05-002</td>
-              <td class="mono tc-1">ISS-2026-08-05-002</td>
-              <td class="mono tc-2">—</td>
-              <td class="tc-3">API Key 测试连接点击无反馈：上游挂起时无超时切断 + 按钮无 loading + 结果仅靠 toast</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复 / 已合入主线</span></td>
-              <td class="tc-6">apps/api/src/utils/kimi-ping.ts / system.usecase.ts / response.ts / ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx</td>
-              <td class="tc-7">三重根因：① <code class="inline">kimi-ping.ts</code> 裸 fetch 无 AbortController，KIMI 上游挂起时 HTTP 请求无限等待，前端表现为点击无响应；② API Key 卡测试按钮无 disabled/loading 状态，等待期零视觉反馈；③ 测试结果仅经全局 toast 呈现，无页面内持久展示。修复：后端 ping 增加 30s 超时（AbortController，可配 timeoutMs，下限 1s），超时抛 kind="timeout"，usecase 映射 50401，fail() 新增 50400-50500→HTTP 504 段；前端按钮加 disabled+“测试中…”文案、页面内联结果行（成功/警告/错误/进行中四态，颜色走 tokens 带 hex 兜底）、空输入直接提示不发请求、清除密钥同步清结果，模型卡连通性按钮同步加 disabled。</td>
-              <td class="tc-8">kimi-ping 测试 3/3（含上游挂起超时中止用例）；新增 SystemManagementApiKeyTest 聚焦 3/3（失败内联、成功内联+明细、空输入守卫）；前端全量 vitest 226/226；test:modules 245/245；build:web/build:api 通过。</td>
-              <td class="tc-9">修复位于独立 worktree（分支 qoder/fix-apikey-test-feedback）；2026-08-06 用户批准直接合并，提交 eba90b4 fast-forward 合入 main，dev 服务已重启生效，待用户浏览器验收。</td>
-            </tr>
-            <tr>
-              <td class="mono tc-0">DEF-2026-08-10-001</td>
-              <td class="mono tc-1">ISS-2026-08-10-005</td>
-              <td class="mono tc-2">—</td>
-              <td class="tc-3">流式回答思考块不可见（前端首批 thought 事件被丢弃；模型侧已实证有 reasoning 流）且回答 Markdown 格式散乱</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已验收关闭（用户 2026-08-10 复测通过）</span></td>
-              <td class="tc-6">ui/V2_PROTOTYPE useChatMessages.js（THOUGHT 分支）/ MessageBubble.jsx（思考块位置与折叠）/ markdownBlocks.js（解析器）/ apps/api model-answer.ts、knowledge-query.handler.ts 系统提示词</td>
-              <td class="tc-7">双根因（A 已修正）：A 思考侧——原判定「kimi-k2.5 无 reasoning 流」经 PostgreSQL 实证证伪（harness_run_events：thought 817 条 / text.delta 1616 条，kimi-k2.5 默认思考模式、004 管道正常）；唯一根因为前端 THOUGHT 分支依赖 streamingMessageIdRef，思考事件早于首个 text.delta 到达时静默丢弃。B 格式侧——① 落库原文证实模型输出本体为单行紧凑 pseudo-markdown（##1. 无空格、列表无换行），提示词无排版规范；② 前端自研逐行解析器要求标题 #+空格+独立行，单行输出整体降级为一段落。修复方向：前端 thought 事件挂 loading 消息兜底 + 思考块置于回答上方流式展开完成后自动折叠（官方口径 thinking 推荐 temperature=1.0 作可调项）；提示词补排版规范 + 渲染层评估成熟流式 Markdown 渲染器。</td>
-              <td class="tc-8">验收口径：发问后思考块先于回答出现且完成后可折叠为「已思考」摘要；回答标题/列表/表格正确分块渲染（含模型紧凑输出口径）；切会话往返内容一致；停止按钮、角标、落库内容不回归。</td>
-              <td class="tc-9">KIMIK3 回填经指挥方五核独立复审一次通过（2f2d8c6 + 7b909e6，矩阵全绿、RED 恰 9 红独立复现、主检出零接触）；2026-08-10 19:07 用户批准 --no-ff 合入（8a419db），主线冒烟 web 296/297（唯一失败为用户 WIP 既有基线）、modules 323/323、双构建零错误；后端已重启（PID 22793，harnessEnabled: true，提示词生效）。复测指引：按 MT-ISS0810-005-001 五项执行（含 ISS-004 第 1 项「思考块可见」并入），通过后推送远端并关闭本 defect 与 ISS-2026-08-10-005。2026-08-10 19:42 用户复测五项全部通过，30 个挂起提交已推送远端（ece7ac2），本 defect 验收关闭。</td>
-            </tr>
-            <tr data-board-event-id="BE-2026-08-11-def-2026-08-10-002-derived:defects">
-              <td class="mono tc-0">DEF-2026-08-10-002</td>
-              <td class="mono tc-1">ISS-2026-08-10-008</td>
-              <td class="mono tc-2">—</td>
-              <td class="tc-3">凭据缓存重启冷启动：服务重启后 DB 中的 API 密钥不预热进内存缓存，读取侧静默回落 env（ISS-2026-08-05-001「重启密钥丢失」修复的回潮缺口）</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复（2b08487，并入 RP-055 批 1）/ 待重启复验关闭</span></td>
-              <td class="tc-6">apps/api/src/modules/system/credentials.store.ts（缓存填充路径）/ apps/api/src/main.ts（启动引导缺 warm）/ AI 全链路密钥解析（resolveActiveRequirementKimiApiKey 同步只读缓存）</td>
-              <td class="tc-7">根因：凭据域 DB 化后，内存缓存仅在两个时机填充——同进程 setApiKey（用户界面录入）与旧文件迁移导入；服务重启后缓存为空，同步读取函数 resolveActiveRequirementKimiApiKey() 无法 await 取 DB，直接回落 env。实证（2026-08-10 23:59，临时全新进程 PORT=3100）：GET /effective credentials.source=「env」而 DB 已有用户 22:34 录入的有效密钥；scenario-test 用 env 旧密钥 401，用 DB 密钥 override 双场景连通 modelMatch=true。当前运行后端因同进程录入密钥未暴露，重启即触发。修复方向：main.ts 启动引导 KEK 校验后 warm（getApiKey 成功填入缓存，失败降级警告不阻断启动）。</td>
-              <td class="tc-8">验收口径：重启后 GET /requirement-settings/effective credentials.source=「db_cache」；AI 评估链路重启后首轮调用即用 DB 密钥（无 401）；KEK 缺失或 DB 无记录时启动警告可见、服务正常启动；补回潮 RED 测试（全新进程无 setApiKey 直接 resolve 命中 DB 密钥）。</td>
-              <td class="tc-9">2026-08-11 由模型配置契约闭环 P1 真实环境验证自发现并登记（changes BE-2026-08-11-model-config-p1-delivered）；按规范未自行修复（偏离已批准计划须用户批准），建议作为 0.5–1h 小修复随下一批次或独立工单执行。</td>
-            </tr>
-            <tr data-board-event-id="BE-2026-08-11-def-2026-08-11-001-derived:defects">
-              <td class="mono tc-0">DEF-2026-08-11-001</td>
-              <td class="mono tc-1">ISS-2026-08-11-002</td>
-              <td class="mono tc-2">RP-052</td>
-              <td class="tc-3">记忆管理面板恒空：listMemory 缺 projectId 恒返回空 + 面板请求从不带 projectId + 不读 ?status=draft query，MS2「UI 可见可确认」验收口径不成立</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复 / 真实环境自动交互复验通过 / 待用户最终确认关闭</span></td>
-              <td class="tc-6">apps/api/src/modules/memory/memory.controller.ts（requireAuth 误挂 middleware 薄包装修复，范围偏差已裁决接受）/ memory.repository.ts（owner 全量读取，共用实现去重）/ memory.usecase.ts（口径透传）/ ui/V2_PROTOTYPE/src/components/system/MemoryManagementPanel.jsx（query 初始化 + 带 projectId）/ dispatch 链路 additive 字段（workbench-dispatch.service / workbench-shared / workbench-chat.handler）</td>
-              <td class="tc-7">根因分两层：代码层三项为 ① <strong>requireAuth 挂起</strong>；② memory.usecase.listMemory 缺 projectId 恒返回空；③ MemoryManagementPanel 请求不带 projectId 且不读 ?status=draft query，已由 318f3bd 修复。2026-08-12 用户截图复测仍为空后，补充确认环境层两项：④ 3000/3002 仍运行未含 318f3bd 的 WIP 分支；⑤ PostgreSQL 迁移账本漂移，0015 未执行，memory_atoms / memory_scenes 不存在。五项叠加造成“代码已合入但真实页仍空”。</td>
-              <td class="tc-8">验收口径：① 面板真实数据非空，draft 记忆可见可确认；② MS2-PATCH 蒸馏成功提示条「去确认」跳转后自动筛选 draft；③ 补 RED 测试（listMemory 无 projectId 非空 + 面板 query 初始化）；④ test:modules / test:harness 计数不下降。</td>
-              <td class="tc-9">2026-08-11 代码修复合入 main（318f3bd）。2026-08-12 接手用户空面板反馈：受控对齐 0012–0016 迁移账本、执行 0015 和标准 db:migrate，并从原用户真实 PLM 会话恢复 14 条原子事实 + 4 个场景，均为 draft；main API/Web 已在 3000/3002 启动。API 200，1440/760 页面、确认/归档、active/archived 筛选与「去确认」自动筛选 draft 均通过；临时验收账号及复制数据已清理。<strong>当前保留待用户本人最终确认，不提前关闭</strong>。遗留：流式通道 chip 缺口需另行决策。</td>
-            </tr>
-            <tr data-board-event-id="BE-2026-08-11-def-2026-08-11-002-derived:defects">
-              <td class="mono tc-0">DEF-2026-08-11-002</td>
-              <td class="mono tc-1">ISS-2026-08-11-003</td>
-              <td class="mono tc-2">RP-055</td>
-              <td class="tc-3">供应商 Key 保存报 apiClient.put is not a function——apiClient 缺 put 封装，setProviderApiKey 必然失败</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已关闭（2026-08-11 21:34 用户复验通过）</span></td>
-              <td class="tc-6">ui/V2_PROTOTYPE/src/api/client.js（缺 put 封装）/ ui/V2_PROTOTYPE/src/hooks/useSystemManagement.js（setProviderApiKey）</td>
-              <td class="tc-7">根因：批 2 hook 新 action 调用了不存在的方法；client.js 自始只有 get/post/patch/delete/upload 五封装。测试盲区：批 2 用例覆盖「未输入时按钮禁用不发 PUT」与测试连接，但保存成功路径无用例，MSW mock 的 PUT 端点从未被真实调用。用户影响：批 2 验收关键动作（保存供应商 Key）100% 失败，阻断自定义供应商接入。</td>
-              <td class="tc-8">验收口径：保存密钥 → PUT 200 + 内联成功 + effective keyHint 刷新；补回潮 RED 用例（PUT 调用次数与 body 断言）；前端基线不下降。</td>
-              <td class="tc-9">2026-08-11 21:21 用户验收反馈（截图），TDD 修复当批完成（RED 复现原始报错 → 补 put → 转绿），提交 <code class="inline">7a9c559</code>（2 文件 +24）。教训登记：新增 apiClient 方法调用须先确认封装存在，Key 写路径须配成功用例。</td>
-            </tr>
-            <tr data-board-event-id="BE-2026-08-11-def-2026-08-11-003-derived:defects">
-              <td class="mono tc-0">DEF-2026-08-11-003</td>
-              <td class="mono tc-1">ISS-2026-08-11-007</td>
-              <td class="mono tc-2">RP-047</td>
-              <td class="tc-3">异步 Run 通道附件全链路丢失：submitRun 载荷无附件 → 落库无 attachmentIds → 切界面/刷新后附件气泡消失、模型收不到附件答非所问、回复裸出 formBlock JSON</td>
-              <td class="tc-4">S2</td>
-              <td class="tc-5"><span class="status done"><span class="dot"></span>已修复 / Codex 主线实测通过 / 待用户最终确认</span></td>
-              <td class="tc-6">ui/V2_PROTOTYPE/src/api/aiRuns.js（submitRun 载荷）/ ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js（Run 提交不带 attachments）/ apps/api/src/modules/harness/harness-runtime.usecase.ts（submitRun 仅取 content）/ apps/api/src/modules/harness/workbench-chat.workflow.ts（落库与 dispatch 无附件、formBlock 不抽取）/ ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/messageFormatter.js（回显依赖 attachmentIds、流式不裁剪 formBlock JSON）</td>
-              <td class="tc-7">2026-08-12 已闭合四段链路：Run 提交携带附件解析结果；后端限量限长写入 executionConfig；worker 幂等写入 session.attachments 与消息 attachmentIds 并把 parsedSummary 传给模型；流式终态抽取 formBlock，前端增量展示隐藏协议 JSON。重放仍按 run 来源键去重，不重复消息或附件。</td>
-              <td class="tc-8">TDD 证据：前端聚焦 14/14；后端聚焦 57 pass / 4 DB skip / 0 fail。合入 main 后全量 modules 372、AI 287、Web 339、Agent 51、规则 8、集成 1 均零失败；Harness 115 pass / 75 DB skip / 0 fail；API/Web build、安全门禁、UI scope 与 board:check 通过。</td>
-              <td class="tc-9">2026-08-12 Codex 使用合成附件摘要完成真实异步 Run：首次加载、刷新、切换项目页再返回后附件气泡持续可见；模型准确引用客户、项目和核心需求；正文无裸 formBlock JSON。验收会话已删除且 GET 404，未上传客户资料。保留待用户本人最终确认后关闭；交叉引用 ISS-2026-08-08-001、ISS-2026-08-09-002、ISS-2026-08-09-003。</td>
-            </tr>
-            <tr data-board-event-id="BE-2026-08-13-def-2026-08-13-001-derived:defects"><td class="mono tc-0">DEF-2026-08-13-001</td><td class="mono tc-1">ISS-2026-08-13-001</td><td class="mono tc-2">—</td><td class="tc-3">AI 工作台异步 Run 完成态未收敛：消息区 loading、左侧完成未读、切回后的 unread 清除存在竞态；用户文本空白表现待证实</td><td class="tc-4">S2</td><td class="tc-5"><span class="status run"><span class="dot"></span>已修复 / 待人工验收</span></td><td class="tc-6">ui/V2_PROTOTYPE/src/hooks/useBackgroundRuns.jsx / ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js / ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/messageFormatter.js</td><td class="tc-7">修复三层状态收敛：终态先写 runtime store 再广播页面事件；当前会话收到终态时重拉 sessions/unified view 并清除 unread；用户消息历史回显 trimEnd。保留 assistant 换行，不改变 Markdown 内容。</td><td class="tc-8">聚焦测试 28/28；build:web 通过；UI scope 0 findings。待用户按“你好→等待完成→切走/切回→刷新”人工验收，确认 loading 消失、回复可见、未读徽标稳定清除且文本无非预期尾随空白。</td><td class="tc-9">2026-08-13 已完成代码修复，未改 API 合同。交叉引用 ISS-2026-08-09-003、ISS-2026-08-10-003、ISS-2026-08-10-004。</td></tr>
-        </tbody>
         </table>
-        </div>
-        </div>
       </div>
     </section>
 </main>
-  <footer>缺陷池 · WES 项目管理 · 2026-08-03</footer>
-  <script src="assets/board-ui.js?v=20260808" defer></script>
-  <script src="assets/vendor/list.min.js?v=20260808" defer></script>
-  <script src="assets/board-table.js?v=20260808" defer></script>
+  </div>
+  <footer>缺陷池 · WES 项目管理 · 2026-08-19</footer>
+  <script>
+    const sidebar = document.getElementById('sidebar');
+    const toggle = document.getElementById('sidebarToggle');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (toggle && sidebar && overlay) {
+      toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('show'); });
+      overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); });
+    }
+  </script>
 </body>
 </html>
