@@ -1,25 +1,19 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import express, { Request, Response } from "express";
-import fs from "node:fs";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
 import supertest from "supertest";
 
 import { createProjectEvaluationsRouter } from "./project-evaluations.routes";
 import { loadUsersStore, saveUsersStore, signAuthToken } from "../middleware/auth";
+import { enterIsolatedConfigRoot, exitIsolatedConfigRoot } from "../test-helpers/isolate-config-root";
 import type { AuthUser } from "../types";
 
-const USERS_JSON = path.resolve(__dirname, "../../../../config/auth/users.json");
-let originalUsersJson = "";
-
-before(() => {
-  originalUsersJson = fs.readFileSync(USERS_JSON, "utf8");
-});
-
-after(() => {
-  fs.writeFileSync(USERS_JSON, originalUsersJson);
-});
+// 竞态隔离（main CI flake 修复）：原 before 备份 / after 恢复真实 users.json
+// 的模式在多文件并行下会互相覆盖（整存 RMW 丢失更新），改为 chdir 隔离根；
+// 详见 test-helpers/isolate-config-root.ts。
+before(() => enterIsolatedConfigRoot("wes-project-evaluations-routes-"));
+after(() => exitIsolatedConfigRoot());
 
 function miniApp(confirmHandler: (req: Request, res: Response) => void) {
   const app = express();

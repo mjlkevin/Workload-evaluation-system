@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import XLSX from "xlsx";
@@ -10,6 +10,7 @@ import { Pool } from "pg";
 import { AuthUser } from "../types";
 import { config } from "../config/env";
 import { loadUsersStore, saveUsersStore, signAuthToken, verifyAuthToken } from "../middleware/auth";
+import { enterIsolatedConfigRoot, exitIsolatedConfigRoot } from "../test-helpers/isolate-config-root";
 import { aiSessionsStorePath, knowledgeBaseConfigStorePath, usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
 import { confirmPasswordReset, listUsers, login, me, requestPasswordReset, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
@@ -38,6 +39,13 @@ import * as ProjectEvaluationsModule from "./project-evaluations/project-evaluat
 import { createConfirmAiAssessmentDraftHandler } from "./project-evaluations/project-evaluations.controller";
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
 import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap";
+
+// 竞态隔离（main CI flake 修复）：本文件多处读改写真实 users.json
+// （getActiveUser / 启停 / 改密），与路由测试文件的整存 RMW 并发互撞，
+// 导致 active user required 间歇性失败。chdir 到隔离根（真实 users.json
+// 做基线拷贝），详见 test-helpers/isolate-config-root.ts。
+before(() => enterIsolatedConfigRoot("wes-modules-handlers-"));
+after(() => exitIsolatedConfigRoot());
 
 type MockRes = {
   statusCode: number;

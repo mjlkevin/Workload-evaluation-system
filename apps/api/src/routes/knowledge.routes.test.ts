@@ -15,20 +15,17 @@ import supertest from "supertest";
 import { createKnowledgeRouter } from "./knowledge.routes";
 import { KnowledgeRepository } from "../modules/knowledge/knowledge.repository";
 import { loadUsersStore, saveUsersStore, signAuthToken } from "../middleware/auth";
+import { enterIsolatedConfigRoot, exitIsolatedConfigRoot } from "../test-helpers/isolate-config-root";
 import type { AuthUser } from "../types";
 
-const USERS_JSON = path.resolve(__dirname, "../../../../config/auth/users.json");
-let originalUsersJson = "";
 let storePath: string;
 let repo: KnowledgeRepository;
 
-before(() => {
-  originalUsersJson = fs.readFileSync(USERS_JSON, "utf8");
-});
-
-after(() => {
-  fs.writeFileSync(USERS_JSON, originalUsersJson);
-});
+// 竞态隔离（main CI flake 修复）：原 before 备份 / after 恢复真实 users.json
+// 的模式在多文件并行下会互相覆盖（整存 RMW 丢失更新），改为 chdir 隔离根，
+// 临时用户的读改写不再触碰真实文件；详见 test-helpers/isolate-config-root.ts。
+before(() => enterIsolatedConfigRoot("wes-knowledge-routes-"));
+after(() => exitIsolatedConfigRoot());
 
 function setupApp() {
   storePath = path.join(os.tmpdir(), `wes-knowledge-routes-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
