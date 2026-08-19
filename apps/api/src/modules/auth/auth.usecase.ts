@@ -7,8 +7,6 @@ import { config } from "../../config/env";
 import { asString, generateInviteCode } from "../../utils";
 import { ok, fail } from "../../utils/response";
 import {
-  loadUsersStore,
-  saveUsersStore,
   signAuthToken,
   toPublicUser,
   isAdminUser,
@@ -18,6 +16,7 @@ import {
   defaultBusinessRoleForSystemRole,
 } from "../../middleware/auth";
 import { getAuthRepository } from "./auth.repository";
+import { getUsersRepository } from "./users.repository";
 
 const REMEMBER_ME_EXPIRES_IN = "7d";
 const PASSWORD_RESET_EXPIRES_MINUTES = 30;
@@ -59,39 +58,48 @@ export async function register(req: Request, res: Response) {
   }
 
   const normalizedUsername = username.toLowerCase();
-  const store = await loadUsersStore();
-  const exists = store.users.some((user) => user.username.toLowerCase() === normalizedUsername);
+  const usersRepo = getUsersRepository();
+  const exists = await usersRepo.findUserByUsername(normalizedUsername);
   if (exists) {
     return fail(res, 40001, "参数错误", [{ field: "username", reason: "already_exists" }]);
   }
 
-  // 阶段 2 批 1：CAS 先消费邀请码再落用户（PG 侧条件 UPDATE 保证并发注册
-  // 恰好一个赢家；旧 JSON 流程为「先落用户后标码」，并发下会双重消费）。
   const userId = randomUUID();
-  const usedInvite = await repo.markInviteCodeUsed({
-    code: inviteRecord.code,
-    usedByUserId: userId,
-    usedByUsername: username,
-  });
-  if (!usedInvite) {
-    return fail(res, 40001, "参数错误", [{ field: "inviteCode", reason: "invalid_invite_code" }]);
+  // 首个注册用户为 admin（与既有口径一致；PG 事务内另有同事务计数兜底）
+  const role: AuthUser["role"] = (await usersRepo.countUsers()) === 0 ? "admin" : "user";
+
+  let user: AuthUser;
+  if (usersRepo.registerWithInviteCode) {
+    // 阶段 2 批 2 附带改造项（§4.4）：users 与邀请码同在 PG，收敛为单事务——
+    // 邀请码 CAS + 用户插入同 tx，用户名冲突回滚不浪费码（消除 CAS-first 窗口）。
+    const result = await usersRepo.registerWithInviteCode({ username, passwordHash: await bcrypt.hash(password, 10), inviteCode });
+    if (result.outcome === "invite_invalid") {
+      return fail(res, 40001, "参数错误", [{ field: "inviteCode", reason: "invalid_invite_code" }]);
+    }
+    if (result.outcome === "username_exists") {
+      return fail(res, 40001, "参数错误", [{ field: "username", reason: "already_exists" }]);
+    }
+    user = result.user;
+  } else {
+    // JSON 后端遗留流程（CAS-first，批 1 确立）：先消费邀请码再落用户，
+    // 事务无法跨越「PG 邀请码 + JSON 用户文件」；users 第 4 步删 JSON 路径后退役。
+    const usedInvite = await repo.markInviteCodeUsed({
+      code: inviteRecord.code,
+      usedByUserId: userId,
+      usedByUsername: username,
+    });
+    if (!usedInvite) {
+      return fail(res, 40001, "参数错误", [{ field: "inviteCode", reason: "invalid_invite_code" }]);
+    }
+    const created = await usersRepo.createUser({
+      id: userId,
+      username,
+      passwordHash: await bcrypt.hash(password, 10),
+      role,
+      businessRole: defaultBusinessRoleForSystemRole(role),
+    });
+    user = created.user;
   }
-
-  const nowIso = new Date().toISOString();
-  const role: AuthUser["role"] = store.users.length === 0 ? "admin" : "user";
-  const user: AuthUser = {
-    id: userId,
-    username,
-    passwordHash: await bcrypt.hash(password, 10),
-    role,
-    businessRole: defaultBusinessRoleForSystemRole(role),
-    status: "active",
-    createdAt: nowIso,
-    lastLoginAt: nowIso,
-  };
-
-  store.users.push(user);
-  await saveUsersStore(store);
 
   const token = signAuthToken(user);
   res.json(ok({ token, user: toPublicUser(user) }, requestId));
@@ -107,8 +115,7 @@ export async function login(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "username/password", reason: "required" }]);
   }
 
-  const store = await loadUsersStore();
-  const user = store.users.find((x) => x.username.toLowerCase() === username.toLowerCase());
+  const user = await getUsersRepository().findUserByUsername(username);
   if (!user) {
     return fail(res, 40001, "参数错误", [{ field: "username/password", reason: "invalid_credentials" }]);
   }
@@ -121,14 +128,14 @@ export async function login(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "username/password", reason: "invalid_credentials" }]);
   }
 
-  user.lastLoginAt = new Date().toISOString();
-  await saveUsersStore(store);
+  // 阶段 2 批 2：行级 touch（PG 侧 DB 时钟 + 写穿缓存），替换整存 RMW
+  const updated = (await getUsersRepository().touchLastLogin({ id: user.id })) ?? user;
 
   const expiresIn = rememberMe ? REMEMBER_ME_EXPIRES_IN : undefined;
-  const token = signAuthToken(user, expiresIn ? { expiresIn } : {});
+  const token = signAuthToken(updated, expiresIn ? { expiresIn } : {});
   res.json(ok({
     token,
-    user: toPublicUser(user),
+    user: toPublicUser(updated),
     rememberMe,
     expiresIn: expiresIn || String(config.jwt.expiresIn),
   }, requestId));
@@ -141,8 +148,7 @@ export async function requestPasswordReset(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "username", reason: "required" }]);
   }
 
-  const store = await loadUsersStore();
-  const user = store.users.find((x) => x.username.toLowerCase() === username.toLowerCase());
+  const user = await getUsersRepository().findUserByUsername(username);
   if (!user || user.status !== "active") {
     return res.json(ok({
       accepted: true,
@@ -189,15 +195,14 @@ export async function confirmPasswordReset(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "token", reason: "invalid_or_expired" }]);
   }
 
-  const store = await loadUsersStore();
-  const user = store.users.find((item) => item.id === record.userId && item.status === "active");
-  if (!user) {
+  const user = await getUsersRepository().findUserById(record.userId);
+  if (!user || user.status !== "active") {
     await repo.consumeResetToken({ tokenId: record.id });
     return fail(res, 40001, "参数错误", [{ field: "token", reason: "invalid_or_expired" }]);
   }
 
-  user.passwordHash = await bcrypt.hash(password, 10);
-  await saveUsersStore(store);
+  // 阶段 2 批 2：行级改密（写穿缓存），替换整存 RMW
+  await getUsersRepository().updateUserPasswordHash({ id: user.id, passwordHash: await bcrypt.hash(password, 10) });
 
   // CAS 消费：active 且未过期（PG 侧另以 DB 时钟双重校验）；
   // 竞争失败/临界过期 → 拒绝（密码已改但令牌重复消费场景以失败告知）。
@@ -228,8 +233,8 @@ export async function listUsers(req: Request, res: Response) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "user_mgmt_required" }]);
   }
 
-  const store = await loadUsersStore();
-  const users = [...store.users]
+  const storeUsers = await getUsersRepository().listUsers();
+  const users = [...storeUsers]
     .sort((a, b) => Number(new Date(b.createdAt)) - Number(new Date(a.createdAt)))
     .map((user) => toPublicUser(user));
   res.json(ok({ users }, randomUUID()));
@@ -252,8 +257,7 @@ export async function updateUserStatus(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "status", reason: "cannot_disable_self" }]);
   }
 
-  const store = await loadUsersStore();
-  const target = store.users.find((user) => user.id === userId);
+  const target = await getUsersRepository().findUserById(userId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
   }
@@ -262,9 +266,9 @@ export async function updateUserStatus(req: Request, res: Response) {
     return fail(res, 40301, "权限不足", [{ field: "user", reason: "sub_admin_cannot_disable_admin" }]);
   }
 
-  target.status = nextStatus;
-  await saveUsersStore(store);
-  res.json(ok({ user: toPublicUser(target) }, randomUUID()));
+  // 阶段 2 批 2：行级条件 UPDATE（PG 侧单行原子，并发写不同用户互不覆盖）
+  const updated = await getUsersRepository().updateUserStatus({ id: userId, status: nextStatus });
+  res.json(ok({ user: toPublicUser(updated ?? { ...target, status: nextStatus }) }, randomUUID()));
 }
 
 export async function updateUserRole(req: Request, res: Response) {
@@ -285,8 +289,8 @@ export async function updateUserRole(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "role", reason: "invalid" }]);
   }
 
-  const store = await loadUsersStore();
-  const target = store.users.find((u) => u.id === userId);
+  const allUsers = await getUsersRepository().listUsers();
+  const target = allUsers.find((u) => u.id === userId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
   }
@@ -301,15 +305,14 @@ export async function updateUserRole(req: Request, res: Response) {
   }
 
   if (target.role === "admin" && nextRole !== "admin") {
-    const adminCount = store.users.filter((u) => u.role === "admin").length;
+    const adminCount = allUsers.filter((u) => u.role === "admin").length;
     if (adminCount <= 1) {
       return fail(res, 40001, "参数错误", [{ field: "role", reason: "last_admin_demote_forbidden" }]);
     }
   }
 
-  target.role = nextRole;
-  await saveUsersStore(store);
-  res.json(ok({ user: toPublicUser(target) }, randomUUID()));
+  const updated = await getUsersRepository().updateUserRole({ id: userId, role: nextRole });
+  res.json(ok({ user: toPublicUser(updated ?? { ...target, role: nextRole }) }, randomUUID()));
 }
 
 export async function updateUserBusinessRole(req: Request, res: Response) {
@@ -328,8 +331,7 @@ export async function updateUserBusinessRole(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "businessRole", reason: "invalid" }]);
   }
 
-  const store = await loadUsersStore();
-  const target = store.users.find((u) => u.id === userId);
+  const target = await getUsersRepository().findUserById(userId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
   }
@@ -338,9 +340,8 @@ export async function updateUserBusinessRole(req: Request, res: Response) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "cannot_modify_super_admin" }]);
   }
 
-  target.businessRole = rawBusinessRole;
-  await saveUsersStore(store);
-  res.json(ok({ user: toPublicUser(target) }, randomUUID()));
+  const updated = await getUsersRepository().updateUserBusinessRole({ id: userId, businessRole: rawBusinessRole });
+  res.json(ok({ user: toPublicUser(updated ?? { ...target, businessRole: rawBusinessRole }) }, randomUUID()));
 }
 
 export async function updateUserPassword(req: Request, res: Response) {
@@ -359,8 +360,7 @@ export async function updateUserPassword(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "password", reason: "min_length_8" }]);
   }
 
-  const store = await loadUsersStore();
-  const target = store.users.find((u) => u.id === userId);
+  const target = await getUsersRepository().findUserById(userId);
   if (!target) {
     return fail(res, 40401, "资源不存在", [{ field: "userId", reason: "not_found" }]);
   }
@@ -369,9 +369,11 @@ export async function updateUserPassword(req: Request, res: Response) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "cannot_modify_super_admin" }]);
   }
 
-  target.passwordHash = await bcrypt.hash(password, 10);
-  await saveUsersStore(store);
-  res.json(ok({ user: toPublicUser(target) }, randomUUID()));
+  const updated = await getUsersRepository().updateUserPasswordHash({
+    id: userId,
+    passwordHash: await bcrypt.hash(password, 10),
+  });
+  res.json(ok({ user: toPublicUser(updated ?? target) }, randomUUID()));
 }
 
 export async function listInviteCodes(req: Request, res: Response) {

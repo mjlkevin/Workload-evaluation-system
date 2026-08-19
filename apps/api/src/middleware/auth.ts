@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { config } from "../config/env";
 import { AuthUser, AuthJwtPayload, BusinessRole, UsersStore } from "../types";
 import { asString, usersStorePath } from "../utils";
+import { getUsersRepository } from "../modules/auth/users.repository";
 
 // -------------------- 用户存储操作 --------------------
 
@@ -39,7 +40,9 @@ export function resolveBusinessRole(user: Pick<AuthUser, "role" | "businessRole"
 
 /**
  * 阶段 1 批 3：签名改 async（Promise<UsersStore>），函数体一字未动——
- * 仍走 JSON 文件同步 I/O，换实现属阶段 2。
+ * 仍走 JSON 文件同步 I/O。
+ * 阶段 2 批 2：保留为 users 域 JSON 后端的 accessor（供 JSON 仓储封装），
+ * 生产请求路径已改经 getUsersRepository() 选择器；第 4 步删除。
  */
 export async function loadUsersStore(): Promise<UsersStore> {
   const filePath = usersStorePath();
@@ -62,6 +65,7 @@ export async function loadUsersStore(): Promise<UsersStore> {
 
 /**
  * 阶段 1 批 3：签名改 async（Promise<void>），函数体一字未动。
+ * 阶段 2 批 2：同 loadUsersStore，保留为 JSON 后端 accessor，第 4 步删除。
  */
 export async function saveUsersStore(store: UsersStore): Promise<void> {
   const filePath = usersStorePath();
@@ -140,6 +144,8 @@ export function resolveApiRoleFromUser(user: AuthUser): "admin" | "operator" {
  *
  * 阶段 1 批 2：签名改 async（Promise<...|null>），函数体一字未动。
  * 阶段 1 批 3：内部 loadUsersStore 已异步化，补 await 调用。
+ * 阶段 2 批 2：改经 getUsersRepository()（缺省 JSON / WES_STORE_USERS_PG=true 切 PG，
+ * PG 侧读路径命中写穿缓存，认证请求零 DB 往返）。
  */
 export async function requireAuth(
   req: Request,
@@ -165,9 +171,8 @@ export async function requireAuth(
     });
     return null;
   }
-  const store = await loadUsersStore();
-  const user = store.users.find((x) => x.id === payload.sub && x.username === payload.username);
-  if (!user || user.status !== "active") {
+  const user = await getUsersRepository().findUserById(payload.sub);
+  if (!user || user.username !== payload.username || user.status !== "active") {
     res.status(401).json({
       code: 40103,
       message: "用户不可用",
