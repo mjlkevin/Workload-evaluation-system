@@ -33,6 +33,20 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        // 前端插批（项三）：vendor 切分——react 生态独立缓存，
+        // 配合路由级 lazy import 避免单 chunk 全量下载。
+        // 用函数式按 node_modules 目录归属匹配，覆盖 CJS 包内
+        // 全部子模块（react 主体在 react/cjs/* 而非入口 index.js）
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('/react-router') || id.includes('/@remix-run/')) return 'vendor-router'
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'vendor-react'
+          return undefined
+        },
+      },
+    },
   },
   test: {
     environment: 'jsdom',

@@ -1,29 +1,34 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import Shell from './components/Layout/Shell.jsx'
 import ToastContainer from './components/ui/ToastContainer.jsx'
 import { ToastProvider } from './hooks/useToast.jsx'
+// 前端插批（项三）：首屏必需路径保持 eager（懒加载反增往返）：
+// Login / ResetPassword（未登录首屏）、HomePage（登录后默认落地页，
+// 含 AI 工作台）、ProtectedLayout 与 Shell（布局骨架）。
 import HomePage from './pages/HomePage.jsx'
-import TraditionalHomeDashboard from './pages/TraditionalHomeDashboard.jsx'
-import AssessmentList from './pages/AssessmentList.jsx'
-import AssessmentDetail from './pages/AssessmentDetail.jsx'
-import RequirementList from './pages/RequirementList.jsx'
-import RequirementDetail from './pages/RequirementDetail.jsx'
-import RequirementAiWorkbench from './pages/RequirementAiWorkbench.jsx'
-import DevAssessmentList from './pages/DevAssessmentList.jsx'
-import DevAssessmentDetail from './pages/DevAssessmentDetail.jsx'
-import ResourceCostList from './pages/ResourceCostList.jsx'
-import ResourceCostDetail from './pages/ResourceCostDetail.jsx'
-import ReviewList from './pages/ReviewList.jsx'
-import ReviewDetail from './pages/ReviewDetail.jsx'
-import WbsList from './pages/WbsList.jsx'
-import HistoryList from './pages/HistoryList.jsx'
-import HistoryDetail from './pages/HistoryDetail.jsx'
-import SystemManagement from './pages/SystemManagement.jsx'
-import UserManagement from './pages/UserManagement.jsx'
-import ApiKeys from './pages/ApiKeys.jsx'
 import Login from './pages/Login.jsx'
 import ResetPassword from './pages/ResetPassword.jsx'
+// 前端插批（项三）：其余 18 个路由页面改为路由级懒加载，
+// 配合 vite manualChunks 切分，登录页不再下载整个应用
+const TraditionalHomeDashboard = lazy(() => import('./pages/TraditionalHomeDashboard.jsx'))
+const AssessmentList = lazy(() => import('./pages/AssessmentList.jsx'))
+const AssessmentDetail = lazy(() => import('./pages/AssessmentDetail.jsx'))
+const RequirementList = lazy(() => import('./pages/RequirementList.jsx'))
+const RequirementDetail = lazy(() => import('./pages/RequirementDetail.jsx'))
+const RequirementAiWorkbench = lazy(() => import('./pages/RequirementAiWorkbench.jsx'))
+const DevAssessmentList = lazy(() => import('./pages/DevAssessmentList.jsx'))
+const DevAssessmentDetail = lazy(() => import('./pages/DevAssessmentDetail.jsx'))
+const ResourceCostList = lazy(() => import('./pages/ResourceCostList.jsx'))
+const ResourceCostDetail = lazy(() => import('./pages/ResourceCostDetail.jsx'))
+const ReviewList = lazy(() => import('./pages/ReviewList.jsx'))
+const ReviewDetail = lazy(() => import('./pages/ReviewDetail.jsx'))
+const WbsList = lazy(() => import('./pages/WbsList.jsx'))
+const HistoryList = lazy(() => import('./pages/HistoryList.jsx'))
+const HistoryDetail = lazy(() => import('./pages/HistoryDetail.jsx'))
+const SystemManagement = lazy(() => import('./pages/SystemManagement.jsx'))
+const UserManagement = lazy(() => import('./pages/UserManagement.jsx'))
+const ApiKeys = lazy(() => import('./pages/ApiKeys.jsx'))
 import { isAuthenticated } from './api/auth.js'
 import { DEFAULT_SYSTEM_MANAGEMENT_ROUTE, SYSTEM_MANAGEMENT_SECTIONS } from './config/systemManagementSections.js'
 import useCurrentUser from './hooks/useCurrentUser.js'
@@ -49,7 +54,15 @@ function ProtectedLayout() {
 
   return (
     <Shell currentUser={user}>
-      <Outlet />
+      {/* 前端插批（项三）：懒加载页面的统一加载态（Shell 骨架已可见） */}
+      <Suspense fallback={(
+        <div role="status" style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+          页面加载中…
+        </div>
+      )}
+      >
+        <Outlet />
+      </Suspense>
     </Shell>
   )
 }
