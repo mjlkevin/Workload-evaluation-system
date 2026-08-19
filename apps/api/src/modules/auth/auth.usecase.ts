@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
-import { AuthUser, InviteCodeRecord, PasswordResetTokenRecord } from "../../types";
+import { AuthUser } from "../../types";
 import { config } from "../../config/env";
 import { asString, generateInviteCode } from "../../utils";
 import { ok, fail } from "../../utils/response";
@@ -17,15 +17,11 @@ import {
   isBusinessRole,
   defaultBusinessRoleForSystemRole,
 } from "../../middleware/auth";
-import {
-  loadInviteCodesStore,
-  loadPasswordResetTokensStore,
-  saveInviteCodesStore,
-  savePasswordResetTokensStore,
-} from "./auth.repository";
+import { getAuthRepository } from "./auth.repository";
 
 const REMEMBER_ME_EXPIRES_IN = "7d";
 const PASSWORD_RESET_EXPIRES_MINUTES = 30;
+const PASSWORD_RESET_TTL_MS = PASSWORD_RESET_EXPIRES_MINUTES * 60 * 1000;
 
 function asBoolean(value: unknown): boolean {
   return value === true || value === "true" || value === 1 || value === "1";
@@ -49,8 +45,8 @@ export async function register(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "inviteCode", reason: "required" }]);
   }
 
-  const inviteStore = await loadInviteCodesStore();
-  const inviteRecord = inviteStore.codes.find((item) => item.code.toUpperCase() === inviteCode);
+  const repo = getAuthRepository();
+  const inviteRecord = await repo.findInviteCode(inviteCode);
   if (!inviteRecord || inviteRecord.status !== "active") {
     return fail(res, 40001, "参数错误", [{ field: "inviteCode", reason: "invalid_invite_code" }]);
   }
@@ -69,10 +65,22 @@ export async function register(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "username", reason: "already_exists" }]);
   }
 
+  // 阶段 2 批 1：CAS 先消费邀请码再落用户（PG 侧条件 UPDATE 保证并发注册
+  // 恰好一个赢家；旧 JSON 流程为「先落用户后标码」，并发下会双重消费）。
+  const userId = randomUUID();
+  const usedInvite = await repo.markInviteCodeUsed({
+    code: inviteRecord.code,
+    usedByUserId: userId,
+    usedByUsername: username,
+  });
+  if (!usedInvite) {
+    return fail(res, 40001, "参数错误", [{ field: "inviteCode", reason: "invalid_invite_code" }]);
+  }
+
   const nowIso = new Date().toISOString();
   const role: AuthUser["role"] = store.users.length === 0 ? "admin" : "user";
   const user: AuthUser = {
-    id: randomUUID(),
+    id: userId,
     username,
     passwordHash: await bcrypt.hash(password, 10),
     role,
@@ -84,12 +92,6 @@ export async function register(req: Request, res: Response) {
 
   store.users.push(user);
   await saveUsersStore(store);
-
-  inviteRecord.status = "used";
-  inviteRecord.usedAt = nowIso;
-  inviteRecord.usedByUserId = user.id;
-  inviteRecord.usedByUsername = user.username;
-  await saveInviteCodesStore(inviteStore);
 
   const token = signAuthToken(user);
   res.json(ok({ token, user: toPublicUser(user) }, requestId));
@@ -150,26 +152,16 @@ export async function requestPasswordReset(req: Request, res: Response) {
   }
 
   const token = createResetToken();
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + PASSWORD_RESET_EXPIRES_MINUTES * 60 * 1000);
-  const resetStore = await loadPasswordResetTokensStore();
-  for (const item of resetStore.tokens) {
-    if (item.userId === user.id && item.status === "active") {
-      item.status = "used";
-      item.usedAt = now.toISOString();
-    }
-  }
-  const record: PasswordResetTokenRecord = {
-    id: randomUUID(),
+  const repo = getAuthRepository();
+  // 阶段 2 批 1：先作废存量 active 令牌，再签发新令牌（expiresAt 由仓储
+  // 以 DB 时钟 + TTL 计算，禁止调用方传主机时间）。
+  await repo.deactivateActiveResetTokens({ userId: user.id });
+  await repo.createResetToken({
     userId: user.id,
     username: user.username,
     tokenHash: hashResetToken(token),
-    status: "active",
-    createdAt: now.toISOString(),
-    expiresAt: expiresAt.toISOString(),
-  };
-  resetStore.tokens.push(record);
-  await savePasswordResetTokensStore(resetStore);
+    ttlMs: PASSWORD_RESET_TTL_MS,
+  });
 
   res.json(ok({
     accepted: true,
@@ -191,9 +183,8 @@ export async function confirmPasswordReset(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "password", reason: "min_length_8" }]);
   }
 
-  const resetStore = await loadPasswordResetTokensStore();
-  const tokenHash = hashResetToken(token);
-  const record = resetStore.tokens.find((item) => item.tokenHash === tokenHash);
+  const repo = getAuthRepository();
+  const record = await repo.findResetTokenByHash(hashResetToken(token));
   if (!record || record.status !== "active" || Number(new Date(record.expiresAt)) <= Date.now()) {
     return fail(res, 40001, "参数错误", [{ field: "token", reason: "invalid_or_expired" }]);
   }
@@ -201,18 +192,19 @@ export async function confirmPasswordReset(req: Request, res: Response) {
   const store = await loadUsersStore();
   const user = store.users.find((item) => item.id === record.userId && item.status === "active");
   if (!user) {
-    record.status = "used";
-    record.usedAt = new Date().toISOString();
-    await savePasswordResetTokensStore(resetStore);
+    await repo.consumeResetToken({ tokenId: record.id });
     return fail(res, 40001, "参数错误", [{ field: "token", reason: "invalid_or_expired" }]);
   }
 
   user.passwordHash = await bcrypt.hash(password, 10);
   await saveUsersStore(store);
 
-  record.status = "used";
-  record.usedAt = new Date().toISOString();
-  await savePasswordResetTokensStore(resetStore);
+  // CAS 消费：active 且未过期（PG 侧另以 DB 时钟双重校验）；
+  // 竞争失败/临界过期 → 拒绝（密码已改但令牌重复消费场景以失败告知）。
+  const consumed = await repo.consumeResetToken({ tokenId: record.id });
+  if (!consumed) {
+    return fail(res, 40001, "参数错误", [{ field: "token", reason: "invalid_or_expired" }]);
+  }
 
   res.json(ok({ success: true }, requestId));
 }
@@ -389,9 +381,9 @@ export async function listInviteCodes(req: Request, res: Response) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "admin_required" }]);
   }
 
-  const store = await loadInviteCodesStore();
-  const codes = [...store.codes].sort((a, b) => Number(new Date(b.createdAt)) - Number(new Date(a.createdAt)));
-  res.json(ok({ codes }, randomUUID()));
+  const codes = await getAuthRepository().listInviteCodes();
+  const sorted = [...codes].sort((a, b) => Number(new Date(b.createdAt)) - Number(new Date(a.createdAt)));
+  res.json(ok({ codes: sorted }, randomUUID()));
 }
 
 export async function generateInviteCodeHandler(req: Request, res: Response) {
@@ -401,17 +393,12 @@ export async function generateInviteCodeHandler(req: Request, res: Response) {
     return fail(res, 40301, "权限不足", [{ field: "role", reason: "admin_required" }]);
   }
 
-  const store = await loadInviteCodesStore();
-  const existing = new Set(store.codes.map((item) => item.code.toUpperCase()));
+  const repo = getAuthRepository();
+  const codes = await repo.listInviteCodes();
+  const existing = new Set(codes.map((item) => item.code.toUpperCase()));
   const code = generateInviteCode(existing);
 
-  const record: InviteCodeRecord = {
-    code,
-    status: "active",
-    createdAt: new Date().toISOString(),
-  };
-
-  store.codes.push(record);
-  await saveInviteCodesStore(store);
+  // 幂等插入；码空间碰撞（概率近零）时返回既有记录而非报错
+  const { record } = await repo.createInviteCode({ code });
   res.json(ok({ code: record }, randomUUID()));
 }
