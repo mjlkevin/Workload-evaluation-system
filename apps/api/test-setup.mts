@@ -70,3 +70,14 @@ if (USE_TC) {
 } else {
   // Local dev: do nothing, tests will fall back to local Postgres.app
 }
+
+// 阶段 1 批 8 skip 计数守卫：CI 模式且 TEST_DATABASE_URL 缺失时，DB 依赖用例
+// （{ skip: !testDatabaseUrl }）会静默跳过造成假绿；直接抛错使套件失败。
+// 本地（CI != true）保持既有跳过行为。testcontainers 分支已设置
+// TEST_DATABASE_URL，不会误触发。
+if (process.env.CI === "true" && !process.env.TEST_DATABASE_URL) {
+  throw new Error(
+    "[test:setup] CI 模式缺少 TEST_DATABASE_URL：DB 依赖套件将全部 skip（假绿）。" +
+      "请在 CI 配置 TEST_DATABASE_URL（或移除 DATABASE_URL 以启用 testcontainers 自动拉起）。",
+  );
+}

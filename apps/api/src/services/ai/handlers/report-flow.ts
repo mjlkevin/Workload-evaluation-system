@@ -56,7 +56,7 @@ export async function runExplicitHomeReportFlow(params: {
   const sourceFiles: string[] = useMulti
     ? allAttachments.map((a) => a.name)
     : [parsedAttachment.name];
-  const updatedSession = appendAiSessionEvent(user, session.sessionId, {
+  const updatedSession = (await appendAiSessionEvent(user, session.sessionId, {
     message: { role: "assistant", content: answer, artifactIds: [artifactId] },
     artifact: {
       artifactId,
@@ -76,7 +76,7 @@ export async function runExplicitHomeReportFlow(params: {
         missingItems: report.missingItems,
       },
     },
-  }) || getAiSession(user, session.sessionId) || sessionWithUserTurn;
+  })) || (await getAiSession(user, session.sessionId)) || sessionWithUserTurn;
   // RP-008: 报告生成后，若提取到客户名称，自动添加“检索主体”建议动作
   const reportSuggestedActions: Array<{ id: string; label: string; actionType: string; payload?: Record<string, string> }> = [];
   if (report.customerName && report.customerName !== "待补充") {

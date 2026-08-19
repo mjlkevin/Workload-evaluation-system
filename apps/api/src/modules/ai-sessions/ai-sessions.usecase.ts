@@ -68,7 +68,8 @@ function normalizeRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-export function createAiSession(user: AuthUser, input: { title?: unknown; domain?: unknown; workflowKey?: unknown; status?: unknown }): AiSessionRecord {
+/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+export async function createAiSession(user: AuthUser, input: { title?: unknown; domain?: unknown; workflowKey?: unknown; status?: unknown }): Promise<AiSessionRecord> {
   const nowIso = new Date().toISOString();
   const session: AiSessionRecord = {
     sessionId: randomUUID(),
@@ -88,16 +89,17 @@ export function createAiSession(user: AuthUser, input: { title?: unknown; domain
     createdAt: nowIso,
     updatedAt: nowIso,
   };
-  const store = loadAiSessionsStore();
+  const store = await loadAiSessionsStore();
   store.sessions.unshift(session);
-  saveAiSessionsStore(store);
+  await saveAiSessionsStore(store);
   return session;
 }
 
-export function listAiSessions(user: AuthUser, filters: { domain?: unknown; status?: unknown } = {}): AiSessionRecord[] {
+/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+export async function listAiSessions(user: AuthUser, filters: { domain?: unknown; status?: unknown } = {}): Promise<AiSessionRecord[]> {
   const domain = asString(filters.domain);
   const status = asString(filters.status);
-  return loadAiSessionsStore().sessions
+  return (await loadAiSessionsStore()).sessions
     .filter((session) => session.ownerUserId === user.id)
     .filter((session) => !domain || session.domain === domain)
     .filter((session) => !status || session.status === status)
@@ -154,7 +156,8 @@ function parseAuditTimeBoundary(value: unknown, endOfDay: boolean): number | nul
  * 管理员审计视图：跨用户聚合全部会话并输出摘要。
  * 摘要不携带 messages 原文数组，仅保留首轮输入/最终输出截断文本。
  */
-export function listAllAiSessionsForAdmin(filters: AdminAiSessionFilters = {}): AdminAiSessionSummary[] {
+/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+export async function listAllAiSessionsForAdmin(filters: AdminAiSessionFilters = {}): Promise<AdminAiSessionSummary[]> {
   const q = asString(filters.q).trim().toLowerCase();
   const status = asString(filters.status);
   const domain = asString(filters.domain);
@@ -165,7 +168,7 @@ export function listAllAiSessionsForAdmin(filters: AdminAiSessionFilters = {}): 
     ? Math.min(Math.floor(limitRaw), ADMIN_AUDIT_MAX_LIMIT)
     : ADMIN_AUDIT_DEFAULT_LIMIT;
 
-  return loadAiSessionsStore().sessions
+  return (await loadAiSessionsStore()).sessions
     .filter((session) => !status || session.status === status)
     .filter((session) => !domain || session.domain === domain)
     .filter((session) => {
@@ -206,23 +209,25 @@ export function listAllAiSessionsForAdmin(filters: AdminAiSessionFilters = {}): 
     });
 }
 
-export function getAiSession(user: AuthUser, sessionId: string): AiSessionRecord | null {
-  return loadAiSessionsStore().sessions.find((session) => session.ownerUserId === user.id && session.sessionId === sessionId) || null;
+/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+export async function getAiSession(user: AuthUser, sessionId: string): Promise<AiSessionRecord | null> {
+  return (await loadAiSessionsStore()).sessions.find((session) => session.ownerUserId === user.id && session.sessionId === sessionId) || null;
 }
 
-export function renameAiSession(user: AuthUser, sessionId: string, newTitle: unknown): AiSessionRecord | null {
+/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+export async function renameAiSession(user: AuthUser, sessionId: string, newTitle: unknown): Promise<AiSessionRecord | null> {
   const id = asString(sessionId);
   if (!id) return null;
   const rawTitle = asString(newTitle).trim();
   if (!rawTitle) return null;
   // 标题长度限制：1~80 字符，去除首尾空白
   const title = rawTitle.slice(0, 80);
-  const store = loadAiSessionsStore();
+  const store = await loadAiSessionsStore();
   const session = store.sessions.find((item) => item.ownerUserId === user.id && item.sessionId === id);
   if (!session) return null;
   session.title = title;
   session.updatedAt = new Date().toISOString();
-  saveAiSessionsStore(store);
+  await saveAiSessionsStore(store);
   return session;
 }
 
@@ -232,11 +237,12 @@ export type DeleteAiSessionDeps = {
 };
 
 /**
- * 删除会话。缺省（无 checker）保持同步布尔语义，既有调用方零改动；
+ * 删除会话。缺省（无 checker）保持原有布尔语义（await 解包后仍为 boolean）；
  * 注入 activeRunChecker 时返回 Promise，命中活跃 Run 抛
  * AiRunsConflictError(SESSION_HAS_ACTIVE_RUN) 且不删除会话（规格 §11.3）。
+ * 阶段 1 批 8：签名 1 由 boolean 改 Promise<boolean>（统一异步契约），实现 不动。
  */
-export function deleteAiSession(user: AuthUser, sessionId: string): boolean;
+export function deleteAiSession(user: AuthUser, sessionId: string): Promise<boolean>;
 export function deleteAiSession(
   user: AuthUser,
   sessionId: string,
@@ -246,14 +252,14 @@ export function deleteAiSession(
   user: AuthUser,
   sessionId: string,
   deps?: DeleteAiSessionDeps,
-): boolean | Promise<boolean> {
+): Promise<boolean> {
   const checker = deps?.activeRunChecker;
   if (!checker) return deleteAiSessionSync(user, sessionId);
   return (async () => {
     const id = asString(sessionId);
     if (!id) return false;
     // 先确认归属，保持与同步路径一致的 not-found 语义
-    const store = loadAiSessionsStore();
+    const store = await loadAiSessionsStore();
     const exists = store.sessions.some((session) => session.ownerUserId === user.id && session.sessionId === id);
     if (!exists) return false;
     if (await checker(id)) {
@@ -263,23 +269,25 @@ export function deleteAiSession(
   })();
 }
 
-function deleteAiSessionSync(user: AuthUser, sessionId: string): boolean {
+/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+async function deleteAiSessionSync(user: AuthUser, sessionId: string): Promise<boolean> {
   const id = asString(sessionId);
   if (!id) return false;
-  const store = loadAiSessionsStore();
+  const store = await loadAiSessionsStore();
   const beforeCount = store.sessions.length;
   store.sessions = store.sessions.filter((session) => !(session.ownerUserId === user.id && session.sessionId === id));
   if (store.sessions.length === beforeCount) return false;
-  saveAiSessionsStore(store);
+  await saveAiSessionsStore(store);
   return true;
 }
 
-export function appendAiSessionEvent(
+/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+export async function appendAiSessionEvent(
   user: AuthUser,
   sessionId: string,
   input: { message?: Partial<AiMessage>; attachments?: Array<Partial<AiAttachment>>; artifact?: Partial<AiArtifact>; pendingAction?: Partial<AiPendingAction> }
-): AiSessionRecord | null {
-  const store = loadAiSessionsStore();
+): Promise<AiSessionRecord | null> {
+  const store = await loadAiSessionsStore();
   const session = store.sessions.find((item) => item.ownerUserId === user.id && item.sessionId === sessionId);
   if (!session) return null;
 
@@ -355,6 +363,6 @@ export function appendAiSessionEvent(
   }
   if (!changed) return session;
   session.updatedAt = nowIso;
-  saveAiSessionsStore(store);
+  await saveAiSessionsStore(store);
   return session;
 }

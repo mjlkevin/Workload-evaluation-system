@@ -119,7 +119,7 @@ function makeSink(storePath: string, failures: { remaining: number }): HarnessSe
         failures.remaining -= 1;
         throw new Error("SINK_UNAVAILABLE");
       }
-      const result = appendAiSessionMessageIdempotent({
+      const result = await appendAiSessionMessageIdempotent({
         sessionId,
         message: {
           messageId: message.messageId ?? `msg-${randomUUID()}`,
@@ -150,19 +150,19 @@ function makeProjector(sink: HarnessSessionMessageSink, options: { lockMs?: numb
 // 单元：appendAiSessionMessageIdempotent 来源键幂等
 // ============================================================
 
-test("appendAiSessionMessageIdempotent dedupes by projection source key", () => {
+test("appendAiSessionMessageIdempotent dedupes by projection source key", async () => {
   const sessionId = `session-${randomUUID()}`;
   const storePath = makeSessionStore(sessionId, "owner-1");
   const source = { deduplicationKey: "run:r1:user-message:cm1", runId: "r1", eventType: "user_message" };
 
-  const first = appendAiSessionMessageIdempotent({
+  const first = await appendAiSessionMessageIdempotent({
     sessionId,
     message: { messageId: "m-1", role: "user", content: "hello", createdAt: new Date().toISOString() },
     source,
     storePath,
   });
   assert.equal(first.created, true);
-  const second = appendAiSessionMessageIdempotent({
+  const second = await appendAiSessionMessageIdempotent({
     sessionId,
     message: { messageId: "m-2", role: "user", content: "hello replayed", createdAt: new Date().toISOString() },
     source,
@@ -177,7 +177,7 @@ test("appendAiSessionMessageIdempotent dedupes by projection source key", () => 
   assert.equal(metadata.projectionSource?.deduplicationKey, source.deduplicationKey);
 });
 
-test("ISS-2026-08-11-007: attachment projection supplies a default for legacy sessions", () => {
+test("ISS-2026-08-11-007: attachment projection supplies a default for legacy sessions", async () => {
   const sessionId = `session-${randomUUID()}`;
   const storePath = makeSessionStore(sessionId, "owner-1");
   const legacyStore = readStore(storePath) as unknown as { sessions: Array<Record<string, unknown>> };
@@ -185,7 +185,7 @@ test("ISS-2026-08-11-007: attachment projection supplies a default for legacy se
   writeFileSync(storePath, JSON.stringify(legacyStore, null, 2), "utf-8");
 
   const createdAt = new Date().toISOString();
-  const result = appendAiSessionMessageIdempotent({
+  const result = await appendAiSessionMessageIdempotent({
     sessionId,
     message: { messageId: "m-legacy-attachment", role: "user", content: "请分析", createdAt, attachmentIds: ["att-1"] },
     attachments: [{ attachmentId: "att-1", name: "需求.xlsx", parsedSummary: "需求摘要", createdAt }],

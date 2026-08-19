@@ -85,7 +85,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
 
   try {
     const workflowKey = asString(body.workflowKey) || "free_chat";
-    const session = ensureHomeAiSession(user, {
+    const session = await ensureHomeAiSession(user, {
       sessionId: body.sessionId,
       workflowKey,
       title: userMessage.content.slice(0, 40),
@@ -93,10 +93,10 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
     traceSessionId = session.sessionId;
 
     // 记录用户消息到 session
-    const sessionWithUserTurn = appendAiSessionEvent(user, session.sessionId, {
+    const sessionWithUserTurn = (await appendAiSessionEvent(user, session.sessionId, {
       message: userMessage,
       attachments: userMessage.attachments,
-    }) || session;
+    })) || session;
 
     // ISS-2026-08-08-001: 请求级附件优先，缺失时回退到已落库会话附件（与非流式对齐）
     const parsedAttachment = latestParsedHomeAttachment(messages) ?? latestSessionAttachmentWithSummary(sessionWithUserTurn);
@@ -266,13 +266,13 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       ...(dispatchData.trace.modelRun ? { modelRun: dispatchData.trace.modelRun } : {}),
       ...(dispatchData.suggestedActions?.length ? { suggestedActions: dispatchData.suggestedActions, intent: dispatchData.intent } : {}),
     };
-    const updatedSession = appendAiSessionEvent(user, session.sessionId, {
+    const updatedSession = (await appendAiSessionEvent(user, session.sessionId, {
       message: {
         role: "assistant",
         content: fullContent,
         ...(Object.keys(assistantMetadata).length > 0 ? { metadata: assistantMetadata } : {}),
       },
-    }) || getAiSession(user, session.sessionId) || session;
+    })) || (await getAiSession(user, session.sessionId)) || session;
 
     // RP-030: 记录 trace
     try {

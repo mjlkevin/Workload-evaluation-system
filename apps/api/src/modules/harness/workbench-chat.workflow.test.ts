@@ -62,7 +62,7 @@ function readStoreFile(storePath: string): AiSessionsStore {
 
 /** 不关心用户消息落库的用例使用的 no-op dep。 */
 function makeNoOpAppendSessionMessage(): WorkbenchChatWorkflowDeps["appendSessionMessage"] {
-  return (input) => ({ found: true, created: false, message: input.message });
+  return async (input) => ({ found: true, created: false, message: input.message });
 }
 
 /** 不关心流式事件的用例使用的 no-op dep（ISS-2026-08-10-004 层 2 接线后 deps 必填）。 */
@@ -503,7 +503,7 @@ test("ISS-2026-08-16-002：第二轮无附件请求时，dispatchAttachment 从�
       },
       appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
       appendRunEvent: makeNoOpAppendRunEvent(),
-      getSessionRecord: (sessionId, ownerUserId) => {
+      getSessionRecord: async (sessionId, ownerUserId) => {
         const store = readStoreFile(storePath);
         return store.sessions.find((s) => s.sessionId === sessionId && s.ownerUserId === ownerUserId) ?? null;
       },
@@ -565,7 +565,7 @@ test("ISS-2026-08-16-002：请求级附件优先于会话级回退（不覆盖�
       },
       appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
       appendRunEvent: makeNoOpAppendRunEvent(),
-      getSessionRecord: (sessionId, ownerUserId) => {
+      getSessionRecord: async (sessionId, ownerUserId) => {
         const store = readStoreFile(storePath);
         return store.sessions.find((s) => s.sessionId === sessionId && s.ownerUserId === ownerUserId) ?? null;
       },
@@ -629,7 +629,7 @@ test("ISS-2026-08-16-004：显式报告闸门——附件存在且消息为「�
       },
       appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
       appendRunEvent: makeNoOpAppendRunEvent(),
-      getSessionRecord: (sid, uid) => {
+      getSessionRecord: async (sid, uid) => {
         const s = readStoreFile(storePath);
         return s.sessions.find((x) => x.sessionId === sid && x.ownerUserId === uid) ?? null;
       },

@@ -45,16 +45,16 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
 
   try {
     const workflowKey = asString(body.workflowKey) || "free_chat";
-    const session = ensureHomeAiSession(user, {
+    const session = await ensureHomeAiSession(user, {
       sessionId: body.sessionId,
       workflowKey,
       title: userMessage.content.slice(0, 40),
     });
     traceSessionId = session.sessionId;
-    const sessionWithUserTurn = appendAiSessionEvent(user, session.sessionId, {
+    const sessionWithUserTurn = (await appendAiSessionEvent(user, session.sessionId, {
       message: userMessage,
       attachments: userMessage.attachments,
-    }) || session;
+    })) || session;
     // ISS-2026-08-08-001: 请求级附件优先，缺失时回退到已落库会话附件（覆盖刷新/切换会话场景）
     const parsedAttachment = latestParsedHomeAttachment(messages) ?? latestSessionAttachmentWithSummary(sessionWithUserTurn);
     const allAttachments = allParsedHomeAttachments(messages);
@@ -129,13 +129,13 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
       ...(dispatchData.trace.memoryRef ? { memoryRef: dispatchData.trace.memoryRef } : {}),
       ...(dispatchData.suggestedActions?.length ? { suggestedActions: dispatchData.suggestedActions, intent: dispatchData.intent } : {}),
     };
-    const updatedSession = appendAiSessionEvent(user, session.sessionId, {
+    const updatedSession = (await appendAiSessionEvent(user, session.sessionId, {
       message: {
         role: "assistant",
         content: dispatchData.answer,
         ...(Object.keys(assistantMetadata).length > 0 ? { metadata: assistantMetadata } : {}),
       },
-    }) || getAiSession(user, session.sessionId) || sessionWithUserTurn;
+    })) || (await getAiSession(user, session.sessionId)) || sessionWithUserTurn;
     return res.json(ok({
       intent: dispatchData.intent,
       answer: dispatchData.answer,

@@ -82,10 +82,11 @@ export function latestUserMessage(messages: HomeMessageInput[]): { role: "user";
   return message ? { role: "user", content: message.content, attachments: message.attachments } : null;
 }
 
-export function ensureHomeAiSession(user: AuthUser, input: { sessionId?: unknown; workflowKey?: unknown; title?: unknown }): AiSessionRecord {
+/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 getAiSession/createAiSession），实现 不动。 */
+export async function ensureHomeAiSession(user: AuthUser, input: { sessionId?: unknown; workflowKey?: unknown; title?: unknown }): Promise<AiSessionRecord> {
   const requestedSessionId = asString(input.sessionId);
   if (requestedSessionId) {
-    const existing = getAiSession(user, requestedSessionId);
+    const existing = await getAiSession(user, requestedSessionId);
     if (existing) return existing;
   }
   const workflowKey = asString(input.workflowKey) || "free_chat";

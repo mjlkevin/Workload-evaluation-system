@@ -36,8 +36,9 @@ export type WorkbenchChatWorkflowDeps = {
   /**
    * 用户消息幂等落库（复用 ai-sessions 仓库公开 API，与投影 sink 同款）。
    * 生产接线见 harness-boot.ts；测试可注入指向临时存储的实现。
+   * 阶段 1 批 8：返回类型由同步改 Promise（底层 accessor 已异步化），实现 不动。
    */
-  appendSessionMessage(input: Omit<AppendAiSessionMessageIdempotentInput, "storePath">): AppendAiSessionMessageIdempotentResult;
+  appendSessionMessage(input: Omit<AppendAiSessionMessageIdempotentInput, "storePath">): Promise<AppendAiSessionMessageIdempotentResult>;
   /**
    * ISS-2026-08-10-004（层 2）：流式事件写入 run 事件流（additive）。
    * 生产接线复用 harness runtime repository 的 appendRunEvent（白名单校验后落库，
@@ -57,8 +58,9 @@ export type WorkbenchChatWorkflowDeps = {
    * 路径 workbench-chat.handler.ts L59 同一口径）。
    * 生产接线见 harness-boot.ts（复用 ai-sessions usecase）；测试注入临时存储实现。
    * 可选以保持 additive 不破坏既有构造点；未注入时回退静默跳过（行为同修复前）。
+   * 阶段 1 批 8：返回类型由同步改 Promise（底层 accessor 已异步化），实现 不动。
    */
-  getSessionRecord?(sessionId: string, ownerUserId: string): AiSessionRecord | null;
+  getSessionRecord?(sessionId: string, ownerUserId: string): Promise<AiSessionRecord | null>;
 };
 
 export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): HarnessWorkflow {
@@ -95,11 +97,11 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       // 已落库会话附件（与同步路径 workbench-chat.handler.ts L59 同一口径）——
       // 覆盖「同一会话第二轮无附件请求」场景（如先传附件解析，再发"生成报告"）。
       const dispatchAttachment = attachments.find((attachment) => attachment.parsedSummary) ?? attachments[0]
-        ?? latestSessionAttachmentWithSummary(deps.getSessionRecord?.(aiSessionId, run.ownerUserId) ?? null);
+        ?? latestSessionAttachmentWithSummary((await deps.getSessionRecord?.(aiSessionId, run.ownerUserId)) ?? null);
 
       // C2 缺陷 B：用户消息先于 dispatch 幂等落库（旧同步路径同款结构）；
       // 来源键 run 维度 deduplicationKey，恢复重放由去重吸收，不重复。
-      deps.appendSessionMessage({
+      await deps.appendSessionMessage({
         sessionId: aiSessionId,
         message: {
           messageId: `msg-${randomUUID()}`,
@@ -121,7 +123,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       // 而不是走 dispatchHomeWorkbenchTurn 的意图分发（后者路由到静态文案）。
       // 与同步路径 workbench-chat.handler.ts L65 同一口径。
       if (dispatchAttachment && isExplicitReportRequest(content)) {
-        const sessionWithUserTurn = deps.getSessionRecord?.(aiSessionId, run.ownerUserId) ?? null;
+        const sessionWithUserTurn = (await deps.getSessionRecord?.(aiSessionId, run.ownerUserId)) ?? null;
         if (!sessionWithUserTurn) {
           throw new Error(`session not found: ${aiSessionId}`);
         }

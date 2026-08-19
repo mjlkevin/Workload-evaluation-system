@@ -391,15 +391,15 @@ test("deleteAiSession stays backward compatible without a checker", async () => 
   const { createAiSession, deleteAiSession } = await import("../ai-sessions/ai-sessions.usecase");
   const { loadAiSessionsStore } = await import("../ai-sessions/ai-sessions.repository");
   const user = makeUser();
-  const session = createAiSession(user, { title: "待删除" });
+  const session = await createAiSession(user, { title: "待删除" });
   try {
-    assert.equal(deleteAiSession(user, session.sessionId), true, "缺省路径必须保持同步布尔语义");
-    assert.equal(loadAiSessionsStore().sessions.some((item) => item.sessionId === session.sessionId), false);
+    assert.equal(await deleteAiSession(user, session.sessionId), true, "缺省路径保持原有布尔语义（await 解包）");
+    assert.equal((await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId), false);
   } finally {
-    const store = loadAiSessionsStore();
+    const store = await loadAiSessionsStore();
     store.sessions = store.sessions.filter((item) => item.ownerUserId !== user.id);
     const { saveAiSessionsStore } = await import("../ai-sessions/ai-sessions.repository");
-    saveAiSessionsStore(store);
+    await saveAiSessionsStore(store);
   }
 });
 
@@ -407,7 +407,7 @@ test("deleteAiSession rejects deletion with 409 SESSION_HAS_ACTIVE_RUN when a ch
   const { createAiSession, deleteAiSession } = await import("../ai-sessions/ai-sessions.usecase");
   const { loadAiSessionsStore, saveAiSessionsStore } = await import("../ai-sessions/ai-sessions.repository");
   const user = makeUser();
-  const session = createAiSession(user, { title: "有活跃 Run" });
+  const session = await createAiSession(user, { title: "有活跃 Run" });
   try {
     await assert.rejects(
       deleteAiSession(user, session.sessionId, { activeRunChecker: async () => true }),
@@ -416,13 +416,13 @@ test("deleteAiSession rejects deletion with 409 SESSION_HAS_ACTIVE_RUN when a ch
         (err as { code?: string }).code === "SESSION_HAS_ACTIVE_RUN" &&
         (err as { status?: number }).status === 409,
     );
-    assert.equal(loadAiSessionsStore().sessions.some((item) => item.sessionId === session.sessionId), true, "冲突时不得删除会话");
+    assert.equal((await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId), true, "冲突时不得删除会话");
 
     assert.equal(await deleteAiSession(user, session.sessionId, { activeRunChecker: async () => false }), true);
   } finally {
-    const store = loadAiSessionsStore();
+    const store = await loadAiSessionsStore();
     store.sessions = store.sessions.filter((item) => item.ownerUserId !== user.id);
-    saveAiSessionsStore(store);
+    await saveAiSessionsStore(store);
   }
 });
 
