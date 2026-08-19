@@ -300,3 +300,58 @@ test("并发修改同一用户状态：最终收敛、无撕裂、无丢失", { 
   const reread = await repo!.findUserById(input.id);
   assert.equal(reread!.status, dbUser.status, "回源后缓存必须与 DB 一致");
 });
+
+test("缓存 TTL：TTL 内保持陈旧，到期后回源自愈（多副本永久分歧降级为短暂陈旧）", { skip: !testDatabaseUrl }, async () => {
+  const input = makeUserInput();
+  await repo!.createUser(input);
+
+  // 短 TTL 实例（与主实例共享 db）
+  const shortTtlRepo = createUsersPgRepository(repo!.__dbForTest(), 60);
+  const warm = await shortTtlRepo.findUserById(input.id);
+  assert.equal(warm!.status, "active");
+
+  // 旁路篡改 DB（模拟另一副本写入）
+  await pool!.query("UPDATE users SET status = 'disabled' WHERE user_id = $1", [input.id]);
+
+  // TTL 内：读路径命中缓存，返回陈旧值（预期行为，窗口有界）
+  const stale = await shortTtlRepo.findUserById(input.id);
+  assert.equal(stale!.status, "active", "TTL 内允许短暂陈旧");
+
+  // 越过 TTL：回源重建，自愈为 DB 真值
+  await new Promise((r) => setTimeout(r, 80));
+  const healed = await shortTtlRepo.findUserById(input.id);
+  assert.equal(healed!.status, "disabled", "TTL 到期后必须回源自愈（不得永久分歧）");
+
+  await pool!.query("UPDATE users SET status = 'active' WHERE user_id = $1", [input.id]);
+});
+// JSON 整存 RMW 真正丢数据的机制：并发修改用户 A 与 B 时，后写者把前写者的
+// 改动整个覆盖。本用例以确定性断言捕捉：A 全部写 role=sub_admin、B 全部写
+// status=disabled，任何一侧丢失更新都会回退初值而使断言失败。
+
+test("并发修改不同用户：全部生效、无互相覆盖（整存 RMW 丢失更新回归对照）", { skip: !testDatabaseUrl }, async () => {
+  const inputA = makeUserInput();
+  const inputB = makeUserInput();
+  await repo!.createUser(inputA);
+  await repo!.createUser(inputB);
+
+  const attempts = [
+    ...Array.from({ length: 4 }, () => repo!.updateUserRole({ id: inputA.id, role: "sub_admin" })),
+    ...Array.from({ length: 4 }, () => repo!.updateUserStatus({ id: inputB.id, status: "disabled" })),
+  ];
+  const results = await Promise.all(attempts);
+  assert.equal(results.filter((r) => r === null).length, 0, "8 路条件 UPDATE 必须全部命中");
+
+  const dbA = await readDbUser(inputA.username);
+  const dbB = await readDbUser(inputB.username);
+  assert.equal(dbA.role, "sub_admin", "用户 A 的角色变更不得被用户 B 的并发写覆盖（整存 RMW 下会丢）");
+  assert.equal(dbB.status, "disabled", "用户 B 的状态变更不得被用户 A 的并发写覆盖（整存 RMW 下会丢）");
+  // 未被写入的字段不得被撞改（无撕裂）
+  assert.equal(dbA.status, "active", "用户 A 的状态未被任何写路径触及");
+  assert.equal(dbB.role, "user", "用户 B 的角色未被任何写路径触及");
+
+  repo!.resetUsersCache();
+  const rereadA = await repo!.findUserById(inputA.id);
+  const rereadB = await repo!.findUserById(inputB.id);
+  assert.equal(rereadA!.role, "sub_admin", "回源后缓存必须与 DB 一致（A）");
+  assert.equal(rereadB!.status, "disabled", "回源后缓存必须与 DB 一致（B）");
+});
