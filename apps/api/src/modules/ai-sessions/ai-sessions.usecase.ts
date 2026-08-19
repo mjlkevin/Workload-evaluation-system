@@ -4,7 +4,7 @@ import type { AuthUser } from "../../types";
 import { resolveBusinessRole } from "../../middleware/auth";
 import { asString } from "../../utils";
 import { AiRunsConflictError } from "../harness/harness-runtime.usecase";
-import { loadAiSessionsStore, saveAiSessionsStore } from "./ai-sessions.repository";
+import { getAiSessionsRepository } from "./ai-sessions.repository";
 import type {
   AiArtifact,
   AiArtifactStatus,
@@ -68,7 +68,7 @@ function normalizeRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+/** 阶段 2 批 3：函数体改经 getAiSessionsRepository()（缺省 JSON / WES_STORE_AI_SESSIONS_PG=true 切 PG），幂等插入由仓储层保证。 */
 export async function createAiSession(user: AuthUser, input: { title?: unknown; domain?: unknown; workflowKey?: unknown; status?: unknown }): Promise<AiSessionRecord> {
   const nowIso = new Date().toISOString();
   const session: AiSessionRecord = {
@@ -89,18 +89,15 @@ export async function createAiSession(user: AuthUser, input: { title?: unknown; 
     createdAt: nowIso,
     updatedAt: nowIso,
   };
-  const store = await loadAiSessionsStore();
-  store.sessions.unshift(session);
-  await saveAiSessionsStore(store);
-  return session;
+  const result = await getAiSessionsRepository().createSession({ session });
+  return result.session;
 }
 
-/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+/** 阶段 2 批 3：函数体改经仓储行级读（过滤/排序保留在 usecase 层）。 */
 export async function listAiSessions(user: AuthUser, filters: { domain?: unknown; status?: unknown } = {}): Promise<AiSessionRecord[]> {
   const domain = asString(filters.domain);
   const status = asString(filters.status);
-  return (await loadAiSessionsStore()).sessions
-    .filter((session) => session.ownerUserId === user.id)
+  return (await getAiSessionsRepository().listSessionsByOwner(user.id))
     .filter((session) => !domain || session.domain === domain)
     .filter((session) => !status || session.status === status)
     .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)));
@@ -156,7 +153,7 @@ function parseAuditTimeBoundary(value: unknown, endOfDay: boolean): number | nul
  * 管理员审计视图：跨用户聚合全部会话并输出摘要。
  * 摘要不携带 messages 原文数组，仅保留首轮输入/最终输出截断文本。
  */
-/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+/** 阶段 2 批 3：函数体改经仓储行级读（管理员审计跨用户全量）。 */
 export async function listAllAiSessionsForAdmin(filters: AdminAiSessionFilters = {}): Promise<AdminAiSessionSummary[]> {
   const q = asString(filters.q).trim().toLowerCase();
   const status = asString(filters.status);
@@ -168,7 +165,7 @@ export async function listAllAiSessionsForAdmin(filters: AdminAiSessionFilters =
     ? Math.min(Math.floor(limitRaw), ADMIN_AUDIT_MAX_LIMIT)
     : ADMIN_AUDIT_DEFAULT_LIMIT;
 
-  return (await loadAiSessionsStore()).sessions
+  return (await getAiSessionsRepository().listAllSessions())
     .filter((session) => !status || session.status === status)
     .filter((session) => !domain || session.domain === domain)
     .filter((session) => {
@@ -209,12 +206,12 @@ export async function listAllAiSessionsForAdmin(filters: AdminAiSessionFilters =
     });
 }
 
-/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+/** 阶段 2 批 3：函数体改经仓储行级读（归属过滤在仓储层）。 */
 export async function getAiSession(user: AuthUser, sessionId: string): Promise<AiSessionRecord | null> {
-  return (await loadAiSessionsStore()).sessions.find((session) => session.ownerUserId === user.id && session.sessionId === sessionId) || null;
+  return getAiSessionsRepository().findSession({ ownerUserId: user.id, sessionId });
 }
 
-/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+/** 阶段 2 批 3：函数体改经仓储行级条件 UPDATE（范式 #3），校验保留在 usecase 层。 */
 export async function renameAiSession(user: AuthUser, sessionId: string, newTitle: unknown): Promise<AiSessionRecord | null> {
   const id = asString(sessionId);
   if (!id) return null;
@@ -222,13 +219,7 @@ export async function renameAiSession(user: AuthUser, sessionId: string, newTitl
   if (!rawTitle) return null;
   // 标题长度限制：1~80 字符，去除首尾空白
   const title = rawTitle.slice(0, 80);
-  const store = await loadAiSessionsStore();
-  const session = store.sessions.find((item) => item.ownerUserId === user.id && item.sessionId === id);
-  if (!session) return null;
-  session.title = title;
-  session.updatedAt = new Date().toISOString();
-  await saveAiSessionsStore(store);
-  return session;
+  return getAiSessionsRepository().renameSession({ ownerUserId: user.id, sessionId: id, title });
 }
 
 export type DeleteAiSessionDeps = {
@@ -259,8 +250,7 @@ export function deleteAiSession(
     const id = asString(sessionId);
     if (!id) return false;
     // 先确认归属，保持与同步路径一致的 not-found 语义
-    const store = await loadAiSessionsStore();
-    const exists = store.sessions.some((session) => session.ownerUserId === user.id && session.sessionId === id);
+    const exists = await getAiSessionsRepository().findSession({ ownerUserId: user.id, sessionId: id });
     if (!exists) return false;
     if (await checker(id)) {
       throw new AiRunsConflictError("SESSION_HAS_ACTIVE_RUN", "会话存在进行中的异步任务，无法删除");
@@ -269,31 +259,23 @@ export function deleteAiSession(
   })();
 }
 
-/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+/** 阶段 2 批 3：函数体改经仓储行级条件 DELETE（范式 #3）。 */
 async function deleteAiSessionSync(user: AuthUser, sessionId: string): Promise<boolean> {
   const id = asString(sessionId);
   if (!id) return false;
-  const store = await loadAiSessionsStore();
-  const beforeCount = store.sessions.length;
-  store.sessions = store.sessions.filter((session) => !(session.ownerUserId === user.id && session.sessionId === id));
-  if (store.sessions.length === beforeCount) return false;
-  await saveAiSessionsStore(store);
-  return true;
+  return getAiSessionsRepository().deleteSession({ ownerUserId: user.id, sessionId: id });
 }
 
-/** 阶段 1 批 8：签名改 async（内部 await 已异步化的 accessor），实现 不动。 */
+/** 阶段 2 批 3：函数体改经仓储 appendSessionEvent（jsonb 原子追加，范式 #3）；归一化/校验保留在 usecase 层。 */
 export async function appendAiSessionEvent(
   user: AuthUser,
   sessionId: string,
   input: { message?: Partial<AiMessage>; attachments?: Array<Partial<AiAttachment>>; artifact?: Partial<AiArtifact>; pendingAction?: Partial<AiPendingAction> }
 ): Promise<AiSessionRecord | null> {
-  const store = await loadAiSessionsStore();
-  const session = store.sessions.find((item) => item.ownerUserId === user.id && item.sessionId === sessionId);
-  if (!session) return null;
-
+  const repo = getAiSessionsRepository();
   const nowIso = new Date().toISOString();
-  let changed = false;
   const messageInput = input.message;
+  const newAttachments: AiAttachment[] = [];
   const attachmentIds = Array.isArray(input.attachments)
     ? input.attachments
       .map((attachmentInput) => {
@@ -306,7 +288,7 @@ export async function appendAiSessionEvent(
             ? `${parsedSummaryRaw.slice(0, PARSED_SUMMARY_MAX_LENGTH)}…[truncated]`
             : parsedSummaryRaw
           : undefined;
-        session.attachments.push({
+        newAttachments.push({
           attachmentId,
           name,
           size: typeof attachmentInput.size === "number" ? attachmentInput.size : undefined,
@@ -318,11 +300,11 @@ export async function appendAiSessionEvent(
       })
       .filter(Boolean)
     : [];
-  if (attachmentIds.length > 0) changed = true;
+  const newMessages: AiMessage[] = [];
   const messageContent = asString(messageInput?.content);
   if (messageContent) {
     const metadata = normalizeRecord(messageInput?.metadata);
-    session.messages.push({
+    newMessages.push({
       messageId: messageInput?.messageId || randomUUID(),
       role: normalizeMessageRole(messageInput?.role),
       content: messageContent,
@@ -331,12 +313,12 @@ export async function appendAiSessionEvent(
       artifactIds: normalizeStringArray(messageInput?.artifactIds),
       ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     });
-    changed = true;
   }
+  const newArtifacts: AiArtifact[] = [];
   const artifactInput = input.artifact;
   const artifactTitle = asString(artifactInput?.title);
   if (artifactTitle) {
-    session.artifacts.push({
+    newArtifacts.push({
       artifactId: artifactInput?.artifactId || randomUUID(),
       type: asString(artifactInput?.type) || "note",
       title: artifactTitle,
@@ -345,12 +327,12 @@ export async function appendAiSessionEvent(
       createdAt: artifactInput?.createdAt || nowIso,
       sourceMessageId: artifactInput?.sourceMessageId,
     });
-    changed = true;
   }
+  const newPendingActions: AiPendingAction[] = [];
   const pendingActionInput = input.pendingAction;
   const pendingActionTitle = asString(pendingActionInput?.title);
   if (pendingActionTitle) {
-    session.pendingActions.push({
+    newPendingActions.push({
       actionId: pendingActionInput?.actionId || randomUUID(),
       actionType: asString(pendingActionInput?.actionType) || "unknown",
       title: pendingActionTitle,
@@ -359,10 +341,18 @@ export async function appendAiSessionEvent(
       payload: normalizeRecord(pendingActionInput?.payload),
       createdAt: pendingActionInput?.createdAt || nowIso,
     });
-    changed = true;
   }
-  if (!changed) return session;
-  session.updatedAt = nowIso;
-  await saveAiSessionsStore(store);
-  return session;
+  const changed = newAttachments.length > 0 || newMessages.length > 0 || newArtifacts.length > 0 || newPendingActions.length > 0;
+  if (!changed) {
+    // 与既有语义一致：无变更不落盘，返回会话现状（不存在为 null）
+    return repo.findSession({ ownerUserId: user.id, sessionId });
+  }
+  return repo.appendSessionEvent({
+    ownerUserId: user.id,
+    sessionId,
+    messages: newMessages,
+    attachments: newAttachments,
+    artifacts: newArtifacts,
+    pendingActions: newPendingActions,
+  });
 }
