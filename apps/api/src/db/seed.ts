@@ -117,7 +117,7 @@ export async function seedBaseConfig(options: SeedBaseConfigOptions = {}): Promi
   const insertedRules = await db
     .insert(versionCodeRules)
     .values(
-      sources.versionCodeRules.rules.map((rule: VersionCodeRule) => ({
+      sources.versionCodeRules.rules.map((rule: VersionCodeRule, index: number) => ({
         ruleId: rule.id,
         moduleKey: rule.moduleKey,
         moduleName: rule.moduleName,
@@ -126,6 +126,8 @@ export async function seedBaseConfig(options: SeedBaseConfigOptions = {}): Promi
         format: rule.format,
         sample: rule.sample,
         status: rule.status,
+        // JSON 数组顺序对 UI 可见，用数组下标保序
+        sortOrder: index,
         effectiveAt: parseDateOrNull(rule.effectiveAt),
         updatedAt: parseDateOrNow(rule.updatedAt),
       })),

@@ -37,6 +37,7 @@ import {
   importApiKeyIfAbsent,
 } from "./credentials.store";
 import { normalizeModelProviders, normalizeScenarioBindings } from "./model-providers";
+import { createSystemPgRepository, type SystemStoreRepository } from "./system-pg.repository";
 
 const EMPTY_TIME = "--";
 const DEFAULT_KIMI_EVALUATION_MODEL = "kimi-k2.5";
@@ -143,8 +144,8 @@ function normalizeStore(input: unknown): VersionCodeRulesStore {
   return { rules: normalized };
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
-export async function loadVersionCodeRulesStore(): Promise<VersionCodeRulesStore> {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
+async function loadVersionCodeRulesStoreJson(): Promise<VersionCodeRulesStore> {
   const filePath = versionCodeRulesStorePath();
   if (!fs.existsSync(filePath)) {
     const initStore: VersionCodeRulesStore = { rules: createDefaultRules() };
@@ -165,8 +166,8 @@ export async function loadVersionCodeRulesStore(): Promise<VersionCodeRulesStore
   }
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync），阶段 2 替换实现。 */
-export async function saveVersionCodeRulesStore(store: VersionCodeRulesStore): Promise<void> {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
+async function saveVersionCodeRulesStoreJson(store: VersionCodeRulesStore): Promise<void> {
   const filePath = versionCodeRulesStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const normalized = normalizeStore(store);
@@ -328,8 +329,8 @@ export function _resetKimiImportCheck(): void {
   _kimiImportChecked = false;
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
-export async function loadRequirementSystemConfigStore(): Promise<RequirementSystemConfigStore> {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
+async function loadRequirementSystemConfigStoreJson(): Promise<RequirementSystemConfigStore> {
   const filePath = requirementSystemConfigStorePath();
   if (!fs.existsSync(filePath)) {
     const now = new Date().toISOString();
@@ -386,8 +387,8 @@ export async function loadRequirementSystemConfigStore(): Promise<RequirementSys
   }
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync），阶段 2 替换实现。 */
-export async function saveRequirementSystemConfigStore(store: RequirementSystemConfigStore): Promise<void> {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
+async function saveRequirementSystemConfigStoreJson(store: RequirementSystemConfigStore): Promise<void> {
   const filePath = requirementSystemConfigStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const normalized = normalizeRequirementStore(store);
@@ -845,8 +846,8 @@ function normalizeImplementationDependencyStore(input: unknown): ImplementationD
   };
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
-export async function loadImplementationDependencyRulesStore(): Promise<ImplementationDependencyRulesStore> {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
+async function loadImplementationDependencyRulesStoreJson(): Promise<ImplementationDependencyRulesStore> {
   const filePath = implementationDependencyRulesStorePath();
   if (!fs.existsSync(filePath)) {
     const now = new Date().toISOString();
@@ -883,8 +884,8 @@ export async function loadImplementationDependencyRulesStore(): Promise<Implemen
   }
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync），阶段 2 替换实现。 */
-export async function saveImplementationDependencyRulesStore(store: ImplementationDependencyRulesStore): Promise<void> {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
+async function saveImplementationDependencyRulesStoreJson(store: ImplementationDependencyRulesStore): Promise<void> {
   const filePath = implementationDependencyRulesStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const normalized = normalizeImplementationDependencyStore(store);
@@ -1153,8 +1154,8 @@ function normalizeKnowledgeBaseStore(input: unknown): KnowledgeBaseConfigStore {
   };
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
-export async function loadKnowledgeBaseConfigStore(): Promise<KnowledgeBaseConfigStore> {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
+async function loadKnowledgeBaseConfigStoreJson(): Promise<KnowledgeBaseConfigStore> {
   const filePath = knowledgeBaseConfigStorePath();
   if (!fs.existsSync(filePath)) {
     const now = new Date().toISOString();
@@ -1191,8 +1192,8 @@ export async function loadKnowledgeBaseConfigStore(): Promise<KnowledgeBaseConfi
   }
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync），阶段 2 替换实现。 */
-export async function saveKnowledgeBaseConfigStore(store: KnowledgeBaseConfigStore): Promise<void> {
+/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
+async function saveKnowledgeBaseConfigStoreJson(store: KnowledgeBaseConfigStore): Promise<void> {
   const filePath = knowledgeBaseConfigStorePath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const normalized = normalizeKnowledgeBaseStore(store);
@@ -1365,4 +1366,97 @@ export async function resolveDraftKnowledgeBaseConfigForTest(
     return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE }, source: "env" };
   }
   return { apiKey: oKey || envKey, knowledgeId: oKid || envKid, model: config.zhipu.model, apiBaseUrl: config.zhipu.apiBaseUrl, retrievalParams: { ...DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS }, promptProfile: { ...DEFAULT_KNOWLEDGE_PROMPT_PROFILE }, source: "none" };
+}
+
+// ============================================================
+// 选择器（阶段 2 批 4 第 3 步开关：缺省 JSON，严格 === "true" 切 PG）
+// ============================================================
+// 约束（架构侧批 4 指令）：system.repository.ts 是阶段 3 拆分对象，
+// 本批只做存储切换——四组 load/save 样板原样保留，不抽取公共逻辑。
+// 8 个公开 accessor 保持原签名与原导出名（调用点零改动），内部经
+// getSystemRepository() 分流；路由层只做两件小事：
+//  1. save 前用既有私有 normalize 统一契约（PG 仓储是纯存储层，不做归一）；
+//  2. load 缺行/空表时用既有私有默认工厂兜底（对齐 JSON「缺文件建默认」，
+//     PG 路径不在读路径写回）。
+
+export type { SystemStoreRepository };
+
+/** JSON 实现装配（四组 Json 函数原样包装，无逻辑改动） */
+export function createSystemJsonRepository(): SystemStoreRepository {
+  return {
+    loadVersionCodeRulesStore: loadVersionCodeRulesStoreJson,
+    saveVersionCodeRulesStore: saveVersionCodeRulesStoreJson,
+    loadRequirementSystemConfigStore: loadRequirementSystemConfigStoreJson,
+    saveRequirementSystemConfigStore: saveRequirementSystemConfigStoreJson,
+    loadImplementationDependencyRulesStore: loadImplementationDependencyRulesStoreJson,
+    saveImplementationDependencyRulesStore: saveImplementationDependencyRulesStoreJson,
+    loadKnowledgeBaseConfigStore: loadKnowledgeBaseConfigStoreJson,
+    saveKnowledgeBaseConfigStore: saveKnowledgeBaseConfigStoreJson,
+  };
+}
+
+let defaultRepo: SystemStoreRepository | null = null;
+
+/** 进程内默认 repository 单例（生产路由使用）；开关只读一次，翻开关需重启 */
+export function getSystemRepository(): SystemStoreRepository {
+  if (!defaultRepo) {
+    defaultRepo =
+      process.env.WES_STORE_SYSTEM_PG === "true"
+        ? createSystemPgRepository()
+        : createSystemJsonRepository();
+  }
+  return defaultRepo;
+}
+
+/** 测试专用：重置单例 */
+export function _resetSystemRepositoryForTest(): void {
+  defaultRepo = null;
+}
+
+// ── 公开 accessor（原签名原导出名，调用点零改动） ──
+
+export async function loadVersionCodeRulesStore(): Promise<VersionCodeRulesStore> {
+  const store = await getSystemRepository().loadVersionCodeRulesStore();
+  // PG 空表（未 seed）时用默认规则兜底；JSON 路径自建文件，永不为空
+  return store.rules.length > 0 ? store : { rules: createDefaultRules() };
+}
+
+export async function saveVersionCodeRulesStore(store: VersionCodeRulesStore): Promise<void> {
+  await getSystemRepository().saveVersionCodeRulesStore(normalizeStore(store));
+}
+
+export async function loadRequirementSystemConfigStore(): Promise<RequirementSystemConfigStore> {
+  const store = await getSystemRepository().loadRequirementSystemConfigStore();
+  if (store) return store;
+  const now = new Date().toISOString();
+  const initial = createDefaultRequirementConfig();
+  return { version: 1, draft: initial, active: initial, updatedAt: now, effectiveAt: now };
+}
+
+export async function saveRequirementSystemConfigStore(store: RequirementSystemConfigStore): Promise<void> {
+  await getSystemRepository().saveRequirementSystemConfigStore(normalizeRequirementStore(store));
+}
+
+export async function loadImplementationDependencyRulesStore(): Promise<ImplementationDependencyRulesStore> {
+  const store = await getSystemRepository().loadImplementationDependencyRulesStore();
+  if (store) return store;
+  const now = new Date().toISOString();
+  const initial = createDefaultImplementationDependencyConfig();
+  return { version: 1, draft: initial, active: initial, updatedAt: now, effectiveAt: now };
+}
+
+export async function saveImplementationDependencyRulesStore(store: ImplementationDependencyRulesStore): Promise<void> {
+  await getSystemRepository().saveImplementationDependencyRulesStore(normalizeImplementationDependencyStore(store));
+}
+
+export async function loadKnowledgeBaseConfigStore(): Promise<KnowledgeBaseConfigStore> {
+  const store = await getSystemRepository().loadKnowledgeBaseConfigStore();
+  if (store) return store;
+  const now = new Date().toISOString();
+  const initial = createDefaultKnowledgeBaseConfig();
+  return { version: 1, draft: initial, active: initial, updatedAt: now, effectiveAt: now };
+}
+
+export async function saveKnowledgeBaseConfigStore(store: KnowledgeBaseConfigStore): Promise<void> {
+  await getSystemRepository().saveKnowledgeBaseConfigStore(normalizeKnowledgeBaseStore(store));
 }

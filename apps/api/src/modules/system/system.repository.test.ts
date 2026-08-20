@@ -5,8 +5,11 @@ import os from "node:os";
 import path from "node:path";
 
 import {
+  _resetKimiImportCheck,
+  _resetSystemRepositoryForTest,
   computeKnowledgeBaseConfigHash,
   computeKnowledgeBaseProfileHash,
+  getSystemRepository,
   loadRequirementSystemConfigStore,
   mergeKnowledgeBaseCredentialsPatch,
   normalizeKnowledgeBaseConfig,
@@ -14,8 +17,8 @@ import {
   saveRequirementSystemConfigStore,
   resolveActiveRequirementKimiApiKey,
   resolveDraftKimiApiKeyForTest,
-  _resetKimiImportCheck,
 } from "./system.repository";
+import { createSystemPgRepository } from "./system-pg.repository";
 import {
   resetCredentialCache,
   getCachedApiKey,
@@ -400,4 +403,84 @@ test("resolveDraftKimiApiKeyForTest: 从 DB 缓存读取草稿密钥", () => {
   assert.equal(fromCache.source, "draft");
 
   resetCredentialCache();
+});
+
+// ─── 选择器（阶段 2 批 4 第 3 步：缺省 JSON，严格 === "true" 切 PG） ───
+
+function isPgRepo(repo: unknown): boolean {
+  // PG 实现独有测试钩子（__dbForTest）作为装配指纹
+  return typeof (repo as { __dbForTest?: unknown }).__dbForTest === "function";
+}
+
+test("选择器缺省（未设开关）装配 JSON 实现", () => {
+  delete process.env.WES_STORE_SYSTEM_PG;
+  _resetSystemRepositoryForTest();
+  const repo = getSystemRepository();
+  assert.equal(isPgRepo(repo), false, "缺省必须走 JSON（回滚安全）");
+});
+
+test("选择器严格语义：仅 'true' 切 PG，歧义值一律 JSON", () => {
+  for (const value of ["1", "yes", "TRUE", "True", ""]) {
+    process.env.WES_STORE_SYSTEM_PG = value;
+    _resetSystemRepositoryForTest();
+    assert.equal(isPgRepo(getSystemRepository()), false, `歧义值 ${JSON.stringify(value)} 必须回落 JSON`);
+  }
+  process.env.WES_STORE_SYSTEM_PG = "true";
+  _resetSystemRepositoryForTest();
+  assert.equal(isPgRepo(getSystemRepository()), true, "'true' 必须切 PG");
+  delete process.env.WES_STORE_SYSTEM_PG;
+  _resetSystemRepositoryForTest();
+});
+
+test("选择器记忆化：装配后 env 变更不影响既有单例", () => {
+  process.env.WES_STORE_SYSTEM_PG = "true";
+  _resetSystemRepositoryForTest();
+  const first = getSystemRepository();
+  process.env.WES_STORE_SYSTEM_PG = "false";
+  const second = getSystemRepository();
+  assert.equal(first, second, "进程内只读一次开关（翻开关需重启，与 §3.1 对齐）");
+  delete process.env.WES_STORE_SYSTEM_PG;
+  _resetSystemRepositoryForTest();
+});
+
+test("PG 工厂为函数且可装配", () => {
+  assert.equal(typeof createSystemPgRepository, "function");
+});
+
+// ─── JSON 整存 RMW 已知缺陷记录（并发 RMW 丢失更新） ─────────────
+// §4.6 模板的 JSON 对照用例：阶段 1 异步化产生的 await 挂起点使两个
+// RMW 的 load 必然先于任一 save 完成（A/B 各自拿到同一全量快照），
+// 随后两次整存 save 先后落盘，后写者把前写者的改动整个覆盖——确定性
+// 复现（不靠时序碰运气）。本用例把缺陷形态钉死为红线回归：未来第 4 步
+// 删除 JSON 路径时本用例随实现一并删除。
+// 隔离：chdir 到独立临时根的 config/system 沙箱，不触碰真实配置文件。
+
+test("对照：JSON 整存 RMW 并发改不同字段必现丢失更新（已知缺陷记录）", async () => {
+  const originalCwd = process.cwd();
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-system-rmw-"));
+  fs.mkdirSync(path.join(tmpDir, "config/system"), { recursive: true });
+  try {
+    process.chdir(tmpDir);
+    // 两个 RMW 并发起步：各自先拿全量快照（await 挂起点保证交错）
+    const loadA = loadRequirementSystemConfigStore();
+    const loadB = loadRequirementSystemConfigStore();
+    const storeA = await loadA;
+    const storeB = await loadB;
+
+    // 各自只改一个字段（管理界面两个配置项并发保存的形态）
+    storeA.draft.kimiEvaluation.model = "wes-t-rmw-a";
+    storeB.draft.fileParsing.maxFileSizeMb = 99;
+
+    await saveRequirementSystemConfigStore(storeA);
+    await saveRequirementSystemConfigStore(storeB); // 整存写：B 的快照覆盖 A 的改动
+
+    const final = await loadRequirementSystemConfigStore();
+    assert.equal(final.draft.fileParsing.maxFileSizeMb, 99, "后写者 B 的改动必须在");
+    assert.notEqual(final.draft.kimiEvaluation.model, "wes-t-rmw-a",
+      "丢失更新：A 的改动被整存覆盖（PG 行级写不会丢，对照 system-pg 并发用例）");
+  } finally {
+    process.chdir(originalCwd);
+    _resetKimiImportCheck();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
