@@ -220,6 +220,8 @@ export const traces = pgTable(
   "traces",
   {
     traceId: text("trace_id").primaryKey(),
+    /** 入站 HTTP 请求关联 ID（JSON 侧 TraceRecord.requestId 同义，批 5 补齐） */
+    requestId: text("request_id"),
     sourceDomain: text("source_domain").notNull(),
     sourceId: text("source_id"),
     ownerUserId: text("owner_user_id").notNull(),
