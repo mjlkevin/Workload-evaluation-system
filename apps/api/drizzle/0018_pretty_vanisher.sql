@@ -1,0 +1,1 @@
+ALTER TABLE "traces" ADD COLUMN "request_id" text;
