@@ -3,7 +3,7 @@
 // ============================================================
 // v1 JSON store 迁移到 PG。
 
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const versionCodeRules = pgTable("version_code_rules", {
   ruleId: text("rule_id").primaryKey(),
@@ -14,6 +14,8 @@ export const versionCodeRules = pgTable("version_code_rules", {
   format: text("format").notNull(),
   sample: text("sample"),
   status: text("status", { enum: ["active", "draft", "disabled"] }).notNull().default("active"),
+  // JSON store 的 rules 数组顺序对 UI 可见（非字母序），需要显式排序列保序
+  sortOrder: integer("sort_order").notNull().default(0),
   effectiveAt: timestamp("effective_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
