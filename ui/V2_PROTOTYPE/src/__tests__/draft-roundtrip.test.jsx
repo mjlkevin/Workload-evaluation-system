@@ -77,7 +77,9 @@ describe('draft-roundtrip: E1 草稿往返', () => {
     await sendFromComposer('我的问题')
 
     // 错误消息显示草稿保留提示
-    const errorMessage = await screen.findByText(/登录已过期/)
+    // 401 渲染链路（响应处理 → draftBeforeLogin 保存 → 错误消息渲染）在 CI 负载下
+    // 偶发超过 findByText 默认 1s 超时（批 3 CI 32287710090 偶发失败根因），显式放宽到 5s
+    const errorMessage = await screen.findByText(/登录已过期/, {}, { timeout: 5000 })
     expect(errorMessage).toBeInTheDocument()
     expect(errorMessage.textContent).toContain('草稿已保留')
   })
@@ -89,8 +91,8 @@ describe('draft-roundtrip: E1 草稿往返', () => {
     await screen.findByText('会话 A')
     await sendFromComposer('我的网络问题')
 
-    // 错误消息出现（500 错误显示 "AI 对话暂未完成"）
-    await screen.findByText(/AI 对话暂未完成/)
+    // 错误消息出现（500 错误显示 "AI 对话暂未完成"；同 401 用例口径放宽超时）
+    await screen.findByText(/AI 对话暂未完成/, {}, { timeout: 5000 })
 
     // 验证 copyDraft 行为：通过检查 draftBeforeLogin 或最后一条用户消息存在
     // 由于 copyDraft 使用 navigator.clipboard，在 jsdom 中需要 mock
