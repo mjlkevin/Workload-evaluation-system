@@ -1,6 +1,6 @@
 import type { VersionRecord } from "../../types";
 import { asString } from "../../utils";
-import { loadVersionsStore, saveVersionsStore } from "../versions/versions.repository";
+import { getVersionsRepository } from "../versions/versions.repository";
 import type { ProjectEvaluationPlan, ProjectEvaluationStatus } from "./project-evaluations.types";
 
 const VALID_PROJECT_STATUSES: ProjectEvaluationStatus[] = ["draft", "active", "reviewing", "published", "archived"];
@@ -50,53 +50,58 @@ export function mapGlobalVersionToProject(record: VersionRecord): ProjectEvaluat
   };
 }
 
-/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+/** 阶段 2 批 6：versions 行级仓储（项目评估记录必为 global 类型）。 */
 export async function listProjectRecords(ownerUserId: string): Promise<VersionRecord[]> {
-  return (await loadVersionsStore()).records.filter((record) => isProjectEvaluationRecord(record) && record.ownerUserId === ownerUserId);
+  const records = await getVersionsRepository().listRecords({ ownerUserId, type: "global" });
+  return records.filter(isProjectEvaluationRecord);
 }
 
-/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+/** 阶段 2 批 6：行级查询重写（先定位项目记录，再按 id 查评估草稿并校验归属）。 */
 export async function findHarnessDraftRecords(ownerUserId: string, harnessRunId: string, actionId: string): Promise<{
   projectRecord: VersionRecord;
   assessmentRecord: VersionRecord;
 } | null> {
-  const records = (await loadVersionsStore()).records;
-  const projectRecord = records.find((record) =>
+  const repo = getVersionsRepository();
+  const globals = await repo.listRecords({ ownerUserId, type: "global" });
+  const projectRecord = globals.find((record) =>
     isProjectEvaluationRecord(record)
-    && record.ownerUserId === ownerUserId
     && asString(record.payload?.createdFromHarnessRunId) === harnessRunId
     && asString(record.payload?.createdFromHarnessActionId) === actionId);
   if (!projectRecord) return null;
 
   const assessmentId = asString(projectRecord.payload?.currentAssessmentVersionId);
-  const assessmentRecord = records.find((record) =>
-    record.id === assessmentId
-    && record.type === "assessment"
-    && record.ownerUserId === ownerUserId
-    && asString(record.payload?.draftSource) === "harness"
-    && asString(record.payload?.harnessRunId) === harnessRunId
-    && asString(record.payload?.harnessActionId) === actionId);
+  const candidate = assessmentId ? await repo.findRecordById(assessmentId) : null;
+  const assessmentRecord = candidate
+    && candidate.type === "assessment"
+    && candidate.ownerUserId === ownerUserId
+    && asString(candidate.payload?.draftSource) === "harness"
+    && asString(candidate.payload?.harnessRunId) === harnessRunId
+    && asString(candidate.payload?.harnessActionId) === actionId
+    ? candidate
+    : null;
 
   if (!assessmentRecord) throw new Error("harness_draft_link_incomplete");
   return { projectRecord, assessmentRecord };
 }
 
-/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+/** 阶段 2 批 6：行级查询重写（同 findHarnessDraftRecords 口径）。 */
 export async function findProjectRecordByAssessmentDraft(ownerUserId: string, assessmentRecordId: string): Promise<{
   projectRecord: VersionRecord;
   assessmentRecord: VersionRecord;
 } | null> {
-  const records = (await loadVersionsStore()).records;
-  const projectRecord = records.find((record) =>
+  const repo = getVersionsRepository();
+  const globals = await repo.listRecords({ ownerUserId, type: "global" });
+  const projectRecord = globals.find((record) =>
     isProjectEvaluationRecord(record)
-    && record.ownerUserId === ownerUserId
     && asString(record.payload?.currentAssessmentVersionId) === assessmentRecordId);
   if (!projectRecord) return null;
 
-  const assessmentRecord = records.find((record) =>
-    record.id === assessmentRecordId
-    && record.type === "assessment"
-    && record.ownerUserId === ownerUserId);
+  const candidate = await repo.findRecordById(assessmentRecordId);
+  const assessmentRecord = candidate
+    && candidate.type === "assessment"
+    && candidate.ownerUserId === ownerUserId
+    ? candidate
+    : null;
   if (!assessmentRecord) throw new Error("harness_draft_link_incomplete");
   return { projectRecord, assessmentRecord };
 }
@@ -109,22 +114,12 @@ export function isProjectEvaluationRecord(record: VersionRecord): boolean {
     );
 }
 
-/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+/** 阶段 2 批 6：写入改行级 upsert（存在则整行覆写，不存在则插入；幂等重放结果不变）。 */
 export async function saveProjectRecord(record: VersionRecord): Promise<void> {
-  const store = await loadVersionsStore();
-  const index = store.records.findIndex((item) => item.id === record.id);
-  if (index >= 0) store.records[index] = record;
-  else store.records.push(record);
-  await saveVersionsStore(store);
+  await getVersionsRepository().upsertVersionRecord(record);
 }
 
-/** 阶段 1 批 4：级联改 async（versions accessor 异步化），实现不动。 */
+/** 阶段 2 批 6：批量一次原子提交（JSON 单次整存落盘 / PG 单事务），保留原「多记录一次提交」契约。 */
 export async function saveProjectRecords(records: VersionRecord[]): Promise<void> {
-  const store = await loadVersionsStore();
-  for (const record of records) {
-    const index = store.records.findIndex((item) => item.id === record.id);
-    if (index >= 0) store.records[index] = record;
-    else store.records.push(record);
-  }
-  await saveVersionsStore(store);
+  await getVersionsRepository().upsertVersionRecords(records);
 }

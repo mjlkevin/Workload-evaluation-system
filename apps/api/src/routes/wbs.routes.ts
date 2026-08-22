@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middleware/auth";
 import { requireCapability } from "../rbac/middleware";
 import { isProjectEvaluationRecord } from "../modules/project-evaluations/project-evaluations.repository";
-import { loadVersionsStore } from "../modules/versions/versions.repository";
+import { getVersionsRepository } from "../modules/versions/versions.repository";
 import { ok } from "../utils/response";
 
 type WbsItem = {
@@ -23,11 +23,10 @@ type WbsItem = {
 
 const router = Router();
 
-/** 阶段 1 批 4：级联改 async（loadVersionsStore 异步化），实现不动。 */
+/** 阶段 2 批 6：versions 改行级仓储只读（仓储已按 updatedAt desc，显式 sort 保留兼容）。 */
 export async function buildDerivedWbsItemsForUser(user: { id: string; username: string }): Promise<WbsItem[]> {
-  const store = await loadVersionsStore();
-  const globals = store.records
-    .filter((record) => record.ownerUserId === user.id && record.type === "global")
+  const records = await getVersionsRepository().listRecords({ ownerUserId: user.id, type: "global" });
+  const globals = records
     .filter((record) => !isProjectEvaluationRecord(record))
     .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)));
 
