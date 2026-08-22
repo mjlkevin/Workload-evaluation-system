@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { VersionRecord } from "../../types";
 import { isProjectEvaluationRecord } from "../project-evaluations/project-evaluations.repository";
-import { loadVersionsStore, saveVersionsStore } from "../versions/versions.repository";
+import { getVersionsRepository } from "../versions/versions.repository";
 import { appendTeamAuditLog, listTeamsByUserId, loadTeamStore, saveTeamStoreWithExpectedVersion } from "./team.repository";
 import { ReviewStatus, TeamMember, TeamRecord, TeamRole, TeamStore } from "./team.types";
 
@@ -182,9 +182,9 @@ export async function getTeamPlans(currentUser: CurrentUser, teamId: string) {
   if (!team) return fail(40401, "团队不存在", "teamId", "not_found");
   if (!ensureTeamMember(team, currentUser.id)) return fail(40301, "权限不足", "teamId", "not_team_member");
 
-  const versionStore = await loadVersionsStore();
-  const items = versionStore.records
-    .filter((x) => x.type === "global")
+  // 阶段 2 批 6：versions 行级仓储（跨用户团队可见性场景不限 owner）
+  const globalRecords = await getVersionsRepository().listRecords({ type: "global" });
+  const items = globalRecords
     .filter((x) => !isProjectEvaluationRecord(x))
     .filter((x) => {
       const bind = teamStore.planBindings.find((b) => b.globalVersionCode === x.versionCode);
@@ -208,7 +208,7 @@ export async function getTeamPlans(currentUser: CurrentUser, teamId: string) {
   return ok({ items });
 }
 
-/** 阶段 1 批 4：级联改 async（loadVersionsStore / saveVersionsStore 异步化），实现不动。 */
+/** 阶段 2 批 6：versions 改行级仓储只读校验；原末尾空操作 saveVersionsStore 一并移除。 */
 export async function updateTeamPlanBinding(
   currentUser: CurrentUser,
   teamId: string,
@@ -225,8 +225,8 @@ export async function updateTeamPlanBinding(
   if (!team || !targetTeam) return fail(40401, "团队不存在", "teamId", "not_found");
   if (!ensureManager(team, currentUser.id)) return fail(40301, "权限不足", "role", "manager_required");
 
-  const versions = await loadVersionsStore();
-  const global = versions.records.find((x) => x.type === "global" && !isProjectEvaluationRecord(x) && x.versionCode === globalVersionCode);
+  const globalRecords = await getVersionsRepository().listRecords({ type: "global" });
+  const global = globalRecords.find((x) => !isProjectEvaluationRecord(x) && x.versionCode === globalVersionCode);
   if (!global) return fail(40401, "总方案不存在", "globalVersionCode", "not_found");
 
   const existed = store.planBindings.find((x) => x.globalVersionCode === globalVersionCode);
@@ -251,7 +251,6 @@ export async function updateTeamPlanBinding(
   });
   const conflict = await persistWithVersionGuard(store, expectedVersion);
   if (conflict) return conflict;
-  await saveVersionsStore(versions);
   return ok({ updated: true });
 }
 

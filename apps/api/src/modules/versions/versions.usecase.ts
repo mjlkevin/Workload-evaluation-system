@@ -1,3 +1,16 @@
+// ============================================================
+// Versions 域 usecase（阶段 2 批 6：整存 load→改→save 改写为行级仓储调用）
+// ============================================================
+// 改写口径：
+//  - 全部读写经 getVersionsRepository() 行级接口（JSON/PG 双后端共用契约）；
+//  - 响应结构、错误码、错误文案与改写前逐条保持一致；
+//  - owner 校验：记录所有权不可变（ownerUserId 创建后不变），读后校验
+//    再写是安全的；状态竞争由仓储层条件 UPDATE CAS / 行锁事务保证；
+//  - 业务时间戳（记录自带的 updatedAt 等）仍由 usecase 生成、按值透传
+//    （与批 1–5 同口径）；仓储自身产生的时间戳（检出/归档时刻）走 DB 时钟。
+//  - JSON 旧实现的 migrateVersionRecord 补全不再需要：JSON 路径在
+//    loadVersionsStore 内已全量补全，PG 路径写入恒为完整字段。
+
 import { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 
@@ -8,18 +21,12 @@ import {
   VersionStatus,
   isVersionType,
   isVersionStatus,
-  migrateVersionRecord,
 } from "../../types";
 import { asString } from "../../utils";
 import { applyVersionCodeFormat, formatHasSequenceToken } from "../../utils/version-code-format";
 import { ok, fail } from "../../utils/response";
 import { requireRoleWithAuth } from "../../middleware/auth";
-import {
-  isVersionReferencedByGlobal,
-  loadVersionsStore,
-  saveVersionsStore,
-  toPublicVersionRecord
-} from "./versions.repository";
+import { getVersionsRepository, toPublicVersionRecord } from "./versions.repository";
 import { loadVersionCodeRulesStore } from "../system/system.repository";
 
 function mapTypeToRuleModuleKey(type: VersionType): VersionCodeRuleModuleKey {
@@ -31,9 +38,10 @@ function mapTypeToRuleModuleKey(type: VersionType): VersionCodeRuleModuleKey {
   return "wbs";
 }
 
-/** 阶段 1 批 5：因内部调用 loadVersionCodeRulesStore（已异步化）级联改 async，实现不动。 */
+/** 阶段 1 批 5：因内部调用 loadVersionCodeRulesStore（已异步化）级联改 async，实现不动。
+ *  阶段 2 批 6：占用集合从整存 store 改为仓储行级查询结果的 versionCode 集合。 */
 async function generateVersionCodeByRule(
-  store: { records: VersionRecord[] },
+  existingCodes: Set<string>,
   input: {
     ownerUserId: string;
     type: VersionType;
@@ -76,14 +84,7 @@ async function generateVersionCodeByRule(
       seq,
       now,
     });
-    const existed = store.records.find(
-      (record) =>
-        record.ownerUserId === input.ownerUserId &&
-        record.type === input.type &&
-        record.templateId === input.templateId &&
-        record.versionCode === candidate
-    );
-    if (!existed) {
+    if (!existingCodes.has(candidate)) {
       return { versionCode: candidate };
     }
   }
@@ -103,9 +104,10 @@ export async function getVersion(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = await loadVersionsStore();
-  const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
-  if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+  const target = await getVersionsRepository().findRecordById(recordId);
+  if (!target || target.ownerUserId !== auth.user.id) {
+    return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+  }
 
   return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
 }
@@ -121,13 +123,13 @@ export async function listVersions(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "type", reason: "invalid" }]);
   }
 
-  const store = await loadVersionsStore();
-  const items = store.records
-    .filter((record) => record.ownerUserId === auth.user.id)
-    .filter((record) => record.type === type)
-    .filter((record) => record.templateId === templateId)
-    .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)))
-    .map(toPublicVersionRecord);
+  // 仓储保证 updatedAt desc 排序（JSON/PG 双实现同口径）
+  const records = await getVersionsRepository().listRecords({
+    ownerUserId: auth.user.id,
+    type,
+    templateId,
+  });
+  const items = records.map(toPublicVersionRecord);
 
   return res.json(ok({ items }, randomUUID()));
 }
@@ -157,9 +159,12 @@ export async function createVersion(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "status", reason: "invalid" }]);
   }
 
-  const store = await loadVersionsStore();
+  const repo = getVersionsRepository();
   if (!versionCode) {
-    const generated = await generateVersionCodeByRule(store, {
+    // 序号探测只需同 owner+type+template 下的既有版本号集合
+    const owned = await repo.listRecords({ ownerUserId: auth.user.id, type, templateId });
+    const existingCodes = new Set(owned.map((record) => record.versionCode));
+    const generated = await generateVersionCodeByRule(existingCodes, {
       ownerUserId: auth.user.id,
       type,
       templateId,
@@ -170,13 +175,7 @@ export async function createVersion(req: Request, res: Response) {
     }
     versionCode = generated.versionCode;
   }
-  const existed = store.records.find(
-    (record) =>
-      record.ownerUserId === auth.user.id &&
-      record.type === type &&
-      record.templateId === templateId &&
-      record.versionCode === versionCode
-  );
+  const existed = await repo.findRecordByCode(auth.user.id, type, templateId, versionCode);
 
   if (existed) {
     return fail(res, 40901, "版本号已存在，不可覆盖（不可变版本）", [{ field: "versionCode", reason: "already_exists" }]);
@@ -212,8 +211,7 @@ export async function createVersion(req: Request, res: Response) {
     record.reviewedByUserId = auth.user.id;
   }
 
-  store.records.push(record);
-  await saveVersionsStore(store);
+  await repo.createVersionRecord(record);
 
   return res.json(ok({ record: toPublicVersionRecord(record) }, randomUUID()));
 }
@@ -232,25 +230,29 @@ export async function updateVersionStatus(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "status", reason: "invalid" }]);
   }
 
-  const store = await loadVersionsStore();
-  const target = store.records.find((record) => record.id === recordId && record.ownerUserId === auth.user.id);
-
-  if (!target) {
+  const repo = getVersionsRepository();
+  const target = await repo.findRecordById(recordId);
+  if (!target || target.ownerUserId !== auth.user.id) {
     return fail(res, 40404, "版本不存在", [{ field: "recordId", reason: "not_found" }]);
   }
 
-  target.status = nextStatus;
-  target.updatedAt = new Date().toISOString();
-  target.updatedByUserId = auth.user.id;
-  target.updatedByUsername = auth.user.username;
-
+  const nowIso = new Date().toISOString();
+  const patch: Partial<Record<keyof VersionRecord, unknown>> = {
+    status: nextStatus,
+    updatedAt: nowIso,
+    updatedByUserId: auth.user.id,
+    updatedByUsername: auth.user.username,
+  };
   if ((nextStatus === "reviewed" || nextStatus === "published") && !target.reviewedAt) {
-    target.reviewedAt = target.updatedAt;
-    target.reviewedByUserId = auth.user.id;
+    patch.reviewedAt = nowIso;
+    patch.reviewedByUserId = auth.user.id;
   }
 
-  await saveVersionsStore(store);
-  return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
+  const updated = await repo.updateVersionRecord(recordId, patch);
+  if (!updated) {
+    return fail(res, 40404, "版本不存在", [{ field: "recordId", reason: "not_found" }]);
+  }
+  return res.json(ok({ record: toPublicVersionRecord(updated) }, randomUUID()));
 }
 
 // ============================================================
@@ -292,39 +294,34 @@ export async function checkoutVersion(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = await loadVersionsStore();
-  const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
-  if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
-
-  migrateVersionRecord(target);
-
-  if (target.isHistoricalArchive) {
-    return fail(res, 40902, "历史归档版本不可检出", [{ field: "id", reason: "historical_archive" }]);
-  }
-  if (target.versionDocStatus === "reviewed") {
-    return fail(res, 40902, "已审核版本不可检出，如需修改请先升版", [
-      { field: "versionDocStatus", reason: "reviewed_readonly" }
-    ]);
-  }
-  if (target.checkoutStatus === "checked_out") {
-    return fail(res, 40902, `当前版本已被「${target.checkedOutByUsername}」检出，请先检入或撤销检出`, [
-      { field: "checkoutStatus", reason: "already_checked_out" }
-    ]);
+  const repo = getVersionsRepository();
+  const target = await repo.findRecordById(recordId);
+  if (!target || target.ownerUserId !== auth.user.id) {
+    return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
   }
 
-  const nowIso = new Date().toISOString();
-  target.checkoutStatus = "checked_out";
-  target.checkedOutByUserId = auth.user.id;
-  target.checkedOutByUsername = auth.user.username;
-  target.checkoutAt = nowIso;
-  target.updatedAt = nowIso;
-  target.updatedByUserId = auth.user.id;
-  target.updatedByUsername = auth.user.username;
-  // 保留当前检入快照，用于必要时撤销恢复
-  target.lastCheckinPayload = target.payload ? { ...target.payload } : {};
-
-  await saveVersionsStore(store);
-  return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
+  // 状态竞争由仓储层条件 UPDATE CAS 保证（并发检出恰一赢家）
+  const result = await repo.checkoutVersionRecord({
+    recordId,
+    actorUserId: auth.user.id,
+    actorUsername: auth.user.username,
+  });
+  switch (result.outcome) {
+    case "ok":
+      return res.json(ok({ record: toPublicVersionRecord(result.record) }, randomUUID()));
+    case "historical_archive":
+      return fail(res, 40902, "历史归档版本不可检出", [{ field: "id", reason: "historical_archive" }]);
+    case "reviewed_readonly":
+      return fail(res, 40902, "已审核版本不可检出，如需修改请先升版", [
+        { field: "versionDocStatus", reason: "reviewed_readonly" }
+      ]);
+    case "already_checked_out":
+      return fail(res, 40902, `当前版本已被「${result.checkedOutByUsername}」检出，请先检入或撤销检出`, [
+        { field: "checkoutStatus", reason: "already_checked_out" }
+      ]);
+    default:
+      return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+  }
 }
 
 /**
@@ -343,11 +340,11 @@ export async function saveCheckedOutDraft(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "payload", reason: "required" }]);
   }
 
-  const store = await loadVersionsStore();
-  const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
-  if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
-
-  migrateVersionRecord(target);
+  const repo = getVersionsRepository();
+  const target = await repo.findRecordById(recordId);
+  if (!target || target.ownerUserId !== auth.user.id) {
+    return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+  }
 
   if (target.checkoutStatus !== "checked_out") {
     return fail(res, 40902, "当前版本未检出，请使用「保存版本」创建新版本记录", [
@@ -359,13 +356,17 @@ export async function saveCheckedOutDraft(req: Request, res: Response) {
   }
 
   const nowIso = new Date().toISOString();
-  target.payload = newPayload;
-  target.updatedAt = nowIso;
-  target.updatedByUserId = auth.user.id;
-  target.updatedByUsername = auth.user.username;
+  const updated = await repo.updateVersionRecord(recordId, {
+    payload: newPayload,
+    updatedAt: nowIso,
+    updatedByUserId: auth.user.id,
+    updatedByUsername: auth.user.username,
+  });
+  if (!updated) {
+    return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+  }
 
-  await saveVersionsStore(store);
-  return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
+  return res.json(ok({ record: toPublicVersionRecord(updated) }, randomUUID()));
 }
 
 /** POST /api/v1/versions/:id/checkin — 检入（释放锁，版本号自然数+1） */
@@ -379,46 +380,31 @@ export async function checkinVersion(req: Request, res: Response) {
   const body = req.body as { payload?: Record<string, unknown> };
   const newPayload = body.payload && typeof body.payload === "object" ? body.payload : null;
 
-  const store = await loadVersionsStore();
-  const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
-  if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
-
-  migrateVersionRecord(target);
-
-  if (target.checkoutStatus !== "checked_out") {
-    return fail(res, 40902, "当前版本未检出，无需检入", [{ field: "checkoutStatus", reason: "not_checked_out" }]);
-  }
-  if (target.checkedOutByUserId !== auth.user.id) {
-    return fail(res, 40301, "只有检出人才能检入", [{ field: "checkedOutByUserId", reason: "not_owner" }]);
+  const repo = getVersionsRepository();
+  const target = await repo.findRecordById(recordId);
+  if (!target || target.ownerUserId !== auth.user.id) {
+    return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
   }
 
-  const nowIso = new Date().toISOString();
-  const nextMinor = (target.minorNumber || 0) + 1;
-  const majorLetter = target.majorLetter || "A";
-  const baseCode = target.baseCode || target.versionCode;
-  const newVersionCode = buildVersionCode(baseCode, majorLetter, nextMinor);
-
-  // 更新字段
-  target.versionCode = newVersionCode;
-  target.minorNumber = nextMinor;
-  target.baseCode = baseCode;
-  target.majorLetter = majorLetter;
-  target.checkoutStatus = "checked_in";
-  target.checkedOutByUserId = undefined;
-  target.checkedOutByUsername = undefined;
-  target.checkoutAt = undefined;
-  target.updatedAt = nowIso;
-  target.updatedByUserId = auth.user.id;
-  target.updatedByUsername = auth.user.username;
-  if (newPayload) {
-    target.payload = newPayload;
-    target.lastCheckinPayload = { ...newPayload };
-  } else {
-    target.lastCheckinPayload = target.payload ? { ...target.payload } : {};
+  // 版本号递增在仓储行锁事务内完成（并发检入串行化，禁止撕裂）
+  const result = await repo.checkinVersionRecord({
+    recordId,
+    actorUserId: auth.user.id,
+    actorUsername: auth.user.username,
+    payload: newPayload,
+  });
+  switch (result.outcome) {
+    case "ok":
+      return res.json(
+        ok({ record: toPublicVersionRecord(result.record), versionCode: result.record.versionCode }, randomUUID())
+      );
+    case "not_checked_out":
+      return fail(res, 40902, "当前版本未检出，无需检入", [{ field: "checkoutStatus", reason: "not_checked_out" }]);
+    case "not_checkout_owner":
+      return fail(res, 40301, "只有检出人才能检入", [{ field: "checkedOutByUserId", reason: "not_owner" }]);
+    default:
+      return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
   }
-
-  await saveVersionsStore(store);
-  return res.json(ok({ record: toPublicVersionRecord(target), versionCode: newVersionCode }, randomUUID()));
 }
 
 /** POST /api/v1/versions/:id/undo-checkout — 撤销检出（丢弃修改，恢复到上次检入状态） */
@@ -429,11 +415,11 @@ export async function undoCheckout(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = await loadVersionsStore();
-  const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
-  if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
-
-  migrateVersionRecord(target);
+  const repo = getVersionsRepository();
+  const target = await repo.findRecordById(recordId);
+  if (!target || target.ownerUserId !== auth.user.id) {
+    return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+  }
 
   if (target.checkoutStatus !== "checked_out") {
     return fail(res, 40902, "当前版本未检出", [{ field: "checkoutStatus", reason: "not_checked_out" }]);
@@ -443,20 +429,25 @@ export async function undoCheckout(req: Request, res: Response) {
   }
 
   const nowIso = new Date().toISOString();
-  // 恢复到上次检入的 payload
+  const patch: Partial<Record<keyof VersionRecord, unknown>> = {
+    checkoutStatus: "checked_in",
+    checkedOutByUserId: null,
+    checkedOutByUsername: null,
+    checkoutAt: null,
+    updatedAt: nowIso,
+    updatedByUserId: auth.user.id,
+    updatedByUsername: auth.user.username,
+  };
+  // 恢复到上次检入的 payload（检出时落快照，检出态存草稿不污染恢复点）
   if (target.lastCheckinPayload) {
-    target.payload = { ...target.lastCheckinPayload };
+    patch.payload = { ...target.lastCheckinPayload };
   }
-  target.checkoutStatus = "checked_in";
-  target.checkedOutByUserId = undefined;
-  target.checkedOutByUsername = undefined;
-  target.checkoutAt = undefined;
-  target.updatedAt = nowIso;
-  target.updatedByUserId = auth.user.id;
-  target.updatedByUsername = auth.user.username;
 
-  await saveVersionsStore(store);
-  return res.json(ok({ record: toPublicVersionRecord(target) }, randomUUID()));
+  const updated = await repo.updateVersionRecord(recordId, patch);
+  if (!updated) {
+    return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+  }
+  return res.json(ok({ record: toPublicVersionRecord(updated) }, randomUUID()));
 }
 
 /** POST /api/v1/versions/:id/promote — 升版（当前版本归档，创建新版本 VX1） */
@@ -467,20 +458,10 @@ export async function promoteVersion(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = await loadVersionsStore();
-  const target = store.records.find((r) => r.id === recordId && r.ownerUserId === auth.user.id);
-  if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
-
-  migrateVersionRecord(target);
-
-  if (target.checkoutStatus !== "checked_in") {
-    return fail(res, 40902, "必须检入后才能升版", [{ field: "checkoutStatus", reason: "must_be_checked_in" }]);
-  }
-  if (target.versionDocStatus !== "drafting") {
-    return fail(res, 40902, "当前版本状态不允许升版", [{ field: "versionDocStatus", reason: "must_be_drafting" }]);
-  }
-  if (target.isHistoricalArchive) {
-    return fail(res, 40902, "历史归档版本不可升版", [{ field: "id", reason: "historical_archive" }]);
+  const repo = getVersionsRepository();
+  const target = await repo.findRecordById(recordId);
+  if (!target || target.ownerUserId !== auth.user.id) {
+    return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
   }
 
   const nowIso = new Date().toISOString();
@@ -488,14 +469,7 @@ export async function promoteVersion(req: Request, res: Response) {
   const newMajorLetter = nextMajorLetter(target.majorLetter || "A");
   const newVersionCode = buildVersionCode(baseCode, newMajorLetter, 1);
 
-  // 将当前记录标记为历史归档
-  target.isHistoricalArchive = true;
-  target.archivedAt = nowIso;
-  target.updatedAt = nowIso;
-  target.updatedByUserId = auth.user.id;
-  target.updatedByUsername = auth.user.username;
-
-  // 创建新版本记录（已检出状态—升版后需要用户检入）
+  // 新版本记录（已检出状态—升版后需要用户检入）；归档 + 插入由仓储行锁事务原子完成
   const newRecord: VersionRecord = {
     id: randomUUID(),
     type: target.type,
@@ -523,9 +497,29 @@ export async function promoteVersion(req: Request, res: Response) {
     lastCheckinPayload: {},
   };
 
-  store.records.push(newRecord);
-  await saveVersionsStore(store);
-  return res.json(ok({ archived: toPublicVersionRecord(target), newRecord: toPublicVersionRecord(newRecord) }, randomUUID()));
+  const result = await repo.promoteVersionRecord({
+    archiveRecordId: recordId,
+    newRecord,
+    actorUserId: auth.user.id,
+    actorUsername: auth.user.username,
+  });
+  switch (result.outcome) {
+    case "ok":
+      return res.json(
+        ok(
+          { archived: toPublicVersionRecord(result.archived), newRecord: toPublicVersionRecord(result.newRecord) },
+          randomUUID()
+        )
+      );
+    case "must_be_checked_in":
+      return fail(res, 40902, "必须检入后才能升版", [{ field: "checkoutStatus", reason: "must_be_checked_in" }]);
+    case "must_be_drafting":
+      return fail(res, 40902, "当前版本状态不允许升版", [{ field: "versionDocStatus", reason: "must_be_drafting" }]);
+    case "historical_archive":
+      return fail(res, 40902, "历史归档版本不可升版", [{ field: "id", reason: "historical_archive" }]);
+    default:
+      return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+  }
 }
 
 /** PATCH /api/v1/versions/:id/force-unlock — 管理员强制解锁 */
@@ -536,28 +530,30 @@ export async function forceUnlockVersion(req: Request, res: Response) {
   const recordId = asString(req.params.id);
   if (!recordId) return fail(res, 40001, "参数错误", [{ field: "id", reason: "required" }]);
 
-  const store = await loadVersionsStore();
-  // 管理员可解锁任意用户的记录
-  const target = store.records.find((r) => r.id === recordId);
+  const repo = getVersionsRepository();
+  // 管理员可解锁任意用户的记录（不带 owner 校验）
+  const target = await repo.findRecordById(recordId);
   if (!target) return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
-
-  migrateVersionRecord(target);
 
   if (target.checkoutStatus !== "checked_out") {
     return fail(res, 40902, "当前版本未检出，无需解锁", [{ field: "checkoutStatus", reason: "not_checked_out" }]);
   }
 
   const nowIso = new Date().toISOString();
-  target.checkoutStatus = "checked_in";
-  target.checkedOutByUserId = undefined;
-  target.checkedOutByUsername = undefined;
-  target.checkoutAt = undefined;
-  target.updatedAt = nowIso;
-  target.updatedByUserId = auth.user.id;
-  target.updatedByUsername = auth.user.username;
+  const updated = await repo.updateVersionRecord(recordId, {
+    checkoutStatus: "checked_in",
+    checkedOutByUserId: null,
+    checkedOutByUsername: null,
+    checkoutAt: null,
+    updatedAt: nowIso,
+    updatedByUserId: auth.user.id,
+    updatedByUsername: auth.user.username,
+  });
+  if (!updated) {
+    return fail(res, 40404, "版本不存在", [{ field: "id", reason: "not_found" }]);
+  }
 
-  await saveVersionsStore(store);
-  return res.json(ok({ record: toPublicVersionRecord(target), unlockedBy: auth.user.username }, randomUUID()));
+  return res.json(ok({ record: toPublicVersionRecord(updated), unlockedBy: auth.user.username }, randomUUID()));
 }
 
 export async function deleteVersion(req: Request, res: Response) {
@@ -575,34 +571,26 @@ export async function deleteVersion(req: Request, res: Response) {
     return fail(res, 40001, "参数错误", [{ field: "versionCode", reason: "required" }]);
   }
 
-  const store = await loadVersionsStore();
-  const targetIdx = store.records.findIndex(
-    (record) =>
-      record.ownerUserId === auth.user.id &&
-      record.type === type &&
-      record.templateId === templateId &&
-      record.versionCode === versionCode
-  );
+  const repo = getVersionsRepository();
+  const target = await repo.findRecordByCode(auth.user.id, type, templateId, versionCode);
 
-  if (targetIdx < 0) {
+  if (!target) {
     return fail(res, 40404, "版本不存在", [{ field: "versionCode", reason: "not_found" }]);
   }
 
-  if (type !== "global") {
-    const referenced = isVersionReferencedByGlobal(
-      store,
-      auth.user.id,
-      templateId,
-      type as Exclude<VersionType, "global">,
-      versionCode
-    );
-    if (referenced) {
-      return fail(res, 40902, "版本已被总方案引用，不能删除", [{ field: "versionCode", reason: "referenced_by_global_plan" }]);
-    }
+  // 「被总方案引用不可删」检查由仓储与删除同路径执行（global 自身删除不检查）
+  const result = await repo.deleteVersionRecord({
+    recordId: target.id,
+    checkReferenced: type !== "global",
+    targetType: type !== "global" ? (type as Exclude<VersionType, "global">) : undefined,
+  });
+
+  if (result.referenced) {
+    return fail(res, 40902, "版本已被总方案引用，不能删除", [{ field: "versionCode", reason: "referenced_by_global_plan" }]);
+  }
+  if (!result.existed) {
+    return fail(res, 40404, "版本不存在", [{ field: "versionCode", reason: "not_found" }]);
   }
 
-  const [removed] = store.records.splice(targetIdx, 1);
-  await saveVersionsStore(store);
-
-  return res.json(ok({ deleted: true, record: toPublicVersionRecord(removed) }, randomUUID()));
+  return res.json(ok({ deleted: true, record: toPublicVersionRecord(target) }, randomUUID()));
 }
