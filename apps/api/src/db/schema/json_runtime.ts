@@ -189,6 +189,15 @@ export const teamAuditLogs = pgTable(
   }),
 );
 
+// 阶段 2 批 7：store 级乐观并发版本计数器（元数据表）。
+// JSON 侧整存 store 的 version 字段（如 TeamStore.version）在 PG 侧无天然
+// 宿主：以单行元数据持久化，写事务内单条条件 UPDATE CAS 完成「比较+递增」。
+export const storeVersions = pgTable("store_versions", {
+  domain: text("domain").primaryKey(),
+  version: integer("version").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const aiSessions = pgTable(
   "ai_sessions",
   {

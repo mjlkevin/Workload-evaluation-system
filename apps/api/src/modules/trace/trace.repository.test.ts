@@ -76,8 +76,7 @@ test("选择器记忆化：装配后 env 变更不影响既有单例", () => {
   _resetTraceRepositoryForTest();
 });
 
-test("storePath 参数强制 JSON 文件路径（开关 'true' 也不改道）", async () => {
-  if (!testDatabaseUrl) return; // 无 DB 环境时开关路径无从对照，跳过
+test("storePath 参数强制 JSON 文件路径（开关 'true' 也不改道）", { skip: !testDatabaseUrl }, async () => {
   process.env.WES_STORE_TRACES_PG = "true";
   _resetTraceRepositoryForTest();
 
@@ -106,8 +105,7 @@ test("storePath 参数强制 JSON 文件路径（开关 'true' 也不改道）",
   }
 });
 
-test("开关 'true' 且无 storePath：写入经 PG，JSON 文件不落盘", async () => {
-  if (!testDatabaseUrl) return;
+test("开关 'true' 且无 storePath：写入经 PG，JSON 文件不落盘", { skip: !testDatabaseUrl }, async () => {
   process.env.WES_STORE_TRACES_PG = "true";
   process.env.WES_TRACE_STORE_PATH = join(mkdtempSync(join(tmpdir(), "wes-trace-switch-")), "trace-store.json");
   _resetTraceRepositoryForTest();
