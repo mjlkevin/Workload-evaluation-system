@@ -86,6 +86,9 @@ export const TRUNCATE_TEST_TABLE_NAMES: string[] = [
   // 记忆域（2）
   "memory_atoms",
   "memory_scenes",
+  // store 级乐观并发版本计数器（阶段 2 批 7，元数据表；truncate 后
+  // 由首次写的行缺失分支自愈重建，测试用例不依赖 seed 行）
+  "store_versions",
   // 会话与配置（7）
   "ai_sessions",
   "invite_codes",
