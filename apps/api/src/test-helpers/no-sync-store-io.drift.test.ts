@@ -84,7 +84,7 @@ const FILE_WHITELIST: Array<{ file: string; reason: string; expectedHits: number
   },
   {
     file: "modules/team/team.repository.ts",
-    reason: "批 6 async accessor（loadTeamStore/saveTeamStore/saveTeamStoreWithExpectedVersion）共用的模块级同步原子写辅助 writeJsonAtomic，阶段 2 替换实现时一并处理",
+    reason: "批 7 选择器下沉的 JSON 实现（loadTeamStoreJson/saveTeamStoreJson/saveTeamStoreWithExpectedVersionJson async accessor）共用的模块级同步原子写辅助 writeJsonAtomic，第 4 步随 JSON 路径删除",
     expectedHits: 1,
   },
   {
