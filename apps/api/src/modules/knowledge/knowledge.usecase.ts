@@ -7,7 +7,7 @@ import { tokenize } from "./knowledge.tokenizer";
 import { buildBm25Index } from "./knowledge.retrieval";
 import { rrfFuse } from "./knowledge.fusion";
 import { applyGuard, DEFAULT_GUARD } from "./knowledge.guard";
-import type { KnowledgeRepository } from "./knowledge.repository";
+import type { KnowledgeStoreRepository } from "./knowledge.repository";
 import type {
   GuardOptions,
   KnowledgeEntry,
@@ -29,7 +29,7 @@ export interface SearchKnowledgeOptions {
  */
 /** 阶段 1 批 7：因内部调用 repo.list（已异步化）级联改 async，实现不动。 */
 export async function searchKnowledge(
-  repo: KnowledgeRepository,
+  repo: KnowledgeStoreRepository,
   query: string,
   options: SearchKnowledgeOptions = {},
 ): Promise<KnowledgeSearchResult> {

@@ -6,11 +6,11 @@
 
 import type { Request, Response } from "express";
 
-import type { KnowledgeRepository } from "./knowledge.repository";
+import type { KnowledgeStoreRepository } from "./knowledge.repository";
 import { searchKnowledge } from "./knowledge.usecase";
 
 /** handler 工厂：路由层注入 repo，便于测试替换存储 */
-export function createKnowledgeHandlers(repo: KnowledgeRepository) {
+export function createKnowledgeHandlers(repo: KnowledgeStoreRepository) {
   /** 阶段 1 批 7：因 searchKnowledge 异步化级联改 async，实现不动。 */
   async function searchHandler(req: Request, res: Response): Promise<void> {
     const q = typeof req.query.q === "string" ? req.query.q : "";

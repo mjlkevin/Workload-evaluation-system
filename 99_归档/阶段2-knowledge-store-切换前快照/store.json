@@ -1,0 +1,30 @@
+{
+  "version": "knowledge-store-v1",
+  "description": "WES 知识库条目种子语料（SP-2026-007 MS1 M1 中文混合检索基线）。覆盖售前估算、实施评估、规则引擎、版本机制、AI 工作台等业务域术语。",
+  "entries": [
+    { "id": "k-presales-estimate", "title": "售前估算流程", "category": "presales", "content": "售前估算用于项目立项前评估实施工作量与报价区间，基于功能清单折算人天，输出标准人天、建议人天与报价建议，支撑售前团队快速给出实施评估结论。", "tags": ["售前", "估算", "报价"] },
+    { "id": "k-effort-assessment", "title": "实施评估人天口径", "category": "estimates", "content": "实施评估按功能点与复杂度折算人天，区分标准人天与建议人天；工作量评估需结合用户规模、集成复杂度与定制化程度进行口径修正。", "tags": ["实施评估", "人天", "工作量"] },
+    { "id": "k-requirement-analysis", "title": "需求分析方法", "category": "requirement", "content": "需求分析从原始需求出发，经澄清、去重与优先级排序形成需求基线；需求规格需覆盖业务场景、边界条件与验收标准。", "tags": ["需求", "分析", "基线"] },
+    { "id": "k-sow", "title": "实施工作说明书 SOW", "category": "presales", "content": "SOW 实施工作说明书定义项目范围、交付物、里程碑与验收标准；售前阶段依据 SOW 深度分析评估实施风险与人天投入。", "tags": ["SOW", "工作说明书", "项目范围"] },
+    { "id": "k-rules-engine", "title": "规则引擎与估算规则", "category": "engine", "content": "规则引擎按分组规则、条目规则、基础规则与组织增量规则四级管线执行估算；规则集支持版本化与 Excel 标准化导入。", "tags": ["规则引擎", "估算规则", "管线"] },
+    { "id": "k-excel-template", "title": "Excel 层级模板", "category": "templates", "content": "Excel 层级模板定义工作表、分组与条目的三级结构，导入时按模板校验层级完整性；模板版本化后可回溯。", "tags": ["Excel", "模板", "层级"] },
+    { "id": "k-wbs", "title": "WBS 工作分解", "category": "engine", "content": "WBS 工作分解结构把项目拆分为可估算的工作包，完整性检查覆盖必选模块与依赖关系，是估算与排期的基础。", "tags": ["WBS", "分解", "工作包"] },
+    { "id": "k-version-control", "title": "版本机制", "category": "versions", "content": "版本机制支持检出、检入、撤销检出、升版与管理员强制解锁；checked_in 只读、checked_out 可编辑，历史归档默认隐藏。", "tags": ["版本", "检出", "检入", "升版"] },
+    { "id": "k-jwt-auth", "title": "JWT 鉴权与登录", "category": "auth", "content": "业务接口默认 JWT Bearer 鉴权，首注册用户为 admin；角色分 admin 与 user，仅 admin 可用户管理、生成邀请码与强制解锁。", "tags": ["JWT", "鉴权", "角色"] },
+    { "id": "k-rbac-capability", "title": "RBAC 能力位", "category": "auth", "content": "RBAC 基于能力位做路由拦截，旧角色经映射转为 v2 角色；无权限返回 403，鉴权失败返回 401，与既有错误格式一致。", "tags": ["RBAC", "能力位", "权限"] },
+    { "id": "k-ai-workbench", "title": "AI 工作台会话", "category": "ai", "content": "AI 工作台支持多会话并行与会话级运行时，任务按 sessionId 隔离；刷新或关闭页面后异步任务由服务端继续，可恢复进度。", "tags": ["AI工作台", "会话", "异步"] },
+    { "id": "k-knowledge-base", "title": "知识库检索与注入", "category": "ai", "content": "知识库检索为 AI 回答提供上下文召回，注入内容受条目数与字符预算护栏约束；检索质量以术语查询 Top-5 命中率衡量。", "tags": ["知识库", "检索", "召回"] },
+    { "id": "k-export-report", "title": "导出报告与 Excel 生成", "category": "exports", "content": "导出服务按项目与版本生成 Excel 评估报告，文件名含项目名与版本号；导出记录可按用户追溯。", "tags": ["导出", "报告", "Excel"] },
+    { "id": "k-change-management", "title": "变更管理", "category": "change", "content": "变更管理登记需求变更的范围、影响与审批结论，变更落地后同步更新估算基线并留痕。", "tags": ["变更", "审批", "影响"] },
+    { "id": "k-testing-regression", "title": "测试与回归验证", "category": "testing", "content": "回归验证覆盖模块测试、集成测试与规则回归；接口改动需补充测试，构建验证通过后方可交付。", "tags": ["测试", "回归", "验证"] },
+    { "id": "k-deploy-rollback", "title": "部署与回滚", "category": "ops", "content": "部署按检查清单执行，回滚 SOP 明确回滚触发条件、操作步骤与数据兼容性核对；发布演练需在预演环境完成。", "tags": ["部署", "回滚", "SOP"] },
+    { "id": "k-collab", "title": "协作与会议纪要", "category": "collab", "content": "协作模块沉淀会议纪要、决议与行动项，支持跨角色共享项目上下文；会议结论可关联到需求与变更。", "tags": ["协作", "会议纪要", "行动项"] },
+    { "id": "k-pm-workbench", "title": "PM 项目工作台", "category": "pm", "content": "PM 工作台聚合项目进度、风险与里程碑视图，面向项目经理提供周报素材与偏差预警。", "tags": ["PM", "工作台", "进度"] },
+    { "id": "k-sales-briefing", "title": "销售简报与商机", "category": "presales", "content": "销售简报从商机信息聚合客户画像、竞争态势与报价要点，支撑售前快速准备客户沟通材料。", "tags": ["销售", "简报", "商机"] },
+    { "id": "k-dev-assessment", "title": "开发工作量评估", "category": "estimates", "content": "开发工作量评估按模块复杂度与复用度折算开发人天，区分设计、编码与联调阶段投入。", "tags": ["开发", "工作量", "评估"] },
+    { "id": "k-trace-audit", "title": "Trace 审计追踪", "category": "trace", "content": "Trace 记录 AI 调用与工具执行的结构化轨迹，支持按用户与时间查询；敏感字段自动脱敏后留存。", "tags": ["Trace", "审计", "脱敏"] },
+    { "id": "k-harness-run", "title": "Harness 持久执行", "category": "harness", "content": "Harness 域以 PostgreSQL 持久化 Run、事件与检查点，支持断点恢复与幂等投影；运行证据可供审计回放。", "tags": ["Harness", "Run", "检查点"] },
+    { "id": "k-history-archive", "title": "历史归档与回溯", "category": "history", "content": "历史归档按项目沉淀交付结论与关键决策，归档内容默认隐藏，检索时按需展开。", "tags": ["历史", "归档", "回溯"] },
+    { "id": "k-monitoring", "title": "监控与运行健康", "category": "ops", "content": "监控覆盖 API 延迟、错误率与任务队列水位，异常触发告警；运行健康页汇总服务状态与最近故障。", "tags": ["监控", "告警", "健康"] }
+  ]
+}
