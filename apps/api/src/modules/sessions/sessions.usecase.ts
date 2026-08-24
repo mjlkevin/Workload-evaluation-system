@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { config } from "../../config/env";
 import { calculateEstimate, validateCalculateRequest } from "../../engine";
 import { CalculateRequest, RuleSet, SessionEstimateContext, Template } from "../../types";
-import { loadJsonFile } from "../../utils/file";
+import { loadTemplate } from "../templates/templates.repository";
+import { loadRuleSet } from "../rules/rules.repository";
 import { cleanupExpiredSessions, getSession, saveSession } from "./sessions.repository";
 
 type FailedResult = {
@@ -21,10 +22,14 @@ type SuccessResult<T> = {
 
 export type SessionUsecaseResult<T> = FailedResult | SuccessResult<T>;
 
-function loadEstimateContext(): { template: Template; ruleSet: RuleSet } {
+/**
+ * 阶段 2 批 8：旁路直读 JSON 改经仓储选择器（与 estimates.usecase 同批修复，
+ * 避免开关翻到 PG 后会话域仍读 JSON 造成读写分裂）。
+ */
+async function loadEstimateContext(): Promise<{ template: Template; ruleSet: RuleSet }> {
   return {
-    template: loadJsonFile<Template>("config/templates/example-template.json"),
-    ruleSet: loadJsonFile<RuleSet>("config/rules/example-rule-set.json")
+    template: await loadTemplate(),
+    ruleSet: await loadRuleSet()
   };
 }
 
@@ -34,7 +39,7 @@ export async function startEstimateSession(
   payload: { templateId?: string; ruleSetId?: string }
 ): Promise<SessionUsecaseResult<{ sessionId: string; templateId: string; ruleSetId: string; expiresAt: string }>> {
   const { templateId, ruleSetId } = payload;
-  const { template, ruleSet } = loadEstimateContext();
+  const { template, ruleSet } = await loadEstimateContext();
 
   if (!templateId || !ruleSetId) {
     return {
@@ -119,7 +124,7 @@ export async function calculateBySession(
     items: payload.items
   };
 
-  const { template, ruleSet } = loadEstimateContext();
+  const { template, ruleSet } = await loadEstimateContext();
   const validation = validateCalculateRequest(mergedBody, template, ruleSet);
   if (!validation.ok) {
     return {
