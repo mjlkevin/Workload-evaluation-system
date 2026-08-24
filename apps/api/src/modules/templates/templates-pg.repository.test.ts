@@ -182,9 +182,12 @@ test("并发写不同 templateId：全部生效、读侧确定性取最新", { s
 
 // ─── 时钟与缓存策略 ───────────────────────────────────────────
 
-test("DB 时钟：updated_at 落在保存前后两次 SELECT now() 之间", { skip: !testDatabaseUrl }, async () => {
+test("DB 时钟：updated_at 落在保存前后两次 SELECT now() 之间（毫秒截断容差）", { skip: !testDatabaseUrl }, async () => {
   // 用 EXTRACT(EPOCH) 取数值比较：pg 驱动对 timestamptz 的类型解析在
   // 不同查询形态下可能是 Date 也可能是字符串，数值比较无歧义。
+  // 容差说明：readDbNow 经 JS Date 回写，updated_at 被截断到毫秒；
+  // before 的微秒部分（如 .642069）可能大于截断后的值（.642），
+  // 故下界按毫秒下取整（-0.001 余量），上界不变（截断只会更早）。
   const dbInstance = repo!.__dbForTest();
   const epochOf = async (query: ReturnType<typeof sql>): Promise<number> =>
     Number((await dbInstance.execute(query)).rows[0].epoch);
@@ -195,7 +198,7 @@ test("DB 时钟：updated_at 落在保存前后两次 SELECT now() 之间", { sk
     sql`SELECT EXTRACT(EPOCH FROM updated_at) AS epoch FROM templates WHERE template_id LIKE ${TEMPLATE_PREFIX + "%"}`,
   );
   assert.ok(
-    updatedEpoch >= beforeEpoch && updatedEpoch <= afterEpoch,
+    updatedEpoch >= beforeEpoch - 0.001 && updatedEpoch <= afterEpoch,
     `updated_at 应为 DB 时钟（before=${beforeEpoch} updated=${updatedEpoch} after=${afterEpoch}）`,
   );
 });
