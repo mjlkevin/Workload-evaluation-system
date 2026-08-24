@@ -21,10 +21,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-const META_DIR = fileURLToPath(new URL("../../drizzle/meta/", import.meta.url));
+// 路径口径：test:modules 在 apps/api 目录下执行（package.json scripts），
+// process.cwd() 即 apps/api。不用 import.meta.url——tsconfig module=CommonJS
+// 下 import.meta 会被 tsc 拒绝（分支 CI tsc job 实测失败）。
+// 若从其他 CWD 单跑本文件，loadJournal 的 existsSync 断言会给出带实际路径的清晰失败，不会假绿。
+const META_DIR = path.resolve(process.cwd(), "drizzle", "meta");
 const JOURNAL_PATH = path.join(META_DIR, "_journal.json");
 
 // 历史缺口，不影响 generate，不予补齐（见文件头说明）。新增条目禁止入列。
