@@ -97,6 +97,8 @@ export const TRUNCATE_TEST_TABLE_NAMES: string[] = [
   "system_configs",
   "templates",
   "traces",
+  // 知识域（1，阶段 2 批 9）
+  "knowledge_entries",
 ];
 
 /**
