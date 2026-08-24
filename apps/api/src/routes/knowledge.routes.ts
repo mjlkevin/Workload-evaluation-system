@@ -8,11 +8,11 @@
 import { Router } from "express";
 
 import { requireCapability } from "../rbac/middleware";
-import type { KnowledgeRepository } from "../modules/knowledge/knowledge.repository";
+import type { KnowledgeStoreRepository } from "../modules/knowledge/knowledge.repository";
 import { createKnowledgeHandlers } from "../modules/knowledge/knowledge.controller";
 
 export interface KnowledgeRouterDeps {
-  repo: KnowledgeRepository;
+  repo: KnowledgeStoreRepository;
 }
 
 export function createKnowledgeRouter({ repo }: KnowledgeRouterDeps): Router {

@@ -28,7 +28,25 @@ export interface CreateEntryInput {
   tags?: string[];
 }
 
-export class KnowledgeRepository {
+/** 更新补丁可覆盖的字段集（JSON / PG 双实现共用） */
+export type UpdateEntryPatch = Partial<
+  Pick<KnowledgeEntry, "title" | "content" | "category" | "tags" | "status">
+>;
+
+/**
+ * 仓储接口（阶段 2 批 9：JSON / PG 双实现共用）。
+ * 从既有类公开方法提取，签名逐字不变；controller / usecase /
+ * routes 的类型标注由此放宽为接口，选择器方可分流。
+ */
+export interface KnowledgeStoreRepository {
+  list(): Promise<KnowledgeEntry[]>;
+  get(id: string): Promise<KnowledgeEntry | null>;
+  create(input: CreateEntryInput): Promise<KnowledgeEntry>;
+  update(id: string, patch: UpdateEntryPatch): Promise<KnowledgeEntry>;
+  archive(id: string): Promise<KnowledgeEntry>;
+}
+
+export class KnowledgeRepository implements KnowledgeStoreRepository {
   private readonly storePath: string;
 
   constructor(storePath?: string) {
@@ -76,7 +94,7 @@ export class KnowledgeRepository {
   }
 
   /** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
-  async update(id: string, patch: Partial<Pick<KnowledgeEntry, "title" | "content" | "category" | "tags" | "status">>): Promise<KnowledgeEntry> {
+  async update(id: string, patch: UpdateEntryPatch): Promise<KnowledgeEntry> {
     const store = this.load();
     const raw = store.entries.find((entry) => entry.id === id);
     if (!raw) {

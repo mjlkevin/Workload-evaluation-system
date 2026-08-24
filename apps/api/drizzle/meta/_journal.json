@@ -141,6 +141,13 @@
       "when": 1787453160000,
       "tag": "0019_store_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1787578237713,
+      "tag": "0020_lame_daredevil",
+      "breakpoints": true
     }
   ]
 }

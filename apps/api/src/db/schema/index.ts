@@ -27,3 +27,4 @@ export * from "./harness";
 export * from "./memory";
 export * from "./json_runtime";
 export * from "./credentials";
+export * from "./knowledge";
