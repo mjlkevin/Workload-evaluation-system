@@ -3,10 +3,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { config } from "../../config/env";
 import { calculateEstimate, validateCalculateRequest } from "../../engine";
 import { CalculateRequest, ImplementationDependencyRulesConfig, RuleSet, Template } from "../../types";
-import { loadJsonFile } from "../../utils/file";
 import { asString } from "../../utils/helpers";
 import { writeExportFile } from "../../services/export.service";
 import { loadImplementationDependencyRulesStore } from "../system/system.repository";
+import { loadTemplate } from "../templates/templates.repository";
+import { loadRuleSet } from "../rules/rules.repository";
 import {
   buildOwnedExportFileName,
   deleteIdempotencyRecord,
@@ -39,10 +40,14 @@ type DependencyIssue = {
   missing: string[];
 };
 
-function loadEstimateContext(): { template: Template; ruleSet: RuleSet } {
+/**
+ * 阶段 2 批 8：旁路直读 JSON 改经仓储选择器（WES_STORE_TEMPLATES_PG /
+ * WES_STORE_RULE_SETS_PG 翻开关后估算热路径同步切 PG，避免读写分裂）。
+ */
+async function loadEstimateContext(): Promise<{ template: Template; ruleSet: RuleSet }> {
   return {
-    template: loadJsonFile<Template>("config/templates/example-template.json"),
-    ruleSet: loadJsonFile<RuleSet>("config/rules/example-rule-set.json")
+    template: await loadTemplate(),
+    ruleSet: await loadRuleSet()
   };
 }
 
@@ -181,7 +186,7 @@ async function validateImplementationDependencies(body: CalculateRequest, templa
 
 /** 阶段 1 批 5：因内部 validateImplementationDependencies（已异步化）级联改 async，实现不动。 */
 export async function calculateEstimateOnly(body: CalculateRequest): Promise<EstimateValidationResult> {
-  const { template, ruleSet } = loadEstimateContext();
+  const { template, ruleSet } = await loadEstimateContext();
   const dependencyValidation = await validateImplementationDependencies(body, template);
   if (dependencyValidation) return dependencyValidation;
   const validation = validateCalculateRequest(body, template, ruleSet);
@@ -206,7 +211,7 @@ export async function calculateAndExportEstimate(
   ownerUserId: string,
   idempotencyKey?: string
 ): Promise<EstimateUsecaseResult<{ totalDays: number; downloadUrl: string; expireAt: string }>> {
-  const { template, ruleSet } = loadEstimateContext();
+  const { template, ruleSet } = await loadEstimateContext();
   const dependencyValidation = await validateImplementationDependencies(body, template);
   if (dependencyValidation) return dependencyValidation;
   const validation = validateCalculateRequest(body, template, ruleSet);
