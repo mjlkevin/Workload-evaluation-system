@@ -1,6 +1,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { randomUUID } = require("node:crypto");
 const jwt = require("jsonwebtoken");
+const { Client } = require("pg");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -40,11 +42,68 @@ function resolveJwtSecret(projectRoot) {
   return "dev-jwt-secret-change-me";
 }
 
-function buildTokens(projectRoot) {
-  const usersPath = path.resolve(projectRoot, "config/auth/users.json");
-  const usersStore = JSON.parse(fs.readFileSync(usersPath, "utf-8"));
-  const users = Array.isArray(usersStore?.users) ? usersStore.users.filter((x) => x && x.status === "active") : [];
+// S1（2026-08-25）：users 域已切 PG（requireAuth 从 PG 重查），config/auth/users.json
+// 已移出 git 跟踪并归档。auth context 改从 PG 读取：优先 process.env.DATABASE_URL，
+// 本地手动运行（node scripts/...）时回退 apps/api/.env.local / apps/api/.env。
+// 参照 scripts/api-integration-check.js 先例（S1 同批适配）。
+function resolveDatabaseUrl(projectRoot) {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  for (const envPath of [
+    path.resolve(projectRoot, "apps/api/.env.local"),
+    path.resolve(projectRoot, "apps/api/.env"),
+    path.resolve(projectRoot, ".env.local")
+  ]) {
+    const parsed = parseEnvFile(envPath);
+    if (parsed.DATABASE_URL) return parsed.DATABASE_URL;
+  }
+  return null;
+}
 
+// 返回 PG users 表全部 active 用户；admin / 非 admin 任一角色缺失时自动 seed
+// 集成测试用户（itest-admin / itest-member，幂等 ON CONFLICT DO NOTHING）。
+async function loadActiveUsers(projectRoot) {
+  const connectionString = resolveDatabaseUrl(projectRoot);
+  if (!connectionString) {
+    throw new Error("database_url_missing: 设置 DATABASE_URL（env 或 apps/api/.env.local）");
+  }
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    const { rows } = await client.query(
+      "SELECT user_id AS id, username, role FROM users WHERE status = 'active' ORDER BY created_at ASC"
+    );
+    const missing = [];
+    if (!rows.some((u) => u.role === "admin")) missing.push(["itest-admin", "admin"]);
+    if (!rows.some((u) => u.role !== "admin")) missing.push(["itest-member", "user"]);
+    if (missing.length > 0) {
+      const bcrypt = require("bcryptjs");
+      for (const [username, role] of missing) {
+        await client.query(
+          `INSERT INTO users (user_id, username, password_hash, role, business_role, status, created_at)
+           VALUES ($1, $2, $3, $4, $5, 'active', now())
+           ON CONFLICT (username) DO NOTHING`,
+          [
+            randomUUID(),
+            username,
+            bcrypt.hashSync(username === "itest-admin" ? "ItestAdmin123!" : "ItestMember123!", 10),
+            role,
+            role === "admin" ? "admin" : "pre_sales"
+          ]
+        );
+      }
+      const { rows: refreshed } = await client.query(
+        "SELECT user_id AS id, username, role FROM users WHERE status = 'active' ORDER BY created_at ASC"
+      );
+      return refreshed;
+    }
+    return rows;
+  } finally {
+    await client.end();
+  }
+}
+
+async function buildTokens(projectRoot) {
+  const users = await loadActiveUsers(projectRoot);
   const adminUser = users.find((x) => x.role === "admin");
   const normalUser = users.find((x) => x.role !== "admin");
   if (!adminUser) throw new Error("active_admin_user_missing");
@@ -73,7 +132,7 @@ function buildTokens(projectRoot) {
 async function run() {
   const projectRoot = process.cwd();
   const baseUrl = process.env.API_BASE_URL || "http://localhost:3000";
-  const { managerUser, memberUser, managerToken, memberToken } = buildTokens(projectRoot);
+  const { managerUser, memberUser, managerToken, memberToken } = await buildTokens(projectRoot);
 
   const auth = (token) => ({
     Authorization: `Bearer ${token}`,

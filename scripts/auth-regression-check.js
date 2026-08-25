@@ -6,7 +6,9 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { randomUUID } = require("node:crypto");
 const jwt = require("jsonwebtoken");
+const { Client } = require("pg");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -51,19 +53,82 @@ const authHeader = (token) => ({
   "Content-Type": "application/json"
 });
 
+// S1（2026-08-25）：users 域已切 PG（requireAuth 从 PG 重查），config/auth/users.json
+// 已移出 git 跟踪并归档。auth context 改从 PG 读取：优先 process.env.DATABASE_URL，
+// 本地手动运行（node scripts/...）时回退 apps/api/.env.local / apps/api/.env。
+// 参照 scripts/api-integration-check.js 先例（S1 同批适配）。
+function resolveDatabaseUrl(projectRoot) {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  for (const envPath of [
+    path.resolve(projectRoot, "apps/api/.env.local"),
+    path.resolve(projectRoot, "apps/api/.env"),
+    path.resolve(projectRoot, ".env.local")
+  ]) {
+    const parsed = parseEnvFile(envPath);
+    if (parsed.DATABASE_URL) return parsed.DATABASE_URL;
+  }
+  return null;
+}
+
+// 返回 PG users 表全部 active 用户；admin / 非 admin 任一角色缺失时自动 seed
+// 集成测试用户（itest-admin / itest-member，幂等 ON CONFLICT DO NOTHING）。
+async function loadActiveUsers(projectRoot) {
+  const connectionString = resolveDatabaseUrl(projectRoot);
+  if (!connectionString) {
+    throw new Error("database_url_missing: 设置 DATABASE_URL（env 或 apps/api/.env.local）");
+  }
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    const { rows } = await client.query(
+      "SELECT user_id AS id, username, role FROM users WHERE status = 'active' ORDER BY created_at ASC"
+    );
+    const missing = [];
+    if (!rows.some((u) => u.role === "admin")) missing.push(["itest-admin", "admin"]);
+    if (!rows.some((u) => u.role !== "admin")) missing.push(["itest-member", "user"]);
+    if (missing.length > 0) {
+      const bcrypt = require("bcryptjs");
+      for (const [username, role] of missing) {
+        await client.query(
+          `INSERT INTO users (user_id, username, password_hash, role, business_role, status, created_at)
+           VALUES ($1, $2, $3, $4, $5, 'active', now())
+           ON CONFLICT (username) DO NOTHING`,
+          [
+            randomUUID(),
+            username,
+            bcrypt.hashSync(username === "itest-admin" ? "ItestAdmin123!" : "ItestMember123!", 10),
+            role,
+            role === "admin" ? "admin" : "pre_sales"
+          ]
+        );
+      }
+      const { rows: refreshed } = await client.query(
+        "SELECT user_id AS id, username, role FROM users WHERE status = 'active' ORDER BY created_at ASC"
+      );
+      return refreshed;
+    }
+    return rows;
+  } finally {
+    await client.end();
+  }
+}
+
+async function loadUsers(projectRoot) {
+  const users = await loadActiveUsers(projectRoot);
+  const adminUser = users.find((x) => x.role === "admin");
+  const normalUser = users.find((x) => x.role !== "admin");
+  assert(adminUser, "no active admin user");
+  assert(normalUser, "no active non-admin user");
+  return { adminUser, normalUser };
+}
+
 async function run() {
   const projectRoot = process.cwd();
   const baseUrl = process.env.API_BASE_URL || "http://localhost:3000";
   const secret = resolveJwtSecret(projectRoot);
 
-  // Load users for login
-  const usersPath = path.resolve(projectRoot, "config/auth/users.json");
-  const usersStore = JSON.parse(fs.readFileSync(usersPath, "utf-8"));
-  const users = usersStore?.users?.filter((x) => x && x.status === "active") || [];
-  const adminUser = users.find((x) => x.role === "admin");
-  const normalUser = users.find((x) => x.role !== "admin");
-  assert(adminUser, "no active admin user");
-  assert(normalUser, "no active non-admin user");
+  // Load users from PG（S1 后 users 域恒 PG，JSON 路径已删）
+  const { adminUser, normalUser } = await loadUsers(projectRoot);
 
   const results = [];
   const pass = (name) => results.push({ name, status: "PASS" });
@@ -151,19 +216,16 @@ async function run() {
     pass("403_non_admin_access");
 
     // === Test 8: 403 — RBAC capability check (missing capability) ===
-    // Try estimates:create with a normal user (PRE_SALES role doesn't have this capability)
-    const createVersionRes = await requestJson(`${baseUrl}/api/v1/versions`, {
-      method: "POST",
-      headers: authHeader(normalToken),
-      body: JSON.stringify({
-        type: "global",
-        templateId: "tmpl-test",
-        payload: { items: [] }
-      })
+    // 普通用户（role !== admin）无 user:manage（ADMIN 专属），访问用户管理端点必 403。
+    // 注：原实现打 POST /versions 期望 estimates:create 缺失——但 permissions.ts 中
+    // SALES/PRE_SALES/IMPL/PM 均持有 estimates:create（仅 DEV 无），PG 真人用户无法
+    // 稳定构造该场景；改用 ADMIN 专属能力位（2026-08-25 C9 适配时修正）。
+    const userListRes = await requestJson(`${baseUrl}/api/v1/auth/users`, {
+      headers: authHeader(normalToken)
     });
-    assert(createVersionRes.status === 403, `non-admin create version should return 403, got ${createVersionRes.status}`);
-    assert(createVersionRes.body.code === 40301, `RBAC 403 code should be 40301, got ${createVersionRes.body.code}`);
-    assert(createVersionRes.body.details?.[0]?.required, "RBAC 403 should include required capability in details");
+    assert(userListRes.status === 403, `non-admin user list should return 403, got ${userListRes.status}`);
+    assert(userListRes.body.code === 40301, `RBAC 403 code should be 40301, got ${userListRes.body.code}`);
+    assert(userListRes.body.details?.[0]?.required, "RBAC 403 should include required capability in details");
     pass("403_rbac_capability_missing");
 
     // === Test 9: Response format — success ===
@@ -199,4 +261,7 @@ async function run() {
   }
 }
 
-run();
+run().catch((err) => {
+  console.error(err.message || String(err));
+  process.exit(1);
+});
