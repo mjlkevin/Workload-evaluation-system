@@ -4,6 +4,8 @@
 // RED 先行：提交 202 契约、submissionKey 幂等、flag 503、session 404、
 // 删除冲突 409、cancel/inputs/confirm/retry 状态矩阵。
 // 使用内存 fake repository，不依赖 PostgreSQL。
+// C10（2026-08-25）：deleteAiSession 契约用例依赖 ai-sessions JSON 文件断言
+// （loadAiSessionsStore 直读文件）——见下方 withAiSessionsJsonIsolation。
 
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -11,6 +13,7 @@ import { randomUUID } from "node:crypto";
 
 import type { AuthUser } from "../../types";
 import type { AiSessionRecord } from "../ai-sessions/ai-sessions.types";
+import { _resetAiSessionsRepositoryForTest } from "../ai-sessions/ai-sessions.repository";
 import {
   AiRunsConflictError,
   AiRunsDisabledError,
@@ -387,7 +390,26 @@ test("getRunSnapshot returns 404 for a non-owner", async () => {
 // C1 Session 删除 409 保护（可选 checker，向后兼容）
 // ----------------------------------------------------------------
 
+/**
+ * C10（2026-08-25）：deleteAiSession 契约用例通过 loadAiSessionsStore 直读
+ * JSON 文件断言（假绿风险：createAiSession 走 PG、断言读 JSON）。显式隔离到
+ * JSON 实现，使断言与被测路径一致。
+ */
+async function withAiSessionsJsonIsolation<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = process.env.WES_STORE_AI_SESSIONS_PG;
+  delete process.env.WES_STORE_AI_SESSIONS_PG;
+  _resetAiSessionsRepositoryForTest();
+  try {
+    return await fn();
+  } finally {
+    if (prev === undefined) delete process.env.WES_STORE_AI_SESSIONS_PG;
+    else process.env.WES_STORE_AI_SESSIONS_PG = prev;
+    _resetAiSessionsRepositoryForTest();
+  }
+}
+
 test("deleteAiSession stays backward compatible without a checker", async () => {
+  await withAiSessionsJsonIsolation(async () => {
   const { createAiSession, deleteAiSession } = await import("../ai-sessions/ai-sessions.usecase");
   const { loadAiSessionsStore } = await import("../ai-sessions/ai-sessions.repository");
   const user = makeUser();
@@ -401,9 +423,11 @@ test("deleteAiSession stays backward compatible without a checker", async () => 
     const { saveAiSessionsStore } = await import("../ai-sessions/ai-sessions.repository");
     await saveAiSessionsStore(store);
   }
+  });
 });
 
 test("deleteAiSession rejects deletion with 409 SESSION_HAS_ACTIVE_RUN when a checker reports an active run", async () => {
+  await withAiSessionsJsonIsolation(async () => {
   const { createAiSession, deleteAiSession } = await import("../ai-sessions/ai-sessions.usecase");
   const { loadAiSessionsStore, saveAiSessionsStore } = await import("../ai-sessions/ai-sessions.repository");
   const user = makeUser();
@@ -424,6 +448,7 @@ test("deleteAiSession rejects deletion with 409 SESSION_HAS_ACTIVE_RUN when a ch
     store.sessions = store.sessions.filter((item) => item.ownerUserId !== user.id);
     await saveAiSessionsStore(store);
   }
+  });
 });
 
 // ----------------------------------------------------------------

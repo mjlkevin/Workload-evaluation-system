@@ -19,6 +19,34 @@ import {
   updateReviewStatus
 } from "./team/team.usecase";
 import { loadVersionsStore, saveVersionsStore } from "./versions/versions.repository";
+import { _resetTemplateRepositoryForTest } from "./templates/templates.repository";
+import { _resetRuleSetRepositoryForTest } from "./rules/rules.repository";
+import { _resetTeamRepositoryForTest } from "./team/team.repository";
+
+/**
+ * C10（2026-08-25）：estimates/sessions 用例的请求构造直读 JSON fixture
+ * （config/templates/example-template.json、config/rules/example-rule-set.json），
+ * 而 usecase 经选择器加载模板/规则。全局开关全开（PG）时选择器读 PG 空库 → 失败；
+ * 显式隔离到 JSON 实现，使 fixture 与被测路径一致。
+ */
+async function withTemplatesAndRulesJsonIsolation<T>(fn: () => Promise<T>): Promise<T> {
+  const prevTemplates = process.env.WES_STORE_TEMPLATES_PG;
+  const prevRuleSets = process.env.WES_STORE_RULE_SETS_PG;
+  delete process.env.WES_STORE_TEMPLATES_PG;
+  delete process.env.WES_STORE_RULE_SETS_PG;
+  _resetTemplateRepositoryForTest();
+  _resetRuleSetRepositoryForTest();
+  try {
+    return await fn();
+  } finally {
+    if (prevTemplates === undefined) delete process.env.WES_STORE_TEMPLATES_PG;
+    else process.env.WES_STORE_TEMPLATES_PG = prevTemplates;
+    if (prevRuleSets === undefined) delete process.env.WES_STORE_RULE_SETS_PG;
+    else process.env.WES_STORE_RULE_SETS_PG = prevRuleSets;
+    _resetTemplateRepositoryForTest();
+    _resetRuleSetRepositoryForTest();
+  }
+}
 
 function loadContext(): { template: Template; ruleSet: RuleSet } {
   return {
@@ -61,6 +89,7 @@ function buildCalculateRequestWithIncludedItems(includedIds: string[]): Calculat
 }
 
 test("estimates.usecase: calculateEstimateOnly returns success for valid request", async () => {
+  await withTemplatesAndRulesJsonIsolation(async () => {
   // 阶段 1 批 5：calculateEstimateOnly 已异步化，补 await（断言不变）。
   const body = buildValidCalculateRequest();
   const result = await calculateEstimateOnly(body);
@@ -68,9 +97,11 @@ test("estimates.usecase: calculateEstimateOnly returns success for valid request
   if (result.ok) {
     assert.equal(typeof result.data.totalDays, "number");
   }
+  });
 });
 
 test("estimates.usecase: dependency check only triggers when the dependent module is selected", async () => {
+  await withTemplatesAndRulesJsonIsolation(async () => {
   // 阶段 1 批 5：calculateEstimateOnly 已异步化，补 await（断言不变）。
   const purchaseOnly = await calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-66"]));
   if (!purchaseOnly.ok) {
@@ -88,9 +119,11 @@ test("estimates.usecase: dependency check only triggers when the dependent modul
 
   const rollingPurchaseWithVmi = await calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-72", "item-73"]));
   assert.equal(rollingPurchaseWithVmi.ok, true);
+  });
 });
 
 test("estimates.usecase: calculateAndExportEstimate returns idempotency replay", async () => {
+  await withTemplatesAndRulesJsonIsolation(async () => {
   const body = buildValidCalculateRequest();
   const ownerUserId = "ut-owner";
   const idempotencyKey = `ut-idem-${Date.now()}`;
@@ -121,9 +154,11 @@ test("estimates.usecase: calculateAndExportEstimate returns idempotency replay",
   } finally {
     deleteIdempotencyRecord(idempotencyKey);
   }
+  });
 });
 
 test("sessions.usecase: startEstimateSession and calculateBySession succeed", async () => {
+  await withTemplatesAndRulesJsonIsolation(async () => {
   const body = buildValidCalculateRequest();
   const ownerUserId = "ut-user";
 
@@ -146,9 +181,11 @@ test("sessions.usecase: startEstimateSession and calculateBySession succeed", as
     assert.equal(calc.data.sessionId, started.data.sessionId);
     assert.equal(typeof calc.data.totalDays, "number");
   }
+  });
 });
 
 test("sessions.usecase: calculateBySession blocks cross user access", async () => {
+  await withTemplatesAndRulesJsonIsolation(async () => {
   const body = buildValidCalculateRequest();
   const started = await startEstimateSession("owner-A", {
     templateId: body.templateId,
@@ -168,6 +205,7 @@ test("sessions.usecase: calculateBySession blocks cross user access", async () =
   if (!calc.ok) {
     assert.equal(calc.code, 40301);
   }
+  });
 });
 
 test("exports.usecase: resolveDownloadFile returns owned file and 404 when missing", () => {
@@ -204,7 +242,14 @@ test("exports.usecase: resolveDownloadFile returns owned file and 404 when missi
 });
 
 // 阶段 1 批 4：支持 async 回调（versions accessor 异步化级联），同步回调仍可传入
+// C10（2026-08-25）：team 用例以 store.json 文件快照断言（backup/unlink/restore），
+// 开关全开（PG）时选择器走 PG 共享测试库，文件级并行下会被其他文件的整表清理
+// 干扰（实测 flaky：createReview 40401）——这里显式隔离到 JSON 实现 + 文件快照，
+// 与全局开关无关。
 async function withTeamStoreIsolation(fn: () => Promise<void> | void): Promise<void> {
+  const previousPgFlag = process.env.WES_STORE_TEAMS_PG;
+  delete process.env.WES_STORE_TEAMS_PG;
+  _resetTeamRepositoryForTest();
   const root = resolveRootDir();
   const storePath = path.resolve(root, "config/teams/store.json");
   const backupPath = `${storePath}.ut.bak`;
@@ -222,6 +267,9 @@ async function withTeamStoreIsolation(fn: () => Promise<void> | void): Promise<v
       fs.copyFileSync(backupPath, storePath);
       fs.unlinkSync(backupPath);
     }
+    if (previousPgFlag === undefined) delete process.env.WES_STORE_TEAMS_PG;
+    else process.env.WES_STORE_TEAMS_PG = previousPgFlag;
+    _resetTeamRepositoryForTest();
   }
 }
 
