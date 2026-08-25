@@ -278,7 +278,7 @@ test("C2 缺陷 B：用户消息在 dispatch 前幂等落库，恢复重放不�
         } as any;
       },
       appendSessionMessage: (input) => {
-        sequence.push("append-user");
+        sequence.push(input.message.role === "user" ? "append-user" : "append-assistant");
         return appendAiSessionMessageIdempotent({ ...input, storePath });
       },
       appendRunEvent: makeNoOpAppendRunEvent(),
@@ -288,17 +288,17 @@ test("C2 缺陷 B：用户消息在 dispatch 前幂等落库，恢复重放不�
     await wf.executeStep("chat", ctx);
 
     let store = readStoreFile(storePath);
-    assert.equal(store.sessions[0].messages.length, 1, "执行后可从会话存储读到本轮 user 消息（缺陷 B）");
+    assert.equal(store.sessions[0].messages.length, 2, "执行后可从会话存储读到本轮 user + assistant 消息（缺陷 B）");
     assert.equal(store.sessions[0].messages[0].role, "user");
     assert.equal(store.sessions[0].messages[0].content, "你好");
     const metadata = store.sessions[0].messages[0].metadata as { projectionSource?: { deduplicationKey?: string } };
     assert.equal(metadata.projectionSource?.deduplicationKey, "run-1:user:1", "来源键冻结为 run 维度 deduplicationKey");
-    assert.deepEqual(sequence, ["append-user", "dispatch"], "用户消息必须先于 dispatch 落库");
+    assert.deepEqual(sequence, ["append-user", "dispatch", "append-assistant"], "用户消息必须先于 dispatch 落库，assistant 消息随后直接落库");
 
     // 恢复重放：同 step 再执行一次，来源键去重吸收
     await wf.executeStep("chat", ctx);
     store = readStoreFile(storePath);
-    assert.equal(store.sessions[0].messages.length, 1, "重复执行不得产生重复用户消息");
+    assert.equal(store.sessions[0].messages.length, 2, "重复执行不得产生重复消息（user/assistant 均按来源键吸收）");
   } finally {
     cleanup();
   }
@@ -357,7 +357,7 @@ test("ISS-2026-08-11-007: 附件写入会话并作为模型上下文 dispatch", 
 
     await wf.executeStep("chat", ctx);
     const replayedStore = readStoreFile(storePath);
-    assert.equal(replayedStore.sessions[0].messages.length, 1, "恢复重放不得重复用户消息");
+    assert.equal(replayedStore.sessions[0].messages.length, 2, "恢复重放不得重复消息（S2a 后 user + assistant 各一条，来源键吸收）");
     assert.equal(replayedStore.sessions[0].attachments.length, 1, "恢复重放不得重复附件实体");
   } finally {
     cleanup();
@@ -682,4 +682,70 @@ test("ISS-2026-08-16-004：显式报告闸门——无附件时不触发（走�
   // 断言：无附件时闸门不命中，走普通 dispatch
   assert.equal(dispatchCalled, true, "无附件时应走普通 dispatch");
   assert.equal(outcome.outbox!.length, 1, "普通 dispatch 应经 outbox 投影");
+});
+
+// ============================================================
+// S2a（阶段 2 · §4.8 写入路径改造：assistant 消息直接幂等落库）RED 守护
+// 契约：assistant 消息与 user 消息同款经 appendSessionMessage 直接幂等落库
+// （同库直写，不经 outbox 中转）；outbox 保留不动（S2b 前双路径共存）——
+// projector 认领后经 sink 以同一 deduplicationKey 追加时命中幂等 no-op，
+// 消息恰好一条，不重复不丢失。deduplicationKey 是本次过渡的安全垫。
+// ============================================================
+
+test("S2a：assistant 消息直接幂等落库 + outbox 保留 + projector 认领 no-op", async () => {
+  const { storePath, cleanup } = makeTempSessionStore("session-1", "user-1");
+  try {
+    const calls: Array<{ role: string; deduplicationKey: string }> = [];
+    const wf = createWorkbenchChatWorkflow({
+      dispatch: async () => ({
+        intent: "domain_qa",
+        answer: "模型回复",
+        businessRole: "pre_sales",
+        roleLabel: "售前顾问",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+      } as any),
+      appendSessionMessage: (input) => {
+        calls.push({ role: input.message.role, deduplicationKey: input.source.deduplicationKey });
+        return appendAiSessionMessageIdempotent({ ...input, storePath });
+      },
+      appendRunEvent: makeNoOpAppendRunEvent(),
+    });
+
+    const outcome = await wf.executeStep("chat", makeFakeCtx());
+
+    // 直接落库：user + assistant 各一条
+    const store = readStoreFile(storePath);
+    assert.equal(store.sessions[0].messages.length, 2, "S2a 后一次执行应落 user + assistant 两条消息");
+    const assistant = store.sessions[0].messages[1];
+    assert.equal(assistant.role, "assistant");
+    assert.equal(assistant.content, "模型回复");
+    const meta = assistant.metadata as { projectionSource?: { deduplicationKey?: string } };
+    assert.equal(meta.projectionSource?.deduplicationKey, "run-1:assistant:1", "assistant 来源键与 outbox 条目一致（projector no-op 前提）");
+    assert.deepEqual(
+      calls.map((c) => c.deduplicationKey),
+      ["run-1:user:1", "run-1:assistant:1"],
+      "user 消息先落库，assistant 消息随后直接落库（同款 appendSessionMessage 通道）",
+    );
+
+    // outbox 保留不动（S2b 之前双路径共存）
+    assert.equal(outcome.outbox!.length, 1, "outbox 保留，双路径共存");
+    assert.equal(outcome.outbox![0].deduplicationKey, "run-1:assistant:1", "outbox 条目 deduplicationKey 与直接写入一致");
+
+    // projector 认领 no-op 等价验证：sink 以同 deduplicationKey 再追加 → created:false，不重复
+    const sinkResult = await appendAiSessionMessageIdempotent({
+      sessionId: "session-1",
+      message: { messageId: "msg-sink-replay", role: "assistant", content: "模型回复", createdAt: new Date().toISOString() },
+      source: { deduplicationKey: "run-1:assistant:1", runId: "run-1", eventType: "assistant_message" },
+      storePath,
+    });
+    assert.equal(sinkResult.created, false, "projector 认领后经 sink 追加应命中幂等 no-op");
+    assert.equal(readStoreFile(storePath).sessions[0].messages.length, 2, "双路径共存期消息不得重复");
+
+    // 恢复重放：assistant 同 key 幂等吸收，仍两条
+    await wf.executeStep("chat", makeFakeCtx());
+    assert.equal(readStoreFile(storePath).sessions[0].messages.length, 2, "恢复重放不得产生重复 assistant 消息");
+  } finally {
+    cleanup();
+  }
 });

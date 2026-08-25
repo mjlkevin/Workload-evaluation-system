@@ -396,10 +396,11 @@ test("T-E1 Batch E 二次返工（新通道消息落库）端到端：workflow �
       appendAiSessionMessageIdempotent({ ...appendInput, storePath }),
   });
 
-  // 1) worker 执行 workflow：用户消息先落库（缺陷 B 守护）
+  // 1) worker 执行 workflow：user + assistant 均直接幂等落库（S2a 写入路径改造后），
+  //    消息恰一条，不经投影（缺陷 B 守护升级：assistant 不再依赖 outbox 中转）
   const outcome = await workflow.executeStep("chat", makeWorkflowStepContext(run, QUESTION));
   const storeAfterStep = readStore(storePath);
-  assert.equal(storeAfterStep.sessions[0].messages.length, 1, "执行完成后即可从会话存储读到本轮 user 消息");
+  assert.equal(storeAfterStep.sessions[0].messages.length, 2, "S2a 后执行完成即读到 user + assistant 两条（直接幂等落库）");
   assert.equal(storeAfterStep.sessions[0].messages[0].role, "user");
   assert.equal(storeAfterStep.sessions[0].messages[0].content, QUESTION);
 

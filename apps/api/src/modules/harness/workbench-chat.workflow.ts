@@ -11,6 +11,8 @@
 // C2 缺陷 B：用户消息在 dispatch 前经 ai-sessions 幂等 API 落库，
 //   来源键 ${runId}:user:1 防恢复重放重复；503 回退同步路径不经
 //   本 workflow，零双写。
+// S2a（阶段 2 · §4.8）：assistant 消息改为同款直接幂等落库（同库直写）；
+//   outbox 保留至 S2b 删除（双路径共存期 projector 认领经幂等键 no-op）。
 
 import { randomUUID } from "node:crypto";
 import type {
@@ -213,6 +215,28 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         trace,
         ...(formBlock ? { formBlock } : {}),
       };
+
+      // S2a（阶段 2 · §4.8 写入路径改造）：assistant 消息与 user 消息同款经
+      // appendSessionMessage 直接幂等落库（同库直写，不经 outbox 中转）；
+      // outbox 保留不动——S2b 前双路径共存，projector 认领后经 sink 以同一
+      // deduplicationKey 追加时命中幂等 no-op，不重复不丢失。来源键与 outbox
+      // 条目一致（${run.harnessRunId}:assistant:1）是本次过渡的安全垫；
+      // 恢复重放由去重吸收（与 user 消息同构）。
+      await deps.appendSessionMessage({
+        sessionId: aiSessionId,
+        message: {
+          messageId: `msg-${randomUUID()}`,
+          role: "assistant",
+          content: answer,
+          createdAt: new Date().toISOString(),
+          metadata: messageMetadata,
+        },
+        source: {
+          deduplicationKey: `${run.harnessRunId}:assistant:1`,
+          runId: run.harnessRunId,
+          eventType: "assistant_message",
+        },
+      });
 
       return {
         nextStepKey: null, // 单步 workflow，执行后直接终态
