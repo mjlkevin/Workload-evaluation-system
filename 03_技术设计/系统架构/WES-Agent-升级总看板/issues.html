@@ -49,13 +49,13 @@
         <div class="meta">
           <span><b>定位</b> 用户原始反馈、截图、疑问和未定性现象的第一入口</span>
           <span><b>流转</b> Issue → triage → Defect / Requirement / Risk / Close</span>
-          <span><b>更新日期</b> 2026-08-19</span>
+          <span><b>更新日期</b> 2026-08-24</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">20 问题</span>
+          <span class="pill brand">21 问题</span>
           <span class="pill warn">0 待分析</span>
           <span class="pill warn">14 转缺陷</span>
-          <span class="pill brand">6 转需求</span>
+          <span class="pill brand">7 转需求</span>
         </div>
       </div>
     </div>
@@ -294,6 +294,17 @@
               <td>第一批已实现多库配置、权限前置、意图路由、一次受控回退和 Trace；待集成并以第二个真实知识库完成路由质量实测。</td>
             </tr>
             <tr>
+              <td class="mono">ISS-2026-08-18-005</td>
+              <td>2026-08-18</td>
+              <td>前端 17 处静默吞错（.catch(() =&gt; {}) 吞掉未匹配请求/失败；现状 26 处）</td>
+              <td>architecture_review</td>
+              <td>MSW 严格门禁（onUnhandledRequest:'error'）实际已生效，但未匹配请求 reject 被前端 17 处空 catch 吞掉，测试照常绿（ISS-2026-08-18-001 修复期间浮出）。2026-08-25 裁决轮补登本地问题池（此前仅登记于 changes.html BE-2026-08-18-stage1-iss001 事件）并补记现状：登记时 17 处 → 现状 26 处（18 处 .catch(() =&gt; {}) + 8 处 .catch(() =&gt; null)；ISS-003/010 系列修复新增 fire-and-forget 调用点）。</td>
+              <td><code class="inline">useRequirementDetail.js L285-288（主请求）</code> <code class="inline">useRequirementAiWorkbench.js L486/503/535/630（草稿保存）</code> <code class="inline">useAssessmentDetail.js L422（估算失败）</code> <code class="inline">useWorkbenchState.js L81（冗余 catch，裁决保留）</code> <code class="inline">useUsers.js / useChatMessages.js / useBackgroundRuns.jsx / ChatArea / AiHomeWorkbench / useAiSessions.js</code></td>
+              <td><span class="status run"><span class="dot"></span>已分析</span></td>
+              <td>defect · 待派生</td>
+              <td>裁决轮逐处判定（2026-08-25）：档 1 必须改 6 处（useRequirementDetail 主请求去空 catch 走 setError、then 内按 HTTP 状态码区分真新建 404 与加载失败；useRequirementAiWorkbench 草稿保存失败置页面级可见状态，状态位节流非 toast）；档 2 建议改 1 处（useAssessmentDetail 估算区「估算暂不可用」占位）；档 3 保留+补注释 19 处（错误已内部暴露，外层 catch 仅防 unhandled rejection；useWorkbenchState L81 冗余 catch 保留加注释，不删）。改造清单已报架构侧，确认后实施。</td>
+            </tr>
+            <tr>
               <td class="mono">ISS-2026-08-19-001</td>
               <td>2026-08-19</td>
               <td>架构侧前端体检三项缺陷：ListPage 12 行硬截断 / SSE sending 无超时兜底 / 无路由懒加载与打包切分</td>
@@ -304,12 +315,23 @@
               <td>转缺陷 · DEF-2026-08-19-001 / -002 / -003</td>
               <td>三项已随前端插批修复并合入 main（452ea65）；视觉验收另发现 DEF-2026-08-19-004（窄视口浮层遮挡翻页按钮）待排期。</td>
             </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-24-001</td>
+              <td>2026-08-24</td>
+              <td>能否融合本体（Ontology）重构工作量评估的标准知识层</td>
+              <td>user_architecture_question</td>
+              <td>用户问本体是什么、有哪些开源工具、WES 能否融合本体重构；并指出评估 80% 按已有标准推理、10% 系数调整、10% 主观判断，认为规则完备时本体可 100% 给出工作量。</td>
+              <td><code class="inline">initial-estimate.ts:68 工时公式</code> <code class="inline">:177 行业系数 includes</code> <code class="inline">docs/diagrams/ontology-principle.html</code> <code class="inline">阶段2-存储切换-实施计划.md</code></td>
+              <td><span class="status run"><span class="dot"></span>converted</span></td>
+              <td>转需求 · RP-059</td>
+              <td>结论：取本体的建模方法（概念/继承/一致性检查），不引 OWL 推理机与三元组库；载体为 PG 表 + 现有 DSL 引擎，排在存储切换阶段 2 收口后。</td>
+            </tr>
         </table>
       </div>
     </section>
 </main>
   </div>
-  <footer>问题池 · WES 项目管理 · 2026-08-19</footer>
+  <footer>问题池 · WES 项目管理 · 2026-08-24</footer>
   <script>
     const sidebar = document.getElementById('sidebar');
     const toggle = document.getElementById('sidebarToggle');

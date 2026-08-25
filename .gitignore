@@ -72,3 +72,4 @@ Session/
 .qoder/
 qa-outputs/
 observations_output.json
+config/auth/users.json

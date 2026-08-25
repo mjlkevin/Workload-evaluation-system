@@ -45,10 +45,3 @@ test('detects passwordHash as a secret field', () => {
   assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /unit-hash-value/)
   fs.rmSync(dir, { recursive: true, force: true })
 })
-
-test('allowlists passwordHash in config/auth/users.json (expires at stage 2 users PG switch)', () => {
-  // 白名单到期条件：阶段 2 users 存储切换 PG 后，从 git 移除该文件并删除白名单条目
-  const result = runScanner(['config/auth/users.json'])
-  assert.equal(result.status, 0, result.stderr)
-  assert.match(result.stdout, /no tracked secret fields/i)
-})

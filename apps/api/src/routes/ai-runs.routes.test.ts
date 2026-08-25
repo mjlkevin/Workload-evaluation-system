@@ -3,14 +3,15 @@
 // ============================================================
 // 覆盖 Gate C 四条：API 契约与状态码矩阵（G1）、JWT + owner 安全（G2）、
 // SSE 回放与断线不取消（G3）、feature flag 与旧路径保护（G4）。
-// 依赖 Testcontainers PostgreSQL（TEST_DATABASE_URL）与真实双用户
-// users.json 备份/恢复模式（仿 harness.routes.test.ts）。缺失 DB 时跳过。
+// 依赖 Testcontainers PostgreSQL（TEST_DATABASE_URL）与真实双用户 PG 测试用户池
+// 注入（wes-ai-runs-* 前缀，C5 数据集隔离；S1 后 users.json 注入路径已删）。
+// ai-sessions 域仍处观察期（S2 才切 PG），其 JSON 快照备份/恢复逻辑保留。
+// 缺失 DB 时整体 skip。
 
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
 import fs from "node:fs";
-import path from "node:path";
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import request from "supertest";
@@ -24,17 +25,16 @@ import { createHarnessRuntimeRepository, type HarnessRuntimeRepository } from ".
 import type { AiRunsUsecase } from "../modules/harness/harness-runtime.usecase";
 import { createAiSession } from "../modules/ai-sessions/ai-sessions.usecase";
 import { aiSessionsStorePath } from "../utils";
-import { loadUsersStore, saveUsersStore, signAuthToken } from "../middleware/auth";
+import { signAuthToken } from "../middleware/auth";
+import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 import { harnessRunEvents, harnessRuns } from "../db/schema";
 import type { AuthUser } from "../types";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-const USERS_JSON = path.resolve(__dirname, "../../../../config/auth/users.json");
 
 let pool: Pool | null = null;
 let testDb: ReturnType<typeof drizzle> | null = null;
 let repo: HarnessRuntimeRepository | null = null;
-let originalUsersJson = "";
 let originalAiSessionsJson: string | null = null;
 let alice: AuthUser | null = null;
 let bob: AuthUser | null = null;
@@ -48,32 +48,11 @@ before(async () => {
   testDb = drizzle(pool);
   repo = createHarnessRuntimeRepository(testDb);
 
-  originalUsersJson = fs.readFileSync(USERS_JSON, "utf8");
   const sessionsPath = aiSessionsStorePath();
   originalAiSessionsJson = fs.existsSync(sessionsPath) ? fs.readFileSync(sessionsPath, "utf8") : null;
 
-  const store = await loadUsersStore();
-  const stamp = randomUUID();
-  alice = {
-    id: `ai-runs-alice-${stamp}`,
-    username: `ai-runs-alice-${stamp}`,
-    role: "user",
-    status: "active",
-    passwordHash: "",
-    createdAt: new Date().toISOString(),
-    lastLoginAt: new Date().toISOString(),
-  };
-  bob = {
-    id: `ai-runs-bob-${stamp}`,
-    username: `ai-runs-bob-${stamp}`,
-    role: "user",
-    status: "active",
-    passwordHash: "",
-    createdAt: new Date().toISOString(),
-    lastLoginAt: new Date().toISOString(),
-  };
-  store.users.push(alice, bob);
-  await saveUsersStore(store);
+  alice = await createTestUser("wes-ai-runs-alice", { role: "user" });
+  bob = await createTestUser("wes-ai-runs-bob", { role: "user" });
   aliceToken = signAuthToken(alice);
   bobToken = signAuthToken(bob);
 });
@@ -83,9 +62,9 @@ after(async () => {
     for (const runId of createdRunIds.splice(0)) {
       await testDb.delete(harnessRuns).where(eq(harnessRuns.harnessRunId, runId));
     }
+    await cleanupTestUsers("wes-ai-runs");
   }
   if (pool) await pool.end();
-  if (originalUsersJson) fs.writeFileSync(USERS_JSON, originalUsersJson);
   const sessionsPath = aiSessionsStorePath();
   if (originalAiSessionsJson !== null) fs.writeFileSync(sessionsPath, originalAiSessionsJson);
   else if (fs.existsSync(sessionsPath)) fs.rmSync(sessionsPath);

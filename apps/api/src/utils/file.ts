@@ -52,13 +52,8 @@ export function ensureExportDir(): string {
   return exportDir;
 }
 
-/**
- * 用户存储路径
- */
-export function usersStorePath(): string {
-  return path.resolve(resolveRootDir(), "config/auth/users.json");
-}
-
+// 阶段 2 S1（2026-08-25）：usersStorePath 已随 users 域 JSON 读写路径删除
+// （users 恒 PG，config/auth/users.json 已移出 git 跟踪并归档）。
 // 阶段 2 批 1 第 4 步：inviteCodesStorePath / passwordResetTokensStorePath
 // 已随 JSON 读写路径删除（邀请码与重置令牌切 PG）。
 

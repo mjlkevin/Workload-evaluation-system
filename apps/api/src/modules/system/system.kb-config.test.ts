@@ -2,19 +2,36 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import test, { after, before } from "node:test";
 import type { Request, Response } from "express";
+import type { AuthUser } from "../../types";
+import { cleanupOneTestUser, createTestUser } from "../../test-helpers/test-users";
 
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const originalCwd = process.cwd();
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "wes-rp031-kb-"));
 
-before(() => {
+// S1（2026-08-25）后 users 域恒 PG：测试 admin 改由 PG 行级注入
+// （JSON 注入路径已删；固定 username 承载身份，id 用合法 uuid）。
+let testAdmin: AuthUser | null = null;
+
+before(async () => {
   process.chdir(tempRoot);
   fs.mkdirSync(path.join(tempRoot, "config", "auth"), { recursive: true });
   fs.mkdirSync(path.join(tempRoot, "config", "system"), { recursive: true });
+  if (!testDatabaseUrl) return;
+  await cleanupOneTestUser("rp031-admin");
+  testAdmin = await createTestUser("wes-kb-config", {
+    id: randomUUID(),
+    username: "rp031-admin",
+    role: "admin",
+    businessRole: "admin",
+  });
 });
 
-after(() => {
+after(async () => {
+  if (testDatabaseUrl) await cleanupOneTestUser("rp031-admin");
   process.chdir(originalCwd);
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });
@@ -32,21 +49,7 @@ function responseCapture() {
 
 async function adminRequest(body: unknown = {}) {
   const { signAuthToken } = await import("../../middleware/auth");
-  const admin = {
-    id: "rp031-admin",
-    username: "rp031-admin",
-    passwordHash: "not-used",
-    role: "admin" as const,
-    businessRole: "admin" as const,
-    status: "active" as const,
-    createdAt: "2026-08-02T00:00:00.000Z",
-    lastLoginAt: "",
-  };
-  fs.writeFileSync(
-    path.join(tempRoot, "config", "auth", "users.json"),
-    JSON.stringify({ users: [admin] }),
-  );
-  const token = signAuthToken(admin);
+  const token = signAuthToken(testAdmin as AuthUser);
   return {
     body,
     query: {},
@@ -59,7 +62,7 @@ function resetStore() {
   fs.rmSync(path.join(tempRoot, "config", "system", "knowledge-base-config.json"), { force: true });
 }
 
-test("activation is blocked until the current draft has a successful probe", { concurrency: false }, async () => {
+test("activation is blocked until the current draft has a successful probe", { skip: !testDatabaseUrl, concurrency: false }, async () => {
   resetStore();
   const { activateKnowledgeBaseConfig, updateKnowledgeBaseConfigDraft } = await import("./system.usecase");
   await updateKnowledgeBaseConfigDraft(
@@ -72,7 +75,7 @@ test("activation is blocked until the current draft has a successful probe", { c
   assert.equal(activation.payload.details[0].reason, "probe_missing");
 });
 
-test("successful zero-hit probe activates only the unchanged draft", { concurrency: false }, async () => {
+test("successful zero-hit probe activates only the unchanged draft", { skip: !testDatabaseUrl, concurrency: false }, async () => {
   resetStore();
   const {
     activateKnowledgeBaseConfig,
@@ -106,7 +109,7 @@ test("successful zero-hit probe activates only the unchanged draft", { concurren
   assert.equal(changed.payload.details[0].reason, "config_changed_after_probe");
 });
 
-test("activation rejects a successful probe older than 24 hours", { concurrency: false }, async () => {
+test("activation rejects a successful probe older than 24 hours", { skip: !testDatabaseUrl, concurrency: false }, async () => {
   resetStore();
   const {
     activateKnowledgeBaseConfig,
@@ -134,7 +137,7 @@ test("activation rejects a successful probe older than 24 hours", { concurrency:
   assert.equal(activation.payload.details[0].reason, "probe_expired");
 });
 
-test("multi knowledge draft rejects duplicate profile and provider ids", { concurrency: false }, async () => {
+test("multi knowledge draft rejects duplicate profile and provider ids", { skip: !testDatabaseUrl, concurrency: false }, async () => {
   resetStore();
   const { updateKnowledgeBaseConfigDraft } = await import("./system.usecase");
   const result = responseCapture();
@@ -157,7 +160,7 @@ test("multi knowledge draft rejects duplicate profile and provider ids", { concu
   ]);
 });
 
-test("connectivity tests are stored per selected knowledge base profile", { concurrency: false }, async () => {
+test("connectivity tests are stored per selected knowledge base profile", { skip: !testDatabaseUrl, concurrency: false }, async () => {
   resetStore();
   const {
     testKnowledgeBaseConnectivityWithFetcher,
@@ -195,7 +198,7 @@ test("connectivity tests are stored per selected knowledge base profile", { conc
   assert.equal(store.probes?.solutions, undefined);
 });
 
-test("activation requires a fresh matching probe for every enabled profile", { concurrency: false }, async () => {
+test("activation requires a fresh matching probe for every enabled profile", { skip: !testDatabaseUrl, concurrency: false }, async () => {
   resetStore();
   const {
     activateKnowledgeBaseConfig,

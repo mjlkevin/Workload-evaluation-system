@@ -2,9 +2,10 @@
 // Users 域仓储（阶段 2 批 2 · 登录热路径）
 // ============================================================
 // 批 1 试点结论复用：整存 load→改→save 无法表达幂等插入（范式 #2）与
-// 条件 UPDATE CAS（范式 #3），接口收敛为行级操作。JSON 实现为既有
-// loadUsersStore/saveUsersStore 的行级封装（遗留语义原样保留，包括整存
-// RMW 的丢失更新窗口——切换观察期结束、第 4 步删除 JSON 路径后消解）。
+// 条件 UPDATE CAS（范式 #3），接口收敛为行级操作。
+//
+// S1（2026-08-25，阶段 2 第 4 步）：JSON 实现与选择器 JSON 分支已删除——
+// users 域恒 PG（WES_STORE_USERS_PG 开关保留至 S7 统一退役）。
 //
 // 选择器落本文件而非 module barrel：middleware/auth.ts 反向引用本文件，
 // 放 barrel 会形成 CJS 循环依赖（批 1 教训）。
@@ -75,114 +76,7 @@ export interface UsersStoreRepository {
 }
 
 // ============================================================
-// JSON 实现（遗留语义原样：整存 RMW；§5.1 遗留模式，勿复制）
-// ============================================================
-
-/**
- * 惰性引用 middleware/auth.ts 的 load/save accessor，避免模块顶层
- * 循环依赖（middleware/auth.ts 导入本文件的选择器）。
- */
-function authMiddleware() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("../../middleware/auth") as typeof import("../../middleware/auth");
-}
-
-function normalizeRole(role: string): AuthUser["role"] {
-  return role === "admin" || role === "sub_admin" ? role : "user";
-}
-
-export function createUsersJsonRepository(): UsersStoreRepository {
-  return {
-    async listUsers() {
-      const store = await authMiddleware().loadUsersStore();
-      return store.users;
-    },
-
-    async findUserById(id) {
-      const store = await authMiddleware().loadUsersStore();
-      return store.users.find((user) => user.id === id) ?? null;
-    },
-
-    async findUserByUsername(username) {
-      const store = await authMiddleware().loadUsersStore();
-      const normalized = username.toLowerCase();
-      return store.users.find((user) => user.username.toLowerCase() === normalized) ?? null;
-    },
-
-    async countUsers() {
-      const store = await authMiddleware().loadUsersStore();
-      return store.users.length;
-    },
-
-    async createUser(input) {
-      const { loadUsersStore, saveUsersStore } = authMiddleware();
-      const store = await loadUsersStore();
-      const existing =
-        store.users.find((user) => user.id === input.id) ??
-        store.users.find((user) => user.username.toLowerCase() === input.username.toLowerCase());
-      if (existing) {
-        return { created: false, user: existing };
-      }
-      const nowIso = (input.now ?? new Date()).toISOString();
-      const user: AuthUser = {
-        id: input.id,
-        username: input.username,
-        passwordHash: input.passwordHash,
-        role: normalizeRole(input.role),
-        businessRole: input.businessRole,
-        status: "active",
-        createdAt: nowIso,
-        lastLoginAt: nowIso,
-      };
-      store.users.push(user);
-      await saveUsersStore(store);
-      return { created: true, user };
-    },
-
-    async updateUserStatus(input) {
-      return mutateUser(input.id, (user) => {
-        user.status = input.status;
-      });
-    },
-
-    async updateUserRole(input) {
-      return mutateUser(input.id, (user) => {
-        user.role = input.role;
-      });
-    },
-
-    async updateUserBusinessRole(input) {
-      return mutateUser(input.id, (user) => {
-        user.businessRole = input.businessRole;
-      });
-    },
-
-    async updateUserPasswordHash(input) {
-      return mutateUser(input.id, (user) => {
-        user.passwordHash = input.passwordHash;
-      });
-    },
-
-    async touchLastLogin(input) {
-      return mutateUser(input.id, (user) => {
-        user.lastLoginAt = (input.now ?? new Date()).toISOString();
-      });
-    },
-  };
-
-  async function mutateUser(id: string, mutate: (user: AuthUser) => void): Promise<AuthUser | null> {
-    const { loadUsersStore, saveUsersStore } = authMiddleware();
-    const store = await loadUsersStore();
-    const target = store.users.find((user) => user.id === id);
-    if (!target) return null;
-    mutate(target);
-    await saveUsersStore(store);
-    return target;
-  }
-}
-
-// ============================================================
-// 选择器（第 3 步开关：缺省 JSON，严格 === "true" 切 PG）
+// 选择器（S1 后恒 PG；开关保留至 S7 统一退役）
 // ============================================================
 
 let defaultRepo: UsersStoreRepository | null = null;
@@ -190,10 +84,7 @@ let defaultRepo: UsersStoreRepository | null = null;
 /** 进程内默认 repository 单例（生产路由使用）；开关只读一次，翻开关需重启 */
 export function getUsersRepository(): UsersStoreRepository {
   if (!defaultRepo) {
-    defaultRepo =
-      process.env.WES_STORE_USERS_PG === "true"
-        ? createUsersPgRepository()
-        : createUsersJsonRepository();
+    defaultRepo = createUsersPgRepository();
   }
   return defaultRepo;
 }

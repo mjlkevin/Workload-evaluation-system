@@ -1,13 +1,11 @@
-import test, { after, before } from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
-import fs from "node:fs";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 import request from "supertest";
 
 import { createHarnessRouter } from "./harness.routes";
-import { signAuthToken, loadUsersStore, saveUsersStore } from "../middleware/auth";
+import { signAuthToken } from "../middleware/auth";
+import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 import type { HarnessRepository } from "../modules/harness/harness.repository";
 import type { HarnessFormalEstimationDraftWriter, HarnessModelRunner } from "../modules/harness/harness.usecase";
 import type {
@@ -20,15 +18,11 @@ import type {
 } from "../db/schema";
 import type { AuthUser } from "../types";
 
-const USERS_JSON = path.resolve(__dirname, "../../../../config/auth/users.json");
-let originalUsersJson = "";
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
-before(() => {
-  originalUsersJson = fs.readFileSync(USERS_JSON, "utf8");
-});
-
-after(() => {
-  fs.writeFileSync(USERS_JSON, originalUsersJson);
+after(async () => {
+  if (!testDatabaseUrl) return;
+  await cleanupTestUsers("wes-harness-routes");
 });
 
 function makeApp(repo: HarnessRepository, extra: { modelRunner?: HarnessModelRunner; formalEstimationDraftWriter?: HarnessFormalEstimationDraftWriter } = {}) {
@@ -159,37 +153,23 @@ function makeRepo(): HarnessRepository {
   };
 }
 
+// S1 后注入方式：统一走 PG 测试用户池（wes-harness-routes-* 前缀），
+// after 按前缀条件 DELETE；无 DB 环境整体 skip（C4 诚实 skip）。
 async function createTempUser(overrides: Partial<AuthUser> = {}): Promise<AuthUser> {
-  const now = new Date().toISOString();
-  const uniqueId = randomUUID();
-  const user: AuthUser = {
-    id: `harness-test-user-${uniqueId}`,
-    username: `harness-test-${uniqueId}`,
-    role: overrides.role || "admin",
-    status: "active",
-    passwordHash: "",
-    createdAt: now,
-    lastLoginAt: now,
-    ...overrides,
-  };
-
-  const store = await loadUsersStore();
-  store.users.push(user);
-  await saveUsersStore(store);
-  return user;
+  return createTestUser("wes-harness-routes", { role: overrides.role ?? "admin", ...overrides });
 }
 
 function createTokenForUser(user: AuthUser): string {
   return signAuthToken(user);
 }
 
-test("POST /harness/runs requires auth", async () => {
+test("POST /harness/runs requires auth", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp(makeRepo());
   const res = await request(app).post("/harness/runs").send({ title: "未登录" });
   assert.equal(res.status, 401);
 });
 
-test("POST /harness/runs creates a run", async () => {
+test("POST /harness/runs creates a run", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const app = makeApp(makeRepo());
   const res = await request(app)
@@ -203,7 +183,7 @@ test("POST /harness/runs creates a run", async () => {
   assert.equal(res.body.data.run.stage, "uploaded");
 });
 
-test("POST /harness/runs/:id/files binds a file and moves run to parsing", async () => {
+test("POST /harness/runs/:id/files binds a file and moves run to parsing", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo);
@@ -219,7 +199,7 @@ test("POST /harness/runs/:id/files binds a file and moves run to parsing", async
   assert.equal(res.body.data.file.fileName, "申请.xlsx");
 });
 
-test("POST /harness/runs/:id/parse-result stores evidence and returns detail", async () => {
+test("POST /harness/runs/:id/parse-result stores evidence and returns detail", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo);
@@ -246,7 +226,7 @@ test("POST /harness/runs/:id/parse-result stores evidence and returns detail", a
   assert.equal(res.body.data.artifacts[0].artifactType, "file_understanding");
 });
 
-test("POST /harness/runs/:id/report-v1 generates model-backed report", async () => {
+test("POST /harness/runs/:id/report-v1 generates model-backed report", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo, {
@@ -285,7 +265,7 @@ test("POST /harness/runs/:id/report-v1 generates model-backed report", async () 
   assert.equal(res.body.data.artifacts.at(-1).artifactType, "requirement_report_v1");
 });
 
-test("POST /harness/runs/:id/report-v1 maps kimi rate limit to 429", async () => {
+test("POST /harness/runs/:id/report-v1 maps kimi rate limit to 429", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo, {
@@ -311,7 +291,7 @@ test("POST /harness/runs/:id/report-v1 maps kimi rate limit to 429", async () =>
   assert.equal(res.body.details[0].reason, "kimi_rate_limited");
 });
 
-test("POST /harness/runs/:id/report-v2 generates v2 report from v1 artifact", async () => {
+test("POST /harness/runs/:id/report-v2 generates v2 report from v1 artifact", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo, {
@@ -368,7 +348,7 @@ test("POST /harness/runs/:id/report-v2 generates v2 report from v1 artifact", as
   assert.equal(res.body.data.artifacts.at(-1).content.nextActions[0].actionType, "enter_formal_estimation");
 });
 
-test("POST /harness/runs/:id/report-v2 rejects invalid stage", async () => {
+test("POST /harness/runs/:id/report-v2 rejects invalid stage", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo);
@@ -380,7 +360,7 @@ test("POST /harness/runs/:id/report-v2 rejects invalid stage", async () => {
   assert.equal(res.body.code, 40001);
 });
 
-test("POST /harness/runs/:id/actions/:actionId/confirm creates project and assessment draft links", async () => {
+test("POST /harness/runs/:id/actions/:actionId/confirm creates project and assessment draft links", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "admin" });
   const token = createTokenForUser(user);
   const repo = makeRepo();
@@ -448,7 +428,7 @@ test("POST /harness/runs/:id/actions/:actionId/confirm creates project and asses
   assert.equal(res.body.data.event.output.assessmentDraft.status, "draft_from_ai");
 });
 
-test("write endpoints return 404 for non-owner runs", async () => {
+test("write endpoints return 404 for non-owner runs", { skip: !testDatabaseUrl }, async () => {
   const ownerToken = createTokenForUser(await createTempUser({ role: "admin" }));
   const otherToken = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
@@ -511,7 +491,7 @@ test("write endpoints return 404 for non-owner runs", async () => {
   assert.equal(reportV2.status, 404);
 });
 
-test("POST /harness/runs/:id/answers rejects invalid stage", async () => {
+test("POST /harness/runs/:id/answers rejects invalid stage", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo);
@@ -526,7 +506,7 @@ test("POST /harness/runs/:id/answers rejects invalid stage", async () => {
   assert.equal(res.body.code, 40001);
 });
 
-test("POST /harness/runs/:id/reanalyze rejects invalid stage", async () => {
+test("POST /harness/runs/:id/reanalyze rejects invalid stage", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo);
@@ -541,7 +521,7 @@ test("POST /harness/runs/:id/reanalyze rejects invalid stage", async () => {
   assert.equal(res.body.code, 40001);
 });
 
-test("POST /harness/runs/:id/actions/:actionId/confirm maps terminal stage to 400", async () => {
+test("POST /harness/runs/:id/actions/:actionId/confirm maps terminal stage to 400", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo);
@@ -558,7 +538,7 @@ test("POST /harness/runs/:id/actions/:actionId/confirm maps terminal stage to 40
   assert.equal(res.body.details[0].reason, "invalid_stage_for_action_confirmation");
 });
 
-test("GET /harness/runs/:id/events returns SSE snapshot", async () => {
+test("GET /harness/runs/:id/events returns SSE snapshot", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepo();
   const app = makeApp(repo);
@@ -639,7 +619,7 @@ function makeRepoWithManualTestResults() {
   };
 }
 
-test("POST /harness/runs/:runId/test-results creates a manual test result", async () => {
+test("POST /harness/runs/:runId/test-results creates a manual test result", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepoWithManualTestResults();
   const app = makeApp(repo);
@@ -662,7 +642,7 @@ test("POST /harness/runs/:runId/test-results creates a manual test result", asyn
   assert.equal(res.body.data.result.resultStatus, "passed");
 });
 
-test("POST /harness/runs/:runId/test-results validates required fields", async () => {
+test("POST /harness/runs/:runId/test-results validates required fields", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepoWithManualTestResults();
   const app = makeApp(repo);
@@ -676,7 +656,7 @@ test("POST /harness/runs/:runId/test-results validates required fields", async (
   assert.equal(res.body.code, 40001);
 });
 
-test("GET /harness/runs/:runId/test-results lists results", async () => {
+test("GET /harness/runs/:runId/test-results lists results", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepoWithManualTestResults();
   const app = makeApp(repo);
@@ -697,7 +677,7 @@ test("GET /harness/runs/:runId/test-results lists results", async () => {
   assert.equal(res.body.data.items[0].executorName, "李四");
 });
 
-test("PATCH /harness/runs/:runId/test-results/:resultId updates a result", async () => {
+test("PATCH /harness/runs/:runId/test-results/:resultId updates a result", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepoWithManualTestResults();
   const app = makeApp(repo);
@@ -719,7 +699,7 @@ test("PATCH /harness/runs/:runId/test-results/:resultId updates a result", async
   assert.equal(res.body.data.result.notes, "已修复");
 });
 
-test("DELETE /harness/runs/:runId/test-results/:resultId deletes a result", async () => {
+test("DELETE /harness/runs/:runId/test-results/:resultId deletes a result", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const repo = makeRepoWithManualTestResults();
   const app = makeApp(repo);

@@ -9,23 +9,24 @@ import express from "express";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import supertest from "supertest";
 
 import { createKnowledgeRouter } from "./knowledge.routes";
 import { KnowledgeRepository } from "../modules/knowledge/knowledge.repository";
-import { loadUsersStore, saveUsersStore, signAuthToken } from "../middleware/auth";
-import { enterIsolatedConfigRoot, exitIsolatedConfigRoot } from "../test-helpers/isolate-config-root";
-import type { AuthUser } from "../types";
+import { signAuthToken } from "../middleware/auth";
+import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 let storePath: string;
 let repo: KnowledgeRepository;
 
-// 竞态隔离（main CI flake 修复）：原 before 备份 / after 恢复真实 users.json
-// 的模式在多文件并行下会互相覆盖（整存 RMW 丢失更新），改为 chdir 隔离根，
-// 临时用户的读改写不再触碰真实文件；详见 test-helpers/isolate-config-root.ts。
-before(() => enterIsolatedConfigRoot("wes-knowledge-routes-"));
-after(() => exitIsolatedConfigRoot());
+// 竞态隔离（S1 后形态）：阶段 2 S1（2026-08-25）users 域已切 PG，原 chdir
+// 沙箱（isolate-config-root.ts）退役；临时用户注入 PG 测试用户池，after 按
+// 前缀条件 DELETE（C5 数据集隔离）。无 DB 时用例整体 skip，钩子不得抛错。
+after(async () => {
+  if (!testDatabaseUrl) return;
+  await cleanupTestUsers("wes-knowledge-route");
+});
 
 function setupApp() {
   storePath = path.join(os.tmpdir(), `wes-knowledge-routes-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
@@ -46,30 +47,17 @@ function setupApp() {
 }
 
 async function createTempUser(role: "admin" | "user"): Promise<{ token: string }> {
-  const uniqueId = randomUUID();
-  const now = new Date().toISOString();
-  const user: AuthUser = {
-    id: `knowledge-route-user-${uniqueId}`,
-    username: `knowledge-route-${uniqueId}`,
-    role,
-    status: "active",
-    passwordHash: "",
-    createdAt: now,
-    lastLoginAt: now,
-  };
-  const store = await loadUsersStore();
-  store.users.push(user);
-  await saveUsersStore(store);
+  const user = await createTestUser("wes-knowledge-route", { role });
   return { token: signAuthToken(user) };
 }
 
-test("GET /knowledge/search 未带 token 返回 401", async () => {
+test("GET /knowledge/search 未带 token 返回 401", { skip: !testDatabaseUrl }, async () => {
   const request = setupApp();
   const res = await request.get("/knowledge/search").query({ q: "售前估算" });
   assert.equal(res.status, 401);
 });
 
-test("GET /knowledge/search 带 token 返回 { code:0, data.items }", async () => {
+test("GET /knowledge/search 带 token 返回 { code:0, data.items }", { skip: !testDatabaseUrl }, async () => {
   const request = setupApp();
   const { token } = await createTempUser("user");
   const res = await request
@@ -83,14 +71,14 @@ test("GET /knowledge/search 带 token 返回 { code:0, data.items }", async () =
   assert.ok(res.body.data.guard, "响应应含护栏留痕");
 });
 
-test("GET /knowledge/search 缺 q 参数返回非零 code", async () => {
+test("GET /knowledge/search 缺 q 参数返回非零 code", { skip: !testDatabaseUrl }, async () => {
   const request = setupApp();
   const { token } = await createTempUser("user");
   const res = await request.get("/knowledge/search").set("Authorization", `Bearer ${token}`);
   assert.notEqual(res.body.code, 0, "缺 q 应报错");
 });
 
-test("GET /knowledge/entries 返回条目列表", async () => {
+test("GET /knowledge/entries 返回条目列表", { skip: !testDatabaseUrl }, async () => {
   const request = setupApp();
   const { token } = await createTempUser("user");
   const res = await request.get("/knowledge/entries").set("Authorization", `Bearer ${token}`);
@@ -99,7 +87,7 @@ test("GET /knowledge/entries 返回条目列表", async () => {
   assert.ok(Array.isArray(res.body.data.items));
 });
 
-test("POST /knowledge/entries admin 可创建，普通 user 返回 403", async () => {
+test("POST /knowledge/entries admin 可创建，普通 user 返回 403", { skip: !testDatabaseUrl }, async () => {
   const request = setupApp();
 
   const admin = await createTempUser("admin");

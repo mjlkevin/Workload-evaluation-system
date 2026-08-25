@@ -2,14 +2,14 @@
 // AI Runs controller 测试（RP-047 Batch C）
 // ============================================================
 // 覆盖 handler 工厂的 flag 门闸、错误映射与 202 envelope；
-// 使用 stub usecase，不依赖 PostgreSQL。
+// 业务逻辑使用 stub usecase，鉴权用户注入 PG 测试用户池
+// （wes-harness-runtime-* 前缀，C5 数据集隔离；S1 后 JSON 注入路径已删）。
+// 无 DB 环境（未设 TEST_DATABASE_URL）按 §4.6/C4 诚实 skip，钩子不执行 DB 操作。
 
 import assert from "node:assert/strict";
 import test from "node:test";
 import express from "express";
 import request from "supertest";
-import fs from "node:fs";
-import path from "node:path";
 
 import { createAiRunsHandlers } from "./harness-runtime.controller";
 import {
@@ -18,33 +18,23 @@ import {
   AiRunsNotFoundError,
   AiRunsValidationError,
 } from "./harness-runtime.usecase";
-import { loadUsersStore, saveUsersStore, signAuthToken } from "../../middleware/auth";
+import { signAuthToken } from "../../middleware/auth";
+import { cleanupTestUsers, createTestUser } from "../../test-helpers/test-users";
 import type { AuthUser } from "../../types";
 
-const USERS_JSON = path.resolve(__dirname, "../../../../../config/auth/users.json");
-let originalUsersJson = "";
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 let user: AuthUser | null = null;
 let token = "";
 
 test.before(async () => {
-  originalUsersJson = fs.readFileSync(USERS_JSON, "utf8");
-  const store = await loadUsersStore();
-  user = {
-    id: `ai-runs-controller-user-${Date.now()}`,
-    username: `ai-runs-controller-${Date.now()}`,
-    role: "user",
-    status: "active",
-    passwordHash: "",
-    createdAt: new Date().toISOString(),
-    lastLoginAt: new Date().toISOString(),
-  };
-  store.users.push(user);
-  await saveUsersStore(store);
+  if (!testDatabaseUrl) return;
+  user = await createTestUser("wes-harness-runtime", { role: "user" });
   token = signAuthToken(user);
 });
 
-test.after(() => {
-  fs.writeFileSync(USERS_JSON, originalUsersJson);
+test.after(async () => {
+  if (!testDatabaseUrl) return;
+  await cleanupTestUsers("wes-harness-runtime");
 });
 
 function makeApp(usecaseStub: Partial<ReturnType<typeof createStubUsecase>> = {}) {
@@ -86,20 +76,20 @@ function createStubUsecase() {
   };
 }
 
-test("list handler wraps usecase result in the ok envelope", async () => {
+test("list handler wraps usecase result in the ok envelope", { skip: !testDatabaseUrl }, async () => {
   const response = await request(makeApp()).get("/ai-runs").set("Authorization", `Bearer ${token}`);
   assert.equal(response.status, 200);
   assert.equal(response.body.code, 0);
   assert.equal(response.body.data.items.length, 1);
 });
 
-test("cancel handler returns 202 from usecase outcome", async () => {
+test("cancel handler returns 202 from usecase outcome", { skip: !testDatabaseUrl }, async () => {
   const response = await request(makeApp()).post("/ai-runs/run-1/cancel").set("Authorization", `Bearer ${token}`);
   assert.equal(response.status, 202);
   assert.equal(response.body.code, 0);
 });
 
-test("not-found errors map to 404 without leaking details", async () => {
+test("not-found errors map to 404 without leaking details", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({
     async getRunSnapshot() {
       throw new AiRunsNotFoundError("run not found");
@@ -110,7 +100,7 @@ test("not-found errors map to 404 without leaking details", async () => {
   assert.equal(response.body.code, 40404);
 });
 
-test("disabled errors map to 503 ASYNC_RUNS_DISABLED", async () => {
+test("disabled errors map to 503 ASYNC_RUNS_DISABLED", { skip: !testDatabaseUrl }, async () => {
   const response = await request(makeApp()).post("/ai-runs/run-1/confirm-stub").set("Authorization", `Bearer ${token}`);
   // confirm 端点未挂载 → 走 404；直接通过 stub cancel 映射
   assert.ok(response.status === 404);
@@ -124,7 +114,7 @@ test("disabled errors map to 503 ASYNC_RUNS_DISABLED", async () => {
   assert.equal(disabled.body.code, "ASYNC_RUNS_DISABLED");
 });
 
-test("conflict errors map to 409 carrying their business code", async () => {
+test("conflict errors map to 409 carrying their business code", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({
     async cancelRun() {
       throw new AiRunsConflictError("RUN_NOT_FAILED", "只有失败终态可重试");
@@ -135,7 +125,7 @@ test("conflict errors map to 409 carrying their business code", async () => {
   assert.equal(response.body.code, "RUN_NOT_FAILED");
 });
 
-test("validation errors map to 422", async () => {
+test("validation errors map to 422", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({
     async listActiveRuns() {
       throw new AiRunsValidationError("参数非法");
@@ -145,7 +135,7 @@ test("validation errors map to 422", async () => {
   assert.equal(response.status, 422);
 });
 
-test("requests without a token get 401 before reaching the usecase", async () => {
+test("requests without a token get 401 before reaching the usecase", { skip: !testDatabaseUrl }, async () => {
   const response = await request(makeApp()).get("/ai-runs");
   assert.equal(response.status, 401);
 });

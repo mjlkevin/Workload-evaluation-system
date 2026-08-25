@@ -154,6 +154,7 @@
           <div class="panel-b">
             <ul class="list-clean">
               <li>不引入向量库。</li>
+              <li>不引入三元组库与 OWL 推理机（RP-059 只取本体建模方法，载体为 PG 表 + 现有 DSL 引擎）。</li>
               <li>不引入 Prompt Profile CRUD。</li>
               <li>不把标准治理流程 Harness 化。</li>
               <li>不自动创建正式项目评估或正式需求记录。</li>
@@ -182,6 +183,7 @@
         <tr><td>模型职责</td><td>文件业务理解必须真实调用 LLM。</td><td>代码抽取只负责证据整理，不能代替业务理解和风险判断。</td></tr>
         <tr><td>formBlock 交互协议</td><td>结构化表单必须先经过后端白名单校验，再由前端渲染；提交仍是普通用户 chat 消息。</td><td>后端协议、session metadata 与前端 InteractiveFormCard 已实现；提交复用 <code class="inline">sendMessage(messageOverride)</code>，避免 LLM 直接驱动写动作。</td></tr>
         <tr><td>低置信度粗评</td><td>规则缺失时允许生成低置信度粗评，并生成待补标准动作。</td><td>不阻断内部讨论，但必须暴露假设和依据缺口。</td></tr>
+        <tr><td>本体融合边界（RP-059）</td><td>取本体的建模方法（概念、继承、一致性检查），不引 OWL 推理机与三元组库；概念数据落 PG 普通表，规则仍由现有 DSL 引擎执行。</td><td>OWL 语义与评估场景相反、不做算术，且阶段 2 正把 9 个 store 收敛到 PG。<details class="tech-detail"><summary>三条硬约束</summary>① OWL 是开放世界 + 单调推理，与「未填写即缺失」「调研后撤销结论」的评估语义相反，缺失校验仍需闭世界的 DSL 规则；② OWL 不做算术，<code class="inline">initial-estimate.ts:68</code> 的 <code class="inline">(10+n×3)×行业系数</code> 必须留在计算引擎；③ 此时新增存储引擎会重造跨存储非原子写债务。</details></td></tr>
         <tr><td>Electron 桌面端定位（RP-051）</td><td>桌面端定位为连接共享服务器的客户端，不做单机离线；数据库留在服务器端部署（应用与数据库分离），桌面端不内嵌任何数据库。</td><td>用户 2026-08-06 拍板；该定位同时消除内嵌 PG 与本地数据目录两大障碍，桌面范围收敛为客户端壳；前置条件是服务器端需部署 V2 前端静态托管（当前 docker-compose 无 web 服务）。</td></tr>
       </table>
     </section>

@@ -1,28 +1,22 @@
-import test, { after, before } from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
-import fs from "node:fs";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 import supertest from "supertest";
 
 import { createAgentRouter } from "./agent.routes";
-import { signAuthToken, loadUsersStore, saveUsersStore } from "../middleware/auth";
+import { signAuthToken } from "../middleware/auth";
+import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 import type { AuthUser } from "../types";
 import type { ChatRunner } from "../agent/orchestrator";
 
-const USERS_JSON = path.resolve(__dirname, "../../../../config/auth/users.json");
-let originalUsersJson = "";
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
-before(() => {
-  originalUsersJson = fs.readFileSync(USERS_JSON, "utf8");
+after(async () => {
+  if (!testDatabaseUrl) return;
+  await cleanupTestUsers("wes-agent-routes");
 });
 
-after(() => {
-  fs.writeFileSync(USERS_JSON, originalUsersJson);
-});
-
-test("POST /agent/chat: 未登录返回 401", async () => {
+test("POST /agent/chat: 未登录返回 401", { skip: !testDatabaseUrl }, async () => {
   const res = await supertest(miniApp(fakeRunner([{ content: "不会执行" }])))
     .post("/agent/chat")
     .send({ message: "你好" });
@@ -31,7 +25,7 @@ test("POST /agent/chat: 未登录返回 401", async () => {
   assert.equal(res.body.code, 40101);
 });
 
-test("POST /agent/chat: 登录后返回统一 JSON 事件数组", async () => {
+test("POST /agent/chat: 登录后返回统一 JSON 事件数组", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const res = await supertest(
     miniApp(
@@ -54,7 +48,7 @@ test("POST /agent/chat: 登录后返回统一 JSON 事件数组", async () => {
   );
 });
 
-test("POST /agent/chat: 事件 type 只来自白名单", async () => {
+test("POST /agent/chat: 事件 type 只来自白名单", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const res = await supertest(miniApp(fakeRunner([{ content: "ok" }])))
     .post("/agent/chat")
@@ -99,24 +93,10 @@ function fakeRunner(seq: Array<{ content?: string; toolCalls?: Array<{ id: strin
   };
 }
 
+// S1 后注入方式：统一走 PG 测试用户池（wes-agent-routes-* 前缀），
+// after 按前缀条件 DELETE；无 DB 环境整体 skip（C4 诚实 skip）。
 async function createTempUser(overrides: Partial<AuthUser> = {}): Promise<AuthUser> {
-  const now = new Date().toISOString();
-  const uniqueId = randomUUID();
-  const user: AuthUser = {
-    id: `agent-test-user-${uniqueId}`,
-    username: `agent-test-${uniqueId}`,
-    role: overrides.role || "user",
-    status: "active",
-    passwordHash: "",
-    createdAt: now,
-    lastLoginAt: now,
-    ...overrides,
-  };
-
-  const store = await loadUsersStore();
-  store.users.push(user);
-  await saveUsersStore(store);
-  return user;
+  return createTestUser("wes-agent-routes", { role: overrides.role ?? "user", ...overrides });
 }
 
 function createTokenForUser(user: AuthUser): string {

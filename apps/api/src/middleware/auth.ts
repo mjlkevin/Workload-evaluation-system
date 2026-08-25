@@ -4,21 +4,14 @@
 
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 
 import { config } from "../config/env";
-import { AuthUser, AuthJwtPayload, BusinessRole, UsersStore } from "../types";
-import { asString, usersStorePath } from "../utils";
+import { AuthUser, AuthJwtPayload, BusinessRole } from "../types";
+import { asString } from "../utils";
 import { getUsersRepository } from "../modules/auth/users.repository";
 
-// -------------------- 用户存储操作 --------------------
-
-function normalizeAuthUserRole(user: AuthUser): AuthUser {
-  const r = user.role as string;
-  if (r === "admin" || r === "sub_admin" || r === "user") return user;
-  return { ...user, role: "user" };
-}
+// -------------------- 业务角色 --------------------
 
 const BUSINESS_ROLES: BusinessRole[] = ["sales", "pre_sales", "delivery", "pm", "pmo", "dev", "admin"];
 
@@ -36,41 +29,6 @@ export function resolveBusinessRole(user: Pick<AuthUser, "role" | "businessRole"
   return user.businessRole && isBusinessRole(user.businessRole)
     ? user.businessRole
     : defaultBusinessRoleForSystemRole(user.role);
-}
-
-/**
- * 阶段 1 批 3：签名改 async（Promise<UsersStore>），函数体一字未动——
- * 仍走 JSON 文件同步 I/O。
- * 阶段 2 批 2：保留为 users 域 JSON 后端的 accessor（供 JSON 仓储封装），
- * 生产请求路径已改经 getUsersRepository() 选择器；第 4 步删除。
- */
-export async function loadUsersStore(): Promise<UsersStore> {
-  const filePath = usersStorePath();
-  if (!fs.existsSync(filePath)) {
-    const initStore: UsersStore = { users: [] };
-    fs.mkdirSync(require("path").dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(initStore, null, 2), "utf-8");
-    return initStore;
-  }
-  try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as UsersStore;
-    if (!parsed || !Array.isArray(parsed.users)) {
-      return { users: [] };
-    }
-    return { users: parsed.users.map((u) => normalizeAuthUserRole(u as AuthUser)) };
-  } catch {
-    return { users: [] };
-  }
-}
-
-/**
- * 阶段 1 批 3：签名改 async（Promise<void>），函数体一字未动。
- * 阶段 2 批 2：同 loadUsersStore，保留为 JSON 后端 accessor，第 4 步删除。
- */
-export async function saveUsersStore(store: UsersStore): Promise<void> {
-  const filePath = usersStorePath();
-  fs.mkdirSync(require("path").dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(store, null, 2), "utf-8");
 }
 
 // -------------------- JWT 操作 --------------------
@@ -144,8 +102,8 @@ export function resolveApiRoleFromUser(user: AuthUser): "admin" | "operator" {
  *
  * 阶段 1 批 2：签名改 async（Promise<...|null>），函数体一字未动。
  * 阶段 1 批 3：内部 loadUsersStore 已异步化，补 await 调用。
- * 阶段 2 批 2：改经 getUsersRepository()（缺省 JSON / WES_STORE_USERS_PG=true 切 PG，
- * PG 侧读路径命中写穿缓存，认证请求零 DB 往返）。
+ * 阶段 2 S1（2026-08-25）：users 域 JSON 读写路径删除，选择器恒装配 PG，
+ * 认证请求零 DB 往返（PG 侧读路径命中写穿缓存）。
  */
 export async function requireAuth(
   req: Request,

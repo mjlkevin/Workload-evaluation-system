@@ -22,11 +22,9 @@ const REQUIRED_FILES: Array<{
   validate: (value: unknown) => boolean;
   fallback: unknown;
 }> = [
-  {
-    relativePath: "config/auth/users.json",
-    validate: (value) => typeof value === "object" && value !== null && Array.isArray((value as { users?: unknown[] }).users),
-    fallback: { users: [] },
-  },
+  // 阶段 2 S1（2026-08-25）：users.json 已切 PG 并移出 git 跟踪（归档至 99_归档/），
+  // 不再列入完整性检查（否则 repair 模式会重建空文件，形成误导性双源）；
+  // 文件本体删除归 S7 收尾批。
   // 阶段 2 批 1 第 4 步：invite-codes.json 已切 PG 并归档，不再列入完整性检查
   // （否则 fallback 会重建空文件，形成误导性双源）。
   {

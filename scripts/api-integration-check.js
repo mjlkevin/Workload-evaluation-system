@@ -1,7 +1,9 @@
 const { spawn, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { randomUUID } = require("node:crypto");
 const jwt = require("jsonwebtoken");
+const { Client } = require("pg");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,16 +51,57 @@ function resolveJwtSecret(projectRoot) {
   return "dev-jwt-secret-change-me";
 }
 
-function buildAuthContext(projectRoot) {
-  const usersPath = path.resolve(projectRoot, "config/auth/users.json");
-  if (!fs.existsSync(usersPath)) {
-    throw new Error("users_store_missing");
+// S1（2026-08-25）：users 域已切 PG（requireAuth 从 PG 重查），config/auth/users.json
+// 已移出 git 跟踪并归档。auth context 改从 PG 读取：优先 process.env.DATABASE_URL，
+// 本地手动运行（node scripts/...）时回退 apps/api/.env.local / apps/api/.env。
+function resolveDatabaseUrl(projectRoot) {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  for (const envPath of [
+    path.resolve(projectRoot, "apps/api/.env.local"),
+    path.resolve(projectRoot, "apps/api/.env"),
+    path.resolve(projectRoot, ".env.local")
+  ]) {
+    const parsed = parseEnvFile(envPath);
+    if (parsed.DATABASE_URL) return parsed.DATABASE_URL;
   }
-  const store = JSON.parse(fs.readFileSync(usersPath, "utf-8"));
-  const users = Array.isArray(store?.users) ? store.users : [];
-  const activeUser = users.find((x) => x && x.status === "active");
+  return null;
+}
+
+async function loadActiveUser(projectRoot) {
+  const connectionString = resolveDatabaseUrl(projectRoot);
+  if (!connectionString) {
+    throw new Error("database_url_missing: 设置 DATABASE_URL（env 或 apps/api/.env.local）");
+  }
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    const { rows } = await client.query(
+      "SELECT user_id AS id, username, role FROM users WHERE status = 'active' ORDER BY created_at ASC LIMIT 1"
+    );
+    if (rows.length > 0) return rows[0];
+    // CI 上 PG users 表为空（db:migrate 只建表不播种）：seed 固定集成测试用户。
+    const bcrypt = require("bcryptjs");
+    const { rows: inserted } = await client.query(
+      `INSERT INTO users (user_id, username, password_hash, role, business_role, status, created_at)
+       VALUES ($1, 'itest-admin', $2, 'admin', 'admin', 'active', now())
+       ON CONFLICT (username) DO NOTHING
+       RETURNING user_id AS id, username, role`,
+      [randomUUID(), bcrypt.hashSync("ItestAdmin123!", 10)]
+    );
+    if (inserted.length > 0) return inserted[0];
+    const { rows: existing } = await client.query(
+      "SELECT user_id AS id, username, role FROM users WHERE username = 'itest-admin'"
+    );
+    return existing[0] || null;
+  } finally {
+    await client.end();
+  }
+}
+
+async function buildAuthContext(projectRoot) {
+  const activeUser = await loadActiveUser(projectRoot);
   if (!activeUser) {
-    throw new Error("active_user_missing");
+    throw new Error("active_user_missing: PG users 表无 active 记录且 seed 失败");
   }
 
   const secret = resolveJwtSecret(projectRoot);
@@ -113,7 +156,7 @@ function stopProcessTree(child) {
 
 async function run() {
   const projectRoot = process.cwd();
-  const auth = buildAuthContext(projectRoot);
+  const auth = await buildAuthContext(projectRoot);
   const authHeaders = {
     Authorization: `Bearer ${auth.token}`
   };

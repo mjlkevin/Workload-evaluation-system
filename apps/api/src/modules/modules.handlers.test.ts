@@ -1,6 +1,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import XLSX from "xlsx";
 import bcrypt from "bcryptjs";
 
@@ -9,9 +10,10 @@ import { Pool } from "pg";
 
 import { AuthUser } from "../types";
 import { config } from "../config/env";
-import { loadUsersStore, saveUsersStore, signAuthToken, verifyAuthToken } from "../middleware/auth";
-import { enterIsolatedConfigRoot, exitIsolatedConfigRoot } from "../test-helpers/isolate-config-root";
-import { aiSessionsStorePath, knowledgeBaseConfigStorePath, usersStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
+import { signAuthToken, verifyAuthToken } from "../middleware/auth";
+import { getUsersRepository } from "./auth/users.repository";
+import { cleanupOneTestUser, cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
+import { aiSessionsStorePath, knowledgeBaseConfigStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
 import { confirmPasswordReset, listUsers, login, me, requestPasswordReset, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
@@ -40,12 +42,21 @@ import { createConfirmAiAssessmentDraftHandler } from "./project-evaluations/pro
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
 import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap";
 
-// 竞态隔离（main CI flake 修复）：本文件多处读改写真实 users.json
-// （getActiveUser / 启停 / 改密），与路由测试文件的整存 RMW 并发互撞，
-// 导致 active user required 间歇性失败。chdir 到隔离根（真实 users.json
-// 做基线拷贝），详见 test-helpers/isolate-config-root.ts。
-before(() => enterIsolatedConfigRoot("wes-modules-handlers-"));
-after(() => exitIsolatedConfigRoot());
+// 竞态隔离（S1 后形态）：阶段 2 S1（2026-08-25）users 域已切 PG（JSON 读写
+// 路径删除），原 chdir 沙箱（isolate-config-root.ts）随之退役。临时用户统一
+// 注入 PG 测试用户池（wes-modules-* 前缀，C5 数据集隔离），after 按前缀
+// 条件 DELETE，不再触碰任何共享文件存储。
+let testAdmin: AuthUser;
+let testPlainUser: AuthUser;
+
+before(async () => {
+  testAdmin = await createTestUser("wes-modules-admin", { role: "admin", businessRole: "admin" });
+  testPlainUser = await createTestUser("wes-modules-user", { role: "user", businessRole: "pre_sales" });
+});
+
+after(async () => {
+  await cleanupTestUsers("wes-modules");
+});
 
 type MockRes = {
   statusCode: number;
@@ -109,10 +120,8 @@ function createMinimalRequirementWorkbookBuffer(): Buffer {
 }
 
 async function getActiveUser(): Promise<AuthUser> {
-  const store = await loadUsersStore();
-  const user = store.users.find((x) => x.status === "active");
-  assert.ok(user, "active user required for handler tests");
-  return user;
+  assert.ok(testAdmin, "active user required for handler tests");
+  return testAdmin;
 }
 
 async function getActiveUserToken(): Promise<string> {
@@ -128,10 +137,8 @@ async function getNonAdminUserToken(): Promise<string> {
 }
 
 async function getNonAdminUser(): Promise<AuthUser> {
-  const store = await loadUsersStore();
-  const user = store.users.find((x) => x.status === "active" && x.role !== "admin");
-  assert.ok(user, "non-admin active user required for handler tests");
-  return user;
+  assert.ok(testPlainUser, "non-admin active user required for handler tests");
+  return testPlainUser;
 }
 
 /**
@@ -208,8 +215,7 @@ function withFileSnapshotRestore(filePath: string, run: () => void): void {
 }
 
 test("system.usecase: empty retrieval still proves knowledge base connectivity", { concurrency: false }, async () => {
-  const store = await loadUsersStore();
-  const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
+  const admin = testAdmin;
   assert.ok(admin, "active admin required");
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () => new globalThis.Response(
@@ -307,9 +313,11 @@ test("auth.usecase: login returns required error when username/password missing"
 });
 
 test("auth.usecase: login can issue a remembered 7-day token", async () => {
-  await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
+  // S1 后注入方式：确定性用户名先清后建（幂等重跑安全），用例结束清理。
+  await cleanupOneTestUser("ut-remember-login-target");
+  try {
     const user: AuthUser = {
-      id: "ut-remember-login-target",
+      id: randomUUID(), // PG users.user_id 是 uuid 列，固定 username 用 text 列承载
       username: "ut-remember-login-target",
       passwordHash: await bcrypt.hash("Remember123!", 10),
       role: "user",
@@ -318,10 +326,13 @@ test("auth.usecase: login can issue a remembered 7-day token", async () => {
       createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
       lastLoginAt: "",
     };
-    const testStore = await loadUsersStore();
-    testStore.users = testStore.users.filter((item) => item.id !== user.id);
-    testStore.users.push(user);
-    await saveUsersStore(testStore);
+    await getUsersRepository().createUser({
+      id: user.id,
+      username: user.username,
+      passwordHash: user.passwordHash,
+      role: user.role,
+      businessRole: user.businessRole,
+    });
 
     const issuedAtSeconds = Math.floor(Date.now() / 1000);
     const req = createMockReq({ body: { username: user.username, password: "Remember123!", rememberMe: true } });
@@ -338,7 +349,9 @@ test("auth.usecase: login can issue a remembered 7-day token", async () => {
     assert.ok(decoded);
     const payload = JSON.parse(Buffer.from(body.data.token.split(".")[1], "base64url").toString("utf-8")) as { exp: number; iat: number };
     assert.ok(payload.exp - (payload.iat || issuedAtSeconds) >= 604700);
-  });
+  } finally {
+    await cleanupOneTestUser("ut-remember-login-target");
+  }
 });
 
 test("auth.usecase: me returns 401 without token", async () => {
@@ -371,13 +384,12 @@ test("auth.usecase: me returns businessRole with valid token", async () => {
 });
 
 test("auth.usecase: updateUserBusinessRole changes only business role", async () => {
-  const store = await loadUsersStore();
-  const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
-  const target = store.users.find((x) => x.status === "active" && x.role !== "admin");
+  const admin = testAdmin;
+  const target = testPlainUser;
   assert.ok(admin, "active admin required");
   assert.ok(target, "active non-admin target required");
 
-  await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
+  try {
     const req = createMockReq({
       token: signAuthToken(admin),
       params: { userId: target.id },
@@ -391,13 +403,17 @@ test("auth.usecase: updateUserBusinessRole changes only business role", async ()
     assert.equal(body.code, 0);
     assert.equal(body.data.user.role, target.role);
     assert.equal(body.data.user.businessRole, "sales");
-  });
+  } finally {
+    // JSON 时代该用例以 withFileSnapshotRestore 包裹（改动自动回滚）；
+    // S1 后 target 是共享的 PG 测试用户，必须显式恢复 businessRole，
+    // 否则污染后续依赖 pre_sales 的用例（如 homeWorkbenchChat 角色注入）。
+    await getUsersRepository().updateUserBusinessRole({ id: target.id, businessRole: "pre_sales" });
+  }
 });
 
 test("auth.usecase: updateUserBusinessRole rejects invalid role", async () => {
-  const store = await loadUsersStore();
-  const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
-  const target = store.users.find((x) => x.status === "active");
+  const admin = testAdmin;
+  const target = testPlainUser;
   assert.ok(admin, "active admin required");
   assert.ok(target, "active target required");
 
@@ -414,13 +430,14 @@ test("auth.usecase: updateUserBusinessRole rejects invalid role", async () => {
 });
 
 test("auth.usecase: updateUserPassword lets an admin reset login password", async () => {
-  const store = await loadUsersStore();
-  const admin = store.users.find((x) => x.status === "active" && x.role === "admin");
+  const admin = testAdmin;
   assert.ok(admin, "active admin required");
 
-  await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
+  // S1 后注入方式：确定性用户名先清后建，用例结束清理。
+  await cleanupOneTestUser("ut-reset-target");
+  try {
     const target: AuthUser = {
-      id: "ut-reset-target",
+      id: randomUUID(), // PG users.user_id 是 uuid 列，固定 username 用 text 列承载
       username: "ut-reset-target",
       passwordHash: await bcrypt.hash("OldPass123!", 10),
       role: "user",
@@ -429,10 +446,13 @@ test("auth.usecase: updateUserPassword lets an admin reset login password", asyn
       createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
       lastLoginAt: "",
     };
-    const testStore = await loadUsersStore();
-    testStore.users = testStore.users.filter((user) => user.id !== target.id);
-    testStore.users.push(target);
-    await saveUsersStore(testStore);
+    await getUsersRepository().createUser({
+      id: target.id,
+      username: target.username,
+      passwordHash: target.passwordHash,
+      role: target.role,
+      businessRole: target.businessRole,
+    });
 
     const req = createMockReq({
       token: signAuthToken(admin),
@@ -457,75 +477,81 @@ test("auth.usecase: updateUserPassword lets an admin reset login password", asyn
     await login(createMockReq({ body: { username: target.username, password: "NewPass123!" } }), newLoginRes as unknown as Response);
     assert.equal(newLoginRes.statusCode, 200);
     assert.equal((newLoginRes.body as { data: { user: { id: string } } }).data.user.id, target.id);
-  });
+  } finally {
+    await cleanupOneTestUser("ut-reset-target");
+  }
 });
 
 test("auth.usecase: password reset request and confirm update password once", { skip: !process.env.TEST_DATABASE_URL }, async () => {
-  // 阶段 2 批 1 第 4 步：重置令牌已切 PG（JSON 读写路径删除），文件快照改为
-  // PG 行级清理（同 auth-pg.repository.test 约定）；users 域未迁移，快照保留。
+  // 阶段 2 批 1 第 4 步：重置令牌已切 PG（JSON 读写路径删除），清理走
+  // password_reset_tokens 表条件 DELETE；S1（2026-08-25）users 域同切 PG，
+  // 目标用户由 users.json 注入改为 createUser 行级注入，users 行同样条件清理。
   const cleanupPool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
   const cleanupTokens = () =>
     cleanupPool.query("DELETE FROM password_reset_tokens WHERE username = 'ut-password-reset-target'");
+  await cleanupOneTestUser("ut-password-reset-target");
   await cleanupTokens();
   try {
-    await withFileSnapshotRestoreAsync(usersStorePath(), async () => {
-      const target: AuthUser = {
-        id: "ut-password-reset-target",
-        username: "ut-password-reset-target",
-        passwordHash: await bcrypt.hash("OldPass123!", 10),
-        role: "user",
-        businessRole: "pre_sales",
-        status: "active",
-        createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
-        lastLoginAt: "",
-      };
-      const testStore = await loadUsersStore();
-      testStore.users = testStore.users.filter((user) => user.id !== target.id);
-      testStore.users.push(target);
-      await saveUsersStore(testStore);
-
-      const requestRes = createMockRes();
-      await requestPasswordReset(
-        createMockReq({ body: { username: target.username } }),
-        requestRes as unknown as Response
-      );
-
-      assert.equal(requestRes.statusCode, 200);
-      const requestBody = requestRes.body as {
-        code: number;
-        data: { accepted: boolean; resetToken?: string; resetUrl?: string; expiresInMinutes: number };
-      };
-      assert.equal(requestBody.code, 0);
-      assert.equal(requestBody.data.accepted, true);
-      assert.equal(requestBody.data.expiresInMinutes, 30);
-      assert.ok(requestBody.data.resetToken);
-      assert.ok(requestBody.data.resetUrl?.includes("/reset-password?token="));
-
-      const confirmRes = createMockRes();
-      await confirmPasswordReset(
-        createMockReq({ body: { token: requestBody.data.resetToken, password: "NewPass123!" } }),
-        confirmRes as unknown as Response
-      );
-      assert.equal(confirmRes.statusCode, 200);
-      assert.equal((confirmRes.body as { code: number; data: { success: boolean } }).data.success, true);
-
-      const oldLoginRes = createMockRes();
-      await login(createMockReq({ body: { username: target.username, password: "OldPass123!" } }), oldLoginRes as unknown as Response);
-      assert.equal(oldLoginRes.statusCode, 400);
-
-      const newLoginRes = createMockRes();
-      await login(createMockReq({ body: { username: target.username, password: "NewPass123!" } }), newLoginRes as unknown as Response);
-      assert.equal(newLoginRes.statusCode, 200);
-
-      const reuseRes = createMockRes();
-      await confirmPasswordReset(
-        createMockReq({ body: { token: requestBody.data.resetToken, password: "AnotherPass123!" } }),
-        reuseRes as unknown as Response
-      );
-      assert.equal(reuseRes.statusCode, 400);
-      assert.equal((reuseRes.body as { code?: number }).code, 40001);
+    const target: AuthUser = {
+      id: randomUUID(), // PG users.user_id 是 uuid 列，固定 username 用 text 列承载
+      username: "ut-password-reset-target",
+      passwordHash: await bcrypt.hash("OldPass123!", 10),
+      role: "user",
+      businessRole: "pre_sales",
+      status: "active",
+      createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
+      lastLoginAt: "",
+    };
+    await getUsersRepository().createUser({
+      id: target.id,
+      username: target.username,
+      passwordHash: target.passwordHash,
+      role: target.role,
+      businessRole: target.businessRole,
     });
+
+    const requestRes = createMockRes();
+    await requestPasswordReset(
+      createMockReq({ body: { username: target.username } }),
+      requestRes as unknown as Response
+    );
+
+    assert.equal(requestRes.statusCode, 200);
+    const requestBody = requestRes.body as {
+      code: number;
+      data: { accepted: boolean; resetToken?: string; resetUrl?: string; expiresInMinutes: number };
+    };
+    assert.equal(requestBody.code, 0);
+    assert.equal(requestBody.data.accepted, true);
+    assert.equal(requestBody.data.expiresInMinutes, 30);
+    assert.ok(requestBody.data.resetToken);
+    assert.ok(requestBody.data.resetUrl?.includes("/reset-password?token="));
+
+    const confirmRes = createMockRes();
+    await confirmPasswordReset(
+      createMockReq({ body: { token: requestBody.data.resetToken, password: "NewPass123!" } }),
+      confirmRes as unknown as Response
+    );
+    assert.equal(confirmRes.statusCode, 200);
+    assert.equal((confirmRes.body as { code: number; data: { success: boolean } }).data.success, true);
+
+    const oldLoginRes = createMockRes();
+    await login(createMockReq({ body: { username: target.username, password: "OldPass123!" } }), oldLoginRes as unknown as Response);
+    assert.equal(oldLoginRes.statusCode, 400);
+
+    const newLoginRes = createMockRes();
+    await login(createMockReq({ body: { username: target.username, password: "NewPass123!" } }), newLoginRes as unknown as Response);
+    assert.equal(newLoginRes.statusCode, 200);
+
+    const reuseRes = createMockRes();
+    await confirmPasswordReset(
+      createMockReq({ body: { token: requestBody.data.resetToken, password: "AnotherPass123!" } }),
+      reuseRes as unknown as Response
+    );
+    assert.equal(reuseRes.statusCode, 400);
+    assert.equal((reuseRes.body as { code?: number }).code, 40001);
   } finally {
+    await cleanupOneTestUser("ut-password-reset-target");
     await cleanupTokens();
     await cleanupPool.end();
   }

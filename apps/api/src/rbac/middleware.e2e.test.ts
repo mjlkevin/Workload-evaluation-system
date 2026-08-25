@@ -5,57 +5,33 @@
 // 401/403/200 响应路径 + 7 角色覆盖 + req.user 挂载
 //
 
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import express, { Request, Response } from "express";
 import supertest from "supertest";
-import jwt from "jsonwebtoken";
-import { randomUUID } from "node:crypto";
 
 import { requireCapability, requireAnyCapability, requireV2Role, requireAuthenticated } from "./middleware";
-import { signAuthToken, loadUsersStore, saveUsersStore } from "../middleware/auth";
+import { signAuthToken } from "../middleware/auth";
+import { cleanupOneTestUser, cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 import type { AuthUser } from "../types";
-import fs from "node:fs";
-import path from "node:path";
-import { before, after } from "node:test";
 
-// 测试要往 users.json 临时写入测试账户
-// 必须 backup + restore，禁止污染真实配置
-const USERS_JSON = path.resolve(__dirname, "../../../../config/auth/users.json");
-let __originalUsersJson: string;
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
-before(() => {
-  __originalUsersJson = fs.readFileSync(USERS_JSON, "utf8");
-});
-
-after(() => {
-  fs.writeFileSync(USERS_JSON, __originalUsersJson);
+// S1 后：测试用户注入 PG 测试用户池（wes-rbac-* 前缀，C5 数据集隔离），
+// after 按前缀条件 DELETE，禁止污染真实用户表。无 DB 环境整体 skip（C4）。
+after(async () => {
+  if (!testDatabaseUrl) return;
+  await cleanupTestUsers("wes-rbac");
 });
 
 // ------------------------------------------------------------------
 // 测试辅助：创建临时用户 + 生成 token
 // ------------------------------------------------------------------
 
+// S1 后注入方式：统一走 PG 测试用户池（wes-rbac-* 前缀），随机 username
+// 幂等（冲突重放返回原记录）；after 按前缀条件 DELETE。
 async function createTempUser(overrides: Partial<AuthUser> = {}): Promise<AuthUser> {
-  const now = new Date().toISOString();
-  // 用 randomUUID 避免 Date.now() 同毫秒冲突 (修：DEV 测试因 admin 用户被前序 sub_admin 覆盖而 403)
-  const uniqueId = randomUUID();
-  const user: AuthUser = {
-    id: `test-user-${uniqueId}`,
-    username: `testuser-${uniqueId}`,
-    role: overrides.role || "user",
-    status: "active",
-    passwordHash: "",
-    createdAt: now,
-    lastLoginAt: now,
-    ...overrides,
-  };
-
-  const store = await loadUsersStore();
-  store.users.push(user);
-  await saveUsersStore(store);
-
-  return user;
+  return createTestUser("wes-rbac", { role: overrides.role ?? "user", ...overrides });
 }
 
 function createTokenForUser(user: AuthUser): string {
@@ -66,7 +42,7 @@ function createTokenForUser(user: AuthUser): string {
 // 测试套件
 // ------------------------------------------------------------------
 
-test("RBAC e2e: 无 Authorization header → 401", async () => {
+test("RBAC e2e: 无 Authorization header → 401", { skip: !testDatabaseUrl }, async () => {
   const app = express();
   app.use(requireCapability("estimates:create"));
   app.get("/test", (_req: Request, res: Response) => res.json({ ok: true }));
@@ -78,7 +54,7 @@ test("RBAC e2e: 无 Authorization header → 401", async () => {
   assert.equal(response.body.message, "未登录或凭证缺失");
 });
 
-test("RBAC e2e: 错误 token → 401", async () => {
+test("RBAC e2e: 错误 token → 401", { skip: !testDatabaseUrl }, async () => {
   const app = express();
   app.use(requireCapability("estimates:create"));
   app.get("/test", (_req: Request, res: Response) => res.json({ ok: true }));
@@ -92,7 +68,7 @@ test("RBAC e2e: 错误 token → 401", async () => {
   assert.equal(response.body.message, "登录态无效");
 });
 
-test("RBAC e2e: 正确 token + 错误能力位 → 403（含详情字段）", async () => {
+test("RBAC e2e: 正确 token + 错误能力位 → 403（含详情字段）", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "user" }); // user → PRE_SALES
   const token = createTokenForUser(user);
 
@@ -115,7 +91,7 @@ test("RBAC e2e: 正确 token + 错误能力位 → 403（含详情字段）", as
   assert.ok(Array.isArray(response.body.details[0].userV2Roles), "userV2Roles 应为数组");
 });
 
-test("RBAC e2e: 正确 token + 正确能力位 → 200", async () => {
+test("RBAC e2e: 正确 token + 正确能力位 → 200", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "user" }); // user → PRE_SALES
   const token = createTokenForUser(user);
 
@@ -135,7 +111,7 @@ test("RBAC e2e: 正确 token + 正确能力位 → 200", async () => {
   assert.equal(response.body.userRole, user.role);
 });
 
-test("RBAC e2e: requireAnyCapability 任一通过 → 200", async () => {
+test("RBAC e2e: requireAnyCapability 任一通过 → 200", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "sub_admin" }); // sub_admin → PM
   const token = createTokenForUser(user);
 
@@ -150,7 +126,7 @@ test("RBAC e2e: requireAnyCapability 任一通过 → 200", async () => {
   assert.equal(response.status, 200);
 });
 
-test("RBAC e2e: requireV2Role 角色不在白名单 → 403", async () => {
+test("RBAC e2e: requireV2Role 角色不在白名单 → 403", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "user" }); // user → PRE_SALES
   const token = createTokenForUser(user);
 
@@ -167,25 +143,33 @@ test("RBAC e2e: requireV2Role 角色不在白名单 → 403", async () => {
   assert.equal(response.body.details[0].field, "role");
 });
 
-test("RBAC e2e: legacy user/PRE_SALES → estimates:create 通过", async () => {
-  const user = await createTempUser({ id: "sales-001", username: "sales001", role: "user" });
-  const token = createTokenForUser(user);
+test("RBAC e2e: legacy user/PRE_SALES → estimates:create 通过", { skip: !testDatabaseUrl }, async () => {
+  // 断言不依赖 id 具体值（PG users.user_id 为 uuid 列，原固定 id=sales-001
+  // 在 uuid 约束下不合法）；固定 username=sales001 先清后建（幂等重跑安全），
+  // 用例结束清理。
+  await cleanupOneTestUser("sales001");
+  try {
+    const user = await createTempUser({ username: "sales001", role: "user" });
+    const token = createTokenForUser(user);
 
-  const app = express();
-  app.use(requireCapability("estimates:create"));
-  app.get("/test", (req: Request, res: Response) => {
-    res.json({ ok: true, v2Roles: req.v2Roles });
-  });
+    const app = express();
+    app.use(requireCapability("estimates:create"));
+    app.get("/test", (req: Request, res: Response) => {
+      res.json({ ok: true, v2Roles: req.v2Roles });
+    });
 
-  const response = await supertest(app)
-    .get("/test")
-    .set("Authorization", `Bearer ${token}`);
+    const response = await supertest(app)
+      .get("/test")
+      .set("Authorization", `Bearer ${token}`);
 
-  assert.equal(response.status, 200);
-  assert.deepEqual(response.body.v2Roles, ["PRE_SALES"]);
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.v2Roles, ["PRE_SALES"]);
+  } finally {
+    await cleanupOneTestUser("sales001");
+  }
 });
 
-test("RBAC e2e: ADMIN 角色 → 所有能力位通过", async () => {
+test("RBAC e2e: ADMIN 角色 → 所有能力位通过", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "admin" });
   const token = createTokenForUser(user);
 
@@ -203,7 +187,7 @@ test("RBAC e2e: ADMIN 角色 → 所有能力位通过", async () => {
   assert.deepEqual(response.body.v2Roles, ["ADMIN"]);
 });
 
-test("RBAC e2e: requireAuthenticated 仅认证不检查能力 → 200", async () => {
+test("RBAC e2e: requireAuthenticated 仅认证不检查能力 → 200", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "user" });
   const token = createTokenForUser(user);
 
@@ -222,7 +206,7 @@ test("RBAC e2e: requireAuthenticated 仅认证不检查能力 → 200", async ()
   assert.ok(Array.isArray(response.body.v2Roles));
 });
 
-test("RBAC e2e: req.user 在 handler 中可拿到 id 和 role", async () => {
+test("RBAC e2e: req.user 在 handler 中可拿到 id 和 role", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "sub_admin" });
   const token = createTokenForUser(user);
 
@@ -250,7 +234,7 @@ test("RBAC e2e: req.user 在 handler 中可拿到 id 和 role", async () => {
 // 7 角色覆盖测试（每个角色至少 1 条）
 // ------------------------------------------------------------------
 
-test("RBAC e2e: 角色覆盖 - SALES (通过 admin 模拟 estimates:create)", async () => {
+test("RBAC e2e: 角色覆盖 - SALES (通过 admin 模拟 estimates:create)", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "admin" });
   const token = createTokenForUser(user);
 
@@ -265,7 +249,7 @@ test("RBAC e2e: 角色覆盖 - SALES (通过 admin 模拟 estimates:create)", as
   assert.equal(response.status, 200);
 });
 
-test("RBAC e2e: 角色覆盖 - PRE_SALES (extractor:trigger)", async () => {
+test("RBAC e2e: 角色覆盖 - PRE_SALES (extractor:trigger)", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "user" });
   const token = createTokenForUser(user);
 
@@ -280,7 +264,7 @@ test("RBAC e2e: 角色覆盖 - PRE_SALES (extractor:trigger)", async () => {
   assert.equal(response.status, 200);
 });
 
-test("RBAC e2e: 角色覆盖 - IMPL (assessment:create)", async () => {
+test("RBAC e2e: 角色覆盖 - IMPL (assessment:create)", { skip: !testDatabaseUrl }, async () => {
   // IMPL 需要通过自定义用户或直接测试能力位
   // 这里用 admin 模拟（ADMIN 拥有 IMPL 的所有能力）
   const user = await createTempUser({ role: "admin" });
@@ -297,7 +281,7 @@ test("RBAC e2e: 角色覆盖 - IMPL (assessment:create)", async () => {
   assert.equal(response.status, 200);
 });
 
-test("RBAC e2e: 角色覆盖 - PM (assessment:handoff)", async () => {
+test("RBAC e2e: 角色覆盖 - PM (assessment:handoff)", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "sub_admin" });
   const token = createTokenForUser(user);
 
@@ -312,7 +296,7 @@ test("RBAC e2e: 角色覆盖 - PM (assessment:handoff)", async () => {
   assert.equal(response.status, 200);
 });
 
-test("RBAC e2e: 角色覆盖 - DEV (dev:write)", async () => {
+test("RBAC e2e: 角色覆盖 - DEV (dev:write)", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "admin" }); // ADMIN 有 dev:write
   const token = createTokenForUser(user);
 
@@ -327,7 +311,7 @@ test("RBAC e2e: 角色覆盖 - DEV (dev:write)", async () => {
   assert.equal(response.status, 200);
 });
 
-test("RBAC e2e: 角色覆盖 - PMO (deliverable:review)", async () => {
+test("RBAC e2e: 角色覆盖 - PMO (deliverable:review)", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "admin" }); // ADMIN 有 deliverable:review
   const token = createTokenForUser(user);
 
@@ -342,7 +326,7 @@ test("RBAC e2e: 角色覆盖 - PMO (deliverable:review)", async () => {
   assert.equal(response.status, 200);
 });
 
-test("RBAC e2e: 角色覆盖 - ADMIN (system:manage)", async () => {
+test("RBAC e2e: 角色覆盖 - ADMIN (system:manage)", { skip: !testDatabaseUrl }, async () => {
   const user = await createTempUser({ role: "admin" });
   const token = createTokenForUser(user);
 
