@@ -40,7 +40,7 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
       .then((count) => {
         if (!cancelled) setDraftMemoryCount(count)
       })
-      .catch(() => {})
+      .catch(() => {}) // ISS-2026-08-18-005（档 3）：draft 记忆计数为提示条徽标，失败时保持 0 渲染，属非关键 UI，可静默
     return () => {
       cancelled = true
     }

@@ -302,6 +302,9 @@ export default function useAssessmentDetail(versionId, {
   const [vm, setVm] = useState(() => ({ ...fallback, loading: Boolean(enabled), error: null }))
   const [reloadKey, setReloadKey] = useState(0)
   const [actionLoading, setActionLoading] = useState({})
+  // ISS-2026-08-18-005（档 2）：估算失败页面级可见状态位——
+  // 失败时估算区渲染「估算暂不可用」占位，模板/规则降级语义不受影响。
+  const [estimateError, setEstimateError] = useState(null)
 
   const refetch = useCallback(() => {
     setReloadKey((value) => value + 1)
@@ -381,6 +384,7 @@ export default function useAssessmentDetail(versionId, {
 
     let cancelled = false
     setVm((current) => ({ ...current, loading: true, error: null }))
+    setEstimateError(null)
 
     async function load() {
       // Step 1 — fetch the version record (must succeed)
@@ -408,8 +412,11 @@ export default function useAssessmentDetail(versionId, {
 
       try {
         const [templatePayload, activeRuleSetPayload, ruleSetMetaPayload] = await Promise.all([
+          // 富化降级：模板缺失时以默认模板渲染，属可选区块，可静默
           apiClient.get(`/templates/${templateId}`).catch(() => null),
+          // 富化降级：规则集缺失时以 ruleSetId 兜底渲染，属可选区块，可静默
           apiClient.get('/rule-sets/active').catch(() => null),
+          // 富化降级：规则元数据缺失时跳过 DSL 校验展示，属可选区块，可静默
           apiClient.get('/rule-sets/meta').catch(() => null),
         ])
         if (cancelled) return
@@ -419,9 +426,15 @@ export default function useAssessmentDetail(versionId, {
         ruleSetMeta = unwrap(ruleSetMetaPayload) || null
 
         const calculateBody = buildCalculateBody({ ...record, payload: { ...payload, templateId, ruleSetId } }, template, fallback)
-        const estimatePayload = await apiClient.post('/estimates/calculate', calculateBody).catch(() => null)
-        if (cancelled) return
-        estimateResult = unwrap(estimatePayload)
+        // ISS-2026-08-18-005（档 2）：估算失败不得静默——置位 estimateError，
+        // 页面估算区渲染「估算暂不可用」占位；其余富化数据继续展示。
+        try {
+          const estimatePayload = await apiClient.post('/estimates/calculate', calculateBody)
+          if (cancelled) return
+          estimateResult = unwrap(estimatePayload)
+        } catch (error) {
+          setEstimateError(error)
+        }
       } catch (_) {
         // enrichment failed — continue with record-only data
       }
@@ -434,5 +447,5 @@ export default function useAssessmentDetail(versionId, {
     return () => { cancelled = true }
   }, [enabled, fallback, reloadKey, versionId])
 
-  return { ...vm, loading: vm.loading, error: vm.error, refetch, actionLoading, actions: { checkout, checkin, undoCheckout, promote, forceUnlock, saveDraft, confirmAiDraft } }
+  return { ...vm, loading: vm.loading, error: vm.error, refetch, actionLoading, actions: { checkout, checkin, undoCheckout, promote, forceUnlock, saveDraft, confirmAiDraft }, estimateError }
 }

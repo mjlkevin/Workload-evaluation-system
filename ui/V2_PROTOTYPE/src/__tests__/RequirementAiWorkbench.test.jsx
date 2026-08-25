@@ -169,4 +169,37 @@ describe('RequirementAiWorkbench', () => {
     expect(updatedMessages.at(-1)?.type).toBe('confirmation')
     expect(updatedMessages.at(-1)?.content).toContain('采购管理')
   })
+
+  // ISS-2026-08-18-005（档 1 改造项 2）：persistAiEvaluationDraft 失败必须置页面级可见状态位
+  // （横幅），不得继续依赖 .catch(() => {}) 静默吞错——L630 场景下用户输入与错误提示会一起丢。
+  test('persist draft failure surfaces page-level error banner', async () => {
+    server.use(
+      http.get(`${BASE}/versions/:id`, () => HttpResponse.json({
+        success: true,
+        data: {
+          id: 'REQ-AI-ERR',
+          versionCode: 'RQ-PERSIST-ERR',
+          checkoutStatus: 'checked_out',
+          payload: {
+            aiEvaluation: {
+              lastPreview: {
+                meta: { mode: 'model', model: 'kimi-k2.5' },
+                assessmentDraft: {
+                  moduleItems: [{ cloudProduct: '供应链云', moduleName: '采购管理', suggestedDays: 5 }],
+                },
+              },
+            },
+          },
+        },
+      })),
+      http.patch(`${BASE}/versions/:id/save-draft`, () => HttpResponse.json({ message: 'save boom' }, { status: 500 })),
+    )
+
+    renderWorkbench('REQ-AI-ERR')
+
+    const confirmButton = await screen.findByRole('button', { name: '加入待确认' })
+    fireEvent.click(confirmButton)
+
+    await waitFor(() => expect(screen.getByText(/草稿保存失败/)).toBeInTheDocument())
+  })
 })

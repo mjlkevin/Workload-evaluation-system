@@ -64,7 +64,7 @@ export default function AiHomeWorkbench({ currentUser }) {
     const completedInBackground = runs.some((run) => wasActive(previous.get(runKey(run))) && run.status === 'completed')
       || [...previous.entries()].some(([id, status]) => wasActive(status) && !next.has(id))
     prevRunStatusesRef.current = next
-    if (completedInBackground) workbench.loadSessions?.().catch(() => {})
+    if (completedInBackground) workbench.loadSessions?.().catch(() => {}) // ISS-2026-08-18-005（档 3）：后台完成通知后的列表刷新为 fire-and-forget——错误由 sessionsError 状态承载，刷新失败不阻塞既有列表，可静默
     // ISS-2026-08-10-001：重挂载后统一视图已含近期已完成 run（后端增补数据源），
     // 本地存在该会话未完成进行中占位（卸载快照）时触发一次 loadSessions 对账。
     const activeSessionId = workbench.activeSession?.sessionId || ''
@@ -73,7 +73,7 @@ export default function AiHomeWorkbench({ currentUser }) {
       const storedMessages = sessionRuntimeStore.getSessionMessages(activeSessionId) || []
       const hasUnfinishedLocal = storedMessages.some((message) => message.loading || message.streaming)
       if (hasUnfinishedLocal && runs.some((run) => run.status === 'completed')) {
-        workbench.loadSessions?.().catch(() => {})
+        workbench.loadSessions?.().catch(() => {}) // ISS-2026-08-18-005（档 3）：重挂载对账刷新为 fire-and-forget——错误由 sessionsError 状态承载，对账失败不阻塞既有会话视图，可静默
       }
     }
   }, [workbench.unifiedView?.runs, workbench.activeSession?.sessionId])

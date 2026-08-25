@@ -300,9 +300,9 @@
               <td>architecture_review</td>
               <td>MSW 严格门禁（onUnhandledRequest:'error'）实际已生效，但未匹配请求 reject 被前端 17 处空 catch 吞掉，测试照常绿（ISS-2026-08-18-001 修复期间浮出）。2026-08-25 裁决轮补登本地问题池（此前仅登记于 changes.html BE-2026-08-18-stage1-iss001 事件）并补记现状：登记时 17 处 → 现状 26 处（18 处 .catch(() =&gt; {}) + 8 处 .catch(() =&gt; null)；ISS-003/010 系列修复新增 fire-and-forget 调用点）。</td>
               <td><code class="inline">useRequirementDetail.js L285-288（主请求）</code> <code class="inline">useRequirementAiWorkbench.js L486/503/535/630（草稿保存）</code> <code class="inline">useAssessmentDetail.js L422（估算失败）</code> <code class="inline">useWorkbenchState.js L81（冗余 catch，裁决保留）</code> <code class="inline">useUsers.js / useChatMessages.js / useBackgroundRuns.jsx / ChatArea / AiHomeWorkbench / useAiSessions.js</code></td>
-              <td><span class="status run"><span class="dot"></span>已分析</span></td>
-              <td>defect · 待派生</td>
-              <td>裁决轮逐处判定（2026-08-25）：档 1 必须改 6 处（useRequirementDetail 主请求去空 catch 走 setError、then 内按 HTTP 状态码区分真新建 404 与加载失败；useRequirementAiWorkbench 草稿保存失败置页面级可见状态，状态位节流非 toast）；档 2 建议改 1 处（useAssessmentDetail 估算区「估算暂不可用」占位）；档 3 保留+补注释 19 处（错误已内部暴露，外层 catch 仅防 unhandled rejection；useWorkbenchState L81 冗余 catch 保留加注释，不删）。改造清单已报架构侧，确认后实施。</td>
+              <td><span class="status run"><span class="dot"></span>已回填 · 待复核</span></td>
+              <td>defect · 已实施（ISS-2026-08-18-005，2026-08-25）</td>
+              <td>裁决轮逐处判定（2026-08-25）：档 1 必须改 6 处（useRequirementDetail 主请求去空 catch 走 setError、then 内按 HTTP 状态码区分真新建 404 与加载失败；useRequirementAiWorkbench 草稿保存失败置页面级可见状态，状态位节流非 toast）；档 2 建议改 1 处（useAssessmentDetail 估算区「估算暂不可用」占位）；档 3 保留+补注释 19 处（错误已内部暴露，外层 catch 仅防 unhandled rejection；useWorkbenchState L81 冗余 catch 保留加注释，不删）。改造清单已报架构侧，确认后实施。<b>实施完成（2026-08-25 派工补发后执行）</b>：三项改造全部落地（主请求 404 区分 / persist 成败标志 + draftPersistError 状态位 + 6 调用点适配含未点名 2 处 / estimateError 页面内占位）+ 19 处档 3 注释补齐（useWorkbenchState L81 保留不删）；新增 4 个失败态可见性测试用例（test:web 373 tests × 3 轮全绿无 flake，build:web 通过）；原则入档 §4.6（优先补种数据而非更换断言目标）。变更随 <code class="inline">fix(WES前端): ISS-2026-08-18-005 静默吞错治理</code> 提交，§10 已登记，待复核。</td>
             </tr>
             <tr>
               <td class="mono">ISS-2026-08-19-001</td>

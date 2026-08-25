@@ -48,4 +48,16 @@ describe('useAssessmentDetail', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.kpi.totalDays).toBe(mockAssessment.kpi.totalDays)
   })
+
+  // ISS-2026-08-18-005（档 2 改造项）：估算失败必须置位 estimateError（页面内占位），
+  // 不得被 .catch(() => null) 吞掉；模板/规则降级语义保持不受影响。
+  test('estimate calculate failure surfaces estimateError instead of silent null', async () => {
+    server.use(http.post(`${BASE}/estimates/calculate`, () => HttpResponse.json({ message: 'boom' }, { status: 500 })))
+
+    const { result } = renderHook(() => useAssessmentDetail('ASM-018', { fallbackData: mockAssessment }))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.estimateError).toBeTruthy()
+    expect(result.current.context.template).toBe('实施评估标准版')
+  })
 })

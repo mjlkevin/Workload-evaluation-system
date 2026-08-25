@@ -321,6 +321,9 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
   const [error, setError] = useState(null)
   const [errorScope, setErrorScope] = useState(null)
   const [loadStatus, setLoadStatus] = useState('idle')
+  // ISS-2026-08-18-005（档 1）：persist 失败页面级可见状态位——
+  // 用状态位而非 toast 实现节流：连续操作失败只置一次位，不会弹一串 toast。
+  const [draftPersistError, setDraftPersistError] = useState(null)
 
   useEffect(() => {
     if (!requirementId) return undefined
@@ -387,7 +390,7 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
                 const [latest] = unwrapItems(payload)
                 if (latest) setLatestRequirement(latest)
               })
-              .catch(() => {})
+              .catch(() => {}) // ISS-2026-08-18-005（档 3）：404 兜底拉取版本列表为最佳努力——失败时 latestRequirement 保持 null，页面仅缺「去新建版本」入口，可静默
           }
         }
       })
@@ -403,6 +406,14 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     window.setTimeout(() => setToast(''), 1500)
   }, [])
 
+  // ISS-2026-08-18-005（档 1）：persist 成败统一汇入页面级状态位（横幅），
+  // 成功清位、失败置位；配合状态位天然节流，不做逐次 toast。
+  const handlePersistResult = useCallback((result) => {
+    if (!result) return
+    if (result.ok) setDraftPersistError(null)
+    else setDraftPersistError(result.error?.message || '草稿保存失败')
+  }, [])
+
   const chooseFile = useCallback(() => fileInputRef.current?.click(), [])
 
   const onFileChange = useCallback((event) => {
@@ -415,59 +426,65 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
   }, [showToast])
 
   const persistAiEvaluationDraft = useCallback(async (overrides = {}) => {
-    if (!requirementId) return null
+    if (!requirementId) return { ok: false, error: new Error('缺少需求版本 ID') }
 
-    const nextAccepted = overrides.accepted ?? accepted
-    const nextConfirmationQuestions = overrides.confirmationQuestions ?? confirmationQuestions
-    const nextFeedbackRecords = overrides.feedbackRecords ?? feedbackRecords
-    const nextLastPreview = overrides.lastPreview ?? lastPreview
-    const nextMessages = overrides.messages ?? messages
-    const nextParseSummary = overrides.parseSummary ?? parseSummary
-    const nextSavedSourceFile = overrides.savedSourceFile ?? savedSourceFile
-    const nextSelectedFile = overrides.selectedFile ?? selectedFile
-    const nextUserInstruction = overrides.userInstruction ?? analysisRequest ?? composer
-    const nextActiveThreadId = overrides.activeThreadId ?? activeThreadId
-    const nextThreadsInput = overrides.threads ?? threads
-    const nextArtifacts = overrides.artifacts ?? artifacts
+    try {
+      const nextAccepted = overrides.accepted ?? accepted
+      const nextConfirmationQuestions = overrides.confirmationQuestions ?? confirmationQuestions
+      const nextFeedbackRecords = overrides.feedbackRecords ?? feedbackRecords
+      const nextLastPreview = overrides.lastPreview ?? lastPreview
+      const nextMessages = overrides.messages ?? messages
+      const nextParseSummary = overrides.parseSummary ?? parseSummary
+      const nextSavedSourceFile = overrides.savedSourceFile ?? savedSourceFile
+      const nextSelectedFile = overrides.selectedFile ?? selectedFile
+      const nextUserInstruction = overrides.userInstruction ?? analysisRequest ?? composer
+      const nextActiveThreadId = overrides.activeThreadId ?? activeThreadId
+      const nextThreadsInput = overrides.threads ?? threads
+      const nextArtifacts = overrides.artifacts ?? artifacts
 
-    const versionPayload = await apiClient.get(`/versions/${requirementId}`)
-    const versionData = unwrapData(versionPayload) || {}
-    const record = versionData.record || versionData
-    if (record.checkoutStatus !== 'checked_out') {
-      await apiClient.post(`/versions/${requirementId}/checkout`)
+      const versionPayload = await apiClient.get(`/versions/${requirementId}`)
+      const versionData = unwrapData(versionPayload) || {}
+      const record = versionData.record || versionData
+      if (record.checkoutStatus !== 'checked_out') {
+        await apiClient.post(`/versions/${requirementId}/checkout`)
+      }
+
+      const currentPayload = record.payload && typeof record.payload === 'object' ? record.payload : {}
+      const aiEvaluation = buildAiEvaluationDraft({
+        accepted: nextAccepted,
+        activeThreadId: nextActiveThreadId,
+        analysisRequest: nextUserInstruction,
+        artifacts: nextArtifacts,
+        composer,
+        confirmationQuestions: nextConfirmationQuestions,
+        feedbackRecords: nextFeedbackRecords,
+        lastPreview: nextLastPreview,
+        messages: nextMessages,
+        parseSummary: nextParseSummary,
+        requirementId,
+        savedSourceFile: nextSavedSourceFile,
+        selectedFile: nextSelectedFile,
+        threads: nextThreadsInput,
+      })
+
+      const nextPayload = {
+        ...currentPayload,
+        aiEvaluation: {
+          ...(currentPayload.aiEvaluation || {}),
+          ...aiEvaluation,
+        },
+      }
+
+      await apiClient.patch(`/versions/${requirementId}/save-draft`, { payload: nextPayload })
+      setActiveThreadId(aiEvaluation.activeThreadId)
+      setThreads(aiEvaluation.threads)
+      setArtifacts(aiEvaluation.threads[0]?.artifacts || {})
+      return { ok: true, value: aiEvaluation }
+    } catch (error) {
+      // ISS-2026-08-18-005（档 1）：persist 失败不再 throw——调用处统一通过返回标志
+      // 置页面级可见状态位（draftPersistError），避免依赖 .catch(() => {}) 静默吞错。
+      return { ok: false, error }
     }
-
-    const currentPayload = record.payload && typeof record.payload === 'object' ? record.payload : {}
-    const aiEvaluation = buildAiEvaluationDraft({
-      accepted: nextAccepted,
-      activeThreadId: nextActiveThreadId,
-      analysisRequest: nextUserInstruction,
-      artifacts: nextArtifacts,
-      composer,
-      confirmationQuestions: nextConfirmationQuestions,
-      feedbackRecords: nextFeedbackRecords,
-      lastPreview: nextLastPreview,
-      messages: nextMessages,
-      parseSummary: nextParseSummary,
-      requirementId,
-      savedSourceFile: nextSavedSourceFile,
-      selectedFile: nextSelectedFile,
-      threads: nextThreadsInput,
-    })
-
-    const nextPayload = {
-      ...currentPayload,
-      aiEvaluation: {
-        ...(currentPayload.aiEvaluation || {}),
-        ...aiEvaluation,
-      },
-    }
-
-    await apiClient.patch(`/versions/${requirementId}/save-draft`, { payload: nextPayload })
-    setActiveThreadId(aiEvaluation.activeThreadId)
-    setThreads(aiEvaluation.threads)
-    setArtifacts(aiEvaluation.threads[0]?.artifacts || {})
-    return aiEvaluation
   }, [accepted, activeThreadId, analysisRequest, artifacts, composer, confirmationQuestions, feedbackRecords, lastPreview, messages, parseSummary, requirementId, savedSourceFile, selectedFile, threads])
 
   const askOrRevise = useCallback((message) => {
@@ -483,8 +500,12 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     setFeedbackRecords(nextFeedbackRecords)
     setMessages(nextMessages)
     showToast(message)
-    persistAiEvaluationDraft({ feedbackRecords: nextFeedbackRecords, messages: nextMessages }).catch(() => {})
-  }, [feedbackRecords, messages, persistAiEvaluationDraft, showToast])
+    // ISS-2026-08-18-005（档 1）：persist 失败经状态位可见；
+    // 尾部 .catch 仅防 unhandled rejection（persist 内部已捕获，正常不触发）
+    persistAiEvaluationDraft({ feedbackRecords: nextFeedbackRecords, messages: nextMessages })
+      .then(handlePersistResult)
+      .catch(() => {})
+  }, [feedbackRecords, handlePersistResult, messages, persistAiEvaluationDraft, showToast])
 
   const acceptItem = useCallback((item = {}) => {
     const acceptedItem = {
@@ -500,8 +521,12 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     setAccepted(nextAccepted)
     setMessages(nextMessages)
     showToast('已采纳到实施评估输入池')
-    persistAiEvaluationDraft({ accepted: nextAccepted, messages: nextMessages }).catch(() => {})
-  }, [accepted, messages, persistAiEvaluationDraft, showToast])
+    // ISS-2026-08-18-005（档 1）：persist 失败经状态位可见；
+    // 尾部 .catch 仅防 unhandled rejection（persist 内部已捕获，正常不触发）
+    persistAiEvaluationDraft({ accepted: nextAccepted, messages: nextMessages })
+      .then(handlePersistResult)
+      .catch(() => {})
+  }, [accepted, handlePersistResult, messages, persistAiEvaluationDraft, showToast])
 
   const handleResultAction = useCallback((action, contextTitle = '当前评估项') => {
     if (action === 'ask') {
@@ -532,13 +557,17 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
       setConfirmationQuestions(nextConfirmationQuestions)
       setMessages(nextMessages)
       showToast('已加入售前待确认问题')
-      persistAiEvaluationDraft({ confirmationQuestions: nextConfirmationQuestions, messages: nextMessages }).catch(() => {})
+      // ISS-2026-08-18-005（档 1）：persist 失败经状态位可见；
+      // 尾部 .catch 仅防 unhandled rejection（persist 内部已捕获，正常不触发）
+      persistAiEvaluationDraft({ confirmationQuestions: nextConfirmationQuestions, messages: nextMessages })
+        .then(handlePersistResult)
+        .catch(() => {})
       return
     }
     if (action === 'accept') {
       acceptItem()
     }
-  }, [acceptItem, askOrRevise, confirmationQuestions, messages, persistAiEvaluationDraft, showToast])
+  }, [acceptItem, askOrRevise, confirmationQuestions, handlePersistResult, messages, persistAiEvaluationDraft, showToast])
 
   const analyze = useCallback(async () => {
     if (!selectedFile) {
@@ -603,7 +632,9 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
       setMessages(nextMessages)
       setArtifacts(nextArtifacts)
       setLastPreview(previewData)
-      await persistAiEvaluationDraft({
+      // ISS-2026-08-18-005（档 1）：analyze 成功路径的 persist 失败同样必须可见——
+      // persist 改为返回标志后不再 throw，此处显式汇入状态位，避免从「可捕获」变「静默」。
+      const persistResult = await persistAiEvaluationDraft({
         activeThreadId,
         artifacts: nextArtifacts,
         lastPreview: previewData,
@@ -612,6 +643,7 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
         selectedFile,
         userInstruction,
       })
+      handlePersistResult(persistResult)
       showToast('文件解析与评估预览已更新')
     } catch (err) {
       setError(err?.message || '分析失败')
@@ -627,12 +659,17 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
         errorMessage,
       ]
       setMessages(nextMessages)
-      persistAiEvaluationDraft({ messages: nextMessages }).catch(() => {})
+      // ISS-2026-08-18-005（档 1）：分析失败分支是最危险的一处——persist 失败时
+      // 用户输入与错误提示会一起丢；失败必须置页面级状态位，提示用户草稿未落盘。
+      // 尾部 .catch 仅防 unhandled rejection（persist 内部已捕获，正常不触发）
+      persistAiEvaluationDraft({ messages: nextMessages })
+        .then(handlePersistResult)
+        .catch(() => {})
       showToast(err?.message || '分析失败，已保留当前草稿')
     } finally {
       setLoading(false)
     }
-  }, [activeThreadId, artifacts, askOrRevise, composer, messages, persistAiEvaluationDraft, requirementId, selectedFile, showToast])
+  }, [activeThreadId, artifacts, askOrRevise, composer, handlePersistResult, messages, persistAiEvaluationDraft, requirementId, selectedFile, showToast])
 
   const saveEvaluationDraft = useCallback(async () => {
     if (!requirementId) {
@@ -644,7 +681,10 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     setError(null)
     setErrorScope(null)
     try {
-      await persistAiEvaluationDraft()
+      const persistResult = await persistAiEvaluationDraft()
+      // ISS-2026-08-18-005（档 1）：persist 改为返回标志后不 throw，
+      // 手动保存场景仍需失败可见——rethrow 走既有 catch → setError + errorScope('save')。
+      if (persistResult && !persistResult.ok) throw persistResult.error
       showToast('已保存到需求版本草稿')
     } catch (err) {
       setError(err?.message || '保存失败')
@@ -745,6 +785,7 @@ export default function useRequirementAiWorkbench({ requirementId } = {}) {
     confirmationQuestions,
     createAssessmentDraft,
     creatingAssessment,
+    draftPersistError,
     error,
     errorScope,
     loadStatus,

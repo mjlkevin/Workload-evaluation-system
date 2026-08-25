@@ -81,6 +81,8 @@ export default function useUsers({ enabled = isAuthenticated() } = {}) {
   }, [enabled])
 
   useEffect(() => {
+    // ISS-2026-08-18-005（档 3）：reload 内部已 setError 后 rethrow，
+    // 错误由 users/error 状态承载呈现；外层 catch 仅防未处理拒绝，可静默。
     void reload().catch(() => {})
     return () => {
       requestIdRef.current += 1

@@ -281,10 +281,21 @@ export default function useRequirementDetail({
     setError(null)
 
     // 并行请求：requirement-pack + 评审 + 当前版本 + 同模块版本列表
+    // ISS-2026-08-18-005（档 1）：主请求（requirement-pack / 当前版本）失败必须可见——
+    // 按 HTTP 状态码区分：404 是「真新建」的结构化信号（无记录），保留 null 走既有新建分支；
+    // 其余错误（5xx/网络）rethrow，由外层 catch → setError 暴露失败态，不得静默降级为新建。
     Promise.all([
-      apiClient.get(`/presales/requirement-packs/${id}`).catch(() => null),
+      apiClient.get(`/presales/requirement-packs/${id}`).catch((err) => {
+        if (err?.status === 404) return null
+        throw err
+      }),
+      // 评审列表降级：缺失时详情页以无评审渲染，属可选区块，可静默
       apiClient.get('/reviews', { versionId: id }).catch(() => null),
-      apiClient.get(`/versions/${id}`).catch(() => null),
+      apiClient.get(`/versions/${id}`).catch((err) => {
+        if (err?.status === 404) return null
+        throw err
+      }),
+      // 版本列表降级：缺失时版本时间线为空，属次要区块，可静默
       apiClient.get('/versions', { type: 'requirementImport' }).catch(() => null),
     ])
       .then(([mainPayload, reviewPayload, versionPayload, versionsPayload]) => {

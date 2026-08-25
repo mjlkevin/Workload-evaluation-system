@@ -188,7 +188,7 @@ export default function useChatMessages(workbench) {
       // 本地视图可能停在离页瞬间，需 C1 新对象经同会话路径完成后端对账；
       // 无快照（新会话、刚经响应 upsert 的会话）直接以列表对象为准，避免
       // 全量重拉把尚未进入列表快照的新会话顶掉。
-      if (storedMessages) workbenchRef.current?.loadSessions?.().catch(() => {})
+      if (storedMessages) workbenchRef.current?.loadSessions?.().catch(() => {}) // ISS-2026-08-18-005（档 3）：离页快照重拉为 fire-and-forget 刷新——错误已由 loadSessions 内部 setSessionsError 承载，刷新失败不阻塞主链路，可静默
       return
     }
     prevSessionIdRef.current = currentSessionId
@@ -229,8 +229,8 @@ export default function useChatMessages(workbench) {
   useEffect(() => {
     function handleVisibilityReturn() {
       if (typeof document === 'undefined' || document.hidden) return
-      workbenchRef.current?.loadSessions?.().catch(() => {})
-      workbenchRef.current?.refreshUnifiedView?.().catch(() => {})
+      workbenchRef.current?.loadSessions?.().catch(() => {}) // ISS-2026-08-18-005（档 3）：页签切回重拉为 fire-and-forget——错误由 sessionsError 状态承载，重拉失败不阻塞既有会话视图，可静默
+      workbenchRef.current?.refreshUnifiedView?.().catch(() => {}) // ISS-2026-08-18-005（档 3）：页签切回统一视图刷新为 fire-and-forget——loadUnifiedView 内部已捕获，此 catch 仅防未处理拒绝，可静默
     }
     document.addEventListener('visibilitychange', handleVisibilityReturn)
     return () => document.removeEventListener('visibilitychange', handleVisibilityReturn)
@@ -371,7 +371,7 @@ export default function useChatMessages(workbench) {
             }
           }
           loadWithRetry()
-          workbenchRef.current?.refreshUnifiedView?.().catch(() => {})
+          workbenchRef.current?.refreshUnifiedView?.().catch(() => {}) // ISS-2026-08-18-005（档 3）：终态通知后的统一视图刷新为 fire-and-forget——错误由 unifiedViewError 状态承载，刷新失败不阻塞终态收敛，可静默
           // 当前会话正在可见，不应被终态通知重新标为未读。
           sessionRuntimeStore.markSessionUnread(sessionId, false)
         }
@@ -431,7 +431,7 @@ export default function useChatMessages(workbench) {
         })
         sessionRuntimeStore.markSessionUnread(sessionKey, false)
         // 重拉后端最新状态，让已落库的结果尽快收敛到消息区
-        workbenchRef.current?.loadSessions?.().catch(() => {})
+        workbenchRef.current?.loadSessions?.().catch(() => {}) // ISS-2026-08-18-005（档 3）：流关闭后重拉为 fire-and-forget——错误由 sessionsError 状态承载，重拉失败不阻塞既有消息展示，可静默
       }, STREAM_CLOSE_TIMEOUT_MS)
     },
     onError: () => {
@@ -636,7 +636,7 @@ export default function useChatMessages(workbench) {
         // 立即触发一次统一视图刷新（与页签切回同款 fire-and-forget）——顶栏角标数据源
         // 即时更新，activeRunId 经渲染重算成立，O8 页面级 SSE 订阅随之建立；
         // 仅异步成功路径，503/409/flag 关闭回退路径不触发。
-        workbenchRef.current?.refreshUnifiedView?.().catch(() => {})
+        workbenchRef.current?.refreshUnifiedView?.().catch(() => {}) // ISS-2026-08-18-005（档 3）：Run 提交后统一视图刷新为 fire-and-forget——loadUnifiedView 内部已捕获，此 catch 仅防未处理拒绝，不阻塞发送链路，可静默
         // Run 已提交：不执行旧同步路径，等待 SSE 事件
         return
       }

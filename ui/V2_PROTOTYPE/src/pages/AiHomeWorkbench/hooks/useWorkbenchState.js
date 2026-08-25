@@ -78,6 +78,10 @@ export default function useWorkbenchState(currentUser, callbacks = {}) {
 
   useEffect(() => {
     // 首屏：统一视图与会话列表并行加载；统一视图失败不阻塞会话列表
+    // ISS-2026-08-18-005（档 3）：保留 .catch 不删——两个浮动 Promise 上删除 catch
+    // 会产生 unhandled rejection；loadUnifiedView 内部已 try/catch 返回 null，
+    // loadSessions 内部已 setSessionsError 后 rethrow，外层 catch 仅防未处理拒绝，
+    // 不承担错误呈现（错误已由 unifiedViewError / sessionsError 状态承载）。
     loadUnifiedView().catch(() => {})
     loadSessions().catch(() => {})
   }, [loadUnifiedView, loadSessions])

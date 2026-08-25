@@ -207,7 +207,7 @@ export function BackgroundRunProvider({ children }) {
           if (!mountedRef.current || !snapshotStatus) return
           setRuns((prev) => prev.map((item) => (item.runId === run.runId ? { ...item, status: snapshotStatus } : item)))
         })
-        .catch(() => {}) // 快照读取失败降级为列表状态，不阻塞恢复
+        .catch(() => {}) // ISS-2026-08-18-005（档 3）：快照读取失败降级为列表状态，不阻塞恢复——快照仅用于终态对齐，失败时保持列表既有状态即可，可静默
     })
   }, [runs])
 

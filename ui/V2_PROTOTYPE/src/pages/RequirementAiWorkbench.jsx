@@ -295,6 +295,7 @@ export default function RequirementAiWorkbench() {
     confirmationQuestions,
     createAssessmentDraft,
     creatingAssessment,
+    draftPersistError,
     error,
     errorScope,
     exportConversation,
@@ -389,6 +390,21 @@ export default function RequirementAiWorkbench() {
             <Badge>{parseSummary ? (parseSummary.model || parseSummary.mode || '模型结果') : '等待模型分析'}</Badge>
             <span className="hint">在 AI 渲染出的评估结果上直接提问、修正、采纳</span>
           </div>
+          {/* ISS-2026-08-18-005（档 1）：persist 失败页面级可见横幅——状态位而非 toast，
+              连续操作失败只置一次位；提示用户草稿未落盘，刷新前请勿关闭页面。 */}
+          {draftPersistError && (
+            <div style={{
+              margin: '0 16px',
+              padding: '8px 12px',
+              borderRadius: 'var(--r-md)',
+              background: 'var(--bg-soft)',
+              border: '1px solid var(--line)',
+              color: 'var(--err)',
+              fontSize: 12,
+            }}>
+              草稿保存失败：{draftPersistError}，已保留在当前页面，刷新前请勿关闭
+            </div>
+          )}
           <div className="aiw-scroll">
             {isMissingVersion ? <MissingVersionState latestRequirement={latestRequirement} /> : !hasConversation && <EmptyState onChooseFile={chooseFile} />}
             {hasThreadMessages ? messages.map((message) => (

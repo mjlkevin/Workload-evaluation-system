@@ -192,6 +192,24 @@ export default function AssessmentDetail() {
           {activeTab === 'sku' && (
             <>
               <KpiCards kpi={vm.kpi} dsl={vm.dsl} />
+              {/* ISS-2026-08-18-005（档 2）：估算失败页面内占位（非弹窗）——
+                  估算区明确展示「估算暂不可用」，其余评估信息继续展示。 */}
+              {vm.estimateError && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: 'var(--r-md)',
+                  background: 'var(--bg-soft)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--err)',
+                  fontSize: 12.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}>
+                  <span>⚠️</span>
+                  <span>估算暂不可用：{vm.estimateError?.message || '估算服务异常'}，已保留其余评估信息</span>
+                </div>
+              )}
               <PathBreadcrumb path={vm.path} />
               <div
                 className="reg"
