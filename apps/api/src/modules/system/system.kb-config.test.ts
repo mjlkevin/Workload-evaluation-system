@@ -11,12 +11,19 @@ import { cleanupOneTestUser, createTestUser } from "../../test-helpers/test-user
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const originalCwd = process.cwd();
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "wes-rp031-kb-"));
+// C10（2026-08-25）：本文件用例以 resetStore()（删 JSON 文件）为状态隔离手段，
+// 假定 system 走 JSON 实现；全局开关全开（PG）时删文件无效、PG 行残留污染后续用例。
+// 文件级显式切回 JSON 实现（单文件进程，不影响其他测试文件）。
+const previousSystemPgFlag = process.env.WES_STORE_SYSTEM_PG;
 
 // S1（2026-08-25）后 users 域恒 PG：测试 admin 改由 PG 行级注入
 // （JSON 注入路径已删；固定 username 承载身份，id 用合法 uuid）。
 let testAdmin: AuthUser | null = null;
 
 before(async () => {
+  delete process.env.WES_STORE_SYSTEM_PG;
+  const { _resetSystemRepositoryForTest } = await import("./system.repository");
+  _resetSystemRepositoryForTest();
   process.chdir(tempRoot);
   fs.mkdirSync(path.join(tempRoot, "config", "auth"), { recursive: true });
   fs.mkdirSync(path.join(tempRoot, "config", "system"), { recursive: true });
@@ -31,6 +38,8 @@ before(async () => {
 });
 
 after(async () => {
+  if (previousSystemPgFlag === undefined) delete process.env.WES_STORE_SYSTEM_PG;
+  else process.env.WES_STORE_SYSTEM_PG = previousSystemPgFlag;
   if (testDatabaseUrl) await cleanupOneTestUser("rp031-admin");
   process.chdir(originalCwd);
   fs.rmSync(tempRoot, { recursive: true, force: true });

@@ -9,6 +9,7 @@ import type { ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import { buildWorkbenchChatModelChat, type HomeMessageInput } from "./handlers/workbench-shared";
 import { defaultProviderRegistry, type ModelProvider, type ChatCompletionRequest, type ChatCompletionResponse } from "../../ai/provider";
 import { loadRequirementSystemConfigStore, saveRequirementSystemConfigStore } from "../../modules/system/system.repository";
+import { _resetVersionsRepositoryForTest } from "../../modules/versions/versions.repository";
 
 const user: AuthUser = {
   id: "user-rp-013",
@@ -95,9 +96,17 @@ async function withVersionsSnapshot(run: () => Promise<void>): Promise<void> {
   const filePath = versionsStorePath();
   const existed = fs.existsSync(filePath);
   const before = existed ? fs.readFileSync(filePath, "utf-8") : "";
+  // C10（2026-08-25）：fixtures 写入 versions JSON 文件，而 dispatch 服务经选择器
+  // 读存储；全局开关全开（PG）时读 PG 空库 → 断言失效。显式隔离到 JSON 实现。
+  const previousPgFlag = process.env.WES_STORE_VERSIONS_PG;
+  delete process.env.WES_STORE_VERSIONS_PG;
+  _resetVersionsRepositoryForTest();
   try {
     await run();
   } finally {
+    if (previousPgFlag === undefined) delete process.env.WES_STORE_VERSIONS_PG;
+    else process.env.WES_STORE_VERSIONS_PG = previousPgFlag;
+    _resetVersionsRepositoryForTest();
     if (existed) {
       fs.writeFileSync(filePath, before, "utf-8");
     } else if (fs.existsSync(filePath)) {

@@ -22,6 +22,7 @@ import {
   queryTraces,
   updateTraceRecord,
   purgeTracesOlderThan,
+  _resetTraceRepositoryForTest,
 } from "./trace.repository";
 
 import {
@@ -40,7 +41,13 @@ const DEFAULT_STORE_PATH = join(process.cwd(), "data", "traces", "trace-store.js
 
 async function withTraceStoreEnv<T>(run: () => T | Promise<T>): Promise<T> {
   const previous = process.env.WES_TRACE_STORE_PATH;
+  // C10（2026-08-25）：同时显式切到 JSON 实现（delete 开关 + 重置单例），
+  // 否则全局开关全开（PG）时 recordWorkbenchTurnTrace 走 PG，
+  // findTraceById(TEST_STORE_PATH) 却直读 JSON 文件，断言失效。
+  const previousPgFlag = process.env.WES_STORE_TRACES_PG;
   process.env.WES_TRACE_STORE_PATH = TEST_STORE_PATH;
+  delete process.env.WES_STORE_TRACES_PG;
+  _resetTraceRepositoryForTest();
   try {
     return await run();
   } finally {
@@ -49,6 +56,9 @@ async function withTraceStoreEnv<T>(run: () => T | Promise<T>): Promise<T> {
     } else {
       process.env.WES_TRACE_STORE_PATH = previous;
     }
+    if (previousPgFlag === undefined) delete process.env.WES_STORE_TRACES_PG;
+    else process.env.WES_STORE_TRACES_PG = previousPgFlag;
+    _resetTraceRepositoryForTest();
   }
 }
 

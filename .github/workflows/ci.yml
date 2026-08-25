@@ -115,6 +115,19 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+    env:
+      # C10（2026-08-25）：CI 配置对齐生产——九个存储域开关与 apps/api/.env 当前启用状态一致。
+      # 此前 CI 无任何开关 → 全 JSON 缺省，而生产/dev 全开 → 全 PG：CI 持续验证 JSON 路径、
+      # 实际运行 PG 路径，经选择器的装配层从未被 CI 验证。新增存储开关时必须同步本列表（§4.9 C10）。
+      WES_STORE_USERS_PG: "true"
+      WES_STORE_AI_SESSIONS_PG: "true"
+      WES_STORE_SYSTEM_PG: "true"
+      WES_STORE_TRACES_PG: "true"
+      WES_STORE_VERSIONS_PG: "true"
+      WES_STORE_TEAMS_PG: "true"
+      WES_STORE_TEMPLATES_PG: "true"
+      WES_STORE_RULE_SETS_PG: "true"
+      WES_STORE_KNOWLEDGE_PG: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -137,6 +150,10 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
+      # C10（2026-08-25）：CI 配置对齐生产——补 DB seed。集成检查脚本与生产一致地
+      # 假定模板/规则种子数据存在（GET /templates 返回 list[0]）；此前 CI 走 JSON 缺省
+      # 时由 JSON 文件承担种子角色，开关全开（PG）后空库无种子 → 集成检查失败。
+
       - name: Test AI
         run: cd apps/api && npm run test:ai
         env:
@@ -148,6 +165,16 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
           TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
+
+      # DB seed 位置必须在 Test modules 之后、Test integration 之前：test:ai / test:modules
+      # 的 truncateTestTables() 会整表清理（含 templates/rule_sets/system_configs），
+      # 若在 migrate 后立即 seed，到 integration 时种子已被清空 → loadTemplate 500
+      # （templates_status_not_200）。db:seed 幂等（缺失才插，onConflictDoNothing），
+      # 重复执行不改变行数。
+      - name: DB seed
+        run: cd apps/api && npm run db:seed
+        env:
+          DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
       - name: Test integration
         run: cd apps/api && npm run test:integration

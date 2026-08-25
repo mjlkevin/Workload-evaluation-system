@@ -9,7 +9,8 @@ import { defaultProviderRegistry, type ModelProvider } from "../../ai/provider";
 import { aiSessionsStorePath } from "../../utils";
 import type { AuthUser } from "../../types";
 import { appendAiSessionEvent, createAiSession } from "../../modules/ai-sessions/ai-sessions.usecase";
-import { queryTraces } from "../../modules/trace/trace.repository";
+import { _resetAiSessionsRepositoryForTest } from "../../modules/ai-sessions/ai-sessions.repository";
+import { _resetTraceRepositoryForTest, queryTraces } from "../../modules/trace/trace.repository";
 import {
   allParsedHomeAttachments,
   buildMergedRequirementAnalysisReport,
@@ -168,6 +169,11 @@ const TEST_TRACE_STORE_PATH = join(TEST_TRACE_STORE_DIR, "trace-store.json");
 async function withChatServiceIsolation(run: () => Promise<void>) {
   const previousTraceStore = process.env.WES_TRACE_STORE_PATH;
   const previousApiKey = config.kimi.apiKey;
+  // C10（2026-08-25）：chat.service 用例以 session 文件快照 / trace 文件断言，
+  // 假定 ai-sessions 与 trace 走 JSON 实现；全局开关全开（PG）时写入 PG、断言读 JSON，
+  // 断言失效。显式隔离到 JSON 实现。
+  const previousAiSessionsPgFlag = process.env.WES_STORE_AI_SESSIONS_PG;
+  const previousTracesPgFlag = process.env.WES_STORE_TRACES_PG;
   const sessionPath = aiSessionsStorePath();
   const sessionExisted = existsSync(sessionPath);
   const sessionBefore = sessionExisted ? readFileSync(sessionPath, "utf-8") : "";
@@ -178,12 +184,22 @@ async function withChatServiceIsolation(run: () => Promise<void>) {
   mkdirSync(TEST_TRACE_STORE_DIR, { recursive: true });
   process.env.WES_TRACE_STORE_PATH = TEST_TRACE_STORE_PATH;
   config.kimi.apiKey = "unit-test-kimi-key";
+  delete process.env.WES_STORE_AI_SESSIONS_PG;
+  delete process.env.WES_STORE_TRACES_PG;
+  _resetAiSessionsRepositoryForTest();
+  _resetTraceRepositoryForTest();
 
   try {
     await run();
   } finally {
     if (previousTraceStore === undefined) delete process.env.WES_TRACE_STORE_PATH;
     else process.env.WES_TRACE_STORE_PATH = previousTraceStore;
+    if (previousAiSessionsPgFlag === undefined) delete process.env.WES_STORE_AI_SESSIONS_PG;
+    else process.env.WES_STORE_AI_SESSIONS_PG = previousAiSessionsPgFlag;
+    if (previousTracesPgFlag === undefined) delete process.env.WES_STORE_TRACES_PG;
+    else process.env.WES_STORE_TRACES_PG = previousTracesPgFlag;
+    _resetAiSessionsRepositoryForTest();
+    _resetTraceRepositoryForTest();
     config.kimi.apiKey = previousApiKey;
 
     defaultProviderRegistry.clear();

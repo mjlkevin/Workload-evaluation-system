@@ -36,11 +36,18 @@ import { loadRequirementSystemConfigStore, saveRequirementSystemConfigStore } fr
 import { BUILTIN_MOONSHOT_PROVIDER_ID } from "./system/model-providers";
 import * as AiSessionsModule from "./ai-sessions/ai-sessions.module";
 import { appendAiSessionEvent, createAiSession } from "./ai-sessions/ai-sessions.usecase";
-import { loadAiSessionsStore, saveAiSessionsStore } from "./ai-sessions/ai-sessions.repository";
+import { _resetAiSessionsRepositoryForTest, loadAiSessionsStore, saveAiSessionsStore } from "./ai-sessions/ai-sessions.repository";
 import * as ProjectEvaluationsModule from "./project-evaluations/project-evaluations.module";
 import { createConfirmAiAssessmentDraftHandler } from "./project-evaluations/project-evaluations.controller";
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
 import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap";
+import { _resetSystemRepositoryForTest } from "./system/system.repository";
+import { _resetVersionsRepositoryForTest } from "./versions/versions.repository";
+import { _resetTemplateRepositoryForTest } from "./templates/templates.repository";
+import { _resetRuleSetRepositoryForTest } from "./rules/rules.repository";
+import { _resetTeamRepositoryForTest } from "./team/team.repository";
+import { _resetTraceRepositoryForTest } from "./trace/trace.repository";
+import { _resetKnowledgeRepositoryForTest } from "./knowledge/knowledge.module";
 
 // 竞态隔离（S1 后形态）：阶段 2 S1（2026-08-25）users 域已切 PG（JSON 读写
 // 路径删除），原 chdir 沙箱（isolate-config-root.ts）随之退役。临时用户统一
@@ -49,13 +56,59 @@ import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap"
 let testAdmin: AuthUser;
 let testPlainUser: AuthUser;
 
+// C10（2026-08-25）：本文件是 handler 契约测试，用例以 JSON 文件构造状态
+// （versionsStorePath / versionCodeRulesStorePath / aiSessionsStorePath 等）并
+// 经选择器访问存储。全局开关全开（PG）时构造与读取不一致 → 用例失败。
+// 文件级显式切回 JSON 实现（users 域 S1 后恒 PG，不受影响）。
+const PREVIOUS_STORE_PG_FLAGS = new Map<string, string | undefined>();
+const STORE_PG_FLAG_KEYS = [
+  "WES_STORE_USERS_PG",
+  "WES_STORE_AI_SESSIONS_PG",
+  "WES_STORE_SYSTEM_PG",
+  "WES_STORE_TRACES_PG",
+  "WES_STORE_VERSIONS_PG",
+  "WES_STORE_TEAMS_PG",
+  "WES_STORE_TEMPLATES_PG",
+  "WES_STORE_RULE_SETS_PG",
+  "WES_STORE_KNOWLEDGE_PG",
+] as const;
+
+function restoreStorePgFlags(): void {
+  for (const key of STORE_PG_FLAG_KEYS) {
+    const prev = PREVIOUS_STORE_PG_FLAGS.get(key);
+    if (prev === undefined) delete process.env[key];
+    else process.env[key] = prev;
+  }
+  _resetAiSessionsRepositoryForTest();
+  _resetSystemRepositoryForTest();
+  _resetTraceRepositoryForTest();
+  _resetVersionsRepositoryForTest();
+  _resetTeamRepositoryForTest();
+  _resetTemplateRepositoryForTest();
+  _resetRuleSetRepositoryForTest();
+  _resetKnowledgeRepositoryForTest();
+}
+
 before(async () => {
+  for (const key of STORE_PG_FLAG_KEYS) {
+    PREVIOUS_STORE_PG_FLAGS.set(key, process.env[key]);
+    delete process.env[key];
+  }
+  _resetAiSessionsRepositoryForTest();
+  _resetSystemRepositoryForTest();
+  _resetTraceRepositoryForTest();
+  _resetVersionsRepositoryForTest();
+  _resetTeamRepositoryForTest();
+  _resetTemplateRepositoryForTest();
+  _resetRuleSetRepositoryForTest();
+  _resetKnowledgeRepositoryForTest();
   testAdmin = await createTestUser("wes-modules-admin", { role: "admin", businessRole: "admin" });
   testPlainUser = await createTestUser("wes-modules-user", { role: "user", businessRole: "pre_sales" });
 });
 
 after(async () => {
   await cleanupTestUsers("wes-modules");
+  restoreStorePgFlags();
 });
 
 type MockRes = {

@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 
 import type { AuthUser } from "../../types";
 import { aiSessionsStorePath } from "../../utils";
+import { _resetAiSessionsRepositoryForTest } from "./ai-sessions.repository";
 import { appendAiSessionEvent, createAiSession, getAiSession, listAllAiSessionsForAdmin } from "./ai-sessions.usecase";
 
 const testUser: AuthUser = {
@@ -28,15 +29,23 @@ const testUser: AuthUser = {
 };
 
 async function withSessionStoreIsolation(run: () => Promise<void>): Promise<void> {
-  // 通过 WES_AI_SESSIONS_STORE_PATH 指向临时文件，避免读写真实 data/ai-sessions.json
+  // 通过 WES_AI_SESSIONS_STORE_PATH 指向临时文件，避免读写真实 data/ai-sessions.json；
+  // C10（2026-08-25）：同时显式切到 JSON 实现（delete 开关 + 重置单例），
+  // 否则全局开关全开（PG）时 usecase 走 PG、readStoredSession 却直读 JSON 文件，断言失效。
   const previousOverride = process.env.WES_AI_SESSIONS_STORE_PATH;
+  const previousPgFlag = process.env.WES_STORE_AI_SESSIONS_PG;
   const tempPath = join(tmpdir(), `wes-ai-sessions-test-${randomUUID()}.json`);
   process.env.WES_AI_SESSIONS_STORE_PATH = tempPath;
+  delete process.env.WES_STORE_AI_SESSIONS_PG;
+  _resetAiSessionsRepositoryForTest();
   try {
     await run();
   } finally {
     if (previousOverride === undefined) delete process.env.WES_AI_SESSIONS_STORE_PATH;
     else process.env.WES_AI_SESSIONS_STORE_PATH = previousOverride;
+    if (previousPgFlag === undefined) delete process.env.WES_STORE_AI_SESSIONS_PG;
+    else process.env.WES_STORE_AI_SESSIONS_PG = previousPgFlag;
+    _resetAiSessionsRepositoryForTest();
     if (existsSync(tempPath)) rmSync(tempPath, { force: true });
   }
 }

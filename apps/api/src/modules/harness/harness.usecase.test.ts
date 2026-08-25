@@ -45,7 +45,7 @@ import type {
 } from "../../db/schema";
 import type { AuthUser } from "../../types";
 import { versionsStorePath } from "../../utils";
-import { loadVersionsStore } from "../versions/versions.repository";
+import { _resetVersionsRepositoryForTest, loadVersionsStore } from "../versions/versions.repository";
 import { createProjectAndAssessmentDraftsFromHarness, listProjectEvaluationsForUser, getProjectEvaluationForUser, confirmAiAssessmentDraftForUser } from "../project-evaluations/project-evaluations.usecase";
 import {
   createHarnessRun,
@@ -61,6 +61,24 @@ import {
   retryHarnessRun,
   reanalyzeHarnessRun,
 } from "./harness.usecase";
+
+/**
+ * C10（2026-08-25）：以下 project-evaluations 用例假定 versions 走 JSON 文件实现
+ * （patch fs 断言原子写、loadVersionsStore 直读文件）。全局开关全开（PG）时
+ * 选择器走 PG，断言失效——这里显式隔离到 JSON 实现，与全局开关无关。
+ */
+async function withVersionsJsonIsolation<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = process.env.WES_STORE_VERSIONS_PG;
+  delete process.env.WES_STORE_VERSIONS_PG;
+  _resetVersionsRepositoryForTest();
+  try {
+    return await fn();
+  } finally {
+    if (prev === undefined) delete process.env.WES_STORE_VERSIONS_PG;
+    else process.env.WES_STORE_VERSIONS_PG = prev;
+    _resetVersionsRepositoryForTest();
+  }
+}
 
 test("harness.types: validates known run stages", () => {
   assert.ok(HARNESS_RUN_STAGES.includes("uploaded"));
@@ -1091,7 +1109,8 @@ test("harness.usecase: formal estimation rejects mismatched action id and type",
 });
 
 test("project-evaluations: harness draft creation persists project and assessment in one atomic store commit", async () => {
-  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
+  await withVersionsJsonIsolation(async () => {
+    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
     const originalWriteFileSync = fs.writeFileSync;
     const originalRenameSync = fs.renameSync;
@@ -1135,11 +1154,13 @@ test("project-evaluations: harness draft creation persists project and assessmen
       (fs as any).writeFileSync = originalWriteFileSync;
       (fs as any).renameSync = originalRenameSync;
     }
+    });
   });
 });
 
 test("project-evaluations: harness draft creation is idempotent by run and action", async () => {
-  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
+  await withVersionsJsonIsolation(async () => {
+    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
     const user = activeHarnessUser();
     const input = {
@@ -1169,11 +1190,13 @@ test("project-evaluations: harness draft creation is idempotent by run and actio
     const records = (await loadVersionsStore()).records;
     assert.equal(records.filter((record) => record.payload?.createdFromHarnessRunId === "run-idempotent").length, 1);
     assert.equal(records.filter((record) => record.payload?.harnessRunId === "run-idempotent").length, 1);
+    });
   });
 });
 
 test("project-evaluations: list and detail expose harness trace fields for ai drafts", async () => {
-  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
+  await withVersionsJsonIsolation(async () => {
+    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
     const user = activeHarnessUser();
     const result = await createProjectAndAssessmentDraftsFromHarness(user, {
@@ -1219,11 +1242,13 @@ test("project-evaluations: list and detail expose harness trace fields for ai dr
       permissions: [],
     } as AuthUser;
     assert.equal((await getProjectEvaluationForUser(otherUser, result.project.projectId)), null, "non-owner should not access ai draft");
+    });
   });
 });
 
 test("project-evaluations: manual confirmation of ai assessment draft writes back harness audit", async () => {
-  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
+  await withVersionsJsonIsolation(async () => {
+    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
     const repo = makeMemoryHarnessRepo();
     const user = activeHarnessUser();
@@ -1291,11 +1316,13 @@ test("project-evaluations: manual confirmation of ai assessment draft writes bac
     assert.equal(second?.harness.toolEventId, result?.harness.toolEventId);
     assert.equal(second?.assessmentDraft.manualConfirmation?.note, "人工审核通过");
     assert.equal((await repo.listToolEvents(run.harnessRunId)).length, 1);
+    });
   });
 });
 
 test("project-evaluations: concurrent manual confirmation creates one audit event", async () => {
-  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
+  await withVersionsJsonIsolation(async () => {
+    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
     fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
     const repo = makeMemoryHarnessRepo();
     const user = activeHarnessUser();
@@ -1339,6 +1366,7 @@ test("project-evaluations: concurrent manual confirmation creates one audit even
     const store = await loadVersionsStore();
     const assessmentRecord = store.records.find((record) => record.id === draft.assessmentDraft.recordId);
     assert.equal((assessmentRecord?.payload?.aiDraftReview as { note?: string } | undefined)?.note, "第一次确认");
+    });
   });
 });
 

@@ -27,49 +27,63 @@ import {
 } from "./credentials.store";
 
 test("loadRequirementSystemConfigStore: 迁移旧 Kimi 模型到 K2.5 默认模型", async () => {
-  const originalCwd = process.cwd();
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-kimi-config-"));
-  const configDir = path.join(tmpDir, "config/system");
-  fs.mkdirSync(configDir, { recursive: true });
-  const configPath = path.join(configDir, "requirement-settings.json");
-  fs.writeFileSync(
-    configPath,
-    JSON.stringify(
-      {
-        version: 1,
-        draft: {
-          kimiEvaluation: { model: "moonshot-v1-128k" },
-          fileParsing: { model: "kimi-k2-turbo-preview" },
-          kimiGeneration: { model: "moonshot-v1-128k" },
-          kimiCredentials: { apiKey: "" },
-        },
-        active: {
-          kimiEvaluation: { model: "moonshot-v1-8k" },
-          fileParsing: { model: "kimi-k2-turbo-preview" },
-          kimiGeneration: { model: "moonshot-v1-128k" },
-          kimiCredentials: { apiKey: "" },
-        },
-      },
-      null,
-      2,
-    ),
-    "utf-8",
-  );
-
+  // C10（2026-08-25）：本用例通过 chdir + 写 JSON 文件构造输入，但
+  // loadRequirementSystemConfigStore 经选择器委托——开关全开（PG）时走 PG
+  // 忽略 JSON 文件（静态假绿：返回 seed/缺省值碰巧匹配断言），并行下被其他
+  // 文件清空/改写 system_configs 表时变真红（实测 flaky ~1/3）。显式隔离到
+  // JSON 实现，使构造输入真实生效。
+  const previousPgFlag = process.env.WES_STORE_SYSTEM_PG;
+  delete process.env.WES_STORE_SYSTEM_PG;
+  _resetSystemRepositoryForTest();
   try {
-    process.chdir(tmpDir);
-    // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
-    const store = await loadRequirementSystemConfigStore();
+    const originalCwd = process.cwd();
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-kimi-config-"));
+    const configDir = path.join(tmpDir, "config/system");
+    fs.mkdirSync(configDir, { recursive: true });
+    const configPath = path.join(configDir, "requirement-settings.json");
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          version: 1,
+          draft: {
+            kimiEvaluation: { model: "moonshot-v1-128k" },
+            fileParsing: { model: "kimi-k2-turbo-preview" },
+            kimiGeneration: { model: "moonshot-v1-128k" },
+            kimiCredentials: { apiKey: "" },
+          },
+          active: {
+            kimiEvaluation: { model: "moonshot-v1-8k" },
+            fileParsing: { model: "kimi-k2-turbo-preview" },
+            kimiGeneration: { model: "moonshot-v1-128k" },
+            kimiCredentials: { apiKey: "" },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
 
-    assert.equal(store.draft.kimiEvaluation.model, "kimi-k2.5");
-    assert.equal(store.draft.fileParsing.model, "kimi-k2.6");
-    assert.equal(store.draft.kimiGeneration.model, "kimi-k2.5");
-    assert.equal(store.active.kimiEvaluation.model, "kimi-k2.5");
-    assert.equal(store.active.fileParsing.model, "kimi-k2.6");
-    assert.equal(store.active.kimiGeneration.model, "kimi-k2.5");
+    try {
+      process.chdir(tmpDir);
+      // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
+      const store = await loadRequirementSystemConfigStore();
+
+      assert.equal(store.draft.kimiEvaluation.model, "kimi-k2.5");
+      assert.equal(store.draft.fileParsing.model, "kimi-k2.6");
+      assert.equal(store.draft.kimiGeneration.model, "kimi-k2.5");
+      assert.equal(store.active.kimiEvaluation.model, "kimi-k2.5");
+      assert.equal(store.active.fileParsing.model, "kimi-k2.6");
+      assert.equal(store.active.kimiGeneration.model, "kimi-k2.5");
+    } finally {
+      process.chdir(originalCwd);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   } finally {
-    process.chdir(originalCwd);
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (previousPgFlag === undefined) delete process.env.WES_STORE_SYSTEM_PG;
+    else process.env.WES_STORE_SYSTEM_PG = previousPgFlag;
+    _resetSystemRepositoryForTest();
   }
 });
 
@@ -238,51 +252,63 @@ test("knowledge base profile hash binds shared settings and the selected profile
 // -------------------- 凭据域 DB 化测试 — ISS-2026-08-05-001 --------------------
 
 test("loadRequirementSystemConfigStore: 文件有 apiKey 时清空文件并填充缓存", async () => {
-  const originalCwd = process.cwd();
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-cred-import-"));
-  const configDir = path.join(tmpDir, "config/system");
-  fs.mkdirSync(configDir, { recursive: true });
-  const configPath = path.join(configDir, "requirement-settings.json");
-  const testApiKey = "sk-test-import-key-12345";
-
-  fs.writeFileSync(
-    configPath,
-    JSON.stringify(
-      {
-        version: 1,
-        draft: { kimiCredentials: { apiKey: testApiKey } },
-        active: { kimiCredentials: { apiKey: testApiKey } },
-      },
-      null,
-      2,
-    ),
-    "utf-8",
-  );
-
-  _resetKimiImportCheck();
-  resetCredentialCache();
-
+  // C10（2026-08-25）：本用例断言“文件被清空/缓存被填充”的导入副作用，
+  // 假定 system 走 JSON 实现；全局开关全开（PG）时经选择器读 PG 不碰文件，断言失效。
+  // 显式隔离到 JSON 实现。
+  const previousPgFlag = process.env.WES_STORE_SYSTEM_PG;
+  delete process.env.WES_STORE_SYSTEM_PG;
+  _resetSystemRepositoryForTest();
   try {
-    process.chdir(tmpDir);
-    // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
-    const store = await loadRequirementSystemConfigStore();
+    const originalCwd = process.cwd();
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wes-cred-import-"));
+    const configDir = path.join(tmpDir, "config/system");
+    fs.mkdirSync(configDir, { recursive: true });
+    const configPath = path.join(configDir, "requirement-settings.json");
+    const testApiKey = "sk-test-import-key-12345";
 
-    // 文件 apiKey 应被清空
-    const fileContent = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    assert.equal(fileContent.draft.kimiCredentials.apiKey, "");
-    assert.equal(fileContent.active.kimiCredentials.apiKey, "");
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          version: 1,
+          draft: { kimiCredentials: { apiKey: testApiKey } },
+          active: { kimiCredentials: { apiKey: testApiKey } },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
 
-    // 缓存应被填充
-    assert.equal(getCachedApiKey(KIMI_SCOPE), testApiKey);
-
-    // 返回的 store 中 apiKey 也应为空（真实密钥在 DB/缓存）
-    assert.equal(store.draft.kimiCredentials.apiKey, "");
-    assert.equal(store.active.kimiCredentials.apiKey, "");
-  } finally {
-    process.chdir(originalCwd);
     _resetKimiImportCheck();
     resetCredentialCache();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    try {
+      process.chdir(tmpDir);
+      // 阶段 1 批 5：store accessor 已异步化，补 await（断言不变）。
+      const store = await loadRequirementSystemConfigStore();
+
+      // 文件 apiKey 应被清空
+      const fileContent = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      assert.equal(fileContent.draft.kimiCredentials.apiKey, "");
+      assert.equal(fileContent.active.kimiCredentials.apiKey, "");
+
+      // 缓存应被填充
+      assert.equal(getCachedApiKey(KIMI_SCOPE), testApiKey);
+
+      // 返回的 store 中 apiKey 也应为空（真实密钥在 DB/缓存）
+      assert.equal(store.draft.kimiCredentials.apiKey, "");
+      assert.equal(store.active.kimiCredentials.apiKey, "");
+    } finally {
+      process.chdir(originalCwd);
+      _resetKimiImportCheck();
+      resetCredentialCache();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  } finally {
+    if (previousPgFlag === undefined) delete process.env.WES_STORE_SYSTEM_PG;
+    else process.env.WES_STORE_SYSTEM_PG = previousPgFlag;
+    _resetSystemRepositoryForTest();
   }
 });
 
