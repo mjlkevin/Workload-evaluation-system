@@ -761,6 +761,12 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td><span class="status run"><span class="dot"></span>已实现 / 自动化通过 / 待体验确认</span>：Skill 本体保持跨项目通用，WES 四个模型入口已统一引用。</td>
           <td>实际任务沟通先说明结果、影响和下一步；专业术语随用随解释；完成、自动验证和人工验收状态准确；路径、命令和报错证据保持原样。</td>
         </tr>
+        <tr data-board-event-id="BE-2026-08-27-def-2026-08-27-001-scheduled:plan">
+          <td class="mono">DEF-2026-08-27-001</td>
+          <td>AI 工作台异步通道丢失多轮上下文与记忆注入修复（含同步流式路径记忆注入对齐）。<b>已定档 2026-08-27</b>：S2b-2 合入且 main CI 绿后立即开工，串行不并行；开工时提申请，架构侧不再另行裁决。范围与约束见 <a href="defects.html">defects.html</a> DEF-2026-08-27-001（两 commit 拆分、StreamingChunk 显式判别字段、替代形态评估、三路径对照表）。</td>
+          <td><span class="status warn"><span class="dot"></span>已定档 / 待 S2b-2 合入</span>：与阶段 2 S2b-2 串行（workflow 同用 ai-sessions 域 appendSessionMessage/getSessionRecord 依赖注入，避免合并点冲突；S2b-2 不可逆须保持干净可回退）。</td>
+          <td>同一会话第二轮起模型可见前序历史（≤12 轮）；记忆注入生效时「引用记忆」chip 在异步模式出现；run 重试不重复当前问题；三路径对照表全对齐。</td>
+        </tr>
       </table>
     </section>
 

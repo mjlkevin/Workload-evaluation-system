@@ -49,11 +49,11 @@
         <div class="meta">
           <span><b>定位</b> 已分析确认的错误行为、回归和质量缺口</span>
           <span><b>来源</b> 只从问题池或测试失败分流，不直接接收未定性原始反馈</span>
-          <span><b>更新日期</b> 2026-08-19</span>
+          <span><b>更新日期</b> 2026-08-27</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">17 缺陷</span>
-          <span class="pill warn">1 待修复 / 返工</span>
+          <span class="pill brand">19 缺陷</span>
+          <span class="pill warn">3 待修复 / 返工</span>
           <span class="pill ok">16 已修复</span>
           <span class="pill warn">13 人工待复核</span>
         </div>
@@ -289,12 +289,36 @@
               <td></td>
               <td>2026-08-19 前端插批视觉验收发现（视口 480×1318）：shell-background-runs-indicator 与分页栏重叠，hit-test 命中指示器、真实点击被拦截；待分诊排期（z-order/布局避让），不属前端插批范围。</td>
             </tr>
+            <tr>
+              <td class="mono">DEF-2026-08-27-001</td>
+              <td class="mono">ISS-2026-08-27-001</td>
+              <td class="mono">RP-047</td>
+              <td>异步 Run 通道模型调用未携带会话历史与记忆注入，多轮对话退化为单轮</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>open · 已定档（S2b-2 合入且 CI 绿后开工）</span></td>
+              <td>apps/api/src/modules/harness/harness-boot.ts:123-157（dispatch 组装不传 messages/projectId，modelChatStream 仅推 system+userContent）+ services/ai/handlers/workbench-shared.ts:206-276（messages 空则无历史、projectId 缺则 memoryBlock 恒 null）。异步通道自上线起每一问均单轮；记忆注入与「引用记忆」chip 在异步模式永不出现。证据会话 c1623a1c-a863-4ff0-a1a3-af033d47c008（4 条消息完整落 PG，上下文丢失发生在模型调用前组装环节，与阶段 2 存储无关）。</td>
+              <td>workflow 在 appendSessionMessage 落库当前用户消息后复用 getSessionRecord 取会话历史，转为 HomeMessageInput[] 注入 dispatch（buildWorkbenchChatDispatchInput 传 messages + projectId=&quot;default&quot;，与同步路径同口径）；modelChatStream 同款组装 safeMessages（slice(-12)+覆盖末条）+ 记忆注入；memoryRef 经 StreamingChunk 元数据透出写 trace（前端 chip 数据通路）。取历史为只读、effectKey 幂等不受影响。<b>架构侧裁决 2026-08-27 批准方案</b>：①排期 S2b-2 后串行（workflow 同用 ai-sessions 域依赖注入、合并点冲突风险；S2b-2 不可逆须保持可回退）；②同步流式路径记忆注入纳入范围，但单独 commit、可独立 revert；③StreamingChunk 用显式判别字段（kind=&quot;metadata&quot;），消费端按字段判断、不按 contentDelta 是否为空；④实现评审评估替代形态——memoryRef 在 systemPrompt 组装时提前已知，评估 harness-boot 闭包内经 dispatch 入参直接透出（更干净则走此路），结论写进实现方案；⑤交付附三路径对照表（历史/记忆/memoryRef × 同步非流式/同步流式/异步 Run），不对齐项写明原因。</td>
+              <td>待实现后补充：workflow/harness-boot 单测（历史注入、覆盖语义、记忆计数、重放幂等）+ 真实会话追问回归。</td>
+              <td>同一会话第二轮起模型可见前序历史（≤12 轮）；记忆注入生效时「引用记忆」chip 在异步模式出现；run 重试不重复当前问题。</td>
+            </tr>
+            <tr>
+              <td class="mono">DEF-2026-08-27-002</td>
+              <td class="mono">ISS-2026-08-27-002</td>
+              <td class="mono">RP-047</td>
+              <td>无活跃 attempt 的 Run 取消请求永久停在 cancelling，前端「停止中…」永不落地</td>
+              <td>S2</td>
+              <td><span class="status warn"><span class="dot"></span>open · 修复已实现待验证（分支 fix/harness-cancel-no-active-attempt）</span></td>
+              <td>apps/api/src/modules/harness/harness-runtime.repository.ts requestRunCancel：无活跃 attempt 的 Run（waiting / 历史 legacy 行）取消时一律置 cancelling，但 claimNextQueuedRun 只认领 queued/recovering、recovery 只收割「attempt 租约过期」的 Run——无任何 worker 观察 cancelling，Run 永久停在活跃集合。2026-08-27 架构侧核查工作区未申报代码改动时审阅确认；修复实现随改动被发现（非本任务链所改、来源另查），架构侧认定修复正确、不主张回退，按正常缺陷流程补流程。</td>
+              <td>requestRunCancel 先查活跃 attempt（claimed/running）：有 → 仍置 cancelling 由 worker 收割（行为不变）；无 → 直接落 cancelled 终态 + completedAt，cancelRequestedAt/By 保留首值（首次请求人不被覆盖）。事件：首次取消追加 cancel_requested、无活跃 attempt 追加 run_cancelled（reason=no_active_attempt）。<b>幂等语义变更（需用例守住）</b>：原逻辑 cancelRequestedAt 已存在一律短路 changed=false；现逻辑有活跃 attempt 且 cancelRequestedAt 已存在才短路——无活跃 attempt 时重复点击继续收尾补落终态（changed=true 但不再重复追加 cancel_requested）。R10b 守 waiting 行直接落终态 + 幂等；R10c 守存量 cancelling+cancelRequestedAt 已写的 rescue 场景（补落终态不重复追加）。</td>
+              <td>R10b/R10c 已随修复实现；本地 tsc + 相关套件 + 分支 CI 六套件（基线 1096）验证中，结果回填。</td>
+              <td>waiting / 无 attempt legacy 行点击停止 → 立即落 cancelled 终态（前端「停止中…」结束）；queued → 直接 cancelled（原逻辑同样无人认领 cancelling）；claimed/running（有活跃 attempt）→ 仍 cancelling 由 worker 收割；重复取消幂等（cancel_requested 不重复追加、run_cancelled 不重复）。</td>
+            </tr>
         </table>
       </div>
     </section>
 </main>
   </div>
-  <footer>缺陷池 · WES 项目管理 · 2026-08-19</footer>
+  <footer>缺陷池 · WES 项目管理 · 2026-08-27</footer>
   <script>
     const sidebar = document.getElementById('sidebar');
     const toggle = document.getElementById('sidebarToggle');

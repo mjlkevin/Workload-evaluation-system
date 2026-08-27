@@ -49,12 +49,12 @@
         <div class="meta">
           <span><b>定位</b> 用户原始反馈、截图、疑问和未定性现象的第一入口</span>
           <span><b>流转</b> Issue → triage → Defect / Requirement / Risk / Close</span>
-          <span><b>更新日期</b> 2026-08-24</span>
+          <span><b>更新日期</b> 2026-08-27</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">21 问题</span>
+          <span class="pill brand">23 问题</span>
           <span class="pill warn">0 待分析</span>
-          <span class="pill warn">14 转缺陷</span>
+          <span class="pill warn">15 转缺陷</span>
           <span class="pill brand">7 转需求</span>
         </div>
       </div>
@@ -326,12 +326,34 @@
               <td>转需求 · RP-059</td>
               <td>结论：取本体的建模方法（概念/继承/一致性检查），不引 OWL 推理机与三元组库；载体为 PG 表 + 现有 DSL 引擎，排在存储切换阶段 2 收口后。</td>
             </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-27-001</td>
+              <td>2026-08-27</td>
+              <td>AI 工作台异步通道丢失多轮上下文与记忆注入</td>
+              <td>project_coverage</td>
+              <td>项目侧 ai-sessions 真实链路覆盖 A 组发现：同一会话内追问，AI 回答与上一轮完全无关联，每问都是独立单轮对话。证据会话 sessionId = c1623a1c-a863-4ff0-a1a3-af033d47c008（owner mjlkevin）。架构侧已定位根因：同一 buildWorkbenchChatDispatchInput，同步路径（workbench-chat.handler.ts:84）传 messages + projectId=&quot;default&quot;，异步 Run 路径（harness-boot.ts:123）两者均不传，下游 buildWorkbenchChatModelChat（workbench-shared.ts:206）messages 为空时仅推当前 userContent，memoryBlock 因无 projectId 恒 null。代码注释（harness-boot.ts:129 / workbench-shared.ts:241）已承认是已知缺口加了兜底，历史始终未补。前端默认走异步 Run（useChatMessages.js submitRun，仅 503/flag off 回退同步），因此生产环境每一问都是单轮。</td>
+              <td><code class="inline">apps/api/src/modules/harness/harness-boot.ts:123-157（异步不传 messages/projectId + modelChatStream 仅推 system+userContent）</code> <code class="inline">apps/api/src/services/ai/handlers/workbench-shared.ts:206-276（messages 空则无历史；projectId 缺则 memoryBlock 恒 null）</code> <code class="inline">apps/api/src/services/ai/handlers/workbench-chat.handler.ts:84-89（同步路径传 messages + projectId=&quot;default&quot;）</code> <code class="inline">apps/api/src/modules/harness/workbench-chat.workflow.ts:106-121（appendSessionMessage 先落当前用户消息）</code> <code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js:601（submitRun 默认路径）</code></td>
+              <td><span class="status run"><span class="dot"></span>已分析 · 已定档</span></td>
+              <td>转缺陷 · DEF-2026-08-27-001（交叉引用 ISS-2026-08-10-004——异步通道流式接线问题，相关但独立：004 是订阅/流式链路，本次是模型输入组装）</td>
+              <td>已定档（2026-08-27 架构侧裁决批准方案）：S2b-2 合入且 main CI 绿后立即开工，串行不并行（workflow 同用 ai-sessions 域依赖注入，避免合并点冲突）；开工时提申请，架构侧不再另行裁决排期。范围含同步流式路径记忆注入（单独 commit 可独立 revert），交付附三路径对照表。裁决详情见 changes.html BE-2026-08-27-iss-2026-08-27-001-ruling。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-27-002</td>
+              <td>2026-08-27</td>
+              <td>无活跃 attempt 的 Run 取消请求永久停在 cancelling（前端「停止中…」永不落地）</td>
+              <td>project_coverage</td>
+              <td>架构侧核查工作区未申报代码改动时审阅确认的既有缺陷：requestRunCancel 对无活跃 attempt 的 Run（waiting / 历史 legacy 行）一律置 cancelling，但 claimNextQueuedRun 只认领 queued/recovering、recovery 只收割「attempt 租约过期」的 Run——没有任何 worker 会观察到 cancelling，Run 永久停在活跃集合，前端「停止中…」永不落地。</td>
+              <td><code class="inline">apps/api/src/modules/harness/harness-runtime.repository.ts（requestRunCancel 取消分支 / claimNextQueuedRun 认领条件 / recovery 收割条件）</code></td>
+              <td><span class="status run"><span class="dot"></span>已分析 · 修复已实现待验证</span></td>
+              <td>转缺陷 · DEF-2026-08-27-002（关联 RP-047——持久 Run 状态机同域；与 ISS-2026-08-10-004 无关）</td>
+              <td>工作区发现未申报修复（架构侧审阅认定为正确修复、不主张回退）：无活跃 attempt 时直接落 cancelled 终态 + completedAt，cancelRequestedAt/By 保留首值，按需追加 cancel_requested / run_cancelled 事件；幂等语义有变化（有活跃 attempt 才短路 changed=false）已用 R10b/R10c 用例守住。按正常缺陷流程处置：分支 fix/harness-cancel-no-active-attempt、补验证（本地 tsc + 相关套件 + CI 六套件）、附行为对照、单独提交单独申请合入，不塞 S2b-2。</td>
+            </tr>
         </table>
       </div>
     </section>
 </main>
   </div>
-  <footer>问题池 · WES 项目管理 · 2026-08-24</footer>
+  <footer>问题池 · WES 项目管理 · 2026-08-27</footer>
   <script>
     const sidebar = document.getElementById('sidebar');
     const toggle = document.getElementById('sidebarToggle');
