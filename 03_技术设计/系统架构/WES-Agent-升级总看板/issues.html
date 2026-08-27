@@ -344,7 +344,7 @@
               <td>project_coverage</td>
               <td>架构侧核查工作区未申报代码改动时审阅确认的既有缺陷：requestRunCancel 对无活跃 attempt 的 Run（waiting / 历史 legacy 行）一律置 cancelling，但 claimNextQueuedRun 只认领 queued/recovering、recovery 只收割「attempt 租约过期」的 Run——没有任何 worker 会观察到 cancelling，Run 永久停在活跃集合，前端「停止中…」永不落地。</td>
               <td><code class="inline">apps/api/src/modules/harness/harness-runtime.repository.ts（requestRunCancel 取消分支 / claimNextQueuedRun 认领条件 / recovery 收割条件）</code></td>
-              <td><span class="status run"><span class="dot"></span>已分析 · 修复已实现待验证</span></td>
+              <td><span class="status run"><span class="dot"></span>已分析 · 修复已验证（分支 CI 33072134333 全绿）· 待合入</span></td>
               <td>转缺陷 · DEF-2026-08-27-002（关联 RP-047——持久 Run 状态机同域；与 ISS-2026-08-10-004 无关）</td>
               <td>工作区发现未申报修复（架构侧审阅认定为正确修复、不主张回退）：无活跃 attempt 时直接落 cancelled 终态 + completedAt，cancelRequestedAt/By 保留首值，按需追加 cancel_requested / run_cancelled 事件；幂等语义有变化（有活跃 attempt 才短路 changed=false）已用 R10b/R10c 用例守住。按正常缺陷流程处置：分支 fix/harness-cancel-no-active-attempt、补验证（本地 tsc + 相关套件 + CI 六套件）、附行为对照、单独提交单独申请合入，不塞 S2b-2。</td>
             </tr>

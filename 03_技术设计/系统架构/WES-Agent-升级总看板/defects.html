@@ -307,10 +307,10 @@
               <td class="mono">RP-047</td>
               <td>无活跃 attempt 的 Run 取消请求永久停在 cancelling，前端「停止中…」永不落地</td>
               <td>S2</td>
-              <td><span class="status warn"><span class="dot"></span>open · 修复已实现待验证（分支 fix/harness-cancel-no-active-attempt）</span></td>
+              <td><span class="status warn"><span class="dot"></span>open · 修复已验证（分支 CI 33072134333 全绿）· 待架构侧批准合入</span></td>
               <td>apps/api/src/modules/harness/harness-runtime.repository.ts requestRunCancel：无活跃 attempt 的 Run（waiting / 历史 legacy 行）取消时一律置 cancelling，但 claimNextQueuedRun 只认领 queued/recovering、recovery 只收割「attempt 租约过期」的 Run——无任何 worker 观察 cancelling，Run 永久停在活跃集合。2026-08-27 架构侧核查工作区未申报代码改动时审阅确认；修复实现随改动被发现（非本任务链所改、来源另查），架构侧认定修复正确、不主张回退，按正常缺陷流程补流程。</td>
               <td>requestRunCancel 先查活跃 attempt（claimed/running）：有 → 仍置 cancelling 由 worker 收割（行为不变）；无 → 直接落 cancelled 终态 + completedAt，cancelRequestedAt/By 保留首值（首次请求人不被覆盖）。事件：首次取消追加 cancel_requested、无活跃 attempt 追加 run_cancelled（reason=no_active_attempt）。<b>幂等语义变更（需用例守住）</b>：原逻辑 cancelRequestedAt 已存在一律短路 changed=false；现逻辑有活跃 attempt 且 cancelRequestedAt 已存在才短路——无活跃 attempt 时重复点击继续收尾补落终态（changed=true 但不再重复追加 cancel_requested）。R10b 守 waiting 行直接落终态 + 幂等；R10c 守存量 cancelling+cancelRequestedAt 已写的 rescue 场景（补落终态不重复追加）。</td>
-              <td>R10b/R10c 已随修复实现；本地 tsc + 相关套件 + 分支 CI 六套件（基线 1096）验证中，结果回填。</td>
+              <td>验证完成（2026-08-27）：本地 tsc（build:api）0 错；harness-runtime.repository + ai-runs.routes 套件 61/61 全绿 skipped=0（R10b/R10c 真实执行）；完整 test:harness 仅 T7a 失败（既有环境 flaky，2026-08-18 批 5 已登记，非本改动引入）。分支 fix/harness-cancel-no-active-attempt CI run 33072134333 全绿（lint/tsc/test-non-db/test-with-db/test-web，docker-build 分支惯例 skipped；test-with-db 内 Test harness 209/209 skipped=0）。main 文档 commit CI run 33072136700 六套件全绿。待架构侧批准合入。</td>
               <td>waiting / 无 attempt legacy 行点击停止 → 立即落 cancelled 终态（前端「停止中…」结束）；queued → 直接 cancelled（原逻辑同样无人认领 cancelling）；claimed/running（有活跃 attempt）→ 仍 cancelling 由 worker 收割；重复取消幂等（cancel_requested 不重复追加、run_cancelled 不重复）。</td>
             </tr>
         </table>
