@@ -8,8 +8,7 @@ import { config } from "../../config/env";
 import { defaultProviderRegistry, type ModelProvider } from "../../ai/provider";
 import { aiSessionsStorePath } from "../../utils";
 import type { AuthUser } from "../../types";
-import { appendAiSessionEvent, createAiSession } from "../../modules/ai-sessions/ai-sessions.usecase";
-import { _resetAiSessionsRepositoryForTest } from "../../modules/ai-sessions/ai-sessions.repository";
+import { appendAiSessionEvent, createAiSession, deleteAiSession, listAiSessions } from "../../modules/ai-sessions/ai-sessions.usecase";
 import { _resetTraceRepositoryForTest, queryTraces } from "../../modules/trace/trace.repository";
 import {
   allParsedHomeAttachments,
@@ -165,6 +164,25 @@ function createMockReqRes(overrides: {
 
 const TEST_TRACE_STORE_DIR = join(process.cwd(), "data", "chat-service-traces-test");
 const TEST_TRACE_STORE_PATH = join(TEST_TRACE_STORE_DIR, "trace-store.json");
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+
+// S2b-1（2026-08-27）：三个 homeWorkbenchChatStream 完整流程用例在九开关全开时
+// 内部创建会话（title 取用户消息首句「请基于附件总结风险」）写入 PG，用例级 finally 定向清理。
+async function cleanupTestStreamSessions(): Promise<void> {
+  const user: AuthUser = {
+    id: "test-user-1",
+    username: "tester",
+    passwordHash: "test-hash",
+    role: "user",
+    businessRole: "pre_sales",
+    status: "active",
+    createdAt: "2026-08-08T00:00:00.000Z",
+    lastLoginAt: "2026-08-08T00:00:00.000Z",
+  };
+  for (const session of await listAiSessions(user)) {
+    if (session.title === "请基于附件总结风险") await deleteAiSession(user, session.sessionId);
+  }
+}
 
 async function withChatServiceIsolation(run: () => Promise<void>) {
   const previousTraceStore = process.env.WES_TRACE_STORE_PATH;
@@ -172,7 +190,8 @@ async function withChatServiceIsolation(run: () => Promise<void>) {
   // C10（2026-08-25）：chat.service 用例以 session 文件快照 / trace 文件断言，
   // 假定 ai-sessions 与 trace 走 JSON 实现；全局开关全开（PG）时写入 PG、断言读 JSON，
   // 断言失效。显式隔离到 JSON 实现。
-  const previousAiSessionsPgFlag = process.env.WES_STORE_AI_SESSIONS_PG;
+  // S2b-1（2026-08-27）：ai-sessions 已随九开关走 PG，不再显式隔离（仅动 AI_SESSIONS 分支）；
+  // TRACES 仍走 JSON，WES_STORE_TRACES_PG 分支原样保留（S3 才动）。
   const previousTracesPgFlag = process.env.WES_STORE_TRACES_PG;
   const sessionPath = aiSessionsStorePath();
   const sessionExisted = existsSync(sessionPath);
@@ -184,9 +203,7 @@ async function withChatServiceIsolation(run: () => Promise<void>) {
   mkdirSync(TEST_TRACE_STORE_DIR, { recursive: true });
   process.env.WES_TRACE_STORE_PATH = TEST_TRACE_STORE_PATH;
   config.kimi.apiKey = "unit-test-kimi-key";
-  delete process.env.WES_STORE_AI_SESSIONS_PG;
   delete process.env.WES_STORE_TRACES_PG;
-  _resetAiSessionsRepositoryForTest();
   _resetTraceRepositoryForTest();
 
   try {
@@ -194,11 +211,8 @@ async function withChatServiceIsolation(run: () => Promise<void>) {
   } finally {
     if (previousTraceStore === undefined) delete process.env.WES_TRACE_STORE_PATH;
     else process.env.WES_TRACE_STORE_PATH = previousTraceStore;
-    if (previousAiSessionsPgFlag === undefined) delete process.env.WES_STORE_AI_SESSIONS_PG;
-    else process.env.WES_STORE_AI_SESSIONS_PG = previousAiSessionsPgFlag;
     if (previousTracesPgFlag === undefined) delete process.env.WES_STORE_TRACES_PG;
     else process.env.WES_STORE_TRACES_PG = previousTracesPgFlag;
-    _resetAiSessionsRepositoryForTest();
     _resetTraceRepositoryForTest();
     config.kimi.apiKey = previousApiKey;
 
@@ -322,8 +336,9 @@ test("homeWorkbenchChatStream: SSE 头信息正确设置", async () => {
   assert.equal(headers["Connection"], "keep-alive");
 });
 
-test("homeWorkbenchChatStream: dispatch 流式成功后发送 delta/done 并写入隔离 trace store", async () => {
+test("homeWorkbenchChatStream: dispatch 流式成功后发送 delta/done 并写入隔离 trace store", { skip: !testDatabaseUrl }, async () => {
   await withChatServiceIsolation(async () => {
+    try {
     registerFakeKimiProvider({
       stream: async function* () {
         yield { contentDelta: "第一段", model: "kimi-test" };
@@ -352,11 +367,15 @@ test("homeWorkbenchChatStream: dispatch 流式成功后发送 delta/done 并写�
     assert.equal(traces.total, 1);
     assert.equal(traces.traces[0].summary.hasError, false);
     assert.equal(traces.traces[0].spans.some((span) => span.spanType === "model_call"), true);
+    } finally {
+      await cleanupTestStreamSessions();
+    }
   });
 });
 
-test("homeWorkbenchChatStream: provider stream 失败时发送 error 并写 failed trace", async () => {
+test("homeWorkbenchChatStream: provider stream 失败时发送 error 并写 failed trace", { skip: !testDatabaseUrl }, async () => {
   await withChatServiceIsolation(async () => {
+    try {
     registerFakeKimiProvider({
       // 非生成器形式：首次拉取即抛错（async generator 无 yield 会触发 require-yield）
       stream: () => ({
@@ -389,11 +408,15 @@ test("homeWorkbenchChatStream: provider stream 失败时发送 error 并写 fail
     assert.equal(traces.total, 1);
     assert.equal(traces.traces[0].summary.hasError, true);
     assert.equal(traces.traces[0].spans[0].error?.code, "upstream_stream_failed");
+    } finally {
+      await cleanupTestStreamSessions();
+    }
   });
 });
 
-test("homeWorkbenchChatStream: client close 后不发送 done，并写 cancelled trace", async () => {
+test("homeWorkbenchChatStream: client close 后不发送 done，并写 cancelled trace", { skip: !testDatabaseUrl }, async () => {
   await withChatServiceIsolation(async () => {
+    try {
     const { req, res, getSseEvents } = createMockReqRes({
       body: {
         workflowKey: "free_chat",
@@ -420,6 +443,9 @@ test("homeWorkbenchChatStream: client close 后不发送 done，并写 cancelled
     assert.equal(traces.total, 1);
     assert.equal(traces.traces[0].summary.hasError, true);
     assert.equal(traces.traces[0].spans[0].error?.code, "client_aborted");
+    } finally {
+      await cleanupTestStreamSessions();
+    }
   });
 });
 
@@ -435,7 +461,7 @@ test("resolveWorkbenchStreamFinalContent: 流式最终内容以 dispatch answer 
 
 // ─── ISS-2026-08-08-001: 流式显式报告闸门与会话附件回退对齐 ───────────────────────────
 
-test("homeWorkbenchChatStream: 显式报告请求回退会话附件后直接生成报告（与非流式对齐）", async () => {
+test("homeWorkbenchChatStream: 显式报告请求回退会话附件后直接生成报告（与非流式对齐）", { skip: !testDatabaseUrl }, async () => {
   await withChatServiceIsolation(async () => {
     registerFakeKimiProvider({
       chatAnswer: JSON.stringify({
@@ -462,6 +488,7 @@ test("homeWorkbenchChatStream: 显式报告请求回退会话附件后直接生�
       lastLoginAt: "2026-08-08T00:00:00.000Z",
     };
     const session = await createAiSession(streamUser, { title: "流式存量附件会话", workflowKey: "parse_requirement_file" });
+    try {
     await appendAiSessionEvent(streamUser, session.sessionId, {
       message: { role: "user", content: "帮我看看这个文件" },
       attachments: [{
@@ -497,5 +524,8 @@ test("homeWorkbenchChatStream: 显式报告请求回退会话附件后直接生�
     );
     const allPayload = JSON.stringify(events);
     assert.ok(!allPayload.includes("请上传需求文件"), "会话已有附件时不应再出现上传引导文案");
+    } finally {
+      await deleteAiSession(streamUser, session.sessionId);
+    }
   });
 });

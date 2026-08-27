@@ -24,7 +24,8 @@ import { createAiSessionsPgRepository } from "./ai-sessions-pg.repository";
 const pgMarker = createAiSessionsPgRepository; // 仅用于类型参照
 
 afterEach(() => {
-  delete process.env.WES_STORE_AI_SESSIONS_PG;
+  // S2b-1（2026-08-27）：显式复位到 JSON 路径（与缺省语义等价），不再 delete 开关。
+  process.env.WES_STORE_AI_SESSIONS_PG = "false";
   _resetAiSessionsRepositoryForTest();
 });
 
@@ -33,8 +34,8 @@ function isPgRepo(repo: unknown): boolean {
   return typeof (repo as { __dbForTest?: unknown }).__dbForTest === "function";
 }
 
-test("选择器缺省（未设开关）装配 JSON 实现", () => {
-  delete process.env.WES_STORE_AI_SESSIONS_PG;
+test("选择器显式 'false'（与缺省同路）装配 JSON 实现", () => {
+  process.env.WES_STORE_AI_SESSIONS_PG = "false";
   _resetAiSessionsRepositoryForTest();
   const repo = getAiSessionsRepository();
   assert.equal(isPgRepo(repo), false, "缺省必须走 JSON（回滚安全）");

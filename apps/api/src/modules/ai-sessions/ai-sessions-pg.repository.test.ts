@@ -16,12 +16,14 @@ import { Pool } from "pg";
 
 import { readDbNow } from "../../db/now";
 import { aiSessions } from "../../db/schema";
+import type { AuthUser } from "../../types";
 import type { AiSessionRecord } from "./ai-sessions.types";
 import {
   AiSessionsStoreError,
   createAiSessionsPgRepository,
   type AiSessionsPgRepository,
 } from "./ai-sessions-pg.repository";
+import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession } from "./ai-sessions.usecase";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -353,4 +355,75 @@ test("缓存语义：无缓存层，带外 SQL 写入读路径立即可见", { s
   await repo!.renameSession({ ownerUserId: "wes-t-owner-a", sessionId, title: "仓储改名" });
   const row = await readDbSession(sessionId);
   assert.equal(row.title, "仓储改名");
+});
+
+// ─── S2b-1 补测：parsedSummary 持久化 / 8000 截断（usecase 层）/ 旧格式兼容 ──
+
+// ① 附件 parsedSummary 必须经 jsonb 原样持久化（PG 仓储不截断，截断在 usecase 层）
+
+test("appendSessionEvent 持久化附件 parsedSummary 原文", { skip: !testDatabaseUrl }, async () => {
+  const session = await seedSession({ ownerUserId: "wes-t-owner-a" });
+  const nowIso = new Date().toISOString();
+  await repo!.appendSessionEvent({
+    ownerUserId: "wes-t-owner-a",
+    sessionId: session.sessionId,
+    attachments: [{
+      attachmentId: "att-summary",
+      name: "需求.xlsx",
+      parsedSummary: "项目：XX\n业务需求：\n1. 重点",
+      createdAt: nowIso,
+    }],
+  });
+  const read = await repo!.findSession({ ownerUserId: "wes-t-owner-a", sessionId: session.sessionId });
+  const attachment = read!.attachments.find((item) => item.attachmentId === "att-summary");
+  assert.ok(attachment, "附件必须存在");
+  assert.equal(attachment.parsedSummary, "项目：XX\n业务需求：\n1. 重点", "parsedSummary 必须原样持久化（仓储层不截断）");
+});
+
+// ② 8000 截断在 usecase 层（PARSED_SUMMARY_MAX_LENGTH）：经 createAiSession +
+// appendAiSessionEvent 种入超长 parsedSummary，读回断言带截断标记且长度精确。
+// 本用例经 usecase 走与测试同库的选择器装配（构造与读取同源）。
+
+test("8000 截断在 usecase 层：超长 parsedSummary 读回带截断标记", { skip: !testDatabaseUrl }, async () => {
+  const user: AuthUser = {
+    id: "wes-pg-usecase-owner",
+    username: "wes-pg-usecase-owner",
+    passwordHash: "",
+    role: "user",
+    businessRole: "pre_sales",
+    status: "active",
+    createdAt: "2026-08-27T00:00:00.000Z",
+    lastLoginAt: "2026-08-27T00:00:00.000Z",
+  };
+  const longSummary = "长".repeat(9000);
+  const created = await createAiSession(user, { title: "截断测试", workflowKey: "parse_requirement_file" });
+  try {
+    await appendAiSessionEvent(user, created.sessionId, {
+      attachments: [{ name: "big.xlsx", parsedSummary: longSummary }],
+    });
+    const read = await getAiSession(user, created.sessionId);
+    assert.ok(read, "会话必须存在");
+    const attachment = read.attachments.find((item) => item.name === "big.xlsx");
+    assert.ok(attachment, "附件必须存在");
+    assert.ok(attachment.parsedSummary?.endsWith("…[truncated]"), "usecase 层必须加截断标记");
+    assert.equal(attachment.parsedSummary!.length, 8000 + "…[truncated]".length, "截断后长度 = 8000 + 标记");
+  } finally {
+    await deleteAiSession(user, created.sessionId);
+  }
+});
+
+// ③ 旧格式兼容（原 usecase.test L169 职责迁移）：JSON 时代遗留行缺 parsedSummary
+// 字段，经 jsonb 带外写入后读回不炸、字段保持 undefined（无迁移脚本，读取兼容）。
+
+test("旧格式兼容：缺 parsedSummary 字段的附件读取不炸且保持 undefined", { skip: !testDatabaseUrl }, async () => {
+  const session = await seedSession({ ownerUserId: "wes-t-owner-a" });
+  const nowIso = new Date().toISOString();
+  await pool!.query(
+    `UPDATE ai_sessions SET attachments = $2::jsonb WHERE session_id = $1`,
+    [session.sessionId, JSON.stringify([{ attachmentId: "legacy-att", name: "旧格式.xlsx", createdAt: nowIso }])],
+  );
+  const read = await repo!.findSession({ ownerUserId: "wes-t-owner-a", sessionId: session.sessionId });
+  assert.equal(read!.attachments.length, 1, "旧格式附件必须可读");
+  assert.equal(read!.attachments[0].attachmentId, "legacy-att");
+  assert.equal("parsedSummary" in read!.attachments[0], false, "缺 parsedSummary 保持 undefined（无迁移脚本，读取兼容）");
 });

@@ -4,8 +4,11 @@
 // RED 先行：提交 202 契约、submissionKey 幂等、flag 503、session 404、
 // 删除冲突 409、cancel/inputs/confirm/retry 状态矩阵。
 // 使用内存 fake repository，不依赖 PostgreSQL。
-// C10（2026-08-25）：deleteAiSession 契约用例依赖 ai-sessions JSON 文件断言
-// （loadAiSessionsStore 直读文件）——见下方 withAiSessionsJsonIsolation。
+// C10（2026-08-25）：deleteAiSession 契约用例依赖 ai-sessions 存储断言。
+// S2b-1（2026-08-27）：两用例已随九开关走 PG（断言经 getAiSession 读回、
+// fixture 经 createAiSession 种入，构造与读取同源），是文件内仅有的 DB
+// 依赖用例——缺失 TEST_DATABASE_URL 时按 C4 诚实 skip；其余用例仍为内存
+// fake repository。
 
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -13,7 +16,6 @@ import { randomUUID } from "node:crypto";
 
 import type { AuthUser } from "../../types";
 import type { AiSessionRecord } from "../ai-sessions/ai-sessions.types";
-import { _resetAiSessionsRepositoryForTest } from "../ai-sessions/ai-sessions.repository";
 import {
   AiRunsConflictError,
   AiRunsDisabledError,
@@ -388,48 +390,27 @@ test("getRunSnapshot returns 404 for a non-owner", async () => {
 
 // ----------------------------------------------------------------
 // C1 Session 删除 409 保护（可选 checker，向后兼容）
+// S2b-1：断言经 getAiSession 读回（与 createAiSession 同仓储单例），
+// 缺失 DB 时 skip；createAiSession 以 makeUser 随机 UUID 为 owner，
+// finally 幂等清理不触碰其他数据。
 // ----------------------------------------------------------------
 
-/**
- * C10（2026-08-25）：deleteAiSession 契约用例通过 loadAiSessionsStore 直读
- * JSON 文件断言（假绿风险：createAiSession 走 PG、断言读 JSON）。显式隔离到
- * JSON 实现，使断言与被测路径一致。
- */
-async function withAiSessionsJsonIsolation<T>(fn: () => Promise<T>): Promise<T> {
-  const prev = process.env.WES_STORE_AI_SESSIONS_PG;
-  delete process.env.WES_STORE_AI_SESSIONS_PG;
-  _resetAiSessionsRepositoryForTest();
-  try {
-    return await fn();
-  } finally {
-    if (prev === undefined) delete process.env.WES_STORE_AI_SESSIONS_PG;
-    else process.env.WES_STORE_AI_SESSIONS_PG = prev;
-    _resetAiSessionsRepositoryForTest();
-  }
-}
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
-test("deleteAiSession stays backward compatible without a checker", async () => {
-  await withAiSessionsJsonIsolation(async () => {
-  const { createAiSession, deleteAiSession } = await import("../ai-sessions/ai-sessions.usecase");
-  const { loadAiSessionsStore } = await import("../ai-sessions/ai-sessions.repository");
+test("deleteAiSession stays backward compatible without a checker", { skip: !testDatabaseUrl }, async () => {
+  const { createAiSession, deleteAiSession, getAiSession } = await import("../ai-sessions/ai-sessions.usecase");
   const user = makeUser();
   const session = await createAiSession(user, { title: "待删除" });
   try {
     assert.equal(await deleteAiSession(user, session.sessionId), true, "缺省路径保持原有布尔语义（await 解包）");
-    assert.equal((await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId), false);
+    assert.equal(await getAiSession(user, session.sessionId), null, "删除后按 owner 查询必须为空");
   } finally {
-    const store = await loadAiSessionsStore();
-    store.sessions = store.sessions.filter((item) => item.ownerUserId !== user.id);
-    const { saveAiSessionsStore } = await import("../ai-sessions/ai-sessions.repository");
-    await saveAiSessionsStore(store);
+    await deleteAiSession(user, session.sessionId);
   }
-  });
 });
 
-test("deleteAiSession rejects deletion with 409 SESSION_HAS_ACTIVE_RUN when a checker reports an active run", async () => {
-  await withAiSessionsJsonIsolation(async () => {
-  const { createAiSession, deleteAiSession } = await import("../ai-sessions/ai-sessions.usecase");
-  const { loadAiSessionsStore, saveAiSessionsStore } = await import("../ai-sessions/ai-sessions.repository");
+test("deleteAiSession rejects deletion with 409 SESSION_HAS_ACTIVE_RUN when a checker reports an active run", { skip: !testDatabaseUrl }, async () => {
+  const { createAiSession, deleteAiSession, getAiSession } = await import("../ai-sessions/ai-sessions.usecase");
   const user = makeUser();
   const session = await createAiSession(user, { title: "有活跃 Run" });
   try {
@@ -440,15 +421,12 @@ test("deleteAiSession rejects deletion with 409 SESSION_HAS_ACTIVE_RUN when a ch
         (err as { code?: string }).code === "SESSION_HAS_ACTIVE_RUN" &&
         (err as { status?: number }).status === 409,
     );
-    assert.equal((await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId), true, "冲突时不得删除会话");
+    assert.notEqual(await getAiSession(user, session.sessionId), null, "冲突时不得删除会话");
 
     assert.equal(await deleteAiSession(user, session.sessionId, { activeRunChecker: async () => false }), true);
   } finally {
-    const store = await loadAiSessionsStore();
-    store.sessions = store.sessions.filter((item) => item.ownerUserId !== user.id);
-    await saveAiSessionsStore(store);
+    await deleteAiSession(user, session.sessionId);
   }
-  });
 });
 
 // ----------------------------------------------------------------
