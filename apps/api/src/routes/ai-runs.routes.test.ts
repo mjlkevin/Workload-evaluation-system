@@ -534,9 +534,12 @@ test("cancel accepts an active run and rejects terminal runs with 409", { skip: 
 
   const accepted = await request(app).post(`/ai-runs/${runId}/cancel`).set("Authorization", `Bearer ${aliceToken}`);
   assert.equal(accepted.status, 202);
-  const cancelling = await repo!.findRunForOwner(runId, alice!.id);
-  assert.equal(cancelling?.status, "cancelling");
+  // 本用例无 worker 认领，Run 无活跃 attempt：没有任何执行者能把 cancelling 收尾，
+  // 故直接落 cancelled 终态（有活跃 attempt 时仍走 cancelling，见 repository R10 / worker T 用例）。
+  const cancelled = await repo!.findRunForOwner(runId, alice!.id);
+  assert.equal(cancelled?.status, "cancelled");
   assert.ok((await listEvents(runId, "cancel_requested")).length > 0);
+  assert.ok((await listEvents(runId, "run_cancelled")).length > 0);
 
   const terminal = await driveRunToTerminal("completed");
   track(terminal.runId);
