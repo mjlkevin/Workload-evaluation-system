@@ -21,13 +21,14 @@ import { and, eq } from "drizzle-orm";
 
 import { createAiRunsRouter } from "./ai-runs.routes";
 import { createAiSessionsRouter } from "./ai-sessions.routes";
+import systemRouter from "./system.routes";
 import { createHarnessRuntimeRepository, type HarnessRuntimeRepository } from "../modules/harness/harness-runtime.repository";
 import type { AiRunsUsecase } from "../modules/harness/harness-runtime.usecase";
-import { createAiSession } from "../modules/ai-sessions/ai-sessions.usecase";
+import { appendAiSessionEvent, createAiSession, deleteAiSession } from "../modules/ai-sessions/ai-sessions.usecase";
 import { aiSessionsStorePath } from "../utils";
 import { signAuthToken } from "../middleware/auth";
 import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
-import { harnessRunEvents, harnessRuns } from "../db/schema";
+import { aiSessions, harnessRunEvents, harnessRuns } from "../db/schema";
 import type { AuthUser } from "../types";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -38,9 +39,12 @@ let repo: HarnessRuntimeRepository | null = null;
 let originalAiSessionsJson: string | null = null;
 let alice: AuthUser | null = null;
 let bob: AuthUser | null = null;
+let admin: AuthUser | null = null;
 let aliceToken = "";
 let bobToken = "";
+let adminToken = "";
 const createdRunIds: string[] = [];
+const createdSessionIds: string[] = [];
 
 before(async () => {
   if (!testDatabaseUrl) return;
@@ -53,14 +57,20 @@ before(async () => {
 
   alice = await createTestUser("wes-ai-runs-alice", { role: "user" });
   bob = await createTestUser("wes-ai-runs-bob", { role: "user" });
+  admin = await createTestUser("wes-ai-runs-admin", { role: "admin" });
   aliceToken = signAuthToken(alice);
   bobToken = signAuthToken(bob);
+  adminToken = signAuthToken(admin);
 });
 
 after(async () => {
   if (testDb) {
     for (const runId of createdRunIds.splice(0)) {
       await testDb.delete(harnessRuns).where(eq(harnessRuns.harnessRunId, runId));
+    }
+    // S2b-1（2026-08-27）：ai-sessions 随九开关走 PG，用例级会话按 sessionId 清理
+    for (const sessionId of createdSessionIds.splice(0)) {
+      await testDb.delete(aiSessions).where(eq(aiSessions.sessionId, sessionId));
     }
     await cleanupTestUsers("wes-ai-runs");
   }
@@ -73,6 +83,11 @@ after(async () => {
 function track(runId: string): string {
   createdRunIds.push(runId);
   return runId;
+}
+
+function trackSession(sessionId: string): string {
+  createdSessionIds.push(sessionId);
+  return sessionId;
 }
 
 // claimNextQueuedRun 是 FIFO 全局捞取：循环消费前序测试遗留的 queued run，
@@ -98,11 +113,12 @@ function makeApp(opts: { enabled: boolean; sse?: { heartbeatMs?: number; pollMs?
   app.use(express.json());
   app.use("/ai-sessions", createAiSessionsRouter(usecaseDeps));
   app.use("/ai-runs", createAiRunsRouter(usecaseDeps));
+  app.use("/system", systemRouter);
   return app;
 }
 
 async function makeSession(owner: AuthUser, title = "集成测试会话"): Promise<string> {
-  return (await createAiSession(owner, { title })).sessionId;
+  return trackSession((await createAiSession(owner, { title })).sessionId);
 }
 
 async function submitValidRun(token: string, sessionId: string, app: express.Express) {
@@ -731,4 +747,60 @@ test("client disconnect does not cancel the run and replay can resume", { skip: 
   } finally {
     await server.close();
   }
+});
+
+// ============================================================
+// S2b-1 补测：system:manage admin 审计聚合（HTTP 装配层）
+// ============================================================
+// 映射表补测分层：admin 聚合 / 过滤倒序 → ai-runs.routes.test.ts（真实 express 装配）。
+// 关键断言全部无条件执行（A-1 判据）；q 用随机前缀限定域，避免共享表依赖。
+
+// ① admin 聚合：GET /system/ai-sessions 跨用户聚合全部会话摘要
+
+test("system:manage admin aggregates ai-sessions across users", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const prefix = `wes-ai-runs-admin-${randomUUID().slice(0, 8)}`;
+  const aliceSession = trackSession((await createAiSession(alice!, { title: `${prefix}-alice` })).sessionId);
+  const bobSession = trackSession((await createAiSession(bob!, { title: `${prefix}-bob` })).sessionId);
+
+  const response = await request(app).get(`/system/ai-sessions?q=${prefix}`).set("Authorization", `Bearer ${adminToken}`);
+  assert.equal(response.status, 200);
+  const items = response.body.data.items as Array<{ sessionId: string; ownerUsername: string }>;
+  const byId = new Map(items.map((item) => [item.sessionId, item]));
+  const aliceSummary = byId.get(aliceSession);
+  const bobSummary = byId.get(bobSession);
+  assert.ok(aliceSummary, "admin 聚合必须包含 alice 的会话");
+  assert.equal(aliceSummary!.ownerUsername, alice!.username);
+  assert.ok(bobSummary, "admin 聚合必须包含 bob 的会话");
+  assert.equal(bobSummary!.ownerUsername, bob!.username);
+  assert.equal("messages" in (aliceSummary as object), false, "审计摘要不得携带消息原文数组");
+});
+
+// ② 过滤倒序：q 限定域内按 updatedAt 倒序，status/domain 过滤各自生效
+
+test("system:manage admin list filters by status/domain and orders by updatedAt desc", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const prefix = `wes-ai-runs-filter-${randomUUID().slice(0, 8)}`;
+  const older = trackSession((await createAiSession(alice!, { title: `${prefix}-older`, status: "standard_review", domain: "standard_governance" })).sessionId);
+  const newer = trackSession((await createAiSession(bob!, { title: `${prefix}-newer` })).sessionId);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  await appendAiSessionEvent(alice!, older, { message: { role: "user", content: "追加一轮" } });
+
+  const list = await request(app).get(`/system/ai-sessions?q=${prefix}`).set("Authorization", `Bearer ${adminToken}`);
+  assert.equal(list.status, 200);
+  const items = list.body.data.items as Array<{ sessionId: string }>;
+  assert.equal(items.length, 2, "q 限定域内应聚合两会话");
+  assert.equal(items[0].sessionId, older, "应按 updatedAt 倒序（追加过的 older 排前）");
+
+  const byStatus = await request(app).get(`/system/ai-sessions?q=${prefix}&status=standard_review`).set("Authorization", `Bearer ${adminToken}`);
+  assert.equal(byStatus.status, 200);
+  const statusItems = byStatus.body.data.items as Array<{ sessionId: string }>;
+  assert.equal(statusItems.length, 1, "status 过滤应生效");
+  assert.equal(statusItems[0].sessionId, older);
+
+  const byDomain = await request(app).get(`/system/ai-sessions?q=${prefix}&domain=standard_governance`).set("Authorization", `Bearer ${adminToken}`);
+  assert.equal(byDomain.status, 200);
+  const domainItems = byDomain.body.data.items as Array<{ sessionId: string }>;
+  assert.equal(domainItems.length, 1, "domain 过滤应生效");
+  assert.equal(domainItems[0].sessionId, older);
 });

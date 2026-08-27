@@ -35,8 +35,8 @@ import { testKnowledgeBaseConnectivity } from "./system/system.usecase";
 import { loadRequirementSystemConfigStore, saveRequirementSystemConfigStore } from "./system/system.repository";
 import { BUILTIN_MOONSHOT_PROVIDER_ID } from "./system/model-providers";
 import * as AiSessionsModule from "./ai-sessions/ai-sessions.module";
-import { appendAiSessionEvent, createAiSession } from "./ai-sessions/ai-sessions.usecase";
-import { _resetAiSessionsRepositoryForTest, loadAiSessionsStore, saveAiSessionsStore } from "./ai-sessions/ai-sessions.repository";
+import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, listAiSessions } from "./ai-sessions/ai-sessions.usecase";
+import { _resetAiSessionsRepositoryForTest } from "./ai-sessions/ai-sessions.repository";
 import * as ProjectEvaluationsModule from "./project-evaluations/project-evaluations.module";
 import { createConfirmAiAssessmentDraftHandler } from "./project-evaluations/project-evaluations.controller";
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
@@ -57,13 +57,15 @@ let testAdmin: AuthUser;
 let testPlainUser: AuthUser;
 
 // C10（2026-08-25）：本文件是 handler 契约测试，用例以 JSON 文件构造状态
-// （versionsStorePath / versionCodeRulesStorePath / aiSessionsStorePath 等）并
-// 经选择器访问存储。全局开关全开（PG）时构造与读取不一致 → 用例失败。
+// （versionsStorePath / versionCodeRulesStorePath 等）并经选择器访问存储。
+// 全局开关全开（PG）时构造与读取不一致 → 用例失败。
 // 文件级显式切回 JSON 实现（users 域 S1 后恒 PG，不受影响）。
+// S2b-1（2026-08-27）：AI_SESSIONS 移出本列表——直读断言已全部改经
+// repository 单例读写（构造与读取同源），九开关全开时用例自然走 PG，
+// 文件级 after 按测试用户兜底清理会话数据。
 const PREVIOUS_STORE_PG_FLAGS = new Map<string, string | undefined>();
 const STORE_PG_FLAG_KEYS = [
   "WES_STORE_USERS_PG",
-  "WES_STORE_AI_SESSIONS_PG",
   "WES_STORE_SYSTEM_PG",
   "WES_STORE_TRACES_PG",
   "WES_STORE_VERSIONS_PG",
@@ -108,6 +110,13 @@ before(async () => {
 
 after(async () => {
   await cleanupTestUsers("wes-modules");
+  // S2b-1：AI_SESSIONS 已随全局开关走 PG，文件级兜底删除本文件注入的会话
+  // （按 owner 过滤，不触碰其他文件/真实数据；restoreStorePgFlags 后单例重建）
+  for (const user of [testAdmin, testPlainUser]) {
+    for (const session of await listAiSessions(user)) {
+      await deleteAiSession(user, session.sessionId);
+    }
+  }
   restoreStorePgFlags();
 });
 
@@ -2009,16 +2018,31 @@ test("ai.usecase: homeWorkbenchChat keeps user turn in session when model fails"
       await homeWorkbenchChat(req, res as unknown as Response);
 
       assert.equal(res.statusCode, 400);
-      const store = JSON.parse(fs.readFileSync(aiSessionsStorePath(), "utf-8")) as {
-        sessions: Array<{ workflowKey: string; messages: Array<{ role: string; content: string }> }>;
-      };
-      const session = store.sessions.find((item) => item.workflowKey === "parse_requirement_file");
-      assert.ok(session);
+      // S2b-1：直读 JSON 改经 repository 查询（同 workflowKey 的并发用例按消息
+      // 内容定向区分，避免 L2027 用例残留干扰）；关键断言无条件执行。
+      const user = await getNonAdminUser();
+      const sessions = await listAiSessions(user);
+      const session = sessions.find(
+        (item) =>
+          item.workflowKey === "parse_requirement_file" &&
+          item.messages.some((message) => message.content === "模型失败也要保留这句话"),
+      );
+      assert.ok(session, "模型失败时用户消息必须保留在会话中");
       assert.deepEqual(session.messages.map((message) => message.content), ["模型失败也要保留这句话"]);
     } finally {
       (globalThis as { fetch?: unknown }).fetch = originalFetch;
       config.kimi.apiKey = originalApiKey;
       _resetAiBootstrapForTest();
+      // 定向清理本用例注入的会话（幂等；其他用例数据由文件级 after 兜底）
+      const user = await getNonAdminUser();
+      for (const session of await listAiSessions(user)) {
+        if (
+          session.workflowKey === "parse_requirement_file" &&
+          session.messages.some((message) => message.content === "模型失败也要保留这句话")
+        ) {
+          await deleteAiSession(user, session.sessionId);
+        }
+      }
     }
   });
 });
@@ -2504,15 +2528,13 @@ test("delete-guard: 旧删除端点注入 checker 命中活跃 Run 时返回 409
     await handler(req, res as unknown as Response, noopNext);
     assert.equal(res.statusCode, 409);
     assert.equal((res.body as { code: string }).code, "SESSION_HAS_ACTIVE_RUN");
-    assert.equal(
-      (await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId),
-      true,
+    assert.notEqual(
+      await getAiSession(user, session.sessionId),
+      null,
       "冲突时不得删除会话",
     );
   } finally {
-    const store = await loadAiSessionsStore();
-    store.sessions = store.sessions.filter((item) => item.sessionId !== session.sessionId);
-    await saveAiSessionsStore(store);
+    await deleteAiSession(user, session.sessionId);
   }
 });
 
@@ -2528,14 +2550,9 @@ test("delete-guard: 旧删除端点注入 checker 且无活跃 Run 时正常删�
     await handler(req, res as unknown as Response, noopNext);
     assert.equal(res.statusCode, 200);
     assert.equal((res.body as { code: number }).code, 0);
-    assert.equal(
-      (await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId),
-      false,
-    );
+    assert.equal(await getAiSession(user, session.sessionId), null, "无活跃 Run 时会话必须被删除");
   } finally {
-    const store = await loadAiSessionsStore();
-    store.sessions = store.sessions.filter((item) => item.sessionId !== session.sessionId);
-    await saveAiSessionsStore(store);
+    await deleteAiSession(user, session.sessionId);
   }
 });
 
@@ -2548,9 +2565,7 @@ test("delete-guard: 无 checker 的旧同步 deleteSession 行为保持不变", 
     await AiSessionsModule.deleteSession(req, res as unknown as Response);
     assert.equal(res.statusCode, 200);
     assert.equal((res.body as { code: number }).code, 0);
-    assert.equal(
-      (await loadAiSessionsStore()).sessions.some((item) => item.sessionId === session.sessionId),
-      false,
-    );
+    assert.equal(await getAiSession(user, session.sessionId), null, "无 checker 时保持同步删除语义");
+    await deleteAiSession(user, session.sessionId);
   });
 });
