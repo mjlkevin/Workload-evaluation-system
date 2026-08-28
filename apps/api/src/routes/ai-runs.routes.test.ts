@@ -11,7 +11,6 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
-import fs from "node:fs";
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import request from "supertest";
@@ -25,7 +24,6 @@ import systemRouter from "./system.routes";
 import { createHarnessRuntimeRepository, type HarnessRuntimeRepository } from "../modules/harness/harness-runtime.repository";
 import type { AiRunsUsecase } from "../modules/harness/harness-runtime.usecase";
 import { appendAiSessionEvent, createAiSession, deleteAiSession } from "../modules/ai-sessions/ai-sessions.usecase";
-import { aiSessionsStorePath } from "../utils";
 import { signAuthToken } from "../middleware/auth";
 import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 import { aiSessions, harnessRunEvents, harnessRuns } from "../db/schema";
@@ -36,7 +34,6 @@ const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 let pool: Pool | null = null;
 let testDb: ReturnType<typeof drizzle> | null = null;
 let repo: HarnessRuntimeRepository | null = null;
-let originalAiSessionsJson: string | null = null;
 let alice: AuthUser | null = null;
 let bob: AuthUser | null = null;
 let admin: AuthUser | null = null;
@@ -51,9 +48,6 @@ before(async () => {
   pool = new Pool({ connectionString: testDatabaseUrl, max: 10 });
   testDb = drizzle(pool);
   repo = createHarnessRuntimeRepository(testDb);
-
-  const sessionsPath = aiSessionsStorePath();
-  originalAiSessionsJson = fs.existsSync(sessionsPath) ? fs.readFileSync(sessionsPath, "utf8") : null;
 
   alice = await createTestUser("wes-ai-runs-alice", { role: "user" });
   bob = await createTestUser("wes-ai-runs-bob", { role: "user" });
@@ -75,9 +69,6 @@ after(async () => {
     await cleanupTestUsers("wes-ai-runs");
   }
   if (pool) await pool.end();
-  const sessionsPath = aiSessionsStorePath();
-  if (originalAiSessionsJson !== null) fs.writeFileSync(sessionsPath, originalAiSessionsJson);
-  else if (fs.existsSync(sessionsPath)) fs.rmSync(sessionsPath);
 });
 
 function track(runId: string): string {

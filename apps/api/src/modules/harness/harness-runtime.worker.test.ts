@@ -20,7 +20,6 @@ import {
   harnessRunCheckpoints,
   harnessRunEvents,
   harnessRunOutputs,
-  harnessSessionOutbox,
   harnessToolEvents,
   type HarnessRunRow,
 } from "../../db/schema";
@@ -163,6 +162,8 @@ function makeFakeWorkflow(hooks: FakeHooks, counters: { toolExecutions: number }
             nextStepKey: "s2",
             statePatch: { clientMessageId },
             checkpoint: { key: "input_committed", kind: "structural", resumePolicy: "resume_next" },
+            // S2b-2 后 worker 忽略 outbox（补偿链已删）；保留返回值模拟旧协议，
+            // 由 T1 的 outbox_enqueued=0 断言守护 worker 不得再入队。
             outbox: [
               {
                 eventType: "user_message",
@@ -239,6 +240,7 @@ function makeFakeWorkflow(hooks: FakeHooks, counters: { toolExecutions: number }
               content: { text: modelText },
               contentHash: createHash("sha256").update(modelText).digest("hex"),
             },
+            // S2b-2 后 worker 忽略 outbox（补偿链已删）；保留返回值模拟旧协议。
             outbox: [
               {
                 eventType: "final_response",
@@ -320,7 +322,9 @@ test("T1 worker claims a queued run and drives the fake workflow to completion",
   ]);
 
   assert.equal((await listEvents(run.harnessRunId, "run_completed")).length, 1);
-  assert.equal((await listEvents(run.harnessRunId, "outbox_enqueued")).length, 2);
+  // S2b-2（2026-08-28）：worker 不再消费 workflow outbox（补偿链已删）——
+  // fake workflow 仍返回 outbox 条目，守护 worker 必须忽略而非入队。
+  assert.equal((await listEvents(run.harnessRunId, "outbox_enqueued")).length, 0, "S2b-2 后不得再入队 outbox 事件");
 
   const outputs = await testDb!
     .select()
@@ -437,12 +441,8 @@ test("T3 crash after input commit recovers from input_committed without duplicat
   assert.equal(resumed.resumeCheckpointId, inputCheckpoint.harnessRunCheckpointId, "resume pointer must target input_committed");
   assert.equal(attempts.find((attempt) => attempt.attemptNo === 1)!.status, "orphaned");
 
-  const outboxRows = await testDb!
-    .select()
-    .from(harnessSessionOutbox)
-    .where(eq(harnessSessionOutbox.harnessRunId, run.harnessRunId));
-  const userMessages = outboxRows.filter((row) => row.eventType === "user_message");
-  assert.equal(userMessages.length, 1, "user message must be enqueued exactly once across attempts");
+  // S2b-2（2026-08-28）：outbox 表已删，用户消息幂等由 workflow 直写路径 +
+  // repository 来源键查重守护（harness_session_outbox 断言随补偿链移除）。
 
   assert.equal((await listEvents(run.harnessRunId, "recovery_started")).length, 1);
   assert.equal((await listEvents(run.harnessRunId, "recovery_completed")).length, 1);
@@ -543,12 +543,6 @@ test("T11 cancel request ends the run at a safe boundary with zero post-cancel e
   const checkpoints = await listCheckpoints(run.harnessRunId);
   assert.ok(!checkpoints.some((cp) => cp.checkpointKey === "final_response_committed"), "no checkpoint after cancel");
 
-  const outboxRows = await testDb!
-    .select()
-    .from(harnessSessionOutbox)
-    .where(eq(harnessSessionOutbox.harnessRunId, run.harnessRunId));
-  assert.ok(!outboxRows.some((entry) => entry.eventType === "final_response"), "no final response outbox after cancel");
-
   assert.equal((await listEvents(run.harnessRunId, "cancel_requested")).length, 1);
   assert.equal((await listEvents(run.harnessRunId, "run_cancelled")).length, 1);
 
@@ -599,9 +593,6 @@ test("T1b worker stops writing after the lease is lost mid-step", { skip: !testD
 
   const checkpoints = await listCheckpoints(run.harnessRunId);
   assert.equal(checkpoints.length, 0, "lease-lost worker must not commit any checkpoint");
-  const outboxRows = await testDb!
-    .select()
-    .from(harnessSessionOutbox)
-    .where(eq(harnessSessionOutbox.harnessRunId, run.harnessRunId));
-  assert.equal(outboxRows.length, 0, "lease-lost worker must not enqueue any outbox event");
+  // S2b-2（2026-08-28）：outbox 表已随补偿链删除，原“不得入队 outbox”断言
+  // 随之移除；lease 失守禁写守卫由 checkpoint 零提交断言覆盖。
 });

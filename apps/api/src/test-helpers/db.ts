@@ -54,13 +54,12 @@ export const TRUNCATE_TEST_TABLE_NAMES: string[] = [
   "version_code_rules",
 
   // ── 补全 34 张（阶段 0 事项 6） ──
-  // harness 域（15）
+  // harness 域（14，S2b-2 删 harness_session_outbox）
   "harness_runs",
   "harness_run_attempts",
   "harness_run_checkpoints",
   "harness_run_events",
   "harness_run_outputs",
-  "harness_session_outbox",
   "harness_files",
   "harness_evidences",
   "harness_tool_events",

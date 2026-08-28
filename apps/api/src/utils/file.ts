@@ -56,21 +56,14 @@ export function ensureExportDir(): string {
 // （users 恒 PG，config/auth/users.json 已移出 git 跟踪并归档）。
 // 阶段 2 批 1 第 4 步：inviteCodesStorePath / passwordResetTokensStorePath
 // 已随 JSON 读写路径删除（邀请码与重置令牌切 PG）。
+// S2b-2（2026-08-28）：aiSessionsStorePath 已随 ai-sessions 域 JSON 读写
+// 路径删除（ai-sessions 恒 PG，data/ai-sessions.json 已移出 git 跟踪）。
 
 /**
  * 版本存储路径
  */
 export function versionsStorePath(): string {
   return path.resolve(resolveRootDir(), "config/versions/records.json");
-}
-
-/**
- * AI 会话存储路径
- */
-export function aiSessionsStorePath(): string {
-  const override = process.env.WES_AI_SESSIONS_STORE_PATH?.trim();
-  if (override) return override;
-  return path.resolve(resolveRootDir(), "data/ai-sessions.json");
 }
 
 /**

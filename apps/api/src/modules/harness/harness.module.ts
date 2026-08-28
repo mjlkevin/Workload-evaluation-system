@@ -11,7 +11,6 @@ export * from "./harness-runtime.usecase";
 export * from "./harness-runtime.controller";
 export * from "./harness-runtime.worker";
 export * from "./harness-runtime.recovery";
-export * from "./harness-session-projector";
 export * from "./harness.controller";
 export * from "./harness.regression";
 export * from "./harness.repository";

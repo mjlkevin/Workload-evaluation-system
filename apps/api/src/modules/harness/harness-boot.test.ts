@@ -1,12 +1,12 @@
 /**
  * Step 2 Boot 接线守护测试（RP-047 Batch E）。
  * 常驻回归资产：
- * 1) enabled=true：registry 含 workbench_chat_v1、worker.start 与 projector.start 各恰 1 次；
+ * 1) enabled=true：registry 含 workbench_chat_v1、worker.start 恰 1 次；
  * 2) enabled=false：零 start、零注册副作用；
- * 3) SIGTERM/SIGINT 触发 worker.stop → projector.stop 顺序。
+ * 3) SIGTERM/SIGINT 触发 worker.stop（S2b-2 后 projector 已随补偿链删除）；
  * 4) boot 默认组装出的 workflow dispatch 不是占位（可调用且不抛 "dispatch not wired"）。
  * 5) G-E1 focused 端到端：boot 默认组装 + 注入 stub modelChat → 提交 run → worker 执行 →
- *    outbox → projector → Session assistant 消息可见。
+ *    assistant 消息直写落库（S2b-2 后不再经 outbox → projector 投影）。
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -14,9 +14,8 @@ import { startHarnessRuntime, createRunTerminalMemoryHook } from "./harness-boot
 import { createMemoryUsecase } from "../memory/memory.usecase";
 import type { distillRunMemory } from "../memory/memory.distiller";
 
-test("boot: enabled=true 启动 worker 与 projector 各恰 1 次", async () => {
+test("boot: enabled=true 启动 worker 恰 1 次", async () => {
   let workerStarted = 0;
-  let projectorStarted = 0;
 
   const runtime = startHarnessRuntime({
     repo: {} as any,
@@ -27,25 +26,18 @@ test("boot: enabled=true 启动 worker 与 projector 各恰 1 次", async () => 
       runNextAttempt: async () => false,
       isStopping: () => false,
     }),
-    createProjector: () => ({
-      start: async () => { projectorStarted += 1; },
-      stop: () => { projectorStarted -= 1; },
-      projectOnce: async () => [],
-    }),
   });
 
   // 给异步 start 一点时间
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   assert.equal(workerStarted, 1, "worker 应启动恰好 1 次");
-  assert.equal(projectorStarted, 1, "projector 应启动恰好 1 次");
 
   await runtime.stop();
 });
 
 test("boot: enabled=false 零 start 零副作用", async () => {
   let workerStarted = 0;
-  let projectorStarted = 0;
 
   const runtime = startHarnessRuntime({
     repo: {} as any,
@@ -56,44 +48,33 @@ test("boot: enabled=false 零 start 零副作用", async () => {
       runNextAttempt: async () => false,
       isStopping: () => false,
     }),
-    createProjector: () => ({
-      start: async () => { projectorStarted += 1; },
-      stop: () => {},
-      projectOnce: async () => [],
-    }),
   });
 
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   assert.equal(workerStarted, 0, "flag off 时 worker 不得启动");
-  assert.equal(projectorStarted, 0, "flag off 时 projector 不得启动");
 
   await runtime.stop();
 });
 
-test("boot: stop 顺序为 worker 先停、projector 后停", async () => {
-  const stopOrder: string[] = [];
+test("boot: stop 调用 worker.stop 恰 1 次", async () => {
+  let workerStops = 0;
 
   const runtime = startHarnessRuntime({
     repo: {} as any,
     enabled: true,
     createWorker: () => ({
       start: async () => {},
-      stop: async () => { stopOrder.push("worker"); },
+      stop: async () => { workerStops += 1; },
       runNextAttempt: async () => false,
       isStopping: () => false,
-    }),
-    createProjector: () => ({
-      start: async () => {},
-      stop: () => { stopOrder.push("projector"); },
-      projectOnce: async () => [],
     }),
   });
 
   await new Promise((resolve) => setTimeout(resolve, 10));
   await runtime.stop();
 
-  assert.deepEqual(stopOrder, ["worker", "projector"], "停机顺序：worker 先停、projector 后停");
+  assert.equal(workerStops, 1, "停机必须调用 worker.stop 恰好 1 次");
 });
 
 test("boot: 默认组装出的 workflow dispatch 不是占位", async () => {
@@ -149,11 +130,6 @@ test("boot: 默认组装出的 workflow dispatch 不是占位", async () => {
       stop: async () => {},
       runNextAttempt: async () => false,
       isStopping: () => false,
-    }),
-    createProjector: () => ({
-      start: async () => {},
-      stop: () => {},
-      projectOnce: async () => [],
     }),
   });
 
@@ -231,11 +207,6 @@ test("boot: G-E1 focused 端到端——stub modelChat 注入后被调用", asyn
       stop: async () => {},
       runNextAttempt: async () => false,
       isStopping: () => false,
-    }),
-    createProjector: () => ({
-      start: async () => {},
-      stop: () => {},
-      projectOnce: async () => [],
     }),
   });
 

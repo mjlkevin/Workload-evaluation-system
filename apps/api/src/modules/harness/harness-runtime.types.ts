@@ -104,20 +104,6 @@ export const HARNESS_RECOVERY_TIMING_DEFAULTS: HarnessRecoveryTiming = {
   backoffMs: [2_000, 10_000, 30_000],
 };
 
-export type HarnessProjectorTiming = {
-  pollIntervalMs: number;
-  lockMs: number;
-  maxAttempts: number;
-  retryAfterMs: number;
-};
-
-export const HARNESS_PROJECTOR_TIMING_DEFAULTS: HarnessProjectorTiming = {
-  pollIntervalMs: 5_000,
-  lockMs: 30_000,
-  maxAttempts: 5,
-  retryAfterMs: 10_000,
-};
-
 /** checkpoint runtimeValidation 的 validatorVersion 固定值。 */
 export const HARNESS_WORKER_VALIDATOR_VERSION = "harness-worker/v1";
 

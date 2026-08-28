@@ -274,7 +274,7 @@ test("f-group: F2 事件流包含 queued 状态", async () => {
 // F3: 离页（unmount）后 run 继续、回页水合消息不丢不重
 // ----------------------------------------------------------------
 
-test("f-group: F3  projector 水合消息到会话且幂等（deduplicationKey）", async () => {
+test("f-group: F3 消息水合到会话且幂等（deduplicationKey）", async () => {
   const deps = makeDeps();
   const user = makeUser();
   const session = makeSession(user);
@@ -301,7 +301,7 @@ test("f-group: F3  projector 水合消息到会话且幂等（deduplicationKey�
 
   assert.ok(
     (session.messages as Array<Record<string, unknown>>).some((m) => m.deduplicationKey === dedupKey),
-    "消息必须经 projector 水合到会话"
+    "消息必须按来源键水合到会话（S2b-2 后为直写路径同一去重语义）"
   );
 
   const appended2 = appendMessages([{ deduplicationKey: dedupKey, content: "F3 测试回复" }]);

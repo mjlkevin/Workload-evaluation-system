@@ -44,12 +44,13 @@ const HISTORICAL_MIGRATIONS = [
 ];
 const TARGET_MIGRATION = "0014_talented_deathstrike.sql";
 
+// S2b-2（2026-08-28）：harness_session_outbox 表/索引已随 §4.8 补偿链删除，
+// 新表/新索引清单同步移除；0007_harness_session_outbox 建表迁移文件保留。
 const NEW_TABLES = [
   "harness_run_attempts",
   "harness_run_checkpoints",
   "harness_run_events",
   "harness_run_outputs",
-  "harness_session_outbox",
 ];
 
 const NEW_RUN_COLUMNS = [
@@ -78,9 +79,6 @@ const NEW_INDEXES = [
   "harness_run_events_run_sequence_unique",
   "harness_run_events_run_created_idx",
   "harness_run_outputs_run_unique",
-  "harness_session_outbox_session_dedupe_unique",
-  "harness_session_outbox_pending_idx",
-  "harness_session_outbox_run_idx",
   "harness_artifacts_run_artifact_unique",
   "harness_runs_queue_idx",
   "harness_runs_owner_submission_unique",

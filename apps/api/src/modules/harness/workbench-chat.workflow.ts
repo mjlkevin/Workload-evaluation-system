@@ -3,16 +3,16 @@
 // ============================================================
 // 复用 workbench-dispatch.service.ts 意图分发链路，
 // 经 HarnessWorker recordToolEffectOnce 实现幂等，
-// 结果经 outbox 投递 assistant 消息到会话。
+// assistant 消息经 appendSessionMessage 直接幂等落库（S2b-2 后 outbox 恒空）。
 //
 // Batch E 二次返工（新通道消息落库双缺陷修复，ISS-2026-08-09-002）：
-// C1 缺陷 A：outbox payload 携带 projector 契约的 message 字段
-//   （{ message: { role, content } }），保留既有 answer/intent 等键；
+// C1 缺陷 A：assistant 直写内容与 answer 一致（不落空消息）；
 // C2 缺陷 B：用户消息在 dispatch 前经 ai-sessions 幂等 API 落库，
 //   来源键 ${runId}:user:1 防恢复重放重复；503 回退同步路径不经
 //   本 workflow，零双写。
 // S2a（阶段 2 · §4.8）：assistant 消息改为同款直接幂等落库（同库直写）；
-//   outbox 保留至 S2b 删除（双路径共存期 projector 认领经幂等键 no-op）。
+// S2b-2（2026-08-28）：projector/sink/outbox 表随 §4.8 补偿链删除，outbox 恒空，
+//   恢复重放由 repository 层来源键查重吸收。
 
 import { randomUUID } from "node:crypto";
 import type {
@@ -36,17 +36,17 @@ export type WorkbenchChatWorkflowDeps = {
    */
   dispatch(input: Pick<WorkbenchDispatchInput, "message" | "user" | "workflowKey"> & Partial<WorkbenchDispatchInput>): Promise<WorkbenchDispatchData>;
   /**
-   * 用户消息幂等落库（复用 ai-sessions 仓库公开 API，与投影 sink 同款）。
-   * 生产接线见 harness-boot.ts；测试可注入指向临时存储的实现。
-   * 阶段 1 批 8：返回类型由同步改 Promise（底层 accessor 已异步化），实现 不动。
+   * 用户消息幂等落库（复用 ai-sessions 仓库公开 API，与直写路径同款）。
+   * 生产接线见 harness-boot.ts；测试可注入 recording fake（S2b-2 后不再有
+   * storePath 注入钩子）。阶段 1 批 8：返回类型由同步改 Promise。
    */
-  appendSessionMessage(input: Omit<AppendAiSessionMessageIdempotentInput, "storePath">): Promise<AppendAiSessionMessageIdempotentResult>;
+  appendSessionMessage(input: AppendAiSessionMessageIdempotentInput): Promise<AppendAiSessionMessageIdempotentResult>;
   /**
    * ISS-2026-08-10-004（层 2）：流式事件写入 run 事件流（additive）。
    * 生产接线复用 harness runtime repository 的 appendRunEvent（白名单校验后落库，
    * SSE 端点原样透传）；payload 形状对齐前端消费侧：
    * text.delta → { delta }，thought → { text }。
-   * 可选以保持 additive 不破坏既有构造点（如 projector 测试 stub）；
+   * 可选以保持 additive 不破坏既有构造点（如 workflow 测试 stub）；
    * 未注入时流式事件静默跳过，不影响 dispatch 主链路。
    */
   appendRunEvent?(input: {
@@ -139,7 +139,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         });
         if (flowResult.ok) {
           // runExplicitHomeReportFlow 已直接落库 assistant 消息 + artifact + pendingAction，
-          // 返回空 outbox 避免双写（projector 不再投影）。
+          // 返回空 outbox 避免双写（S2b-2 后补偿链已删，outbox 恒空）。
           return {
             nextStepKey: null,
             outbox: [],
@@ -216,12 +216,10 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         ...(formBlock ? { formBlock } : {}),
       };
 
-      // S2a（阶段 2 · §4.8 写入路径改造）：assistant 消息与 user 消息同款经
-      // appendSessionMessage 直接幂等落库（同库直写，不经 outbox 中转）；
-      // outbox 保留不动——S2b 前双路径共存，projector 认领后经 sink 以同一
-      // deduplicationKey 追加时命中幂等 no-op，不重复不丢失。来源键与 outbox
-      // 条目一致（${run.harnessRunId}:assistant:1）是本次过渡的安全垫；
-      // 恢复重放由去重吸收（与 user 消息同构）。
+      // S2b-2（§4.8 补偿链删除）：assistant 消息与 user 消息同款经
+      // appendSessionMessage 直接幂等落库（同库直写），来源键
+      // ${run.harnessRunId}:assistant:1 由仓储层按键查重吸收；outbox 恒空
+      // （projector/sink/outbox 表已随补偿链删除，恢复重放由去重吸收）。
       await deps.appendSessionMessage({
         sessionId: aiSessionId,
         message: {
@@ -240,21 +238,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
 
       return {
         nextStepKey: null, // 单步 workflow，执行后直接终态
-        outbox: [
-          {
-            eventType: "assistant_message",
-            deduplicationKey: `${run.harnessRunId}:assistant:1`,
-            payload: {
-              // C1 缺陷 A：projector 契约字段，投影落库的正文来源
-              message: { role: "assistant", content: answer, metadata: messageMetadata },
-              answer,
-              intent,
-              suggestedActions,
-              trace,
-              ...(formBlock ? { formBlock } : {}),
-            },
-          },
-        ],
+        outbox: [],
       };
     },
   };

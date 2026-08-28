@@ -2,13 +2,12 @@
 // Harness Runtime Boot（RP-047 Batch E · Step 2）
 // ============================================================
 // 导出 startHarnessRuntime({ repo, enabled }) → { stop }；
-// enabled=true 时创建 registry + worker + projector 并 start；
+// enabled=true 时创建 registry + worker 并 start；
 // enabled=false 返回 no-op stop。
+// S2b-2（2026-08-28）：session projector/sink 已随 §4.8 补偿链删除。
 
 import type { HarnessRuntimeRepository } from "./harness-runtime.repository";
 import { createHarnessRuntimeWorker, type HarnessRuntimeWorker } from "./harness-runtime.worker";
-import { createHarnessSessionProjector, type HarnessSessionProjector } from "./harness-session-projector";
-import { createHarnessSessionSink } from "./harness-session-sink";
 import { createWorkbenchChatWorkflow } from "./workbench-chat.workflow";
 import { createHarnessWorkflowRegistry } from "./harness-runtime.worker";
 import { dispatchHomeWorkbenchTurn } from "../../services/ai/workbench-dispatch.service";
@@ -27,8 +26,6 @@ export type HarnessRuntimeBootOptions = {
   enabled: boolean;
   /** 测试注入用：自定义 worker 工厂 */
   createWorker?: (opts: { repo: HarnessRuntimeRepository; registry: ReturnType<typeof createHarnessWorkflowRegistry> }) => HarnessRuntimeWorker;
-  /** 测试注入用：自定义 projector 工厂 */
-  createProjector?: (opts: { repo: HarnessRuntimeRepository }) => HarnessSessionProjector;
   /** 测试注入用：自定义 modelChat 工厂（覆盖默认真实组装） */
   createModelChat?: (user: AuthUser, content: string) => import("../../services/ai/handlers/workbench-shared").ModelChatFactory;
 };
@@ -174,7 +171,7 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
       });
     },
     // Batch E 二次返工（新通道消息落库）C2：用户消息幂等落库生产接线，
-    // 与投影 sink 同款 API，默认会话存储路径（data/ai-sessions.json）。
+    // S2b-2 后恒走 PG 选择器（ai-sessions 域 JSON 路径已删）。
     appendSessionMessage: (input) => appendAiSessionMessageIdempotent(input),
     // ISS-2026-08-10-004（层 2）：流式事件写 run 事件流，复用 runtime repository
     // （白名单校验 + 序号分配 + SSE 透传均走既有链路）。
@@ -208,24 +205,13 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
     ? options.createWorker({ repo: options.repo, registry })
     : createHarnessRuntimeWorker({ repository: options.repo, registry, workerId: "wes-worker-1", onRunTerminal });
 
-  const projector = options.createProjector
-    ? options.createProjector({ repo: options.repo })
-    : createHarnessSessionProjector({
-        repository: options.repo,
-        sink: createHarnessSessionSink(),
-        projectorId: "wes-projector-1",
-      });
-
   // 异步启动（不 await，让 boot 立即返回）
   const workerStart = worker.start();
-  const projectorStart = projector.start();
 
   return {
     async stop() {
       await worker.stop();
-      projector.stop();
       await workerStart.catch(() => {});
-      await projectorStart.catch(() => {});
     },
   };
 }
