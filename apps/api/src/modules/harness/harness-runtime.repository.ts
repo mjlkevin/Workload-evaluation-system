@@ -1275,25 +1275,53 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
           if ((HARNESS_RUN_TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
             return { changed: false, run };
           }
-          if (run.cancelRequestedAt) {
+          // 无活跃 attempt 的 Run（waiting / 历史 legacy 行）没有任何 worker 会
+          // 观察到 cancelling：claimNextQueuedRun 只认领 queued/recovering，
+          // recovery 只收割「attempt 租约过期」的 Run。此前一律置 cancelling
+          // 会让这类 Run 永久停在活跃集合里，前端「停止中…」永不落地。
+          // 运行锁已由 lockRunRow 持有，claim 侧同样先锁 run 行，故此处判定无竞态。
+          const activeAttempts = await tx
+            .select({ attemptId: harnessRunAttempts.harnessRunAttemptId })
+            .from(harnessRunAttempts)
+            .where(
+              and(
+                eq(harnessRunAttempts.harnessRunId, input.runId),
+                inArray(harnessRunAttempts.status, ["claimed", "running"]),
+              ),
+            )
+            .limit(1);
+          const hasActiveAttempt = activeAttempts.length > 0;
+          // 已有挂起取消：有 worker 在跑时保持幂等（changed=false）；
+          // 无 worker 可收尾时必须补落终态，否则重复点击也救不回来。
+          if (run.cancelRequestedAt && hasActiveAttempt) {
             return { changed: false, run };
           }
           const now = input.now ?? (await readDbNow(tx));
           const [updated] = await tx
             .update(harnessRuns)
             .set({
-              status: "cancelling",
-              cancelRequestedAt: now,
-              cancelRequestedBy: input.requestedBy,
+              status: hasActiveAttempt ? "cancelling" : "cancelled",
+              ...(hasActiveAttempt ? {} : { completedAt: now }),
+              cancelRequestedAt: run.cancelRequestedAt ?? now,
+              cancelRequestedBy: run.cancelRequestedBy ?? input.requestedBy,
               updatedAt: now,
             })
             .where(eq(harnessRuns.harnessRunId, input.runId))
             .returning();
-          await appendRunEventInTransaction(tx, {
-            runId: input.runId,
-            eventType: "cancel_requested",
-            payload: { requestedBy: input.requestedBy },
-          });
+          if (!run.cancelRequestedAt) {
+            await appendRunEventInTransaction(tx, {
+              runId: input.runId,
+              eventType: "cancel_requested",
+              payload: { requestedBy: input.requestedBy },
+            });
+          }
+          if (!hasActiveAttempt) {
+            await appendRunEventInTransaction(tx, {
+              runId: input.runId,
+              eventType: "run_cancelled",
+              payload: { requestedBy: input.requestedBy, reason: "no_active_attempt" },
+            });
+          }
           return { changed: true, run: updated };
         });
       } catch (err) {

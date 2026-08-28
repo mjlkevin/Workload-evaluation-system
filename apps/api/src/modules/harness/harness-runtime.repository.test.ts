@@ -918,6 +918,64 @@ describeOrSkip("R10 requestRunCancel marks cancelling and never touches terminal
   assert.equal(terminalRun.status, "completed");
 });
 
+describeOrSkip("R10b requestRunCancel finalizes runs that have no active attempt", { skip: !testDatabaseUrl }, async () => {
+  // waiting / legacy 行没有活跃 attempt：claim 只取 queued/recovering，
+  // recovery 只收割租约过期的 attempt，置 cancelling 会永久留在活跃集合。
+  const created = await repo!.createQueuedRun(makeQueuedRunInput());
+  const runId = track(created.run.harnessRunId);
+  await testDb!.update(harnessRuns).set({ status: "waiting" }).where(eq(harnessRuns.harnessRunId, runId));
+
+  const cancel = await repo!.requestRunCancel({ runId, requestedBy: "tester" });
+  assert.equal(cancel.changed, true);
+  assert.equal(cancel.run.status, "cancelled", "attempt 缺席时必须直接落终态");
+
+  const [run] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, runId));
+  assert.equal(run.status, "cancelled");
+  assert.ok(run.completedAt, "终态必须写 completedAt");
+  assert.equal(run.cancelRequestedBy, "tester");
+  const requested = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, "cancel_requested")));
+  assert.equal(requested.length, 1);
+  const cancelled = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, "run_cancelled")));
+  assert.equal(cancelled.length, 1, "终态事件必须补齐");
+
+  // 幂等：已终态的 Run 再取消不改行、不再追加事件。
+  const again = await repo!.requestRunCancel({ runId, requestedBy: "tester" });
+  assert.equal(again.changed, false);
+  const cancelledAgain = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, "run_cancelled")));
+  assert.equal(cancelledAgain.length, 1);
+});
+
+describeOrSkip("R10c requestRunCancel rescues a run already stuck in cancelling without an attempt", { skip: !testDatabaseUrl }, async () => {
+  // 修复前留下的存量：status=cancelling 且 cancelRequestedAt 已写，
+  // 旧实现的 cancelRequestedAt 守卫会让重复点击也无法收尾。
+  const created = await repo!.createQueuedRun(makeQueuedRunInput());
+  const runId = track(created.run.harnessRunId);
+  await testDb!
+    .update(harnessRuns)
+    .set({ status: "cancelling", cancelRequestedAt: new Date(), cancelRequestedBy: "earlier-click" })
+    .where(eq(harnessRuns.harnessRunId, runId));
+
+  const cancel = await repo!.requestRunCancel({ runId, requestedBy: "tester" });
+  assert.equal(cancel.changed, true);
+  const [run] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, runId));
+  assert.equal(run.status, "cancelled");
+  assert.equal(run.cancelRequestedBy, "earlier-click", "首次取消请求人必须保留");
+  const requested = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, "cancel_requested")));
+  assert.equal(requested.length, 0, "补落终态不得重复追加 cancel_requested");
+});
+
 describeOrSkip("R11 releaseAttemptForShutdown requeues the run or completes a pending cancel", { skip: !testDatabaseUrl }, async () => {
   const claimed = await makeClaimedRun(1_000);
   const released = await repo!.releaseAttemptForShutdown({
