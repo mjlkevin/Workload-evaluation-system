@@ -13,7 +13,7 @@ import { config } from "../config/env";
 import { signAuthToken, verifyAuthToken } from "../middleware/auth";
 import { getUsersRepository } from "./auth/users.repository";
 import { cleanupOneTestUser, cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
-import { aiSessionsStorePath, knowledgeBaseConfigStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
+import { knowledgeBaseConfigStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
 import { confirmPasswordReset, listUsers, login, me, requestPasswordReset, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
@@ -63,6 +63,8 @@ let testPlainUser: AuthUser;
 // S2b-1（2026-08-27）：AI_SESSIONS 移出本列表——直读断言已全部改经
 // repository 单例读写（构造与读取同源），九开关全开时用例自然走 PG，
 // 文件级 after 按测试用户兜底清理会话数据。
+// S2b-2（2026-08-28）：aiSessionsStorePath() 生命周期包装已随 JSON 路径
+// 退役移除（14 处），用例直接走 repository 单例，无文件快照依赖。
 const PREVIOUS_STORE_PG_FLAGS = new Map<string, string | undefined>();
 const STORE_PG_FLAG_KEYS = [
   "WES_STORE_USERS_PG",
@@ -1195,162 +1197,154 @@ test("team.controller: patchReviewStatus returns 401 without token", async () =>
 });
 
 test("ai-sessions: creates and lists a persistent session", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const token = await getActiveUserToken();
-    const createReq = createMockReq({
-      token,
-      body: {
-        title: "XX制造 WMS 粗评",
-        domain: "business_evaluation",
-        workflowKey: "rough_estimate",
-        status: "rough_estimate",
-      },
-    });
-    const createRes = createMockRes();
-    await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
-
-    assert.equal(createRes.statusCode, 200);
-    const created = createRes.body as { code: number; data: { session: { sessionId: string; title: string; status: string } } };
-    assert.equal(created.code, 0);
-    assert.equal(created.data.session.title, "XX制造 WMS 粗评");
-    assert.equal(created.data.session.status, "rough_estimate");
-
-    const listReq = createMockReq({ token, query: { domain: "business_evaluation" } });
-    const listRes = createMockRes();
-    await AiSessionsModule.listSessions(listReq, listRes as unknown as Response);
-
-    assert.equal(listRes.statusCode, 200);
-    const listed = listRes.body as { code: number; data: { items: Array<{ sessionId: string }> } };
-    assert.ok(listed.data.items.some((item) => item.sessionId === created.data.session.sessionId));
+  const token = await getActiveUserToken();
+  const createReq = createMockReq({
+    token,
+    body: {
+      title: "XX制造 WMS 粗评",
+      domain: "business_evaluation",
+      workflowKey: "rough_estimate",
+      status: "rough_estimate",
+    },
   });
+  const createRes = createMockRes();
+  await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+
+  assert.equal(createRes.statusCode, 200);
+  const created = createRes.body as { code: number; data: { session: { sessionId: string; title: string; status: string } } };
+  assert.equal(created.code, 0);
+  assert.equal(created.data.session.title, "XX制造 WMS 粗评");
+  assert.equal(created.data.session.status, "rough_estimate");
+
+  const listReq = createMockReq({ token, query: { domain: "business_evaluation" } });
+  const listRes = createMockRes();
+  await AiSessionsModule.listSessions(listReq, listRes as unknown as Response);
+
+  assert.equal(listRes.statusCode, 200);
+  const listed = listRes.body as { code: number; data: { items: Array<{ sessionId: string }> } };
+  assert.ok(listed.data.items.some((item) => item.sessionId === created.data.session.sessionId));
 });
 
 test("ai-sessions: appends messages and creates pending action", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const token = await getActiveUserToken();
-    const createReq = createMockReq({
-      token,
-      body: { title: "创建项目确认", domain: "business_evaluation", workflowKey: "project_discovery" },
-    });
-    const createRes = createMockRes();
-    await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
-    const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
-
-    const appendReq = createMockReq({
-      token,
-      params: { sessionId },
-      body: {
-        message: { role: "user", content: "请把它转成正式项目评估" },
-        artifact: { type: "rough_report", title: "粗评报告", content: "预计 120 人天" },
-        pendingAction: {
-          actionType: "create_project_evaluation",
-          title: "创建项目评估方案",
-          riskLevel: "high",
-          payload: { projectName: "XX制造 WMS 项目", customerName: "XX制造" },
-        },
-      },
-    });
-    const appendRes = createMockRes();
-    await AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
-
-    assert.equal(appendRes.statusCode, 200);
-    const body = appendRes.body as { code: number; data: { session: { messages: unknown[]; artifacts: unknown[]; pendingActions: Array<{ status: string }> } } };
-    assert.equal(body.code, 0);
-    assert.equal(body.data.session.messages.length, 1);
-    assert.equal(body.data.session.artifacts.length, 1);
-    assert.equal(body.data.session.pendingActions[0].status, "pending");
+  const token = await getActiveUserToken();
+  const createReq = createMockReq({
+    token,
+    body: { title: "创建项目确认", domain: "business_evaluation", workflowKey: "project_discovery" },
   });
+  const createRes = createMockRes();
+  await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+  const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
+
+  const appendReq = createMockReq({
+    token,
+    params: { sessionId },
+    body: {
+      message: { role: "user", content: "请把它转成正式项目评估" },
+      artifact: { type: "rough_report", title: "粗评报告", content: "预计 120 人天" },
+      pendingAction: {
+        actionType: "create_project_evaluation",
+        title: "创建项目评估方案",
+        riskLevel: "high",
+        payload: { projectName: "XX制造 WMS 项目", customerName: "XX制造" },
+      },
+    },
+  });
+  const appendRes = createMockRes();
+  await AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
+
+  assert.equal(appendRes.statusCode, 200);
+  const body = appendRes.body as { code: number; data: { session: { messages: unknown[]; artifacts: unknown[]; pendingActions: Array<{ status: string }> } } };
+  assert.equal(body.code, 0);
+  assert.equal(body.data.session.messages.length, 1);
+  assert.equal(body.data.session.artifacts.length, 1);
+  assert.equal(body.data.session.pendingActions[0].status, "pending");
 });
 
 test("ai-sessions: deletes an owned session permanently", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const token = await getActiveUserToken();
-    const createReq = createMockReq({
-      token,
-      body: { title: "待删除会话", domain: "business_evaluation", workflowKey: "free_chat" },
-    });
-    const createRes = createMockRes();
-    await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
-    const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
-
-    const deleteReq = createMockReq({ token, params: { sessionId } });
-    const deleteRes = createMockRes();
-    await AiSessionsModule.deleteSession(deleteReq, deleteRes as unknown as Response);
-
-    assert.equal(deleteRes.statusCode, 200);
-    const body = deleteRes.body as { code: number; data: { deletedSessionId: string } };
-    assert.equal(body.code, 0);
-    assert.equal(body.data.deletedSessionId, sessionId);
-
-    const getReq = createMockReq({ token, params: { sessionId } });
-    const getRes = createMockRes();
-    await AiSessionsModule.getSession(getReq, getRes as unknown as Response);
-    assert.equal(getRes.statusCode, 404);
+  const token = await getActiveUserToken();
+  const createReq = createMockReq({
+    token,
+    body: { title: "待删除会话", domain: "business_evaluation", workflowKey: "free_chat" },
   });
+  const createRes = createMockRes();
+  await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+  const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
+
+  const deleteReq = createMockReq({ token, params: { sessionId } });
+  const deleteRes = createMockRes();
+  await AiSessionsModule.deleteSession(deleteReq, deleteRes as unknown as Response);
+
+  assert.equal(deleteRes.statusCode, 200);
+  const body = deleteRes.body as { code: number; data: { deletedSessionId: string } };
+  assert.equal(body.code, 0);
+  assert.equal(body.data.deletedSessionId, sessionId);
+
+  const getReq = createMockReq({ token, params: { sessionId } });
+  const getRes = createMockRes();
+  await AiSessionsModule.getSession(getReq, getRes as unknown as Response);
+  assert.equal(getRes.statusCode, 404);
 });
 
 test("ai-sessions: normalizes invalid event fields and ignores blank events", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const token = await getActiveUserToken();
-    const createReq = createMockReq({
-      token,
-      body: { title: "事件规范化", domain: "business_evaluation", workflowKey: "free_chat" },
-    });
-    const createRes = createMockRes();
-    await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
-    const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
+  const token = await getActiveUserToken();
+  const createReq = createMockReq({
+    token,
+    body: { title: "事件规范化", domain: "business_evaluation", workflowKey: "free_chat" },
+  });
+  const createRes = createMockRes();
+  await AiSessionsModule.createSession(createReq, createRes as unknown as Response);
+  const sessionId = (createRes.body as { data: { session: { sessionId: string } } }).data.session.sessionId;
 
-    const appendReq = createMockReq({
-      token,
-      params: { sessionId },
-      body: {
-        message: { role: "bad_role", content: "  有效消息  ", attachmentIds: ["att-1", "", null], artifactIds: "bad" },
-        artifact: { type: "note", title: "  产物  ", status: "bad_status" },
-        pendingAction: { actionType: "create_project_evaluation", title: "  动作  ", riskLevel: "bad_risk", payload: [] },
-      },
-    });
-    const appendRes = createMockRes();
-    await AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
+  const appendReq = createMockReq({
+    token,
+    params: { sessionId },
+    body: {
+      message: { role: "bad_role", content: "  有效消息  ", attachmentIds: ["att-1", "", null], artifactIds: "bad" },
+      artifact: { type: "note", title: "  产物  ", status: "bad_status" },
+      pendingAction: { actionType: "create_project_evaluation", title: "  动作  ", riskLevel: "bad_risk", payload: [] },
+    },
+  });
+  const appendRes = createMockRes();
+  await AiSessionsModule.appendSessionEvent(appendReq, appendRes as unknown as Response);
 
-    const body = appendRes.body as {
-      data: {
-        session: {
-          messages: Array<{ role: string; content: string; attachmentIds: string[]; artifactIds: string[] }>;
-          artifacts: Array<{ title: string; status: string }>;
-          pendingActions: Array<{ title: string; riskLevel: string; payload: Record<string, unknown> }>;
-          updatedAt: string;
-        };
+  const body = appendRes.body as {
+    data: {
+      session: {
+        messages: Array<{ role: string; content: string; attachmentIds: string[]; artifactIds: string[] }>;
+        artifacts: Array<{ title: string; status: string }>;
+        pendingActions: Array<{ title: string; riskLevel: string; payload: Record<string, unknown> }>;
+        updatedAt: string;
       };
     };
-    assert.equal(body.data.session.messages[0].role, "user");
-    assert.equal(body.data.session.messages[0].content, "有效消息");
-    assert.deepEqual(body.data.session.messages[0].attachmentIds, ["att-1"]);
-    assert.deepEqual(body.data.session.messages[0].artifactIds, []);
-    assert.equal(body.data.session.artifacts[0].title, "产物");
-    assert.equal(body.data.session.artifacts[0].status, "generated");
-    assert.equal(body.data.session.pendingActions[0].title, "动作");
-    assert.equal(body.data.session.pendingActions[0].riskLevel, "high");
-    assert.deepEqual(body.data.session.pendingActions[0].payload, {});
-    const updatedAt = body.data.session.updatedAt;
+  };
+  assert.equal(body.data.session.messages[0].role, "user");
+  assert.equal(body.data.session.messages[0].content, "有效消息");
+  assert.deepEqual(body.data.session.messages[0].attachmentIds, ["att-1"]);
+  assert.deepEqual(body.data.session.messages[0].artifactIds, []);
+  assert.equal(body.data.session.artifacts[0].title, "产物");
+  assert.equal(body.data.session.artifacts[0].status, "generated");
+  assert.equal(body.data.session.pendingActions[0].title, "动作");
+  assert.equal(body.data.session.pendingActions[0].riskLevel, "high");
+  assert.deepEqual(body.data.session.pendingActions[0].payload, {});
+  const updatedAt = body.data.session.updatedAt;
 
-    const blankReq = createMockReq({
-      token,
-      params: { sessionId },
-      body: {
-        message: { role: "assistant", content: "   " },
-        artifact: { title: "   " },
-        pendingAction: { title: "   " },
-      },
-    });
-    const blankRes = createMockRes();
-    await AiSessionsModule.appendSessionEvent(blankReq, blankRes as unknown as Response);
-    const blankBody = blankRes.body as { data: { session: { messages: unknown[]; artifacts: unknown[]; pendingActions: unknown[]; updatedAt: string } } };
-
-    assert.equal(blankBody.data.session.messages.length, 1);
-    assert.equal(blankBody.data.session.artifacts.length, 1);
-    assert.equal(blankBody.data.session.pendingActions.length, 1);
-    assert.equal(blankBody.data.session.updatedAt, updatedAt);
+  const blankReq = createMockReq({
+    token,
+    params: { sessionId },
+    body: {
+      message: { role: "assistant", content: "   " },
+      artifact: { title: "   " },
+      pendingAction: { title: "   " },
+    },
   });
+  const blankRes = createMockRes();
+  await AiSessionsModule.appendSessionEvent(blankReq, blankRes as unknown as Response);
+  const blankBody = blankRes.body as { data: { session: { messages: unknown[]; artifacts: unknown[]; pendingActions: unknown[]; updatedAt: string } } };
+
+  assert.equal(blankBody.data.session.messages.length, 1);
+  assert.equal(blankBody.data.session.artifacts.length, 1);
+  assert.equal(blankBody.data.session.pendingActions.length, 1);
+  assert.equal(blankBody.data.session.updatedAt, updatedAt);
 });
 
 test("project-evaluations: creates project plan from ai session", async () => {
@@ -1653,501 +1647,489 @@ test("ai.usecase: kimiAssessmentPreview returns model result on valid response",
 });
 
 test("ai.usecase: homeWorkbenchChat injects role context and persists messages into an AI session", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const req = createMockReq({
+  const req = createMockReq({
+    token: await getNonAdminUserToken(),
+    body: {
+      messages: [{ role: "user", content: "请帮我解析客户需求材料" }],
+      workflowKey: "parse_requirement_file",
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  let capturedBody: { messages?: Array<{ role: string; content: string }> } = {};
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async (_url: unknown, init?: { body?: string }) => {
+      capturedBody = JSON.parse(String(init?.body || "{}")) as { messages?: Array<{ role: string; content: string }> };
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "已识别为售前需求解析任务。" } }],
+        }),
+      } as unknown;
+    };
+
+    await homeWorkbenchChat(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: {
+        answer: string;
+        businessRole: string;
+        model: string;
+        session: { sessionId: string; workflowKey: string; status: string; messages: Array<{ role: string; content: string }> };
+      };
+    };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.businessRole, "pre_sales");
+    assert.equal(body.data.answer, "已识别为售前需求解析任务。");
+    assert.equal(body.data.session.workflowKey, "parse_requirement_file");
+    assert.equal(body.data.session.status, "rough_estimate");
+    assert.equal(body.data.session.messages.length, 2);
+    assert.deepEqual(body.data.session.messages.map((message) => message.role), ["user", "assistant"]);
+    assert.equal(body.data.session.messages[0].content, "请帮我解析客户需求材料");
+    assert.equal(body.data.session.messages[1].content, "已识别为售前需求解析任务。");
+    const systemPrompt = capturedBody.messages?.find((item) => item.role === "system")?.content || "";
+    assert.match(systemPrompt, /售前顾问/);
+    assert.match(systemPrompt, /parse_requirement_file/);
+    assert.doesNotMatch(systemPrompt, /当前阶段仅支持文本对话/);
+
+    const followUpReq = createMockReq({
       token: await getNonAdminUserToken(),
       body: {
-        messages: [{ role: "user", content: "请帮我解析客户需求材料" }],
+        sessionId: body.data.session.sessionId,
+        messages: [
+          { role: "user", content: "请帮我解析客户需求材料" },
+          { role: "assistant", content: "已识别为售前需求解析任务。" },
+          { role: "user", content: "继续补充风险" },
+        ],
         workflowKey: "parse_requirement_file",
       },
     });
-    const res = createMockRes();
-    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-    const originalApiKey = config.kimi.apiKey;
-    let capturedBody: { messages?: Array<{ role: string; content: string }> } = {};
-    try {
-      config.kimi.apiKey = "unit-test-key";
-      bootstrapAiProviders();
-      (globalThis as { fetch?: unknown }).fetch = async (_url: unknown, init?: { body?: string }) => {
-        capturedBody = JSON.parse(String(init?.body || "{}")) as { messages?: Array<{ role: string; content: string }> };
-        return {
-          ok: true,
-          json: async () => ({
-            choices: [{ message: { content: "已识别为售前需求解析任务。" } }],
-          }),
-        } as unknown;
-      };
+    const followUpRes = createMockRes();
+    await homeWorkbenchChat(followUpReq, followUpRes as unknown as Response);
+    const followUpBody = followUpRes.body as { data: { session: { sessionId: string; messages: Array<{ role: string; content: string }> } } };
+    assert.equal(followUpBody.data.session.sessionId, body.data.session.sessionId);
+    assert.equal(followUpBody.data.session.messages.length, 4);
+    assert.equal(followUpBody.data.session.messages[2].content, "继续补充风险");
 
-      await homeWorkbenchChat(req, res as unknown as Response);
-
-      assert.equal(res.statusCode, 200);
-      const body = res.body as {
-        code: number;
-        data: {
-          answer: string;
-          businessRole: string;
-          model: string;
-          session: { sessionId: string; workflowKey: string; status: string; messages: Array<{ role: string; content: string }> };
-        };
-      };
-      assert.equal(body.code, 0);
-      assert.equal(body.data.businessRole, "pre_sales");
-      assert.equal(body.data.answer, "已识别为售前需求解析任务。");
-      assert.equal(body.data.session.workflowKey, "parse_requirement_file");
-      assert.equal(body.data.session.status, "rough_estimate");
-      assert.equal(body.data.session.messages.length, 2);
-      assert.deepEqual(body.data.session.messages.map((message) => message.role), ["user", "assistant"]);
-      assert.equal(body.data.session.messages[0].content, "请帮我解析客户需求材料");
-      assert.equal(body.data.session.messages[1].content, "已识别为售前需求解析任务。");
-      const systemPrompt = capturedBody.messages?.find((item) => item.role === "system")?.content || "";
-      assert.match(systemPrompt, /售前顾问/);
-      assert.match(systemPrompt, /parse_requirement_file/);
-      assert.doesNotMatch(systemPrompt, /当前阶段仅支持文本对话/);
-
-      const followUpReq = createMockReq({
-        token: await getNonAdminUserToken(),
-        body: {
-          sessionId: body.data.session.sessionId,
-          messages: [
-            { role: "user", content: "请帮我解析客户需求材料" },
-            { role: "assistant", content: "已识别为售前需求解析任务。" },
-            { role: "user", content: "继续补充风险" },
-          ],
-          workflowKey: "parse_requirement_file",
-        },
-      });
-      const followUpRes = createMockRes();
-      await homeWorkbenchChat(followUpReq, followUpRes as unknown as Response);
-      const followUpBody = followUpRes.body as { data: { session: { sessionId: string; messages: Array<{ role: string; content: string }> } } };
-      assert.equal(followUpBody.data.session.sessionId, body.data.session.sessionId);
-      assert.equal(followUpBody.data.session.messages.length, 4);
-      assert.equal(followUpBody.data.session.messages[2].content, "继续补充风险");
-
-      const invalidSessionReq = createMockReq({
-        token: await getNonAdminUserToken(),
-        body: {
-          sessionId: "missing-session",
-          messages: [{ role: "user", content: "新会话粗评" }],
-          workflowKey: "parse_requirement_file",
-        },
-      });
-      const invalidSessionRes = createMockRes();
-      await homeWorkbenchChat(invalidSessionReq, invalidSessionRes as unknown as Response);
-      const invalidSessionBody = invalidSessionRes.body as { data: { session: { sessionId: string; domain: string; messages: unknown[] } } };
-      assert.notEqual(invalidSessionBody.data.session.sessionId, "missing-session");
-      assert.equal(invalidSessionBody.data.session.domain, "business_evaluation");
-      assert.equal(invalidSessionBody.data.session.messages.length, 2);
-    } finally {
-      (globalThis as { fetch?: unknown }).fetch = originalFetch;
-      config.kimi.apiKey = originalApiKey;
-      _resetAiBootstrapForTest();
-    }
-  });
+    const invalidSessionReq = createMockReq({
+      token: await getNonAdminUserToken(),
+      body: {
+        sessionId: "missing-session",
+        messages: [{ role: "user", content: "新会话粗评" }],
+        workflowKey: "parse_requirement_file",
+      },
+    });
+    const invalidSessionRes = createMockRes();
+    await homeWorkbenchChat(invalidSessionReq, invalidSessionRes as unknown as Response);
+    const invalidSessionBody = invalidSessionRes.body as { data: { session: { sessionId: string; domain: string; messages: unknown[] } } };
+    assert.notEqual(invalidSessionBody.data.session.sessionId, "missing-session");
+    assert.equal(invalidSessionBody.data.session.domain, "business_evaluation");
+    assert.equal(invalidSessionBody.data.session.messages.length, 2);
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
 });
 
 test("ai.usecase: homeWorkbenchChat returns formBlock and persists it in assistant message metadata", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
+  const req = createMockReq({
+    token: await getNonAdminUserToken(),
+    body: {
+      messages: [{ role: "user", content: "请帮我补齐项目信息" }],
+      workflowKey: "parse_requirement_file",
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: [
+              "还需要补充金额和周期。",
+              "",
+              "```json",
+              JSON.stringify({
+                formBlock: {
+                  blockId: "clarify-project",
+                  title: "补充项目关键字段",
+                  submitLabel: "提交补充",
+                  fields: [
+                    { id: "amountRange", label: "预计金额范围", type: "single_select", required: true, options: [{ label: "50万以下", value: "under_500k" }] },
+                    { id: "deliveryMonths", label: "目标交付周期（月）", type: "number" },
+                  ],
+                },
+              }),
+              "```",
+            ].join("\n"),
+          },
+        }],
+      }),
+    }) as unknown;
+
+    await homeWorkbenchChat(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: {
+        answer: string;
+        formBlock?: { blockId: string; fields: Array<{ id: string; type: string }> };
+        session: { messages: Array<{ role: string; content: string; metadata?: { formBlock?: { blockId: string } } }> };
+      };
+    };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.answer.trim(), "还需要补充金额和周期。");
+    assert.equal(body.data.formBlock?.blockId, "clarify-project");
+    assert.equal(body.data.formBlock?.fields[0]?.type, "single_select");
+    assert.equal(body.data.session.messages[1]?.metadata?.formBlock?.blockId, "clarify-project");
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
+});
+
+test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant message metadata", async () => {
+  await withFileSnapshotRestoreAsync(knowledgeBaseConfigStorePath(), async () => {
     const req = createMockReq({
       token: await getNonAdminUserToken(),
       body: {
-        messages: [{ role: "user", content: "请帮我补齐项目信息" }],
-        workflowKey: "parse_requirement_file",
+        messages: [{ role: "user", content: "购买存货核算模块必须购买哪些相关模块？" }],
+        workflowKey: "free_chat",
       },
     });
     const res = createMockRes();
     const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-    const originalApiKey = config.kimi.apiKey;
+    const originalZhipu = { ...(config as any).zhipu };
     try {
-      config.kimi.apiKey = "unit-test-key";
-      bootstrapAiProviders();
-      (globalThis as { fetch?: unknown }).fetch = async () => ({
-        ok: true,
-        json: async () => ({
-          choices: [{
-            message: {
-              content: [
-                "还需要补充金额和周期。",
-                "",
-                "```json",
-                JSON.stringify({
-                  formBlock: {
-                    blockId: "clarify-project",
-                    title: "补充项目关键字段",
-                    submitLabel: "提交补充",
-                    fields: [
-                      { id: "amountRange", label: "预计金额范围", type: "single_select", required: true, options: [{ label: "50万以下", value: "under_500k" }] },
-                      { id: "deliveryMonths", label: "目标交付周期（月）", type: "number" },
-                    ],
-                  },
-                }),
-                "```",
-              ].join("\n"),
-            },
-          }],
-        }),
-      }) as unknown;
-
-      await homeWorkbenchChat(req, res as unknown as Response);
-
-      assert.equal(res.statusCode, 200);
-      const body = res.body as {
-        code: number;
-        data: {
-          answer: string;
-          formBlock?: { blockId: string; fields: Array<{ id: string; type: string }> };
-          session: { messages: Array<{ role: string; content: string; metadata?: { formBlock?: { blockId: string } } }> };
-        };
+      (config as any).zhipu = {
+        apiKey: "zhipu-unit-test-key",
+        model: "glm-4.6",
+        knowledgeId: "kb-sales",
+        apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
       };
-      assert.equal(body.code, 0);
-      assert.equal(body.data.answer.trim(), "还需要补充金额和周期。");
-      assert.equal(body.data.formBlock?.blockId, "clarify-project");
-      assert.equal(body.data.formBlock?.fields[0]?.type, "single_select");
-      assert.equal(body.data.session.messages[1]?.metadata?.formBlock?.blockId, "clarify-project");
-    } finally {
-      (globalThis as { fetch?: unknown }).fetch = originalFetch;
-      config.kimi.apiKey = originalApiKey;
-      _resetAiBootstrapForTest();
-    }
-  });
-});
-
-test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant message metadata", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    await withFileSnapshotRestoreAsync(knowledgeBaseConfigStorePath(), async () => {
-      const req = createMockReq({
-        token: await getNonAdminUserToken(),
-        body: {
-          messages: [{ role: "user", content: "购买存货核算模块必须购买哪些相关模块？" }],
-          workflowKey: "free_chat",
-        },
-      });
-      const res = createMockRes();
-      const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-      const originalZhipu = { ...(config as any).zhipu };
-      try {
-        (config as any).zhipu = {
-          apiKey: "zhipu-unit-test-key",
+      fs.writeFileSync(knowledgeBaseConfigStorePath(), JSON.stringify({
+        version: 1,
+        draft: {
           model: "glm-4.6",
-          knowledgeId: "kb-sales",
           apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-        };
-        fs.writeFileSync(knowledgeBaseConfigStorePath(), JSON.stringify({
-          version: 1,
-          draft: {
-            model: "glm-4.6",
-            apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-            credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
-          },
-          active: {
-            model: "glm-4.6",
-            apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-            credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
-          },
-          updatedAt: "2026-06-28T00:00:00.000Z",
-          effectiveAt: "2026-06-28T00:00:00.000Z",
-        }, null, 2), "utf-8");
-        const zhipuCalls: Array<{ url: string; payload: Record<string, unknown> }> = [];
-        (globalThis as { fetch?: unknown }).fetch = async (url: unknown, init?: { body?: string }) => {
-          const urlText = String(url);
-          const payload = JSON.parse(String(init?.body || "{}")) as { tools?: unknown };
-          zhipuCalls.push({ url: urlText, payload: payload as Record<string, unknown> });
-          if (urlText.includes("/knowledge/retrieve")) {
-            assert.deepEqual((payload as Record<string, unknown>).knowledge_ids, ["kb-sales"]);
-            return {
-              ok: true,
-              status: 200,
-              headers: { get: () => null },
-              json: async () => ({
-                code: 200,
-                data: [
-                  {
-                    text: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。",
-                    score: 0.92,
-                    metadata: { doc_name: "产品知识文档", doc_id: "doc-1", knowledge_id: "kb-sales" },
-                  },
-                ],
-              }),
-            } as unknown;
-          }
-          assert.ok(urlText.includes("/chat/completions"));
-          assert.equal(
-            (payload as Record<string, unknown>).model,
-            "glm-4.6",
-            JSON.stringify(zhipuCalls.map((call) => ({ url: call.url, model: call.payload.model }))),
-          );
+          credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
+        },
+        active: {
+          model: "glm-4.6",
+          apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+          credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
+        },
+        updatedAt: "2026-06-28T00:00:00.000Z",
+        effectiveAt: "2026-06-28T00:00:00.000Z",
+      }, null, 2), "utf-8");
+      const zhipuCalls: Array<{ url: string; payload: Record<string, unknown> }> = [];
+      (globalThis as { fetch?: unknown }).fetch = async (url: unknown, init?: { body?: string }) => {
+        const urlText = String(url);
+        const payload = JSON.parse(String(init?.body || "{}")) as { tools?: unknown };
+        zhipuCalls.push({ url: urlText, payload: payload as Record<string, unknown> });
+        if (urlText.includes("/knowledge/retrieve")) {
+          assert.deepEqual((payload as Record<string, unknown>).knowledge_ids, ["kb-sales"]);
           return {
             ok: true,
             status: 200,
             headers: { get: () => null },
             json: async () => ({
-              choices: [{ message: { content: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。" } }],
-              usage: { prompt_tokens: 1420, completion_tokens: 48, total_tokens: 1468 },
+              code: 200,
+              data: [
+                {
+                  text: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。",
+                  score: 0.92,
+                  metadata: { doc_name: "产品知识文档", doc_id: "doc-1", knowledge_id: "kb-sales" },
+                },
+              ],
             }),
           } as unknown;
-        };
-
-        await homeWorkbenchChat(req, res as unknown as Response);
-
-        assert.equal(res.statusCode, 200, JSON.stringify(res.body));
-        const body = res.body as {
-          code: number;
-          data: {
-            intent: string;
-            answer: string;
-            trace: { knowledgeTool?: { toolId: string; retrievalTriggered: boolean; confidence: string; contextRef: string } };
-            session: { messages: Array<{ role: string; content: string; metadata?: { knowledgeTool?: { toolId: string; contextRef: string } } }> };
-          };
-        };
-        assert.equal(body.code, 0);
-        assert.equal(body.data.intent, "knowledge_query");
-        assert.match(body.data.answer, /知识库参考/);
-        assert.equal(body.data.trace.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
-        assert.equal(body.data.trace.knowledgeTool?.retrievalTriggered, true);
-        assert.equal(body.data.trace.knowledgeTool?.confidence, "high");
-        assert.equal(body.data.session.messages.length, 2);
-        assert.equal(body.data.session.messages[1]?.metadata?.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
-        assert.equal(body.data.session.messages[1]?.metadata?.knowledgeTool?.contextRef, body.data.trace.knowledgeTool?.contextRef);
-        assert.equal(zhipuCalls.length, 2);
-        assert.ok(zhipuCalls[0]?.url.includes("/knowledge/retrieve"));
-        assert.ok(zhipuCalls[1]?.url.includes("/chat/completions"));
-      } finally {
-        (globalThis as { fetch?: unknown }).fetch = originalFetch;
-        (config as any).zhipu = originalZhipu;
-      }
-    });
-  });
-});
-
-test("ai.usecase: homeWorkbenchChat persists lightweight model run trace for attachment qa", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const req = createMockReq({
-      token: await getNonAdminUserToken(),
-      body: {
-        messages: [{
-          role: "user",
-          content: "这个附件里有哪些实施风险？",
-          attachments: [{
-            name: "蓝海需求.xlsx",
-            size: 2048,
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            parsedSummary: "项目：蓝海 WMS\n客户：蓝海制造\n业务需求：多组织库存协同\n风险：交付周期紧",
-          }],
-        }],
-        workflowKey: "parse_requirement_file",
-      },
-    });
-    const res = createMockRes();
-    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-    const originalApiKey = config.kimi.apiKey;
-    try {
-      config.kimi.apiKey = "unit-test-key";
-      bootstrapAiProviders();
-      (globalThis as { fetch?: unknown }).fetch = async () => ({
-        ok: true,
-        json: async () => ({
-          choices: [{ message: { content: "主要风险是多组织库存协同边界和交付周期。" }, finish_reason: "stop" }],
-        }),
-      }) as unknown;
-
-      await homeWorkbenchChat(req, res as unknown as Response);
-
-      assert.equal(res.statusCode, 200);
-      const body = res.body as {
-        code: number;
-        data: {
-          intent: string;
-          trace: {
-            modelRun?: {
-              runKind: string;
-              provider: string;
-              model: string;
-              contextRefs: string[];
-              rawContentLength: number;
-            };
-          };
-          session: {
-            messages: Array<{
-              role: string;
-              content: string;
-              metadata?: {
-                modelRun?: {
-                  runKind: string;
-                  contextRefs: string[];
-                };
-              };
-            }>;
-          };
-        };
-      };
-      assert.equal(body.code, 0);
-      assert.equal(body.data.intent, "attachment_qa");
-      assert.equal(body.data.trace.modelRun?.runKind, "attachment_qa");
-      assert.equal(body.data.trace.modelRun?.provider, "kimi");
-      assert.match(body.data.trace.modelRun?.model || "", /kimi/);
-      assert.ok(body.data.trace.modelRun?.rawContentLength);
-      assert.ok(body.data.trace.modelRun?.contextRefs.includes("attachment:蓝海需求.xlsx"));
-      assert.equal(body.data.session.messages[1]?.metadata?.modelRun?.runKind, "attachment_qa");
-      assert.ok(body.data.session.messages[1]?.metadata?.modelRun?.contextRefs.includes("attachment:蓝海需求.xlsx"));
-    } finally {
-      (globalThis as { fetch?: unknown }).fetch = originalFetch;
-      config.kimi.apiKey = originalApiKey;
-      _resetAiBootstrapForTest();
-    }
-  });
-});
-
-test("ai.usecase: homeWorkbenchChat keeps user turn in session when model fails", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-    const originalApiKey = config.kimi.apiKey;
-    try {
-      config.kimi.apiKey = "unit-test-key";
-      bootstrapAiProviders();
-      (globalThis as { fetch?: unknown }).fetch = async () => {
-        throw new Error("model timeout");
-      };
-
-      const req = createMockReq({
-        token: await getNonAdminUserToken(),
-        body: {
-          messages: [{ role: "user", content: "模型失败也要保留这句话" }],
-          workflowKey: "parse_requirement_file",
-        },
-      });
-      const res = createMockRes();
-      await homeWorkbenchChat(req, res as unknown as Response);
-
-      assert.equal(res.statusCode, 400);
-      // S2b-1：直读 JSON 改经 repository 查询（同 workflowKey 的并发用例按消息
-      // 内容定向区分，避免 L2027 用例残留干扰）；关键断言无条件执行。
-      const user = await getNonAdminUser();
-      const sessions = await listAiSessions(user);
-      const session = sessions.find(
-        (item) =>
-          item.workflowKey === "parse_requirement_file" &&
-          item.messages.some((message) => message.content === "模型失败也要保留这句话"),
-      );
-      assert.ok(session, "模型失败时用户消息必须保留在会话中");
-      assert.deepEqual(session.messages.map((message) => message.content), ["模型失败也要保留这句话"]);
-    } finally {
-      (globalThis as { fetch?: unknown }).fetch = originalFetch;
-      config.kimi.apiKey = originalApiKey;
-      _resetAiBootstrapForTest();
-      // 定向清理本用例注入的会话（幂等；其他用例数据由文件级 after 兜底）
-      const user = await getNonAdminUser();
-      for (const session of await listAiSessions(user)) {
-        if (
-          session.workflowKey === "parse_requirement_file" &&
-          session.messages.some((message) => message.content === "模型失败也要保留这句话")
-        ) {
-          await deleteAiSession(user, session.sessionId);
         }
-      }
-    }
-  });
-});
-
-test("ai.usecase: homeWorkbenchChat asks the model to analyze parsed attachments into a report artifact", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const req = createMockReq({
-      token: await getNonAdminUserToken(),
-      body: {
-        messages: [{
-          role: "user",
-          content: "请解析这个文件并生成需求解析报告",
-          attachments: [{
-            name: "实施工作量评估申请240616-V1.0.xlsx",
-            size: 58000,
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            parsedSummary: [
-              "AI 已完成文件解析摘要：",
-              "文件：实施工作量评估申请240616-V1.0.xlsx",
-              "项目：哈希温控项目评估",
-              "客户：哈希温控",
-              "行业：制造业",
-              "业务需求：",
-              "1. 智能核算：凭证处理 + 自动生成凭证",
-              "2. 报表体系：法定报表 + 自定义报表",
-            ].join("\n"),
-          }],
-        }],
-        workflowKey: "parse_requirement_file",
-      },
-    });
-    const res = createMockRes();
-    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-    const originalApiKey = config.kimi.apiKey;
-    let capturedBody: { messages?: Array<{ role: string; content: string }> } = {};
-    try {
-      config.kimi.apiKey = "unit-test-key";
-      bootstrapAiProviders();
-      (globalThis as { fetch?: unknown }).fetch = async (_url: unknown, init?: { body?: string }) => {
-        capturedBody = JSON.parse(String(init?.body || "{}")) as { messages?: Array<{ role: string; content: string }> };
+        assert.ok(urlText.includes("/chat/completions"));
+        assert.equal(
+          (payload as Record<string, unknown>).model,
+          "glm-4.6",
+          JSON.stringify(zhipuCalls.map((call) => ({ url: call.url, model: call.payload.model }))),
+        );
         return {
           ok: true,
+          status: 200,
+          headers: { get: () => null },
           json: async () => ({
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  answer: "已完成 AI 深度需求分析，并生成《需求解析报告 v1》。",
-                  projectName: "哈希温控项目评估",
-                  customerName: "哈希温控",
-                  industry: "制造业",
-                  productLines: ["金蝶云星空"],
-                  sourceSheets: ["1.项目概况", "3.业务需求及问题一览表"],
-                  needs: ["智能核算：凭证处理 + 自动生成凭证", "报表体系：法定报表 + 自定义报表"],
-                  modules: ["财务云 / 总账", "财务云 / 报表"],
-                  missingItems: ["自定义报表数量", "自动凭证规则复杂度"],
-                  risks: ["自定义报表范围可能扩大", "凭证规则依赖前端业务数据质量"],
-                  nextActions: ["补充项目信息", "生成待确认问题", "进入正式评估"],
-                }),
-              },
-            }],
+            choices: [{ message: { content: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。" } }],
+            usage: { prompt_tokens: 1420, completion_tokens: 48, total_tokens: 1468 },
           }),
         } as unknown;
       };
 
       await homeWorkbenchChat(req, res as unknown as Response);
 
-      assert.equal(res.statusCode, 200);
+      assert.equal(res.statusCode, 200, JSON.stringify(res.body));
       const body = res.body as {
         code: number;
         data: {
+          intent: string;
           answer: string;
-          session: {
-            artifacts: Array<{ type: string; title: string; content: { sourceFile?: string; summary?: string; needs?: string[]; modules?: string[]; missingItems?: string[] } }>;
-            messages: Array<{ role: string; content: string; artifactIds?: string[] }>;
-            pendingActions: Array<{ actionType: string; title: string }>;
-          };
+          trace: { knowledgeTool?: { toolId: string; retrievalTriggered: boolean; confidence: string; contextRef: string } };
+          session: { messages: Array<{ role: string; content: string; metadata?: { knowledgeTool?: { toolId: string; contextRef: string } } }> };
         };
       };
       assert.equal(body.code, 0);
-      const systemPrompt = capturedBody.messages?.find((item) => item.role === "system")?.content || "";
-      const userPrompt = capturedBody.messages?.find((item) => item.role === "user")?.content || "";
-      assert.match(systemPrompt, /完整业务理解/);
-      assert.match(systemPrompt, /只输出 JSON/);
-      assert.match(userPrompt, /实施工作量评估申请240616-V1.0.xlsx/);
-      assert.match(userPrompt, /智能核算/);
-      assert.match(body.data.answer, /AI 深度需求分析/);
-      assert.equal(body.data.session.artifacts.length, 1);
-      assert.equal(body.data.session.artifacts[0].type, "requirement_analysis_report");
-      assert.equal(body.data.session.artifacts[0].title, "需求解析报告 v1");
-      assert.equal(body.data.session.artifacts[0].content.sourceFile, "实施工作量评估申请240616-V1.0.xlsx");
-      assert.match(body.data.session.artifacts[0].content.summary || "", /哈希温控/);
-      assert.deepEqual(body.data.session.artifacts[0].content.needs, [
-        "智能核算：凭证处理 + 自动生成凭证",
-        "报表体系：法定报表 + 自定义报表",
-      ]);
-      assert.deepEqual(body.data.session.artifacts[0].content.modules, ["财务云 / 总账", "财务云 / 报表"]);
-      assert.equal(body.data.session.pendingActions[0].actionType, "supplement_requirement_report");
-      assert.equal(body.data.session.messages[1].role, "assistant");
-      assert.equal(body.data.session.messages[1].artifactIds?.length, 1);
+      assert.equal(body.data.intent, "knowledge_query");
+      assert.match(body.data.answer, /知识库参考/);
+      assert.equal(body.data.trace.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
+      assert.equal(body.data.trace.knowledgeTool?.retrievalTriggered, true);
+      assert.equal(body.data.trace.knowledgeTool?.confidence, "high");
+      assert.equal(body.data.session.messages.length, 2);
+      assert.equal(body.data.session.messages[1]?.metadata?.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
+      assert.equal(body.data.session.messages[1]?.metadata?.knowledgeTool?.contextRef, body.data.trace.knowledgeTool?.contextRef);
+      assert.equal(zhipuCalls.length, 2);
+      assert.ok(zhipuCalls[0]?.url.includes("/knowledge/retrieve"));
+      assert.ok(zhipuCalls[1]?.url.includes("/chat/completions"));
     } finally {
       (globalThis as { fetch?: unknown }).fetch = originalFetch;
-      config.kimi.apiKey = originalApiKey;
-      _resetAiBootstrapForTest();
+      (config as any).zhipu = originalZhipu;
     }
   });
+});
+
+test("ai.usecase: homeWorkbenchChat persists lightweight model run trace for attachment qa", async () => {
+  const req = createMockReq({
+    token: await getNonAdminUserToken(),
+    body: {
+      messages: [{
+        role: "user",
+        content: "这个附件里有哪些实施风险？",
+        attachments: [{
+          name: "蓝海需求.xlsx",
+          size: 2048,
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          parsedSummary: "项目：蓝海 WMS\n客户：蓝海制造\n业务需求：多组织库存协同\n风险：交付周期紧",
+        }],
+      }],
+      workflowKey: "parse_requirement_file",
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: "主要风险是多组织库存协同边界和交付周期。" }, finish_reason: "stop" }],
+      }),
+    }) as unknown;
+
+    await homeWorkbenchChat(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: {
+        intent: string;
+        trace: {
+          modelRun?: {
+            runKind: string;
+            provider: string;
+            model: string;
+            contextRefs: string[];
+            rawContentLength: number;
+          };
+        };
+        session: {
+          messages: Array<{
+            role: string;
+            content: string;
+            metadata?: {
+              modelRun?: {
+                runKind: string;
+                contextRefs: string[];
+              };
+            };
+          }>;
+        };
+      };
+    };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.intent, "attachment_qa");
+    assert.equal(body.data.trace.modelRun?.runKind, "attachment_qa");
+    assert.equal(body.data.trace.modelRun?.provider, "kimi");
+    assert.match(body.data.trace.modelRun?.model || "", /kimi/);
+    assert.ok(body.data.trace.modelRun?.rawContentLength);
+    assert.ok(body.data.trace.modelRun?.contextRefs.includes("attachment:蓝海需求.xlsx"));
+    assert.equal(body.data.session.messages[1]?.metadata?.modelRun?.runKind, "attachment_qa");
+    assert.ok(body.data.session.messages[1]?.metadata?.modelRun?.contextRefs.includes("attachment:蓝海需求.xlsx"));
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
+});
+
+test("ai.usecase: homeWorkbenchChat keeps user turn in session when model fails", async () => {
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async () => {
+      throw new Error("model timeout");
+    };
+
+    const req = createMockReq({
+      token: await getNonAdminUserToken(),
+      body: {
+        messages: [{ role: "user", content: "模型失败也要保留这句话" }],
+        workflowKey: "parse_requirement_file",
+      },
+    });
+    const res = createMockRes();
+    await homeWorkbenchChat(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 400);
+    // S2b-1：直读 JSON 改经 repository 查询（同 workflowKey 的并发用例按消息
+    // 内容定向区分，避免 L2027 用例残留干扰）；关键断言无条件执行。
+    const user = await getNonAdminUser();
+    const sessions = await listAiSessions(user);
+    const session = sessions.find(
+      (item) =>
+        item.workflowKey === "parse_requirement_file" &&
+        item.messages.some((message) => message.content === "模型失败也要保留这句话"),
+    );
+    assert.ok(session, "模型失败时用户消息必须保留在会话中");
+    assert.deepEqual(session.messages.map((message) => message.content), ["模型失败也要保留这句话"]);
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+    // 定向清理本用例注入的会话（幂等；其他用例数据由文件级 after 兜底）
+    const user = await getNonAdminUser();
+    for (const session of await listAiSessions(user)) {
+      if (
+        session.workflowKey === "parse_requirement_file" &&
+        session.messages.some((message) => message.content === "模型失败也要保留这句话")
+      ) {
+        await deleteAiSession(user, session.sessionId);
+      }
+    }
+  }
+});
+
+test("ai.usecase: homeWorkbenchChat asks the model to analyze parsed attachments into a report artifact", async () => {
+  const req = createMockReq({
+    token: await getNonAdminUserToken(),
+    body: {
+      messages: [{
+        role: "user",
+        content: "请解析这个文件并生成需求解析报告",
+        attachments: [{
+          name: "实施工作量评估申请240616-V1.0.xlsx",
+          size: 58000,
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          parsedSummary: [
+            "AI 已完成文件解析摘要：",
+            "文件：实施工作量评估申请240616-V1.0.xlsx",
+            "项目：哈希温控项目评估",
+            "客户：哈希温控",
+            "行业：制造业",
+            "业务需求：",
+            "1. 智能核算：凭证处理 + 自动生成凭证",
+            "2. 报表体系：法定报表 + 自定义报表",
+          ].join("\n"),
+        }],
+      }],
+      workflowKey: "parse_requirement_file",
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  let capturedBody: { messages?: Array<{ role: string; content: string }> } = {};
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async (_url: unknown, init?: { body?: string }) => {
+      capturedBody = JSON.parse(String(init?.body || "{}")) as { messages?: Array<{ role: string; content: string }> };
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                answer: "已完成 AI 深度需求分析，并生成《需求解析报告 v1》。",
+                projectName: "哈希温控项目评估",
+                customerName: "哈希温控",
+                industry: "制造业",
+                productLines: ["金蝶云星空"],
+                sourceSheets: ["1.项目概况", "3.业务需求及问题一览表"],
+                needs: ["智能核算：凭证处理 + 自动生成凭证", "报表体系：法定报表 + 自定义报表"],
+                modules: ["财务云 / 总账", "财务云 / 报表"],
+                missingItems: ["自定义报表数量", "自动凭证规则复杂度"],
+                risks: ["自定义报表范围可能扩大", "凭证规则依赖前端业务数据质量"],
+                nextActions: ["补充项目信息", "生成待确认问题", "进入正式评估"],
+              }),
+            },
+          }],
+        }),
+      } as unknown;
+    };
+
+    await homeWorkbenchChat(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: {
+        answer: string;
+        session: {
+          artifacts: Array<{ type: string; title: string; content: { sourceFile?: string; summary?: string; needs?: string[]; modules?: string[]; missingItems?: string[] } }>;
+          messages: Array<{ role: string; content: string; artifactIds?: string[] }>;
+          pendingActions: Array<{ actionType: string; title: string }>;
+        };
+      };
+    };
+    assert.equal(body.code, 0);
+    const systemPrompt = capturedBody.messages?.find((item) => item.role === "system")?.content || "";
+    const userPrompt = capturedBody.messages?.find((item) => item.role === "user")?.content || "";
+    assert.match(systemPrompt, /完整业务理解/);
+    assert.match(systemPrompt, /只输出 JSON/);
+    assert.match(userPrompt, /实施工作量评估申请240616-V1.0.xlsx/);
+    assert.match(userPrompt, /智能核算/);
+    assert.match(body.data.answer, /AI 深度需求分析/);
+    assert.equal(body.data.session.artifacts.length, 1);
+    assert.equal(body.data.session.artifacts[0].type, "requirement_analysis_report");
+    assert.equal(body.data.session.artifacts[0].title, "需求解析报告 v1");
+    assert.equal(body.data.session.artifacts[0].content.sourceFile, "实施工作量评估申请240616-V1.0.xlsx");
+    assert.match(body.data.session.artifacts[0].content.summary || "", /哈希温控/);
+    assert.deepEqual(body.data.session.artifacts[0].content.needs, [
+      "智能核算：凭证处理 + 自动生成凭证",
+      "报表体系：法定报表 + 自定义报表",
+    ]);
+    assert.deepEqual(body.data.session.artifacts[0].content.modules, ["财务云 / 总账", "财务云 / 报表"]);
+    assert.equal(body.data.session.pendingActions[0].actionType, "supplement_requirement_report");
+    assert.equal(body.data.session.messages[1].role, "assistant");
+    assert.equal(body.data.session.messages[1].artifactIds?.length, 1);
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
 });
 
 // ============================================================
@@ -2181,160 +2163,154 @@ function mockReportAnalysisFetch() {
 }
 
 test("ai.usecase: homeWorkbenchChat generates report from session-level attachment when request carries none", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const user = await getNonAdminUser();
-    const session = await createAiSession(user, { title: "存量附件会话", workflowKey: "parse_requirement_file" });
-    await appendAiSessionEvent(user, session.sessionId, {
-      message: { role: "user", content: "帮我看看这个文件" },
-      attachments: [{
-        name: "存量需求.xlsx",
-        size: 1200,
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        parsedSummary: "项目：会话回退项目\n客户：会话回退客户\n行业：制造业\n业务需求：\n1. 存量需求一",
-      }],
-    });
+  const user = await getNonAdminUser();
+  const session = await createAiSession(user, { title: "存量附件会话", workflowKey: "parse_requirement_file" });
+  await appendAiSessionEvent(user, session.sessionId, {
+    message: { role: "user", content: "帮我看看这个文件" },
+    attachments: [{
+      name: "存量需求.xlsx",
+      size: 1200,
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      parsedSummary: "项目：会话回退项目\n客户：会话回退客户\n行业：制造业\n业务需求：\n1. 存量需求一",
+    }],
+  });
 
-    const req = createMockReq({
-      token: await getNonAdminUserToken(),
-      body: {
-        sessionId: session.sessionId,
-        workflowKey: "parse_requirement_file",
-        // 显式报告请求，但请求级消息不携带附件（模拟刷新/切换会话后重发）
-        messages: [{ role: "user", content: "请基于当前附件生成需求解析报告" }],
-      },
-    });
-    const res = createMockRes();
-    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-    const originalApiKey = config.kimi.apiKey;
-    try {
-      config.kimi.apiKey = "unit-test-key";
-      bootstrapAiProviders();
-      mockReportAnalysisFetch();
+  const req = createMockReq({
+    token: await getNonAdminUserToken(),
+    body: {
+      sessionId: session.sessionId,
+      workflowKey: "parse_requirement_file",
+      // 显式报告请求，但请求级消息不携带附件（模拟刷新/切换会话后重发）
+      messages: [{ role: "user", content: "请基于当前附件生成需求解析报告" }],
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    mockReportAnalysisFetch();
 
-      await homeWorkbenchChat(req, res as unknown as Response);
+    await homeWorkbenchChat(req, res as unknown as Response);
 
-      assert.equal(res.statusCode, 200);
-      const body = res.body as {
-        code: number;
-        data: {
-          intent: string;
-          answer: string;
-          session: {
-            artifacts: Array<{ type: string; title: string; content: { sourceFile?: string } }>;
-            pendingActions: Array<{ actionType: string }>;
-          };
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: {
+        intent: string;
+        answer: string;
+        session: {
+          artifacts: Array<{ type: string; title: string; content: { sourceFile?: string } }>;
+          pendingActions: Array<{ actionType: string }>;
         };
       };
-      assert.equal(body.code, 0);
-      assert.equal(body.data.intent, "harness_report_generation");
-      assert.match(body.data.answer, /AI 深度需求分析/);
-      assert.equal(body.data.session.artifacts.length, 1);
-      assert.equal(body.data.session.artifacts[0].type, "requirement_analysis_report");
-      assert.equal(body.data.session.artifacts[0].title, "需求解析报告 v1");
-      assert.equal(body.data.session.artifacts[0].content.sourceFile, "存量需求.xlsx");
-      assert.equal(body.data.session.pendingActions[0].actionType, "supplement_requirement_report");
-    } finally {
-      (globalThis as { fetch?: unknown }).fetch = originalFetch;
-      config.kimi.apiKey = originalApiKey;
-      _resetAiBootstrapForTest();
-    }
-  });
+    };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.intent, "harness_report_generation");
+    assert.match(body.data.answer, /AI 深度需求分析/);
+    assert.equal(body.data.session.artifacts.length, 1);
+    assert.equal(body.data.session.artifacts[0].type, "requirement_analysis_report");
+    assert.equal(body.data.session.artifacts[0].title, "需求解析报告 v1");
+    assert.equal(body.data.session.artifacts[0].content.sourceFile, "存量需求.xlsx");
+    assert.equal(body.data.session.pendingActions[0].actionType, "supplement_requirement_report");
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
 });
 
 test("ai.usecase: homeWorkbenchChat keeps upload guidance when neither session nor request has attachment", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const req = createMockReq({
-      token: await getNonAdminUserToken(),
-      body: {
-        workflowKey: "parse_requirement_file",
-        messages: [{ role: "user", content: "生成需求解析报告" }],
-      },
-    });
-    const res = createMockRes();
-    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-    const originalApiKey = config.kimi.apiKey;
-    try {
-      config.kimi.apiKey = "unit-test-key";
-      bootstrapAiProviders();
-      (globalThis as { fetch?: unknown }).fetch = async () => {
-        throw new Error("static route should not call model");
-      };
-
-      await homeWorkbenchChat(req, res as unknown as Response);
-
-      assert.equal(res.statusCode, 200);
-      const body = res.body as {
-        code: number;
-        data: { intent: string; answer: string; suggestedActions: Array<{ actionType: string }> };
-      };
-      assert.equal(body.code, 0);
-      assert.equal(body.data.intent, "harness_report_generation");
-      assert.match(body.data.answer, /请上传需求文件/);
-      assert.equal(body.data.suggestedActions[0].actionType, "generate_requirement_report");
-    } finally {
-      (globalThis as { fetch?: unknown }).fetch = originalFetch;
-      config.kimi.apiKey = originalApiKey;
-      _resetAiBootstrapForTest();
-    }
+  const req = createMockReq({
+    token: await getNonAdminUserToken(),
+    body: {
+      workflowKey: "parse_requirement_file",
+      messages: [{ role: "user", content: "生成需求解析报告" }],
+    },
   });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async () => {
+      throw new Error("static route should not call model");
+    };
+
+    await homeWorkbenchChat(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: { intent: string; answer: string; suggestedActions: Array<{ actionType: string }> };
+    };
+    assert.equal(body.code, 0);
+    assert.equal(body.data.intent, "harness_report_generation");
+    assert.match(body.data.answer, /请上传需求文件/);
+    assert.equal(body.data.suggestedActions[0].actionType, "generate_requirement_report");
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
 });
 
 test("ai.usecase: homeWorkbenchChat does not generate report when session attachment lacks explicit intent", async () => {
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const user = await getNonAdminUser();
-    const session = await createAiSession(user, { title: "存量附件会话2", workflowKey: "parse_requirement_file" });
-    await appendAiSessionEvent(user, session.sessionId, {
-      message: { role: "user", content: "帮我看看这个文件" },
-      attachments: [{
-        name: "存量需求2.xlsx",
-        parsedSummary: "项目：会话回退项目\n客户：会话回退客户\n业务需求：\n1. 存量需求一",
-      }],
-    });
-
-    const req = createMockReq({
-      token: await getNonAdminUserToken(),
-      body: {
-        sessionId: session.sessionId,
-        workflowKey: "parse_requirement_file",
-        // 有会话附件但无显式报告意图：只做附件问答，不得创建报告
-        messages: [{ role: "user", content: "帮我看看这个附件有哪些风险" }],
-      },
-    });
-    const res = createMockRes();
-    const originalFetch = (globalThis as { fetch?: unknown }).fetch;
-    const originalApiKey = config.kimi.apiKey;
-    try {
-      config.kimi.apiKey = "unit-test-key";
-      bootstrapAiProviders();
-      (globalThis as { fetch?: unknown }).fetch = async () => ({
-        ok: true,
-        json: async () => ({
-          choices: [{ message: { content: "主要风险是范围未锁定。" }, finish_reason: "stop" }],
-        }),
-      }) as unknown;
-
-      await homeWorkbenchChat(req, res as unknown as Response);
-
-      assert.equal(res.statusCode, 200);
-      const body = res.body as {
-        code: number;
-        data: {
-          intent: string;
-          answer: string;
-          session: { artifacts: Array<{ type: string }>; pendingActions: Array<{ actionType: string }> };
-        };
-      };
-      assert.equal(body.code, 0);
-      assert.notEqual(body.data.intent, "harness_report_generation");
-      assert.equal(body.data.intent, "attachment_qa");
-      assert.equal(body.data.session.artifacts.filter((artifact) => artifact.type === "requirement_analysis_report").length, 0);
-      assert.equal(body.data.session.pendingActions.filter((action) => action.actionType === "supplement_requirement_report").length, 0);
-    } finally {
-      (globalThis as { fetch?: unknown }).fetch = originalFetch;
-      config.kimi.apiKey = originalApiKey;
-      _resetAiBootstrapForTest();
-    }
+  const user = await getNonAdminUser();
+  const session = await createAiSession(user, { title: "存量附件会话2", workflowKey: "parse_requirement_file" });
+  await appendAiSessionEvent(user, session.sessionId, {
+    message: { role: "user", content: "帮我看看这个文件" },
+    attachments: [{
+      name: "存量需求2.xlsx",
+      parsedSummary: "项目：会话回退项目\n客户：会话回退客户\n业务需求：\n1. 存量需求一",
+    }],
   });
+
+  const req = createMockReq({
+    token: await getNonAdminUserToken(),
+    body: {
+      sessionId: session.sessionId,
+      workflowKey: "parse_requirement_file",
+      // 有会话附件但无显式报告意图：只做附件问答，不得创建报告
+      messages: [{ role: "user", content: "帮我看看这个附件有哪些风险" }],
+    },
+  });
+  const res = createMockRes();
+  const originalFetch = (globalThis as { fetch?: unknown }).fetch;
+  const originalApiKey = config.kimi.apiKey;
+  try {
+    config.kimi.apiKey = "unit-test-key";
+    bootstrapAiProviders();
+    (globalThis as { fetch?: unknown }).fetch = async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: "主要风险是范围未锁定。" }, finish_reason: "stop" }],
+      }),
+    }) as unknown;
+
+    await homeWorkbenchChat(req, res as unknown as Response);
+
+    assert.equal(res.statusCode, 200);
+    const body = res.body as {
+      code: number;
+      data: {
+        intent: string;
+        answer: string;
+        session: { artifacts: Array<{ type: string }>; pendingActions: Array<{ actionType: string }> };
+      };
+    };
+    assert.equal(body.code, 0);
+    assert.notEqual(body.data.intent, "harness_report_generation");
+    assert.equal(body.data.intent, "attachment_qa");
+    assert.equal(body.data.session.artifacts.filter((artifact) => artifact.type === "requirement_analysis_report").length, 0);
+    assert.equal(body.data.session.pendingActions.filter((action) => action.actionType === "supplement_requirement_report").length, 0);
+  } finally {
+    (globalThis as { fetch?: unknown }).fetch = originalFetch;
+    config.kimi.apiKey = originalApiKey;
+    _resetAiBootstrapForTest();
+  }
 });
 
 test("ai.usecase: parseBasicInfo fails instead of returning rule fallback when model parsing fails", async () => {
@@ -2558,14 +2534,12 @@ test("delete-guard: 旧删除端点注入 checker 且无活跃 Run 时正常删�
 
 test("delete-guard: 无 checker 的旧同步 deleteSession 行为保持不变", async () => {
   const user = await getActiveUser();
-  await withFileSnapshotRestoreAsync(aiSessionsStorePath(), async () => {
-    const session = await createAiSession(user, { title: "E1 旧行为会话" });
-    const req = createMockReq({ token: await getActiveUserToken(), params: { sessionId: session.sessionId } });
-    const res = createMockRes();
-    await AiSessionsModule.deleteSession(req, res as unknown as Response);
-    assert.equal(res.statusCode, 200);
-    assert.equal((res.body as { code: number }).code, 0);
-    assert.equal(await getAiSession(user, session.sessionId), null, "无 checker 时保持同步删除语义");
-    await deleteAiSession(user, session.sessionId);
-  });
+  const session = await createAiSession(user, { title: "E1 旧行为会话" });
+  const req = createMockReq({ token: await getActiveUserToken(), params: { sessionId: session.sessionId } });
+  const res = createMockRes();
+  await AiSessionsModule.deleteSession(req, res as unknown as Response);
+  assert.equal(res.statusCode, 200);
+  assert.equal((res.body as { code: number }).code, 0);
+  assert.equal(await getAiSession(user, session.sessionId), null, "无 checker 时保持同步删除语义");
+  await deleteAiSession(user, session.sessionId);
 });
