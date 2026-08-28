@@ -313,6 +313,42 @@
               <td>验证完成（2026-08-27）：本地 tsc（build:api）0 错；harness-runtime.repository + ai-runs.routes 套件 61/61 全绿 skipped=0（R10b/R10c 真实执行）；完整 test:harness 仅 T7a 失败（既有环境 flaky，2026-08-18 批 5 已登记，非本改动引入）。分支 fix/harness-cancel-no-active-attempt CI run 33072134333 全绿（lint/tsc/test-non-db/test-with-db/test-web，docker-build 分支惯例 skipped；test-with-db 内 Test harness 209/209 skipped=0）。main 文档 commit CI run 33072136700 六套件全绿。待架构侧批准合入。</td>
               <td>waiting / 无 attempt legacy 行点击停止 → 立即落 cancelled 终态（前端「停止中…」结束）；queued → 直接 cancelled（原逻辑同样无人认领 cancelling）；claimed/running（有活跃 attempt）→ 仍 cancelling 由 worker 收割；重复取消幂等（cancel_requested 不重复追加、run_cancelled 不重复）。</td>
             </tr>
+        <tr>
+              <td class="mono">DEF-2026-08-27-003</td>
+              <td class="mono">ISS-2026-08-27-003</td>
+              <td class="mono">待定（暂不挂 RP-047，方案与 001 关系见备注）</td>
+              <td>新会话首次带文件发送时，同步解析阻塞在会话创建之前；超时（最长120秒）则会话从未创建，用户消息与附件双双丢失、无痕迹不可恢复</td>
+              <td>S2（数据丢失 + 无反馈，非崩溃但用户内容不可恢复；未定级为 S1 因有临时可用绕行路径：先建会话发文字再在会话内传文件）</td>
+              <td><span class="status warn"><span class="dot"></span>open · 方案待架构侧评审，不与 DEF-2026-08-27-001 抢排期</span></td>
+              <td>useChatMessages.js:549-611 sendMessage() 中，带文件消息先 await 阻塞版 /ai/parse-basic-info（extractor.service.ts:352-412，超时上限 120s，无 abort/idle 兜底、无进度事件），解析返回后才 createSession→submitRun。已存在 /ai/parse-basic-info/stream（extractor.service.ts:414-471，createAbortBridge totalTimeoutMs=180000/idleTimeoutMs=60000 + progress/model_start/model_delta SSE 事件）但前端未使用。</td>
+              <td>方案（未改代码，供架构侧评审选型）：<b>①顺序倒转</b>——先 createSession + 落用户消息（含附件本地占位/上传中状态），再异步触发解析；解析失败或超时时会话与消息已持久化，用户可见「解析失败，点击重试」而非整体消失，彻底消除数据丢失风险，改动集中在 useChatMessages.js，风险最低、收益最大，建议优先。<b>②解析并入 Run</b>——将解析步骤改为 workflow 内的一个 step（复用已有流式基础设施），与 createSession/submitRun 合并为单次异步链路；优点是天然获得进度/取消/重试能力，但改动面覆盖 workflow 与 harness-boot（与 DEF-2026-08-27-001 的 harness-boot.ts:123-157 dispatch 组装、workbench-chat.workflow.ts appendSessionMessage 高度重叠，若两者并行开工存在合并点冲突风险，与 001 同款顾虑）。<b>③改用 /parse-basic-info/stream</b>——前端将阻塞 upload 换成已有流式端点，解析期间用 progress/model_start/model_delta 驱动进度展示；相对①改动更小但仍是「解析先于 createSession」的阻塞结构，只是从「无反馈」变成「有反馈但仍阻塞」，未解决超时后消息丢失的根本问题，建议作为①的辅助（配合①在解析进行时展示进度条），不单独作为最终方案。<b>与 DEF-2026-08-27-001 关系的结论</b>：001 的改动面是 submitRun 之后的模型输入组装（历史/记忆注入），发生在会话已创建之后；本缺陷的改动面是 createSession 之前的解析阻塞，发生在会话创建之前。方案①（推荐）与 001 完全不重叠，可独立排期、独立提交、独立 revert；仅当选用方案②（解析并入 Run）时才与 001 的 harness-boot/workflow 改动面重叠，此时应评估是否合并为一次修复以避免合并冲突——但鉴于方案①风险更低且已能解决数据丢失核心问题，不建议为合并收益牺牲方案①的独立性。<b>超时反馈现状</b>：120 秒期间前端仅显示静态文案「正在提取文件结构」，无进度、无取消、无来自本次改动前的重试路径；方案①落地后超时展示「解析失败，点击重试」按钮，会话与原消息保留。</td>
+              <td>待架构侧批准方案后补充：createSession 提前后的落库时序单测、解析失败/超时场景下会话与消息可恢复性回归、真实 xlsx 上传覆盖 D 组重跑。</td>
+              <td>新会话带文件发送后，会话立即出现在会话列表（不等待解析完成）；解析失败或超时时用户消息与附件仍可见、可重试，不丢失；解析过程有可感知的进度反馈。</td>
+            </tr>
+            <tr>
+              <td class="mono">DEF-2026-08-27-004</td>
+              <td class="mono">ISS-2026-08-27-005</td>
+              <td class="mono">阶段 2 测试基建（非存储切换批次）</td>
+              <td>本地带 DB 测试写开发库 + 清理清错库：repo 注入 workload_eval_test、usecase 走默认单例 workload_eval，测试会话/用户残留开发库</td>
+              <td>S2（本地 test:harness / test:modules 每次运行持续污染开发库，已造成测试用户与会话残留、1 条孤儿 run 同源；直接干扰 S2b-2 开工验证的可信度，故裁决为 S2b-2 放行唯一前置）</td>
+              <td><span class="status warn"><span class="dot"></span>open · 禁令 C11 生效中（§4.9）· 修复方案待出（队列 4）</span></td>
+              <td>apps/api/src/routes/ai-runs.routes.test.ts（同款注入模式的其他带 DB 测试文件一并排查：chat.service.test.ts cleanupTestStreamSessions 走 usecase 默认单例等）</td>
+              <td><b>根因（实取行号，与架构侧裁决 L53/L73 吻合）</b>：①before 钩子 L49-64 <code class="inline">repo = createHarnessRuntimeRepository(testDb)</code>（L53，testDb 连 TEST_DATABASE_URL → workload_eval_test）；②makeSession L120-122 走 <code class="inline">createAiSession</code> usecase → 默认 db 单例（db/client.ts）→ DATABASE_URL → workload_eval 开发库——会话落开发库；③after 钩子 L66-81 清理经 testDb 删 harness_runs/ai_sessions（L68-74）只删测试库——开发库会话永不清理。CI 无此问题（DATABASE_URL 与 TEST_DATABASE_URL 同库，均由 CI env 注入）；本地 .env 无 TEST_DATABASE_URL（需 shell 注入或 test-helpers/db.ts 硬编码回退 workload_eval_test），缺省即分裂。<b>污染实据</b>：孤儿 run 归属 ut-remember-login-target 1 条为测试用户漏进开发库（与 DEF-2026-08-27-005 同源）；S2b-1 实验 A 证据效力受影响（见实验 A 答复）。<b>方案</b>：未定（队列 4 测试污染修复方案）；候选方向——本地显式双库指向（与 CI 同款 env），或测试进程强制 DATABASE_URL=workload_eval_test。</td>
+              <td>待方案批准后补充：本地全量 test:harness / test:modules 跑完后开发库零新增测试残留（owner_username 非 wes-% 过滤外无测试行）</td>
+              <td>修复合入前，本地跑 test:harness / test:modules 必须二选一——走分支 CI，或临时把 .env 的 DATABASE_URL 指向 workload_eval_test 跑完还原（禁令 C11，每次交付报告声明用了哪种）；修复合入后本地跑全量开发库零新增残留。</td>
+            </tr>
+            <tr>
+              <td class="mono">DEF-2026-08-27-005</td>
+              <td class="mono">ISS-2026-08-27-006</td>
+              <td class="mono">Harness 域（harness_runs）</td>
+              <td>78 条历史孤儿 Run：ai_session_id 指向已删除会话，占全表 88 条的 89%，污染统计与审计口径</td>
+              <td>S3（观察缺陷：不影响功能，污染统计与审计口径；量级 89% 超「顺手记一笔」，单独立观察缺陷；若后续确认 run 需独立留存审计则为口径定义问题，可随清理方案一并定）</td>
+              <td><span class="status warn"><span class="dot"></span>open · 观察缺陷 · 清理方案另案待架构侧批准（本轮不删任何数据）</span></td>
+              <td>harness_runs 88 条中 78 条孤儿（37 个已删除会话，时间范围 2026-06-22 ~ 2026-08-19，completed 57 / failed 13 / cancelled 8；归属 mjlkevin 68 / elly 9 / ut-remember-login-target 1）；db/schema/harness.ts harness_runs.ai_session_id 为 text 无外键无级联</td>
+              <td><b>机制根源</b>：harness_runs.ai_session_id 无外键无级联；删除会话仅行级 DELETE ai_sessions，不级联 run（ai-sessions-pg.repository.ts deleteSession）。<b>必答（补偿链生效起始时间对齐）</b>：删除 409 守护引入 70e78b1（RP-047-C，2026-08-07）+ 81a7839（RP-047-D，2026-08-08，E1 删除守护 409 生效，flag 关闭分支同样生效）——补偿链生效起始 2026-08-08；孤儿末位 08-19 晚于上线，按判据字面触发「有盲区」；<b>但 78 条孤儿状态分布全部为终态（completed/failed/cancelled）、活跃状态孤儿 = 0</b>——若守护存在盲区应出现活跃/中间态孤儿，实取为零，证明 409 守护无覆盖盲区：08-08 后「活跃 run 伴随会话删除」不可能发生；08-08~08-19 间孤儿为终态 run 随会话删除后的正常残留（守护职责之外的设计行为，非守护缺陷）。08-20 后（PG 全量启用）真实删除动作少，08-27 当天孤儿 = 0；E2 删除未新增孤儿（库分裂下平凡真，见 DEF-004）。<b>处置</b>：S2b-2 不负责清理，不扩范围；清理另行提方案（含 run 留存策略/审计口径定义），经架构侧批准后执行；本轮不删任何数据。</td>
+              <td>不适用（本轮不删数据）；观察项：后续真实删除会话时记录是否持续产生终态残留</td>
+              <td>清理方案经架构侧批准后执行并回填；统计/审计口径（孤儿 run 是否计为有效 run）定义明确。</td>
+            </tr>
         </table>
       </div>
     </section>

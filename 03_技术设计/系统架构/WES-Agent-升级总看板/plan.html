@@ -767,6 +767,36 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td><span class="status warn"><span class="dot"></span>已定档 / 待 S2b-2 合入</span>：与阶段 2 S2b-2 串行（workflow 同用 ai-sessions 域 appendSessionMessage/getSessionRecord 依赖注入，避免合并点冲突；S2b-2 不可逆须保持干净可回退）。</td>
           <td>同一会话第二轮起模型可见前序历史（≤12 轮）；记忆注入生效时「引用记忆」chip 在异步模式出现；run 重试不重复当前问题；三路径对照表全对齐。</td>
         </tr>
+        <tr data-board-event-id="BE-2026-08-27-def-2026-08-27-004-queued:plan">
+          <td class="mono">DEF-2026-08-27-004（队列 1+4）</td>
+          <td>测试污染止血（<b>队列 1，最优先</b>）：本地带 DB 测试写开发库 + 清理清错库。本轮已完成：立项（定级 S2）+ 禁令 C11 入档 + 实验 A 清库答复。队列 4：测试污染修复方案（候选方向——本地显式双库指向与 CI 同款，或测试进程强制 DATABASE_URL=workload_eval_test）。详见 <a href="defects.html">defects.html</a>。</td>
+          <td><span class="status run"><span class="dot"></span>已立项 / 禁令 C11 生效中</span>：S2b-2 开工唯一前置（裁决 2026-08-27）；止血两件套完成即可开工，不必再等架构侧二次批准。</td>
+          <td>修复合入后本地跑 test:harness / test:modules 开发库零新增测试残留；禁令期间每次交付报告声明本地验证方式（分支 CI 或临时 DATABASE_URL 指向 workload_eval_test）。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-27-s2b2-queued:plan">
+          <td class="mono">S2b-2（队列 2）</td>
+          <td>ai-sessions 第 4 步不可逆段：删 ai-sessions JSON 路径 + §4.8 补偿链删除清单全量执行 + 退役 WES_STORE_AI_SESSIONS_PG。<b>已放行（2026-08-27 裁决）</b>：三条件满足（S2b-1 合入 e7d0540 ✓ / main CI 绿 ✓ / 真实链路覆盖取证 ✓，覆盖数据直接抄用不重采）。执行要求：回退基线 157f014（git revert e7d0540，已备案不需重报）；不可逆批次开工前 tag 基线点写进 §10；六套件绿基线 1096（非 1092）；独立 worktree 内作业、主目录仅用于合入、占用前先申请；交付时 §10 登记覆盖取证。</td>
+          <td><span class="status warn"><span class="dot"></span>已放行 / 待止血落地</span>：止血两件套（DEF-004 立项 + 禁令 C11 生效）落地即可开工，不必再等架构侧二次批准。</td>
+          <td>删 JSON 路径后九开关全开六套件 1096 全绿 skipped=0；outbox 四方法/投影/sink/表/六处新发现删除齐全；开关退役；§10 登记覆盖取证（第一节数据抄用）；tag 基线点入档。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-27-def-2026-08-27-005-queued:plan">
+          <td class="mono">DEF-2026-08-27-005（队列 3）</td>
+          <td>78 条历史孤儿 Run 观察缺陷立项（已完成）：88 条中 78 条 ai_session_id 指向已删除会话（89%）。必答项已随立项给出——补偿链（409 守护）生效起始 2026-08-08（81a7839，RP-047-D）vs 孤儿末位 08-19：78 条全部终态、活跃孤儿 = 0，证明无覆盖盲区，终态残留为守护职责之外的设计行为，维持 S3。清理另案待架构侧批准，S2b-2 不负责清理。详见 <a href="defects.html">defects.html</a>。</td>
+          <td><span class="status warn"><span class="dot"></span>已立项（S3 观察缺陷）</span>：本轮不删任何数据。</td>
+          <td>清理方案经架构侧批准后执行并回填；统计/审计口径（孤儿 run 是否计为有效 run）定义明确。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-27-def-2026-08-27-003-queued:plan">
+          <td class="mono">DEF-2026-08-27-003（队列 5）</td>
+          <td>新会话首次带文件发送解析阻塞在会话创建之前、超时消息与附件丢失。方案①（顺序倒转：先 createSession 落库再异步解析）为推荐方案，与 DEF-2026-08-27-001 改动面不重叠可独立排期。开工申请见 <a href="defects.html">defects.html</a>。</td>
+          <td><span class="status warn"><span class="dot"></span>方案待评审 / 队列 5 开工申请</span>：不与 DEF-001 抢排期。</td>
+          <td>新会话带文件发送后会话立即出现（不等待解析）；解析失败/超时消息与附件仍可见可重试；解析过程有进度反馈。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-08-27-def-2026-08-27-002-queued:plan">
+          <td class="mono">DEF-2026-08-27-002（队列 6）</td>
+          <td>无活跃 attempt 的 Run 取消永久 cancelling 修复合入 main。<b>已批准（2026-08-27）</b>，择机合入，需申请主目录占用。分支 fix/harness-cancel-no-active-attempt，分支 CI 33072134333 全绿（harness 209/209 skipped=0）。</td>
+          <td><span class="status done"><span class="dot"></span>修复已验证 / 待合入</span>：已批准，择机；合入需申请主目录。</td>
+          <td>分支 CI 六套件全绿；合入后 main CI 绿；行为对照（四状态 × 改动前后）随交付附上。</td>
+        </tr>
       </table>
     </section>
 

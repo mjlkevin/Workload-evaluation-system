@@ -348,6 +348,50 @@
               <td>转缺陷 · DEF-2026-08-27-002（关联 RP-047——持久 Run 状态机同域；与 ISS-2026-08-10-004 无关）</td>
               <td>工作区发现未申报修复（架构侧审阅认定为正确修复、不主张回退）：无活跃 attempt 时直接落 cancelled 终态 + completedAt，cancelRequestedAt/By 保留首值，按需追加 cancel_requested / run_cancelled 事件；幂等语义有变化（有活跃 attempt 才短路 changed=false）已用 R10b/R10c 用例守住。按正常缺陷流程处置：分支 fix/harness-cancel-no-active-attempt、补验证（本地 tsc + 相关套件 + CI 六套件）、附行为对照、单独提交单独申请合入，不塞 S2b-2。</td>
             </tr>
+        <tr>
+              <td class="mono">ISS-2026-08-27-003</td>
+              <td>2026-08-27</td>
+              <td>新会话首次带文件发送时,解析阻塞在会话创建之前,超时则消息与附件双双丢失</td>
+              <td>project_coverage</td>
+              <td>2026-08-27 约 20:30 项目侧执行 ai-sessions 真实链路覆盖 D 组：新会话上传 xlsx(57KB) + 文本发送后，会话列表未出现新会话，界面停在「正在提取文件结构」超过 2 分钟无回复。架构侧已定位根因：useChatMessages.js sendMessage() 对带文件消息先 await 阻塞版 apiClient.upload('/ai/parse-basic-info?allowLocalFallback=true', formData)（extractor.service.ts:391 超时上限 requirementSettings.kimiEvaluation.timeoutMs || 120000 = 最长 120 秒，且无 abort/idle 兜底、无进度反馈），解析返回后才 createSession→submitRun；解析超时或失败时会话从未创建，用户消息与附件无痕迹丢失、不可恢复。库内取证：mjlkevin 最新会话 20:04:53 本次无新行、最新 harness_run 20:21:43 属 elly 会话(C组)非本次、traces 本次零记录。已排除显式报告闸门误触发（workbench-shared.ts:322 需同时命中动词组与名词组正则，「工作流」不在名词组，走普通路径）。查重：与 ISS-2026-08-10-004（异步通道 runId 字段不匹配/无流式，同在 useChatMessages.js 但是 SSE 订阅层问题，非本次同源）、DEF-2026-08-27-001（异步 Run 通道丢失历史/记忆注入，同在 submitRun 后的模型输入组装环节，发生在会话已创建之后）均不重叠，为独立新问题。</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js:549-611（sendMessage：文件解析 await 挡在 createSession/submitRun 之前）</code> <code class="inline">apps/api/src/services/ai/extractor.service.ts:352-412（parseBasicInfo 阻塞版，无 abort bridge）</code> <code class="inline">apps/api/src/services/ai/extractor.service.ts:414-471（parseBasicInfoStream 流式版，已有 createAbortBridge totalTimeoutMs=180000/idleTimeoutMs=60000 + progress/model_start/model_delta 事件，前端未使用）</code> <code class="inline">apps/api/src/routes/ai.routes.ts:45-46（两条路由并存）</code></td>
+              <td><span class="status warn"><span class="dot"></span>待分诊</span></td>
+              <td>待转缺陷 DEF-2026-08-27-003（暂不与 DEF-2026-08-27-001 抢排期，方案齐后由架构侧统一定档；与 ISS-2026-08-10-004 相关但独立）</td>
+              <td>覆盖影响：D 组「新会话直接带文件」路径暂不可执行，项目侧已改走「先建会话发文字→在已有会话内上传文件」路径重跑，covering 断言不变（parsedSummary 落库+刷新后仍在），该路径走异步 Run 不经过本缺陷；D 组结论待项目侧按新路径重跑后再定。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-27-004</td>
+              <td>2026-08-27</td>
+              <td>对比 bytedance/deer-flow 后判断 WES Agent 底座是否在重复造轮子</td>
+              <td>user_architecture_question</td>
+              <td>用户要求读 deer-flow 并与 WES 对比，认为「几乎我们是在重复造轮子」。核查结论分两层：① 产品域零重叠——工作量评估链路、规则 DSL、版本机制、成本人天、Excel 导入导出（约占 apps/api 源码 63%）在 deer-flow 中无对位物；② Agent 底座层存在实质重叠，约 1.07 万行源码（harness 6333 / trace 1522 / agent 1135 / knowledge 968 / memory 772）对位 deer-flow <code class="inline">backend/packages/harness/deerflow</code> 的 runtime/{runs,checkpointer,events,stream_bridge}、tracing、agents/memory（4 后端）、agents/middlewares（45 个）。不建议迁移的三条硬约束：栈不同（Python/LangGraph/FastAPI vs TypeScript/Express，接入即引入第二后端运行时，触碰 AGENTS.md §12）；deer-flow 自述 authz 为 best-effort behavioral scoping, not a hard security boundary，与 WES 的 owner 隔离/写确认/证据链硬要求相反；WES 8 个业务工具（create_project / estimate_implementation / generate_wbs / rule_lookup / export_report 等）无论用哪个底座都要自己写。真正的风险不在已建部分，而在下一步：未开工的 RP-050（skill manifest + 级联 Matcher）与 deer-flow skills 子系统重叠度最高。<b>补充（同轮追问「若最初以 deer-flow 为骨架」）</b>：该选项在时间线上不可得——deer-flow 2.0 是 ground-up rewrite、与 1.x 零共享代码，2026-06-25 发布；WES harness 首个 commit 2026-06-17（早 8 天），agent 目录 2026-06-15，项目起步 2026-03-24（当时 deer-flow 仍是 1.x deep-research 工作流 demo）。且即使今天重来，可替换面仅约 6500 行 = <code class="inline">apps/api</code> 源码 13%（runtime 通用件 3110 + trace 1522 + agent 编排 1135 + memory 772）；harness 内 WES 域件约 3200 行（证据链/产物/草稿确认闸门/工作台投影）与 <code class="inline">services/ai</code> 5733 行意图路由不可替换。</td>
+              <td><code class="inline">apps/api/src/modules/harness/*（6333 源码 + 7201 测试行，durable run/attempt 租约/checkpoint/outbox/recovery/projector）</code> <code class="inline">apps/api/src/agent/orchestrator.ts（tool-calling 循环 + list_tools 按需发现，对位 deferred_tool_filter_middleware）</code> <code class="inline">github.com/bytedance/deer-flow（MIT，8.1 万 star，harness 包 501 个 py 文件，最近推送 2026-08-27）</code> <code class="inline">requirements.html RP-050（skill manifest 驱动级联匹配，当前仅详细登记未开工）</code></td>
+              <td><span class="status warn"><span class="dot"></span>待分诊</span></td>
+              <td>待架构侧裁决（预期产出为范围排除项而非需求；已建底座不主张重构迁移）</td>
+              <td>下一步待用户裁决：是否把「沙箱代码执行 / 子代理并行编排 / 技能市场与技能审核 / MCP 客户端 / 浏览器自动化」写入 <code class="inline">risks.html</code> 范围排除，并在 RP-050 开工前补一条「先评估现成方案」前置门；本条不改动任何代码。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-27-005</td>
+              <td>2026-08-27</td>
+              <td>本地带 DB 测试写开发库 + 清理清错库（测试库指向分裂，每次跑套件即污染开发库）</td>
+              <td>architecture_audit（S2b-2 放行前置核查发现）</td>
+              <td>本地跑 test:harness / test:modules 时，测试用例把数据写入开发库（workload_eval）而清理只删测试库（workload_eval_test）：repo 注入 TEST_DATABASE_URL 走测试库、makeSession/usecase 走默认 db 单例走 DATABASE_URL（开发库）、after 钩子清理删测试库——开发库会话/用户永久残留。CI 无此问题（双 URL 同库）。已造成污染实据：harness_runs 88 条中 ut-remember-login-target 1 条为测试用户漏进开发库（与 ISS-2026-08-27-006 孤儿 run 同源）；S2b-1 反向验证实验 A 的证据效力受此影响（已随止血答复给出分拆重估结论）。</td>
+              <td><code class="inline">apps/api/src/routes/ai-runs.routes.test.ts L49-64（before：repo = createHarnessRuntimeRepository(testDb)，testDb 连 TEST_DATABASE_URL）</code> <code class="inline">L120-122（makeSession → createAiSession usecase → 默认 db 单例 → DATABASE_URL=workload_eval 开发库）</code> <code class="inline">L66-81（after：清理经 testDb 删 harness_runs/ai_sessions，只删测试库）</code> <code class="inline">apps/api/src/test-helpers/db.ts（TEST_DATABASE_URL 缺省硬编码回退 workload_eval_test）</code> <code class="inline">apps/api/.env（DATABASE_URL=workload_eval，无 TEST_DATABASE_URL）</code></td>
+              <td><span class="status run"><span class="dot"></span>已分析 · 已立项</span></td>
+              <td>转缺陷 · DEF-2026-08-27-004（定级 S2，open；修复方案队列 4）</td>
+              <td>禁令 C11 已入档生效（§4.9）：修复合入前本地跑 test:harness / test:modules 二选一（分支 CI 或临时 DATABASE_URL 指向 workload_eval_test 跑完还原），每次交付报告声明方式；修复方案待队列 4 实施。</td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-08-27-006</td>
+              <td>2026-08-27</td>
+              <td>78 条历史孤儿 Run：ai_session_id 指向已删除会话（占 harness_runs 全表 89%），污染统计与审计口径</td>
+              <td>architecture_audit（架构侧库内 SQL 实取附带发现）</td>
+              <td>架构侧实取 harness_runs 全表：总数 88 条，其中 78 条 ai_session_id 指向已不存在的会话（89%），涉及 37 个已删除会话，时间范围 2026-06-22 ~ 2026-08-19（横跨近两个月）；状态分布 completed 57 / failed 13 / cancelled 8（全部为终态，活跃状态孤儿 = 0）；归属 mjlkevin 68 / elly 9 / ut-remember-login-target 1（测试用户漏进开发库，与 ISS-2026-08-27-005 同源）。全部早于 2026-08-27，即全部产生于删除补偿链（409 守护）实现之前或守护职责之外；08-27 当天孤儿 = 0，E2 删除未新增孤儿（库分裂下平凡真，见 ISS-2026-08-27-005）。</td>
+              <td><code class="inline">apps/api/src/db/schema/harness.ts（harness_runs.ai_session_id text 无外键无级联）</code> <code class="inline">apps/api/src/modules/ai-sessions/ai-sessions-pg.repository.ts deleteSession（仅行级 DELETE，不级联 run）</code> <code class="inline">apps/api/src/modules/harness/harness-runtime.repository.ts hasActiveRunForSession（409 守护，仅查活跃状态 run）</code></td>
+              <td><span class="status run"><span class="dot"></span>已分析 · 已立项</span></td>
+              <td>转缺陷 · DEF-2026-08-27-005（观察缺陷，定级 S3；必答项——补偿链生效起始 2026-08-08 vs 孤儿末位 08-19 对齐分析已随立项给出：全终态证明无覆盖盲区）</td>
+              <td>S2b-2 不负责清理、不扩范围；清理另行提方案（含 run 留存策略/审计口径定义）经架构侧批准后执行；本轮不删任何数据。</td>
+            </tr>
         </table>
       </div>
     </section>
