@@ -792,10 +792,10 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td>新会话带文件发送后会话立即出现（不等待解析）；解析失败/超时消息与附件仍可见可重试；解析过程有进度反馈。</td>
         </tr>
         <tr data-board-event-id="BE-2026-08-27-def-2026-08-27-002-queued:plan">
-          <td class="mono">DEF-2026-08-27-002（队列 6）</td>
-          <td>无活跃 attempt 的 Run 取消永久 cancelling 修复合入 main。<b>已批准（2026-08-27）</b>，择机合入，需申请主目录占用。分支 fix/harness-cancel-no-active-attempt，分支 CI 33072134333 全绿（harness 209/209 skipped=0）。</td>
-          <td><span class="status done"><span class="dot"></span>修复已验证 / 待合入</span>：已批准，择机；合入需申请主目录。</td>
-          <td>分支 CI 六套件全绿；合入后 main CI 绿；行为对照（四状态 × 改动前后）随交付附上。</td>
+          <td class="mono">DEF-2026-08-27-002（队列 6 · 已闭环）</td>
+          <td>无活跃 attempt 的 Run 取消永久 cancelling 修复<b>已合入 main</b>（--no-ff merge 1cdb3c2，2026-08-28）。main CI 33148758925 六 job 全绿实取：harness 209/209 skipped=0，六套件合计 1098。</td>
+          <td><span class="status done"><span class="dot"></span>已合入 · 缺陷闭环</span>：main CI 全绿，状态回填 defects.html。</td>
+          <td>合入后 main CI 六 job 全绿（run 33148758925，`gh run view --log` 实取）；行为对照（四状态 × 改动前后）随合入前交付已附，架构侧复核通过。</td>
         </tr>
       </table>
     </section>
