@@ -4,8 +4,8 @@
 // 批 2/批 3 试点结论：整存 load→改→save 无法表达幂等插入（范式 #2）与
 // 条件 UPDATE CAS / 原子追加（范式 #3），接口收敛为行级操作。
 // S2b-2（2026-08-28）：JSON accessor / JSON 实现 / storePath 测试注入钩子
-// 随 JSON 路径一并删除，选择器恒 PG；开关 WES_STORE_AI_SESSIONS_PG 的
-// 环境变量与配置残留由 commit C 退役。
+// 随 JSON 路径一并删除，选择器恒 PG；开关 WES_STORE_AI_SESSIONS_PG 已随
+// ci.yml / .env.example / 注释残留一并退役（commit C）。
 //
 // 缓存策略（与 users 域不同，架构侧 2026-08-19 指令「不照搬全表填充」）：
 // 本域 PG 实现不加缓存层，读路径直查（owner_idx / owner_updated_idx 索引

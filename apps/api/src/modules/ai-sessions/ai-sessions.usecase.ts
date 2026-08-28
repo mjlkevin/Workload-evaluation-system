@@ -68,7 +68,7 @@ function normalizeRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-/** 阶段 2 批 3：函数体改经 getAiSessionsRepository()（缺省 JSON / WES_STORE_AI_SESSIONS_PG=true 切 PG），幂等插入由仓储层保证。 */
+/** S2b-2（2026-08-28）：恒经 getAiSessionsRepository()（ai-sessions 域 PG-only，开关已退役），幂等插入由仓储层保证。 */
 export async function createAiSession(user: AuthUser, input: { title?: unknown; domain?: unknown; workflowKey?: unknown; status?: unknown }): Promise<AiSessionRecord> {
   const nowIso = new Date().toISOString();
   const session: AiSessionRecord = {
