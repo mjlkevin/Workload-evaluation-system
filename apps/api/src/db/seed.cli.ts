@@ -8,7 +8,7 @@
 //
 // 语义：
 //   - 默认口径：缺失才插（onConflictDoNothing），不 TRUNCATE、不覆盖运行时写入；
-//     连续执行两次，四类配置行数不变。
+//     连续执行两次，各类配置行数不变。
 //   - --force：先删除源文件对应的既有行再插入（评估结论见计划文档记录 1 回填），
 //     生产环境（NODE_ENV=production）直接拒绝。
 
@@ -22,7 +22,8 @@ async function main(): Promise<void> {
   console.log(
     `[db:seed] admin={username:${admin.username}, created:${admin.created}} ` +
       `versionCodeRules=${base.versionCodeRules} templates=${base.templates} ` +
-      `ruleSets=${base.ruleSets} systemConfigs=${base.systemConfigs} force=${force}`,
+      `ruleSets=${base.ruleSets} systemConfigs=${base.systemConfigs} ` +
+      `knowledgeEntries=${base.knowledgeEntries} force=${force}`,
   );
 }
 
