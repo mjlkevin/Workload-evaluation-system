@@ -838,12 +838,13 @@ test("RP-030 覆盖：恢复重放跳过 execute，trace 不重复写（幂等�
 });
 
 test("RP-030 覆盖：recordTurnTrace 写入失败不影响主链路（静默吸收）", async () => {
+  const calls: RecordedAppendCall[] = [];
   const wf = createWorkbenchChatWorkflow({
     dispatch: async () => ({
       answer: "模型回复",
       trace: { intentConfidence: 0.9, routingRule: "mock_rule", contextRefs: [] },
     } as any),
-    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendSessionMessage: makeRecordingAppendSessionMessage(calls),
     appendRunEvent: makeNoOpAppendRunEvent(),
     recordTurnTrace: async () => {
       throw new Error("trace_store_down");
@@ -852,5 +853,10 @@ test("RP-030 覆盖：recordTurnTrace 写入失败不影响主链路（静默吸
 
   const outcome = await wf.executeStep("chat", makeFakeCtx());
   assert.equal(outcome.nextStepKey, null, "trace 写入失败不得阻断主链路");
-  assert.equal(outcome.outbox![0].payload.answer, "模型回复");
+  // §4.8 随动项（S2b-2）：assistant 正文不再经 outbox 中转，改由
+  // appendSessionMessage 同库直写，故「主链路仍完成它该做的持久化」这一层
+  // 断言随终态改造为直写调用观测（outbox 恒空的不变量由本文件 S2b-2 守护用例断）。
+  const assistantCalls = calls.filter((c) => c.role === "assistant");
+  assert.equal(assistantCalls.length, 1, "trace 写入失败仍须直写恰好一条 assistant 消息");
+  assert.equal(assistantCalls[0].content, "模型回复", "assistant 正文不得因 trace 归档失败而丢失");
 });
