@@ -2,6 +2,25 @@ import React, { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { apiClient } from '../api/client.js'
 
+function getDetail(error, field) {
+  return Array.isArray(error?.details)
+    ? error.details.find((item) => item?.field === field)
+    : null
+}
+
+// 后端外层 message 对所有参数错误都写死「参数错误」，可区分的 reason 在 details 里，
+// 不读 details 就只能把「参数错误」直接展示给用户。
+function getResetErrorMessage(error) {
+  const tokenDetail = getDetail(error, 'token')
+  if (tokenDetail?.reason === 'invalid_or_expired') return '重置链接已失效或已过期，请返回登录重新申请'
+  if (tokenDetail?.reason === 'required') return '重置链接无效，请从邮件中的链接打开本页'
+
+  const passwordDetail = getDetail(error, 'password')
+  if (passwordDetail?.reason === 'min_length_8') return '密码至少需要 8 位'
+
+  return error?.message || '密码重置失败，请重新申请链接'
+}
+
 export default function ResetPassword() {
   const location = useLocation()
   const token = useMemo(() => new URLSearchParams(location.search).get('token') || '', [location.search])
@@ -34,7 +53,7 @@ export default function ResetPassword() {
       setConfirm('')
       setMessage('密码已重置，请返回登录')
     } catch (err) {
-      setMessage(err?.message || '密码重置失败，请重新申请链接')
+      setMessage(getResetErrorMessage(err))
     } finally {
       setSubmitting(false)
     }

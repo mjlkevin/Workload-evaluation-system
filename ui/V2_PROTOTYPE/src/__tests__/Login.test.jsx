@@ -165,6 +165,28 @@ describe('Login', () => {
     expect(await screen.findByText('密码已重置，请返回登录')).toBeInTheDocument()
   })
 
+  test('translates an expired reset link into readable text on the reset page', async () => {
+    // 后端外层 message 一律是「参数错误」,可区分信息在 details[].reason 里。
+    // 只读 message 会让拿着旧链接的人以为是自己密码填错了。
+    server.use(
+      http.post(`${BASE}/auth/password-reset/confirm`, () =>
+        HttpResponse.json(
+          { code: 40001, message: '参数错误', details: [{ field: 'token', reason: 'invalid_or_expired' }] },
+          { status: 400 }
+        )
+      )
+    )
+
+    renderAuthRoutes(['/reset-password?token=expired-token'])
+    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'NewPass123!' } })
+    fireEvent.change(screen.getByLabelText('确认新密码'), { target: { value: 'NewPass123!' } })
+    fireEvent.click(screen.getByRole('button', { name: '确认重置密码' }))
+
+    const notice = await screen.findByText(/重置链接已失效或已过期/)
+    expect(notice).toBeInTheDocument()
+    expect(screen.queryByText('参数错误')).not.toBeInTheDocument()
+  })
+
   test('lets the shared .input focus contract style credential fields', async () => {
     renderAuthRoutes()
     fireEvent.click(screen.getByRole('link', { name: /使用邀请码激活/ }))
@@ -177,6 +199,14 @@ describe('Login', () => {
       expect(field.className).toContain('input')
       expect(field.style.border).toBe('')
       expect(field.style.borderColor).toBe('')
+    }
+
+    // 重置密码页是同一批认证表单,行内 border 同样会短路聚焦契约
+    renderAuthRoutes(['/reset-password?token=t1'])
+    for (const name of ['新密码', '确认新密码']) {
+      const field = screen.getByLabelText(name)
+      expect(field.className).toContain('input')
+      expect(field.getAttribute('style')).toBeNull()
     }
   })
 })
