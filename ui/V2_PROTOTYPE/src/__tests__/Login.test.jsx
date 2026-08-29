@@ -148,7 +148,7 @@ describe('Login', () => {
     renderAuthRoutes()
 
     fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'demo' } })
-    fireEvent.click(screen.getByRole('button', { name: '忘记密码?' }))
+    fireEvent.click(screen.getByRole('button', { name: '忘记密码？' }))
     fireEvent.click(screen.getByRole('button', { name: '发送重置链接' }))
 
     expect(await screen.findByText(/重置链接已生成/)).toBeInTheDocument()
@@ -165,6 +165,97 @@ describe('Login', () => {
     expect(await screen.findByText('密码已重置，请返回登录')).toBeInTheDocument()
   })
 
+  test('tells a disabled account its status instead of a generic parameter error', async () => {
+    // 映射本身已在 useAuth.js 里存在,本测试是把行为钉住:被停用的人不该看到
+    // 「参数错误」以为自己格式打错了。此前这条只有手工实测,无 CI 覆盖。
+    server.use(
+      http.post(`${BASE}/auth/login`, () =>
+        HttpResponse.json(
+          { code: 40001, message: '参数错误', details: [{ field: 'user', reason: 'disabled' }] },
+          { status: 400 }
+        )
+      )
+    )
+
+    renderAuthRoutes()
+    fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'test-disabled' } })
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'whatever' } })
+    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+
+    expect(await screen.findByText('账号已被禁用，请联系管理员')).toBeInTheDocument()
+    // 不区分「用户不存在」与「密码错」,所以不会因这条映射造成账号枚举
+    expect(screen.queryByText('参数错误')).not.toBeInTheDocument()
+  })
+
+  test('translates an expired reset link into readable text on the reset page', async () => {
+    // 后端外层 message 一律是「参数错误」,可区分信息在 details[].reason 里。
+    // 只读 message 会让拿着旧链接的人以为是自己密码填错了。
+    server.use(
+      http.post(`${BASE}/auth/password-reset/confirm`, () =>
+        HttpResponse.json(
+          { code: 40001, message: '参数错误', details: [{ field: 'token', reason: 'invalid_or_expired' }] },
+          { status: 400 }
+        )
+      )
+    )
+
+    renderAuthRoutes(['/reset-password?token=expired-token'])
+    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'NewPass123!' } })
+    fireEvent.change(screen.getByLabelText('确认新密码'), { target: { value: 'NewPass123!' } })
+    fireEvent.click(screen.getByRole('button', { name: '确认重置密码' }))
+
+    const notice = await screen.findByText(/重置链接已失效或已过期/)
+    expect(notice).toBeInTheDocument()
+    expect(screen.queryByText('参数错误')).not.toBeInTheDocument()
+  })
+
+  test('clears the credential error as soon as the user edits a field', async () => {
+    server.use(
+      http.post(`${BASE}/auth/login`, () =>
+        HttpResponse.json(
+          { code: 40001, message: '参数错误', details: [{ field: 'username/password', reason: 'invalid_credentials' }] },
+          { status: 400 }
+        )
+      )
+    )
+
+    renderAuthRoutes()
+    fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'demo' } })
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'wrong' } })
+    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+
+    expect(await screen.findByText('账号或密码错误，请重新输入')).toBeInTheDocument()
+
+    // 人在改密码的过程中,上一轮报错就不该还挂在下面
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'r' } })
+    await waitFor(() => {
+      expect(screen.queryByText('账号或密码错误，请重新输入')).not.toBeInTheDocument()
+    })
+  })
+
+  test('clears the reset-page error as soon as the user edits a field', async () => {
+    server.use(
+      http.post(`${BASE}/auth/password-reset/confirm`, () =>
+        HttpResponse.json(
+          { code: 40001, message: '参数错误', details: [{ field: 'token', reason: 'invalid_or_expired' }] },
+          { status: 400 }
+        )
+      )
+    )
+
+    renderAuthRoutes(['/reset-password?token=expired-token'])
+    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'NewPass123!' } })
+    fireEvent.change(screen.getByLabelText('确认新密码'), { target: { value: 'NewPass123!' } })
+    fireEvent.click(screen.getByRole('button', { name: '确认重置密码' }))
+
+    expect(await screen.findByText(/重置链接已失效或已过期/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'NewPass1234' } })
+    await waitFor(() => {
+      expect(screen.queryByText(/重置链接已失效或已过期/)).not.toBeInTheDocument()
+    })
+  })
+
   test('lets the shared .input focus contract style credential fields', async () => {
     renderAuthRoutes()
     fireEvent.click(screen.getByRole('link', { name: /使用邀请码激活/ }))
@@ -177,6 +268,14 @@ describe('Login', () => {
       expect(field.className).toContain('input')
       expect(field.style.border).toBe('')
       expect(field.style.borderColor).toBe('')
+    }
+
+    // 重置密码页是同一批认证表单,行内 border 同样会短路聚焦契约
+    renderAuthRoutes(['/reset-password?token=t1'])
+    for (const name of ['新密码', '确认新密码']) {
+      const field = screen.getByLabelText(name)
+      expect(field.className).toContain('input')
+      expect(field.getAttribute('style')).toBeNull()
     }
   })
 })

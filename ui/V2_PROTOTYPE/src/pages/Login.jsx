@@ -65,7 +65,7 @@ export default function Login() {
   const usernameInputRef = useRef(null)
   const passwordInputRef = useRef(null)
   const dropdownRef = useRef(null)
-  const { login, register, loading, error } = useAuth()
+  const { login, register, loading, error, clearError } = useAuth()
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -143,7 +143,7 @@ export default function Login() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: 'linear-gradient(135deg,var(--bg) 0%,var(--brand-soft) 100%)', fontFamily: 'var(--font-sans)' }}>
+    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', placeItems: 'center', padding: 24, background: 'linear-gradient(135deg,var(--bg) 0%,var(--brand-soft) 100%)', fontFamily: 'var(--font-sans)' }}>
       <div style={{ width: 380, maxWidth: '100%', background: '#fff', borderRadius: 'var(--shell-radius)', boxShadow: 'var(--shadow-3)', padding: '30px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,var(--brand),var(--accent))', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800 }}>W</div>
@@ -161,7 +161,7 @@ export default function Login() {
           {mode === 'register' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label htmlFor="login-email" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邮箱</label>
-              <input id="login-email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+              <input id="login-email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); clearError() }} />
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -174,9 +174,8 @@ export default function Login() {
                 type="text"
                 autoComplete="username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => { setUsername(e.target.value); clearError() }}
                 onFocus={handleUsernameFocus}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }}
               />
             {showUsernameDropdown && usernameHistory.length > 0 && (
               <div
@@ -222,12 +221,12 @@ export default function Login() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label htmlFor="login-password" style={{ fontSize: 12, color: 'var(--ink-2)' }}>密码</label>
-            <input ref={passwordInputRef} id="login-password" className="input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            <input ref={passwordInputRef} id="login-password" className="input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => { setPassword(e.target.value); clearError() }} />
           </div>
           {mode === 'register' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label htmlFor="login-invite" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邀请码</label>
-              <input id="login-invite" className="input" type="text" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+              <input id="login-invite" className="input" type="text" autoComplete="off" value={inviteCode} onChange={(e) => { setInviteCode(e.target.value); clearError() }} />
             </div>
           )}
 
@@ -251,7 +250,7 @@ export default function Login() {
                 }}
                 style={{ border: 0, background: 'transparent', padding: 0, fontSize: 12, color: 'var(--brand)', cursor: 'pointer' }}
               >
-                忘记密码?
+                忘记密码？
               </button>
             </div>
           )}
@@ -275,11 +274,11 @@ export default function Login() {
       </div>
 
       <div style={{ position: 'fixed', bottom: 16, right: 20, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-        v 1.4.0 · © 2026 WES Team · <span style={{ cursor: 'pointer' }}>简体中文 ▾</span>
+        v 1.4.0 · © 2026 WES Team
       </div>
 
       {resetOpen && (
-        <div role="dialog" aria-modal="true" aria-label="找回密码" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.22)', display: 'grid', placeItems: 'center', padding: 20 }}>
+        <div role="dialog" aria-modal="true" aria-label="找回密码" style={{ position: 'fixed', inset: 0, background: 'color-mix(in oklch, var(--ink) 22%, transparent)', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', placeItems: 'center', padding: 20 }}>
           <div style={{ width: 360, maxWidth: '100%', background: '#fff', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-3)', padding: 22 }}>
             <h3 style={{ margin: 0, fontSize: 16 }}>找回密码</h3>
             <p style={{ margin: '10px 0 14px', fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.6 }}>
@@ -292,7 +291,6 @@ export default function Login() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="请输入用户名"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }}
             />
             {resetMessage && (
               <div style={{ marginTop: 12, fontSize: 12, lineHeight: 1.6, color: resetLink ? 'var(--ok)' : 'var(--ink-2)' }}>
