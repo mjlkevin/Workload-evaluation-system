@@ -31,6 +31,7 @@
     "test:api:team": "node scripts/team-api-check.js",
     "test:ai": "npm run test:ai -w apps/api",
     "test:modules": "npm run test:modules -w apps/api",
+    "test:modules:serial-store": "npm run test:modules:serial-store -w apps/api",
     "test:rules": "npm run test:rules -w apps/api",
     "test:integration": "npm run test:integration -w apps/api",
     "test:agent": "npm run test:agent -w apps/api",
@@ -39,7 +40,7 @@
     "ops:backup:config": "node scripts/backup-config.js",
     "ops:check:config": "npm run ops:config:check -w apps/api",
     "ops:check:config:repair": "npm run ops:config:check:repair -w apps/api",
-    "test:all": "npm run test:modules && npm run test:rules && npm run test:integration && npm run rules:regression && npm run rules:excel-report",
+    "test:all": "npm run test:modules && npm run test:modules:serial-store && npm run test:rules && npm run test:integration && npm run rules:regression && npm run rules:excel-report",
     "test:e2e:web": "npm run test:web"
   },
   "devDependencies": {
