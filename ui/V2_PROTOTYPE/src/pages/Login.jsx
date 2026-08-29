@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { apiClient } from '../api/client.js'
 import { unwrap } from '../api/utils.js'
 import useAuth from '../hooks/useAuth.js'
 import { APP_VERSION } from '../config/app.js'
+import { resolvePostLoginRedirect } from '../utils/authRedirect.js'
 
 const USERNAME_HISTORY_KEY = 'wes_username_history'
 const LEGACY_RECENT_USERS_KEY = 'wes_recent_users'
@@ -66,6 +67,7 @@ export default function Login() {
   const usernameInputRef = useRef(null)
   const passwordInputRef = useRef(null)
   const dropdownRef = useRef(null)
+  const location = useLocation()
   const { login, register, loading, error, clearError } = useAuth()
 
   // Close dropdown on outside click
@@ -115,7 +117,7 @@ export default function Login() {
       return
     }
 
-    const result = await login(trimmedUsername, password, rememberMe)
+    const result = await login(trimmedUsername, password, rememberMe, resolvePostLoginRedirect(location))
     if (result.success) {
       saveUsernameHistory(trimmedUsername)
       setUsernameHistory(getUsernameHistory())
