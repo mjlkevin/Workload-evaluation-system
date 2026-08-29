@@ -173,8 +173,9 @@ export default function ListPage({
     <PageShell crumb={crumb} title={title} subtitle={subtitle} actions={actions}>
       <div className={sidebar ? 'home-grid' : undefined}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
-      {/* KPI Cards */}
-      {kpiCards && kpiCards.length > 0 && (
+      {/* KPI Cards — 取数未完成或失败时不出：卡上每个数字都是 rows 的汇总，
+          这时候的 0 与无条件亮的绿点都是在把「不知道」说成「没有」。 */}
+      {!loading && !error && kpiCards && kpiCards.length > 0 && (
         <div className="home-kpi">
           {kpiCards.map((k, i) => (
             <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 14, boxShadow: 'var(--shadow-1)' }}>

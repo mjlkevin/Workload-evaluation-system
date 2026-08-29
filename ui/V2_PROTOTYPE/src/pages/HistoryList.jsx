@@ -6,7 +6,7 @@ import useHistoryProjects from '../hooks/useHistoryProjects.js'
 
 export default function HistoryList() {
   const navigate = useNavigate()
-  const { projects, refetch, remove, create, creating } = useHistoryProjects({
+  const { projects, loading, loadError, refetch, remove, create, creating } = useHistoryProjects({
     fallbackData: historyItems,
   })
 
@@ -30,6 +30,11 @@ export default function HistoryList() {
       title="历史项目列表"
       subtitle="历史项目归档与相似度检索"
       data={projects}
+      loading={loading}
+      loadingText="正在加载历史项目列表…"
+      error={loadError}
+      errorText="加载历史项目列表失败，请检查网络后重试"
+      onRetry={refetch}
       rowKey="id"
       onRowClick={(row) => navigate(`/history/${row.id}`)}
       onBulkAction={handleBulkAction}

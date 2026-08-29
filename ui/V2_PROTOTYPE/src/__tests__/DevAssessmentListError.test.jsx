@@ -58,7 +58,8 @@ describe('DevAssessmentList 加载失败', () => {
 
     renderDevAssessments()
 
-    await screen.findByText(/共 0 条/)
+    // 汇总卡现在只在取到数之后才出，正好拿它当「加载已完成」的信号
+    await screen.findByText('共 0 条')
     fireEvent.click(screen.getByRole('button', { name: '+ 新建' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('创建开发评估失败')

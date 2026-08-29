@@ -6,7 +6,7 @@ import { resourceCosts as mockData } from '../mock/listData.js'
 
 export default function ResourceCostList() {
   const navigate = useNavigate()
-  const { rows, creating, refetch, create, remove } = useResourceCostList({ fallbackData: mockData })
+  const { rows, loading, loadError, creating, refetch, create, remove } = useResourceCostList({ fallbackData: mockData })
 
   const kpiCards = useMemo(() => {
     const total = rows.length
@@ -45,6 +45,11 @@ export default function ResourceCostList() {
       title="资源及人天成本"
       subtitle="查看资源成本概览与版本管理"
       data={rows}
+      loading={loading}
+      loadingText="正在加载资源成本列表…"
+      error={loadError}
+      errorText="加载资源成本列表失败，请检查网络后重试"
+      onRetry={refetch}
       rowKey="id"
       kpiCards={kpiCards}
       onRowClick={(row) => navigate(`/resource-costs/${row.id}`)}
