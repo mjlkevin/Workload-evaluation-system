@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { apiClient } from '../api/client.js'
 import { unwrap } from '../api/utils.js'
 import useAuth from '../hooks/useAuth.js'
+import { APP_VERSION } from '../config/app.js'
 
 const USERNAME_HISTORY_KEY = 'wes_username_history'
 const LEGACY_RECENT_USERS_KEY = 'wes_recent_users'
@@ -274,7 +275,7 @@ export default function Login() {
       </div>
 
       <div style={{ position: 'fixed', bottom: 16, right: 20, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-        v 1.4.0 · © 2026 Datum
+        v {APP_VERSION} · © 2026 Datum
       </div>
 
       {resetOpen && (
