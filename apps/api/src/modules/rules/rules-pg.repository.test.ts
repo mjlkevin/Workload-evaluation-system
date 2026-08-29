@@ -10,7 +10,10 @@
 //
 // 隔离（§4.9 C5）：全部规则集行使用 wes-t-rules-* ruleSetId 前缀，
 // 清理为条件 DELETE（cleanupRuleSetRowsByPrefix），不做整表计数与
-// 整表清理。本域表仅本文件触碰（已核实无其他套件读写 rule_sets 表）。
+// 整表清理。S6（2026-08-29）起 modules.usecase.test.ts 与
+// modules.handlers.test.ts 也经 seedSingleDocStoreFixture 写入本表（行 id 为
+// wes-t-uc-rules / wes-t-hdr-rules，不与本文件 wes-t-rules-* 前缀相撞），
+// 三者同在 test:modules:serial-store 串行套件内，时序互斥。
 //
 // 缺行/错误边界用例不依赖真实库：以最小 stub executor 注入
 // 仓储构造器，无库环境同样真实执行。

@@ -19,6 +19,15 @@
 // 同时交叉核验白名单与 package.json 串行脚本的参数列表完全一致，
 // 防止「加了脚本忘了守卫」与「加了守卫忘了脚本」两种漂移。
 //
+// 双向约束（S6 加固）：白名单里不属于已识别写入方的文件同样判红。
+// 单向校验只能拦「漏登记」，拦不住「登记过期」——S6 把 knowledge 两个
+// 用例改用 in-memory 替身后，它们在白名单里躺成僵尸条目（既占串行名额
+// 又误导后人「此文件会写表」），正是靠人肉发现。加了反向校验后机械可现。
+//
+// 豁免机制：命中指纹但经核实不写行的文件（如只取用选择器断装配的测试）
+// 走 DECLARED_NON_WRITERS，逐条登记理由与期望命中数，照抄
+// no-sync-store-io.drift.test.ts 白名单范式；命中数变化即红，豁免不会过期。
+//
 // 白名单计数钉定：expectedFiles 与实际条目严格相等——新增触碰即红
 // （要求显式登记），阶段 2 后续批次收敛也会红（强制更新，进展可见）。
 
@@ -36,8 +45,7 @@ const SERIAL_SCOPE_FILES = [
   "modules/rules/rules-pg.repository.test.ts",
   "modules/modules.usecase.test.ts",
   "modules/knowledge/knowledge-pg.repository.test.ts",
-  "modules/knowledge/knowledge.usecase.test.ts",
-  "routes/knowledge.routes.test.ts",
+  "modules/modules.handlers.test.ts",
 ] as const;
 
 /** 串行套件脚本名与并行套件脚本名。 */
@@ -46,10 +54,11 @@ const PARALLEL_SCRIPT = "test:modules";
 
 /**
  * 写入指纹：命中任一项即认定该测试文件会向无界读表写入行。
- * 只匹配「构造 PG 仓储 / 调用写入方法 / 直连选择器」的符号，不匹配
- * 纯 reset 钩子（modules.handlers.test.ts 仅取用 _reset*ForTest()，
- * 属只读方，留在并行套件）；也不匹配 JSON 实现类（new KnowledgeRepository
- * 写的是本文件私有临时路径，不触碰共享表，不构成跨文件污染）。
+ * 匹配「构造 PG 仓储 / 调用写入方法 / 直连选择器 / 经共享 helper 间接写入」
+ * 的符号；seedSingleDocStoreFixture 是 S6 新增的共享种入 helper（本守卫
+ * 只扫 *.test.ts，helper 自身不在扫描范围内），所以必须靠调用方指纹兼容。
+ * 不匹配纯 reset 钩子；也不匹配 JSON 实现类残留名（写的是本文件私有
+ * 临时路径，不触碰共享表，不构成跳文件污染）。
  */
 const WRITER_PATTERNS: RegExp[] = [
   /\bcreateTemplatesPgRepository\b/,
@@ -62,6 +71,19 @@ const WRITER_PATTERNS: RegExp[] = [
   /\bsaveRuleSet\b/,
   /\bKnowledgePgRepository\b/,
   /\bgetKnowledgeRepository\b/,
+  /\bseedSingleDocStoreFixture\b/,
+];
+
+/**
+ * 命中指纹但经核实不写行的文件（豁免须同时钉期望命中数，防止
+ * 豁免范围静默扩大；不再命中指纹时也必须显式删掉本条）。
+ */
+const DECLARED_NON_WRITERS: Array<{ file: string; expectedHits: number; why: string }> = [
+  {
+    file: "modules/knowledge/knowledge.repository.test.ts",
+    expectedHits: 6,
+    why: "S6 后收缩为装配测试：只取用选择器断实现装配与单例语义，全程不 await 任何仓储方法，不写 knowledge_entries 行",
+  },
 ];
 
 /** 剥除行注释与块注释，避免文档性提及被误判为写入。 */
@@ -78,14 +100,24 @@ function collectTestFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/** 本文件内全部写入指纹的命中次数（已剥注释）。 */
+function countPatternHits(absFile: string): number {
+  const source = stripComments(fs.readFileSync(absFile, "utf-8"));
+  return WRITER_PATTERNS.reduce(
+    (sum, re) => sum + (source.match(new RegExp(re.source, "g")) ?? []).length,
+    0,
+  );
+}
+
 function findWriterFiles(): string[] {
+  const exempt = new Set(DECLARED_NON_WRITERS.map((entry) => entry.file));
   const writers: string[] = [];
   for (const file of collectTestFiles(SRC_ROOT)) {
     const rel = path.relative(SRC_ROOT, file).split(path.sep).join("/");
     // 守卫自身必然包含全部指纹字符串，跳过
     if (rel === "test-helpers/single-doc-serial-scope.drift.test.ts") continue;
-    const source = stripComments(fs.readFileSync(file, "utf-8"));
-    if (WRITER_PATTERNS.some((re) => re.test(source))) writers.push(rel);
+    if (exempt.has(rel)) continue;
+    if (countPatternHits(file) > 0) writers.push(rel);
   }
   return writers.sort();
 }
@@ -115,6 +147,40 @@ test("触碰无界读表与单文档表的测试文件必须全部在串行白�
       `处置：加进 apps/api/package.json 的 ${SERIAL_SCRIPT}，并把同一文件登记进本测试的 SERIAL_SCOPE_FILES。`,
     ].join("\n"),
   );
+
+  // 反向约束：白名单里不得躺「已不再是写入方」的条目——它既白占串行名额，
+  // 又向后人和下一个改这个机制的人传递错信息。真需要保留时（纯只读但
+  // 依赖活动文档/全表状态的用例）应把读取形态补进 WRITER_PATTERNS，而不是往本表加水份。
+  const stale = (SERIAL_SCOPE_FILES as readonly string[]).filter((f) => !writers.includes(f));
+  assert.deepEqual(
+    stale,
+    [],
+    [
+      `以下文件在 ${SERIAL_SCRIPT} 白名单内，但已命中不了任何写入指纹（登记过期）：`,
+      ...stale.map((f) => `  src/${f}`),
+      "处置：确认它确实不再写行后从串行脚本与白名单同步移除；若它仍靠时序隔离，",
+      "则把它实际依赖的读取形态补进 WRITER_PATTERNS，使指纹能真断到它。",
+    ].join("\n"),
+  );
+});
+
+test("不写行豁免清单不得过期（命中数必须逐位相等）", () => {
+  for (const entry of DECLARED_NON_WRITERS) {
+    const hits = countPatternHits(path.join(SRC_ROOT, entry.file));
+    assert.ok(
+      hits > 0,
+      `豁免条目 ${entry.file} 已不再命中任何写入指纹，本条应直接删除（豁免不能靠惯性留着）`,
+    );
+    assert.equal(
+      hits,
+      entry.expectedHits,
+      `${entry.file} 指纹命中数 ${hits} ≠ 登记值 ${entry.expectedHits}（豁免范围不得静默扩大）\n登记理由：${entry.why}`,
+    );
+    assert.ok(
+      !(SERIAL_SCOPE_FILES as readonly string[]).includes(entry.file),
+      `${entry.file} 既被声明为不写行，就不应同时在串行白名单内`,
+    );
+  }
 });
 
 test("串行白名单与 package.json 脚本参数列表逐位一致", () => {
@@ -145,8 +211,8 @@ test("串行白名单与 package.json 脚本参数列表逐位一致", () => {
 test("串行白名单计数钉定（新增触碰或批次收敛都必须显式更新本条）", () => {
   assert.equal(
     SERIAL_SCOPE_FILES.length,
-    6,
+    5,
     `SERIAL_SCOPE_FILES 实为 ${SERIAL_SCOPE_FILES.length} 条：新增即意味着有新的无界读表写入方，` +
-      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账",
+      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进）"
   );
 });

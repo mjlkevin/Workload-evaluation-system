@@ -166,9 +166,12 @@ jobs:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
           TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
-      # B1/B2（2026-08-29 架构侧裁决 O1）：单文档表（templates / rule_sets 取「最近写入行」
+      # B1/B2/B3（2026-08-29 架构侧裁决 O1）：单文档表（templates / rule_sets 取「最近写入行」
       # 为活动文档）与无界读表（knowledge_entries.list() 全表读）的测试文件必须串行执行，
-      # 否则并发写互相顶掉活动文档 / 打破「空表合法状态」断言。该约束是存储语义级的，
+      # 否则并发写互相顶掉活动文档 / 打破「空表合法状态」断言。B3（S6）是 B1 的镜像形态：
+      # 本步骤排在 DB seed 之前，两张单文档表此时是空的，依赖「读到活动文档」的用例
+      # （modules.handlers.test.ts 的 getRuleSetMeta）必须自己种入 seed 源 fixture——
+      # 而种入就是写入，又回到 B1 的争抢，故该文件也在本套件内。该约束是存储语义级的，
       # git 无冲突标记、tsc 也过，只在全量 CI 间歇性炸，故由
       # src/test-helpers/single-doc-serial-scope.drift.test.ts 自动守卫白名单。
       # 新增触碰这三张表的测试文件时，必须同时加进 test:modules:serial-store 与该守卫白名单。

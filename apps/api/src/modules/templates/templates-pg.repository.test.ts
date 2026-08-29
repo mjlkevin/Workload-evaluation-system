@@ -12,9 +12,13 @@
 // 隔离（批 3/5/6/7 口径，§4.9 C5）：共享测试库下多文件并发执行，
 // 全部模板行使用 wes-t-tmpl-* templateId 前缀，清理为条件 DELETE
 // （cleanupTemplateRowsByPrefix），不做整表计数与整表清理。
-// 「活动文档 = 最近写入行」用例要求测试行 updated_at 最新：本域
-// 表仅本文件触碰（已核实无其他套件读写 templates 表），测试行
-// 经仓储写入（readDbNow 当下时刻）必然晚于任何存量行。
+// 「活动文档 = 最近写入行」用例要求测试行 updated_at 最新。S6（2026-08-29）
+// 起本域表不再只由本文件触碰——modules.usecase.test.ts 与
+// modules.handlers.test.ts 也经 seedSingleDocStoreFixture 写入行（台账 B3
+// 处置）；三个文件同在 test:modules:serial-store 串行套件内，由
+// --test-concurrency=1 保证时序互斥，且各自用独立行前缀（wes-t-tmpl- /
+// wes-t-uc- / wes-t-hdr-）。本文件测试行经仓储写入（readDbNow 当下时刻）
+// 必然晚于任何存量行，且串行期内无其他写者，故取最新断言成立。
 //
 // 缺行/错误边界用例不依赖真实库：以最小 stub executor 注入
 // 仓储构造器，验证纯逻辑分支（TEMPLATE_STORE_NOT_FOUND / 收敛不泄
