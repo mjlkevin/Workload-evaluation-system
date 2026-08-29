@@ -57,7 +57,9 @@ export function ensureExportDir(): string {
 // 阶段 2 批 1 第 4 步：inviteCodesStorePath / passwordResetTokensStorePath
 // 已随 JSON 读写路径删除（邀请码与重置令牌切 PG）。
 // S2b-2（2026-08-28）：aiSessionsStorePath 已随 ai-sessions 域 JSON 读写
-// 路径删除（ai-sessions 恒 PG，data/ai-sessions.json 已移出 git 跟踪）。
+// 路径删除（ai-sessions 恒 PG）。与 users 域不同，data/ai-sessions.json
+// 从未被 git 跟踪（.gitignore 第 59 行整目录忽略 data/），故无需 git rm --cached；
+// 开工实取该文件为 {"sessions": []}（0 条会话），删读写路径不丢数据。
 
 /**
  * 版本存储路径
