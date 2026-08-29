@@ -164,4 +164,19 @@ describe('Login', () => {
     })
     expect(await screen.findByText('密码已重置，请返回登录')).toBeInTheDocument()
   })
+
+  test('lets the shared .input focus contract style credential fields', async () => {
+    renderAuthRoutes()
+    fireEvent.click(screen.getByRole('link', { name: /使用邀请码激活/ }))
+
+    // 行内 border 的优先级高于 .input:focus{border-color:var(--brand)},
+    // 一旦写在 style 上,聚焦蓝边框就永远不会出现。
+    for (const id of ['login-email', 'login-username', 'login-password', 'login-invite']) {
+      const field = document.getElementById(id)
+      expect(field).toBeTruthy()
+      expect(field.className).toContain('input')
+      expect(field.style.border).toBe('')
+      expect(field.style.borderColor).toBe('')
+    }
+  })
 })
