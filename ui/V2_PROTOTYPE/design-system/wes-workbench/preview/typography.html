@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="WES Workbench typography preview: dense 8-step scale from 11.5px to 32px, Inter + Noto Sans SC body, JetBrains Mono numerals, tabular nums and uppercase micro-labels." />
+<title>WES Workbench — Typography</title>
+<style>
+:root {
+  --bg: oklch(0.985 0.004 250);
+  --surface: #fff;
+  --fg: oklch(0.21 0.03 260);
+  --fg-2: oklch(0.42 0.02 260);
+  --muted: oklch(0.62 0.012 260);
+  --border: oklch(0.92 0.008 255);
+  --accent: oklch(0.42 0.14 262);
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --text-3xl: 28px;
+  --text-4xl: 32px;
+  --leading-body: 1.6;
+  --leading-tight: 1.3;
+  --tracking-display: -0.01em;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-6: 24px;
+  --radius-lg: 14px;
+  --elev-raised: 0 1px 2px rgba(20, 28, 48, 0.05), 0 1px 1px rgba(20, 28, 48, 0.04);
+  --container-max: 1320px;
+  --container-gutter-desktop: 28px;
+  --section-y-desktop: 24px;
+  --bg-soft: oklch(0.965 0.006 250);
+  --brand: oklch(0.42 0.14 262);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: var(--text-base); line-height: var(--leading-body); -webkit-font-smoothing: antialiased; }
+main { max-width: var(--container-max); margin: 0 auto; padding: var(--section-y-desktop) var(--container-gutter-desktop); }
+h1 { margin: 0 0 var(--space-2); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); }
+h2 { margin: var(--space-6) 0 var(--space-4); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; line-height: var(--leading-tight); }
+p { margin: 0 0 var(--space-4); color: var(--fg-2); }
+.spec { display: grid; grid-template-columns: 120px 1fr auto; gap: var(--space-4); align-items: baseline; padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.spec .tk { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+.spec .px { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); box-shadow: var(--elev-raised); max-width: 720px; }
+.kpi-num { font-size: var(--text-3xl); font-weight: 800; line-height: 1.05; letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; }
+.mono-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--fg); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Typography 字体排印</h1>
+  <p>密集工作台字阶：14px 正文基线，等宽字体承载数字与微标签，CJK 依赖 Noto Sans SC。</p>
+
+  <h2>Type Scale 字阶</h2>
+  <div>
+    <div class="spec"><span class="tk">--text-4xl</span><span style="font-family: var(--font-display); font-size: var(--text-4xl); font-weight: 800; letter-spacing: var(--tracking-display); line-height: var(--leading-tight);">总工作量 1,284.5</span><span class="px">32px / 800</span></div>
+    <div class="spec"><span class="tk">--text-3xl</span><span style="font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 800; letter-spacing: var(--tracking-display); line-height: var(--leading-tight);">总工作量 1,284.5</span><span class="px">28px / 800</span></div>
+    <div class="spec"><span class="tk">--text-2xl</span><span style="font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-display); line-height: var(--leading-tight);">页面标题 H1</span><span class="px">20px / 700</span></div>
+    <div class="spec"><span class="tk">--text-xl</span><span style="font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; line-height: var(--leading-tight);">弹窗标题 H2</span><span class="px">18px / 700</span></div>
+    <div class="spec"><span class="tk">--text-lg</span><span style="font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; line-height: var(--leading-tight);">分区标题 H3</span><span class="px">16px / 700</span></div>
+    <div class="spec"><span class="tk">--text-base</span><span style="font-size: var(--text-base); line-height: var(--leading-body);">正文基线 14px，行高 1.6。评估结果将同步到版本历史。</span><span class="px">14px / 400</span></div>
+    <div class="spec"><span class="tk">--text-sm</span><span style="font-size: var(--text-sm); color: var(--fg-2); line-height: var(--leading-body);">表格单元格与辅助说明 12.5px。</span><span class="px">12.5px / 400</span></div>
+    <div class="spec"><span class="tk">--text-xs</span><span class="mono-num" style="font-size: var(--text-xs);">MONO XS · 11.5px · V00.07 · checked_in</span><span class="px">11.5px / mono</span></div>
+  </div>
+
+  <h2>Families 字体族</h2>
+  <div class="card">
+    <p style="margin: 0;"><strong>Display / Body：</strong>Inter + Noto Sans SC（CJK 必需）· system-ui 兜底</p>
+    <p style="margin: 0;"><strong>Mono：</strong><span class="mono-num">JetBrains Mono · 数字、版本号、表头、eyebrow 全走等宽</span></p>
+  </div>
+
+  <h2>Micro-labels &amp; Numbers 微标签与数字</h2>
+  <div class="card">
+    <span class="eyebrow">EYEBROW · MONO UPPERCASE · +0.08EM</span>
+    <div class="kpi-num" style="margin-top: var(--space-3);">1,284.5</div>
+    <p style="margin: var(--space-2) 0 0;">KPI 数字：28px / 800，行高可压到 1.05，全程 <span class="mono-num">tabular-nums</span>。</p>
+    <p style="margin-top: var(--space-3);">表头口径：<span class="mono-num" style="font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--bg-soft); padding: 2px 8px; border-radius: 6px;">功能项 · 复杂度 · 估算</span></p>
+    <p style="margin-top: var(--space-3);">行内链接用 <a href="#type-scale">品牌靛蓝 + 3px 下划线偏移</a>，不依赖下划线常驻。</p>
+  </div>
+</main>
+</body>
+</html>

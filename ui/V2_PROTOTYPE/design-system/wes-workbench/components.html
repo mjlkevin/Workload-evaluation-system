@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="WES Workbench component fixture: buttons, inputs, tags, KPI cards, panels, tables, tabs, dialogs, keyboard hints, and layout primitives bound to the wes-workbench token set." />
+<title>WES Workbench — Components</title>
+<style>
+:root {
+  --bg: oklch(0.985 0.004 250);
+  --surface: #fff;
+  --surface-warm: var(--bg-soft);
+  --fg: oklch(0.21 0.03 260);
+  --fg-2: oklch(0.42 0.02 260);
+  --muted: oklch(0.62 0.012 260);
+  --meta: var(--muted);
+  --border: oklch(0.92 0.008 255);
+  --border-soft: var(--border);
+  --accent: oklch(0.42 0.14 262);
+  --accent-on: #ffffff;
+  --accent-hover: var(--brand-ink);
+  --accent-active: color-mix(in oklab, var(--brand-ink), black 10%);
+  --success: oklch(0.66 0.13 152);
+  --warn: oklch(0.78 0.13 80);
+  --danger: oklch(0.62 0.2 25);
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --text-3xl: 28px;
+  --text-4xl: 32px;
+  --leading-body: 1.6;
+  --leading-tight: 1.3;
+  --tracking-display: -0.01em;
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --section-y-desktop: 24px;
+  --section-y-tablet: 20px;
+  --section-y-phone: 16px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 9999px;
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 1px 2px rgba(20, 28, 48, 0.05), 0 1px 1px rgba(20, 28, 48, 0.04);
+  --focus-ring: 0 0 0 3px oklch(0.42 0.14 262 / 0.35);
+  --motion-fast: 120ms;
+  --motion-base: 150ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --container-max: 1320px;
+  --container-gutter-desktop: 28px;
+  --container-gutter-tablet: 20px;
+  --container-gutter-phone: 16px;
+  --bg-2: oklch(0.96 0.01 255);
+  --bg-soft: oklch(0.965 0.006 250);
+  --line-2: oklch(0.86 0.012 255);
+  --brand: oklch(0.42 0.14 262);
+  --brand-ink: oklch(0.32 0.13 262);
+  --brand-soft: oklch(0.96 0.025 260);
+  --highlight: oklch(0.69 0.18 45);
+  --highlight-ink: oklch(0.5 0.18 45);
+  --highlight-soft: oklch(0.965 0.05 60);
+  --success-soft: oklch(0.96 0.04 152);
+  --warn-soft: oklch(0.97 0.04 80);
+  --danger-soft: oklch(0.97 0.04 25);
+  --info: oklch(0.66 0.1 195);
+  --info-soft: oklch(0.97 0.025 195);
+  --chart-1: oklch(0.42 0.14 262);
+  --chart-2: oklch(0.69 0.18 45);
+  --chart-3: oklch(0.66 0.1 195);
+  --chart-4: oklch(0.66 0.13 152);
+  --chart-5: oklch(0.55 0.18 320);
+  --elev-hover: 0 8px 28px -12px rgba(20, 28, 48, 0.18), 0 2px 6px -2px rgba(20, 28, 48, 0.06);
+  --elev-floating: 0 22px 60px -28px rgba(20, 28, 48, 0.3), 0 4px 14px -6px rgba(20, 28, 48, 0.08);
+  --layer-float: 40;
+  --layer-drawer: 50;
+  --layer-modal: 60;
+  --control-height: 36px;
+  --table-row-height: 36px;
+  --radius-shell: 18px;
+  --radius-xl: 22px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: var(--container-max); margin: 0 auto; padding: var(--section-y-desktop) var(--container-gutter-desktop); }
+section { margin-bottom: var(--section-y-desktop); }
+h1 { margin: 0 0 var(--space-2); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); }
+h2 { margin: 0 0 var(--space-4); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; line-height: var(--leading-tight); }
+h3 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-size: var(--text-base); font-weight: 700; }
+p { margin: 0 0 var(--space-3); font-size: var(--text-base); color: var(--fg-2); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+kbd {
+  display: inline-block; padding: 2px var(--space-2); border-radius: var(--radius-sm);
+  background: var(--bg-soft); box-shadow: var(--elev-ring);
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--fg-2);
+}
+nav.crumbs { display: flex; gap: var(--space-2); margin-bottom: var(--space-1); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+.eyebrow { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+
+/* Buttons — WES .btn family */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3);
+  height: var(--control-height); padding: 0 var(--space-5); border-radius: var(--radius-md);
+  border: 1px solid transparent; font-family: inherit; font-size: 13px; font-weight: 600;
+  white-space: nowrap; cursor: pointer; transition: transform var(--motion-base) var(--ease-standard), background var(--motion-base) var(--ease-standard), border-color var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard);
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn-pri { background: var(--brand); color: var(--accent-on); }
+.btn-pri:hover { background: var(--brand-ink); }
+.btn-pri:active { background: var(--accent-active); }
+.btn-hl { background: var(--highlight); color: var(--accent-on); }
+.btn-hl:hover { background: var(--highlight-ink); }
+.btn-out { background: var(--surface); color: var(--fg); border-color: var(--line-2); }
+.btn-out:hover { border-color: var(--brand); color: var(--brand); }
+.btn-ghost { background: transparent; color: var(--fg-2); }
+.btn-ghost:hover { background: var(--bg-soft); color: var(--fg); }
+.btn-dan { background: var(--surface); color: var(--danger); border-color: var(--danger); }
+.btn-dan:hover { background: var(--danger); color: var(--accent-on); }
+.btn-sm { height: 28px; padding: 0 10px; font-size: var(--text-sm); border-radius: var(--radius-sm); }
+
+/* Inputs */
+.field { display: grid; gap: var(--space-2); max-width: 360px; }
+.field label { font-size: var(--text-sm); color: var(--fg-2); }
+.input {
+  width: 100%; height: var(--control-height); padding: 0 var(--space-4);
+  border: 1px solid var(--line-2); border-radius: var(--radius-md); background: var(--surface);
+  font: inherit; font-size: 13px; color: var(--fg); outline: none;
+  transition: border-color var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard);
+}
+.input:focus-visible { border-color: var(--brand); box-shadow: var(--focus-ring); }
+.input[readonly] { background: var(--bg-soft); color: var(--muted); }
+
+/* Tags & status badges — soft fill + saturated ink + dot */
+.tag, .bdg {
+  display: inline-flex; align-items: center; gap: var(--space-2); height: 22px; padding: 0 10px;
+  border-radius: var(--radius-pill); font-family: var(--font-mono); font-size: var(--text-xs);
+  font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+}
+.tag { background: var(--bg-soft); color: var(--fg-2); }
+.tag.ok { background: var(--success-soft); color: var(--success); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.err { background: var(--danger-soft); color: var(--danger); }
+.tag.brd { background: var(--brand-soft); color: var(--brand-ink); }
+.tag.hl { background: var(--highlight-soft); color: var(--highlight-ink); }
+.tag.info { background: var(--info-soft); color: var(--info); }
+.bdg .dot { width: 6px; height: 6px; border-radius: var(--radius-pill); }
+.bdg.ok { background: var(--success-soft); color: var(--success); }
+.bdg.ok .dot { background: var(--success); }
+.bdg.co { background: var(--highlight-soft); color: var(--highlight-ink); }
+.bdg.co .dot { background: var(--highlight); }
+.bdg.lock { background: var(--danger-soft); color: var(--danger); }
+.bdg.lock .dot { background: var(--danger); }
+
+/* KPI cards */
+.grid-kpi { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
+.card-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-5); box-shadow: var(--elev-raised); }
+.card-kpi .lb { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.card-kpi .num { margin-top: var(--space-3); font-size: var(--text-3xl); font-weight: 800; line-height: 1.05; letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; }
+.card-kpi .sub { margin-top: var(--space-2); font-size: var(--text-sm); color: var(--fg-2); }
+.card-kpi--featured { background: linear-gradient(135deg, var(--brand), var(--brand-ink)); border-color: transparent; color: var(--accent-on); }
+.card-kpi--featured .lb, .card-kpi--featured .sub { color: var(--accent-on); opacity: 0.78; }
+
+/* Panel (section card) */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-shell); box-shadow: var(--elev-raised); overflow: hidden; }
+.panel-hd { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); font-weight: 700; }
+.panel-bd { padding: var(--space-6); }
+.panel-ft { display: flex; justify-content: flex-end; gap: var(--space-3); padding: var(--space-5) var(--space-6); border-top: 1px solid var(--border); background: var(--bg-soft); }
+
+/* Table */
+.table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.table th, .table td { padding: 0 var(--space-4); height: var(--table-row-height); border-bottom: 1px solid var(--border-soft); text-align: left; font-size: var(--text-sm); vertical-align: middle; }
+.table th { background: var(--bg-soft); font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.table tr:hover td { background: var(--bg-soft); }
+.table .num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.table .calc { color: var(--brand); font-weight: 600; }
+.table tr.row-selected td { background: var(--brand-soft); }
+.table tr.row-selected td:first-child { box-shadow: inset 2px 0 0 var(--brand); }
+.table tr.row-error td { background: var(--danger-soft); }
+
+/* Tabs */
+.tabs { display: flex; gap: 2px; padding: 0 var(--space-6); background: var(--surface); border-bottom: 1px solid var(--border); }
+.tabs .t { display: inline-flex; align-items: center; gap: 7px; padding: 10px var(--space-4); border: 0; background: transparent; border-bottom: 2px solid transparent; font-family: inherit; font-size: var(--text-sm); font-weight: 500; color: var(--fg-2); cursor: pointer; }
+.tabs .t.on { color: var(--brand); border-bottom-color: var(--brand); font-weight: 700; }
+
+/* Dialog (static representation) */
+.dialog { width: min(560px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-shell); box-shadow: var(--elev-floating); overflow: hidden; }
+.dialog .hd { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-5); padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); cursor: grab; }
+.dialog .hd h3 { margin: 0; font-size: var(--text-xl); font-weight: 700; line-height: 1.35; }
+.dialog .bd { padding: var(--space-6); }
+.dialog .ft { display: flex; justify-content: flex-end; gap: var(--space-3); padding: var(--space-5) var(--space-6); border-top: 1px solid var(--border); background: var(--bg-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .input { transition: none; }
+  .btn:hover { transform: none; }
+}
+</style>
+</head>
+<body>
+<main>
+  <nav class="crumbs" aria-label="breadcrumb">
+    <span>工作台</span><span aria-hidden="true">/</span><span>组件总览</span>
+  </nav>
+  <h1>WES Workbench 组件</h1>
+  <p>WES 工作量评估工作台的组件基线：密集、克制、以表格为中心。</p>
+
+  <section aria-labelledby="s-buttons">
+    <h2 id="s-buttons">Buttons 按钮</h2>
+    <div class="row">
+      <button class="btn btn-pri" type="button">保存并检入</button>
+      <button class="btn btn-hl" type="button">发起评估</button>
+      <button class="btn btn-out" type="button">导出 Excel</button>
+      <button class="btn btn-ghost" type="button">取消</button>
+      <button class="btn btn-dan" type="button">强制解锁</button>
+      <button class="btn btn-out btn-sm" type="button">小尺寸</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-inputs">
+    <h2 id="s-inputs">Inputs 输入</h2>
+    <div class="stack">
+      <div class="field">
+        <label for="f-project">项目名称</label>
+        <input class="input" id="f-project" type="text" value="小鹏汽车工作量评估" />
+      </div>
+      <div class="field">
+        <label for="f-version">版本号（只读）</label>
+        <input class="input" id="f-version" type="text" value="V00.07" readonly />
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-status">
+    <h2 id="s-status">Tags &amp; Badges 状态</h2>
+    <div class="row">
+      <span class="tag">基线</span>
+      <span class="tag brd">评审中</span>
+      <span class="tag ok">已检入</span>
+      <span class="tag warn">待复核</span>
+      <span class="tag err">已锁定</span>
+      <span class="tag hl">检出中</span>
+      <span class="tag info">提示</span>
+      <span class="bdg ok"><i class="dot"></i>checked_in</span>
+      <span class="bdg co"><i class="dot"></i>checked_out</span>
+      <span class="bdg lock"><i class="dot"></i>locked</span>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-kpi">
+    <h2 id="s-kpi">KPI Cards 指标卡</h2>
+    <div class="grid-kpi">
+      <div class="card-kpi card-kpi--featured">
+        <div class="lb">总工作量（人天）</div>
+        <div class="num">1,284.5</div>
+        <div class="sub">较上一版本 +3.2%</div>
+      </div>
+      <div class="card-kpi">
+        <div class="lb">功能点</div>
+        <div class="num">412</div>
+        <div class="sub">5 个模块</div>
+      </div>
+      <div class="card-kpi">
+        <div class="lb">评审通过率</div>
+        <div class="num">96.4%</div>
+        <div class="sub">29 / 30 项</div>
+      </div>
+      <div class="card-kpi">
+        <div class="lb">风险项</div>
+        <div class="num">2</div>
+        <div class="sub">1 高 · 1 中</div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-table">
+    <h2 id="s-table">Table 评估表</h2>
+    <div class="panel">
+      <div class="panel-hd">
+        <span>工作量明细</span>
+        <span class="tag brd">V00.07</span>
+      </div>
+      <div class="panel-bd" style="padding: 0;">
+        <table class="table">
+          <thead>
+            <tr><th>功能项</th><th>复杂度</th><th class="num">估算（人天）</th><th>状态</th></tr>
+          </thead>
+          <tbody>
+            <tr class="row-selected"><td>登录与权限</td><td>中</td><td class="num">12.0</td><td><span class="bdg ok"><i class="dot"></i>已检入</span></td></tr>
+            <tr><td>评估模型配置</td><td>高</td><td class="num calc">36.5</td><td><span class="bdg co"><i class="dot"></i>检出中</span></td></tr>
+            <tr class="row-error"><td>导出模板</td><td>低</td><td class="num">4.0</td><td><span class="bdg lock"><i class="dot"></i>锁定</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel-ft">
+        <button class="btn btn-ghost" type="button">重置</button>
+        <button class="btn btn-pri" type="button">保存</button>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-tabs">
+    <h2 id="s-tabs">Tabs 页签</h2>
+    <div class="tabs" role="tablist">
+      <button class="t on" role="tab" aria-selected="true">评估明细</button>
+      <button class="t" role="tab" aria-selected="false">版本历史</button>
+      <button class="t" role="tab" aria-selected="false">评审记录</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-dialog">
+    <h2 id="s-dialog">Dialog 弹窗（静态示意）</h2>
+    <div class="dialog" role="dialog" aria-modal="false" aria-labelledby="dlg-title">
+      <div class="hd"><h3 id="dlg-title">升版确认</h3></div>
+      <div class="bd">
+        <p>将基于当前检出内容创建新版本 <kbd>V00.08</kbd>，原版本自动归档为只读。</p>
+      </div>
+      <div class="ft">
+        <button class="btn btn-ghost" type="button">取消</button>
+        <button class="btn btn-pri" type="button">确认升版</button>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-type">
+    <h2 id="s-type">Typography 与快捷键</h2>
+    <div class="stack">
+      <span class="eyebrow">EYEBROW · MONO UPPERCASE</span>
+      <h3>卡片标题 · 14px / 700</h3>
+      <p>正文 14px，行高 1.6。数字使用等宽字体与表格数字：<a href="#s-type">查看详情</a>。</p>
+      <div class="row">
+        <kbd>Ctrl</kbd><span>+</span><kbd>S</kbd><span>保存</span>
+        <kbd>Esc</kbd><span>关闭弹窗</span>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

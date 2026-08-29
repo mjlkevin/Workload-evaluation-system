@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="WES Workbench spacing preview: 8-step space ramp, radius scale, control and table-row metrics, gutters, container cap, and elevation shadows bound to the wes-workbench token set." />
+<title>WES Workbench — Spacing</title>
+<style>
+:root {
+  --bg: oklch(0.985 0.004 250);
+  --surface: #fff;
+  --fg: oklch(0.21 0.03 260);
+  --fg-2: oklch(0.42 0.02 260);
+  --muted: oklch(0.62 0.012 260);
+  --border: oklch(0.92 0.008 255);
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-2xl: 20px;
+  --leading-body: 1.6;
+  --leading-tight: 1.3;
+  --tracking-display: -0.01em;
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --section-y-desktop: 24px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 9999px;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 1px 2px rgba(20, 28, 48, 0.05), 0 1px 1px rgba(20, 28, 48, 0.04);
+  --elev-hover: 0 8px 28px -12px rgba(20, 28, 48, 0.18), 0 2px 6px -2px rgba(20, 28, 48, 0.06);
+  --elev-floating: 0 22px 60px -28px rgba(20, 28, 48, 0.3), 0 4px 14px -6px rgba(20, 28, 48, 0.08);
+  --container-max: 1320px;
+  --container-gutter-desktop: 28px;
+  --container-gutter-tablet: 20px;
+  --container-gutter-phone: 16px;
+  --bg-soft: oklch(0.965 0.006 250);
+  --line-2: oklch(0.86 0.012 255);
+  --brand: oklch(0.42 0.14 262);
+  --control-height: 36px;
+  --table-row-height: 36px;
+  --radius-shell: 18px;
+  --radius-xl: 22px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: var(--text-base); line-height: var(--leading-body); -webkit-font-smoothing: antialiased; }
+main { max-width: var(--container-max); margin: 0 auto; padding: var(--section-y-desktop) var(--container-gutter-desktop); }
+h1 { margin: 0 0 var(--space-2); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: var(--tracking-display); line-height: var(--leading-tight); }
+h2 { margin: var(--space-6) 0 var(--space-4); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; line-height: var(--leading-tight); }
+p { margin: 0 0 var(--space-4); color: var(--fg-2); }
+.lb { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: var(--space-4); }
+.step { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+.step .bar { background: var(--brand); border-radius: var(--radius-sm); width: 28px; }
+.step .cap { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.rrow { display: flex; align-items: flex-end; gap: var(--space-5); flex-wrap: wrap; }
+.rbox { width: 84px; height: 56px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--elev-raised); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-4); }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-4); box-shadow: var(--elev-raised); }
+.tile .nm { font-size: var(--text-sm); font-weight: 600; }
+.tile .vl { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
+.ctl { display: inline-flex; align-items: center; justify-content: center; height: var(--control-height); padding: 0 var(--space-5); border-radius: var(--radius-md); background: var(--surface); border: 1px solid var(--line-2); font-size: 13px; font-weight: 600; color: var(--fg); }
+.rowline { height: var(--table-row-height); display: flex; align-items: center; padding: 0 var(--space-4); border-bottom: 1px solid var(--border); background: var(--surface); font-size: var(--text-sm); color: var(--fg-2); }
+.gut { background: var(--bg-soft); border: 1px dashed var(--border); border-radius: var(--radius-sm); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Spacing 间距</h1>
+  <p>紧凑间距体系：4–48px 八档，36px 控件与表格行，1320px 内容上限。</p>
+
+  <h2>Space Ramp 间距阶梯</h2>
+  <div class="row">
+    <div class="step"><div class="bar" style="height: var(--space-1);"></div><span class="cap">1 · 4px</span></div>
+    <div class="step"><div class="bar" style="height: var(--space-2);"></div><span class="cap">2 · 6px</span></div>
+    <div class="step"><div class="bar" style="height: var(--space-3);"></div><span class="cap">3 · 8px</span></div>
+    <div class="step"><div class="bar" style="height: var(--space-4);"></div><span class="cap">4 · 12px</span></div>
+    <div class="step"><div class="bar" style="height: var(--space-5);"></div><span class="cap">5 · 16px</span></div>
+    <div class="step"><div class="bar" style="height: var(--space-6);"></div><span class="cap">6 · 24px</span></div>
+    <div class="step"><div class="bar" style="height: var(--space-8);"></div><span class="cap">8 · 32px</span></div>
+    <div class="step"><div class="bar" style="height: var(--space-12);"></div><span class="cap">12 · 48px</span></div>
+  </div>
+  <p style="margin-top: var(--space-4);">卡片网格间距固定 <span class="cap" style="font-family: var(--font-mono); color: var(--muted);">16px</span>；分区垂直节奏 <span style="font-family: var(--font-mono); color: var(--muted);">24 / 20 / 16px</span>（桌/平/手）。</p>
+
+  <h2>Radius 圆角</h2>
+  <div class="rrow">
+    <div class="step"><div class="rbox" style="border-radius: var(--radius-sm);"></div><span class="cap">sm · 6px</span></div>
+    <div class="step"><div class="rbox" style="border-radius: var(--radius-md);"></div><span class="cap">md · 10px</span></div>
+    <div class="step"><div class="rbox" style="border-radius: var(--radius-lg);"></div><span class="cap">lg · 14px</span></div>
+    <div class="step"><div class="rbox" style="border-radius: var(--radius-shell);"></div><span class="cap">shell · 18px</span></div>
+    <div class="step"><div class="rbox" style="border-radius: var(--radius-xl);"></div><span class="cap">xl · 22px</span></div>
+    <div class="step"><div class="rbox" style="border-radius: var(--radius-pill); width: 56px;"></div><span class="cap">pill</span></div>
+  </div>
+
+  <h2>Control Metrics 控件度量</h2>
+  <div class="row">
+    <span class="ctl">按钮 / 输入 36px</span>
+    <span class="ctl" style="height: 28px; font-size: var(--text-sm); border-radius: var(--radius-sm);">小按钮 28px</span>
+  </div>
+  <div style="margin-top: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; max-width: 560px;">
+    <div class="rowline" style="background: var(--bg-soft); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);">表头 · 36px</div>
+    <div class="rowline">表格行 · --table-row-height 36px</div>
+    <div class="rowline" style="border-bottom: 0;">悬停染 bg-soft，选中染 brand-soft</div>
+  </div>
+
+  <h2>Container &amp; Gutters 容器与留白</h2>
+  <div class="tiles">
+    <div class="tile"><div class="nm">内容上限</div><div class="vl">--container-max · 1320px</div></div>
+    <div class="tile"><div class="nm">桌面留白</div><div class="vl">gutter-desktop · 28px</div><div class="gut" style="margin-top: var(--space-3); height: var(--container-gutter-desktop);"></div></div>
+    <div class="tile"><div class="nm">平板留白</div><div class="vl">gutter-tablet · 20px</div><div class="gut" style="margin-top: var(--space-3); height: var(--container-gutter-tablet);"></div></div>
+    <div class="tile"><div class="nm">手机留白</div><div class="vl">gutter-phone · 16px</div><div class="gut" style="margin-top: var(--space-3); height: var(--container-gutter-phone);"></div></div>
+  </div>
+
+  <h2>Elevation 投影</h2>
+  <div class="tiles">
+    <div class="tile" style="box-shadow: var(--elev-ring);"><div class="nm">elev-ring</div><div class="vl">发丝线即阴影</div></div>
+    <div class="tile" style="box-shadow: var(--elev-raised);"><div class="nm">elev-raised</div><div class="vl">卡片默认</div></div>
+    <div class="tile" style="box-shadow: var(--elev-hover);"><div class="nm">elev-hover</div><div class="vl">悬停抬升</div></div>
+    <div class="tile" style="box-shadow: var(--elev-floating);"><div class="nm">elev-floating</div><div class="vl">弹窗 / 抽屉</div></div>
+  </div>
+</main>
+</body>
+</html>

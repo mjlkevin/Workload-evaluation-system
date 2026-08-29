@@ -1,0 +1,172 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * design-systems/wes-workbench/tokens.css
+ *
+ * Compiled semantic tokens for "WES Workbench" — the design system of the
+ * WES (WorkEvolutionSys) workload-evaluation workbench, extracted from
+ * ui/V2_PROTOTYPE (tokens.css / tailwind.css / components.css / layout.css)
+ * on 2026-08-28.
+ *
+ * Agents: paste the `:root { … }` block verbatim into the first <style> of
+ * every artifact generated against this system, then reference tokens via
+ * var(--name) only. No raw hex/oklch outside this block.
+ *
+ * Binding notes (Open Design shared schema ↔ WES native vocabulary):
+ *   --accent      binds WES "brand" indigo — the primary action color.
+ *   --brand*      kept as extensions because WES components speak "brand".
+ *   --highlight*  is WES's native "--accent" amber tier, renamed so the
+ *                 shared --accent slot stays unambiguous.
+ *   --fg / --fg-2 / --muted  bind the WES ink ramp (--ink / --ink-2 / --ink-3).
+ *   --border      binds WES --line; --line-2 (the STRONGER control border)
+ *                 is carried as an extension, not as --border-soft.
+ *   Spacing keeps the tighter WES app scale (space-2 = 6px, space-6 = 24px),
+ *                 intentionally different from the 4px-multiple defaults.
+ * ─────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ─── Surface ──────────────────────────────────────────────────────
+   * Blue-gray canvas (#F9FAFC-ish in OKLCH), white cards. The tertiary
+   * tier is WES --bg-soft: table headers, dialog footers, ghost hovers. */
+  --bg: oklch(0.985 0.004 250);
+  --surface: #fff;
+  --surface-warm: var(--bg-soft);
+
+  /* ─── Foreground ramp (WES ink ramp, 3 real tiers) ──────────────── */
+  --fg: oklch(0.21 0.03 260);      /* --ink: primary text */
+  --fg-2: oklch(0.42 0.02 260);    /* --ink-2: secondary text */
+  --muted: oklch(0.62 0.012 260);  /* --ink-3: captions, meta, labels */
+  --meta: var(--muted);            /* alias — WES has no 4th tier */
+
+  /* ─── Border ───────────────────────────────────────────────────────
+   * --line is the default hairline; --border-soft aliases it because
+   * WES row separators reuse --line. The stronger --line-2 (inputs,
+   * outline buttons) is an extension below. */
+  --border: oklch(0.92 0.008 255);
+  --border-soft: var(--border);
+
+  /* ─── Accent ───────────────────────────────────────────────────────
+   * WES brand indigo. Primary buttons, links, active tabs, focus.
+   * Hover binds the real WES value (--brand-ink), not a formula. */
+  --accent: oklch(0.42 0.14 262);
+  --accent-on: #ffffff;
+  --accent-hover: var(--brand-ink);
+  --accent-active: color-mix(in oklab, var(--brand-ink), black 10%);
+
+  /* ─── Semantic (WES ok/warn/err saturated values) ───────────────── */
+  --success: oklch(0.66 0.13 152);
+  --warn: oklch(0.78 0.13 80);
+  --danger: oklch(0.62 0.2 25);
+
+  /* ─── Typography ───────────────────────────────────────────────────
+   * Inter + Noto Sans SC for CJK coverage; JetBrains Mono carries every
+   * number, code, eyebrow label, and table header. */
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Type scale — fitted to WES's dense workbench sizes */
+  --text-xs: 11.5px;   /* tags, badges, micro labels */
+  --text-sm: 12.5px;   /* table cells, tabs, secondary text */
+  --text-base: 14px;   /* body baseline */
+  --text-lg: 16px;     /* emphasized body / card steps */
+  --text-xl: 18px;     /* dialog & drawer titles */
+  --text-2xl: 20px;    /* page H1 (.pg-hd h1) */
+  --text-3xl: 28px;    /* KPI display numbers */
+  --text-4xl: 32px;    /* hero display, rare in app context */
+
+  --leading-body: 1.6;
+  --leading-tight: 1.3;
+  --tracking-display: -0.01em;
+
+  /* ─── Spacing — WES native 8-step scale (NOT 4px multiples) ────── */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Section rhythm — app-shell interpretation (page block separation) */
+  --section-y-desktop: 24px;
+  --section-y-tablet: 20px;
+  --section-y-phone: 16px;
+
+  /* ─── Radius — exact WES values ──────────────────────────────────── */
+  --radius-sm: 6px;     /* --r-sm: small controls, diff chips */
+  --radius-md: 10px;    /* --r-md: buttons, inputs (default control) */
+  --radius-lg: 14px;    /* --r-lg: cards, tables, KPI tiles */
+  --radius-pill: 9999px; /* tags, badges, dots */
+
+  /* ─── Elevation — WES shadow-1/2/3 + focus ring ─────────────────── */
+  --elev-flat: none;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 1px 2px rgba(20, 28, 48, 0.05), 0 1px 1px rgba(20, 28, 48, 0.04);
+
+  /* ─── Focus — WES --shadow-focus, brand-tinted 3px ring ─────────── */
+  --focus-ring: 0 0 0 3px oklch(0.42 0.14 262 / 0.35);
+
+  /* ─── Motion — WES runs 120–150ms with material-style easing ────── */
+  --motion-fast: 120ms;
+  --motion-base: 150ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ─── Layout ───────────────────────────────────────────────────────
+   * 1320px page cap (WES --page-max-width); gutters from .pg-hd (28px). */
+  --container-max: 1320px;
+  --container-gutter-desktop: 28px;
+  --container-gutter-tablet: 20px;
+  --container-gutter-phone: 16px;
+
+  /* ═══ WES extensions (Layer C) — native workbench vocabulary ═════
+   * Registered in BRAND_EXTENSIONS["wes-workbench"]. Cross-brand
+   * components must not reference these; WES-faithful artifacts may. */
+
+  /* Surface extras */
+  --bg-2: oklch(0.96 0.01 255);        /* sub-canvas / alternate page tint */
+  --bg-soft: oklch(0.965 0.006 250);   /* soft fill: th, footers, ghost hover */
+
+  /* Border extras */
+  --line-2: oklch(0.86 0.012 255);     /* strong border: inputs, outline buttons */
+
+  /* Brand ramp (WES native names; --accent mirrors --brand) */
+  --brand: oklch(0.42 0.14 262);
+  --brand-ink: oklch(0.32 0.13 262);
+  --brand-soft: oklch(0.96 0.025 260);
+
+  /* Highlight ramp — WES native "--accent" amber tier */
+  --highlight: oklch(0.69 0.18 45);
+  --highlight-ink: oklch(0.5 0.18 45);
+  --highlight-soft: oklch(0.965 0.05 60);
+
+  /* Semantic soft fills (status tag/badge/row backgrounds) */
+  --success-soft: oklch(0.96 0.04 152);
+  --warn-soft: oklch(0.97 0.04 80);
+  --danger-soft: oklch(0.97 0.04 25);
+  --info: oklch(0.66 0.1 195);
+  --info-soft: oklch(0.97 0.025 195);
+
+  /* Chart palette (chart-1 = brand, chart-2 = amber, then cyan/green/violet) */
+  --chart-1: oklch(0.42 0.14 262);
+  --chart-2: oklch(0.69 0.18 45);
+  --chart-3: oklch(0.66 0.1 195);
+  --chart-4: oklch(0.66 0.13 152);
+  --chart-5: oklch(0.55 0.18 320);
+
+  /* Elevation extras */
+  --elev-hover: 0 8px 28px -12px rgba(20, 28, 48, 0.18), 0 2px 6px -2px rgba(20, 28, 48, 0.06);
+  --elev-floating: 0 22px 60px -28px rgba(20, 28, 48, 0.3), 0 4px 14px -6px rgba(20, 28, 48, 0.08);
+
+  /* Stacking layers (float sits between tabs=30 and drawer/modal) */
+  --layer-float: 40;
+  --layer-drawer: 50;
+  --layer-modal: 60;
+
+  /* Control metrics */
+  --control-height: 36px;
+  --table-row-height: 36px;
+
+  /* Radius extras */
+  --radius-shell: 18px; /* sections, dialogs, drawers */
+  --radius-xl: 22px;    /* featured containers */
+}
