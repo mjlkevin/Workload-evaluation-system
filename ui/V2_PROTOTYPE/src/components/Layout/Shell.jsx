@@ -235,7 +235,7 @@ export default function Shell({ children, currentUser = null }) {
       <aside className={collapsed ? 'sidebar collapsed' : 'sidebar'}>
         <div className="brand">
           <div className="l">W</div>
-          <div>WES</div>
+          <div>Datum</div>
           <button type="button"
             className="toggle-btn"
             onClick={() => setCollapsed(!collapsed)}

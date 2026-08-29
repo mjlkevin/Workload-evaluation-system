@@ -65,8 +65,8 @@ export default function ResetPassword() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,var(--brand),var(--accent))', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800 }}>W</div>
           <div>
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>WorkEvolutionSys</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>WES · 工作量演化系统</div>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>Datum</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>工作量评估系统</div>
           </div>
         </div>
 
