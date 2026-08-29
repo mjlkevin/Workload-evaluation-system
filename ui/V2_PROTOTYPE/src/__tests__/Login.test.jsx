@@ -165,6 +165,28 @@ describe('Login', () => {
     expect(await screen.findByText('密码已重置，请返回登录')).toBeInTheDocument()
   })
 
+  test('tells a disabled account its status instead of a generic parameter error', async () => {
+    // 映射本身已在 useAuth.js 里存在,本测试是把行为钉住:被停用的人不该看到
+    // 「参数错误」以为自己格式打错了。此前这条只有手工实测,无 CI 覆盖。
+    server.use(
+      http.post(`${BASE}/auth/login`, () =>
+        HttpResponse.json(
+          { code: 40001, message: '参数错误', details: [{ field: 'user', reason: 'disabled' }] },
+          { status: 400 }
+        )
+      )
+    )
+
+    renderAuthRoutes()
+    fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'test-disabled' } })
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'whatever' } })
+    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+
+    expect(await screen.findByText('账号已被禁用，请联系管理员')).toBeInTheDocument()
+    // 不区分「用户不存在」与「密码错」,所以不会因这条映射造成账号枚举
+    expect(screen.queryByText('参数错误')).not.toBeInTheDocument()
+  })
+
   test('translates an expired reset link into readable text on the reset page', async () => {
     // 后端外层 message 一律是「参数错误」,可区分信息在 details[].reason 里。
     // 只读 message 会让拿着旧链接的人以为是自己密码填错了。
