@@ -278,7 +278,7 @@ export default function Login() {
       </div>
 
       {resetOpen && (
-        <div role="dialog" aria-modal="true" aria-label="找回密码" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.22)', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', placeItems: 'center', padding: 20 }}>
+        <div role="dialog" aria-modal="true" aria-label="找回密码" style={{ position: 'fixed', inset: 0, background: 'color-mix(in oklch, var(--ink) 22%, transparent)', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', placeItems: 'center', padding: 20 }}>
           <div style={{ width: 360, maxWidth: '100%', background: '#fff', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-3)', padding: 22 }}>
             <h3 style={{ margin: 0, fontSize: 16 }}>找回密码</h3>
             <p style={{ margin: '10px 0 14px', fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.6 }}>
