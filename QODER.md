@@ -44,6 +44,15 @@ If Qoder does not support skill installation, read and follow the same files man
 - Print `Worktree Contract ACK` before the first file edit.
 - Finish with the structured handoff template from `references/protocol.md`.
 
+### 推送前安全扫描判定（2026-08-29 架构侧常设规则，后续批次一律照此执行）
+
+判断轴不是「有没有新代码」，而是**改动有没有落在攻击面上**。按下表自行判断，不必每次询问架构侧。
+
+- **直接推送，不用扫**：纯文档、注释、看板、计划文档；文件删除、重命名、移动（不含新增逻辑）；纯样式/布局/文案改动；测试文件的新增与修改；种子/固定数据的读取与装载（源为仓库内文件）；已被架构侧读过 diff 并明确批准的内容。
+- **必须扫**：鉴权、会话、令牌、权限判定相关的任何改动；处理外部输入的路径（HTTP 入参、上传文件、第三方回调、模型返回值落库）；拼接 SQL、动态执行、反序列化、路径拼接；新增依赖或依赖版本升级；加密、签名、随机数、凭据读写；CORS / CSP / Cookie 属性 / 重定向目标；对外暴露新端点，或放宽既有端点的权限要求。
+- **拿不准时按「必须扫」处理**——判断成本远低于漏扫成本。
+- 额度不足且改动落在「必须扫」清单里：**停下报架构侧**，由架构侧代读 diff 或安排他法；不得以「额度不足」为由跳过必扫项。
+
 Qoder may report `已回填 / 待 Codex 复核`; Codex/user decide whether a WES requirement is `已交付`.
 
 ## 历史说明（已下线）

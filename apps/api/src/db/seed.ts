@@ -10,10 +10,21 @@
 //                            knowledgeBaseConfig（config/system/*.json 三 key）
 //   5. system_configs     <- modelVerifyStatus：只建 key（空 store）供运行时写入，
 //                            由 saveScenarioVerifyRecord 写，不播种当前内容
+//   6. knowledge_entries  <- config/knowledge/store.json（业务域种子语料，AI 检索依赖）
+//                            2026-08-29 补：本项原先不在清单内，导致新库重建后
+//                            知识语料不会被带回、「AI 检索恒空」事故复发（见事故记录）；
+//                            同时吸收一次性脚本 scripts/migrate-knowledge-json-to-pg.cjs 的职责
 //   +  ensureAdminSeed    <- WES_ADMIN_USERNAME / WES_ADMIN_PASSWORD（生产缺密码拒绝启动）
 //
 // 幂等口径：缺失才插（onConflictDoNothing），不 TRUNCATE、不覆盖运行时写入；
-// 连续执行两次，四类配置行数不变。
+// 连续执行两次，各类配置行数不变。
+//
+// 编辑过种子行的处置口径（knowledge_entries 与 templates / rule_sets / version_code_rules /
+// system_configs 同源）：
+//   - 普通 db:seed：只补缺、不覆盖——用户改过的种子行**保持改后的值**，不会被还原；
+//   - db:seed --force：先删源文件派生行再重播，用户对这些行的编辑**会被还原成仓库 JSON
+//     源里的值**。种子数据以仓库文件为准是 --force 的设计语义，不是数据丢失；
+//     用户自建、id 不在种子源里的知识词条，两种模式下都不会被动。
 //
 // 本模块只落 seed 函数；db:seed 脚本接线与启动 migrate 属事项 7。
 
@@ -24,7 +35,7 @@ import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 
 import { db } from "./client";
-import { ruleSets, systemConfigs, templates, users, versionCodeRules } from "./schema";
+import { knowledgeEntries, ruleSets, systemConfigs, templates, users, versionCodeRules } from "./schema";
 import { resolveRootDir } from "../utils/file";
 import type { RuleSet, Template, VersionCodeRule, VersionCodeRulesStore } from "../types";
 
@@ -33,6 +44,7 @@ export type SeedBaseConfigResult = {
   templates: number;
   ruleSets: number;
   systemConfigs: number;
+  knowledgeEntries: number;
 };
 
 export type SeedAdminResult = {
@@ -72,6 +84,71 @@ function parseDateOrNow(value: unknown): Date {
   return parseDateOrNull(value) ?? new Date();
 }
 
+/** seed 源里的单条知识词（config/knowledge/store.json 只保证 id/title/content/category/tags，无 status/时间列）。 */
+type KnowledgeSeedSourceEntry = {
+  id?: unknown;
+  title?: unknown;
+  content?: unknown;
+  category?: unknown;
+  tags?: unknown;
+};
+
+/**
+ * 知识词条 seed 行构造（纯函数，不碰 DB）。
+ *
+ * 字段口径与 knowledge-pg.repository.create 一致：title/content 去首尾空白、
+ * category 缺省 general、tags 缺省 []、status 直接 active（新库重建后 AI 检索需立刻可检）。
+ * 语料文件里没有 status/createdAt/updatedAt 三列，统一由本函数补齐。
+ * 缺 id / title / content 任一项的条目直接跳过，不产生脏行。
+ */
+export function buildKnowledgeSeedRows(
+  raw: unknown,
+  now: Date = new Date(),
+): Array<{
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+  status: "active";
+  createdAt: Date;
+  updatedAt: Date;
+}> {
+  const entries = Array.isArray((raw as { entries?: unknown } | null)?.entries)
+    ? ((raw as { entries: KnowledgeSeedSourceEntry[] }).entries ?? [])
+    : [];
+
+  const rows: Array<{
+    id: string;
+    title: string;
+    content: string;
+    category: string;
+    tags: string[];
+    status: "active";
+    createdAt: Date;
+    updatedAt: Date;
+  }> = [];
+
+  for (const entry of entries) {
+    const id = typeof entry?.id === "string" ? entry.id.trim() : "";
+    const title = typeof entry?.title === "string" ? entry.title.trim() : "";
+    const content = typeof entry?.content === "string" ? entry.content.trim() : "";
+    if (!id || !title || !content) continue;
+    rows.push({
+      id,
+      title,
+      content,
+      category: typeof entry.category === "string" && entry.category.trim() ? entry.category.trim() : "general",
+      tags: Array.isArray(entry.tags) ? (entry.tags as string[]) : [],
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  return rows;
+}
+
 function resolveAdminCredentials(options: SeedAdminOptions): { username: string; password: string } {
   const username = (options.adminUsername || process.env.WES_ADMIN_USERNAME || "admin").trim();
   const password = options.adminPassword || process.env.WES_ADMIN_PASSWORD || "Admin@2026!";
@@ -93,6 +170,7 @@ function loadSeedSources(rootDir: string) {
       ["implementationDependencyRules", readJsonOr<unknown>(rootDir, "config/system/implementation-dependency-rules.json", null)],
       ["knowledgeBaseConfig", readJsonOr<unknown>(rootDir, "config/system/knowledge-base-config.json", null)],
     ] as const,
+    knowledgeStore: readJsonOr<unknown>(rootDir, "config/knowledge/store.json", null),
   };
 }
 
@@ -112,6 +190,13 @@ export async function seedBaseConfig(options: SeedBaseConfigOptions = {}): Promi
     await db.delete(templates);
     await db.delete(ruleSets);
     await db.delete(versionCodeRules);
+    // knowledge_entries 与上面三张“只由 seed 写”的表不同：它是运行时可写表
+    // （用户可在知识管理入口新增/修改词条）。因此 force 只按 seed 源里的 id 定点删除，
+    // 不得整表删除，否则会把切换后用户新增的词条一并清掉。
+    const knowledgeSeedIds = buildKnowledgeSeedRows(sources.knowledgeStore).map((row) => row.id);
+    if (knowledgeSeedIds.length > 0) {
+      await db.delete(knowledgeEntries).where(inArray(knowledgeEntries.id, knowledgeSeedIds));
+    }
   }
 
   const insertedRules = await db
@@ -196,11 +281,21 @@ export async function seedBaseConfig(options: SeedBaseConfigOptions = {}): Promi
     .onConflictDoNothing({ target: systemConfigs.configKey })
     .returning();
 
+  const knowledgeSeedRows = buildKnowledgeSeedRows(sources.knowledgeStore);
+  const insertedKnowledgeEntries = knowledgeSeedRows.length
+    ? await db
+        .insert(knowledgeEntries)
+        .values(knowledgeSeedRows)
+        .onConflictDoNothing({ target: knowledgeEntries.id })
+        .returning()
+    : [];
+
   return {
     versionCodeRules: insertedRules.length,
     templates: insertedTemplates.length,
     ruleSets: insertedRuleSets.length,
     systemConfigs: insertedSystemConfigs.length,
+    knowledgeEntries: insertedKnowledgeEntries.length,
   };
 }
 

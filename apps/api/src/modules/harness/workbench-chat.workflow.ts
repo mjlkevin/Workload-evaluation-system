@@ -28,6 +28,7 @@ import type {
 import type { AiAttachment, AiSessionRecord } from "../ai-sessions/ai-sessions.types";
 import { normalizeHomeAttachments, latestSessionAttachmentWithSummary, isExplicitReportRequest } from "../../services/ai/handlers/workbench-shared";
 import { runExplicitHomeReportFlow } from "../../services/ai/handlers/report-flow";
+import type { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
 
 export type WorkbenchChatWorkflowDeps = {
   /**
@@ -63,6 +64,15 @@ export type WorkbenchChatWorkflowDeps = {
    * 阶段 1 批 8：返回类型由同步改 Promise（底层 accessor 已异步化），实现 不动。
    */
   getSessionRecord?(sessionId: string, ownerUserId: string): Promise<AiSessionRecord | null>;
+  /**
+   * RP-030 真实链路覆盖（2026-08-28）：异步通道 trace 归档（与同步路径
+   * workbench-chat.handler.ts 同口径）。生产接线注入 trace.usecase 真实
+   * 实现；测试注入 spy。可选以保持 additive 不破坏既有构造点；未注入时
+   * 静默跳过。写入必须置于 recordToolEffectOnce 的 execute 内——恢复重放
+   * 跳过 execute，幂等天然成立（同流式事件口径）。
+   */
+  recordTurnTrace?(input: Parameters<typeof recordWorkbenchTurnTrace>[0]): Promise<unknown>;
+  recordTurnFailureTrace?(input: Parameters<typeof recordWorkbenchTurnFailureTrace>[0]): Promise<unknown>;
 };
 
 export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): HarnessWorkflow {
@@ -184,15 +194,48 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               }
             },
           };
-          const result = await deps.dispatch({
-            message: content,
-            attachment: dispatchAttachment,
-            user: { id: run.ownerUserId, username: run.ownerUsername, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" },
-            workflowKey: "free_chat",
-            streamingAdapter,
-          });
+          let result: Awaited<ReturnType<WorkbenchChatWorkflowDeps["dispatch"]>>;
+          try {
+            result = await deps.dispatch({
+              message: content,
+              attachment: dispatchAttachment,
+              user: { id: run.ownerUserId, username: run.ownerUsername, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" },
+              workflowKey: "free_chat",
+              streamingAdapter,
+            });
+          } catch (err) {
+            // RP-030：失败 trace 归档（与同步路径同口径；归档自身失败静默吸收），随后重抛由 runtime 标记 run failed
+            if (deps.recordTurnFailureTrace) {
+              const reason = err instanceof Error ? err.message : "workbench_chat_failed";
+              await deps.recordTurnFailureTrace({
+                ownerUserId: run.ownerUserId,
+                ownerUsername: run.ownerUsername,
+                aiSessionId,
+                userInputSummary: content.slice(0, 200),
+                routingRule: "failed_before_dispatch",
+                contextRefs: dispatchAttachment ? [`attachment:${dispatchAttachment.name}`] : [],
+                error: { code: reason, message: reason, retryable: true },
+              }).catch(() => {
+                // 失败 trace 写入失败不影响主链路
+              });
+            }
+            throw err;
+          }
           // execute 返回前冲刷写链，避免流式事件丢失在游离 promise 中
           await streamEventChain;
+          // RP-030：成功 trace 归档（置于 execute 内，恢复重放跳过不重复写）
+          if (deps.recordTurnTrace) {
+            await deps.recordTurnTrace({
+              ownerUserId: run.ownerUserId,
+              ownerUsername: run.ownerUsername,
+              aiSessionId,
+              userInputSummary: content.slice(0, 200),
+              dispatchTrace: result.trace,
+              model: result.model,
+            }).catch(() => {
+              // trace 写入失败不影响主链路
+            });
+          }
           return {
             answer: result.answer,
             intent: result.intent,

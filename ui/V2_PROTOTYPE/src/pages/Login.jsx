@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { apiClient } from '../api/client.js'
 import { unwrap } from '../api/utils.js'
 import useAuth from '../hooks/useAuth.js'
+import { APP_VERSION } from '../config/app.js'
 
 const USERNAME_HISTORY_KEY = 'wes_username_history'
 const LEGACY_RECENT_USERS_KEY = 'wes_recent_users'
@@ -65,7 +66,7 @@ export default function Login() {
   const usernameInputRef = useRef(null)
   const passwordInputRef = useRef(null)
   const dropdownRef = useRef(null)
-  const { login, register, loading, error } = useAuth()
+  const { login, register, loading, error, clearError } = useAuth()
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -143,36 +144,40 @@ export default function Login() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: 'linear-gradient(135deg,var(--bg) 0%,var(--brand-soft) 100%)', fontFamily: 'var(--font-sans)' }}>
+    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', placeItems: 'center', padding: 24, background: 'linear-gradient(135deg,var(--bg) 0%,var(--brand-soft) 100%)', fontFamily: 'var(--font-sans)' }}>
       <div style={{ width: 380, maxWidth: '100%', background: '#fff', borderRadius: 'var(--shell-radius)', boxShadow: 'var(--shadow-3)', padding: '30px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,var(--brand),var(--accent))', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800 }}>W</div>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,var(--brand),var(--accent))', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800 }}>D</div>
           <div>
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>WorkEvolutionSys</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>WES · 工作量演化系统</div>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>Datum</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>工作量评估系统</div>
           </div>
         </div>
 
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, display: mode === 'login' ? 'block' : 'none' }}>登录</h3>
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, display: mode === 'register' ? 'block' : 'none' }}>使用邀请码激活账号</h3>
-        <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 20 }}>请输入账号信息以继续</p>
+        <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 20 }}>{mode === 'login' ? '请输入账号信息以继续' : '以下信息均为必填'}</p>
 
         <form style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={handleSubmit} onKeyDown={(e) => { if (e.altKey && e.key.toLowerCase() === 'a') { e.preventDefault(); e.target.select?.() } }}>
           {mode === 'register' && (
-            <input className="input" type="email" placeholder="邮箱" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label htmlFor="login-email" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邮箱</label>
+              <input id="login-email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); clearError() }} />
+            </div>
           )}
-          <div style={{ position: 'relative' }}>
-            <input
-              ref={usernameInputRef}
-              className="input"
-              type="text"
-              placeholder="用户名"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onFocus={handleUsernameFocus}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }}
-            />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label htmlFor="login-username" style={{ fontSize: 12, color: 'var(--ink-2)' }}>用户名</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                id="login-username"
+                ref={usernameInputRef}
+                className="input"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => { setUsername(e.target.value); clearError() }}
+                onFocus={handleUsernameFocus}
+              />
             {showUsernameDropdown && usernameHistory.length > 0 && (
               <div
                 ref={dropdownRef}
@@ -213,10 +218,17 @@ export default function Login() {
                 ))}
               </div>
             )}
+            </div>
           </div>
-          <input ref={passwordInputRef} className="input" type="password" placeholder="密码" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14, borderColor: 'var(--brand)', boxShadow: 'var(--shadow-focus)' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label htmlFor="login-password" style={{ fontSize: 12, color: 'var(--ink-2)' }}>密码</label>
+            <input ref={passwordInputRef} id="login-password" className="input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => { setPassword(e.target.value); clearError() }} />
+          </div>
           {mode === 'register' && (
-            <input className="input" type="text" placeholder="邀请码（必填）" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label htmlFor="login-invite" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邀请码</label>
+              <input id="login-invite" className="input" type="text" autoComplete="off" value={inviteCode} onChange={(e) => { setInviteCode(e.target.value); clearError() }} />
+            </div>
           )}
 
           {mode === 'login' && (
@@ -239,7 +251,7 @@ export default function Login() {
                 }}
                 style={{ border: 0, background: 'transparent', padding: 0, fontSize: 12, color: 'var(--brand)', cursor: 'pointer' }}
               >
-                忘记密码?
+                忘记密码？
               </button>
             </div>
           )}
@@ -263,23 +275,23 @@ export default function Login() {
       </div>
 
       <div style={{ position: 'fixed', bottom: 16, right: 20, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-        v 1.4.0 · © 2026 WES Team · <span style={{ cursor: 'pointer' }}>简体中文 ▾</span>
+        v {APP_VERSION} · © 2026 Datum
       </div>
 
       {resetOpen && (
-        <div role="dialog" aria-modal="true" aria-label="找回密码" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.22)', display: 'grid', placeItems: 'center', padding: 20 }}>
+        <div role="dialog" aria-modal="true" aria-label="找回密码" style={{ position: 'fixed', inset: 0, background: 'color-mix(in oklch, var(--ink) 22%, transparent)', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', placeItems: 'center', padding: 20 }}>
           <div style={{ width: 360, maxWidth: '100%', background: '#fff', borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-3)', padding: 22 }}>
             <h3 style={{ margin: 0, fontSize: 16 }}>找回密码</h3>
             <p style={{ margin: '10px 0 14px', fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.6 }}>
               将为当前用户名生成一次性重置链接。
             </p>
-            <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 6 }}>用户名</div>
+            <label htmlFor="reset-username" style={{ display: 'block', fontSize: 12, color: 'var(--ink-2)', marginBottom: 6 }}>用户名</label>
             <input
+              id="reset-username"
               className="input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="请输入用户名"
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }}
             />
             {resetMessage && (
               <div style={{ marginTop: 12, fontSize: 12, lineHeight: 1.6, color: resetLink ? 'var(--ok)' : 'var(--ink-2)' }}>
@@ -292,7 +304,7 @@ export default function Login() {
               </Link>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
-              <button type="button" className="btn" onClick={() => setResetOpen(false)} style={{ height: 32, fontSize: 12 }}>关闭</button>
+              <button type="button" className="btn btn-out" onClick={() => setResetOpen(false)} style={{ height: 32, fontSize: 12 }}>关闭</button>
               <button type="button" className="btn btn-pri" disabled={resetLoading} onClick={requestReset} style={{ height: 32, fontSize: 12 }}>
                 {resetLoading ? '发送中…' : '发送重置链接'}
               </button>

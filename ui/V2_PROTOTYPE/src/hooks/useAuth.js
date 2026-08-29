@@ -82,5 +82,8 @@ export default function useAuth({ enabled = true } = {}) {
     }
   }
 
-  return { login, register, loading, error }
+  // 用户开始修改输入时上一轮报错就该消失,不等下一次提交
+  const clearError = () => setError(null)
+
+  return { login, register, loading, error, clearError }
 }
