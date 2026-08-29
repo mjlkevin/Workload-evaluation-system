@@ -187,6 +187,53 @@ describe('Login', () => {
     expect(screen.queryByText('参数错误')).not.toBeInTheDocument()
   })
 
+  test('clears the credential error as soon as the user edits a field', async () => {
+    server.use(
+      http.post(`${BASE}/auth/login`, () =>
+        HttpResponse.json(
+          { code: 40001, message: '参数错误', details: [{ field: 'username/password', reason: 'invalid_credentials' }] },
+          { status: 400 }
+        )
+      )
+    )
+
+    renderAuthRoutes()
+    fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'demo' } })
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'wrong' } })
+    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+
+    expect(await screen.findByText('账号或密码错误，请重新输入')).toBeInTheDocument()
+
+    // 人在改密码的过程中,上一轮报错就不该还挂在下面
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'r' } })
+    await waitFor(() => {
+      expect(screen.queryByText('账号或密码错误，请重新输入')).not.toBeInTheDocument()
+    })
+  })
+
+  test('clears the reset-page error as soon as the user edits a field', async () => {
+    server.use(
+      http.post(`${BASE}/auth/password-reset/confirm`, () =>
+        HttpResponse.json(
+          { code: 40001, message: '参数错误', details: [{ field: 'token', reason: 'invalid_or_expired' }] },
+          { status: 400 }
+        )
+      )
+    )
+
+    renderAuthRoutes(['/reset-password?token=expired-token'])
+    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'NewPass123!' } })
+    fireEvent.change(screen.getByLabelText('确认新密码'), { target: { value: 'NewPass123!' } })
+    fireEvent.click(screen.getByRole('button', { name: '确认重置密码' }))
+
+    expect(await screen.findByText(/重置链接已失效或已过期/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'NewPass1234' } })
+    await waitFor(() => {
+      expect(screen.queryByText(/重置链接已失效或已过期/)).not.toBeInTheDocument()
+    })
+  })
+
   test('lets the shared .input focus contract style credential fields', async () => {
     renderAuthRoutes()
     fireEvent.click(screen.getByRole('link', { name: /使用邀请码激活/ }))

@@ -81,7 +81,7 @@ export default function ResetPassword() {
               type="password"
               autoComplete="new-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); if (!success) setMessage('') }}
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: 'var(--ink-2)' }}>
@@ -91,7 +91,7 @@ export default function ResetPassword() {
               type="password"
               autoComplete="new-password"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              onChange={(e) => { setConfirm(e.target.value); if (!success) setMessage('') }}
             />
           </label>
 

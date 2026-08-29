@@ -65,7 +65,7 @@ export default function Login() {
   const usernameInputRef = useRef(null)
   const passwordInputRef = useRef(null)
   const dropdownRef = useRef(null)
-  const { login, register, loading, error } = useAuth()
+  const { login, register, loading, error, clearError } = useAuth()
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -161,7 +161,7 @@ export default function Login() {
           {mode === 'register' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label htmlFor="login-email" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邮箱</label>
-              <input id="login-email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input id="login-email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); clearError() }} />
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -174,7 +174,7 @@ export default function Login() {
                 type="text"
                 autoComplete="username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => { setUsername(e.target.value); clearError() }}
                 onFocus={handleUsernameFocus}
               />
             {showUsernameDropdown && usernameHistory.length > 0 && (
@@ -221,12 +221,12 @@ export default function Login() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label htmlFor="login-password" style={{ fontSize: 12, color: 'var(--ink-2)' }}>密码</label>
-            <input ref={passwordInputRef} id="login-password" className="input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input ref={passwordInputRef} id="login-password" className="input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => { setPassword(e.target.value); clearError() }} />
           </div>
           {mode === 'register' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label htmlFor="login-invite" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邀请码</label>
-              <input id="login-invite" className="input" type="text" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} />
+              <input id="login-invite" className="input" type="text" autoComplete="off" value={inviteCode} onChange={(e) => { setInviteCode(e.target.value); clearError() }} />
             </div>
           )}
 
