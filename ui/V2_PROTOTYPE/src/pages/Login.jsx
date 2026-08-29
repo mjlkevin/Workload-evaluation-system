@@ -292,7 +292,7 @@ export default function Login() {
               </Link>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
-              <button type="button" className="btn" onClick={() => setResetOpen(false)} style={{ height: 32, fontSize: 12 }}>关闭</button>
+              <button type="button" className="btn btn-out" onClick={() => setResetOpen(false)} style={{ height: 32, fontSize: 12 }}>关闭</button>
               <button type="button" className="btn btn-pri" disabled={resetLoading} onClick={requestReset} style={{ height: 32, fontSize: 12 }}>
                 {resetLoading ? '发送中…' : '发送重置链接'}
               </button>
