@@ -124,4 +124,18 @@ describe('ApiKeys · 窄屏响应式', () => {
     const gridEl = container.querySelector('.grid-2-eq')
     expect(gridEl).not.toBeNull()
   })
+
+  // 卡片自带 overflow:hidden，指令行里两个按钮不换行时，
+  // 360 宽下第二个按钮的右边缘被卡片切掉，看上去存在但点不到。
+  test('指令行的按钮允许换行，窄屏下「复制 cURL」不会被卡片切掉', async () => {
+    mockKeyApis()
+    renderPage()
+
+    const curlButtons = await screen.findAllByRole('button', { name: /复制 cURL/ })
+    expect(curlButtons.length).toBeGreaterThan(1)
+
+    for (const button of curlButtons) {
+      expect(button.parentElement).toHaveStyle({ flexWrap: 'wrap' })
+    }
+  })
 })
