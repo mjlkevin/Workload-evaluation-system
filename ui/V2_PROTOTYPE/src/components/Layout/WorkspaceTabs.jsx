@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
+import { ROUTE_REDIRECTS, SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
 import { useUnsavedNavigation } from '../../hooks/useUnsavedChanges.jsx'
 
 const STORAGE_KEY = 'wes-v2-workspace-tabs-v1'
@@ -65,7 +65,10 @@ function normalizeTabs(input) {
   const seen = new Set()
   const tabs = []
   for (const tab of input) {
-    const path = String(tab?.path || '').trim()
+    // 先把跳转路由解到它真正指向的子页再进去重：/system 会被 <Navigate replace>
+    // 立刻换成 /system/code-rules，但布局路由在重定向期间不卸载，两个路径都会被记
+    // 一笔。不解的话条上会常年挂着一个点不动的「系统管理」僵尸页签。
+    const path = resolveRedirectPath(tab?.path)
     if (!path || path === '/login' || !path.startsWith('/')) continue
     const dedupeKey = normalizeTabPath(path)
     if (seen.has(dedupeKey)) continue
@@ -73,6 +76,14 @@ function normalizeTabs(input) {
     tabs.push({ path, title: resolveTabTitle(path) })
   }
   return tabs.length ? tabs : [{ path: '/', title: 'AI 工作台' }]
+}
+
+function resolveRedirectPath(path) {
+  const raw = String(path || '').trim()
+  const [basePath, query = ''] = raw.split('?')
+  const target = ROUTE_REDIRECTS[basePath]
+  if (!target) return raw
+  return query ? `${target}?${query}` : target
 }
 
 function menuPosition(x, y) {

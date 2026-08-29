@@ -30,7 +30,7 @@ const SystemManagement = lazy(() => import('./pages/SystemManagement.jsx'))
 const UserManagement = lazy(() => import('./pages/UserManagement.jsx'))
 const ApiKeys = lazy(() => import('./pages/ApiKeys.jsx'))
 import { isAuthenticated } from './api/auth.js'
-import { DEFAULT_SYSTEM_MANAGEMENT_ROUTE, SYSTEM_MANAGEMENT_SECTIONS } from './config/systemManagementSections.js'
+import { DEFAULT_SYSTEM_MANAGEMENT_ROUTE, SYSTEM_MANAGEMENT_PARENT_ROUTE, SYSTEM_MANAGEMENT_SECTIONS } from './config/systemManagementSections.js'
 import useCurrentUser from './hooks/useCurrentUser.js'
 import { isAdminOnlyPath, isAdminUser } from './utils/adminAccess.js'
 
@@ -91,7 +91,7 @@ export default function App() {
         <Route path="/wbs" element={<WbsList />} />
         <Route path="/history" element={<HistoryList />} />
         <Route path="/history/:id" element={<HistoryDetail />} />
-        <Route path="/system" element={<Navigate to={DEFAULT_SYSTEM_MANAGEMENT_ROUTE} replace />} />
+        <Route path={SYSTEM_MANAGEMENT_PARENT_ROUTE} element={<Navigate to={DEFAULT_SYSTEM_MANAGEMENT_ROUTE} replace />} />
         {SYSTEM_MANAGEMENT_SECTIONS.map((section) => (
           <Route
             key={section.id}
