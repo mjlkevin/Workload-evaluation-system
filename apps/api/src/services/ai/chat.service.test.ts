@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PassThrough } from "node:stream";
-import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { Request, Response } from "express";
 import { config } from "../../config/env";
 import { defaultProviderRegistry, type ModelProvider } from "../../ai/provider";
-import { aiSessionsStorePath } from "../../utils";
 import type { AuthUser } from "../../types";
 import { appendAiSessionEvent, createAiSession, deleteAiSession, listAiSessions } from "../../modules/ai-sessions/ai-sessions.usecase";
 import { _resetTraceRepositoryForTest, queryTraces } from "../../modules/trace/trace.repository";
@@ -192,10 +191,9 @@ async function withChatServiceIsolation(run: () => Promise<void>) {
   // 断言失效。显式隔离到 JSON 实现。
   // S2b-1（2026-08-27）：ai-sessions 已随九开关走 PG，不再显式隔离（仅动 AI_SESSIONS 分支）；
   // TRACES 仍走 JSON，WES_STORE_TRACES_PG 分支原样保留（S3 才动）。
+  // S2b-2（2026-08-28）：ai-sessions JSON 路径已删除，session 文件快照/还原随
+  // 之移除（用例经 repository 单例读写，after 按测试用户清理）；TRACES 不变。
   const previousTracesPgFlag = process.env.WES_STORE_TRACES_PG;
-  const sessionPath = aiSessionsStorePath();
-  const sessionExisted = existsSync(sessionPath);
-  const sessionBefore = sessionExisted ? readFileSync(sessionPath, "utf-8") : "";
   const providersBefore = defaultProviderRegistry.list();
   const defaultBefore = defaultProviderRegistry.getDefault()?.name;
 
@@ -221,11 +219,6 @@ async function withChatServiceIsolation(run: () => Promise<void>) {
       defaultProviderRegistry.register(provider, { asDefault: provider.name === defaultBefore });
     }
 
-    if (sessionExisted) {
-      writeFileSync(sessionPath, sessionBefore, "utf-8");
-    } else if (existsSync(sessionPath)) {
-      rmSync(sessionPath, { force: true });
-    }
     rmSync(TEST_TRACE_STORE_DIR, { recursive: true, force: true });
   }
 }

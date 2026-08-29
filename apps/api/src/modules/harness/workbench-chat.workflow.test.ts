@@ -3,9 +3,11 @@
  * 常驻回归资产：workbench_chat_v1@1.0.0 workflow——
  * 1) 从 executionConfig.content 取输入，复用 dispatch 链路；
  * 2) AI 调用经 recordToolEffectOnce 幂等（重复执行同 step 不产生第二次 AI 调用）；
- * 3) 结果经 outbox 投递 assistant 消息（deduplicationKey = ${runId}:assistant:1）；
- * 4)（Batch E 二次返工 · 新通道消息落库双缺陷修复）outbox payload 携带
- *    projector 契约的 message 字段；用户消息在 dispatch 前幂等落库。
+ * 3) assistant 消息经 appendSessionMessage 直接幂等落库（来源键 = ${runId}:assistant:1）；
+ * 4)（Batch E 二次返工 · 新通道消息落库双缺陷修复）assistant 直写内容非空且与
+ *    answer 一致；用户消息在 dispatch 前幂等落库。
+ * 5)（S2b-2 · §4.8 补偿链删除）outbox 恒空，projector/sink 已删；幂等吸收由
+ *    repository 层按键查重守护（本套件以 recording fake 断言调用序列与来源键）。
  */
 import test, { before } from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +17,6 @@ import path from "node:path";
 import { createWorkbenchChatWorkflow, type WorkbenchChatWorkflowDeps } from "./workbench-chat.workflow";
 import type { HarnessWorkflowStepContext } from "./harness-runtime.worker";
 import {
-  appendAiSessionMessageIdempotent,
   type AppendAiSessionMessageIdempotentInput,
 } from "../ai-sessions/ai-sessions.repository";
 import type { AiSessionsStore } from "../ai-sessions/ai-sessions.types";
@@ -63,6 +64,28 @@ function readStoreFile(storePath: string): AiSessionsStore {
 /** 不关心用户消息落库的用例使用的 no-op dep。 */
 function makeNoOpAppendSessionMessage(): WorkbenchChatWorkflowDeps["appendSessionMessage"] {
   return async (input) => ({ found: true, created: false, message: input.message });
+}
+
+type RecordedAppendCall = {
+  role: string;
+  content: string;
+  deduplicationKey: string;
+  attachmentIds?: string[];
+};
+
+/** S2b-2 后 appendSessionMessage 为注入 dep（直写 PG 由 repository 层守护）：
+ *  本套件以 recording fake 断言 workflow 的调用序列与来源键；幂等吸收语义
+ *  由 ai-sessions.repository.test.ts（PG）守护。 */
+function makeRecordingAppendSessionMessage(calls: RecordedAppendCall[]) {
+  return async (input: AppendAiSessionMessageIdempotentInput) => {
+    calls.push({
+      role: input.message.role,
+      content: input.message.content,
+      deduplicationKey: input.source.deduplicationKey,
+      attachmentIds: input.message.attachmentIds,
+    });
+    return { found: false, created: true, message: input.message };
+  };
 }
 
 /** 不关心流式事件的用例使用的 no-op dep（ISS-2026-08-10-004 层 2 接线后 deps 必填）。 */
@@ -157,10 +180,7 @@ test("executeStep 从 executionConfig.content 取输入并 dispatch", async () =
 
   assert.equal(dispatchedContent, "你好");
   assert.equal(outcome.nextStepKey, null, "单步 workflow 执行后应到达终态");
-  assert.ok(outcome.outbox);
-  assert.equal(outcome.outbox!.length, 1);
-  assert.equal(outcome.outbox![0].eventType, "assistant_message");
-  assert.equal(outcome.outbox![0].payload.answer, "模型回复");
+  assert.deepEqual(outcome.outbox, [], "S2b-2 后补偿链已删，outbox 恒空");
 });
 
 test("recordToolEffectOnce 幂等：重复执行不产生第二次 AI 调用", async () => {
@@ -202,7 +222,8 @@ test("recordToolEffectOnce 幂等：重复执行不产生第二次 AI 调用", a
   assert.equal(callCount, 1, "幂等性保证：第二次不应触发新的 AI 调用");
 });
 
-test("outbox deduplicationKey 冻结为 ${runId}:assistant:1", async () => {
+test("assistant 消息来源键冻结为 ${runId}:assistant:1", async () => {
+  const calls: RecordedAppendCall[] = [];
   const wf = createWorkbenchChatWorkflow({
     dispatch: async () => ({
       intent: "domain_qa",
@@ -212,21 +233,27 @@ test("outbox deduplicationKey 冻结为 ${runId}:assistant:1", async () => {
       suggestedActions: [],
       trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
     } as any),
-    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendSessionMessage: makeRecordingAppendSessionMessage(calls),
     appendRunEvent: makeNoOpAppendRunEvent(),
   });
 
   const ctx = makeFakeCtx();
   const outcome = await wf.executeStep("chat", ctx);
 
-  assert.equal(outcome.outbox![0].deduplicationKey, "run-1:assistant:1");
+  assert.equal(
+    calls.find((c) => c.role === "assistant")?.deduplicationKey,
+    "run-1:assistant:1",
+    "assistant 来源键冻结为 run 维度 deduplicationKey",
+  );
+  assert.deepEqual(outcome.outbox, [], "S2b-2 后 outbox 恒空");
 });
 
 // ============================================================
 // Batch E 二次返工（新通道消息落库双缺陷修复）RED 守护
 // ============================================================
 
-test("C1 缺陷 A：outbox payload 携带 projector 契约 message（内容非空且与 answer 一致）", async () => {
+test("C1 缺陷 A：assistant 消息直写内容非空且与 answer 一致", async () => {
+  const calls: RecordedAppendCall[] = [];
   const wf = createWorkbenchChatWorkflow({
     dispatch: async () =>
       ({
@@ -237,131 +264,122 @@ test("C1 缺陷 A：outbox payload 携带 projector 契约 message（内容非�
         suggestedActions: [],
         trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
       }) as any,
-    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendSessionMessage: makeRecordingAppendSessionMessage(calls),
     appendRunEvent: makeNoOpAppendRunEvent(),
   });
 
-  const outcome = await wf.executeStep("chat", makeFakeCtx());
-  const payload = outcome.outbox![0].payload as {
-    message?: { role: string; content: string };
-    answer?: string;
-    intent?: string;
-  };
+  await wf.executeStep("chat", makeFakeCtx());
 
-  assert.ok(payload.message, "outbox payload 必须携带 projector 契约的 message 字段（缺陷 A）");
-  assert.equal(payload.message!.role, "assistant");
+  const assistant = calls.find((c) => c.role === "assistant");
+  assert.ok(assistant, "assistant 消息必须经 appendSessionMessage 直写落库（缺陷 A 不得落空消息）");
   assert.equal(
-    payload.message!.content,
+    assistant!.content,
     "利润中心是承担损益责任的组织单元",
-    "message.content 必须与 answer 一致，不得落成空消息",
+    "直写内容必须与 answer 一致，不得落成空消息",
   );
-  // 既有键保留（G-E3 口径不回退）
-  assert.equal(payload.answer, "利润中心是承担损益责任的组织单元");
-  assert.equal(payload.intent, "domain_qa");
 });
 
-test("C2 缺陷 B：用户消息在 dispatch 前幂等落库，恢复重放不重复", async () => {
-  // makeFakeCtx 默认 run：aiSessionId=session-1 / ownerUserId=user-1 / harnessRunId=run-1
-  const { storePath, cleanup } = makeTempSessionStore("session-1", "user-1");
-  try {
-    const sequence: string[] = [];
-    const wf = createWorkbenchChatWorkflow({
-      dispatch: async () => {
-        sequence.push("dispatch");
-        return {
-          intent: "domain_qa",
-          answer: "ok",
-          businessRole: "pre_sales",
-          roleLabel: "售前顾问",
-          suggestedActions: [],
-          trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
-        } as any;
-      },
-      appendSessionMessage: (input) => {
-        sequence.push(input.message.role === "user" ? "append-user" : "append-assistant");
-        return appendAiSessionMessageIdempotent({ ...input, storePath });
-      },
-      appendRunEvent: makeNoOpAppendRunEvent(),
-    });
+test("C2 缺陷 B：用户消息在 dispatch 前幂等落库，来源键冻结", async () => {
+  const sequence: string[] = [];
+  const calls: RecordedAppendCall[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async () => {
+      sequence.push("dispatch");
+      return {
+        intent: "domain_qa",
+        answer: "ok",
+        businessRole: "pre_sales",
+        roleLabel: "售前顾问",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+      } as any;
+    },
+    appendSessionMessage: (input) => {
+      calls.push({
+        role: input.message.role,
+        content: input.message.content,
+        deduplicationKey: input.source.deduplicationKey,
+      });
+      sequence.push(input.message.role === "user" ? "append-user" : "append-assistant");
+      return Promise.resolve({ found: false, created: true, message: input.message });
+    },
+    appendRunEvent: makeNoOpAppendRunEvent(),
+  });
 
-    const ctx = makeFakeCtx();
-    await wf.executeStep("chat", ctx);
+  const ctx = makeFakeCtx();
+  await wf.executeStep("chat", ctx);
 
-    let store = readStoreFile(storePath);
-    assert.equal(store.sessions[0].messages.length, 2, "执行后可从会话存储读到本轮 user + assistant 消息（缺陷 B）");
-    assert.equal(store.sessions[0].messages[0].role, "user");
-    assert.equal(store.sessions[0].messages[0].content, "你好");
-    const metadata = store.sessions[0].messages[0].metadata as { projectionSource?: { deduplicationKey?: string } };
-    assert.equal(metadata.projectionSource?.deduplicationKey, "run-1:user:1", "来源键冻结为 run 维度 deduplicationKey");
-    assert.deepEqual(sequence, ["append-user", "dispatch", "append-assistant"], "用户消息必须先于 dispatch 落库，assistant 消息随后直接落库");
+  assert.equal(calls.length, 2, "执行后应直写 user + assistant 两条消息（缺陷 B）");
+  assert.equal(calls[0].role, "user");
+  assert.equal(calls[0].content, "你好");
+  assert.equal(calls[0].deduplicationKey, "run-1:user:1", "用户消息来源键冻结为 run 维度 deduplicationKey");
+  assert.deepEqual(sequence, ["append-user", "dispatch", "append-assistant"], "用户消息必须先于 dispatch 落库，assistant 消息随后直接落库");
 
-    // 恢复重放：同 step 再执行一次，来源键去重吸收
-    await wf.executeStep("chat", ctx);
-    store = readStoreFile(storePath);
-    assert.equal(store.sessions[0].messages.length, 2, "重复执行不得产生重复消息（user/assistant 均按来源键吸收）");
-  } finally {
-    cleanup();
-  }
+  // 恢复重放：workflow 以同一来源键再次直写，重复吸收由 repository 层按键查重
+  //（S2b-2 后 outbox/projector 补偿链已删，去重防线即直写路径本身）。
+  await wf.executeStep("chat", ctx);
+  assert.equal(calls.length, 4, "重放仍直写且携带同一来源键，吸收在 repository 层");
+  assert.equal(calls[2].deduplicationKey, "run-1:user:1");
+  assert.equal(calls[3].deduplicationKey, "run-1:assistant:1");
 });
 
 test("ISS-2026-08-11-007: 附件写入会话并作为模型上下文 dispatch", async () => {
-  const { storePath, cleanup } = makeTempSessionStore("session-1", "user-1");
-  try {
-    let dispatchedAttachment: Record<string, unknown> | null | undefined;
-    const wf = createWorkbenchChatWorkflow({
-      dispatch: async (input) => {
-        dispatchedAttachment = input.attachment as Record<string, unknown> | null | undefined;
-        return {
-          intent: "attachment_qa",
-          answer: "多组织业务通常涉及组织间交易与结算。",
-          businessRole: "pre_sales",
-          roleLabel: "售前顾问",
-          suggestedActions: [],
-          trace: { intentConfidence: 0.9, routingRule: "attachment_context", contextRefs: ["attachment:客户需求.xlsx"] },
-        } as any;
+  const calls: RecordedAppendCall[] = [];
+  let dispatchedAttachment: Record<string, unknown> | null | undefined;
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      dispatchedAttachment = input.attachment as Record<string, unknown> | null | undefined;
+      return {
+        intent: "attachment_qa",
+        answer: "多组织业务通常涉及组织间交易与结算。",
+        businessRole: "pre_sales",
+        roleLabel: "售前顾问",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "attachment_context", contextRefs: ["attachment:客户需求.xlsx"] },
+      } as any;
+    },
+    appendSessionMessage: makeRecordingAppendSessionMessage(calls),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+  });
+  const ctx = makeFakeCtx({
+    run: {
+      executionConfig: {
+        content: "多组织业务往来一般包含哪些模块？",
+        attachments: [{
+          name: "客户需求.xlsx",
+          size: 4096,
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
+        }],
       },
-      appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
-      appendRunEvent: makeNoOpAppendRunEvent(),
-    });
-    const ctx = makeFakeCtx({
-      run: {
-        executionConfig: {
-          content: "多组织业务往来一般包含哪些模块？",
-          attachments: [{
-            name: "客户需求.xlsx",
-            size: 4096,
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
-          }],
-        },
-      },
-    });
+    },
+  });
 
-    await wf.executeStep("chat", ctx);
+  await wf.executeStep("chat", ctx);
 
-    assert.deepEqual(dispatchedAttachment, {
-      name: "客户需求.xlsx",
-      size: 4096,
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
-    });
-    const store = readStoreFile(storePath);
-    assert.equal(store.sessions[0].attachments.length, 1, "附件实体必须持久化，切换会话后才能回显");
-    assert.equal(store.sessions[0].attachments[0].name, "客户需求.xlsx");
-    assert.equal(store.sessions[0].attachments[0].parsedSummary, "项目：蓝海制造\n需求：多组织业务协同");
-    assert.deepEqual(
-      store.sessions[0].messages[0].attachmentIds,
-      [store.sessions[0].attachments[0].attachmentId],
-      "用户消息必须引用已持久化附件",
-    );
+  assert.deepEqual(dispatchedAttachment, {
+    name: "客户需求.xlsx",
+    size: 4096,
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
+  });
+  // S2b-2 后附件实体落库在 repository 层（workflow 经 appendSessionMessage 携带
+  // attachments）；本用例断言直写调用携带附件引用，重放由来源键去重吸收。
+  assert.equal(calls.length, 2, "执行后应直写 user + assistant 两条消息");
+  assert.equal(calls[0].role, "user");
+  assert.ok(calls[0].attachmentIds?.length === 1, "用户消息必须引用已持久化附件");
+  assert.equal(calls[0].attachmentIds![0].startsWith("att-"), true, "附件 ID 由 workflow 生成（att- 前缀）");
 
-    await wf.executeStep("chat", ctx);
-    const replayedStore = readStoreFile(storePath);
-    assert.equal(replayedStore.sessions[0].messages.length, 2, "恢复重放不得重复消息（S2a 后 user + assistant 各一条，来源键吸收）");
-    assert.equal(replayedStore.sessions[0].attachments.length, 1, "恢复重放不得重复附件实体");
-  } finally {
-    cleanup();
-  }
+  // 恢复重放：workflow 每次生成新附件 ID 直写，实体幂等由 repository 层按来源键吸收
+  //（S2b-2 后不再有 outbox 双路径）；dispatch 附件上下文不得回退。
+  await wf.executeStep("chat", ctx);
+  assert.equal(calls.length, 4, "重放仍直写（附件引用再次携带，吸收在 repository 层）");
+  assert.deepEqual(dispatchedAttachment, {
+    name: "客户需求.xlsx",
+    size: 4096,
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
+  }, "重放后 dispatch 附件上下文不回退");
 });
 
 // ============================================================
@@ -471,6 +489,7 @@ test("ISS-2026-08-16-002：第二轮无附件请求时，dispatchAttachment 从�
   // 场景：第一轮用户带附件发送，附件已落库；第二轮用户发送纯文本（无附件），
   // workflow 应从会话存储回退取附件，而非 dispatchAttachment=null。
   const { storePath, cleanup } = makeTempSessionStore("session-1", "user-1");
+  const calls: RecordedAppendCall[] = [];
   try {
     // 预置：会话中已有一个带 parsedSummary 的附件（模拟第一轮已落库）
     const store = readStoreFile(storePath);
@@ -501,7 +520,7 @@ test("ISS-2026-08-16-002：第二轮无附件请求时，dispatchAttachment 从�
           },
         } as any;
       },
-      appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
+      appendSessionMessage: makeRecordingAppendSessionMessage(calls),
       appendRunEvent: makeNoOpAppendRunEvent(),
       getSessionRecord: async (sessionId, ownerUserId) => {
         const store = readStoreFile(storePath);
@@ -537,6 +556,7 @@ test("ISS-2026-08-16-002：第二轮无附件请求时，dispatchAttachment 从�
 test("ISS-2026-08-16-002：请求级附件优先于会话级回退（不覆盖新上传附件）", async () => {
   // 场景：用户第二轮上传了新附件，请求级附件应优先，会话级回退不生效。
   const { storePath, cleanup } = makeTempSessionStore("session-1", "user-1");
+  const calls: RecordedAppendCall[] = [];
   try {
     // 预置：会话中已有旧附件
     const store = readStoreFile(storePath);
@@ -563,7 +583,7 @@ test("ISS-2026-08-16-002：请求级附件优先于会话级回退（不覆盖�
           trace: { intentConfidence: 0.9, routingRule: "attachment_context", contextRefs: ["attachment:新需求文档.xlsx"] },
         } as any;
       },
-      appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
+      appendSessionMessage: makeRecordingAppendSessionMessage(calls),
       appendRunEvent: makeNoOpAppendRunEvent(),
       getSessionRecord: async (sessionId, ownerUserId) => {
         const store = readStoreFile(storePath);
@@ -601,6 +621,7 @@ test("ISS-2026-08-16-004：显式报告闸门——附件存在且消息为「�
   const sessionId = "session-report-gate";
   const ownerUserId = "user-report-gate";
   const { storePath, cleanup } = makeTempSessionStore(sessionId, ownerUserId);
+  const calls: RecordedAppendCall[] = [];
   try {
     // 预置会话附件（带 parsedSummary）
     const store = readStoreFile(storePath);
@@ -627,7 +648,7 @@ test("ISS-2026-08-16-004：显式报告闸门——附件存在且消息为「�
           trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
         } as any;
       },
-      appendSessionMessage: (input) => appendAiSessionMessageIdempotent({ ...input, storePath }),
+      appendSessionMessage: makeRecordingAppendSessionMessage(calls),
       appendRunEvent: makeNoOpAppendRunEvent(),
       getSessionRecord: async (sid, uid) => {
         const s = readStoreFile(storePath);
@@ -647,7 +668,8 @@ test("ISS-2026-08-16-004：显式报告闸门——附件存在且消息为「�
     // 闸门回退到普通 dispatch（与同步路径 40001 降级行为对齐）。
     assert.equal(dispatchCalled, true, "API Key 缺失时应回退到普通 dispatch");
     assert.equal(outcome.nextStepKey, null);
-    assert.equal(outcome.outbox!.length, 1, "回退后应经 outbox 投影");
+    assert.deepEqual(outcome.outbox, [], "S2b-2 后补偿链已删，outbox 恒空");
+    assert.equal(calls.length, 2, "回退后仍直写 user + assistant 两条消息");
   } finally {
     cleanup();
   }
@@ -681,73 +703,54 @@ test("ISS-2026-08-16-004：显式报告闸门——无附件时不触发（走�
 
   // 断言：无附件时闸门不命中，走普通 dispatch
   assert.equal(dispatchCalled, true, "无附件时应走普通 dispatch");
-  assert.equal(outcome.outbox!.length, 1, "普通 dispatch 应经 outbox 投影");
+  assert.deepEqual(outcome.outbox, [], "S2b-2 后 outbox 恒空");
 });
 
 // ============================================================
-// S2a（阶段 2 · §4.8 写入路径改造：assistant 消息直接幂等落库）RED 守护
+// S2b-2（阶段 2 · §4.8 补偿链删除：assistant 消息直写幂等落库终态）RED 守护
 // 契约：assistant 消息与 user 消息同款经 appendSessionMessage 直接幂等落库
-// （同库直写，不经 outbox 中转）；outbox 保留不动（S2b 前双路径共存）——
-// projector 认领后经 sink 以同一 deduplicationKey 追加时命中幂等 no-op，
-// 消息恰好一条，不重复不丢失。deduplicationKey 是本次过渡的安全垫。
+// （同库直写，不经 outbox 中转）；outbox 恒空——projector/sink/outbox 表
+// 已随补偿链删除，恢复重放由 repository 层来源键查重吸收，消息恰好一条。
 // ============================================================
 
-test("S2a：assistant 消息直接幂等落库 + outbox 保留 + projector 认领 no-op", async () => {
-  const { storePath, cleanup } = makeTempSessionStore("session-1", "user-1");
-  try {
-    const calls: Array<{ role: string; deduplicationKey: string }> = [];
-    const wf = createWorkbenchChatWorkflow({
-      dispatch: async () => ({
-        intent: "domain_qa",
-        answer: "模型回复",
-        businessRole: "pre_sales",
-        roleLabel: "售前顾问",
-        suggestedActions: [],
-        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
-      } as any),
-      appendSessionMessage: (input) => {
-        calls.push({ role: input.message.role, deduplicationKey: input.source.deduplicationKey });
-        return appendAiSessionMessageIdempotent({ ...input, storePath });
-      },
-      appendRunEvent: makeNoOpAppendRunEvent(),
-    });
+test("S2b-2：assistant 消息直写幂等落库 + outbox 恒空", async () => {
+  const calls: RecordedAppendCall[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async () => ({
+      intent: "domain_qa",
+      answer: "模型回复",
+      businessRole: "pre_sales",
+      roleLabel: "售前顾问",
+      suggestedActions: [],
+      trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+    } as any),
+    appendSessionMessage: makeRecordingAppendSessionMessage(calls),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+  });
 
-    const outcome = await wf.executeStep("chat", makeFakeCtx());
+  const outcome = await wf.executeStep("chat", makeFakeCtx());
 
-    // 直接落库：user + assistant 各一条
-    const store = readStoreFile(storePath);
-    assert.equal(store.sessions[0].messages.length, 2, "S2a 后一次执行应落 user + assistant 两条消息");
-    const assistant = store.sessions[0].messages[1];
-    assert.equal(assistant.role, "assistant");
-    assert.equal(assistant.content, "模型回复");
-    const meta = assistant.metadata as { projectionSource?: { deduplicationKey?: string } };
-    assert.equal(meta.projectionSource?.deduplicationKey, "run-1:assistant:1", "assistant 来源键与 outbox 条目一致（projector no-op 前提）");
-    assert.deepEqual(
-      calls.map((c) => c.deduplicationKey),
-      ["run-1:user:1", "run-1:assistant:1"],
-      "user 消息先落库，assistant 消息随后直接落库（同款 appendSessionMessage 通道）",
-    );
+  // 直写通道：user + assistant 各一次，来源键与 S2a 契约一致
+  assert.equal(calls.length, 2, "一次执行应直写 user + assistant 两条消息");
+  assert.deepEqual(
+    calls.map((c) => c.deduplicationKey),
+    ["run-1:user:1", "run-1:assistant:1"],
+    "user 消息先落库，assistant 消息随后直接落库（同款 appendSessionMessage 通道）",
+  );
+  assert.equal(calls[1].role, "assistant");
+  assert.equal(calls[1].content, "模型回复");
 
-    // outbox 保留不动（S2b 之前双路径共存）
-    assert.equal(outcome.outbox!.length, 1, "outbox 保留，双路径共存");
-    assert.equal(outcome.outbox![0].deduplicationKey, "run-1:assistant:1", "outbox 条目 deduplicationKey 与直接写入一致");
+  // S2b-2 后 outbox 恒空（补偿链已删，不再有双路径共存）
+  assert.deepEqual(outcome.outbox, [], "S2b-2 后 outbox 恒空");
 
-    // projector 认领 no-op 等价验证：sink 以同 deduplicationKey 再追加 → created:false，不重复
-    const sinkResult = await appendAiSessionMessageIdempotent({
-      sessionId: "session-1",
-      message: { messageId: "msg-sink-replay", role: "assistant", content: "模型回复", createdAt: new Date().toISOString() },
-      source: { deduplicationKey: "run-1:assistant:1", runId: "run-1", eventType: "assistant_message" },
-      storePath,
-    });
-    assert.equal(sinkResult.created, false, "projector 认领后经 sink 追加应命中幂等 no-op");
-    assert.equal(readStoreFile(storePath).sessions[0].messages.length, 2, "双路径共存期消息不得重复");
-
-    // 恢复重放：assistant 同 key 幂等吸收，仍两条
-    await wf.executeStep("chat", makeFakeCtx());
-    assert.equal(readStoreFile(storePath).sessions[0].messages.length, 2, "恢复重放不得产生重复 assistant 消息");
-  } finally {
-    cleanup();
-  }
+  // 恢复重放：workflow 以同一来源键再次直写，去重由 repository 层按键查重保证
+  await wf.executeStep("chat", makeFakeCtx());
+  assert.equal(calls.length, 4, "重放仍直写（来源键一致），吸收在 repository 层");
+  assert.deepEqual(
+    calls.map((c) => c.deduplicationKey),
+    ["run-1:user:1", "run-1:assistant:1", "run-1:user:1", "run-1:assistant:1"],
+    "重放来源键与首次一致，repository 层按键查重吸收重复",
+  );
 });
 
 // ============================================================
@@ -835,12 +838,13 @@ test("RP-030 覆盖：恢复重放跳过 execute，trace 不重复写（幂等�
 });
 
 test("RP-030 覆盖：recordTurnTrace 写入失败不影响主链路（静默吸收）", async () => {
+  const calls: RecordedAppendCall[] = [];
   const wf = createWorkbenchChatWorkflow({
     dispatch: async () => ({
       answer: "模型回复",
       trace: { intentConfidence: 0.9, routingRule: "mock_rule", contextRefs: [] },
     } as any),
-    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendSessionMessage: makeRecordingAppendSessionMessage(calls),
     appendRunEvent: makeNoOpAppendRunEvent(),
     recordTurnTrace: async () => {
       throw new Error("trace_store_down");
@@ -849,5 +853,10 @@ test("RP-030 覆盖：recordTurnTrace 写入失败不影响主链路（静默吸
 
   const outcome = await wf.executeStep("chat", makeFakeCtx());
   assert.equal(outcome.nextStepKey, null, "trace 写入失败不得阻断主链路");
-  assert.equal(outcome.outbox![0].payload.answer, "模型回复");
+  // §4.8 随动项（S2b-2）：assistant 正文不再经 outbox 中转，改由
+  // appendSessionMessage 同库直写，故「主链路仍完成它该做的持久化」这一层
+  // 断言随终态改造为直写调用观测（outbox 恒空的不变量由本文件 S2b-2 守护用例断）。
+  const assistantCalls = calls.filter((c) => c.role === "assistant");
+  assert.equal(assistantCalls.length, 1, "trace 写入失败仍须直写恰好一条 assistant 消息");
+  assert.equal(assistantCalls[0].content, "模型回复", "assistant 正文不得因 trace 归档失败而丢失");
 });

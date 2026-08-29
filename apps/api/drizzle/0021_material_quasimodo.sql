@@ -1,0 +1,1 @@
+DROP TABLE "harness_session_outbox" CASCADE;

@@ -178,37 +178,6 @@ export const harnessRunOutputs = pgTable(
   }),
 );
 
-export const harnessSessionOutbox = pgTable(
-  "harness_session_outbox",
-  {
-    harnessSessionOutboxId: uuid("harness_session_outbox_id").primaryKey(),
-    harnessRunId: uuid("harness_run_id")
-      .notNull()
-      .references(() => harnessRuns.harnessRunId, { onDelete: "cascade" }),
-    aiSessionId: text("ai_session_id").notNull(),
-    eventType: text("event_type").notNull(),
-    deduplicationKey: text("deduplication_key").notNull(),
-    payload: jsonb("payload").notNull(),
-    status: text("status", { enum: ["pending", "processing", "published", "failed"] }).default("pending").notNull(),
-    attempts: integer("attempts").default(0).notNull(),
-    availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
-    lockedBy: text("locked_by"),
-    lockedAt: timestamp("locked_at", { withTimezone: true }),
-    lastError: text("last_error"),
-    publishedAt: timestamp("published_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => ({
-    sessionDedupeUnique: uniqueIndex("harness_session_outbox_session_dedupe_unique").on(
-      table.aiSessionId,
-      table.deduplicationKey,
-    ),
-    pendingIdx: index("harness_session_outbox_pending_idx").on(table.status, table.availableAt),
-    runIdx: index("harness_session_outbox_run_idx").on(table.harnessRunId),
-  }),
-);
-
 export const harnessFiles = pgTable(
   "harness_files",
   {
@@ -440,5 +409,4 @@ export type HarnessRunEventRow = typeof harnessRunEvents.$inferSelect;
 export type HarnessRunEventInsert = typeof harnessRunEvents.$inferInsert;
 export type HarnessRunOutputRow = typeof harnessRunOutputs.$inferSelect;
 export type HarnessRunOutputInsert = typeof harnessRunOutputs.$inferInsert;
-export type HarnessSessionOutboxRow = typeof harnessSessionOutbox.$inferSelect;
-export type HarnessSessionOutboxInsert = typeof harnessSessionOutbox.$inferInsert;
+// S2b-2（2026-08-28）：HarnessSessionOutboxRow/Insert 已随 §4.8 补偿链删除

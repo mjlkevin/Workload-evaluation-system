@@ -403,15 +403,6 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
             contentHash: outcome.output.contentHash,
           });
         }
-        for (const entry of outcome.outbox ?? []) {
-          await repository.enqueueSessionOutbox({
-            runId,
-            aiSessionId: run.aiSessionId ?? "",
-            eventType: entry.eventType,
-            deduplicationKey: entry.deduplicationKey,
-            payload: entry.payload,
-          });
-        }
         options.faultInjector?.(currentStepKey, "afterStepCommit");
         stepKey = outcome.nextStepKey;
       }

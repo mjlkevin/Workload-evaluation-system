@@ -9,7 +9,6 @@ import test from "node:test";
 
 import {
   HARNESS_CHECKPOINT_KINDS,
-  HARNESS_PROJECTOR_TIMING_DEFAULTS,
   HARNESS_RECOVERY_INCOMPATIBLE_ERROR_CODE,
   HARNESS_RECOVERY_LIMIT_ERROR_CODE,
   HARNESS_RECOVERY_TIMING_DEFAULTS,
@@ -52,14 +51,15 @@ test("runtime vocabularies and effect keys are deterministic", () => {
 // ============================================================
 // RP-047 Batch B：时序默认常量、恢复/取消事件词汇（E1 additive）
 // ============================================================
+// S2b-2（2026-08-28）：projector timing 常量已随 §4.8 补偿链删除，
+// 本用例仅保留 worker/recovery 口径。
 
-test("Batch B worker/recovery/projector timing defaults freeze roadmap constants", () => {
+test("Batch B worker/recovery timing defaults freeze roadmap constants", () => {
   assert.equal(HARNESS_WORKER_TIMING_DEFAULTS.leaseMs, 45_000, "lease 必须为 roadmap 口径 45s");
   assert.equal(HARNESS_WORKER_TIMING_DEFAULTS.heartbeatIntervalMs, 15_000, "heartbeat 必须为 roadmap 口径 15s");
   assert.equal(HARNESS_RECOVERY_TIMING_DEFAULTS.scanIntervalMs, 10_000, "扫描周期必须为 roadmap 口径 10s");
   assert.equal(HARNESS_RECOVERY_TIMING_DEFAULTS.maxAutoRecoveries, 3, "最多 3 次自动恢复");
   assert.deepEqual([...HARNESS_RECOVERY_TIMING_DEFAULTS.backoffMs], [2_000, 10_000, 30_000], "退避必须为 2/10/30s");
-  assert.ok(HARNESS_PROJECTOR_TIMING_DEFAULTS.pollIntervalMs > 0);
 });
 
 test("Batch B adds recovery and cancellation event types additively (E1)", () => {

@@ -12,7 +12,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
 
-import { harnessRuns, harnessRunAttempts, harnessRunEvents, harnessRunCheckpoints, harnessRunOutputs, harnessSessionOutbox, harnessToolEvents } from "../../db/schema";
+import { harnessRuns, harnessRunAttempts, harnessRunEvents, harnessRunCheckpoints, harnessRunOutputs, harnessToolEvents } from "../../db/schema";
 import * as schema from "../../db/schema";
 import {
   HarnessRuntimeError,
@@ -412,57 +412,6 @@ describeOrSkip("upsertRunOutput versions, dedupes by contentHash and protects fi
   assert.equal(err.code, "FINAL_OUTPUT_IMMUTABLE");
 });
 
-describeOrSkip("enqueueSessionOutbox dedupes per session key and validates session binding", { skip: !testDatabaseUrl }, async () => {
-  const input = makeQueuedRunInput();
-  const created = await repo!.createQueuedRun(input);
-  track(created.run.harnessRunId);
-  const dedupeKey = `dedupe-${randomUUID()}`;
-  const first = await repo!.enqueueSessionOutbox({
-    runId: created.run.harnessRunId,
-    aiSessionId: input.aiSessionId,
-    eventType: "run.progress",
-    deduplicationKey: dedupeKey,
-    payload: { progress: 1 },
-  });
-  assert.equal(first.created, true);
-  const second = await repo!.enqueueSessionOutbox({
-    runId: created.run.harnessRunId,
-    aiSessionId: input.aiSessionId,
-    eventType: "run.progress",
-    deduplicationKey: dedupeKey,
-    payload: { progress: 1 },
-  });
-  assert.equal(second.created, false);
-  assert.equal(second.outbox.harnessSessionOutboxId, first.outbox.harnessSessionOutboxId);
-
-  const other = await repo!.enqueueSessionOutbox({
-    runId: created.run.harnessRunId,
-    aiSessionId: input.aiSessionId,
-    eventType: "run.progress",
-    deduplicationKey: `dedupe-${randomUUID()}`,
-    payload: { progress: 2 },
-  });
-  assert.equal(other.created, true, "different deduplication keys coexist");
-
-  const rows = await testDb!
-    .select()
-    .from(harnessSessionOutbox)
-    .where(eq(harnessSessionOutbox.aiSessionId, input.aiSessionId));
-  assert.equal(rows.length, 2);
-
-  const err = await repo!
-    .enqueueSessionOutbox({
-      runId: created.run.harnessRunId,
-      aiSessionId: "session-other",
-      eventType: "run.progress",
-      deduplicationKey: `dedupe-${randomUUID()}`,
-      payload: {},
-    })
-    .then(() => null, (error: unknown) => error);
-  assert.ok(err instanceof HarnessRuntimeError);
-  assert.equal(err.code, "RUN_SESSION_MISMATCH");
-});
-
 describeOrSkip("payloads must be plain JSON objects under 1 MiB", { skip: !testDatabaseUrl }, async () => {
   const runId = await createTrackedRun();
 
@@ -812,54 +761,6 @@ describeOrSkip("R6 recordToolEffectOnce dedupes side effects by (runId, effectKe
 
   const rows = await testDb!.select().from(harnessToolEvents).where(eq(harnessToolEvents.harnessRunId, runId));
   assert.equal(rows.length, 1, "exactly one tool event row per effect key");
-});
-
-describeOrSkip("R7/R8 session outbox claim, publish, retry and exhaustion lifecycle", { skip: !testDatabaseUrl }, async () => {
-  const claimed = await makeClaimedRun(1_000);
-  const runId = claimed.run.harnessRunId;
-  const sessionId = claimed.run.aiSessionId!;
-  await repo!.enqueueSessionOutbox({ runId, aiSessionId: sessionId, eventType: "user_message", deduplicationKey: `dk-${randomUUID()}`, payload: { a: 1 } });
-  const second = await repo!.enqueueSessionOutbox({ runId, aiSessionId: sessionId, eventType: "final_response", deduplicationKey: `dk-${randomUUID()}`, payload: { b: 2 } });
-
-  const claimedRows = await repo!.claimPendingSessionOutbox({ lockerId: "projector-1", limit: 10, lockMs: 30_000 });
-  assert.equal(claimedRows.length, 2);
-  assert.ok(claimedRows.every((row) => row.status === "processing" && row.lockedBy === "projector-1"));
-  const again = await repo!.claimPendingSessionOutbox({ lockerId: "projector-2", limit: 10, lockMs: 30_000 });
-  assert.equal(again.length, 0, "locked rows must not be claimed twice");
-
-  const target = claimedRows.find((row) => row.harnessSessionOutboxId === second.outbox.harnessSessionOutboxId)!;
-  const published = await repo!.markSessionOutboxPublished({ outboxId: target.harnessSessionOutboxId, lockerId: "projector-1" });
-  assert.equal(published?.status, "published");
-  assert.ok(published?.publishedAt);
-
-  const retryable = claimedRows.find((row) => row.harnessSessionOutboxId !== target.harnessSessionOutboxId)!;
-  const failedOnce = await repo!.markSessionOutboxFailed({
-    outboxId: retryable.harnessSessionOutboxId,
-    lockerId: "projector-1",
-    errorCode: "SINK_UNAVAILABLE",
-    retryAfterMs: 60_000,
-    maxAttempts: 2,
-  });
-  assert.equal(failedOnce?.status, "pending", "first failure returns the row to pending");
-  assert.equal(failedOnce?.attempts, 1);
-  assert.ok(failedOnce!.availableAt.getTime() > Date.now(), "retry must be delayed");
-  assert.equal(failedOnce?.lastError, "SINK_UNAVAILABLE");
-
-  await testDb!
-    .update(harnessSessionOutbox)
-    .set({ availableAt: new Date(Date.now() - 1_000) })
-    .where(eq(harnessSessionOutbox.harnessSessionOutboxId, retryable.harnessSessionOutboxId));
-  const reclaimed = await repo!.claimPendingSessionOutbox({ lockerId: "projector-1", limit: 10, lockMs: 30_000 });
-  assert.equal(reclaimed.length, 1);
-  const exhausted = await repo!.markSessionOutboxFailed({
-    outboxId: retryable.harnessSessionOutboxId,
-    lockerId: "projector-1",
-    errorCode: "SINK_UNAVAILABLE",
-    retryAfterMs: 60_000,
-    maxAttempts: 2,
-  });
-  assert.equal(exhausted?.status, "failed", "reaching maxAttempts marks the outbox row failed");
-  assert.equal(exhausted?.attempts, 2);
 });
 
 describeOrSkip("R9 completeAttemptAndRun finalizes attempt and run exactly once", { skip: !testDatabaseUrl }, async () => {

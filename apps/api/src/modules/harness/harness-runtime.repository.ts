@@ -18,14 +18,12 @@ import {
   harnessRunEvents,
   harnessRunOutputs,
   harnessRuns,
-  harnessSessionOutbox,
   harnessToolEvents,
   type HarnessRunAttemptRow,
   type HarnessRunCheckpointRow,
   type HarnessRunEventRow,
   type HarnessRunOutputRow,
   type HarnessRunRow,
-  type HarnessSessionOutboxRow,
   type HarnessToolEventRow,
 } from "../../db/schema";
 import {
@@ -132,17 +130,8 @@ export type UpsertHarnessRunOutputInput = {
   contentHash: string;
 };
 
-export type EnqueueHarnessSessionOutboxInput = {
-  runId: string;
-  aiSessionId: string;
-  eventType: string;
-  deduplicationKey: string;
-  payload: Record<string, unknown>;
-  availableAt?: Date;
-};
-
 // ============================================================
-// RP-047 Batch B：Worker / Recovery / Projector 扩展输入类型
+// RP-047 Batch B：Worker / Recovery 扩展输入类型
 // ============================================================
 
 export type FindRunsWithExpiredActiveLeaseInput = {
@@ -171,22 +160,6 @@ export type RecordHarnessToolEffectInput = {
   toolName: string;
   input: Record<string, unknown>;
   output?: Record<string, unknown>;
-};
-
-export type ClaimPendingSessionOutboxInput = {
-  lockerId: string;
-  limit: number;
-  lockMs: number;
-  now?: Date;
-};
-
-export type MarkSessionOutboxFailedInput = {
-  outboxId: string;
-  lockerId: string;
-  errorCode: string;
-  retryAfterMs: number;
-  maxAttempts: number;
-  now?: Date;
 };
 
 export type CompleteHarnessAttemptAndRunInput = {
@@ -249,9 +222,6 @@ export interface HarnessRuntimeRepository {
   appendRunEvent(input: AppendHarnessRunEventInput): Promise<HarnessRunEventRow>;
   commitCheckpoint(input: CommitHarnessCheckpointInput): Promise<{ checkpoint: HarnessRunCheckpointRow; created: boolean }>;
   upsertRunOutput(input: UpsertHarnessRunOutputInput): Promise<HarnessRunOutputRow>;
-  enqueueSessionOutbox(
-    input: EnqueueHarnessSessionOutboxInput,
-  ): Promise<{ outbox: HarnessSessionOutboxRow; created: boolean }>;
   findRunsWithExpiredActiveLease(
     input: FindRunsWithExpiredActiveLeaseInput,
   ): Promise<Array<{ run: HarnessRunRow; attempt: HarnessRunAttemptRow }>>;
@@ -268,12 +238,6 @@ export interface HarnessRuntimeRepository {
     input: RecordHarnessToolEffectInput,
   ): Promise<{ toolEvent: HarnessToolEventRow; created: boolean }>;
   findToolEffectByKey(input: { runId: string; effectKey: string }): Promise<HarnessToolEventRow | null>;
-  claimPendingSessionOutbox(input: ClaimPendingSessionOutboxInput): Promise<HarnessSessionOutboxRow[]>;
-  markSessionOutboxPublished(input: {
-    outboxId: string;
-    lockerId: string;
-  }): Promise<HarnessSessionOutboxRow | null>;
-  markSessionOutboxFailed(input: MarkSessionOutboxFailedInput): Promise<HarnessSessionOutboxRow | null>;
   completeAttemptAndRun(
     input: CompleteHarnessAttemptAndRunInput,
   ): Promise<{ changed: boolean; run: HarnessRunRow }>;
@@ -822,67 +786,8 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
       }
     },
 
-    async enqueueSessionOutbox(input) {
-      try {
-        assertNonEmptyText(input.runId, "runId");
-        assertNonEmptyText(input.aiSessionId, "aiSessionId");
-        assertNonEmptyText(input.eventType, "eventType");
-        assertNonEmptyText(input.deduplicationKey, "deduplicationKey");
-        assertSafeJsonObject(input.payload);
-        const payload = normalizeJsonObject(input.payload);
-
-        return await dbInstance.transaction(async (tx) => {
-          const run = await lockRunRow(tx, input.runId);
-          if (run.aiSessionId !== input.aiSessionId) {
-            throw new HarnessRuntimeError("RUN_SESSION_MISMATCH", "run is bound to a different ai session");
-          }
-
-          const existing = await tx
-            .select()
-            .from(harnessSessionOutbox)
-            .where(
-              and(
-                eq(harnessSessionOutbox.aiSessionId, input.aiSessionId),
-                eq(harnessSessionOutbox.deduplicationKey, input.deduplicationKey),
-              ),
-            );
-          if (existing.length > 0) {
-            return { outbox: existing[0], created: false };
-          }
-
-          const now = await readDbNow(tx);
-          const [outbox] = await tx
-            .insert(harnessSessionOutbox)
-            .values({
-              harnessSessionOutboxId: randomUUID(),
-              harnessRunId: input.runId,
-              aiSessionId: input.aiSessionId,
-              eventType: input.eventType,
-              deduplicationKey: input.deduplicationKey,
-              payload,
-              status: "pending",
-              attempts: 0,
-              availableAt: input.availableAt ?? now,
-              createdAt: now,
-              updatedAt: now,
-            })
-            .returning();
-
-          await appendRunEventInTransaction(tx, {
-            runId: input.runId,
-            eventType: "outbox_enqueued",
-            payload: { outboxId: outbox.harnessSessionOutboxId, deduplicationKey: input.deduplicationKey },
-          });
-
-          return { outbox, created: true };
-        });
-      } catch (err) {
-        throw toSafeError(err);
-      }
-    },
-
     // ========================================================
-    // RP-047 Batch B：Worker / Recovery / Projector 扩展实现
+    // RP-047 Batch B：Worker / Recovery 扩展实现
     // ========================================================
 
     async findRunsWithExpiredActiveLease(input) {
@@ -1118,94 +1023,6 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
           .from(harnessToolEvents)
           .where(and(eq(harnessToolEvents.harnessRunId, input.runId), eq(harnessToolEvents.effectKey, input.effectKey)));
         return rows[0] ?? null;
-      } catch (err) {
-        throw toSafeError(err);
-      }
-    },
-
-    async claimPendingSessionOutbox(input) {
-      try {
-        assertNonEmptyText(input.lockerId, "lockerId");
-        return await dbInstance.transaction(async (tx) => {
-          const now = input.now ?? (await readDbNow(tx));
-          const lockCutoff = new Date(now.getTime() - input.lockMs);
-          const picked = await tx.execute(sql`
-            SELECT harness_session_outbox_id
-            FROM harness_session_outbox
-            WHERE (status = 'pending' AND available_at <= ${now})
-               OR (status = 'processing' AND locked_at < ${lockCutoff})
-            ORDER BY available_at ASC
-            LIMIT ${input.limit}
-            FOR UPDATE SKIP LOCKED
-          `);
-          const ids = (picked.rows as Array<{ harness_session_outbox_id: string }>).map(
-            (row) => row.harness_session_outbox_id,
-          );
-          if (ids.length === 0) return [];
-          return await tx
-            .update(harnessSessionOutbox)
-            .set({ status: "processing", lockedBy: input.lockerId, lockedAt: now, updatedAt: now })
-            .where(inArray(harnessSessionOutbox.harnessSessionOutboxId, ids))
-            .returning();
-        });
-      } catch (err) {
-        throw toSafeError(err);
-      }
-    },
-
-    async markSessionOutboxPublished(input) {
-      try {
-        const rows = await dbInstance
-          .update(harnessSessionOutbox)
-          .set({ status: "published", publishedAt: new Date(), updatedAt: new Date() })
-          .where(
-            and(
-              eq(harnessSessionOutbox.harnessSessionOutboxId, input.outboxId),
-              eq(harnessSessionOutbox.lockedBy, input.lockerId),
-              eq(harnessSessionOutbox.status, "processing"),
-            ),
-          )
-          .returning();
-        return rows[0] ?? null;
-      } catch (err) {
-        throw toSafeError(err);
-      }
-    },
-
-    async markSessionOutboxFailed(input) {
-      try {
-        assertNonEmptyText(input.errorCode, "errorCode");
-        return await dbInstance.transaction(async (tx) => {
-          const rows = await tx
-            .select()
-            .from(harnessSessionOutbox)
-            .where(
-              and(
-                eq(harnessSessionOutbox.harnessSessionOutboxId, input.outboxId),
-                eq(harnessSessionOutbox.lockedBy, input.lockerId),
-                eq(harnessSessionOutbox.status, "processing"),
-              ),
-            );
-          const row = rows[0];
-          if (!row) return null;
-          const now = input.now ?? (await readDbNow(tx));
-          const attempts = row.attempts + 1;
-          const exhausted = attempts >= input.maxAttempts;
-          const [updated] = await tx
-            .update(harnessSessionOutbox)
-            .set({
-              status: exhausted ? "failed" : "pending",
-              attempts,
-              lastError: input.errorCode,
-              lockedBy: exhausted ? row.lockedBy : null,
-              lockedAt: exhausted ? row.lockedAt : null,
-              availableAt: exhausted ? row.availableAt : new Date(now.getTime() + input.retryAfterMs),
-              updatedAt: now,
-            })
-            .where(eq(harnessSessionOutbox.harnessSessionOutboxId, input.outboxId))
-            .returning();
-          return updated;
-        });
       } catch (err) {
         throw toSafeError(err);
       }
