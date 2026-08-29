@@ -16,6 +16,25 @@ const PROMPT_TABS = [
   { key: 'generate', label: '生成提示词' },
 ]
 
+// DSL 依赖规则逻辑类型 → 徽标展示映射
+const DSL_LOGIC_META = {
+  requires_all: { label: '全部依赖', cls: 'lock' },
+  requires_any: { label: '任一依赖', cls: 'warn' },
+  combo: { label: '组合依赖', cls: 'warn' },
+  blocking: { label: '阻断', cls: 'lock' },
+  warning: { label: '警告', cls: 'warn' },
+}
+
+function DslLogicBadge({ logic }) {
+  const meta = DSL_LOGIC_META[logic] || { label: logic || '规则', cls: 'warn' }
+  return (
+    <span className={`bdg ${meta.cls}`}>
+      <span className="dot" />
+      {meta.label}
+    </span>
+  )
+}
+
 const MODEL_CARDS = [
   {
     key: 'kimiEvaluation',
@@ -125,7 +144,7 @@ const TEST_RESULT_STATUS = {
 export default function SystemManagement({ sectionId }) {
   const {
     rules, modelConfig, modelActiveConfig, effectiveConfig, effectiveLoading, ratecard,
-    dslRules, templates, prompts, setPrompts,
+    dslRules, dslLoading, templates, prompts, setPrompts,
     kbConfig, kbLoading,
     testResults, testResultsLoading,
     actionLoading,
@@ -133,7 +152,8 @@ export default function SystemManagement({ sectionId }) {
   } = useSystemManagement()
 
   const navigate = useNavigate()
-  const [dialog, setDialog] = useState(null) // 'prompt' | 'rule' | null
+  const [dialog, setDialog] = useState(null) // 'prompt' | 'rule' | 'dslNew' | null
+  const [dslNewForm, setDslNewForm] = useState({ subject: '', trigger: '', logic: 'requires_all', dependenciesText: '', enabled: true })
   const [promptTab, setPromptTab] = useState('assessment')
   const [promptResult, setPromptResult] = useState(null)
   const [selectedRuleCode, setSelectedRuleCode] = useState('')
@@ -218,6 +238,26 @@ export default function SystemManagement({ sectionId }) {
     setKbSaveResult(result.success
       ? { ok: true, message: '知识库配置已生效' }
       : { ok: false, message: gateMessage || result.error || '知识库配置生效失败' })
+  }
+
+  const handleAddDslRule = () => {
+    const subject = (dslNewForm.subject || '').trim()
+    const trigger = (dslNewForm.trigger || '').trim()
+    if (!subject || !trigger) {
+      toast.error('规则主题与触发场景必填')
+      return
+    }
+    const dependencies = (dslNewForm.dependenciesText || '').split(/[,，]/).map((s) => s.trim()).filter(Boolean)
+    actions.addDslRule({
+      id: `dep-custom-${Date.now().toString(36)}`,
+      subject,
+      trigger,
+      logic: dslNewForm.logic,
+      dependencies,
+      enabled: dslNewForm.enabled,
+    })
+    setDialog(null)
+    toast.success('已添加规则，请点「保存草稿」后「生效」写入系统')
   }
 
   const handleClearKbKey = async () => {
@@ -1113,7 +1153,8 @@ export default function SystemManagement({ sectionId }) {
         {activeSectionId === 'dsl' && (
           <div>
             <div className="sys-toolbar">
-              <span className="meta">共 {dslRules.length} 条实施评估依赖规则</span>
+              <span className="meta">共 {dslRules.length} 条实施评估依赖规则{dslLoading ? '（加载中…）' : ''}</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDslNewForm({ subject: '', trigger: '', logic: 'requires_all', dependenciesText: '', enabled: true }); setDialog('dslNew') }}>+ 新增规则</button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={async () => { const r = await actions.saveDslDraft(); r.success ? toast.success('DSL 草稿已保存') : toast.error(r.error || '保存失败') }}>
                 保存草稿
               </button>
@@ -1125,15 +1166,21 @@ export default function SystemManagement({ sectionId }) {
               {dslRules.map((r) => (
                 <div key={r.id} className="sys-card">
                   <div className="sys-card__hd">
-                    <span className="sys-card__title mono">{r.id}</span>
-                    <span className={`bdg ${r.type === 'blocking' ? 'lock' : 'warn'}`}>
-                      <span className="dot" />
-                      {r.type === 'blocking' ? '阻断' : '警告'}
-                    </span>
+                    <span className="sys-card__title">{r.subject || r.id}</span>
+                    <DslLogicBadge logic={r.logic} />
                   </div>
                   <div className="sys-card__bd sys-card__bd--col">
+                    {r.trigger ? (
+                      <div className="sys-field">
+                        <span className="sys-field__lb">触发场景</span>
+                        <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500, lineHeight: 1.6 }}>{r.trigger}</span>
+                      </div>
+                    ) : null}
                     <div className="sys-field">
-                      <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500, lineHeight: 1.6 }}>{r.message}</span>
+                      <span className="sys-field__lb">依赖模块</span>
+                      <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500, lineHeight: 1.6 }}>
+                        {r.dependencies?.length ? r.dependencies.join('、') : '无固定依赖（按任一/组合条件校验）'}
+                      </span>
                     </div>
                   </div>
                   <div className="sys-card__ft">
@@ -1144,6 +1191,13 @@ export default function SystemManagement({ sectionId }) {
                   </div>
                 </div>
               ))}
+              {!dslLoading && dslRules.length === 0 ? (
+                <div className="sys-card">
+                  <div className="sys-card__bd sys-card__bd--col">
+                    <span className="sys-field__v sys-field__v--dim" style={{ lineHeight: 1.6 }}>暂无规则，点击右上角「+ 新增规则」创建第一条。</span>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         )}
@@ -1353,6 +1407,42 @@ export default function SystemManagement({ sectionId }) {
                 {actionLoading.savePrompts ? '保存中...' : '保存'}
               </button>
             </DialogActions>
+      </Dialog>
+
+      {/* 新增实施依赖规则 dialog */}
+      <Dialog
+        open={dialog === 'dslNew'}
+        title="新增实施依赖规则"
+        onClose={() => setDialog(null)}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <FormRow label="规则主题">
+            <input className="input" value={dslNewForm.subject} onChange={(e) => setDslNewForm({ ...dslNewForm, subject: e.target.value })} placeholder="如：研发文档查阅" />
+          </FormRow>
+          <FormRow label="触发场景">
+            <input className="input" value={dslNewForm.trigger} onChange={(e) => setDslNewForm({ ...dslNewForm, trigger: e.target.value })} placeholder="如：使用研发文档查阅场景" />
+          </FormRow>
+          <FormRow label="依赖逻辑">
+            <select className="input" value={dslNewForm.logic} onChange={(e) => setDslNewForm({ ...dslNewForm, logic: e.target.value })}>
+              <option value="requires_all">全部依赖（缺一不可）</option>
+              <option value="requires_any">任一依赖（满足一组即可）</option>
+              <option value="combo">组合依赖（依赖 + 组合项）</option>
+            </select>
+          </FormRow>
+          <FormRow label="依赖模块">
+            <input className="input" value={dslNewForm.dependenciesText} onChange={(e) => setDslNewForm({ ...dslNewForm, dependenciesText: e.target.value })} placeholder="多个用逗号分隔，如：合同管理,税企直连" />
+          </FormRow>
+          <FormRow label="启用">
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+              <input type="checkbox" checked={dslNewForm.enabled} onChange={(e) => setDslNewForm({ ...dslNewForm, enabled: e.target.checked })} />
+              新增后立即启用
+            </label>
+          </FormRow>
+        </div>
+        <DialogActions>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDialog(null)}>取消</button>
+          <button type="button" className="btn btn-pri btn-sm" onClick={handleAddDslRule}>添加规则</button>
+        </DialogActions>
       </Dialog>
 
       {/* 模型编辑 dialog */}

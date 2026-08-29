@@ -225,4 +225,48 @@ describe('useSystemManagement', () => {
     })
     expect(window.alert).not.toHaveBeenCalled()
   })
+
+  test('loadDsl unwraps draft.rules from object response (real backend shape)', async () => {
+    // 真实后端 GET /system/implementation-dependency-rules 返回 { data: { version, draft: { rules }, active } }
+    // 而非数组——DSL 页签因此曾显示 0 条。
+    server.use(
+      http.get(`${BASE}/system/implementation-dependency-rules`, () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            version: 1,
+            draft: {
+              rules: [
+                { id: 'dep-rd-doc-read', subject: '研发文档查阅', scope: 'scenario', logic: 'requires_all', trigger: '使用研发文档查阅场景', dependencies: ['研发文档管理', '研发物料管理'], enabled: true },
+                { id: 'dep-rolling-purchase', subject: '滚动采购管理', logic: 'requires_any', trigger: '支持VMI', anyOfGroups: [['VMI采购', '基础供应链包']], dependencies: [], enabled: true },
+              ],
+            },
+            active: { rules: [] },
+          },
+        })
+      )
+    )
+    const { result } = renderHook(() => useSystemManagement())
+
+    await waitFor(() => expect(result.current.dslRules).toHaveLength(2))
+    expect(result.current.dslRules[0].id).toBe('dep-rd-doc-read')
+    expect(result.current.dslRules[0].subject).toBe('研发文档查阅')
+    expect(result.current.dslRules[0].logic).toBe('requires_all')
+    expect(result.current.dslRules[0].dependencies).toEqual(['研发文档管理', '研发物料管理'])
+    expect(result.current.dslRules[0].enabled).toBe(true)
+  })
+
+  test('addDslRule appends a rule with enabled default true', async () => {
+    const { result } = renderHook(() => useSystemManagement())
+    await waitFor(() => expect(result.current.dslRules).toHaveLength(3))
+
+    act(() => {
+      result.current.actions.addDslRule({ id: 'dep-test-new', subject: '测试新增规则', logic: 'requires_all', trigger: '测试场景', dependencies: ['测试模块'] })
+    })
+
+    const added = result.current.dslRules.find((rule) => rule.id === 'dep-test-new')
+    expect(added).toBeDefined()
+    expect(added.subject).toBe('测试新增规则')
+    expect(added.enabled).toBe(true)
+  })
 })
