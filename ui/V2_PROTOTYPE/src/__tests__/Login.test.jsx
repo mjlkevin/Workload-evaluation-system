@@ -38,8 +38,8 @@ describe('Login', () => {
 
     renderAuthRoutes()
 
-    fireEvent.change(screen.getByPlaceholderText('用户名'), { target: { value: 'demo' } })
-    fireEvent.change(screen.getByPlaceholderText('密码'), { target: { value: 'Password123!' } })
+    fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'demo' } })
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'Password123!' } })
     fireEvent.click(screen.getByRole('button', { name: '登录' }))
 
     await waitFor(() => {
@@ -58,7 +58,7 @@ describe('Login', () => {
 
     renderAuthRoutes()
 
-    fireEvent.focus(screen.getByPlaceholderText('用户名'))
+    fireEvent.focus(screen.getByLabelText('用户名'))
 
     expect(await screen.findByText('legacy-user')).toBeInTheDocument()
     expect(localStorage.getItem('wes_recent_users')).toBeNull()
@@ -71,11 +71,11 @@ describe('Login', () => {
 
     renderAuthRoutes()
 
-    fireEvent.focus(screen.getByPlaceholderText('用户名'))
+    fireEvent.focus(screen.getByLabelText('用户名'))
     fireEvent.click(await screen.findByText('recent-user'))
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('密码')).toHaveFocus()
+      expect(screen.getByLabelText('密码')).toHaveFocus()
     })
   })
 
@@ -97,8 +97,8 @@ describe('Login', () => {
 
     renderAuthRoutes()
 
-    fireEvent.change(screen.getByPlaceholderText('用户名'), { target: { value: 'demo' } })
-    fireEvent.change(screen.getByPlaceholderText('密码'), { target: { value: 'Password123!' } })
+    fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'demo' } })
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'Password123!' } })
     fireEvent.click(screen.getByLabelText('记住 7 天'))
     fireEvent.click(screen.getByRole('button', { name: '登录' }))
 
@@ -107,6 +107,19 @@ describe('Login', () => {
       expect(localStorage.getItem('wes_token')).toBe('remembered-token')
       expect(sessionStorage.getItem('wes_token')).toBeNull()
     })
+  })
+
+  test('gives every credential field a persistent visible label', async () => {
+    renderAuthRoutes()
+
+    fireEvent.click(screen.getByRole('link', { name: /使用邀请码激活/ }))
+
+    // 激活模式下四个字段的名称不能只靠 placeholder:输入后会消失,读屏也念不到
+    for (const name of ['邮箱', '用户名', '密码', '邀请码']) {
+      const field = screen.getByLabelText(name)
+      expect(field).toBeInTheDocument()
+      expect(field.labels?.length).toBeGreaterThan(0)
+    }
   })
 
   test('requests and confirms password reset from the login page', async () => {
@@ -134,7 +147,7 @@ describe('Login', () => {
 
     renderAuthRoutes()
 
-    fireEvent.change(screen.getByPlaceholderText('用户名'), { target: { value: 'demo' } })
+    fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'demo' } })
     fireEvent.click(screen.getByRole('button', { name: '忘记密码?' }))
     fireEvent.click(screen.getByRole('button', { name: '发送重置链接' }))
 
@@ -150,5 +163,20 @@ describe('Login', () => {
       expect(confirmBody).toEqual({ token: 'reset-token-123', password: 'NewPass123!' })
     })
     expect(await screen.findByText('密码已重置，请返回登录')).toBeInTheDocument()
+  })
+
+  test('lets the shared .input focus contract style credential fields', async () => {
+    renderAuthRoutes()
+    fireEvent.click(screen.getByRole('link', { name: /使用邀请码激活/ }))
+
+    // 行内 border 的优先级高于 .input:focus{border-color:var(--brand)},
+    // 一旦写在 style 上,聚焦蓝边框就永远不会出现。
+    for (const id of ['login-email', 'login-username', 'login-password', 'login-invite']) {
+      const field = document.getElementById(id)
+      expect(field).toBeTruthy()
+      expect(field.className).toContain('input')
+      expect(field.style.border).toBe('')
+      expect(field.style.borderColor).toBe('')
+    }
   })
 })

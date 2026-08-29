@@ -155,24 +155,29 @@ export default function Login() {
 
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, display: mode === 'login' ? 'block' : 'none' }}>登录</h3>
         <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, display: mode === 'register' ? 'block' : 'none' }}>使用邀请码激活账号</h3>
-        <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 20 }}>请输入账号信息以继续</p>
+        <p style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 20 }}>{mode === 'login' ? '请输入账号信息以继续' : '以下信息均为必填'}</p>
 
         <form style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={handleSubmit} onKeyDown={(e) => { if (e.altKey && e.key.toLowerCase() === 'a') { e.preventDefault(); e.target.select?.() } }}>
           {mode === 'register' && (
-            <input className="input" type="email" placeholder="邮箱" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label htmlFor="login-email" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邮箱</label>
+              <input id="login-email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            </div>
           )}
-          <div style={{ position: 'relative' }}>
-            <input
-              ref={usernameInputRef}
-              className="input"
-              type="text"
-              placeholder="用户名"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onFocus={handleUsernameFocus}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }}
-            />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label htmlFor="login-username" style={{ fontSize: 12, color: 'var(--ink-2)' }}>用户名</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                id="login-username"
+                ref={usernameInputRef}
+                className="input"
+                type="text"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onFocus={handleUsernameFocus}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }}
+              />
             {showUsernameDropdown && usernameHistory.length > 0 && (
               <div
                 ref={dropdownRef}
@@ -213,10 +218,17 @@ export default function Login() {
                 ))}
               </div>
             )}
+            </div>
           </div>
-          <input ref={passwordInputRef} className="input" type="password" placeholder="密码" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14, borderColor: 'var(--brand)', boxShadow: 'var(--shadow-focus)' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label htmlFor="login-password" style={{ fontSize: 12, color: 'var(--ink-2)' }}>密码</label>
+            <input ref={passwordInputRef} id="login-password" className="input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+          </div>
           {mode === 'register' && (
-            <input className="input" type="text" placeholder="邀请码（必填）" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label htmlFor="login-invite" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邀请码</label>
+              <input id="login-invite" className="input" type="text" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            </div>
           )}
 
           {mode === 'login' && (
@@ -273,13 +285,14 @@ export default function Login() {
             <p style={{ margin: '10px 0 14px', fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.6 }}>
               将为当前用户名生成一次性重置链接。
             </p>
-            <div style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 6 }}>用户名</div>
+            <label htmlFor="reset-username" style={{ display: 'block', fontSize: 12, color: 'var(--ink-2)', marginBottom: 6 }}>用户名</label>
             <input
+              id="reset-username"
               className="input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="请输入用户名"
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', fontSize: 14 }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }}
             />
             {resetMessage && (
               <div style={{ marginTop: 12, fontSize: 12, lineHeight: 1.6, color: resetLink ? 'var(--ok)' : 'var(--ink-2)' }}>
@@ -292,7 +305,7 @@ export default function Login() {
               </Link>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
-              <button type="button" className="btn" onClick={() => setResetOpen(false)} style={{ height: 32, fontSize: 12 }}>关闭</button>
+              <button type="button" className="btn btn-out" onClick={() => setResetOpen(false)} style={{ height: 32, fontSize: 12 }}>关闭</button>
               <button type="button" className="btn btn-pri" disabled={resetLoading} onClick={requestReset} style={{ height: 32, fontSize: 12 }}>
                 {resetLoading ? '发送中…' : '发送重置链接'}
               </button>
