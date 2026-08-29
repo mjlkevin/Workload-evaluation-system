@@ -8,6 +8,7 @@ import { primeStoredActiveSessionId } from '../../hooks/useAiSessions.js'
 import useCurrentUser from '../../hooks/useCurrentUser.js'
 import { clearToken, isAuthenticated } from '../../api/auth.js'
 import { SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
+import { APP_VERSION } from '../../config/app.js'
 import { isAdminUser } from '../../utils/adminAccess.js'
 
 const navGroups = [
@@ -235,7 +236,7 @@ export default function Shell({ children, currentUser = null }) {
       <aside className={collapsed ? 'sidebar collapsed' : 'sidebar'}>
         <div className="brand">
           <div className="l">W</div>
-          <div>WES</div>
+          <div>Datum</div>
           <button type="button"
             className="toggle-btn"
             onClick={() => setCollapsed(!collapsed)}
@@ -315,6 +316,8 @@ export default function Shell({ children, currentUser = null }) {
             </div>
             {!collapsed && <button type="button" className="out" aria-label="退出登录" onClick={handleLogout}>退出</button>}
           </div>
+          {/* 线上排障需要一个版本锚点；侧栏收起时与账号信息一同隐藏，不抢视觉 */}
+          {!collapsed && <div className="meta" title="当前界面展示版本">v {APP_VERSION}</div>}
         </div>
       </aside>
       <BackgroundRunProvider>
