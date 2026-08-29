@@ -6,7 +6,7 @@ import { devAssessments as mockData } from '../mock/listData.js'
 
 export default function DevAssessmentList() {
   const navigate = useNavigate()
-  const { rows, creating, refetch, create } = useDevAssessmentList({ fallbackData: mockData })
+  const { rows, loading, loadError, createError, creating, refetch, create } = useDevAssessmentList({ fallbackData: mockData })
 
   const kpiCards = useMemo(() => {
     const total = rows.length
@@ -42,6 +42,12 @@ export default function DevAssessmentList() {
       title="开发评估"
       subtitle="查看开发评估概览与版本管理"
       data={rows}
+      loading={loading}
+      loadingText="正在加载开发评估列表…"
+      error={loadError}
+      errorText="加载开发评估列表失败，请检查网络后重试"
+      onRetry={refetch}
+      feedback={createError ? { role: 'alert', message: '创建开发评估失败，已先保留在本地列表，请稍后重试' } : null}
       rowKey="id"
       kpiCards={kpiCards}
       onRowClick={(row) => navigate(`/dev-assessments/${row.id}`)}
