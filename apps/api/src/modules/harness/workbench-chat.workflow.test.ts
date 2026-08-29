@@ -749,3 +749,105 @@ test("S2a：assistant 消息直接幂等落库 + outbox 保留 + projector 认�
     cleanup();
   }
 });
+
+// ============================================================
+// RP-030 真实链路覆盖（2026-08-28）：异步通道 trace 归档缺口修复
+// ============================================================
+// 背景：前端 AI 工作台走 ai-runs 异步通道（本 workflow），但 trace 归档
+// 只存在于旧同步/流式 handler，导致真实问答不写 traces 表（断链）。
+// 修复口径：deps 增加可选 recordTurnTrace / recordTurnFailureTrace，
+// 生产接线注入 trace.usecase 真实实现；写入置于 recordToolEffectOnce
+// 的 execute 内——恢复重放跳过 execute，幂等天然成立（同流式事件口径）。
+
+test("RP-030 覆盖：dispatch 成功经 recordTurnTrace 归档 trace（与同步路径同口径）", async () => {
+  const traceCalls: any[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async () => ({
+      intent: "domain_qa",
+      answer: "模型回复",
+      suggestedActions: [],
+      trace: { intentConfidence: 0.9, routingRule: "mock_rule", contextRefs: ["ref-1"] },
+    } as any),
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    recordTurnTrace: async (input) => {
+      traceCalls.push(input);
+      return {} as any;
+    },
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+
+  assert.equal(traceCalls.length, 1, "成功 turn 必须归档一条 trace");
+  assert.equal(traceCalls[0].ownerUserId, "user-1");
+  assert.equal(traceCalls[0].ownerUsername, "alice");
+  assert.equal(traceCalls[0].aiSessionId, "session-1");
+  assert.equal(traceCalls[0].userInputSummary, "你好");
+  assert.equal(traceCalls[0].dispatchTrace.routingRule, "mock_rule");
+  assert.deepEqual(traceCalls[0].dispatchTrace.contextRefs, ["ref-1"]);
+});
+
+test("RP-030 覆盖：dispatch 失败经 recordTurnFailureTrace 归档失败 trace 并重抛", async () => {
+  const failCalls: any[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async () => {
+      throw new Error("model_down");
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    recordTurnFailureTrace: async (input) => {
+      failCalls.push(input);
+      return {} as any;
+    },
+  });
+
+  await assert.rejects(() => wf.executeStep("chat", makeFakeCtx()), /model_down/, "失败必须重抛给 runtime 标记 run failed");
+  assert.equal(failCalls.length, 1, "失败 turn 必须归档一条 failure trace");
+  assert.equal(failCalls[0].ownerUsername, "alice");
+  assert.equal(failCalls[0].aiSessionId, "session-1");
+});
+
+test("RP-030 覆盖：恢复重放跳过 execute，trace 不重复写（幂等天然成立）", async () => {
+  const traceCalls: any[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async () => ({
+      answer: "模型回复",
+      trace: { intentConfidence: 0.9, routingRule: "mock_rule", contextRefs: [] },
+    } as any),
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    recordTurnTrace: async (input) => {
+      traceCalls.push(input);
+      return {} as any;
+    },
+  });
+
+  // 重放语义：recordToolEffectOnce 命中既有 effect，直接返回 output 不执行 execute
+  const replayCtx = makeFakeCtx({
+    recordToolEffectOnce: async () => ({
+      output: { answer: "缓存回复", intent: "domain_qa", suggestedActions: [], trace: { intentConfidence: 0.9, routingRule: "mock_rule", contextRefs: [] } },
+      created: false,
+    }),
+  });
+  await wf.executeStep("chat", replayCtx);
+
+  assert.equal(traceCalls.length, 0, "恢复重放不得重复归档 trace");
+});
+
+test("RP-030 覆盖：recordTurnTrace 写入失败不影响主链路（静默吸收）", async () => {
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async () => ({
+      answer: "模型回复",
+      trace: { intentConfidence: 0.9, routingRule: "mock_rule", contextRefs: [] },
+    } as any),
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    recordTurnTrace: async () => {
+      throw new Error("trace_store_down");
+    },
+  });
+
+  const outcome = await wf.executeStep("chat", makeFakeCtx());
+  assert.equal(outcome.nextStepKey, null, "trace 写入失败不得阻断主链路");
+  assert.equal(outcome.outbox![0].payload.answer, "模型回复");
+});
