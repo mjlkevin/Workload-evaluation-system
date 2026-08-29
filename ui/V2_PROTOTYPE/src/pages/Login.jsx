@@ -274,7 +274,7 @@ export default function Login() {
       </div>
 
       <div style={{ position: 'fixed', bottom: 16, right: 20, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-        v 1.4.0 · © 2026 WES Team · <span style={{ cursor: 'pointer' }}>简体中文 ▾</span>
+        v 1.4.0 · © 2026 WES Team
       </div>
 
       {resetOpen && (
