@@ -148,7 +148,7 @@ describe('Login', () => {
     renderAuthRoutes()
 
     fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'demo' } })
-    fireEvent.click(screen.getByRole('button', { name: '忘记密码?' }))
+    fireEvent.click(screen.getByRole('button', { name: '忘记密码？' }))
     fireEvent.click(screen.getByRole('button', { name: '发送重置链接' }))
 
     expect(await screen.findByText(/重置链接已生成/)).toBeInTheDocument()

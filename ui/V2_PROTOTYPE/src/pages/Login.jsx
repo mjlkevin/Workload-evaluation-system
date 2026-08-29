@@ -250,7 +250,7 @@ export default function Login() {
                 }}
                 style={{ border: 0, background: 'transparent', padding: 0, fontSize: 12, color: 'var(--brand)', cursor: 'pointer' }}
               >
-                忘记密码?
+                忘记密码？
               </button>
             </div>
           )}
