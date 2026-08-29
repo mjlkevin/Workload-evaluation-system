@@ -317,7 +317,7 @@ export default function Shell({ children, currentUser = null }) {
             {!collapsed && <button type="button" className="out" aria-label="退出登录" onClick={handleLogout}>退出</button>}
           </div>
           {/* 线上排障需要一个版本锚点；侧栏收起时与账号信息一同隐藏，不抢视觉 */}
-          {!collapsed && <div className="meta" title="当前界面展示版本">v {APP_VERSION}</div>}
+          {!collapsed && <div className="meta font-mono" title="当前界面展示版本">v {APP_VERSION}</div>}
         </div>
       </aside>
       <BackgroundRunProvider>
