@@ -103,10 +103,18 @@ function mapRules(raw) {
 }
 
 function mapDslRules(raw) {
+  // 真实后端规则结构：{ id, subject, scope, logic, trigger, dependencies, enabled }
+  // 兼容旧校验规则结构：{ id, type, message }（mock/fallback 场景）
   return raw.map((r) => ({
     id: r.id || r.ruleId || '',
-    type: r.type || r.logic || (r.blocking ? 'blocking' : 'warning'),
-    message: r.message || r.description || '',
+    subject: r.subject || r.name || r.message || '',
+    trigger: r.trigger || r.description || '',
+    logic: r.logic || r.type || 'requires_all',
+    dependencies: Array.isArray(r.dependencies)
+      ? r.dependencies
+      : Array.isArray(r.anyOfGroups)
+        ? r.anyOfGroups.flat()
+        : [],
     enabled: Boolean(r.enabled ?? r.active ?? true),
   }))
 }
@@ -372,14 +380,26 @@ export default function useSystemManagement({
     setDslLoading(true)
     try {
       const payload = await apiClient.get('/system/implementation-dependency-rules')
-      const mapped = mapDslRules(unwrapList(payload))
-      setDslRules(mapped)
+      // 真实后端返回 { data: { version, draft: { rules }, active } }；mock 返回数组。两种形态都兼容。
+      const data = payload?.data ?? payload ?? {}
+      const rules = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.draft?.rules)
+          ? data.draft.rules
+          : Array.isArray(data?.rules)
+            ? data.rules
+            : []
+      setDslRules(mapDslRules(rules))
     } catch (_) { /* keep fallback */ }
     finally { setDslLoading(false) }
   }, [enabled])
 
   const toggleDsl = useCallback((id) => {
     setDslRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)))
+  }, [])
+
+  const addDslRule = useCallback((rule) => {
+    setDslRules((prev) => [...prev, { ...rule, enabled: rule.enabled !== false }])
   }, [])
 
   const saveDslDraft = useCallback(() => withAction('saveDslDraft', async () => {
@@ -608,6 +628,7 @@ export default function useSystemManagement({
       testProviderApiKey,
       testScenario,
       toggleDsl,
+      addDslRule,
       saveDslDraft,
       activateDsl,
       useTemplate,
