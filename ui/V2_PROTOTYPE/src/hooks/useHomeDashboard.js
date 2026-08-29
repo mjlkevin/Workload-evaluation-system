@@ -53,13 +53,28 @@ function generateFeed(allRecords) {
 }
 
 const DEFAULT_KPI = [
-  { ic: '▣', lb: '项目数', num: 0, sub: '加载中…', bar: '0%', icBg: 'var(--brand-soft)', icCo: 'var(--brand-ink)' },
-  { ic: '≡', lb: '需求条目', num: 0, sub: '加载中…', bar: '0%', icBg: 'var(--accent-soft)', icCo: 'var(--accent)' },
-  { ic: '⏱', lb: '评估人天', num: 0, sub: '加载中…', bar: '0%', icBg: 'var(--info-soft)', icCo: 'var(--info)' },
-  { ic: '⚇', lb: '参与成员', num: 0, sub: '加载中…', bar: '0%', icBg: 'var(--ok-soft)', icCo: 'var(--ok)' },
+  { ic: '▣', lb: '项目数', num: null, state: 'loading', sub: '加载中…', bar: '0%', icBg: 'var(--brand-soft)', icCo: 'var(--brand-ink)' },
+  { ic: '≡', lb: '需求条目', num: null, state: 'loading', sub: '加载中…', bar: '0%', icBg: 'var(--accent-soft)', icCo: 'var(--accent)' },
+  { ic: '⏱', lb: '评估人天', num: null, state: 'loading', sub: '加载中…', bar: '0%', icBg: 'var(--info-soft)', icCo: 'var(--info)' },
+  { ic: '⚇', lb: '参与成员', num: null, state: 'loading', sub: '加载中…', bar: '0%', icBg: 'var(--ok-soft)', icCo: 'var(--ok)' },
 ]
 const EMPTY_ROWS = []
 const EMPTY_DASHBOARD = { kpi: DEFAULT_KPI, plans: EMPTY_ROWS, feed: EMPTY_ROWS }
+
+// 指标卡按位对应四个数据源；源挂了不能退化成 0，否则「取不到」和「真的是 0」在界面上长得一样。
+const KPI_SOURCES = [
+  { label: '项目', run: () => apiClient.get('/project-evaluations') },
+  { label: '需求条目', run: () => apiClient.get('/versions', { type: 'requirementImport' }) },
+  { label: '评估人天', run: () => apiClient.get('/versions', { type: 'assessment' }) },
+  { label: '成员', run: () => apiClient.get('/auth/users') },
+]
+
+function settle(promise) {
+  return promise.then(
+    (value) => ({ ok: true, value }),
+    (reason) => ({ ok: false, reason })
+  )
+}
 
 function createLocalPlan(input = {}) {
   const now = new Date()
@@ -96,33 +111,37 @@ export default function useHomeDashboard({
   const [localPlans, setLocalPlans] = useState([])
 
   const load = useCallback(async () => {
-    if (!enabled) return fallback
+    if (!enabled) return { ...fallback, error: null }
 
-    // 并发请求 4 个端点
-    const [
-      projectPayload,
-      assessmentPayload,
-      requirementPayload,
-      usersPayload,
-    ] = await Promise.all([
-      apiClient.get('/project-evaluations').catch(() => ({ data: { items: [] } })),
-      apiClient.get('/versions', { type: 'assessment' }).catch(() => ({ data: [] })),
-      apiClient.get('/versions', { type: 'requirementImport' }).catch(() => ({ data: [] })),
-      apiClient.get('/auth/users').catch(() => ({ data: [] })),
-    ])
+    // 并发请求 4 个端点；逐源记账，一个源失败只影响它自己那张卡
+    const settled = await Promise.all(KPI_SOURCES.map((source) => settle(source.run())))
+    const failed = KPI_SOURCES.filter((_, i) => !settled[i].ok)
+
+    const ok = (i) => settled[i].ok
+    const projectPayload = ok(0) ? settled[0].value : null
+    const requirementPayload = ok(1) ? settled[1].value : null
+    const assessmentPayload = ok(2) ? settled[2].value : null
+    const usersPayload = ok(3) ? settled[3].value : null
 
     const projectRecords = unwrapList(projectPayload)
-    const assessmentRecords = unwrapList(assessmentPayload)
     const requirementRecords = unwrapList(requirementPayload)
+    const assessmentRecords = unwrapList(assessmentPayload)
     const users = unwrapUsers(usersPayload)
 
     // KPI 聚合
-    const kpi = [
-      { ...DEFAULT_KPI[0], num: projectRecords.length },
-      { ...DEFAULT_KPI[1], num: requirementRecords.length },
-      { ...DEFAULT_KPI[2], num: Math.round(sumDays(assessmentRecords)) },
-      { ...DEFAULT_KPI[3], num: users.length },
+    const kpiValues = [
+      projectRecords.length,
+      requirementRecords.length,
+      Math.round(sumDays(assessmentRecords)),
+      users.length,
     ]
+    const kpiSubs = [`共 ${projectRecords.length} 个项目`, `共 ${requirementRecords.length} 条`, `累计 ${kpiValues[2]} 人天`, `共 ${users.length} 人`]
+    const kpi = DEFAULT_KPI.map((item, i) => ({
+      ...item,
+      state: ok(i) ? 'ok' : 'error',
+      num: ok(i) ? kpiValues[i] : null,
+      sub: ok(i) ? kpiSubs[i] : `${KPI_SOURCES[i].label}取数失败`,
+    }))
 
     // Plans（项目评估方案列表）
     const plans = [...localPlans, ...projectRecords.map(mapProjectEvaluationToPlan)]
@@ -134,15 +153,25 @@ export default function useHomeDashboard({
     ]
     const feed = generateFeed(allRecords)
 
-    return { kpi, plans, feed }
+    const error = failed.length
+      ? new Error(`${failed.map((source) => source.label).join('、')}加载失败，数据可能不完整`)
+      : null
+
+    return { kpi, plans, feed, error }
   }, [enabled, fallback, localPlans])
+
+  const applyResult = useCallback((result) => {
+    const { error: loadError, ...dashboard } = result
+    setData(dashboard)
+    setError(loadError ?? null)
+  }, [])
 
   useEffect(() => {
     if (!enabled) {
       setData({
         ...EMPTY_DASHBOARD,
         plans: [...localPlans],
-        kpi: DEFAULT_KPI.map((item) => item.lb === '项目数' ? { ...item, num: localPlans.length, sub: localPlans.length ? '本地新增' : '无数据' } : { ...item, sub: '无数据' }),
+        kpi: DEFAULT_KPI.map((item) => item.lb === '项目数' ? { ...item, num: localPlans.length, state: 'ok', sub: localPlans.length ? '本地新增' : '无数据' } : { ...item, state: 'ok', sub: '无数据' }),
       })
       setLoading(false)
       return undefined
@@ -154,7 +183,7 @@ export default function useHomeDashboard({
 
     load()
       .then((result) => {
-        if (!cancelled) setData(result)
+        if (!cancelled) applyResult(result)
       })
       .catch((err) => {
         if (cancelled) return
@@ -166,27 +195,27 @@ export default function useHomeDashboard({
       })
 
     return () => { cancelled = true }
-  }, [enabled, fallback, load, localPlans])
+  }, [enabled, fallback, load, localPlans, applyResult])
 
   const refetch = useCallback(() => {
     if (!enabled) {
       setData({
         ...EMPTY_DASHBOARD,
         plans: [...localPlans],
-        kpi: DEFAULT_KPI.map((item) => item.lb === '项目数' ? { ...item, num: localPlans.length, sub: localPlans.length ? '本地新增' : '无数据' } : { ...item, sub: '无数据' }),
+        kpi: DEFAULT_KPI.map((item) => item.lb === '项目数' ? { ...item, num: localPlans.length, state: 'ok', sub: localPlans.length ? '本地新增' : '无数据' } : { ...item, state: 'ok', sub: '无数据' }),
       })
       return
     }
     setLoading(true)
     setError(null)
     load()
-      .then(setData)
+      .then(applyResult)
       .catch((err) => {
         setError(err)
         setData(EMPTY_DASHBOARD)
       })
       .finally(() => setLoading(false))
-  }, [enabled, fallback, localPlans, load])
+  }, [enabled, fallback, localPlans, load, applyResult])
 
   const remove = useCallback(async (versionCode) => {
     if (!enabled) return
@@ -200,7 +229,7 @@ export default function useHomeDashboard({
     setData((prev) => ({
       ...prev,
       plans: [localPlan, ...prev.plans],
-      kpi: prev.kpi.map((item) => item.lb === '项目数' ? { ...item, num: Number(item.num || 0) + 1, sub: '刚刚新增' } : item),
+      kpi: prev.kpi.map((item) => item.lb === '项目数' ? { ...item, num: item.state === 'error' ? item.num : Number(item.num || 0) + 1, sub: '刚刚新增' } : item),
       feed: [
         { name: 'mjlkevin', action: `新建了 项目评估 · ${localPlan.projectName}`, time: '刚刚', accent: true },
         ...prev.feed,

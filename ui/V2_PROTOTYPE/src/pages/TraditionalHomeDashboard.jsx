@@ -9,6 +9,9 @@ const PROJECT_ACTIONS = [
   { key: 'delete', label: '🗑 删除', mode: 'select-any', danger: true },
 ]
 
+// 状态灯跟着取数结果走：绿只在数据真的拿到时亮，取数失败置红、未取到置灰。
+const KPI_DOT_COLOR = { ok: 'var(--ok)', error: 'var(--err)', loading: 'var(--ink-3)' }
+
 export default function TraditionalHomeDashboard() {
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
@@ -24,7 +27,7 @@ export default function TraditionalHomeDashboard() {
     template: '',
   })
 
-  const { kpi, plans, refetch, remove, create } = useHomeDashboard()
+  const { kpi, plans, error, refetch, remove, create } = useHomeDashboard()
   const filteredPlans = plans.filter((plan) => {
     const q = planSearch.trim().toLowerCase()
     if (!q) return true
@@ -119,6 +122,20 @@ export default function TraditionalHomeDashboard() {
   const content = (
     <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {error && (
+            <div
+              role="alert"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+                padding: '10px 12px', border: '1px solid var(--err)', borderRadius: 'var(--r-md)',
+                background: 'var(--err-soft)', color: 'var(--err)', fontSize: 12,
+              }}
+            >
+              <span>{error.message}</span>
+              <button type="button" className="btn btn-out" onClick={() => refetch()}>重试</button>
+            </div>
+          )}
+
           {/* KPI */}
           <div className="home-kpi">
             {kpi.map((k, i) => (
@@ -126,9 +143,9 @@ export default function TraditionalHomeDashboard() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ width: 26, height: 26, borderRadius: 6, background: k.icBg || 'var(--brand-soft)', color: k.icCo || 'var(--brand-ink)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{k.ic}</span>
                   <span style={{ fontSize: 12, fontWeight: 600 }}>{k.lb}</span>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ok)', marginLeft: 'auto' }} />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: KPI_DOT_COLOR[k.state] || KPI_DOT_COLOR.ok, marginLeft: 'auto' }} />
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono)', lineHeight: 1.05, marginBottom: 4 }}>{k.num}</div>
+                <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono)', lineHeight: 1.05, marginBottom: 4 }}>{k.num === null || k.num === undefined ? '—' : k.num}</div>
                 <div style={{ height: 4, borderRadius: 999, background: 'var(--bg-soft)', marginTop: 10, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: k.bar, borderRadius: 999, background: `linear-gradient(90deg,${k.icCo || 'var(--brand)'},var(--accent))` }} />
                 </div>
