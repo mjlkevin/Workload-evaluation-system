@@ -16,6 +16,7 @@ import type { StreamingChunk } from "../../services/ai/workbench-dispatch.servic
 import { buildWorkbenchChatDispatchInput, getKimiProvider } from "../../services/ai/handlers/workbench-shared";
 import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.repository";
 import { getAiSession } from "../ai-sessions/ai-sessions.usecase";
+import { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
 import type { AuthUser } from "../../types";
 import { config } from "../../config/env";
 import { loadRequirementSystemConfigStore, resolveActiveRequirementKimiApiKey } from "../system/system.repository";
@@ -185,6 +186,10 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
       const user: AuthUser = { id: ownerUserId, username: "", role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" };
       return getAiSession(user, sessionId);
     },
+    // RP-030 真实链路覆盖（2026-08-28）：异步通道 trace 归档生产接线，
+    // 与同步路径 workbench-chat.handler.ts 同口径（成功/失败均归档）。
+    recordTurnTrace: (input) => recordWorkbenchTurnTrace(input),
+    recordTurnFailureTrace: (input) => recordWorkbenchTurnFailureTrace(input),
   });
   const registry = createHarnessWorkflowRegistry([workflow]);
 
