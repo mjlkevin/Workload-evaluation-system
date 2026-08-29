@@ -161,7 +161,7 @@ export default function Login() {
           {mode === 'register' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label htmlFor="login-email" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邮箱</label>
-              <input id="login-email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+              <input id="login-email" className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -176,7 +176,6 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 onFocus={handleUsernameFocus}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }}
               />
             {showUsernameDropdown && usernameHistory.length > 0 && (
               <div
@@ -222,12 +221,12 @@ export default function Login() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label htmlFor="login-password" style={{ fontSize: 12, color: 'var(--ink-2)' }}>密码</label>
-            <input ref={passwordInputRef} id="login-password" className="input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+            <input ref={passwordInputRef} id="login-password" className="input" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           {mode === 'register' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label htmlFor="login-invite" style={{ fontSize: 12, color: 'var(--ink-2)' }}>邀请码</label>
-              <input id="login-invite" className="input" type="text" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }} />
+              <input id="login-invite" className="input" type="text" autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} />
             </div>
           )}
 
@@ -292,7 +291,6 @@ export default function Login() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="请输入用户名"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)', fontSize: 14 }}
             />
             {resetMessage && (
               <div style={{ marginTop: 12, fontSize: 12, lineHeight: 1.6, color: resetLink ? 'var(--ok)' : 'var(--ink-2)' }}>
