@@ -235,7 +235,7 @@ export default function Shell({ children, currentUser = null }) {
     <div className="shell" style={{ gridTemplateColumns: collapsed ? '64px minmax(0,1fr)' : undefined }}>
       <aside className={collapsed ? 'sidebar collapsed' : 'sidebar'}>
         <div className="brand">
-          <div className="l">W</div>
+          <div className="l">D</div>
           <div>Datum</div>
           <button type="button"
             className="toggle-btn"
