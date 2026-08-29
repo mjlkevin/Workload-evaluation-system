@@ -3,43 +3,38 @@
 // knowledge.routes — JWT 鉴权 + 响应结构 { code, message, data }
 // ============================================================
 
-import test, { after, before } from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import supertest from "supertest";
 
 import { createKnowledgeRouter } from "./knowledge.routes";
-import { KnowledgeRepository } from "../modules/knowledge/knowledge.repository";
+import {
+  createKnowledgeInMemoryRepository,
+  type KnowledgeInMemoryRepository,
+} from "../test-helpers/knowledge-in-memory.repository";
 import { signAuthToken } from "../middleware/auth";
 import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-let storePath: string;
-let repo: KnowledgeRepository;
+let repo: KnowledgeInMemoryRepository;
 
 // 竞态隔离（S1 后形态）：阶段 2 S1（2026-08-25）users 域已切 PG，原 chdir
 // 沙箱（isolate-config-root.ts）退役；临时用户注入 PG 测试用户池，after 按
 // 前缀条件 DELETE（C5 数据集隔离）。无 DB 时用例整体 skip，钩子不得抛错。
+//
+// 语料侧（阶段 2 S6 · 2026-08-29）：knowledge JSON 仓储类删除后，本文件不再
+// 写临时 store.json，改用 in-memory 替身（test-helpers/knowledge-in-memory.
+// repository.ts）——零 fs、零 knowledge_entries 写入，因此本文件不进串行组。
 after(async () => {
   if (!testDatabaseUrl) return;
   await cleanupTestUsers("wes-knowledge-route");
 });
 
 function setupApp() {
-  storePath = path.join(os.tmpdir(), `wes-knowledge-routes-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
-  fs.writeFileSync(
-    storePath,
-    JSON.stringify({
-      entries: [
-        { id: "r-1", title: "售前估算流程", content: "售前估算用于评估实施工作量与人天。", status: "active" },
-      ],
-    }),
-    "utf-8",
-  );
-  repo = new KnowledgeRepository(storePath);
+  repo = createKnowledgeInMemoryRepository([
+    { id: "r-1", title: "售前估算流程", content: "售前估算用于评估实施工作量与人天。", status: "active" },
+  ]);
   const app = express();
   app.use(express.json());
   app.use("/knowledge", createKnowledgeRouter({ repo }));
