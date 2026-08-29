@@ -222,101 +222,103 @@ export default function DevAssessmentDetail() {
           </span>
         </div>
         <div className="bd" style={{ padding: 0, overflow: 'hidden' }}>
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: 160 }}>分组</th>
-                <th>子项</th>
-                <th style={{ width: 150 }}>基础人天</th>
-                <th style={{ width: 90 }}>难度</th>
-                <th style={{ width: 170 }}>系数后</th>
-                <th style={{ width: 96 }}>状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map((g) => (
-                <React.Fragment key={g}>
-                  <tr style={{ background: '#fbfbff', fontWeight: 800, color: 'var(--ink)' }}>
-                    <td colSpan={6}>
-                      {g}{' '}
-                      <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>
-                        · {items.filter((x) => x.group === g).length} 项
-                      </span>
-                    </td>
-                  </tr>
-                  {items.filter((x) => x.group === g).map((it, idx) => (
-                    <tr key={idx}>
-                      <td>
-                        <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>{g}</span>
-                      </td>
-                      <td>{it.name}</td>
-                      <td>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <button type="button"
-                            style={{
-                              width: 22,
-                              height: 22,
-                              border: '1px solid var(--line)',
-                              background: '#fff',
-                              borderRadius: 6,
-                              color: 'var(--ink)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            −
-                          </button>
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.5}
-                            defaultValue={it.base}
-                            style={{
-                              width: 38,
-                              textAlign: 'center',
-                              border: '1px solid var(--line)',
-                              borderRadius: 6,
-                              padding: '4px 0',
-                              font: '600 12px/1 var(--font-mono)',
-                              color: 'var(--ink)',
-                            }}
-                          />
-                          <button type="button"
-                            style={{
-                              width: 22,
-                              height: 22,
-                              border: '1px solid var(--line)',
-                              background: '#fff',
-                              borderRadius: 6,
-                              color: 'var(--ink)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            +
-                          </button>
-                        </div>
-                      </td>
-                      <td>{renderBar(it.diff)}</td>
-                      <td>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-                          {it.base} × {it.factor} = {(it.base * it.factor).toFixed(2)}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`bdg ${
-                            it.status === '已完成' ? 'ok' : it.status === '进行中' ? 'ci' : 'rev'
-                          }`}
-                        >
-                          <span className="dot" />
-                          {it.status}
+          <div className="sys-table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th style={{ width: 160 }}>分组</th>
+                  <th>子项</th>
+                  <th style={{ width: 150 }}>基础人天</th>
+                  <th style={{ width: 90 }}>难度</th>
+                  <th style={{ width: 170 }}>系数后</th>
+                  <th style={{ width: 96 }}>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((g) => (
+                  <React.Fragment key={g}>
+                    <tr style={{ background: '#fbfbff', fontWeight: 800, color: 'var(--ink)' }}>
+                      <td colSpan={6}>
+                        {g}{' '}
+                        <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>
+                          · {items.filter((x) => x.group === g).length} 项
                         </span>
                       </td>
                     </tr>
-                  ))}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                    {items.filter((x) => x.group === g).map((it, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>{g}</span>
+                        </td>
+                        <td>{it.name}</td>
+                        <td>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <button type="button"
+                              style={{
+                                width: 22,
+                                height: 22,
+                                border: '1px solid var(--line)',
+                                background: '#fff',
+                                borderRadius: 6,
+                                color: 'var(--ink)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.5}
+                              defaultValue={it.base}
+                              style={{
+                                width: 38,
+                                textAlign: 'center',
+                                border: '1px solid var(--line)',
+                                borderRadius: 6,
+                                padding: '4px 0',
+                                font: '600 12px/1 var(--font-mono)',
+                                color: 'var(--ink)',
+                              }}
+                            />
+                            <button type="button"
+                              style={{
+                                width: 22,
+                                height: 22,
+                                border: '1px solid var(--line)',
+                                background: '#fff',
+                                borderRadius: 6,
+                                color: 'var(--ink)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                        <td>{renderBar(it.diff)}</td>
+                        <td>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
+                            {it.base} × {it.factor} = {(it.base * it.factor).toFixed(2)}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            className={`bdg ${
+                              it.status === '已完成' ? 'ok' : it.status === '进行中' ? 'ci' : 'rev'
+                            }`}
+                          >
+                            <span className="dot" />
+                            {it.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
         <div
           style={{

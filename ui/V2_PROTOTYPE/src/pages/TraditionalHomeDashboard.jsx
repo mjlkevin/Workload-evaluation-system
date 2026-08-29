@@ -215,53 +215,55 @@ export default function TraditionalHomeDashboard() {
                 />
               </div>
             </div>
-            <table className="table" style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
-              <thead>
-                <tr>
-                  <th style={{ width: 38 }}>#</th>
-                  <th>项目名称</th>
-                  <th>项目编号</th>
-                  <th>状态</th>
-                  <th>客户</th>
-                  <th className="num">人天</th>
-                  <th>更新时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPlans.map((p, i) => {
-                  const isSel = selected.has(p.id)
-                  return (
-                    <tr
-                      key={p.id}
-                      onClick={(e) => handleRowClick(e, p, i)}
-                      onDoubleClick={() => setDialog('er')}
-                      style={{
-                        cursor: 'pointer',
-                        background: isSel ? 'var(--brand-soft)' : undefined,
-                        userSelect: 'none',
-                      }}
-                    >
-                      <td>{i + 1}</td>
-                      <td>
-                        <b>{p.projectName}</b>
-                        <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>{p.globalVersion}</div>
-                      </td>
-                      <td className="mono" style={{ fontFamily: 'var(--font-mono)' }}>{p.globalVersion.replace('GL-', 'v')}</td>
-                      <td>
-                        <span className={`bdg ${p.status === '进行中' ? 'co' : p.status === '待评审' ? 'rev' : 'ci'}`} style={{ fontSize: 10.5 }}>
-                          <span className="dot" />{p.status}
-                        </span>
-                      </td>
-                      <td>
-                        {p.customerName || p.raw?.customerName || '—'}
-                      </td>
-                      <td className="num">{p.mandays}</td>
-                      <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.updatedAt || '—'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="sys-table-wrap">
+              <table className="table" style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 38 }}>#</th>
+                    <th>项目名称</th>
+                    <th>项目编号</th>
+                    <th>状态</th>
+                    <th>客户</th>
+                    <th className="num">人天</th>
+                    <th>更新时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPlans.map((p, i) => {
+                    const isSel = selected.has(p.id)
+                    return (
+                      <tr
+                        key={p.id}
+                        onClick={(e) => handleRowClick(e, p, i)}
+                        onDoubleClick={() => setDialog('er')}
+                        style={{
+                          cursor: 'pointer',
+                          background: isSel ? 'var(--brand-soft)' : undefined,
+                          userSelect: 'none',
+                        }}
+                      >
+                        <td>{i + 1}</td>
+                        <td>
+                          <b>{p.projectName}</b>
+                          <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>{p.globalVersion}</div>
+                        </td>
+                        <td className="mono" style={{ fontFamily: 'var(--font-mono)' }}>{p.globalVersion.replace('GL-', 'v')}</td>
+                        <td>
+                          <span className={`bdg ${p.status === '进行中' ? 'co' : p.status === '待评审' ? 'rev' : 'ci'}`} style={{ fontSize: 10.5 }}>
+                            <span className="dot" />{p.status}
+                          </span>
+                        </td>
+                        <td>
+                          {p.customerName || p.raw?.customerName || '—'}
+                        </td>
+                        <td className="num">{p.mandays}</td>
+                        <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.updatedAt || '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
           {filteredPlans.length === 0 && (
             <div style={{ padding: '18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, borderTop: '1px solid var(--line)' }}>

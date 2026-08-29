@@ -344,29 +344,31 @@ export default function AssessmentDetail() {
             <div className="reg" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 18, boxShadow: 'var(--shadow-1)' }}>
               <h3 style={{ margin: '0 0 12px' }}>DSL 规则审阅</h3>
               {vm.dsl?.issues?.length ? (
-                <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
-                  <thead>
-                    <tr><th>规则 ID</th><th>类型</th><th>说明</th><th>状态</th></tr>
-                  </thead>
-                  <tbody>
-                    {vm.dsl.issues.map((r) => (
-                      <tr key={r.ruleId || r.id}>
-                        <td className="mono" style={{ fontSize: 12 }}>{r.ruleId || r.id}</td>
-                        <td>
-                          <span className="bdg" style={{ fontSize: 10.5, padding: '1px 6px', background: r.type === 'blocking' ? 'var(--err-soft)' : 'var(--warn-soft)', color: r.type === 'blocking' ? 'var(--err)' : 'var(--warn-ink)' }}>
-                            {r.type === 'blocking' ? '阻断' : '警告'}
-                          </span>
-                        </td>
-                        <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>{r.message}</td>
-                        <td>
-                          <span className={`bdg ${r.blocking ? 'co' : 'ok'}`} style={{ fontSize: 10.5, padding: '1px 6px' }}>
-                            <span className="dot" />{r.blocking ? '已触发' : '已通过'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="sys-table-wrap">
+                  <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
+                    <thead>
+                      <tr><th>规则 ID</th><th>类型</th><th>说明</th><th>状态</th></tr>
+                    </thead>
+                    <tbody>
+                      {vm.dsl.issues.map((r) => (
+                        <tr key={r.ruleId || r.id}>
+                          <td className="mono" style={{ fontSize: 12 }}>{r.ruleId || r.id}</td>
+                          <td>
+                            <span className="bdg" style={{ fontSize: 10.5, padding: '1px 6px', background: r.type === 'blocking' ? 'var(--err-soft)' : 'var(--warn-soft)', color: r.type === 'blocking' ? 'var(--err)' : 'var(--warn-ink)' }}>
+                              {r.type === 'blocking' ? '阻断' : '警告'}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>{r.message}</td>
+                          <td>
+                            <span className={`bdg ${r.blocking ? 'co' : 'ok'}`} style={{ fontSize: 10.5, padding: '1px 6px' }}>
+                              <span className="dot" />{r.blocking ? '已触发' : '已通过'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>暂无 DSL 规则审阅数据，完成评估计算后自动生成</div>
               )}
