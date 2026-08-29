@@ -4,6 +4,10 @@ import { isAuthenticated } from '../api/auth.js'
 import { mapVcsStatus } from './mapVersionStatus.js'
 import { unwrapSingle } from '../api/utils.js'
 
+function unwrapVersionRecord(payload) {
+  return payload?.data?.record || payload?.record || unwrapSingle(payload)
+}
+
 export function mapResourceCostRowToVM(raw = {}) {
   return {
     name: raw.name || raw.userName || '—',
@@ -73,14 +77,18 @@ export default function useResourceCostDetail({
   const [loading, setLoading] = useState(Boolean(enabled && id))
   const [error, setError] = useState(null)
   const [actionLoading, setActionLoading] = useState({})
+  const [actionError, setActionError] = useState(null)
 
   const withAction = useCallback(async (key, task) => {
     setActionLoading((prev) => ({ ...prev, [key]: true }))
+    setActionError(null)
     try {
-      await task()
-      return { success: true, error: null }
+      const message = await task()
+      return { success: true, error: null, message: typeof message === 'string' ? message : null }
     } catch (err) {
-      return { success: false, error: err?.message || '操作失败' }
+      const message = err?.message || '操作失败'
+      setActionError(message)
+      return { success: false, error: message, message: null }
     } finally {
       setActionLoading((prev) => ({ ...prev, [key]: false }))
     }
@@ -100,7 +108,7 @@ export default function useResourceCostDetail({
     apiClient.get(`/versions/${id}`)
       .then((payload) => {
         if (cancelled) return
-        const vm = mapResourceCostDetailToVM(unwrapSingle(payload))
+        const vm = mapResourceCostDetailToVM(unwrapVersionRecord(payload))
         setData(vm || fallbackVM)
       })
       .catch((err) => {
@@ -115,24 +123,41 @@ export default function useResourceCostDetail({
     return () => { cancelled = true }
   }, [enabled, id, fallbackVM])
 
+  const refresh = useCallback(async () => {
+    const payload = await apiClient.get(`/versions/${id}`)
+    setData(mapResourceCostDetailToVM(unwrapVersionRecord(payload)))
+  }, [id])
+
   const checkout = useCallback(() => withAction('checkout', async () => {
     await apiClient.post(`/versions/${id}/checkout`)
-    setData((prev) => prev ? { ...prev, checkedOut: true, status: '已检出' } : prev)
-  }), [id, withAction])
+    await refresh()
+    return '已检出，进入可编辑状态'
+  }), [id, refresh, withAction])
   const checkin = useCallback(() => withAction('checkin', async () => {
     await apiClient.post(`/versions/${id}/checkin`)
-    setData((prev) => prev ? { ...prev, checkedOut: false, status: '已检入' } : prev)
-  }), [id, withAction])
+    await refresh()
+    return '已检入，版本已锁定'
+  }), [id, refresh, withAction])
   const undoCheckout = useCallback(() => withAction('undoCheckout', async () => {
     await apiClient.post(`/versions/${id}/undo-checkout`)
-    setData((prev) => prev ? { ...prev, checkedOut: false, status: '已检入' } : prev)
-  }), [id, withAction])
-  const promote = useCallback(() => withAction('promote', () => apiClient.post(`/versions/${id}/promote`)), [id, withAction])
+    await refresh()
+    return '已撤销检出，未保存的修改已放弃'
+  }), [id, refresh, withAction])
+  const promote = useCallback(() => withAction('promote', async () => {
+    await apiClient.post(`/versions/${id}/promote`)
+    await refresh()
+    return '已升版，新版本已生成'
+  }), [id, refresh, withAction])
   const forceUnlock = useCallback(() => withAction('forceUnlock', async () => {
     await apiClient.patch(`/versions/${id}/force-unlock`)
-    setData((prev) => prev ? { ...prev, checkedOut: false, status: '已检入' } : prev)
-  }), [id, withAction])
-  const saveDraft = useCallback(() => withAction('saveDraft', () => apiClient.patch(`/versions/${id}/save-draft`)), [id, withAction])
+    await refresh()
+    return '已强制解锁'
+  }), [id, refresh, withAction])
+  const saveDraft = useCallback(() => withAction('saveDraft', async () => {
+    await apiClient.patch(`/versions/${id}/save-draft`, { payload: data?.raw?.payload ?? {} })
+    await refresh()
+    return `版本已保存（${new Date().toLocaleTimeString('zh-CN')}）`
+  }), [id, data, refresh, withAction])
 
   return {
     ...(data || fallbackVM || {}),
@@ -144,6 +169,7 @@ export default function useResourceCostDetail({
     monthTotals: data?.monthTotals || fallbackVM?.monthTotals || [],
     loading,
     error,
+    actionError,
     actions: { checkout, checkin, undoCheckout, promote, forceUnlock, saveDraft },
     actionLoading,
   }

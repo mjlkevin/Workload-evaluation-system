@@ -5,6 +5,7 @@ import useResourceCostDetail from '../hooks/useResourceCostDetail.js'
 import { apiClient } from '../api/client.js'
 import { unwrapList } from '../api/utils.js'
 import { mapVcsStatus } from '../hooks/mapVersionStatus.js'
+import { useToast } from '../hooks/useToast.jsx'
 import { downloadCSV } from '../utils/download.js'
 
 export default function ResourceCostDetail() {
@@ -13,6 +14,12 @@ export default function ResourceCostDetail() {
   const [historyRows, setHistoryRows] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const detail = useResourceCostDetail({ id })
+  const toast = useToast()
+  const runVcs = async (fn) => {
+    const res = await fn()
+    if (res?.success) { if (res.message) toast.success(res.message) }
+    else toast.error(res?.error || '操作失败')
+  }
   const {
     groups = [],
     months = [],
@@ -31,15 +38,15 @@ export default function ResourceCostDetail() {
       actions={[
         // 全套 VCS（决策 A）—— 当前 RS-04001 已检出态：检出 disabled / 检入 pri / 撤销+解锁可用
         <button type="button" key="hist" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={async () => { setHistoryOpen(true); setHistoryLoading(true); try { const payload = await apiClient.get('/versions', { type: 'resource' }); const list = unwrapList(payload).filter(r => r.baseCode === (detail.globalVersion || detail.code || id)); setHistoryRows(list.map(r => ({ version: r.versionCode || r.version || '', status: mapVcsStatus(r), owner: r.checkedOutByUsername || r.updatedByUsername || '—', updatedAt: (r.updatedAt || '').slice(0, 10) }))); } catch (err) { alert('加载历史失败: ' + err.message); } finally { setHistoryLoading(false); } }}>⏱ 历史</button>,
-        <button type="button" key="promote" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => actions?.promote?.()}>⬆ 升版</button>,
+        <button type="button" key="promote" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => runVcs(() => actions?.promote?.())}>⬆ 升版</button>,
         <span key="sep1" style={{ width: 1, height: 18, background: 'var(--line)' }} />,
-        <button type="button" key="checkin" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => actions?.checkin?.()}>🔒 检入</button>,
-        <button type="button" key="undo" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => actions?.undoCheckout?.()}>↺ 撤销</button>,
-        <button type="button" key="checkout" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px', opacity: checkedOut ? 0.45 : 1, cursor: checkedOut ? 'not-allowed' : 'pointer' }} disabled={checkedOut} onClick={() => !checkedOut && actions?.checkout?.()}>🔓 检出</button>,
+        <button type="button" key="checkin" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => runVcs(() => actions?.checkin?.())}>🔒 检入</button>,
+        <button type="button" key="undo" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => runVcs(() => actions?.undoCheckout?.())}>↺ 撤销</button>,
+        <button type="button" key="checkout" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px', opacity: checkedOut ? 0.45 : 1, cursor: checkedOut ? 'not-allowed' : 'pointer' }} disabled={checkedOut} onClick={() => !checkedOut && runVcs(() => actions?.checkout?.())}>🔓 检出</button>,
         <span key="sep2" style={{ width: 1, height: 18, background: 'var(--line)' }} />,
-        <button type="button" key="unlock" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px', color: 'var(--err)' }} onClick={() => confirm('强制解锁会覆盖他人改动，确定？') && actions?.forceUnlock?.()}>⚠ 解锁</button>,
+        <button type="button" key="unlock" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px', color: 'var(--err)' }} onClick={() => confirm('强制解锁会覆盖他人改动，确定？') && runVcs(() => actions?.forceUnlock?.())}>⚠ 解锁</button>,
         <button type="button" key="export" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => { const rows = groups.flatMap(g => g.rows.map(r => ({ 角色: g.role, 姓名: r.name, 单价: r.unitPrice, 计划人天: r.plannedDays, 差旅: r.travelCost, 小计: r.unitPrice * r.plannedDays + r.travelCost }))); downloadCSV(rows, `resource-cost-${detail.code || id}.csv`); }}>↓ 导出</button>,
-        <button type="button" key="save" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => actions?.saveDraft?.()}>⤒ 保存版本</button>,
+        <button type="button" key="save" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => runVcs(() => actions?.saveDraft?.())}>⤒ 保存版本</button>,
       ]}
     >
       {/* pmstrip */}

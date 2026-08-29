@@ -91,8 +91,8 @@ export default function useDevAssessmentDetail({
   }, [enabled, id, fallbackVM])
 
   const save = useCallback(() => withAction('save', async () => {
-    await apiClient.patch(`/versions/${id}/save-draft`)
-  }), [id, withAction])
+    await apiClient.patch(`/versions/${id}/save-draft`, { payload: data?.raw?.payload ?? {} })
+  }), [id, data, withAction])
 
   const merge = useCallback(() => withAction('merge', async () => {
     await apiClient.post(`/versions/${id}/checkin`)
