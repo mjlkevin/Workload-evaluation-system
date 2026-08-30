@@ -1,50 +1,32 @@
 // ============================================================
-// Templates 域仓储入口（选择器：缺省 JSON / WES_STORE_TEMPLATES_PG=true 切 PG）
+// Templates 域仓储入口（阶段 2 S6 终态：PG-only）
 // ============================================================
-// 阶段 2 批 8：实现改经选择器分流（§3.1 形态：选择仓储实现）。
-// JSON 路径保留至第 4 步（删 JSON 路径 + 退役开关为独立后续批次）。
+// 阶段 2 批 8 起实现改经选择器分流（§3.1 形态）；S6（2026-08-29）删除
+// JSON 读写路径并退役 WES_STORE_TEMPLATES_PG，选择器恒装配 PG 实现——
+// 与本域外其余「第 4 步已完成」域（ai-sessions S2b-2）同形态。
+//
+// seed 源文件 config/templates/example-template.json 保留不删：它仍是
+// db/seed.ts 的播种来源（阶段 2 D17「零数据迁移」口径下，PG 里的活动
+// 模板即由该文件播入），删除即断 seed。
 
 import { Template } from "../../types";
-import { loadJsonFile, saveJsonFile } from "../../utils/file";
 import {
   createTemplatesPgRepository,
   type TemplateStoreRepository,
 } from "./templates-pg.repository";
 
-const TEMPLATE_PATH = "config/templates/example-template.json";
-
 export type { TemplateStoreRepository, TemplatesPgRepository } from "./templates-pg.repository";
 export { TemplateStoreError, createTemplatesPgRepository } from "./templates-pg.repository";
 
 // ============================================================
-// JSON 实现（现状，阶段 1 批 6 签名已 async）
-// ============================================================
-
-function createTemplateJsonRepository(): TemplateStoreRepository {
-  return {
-    async loadTemplate(): Promise<Template> {
-      return loadJsonFile<Template>(TEMPLATE_PATH);
-    },
-    async saveTemplate(template: Template): Promise<void> {
-      saveJsonFile(TEMPLATE_PATH, template);
-    },
-  };
-}
-
-// ============================================================
-// 选择器（第 3 步开关：缺省 JSON，严格 === "true" 切 PG）
+// 选择器（S6 后恒 PG，无开关分流；单例语义保留）
 // ============================================================
 
 let defaultRepo: TemplateStoreRepository | null = null;
 
-/** 进程内默认 repository 单例（生产路由使用）；开关只读一次，翻开关需重启 */
+/** 进程内默认 repository 单例（生产路由使用）；S6 后恒 PG 实现 */
 export function getTemplateRepository(): TemplateStoreRepository {
-  if (!defaultRepo) {
-    defaultRepo =
-      process.env.WES_STORE_TEMPLATES_PG === "true"
-        ? createTemplatesPgRepository()
-        : createTemplateJsonRepository();
-  }
+  if (!defaultRepo) defaultRepo = createTemplatesPgRepository();
   return defaultRepo;
 }
 
@@ -58,14 +40,14 @@ export function _resetTemplateRepositoryForTest(): void {
 // ============================================================
 
 /**
- * 阶段 2 批 8：实现改经选择器（缺省 JSON / WES_STORE_TEMPLATES_PG=true 切 PG）。
+ * 阶段 2 S6：实现改经选择器恒直连 PG（JSON 路径与开关已退役）。
  */
 export async function loadTemplate(): Promise<Template> {
   return getTemplateRepository().loadTemplate();
 }
 
 /**
- * 阶段 2 批 8：实现改经选择器（缺省 JSON / WES_STORE_TEMPLATES_PG=true 切 PG）。
+ * 阶段 2 S6：实现改经选择器恒直连 PG（JSON 路径与开关已退役）。
  */
 export async function saveTemplate(template: Template): Promise<void> {
   return getTemplateRepository().saveTemplate(template);

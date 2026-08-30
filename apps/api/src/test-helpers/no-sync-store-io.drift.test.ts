@@ -33,8 +33,9 @@ const SYNC_IO_NAMES = new Set(["readFileSync", "writeFileSync"]);
 /** 文件级白名单：条目内所有同步 I/O 调用豁免（命中输出审查日志）。 */
 // 条目均经 RED 违例清单逐项裁决（批 8）：
 // - 用户指定例外：config-integrity.ts（启动期路径，D15 阶段 2 删除对象）、db/seed.ts（seed 源读取）
-// - 阶段 1 批 N accessor 的内部同步实现：knowledge/team/trace repository
+// - 阶段 1 批 N accessor 的内部同步实现：team/trace repository
 //   （函数体「实现不动」，阶段 2 替换存储时一并异步化）
+//   （S6 2026-08-29：knowledge repository 的 JSON 实现类已删除，其条目随之下线）
 // - 复用型同步工具：utils/file.ts、prompt-registry.ts、rag-baseline 三个文件
 //   （被请求路径复用或 CLI/离线工具；异步化属阶段 2 评估项）
 //
@@ -74,12 +75,7 @@ const FILE_WHITELIST: Array<{ file: string; reason: string; expectedHits: number
   },
   {
     file: "utils/file.ts",
-    reason: "loadJsonFile/saveJsonFile 通用同步工具，被 rules/templates 仓储与 estimates/sessions usecase 复用；异步化属阶段 2 评估项",
-    expectedHits: 2,
-  },
-  {
-    file: "modules/knowledge/knowledge.repository.ts",
-    reason: "批 7 已 async 化全部公开方法的内部 private load/save（class 方法不满足顶层命名豁免），阶段 2 替换实现",
+    reason: "loadJsonFile/saveJsonFile 通用同步工具；S6 后生产侧零调用方（loadJsonFile 仅剩 seed 测试 helper 读 seed 源 fixture，saveJsonFile 已全仓零引用 → 台账 B5，清理归 S7），异步化属阶段 2 评估项",
     expectedHits: 2,
   },
   {
