@@ -11,6 +11,9 @@
 //   --format <type>    输出格式：simple | batch（默认 batch）
 //   --limit <n>        最多导出条数（默认 100）
 //   --source <type>    数据源：json | pg（默认 json）
+//                      阶段 2 S3（2026-08-30）：traces JSON 读写路径已删除，
+//                      json 不再指 data/traces/trace-store.json，而是经仓储
+//                      选择器读取（恒 PG）；pg = 绕过仓储层的裸 SQL 直读。
 //   --help             显示帮助信息
 //
 // 不碰生产路由，纯脚本。
@@ -93,8 +96,8 @@ Trace → Langfuse NDJSON 导出脚本（O7 PoC）
                       batch  = 每行一个 ingest event（trace-create / observation-create）
   --limit <n>        最多导出条数（默认 100）
   --source <type>    数据源：json | pg（默认 json）
-                      json = 从 data/traces/trace-store.json 读取
-                      pg   = 从 PostgreSQL traces 表读取（需要 DATABASE_URL）
+                      json = 经仓储选择器读取（S3 后恒 PG，需 DATABASE_URL）
+                      pg   = 裸 SQL 直读 PostgreSQL traces 表（需要 DATABASE_URL）
   --help, -h         显示此帮助信息
 
 示例：
@@ -113,10 +116,15 @@ Trace → Langfuse NDJSON 导出脚本（O7 PoC）
   - PG 模式需要配置 DATABASE_URL 环境变量。
 `.trim();
 
-// ─── JSON 数据源 ──────────────────────────────────────────────
+// ─── 仓储选择器数据源（S3 后恒 PG） ──────────────────────────
 
-function loadFromJsonStore(session: string | undefined, limit: number): TraceRecord[] {
-  const result = queryTraces({
+// 阶段 2 S3（2026-08-30）：traces JSON 读写路径删除，本函数不再能读到文件；
+// 保留 `--source json` 别名仅作向后兼容，实际经仓储选择器→ PG。
+// 同时修正一个阶段 1 批 7 遗留缺陷：queryTraces 自批 7 起已异步化，原同步写法
+// `queryTraces(...).traces` 恒得 undefined（默认 `--source json` 自那时起即抛
+// TypeError），因 scripts/ 不在任何 tsconfig 的 include 内、也无用例覆盖而未被发现。
+async function loadFromStore(session: string | undefined, limit: number): Promise<TraceRecord[]> {
+  const result = await queryTraces({
     ownerUserId: "", // 空字符串 = 不按 owner 过滤（admin 全量场景）
     ...(session ? { sourceId: session } : {}),
     limit,
@@ -132,7 +140,7 @@ async function loadFromPg(session: string | undefined, limit: number): Promise<T
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
-    throw new Error("DATABASE_URL 未设置。使用 --source json 或配置 DATABASE_URL。");
+    throw new Error("DATABASE_URL 未设置（--source pg 裸 SQL 模式需要）。");
   }
 
   const pool = new pg.Pool({ connectionString });
@@ -205,7 +213,7 @@ async function main(): Promise<void> {
   if (opts.source === "pg") {
     traces = await loadFromPg(opts.session, opts.limit);
   } else {
-    traces = loadFromJsonStore(opts.session, opts.limit);
+    traces = await loadFromStore(opts.session, opts.limit);
   }
 
   if (traces.length === 0) {

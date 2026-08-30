@@ -69,7 +69,7 @@ const HDR_STORE_PREFIX = "wes-t-hdr-";
 let storeSeed: SingleDocStoreSeed | null = null;
 
 // C10（2026-08-25）：本文件是 handler 契约测试，用例以 JSON 文件构造状态
-// （versionsStorePath / versionCodeRulesStorePath 等）并经选择器访问存储。
+// （当时为 versionsStorePath / versionCodeRulesStorePath 等）并经选择器访问存储。
 // 全局开关全开（PG）时构造与读取不一致 → 用例失败。
 // 文件级显式切回 JSON 实现（users 域 S1 后恒 PG，不受影响）。
 // S2b-1（2026-08-27）：AI_SESSIONS 移出本列表——直读断言已全部改经
@@ -80,7 +80,9 @@ let storeSeed: SingleDocStoreSeed | null = null;
 // S3（2026-08-30）：SYSTEM / TRACES 两开关移出本列表——两域 JSON 路径已删、
 // 选择器恒 PG，delete 开关已不再能切回任何实现；version_code_rules 与
 // knowledge-base-config 的 fixture 随之从「写 JSON 文件」改为「经 PG 仓储种入 +
-// 原值还原」（见 withKnowledgeBaseConfigSnapshot 与各用例的 t.after）。
+// 原值还原」（见 withKnowledgeBaseConfigSnapshot 与各用例的 t.after）；四个
+// *StorePath 也已从 utils/file.ts 下线，本文件残留的 JSON 文件构造仅剩
+// versionsStorePath（实取 15 处，归 S4）。
 // S6（2026-08-29）：TEMPLATES / RULE_SETS / KNOWLEDGE 三域移出本列表——
 // 三域 JSON 路径已删、选择器恒 PG，delete 开关已不再能切回任何实现；
 // getRuleSetMeta 需要「活动文档存在」，而 db:seed 在 CI 里排在 Test modules

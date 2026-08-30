@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import { createHash } from "node:crypto";
 
 import {
@@ -21,20 +19,21 @@ import {
   VersionCodeRulesStore,
 } from "../../types";
 import { config } from "../../config/env";
-import {
-  implementationDependencyRulesStorePath,
-  knowledgeBaseConfigStorePath,
-  requirementSystemConfigStorePath,
-  versionCodeRulesStorePath,
-} from "../../utils";
 import { applyVersionCodeFormat } from "../../utils/version-code-format";
+// S3（2026-08-30）：四个 *StorePath 导入随 JSON 读写路径删除。注意
+// config/system/{requirement-settings,implementation-dependency-rules,knowledge-base-config}.json
+// 与 config/versions/version-code-rules.json 仍是 db/seed.ts 的播种来源（阶段 2
+// D17「零数据迁移」口径），文件保留，只是运行时不再读写。
+// setCachedApiKey / importApiKeyIfAbsent 同批摘除：前者仅被两个 *Json 函数调用
+// （PG 路径在 system-pg.repository.ts 内自行填充凭据缓存）；后者是「文件密钥
+// 一次性导入 DB」补偿链的唯一调用点，该补偿链随 JSON 读路径一并下线——PG 早已
+// 是权威源，且 2026-08-29 实测文件与 PG 密钥非同值，项目侧已裁决「密钥重新
+// 配置，不做保全」。
 import {
   KIMI_SCOPE,
   getCachedApiKey,
-  setCachedApiKey,
   setApiKey as dbSetApiKey,
   clearApiKey as dbClearApiKey,
-  importApiKeyIfAbsent,
 } from "./credentials.store";
 import { normalizeModelProviders, normalizeScenarioBindings } from "./model-providers";
 import { createSystemPgRepository, type SystemStoreRepository } from "./system-pg.repository";
@@ -142,36 +141,6 @@ function normalizeStore(input: unknown): VersionCodeRulesStore {
     }));
   if (!normalized.length) return { rules: createDefaultRules() };
   return { rules: normalized };
-}
-
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
-async function loadVersionCodeRulesStoreJson(): Promise<VersionCodeRulesStore> {
-  const filePath = versionCodeRulesStorePath();
-  if (!fs.existsSync(filePath)) {
-    const initStore: VersionCodeRulesStore = { rules: createDefaultRules() };
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(initStore, null, 2), "utf-8");
-    return initStore;
-  }
-  try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
-    const normalized = normalizeStore(parsed);
-    fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
-    return normalized;
-  } catch {
-    const fallback: VersionCodeRulesStore = { rules: createDefaultRules() };
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
-  }
-}
-
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
-async function saveVersionCodeRulesStoreJson(store: VersionCodeRulesStore): Promise<void> {
-  const filePath = versionCodeRulesStorePath();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const normalized = normalizeStore(store);
-  fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
 }
 
 export function buildVersionCodeSample(format: string, prefix: string, moduleCode: string): string {
@@ -319,92 +288,6 @@ function normalizeRequirementStore(input: unknown): RequirementSystemConfigStore
     updatedAt: String(data.updatedAt || now),
     effectiveAt: String(data.effectiveAt || now),
   };
-}
-
-/** 一次性导入标记：首次 loadRequirementSystemConfigStore 时检查文件密钥 → DB */
-let _kimiImportChecked = false;
-
-/** 重置一次性导入标记（测试用） */
-export function _resetKimiImportCheck(): void {
-  _kimiImportChecked = false;
-}
-
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
-async function loadRequirementSystemConfigStoreJson(): Promise<RequirementSystemConfigStore> {
-  const filePath = requirementSystemConfigStorePath();
-  if (!fs.existsSync(filePath)) {
-    const now = new Date().toISOString();
-    const initial = createDefaultRequirementConfig();
-    const initStore: RequirementSystemConfigStore = {
-      version: 1,
-      draft: initial,
-      active: initial,
-      updatedAt: now,
-      effectiveAt: now,
-    };
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(initStore, null, 2), "utf-8");
-    return initStore;
-  }
-  try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
-    const normalized = normalizeRequirementStore(parsed);
-
-    // 一次性导入：文件有 apiKey → 导入 DB + 立即清文件
-    if (!_kimiImportChecked) {
-      _kimiImportChecked = true;
-      const fileApiKey = (
-        normalized.active.kimiCredentials?.apiKey ||
-        normalized.draft.kimiCredentials?.apiKey ||
-        ""
-      ).trim();
-      if (fileApiKey) {
-        // 立即填充缓存，保证同步读取可用
-        setCachedApiKey(KIMI_SCOPE, fileApiKey);
-        // 幂等导入 DB（fire-and-forget，缓存已就绪）
-        importApiKeyIfAbsent(KIMI_SCOPE, fileApiKey, "system-import").catch(() => {});
-      }
-    }
-
-    // 文件 apiKey 永久写空串（真实密钥存 DB）
-    normalized.draft.kimiCredentials.apiKey = "";
-    normalized.active.kimiCredentials.apiKey = "";
-    fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
-    return normalized;
-  } catch {
-    const now = new Date().toISOString();
-    const fallbackConfig = createDefaultRequirementConfig();
-    const fallback: RequirementSystemConfigStore = {
-      version: 1,
-      draft: fallbackConfig,
-      active: fallbackConfig,
-      updatedAt: now,
-      effectiveAt: now,
-    };
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
-  }
-}
-
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
-async function saveRequirementSystemConfigStoreJson(store: RequirementSystemConfigStore): Promise<void> {
-  const filePath = requirementSystemConfigStorePath();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const normalized = normalizeRequirementStore(store);
-  // 兼容：store 中有非空 apiKey 时填充缓存（生产路径由 persistKimiApiKey 先行写入，此处为直接调用场景）
-  const effectiveKey = (
-    normalized.active.kimiCredentials?.apiKey ||
-    normalized.draft.kimiCredentials?.apiKey ||
-    ""
-  ).trim();
-  if (effectiveKey) {
-    setCachedApiKey(KIMI_SCOPE, effectiveKey);
-  }
-  // 文件 apiKey 永久写空串（真实密钥存 DB）
-  normalized.draft.kimiCredentials.apiKey = "";
-  normalized.active.kimiCredentials.apiKey = "";
-  fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
 }
 
 export function normalizeRequirementSystemConfig(input: unknown): RequirementSystemConfig {
@@ -846,52 +729,6 @@ function normalizeImplementationDependencyStore(input: unknown): ImplementationD
   };
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
-async function loadImplementationDependencyRulesStoreJson(): Promise<ImplementationDependencyRulesStore> {
-  const filePath = implementationDependencyRulesStorePath();
-  if (!fs.existsSync(filePath)) {
-    const now = new Date().toISOString();
-    const initial = createDefaultImplementationDependencyConfig();
-    const initStore: ImplementationDependencyRulesStore = {
-      version: 1,
-      draft: initial,
-      active: initial,
-      updatedAt: now,
-      effectiveAt: now,
-    };
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(initStore, null, 2), "utf-8");
-    return initStore;
-  }
-  try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
-    const normalized = normalizeImplementationDependencyStore(parsed);
-    fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
-    return normalized;
-  } catch {
-    const now = new Date().toISOString();
-    const fallbackRules = createDefaultImplementationDependencyConfig();
-    const fallback: ImplementationDependencyRulesStore = {
-      version: 1,
-      draft: fallbackRules,
-      active: fallbackRules,
-      updatedAt: now,
-      effectiveAt: now,
-    };
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
-  }
-}
-
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
-async function saveImplementationDependencyRulesStoreJson(store: ImplementationDependencyRulesStore): Promise<void> {
-  const filePath = implementationDependencyRulesStorePath();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const normalized = normalizeImplementationDependencyStore(store);
-  fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
-}
-
 export function normalizeImplementationDependencyRulesConfig(input: unknown): ImplementationDependencyRulesConfig {
   return normalizeImplementationDependencyConfig(input);
 }
@@ -1154,52 +991,6 @@ function normalizeKnowledgeBaseStore(input: unknown): KnowledgeBaseConfigStore {
   };
 }
 
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 readFileSync/writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
-async function loadKnowledgeBaseConfigStoreJson(): Promise<KnowledgeBaseConfigStore> {
-  const filePath = knowledgeBaseConfigStorePath();
-  if (!fs.existsSync(filePath)) {
-    const now = new Date().toISOString();
-    const initial = createDefaultKnowledgeBaseConfig();
-    const initStore: KnowledgeBaseConfigStore = {
-      version: 1,
-      draft: initial,
-      active: initial,
-      updatedAt: now,
-      effectiveAt: now,
-    };
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(initStore, null, 2), "utf-8");
-    return initStore;
-  }
-  try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as unknown;
-    const normalized = normalizeKnowledgeBaseStore(parsed);
-    fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
-    return normalized;
-  } catch {
-    const now = new Date().toISOString();
-    const fallbackConfig = createDefaultKnowledgeBaseConfig();
-    const fallback: KnowledgeBaseConfigStore = {
-      version: 1,
-      draft: fallbackConfig,
-      active: fallbackConfig,
-      updatedAt: now,
-      effectiveAt: now,
-    };
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
-  }
-}
-
-/** 阶段 1 批 5：签名改 async，实现不动（仍为 writeFileSync）。阶段 2 批 4：JSON 实现体原样保留，经选择器分流。 */
-async function saveKnowledgeBaseConfigStoreJson(store: KnowledgeBaseConfigStore): Promise<void> {
-  const filePath = knowledgeBaseConfigStorePath();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const normalized = normalizeKnowledgeBaseStore(store);
-  fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2), "utf-8");
-}
-
 /** 合并知识库凭证 PATCH：null 表示清除；空字符串表示不修改；非空则写入 */
 export function mergeKnowledgeBaseCredentialsPatch(
   prev: KnowledgeBaseCredentialsConfig,
@@ -1369,42 +1160,26 @@ export async function resolveDraftKnowledgeBaseConfigForTest(
 }
 
 // ============================================================
-// 选择器（阶段 2 批 4 第 3 步开关：缺省 JSON，严格 === "true" 切 PG）
+// 选择器（阶段 2 S3 终态：恒 PG，无开关分流）
 // ============================================================
-// 约束（架构侧批 4 指令）：system.repository.ts 是阶段 3 拆分对象，
-// 本批只做存储切换——四组 load/save 样板原样保留，不抽取公共逻辑。
+// S3（2026-08-30）删除四组 *Json 实现与 createSystemJsonRepository，并
+// 退役 WES_STORE_SYSTEM_PG（commit C）——选择器恒装配 PG，与本阶段其余
+// 「第 4 步已完成」域（templates/rule_sets/knowledge S6）同形态。
+// 约束（架构侧批 4 指令，仍生效）：system.repository.ts 是阶段 3 拆分对象，
+// 本批只做存储切换——不抽取公共逻辑。
 // 8 个公开 accessor 保持原签名与原导出名（调用点零改动），内部经
-// getSystemRepository() 分流；路由层只做两件小事：
+// getSystemRepository() 取用；路由层契约不变：
 //  1. save 前用既有私有 normalize 统一契约（PG 仓储是纯存储层，不做归一）；
-//  2. load 缺行/空表时用既有私有默认工厂兜底（对齐 JSON「缺文件建默认」，
+//  2. load 缺行/空表时用既有私有默认工厂兜底（对齐旧 JSON「缺文件建默认」，
 //     PG 路径不在读路径写回）。
 
 export type { SystemStoreRepository };
 
-/** JSON 实现装配（四组 Json 函数原样包装，无逻辑改动） */
-export function createSystemJsonRepository(): SystemStoreRepository {
-  return {
-    loadVersionCodeRulesStore: loadVersionCodeRulesStoreJson,
-    saveVersionCodeRulesStore: saveVersionCodeRulesStoreJson,
-    loadRequirementSystemConfigStore: loadRequirementSystemConfigStoreJson,
-    saveRequirementSystemConfigStore: saveRequirementSystemConfigStoreJson,
-    loadImplementationDependencyRulesStore: loadImplementationDependencyRulesStoreJson,
-    saveImplementationDependencyRulesStore: saveImplementationDependencyRulesStoreJson,
-    loadKnowledgeBaseConfigStore: loadKnowledgeBaseConfigStoreJson,
-    saveKnowledgeBaseConfigStore: saveKnowledgeBaseConfigStoreJson,
-  };
-}
-
 let defaultRepo: SystemStoreRepository | null = null;
 
-/** 进程内默认 repository 单例（生产路由使用）；开关只读一次，翻开关需重启 */
+/** 进程内默认 repository 单例（生产路由使用）；S3 后恒 PG 实现 */
 export function getSystemRepository(): SystemStoreRepository {
-  if (!defaultRepo) {
-    defaultRepo =
-      process.env.WES_STORE_SYSTEM_PG === "true"
-        ? createSystemPgRepository()
-        : createSystemJsonRepository();
-  }
+  if (!defaultRepo) defaultRepo = createSystemPgRepository();
   return defaultRepo;
 }
 
@@ -1417,7 +1192,8 @@ export function _resetSystemRepositoryForTest(): void {
 
 export async function loadVersionCodeRulesStore(): Promise<VersionCodeRulesStore> {
   const store = await getSystemRepository().loadVersionCodeRulesStore();
-  // PG 空表（未 seed）时用默认规则兜底；JSON 路径自建文件，永不为空
+  // PG 空表（未 seed）时用默认规则兜底（S3 后恒 PG；旧 JSON 路径自建文件、
+  // 永不为空，兜底分支只在未播种空库生效，语义与当时等价）
   return store.rules.length > 0 ? store : { rules: createDefaultRules() };
 }
 
