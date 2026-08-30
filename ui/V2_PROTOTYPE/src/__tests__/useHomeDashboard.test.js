@@ -97,4 +97,47 @@ describe('useHomeDashboard', () => {
     expect(projectCreateBody).toMatchObject({ projectName: '新项目', customerName: '新客户', industry: '制造业' })
     expect(versionCreateCalls).toBe(0)
   })
+
+  test('加载完成后 KPI 不再停在「加载中…」占位', async () => {
+    const { result } = renderHook(() => useHomeDashboard())
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.kpi.map((k) => k.sub)).not.toContain('加载中…')
+    expect(result.current.kpi.every((k) => k.state === 'ok')).toBe(true)
+    expect(result.current.error).toBeNull()
+  })
+
+  test('单个数据源取数失败时，该指标卡是未知而不是 0，其余照常出数', async () => {
+    server.use(
+      http.get(`${BASE}/auth/users`, () => HttpResponse.json({ message: 'boom' }, { status: 500 }))
+    )
+
+    const { result } = renderHook(() => useHomeDashboard())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.kpi[3].num).toBeNull()
+    expect(result.current.kpi[3].state).toBe('error')
+    expect(result.current.kpi[3].sub).toContain('失败')
+    // 一个源挂了不能把另外三个也打成未知
+    expect(result.current.kpi[0].num).toBe(mockProjectEvaluations.length)
+    expect(result.current.kpi[0].state).toBe('ok')
+    expect(result.current.error).toBeTruthy()
+  })
+
+  test('四个端点全挂时 error 置位，页面能出可重试提示', async () => {
+    server.use(
+      http.get(`${BASE}/project-evaluations`, () => HttpResponse.json({ message: 'boom' }, { status: 500 })),
+      http.get(`${BASE}/versions`, () => HttpResponse.json({ message: 'boom' }, { status: 500 })),
+      http.get(`${BASE}/auth/users`, () => HttpResponse.json({ message: 'boom' }, { status: 500 }))
+    )
+
+    const { result } = renderHook(() => useHomeDashboard())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.error).toBeTruthy()
+    expect(result.current.kpi.every((k) => k.state === 'error')).toBe(true)
+    expect(result.current.kpi.every((k) => k.num === null)).toBe(true)
+    expect(result.current.plans).toEqual([])
+  })
 })

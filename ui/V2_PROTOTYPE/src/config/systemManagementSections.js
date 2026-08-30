@@ -13,6 +13,15 @@ export const SYSTEM_MANAGEMENT_SECTIONS = [
 
 export const DEFAULT_SYSTEM_MANAGEMENT_ROUTE = SYSTEM_MANAGEMENT_SECTIONS[0].route
 
+// 只做跳转、本身不渲染内容的父路由 → 它指向的默认子页。
+// App.jsx 的 <Route element={<Navigate replace/>} /> 和页签条共用这一份事实，
+// 不在两处各写一遍路由。
+export const SYSTEM_MANAGEMENT_PARENT_ROUTE = '/system'
+
+export const ROUTE_REDIRECTS = {
+  [SYSTEM_MANAGEMENT_PARENT_ROUTE]: DEFAULT_SYSTEM_MANAGEMENT_ROUTE,
+}
+
 export function getSystemManagementSectionById(id) {
   return SYSTEM_MANAGEMENT_SECTIONS.find((section) => section.id === id) || SYSTEM_MANAGEMENT_SECTIONS[0]
 }

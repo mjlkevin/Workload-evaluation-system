@@ -162,38 +162,40 @@ export default function ReviewDetail() {
               >{pendingCount === 0 ? '✦ 已全部生成' : '✦ 一键全部生成'}</button>
             </div>
             <div className="bd" style={{ padding: 0 }}>
-              <table className="table">
-                <thead>
-                  <tr><th>文件</th><th>类型</th><th className="num">生成时间</th><th>状态</th><th className="num">操作</th></tr>
-                </thead>
-                <tbody>
-                  {deliverables.map((d) => {
-                    const t = typeMap[d.type]
-                    const statusEl = d.status === 'pending'
-                      ? <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>未生成</span>
-                      : d.status === 'generated'
-                        ? <span style={{ color: 'var(--ok)', fontSize: 12, fontWeight: 700 }}>已生成</span>
-                        : <span style={{ color: 'var(--accent-ink)', fontSize: 12, fontWeight: 700 }}>已盖章<span style={{ fontWeight: 400, color: 'var(--ink-3)', marginLeft: 4 }}>{d.sealName}</span></span>
-                    const ops = d.status === 'pending'
-                      ? <button type="button" className="btn btn-pri" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => genOne(d.id)} disabled={actionLoading[`generate:${d.id}`]}>生成</button>
-                      : d.status === 'generated'
-                        ? <span style={{ display: 'inline-flex', gap: 4 }}>
-                            <button type="button" className="btn btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => downloadJSON(d, `${d.name}.json`)}>↓ 下载</button>
-                            <button type="button" className="btn btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => { setSealTarget(d.id); setPickedSeal(seals[0]?.id || '') }} disabled={actionLoading[`seal:${d.id}`]}>⊘ 盖章</button>
-                          </span>
-                        : <button type="button" className="btn btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => downloadJSON(d, `${d.name}.json`)}>↓ 下载（已盖章）</button>
-                    return (
-                      <tr key={d.id}>
-                        <td>{d.name}</td>
-                        <td><span className="bdg" style={{ background: t?.bg || 'var(--bg-soft)', color: t?.co || 'var(--ink-3)', fontSize: 10.5, padding: '1px 7px' }}>{d.type}</span></td>
-                        <td className="num" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.generatedAt || '—'}</td>
-                        <td>{statusEl}</td>
-                        <td className="num">{ops}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <div className="sys-table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr><th>文件</th><th>类型</th><th className="num">生成时间</th><th>状态</th><th className="num">操作</th></tr>
+                  </thead>
+                  <tbody>
+                    {deliverables.map((d) => {
+                      const t = typeMap[d.type]
+                      const statusEl = d.status === 'pending'
+                        ? <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>未生成</span>
+                        : d.status === 'generated'
+                          ? <span style={{ color: 'var(--ok)', fontSize: 12, fontWeight: 700 }}>已生成</span>
+                          : <span style={{ color: 'var(--accent-ink)', fontSize: 12, fontWeight: 700 }}>已盖章<span style={{ fontWeight: 400, color: 'var(--ink-3)', marginLeft: 4 }}>{d.sealName}</span></span>
+                      const ops = d.status === 'pending'
+                        ? <button type="button" className="btn btn-pri" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => genOne(d.id)} disabled={actionLoading[`generate:${d.id}`]}>生成</button>
+                        : d.status === 'generated'
+                          ? <span style={{ display: 'inline-flex', gap: 4 }}>
+                              <button type="button" className="btn btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => downloadJSON(d, `${d.name}.json`)}>↓ 下载</button>
+                              <button type="button" className="btn btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => { setSealTarget(d.id); setPickedSeal(seals[0]?.id || '') }} disabled={actionLoading[`seal:${d.id}`]}>⊘ 盖章</button>
+                            </span>
+                          : <button type="button" className="btn btn-ghost" style={{ height: 24, padding: '0 8px', fontSize: 11 }} onClick={() => downloadJSON(d, `${d.name}.json`)}>↓ 下载（已盖章）</button>
+                      return (
+                        <tr key={d.id}>
+                          <td>{d.name}</td>
+                          <td><span className="bdg" style={{ background: t?.bg || 'var(--bg-soft)', color: t?.co || 'var(--ink-3)', fontSize: 10.5, padding: '1px 7px' }}>{d.type}</span></td>
+                          <td className="num" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.generatedAt || '—'}</td>
+                          <td>{statusEl}</td>
+                          <td className="num">{ops}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

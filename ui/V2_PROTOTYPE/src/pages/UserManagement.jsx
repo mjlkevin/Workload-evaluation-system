@@ -990,120 +990,122 @@ export default function UserManagement() {
         </div>
 
         {/* Table */}
-        <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
-          <thead>
-            <tr>
-              <th style={{ width: 40, textAlign: 'center' }}>
-                <input
-                  type="checkbox"
-                  aria-label="选择全部可见用户"
-                  checked={
-                    visibleSelectableRows.length > 0
-                    && visibleSelectableRows.every((user) => selected.has(user.id))
-                  }
-                  disabled={visibleSelectableRows.length === 0 || globalOperationLocked}
-                  onChange={(e) => {
-                    const next = new Set(selected)
-                    if (e.target.checked) {
-                      visibleSelectableRows.forEach((user) => next.add(user.id))
-                    } else {
-                      visibleSelectableRows.forEach((user) => next.delete(user.id))
+        <div className="sys-table-wrap">
+          <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
+            <thead>
+              <tr>
+                <th style={{ width: 40, textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    aria-label="选择全部可见用户"
+                    checked={
+                      visibleSelectableRows.length > 0
+                      && visibleSelectableRows.every((user) => selected.has(user.id))
                     }
-                    setSelected(next)
-                  }}
-                />
-              </th>
-              <th style={{ minWidth: 160 }}>用户</th>
-              <th style={{ minWidth: 100 }}>系统角色</th>
-              <th style={{ minWidth: 120 }}>业务角色</th>
-              <th style={{ minWidth: 80 }}>状态</th>
-              <th style={{ minWidth: 140 }}>最后登录</th>
-              <th style={{ minWidth: 70 }}>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((u, idx) => {
-              const isSel = selected.has(u.id)
-              return (
-                <tr
-                  key={u.id}
-                  onClick={(e) => handleRowClick(e, u, idx)}
-                  style={{
-                    cursor: u.locked ? 'default' : 'pointer',
-                    background: isSel ? 'var(--brand-soft)' : undefined,
-                    userSelect: 'none',
-                  }}
-                >
-                  <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                    {u.locked ? (
-                      <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>—</span>
-                    ) : (
-                      <input
-                        type="checkbox"
-                        aria-label={`选择 ${u.username}`}
-                        checked={isSel}
-                        disabled={globalOperationLocked}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={() => toggleOne(u.id)}
-                      />
-                    )}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: '50%',
-                          background: 'var(--brand-soft)',
-                          color: 'var(--brand-ink)',
-                          display: 'grid',
-                          placeItems: 'center',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {u.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{u.username}</div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-                          {u.email || `${u.username}@wes.local`}
+                    disabled={visibleSelectableRows.length === 0 || globalOperationLocked}
+                    onChange={(e) => {
+                      const next = new Set(selected)
+                      if (e.target.checked) {
+                        visibleSelectableRows.forEach((user) => next.add(user.id))
+                      } else {
+                        visibleSelectableRows.forEach((user) => next.delete(user.id))
+                      }
+                      setSelected(next)
+                    }}
+                  />
+                </th>
+                <th style={{ minWidth: 160 }}>用户</th>
+                <th style={{ minWidth: 100 }}>系统角色</th>
+                <th style={{ minWidth: 120 }}>业务角色</th>
+                <th style={{ minWidth: 80 }}>状态</th>
+                <th style={{ minWidth: 140 }}>最后登录</th>
+                <th style={{ minWidth: 70 }}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((u, idx) => {
+                const isSel = selected.has(u.id)
+                return (
+                  <tr
+                    key={u.id}
+                    onClick={(e) => handleRowClick(e, u, idx)}
+                    style={{
+                      cursor: u.locked ? 'default' : 'pointer',
+                      background: isSel ? 'var(--brand-soft)' : undefined,
+                      userSelect: 'none',
+                    }}
+                  >
+                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      {u.locked ? (
+                        <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>—</span>
+                      ) : (
+                        <input
+                          type="checkbox"
+                          aria-label={`选择 ${u.username}`}
+                          checked={isSel}
+                          disabled={globalOperationLocked}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => toggleOne(u.id)}
+                        />
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            background: 'var(--brand-soft)',
+                            color: 'var(--brand-ink)',
+                            display: 'grid',
+                            placeItems: 'center',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {u.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{u.username}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                            {u.email || `${u.username}@wes.local`}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>{fmtRoleChip(u.role)}</td>
-                  <td><span className="bdg brd" style={{ fontSize: 10.5, padding: '1px 7px' }}><span className="dot" />{u.businessRoleLabel || businessRoleLabel(u.businessRole)}</span></td>
-                  <td>{fmtStatus(u.status)}</td>
-                  <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                    {u.lastLoginAt ? u.lastLoginAt.replace('T', ' ').replace('Z', '') : '—'}
-                  </td>
-                  <td>
-                    {u.locked ? (
-                      <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>— 系统账号 —</span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        aria-label={`编辑 ${u.username}`}
-                        disabled={globalOperationLocked}
-                        style={{ fontSize: 12, padding: '4px 10px', height: 28 }}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openUserEditor(u)
-                        }}
-                      >
-                        编辑
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td>{fmtRoleChip(u.role)}</td>
+                    <td><span className="bdg brd" style={{ fontSize: 10.5, padding: '1px 7px' }}><span className="dot" />{u.businessRoleLabel || businessRoleLabel(u.businessRole)}</span></td>
+                    <td>{fmtStatus(u.status)}</td>
+                    <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                      {u.lastLoginAt ? u.lastLoginAt.replace('T', ' ').replace('Z', '') : '—'}
+                    </td>
+                    <td>
+                      {u.locked ? (
+                        <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>— 系统账号 —</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          aria-label={`编辑 ${u.username}`}
+                          disabled={globalOperationLocked}
+                          style={{ fontSize: 12, padding: '4px 10px', height: 28 }}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openUserEditor(u)
+                          }}
+                        >
+                          编辑
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <UserEditorDrawer

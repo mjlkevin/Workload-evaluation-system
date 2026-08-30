@@ -1,9 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
 import UserManagement, * as UserManagementModule from '../pages/UserManagement.jsx'
 import { server } from './mocks/server.js'
+
+const layoutCss = readFileSync(join(process.cwd(), 'layout.css'), 'utf-8')
 
 const BASE = '/api/v1'
 
@@ -36,6 +40,17 @@ describe('UserManagement', () => {
       expect(within(selectionBar).getByRole('button', { name: actionName })).toBeInTheDocument()
     }
     expect(within(selectionBar).queryByRole('button', { name: /重置密码/ })).not.toBeInTheDocument()
+  })
+
+  // 窄屏回归：.section{overflow:hidden} 且不包裹滚动容器时，六列 minWidth 合计
+  // 670px（加勾选列 710px）在手机上装不下，右侧四列（状态/最后登录/操作）永久滑不到。
+  test('用户表格外层是横向滚动容器，窄屏下右侧列能滚到', async () => {
+    render(<MemoryRouter><UserManagement /></MemoryRouter>)
+
+    const table = await screen.findByRole('table')
+
+    expect(table.closest('.sys-table-wrap')).not.toBeNull()
+    expect(layoutCss).toMatch(/\.sys-table-wrap\{[^}]*overflow-x:auto/)
   })
 
   test('focuses the first editable user field', async () => {

@@ -156,62 +156,64 @@ export default function ApiKeys() {
             {error && <div style={{ padding: '0 18px 10px', fontSize: 12, color: 'var(--err)' }}>{error}</div>}
             <div style={{ padding: '16px 18px' }}>
               {loading && <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>加载中…</div>}
-              <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
-                <thead>
-                  <tr>
-                    <th>名称</th>
-                    <th>Key</th>
-                    <th>状态</th>
-                    <th>权限</th>
-                    <th style={{ width: 90 }}>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredKeys.map((k) => (
-                    <tr key={k.id}>
-                      <td style={{ fontWeight: 600, fontSize: 13 }}>{k.name}</td>
-                      <td className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                        {k.key}
-                      </td>
-                      <td>
-                        <span
-                          className={`bdg ${k.status === 'active' ? 'ok' : 'draft'}`}
-                          style={{ fontSize: 10.5, padding: '1px 6px' }}
-                        >
-                          <span className="dot" />
-                          {k.status === 'active' ? '生效中' : '已撤销'}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>
-                        {k.scope}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button type="button"
-                            className="btn btn-ghost"
-                            style={{ fontSize: 11, padding: '4px 8px', height: 26 }}
-                            onClick={() => copyKey(k.key)}
-                          >
-                            复制
-                          </button>
-                          <button type="button"
-                            className="btn btn-ghost"
-                            style={{
-                              fontSize: 11,
-                              padding: '4px 8px',
-                              height: 26,
-                              color: k.status === 'active' ? 'var(--err)' : 'var(--ink-3)',
-                            }}
-                            onClick={() => toggleStatus(k)}
-                          >
-                            {k.status === 'active' ? '撤销' : '恢复'}
-                          </button>
-                        </div>
-                      </td>
+              <div className="sys-table-wrap">
+                <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
+                  <thead>
+                    <tr>
+                      <th>名称</th>
+                      <th>Key</th>
+                      <th>状态</th>
+                      <th>权限</th>
+                      <th style={{ width: 90 }}>操作</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredKeys.map((k) => (
+                      <tr key={k.id}>
+                        <td style={{ fontWeight: 600, fontSize: 13 }}>{k.name}</td>
+                        <td className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                          {k.key}
+                        </td>
+                        <td>
+                          <span
+                            className={`bdg ${k.status === 'active' ? 'ok' : 'draft'}`}
+                            style={{ fontSize: 10.5, padding: '1px 6px' }}
+                          >
+                            <span className="dot" />
+                            {k.status === 'active' ? '生效中' : '已撤销'}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+                          {k.scope}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button type="button"
+                              className="btn btn-ghost"
+                              style={{ fontSize: 11, padding: '4px 8px', height: 26 }}
+                              onClick={() => copyKey(k.key)}
+                            >
+                              复制
+                            </button>
+                            <button type="button"
+                              className="btn btn-ghost"
+                              style={{
+                                fontSize: 11,
+                                padding: '4px 8px',
+                                height: 26,
+                                color: k.status === 'active' ? 'var(--err)' : 'var(--ink-3)',
+                              }}
+                              onClick={() => toggleStatus(k)}
+                            >
+                              {k.status === 'active' ? '撤销' : '恢复'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -376,7 +378,7 @@ export default function ApiKeys() {
                   <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
                     {b.txt}
                     {b.actions && (
-                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                         <button type="button" className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', height: 28 }}>
                           📜 查看 OpenAPI
                         </button>
@@ -416,62 +418,64 @@ export default function ApiKeys() {
             <span>接口目录</span>
           </div>
           <div style={{ padding: 0 }}>
-            <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
-              <thead>
-                <tr>
-                  <th>分组</th>
-                  <th>说明</th>
-                  <th>路径</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(catalog).map(([grp, list]) => (
-                  <tr key={grp}>
-                    <td
-                      style={{
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        letterSpacing: '.06em',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {grp}
-                    </td>
-                    <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>{list[0].desc}</td>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, lineHeight: 1.95 }}>
-                        {list.map((ep, i) => {
-                          const m = ep.method.toLowerCase()
-                          const cls = methodCls[m] || methodCls.get
-                          return (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span
-                                style={{
-                                  fontFamily: 'var(--font-mono)',
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  padding: '2px 7px',
-                                  borderRadius: 4,
-                                  whiteSpace: 'nowrap',
-                                  background: cls.bg,
-                                  color: cls.co,
-                                }}
-                              >
-                                {ep.method}
-                              </span>
-                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)' }}>
-                                {ep.path}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </td>
+            <div className="sys-table-wrap">
+              <table className="table" style={{ borderRadius: 0, borderLeft: 'none', borderRight: 'none' }}>
+                <thead>
+                  <tr>
+                    <th>分组</th>
+                    <th>说明</th>
+                    <th>路径</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {Object.entries(catalog).map(([grp, list]) => (
+                    <tr key={grp}>
+                      <td
+                        style={{
+                          fontWeight: 700,
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          letterSpacing: '.06em',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {grp}
+                      </td>
+                      <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>{list[0].desc}</td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, lineHeight: 1.95 }}>
+                          {list.map((ep, i) => {
+                            const m = ep.method.toLowerCase()
+                            const cls = methodCls[m] || methodCls.get
+                            return (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span
+                                  style={{
+                                    fontFamily: 'var(--font-mono)',
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    padding: '2px 7px',
+                                    borderRadius: 4,
+                                    whiteSpace: 'nowrap',
+                                    background: cls.bg,
+                                    color: cls.co,
+                                  }}
+                                >
+                                  {ep.method}
+                                </span>
+                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)' }}>
+                                  {ep.path}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

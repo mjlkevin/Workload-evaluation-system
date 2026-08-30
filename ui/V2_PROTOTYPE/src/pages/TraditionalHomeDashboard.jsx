@@ -9,6 +9,9 @@ const PROJECT_ACTIONS = [
   { key: 'delete', label: '🗑 删除', mode: 'select-any', danger: true },
 ]
 
+// 状态灯跟着取数结果走：绿只在数据真的拿到时亮，取数失败置红、未取到置灰。
+const KPI_DOT_COLOR = { ok: 'var(--ok)', error: 'var(--err)', loading: 'var(--ink-3)' }
+
 export default function TraditionalHomeDashboard() {
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
@@ -24,7 +27,7 @@ export default function TraditionalHomeDashboard() {
     template: '',
   })
 
-  const { kpi, plans, refetch, remove, create } = useHomeDashboard()
+  const { kpi, plans, error, refetch, remove, create } = useHomeDashboard()
   const filteredPlans = plans.filter((plan) => {
     const q = planSearch.trim().toLowerCase()
     if (!q) return true
@@ -119,6 +122,20 @@ export default function TraditionalHomeDashboard() {
   const content = (
     <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {error && (
+            <div
+              role="alert"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+                padding: '10px 12px', border: '1px solid var(--err)', borderRadius: 'var(--r-md)',
+                background: 'var(--err-soft)', color: 'var(--err)', fontSize: 12,
+              }}
+            >
+              <span>{error.message}</span>
+              <button type="button" className="btn btn-out" onClick={() => refetch()}>重试</button>
+            </div>
+          )}
+
           {/* KPI */}
           <div className="home-kpi">
             {kpi.map((k, i) => (
@@ -126,9 +143,9 @@ export default function TraditionalHomeDashboard() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ width: 26, height: 26, borderRadius: 6, background: k.icBg || 'var(--brand-soft)', color: k.icCo || 'var(--brand-ink)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>{k.ic}</span>
                   <span style={{ fontSize: 12, fontWeight: 600 }}>{k.lb}</span>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ok)', marginLeft: 'auto' }} />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: KPI_DOT_COLOR[k.state] || KPI_DOT_COLOR.ok, marginLeft: 'auto' }} />
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono)', lineHeight: 1.05, marginBottom: 4 }}>{k.num}</div>
+                <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono)', lineHeight: 1.05, marginBottom: 4 }}>{k.num === null || k.num === undefined ? '—' : k.num}</div>
                 <div style={{ height: 4, borderRadius: 999, background: 'var(--bg-soft)', marginTop: 10, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: k.bar, borderRadius: 999, background: `linear-gradient(90deg,${k.icCo || 'var(--brand)'},var(--accent))` }} />
                 </div>
@@ -198,53 +215,55 @@ export default function TraditionalHomeDashboard() {
                 />
               </div>
             </div>
-            <table className="table" style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
-              <thead>
-                <tr>
-                  <th style={{ width: 38 }}>#</th>
-                  <th>项目名称</th>
-                  <th>项目编号</th>
-                  <th>状态</th>
-                  <th>客户</th>
-                  <th className="num">人天</th>
-                  <th>更新时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPlans.map((p, i) => {
-                  const isSel = selected.has(p.id)
-                  return (
-                    <tr
-                      key={p.id}
-                      onClick={(e) => handleRowClick(e, p, i)}
-                      onDoubleClick={() => setDialog('er')}
-                      style={{
-                        cursor: 'pointer',
-                        background: isSel ? 'var(--brand-soft)' : undefined,
-                        userSelect: 'none',
-                      }}
-                    >
-                      <td>{i + 1}</td>
-                      <td>
-                        <b>{p.projectName}</b>
-                        <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>{p.globalVersion}</div>
-                      </td>
-                      <td className="mono" style={{ fontFamily: 'var(--font-mono)' }}>{p.globalVersion.replace('GL-', 'v')}</td>
-                      <td>
-                        <span className={`bdg ${p.status === '进行中' ? 'co' : p.status === '待评审' ? 'rev' : 'ci'}`} style={{ fontSize: 10.5 }}>
-                          <span className="dot" />{p.status}
-                        </span>
-                      </td>
-                      <td>
-                        {p.customerName || p.raw?.customerName || '—'}
-                      </td>
-                      <td className="num">{p.mandays}</td>
-                      <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.updatedAt || '—'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <div className="sys-table-wrap">
+              <table className="table" style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 38 }}>#</th>
+                    <th>项目名称</th>
+                    <th>项目编号</th>
+                    <th>状态</th>
+                    <th>客户</th>
+                    <th className="num">人天</th>
+                    <th>更新时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPlans.map((p, i) => {
+                    const isSel = selected.has(p.id)
+                    return (
+                      <tr
+                        key={p.id}
+                        onClick={(e) => handleRowClick(e, p, i)}
+                        onDoubleClick={() => setDialog('er')}
+                        style={{
+                          cursor: 'pointer',
+                          background: isSel ? 'var(--brand-soft)' : undefined,
+                          userSelect: 'none',
+                        }}
+                      >
+                        <td>{i + 1}</td>
+                        <td>
+                          <b>{p.projectName}</b>
+                          <div style={{ color: 'var(--ink-3)', fontSize: 11 }}>{p.globalVersion}</div>
+                        </td>
+                        <td className="mono" style={{ fontFamily: 'var(--font-mono)' }}>{p.globalVersion.replace('GL-', 'v')}</td>
+                        <td>
+                          <span className={`bdg ${p.status === '进行中' ? 'co' : p.status === '待评审' ? 'rev' : 'ci'}`} style={{ fontSize: 10.5 }}>
+                            <span className="dot" />{p.status}
+                          </span>
+                        </td>
+                        <td>
+                          {p.customerName || p.raw?.customerName || '—'}
+                        </td>
+                        <td className="num">{p.mandays}</td>
+                        <td style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.updatedAt || '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
           {filteredPlans.length === 0 && (
             <div style={{ padding: '18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, borderTop: '1px solid var(--line)' }}>

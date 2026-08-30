@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { apiClient } from '../api/client.js'
 import { setToken } from '../api/auth.js'
 import { unwrap } from '../api/utils.js'
+import { navigateAfterLogin } from '../utils/authRedirect.js'
 
 function getDetail(error, field) {
   return Array.isArray(error?.details)
@@ -44,7 +45,9 @@ export default function useAuth({ enabled = true } = {}) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const login = async (username, password, rememberMe = false) => {
+  // redirectTo 由调用方给出登录成功后的落地页（默认首页）。整页跳转的既有语义不变：
+  // 刷新可重置模块级缓存与多页签工作区状态，不改成 SPA 跳转。
+  const login = async (username, password, rememberMe = false, redirectTo = '/') => {
     if (!enabled) return { success: false, error: '登录暂不可用' }
 
     setLoading(true)
@@ -54,7 +57,7 @@ export default function useAuth({ enabled = true } = {}) {
       const token = extractToken(payload)
       if (!token) throw new Error('登录成功但未返回 token')
       setToken(token, { rememberMe })
-      window.location.href = '/'
+      navigateAfterLogin(redirectTo)
       return { success: true, error: null }
     } catch (err) {
       const message = getLoginErrorMessage(err)

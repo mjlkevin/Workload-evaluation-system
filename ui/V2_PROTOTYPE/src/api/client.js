@@ -1,5 +1,6 @@
 import { getToken, clearToken } from './auth'
 import { ApiError, NetworkError } from './errors'
+import { goToLogin } from '../utils/authRedirect'
 
 const BASE = '/api/v1'
 
@@ -52,7 +53,7 @@ async function request(method, path, {
   if (res.status === 401) {
     clearToken()
     if (!suppressUnauthorizedRedirect && window.location.pathname !== '/login') {
-      window.location.href = '/login'
+      goToLogin(`${window.location.pathname}${window.location.search}${window.location.hash}`)
     }
     throw new ApiError(401, 'UNAUTHORIZED', '登录已过期，请重新登录')
   }

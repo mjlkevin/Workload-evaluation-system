@@ -20,6 +20,11 @@ code,pre{font-family:var(--font-mono)}
 .btn-dan:hover{background:var(--err);color:#fff}
 .btn-sm{height:28px;padding:0 10px;font-size:12px;border-radius:8px}
 .btn-xs{height:24px;padding:0 8px;font-size:11px;border-radius:7px}
+/* 禁用态补齐（AGENTS §7 冻结令下架构侧 2026-08-29 单点解冻，仅本规则块）：
+   此前 disabled 只改语义不改观感，禁用按钮与可点按钮长得一样。
+   只用既有 token；不用 pointer-events:none——禁用按钮靠 title 说明为什么点不了，
+   而 title 需要 hover 才读得到。 */
+.btn:disabled,.btn[disabled]{background:var(--bg-soft);color:var(--ink-3);border-color:var(--line);box-shadow:none;transform:none;cursor:not-allowed}
 
 .input{width:100%;height:var(--control-height);padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-md);background:#fff;font:inherit;font-size:13px;outline:none;transition:border-color .15s, box-shadow .15s;color:var(--ink)}
 .input:focus{border-color:var(--brand);box-shadow:var(--shadow-focus)}

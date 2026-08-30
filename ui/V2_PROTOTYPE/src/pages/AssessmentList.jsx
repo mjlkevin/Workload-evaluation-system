@@ -6,7 +6,7 @@ import { assessments as mockData } from '../mock/listData.js'
 
 export default function AssessmentList() {
   const navigate = useNavigate()
-  const { rows, creating, refetch, create, remove } = useAssessmentList({ fallbackData: mockData })
+  const { rows, loading, loadError, creating, refetch, create, remove } = useAssessmentList({ fallbackData: mockData })
 
   const kpiCards = useMemo(() => {
     const total = rows.length
@@ -54,6 +54,11 @@ export default function AssessmentList() {
       title="实施评估列表"
       subtitle="查看评估概览与版本管理"
       data={rows}
+      loading={loading}
+      loadingText="正在加载实施评估列表…"
+      error={loadError}
+      errorText="加载实施评估列表失败，请检查网络后重试"
+      onRetry={refetch}
       rowKey="id"
       kpiCards={kpiCards}
       onRowClick={openDetail}

@@ -80,7 +80,9 @@ export default function useHistoryProjects({
   const similarKey = JSON.stringify(similarQuery || {})
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(Boolean(enabled))
-  const [error, setError] = useState(null)
+  // 加载失败和创建失败分开记账，命名跟 useReviewList 保持一致。
+  const [loadError, setLoadError] = useState(null)
+  const [createError, setCreateError] = useState(null)
   const [fetchId, setFetchId] = useState(0)
   const [creating, setCreating] = useState(false)
   const [localProjects, setLocalProjects] = useState([])
@@ -110,7 +112,7 @@ export default function useHistoryProjects({
 
     let cancelled = false
     setLoading(true)
-    setError(null)
+    setLoadError(null)
 
     load()
       .then((mapped) => {
@@ -118,7 +120,7 @@ export default function useHistoryProjects({
       })
       .catch((err) => {
         if (cancelled) return
-        setError(err)
+        setLoadError(err)
         setProjects([...localProjects])
       })
       .finally(() => {
@@ -184,12 +186,12 @@ export default function useHistoryProjects({
       refetch()
       return record.id || local.id
     } catch (err) {
-      setError(err)
+      setCreateError(err)
       return local.id
     } finally {
       setCreating(false)
     }
   }, [enabled, refetch])
 
-  return { projects, loading, error, refetch, remove, create, creating }
+  return { projects, loading, loadError, createError, refetch, remove, create, creating }
 }
