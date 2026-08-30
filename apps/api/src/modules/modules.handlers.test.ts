@@ -92,10 +92,12 @@ let storeSeed: SingleDocStoreSeed | null = null;
 // test:modules:serial-store 串行套件内（防漂移守卫已以
 // seedSingleDocStoreFixture 为写入指纹自动校验）。
 const PREVIOUS_STORE_PG_FLAGS = new Map<string, string | undefined>();
+// S5（2026-08-30）：WES_STORE_TEAMS_PG 已退役（teams 域恒 PG，JSON 路径已删），
+// 从本清单移除；下方 before/restoreStorePgFlags 仍逐个重置各域单例，
+// _resetTeamRepositoryForTest() 保留（重置钩子是测试能力，不依赖开关）。
 const STORE_PG_FLAG_KEYS = [
   "WES_STORE_USERS_PG",
   "WES_STORE_VERSIONS_PG",
-  "WES_STORE_TEAMS_PG",
 ] as const;
 
 /**

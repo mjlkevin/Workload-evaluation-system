@@ -24,7 +24,7 @@ import {
   updateReviewStatus
 } from "./team/team.usecase";
 import { loadVersionsStore, saveVersionsStore } from "./versions/versions.repository";
-import { _resetTeamRepositoryForTest, loadTeamStore, saveTeamStore } from "./team/team.repository";
+import { loadTeamStore, saveTeamStore } from "./team/team.repository";
 
 /**
  * C10（2026-08-25）→ 阶段 2 S6（2026-08-29）：estimates/sessions 用例的请求
@@ -275,20 +275,13 @@ test("exports.usecase: resolveDownloadFile returns owned file and 404 when missi
 // store_versions.version 不还原：saveStore 不触碰版本行（team-pg.repository.ts:356-364），
 // 回退它需要裸 SQL 且无收益——teams 用例只断言相对状态，全局计数器单调递增无害
 // （与 team-pg.repository.test.ts 头注释「用例不依赖 version 绝对值」同口径）。
+// S5 commit C：开关已退役（teams 域无分流分支），本夹具不再需要显式钉开关或重置单例。
 async function withTeamStoreIsolation(fn: () => Promise<void> | void): Promise<void> {
-  const previousPgFlag = process.env.WES_STORE_TEAMS_PG;
-  // S5 commit A 桥接：JSON 路径到 commit B 才删，这里显式把 team 用例钉到 PG，
-  // 使 commit A 单独可绿且与 commit B/C 之后的终态一致；commit C 退役开关时删除本行。
-  process.env.WES_STORE_TEAMS_PG = "true";
-  _resetTeamRepositoryForTest();
   const snapshot = await loadTeamStore();
   try {
     await fn();
   } finally {
     await saveTeamStore(snapshot);
-    if (previousPgFlag === undefined) delete process.env.WES_STORE_TEAMS_PG;
-    else process.env.WES_STORE_TEAMS_PG = previousPgFlag;
-    _resetTeamRepositoryForTest();
   }
 }
 
