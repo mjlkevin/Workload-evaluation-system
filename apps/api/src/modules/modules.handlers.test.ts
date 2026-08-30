@@ -95,13 +95,11 @@ let storeSeed: SingleDocStoreSeed | null = null;
 // test:modules:serial-store 串行套件内（防漂移守卫已以
 // seedSingleDocStoreFixture 为写入指纹自动校验）。
 const PREVIOUS_STORE_PG_FLAGS = new Map<string, string | undefined>();
-// S5（2026-08-30）：WES_STORE_TEAMS_PG 已退役（teams 域恒 PG，JSON 路径已删），
-// 从本清单移除；下方 before/restoreStorePgFlags 仍逐个重置各域单例，
-// _resetTeamRepositoryForTest() 保留（重置钩子是测试能力，不依赖开关）。
-const STORE_PG_FLAG_KEYS = [
-  "WES_STORE_USERS_PG",
-  "WES_STORE_VERSIONS_PG",
-] as const;
+// S5（2026-08-30）/ S4（2026-08-30）：WES_STORE_TEAMS_PG 与 WES_STORE_VERSIONS_PG
+// 已退役（两域恒 PG，JSON 路径已删），从本清单移除；下方 before/restoreStorePgFlags
+// 仍逐个重置各域单例，_resetTeamRepositoryForTest() / _resetVersionsRepositoryForTest()
+// 保留（重置钩子是测试能力，不依赖开关）。
+const STORE_PG_FLAG_KEYS = ["WES_STORE_USERS_PG"] as const;
 
 /**
  * S3（2026-08-30）：knowledge-base-config 的 JSON 读写路径随本批删除、system 域恒 PG。
@@ -173,10 +171,6 @@ before(async () => {
   _resetAiSessionsRepositoryForTest();
   _resetSystemRepositoryForTest();
   _resetTraceRepositoryForTest();
-  // S4 commit A 桥接：versions 的 JSON 路径到 commit B 才删，而本文件用例已改为
-  // 经 PG 仓储种入/读取，故把开关显式打开（覆盖上方 delete），使构造与读取同源。
-  // commit C 退役开关时连同 STORE_PG_FLAG_KEYS 里的 WES_STORE_VERSIONS_PG 一并删除。
-  process.env.WES_STORE_VERSIONS_PG = "true";
   _resetVersionsRepositoryForTest();
   _resetTeamRepositoryForTest();
   _resetTemplateRepositoryForTest();

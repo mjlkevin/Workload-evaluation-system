@@ -78,18 +78,14 @@ async function resetHarnessVersionsRows(): Promise<void> {
 }
 
 async function withHarnessVersionsReset<T>(fn: () => Promise<T>): Promise<T> {
-  // S4 commit A 桥接：JSON 路径到 commit B 才删，而本文件用例已改经 PG 仓储读写，
-  // 故显式打开开关（commit C 退役 WES_STORE_VERSIONS_PG 时删除本函数内的开关存取）。
-  const prev = process.env.WES_STORE_VERSIONS_PG;
-  process.env.WES_STORE_VERSIONS_PG = "true";
+  // S4 commit C：versions 已恒 PG（WES_STORE_VERSIONS_PG 随本批退役），
+  // 此处只重置进程内仓储单例 + 按 owner 做行级重置。
   _resetVersionsRepositoryForTest();
   await resetHarnessVersionsRows();
   try {
     return await fn();
   } finally {
     await resetHarnessVersionsRows();
-    if (prev === undefined) delete process.env.WES_STORE_VERSIONS_PG;
-    else process.env.WES_STORE_VERSIONS_PG = prev;
     _resetVersionsRepositoryForTest();
   }
 }

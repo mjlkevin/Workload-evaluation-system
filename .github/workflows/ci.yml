@@ -126,9 +126,11 @@ jobs:
       # S3（2026-08-30）：WES_STORE_SYSTEM_PG / WES_STORE_TRACES_PG 已退役（两域恒 PG，
       # JSON 路径已删），同 S6 口径：分流分支不存在后，开关是死配置。
       # S5（2026-08-30）：WES_STORE_TEAMS_PG 已退役（teams 域恒 PG，JSON 路径已删），
-      # 同 S6/S3 口径。本列表余下两个开关（users 归 S1 后仍在役、versions 归 S4 退役）。
+      # 同 S6/S3 口径。
+      # S4（2026-08-30）：WES_STORE_VERSIONS_PG 已退役（versions 域恒 PG，JSON 路径已删），
+      # 同 S6/S3/S5 口径。本列表仅余 WES_STORE_USERS_PG（users 归 S1，选择器仍在役）；
+      # apps/api/.env 里的死开关行全清归 S7。
       WES_STORE_USERS_PG: "true"
-      WES_STORE_VERSIONS_PG: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

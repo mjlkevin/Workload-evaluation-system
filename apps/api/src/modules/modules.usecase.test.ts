@@ -338,9 +338,6 @@ test("team.usecase: team plan visibility blocks cross-team user", { skip: !testD
     // 收尾再把快照 saveVersionsStore 还原。versions 域 JSON 读写路径删除后改经行级
     // 仓储种入，收尾按 recordId 条件删除（不整表 TRUNCATE，与 versions-pg.repository.test.ts
     // 的行级清理口径一致）。
-    // S4 commit A 桥接：JSON 路径到 commit B 才删，这里显式把 versions 分流的缺省实现指到 PG，
-    // 使 commit A 单独可绿且与 commit B/C 之后的终态一致；commit C 退役开关时删除本两行。
-    process.env.WES_STORE_VERSIONS_PG = "true";
     _resetVersionsRepositoryForTest();
     await getVersionsRepository().upsertVersionRecord({
       id: "ver-ut-gl-1",

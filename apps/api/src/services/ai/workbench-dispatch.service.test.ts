@@ -109,10 +109,8 @@ async function resetVersionsRowsForFixtureOwners(): Promise<void> {
 }
 
 async function withVersionsFixtures(run: () => Promise<void>): Promise<void> {
-  // S4 commit A 桥接：JSON 路径到 commit B 才删，本文件已改经 PG 仓储读写，故显式
-  // 打开开关（commit C 退役 WES_STORE_VERSIONS_PG 时删除开关存取与两处 _reset 调用）。
-  const previousPgFlag = process.env.WES_STORE_VERSIONS_PG;
-  process.env.WES_STORE_VERSIONS_PG = "true";
+  // S4 commit C：versions 已恒 PG（WES_STORE_VERSIONS_PG 随本批退役），此处只
+  // 重置进程内仓储单例 + 按 owner 做行级重置（重置钩子是测试能力，不依赖开关）。
   _resetVersionsRepositoryForTest();
   await resetVersionsRowsForFixtureOwners();
   try {
@@ -120,8 +118,6 @@ async function withVersionsFixtures(run: () => Promise<void>): Promise<void> {
     await run();
   } finally {
     await resetVersionsRowsForFixtureOwners();
-    if (previousPgFlag === undefined) delete process.env.WES_STORE_VERSIONS_PG;
-    else process.env.WES_STORE_VERSIONS_PG = previousPgFlag;
     _resetVersionsRepositoryForTest();
   }
 }

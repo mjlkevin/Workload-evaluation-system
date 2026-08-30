@@ -35,10 +35,6 @@ function isPgRepo(repo: unknown): boolean {
   return typeof (repo as { __dbForTest?: unknown }).__dbForTest === "function";
 }
 
-// S4 commit A 桥接：JSON 路径到 commit B 才删，此处显式钉开关到 PG，
-// 使 commit A 单独可绿且与 commit B/C 之后的终态一致；commit C 退役开关时删除下行。
-process.env.WES_STORE_VERSIONS_PG = "true";
-
 test("选择器恒装配 PG 实现（S4 JSON 路径删除后）", () => {
   _resetVersionsRepositoryForTest();
   assert.equal(isPgRepo(getVersionsRepository()), true, "必须恒走 PG");
