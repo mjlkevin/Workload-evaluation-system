@@ -5,7 +5,7 @@ import { wbsItems as mockData } from '../mock/listData.js'
 
 export default function WbsList() {
   // WBS 详情页 PB-R3 待建；列表行不导航避免 404
-  const { rows, refetch } = useWbsList({ fallbackData: mockData })
+  const { rows, loading, loadError, refetch } = useWbsList({ fallbackData: mockData })
 
   const kpiCards = useMemo(() => {
     const total = rows.length
@@ -41,6 +41,11 @@ export default function WbsList() {
       title="WBS 任务列表"
       subtitle="工作分解结构与任务进度跟踪"
       data={rows}
+      loading={loading}
+      loadingText="正在加载 WBS 任务列表…"
+      error={loadError}
+      errorText="加载 WBS 任务列表失败，请检查网络后重试"
+      onRetry={refetch}
       rowKey="id"
       kpiCards={kpiCards}
       onRowClick={(row) => alert('WBS 详情页 · PB-R3 待建')}

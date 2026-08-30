@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
+import { ROUTE_REDIRECTS, SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
 import { useUnsavedNavigation } from '../../hooks/useUnsavedChanges.jsx'
 
 const STORAGE_KEY = 'wes-v2-workspace-tabs-v1'
@@ -65,7 +65,10 @@ function normalizeTabs(input) {
   const seen = new Set()
   const tabs = []
   for (const tab of input) {
-    const path = String(tab?.path || '').trim()
+    // 先把跳转路由解到它真正指向的子页再进去重：/system 会被 <Navigate replace>
+    // 立刻换成 /system/code-rules，但布局路由在重定向期间不卸载，两个路径都会被记
+    // 一笔。不解的话条上会常年挂着一个点不动的「系统管理」僵尸页签。
+    const path = resolveRedirectPath(tab?.path)
     if (!path || path === '/login' || !path.startsWith('/')) continue
     const dedupeKey = normalizeTabPath(path)
     if (seen.has(dedupeKey)) continue
@@ -73,6 +76,14 @@ function normalizeTabs(input) {
     tabs.push({ path, title: resolveTabTitle(path) })
   }
   return tabs.length ? tabs : [{ path: '/', title: 'AI 工作台' }]
+}
+
+function resolveRedirectPath(path) {
+  const raw = String(path || '').trim()
+  const [basePath, query = ''] = raw.split('?')
+  const target = ROUTE_REDIRECTS[basePath]
+  if (!target) return raw
+  return query ? `${target}?${query}` : target
 }
 
 function menuPosition(x, y) {
@@ -87,6 +98,18 @@ function menuPosition(x, y) {
   }
 }
 
+// 溢出时贴在条两侧的滚动按钮：滚动条在 macOS / 手机上默认不占位，
+// 不给出可点的箭头，用户不知道右边还有页签。sticky 在横向滚动容器里
+// 能贴在 scrollport 边缘，所以它们可以当普通 flow 子项放进 track，
+// 不必新增 DOM 层，也不动已冻结的 layout.css。
+const SCROLL_CUE_BASE = 'sticky z-10 grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line bg-surface text-ink-3 cursor-pointer hover:bg-bg-soft'
+
+// jsdom 不实现这些几何 API，组件侧得先探一下；真实浏览器全部可用。
+function scrollByAmount(el, amount) {
+  if (typeof el?.scrollBy === 'function') el.scrollBy({ left: amount, behavior: 'smooth' })
+  else if (el) el.scrollLeft += amount
+}
+
 export default function WorkspaceTabs() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -95,6 +118,47 @@ export default function WorkspaceTabs() {
   const [tabs, setTabs] = useState(() => [{ path: '/', title: 'AI 工作台' }])
   const [ready, setReady] = useState(false)
   const [menu, setMenu] = useState(null)
+  const stripRef = useRef(null)
+  const [cue, setCue] = useState({ left: false, right: false })
+
+  const measureCue = useCallback(() => {
+    const el = stripRef.current
+    if (!el) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    const left = el.scrollLeft > 1
+    const right = el.scrollLeft < maxScroll - 1
+    setCue((prev) => (prev.left === left && prev.right === right ? prev : { left, right }))
+  }, [])
+
+  useEffect(() => {
+    const el = stripRef.current
+    if (!el) return undefined
+    measureCue()
+    // 页签增减、窗口缩放、字体回位都会改变溢出量，三个信号都得重测
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measureCue) : null
+    if (observer) observer.observe(el)
+    el.addEventListener('scroll', measureCue, { passive: true })
+    window.addEventListener('resize', measureCue)
+    return () => {
+      el.removeEventListener('scroll', measureCue)
+      window.removeEventListener('resize', measureCue)
+      if (observer) observer.disconnect()
+    }
+  }, [measureCue, tabs])
+
+  // 当前页签可能在屏幕外：只给箭头不够，切页时自己滚过来
+  useEffect(() => {
+    const active = stripRef.current?.querySelector('.workspace-tab.on')
+    if (active && typeof active.scrollIntoView === 'function') {
+      active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+  }, [currentRouteKey, tabs])
+
+  function nudgeCue(direction) {
+    const el = stripRef.current
+    if (!el) return
+    scrollByAmount(el, direction * Math.max(1, Math.round(el.clientWidth * 0.9)))
+  }
 
   useEffect(() => {
     let restored = []
@@ -199,8 +263,18 @@ export default function WorkspaceTabs() {
   if (!ready) return null
 
   return (
-    <div className="workspace-tabs" role="tablist" aria-label="已打开页面">
+    <div className="workspace-tabs" role="tablist" aria-label="已打开页面" tabIndex={0} ref={stripRef}>
       <div className="workspace-tabs-track">
+        {cue.left && (
+          <button
+            type="button"
+            className={`${SCROLL_CUE_BASE} left-0`}
+            aria-label="页签向左滚动"
+            onClick={() => nudgeCue(-1)}
+          >
+            ‹
+          </button>
+        )}
         {tabs.map((tab) => {
           const isActive = normalizeTabPath(tab.path) === normalizeTabPath(currentRouteKey)
           return (
@@ -233,6 +307,16 @@ export default function WorkspaceTabs() {
             </div>
           )
         })}
+        {cue.right && (
+          <button
+            type="button"
+            className={`${SCROLL_CUE_BASE} right-0`}
+            aria-label="页签向右滚动"
+            onClick={() => nudgeCue(1)}
+          >
+            ›
+          </button>
+        )}
       </div>
       {menu && createPortal(
         <div

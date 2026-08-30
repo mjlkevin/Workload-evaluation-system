@@ -35,7 +35,8 @@ export default function useWbsList({
   )
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(Boolean(enabled))
-  const [error, setError] = useState(null)
+  // 命名跟 useReviewList 对齐：只可能是加载失败，叫 loadError 而不是泛 error。
+  const [loadError, setLoadError] = useState(null)
   const [fetchId, setFetchId] = useState(0)
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export default function useWbsList({
 
     let cancelled = false
     setLoading(true)
-    setError(null)
+    setLoadError(null)
 
     apiClient.get('/wbs')
       .then((payload) => {
@@ -57,7 +58,7 @@ export default function useWbsList({
       })
       .catch((err) => {
         if (cancelled) return
-        setError(err)
+        setLoadError(err)
         setRows([])
       })
       .finally(() => {
@@ -71,5 +72,5 @@ export default function useWbsList({
     setFetchId((n) => n + 1)
   }, [])
 
-  return { rows, loading, error, refetch }
+  return { rows, loading, loadError, refetch }
 }

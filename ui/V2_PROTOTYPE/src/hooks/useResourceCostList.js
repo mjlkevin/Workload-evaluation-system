@@ -32,7 +32,10 @@ export default function useResourceCostList({
   )
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(Boolean(enabled))
-  const [error, setError] = useState(null)
+  // 加载失败和创建失败分开记账：合并成一个 error 后，创建失败会被念成「加载列表失败」。
+  // 命名跟 useReviewList 保持一致。
+  const [loadError, setLoadError] = useState(null)
+  const [createError, setCreateError] = useState(null)
   const [creating, setCreating] = useState(false)
   const [localRows, setLocalRows] = useState([])
 
@@ -44,11 +47,11 @@ export default function useResourceCostList({
 
   const refetch = useCallback(async () => {
     setLoading(true)
-    setError(null)
+    setLoadError(null)
     try {
       setRows(await load())
     } catch (err) {
-      setError(err)
+      setLoadError(err)
       setRows([])
     } finally {
       setLoading(false)
@@ -79,6 +82,7 @@ export default function useResourceCostList({
       return local.id
     }
     setCreating(true)
+    setCreateError(null)
     try {
       const payload = await apiClient.post('/versions', { type: 'resource' })
       const record = payload?.data?.record || payload?.data || payload
@@ -87,7 +91,7 @@ export default function useResourceCostList({
     } catch (err) {
       setLocalRows((prev) => [local, ...prev])
       setRows((prev) => [local, ...prev])
-      setError(err)
+      setCreateError(err)
       return local.id
     } finally {
       setCreating(false)
@@ -109,15 +113,15 @@ export default function useResourceCostList({
 
     let cancelled = false
     setLoading(true)
-    setError(null)
+    setLoadError(null)
 
     load()
       .then((mapped) => { if (!cancelled) setRows(mapped) })
-      .catch((err) => { if (!cancelled) { setError(err); setRows([]) } })
+      .catch((err) => { if (!cancelled) { setLoadError(err); setRows([]) } })
       .finally(() => { if (!cancelled) setLoading(false) })
 
     return () => { cancelled = true }
   }, [enabled, fallbackRows, load, localRows])
 
-  return { rows, loading, error, creating, refetch, create, remove }
+  return { rows, loading, loadError, createError, creating, refetch, create, remove }
 }

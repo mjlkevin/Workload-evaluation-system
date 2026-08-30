@@ -6,7 +6,7 @@ import { requirements as mockData } from '../mock/listData.js'
 
 export default function RequirementList() {
   const navigate = useNavigate()
-  const { rows, creating, refetch, create, remove } = useRequirementList({ fallbackData: mockData })
+  const { rows, loading, loadError, creating, refetch, create, remove } = useRequirementList({ fallbackData: mockData })
 
   const kpiCards = useMemo(() => {
     const total = rows.length
@@ -49,6 +49,11 @@ export default function RequirementList() {
       title="需求管理列表"
       subtitle="查看需求概览与版本管理"
       data={rows}
+      loading={loading}
+      loadingText="正在加载需求列表…"
+      error={loadError}
+      errorText="加载需求列表失败，请检查网络后重试"
+      onRetry={refetch}
       rowKey="id"
       kpiCards={kpiCards}
       onRowClick={(row) => navigate(`/requirements/${row.id}`)}

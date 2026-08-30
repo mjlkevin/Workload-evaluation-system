@@ -1489,3 +1489,18 @@ input, button, select, textarea { font-family: inherit; }
     width: 0;
   }
 }
+
+/* ── Sidebar: keyboard focus visibility ── */
+/* 折叠按钮平时是透明的（layout.css:18 opacity:0），只有 .sidebar:hover 才显形。
+   键盘 Tab 能落到它身上，但焦点环画在一个 opacity:0 的方块上——按下 Tab 什么
+   都没高亮，再按回车侧栏突然动了，用户不知道为什么。鼠标不受影响，所以这条
+   只在 :focus-visible 下生效。
+   layout.css 全冻结（AGENTS §7），因此落在 index.css，与仓库既有做法一致：
+   .ai-home-inspector__toggle:focus-visible（本文件）、.wes-dialog__close:focus-visible
+   （components.css:92）都是在各自文件里补焦点态。焦点环复用 --shadow-focus，
+   不新增 token、不新写色值。 */
+.sidebar .toggle-btn:focus-visible {
+  opacity: 1;
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
