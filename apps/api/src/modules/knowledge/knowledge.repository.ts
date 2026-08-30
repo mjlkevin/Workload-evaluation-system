@@ -1,24 +1,22 @@
 // ============================================================
 // SP-2026-007 · MS1（M1 中文混合检索基线）
-// knowledge.repository — JSON 文件存储（config/knowledge/store.json）
-// 业务层不直接依赖 JSON 结构（AGENTS.md §2 Repository 边界）；
-// 存量记录缺字段时默认值补齐，零人工迁移
+// knowledge.repository — 仓储契约（接口 + 输入/补丁类型）
+// ============================================================
+// 阶段 2 S6（2026-08-29）终态：JSON 文件实现类（KnowledgeRepository）与其
+// private load/save 已删除，本文件收敛为**纯契约文件**——只保留 JSON / PG
+// 双实现共用的接口与类型，实现唯一为 knowledge-pg.repository.ts，
+// 装配点在 knowledge.module.ts 的选择器（S6 后恒 PG，无开关分流）。
+//
+// 为什么不把接口挪进 knowledge.types.ts：批 9 指令要求「类接口保持不变、
+// 装配点不变」，controller / usecase / routes / pg 实现四处 import 路径一律
+// 不动，删除面最小、可单独 revert。
+//
+// 源文件 config/knowledge/store.json 保留不删：它仍是 db/seed.ts 的播种来源
+// （seed.ts:173），且 seed.guards.test.ts:71 显式断言其必须在仓内——
+// 与 templates / rule_sets 的 seed 源文件同口径（台账 §10 P2 更正）。
 // ============================================================
 
-import fs from "node:fs";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
-
-import { resolveRootDir } from "../../utils/file";
-import type { KnowledgeEntry, KnowledgeStatus } from "./knowledge.types";
-
-export const DEFAULT_STORE_RELATIVE = "config/knowledge/store.json";
-
-interface KnowledgeStore {
-  version?: string;
-  description?: string;
-  entries: Array<Partial<KnowledgeEntry>>;
-}
+import type { KnowledgeEntry } from "./knowledge.types";
 
 export interface CreateEntryInput {
   id?: string;
@@ -28,15 +26,15 @@ export interface CreateEntryInput {
   tags?: string[];
 }
 
-/** 更新补丁可覆盖的字段集（JSON / PG 双实现共用） */
+/** 更新补丁可覆盖的字段集 */
 export type UpdateEntryPatch = Partial<
   Pick<KnowledgeEntry, "title" | "content" | "category" | "tags" | "status">
 >;
 
 /**
- * 仓储接口（阶段 2 批 9：JSON / PG 双实现共用）。
- * 从既有类公开方法提取，签名逐字不变；controller / usecase /
- * routes 的类型标注由此放宽为接口，选择器方可分流。
+ * 仓储接口（阶段 2 批 9 从 JSON 类公开方法提取，签名逐字不变）。
+ * 实现方：knowledge-pg.repository.ts（生产唯一实现）+
+ * test-helpers/knowledge-in-memory.repository.ts（检索/路由用例替身）。
  */
 export interface KnowledgeStoreRepository {
   list(): Promise<KnowledgeEntry[]>;
@@ -44,123 +42,4 @@ export interface KnowledgeStoreRepository {
   create(input: CreateEntryInput): Promise<KnowledgeEntry>;
   update(id: string, patch: UpdateEntryPatch): Promise<KnowledgeEntry>;
   archive(id: string): Promise<KnowledgeEntry>;
-}
-
-export class KnowledgeRepository implements KnowledgeStoreRepository {
-  private readonly storePath: string;
-
-  constructor(storePath?: string) {
-    this.storePath = storePath ?? path.resolve(resolveRootDir(), DEFAULT_STORE_RELATIVE);
-  }
-
-  /** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync），阶段 2 替换实现。 */
-  async list(): Promise<KnowledgeEntry[]> {
-    const store = this.load();
-    return store.entries.map((entry, index) => this.normalize(entry, index));
-  }
-
-  /** 阶段 1 批 7：签名改 async（含内部 list 级联），实现不动，阶段 2 替换实现。 */
-  async get(id: string): Promise<KnowledgeEntry | null> {
-    return (await this.list()).find((entry) => entry.id === id) ?? null;
-  }
-
-  /** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
-  async create(input: CreateEntryInput): Promise<KnowledgeEntry> {
-    if (!input.title || !input.title.trim()) {
-      throw new Error("Knowledge entry title is required");
-    }
-    if (!input.content || !input.content.trim()) {
-      throw new Error("Knowledge entry content is required");
-    }
-    const store = this.load();
-    const now = new Date().toISOString();
-    const id = input.id?.trim() || `k-${randomUUID().slice(0, 8)}`;
-    if (store.entries.some((entry) => entry.id === id)) {
-      throw new Error(`Knowledge entry id 已存在: ${id}`);
-    }
-    const entry: KnowledgeEntry = {
-      id,
-      title: input.title.trim(),
-      content: input.content.trim(),
-      category: input.category?.trim() || "general",
-      tags: input.tags ?? [],
-      status: "active",
-      createdAt: now,
-      updatedAt: now,
-    };
-    store.entries.push(entry);
-    this.save(store);
-    return entry;
-  }
-
-  /** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
-  async update(id: string, patch: UpdateEntryPatch): Promise<KnowledgeEntry> {
-    const store = this.load();
-    const raw = store.entries.find((entry) => entry.id === id);
-    if (!raw) {
-      throw new Error(`Knowledge entry 不存在: ${id}`);
-    }
-    const normalized = this.normalize(raw, 0);
-    if (normalized.status === "archived") {
-      throw new Error(`Knowledge entry 已归档，不可修改: ${id}`);
-    }
-    const updated: KnowledgeEntry = {
-      ...normalized,
-      ...(patch.title != null ? { title: patch.title } : {}),
-      ...(patch.content != null ? { content: patch.content } : {}),
-      ...(patch.category != null ? { category: patch.category } : {}),
-      ...(patch.tags != null ? { tags: patch.tags } : {}),
-      ...(patch.status != null ? { status: patch.status } : {}),
-      updatedAt: new Date().toISOString(),
-    };
-    store.entries[store.entries.indexOf(raw)] = updated;
-    this.save(store);
-    return updated;
-  }
-
-  /** 阶段 1 批 7：签名改 async，实现不动（仍为 readFileSync/writeFileSync），阶段 2 替换实现。 */
-  async archive(id: string): Promise<KnowledgeEntry> {
-    const store = this.load();
-    const raw = store.entries.find((entry) => entry.id === id);
-    if (!raw) {
-      throw new Error(`Knowledge entry 不存在: ${id}`);
-    }
-    const updated: KnowledgeEntry = {
-      ...this.normalize(raw, 0),
-      status: "archived",
-      updatedAt: new Date().toISOString(),
-    };
-    store.entries[store.entries.indexOf(raw)] = updated;
-    this.save(store);
-    return updated;
-  }
-
-  private load(): KnowledgeStore {
-    if (!fs.existsSync(this.storePath)) {
-      return { entries: [] };
-    }
-    const parsed = JSON.parse(fs.readFileSync(this.storePath, "utf-8")) as KnowledgeStore;
-    if (!Array.isArray(parsed.entries)) return { entries: [] };
-    return parsed;
-  }
-
-  private save(store: KnowledgeStore): void {
-    fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
-    fs.writeFileSync(this.storePath, JSON.stringify(store, null, 2), "utf-8");
-  }
-
-  /** 默认值补齐：存量数据缺 status/category/时间戳时不迁移即可读 */
-  private normalize(raw: Partial<KnowledgeEntry>, index: number): KnowledgeEntry {
-    const now = new Date().toISOString();
-    return {
-      id: raw.id ?? `k-legacy-${index + 1}`,
-      title: raw.title ?? "",
-      content: raw.content ?? "",
-      category: raw.category ?? "general",
-      tags: raw.tags ?? [],
-      status: (raw.status as KnowledgeStatus) ?? "active",
-      createdAt: raw.createdAt ?? now,
-      updatedAt: raw.updatedAt ?? raw.createdAt ?? now,
-    };
-  }
 }
