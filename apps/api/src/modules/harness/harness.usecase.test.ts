@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
 import {
   isHarnessRunStage,
@@ -284,20 +283,10 @@ function activeHarnessUser(): AuthUser {
   } as AuthUser;
 }
 
-function withFileSnapshotRestore(filePath: string, run: () => void): void {
-  const existed = fs.existsSync(filePath);
-  const snapshot = existed ? fs.readFileSync(filePath, "utf-8") : "";
-  try {
-    run();
-  } finally {
-    if (existed) fs.writeFileSync(filePath, snapshot, "utf-8");
-    else if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  }
-}
-
-// S4（2026-08-30）：withFileSnapshotRestoreAsync 已随本批 5 处 versions 用例迁移失去
-// 调用方，已删除；上方 withFileSnapshotRestore 在本批之前已无调用方（预存在死代码），
-// 归 commit B 与 JSON 实现一并清理。
+// S4（2026-08-30）：本文件的文件快照包装已全部下线——withFileSnapshotRestoreAsync
+// 随本批 5 处 versions 用例迁移失去调用方，withFileSnapshotRestore 在本批之前
+// 已无调用方（预存在死代码）；import fs 随之删除。versions 域改用上方
+// withHarnessVersionsReset 的行级重置。
 
 function makeMemoryHarnessRepo(): HarnessRepository {
   const runs: HarnessRunRow[] = [];

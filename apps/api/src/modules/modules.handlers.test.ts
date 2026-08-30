@@ -1,6 +1,5 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import XLSX from "xlsx";
 import bcrypt from "bcryptjs";
@@ -85,7 +84,8 @@ let storeSeed: SingleDocStoreSeed | null = null;
 // S4（2026-08-30）：versions 的 JSON 读写路径随本批删除、versions 域恒 PG。本文件
 // 13 处 versionsStorePath() 文件快照包装全部换成 withVersionsRowsReset——按 owner
 // 条件 DELETE 的行级重置（version_records 是行级域，不整表 TRUNCATE，C14 不适用）；
-// 用例不再直接读写 config/versions/records.json，fixture 改经版本仓储种入。
+// 用例不再直接读写 config/versions/records.json，fixture 改经版本仓储种入；
+// 本文件连 import fs 与四个 *SnapshotRestore 包装一并下线（已无文件可快照）。
 // S6（2026-08-29）：TEMPLATES / RULE_SETS / KNOWLEDGE 三域移出本列表——
 // 三域 JSON 路径已删、选择器恒 PG，delete 开关已不再能切回任何实现；
 // getRuleSetMeta 需要「活动文档存在」，而 db:seed 在 CI 里排在 Test modules
@@ -349,20 +349,6 @@ async function pinAssessmentBindingToBuiltinMoonshot(): Promise<() => Promise<vo
   };
 }
 
-function withFileSnapshotRestore(filePath: string, run: () => void): void {
-  const existed = fs.existsSync(filePath);
-  const before = existed ? fs.readFileSync(filePath, "utf-8") : "";
-  try {
-    run();
-  } finally {
-    if (existed) {
-      fs.writeFileSync(filePath, before, "utf-8");
-    } else if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  }
-}
-
 test("system.usecase: empty retrieval still proves knowledge base connectivity", { concurrency: false }, async () => {
   const admin = testAdmin;
   assert.ok(admin, "active admin required");
@@ -400,29 +386,10 @@ test("system.usecase: empty retrieval still proves knowledge base connectivity",
   }
 });
 
-// S4（2026-08-30）：withFileSnapshotRestoreAsync / withFilesSnapshotRestoreAsync 两个
-// async 快照包装已随本批 13 处 versionsStorePath 迁移失去调用方，已删除。
-// 下方 withFilesSnapshotRestore 与本文件上方的 withFileSnapshotRestore 在本批之前
-// 已无调用方（预存在死代码），归 commit B 与 JSON 实现一并清理。
-
-function withFilesSnapshotRestore(filePaths: string[], run: () => void): void {
-  const snapshots = filePaths.map((filePath) => ({
-    filePath,
-    existed: fs.existsSync(filePath),
-    content: fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "",
-  }));
-  try {
-    run();
-  } finally {
-    for (const item of snapshots) {
-      if (item.existed) {
-        fs.writeFileSync(item.filePath, item.content, "utf-8");
-      } else if (fs.existsSync(item.filePath)) {
-        fs.unlinkSync(item.filePath);
-      }
-    }
-  }
-}
+// S4（2026-08-30）：本文件的四个文件快照包装（withFileSnapshotRestore /
+// withFilesSnapshotRestore 及其 async 版）已全部下线——前两个在本批之前已无
+// 调用方（预存在死代码），后两个随本批 13 处 versionsStorePath 迁移失去调用方。
+// versions 域改用下方 withVersionsRowsReset 的行级重置；其他域早已恒 PG。
 
 test("auth.usecase: login returns required error when username/password missing", async () => {
   const req = createMockReq({ body: {} });
