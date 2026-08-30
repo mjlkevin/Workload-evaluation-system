@@ -36,6 +36,12 @@ if (USE_TC) {
 
   const connectionUri = container.getConnectionUri();
   process.env.TEST_DATABASE_URL = connectionUri;
+  // 默认 db 单例（src/db/client.ts）读的是 DATABASE_URL。container 拉起后必须
+  // 同步指到同一个库，否则各测试文件 import config/env.ts 时 dotenv 会把 .env 里的
+  // 开发库填进 DATABASE_URL（dotenv 不覆盖已存在的键，但此模式下它并不存在），
+  // 形成 testPool 指容器、默认单例指开发库的分裂。先置此变量也让 dotenv 跳过覆盖；
+  // src/db/client.ts 的测试守卫（DEF-2026-08-27-004）会对此类不一致直接报错。
+  process.env.DATABASE_URL = connectionUri;
 
   console.log("[test:setup] PostgreSQL container started");
 

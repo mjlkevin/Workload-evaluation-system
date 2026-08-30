@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import test, { after, before } from "node:test";
+import { Pool } from "pg";
 import type { Request, Response } from "express";
 import type { AuthUser } from "../../types";
 import { cleanupOneTestUser, createTestUser } from "../../test-helpers/test-users";
@@ -11,23 +12,25 @@ import { cleanupOneTestUser, createTestUser } from "../../test-helpers/test-user
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const originalCwd = process.cwd();
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "wes-rp031-kb-"));
-// C10（2026-08-25）：本文件用例以 resetStore()（删 JSON 文件）为状态隔离手段，
-// 假定 system 走 JSON 实现；全局开关全开（PG）时删文件无效、PG 行残留污染后续用例。
-// 文件级显式切回 JSON 实现（单文件进程，不影响其他测试文件）。
-const previousSystemPgFlag = process.env.WES_STORE_SYSTEM_PG;
+// S3（2026-08-30）口径：system 四配置 JSON 读写路径删除后本域恒 PG，
+// 不再强制切回 JSON 实现；状态隔离从「删 JSON 文件」改为「删 system_configs
+// 的 knowledgeBaseConfig 行」。该表无隔离维度（config_key 固定枚举），与
+// system-pg.repository.test.ts / assessment / workbench-dispatch / modules.handlers
+// 共写同一行，故本文件必须待在 test:modules:serial-store 串行组内。
+let pool: Pool | null = null;
 
 // S1（2026-08-25）后 users 域恒 PG：测试 admin 改由 PG 行级注入
 // （JSON 注入路径已删；固定 username 承载身份，id 用合法 uuid）。
 let testAdmin: AuthUser | null = null;
 
 before(async () => {
-  delete process.env.WES_STORE_SYSTEM_PG;
   const { _resetSystemRepositoryForTest } = await import("./system.repository");
   _resetSystemRepositoryForTest();
   process.chdir(tempRoot);
   fs.mkdirSync(path.join(tempRoot, "config", "auth"), { recursive: true });
   fs.mkdirSync(path.join(tempRoot, "config", "system"), { recursive: true });
   if (!testDatabaseUrl) return;
+  pool = new Pool({ connectionString: testDatabaseUrl, max: 5 });
   await cleanupOneTestUser("rp031-admin");
   testAdmin = await createTestUser("wes-kb-config", {
     id: randomUUID(),
@@ -38,9 +41,9 @@ before(async () => {
 });
 
 after(async () => {
-  if (previousSystemPgFlag === undefined) delete process.env.WES_STORE_SYSTEM_PG;
-  else process.env.WES_STORE_SYSTEM_PG = previousSystemPgFlag;
   if (testDatabaseUrl) await cleanupOneTestUser("rp031-admin");
+  await resetStore();
+  if (pool) await pool.end();
   process.chdir(originalCwd);
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });
@@ -67,12 +70,13 @@ async function adminRequest(body: unknown = {}) {
   } as unknown as Request;
 }
 
-function resetStore() {
-  fs.rmSync(path.join(tempRoot, "config", "system", "knowledge-base-config.json"), { force: true });
+async function resetStore(): Promise<void> {
+  if (!pool) return;
+  await pool.query("DELETE FROM system_configs WHERE config_key = 'knowledgeBaseConfig'");
 }
 
 test("activation is blocked until the current draft has a successful probe", { skip: !testDatabaseUrl, concurrency: false }, async () => {
-  resetStore();
+  await resetStore();
   const { activateKnowledgeBaseConfig, updateKnowledgeBaseConfigDraft } = await import("./system.usecase");
   await updateKnowledgeBaseConfigDraft(
     await adminRequest({ credentials: { apiKey: "fixture-key", knowledgeId: "kb-fixture" } }),
@@ -85,7 +89,7 @@ test("activation is blocked until the current draft has a successful probe", { s
 });
 
 test("successful zero-hit probe activates only the unchanged draft", { skip: !testDatabaseUrl, concurrency: false }, async () => {
-  resetStore();
+  await resetStore();
   const {
     activateKnowledgeBaseConfig,
     testKnowledgeBaseConnectivityWithFetcher,
@@ -119,7 +123,7 @@ test("successful zero-hit probe activates only the unchanged draft", { skip: !te
 });
 
 test("activation rejects a successful probe older than 24 hours", { skip: !testDatabaseUrl, concurrency: false }, async () => {
-  resetStore();
+  await resetStore();
   const {
     activateKnowledgeBaseConfig,
     testKnowledgeBaseConnectivityWithFetcher,
@@ -147,7 +151,7 @@ test("activation rejects a successful probe older than 24 hours", { skip: !testD
 });
 
 test("multi knowledge draft rejects duplicate profile and provider ids", { skip: !testDatabaseUrl, concurrency: false }, async () => {
-  resetStore();
+  await resetStore();
   const { updateKnowledgeBaseConfigDraft } = await import("./system.usecase");
   const result = responseCapture();
   await updateKnowledgeBaseConfigDraft(
@@ -170,7 +174,7 @@ test("multi knowledge draft rejects duplicate profile and provider ids", { skip:
 });
 
 test("connectivity tests are stored per selected knowledge base profile", { skip: !testDatabaseUrl, concurrency: false }, async () => {
-  resetStore();
+  await resetStore();
   const {
     testKnowledgeBaseConnectivityWithFetcher,
     updateKnowledgeBaseConfigDraft,
@@ -208,7 +212,7 @@ test("connectivity tests are stored per selected knowledge base profile", { skip
 });
 
 test("activation requires a fresh matching probe for every enabled profile", { skip: !testDatabaseUrl, concurrency: false }, async () => {
-  resetStore();
+  await resetStore();
   const {
     activateKnowledgeBaseConfig,
     testKnowledgeBaseConnectivityWithFetcher,

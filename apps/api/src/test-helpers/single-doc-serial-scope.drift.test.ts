@@ -1,18 +1,25 @@
 // ============================================================
 // 防漂移测试：无界读表 / 单文档表的测试文件必须在串行套件内
 // ============================================================
-// 口径（阶段 2 S6，2026-08-29 架构侧裁决 O1 + 强制守卫要求）：
+// 口径（阶段 2 S6，2026-08-29 架构侧裁决 O1 + 强制守卫要求；S3 扩容）：
 // npm run test:modules 默认按文件并行执行；npm run test:modules:serial-store
-// 带 --test-concurrency=1。向下列三张表写入行的测试文件必须落在串行套件，
+// 带 --test-concurrency=1。向下列表写入行的测试文件必须落在串行套件，
 // 否则并发执行会互相污染，且 git 合并无冲突标记、tsc 也通过，只在全量 CI
 // 间歇性炸（存储语义互斥，台账 §10 B1/B2）。
 //
-// 三张表的「无界」成因各不相同：
+// 各表的「无界」成因各不相同：
 // - templates / rule_sets：单文档表，loadTemplate / loadRuleSet 按
 //   updated_at DESC 取「最近写入行」当活动文档，不按主键取。任何测试写入
 //   一行即成为同时段全体测试眼中的生效文档。
 // - knowledge_entries：list() 全表读、无 id 与前缀限定，「空表合法状态」
 //   断言隐含依赖本文件是唯一写入者。
+// - system_configs（S3 新增，2026-08-30）：requirementSettings /
+//   knowledgeBaseConfig / implementationDependencyRules 三个 config_key 各为一行
+//   upsert，无隔离维度。共写文件：system-pg.repository / system.kb-config /
+//   modules.handlers / assessment / workbench-dispatch（后两者是为注入 mock 模型与
+//   测试 apiKey 而整份读写 store，它们的用例断言的是「读到刚写入的配置」）。
+// - version_code_rules（同上，随 system 域走）：PG 写路径是事务内 TRUNCATE
+//   整表再整表重插，比 upsert 更极端——任何测试写一次就清空同时段全表。
 //
 // 实现：文本扫描 src 下全部 *.test.ts（剥除注释后匹配写入指纹），
 // 命中指纹却不在 SERIAL_SCOPE_FILES 内的文件即判红并报出文件名；
@@ -46,6 +53,12 @@ const SERIAL_SCOPE_FILES = [
   "modules/modules.usecase.test.ts",
   "modules/knowledge/knowledge-pg.repository.test.ts",
   "modules/modules.handlers.test.ts",
+  // S3（2026-08-30）：system 域 JSON 读写路径删除后，四个恒写 system_configs /
+  // version_code_rules 单文档表的文件移进串行组
+  "modules/system/system-pg.repository.test.ts",
+  "modules/system/system.kb-config.test.ts",
+  "services/ai/assessment.service.test.ts",
+  "services/ai/workbench-dispatch.service.test.ts",
 ] as const;
 
 /** 串行套件脚本名与并行套件脚本名。 */
@@ -59,6 +72,9 @@ const PARALLEL_SCRIPT = "test:modules";
  * 只扫 *.test.ts，helper 自身不在扫描范围内），所以必须靠调用方指纹兼容。
  * 不匹配纯 reset 钩子；也不匹配 JSON 实现类残留名（写的是本文件私有
  * 临时路径，不触碰共享表，不构成跳文件污染）。
+ * S3：后六条是 system 域写入口——两条仓储构造/类型名 + 四条 config 的 save*。
+ * save* 同时覆盖 system_configs 的单行 upsert 与 version_code_rules 的整表替换
+ * 两条写路径（save* 是唯一写入口，裸 SQL 写库不属仓储层能力，指纹不会漏到旁路）。
  */
 const WRITER_PATTERNS: RegExp[] = [
   /\bcreateTemplatesPgRepository\b/,
@@ -72,6 +88,12 @@ const WRITER_PATTERNS: RegExp[] = [
   /\bKnowledgePgRepository\b/,
   /\bgetKnowledgeRepository\b/,
   /\bseedSingleDocStoreFixture\b/,
+  /\bcreateSystemPgRepository\b/,
+  /\bSystemPgRepository\b/,
+  /\bsaveRequirementSystemConfigStore\b/,
+  /\bsaveKnowledgeBaseConfigStore\b/,
+  /\bsaveImplementationDependencyRulesStore\b/,
+  /\bsaveVersionCodeRulesStore\b/,
 ];
 
 /**
@@ -83,6 +105,11 @@ const DECLARED_NON_WRITERS: Array<{ file: string; expectedHits: number; why: str
     file: "modules/knowledge/knowledge.repository.test.ts",
     expectedHits: 6,
     why: "S6 后收缩为装配测试：只取用选择器断实现装配与单例语义，全程不 await 任何仓储方法，不写 knowledge_entries 行",
+  },
+  {
+    file: "modules/system/system.repository.test.ts",
+    expectedHits: 2,
+    why: "S3 后收缩为装配与纯函数测试：JSON 读写用例已逐条删除（职责去向见本文件头注释），命中项仅为 import 与 PG 工厂签名断言处的 createSystemPgRepository，全程不 await 任何仓储方法，不写 system_configs 行",
   },
 ];
 
@@ -141,8 +168,8 @@ test("触碰无界读表与单文档表的测试文件必须全部在串行白�
     unregistered,
     [],
     [
-      `以下测试文件向 templates / rule_sets / knowledge_entries 写入行，但不在 ${SERIAL_SCRIPT} 白名单内`,
-      "并发执行会互相顶掉活动文档或打破「空表合法状态」断言（存储语义互斥，仅在全量 CI 间歇性炸）：",
+      `以下测试文件向无界读表（templates / rule_sets / knowledge_entries / system_configs / version_code_rules）写入行，但不在 ${SERIAL_SCRIPT} 白名单内`,
+      "并发执行会互相顶掉活动文档、打破「空表合法状态」断言，或把版本编码规则整表清空（存储语义互斥，仅在全量 CI 间歇性炸）：",
       ...unregistered.map((f) => `  src/${f}`),
       `处置：加进 apps/api/package.json 的 ${SERIAL_SCRIPT}，并把同一文件登记进本测试的 SERIAL_SCOPE_FILES。`,
     ].join("\n"),
@@ -211,8 +238,8 @@ test("串行白名单与 package.json 脚本参数列表逐位一致", () => {
 test("串行白名单计数钉定（新增触碰或批次收敛都必须显式更新本条）", () => {
   assert.equal(
     SERIAL_SCOPE_FILES.length,
-    5,
+    9,
     `SERIAL_SCOPE_FILES 实为 ${SERIAL_SCOPE_FILES.length} 条：新增即意味着有新的无界读表写入方，` +
-      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进）"
+      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进）"
   );
 });

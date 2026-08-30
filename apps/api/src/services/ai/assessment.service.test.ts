@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import test from "node:test";
 
-import { requirementSystemConfigStorePath } from "../../utils";
 import { kimiAssessmentPreview } from "./assessment.service";
 import { defaultProviderRegistry, type ModelProvider, type ChatCompletionRequest, type ChatCompletionResponse } from "../../ai/provider";
 import { getCachedApiKey, KIMI_SCOPE, resetCredentialCache, setCachedApiKey } from "../../modules/system/credentials.store";
@@ -40,9 +38,16 @@ async function withAssessmentSandbox(
   mutate: (store: Awaited<ReturnType<typeof loadRequirementSystemConfigStore>>) => void,
   run: (provider: ModelProvider & { lastRequest?: ChatCompletionRequest }) => Promise<void>,
 ): Promise<void> {
-  const storePath = requirementSystemConfigStorePath();
-  const existed = fs.existsSync(storePath);
-  const before = existed ? fs.readFileSync(storePath, "utf-8") : "";
+  // S3（2026-08-30）：requirementSettings 的状态源从 config/system/*.json 换成了
+  // system_configs 单行，已经没有文件可快照。改用公共 accessor 做逻辑快照：
+  // 进入时读回整份 store，finally 原样写回（与旧文件快照同一口径——「结束后原样恢复」）。
+  // 不用裸 SQL 还原行：表列布局（config_key / store jsonb / version）是仓储私有细节，
+  // 业务测试直写会踩破 Repository 边界（AGENTS §2）。代价是原本无行时会留下一行默认
+  // 内容，而默认内容与 loadRequirementSystemConfigStore 的兜底返回等价、语义零变化；
+  // CI 测试库每个 job 新建，本地只会落 test 库（src/db/client.ts 的测试守卫兜底）。
+  // 竞态约束：本文件向 system_configs 写入 → 必须待在 test:modules:serial-store 串行组
+  //（守卫 single-doc-serial-scope.drift.test.ts 以 saveRequirementSystemConfigStore 为写入指纹）。
+  const previousStore = await loadRequirementSystemConfigStore();
   const previousProvider = defaultProviderRegistry.get("kimi");
   const previousApiKey = getCachedApiKey(KIMI_SCOPE);
   const mockProvider = createCapturingKimiProvider();
@@ -54,11 +59,7 @@ async function withAssessmentSandbox(
     await saveRequirementSystemConfigStore(store);
     await run(mockProvider);
   } finally {
-    if (existed) {
-      fs.writeFileSync(storePath, before, "utf-8");
-    } else if (fs.existsSync(storePath)) {
-      fs.unlinkSync(storePath);
-    }
+    await saveRequirementSystemConfigStore(previousStore);
     defaultProviderRegistry.unregister("kimi");
     if (previousProvider) defaultProviderRegistry.register(previousProvider);
     if (previousApiKey) setCachedApiKey(KIMI_SCOPE, previousApiKey);

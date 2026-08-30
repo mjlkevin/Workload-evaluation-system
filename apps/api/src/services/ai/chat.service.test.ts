@@ -1,14 +1,13 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { after } from "node:test";
 import { PassThrough } from "node:stream";
-import { mkdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { Pool } from "pg";
 import type { Request, Response } from "express";
 import { config } from "../../config/env";
 import { defaultProviderRegistry, type ModelProvider } from "../../ai/provider";
 import type { AuthUser } from "../../types";
 import { appendAiSessionEvent, createAiSession, deleteAiSession, listAiSessions } from "../../modules/ai-sessions/ai-sessions.usecase";
-import { _resetTraceRepositoryForTest, queryTraces } from "../../modules/trace/trace.repository";
+import { queryTraces } from "../../modules/trace/trace.repository";
 import {
   allParsedHomeAttachments,
   buildMergedRequirementAnalysisReport,
@@ -114,7 +113,7 @@ function createMockReqRes(overrides: {
   req.body = overrides.body ?? { messages: [{ role: "user", content: "hello" }] };
   if (overrides.user !== null) {
     (req as unknown as Record<string, unknown>).user = overrides.user ?? {
-      id: "test-user-1",
+      id: TRACE_TEST_USER_ID,
       username: "tester",
       role: "user",
       businessRole: "pre_sales",
@@ -161,15 +160,48 @@ function createMockReqRes(overrides: {
   return { req, res, getSseEvents };
 }
 
-const TEST_TRACE_STORE_DIR = join(process.cwd(), "data", "chat-service-traces-test");
-const TEST_TRACE_STORE_PATH = join(TEST_TRACE_STORE_DIR, "trace-store.json");
+// S3（2026-08-30）：trace JSON 路径删除后，本文件三条流式用例的 trace 断言走 PG。
+// traces 表由多个测试文件共享（CI 按文件并行执行），沿用 trace-pg.repository.test.ts
+// 已确立的数据集隔离范式：独占 owner 前缀 + 用例级条件 DELETE + 按 owner 过滤的
+// 计数断言（全表精确计数在共享库不可判定）。前缀刻意与 wes-t-trace-% 不同，
+// 避免并发执行时 trace.test.ts 的清理误删本文件在途的行。
+const TRACE_TEST_USER_ID = "wes-chat-svc-user-1";
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+
+let tracePool: Pool | null = null;
+
+async function cleanTraceRows(): Promise<void> {
+  if (!testDatabaseUrl) return;
+  tracePool ??= new Pool({ connectionString: testDatabaseUrl, max: 2 });
+  await tracePool.query("DELETE FROM traces WHERE owner_user_id = $1", [TRACE_TEST_USER_ID]);
+}
+
+after(async () => {
+  await cleanTraceRows();
+  if (tracePool) await tracePool.end();
+});
+
+/**
+ * handler 侧 trace 写入是 fire-and-forget（workbench-chat-stream.handler.ts 未
+ * await recordWorkbenchTurnTrace，外层 try/catch 也接不住它的 rejection）：
+ * JSON 时代靠 microtask 顺序恰好读到，切 PG 后走真实 I/O、必须等落库。
+ * 故轮询到出现行为止；超时则原样返回，让调用处的 total 断言照常判红——
+ * 等待不弱化断言，只把「最终必须写入」这层不变量显式化。
+ */
+async function queryOwnTraces(ownerUserId: string) {
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const result = await queryTraces({ ownerUserId });
+    if (result.total > 0 || Date.now() >= deadline) return result;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
 
 // S2b-1（2026-08-27）：三个 homeWorkbenchChatStream 完整流程用例在九开关全开时
 // 内部创建会话（title 取用户消息首句「请基于附件总结风险」）写入 PG，用例级 finally 定向清理。
 async function cleanupTestStreamSessions(): Promise<void> {
   const user: AuthUser = {
-    id: "test-user-1",
+    id: TRACE_TEST_USER_ID,
     username: "tester",
     passwordHash: "test-hash",
     role: "user",
@@ -184,34 +216,24 @@ async function cleanupTestStreamSessions(): Promise<void> {
 }
 
 async function withChatServiceIsolation(run: () => Promise<void>) {
-  const previousTraceStore = process.env.WES_TRACE_STORE_PATH;
   const previousApiKey = config.kimi.apiKey;
   // C10（2026-08-25）：chat.service 用例以 session 文件快照 / trace 文件断言，
   // 假定 ai-sessions 与 trace 走 JSON 实现；全局开关全开（PG）时写入 PG、断言读 JSON，
   // 断言失效。显式隔离到 JSON 实现。
-  // S2b-1（2026-08-27）：ai-sessions 已随九开关走 PG，不再显式隔离（仅动 AI_SESSIONS 分支）；
-  // TRACES 仍走 JSON，WES_STORE_TRACES_PG 分支原样保留（S3 才动）。
-  // S2b-2（2026-08-28）：ai-sessions JSON 路径已删除，session 文件快照/还原随
-  // 之移除（用例经 repository 单例读写，after 按测试用户清理）；TRACES 不变。
-  const previousTracesPgFlag = process.env.WES_STORE_TRACES_PG;
+  // S2b-1/S2b-2：ai-sessions JSON 路径已删除，session 文件快照/还原随之移除
+  // （用例经 repository 单例读写，after 按测试用户清理）。
+  // S3（2026-08-30）：trace JSON 路径同样删除，原 WES_TRACE_STORE_PATH 注入 +
+  // `delete WES_STORE_TRACES_PG` 的 JSON 隔离钩子随之移除，改为 PG 数据集隔离
+  // （cleanTraceRows 按独占 owner 定向清理）。
   const providersBefore = defaultProviderRegistry.list();
   const defaultBefore = defaultProviderRegistry.getDefault()?.name;
 
-  rmSync(TEST_TRACE_STORE_DIR, { recursive: true, force: true });
-  mkdirSync(TEST_TRACE_STORE_DIR, { recursive: true });
-  process.env.WES_TRACE_STORE_PATH = TEST_TRACE_STORE_PATH;
   config.kimi.apiKey = "unit-test-kimi-key";
-  delete process.env.WES_STORE_TRACES_PG;
-  _resetTraceRepositoryForTest();
+  await cleanTraceRows();
 
   try {
     await run();
   } finally {
-    if (previousTraceStore === undefined) delete process.env.WES_TRACE_STORE_PATH;
-    else process.env.WES_TRACE_STORE_PATH = previousTraceStore;
-    if (previousTracesPgFlag === undefined) delete process.env.WES_STORE_TRACES_PG;
-    else process.env.WES_STORE_TRACES_PG = previousTracesPgFlag;
-    _resetTraceRepositoryForTest();
     config.kimi.apiKey = previousApiKey;
 
     defaultProviderRegistry.clear();
@@ -219,7 +241,7 @@ async function withChatServiceIsolation(run: () => Promise<void>) {
       defaultProviderRegistry.register(provider, { asDefault: provider.name === defaultBefore });
     }
 
-    rmSync(TEST_TRACE_STORE_DIR, { recursive: true, force: true });
+    await cleanTraceRows();
   }
 }
 
@@ -329,7 +351,7 @@ test("homeWorkbenchChatStream: SSE 头信息正确设置", async () => {
   assert.equal(headers["Connection"], "keep-alive");
 });
 
-test("homeWorkbenchChatStream: dispatch 流式成功后发送 delta/done 并写入隔离 trace store", { skip: !testDatabaseUrl }, async () => {
+test("homeWorkbenchChatStream: dispatch 流式成功后发送 delta/done 并写入 PG trace 表", { skip: !testDatabaseUrl }, async () => {
   await withChatServiceIsolation(async () => {
     try {
     registerFakeKimiProvider({
@@ -356,7 +378,7 @@ test("homeWorkbenchChatStream: dispatch 流式成功后发送 delta/done 并写�
     assert.deepEqual(events.map((event) => event.event), ["delta", "delta", "done"]);
     assert.equal((events[2].data as Record<string, unknown>).content, "第一段第二段");
 
-    const traces = await queryTraces({ ownerUserId: "test-user-1" }, TEST_TRACE_STORE_PATH);
+    const traces = await queryOwnTraces(TRACE_TEST_USER_ID);
     assert.equal(traces.total, 1);
     assert.equal(traces.traces[0].summary.hasError, false);
     assert.equal(traces.traces[0].spans.some((span) => span.spanType === "model_call"), true);
@@ -397,7 +419,7 @@ test("homeWorkbenchChatStream: provider stream 失败时发送 error 并写 fail
 
     const events = getSseEvents();
     assert.equal(events.some((event) => event.event === "error"), true);
-    const traces = await queryTraces({ ownerUserId: "test-user-1" }, TEST_TRACE_STORE_PATH);
+    const traces = await queryOwnTraces(TRACE_TEST_USER_ID);
     assert.equal(traces.total, 1);
     assert.equal(traces.traces[0].summary.hasError, true);
     assert.equal(traces.traces[0].spans[0].error?.code, "upstream_stream_failed");
@@ -432,7 +454,7 @@ test("homeWorkbenchChatStream: client close 后不发送 done，并写 cancelled
 
     const events = getSseEvents();
     assert.deepEqual(events.map((event) => event.event), ["delta"]);
-    const traces = await queryTraces({ ownerUserId: "test-user-1" }, TEST_TRACE_STORE_PATH);
+    const traces = await queryOwnTraces(TRACE_TEST_USER_ID);
     assert.equal(traces.total, 1);
     assert.equal(traces.traces[0].summary.hasError, true);
     assert.equal(traces.traces[0].spans[0].error?.code, "client_aborted");
@@ -471,7 +493,7 @@ test("homeWorkbenchChatStream: 显式报告请求回退会话附件后直接生�
     });
 
     const streamUser: AuthUser = {
-      id: "test-user-1",
+      id: TRACE_TEST_USER_ID,
       username: "tester",
       passwordHash: "test-hash",
       role: "user",
