@@ -106,7 +106,10 @@ for kv in $STORE_FLAGS; do export "$kv=true"; done
 run_npm_script() {
   local name="$1" args
   args="$("$NODE_BIN" -e '
-    const [,, file, name] = process.argv;
+    // 注：`node -e` 的 process.argv 是 [execPath, ...用户参数]，**没有脚本文件名占位**，
+    // 故只跳一格。曾误写 [,, file, name] 使 file 拿到 name 的值，npm script 分支
+    // 全部误报「未知 npm script」（单文件分支不走此路径，故未暴露）。
+    const [, file, name] = process.argv;
     const s = require(file).scripts[name];
     if (!s) { process.exit(1); }
     process.stdout.write(s.replace(/^tsx\s+/, ""));
