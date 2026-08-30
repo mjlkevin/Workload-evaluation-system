@@ -1,9 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
 import { VersionsStore } from "../types";
-import { versionsStorePath } from "../utils";
 import {
   deleteIdempotencyRecord,
   getIdempotencyRecord,
@@ -11,19 +9,14 @@ import {
   setIdempotencyRecord
 } from "./estimates/estimates.repository";
 import { cleanupExpiredSessions, getSession, saveSession } from "./sessions/sessions.repository";
-import { isVersionReferencedByGlobal, saveVersionsStore } from "./versions/versions.repository";
+import { isVersionReferencedByGlobal } from "./versions/versions.repository";
 
-// 阶段 1 批 4：支持 async 回调（versions accessor 异步化级联）
-async function withFileSnapshotRestore(filePath: string, run: () => Promise<void>): Promise<void> {
-  const existed = fs.existsSync(filePath);
-  const snapshot = existed ? fs.readFileSync(filePath, "utf-8") : "";
-  try {
-    await run();
-  } finally {
-    if (existed) fs.writeFileSync(filePath, snapshot, "utf-8");
-    else if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  }
-}
+// S4（2026-08-30）：本文件原「versions.repository: saveVersionsStore writes through
+// a temp file before rename」用例（含其专用的 withFileSnapshotRestore 夹具）已随
+// versions JSON 写路径退役——它断的是「临时文件 + rename 原子替换」这一文件落盘
+// 形态，PG 侧无对应物。同一条不变量（一次批量写不得留下部分落库的中间态）改由
+// versions-pg.repository.test.ts「upsertVersionRecords：批量一次提交（新增+覆写
+// 混合，空数组无操作）」在 S4 补上的全有或全无断言承担。
 
 test("estimates.repository: parseOwnedExportFileName parses owned filename", () => {
   const parsed = parseOwnedExportFileName("user-1__项目A+V01+01.xlsx");
@@ -108,35 +101,4 @@ test("versions.repository: isVersionReferencedByGlobal returns true when referen
 
   assert.equal(isVersionReferencedByGlobal(store, "u1", "default", "assessment", "A01"), true);
   assert.equal(isVersionReferencedByGlobal(store, "u1", "default", "assessment", "A02"), false);
-});
-
-test("versions.repository: saveVersionsStore writes through a temp file before rename", async () => {
-  const filePath = versionsStorePath();
-  await withFileSnapshotRestore(filePath, async () => {
-    const originalWriteFileSync = fs.writeFileSync;
-    const originalRenameSync = fs.renameSync;
-    const writes: string[] = [];
-    const renames: Array<[string, string]> = [];
-    try {
-      (fs as any).writeFileSync = function patchedWriteFileSync(file: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, options?: fs.WriteFileOptions) {
-        writes.push(String(file));
-        return originalWriteFileSync.call(fs, file, data as any, options as any);
-      };
-      (fs as any).renameSync = function patchedRenameSync(oldPath: fs.PathLike, newPath: fs.PathLike) {
-        renames.push([String(oldPath), String(newPath)]);
-        return originalRenameSync.call(fs, oldPath, newPath);
-      };
-
-      await saveVersionsStore({ records: [] });
-
-      assert.equal(renames.length, 1);
-      assert.equal(renames[0][1], filePath);
-      assert.match(renames[0][0], /\.tmp-/);
-      assert.equal(writes[0], renames[0][0]);
-      assert.equal(writes.includes(filePath), false);
-    } finally {
-      (fs as any).writeFileSync = originalWriteFileSync;
-      (fs as any).renameSync = originalRenameSync;
-    }
-  });
 });

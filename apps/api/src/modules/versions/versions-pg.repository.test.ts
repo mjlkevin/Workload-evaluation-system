@@ -224,6 +224,23 @@ test("upsertVersionRecords：批量一次提交（新增+覆写混合，空数�
 
   await repo!.upsertVersionRecords([]);
   assert.equal((await repo!.listRecords({ ownerUserId: OWNER_A })).length, 2, "空数组不得产生写入");
+
+  // S4 替代回归防线（2026-08-30）：原 harness 用例
+  // 「project-evaluations: harness draft creation persists project and assessment
+  // in one atomic store commit」断的是 JSON 侧「一次临时文件写 + 一次 rename」，
+  // 该落盘形态随 JSON 写路径下线。它守护的业务不变量——一批记录要么全部落库、
+  // 要么全部不落——在 PG 侧的承载点就是本用例（单事务一次提交），故在此补上
+  // 全有或全无断言：事务内第二条语句失败（owner_user_id NOT NULL 违例）时，
+  // 已执行的第一条 INSERT 必须一并回滚。
+  const first = makeRecord({ payload: { marker: "atomic-rollback-first" } });
+  const violator = makeRecord({ ownerUserId: undefined as unknown as string });
+  await assert.rejects(
+    () => repo!.upsertVersionRecords([first, violator]),
+    (err: unknown) => err instanceof VersionsStoreError,
+    "批量内任一行失败必须抛出，不得静默部分提交",
+  );
+  assert.equal(await repo!.findRecordById(first.id), null, "整体回滚：同批首条也不得落库");
+  assert.equal(await repo!.findRecordById(violator.id), null, "失败行本身不得落库");
 });
 
 test("updateVersionRecord：patch 合并、null 清除字段、缺行返回 null", { skip: !testDatabaseUrl }, async () => {

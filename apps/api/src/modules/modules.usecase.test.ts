@@ -23,7 +23,7 @@ import {
   getTeamPlans,
   updateReviewStatus
 } from "./team/team.usecase";
-import { loadVersionsStore, saveVersionsStore } from "./versions/versions.repository";
+import { getVersionsRepository, _resetVersionsRepositoryForTest } from "./versions/versions.repository";
 import { loadTeamStore, saveTeamStore } from "./team/team.repository";
 
 /**
@@ -331,12 +331,18 @@ test("team.usecase: non-manager cannot close review", { skip: !testDatabaseUrl }
 
 test("team.usecase: team plan visibility blocks cross-team user", { skip: !testDatabaseUrl }, async () => {
   await withTeamStoreIsolation(async () => {
-    const store = await loadVersionsStore();
-    const snapshot = JSON.parse(JSON.stringify(store));
     const ownerA = "team-owner-a-ut";
     const ownerB = "team-owner-b-ut";
     const now = new Date().toISOString();
-    store.records.push({
+    // S4（2026-08-30）：原形态是 loadVersionsStore → push → saveVersionsStore（整存 RMW），
+    // 收尾再把快照 saveVersionsStore 还原。versions 域 JSON 读写路径删除后改经行级
+    // 仓储种入，收尾按 recordId 条件删除（不整表 TRUNCATE，与 versions-pg.repository.test.ts
+    // 的行级清理口径一致）。
+    // S4 commit A 桥接：JSON 路径到 commit B 才删，这里显式把 versions 分流的缺省实现指到 PG，
+    // 使 commit A 单独可绿且与 commit B/C 之后的终态一致；commit C 退役开关时删除本两行。
+    process.env.WES_STORE_VERSIONS_PG = "true";
+    _resetVersionsRepositoryForTest();
+    await getVersionsRepository().upsertVersionRecord({
       id: "ver-ut-gl-1",
       type: "global",
       versionCode: "GL-UT-03",
@@ -357,7 +363,6 @@ test("team.usecase: team plan visibility blocks cross-team user", { skip: !testD
       baseCode: "GL-UT-03",
       isHistoricalArchive: false
     });
-    await saveVersionsStore(store);
 
     try {
       const team = await createTeam({ id: ownerA }, { name: "Owner A Team" });
@@ -368,7 +373,7 @@ test("team.usecase: team plan visibility blocks cross-team user", { skip: !testD
       assert.equal(denied.ok, false);
       if (!denied.ok) assert.equal(denied.error.code, 40301);
     } finally {
-      await saveVersionsStore(snapshot);
+      await getVersionsRepository().deleteVersionRecord({ recordId: "ver-ut-gl-1", checkReferenced: false });
     }
   });
 });

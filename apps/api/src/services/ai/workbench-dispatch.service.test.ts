@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import test from "node:test";
 
-import type { AuthUser, KnowledgeBaseProfile } from "../../types";
-import { versionsStorePath } from "../../utils";
+import type { AuthUser, KnowledgeBaseProfile, VersionRecord } from "../../types";
 import { dispatchHomeWorkbenchTurn } from "./workbench-dispatch.service";
 import type { ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import { buildWorkbenchChatModelChat, type HomeMessageInput } from "./handlers/workbench-shared";
 import { defaultProviderRegistry, type ModelProvider, type ChatCompletionRequest, type ChatCompletionResponse } from "../../ai/provider";
 import { loadRequirementSystemConfigStore, saveRequirementSystemConfigStore } from "../../modules/system/system.repository";
-import { _resetVersionsRepositoryForTest } from "../../modules/versions/versions.repository";
+import { _resetVersionsRepositoryForTest, getVersionsRepository } from "../../modules/versions/versions.repository";
 
 const user: AuthUser = {
   id: "user-rp-013",
@@ -92,118 +90,129 @@ const multiKnowledgeCatalog = {
   ],
 };
 
-async function withVersionsSnapshot(run: () => Promise<void>): Promise<void> {
-  const filePath = versionsStorePath();
-  const existed = fs.existsSync(filePath);
-  const before = existed ? fs.readFileSync(filePath, "utf-8") : "";
-  // C10（2026-08-25）：fixtures 写入 versions JSON 文件，而 dispatch 服务经选择器
-  // 读存储；全局开关全开（PG）时读 PG 空库 → 断言失效。显式隔离到 JSON 实现。
-  const previousPgFlag = process.env.WES_STORE_VERSIONS_PG;
-  delete process.env.WES_STORE_VERSIONS_PG;
-  _resetVersionsRepositoryForTest();
-  try {
-    await run();
-  } finally {
-    if (previousPgFlag === undefined) delete process.env.WES_STORE_VERSIONS_PG;
-    else process.env.WES_STORE_VERSIONS_PG = previousPgFlag;
-    _resetVersionsRepositoryForTest();
-    if (existed) {
-      fs.writeFileSync(filePath, before, "utf-8");
-    } else if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+/**
+ * S4（2026-08-30）：原形态是「delete 开关强制走 JSON + 整份写 records.json + 跑完
+ * 还原文件」（C10）。versions 的 JSON 读写路径随本批删除、域恒 PG，这里改为
+ * 「起始按 owner 清空 + 经仓储批量种入 + finally 清空」。owner 集合含 other-user
+ * 那条——用例正是用它断 owner 作用域隔离，清理也必须覆盖到它。
+ * version_records 是行级域（条件 DELETE），不整表 TRUNCATE，C14 不适用。
+ */
+const FIXTURE_OWNER_USER_IDS = [user.id, "other-user"];
+
+async function resetVersionsRowsForFixtureOwners(): Promise<void> {
+  const repo = getVersionsRepository();
+  for (const ownerUserId of FIXTURE_OWNER_USER_IDS) {
+    for (const record of await repo.listRecords({ ownerUserId })) {
+      await repo.deleteVersionRecord({ recordId: record.id, checkReferenced: false });
     }
   }
 }
 
-function writeProjectEvaluationFixtures() {
-  fs.writeFileSync(versionsStorePath(), JSON.stringify({
-    records: [
-      {
-        id: "project-draft",
-        type: "global",
-        versionCode: "PROJECT-DRAFT",
-        templateId: "project-evaluation",
-        ownerUserId: user.id,
-        status: "draft",
-        payload: {
-          recordKind: "project_evaluation",
-          projectName: "蓝海 WMS 项目",
-          customerName: "蓝海制造",
-          industry: "制造业",
-          projectStatus: "draft",
-          createdFromHarnessRunId: "harness-run-1",
-        },
-        createdAt: "2026-06-24T00:00:00.000Z",
-        updatedAt: "2026-06-24T01:00:00.000Z",
-        createdByUserId: user.id,
-        createdByUsername: user.username,
-        updatedByUserId: user.id,
-        updatedByUsername: user.username,
-        checkoutStatus: "checked_in",
-        versionDocStatus: "drafting",
-        majorLetter: "A",
-        minorNumber: 0,
-        baseCode: "PROJECT-DRAFT",
-        isHistoricalArchive: false,
-        lastCheckinPayload: {},
+async function withVersionsFixtures(run: () => Promise<void>): Promise<void> {
+  // S4 commit A 桥接：JSON 路径到 commit B 才删，本文件已改经 PG 仓储读写，故显式
+  // 打开开关（commit C 退役 WES_STORE_VERSIONS_PG 时删除开关存取与两处 _reset 调用）。
+  const previousPgFlag = process.env.WES_STORE_VERSIONS_PG;
+  process.env.WES_STORE_VERSIONS_PG = "true";
+  _resetVersionsRepositoryForTest();
+  await resetVersionsRowsForFixtureOwners();
+  try {
+    await getVersionsRepository().upsertVersionRecords(projectEvaluationFixtures());
+    await run();
+  } finally {
+    await resetVersionsRowsForFixtureOwners();
+    if (previousPgFlag === undefined) delete process.env.WES_STORE_VERSIONS_PG;
+    else process.env.WES_STORE_VERSIONS_PG = previousPgFlag;
+    _resetVersionsRepositoryForTest();
+  }
+}
+
+function projectEvaluationFixtures(): VersionRecord[] {
+  return [
+    {
+      id: "project-draft",
+      type: "global",
+      versionCode: "PROJECT-DRAFT",
+      templateId: "project-evaluation",
+      ownerUserId: user.id,
+      status: "draft",
+      payload: {
+        recordKind: "project_evaluation",
+        projectName: "蓝海 WMS 项目",
+        customerName: "蓝海制造",
+        industry: "制造业",
+        projectStatus: "draft",
+        createdFromHarnessRunId: "harness-run-1",
       },
-      {
-        id: "project-reviewing",
-        type: "global",
-        versionCode: "PROJECT-REVIEWING",
-        templateId: "project-evaluation",
-        ownerUserId: user.id,
-        status: "draft",
-        payload: {
-          recordKind: "project_evaluation",
-          projectName: "星河 ERP 项目",
-          customerName: "星河集团",
-          industry: "零售",
-          projectStatus: "reviewing",
-        },
-        createdAt: "2026-06-24T00:00:00.000Z",
-        updatedAt: "2026-06-24T02:00:00.000Z",
-        createdByUserId: user.id,
-        createdByUsername: user.username,
-        updatedByUserId: user.id,
-        updatedByUsername: user.username,
-        checkoutStatus: "checked_in",
-        versionDocStatus: "drafting",
-        majorLetter: "A",
-        minorNumber: 0,
-        baseCode: "PROJECT-REVIEWING",
-        isHistoricalArchive: false,
-        lastCheckinPayload: {},
+      createdAt: "2026-06-24T00:00:00.000Z",
+      updatedAt: "2026-06-24T01:00:00.000Z",
+      createdByUserId: user.id,
+      createdByUsername: user.username,
+      updatedByUserId: user.id,
+      updatedByUsername: user.username,
+      checkoutStatus: "checked_in",
+      versionDocStatus: "drafting",
+      majorLetter: "A",
+      minorNumber: 0,
+      baseCode: "PROJECT-DRAFT",
+      isHistoricalArchive: false,
+      lastCheckinPayload: {},
+    },
+    {
+      id: "project-reviewing",
+      type: "global",
+      versionCode: "PROJECT-REVIEWING",
+      templateId: "project-evaluation",
+      ownerUserId: user.id,
+      status: "draft",
+      payload: {
+        recordKind: "project_evaluation",
+        projectName: "星河 ERP 项目",
+        customerName: "星河集团",
+        industry: "零售",
+        projectStatus: "reviewing",
       },
-      {
-        id: "project-other-owner",
-        type: "global",
-        versionCode: "PROJECT-OTHER",
-        templateId: "project-evaluation",
-        ownerUserId: "other-user",
-        status: "draft",
-        payload: {
-          recordKind: "project_evaluation",
-          projectName: "其他用户项目",
-          customerName: "不应出现",
-          projectStatus: "published",
-        },
-        createdAt: "2026-06-24T00:00:00.000Z",
-        updatedAt: "2026-06-24T03:00:00.000Z",
-        createdByUserId: "other-user",
-        createdByUsername: "other",
-        updatedByUserId: "other-user",
-        updatedByUsername: "other",
-        checkoutStatus: "checked_in",
-        versionDocStatus: "drafting",
-        majorLetter: "A",
-        minorNumber: 0,
-        baseCode: "PROJECT-OTHER",
-        isHistoricalArchive: false,
-        lastCheckinPayload: {},
+      createdAt: "2026-06-24T00:00:00.000Z",
+      updatedAt: "2026-06-24T02:00:00.000Z",
+      createdByUserId: user.id,
+      createdByUsername: user.username,
+      updatedByUserId: user.id,
+      updatedByUsername: user.username,
+      checkoutStatus: "checked_in",
+      versionDocStatus: "drafting",
+      majorLetter: "A",
+      minorNumber: 0,
+      baseCode: "PROJECT-REVIEWING",
+      isHistoricalArchive: false,
+      lastCheckinPayload: {},
+    },
+    {
+      id: "project-other-owner",
+      type: "global",
+      versionCode: "PROJECT-OTHER",
+      templateId: "project-evaluation",
+      ownerUserId: "other-user",
+      status: "draft",
+      payload: {
+        recordKind: "project_evaluation",
+        projectName: "其他用户项目",
+        customerName: "不应出现",
+        projectStatus: "published",
       },
-    ],
-  }, null, 2), "utf-8");
+      createdAt: "2026-06-24T00:00:00.000Z",
+      updatedAt: "2026-06-24T03:00:00.000Z",
+      createdByUserId: "other-user",
+      createdByUsername: "other",
+      updatedByUserId: "other-user",
+      updatedByUsername: "other",
+      checkoutStatus: "checked_in",
+      versionDocStatus: "drafting",
+      majorLetter: "A",
+      minorNumber: 0,
+      baseCode: "PROJECT-OTHER",
+      isHistoricalArchive: false,
+      lastCheckinPayload: {},
+    },
+  ];
 }
 
 test("workbench dispatch extracts a valid formBlock and strips protocol JSON from answer", async () => {
@@ -553,9 +562,7 @@ test("workbench dispatch does not fan out on provider failures", async () => {
 });
 
 test("workbench dispatch summarizes owner scoped project status and pending AI draft review", async () => {
-  await withVersionsSnapshot(async () => {
-    writeProjectEvaluationFixtures();
-
+  await withVersionsFixtures(async () => {
     const result = await dispatchHomeWorkbenchTurn({
       user,
       workflowKey: "free_chat",
@@ -1003,7 +1010,8 @@ async function withModelChatSandbox(run: (provider: ModelProvider & { lastReques
   // S3（2026-08-30）：requirementSettings 的状态源已从 config/system/*.json 换成
   // system_configs 单行，没有文件可快照。改用公共 accessor 做逻辑快照（与
   // assessment.service.test.ts 同口径）：为什么不用裸 SQL、代价与串行约束见彼处注释。
-  // 本文件保留的 versionsStorePath 快照属 versions 域，S4 另批处理。
+  // 本文件原保留的 versionsStorePath 快照已随 S4（2026-08-30）迁为 PG 行级种入
+  // + 按 owner 清理（见 withVersionsFixtures）。
   const previousStore = await loadRequirementSystemConfigStore();
   const previousProvider = defaultProviderRegistry.get("kimi");
   const mockProvider = createCapturingKimiProvider();

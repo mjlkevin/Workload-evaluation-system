@@ -44,8 +44,7 @@ import type {
   HarnessModelRunRow,
 } from "../../db/schema";
 import type { AuthUser } from "../../types";
-import { versionsStorePath } from "../../utils";
-import { _resetVersionsRepositoryForTest, loadVersionsStore } from "../versions/versions.repository";
+import { _resetVersionsRepositoryForTest, getVersionsRepository } from "../versions/versions.repository";
 import { createProjectAndAssessmentDraftsFromHarness, listProjectEvaluationsForUser, getProjectEvaluationForUser, confirmAiAssessmentDraftForUser } from "../project-evaluations/project-evaluations.usecase";
 import {
   createHarnessRun,
@@ -63,17 +62,33 @@ import {
 } from "./harness.usecase";
 
 /**
- * C10（2026-08-25）：以下 project-evaluations 用例假定 versions 走 JSON 文件实现
- * （patch fs 断言原子写、loadVersionsStore 直读文件）。全局开关全开（PG）时
- * 选择器走 PG，断言失效——这里显式隔离到 JSON 实现，与全局开关无关。
+ * C10（2026-08-25）→ S4（2026-08-30）口径变更。
+ * 原 withVersionsJsonIsolation：以下 project-evaluations 用例假定 versions 走 JSON
+ * 文件实现（patch fs 断言原子写、loadVersionsStore 直读文件），故显式切回 JSON。
+ * versions 的 JSON 读写路径随 S4 删除、域恒 PG，这里改为「起始按 owner 清空 +
+ * finally 清空」的行级重置，同时替代原先叠加的
+ * withFileSnapshotRestoreAsync(versionsStorePath()) 文件快照包装与
+ * fs.writeFileSync(versionsStorePath(), { records: [] }) 清空动作（3 层→ 1 层）。
+ * version_records 是行级域（条件 DELETE），不整表 TRUNCATE，C14 不适用。
  */
-async function withVersionsJsonIsolation<T>(fn: () => Promise<T>): Promise<T> {
+async function resetHarnessVersionsRows(): Promise<void> {
+  const repo = getVersionsRepository();
+  for (const record of await repo.listRecords({ ownerUserId: activeHarnessUser().id })) {
+    await repo.deleteVersionRecord({ recordId: record.id, checkReferenced: false });
+  }
+}
+
+async function withHarnessVersionsReset<T>(fn: () => Promise<T>): Promise<T> {
+  // S4 commit A 桥接：JSON 路径到 commit B 才删，而本文件用例已改经 PG 仓储读写，
+  // 故显式打开开关（commit C 退役 WES_STORE_VERSIONS_PG 时删除本函数内的开关存取）。
   const prev = process.env.WES_STORE_VERSIONS_PG;
-  delete process.env.WES_STORE_VERSIONS_PG;
+  process.env.WES_STORE_VERSIONS_PG = "true";
   _resetVersionsRepositoryForTest();
+  await resetHarnessVersionsRows();
   try {
     return await fn();
   } finally {
+    await resetHarnessVersionsRows();
     if (prev === undefined) delete process.env.WES_STORE_VERSIONS_PG;
     else process.env.WES_STORE_VERSIONS_PG = prev;
     _resetVersionsRepositoryForTest();
@@ -280,16 +295,9 @@ function withFileSnapshotRestore(filePath: string, run: () => void): void {
   }
 }
 
-async function withFileSnapshotRestoreAsync(filePath: string, run: () => Promise<void>): Promise<void> {
-  const existed = fs.existsSync(filePath);
-  const snapshot = existed ? fs.readFileSync(filePath, "utf-8") : "";
-  try {
-    await run();
-  } finally {
-    if (existed) fs.writeFileSync(filePath, snapshot, "utf-8");
-    else if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  }
-}
+// S4（2026-08-30）：withFileSnapshotRestoreAsync 已随本批 5 处 versions 用例迁移失去
+// 调用方，已删除；上方 withFileSnapshotRestore 在本批之前已无调用方（预存在死代码），
+// 归 commit B 与 JSON 实现一并清理。
 
 function makeMemoryHarnessRepo(): HarnessRepository {
   const runs: HarnessRunRow[] = [];
@@ -1109,59 +1117,42 @@ test("harness.usecase: formal estimation rejects mismatched action id and type",
 });
 
 test("project-evaluations: harness draft creation persists project and assessment in one atomic store commit", async () => {
-  await withVersionsJsonIsolation(async () => {
-    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
-    fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
-    const originalWriteFileSync = fs.writeFileSync;
-    const originalRenameSync = fs.renameSync;
-    let tempWrites = 0;
-    let commits = 0;
-    try {
-      (fs as any).writeFileSync = function patchedWriteFileSync(file: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, options?: fs.WriteFileOptions) {
-        if (String(file).startsWith(`${versionsStorePath()}.tmp-`)) tempWrites += 1;
-        return originalWriteFileSync.call(fs, file, data as any, options as any);
-      };
-      (fs as any).renameSync = function patchedRenameSync(oldPath: fs.PathLike, newPath: fs.PathLike) {
-        if (String(newPath) === versionsStorePath()) commits += 1;
-        return originalRenameSync.call(fs, oldPath, newPath);
-      };
-
-      const result = await createProjectAndAssessmentDraftsFromHarness(activeHarnessUser(), {
-        harnessRunId: "run-atomic",
-        actionId: "enter_formal_estimation",
-        aiSessionId: "session-atomic",
-        report: {
-          version: "v2",
-          sourceFile: "需求.xlsx",
-          project: { projectName: "原子写项目", customerName: "原子客户", industry: "制造业" },
-          sourceSheets: ["需求清单"],
-          requirementFindings: [{ domain: "供应链", scenario: "采购闭环", moduleHint: "供应链云", confidence: 0.9, evidenceRefs: ["需求清单!B12"] }],
-          missingFields: [],
-          clarificationQuestions: [],
-          answeredQuestions: [],
-          risks: [],
-          nextActions: [{ label: "进入正式评估", actionType: "enter_formal_estimation" }],
-          clarificationSummary: "已确认。",
-        },
-      });
-
-      assert.equal(tempWrites, 1);
-      assert.equal(commits, 1);
-      const records = (await loadVersionsStore()).records;
-      assert.ok(records.some((record) => record.id === result.project.projectId && record.payload.createdFromHarnessRunId === "run-atomic"));
-      assert.ok(records.some((record) => record.id === result.assessmentDraft.recordId && record.payload.harnessActionId === "enter_formal_estimation"));
-    } finally {
-      (fs as any).writeFileSync = originalWriteFileSync;
-      (fs as any).renameSync = originalRenameSync;
-    }
+  await withHarnessVersionsReset(async () => {
+    // S4（原形态：patch fs.writeFileSync / renameSync 计数，断 tempWrites===1 &&
+    // commits===1）：那断的是 JSON 侧「一次临时文件写 + 一次 rename」的落盘形态，
+    // 该形态随 JSON 写路径下线。它守护的业务不变量——「一批记录要么全落、
+    // 要么全不落」——的替代回归防线见 versions-pg.repository.test.ts
+    // 「upsertVersionRecords：批量一次提交」（S4 commit A 已在该用例补上失败整体
+    // 回滚断言）。本用例保留业务侧断言：项目与评估两条记录各带自己的 harness
+    // 溯源字段，且由同一次草稿创建产生。
+    const user = activeHarnessUser();
+    const result = await createProjectAndAssessmentDraftsFromHarness(user, {
+      harnessRunId: "run-atomic",
+      actionId: "enter_formal_estimation",
+      aiSessionId: "session-atomic",
+      report: {
+        version: "v2",
+        sourceFile: "需求.xlsx",
+        project: { projectName: "原子写项目", customerName: "原子客户", industry: "制造业" },
+        sourceSheets: ["需求清单"],
+        requirementFindings: [{ domain: "供应链", scenario: "采购闭环", moduleHint: "供应链云", confidence: 0.9, evidenceRefs: ["需求清单!B12"] }],
+        missingFields: [],
+        clarificationQuestions: [],
+        answeredQuestions: [],
+        risks: [],
+        nextActions: [{ label: "进入正式评估", actionType: "enter_formal_estimation" }],
+        clarificationSummary: "已确认。",
+      },
     });
+
+    const records = await getVersionsRepository().listRecords({ ownerUserId: user.id });
+    assert.ok(records.some((record) => record.id === result.project.projectId && record.payload.createdFromHarnessRunId === "run-atomic"));
+    assert.ok(records.some((record) => record.id === result.assessmentDraft.recordId && record.payload.harnessActionId === "enter_formal_estimation"));
   });
 });
 
 test("project-evaluations: harness draft creation is idempotent by run and action", async () => {
-  await withVersionsJsonIsolation(async () => {
-    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
-    fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
+  await withHarnessVersionsReset(async () => {
     const user = activeHarnessUser();
     const input = {
       harnessRunId: "run-idempotent",
@@ -1187,17 +1178,15 @@ test("project-evaluations: harness draft creation is idempotent by run and actio
 
     assert.equal(second.project.projectId, first.project.projectId);
     assert.equal(second.assessmentDraft.recordId, first.assessmentDraft.recordId);
-    const records = (await loadVersionsStore()).records;
+    // 原形态：loadVersionsStore() 读整份 JSON；PG 侧按 owner 列行（与本用例写入方同口径）。
+    const records = await getVersionsRepository().listRecords({ ownerUserId: user.id });
     assert.equal(records.filter((record) => record.payload?.createdFromHarnessRunId === "run-idempotent").length, 1);
     assert.equal(records.filter((record) => record.payload?.harnessRunId === "run-idempotent").length, 1);
-    });
   });
 });
 
 test("project-evaluations: list and detail expose harness trace fields for ai drafts", async () => {
-  await withVersionsJsonIsolation(async () => {
-    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
-    fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
+  await withHarnessVersionsReset(async () => {
     const user = activeHarnessUser();
     const result = await createProjectAndAssessmentDraftsFromHarness(user, {
       harnessRunId: "run-trace",
@@ -1242,14 +1231,11 @@ test("project-evaluations: list and detail expose harness trace fields for ai dr
       permissions: [],
     } as AuthUser;
     assert.equal((await getProjectEvaluationForUser(otherUser, result.project.projectId)), null, "non-owner should not access ai draft");
-    });
   });
 });
 
 test("project-evaluations: manual confirmation of ai assessment draft writes back harness audit", async () => {
-  await withVersionsJsonIsolation(async () => {
-    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
-    fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
+  await withHarnessVersionsReset(async () => {
     const repo = makeMemoryHarnessRepo();
     const user = activeHarnessUser();
     const run = await repo.createRun({
@@ -1296,9 +1282,10 @@ test("project-evaluations: manual confirmation of ai assessment draft writes bac
     assert.equal(events[0].actionId, "enter_formal_estimation");
     assert.equal((events[0].output as { assessmentDraft?: { recordId?: string } })?.assessmentDraft?.recordId, draft.assessmentDraft.recordId);
 
-    const store = await loadVersionsStore();
-    const assessmentRecord = store.records.find((record) => record.id === draft.assessmentDraft.recordId);
-    const projectRecord = store.records.find((record) => record.id === draft.project.projectId);
+    // 原形态：loadVersionsStore() 整读后 find；PG 侧按 recordId 取行。
+    const versionsRepo = getVersionsRepository();
+    const assessmentRecord = await versionsRepo.findRecordById(draft.assessmentDraft.recordId);
+    const projectRecord = await versionsRepo.findRecordById(draft.project.projectId);
     assert.equal((assessmentRecord?.payload?.aiDraftReview as { status?: string } | undefined)?.status, "confirmed");
     assert.equal(projectRecord?.payload?.currentStage, "manual_confirmed");
     assert.equal(projectRecord?.payload?.projectStatus, "reviewing");
@@ -1316,14 +1303,11 @@ test("project-evaluations: manual confirmation of ai assessment draft writes bac
     assert.equal(second?.harness.toolEventId, result?.harness.toolEventId);
     assert.equal(second?.assessmentDraft.manualConfirmation?.note, "人工审核通过");
     assert.equal((await repo.listToolEvents(run.harnessRunId)).length, 1);
-    });
   });
 });
 
 test("project-evaluations: concurrent manual confirmation creates one audit event", async () => {
-  await withVersionsJsonIsolation(async () => {
-    await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
-    fs.writeFileSync(versionsStorePath(), JSON.stringify({ records: [] }, null, 2), "utf-8");
+  await withHarnessVersionsReset(async () => {
     const repo = makeMemoryHarnessRepo();
     const user = activeHarnessUser();
     const run = await repo.createRun({
@@ -1363,10 +1347,9 @@ test("project-evaluations: concurrent manual confirmation creates one audit even
     assert.equal(first?.harness.toolEventId, second?.harness.toolEventId);
     const events = await repo.listToolEvents(run.harnessRunId);
     assert.equal(events.filter((event) => event.toolName === "manual_confirm_ai_draft").length, 1);
-    const store = await loadVersionsStore();
-    const assessmentRecord = store.records.find((record) => record.id === draft.assessmentDraft.recordId);
+    // 原形态：loadVersionsStore() 整读后 find；PG 侧按 recordId 取行。
+    const assessmentRecord = await getVersionsRepository().findRecordById(draft.assessmentDraft.recordId);
     assert.equal((assessmentRecord?.payload?.aiDraftReview as { note?: string } | undefined)?.note, "第一次确认");
-    });
   });
 });
 
