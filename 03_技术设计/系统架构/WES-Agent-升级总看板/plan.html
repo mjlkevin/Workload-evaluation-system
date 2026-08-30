@@ -779,6 +779,12 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td><span class="status warn"><span class="dot"></span>已放行 / 待止血落地</span>：止血两件套（DEF-004 立项 + 禁令 C11 生效）落地即可开工，不必再等架构侧二次批准。</td>
           <td>删 JSON 路径后九开关全开六套件 1096 全绿 skipped=0；outbox 四方法/投影/sink/表/六处新发现删除齐全；开关退役；§10 登记覆盖取证（第一节数据抄用）；tag 基线点入档。</td>
         </tr>
+        <tr data-board-event-id="BE-2026-08-30-stage2-step4-remaining-queue:plan">
+          <td class="mono">阶段 2 第 4 步剩余批次（队列 S5 → S4 → S7）</td>
+          <td>删除不再使用的 JSON 代码路径（存储迁移线的收尾面）。<b>已合入</b>：S1 users / S2a + S2b-1 + S2b-2 ai-sessions / S6 templates + rule_sets + knowledge / S3 system + traces（今日 <code class="inline">fede47c</code>）。<b>待开工</b>：S5 teams（已建 worktree + 基线 tag）、S4 versions，两批各含删 JSON 路径 + 移除测试 delete 强制 + 退役 <code class="inline">WES_STORE_TEAMS_PG</code> / <code class="inline">WES_STORE_VERSIONS_PG</code> + <b>摘 <code class="inline">config-integrity.ts</code> 对应条目</b>；S7 收尾批（utils/file.ts 清理、config-integrity 整体下线、死配置清空、outbox 三死符号退役、防漂移归零验证、trace 仓储隐式提权加固评估）。项目侧已裁决：teams / versions 两个 JSON 文件的历史累积数据全部可弃，不迁移不保全（文件已被 git 跟踪，可恢复）。</td>
+          <td><span class="status run"><span class="dot"></span>S5 开工中 / S4 排队 / S7 待批方案</span>：四批已于 2026-08-29 全部放行，按风险递增序 S6 → S3 → S5 → S4 执行；<b>S7 必须先报方案经批准才执行</b>。每批硬性：独立 worktree + 独立分支 + 开工前 tag + commit 按 A/B/C/D 拆 + <b>分支 CI 全绿才能开下一批，红就停</b>。</td>
+          <td>每批分支 CI 五 job 全绿且六套件 / test-web 计数变化逐条对到具体用例（在 §10 登新的「基线变更」行，不登记预测值）；S5+S4 摘完后 <code class="inline">REQUIRED_FILES</code> 应为空（已具备 S7 下线条件）；skipped ≠ 0 等同失败。当前核对口径：main 自 <code class="inline">fede47c</code> 起六套件 <b>1083</b> / test-web <b>442</b>。</td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-27-def-2026-08-27-005-queued:plan">
           <td class="mono">DEF-2026-08-27-005（队列 3）</td>
           <td>78 条历史孤儿 Run 观察缺陷立项（已完成）：88 条中 78 条 ai_session_id 指向已删除会话（89%）。必答项已随立项给出——补偿链（409 守护）生效起始 2026-08-08（81a7839，RP-047-D）vs 孤儿末位 08-19：78 条全部终态、活跃孤儿 = 0，证明无覆盖盲区，终态残留为守护职责之外的设计行为，维持 S3。清理另案待架构侧批准，S2b-2 不负责清理。详见 <a href="defects.html">defects.html</a>。</td>
