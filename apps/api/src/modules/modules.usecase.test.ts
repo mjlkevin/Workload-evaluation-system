@@ -1,11 +1,16 @@
-import test from "node:test";
+import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
 import { CalculateRequest, RuleSet, Template } from "../types";
-import { loadJsonFile, ensureExportDir, resolveRootDir } from "../utils/file";
+import { ensureExportDir, resolveRootDir } from "../utils/file";
+import {
+  cleanupSingleDocStoreFixture,
+  seedSingleDocStoreFixture,
+  type SingleDocStoreSeed,
+} from "../test-helpers/single-doc-store-seed";
 import { calculateAndExportEstimate, calculateEstimateOnly } from "./estimates/estimates.usecase";
 import { setIdempotencyRecord, deleteIdempotencyRecord } from "./estimates/estimates.repository";
 import { resolveDownloadFile } from "./exports/exports.usecase";
@@ -19,40 +24,38 @@ import {
   updateReviewStatus
 } from "./team/team.usecase";
 import { loadVersionsStore, saveVersionsStore } from "./versions/versions.repository";
-import { _resetTemplateRepositoryForTest } from "./templates/templates.repository";
-import { _resetRuleSetRepositoryForTest } from "./rules/rules.repository";
 import { _resetTeamRepositoryForTest } from "./team/team.repository";
 
 /**
- * C10（2026-08-25）：estimates/sessions 用例的请求构造直读 JSON fixture
- * （config/templates/example-template.json、config/rules/example-rule-set.json），
- * 而 usecase 经选择器加载模板/规则。全局开关全开（PG）时选择器读 PG 空库 → 失败；
- * 显式隔离到 JSON 实现，使 fixture 与被测路径一致。
+ * C10（2026-08-25）→ 阶段 2 S6（2026-08-29）：estimates/sessions 用例的请求
+ * 构造与被测路径必须同源。原形态是「delete 两个开关强制选择器走 JSON 实现
+ * + 直读 JSON fixture」；S6 删除两域 JSON 读写路径后选择器恒 PG，该隔离法失效。
+ *
+ * 现形态：before 把 seed 源 fixture 内容经 PG 仓储种入（单文档表读语义是
+ * 「最近写入行」，用例期间本文件是唯一写入者——已在 test:modules:serial-store
+ * 串行套件内），用例用种入后的文档构造请求；after 按前缀条件清理（§4.6/C5）。
+ * 无 DB 环境（未设 TEST_DATABASE_URL）：相关用例按 §4.6/C4 诚实 skip。
  */
-async function withTemplatesAndRulesJsonIsolation<T>(fn: () => Promise<T>): Promise<T> {
-  const prevTemplates = process.env.WES_STORE_TEMPLATES_PG;
-  const prevRuleSets = process.env.WES_STORE_RULE_SETS_PG;
-  delete process.env.WES_STORE_TEMPLATES_PG;
-  delete process.env.WES_STORE_RULE_SETS_PG;
-  _resetTemplateRepositoryForTest();
-  _resetRuleSetRepositoryForTest();
-  try {
-    return await fn();
-  } finally {
-    if (prevTemplates === undefined) delete process.env.WES_STORE_TEMPLATES_PG;
-    else process.env.WES_STORE_TEMPLATES_PG = prevTemplates;
-    if (prevRuleSets === undefined) delete process.env.WES_STORE_RULE_SETS_PG;
-    else process.env.WES_STORE_RULE_SETS_PG = prevRuleSets;
-    _resetTemplateRepositoryForTest();
-    _resetRuleSetRepositoryForTest();
-  }
-}
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+const STORE_PREFIX = "wes-t-uc-";
+let seed: SingleDocStoreSeed | null = null;
+
+before(async () => {
+  if (!testDatabaseUrl) return;
+  seed = await seedSingleDocStoreFixture(STORE_PREFIX);
+});
+
+after(async () => {
+  if (!seed) return;
+  await cleanupSingleDocStoreFixture(seed.prefix);
+  seed = null;
+});
 
 function loadContext(): { template: Template; ruleSet: RuleSet } {
-  return {
-    template: loadJsonFile<Template>("config/templates/example-template.json"),
-    ruleSet: loadJsonFile<RuleSet>("config/rules/example-rule-set.json")
-  };
+  if (!seed) {
+    throw new Error("单文档表种子未就绪（TEST_DATABASE_URL 缺失时相关用例应已 skip）");
+  }
+  return { template: seed.template, ruleSet: seed.ruleSet };
 }
 
 function buildValidCalculateRequest(): CalculateRequest {
@@ -88,8 +91,10 @@ function buildCalculateRequestWithIncludedItems(includedIds: string[]): Calculat
   };
 }
 
-test("estimates.usecase: calculateEstimateOnly returns success for valid request", async () => {
-  await withTemplatesAndRulesJsonIsolation(async () => {
+test(
+  "estimates.usecase: calculateEstimateOnly returns success for valid request",
+  { skip: !testDatabaseUrl },
+  async () => {
   // 阶段 1 批 5：calculateEstimateOnly 已异步化，补 await（断言不变）。
   const body = buildValidCalculateRequest();
   const result = await calculateEstimateOnly(body);
@@ -97,19 +102,29 @@ test("estimates.usecase: calculateEstimateOnly returns success for valid request
   if (result.ok) {
     assert.equal(typeof result.data.totalDays, "number");
   }
-  });
 });
 
-test("estimates.usecase: dependency check only triggers when the dependent module is selected", async () => {
-  await withTemplatesAndRulesJsonIsolation(async () => {
-  // 阶段 1 批 5：calculateEstimateOnly 已异步化，补 await（断言不变）。
-  const purchaseOnly = await calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-66"]));
-  if (!purchaseOnly.ok) {
+test(
+  "estimates.usecase: dependency check only triggers when the dependent module is selected",
+  { skip: !testDatabaseUrl },
+  async () => {
+  const { template } = loadContext();
+  for (const itemId of ["item-66", "item-72", "item-73"]) {
     assert.ok(
-      purchaseOnly.details?.every((detail) => !detail.reason.includes("滚动采购管理")),
-      "普通采购管理不应触发滚动采购管理依赖",
+      template.items.some((item) => item.templateItemId === itemId),
+      `种子模板必须含 ${itemId}（缺失则本用例三组请求全空跑）`,
     );
   }
+
+  // 阶段 1 批 5：calculateEstimateOnly 已异步化，补 await（断言不变）。
+  const purchaseOnly = await calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-66"]));
+  // S6（A-3 加固）：原写法把断言整体包在 if (!purchaseOnly.ok) 里，成功时零断言
+  // ——用例退化成「跑通即绿」。改为无条件形态：ok 时 flagged=false，不 ok 时
+  // 看 details 里有没有滚动采购管理，两条路径都真断言。
+  const purchaseOnlyFlagged = purchaseOnly.ok
+    ? false
+    : (purchaseOnly.details ?? []).some((detail) => detail.reason.includes("滚动采购管理"));
+  assert.equal(purchaseOnlyFlagged, false, "普通采购管理不应触发滚动采购管理依赖");
 
   const rollingPurchaseWithoutVmi = await calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-73"]));
   assert.equal(rollingPurchaseWithoutVmi.ok, false);
@@ -119,11 +134,12 @@ test("estimates.usecase: dependency check only triggers when the dependent modul
 
   const rollingPurchaseWithVmi = await calculateEstimateOnly(buildCalculateRequestWithIncludedItems(["item-72", "item-73"]));
   assert.equal(rollingPurchaseWithVmi.ok, true);
-  });
 });
 
-test("estimates.usecase: calculateAndExportEstimate returns idempotency replay", async () => {
-  await withTemplatesAndRulesJsonIsolation(async () => {
+test(
+  "estimates.usecase: calculateAndExportEstimate returns idempotency replay",
+  { skip: !testDatabaseUrl },
+  async () => {
   const body = buildValidCalculateRequest();
   const ownerUserId = "ut-owner";
   const idempotencyKey = `ut-idem-${Date.now()}`;
@@ -154,11 +170,12 @@ test("estimates.usecase: calculateAndExportEstimate returns idempotency replay",
   } finally {
     deleteIdempotencyRecord(idempotencyKey);
   }
-  });
 });
 
-test("sessions.usecase: startEstimateSession and calculateBySession succeed", async () => {
-  await withTemplatesAndRulesJsonIsolation(async () => {
+test(
+  "sessions.usecase: startEstimateSession and calculateBySession succeed",
+  { skip: !testDatabaseUrl },
+  async () => {
   const body = buildValidCalculateRequest();
   const ownerUserId = "ut-user";
 
@@ -181,11 +198,12 @@ test("sessions.usecase: startEstimateSession and calculateBySession succeed", as
     assert.equal(calc.data.sessionId, started.data.sessionId);
     assert.equal(typeof calc.data.totalDays, "number");
   }
-  });
 });
 
-test("sessions.usecase: calculateBySession blocks cross user access", async () => {
-  await withTemplatesAndRulesJsonIsolation(async () => {
+test(
+  "sessions.usecase: calculateBySession blocks cross user access",
+  { skip: !testDatabaseUrl },
+  async () => {
   const body = buildValidCalculateRequest();
   const started = await startEstimateSession("owner-A", {
     templateId: body.templateId,
@@ -205,7 +223,6 @@ test("sessions.usecase: calculateBySession blocks cross user access", async () =
   if (!calc.ok) {
     assert.equal(calc.code, 40301);
   }
-  });
 });
 
 test("exports.usecase: resolveDownloadFile returns owned file and 404 when missing", () => {

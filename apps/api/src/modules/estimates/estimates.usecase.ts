@@ -41,8 +41,10 @@ type DependencyIssue = {
 };
 
 /**
- * 阶段 2 批 8：旁路直读 JSON 改经仓储选择器（WES_STORE_TEMPLATES_PG /
- * WES_STORE_RULE_SETS_PG 翻开关后估算热路径同步切 PG，避免读写分裂）。
+ * 阶段 2 批 8：旁路直读 JSON 改经仓储选择器。
+ * S6（2026-08-29）：templates / rule_sets 两域 JSON 路径与 WES_STORE_TEMPLATES_PG /
+ * WES_STORE_RULE_SETS_PG 开关已退役，选择器恒 PG——估算热路径与仓储读写同源，
+ * 不再存在「翻开关后同步切 PG」这个动作（历史说明：批 8 时的读写分裂窗口已随开关下线）。
  */
 async function loadEstimateContext(): Promise<{ template: Template; ruleSet: RuleSet }> {
   return {

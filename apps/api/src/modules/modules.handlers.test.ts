@@ -13,6 +13,7 @@ import { config } from "../config/env";
 import { signAuthToken, verifyAuthToken } from "../middleware/auth";
 import { getUsersRepository } from "./auth/users.repository";
 import { cleanupOneTestUser, cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
+import { cleanupSingleDocStoreFixture, seedSingleDocStoreFixture, type SingleDocStoreSeed } from "../test-helpers/single-doc-store-seed";
 import { knowledgeBaseConfigStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
 import { confirmPasswordReset, listUsers, login, me, requestPasswordReset, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
@@ -56,6 +57,10 @@ import { _resetKnowledgeRepositoryForTest } from "./knowledge/knowledge.module";
 let testAdmin: AuthUser;
 let testPlainUser: AuthUser;
 
+// S6/B3：单文档表（templates / rule_sets）种子与本文件专属行前缀
+const HDR_STORE_PREFIX = "wes-t-hdr-";
+let storeSeed: SingleDocStoreSeed | null = null;
+
 // C10（2026-08-25）：本文件是 handler 契约测试，用例以 JSON 文件构造状态
 // （versionsStorePath / versionCodeRulesStorePath 等）并经选择器访问存储。
 // 全局开关全开（PG）时构造与读取不一致 → 用例失败。
@@ -65,6 +70,14 @@ let testPlainUser: AuthUser;
 // 文件级 after 按测试用户兜底清理会话数据。
 // S2b-2（2026-08-28）：aiSessionsStorePath() 生命周期包装已随 JSON 路径
 // 退役移除（14 处），用例直接走 repository 单例，无文件快照依赖。
+// S6（2026-08-29）：TEMPLATES / RULE_SETS / KNOWLEDGE 三域移出本列表——
+// 三域 JSON 路径已删、选择器恒 PG，delete 开关已不再能切回任何实现；
+// getRuleSetMeta 需要「活动文档存在」，而 db:seed 在 CI 里排在 Test modules
+// 之后（migrate → test:ai → test:modules → serial → db:seed → integration）
+// → 本文件 before 自己经 PG 仓储种入 seed 源 fixture（台账 §10 B3）。
+// 因此本文件是 templates / rule_sets 的写入方，必须待在
+// test:modules:serial-store 串行套件内（防漂移守卫已以
+// seedSingleDocStoreFixture 为写入指纹自动校验）。
 const PREVIOUS_STORE_PG_FLAGS = new Map<string, string | undefined>();
 const STORE_PG_FLAG_KEYS = [
   "WES_STORE_USERS_PG",
@@ -72,9 +85,6 @@ const STORE_PG_FLAG_KEYS = [
   "WES_STORE_TRACES_PG",
   "WES_STORE_VERSIONS_PG",
   "WES_STORE_TEAMS_PG",
-  "WES_STORE_TEMPLATES_PG",
-  "WES_STORE_RULE_SETS_PG",
-  "WES_STORE_KNOWLEDGE_PG",
 ] as const;
 
 function restoreStorePgFlags(): void {
@@ -108,9 +118,16 @@ before(async () => {
   _resetKnowledgeRepositoryForTest();
   testAdmin = await createTestUser("wes-modules-admin", { role: "admin", businessRole: "admin" });
   testPlainUser = await createTestUser("wes-modules-user", { role: "user", businessRole: "pre_sales" });
+  // B3：getRuleSetMeta 走选择器读活动规则集，空表下抛 RULE_SET_STORE_NOT_FOUND
+  // → 用例必红。本用例不假设 db:seed 已跑（它在后面的 CI 步骤），自己种入。
+  storeSeed = await seedSingleDocStoreFixture(HDR_STORE_PREFIX);
 });
 
 after(async () => {
+  if (storeSeed) {
+    await cleanupSingleDocStoreFixture(storeSeed.prefix);
+    storeSeed = null;
+  }
   await cleanupTestUsers("wes-modules");
   // S2b-1：AI_SESSIONS 已随全局开关走 PG，文件级兜底删除本文件注入的会话
   // （按 owner 过滤，不触碰其他文件/真实数据；restoreStorePgFlags 后单例重建）
@@ -654,6 +671,9 @@ test("rules.usecase: getRuleSetMeta returns metadata with valid token", async ()
   const body = res.body as { code: number; data: { pipeline: string[] } };
   assert.equal(body.code, 0);
   assert.ok(Array.isArray(body.data.pipeline));
+  // S6（A-3）：空数组也能过上一句，而 seed 源 fixture 的 pipeline 固定 4 项；
+  // 补非空断言，防「活动文档存在但内容丢失」仍绿。
+  assert.ok(body.data.pipeline.length > 0, "活动规则集 pipeline 不得为空（种子未生效？）");
 });
 
 test("templates.usecase: getTemplate returns not_found code for wrong templateId", async () => {
