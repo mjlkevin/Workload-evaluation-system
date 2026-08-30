@@ -1,7 +1,7 @@
 // ============================================================
 // 防漂移测试：无界读表 / 单文档表的测试文件必须在串行套件内
 // ============================================================
-// 口径（阶段 2 S6，2026-08-29 架构侧裁决 O1 + 强制守卫要求；S3 扩容）：
+// 口径（阶段 2 S6，2026-08-29 架构侧裁决 O1 + 强制守卫要求；S3、S5 扩容）：
 // npm run test:modules 默认按文件并行执行；npm run test:modules:serial-store
 // 带 --test-concurrency=1。向下列表写入行的测试文件必须落在串行套件，
 // 否则并发执行会互相污染，且 git 合并无冲突标记、tsc 也通过，只在全量 CI
@@ -20,6 +20,11 @@
 //   测试 apiKey 而整份读写 store，它们的用例断言的是「读到刚写入的配置」）。
 // - version_code_rules（同上，随 system 域走）：PG 写路径是事务内 TRUNCATE
 //   整表再整表重插，比 upsert 更极端——任何测试写一次就清空同时段全表。
+// - teams 六表（S5 新增，2026-08-30）：整存 load/save 语义，写路径是事务内
+//   TRUNCATE 六表 + 全量 INSERT（team-pg.repository.ts:198-203），且 store 级
+//   version 是单行全局计数器 store_versions.domain='teams'。team.usecase 的每次
+//   写都是整存 RMW，写回的「全量」只含自己 load 到的那份快照——并发写者必然互相
+//   整表覆盖（C10 登记的 flaky 根因：createReview 40401「团队不存在」）。
 //
 // 实现：文本扫描 src 下全部 *.test.ts（剥除注释后匹配写入指纹），
 // 命中指纹却不在 SERIAL_SCOPE_FILES 内的文件即判红并报出文件名；
@@ -59,6 +64,10 @@ const SERIAL_SCOPE_FILES = [
   "modules/system/system.kb-config.test.ts",
   "services/ai/assessment.service.test.ts",
   "services/ai/workbench-dispatch.service.test.ts",
+  // S5（2026-08-30）：teams 六表整存替换（TRUNCATE + 全量 INSERT）与 store 级
+  // version 单行计数器均无隔离维度。本文件与 modules.usecase.test.ts（team 用例
+  // 改走 PG 快照-还原）互为对方的 TRUNCATE 源，必须同处串行组。
+  "modules/team/team-pg.repository.test.ts",
 ] as const;
 
 /** 串行套件脚本名与并行套件脚本名。 */
@@ -75,6 +84,10 @@ const PARALLEL_SCRIPT = "test:modules";
  * S3：后六条是 system 域写入口——两条仓储构造/类型名 + 四条 config 的 save*。
  * save* 同时覆盖 system_configs 的单行 upsert 与 version_code_rules 的整表替换
  * 两条写路径（save* 是唯一写入口，裸 SQL 写库不属仓储层能力，指纹不会漏到旁路）。
+ * S5：末五条是 teams 域写入口——仓储构造/类型名/选择器 + 两条 save*（整存与
+ * 带版本整存）。\b 边界不会误命中 JSON 实现名 loadTeamStoreJson /
+ * saveTeamStoreJson / saveTeamStoreWithExpectedVersionJson（Json 前无词边界），
+ * 也不会命中本目录 no-sync-store-io.drift.test.ts 白名单 reason 里的同名串。
  */
 const WRITER_PATTERNS: RegExp[] = [
   /\bcreateTemplatesPgRepository\b/,
@@ -94,6 +107,11 @@ const WRITER_PATTERNS: RegExp[] = [
   /\bsaveKnowledgeBaseConfigStore\b/,
   /\bsaveImplementationDependencyRulesStore\b/,
   /\bsaveVersionCodeRulesStore\b/,
+  /\bcreateTeamPgRepository\b/,
+  /\bTeamsPgRepository\b/,
+  /\bgetTeamRepository\b/,
+  /\bsaveTeamStore\b/,
+  /\bsaveTeamStoreWithExpectedVersion\b/,
 ];
 
 /**
@@ -168,8 +186,8 @@ test("触碰无界读表与单文档表的测试文件必须全部在串行白�
     unregistered,
     [],
     [
-      `以下测试文件向无界读表（templates / rule_sets / knowledge_entries / system_configs / version_code_rules）写入行，但不在 ${SERIAL_SCRIPT} 白名单内`,
-      "并发执行会互相顶掉活动文档、打破「空表合法状态」断言，或把版本编码规则整表清空（存储语义互斥，仅在全量 CI 间歇性炸）：",
+      `以下测试文件向无界读表（templates / rule_sets / knowledge_entries / system_configs / version_code_rules / teams 六表）写入行，但不在 ${SERIAL_SCRIPT} 白名单内`,
+      "并发执行会互相顶掉活动文档、打破「空表合法状态」断言，或把版本编码规则整表清空、把团队六表 TRUNCATE 覆盖（存储语义互斥，仅在全量 CI 间歇性炸）：",
       ...unregistered.map((f) => `  src/${f}`),
       `处置：加进 apps/api/package.json 的 ${SERIAL_SCRIPT}，并把同一文件登记进本测试的 SERIAL_SCOPE_FILES。`,
     ].join("\n"),
@@ -238,8 +256,8 @@ test("串行白名单与 package.json 脚本参数列表逐位一致", () => {
 test("串行白名单计数钉定（新增触碰或批次收敛都必须显式更新本条）", () => {
   assert.equal(
     SERIAL_SCOPE_FILES.length,
-    9,
+    10,
     `SERIAL_SCOPE_FILES 实为 ${SERIAL_SCOPE_FILES.length} 条：新增即意味着有新的无界读表写入方，` +
-      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进）"
+      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进；S5：9→10，teams 域 JSON 路径删除使 modules.usecase 的 team 用例改走 PG 整存快照-还原，team-pg.repository 随之移进串行组）"
   );
 });
