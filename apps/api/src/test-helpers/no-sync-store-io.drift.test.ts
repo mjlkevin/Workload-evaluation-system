@@ -37,6 +37,8 @@ const SYNC_IO_NAMES = new Set(["readFileSync", "writeFileSync"]);
 //   （函数体「实现不动」，阶段 2 替换存储时一并异步化）
 //   （S6 2026-08-29：knowledge repository 的 JSON 实现类已删除，其条目随之下线）
 //   （S3 2026-08-30：trace repository 的 JSON 读写路径已删除，其条目随之下线）
+//   （S5 2026-08-30：team repository 的 JSON 读写路径已删除，其条目随之下线，
+//     本白名单从 8 条 / 13 处收敛为 7 条 / 12 处）
 // - 复用型同步工具：utils/file.ts、prompt-registry.ts、rag-baseline 三个文件
 //   （被请求路径复用或 CLI/离线工具；异步化属阶段 2 评估项）
 //
@@ -78,11 +80,6 @@ const FILE_WHITELIST: Array<{ file: string; reason: string; expectedHits: number
     file: "utils/file.ts",
     reason: "loadJsonFile/saveJsonFile 通用同步工具；S6 后生产侧零调用方（loadJsonFile 仅剩 seed 测试 helper 读 seed 源 fixture，saveJsonFile 已全仓零引用 → 台账 B5，清理归 S7），异步化属阶段 2 评估项",
     expectedHits: 2,
-  },
-  {
-    file: "modules/team/team.repository.ts",
-    reason: "批 7 选择器下沉的 JSON 实现（loadTeamStoreJson/saveTeamStoreJson/saveTeamStoreWithExpectedVersionJson async accessor）共用的模块级同步原子写辅助 writeJsonAtomic，第 4 步随 JSON 路径删除",
-    expectedHits: 1,
   },
 ];
 

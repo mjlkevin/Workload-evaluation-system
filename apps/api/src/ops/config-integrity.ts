@@ -27,22 +27,14 @@ const REQUIRED_FILES: Array<{
   // 文件本体删除归 S7 收尾批。
   // 阶段 2 批 1 第 4 步：invite-codes.json 已切 PG 并归档，不再列入完整性检查
   // （否则 fallback 会重建空文件，形成误导性双源）。
+  // 阶段 2 S5（2026-08-30）：config/teams/store.json 随 teams 域 JSON 读写路径删除
+  // 一并摘除（沿用 S1 先例的理由：teams 已恒 PG，保留条目会使 repair 重建一个
+  // 六数组空结构的文件，形成误导性双源）。摘除后本表仅剩 versions 一条，
+  // S4 摘完后 REQUIRED_FILES 即为空，具备 S7 整体下线条件（D15）。
   {
     relativePath: "config/versions/records.json",
     validate: (value) => typeof value === "object" && value !== null && Array.isArray((value as { records?: unknown[] }).records),
     fallback: { records: [] },
-  },
-  {
-    relativePath: "config/teams/store.json",
-    validate: (value) =>
-      typeof value === "object" &&
-      value !== null &&
-      Array.isArray((value as { teams?: unknown[] }).teams) &&
-      Array.isArray((value as { reviews?: unknown[] }).reviews) &&
-      Array.isArray((value as { comments?: unknown[] }).comments) &&
-      Array.isArray((value as { planBindings?: unknown[] }).planBindings) &&
-      Array.isArray((value as { auditLogs?: unknown[] }).auditLogs),
-    fallback: { version: 1, teams: [], reviews: [], comments: [], planBindings: [], auditLogs: [] },
   },
 ];
 
