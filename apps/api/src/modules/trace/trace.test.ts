@@ -2,10 +2,9 @@
 // RP-030 · Trace 模块单元测试
 // ============================================================
 
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { after, before, describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { Pool } from "pg";
 import type { Request, Response } from "express";
 
 import {
@@ -20,8 +19,6 @@ import {
   insertTraceRecord,
   findTraceById,
   queryTraces,
-  updateTraceRecord,
-  purgeTracesOlderThan,
   _resetTraceRepositoryForTest,
 } from "./trace.repository";
 
@@ -34,41 +31,41 @@ import {
 } from "./trace.usecase";
 
 // ─── 测试辅助 ────────────────────────────────────────────────
+// S3（2026-08-30）：JSON 读写路径删除后本文件走 PG。traces 表不是本文件
+// 独占（CI 多测试文件并发共享同一测试库），故照 trace-pg.repository.test.ts
+// 已确立的范式做数据集隔离：所有行用独占 owner 前缀，断言按 owner 过滤
+// 收敛到自身数据集，清理为条件 DELETE（不整表 TRUNCATE）。
+// 原 storePath 注入 + `delete WES_STORE_TRACES_PG` 的 JSON 隔离钩子随之移除。
+// 前缀判据：必须与同表其他套件的前缀互不重叠、互不为前缀。本文件曾用
+// wes-t-trace-*，与 trace-pg.repository.test.ts 的 LIKE 'wes-t-trace-%' 同名
+// 命名空间，并发时两边 cleanOwnRows 会删掉对方在途的行、并把本文件的行
+// 送进对方 ownIds.size === 5 的分页窗口（同跑必红、单跑绿）。故改用独占的
+// wes-trace-repo-*，与 wes-t-trace-%、wes-chat-svc-% 均无 LIKE 交集。
 
-const TEST_STORE_DIR = join(process.cwd(), "data", "traces-test");
-const TEST_STORE_PATH = join(TEST_STORE_DIR, "trace-store.json");
-const DEFAULT_STORE_PATH = join(process.cwd(), "data", "traces", "trace-store.json");
+const OWNER_A = "wes-trace-repo-user-1";
+const OWNER_B = "wes-trace-repo-user-2";
+const OWNER_LIKE = "wes-trace-repo-%";
 
-async function withTraceStoreEnv<T>(run: () => T | Promise<T>): Promise<T> {
-  const previous = process.env.WES_TRACE_STORE_PATH;
-  // C10（2026-08-25）：同时显式切到 JSON 实现（delete 开关 + 重置单例），
-  // 否则全局开关全开（PG）时 recordWorkbenchTurnTrace 走 PG，
-  // findTraceById(TEST_STORE_PATH) 却直读 JSON 文件，断言失效。
-  const previousPgFlag = process.env.WES_STORE_TRACES_PG;
-  process.env.WES_TRACE_STORE_PATH = TEST_STORE_PATH;
-  delete process.env.WES_STORE_TRACES_PG;
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+let pool: Pool | null = null;
+
+async function cleanOwnRows(): Promise<void> {
+  if (pool) await pool.query("DELETE FROM traces WHERE owner_user_id LIKE $1", [OWNER_LIKE]);
+}
+
+before(async () => {
+  if (!testDatabaseUrl) return;
+  pool = new Pool({ connectionString: testDatabaseUrl, max: 5 });
   _resetTraceRepositoryForTest();
-  try {
-    return await run();
-  } finally {
-    if (previous === undefined) {
-      delete process.env.WES_TRACE_STORE_PATH;
-    } else {
-      process.env.WES_TRACE_STORE_PATH = previous;
-    }
-    if (previousPgFlag === undefined) delete process.env.WES_STORE_TRACES_PG;
-    else process.env.WES_STORE_TRACES_PG = previousPgFlag;
-    _resetTraceRepositoryForTest();
-  }
-}
+  // 清理历史残留（前次运行异常退出时 afterEach 可能未跑完）
+  await cleanOwnRows();
+});
 
-function ensureTestDir() {
-  if (!existsSync(TEST_STORE_DIR)) mkdirSync(TEST_STORE_DIR, { recursive: true });
-}
-
-function cleanTestStore() {
-  if (existsSync(TEST_STORE_DIR)) rmSync(TEST_STORE_DIR, { recursive: true, force: true });
-}
+after(async () => {
+  await cleanOwnRows();
+  _resetTraceRepositoryForTest();
+  if (pool) await pool.end();
+});
 
 function makeSpan(overrides: Partial<TraceSpanData> = {}): TraceSpanData {
   return {
@@ -122,14 +119,14 @@ describe("createTraceRecord", () => {
   it("creates a valid trace record skeleton", () => {
     const trace = createTraceRecord({
       sourceDomain: "ai_session",
-      ownerUserId: "user-1",
+      ownerUserId: OWNER_A,
       ownerUsername: "testuser",
       userInputSummary: "测试输入",
     });
 
     assert.ok(trace.traceId);
     assert.equal(trace.sourceDomain, "ai_session");
-    assert.equal(trace.ownerUserId, "user-1");
+    assert.equal(trace.ownerUserId, OWNER_A);
     assert.equal(trace.ownerUsername, "testuser");
     assert.equal(trace.userInputSummary, "测试输入");
     assert.equal(trace.spans.length, 0);
@@ -141,7 +138,7 @@ describe("createTraceRecord", () => {
     const longInput = "a".repeat(500);
     const trace = createTraceRecord({
       sourceDomain: "ai_session",
-      ownerUserId: "user-1",
+      ownerUserId: OWNER_A,
       ownerUsername: "testuser",
       userInputSummary: longInput,
     });
@@ -155,7 +152,7 @@ describe("appendTraceSpan", () => {
   it("appends span and updates summary", () => {
     const trace = createTraceRecord({
       sourceDomain: "ai_session",
-      ownerUserId: "user-1",
+      ownerUserId: OWNER_A,
       ownerUsername: "testuser",
     });
 
@@ -172,7 +169,7 @@ describe("appendTraceSpan", () => {
   it("sets hasError when span fails", () => {
     const trace = createTraceRecord({
       sourceDomain: "ai_session",
-      ownerUserId: "user-1",
+      ownerUserId: OWNER_A,
       ownerUsername: "testuser",
     });
 
@@ -185,7 +182,7 @@ describe("appendTraceSpan", () => {
   it("sets hasDegradation when span degrades", () => {
     const trace = createTraceRecord({
       sourceDomain: "ai_session",
-      ownerUserId: "user-1",
+      ownerUserId: OWNER_A,
       ownerUsername: "testuser",
     });
 
@@ -199,175 +196,104 @@ describe("appendTraceSpan", () => {
   });
 });
 
-// ─── Repository 测试 ─────────────────────────────────────────
+// ─── Repository 测试（公开 accessor → 选择器 → PG） ───────────
+// 原 6 条 JSON store 用例中的四条职责已有 PG 逐条对应承担（本文件改用
+// 公开 accessor、trace-pg 直接实例化仓储类，两层各断一件事）：
+//   「returns null for non-existent」→ trace-pg.repository.test.ts「findTraceById 未命中返回 null」
+//   「queries with sourceDomain filter」→ 同文件「queryTraces：sourceDomain/sourceId/traceId 过滤」
+//   「updates a trace record」→ 同文件「updateTraceRecord 合并 patch」（另含行锁并发用例）
+//   「purges old traces」→ 同文件「purgeOlderThan 只删 cutoff 之前的行」（DB 时钟下
+//     无法经公开入口造出历史 createdAt，带外 SQL 种入的覆盖仅在 PG 层）
+// 此处保留 2 条，专断「公开函数不传 storePath 确实落到 PG 且归属隔离生效」。
 
-describe("trace repository", () => {
-  beforeEach(() => {
-    ensureTestDir();
-    cleanTestStore();
-    ensureTestDir();
-  });
+describe("trace repository (public accessor → PG)", () => {
+  beforeEach(cleanOwnRows);
+  afterEach(cleanOwnRows);
 
-  afterEach(() => {
-    cleanTestStore();
-  });
-
-  it("inserts and finds a trace by ID", async () => {
+  it("inserts and finds a trace by ID", { skip: !testDatabaseUrl }, async () => {
     const trace = createTraceRecord({
       sourceDomain: "ai_session",
-      ownerUserId: "user-1",
-      ownerUsername: "testuser",
+      ownerUserId: OWNER_A,
+      ownerUsername: "alice",
     });
-    await insertTraceRecord(trace, TEST_STORE_PATH);
+    await insertTraceRecord(trace);
 
-    const found = await findTraceById(trace.traceId, TEST_STORE_PATH);
-    assert.ok(found);
+    const found = await findTraceById(trace.traceId);
+    assert.ok(found, "公开 accessor 写入后必须能从 PG 读回");
     assert.equal(found.traceId, trace.traceId);
+    assert.equal(found.ownerUserId, OWNER_A);
   });
 
-  it("returns null for non-existent trace", async () => {
-    const found = await findTraceById("non-existent-id", TEST_STORE_PATH);
-    assert.equal(found, null);
-  });
-
-  it("queries traces with owner isolation", async () => {
+  it("queries traces with owner isolation", { skip: !testDatabaseUrl }, async () => {
     const trace1 = createTraceRecord({
       sourceDomain: "ai_session",
-      ownerUserId: "user-1",
+      ownerUserId: OWNER_A,
       ownerUsername: "alice",
     });
     const trace2 = createTraceRecord({
       sourceDomain: "harness_run",
-      ownerUserId: "user-2",
+      ownerUserId: OWNER_B,
       ownerUsername: "bob",
     });
-    await insertTraceRecord(trace1, TEST_STORE_PATH);
-    await insertTraceRecord(trace2, TEST_STORE_PATH);
+    await insertTraceRecord(trace1);
+    await insertTraceRecord(trace2);
 
-    const result = await queryTraces({ ownerUserId: "user-1" }, TEST_STORE_PATH);
-    assert.equal(result.total, 1);
-    assert.equal(result.traces[0].ownerUserId, "user-1");
-  });
-
-  it("queries traces with sourceDomain filter", async () => {
-    const trace1 = createTraceRecord({
-      sourceDomain: "ai_session",
-      ownerUserId: "user-1",
-      ownerUsername: "alice",
-    });
-    const trace2 = createTraceRecord({
-      sourceDomain: "harness_run",
-      ownerUserId: "user-1",
-      ownerUsername: "alice",
-    });
-    await insertTraceRecord(trace1, TEST_STORE_PATH);
-    await insertTraceRecord(trace2, TEST_STORE_PATH);
-
-    const result = await queryTraces({ ownerUserId: "user-1", sourceDomain: "harness_run" }, TEST_STORE_PATH);
-    assert.equal(result.total, 1);
-    assert.equal(result.traces[0].sourceDomain, "harness_run");
-  });
-
-  it("updates a trace record", async () => {
-    const trace = createTraceRecord({
-      sourceDomain: "ai_session",
-      ownerUserId: "user-1",
-      ownerUsername: "alice",
-    });
-    await insertTraceRecord(trace, TEST_STORE_PATH);
-
-    const updated = await updateTraceRecord(trace.traceId, { userInputSummary: "updated" }, TEST_STORE_PATH);
-    assert.ok(updated);
-    assert.equal(updated.userInputSummary, "updated");
-  });
-
-  it("purges old traces", async () => {
-    const oldTrace = createTraceRecord({
-      sourceDomain: "ai_session",
-      ownerUserId: "user-1",
-      ownerUsername: "alice",
-    });
-    oldTrace.createdAt = "2020-01-01T00:00:00.000Z";
-    await insertTraceRecord(oldTrace, TEST_STORE_PATH);
-
-    const newTrace = createTraceRecord({
-      sourceDomain: "ai_session",
-      ownerUserId: "user-1",
-      ownerUsername: "alice",
-    });
-    await insertTraceRecord(newTrace, TEST_STORE_PATH);
-
-    const removed = await purgeTracesOlderThan("2023-01-01T00:00:00.000Z", TEST_STORE_PATH);
-    assert.equal(removed, 1);
-
-    const remaining = await queryTraces({ ownerUserId: "user-1" }, TEST_STORE_PATH);
-    assert.equal(remaining.total, 1);
+    const result = await queryTraces({ ownerUserId: OWNER_A });
+    assert.equal(result.total, 1, "owner 过滤不得把别人的 trace 带进来");
+    assert.equal(result.traces[0].ownerUserId, OWNER_A);
   });
 });
 
 // ─── Usecase 集成测试 ────────────────────────────────────────
 
 describe("recordWorkbenchTurnTrace", () => {
-  beforeEach(() => {
-    ensureTestDir();
-    cleanTestStore();
-    ensureTestDir();
-  });
+  beforeEach(cleanOwnRows);
+  afterEach(cleanOwnRows);
 
-  afterEach(() => {
-    cleanTestStore();
-  });
-
-  it("creates a trace with intent routing span in the configured test store", async () => {
-    await withTraceStoreEnv(async () => {
-      const defaultExistedBefore = existsSync(DEFAULT_STORE_PATH);
-      const trace = await recordWorkbenchTurnTrace({
-        ownerUserId: "user-1",
-        ownerUsername: "alice",
-        aiSessionId: "session-1",
-        userInputSummary: "帮我分析这个附件",
-        dispatchTrace: {
-          intentConfidence: 0.95,
-          routingRule: "explicit_report_with_attachment",
-          contextRefs: ["attachment:test.xlsx"],
-        },
-      });
-
-      assert.ok(trace.traceId);
-      assert.equal(trace.sourceDomain, "ai_session");
-      assert.equal(trace.sourceId, "session-1");
-      assert.ok(trace.spans.length >= 1);
-      assert.equal(trace.spans[0].spanType, "intent_routing");
-
-      const stored = await findTraceById(trace.traceId, TEST_STORE_PATH);
-      assert.equal(stored?.traceId, trace.traceId);
-      assert.equal(existsSync(DEFAULT_STORE_PATH), defaultExistedBefore);
-    });
-  });
-
-  it("records failed workbench turns as failed traces", async () => {
-    await withTraceStoreEnv(async () => {
-      const trace = await recordWorkbenchTurnFailureTrace({
-        ownerUserId: "user-1",
-        ownerUsername: "alice",
-        aiSessionId: "session-failed",
-        userInputSummary: "模型调用失败",
-        routingRule: "attachment_context",
+  it("creates a trace with intent routing span and persists it to PG", { skip: !testDatabaseUrl }, async () => {
+    const trace = await recordWorkbenchTurnTrace({
+      ownerUserId: OWNER_A,
+      ownerUsername: "alice",
+      aiSessionId: "session-1",
+      userInputSummary: "帮我分析这个附件",
+      dispatchTrace: {
+        intentConfidence: 0.95,
+        routingRule: "explicit_report_with_attachment",
         contextRefs: ["attachment:test.xlsx"],
-        error: { code: "stream_failed", message: "upstream failed", retryable: true },
-      });
-
-      assert.equal(trace.summary.hasError, true);
-      assert.equal(trace.spans[0].status, "failed");
-      assert.equal(trace.spans[0].error?.code, "stream_failed");
-      const stored = await findTraceById(trace.traceId, TEST_STORE_PATH);
-      assert.equal(stored?.summary.hasError, true);
+      },
     });
+
+    assert.ok(trace.traceId);
+    assert.equal(trace.sourceDomain, "ai_session");
+    assert.equal(trace.sourceId, "session-1");
+    assert.ok(trace.spans.length >= 1);
+    assert.equal(trace.spans[0].spanType, "intent_routing");
+
+    const stored = await findTraceById(trace.traceId);
+    assert.equal(stored?.traceId, trace.traceId, "usecase 写入必须落 PG、可按主键读回");
+  });
+
+  it("records failed workbench turns as failed traces", { skip: !testDatabaseUrl }, async () => {
+    const trace = await recordWorkbenchTurnFailureTrace({
+      ownerUserId: OWNER_A,
+      ownerUsername: "alice",
+      aiSessionId: "session-failed",
+      userInputSummary: "模型调用失败",
+      routingRule: "attachment_context",
+      contextRefs: ["attachment:test.xlsx"],
+      error: { code: "stream_failed", message: "upstream failed", retryable: true },
+    });
+
+    assert.equal(trace.summary.hasError, true);
+    assert.equal(trace.spans[0].status, "failed");
+    assert.equal(trace.spans[0].error?.code, "stream_failed");
+    const stored = await findTraceById(trace.traceId);
+    assert.equal(stored?.summary.hasError, true, "失败链路必须完整落 PG，不得只存部分字段");
   });
 
   it("creates knowledge retrieval span when knowledgeTool is present", async () => {
     const trace = await recordWorkbenchTurnTrace({
-      ownerUserId: "user-1",
+      ownerUserId: OWNER_A,
       ownerUsername: "alice",
       dispatchTrace: {
         intentConfidence: 0.8,
@@ -402,7 +328,7 @@ describe("recordWorkbenchTurnTrace", () => {
   it("persists request, provider, prompt and config metadata on the knowledge span", async () => {
     const trace = await recordWorkbenchTurnTrace({
       requestId: "00000000-0000-4000-8000-000000000001",
-      ownerUserId: "user-1",
+      ownerUserId: OWNER_A,
       ownerUsername: "alice",
       dispatchTrace: {
         intentConfidence: 0.9,
@@ -457,7 +383,7 @@ describe("recordWorkbenchTurnTrace", () => {
 
   it("marks knowledge span as degraded when fallbackReason present", async () => {
     const trace = await recordWorkbenchTurnTrace({
-      ownerUserId: "user-1",
+      ownerUserId: OWNER_A,
       ownerUsername: "alice",
       dispatchTrace: {
         intentConfidence: 0.8,
@@ -509,9 +435,8 @@ describe("recordWorkbenchTurnTrace", () => {
 
 describe("getTraceById (owner isolation)", () => {
   it("returns null when trace belongs to different user", async () => {
-    // getTraceById 使用默认 store path，这里只测试逻辑
-    // 在真实场景中，owner 隔离确保用户只能看到自己的 trace
-    const result = await getTraceById("non-existent", "user-1");
+    // 未入库的 traceId：无论传哪个 owner 都必须 null（缺行 ≠ 失败）
+    const result = await getTraceById("non-existent", OWNER_A);
     assert.equal(result, null);
   });
 });
@@ -555,7 +480,7 @@ describe("listTracesHandler (RP-030 auth fix)", () => {
 
   it("returns 200 for authenticated user", async () => {
     const { req, res, getStatusCode } = createMockReqRes({
-      user: { id: "user-1", username: "alice", role: "user" },
+      user: { id: OWNER_A, username: "alice", role: "user" },
     });
     await listTracesHandler(req, res);
     assert.equal(getStatusCode(), 200);
@@ -574,7 +499,7 @@ describe("getTraceHandler (RP-030 auth fix)", () => {
 
   it("returns 404 for non-existent trace", async () => {
     const { req, res, getStatusCode } = createMockReqRes({
-      user: { id: "user-1", username: "alice", role: "user" },
+      user: { id: OWNER_A, username: "alice", role: "user" },
       params: { traceId: "non-existent-id" },
     });
     await getTraceHandler(req, res);

@@ -23,6 +23,7 @@ import {
   normalizeKnowledgeBaseConfig,
   normalizeRequirementSystemConfig,
 } from "./system.repository";
+import { getCachedApiKey, KIMI_SCOPE, resetCredentialCache } from "./credentials.store";
 import {
   SystemStoreError,
   createSystemPgRepository,
@@ -159,18 +160,27 @@ test("requirementSettings round-trip：store 深相等且 apiKey 读回必为空
   // save 输入带 apiKey（模拟管理界面直接调用场景）：PG 侧必须复制 JSON save 的
   // 「缓存填充 + 落库前写空」语义
   const input = makeRequirementStore(3, "wes-t-marker-req", "wes-t-secret-key");
-  await repo!.saveRequirementSystemConfigStore(input);
+  // 缓存为进程级单例，先归零才能区分「本次 save 填充」与「上例残留」
+  resetCredentialCache();
+  try {
+    await repo!.saveRequirementSystemConfigStore(input);
 
-  const loaded = await repo!.loadRequirementSystemConfigStore();
-  assert.ok(loaded, "刚写入的 key 必须读得到");
-  assert.equal(loaded!.version, 3);
-  assert.equal(loaded!.draft.kimiEvaluation.promptTemplate, "wes-t-marker-req");
-  assert.equal(loaded!.draft.kimiCredentials.apiKey, "", "apiKey 读回必须为空串");
-  assert.equal(loaded!.active.kimiCredentials.apiKey, "", "apiKey 读回必须为空串");
+    const loaded = await repo!.loadRequirementSystemConfigStore();
+    assert.ok(loaded, "刚写入的 key 必须读得到");
+    assert.equal(loaded!.version, 3);
+    assert.equal(loaded!.draft.kimiEvaluation.promptTemplate, "wes-t-marker-req");
+    assert.equal(loaded!.draft.kimiCredentials.apiKey, "", "apiKey 读回必须为空串");
+    assert.equal(loaded!.active.kimiCredentials.apiKey, "", "apiKey 读回必须为空串");
 
-  const row = await pool!.query("SELECT store FROM system_configs WHERE config_key = 'requirementSettings'");
-  const stored = row.rows[0].store as RequirementSystemConfigStore;
-  assert.equal(stored.draft.kimiCredentials.apiKey, "", "jsonb 内 apiKey 必须为空串（密钥不进存储）");
+    const row = await pool!.query("SELECT store FROM system_configs WHERE config_key = 'requirementSettings'");
+    const stored = row.rows[0].store as RequirementSystemConfigStore;
+    assert.equal(stored.draft.kimiCredentials.apiKey, "", "jsonb 内 apiKey 必须为空串（密钥不进存储）");
+    // 语义另一半：密钥不走存储层，但必须落到凭据缓存，否则后续模型调用无 key 可用。
+    // 原 JSON 时代该断言在 system.repository.test.ts，该文件随 JSON 路径退役后职责归本例。
+    assert.equal(getCachedApiKey(KIMI_SCOPE), "wes-t-secret-key", "save 必须填充凭据缓存");
+  } finally {
+    resetCredentialCache();
+  }
 });
 
 test("implementationDependencyRules round-trip：store 深相等", { skip: !testDatabaseUrl }, async () => {

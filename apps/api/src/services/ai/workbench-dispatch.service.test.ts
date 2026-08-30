@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 import type { AuthUser, KnowledgeBaseProfile } from "../../types";
-import { versionsStorePath, requirementSystemConfigStorePath } from "../../utils";
+import { versionsStorePath } from "../../utils";
 import { dispatchHomeWorkbenchTurn } from "./workbench-dispatch.service";
 import type { ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import { buildWorkbenchChatModelChat, type HomeMessageInput } from "./handlers/workbench-shared";
@@ -1000,9 +1000,11 @@ function createCapturingKimiProvider(): ModelProvider & { lastRequest?: ChatComp
 
 /** 快照需求系统配置 store 与 provider 注册表，注入测试 apiKey 与 mock provider，结束后原样恢复 */
 async function withModelChatSandbox(run: (provider: ModelProvider & { lastRequest?: ChatCompletionRequest }) => Promise<void>): Promise<void> {
-  const storePath = requirementSystemConfigStorePath();
-  const existed = fs.existsSync(storePath);
-  const before = existed ? fs.readFileSync(storePath, "utf-8") : "";
+  // S3（2026-08-30）：requirementSettings 的状态源已从 config/system/*.json 换成
+  // system_configs 单行，没有文件可快照。改用公共 accessor 做逻辑快照（与
+  // assessment.service.test.ts 同口径）：为什么不用裸 SQL、代价与串行约束见彼处注释。
+  // 本文件保留的 versionsStorePath 快照属 versions 域，S4 另批处理。
+  const previousStore = await loadRequirementSystemConfigStore();
   const previousProvider = defaultProviderRegistry.get("kimi");
   const mockProvider = createCapturingKimiProvider();
   defaultProviderRegistry.register(mockProvider, { asDefault: true });
@@ -1013,11 +1015,7 @@ async function withModelChatSandbox(run: (provider: ModelProvider & { lastReques
     await saveRequirementSystemConfigStore(store);
     await run(mockProvider);
   } finally {
-    if (existed) {
-      fs.writeFileSync(storePath, before, "utf-8");
-    } else if (fs.existsSync(storePath)) {
-      fs.unlinkSync(storePath);
-    }
+    await saveRequirementSystemConfigStore(previousStore);
     defaultProviderRegistry.unregister("kimi");
     if (previousProvider) defaultProviderRegistry.register(previousProvider);
   }

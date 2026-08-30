@@ -14,7 +14,14 @@ import { signAuthToken, verifyAuthToken } from "../middleware/auth";
 import { getUsersRepository } from "./auth/users.repository";
 import { cleanupOneTestUser, cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 import { cleanupSingleDocStoreFixture, seedSingleDocStoreFixture, type SingleDocStoreSeed } from "../test-helpers/single-doc-store-seed";
-import { knowledgeBaseConfigStorePath, versionCodeRulesStorePath, versionsStorePath } from "../utils";
+import { versionsStorePath } from "../utils";
+import {
+  loadKnowledgeBaseConfigStore,
+  loadVersionCodeRulesStore,
+  normalizeKnowledgeBaseConfig,
+  saveKnowledgeBaseConfigStore,
+  saveVersionCodeRulesStore,
+} from "./system/system.repository";
 import { confirmPasswordReset, listUsers, login, me, requestPasswordReset, updateUserBusinessRole, updateUserPassword } from "./auth/auth.usecase";
 import { getRuleSetMeta } from "./rules/rules.usecase";
 import { getTemplate } from "./templates/templates.usecase";
@@ -62,7 +69,7 @@ const HDR_STORE_PREFIX = "wes-t-hdr-";
 let storeSeed: SingleDocStoreSeed | null = null;
 
 // C10（2026-08-25）：本文件是 handler 契约测试，用例以 JSON 文件构造状态
-// （versionsStorePath / versionCodeRulesStorePath 等）并经选择器访问存储。
+// （当时为 versionsStorePath / versionCodeRulesStorePath 等）并经选择器访问存储。
 // 全局开关全开（PG）时构造与读取不一致 → 用例失败。
 // 文件级显式切回 JSON 实现（users 域 S1 后恒 PG，不受影响）。
 // S2b-1（2026-08-27）：AI_SESSIONS 移出本列表——直读断言已全部改经
@@ -70,6 +77,12 @@ let storeSeed: SingleDocStoreSeed | null = null;
 // 文件级 after 按测试用户兜底清理会话数据。
 // S2b-2（2026-08-28）：aiSessionsStorePath() 生命周期包装已随 JSON 路径
 // 退役移除（14 处），用例直接走 repository 单例，无文件快照依赖。
+// S3（2026-08-30）：SYSTEM / TRACES 两开关移出本列表——两域 JSON 路径已删、
+// 选择器恒 PG，delete 开关已不再能切回任何实现；version_code_rules 与
+// knowledge-base-config 的 fixture 随之从「写 JSON 文件」改为「经 PG 仓储种入 +
+// 原值还原」（见 withKnowledgeBaseConfigSnapshot 与各用例的 t.after）；四个
+// *StorePath 也已从 utils/file.ts 下线，本文件残留的 JSON 文件构造仅剩
+// versionsStorePath（实取 15 处，归 S4）。
 // S6（2026-08-29）：TEMPLATES / RULE_SETS / KNOWLEDGE 三域移出本列表——
 // 三域 JSON 路径已删、选择器恒 PG，delete 开关已不再能切回任何实现；
 // getRuleSetMeta 需要「活动文档存在」，而 db:seed 在 CI 里排在 Test modules
@@ -81,11 +94,26 @@ let storeSeed: SingleDocStoreSeed | null = null;
 const PREVIOUS_STORE_PG_FLAGS = new Map<string, string | undefined>();
 const STORE_PG_FLAG_KEYS = [
   "WES_STORE_USERS_PG",
-  "WES_STORE_SYSTEM_PG",
-  "WES_STORE_TRACES_PG",
   "WES_STORE_VERSIONS_PG",
   "WES_STORE_TEAMS_PG",
 ] as const;
+
+/**
+ * S3（2026-08-30）：knowledge-base-config 的 JSON 读写路径随本批删除、system 域恒 PG。
+ * 语义与 withFileSnapshotRestoreAsync 对齐（读回原值 → 跑用例 → finally 写回），
+ * 使迁移期测试保持同样的嵌套结构。该 store 是 system_configs 的单行 upsert，
+ * 种入不还原会泄漏到同套件其他文件与本表其他共写文件（system.kb-config /
+ * system-pg.repository / assessment / workbench-dispatch），故本文件继续待在
+ * test:modules:serial-store 串行组内。
+ */
+async function withKnowledgeBaseConfigSnapshot(fn: () => Promise<void>): Promise<void> {
+  const previous = await loadKnowledgeBaseConfigStore();
+  try {
+    await fn();
+  } finally {
+    await saveKnowledgeBaseConfigStore(previous);
+  }
+}
 
 function restoreStorePgFlags(): void {
   for (const key of STORE_PG_FLAG_KEYS) {
@@ -784,35 +812,30 @@ test("versions.usecase: create -> update -> delete lifecycle works", { concurren
   });
 });
 
-test("versions.usecase: createVersion generates versionCode by active rule when omitted", { concurrency: false }, async () => {
+test("versions.usecase: createVersion generates versionCode by active rule when omitted", { concurrency: false }, async (t) => {
   const versionsPath = versionsStorePath();
-  const rulesPath = versionCodeRulesStorePath();
-  await withFilesSnapshotRestoreAsync([versionsPath, rulesPath], async () => {
+  const previousRules = await loadVersionCodeRulesStore();
+  t.after(async () => {
+    await saveVersionCodeRulesStore(previousRules);
+  });
+  await withFilesSnapshotRestoreAsync([versionsPath], async () => {
     fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
-    fs.writeFileSync(
-      rulesPath,
-      JSON.stringify(
+    await saveVersionCodeRulesStore({
+      rules: [
         {
-          rules: [
-            {
-              id: "rule-implementation",
-              moduleKey: "implementation",
-              moduleName: "实施评估",
-              moduleCode: "IA",
-              prefix: "IA",
-              format: "{PREFIX}-{GL}-{NN}",
-              sample: "IA-GL-UT-01",
-              status: "active",
-              effectiveAt: "2026-04-06T00:00:00.000Z",
-              updatedAt: "2026-04-06T00:00:00.000Z",
-            },
-          ],
+          id: "rule-implementation",
+          moduleKey: "implementation",
+          moduleName: "实施评估",
+          moduleCode: "IA",
+          prefix: "IA",
+          format: "{PREFIX}-{GL}-{NN}",
+          sample: "IA-GL-UT-01",
+          status: "active",
+          effectiveAt: "2026-04-06T00:00:00.000Z",
+          updatedAt: "2026-04-06T00:00:00.000Z",
         },
-        null,
-        2,
-      ),
-      "utf-8",
-    );
+      ],
+    });
 
     const req = createMockReq({
       token: await getActiveUserToken(),
@@ -832,35 +855,30 @@ test("versions.usecase: createVersion generates versionCode by active rule when 
   });
 });
 
-test("versions.usecase: createVersion increments sequence on conflict under active rule", { concurrency: false }, async () => {
+test("versions.usecase: createVersion increments sequence on conflict under active rule", { concurrency: false }, async (t) => {
   const versionsPath = versionsStorePath();
-  const rulesPath = versionCodeRulesStorePath();
-  await withFilesSnapshotRestoreAsync([versionsPath, rulesPath], async () => {
+  const previousRules = await loadVersionCodeRulesStore();
+  t.after(async () => {
+    await saveVersionCodeRulesStore(previousRules);
+  });
+  await withFilesSnapshotRestoreAsync([versionsPath], async () => {
     fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
-    fs.writeFileSync(
-      rulesPath,
-      JSON.stringify(
+    await saveVersionCodeRulesStore({
+      rules: [
         {
-          rules: [
-            {
-              id: "rule-implementation",
-              moduleKey: "implementation",
-              moduleName: "实施评估",
-              moduleCode: "IA",
-              prefix: "IA",
-              format: "{PREFIX}-{NN}",
-              sample: "IA-01",
-              status: "active",
-              effectiveAt: "2026-04-06T00:00:00.000Z",
-              updatedAt: "2026-04-06T00:00:00.000Z",
-            },
-          ],
+          id: "rule-implementation",
+          moduleKey: "implementation",
+          moduleName: "实施评估",
+          moduleCode: "IA",
+          prefix: "IA",
+          format: "{PREFIX}-{NN}",
+          sample: "IA-01",
+          status: "active",
+          effectiveAt: "2026-04-06T00:00:00.000Z",
+          updatedAt: "2026-04-06T00:00:00.000Z",
         },
-        null,
-        2,
-      ),
-      "utf-8",
-    );
+      ],
+    });
 
     const req1 = createMockReq({
       token: await getActiveUserToken(),
@@ -884,35 +902,30 @@ test("versions.usecase: createVersion increments sequence on conflict under acti
   });
 });
 
-test("versions.usecase: createVersion fails when rule is not active", { concurrency: false }, async () => {
+test("versions.usecase: createVersion fails when rule is not active", { concurrency: false }, async (t) => {
   const versionsPath = versionsStorePath();
-  const rulesPath = versionCodeRulesStorePath();
-  await withFilesSnapshotRestoreAsync([versionsPath, rulesPath], async () => {
+  const previousRules = await loadVersionCodeRulesStore();
+  t.after(async () => {
+    await saveVersionCodeRulesStore(previousRules);
+  });
+  await withFilesSnapshotRestoreAsync([versionsPath], async () => {
     fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
-    fs.writeFileSync(
-      rulesPath,
-      JSON.stringify(
+    await saveVersionCodeRulesStore({
+      rules: [
         {
-          rules: [
-            {
-              id: "rule-implementation",
-              moduleKey: "implementation",
-              moduleName: "实施评估",
-              moduleCode: "IA",
-              prefix: "IA",
-              format: "{PREFIX}-{NN}",
-              sample: "IA-01",
-              status: "draft",
-              effectiveAt: "--",
-              updatedAt: "2026-04-06T00:00:00.000Z",
-            },
-          ],
+          id: "rule-implementation",
+          moduleKey: "implementation",
+          moduleName: "实施评估",
+          moduleCode: "IA",
+          prefix: "IA",
+          format: "{PREFIX}-{NN}",
+          sample: "IA-01",
+          status: "draft",
+          effectiveAt: "--",
+          updatedAt: "2026-04-06T00:00:00.000Z",
         },
-        null,
-        2,
-      ),
-      "utf-8",
-    );
+      ],
+    });
 
     const req = createMockReq({
       token: await getActiveUserToken(),
@@ -925,10 +938,13 @@ test("versions.usecase: createVersion fails when rule is not active", { concurre
   });
 });
 
-test("versions.usecase: createVersion fails when active rule lacks sequence placeholder and conflicts", { concurrency: false }, async () => {
+test("versions.usecase: createVersion fails when active rule lacks sequence placeholder and conflicts", { concurrency: false }, async (t) => {
   const versionsPath = versionsStorePath();
-  const rulesPath = versionCodeRulesStorePath();
-  await withFilesSnapshotRestoreAsync([versionsPath, rulesPath], async () => {
+  const previousRules = await loadVersionCodeRulesStore();
+  t.after(async () => {
+    await saveVersionCodeRulesStore(previousRules);
+  });
+  await withFilesSnapshotRestoreAsync([versionsPath], async () => {
     const owner = await getActiveUser();
     const now = new Date().toISOString();
     fs.writeFileSync(
@@ -964,30 +980,22 @@ test("versions.usecase: createVersion fails when active rule lacks sequence plac
       ),
       "utf-8",
     );
-    fs.writeFileSync(
-      rulesPath,
-      JSON.stringify(
+    await saveVersionCodeRulesStore({
+      rules: [
         {
-          rules: [
-            {
-              id: "rule-implementation",
-              moduleKey: "implementation",
-              moduleName: "实施评估",
-              moduleCode: "IA",
-              prefix: "IA",
-              format: "{PREFIX}-FIXED",
-              sample: "IA-FIXED",
-              status: "active",
-              effectiveAt: now,
-              updatedAt: now,
-            },
-          ],
+          id: "rule-implementation",
+          moduleKey: "implementation",
+          moduleName: "实施评估",
+          moduleCode: "IA",
+          prefix: "IA",
+          format: "{PREFIX}-FIXED",
+          sample: "IA-FIXED",
+          status: "active",
+          effectiveAt: now,
+          updatedAt: now,
         },
-        null,
-        2,
-      ),
-      "utf-8",
-    );
+      ],
+    });
 
     const req = createMockReq({
       token: await getActiveUserToken(),
@@ -1822,7 +1830,7 @@ test("ai.usecase: homeWorkbenchChat returns formBlock and persists it in assista
 });
 
 test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant message metadata", async () => {
-  await withFileSnapshotRestoreAsync(knowledgeBaseConfigStorePath(), async () => {
+  await withKnowledgeBaseConfigSnapshot(async () => {
     const req = createMockReq({
       token: await getNonAdminUserToken(),
       body: {
@@ -1840,21 +1848,22 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
         knowledgeId: "kb-sales",
         apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
       };
-      fs.writeFileSync(knowledgeBaseConfigStorePath(), JSON.stringify({
+      // S3（2026-08-30）：原 fixture 只写旧版单知识库 credentials（无 knowledgeBases 数组），
+      // 由 JSON 加载时的 normalizeKnowledgeBaseConfig 迁移成单一 profile。PG 路径下
+      // 同样经该函数构造，保持与被删 JSON 形态逐字段等价（不传 knowledgeBases 才触发
+      // 旧版迁移分支；显式传 [] 会被当作「多知识库列表为空」，行为不等价）。
+      const kbProfile = {
+        model: "glm-4.6",
+        apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+        credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
+      };
+      await saveKnowledgeBaseConfigStore({
         version: 1,
-        draft: {
-          model: "glm-4.6",
-          apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-          credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
-        },
-        active: {
-          model: "glm-4.6",
-          apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
-          credentials: { apiKey: "zhipu-unit-test-key", knowledgeId: "kb-sales" },
-        },
+        draft: normalizeKnowledgeBaseConfig(kbProfile),
+        active: normalizeKnowledgeBaseConfig(kbProfile),
         updatedAt: "2026-06-28T00:00:00.000Z",
         effectiveAt: "2026-06-28T00:00:00.000Z",
-      }, null, 2), "utf-8");
+      });
       const zhipuCalls: Array<{ url: string; payload: Record<string, unknown> }> = [];
       (globalThis as { fetch?: unknown }).fetch = async (url: unknown, init?: { body?: string }) => {
         const urlText = String(url);

@@ -33,9 +33,10 @@ const SYNC_IO_NAMES = new Set(["readFileSync", "writeFileSync"]);
 /** 文件级白名单：条目内所有同步 I/O 调用豁免（命中输出审查日志）。 */
 // 条目均经 RED 违例清单逐项裁决（批 8）：
 // - 用户指定例外：config-integrity.ts（启动期路径，D15 阶段 2 删除对象）、db/seed.ts（seed 源读取）
-// - 阶段 1 批 N accessor 的内部同步实现：team/trace repository
+// - 阶段 1 批 N accessor 的内部同步实现：team repository
 //   （函数体「实现不动」，阶段 2 替换存储时一并异步化）
 //   （S6 2026-08-29：knowledge repository 的 JSON 实现类已删除，其条目随之下线）
+//   （S3 2026-08-30：trace repository 的 JSON 读写路径已删除，其条目随之下线）
 // - 复用型同步工具：utils/file.ts、prompt-registry.ts、rag-baseline 三个文件
 //   （被请求路径复用或 CLI/离线工具；异步化属阶段 2 评估项）
 //
@@ -82,11 +83,6 @@ const FILE_WHITELIST: Array<{ file: string; reason: string; expectedHits: number
     file: "modules/team/team.repository.ts",
     reason: "批 7 选择器下沉的 JSON 实现（loadTeamStoreJson/saveTeamStoreJson/saveTeamStoreWithExpectedVersionJson async accessor）共用的模块级同步原子写辅助 writeJsonAtomic，第 4 步随 JSON 路径删除",
     expectedHits: 1,
-  },
-  {
-    file: "modules/trace/trace.repository.ts",
-    reason: "批 7 async 公开函数共用的模块级同步辅助 readStore/writeStore（非 load/save 命名），阶段 2 替换实现时一并处理",
-    expectedHits: 2,
   },
 ];
 

@@ -60,6 +60,12 @@ export function ensureExportDir(): string {
 // 路径删除（ai-sessions 恒 PG）。与 users 域不同，data/ai-sessions.json
 // 从未被 git 跟踪（.gitignore 第 59 行整目录忽略 data/），故无需 git rm --cached；
 // 开工实取该文件为 {"sessions": []}（0 条会话），删读写路径不丢数据。
+// 阶段 2 S3（2026-08-30）：versionCodeRulesStorePath / requirementSystemConfigStorePath /
+// implementationDependencyRulesStorePath / knowledgeBaseConfigStorePath 已随 system 域
+// JSON 读写路径删除（四配置恒 PG）。与 users 域不同，这四个 seed 源文件仍在版本库
+// 内——它们是 db/seed.ts 的入播来源（D17「零数据迁移」口径），保留文件仅停读写；
+// modelVerifyStatusPath 不属本批删除面（S3 开工盘点 C1：读写方 system-effective.ts
+// 恒 JSON、PG 侧仅 seed 占位行，列入待裁），versionsStorePath 归 S4。
 
 /**
  * 版本存储路径
@@ -69,38 +75,10 @@ export function versionsStorePath(): string {
 }
 
 /**
- * 版本号编码规则存储路径
- */
-export function versionCodeRulesStorePath(): string {
-  return path.resolve(resolveRootDir(), "config/versions/version-code-rules.json");
-}
-
-/**
- * 系统管理-需求模块配置存储路径
- */
-export function requirementSystemConfigStorePath(): string {
-  return path.resolve(resolveRootDir(), "config/system/requirement-settings.json");
-}
-
-/**
  * 系统管理-模型场景最近验证状态存储路径
  */
 export function modelVerifyStatusPath(): string {
   return path.resolve(resolveRootDir(), "config/system/model-verify-status.json");
-}
-
-/**
- * 系统管理-实施评估依赖规则存储路径
- */
-export function implementationDependencyRulesStorePath(): string {
-  return path.resolve(resolveRootDir(), "config/system/implementation-dependency-rules.json");
-}
-
-/**
- * 系统管理-知识库配置存储路径
- */
-export function knowledgeBaseConfigStorePath(): string {
-  return path.resolve(resolveRootDir(), "config/system/knowledge-base-config.json");
 }
 
 /**
