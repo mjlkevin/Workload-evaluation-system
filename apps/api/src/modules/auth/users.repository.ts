@@ -4,8 +4,9 @@
 // 批 1 试点结论复用：整存 load→改→save 无法表达幂等插入（范式 #2）与
 // 条件 UPDATE CAS（范式 #3），接口收敛为行级操作。
 //
-// S1（2026-08-25，阶段 2 第 4 步）：JSON 实现与选择器 JSON 分支已删除——
-// users 域恒 PG（WES_STORE_USERS_PG 开关保留至 S7 统一退役）。
+// S1（2026-08-25，阶段 2 第 4 步）：JSON 实现与选择器 JSON 分支已删除——users 域恒 PG。
+// S7（2026-08-31，D18 裁决）：开关机制已退役——`WES_STORE_USERS_PG` 自 S1 起已无可
+// 影响的路由分支，仅作为已不存在的 JSON 实现的残留开关，随本批与其他各域开关一并清零。
 //
 // 选择器落本文件而非 module barrel：middleware/auth.ts 反向引用本文件，
 // 放 barrel 会形成 CJS 循环依赖（批 1 教训）。
@@ -76,12 +77,12 @@ export interface UsersStoreRepository {
 }
 
 // ============================================================
-// 选择器（S1 后恒 PG；开关保留至 S7 统一退役）
+// 选择器（S1 后恒 PG；S7 起开关机制已不存在）
 // ============================================================
 
 let defaultRepo: UsersStoreRepository | null = null;
 
-/** 进程内默认 repository 单例（生产路由使用）；开关只读一次，翻开关需重启 */
+/** 进程内默认 repository 单例（生产路由使用，恒 PG） */
 export function getUsersRepository(): UsersStoreRepository {
   if (!defaultRepo) {
     defaultRepo = createUsersPgRepository();

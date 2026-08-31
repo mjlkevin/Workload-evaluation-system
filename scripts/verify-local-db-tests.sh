@@ -74,25 +74,17 @@ done
 PKG_JSON="$API_DIR/package.json"
 [ -f "$API_DIR/test-setup.mts" ] || die "找不到 $API_DIR/test-setup.mts（global setup 守卫所在，缺失即无法保证 C11）"
 
-# C10 对齐：在役存储开关从 ci.yml 的 test-with-db job env 段实取，不手抄
-CI_YML="${REPO_ROOT:+$REPO_ROOT/.github/workflows/ci.yml}"
-STORE_FLAGS=""
-if [ -n "$CI_YML" ] && [ -f "$CI_YML" ]; then
-  STORE_FLAGS="$("$NODE_BIN" -e '
-    const fs = require("fs");
-    const text = fs.readFileSync(process.argv[1], "utf-8");
-    const keys = [...text.matchAll(/^\s{6}(WES_STORE_[A-Z_]+_PG):\s*"?true"?\s*$/gm)].map((m) => m[1]);
-    process.stdout.write([...new Set(keys)].join(" "));
-  ' "$CI_YML")"
-fi
-[ -n "$STORE_FLAGS" ] || echo "WARN: 未从 ci.yml 解析到在役 WES_STORE_*_PG 开关，本次将用当前环境值（C10 不齐 = 验的不是 CI 同一条路径）" >&2
+# 存储开关说明：C10（2026-08-25）曾要求「从 ci.yml 的 test-with-db job env 段实取
+# 在役开关再注入」，以保证本地验的是 CI 同一条路径。阶段 2 收官（S7，2026-08-31，
+# D18 裁决）后九域存储开关全部退役、仓储选择器恒装配 PG，ci.yml 已无 env 可取
+# → 本段解析随之删除（留着只会永远报 WARN、给出「还有开关可对齐」的错印象）。
+# 若将来新域重新引入分流开关，须同时恢复本段与 ci.yml 的同源解析，不手抄。
 
 mkdir -p "$LOG_DIR"
 
 echo "node      = $NODE_BIN ($("$NODE_BIN" -v))"
 echo "api dir   = $API_DIR"
 echo "db url    = $TEST_DB_URL  (DATABASE_URL 与 TEST_DATABASE_URL 同指，C11 方式②)"
-echo "store flags = ${STORE_FLAGS:-<none>}"
 echo "logs      = $LOG_DIR"
 echo
 
@@ -101,7 +93,6 @@ echo
 # ── 3. 逐项执行 ─────────────────────────────────────────────
 export DATABASE_URL="$TEST_DB_URL"
 export TEST_DATABASE_URL="$TEST_DB_URL"
-for kv in $STORE_FLAGS; do export "$kv=true"; done
 
 run_npm_script() {
   local name="$1" args

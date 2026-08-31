@@ -60,7 +60,7 @@ npx drizzle-kit studio   # 可视化浏览数据库
 
 > **当前部署形态：单副本。多副本部署前请读完本节。**
 
-users 域切 PG 后采用**进程级写穿缓存 + 60s 有界 TTL**（`WES_STORE_USERS_PG=true` 时生效，见 `apps/api/src/modules/auth/users-pg.repository.ts`）：
+users 域切 PG 后采用**进程级写穿缓存 + 60s 有界 TTL**（users 域恒 PG、无开关分流：`WES_STORE_USERS_PG` 已随阶段 2 收官于 S7（2026-08-31）退役，见 `apps/api/src/modules/auth/users-pg.repository.ts`）：
 
 - 写副本落库后立即写穿，本副本内零失效窗口。
 - 副本间无主动失效：副本 B 注册/修改的用户，副本 A 最长滞后一个 TTL（≤60s）后回源自愈。无 TTL 的旧实现是**永久分歧**（副本 B 注册的用户在副本 A 永远查不到，该用户无法从副本 A 登录，直至重启）——TTL 已把失效模式降级为「短暂陈旧」，但多副本下仍可能出现 ≤60s 的登录/权限陈旧窗口。

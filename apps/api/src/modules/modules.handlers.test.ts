@@ -94,12 +94,13 @@ let storeSeed: SingleDocStoreSeed | null = null;
 // 因此本文件是 templates / rule_sets 的写入方，必须待在
 // test:modules:serial-store 串行套件内（防漂移守卫已以
 // seedSingleDocStoreFixture 为写入指纹自动校验）。
-const PREVIOUS_STORE_PG_FLAGS = new Map<string, string | undefined>();
-// S5（2026-08-30）/ S4（2026-08-30）：WES_STORE_TEAMS_PG 与 WES_STORE_VERSIONS_PG
-// 已退役（两域恒 PG，JSON 路径已删），从本清单移除；下方 before/restoreStorePgFlags
-// 仍逐个重置各域单例，_resetTeamRepositoryForTest() / _resetVersionsRepositoryForTest()
-// 保留（重置钩子是测试能力，不依赖开关）。
-const STORE_PG_FLAG_KEYS = ["WES_STORE_USERS_PG"] as const;
+// S7（2026-08-31，D18 裁决·开关终态退役）：本文件原有的「存储开关清单」
+// （PREVIOUS_STORE_PG_FLAGS + STORE_PG_FLAG_KEYS + restoreStorePgFlags 里的 env
+// 存取环）随九域开关全部退役一并删除。users 是清单里最后一个在役条目，而它的
+// JSON 分支早已随 S1 删除——delete 这个开关已无任何可切换的实现，留着只会给出
+// 「还能切回 JSON 跑」的假安全感（历史形态见 git 历史与台账 §10）。
+// 下方 resetRepositorySingletonsForTest() 保留：清的是进程内仓储单例，属测试能力，
+// 不依赖任何开关（沿用 S5/S4 先例）。
 
 /**
  * S3（2026-08-30）：knowledge-base-config 的 JSON 读写路径随本批删除、system 域恒 PG。
@@ -147,12 +148,11 @@ async function withVersionsRowsReset(run: (owner: AuthUser) => Promise<void>): P
   }
 }
 
-function restoreStorePgFlags(): void {
-  for (const key of STORE_PG_FLAG_KEYS) {
-    const prev = PREVIOUS_STORE_PG_FLAGS.get(key);
-    if (prev === undefined) delete process.env[key];
-    else process.env[key] = prev;
-  }
+/**
+ * S7 后各域选择器恒 PG，本函数只剩「清进程内仓储单例」这一件事：
+ * 让本文件构造的单例不会泄漏到同进程后续套件，与已退役的存储开关无关。
+ */
+function resetRepositorySingletonsForTest(): void {
   _resetAiSessionsRepositoryForTest();
   _resetSystemRepositoryForTest();
   _resetTraceRepositoryForTest();
@@ -164,18 +164,7 @@ function restoreStorePgFlags(): void {
 }
 
 before(async () => {
-  for (const key of STORE_PG_FLAG_KEYS) {
-    PREVIOUS_STORE_PG_FLAGS.set(key, process.env[key]);
-    delete process.env[key];
-  }
-  _resetAiSessionsRepositoryForTest();
-  _resetSystemRepositoryForTest();
-  _resetTraceRepositoryForTest();
-  _resetVersionsRepositoryForTest();
-  _resetTeamRepositoryForTest();
-  _resetTemplateRepositoryForTest();
-  _resetRuleSetRepositoryForTest();
-  _resetKnowledgeRepositoryForTest();
+  resetRepositorySingletonsForTest();
   testAdmin = await createTestUser("wes-modules-admin", { role: "admin", businessRole: "admin" });
   testPlainUser = await createTestUser("wes-modules-user", { role: "user", businessRole: "pre_sales" });
   // B3：getRuleSetMeta 走选择器读活动规则集，空表下抛 RULE_SET_STORE_NOT_FOUND
@@ -190,7 +179,7 @@ after(async () => {
   }
   await cleanupTestUsers("wes-modules");
   // S2b-1：AI_SESSIONS 已随全局开关走 PG，文件级兜底删除本文件注入的会话
-  // （按 owner 过滤，不触碰其他文件/真实数据；restoreStorePgFlags 后单例重建）
+  // （按 owner 过滤，不触碰其他文件/真实数据；末尾重置单例后由后续套件重新装配）
   for (const user of [testAdmin, testPlainUser]) {
     for (const session of await listAiSessions(user)) {
       await deleteAiSession(user, session.sessionId);
@@ -198,7 +187,7 @@ after(async () => {
     // S4：版本行同口径兜底（按 owner 过滤，用例中途断言失败也不泄漏）
     await resetVersionsRowsForOwner(user.id);
   }
-  restoreStorePgFlags();
+  resetRepositorySingletonsForTest();
 });
 
 type MockRes = {
