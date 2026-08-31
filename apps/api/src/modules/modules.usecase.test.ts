@@ -5,7 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 
 import { CalculateRequest, RuleSet, Template } from "../types";
-import { ensureExportDir, resolveRootDir } from "../utils/file";
+import { ensureExportDir } from "../utils/file";
 import {
   cleanupSingleDocStoreFixture,
   seedSingleDocStoreFixture,
@@ -24,7 +24,7 @@ import {
   updateReviewStatus
 } from "./team/team.usecase";
 import { loadVersionsStore, saveVersionsStore } from "./versions/versions.repository";
-import { _resetTeamRepositoryForTest } from "./team/team.repository";
+import { loadTeamStore, saveTeamStore } from "./team/team.repository";
 
 /**
  * C10（2026-08-25）→ 阶段 2 S6（2026-08-29）：estimates/sessions 用例的请求
@@ -259,38 +259,34 @@ test("exports.usecase: resolveDownloadFile returns owned file and 404 when missi
 });
 
 // 阶段 1 批 4：支持 async 回调（versions accessor 异步化级联），同步回调仍可传入
-// C10（2026-08-25）：team 用例以 store.json 文件快照断言（backup/unlink/restore），
-// 开关全开（PG）时选择器走 PG 共享测试库，文件级并行下会被其他文件的整表清理
-// 干扰（实测 flaky：createReview 40401）——这里显式隔离到 JSON 实现 + 文件快照，
-// 与全局开关无关。
+// C10（2026-08-25）→ 阶段 2 S5（2026-08-30）：原形态是「delete WES_STORE_TEAMS_PG
+// 强制选择器走 JSON 实现 + store.json 文件 backup/unlink/restore」。teams 域 JSON
+// 读写路径随 S5 删除后该隔离法失效，改为本文件自持 PG 整存快照-还原。
+//
+// 为什么用快照-还原、而不是像 team-pg.repository.test.ts 那样按前缀条件清理：
+// team.usecase 的写是「loadStore → 内存改写 → saveStoreWithExpectedVersion」，而 PG
+// 侧该方法的落库形态是六张团队表 TRUNCATE + 全量 INSERT（team-pg.repository.ts:198-203）
+// ——本文件写回的「全量」是 load 到的快照加一条新团队。用例期间任何并发写者都会把
+// 对方的整表覆盖掉，实测 flaky 形态即 createReview 40401「团队不存在」（前一次
+// TRUNCATE 把 teamId 抹掉）。前缀清理拦不住这种覆盖，只能靠时序独占：① 本文件已在
+// test:modules:serial-store 串行组；② team-pg.repository.test.ts 同批移进该组，
+// 否则两个文件互为对方的 TRUNCATE 源（同 §10 B1/B2 的存储语义互斥族）。
+//
+// store_versions.version 不还原：saveStore 不触碰版本行（team-pg.repository.ts:356-364），
+// 回退它需要裸 SQL 且无收益——teams 用例只断言相对状态，全局计数器单调递增无害
+// （与 team-pg.repository.test.ts 头注释「用例不依赖 version 绝对值」同口径）。
+// S5 commit C：开关已退役（teams 域无分流分支），本夹具不再需要显式钉开关或重置单例。
 async function withTeamStoreIsolation(fn: () => Promise<void> | void): Promise<void> {
-  const previousPgFlag = process.env.WES_STORE_TEAMS_PG;
-  delete process.env.WES_STORE_TEAMS_PG;
-  _resetTeamRepositoryForTest();
-  const root = resolveRootDir();
-  const storePath = path.resolve(root, "config/teams/store.json");
-  const backupPath = `${storePath}.ut.bak`;
-  const existed = fs.existsSync(storePath);
-  if (existed) {
-    fs.mkdirSync(path.dirname(backupPath), { recursive: true });
-    fs.copyFileSync(storePath, backupPath);
-  }
+  const snapshot = await loadTeamStore();
   try {
-    if (fs.existsSync(storePath)) fs.unlinkSync(storePath);
     await fn();
   } finally {
-    if (fs.existsSync(storePath)) fs.unlinkSync(storePath);
-    if (existed && fs.existsSync(backupPath)) {
-      fs.copyFileSync(backupPath, storePath);
-      fs.unlinkSync(backupPath);
-    }
-    if (previousPgFlag === undefined) delete process.env.WES_STORE_TEAMS_PG;
-    else process.env.WES_STORE_TEAMS_PG = previousPgFlag;
-    _resetTeamRepositoryForTest();
+    await saveTeamStore(snapshot);
   }
 }
 
-test("team.usecase: manager can add member and create review/comment", async () => {
+test("team.usecase: manager can add member and create review/comment", { skip: !testDatabaseUrl }, async () => {
+  // S5：team 用例经 PG 共享测试库，无 DB 环境按 §4.6/C4 诚实 skip（原 JSON 文件隔离不依赖 DB）
   await withTeamStoreIsolation(async () => {
     const manager = { id: "team-manager-ut" };
     const member = { id: "team-member-ut" };
@@ -310,7 +306,7 @@ test("team.usecase: manager can add member and create review/comment", async () 
   });
 });
 
-test("team.usecase: non-manager cannot close review", async () => {
+test("team.usecase: non-manager cannot close review", { skip: !testDatabaseUrl }, async () => {
   await withTeamStoreIsolation(async () => {
     const manager = { id: "team-manager-ut-2" };
     const member = { id: "team-member-ut-2" };
@@ -333,7 +329,7 @@ test("team.usecase: non-manager cannot close review", async () => {
   });
 });
 
-test("team.usecase: team plan visibility blocks cross-team user", async () => {
+test("team.usecase: team plan visibility blocks cross-team user", { skip: !testDatabaseUrl }, async () => {
   await withTeamStoreIsolation(async () => {
     const store = await loadVersionsStore();
     const snapshot = JSON.parse(JSON.stringify(store));

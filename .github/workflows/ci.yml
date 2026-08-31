@@ -116,7 +116,7 @@ jobs:
         ports:
           - 5432:5432
     env:
-      # C10（2026-08-25）：CI 配置对齐生产——三个存储域开关与 apps/api/.env 当前启用状态一致。
+      # C10（2026-08-25）：CI 配置对齐生产——存储域开关与 apps/api/.env 当前启用状态一致。
       # 此前 CI 无任何开关 → 全 JSON 缺省，而生产/dev 全开 → 全 PG：CI 持续验证 JSON 路径、
       # 实际运行 PG 路径，经选择器的装配层从未被 CI 验证。新增存储开关时必须同步本列表（§4.9 C10）。
       # S2b-2（2026-08-28）：WES_STORE_AI_SESSIONS_PG 已退役（ai-sessions 域恒 PG，JSON 路径已删）。
@@ -125,9 +125,10 @@ jobs:
       # 保留只会给出「切回 JSON 还能跑」的假安全感。
       # S3（2026-08-30）：WES_STORE_SYSTEM_PG / WES_STORE_TRACES_PG 已退役（两域恒 PG，
       # JSON 路径已删），同 S6 口径：分流分支不存在后，开关是死配置。
+      # S5（2026-08-30）：WES_STORE_TEAMS_PG 已退役（teams 域恒 PG，JSON 路径已删），
+      # 同 S6/S3 口径。本列表余下两个开关（users 归 S1 后仍在役、versions 归 S4 退役）。
       WES_STORE_USERS_PG: "true"
       WES_STORE_VERSIONS_PG: "true"
-      WES_STORE_TEAMS_PG: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

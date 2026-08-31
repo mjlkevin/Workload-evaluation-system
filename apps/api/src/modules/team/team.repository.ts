@@ -1,23 +1,26 @@
 // ============================================================
-// Teams 域仓储（阶段 2 批 7 · 第 1–3 步）
+// Teams 域仓储（阶段 2 批 7 建立 · 第 4 步 S5 收敛为恒 PG）
 // ============================================================
-// 纯数据访问层：JSON 文件实现（既有语义原样保留，第 4 步删除）+
-// PG 实现（team-pg.repository.ts，五范式）+ 选择器路由。
+// 纯数据访问层：本文件不再自带实现，只做单例转发与纯内存 helper
+// （PG 实现在 team-pg.repository.ts，五范式）。
 // 不涉及业务逻辑，不包含权限校验。
 //
-// 公开函数签名不变（调用点零改动）：选择器透明委托
-// （WES_STORE_TEAMS_PG 严格 === "true" 切 PG，缺省 JSON）。
-// team.usecase.ts 的整存 RMW 调用链（load → 内存改写 →
-// saveTeamStoreWithExpectedVersion）在两种实现下语义一致：
-// JSON 侧「读版本 → 比较 → 写」三步，PG 侧整体下沉进单条条件
-// UPDATE CAS（§4.6 规则，见 team-pg.repository.ts 头部）。
+// 阶段 2 S5（2026-08-30）：JSON 文件读写路径（loadTeamStoreJson /
+// saveTeamStoreJson / saveTeamStoreWithExpectedVersionJson /
+// writeJsonAtomic / createTeamJsonRepository）连同 config/teams/store.json
+// 一并删除，选择器不再有分流分支（WES_STORE_TEAMS_PG 在本批后续提交里
+// 从 ci.yml / .env / 测试开关清单退役；自本提交起它已无可影响的路由分支）。
+// 删除理由：九存储域已全部跑在 PostgreSQL 上，JSON 侧只剩「并发写静默丢数据」
+// 的历史形态，保留只会提供第二条可达写路径（阶段 2 立项根因）。
+//
+// 公开函数签名不变（调用点零改动）：team.usecase.ts 的整存 RMW 调用链
+// （load → 内存改写 → saveTeamStoreWithExpectedVersion）无需改造；
+// 「读版本 → 比较 → 递增」整体下沉进单条条件 UPDATE CAS（§4.6 规则，
+// 见 team-pg.repository.ts 头部）。
 // ============================================================
 
-import fs from "node:fs";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-import { resolveRootDir } from "../../utils/file";
 import { createTeamPgRepository, type TeamStoreRepository } from "./team-pg.repository";
 import { TeamAuditLog, TeamRecord, TeamStore } from "./team.types";
 
@@ -25,89 +28,15 @@ export type { TeamStoreRepository, TeamsPgRepository } from "./team-pg.repositor
 export { TeamStoreError, createTeamPgRepository, cleanupTeamRowsByPrefix } from "./team-pg.repository";
 
 // ============================================================
-// 遗留 JSON 实现（§5.1 遗留模式：读失败静默空库、缺文件建默认写回；
-// 勿复制到新实现；第 4 步删除）
-// ============================================================
-
-function teamStorePath(): string {
-  return path.resolve(resolveRootDir(), "config/teams/store.json");
-}
-
-function writeJsonAtomic(filePath: string, value: unknown): void {
-  const dir = path.dirname(filePath);
-  fs.mkdirSync(dir, { recursive: true });
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(value, null, 2), "utf-8");
-  fs.renameSync(tempPath, filePath);
-}
-
-async function loadTeamStoreJson(): Promise<TeamStore> {
-  const filePath = teamStorePath();
-  if (!fs.existsSync(filePath)) {
-    const initStore: TeamStore = {
-      version: 0,
-      teams: [],
-      reviews: [],
-      comments: [],
-      planBindings: [],
-      auditLogs: []
-    };
-    writeJsonAtomic(filePath, initStore);
-    return initStore;
-  }
-  try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as TeamStore;
-    return {
-      version: Number.isFinite(Number(parsed.version)) ? Number(parsed.version) : 0,
-      teams: Array.isArray(parsed.teams) ? parsed.teams : [],
-      reviews: Array.isArray(parsed.reviews) ? parsed.reviews : [],
-      comments: Array.isArray(parsed.comments) ? parsed.comments : [],
-      planBindings: Array.isArray(parsed.planBindings) ? parsed.planBindings : [],
-      auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : []
-    };
-  } catch {
-    return { version: 0, teams: [], reviews: [], comments: [], planBindings: [], auditLogs: [] };
-  }
-}
-
-async function saveTeamStoreJson(store: TeamStore): Promise<void> {
-  writeJsonAtomic(teamStorePath(), store);
-}
-
-async function saveTeamStoreWithExpectedVersionJson(
-  store: TeamStore,
-  expectedVersion: number
-): Promise<{ ok: true; savedVersion: number } | { ok: false; currentVersion: number }> {
-  // 乐观并发语义：读取版本与写入之间为同步顺序执行（readFileSync + writeFileSync），
-  // 补 await 不在二者之间插入新的让出点——load 仍是同步文件读（仅签名包 Promise）。
-  const current = await loadTeamStoreJson();
-  if (current.version !== expectedVersion) {
-    return { ok: false, currentVersion: current.version };
-  }
-  const nextVersion = expectedVersion + 1;
-  writeJsonAtomic(teamStorePath(), { ...store, version: nextVersion });
-  return { ok: true, savedVersion: nextVersion };
-}
-
-function createTeamJsonRepository(): TeamStoreRepository {
-  return {
-    loadStore: loadTeamStoreJson,
-    saveStore: saveTeamStoreJson,
-    saveStoreWithExpectedVersion: saveTeamStoreWithExpectedVersionJson
-  };
-}
-
-// ============================================================
-// 选择器（第 3 步开关：缺省 JSON，严格 === "true" 切 PG）
+// 默认仓储（阶段 2 第 4 步 S5：恒 PG，选择器已无分流分支）
 // ============================================================
 
 let defaultRepo: TeamStoreRepository | null = null;
 
-/** 进程内默认 repository 单例（生产路由使用）；开关只读一次，翻开关需重启 */
+/** 进程内默认 repository 单例（恒 PG）；S5 前依 WES_STORE_TEAMS_PG 分流，现已退役 */
 export function getTeamRepository(): TeamStoreRepository {
   if (!defaultRepo) {
-    defaultRepo =
-      process.env.WES_STORE_TEAMS_PG === "true" ? createTeamPgRepository() : createTeamJsonRepository();
+    defaultRepo = createTeamPgRepository();
   }
   return defaultRepo;
 }
@@ -122,23 +51,24 @@ export function _resetTeamRepositoryForTest(): void {
 // ============================================================
 
 /**
- * 阶段 2 批 7：实现改经选择器（缺省 JSON / WES_STORE_TEAMS_PG=true 切 PG）。
+ * 阶段 2 第 4 步 S5：实现恒走 PG 仓储（team-pg.repository.ts）。
  */
 export async function loadTeamStore(): Promise<TeamStore> {
   return getTeamRepository().loadStore();
 }
 
 /**
- * 阶段 2 批 7：实现改经选择器（缺省 JSON / WES_STORE_TEAMS_PG=true 切 PG）。
+ * 阶段 2 第 4 步 S5：实现恒走 PG 仓储；无版本校验的整存替换
+ * （六表 TRUNCATE + 全量 INSERT），不触碰 store_versions 版本行。
  */
 export async function saveTeamStore(store: TeamStore): Promise<void> {
   return getTeamRepository().saveStore(store);
 }
 
 /**
- * 阶段 2 批 7：实现改经选择器（缺省 JSON / WES_STORE_TEAMS_PG=true 切 PG）。
- * 乐观并发语义两种实现一致：JSON 侧「读→比→写」同步三步；
- * PG 侧单条条件 UPDATE CAS（比较+递增原子完成，冲突事务回滚）。
+ * 阶段 2 第 4 步 S5：实现恒走 PG 仓储。
+ * 乐观并发语义：「读版本 → 比较 → 递增」整体下沉进单条条件 UPDATE CAS，
+ * 冲突时事务回滚、结构化返回 {ok:false}（40909 契约与切换前一致）。
  */
 export async function saveTeamStoreWithExpectedVersion(
   store: TeamStore,
