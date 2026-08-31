@@ -1,8 +1,11 @@
 // ============================================================
 // 凭据域 DB 化测试 — ISS-2026-08-05-001
 // ============================================================
-// 验证 AES-256-GCM 加密/解密、DB 持久化、变更审计、导入幂等。
+// 验证 AES-256-GCM 加密/解密、DB 持久化、变更审计。
 // 纯加密测试无需 DB；DB 测试需要 TEST_DATABASE_URL，缺失时跳过。
+// S7（2026-08-31，台账 B7）：「导入幂等」面随 `importApiKeyIfAbsent` 一并退役
+// ——文件密钥一次性导入的唯一生产调用点已随 S3 删除，保留它只会给
+// 「还有一条从文件导入凭据的在用通道」的错印象（历史形态见 git 历史）。
 
 import assert from "node:assert/strict";
 import { after, afterEach, before, test } from "node:test";
@@ -17,7 +20,6 @@ import {
   setApiKey,
   rotateApiKey,
   clearApiKey,
-  importApiKeyIfAbsent,
   getAuditLog,
   resetCredentialCache,
 } from "./credentials.store";
@@ -198,27 +200,9 @@ test("DB rotate: key_version 递增且审计存在 action=rotate", { skip: !test
   assert.ok(rotateAction, "应存在 action='rotate' 审计行");
 });
 
-test("DB import 幂等: 首次导入成功，二次不覆盖", { skip: !testDatabaseUrl }, async () => {
-  const fileKey = "sk-import-from-file-005";
-  const dbKey = "sk-already-in-db-006";
-
-  // 首次：DB 空 → 导入成功
-  const imported1 = await importApiKeyIfAbsent(testScope, fileKey, "system-import", pool!);
-  assert.equal(imported1, true, "首次导入应返回 true");
-
-  const result1 = await getApiKey(testScope, pool!);
-  assert.equal(result1.apiKey, fileKey, "导入后 DB 应为文件密钥");
-
-  // 二次：DB 已有 → 不覆盖
-  // 先直接 set 一个不同的 key 到 DB（模拟 DB 已有不同密钥）
-  await setApiKey(testScope, dbKey, "test-actor", pool!);
-
-  const imported2 = await importApiKeyIfAbsent(testScope, fileKey, "system-import", pool!);
-  assert.equal(imported2, false, "DB 已有时导入应返回 false");
-
-  const result2 = await getApiKey(testScope, pool!);
-  assert.equal(result2.apiKey, dbKey, "DB 已有密钥不应被覆盖");
-});
+// S7（2026-08-31，台账 B7）：原「DB import 幂等: 首次导入成功，二次不覆盖」用例
+// 随 `importApiKeyIfAbsent` 删除。本文件不属任何 test:* 脚本（台账 B4 的 14 个
+// 孤儿测试文件之一），故本批不影响六套件计数。
 
 test("重启留存: set 后清缓存再读取，密钥仍可解密一致", { skip: !testDatabaseUrl }, async () => {
   const plaintext = "sk-restart-persistence-007";
