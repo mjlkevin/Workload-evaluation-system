@@ -5,23 +5,18 @@
 import { createApp } from "./app";
 import { config } from "./config/env";
 import { runMigrations } from "./db/migrate";
-import { runConfigIntegrityCheck } from "./ops/config-integrity";
 import { logger } from "./utils/logger";
 import { startHarnessRuntime } from "./modules/harness/harness-boot";
 import { createHarnessRuntimeRepository } from "./modules/harness/harness-runtime.repository";
 import { isDurableRunsEnabledFromEnv } from "./modules/harness/harness-runtime.usecase";
 import { resolveKek, warmCredentialScopes } from "./modules/system/credentials.store";
 
-const shouldRunIntegrityCheck = process.env.CONFIG_INTEGRITY_ON_STARTUP !== "false";
-if (shouldRunIntegrityCheck) {
-  const integrity = runConfigIntegrityCheck("startup", false);
-  if (!integrity.ok) {
-    logger.warn(
-      { event: "startup", issues: integrity.issues.length },
-      `[api] config integrity check found ${integrity.issues.length} issue(s), see logs/data-anomaly-repair.log`
-    );
-  }
-}
+// S7（2026-08-31，D15 执行）：原启动期 `runConfigIntegrityCheck("startup", false)`
+// 及其 `CONFIG_INTEGRITY_ON_STARTUP` 开关已整链删除。下线前提不是「暂时注释」
+// 而是「已无对象可检查」：九域 JSON 读写路径全部删除后 REQUIRED_FILES 已清空
+// （S5/S4 合入 main 后实取），校验器实跑只能输出 `checked 0 files.`——留一个
+// 不检查任何东西的「启动保护」比没有更糟（后来人会误以为启动时有配置兜底）。
+// 配置正确性自此由 DB 侧承载：migrate fail-fast + seed 守卫 + 防漂移测试。
 
 async function bootstrap(): Promise<void> {
   // 启动时迁移（事项 7；D13：advisory lock 串行化多副本；D4：失败统一 fail-fast）。

@@ -32,13 +32,18 @@ const SYNC_IO_NAMES = new Set(["readFileSync", "writeFileSync"]);
 
 /** 文件级白名单：条目内所有同步 I/O 调用豁免（命中输出审查日志）。 */
 // 条目均经 RED 违例清单逐项裁决（批 8）：
-// - 用户指定例外：config-integrity.ts（启动期路径，D15 阶段 2 删除对象）、db/seed.ts（seed 源读取）
+// - 用户指定例外：db/seed.ts（seed 源读取）
 // - 阶段 1 批 N accessor 的内部同步实现：team repository
 //   （函数体「实现不动」，阶段 2 替换存储时一并异步化）
 //   （S6 2026-08-29：knowledge repository 的 JSON 实现类已删除，其条目随之下线）
 //   （S3 2026-08-30：trace repository 的 JSON 读写路径已删除，其条目随之下线）
 //   （S5 2026-08-30：team repository 的 JSON 读写路径已删除，其条目随之下线，
 //     本白名单从 8 条 / 13 处收敛为 7 条 / 12 处）
+//   （S7 2026-08-31：utils/file.ts 的 saveJsonFile 已删（台账 B5），该条命中 2 → 1，
+//     条目数不变仍 7 条，总命中 12 → 11 处）
+//   （S7 2026-08-31：ops/config-integrity.ts 随 D15 整链下线，本白名单首个条目
+//     随文件一并删除（−4 处），收敛为 6 条 / 7 处：seed 1 + rag-baseline 2+1+1
+//     + prompt-registry 1 + utils/file 1）
 // - 复用型同步工具：utils/file.ts、prompt-registry.ts、rag-baseline 三个文件
 //   （被请求路径复用或 CLI/离线工具；异步化属阶段 2 评估项）
 //
@@ -46,11 +51,6 @@ const SYNC_IO_NAMES = new Set(["readFileSync", "writeFileSync"]);
 // 断言严格相等——新增命中即红（新增未经批准的同步 I/O），阶段 2 逐步消除也会红
 // （已减少，强制更新计数使进展可见）。
 const FILE_WHITELIST: Array<{ file: string; reason: string; expectedHits: number }> = [
-  {
-    file: "ops/config-integrity.ts",
-    reason: "启动期配置完整性检查（非请求路径），D15 已登记为阶段 2 删除对象；用户指定例外",
-    expectedHits: 4,
-  },
   {
     file: "db/seed.ts",
     reason: "seed 源数据读取（一次性初始化 CLI）；用户指定例外",
@@ -78,8 +78,8 @@ const FILE_WHITELIST: Array<{ file: string; reason: string; expectedHits: number
   },
   {
     file: "utils/file.ts",
-    reason: "loadJsonFile/saveJsonFile 通用同步工具；S6 后生产侧零调用方（loadJsonFile 仅剩 seed 测试 helper 读 seed 源 fixture，saveJsonFile 已全仓零引用 → 台账 B5，清理归 S7），异步化属阶段 2 评估项",
-    expectedHits: 2,
+    reason: "loadJsonFile 通用同步工具，仅剩 seed 测试 helper 读 seed 源 fixture 使用；S6 后生产侧零调用方，异步化属阶段 2 评估项（S7 2026-08-31：saveJsonFile 已全仓零引用 → 台账 B5，随本批删除，本条命中 2 → 1）",
+    expectedHits: 1,
   },
 ];
 

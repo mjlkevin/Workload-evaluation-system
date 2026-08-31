@@ -12,7 +12,7 @@
   - `实施评估`（模板/规则/多组织/导出与版本；**项目名称**字段，与总方案联动或手填；**当前生效版本**下拉仅展示最新一条，历史在「版本历史」中查看，**按历史版本创建新版**用新编码继承快照；**导出 Excel** 列至表头「小计」、页脚无尾部多余空行，与参考版式一致）
   - `开发评估`（**项目名称**与总方案联动/手填，与实施评估一致）
   - `资源人天及成本`
-  - `系统管理`（**admin**：版本号编码规则列表、配置、生效、禁用；持久化 `config/versions/version-code-rules.json`）
+  - `系统管理`（**admin**：版本号编码规则列表、配置、生效、禁用；持久化 PostgreSQL `version_code_rules` / `system_configs`，seed 源仍为 `config/versions/version-code-rules.json` 等只读 fixture）
   - `WBS`（只读派生视图，见下文 API）、`评审`（团队评审能力见 `/api/v1/teams/.../reviews`）
 - 用户与权限：
   - 注册/登录/JWT 鉴权，支持“记住 7 天”会话
@@ -29,7 +29,7 @@
   - 需求支持 Excel 上传解析
   - Kimi 模型解析 + 规则回退解析融合，提升结构化表单兼容性
 - 团队协同（后端 P0）：
-  - 团队、成员、方案绑定、评审与评论：`/api/v1/teams/*`（持久化 `config/teams/store.json`）
+  - 团队、成员、方案绑定、评审与评论：`/api/v1/teams/*`（持久化 PostgreSQL `teams` / `team_plan_bindings`，阶段 2 S5，2026-08-30；原 `config/teams/store.json` 已随 JSON 读写路径删除）
 
 ## 前端与重构说明（2026-03 起）
 
@@ -68,23 +68,24 @@ npm run build -w apps/api
 
 - Web 前端：Vite + React（`ui/V2_PROTOTYPE`）
 - 后端：Express + TypeScript（`apps/api`）
-- 存储：当前以本地文件持久化为主（非传统数据库）
-  - 用户：`config/auth/users.json`
-  - 密码重置令牌：`config/auth/password-reset-tokens.json`
-  - 推荐码：`config/auth/invite-codes.json`
-  - 版本号规则：`config/versions/version-code-rules.json`
-  - 版本：已改存 PostgreSQL `version_records`（阶段 2 S4，2026-08-30）；
-    原 `config/versions/records.json` 已随 JSON 读写路径删除
-  - 团队：`config/teams/store.json`
+- 存储：PostgreSQL 是九域业务数据的唯一主存储（阶段 2 于 2026-08-31 收官，`WES_STORE_*_PG` 开关机制已退役、各域选择器恒装配 PG）；`config/*.json` 不再承载业务 store，只剩三类资产：
+  - 用户：PostgreSQL `users`（阶段 2 S1）；原 `config/auth/users.json` 已删除（切换前快照见 `99_归档/阶段2-users-store-切换前快照/`）
+  - 密码重置令牌 / 邀请码：PostgreSQL `password_reset_tokens` / `invite_codes`（阶段 2 批 1）；原 `config/auth/*.json` 归档至 `99_归档/`
+  - 版本记录：PostgreSQL `version_records`（阶段 2 S4，2026-08-30）；原 `config/versions/records.json` 已随 JSON 读写路径删除
+  - 团队：PostgreSQL `teams` / `team_plan_bindings`（阶段 2 S5，2026-08-30）；原 `config/teams/store.json` 已删除
+  - **seed 源 fixture（只读）**：`db/seed.ts` 的播种来源，不是运行时写入目标——`config/versions/version-code-rules.json`、`config/templates/example-template.json`、`config/rules/example-rule-set.json`、`config/system/requirement-settings.json`、`config/system/implementation-dependency-rules.json`、`config/knowledge/store.json`
+  - **运行时状态文件（非 store，永久豁免）**：`config/system/model-verify-status.json`（模型校验状态缓存，读写方 `system-effective.ts`）
+  - **离线评测资产（非请求路径）**：`config/rag/*.json`（baseline-samples / knowledge-retrieval-samples / prompts）
 
 ## 目录结构
 
 - `ui/V2_PROTOTYPE`：当前唯一 Web 前端主线（Vite + React，Phase B）
 - `apps/api`：后端 API 服务
-- `config/templates`：模板配置
-- `config/rules`：规则配置
-- `config/versions`：版本号编码规则（版本记录本体已改存 PostgreSQL）
-- `config/teams`：团队协同数据
+- `config/templates` / `config/rules` / `config/knowledge`：模板 / 规则集 / 知识词条的 **seed 源 fixture**（本体已改存 PostgreSQL `templates` / `rule_sets` 等表）
+- `config/system`：系统配置 seed 源 + `model-verify-status.json`（运行时状态缓存，非 store）
+- `config/versions`：版本号编码规则 seed 源 fixture（编码规则与版本记录本体均已改存 PostgreSQL）
+- `config/rag`：RAG 离线评测样本与 prompt 配置资产
+- 【历史说明，已下线】`config/auth` / `config/teams`：目录已随阶段 2 批 1 与 S5 删除，数据改存 PostgreSQL
 - `scripts`：规则抽取、回归、测试脚本
 - `对话流程总结`：过程沉淀与里程碑记录
 
@@ -149,8 +150,11 @@ npm run dev:web
 - `npm run test:web`：运行 Web 前端主线 Vitest 测试
 - `npm run test:e2e:web`：当前临时映射到 `npm run test:web`；V2 e2e 后续补齐后再切回专用端到端脚本
 - `npm run ops:backup:config`：备份 `config/*` 到 `backups/config/*`
-- `npm run ops:check:config`：执行配置完整性校验
-- `npm run ops:check:config:repair`：按兜底结构修复缺失/损坏配置，并记录日志
+
+> 【历史说明，已下线】原列于此的 `npm run ops:check:config` / `ops:check:config:repair`
+> （配置完整性校验与修复）已于 2026-08-31 随阶段 2 S7（D15 执行）整链删除；校验器的
+> `REQUIRED_FILES` 在九域 JSON 读写路径删完后已空，现行防线为 migrate fail-fast +
+> seed 守卫 + 防漂移测试（均进 CI）。
 
 ## 文档入口
 

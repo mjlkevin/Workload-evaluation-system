@@ -227,45 +227,10 @@ export async function clearApiKey(
   _credentialCache.delete(scope);
 }
 
-/** 幂等导入：DB 无此 scope 时导入，已有则不覆盖。返回 true=已导入，false=已存在跳过 */
-export async function importApiKeyIfAbsent(
-  scope: string,
-  plaintext: string,
-  actor: string,
-  poolOverride?: Pool,
-): Promise<boolean> {
-  const kek = resolveKek();
-  if (!kek) {
-    throw new Error("CREDENTIAL_KEK not configured: cannot import credentials");
-  }
-  const encrypted = encryptCredential(plaintext, kek);
-  const pool = resolvePool(poolOverride);
-
-  // INSERT ... ON CONFLICT DO NOTHING：已存在时不覆盖
-  const result = await pool.query(
-    `INSERT INTO credentials (scope, api_key_encrypted, key_version, updated_by, updated_at)
-     VALUES ($1, $2, 1, $3, now())
-     ON CONFLICT (scope) DO NOTHING
-     RETURNING scope`,
-    [scope, encrypted, actor],
-  );
-
-  if (result.rows.length === 0) {
-    // 已存在，不导入
-    return false;
-  }
-
-  // 写审计
-  await pool.query(
-    `INSERT INTO credential_audit (scope, action, actor, at, meta)
-     VALUES ($1, 'import', $2, now(), $3)`,
-    [scope, actor, JSON.stringify({ key_version: 1, source: "file" })],
-  );
-
-  // 更新缓存
-  _credentialCache.set(scope, plaintext);
-  return true;
-}
+// S7（2026-08-31，台账 B7）：原 `importApiKeyIfAbsent()`（幂等导入：DB 无此 scope
+// 时从文件密钥导入一次）已删除——它是凭据域 DB 化迁移的一次性补偿链，唯一
+// 生产调用点随 S3（system 域 JSON 读路径删除）消失，此后仅剩自身测试引用。
+// 凭据写入的唯一入口自此收敛为 setApiKey / rotateApiKey（均强制走加密 + 审计）。
 
 /** 读取审计日志 */
 export async function getAuditLog(

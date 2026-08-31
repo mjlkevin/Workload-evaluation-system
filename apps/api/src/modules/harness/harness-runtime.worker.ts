@@ -66,11 +66,10 @@ export type HarnessWorkflowCheckpointDirective = {
   aiMilestone?: Record<string, unknown>;
 };
 
-export type HarnessWorkflowOutboxEntry = {
-  eventType: string;
-  deduplicationKey: string;
-  payload: Record<string, unknown>;
-};
+// S7（2026-08-31）：原 `HarnessWorkflowOutboxEntry` 类型已删除——§4.8 补偿链
+// 于 S2b-2 拆除后它零生产者、零消费者（全仓 .outbox 命中仅测试文件），
+// 不落库、无持久化兼容负担，与事件名 outbox_enqueued 不同（后者须
+// 兼容已入库历史行，留档注见 harness-runtime.types.ts 的 HARNESS_RUN_EVENT_TYPES）。
 
 export type HarnessWorkflowOutputDirective = {
   status: HarnessOutputStatus;
@@ -83,7 +82,6 @@ export type HarnessWorkflowStepOutcome = {
   statePatch?: Record<string, unknown>;
   checkpoint?: HarnessWorkflowCheckpointDirective;
   output?: HarnessWorkflowOutputDirective;
-  outbox?: HarnessWorkflowOutboxEntry[];
 };
 
 export type HarnessToolEffectExecution = {

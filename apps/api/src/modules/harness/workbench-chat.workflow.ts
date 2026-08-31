@@ -3,7 +3,8 @@
 // ============================================================
 // 复用 workbench-dispatch.service.ts 意图分发链路，
 // 经 HarnessWorker recordToolEffectOnce 实现幂等，
-// assistant 消息经 appendSessionMessage 直接幂等落库（S2b-2 后 outbox 恒空）。
+// assistant 消息经 appendSessionMessage 直接幂等落库（S2b-2 补偿链已删；
+// S7 起返回结构不再包含 outbox 键）。
 //
 // Batch E 二次返工（新通道消息落库双缺陷修复，ISS-2026-08-09-002）：
 // C1 缺陷 A：assistant 直写内容与 answer 一致（不落空消息）；
@@ -11,8 +12,10 @@
 //   来源键 ${runId}:user:1 防恢复重放重复；503 回退同步路径不经
 //   本 workflow，零双写。
 // S2a（阶段 2 · §4.8）：assistant 消息改为同款直接幂等落库（同库直写）；
-// S2b-2（2026-08-28）：projector/sink/outbox 表随 §4.8 补偿链删除，outbox 恒空，
-//   恢复重放由 repository 层来源键查重吸收。
+// S2b-2（2026-08-28）：projector/sink/outbox 表随 §4.8 补偿链删除，
+//   恢复重放由 repository 层来源键查重吸收；S7（2026-08-31）连带删除
+//   已无生产者与消费者的 `outbox` 返回字段（旧注释里的「outbox 恒空」自此
+//   不再是「存在但为空」，而是「结构上不存在」）。
 
 import { randomUUID } from "node:crypto";
 import type {
@@ -149,10 +152,9 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         });
         if (flowResult.ok) {
           // runExplicitHomeReportFlow 已直接落库 assistant 消息 + artifact + pendingAction，
-          // 返回空 outbox 避免双写（S2b-2 后补偿链已删，outbox 恒空）。
+          // 返回体只带终态游标（补偿链已于 S2b-2 删除，outbox 字段随 S7 退役）。
           return {
             nextStepKey: null,
-            outbox: [],
           };
         }
         // API Key 缺失时回退到普通 dispatch（与同步路径行为对齐：同步路径返回 40001，
@@ -261,7 +263,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
 
       // S2b-2（§4.8 补偿链删除）：assistant 消息与 user 消息同款经
       // appendSessionMessage 直接幂等落库（同库直写），来源键
-      // ${run.harnessRunId}:assistant:1 由仓储层按键查重吸收；outbox 恒空
+      // ${run.harnessRunId}:assistant:1 由仓储层按键查重吸收；返回体已无 outbox 键
       // （projector/sink/outbox 表已随补偿链删除，恢复重放由去重吸收）。
       await deps.appendSessionMessage({
         sessionId: aiSessionId,
@@ -281,7 +283,6 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
 
       return {
         nextStepKey: null, // 单步 workflow，执行后直接终态
-        outbox: [],
       };
     },
   };

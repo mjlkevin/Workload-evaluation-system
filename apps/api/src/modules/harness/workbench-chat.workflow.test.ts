@@ -6,8 +6,9 @@
  * 3) assistant 消息经 appendSessionMessage 直接幂等落库（来源键 = ${runId}:assistant:1）；
  * 4)（Batch E 二次返工 · 新通道消息落库双缺陷修复）assistant 直写内容非空且与
  *    answer 一致；用户消息在 dispatch 前幂等落库。
- * 5)（S2b-2 · §4.8 补偿链删除）outbox 恒空，projector/sink 已删；幂等吸收由
- *    repository 层按键查重守护（本套件以 recording fake 断言调用序列与来源键）。
+ * 5)（S2b-2 · §4.8 补偿链删除，S7 收口）projector/sink 已删，workflow 返回
+ *    结构不再包含 outbox 键（不只看「恒空」，而是结构上不可能非空）；
+ *    幂等吸收由 repository 层按键查重守护（本套件以 recording fake 断言调用序列与来源键）。
  */
 import test, { before } from "node:test";
 import assert from "node:assert/strict";
@@ -180,7 +181,7 @@ test("executeStep 从 executionConfig.content 取输入并 dispatch", async () =
 
   assert.equal(dispatchedContent, "你好");
   assert.equal(outcome.nextStepKey, null, "单步 workflow 执行后应到达终态");
-  assert.deepEqual(outcome.outbox, [], "S2b-2 后补偿链已删，outbox 恒空");
+  assert.ok(!("outbox" in outcome), "S7 起返回结构不再包含 outbox 键（补偿链已于 S2b-2 删除）");
 });
 
 test("recordToolEffectOnce 幂等：重复执行不产生第二次 AI 调用", async () => {
@@ -245,7 +246,7 @@ test("assistant 消息来源键冻结为 ${runId}:assistant:1", async () => {
     "run-1:assistant:1",
     "assistant 来源键冻结为 run 维度 deduplicationKey",
   );
-  assert.deepEqual(outcome.outbox, [], "S2b-2 后 outbox 恒空");
+  assert.ok(!("outbox" in outcome), "S7 起返回结构不再包含 outbox 键");
 });
 
 // ============================================================
@@ -668,7 +669,7 @@ test("ISS-2026-08-16-004：显式报告闸门——附件存在且消息为「�
     // 闸门回退到普通 dispatch（与同步路径 40001 降级行为对齐）。
     assert.equal(dispatchCalled, true, "API Key 缺失时应回退到普通 dispatch");
     assert.equal(outcome.nextStepKey, null);
-    assert.deepEqual(outcome.outbox, [], "S2b-2 后补偿链已删，outbox 恒空");
+    assert.ok(!("outbox" in outcome), "S7 起返回结构不再包含 outbox 键（补偿链已于 S2b-2 删除）");
     assert.equal(calls.length, 2, "回退后仍直写 user + assistant 两条消息");
   } finally {
     cleanup();
@@ -703,17 +704,17 @@ test("ISS-2026-08-16-004：显式报告闸门——无附件时不触发（走�
 
   // 断言：无附件时闸门不命中，走普通 dispatch
   assert.equal(dispatchCalled, true, "无附件时应走普通 dispatch");
-  assert.deepEqual(outcome.outbox, [], "S2b-2 后 outbox 恒空");
+  assert.ok(!("outbox" in outcome), "S7 起返回结构不再包含 outbox 键");
 });
 
 // ============================================================
 // S2b-2（阶段 2 · §4.8 补偿链删除：assistant 消息直写幂等落库终态）RED 守护
 // 契约：assistant 消息与 user 消息同款经 appendSessionMessage 直接幂等落库
-// （同库直写，不经 outbox 中转）；outbox 恒空——projector/sink/outbox 表
+// （同库直写，不经 outbox 中转）；S7 起返回结构已无 outbox 键——projector/sink/outbox 表
 // 已随补偿链删除，恢复重放由 repository 层来源键查重吸收，消息恰好一条。
 // ============================================================
 
-test("S2b-2：assistant 消息直写幂等落库 + outbox 恒空", async () => {
+test("S2b-2：assistant 消息直写幂等落库 + 返回结构无 outbox 键", async () => {
   const calls: RecordedAppendCall[] = [];
   const wf = createWorkbenchChatWorkflow({
     dispatch: async () => ({
@@ -740,8 +741,8 @@ test("S2b-2：assistant 消息直写幂等落库 + outbox 恒空", async () => {
   assert.equal(calls[1].role, "assistant");
   assert.equal(calls[1].content, "模型回复");
 
-  // S2b-2 后 outbox 恒空（补偿链已删，不再有双路径共存）
-  assert.deepEqual(outcome.outbox, [], "S2b-2 后 outbox 恒空");
+  // S7 起 outbox 键已从返回结构移除（不再是「存在但为空」，而是结构上不存在）
+  assert.ok(!("outbox" in outcome), "S7 起返回结构不再包含 outbox 键");
 
   // 恢复重放：workflow 以同一来源键再次直写，去重由 repository 层按键查重保证
   await wf.executeStep("chat", makeFakeCtx());
