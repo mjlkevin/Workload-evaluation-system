@@ -39,6 +39,8 @@ const SYNC_IO_NAMES = new Set(["readFileSync", "writeFileSync"]);
 //   （S3 2026-08-30：trace repository 的 JSON 读写路径已删除，其条目随之下线）
 //   （S5 2026-08-30：team repository 的 JSON 读写路径已删除，其条目随之下线，
 //     本白名单从 8 条 / 13 处收敛为 7 条 / 12 处）
+//   （S7 2026-08-31：utils/file.ts 的 saveJsonFile 已删（台账 B5），该条命中 2 → 1，
+//     条目数不变仍 7 条，总命中 12 → 11 处）
 // - 复用型同步工具：utils/file.ts、prompt-registry.ts、rag-baseline 三个文件
 //   （被请求路径复用或 CLI/离线工具；异步化属阶段 2 评估项）
 //
@@ -78,8 +80,8 @@ const FILE_WHITELIST: Array<{ file: string; reason: string; expectedHits: number
   },
   {
     file: "utils/file.ts",
-    reason: "loadJsonFile/saveJsonFile 通用同步工具；S6 后生产侧零调用方（loadJsonFile 仅剩 seed 测试 helper 读 seed 源 fixture，saveJsonFile 已全仓零引用 → 台账 B5，清理归 S7），异步化属阶段 2 评估项",
-    expectedHits: 2,
+    reason: "loadJsonFile 通用同步工具，仅剩 seed 测试 helper 读 seed 源 fixture 使用；S6 后生产侧零调用方，异步化属阶段 2 评估项（S7 2026-08-31：saveJsonFile 已全仓零引用 → 台账 B5，随本批删除，本条命中 2 → 1）",
+    expectedHits: 1,
   },
 ];
 

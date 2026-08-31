@@ -35,15 +35,6 @@ export function loadJsonFile<T>(relativePath: string): T {
 }
 
 /**
- * 保存 JSON 文件
- */
-export function saveJsonFile(relativePath: string, data: unknown): void {
-  const filePath = path.resolve(resolveRootDir(), relativePath);
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
-}
-
-/**
  * 确保导出目录存在
  */
 export function ensureExportDir(): string {
@@ -67,6 +58,8 @@ export function ensureExportDir(): string {
 // modelVerifyStatusPath 不属本批删除面（S3 开工盘点 C1：读写方 system-effective.ts
 // 恒 JSON、PG 侧仅 seed 占位行，列入待裁）。versionsStorePath 已随 S4（2026-08-30）
 // 的 versions 域 JSON 读写路径删除一并下线。
+// S7（2026-08-31，台账 B5）：saveJsonFile 已删除——S6 后全仓零引用，九域 JSON
+// 写路径已全部下线，保留它等于给「还能写回 JSON」留一个不存在的出口。
 
 /**
  * 系统管理-模型场景最近验证状态存储路径

@@ -298,9 +298,8 @@ export type VersionRecord = {
   lastCheckinPayload?: Record<string, unknown>;
 };
 
-export type VersionsStore = {
-  records: VersionRecord[];
-};
+// S7（2026-08-31，台账 B10①）：`VersionsStore`（records.json 整存形状）已删除
+// ——S4 后 versions 域行级 PG 仓储零引用，保留它会误导「还存在整份快照结构」。
 
 // -------------------- 系统管理：版本号编码规则 --------------------
 
@@ -610,40 +609,9 @@ export function isVersionDocStatus(value: string): value is VersionDocStatus {
   return ["drafting", "reviewed"].includes(value);
 }
 
-/**
- * 迁移补全旧版本记录缺失的检入检出字段
- */
-export function migrateVersionRecord(record: VersionRecord): VersionRecord {
-  if (record.checkoutStatus === undefined) {
-    record.checkoutStatus = "checked_in";
-  }
-  if (record.versionDocStatus === undefined) {
-    record.versionDocStatus = "drafting";
-  }
-  if (record.majorLetter === undefined) {
-    record.majorLetter = "A";
-  }
-  if (record.minorNumber === undefined) {
-    record.minorNumber = 1;
-  }
-  if (record.baseCode === undefined) {
-    record.baseCode = record.versionCode;
-  }
-  if (record.isHistoricalArchive === undefined) {
-    record.isHistoricalArchive = false;
-  }
-  if (!record.createdByUserId) {
-    record.createdByUserId = record.ownerUserId;
-  }
-  if (!record.createdByUsername) {
-    record.createdByUsername = "—";
-  }
-  if (!record.updatedByUserId) {
-    record.updatedByUserId = record.createdByUserId;
-    record.updatedByUsername = record.createdByUsername;
-  }
-  return record;
-}
+// S7（2026-08-31，台账 B10①）：原 migrateVersionRecord() 已删除——它专为旧
+// records.json 缺字段补全而存在，S4 删除 JSON 读路径后零调用方（PG 写入恒为
+// 完整字段，见 versions.usecase.ts 头注）。
 
 export function isTemplateLike(input: unknown): input is Template {
   const t = input as Partial<Template>;
