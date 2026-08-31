@@ -1,6 +1,5 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import XLSX from "xlsx";
 import bcrypt from "bcryptjs";
@@ -14,7 +13,6 @@ import { signAuthToken, verifyAuthToken } from "../middleware/auth";
 import { getUsersRepository } from "./auth/users.repository";
 import { cleanupOneTestUser, cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 import { cleanupSingleDocStoreFixture, seedSingleDocStoreFixture, type SingleDocStoreSeed } from "../test-helpers/single-doc-store-seed";
-import { versionsStorePath } from "../utils";
 import {
   loadKnowledgeBaseConfigStore,
   loadVersionCodeRulesStore,
@@ -50,7 +48,7 @@ import { createConfirmAiAssessmentDraftHandler } from "./project-evaluations/pro
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
 import { bootstrapAiProviders, _resetAiBootstrapForTest } from "../ai/bootstrap";
 import { _resetSystemRepositoryForTest } from "./system/system.repository";
-import { _resetVersionsRepositoryForTest } from "./versions/versions.repository";
+import { _resetVersionsRepositoryForTest, getVersionsRepository } from "./versions/versions.repository";
 import { _resetTemplateRepositoryForTest } from "./templates/templates.repository";
 import { _resetRuleSetRepositoryForTest } from "./rules/rules.repository";
 import { _resetTeamRepositoryForTest } from "./team/team.repository";
@@ -82,7 +80,12 @@ let storeSeed: SingleDocStoreSeed | null = null;
 // knowledge-base-config 的 fixture 随之从「写 JSON 文件」改为「经 PG 仓储种入 +
 // 原值还原」（见 withKnowledgeBaseConfigSnapshot 与各用例的 t.after）；四个
 // *StorePath 也已从 utils/file.ts 下线，本文件残留的 JSON 文件构造仅剩
-// versionsStorePath（实取 15 处，归 S4）。
+// versionsStorePath（S3 交接口径：实取 15 处，归 S4）。
+// S4（2026-08-30）：versions 的 JSON 读写路径随本批删除、versions 域恒 PG。本文件
+// 13 处 versionsStorePath() 文件快照包装全部换成 withVersionsRowsReset——按 owner
+// 条件 DELETE 的行级重置（version_records 是行级域，不整表 TRUNCATE，C14 不适用）；
+// 用例不再直接读写 config/versions/records.json，fixture 改经版本仓储种入；
+// 本文件连 import fs 与四个 *SnapshotRestore 包装一并下线（已无文件可快照）。
 // S6（2026-08-29）：TEMPLATES / RULE_SETS / KNOWLEDGE 三域移出本列表——
 // 三域 JSON 路径已删、选择器恒 PG，delete 开关已不再能切回任何实现；
 // getRuleSetMeta 需要「活动文档存在」，而 db:seed 在 CI 里排在 Test modules
@@ -92,17 +95,15 @@ let storeSeed: SingleDocStoreSeed | null = null;
 // test:modules:serial-store 串行套件内（防漂移守卫已以
 // seedSingleDocStoreFixture 为写入指纹自动校验）。
 const PREVIOUS_STORE_PG_FLAGS = new Map<string, string | undefined>();
-// S5（2026-08-30）：WES_STORE_TEAMS_PG 已退役（teams 域恒 PG，JSON 路径已删），
-// 从本清单移除；下方 before/restoreStorePgFlags 仍逐个重置各域单例，
-// _resetTeamRepositoryForTest() 保留（重置钩子是测试能力，不依赖开关）。
-const STORE_PG_FLAG_KEYS = [
-  "WES_STORE_USERS_PG",
-  "WES_STORE_VERSIONS_PG",
-] as const;
+// S5（2026-08-30）/ S4（2026-08-30）：WES_STORE_TEAMS_PG 与 WES_STORE_VERSIONS_PG
+// 已退役（两域恒 PG，JSON 路径已删），从本清单移除；下方 before/restoreStorePgFlags
+// 仍逐个重置各域单例，_resetTeamRepositoryForTest() / _resetVersionsRepositoryForTest()
+// 保留（重置钩子是测试能力，不依赖开关）。
+const STORE_PG_FLAG_KEYS = ["WES_STORE_USERS_PG"] as const;
 
 /**
  * S3（2026-08-30）：knowledge-base-config 的 JSON 读写路径随本批删除、system 域恒 PG。
- * 语义与 withFileSnapshotRestoreAsync 对齐（读回原值 → 跑用例 → finally 写回），
+ * 语义与旧 withFileSnapshotRestoreAsync 对齐（跑前快照 → 跑用例 → finally 还原），
  * 使迁移期测试保持同样的嵌套结构。该 store 是 system_configs 的单行 upsert，
  * 种入不还原会泄漏到同套件其他文件与本表其他共写文件（system.kb-config /
  * system-pg.repository / assessment / workbench-dispatch），故本文件继续待在
@@ -114,6 +115,35 @@ async function withKnowledgeBaseConfigSnapshot(fn: () => Promise<void>): Promise
     await fn();
   } finally {
     await saveKnowledgeBaseConfigStore(previous);
+  }
+}
+
+/**
+ * S4（2026-08-30）：按 owner 条件删除本文件测试用户的版本行。
+ * 原 withFileSnapshotRestoreAsync(versionsStorePath()) 的「跑完还原文件」语义，
+ * 在 PG 侧由「起始清空 + finally 清空」承载：版本行全部归属 testAdmin/testPlainUser
+ * 这两个每次运行新建的测试用户，清自己的行不会触碰其他域或其他用户的真实数据。
+ * 走仓储 listRecords/deleteVersionRecord，不下沉到裸 SQL（AGENTS.md §2 Repository 边界）。
+ */
+async function resetVersionsRowsForOwner(ownerUserId: string): Promise<void> {
+  const repo = getVersionsRepository();
+  for (const record of await repo.listRecords({ ownerUserId })) {
+    await repo.deleteVersionRecord({ recordId: record.id, checkReferenced: false });
+  }
+}
+
+/**
+ * S4：versions 的行级重置包装，替代 JSON 时代的文件快照包装。
+ * 与 withFileSnapshotRestoreAsync 同位（包住整段用例、失败也清理），
+ * 并把当前活跃用户交给回调，供 fixture 种入时填 ownerUserId/createdBy*。
+ */
+async function withVersionsRowsReset(run: (owner: AuthUser) => Promise<void>): Promise<void> {
+  const owner = await getActiveUser();
+  await resetVersionsRowsForOwner(owner.id);
+  try {
+    await run(owner);
+  } finally {
+    await resetVersionsRowsForOwner(owner.id);
   }
 }
 
@@ -165,6 +195,8 @@ after(async () => {
     for (const session of await listAiSessions(user)) {
       await deleteAiSession(user, session.sessionId);
     }
+    // S4：版本行同口径兜底（按 owner 过滤，用例中途断言失败也不泄漏）
+    await resetVersionsRowsForOwner(user.id);
   }
   restoreStorePgFlags();
 });
@@ -311,20 +343,6 @@ async function pinAssessmentBindingToBuiltinMoonshot(): Promise<() => Promise<vo
   };
 }
 
-function withFileSnapshotRestore(filePath: string, run: () => void): void {
-  const existed = fs.existsSync(filePath);
-  const before = existed ? fs.readFileSync(filePath, "utf-8") : "";
-  try {
-    run();
-  } finally {
-    if (existed) {
-      fs.writeFileSync(filePath, before, "utf-8");
-    } else if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  }
-}
-
 test("system.usecase: empty retrieval still proves knowledge base connectivity", { concurrency: false }, async () => {
   const admin = testAdmin;
   assert.ok(admin, "active admin required");
@@ -362,58 +380,10 @@ test("system.usecase: empty retrieval still proves knowledge base connectivity",
   }
 });
 
-async function withFileSnapshotRestoreAsync(filePath: string, run: () => Promise<void>): Promise<void> {
-  const existed = fs.existsSync(filePath);
-  const before = existed ? fs.readFileSync(filePath, "utf-8") : "";
-  try {
-    await run();
-  } finally {
-    if (existed) {
-      fs.writeFileSync(filePath, before, "utf-8");
-    } else if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  }
-}
-
-function withFilesSnapshotRestore(filePaths: string[], run: () => void): void {
-  const snapshots = filePaths.map((filePath) => ({
-    filePath,
-    existed: fs.existsSync(filePath),
-    content: fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "",
-  }));
-  try {
-    run();
-  } finally {
-    for (const item of snapshots) {
-      if (item.existed) {
-        fs.writeFileSync(item.filePath, item.content, "utf-8");
-      } else if (fs.existsSync(item.filePath)) {
-        fs.unlinkSync(item.filePath);
-      }
-    }
-  }
-}
-
-// 阶段 1 批 2：多文件快照恢复的 async 版，供含 async handler 调用的测试使用。
-async function withFilesSnapshotRestoreAsync(filePaths: string[], run: () => Promise<void>): Promise<void> {
-  const snapshots = filePaths.map((filePath) => ({
-    filePath,
-    existed: fs.existsSync(filePath),
-    content: fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "",
-  }));
-  try {
-    await run();
-  } finally {
-    for (const item of snapshots) {
-      if (item.existed) {
-        fs.writeFileSync(item.filePath, item.content, "utf-8");
-      } else if (fs.existsSync(item.filePath)) {
-        fs.unlinkSync(item.filePath);
-      }
-    }
-  }
-}
+// S4（2026-08-30）：本文件的四个文件快照包装（withFileSnapshotRestore /
+// withFilesSnapshotRestore 及其 async 版）已全部下线——前两个在本批之前已无
+// 调用方（预存在死代码），后两个随本批 13 处 versionsStorePath 迁移失去调用方。
+// versions 域改用下方 withVersionsRowsReset 的行级重置；其他域早已恒 PG。
 
 test("auth.usecase: login returns required error when username/password missing", async () => {
   const req = createMockReq({ body: {} });
@@ -767,8 +737,7 @@ test("versions.usecase: deleteVersion returns type invalid", async () => {
 });
 
 test("versions.usecase: create -> update -> delete lifecycle works", { concurrency: false }, async () => {
-  const versionsPath = versionsStorePath();
-  await withFileSnapshotRestoreAsync(versionsPath, async () => {
+  await withVersionsRowsReset(async () => {
     const versionCode = `UT-LC-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
     const createReq = createMockReq({
@@ -815,13 +784,11 @@ test("versions.usecase: create -> update -> delete lifecycle works", { concurren
 });
 
 test("versions.usecase: createVersion generates versionCode by active rule when omitted", { concurrency: false }, async (t) => {
-  const versionsPath = versionsStorePath();
   const previousRules = await loadVersionCodeRulesStore();
   t.after(async () => {
     await saveVersionCodeRulesStore(previousRules);
   });
-  await withFilesSnapshotRestoreAsync([versionsPath], async () => {
-    fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
+  await withVersionsRowsReset(async () => {
     await saveVersionCodeRulesStore({
       rules: [
         {
@@ -858,13 +825,11 @@ test("versions.usecase: createVersion generates versionCode by active rule when 
 });
 
 test("versions.usecase: createVersion increments sequence on conflict under active rule", { concurrency: false }, async (t) => {
-  const versionsPath = versionsStorePath();
   const previousRules = await loadVersionCodeRulesStore();
   t.after(async () => {
     await saveVersionCodeRulesStore(previousRules);
   });
-  await withFilesSnapshotRestoreAsync([versionsPath], async () => {
-    fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
+  await withVersionsRowsReset(async () => {
     await saveVersionCodeRulesStore({
       rules: [
         {
@@ -905,13 +870,11 @@ test("versions.usecase: createVersion increments sequence on conflict under acti
 });
 
 test("versions.usecase: createVersion fails when rule is not active", { concurrency: false }, async (t) => {
-  const versionsPath = versionsStorePath();
   const previousRules = await loadVersionCodeRulesStore();
   t.after(async () => {
     await saveVersionCodeRulesStore(previousRules);
   });
-  await withFilesSnapshotRestoreAsync([versionsPath], async () => {
-    fs.writeFileSync(versionsPath, JSON.stringify({ records: [] }, null, 2), "utf-8");
+  await withVersionsRowsReset(async () => {
     await saveVersionCodeRulesStore({
       rules: [
         {
@@ -941,47 +904,36 @@ test("versions.usecase: createVersion fails when rule is not active", { concurre
 });
 
 test("versions.usecase: createVersion fails when active rule lacks sequence placeholder and conflicts", { concurrency: false }, async (t) => {
-  const versionsPath = versionsStorePath();
   const previousRules = await loadVersionCodeRulesStore();
   t.after(async () => {
     await saveVersionCodeRulesStore(previousRules);
   });
-  await withFilesSnapshotRestoreAsync([versionsPath], async () => {
-    const owner = await getActiveUser();
+  await withVersionsRowsReset(async (owner) => {
     const now = new Date().toISOString();
-    fs.writeFileSync(
-      versionsPath,
-      JSON.stringify(
-        {
-          records: [
-            {
-              id: "ut-fixed-existing",
-              type: "assessment",
-              versionCode: "IA-FIXED",
-              templateId: "default",
-              ownerUserId: owner.id,
-              status: "draft",
-              payload: {},
-              createdAt: now,
-              updatedAt: now,
-              createdByUserId: owner.id,
-              createdByUsername: owner.username,
-              updatedByUserId: owner.id,
-              updatedByUsername: owner.username,
-              checkoutStatus: "checked_in",
-              versionDocStatus: "drafting",
-              majorLetter: "A",
-              minorNumber: 0,
-              baseCode: "IA-FIXED",
-              isHistoricalArchive: false,
-            },
-          ],
-        },
-        null,
-        2,
-      ),
-      "utf-8",
-    );
+    // 原形态：把一条 IA-FIXED 直写进 records.json，作为「同号已被占用」的既有事实；
+    // PG 侧等价动作是经仓储种入同一行（owner/type/template 与 createVersion 的序号
+    // 探测口径一致，见 versions.usecase.ts 的 listRecords 调用）。
+    await getVersionsRepository().upsertVersionRecord({
+      id: "ut-fixed-existing",
+      type: "assessment",
+      versionCode: "IA-FIXED",
+      templateId: "default",
+      ownerUserId: owner.id,
+      status: "draft",
+      payload: {},
+      createdAt: now,
+      updatedAt: now,
+      createdByUserId: owner.id,
+      createdByUsername: owner.username,
+      updatedByUserId: owner.id,
+      updatedByUsername: owner.username,
+      checkoutStatus: "checked_in",
+      versionDocStatus: "drafting",
+      majorLetter: "A",
+      minorNumber: 0,
+      baseCode: "IA-FIXED",
+      isHistoricalArchive: false,
+    });
     await saveVersionCodeRulesStore({
       rules: [
         {
@@ -1011,8 +963,7 @@ test("versions.usecase: createVersion fails when active rule lacks sequence plac
 });
 
 test("versions.usecase: checkout -> checkin updates lock and version code", { concurrency: false }, async () => {
-  const versionsPath = versionsStorePath();
-  await withFileSnapshotRestoreAsync(versionsPath, async () => {
+  await withVersionsRowsReset(async () => {
     const versionCode = `UT-VCS-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: await getActiveUserToken(),
@@ -1054,8 +1005,7 @@ test("versions.usecase: checkout -> checkin updates lock and version code", { co
 });
 
 test("versions.usecase: save-draft updates payload while staying checked out", { concurrency: false }, async () => {
-  const versionsPath = versionsStorePath();
-  await withFileSnapshotRestoreAsync(versionsPath, async () => {
+  await withVersionsRowsReset(async () => {
     const versionCode = `UT-DRAFT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: await getActiveUserToken(),
@@ -1095,8 +1045,7 @@ test("versions.usecase: save-draft updates payload while staying checked out", {
 });
 
 test("versions.usecase: undo-checkout restores last checkin payload", { concurrency: false }, async () => {
-  const versionsPath = versionsStorePath();
-  await withFileSnapshotRestoreAsync(versionsPath, async () => {
+  await withVersionsRowsReset(async () => {
     const versionCode = `UT-UNDO-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: await getActiveUserToken(),
@@ -1117,13 +1066,13 @@ test("versions.usecase: undo-checkout restores last checkin payload", { concurre
     await checkoutVersion(checkoutReq, checkoutRes as unknown as Response);
     assert.equal(checkoutRes.statusCode, 200);
 
-    const store = JSON.parse(fs.readFileSync(versionsPath, "utf-8")) as {
-      records: Array<{ id: string; payload: Record<string, unknown> }>;
-    };
-    const target = store.records.find((x) => x.id === recordId);
-    assert.ok(target);
-    target.payload = { name: "changed" };
-    fs.writeFileSync(versionsPath, JSON.stringify(store, null, 2), "utf-8");
+    // 原形态：绕过 handler 直接改 JSON 文件里的 payload，模拟「检出后草稿被外部写脏」；
+    // PG 侧等价动作是行级 patch（同样不走 checkin/undo 流程，只脏化 payload）。
+    // 补上落库断言：原形态下「文件没写成功」会让用例变成假绿（payload 仍是
+    // before，undo 后仍断言通过），改后必须确认脏化真的生效。
+    const patched = await getVersionsRepository().updateVersionRecord(recordId, { payload: { name: "changed" } });
+    assert.ok(patched, "行级 patch 必须命中已检出记录");
+    assert.deepEqual(patched.payload, { name: "changed" });
 
     const undoReq = createMockReq({ token: await getActiveUserToken(), params: { id: recordId } });
     const undoRes = createMockRes();
@@ -1136,8 +1085,7 @@ test("versions.usecase: undo-checkout restores last checkin payload", { concurre
 });
 
 test("versions.usecase: promote archives current record and creates checked_out record", { concurrency: false }, async () => {
-  const versionsPath = versionsStorePath();
-  await withFileSnapshotRestoreAsync(versionsPath, async () => {
+  await withVersionsRowsReset(async () => {
     const versionCode = `UT-PM-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: await getActiveUserToken(),
@@ -1170,8 +1118,7 @@ test("versions.usecase: promote archives current record and creates checked_out 
 });
 
 test("versions.usecase: force-unlock requires admin and unlocks checked out record", { concurrency: false }, async () => {
-  const versionsPath = versionsStorePath();
-  await withFileSnapshotRestoreAsync(versionsPath, async () => {
+  await withVersionsRowsReset(async () => {
     const versionCode = `UT-FU-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const createReq = createMockReq({
       token: await getActiveUserToken(),
@@ -1378,7 +1325,7 @@ test("ai-sessions: normalizes invalid event fields and ignores blank events", as
 });
 
 test("project-evaluations: creates project plan from ai session", async () => {
-  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
+  await withVersionsRowsReset(async () => {
     const token = await getActiveUserToken();
     const req = createMockReq({
       token,
@@ -1399,17 +1346,19 @@ test("project-evaluations: creates project plan from ai session", async () => {
     assert.equal(body.data.project.customerName, "XX制造");
     assert.equal(body.data.project.createdFromSessionId, "session-001");
 
-    const store = fs.readFileSync(versionsStorePath(), "utf-8");
-    const parsed = JSON.parse(store) as { records: Array<{ id: string; type: string; ownerUserId: string; payload?: Record<string, unknown> }> };
-    const backing = parsed.records.find((record) => record.id === body.data.project.projectId);
-    assert.equal(backing?.type, "global");
-    assert.equal(backing?.payload?.recordKind, "project_evaluation");
-    assert.equal(backing?.payload?.projectStatus, "draft");
+    // 原形态：直读 records.json 找 backing 记录；PG 侧按 recordId 取行。
+    // 改成先 assert.ok 再断字段：原写法用 backing?.type，行不存在时只会得到
+    // undefined ≠ "global"，这里显式化避免空跑（§4.11 断言有效性口径）。
+    const backing = await getVersionsRepository().findRecordById(body.data.project.projectId);
+    assert.ok(backing, "项目容器必须落到 version_records");
+    assert.equal(backing.type, "global");
+    assert.equal(backing.payload.recordKind, "project_evaluation");
+    assert.equal(backing.payload.projectStatus, "draft");
   });
 });
 
 test("project-evaluations: lists project plans", async () => {
-  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
+  await withVersionsRowsReset(async () => {
     const token = await getActiveUserToken();
     await ProjectEvaluationsModule.createProjectEvaluation(createMockReq({
       token,
@@ -1428,64 +1377,63 @@ test("project-evaluations: lists project plans", async () => {
 });
 
 test("project-evaluations: project containers do not replace latest formal global plan for WBS", async () => {
-  await withFileSnapshotRestoreAsync(versionsStorePath(), async () => {
-    const user = await getActiveUser();
-    const token = signAuthToken(user);
-    fs.writeFileSync(versionsStorePath(), JSON.stringify({
-      records: [
-        {
-          id: "formal-global",
-          type: "global",
-          versionCode: "GL-FORMAL",
-          templateId: "default",
-          ownerUserId: user.id,
-          status: "draft",
-          payload: { projectName: "正式总方案", requirementImportVersionCode: "RI-FORMAL" },
-          createdAt: "2026-01-01T00:00:00.000Z",
-          updatedAt: "2026-01-01T00:00:00.000Z",
-          createdByUserId: user.id,
-          createdByUsername: user.username,
-          updatedByUserId: user.id,
-          updatedByUsername: user.username,
-          checkoutStatus: "checked_in",
-          versionDocStatus: "drafting",
-          majorLetter: "A",
-          minorNumber: 0,
-          baseCode: "GL-FORMAL",
-          isHistoricalArchive: false,
-          lastCheckinPayload: {},
-        },
-        {
-          id: "legacy-project-container",
-          type: "global",
-          versionCode: "PROJECT-LEGACY",
-          templateId: "project-evaluation",
-          ownerUserId: user.id,
-          status: "draft",
-          payload: { projectName: "遗留项目容器" },
-          createdAt: "2026-01-02T00:00:00.000Z",
-          updatedAt: "2026-01-02T00:00:00.000Z",
-          createdByUserId: user.id,
-          createdByUsername: user.username,
-          updatedByUserId: user.id,
-          updatedByUsername: user.username,
-          checkoutStatus: "checked_in",
-          versionDocStatus: "drafting",
-          majorLetter: "A",
-          minorNumber: 0,
-          baseCode: "PROJECT-LEGACY",
-          isHistoricalArchive: false,
-          lastCheckinPayload: {},
-        },
-      ],
-    }, null, 2), "utf-8");
+  await withVersionsRowsReset(async (owner) => {
+    const token = signAuthToken(owner);
+    // 原形态：直写 records.json 整份 fixture（一条正式总方案 + 一条遗留项目容器）；
+    // PG 侧经 upsertVersionRecords 批量种入，保留「多条一次提交」的原语义。
+    await getVersionsRepository().upsertVersionRecords([
+      {
+        id: "formal-global",
+        type: "global",
+        versionCode: "GL-FORMAL",
+        templateId: "default",
+        ownerUserId: owner.id,
+        status: "draft",
+        payload: { projectName: "正式总方案", requirementImportVersionCode: "RI-FORMAL" },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        createdByUserId: owner.id,
+        createdByUsername: owner.username,
+        updatedByUserId: owner.id,
+        updatedByUsername: owner.username,
+        checkoutStatus: "checked_in",
+        versionDocStatus: "drafting",
+        majorLetter: "A",
+        minorNumber: 0,
+        baseCode: "GL-FORMAL",
+        isHistoricalArchive: false,
+        lastCheckinPayload: {},
+      },
+      {
+        id: "legacy-project-container",
+        type: "global",
+        versionCode: "PROJECT-LEGACY",
+        templateId: "project-evaluation",
+        ownerUserId: owner.id,
+        status: "draft",
+        payload: { projectName: "遗留项目容器" },
+        createdAt: "2026-01-02T00:00:00.000Z",
+        updatedAt: "2026-01-02T00:00:00.000Z",
+        createdByUserId: owner.id,
+        createdByUsername: owner.username,
+        updatedByUserId: owner.id,
+        updatedByUsername: owner.username,
+        checkoutStatus: "checked_in",
+        versionDocStatus: "drafting",
+        majorLetter: "A",
+        minorNumber: 0,
+        baseCode: "PROJECT-LEGACY",
+        isHistoricalArchive: false,
+        lastCheckinPayload: {},
+      },
+    ]);
 
     await ProjectEvaluationsModule.createProjectEvaluation(createMockReq({
       token,
       body: { projectName: "最新项目容器", customerName: "XX制造" },
     }), createMockRes() as unknown as Response);
 
-    const items = await buildDerivedWbsItemsForUser(user);
+    const items = await buildDerivedWbsItemsForUser(owner);
     assert.equal(items[0].sourceGlobalVersionCode, "GL-FORMAL");
     assert.match(items[0].taskName, /正式总方案/);
 

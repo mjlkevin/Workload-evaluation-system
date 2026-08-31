@@ -72,8 +72,9 @@ npm run build -w apps/api
   - 用户：`config/auth/users.json`
   - 密码重置令牌：`config/auth/password-reset-tokens.json`
   - 推荐码：`config/auth/invite-codes.json`
-  - 版本：`config/versions/records.json`
   - 版本号规则：`config/versions/version-code-rules.json`
+  - 版本：已改存 PostgreSQL `version_records`（阶段 2 S4，2026-08-30）；
+    原 `config/versions/records.json` 已随 JSON 读写路径删除
   - 团队：`config/teams/store.json`
 
 ## 目录结构
@@ -82,7 +83,7 @@ npm run build -w apps/api
 - `apps/api`：后端 API 服务
 - `config/templates`：模板配置
 - `config/rules`：规则配置
-- `config/versions`：版本持久化记录
+- `config/versions`：版本号编码规则（版本记录本体已改存 PostgreSQL）
 - `config/teams`：团队协同数据
 - `scripts`：规则抽取、回归、测试脚本
 - `对话流程总结`：过程沉淀与里程碑记录

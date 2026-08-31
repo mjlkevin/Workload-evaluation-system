@@ -65,14 +65,8 @@ export function ensureExportDir(): string {
 // JSON 读写路径删除（四配置恒 PG）。与 users 域不同，这四个 seed 源文件仍在版本库
 // 内——它们是 db/seed.ts 的入播来源（D17「零数据迁移」口径），保留文件仅停读写；
 // modelVerifyStatusPath 不属本批删除面（S3 开工盘点 C1：读写方 system-effective.ts
-// 恒 JSON、PG 侧仅 seed 占位行，列入待裁），versionsStorePath 归 S4。
-
-/**
- * 版本存储路径
- */
-export function versionsStorePath(): string {
-  return path.resolve(resolveRootDir(), "config/versions/records.json");
-}
+// 恒 JSON、PG 侧仅 seed 占位行，列入待裁）。versionsStorePath 已随 S4（2026-08-30）
+// 的 versions 域 JSON 读写路径删除一并下线。
 
 /**
  * 系统管理-模型场景最近验证状态存储路径

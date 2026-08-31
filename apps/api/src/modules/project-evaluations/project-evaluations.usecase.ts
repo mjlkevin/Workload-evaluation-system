@@ -4,7 +4,7 @@ import type { AuthUser, VersionRecord } from "../../types";
 import { asString } from "../../utils";
 import { applyVersionCodeFormat, formatHasSequenceToken } from "../../utils/version-code-format";
 import { loadVersionCodeRulesStore } from "../system/system.repository";
-import { loadVersionsStore } from "../versions/versions.repository";
+import { getVersionsRepository } from "../versions/versions.repository";
 import type { HarnessRequirementReportV2Content } from "../harness/harness.types";
 import { createHarnessRepository, type HarnessRepository } from "../harness/harness.repository";
 import { PROJECT_EVALUATION_RECORD_KIND, findHarnessDraftRecords, findProjectRecordByAssessmentDraft, listProjectRecords, mapGlobalVersionToProject, saveProjectRecord, saveProjectRecords } from "./project-evaluations.repository";
@@ -15,6 +15,9 @@ import type { AiAssessmentDraftManualConfirmResult, AiDraftManualConfirmation, P
  * 若规则不存在或未生效，回退到 PROJECT-{uuid} 保证不阻断创建。
  * 阶段 1 批 4：级联改 async（loadVersionsStore 异步化）；
  * 阶段 1 批 5：loadVersionCodeRulesStore 已异步化，下方调用补 await（跨批依赖点真正生效）。
+ * 阶段 2 S4（2026-08-30）：冲突探测改经版本仓储 listRecords（原直读
+ * records.json 的 loadVersionsStore 是本域 JSON 路径的最后一条生产旁路，
+ * 随该路径删除一并收口）；同 owner + type=global 的过滤口径不变。
  */
 async function generateProjectVersionCode(ownerUserId: string): Promise<string> {
   const rulesStore = await loadVersionCodeRulesStore();
@@ -24,7 +27,7 @@ async function generateProjectVersionCode(ownerUserId: string): Promise<string> 
   const format = rule.format || "{PREFIX}-{YYYYMMDD}-{NNN}";
   const hasSeq = formatHasSequenceToken(format);
   const now = new Date();
-  const store = await loadVersionsStore();
+  const existingGlobals = await getVersionsRepository().listRecords({ ownerUserId, type: "global" });
 
   for (let seq = 1; seq <= 9999; seq += 1) {
     if (!hasSeq && seq > 1) break;
@@ -35,9 +38,7 @@ async function generateProjectVersionCode(ownerUserId: string): Promise<string> 
       seq,
       now,
     });
-    const conflict = store.records.some(
-      (r) => r.ownerUserId === ownerUserId && r.type === "global" && r.versionCode === candidate
-    );
+    const conflict = existingGlobals.some((r) => r.versionCode === candidate);
     if (!conflict) return candidate;
   }
   return `PROJECT-${randomUUID()}`;
