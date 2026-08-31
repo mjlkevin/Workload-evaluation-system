@@ -37,6 +37,12 @@ export const HARNESS_RUN_EVENT_TYPES = [
   "run_status_changed",
   "checkpoint_committed",
   "output_updated",
+  // outbox_enqueued：生产者已于 S2b-2 退役，永不再发；保留仅为兼容已持久化的
+  // 历史行（2026-08-31 实取 harness_run_events 31 727 行中含本事件 68 行）。
+  // 词汇表描述的是「这张表里可能存在什么」，删条目会让按白名单校验或映射
+  // event_type 的读路径把这 68 行判为非法或静默丢弃。新增写入即为缺陷，
+  // 由 harness-runtime.worker.test.ts 的负向守护拦截。
+  // 本条不为 S7 而减少：additive-only（只增不减）契约未修订。
   "outbox_enqueued",
   "cancel_requested",
   "run_completed",
