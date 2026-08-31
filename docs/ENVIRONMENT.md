@@ -9,7 +9,11 @@
 | `PORT` | 否 | `3000` | API 监听端口 |
 | `JWT_SECRET` | 生产必填 | 开发内置弱密钥 | JWT 签名密钥，**生产环境必须更换** |
 | `JWT_EXPIRES_IN` | 否 | `8h` | Token 有效期 |
-| `CONFIG_INTEGRITY_ON_STARTUP` | 否 | `true` | 是否在 API 启动时执行 `config/*` 完整性校验（`false` 关闭） |
+
+> **S7（2026-08-31，D15 执行）**：`CONFIG_INTEGRITY_ON_STARTUP` 已退役删除。
+> 启动期 `config/*` 完整性校验（`ops/config-integrity.ts` + `ops:config:check` CLI）整链下线：
+> 九域 JSON 读写路径删除后 `REQUIRED_FILES` 已清空，校验器实跑仅输出 `checked 0 files.`。
+> 配置正确性现由 DB 侧承载（migrate fail-fast + seed 守卫 + `no-sync-store-io` 防漂移测试）。
 
 ## 需求 / Excel 智能解析（Kimi / Moonshot）
 
@@ -33,7 +37,6 @@ JWT_SECRET=please-change-in-production
 JWT_EXPIRES_IN=8h
 KIMI_API_KEY=
 KIMI_MODEL=kimi-k2.5
-CONFIG_INTEGRITY_ON_STARTUP=true
 ```
 
 **注意**：不要将包含真实 Key 的 `.env.local` 提交到 Git。

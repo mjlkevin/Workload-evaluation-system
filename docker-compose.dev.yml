@@ -18,7 +18,8 @@ services:
       - ./apps/api/drizzle:/repo/apps/api/drizzle
     environment:
       NODE_ENV: development
-      CONFIG_INTEGRITY_ON_STARTUP: "false"
+      # S7（2026-08-31，D15 执行）：原 CONFIG_INTEGRITY_ON_STARTUP: "false" 随启动期
+      # 配置完整性校验整链下线删除（REQUIRED_FILES 已空，校验器实跑 checked 0 files）。
     ports:
       - "3000:3000"
 

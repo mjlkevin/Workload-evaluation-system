@@ -149,8 +149,11 @@ npm run dev:web
 - `npm run test:web`：运行 Web 前端主线 Vitest 测试
 - `npm run test:e2e:web`：当前临时映射到 `npm run test:web`；V2 e2e 后续补齐后再切回专用端到端脚本
 - `npm run ops:backup:config`：备份 `config/*` 到 `backups/config/*`
-- `npm run ops:check:config`：执行配置完整性校验
-- `npm run ops:check:config:repair`：按兜底结构修复缺失/损坏配置，并记录日志
+
+> 【历史说明，已下线】原列于此的 `npm run ops:check:config` / `ops:check:config:repair`
+> （配置完整性校验与修复）已于 2026-08-31 随阶段 2 S7（D15 执行）整链删除；校验器的
+> `REQUIRED_FILES` 在九域 JSON 读写路径删完后已空，现行防线为 migrate fail-fast +
+> seed 守卫 + 防漂移测试（均进 CI）。
 
 ## 文档入口
 
