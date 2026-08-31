@@ -38,8 +38,6 @@
     "test:web": "npm run test --prefix ui/V2_PROTOTYPE",
     "test:bundle": "bash scripts/run-test-bundle.sh",
     "ops:backup:config": "node scripts/backup-config.js",
-    "ops:check:config": "npm run ops:config:check -w apps/api",
-    "ops:check:config:repair": "npm run ops:config:check:repair -w apps/api",
     "test:all": "npm run test:modules && npm run test:modules:serial-store && npm run test:rules && npm run test:integration && npm run rules:regression && npm run rules:excel-report",
     "test:e2e:web": "npm run test:web"
   },
