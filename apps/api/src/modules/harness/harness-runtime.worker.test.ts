@@ -162,15 +162,8 @@ function makeFakeWorkflow(hooks: FakeHooks, counters: { toolExecutions: number }
             nextStepKey: "s2",
             statePatch: { clientMessageId },
             checkpoint: { key: "input_committed", kind: "structural", resumePolicy: "resume_next" },
-            // S2b-2 后 worker 忽略 outbox（补偿链已删）；保留返回值模拟旧协议，
-            // 由 T1 的 outbox_enqueued=0 断言守护 worker 不得再入队。
-            outbox: [
-              {
-                eventType: "user_message",
-                deduplicationKey: `run:${runId}:user-message:${clientMessageId}`,
-                payload: { message: { role: "user", content: "fake user message" } },
-              },
-            ],
+            // S7（2026-08-31）：原 fake 返回的 outbox 条目已删（字段与补偿链同步退役）；
+            // 不得再产生 outbox_enqueued 行由下方守护断言拦截。
           };
         }
         case "s2": {
@@ -240,14 +233,7 @@ function makeFakeWorkflow(hooks: FakeHooks, counters: { toolExecutions: number }
               content: { text: modelText },
               contentHash: createHash("sha256").update(modelText).digest("hex"),
             },
-            // S2b-2 后 worker 忽略 outbox（补偿链已删）；保留返回值模拟旧协议。
-            outbox: [
-              {
-                eventType: "final_response",
-                deduplicationKey: `run:${runId}:final-response`,
-                payload: { message: { role: "assistant", content: modelText } },
-              },
-            ],
+            // S7（2026-08-31）：原 fake 返回的 outbox 条目已删（字段与补偿链同步退役）。
           };
         }
         default:
@@ -322,9 +308,12 @@ test("T1 worker claims a queued run and drives the fake workflow to completion",
   ]);
 
   assert.equal((await listEvents(run.harnessRunId, "run_completed")).length, 1);
-  // S2b-2（2026-08-28）：worker 不再消费 workflow outbox（补偿链已删）——
-  // fake workflow 仍返回 outbox 条目，守护 worker 必须忽略而非入队。
-  assert.equal((await listEvents(run.harnessRunId, "outbox_enqueued")).length, 0, "S2b-2 后不得再入队 outbox 事件");
+  // S2b-2（2026-08-28）：worker 不再消费 workflow outbox（补偿链已删）。
+  // S7（2026-08-31）：`outbox` 字段与 fake workflow 的 outbox 返回值已一并删除，
+  // 本守护的职责由「带 outbox 输入仍须忽略」转为「不再产生新行」：生产者
+  // 结构上已不存在，任何 outbox_enqueued 新行即为缺陷。事件名本身因已入库
+  // 历史行（2026-08-31 实取 68 行）保留，留档注见 harness-runtime.types.ts。
+  assert.equal((await listEvents(run.harnessRunId, "outbox_enqueued")).length, 0, "S7 后不得再产生 outbox_enqueued 事件行");
 
   const outputs = await testDb!
     .select()

@@ -2,8 +2,11 @@
 // Harness 持久运行 Runtime 类型
 // ============================================================
 // RP-047 Batch A：定义 durable Run 的 runKind、Attempt/Checkpoint/
-// Output/Outbox 状态词汇、事件类型与确定性 effectKey。本文件不含
+// Output 状态词汇、事件类型与确定性 effectKey。本文件不含
 // 数据库访问逻辑，供 schema、repository 与后续批次共享契约。
+// S7（2026-08-31）：Outbox 状态词汇（HARNESS_OUTBOX_STATUSES /
+// HarnessOutboxStatus）已随全仓零消费者删除；事件名 outbox_enqueued
+// 保留（已入库历史行兼容，见下方留档注）。
 
 import type { HarnessRunStatus } from "./harness.types";
 
@@ -27,9 +30,6 @@ export type HarnessResumePolicy = (typeof HARNESS_RESUME_POLICIES)[number];
 
 export const HARNESS_OUTPUT_STATUSES = ["partial", "final"] as const;
 export type HarnessOutputStatus = (typeof HARNESS_OUTPUT_STATUSES)[number];
-
-export const HARNESS_OUTBOX_STATUSES = ["pending", "processing", "published", "failed"] as const;
-export type HarnessOutboxStatus = (typeof HARNESS_OUTBOX_STATUSES)[number];
 
 export const HARNESS_RUN_EVENT_TYPES = [
   "run_queued",
