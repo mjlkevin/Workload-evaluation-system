@@ -68,6 +68,10 @@ const SERIAL_SCOPE_FILES = [
   // version 单行计数器均无隔离维度。本文件与 modules.usecase.test.ts（team 用例
   // 改走 PG 快照-还原）互为对方的 TRUNCATE 源，必须同处串行组。
   "modules/team/team-pg.repository.test.ts",
+  // S3B1（2026-09-01）：ai.repository.test.ts 接入 test:modules:serial-store，
+  // before 自种 requirementSettings 行（load 缺行返回 null，断言依赖行存在），
+  // 经 saveRequirementSystemConfigStore 写 system_configs 单文档表——同 S3 判据。
+  "modules/ai/ai.repository.test.ts",
 ] as const;
 
 /** 串行套件脚本名与并行套件脚本名。 */
@@ -256,8 +260,8 @@ test("串行白名单与 package.json 脚本参数列表逐位一致", () => {
 test("串行白名单计数钉定（新增触碰或批次收敛都必须显式更新本条）", () => {
   assert.equal(
     SERIAL_SCOPE_FILES.length,
-    10,
+    11,
     `SERIAL_SCOPE_FILES 实为 ${SERIAL_SCOPE_FILES.length} 条：新增即意味着有新的无界读表写入方，` +
-      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进；S5：9→10，teams 域 JSON 路径删除使 modules.usecase 的 team 用例改走 PG 整存快照-还原，team-pg.repository 随之移进串行组）"
+      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进；S5：9→10，teams 域 JSON 路径删除使 modules.usecase 的 team 用例改走 PG 整存快照-还原，team-pg.repository 随之移进串行组；S3B1：10→11，ai.repository.test.ts 接入串行组，before 自种 system_configs.requirementSettings 行）"
   );
 });

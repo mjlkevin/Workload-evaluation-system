@@ -25,7 +25,9 @@ import {
 //  - 「loadRequirementSystemConfigStore: 文件有 apiKey 时清空文件并填充缓存」
 //    与「文件无 apiKey 时不触发导入」：文件→DB 一次性密钥导入是 JSON 读路径
 //    专属 shim（system-pg.repository.ts:35-37 自承「PG 路径不适用」）；导入函数
-//    本身的幂等语义由 credentials.store.test.ts 直接持 pool 覆盖，不依赖被删 shim。
+//    本身的幂等语义由 credentials.store.test.ts 直接持 pool 覆盖（S3B1 2026-09-01
+//    前该文件零引用从未运行，本条注释曾以它为覆盖依据——假绿证据；本批已将其
+//    接入 test:modules，声明成立）。
 //  - 「saveRequirementSystemConfigStore: 即使 store 有 apiKey 也写空串到文件」：
 //    职责由 system-pg.repository.test.ts「requirementSettings round-trip：store
 //    深相等且 apiKey 读回必为空（密钥不落库）」承担，并补上原未断的缓存填充。

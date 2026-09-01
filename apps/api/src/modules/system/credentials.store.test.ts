@@ -127,6 +127,11 @@ const testScope = "kimi-test-" + Date.now().toString(36);
 
 before(async () => {
   if (!testDatabaseUrl) return;
+  // S3B1（2026-09-01）：DB 写路径无 KEK 拒绝降级明文（credentials.store.ts:10）。
+  // CI 与本地直接跑均不带 CREDENTIAL_KEK，测试自产随机 KEK 注入。resolveKek
+  // 优先读 process.env，config/env.ts 的 credentialKek 缓存为 undefined（模块
+  // import 时无 KEK）→ 上层「未配置返回 null」用例 delete env 后仍走 null 分支。
+  process.env.CREDENTIAL_KEK = randomBytes(32).toString("base64");
   pool = new Pool({ connectionString: testDatabaseUrl, max: 5 });
   // 清理可能的残留
   await pool.query("DELETE FROM credential_audit WHERE scope = $1", [testScope]);
@@ -139,6 +144,7 @@ after(async () => {
     await pool.query("DELETE FROM credentials WHERE scope = $1", [testScope]);
     await pool.end();
   }
+  delete process.env.CREDENTIAL_KEK;
 });
 
 afterEach(async () => {
@@ -201,8 +207,11 @@ test("DB rotate: key_version 递增且审计存在 action=rotate", { skip: !test
 });
 
 // S7（2026-08-31，台账 B7）：原「DB import 幂等: 首次导入成功，二次不覆盖」用例
-// 随 `importApiKeyIfAbsent` 删除。本文件不属任何 test:* 脚本（台账 B4 的 14 个
-// 孤儿测试文件之一），故本批不影响六套件计数。
+// 随 `importApiKeyIfAbsent` 删除。
+// S3B1（2026-09-01，台账 B4 分诊）：接入 test:modules（该跑没跑——实现全在役、
+// 断言无条件、scope 前缀 + 条件 DELETE 符合 C5 数据集隔离；DB 用例 KEK 由 before
+// 自产注入）。接入前本文件零引用从未运行，system.repository.test.ts:28 曾以它
+// 为「幂等语义已覆盖」依据（假绿证据），该注释已随本批一并修正。
 
 test("重启留存: set 后清缓存再读取，密钥仍可解密一致", { skip: !testDatabaseUrl }, async () => {
   const plaintext = "sk-restart-persistence-007";
