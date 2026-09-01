@@ -48,6 +48,15 @@ jobs:
       - name: Type-check API
         run: cd apps/api && npx tsc --noEmit
 
+      # S3B2（2026-09-01，阶段 3 批 2 任务 D，原 B6）：仓根 scripts/ 纳入类型检查。
+      # apps/api/tsconfig.json 的 include/rootDir 不动（避免污染 dist 产物布局）；
+      # 新增独立 noEmit 工程 tsconfig.scripts.json 仅覆盖 scripts/**/*.ts，
+      # import 的 apps/api/src 依赖自动拉入编译图（strict 同口径）。
+      # 首跑（2026-09-01，worktree 本地实取）：零错误——export-traces-to-langfuse.ts
+      # 的 async 缺陷已在 S3（2026-08-30）修复（注释见 L123-125），无其它类型错误。
+      - name: Type-check scripts (tsconfig.scripts.json)
+        run: npx tsc -p tsconfig.scripts.json --noEmit
+
   test-non-db:
     needs: tsc
     runs-on: ubuntu-latest
@@ -70,6 +79,31 @@ jobs:
 
       - name: Test agent (no DB)
         run: npm run test:agent
+
+      # S3B2（2026-09-01，阶段 3 批 2 任务 C）：test:security 接入 CI（此前从未在 CI 执行）。
+      # 串起 check-tracked-secrets.js（误提交密钥扫描，git ls-files 的 config 文件）+
+      # knowledge-base-url-policy.test.ts（Zhipu URL 策略，同时被 test:modules 引用）。
+      # 无库依赖（git ls-files + JSON 解析），挂在 test-non-db 耗时 <1s。
+      # 首跑（2026-09-01，worktree 本地实取）：3+2 用例 pass / fail 0 / skipped 0，
+      # 主脚本输出 [secret-scan] no tracked secret fields found，不报红、无需白名单。
+      # config/auth/users.json 已在 .gitignore:75 忽略且不在 git 跟踪（S1 已移出跟踪归档），
+      # 密钥扫描只扫 git 跟踪的 config 文件，故不触发。
+      - name: Test security (secret scan + URL policy)
+        run: npm run test:security
+
+      # S3B2（2026-09-01，阶段 3 批 2 任务 B）：scripts/ 5 个测试文件接入 CI。
+      # 此前 scripts/ 6 个测试文件全部不在 CI 执行范围（3 个零引用 + 2 个被
+      # test:board:branches 引用但该脚本不在 CI + 1 个随 test:security 进 CI）。
+      # 无库依赖（纯 node:test + 看板资产文件读取），挂 test-non-db 实测 <4s。
+      # 接入前本地实跑发现 2 处真实漂移并修复：
+      # ① board-work-items.test.js:135 updatedAt 断言停在 08-03，
+      #    board-work-items.json 已于 08-19（fdfe45f）合法更新至 08-19 → 断言同步；
+      # ② branch-board-page.test.js:836 要求 issues.html 含 RP-045 事件挂载，
+      #    fdfe45f 重写 issues.html 时丢失该挂载（其余 6 页面均保留）→ 补回
+      #    data-board-event-id="BE-2026-08-02-rp-045-branch-topology:issues"。
+      # 断言均为无条件形态（§4.11 A-1/A-2/A-3），无假绿。
+      - name: Test scripts (board event / work items / speak-plainly / branch board)
+        run: npm run test:scripts
 
   # 前端门禁（阶段 1 合并排期裁决）：V2_PROTOTYPE 是当前唯一 Web 主线，
   # 其 356 个 vitest 用例与生产构建从未接入 CI（阶段 0 第 0 批清单第 5 项遗留）。

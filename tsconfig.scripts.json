@@ -1,0 +1,22 @@
+{
+  // S3B2（2026-09-01，阶段 3 批 2 任务 D，原 B6）：仓根 scripts/**/*.ts 纳入类型检查。
+  // 背景：apps/api/tsconfig.json 的 include 仅 src/**/*.ts、rootDir: src，
+  // scripts/export-traces-to-langfuse.ts 长期不在任何 tsconfig 视野（该目录另有 49 个 .js），
+  // 其 async 缺陷从阶段 1 存活至 S3 才被注释式修复（L123-125），此后无类型检查兜底。
+  // 做法：不动 apps/api/tsconfig.json（避免污染 dist 产物布局）；本文件独立 noEmit 工程，
+  // 仅覆盖仓根 scripts/**/*.ts，import 的 apps/api/src 依赖自动拉入编译图（strict 同口径，
+  // 该面已在 apps/api tsconfig 下检查通过，不产生新噪声）。CI tsc job 增一步
+  // `npx tsc -p tsconfig.scripts.json --noEmit` 执行。
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*.ts"]
+}

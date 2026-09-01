@@ -132,7 +132,7 @@ test('RP-045 branch topology intake is registered once with issue-first traceabi
   );
   const matches = registry.issues.filter((issue) => issue.id === 'ISS-2026-08-02-001');
 
-  assert.equal(registry.updatedAt, '2026-08-03');
+  assert.equal(registry.updatedAt, '2026-08-19');
   assert.equal(matches.length, 1);
   assert.equal(matches[0].title, '项目看板缺少主分支与子分支拓扑');
   assert.equal(matches[0].triageStatus, 'converted');
