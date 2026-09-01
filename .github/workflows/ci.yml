@@ -48,6 +48,15 @@ jobs:
       - name: Type-check API
         run: cd apps/api && npx tsc --noEmit
 
+      # S3B2（2026-09-01，阶段 3 批 2 任务 D，原 B6）：仓根 scripts/ 纳入类型检查。
+      # apps/api/tsconfig.json 的 include/rootDir 不动（避免污染 dist 产物布局）；
+      # 新增独立 noEmit 工程 tsconfig.scripts.json 仅覆盖 scripts/**/*.ts，
+      # import 的 apps/api/src 依赖自动拉入编译图（strict 同口径）。
+      # 首跑（2026-09-01，worktree 本地实取）：零错误——export-traces-to-langfuse.ts
+      # 的 async 缺陷已在 S3（2026-08-30）修复（注释见 L123-125），无其它类型错误。
+      - name: Type-check scripts (tsconfig.scripts.json)
+        run: npx tsc -p tsconfig.scripts.json --noEmit
+
   test-non-db:
     needs: tsc
     runs-on: ubuntu-latest
