@@ -3,7 +3,10 @@
 // memory.repository.test — 记忆 repository 单元测试
 // ============================================================
 // 使用 node:test + node:assert，不依赖 vitest
-// 需要可用 PostgreSQL（TEST_DATABASE_URL）；缺失时跳过
+// 需要可用 PostgreSQL（TEST_DATABASE_URL || DATABASE_URL）；缺失时跳过
+// S3B1（2026-09-01，台账 B4 分诊）：接入 test:modules。cleanup 原为整表 delete
+// （违 C5 数据集隔离），改为 ownerUserId 前缀 + 条件 DELETE；测试数据带随机
+// 前缀，与共享测试库其他数据集互不干扰。
 
 import assert from "node:assert/strict";
 import { after, afterEach, before, test, describe } from "node:test";
@@ -25,8 +28,9 @@ maybeSkip("memory.repository (requires DB)", () => {
   let pool: Pool;
   let repo: ReturnType<typeof createMemoryRepository>;
 
-  const ownerUserId = "user-001";
-  const projectId = "proj-001";
+  // 随机前缀隔离（C5）：与共享测试库其他数据集互不干扰；条件 DELETE 只清本前缀
+  const ownerUserId = "memtest-" + randomUUID();
+  const projectId = "memtest-proj-" + randomUUID();
   const harnessRunId = randomUUID();
 
   const sampleDistill: DistillOutput = {
@@ -41,8 +45,9 @@ maybeSkip("memory.repository (requires DB)", () => {
 
   async function cleanup() {
     if (!db) return;
-    await db.delete(memoryScenes);
-    await db.delete(memoryAtoms);
+    // C5 数据集隔离：按 ownerUserId 前缀条件删除，禁止整表 delete
+    await db.delete(memoryScenes).where(eq(memoryScenes.ownerUserId, ownerUserId));
+    await db.delete(memoryAtoms).where(eq(memoryAtoms.ownerUserId, ownerUserId));
   }
 
   before(async () => {

@@ -1,10 +1,17 @@
 /**
- * Step 4 F 组验收复活（RP-047 Batch E）。
- * 常驻回归资产：
- * F1) 发送后指示器 activeCount > 0；
- * F2) 三色通知三态（queued/running/终态）事件流断言；
- * F3) 离页（unmount）后 run 继续、回页水合消息不丢不重（零 cancel 守护）；
- * F4) 同会话活跃 run 期间二次提交 → 409 SESSION_HAS_ACTIVE_RUN 前端文案呈现。
+ * Step 4 F 组验收（RP-047 Batch E）· S3B1 瘦身后仅保留 F4。
+ * S3B1（2026-09-01，台账 B4 分诊）：本文件零引用接入 test:harness 前逐条裁决——
+ *  - F1（提交后 listActiveRuns > 0）：与 harness-runtime.usecase.test.ts:354
+ *    「listActiveRuns only returns the caller's own active runs」重复 → 删；
+ *  - F2（三色通知事件流）：与 harness-runtime.usecase.test.ts:203（202 payload
+ *    queued status + eventCursor）重叠 → 删；
+ *  - F3（回页水合幂等）：L292-311 自写 appendMessages 闭包模拟水合，被测实现
+ *    完全不参与，属 §4.11 A-3 假绿；真实水合/去重语义已由
+ *    workbench-chat.workflow.test.ts:187（recordToolEffectOnce 幂等）与 :829
+ *    （重放语义）覆盖 → 删；
+ *  - F4（同会话活跃 run 二次提交 409）：usecase 层无等价用例（routes 层
+ *    ai-runs.routes.test.ts:446 是 delete session 的 409，非 submitRun）→ 保留。
+ * 常驻回归资产：同会话活跃 run 期间二次提交 → 409 SESSION_HAS_ACTIVE_RUN。
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -97,7 +104,7 @@ function makeRunRow(overrides: Record<string, unknown> = {}): Record<string, unk
   };
 }
 
-function makeFakeRepo(options: { activeRunForSession?: boolean } = {}) {
+function makeFakeRepo() {
   const runs: Array<Record<string, unknown>> = [];
   const events: Array<Record<string, unknown>> = [];
   const calls: Record<string, number> = {};
@@ -160,7 +167,6 @@ function makeFakeRepo(options: { activeRunForSession?: boolean } = {}) {
     },
     async hasActiveRunForSession(aiSessionId: string) {
       bump("hasActiveRunForSession");
-      if (options.activeRunForSession) return true;
       return runs.some((run) => run.aiSessionId === aiSessionId && ["queued", "running", "waiting", "recovering", "cancelling"].includes(String(run.status)));
     },
     async listRunEventsAfter(runId: string, after: number) {
@@ -218,98 +224,6 @@ function makeDeps(overrides: Partial<AiRunsUsecaseDeps> = {}): TestDeps {
     ...overrides,
   } as unknown as TestDeps;
 }
-
-// ----------------------------------------------------------------
-// F1: 发送后指示器 activeCount > 0
-// ----------------------------------------------------------------
-
-test("f-group: F1 提交后 listActiveRuns 返回真实 run 且 activeCount > 0", async () => {
-  const deps = makeDeps();
-  const user = makeUser();
-  const session = makeSession(user);
-  deps.sessions.set(session.sessionId, session);
-  const usecase = createAiRunsUsecase(deps);
-
-  const submitted = await usecase.submitRun(user, session.sessionId, {
-    submissionKey: randomUUID(),
-    content: "F1 测试消息",
-  });
-  assert.equal(submitted.status, 202);
-  assert.ok(submitted.data.runId);
-
-  const active = await usecase.listActiveRuns(user);
-  assert.equal(active.length, 1, "activeCount 必须 > 0");
-  assert.equal(active[0].runId, submitted.data.runId);
-});
-
-// ----------------------------------------------------------------
-// F2: 三色通知三态事件流断言
-// ----------------------------------------------------------------
-
-test("f-group: F2 事件流包含 queued 状态", async () => {
-  const deps = makeDeps();
-  const user = makeUser();
-  const session = makeSession(user);
-  deps.sessions.set(session.sessionId, session);
-  const usecase = createAiRunsUsecase(deps);
-
-  const submitted = await usecase.submitRun(user, session.sessionId, {
-    submissionKey: randomUUID(),
-    content: "F2 测试消息",
-  });
-  const runId = submitted.data.runId;
-
-  const snapshot = await usecase.getRunSnapshot(user, runId);
-  assert.ok(snapshot);
-  assert.equal(snapshot.run.status, "queued");
-
-  const runEvents = deps.repo.events.filter((e: Record<string, unknown>) => e.harnessRunId === runId);
-  assert.ok(
-    runEvents.some((e: Record<string, unknown>) => e.eventType === "run_queued"),
-    "事件流必须包含 run_queued 事件"
-  );
-});
-
-// ----------------------------------------------------------------
-// F3: 离页（unmount）后 run 继续、回页水合消息不丢不重
-// ----------------------------------------------------------------
-
-test("f-group: F3 消息水合到会话且幂等（deduplicationKey）", async () => {
-  const deps = makeDeps();
-  const user = makeUser();
-  const session = makeSession(user);
-  deps.sessions.set(session.sessionId, session);
-  const usecase = createAiRunsUsecase(deps);
-
-  const submitted = await usecase.submitRun(user, session.sessionId, {
-    submissionKey: randomUUID(),
-    content: "F3 测试消息",
-  });
-  const runId = submitted.data.runId;
-
-  const dedupKey = `${runId}:assistant:1`;
-
-  const appendMessages = (messages: Array<Record<string, unknown>>) => {
-    const existingKeys = new Set((session.messages as Array<Record<string, unknown>>).map((m) => m.deduplicationKey).filter(Boolean));
-    const newMessages = messages.filter((m) => !existingKeys.has(m.deduplicationKey));
-    session.messages.push(...newMessages as never[]);
-    return newMessages.length;
-  };
-
-  const appended1 = appendMessages([{ deduplicationKey: dedupKey, content: "F3 测试回复" }]);
-  assert.equal(appended1, 1, "第一次水合应追加 1 条消息");
-
-  assert.ok(
-    (session.messages as Array<Record<string, unknown>>).some((m) => m.deduplicationKey === dedupKey),
-    "消息必须按来源键水合到会话（S2b-2 后为直写路径同一去重语义）"
-  );
-
-  const appended2 = appendMessages([{ deduplicationKey: dedupKey, content: "F3 测试回复" }]);
-  assert.equal(appended2, 0, "幂等：相同 deduplicationKey 不得重复追加");
-
-  const assistantMessages = (session.messages as Array<Record<string, unknown>>).filter((m) => m.deduplicationKey === dedupKey);
-  assert.equal(assistantMessages.length, 1, "会话中必须只有一条该 deduplicationKey 的消息");
-});
 
 // ----------------------------------------------------------------
 // F4: 同会话活跃 run 期间二次提交 → 409 SESSION_HAS_ACTIVE_RUN

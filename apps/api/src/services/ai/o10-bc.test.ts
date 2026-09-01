@@ -2,6 +2,14 @@
 // O10 Batch C: 能力回复自然化与回归加固测试
 // RED 先行 — 断言新行为，先跑红再实现。
 // ============================================================
+// S3B1（2026-09-01，台账 B4 分诊）：接入 test:modules。原 10 条中删除 2 条重复——
+//  - 「unsupported classification at 0.9 still adopted」：与
+//    workbench-dispatch.service.test.ts:660（同场景 unsupported 0.9 采纳 +
+//    model_classification_fallback + 「超出了我的能力范围」）完全等价 → 删；
+//  - 「greeting '你好' still routes to capability_discovery」：与
+//    workbench-intent.service.test.ts:16 完全重复 → 删。
+// 其余 8 条为增量（新问法「你会干什么/你能帮我干啥/支持哪些操作/你有什么能力」
+// 与 capability handler 模型辅助/降级路径，既有套件未覆盖）。
 
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -50,33 +58,7 @@ test("O10-C: '你会干什么，还有多组织业务往来' routes to capabilit
   assert.equal(result.intent, "capability_discovery");
 });
 
-// 3. Batch A unsupported_or_out_of_scope 行为不回退
-
-test("O10-C: unsupported classification at 0.9 still adopted (Batch A not regressed)", async () => {
-  const result = await dispatchHomeWorkbenchTurn({
-    user,
-    workflowKey: "free_chat",
-    message: "帮我写一首诗",
-    businessRole: "pre_sales",
-    roleLabel: "售前顾问",
-    model: "kimi-test",
-    modelChat: async ({ systemPrompt }) => {
-      if (systemPrompt.includes("意图分类器")) {
-        return {
-          answer: JSON.stringify({ intent: "unsupported_or_out_of_scope", confidence: 0.9, reason: "创作请求" }),
-          rawContent: "",
-        };
-      }
-      throw new Error("model_should_not_be_called");
-    },
-  });
-
-  assert.equal(result.intent, "unsupported_or_out_of_scope");
-  assert.equal(result.trace.routingRule, "model_classification_fallback");
-  assert.match(result.answer, /超出了我的能力范围/);
-});
-
-// 4. 报告显式请求不误入 capability_reply
+// 3. 报告显式请求不误入 capability_reply
 
 test("O10-C: explicit report request '生成需求解析报告' routes to harness_report_generation, not capability", () => {
   const result = routeWorkbenchIntent({ message: "生成需求解析报告", hasAttachment: false, hasLatestV1Artifact: false });
@@ -84,13 +66,8 @@ test("O10-C: explicit report request '生成需求解析报告' routes to harnes
   assert.equal(result.routingRule, "report_generation_keywords");
 });
 
-// 5. 问候语仍走 capability_discovery（硬口径零变更）
-
-test("O10-C: greeting '你好' still routes to capability_discovery (unchanged)", () => {
-  const result = routeWorkbenchIntent({ message: "你好", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "capability_discovery");
-  assert.equal(result.routingRule, "greeting_keywords");
-});
+// 4. 问候语仍走 capability_discovery（硬口径零变更）
+// （S3B1：原「greeting '你好'」用例与 workbench-intent.service.test.ts:16 重复，已删）
 
 // ── Dispatch / Handler 层测试（≥4 类）────────────────────────
 
