@@ -357,7 +357,7 @@
               <td>S3（不影响任何在役功能；但它是「<b>看起来有测试，实则从不运行</b>」的活样本——一个红在主干上的断言提供的不是保护而是假覆盖，且恰好是阶段 3 B4 守卫要防的那一类）。定级按影响而非量级：不阻断发布，但直接证伪「测试通过」这类声称</td>
               <td><span class="status warn"><span class="dot"></span>open · 归阶段 3 测试基建小批（本行仅立项，本轮纯文档不改代码）</span></td>
               <td><code class="inline">scripts/board-work-items.test.js</code>（实取 8 用例中 1 条红）。同面另两个零引用文件现均绿：<code class="inline">board-event.test.js</code> 7/7、<code class="inline">speak-plainly-skill.test.js</code> 6/6</td>
-              <td>属 B4 三分类的「<b>该跑没跑</b>」。候选修法：把钉死字面值的断言改为不断言全局 <code class="inline">updatedAt</code>（或改读该 issue 条目自身字段），再接进可见面。<b>禁止「直接删断言」式灭火</b>，也不得靠改 JSON 把日期改回去凑断言。是否把守卫扫描面从 <code class="inline">apps/api/src/**/*.test.ts</code> 扩到仓根 <code class="inline">scripts/</code> 另待开工请示，不在本行预设</td>
+              <td>属 B4 三分类的「<b>该跑没跑</b>」。候选修法：把钉死字面值的断言改为不断言全局 <code class="inline">updatedAt</code>（或改读该 issue 条目自身字段），再接进可见面。<b>禁止「直接删断言」式灭火</b>，也不得靠改 JSON 把日期改回去凑断言。守卫扫描面从 <code class="inline">apps/api/src/**/*.test.ts</code> 扩到仓根 <code class="inline">scripts/</code> —— <b>2026-09-01 复核轮已批准扩面</b>，本行所在面一并纳入（与 B6 同源盲区，一起覆盖）</td>
               <td>已实取：干净 main HEAD（<code class="inline">e50becd</code>）上 <code class="inline">node --test scripts/board-work-items.test.js</code> → tests 8 / pass 7 / <b>fail 1</b>；<code class="inline">git log</code> 实取断言引入于 <code class="inline">6d940c8</code>（2026-08-03），<code class="inline">updatedAt</code> 变更于 <code class="inline">fdfe45f</code>（2026-08-19，+68/−1）。修法落地后目标 8/8</td>
               <td>该文件三选一落地：被某个 <code class="inline">test:*</code> 引用并跑绿 / 删除并理由入档 / 显式排除并在文件头写明为什么。不得继续以「写了但从不运行」形态存在</td>
             </tr>
