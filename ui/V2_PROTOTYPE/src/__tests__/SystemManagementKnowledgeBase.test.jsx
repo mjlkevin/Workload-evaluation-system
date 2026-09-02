@@ -306,4 +306,35 @@ describe('SystemManagement knowledge base feedback', () => {
     expect(await screen.findByText('验证失败')).toBeInTheDocument()
     expect(screen.queryByText('已验证')).not.toBeInTheDocument()
   })
+
+  test('warns on save when a knowledge id looks like a placeholder (DEF-2026-09-02-001)', async () => {
+    server.use(
+      http.patch(`${BASE}/system/knowledge-base-config/draft`, () => HttpResponse.json({
+        success: true,
+        data: {
+          version: 2,
+          warnings: [{
+            field: 'knowledgeBases.solutions.knowledgeId',
+            reason: 'placeholder_knowledge_id',
+            message: '知识库「金蝶解决方案知识库」的 ID「kb-solutions」形似占位值，请确认已替换为真实 ID',
+          }],
+        },
+      })),
+    )
+    await renderKnowledgeBase()
+
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }))
+
+    expect(await screen.findByText(/形似占位值，请确认已替换为真实 ID/)).toBeInTheDocument()
+    expect(screen.getByText('知识库配置草稿已保存')).toBeInTheDocument()
+  })
+
+  test('saves without a warning toast when no placeholder ids are present (DEF-2026-09-02-001)', async () => {
+    await renderKnowledgeBase()
+
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }))
+
+    expect(await screen.findByText('知识库配置草稿已保存')).toBeInTheDocument()
+    expect(screen.queryByText(/形似占位值/)).not.toBeInTheDocument()
+  })
 })

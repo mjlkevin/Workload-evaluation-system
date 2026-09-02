@@ -890,6 +890,57 @@ export function validateKnowledgeBaseProfiles(
   return issues;
 }
 
+export type KnowledgeBasePlaceholderWarning = {
+  field: string;
+  reason: "placeholder_knowledge_id";
+  message: string;
+  profileId?: string;
+};
+
+/**
+ * DEF-2026-09-02-001：占位形态知识库 ID 检测（仅警告，不阻断保存）。
+ * 已取证真实 ID 为 19 位数字串；`kb-` 前缀命名与 fixture/placeholder 等词汇
+ * 属开发夹具习惯（kb-solutions / kb-fixture / kb-cases 为 08-30 污染源），
+ * 命中即提示；不做硬校验——无法证明全部合法形态。
+ */
+export function collectKnowledgeBasePlaceholderWarnings(input: {
+  credentialsKnowledgeId?: string;
+  knowledgeBases?: Array<Pick<KnowledgeBaseProfile, "id" | "name" | "knowledgeId">>;
+}): KnowledgeBasePlaceholderWarning[] {
+  const warnings: KnowledgeBasePlaceholderWarning[] = [];
+  const legacyId = String(input.credentialsKnowledgeId || "").trim();
+  if (legacyId && looksLikePlaceholderKnowledgeId(legacyId)) {
+    warnings.push({
+      field: "credentials.knowledgeId",
+      reason: "placeholder_knowledge_id",
+      message: `知识库 ID「${legacyId}」形似占位值，保存已生效但连通性测试可能失败，请确认真实 ID`,
+    });
+  }
+  for (const profile of input.knowledgeBases || []) {
+    const knowledgeId = String(profile.knowledgeId || "").trim();
+    if (knowledgeId && looksLikePlaceholderKnowledgeId(knowledgeId)) {
+      warnings.push({
+        field: `knowledgeBases.${profile.id || "?"}.knowledgeId`,
+        reason: "placeholder_knowledge_id",
+        ...(profile.id ? { profileId: profile.id } : {}),
+        message: `知识库「${profile.name || profile.id || "未命名"}」的 ID「${knowledgeId}」形似占位值，请确认已替换为真实 ID`,
+      });
+    }
+  }
+  return warnings;
+}
+
+function looksLikePlaceholderKnowledgeId(id: string): boolean {
+  // 已取证的合法形态（智谱真实 ID）：19 位数字串，不告警
+  if (/^\d{19}$/.test(id)) return false;
+  // `kb-` 前缀为开发夹具命名习惯（kb-solutions / kb-fixture / kb-cases）
+  if (/^kb-/i.test(id)) return true;
+  // 明显占位词汇
+  if (/\b(fixture|placeholder|dummy|mock|sample|example)\b/i.test(id)) return true;
+  if (/^(test|demo|changeme|change-me|your[-_]?id)$/i.test(id)) return true;
+  return false;
+}
+
 export function normalizeKnowledgeBaseConfig(input: unknown): KnowledgeBaseConfig {
   const base = createDefaultKnowledgeBaseConfig();
   const source = (input || {}) as Partial<KnowledgeBaseConfig>;

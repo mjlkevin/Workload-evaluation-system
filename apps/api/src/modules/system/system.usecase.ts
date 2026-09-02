@@ -19,6 +19,7 @@ import { fail, ok } from "../../utils/response";
 import { KimiPingFailure, pingKimiChatCompletion } from "../../utils/kimi-ping";
 import {
   buildVersionCodeSample,
+  collectKnowledgeBasePlaceholderWarnings,
   computeKnowledgeBaseConfigHash,
   computeKnowledgeBaseProfileHash,
   loadImplementationDependencyRulesStore,
@@ -859,6 +860,12 @@ export async function updateKnowledgeBaseConfigDraft(req: Request, res: Response
   store.draft = nextDraft;
   store.updatedAt = now;
   await saveKnowledgeBaseConfigStore(store);
+  // DEF-2026-09-02-001：占位形态知识库 ID 警告（不阻断保存）；
+  // 真实 ID 已取证为 19 位数字串，但不足证明全部合法形态，故仅提示。
+  const placeholderWarnings = collectKnowledgeBasePlaceholderWarnings({
+    credentialsKnowledgeId: store.draft.credentials.knowledgeId,
+    knowledgeBases: store.draft.knowledgeBases,
+  });
   return res.json(
     ok(
       {
@@ -876,6 +883,7 @@ export async function updateKnowledgeBaseConfigDraft(req: Request, res: Response
           },
         },
         updatedAt: store.updatedAt,
+        ...(placeholderWarnings.length ? { warnings: placeholderWarnings } : {}),
       },
       responseRequestId(res),
     ),

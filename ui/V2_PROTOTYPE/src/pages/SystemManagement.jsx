@@ -248,6 +248,12 @@ export default function SystemManagement({ sectionId }) {
     setKbSaveResult(result.success
       ? { ok: true, message: '知识库配置草稿已保存' }
       : { ok: false, message: result.error || '知识库配置草稿保存失败' })
+    // DEF-2026-09-02-001：占位形态知识库 ID 仅警告不阻断（后端已附带 warnings）
+    if (result.success && Array.isArray(result.data?.warnings) && result.data.warnings.length) {
+      result.data.warnings.forEach((warning) => {
+        toast.warn(warning.message || '知识库 ID 形似占位值，请确认已替换为真实 ID')
+      })
+    }
   }
 
   const handleActivateKb = async () => {

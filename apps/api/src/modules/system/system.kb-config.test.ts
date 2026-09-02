@@ -284,3 +284,35 @@ test("probe failure carries classified reason and raw provider code/msg into fai
   assert.equal(persisted?.providerCode, 500);
   assert.equal(persisted?.providerMessage, "x".repeat(200));
 });
+
+test("draft save warns on placeholder knowledge ids without blocking (DEF-2026-09-02-001)", { skip: !testDatabaseUrl, concurrency: false }, async () => {
+  await resetStore();
+  const { updateKnowledgeBaseConfigDraft } = await import("./system.usecase");
+
+  const saved = responseCapture();
+  await updateKnowledgeBaseConfigDraft(
+    await adminRequest({
+      credentials: { apiKey: "fixture-key", knowledgeId: "1234567890123456789" },
+      knowledgeBases: [
+        { id: "solutions", name: "方案库", knowledgeId: "kb-solutions", enabled: true, isDefault: true },
+        { id: "real", name: "真实库", knowledgeId: "1234567890123456789", enabled: true },
+      ],
+    }),
+    saved.response,
+  );
+  assert.equal(saved.statusCode, 200);
+  assert.equal(saved.payload.data.warnings.length, 1);
+  assert.equal(saved.payload.data.warnings[0].reason, "placeholder_knowledge_id");
+  assert.equal(saved.payload.data.warnings[0].field, "knowledgeBases.solutions.knowledgeId");
+
+  const real = responseCapture();
+  await updateKnowledgeBaseConfigDraft(
+    await adminRequest({
+      credentials: { apiKey: "fixture-key", knowledgeId: "1234567890123456789" },
+      knowledgeBases: [],
+    }),
+    real.response,
+  );
+  assert.equal(real.statusCode, 200);
+  assert.equal(real.payload.data.warnings, undefined);
+});

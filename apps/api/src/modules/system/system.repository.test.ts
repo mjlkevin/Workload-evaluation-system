@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   _resetSystemRepositoryForTest,
+  collectKnowledgeBasePlaceholderWarnings,
   computeKnowledgeBaseConfigHash,
   computeKnowledgeBaseProfileHash,
   getSystemRepository,
@@ -296,4 +297,52 @@ test("选择器记忆化：多次取用返回同一单例", () => {
 test("PG 工厂签名与选择器装配一致", () => {
   const pgMarker = createSystemPgRepository;
   assert.equal(typeof pgMarker, "function");
+});
+
+test("占位形态知识库 ID 告警：kb- 前缀与占位词命中，19 位数字真实 ID 不命中", () => {
+  // DEF-2026-09-02-001：仅警告不阻断；真实 ID 已取证为 19 位数字串，
+  // 但不足以证明全部合法形态，故不做硬校验。
+  assert.deepEqual(
+    collectKnowledgeBasePlaceholderWarnings({
+      credentialsKnowledgeId: "",
+      knowledgeBases: [
+        { id: "solutions", name: "方案库", knowledgeId: "kb-solutions" },
+        { id: "cases", name: "案例库", knowledgeId: "kb-cases" },
+        { id: "real", name: "真实库", knowledgeId: "1234567890123456789" },
+      ],
+    }),
+    [
+      {
+        field: "knowledgeBases.solutions.knowledgeId",
+        reason: "placeholder_knowledge_id",
+        profileId: "solutions",
+        message: "知识库「方案库」的 ID「kb-solutions」形似占位值，请确认已替换为真实 ID",
+      },
+      {
+        field: "knowledgeBases.cases.knowledgeId",
+        reason: "placeholder_knowledge_id",
+        profileId: "cases",
+        message: "知识库「案例库」的 ID「kb-cases」形似占位值，请确认已替换为真实 ID",
+      },
+    ],
+  );
+  assert.deepEqual(
+    collectKnowledgeBasePlaceholderWarnings({
+      credentialsKnowledgeId: "1234567890123456789",
+      knowledgeBases: [{ id: "legacy-default", name: "默认", knowledgeId: "1234567890123456789" }],
+    }),
+    [],
+  );
+  assert.equal(
+    collectKnowledgeBasePlaceholderWarnings({ credentialsKnowledgeId: "kb-fixture" })[0].reason,
+    "placeholder_knowledge_id",
+  );
+  assert.equal(
+    collectKnowledgeBasePlaceholderWarnings({ credentialsKnowledgeId: "fixture-abc" })[0].reason,
+    "placeholder_knowledge_id",
+  );
+  assert.equal(
+    collectKnowledgeBasePlaceholderWarnings({ credentialsKnowledgeId: "demo" })[0].reason,
+    "placeholder_knowledge_id",
+  );
 });

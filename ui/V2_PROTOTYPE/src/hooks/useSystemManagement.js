@@ -510,7 +510,7 @@ export default function useSystemManagement({
       const credentials = {
         ...(kbConfig.apiKey.trim() ? { apiKey: kbConfig.apiKey.trim() } : {}),
       }
-      await apiClient.patch('/system/knowledge-base-config/draft', {
+      const payload = await apiClient.patch('/system/knowledge-base-config/draft', {
         model: kbConfig.model,
         apiBaseUrl: kbConfig.apiBaseUrl,
         credentials,
@@ -518,6 +518,8 @@ export default function useSystemManagement({
         retrievalParams: kbConfig.retrievalParams,
         promptProfile: kbConfig.promptProfile,
       })
+      // DEF-2026-09-02-001：透出保存响应的占位 ID 警告（不阻断保存）
+      return payload?.data
     })
   }, [enabled, kbConfig, withAction])
 
