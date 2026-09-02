@@ -57,6 +57,8 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
     goLogin: chat.goLogin,
     copyDraft: chat.copyDraft,
     onToggleThought: chat.toggleThought,
+    // DEF-2026-08-27-003：解析失败气泡的重试入口
+    onRetryParse: chat.retryAttachmentParse,
   }
 
   // O8：当前活跃 Run（用于停止按钮）
