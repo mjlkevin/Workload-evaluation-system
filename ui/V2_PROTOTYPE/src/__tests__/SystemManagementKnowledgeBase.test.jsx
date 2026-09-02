@@ -291,4 +291,19 @@ describe('SystemManagement knowledge base feedback', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('上游服务暂不可用')
     expect(screen.getByRole('alert')).toHaveTextContent('HTTP 503')
   })
+
+  test('marks the profile probe as failed when the connectivity test fails (DEF-2026-09-02-001)', async () => {
+    server.use(
+      http.post(`${BASE}/system/knowledge-base-config/test`, () => {
+        return HttpResponse.json({ code: 40001, message: '知识库连通性测试未通过' }, { status: 400 })
+      })
+    )
+    await renderKnowledgeBase()
+
+    expect(screen.getAllByText('待测试').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: /测试 .*知识库/ }))
+
+    expect(await screen.findByText('验证失败')).toBeInTheDocument()
+    expect(screen.queryByText('已验证')).not.toBeInTheDocument()
+  })
 })

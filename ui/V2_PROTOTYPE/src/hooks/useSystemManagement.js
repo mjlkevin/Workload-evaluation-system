@@ -563,19 +563,32 @@ export default function useSystemManagement({
       }
       return { ok: true, ...data }
     } catch (e) {
-      if (e instanceof ApiError) {
-        const isNotFound = e.status === 404 || e.code === 'UNKNOWN'
-        return {
-          ok: false,
-          error: isNotFound ? '接口不存在，请确认后端已更新并重启' : e.message,
-          status: e.status,
-          code: e.code,
-          // DEF-2026-09-02-001：保留后端分类结果与供应商原始 code/msg，
-          // 供失败横幅显示人话原因（此前被丢弃导致只拼出 HTTP 状态）。
-          ...(Array.isArray(e.details) ? { details: e.details } : {}),
-        }
+      const failure = e instanceof ApiError
+        ? (() => {
+            const isNotFound = e.status === 404 || e.code === 'UNKNOWN'
+            return {
+              ok: false,
+              error: isNotFound ? '接口不存在，请确认后端已更新并重启' : e.message,
+              status: e.status,
+              code: e.code,
+              // DEF-2026-09-02-001：保留后端分类结果与供应商原始 code/msg，
+              // 供失败横幅显示人话原因（此前被丢弃导致只拼出 HTTP 状态）。
+              ...(Array.isArray(e.details) ? { details: e.details } : {}),
+            }
+          })()
+        : { ok: false, error: e?.message || '未知错误' }
+      // DEF-2026-09-02-001：失败也写 probe，行内徽章同步为「验证失败」，
+      // 避免与失败横幅自相矛盾（此前只写成功分支，徽章停留在旧状态）。
+      if (profileId) {
+        setKbConfig((prev) => ({
+          ...prev,
+          probes: {
+            ...prev.probes,
+            [profileId]: { status: 'failure', checkedAt: new Date().toISOString() },
+          },
+        }))
       }
-      return { ok: false, error: e?.message || '未知错误' }
+      return failure
     }
   }, [enabled, kbConfig])
 
