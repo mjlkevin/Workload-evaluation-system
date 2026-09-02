@@ -1,6 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
+const crypto = require('node:crypto')
 
 const SECRET_KEYS = new Set([
   'apikey',
@@ -26,7 +27,12 @@ const INLINE_SECRET_RE =
   /["']?(?:apiKey|api_key|clientSecret|client_secret|accessToken|access_token|refreshToken|refresh_token|privateKey|private_key|passwordHash)["']?\s*[:=]\s*["']([^"'\n]+)/g
 
 // 白名单（EXCLUDED 口径，同防漂移守卫）：每条 { file, reason, clearCondition }。
-// 过期自检：文件已删或已不再命中 → 报红（不得让白名单永久躺平）。
+// S3B4 起豁免是「文件 + 值形态」双条件（任务 A）：白名单只对「可豁免形态」（短占位，
+// isMeaningfulSecret 判据）生效；命中「真凭据形态」（isCredentialLike：完整 bcrypt /
+// 长度与熵超阈值随机串）时**即便文件在白名单内也必须报出并失败**——不再有整文件盲区。
+// 唯一例外：条目可带 allowedCredentialFingerprints（sha256 十六进制）按值登记豁免，
+// 只豁免该值本身（指纹），非该值的新命中仍然报红。
+// 过期自检：文件已删或已不再命中可豁免形态 → 报红（不得让白名单永久躺平）。
 // 条目来源：S3B3 report-only 全量清单（120 hits）逐条判定——真凭据仅归档 users.json（已移出跟踪），
 // 其余为测试夹具 / 文档示例 / 锁文件包名误报，全部显式登记。
 const EXCLUDED = [
@@ -54,14 +60,17 @@ const EXCLUDED = [
   { file: 'apps/api/src/services/ai/workbench-routing.snapshot.test.ts', reason: '测试夹具', clearCondition: '该文件删除或改用非密钥形态常量' },
   { file: 'apps/api/src/utils/kimi-ping.test.ts', reason: '测试夹具', clearCondition: '该文件删除或改用非密钥形态常量' },
   // ── 扫描器自测（fixture 必须像密钥才能验证检测能力）──
-  { file: 'scripts/check-tracked-secrets.test.js', reason: '自测 fixture apiKey/passwordHash（unit-* 占位）', clearCondition: '测试改构非密钥形态后删条目' },
+  // S3B4 任务 B：探针固化的完整 bcrypt 样本（probe-1/2 的 fullHash 常量）按值登记指纹豁免——
+  // 测试必须持有真散列形态才能验证检测能力，仅豁免该值本身，其他新命中仍报红。
+  { file: 'scripts/check-tracked-secrets.test.js', reason: '自测 fixture apiKey/passwordHash（unit-* 占位）+ 完整 bcrypt 样本按值登记指纹', clearCondition: '测试改构非密钥形态后删条目', allowedCredentialFingerprints: ['9aaa24da796108523b71758949edb4a2fc8703acfd8781352dd394e83c89c1c6'] },
   // ── 文档示例（API 契约/方案示例值，非运行配置）──
   { file: '03_技术设计/API与集成/API接口设计-V2.md', reason: '接口文档示例 accessToken: jwt-token', clearCondition: '示例改占位符后删条目' },
   { file: 'docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md', reason: '实现计划示例 apiKey: test-key', clearCondition: '示例改占位符后删条目' },
-  // ── npm 锁文件（机器生成，cookie 等字段名是依赖包名非密钥）──
-  { file: 'package-lock.json', reason: 'npm 锁文件包名 cookie 误报（express 依赖）', clearCondition: 'express 移除 cookie 依赖后删条目' },
-  { file: 'ui/V2_PROTOTYPE/package-lock.json', reason: 'npm 锁文件包名 cookie 误报（msw 依赖）', clearCondition: 'msw 移除 cookie 依赖后删条目' },
 ]
+
+// S3B4 任务 C 瘦身登记：原 24 条 → 22 条（−2）。删除的 2 条：package-lock.json ×2
+// （express/msw 依赖包名 cookie 误报）——已改用值形态判据（semver 含 ~/^ 前缀）识别包版本号，
+// 无需整文件豁免；其余 22 条全部仍命中可豁免形态（短占位），保留。
 
 // 文本扩展名集合：其余扩展名按内容判二进制（含 NUL 即跳过，如 xlsx/zip/png）。
 const TEXT_EXTENSIONS = new Set([
@@ -79,8 +88,39 @@ function isMeaningfulSecret(value) {
   if (/^(?:masked|redacted|placeholder|example|changeme|\$\{[^}]+\}|\$[A-Z_][A-Z0-9_]*)$/i.test(normalized)) return false
   // 全大写蛇形环境变量名（区分大小写，避免 /i 把 fake/hash 等短占位也吞掉）
   if (/^[A-Z][A-Z0-9_]{3,}$/.test(normalized)) return false
+  // 语义版本号（npm 锁文件依赖版本号，S3B4 任务 C：package-lock 的 cookie 字段值是包版本非密钥；
+  // 含 ~/^ 范围前缀形态，如 `~0.7.1` / `^1.1.1`）——包名 vs 值形态：值形态判据优先，不靠整文件豁免
+  if (/^[~^]?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(normalized)) return false
   if (/^.{1,40}\.\.\.$/.test(normalized)) return false
   return true
+}
+
+// 真凭据形态判据（S3B4 任务 A：真凭据形态不可按文件名豁免）：
+// ① 完整 bcrypt 散列：$2a$/$2b$/$2y$ + 两位 cost + $ + 22 盐 + 31 散列 = 53 字符（与 BCRYPT_RE 锚定一致）；
+// ② 长度与熵超阈值的随机串：长度 ≥ 32 且至少 3 个字符类（小写/大写/数字/符号）。
+// 阈值 32 的依据：主流 API key 最短常见形态为 32 位 base64（智谱）；Kimi 48 位、OpenAI 48 位、
+// JWT 与完整 bcrypt 均更长；存量测试占位最长实取 25 位（`$2a$10$test-hash-not-real`）——
+// 32 位在真凭据与测试占位之间有明确间隙，不误伤既有夹具（users-pg L71 25 位、unit-* 系列均 < 32）。
+function isCredentialLike(value) {
+  if (typeof value !== 'string') return value != null
+  const normalized = value.trim()
+  if (!normalized) return false
+  if (/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(normalized)) return true
+  return normalized.length >= 32 && countCharClasses(normalized) >= 3
+}
+
+function countCharClasses(value) {
+  let classes = 0
+  if (/[a-z]/.test(value)) classes += 1
+  if (/[A-Z]/.test(value)) classes += 1
+  if (/[0-9]/.test(value)) classes += 1
+  if (/[^a-zA-Z0-9]/.test(value)) classes += 1
+  return classes
+}
+
+// 按值登记豁免用指纹（只存 sha256 十六进制，不存明文散列样本）。
+function sha256Hex(value) {
+  return crypto.createHash('sha256').update(value).digest('hex')
 }
 
 function collectSecretPaths(value, prefix = '', findings = []) {
@@ -91,7 +131,7 @@ function collectSecretPaths(value, prefix = '', findings = []) {
   if (!value || typeof value !== 'object') return findings
   for (const [key, child] of Object.entries(value)) {
     const fieldPath = prefix ? `${prefix}.${key}` : key
-    if (SECRET_KEYS.has(key.toLowerCase()) && isMeaningfulSecret(child)) findings.push(fieldPath)
+    if (SECRET_KEYS.has(key.toLowerCase()) && isMeaningfulSecret(child)) findings.push({ fieldPath, value: child })
     if (child && typeof child === 'object') collectSecretPaths(child, fieldPath, findings)
   }
   return findings
@@ -123,8 +163,8 @@ function scanFile(filePath, cwd) {
     } catch {
       return findings
     }
-    for (const fieldPath of collectSecretPaths(parsed)) {
-      findings.push({ file: relative, fieldPath, kind: 'json-field' })
+    for (const hit of collectSecretPaths(parsed)) {
+      findings.push({ file: relative, fieldPath: hit.fieldPath, kind: 'json-field', credentialLike: isCredentialLike(hit.value), value: hit.value })
     }
     return findings
   }
@@ -133,13 +173,15 @@ function scanFile(filePath, cwd) {
   const lines = text.split('\n')
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    if (BCRYPT_RE.test(line)) {
-      findings.push({ file: relative, fieldPath: `L${i + 1}`, kind: 'bcrypt-hash' })
+    BCRYPT_RE.lastIndex = 0
+    const bcryptMatch = BCRYPT_RE.exec(line)
+    if (bcryptMatch) {
+      findings.push({ file: relative, fieldPath: `L${i + 1}`, kind: 'bcrypt-hash', credentialLike: true, value: bcryptMatch[0] })
       BCRYPT_RE.lastIndex = 0
     }
     for (const m of line.matchAll(INLINE_SECRET_RE)) {
       if (!isMeaningfulSecret(m[1])) continue
-      findings.push({ file: relative, fieldPath: `L${i + 1}`, kind: 'inline-secret' })
+      findings.push({ file: relative, fieldPath: `L${i + 1}`, kind: 'inline-secret', credentialLike: isCredentialLike(m[1]), value: m[1] })
     }
   }
   return findings
@@ -165,10 +207,12 @@ function runCli(argv = process.argv.slice(2), cwd = process.cwd(), options = {})
   const paths = scoped ? explicitPaths : trackedFiles(cwd)
   const findings = scanFiles(paths, cwd)
 
-  // 白名单过期自检：文件已删或已不再命中 → 报红（report-only / 部分扫描不参与判定）
+  // 白名单过期自检：文件已删或已不再命中可豁免形态 → 报红（report-only / 部分扫描不参与判定）。
+  // S3B4：只统计可豁免命中（非 credentialLike）——白名单内仅真凭据形态命中不构成「还在命中」，
+  // 不应据此判定条目未过期（真凭据命中本来就会报红，条目是无效豁免）。
   const expired = []
   if (!reportOnly && !scoped) {
-    const hitFiles = new Set(findings.map((f) => f.file))
+    const hitFiles = new Set(findings.filter((f) => !f.credentialLike).map((f) => f.file))
     for (const entry of excludedList) {
       if (!entry.reason || !entry.clearCondition) {
         expired.push(`白名单条目 ${entry.file} 必须写明 reason 与 clearCondition`)
@@ -186,7 +230,16 @@ function runCli(argv = process.argv.slice(2), cwd = process.cwd(), options = {})
   }
 
   const excludedSet = new Set(reportOnly ? [] : excludedList.map((e) => e.file))
-  const remaining = reportOnly ? findings : findings.filter((f) => !excludedSet.has(f.file))
+  const whitelistByFile = new Map(excludedList.map((e) => [e.file, e]))
+  // S3B4 核心修复：白名单只豁免「可豁免形态」——真凭据形态（credentialLike）即便文件在白名单内
+  // 也必须报出并失败；唯一例外是按值登记指纹（allowedCredentialFingerprints）只豁免该值本身。
+  const remaining = reportOnly ? findings : findings.filter((f) => {
+    const entry = whitelistByFile.get(f.file)
+    if (!entry) return true
+    if (!f.credentialLike) return false
+    if (entry.allowedCredentialFingerprints?.includes(f.value ? sha256Hex(String(f.value)) : '')) return false
+    return true
+  })
 
   if (reportOnly) {
     // 只报告不失败：全量命中清单（不含值），供架构侧决策白名单
@@ -198,7 +251,10 @@ function runCli(argv = process.argv.slice(2), cwd = process.cwd(), options = {})
   }
 
   for (const finding of remaining) {
-    process.stderr.write(`[secret-scan] ${finding.file}:${finding.fieldPath} (${finding.kind})\n`)
+    const note = finding.credentialLike && excludedSet.has(finding.file)
+      ? ' — 该文件虽在白名单，但命中真凭据形态（不可豁免）'
+      : ''
+    process.stderr.write(`[secret-scan] ${finding.file}:${finding.fieldPath} (${finding.kind})${note}\n`)
   }
   for (const line of expired) {
     process.stderr.write(`[secret-scan] whitelist-expired: ${line}\n`)
@@ -217,4 +273,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { BCRYPT_RE, INLINE_SECRET_RE, collectSecretPaths, runCli, scanFiles, trackedFiles }
+module.exports = { BCRYPT_RE, INLINE_SECRET_RE, collectSecretPaths, isCredentialLike, runCli, scanFiles, trackedFiles }

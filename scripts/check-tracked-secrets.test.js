@@ -153,3 +153,63 @@ test('whitelist entry missing reason or clearCondition is reported', () => {
     fs.rmSync(repo, { recursive: true, force: true })
   }
 })
+
+// ── 批 4：白名单整文件盲区对照探针（架构侧 2026-09-01 独立探针固化，S3B4 核心验收证据）──
+// 探针原始形态：完整 bcrypt 散列追加进白名单文件 → 批 3 扫描报 `no tracked secret fields found` + EXIT=0，
+// 即白名单是整文件永久盲区。本批修复 = 豁免粒度按「值形态」而非「文件名」：
+// 真凭据形态（完整 bcrypt / 高熵长随机串）即使文件在白名单内也必须报出并失败。
+// 断言无条件形态（§4.11 A-1/A-2/A-3），fixture 全部用临时文件（用完即删），不往仓库塞散列样本。
+
+test('probe-1: full bcrypt in a non-whitelisted file is reported and fails', () => {
+  const fullHash = '$2b$10$o7e5XNPyMl90S.yt.0AN4OV9vRHwODus0ENXfw3QUB45Uz0HUypnC'
+  const repo = makeTempRepo({ 'probe.ts': `const hash = '${fullHash}'\n` })
+  try {
+    const result = spawnSync(process.execPath, [script, 'probe.ts'], { cwd: repo, encoding: 'utf8' })
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stderr, /probe\.ts:L1 \(bcrypt-hash\)/)
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('probe-2: full bcrypt in a WHITELISTED file is still reported and fails (S3B4 core)', () => {
+  const fullHash = '$2b$10$o7e5XNPyMl90S.yt.0AN4OV9vRHwODus0ENXfw3QUB45Uz0HUypnC'
+  const repo = makeTempRepo({ 'whitelisted.ts': `const hash = '${fullHash}'\n` })
+  const excluded = [{ file: 'whitelisted.ts', reason: '测试', clearCondition: '文件删除后删条目' }]
+  const realWrite = process.stderr.write.bind(process.stderr)
+  let output = ''
+  process.stderr.write = (chunk) => {
+    output += String(chunk)
+    return true
+  }
+  try {
+    const status = scanner.runCli([], repo, { excluded })
+    assert.equal(status, 1, output)
+    assert.match(output, /whitelisted\.ts:L1 \(bcrypt-hash\)/)
+    assert.match(output, /虽在白名单，但命中真凭据形态/)
+  } finally {
+    process.stderr.write = realWrite
+    fs.rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('probe-3: short placeholder in a whitelisted file passes', () => {
+  const repo = makeTempRepo({ 'whitelisted.ts': "const key = apiKey: 'test-key'\n" })
+  const excluded = [{ file: 'whitelisted.ts', reason: '测试', clearCondition: '文件删除后删条目' }]
+  try {
+    const status = scanner.runCli([], repo, { excluded })
+    assert.equal(status, 0, '白名单内短占位应放行')
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('probe-4: short placeholder in a non-whitelisted file is reported (existing behavior)', () => {
+  const repo = makeTempRepo({ 'plain.ts': "const key = apiKey: 'test-key'\n" })
+  try {
+    const status = scanner.runCli([], repo, { excluded: [] })
+    assert.equal(status, 1, '短占位在非白名单文件按现有口径报出，保持不变')
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true })
+  }
+})
