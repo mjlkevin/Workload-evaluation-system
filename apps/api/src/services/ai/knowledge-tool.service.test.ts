@@ -38,7 +38,15 @@ test("knowledge tool two-stage: retrieve then generate answer", async () => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const result = await queryZhipuKnowledgeBase(
     "多组织业务往来一般包含哪些模块？",
-    { apiKey: "zhipu-test-key", knowledgeId: "kb-sales", model: "GLM-5V-Turbo", apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4" },
+    {
+      apiKey: "zhipu-test-key",
+      knowledgeId: "kb-sales",
+      model: "GLM-5V-Turbo",
+      apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      // DEF-2026-09-02-001：默认 rerankStatus 已改 0，此处显式传 1 验证
+      // 「显式取值不被覆盖」语义（也守护请求体里 rerank_status/rerank_model 透传）。
+      retrievalParams: { rerankStatus: 1, rerankModel: "rerank" },
+    },
     async (url, init) => {
       calls.push({ url: String(url), init });
       const urlStr = String(url);
