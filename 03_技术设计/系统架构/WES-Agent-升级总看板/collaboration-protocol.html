@@ -595,8 +595,8 @@
         <tr>
           <td>写操作归属登记</td>
           <td>FF 合入、分支删除、worktree 注销、吸收看板草稿等改变共享状态的操作。</td>
-          <td>只登记可核实事实：时刻、sha、操作类型、否认记录。<details class="tech-detail"><summary>2026-09-02 实例与登记口径</summary><b>事实</b>：<code class="inline">main</code> reflog 15:28:24 <code class="inline">merge origin/qoder/ui-kb-toast: Fast-forward</code> → <code class="inline">c8ad3eb</code>、15:44:11 台账提交 <code class="inline">41517c9</code>；其后的分支删除 + worktree 注销 + 看板草稿吸收，<b>执行者身份未确认</b>。架构侧已明确否认执行（自述全程仅只读核查命令，外加在该 worktree 内一次 <code class="inline">vite build</code> 与一次 <code class="inline">npm test</code>）。提交作者与提交者均为本机共享 git 身份，该字段无法区分执行会话或个人。<b>口径</b>：执行者不明时写「执行者身份未确认」，不得代填任何 Agent 也不得写「用户手动」；用户确认为本人操作后降级为「用户手动操作，已澄清」并记澄清日期。</details></td>
-          <td>归属存疑时保持「身份未确认」，不指定候选；就地标注「归属更正 + 日期」，不静默改写原有时间线与 sha。</td>
+          <td>只登记可核实事实：时刻、sha、操作类型、否认记录。<details class="tech-detail"><summary>2026-09-02 实例与登记口径（已定性）</summary><b>定稿口径（2026-09-02 架构侧裁决，可确定的部分已定稿，不再挂「待用户确认」）</b>：操作位置 = 主工作目录；时间 = 15:16 补提交、15:28 FF 合入（合远端 ref）；执行者会话不可判定——本机所有执行者共用同一 git 身份，git 内无会话标识字段；用户答复“不清楚，可能为另一架构会话”；本架构会话已明确否认执行任何写操作。<b>状</b>：<code class="inline">main</code> reflog 15:28:24 <code class="inline">merge origin/qoder/ui-kb-toast: Fast-forward</code> → <code class="inline">c8ad3eb</code>、15:44:11 台账提交 <code class="inline">41517c9</code>；其后的分支删除 + worktree 注销 + 看板草稿吸收。<b>定性结果：会话不可判定</b>（不是「待确认」、也不是「已查清为某方所为」）；根治手段另立 <code class="inline">ISS-2026-09-02-003</code> 提交身份可追溯。<b>口径</b>：同一 git 身份下不得代填任何 Agent 也不得写「用户手动」；若后续出现可推翻本定性的硬证据（而非回忆），就地标注「定性更正 + 日期」并保留原时间线与 sha。</details></td>
+          <td>已定性为「会话不可判定」的条目不再悬挂等待；就地标注「归属更正 + 日期」，不静默改写原有时间线与 sha。</td>
         </tr>
       </table>
       <div class="callout"><div><b>扩展原则</b>新增 Agent 时只新增注册表条目、入口文件、handoff profile 与试运行记录；不重写现有协议，也不把工具品牌直接等同于权限。</div></div>

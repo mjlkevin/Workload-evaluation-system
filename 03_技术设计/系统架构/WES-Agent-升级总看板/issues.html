@@ -49,12 +49,12 @@
         <div class="meta">
           <span><b>定位</b> 用户原始反馈、截图、疑问和未定性现象的第一入口</span>
           <span><b>流转</b> Issue → triage → Defect / Requirement / Risk / Close</span>
-          <span><b>更新日期</b> 2026-08-27</span>
+          <span><b>更新日期</b> 2026-09-02</span>
         </div>
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">23 问题</span>
-          <span class="pill warn">0 待分析</span>
-          <span class="pill warn">15 转缺陷</span>
+          <span class="pill brand">30 问题</span>
+          <span class="pill warn">2 待分诊</span>
+          <span class="pill warn">19 转缺陷</span>
           <span class="pill brand">7 转需求</span>
         </div>
       </div>
@@ -83,6 +83,17 @@
           <p>本页只承载原始问题和 triage 结论；修复和需求规划分别进入缺陷池或需求池。</p>
         </div>
         <table>
+          <colgroup>
+            <col style="width:13%">
+            <col style="width:9%">
+            <col style="width:15%">
+            <col style="width:11%">
+            <col style="width:13%">
+            <col style="width:12%">
+            <col style="width:10%">
+            <col style="width:6%">
+            <col style="width:11%">
+          </colgroup>
           <tr><th>ID</th><th>日期</th><th>标题</th><th>来源</th><th>原始反馈</th><th>证据</th><th>分析状态</th><th>分流</th><th>下一步</th></tr>
             <tr>
               <td class="mono">ISS-2026-07-02-001</td>
@@ -344,7 +355,7 @@
               <td>project_coverage</td>
               <td>架构侧核查工作区未申报代码改动时审阅确认的既有缺陷：requestRunCancel 对无活跃 attempt 的 Run（waiting / 历史 legacy 行）一律置 cancelling，但 claimNextQueuedRun 只认领 queued/recovering、recovery 只收割「attempt 租约过期」的 Run——没有任何 worker 会观察到 cancelling，Run 永久停在活跃集合，前端「停止中…」永不落地。</td>
               <td><code class="inline">apps/api/src/modules/harness/harness-runtime.repository.ts（requestRunCancel 取消分支 / claimNextQueuedRun 认领条件 / recovery 收割条件）</code></td>
-              <td><span class="status run"><span class="dot"></span>已分析 · 修复已验证（分支 CI 33072134333 全绿）· 待合入</span></td>
+              <td><span class="status run"><span class="dot"></span>已分析 · 待合入</span> 修复已验证（分支 CI <code class="inline">33072134333</code> 全绿）</td>
               <td>转缺陷 · DEF-2026-08-27-002（关联 RP-047——持久 Run 状态机同域；与 ISS-2026-08-10-004 无关）</td>
               <td>工作区发现未申报修复（架构侧审阅认定为正确修复、不主张回退）：无活跃 attempt 时直接落 cancelled 终态 + completedAt，cancelRequestedAt/By 保留首值，按需追加 cancel_requested / run_cancelled 事件；幂等语义有变化（有活跃 attempt 才短路 changed=false）已用 R10b/R10c 用例守住。按正常缺陷流程处置：分支 fix/harness-cancel-no-active-attempt、补验证（本地 tsc + 相关套件 + CI 六套件）、附行为对照、单独提交单独申请合入，不塞 S2b-2。</td>
             </tr>
@@ -399,27 +410,38 @@
               <td>用户反馈（架构侧 UI 批次下发）</td>
               <td>知识库区段的保存结果、连通性测试结果与接入状态三处仍用 <code class="inline">sys-banner</code> 常驻显示，同页模型配置与编码规则早已用标准 toast。<details class="tech-detail"><summary>三根问题与去重依据</summary>P1 保存草稿结果横幅（操作反馈却常驻）；P2 连通性测试结果横幅；P3「知识库接入已配置（来自存储）」状态横幅——档案数与启用数在下方 <code class="inline">kb-profiles</code> 表格逐行可见（含状态徽章），属纯冗余，故删除不做 toast。<b>去重</b>：工单把 DEF-2026-09-02-001 的 ③失败人话原因、④失败徽章同步两项移入本批；执行期间 origin/main 已由 <code class="inline">66ac13f</code>/<code class="inline">2c64ddd</code> 交付并通过架构侧复核（DEF 已 done 关闭），故本批只做呈现层（横幅 → toast）并复用 main 的 <code class="inline">describeKbTestFailure</code>，不重复实现 ③④。</details></td>
               <td><code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx（修复前三处 sys-banner，全仓仅该页引用 12 处）</code> <code class="inline">ToastContainer.jsx L51-52（按 kind 给 role=alert/status）</code> <code class="inline">分支 qoder/ui-kb-toast @ c8ad3eb</code></td>
-              <td><span class="status done"><span class="dot"></span>已实施 · 已合入 main @ <code class="inline">c8ad3eb</code>（2026-09-02 FF 合入）· main CI 33603761390 六 job 全绿</span></td>
+              <td><span class="status done"><span class="dot"></span>已实施 · 已合入 main</span> <code class="inline">c8ad3eb</code>（2026-09-02 FF 合入）· main CI <code class="inline">33603761390</code> 六 job 全绿</td>
               <td>不转缺陷 · 随 UI 批次交付（同表面三根问题，未新增技术栈）</td>
-              <td>2026-09-02 已 FF 合入 main（<code class="inline">d0c041a</code> → <code class="inline">c8ad3eb</code>）并完成台账回填（changes.html BE 行 + testing.html 451 归因行同批更新）；知识库三路径视觉自验因登录阻断未做，按用户裁决登记为待执行（阻塞根因见 <code class="inline">ISS-2026-09-02-002</code>）。<details class="tech-detail"><summary>为什么不开 DEF · §7 冻结面更正</summary>不改鉴权、不改存储与数据结构，<code class="inline">useToast</code> 早已在该页就位（模型配置/编码规则在用），属体系内一致性收敛而非新能力。<b>§7 冻结面更正（2026-09-02 收尾复核）</b>：本格原写「样式在 <code class="inline">src/index.css</code> L1118 一带、是否顺手清掉待架构侧定」不成立 —— 基础块 <code class="inline">.sys-banner</code> 位于 §7 冻结文件 <code class="inline">layout.css:107-114</code>（8 条规则），<code class="inline">src/index.css:1118</code> 仅 <code class="inline">--danger</code> 变体 1 行，且 <code class="inline">src/index.css:1-3</code> 以 <code class="inline">@import</code> 把 layout.css 引入 React 应用。清理属冻结文件变更，须单独立项并申请 §7 例外，任何批次不得「顺手清掉」；结论见 <code class="inline">risks.html</code> 决策行。</details></td>
+              <td><b>误诊推翻依据（架构侧 2026-09-02 裁决）</b>：该卡点判为误诊，详见 <code class="inline">ISS-2026-09-02-002</code>；<b>本批视觉自验仍未执行</b>，阻塞原因更正为本机环境状态，实际结果见 <code class="inline">testing.html</code> MT-ISS0902-001-001。合入事实：2026-09-02 已 FF 合入 main（<code class="inline">d0c041a</code> → <code class="inline">c8ad3eb</code>）并完成台账回填。<details class="tech-detail"><summary>为什么不开 DEF · §7 冻结面更正</summary>不改鉴权、不改存储与数据结构，<code class="inline">useToast</code> 早已在该页就位（模型配置/编码规则在用），属体系内一致性收敛而非新能力。<b>§7 冻结面更正（2026-09-02 收尾复核）</b>：本格原写「样式在 <code class="inline">src/index.css</code> L1118 一带、是否顺手清掉待架构侧定」不成立 —— 基础块 <code class="inline">.sys-banner</code> 位于 §7 冻结文件 <code class="inline">layout.css:107-114</code>（8 条规则），<code class="inline">src/index.css:1118</code> 仅 <code class="inline">--danger</code> 变体 1 行，且 <code class="inline">src/index.css:1-3</code> 以 <code class="inline">@import</code> 把 layout.css 引入 React 应用。清理属冻结文件变更，须单独立项并申请 §7 例外，任何批次不得「顺手清掉」；结论见 <code class="inline">risks.html</code> 决策行。</details></td>
             </tr>
             <tr>
               <td class="mono">ISS-2026-09-02-002</td>
               <td>2026-09-02</td>
               <td>开发环境拿不到可登录的管理员凭据，UI 批次无法做视觉自验</td>
               <td>执行侧自验受阻（知识库 toast 批次收尾登记）</td>
-              <td>UI 批次需登录系统管理页做三路径截图，本地登录进不去；该卡点会使后续每一个 UI 批次都无法做视觉自验。<details class="tech-detail"><summary>根因实取（含对旧登记的更正）</summary><b>更正</b>：旧登记写「无 seed 脚本与默认账号」不成立 —— <code class="inline">npm run db:seed -w apps/api</code> 与 <code class="inline">ensureAdminSeed</code>（<code class="inline">db/seed.ts:303</code>）2026-08-17 已进主干，dev 库实有 2 个 active admin（含 <code class="inline">username=admin</code>）。真实卡点是「无可登录的管理员凭据」：① seed 幂等「缺失才插」（<code class="inline">onConflictDoNothing</code>），不会重置已有口令；② 代码内非生产默认口令与库中该行 hash 不匹配，登录实取 <code class="inline">invalid_credentials</code>；③ 注册在 users 非空时只能拿到 <code class="inline">user</code> 角色（<code class="inline">auth.usecase.ts:69</code>），而系统管理页 admin-only；④ 生成邀请码需 <code class="inline">user:manage</code> 能力即 admin token（<code class="inline">auth.routes.ts:28</code>），鸡生蛋；⑤ dev 库现存 1 条邀请码状态为 <code class="inline">used</code>。</details></td>
-              <td><code class="inline">apps/api/src/db/seed.ts:152-161,303-329</code> <code class="inline">apps/api/src/modules/auth/auth.usecase.ts:69,108-144</code> <code class="inline">apps/api/src/routes/auth.routes.ts:28</code> <code class="inline">POST /api/v1/auth/login → details[0].reason=invalid_credentials（本机 dev 库实取，凭据值不入板）</code></td>
-              <td><span class="status run"><span class="dot"></span>已分析 · 方案候选已出 · 待架构侧裁决</span></td>
-              <td>待分诊（建议 requirement）· <b>去重结论：未命中，新增 ISS-2026-09-02-002</b>。<details class="tech-detail"><summary>去重依据</summary>全板检索 登录 / 认证 / seed / 测试账号 / 邀请码 / 视觉自验 / 截图 —— 历史仅 RP-043（testing.html「认证阻塞 / 人工待回填」，2026-07-25）与 RP-057（同页「截图取证受登录态阻断」）两条<b>结果侧</b>记录，无一条把「开发环境拿不到可登录管理员」当作问题立项，故新增本条并回链这两处历史同因。</details></td>
-              <td>本批只立项与出方案候选，等架构侧裁决后再实现。<b>安全侧</b>：候选方案全部触及鉴权面，实现批次不适用免扫，须走 <code class="inline">skills/wes-security-review</code> 审阅。<details class="tech-detail"><summary>最小可行方案候选与代价</summary><b>A 用 seed 重置 admin 口令</b>：<code class="inline">WES_ADMIN_PASSWORD=… npm run db:seed -w apps/api</code>；代价 —— seed 现在「存在即跳过」，需加 dev-only 的「存在则更新口令」分支，改鉴权数据写入路径。<b>B 独立的 dev-only 管理员 seed</b>：新增脚本，硬守卫 <code class="inline">NODE_ENV !== production</code>；代价 —— 新脚本 + 一条开发数据，须确保不进生产镜像、不被 CI 扫命中。<b>C 本地登录旁路脚本</b>：直接用 <code class="inline">signAuthToken</code> 签 admin token 注入本地存储；代价 —— 绕开真实登录链路，视觉自验结论对「真实登录态」的等价性被削弱，且签发入口暴露即高危。<b>D 发一个活跃邀请码走注册</b>：代价 —— 注册只能拿到 <code class="inline">user</code> 角色，<b>不解决</b>系统管理页 admin-only，对本卡点无效（列为已排除项）。<b>E 把 dev 账号口令写进文档</b>：代价 —— 凭据入文档与本板禁令冲突，<b>不可取</b>。</details></td>
+              <td>UI 批次需登录系统管理页做三路径截图，本地登录进不去；该卡点会使后续每一个 UI 批次都无法做视觉自验。<b>2026-09-02 架构侧裁决：本条误诊</b> —— 「拿不到可登录的管理员凭据」不是产品与鉴权设计问题，下方五条「真实卡点」中的③④⑤建立在错误前提上、②属本机环境状态。<details class="tech-detail"><summary>误诊推翻依据（架构侧实取）</summary>① 本机 <code class="inline">users</code> 表只读核查 6 行，含 <code class="inline">admin</code>（role=admin / status=active / 有 password_hash）；② <code class="inline">apps/api/src/db/seed.ts:152-161 resolveAdminCredentials()</code> 本就播种默认管理员 <code class="inline">admin</code>，开发默认口令写死在该函数内（源码自读，值不入板），<b>仅生产环境</b>强制 <code class="inline">WES_ADMIN_PASSWORD</code>；③ <code class="inline">invite_codes</code> 只管注册、不是登录门槛 —— 故原登记③「注册只能拿 user 角色」、④「生成邀请码需 admin token 鸡生蛋」、⑤「现存邀请码已 used」三条对既有 admin 账号的登录链路不适用；④ 原登记②「代码内默认口令与库中 hash 不匹配」属实但为<b>本机数据状态</b>（该行口令被改过），不构成产品缺陷，不得据此动鉴权面。</details><details class="tech-detail"><summary>原根因实取（已作废，仅留追溯）</summary><b>更正</b>：旧登记写「无 seed 脚本与默认账号」不成立 —— <code class="inline">npm run db:seed -w apps/api</code> 与 <code class="inline">ensureAdminSeed</code>（<code class="inline">db/seed.ts:303</code>）2026-08-17 已进主干，dev 库实有 2 个 active admin（含 <code class="inline">username=admin</code>）。旧登记据此推出的「真实卡点是无可登录的管理员凭据」一并作废。</details></td>
+              <td><code class="inline">apps/api/src/db/seed.ts:152-161 resolveAdminCredentials()</code> <code class="inline">apps/api/src/db/seed.ts:303-329 ensureAdminSeed()</code> <code class="inline">本机 PG users 只读核查 = 6 行 / admin 为 active+admin / 与 seed 默认口令匹配 = false（凭据值不入板）</code> <code class="inline">POST /api/v1/auth/login 实取 = 400 / code 40001</code></td>
+              <td><span class="status done"><span class="dot"></span>误诊 · 已关闭</span> 2026-09-02 架构侧裁决，五方案候选一并作废</td>
+              <td>不转需求 · 不转缺陷 · 误诊关闭<details class="tech-detail"><summary>为什么不保留「待裁决」</summary>五个候选（A 用 seed 重置 admin 口令 / B 独立 dev-only 管理员 seed / C 本地签 admin token 旁路 / D 发活跃邀请码走注册 / E 把 dev 口令写进文档）全部是为一个不存在的问题改鉴权面；保留「待裁决」状态会被后续批次照着实现，故一并作废、不留可执行分支。原「去重结论：未命中，新增本条」同时作废。</details></td>
+              <td>无需实现。残余卡点按<b>本机环境状态</b>报回用户处置：本地 <code class="inline">admin</code> 行口令已偏离 seed 开发默认值（只读核查与默认口令匹配 = false），按派单纪律<b>不重置任何账号、不动 mjlkevin</b>；三路径视觉自验因此仍未执行，实际结果入 <code class="inline">testing.html</code> MT-ISS0902-001-001。<details class="tech-detail"><summary>口令纪律与本批一次违规登记</summary>seed 内的开发默认口令不得写进报告、看板、台账、提交信息或对话，仅本地登录使用。本批执行中发生过一次误把该默认口令打印到会话输出的事故（为看 seed.ts 结构写的掩码正则只覆盖单引号、源码用双引号），已在交付报告与 <code class="inline">changes.html</code> 本批 BE 行如实登记；该值为源码内开发默认值、随仓库跟踪、生产被 <code class="inline">WES_ADMIN_PASSWORD</code> 强制覆盖，不构成生产泄露，但仍属口令纪律违规，后续不得再现。</details></td>
+            </tr>
+            <tr>
+              <td class="mono">ISS-2026-09-02-003</td>
+              <td>2026-09-02</td>
+              <td>提交身份可追溯：本机所有执行会话共用同一 git 身份，写操作归属无法从 git 判定</td>
+              <td>架构侧派单立项（合入归属事故的唯一可根治点）</td>
+              <td>一次 FF 合入 + 删分支 + worktree 注销 + 吸收看板草稿的写操作，事后无法从 git 判定是哪个执行会话做的，只能靠各方否认与用户回忆兵组成“会话不可判定”。该缺陷不修，后续每一次多会话并行的归属争议都只能归档为“无法认定”。<details class="tech-detail"><summary>去重依据</summary>全板检索 “提交身份 / Session trailer / 可追溯 / 归属” —— 历史无一条把“git 身份无法区分执行会话”作为问题立项；仅在 <code class="inline">collaboration-protocol.html</code> 协作模式表「写操作归属登记」行以登记口径形式存在（只规定“怎么写”，未解决“怎么知道”），属同因不同层，故新增本条并与该行互链。</details></td>
+              <td><code class="inline">main@{15:28:24} merge origin/qoder/ui-kb-toast: Fast-forward</code> <code class="inline">c8ad3eb / 41517c9 author = committer = 本机共享 git 身份</code> <code class="inline">git log --format=%aN&lt;%aE&gt; 全仓去重 = 1 个身份</code></td>
+              <td><span class="status run"><span class="dot"></span>已立项 · 只出方案</span> 本批不实现，待架构侧裁决</td>
+              <td>转 requirement · 治理类（非业务功能）· 优先级高于事故追认本身</td>
+              <td>待架构侧选定后另批实现；选定前不得动 <code class="inline">.git/hooks</code> 与提交规范。三候选均已按对 §10 / 对 board-* 门禁 / 对现有历史的影响与代价逐条写明。<details class="tech-detail"><summary>候选 A · 提交信息尾部 Session: &lt;会话ID&gt; trailer</summary><b>对 §10 提交规范</b>：§10 现格式为 <code class="inline">type(scope): 中文描述</code>，trailer 位于正文之外不改 subject，与现规范兼容；但须在 §10 补一行“会话 trailer”口径，否则人与门禁都无判据。<b>对 board-* 门禁</b>：<code class="inline">board-build</code> / <code class="inline">board-consistency-check</code> 不读 commit message，零影响；若要求 trailer 与看板事件 <code class="inline">data-board-event-id</code> 对齐，需另写校验。<b>对现有历史</b>：零改写。<b>代价</b>：完全靠自觉 —— 现有多个执行者无强制，漏写即断链；会话ID 需自定义唯一规则（建议 worktree 路径 + 开工 HEAD 短 sha）；他人 amend / squash 后 trailer 可丢。</details><details class="tech-detail"><summary>候选 B · 各执行者用不同 committer.name</summary><b>对 §10</b>：不涉及提交信息格式，无冲突。<b>对 board-* 门禁</b>：无影响，且 <code class="inline">check-tracked-secrets</code> 等不读身份，无从把关。<b>对现有历史</b>：代价最高 —— 历史提交全是同一个本机身份，启用后会出现“改名前后两套身份”断层，看板内已有的 <code class="inline">--author</code> 类归属表述与脚本需重跑；worktree 删除即丢本地 <code class="inline">.git/config</code> 配置。<b>结论口径（不代裁决）</b>：author / committer 均为本地可任意改写字段，防伪能力为零，它只把“不可判定”变成“可伪装的可判定”。</details><details class="tech-detail"><summary>候选 C · 提交前钩子强制校验</summary><b>对 §10</b>：把 §10 从文字约定升级为可执行约束；但与“纯文档随手提交”摩擦，需允许 <code class="inline">--no-verify</code> 而一旦可绕就等于没有。<b>对 board-* 门禁</b>：可与看板一致性检查合流（校验 trailer 与登记的 worktree / 分支一致）；但 hooks 不入 git 跟踪，需 <code class="inline">core.hooksPath</code> 指向仓内脚本且每人一次性启用，本地启用状态不可远程验证 —— 因此必须在 CI 加一步同类校验（建议并入 lint）才能兼顾。<b>对现有历史</b>：零改写，但只能保证启用日之后可追溯，对本次事故及此前全部历史无效（仍需按“会话不可判定”归档）。<b>执行约束</b>：本项目的 AGENTS.md 与全局纪律均默认不得跳过 hook，新增 hook 需架构侧先定例外口径。</details><details class="tech-detail"><summary>建议组合（仅供裁决，不实现）</summary>A 定事实源 + C 防漏写（本地 hook + CI 双校），B 不建议。理由：只有 A 能低成本存下“会话 ↔ 提交”映射且不改写历史；C 是 A 的执行护柰；B 提供的是可伪装信号，收益最低风险最高。</details></td>
             </tr>
         </table>
       </div>
     </section>
 </main>
   </div>
-  <footer>问题池 · WES 项目管理 · 2026-08-27</footer>
+  <footer>问题池 · WES 项目管理 · 2026-09-02</footer>
   <script>
     const sidebar = document.getElementById('sidebar');
     const toggle = document.getElementById('sidebarToggle');
