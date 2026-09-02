@@ -21,6 +21,7 @@ export default function MessageBubble({
   goLogin,
   copyDraft,
   onToggleThought,
+  onRetryParse,
 }) {
   const isUser = message.role === 'user'
   const hasArtifacts = !isUser && !message.error && pickArray(message.artifacts).length > 0
@@ -103,6 +104,20 @@ export default function MessageBubble({
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             <button className="btn btn-pri" type="button" onClick={goLogin} style={{ height: 30 }}>重新登录</button>
             <button className="btn btn-out" type="button" onClick={copyDraft} style={{ height: 30 }}>复制草稿</button>
+          </div>
+        )}
+        {/* DEF-2026-08-27-003：解析超时/失败后的恢复入口——复用本轮已暂存的 File，不需重新选文件 */}
+        {message.action === 'retry_parse' && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            <button
+              className="btn btn-out"
+              type="button"
+              disabled={sending}
+              onClick={() => onRetryParse?.(message.retryId)}
+              style={{ height: 30 }}
+            >
+              重试
+            </button>
           </div>
         )}
       </div>

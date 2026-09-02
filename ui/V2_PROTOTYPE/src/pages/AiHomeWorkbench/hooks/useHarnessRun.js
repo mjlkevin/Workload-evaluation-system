@@ -21,9 +21,12 @@ import { mergeAttachmentUnderstanding } from '../utils/reportParser.js'
 export default function useHarnessRun(workbench, chat) {
   const [confirmingActionId, setConfirmingActionId] = useState('')
 
-  async function runExplicitReportFlow({ text, fileSnapshot, selectedFile, parsed, userMessage, loadingId, localAttachmentUnderstanding }) {
-    const workflowKey = workbench.activeWorkflowKey || workbench.activeSession?.workflowKey || 'parse_requirement_file'
-    const session = workbench.activeSession || await workbench.createSession({
+  async function runExplicitReportFlow({ text, fileSnapshot, selectedFile, parsed, userMessage, loadingId, localAttachmentUnderstanding, preparedSession }) {
+    // DEF-2026-08-27-003：调用方已把会话创建提到解析之前，这里优先复用显式传入的会话——
+    // workbench 对象是渲染快照，异步链路中可能尚未反映刚落库的 activeSession，只看它会二次建会话。
+    const activeSession = preparedSession || workbench.activeSession
+    const workflowKey = workbench.activeWorkflowKey || activeSession?.workflowKey || 'parse_requirement_file'
+    const session = activeSession || await workbench.createSession({
       title: text.slice(0, 40) || fileSnapshot?.name || 'AI 工作台会话',
       workflowKey,
       status: workflowKey === 'free_chat' ? 'temporary_chat' : 'rough_estimate',

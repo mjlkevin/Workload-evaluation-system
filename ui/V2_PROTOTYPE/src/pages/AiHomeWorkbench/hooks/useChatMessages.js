@@ -38,6 +38,13 @@ const STREAM_EVENT_TYPES = {
 // （清理 sending + 可见提示），绝不发起 cancel（G2/G4 硬口径不变）。
 const STREAM_CLOSE_TIMEOUT_MS = 10000
 
+// DEF-2026-08-27-003：附件解析的客户端有界超时（apiClient 默认 timeoutMs=0 即永不超时）。
+// 服务端单次模型尝试上限是 120s（extractor.service.ts 取 kimiEvaluation.timeoutMs || 120000），
+// 而 provider 默认还会指数退避重试，整请求没有有界终点——不设客户端超时就是无限等待。
+// 取 120s 与服务端单次尝试上限对齐：超过该值意味着已进入重试区，继续等待无确定终点；
+// 顺序倒转后到点判为「解析失败，可重试」是非破坏性收尾，代价只有一次点击。
+const ATTACHMENT_PARSE_TIMEOUT_MS = 120000
+
 /**
  * ISS-2026-08-09-003 C2（离页返回旧缓存渲染、AI 回复不显示）：后端 messages 为准的对账合并。
  * - 后端为空时保留本地视图（沿用旧守卫语义，避免空响应清屏）；
@@ -127,6 +134,10 @@ export default function useChatMessages(workbench) {
   sendingKeysRef.current = sendingSessionKeys
   const streamCloseTimerRef = useRef(null)
   const streamErrorNotifiedRef = useRef(false)
+  // DEF-2026-08-27-003：解析失败后「点击重试」的免重选凭据——按 retryId 暂存本轮上下文
+  // 与 File 对象本身。File 不可序列化进 sessionStorage/localStorage，故该凭据只在同页面
+  // 生命周期内有效；页面刷新后需重新选择文件（届时消息正文与附件记录仍已在库）。
+  const parseRetryRef = useRef(new Map())
 
   function markSending(sessionKey, value) {
     setSendingSessionKeys((prev) => {
@@ -462,6 +473,124 @@ export default function useChatMessages(workbench) {
     }
   }, [])
 
+  /**
+   * DEF-2026-08-27-003：附件解析单独成函数，供「首次发送」与「点击重试」共用。
+   * 仍走阻塞版 /ai/parse-basic-info（方案③流式端点本次不并入），并补上客户端有界超时；
+   * 失败信号＝该请求以超时/网络/非 2xx 错误 reject（由 apiClient 统一抛出）。
+   */
+  async function parseAttachment({ selectedFile, fileSnapshot, loadingId, userMessage }) {
+    const formData = new FormData()
+    formData.append('file', selectedFile)
+    patchMessage(loadingId, { text: '正在提取文件结构' })
+    const parsed = await apiClient.upload('/ai/parse-basic-info?allowLocalFallback=true', formData, {
+      suppressUnauthorizedRedirect: true,
+      timeoutMs: ATTACHMENT_PARSE_TIMEOUT_MS,
+    })
+    const outboundFile = {
+      ...fileSnapshot,
+      parsedSummary: summarizeHomeParsedFile(selectedFile, parsed),
+    }
+    userMessage.file = outboundFile
+    patchMessage(userMessage.id, { file: outboundFile })
+    return { parsed, outboundFile }
+  }
+
+  /** 为本轮失败态登记免重选凭据（同一轮只保留一个可点入口）。 */
+  function armParseRetry(entry) {
+    const retryId = `parse-retry-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    entry.retryId = retryId
+    parseRetryRef.current.set(retryId, entry)
+    return retryId
+  }
+
+  /**
+   * DEF-2026-08-27-003：解析失败时把本轮用户消息 + 附件占位落库，保证刷新后仍有痕迹。
+   * 仅失败路径落库：成功路径由后端 Run/同步链路按 run 维度 deduplicationKey 自行追加
+   * 用户消息（见 workbench-chat.workflow.ts），前端提前落库会造成双份用户气泡；
+   * 同一轮多次重试由 entry.persisted 闸门保证只落一次，保持幂等。
+   */
+  function persistFailedTurn(entry) {
+    if (entry.persisted || !entry.session?.sessionId) return
+    entry.persisted = true
+    const attachmentId = `pending-${entry.userMessage.id}`
+    const file = entry.outboundFile
+    apiClient.post(`/ai-sessions/${entry.session.sessionId}/events`, {
+      message: {
+        messageId: entry.userMessage.id,
+        role: 'user',
+        content: entry.userMessage.text,
+        createdAt: entry.userMessage.createdAt,
+        attachmentIds: file ? [attachmentId] : [],
+      },
+      attachments: file
+        ? [{ attachmentId, name: file.name, size: file.size, type: file.type, createdAt: entry.userMessage.createdAt }]
+        : [],
+    }, { suppressUnauthorizedRedirect: true })
+      .catch(() => {}) // DEF-2026-08-27-003：兜底落库失败不得掩盖解析失败本身，重试入口仍在本地视图，可静默
+  }
+
+  /** 失败态收尾：登记免重选凭据 + 把进行中占位换成带「点击重试」的错误气泡。 */
+  function markTurnRecoverable(entry, err) {
+    const retryId = armParseRetry(entry)
+    const bubble = {
+      id: entry.bubbleId,
+      role: 'assistant',
+      text: entry.kind === 'standard_draft'
+        ? `标准文件解析暂未完成：${err?.message || '请求失败'}`
+        : `文件解析未完成：${err?.message || '请求失败'}。本次会话与消息已保留，可直接重试，无需重新选择文件。`,
+      error: true,
+      action: 'retry_parse',
+      retryId,
+      createdAt: new Date().toISOString(),
+    }
+    if (entry.kind === 'standard_draft') {
+      setMessages((prev) => (prev.some((message) => message.id === entry.bubbleId)
+        ? prev.map((message) => (message.id === entry.bubbleId ? bubble : message))
+        : [...prev, bubble]))
+      return
+    }
+    writeArrivalMessage(entry.sendKey, entry.bubbleId, bubble)
+  }
+
+  /** 重试成功后撤掉驻留的失败占位（不存在时为空操作，不产生新数组）。 */
+  function dismissMessage(id) {
+    setMessages((prev) => (prev.some((message) => message.id === id) ? prev.filter((message) => message.id !== id) : prev))
+  }
+
+  /**
+   * DEF-2026-08-27-003 §3.1：标准治理域 attach 即解析。该路径的 createSession 本就排在
+   * 网络调用之前（不受顺序倒转缺陷影响），此处补齐的是同口径的失败可恢复：
+   * 记住 File 对象供「点击重试」免重选，不再要求用户重新挑一次文件。
+   */
+  function startStandardDraftParse(file, reusedBubbleId) {
+    const bubbleId = reusedBubbleId || `standard-parse-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const entry = { kind: 'standard_draft', file, bubbleId }
+    createStandardDraftFromFile(file)
+      .then(() => {
+        if (entry.retryId) parseRetryRef.current.delete(entry.retryId)
+        dismissMessage(bubbleId)
+      })
+      .catch((err) => {
+        markTurnRecoverable(entry, err)
+      })
+  }
+
+  /**
+   * DEF-2026-08-27-003：「点击重试」入口。带文件轮次以 { retryId } 复入 sendMessage，
+   * 复用已暂存的 File 与本轮会话/消息上下文——用户无需重新选择文件。
+   */
+  function retryAttachmentParse(retryId) {
+    const entry = parseRetryRef.current.get(retryId)
+    if (!entry || sending) return
+    if (entry.kind === 'standard_draft') {
+      parseRetryRef.current.delete(retryId)
+      patchMessage(entry.bubbleId, { text: '正在重新解析标准文件' })
+      startStandardDraftParse(entry.file, entry.bubbleId)
+      return
+    }
+    sendMessage({ retryId })
+  }
+
   function chooseFile() {
     fileInputRef.current?.click()
   }
@@ -485,15 +614,7 @@ export default function useChatMessages(workbench) {
   function attachFile(file) {
     workbench.setSelectedFile(file || null)
     if (file && workbench.activeWorkflowKey === 'standard_governance') {
-      createStandardDraftFromFile(file).catch((err) => {
-        setMessages((prev) => [...prev, {
-          id: `standard-error-${Date.now()}`,
-          role: 'assistant',
-          text: `标准文件解析暂未完成：${err.message || '请求失败'}`,
-          error: true,
-          createdAt: new Date().toISOString(),
-        }])
-      })
+      startStandardDraftParse(file)
     }
   }
 
@@ -503,22 +624,30 @@ export default function useChatMessages(workbench) {
   }
 
   async function sendMessage(messageOverride) {
-    const text = (typeof messageOverride === 'string' ? messageOverride : workbench.composer).trim()
-    const selectedFile = workbench.selectedFile
+    // DEF-2026-08-27-003：messageOverride 为 { retryId } 时是「解析失败后点击重试」复入——
+    // 复用已暂存的 File 与本轮上下文，不重新采集输入、不重复落会话与用户消息。
+    const retryEntry = messageOverride?.retryId
+      ? (parseRetryRef.current.get(messageOverride.retryId) || null)
+      : null
+    if (messageOverride?.retryId && !retryEntry) return
+    const text = retryEntry
+      ? retryEntry.text
+      : (typeof messageOverride === 'string' ? messageOverride : workbench.composer).trim()
+    const selectedFile = retryEntry ? retryEntry.file : workbench.selectedFile
     if ((!text && !selectedFile) || sending) return
     // G1：发送时捕获归属会话键（空串代表未落库的新会话），响应到达后按键写归属。
-    let sendKey = workbench.activeSession?.sessionId || ''
+    let sendKey = retryEntry?.sendKey || workbench.activeSession?.sessionId || ''
     const fileSnapshot = selectedFile
       ? { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type }
       : null
-    const userMessage = {
+    const userMessage = retryEntry?.userMessage || {
       id: `ai-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       role: 'user',
       text: text || '请解析这个文件并启动工作流。',
       file: fileSnapshot,
       createdAt: new Date().toISOString(),
     }
-    const loadingId = `ai-loading-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const loadingId = retryEntry?.loadingId || `ai-loading-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const loadingMessage = {
       id: loadingId,
       role: 'assistant',
@@ -526,7 +655,7 @@ export default function useChatMessages(workbench) {
       loading: true,
       createdAt: new Date().toISOString(),
     }
-    const baseOutboundMessages = messages
+    const baseOutboundMessages = retryEntry?.baseOutboundMessages || messages
       .filter((message) => !message.loading && !message.error)
       .map((message) => ({
         role: message.role === 'assistant' ? 'assistant' : 'user',
@@ -540,28 +669,74 @@ export default function useChatMessages(workbench) {
     // 前端插批（项二）：新发送周期重置错误提示闸门
     streamErrorNotifiedRef.current = false
 
-    setMessages((prev) => [...prev, userMessage, loadingMessage])
-    workbench.setComposer('')
-    workbench.clearComposerDraft?.()
-    removeSelectedFile()
-    workbench.setDraftBeforeLogin(text)
+    if (retryEntry) {
+      // 重试：失败气泡复位为进行中占位；本轮凭据已在重试入口消费
+      parseRetryRef.current.delete(messageOverride.retryId)
+      replaceMessage(loadingId, loadingMessage)
+    } else {
+      setMessages((prev) => [...prev, userMessage, loadingMessage])
+      workbench.setComposer('')
+      workbench.clearComposerDraft?.()
+      removeSelectedFile()
+      workbench.setDraftBeforeLogin(text)
+    }
     markSending(sendKey, true)
     try {
+      // DEF-2026-08-27-003（方案①顺序倒转）：会话创建必须先于可能长阻塞的附件解析——
+      // 旧顺序下新会话首次带文件发送一旦解析超时，会话从未建立，刚输入的文字与
+      // 刚上传的文件一起消失、无痕迹、不可恢复。
+      const wantsExplicitReport = Boolean(selectedFile) && isExplicitReportRequest(text || '')
+      const workflowKey = retryEntry?.workflowKey
+        || workbench.activeWorkflowKey
+        || workbench.activeSession?.workflowKey
+        // 显式报告流程的兜底域与原 runExplicitReportFlow 保持一致，避免倒转后漂移
+        || (wantsExplicitReport ? 'parse_requirement_file' : 'free_chat')
+      const session = retryEntry?.session
+        || workbench.activeSession
+        || await workbench.createSession({
+          title: text.slice(0, 40) || fileSnapshot?.name || 'AI 工作台会话',
+          workflowKey,
+          status: workflowKey === 'free_chat' ? 'temporary_chat' : 'rough_estimate',
+        })
+      // 会话落库后将发送标记迁移到真实会话键。
+      if (session?.sessionId && session.sessionId !== sendKey) {
+        markSending(sendKey, false)
+        sendKey = session.sessionId
+        markSending(sendKey, true)
+      }
       let outboundFile = fileSnapshot
       if (selectedFile) {
-        const formData = new FormData()
-        formData.append('file', selectedFile)
-        patchMessage(loadingId, { text: '正在提取文件结构' })
-        const parsed = await apiClient.upload('/ai/parse-basic-info?allowLocalFallback=true', formData, { suppressUnauthorizedRedirect: true })
-        const localAttachmentUnderstanding = buildAttachmentUnderstanding(selectedFile, parsed)
-        outboundFile = {
-          ...fileSnapshot,
-          parsedSummary: summarizeHomeParsedFile(selectedFile, parsed),
+        const turnEntry = {
+          kind: 'attachment',
+          file: selectedFile,
+          fileSnapshot,
+          session,
+          sendKey,
+          workflowKey,
+          text,
+          userMessage,
+          loadingId,
+          bubbleId: loadingId,
+          baseOutboundMessages,
+          // 失败落库只需附件占位（尚无 parsedSummary），因此不随解析成功而更新
+          outboundFile,
+          persisted: Boolean(retryEntry?.persisted),
         }
-        userMessage.file = outboundFile
-        patchMessage(userMessage.id, { file: outboundFile })
+        let parsed
+        try {
+          ({ parsed, outboundFile } = await parseAttachment({ selectedFile, fileSnapshot, loadingId, userMessage }))
+        } catch (err) {
+          // 401 不属解析失败语义，交回外层统一承载「登录已过期 + 重新登录/复制草稿」入口。
+          if (err?.status === 401) throw err
+          // 解析超时/失败不再牵连会话与消息：会话与用户消息已各自落定，
+          // 这里只做「痕迹入库 + 失败可见 + 可免重选重试」的收尾。
+          persistFailedTurn(turnEntry)
+          markTurnRecoverable(turnEntry, err)
+          return
+        }
         // Phase 1G: 只有明确报告生成请求才进入 Harness v1 流程
-        if (isExplicitReportRequest(text || '')) {
+        // （报告流程的错误仍由外层统一承载，不当作解析失败处理）
+        if (wantsExplicitReport) {
           await harnessRef.current.runExplicitReportFlow({
             text,
             fileSnapshot,
@@ -569,7 +744,8 @@ export default function useChatMessages(workbench) {
             parsed,
             userMessage,
             loadingId,
-            localAttachmentUnderstanding,
+            preparedSession: session,
+            localAttachmentUnderstanding: buildAttachmentUnderstanding(selectedFile, parsed),
           })
           return
         }
@@ -582,18 +758,6 @@ export default function useChatMessages(workbench) {
           attachments: outboundFile ? [outboundFile] : [],
         },
       ]
-      const workflowKey = workbench.activeWorkflowKey || workbench.activeSession?.workflowKey || 'free_chat'
-      const session = workbench.activeSession || await workbench.createSession({
-        title: text.slice(0, 40) || fileSnapshot?.name || 'AI 工作台会话',
-        workflowKey,
-        status: workflowKey === 'free_chat' ? 'temporary_chat' : 'rough_estimate',
-      })
-      // 会话落库后将发送标记迁移到真实会话键。
-      if (session?.sessionId && session.sessionId !== sendKey) {
-        markSending(sendKey, false)
-        sendKey = session.sessionId
-        markSending(sendKey, true)
-      }
       // RP-047 Batch E：尝试 Run 提交；503 回退旧同步路径
       let runSubmitted = false
       if (!runsDisabledRef.current && session?.sessionId) {
@@ -809,6 +973,8 @@ export default function useChatMessages(workbench) {
     attachFile,
     removeSelectedFile,
     sendMessage,
+    // DEF-2026-08-27-003：解析失败后的免重选重试入口
+    retryAttachmentParse,
     handleInteractiveOptionSelect,
     handleInteractiveFormSubmit,
     handleSuggestedAction,
