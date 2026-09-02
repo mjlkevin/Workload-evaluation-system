@@ -455,8 +455,10 @@ test("DEF-2026-08-27-001：同一会话连发两轮，第二轮 provider 实收�
   const runtime = startHarnessRuntime({
     repo: { appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
     enabled: true,
-    // CI 无 KIMI_API_KEY：密钥与 provider 走注入钩子，其余链路用生产默认装配
-    resolveApiKey: () => ({ apiKey: "test-key-not-real" }),
+    // CI 无 KIMI_API_KEY：密钥与 provider 走注入钩子，其余链路用生产默认装配。
+    // 值刻意取 tracked-secret 扫描器认可的「非密钥形态」占位（isMeaningfulSecret 直接放行），
+    // 不给本文件加 EXCLUDED 豁免条目——与白名单 clearCondition「改用非密钥形态常量」的取向一致。
+    resolveApiKey: () => ({ apiKey: "placeholder" }),
     getProvider: () => fakeProvider as never,
     createModelChat: () => async () => ({
       answer: "非结构化分类兜底",
