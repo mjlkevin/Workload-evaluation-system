@@ -134,7 +134,7 @@ describe('SystemManagement knowledge base feedback', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('知识库配置草稿已保存')
   })
 
-  test('shows testing state and a terminal error when connectivity fails', async () => {
+  test('shows testing state and an error toast when connectivity fails', async () => {
     server.use(
       http.post(`${BASE}/system/knowledge-base-config/test`, () => {
         return HttpResponse.json({ code: 'UPSTREAM_UNAVAILABLE', message: '上游服务暂不可用' }, { status: 503 })
@@ -145,7 +145,48 @@ describe('SystemManagement knowledge base feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: /测试 .*知识库/ }))
 
     expect(screen.getByRole('button', { name: '测试中...' })).toBeDisabled()
-    expect(await screen.findByText('连通性测试失败')).toBeInTheDocument()
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveClass('wes-toast--error')
+    expect(alert).toHaveTextContent('连通性测试未通过')
+  })
+
+
+
+
+  test('never echoes unknown details fields in the connectivity failure toast', async () => {
+    server.use(
+      http.post(`${BASE}/system/knowledge-base-config/test`, () => {
+        return HttpResponse.json({
+          code: 40001,
+          message: '知识库连通性测试未通过',
+          details: [{
+            field: 'knowledgeBase',
+            reason: 'authentication_failed',
+            providerCode: 401,
+            providerMessage: '令牌已过期或验证不正确',
+            requestEcho: 'visible-request-fragment-should-not-render',
+            apiKey: 'raw-key-should-not-render',
+          }],
+        }, { status: 400 })
+      })
+    )
+    await renderKnowledgeBase()
+
+    fireEvent.click(screen.getByRole('button', { name: '测试 金蝶解决方案知识库' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.closest('.wes-toast-container')).not.toBeNull()
+    expect(alert).toHaveTextContent('供应商鉴权失败')
+    expect(alert).not.toHaveTextContent('visible-request-fragment-should-not-render')
+    expect(alert).not.toHaveTextContent('raw-key-should-not-render')
+  })
+
+  test('drops the persistent knowledge base status banner', async () => {
+    await renderKnowledgeBase()
+
+    expect(screen.queryByText(/知识库接入已配置/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/知识库接入未配置/)).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.sys-banner')).toHaveLength(0)
   })
 
   test('shows connectivity success with an empty-retrieval notice', async () => {
