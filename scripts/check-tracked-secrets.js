@@ -66,10 +66,11 @@ const EXCLUDED = [
   // ── 文档示例（API 契约/方案示例值，非运行配置）──
   { file: '03_技术设计/API与集成/API接口设计-V2.md', reason: '接口文档示例 accessToken: jwt-token', clearCondition: '示例改占位符后删条目' },
   { file: 'docs/superpowers/plans/2026-06-24-wes-agent-rp-018-knowledge-tool.md', reason: '实现计划示例 apiKey: test-key', clearCondition: '示例改占位符后删条目' },
-  // ── npm 锁文件（机器生成，cookie 等字段名是依赖包名非密钥）──
-  { file: 'package-lock.json', reason: 'npm 锁文件包名 cookie 误报（express 依赖）', clearCondition: 'express 移除 cookie 依赖后删条目' },
-  { file: 'ui/V2_PROTOTYPE/package-lock.json', reason: 'npm 锁文件包名 cookie 误报（msw 依赖）', clearCondition: 'msw 移除 cookie 依赖后删条目' },
 ]
+
+// S3B4 任务 C 瘦身登记：原 24 条 → 22 条（−2）。删除的 2 条：package-lock.json ×2
+// （express/msw 依赖包名 cookie 误报）——已改用值形态判据（semver 含 ~/^ 前缀）识别包版本号，
+// 无需整文件豁免；其余 22 条全部仍命中可豁免形态（短占位），保留。
 
 // 文本扩展名集合：其余扩展名按内容判二进制（含 NUL 即跳过，如 xlsx/zip/png）。
 const TEXT_EXTENSIONS = new Set([
@@ -87,6 +88,9 @@ function isMeaningfulSecret(value) {
   if (/^(?:masked|redacted|placeholder|example|changeme|\$\{[^}]+\}|\$[A-Z_][A-Z0-9_]*)$/i.test(normalized)) return false
   // 全大写蛇形环境变量名（区分大小写，避免 /i 把 fake/hash 等短占位也吞掉）
   if (/^[A-Z][A-Z0-9_]{3,}$/.test(normalized)) return false
+  // 语义版本号（npm 锁文件依赖版本号，S3B4 任务 C：package-lock 的 cookie 字段值是包版本非密钥；
+  // 含 ~/^ 范围前缀形态，如 `~0.7.1` / `^1.1.1`）——包名 vs 值形态：值形态判据优先，不靠整文件豁免
+  if (/^[~^]?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(normalized)) return false
   if (/^.{1,40}\.\.\.$/.test(normalized)) return false
   return true
 }
