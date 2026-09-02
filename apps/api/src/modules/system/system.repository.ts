@@ -739,7 +739,7 @@ export const DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS: KnowledgeRetrievalParams = {
   topK: 8,
   topN: 20,
   recallMethod: "mixed",
-  rerankStatus: 1,
+  rerankStatus: 0,
   rerankModel: "rerank",
   fractionalThreshold: 0.2,
 };
@@ -773,7 +773,11 @@ export function normalizeKnowledgeRetrievalParams(input: unknown): KnowledgeRetr
     topK,
     topN,
     recallMethod,
-    rerankStatus: source.rerankStatus === 0 ? 0 : 1,
+    // DEF-2026-09-02-001：rerank_status: 1 会触发智谱供应商裸 code:500（无 msg），
+    // 默认必须关闭；仅显式保存过的 0/1 视为用户取值，其余（含缺失/非法）回落默认 0。
+    rerankStatus: source.rerankStatus === 0 || source.rerankStatus === 1
+      ? source.rerankStatus
+      : DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.rerankStatus,
     rerankModel: typeof source.rerankModel === "string" && source.rerankModel.trim()
       ? source.rerankModel.trim()
       : DEFAULT_KNOWLEDGE_RETRIEVAL_PARAMS.rerankModel,

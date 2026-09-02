@@ -8,6 +8,7 @@ import {
   getSystemRepository,
   mergeKnowledgeBaseCredentialsPatch,
   normalizeKnowledgeBaseConfig,
+  normalizeKnowledgeRetrievalParams,
   normalizeRequirementSystemConfig,
   validateKnowledgeBaseProfiles,
   resolveActiveRequirementKimiApiKey,
@@ -71,10 +72,20 @@ test("knowledge base legacy config receives safe retrieval defaults", () => {
     topK: 8,
     topN: 20,
     recallMethod: "mixed",
-    rerankStatus: 1,
+    rerankStatus: 0,
     rerankModel: "rerank",
     fractionalThreshold: 0.2,
   });
+});
+
+test("knowledge base rerank defaults off and preserves explicit user values", () => {
+  // DEF-2026-09-02-001：rerank_status: 1 触发智谱供应商裸 code:500，默认必须关闭；
+  // 显式保存过的取值（0/1）不得被默认值覆盖。
+  assert.equal(normalizeKnowledgeRetrievalParams(undefined).rerankStatus, 0);
+  assert.equal(normalizeKnowledgeRetrievalParams({}).rerankStatus, 0);
+  assert.equal(normalizeKnowledgeRetrievalParams({ rerankStatus: 1 }).rerankStatus, 1);
+  assert.equal(normalizeKnowledgeRetrievalParams({ rerankStatus: 0 }).rerankStatus, 0);
+  assert.equal(normalizeKnowledgeRetrievalParams({ rerankStatus: 9 }).rerankStatus, 0);
 });
 
 test("knowledge base retrieval parameters are clamped and internally consistent", () => {
@@ -92,7 +103,7 @@ test("knowledge base retrieval parameters are clamped and internally consistent"
     topK: 50,
     topN: 50,
     recallMethod: "mixed",
-    rerankStatus: 1,
+    rerankStatus: 0,
     rerankModel: "rerank",
     fractionalThreshold: 0,
   });
