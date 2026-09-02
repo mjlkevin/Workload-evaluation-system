@@ -20,7 +20,8 @@ import type { HarnessWorkflowStepContext } from "./harness-runtime.worker";
 import {
   type AppendAiSessionMessageIdempotentInput,
 } from "../ai-sessions/ai-sessions.repository";
-import type { AiSessionsStore } from "../ai-sessions/ai-sessions.types";
+import type { AiSessionRecord, AiSessionsStore } from "../ai-sessions/ai-sessions.types";
+import type { HomeMessageInput } from "../../services/ai/handlers/workbench-shared";
 
 /** 临时目录会话存储（不触碰真实 data/config）：供 C2 用户消息落库用例使用。 */
 function makeTempSessionStore(sessionId: string, ownerUserId: string): { storePath: string; cleanup(): void } {
@@ -860,4 +861,146 @@ test("RP-030 覆盖：recordTurnTrace 写入失败不影响主链路（静默吸
   const assistantCalls = calls.filter((c) => c.role === "assistant");
   assert.equal(assistantCalls.length, 1, "trace 写入失败仍须直写恰好一条 assistant 消息");
   assert.equal(assistantCalls[0].content, "模型回复", "assistant 正文不得因 trace 归档失败而丢失");
+});
+
+// ============================================================
+// DEF-2026-08-27-001：异步 Run 通道必须携带会话历史与记忆项目
+// 契约：①历史必须取自「当前用户消息落库之后」的会话记录（workbench-shared
+//   的历史整形是覆盖末条而非追加，落库前取会把上一轮 assistant 覆盖丢失）；
+// ②口径与同步路径一致（含当前轮，末条即当前 user）；
+// ③projectId 与蒸馏钩子同表达式，供记忆注入；
+// ④memoryRef 经显式判别 chunk（kind=metadata）透出，不得写成 run 事件流，
+//   并落 assistant 顶层 metadata（前端 messageFormatter 只读顶层）。
+// ============================================================
+
+type HistoryDispatchInput = {
+  message: string;
+  messages?: HomeMessageInput[];
+  projectId?: string;
+};
+
+function makeInMemorySession(sessionId: string, ownerUserId: string, seed: Array<{ role: "user" | "assistant"; content: string }> = []): AiSessionRecord {
+  const nowIso = new Date().toISOString();
+  return {
+    sessionId,
+    ownerUserId,
+    ownerUsername: "workflow-tester",
+    title: "历史注入测试会话",
+    domain: "business_evaluation",
+    workflowKey: "free_chat",
+    businessRole: "pre_sales",
+    status: "temporary_chat",
+    summary: "",
+    messages: seed.map((m, i) => ({ messageId: `msg-seed-${i}`, role: m.role, content: m.content, createdAt: nowIso })),
+    attachments: [],
+    artifacts: [],
+    pendingActions: [],
+    linkedRecords: {},
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+}
+
+test("DEF-2026-08-27-001：第二轮 dispatch 入参含第一轮 user+assistant，且历史取自当前轮落库之后", async () => {
+  const session = makeInMemorySession("session-1", "user-1", [
+    { role: "user", content: "第一轮：帮我评估 PLM 项目工作量" },
+    { role: "assistant", content: "第一轮回答：已完成初步评估" },
+  ]);
+  const dispatchInputs: HistoryDispatchInput[] = [];
+
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      dispatchInputs.push({ message: input.message, messages: input.messages, projectId: input.projectId });
+      return {
+        intent: "domain_qa",
+        answer: "第二轮回答：实施周期约 6 个月",
+        businessRole: "pre_sales",
+        roleLabel: "售前顾问",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+      } as any;
+    },
+    // 真实模拟仓储：落库即写入会话，getSessionRecord 读回同一份——
+    // 若 workflow 在 append 之前取历史，读到的末条就是第一轮 assistant。
+    appendSessionMessage: async (input) => {
+      session.messages.push(input.message);
+      if (input.attachments) session.attachments.push(...input.attachments);
+      return { found: true, created: true, message: input.message };
+    },
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    getSessionRecord: async () => session,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx({
+    run: { executionConfig: { content: "第二轮：那实施周期多久" } },
+  }));
+
+  assert.equal(dispatchInputs.length, 1, "本轮必须恰好一次 dispatch");
+  const history = dispatchInputs[0].messages;
+  assert.ok(Array.isArray(history), "异步通道 dispatch 必须收到 messages 历史（不得只发当前轮）");
+  const texts = history!.map((m) => m.content);
+  assert.equal(texts.length, 3, `历史窗口应为[第一轮 user, 第一轮 assistant, 当前 user]，实取 ${JSON.stringify(texts)}`);
+  assert.equal(texts[0], "第一轮：帮我评估 PLM 项目工作量", "历史必须含第一轮 user 原文");
+  assert.equal(texts[1], "第一轮回答：已完成初步评估", "历史必须含第一轮 assistant——落库前取会被「覆盖末条」丢掉");
+  assert.equal(texts[2], "第二轮：那实施周期多久", "末条必须是刚落库的当前用户轮（证明取历史发生在落库之后）");
+});
+
+test("DEF-2026-08-27-001：projectId 与蒸馏钩子同表达式（无项目时为 default）", async () => {
+  const captured: HistoryDispatchInput[] = [];
+  const buildWf = () => createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      captured.push({ message: input.message, messages: input.messages, projectId: input.projectId });
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeRecordingAppendSessionMessage([]),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+  });
+
+  await buildWf().executeStep("chat", makeFakeCtx());
+  assert.equal(captured[0].projectId, "default", "run 无项目归属时 projectId 必须为 default（与蒸馏钩子同口径）");
+
+  await buildWf().executeStep("chat", makeFakeCtx({ run: { projectEvaluationId: "proj-9" } }));
+  assert.equal(captured[1].projectId, "proj-9", "run.projectEvaluationId 存在时必须作为记忆注入项目");
+
+  await buildWf().executeStep("chat", makeFakeCtx({ run: { metadata: { projectId: "meta-7" } } }));
+  assert.equal(captured[2].projectId, "meta-7", "run.metadata.projectId 为次优先取值");
+});
+
+test("DEF-2026-08-27-001：kind=metadata chunk 不写 run 事件，memoryRef 落 assistant 顶层 metadata", async () => {
+  const runEvents: Array<{ eventType: string; payload: Record<string, unknown> }> = [];
+  const appended: Array<{ role: string; content: string; metadata?: Record<string, unknown> }> = [];
+
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      // 模拟 boot 的 modelChatStream：先透出显式 metadata chunk（无 contentDelta），再发正文增量
+      input.streamingAdapter!.onToken({ kind: "metadata", contentDelta: "", memoryRef: { scenesCount: 1, atomsCount: 2 } } as any);
+      input.streamingAdapter!.onToken({ contentDelta: "模", model: "kimi-test" } as any);
+      input.streamingAdapter!.onToken({ contentDelta: "型回复", model: "kimi-test" } as any);
+      return {
+        answer: "模型回复",
+        intent: "domain_qa",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+      } as any;
+    },
+    appendSessionMessage: async (input) => {
+      appended.push({ role: input.message.role, content: input.message.content, metadata: input.message.metadata as Record<string, unknown> | undefined });
+      return { found: true, created: true, message: input.message };
+    },
+    appendRunEvent: async (input) => {
+      runEvents.push({ eventType: input.eventType, payload: input.payload });
+      return input;
+    },
+  });
+
+  await wf.executeStep("chat", makeFakeCtx({ run: { executionConfig: { content: "追问" } } }));
+
+  assert.deepEqual(
+    runEvents.map((e) => `${e.eventType}:${JSON.stringify(e.payload)}`),
+    ['text.delta:{"delta":"模"}', 'text.delta:{"delta":"型回复"}'],
+    "metadata chunk 不得进入 run 事件流（既非 text.delta 也非 thought）",
+  );
+  const assistant = appended.find((c) => c.role === "assistant");
+  assert.ok(assistant, "assistant 消息必须落库");
+  assert.deepEqual(assistant!.metadata?.memoryRef, { scenesCount: 1, atomsCount: 2 }, "memoryRef 必须写在 assistant 消息 metadata 顶层");
 });

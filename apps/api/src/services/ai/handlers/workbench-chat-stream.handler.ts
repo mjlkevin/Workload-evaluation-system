@@ -17,7 +17,7 @@ import { recordWorkbenchTurnFailureTrace, recordWorkbenchTurnTrace } from "../..
 import {
   HOME_ROLE_PRESETS,
   allParsedHomeAttachments,
-  buildHomeMessageContentForModel,
+  buildWorkbenchChatModelInput,
   currentUserFromRequest,
   ensureHomeAiSession,
   getKimiProvider,
@@ -27,6 +27,7 @@ import {
   latestUserMessage,
   normalizeHomeMessages,
   resolveWorkbenchStreamFinalContent,
+  type WorkbenchModelMemoryRef,
 } from "./workbench-shared";
 import { runExplicitHomeReportFlow } from "./report-flow";
 
@@ -135,8 +136,17 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
 
     // 构建流式 adapter — 收集 chunks 并通过 SSE 发送
     const streamedChunks: StreamingChunk[] = [];
+    // DEF-2026-08-27-001 B3：流式通道的 memoryRef 只存在于 metadata chunk（modelChat
+    // 捕获包装不覆盖 modelChatStream），故在此暂存，供 assistant metadata 落库使用。
+    let streamMemoryRef: WorkbenchModelMemoryRef | undefined;
     const streamingAdapter: StreamingAdapter = {
       onToken: (chunk) => {
+        // metadata chunk 是模型调用元信息，不是内容增量：既不入 streamedChunks
+        // （否则污染 resolveWorkbenchStreamFinalContent），也不下发 delta 帧。
+        if (chunk.kind === "metadata") {
+          if (chunk.memoryRef) streamMemoryRef = chunk.memoryRef;
+          return;
+        }
         streamedChunks.push(chunk);
         sendSseEvent("delta", {
           content: chunk.contentDelta || "",
@@ -158,13 +168,20 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       const { apiKey } = resolveActiveRequirementKimiApiKey();
       if (!apiKey) throw new Error("api_key_missing");
 
-      const safeMessages = messages.slice(-12).map((message) => ({
-        role: message.role,
-        content: buildHomeMessageContentForModel(message),
-      }));
-      // 覆盖最后一条用户消息
-      if (safeMessages.length > 0) {
-        safeMessages[safeMessages.length - 1] = { role: "user", content: params.userContent };
+      // DEF-2026-08-27-001 B3：与同步非流式路径共用同一份模型入参组装口径
+      // （历史窗口 slice(-12) + 覆盖末条 + active 记忆注入）。此前本路径自行内联
+      // 整形、只拼历史不注入记忆，属同源不对称。
+      // projectId 取 "default"，与 workbench-chat.handler.ts 口径一致——工作台会话
+      // 蒸馏产物落 default 项目（harness-boot 蒸馏钩子口径）。
+      const modelInput = await buildWorkbenchChatModelInput(user, {
+        systemPrompt: params.systemPrompt,
+        userContent: params.userContent,
+        messages,
+        projectId: "default",
+      });
+      // metadata chunk 必须首发：消费端以末条 chunk 决定 model/finishReason。
+      if (modelInput.memoryRef) {
+        yield { contentDelta: "", kind: "metadata", memoryRef: modelInput.memoryRef };
       }
 
       const provider = getKimiProvider();
@@ -180,7 +197,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
         promptCacheKey: "home-workbench-stream-v1",
         timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
         credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
-        messages: [{ role: "system", content: params.systemPrompt }, ...safeMessages],
+        messages: modelInput.messages,
       });
 
       for await (const chunk of stream) {
@@ -199,13 +216,13 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
     const modelChat = async ({ systemPrompt, userContent }: { systemPrompt: string; userContent: string }) => {
       const { apiKey } = resolveActiveRequirementKimiApiKey();
       if (!apiKey) throw new Error("api_key_missing");
-      const safeMessages = messages.slice(-12).map((message) => ({
-        role: message.role,
-        content: buildHomeMessageContentForModel(message),
-      }));
-      if (safeMessages.length > 0) {
-        safeMessages[safeMessages.length - 1] = { role: "user", content: userContent };
-      }
+      // DEF-2026-08-27-001 B3：同上，与流式/非流式共用唯一口径。
+      const modelInput = await buildWorkbenchChatModelInput(user, {
+        systemPrompt,
+        userContent,
+        messages,
+        projectId: "default",
+      });
       // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
       const requirementSystemConfig = await loadRequirementSystemConfigStore();
       const completion = await getKimiProvider().chatCompletion({
@@ -214,7 +231,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
         promptCacheKey: "home-workbench-dispatch-v1",
         timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
         credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
-        messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
+        messages: modelInput.messages,
       });
       return {
         answer: completion.content,
@@ -223,6 +240,8 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
         model: completion.model,
         attempts: completion.attempts,
         finishReason: completion.finishReason,
+        // additive：dispatch 的捕获包装会把 memoryRef 透传进 trace.memoryRef
+        ...(modelInput.memoryRef ? { memoryRef: modelInput.memoryRef } : {}),
       };
     };
 
@@ -260,10 +279,15 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
     }
 
     // 保存 assistant 消息到 session
+    // DEF-2026-08-27-001 B3：流式路径的记忆来自 metadata chunk，非流式兜底路径的
+    // 记忆由 dispatch 捕获进 trace；两条都落到 assistant metadata 顶层，与
+    // workbench-chat.handler.ts:129 同口径（前端 messageFormatter 只读顶层）。
+    const memoryRefForMessage = streamMemoryRef ?? dispatchData.trace.memoryRef;
     const assistantMetadata = {
       ...(dispatchData.formBlock ? { formBlock: dispatchData.formBlock } : {}),
       ...(dispatchData.trace.knowledgeTool ? { knowledgeTool: dispatchData.trace.knowledgeTool } : {}),
       ...(dispatchData.trace.modelRun ? { modelRun: dispatchData.trace.modelRun } : {}),
+      ...(memoryRefForMessage ? { memoryRef: memoryRefForMessage } : {}),
       ...(dispatchData.suggestedActions?.length ? { suggestedActions: dispatchData.suggestedActions, intent: dispatchData.intent } : {}),
     };
     const updatedSession = (await appendAiSessionEvent(user, session.sessionId, {

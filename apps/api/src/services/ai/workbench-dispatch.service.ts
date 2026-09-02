@@ -163,6 +163,15 @@ export type StreamingChunk = {
   reasoningContentDelta?: string;
   model?: string;
   finishReason?: string;
+  /**
+   * DEF-2026-08-27-001：chunk 类型显式判别字段。
+   * 缺省（undefined）等同 "delta"——正文增量，既有消费端行为不变；
+   * "metadata" 表示本轮模型调用的元信息载荷（如 memoryRef），contentDelta
+   * 恒为空串，消费端**必须**按本字段分支处理，不得靠「空 content」隐式判定。
+   */
+  kind?: "delta" | "metadata";
+  /** kind === "metadata" 时携带：本轮注入的 active 记忆计数（引用记忆 chip 数据源） */
+  memoryRef?: WorkbenchMemoryRefTrace;
 };
 
 /** RP-029 返工：流式 adapter — 由调用方实现，dispatch 内部模型调用路径会回调此 adapter */

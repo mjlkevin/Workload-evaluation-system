@@ -307,3 +307,21 @@ export function nextStageForConfirmedAction(actionType: string): HarnessRunStage
       return null;
   }
 }
+
+/**
+ * DEF-2026-08-27-001：Run → 记忆注入项目 ID 的唯一口径。
+ * 异步 Run 的对话记忆注入（workbench-chat.workflow）与终态蒸馏钩子
+ * （harness-boot.createRunTerminalMemoryHook）必须解出同一个项目，
+ * 否则蒸馏写 A 项目、注入读 B 项目，记忆永远回流不进对话。
+ */
+export function resolveRunMemoryProjectId(run: {
+  projectEvaluationId?: string | null;
+  /** 仓储行 metadata 定为 unknown（自由 jsonb），本函数内做形状窄化 */
+  metadata?: unknown;
+}): string {
+  const record = run.metadata && typeof run.metadata === "object" && !Array.isArray(run.metadata)
+    ? (run.metadata as Record<string, unknown>)
+    : {};
+  const metadataProjectId = typeof record.projectId === "string" ? record.projectId : "";
+  return run.projectEvaluationId || metadataProjectId || "default";
+}

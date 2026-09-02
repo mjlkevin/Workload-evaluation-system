@@ -6,7 +6,8 @@ import type { Request, Response } from "express";
 import { config } from "../../config/env";
 import { defaultProviderRegistry, type ModelProvider } from "../../ai/provider";
 import type { AuthUser } from "../../types";
-import { appendAiSessionEvent, createAiSession, deleteAiSession, listAiSessions } from "../../modules/ai-sessions/ai-sessions.usecase";
+import { appendAiSessionEvent, createAiSession, deleteAiSession, getAiSession, listAiSessions } from "../../modules/ai-sessions/ai-sessions.usecase";
+import type { ChatCompletionRequest } from "../../ai/provider/model-provider";
 import { queryTraces } from "../../modules/trace/trace.repository";
 import {
   allParsedHomeAttachments,
@@ -248,6 +249,8 @@ async function withChatServiceIsolation(run: () => Promise<void>) {
 function registerFakeKimiProvider(options: {
   stream?: () => AsyncIterable<{ contentDelta: string; model?: string; finishReason?: string }>;
   chatAnswer?: string;
+  /** DEF-2026-08-27-001 B3：捕获实际发给 provider 的入参（断言需打在真发出去的消息数组上） */
+  onStreamRequest?: (req: ChatCompletionRequest) => void;
 }) {
   const provider: ModelProvider = {
     name: "kimi",
@@ -262,7 +265,8 @@ function registerFakeKimiProvider(options: {
       finishReason: "stop",
     }),
     streamChatCompletion: options.stream
-      ? async function* () {
+      ? async function* (req: ChatCompletionRequest) {
+        options.onStreamRequest?.(req);
         for await (const chunk of options.stream!()) {
           yield {
             contentDelta: chunk.contentDelta,
@@ -460,6 +464,92 @@ test("homeWorkbenchChatStream: client close 后不发送 done，并写 cancelled
     assert.equal(traces.traces[0].spans[0].error?.code, "client_aborted");
     } finally {
       await cleanupTestStreamSessions();
+    }
+  });
+});
+
+// ============================================================
+// DEF-2026-08-27-001 B3：同步流式路径的记忆注入（与非流式同口径）
+// 三条工作台对话路径中的同源不对称：同步非流式 handler 已传 projectId
+// 走记忆注入，同步流式 handler 有历史无记忆。断言打在【实际发给 provider
+// 的 messages 数组】与【落库后读回的 assistant metadata】上。
+// ============================================================
+
+test("homeWorkbenchChatStream: 与非流式同口径注入记忆，memoryRef 落 assistant metadata 顶层", { skip: !testDatabaseUrl }, async () => {
+  await withChatServiceIsolation(async () => {
+    const user: AuthUser = {
+      id: TRACE_TEST_USER_ID,
+      username: "tester",
+      passwordHash: "test-hash",
+      role: "user",
+      businessRole: "pre_sales",
+      status: "active",
+      createdAt: "2026-08-08T00:00:00.000Z",
+      lastLoginAt: "2026-08-08T00:00:00.000Z",
+    };
+    const session = await createAiSession(user, { title: "B3 流式记忆注入会话", domain: "business_evaluation", workflowKey: "free_chat", status: "temporary_chat" });
+    const streamRequests: Array<Array<{ role: string; content: string }>> = [];
+
+    try {
+      registerFakeKimiProvider({
+        onStreamRequest: (req) => streamRequests.push((req.messages ?? []).map((m) => ({ role: String(m.role), content: String(m.content) }))),
+        stream: async function* () {
+          yield { contentDelta: "第一段", model: "kimi-test", finishReason: "stop" };
+        },
+      });
+
+      const { req, res, getSseEvents } = createMockReqRes({
+        body: {
+          workflowKey: "free_chat",
+          sessionId: session.sessionId,
+          messages: [
+            { role: "user", content: "B3 第一轮：请记住关键词青柠" },
+            { role: "assistant", content: "B3 第一轮回答：已记住青柠" },
+            { role: "user", content: "B3 第二轮：我刚才说的关键词是什么" },
+          ],
+        },
+      });
+
+      await homeWorkbenchChatStream(req, res);
+
+      assert.equal(streamRequests.length, 1, `本轮应恰好一次流式模型调用，实取 ${streamRequests.length} 次`);
+      const sent = streamRequests[0];
+      assert.equal(
+        sent.map((m) => m.role).join(","),
+        "system,user,assistant,user",
+        `同步流式历史窗口口径必须与非流式一致（slice(-12) 且覆盖末条），实取 ${JSON.stringify(sent.map((m) => m.content))}`,
+      );
+      assert.ok(
+        sent[0].content.includes("【历史记忆上下文】"),
+        "同步流式必须与非流式同口径注入 active 记忆（修复前有历史无记忆）",
+      );
+
+      const events = getSseEvents();
+      assert.deepEqual(
+        events.map((event) => event.event),
+        ["delta", "done"],
+        "metadata chunk 不得作为空 content 的 delta 帧下发给客户端",
+      );
+      const doneEvent = events.find((event) => event.event === "done")!;
+      const doneData = doneEvent.data as { content?: string };
+      assert.match(doneData.content || "", /第一段/, "done 事件正文应来自流式内容，不得被 metadata chunk 污染");
+      const deltaData = events.find((event) => event.event === "delta")!.data as { content?: string; model?: string };
+      assert.deepEqual(
+        { content: deltaData.content, model: deltaData.model },
+        { content: "第一段", model: "kimi-test" },
+        "唯一的 delta 帧必须是真实内容增量；metadata 不得以空 content delta 的形态泄露给客户端",
+      );
+
+      const stored = await getAiSession(user, session.sessionId);
+      const assistant = [...(stored?.messages ?? [])].reverse().find((m) => m.role === "assistant");
+      assert.ok(assistant, "assistant 消息必须落库");
+      assert.deepEqual(
+        (assistant!.metadata as Record<string, unknown> | undefined)?.memoryRef,
+        { scenesCount: 0, atomsCount: 0 },
+        "memoryRef 必须写到 assistant metadata 顶层（前端 messageFormatter 只读顶层）",
+      );
+    } finally {
+      await deleteAiSession(user, session.sessionId);
     }
   });
 });

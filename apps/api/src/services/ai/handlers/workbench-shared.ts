@@ -13,7 +13,7 @@ import { loadRequirementSystemConfigStore, resolveActiveRequirementKimiApiKey } 
 import { createAiSession, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import type { AiSessionRecord } from "../../../modules/ai-sessions/ai-sessions.types";
 import type { AuthUser, BusinessRole } from "../../../types";
-import { defaultProviderRegistry, type ModelProvider } from "../../../ai/provider";
+import { defaultProviderRegistry, type ChatRole, type ModelProvider } from "../../../ai/provider";
 import type { StreamingChunk } from "../workbench-dispatch.service";
 import type { WorkbenchAttachmentContext } from "../workbench-context.service";
 import { createMemoryUsecase, getMemoryRepository } from "../../../modules/memory/memory.module";
@@ -203,6 +203,89 @@ export type ModelChatFactory = (params: {
   memoryRef?: { scenesCount: number; atomsCount: number };
 }>;
 
+// ============================================================
+// DEF-2026-08-27-001：模型入参组装的唯一口径
+// ============================================================
+// 三条工作台对话路径（同步非流式 / 同步流式 / 异步 Run）共用本函数，
+// 避免「中间层对了、底层另写一份」的口径分叉再次发生：
+//  · 历史窗口 slice(-12) 且**覆盖末条**为用户本轮——因此调用方必须
+//    在当前用户消息落库之后再取历史，否则上一轮 assistant 会被覆盖丢失；
+//  · 仅当传入 projectId 才注入 active 记忆，失败静默降级为无记忆模式。
+
+export const WORKBENCH_MODEL_HISTORY_WINDOW = 12;
+
+export type WorkbenchModelMessage = { role: ChatRole; content: string };
+
+export type WorkbenchModelMemoryRef = { scenesCount: number; atomsCount: number };
+
+export async function buildWorkbenchChatModelInput(
+  user: AuthUser,
+  params: {
+    systemPrompt: string;
+    userContent: string;
+    messages?: HomeMessageInput[];
+    /** 记忆注入项目上下文（缺省不注入，行为与旧版一致） */
+    projectId?: string;
+  },
+): Promise<{ messages: WorkbenchModelMessage[]; memoryRef?: WorkbenchModelMemoryRef }> {
+  let memoryBlock: MemoryContextBlock | null = null;
+  if (params.projectId) {
+    try {
+      const memoryUsecase = createMemoryUsecase({ repo: getMemoryRepository() });
+      memoryBlock = await memoryUsecase.buildMemoryContext({
+        ownerUserId: user.id,
+        projectId: params.projectId,
+        maxScenes: 3,
+        maxAtoms: 5,
+      });
+    } catch {
+      // 记忆注入失败降级为无记忆模式，不阻塞主链路
+    }
+  }
+
+  const memoryPrompt = memoryBlock ? buildMemoryPrompt(memoryBlock) : "";
+
+  const safeMessages: WorkbenchModelMessage[] = (params.messages ?? []).slice(-WORKBENCH_MODEL_HISTORY_WINDOW).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
+  // 覆盖末条为用户本轮（非追加）；无历史时补推 userContent，避免模型只看到 system prompt（C3）
+  if (safeMessages.length > 0) {
+    safeMessages[safeMessages.length - 1] = { role: "user", content: params.userContent };
+  } else {
+    safeMessages.push({ role: "user", content: params.userContent });
+  }
+
+  const finalSystemPrompt = memoryPrompt
+    ? `${params.systemPrompt}\n\n${memoryPrompt}`
+    : params.systemPrompt;
+
+  return {
+    messages: [{ role: "system", content: finalSystemPrompt }, ...safeMessages],
+    // additive：记忆注入透明度——注入成功（含 0 条）即携带计数，
+    // 前端仅在计数 > 0 时渲染「引用记忆」chip，缺省保持静默降级
+    ...(memoryBlock ? { memoryRef: { scenesCount: memoryBlock.scenes.length, atomsCount: memoryBlock.atoms.length } } : {}),
+  };
+}
+
+/**
+ * DEF-2026-08-27-001：已落库会话记录 → 模型历史入参。
+ * 附件按 message.attachmentIds 从会话 attachments 解析（与同步路径来前端的
+ * messages[].attachments 同一形状，使 buildHomeMessageContentForModel 能拼出
+ * 【附件解析上下文】）；system/tool 角色与空正文不进历史窗口。
+ */
+export function sessionRecordToHomeMessages(session: AiSessionRecord | null | undefined): HomeMessageInput[] {
+  if (!session || !Array.isArray(session.messages)) return [];
+  const attachmentsById = new Map((Array.isArray(session.attachments) ? session.attachments : []).map((attachment) => [attachment.attachmentId, attachment]));
+  return session.messages
+    .filter((message) => (message.role === "user" || message.role === "assistant") && asString(message.content))
+    .map((message) => ({
+      role: message.role as "user" | "assistant",
+      content: message.content,
+      attachments: (message.attachmentIds ?? [])
+        .map((id) => attachmentsById.get(id))
+        .filter((attachment): attachment is NonNullable<typeof attachment> => Boolean(attachment))
+        .map((attachment) => ({ name: attachment.name, size: attachment.size, type: attachment.type, parsedSummary: attachment.parsedSummary })),
+    }));
+}
+
 export function buildWorkbenchChatModelChat(
   user: AuthUser,
   options: {
@@ -217,37 +300,12 @@ export function buildWorkbenchChatModelChat(
     const { apiKey } = resolveActiveRequirementKimiApiKey();
     if (!apiKey) throw new Error("required_or_env_missing");
 
-    // SP-2026-007 MS2：按 projectId 拉取 active 记忆上下文
-    let memoryBlock: MemoryContextBlock | null = null;
-    if (options.projectId) {
-      try {
-        const memoryUsecase = createMemoryUsecase({ repo: getMemoryRepository() });
-        memoryBlock = await memoryUsecase.buildMemoryContext({
-          ownerUserId: user.id,
-          projectId: options.projectId,
-          maxScenes: 3,
-          maxAtoms: 5,
-        });
-      } catch {
-        // 记忆注入失败降级为无记忆模式，不阻塞主链路
-      }
-    }
-
-    const memoryPrompt = memoryBlock
-      ? buildMemoryPrompt(memoryBlock)
-      : "";
-
-    const safeMessages = messages.slice(-12).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
-    // 覆盖最后一条用户消息的 system prompt；异步通道不传历史时补推 userContent，避免模型只看到 system prompt（C3）
-    if (safeMessages.length > 0) {
-      safeMessages[safeMessages.length - 1] = { role: "user", content: userContent };
-    } else {
-      safeMessages.push({ role: "user", content: userContent });
-    }
-
-    const finalSystemPrompt = memoryPrompt
-      ? `${systemPrompt}\n\n${memoryPrompt}`
-      : systemPrompt;
+    const modelInput = await buildWorkbenchChatModelInput(user, {
+      systemPrompt,
+      userContent,
+      messages,
+      projectId: options.projectId,
+    });
 
     // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
     const requirementSystemConfig = await loadRequirementSystemConfigStore();
@@ -257,7 +315,7 @@ export function buildWorkbenchChatModelChat(
       promptCacheKey: "home-workbench-dispatch-v1",
       timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
       credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
-      messages: [{ role: "system", content: finalSystemPrompt }, ...safeMessages],
+      messages: modelInput.messages,
     });
     return {
       answer: completion.content,
@@ -266,11 +324,7 @@ export function buildWorkbenchChatModelChat(
       model: completion.model,
       attempts: completion.attempts,
       finishReason: completion.finishReason,
-      // additive：记忆注入透明度——注入成功（含 0 条）即携带计数，
-      // 前端仅在计数 > 0 时渲染「引用记忆」chip，缺省保持静默降级
-      ...(memoryBlock
-        ? { memoryRef: { scenesCount: memoryBlock.scenes.length, atomsCount: memoryBlock.atoms.length } }
-        : {}),
+      ...(modelInput.memoryRef ? { memoryRef: modelInput.memoryRef } : {}),
     };
   };
 }

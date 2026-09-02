@@ -10,9 +10,12 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { startHarnessRuntime, createRunTerminalMemoryHook } from "./harness-boot";
 import { createMemoryUsecase } from "../memory/memory.usecase";
 import type { distillRunMemory } from "../memory/memory.distiller";
+import type { AuthUser } from "../../types";
+import { createAiSession, deleteAiSession, getAiSession } from "../ai-sessions/ai-sessions.usecase";
 
 test("boot: enabled=true 启动 worker 恰 1 次", async () => {
   let workerStarted = 0;
@@ -367,4 +370,152 @@ test("MS2 补测：注入通道只读 active 记忆（draft 未确认不注入�
     !called.includes("listMemoryForProject"),
     "注入通道不得读取含 draft 的列表通道",
   );
+});
+
+// ============================================================
+// DEF-2026-08-27-001：异步 Run 通道必须把会话历史送到 provider
+// 断言打在【实际发给 provider 的 messages 数组】上——本缺陷第二层根因
+// 正是「中间层对了、底层 modelChatStream 写死两条」，只断中间层参数
+// 不构成回归防线。会话历史经 appendSessionMessage / getSessionRecord
+// 真实落库读回，故需 PG（TEST_DATABASE_URL）。
+// ============================================================
+
+type ProviderCall = { role: string; content: string }[];
+
+function makeRunStepCtx(input: {
+  harnessRunId: string;
+  ownerUserId: string;
+  aiSessionId: string;
+  content: string;
+}): import("./harness-runtime.worker").HarnessWorkflowStepContext {
+  return {
+    run: {
+      harnessRunId: input.harnessRunId,
+      ownerUserId: input.ownerUserId,
+      ownerUsername: "def001-tester",
+      aiSessionId: input.aiSessionId,
+      submissionKey: `sub-${input.harnessRunId}`,
+      title: input.content.slice(0, 40),
+      workflowId: "workbench_chat_v1",
+      workflowVersion: "1.0.0",
+      executionConfig: { content: input.content },
+      status: "running",
+      eventSequence: 1,
+      metadata: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any,
+    attempt: {
+      harnessRunAttemptId: `attempt-${input.harnessRunId}`,
+      harnessRunId: input.harnessRunId,
+      workerId: "worker-1",
+      attemptNo: 1,
+      status: "claimed",
+      startedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any,
+    stepKey: "chat",
+    state: {},
+    resumeFrom: null,
+    abortSignal: new AbortController().signal,
+    makeEffectKey: (name, ord) => `${input.harnessRunId}:chat:${name}:${ord}`,
+    recordToolEffectOnce: async (effect) => ({ output: await effect.execute(), created: true }),
+  };
+}
+
+const def001TestDatabaseUrl = process.env.TEST_DATABASE_URL;
+const DEF001_ROUND1 = "客户希望提升订单处理效率，请先复述这句话";
+const DEF001_ROUND2 = "那这句话里的目标还缺什么？请直接复述上一轮我说过的内容";
+
+test("DEF-2026-08-27-001：同一会话连发两轮，第二轮 provider 实收入参含第一轮 user+assistant", { skip: !def001TestDatabaseUrl }, async () => {
+  const ownerUserId = `wes-t-def001-${randomUUID().slice(0, 8)}`;
+  const user: AuthUser = { id: ownerUserId, username: ownerUserId, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" };
+  const session = await createAiSession(user, { title: "DEF-001 两轮会话", workflowKey: "free_chat" });
+
+  const providerCalls: ProviderCall[] = [];
+  let bootError: unknown = null;
+
+  const fakeProvider = {
+    name: "kimi",
+    defaultModel: "kimi-test",
+    isAvailable: () => true,
+    chatCompletion: async () => {
+      throw new Error("chatCompletion_should_not_be_called");
+    },
+    streamChatCompletion: (req: { messages: ProviderCall }) => {
+      providerCalls.push(req.messages.map((m) => ({ role: String(m.role), content: String(m.content) })));
+      const answer = `第 ${providerCalls.length} 轮回答`;
+      return (async function* () {
+        yield { contentDelta: answer, model: "kimi-test", finishReason: "stop" };
+      })();
+    },
+  };
+
+  const runtime = startHarnessRuntime({
+    repo: { appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
+    enabled: true,
+    // CI 无 KIMI_API_KEY：密钥与 provider 走注入钩子，其余链路用生产默认装配。
+    // 值刻意取 tracked-secret 扫描器认可的「非密钥形态」占位（isMeaningfulSecret 直接放行），
+    // 不给本文件加 EXCLUDED 豁免条目——与白名单 clearCondition「改用非密钥形态常量」的取向一致。
+    resolveApiKey: () => ({ apiKey: "placeholder" }),
+    getProvider: () => fakeProvider as never,
+    createModelChat: () => async () => ({
+      answer: "非结构化分类兜底",
+      rawContent: "非结构化分类兜底",
+      provider: "stub",
+      model: "stub",
+      attempts: 1,
+      finishReason: "stop",
+    }),
+    createWorker: ({ registry }) => ({
+      start: async () => {
+        try {
+          const workflow = registry.get("workbench_chat_v1", "1.0.0");
+          if (!workflow) throw new Error("workflow not found");
+          await workflow.executeStep("chat", makeRunStepCtx({ harnessRunId: `run-def001-1-${ownerUserId}`, ownerUserId, aiSessionId: session.sessionId, content: DEF001_ROUND1 }));
+          await workflow.executeStep("chat", makeRunStepCtx({ harnessRunId: `run-def001-2-${ownerUserId}`, ownerUserId, aiSessionId: session.sessionId, content: DEF001_ROUND2 }));
+        } catch (err) {
+          bootError = err;
+        }
+      },
+      stop: async () => {},
+      runNextAttempt: async () => false,
+      isStopping: () => false,
+    }),
+  });
+
+  // stop() 会 await worker.start() 的 promise，两轮真实执行完毕后才会返回
+  await runtime.stop();
+
+  try {
+    assert.equal(bootError, null, `两轮执行不得抛错：${bootError instanceof Error ? bootError.message : String(bootError)}`);
+    assert.equal(providerCalls.length, 2, `两轮应各触发一次 provider 流式调用，实取 ${providerCalls.length} 次`);
+
+    const [firstCall, secondCall] = providerCalls;
+    assert.deepEqual(firstCall.map((m) => m.role), ["system", "user"], "首轮无历史，入参为 [system, user]");
+    assert.equal(firstCall[1].content, DEF001_ROUND1);
+
+    const secondContents = secondCall.map((m) => m.content);
+    assert.equal(
+      secondCall.map((m) => m.role).join(","),
+      "system,user,assistant,user",
+      `第二轮 provider 实收入参角色序列错误，实取 ${JSON.stringify(secondContents)}`,
+    );
+    assert.equal(secondContents[1], DEF001_ROUND1, "第二轮必须带上第一轮 user 原文");
+    assert.equal(secondContents[2], "第 1 轮回答", "第二轮必须带上第一轮 assistant 回答——它同时是「取历史在落库之后」的见证");
+    assert.equal(secondContents[3], DEF001_ROUND2, "末条必须是当前轮 user（覆盖末条不得丢历史）");
+    assert.ok(secondContents[0].includes(DEF001_ROUND1) === false, "system prompt 不得被历史内容污染");
+
+    const stored = await getAiSession(user, session.sessionId);
+    assert.ok(stored, "会话必须可读回");
+    assert.equal(stored!.messages.length, 4, `落库消息应为 2 user + 2 assistant，实取 ${stored!.messages.length} 条（覆盖末条语义下第一轮 assistant 不得丢失）`);
+    assert.deepEqual(
+      stored!.messages.map((m) => `${m.role}:${m.content}`),
+      [`user:${DEF001_ROUND1}`, "assistant:第 1 轮回答", `user:${DEF001_ROUND2}`, "assistant:第 2 轮回答"],
+      "会话存储序列必须与两轮对话一致",
+    );
+  } finally {
+    await deleteAiSession(user, session.sessionId);
+  }
 });

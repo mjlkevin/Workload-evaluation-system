@@ -9,10 +9,11 @@
 import type { HarnessRuntimeRepository } from "./harness-runtime.repository";
 import { createHarnessRuntimeWorker, type HarnessRuntimeWorker } from "./harness-runtime.worker";
 import { createWorkbenchChatWorkflow } from "./workbench-chat.workflow";
+import { resolveRunMemoryProjectId } from "./harness.types";
 import { createHarnessWorkflowRegistry } from "./harness-runtime.worker";
 import { dispatchHomeWorkbenchTurn } from "../../services/ai/workbench-dispatch.service";
 import type { StreamingChunk } from "../../services/ai/workbench-dispatch.service";
-import { buildWorkbenchChatDispatchInput, getKimiProvider } from "../../services/ai/handlers/workbench-shared";
+import { buildWorkbenchChatDispatchInput, buildWorkbenchChatModelInput, getKimiProvider } from "../../services/ai/handlers/workbench-shared";
 import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.repository";
 import { getAiSession } from "../ai-sessions/ai-sessions.usecase";
 import { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
@@ -29,6 +30,14 @@ export type HarnessRuntimeBootOptions = {
   createWorker?: (opts: { repo: HarnessRuntimeRepository; registry: ReturnType<typeof createHarnessWorkflowRegistry> }) => HarnessRuntimeWorker;
   /** 测试注入用：自定义 modelChat 工厂（覆盖默认真实组装） */
   createModelChat?: (user: AuthUser, content: string) => import("../../services/ai/handlers/workbench-shared").ModelChatFactory;
+  /**
+   * DEF-2026-08-27-001 测试注入用：provider 与活动 API Key 解析器。
+   * 异步 Run 的模型调用 100% 走本文件的 modelChatStream（流式闸门），而 CI
+   * 环境不注入 KIMI_API_KEY；不提供该钩子则无法在回归中跑到真实入参组装。
+   * 缺省仍取生产默认（kimi 注册表 + 活动配置），行为不变。
+   */
+  getProvider?: () => ReturnType<typeof getKimiProvider>;
+  resolveApiKey?: () => { apiKey: string };
 };
 
 export type HarnessRuntimeBootResult = {
@@ -79,7 +88,7 @@ export function createRunTerminalMemoryHook(deps: RunTerminalMemoryHookDeps) {
         },
         {
           ownerUserId: run.ownerUserId,
-          projectId: run.projectEvaluationId || run.metadata?.projectId || "default",
+          projectId: resolveRunMemoryProjectId(run),
           harnessRunId: run.harnessRunId,
           runTitle: run.title,
           messages: [
@@ -121,16 +130,33 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
       const dispatchInput = buildWorkbenchChatDispatchInput(user, content, {
         modelChat: options.createModelChat ? options.createModelChat(user, content) : undefined,
         attachment: input.attachment ?? null,
+        // DEF-2026-08-27-001 第一层：历史与记忆项目必须透传给入参组装，
+        // 口径与同步路径 workbench-chat.handler.ts 一致。
+        messages: input.messages,
+        projectId: input.projectId,
       });
       // ISS-2026-08-10-004（层 2）：workflow 注入 streamingAdapter 时接线流式模型调用——
       // dispatch 流式闸门（model-answer）要求 streamingAdapter + modelChatStream 同时
-      // 存在，缺一则静默回退非流式；异步通道无历史消息，与同步 SSE 路径同款参数直推
-      // 当前 userContent（同步路径逐字行为零改动）。
+      // 存在，缺一则静默回退非流式。
+      // DEF-2026-08-27-001 第二层（关键）：闸门恒命中，异步回答 100% 走本函数，
+      // 因此历史/记忆必须在【这里】与 modelChat 共用 buildWorkbenchChatModelInput
+      // 取同一份组装口径——只补第一层（dispatchInput）修的是永不执行的分支。
       const modelChatStream = async function* (params: { systemPrompt: string; userContent: string }): AsyncIterable<StreamingChunk> {
-        const { apiKey } = resolveActiveRequirementKimiApiKey();
+        const { apiKey } = (options.resolveApiKey ?? resolveActiveRequirementKimiApiKey)();
         if (!apiKey) throw new Error("required_or_env_missing");
-        const provider = getKimiProvider();
+        const provider = (options.getProvider ?? getKimiProvider)();
         if (!provider.streamChatCompletion) throw new Error("stream_not_supported");
+        const modelInput = await buildWorkbenchChatModelInput(user, {
+          systemPrompt: params.systemPrompt,
+          userContent: params.userContent,
+          messages: input.messages,
+          projectId: input.projectId,
+        });
+        // 显式判别 chunk 首发：model-answer 以末条 chunk 定 model/finishReason，
+        // 末发会让终 chunk 变成无 model 的 metadata，污染回合元信息。
+        if (modelInput.memoryRef) {
+          yield { contentDelta: "", kind: "metadata", memoryRef: modelInput.memoryRef };
+        }
         // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
         const requirementSystemConfig = await loadRequirementSystemConfigStore();
         const stream = provider.streamChatCompletion({
@@ -139,10 +165,7 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
           promptCacheKey: "home-workbench-dispatch-v1",
           timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
           credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
-          messages: [
-            { role: "system", content: params.systemPrompt },
-            { role: "user", content: params.userContent },
-          ],
+          messages: modelInput.messages,
         });
         for await (const chunk of stream) {
           yield {
