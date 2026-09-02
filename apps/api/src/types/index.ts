@@ -546,6 +546,10 @@ export type KnowledgeBaseProbeRecord = {
   warning?: "retrieval_empty";
   providerRequestId?: string;
   errorCode?: string;
+  /** 供应商业务码（HTTP 200 时智谱将错误码放响应体；仅业务失败分支透传）。 */
+  providerCode?: number;
+  /** 供应商原始 msg（截断 200 字符；仅业务失败分支透传）。 */
+  providerMessage?: string;
 };
 
 export type KnowledgeBaseConfigStore = {

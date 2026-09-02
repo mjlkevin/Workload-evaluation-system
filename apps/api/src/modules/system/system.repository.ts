@@ -959,6 +959,11 @@ function normalizeKnowledgeBaseProbe(input: unknown): KnowledgeBaseProbeRecord |
   ) return undefined;
   const providerRequestId = String(source.providerRequestId || "").trim();
   const errorCode = String(source.errorCode || "").trim();
+  const providerMessage = String(source.providerMessage || "").trim();
+  const rawProviderCode = source.providerCode;
+  const providerCode = typeof rawProviderCode === "number" && Number.isFinite(rawProviderCode)
+    ? Math.trunc(rawProviderCode)
+    : undefined;
   const profileId = String(source.profileId || "").trim();
   return {
     status: source.status,
@@ -969,6 +974,8 @@ function normalizeKnowledgeBaseProbe(input: unknown): KnowledgeBaseProbeRecord |
     ...(source.warning === "retrieval_empty" ? { warning: source.warning } : {}),
     ...(providerRequestId ? { providerRequestId: providerRequestId.slice(0, 128) } : {}),
     ...(errorCode ? { errorCode: errorCode.slice(0, 64) } : {}),
+    ...(providerCode !== undefined ? { providerCode } : {}),
+    ...(providerMessage ? { providerMessage: providerMessage.slice(0, 200) } : {}),
   };
 }
 

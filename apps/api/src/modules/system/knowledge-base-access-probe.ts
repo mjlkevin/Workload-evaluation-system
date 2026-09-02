@@ -21,6 +21,11 @@ function asBusinessCode(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function asProviderMessage(value: unknown): string | undefined {
+  const text = asString(value);
+  return text ? text.slice(0, 200) : undefined;
+}
+
 async function readJsonSafely(response: Response): Promise<Record<string, unknown>> {
   try {
     return asRecord(await response.json());
@@ -38,11 +43,22 @@ function providerRequestId(response: Response, payload: Record<string, unknown>)
   return value ? value.slice(0, 128) : undefined;
 }
 
-function classifyFailure(status: number): string {
+// HTTP 状态分类（网络/网关语义），与供应商业务码分开，不得共用。
+function classifyHttpFailure(status: number): string {
   if (status === 401 || status === 403) return "authentication_failed";
   if (status === 429) return "rate_limited";
   if (status >= 500) return "provider_unavailable";
   return "provider_rejected";
+}
+
+// 供应商业务码分类（智谱一律 HTTP 200、错误码在响应体）。映射仅建立在
+// 已取证事实之上（DEF-2026-09-02-001 逐参数二分）：401=令牌无效、
+// 100013=字段错误、500=无 msg 的拒绝；无依据的码归 unknown 并原样带出。
+function classifyBusinessFailure(code: number): string {
+  if (code === 401) return "authentication_failed";
+  if (code === 100013) return "invalid_arguments";
+  if (code === 500) return "provider_unspecified_rejection";
+  return "unknown";
 }
 
 function resolveRetrieveUrl(apiBaseUrl: string): string {
@@ -99,7 +115,7 @@ export async function probeKnowledgeBaseAccess(
         status: "failure",
         latencyMs: Date.now() - startedAt,
         providerRequestId: requestIdFromProvider,
-        errorCode: classifyFailure(response.status),
+        errorCode: classifyHttpFailure(response.status),
       };
     }
     const businessCode = asBusinessCode(payload.code);
@@ -108,7 +124,11 @@ export async function probeKnowledgeBaseAccess(
         status: "failure",
         latencyMs: Date.now() - startedAt,
         providerRequestId: requestIdFromProvider,
-        errorCode: classifyFailure(businessCode),
+        providerCode: businessCode,
+        ...(asProviderMessage(payload.msg ?? payload.message)
+          ? { providerMessage: asProviderMessage(payload.msg ?? payload.message) }
+          : {}),
+        errorCode: classifyBusinessFailure(businessCode),
       };
     }
     const data = Array.isArray(payload.data) ? payload.data : [];
