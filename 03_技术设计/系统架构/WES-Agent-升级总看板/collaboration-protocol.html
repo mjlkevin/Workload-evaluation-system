@@ -592,6 +592,12 @@
           <td>每天 <code class="inline">git fetch origin &amp;&amp; git pull --rebase origin main</code> 对齐；冲突按「三轴并存」解，不改写已推送历史。</td>
           <td>确实无法并存时停下报架构侧，不得由执行方自行取舍。</td>
         </tr>
+        <tr>
+          <td>写操作归属登记</td>
+          <td>FF 合入、分支删除、worktree 注销、吸收看板草稿等改变共享状态的操作。</td>
+          <td>只登记可核实事实：时刻、sha、操作类型、否认记录。<details class="tech-detail"><summary>2026-09-02 实例与登记口径</summary><b>事实</b>：<code class="inline">main</code> reflog 15:28:24 <code class="inline">merge origin/qoder/ui-kb-toast: Fast-forward</code> → <code class="inline">c8ad3eb</code>、15:44:11 台账提交 <code class="inline">41517c9</code>；其后的分支删除 + worktree 注销 + 看板草稿吸收，<b>执行者身份未确认</b>。架构侧已明确否认执行（自述全程仅只读核查命令，外加在该 worktree 内一次 <code class="inline">vite build</code> 与一次 <code class="inline">npm test</code>）。提交作者与提交者均为本机共享 git 身份，该字段无法区分执行会话或个人。<b>口径</b>：执行者不明时写「执行者身份未确认」，不得代填任何 Agent 也不得写「用户手动」；用户确认为本人操作后降级为「用户手动操作，已澄清」并记澄清日期。</details></td>
+          <td>归属存疑时保持「身份未确认」，不指定候选；就地标注「归属更正 + 日期」，不静默改写原有时间线与 sha。</td>
+        </tr>
       </table>
       <div class="callout"><div><b>扩展原则</b>新增 Agent 时只新增注册表条目、入口文件、handoff profile 与试运行记录；不重写现有协议，也不把工具品牌直接等同于权限。</div></div>
     </section>

@@ -172,6 +172,7 @@
         <tr><th>决策</th><th>结论</th><th>原因</th></tr>
         <tr><td>产品形态</td><td>L2 内嵌 Copilot，而非 L3 全自主 Agent。</td><td>WES 的价值是规则驱动、可控、可追溯；写动作需要人在环。</td></tr>
         <tr><td>前端主线</td><td><code class="inline">ui/V2_PROTOTYPE</code> 是唯一 Web 主线。</td><td>Agent 工作台和后续体验都在 V2 演进。</td></tr>
+        <tr><td>样式冻结面例外（<code class="inline">.sys-banner</code>）</td><td>本批后 <code class="inline">.sys-banner</code> 已无生产消费方，但其清理属 §7 冻结文件变更，须单独立项并申请 §7 例外，任何批次不得「顺手清掉」。</td><td>基础块在冻结文件 <code class="inline">ui/V2_PROTOTYPE/layout.css:107-114</code>（8 条规则），<code class="inline">src/index.css:1118</code> 仅 <code class="inline">--danger</code> 变体 1 行，且 <code class="inline">src/index.css:1-3</code> 以 <code class="inline">@import</code> 把 layout.css 引入 React 应用。<details class="tech-detail"><summary>消费方盘点与派单基线更正</summary><b>消费方盘点</b>：全仓仅剩两条测试负向断言（断言 “不存在 sys-banner”），<code class="inline">pages/*.html</code> 静态原型不引用；即样式已无人用，但不等于可删。<b>派单基线更正（2026-09-02）</b>：UI 批次派单原写「<code class="inline">sys-banner</code> 样式不在冻结的 <code class="inline">components.css</code> / <code class="inline">layout.css</code> 内」——不成立，该结论只查了 <code class="inline">src/index.css</code> 未查 <code class="inline">layout.css</code>，后续引用不得沿用此错误口径。</details></td></tr>
         <tr><td>后端主线</td><td><code class="inline">apps/api</code> 是唯一服务入口。</td><td>继续沿 modules/routes 模式扩展。</td></tr>
         <tr><td>Harness 存储</td><td>Harness 作为首个 PostgreSQL-backed 新业务域。</td><td>审计、统计、权限追溯与模型回放需求已触发 DB 迁移条件。</td></tr>
         <tr><td>阶段 1D confirm</td><td>只创建传统草稿，不创建正式评估。</td><td>保留传统系统人工确认和版本流程。</td></tr>

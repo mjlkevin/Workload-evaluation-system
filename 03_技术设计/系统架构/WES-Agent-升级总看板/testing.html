@@ -142,6 +142,15 @@
       <div class="callout warn"><div><b>超期预警</b>以下 MT-1E / MT-1F / MT-1H-A / MT-1H-B 人工测试自登记以来已超过 2 周未执行。P0 测试应在人工验收窗口优先完成；超期未执行的测试将在监控页标红。如需延期，请在 changes.html 记录决策。</div></div>
       <table>
         <tr><th>ID</th><th>场景</th><th>优先级</th><th>操作路径</th><th>预期结果</th><th>状态</th><th>反馈记录</th></tr>
+        <tr data-board-event-id="BE-2026-09-02-kb-toast-closure-registration:testing-manual">
+          <td class="mono">MT-ISS0902-001-001</td>
+          <td>ISS-2026-09-02-001 · 知识库标签页 toast 化三路径视觉自验</td>
+          <td><span class="status warn"><span class="dot"></span>P1</span></td>
+          <td>登录系统管理 → 知识库标签页：① 保存草稿（成功 / 失败各一次）② 测试连通性（成功 / 失败各一次）③ 确认「知识库接入已配置」状态横幅已撤下且下方档案表格的状态徽章仍正确。</td>
+          <td>三条反馈均以标准 toast 出现在右上角、自动消失、不打断布局；失败 toast 含人话原因；页面无残留 <code class="inline">sys-banner</code>；窄屏下 toast 不遮挡操作按钮。</td>
+          <td><span class="status todo"><span class="dot"></span>待执行 · 被 ISS-2026-09-02-002 阻塞</span></td>
+          <td>2026-09-02 未做：本地开发环境拿不到可登录的管理员凭据（阻塞根因见 <code class="inline">ISS-2026-09-02-002</code>），用户已裁定本批跳过视觉自验。<b>DOM 度量不等于视觉自验</b>：本批仅有 vitest DOM 断言（451 用例）证明结构正确，未获得任何渲染 / 截图证据，不主张视觉结论，两者分别登记。解锁后按本行操作路径补做并回填截图路径。<details class="tech-detail"><summary>为什么不算已通过</summary>自动化基线只能证明「DOM 里没有 sys-banner、toast 调用点正确」，无法证明视觉层次、间距、动画、窄屏遮挡与真实失败文案的可读性；看板规则要求人工验收在没有真实结果时不得写「已通过」。</details></td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-12-iss-2026-08-11-007-fixed:testing-manual">
           <td class="mono">MT-ISS0811-007-001</td>
           <td>异步 Run 附件持久化、模型上下文与 formBlock 清理</td>
