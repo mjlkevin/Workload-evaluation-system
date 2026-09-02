@@ -339,97 +339,97 @@
     <section>
       <div class="h-num">Section 02</div>
       <h2>协作架构图</h2>
-      <div class="diagram-canvas" aria-label="WES 本地 A2A / 多 Agent 协作协议架构图">
+      <div class="diagram-canvas" aria-label="WES 本地多 AI 协作实际拓扑（2026-09-02 as-run）">
         <div class="diagram-header">
           <h2 class="diagram-title">WES Local A2A Collaboration Protocol</h2>
-          <p class="diagram-subtitle">AGENT REGISTRY · GIT WORKTREE · STRUCTURED HANDOFF · COMMAND BOARD · VERIFICATION GATE</p>
+          <p class="diagram-subtitle">AS RUN 2026-09-02 · PARALLEL ARCHITECTURE SESSIONS · TWO EXECUTOR CHANNELS · BIDIRECTIONAL VERIFICATION · USER ACCEPTANCE</p>
         </div>
 
         <div class="diagram-row">
           <div class="node strong">
             <span class="badge filled">USER</span>
-            <h3>任务意图与验收权</h3>
-            <p>给出需求、优先级、循环（Loop） 指令或单条任务；决定最终是否集成、是否标记已交付。</p>
-            <span class="mono-line">authority: final acceptance</span>
+            <h3>用户 · 唯一验收位</h3>
+            <p>给出需求、优先级与任务意图。是否接受、是否集成，只有这一处能决定。</p>
+            <span class="mono-line">authority: sole acceptance</span>
           </div>
-          <div class="connector"><span>1</span></div>
-          <div class="node">
-            <span class="badge">EXECUTOR</span>
-            <h3>执行 Agent 插槽</h3>
-            <p>当前启用 Qoder；后续 KIMICODE 或其他工具必须先注册、ACK、试运行，再获得执行范围。</p>
-            <span class="mono-line">active now: qoder1</span>
-          </div>
-          <div class="connector"><span>2</span></div>
-          <div class="node">
-            <span class="badge">GIT STATE</span>
-            <h3>branch / worktree / commit</h3>
-            <p>保存范围、baseCommit、diff、测试变更和可回滚边界；禁止混入无关 dirty changes。</p>
-            <span class="mono-line">carrier: qoder/* or codex/*</span>
-          </div>
-        </div>
-
-        <div class="diagram-row">
-          <div class="node">
-            <span class="badge">HANDOFF</span>
-            <h3>交付事实信封</h3>
-            <p>目标、文件、验证、风险、看板建议、下一步；缺 worktree、文件清单或命令证据即拒收。</p>
-            <span class="mono-line">template: external-ai-handoff</span>
-          </div>
-          <div class="connector"><span>3</span></div>
+          <div class="connector"><span>✓</span></div>
           <div class="node strong">
-            <span class="badge filled">CODEX</span>
-            <h3>复核与修复闸门</h3>
-            <p>核验路径、diff、测试、权限、数据隔离和范围；必要时切 codex/* 分支补最小修复。</p>
-            <span class="mono-line">gate: review + verification</span>
+            <span class="badge filled">ARCHITECTURE</span>
+            <h3>架构侧会话 · 多个并行</h3>
+            <p>每条工作线一个架构侧会话，各自指挥自己的执行方。这个数量不是设计出来的，是上下文窗口逼出来的——一条线跟久了上下文满，只能分裂。</p>
+            <span class="mono-line">count: emergent, not designed</span>
           </div>
-          <div class="connector"><span>4</span></div>
-          <div class="node">
-            <span class="badge">VERIFICATION</span>
-            <h3>可复跑命令证据</h3>
-            <p>按变更类型运行 build、unit、module、AI、Harness、web 测试；不能运行则记录残余风险。</p>
-            <span class="mono-line">evidence: command + result</span>
+          <div class="connector"><span>⇄</span></div>
+          <div class="node strong">
+            <span class="badge filled">EXECUTOR</span>
+            <h3>执行方 · 两类通道</h3>
+            <p>Qoder IDE 会话：架构侧粘贴提示词驱动。Qoder CLI 直驱：架构侧直接调用命令行，2026-09-02 启用。</p>
+            <span class="mono-line">channels: qoder-ide / qoder-cli</span>
           </div>
         </div>
 
         <div class="diagram-row">
-          <div class="node">
-            <span class="badge">BOARD</span>
-            <h3>共享事实源</h3>
-            <p>requirements、plan、testing、monitoring、risks、changes、sources 保持一致，不让关键事实只留在聊天或 commit。</p>
-            <span class="mono-line">ledger: WES command board</span>
+          <div class="node strong">
+            <span class="badge filled">VERIFY →</span>
+            <h3>独立核实 · 架构侧查执行方</h3>
+            <p>架构侧用命令实取核实执行方的声明，不读报告下结论。报告写“已完成”不构成事实。</p>
+            <span class="mono-line">arch checks exec: run it, not read it</span>
           </div>
-          <div class="connector"><span>5</span></div>
-          <div class="node">
-            <span class="badge">INTEGRATION</span>
-            <h3>最小 patch 集成</h3>
-            <p>按 RP 提取已验证最小差异，不整分支粗暴合并，不恢复历史主线，不带入运行态数据。</p>
-            <span class="mono-line">rule: one scoped patch</span>
+          <div class="connector"><span>⇄</span></div>
+          <div class="node strong">
+            <span class="badge filled">VERIFY ←</span>
+            <h3>独立核实 · 执行方查架构侧</h3>
+            <p>同一套规则反向成立：执行方也拿实取证据纠正过架构侧的判断。核实不是单向质检。</p>
+            <span class="mono-line">exec corrected arch, with evidence</span>
           </div>
-          <div class="connector"><span>6</span></div>
+          <div class="connector"><span>→</span></div>
+          <div class="node strong">
+            <span class="badge filled">RULE</span>
+            <h3>裁决口径</h3>
+            <p>谁拿得出实取证据谁说了算。拿不出实取证据的一方，结论让位。</p>
+            <span class="mono-line">live retrieval evidence wins</span>
+          </div>
+        </div>
+
+        <div class="diagram-row">
           <div class="node warn">
-            <span class="badge">REJECT / REWORK</span>
-            <h3>拒收与返工路径</h3>
-            <p>缺验证、越权改文件、混入旁路、绕过 dispatch、泄露密钥、错误标记已交付，均退回复工。</p>
-            <span class="mono-line">fallback: rework prompt</span>
+            <span class="badge">WEAKNESS</span>
+            <h3>跨线共享事实没有单一 owner</h3>
+            <p>多条架构侧会话并行时，下面三类事实被多方共同读写，没有任何一类有唯一负责人。</p>
+            <span class="mono-line">unowned: facts shared across lines</span>
+          </div>
+          <div class="connector"><span>⚠</span></div>
+          <div class="node warn">
+            <span class="badge">SHARED</span>
+            <h3>测试基线 / 编号池</h3>
+            <p>各条线各自实取的测试基线、各自领取的编号池，都是跨线共享事实。</p>
+            <span class="mono-line">baseline · id pool · no owner</span>
+          </div>
+          <div class="connector"><span>⚠</span></div>
+          <div class="node warn">
+            <span class="badge">SHARED</span>
+            <h3>看板文件</h3>
+            <p>总看板页面与登记页同样是跨线共享事实，与前两类一样没有唯一负责人。</p>
+            <span class="mono-line">command board · no owner</span>
           </div>
         </div>
 
         <div class="swimlane">
           <div class="swimlane-row">
-            <div class="lane-head">TASK</div>
-            <div class="lane-cell"><b>需求 / 指令</b><span>用户或需求池给出 RP、边界和优先级。</span></div>
-            <div class="lane-cell"><b>Worktree ACK</b><span>Qoder 记录 projectRoot、branch、baseCommit、allowedPaths。</span></div>
-            <div class="lane-cell"><b>实现与验证</b><span>执行最小变更和匹配测试。</span></div>
-            <div class="lane-cell"><b>Handoff</b><span>结构化交付结果，等待 Codex。</span></div>
-            <div class="lane-cell"><b>Acceptance</b><span>Codex/用户复核后决定合并或返工。</span></div>
+            <div class="lane-head">WORK LINE</div>
+            <div class="lane-cell"><b>线 A</b><span>一个架构侧会话 + 它指挥的执行方。</span></div>
+            <div class="lane-cell"><b>线 B</b><span>同结构，独立推进。</span></div>
+            <div class="lane-cell"><b>线 C … N</b><span>上下文满就再分裂一条。</span></div>
+            <div class="lane-cell"><b>执行通道</b><span>Qoder IDE 会话（粘贴提示词）/ Qoder CLI 直驱（架构侧直接调用）。</span></div>
+            <div class="lane-cell"><b>收敛点</b><span>只有用户验收这一处；跨线共享事实面没有收敛点。</span></div>
           </div>
           <div class="swimlane-row">
             <div class="lane-head">EVIDENCE</div>
-            <div class="lane-cell"><b>需求池</b><span>requirements.html / plan.html</span></div>
-            <div class="lane-cell"><b>Git 对象</b><span>worktree path / branch / commit</span></div>
-            <div class="lane-cell"><b>命令输出</b><span>build / test / targeted checks</span></div>
-            <div class="lane-cell"><b>交付信封</b><span>目标、文件、验证、风险、下一步</span></div>
-            <div class="lane-cell"><b>总看板</b><span>changes / testing / monitoring / risks</span></div>
+            <div class="lane-cell"><b>实取</b><span>命令跑出来的结果才算数。</span></div>
+            <div class="lane-cell"><b>不读报告</b><span>“已完成”不作为结论依据。</span></div>
+            <div class="lane-cell"><b>双向</b><span>架构侧可查执行方，执行方也可查架构侧。</span></div>
+            <div class="lane-cell"><b>裁决</b><span>谁有实取证据谁说了算。</span></div>
+            <div class="lane-cell"><b>未解决</b><span>共享事实的归属尚未定下来。</span></div>
           </div>
         </div>
       </div>
@@ -493,23 +493,31 @@
       <div class="diagram-canvas" aria-label="WES 多 Agent 团队注册表图">
         <div class="diagram-header">
           <h2 class="diagram-title">Team Registry Snapshot</h2>
-          <p class="diagram-subtitle">ACTIVE MEMBERS · CANDIDATE SLOTS · REVIEW GATE · USER ACCEPTANCE</p>
+          <p class="diagram-subtitle">ARCHITECTURE SLOT MULTIPLE HOLDERS · TWO EXECUTOR CHANNELS · RETIRED SLOTS · CANDIDATE GATE · USER ACCEPTANCE</p>
         </div>
-        <div class="diagram-row four">
+        <div class="diagram-row">
           <div class="node strong">
             <span class="badge filled">ACTIVE</span>
-            <h3>Codex</h3>
-            <p>复核、修复、验证、看板沉淀和集成建议。负责防止外部交付越界。</p>
-            <span class="mono-line">branch: codex/*</span>
+            <h3>架构侧 · codex 槽位</h3>
+            <p>复核、修复、验证、看板沉淀和集成建议，负责防止外部交付越界。<b>该槽位现由多个架构侧会话共同持有，不再是单一会话</b>——每条工作线各持有一条。</p>
+            <span class="mono-line">holders: multiple sessions</span>
           </div>
           <div class="connector"><span>+</span></div>
           <div class="node strong">
             <span class="badge filled">ACTIVE</span>
-            <h3>Qoder1</h3>
-            <p>需求池 循环 执行代理。产出隔离 worktree、commit 和 handoff。</p>
-            <span class="mono-line">branch: qoder/*</span>
+            <h3>Qoder IDE 会话</h3>
+            <p>需求池 循环 执行代理，由架构侧粘贴提示词驱动。产出隔离 worktree、commit 和 handoff。</p>
+            <span class="mono-line">channel: ide · pasted prompt</span>
           </div>
           <div class="connector"><span>+</span></div>
+          <div class="node strong">
+            <span class="badge filled">ACTIVE</span>
+            <h3>Qoder CLI 直驱</h3>
+            <p>架构侧直接调用命令行执行，不经 IDE 会话粘贴提示词。2026-09-02 启用，与 IDE 会话并列为第二类执行通道。</p>
+            <span class="mono-line">enabled: 2026-09-02</span>
+          </div>
+        </div>
+        <div class="diagram-row">
           <div class="node warn">
             <span class="badge">RETIRED</span>
             <h3>KIMICODE</h3>
@@ -522,6 +530,13 @@
             <h3>Claude Code</h3>
             <p>【已下线】不再参与本项目开发；候选槽位已于 2026-08-09 移除。</p>
             <span class="mono-line">removed: 2026-08-09</span>
+          </div>
+          <div class="connector"><span>+</span></div>
+          <div class="node">
+            <span class="badge">CANDIDATE</span>
+            <h3>候选槽位</h3>
+            <p>新工具必须先注册、ACK、明确分支边界并完成试运行，才获得执行范围；工具品牌本身不等于权限。</p>
+            <span class="mono-line">gate: register → ack → pilot</span>
           </div>
         </div>
       </div>
@@ -595,8 +610,8 @@
         <tr>
           <td>写操作归属登记</td>
           <td>FF 合入、分支删除、worktree 注销、吸收看板草稿等改变共享状态的操作。</td>
-          <td>只登记可核实事实：时刻、sha、操作类型、否认记录。<details class="tech-detail"><summary>2026-09-02 实例与登记口径</summary><b>事实</b>：<code class="inline">main</code> reflog 15:28:24 <code class="inline">merge origin/qoder/ui-kb-toast: Fast-forward</code> → <code class="inline">c8ad3eb</code>、15:44:11 台账提交 <code class="inline">41517c9</code>；其后的分支删除 + worktree 注销 + 看板草稿吸收，<b>执行者身份未确认</b>。架构侧已明确否认执行（自述全程仅只读核查命令，外加在该 worktree 内一次 <code class="inline">vite build</code> 与一次 <code class="inline">npm test</code>）。提交作者与提交者均为本机共享 git 身份，该字段无法区分执行会话或个人。<b>口径</b>：执行者不明时写「执行者身份未确认」，不得代填任何 Agent 也不得写「用户手动」；用户确认为本人操作后降级为「用户手动操作，已澄清」并记澄清日期。</details></td>
-          <td>归属存疑时保持「身份未确认」，不指定候选；就地标注「归属更正 + 日期」，不静默改写原有时间线与 sha。</td>
+          <td>只登记可核实事实：时刻、sha、操作类型、否认记录。<details class="tech-detail"><summary>2026-09-02 实例与登记口径（已定性）</summary><b>定稿口径（2026-09-02 架构侧裁决，可确定的部分已定稿，不再挂「待用户确认」）</b>：操作位置 = 主工作目录；时间 = 15:16 补提交、15:28 FF 合入（合远端 ref）；执行者会话不可判定——本机所有执行者共用同一 git 身份，git 内无会话标识字段；用户答复“不清楚，可能为另一架构会话”；本架构会话已明确否认执行任何写操作。<b>状</b>：<code class="inline">main</code> reflog 15:28:24 <code class="inline">merge origin/qoder/ui-kb-toast: Fast-forward</code> → <code class="inline">c8ad3eb</code>、15:44:11 台账提交 <code class="inline">41517c9</code>；其后的分支删除 + worktree 注销 + 看板草稿吸收。<b>定性结果：会话不可判定</b>（不是「待确认」、也不是「已查清为某方所为」）；根治手段另立 <code class="inline">ISS-2026-09-02-003</code> 提交身份可追溯。<b>口径</b>：同一 git 身份下不得代填任何 Agent 也不得写「用户手动」；若后续出现可推翻本定性的硬证据（而非回忆），就地标注「定性更正 + 日期」并保留原时间线与 sha。</details></td>
+          <td>已定性为「会话不可判定」的条目不再悬挂等待；就地标注「归属更正 + 日期」，不静默改写原有时间线与 sha。</td>
         </tr>
       </table>
       <div class="callout"><div><b>扩展原则</b>新增 Agent 时只新增注册表条目、入口文件、handoff profile 与试运行记录；不重写现有协议，也不把工具品牌直接等同于权限。</div></div>
@@ -664,20 +679,22 @@
           <td>需要用户决策时停止。</td>
         </tr>
       </table>
-      <div class="diagram-canvas" aria-label="NightOps 三 AI 无人值守闭环">
+      <div class="diagram-canvas" aria-label="NightOps 三 AI 无人值守闭环（历史机制，已于 2026-08-09 下线）">
+        <div class="callout warn"><div><b>【历史说明，已下线 · 本页已停用】</b>NightOps 无人值守三 AI 协作机制已于 <b>2026-08-09 整体下线</b>：相关模板（nightops-templates.md）与 mission/brief/TRIAL 产物、KIMICODE peer audit Loop 脚本均已删除。<b>禁止据此重建无人值守实现 / 审计 Loop</b>；如需恢复夜间自动化，须经用户重新授权并重建协议。<b>保留理由</b>：这是本项目试过又停掉的机制，留作历史以免后人重新提议。下图为下线前的设计原貌。</div></div>
         <div class="diagram-header">
-          <h2 class="diagram-title">NightOps 3AI Closed 循环</h2>
-          <p class="diagram-subtitle">CODEX COMMANDER · QODER EXECUTOR · KIMICODE PEER AUDITOR · USER FINAL ACCEPTANCE</p>
+          <span class="badge filled">RETIRED · 2026-08-09 · HISTORY ONLY</span>
+          <h2 class="diagram-title">NightOps 3AI Closed 循环【已下线】</h2>
+          <p class="diagram-subtitle">HISTORICAL MECHANISM · CODEX COMMANDER · QODER EXECUTOR · KIMICODE PEER AUDITOR · NOT IN FORCE SINCE 2026-08-09</p>
         </div>
         <div class="diagram-row">
-          <div class="node strong">
-            <span class="badge filled">CODEX</span>
+          <div class="node warn">
+            <span class="badge">CODEX</span>
             <h3>Night Mission Packet</h3>
             <p>发布任务包、限定路径、指定 Qoder/KIMICODE 角色、设置 stopConditions。</p>
             <span class="mono-line">allowNextTask: false by default</span>
           </div>
           <div class="connector"><span>1</span></div>
-          <div class="node">
+          <div class="node warn">
             <span class="badge">QODER</span>
             <h3>Execute + Handoff</h3>
             <p>高吞吐执行、测试和结构化回填；返工优先于新需求。</p>
@@ -692,21 +709,21 @@
           </div>
         </div>
         <div class="diagram-row">
-          <div class="node">
+          <div class="node warn">
             <span class="badge">REWORK</span>
             <h3>Qoder 修复审计项</h3>
             <p>存在审计问题时只修当前任务，不拿新 RP，不扩大范围。</p>
             <span class="mono-line">mustReworkFirst: true</span>
           </div>
           <div class="connector"><span>3</span></div>
-          <div class="node strong">
-            <span class="badge filled">CODEX GATE</span>
+          <div class="node warn">
+            <span class="badge">CODEX GATE</span>
             <h3>最终审计闸门</h3>
             <p>给出 ACCEPTED_PENDING_USER、REWORK_REQUIRED、REJECTED、USER_DECISION_REQUIRED 或 ALLOW_NEXT。</p>
             <span class="mono-line">gate: no auto delivery</span>
           </div>
           <div class="connector"><span>4</span></div>
-          <div class="node">
+          <div class="node warn">
             <span class="badge">USER</span>
             <h3>晨间决策</h3>
             <p>查看 Codex 摘要，决定人工验收、集成、暂停或调整下一夜任务。</p>

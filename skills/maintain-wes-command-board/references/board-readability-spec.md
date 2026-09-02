@@ -28,9 +28,18 @@
 
 - **不要**手写 `width:1%`、内联列宽或给单元格加 `nowrap` 来"帮忙"——百分比宽度提示会扭曲 Chromium 的剩余宽度分配（长列吞掉全部余量、正文列被压成竖排），统一 `nowrap` 会把长文本列顶出容器。两条均为 2026-08-10 实测翻车结论，详见 `components.css` 表格区注释。
 - 短标识列沿用既有类即可被自动识别：`td.mono`（编号 / commit 哈希 / 日期 / 估时）、单 `.pill` / `.status` 单元格（优先级 / 类型 / 状态）。
-- 少数内容比例悬殊的表（如 changes.html 时间线表、github-radar 12 列台账），允许加 `<colgroup>` 显式声明列宽意图；含 `colgroup` 的表 `initColumnFit` 自动跳过，不重复干预。
+- 少数内容比例悬殊的表（如 changes.html 时间线表、github-radar 12 列台账、issues.html 9 列台账），允许加 `<colgroup>` 显式声明列宽意图；含 `colgroup` 的表 `initColumnFit` 自动跳过，不重复干预。
 - 含 `colspan` / `rowspan` 的表（如 sources.html）不参与实测加注，保持纯 auto 布局。
 - 恢复等宽布局的逃生口：给该表格加 `style="table-layout:fixed"`。
+
+### 2A.1 两套列宽机制并存与真凶定位（2026-09-02 issues.html 列挤压实测结论）
+
+- **两套机制互斥**：看板表格列宽有两条路径 —— 显式 `<colgroup>` 与自动量 `measureColumnFit()`。`board-ui.js:293-294` 对**已有 `colgroup`** 或**含 `colspan`/`rowspan`** 的表直接 `return`，即表现正常的页未必在用自动量，可能用的是显式列宽。实扫全板：17 页含表，仅 4 处 `colgroup`（changes 1 / github-radar 1 / requirements 2），其余全走自动量。
+- **新增看板页优先用显式 `colgroup`**（2026-09-02 架构侧裁决）：显式列宽可预测，不会被单条长内容拉塌；代价是失去短列自动贴合。
+- **列挤压的真凶往往是 `nowrap` 胶囊，不是缺 `colgroup`**。`.status` / `.pill` 带 `white-space: nowrap`（`components.css:610`），一条超长状态胶囊的 min-content 直接决定该列宽度下限并吞掉全表余量；**此时 `colgroup` 提示无效**。实测：issues.html 只补 colgroup 不动内容，「分析状态」列仍 609px；把胶囊只留短状态、将 sha / CI run 移到可换行的普通文本与 `code.inline` 后降至 171px。**修顺序：先瘦身胶囊，再调列宽。**
+- **口径澄清**（不与 §2A 第 1 条矛盾）：第 29 行禁令针对的是在自动量表里给**单个单元格**加宽度提示 / `nowrap`（扭曲剩余宽度分配）；对**整表**声明 `colgroup` 属第 31 行允许范围。但带 `colgroup` 后每列百分比需调到 **≥ 该列单行需求宽度**，否则 `td.mono` 编号会断行——用同表 A/B 度量（rendered vs 强制单行 demand）逐列验证。
+- **窄列里不只胶囊会竖排，`<summary>` 与任意内联块同样会**（2026-09-02 同页二次实测）：把一个长标题的折叠层登进 6%～8% 的窄列，summary 会被压成 1 字/行的竖排（实测 49px × 12 行）。因此“`nowrap` 胶囊溢出 = 0”**不等于列内可读**，自检必须覆盖格内**全部可见文本元素**（至少含 `summary`），而不仅是 `.status` / `.pill`；窄列只放短状态与分流结论，解释性折叠层一律落宽列。
+- **改进自动量算法属共享资产改动**（影响全板 21 页），不得在单页批次顺手做；如认为自动量本身该修，单独立项报架构侧。
 
 ## 3. 数字单一来源
 
@@ -38,6 +47,7 @@
 - 测试数字 → 以当次实跑命令输出为准（test:modules / test:web / test:ai），禁止沿用旧快照。
 - 专项数量 → 以 `special-projects.html` KPI 元数据为准。
 - 更新任一数字时，必须全板 `rg` 旧值，同步所有副本（index pill/sub、trust strip、hero console、plan meta、changes lead）。
+- **页顶统计枚的计数一律由表结构实取单一来源定值，禁止用“推断哪一个多了表头”反向修正旧口径**（2026-09-02 同页两次计错）：总数 = `tbody tr` 中含 `td` 的行数（表头行无 `td`，天然不会被计入）且需按 ID 去重校验；分项 = 按对应列文本逐行归桶，同一分项不得混用中 / 英文标签口径（如“转需求 · RP-”与“转 requirement”计同一桶）。写完必须做**桶闭合校验**（各分项之和 = 数据行总数）。增行后至少复跑一次归桶探针得数，不目测、不沿用上一轮结论。
 
 ## 4. 阶段标签同步
 

@@ -98,6 +98,7 @@
 - 用户消息包含"测试问题""需求""反馈""缺陷""bug""体验调整""功能调整""大方向思考""需求池"等关键词，或通过 UI 截图反馈可用性问题时，必须读取并执行 `skills/recording-wes-requirements/SKILL.md`；原始反馈统一先进入问题池，再由 **Codex Intake/Triage Loop** 按 `docs/codex-workflows/wes-feedback-intake.md` 去重、分类和处置。已有同类 issue / RP / defect 时只补充证据或范围，不重复建项；只有分诊结果为 requirement 或 defect 时才创建或更新对应派生记录，信息不足的 issue 保持 `待补充` 并最小化追问。
 - 进行安全审查、漏洞扫描、JWT/auth 边界审计、或合并涉及鉴权/路由/文件上传/外部 API 的变更前，必须读取并执行 `skills/wes-security-review/SKILL.md`；按 WES 专属攻击面（JWT、Excel 上传、AI API、文件导出、版本控制、Harness PostgreSQL）执行六步安全审计流程。
 - 审查代码变更（包括 Qoder handoff、PR、或其他 Agent 交付结果）前，必须读取并执行 `skills/wes-code-review/SKILL.md`；按五轴框架（正确性、可读性、架构、安全、性能）进行审查，变更超 1000 行需要求拆分。
+- 以架构侧/复核方身份承接 WES 任务时——复核执行方交付、独立核实其声明、撰写架构侧交接文档或直接驱动 Qoder CLI 执行任务——必须读取并执行 `skills/wes-architect-review/SKILL.md`；要害是用命令实取核实，而不是读报告下结论，其中含五种反复出现的失效形态与对策、断言有效性判据 A-1 / A-2 / A-3、实取命令清单、架构侧交接文档模板与 Qoder CLI 直驱协议。与 `wes-code-review` 的分工：后者审的是代码变更本身（五轴框架），本 Skill 管的是架构侧这个角色的工作方法（怎么核实、怎么交接、怎么驱动执行方）。
 - 实现新功能、修复缺陷或重构代码时，必须读取并执行 `skills/wes-tdd/SKILL.md`；遵循 RED-GREEN-REFACTOR 循环，先写失败测试，再写最小实现，最后重构，每次变更后运行 `npm run test:modules` 验证。
 - Codex 不再创建或执行 WES 需求池迭代实现 Loop，也不创建 heartbeat/recurring 自动化来持续跑需求池；WES 实现 Loop 后续交给 Qoder 创建和执行。用户明确要求 Codex 处理单条需求时，按普通一次性任务执行，不自动调度下一轮。
 - 【历史说明，已下线】NightOps 无人值守三 AI 协作机制已于 2026-08-09 整体下线：相关模板（nightops-templates.md）、mission/brief/TRIAL 产物与 KIMICODE peer audit Loop 脚本已删除。禁止重新创建无人值守实现/审计 Loop；如需恢复夜间自动化，须经用户重新授权并重建协议。
@@ -133,7 +134,8 @@
 12. `skills/wes-code-review/SKILL.md` — WES 代码审查与质量门禁规则
 13. `skills/wes-tdd/SKILL.md` — WES 测试驱动开发规范（RED-GREEN-REFACTOR）
 14. `QODER.md`、`skills/wes-qoder-worktree-protocol/SKILL.md` 与 `skills/wes-multi-agent-collaboration/SKILL.md` — Qoder / Codex 多 Agent 协作、worktree 执行、回填与复核协议
-15. `docs/codex-workflows/` — 需求去重、外部 AI 回填、长文档检查与 API 密钥验证流程
+15. `skills/wes-architect-review/SKILL.md` — 架构侧复核与交接工作法（实取核实、失效形态、交接模板、CLI 直驱协议）
+16. `docs/codex-workflows/` — 需求去重、外部 AI 回填、长文档检查与 API 密钥验证流程
 
 ## 12. 禁止事项
 
