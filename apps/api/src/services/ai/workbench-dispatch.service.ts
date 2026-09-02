@@ -5,6 +5,8 @@
 // ============================================================
 
 import type { AuthUser, BusinessRole } from "../../types";
+import type { ToolCall } from "../../ai/provider/model-provider";
+import type { WorkbenchToolEffectRecorder } from "./workbench-tool-loop";
 import type { ZhipuKnowledgeToolConfig, ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import { routeWorkbenchIntent, classifyIntentWithModel, type WorkbenchIntent, type ModelClassificationResult } from "./workbench-intent.service";
 import { buildWorkbenchContext, type WorkbenchAttachmentContext, type WorkbenchHarnessArtifactContext } from "./workbench-context.service";
@@ -118,6 +120,13 @@ export type WorkbenchDispatchInput = {
   modelChatStream?: (params: { systemPrompt: string; userContent: string }) => AsyncIterable<StreamingChunk>;
   /** RP-047 Batch B：可选服务端取消信号；中止后在安全边界拒绝，取消后零副作用 */
   abortSignal?: AbortSignal;
+  /**
+   * 批次 0 · ④：工具调用幂等接缝（additive）。仅异步 Run 通道注入——
+   * 由 workbench-chat.workflow 用 ctx.recordToolEffectOnce 实现，
+   * 使每次工具调用落 `runId:stepKey:workbench_chat_tool_call:N` 独立 effectKey；
+   * 同步直写路径不经 Harness 步骤提交点，无重放语义，不注入即为 undefined。
+   */
+  recordToolEffect?: WorkbenchToolEffectRecorder;
 };
 
 /** RP-047 Batch B：dispatch 取消错误，供调用方区分取消与真实模型故障。 */
@@ -172,6 +181,12 @@ export type StreamingChunk = {
   kind?: "delta" | "metadata";
   /** kind === "metadata" 时携带：本轮注入的 active 记忆计数（引用记忆 chip 数据源） */
   memoryRef?: WorkbenchMemoryRefTrace;
+  /**
+   * 批次 0：本轮模型发起的工具调用（已按 index 拼装完毕的完整列表）。
+   * 出现在携带 finishReason === "tool_calls" 的 delta chunk 上，以及工具循环
+   * 补发的 kind === "metadata" chunk 上；无工具调用时缺省，既有消费端零回归。
+   */
+  toolCalls?: ToolCall[];
 };
 
 /** RP-029 返工：流式 adapter — 由调用方实现，dispatch 内部模型调用路径会回调此 adapter */

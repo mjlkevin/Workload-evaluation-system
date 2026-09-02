@@ -13,6 +13,12 @@ import { resolveBusinessRole } from "../../../middleware/auth";
 import { resolveActiveRequirementKimiApiKey, loadRequirementSystemConfigStore } from "../../../modules/system/system.repository";
 import { appendAiSessionEvent, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import { dispatchHomeWorkbenchTurn, type StreamingAdapter, type StreamingChunk } from "../workbench-dispatch.service";
+import {
+  resolveReadOnlyWorkbenchTools,
+  runWorkbenchToolLoop,
+  runWorkbenchToolLoopStream,
+} from "../workbench-tool-loop";
+import type { ChatCompletionResponse } from "../../../ai/provider";
 import { recordWorkbenchTurnFailureTrace, recordWorkbenchTurnTrace } from "../../../modules/trace/trace.usecase";
 import {
   HOME_ROLE_PRESETS,
@@ -191,23 +197,40 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
 
       // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
       const requirementSystemConfig = await loadRequirementSystemConfigStore();
-      const stream = provider.streamChatCompletion({
-        model: config.kimi.model,
-        temperature: 0.3,
-        promptCacheKey: "home-workbench-stream-v1",
-        timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
-        credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+      const timeoutMs = requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000;
+      // 批次 0 · ①②③：只读工具在注入点过滤（不改 ToolRegistry），并把单轮流式调用
+      // 交给工具循环——模型返回的 tool_calls 必须被真正执行后回填再问，否则
+      // 「传了 tools 等于模型说了没人听」。
+      const toolSet = resolveReadOnlyWorkbenchTools(user);
+      for await (const chunk of runWorkbenchToolLoopStream({
         messages: modelInput.messages,
-      });
-
-      for await (const chunk of stream) {
-        if (aborted) throw new Error("client_aborted");
-        yield {
-          contentDelta: chunk.contentDelta || "",
-          reasoningContentDelta: chunk.reasoningContentDelta || "",
-          model: chunk.model,
-          finishReason: chunk.finishReason,
-        };
+        registry: toolSet.registry,
+        agentUser: toolSet.agentUser,
+        readOnlyToolNames: toolSet.readOnlyToolNames,
+        invokeStream: async function* ({ messages }) {
+          const stream = provider.streamChatCompletion!({
+            model: config.kimi.model,
+            temperature: 0.3,
+            promptCacheKey: "home-workbench-stream-v1",
+            timeoutMs,
+            credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+            messages,
+            ...(toolSet.tools.length > 0 ? { tools: toolSet.tools, toolChoice: "auto" as const } : {}),
+          });
+          for await (const providerChunk of stream) {
+            if (aborted) throw new Error("client_aborted");
+            yield {
+              contentDelta: providerChunk.contentDelta || "",
+              reasoningContentDelta: providerChunk.reasoningContentDelta || "",
+              model: providerChunk.model,
+              finishReason: providerChunk.finishReason,
+              // 批次 0：不得丢弃 toolCalls——工具循环靠它识别本轮要执行的调用
+              ...(providerChunk.toolCalls ? { toolCalls: providerChunk.toolCalls } : {}),
+            };
+          }
+        },
+      })) {
+        yield chunk;
       }
       if (aborted) throw new Error("client_aborted");
     };
@@ -225,22 +248,38 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       });
       // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
       const requirementSystemConfig = await loadRequirementSystemConfigStore();
-      const completion = await getKimiProvider().chatCompletion({
-        model: config.kimi.model,
-        temperature: 0.3,
-        promptCacheKey: "home-workbench-dispatch-v1",
-        timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
-        credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+      // 批次 0 · ①②③：与流式路径同口径——注入点过滤只读工具 + 真正执行 tool_calls。
+      const toolSet = resolveReadOnlyWorkbenchTools(user);
+      let lastCompletion: ChatCompletionResponse | undefined;
+      const loop = await runWorkbenchToolLoop({
         messages: modelInput.messages,
+        registry: toolSet.registry,
+        agentUser: toolSet.agentUser,
+        readOnlyToolNames: toolSet.readOnlyToolNames,
+        invoke: async ({ messages }) => {
+          const completion = await getKimiProvider().chatCompletion({
+            model: config.kimi.model,
+            temperature: 0.3,
+            promptCacheKey: "home-workbench-dispatch-v1",
+            timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
+            credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+            messages,
+            ...(toolSet.tools.length > 0 ? { tools: toolSet.tools, toolChoice: "auto" as const } : {}),
+          });
+          lastCompletion = completion;
+          return { content: completion.content, toolCalls: completion.toolCalls };
+        },
       });
+      const completion = lastCompletion;
       return {
-        answer: completion.content,
-        rawContent: completion.rawContent,
-        provider: completion.provider,
-        model: completion.model,
-        attempts: completion.attempts,
-        finishReason: completion.finishReason,
-        // additive：dispatch 的捕获包装会把 memoryRef 透传进 trace.memoryRef
+        answer: loop.content,
+        rawContent: completion?.rawContent ?? loop.content,
+        provider: completion?.provider,
+        model: completion?.model,
+        attempts: completion?.attempts,
+        finishReason: completion?.finishReason,
+        // additive：dispatch 的捕获包装会把 toolCalls / memoryRef 透传进 trace
+        ...(loop.toolCalls.length > 0 ? { toolCalls: loop.toolCalls } : {}),
         ...(modelInput.memoryRef ? { memoryRef: modelInput.memoryRef } : {}),
       };
     };
@@ -288,6 +327,9 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       ...(dispatchData.trace.knowledgeTool ? { knowledgeTool: dispatchData.trace.knowledgeTool } : {}),
       ...(dispatchData.trace.modelRun ? { modelRun: dispatchData.trace.modelRun } : {}),
       ...(memoryRefForMessage ? { memoryRef: memoryRefForMessage } : {}),
+      // MS3 chip 活数据链路（additive）：流式通道的工具调用同样写入消息 metadata，
+      // 与 workbench-chat.handler.ts 同口径（前端 messageFormatter 只读顶层）。
+      ...(dispatchData.trace.toolCalls?.length ? { toolCalls: dispatchData.trace.toolCalls } : {}),
       ...(dispatchData.suggestedActions?.length ? { suggestedActions: dispatchData.suggestedActions, intent: dispatchData.intent } : {}),
     };
     const updatedSession = (await appendAiSessionEvent(user, session.sessionId, {

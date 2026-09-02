@@ -14,6 +14,7 @@ import { routeKnowledgeBase, type KnowledgeBaseRouteDecision } from "../knowledg
 import type { WorkbenchContext } from "../workbench-context.service";
 import type { WorkbenchDispatchData, WorkbenchDispatchInput } from "../workbench-dispatch.service";
 import type { WorkbenchIntentHandler } from "./handler.types";
+import { createWorkbenchToolCallTraceCollector } from "../workbench-tool-loop";
 import { asCleanString, parseJsonObject } from "./json-utils";
 
 function buildKnowledgeToolAnswer(trace: ZhipuKnowledgeToolTrace): string {
@@ -184,6 +185,10 @@ async function buildKnowledgeQueryResponse(
 
     const startedAt = Date.now();
     let modelResult: { answer: string; rawContent: string; provider?: string; model?: string; attempts?: number; finishReason?: string };
+    // 批次 0 · ③：流式分支不经过 modelChat，dispatch 的捕获包装看不到工具调用，
+    // 故在此按 chunk 收集；非流式分支不 absorb，toTrace() 返回 undefined，
+    // trace.toolCalls 仍由 dispatch 写入，两条路径同形状。
+    const toolCallTrace = createWorkbenchToolCallTraceCollector();
 
     // RP-029 返工：知识库 fallback 也支持流式
     if (input.streamingAdapter && input.modelChatStream) {
@@ -192,6 +197,7 @@ async function buildKnowledgeQueryResponse(
         const stream = input.modelChatStream({ systemPrompt, userContent: input.message });
         for await (const chunk of stream) {
           input.streamingAdapter.onToken(chunk);
+          toolCallTrace.absorb(chunk);
           fullContent += chunk.contentDelta || "";
         }
         input.streamingAdapter.onComplete?.(fullContent);
@@ -239,6 +245,7 @@ async function buildKnowledgeQueryResponse(
           ...(typeof modelResult.attempts === "number" ? { attempts: modelResult.attempts } : {}),
           ...(modelResult.finishReason ? { finishReason: modelResult.finishReason } : {}),
         },
+        ...(toolCallTrace.toTrace() ? { toolCalls: toolCallTrace.toTrace() } : {}),
       },
     };
   }

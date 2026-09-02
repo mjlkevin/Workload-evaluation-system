@@ -14,6 +14,8 @@ import { createHarnessWorkflowRegistry } from "./harness-runtime.worker";
 import { dispatchHomeWorkbenchTurn } from "../../services/ai/workbench-dispatch.service";
 import type { StreamingChunk } from "../../services/ai/workbench-dispatch.service";
 import { buildWorkbenchChatDispatchInput, buildWorkbenchChatModelInput, getKimiProvider } from "../../services/ai/handlers/workbench-shared";
+import { resolveReadOnlyWorkbenchTools, runWorkbenchToolLoopStream } from "../../services/ai/workbench-tool-loop";
+import { assertWorkbenchModelRequestMatchesStorage } from "../../services/ai/workbench-request-invariant";
 import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.repository";
 import { getAiSession } from "../ai-sessions/ai-sessions.usecase";
 import { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
@@ -152,6 +154,17 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
           messages: input.messages,
           projectId: input.projectId,
         });
+        // 批次 0 · ⑤：弱请求重构不变量——本轮真正发给模型的历史必须等于「当场重取的
+        // ai_sessions 可推导结果」。DEF-2026-08-27-001 的失效形态（历史在中间管道被丢/取早）
+        // 类型系统与分层单测都查不出来，只能在这里两侧对账。位置是硬约束：必须在任何
+        // yield 之前，否则抛错会留下半截流。未注入钩子（同步路径存储不权威）即不对账。
+        if (input.readSessionForInvariant) {
+          assertWorkbenchModelRequestMatchesStorage({
+            sent: modelInput.messages,
+            session: await input.readSessionForInvariant(),
+            userContent: params.userContent,
+          });
+        }
         // 显式判别 chunk 首发：model-answer 以末条 chunk 定 model/finishReason，
         // 末发会让终 chunk 变成无 model 的 metadata，污染回合元信息。
         if (modelInput.memoryRef) {
@@ -159,21 +172,45 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
         }
         // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
         const requirementSystemConfig = await loadRequirementSystemConfigStore();
-        const stream = provider.streamChatCompletion({
-          model: config.kimi.model,
-          temperature: 0.3,
-          promptCacheKey: "home-workbench-dispatch-v1",
-          timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
-          credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+        const timeoutMs = requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000;
+        // 批次 0 · ①②③：本条是生产实际在跑的异步路径（流式闸门恒命中），
+        // 必须与同步路径同口径传 tools 并真正执行 tool_calls——DEF-2026-08-27-001
+        // 的根因正是「只修了没在跑的分支」。只读过滤在注入点完成，不改 ToolRegistry。
+        const toolSet = resolveReadOnlyWorkbenchTools(user);
+        const streamChatCompletion = provider.streamChatCompletion!.bind(provider);
+        // 单轮流式调用：透传 provider 全部可见字段（含 toolCalls，工具循环靠它识别调用）
+        for await (const chunk of runWorkbenchToolLoopStream({
           messages: modelInput.messages,
-        });
-        for await (const chunk of stream) {
-          yield {
-            contentDelta: chunk.contentDelta || "",
-            reasoningContentDelta: chunk.reasoningContentDelta || "",
-            model: chunk.model,
-            finishReason: chunk.finishReason,
-          };
+          registry: toolSet.registry,
+          agentUser: toolSet.agentUser,
+          readOnlyToolNames: toolSet.readOnlyToolNames,
+          // 批次 0 · ④：workflow 注入的幂等接缝必须接到本循环——
+          // 每次工具调用经它落 `runId:stepKey:workbench_chat_tool_call:N`，
+          // 中途失败重跑时已执行的轮次命中存量 effect 不再重复执行。
+          recordToolEffect: input.recordToolEffect,
+          invokeStream: async function* ({ messages }) {
+            const stream = streamChatCompletion({
+              model: config.kimi.model,
+              temperature: 0.3,
+              promptCacheKey: "home-workbench-dispatch-v1",
+              timeoutMs,
+              credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+              messages,
+              ...(toolSet.tools.length > 0 ? { tools: toolSet.tools, toolChoice: "auto" as const } : {}),
+            });
+            for await (const providerChunk of stream) {
+              yield {
+                contentDelta: providerChunk.contentDelta || "",
+                reasoningContentDelta: providerChunk.reasoningContentDelta || "",
+                model: providerChunk.model,
+                finishReason: providerChunk.finishReason,
+                // 批次 0：不得丢弃 toolCalls——此前 re-yield 只映射 4 个字段
+                ...(providerChunk.toolCalls ? { toolCalls: providerChunk.toolCalls } : {}),
+              };
+            }
+          },
+        })) {
+          yield chunk;
         }
       };
       return dispatchHomeWorkbenchTurn({

@@ -13,8 +13,9 @@ import { loadRequirementSystemConfigStore, resolveActiveRequirementKimiApiKey } 
 import { createAiSession, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import type { AiSessionRecord } from "../../../modules/ai-sessions/ai-sessions.types";
 import type { AuthUser, BusinessRole } from "../../../types";
-import { defaultProviderRegistry, type ChatRole, type ModelProvider } from "../../../ai/provider";
+import { defaultProviderRegistry, type ChatCompletionResponse, type ChatRole, type ModelProvider } from "../../../ai/provider";
 import type { StreamingChunk } from "../workbench-dispatch.service";
+import { resolveReadOnlyWorkbenchTools, runWorkbenchToolLoop } from "../workbench-tool-loop";
 import type { WorkbenchAttachmentContext } from "../workbench-context.service";
 import { createMemoryUsecase, getMemoryRepository } from "../../../modules/memory/memory.module";
 import type { MemoryContextBlock } from "../../../modules/memory/memory.usecase";
@@ -171,15 +172,33 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
   const safeMessages = params.messages.slice(-12).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
   // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
   const requirementSystemConfig = await loadRequirementSystemConfigStore();
-  const completion = await getKimiProvider().chatCompletion({
-    model: params.model,
-    temperature: 0.3,
-    promptCacheKey: "home-workbench-chat-v1",
-    timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
-    credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl },
+  const timeoutMs = requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000;
+  // 批次 0 · ①②③：模型调用点必须传 tools，且模型返回的 tool_calls 必须被真正
+  // 执行后回填再问一次。只读过滤在注入点完成（见 resolveReadOnlyWorkbenchTools），
+  // 不改注册表；注入集为空时连 tools 字段都不传，行为与修复前逐字节一致。
+  const toolSet = resolveReadOnlyWorkbenchTools(params.user);
+  // 循环只回传末轮正文，provider 元信息（rawContent/model/attempts…）取末轮实际响应
+  let lastCompletion: ChatCompletionResponse | undefined;
+  const loop = await runWorkbenchToolLoop({
     messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
+    registry: toolSet.registry,
+    agentUser: toolSet.agentUser,
+    readOnlyToolNames: toolSet.readOnlyToolNames,
+    invoke: async ({ messages }) => {
+      const completion = await getKimiProvider().chatCompletion({
+        model: params.model,
+        temperature: 0.3,
+        promptCacheKey: "home-workbench-chat-v1",
+        timeoutMs,
+        credentialsOverride: { apiKey: params.apiKey, apiBaseUrl: params.apiUrl },
+        messages,
+        ...(toolSet.tools.length > 0 ? { tools: toolSet.tools, toolChoice: "auto" as const } : {}),
+      });
+      lastCompletion = completion;
+      return { content: completion.content, toolCalls: completion.toolCalls };
+    },
   });
-  return { answer: completion.content, rawContent: completion.rawContent, businessRole, roleLabel: preset.label };
+  return { answer: loop.content, rawContent: lastCompletion?.rawContent ?? loop.content, businessRole, roleLabel: preset.label };
 }
 
 // ============================================================
@@ -307,23 +326,40 @@ export function buildWorkbenchChatModelChat(
       projectId: options.projectId,
     });
 
+    // 批次 0 · ①②③：注入点解析只读工具集（mutates===false），不改 ToolRegistry。
+    const toolSet = resolveReadOnlyWorkbenchTools(user);
     // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
     const requirementSystemConfig = await loadRequirementSystemConfigStore();
-    const completion = await getKimiProvider().chatCompletion({
-      model: config.kimi.model,
-      temperature: 0.3,
-      promptCacheKey: "home-workbench-dispatch-v1",
-      timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
-      credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+    // provider 元信息取末轮（真正回答轮）的实际响应，首轮多为工具调用轮
+    let lastCompletion: ChatCompletionResponse | undefined;
+    const loop = await runWorkbenchToolLoop({
       messages: modelInput.messages,
+      registry: toolSet.registry,
+      agentUser: toolSet.agentUser,
+      readOnlyToolNames: toolSet.readOnlyToolNames,
+      invoke: async ({ messages }) => {
+        const completion = await getKimiProvider().chatCompletion({
+          model: config.kimi.model,
+          temperature: 0.3,
+          promptCacheKey: "home-workbench-dispatch-v1",
+          timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
+          credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+          messages,
+          ...(toolSet.tools.length > 0 ? { tools: toolSet.tools, toolChoice: "auto" as const } : {}),
+        });
+        lastCompletion = completion;
+        return { content: completion.content, toolCalls: completion.toolCalls };
+      },
     });
+    const completion = lastCompletion;
     return {
-      answer: completion.content,
-      rawContent: completion.rawContent,
-      provider: completion.provider,
-      model: completion.model,
-      attempts: completion.attempts,
-      finishReason: completion.finishReason,
+      answer: loop.content,
+      rawContent: completion?.rawContent ?? loop.content,
+      provider: completion?.provider,
+      model: completion?.model,
+      attempts: completion?.attempts,
+      finishReason: completion?.finishReason,
+      ...(loop.toolCalls.length > 0 ? { toolCalls: loop.toolCalls } : {}),
       ...(modelInput.memoryRef ? { memoryRef: modelInput.memoryRef } : {}),
     };
   };

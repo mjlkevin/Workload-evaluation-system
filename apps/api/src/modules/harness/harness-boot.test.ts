@@ -15,7 +15,12 @@ import { startHarnessRuntime, createRunTerminalMemoryHook } from "./harness-boot
 import { createMemoryUsecase } from "../memory/memory.usecase";
 import type { distillRunMemory } from "../memory/memory.distiller";
 import type { AuthUser } from "../../types";
+import type { WorkbenchModelMessage } from "../../services/ai/handlers/workbench-shared";
 import { createAiSession, deleteAiSession, getAiSession } from "../ai-sessions/ai-sessions.usecase";
+import {
+  WorkbenchModelRequestInvariantError,
+  assertWorkbenchModelRequestMatchesStorage,
+} from "../../services/ai/workbench-request-invariant";
 
 test("boot: enabled=true 启动 worker 恰 1 次", async () => {
   let workerStarted = 0;
@@ -515,6 +520,92 @@ test("DEF-2026-08-27-001：同一会话连发两轮，第二轮 provider 实收�
       [`user:${DEF001_ROUND1}`, "assistant:第 1 轮回答", `user:${DEF001_ROUND2}`, "assistant:第 2 轮回答"],
       "会话存储序列必须与两轮对话一致",
     );
+  } finally {
+    await deleteAiSession(user, session.sessionId);
+  }
+});
+
+// ============================================================
+// 批次 0 · ⑤：弱请求重构不变量在【provider 边界】成立
+// ------------------------------------------------------------
+// 生产钩子（harness-boot.ts modelChatStream）对账点在工具循环之前，
+// 断的是「组装给模型的 messages」。本用例把同一断言下移到最外层可观测
+// 边界——假 provider 真正收到的 req.messages——覆盖钩子之后的下游漂移
+// （工具循环 re-yield、invokeStream 透传丢字段）。存储侧期望值由生产断言
+// 内部的 deriveWorkbenchModelHistoryFromSession 独立推导，不复用发送侧组装结果。
+// 违规在此刻意「收集不抛」，以便断言「边界上零违规」而非仅让 run 失败；
+// 抛错语义由 workbench-chat.workflow.test.ts 的接线用例与实取红/绿覆盖。
+// 会话读写经真实 PG，故需 TEST_DATABASE_URL。
+// ============================================================
+
+test("批次0·⑤：provider 边界实收 messages 与存储侧推导当场对账零违规", { skip: !def001TestDatabaseUrl }, async () => {
+  const ownerUserId = `wes-t-inv005-${randomUUID().slice(0, 8)}`;
+  const user: AuthUser = { id: ownerUserId, username: ownerUserId, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" };
+  const session = await createAiSession(user, { title: "批次0 ⑤ 边界对账会话", workflowKey: "free_chat" });
+
+  type BoundaryCheck = { rounds: number; violations: string[] };
+  const boundary: BoundaryCheck = { rounds: 0, violations: [] };
+  let bootError: unknown = null;
+
+  const fakeProvider = {
+    name: "kimi",
+    defaultModel: "kimi-test",
+    isAvailable: () => true,
+    chatCompletion: async () => {
+      throw new Error("chatCompletion_should_not_be_called");
+    },
+    streamChatCompletion: (req: { messages: WorkbenchModelMessage[] }) => {
+      const received: WorkbenchModelMessage[] = req.messages.map((m) => ({ role: m.role, content: String(m.content) }));
+      const roundNo = boundary.rounds + 1;
+      const userContent = received[received.length - 1]?.content ?? "";
+      return (async function* () {
+        // 首发之前完成对账：与生产钩子同一位置约束（yield 之后流不可撤销）
+        boundary.rounds += 1;
+        try {
+          assertWorkbenchModelRequestMatchesStorage({
+            sent: received,
+            session: await getAiSession(user, session.sessionId),
+            userContent,
+          });
+        } catch (err) {
+          boundary.violations.push(
+            `round${roundNo}: ${err instanceof WorkbenchModelRequestInvariantError ? err.reason : String(err)}`,
+          );
+        }
+        yield { contentDelta: `第 ${roundNo} 轮回答`, model: "kimi-test", finishReason: "stop" };
+      })();
+    },
+  };
+
+  const runtime = startHarnessRuntime({
+    repo: { appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
+    enabled: true,
+    resolveApiKey: () => ({ apiKey: "placeholder" }),
+    getProvider: () => fakeProvider as never,
+    createWorker: ({ registry }) => ({
+      start: async () => {
+        try {
+          const workflow = registry.get("workbench_chat_v1", "1.0.0");
+          if (!workflow) throw new Error("workflow not found");
+          await workflow.executeStep("chat", makeRunStepCtx({ harnessRunId: `run-inv005-1-${ownerUserId}`, ownerUserId, aiSessionId: session.sessionId, content: DEF001_ROUND1 }));
+          await workflow.executeStep("chat", makeRunStepCtx({ harnessRunId: `run-inv005-2-${ownerUserId}`, ownerUserId, aiSessionId: session.sessionId, content: DEF001_ROUND2 }));
+        } catch (err) {
+          bootError = err;
+        }
+      },
+      stop: async () => {},
+      runNextAttempt: async () => false,
+      isStopping: () => false,
+    }),
+  });
+
+  await runtime.stop();
+
+  try {
+    assert.equal(bootError, null, `两轮执行不得抛错：${bootError instanceof Error ? bootError.message : String(bootError)}`);
+    // 反空断：守卫必须真的在两轮的 provider 入参上各跑一次，否则零违规只是没跑到
+    assert.equal(boundary.rounds, 2, `边界对账必须覆盖两次 provider 实调，实取 ${boundary.rounds} 次`);
+    assert.deepEqual(boundary.violations, [], `provider 边界实收 messages 必须与存储侧推导逐条相等：${boundary.violations.join(" | ")}`);
   } finally {
     await deleteAiSession(user, session.sessionId);
   }
