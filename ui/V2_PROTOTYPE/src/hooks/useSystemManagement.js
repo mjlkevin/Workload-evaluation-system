@@ -8,7 +8,7 @@ const DEFAULT_KB_RETRIEVAL_PARAMS = {
   topK: 8,
   topN: 20,
   recallMethod: 'mixed',
-  rerankStatus: 1,
+  rerankStatus: 0,
   rerankModel: 'rerank',
   fractionalThreshold: 0.2,
 }
@@ -570,6 +570,9 @@ export default function useSystemManagement({
           error: isNotFound ? '接口不存在，请确认后端已更新并重启' : e.message,
           status: e.status,
           code: e.code,
+          // DEF-2026-09-02-001：保留后端分类结果与供应商原始 code/msg，
+          // 供失败横幅显示人话原因（此前被丢弃导致只拼出 HTTP 状态）。
+          ...(Array.isArray(e.details) ? { details: e.details } : {}),
         }
       }
       return { ok: false, error: e?.message || '未知错误' }

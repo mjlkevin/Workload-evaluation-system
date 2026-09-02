@@ -4,6 +4,14 @@ import { server } from './mocks/server.js'
 
 const realFetch = globalThis.fetch
 
+// DEF-2026-09-02-001 取证：vitest jsdom 环境把 jsdom 版 AbortController/AbortSignal
+// 覆盖到全局，而 msw fetchProxy 构造 undici Request 时校验 signal 必须是同 realm
+// 的 AbortSignal 实例——两者 realm 不同，任何带 timeoutMs 的请求都在 Request
+// 构造处抛 TypeError，表现为「网络请求失败」（既有 503 用例因此一直假绿，
+// 只断言标题未断言内容）。测试环境 msw 即时响应，超时语义不可测（已由
+// apiClient.test.js 直接 spy fetch 覆盖 abort 断言），故在 fetchProxy 之上再包
+// 一层剥离 signal 规避类型校验。
+
 // ISS-2026-08-18-001（MSW 逃逸，架构侧 2026-08-18 裁决：收集器 + 框架层断言）：
 // 原 onUnhandledRequest:'error' 抛出的 reject 会被应用代码的 .catch(() => {}) 吞掉，
 // 导致未匹配请求静默通过（前端源码共 17 处吞错点，见 ISS-2026-08-18-005）。
@@ -13,17 +21,18 @@ const realFetch = globalThis.fetch
 const unhandledRequests = []
 
 beforeAll(() => {
-  globalThis.fetch = (input, init) => {
-    if (typeof input === 'string' && input.startsWith('/')) {
-      return realFetch(`http://localhost${input}`, init)
-    }
-    return realFetch(input, init)
-  }
   server.listen({
     onUnhandledRequest: (request) => {
       unhandledRequests.push(`${request.method} ${request.url}`)
     },
   })
+  // 必须在 server.listen() 之后包装：此时 globalThis.fetch 已是 msw fetchProxy，
+  // 相对 URL 由它自行解析；此前直接赋值的包装会被 msw patch 覆盖成死代码。
+  const proxiedFetch = globalThis.fetch
+  globalThis.fetch = (input, init) => {
+    const { signal: _signal, ...rest } = init || {}
+    return proxiedFetch(input, rest)
+  }
 })
 
 beforeEach(() => {

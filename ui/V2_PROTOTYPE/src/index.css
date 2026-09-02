@@ -1154,6 +1154,13 @@ input, button, select, textarea { font-family: inherit; }
   font-size: 12px;
 }
 
+.kb-retrieval-params__hint {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .kb-profiles {
   display: grid;
   gap: 12px;

@@ -1087,8 +1087,15 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
       ...(result.providerRequestId ? { providerRequestId: result.providerRequestId } : {}),
     }, responseRequestId(res)));
   }
+  // DEF-2026-09-02-001：失败详情透传供应商原始 code/msg（仅业务拒绝分支有值），
+  // 前端据此显示人话原因；msg 已在 probe 侧截断 200 字符。
   return fail(res, 40001, "知识库连通性测试未通过", [
-    { field: "knowledgeBase", reason: result.errorCode || "test_failed" },
+    {
+      field: "knowledgeBase",
+      reason: result.errorCode || "test_failed",
+      ...(result.providerCode !== undefined ? { providerCode: result.providerCode } : {}),
+      ...(result.providerMessage ? { providerMessage: result.providerMessage } : {}),
+    },
   ]);
 }
 

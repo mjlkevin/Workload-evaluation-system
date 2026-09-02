@@ -16,6 +16,40 @@ const PROMPT_TABS = [
   { key: 'generate', label: '生成提示词' },
 ]
 
+// DEF-2026-09-02-001：知识库连通性失败 → 人话原因。仅按后端已分类的 reason
+// 出文案，供应商原始 code/msg 附注在括号内；文案不含密钥与请求体片段，
+// 无映射时回退后端 message（HTTP 状态由横幅降为次要信息拼接）。
+function describeKbTestFailure(kbTestResult) {
+  const detail = Array.isArray(kbTestResult?.details)
+    ? kbTestResult.details.find((d) => d && d.field === 'knowledgeBase')
+    : null
+  const code = detail?.providerCode
+  const providerMessage = detail?.providerMessage
+  const suffix = code != null
+    ? `（智谱 code=${code}${providerMessage ? `，供应商：${providerMessage.slice(0, 80)}` : ''}）`
+    : ''
+  switch (detail?.reason) {
+    case 'provider_unspecified_rejection':
+      return code === 500
+        ? '供应商拒绝（智谱 code=500，常见于重排未授权），可尝试关闭检索重排'
+        : `供应商未说明原因的拒绝${suffix}`
+    case 'authentication_failed':
+      return `供应商鉴权失败${suffix}，请检查 API 密钥是否有效`
+    case 'invalid_arguments':
+      return `供应商参数错误${suffix}，请检查知识库 ID 与检索参数`
+    case 'rate_limited':
+      return '供应商请求限流，请稍后重试'
+    case 'provider_unavailable':
+      return '供应商服务暂不可用，请稍后重试'
+    case 'provider_rejected':
+      return `供应商拒绝请求${suffix}`
+    case 'unknown':
+      return `供应商返回未知错误${suffix}`
+    default:
+      return kbTestResult?.error || '未知错误'
+  }
+}
+
 // DSL 依赖规则逻辑类型 → 徽标展示映射
 const DSL_LOGIC_META = {
   requires_all: { label: '全部依赖', cls: 'lock' },
@@ -1078,6 +1112,7 @@ export default function SystemManagement({ sectionId }) {
                       <input type="checkbox" checked={kbConfig.retrievalParams.rerankStatus === 1} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, rerankStatus: e.target.checked ? 1 : 0 } })} />
                       启用检索重排
                     </label>
+                    <p className="kb-retrieval-params__hint">开启需账号具备重排权限且填写供应商认可的重排模型名，否则连通性测试会失败。</p>
                   </div>
                 </fieldset>
 
@@ -1110,7 +1145,7 @@ export default function SystemManagement({ sectionId }) {
                           ].filter(Boolean).join(' · ')}
                         </div>
                       ) : (
-                        <div className="sys-banner__sub">{[kbTestResult.error || '未知错误', kbTestResult.status && `HTTP ${kbTestResult.status}`].filter(Boolean).join(' · ')}</div>
+                        <div className="sys-banner__sub">{[describeKbTestFailure(kbTestResult), kbTestResult.status && `HTTP ${kbTestResult.status}`].filter(Boolean).join(' · ')}</div>
                       )}
                     </div>
                   </div>

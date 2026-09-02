@@ -234,4 +234,61 @@ describe('SystemManagement knowledge base feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: '测试 金蝶解决方案知识库' }))
     await waitFor(() => expect(payload).toEqual(expect.objectContaining({ profileId: 'solutions' })))
   })
+
+  test('rerank checkbox defaults off with an explanatory hint (DEF-2026-09-02-001)', async () => {
+    await renderKnowledgeBase()
+
+    const checkbox = screen.getByRole('checkbox', { name: '启用检索重排' })
+    expect(checkbox).not.toBeChecked()
+    expect(screen.getByText(/开启需账号具备重排权限且填写供应商认可的重排模型名，否则连通性测试会失败/)).toBeInTheDocument()
+  })
+
+  test('shows a human-readable provider reason when the failure carries details (DEF-2026-09-02-001)', async () => {
+    server.use(
+      http.post(`${BASE}/system/knowledge-base-config/test`, () => {
+        return HttpResponse.json({
+          code: 40001,
+          message: '知识库连通性测试未通过',
+          details: [{ field: 'knowledgeBase', reason: 'provider_unspecified_rejection', providerCode: 500 }],
+        }, { status: 400 })
+      })
+    )
+    await renderKnowledgeBase()
+
+    fireEvent.click(screen.getByRole('button', { name: /测试 .*知识库/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('供应商拒绝（智谱 code=500，常见于重排未授权），可尝试关闭检索重排')
+    expect(screen.getByRole('alert')).toHaveTextContent('HTTP 400')
+  })
+
+  test('shows provider message alongside classified reason when details include it (DEF-2026-09-02-001)', async () => {
+    server.use(
+      http.post(`${BASE}/system/knowledge-base-config/test`, () => {
+        return HttpResponse.json({
+          code: 40001,
+          message: '知识库连通性测试未通过',
+          details: [{ field: 'knowledgeBase', reason: 'authentication_failed', providerCode: 401, providerMessage: '令牌已过期或验证不正确' }],
+        }, { status: 400 })
+      })
+    )
+    await renderKnowledgeBase()
+
+    fireEvent.click(screen.getByRole('button', { name: /测试 .*知识库/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('供应商鉴权失败（智谱 code=401，供应商：令牌已过期或验证不正确），请检查 API 密钥是否有效')
+  })
+
+  test('falls back to the backend message without details (DEF-2026-09-02-001)', async () => {
+    server.use(
+      http.post(`${BASE}/system/knowledge-base-config/test`, () => {
+        return HttpResponse.json({ code: 'UPSTREAM_UNAVAILABLE', message: '上游服务暂不可用' }, { status: 503 })
+      })
+    )
+    await renderKnowledgeBase()
+
+    fireEvent.click(screen.getByRole('button', { name: /测试 .*知识库/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('上游服务暂不可用')
+    expect(screen.getByRole('alert')).toHaveTextContent('HTTP 503')
+  })
 })

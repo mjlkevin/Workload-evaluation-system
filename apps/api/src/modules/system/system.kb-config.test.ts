@@ -252,3 +252,35 @@ test("activation requires a fresh matching probe for every enabled profile", { s
   assert.equal(activated.statusCode, 200);
   assert.equal(activated.payload.data.active.knowledgeBases.length, 2);
 });
+
+test("probe failure carries classified reason and raw provider code/msg into fail details", { skip: !testDatabaseUrl, concurrency: false }, async () => {
+  await resetStore();
+  const {
+    testKnowledgeBaseConnectivityWithFetcher,
+    updateKnowledgeBaseConfigDraft,
+  } = await import("./system.usecase");
+  const { loadKnowledgeBaseConfigStore } = await import("./system.repository");
+  await updateKnowledgeBaseConfigDraft(
+    await adminRequest({ credentials: { apiKey: "fixture-key", knowledgeId: "kb-fixture" } }),
+    responseCapture().response,
+  );
+  const probe = responseCapture();
+  await testKnowledgeBaseConnectivityWithFetcher(
+    await adminRequest(),
+    probe.response,
+    async () => new Response(JSON.stringify({ code: 500, msg: "x".repeat(300) }), { status: 200 }),
+  );
+  assert.equal(probe.statusCode, 400);
+  assert.equal(probe.payload.message, "知识库连通性测试未通过");
+  assert.deepEqual(probe.payload.details, [{
+    field: "knowledgeBase",
+    reason: "provider_unspecified_rejection",
+    providerCode: 500,
+    providerMessage: "x".repeat(200),
+  }]);
+  const store = await loadKnowledgeBaseConfigStore();
+  const persisted = store.probes?.["legacy-default"];
+  assert.equal(persisted?.errorCode, "provider_unspecified_rejection");
+  assert.equal(persisted?.providerCode, 500);
+  assert.equal(persisted?.providerMessage, "x".repeat(200));
+});
