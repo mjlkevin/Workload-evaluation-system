@@ -192,8 +192,6 @@ export default function SystemManagement({ sectionId }) {
   const [promptResult, setPromptResult] = useState(null)
   const [selectedRuleCode, setSelectedRuleCode] = useState('')
   const [ruleConfigForm, setRuleConfigForm] = useState({ prefix: '', format: '' })
-  const [kbTestResult, setKbTestResult] = useState(null)
-  const [kbSaveResult, setKbSaveResult] = useState(null)
   const toast = useToast()
   const [editingModel, setEditingModel] = useState(null)
   const [extInput, setExtInput] = useState('')
@@ -243,11 +241,12 @@ export default function SystemManagement({ sectionId }) {
   }
 
   const handleSaveKbDraft = async () => {
-    setKbSaveResult(null)
     const result = await actions.saveKbDraft()
-    setKbSaveResult(result.success
-      ? { ok: true, message: '知识库配置草稿已保存' }
-      : { ok: false, message: result.error || '知识库配置草稿保存失败' })
+    if (result.success) {
+      toast.success('知识库配置草稿已保存')
+    } else {
+      toast.error(result.error || '知识库配置草稿保存失败')
+    }
     // DEF-2026-09-02-001：占位形态知识库 ID 仅警告不阻断（后端已附带 warnings）
     if (result.success && Array.isArray(result.data?.warnings) && result.data.warnings.length) {
       result.data.warnings.forEach((warning) => {
@@ -257,7 +256,6 @@ export default function SystemManagement({ sectionId }) {
   }
 
   const handleActivateKb = async () => {
-    setKbSaveResult(null)
     const result = await actions.activateKbConfig()
     const probeIssue = result.details?.find?.((item) => item?.field === 'probe' || item?.field?.endsWith?.('.probe'))
     const probeReason = probeIssue?.reason
@@ -275,9 +273,11 @@ export default function SystemManagement({ sectionId }) {
             ? `请先测试${profileName}的连通性，再生效配置`
             : '请先完成当前配置的连通性测试，再生效配置'
           : null
-    setKbSaveResult(result.success
-      ? { ok: true, message: '知识库配置已生效' }
-      : { ok: false, message: gateMessage || result.error || '知识库配置生效失败' })
+    if (result.success) {
+      toast.success('知识库配置已生效')
+    } else {
+      toast.error(gateMessage || result.error || '知识库配置生效失败')
+    }
   }
 
   const handleAddDslRule = () => {
@@ -303,17 +303,30 @@ export default function SystemManagement({ sectionId }) {
   const handleClearKbKey = async () => {
     const result = await actions.clearKbApiKeyDraft()
     setConfirmClearKbKey(false)
-    setKbSaveResult(result.success
-      ? { ok: true, message: '已清除草稿中保存的 API Key；如需影响正在使用的配置，请重新测试并生效' }
-      : { ok: false, message: result.error || '密钥清除失败' })
+    if (result.success) {
+      toast.success('已清除草稿中保存的 API Key；如需影响正在使用的配置，请重新测试并生效')
+    } else {
+      toast.error(result.error || '密钥清除失败')
+    }
   }
 
   const handleTestKbProfile = async (profileId) => {
     setKbTestingProfileId(profileId)
-    setKbTestResult(null)
     try {
-      const result = await actions.testKbConnectivity(profileId)
-      setKbTestResult(result || { ok: false, error: '连通性测试未返回结果' })
+      const result = (await actions.testKbConnectivity(profileId)) || { ok: false, error: '连通性测试未返回结果' }
+      if (result.ok) {
+        const detail = [
+          result.model && `模型 ${result.model}`,
+          result.knowledgeId && `知识库 ${result.knowledgeId}`,
+          result.latencyMs !== undefined && `延迟 ${result.latencyMs}ms`,
+          result.retrievalTriggered !== undefined && `检索触发 ${result.retrievalTriggered ? '是' : '否'}`,
+          result.testedSource && `凭证来源 ${result.testedSource === 'draft_store' ? '草稿存储' : result.testedSource === 'environment' ? '环境变量' : '请求参数'}`,
+        ].filter(Boolean).join(' · ')
+        const message = result.warning === 'retrieval_empty' ? '连通性测试通过，但未检索到文档' : '连通性测试通过'
+        toast.success(message, detail ? { detail } : undefined)
+      } else {
+        toast.error('连通性测试未通过', { detail: [describeKbTestFailure(result), result.status && `HTTP ${result.status}`].filter(Boolean).join(' · ') })
+      }
     } finally {
       setKbTestingProfileId('')
     }
@@ -1012,30 +1025,6 @@ export default function SystemManagement({ sectionId }) {
               </button>
             </div>
 
-            {kbSaveResult && (
-              <div
-                role={kbSaveResult.ok ? 'status' : 'alert'}
-                className={`sys-banner ${kbSaveResult.ok ? 'sys-banner--ok' : 'sys-banner--danger'}`}
-              >
-                <span className="sys-banner__ic">{kbSaveResult.ok ? '✓' : '✗'}</span>
-                <div className="sys-banner__ti">{kbSaveResult.message}</div>
-              </div>
-            )}
-
-            <div className={`sys-banner ${kbConfig.resolvedFrom !== 'none' ? 'sys-banner--ok' : 'sys-banner--warn'}`}>
-              <span className="sys-banner__ic">{kbConfig.resolvedFrom !== 'none' ? '✓' : '⚠'}</span>
-              <div>
-                <div className="sys-banner__ti">
-                  {kbConfig.resolvedFrom === 'store' ? '知识库接入已配置（来自存储）' : kbConfig.resolvedFrom === 'env' ? '知识库接入已配置（来自环境变量）' : '知识库接入未配置'}
-                </div>
-                <div className="sys-banner__sub">
-                  {kbConfig.resolvedFrom !== 'none'
-                    ? `当前草稿包含 ${kbConfig.knowledgeBases.length} 个知识库档案，其中 ${kbConfig.knowledgeBases.filter((item) => item.enabled).length} 个已启用`
-                    : '请填写共享 API Key，新增知识库档案，保存草稿并逐个测试后再生效'}
-                </div>
-              </div>
-            </div>
-
             <div className="sys-card">
               <div className="sys-card__hd">
                 <span className="sys-card__title">智谱共享接入配置</span>
@@ -1130,32 +1119,6 @@ export default function SystemManagement({ sectionId }) {
                   onChange={(knowledgeBases) => actions.updateKbConfig({ knowledgeBases })}
                   onTest={handleTestKbProfile}
                 />
-
-                {kbTestResult && (
-                  <div role={kbTestResult.ok ? 'status' : 'alert'} className={`sys-banner ${kbTestResult.ok ? 'sys-banner--ok' : 'sys-banner--danger'}`}>
-                    <span className="sys-banner__ic">{kbTestResult.ok ? '✓' : '✗'}</span>
-                    <div>
-                      <div className="sys-banner__ti">
-                        {kbTestResult.ok
-                          ? kbTestResult.warning === 'retrieval_empty' ? '连通性测试通过，但未检索到文档' : '连通性测试通过'
-                          : '连通性测试失败'}
-                      </div>
-                      {kbTestResult.ok ? (
-                        <div className="sys-banner__sub">
-                          {[
-                            kbTestResult.model && `模型 ${kbTestResult.model}`,
-                            kbTestResult.knowledgeId && `知识库 ${kbTestResult.knowledgeId}`,
-                            kbTestResult.latencyMs !== undefined && `延迟 ${kbTestResult.latencyMs}ms`,
-                            kbTestResult.retrievalTriggered !== undefined && `检索触发 ${kbTestResult.retrievalTriggered ? '是' : '否'}`,
-                            kbTestResult.testedSource && `凭证来源 ${kbTestResult.testedSource === 'draft_store' ? '草稿存储' : kbTestResult.testedSource === 'environment' ? '环境变量' : '请求参数'}`,
-                          ].filter(Boolean).join(' · ')}
-                        </div>
-                      ) : (
-                        <div className="sys-banner__sub">{[describeKbTestFailure(kbTestResult), kbTestResult.status && `HTTP ${kbTestResult.status}`].filter(Boolean).join(' · ')}</div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
