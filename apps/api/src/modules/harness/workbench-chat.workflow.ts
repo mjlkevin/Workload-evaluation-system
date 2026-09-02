@@ -23,13 +23,20 @@ import type {
   HarnessWorkflowStepContext,
   HarnessWorkflowStepOutcome,
 } from "./harness-runtime.worker";
-import type { WorkbenchDispatchInput, WorkbenchDispatchData } from "../../services/ai/workbench-dispatch.service";
+import type {
+  StreamingChunk,
+  WorkbenchDispatchInput,
+  WorkbenchDispatchData,
+  WorkbenchMemoryRefTrace,
+} from "../../services/ai/workbench-dispatch.service";
 import type {
   AppendAiSessionMessageIdempotentInput,
   AppendAiSessionMessageIdempotentResult,
 } from "../ai-sessions/ai-sessions.repository";
 import type { AiAttachment, AiSessionRecord } from "../ai-sessions/ai-sessions.types";
-import { normalizeHomeAttachments, latestSessionAttachmentWithSummary, isExplicitReportRequest } from "../../services/ai/handlers/workbench-shared";
+import { normalizeHomeAttachments, latestSessionAttachmentWithSummary, sessionRecordToHomeMessages, isExplicitReportRequest } from "../../services/ai/handlers/workbench-shared";
+import type { HomeMessageInput } from "../../services/ai/handlers/workbench-shared";
+import { resolveRunMemoryProjectId } from "./harness.types";
 import { runExplicitHomeReportFlow } from "../../services/ai/handlers/report-flow";
 import type { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
 
@@ -37,8 +44,13 @@ export type WorkbenchChatWorkflowDeps = {
   /**
    * 复用 workbench-dispatch.service.ts 的分发入口。
    * 调用方注入真实 dispatch 或测试 stub。
+   * messages/projectId 为 DEF-2026-08-27-001 additive 字段：会话历史窗口与
+   * 记忆注入项目上下文，由本 workflow 在当前用户消息落库之后组装。
    */
-  dispatch(input: Pick<WorkbenchDispatchInput, "message" | "user" | "workflowKey"> & Partial<WorkbenchDispatchInput>): Promise<WorkbenchDispatchData>;
+  dispatch(input: Pick<WorkbenchDispatchInput, "message" | "user" | "workflowKey"> & Partial<WorkbenchDispatchInput> & {
+    messages?: HomeMessageInput[];
+    projectId?: string;
+  }): Promise<WorkbenchDispatchData>;
   /**
    * 用户消息幂等落库（复用 ai-sessions 仓库公开 API，与直写路径同款）。
    * 生产接线见 harness-boot.ts；测试可注入 recording fake（S2b-2 后不再有
@@ -133,6 +145,15 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         },
       });
 
+      // DEF-2026-08-27-001 第一层：异步 Run 通道必须携带会话历史与记忆项目。
+      // 取历史时机是硬约束——必须在上面 appendSessionMessage 之后：
+      // workbench-shared 的历史整形是「覆盖末条为用户本轮」而非追加，
+      // 落库前取会把上一轮 assistant 当成末条覆盖丢失。
+      const historyMessages = sessionRecordToHomeMessages(
+        (await deps.getSessionRecord?.(aiSessionId, run.ownerUserId)) ?? null,
+      );
+      const memoryProjectId = resolveRunMemoryProjectId(run);
+
       // ISS-2026-08-16-004：显式报告闸门——当 dispatchAttachment 存在且用户消息
       // 是「生成需求解析报告」时，直接调用 runExplicitHomeReportFlow 生成报告，
       // 而不是走 dispatchHomeWorkbenchTurn 的意图分发（后者路由到静态文案）。
@@ -186,8 +207,16 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
                 console.error(`[workbench-chat] appendRunEvent ${eventType} run=${run.harnessRunId} failed: ${msg.slice(0, 200)}`);
               });
           };
+          // 本轮模型调用注入的 active 记忆计数（经 kind=metadata chunk 透出）
+          let memoryRef: WorkbenchMemoryRefTrace | undefined;
           const streamingAdapter = {
-            onToken: (chunk: { contentDelta?: string; reasoningContentDelta?: string }) => {
+            onToken: (chunk: StreamingChunk) => {
+              // DEF-2026-08-27-001：显式判别字段优先——metadata chunk 不是正文，
+              // 既不得写进 run 事件流，也不得靠「空 content」隐式判定。
+              if (chunk.kind === "metadata") {
+                if (chunk.memoryRef) memoryRef = chunk.memoryRef;
+                return;
+              }
               if (chunk.reasoningContentDelta) {
                 appendStreamEvent("thought", { text: chunk.reasoningContentDelta });
               }
@@ -203,6 +232,8 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               attachment: dispatchAttachment,
               user: { id: run.ownerUserId, username: run.ownerUsername, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" },
               workflowKey: "free_chat",
+              messages: historyMessages,
+              projectId: memoryProjectId,
               streamingAdapter,
             });
           } catch (err) {
@@ -244,6 +275,9 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
             suggestedActions: result.suggestedActions,
             trace: result.trace,
             formBlock: result.formBlock,
+            // memoryRef 必须进 execute 返回值：恢复重放会跳过 execute，
+            // 只有幂等吸收后的 output 才能保证两次执行写出同一条 metadata。
+            ...(memoryRef ? { memoryRef } : {}),
           };
         },
       });
@@ -254,11 +288,14 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       const suggestedActions = (output as any).suggestedActions ?? [];
       const trace = (output as any).trace ?? {};
       const formBlock = (output as any).formBlock;
+      const memoryRef = (output as any).memoryRef as WorkbenchMemoryRefTrace | undefined;
       const messageMetadata = {
         intent,
         suggestedActions,
         trace,
         ...(formBlock ? { formBlock } : {}),
+        // 前端 messageFormatter 只读 metadata 顶层 memoryRef，不得嵌进 trace
+        ...(memoryRef ? { memoryRef } : {}),
       };
 
       // S2b-2（§4.8 补偿链删除）：assistant 消息与 user 消息同款经
