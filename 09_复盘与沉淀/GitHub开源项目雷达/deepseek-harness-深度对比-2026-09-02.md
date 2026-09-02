@@ -508,3 +508,94 @@ A 用最高成本买一个别人还没做完的地基；B 零成本但每次都�
 - **一个工具结果要同时喂三双眼睛，且差异要显式建模。** `createSuccessResult`（`tools/src/index.ts:1792-1822`）依次 `snapshotToolValue`（原始值）→ `validateJsonSchemaValue`/`ToolOutputError`（模型可见）→ `deepFreeze` → `render` → `snapshotProjection`（投影层），并在 1805 把 `presentationMeta` 限定在根调用上、1814 `concludesTurn`、1815 `markCanonical`。对照 §四 C：WES 现在把这几层塞进同一份 JSON。
 - **并发安全性拿不准时默认独占（fail-closed），且分类是一元的。** `tools/src/index.ts:269` `isConcurrencySafe?(args: unknown): boolean`（调用点 1279）配合 README 声明 `agent-loop/README.zh.md:186`「分类是一元的：安全性取决于比较同级调用或资源的调用必须保持独占」—— 没有二元"部分安全"档，因此实现方漏写这个谓词时的默认方向是安全的。
 - **不变式的最小可平移单元是"四件套"而不是单个文件。** `packages/core/*/src/invariant.ts`（每包一份，抛 `InvariantError`，`code='INVARIANT'`）+ 注册与开关 `runtime-diagnostics/invariants/src/index.ts:15-22`、50-66（`{global:true, prepend:true}`、`package_allowlist`/`package_blocklist` 大小写敏感正则、子 fiber 安装与回滚）+ 独立 `./invariant` 子路径与 `dsh-invariants` peerDependency + **双向测试**：`agent-loop/tests/invariant.spec.ts:45-56` 正例（步骤内 `user/message` 带 `surfaceOp:'append'` 不抛）、58-67 反例（63 前缀、65 后缀都 `.toThrow(/diverges from the dispatch-time durable derivation/)`）。§六 那条"每借一个概念就配一条不变式"的纪律，到这里才有可抄的最小骨架。
+
+---
+
+## 九、WES 侧落地决定（2026-09-02 架构侧裁决）
+
+本章是**已定的决定**，不是建议。§七 的依赖链、`| 项 | 内容 |` 表格体例，以及「过线判据必须是命令实取拿到的输出，不是报告里的自述」这条口径，在本章一并沿用。唯一保持开放的是各批的「必须先答的问题」——那是要用户或执行方回答的，架构侧不代答。
+
+### 9.1 编号约定
+
+**不重编 §七 已有的批次 0–5。** 新增项用小数插入，本章引入两个：**批次 0.5**、**批次 6**。
+
+理由：§七 的批次号已经被写进依赖链自身（「依赖 批次 1」「依赖 批次 2」）与总看板的过程记录。重编号会让这两处同时失效，而收益只是"数字更好看"——纯记账成本，不做。代价是小数号读起来别扭，接受。
+
+### 9.2 批次 0 范围确认，并追加一项
+
+§七 批次 0 已定的两项原样不动：① 工作台把 tools 传给模型；② 修掉固定 `effectKey = workbench_chat_answer:1`（多轮副作用互相吞）。**本批追加第 ③ 项。**
+
+| 项 | 内容 |
+|---|---|
+| 追加做什么 | 建立**弱版请求重建不变式**：每次工作台调模型前，断言「实际发给模型的 `messages`」与「从当前 `ai_sessions` 的 jsonb 消息推导出的 `messages`」逐字节一致 |
+| 依据 | §8.3。dsh 的 `agent-loop/src/invariant.ts`（63 行）挂在 `llm/stream` 上（`{ global: true, prepend: true }`），断言 `options.messages` 与 `session.deriveMessages()` 一致。WES 借的是**这条断言的形状**，不是它的推导源 |
+| 为什么只能是弱版 | WES 今天没有事件日志——那是批次 2 的产物。推导源只能先落在 jsonb 快照上 |
+| 升级到完整版的路径 | 批次 2 把历史表示换成事件序列后，**同一断言只换推导源**（jsonb → 日志重放），断言本体与测试骨架不改写。这就是"完整版顺手挣到"的含义：不预留抽象层，只保证一次改动的半径 |
+| 为什么并进批次 0 而不单独排期 | 批次 0 正是 WES 第一次改变「发给模型的东西」的时机，也是偏离最容易被引入的时机。独立排期等于在最危险的窗口里不设防 |
+| 与 §七 那条跨批次纪律的接合 | §七 末尾要求「每引入一个借自 dsh 的概念，同批次必须配一条不变式测试」。原批次 0 只做两处修复、不带不变式，是这条纪律唯一的例外；追加第 ③ 项正好把它补齐——批次 0 从此也有自己的判据，不再只靠构建与既有测试绿过关 |
+| 已发生的同形事故 | DEF-2026-08-27-001（S2 · open · 已定档）：异步 Run 通道组装时不传 messages/projectId，`modelChatStream` 只推 system + userContent，于是**会话里存着完整历史、请求里只发两条**，五天内无人发现。若有这条断言，它的第一个测试就是红的 |
+| 推导源的实取形状 | 弱版断言比对的两段数据里，存储侧只有一列：`ai_sessions`（`apps/api/src/db/schema/json_runtime.ts:202` 起）的 `messages` jsonb（同文件 `:213`，`notNull().default([])`）。同表另有 `attachments` / `artifacts` / `pending_actions` / `linked_records` 四份 jsonb，**它们不属于本断言射程**。这一点必须写进实现的注释，否则"请求重建不变式"会被后续读者误解为覆盖整个会话记录 |
+| 与批次 0.5 的判据接合 | 批次 0.5 的过线判据 ②（确认工具参数与中间态没有进入下一轮请求的 messages）用的就是本批建起的**请求侧 dump 能力**。先做本批，0.5 的判据只是多断言一个来源；反过来做则两批各造一套 dump |
+| 过线判据 | ① 故意构造一处发送与存储的偏离（例如组装时丢一条历史消息），断言**必须红**，且失败信息指名是哪一侧偏离；② 还原后断言**必须绿**；③ `npm run test:modules` 全绿，且该断言在测试文件里可 `grep` 到，不是只存在于本地脚本 |
+| 必须先答的问题 | 断言以什么强度运行：常开（每次请求都跑，成本 O(messages)）、仅测试构建开启，还是按配置开启。dsh 的实取结论是**默认生产路径上关着、可随时整体打开**（§8.3「必须显式挂载」条）；WES 若选常开，需先给出实测开销 |
+| 风险 | 弱版会漏掉一类真实偏离：jsonb 本身写错（存了不该存的、或漏存）。它保证的是"发送与存储一致"，不保证"存储正确"。批次 2 之后这类偏离才进入断言射程 |
+
+### 9.3 批次 0.5：SSE 工具调用可视化（新增 · 项目侧需求）
+
+| 项 | 内容 |
+|---|---|
+| 做什么 | 给 SSE 流补上工具调用可视化：前端把既有 `WorkbenchToolCallTrace` / `toolCalls` 通道（`apps/api/src/services/ai/workbench-dispatch.service.ts:57-60`、`:87-88`，即 MS3 工具调用 chip 的数据源，工作台侧当前恒为空）接上真实数据，并补流式状态 |
+| 依赖 | 批次 0。不传 tools 就没有工具调用可看，本批会变成一个空壳 |
+| 通道现状（实取） | 该字段是**已存在的 additive 契约**：`WorkbenchToolCallTrace = { name: string; source?: string }`，注释明写「仅新增、可选；缺数据时字段缺省，既有字段语义与事件契约零变更，前端缺数据时保持 MS3 静默降级」；捕获点在 `workbench-dispatch.service.ts:254-266`，按 `${name}:${source}` 去重。**结论：本批不是新建一条链路，是给一条已铺好但恒为空的链路喂数据 + 补三态**，因此前端降级路径无需重做 |
+| 同仓已验证的模板（实取） | 事件契约扩展在 WES 里已有走通的先例，不必另找路。ISS-2026-08-10-004 的三步：① 在 `HARNESS_RUN_EVENT_TYPES` 增量登记 `text.delta` / `thought`（`apps/api/src/modules/harness/harness-runtime.types.ts:57-61`，附 additive-only 说明与「新增写入即为缺陷」的负向守护）；② 异步 workflow 经 `deps.appendRunEvent` 写入 `harness_run_events`；③ 前端 `useChatMessages.js:25` 的 `STREAM_EVENT_TYPES` 加 case 消费。**本批按同一形状加工具事件类**，且 `harness-runtime.types.test.ts:121` 已在守护这条扩展路径本身——复用先例，不是首例 |
+| 为什么排在批次 1 之前 | §七 批次 1 的过线判据 ① 要求「日志里能看到拦截，不是前端静默替换」。**工具调用不可见 = 之后每一批都无法验证**。这是验证前提，不是体验优化 |
+| 事件契约扩展（已获架构侧批准） | `HARNESS_RUN_EVENT_TYPES` 现为 16 类，additive-only（只增不减，增需架构裁决）。本批新增的工具调用事件类属 additive，**批准**。但必须按规则走：登记新类型 → 更新计数 → 跑防漂移测试（`apps/api/src/test-helpers/` 下 `db.drift.test.ts` 等四份在役）→ 把这次基线变更登记进 WES 总看板。绕过任一步，additive 契约就退化成"谁都能改" |
+| 同时必须立的一条边界 | 仿 §八 的 dsh `SurfaceEventType`（只有 `user/message`、`assistant/message`、`tool/result` 进入模型可见折叠），**区分「UI 可见事件」与「模型可见事件」**。工具的完整参数与执行中间态给 UI 看可以，**不得整体回灌进模型上下文**，否则长会话比批次 3 之前爆得更快。WES 今天 `messages` 里的东西一律模型可见，没有这层区分——本批要把它建出来 |
+| 已有的三态雏形（实取） | 编排循环侧**已经**在发工具事件：`AgentEvent`（`apps/api/src/agent/agent.types.ts:39-43`）的 `need_confirm` / `tool_call` / `tool_result`，在 `routes/agent.routes.ts:100-108` 映射为 SSE 帧 `needs_confirmation` / `tool_started` / `tool_finished`，发射点在 `apps/api/src/agent/orchestrator.ts:64`、`72`、`75`、`90`。**对照下来本批真正新增的只有"执行中"这一态**（现有实现从 `tool_call` 直接跳到结果，长工具挂着时中间无进度）。同时记下：`mutates: true` + `confirm` 那条分支是批次 1 `ask` 决策槽的雏形，但它在编排循环里硬编码——批次 0.5 只把它**显示**出来，不改造成可配置的拦截，改造属批次 1 |
+| 三态设计 | 一次工具调用不是 `text.delta` 那样的字符流，而是**「开始 → 执行中 → 完成/失败」**，且可能长时间挂着（例如"新建项目"要落库）。事件必须能表达进度，否则界面上就是一段死空气 |
+| 过线判据 | ① 工作台跑一条真实工具调用，UI 上三态逐态可见（命令实取：SSE 帧序列里三类事件按序出现，不是只有最后一帧）；② 命令实取确认**该调用的参数与中间态没有进入下一轮模型请求的 messages**——打印请求侧 messages 计数与内容比对，不靠"前端没显示"来推断；③ 事件类型计数与登记表一致，防漂移测试绿；④ `npm run build:web` + `npm run build:api` + `npm run test:modules` 全绿 |
+| 必须先答的问题 | log-only 事件的存储落点**已有一个具体候选，需确认**：`harness_run_events`（`apps/api/src/db/schema/harness.ts:141-157`）已是 per-run 单调 `sequence` + `event_type` + `payload` jsonb，且 `(run_id, sequence)` 唯一索引在 DB 层强制——批次 2 要的 append-only 事件序列在**异步 Run 通道上已存在**。问题因此收窄为：工作台的**同步** SSE 通道今天只透传不落事件表，工具事件要不要补持久化；若要，同步与异步是否共用同一张表。此问不能拖到批次 2 现编 |
+| 与批次 6 的分工 | 本批只管**看得见**，不管**可配置**。工具清单的启用/角色可见/审批策略属批次 6。在本批顺手加一个"工具开关"会把一个验证前提做成了治理功能，两件都没做完——不做 |
+| 风险 | 可视化一旦上线就变成产品承诺，之后想收回等于功能删减。事件类型命名在本批定死，因为它同时是 DB 值、SSE 帧名和前端契约三份 |
+| 本批明确不做 | ① 不做工具启停/角色可见的可配置策略（批次 6）；② 不做执行前的拦截与改写，`ask` 分支本批只显示不改道（批次 1）；③ 不把工具事件回灌进模型可见历史（该折叠规则属批次 2 的历史表示）；④ 不做工具输出的展示模板/渲染层。理由同一条：本批的验收面是"看得见进度"，多一项都会把判据从事件序列比对拖成 UI 主观评价 |
+
+### 9.4 批次 6：工具策略管理页（新增 · 项目侧需求）
+
+| 项 | 内容 |
+|---|---|
+| 做什么 | 工具清单进【系统管理】二级菜单，后台可审计、可维护 |
+| 代码 / 数据边界（本批要害） | 工具的 `execute`、参数 schema、实现**留在代码里，不得变成数据**。落库的只有**策略**：是否启用 / 对哪些角色可见（覆盖 `capability` 默认值）/ 是否需要审批及走哪个审批策略 / 注入模式。参照 dsh `permission-presets`（§一 第 8 项 ③）：把沙箱模式与审批策略打包成具名预设，预设自身不实施任何强制、只产出策略 |
+| 必须复用现有机制，不另造 | 系统管理现有配置区一律走 **draft → 生效**；`system_configs` 已有 `version` 与 `effective_at`（`apps/api/src/db/schema/json_runtime.ts:108-112`、`apps/api/src/modules/system/system-pg.repository.ts:150-159`）。工具策略作为**第五个配置区**接入同一套机制，复用其版本、审计与生效流程，不为这个页面另开一套草稿存储 |
+| 模型可见 schema 的落点（实取） | 「实现不得进模型」这条边界 WES **今天已经具备**：`toToolDefinition`（`apps/api/src/agent/agent.types.ts:46-55`）是**显式字段投影**，只组装 `{ type, function: { name, description, parameters } }`，`execute` / `capability` / `mutates` / `category` / `discoverable` 结构上不可能随请求发出——这正是 §一 第 2 项里 dsh `schemas()` 显式允许列表的同类物。**所以本批不改投影函数**，策略只作为 `ToolRegistry` 现有五个注入集 selector（`listToolsFor:21`、`listFullToolsFor:32`、`listCoreToolsFor:40`、`listDiscoveryToolsFor:51`、`listDiscoveredToolDefinitionsFor:78`）上叠加的第二层过滤。这五处今天一律只按 `capability` 过滤，且三份带 MS3 注释的注入集（全量回退 / 核心 / 发现）本身就是"注入模式"的既有实现——批次 6 的"注入模式"字段应当映射到这三档，不要另发明第四种口径 |
+| 第 10 个存储域 | 阶段 2 九域迁移已于 2026-08-31 收口。新增一个域必须走同一套纪律：drizzle 迁移文件（`apps/api/drizzle/` 现有 22 份在役）、seed 播种清单登记（`apps/api/src/db/seed.ts:168-172`）、防漂移计数。**不得因为"只是个配置页"绕开**——绕开的那一次，事后没人能从迁移序列里还原它的 schema 来历 |
+| 依赖 | 批次 0（工具得先能被调用）。**建议在批次 3 之后**：管理页要显示"当前注入了几个工具、占多少 token"，这需要批次 3 的 token-meter；没有它，这个页面只能开关而看不到代价，于是会一直往里塞到上下文爆 |
+| 为什么排最后 | 这是运营需求，不是能力需求。能力没跑通就建管理后台，管的是一个空东西 |
+| 过线判据 | ① 禁用一个工具后，命令实取确认模型请求里真的不含它（抓组装后的 tools 列表，不看页面状态）；② 变更轨迹可查：谁、何时、改了什么，且能对上 `version` 递增；③ 页面显示当前注入的工具数与 token 占用，两个数与请求侧实测一致；④ 迁移与 seed 落地后 `npm run test:modules` 全绿 |
+| 必须先答的问题 | 谁能改工具策略（`capability` 覆盖是权限面的重分配，比改文案敏感得多）；生效前是否需要预览影响面，还是直接生效；已禁用工具的历史调用在审计里如何呈现 |
+| 与 RBAC 的关系 | 策略层**只做减法与另存默认，不替代既有权限校验**。今天每个工具带一个必填的 `capability: Capability`（`apps/api/src/agent/agent.types.ts:18`），而 `AgentUser.capabilities: Capability[]`（同文件 `:8`），selector 按 `caps.has(tool.capability)` 过滤。管理页的"对哪些角色可见"是在这条过滤之上再加一层，两层都通过才注入；不得做成"策略里启用了就能绕过 `capability`"——那是把审计页变成提权入口 |
+| 本批明确不做 | ① 不做工具的在线编写与热注册（`execute` 不落库，见「代码 / 数据边界」条）；② 不做工具市场/导入导出；③ 不自建一套审批引擎——策略里只存"是否需要审批 + 走哪个审批策略"的引用，审批本身复用系统既有审批链路。理由：这三项都不是"让后台看得见、改得动"所必需的，而第 ① 项一旦做了，本批的要害边界（实现不落库）当场失效 |
+
+### 9.5 更新后的完整顺序
+
+| 顺序 | 批次 | 一句话 | 依赖 |
+|---|---|---|---|
+| 1 | 批次 0 | 传 tools + 修 effectKey + 弱版请求重建不变式 | 无（阻塞其余全部） |
+| 2 | 批次 0.5 | SSE 工具调用可视化 + 事件契约扩展 + UI/模型可见边界 | 批次 0 |
+| 3 | 批次 1 | 执行前决策槽（`allow\|modify\|skip\|ask\|stop`） | 批次 0；验证前提在 0.5 |
+| 4 | 批次 2 | 历史表示：jsonb 快照 → append-only 事件序列 | 批次 1 |
+| 5 | 批次 3 | 上下文预算：token-meter → 确定性剪枝 → compaction | 批次 2 |
+| 6 | 批次 4 | 18 个正则 handler 按「谁发起」退役为 command 或 tool | 批次 0、1 |
+| 7 | 批次 6 | 工具策略管理页（第 10 个存储域） | 批次 0、3 |
+| 8 | 批次 5 | 可选：skills 机制化 / subagent / sandbox | 批次 2 + §六 第 10 条，需独立决策 |
+
+批次 4 与批次 6 的相对顺序可按排期互换（两者互不依赖）。批次 5 保持末位、不进本次范围。**本章唯一的顺序改动是把批次 0.5 插到批次 1 之前，理由是验证能力，不是用户体验。**
+
+### 9.6 与 dsh 迁移决策的关系
+
+本章全部批次仍落在 §四 的 **C 路线（局部替换）**内：借的是断言形状、决策槽分层、surface 白名单、策略预设打包这几条**判据**，`import` 的 dsh 代码为零。因此 §四 判定 C 的那条决定性理由——dsh 处于开发者预览期、README 自陈未来会有破坏兼容性变更、`SessionHeader.version` 不匹配时拒绝加载而不自动迁移——**不影响 WES 构建**：不存在可断裂的上游依赖。
+
+批次 0 与批次 0.5 与迁移决策**完全解耦**：不论最终选 A、B 还是 C，这两批都必须做。它们的理由分别是「工具能不能被调用」和「调用过程看不看得见」，与借不借 dsh 无关。这也意味着——这两批不应拿"迁移方案还没定"当暂停理由。
+
+若日后改判为 A 或 B，本章各批的存续性并不相同。**批次 0（含追加的第 ③ 项）、批次 0.5、批次 6 全部原样存活**：它们落在 WES 自己的契约上——tools 注入、`HARNESS_RUN_EVENT_TYPES` 白名单、`system_configs` 的版本化与 draft→生效、`ToolRegistry` 的注入集——换路线不推翻任何一条已定的判据。批次 1 至批次 4 会变的是**目标形态**（决策槽与事件序列照 dsh 实现重画、上下文预算改用其 compaction），不会变的是**这批工作必须做**：改的是"抄谁的"，不是"做不做"。
+
+排期上的直接后果：迁移决策可以长时间悬置，而批次 0 → 0.5 照跑。真正被决策卡住的只有批次 2 之后（历史表示一换，批次 3 的剪枝对象与批次 4 的 handler 归属才受影响）。
