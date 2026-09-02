@@ -805,9 +805,15 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
         </tr>
         <tr data-board-event-id="BE-2026-08-27-def-2026-08-27-003-queued:plan">
           <td class="mono">DEF-2026-08-27-003（队列 5）</td>
-          <td>新会话首次带文件发送解析阻塞在会话创建之前、超时消息与附件丢失。方案①（顺序倒转：先 createSession 落库再异步解析）为推荐方案，与 DEF-2026-08-27-001 改动面不重叠可独立排期。开工申请见 <a href="defects.html">defects.html</a>。</td>
-          <td><span class="status warn"><span class="dot"></span>方案待评审 / 队列 5 开工申请</span>：不与 DEF-001 抢排期。</td>
-          <td>新会话带文件发送后会话立即出现（不等待解析）；解析失败/超时消息与附件仍可见可重试；解析过程有进度反馈。</td>
+          <td>新会话首次带文件发送解析阻塞在会话创建之前、超时消息与附件丢失。<b>已修复合入 main</b>：方案①顺序倒转，commit <code class="inline">16fff62</code> / merge <code class="inline">95dbb63</code>（保父提交可追溯，未 squash）。详见 <a href="defects.html">defects.html</a>。</td>
+          <td><span class="status done"><span class="dot"></span>已修复 · 分支 CI 33614209215 · main CI 33616291944 六 job 全绿</span>：含分支上被跳过的 docker-build，skipped 全 0。</td>
+          <td>①会话先于解析创建 ②失败/超时后消息与附件可重试——两项已达成。<b>③「解析过程有可感知的进度反馈」未满足</b>（仅两段文案级进度），架构侧裁定不阻塞关闭，转下行增强项。</td>
+        </tr>
+        <tr>
+          <td class="mono">附件解析真进度反馈（队列 7）</td>
+          <td><b>[增强] 附件解析真进度反馈 + 接入已有流式端点 <code class="inline">/ai/parse-basic-info/stream</code></b>——由 DEF-2026-08-27-003 关闭标准未满足项与原方案③（降级项）<b>合并为一条</b>。本轮只登记不实现。</td>
+          <td><span class="status warn"><span class="dot"></span>已立项 / 待排期</span>：源起 2026-09-02 架构侧对 DEF-003 的关闭裁定；后端流式能力已在位（<code class="inline">extractor.service.ts:414-471</code>，createAbortBridge + progress/model_start/model_delta SSE），<b>缺的是前端消费</b>。</td>
+          <td>解析期间展示真进度（非两段静态文案）；可取消；进度事件驱动而非轮询。与 DEF-2026-09-02-003（场景/超时口径）同块代码，建议合做。</td>
         </tr>
         <tr data-board-event-id="BE-2026-08-27-def-2026-08-27-002-queued:plan">
           <td class="mono">DEF-2026-08-27-002（队列 6 · 已闭环）</td>
