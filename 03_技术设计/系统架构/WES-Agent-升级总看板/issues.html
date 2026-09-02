@@ -392,6 +392,17 @@
               <td>转缺陷 · DEF-2026-08-27-005（观察缺陷，定级 S3；必答项——补偿链生效起始 2026-08-08 vs 孤儿末位 08-19 对齐分析已随立项给出：全终态证明无覆盖盲区）</td>
               <td>S2b-2 不负责清理、不扩范围；清理另行提方案（含 run 留存策略/审计口径定义）经架构侧批准后执行；本轮不删任何数据。</td>
             </tr>
+            <tr>
+              <td class="mono">ISS-2026-09-02-001</td>
+              <td>2026-09-02</td>
+              <td>系统管理 · 知识库标签页三处结果横幅常驻，与同页 toast 体系不一致</td>
+              <td>用户反馈（架构侧 UI 批次下发）</td>
+              <td>知识库区段的保存结果、连通性测试结果与接入状态三处仍用 <code class="inline">sys-banner</code> 常驻显示，同页模型配置与编码规则早已用标准 toast。<details class="tech-detail"><summary>三根问题与去重依据</summary>P1 保存草稿结果横幅（操作反馈却常驻）；P2 连通性测试结果横幅；P3「知识库接入已配置（来自存储）」状态横幅——档案数与启用数在下方 <code class="inline">kb-profiles</code> 表格逐行可见（含状态徽章），属纯冗余，故删除不做 toast。<b>去重</b>：工单把 DEF-2026-09-02-001 的 ③失败人话原因、④失败徽章同步两项移入本批；执行期间 origin/main 已由 <code class="inline">66ac13f</code>/<code class="inline">2c64ddd</code> 交付并通过架构侧复核（DEF 已 done 关闭），故本批只做呈现层（横幅 → toast）并复用 main 的 <code class="inline">describeKbTestFailure</code>，不重复实现 ③④。</details></td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx（修复前三处 sys-banner，全仓仅该页引用 12 处）</code> <code class="inline">ToastContainer.jsx L51-52（按 kind 给 role=alert/status）</code> <code class="inline">分支 qoder/ui-kb-toast @ c8ad3eb</code></td>
+              <td><span class="status done"><span class="dot"></span>已实施 · 已合入 main @ <code class="inline">c8ad3eb</code>（2026-09-02 FF 合入）· main CI 33603761390 六 job 全绿</span></td>
+              <td>不转缺陷 · 随 UI 批次交付（同表面三根问题，未新增技术栈）</td>
+              <td>2026-09-02 已 FF 合入 main（<code class="inline">d0c041a</code> → <code class="inline">c8ad3eb</code>）并完成台账回填（changes.html BE 行 + testing.html 451 归因行同批更新）；知识库三路径视觉自验因登录阻断未做，按用户裁决登记为待执行。<details class="tech-detail"><summary>为什么不开 DEF</summary>不改鉴权、不改存储与数据结构，<code class="inline">useToast</code> 早已在该页就位（模型配置/编码规则在用），属体系内一致性收敛而非新能力。<b>待裁项</b>：<code class="inline">sys-banner</code> 样式（<code class="inline">src/index.css</code> L1118 一带）自此无任何引用，是否顺手清死样式待架构侧定，本批不扩范围。</details></td>
+            </tr>
         </table>
       </div>
     </section>

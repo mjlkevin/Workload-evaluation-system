@@ -586,6 +586,12 @@
           <td>更新 sources / changes / collaboration protocol。</td>
           <td>不得伪造成代码交付。</td>
         </tr>
+        <tr>
+          <td>分支每日对齐</td>
+          <td>分支存活超过一天，或与其他线改到同一批文件。</td>
+          <td>每天 <code class="inline">git fetch origin &amp;&amp; git pull --rebase origin main</code> 对齐；冲突按「三轴并存」解，不改写已推送历史。</td>
+          <td>确实无法并存时停下报架构侧，不得由执行方自行取舍。</td>
+        </tr>
       </table>
       <div class="callout"><div><b>扩展原则</b>新增 Agent 时只新增注册表条目、入口文件、handoff profile 与试运行记录；不重写现有协议，也不把工具品牌直接等同于权限。</div></div>
     </section>
