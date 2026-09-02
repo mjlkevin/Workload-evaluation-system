@@ -213,3 +213,42 @@ test('probe-4: short placeholder in a non-whitelisted file is reported (existing
     fs.rmSync(repo, { recursive: true, force: true })
   }
 })
+
+// ── S3B4M（2026-09-02）：阈值 32→26 收窄的两条钉住自测 ──
+// 依据（架构侧实取）：存量占位最长 25 位 → 26 是不误伤下界；主流 key 最短 32 位 → 26 在
+// 真凭据最短形态与占位上界之间。probe-5 钉「26 位必须报红」（白名单内也报），
+// probe-6 钉「存量占位 ≤ 25」（将来有人加长占位即红，阈值依据失效有人发现）。
+
+test('probe-5: 26-char mixed-class value in a WHITELISTED file is reported and fails (threshold floor)', () => {
+  const value = 'Ab1xxxxxxxxxxxxxxxxxxxxxxx' // 26 位：小写+大写+数字 3 个字符类，无符号
+  const repo = makeTempRepo({ 'whitelisted.ts': `const key = apiKey: '${value}'\n` })
+  const excluded = [{ file: 'whitelisted.ts', reason: '测试', clearCondition: '文件删除后删条目' }]
+  const realWrite = process.stderr.write.bind(process.stderr)
+  let output = ''
+  process.stderr.write = (chunk) => {
+    output += String(chunk)
+    return true
+  }
+  try {
+    const status = scanner.runCli([], repo, { excluded })
+    assert.equal(status, 1, output)
+    assert.match(output, /whitelisted\.ts:L1 \(inline-secret\)/)
+    assert.match(output, /虽在白名单，但命中真凭据形态/)
+  } finally {
+    process.stderr.write = realWrite
+    fs.rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('probe-6: existing placeholder values never exceed 25 chars (threshold 26 floor evidence)', () => {
+  // 全仓扫描（内存 API，不打印值）：统计所有可豁免命中（非 credentialLike）的值长度上界。
+  // 断言 ≤ 25 —— 钉住阈值 26 的依据 a（存量占位最长实取 25 位，users-pg L71）；
+  // 将来有人加长占位即红，提醒阈值依据失效需重新评估（重新评估阈值，而非删断言）。
+  const root = path.resolve(__dirname, '..')
+  const findings = scanner.scanFiles(scanner.trackedFiles(root), root)
+  const placeholderLens = findings
+    .filter((f) => !scanner.isCredentialLike(f.value))
+    .map((f) => String(f.value ?? '').length)
+  const maxLen = Math.max(0, ...placeholderLens)
+  assert.ok(maxLen <= 25, `存量占位最长 ${maxLen} 位 > 25，阈值 26 的依据失效（需重新评估阈值而非删断言）`)
+})

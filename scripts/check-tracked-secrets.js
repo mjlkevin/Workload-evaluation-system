@@ -95,18 +95,20 @@ function isMeaningfulSecret(value) {
   return true
 }
 
-// 真凭据形态判据（S3B4 任务 A：真凭据形态不可按文件名豁免）：
+// 真凭据形态判据（S3B4 任务 A：真凭据形态不可按文件名豁免；S3B4M 阈值 32→26 收窄）：
 // ① 完整 bcrypt 散列：$2a$/$2b$/$2y$ + 两位 cost + $ + 22 盐 + 31 散列 = 53 字符（与 BCRYPT_RE 锚定一致）；
-// ② 长度与熵超阈值的随机串：长度 ≥ 32 且至少 3 个字符类（小写/大写/数字/符号）。
-// 阈值 32 的依据：主流 API key 最短常见形态为 32 位 base64（智谱）；Kimi 48 位、OpenAI 48 位、
-// JWT 与完整 bcrypt 均更长；存量测试占位最长实取 25 位（`$2a$10$test-hash-not-real`）——
-// 32 位在真凭据与测试占位之间有明确间隙，不误伤既有夹具（users-pg L71 25 位、unit-* 系列均 < 32）。
+// ② 长度与熵超阈值的随机串：长度 ≥ 26 且至少 3 个字符类（小写/大写/数字/符号）。
+// 阈值 26 的两条依据（架构侧 2026-09-02 实取，非估算）：
+//   a) 存量测试占位最长实取 25 位（`$2a$10$test-hash-not-real`，users-pg L71）——26 是不误伤存量的最小安全下界；
+//   b) 主流 API key 最短常见形态为 32 位 base64（智谱）；Kimi 48 位、OpenAI 48 位、JWT 与完整 bcrypt 均更长——
+//      26 取真凭据最短形态（32）与存量占位上界（25）之间的不误伤下界，白名单内盲窗从「< 32 位」缩到「< 26 位」。
+// 依据钉住：probe-6 断言存量占位最长 ≤ 25（将来有人加长占位即红，阈值依据失效有人发现）。
 function isCredentialLike(value) {
   if (typeof value !== 'string') return value != null
   const normalized = value.trim()
   if (!normalized) return false
   if (/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(normalized)) return true
-  return normalized.length >= 32 && countCharClasses(normalized) >= 3
+  return normalized.length >= 26 && countCharClasses(normalized) >= 3
 }
 
 function countCharClasses(value) {
