@@ -132,7 +132,10 @@ test('RP-045 branch topology intake is registered once with issue-first traceabi
   );
   const matches = registry.issues.filter((issue) => issue.id === 'ISS-2026-08-02-001');
 
-  assert.equal(registry.updatedAt, '2026-08-19');
+  // S3B3（任务 C）：不再钉死具体日期（board-work-items.json 合法更新即无辜报红），
+  // 改为「不早于基线日期 + 格式合法」——基线为 2026-08-19（S3B2 漂移修复时的实取值）
+  assert.match(registry.updatedAt, /^\d{4}-\d{2}-\d{2}$/);
+  assert.ok(registry.updatedAt >= '2026-08-19', `updatedAt(${registry.updatedAt}) 早于基线 2026-08-19`);
   assert.equal(matches.length, 1);
   assert.equal(matches[0].title, '项目看板缺少主分支与子分支拓扑');
   assert.equal(matches[0].triageStatus, 'converted');

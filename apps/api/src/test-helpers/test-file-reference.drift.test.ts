@@ -148,6 +148,24 @@ function ciReachableScripts(): { root: Set<string>; api: Set<string> } {
   return { root, api };
 }
 
+/**
+ * 工作流直引：只认 run: 行的命令内容（防未来工作流绕过 npm script 直接跑文件）。
+ * S3B3（任务 C）：不再对整份 YAML 做正则——若注释里写出 scripts/xxx.test.js 形态的路径，
+ * 该文件会被当成已引用（假绿路径）；只认 run: 行（或 # 起始注释行天然跳过）。
+ */
+function workflowDirectRefs(content: string, into: { src: Set<string>; scripts: Set<string> }): void {
+  for (const line of content.split("\n")) {
+    const m = line.match(/^\s*run:\s*['"]?(.+?)['"]?\s*$/);
+    if (!m) continue;
+    for (const mm of m[1].matchAll(/src\/[\w./-]+\.test\.(?:ts|mts)/g)) {
+      into.src.add(mm[0].slice("src/".length));
+    }
+    for (const mm of m[1].matchAll(/scripts\/[\w./-]+\.test\.(?:js|ts|mts)/g)) {
+      into.scripts.add(mm[0].slice("scripts/".length));
+    }
+  }
+}
+
 /** CI 可达引用源并集：src 相对 apps/api/src、scripts 相对仓根 scripts/。 */
 function collectReferenced(): { src: Set<string>; scripts: Set<string> } {
   const refs = { src: new Set<string>(), scripts: new Set<string>() };
@@ -171,13 +189,7 @@ function collectReferenced(): { src: Set<string>; scripts: Set<string> } {
     for (const wf of fs.readdirSync(WORKFLOWS_DIR)) {
       if (!/\.ya?ml$/.test(wf)) continue;
       const content = fs.readFileSync(path.join(WORKFLOWS_DIR, wf), "utf-8");
-      // 工作流直引（防未来工作流绕过 npm script 直接跑文件）
-      for (const m of content.matchAll(/src\/[\w./-]+\.test\.(?:ts|mts)/g)) {
-        refs.src.add(m[0].slice("src/".length));
-      }
-      for (const m of content.matchAll(/scripts\/[\w./-]+\.test\.(?:js|ts|mts)/g)) {
-        refs.scripts.add(m[0].slice("scripts/".length));
-      }
+      workflowDirectRefs(content, refs);
     }
   }
   return refs;
@@ -216,6 +228,22 @@ test("apps/api/src 与 scripts/ 下全部测试文件必须被 CI 可达脚本�
       "或确认属「有意排除」（需外部密钥 / 需人工数据 / 成本高）后登记进本守卫 EXCLUDED 并写明原因。",
     ].join("\n"),
   );
+});
+
+test("工作流直引只认 run: 行，注释里的测试路径不计入引用（S3B3 任务 C）", () => {
+  const refs = { src: new Set<string>(), scripts: new Set<string>() };
+  const yaml = [
+    "# 示例注释：scripts/comment-fake.test.js 不应计入",
+    "# scripts/another-comment.test.js 也不计入",
+    "steps:",
+    "  - name: run scripts tests",
+    "    run: node scripts/real.test.js src/real.test.ts",
+    "  - name: commented-out step",
+    "    # run: node scripts/comment-fake.test.js",
+  ].join("\n");
+  workflowDirectRefs(yaml, refs);
+  assert.deepEqual([...refs.scripts], ["real.test.js"]);
+  assert.deepEqual([...refs.src], ["real.test.ts"]);
 });
 
 test("排除清单条目不得过期（文件已删或已被引用都必须移除条目）", () => {

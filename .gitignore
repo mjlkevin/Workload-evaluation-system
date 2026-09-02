@@ -73,3 +73,5 @@ Session/
 qa-outputs/
 observations_output.json
 config/auth/users.json
+# S3B3（2026-09-01）：归档快照含 40 条 bcrypt 密码散列，已移出 git 跟踪（git rm --cached，本机文件保留）
+99_归档/阶段2-users-store-切换前快照/users.json
