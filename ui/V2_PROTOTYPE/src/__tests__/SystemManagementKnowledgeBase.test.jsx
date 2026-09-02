@@ -150,9 +150,6 @@ describe('SystemManagement knowledge base feedback', () => {
     expect(alert).toHaveTextContent('连通性测试未通过')
   })
 
-
-
-
   test('never echoes unknown details fields in the connectivity failure toast', async () => {
     server.use(
       http.post(`${BASE}/system/knowledge-base-config/test`, () => {
@@ -165,7 +162,9 @@ describe('SystemManagement knowledge base feedback', () => {
             providerCode: 401,
             providerMessage: '令牌已过期或验证不正确',
             requestEcho: 'visible-request-fragment-should-not-render',
-            apiKey: 'raw-key-should-not-render',
+            // 全大写占位形态：check-tracked-secrets 的 isMeaningfulSecret 判为非真凭据，
+            // 改成像真密钥的串会让 test:security 实扫红（2026-09-02 已实际付过一次）。
+            apiKey: 'PLACEHOLDER_KEY_NOT_REAL',
           }],
         }, { status: 400 })
       })
@@ -178,7 +177,7 @@ describe('SystemManagement knowledge base feedback', () => {
     expect(alert.closest('.wes-toast-container')).not.toBeNull()
     expect(alert).toHaveTextContent('供应商鉴权失败')
     expect(alert).not.toHaveTextContent('visible-request-fragment-should-not-render')
-    expect(alert).not.toHaveTextContent('raw-key-should-not-render')
+    expect(alert).not.toHaveTextContent('PLACEHOLDER_KEY_NOT_REAL')
   })
 
   test('drops the persistent knowledge base status banner', async () => {
