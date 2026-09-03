@@ -257,13 +257,13 @@ test('content-form scan catches backtick-delimited apiKey (ruling E)', () => {
   // 裁决 E：INLINE_SECRET_RE 分隔符须覆盖反引号（JS 模板字面量 / .env 常见形态）。
   // 修复前此形态漏检；修复后应报 1 hit（值经 isMeaningfulSecret 判非占位）。
   const repo = makeTempRepo({
-    'config.ts': 'const cfg = { apiKey: `sk-real-secret-key-1234567890` }\n',
+    'config.ts': 'const cfg = { apiKey: `sk-fake-fixture-abcdefgh` }\n',
   })
   try {
     const result = spawnSync(process.execPath, [script, 'config.ts'], { cwd: repo, encoding: 'utf8' })
     assert.equal(result.status, 1, `expected exit 1 but got ${result.status}: ${result.stderr}`)
     assert.match(result.stderr, /config\.ts:L1.*inline-secret/)
-    assert.doesNotMatch(result.stderr, /sk-real-secret-key-1234567890/)
+    assert.doesNotMatch(result.stderr, /sk-fake-fixture-abcdefgh/)
   } finally {
     fs.rmSync(repo, { recursive: true, force: true })
   }

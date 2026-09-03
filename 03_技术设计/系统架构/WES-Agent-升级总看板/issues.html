@@ -441,7 +441,7 @@
               <td>2026-09-03</td>
               <td>密钥扫描 INLINE_SECRET_RE 漏检反引号分隔的密钥赋值</td>
               <td>架构侧裁决 E（s3-supplemental 批次）</td>
-              <td><code class="inline">check-tracked-secrets.js</code> 的 <code class="inline">INLINE_SECRET_RE</code> 分隔符只覆盖单/双引号 <code class="inline">["']</code>，不覆盖反引号 <code class="inline">`</code>；JS 模板字面量与 .env 文件中 <code class="inline">apiKey: `sk-xxx`</code> 形态的密钥赋值不会被行内扫描命中，形成盲区。</td>
+              <td><code class="inline">check-tracked-secrets.js</code> 的 <code class="inline">INLINE_SECRET_RE</code> 分隔符只覆盖单/双引号 <code class="inline">["']</code>，不覆盖反引号 <code class="inline">`</code>；JS 模板字面量与 .env 文件中以反引号（而非单/双引号）包裹值的 <code class="inline">apiKey</code> 赋值形态不会被行内扫描命中，形成盲区。</td>
               <td><code class="inline">scripts/check-tracked-secrets.js:26-27</code> 修复前正则 <code class="inline">["']</code> 两处无 <code class="inline">`</code>；修复后 <code class="inline">[`"']</code>；新增自测 <code class="inline">content-form scan catches backtick-delimited apiKey (ruling E)</code> 17/17 pass。</td>
               <td><span class="status done"><span class="dot"></span>已修复 · 已自验</span> 裁决 E 分支提交</td>
               <td>不转缺陷 · 扫描器自身盲区修复，无业务代码影响</td>
