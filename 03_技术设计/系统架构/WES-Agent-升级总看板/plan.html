@@ -845,6 +845,30 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td><span class="status warn"><span class="dot"></span>已立项 / 待触发</span>：触发条件——本批次裁决变更合入后，随同其他看板页面 footer 一并刷新；不排固定日历日期。</td>
           <td>页脚日期与最近一次内容变更日期的差距 ≤ 7 天；<code class="inline">node scripts/board-consistency-check.js</code> check 3 不再对 plan.html 发出警告。</td>
         </tr>
+        <tr data-board-event-id="BE-2026-09-03-def-001-workbench-chat-model:plan">
+          <td class="mono">DEF-2026-09-03-001<br>AI 工作台对话模型硬编码</td>
+          <td>AI 工作台三条对话路径（harness-boot / workbench-shared / workbench-chat-stream）未读取系统配置模型，硬编码已退役 kimi-k2.5。四层根因：① <code class="inline">env.ts:36</code> 字面量 <code class="inline">"kimi-k2.5"</code> 兜底；② 三条路径绕过场景绑定；③ 归一化内置兜底 DEFAULT_KIMI_EVALUATION/GENERATION_MODEL（system.repository.ts:42/44）同为 kimi-k2.5；④ 读路径不做 normalize 导致退役模型名永不升级。修复：统一 <code class="inline">resolveWorkbenchChatScenario</code>、删除 env 字面量、兜底升至 kimi-k2.6、读路径加 normalize、kimi-k2.5 加入退役名单。分支 <code class="inline">fix/workbench-chat-model-scenario</code>，commit <code class="inline">a05a50a</code>，合入 <code class="inline">3f72dee</code>。</td>
+          <td><span class="status done"><span class="dot"></span>已合入主干 / 人工验收待用户执行</span>：分支 CI <code class="inline">33712301368</code> success · 主干 CI <code class="inline">33713325832</code> success（六 job 全绿含 docker-build）。七套件逐块实取：rules 8 / agent 87 / AI 287 / modules 458 / serial-store 170 / integration 1 / harness 215 = 1226。新增回归 <code class="inline">workbench-chat-scenario.test.ts</code> 5 条 + serial-store 守卫白名单 11→12。<b>披露：架构侧自写未经独立复核，用户知情后批准合入。</b></td>
+          <td>用户在 AI 工作台发起对话，确认实际调用模型与系统配置一致（非 kimi-k2.5）；<code class="inline">npm run test:modules</code> / <code class="inline">test:ai</code> / <code class="inline">test:modules:serial-store</code> 全绿。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-03-model-name-empty-fallback:plan">
+          <td class="mono">【只登记·未实现】<br>normalizeKimiModelName 空值回退退役模型</td>
+          <td><code class="inline">model-name.ts:5</code> 的 <code class="inline">normalizeKimiModelName</code> 在传入空值（<code class="inline">""</code> / <code class="inline">undefined</code>）时仍返回退役的 kimi-k2.5 而非当前兜底 kimi-k2.6。与 DEF-2026-09-03-001 同族（默认值残留），但不在该批修复范围内。</td>
+          <td><span class="status warn"><span class="dot"></span>已立项 / 待触发</span>：来源 DEF-2026-09-03-001 修复轮实取发现；触发条件——与下方 kimi-ping / change-management 硬编码一起归入「退役模型名清理」小批，不排固定日历日期。</td>
+          <td><code class="inline">normalizeKimiModelName("")</code> 与 <code class="inline">normalizeKimiModelName(undefined)</code> 均返回 kimi-k2.6 或更高版本；<code class="inline">test:modules</code> 全绿。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-03-kimi-ping-hardcode:plan">
+          <td class="mono">【只登记·未实现】<br>kimi-ping / change-management 硬编码 kimi-k2.5</td>
+          <td><code class="inline">kimi-ping.ts:69</code> 与 <code class="inline">change-management.usecase.ts:70</code> 仍硬编码 <code class="inline">"kimi-k2.5"</code>，未走场景绑定或统一 resolve 函数。DEF-2026-09-03-001 只覆盖三条对话路径，这两个调用点不在修复范围内。</td>
+          <td><span class="status warn"><span class="dot"></span>已立项 / 待触发</span>：来源 DEF-2026-09-03-001 修复轮实取发现；触发条件——与上方 normalizeKimiModelName 空值问题一起归入「退役模型名清理」小批。</td>
+          <td>两处调用点改用 <code class="inline">resolveWorkbenchChatScenario</code> 或同类统一入口；<code class="inline">grep -rn "kimi-k2\.5"</code> 在 <code class="inline">apps/api/src</code> 内零命中（测试 fixture 与退役名单除外）。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-03-retired-model-guard:plan">
+          <td class="mono">【只登记·未实现】<br>退役模型名仓级守卫缺失</td>
+          <td>当前无仓级自动化守卫阻止退役模型名（如 kimi-k2.5）重新出现在源码中。DEF-2026-09-03-001 的四层根因中有三层涉及默认值残留，若有 grep 型守卫可在 CI 层即时拦截。建议形态：<code class="inline">test:security</code> 或 <code class="inline">scripts/</code> 新增退役模型名扫描，维护一份退役名单（已有 <code class="inline">RETIRED_KIMI_MODELS</code>），硬编码命中即 exit 1。</td>
+          <td><span class="status warn"><span class="dot"></span>已立项 / 待触发</span>：来源 DEF-2026-09-03-001 修复轮实取发现；触发条件——上方两个硬编码缺陷修复后，守卫作为「清理小批」收尾项一并落地。</td>
+          <td>退役名单非空；CI 中任一步新增 <code class="inline">*.ts</code> 源码命中退役名即 fail；现有 <code class="inline">RETIRED_KIMI_MODELS</code> 列表作为扫描输入。</td>
+        </tr>
       </table>
     </section>
 

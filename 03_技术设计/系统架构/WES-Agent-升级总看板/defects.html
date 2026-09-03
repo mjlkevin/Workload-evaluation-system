@@ -49,15 +49,16 @@
         <div class="meta">
           <span><b>定位</b> 已分析确认的错误行为、回归和质量缺口</span>
           <span><b>来源</b> 只从问题池或测试失败分流，不直接接收未定性原始反馈</span>
-          <span><b>更新日期</b> 2026-09-02</span>
+          <span><b>更新日期</b> 2026-09-03</span>
         </div>
         <!-- pill 计数为 2026-09-02 逐行实取（原 19/3/16/13 系长期未随增行更新的陈旧值，本次随 DEF-2026-08-27-003 回填一并补正）
              2026-09-02 DEF-2026-08-27-001 交付轮再实取：总数 26 不变，状态桶 open 6→5、fixed_manual_pending 12→13（done 桶 8 不变）
-             2026-09-02 DEF-2026-08-27-001 合入轮再实取：新增两行只登记项（DEF-2026-09-02-004 / -005）使总数 26→28；DEF-001 由 fixed_manual_pending 转 done 使 done 8→9、人工待复核 13→12；open 5→7。闭合校验 9 + 7 + 12 = 28 -->
+             2026-09-02 DEF-2026-08-27-001 合入轮再实取：新增两行只登记项（DEF-2026-09-02-004 / -005）使总数 26→28；DEF-001 由 fixed_manual_pending 转 done 使 done 8→9、人工待复核 13→12；open 5→7。闭合校验 9 + 7 + 12 = 28
+             2026-09-03 DEF-2026-09-03-001 合入轮实取：新增一行已修复（done），总数 28→29、done 9→10；open 7 不变、人工待复核 12 不变。闭合校验 10 + 7 + 12 = 29 -->
         <div class="pill-row" style="margin-top:18px">
-          <span class="pill brand">28 缺陷</span>
+          <span class="pill brand">29 缺陷</span>
           <span class="pill warn">7 待修复 / 返工</span>
-          <span class="pill ok">9 已修复 / 已关闭</span>
+          <span class="pill ok">10 已修复 / 已关闭</span>
           <span class="pill warn">12 人工待复核</span>
         </div>
       </div>
@@ -423,6 +424,18 @@
               <td>候选方向（待前端线定口径，本轮不实现）：上调该单条用例的超时上限（仅局部、不改全局）；或查该用例内等待的异步链是否在并行满载下被饿（与 DEF-003 批披露的本地 <code class="inline">findByRole</code> 等不到按钮同为 5s 默认上限问题）。<b>建议一并处理同族用例</b>，不逐条等它红一次改一次。</td>
               <td>待前端线接手后补充：该用例（及同族）连续多轮 CI 无超时记录，或局部超时上调后重跑平稳。</td>
               <td><code class="inline">test-web</code> 不再因这一条偶发超时把主干打红；无需依赖 rerun 才能拿到绿 run。</td>
+            </tr>
+            <tr data-defect-id="DEF-2026-09-03-001">
+              <td class="mono">DEF-2026-09-03-001</td>
+              <td class="mono">—（架构侧自查发现，不单开 issue）</td>
+              <td class="mono">RP-049（关联）</td>
+              <td>AI 工作台对话模型未读系统配置，硬编码已退役 kimi-k2.5</td>
+              <td>S1（用户对话静默走错误模型，功能可损但无数据丢失）</td>
+              <td><span class="status done"><span class="dot"></span>已修复 · 已合入 main</span></td>
+              <td><code class="inline">apps/api/src/services/ai/</code> 三条工作台对话路径（harness-boot / workbench-shared / workbench-chat-stream）+ 模型归一化模块 <code class="inline">model-name.ts</code> + 读取路径 <code class="inline">normalizeRequirementStore</code>。<details class="tech-detail"><summary>四层根因链（实取，非转述）</summary>① <code class="inline">env.ts:36</code> 字面量 <code class="inline">"kimi-k2.5"</code> 作为 fallback 默认值，环境变量未设时静默落到已退役模型。② 三条工作台路径（<code class="inline">harness-boot.ts</code> / <code class="inline">workbench-shared.ts</code> 两处 / <code class="inline">workbench-chat-stream.ts</code>）各自直取硬编码 scenario，<b>绕过系统配置的场景绑定</b>——用户在页面切到 kimi-k3 后对话仍走 kimi-k2.5。③ <code class="inline">model-name.ts</code> 的 <code class="inline">normalizeKimiModelName</code> 归一化默认值同样写死 kimi-k2.5，把空值、未知值全部静默归到退役模型。④ 读取路径 <code class="inline">normalizeRequirementStore</code> 不做归一化，历史会话里存着的 kimi-k2.5 <b>永远不会被升级到当前模型</b>——用户看到的"模型"字段与实际执行模型不一致。</details></td>
+              <td>统一 <code class="inline">resolveWorkbenchChatScenario</code> 函数，三路径共用；删除 <code class="inline">env.ts:36</code> 字面量；fallback 提升到 kimi-k2.6；读取路径加归一化；kimi-k2.5 加入退役名单。<details class="tech-detail"><summary>提交链与合入方式</summary>分支 <code class="inline">fix/workbench-chat-model-scenario</code>，功能提交 <code class="inline">a05a50a</code>，合入点 <code class="inline">3f72dee</code>（merge --no-ff）。分支 CI <code class="inline">33712301368</code> success → 主干 CI <code class="inline">33713325832</code> success（六 job 全绿含 docker-build）。<b>与批次 0 工具调用的三文件冲突</b>（<code class="inline">harness-boot.ts</code> / <code class="inline">workbench-shared.ts</code> / <code class="inline">workbench-chat-stream.ts</code>）：批次 0 在同一文件注入了 tools 参数，本批在同一文件替换了模型解析路径，rebase 时三文件均有语义冲突，已逐文件手工合并（保留批次 0 的 tools 注入 + 本批的 scenario 统一解析）。</details><details class="tech-detail"><summary>安全扫描与架构侧审阅</summary><code class="inline">node scripts/check-tracked-secrets.js</code> rc=0，输出 <code class="inline">no tracked secret fields found</code>。工具深度扫描<b>未执行</b>（本轮为架构侧自查修复、无独立安全审查通道），登记口径为「<b>工具扫描未执行 + 架构侧审阅，无风险</b>」，<b>不表述为「扫描通过」</b>。审阅范围：模型解析纯业务逻辑，不涉及 JWT / 文件上传 / 外部 API 密钥 / DB schema 变更，无攻击面扩展。</details><details class="tech-detail"><summary>自审披露</summary>本缺陷由架构侧自行发现并自行修复，<b>未经独立执行方复核</b>。用户已知悉此情况并授权合入。建议后续安排独立验证（在真实对话中切换模型后确认实际执行模型与页面显示一致）。</details></td>
+              <td>待用户执行：在 AI 工作台页面切换到 kimi-k3 后发送对话，确认实际执行模型为 kimi-k3（而非 kimi-k2.5）；历史会话重新打开后模型字段显示当前模型而非 kimi-k2.5。</td>
+              <td>工作台对话模型跟随系统配置场景绑定，不再硬编码；历史会话读取路径自动归一化到当前模型。</td>
             </tr>
         </table>
       </div>
