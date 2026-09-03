@@ -12,6 +12,9 @@ const PROJECT_ACTIONS = [
 // 状态灯跟着取数结果走：绿只在数据真的拿到时亮，取数失败置红、未取到置灰。
 const KPI_DOT_COLOR = { ok: 'var(--ok)', error: 'var(--err)', loading: 'var(--ink-3)' }
 
+// 加载态 / 空态共用一行提示的排版，避免三处各写一份内联样式
+const STATUS_ROW_STYLE = { padding: '18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, borderTop: '1px solid var(--line)' }
+
 export default function TraditionalHomeDashboard() {
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
@@ -27,7 +30,7 @@ export default function TraditionalHomeDashboard() {
     template: '',
   })
 
-  const { kpi, plans, error, refetch, remove, create } = useHomeDashboard()
+  const { kpi, plans, loading, error, refetch, remove, create } = useHomeDashboard()
   const filteredPlans = plans.filter((plan) => {
     const q = planSearch.trim().toLowerCase()
     if (!q) return true
@@ -265,10 +268,17 @@ export default function TraditionalHomeDashboard() {
               </table>
             </div>
           </div>
-          {filteredPlans.length === 0 && (
-            <div style={{ padding: '18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, borderTop: '1px solid var(--line)' }}>
-              未找到匹配的项目
-            </div>
+          {/* 加载中 / 取数失败 / 一个项目都没有 / 搜索没命中，是四回事：
+              加载中不能说「没有」，取数失败由上面的 role="alert" 报错条负责，
+              这里只区分「还没有项目」和「有项目但没搜到」。 */}
+          {loading && (
+            <div style={STATUS_ROW_STYLE}>正在加载项目列表…</div>
+          )}
+          {!loading && !error && plans.length === 0 && (
+            <div style={STATUS_ROW_STYLE}>还没有项目，新建后会显示在这里</div>
+          )}
+          {!loading && plans.length > 0 && filteredPlans.length === 0 && (
+            <div style={STATUS_ROW_STYLE}>未找到匹配的项目</div>
           )}
       </div>
 
