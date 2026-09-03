@@ -6,11 +6,10 @@
 import { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 
-import { config } from "../../../config/env";
 import { asString } from "../../../utils/helpers";
 import { normalizeKimiModelName } from "../../../utils/model-name";
 import { resolveBusinessRole } from "../../../middleware/auth";
-import { resolveActiveRequirementKimiApiKey, loadRequirementSystemConfigStore } from "../../../modules/system/system.repository";
+import { resolveActiveApiKeyForScope, resolveActiveRequirementKimiApiKey } from "../../../modules/system/system.repository";
 import { appendAiSessionEvent, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import { dispatchHomeWorkbenchTurn, type StreamingAdapter, type StreamingChunk } from "../workbench-dispatch.service";
 import { recordWorkbenchTurnFailureTrace, recordWorkbenchTurnTrace } from "../../../modules/trace/trace.usecase";
@@ -28,6 +27,7 @@ import {
   normalizeHomeMessages,
   resolveWorkbenchStreamFinalContent,
   type WorkbenchModelMemoryRef,
+  resolveWorkbenchChatScenario,
 } from "./workbench-shared";
 import { runExplicitHomeReportFlow } from "./report-flow";
 
@@ -105,7 +105,8 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
     traceContextRefs = parsedAttachment ? [`attachment:${parsedAttachment.name}`] : [];
     const businessRole = resolveBusinessRole(user);
     const roleLabel = HOME_ROLE_PRESETS[businessRole].label;
-    const modelName = normalizeKimiModelName(config.kimi.model);
+    // DEF-2026-09-03-001：模型名取自场景配置（assessment 绑定），不再是 env 默认值。
+    const modelName = normalizeKimiModelName((await resolveWorkbenchChatScenario()).model);
 
     // ISS-2026-08-08-001: 显式报告闸门与非流式对齐——命中时走共享报告流程，结果以 done 事件一次性下发
     if (parsedAttachment && (isExplicitReportRequest(userMessage.content) || asString(body.clientAction) === "generate_requirement_report")) {
@@ -189,14 +190,14 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
         throw new Error("stream_not_supported");
       }
 
-      // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
-      const requirementSystemConfig = await loadRequirementSystemConfigStore();
+      // DEF-2026-09-03-001：模型/baseUrl/超时统一取自场景配置（assessment 绑定）。
+      const scenario = await resolveWorkbenchChatScenario();
       const stream = provider.streamChatCompletion({
-        model: config.kimi.model,
+        model: scenario.model,
         temperature: 0.3,
         promptCacheKey: "home-workbench-stream-v1",
-        timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
-        credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+        timeoutMs: scenario.timeoutMs,
+        credentialsOverride: { apiKey, apiBaseUrl: scenario.baseUrl },
         messages: modelInput.messages,
       });
 
@@ -214,7 +215,9 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
 
     // 非流式 modelChat（用于静态路由后可能的模型调用）
     const modelChat = async ({ systemPrompt, userContent }: { systemPrompt: string; userContent: string }) => {
-      const { apiKey } = resolveActiveRequirementKimiApiKey();
+      // DEF-2026-09-03-001：场景解析先于取密钥——凭据 scope 由场景绑定的供应商决定。
+      const scenario = await resolveWorkbenchChatScenario();
+      const { apiKey } = resolveActiveApiKeyForScope(scenario.credentialScope);
       if (!apiKey) throw new Error("api_key_missing");
       // DEF-2026-08-27-001 B3：同上，与流式/非流式共用唯一口径。
       const modelInput = await buildWorkbenchChatModelInput(user, {
@@ -223,14 +226,12 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
         messages,
         projectId: "default",
       });
-      // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
-      const requirementSystemConfig = await loadRequirementSystemConfigStore();
       const completion = await getKimiProvider().chatCompletion({
-        model: config.kimi.model,
+        model: scenario.model,
         temperature: 0.3,
         promptCacheKey: "home-workbench-dispatch-v1",
-        timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
-        credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+        timeoutMs: scenario.timeoutMs,
+        credentialsOverride: { apiKey, apiBaseUrl: scenario.baseUrl },
         messages: modelInput.messages,
       });
       return {

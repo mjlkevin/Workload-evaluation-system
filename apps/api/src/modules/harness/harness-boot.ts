@@ -13,13 +13,12 @@ import { resolveRunMemoryProjectId } from "./harness.types";
 import { createHarnessWorkflowRegistry } from "./harness-runtime.worker";
 import { dispatchHomeWorkbenchTurn } from "../../services/ai/workbench-dispatch.service";
 import type { StreamingChunk } from "../../services/ai/workbench-dispatch.service";
-import { buildWorkbenchChatDispatchInput, buildWorkbenchChatModelInput, getKimiProvider } from "../../services/ai/handlers/workbench-shared";
+import { buildWorkbenchChatDispatchInput, buildWorkbenchChatModelInput, getKimiProvider, resolveWorkbenchChatScenario } from "../../services/ai/handlers/workbench-shared";
 import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.repository";
 import { getAiSession } from "../ai-sessions/ai-sessions.usecase";
 import { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
 import type { AuthUser } from "../../types";
-import { config } from "../../config/env";
-import { loadRequirementSystemConfigStore, resolveActiveRequirementKimiApiKey } from "../system/system.repository";
+import { resolveActiveApiKeyForScope, resolveActiveRequirementKimiApiKey } from "../system/system.repository";
 import { distillRunMemory } from "../memory/memory.distiller";
 import { getMemoryRepository } from "../memory/memory.module";
 
@@ -58,8 +57,13 @@ export type RunTerminalMemoryHookDeps = {
   getProvider: () => ReturnType<typeof getKimiProvider>;
   getMemoryRepo: () => ReturnType<typeof getMemoryRepository>;
   distill: typeof distillRunMemory;
-  model: string;
-  apiBaseUrl: string;
+  /**
+   * DEF-2026-09-03-001：允许传解析函数——模型名来自系统场景配置，
+   * 工厂装配时（进程启动）读不到，必须推迟到 run 终态触发时解析。
+   * 保留 string 形态供测试直接注入。
+   */
+  model: string | (() => Promise<string>);
+  apiBaseUrl: string | (() => Promise<string>);
   timeoutMs: number;
   onError: (info: { harnessRunId: string; outcome: string; error: string }) => void;
 };
@@ -77,13 +81,16 @@ export function createRunTerminalMemoryHook(deps: RunTerminalMemoryHookDeps) {
       const { apiKey } = deps.resolveApiKey();
       if (!apiKey) return; // 无 API Key 时静默跳过
 
+      const model = typeof deps.model === "function" ? await deps.model() : deps.model;
+      const apiBaseUrl = typeof deps.apiBaseUrl === "function" ? await deps.apiBaseUrl() : deps.apiBaseUrl;
+
       const result = await deps.distill(
         {
           repo: deps.getMemoryRepo(),
           provider: deps.getProvider(),
-          model: deps.model,
+          model,
           apiKey,
-          apiBaseUrl: deps.apiBaseUrl,
+          apiBaseUrl,
           timeoutMs: deps.timeoutMs,
         },
         {
@@ -127,7 +134,7 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
     dispatch: async (input) => {
       const user = input.user as AuthUser;
       const content = input.message;
-      const dispatchInput = buildWorkbenchChatDispatchInput(user, content, {
+      const dispatchInput = await buildWorkbenchChatDispatchInput(user, content, {
         modelChat: options.createModelChat ? options.createModelChat(user, content) : undefined,
         attachment: input.attachment ?? null,
         // DEF-2026-08-27-001 第一层：历史与记忆项目必须透传给入参组装，
@@ -142,7 +149,10 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
       // 因此历史/记忆必须在【这里】与 modelChat 共用 buildWorkbenchChatModelInput
       // 取同一份组装口径——只补第一层（dispatchInput）修的是永不执行的分支。
       const modelChatStream = async function* (params: { systemPrompt: string; userContent: string }): AsyncIterable<StreamingChunk> {
-        const { apiKey } = (options.resolveApiKey ?? resolveActiveRequirementKimiApiKey)();
+        // DEF-2026-09-03-001：模型/baseUrl/凭据 scope 统一取自场景配置（assessment 绑定），
+        // 不再直读 config.kimi.model——后者是 env 默认值，用户改系统设置不生效。
+        const scenario = await resolveWorkbenchChatScenario();
+        const { apiKey } = (options.resolveApiKey ?? (() => resolveActiveApiKeyForScope(scenario.credentialScope)))();
         if (!apiKey) throw new Error("required_or_env_missing");
         const provider = (options.getProvider ?? getKimiProvider)();
         if (!provider.streamChatCompletion) throw new Error("stream_not_supported");
@@ -157,14 +167,12 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
         if (modelInput.memoryRef) {
           yield { contentDelta: "", kind: "metadata", memoryRef: modelInput.memoryRef };
         }
-        // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
-        const requirementSystemConfig = await loadRequirementSystemConfigStore();
         const stream = provider.streamChatCompletion({
-          model: config.kimi.model,
+          model: scenario.model,
           temperature: 0.3,
           promptCacheKey: "home-workbench-dispatch-v1",
-          timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
-          credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+          timeoutMs: scenario.timeoutMs,
+          credentialsOverride: { apiKey, apiBaseUrl: scenario.baseUrl },
           messages: modelInput.messages,
         });
         for await (const chunk of stream) {
@@ -221,8 +229,9 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
     getProvider: () => getKimiProvider(),
     getMemoryRepo: () => getMemoryRepository(),
     distill: distillRunMemory,
-    model: config.kimi.model,
-    apiBaseUrl: config.kimi.apiBaseUrl,
+    // DEF-2026-09-03-001：与对话路径同源——蒸馏也走场景配置，不再用 env 默认值。
+    model: async () => (await resolveWorkbenchChatScenario()).model,
+    apiBaseUrl: async () => (await resolveWorkbenchChatScenario()).baseUrl,
     timeoutMs: 60000,
     onError: ({ harnessRunId, outcome, error }) => {
       console.error(`[memory-distill] run=${harnessRunId} outcome=${outcome} error=${error}`);

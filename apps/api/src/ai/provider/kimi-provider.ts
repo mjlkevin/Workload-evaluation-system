@@ -38,7 +38,8 @@ import type {
 } from "./model-provider";
 
 const PROVIDER_NAME = "kimi";
-const DEFAULT_MODEL = "kimi-k2.5";
+// DEF-2026-09-03-001：原为 "kimi-k2.5"，该模型已被供应商下线（实测 404）。
+const DEFAULT_MODEL = "kimi-k2.6";
 const DEFAULT_API_BASE_URL = "https://api.moonshot.cn/v1";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_ATTEMPTS = 3;

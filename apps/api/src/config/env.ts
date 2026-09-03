@@ -33,7 +33,10 @@ export const config = {
   
   kimi: {
     apiKey: process.env.KIMI_API_KEY || "",
-    model: process.env.KIMI_MODEL || "kimi-k2.5",
+    // DEF-2026-09-03-001：不再内置模型名字面量。此处曾硬编码 "kimi-k2.5"，
+    // 该模型被供应商下线后，所有绕过场景配置直读本字段的链路静默 404 长达三个月。
+    // 缺省留空：场景解析拿不到模型时显式失败（model_not_configured），不静默兜底。
+    model: process.env.KIMI_MODEL || "",
     apiBaseUrl: process.env.KIMI_API_BASE_URL || "https://api.moonshot.cn/v1",
   },
 

@@ -39,9 +39,13 @@ import { normalizeModelProviders, normalizeScenarioBindings } from "./model-prov
 import { createSystemPgRepository, type SystemStoreRepository } from "./system-pg.repository";
 
 const EMPTY_TIME = "--";
-const DEFAULT_KIMI_EVALUATION_MODEL = "kimi-k2.5";
+// DEF-2026-09-03-001：评估/生成两个场景的内置默认模型原为 "kimi-k2.5"，
+// 该模型已被供应商下线（实测 404 resource_not_found_error）。归一化会把空值
+// 填回默认，因此这里的过期字面量会**静默覆盖用户配置**——用户清空或新装即中弹。
+// 统一改为 kimi-k2.6（与 fileParsing 默认一致，且 model-verify-status 记为 ok）。
+const DEFAULT_KIMI_EVALUATION_MODEL = "kimi-k2.6";
 const DEFAULT_KIMI_FILE_PARSING_MODEL = "kimi-k2.6";
-const DEFAULT_KIMI_GENERATION_MODEL = "kimi-k2.5";
+const DEFAULT_KIMI_GENERATION_MODEL = "kimi-k2.6";
 
 /** 与生成真实版本号同一套占位符，固定参考时间便于示例列展示 */
 function buildSample(format: string, prefix: string, moduleCode: string): string {
@@ -272,6 +276,10 @@ function normalizeKimiConfiguredModel(value: unknown, fallback: string): string 
   if (!model) return fallback;
   const id = model.toLowerCase();
   if (id === "kimi-k2-turbo-preview") return fallback;
+  // DEF-2026-09-03-001：kimi-k2.5 已被供应商下线（实测 404
+  // resource_not_found_error），与上面两类同属「配置里存量、但调用必失败」的
+  // 退役模型名——存量配置必须在归一化时升级，否则用户不主动改配置就永远调不通。
+  if (id === "kimi-k2.5") return fallback;
   if (id.startsWith("moonshot-v1-")) return fallback;
   return model;
 }
@@ -1265,7 +1273,12 @@ export async function saveVersionCodeRulesStore(store: VersionCodeRulesStore): P
 
 export async function loadRequirementSystemConfigStore(): Promise<RequirementSystemConfigStore> {
   const store = await getSystemRepository().loadRequirementSystemConfigStore();
-  if (store) return store;
+  // DEF-2026-09-03-001：读路径同样过归一化。此前只有写路径归一化，导致
+  // 「退役模型名的存量配置」永远不会被升级——用户库里 kimiEvaluation.model
+  // 停在已下线的 kimi-k2.5，除非他手动改配置并保存，否则调用必然 404。
+  // normalizeRequirementStore 保留 version / updatedAt / effectiveAt，
+  // 且与写路径同函数，故读写收敛、幂等。
+  if (store) return normalizeRequirementStore(store);
   const now = new Date().toISOString();
   const initial = createDefaultRequirementConfig();
   return { version: 1, draft: initial, active: initial, updatedAt: now, effectiveAt: now };

@@ -7,7 +7,6 @@
 import { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 
-import { config } from "../../../config/env";
 import { asString } from "../../../utils/helpers";
 import { normalizeKimiModelName } from "../../../utils/model-name";
 import { ok, fail } from "../../../utils/response";
@@ -26,6 +25,7 @@ import {
   latestSessionAttachmentWithSummary,
   latestUserMessage,
   normalizeHomeMessages,
+  resolveWorkbenchChatScenario,
 } from "./workbench-shared";
 import { runExplicitHomeReportFlow } from "./report-flow";
 
@@ -79,9 +79,10 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
     // 静态意图（能力发现、项目查询、写动作确认）不应依赖模型额度；只有实际模型问答时才解析 API Key。
     const businessRole = resolveBusinessRole(user);
     const roleLabel = HOME_ROLE_PRESETS[businessRole].label;
-    const modelName = normalizeKimiModelName(config.kimi.model);
+    // DEF-2026-09-03-001：模型名取自场景配置（assessment 绑定），不再是 env 默认值。
+    const modelName = normalizeKimiModelName((await resolveWorkbenchChatScenario()).model);
 
-    const dispatchInput = buildWorkbenchChatDispatchInput(user, userMessage.content, {
+    const dispatchInput = await buildWorkbenchChatDispatchInput(user, userMessage.content, {
       messages,
       // DEF-2026-08-11-001 关联：同步通道启用记忆注入——工作台会话蒸馏产物落 default 项目
       // （harness-boot 蒸馏钩子口径），注入计数经 memoryRef additive 字段透出给 chip。
