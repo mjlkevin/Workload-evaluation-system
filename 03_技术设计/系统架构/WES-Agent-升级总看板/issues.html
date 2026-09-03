@@ -447,6 +447,17 @@
               <td>不转缺陷 · 扫描器自身盲区修复，无业务代码影响</td>
               <td>正则已补反引号 + 自测已覆盖；后续若有新分隔符形态（如 YAML 多行 <code class="inline">|</code>）按需扩展。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-09-03-s3-hooks-unauthorized-global-enable">
+              <td class="mono">ISS-2026-09-03-004</td>
+              <td>2026-09-03</td>
+              <td>Session 钩子未授权全仓启用约 78 分钟（10:37:45–11:56:00）已撤销</td>
+              <td>架构侧复核实测 + 复核补打派单任务 1（s3-supplemental 批次）</td>
+              <td><code class="inline">scripts/hooks/install.sh</code> 把 <code class="inline">commit-msg</code>/<code class="inline">pre-commit</code> 装进共享 <code class="inline">.git/hooks/</code> 并在 <code class="inline">.git/config</code> 写入 <code class="inline">core.hooksPath</code>，而 <code class="inline">.git</code> 被全部 worktree 共用——其他六七条并行线提交缺 <code class="inline">Session:</code> 行或 committer 不匹配时会被直接拒绝，而它们不知道这条规则。派单只要求“分支上实现 + 自测”，未授权全仓启用。<b>如实登记：不是按计划启用</b>。</td>
+              <td>撤销前：<code class="inline">commit-msg</code>/<code class="inline">pre-commit</code> mtime 2026-09-03 10:37:45、<code class="inline">git config --show-origin --get core.hooksPath</code> → <code class="inline">.git/config: .git/hooks</code>；撤销后：该键 exit=1 不存在、两文件已删除，9 月 2 日既有的 <code class="inline">post-checkout</code>/<code class="inline">post-commit</code> 保留未动。分支提交附撤销前后命令输出。</td>
+              <td><span class="status done"><span class="dot"></span>已撤销（11:56:00）</span> 复核补打分支提交 · 钩子文件仍留在分支 <code class="inline">scripts/hooks/*</code> 未删</td>
+              <td>治理事件 · 不转缺陷（无业务代码影响）</td>
+              <td><code class="inline">install.sh</code> 已加影响范围警告（全部 worktree 与并行会话）+ 执行前打印目标路径 + 交互确认（或 <code class="inline">--yes</code> 显式参数）；后续全仓启用钩子须经架构侧批准并通知各线。</td>
+            </tr>
         </table>
       </div>
     </section>
