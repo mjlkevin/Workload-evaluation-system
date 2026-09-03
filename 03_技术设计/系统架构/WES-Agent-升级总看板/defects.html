@@ -419,11 +419,11 @@
               <td class="mono">前端线（本缺陷修复线不接）</td>
               <td><code class="inline">draft-roundtrip.test.jsx &gt; 401 发送失败后草稿保留在对话里</code> 在 CI 上偶发超时（实耗 5223ms > 5000ms 默认上限）</td>
               <td>S3（不丢数据、不影响功能，属 CI 稳定性抖动；同 SHA rerun 即绿，与 DEF-2026-08-27-003 批次披露的 test-web 超时属同族）</td>
-              <td><span class="status warn"><span class="dot"></span>open · 已立项（本轮只登记，不实现）</span></td>
+              <td><span class="status warn"><span class="dot"></span>部分修复已合入 main（4f5a16f 用例级 15s）· 解红改动在分支 worktree-flaky-timing @ <code class="inline">3dccd86</code> 待架构侧复核合入</span></td>
               <td><code class="inline">ui/V2_PROTOTYPE/src/__tests__/draft-roundtrip.test.jsx</code> 单条用例。影响面仅 CI 红/绿与重跑成本，不触及业务代码。<details class="tech-detail"><summary>实取与定性依据</summary>① 现场：主干 CI run <code class="inline">33635747360</code> attempt 1 的 <code class="inline">test-web</code> 块，报错 <code class="inline">Test timed out in 5000ms</code>（实耗 5223ms），其余 466 条全绿。② 非回归依据：<code class="inline">git diff 7a1a534..857e0f2 --name-only -- ui/ apps/ scripts/ package*.json</code> 输出 <b>0 文件</b>（该区间仅改看板文档）。③ 同 SHA <code class="inline">gh run rerun --failed</code> 后 attempt 2 六 job 全绿、test-web 61/467——同代码两次结果不同。④ 后续旁证：合入轮主干 run <code class="inline">33641949469</code> attempt 1 即绿（test-web 61/467，Duration 58.48s），<b>未使用 rerun</b>——印证是偶发而非必现。</details></td>
-              <td>候选方向（待前端线定口径，本轮不实现）：上调该单条用例的超时上限（仅局部、不改全局）；或查该用例内等待的异步链是否在并行满载下被饿（与 DEF-003 批披露的本地 <code class="inline">findByRole</code> 等不到按钮同为 5s 默认上限问题）。<b>建议一并处理同族用例</b>，不逐条等它红一次改一次。</td>
-              <td>待前端线接手后补充：该用例（及同族）连续多轮 CI 无超时记录，或局部超时上调后重跑平稳。</td>
-              <td><code class="inline">test-web</code> 不再因这一条偶发超时把主干打红；无需依赖 rerun 才能拿到绿 run。</td>
+              <td>双重处置已落地：① <code class="inline">4f5a16f</code>（已入 main，DEF 处置提交）给两用例补用例级 15000ms 兜底；② 本分支改为<b>确定性信号</b>——401 用例由「5s findByText 死等错误文案」改为点「复制草稿」按钮 → 断言剪贴板收到真实草稿文本（writeText），再同步断言错误提示文案，<b>覆盖强于改造前</b>（原来只断言出现一句提示）。<details class="tech-detail"><summary>语义合并口径（rebase on main 45be20a）</summary>与 4f5a16f 冲突时保留两方意图：内层等待上限 ≤3s 有界窗口 <b>与用例级 15s 不再相等</b>，消除「内层没等满、外层先判超时」结构。401/500 两用例的 find 类等待均收至 3000ms 有界窗口，两处固定窗口如实保留（见 <a href="changes.html">changes.html</a> BE-2026-09-03-flaky-timing-ci-verified 行的①逐条口径）。</details></td>
+              <td>分支 CI 实证绿：run <code class="inline">33738728680</code> @ <code class="inline">3dccd86</code> 六 job 全绿，test-web 63 files / 493 tests（含此前主干红的 401 用例）；Test modules tests 458 / pass 458 / fail 0 / skipped 0。<details class="tech-detail"><summary>主干红现状与本分支解红条件</summary>main tip <code class="inline">45be20a</code> 的 run <code class="inline">33737384688</code> test-web 仍红在 401 用例（4f5a16f 纯放宽未解净：内层 5s findByText 在 5517ms 找不到文案）；本分支确定性信号改造已实证解净，<b>待架构侧复核合入 main 后主干转绿</b>。触发事实（run <code class="inline">33717301840</code> 主干红过）与两条过程事实登记见 changes.html 同上行。</details></td>
+              <td><code class="inline">test-web</code> 不再因这一条偶发超时把主干打红（本分支合入后主干实证）；无需依赖 rerun 才能拿到绿 run。</td>
             </tr>
             <tr data-defect-id="DEF-2026-09-03-001">
               <td class="mono">DEF-2026-09-03-001</td>
