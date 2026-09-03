@@ -170,3 +170,40 @@ describe('/projects 指标卡不再渲染恒为空的进度条', () => {
     })
   })
 })
+
+describe('/projects 工具条不再渲染点不动的假筛选标签', () => {
+  beforeEach(() => {
+    localStorage.setItem('wes_token', 'mock-token')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  // 「状态：全部 ×」「行业：制造业 ×」文字写死、无 onClick，页面也没有状态/行业筛选逻辑
+  test('没有写死的「状态：全部」「行业：制造业」标签', async () => {
+    mockSources({ projects: [PROJECT_ROW] })
+
+    renderProjects()
+
+    await screen.findByText('利民集团数字化二期')
+
+    expect(document.body.textContent).not.toContain('状态：全部')
+    expect(document.body.textContent).not.toContain('行业：制造业')
+  })
+
+  test('真的搜索框保持可用', async () => {
+    mockSources({ projects: [PROJECT_ROW] })
+
+    renderProjects()
+
+    await screen.findByText('利民集团数字化二期')
+
+    const search = screen.getByPlaceholderText(SEARCH_PLACEHOLDER)
+    expect(search).toBeEnabled()
+
+    fireEvent.change(search, { target: { value: '利民' } })
+    expect(screen.getByText('利民集团数字化二期')).toBeInTheDocument()
+  })
+})

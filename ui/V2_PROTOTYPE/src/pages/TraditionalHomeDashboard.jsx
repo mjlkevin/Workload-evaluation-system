@@ -203,9 +203,13 @@ export default function TraditionalHomeDashboard() {
                 className="btn btn-pri"
                 style={{ marginLeft: 4, height: 28, fontSize: 12, padding: '0 12px' }}
               >＋ 新建</button>
+              {/* 这里原有「状态：全部 ×」「行业：制造业 ×」两个标签：文字写死、
+                  没有任何 onClick 或状态绑定，末尾的 × 点不动，而 filteredPlans
+                  也只按 planSearch 做关键字过滤、根本不存在状态/行业筛选逻辑，
+                  连「显示当前筛选状态」都不成立，故删除（判例：批 2 已按同一
+                  理由删掉界面上的假语言切换器）。真正的状态/行业筛选属新功能，
+                  另行立项，不在本批内实现。 */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'var(--surface)', border: '1px solid var(--line)', fontSize: 11.5, color: 'var(--ink-2)' }}>状态：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>全部</b><span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span></span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'var(--surface)', border: '1px solid var(--line)', fontSize: 11.5, color: 'var(--ink-2)' }}>行业：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>制造业</b><span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span></span>
                 <input
                   type="text"
                   placeholder="⌕ 搜索项目 / 客户 / 负责人"
