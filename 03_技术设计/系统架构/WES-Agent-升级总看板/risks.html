@@ -262,6 +262,18 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-09-03-batch05-merged:risks-1">
+          <td>模型可见的工具结果无长度上限（批次 0.5 残留）。UI 侧有截断（条数 / 键数 / 字符三重），模型侧沿用批次 0 原样。</td>
+          <td>超长工具输出不受限进入模型上下文，挤占上下文预算。本批不改的判断正确（该正文形态同步通道也在用，改它等于动同步通道的模型输入，超出「只做异步路径」范围），但<b>风险真实</b>。</td>
+          <td>归属<b>批次 3（上下文预算）</b>统一处置。边界已收窄：架构侧自建探针实取确认工具参数与循环内部状态均不进入第二轮 messages，模型可见面仅此结果正文的长度。登记与复核见 <a href="changes.html">changes.html</a> BE-2026-09-03-batch05-merged 行。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 3（上下文预算）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-03-batch05-merged:risks-2">
+          <td>同步路径无服务端事实源可对账（批次 0 遗留提问，批次 0.5 由架构侧实取答毕）。同步路径 messages 取自 <code class="inline">req.body</code>（<code class="inline">ai.controller.ts:24</code>），不从 <code class="inline">ai_sessions</code> 推导，请求重建不变式挂不上去。</td>
+          <td><b>不是因为同步路径安全，而是它没有服务端事实源可对账</b>——该路上模型输入无法服务端校验；且静默降级存在时，用户可能被悄悄挪到这条路上。</td>
+          <td>这是同步路径「该退休」的又一条理由，不是豁免理由：批次 0.5 已把 503 降级改为界面可见提示（不再悄悄挪），批次 2 合并两条路并退休旧路后本风险消解。合入登记见 <a href="changes.html">changes.html</a> BE-2026-09-03-batch05-merged 行。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 批次 2（两条路合并）消解</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-08-17-stage0-config-seed:risks:1">
           <td>配置播种缺失导致版本号与估算不可用（高）。若 db:seed 未覆盖 version_code_rules / templates / rule_sets / system_configs，切换后系统可启动但无法出版本号、无法计算估算。</td>
           <td>版本号生成链路（GL/AS/DV/RI/RS 前缀规则）、估算引擎（414KB 模板）、需求解析与实施评估配置全空，核心业务链路中断。</td>
