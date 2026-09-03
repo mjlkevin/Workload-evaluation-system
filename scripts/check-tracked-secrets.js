@@ -23,8 +23,9 @@ const SECRET_KEYS = new Set([
 const BCRYPT_RE = /\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}/g
 
 // 内容形态：行内密钥字段赋值（捕获值后经 isMeaningfulSecret 判占位，不含值打印，只报位置）。
+// 分隔符覆盖反引号（JS 模板字面量 / .env 常见形态）：裁决 E 修复。
 const INLINE_SECRET_RE =
-  /["']?(?:apiKey|api_key|clientSecret|client_secret|accessToken|access_token|refreshToken|refresh_token|privateKey|private_key|passwordHash)["']?\s*[:=]\s*["']([^"'\n]+)/g
+  /[`"']?(?:apiKey|api_key|clientSecret|client_secret|accessToken|access_token|refreshToken|refresh_token|privateKey|private_key|passwordHash)[`"']?\s*[:=]\s*[`"']([^`"'\n]+)/g
 
 // 白名单（EXCLUDED 口径，同防漂移守卫）：每条 { file, reason, clearCondition }。
 // S3B4 起豁免是「文件 + 值形态」双条件（任务 A）：白名单只对「可豁免形态」（短占位，
