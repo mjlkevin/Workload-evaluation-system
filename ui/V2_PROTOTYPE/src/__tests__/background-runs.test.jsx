@@ -15,7 +15,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import Shell from '../components/Layout/Shell.jsx'
 import { useBackgroundRuns, useRunEventStream } from '../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
-import HomeWorkspace from '../pages/HomeWorkspace.jsx'
+// ISS-2026-09-03-005：挂载真实生产路径（路由 / → HomePage → AiHomeWorkbench）；
+// HomeWorkspace 在生产中无路由可达，其 PageShell 壳会掩盖真实渲染结构。
+import HomePage from '../pages/HomePage.jsx'
 import ToastContainer from '../components/ui/ToastContainer.jsx'
 import { ToastProvider } from '../hooks/useToast.jsx'
 import { server } from './mocks/server.js'
@@ -374,7 +376,7 @@ describe('background-runs: G2 后台继续', () => {
       <MemoryRouter initialEntries={['/ai']}>
         <Shell currentUser={TEST_USER}>
           <Routes>
-            <Route path="/ai" element={<ToastProvider><ToastContainer /><HomeWorkspace /></ToastProvider>} />
+            <Route path="/ai" element={<ToastProvider><ToastContainer /><HomePage /></ToastProvider>} />
             <Route path="/login" element={<div>登录页</div>} />
           </Routes>
         </Shell>

@@ -13,7 +13,9 @@ import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 import ToastContainer from '../components/ui/ToastContainer.jsx'
 import { ToastProvider } from '../hooks/useToast.jsx'
 import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
-import HomeWorkspace from '../pages/HomeWorkspace.jsx'
+// ISS-2026-09-03-005：挂载真实生产路径（路由 / → HomePage → AiHomeWorkbench）；
+// HomeWorkspace 在生产中无路由可达，其 PageShell 壳会掩盖真实渲染结构。
+import HomePage from '../pages/HomePage.jsx'
 import useChatMessages from '../pages/AiHomeWorkbench/hooks/useChatMessages.js'
 import MessageBubble from '../pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx'
 import { server } from './mocks/server.js'
@@ -21,7 +23,7 @@ import { server } from './mocks/server.js'
 /**
  * ISS-2026-08-10-005（思考块空窗丢弃）：hook 级测试直接捕获 useRunEventStream
  * 注册的 onEvent 回调，绕开 SSE 管道聚焦 handleStreamEvent 分支语义；
- * 其余导出保持原实现，上方 HomeWorkspace 页面级用例不受影响。
+ * 其余导出保持原实现，工作台页面级用例不受影响。
  */
 let capturedStreamHandlers = null
 vi.mock('../hooks/useBackgroundRuns.jsx', async (importOriginal) => {
@@ -139,7 +141,7 @@ function renderWorkbench() {
   return render(
     <ToastProvider>
       <ToastContainer />
-      <MemoryRouter><HomeWorkspace /></MemoryRouter>
+      <MemoryRouter><HomePage /></MemoryRouter>
     </ToastProvider>,
   )
 }
