@@ -458,6 +458,17 @@
               <td>治理事件 · 不转缺陷（无业务代码影响）</td>
               <td><code class="inline">install.sh</code> 已加影响范围警告（全部 worktree 与并行会话）+ 执行前打印目标路径 + 交互确认（或 <code class="inline">--yes</code> 显式参数）；后续全仓启用钩子须经架构侧批准并通知各线。</td>
             </tr>
+            <tr data-board-event-id="BE-2026-09-03-s3-precommit-removal">
+              <td class="mono">ISS-2026-09-03-005</td>
+              <td>2026-09-03</td>
+              <td>pre-commit 强制钩子（方案 B）已删除 —— 超出裁决范围且当前条件下不可触发</td>
+              <td>架构侧复核追加 2（s3-supplemental 批次，合入前必做）</td>
+              <td><code class="inline">scripts/hooks/pre-commit</code> 逻辑仅当 <code class="inline">GIT_COMMITTER_NAME</code> 被显式设置且异于默认值时才拒绝；本机无任何 git 身份配置、无人设该变量 → 恒 <code class="inline">exit 0</code> <b>永不触发</b>，且它强制的是架构侧明确不采纳的方案 B（各执行者不同 committer 身份）。<b>如实登记：曾实现方案 B 的强制钩子，因超出裁决范围且在当前条件下不可触发，已删除</b>，install.sh 同步去掉其安装逻辑，只保留 <code class="inline">commit-msg</code>（Session trailer 校验，已实测有效）。</td>
+              <td><code class="inline">git rm scripts/hooks/pre-commit</code> + <code class="inline">install.sh</code> 两处循环去 pre-commit 仅留 commit-msg + 顶部注释登记删除原因；提交 7f1436f（rebase 后 sha，含 Session trailer）；共享 <code class="inline">.git/hooks</code> 仍仅剩 post-checkout/post-commit 两枚既有钩子，core.hooksPath 键不存在。</td>
+              <td><span class="status done"><span class="dot"></span>已删除（2026-09-03）</span> 复核追加 2 分支提交 · 本批合入前置完成</td>
+              <td>治理事件 · 不转缺陷（无业务代码影响）</td>
+              <td>commit-msg 钩子全仓启用仍为<b>独立动作待办</b>：须架构侧批准并通知全部并行线后方可执行，本批不启用、不登记为“已计划启用”。</td>
+            </tr>
         </table>
       </div>
     </section>
