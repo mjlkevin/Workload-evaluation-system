@@ -9,6 +9,8 @@
  *   3. 需求数量 KPI 在不同页面间不一致
  *   4. 导航栏 HTML 片段不一致（结构漂移）
  *   5. Google Fonts 外部依赖检测
+ *   6. （保留编号）
+ *   7. HTML 标签闭合校验（td / tr / table / details 按行计数）
  *
  * 用法：node scripts/board-consistency-check.js [--fix]
  *   --fix  自动修复可安全修复的问题（当前仅报告，不自动修复）
@@ -20,6 +22,9 @@ const fs = require('fs');
 const path = require('path');
 
 const BOARD_DIR = path.join(__dirname, '..', '03_技术设计', '系统架构', 'WES-Agent-升级总看板');
+
+// 模板同源检查（检查 1-6）覆盖名单 —— 历史基线 13 页。
+// 注意：branch-board-page.test.js 防漂移断言依赖本名单包含 branches.html，勿删条目。
 const HTML_FILES = [
   'index.html',
   'design.html',
@@ -36,6 +41,32 @@ const HTML_FILES = [
   'requirements.html',
 ];
 
+// 检查 1-6 显式排除页登记（2026-09-03 复核补打，不得静默漏页）：
+// 看板目录内其余 8 页不属模板同源名单，排除原因逐条登记如下（依据实测结构）；
+// 闭合校验（检查 7）不受此表限制 —— 扫描目录内全部 *.html。
+// 这 8 页若纳入检查 1-6 的预期影响（实测 0 新增 error）已写入批次报告，是否扩面单独立项。
+const TEMPLATE_CHECK_EXCLUDED = {
+  'code-audit.html': '代码审计数据页，topnav pill 为业务口径，非 Phase 模板同源',
+  'defects.html': '缺陷台账数据页，无 topnav / navlinks 模板结构',
+  'github-radar.html': 'GitHub 雷达数据页，pill 为业务标题，非 Phase 模板同源',
+  'issues.html': '问题池台账数据页，无 topnav / navlinks 模板结构',
+  'ops-health.html': '运维健康数据页，pill 为业务口径，非 Phase 模板同源',
+  'roadmap.html': '版本路标数据页，pill 为业务标题，非 Phase 模板同源',
+  'skill.html': 'Skill 治理数据页，pill 为业务标题，非 Phase 模板同源',
+  'special-projects.html': '专项行动数据页，pill 为业务标题，非 Phase 模板同源',
+};
+
+// 闭合校验（检查 7）扫描面：看板目录内全部 *.html（当前 21 页）。
+// 动态发现目录文件，不用写死名单；若未来有页面因结构特殊必须排除，须在此显式登记原因。
+function listBoardHtmlFiles(boardDir) {
+  return fs.readdirSync(boardDir).filter((f) => f.endsWith('.html')).sort();
+}
+
+// 检查 1-6（模板同源检查）是否显式排除该页
+function isExcluded(file) {
+  return Object.prototype.hasOwnProperty.call(TEMPLATE_CHECK_EXCLUDED, file);
+}
+
 // ─── 颜色输出 ───
 const RED = '\x1b[31m';
 const YELLOW = '\x1b[33m';
@@ -50,8 +81,8 @@ function ok(msg) { console.log(`${GREEN}✓${RESET} ${msg}`); }
 function info(msg) { console.log(`${CYAN}ℹ${RESET} ${msg}`); }
 
 // ─── 读取文件 ───
-function readHtml(filename) {
-  const fp = path.join(BOARD_DIR, filename);
+function readHtml(boardDir, filename) {
+  const fp = path.join(boardDir, filename);
   if (!fs.existsSync(fp)) return null;
   return fs.readFileSync(fp, 'utf-8');
 }
@@ -122,18 +153,43 @@ function hasGoogleFonts(html) {
   return /fonts\.googleapis\.com|fonts\.gstatic\.com/.test(html);
 }
 
+// ─── 检查 7：HTML 标签闭合校验（td / tr / table / details） ───
+// 裁决 C（2026-09-03 架构侧）：看板行级 HTML 的 <td> 漏闭合靠浏览器自动闭合，
+// 一致性门禁应主动捕获。采用整文件计数比对：开标签总数 ≠ 闭标签总数即报错误。
+// 注：本板所有 <table>/<tr>/<details> 均为成对闭合（多行展开），按文件计数足够定位漏闭合。
+const TAG_CLOSURE_TAGS = ['td', 'tr', 'table', 'details'];
+
+function checkTagClosures(html, filename) {
+  const issues = [];
+  for (const tag of TAG_CLOSURE_TAGS) {
+    const openRe = new RegExp(`<${tag}(?:\\s[^>]*)?>`, 'gi');
+    const closeRe = new RegExp(`</${tag}>`, 'gi');
+    const selfCloseRe = new RegExp(`<${tag}[^>]*/>`, 'gi');
+    const opens = (html.match(openRe) || []).length - (html.match(selfCloseRe) || []).length;
+    const closes = (html.match(closeRe) || []).length;
+    if (opens !== closes) {
+      issues.push({ tag, opens, closes, file: filename });
+    }
+  }
+  return issues;
+}
+
 // ─── 主检查逻辑 ───
-function run() {
+function run(boardDir = BOARD_DIR) {
+  const allFiles = listBoardHtmlFiles(boardDir);
+  const excludedNames = Object.keys(TEMPLATE_CHECK_EXCLUDED);
   console.log(`\n${BOLD}═══ WES 总看板一致性校验 ═══${RESET}\n`);
-  console.log(`扫描目录：${BOARD_DIR}\n`);
+  console.log(`扫描目录：${boardDir}\n`);
+  console.log(`扫描面：共 ${allFiles.length} 页（目录内全部 *.html）/ 闭合校验显式排除 0 页`);
+  console.log(`模板同源检查（检查 1-6）覆盖基线 ${HTML_FILES.length} 页名单，显式排除 ${excludedNames.length} 页（${excludedNames.join(' / ')}，原因见 TEMPLATE_CHECK_EXCLUDED 登记）\n`);
 
   let issues = 0;
   let warnings = 0;
 
   // 收集所有页面数据
   const pages = {};
-  for (const file of HTML_FILES) {
-    const html = readHtml(file);
+  for (const file of allFiles) {
+    const html = readHtml(boardDir, file);
     if (!html) {
       info(`${file} 不存在，跳过`);
       continue;
@@ -158,7 +214,7 @@ function run() {
   }
 
   for (const [file, data] of Object.entries(pages)) {
-    if (file === 'index.html') continue;
+    if (file === 'index.html' || isExcluded(file)) continue;
     // 只检查 topnav 中第一个 pill 是否包含 Phase 标记
     const topnavPill = data.pills[0];
     if (topnavPill) {
@@ -178,6 +234,7 @@ function run() {
   // ─── 检查 2：meta 区域状态一致性 ───
   console.log(`\n${BOLD}── 检查 2：meta 区域当前阶段/事实基线 ──${RESET}`);
   for (const [file, data] of Object.entries(pages)) {
+    if (isExcluded(file)) continue;
     const stage = data.meta['当前阶段'] || data.meta['事实基线'];
     if (stage) {
       // 检测是否只写到 1F（过时）
@@ -192,6 +249,7 @@ function run() {
   console.log(`\n${BOLD}── 检查 3：footer 日期 ──${RESET}`);
   const today = '2026-06-29'; // 当前系统日期
   for (const [file, data] of Object.entries(pages)) {
+    if (isExcluded(file)) continue;
     if (!data.footerDate) {
       warn(`${file}: footer 中未找到日期`);
       warnings++;
@@ -210,6 +268,7 @@ function run() {
   // 提取需求总数（匹配 "需求池 N 项" / "N 条需求" / "N requirements"）
   const reqTotalMap = {};
   for (const [file, data] of Object.entries(pages)) {
+    if (isExcluded(file)) continue;
     const html = data.html;
     // 优先匹配 "需求池 33 项" 或 "33 条需求" 或 "33 requirements"
     const totalPatterns = [
@@ -241,7 +300,7 @@ function run() {
   const indexNav = pages['index.html']?.navHtml;
   if (indexNav) {
     for (const [file, data] of Object.entries(pages)) {
-      if (file === 'index.html' || file === 'collaboration-protocol.html') continue;
+      if (file === 'index.html' || file === 'collaboration-protocol.html' || isExcluded(file)) continue;
       if (!data.navHtml) continue;
       // 比较链接数量（忽略 active class 差异）
       const indexLinks = (indexNav.match(/href="[^"]+"/g) || []).length;
@@ -258,6 +317,7 @@ function run() {
   console.log(`\n${BOLD}── 检查 6：Google Fonts 外部依赖 ──${RESET}`);
   let fontCount = 0;
   for (const [file, data] of Object.entries(pages)) {
+    if (isExcluded(file)) continue;
     if (data.hasGoogleFonts) {
       fontCount++;
     }
@@ -267,6 +327,39 @@ function run() {
     warnings++;
   } else {
     ok('无 Google Fonts 外部依赖');
+  }
+
+  // ─── 检查 7：HTML 标签闭合（td / tr / table / details） ───
+  console.log(`\n${BOLD}── 检查 7：HTML 标签闭合校验 ──${RESET}`);
+  // 裁决 C（2026-09-03）：
+  //   - <td> 漏闭合（changes.html 单行式行的已知形态）→ error，必须清零
+  //   - 其他标签（tr / table / details）整文件计数不匹配 → warn，留作跨页陈旧事实备查
+  //     （多行展开结构偶有跨行未闭合，按整文件计数会出现假阳性，故降级处理）
+  let tagClosureErrors = 0;
+  let tagClosureWarnings = 0;
+  for (const [file, data] of Object.entries(pages)) {
+    const found = checkTagClosures(data.html, file);
+    for (const iss of found) {
+      const delta = iss.opens - iss.closes;
+      const msg = `${iss.file} <${iss.tag}> 不闭合 → opens=${iss.opens} closes=${iss.closes}（Δ=${delta}）`;
+      if (iss.tag === 'td') {
+        error(msg);
+        tagClosureErrors++;
+      } else {
+        warn(msg + '（多行结构允许，降级为警告）');
+        tagClosureWarnings++;
+      }
+    }
+  }
+  if (tagClosureErrors > 0) {
+    issues += tagClosureErrors;
+  } else if (tagClosureWarnings === 0) {
+    ok(`全部 ${allFiles.length} 页标签闭合正常（共扫描 ${allFiles.length} 页 / 显式排除 0 页；检查标签：${TAG_CLOSURE_TAGS.join(' / ')}）`);
+  } else {
+    ok(`<td> 全部闭合正常（共扫描 ${allFiles.length} 页 / 显式排除 0 页）`);
+  }
+  if (tagClosureWarnings > 0) {
+    warnings += tagClosureWarnings;
   }
 
   // ─── 汇总 ───
@@ -287,6 +380,13 @@ function run() {
   }
 }
 
-if (require.main === module) run();
+if (require.main === module) {
+  // --board-dir <path>：供注入自测等场景在副本目录上跑门禁（默认看板目录）
+  const boardDirArg = (() => {
+    const i = process.argv.indexOf('--board-dir');
+    return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : null;
+  })();
+  run(boardDirArg || BOARD_DIR);
+}
 
-module.exports = { BOARD_DIR, HTML_FILES, main: run, run };
+module.exports = { BOARD_DIR, HTML_FILES, TEMPLATE_CHECK_EXCLUDED, listBoardHtmlFiles, main: run, run, checkTagClosures, TAG_CLOSURE_TAGS };

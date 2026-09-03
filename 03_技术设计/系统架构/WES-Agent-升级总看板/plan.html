@@ -833,6 +833,18 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td><span class="status done"><span class="dot"></span>已合入 · 缺陷闭环</span>：main CI 全绿，状态回填 defects.html。</td>
           <td>合入后 main CI 六 job 全绿（run 33148758925，`gh run view --log` 实取）；行为对照（四状态 × 改动前后）随合入前交付已附，架构侧复核通过。</td>
         </tr>
+        <tr data-board-event-id="BE-2026-09-03-s3-narrow-column-overflow:plan">
+          <td class="mono">ISS-2026-09-03-001<br>看板窄栏溢出（Section 11 任务池表格）</td>
+          <td>Section 11 后续任务池表格在 ≤768px 视口下产生横向溢出，窄屏响应式折叠未实施（来源：RP-032 验收备注，2026-09-03 架构侧裁决 D 登记）。</td>
+          <td><span class="status warn"><span class="dot"></span>已立项 / 待触发</span>：触发条件——当前批次高优先级需求验收完毕、或 ≤768px 实测出现横向滚动条时启动；不排固定日历日期。</td>
+          <td>≤768px 视口无横向滚动条；任务池表格四列（候选任务/目标/启动条件/验收口径）在窄屏均可完整阅读（折叠或堆叠均可接受）。</td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-03-s3-footer-date-staleness:plan">
+          <td class="mono">ISS-2026-09-03-002<br>页脚日期陈旧（plan.html）</td>
+          <td>plan.html 页脚日期停滞于 2026-08-17，而页面内容已更新至 2026-09-02+；与看板一致性校验脚本 check 3 的阈值（&lt;2026-06-26 告警）虽未触发，但信息可信度下降（来源：2026-09-03 架构侧裁决 D 登记）。</td>
+          <td><span class="status warn"><span class="dot"></span>已立项 / 待触发</span>：触发条件——本批次裁决变更合入后，随同其他看板页面 footer 一并刷新；不排固定日历日期。</td>
+          <td>页脚日期与最近一次内容变更日期的差距 ≤ 7 天；<code class="inline">node scripts/board-consistency-check.js</code> check 3 不再对 plan.html 发出警告。</td>
+        </tr>
       </table>
     </section>
 

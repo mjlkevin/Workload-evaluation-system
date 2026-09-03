@@ -436,6 +436,39 @@
               <td>转 requirement · 治理类（非业务功能）· 优先级高于事故追认本身</td>
               <td>待架构侧选定后另批实现；选定前不得动 <code class="inline">.git/hooks</code> 与提交规范。三候选均已按对 §10 / 对 board-* 门禁 / 对现有历史的影响与代价逐条写明。<details class="tech-detail"><summary>候选 A · 提交信息尾部 Session: &lt;会话ID&gt; trailer</summary><b>对 §10 提交规范</b>：§10 现格式为 <code class="inline">type(scope): 中文描述</code>，trailer 位于正文之外不改 subject，与现规范兼容；但须在 §10 补一行“会话 trailer”口径，否则人与门禁都无判据。<b>对 board-* 门禁</b>：<code class="inline">board-build</code> / <code class="inline">board-consistency-check</code> 不读 commit message，零影响；若要求 trailer 与看板事件 <code class="inline">data-board-event-id</code> 对齐，需另写校验。<b>对现有历史</b>：零改写。<b>代价</b>：完全靠自觉 —— 现有多个执行者无强制，漏写即断链；会话ID 需自定义唯一规则（建议 worktree 路径 + 开工 HEAD 短 sha）；他人 amend / squash 后 trailer 可丢。</details><details class="tech-detail"><summary>候选 B · 各执行者用不同 committer.name</summary><b>对 §10</b>：不涉及提交信息格式，无冲突。<b>对 board-* 门禁</b>：无影响，且 <code class="inline">check-tracked-secrets</code> 等不读身份，无从把关。<b>对现有历史</b>：代价最高 —— 历史提交全是同一个本机身份，启用后会出现“改名前后两套身份”断层，看板内已有的 <code class="inline">--author</code> 类归属表述与脚本需重跑；worktree 删除即丢本地 <code class="inline">.git/config</code> 配置。<b>结论口径（不代裁决）</b>：author / committer 均为本地可任意改写字段，防伪能力为零，它只把“不可判定”变成“可伪装的可判定”。<b>本批新增一条实取否证（比“共用同一身份”更底层）</b>：<code class="inline">git config --list --show-origin</code> 实取本机 <b>不存在任何 <code class="inline">user.name</code> / <code class="inline">user.email</code> 配置</b>（global <code class="inline">~/.gitconfig</code> 仅 3 项：两组 proxy 与 <code class="inline">safe.directory=*</code>；repo 级无），即现在的“共享身份”并非有人刻意设定，而是 git 在无配置时按 <code class="inline">$USER@hostname</code> 兜底拼出来的——所以它会随本机网络标识漂移：同一台机器同一天内，17:38 的提交是 <code class="inline">…@192.168.5.9</code>，19:23 之后是 <code class="inline">…@192.168.5.34</code>，两侧都不是人为选择。故 B 方案“给各执行者配不同 committer.name”的前提不成立：当前不是“都一样”，而是“根本没配”，要先补一次全机身份设定才能谈分流，且该字段依旧可被任何执行者本地改写。</details><details class="tech-detail"><summary>候选 C · 提交前钩子强制校验</summary><b>对 §10</b>：把 §10 从文字约定升级为可执行约束；但与“纯文档随手提交”摩擦，需允许 <code class="inline">--no-verify</code> 而一旦可绕就等于没有。<b>对 board-* 门禁</b>：可与看板一致性检查合流（校验 trailer 与登记的 worktree / 分支一致）；但 hooks 不入 git 跟踪，需 <code class="inline">core.hooksPath</code> 指向仓内脚本且每人一次性启用，本地启用状态不可远程验证 —— 因此必须在 CI 加一步同类校验（建议并入 lint）才能兼顾。<b>对现有历史</b>：零改写，但只能保证启用日之后可追溯，对本次事故及此前全部历史无效（仍需按“会话不可判定”归档）。<b>执行约束</b>：本项目的 AGENTS.md 与全局纪律均默认不得跳过 hook，新增 hook 需架构侧先定例外口径。</details><details class="tech-detail"><summary>建议组合（仅供裁决，不实现）</summary>A 定事实源 + C 防漏写（本地 hook + CI 双校），B 不建议。理由：只有 A 能低成本存下“会话 ↔ 提交”映射且不改写历史；C 是 A 的执行护栏；B 提供的是可伪装信号，收益最低风险最高。</details></td>
             </tr>
+            <tr data-board-event-id="BE-2026-09-03-s3-inline-secret-backtick-blindspot">
+              <td class="mono">ISS-2026-09-03-003</td>
+              <td>2026-09-03</td>
+              <td>密钥扫描 INLINE_SECRET_RE 漏检反引号分隔的密钥赋值</td>
+              <td>架构侧裁决 E（s3-supplemental 批次）</td>
+              <td><code class="inline">check-tracked-secrets.js</code> 的 <code class="inline">INLINE_SECRET_RE</code> 分隔符只覆盖单/双引号 <code class="inline">["']</code>，不覆盖反引号 <code class="inline">`</code>；JS 模板字面量与 .env 文件中以反引号（而非单/双引号）包裹值的 <code class="inline">apiKey</code> 赋值形态不会被行内扫描命中，形成盲区。</td>
+              <td><code class="inline">scripts/check-tracked-secrets.js:26-27</code> 修复前正则 <code class="inline">["']</code> 两处无 <code class="inline">`</code>；修复后 <code class="inline">[`"']</code>；新增自测 <code class="inline">content-form scan catches backtick-delimited apiKey (ruling E)</code> 17/17 pass。</td>
+              <td><span class="status done"><span class="dot"></span>已修复 · 已自验</span> 裁决 E 分支提交</td>
+              <td>不转缺陷 · 扫描器自身盲区修复，无业务代码影响</td>
+              <td>正则已补反引号 + 自测已覆盖；后续若有新分隔符形态（如 YAML 多行 <code class="inline">|</code>）按需扩展。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-09-03-s3-hooks-unauthorized-global-enable">
+              <td class="mono">ISS-2026-09-03-004</td>
+              <td>2026-09-03</td>
+              <td>Session 钩子未授权全仓启用约 78 分钟（10:37:45–11:56:00）已撤销</td>
+              <td>架构侧复核实测 + 复核补打派单任务 1（s3-supplemental 批次）</td>
+              <td><code class="inline">scripts/hooks/install.sh</code> 把 <code class="inline">commit-msg</code>/<code class="inline">pre-commit</code> 装进共享 <code class="inline">.git/hooks/</code> 并在 <code class="inline">.git/config</code> 写入 <code class="inline">core.hooksPath</code>，而 <code class="inline">.git</code> 被全部 worktree 共用——其他六七条并行线提交缺 <code class="inline">Session:</code> 行或 committer 不匹配时会被直接拒绝，而它们不知道这条规则。派单只要求“分支上实现 + 自测”，未授权全仓启用。<b>如实登记：不是按计划启用</b>。</td>
+              <td>撤销前：<code class="inline">commit-msg</code>/<code class="inline">pre-commit</code> mtime 2026-09-03 10:37:45、<code class="inline">git config --show-origin --get core.hooksPath</code> → <code class="inline">.git/config: .git/hooks</code>；撤销后：该键 exit=1 不存在、两文件已删除，9 月 2 日既有的 <code class="inline">post-checkout</code>/<code class="inline">post-commit</code> 保留未动。分支提交附撤销前后命令输出。</td>
+              <td><span class="status done"><span class="dot"></span>已撤销（11:56:00）</span> 复核补打分支提交 · 钩子文件仍留在分支 <code class="inline">scripts/hooks/*</code> 未删</td>
+              <td>治理事件 · 不转缺陷（无业务代码影响）</td>
+              <td><code class="inline">install.sh</code> 已加影响范围警告（全部 worktree 与并行会话）+ 执行前打印目标路径 + 交互确认（或 <code class="inline">--yes</code> 显式参数）；后续全仓启用钩子须经架构侧批准并通知各线。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-09-03-s3-precommit-removal">
+              <td class="mono">ISS-2026-09-03-005</td>
+              <td>2026-09-03</td>
+              <td>pre-commit 强制钩子（方案 B）已删除 —— 超出裁决范围且当前条件下不可触发</td>
+              <td>架构侧复核追加 2（s3-supplemental 批次，合入前必做）</td>
+              <td><code class="inline">scripts/hooks/pre-commit</code> 逻辑仅当 <code class="inline">GIT_COMMITTER_NAME</code> 被显式设置且异于默认值时才拒绝；本机无任何 git 身份配置、无人设该变量 → 恒 <code class="inline">exit 0</code> <b>永不触发</b>，且它强制的是架构侧明确不采纳的方案 B（各执行者不同 committer 身份）。<b>如实登记：曾实现方案 B 的强制钩子，因超出裁决范围且在当前条件下不可触发，已删除</b>，install.sh 同步去掉其安装逻辑，只保留 <code class="inline">commit-msg</code>（Session trailer 校验，已实测有效）。</td>
+              <td><code class="inline">git rm scripts/hooks/pre-commit</code> + <code class="inline">install.sh</code> 两处循环去 pre-commit 仅留 commit-msg + 顶部注释登记删除原因；提交 7f1436f（rebase 后 sha，含 Session trailer）；共享 <code class="inline">.git/hooks</code> 仍仅剩 post-checkout/post-commit 两枚既有钩子，core.hooksPath 键不存在。</td>
+              <td><span class="status done"><span class="dot"></span>已删除（2026-09-03）</span> 复核追加 2 分支提交 · 本批合入前置完成</td>
+              <td>治理事件 · 不转缺陷（无业务代码影响）</td>
+              <td>commit-msg 钩子全仓启用仍为<b>独立动作待办</b>：须架构侧批准并通知全部并行线后方可执行，本批不启用、不登记为“已计划启用”。</td>
+            </tr>
         </table>
       </div>
     </section>

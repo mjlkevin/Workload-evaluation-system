@@ -12,7 +12,7 @@
     "board:archive": "node scripts/board-archive-changes.js",
     "board:branches:check": "node scripts/generate-branch-board.js --check && node --test scripts/branch-board.test.js scripts/branch-board-page.test.js",
     "test:board:branches": "node --test scripts/branch-board.test.js scripts/branch-board-page.test.js",
-    "test:scripts": "node --test scripts/board-event.test.js scripts/board-work-items.test.js scripts/speak-plainly-skill.test.js scripts/branch-board.test.js scripts/branch-board-page.test.js",
+    "test:scripts": "node --test scripts/board-event.test.js scripts/board-work-items.test.js scripts/speak-plainly-skill.test.js scripts/branch-board.test.js scripts/branch-board-page.test.js scripts/board-consistency-check.test.js",
     "test:security": "node --test scripts/check-tracked-secrets.test.js && npx tsx --test apps/api/src/services/ai/knowledge-base-url-policy.test.ts && node scripts/check-tracked-secrets.js",
     "dev:web": "npm run dev --prefix ui/V2_PROTOTYPE",
     "dev:api": "npm run dev -w apps/api",
