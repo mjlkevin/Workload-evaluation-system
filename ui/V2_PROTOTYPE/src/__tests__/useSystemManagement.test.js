@@ -248,8 +248,8 @@ describe('useSystemManagement', () => {
     )
     const { result } = renderHook(() => useSystemManagement())
 
-    await waitFor(() => expect(result.current.dslRules).toHaveLength(2))
-    expect(result.current.dslRules[0].id).toBe('dep-rd-doc-read')
+    await waitFor(() => expect(result.current.dslRules[0]?.id).toBe('dep-rd-doc-read'))
+    expect(result.current.dslRules).toHaveLength(2)
     expect(result.current.dslRules[0].subject).toBe('研发文档查阅')
     expect(result.current.dslRules[0].logic).toBe('requires_all')
     expect(result.current.dslRules[0].dependencies).toEqual(['研发文档管理', '研发物料管理'])

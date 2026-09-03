@@ -19,6 +19,7 @@ import { inviteCodes, users } from "../../db/schema";
 import { createAuthPgRepository } from "./auth-pg.repository";
 import {
   UsersStoreError,
+  USERS_CACHE_TTL_MS,
   createUsersPgRepository,
   type UsersPgRepository,
 } from "./users-pg.repository";
@@ -305,21 +306,19 @@ test("缓存 TTL：TTL 内保持陈旧，到期后回源自愈（多副本永久
   const input = makeUserInput();
   await repo!.createUser(input);
 
-  // 短 TTL 实例（与主实例共享 db）
-  const shortTtlRepo = createUsersPgRepository(repo!.__dbForTest(), 60);
-  const warm = await shortTtlRepo.findUserById(input.id);
+  let now = 1_000_000;
+  const replicaRepo = createUsersPgRepository(repo!.__dbForTest(), USERS_CACHE_TTL_MS, () => now);
+  const warm = await replicaRepo.findUserById(input.id);
   assert.equal(warm!.status, "active");
 
-  // 旁路篡改 DB（模拟另一副本写入）
   await pool!.query("UPDATE users SET status = 'disabled' WHERE user_id = $1", [input.id]);
 
-  // TTL 内：读路径命中缓存，返回陈旧值（预期行为，窗口有界）
-  const stale = await shortTtlRepo.findUserById(input.id);
+  now += USERS_CACHE_TTL_MS - 1;
+  const stale = await replicaRepo.findUserById(input.id);
   assert.equal(stale!.status, "active", "TTL 内允许短暂陈旧");
 
-  // 越过 TTL：回源重建，自愈为 DB 真值
-  await new Promise((r) => setTimeout(r, 80));
-  const healed = await shortTtlRepo.findUserById(input.id);
+  now += 1;
+  const healed = await replicaRepo.findUserById(input.id);
   assert.equal(healed!.status, "disabled", "TTL 到期后必须回源自愈（不得永久分歧）");
 
   await pool!.query("UPDATE users SET status = 'active' WHERE user_id = $1", [input.id]);

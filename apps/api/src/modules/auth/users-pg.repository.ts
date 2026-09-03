@@ -116,7 +116,11 @@ class UsernameConflictSentinel extends Error {
 /** 缓存 TTL 缺省值：每进程每 60s 最多一次全表回源 */
 export const USERS_CACHE_TTL_MS = 60_000;
 
-export function createUsersPgRepository(dbInstance: Database = db, cacheTtlMs: number = USERS_CACHE_TTL_MS): UsersPgRepository {
+export function createUsersPgRepository(
+  dbInstance: Database = db,
+  cacheTtlMs: number = USERS_CACHE_TTL_MS,
+  now: () => number = Date.now,
+): UsersPgRepository {
   // 写穿缓存：null = 冷（未加载）；非 null = 热（读路径不再回源，直至 TTL 到期）
   let cache: Map<string, AuthUser> | null = null;
   let cacheLoadedAt = 0;
@@ -130,12 +134,12 @@ export function createUsersPgRepository(dbInstance: Database = db, cacheTtlMs: n
     const rows = await dbInstance.select().from(users);
     const loaded = rows.map(toAuthUser);
     cache = new Map(loaded.map((user) => [user.id, user]));
-    cacheLoadedAt = Date.now(); // 主机时钟仅用于 TTL 判定，不落库
+    cacheLoadedAt = now(); // 主机时钟仅用于 TTL 判定，不落库
     return loaded;
   }
 
   async function ensureLoaded(): Promise<Map<string, AuthUser>> {
-    if (!cache || Date.now() - cacheLoadedAt >= cacheTtlMs) await loadAll();
+    if (!cache || now() - cacheLoadedAt >= cacheTtlMs) await loadAll();
     return cache!;
   }
 
