@@ -127,7 +127,9 @@ git grep <pattern> <ref> -- <path>
 
 - **调用形态**：`cd` 到目标 worktree 后调用，CLI 会在该分支上工作。不在目标目录调用就会改到别的树上。
 - **凭据：用 `qodercli login`，完全不碰 token（2026-09-03 更正）**。用户在自己的终端跑一次交互登录，凭据由 CLI 自行保管；架构侧调用时什么都不用带。**这条取代了 2026-09-02 立的「token 存 `~/.qoder-env` 并 `source` 取用」——那条当晚就被实测推翻，两个原因**：① 环境变量 `QODER_PERSONAL_ACCESS_TOKEN` 的优先级**高于**已保存的登录，设了它就把登录整个盖掉，于是"登了也白登"，报错是 `QoderAuthError: ...token that was rejected. It overrides any saved login`；② 文件里存 token 只是把明文从对话搬到磁盘，账户可同时持有多个 PAT、吊销时极易点错，一旦失效整条通道就断。**所以调用时显式 `env -u QODER_PERSONAL_ACCESS_TOKEN qodercli ...`**，把可能残留的变量摘掉。凭据不进对话这条底线不变（贴进对话会以明文落进会话记录 `.jsonl`，不加密、每次压缩续会都被重新读回，并作为对话内容出网）；变的是达成方式——**不是换个地方存 token，是根本不要 token**。登录这一步必须用户自己做，架构侧不代为认证。核实只跑 `qodercli status` 看有没有账号，不打印任何凭据。
-- **选模型是成本纪律，不是可选项**：机械执行类任务一律显式 `-m Qwen3.8-Flash`。不写 `-m` 会落到默认模型，同一批活贵数倍。注意 CLI 烧的是 Qoder 账户 credit、不是架构侧会话额度——所以"派给 CLI 更省"这句**只在选对模型时成立**，漏写 `-m` 时它是反的。
+- **选模型：一律显式 `-m bailian/qwen3.8-flash-tp`（2026-09-03 更正）**。这是配好的自定义模型（阿里云百炼 Qwen3.8-Flash，token plan，上下文 100 万），费用直接结算到项目方自己的供应商 API 账户，**实测 Qoder credit = 0**。注意自定义模型在 `-m` 里要传 **modelID** 而不是模型名（Default / New Models 传名字，Custom 传 ID），当前配置可从 `~/.qoder/settings.json` 的 `model.name` 读到——`~/.qoder/.models/<uid>/catalog-*` 是加密的，读不了也改不了，所以别去翻。
+- **换成自定义模型之后，选型标准变了**：原来是"省 Qoder credit"，现在成本落在自己的 API 账户上，标准变成"够用就好"。**但显式写 `-m` 这条纪律不能松**——不写就落到默认模型，那条仍然吃 Qoder credit。
+- **额度耗尽是一种会吃掉整份交付的失效形态，必须知道它长什么样**：2026-09-03 批次 0.5 那次直驱跑到第 414 轮、2 小时 44 分，因 Qoder 信用额度打满被掐断（`error_code 118`，`errors: ["You've reached your credit usage limit..."]`），`is_error: true`、`result: null`——**没有汇报、没有提交，19 个文件全悬在工作树里**。教训有两条：① 遇到 `is_error: true` **先查 git 和工作树再下结论**，那次的活其实基本干完了（构建双绿、套件全过），架构侧评估自洽后代为提交才没丢；② 自定义模型把这个失效形态从"额度"这一侧消除了，但**"长任务尾部丢失"本身还在**——耗时的机械步骤（commit、push）仍应由架构侧收口。
 - **写文件必须加 `--permission-mode acceptEdits`**，只给 `--allowed-tools` 不够——工具允许但写入被拦，任务会静默停在"什么都没改"的状态。
 - **被权限拦截时 `permission_denials` 字段是空的**，不能靠它判断有没有被拦。要看文件是否真的变了。
 - **输出用 `--output-format json`，只提取需要的字段**，不要把原始 JSON 全读进上下文——一次调用的原始输出能把架构侧会话挤爆，而你需要的是其中几行。
@@ -152,10 +154,10 @@ git grep <pattern> <ref> -- <path>
 
 ## System Prompt Summary
 
-以架构侧身份处理 WES 任务时：复核结论先行说人话，紧跟一段自包含的四反引号提示词；对执行方的每条关键声明用 git / gh / node 实取核实，不照单全收；按五种失效形态扫一遍（未提交、推导值冒充实测、空验证、静默漂移、并发写入）；判测试覆盖前先确认断言无条件执行，再分 A-1 / A-2 / A-3；交接文档按九节骨架写；CLI 可直驱能自动验证对错的任务，也可直驱改代码——后者须独立 worktree + 独立分支 + 执行前简报确认 + CI 绿 + 架构侧逐条实取复核后才准合入，四项缺一不可；不可逆动作与动鉴权仍逐项过目。调 CLI 用 `env -u QODER_PERSONAL_ACCESS_TOKEN qodercli ... -m Qwen3.8-Flash`，凭据走 `qodercli login`、不碰 token、不进对话。
+以架构侧身份处理 WES 任务时：复核结论先行说人话，紧跟一段自包含的四反引号提示词；对执行方的每条关键声明用 git / gh / node 实取核实，不照单全收；按五种失效形态扫一遍（未提交、推导值冒充实测、空验证、静默漂移、并发写入）；判测试覆盖前先确认断言无条件执行，再分 A-1 / A-2 / A-3；交接文档按九节骨架写；CLI 可直驱能自动验证对错的任务，也可直驱改代码——后者须独立 worktree + 独立分支 + 执行前简报确认 + CI 绿 + 架构侧逐条实取复核后才准合入，四项缺一不可；不可逆动作与动鉴权仍逐项过目。调 CLI 用 `qodercli ... -m bailian/qwen3.8-flash-tp`（自定义模型，费用走项目方自己的供应商账户、Qoder credit 为 0；`-m` 必须显式写，漏写会落回吃 credit 的默认模型），凭据走 `qodercli login`、不碰 token、不进对话；遇 `is_error: true` 先查 git 与工作树再下结论。
 
 ---
 
-*本 Skill 版本：v0.1.2*
+*本 Skill 版本：v0.1.3*
 *对应系统版本：WES Agent 升级总看板 · 架构侧复核与交接协议*
 *最后更新：2026-09-03*
