@@ -22,6 +22,11 @@ import {
 } from "../ai-sessions/ai-sessions.repository";
 import type { AiSessionRecord, AiSessionsStore } from "../ai-sessions/ai-sessions.types";
 import type { HomeMessageInput } from "../../services/ai/handlers/workbench-shared";
+import { buildWorkbenchChatModelInput } from "../../services/ai/handlers/workbench-shared";
+import {
+  WorkbenchModelRequestInvariantError,
+  assertWorkbenchModelRequestMatchesStorage,
+} from "../../services/ai/workbench-request-invariant";
 
 /** 临时目录会话存储（不触碰真实 data/config）：供 C2 用户消息落库用例使用。 */
 function makeTempSessionStore(sessionId: string, ownerUserId: string): { storePath: string; cleanup(): void } {
@@ -1003,4 +1008,192 @@ test("DEF-2026-08-27-001：kind=metadata chunk 不写 run 事件，memoryRef 落
   const assistant = appended.find((c) => c.role === "assistant");
   assert.ok(assistant, "assistant 消息必须落库");
   assert.deepEqual(assistant!.metadata?.memoryRef, { scenesCount: 1, atomsCount: 2 }, "memoryRef 必须写在 assistant 消息 metadata 顶层");
+});
+
+// ============================================================
+// 批次 0 · ④：工具副作用必须逐次独立编号（修复固定 effectKey）
+// ============================================================
+// 修复前 dispatch 侧只有 `workbench_chat_answer` 一个固定 effect；多轮工具调用下
+// 若沿用固定 key，后几轮会命中同一 effect 被跳过 → 副作用互相吞。
+// 本用例锁定：① dispatch 入参携带 recordToolEffect；② ordinal → 独立 effectKey；
+// ③ 重放同一 Run 命中各自轮次的 effect，不重复执行。
+test("批次0·④：recordToolEffect 逐 ordinal 落独立 effectKey，重放不重复执行工具", async () => {
+  type Recorder = NonNullable<Parameters<WorkbenchChatWorkflowDeps["dispatch"]>[0]["recordToolEffect"]>;
+  let recorder: Recorder | undefined;
+
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      recorder = input.recordToolEffect;
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeRecordingAppendSessionMessage([]),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+  });
+
+  const TOOL_EFFECT = "workbench_chat_tool_call";
+  const recordedKeys: string[] = [];
+  const store = new Map<string, Record<string, unknown>>();
+  let toolExecutions = 0;
+
+  const ctx = makeFakeCtx({
+    // 复刻 worker 真实语义：命中既有 key 直接返回存量 output，不调用 execute
+    recordToolEffectOnce: async (effect) => {
+      recordedKeys.push(effect.effectKey);
+      const existing = store.get(effect.effectKey);
+      if (existing) return { output: existing, created: false };
+      if (effect.effectKey.includes(TOOL_EFFECT)) toolExecutions += 1;
+      const output = await effect.execute();
+      store.set(effect.effectKey, output);
+      return { output, created: true };
+    },
+  });
+
+  await wf.executeStep("chat", ctx);
+  assert.ok(recorder, "dispatch 入参必须注入 recordToolEffect（未注入则工具轮次无幂等）");
+
+  const runEffect = (ordinal: number) =>
+    recorder!(ordinal, async () => ({ ok: true, data: ordinal }), { toolName: `t${ordinal}`, arguments: {} });
+
+  const first1 = await runEffect(1);
+  const first2 = await runEffect(2);
+  assert.deepEqual(first1, { ok: true, data: 1 });
+  assert.deepEqual(first2, { ok: true, data: 2 });
+  assert.equal(toolExecutions, 2, "两个 ordinal 必须各自真正执行一次");
+  assert.deepEqual(
+    recordedKeys.filter((key) => key.includes(TOOL_EFFECT)),
+    [`run-1:chat:${TOOL_EFFECT}:1`, `run-1:chat:${TOOL_EFFECT}:2`],
+    "effectKey 必须逐 ordinal 独立（固定 key 会让第 2 轮命中第 1 轮被跳过）",
+  );
+
+  // 重放：同 ordinal 命中各自已记录 effect，不重复执行、产出与首跑一致
+  const replay1 = await runEffect(1);
+  const replay2 = await runEffect(2);
+  assert.equal(toolExecutions, 2, "重放不得重复执行工具");
+  assert.deepEqual(replay1, { ok: true, data: 1 });
+  assert.deepEqual(replay2, { ok: true, data: 2 });
+
+  // 外层整轮 effect 冻结口径不变（ordinal 恒为 1），重放仍然吸收整轮
+  assert.ok(
+    recordedKeys.includes("run-1:chat:workbench_chat_answer:1"),
+    "workbench_chat_answer 的 key 形态必须保持冻结",
+  );
+});
+
+// ============================================================
+// 批次 0 · ⑤：异步 Run 通道必须注入「存储侧当场重取」钩子
+// ============================================================
+// 对账本体由 workbench-request-invariant.test.ts 守护（含红→绿配对）。本组用例
+// 只锁 workflow 侧接线契约，防两种让断言退化为形式的失效：
+//  ① 钩子不下发 → 全链路无人对账，且不会报错（与 DEF-001 同一种静默失效）；
+//  ② 钩子复用发送侧组装时的快照 → 两侧同源、断言永真，等于没有断言。
+test("批次0·⑤：注入 getSessionRecord 时下发 readSessionForInvariant，且钩子当场重取存储", async () => {
+  type DispatchInput = Parameters<WorkbenchChatWorkflowDeps["dispatch"]>[0];
+  let hook: DispatchInput["readSessionForInvariant"];
+  let sentHistory: HomeMessageInput[] | undefined;
+
+  const session = makeInMemorySession("session-1", "user-1", [
+    { role: "user", content: "第一轮：帮我评估 PLM 项目工作量" },
+    { role: "assistant", content: "第一轮回答：已完成初步评估" },
+  ]);
+
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      hook = input.readSessionForInvariant;
+      sentHistory = input.messages;
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: async (input) => {
+      session.messages.push(input.message);
+      return { found: true, created: true, message: input.message };
+    },
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    getSessionRecord: async () => session,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx({
+    run: { executionConfig: { content: "第二轮：那实施周期多久" } },
+  }));
+
+  assert.ok(hook, "具备存储读取能力时 dispatch 必须收到 readSessionForInvariant，否则无人对账");
+  assert.equal(sentHistory?.length, 3, "发送侧基线应为[第一轮 user, 第一轮 assistant, 当前 user]");
+
+  // 存储侧的权威时点＝钩子被调用的那一刻。workflow 在 dispatch 之后才写 assistant，
+  // 故 executeStep 结束后存储已有 4 条而发送侧组装时只有 3 条；若实现复用了组装期
+  // 快照，这里读回仍是 3。
+  const stored = await hook!();
+  assert.equal(stored?.messages.length, 4, "钩子必须当场重取存储侧，而非复用发送侧组装时的快照");
+});
+
+test("批次0·⑤：未注入 getSessionRecord 时不下发钩子（additive 契约，行为同修复前）", async () => {
+  let hookDelivered = false;
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      hookDelivered = input.readSessionForInvariant !== undefined;
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeRecordingAppendSessionMessage([]),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+  assert.equal(hookDelivered, false, "无存储读取能力时不得凭空下发钩子（条件展开契约）");
+});
+
+test("批次0·⑤：接线点上生产 builder + 生产断言为绿，管道丢历史即红", async () => {
+  const SYSTEM_PROMPT = "你是售前顾问的 AI 工作助手。";
+  let greenPassed = false;
+  let redReason = "";
+
+  const session = makeInMemorySession("session-1", "user-1", [
+    { role: "user", content: "第一轮：帮我评估 PLM 项目工作量" },
+    { role: "assistant", content: "第一轮回答：已完成初步评估" },
+  ]);
+
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      // 复刻 harness-boot.modelChatStream 的构造点：发送侧用生产 builder 组装，
+      // 存储侧用钩子当场重取，再交给生产断言对账。
+      const sent = await buildWorkbenchChatModelInput(input.user, {
+        systemPrompt: SYSTEM_PROMPT,
+        userContent: input.message,
+        messages: input.messages,
+      });
+      assertWorkbenchModelRequestMatchesStorage({
+        sent: sent.messages,
+        session: await input.readSessionForInvariant!(),
+        userContent: input.message,
+      });
+      greenPassed = true;
+
+      // DEF-2026-08-27-001 第一层根因形态：中间管道把历史丢掉。
+      const dropped = await buildWorkbenchChatModelInput(input.user, {
+        systemPrompt: SYSTEM_PROMPT,
+        userContent: input.message,
+        messages: [],
+      });
+      try {
+        assertWorkbenchModelRequestMatchesStorage({
+          sent: dropped.messages,
+          session: await input.readSessionForInvariant!(),
+          userContent: input.message,
+        });
+      } catch (err) {
+        redReason = err instanceof WorkbenchModelRequestInvariantError ? err.reason : `unexpected:${String(err)}`;
+      }
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: async (input) => {
+      session.messages.push(input.message);
+      return { found: true, created: true, message: input.message };
+    },
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    getSessionRecord: async () => session,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx({
+    run: { executionConfig: { content: "第二轮：那实施周期多久" } },
+  }));
+
+  assert.equal(greenPassed, true, "接线点两侧一致时必须为绿");
+  assert.equal(redReason, "history_length_mismatch: sent=1 expected=3", "发送侧丢历史必须当场红并给出结构差异");
 });

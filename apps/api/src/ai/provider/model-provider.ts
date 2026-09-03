@@ -148,6 +148,15 @@ export interface ChatCompletionStreamChunk {
   finishReason?: string;
   /** Token 消耗统计；流式场景通常在最后一个 chunk 中出现 */
   usage?: TokenUsage;
+  /**
+   * 模型发起的工具调用。
+   *
+   * 流式协议下 tool_calls 以分片下发（arguments 逐段拼接），因此本字段只在
+   * 聚合完成后出现——即携带 `finishReason === "tool_calls"` 的那个 chunk 上，
+   * 值为按 index 拼装完毕的完整调用列表。普通回答与不支持流式工具调用的
+   * Provider 均为 undefined。
+   */
+  toolCalls?: ToolCall[];
 }
 
 export interface ModelProvider {

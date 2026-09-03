@@ -230,6 +230,10 @@ export class KimiProvider implements ModelProvider {
       stream: true,
     };
     applyCommonKimiOptions(body, req, model, preferredTemperature);
+    if (req.tools && req.tools.length > 0) {
+      body.tools = req.tools;
+      body.tool_choice = req.toolChoice ?? "auto";
+    }
 
     // 流式调用使用更保守的超时上限（官方推荐 stream=true 保持连接活跃）
     const streamTimeoutMs = Math.min(STREAM_MAX_TIMEOUT_MS, timeoutMs);
@@ -535,6 +539,36 @@ async function* parseStream(
   let finishReason: string | undefined;
   let lastUsage: TokenUsage | undefined;
 
+  // 流式 tool_calls 分片聚合：按 index 归并，id/name 取最早分片，arguments 逐段拼接。
+  // 仅在 finish_reason === "tool_calls" 的 chunk 上输出拼装结果（与 usage 同为末 chunk 语义）。
+  const toolCallParts = new Map<number, { id?: string; name?: string; arguments: string }>();
+  let toolCallsEmitted = false;
+
+  const assembleToolCalls = (): ToolCall[] | undefined => {
+    if (toolCallParts.size === 0) return undefined;
+    toolCallsEmitted = true;
+    return Array.from(toolCallParts.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([index, part]) => ({
+        id: part.id || `call_${index}`,
+        name: part.name ?? "",
+        arguments: parseToolArguments(part.arguments),
+      }));
+  };
+
+  // 兜底：厂商未按惯例补 finish_reason 分片时也要交出工具调用，否则会退化成"模型说了没人听"的空回答
+  const pendingToolCallsChunk = (): ChatCompletionStreamChunk | undefined => {
+    if (toolCallsEmitted || toolCallParts.size === 0) return undefined;
+    return {
+      contentDelta: "",
+      model,
+      provider: PROVIDER_NAME,
+      attempts,
+      finishReason: "tool_calls",
+      toolCalls: assembleToolCalls(),
+    };
+  };
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -552,11 +586,18 @@ async function* parseStream(
         for (const data of dataLines) {
           if (!data || data === "[DONE]") {
             // 流结束前如果未输出 usage，不额外补充（部分厂商不返回流式 usage）
+            const flush = pendingToolCallsChunk();
+            if (flush) yield flush;
             return;
           }
           let json: {
             choices?: Array<{
-              delta?: { content?: string; reasoning_content?: string; reasoningContent?: string };
+              delta?: {
+                content?: string;
+                reasoning_content?: string;
+                reasoningContent?: string;
+                tool_calls?: RawToolCallFragment[];
+              };
               message?: { content?: string; reasoning_content?: string; reasoningContent?: string };
               finish_reason?: string | null;
             }>;
@@ -575,10 +616,24 @@ async function* parseStream(
               choice?.message?.reasoning_content ||
               choice?.message?.reasoningContent,
           );
+          for (const [pos, frag] of (choice?.delta?.tool_calls ?? []).entries()) {
+            const key = Number.isFinite(Number(frag?.index)) ? Number(frag?.index) : pos;
+            const prev = toolCallParts.get(key) ?? { arguments: "" };
+            toolCallParts.set(key, {
+              id: prev.id || asString(frag?.id) || undefined,
+              name: prev.name || asString(frag?.function?.name) || undefined,
+              arguments: prev.arguments + asString(frag?.function?.arguments),
+            });
+          }
           finishReason = asString(choice?.finish_reason) || finishReason;
           const streamUsage = extractUsage(json?.usage);
           if (streamUsage) lastUsage = streamUsage;
-          if (!delta && !reasoningDelta && !finishReason && !streamUsage) continue;
+          // 一批 tool_calls 只交付一次：finishReason 是粘性的（上一行），而厂商在结束帧之后
+          // 常补发一个纯用量帧（OpenAI 兼容接口 include_usage 的标准行为），若不再次拦截，
+          // 同一批调用会被 assemble 两次、下游工具被执行两次。
+          const streamToolCalls =
+            finishReason === "tool_calls" && !toolCallsEmitted ? assembleToolCalls() : undefined;
+          if (!delta && !reasoningDelta && !finishReason && !streamUsage && !streamToolCalls) continue;
           // P1-1: 仅 yield delta，不再携带累积的 content/reasoningContent 字段
           yield {
             contentDelta: delta,
@@ -588,10 +643,13 @@ async function* parseStream(
             attempts,
             finishReason,
             usage: streamUsage,
+            ...(streamToolCalls ? { toolCalls: streamToolCalls } : {}),
           };
         }
       }
     }
+    const tailFlush = pendingToolCallsChunk();
+    if (tailFlush) yield tailFlush;
   } catch (e) {
     if (isFetchAbortError(e)) {
       throw new ProviderError("timeout", "kimi_request_timeout", {
@@ -642,10 +700,18 @@ function mapHttpError(status: number, errorText: string): ProviderError {
   });
 }
 
+/** 工具调用分片：非流式一次性给全；流式按 index 分片下发，arguments 逐段拼接 */
+interface RawToolCallFragment {
+  index?: number;
+  id?: string;
+  type?: string;
+  function?: { name?: string; arguments?: string };
+}
+
 interface RawChoice {
   message?: {
     content?: string | null;
-    tool_calls?: Array<{ id?: string; type?: string; function?: { name?: string; arguments?: string } }>;
+    tool_calls?: RawToolCallFragment[];
   };
   finish_reason?: string | null;
 }
@@ -669,6 +735,17 @@ function extractUsage(raw: RawUsage | undefined): TokenUsage | undefined {
   };
 }
 
+/** 工具参数容错解析：缺失/非法 JSON/非对象一律回落 {}，由工具层按参数校验报错 */
+function parseToolArguments(raw: string | undefined): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(asString(raw) || "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+  } catch {
+    // 回落空参数，不中断链路
+  }
+  return {};
+}
+
 /** 纯函数：把厂商 choice 解析为 { content, toolCalls, finishReason } */
 export function parseChoiceMessage(choice: RawChoice): {
   content: string;
@@ -681,15 +758,10 @@ export function parseChoiceMessage(choice: RawChoice): {
   if (!Array.isArray(rawCalls) || rawCalls.length === 0) {
     return { content, finishReason };
   }
-  const toolCalls: ToolCall[] = rawCalls.map((c, i) => {
-    let args: Record<string, unknown> = {};
-    try {
-      const parsed = JSON.parse(asString(c?.function?.arguments) || "{}");
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) args = parsed as Record<string, unknown>;
-    } catch {
-      args = {};
-    }
-    return { id: asString(c?.id) || `call_${i}`, name: asString(c?.function?.name), arguments: args };
-  });
+  const toolCalls: ToolCall[] = rawCalls.map((c, i) => ({
+    id: asString(c?.id) || `call_${i}`,
+    name: asString(c?.function?.name),
+    arguments: parseToolArguments(c?.function?.arguments),
+  }));
   return { content, toolCalls, finishReason };
 }
