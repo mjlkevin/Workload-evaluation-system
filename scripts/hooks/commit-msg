@@ -1,0 +1,30 @@
+#!/bin/sh
+# commit-msg: validate that the commit message contains a Session trailer.
+# Install: scripts/hooks/install.sh
+# Ruling B (2026-09-03 架构侧裁决): 所有提交必须包含 Session: <会话ID> 尾行。
+#
+# Trailer format: `Session: <identifier>` on its own line (typically the last line).
+# Merge commits and revert commits are exempt (auto-generated messages).
+
+MSG_FILE="$1"
+MSG=$(cat "$MSG_FILE")
+
+# Skip merge commits (git merge generates these automatically)
+if echo "$MSG" | head -1 | grep -qE '^Merge '; then
+  exit 0
+fi
+
+# Skip revert commits
+if echo "$MSG" | head -1 | grep -qE '^Revert '; then
+  exit 0
+fi
+
+# Check for Session trailer
+if ! grep -qE '^Session: .+' "$MSG_FILE"; then
+  echo "[commit-msg] Missing required trailer: Session: <会话ID>"
+  echo "[commit-msg] Add a line like 'Session: s3-supplemental-20260903' to the commit message."
+  echo "[commit-msg] Merge and revert commits are exempt."
+  exit 1
+fi
+
+exit 0
