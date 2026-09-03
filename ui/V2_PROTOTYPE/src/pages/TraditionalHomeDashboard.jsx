@@ -149,9 +149,10 @@ export default function TraditionalHomeDashboard() {
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: KPI_DOT_COLOR[k.state] || KPI_DOT_COLOR.ok, marginLeft: 'auto' }} />
                 </div>
                 <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono)', lineHeight: 1.05, marginBottom: 4 }}>{k.num === null || k.num === undefined ? '—' : k.num}</div>
-                <div style={{ height: 4, borderRadius: 999, background: 'var(--bg-soft)', marginTop: 10, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: k.bar, borderRadius: 999, background: `linear-gradient(90deg,${k.icCo || 'var(--brand)'},var(--accent))` }} />
-                </div>
+                {/* 这里原有一条装饰进度条，宽度取 k.bar 而 k.bar 恒为 '0%'，
+                    三种状态下都是空条。项目数 / 需求条目 / 评估人天 / 参与成员
+                    四项没有任何真实目标值或分母，编一个百分比就是造假数据，
+                    故整条删除而不是补分母。 */}
                 <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-2)' }}>{k.sub}</div>
               </div>
             ))}

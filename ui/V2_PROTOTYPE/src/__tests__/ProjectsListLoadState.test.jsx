@@ -2,7 +2,20 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { apiClient } from '../api/client.js'
+import useHomeDashboard from '../hooks/useHomeDashboard.js'
 import TraditionalHomeDashboard from '../pages/TraditionalHomeDashboard.jsx'
+
+// 直接把 hook 返回的指标项字段名暴露出来，断言 bar 字段确实从数据契约里消失了，
+// 而不是仅仅在页面上没渲染。
+function KpiKeyProbe() {
+  const { kpi } = useHomeDashboard()
+  return (
+    <>
+      <div data-testid="kpi-keys">{JSON.stringify(kpi.map((item) => Object.keys(item)))}</div>
+      {kpi.every((item) => item.state === 'ok') && <div data-testid="kpi-state-ok" />}
+    </>
+  )
+}
 
 // /projects 页此前把「正在加载」「取数失败」「一个项目都没有」「搜索没命中」四种情况
 // 混成同一句「未找到匹配的项目」——首屏还在请求就先告诉用户没数据。
@@ -110,5 +123,50 @@ describe('/projects 项目列表的加载态与空态', () => {
     expect(screen.getByRole('button', { name: '重试' })).toBeEnabled()
     expect(screen.queryByText(NO_MATCH_TEXT)).not.toBeInTheDocument()
     expect(screen.queryByText(NO_PROJECT_TEXT)).not.toBeInTheDocument()
+  })
+})
+
+describe('/projects 指标卡不再渲染恒为空的进度条', () => {
+  beforeEach(() => {
+    localStorage.setItem('wes_token', 'mock-token')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  // 这四个指标没有真实分母，进度条永远是 0% 宽——删掉，不编分母
+  test('指标卡区内没有恒为空的进度条元素', async () => {
+    mockSources({ projects: [PROJECT_ROW] })
+
+    renderProjects()
+
+    await screen.findByText('利民集团数字化二期')
+
+    const kpi = document.querySelector('.home-kpi')
+    expect(kpi).not.toBeNull()
+    expect(kpi.children.length).toBe(4)
+    // 进度条 = 高 4px 的轨道 + 宽 0% 的填充，两者都必须消失。
+    // 注意：不要用 [style*="linear-gradient"] 断言——jsdom 会把带 var() 的渐变从
+    // 序列化后的 style 里丢掉，改前改后都是 0 个，那条断言恒真、不具鉴别力。
+    expect(kpi.querySelectorAll('[style*="height: 4px"]')).toHaveLength(0)
+    expect(kpi.querySelectorAll('[style*="width: 0%"]')).toHaveLength(0)
+    expect(kpi.querySelectorAll('[style*="border-radius: 999px"]')).toHaveLength(0)
+  })
+
+  test('hook 返回的指标项不再带 bar 字段', async () => {
+    mockSources({ projects: [PROJECT_ROW] })
+
+    render(<KpiKeyProbe />)
+
+    // 先等取数落地，确保断言的是成功分支的指标项（而不是初始 DEFAULT_KPI）
+    await screen.findByTestId('kpi-state-ok')
+
+    const keys = JSON.parse(screen.getByTestId('kpi-keys').textContent)
+    expect(keys.length).toBe(4)
+    keys.forEach((itemKeys) => {
+      expect(itemKeys).not.toContain('bar')
+    })
   })
 })

@@ -53,10 +53,10 @@ function generateFeed(allRecords) {
 }
 
 const DEFAULT_KPI = [
-  { ic: '▣', lb: '项目数', num: null, state: 'loading', sub: '加载中…', bar: '0%', icBg: 'var(--brand-soft)', icCo: 'var(--brand-ink)' },
-  { ic: '≡', lb: '需求条目', num: null, state: 'loading', sub: '加载中…', bar: '0%', icBg: 'var(--accent-soft)', icCo: 'var(--accent)' },
-  { ic: '⏱', lb: '评估人天', num: null, state: 'loading', sub: '加载中…', bar: '0%', icBg: 'var(--info-soft)', icCo: 'var(--info)' },
-  { ic: '⚇', lb: '参与成员', num: null, state: 'loading', sub: '加载中…', bar: '0%', icBg: 'var(--ok-soft)', icCo: 'var(--ok)' },
+  { ic: '▣', lb: '项目数', num: null, state: 'loading', sub: '加载中…', icBg: 'var(--brand-soft)', icCo: 'var(--brand-ink)' },
+  { ic: '≡', lb: '需求条目', num: null, state: 'loading', sub: '加载中…', icBg: 'var(--accent-soft)', icCo: 'var(--accent)' },
+  { ic: '⏱', lb: '评估人天', num: null, state: 'loading', sub: '加载中…', icBg: 'var(--info-soft)', icCo: 'var(--info)' },
+  { ic: '⚇', lb: '参与成员', num: null, state: 'loading', sub: '加载中…', icBg: 'var(--ok-soft)', icCo: 'var(--ok)' },
 ]
 const EMPTY_ROWS = []
 const EMPTY_DASHBOARD = { kpi: DEFAULT_KPI, plans: EMPTY_ROWS, feed: EMPTY_ROWS }
