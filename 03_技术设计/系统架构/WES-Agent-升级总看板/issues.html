@@ -95,6 +95,61 @@
             <col style="width:11%">
           </colgroup>
           <tr><th>ID</th><th>日期</th><th>标题</th><th>来源</th><th>原始反馈</th><th>证据</th><th>分析状态</th><th>分流</th><th>下一步</th></tr>
+            <tr data-board-event-id="BE-2026-09-03-ui-projects-load-state:issues-homeworkspace">
+              <td class="mono">ISS-2026-09-03-001</td>
+              <td>2026-09-03</td>
+              <td><code class="inline">HomeWorkspace.jsx</code> 在生产中不可达，却占着前端测试基线里的用例数</td>
+              <td>架构侧实取（前端优化线批 4 下发，执行方复核后订正计数）</td>
+              <td>在维护一个用户进不去的「AI 工作台 / 传统工作台」切换页：<code class="inline">src/App.jsx:78</code> 是 <code class="inline">/</code> → <code class="inline">HomePage</code>，而 <code class="inline">HomePage.jsx</code> 内部直接渲染 <code class="inline">AiHomeWorkbench</code>（全文仅 7 行、无切换入口）；<code class="inline">:79</code> 是 <code class="inline">/projects</code> → <code class="inline">TraditionalHomeDashboard</code>。即两个工作台各有自己的路由，<code class="inline">HomeWorkspace</code> 这个「切换页」没有任何路由指向它。</td>
+              <td><code class="inline">src/App.jsx:78-79</code> <code class="inline">src/pages/HomePage.jsx</code> <code class="inline">src/pages/HomeWorkspace.jsx</code><details class="tech-detail"><summary><b>【再订正 · 第二次】执行方前次「3 文件 / 66 用例」漏检 4 个文件，实取为 7 文件 / 104 用例</b></summary>批 4 首次下发误称「全仓仅 1 文件 / 8 用例」，执行方复核订正为「3 文件 / 66 用例」，但该次检索方式（<code class="inline">grep -rn "HomeWorkspace" ui/V2_PROTOTYPE/src/</code> 未跟踪全部命中文件，只摘取了部分结果）遗漏了 <code class="inline">streaming-ux.test.jsx</code>（14）/ <code class="inline">background-runs.test.jsx</code>（13）/ <code class="inline">session-isolation.test.jsx</code>（9）/ <code class="inline">draft-roundtrip.test.jsx</code>（2）四个文件、共 38 条用例。架构侧全量实取：<code class="inline">grep -rl "HomeWorkspace" src/</code> 命中 <b>7</b> 个测试文件，且每个均 <code class="inline">import … from '../pages/HomeWorkspace'</code>（<code class="inline">grep -c</code> 逐一为 1）：① HomeWorkspace.test.jsx 51 ② streaming-ux.test.jsx 14 ③ background-runs.test.jsx 13 ④ unified-view.test.jsx 11 ⑤ session-isolation.test.jsx 9 ⑥ run-submit.test.jsx 4 ⑦ draft-roundtrip.test.jsx 2，合计 <b>104</b>。占前端基线 475 条中约 <b>22%</b>，不是 66 条 / 14%——处置代价与收益评估须按 104 条计。</details></td>
+              <td><span class="status warn"><span class="dot"></span>已登记 · <b>本批只登记不动代码</b></span></td>
+              <td>待架构侧裁决（接回入口 or 删除）</td>
+              <td>请架构侧就「接回入口」还是「删除页面 + 相应 104 条用例」定调。<b>本批未动任何相关代码</b>。注意删除方案会使前端基线用例数一次性下降约 104 条，需与基线口径同步登记，避免被误读为回归。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-09-03-ui-projects-load-state:issues-test-host-mismatch">
+              <td class="mono">ISS-2026-09-03-005</td>
+              <td>2026-09-03</td>
+              <td>AI 工作台测试宿主与生产路径不一致（<code class="inline">HomeWorkspace</code> 挂载 vs. 生产 <code class="inline">HomePage</code> 直渲）</td>
+              <td>架构侧复核 ISS-2026-09-03-001 时升级发现</td>
+              <td>生产路径 <code class="inline">src/App.jsx:78</code> → <code class="inline">HomePage</code> → 内部直接渲染 <code class="inline">AiHomeWorkbench</code>（<b>无</b> <code class="inline">PageShell</code> 包裹）；而 AI 工作台的 104 条用例全部经由 <code class="inline">HomeWorkspace</code> 挂载（带 <code class="inline">PageShell</code> + <code class="inline">fillViewport</code> + 视图切换器）。即前端 475 条用例里约 104 条（22%）测的是一个用户永远打不开的宿主外壳，真正的首页渲染路径（<code class="inline">HomePage</code> → <code class="inline">AiHomeWorkbench</code>，无 <code class="inline">PageShell</code>）无任何用例覆盖——这些用例再绿，也不保证 <code class="inline">/</code> 打开是好的，属于「假绿」的宿主错位型，比 ISS-2026-09-03-001 的纯死代码问题更严重。</td>
+              <td><code class="inline">src/App.jsx:78</code> <code class="inline">src/pages/HomePage.jsx</code> <code class="inline">src/pages/AiHomeWorkbench.jsx</code> <code class="inline">src/pages/HomeWorkspace.jsx</code>（104 条用例的挂载点）</td>
+              <td><span class="status warn"><span class="dot"></span>已登记 · 本批只登记不动代码</span></td>
+              <td>待架构侧排期</td>
+              <td>候选处置方向：把 104 条用例改挂真实生产路径（<code class="inline">HomePage</code> → <code class="inline">AiHomeWorkbench</code>，无 <code class="inline">PageShell</code>），或确认 <code class="inline">PageShell</code> 差异对 AI 工作台渲染无实质影响后关闭本条。与 ISS-2026-09-03-001（是否接回/删除 <code class="inline">HomeWorkspace</code>）为同一根因下的两个独立问题，处置顺序建议先裁决 001 再排 005，避免重复劳动。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-09-03-ui-projects-load-state:issues-attribution">
+              <td class="mono">ISS-2026-09-03-002</td>
+              <td>2026-09-03</td>
+              <td>待办池三条前端问题的表面归属订正（<code class="inline">/</code> 与 <code class="inline">/projects</code> 记混）</td>
+              <td>架构侧实取（前端优化线批 4 下发）</td>
+              <td>待办池此前把三条问题记到了错误的业务表面，会导致下一批选错表面：①原记「<code class="inline">/</code> 上 8 个气泡元素右边界 392 &gt; 360」应归属 <code class="inline">/</code> 的 AI 工作台（<code class="inline">AiHomeWorkbench</code>）；②原记「首页 KPI 进度条恒 0%」应归属 <code class="inline">/projects</code>；③原记「首页缺 <code class="inline">!loading</code>」应归属 <code class="inline">/projects</code>。</td>
+              <td><code class="inline">src/App.jsx:78-79</code>（<code class="inline">/</code> → <code class="inline">HomePage</code> → <code class="inline">AiHomeWorkbench</code>；<code class="inline">/projects</code> → <code class="inline">TraditionalHomeDashboard</code>）<details class="tech-detail"><summary>②③ 两条已在本批闭环，可作归属正确性的反向印证</summary>②「KPI 进度条恒 0%」与③「缺 <code class="inline">!loading</code>」两条经实取确认根因均在 <code class="inline">TraditionalHomeDashboard.jsx</code> + <code class="inline">useHomeDashboard.js</code>（即 <code class="inline">/projects</code>），并已随本批 <code class="inline">692cf9d</code> / <code class="inline">79b5c1a</code> 修复完毕——修复落点即归属证据。①「气泡元素越界」<b>不在本批表面内，未验证、未处置</b>，仅完成归属订正。</details></td>
+              <td><span class="status done"><span class="dot"></span>归属已订正（②③ 已随本批修复闭环）</span></td>
+              <td>口径订正 · 不新建实现项</td>
+              <td>下一批若接 ① 的气泡越界，业务表面应申报为 <code class="inline">/</code>（<code class="inline">AiHomeWorkbench</code>），<b>不要再选 <code class="inline">/projects</code></b>。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-09-03-ui-projects-load-state:issues-real-filter">
+              <td class="mono">ISS-2026-09-03-003</td>
+              <td>2026-09-03</td>
+              <td>项目列表页缺真实的状态 / 行业筛选（删除假标签后的功能缺口）</td>
+              <td>前端优化线批 4 P3 派生</td>
+              <td>本批 <code class="inline">3aec3e7</code> 删除了 <code class="inline">/projects</code> 工具条上两个点不动的假筛选标签（「状态：全部 ×」「行业：制造业 ×」）。删除后该页<b>确实没有</b>按状态或行业筛选的能力，只剩关键字搜索——原假标签虽然不可用，但曾在视觉上暗示存在该能力，故记为功能缺口而非纯删除。</td>
+              <td><code class="inline">TraditionalHomeDashboard.jsx:31-42</code>（<code class="inline">filteredPlans</code> 仅按 <code class="inline">planSearch</code> 过滤，无状态/行业维度）· 删除前假标签位于同文件 <code class="inline">:203-204</code> · 数据侧字段可用：<code class="inline">mapProjectEvaluationToPlan</code> 已产出 <code class="inline">status</code> 与 <code class="inline">industry</code>（<code class="inline">useHomeDashboard.js:16,18</code>），实现真筛选<b>无需改后端</b></td>
+              <td><span class="status warn"><span class="dot"></span>需求候选 · <b>本批未实现</b></span></td>
+              <td>requirement 候选（待架构侧排期）</td>
+              <td>实现真的状态/行业筛选属新功能，<b>超出本批授权范围，本批只登记</b>。若排期，建议与列表页既有关键字搜索合并为一套筛选条，并复用已有的 <code class="inline">status</code> / <code class="inline">industry</code> 字段。</td>
+            </tr>
+            <tr data-board-event-id="BE-2026-09-03-ui-projects-load-state:issues-false-claim">
+              <td class="mono">ISS-2026-09-03-004</td>
+              <td>2026-09-03</td>
+              <td><b>交接说明中一项不符事实的完成声明</b>：批 0 <code class="inline">design-system-bridge.css</code> 称「已推 origin / CI 绿」，三点实取全部不成立</td>
+              <td>架构侧实取（前端优化线批 4 下发）· 执行方独立复核复现</td>
+              <td><b>原始声明原文（引自上一任执行方交接说明，来源为 OpenDesign 客户端会话）</b>：「批 0 已收官：<code class="inline">design-system-bridge.css</code> 在分支 <code class="inline">feat/design-system-bridge</code>，commit <code class="inline">37e1a5e</code> 已推 origin，CI test-web 绿」。<b>执行方身份未经确认，故如实记为「来源未确认」，不代为归因到具体执行者。</b></td>
+              <td><b>三条实取反证（架构侧实取，执行方在本批 worktree 内独立复现，结果一致）</b>：① <code class="inline">git cat-file -t 37e1a5e</code> → <code class="inline">fatal: Not a valid object name 37e1a5e</code>，该提交号在本仓（含全部 worktree 共享对象库）<b>不存在</b>；② <code class="inline">git ls-remote --heads origin feat/design-system-bridge</code> → <b>返回空</b>，远端<b>没有</b>该分支；③ 本地 <code class="inline">feat/design-system-bridge</code> 实指 <code class="inline">ad42cb0</code>，提交标题为「docs(看板): 阶段3批2合入回填（changes.html 事件行 + plan.html 状态更新）」，<code class="inline">git ls-tree -r --name-only</code> 在该树里<b>找不到 <code class="inline">design-system-bridge.css</code></b>。三点合并结论：该「已收官」声明的<b>提交、分支、文件三者均不存在</b>，CI 绿也就无从成立。</td>
+              <td><span class="status err"><span class="dot"></span>不符事实已登记 · 三点实取反证均复现</span></td>
+              <td>纪律事件 · 不转需求 / 不转缺陷</td>
+              <td><b>新纪律（本条同步立规）</b>：报告中凡提及<b>其它批次 / 分支</b>的完成状态，必须附 <code class="inline">git ls-remote</code> 或 CI run 号证据；无证据的一律写「<b>未核实</b>」，<b>不得写成已完成</b>。与协作协议既有通用规则「写操作归属只认执行记录，不认自述」（<code class="inline">b46da04</code>）同源，本条把该规则从「归属」扩到「完成状态」。建议架构侧考虑并入 <a href="collaboration-protocol.html">collaboration-protocol.html</a>。</td>
+            </tr>
             <tr>
               <td class="mono">ISS-2026-07-02-001</td>
               <td>2026-07-02</td>

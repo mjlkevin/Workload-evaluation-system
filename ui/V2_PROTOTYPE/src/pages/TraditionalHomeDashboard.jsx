@@ -12,6 +12,9 @@ const PROJECT_ACTIONS = [
 // 状态灯跟着取数结果走：绿只在数据真的拿到时亮，取数失败置红、未取到置灰。
 const KPI_DOT_COLOR = { ok: 'var(--ok)', error: 'var(--err)', loading: 'var(--ink-3)' }
 
+// 加载态 / 空态共用一行提示的排版，避免三处各写一份内联样式
+const STATUS_ROW_STYLE = { padding: '18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, borderTop: '1px solid var(--line)' }
+
 export default function TraditionalHomeDashboard() {
   const [selected, setSelected] = useState(new Set())
   const [anchorId, setAnchorId] = useState(null)
@@ -27,7 +30,7 @@ export default function TraditionalHomeDashboard() {
     template: '',
   })
 
-  const { kpi, plans, error, refetch, remove, create } = useHomeDashboard()
+  const { kpi, plans, loading, error, refetch, remove, create } = useHomeDashboard()
   const filteredPlans = plans.filter((plan) => {
     const q = planSearch.trim().toLowerCase()
     if (!q) return true
@@ -146,9 +149,10 @@ export default function TraditionalHomeDashboard() {
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: KPI_DOT_COLOR[k.state] || KPI_DOT_COLOR.ok, marginLeft: 'auto' }} />
                 </div>
                 <div style={{ fontSize: 28, fontWeight: 800, fontFamily: 'var(--font-mono)', lineHeight: 1.05, marginBottom: 4 }}>{k.num === null || k.num === undefined ? '—' : k.num}</div>
-                <div style={{ height: 4, borderRadius: 999, background: 'var(--bg-soft)', marginTop: 10, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: k.bar, borderRadius: 999, background: `linear-gradient(90deg,${k.icCo || 'var(--brand)'},var(--accent))` }} />
-                </div>
+                {/* 这里原有一条装饰进度条，宽度取 k.bar 而 k.bar 恒为 '0%'，
+                    三种状态下都是空条。项目数 / 需求条目 / 评估人天 / 参与成员
+                    四项没有任何真实目标值或分母，编一个百分比就是造假数据，
+                    故整条删除而不是补分母。 */}
                 <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-2)' }}>{k.sub}</div>
               </div>
             ))}
@@ -199,9 +203,13 @@ export default function TraditionalHomeDashboard() {
                 className="btn btn-pri"
                 style={{ marginLeft: 4, height: 28, fontSize: 12, padding: '0 12px' }}
               >＋ 新建</button>
+              {/* 这里原有「状态：全部 ×」「行业：制造业 ×」两个标签：文字写死、
+                  没有任何 onClick 或状态绑定，末尾的 × 点不动，而 filteredPlans
+                  也只按 planSearch 做关键字过滤、根本不存在状态/行业筛选逻辑，
+                  连「显示当前筛选状态」都不成立，故删除（判例：批 2 已按同一
+                  理由删掉界面上的假语言切换器）。真正的状态/行业筛选属新功能，
+                  另行立项，不在本批内实现。 */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'var(--surface)', border: '1px solid var(--line)', fontSize: 11.5, color: 'var(--ink-2)' }}>状态：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>全部</b><span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span></span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 5, background: 'var(--surface)', border: '1px solid var(--line)', fontSize: 11.5, color: 'var(--ink-2)' }}>行业：<b style={{ color: 'var(--ink)', fontWeight: 600 }}>制造业</b><span style={{ color: 'var(--ink-3)', fontSize: 10 }}>×</span></span>
                 <input
                   type="text"
                   placeholder="⌕ 搜索项目 / 客户 / 负责人"
@@ -265,10 +273,17 @@ export default function TraditionalHomeDashboard() {
               </table>
             </div>
           </div>
-          {filteredPlans.length === 0 && (
-            <div style={{ padding: '18px', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, borderTop: '1px solid var(--line)' }}>
-              未找到匹配的项目
-            </div>
+          {/* 加载中 / 取数失败 / 一个项目都没有 / 搜索没命中，是四回事：
+              加载中不能说「没有」，取数失败由上面的 role="alert" 报错条负责，
+              这里只区分「还没有项目」和「有项目但没搜到」。 */}
+          {loading && (
+            <div style={STATUS_ROW_STYLE}>正在加载项目列表…</div>
+          )}
+          {!loading && !error && plans.length === 0 && (
+            <div style={STATUS_ROW_STYLE}>还没有项目，新建后会显示在这里</div>
+          )}
+          {!loading && plans.length > 0 && filteredPlans.length === 0 && (
+            <div style={STATUS_ROW_STYLE}>未找到匹配的项目</div>
           )}
       </div>
 
