@@ -69,6 +69,10 @@ describe('draft-roundtrip: E1 草稿往返', () => {
     sessionRuntimeStore.resetAllSessionViews()
   })
 
+  // DEF-2026-09-02-005：内层 findByText 上限 5s 与 vitest 默认用例时限 5s 相等，
+  // 内层等待还没用满，外层就先判超时——CI 负载偏高时该用例稳定红（实测 5216/5268ms）。
+  // 这里只放宽【用例自身】时限，内层等待上限与断言均不变：断言强度零变化，
+  // 变的只是"允许它跑完自己本来就需要的时间"。
   test('draft-roundtrip: 401 发送失败后草稿保留在对话里', async () => {
     setupDraftScenario({ status: 401 })
     renderWorkbench()
@@ -82,7 +86,7 @@ describe('draft-roundtrip: E1 草稿往返', () => {
     const errorMessage = await screen.findByText(/登录已过期/, {}, { timeout: 5000 })
     expect(errorMessage).toBeInTheDocument()
     expect(errorMessage.textContent).toContain('草稿已保留')
-  })
+  }, 15000)
 
   test('draft-roundtrip: 网络错误后草稿保留且 copyDraft 可取回', async () => {
     setupDraftScenario({ status: 500 })
@@ -98,5 +102,7 @@ describe('draft-roundtrip: E1 草稿往返', () => {
     // 由于 copyDraft 使用 navigator.clipboard，在 jsdom 中需要 mock
     const lastUserMessage = screen.getAllByText(/我的网络问题/)
     expect(lastUserMessage.length).toBeGreaterThan(0)
-  })
+    // DEF-2026-09-02-005：与 401 用例同构（内层 5s == 默认用例时限 5s），
+    // 尚未红过但成因相同，一并放宽用例时限，避免留同款地雷。
+  }, 15000)
 })
