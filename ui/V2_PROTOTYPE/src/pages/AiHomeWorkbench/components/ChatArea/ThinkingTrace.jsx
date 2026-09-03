@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TOOL_CALL_STATUS } from '../../utils/messageFormatter.js'
 
 /**
  * 统一的模型「思考轨迹」披露区：合并推理文本、工具调用、知识检索、
@@ -16,13 +17,18 @@ export default function ThinkingTrace({
   toolCalls,
   memoryRef,
 }) {
-  const [toolsExpanded, setToolsExpanded] = useState(false)
+  // null = 用户未显式操作过：此时由「流式期间是否有运行中项」自动决定展开，
+  // 保证 started→running 阶段免点击即可见（批次 0.5 ③）。用户一旦点过开关，
+  // 其选择优先于自动展开。
+  const [toolsExpanded, setToolsExpanded] = useState(null)
 
   const thoughtList = Array.isArray(thoughts) ? thoughts : []
   const hasThoughts = thoughtList.length > 0
   const hasKnowledge = Boolean(knowledgeTool)
   const toolCallList = Array.isArray(toolCalls) ? toolCalls.filter((t) => t && t.name) : []
   const hasToolCalls = toolCallList.length > 0
+  const hasLiveRunning = streaming && toolCallList.some((call) => call.status === TOOL_CALL_STATUS.RUNNING)
+  const showToolList = toolsExpanded ?? hasLiveRunning
   const scenesCount = Number(memoryRef?.scenesCount) || 0
   const atomsCount = Number(memoryRef?.atomsCount) || 0
   const hasMemoryRef = scenesCount > 0 || atomsCount > 0
@@ -53,17 +59,18 @@ export default function ThinkingTrace({
         <div aria-label="工具调用" className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
           <button
             type="button"
-            onClick={() => setToolsExpanded((v) => !v)}
-            aria-expanded={toolsExpanded}
+            onClick={() => setToolsExpanded(!showToolList)}
+            aria-expanded={showToolList}
             className="inline-flex min-h-[22px] cursor-pointer items-center gap-1 rounded-md border border-brand/30 bg-brand-soft px-1.5 py-0.5 text-[11px] font-bold text-brand"
           >
-            <span aria-hidden="true">{toolsExpanded ? '▾' : '▸'}</span>
+            <span aria-hidden="true">{showToolList ? '▾' : '▸'}</span>
             工具调用 {toolCallList.length} 项
           </button>
-          {toolsExpanded && toolCallList.map((call, idx) => (
-            <span key={`${call.name}-${idx}`}>
+          {showToolList && toolCallList.map((call, idx) => (
+            <span key={`${call.name}-${idx}`} className="inline-flex items-center gap-1">
               <code className="border-0 bg-transparent p-0">{call.name}</code>
               {call.source === 'list_tools' && <em className="not-italic text-ink-3">· 经发现</em>}
+              <ToolCallStatusTag call={call} streaming={streaming} />
             </span>
           ))}
         </div>
@@ -97,4 +104,35 @@ function KnowledgeTraceChip({ knowledgeTool }) {
       {hasFallback && !isUnavailable && <span className="text-warn">检索未命中</span>}
     </div>
   )
+}
+
+/**
+ * 工具调用状态标签（批次 0.5 ③）：started→运行中、completed→已完成、failed→失败
+ * 三态各自可见。存量数据无 status 时不渲染任何标签，保持既有行为。
+ */
+function ToolCallStatusTag({ call, streaming }) {
+  const elapsed = formatToolCallElapsed(call.elapsedMs)
+  if (call.status === TOOL_CALL_STATUS.RUNNING) {
+    // 流已结束却仍残留 running，只说明本轮未收到终态帧，不臆造「运行中」。
+    if (!streaming) return null
+    return <em className="not-italic text-brand">· 运行中{elapsed ? ` ${elapsed}` : ''}</em>
+  }
+  if (call.status === TOOL_CALL_STATUS.COMPLETED) {
+    return <em className="not-italic text-ink-3">· 已完成{elapsed ? ` ${elapsed}` : ''}</em>
+  }
+  if (call.status === TOOL_CALL_STATUS.FAILED) {
+    return (
+      <em className="not-italic text-warn">
+        · 失败{elapsed ? ` ${elapsed}` : ''}{call.errorPreview ? ` · ${call.errorPreview}` : ''}
+      </em>
+    )
+  }
+  return null
+}
+
+/** 耗时可读化：< 1s 用毫秒，其余保留一位小数秒 */
+function formatToolCallElapsed(value) {
+  const ms = Number(value)
+  if (!Number.isFinite(ms) || ms <= 0) return ''
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
 }

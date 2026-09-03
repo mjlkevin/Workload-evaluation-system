@@ -8,9 +8,16 @@ import {
   runWorkbenchToolLoopStream,
   type WorkbenchToolEffectOutput,
 } from "./workbench-tool-loop";
+import {
+  WORKBENCH_MODEL_VISIBLE_SURFACE_TYPES,
+  WORKBENCH_TOOL_UI_EVENT_TYPES,
+  isWorkbenchModelVisibleSurfaceType,
+  toWorkbenchModelVisibleMessage,
+  toWorkbenchModelVisibleToolMessage,
+} from "./workbench-tool-event-surface";
 import { ToolRegistry, DISCOVERY_CATEGORY } from "../../agent/tool-registry";
 import { createDefaultRegistry } from "../../agent/default-registry";
-import type { AgentEvent, AgentTool } from "../../agent/agent.types";
+import type { AgentEvent, AgentTool, AgentUser } from "../../agent/agent.types";
 import type { StreamingChunk } from "./workbench-dispatch.service";
 import type { AuthUser } from "../../types";
 
@@ -533,3 +540,147 @@ test("runWorkbenchToolLoopStream: 去重是轮内的，第二轮同名 call_0 �
   assert.equal(collected.result.content, "两次都查了");
   assert.equal(collected.result.turns, 3);
 });
+
+// ============================================================
+// 批次 0.5 · ④：UI 可见事件 与 模型可见事件 的分层边界
+// ============================================================
+// 本批把工具调用投影成四类 UI 事件（含完整参数与执行中间态）落 run 事件流。
+// 这条投影只能面向 UI：一旦整体回灌 messages，长会话会比批次 3 之前爆得更快，
+// 且泄漏点是隐性的（模型只是变笨，不会报错）。因此准入判定必须是运行时判定，
+// 且工具回填消息必须只有 toWorkbenchModelVisibleToolMessage 这一个构造点。
+
+const B04_ARG_SENTINEL = "B04SENTINEL-工具参数绝不得进模型-7a1e";
+
+test("批次0.5·④：四类 UI 事件与模型可见 surface 集合互斥", () => {
+  for (const type of WORKBENCH_TOOL_UI_EVENT_TYPES) {
+    assert.equal(
+      isWorkbenchModelVisibleSurfaceType(type),
+      false,
+      `${type} 是 UI 专用事件，出现在模型可见集合即本批边界失效（等于把参数/中间态回灌模型）`,
+    );
+  }
+  assert.deepEqual(
+    [...WORKBENCH_MODEL_VISIBLE_SURFACE_TYPES],
+    ["user/message", "assistant/message", "tool/result"],
+    "模型可见折叠必须恰好是这三类（对齐 dsh SurfaceEventType 口径）",
+  );
+  assert.equal(isWorkbenchModelVisibleSurfaceType("tool/result"), true);
+});
+
+test("批次0.5·④：模型可见消息构造点是运行时准入，UI 事件类型一律拒绝", () => {
+  assert.equal(
+    toWorkbenchModelVisibleMessage({ surfaceType: "tool/result", role: "assistant", content: "x" }).content,
+    "x",
+  );
+  for (const surfaceType of ["tool.call.started", "tool.call.progress", "tool.call.completed", "tool.call.failed"]) {
+    assert.throws(
+      () => toWorkbenchModelVisibleMessage({ surfaceType, role: "assistant", content: "x" }),
+      /model_visible_surface_not_allowed/,
+      `${surfaceType} 不得作为模型可见 surface 类型`,
+    );
+  }
+});
+
+test("批次0.5·④：工具回填消息形态与批次 0 逐字节一致（同步通道零回归）", () => {
+  const message = toWorkbenchModelVisibleToolMessage({
+    toolName: "estimate_history",
+    callId: "call_hist",
+    outcome: { ok: true, data: { total: 0, items: [] } },
+  });
+  assert.deepEqual(message, {
+    role: "assistant",
+    content: '[工具结果] estimate_history (callId=call_hist): {"ok":true,"data":{"total":0,"items":[]}}',
+  });
+  const failed = toWorkbenchModelVisibleToolMessage({
+    toolName: "create_project",
+    callId: "call_write",
+    outcome: { ok: false, error: "工作台仅开放只读工具，create_project 未获准执行" },
+  });
+  assert.equal(
+    failed.content,
+    '[工具结果] create_project (callId=call_write): {"ok":false,"error":"工作台仅开放只读工具，create_project 未获准执行"}',
+  );
+});
+
+for (const variant of ["stream", "sync"] as const) {
+  test(`批次0.5·④（${variant}）：完整参数与 UI 中间态不进任何一轮模型请求 messages`, async () => {
+    const registry = new ToolRegistry();
+    registry.register(
+      fakeTool({
+        name: "project_list",
+        // 参数里埋哨兵：只要「完整参数回灌」发生，哨兵必出现在请求侧
+        execute: async () => ({ items: [{ name: B04_ARG_SENTINEL }] }),
+      }),
+    );
+
+    const requests: { role: string; content: string }[][] = [];
+    const runLoop = async () => {
+      const agentUser: AgentUser = { id: "u1", capabilities: ["estimates:read"] };
+      const common = {
+        messages: [{ role: "user" as const, content: "列一下项目" }],
+        registry,
+        agentUser,
+        readOnlyToolNames: new Set(["project_list"]),
+      };
+      if (variant === "stream") {
+        return collectStream(
+          runWorkbenchToolLoopStream({
+            ...common,
+            invokeStream: ({ turnOrdinal, messages }) => {
+              requests.push(messages.map((m) => ({ role: String(m.role), content: String(m.content) })));
+              if (turnOrdinal === 1) {
+                return turnStream([
+                  chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "call_1", name: "project_list", arguments: { keyword: B04_ARG_SENTINEL } }] }),
+                ]);
+              }
+              return turnStream([chunkOf({ contentDelta: "查完了" }), chunkOf({ finishReason: "stop" })]);
+            },
+          }),
+        ).then((out) => out.result);
+      }
+      return runWorkbenchToolLoop({
+        ...common,
+        invoke: ({ turnOrdinal, messages }) => {
+          requests.push(messages.map((m) => ({ role: String(m.role), content: String(m.content) })));
+          if (turnOrdinal === 1) {
+            return Promise.resolve({ content: "", toolCalls: [{ id: "call_1", name: "project_list", arguments: { keyword: B04_ARG_SENTINEL } }] });
+          }
+          return Promise.resolve({ content: "查完了" });
+        },
+      });
+    };
+
+    const result = await runLoop();
+    assert.equal(result.content, "查完了");
+    // 反空断：工具必须真跑过，否则下面「没有泄漏」只是因为什么都没发生
+    assert.equal(requests.length, 2, "必须真跑两轮（工具轮 + 回答轮），否则本用例是空断言");
+    assert.equal(result.toolCalls.length, 1);
+
+    const secondTurn = JSON.stringify(requests[1]);
+    // 工具结果按 tool/result 口径回灌是允许的（模型需要知道调用成功），
+    // 但必须是冻结形态：只含 [工具结果] name (callId=...) + outcome，不含参数与 UI 投影字段。
+    assert.deepEqual(requests[1][1], {
+      role: "assistant",
+      content: `[工具结果] project_list (callId=call_1): {"ok":true,"data":{"items":[{"name":"${B04_ARG_SENTINEL}"}]}}`,
+    });
+    assert.equal(
+      secondTurn.includes("keyword"),
+      false,
+      `工具完整参数（arguments）不得进模型上下文，实取 ${secondTurn}`,
+    );
+    for (const leak of ["callIndex", "elapsedMs", "resultPreview", "tool.call."]) {
+      assert.equal(
+        secondTurn.includes(leak),
+        false,
+        `UI 投影字段 ${leak} 不得进模型上下文（它只属于 run 事件流）`,
+      );
+    }
+    // 结果正文本身允许回灌（tool/result 在准入集合内），这里只断言它没有被 UI 预览形态取代
+    assert.ok(secondTurn.includes("[工具结果] project_list"));
+    console.log(
+      `[B05·④ 请求侧 messages 实取] variant=${variant} 轮次=${requests.length} ` +
+        `第一轮(${requests[0].length}条)=${JSON.stringify(requests[0])} ` +
+        `第二轮(${requests[1].length}条)=${JSON.stringify(requests[1])}`,
+    );
+  });
+}

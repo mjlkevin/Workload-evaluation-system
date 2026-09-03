@@ -7,6 +7,7 @@ import { sessionRuntimeStore } from '../../../hooks/useSessionRuntimeStore.js'
 import { pickArray } from '../utils/harnessPayload.js'
 import { buildAttachmentUnderstanding, isExplicitReportRequest, summarizeHomeParsedFile } from '../utils/reportParser.js'
 import {
+  applyToolCallEventToList,
   attachFormBlockToLatestAssistant,
   attachKnowledgeToolToLatestAssistant,
   attachTraceChipsToLatestAssistant,
@@ -20,11 +21,18 @@ import {
   stripFormBlockJson,
   withCurrentUserFile,
 } from '../utils/messageFormatter.js'
+import { AI_DEGRADATION_REASONS, recordAiDegradation } from '../utils/degradationTrace.js'
 
 // O8 Sprint 3A：流式事件类型（前端映射，后端事件流底座已就绪）
+// 批次 0.5 · ③：四类 tool.call.* 为工具调用 UI 投影事件（异步 Run 通道），
+// 字符串与 HARNESS_RUN_EVENT_TYPES 白名单逐字一致。
 const STREAM_EVENT_TYPES = {
   TEXT_DELTA: 'text.delta',
   THOUGHT: 'thought',
+  TOOL_CALL_STARTED: 'tool.call.started',
+  TOOL_CALL_PROGRESS: 'tool.call.progress',
+  TOOL_CALL_COMPLETED: 'tool.call.completed',
+  TOOL_CALL_FAILED: 'tool.call.failed',
   RUN_COMPLETED: 'run_completed',
   RUN_FAILED: 'run_failed',
   RUN_CANCELLED: 'run_cancelled',
@@ -107,6 +115,10 @@ function hasUnfinishedSnapshotTail(messages) {
 export default function useChatMessages(workbench) {
   // RP-047 Batch E：模块级缓存，避免每条消息重复探测 503
   const runsDisabledRef = useRef(false)
+  // 批次 0.5 · Part2：改走备用通道必须可见。`runsDisabledRef` 是单向闸（无人复位、
+  // 且本 hook 每页只创建一次），所以这里单独记一份「当前降级状态」给界面渲染，
+  // 而不是去给那道闸加复位——本批口径是「先让它响，再谈删」。
+  const [degradationNotice, setDegradationNotice] = useState(null)
   const [messages, setMessages] = useState([])
   // RP-047 Batch D（G1）：sending 按会话键控，A 进行中不阻塞 B 发送；
   // 对外暴露的 sending 仅反映当前激活会话，旧链路行为不变。
@@ -336,6 +348,30 @@ export default function useChatMessages(workbench) {
               ? [{ ...thoughts[0], text: thoughts[0].text + thoughtText, collapsed: false }]
               : [{ text: thoughtText, collapsed: false }]
             return { ...m, thoughts: merged }
+          })
+        })
+        break
+      }
+      case STREAM_EVENT_TYPES.TOOL_CALL_STARTED:
+      case STREAM_EVENT_TYPES.TOOL_CALL_PROGRESS:
+      case STREAM_EVENT_TYPES.TOOL_CALL_COMPLETED:
+      case STREAM_EVENT_TYPES.TOOL_CALL_FAILED: {
+        // 批次 0.5 · ③：工具调用三态可视化。四类事件喂进既有 toolCalls 通道
+        // （WorkbenchToolCallTrace → MessageBubble → ThinkingTrace），不建新通道。
+        // 目标消息选取与 THOUGHT 同款：工具事件天然先于首个 text.delta 到达，
+        // streamingMessageIdRef 尚未建立时兜底挂到当前 loading 占位。
+        setMessages((prev) => {
+          let targetId = streamingMessageIdRef.current
+          if (!targetId || !prev.some((m) => m.id === targetId)) {
+            const loadingMsg = prev.find((m) => m.loading && m.role === 'assistant')
+            if (!loadingMsg) return prev
+            targetId = loadingMsg.id
+            streamingMessageIdRef.current = targetId
+          }
+          return prev.map((m) => {
+            if (m.id !== targetId) return m
+            const next = applyToolCallEventToList(m.toolCalls, event)
+            return next === null ? m : { ...m, toolCalls: next }
           })
         })
         break
@@ -623,6 +659,16 @@ export default function useChatMessages(workbench) {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  /**
+   * 批次 0.5 · Part2：改走备用通道的唯一登记入口。
+   * 提示状态直接取留痕函数返回的那一条，不再独立判定一次是否闭锁——
+   * 否则「界面说的」和「留痕记的」会出现两套结论。
+   * detail 只被取用 status / code，绝不把 err 整体入档（可能挂着对话正文）。
+   */
+  function noteAiDegradation(reason, detail = {}) {
+    setDegradationNotice(recordAiDegradation(reason, detail))
+  }
+
   async function sendMessage(messageOverride) {
     // DEF-2026-08-27-003：messageOverride 为 { retryId } 时是「解析失败后点击重试」复入——
     // 复用已暂存的 File 与本轮上下文，不重新采集输入、不重复落会话与用户消息。
@@ -668,6 +714,9 @@ export default function useChatMessages(workbench) {
     processedSequencesRef.current.clear()
     // 前端插批（项二）：新发送周期重置错误提示闸门
     streamErrorNotifiedRef.current = false
+    // 批次 0.5 · Part2：单轮提示不得赖着不走（否则下一轮明明恢复了还挂着警告）；
+    // 闭锁提示必须留着——它的恢复手段只有刷新页面，本轮清掉就等于又变回静默。
+    setDegradationNotice((prev) => (prev?.latched ? prev : null))
 
     if (retryEntry) {
       // 重试：失败气泡复位为进行中占位；本轮凭据已在重试入口消费
@@ -760,7 +809,11 @@ export default function useChatMessages(workbench) {
       ]
       // RP-047 Batch E：尝试 Run 提交；503 回退旧同步路径
       let runSubmitted = false
-      if (!runsDisabledRef.current && session?.sessionId) {
+      if (runsDisabledRef.current) {
+        // 批次 0.5 · Part2：闭锁后本轮依旧不回试快速通道（行为不变），但要留痕——
+        // 「还有没有人走这条老路」只能靠逐轮计数量出来。
+        noteAiDegradation(AI_DEGRADATION_REASONS.ALREADY_DEGRADED)
+      } else if (session?.sessionId) {
         try {
           const runResult = await submitRun(session.sessionId, {
             submissionKey: userMessage.id,
@@ -777,6 +830,7 @@ export default function useChatMessages(workbench) {
           if (err?.status === 503 || err?.code === 'ASYNC_RUNS_DISABLED') {
             runsDisabledRef.current = true
             // 503 回退旧同步路径
+            noteAiDegradation(AI_DEGRADATION_REASONS.RUN_DISABLED, err)
           } else if (err?.status === 409 || err?.code === 'SESSION_HAS_ACTIVE_RUN') {
             // 409：呈现用户可见文案，直接 return，不回退旧同步路径
             const errorMessage = {
@@ -790,8 +844,16 @@ export default function useChatMessages(workbench) {
             markSending(sendKey, false)
             return
           }
-          // 其他错误（404/网络等）静默回退旧同步路径，不抛错
+          // 其他错误（404/网络等）回退旧同步路径，不抛错（行为不变）。
+          // 批次 0.5 · Part2：不再「静默」——原因分流留痕，404 与网络失败是两类
+          // 不同的故障（服务端版本落后 vs 请求没到），排查方向也不同。
+          else if (err?.status === 404) noteAiDegradation(AI_DEGRADATION_REASONS.RUN_NOT_FOUND, err)
+          else if (err?.name === 'NetworkError') noteAiDegradation(AI_DEGRADATION_REASONS.RUN_NETWORK, err)
+          else noteAiDegradation(AI_DEGRADATION_REASONS.RUN_REQUEST_FAILED, err)
         }
+      } else {
+        // 会话没建立成功：压根没试过快通道，但这一轮同样走的备用通道，一样要说清
+        noteAiDegradation(AI_DEGRADATION_REASONS.NO_SESSION)
       }
 
       // flag off 或 Run 提交失败时回退旧同步路径（行为逐字不变）
@@ -982,5 +1044,7 @@ export default function useChatMessages(workbench) {
     goLogin,
     // O8：流式 UX 暴露
     toggleThought,
+    // 批次 0.5 · Part2：改走备用通道的可见状态（null = 正常路径不渲染任何提示）
+    degradationNotice,
   }
 }

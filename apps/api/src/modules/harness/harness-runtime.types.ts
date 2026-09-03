@@ -59,6 +59,21 @@ export const HARNESS_RUN_EVENT_TYPES = [
   // 异步 worker 经 streamingAdapter.onToken 逐 chunk 写入 run 事件流。
   "text.delta",
   "thought",
+  // 批次 0.5（additive）：工具调用可视化事件——
+  // 批次 0 让工作台真正执行只读工具，但调用过程对用户完全不可见。本批把
+  // 「模型请求调用 → 执行中 → 成功 / 失败」四态写入 run 事件流，前端
+  // 消费侧（useChatMessages STREAM_EVENT_TYPES）经既有 SSE 透传链路呈现。
+  // 四条独立类型而非一条 + status：本表的作用是**把词汇锁进契约**，
+  // 把状态塞进 payload 等于造一个不受白名单校验的联合类型——绕过白名单。
+  // tool.call.progress 是本族唯一真正新增的状态：AgentEvent 只有
+  // tool_call / tool_result 两种 kind（批次 0 冻结裁决：复用既有 kind 不自造），
+  // 执行中心跳由事件映射层在两者之间派生，用于长耗时工具的可见性。
+  // 仅异步 run 通道发射；同步通道为历史遗留回退，本批不为其登记。
+  // confirm 相关类型属批次 1（写操作确认闸门），本批不预登记。
+  "tool.call.started",
+  "tool.call.progress",
+  "tool.call.completed",
+  "tool.call.failed",
 ] as const;
 export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
 

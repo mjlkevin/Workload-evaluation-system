@@ -392,6 +392,8 @@ function makeRunStepCtx(input: {
   ownerUserId: string;
   aiSessionId: string;
   content: string;
+  /** 批次 0.5 · ②：模拟工具执行耗时，使 progress 心跳可被确定性观测 */
+  toolDelayMs?: number;
 }): import("./harness-runtime.worker").HarnessWorkflowStepContext {
   return {
     run: {
@@ -425,7 +427,10 @@ function makeRunStepCtx(input: {
     resumeFrom: null,
     abortSignal: new AbortController().signal,
     makeEffectKey: (name, ord) => `${input.harnessRunId}:chat:${name}:${ord}`,
-    recordToolEffectOnce: async (effect) => ({ output: await effect.execute(), created: true }),
+    recordToolEffectOnce: async (effect) => {
+      if (input.toolDelayMs) await new Promise((resolve) => setTimeout(resolve, input.toolDelayMs));
+      return { output: await effect.execute(), created: true };
+    },
   };
 }
 
@@ -606,6 +611,183 @@ test("批次0·⑤：provider 边界实收 messages 与存储侧推导当场对�
     // 反空断：守卫必须真的在两轮的 provider 入参上各跑一次，否则零违规只是没跑到
     assert.equal(boundary.rounds, 2, `边界对账必须覆盖两次 provider 实调，实取 ${boundary.rounds} 次`);
     assert.deepEqual(boundary.violations, [], `provider 边界实收 messages 必须与存储侧推导逐条相等：${boundary.violations.join(" | ")}`);
+  } finally {
+    await deleteAiSession(user, session.sessionId);
+  }
+});
+
+// ============================================================
+// 批次 0.5 · ②：四类工具 UI 事件必须在【生产装配】里发射
+// ------------------------------------------------------------
+// workbench-chat.workflow.test.ts 的九个用例把 dispatch 整体打桩，结构上
+// 看不见 harness-boot 的接线（onEvent: input.onToolEvent、progressIntervalMs
+// 下传、provider chunk 的 toolCalls 透传）——与 DEF-2026-08-27-001 的教训同形：
+// 「中间层对了、底层写死」只有打在真实组装链上才构成回归防线。
+// 本用例同时钉住 ④ 的边界：UI 事件带完整参数（用户要看），而模型可见
+// messages 只带批次 0 的 [工具结果] 回填（既不得丢、也不得漏参数与中间态）。
+// 工具执行与只读判定用真实 default registry，故 provider 只能选一个
+// 与机器状态无关的只读工具：estimate_history（estimates.repository
+// getExportHistoryList 按 owner 过滤，新生成的随机 owner 恒得空集）。
+// 会话读写经真实 PG，故需 TEST_DATABASE_URL。
+// ============================================================
+
+const B05_SENTINEL = "B05SENTINEL-绝不得进入模型上下文-9f3c";
+
+test("批次0.5·②：四类 tool.call.* 经生产装配落入 run 事件流，且参数/中间态不进模型 messages", { skip: !def001TestDatabaseUrl }, async () => {
+  const ownerUserId = `wes-t-b05ui-${randomUUID().slice(0, 8)}`;
+  const user: AuthUser = { id: ownerUserId, username: ownerUserId, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" };
+  const session = await createAiSession(user, { title: "批次0.5 ② UI事件会话", workflowKey: "free_chat" });
+
+  type RecordedEvent = { eventType: string; payload: Record<string, unknown> };
+  const runEvents: RecordedEvent[] = [];
+  const providerCalls: ProviderCall[] = [];
+  let bootError: unknown = null;
+
+  const fakeProvider = {
+    name: "kimi",
+    defaultModel: "kimi-test",
+    isAvailable: () => true,
+    chatCompletion: async () => {
+      throw new Error("chatCompletion_should_not_be_called");
+    },
+    streamChatCompletion: (req: { messages: ProviderCall }) => {
+      providerCalls.push(req.messages.map((m) => ({ role: String(m.role), content: String(m.content) })));
+      const turnNo = providerCalls.length;
+      return (async function* () {
+        if (turnNo === 1) {
+          // 一轮内两个调用：只读工具（应 completed）+ 写工具（批次0 白名单必拒 → failed）
+          yield {
+            contentDelta: "",
+            model: "kimi-test",
+            finishReason: "tool_calls",
+            toolCalls: [
+              { id: "call_hist", name: "estimate_history", arguments: { page: 1, pageSize: 1 } },
+              { id: "call_write", name: "create_project", arguments: { projectName: B05_SENTINEL } },
+            ],
+          };
+          return;
+        }
+        yield { contentDelta: "工具已经跑完了。", model: "kimi-test", finishReason: "stop" };
+      })();
+    },
+  };
+
+  const runtime = startHarnessRuntime({
+    repo: {
+      appendRunEvent: async (input: { eventType: string; payload: Record<string, unknown> }) => {
+        runEvents.push({ eventType: input.eventType, payload: input.payload });
+        return input;
+      },
+      getRunSnapshot: async () => null,
+    } as any,
+    enabled: true,
+    resolveApiKey: () => ({ apiKey: "placeholder" }),
+    getProvider: () => fakeProvider as never,
+    // progress 是唯一新增状态，生产心跳 3s 在测试里等不起：下传小间隔 + 注入执行耗时，
+    // 使「执行中」心跳可被确定性观测（不注入即行为不变，见 HarnessRuntimeBootOptions）。
+    toolCallProgressIntervalMs: 25,
+    createWorker: ({ registry }) => ({
+      start: async () => {
+        try {
+          const workflow = registry.get("workbench_chat_v1", "1.0.0");
+          if (!workflow) throw new Error("workflow not found");
+          await workflow.executeStep(
+            "chat",
+            makeRunStepCtx({
+              harnessRunId: `run-b05ui-1-${ownerUserId}`,
+              ownerUserId,
+              aiSessionId: session.sessionId,
+              content: "帮我看看导出历史，再顺手建个项目",
+              toolDelayMs: 80,
+            }),
+          );
+        } catch (err) {
+          bootError = err;
+        }
+      },
+      stop: async () => {},
+      runNextAttempt: async () => false,
+      isStopping: () => false,
+    }),
+  });
+
+  await runtime.stop();
+
+  try {
+    assert.equal(bootError, null, `执行不得抛错：${bootError instanceof Error ? bootError.message : String(bootError)}`);
+    // 反空断：工具循环必须真跑了两轮，否则事件序列是零而非「顺序正确」
+    assert.equal(providerCalls.length, 2, `工具循环应触发两次 provider 调用，实取 ${providerCalls.length} 次`);
+
+    const marker = (event: RecordedEvent) =>
+      `${event.eventType}#${typeof event.payload.callIndex === "number" ? event.payload.callIndex : "-"}`;
+    const family = runEvents.filter((e) => e.eventType.startsWith("tool.call.") || e.eventType === "text.delta");
+    const indexes = family.map(marker);
+
+    const firstIndexOf = (needle: string) => indexes.indexOf(needle);
+    const started1 = firstIndexOf("tool.call.started#1");
+    const completed1 = firstIndexOf("tool.call.completed#1");
+    const started2 = firstIndexOf("tool.call.started#2");
+    const failed2 = firstIndexOf("tool.call.failed#2");
+    const progress1 = family.findIndex((e) => e.eventType === "tool.call.progress" && e.payload.callIndex === 1);
+    const progress2 = family.findIndex((e) => e.eventType === "tool.call.progress" && e.payload.callIndex === 2);
+    const firstTextDelta = firstIndexOf("text.delta#-");
+
+    assert.ok(started1 >= 0, `必须发射 callIndex=1 的 tool.call.started，实取 ${JSON.stringify(indexes)}`);
+    assert.ok(completed1 >= 0, "estimate_history 成功必须发射 tool.call.completed");
+    assert.ok(started2 >= 0, "第二个调用必须发射 callIndex=2 的 tool.call.started");
+    assert.ok(failed2 >= 0, "写工具被批次0 白名单拒绝必须发射 tool.call.failed");
+    assert.ok(progress1 >= 0, "长耗时调用必须发射 tool.call.progress（本批唯一新增状态）");
+    assert.ok(progress2 >= 0, "第二个调用同样要有 progress 心跳");
+    assert.ok(firstTextDelta >= 0, "模型回答正文仍须走 text.delta（既有事件不得被工具事件取代）");
+
+    // 「先说话、再要求调工具、再回答」的真实 interleaving 只能靠同一条串行写链保证
+    assert.ok(
+      started1 < progress1 && progress1 < completed1 && completed1 < started2 && started2 < progress2 && progress2 < failed2 && failed2 < firstTextDelta,
+      `事件顺序必须严格为 started1→progress1→completed1→started2→progress2→failed2→text.delta，实取 ${JSON.stringify(indexes)}`,
+    );
+
+    for (const callIndex of [1, 2]) {
+      const terminals = family.filter(
+        (e) => e.payload.callIndex === callIndex && (e.eventType === "tool.call.completed" || e.eventType === "tool.call.failed"),
+      );
+      assert.equal(terminals.length, 1, `callIndex=${callIndex} 只能有一个终态事件，实取 ${terminals.map((e) => e.eventType).join(",")}`);
+      const terminalPos = indexes.indexOf(`${terminals[0].eventType}#${callIndex}`);
+      const lateProgress = family.filter(
+        (e, pos) => e.eventType === "tool.call.progress" && e.payload.callIndex === callIndex && pos > terminalPos,
+      );
+      assert.equal(lateProgress.length, 0, `callIndex=${callIndex} 终态之后不得再发 progress（定时器未清理即事件外溢），实取 ${lateProgress.length} 条`);
+    }
+
+    const failedEvent = family[failed2];
+    assert.match(String(failedEvent.payload.error), /仅开放只读工具/, `写工具失败原因必须回填批次0 口径，实取 ${String(failedEvent.payload.error)}`);
+    assert.equal(failedEvent.payload.name, "create_project");
+    assert.ok(
+      typeof family[completed1].payload.resultPreview === "string" && String(family[completed1].payload.resultPreview).length > 0,
+      "completed 必须带 resultPreview 供 UI 展示结果摘要",
+    );
+    for (const pos of [progress1, progress2, completed1, failed2]) {
+      assert.ok(typeof family[pos].payload.elapsedMs === "number", `${family[pos].eventType} 必须带 elapsedMs`);
+    }
+    // UI 侧看得到完整参数——这是本批的存在理由；③/④ 的另一半在下面对模型侧断言
+    assert.equal(
+      JSON.stringify(family[started2].payload.arguments),
+      JSON.stringify({ projectName: B05_SENTINEL }),
+      "tool.call.started 必须把完整参数投给 UI 事件面",
+    );
+
+    // ④ 边界：第二轮模型请求只带批次 0 的 [工具结果] 回填，不带参数、不带中间态
+    const secondRequest = JSON.stringify(providerCalls[1]);
+    assert.ok(secondRequest.includes(B05_SENTINEL) === false, `UI 专属的完整参数泄进了模型上下文：${secondRequest}`);
+    for (const leaked of ["tool.call.", "elapsedMs", "callIndex", "resultPreview"]) {
+      assert.ok(secondRequest.includes(leaked) === false, `UI 事件字段「${leaked}」不得进入模型可见 messages`);
+    }
+    assert.ok(secondRequest.includes("[工具结果] estimate_history"), "批次0 的回填契约不得被本批削弱（工具结果必须回灌模型）");
+    assert.ok(secondRequest.includes("[工具结果] create_project"), "被拒绝的调用同样必须回填 ok:false，否则模型会无限重试");
+    assert.deepEqual(
+      providerCalls[1].map((m) => m.role),
+      ["system", "user", "assistant", "assistant"],
+      `第二轮模型入参形状错误，实取 ${JSON.stringify(providerCalls[1].map((m) => `${m.role}:${m.content.slice(0, 40)}`))}`,
+    );
   } finally {
     await deleteAiSession(user, session.sessionId);
   }

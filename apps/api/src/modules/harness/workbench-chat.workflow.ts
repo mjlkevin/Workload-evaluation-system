@@ -23,6 +23,7 @@ import type {
   HarnessWorkflowStepContext,
   HarnessWorkflowStepOutcome,
 } from "./harness-runtime.worker";
+import type { HarnessRunEventType } from "./harness-runtime.types";
 import type {
   StreamingChunk,
   WorkbenchDispatchInput,
@@ -30,6 +31,8 @@ import type {
   WorkbenchMemoryRefTrace,
 } from "../../services/ai/workbench-dispatch.service";
 import type { WorkbenchToolEffectOutput } from "../../services/ai/workbench-tool-loop";
+import { createWorkbenchToolEventSink, toWorkbenchToolCallMetadata } from "../../services/ai/workbench-tool-event-surface";
+import type { WorkbenchToolCallSummary } from "../../services/ai/workbench-tool-event-surface";
 import type {
   AppendAiSessionMessageIdempotentInput,
   AppendAiSessionMessageIdempotentResult,
@@ -72,12 +75,22 @@ export type WorkbenchChatWorkflowDeps = {
    * text.delta → { delta }，thought → { text }。
    * 可选以保持 additive 不破坏既有构造点（如 workflow 测试 stub）；
    * 未注入时流式事件静默跳过，不影响 dispatch 主链路。
+   *
+   * 批次 0.5 · ②：eventType 由 "text.delta" | "thought" 放宽到整个
+   * HarnessRunEventType——工具四类（tool.call.*）与本族共用**同一条串行写链**，
+   * 时序即模型真实产生顺序；再收窄字面量联合会让工具事件只能另起一条链，
+   * sequence 将反映错误的 interleaving。白名单校验在 repository 侧，本处不重复。
    */
   appendRunEvent?(input: {
     runId: string;
-    eventType: "text.delta" | "thought";
+    eventType: HarnessRunEventType;
     payload: Record<string, unknown>;
   }): Promise<unknown>;
+  /**
+   * 批次 0.5 · ②：tool.call.progress 心跳间隔（additive，仅测试用）。
+   * 缺省取 WORKBENCH_TOOL_CALL_PROGRESS_INTERVAL_MS；0 关闭心跳。
+   */
+  toolCallProgressIntervalMs?: number;
   /**
    * ISS-2026-08-16-002：会话级附件回退——请求未携带附件时，从已落库会话
    * 记录中取最近一个带 parsedSummary 的附件作为 dispatch 上下文（与同步
@@ -209,7 +222,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
           // 副作用位于 execute 内，恢复重放经 recordToolEffectOnce 跳过，幂等天然成立；
           // 写链串行化保持事件时序，单条写失败不阻断模型主链路。
           let streamEventChain: Promise<unknown> = Promise.resolve();
-          const appendStreamEvent = (eventType: "text.delta" | "thought", payload: Record<string, unknown>) => {
+          const appendStreamEvent = (eventType: HarnessRunEventType, payload: Record<string, unknown>) => {
             if (!deps.appendRunEvent) return; // 未注入（兼容构造点）时静默跳过
             const append = deps.appendRunEvent;
             streamEventChain = streamEventChain
@@ -237,6 +250,15 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               }
             },
           };
+          // 批次 0.5 · ②：工具调用四类 UI 事件。发射口挂在**同一条** streamEventChain
+          // 上——与 text.delta 共用串行写链与 execute 返回前的冲刷，sequence 才能反映
+          // 「模型先说话、再要求调工具、再回答」的真实 interleaving。callIndex 由 sink
+          // 持有（AgentEvent 无 toolCallId，UI 配对只能靠本轮序号）；progress 心跳亦归
+          // sink 管理。副作用位于 execute 内，恢复重放跳过 execute，幂等天然成立。
+          const toolEventSink = createWorkbenchToolEventSink({
+            emit: appendStreamEvent,
+            progressIntervalMs: deps.toolCallProgressIntervalMs,
+          });
           let result: Awaited<ReturnType<WorkbenchChatWorkflowDeps["dispatch"]>>;
           try {
             result = await deps.dispatch({
@@ -247,6 +269,9 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               messages: historyMessages,
               projectId: memoryProjectId,
               streamingAdapter,
+              // 批次 0.5 · ②：工具事件 → UI 事件接缝（additive）。仅异步 Run 通道
+              // 注入；同步直写路径不经 Harness 事件流，无 runId 可写，不注入即为 undefined。
+              onToolEvent: toolEventSink.onToolEvent,
               // 批次 0 · ⑤：发送-vs-存储对账的读取钩子。必须当场重取会话记录，
               // 不得复用上面的 historyMessages——那份正是被对账的发送侧，同源即永真。
               ...(deps.getSessionRecord
@@ -286,6 +311,10 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               });
             }
             throw err;
+          } finally {
+            // 心跳定时器无条件停止：dispatch 若在 tool_call 与 tool_result 之间抛错，
+            // 存活定时器会持续往已失败的 Run 写 progress（事件泄漏 + 污染时序）。
+            toolEventSink.stop();
           }
           // execute 返回前冲刷写链，避免流式事件丢失在游离 promise 中
           await streamEventChain;
@@ -302,6 +331,9 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               // trace 写入失败不影响主链路
             });
           }
+          // 批次 0.5 · ③：快照取在写链冲刷之后——sink 与四类事件同源，
+          // 此处读到的一定是整轮工具循环落定后的终态。
+          const toolCallSummaries = toolEventSink.getToolCalls();
           return {
             answer: result.answer,
             intent: result.intent,
@@ -311,6 +343,9 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
             // memoryRef 必须进 execute 返回值：恢复重放会跳过 execute，
             // 只有幂等吸收后的 output 才能保证两次执行写出同一条 metadata。
             ...(memoryRef ? { memoryRef } : {}),
+            // 批次 0.5 · ③：工具调用展示摘要同理——重放若不从 output 读，
+            // sink 内存态已随第一次执行销毁，重放会写出空列表（可视化倒退）。
+            ...(toolCallSummaries.length ? { toolCalls: toolCallSummaries } : {}),
           };
         },
       });
@@ -322,6 +357,13 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       const trace = (output as any).trace ?? {};
       const formBlock = (output as any).formBlock;
       const memoryRef = (output as any).memoryRef as WorkbenchMemoryRefTrace | undefined;
+      const absorbedToolCalls = (output as any).toolCalls as WorkbenchToolCallSummary[] | undefined;
+      // 批次 0.5 · ③：镜像到 metadata **顶层** toolCalls。前端 mapSessionMessages
+      // 只读顶层（MS3 口径），而 trace.toolCalls 嵌在 metadata.trace 下——不镜像
+      // 则刷新页面/重开会话后 ② 的三态全部消失，可视化只活在一次 SSE 连接里。
+      // 落库只带展示字段（callIndex/name/status/elapsedMs/errorPreview + source），
+      // 完整参数与结果预览留在事件面，不进随会话持久化的列表。
+      const toolCalls = toWorkbenchToolCallMetadata(absorbedToolCalls ?? [], (trace as { toolCalls?: unknown }).toolCalls);
       const messageMetadata = {
         intent,
         suggestedActions,
@@ -329,6 +371,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         ...(formBlock ? { formBlock } : {}),
         // 前端 messageFormatter 只读 metadata 顶层 memoryRef，不得嵌进 trace
         ...(memoryRef ? { memoryRef } : {}),
+        ...(toolCalls ? { toolCalls } : {}),
       };
 
       // S2b-2（§4.8 补偿链删除）：assistant 消息与 user 消息同款经
