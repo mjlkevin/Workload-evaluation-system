@@ -9,6 +9,8 @@
  *   3. 需求数量 KPI 在不同页面间不一致
  *   4. 导航栏 HTML 片段不一致（结构漂移）
  *   5. Google Fonts 外部依赖检测
+ *   6. （保留编号）
+ *   7. HTML 标签闭合校验（td / tr / table / details 按行计数）
  *
  * 用法：node scripts/board-consistency-check.js [--fix]
  *   --fix  自动修复可安全修复的问题（当前仅报告，不自动修复）
@@ -120,6 +122,27 @@ function extractNavHtml(html) {
 // ─── 检测 Google Fonts 依赖 ───
 function hasGoogleFonts(html) {
   return /fonts\.googleapis\.com|fonts\.gstatic\.com/.test(html);
+}
+
+// ─── 检查 7：HTML 标签闭合校验（td / tr / table / details） ───
+// 裁决 C（2026-09-03 架构侧）：看板行级 HTML 的 <td> 漏闭合靠浏览器自动闭合，
+// 一致性门禁应主动捕获。采用整文件计数比对：开标签总数 ≠ 闭标签总数即报错误。
+// 注：本板所有 <table>/<tr>/<details> 均为成对闭合（多行展开），按文件计数足够定位漏闭合。
+const TAG_CLOSURE_TAGS = ['td', 'tr', 'table', 'details'];
+
+function checkTagClosures(html, filename) {
+  const issues = [];
+  for (const tag of TAG_CLOSURE_TAGS) {
+    const openRe = new RegExp(`<${tag}(?:\\s[^>]*)?>`, 'gi');
+    const closeRe = new RegExp(`</${tag}>`, 'gi');
+    const selfCloseRe = new RegExp(`<${tag}[^>]*/>`, 'gi');
+    const opens = (html.match(openRe) || []).length - (html.match(selfCloseRe) || []).length;
+    const closes = (html.match(closeRe) || []).length;
+    if (opens !== closes) {
+      issues.push({ tag, opens, closes, file: filename });
+    }
+  }
+  return issues;
 }
 
 // ─── 主检查逻辑 ───
@@ -269,6 +292,39 @@ function run() {
     ok('无 Google Fonts 外部依赖');
   }
 
+  // ─── 检查 7：HTML 标签闭合（td / tr / table / details） ───
+  console.log(`\n${BOLD}── 检查 7：HTML 标签闭合校验 ──${RESET}`);
+  // 裁决 C（2026-09-03）：
+  //   - <td> 漏闭合（changes.html 单行式行的已知形态）→ error，必须清零
+  //   - 其他标签（tr / table / details）整文件计数不匹配 → warn，留作跨页陈旧事实备查
+  //     （多行展开结构偶有跨行未闭合，按整文件计数会出现假阳性，故降级处理）
+  let tagClosureErrors = 0;
+  let tagClosureWarnings = 0;
+  for (const [file, data] of Object.entries(pages)) {
+    const found = checkTagClosures(data.html, file);
+    for (const iss of found) {
+      const delta = iss.opens - iss.closes;
+      const msg = `${iss.file} <${iss.tag}> 不闭合 → opens=${iss.opens} closes=${iss.closes}（Δ=${delta}）`;
+      if (iss.tag === 'td') {
+        error(msg);
+        tagClosureErrors++;
+      } else {
+        warn(msg + '（多行结构允许，降级为警告）');
+        tagClosureWarnings++;
+      }
+    }
+  }
+  if (tagClosureErrors > 0) {
+    issues += tagClosureErrors;
+  } else if (tagClosureWarnings === 0) {
+    ok(`全部 ${Object.keys(pages).length} 页标签闭合正常（检查标签：${TAG_CLOSURE_TAGS.join(' / ')}）`);
+  } else {
+    ok(`<td> 全部闭合正常（共 ${Object.keys(pages).length} 页）`);
+  }
+  if (tagClosureWarnings > 0) {
+    warnings += tagClosureWarnings;
+  }
+
   // ─── 汇总 ───
   console.log(`\n${BOLD}═══ 校验结果 ═══${RESET}`);
   console.log(`  错误：${issues}`);
@@ -289,4 +345,4 @@ function run() {
 
 if (require.main === module) run();
 
-module.exports = { BOARD_DIR, HTML_FILES, main: run, run };
+module.exports = { BOARD_DIR, HTML_FILES, main: run, run, checkTagClosures, TAG_CLOSURE_TAGS };
