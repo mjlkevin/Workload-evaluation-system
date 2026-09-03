@@ -311,3 +311,202 @@ test("KimiProvider: 流式响应提取 reasoning_content 与 usage", async () =>
     globalThis.fetch = originalFetch;
   }
 });
+
+// ============================================================
+// Batch 0 · 异步流式路径工具调用能力（三处注入点中的 harness 站点前置）
+// 缺失即静默：流式若不注入 tools，模型永远不会发起 tool_calls；
+// 若不解析 delta.tool_calls，即使发起了也读不到。
+// ============================================================
+
+test("KimiProvider: 流式请求体在 tools 非空时注入 tools 与默认 tool_choice=auto", async () => {
+  const originalFetch = globalThis.fetch;
+  let capturedBody: Record<string, unknown> | undefined;
+  const encoder = new TextEncoder();
+  globalThis.fetch = async (_url, init) => {
+    capturedBody = JSON.parse(String(init?.body));
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n'),
+          );
+          controller.close();
+        },
+      }),
+      { status: 200 },
+    );
+  };
+
+  try {
+    const provider = new KimiProvider({ apiKey: "test-key" });
+    for await (const _chunk of provider.streamChatCompletion({
+      messages: [{ role: "user", content: "查项目" }],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "query_project_list",
+            description: "查询项目列表",
+            parameters: { type: "object", properties: { keyword: { type: "string" } } },
+          },
+        },
+      ],
+    })) {
+      // 冲刷流，请求体在首个 await 前已构造
+    }
+
+    assert.deepEqual(capturedBody?.tools, [
+      {
+        type: "function",
+        function: {
+          name: "query_project_list",
+          description: "查询项目列表",
+          parameters: { type: "object", properties: { keyword: { type: "string" } } },
+        },
+      },
+    ]);
+    assert.equal(capturedBody?.tool_choice, "auto");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("KimiProvider: 流式按 index 聚合 delta.tool_calls 分片并在末 chunk 输出完整调用", async () => {
+  const originalFetch = globalThis.fetch;
+  const encoder = new TextEncoder();
+  const events = [
+    // 分片 1：id / name 出现在最早的分片，arguments 为空
+    '{"choices":[{"index":0,"delta":{"role":"assistant","content":"","tool_calls":[{"index":0,"id":"call_a","type":"function","function":{"name":"query_project_list","arguments":""}}]},"finish_reason":null}]}',
+    // 分片 2：arguments 续写
+    '{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"keyword\\":"}}]},"finish_reason":null}]}',
+    // 分片 3：并行第二个调用 + 第一个调用参数收尾
+    '{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"ERP\\"}"}},{"index":1,"id":"call_b","type":"function","function":{"name":"lookup_rule","arguments":"{}"}}]},"finish_reason":null}]}',
+    // 终止分片
+    '{"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}',
+  ];
+
+  globalThis.fetch = async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(events.map((e) => `data: ${e}`).join("\n\n") + "\n\ndata: [DONE]\n"));
+          controller.close();
+        },
+      }),
+      { status: 200 },
+    );
+
+  try {
+    const provider = new KimiProvider({ apiKey: "test-key" });
+    const chunks = [];
+    for await (const chunk of provider.streamChatCompletion({
+      messages: [{ role: "user", content: "查项目" }],
+      tools: [],
+    })) {
+      chunks.push(chunk);
+    }
+
+    const terminal = chunks[chunks.length - 1];
+    assert.equal(terminal.finishReason, "tool_calls");
+    assert.deepEqual(terminal.toolCalls, [
+      { id: "call_a", name: "query_project_list", arguments: { keyword: "ERP" } },
+      { id: "call_b", name: "lookup_rule", arguments: {} },
+    ]);
+    // 同一批调用只允许交付一次（只看末帧数不出多发）
+    assert.equal(chunks.filter((chunk) => chunk.toolCalls?.length).length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("KimiProvider: 结束帧之后厂商补发的纯用量帧不得再次携带同一批 tool_calls", async () => {
+  const originalFetch = globalThis.fetch;
+  const encoder = new TextEncoder();
+  const events = [
+    // 工具调用分片（finish_reason 仍为 null，只累积不交付）
+    '{"choices":[{"index":0,"delta":{"role":"assistant","content":"","tool_calls":[{"index":0,"id":"call_a","type":"function","function":{"name":"project_list","arguments":"{}"}}]},"finish_reason":null}]}',
+    // 结束帧：由这一帧负责交付
+    '{"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}',
+    // 结束帧之后厂商补发的纯用量帧（OpenAI 兼容接口开 include_usage 的标准形态：choices 为空）
+    // finishReason 是粘性的，若此处不判已交付，同一批 tool_calls 会被再交付一次 → 下游执行两次
+    '{"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}',
+  ];
+
+  globalThis.fetch = async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(events.map((e) => `data: ${e}`).join("\n\n") + "\n\ndata: [DONE]\n"));
+          controller.close();
+        },
+      }),
+      { status: 200 },
+    );
+
+  try {
+    const provider = new KimiProvider({ apiKey: "test-key" });
+    const chunks = [];
+    for await (const chunk of provider.streamChatCompletion({
+      messages: [{ role: "user", content: "查项目" }],
+      tools: [],
+    })) {
+      chunks.push(chunk);
+    }
+
+    const framesWithToolCalls = chunks.filter((chunk) => chunk.toolCalls?.length);
+    assert.equal(
+      framesWithToolCalls.length,
+      1,
+      `同一批 tool_calls 只能交付一次，实际交付 ${framesWithToolCalls.length} 帧（重复交付会导致工具被执行两次）`,
+    );
+    assert.deepEqual(framesWithToolCalls[0]?.toolCalls, [
+      { id: "call_a", name: "project_list", arguments: {} },
+    ]);
+    // 修重复交付不得把用量帧一起吞掉：usage 仍必须送达
+    assert.deepEqual(chunks[chunks.length - 1].usage, {
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("KimiProvider: 流式无 tool_calls 时不输出 toolCalls 字段（additive 不污染普通回答）", async () => {
+  const originalFetch = globalThis.fetch;
+  const encoder = new TextEncoder();
+  globalThis.fetch = async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              'data: {"choices":[{"delta":{"content":"普通回答"},"finish_reason":null}]}\n\n' +
+                'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n',
+            ),
+          );
+          controller.close();
+        },
+      }),
+      { status: 200 },
+    );
+
+  try {
+    const provider = new KimiProvider({ apiKey: "test-key" });
+    const chunks = [];
+    for await (const chunk of provider.streamChatCompletion({
+      messages: [{ role: "user", content: "闲聊" }],
+    })) {
+      chunks.push(chunk);
+    }
+
+    assert.equal(
+      chunks.every((chunk) => !("toolCalls" in chunk) || chunk.toolCalls === undefined),
+      true,
+    );
+    assert.equal(chunks[chunks.length - 1].finishReason, "stop");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

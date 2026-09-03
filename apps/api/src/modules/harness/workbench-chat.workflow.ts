@@ -29,6 +29,7 @@ import type {
   WorkbenchDispatchData,
   WorkbenchMemoryRefTrace,
 } from "../../services/ai/workbench-dispatch.service";
+import type { WorkbenchToolEffectOutput } from "../../services/ai/workbench-tool-loop";
 import type {
   AppendAiSessionMessageIdempotentInput,
   AppendAiSessionMessageIdempotentResult,
@@ -50,6 +51,13 @@ export type WorkbenchChatWorkflowDeps = {
   dispatch(input: Pick<WorkbenchDispatchInput, "message" | "user" | "workflowKey"> & Partial<WorkbenchDispatchInput> & {
     messages?: HomeMessageInput[];
     projectId?: string;
+    /**
+     * 批次 0 · ⑤：存储侧快照读取钩子（additive）。`messages` 是**发送侧**
+     * （已经过 workflow → dispatch → modelChatStream 管道），本钩子供调用方
+     * 在请求构造点**当场重取**会话记录作为**存储侧**基准，两侧独立推导再对账。
+     * 只有异步 Run 通道存储权威，故只有本通道注入；未注入即不对账（行为同修复前）。
+     */
+    readSessionForInvariant?: () => Promise<AiSessionRecord | null>;
   }): Promise<WorkbenchDispatchData>;
   /**
    * 用户消息幂等落库（复用 ai-sessions 仓库公开 API，与直写路径同款）。
@@ -182,7 +190,11 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         // 异步路径降级为普通问答，由意图分发器路由到静态文案）。
       }
 
-      // effectKey 冻结口径：workbench_chat_answer
+      // effectKey 冻结口径：外层 dispatch 副作用恒为 workbench_chat_answer:1。
+      // 批次 0 · ④：工具调用不复用这个 key——一轮 Run 内可能有 N 次工具调用，
+      // 共用固定 key 会让第 2..N 次命中第 1 次已记录的 effect 被直接跳过
+      // （副作用互相吞）。工具副作用改由下方 recordToolEffect 接缝逐 ordinal
+      // 落 workbench_chat_tool_call:N，结构仍由 ctx.makeEffectKey 冻结。
       const effectKey = ctx.makeEffectKey("workbench_chat_answer", 1);
 
       const effectResult = await ctx.recordToolEffectOnce({
@@ -235,6 +247,27 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               messages: historyMessages,
               projectId: memoryProjectId,
               streamingAdapter,
+              // 批次 0 · ⑤：发送-vs-存储对账的读取钩子。必须当场重取会话记录，
+              // 不得复用上面的 historyMessages——那份正是被对账的发送侧，同源即永真。
+              ...(deps.getSessionRecord
+                ? { readSessionForInvariant: () => deps.getSessionRecord!(aiSessionId, run.ownerUserId) }
+                : {}),
+              // 批次 0 · ④：工具副作用逐次落独立 effectKey（N = 全局第 N 次工具调用）。
+              // 命中已记录 effect 时 recordToolEffectOnce 直接回存量 output 且不调用
+              // execute —— 重放同一 Run 不会重复执行工具，幂等语义与外层同构。
+              recordToolEffect: async (ordinal, execute, toolEffectContext) => {
+                const { output } = await ctx.recordToolEffectOnce({
+                  effectKey: ctx.makeEffectKey("workbench_chat_tool_call", ordinal),
+                  toolName: "workbench_chat_tool_call",
+                  input: {
+                    ordinal,
+                    toolName: toolEffectContext.toolName,
+                    arguments: toolEffectContext.arguments,
+                  },
+                  execute,
+                });
+                return (output ?? { ok: false, error: "effect_output_missing" }) as WorkbenchToolEffectOutput;
+              },
             });
           } catch (err) {
             // RP-030：失败 trace 归档（与同步路径同口径；归档自身失败静默吸收），随后重抛由 runtime 标记 run failed

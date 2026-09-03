@@ -13,6 +13,7 @@ import type {
   WorkbenchSuggestedAction,
 } from "../workbench-dispatch.service";
 import { extractFormBlockFromModelOutput } from "./form-block";
+import { createWorkbenchToolCallTraceCollector } from "../workbench-tool-loop";
 
 /**
  * 附件摘要 / 附件问答 — 调用模型回复
@@ -57,10 +58,14 @@ export async function answerWithModelAndContext(
   if (input.streamingAdapter && input.modelChatStream) {
     let fullContent = "";
     let lastChunk: StreamingChunk | undefined;
+    // 批次 0 · ③：流式分支不经过 modelChat，dispatch 的捕获包装看不到工具调用，
+    // 故在此按 chunk 收集（去双投 + 按名去重），使流式/非流式 trace 同形状。
+    const toolCallTrace = createWorkbenchToolCallTraceCollector();
     try {
       const stream = input.modelChatStream({ systemPrompt, userContent });
       for await (const chunk of stream) {
         input.streamingAdapter.onToken(chunk);
+        toolCallTrace.absorb(chunk);
         fullContent += chunk.contentDelta || "";
         lastChunk = chunk;
       }
@@ -114,6 +119,7 @@ export async function answerWithModelAndContext(
         routingRule: intent.routingRule,
         contextRefs: context.contextRefs,
         modelRun: modelRunTrace,
+        ...(toolCallTrace.toTrace() ? { toolCalls: toolCallTrace.toTrace() } : {}),
       },
     };
   }
