@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { HoverBadge } from './MessageBits.jsx'
 import MessageList from './MessageList.jsx'
 import Composer from './Composer.jsx'
+import AiDegradationNotice from './AiDegradationNotice.jsx'
 import { apiClient } from '../../../../api/client.js'
 
 const panel = {
@@ -114,6 +115,9 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
           </Link>
         </div>
       )}
+
+      {/* 批次 0.5 · Part2：应答通道改走备用时必须可见（贴发送区，用户正要按发送键） */}
+      <AiDegradationNotice notice={chat.degradationNotice} />
 
       <Composer
         composer={workbench.composer}

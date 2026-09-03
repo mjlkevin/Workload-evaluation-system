@@ -23,6 +23,8 @@ import { createAiSessionsRouter } from "./ai-sessions.routes";
 import systemRouter from "./system.routes";
 import { createHarnessRuntimeRepository, type HarnessRuntimeRepository } from "../modules/harness/harness-runtime.repository";
 import type { AiRunsUsecase } from "../modules/harness/harness-runtime.usecase";
+import { startHarnessRuntime } from "../modules/harness/harness-boot";
+import { routeWorkbenchIntent } from "../services/ai/workbench-intent.service";
 import { appendAiSessionEvent, createAiSession, deleteAiSession } from "../modules/ai-sessions/ai-sessions.usecase";
 import { signAuthToken } from "../middleware/auth";
 import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
@@ -738,6 +740,238 @@ test("client disconnect does not cancel the run and replay can resume", { skip: 
     // 重连仍可回放既有事件
     const resumed = await collectSse({ port: server.port, path: `/ai-runs/${runId}/events?after=0`, token: aliceToken, abortAfterMs: 500, timeoutMs: 5_000 });
     assert.ok(resumed.events.some((event) => event.event === "run_queued"), "重连后事件必须可继续回放");
+  } finally {
+    await server.close();
+  }
+});
+
+// ============================================================
+// 批次 0.5 · ② 交付判据实取：四类 tool.call.* 经【真实 repository】落
+// harness_run_events，并在【SSE 帧序列】里按顺序出现（判据 1 + 判据 3）。
+// 与 harness-boot.test.ts 同名回归的分工：boot 级用桩 repo 断「生产装配把
+// onToolEvent 接缝接通 + 参数/中间态不进模型 messages」；本条断「事件真正
+// 持久化 + 真正经 HTTP 帧回放」。两者不可互相替代——桩 repo 不校验 sequence
+// 分配与 payload 落库往返，表查询也看不到线格式。
+// ============================================================
+
+/** 工具执行耗时注入：progress 心跳间隔 25ms × 延迟 80ms ⇒ 每次调用至少一条心跳。 */
+function makeToolStepCtx(input: {
+  runId: string;
+  ownerUserId: string;
+  ownerUsername: string;
+  aiSessionId: string;
+  content: string;
+}): import("../modules/harness/harness-runtime.worker").HarnessWorkflowStepContext {
+  return {
+    run: {
+      harnessRunId: input.runId,
+      ownerUserId: input.ownerUserId,
+      ownerUsername: input.ownerUsername,
+      aiSessionId: input.aiSessionId,
+      submissionKey: `sub-${input.runId}`,
+      title: input.content.slice(0, 40),
+      workflowId: "workbench_chat_v1",
+      workflowVersion: "1.0.0",
+      executionConfig: { content: input.content },
+      status: "running",
+      eventSequence: 1,
+      metadata: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any,
+    attempt: {
+      harnessRunAttemptId: `attempt-${input.runId}`,
+      harnessRunId: input.runId,
+      workerId: "b05-worker",
+      attemptNo: 1,
+      status: "claimed",
+      startedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any,
+    stepKey: "chat",
+    state: {},
+    resumeFrom: null,
+    abortSignal: new AbortController().signal,
+    makeEffectKey: (name, ord) => `${input.runId}:chat:${name}:${ord}`,
+    recordToolEffectOnce: async (effect) => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      return { output: await effect.execute(), created: true };
+    },
+  };
+}
+
+test("批次0.5·②：四类工具事件落 harness_run_events 并按序经 SSE 帧回放", { skip: !testDatabaseUrl }, async () => {
+  // content 措辞是承重的：意图分发器按关键词先路由，命中 write_action_request 等
+  // 静态 handler 则**根本不调用模型**，四类事件必为 0（表现为「落库缺失」而非装配缺陷）。
+  // 下面断言把这条前置条件钉死，规则变更时失败信息直接指向路由。
+  const content = "先看看历史估算记录，再说说整体情况";
+  const routed = routeWorkbenchIntent({
+    message: content,
+    hasAttachment: false,
+    hasLatestV1Artifact: false,
+    clientAction: "",
+  });
+  assert.equal(routed.routingRule, "default_domain_qa", `前置条件：content 必须命中模型问答分支，实取 ${JSON.stringify(routed)}`);
+  const sessionCreated = await createAiSession(alice!, { title: "批次0.5 ② 落库与帧回放会话", workflowKey: "free_chat" });
+  const sessionId = trackSession(sessionCreated.sessionId);
+  const created = await repo!.createQueuedRun({
+    ownerUserId: alice!.id,
+    ownerUsername: alice!.username,
+    aiSessionId: sessionId,
+    submissionKey: `submission-${randomUUID()}`,
+    title: content,
+    workflowId: "workbench_chat_v1",
+    workflowVersion: "1.0.0",
+  });
+  const runId = created.run.harnessRunId;
+  track(runId);
+  await testDb!
+    .update(harnessRuns)
+    .set({ availableAt: new Date(Date.now() - 60_000) })
+    .where(eq(harnessRuns.harnessRunId, runId));
+  const claimed = await claimRunById(runId);
+
+  let callTurn = 0;
+  let bootError: unknown = null;
+  const fakeProvider = {
+    name: "kimi",
+    defaultModel: "kimi-test",
+    isAvailable: () => true,
+    chatCompletion: async () => {
+      throw new Error("chatCompletion_should_not_be_called");
+    },
+    streamChatCompletion: () => {
+      callTurn += 1;
+      if (callTurn === 1) {
+        return (async function* () {
+          yield {
+            contentDelta: "",
+            model: "kimi-test",
+            finishReason: "tool_calls",
+            toolCalls: [
+              { id: "call_hist", name: "estimate_history", arguments: { page: 1, pageSize: 1 } },
+              { id: "call_write", name: "create_project", arguments: { projectName: "批次0.5落库探针" } },
+            ],
+          };
+        })();
+      }
+      return (async function* () {
+        yield { contentDelta: "工具已经跑完了。", model: "kimi-test", finishReason: "stop" };
+      })();
+    },
+  };
+
+  const runtime = startHarnessRuntime({
+    repo: repo!,
+    enabled: true,
+    resolveApiKey: () => ({ apiKey: "placeholder" }),
+    getProvider: () => fakeProvider as never,
+    // default_domain_qa 分支会拿 modelChat 做二次意图分类；本机若配了真实
+    // KIMI_API_KEY 就会真发网络请求并可能把意图翻成 unsupported（不再走模型流）。
+    // 桩答案刻意不含 JSON ⇒ classifyIntentWithModel 恒返回 null，路由稳定在问答分支。
+    createModelChat: () => async () => ({
+      answer: "本用例不参与模型二次分类",
+      rawContent: "本用例不参与模型二次分类",
+      provider: "stub",
+      model: "stub",
+      attempts: 1,
+      finishReason: "stop",
+    }),
+    toolCallProgressIntervalMs: 25,
+    createWorker: ({ registry }) => ({
+      start: async () => {
+        try {
+          const workflow = registry.get("workbench_chat_v1", "1.0.0");
+          if (!workflow) throw new Error("workflow not found");
+          await workflow.executeStep("chat", makeToolStepCtx({
+            runId,
+            ownerUserId: alice!.id,
+            ownerUsername: alice!.username,
+            aiSessionId: sessionId,
+            content,
+          }));
+        } catch (err) {
+          bootError = err;
+        }
+      },
+      stop: async () => {},
+      runNextAttempt: async () => false,
+      isStopping: () => false,
+    }),
+  });
+  await runtime.stop();
+  assert.equal(bootError, null, `workflow 执行不得抛错：${bootError instanceof Error ? bootError.message : String(bootError)}`);
+  // 反空断：模型必须真被调用两轮（工具轮 + 回答轮）。缺这条断言时「provider 没跑」
+  // 与「事件没发射」都表现为零行，二者根因完全不同却无从分辨。
+  assert.equal(callTurn, 2, `provider 必须被调用两轮（工具轮 + 回答轮），实取 ${callTurn} 次`);
+  await repo!.completeAttemptAndRun({ attemptId: claimed.attempt.harnessRunAttemptId, runId, outcome: "succeeded" });
+
+  // ---------- 判据 3：查表，不是查日志 ----------
+  const rows = await listEvents(runId);
+  const toolRows = rows.filter((row) => row.eventType.startsWith("tool.call."));
+  const typeCounts = new Map<string, number>();
+  for (const row of toolRows) {
+    typeCounts.set(row.eventType, (typeCounts.get(row.eventType) ?? 0) + 1);
+  }
+  console.log("[B05·② harness_run_events 实取] runId=%s\n%s", runId,
+    rows.map((row) => `  sequence=${row.sequence} event_type=${row.eventType} payload=${JSON.stringify(row.payload)}`).join("\n"));
+  for (const type of ["tool.call.started", "tool.call.progress", "tool.call.completed", "tool.call.failed"]) {
+    assert.ok((typeCounts.get(type) ?? 0) >= 1, `表内必须存在 ${type} 行，实取 ${typeCounts.get(type) ?? 0} 行`);
+  }
+  // 复用既有单调 sequence：连续无空洞，(runId, sequence) 唯一性由 DB 保证
+  assert.deepEqual(rows.map((row) => row.sequence), rows.map((_, i) => i + 1), "sequence 必须是该 Run 内的连续单调序号");
+
+  const tableMarkers = [...new Set(toolRows.map((row) => `${row.eventType}#${(row.payload as { callIndex?: number }).callIndex}`))];
+  assert.deepEqual(tableMarkers, [
+    "tool.call.started#1",
+    "tool.call.progress#1",
+    "tool.call.completed#1",
+    "tool.call.started#2",
+    "tool.call.progress#2",
+    "tool.call.failed#2",
+  ], "表内四类事件必须按【调用一：started→progress→completed / 调用二：started→progress→failed】顺序落库");
+  // 只读工具成功、写工具被白名单拒绝（批次 0 冻结口径）
+  const completedRow = toolRows.find((row) => row.eventType === "tool.call.completed")!;
+  const failedRow = toolRows.find((row) => row.eventType === "tool.call.failed")!;
+  assert.equal((completedRow.payload as { name?: string }).name, "estimate_history");
+  assert.equal((failedRow.payload as { name?: string }).name, "create_project");
+  assert.match(String((failedRow.payload as { error?: string }).error), /仅开放只读工具/);
+  assert.equal(
+    JSON.stringify((toolRows.find((row) => row.eventType === "tool.call.started" && (row.payload as { callIndex?: number }).callIndex === 2)!.payload as { arguments?: unknown }).arguments),
+    JSON.stringify({ projectName: "批次0.5落库探针" }),
+    "工具入参必须完整落库供 UI 呈现（UI 侧不做二次截断）",
+  );
+
+  // ---------- 判据 1：实际抓帧，不是只看最后一帧 ----------
+  const app = makeApp({ enabled: true, sse: { pollMs: 50, heartbeatMs: 3_000 } });
+  const server = await listen(app);
+  try {
+    const stream = await collectSse({ port: server.port, path: `/ai-runs/${runId}/events?after=0`, token: aliceToken, timeoutMs: 5_000 });
+    assert.equal(stream.contentType.includes("text/event-stream"), true);
+    assert.equal(stream.closedByServer, true, "终态排空后服务端必须主动关闭");
+    console.log("[B05·② SSE 帧实取] %s 帧", stream.events.length);
+    for (const frame of stream.events) {
+      console.log("  id: %s\nevent: %s\ndata: %s\n", frame.id, frame.event, frame.data);
+    }
+    const frameSeq = stream.events.map((frame) => Number(frame.id));
+    assert.deepEqual(frameSeq, rows.map((row) => row.sequence), "SSE 帧序号必须与表内 sequence 完全一致（同一单调序号，另建去重即回归）");
+    const frameMarkers = [...new Set(
+      stream.events
+        .filter((frame) => String(frame.event ?? "").startsWith("tool.call."))
+        .map((frame) => `${frame.event}#${(JSON.parse(frame.data).payload as { callIndex?: number }).callIndex}`),
+    )];
+    assert.deepEqual(frameMarkers, tableMarkers, "SSE 帧序列里的四类事件顺序必须与落库顺序一致");
+    const frameTypes = new Set(stream.events.map((frame) => frame.event));
+    for (const type of ["tool.call.started", "tool.call.progress", "tool.call.completed", "tool.call.failed"]) {
+      assert.ok(frameTypes.has(type), `帧流必须回放 ${type}`);
+    }
+    // 帧内 payload 与表内 payload 同构（无字段丢失/二次包装）
+    for (const row of toolRows) {
+      const frame = stream.events.find((f) => Number(f.id) === row.sequence)!;
+      assert.equal(frame.event, row.eventType);
+      assert.deepEqual(JSON.parse(frame.data).payload, row.payload, `sequence=${row.sequence} 的帧 payload 必须等于表内 payload`);
+    }
   } finally {
     await server.close();
   }

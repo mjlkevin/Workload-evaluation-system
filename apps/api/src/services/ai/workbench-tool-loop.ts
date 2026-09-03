@@ -26,6 +26,7 @@ import { getCombinedCapabilities } from "../../rbac/permissions";
 import { legacyRoleToV2Roles } from "../../rbac/roles";
 import type { AuthUser } from "../../types";
 import type { StreamingChunk, WorkbenchToolCallTrace } from "./workbench-dispatch.service";
+import { toWorkbenchModelVisibleToolMessage } from "./workbench-tool-event-surface";
 
 /** 轮次上限：与 orchestrator 的 DEFAULT_MAX_TURNS 同口径 */
 export const WORKBENCH_TOOL_LOOP_MAX_TURNS = 12;
@@ -142,15 +143,6 @@ function toEffectError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-/** 回填正文必须可 JSON 序列化；工具返回不可序列化时降级为字符串，不得让循环抛出 */
-function safeStringify(value: unknown): string {
-  try {
-    return JSON.stringify(value) ?? "null";
-  } catch {
-    return '"[工具结果无法序列化]"';
-  }
-}
-
 type ToolBatchContext = WorkbenchToolLoopCommon & {
   workingMessages: WorkbenchToolLoopMessage[];
   trace: WorkbenchToolCallTrace[];
@@ -192,10 +184,10 @@ async function executeToolCallBatch(ctx: ToolBatchContext, calls: ToolCall[]): P
         : { kind: "tool_result", name, ok: false, error: outcome.error },
     );
     ctx.trace.push({ name });
-    ctx.workingMessages.push({
-      role: "assistant",
-      content: `[工具结果] ${name} (callId=${call.id}): ${safeStringify(outcome)}`,
-    });
+    // ④：工具结果回灌模型必须走模型可见面的唯一构造点。完整参数（args）、
+    // 心跳中间态（callIndex/elapsedMs）、结果预览（resultPreview）都只进 UI
+    // 事件，不得进 messages；正文形态与批次 0 逐字节一致（同步通道共用）。
+    ctx.workingMessages.push(toWorkbenchModelVisibleToolMessage({ toolName: name, callId: call.id, outcome }));
   }
 }
 

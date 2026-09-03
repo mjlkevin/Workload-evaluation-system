@@ -7,6 +7,7 @@
 import type { AuthUser, BusinessRole } from "../../types";
 import type { ToolCall } from "../../ai/provider/model-provider";
 import type { WorkbenchToolEffectRecorder } from "./workbench-tool-loop";
+import type { AgentEvent } from "../../agent/agent.types";
 import type { ZhipuKnowledgeToolConfig, ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import { routeWorkbenchIntent, classifyIntentWithModel, type WorkbenchIntent, type ModelClassificationResult } from "./workbench-intent.service";
 import { buildWorkbenchContext, type WorkbenchAttachmentContext, type WorkbenchHarnessArtifactContext } from "./workbench-context.service";
@@ -127,6 +128,14 @@ export type WorkbenchDispatchInput = {
    * 同步直写路径不经 Harness 步骤提交点，无重放语义，不注入即为 undefined。
    */
   recordToolEffect?: WorkbenchToolEffectRecorder;
+  /**
+   * 批次 0.5 · ②：工具事件 UI 投影接缝（additive）。仅异步 Run 通道注入——
+   * 由 workbench-chat.workflow 用 createWorkbenchToolEventSink 实现，把工具循环
+   * 发出的 tool_call / tool_result 落 harness_run_events 的 tool.call.* 四类。
+   * 本接缝只有消费者、不参与模型上下文构造：它是「UI 可见」侧，
+   * 与「模型可见」侧的边界见 ④（workbench-tool-event-surface）。
+   */
+  onToolEvent?: (event: AgentEvent) => void;
 };
 
 /** RP-047 Batch B：dispatch 取消错误，供调用方区分取消与真实模型故障。 */

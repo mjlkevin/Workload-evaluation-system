@@ -39,6 +39,12 @@ export type HarnessRuntimeBootOptions = {
    */
   getProvider?: () => ReturnType<typeof getKimiProvider>;
   resolveApiKey?: () => { apiKey: string };
+  /**
+   * 批次 0.5 · ② 测试注入用：工具执行中 `tool.call.progress` 心跳间隔（ms）。
+   * 缺省走 sink 的生产默认（3s）。boot 级回归要观测 progress 这一新增状态，
+   * 等 3 秒不现实，故把间隔下传到 workflow deps；不注入即行为不变。
+   */
+  toolCallProgressIntervalMs?: number;
 };
 
 export type HarnessRuntimeBootResult = {
@@ -197,6 +203,9 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
           // 每次工具调用经它落 `runId:stepKey:workbench_chat_tool_call:N`，
           // 中途失败重跑时已执行的轮次命中存量 effect 不再重复执行。
           recordToolEffect: input.recordToolEffect,
+          // 批次 0.5 · ②：工具事件 UI 投影接缝。仅异步 Run 通道接线（同步路径是历史
+          // 兜底、批次 2 合并即删，不给它加台账）。本接缝只消费、不参与模型上下文构造。
+          onEvent: input.onToolEvent,
           invokeStream: async function* ({ messages }) {
             const stream = streamChatCompletion({
               // DEF-2026-09-03-001：模型与 baseUrl 取自场景配置，不再直读 env 默认值。
@@ -247,6 +256,7 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
     // ISS-2026-08-10-004（层 2）：流式事件写 run 事件流，复用 runtime repository
     // （白名单校验 + 序号分配 + SSE 透传均走既有链路）。
     appendRunEvent: (input) => options.repo.appendRunEvent(input),
+    toolCallProgressIntervalMs: options.toolCallProgressIntervalMs,
     // ISS-2026-08-16-002：会话级附件回退——请求未携带附件时，从已落库会话
     // 记录中取最近一个带 parsedSummary 的附件（与同步路径同一口径）。
     getSessionRecord: (sessionId, ownerUserId) => {

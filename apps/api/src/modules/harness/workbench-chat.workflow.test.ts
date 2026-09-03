@@ -1197,3 +1197,453 @@ test("批次0·⑤：接线点上生产 builder + 生产断言为绿，管道丢
   assert.equal(greenPassed, true, "接线点两侧一致时必须为绿");
   assert.equal(redReason, "history_length_mismatch: sent=1 expected=3", "发送侧丢历史必须当场红并给出结构差异");
 });
+
+// ============================================================
+// 批次 0.5 · ②：工具调用四类事件必须写入异步 run 事件流
+// ============================================================
+// 批次 0 让工作台真正执行了只读工具，但调用对用户完全不可见——事件只到
+// onEvent 接缝（无消费者）即蒸发。本批把四类 tool.call.* 经 deps.appendRunEvent
+// 落 harness_run_events，复用既有单调 sequence 与串行写链（不自建去重）。
+// 口径：
+//  · 只异步通道发射（同步通道是历史兜底，批次 2 合并即删）；
+//  · tool.call.progress 是本轮唯一真正新增的状态，由「执行中」超时心跳派生——
+//    批次 0 冻结了 AgentEvent 词汇表（不自造 kind），循环侧不新增事件类型；
+//  · 副作用位于 recordToolEffectOnce 的 execute 内，恢复重放天然吸收。
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+type RecordedRunEvent = { runId: string; eventType: string; payload: Record<string, unknown> };
+
+function makeRecordingAppendRunEvent(sink: RecordedRunEvent[]) {
+  return async (input: { runId: string; eventType: string; payload: Record<string, unknown> }) => {
+    // 复刻 repository 的 1 MiB 闸门：payload 超限即丢弃（本批必须靠截断避免）
+    sink.push(input as RecordedRunEvent);
+    return input;
+  };
+}
+
+/** 把连续 progress 折叠为一条，使顺序断言不受心跳次数影响 */
+function collapseProgress(events: RecordedRunEvent[]): string[] {
+  const out: string[] = [];
+  for (const event of events) {
+    if (event.eventType === "tool.call.progress" && out[out.length - 1] === "tool.call.progress") continue;
+    out.push(event.eventType);
+  }
+  return out;
+}
+
+test("批次0.5·②：工具调用经 appendRunEvent 落 started→progress→completed，顺序与载荷形状冻结", async () => {
+  const appended: RecordedRunEvent[] = [];
+  let toolEventCount = 0;
+
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      toolEventCount += 1;
+      input.onToolEvent?.({ kind: "tool_call", name: "list_estimates", arguments: { keyword: "PLM" } });
+      await sleep(45);
+      input.onToolEvent?.({ kind: "tool_result", name: "list_estimates", ok: true, data: { total: 3 } });
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeRecordingAppendRunEvent(appended),
+    toolCallProgressIntervalMs: 15,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+  assert.equal(toolEventCount, 1, "dispatch 必须收到 onToolEvent（未下发则事件无处产生）");
+
+  assert.deepEqual(
+    collapseProgress(appended),
+    ["tool.call.started", "tool.call.progress", "tool.call.completed"],
+    "长耗时工具必须依次发射 started → progress → completed",
+  );
+  assert.ok(
+    appended.every((event) => event.runId === "run-1"),
+    "工具事件必须挂在本次 Run 的事件流上",
+  );
+
+  const started = appended.find((event) => event.eventType === "tool.call.started")!;
+  assert.deepEqual(
+    { callIndex: started.payload.callIndex, name: started.payload.name, arguments: started.payload.arguments },
+    { callIndex: 1, name: "list_estimates", arguments: { keyword: "PLM" } },
+    "started 载荷 = { callIndex, name, arguments }：参数供 UI 展示（模型侧不得可见）",
+  );
+
+  const progressEvents = appended.filter((event) => event.eventType === "tool.call.progress");
+  assert.ok(progressEvents.length >= 1, "执行时长超过心跳间隔必须至少发出一条 progress");
+  for (const event of progressEvents) {
+    assert.equal(event.payload.callIndex, 1);
+    assert.equal(event.payload.name, "list_estimates");
+    assert.equal(typeof event.payload.elapsedMs, "number", "progress 必须携带已耗时供 UI 展示进度");
+  }
+
+  const completed = appended.find((event) => event.eventType === "tool.call.completed")!;
+  assert.equal(completed.payload.callIndex, 1);
+  assert.equal(completed.payload.name, "list_estimates");
+  assert.equal(typeof completed.payload.elapsedMs, "number", "completed 必须携带总耗时");
+  assert.ok(String(completed.payload.resultPreview).includes("total"), "completed 载荷须含结果摘要供 UI 展示");
+});
+
+test("批次0.5·②：工具执行失败落 tool.call.failed 并携带 error", async () => {
+  const appended: RecordedRunEvent[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      input.onToolEvent?.({ kind: "tool_call", name: "query_knowledge_base", arguments: { query: "x" } });
+      input.onToolEvent?.({ kind: "tool_result", name: "query_knowledge_base", ok: false, error: "权限不足" });
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeRecordingAppendRunEvent(appended),
+    toolCallProgressIntervalMs: 10_000,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+  assert.deepEqual(
+    appended.map((event) => event.eventType),
+    ["tool.call.started", "tool.call.failed"],
+    "ok=false 必须落 failed，不得伪装成 completed",
+  );
+  assert.equal(appended[1].payload.error, "权限不足");
+  assert.equal(appended[1].payload.callIndex, 1);
+});
+
+test("批次0.5·②：多次调用 callIndex 逐次递增；非工具类 AgentEvent 不产工具事件", async () => {
+  const appended: RecordedRunEvent[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      input.onToolEvent?.({ kind: "final", content: "不该产生事件" });
+      input.onToolEvent?.({ kind: "need_confirm", name: "create_estimate", arguments: {} });
+      input.onToolEvent?.({ kind: "tool_call", name: "t1", arguments: { a: 1 } });
+      input.onToolEvent?.({ kind: "tool_result", name: "t1", ok: true, data: "r1" });
+      input.onToolEvent?.({ kind: "tool_call", name: "t2", arguments: { b: 2 } });
+      input.onToolEvent?.({ kind: "tool_result", name: "t2", ok: true, data: "r2" });
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeRecordingAppendRunEvent(appended),
+    toolCallProgressIntervalMs: 10_000,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+  assert.deepEqual(
+    appended.map((event) => [event.eventType, event.payload.callIndex, event.payload.name]),
+    [
+      ["tool.call.started", 1, "t1"],
+      ["tool.call.completed", 1, "t1"],
+      ["tool.call.started", 2, "t2"],
+      ["tool.call.completed", 2, "t2"],
+    ],
+    "callIndex 必须逐次递增以支持 UI 配对；final/need_confirm 不属本批四类",
+  );
+});
+
+test("批次0.5·②：短调用不触发 progress 心跳（心跳是长耗时信号，不是每次调用的噪音）", async () => {
+  const appended: RecordedRunEvent[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      input.onToolEvent?.({ kind: "tool_call", name: "t", arguments: {} });
+      await sleep(10);
+      input.onToolEvent?.({ kind: "tool_result", name: "t", ok: true, data: 1 });
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeRecordingAppendRunEvent(appended),
+    toolCallProgressIntervalMs: 500,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+  assert.deepEqual(
+    appended.map((event) => event.eventType),
+    ["tool.call.started", "tool.call.completed"],
+    "未达心跳间隔不得发 progress",
+  );
+});
+
+test("批次0.5·②：progress 定时器在结果返回后必须停止（不得在 Run 结束后继续写事件）", async () => {
+  const appended: RecordedRunEvent[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      input.onToolEvent?.({ kind: "tool_call", name: "slow_tool", arguments: {} });
+      await sleep(60);
+      input.onToolEvent?.({ kind: "tool_result", name: "slow_tool", ok: true, data: 1 });
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeRecordingAppendRunEvent(appended),
+    toolCallProgressIntervalMs: 15,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+  const before = appended.length;
+  await sleep(60);
+  assert.equal(appended.length, before, "completed 之后不得再有 progress 写入（定时器未清理 = 事件泄漏）");
+});
+
+test("批次0.5·②：超大工具结果必须截断，不得整条被 1 MiB 闸门丢弃", async () => {
+  const appended: RecordedRunEvent[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      input.onToolEvent?.({ kind: "tool_call", name: "big", arguments: { blob: "x".repeat(200_000) } });
+      input.onToolEvent?.({ kind: "tool_result", name: "big", ok: true, data: { rows: "y".repeat(2_000_000) } });
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: async (input) => {
+      const size = Buffer.byteLength(JSON.stringify(input.payload), "utf-8");
+      if (size > 1024 * 1024) throw new Error("payload exceeds 1 MiB JSON limit");
+      appended.push(input as RecordedRunEvent);
+      return input;
+    },
+    toolCallProgressIntervalMs: 10_000,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+  assert.deepEqual(
+    appended.map((event) => event.eventType),
+    ["tool.call.started", "tool.call.completed"],
+    "事件必须存活到落库——丢弃等于回到本批要消灭的不可见",
+  );
+  assert.ok(
+    JSON.stringify(appended[0].payload.arguments).length < 10_000,
+    "arguments 必须截断后透出（String(object) 恒为 [object Object]，故按序列化长度断言）",
+  );
+  assert.ok(String(appended[1].payload.resultPreview).length < 10_000, "resultPreview 必须截断后透出");
+});
+
+test("批次0.5·②：未注入 appendRunEvent 时 onToolEvent 为空操作，不抛错也不阻断主链路", async () => {
+  let fired = 0;
+  const calls: RecordedAppendCall[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      assert.ok(input.onToolEvent, "即使未注入 appendRunEvent，接缝也应下发（additive 契约）");
+      input.onToolEvent?.({ kind: "tool_call", name: "t", arguments: {} });
+      fired += 1;
+      input.onToolEvent?.({ kind: "tool_result", name: "t", ok: true, data: 1 });
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeRecordingAppendSessionMessage(calls),
+  });
+
+  const ctx = makeFakeCtx();
+  const outcome = await wf.executeStep("chat", ctx);
+  assert.equal(fired, 1);
+  assert.equal(outcome.nextStepKey, null, "无事件写入能力时不得抛错中断 Run");
+  const assistant = calls.find((call) => call.role === "assistant");
+  assert.equal(assistant?.content, "ok", "无事件写入能力时回答主链路不受影响");
+});
+
+test("批次0.5·②：恢复重放命中既有 effect 时不重发工具事件", async () => {
+  const appended: RecordedRunEvent[] = [];
+  const recordedEffects: string[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      input.onToolEvent?.({ kind: "tool_call", name: "t", arguments: {} });
+      input.onToolEvent?.({ kind: "tool_result", name: "t", ok: true, data: 1 });
+      return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeRecordingAppendRunEvent(appended),
+    toolCallProgressIntervalMs: 10_000,
+  });
+
+  const recordToolEffectOnce = async (effect: FakeEffect) => {
+    if (recordedEffects.includes(effect.effectKey)) return { output: { answer: "cached" }, created: false };
+    recordedEffects.push(effect.effectKey);
+    return { output: await effect.execute(), created: true };
+  };
+  const ctx = makeFakeCtx({ recordToolEffectOnce: recordToolEffectOnce as any });
+
+  await wf.executeStep("chat", ctx);
+  assert.equal(appended.length, 2, "首跑发射 started + completed");
+  await wf.executeStep("chat", ctx);
+  assert.equal(appended.length, 2, "重放跳过 execute，工具事件不得重发");
+});
+
+test("批次0.5·②：工具事件与 text.delta 共用同一写链，顺序即模型真实产生顺序", async () => {
+  const appended: RecordedRunEvent[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      input.streamingAdapter?.onToken({ contentDelta: "先查" });
+      input.onToolEvent?.({ kind: "tool_call", name: "list_estimates", arguments: {} });
+      input.onToolEvent?.({ kind: "tool_result", name: "list_estimates", ok: true, data: 1 });
+      input.streamingAdapter?.onToken({ contentDelta: "再答" });
+      return { answer: "先查再答", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeNoOpAppendSessionMessage(),
+    appendRunEvent: makeRecordingAppendRunEvent(appended),
+    toolCallProgressIntervalMs: 10_000,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+  assert.deepEqual(
+    appended.map((event) => event.eventType),
+    ["text.delta", "tool.call.started", "tool.call.completed", "text.delta"],
+    "两条事件族必须共用串行链，否则 sequence 会反映错误的时序",
+  );
+});
+
+// ============================================================
+// 批次 0.5 · ③：会话消息必须顶层镜像 toolCalls（重后可见）
+// ============================================================
+// ② 只解决「流式期间可见」。前端 messageFormatter.mapSessionMessages 只读
+// metadata.toolCalls **顶层**（MS3 口径），而 trace.toolCalls 嵌在 metadata.trace
+// 下——故刷新页面/重开会话后三态全部消失，可视化只在一次 SSE 连接内存活。
+// 本组用例锁：① 顶层镜像落库；② UI 专用载荷（完整参数、resultPreview）不得
+// 进消息（列表随会话持久化，与模型可见面同源受约束）；③ source 按名合并，
+// 「· 经发现」不因镜像而丢；④ 无调用时不写键（保持既有静默）；⑤ 恢复重放
+// 跳过 execute，只有把结果放进 execute 返回值才能保证两次写出同一份 metadata
+// （与 DEF-2026-08-27-001 的 memoryRef 同构）。
+
+type AppendedMessage = { role: string; content: string; metadata?: Record<string, unknown> };
+
+function makeMessageCapturingAppendSessionMessage(sink: AppendedMessage[]): WorkbenchChatWorkflowDeps["appendSessionMessage"] {
+  return async (input) => {
+    sink.push({
+      role: input.message.role,
+      content: input.message.content,
+      metadata: input.message.metadata as Record<string, unknown> | undefined,
+    });
+    return { found: true, created: true, message: input.message };
+  };
+}
+
+type WorkbenchDispatchInput = Parameters<WorkbenchChatWorkflowDeps["dispatch"]>[0];
+
+/** 只工具调用、不出正文的 dispatch，用于聚焦 metadata 镜像 */
+function makeToolOnlyDispatch(events: Array<(input: WorkbenchDispatchInput) => void>) {
+  return async (input: WorkbenchDispatchInput) => {
+    for (const fire of events) fire(input);
+    return {
+      answer: "已处理",
+      intent: "domain_qa",
+      suggestedActions: [],
+      trace: { toolCalls: [{ name: "list_estimates", source: "list_tools" }] },
+    } as any;
+  };
+}
+
+test("批次0.5·③：assistant 消息顶层镜像 toolCalls 三态，UI 专用载荷不得进消息", async () => {
+  const messages: AppendedMessage[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: makeToolOnlyDispatch([
+      (input) => input.onToolEvent?.({ kind: "tool_call", name: "list_estimates", arguments: { keyword: "PLM项目工作量参数很长" } }),
+      (input) => input.onToolEvent?.({ kind: "tool_result", name: "list_estimates", ok: true, data: { rows: "结果不应进消息".repeat(10) } }),
+      (input) => input.onToolEvent?.({ kind: "tool_call", name: "create_project", arguments: {} }),
+      (input) => input.onToolEvent?.({ kind: "tool_result", name: "create_project", ok: false, error: "工作台仅开放只读工具，create_project 未获准执行" }),
+    ]),
+    appendSessionMessage: makeMessageCapturingAppendSessionMessage(messages),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    toolCallProgressIntervalMs: 10_000,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+
+  const assistant = messages.find((c) => c.role === "assistant");
+  assert.ok(assistant, "assistant 消息必须落库");
+  const toolCalls = assistant!.metadata?.toolCalls;
+  assert.ok(Array.isArray(toolCalls), "metadata.toolCalls 必须是顶层数组，否则重后前端读不到");
+  assert.deepEqual(
+    (toolCalls as Array<Record<string, unknown>>).map((call) => call.name),
+    ["list_estimates", "create_project"],
+    "镜像必须按调用顺序覆盖全部工具",
+  );
+  assert.deepEqual(
+    (toolCalls as Array<Record<string, unknown>>).map((call) => call.status),
+    ["completed", "failed"],
+    "三态必须在镜像里还原（started→running→completed/failed 的终态）",
+  );
+  assert.deepEqual(
+    (toolCalls as Array<Record<string, unknown>>).map((call) => call.callIndex),
+    [1, 2],
+    "callIndex 必须随镜像落库，供前端与既有归一化配对",
+  );
+  assert.equal(
+    (toolCalls as Array<Record<string, unknown>>)[0].source,
+    "list_tools",
+    "trace.toolCalls 的 source 必须按名合并进镜像，否则「· 经发现」在重后丢失",
+  );
+
+  const serialized = JSON.stringify(toolCalls);
+  assert.ok(!serialized.includes("arguments"), "完整工具参数属 UI 事件专用面，不得进会话消息");
+  assert.ok(!serialized.includes("resultPreview"), "结果预览属 UI 事件专用面，不得进会话消息");
+  assert.ok(!serialized.includes("结果不应进消息"), "工具返回内容不得经镜像回灌会话消息");
+  assert.ok(
+    (toolCalls as Array<Record<string, unknown>>).every(
+      (call) => typeof call.elapsedMs === "number" && (call.elapsedMs as number) >= 0,
+    ),
+    "耗时必须随镜像落库（重后仍展示耗时，不只是状态词）",
+  );
+  assert.equal(
+    typeof (toolCalls as Array<Record<string, unknown>>)[1].errorPreview,
+    "string",
+    "失败原因必须进镜像，否则重后只剩「失败」二字、无因可循",
+  );
+});
+
+test("批次0.5·③：无工具调用时不写 toolCalls 键（保持既有静默，不制造空数组）", async () => {
+  const messages: AppendedMessage[] = [];
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: makeToolOnlyDispatch([]),
+    appendSessionMessage: makeMessageCapturingAppendSessionMessage(messages),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    toolCallProgressIntervalMs: 10_000,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+  const assistant = messages.find((c) => c.role === "assistant");
+  assert.ok(assistant, "assistant 消息必须落库");
+  assert.equal(
+    "toolCalls" in (assistant!.metadata ?? {}),
+    false,
+    "缺数据时不得写键：前端 normalizeToolCalls 对空数组返回 undefined，写空数组只会制造 diff 噪音",
+  );
+});
+
+test("批次0.5·③：恢复重放吸收整轮 effect 后，metadata.toolCalls 与首跑逐字节一致", async () => {
+  const messages: AppendedMessage[] = [];
+  const store = new Map<string, Record<string, unknown>>();
+  let dispatchCalls = 0;
+
+  const wf = createWorkbenchChatWorkflow({
+    dispatch: async (input) => {
+      dispatchCalls += 1;
+      input.onToolEvent?.({ kind: "tool_call", name: "list_estimates", arguments: { a: 1 } });
+      input.onToolEvent?.({ kind: "tool_result", name: "list_estimates", ok: true, data: { total: 3 } });
+      return { answer: "已处理", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
+    },
+    appendSessionMessage: makeMessageCapturingAppendSessionMessage(messages),
+    appendRunEvent: makeNoOpAppendRunEvent(),
+    toolCallProgressIntervalMs: 10_000,
+  });
+
+  // 复刻 worker 真实语义：命中既有 key 直接返回存量 output，不调用 execute
+  const replayCtx = makeFakeCtx({
+    recordToolEffectOnce: async (effect) => {
+      const existing = store.get(effect.effectKey);
+      if (existing) return { output: existing, created: false };
+      const output = await effect.execute();
+      store.set(effect.effectKey, output);
+      return { output, created: true };
+    },
+  });
+
+  await wf.executeStep("chat", replayCtx);
+  await wf.executeStep("chat", replayCtx);
+
+  assert.equal(dispatchCalls, 1, "整轮 effect 必须吸收重放，否则工具会被执行两次");
+  const assistants = messages.filter((c) => c.role === "assistant");
+  assert.equal(assistants.length, 2, "两次执行各写一条 assistant 消息");
+  // 先确立首跑镜像非空：否则下面的 deepEqual 会退化成 undefined === undefined 永真
+  const firstMirror = assistants[0].metadata?.toolCalls;
+  assert.ok(Array.isArray(firstMirror) && firstMirror.length === 1, "首跑必须写出单条镜像");
+  assert.equal(
+    (firstMirror as Array<Record<string, unknown>>)[0].status,
+    "completed",
+    "首跑镜像必须是终态",
+  );
+  assert.deepEqual(
+    assistants[1].metadata?.toolCalls,
+    assistants[0].metadata?.toolCalls,
+    "镜像必须经 execute 返回值传递：重放跳过 execute，只靠 sink 内存态会写出空列表",
+  );
+});
