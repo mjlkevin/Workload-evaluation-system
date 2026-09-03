@@ -9,6 +9,9 @@
 # 本脚本会打印将要修改的路径，并要求交互确认（输入 yes），或显式传 --yes。
 # 另注意：钩子写入 common hooks 目录即已全仓生效，无需也不应另设
 # core.hooksPath（2026-09-03 曾发生未授权全仓启用事故，处置见总看板台账）。
+# 本脚本仅安装 commit-msg（Session trailer 校验，已实测有效）；pre-commit
+# （方案 B 强制 committer 钩子）已按 2026-09-03 架构侧复核追加 2 删除——
+# 其逻辑超出裁决范围，且本机无任何 git 身份配置时恒 exit 0 永不触发。
 #
 # Usage:
 #   sh scripts/hooks/install.sh          # 交互确认（输入 yes）后安装
@@ -45,7 +48,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 打印将要修改的路径（安装前必示）
 echo "⚠️  影响范围：本仓库全部 worktree 与所有并行会话（common .git 共享）"
 echo "    将安装钩子到：${HOOKS_DIR}"
-for hook in pre-commit commit-msg; do
+for hook in commit-msg; do
   src="$SCRIPT_DIR/$hook"
   dst="$HOOKS_DIR/$hook"
   if [ -f "$src" ]; then
@@ -71,7 +74,7 @@ fi
 
 mkdir -p "$HOOKS_DIR"
 
-for hook in pre-commit commit-msg; do
+for hook in commit-msg; do
   src="$SCRIPT_DIR/$hook"
   dst="$HOOKS_DIR/$hook"
   if [ -f "$src" ]; then
