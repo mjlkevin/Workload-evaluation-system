@@ -9,7 +9,8 @@ import { config } from "../../../config/env";
 import { asString } from "../../../utils/helpers";
 import { normalizeKimiModelName } from "../../../utils/model-name";
 import { requireAuth, resolveBusinessRole } from "../../../middleware/auth";
-import { loadRequirementSystemConfigStore, resolveActiveRequirementKimiApiKey } from "../../../modules/system/system.repository";
+import { loadRequirementSystemConfigStore, resolveActiveApiKeyForScope } from "../../../modules/system/system.repository";
+import { resolveScenarioConfig } from "../../../modules/system/model-providers";
 import { createAiSession, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import type { AiSessionRecord } from "../../../modules/ai-sessions/ai-sessions.types";
 import type { AuthUser, BusinessRole } from "../../../types";
@@ -305,6 +306,49 @@ export function sessionRecordToHomeMessages(session: AiSessionRecord | null | un
     }));
 }
 
+// ============================================================
+// DEF-2026-09-03-001：工作台对话的模型/供应商/凭据统一走场景配置
+// ============================================================
+// 此前三条对话路径直读 `config.kimi.model`（env 默认值），完全绕开用户在系统
+// 设置里配的场景绑定——用户改配置不生效，而 env 默认值 "kimi-k2.5" 已被供应商
+// 下线（404），导致自 2026-06 起异步通道无一次成功的真实模型调用。
+//
+// 绑定到 assessment 场景：这三条路径的超时本就取自 kimiEvaluation.timeoutMs
+// （= assessment 场景的 legacy 字段），挂过去后模型与超时同源，
+// 一并消解 extractor.service.ts 上「模型取 fileParsing、超时取 kimiEvaluation」
+// 的同类口径分叉。
+export const WORKBENCH_CHAT_SCENARIO = "assessment" as const;
+
+export interface WorkbenchChatScenario {
+  model: string;
+  baseUrl: string;
+  credentialScope: string;
+  timeoutMs: number;
+  modelSource: string;
+}
+
+/**
+ * 工作台对话的场景配置解析。三条路径（同步非流式 / 同步流式 / 异步 Run）唯一入口。
+ * 解析不出模型时**显式失败**，不得回落到任意兜底值——「静默用一个过期模型」
+ * 正是本缺陷瞒了三个月的原因（失败被静态文案掩盖）。
+ */
+export async function resolveWorkbenchChatScenario(): Promise<WorkbenchChatScenario> {
+  const active = (await loadRequirementSystemConfigStore()).active;
+  const scenarioCfg = resolveScenarioConfig(active, WORKBENCH_CHAT_SCENARIO, {
+    model: config.kimi.model,
+    baseUrl: config.kimi.apiBaseUrl,
+  });
+  const model = scenarioCfg.model?.trim() || "";
+  if (!model) throw new Error("model_not_configured");
+  return {
+    model,
+    baseUrl: scenarioCfg.baseUrl,
+    credentialScope: scenarioCfg.credentialScope,
+    timeoutMs: active.kimiEvaluation.timeoutMs || 120000,
+    modelSource: scenarioCfg.modelSource,
+  };
+}
+
 export function buildWorkbenchChatModelChat(
   user: AuthUser,
   options: {
@@ -314,9 +358,10 @@ export function buildWorkbenchChatModelChat(
   },
 ): ModelChatFactory {
   const messages = options.messages ?? [];
-  const modelName = options.modelName ?? normalizeKimiModelName(config.kimi.model);
   return async ({ systemPrompt, userContent }) => {
-    const { apiKey } = resolveActiveRequirementKimiApiKey();
+    // 场景解析先于取密钥：凭据 scope 由场景绑定的供应商决定，不再固定 kimi scope。
+    const scenario = await resolveWorkbenchChatScenario();
+    const { apiKey } = resolveActiveApiKeyForScope(scenario.credentialScope);
     if (!apiKey) throw new Error("required_or_env_missing");
 
     const modelInput = await buildWorkbenchChatModelInput(user, {
@@ -328,8 +373,6 @@ export function buildWorkbenchChatModelChat(
 
     // 批次 0 · ①②③：注入点解析只读工具集（mutates===false），不改 ToolRegistry。
     const toolSet = resolveReadOnlyWorkbenchTools(user);
-    // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
-    const requirementSystemConfig = await loadRequirementSystemConfigStore();
     // provider 元信息取末轮（真正回答轮）的实际响应，首轮多为工具调用轮
     let lastCompletion: ChatCompletionResponse | undefined;
     const loop = await runWorkbenchToolLoop({
@@ -339,11 +382,11 @@ export function buildWorkbenchChatModelChat(
       readOnlyToolNames: toolSet.readOnlyToolNames,
       invoke: async ({ messages }) => {
         const completion = await getKimiProvider().chatCompletion({
-          model: config.kimi.model,
+          model: scenario.model,
           temperature: 0.3,
           promptCacheKey: "home-workbench-dispatch-v1",
-          timeoutMs: requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000,
-          credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
+          timeoutMs: scenario.timeoutMs,
+          credentialsOverride: { apiKey, apiBaseUrl: scenario.baseUrl },
           messages,
           ...(toolSet.tools.length > 0 ? { tools: toolSet.tools, toolChoice: "auto" as const } : {}),
         });
@@ -365,13 +408,16 @@ export function buildWorkbenchChatModelChat(
   };
 }
 
-export function buildWorkbenchChatDispatchInput(user: AuthUser, content: string, options?: {
+// DEF-2026-09-03-001：改为 async——模型名来自场景配置（异步读取），
+// 不再是 env 常量。返回的 model 是 trace/展示口径，必须与实际调用的模型一致，
+// 否则 trace 记的模型与真正发出的模型对不上。
+export async function buildWorkbenchChatDispatchInput(user: AuthUser, content: string, options?: {
   modelChat?: ModelChatFactory;
   messages?: HomeMessageInput[];
   /** 记忆注入项目上下文（缺省不注入，行为与旧版一致）；工作台会话蒸馏落 default 项目 */
   projectId?: string;
   attachment?: WorkbenchAttachmentContext | null;
-}): {
+}): Promise<{
   user: AuthUser;
   workflowKey: string;
   message: string;
@@ -383,10 +429,10 @@ export function buildWorkbenchChatDispatchInput(user: AuthUser, content: string,
   model: string;
   rolePrompt: string;
   modelChat: ModelChatFactory;
-} {
+}> {
   const businessRole = resolveBusinessRole(user);
   const roleLabel = HOME_ROLE_PRESETS[businessRole].label;
-  const modelName = normalizeKimiModelName(config.kimi.model);
+  const modelName = normalizeKimiModelName((await resolveWorkbenchChatScenario()).model);
   const modelChat = options?.modelChat ?? buildWorkbenchChatModelChat(user, {
     messages: options?.messages,
     modelName,

@@ -97,8 +97,10 @@ test("RP-055 迁移：旧配置场景绑定自动从 kimi* 字段推导", () => 
   assert.ok(bindings, "应合成场景绑定");
   assert.deepEqual(bindings.assessment, { providerId: "moonshot", modelId: "kimi-k3" });
   assert.deepEqual(bindings.fileParsing, { providerId: "moonshot", modelId: "kimi-k2.6" });
-  // generation 旧字段为空 → 按既有归一化语义回填默认模型（kimi-k2.5），绑定与归一化后字段保持一致
-  assert.deepEqual(bindings.generation, { providerId: "moonshot", modelId: "kimi-k2.5" });
+  // generation 旧字段为空 → 按既有归一化语义回填默认模型，绑定与归一化后字段保持一致。
+  // DEF-2026-09-03-001：该默认由已下线的 kimi-k2.5 改为 kimi-k2.6——归一化的兜底值
+  // 会在用户清空配置或新装系统时写回库，过期兜底等于静默覆盖用户设置。
+  assert.deepEqual(bindings.generation, { providerId: "moonshot", modelId: "kimi-k2.6" });
 });
 
 test("RP-055 归一化：已有自定义供应商原样保留，不被内置供应商覆盖", () => {

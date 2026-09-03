@@ -43,15 +43,17 @@ test("normalizeRequirementSystemConfig: 迁移旧 Kimi 模型到 K2.5/K2.6 默�
   // 删除后 PG 读路径按设计不做读时迁移（seed 已经过 normalize，实测在库配置仅
   // 含 kimi-k2.6、无 legacy 值），迁移语义的唯一承载点就是 normalizeRequirementConfig
   // 本身，故断言直接打在导出的纯函数上——与用例主题一致，不经存储。
+  // DEF-2026-09-03-001：evaluation/generation 的内置兜底由已下线的 kimi-k2.5
+  // 改为 kimi-k2.6（归一化会把非法/空模型填回兜底，过期兜底会静默覆盖用户配置）。
   const draft = normalizeRequirementSystemConfig({
     kimiEvaluation: { model: "moonshot-v1-128k" },
     fileParsing: { model: "kimi-k2-turbo-preview" },
     kimiGeneration: { model: "moonshot-v1-128k" },
     kimiCredentials: { apiKey: "" },
   });
-  assert.equal(draft.kimiEvaluation.model, "kimi-k2.5");
+  assert.equal(draft.kimiEvaluation.model, "kimi-k2.6");
   assert.equal(draft.fileParsing.model, "kimi-k2.6");
-  assert.equal(draft.kimiGeneration.model, "kimi-k2.5");
+  assert.equal(draft.kimiGeneration.model, "kimi-k2.6");
 
   const active = normalizeRequirementSystemConfig({
     kimiEvaluation: { model: "moonshot-v1-8k" },
@@ -59,9 +61,9 @@ test("normalizeRequirementSystemConfig: 迁移旧 Kimi 模型到 K2.5/K2.6 默�
     kimiGeneration: { model: "moonshot-v1-128k" },
     kimiCredentials: { apiKey: "" },
   });
-  assert.equal(active.kimiEvaluation.model, "kimi-k2.5");
+  assert.equal(active.kimiEvaluation.model, "kimi-k2.6");
   assert.equal(active.fileParsing.model, "kimi-k2.6");
-  assert.equal(active.kimiGeneration.model, "kimi-k2.5");
+  assert.equal(active.kimiGeneration.model, "kimi-k2.6");
 });
 
 test("knowledge base legacy config receives safe retrieval defaults", () => {

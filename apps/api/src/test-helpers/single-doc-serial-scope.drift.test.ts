@@ -72,6 +72,10 @@ const SERIAL_SCOPE_FILES = [
   // before 自种 requirementSettings 行（load 缺行返回 null，断言依赖行存在），
   // 经 saveRequirementSystemConfigStore 写 system_configs 单文档表——同 S3 判据。
   "modules/ai/ai.repository.test.ts",
+  // DEF-2026-09-03-001（2026-09-03）：工作台对话按场景配置解析模型的回归。
+  // 用例需在「改配置前后」各跑一次并比对实际发给 provider 的 model，
+  // 故经 saveRequirementSystemConfigStore 改写 assessment 绑定再还原——同 S3 判据。
+  "services/ai/handlers/workbench-chat-scenario.test.ts",
 ] as const;
 
 /** 串行套件脚本名与并行套件脚本名。 */
@@ -260,8 +264,8 @@ test("串行白名单与 package.json 脚本参数列表逐位一致", () => {
 test("串行白名单计数钉定（新增触碰或批次收敛都必须显式更新本条）", () => {
   assert.equal(
     SERIAL_SCOPE_FILES.length,
-    11,
+    12,
     `SERIAL_SCOPE_FILES 实为 ${SERIAL_SCOPE_FILES.length} 条：新增即意味着有新的无界读表写入方，` +
-      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进；S5：9→10，teams 域 JSON 路径删除使 modules.usecase 的 team 用例改走 PG 整存快照-还原，team-pg.repository 随之移进串行组；S3B1：10→11，ai.repository.test.ts 接入串行组，before 自种 system_configs.requirementSettings 行）"
+      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进；S5：9→10，teams 域 JSON 路径删除使 modules.usecase 的 team 用例改走 PG 整存快照-还原，team-pg.repository 随之移进串行组；S3B1：10→11，ai.repository.test.ts 接入串行组，before 自种 system_configs.requirementSettings 行；DEF-2026-09-03-001：11→12，workbench-chat-scenario.test.ts 需在改配置前后各跑一次并比对实际发给 provider 的 model，经 saveRequirementSystemConfigStore 改写 assessment 绑定再还原）"
   );
 });
