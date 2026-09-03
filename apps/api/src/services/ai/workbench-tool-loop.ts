@@ -241,10 +241,19 @@ export async function* runWorkbenchToolLoopStream(
   for (let turn = 1; turn <= maxTurns; turn += 1) {
     let turnContent = "";
     const turnCalls: ToolCall[] = [];
+    // 轮内去重（执行侧兜底）：provider 可能把同一批调用投两次（结束帧 + 其后补发的用量帧），
+    // 而 id 缺失时 provider 按 index 兜底成 call_0，故第二轮的同名调用是合法新调用。
+    // 集合声明在轮循环内 → 每轮天然重置；若改成全局去重会吞掉后续轮次的调用。
+    const seenTurnCallIds = new Set<string>();
     for await (const chunk of input.invokeStream({ messages: [...workingMessages], turnOrdinal: turn })) {
       yield chunk;
       if (chunk.kind !== "metadata") turnContent += chunk.contentDelta ?? "";
-      if (chunk.toolCalls?.length) turnCalls.push(...chunk.toolCalls);
+      for (const call of chunk.toolCalls ?? []) {
+        const dedupKey = call.id || `${call.name}:${turnCalls.length}`;
+        if (seenTurnCallIds.has(dedupKey)) continue;
+        seenTurnCallIds.add(dedupKey);
+        turnCalls.push(call);
+      }
     }
     content = turnContent;
     if (turnCalls.length === 0) return { content, turns: turn, truncated: false, toolCalls: trace };

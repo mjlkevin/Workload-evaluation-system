@@ -412,6 +412,62 @@ test("KimiProvider: 流式按 index 聚合 delta.tool_calls 分片并在末 chun
       { id: "call_a", name: "query_project_list", arguments: { keyword: "ERP" } },
       { id: "call_b", name: "lookup_rule", arguments: {} },
     ]);
+    // 同一批调用只允许交付一次（只看末帧数不出多发）
+    assert.equal(chunks.filter((chunk) => chunk.toolCalls?.length).length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("KimiProvider: 结束帧之后厂商补发的纯用量帧不得再次携带同一批 tool_calls", async () => {
+  const originalFetch = globalThis.fetch;
+  const encoder = new TextEncoder();
+  const events = [
+    // 工具调用分片（finish_reason 仍为 null，只累积不交付）
+    '{"choices":[{"index":0,"delta":{"role":"assistant","content":"","tool_calls":[{"index":0,"id":"call_a","type":"function","function":{"name":"project_list","arguments":"{}"}}]},"finish_reason":null}]}',
+    // 结束帧：由这一帧负责交付
+    '{"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}',
+    // 结束帧之后厂商补发的纯用量帧（OpenAI 兼容接口开 include_usage 的标准形态：choices 为空）
+    // finishReason 是粘性的，若此处不判已交付，同一批 tool_calls 会被再交付一次 → 下游执行两次
+    '{"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}',
+  ];
+
+  globalThis.fetch = async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(events.map((e) => `data: ${e}`).join("\n\n") + "\n\ndata: [DONE]\n"));
+          controller.close();
+        },
+      }),
+      { status: 200 },
+    );
+
+  try {
+    const provider = new KimiProvider({ apiKey: "test-key" });
+    const chunks = [];
+    for await (const chunk of provider.streamChatCompletion({
+      messages: [{ role: "user", content: "查项目" }],
+      tools: [],
+    })) {
+      chunks.push(chunk);
+    }
+
+    const framesWithToolCalls = chunks.filter((chunk) => chunk.toolCalls?.length);
+    assert.equal(
+      framesWithToolCalls.length,
+      1,
+      `同一批 tool_calls 只能交付一次，实际交付 ${framesWithToolCalls.length} 帧（重复交付会导致工具被执行两次）`,
+    );
+    assert.deepEqual(framesWithToolCalls[0]?.toolCalls, [
+      { id: "call_a", name: "project_list", arguments: {} },
+    ]);
+    // 修重复交付不得把用量帧一起吞掉：usage 仍必须送达
+    assert.deepEqual(chunks[chunks.length - 1].usage, {
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+    });
   } finally {
     globalThis.fetch = originalFetch;
   }

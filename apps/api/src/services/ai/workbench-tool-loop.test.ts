@@ -408,3 +408,128 @@ test("runWorkbenchToolLoopStream: 流式下写工具一律不执行，只回填�
   );
   assert.equal(collected.result.content, "无法导出");
 });
+
+// ---- 重复投递（同一调用被执行两次）----
+// provider 的 finishReason 是粘性的，厂商又常在结束帧之后补发一个纯用量帧，
+// 于是同一批 tool_calls 会被投递两次；执行侧必须自己按 call.id 轮内去重。
+// 只数「执行次数 / effect 次数」，不能只看末帧。
+
+test("runWorkbenchToolLoopStream: 同一批 tool_calls 被投递两次时只执行一次、只落一个 effect", async () => {
+  const registry = new ToolRegistry();
+  let executed = 0;
+  registry.register(fakeTool({ name: "project_list", execute: async () => { executed += 1; return { items: [] }; } }));
+
+  const effectKeys: string[] = [];
+  const collected = await collectStream(
+    runWorkbenchToolLoopStream({
+      messages: [{ role: "user", content: "我有哪些项目" }],
+      registry,
+      agentUser: { id: "u1", capabilities: ["estimates:read"] },
+      readOnlyToolNames: new Set(["project_list"]),
+      recordToolEffect: async (ordinal, execute) => {
+        const effectKey = `run-1:chat:workbench_chat_tool_call:${ordinal}`;
+        effectKeys.push(effectKey);
+        return execute();
+      },
+      invokeStream: ({ turnOrdinal }) => {
+        const c1 = [{ id: "c1", name: "project_list", arguments: {} }];
+        if (turnOrdinal === 1) {
+          return turnStream([
+            // 结束帧：首次交付
+            chunkOf({ finishReason: "tool_calls", toolCalls: c1 }),
+            // 结束帧之后厂商补发的帧：粘性 finishReason 会再次交付同一批
+            chunkOf({ finishReason: "tool_calls", toolCalls: c1 }),
+          ]);
+        }
+        return turnStream([chunkOf({ contentDelta: "你有 0 个项目" }), chunkOf({ finishReason: "stop" })]);
+      },
+    }),
+  );
+
+  assert.equal(executed, 1, "同一调用被执行两次（写工具下即一次对话建两个项目）");
+  assert.deepEqual(effectKeys, ["run-1:chat:workbench_chat_tool_call:1"], "重复投递不得吃掉第二个序号或产生第二个 effect");
+  assert.deepEqual(collected.result.toolCalls, [{ name: "project_list" }]);
+  assert.deepEqual(
+    collected.chunks.filter((chunk) => chunk.kind === "metadata" && chunk.toolCalls).map((chunk) => chunk.toolCalls?.length),
+    [1],
+    "补发给 dispatch 的 metadata 只有一批调用",
+  );
+});
+
+test("runWorkbenchToolLoopStream: 同一轮内两个不同 id 的调用必须都执行", async () => {
+  const registry = new ToolRegistry();
+  const executedArgs: unknown[] = [];
+  registry.register(fakeTool({ name: "knowledge_query", execute: async (args) => { executedArgs.push(args); return { hit: args.q }; } }));
+
+  const ordinals: number[] = [];
+  const events: AgentEvent[] = [];
+  const collected = await collectStream(
+    runWorkbenchToolLoopStream({
+      messages: [{ role: "user", content: "查两个问题" }],
+      registry,
+      agentUser: { id: "u1", capabilities: ["estimates:read"] },
+      readOnlyToolNames: new Set(["knowledge_query"]),
+      onEvent: (event) => events.push(event),
+      recordToolEffect: async (ordinal, execute) => {
+        ordinals.push(ordinal);
+        return execute();
+      },
+      invokeStream: ({ turnOrdinal }) => {
+        if (turnOrdinal === 1) {
+          // 同名不同参的并行调用：去重键若取 name 会误合成一个
+          return turnStream([
+            chunkOf({
+              finishReason: "tool_calls",
+              toolCalls: [
+                { id: "c1", name: "knowledge_query", arguments: { q: "ERP" } },
+                { id: "c2", name: "knowledge_query", arguments: { q: "WBS" } },
+              ],
+            }),
+          ]);
+        }
+        return turnStream([chunkOf({ contentDelta: "两个结果" }), chunkOf({ finishReason: "stop" })]);
+      },
+    }),
+  );
+
+  assert.equal(executedArgs.length, 2, "同轮内不同 id 的并行调用一个都不能被去重吞掉");
+  assert.deepEqual(executedArgs, [{ q: "ERP" }, { q: "WBS" }]);
+  assert.deepEqual(ordinals, [1, 2], "两个调用必须各占一个独立序号");
+  assert.deepEqual(collected.result.toolCalls, [{ name: "knowledge_query" }, { name: "knowledge_query" }]);
+  assert.equal(events.filter((event) => event.kind === "tool_result").length, 2);
+});
+
+test("runWorkbenchToolLoopStream: 去重是轮内的，第二轮同名 call_0 必须照常执行", async () => {
+  const registry = new ToolRegistry();
+  let executed = 0;
+  registry.register(fakeTool({ name: "project_list", execute: async () => { executed += 1; return { items: [] }; } }));
+
+  const ordinals: number[] = [];
+  const messagesPerTurn: number[] = [];
+  const collected = await collectStream(
+    runWorkbenchToolLoopStream({
+      messages: [{ role: "user", content: "再看一次项目" }],
+      registry,
+      agentUser: { id: "u1", capabilities: ["estimates:read"] },
+      readOnlyToolNames: new Set(["project_list"]),
+      recordToolEffect: async (ordinal, execute) => {
+        ordinals.push(ordinal);
+        return execute();
+      },
+      invokeStream: ({ turnOrdinal, messages }) => {
+        messagesPerTurn.push(messages.length);
+        // provider 在 id 缺失时按 index 兜底成 call_0，故第二轮的合法新调用 id 与第一轮相同
+        if (turnOrdinal <= 2) {
+          return turnStream([chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "call_0", name: "project_list", arguments: {} }] })]);
+        }
+        return turnStream([chunkOf({ contentDelta: "两次都查了" }), chunkOf({ finishReason: "stop" })]);
+      },
+    }),
+  );
+
+  assert.equal(executed, 2, "全局去重会吞掉第二轮的合法调用（表现为「第二次调同一个工具没反应」）");
+  assert.deepEqual(ordinals, [1, 2]);
+  assert.deepEqual(messagesPerTurn, [1, 2, 3], "每轮都要带上前一轮的回填");
+  assert.equal(collected.result.content, "两次都查了");
+  assert.equal(collected.result.turns, 3);
+});

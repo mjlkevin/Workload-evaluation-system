@@ -627,7 +627,11 @@ async function* parseStream(
           finishReason = asString(choice?.finish_reason) || finishReason;
           const streamUsage = extractUsage(json?.usage);
           if (streamUsage) lastUsage = streamUsage;
-          const streamToolCalls = finishReason === "tool_calls" ? assembleToolCalls() : undefined;
+          // 一批 tool_calls 只交付一次：finishReason 是粘性的（上一行），而厂商在结束帧之后
+          // 常补发一个纯用量帧（OpenAI 兼容接口 include_usage 的标准行为），若不再次拦截，
+          // 同一批调用会被 assemble 两次、下游工具被执行两次。
+          const streamToolCalls =
+            finishReason === "tool_calls" && !toolCallsEmitted ? assembleToolCalls() : undefined;
           if (!delta && !reasoningDelta && !finishReason && !streamUsage && !streamToolCalls) continue;
           // P1-1: 仅 yield delta，不再携带累积的 content/reasoningContent 字段
           yield {
