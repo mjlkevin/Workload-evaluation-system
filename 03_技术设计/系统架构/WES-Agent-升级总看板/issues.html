@@ -95,6 +95,17 @@
             <col style="width:11%">
           </colgroup>
           <tr><th>ID</th><th>日期</th><th>标题</th><th>来源</th><th>原始反馈</th><th>证据</th><th>分析状态</th><th>分流</th><th>下一步</th></tr>
+            <tr data-board-event-id="BE-2026-09-04-ui-home-bubble-overflow:issues-no-geometry-guard">
+              <td class="mono">ISS-2026-09-04-002</td>
+              <td>2026-09-04</td>
+              <td>气泡越界修复缺少自动化几何回归守卫（当前守卫仅类名契约；浏览器实测未进 CI）</td>
+              <td>架构侧批 6 复核提出（2.2）· 执行方已在回填中自行披露同一缺口</td>
+              <td>批 6 新增的 4 条守卫用例断言的是 <code class="inline">classList.contains('min-w-0' / 'break-words')</code>，即<b>类名契约</b>而非溢出行为本身。由此产生一个真实缺口：<b>上游布局若被改动（外层 grid 定轨方式变化、或 Tailwind utility 被移除/改名），本缺陷会复发，而这 4 条用例仍会全绿。</b>真正的证据是浏览器三档实测，而它<b>不在 CI 里</b>。</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/__tests__/home-bubble-narrow-overflow.test.jsx</code>（4 条均为类名断言）· 执行方披露原文：「jsdom 无布局引擎，用例断的是 DOM 类名契约，几何结论全部来自真实浏览器实测」· 实测脚本与 JSON 留存于分支 <code class="inline">.cache/batch6/</code>（gitignore 内，未入库，故亦不可复跑）</td>
+              <td><span class="status warn"><span class="dot"></span>已登记 · 待架构侧排期</span></td>
+              <td>待架构侧裁决（本批只登记不处置）</td>
+              <td><b>处置方向留白</b>：是否把浏览器几何实测纳入 CI、以何种形态纳入，属架构决策，交架构侧排期定调，本批未开工、不提方案。</td>
+            </tr>
             <tr data-board-event-id="BE-2026-09-04-ui-home-bubble-overflow:issues-composer-clip">
               <td class="mono">ISS-2026-09-04-001</td>
               <td>2026-09-04</td>
@@ -135,9 +146,9 @@
               <td>架构侧实取（前端优化线批 4 下发）</td>
               <td>待办池此前把三条问题记到了错误的业务表面，会导致下一批选错表面：①原记「<code class="inline">/</code> 上 8 个气泡元素右边界 392 &gt; 360」应归属 <code class="inline">/</code> 的 AI 工作台（<code class="inline">AiHomeWorkbench</code>）；②原记「首页 KPI 进度条恒 0%」应归属 <code class="inline">/projects</code>；③原记「首页缺 <code class="inline">!loading</code>」应归属 <code class="inline">/projects</code>。</td>
               <td><code class="inline">src/App.jsx:78-79</code>（<code class="inline">/</code> → <code class="inline">HomePage</code> → <code class="inline">AiHomeWorkbench</code>；<code class="inline">/projects</code> → <code class="inline">TraditionalHomeDashboard</code>）<details class="tech-detail"><summary>②③ 两条已在本批闭环，可作归属正确性的反向印证</summary>②「KPI 进度条恒 0%」与③「缺 <code class="inline">!loading</code>」两条经实取确认根因均在 <code class="inline">TraditionalHomeDashboard.jsx</code> + <code class="inline">useHomeDashboard.js</code>（即 <code class="inline">/projects</code>），并已随本批 <code class="inline">692cf9d</code> / <code class="inline">79b5c1a</code> 修复完毕——修复落点即归属证据。①「气泡元素越界」<b>不在本批表面内，未验证、未处置</b>，仅完成归属订正。</details></td>
-              <td><span class="status done"><span class="dot"></span>归属已订正 · ① 已由批 6 实测复现并修复（分支待复核）· ②③ 已闭环</span></td>
+              <td><span class="status done"><span class="dot"></span>归属已订正 · ① 已处置（批 6 实测复现并修复，已合入 main <code class="inline">fb1dd9c</code>）· ②③ 已闭环</span></td>
               <td>口径订正 · 不新建实现项</td>
-              <td>① 的气泡越界已由前端优化线批 6 承接（业务表面按订正口径申报为 <code class="inline">/</code> → <code class="inline">AiHomeWorkbench</code>）：真实浏览器三档实测复现成立且较原记录更严重（8 行 right=989，grid auto 轨被 min-content 撑爆），修复见 <a href="changes.html">BE-2026-09-04-ui-home-bubble-overflow</a>（分支 <code class="inline">qoder/ui-home-bubble-overflow</code> @ <code class="inline">0541131</code>，未合入，待 Codex 复核）。本条订正使命完成。</td>
+              <td>① 的气泡越界已由前端优化线批 6 承接（业务表面按订正口径申报为 <code class="inline">/</code> → <code class="inline">AiHomeWorkbench</code>）：真实浏览器三档实测复现成立且较原记录更严重（8 行 right=989，grid auto 轨被 min-content 撑爆），修复见 <a href="changes.html">BE-2026-09-04-ui-home-bubble-overflow</a>（分支 <code class="inline">qoder/ui-home-bubble-overflow</code> @ <code class="inline">0541131</code>）。<b>已处置</b>：架构侧复核通过准予合入，批 6 于 2026-09-04 以 <code class="inline">git merge --no-ff</code> 并入 main（merge commit <code class="inline">fb1dd9c</code>）。本条订正使命完成。<b>唯一残留缺口另立新条</b>：<a href="issues.html">ISS-2026-09-04-002</a>（守卫仅类名契约、浏览器实测未进 CI），待架构侧排期。</td>
             </tr>
             <tr data-board-event-id="BE-2026-09-03-ui-projects-load-state:issues-real-filter">
               <td class="mono">ISS-2026-09-03-003</td>
