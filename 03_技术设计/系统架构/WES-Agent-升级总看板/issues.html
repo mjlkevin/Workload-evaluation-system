@@ -95,6 +95,17 @@
             <col style="width:11%">
           </colgroup>
           <tr><th>ID</th><th>日期</th><th>标题</th><th>来源</th><th>原始反馈</th><th>证据</th><th>分析状态</th><th>分流</th><th>下一步</th></tr>
+            <tr data-board-event-id="BE-2026-09-04-ui-home-bubble-overflow:issues-composer-clip">
+              <td class="mono">ISS-2026-09-04-001</td>
+              <td>2026-09-04</td>
+              <td>360 档首页 AI 工作台发送区（<code class="inline">.ai-composer__row</code> / <code class="inline">.ai-composer__send</code>）右缘越界且被 <code class="inline">overflow-x:hidden</code> 祖先永久裁切</td>
+              <td>前端优化线批 6 全页扫描（真实浏览器实测，同表面其余问题按 §9 只登记不修）</td>
+              <td>批 6 在修气泡越界时对 <code class="inline">/</code> 做整页逐元素扫描：360 视口下 <code class="inline">div.ai-composer__row</code> right=375&gt;360、<code class="inline">button.ai-composer__send</code> right=375、发送图标 svg right=365，最近滚动祖先为聊天 <code class="inline">section</code>（实测 <code class="inline">overflow-x:hidden</code>）= 发送按钮部分不可点。390/414 档复测无越界。</td>
+              <td><code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/Composer.jsx</code>；测量：playwright-core + 系统 Chrome，<code class="inline">page.route('**/api/v1/**')</code> 打桩，360/390/414 三档逐元素 <code class="inline">rect.right &gt; innerWidth</code> 清单（本行数值为浏览器实取，非推导）。扫描在批 6 气泡修复落地后进行（修复前整页气泡面已越界、未单独扫描 composer）；该元素属输入区组件，与本批气泡修复无共享样式因果，判为独立既有问题。</td>
+              <td><span class="status warn"><span class="dot"></span>已登记 · 待分诊</span></td>
+              <td>defect 候选（窄屏可用性），严重度中——360 档发送按钮被裁但 textarea 仍可见可输入</td>
+              <td>下一批若接，业务表面申报为 <code class="inline">/</code>（AiHomeWorkbench Composer），修法优先响应式收敛（composer 行 min-width:0 / 按钮列换行或弹性收缩），不给聊天区加横向滚动。</td>
+            </tr>
             <tr data-board-event-id="BE-2026-09-03-ui-projects-load-state:issues-homeworkspace">
               <td class="mono">ISS-2026-09-03-001</td>
               <td>2026-09-03</td>
@@ -124,9 +135,9 @@
               <td>架构侧实取（前端优化线批 4 下发）</td>
               <td>待办池此前把三条问题记到了错误的业务表面，会导致下一批选错表面：①原记「<code class="inline">/</code> 上 8 个气泡元素右边界 392 &gt; 360」应归属 <code class="inline">/</code> 的 AI 工作台（<code class="inline">AiHomeWorkbench</code>）；②原记「首页 KPI 进度条恒 0%」应归属 <code class="inline">/projects</code>；③原记「首页缺 <code class="inline">!loading</code>」应归属 <code class="inline">/projects</code>。</td>
               <td><code class="inline">src/App.jsx:78-79</code>（<code class="inline">/</code> → <code class="inline">HomePage</code> → <code class="inline">AiHomeWorkbench</code>；<code class="inline">/projects</code> → <code class="inline">TraditionalHomeDashboard</code>）<details class="tech-detail"><summary>②③ 两条已在本批闭环，可作归属正确性的反向印证</summary>②「KPI 进度条恒 0%」与③「缺 <code class="inline">!loading</code>」两条经实取确认根因均在 <code class="inline">TraditionalHomeDashboard.jsx</code> + <code class="inline">useHomeDashboard.js</code>（即 <code class="inline">/projects</code>），并已随本批 <code class="inline">692cf9d</code> / <code class="inline">79b5c1a</code> 修复完毕——修复落点即归属证据。①「气泡元素越界」<b>不在本批表面内，未验证、未处置</b>，仅完成归属订正。</details></td>
-              <td><span class="status done"><span class="dot"></span>归属已订正（②③ 已随本批修复闭环）</span></td>
+              <td><span class="status done"><span class="dot"></span>归属已订正 · ① 已由批 6 实测复现并修复（分支待复核）· ②③ 已闭环</span></td>
               <td>口径订正 · 不新建实现项</td>
-              <td>下一批若接 ① 的气泡越界，业务表面应申报为 <code class="inline">/</code>（<code class="inline">AiHomeWorkbench</code>），<b>不要再选 <code class="inline">/projects</code></b>。</td>
+              <td>① 的气泡越界已由前端优化线批 6 承接（业务表面按订正口径申报为 <code class="inline">/</code> → <code class="inline">AiHomeWorkbench</code>）：真实浏览器三档实测复现成立且较原记录更严重（8 行 right=989，grid auto 轨被 min-content 撑爆），修复见 <a href="changes.html">BE-2026-09-04-ui-home-bubble-overflow</a>（分支 <code class="inline">qoder/ui-home-bubble-overflow</code> @ <code class="inline">0541131</code>，未合入，待 Codex 复核）。本条订正使命完成。</td>
             </tr>
             <tr data-board-event-id="BE-2026-09-03-ui-projects-load-state:issues-real-filter">
               <td class="mono">ISS-2026-09-03-003</td>

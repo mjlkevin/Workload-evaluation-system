@@ -29,10 +29,10 @@ export default function MessageBubble({
   const showMetaBar = !message.loading && !message.error && Boolean(message.text)
   const metaAlign = isUser ? 'justify-end' : 'justify-start'
   return (
-    <article className="ai-msg-row" style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+    <article className="ai-msg-row min-w-0" style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
       <div className="ai-msg-col" style={{ width: hasArtifacts ? 'min(100%, 1080px)' : undefined, maxWidth: hasArtifacts ? '100%' : (isUser ? '70%' : '76%') }}>
       <div
-        className={`ai-bubble-wrap ${isUser ? 'text-right font-medium' : 'text-left font-normal'}${message.error ? ' border-l-2 border-err pl-2.5' : ''}`}
+        className={`ai-bubble-wrap break-words ${isUser ? 'text-right font-medium' : 'text-left font-normal'}${message.error ? ' border-l-2 border-err pl-2.5' : ''}`}
         style={{ position: 'relative' }}
       >
         {/* ISS-2026-08-10-005：思考轨迹移到回答正文上方（对标业内：思考在上、回答在下）；
