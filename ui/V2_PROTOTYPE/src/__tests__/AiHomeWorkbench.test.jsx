@@ -4,13 +4,10 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import ToastContainer from '../components/ui/ToastContainer.jsx'
 import { ToastProvider } from '../hooks/useToast.jsx'
-// ISS-2026-09-03-005：本文件有两个宿主，分工如下——
-// renderAiWorkbench 挂生产路径（路由 / → HomePage → AiHomeWorkbench），46 条工作台行为用例走它；
-// renderHomeWorkspaceView 挂 HomeWorkspace，仅服务视图切换器 / PageShell 契约这 5 条用例：
-// 那 5 条断言的对象（'AI 工作台' / '传统工作台' 按钮、aria-pressed、PageShell 的 .pg-hd）
-// 本就只存在于 HomeWorkspace，换宿主等于删覆盖，故保留（HomeWorkspace 的去留属 ISS-2026-09-03-001）。
+// ISS-2026-09-03-005 / ISS-2026-09-03-001：挂载真实生产路径（路由 / → HomePage → AiHomeWorkbench）。
+// 本页曾有第二个宿主 HomeWorkspace（AI / 传统工作台左右切换），经用户裁决（2026-09-04）
+// 连同其专属的 5 条视图切换器 / PageShell 契约用例一并删除——该页面在生产中无任何路由可达。
 import HomePage from '../pages/HomePage.jsx'
-import HomeWorkspace from '../pages/HomeWorkspace.jsx'
 import { server } from './mocks/server.js'
 
 const BASE = '/api/v1'
@@ -29,15 +26,6 @@ function renderAiWorkbench() {
   )
 }
 
-function renderHomeWorkspaceView() {
-  return render(
-    <ToastProvider>
-      <ToastContainer />
-      <MemoryRouter><HomeWorkspace /></MemoryRouter>
-    </ToastProvider>
-  )
-}
-
 function requestSessionDelete(title) {
   const sessionCard = screen.getByText(title).closest('[role="button"]')
   fireEvent.contextMenu(sessionCard, { clientX: 40, clientY: 40 })
@@ -51,13 +39,6 @@ describe('HomeWorkspace', () => {
     localStorage.removeItem('wes-ai-workspace-panel-collapsed')
   })
 
-  test('defaults to AI workbench', async () => {
-    renderHomeWorkspaceView()
-
-    await waitFor(() => expect(screen.getByRole('button', { name: 'AI 工作台' })).toBeInTheDocument())
-    expect(screen.queryByText(/按登录账号业务角色预置对话工作流/)).not.toBeInTheDocument()
-  })
-
   test('collapses AI workspace panel and remembers the preference', async () => {
     renderAiWorkbench()
 
@@ -69,23 +50,6 @@ describe('HomeWorkspace', () => {
     expect(screen.getByText('预期产出').closest('.ai-home-inspector__content')).toHaveClass('ai-home-inspector__content--hidden')
     expect(screen.getByRole('button', { name: '展开工作区' })).toBeInTheDocument()
     expect(localStorage.getItem('wes-ai-workspace-panel-collapsed')).toBe('true')
-  })
-
-  test('switches to traditional dashboard', async () => {
-    renderHomeWorkspaceView()
-
-    fireEvent.click(screen.getByRole('button', { name: '传统工作台' }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: '项目列表' })).toBeInTheDocument())
-  })
-
-  test('updates page identity when switching to traditional dashboard', async () => {
-    renderHomeWorkspaceView()
-
-    fireEvent.click(screen.getByRole('button', { name: '传统工作台' }))
-
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: '项目评估工作台' })).toBeInTheDocument())
-    expect(screen.getByRole('link', { name: '项目评估工作台' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: '传统工作台' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('selected workflow reshapes the central empty state and composer context', async () => {
@@ -1655,25 +1619,6 @@ describe('HomeWorkspace', () => {
     expect(screen.getByText(/查看今日项目队列/).closest('ul')).toBeInTheDocument()
   })
 
-  test('keeps AI workbench scrolling inside the message pane', async () => {
-    const { container } = renderHomeWorkspaceView()
-
-    const pageHeader = container.querySelector('.pg-hd')
-    const workbench = await screen.findByTestId('ai-home-workbench')
-    const messagePane = screen.getByTestId('ai-home-message-pane')
-    const composer = screen.getByRole('textbox')
-
-    expect(pageHeader.style.position).toBe('relative')
-    expect(pageHeader.style.flexShrink).toBe('0')
-    expect(workbench.style.height).toBe('100%')
-    expect(workbench.style.minHeight).toBe('0px')
-    expect(messagePane.style.overflowY).toBe('auto')
-    expect(messagePane.style.minHeight).toBe('0px')
-    expect(composer).toHaveClass('ai-composer__textarea')
-    expect(screen.getByRole('button', { name: '附加文件' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '发送消息' })).toBeInTheDocument()
-  })
-
   test('pressing Enter sends AI home message', async () => {
     renderAiWorkbench()
 
@@ -1866,67 +1811,6 @@ describe('HomeWorkspace', () => {
     expect(input).toHaveClass('ai-composer__textarea')
     expect(screen.getByRole('button', { name: '发送消息' })).toBeVisible()
     expect(screen.getByRole('button', { name: '附加文件' })).toBeVisible()
-  })
-
-  test('updates linked records and project list after confirming project creation', async () => {
-    const projectRecords = [
-      { projectId: 'existing-1', projectName: '已有项目', customerName: '已有客户', currentStage: 'project_discovery', status: 'draft', ownerUsername: 'arch', participantUserIds: [], createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z' },
-    ]
-    server.use(
-      http.get(`${BASE}/ai-sessions`, () => HttpResponse.json({
-        success: true,
-        data: {
-          items: [{
-            sessionId: 'session-action',
-            title: 'XX制造 WMS 粗评',
-            status: 'rough_estimate',
-            domain: 'business_evaluation',
-            workflowKey: 'rough_estimate',
-            messages: [],
-            artifacts: [{ artifactId: 'art-1', type: 'rough_report', title: '粗评报告', content: '预计 120 人天', status: 'generated' }],
-            pendingActions: [{
-              actionId: 'act-1',
-              actionType: 'create_project_evaluation',
-              title: '创建项目评估方案',
-              riskLevel: 'high',
-              status: 'pending',
-              payload: { projectName: 'XX制造 WMS 项目', customerName: 'XX制造' },
-            }],
-            linkedRecords: {},
-            updatedAt: '2026-06-14T08:00:00.000Z',
-          }],
-        },
-      })),
-      http.get(`${BASE}/project-evaluations`, () => HttpResponse.json({ success: true, data: { items: projectRecords } })),
-      http.post(`${BASE}/project-evaluations`, async ({ request }) => {
-        const body = await request.json()
-        const project = {
-          projectId: 'project-1',
-          projectName: body.projectName,
-          customerName: body.customerName,
-          currentStage: 'project_discovery',
-          status: 'draft',
-          projectStatus: 'draft',
-          ownerUsername: 'arch',
-          participantUserIds: ['u3'],
-          createdAt: '2026-06-23T00:00:00.000Z',
-          updatedAt: '2026-06-23T00:00:00.000Z',
-        }
-        projectRecords.unshift(project)
-        return HttpResponse.json({ success: true, data: { project } })
-      })
-    )
-
-    renderHomeWorkspaceView()
-
-    expect(await screen.findByText('XX制造 WMS 粗评')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '确认执行' }))
-
-    expect(await screen.findByText(/项目：XX制造 WMS 项目/)).toBeInTheDocument()
-    expect(await screen.findByText(/项目已创建并关联/)).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: '传统工作台' }))
-    expect(await screen.findByText('XX制造 WMS 项目')).toBeInTheDocument()
   })
 
   test('opens company lookup dialog from suggested action and writes selected candidate back to the workbench', async () => {
