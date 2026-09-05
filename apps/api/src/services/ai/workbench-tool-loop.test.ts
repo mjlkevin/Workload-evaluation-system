@@ -3,11 +3,16 @@ import assert from "node:assert/strict";
 
 import {
   WORKBENCH_TOOL_LOOP_MAX_TURNS,
-  resolveReadOnlyWorkbenchTools,
+  resolveWorkbenchInjectableTools,
   runWorkbenchToolLoop,
   runWorkbenchToolLoopStream,
   type WorkbenchToolEffectOutput,
 } from "./workbench-tool-loop";
+import {
+  WorkbenchToolApprovalPendingError,
+  WORKBENCH_TOOL_APPROVAL_UNWIRED_MESSAGE,
+  type WorkbenchToolApprovalGate,
+} from "./workbench-tool-approval";
 import {
   WORKBENCH_MODEL_VISIBLE_SURFACE_TYPES,
   WORKBENCH_TOOL_UI_EVENT_TYPES,
@@ -54,34 +59,55 @@ function fakeTool(overrides: Partial<AgentTool> = {}): AgentTool {
   };
 }
 
-/** 注入点解析出的工具集必须逐个为只读，且写工具/发现工具一个都不出现 */
+/**
+ * 批次 1a · 注入点分流：注入集 = allow ∪ ask（批次 0 的「只注入只读」随闸门就位而扩）；
+ * 两个集合必须互斥且穷尽覆盖注入集——「没落进任何一档」等于没有闸门可言。
+ */
 for (const role of ["admin", "sub_admin", "user"] as const) {
-  test(`resolveReadOnlyWorkbenchTools: ${role} 注入集内无任何 mutates 工具`, () => {
-    const set = resolveReadOnlyWorkbenchTools(authUser(role), { registry: createDefaultRegistry(authUser(role)) });
+  test(`resolveWorkbenchInjectableTools: ${role} 分流互斥穷尽，写工具已注入但落 ask 档`, () => {
+    const set = resolveWorkbenchInjectableTools(authUser(role), { registry: createDefaultRegistry(authUser(role)) });
 
-    assert.ok(set.tools.length > 0, `${role} 的只读注入集不得为空（否则本批等于没传 tools）`);
+    assert.ok(set.tools.length > 0, `${role} 的注入集不得为空（否则本批等于没传 tools）`);
+    const names: string[] = set.tools.map((definition) => definition.function.name);
     for (const definition of set.tools) {
       const tool = set.registry.get(definition.function.name);
       assert.ok(tool, `注入集内工具必须已注册：${definition.function.name}`);
-      assert.equal(tool.mutates, false, `注入到模型的工具必须 mutates=false：${definition.function.name}`);
       assert.notEqual(tool.category, DISCOVERY_CATEGORY, `发现类工具不得注入工作台：${definition.function.name}`);
+      const inAllow = set.allowToolNames.has(definition.function.name);
+      const inAsk = set.approvalRequiredToolNames.has(definition.function.name);
+      assert.equal(inAllow && inAsk, false, `${definition.function.name} 不得同时落两档`);
+      assert.equal(inAllow || inAsk, true, `${definition.function.name} 必须落进某一档（无第三条评论路径）`);
+      assert.equal(tool.mutates === false, inAllow, `${definition.function.name} 档位必须与注册表 mutates 一致`);
     }
 
-    const names = set.tools.map((definition) => definition.function.name);
-    assert.deepEqual(
-      names,
-      ["estimate_implementation", "project_list", "estimate_history", "knowledge_query", "rule_lookup"],
-    );
-    assert.equal(names.includes("create_project"), false);
-    assert.equal(names.includes("generate_wbs"), false);
-    assert.equal(names.includes("export_report"), false);
-    assert.equal(names.includes("list_tools"), false);
-    assert.equal(set.readOnlyToolNames.has("create_project"), false);
+    // 本批产品口径：三个写工具**全部**放开（不是只放开 create_project），
+    // 但注入与否仍由 RBAC 能力位决定——estimates:write 只给 admin/sub_admin，
+    // 普通 user 因此只拿到 create_project。放开闸门不得顺手放宽权限。
+    const WRITE_TOOLS = ["create_project", "generate_wbs", "export_report"] as const;
+    const READ_TOOLS = ["estimate_implementation", "project_list", "estimate_history", "knowledge_query", "rule_lookup"] as const;
+    assert.deepEqual(names, [...READ_TOOLS, ...WRITE_TOOLS.filter((name) => set.registry.get(name) && set.agentUser.capabilities.includes(set.registry.get(name)!.capability))]);
+    assert.equal((names as string[]).includes("list_tools"), false);
+    for (const writeTool of WRITE_TOOLS) {
+      const injected: boolean = names.includes(writeTool);
+      assert.equal(set.approvalRequiredToolNames.has(writeTool), injected, `${writeTool} 注入即必须走审批`);
+      assert.equal(set.allowToolNames.has(writeTool), false, `${writeTool} 不得直接放行`);
+    }
+    for (const readOnlyTool of READ_TOOLS) {
+      assert.equal(set.allowToolNames.has(readOnlyTool), true, `${readOnlyTool} 应直接放行`);
+    }
+    if (set.agentUser.capabilities.includes("estimates:write")) {
+      assert.deepEqual(
+        WRITE_TOOLS.filter((name) => names.includes(name)),
+        [...WRITE_TOOLS],
+        "admin/sub_admin 三个写工具必须全部注入（本批产品口径）",
+      );
+    }
+    assert.equal(set.allowToolNames.has("create_project"), false);
   });
 }
 
-test("resolveReadOnlyWorkbenchTools: 能力位由 legacy role 推导，模型入参无法扩权", () => {
-  const set = resolveReadOnlyWorkbenchTools(authUser("user"), { registry: createDefaultRegistry(authUser("user")) });
+test("resolveWorkbenchInjectableTools: 能力位由 legacy role 推导，模型入参无法扩权", () => {
+  const set = resolveWorkbenchInjectableTools(authUser("user"), { registry: createDefaultRegistry(authUser("user")) });
   assert.ok(set.agentUser.capabilities.includes("estimates:read"));
   assert.equal(set.agentUser.capabilities.includes("system:manage"), false);
   assert.equal(set.agentUser.id, "u-batch0");
@@ -98,7 +124,7 @@ test("runWorkbenchToolLoop: 执行工具→回填→再问一次，返回最终�
     messages: [{ role: "user", content: "查一下知识库" }],
     registry,
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
-    readOnlyToolNames: new Set(["knowledge_query"]),
+    allowToolNames: new Set(["knowledge_query"]),
     onEvent: (event) => events.push(event),
     invoke: async ({ messages }) => {
       seenMessages.push(messages.map((m) => ({ role: m.role, content: m.content })));
@@ -135,7 +161,7 @@ test("runWorkbenchToolLoop: 写工具与未注册工具一律不执行，只回�
     messages: [{ role: "user", content: "导出报告" }],
     registry,
     agentUser: { id: "u1", capabilities: ["estimates:read", "estimates:write"] },
-    readOnlyToolNames: new Set(["project_list"]),
+    allowToolNames: new Set(["project_list"]),
     onEvent: (event) => events.push(event),
     // 模型每轮都提同一批调用：上限设 2 → 第 1 轮执行并回填，第 2 轮触顶不再执行
     maxTurns: 2,
@@ -152,7 +178,8 @@ test("runWorkbenchToolLoop: 写工具与未注册工具一律不执行，只回�
     },
   });
 
-  assert.equal(writeCalled, false, "mutates 工具绝不得被执行（写确认闸门属批次 1）");
+  // 批次 1a：写工具落 ask 档，但本用例**未注入审批闸门** → 一律拒绝执行（失败方向关闭）
+  assert.equal(writeCalled, false, "mutates 工具在无闸门链路下绝不得被执行");
   assert.equal(readCalled, true);
   // 三个调用都不得抛错：拒绝执行为回填 ok:false
   const results = events.filter((event) => event.kind === "tool_result");
@@ -182,7 +209,7 @@ test("runWorkbenchToolLoop: 工具抛错不阻断主链路，异常摘要回填"
     messages: [{ role: "user", content: "x" }],
     registry,
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
-    readOnlyToolNames: new Set(["boom"]),
+    allowToolNames: new Set(["boom"]),
     invoke: async ({ messages }) =>
       messages.length === 1
         ? { content: "", toolCalls: [{ id: "c1", name: "boom", arguments: {} }] }
@@ -202,7 +229,7 @@ test("runWorkbenchToolLoop: 达最大轮数不抛错，返回末轮内容并标�
     messages: [{ role: "user", content: "x" }],
     registry,
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
-    readOnlyToolNames: new Set(["a"]),
+    allowToolNames: new Set(["a"]),
     maxTurns: 3,
     invoke: async () => {
       invokes += 1;
@@ -232,7 +259,7 @@ test("runWorkbenchToolLoop: recordToolEffect 逐次独立编号，重放命中�
       messages: [{ role: "user", content: "x" }],
       registry,
       agentUser: { id: "u1", capabilities: ["estimates:read"] },
-      readOnlyToolNames: new Set(["a"]),
+      allowToolNames: new Set(["a"]),
       recordToolEffect: async (ordinal, execute) => {
         const effectKey = `run-1:chat:workbench_chat_tool_call:${ordinal}`;
         effectKeys.push(effectKey);
@@ -298,7 +325,7 @@ test("runWorkbenchToolLoopStream: 无工具调用时逐 chunk 原样透传（零
       messages: [{ role: "user", content: "x" }],
       registry,
       agentUser: { id: "u1", capabilities: ["estimates:read"] },
-      readOnlyToolNames: new Set<string>(),
+      allowToolNames: new Set<string>(),
       invokeStream: () =>
         turnStream([
           chunkOf({ kind: "metadata", memoryRef: { scenesCount: 1, atomsCount: 2 } }),
@@ -333,7 +360,7 @@ test("runWorkbenchToolLoopStream: 首轮工具调用执行后补发 metadata，�
     messages: [{ role: "user", content: "我有哪些项目" }],
     registry,
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
-    readOnlyToolNames: new Set(["project_list"]),
+    allowToolNames: new Set(["project_list"]),
     onEvent: (event) => events.push(event),
     invokeStream: ({ turnOrdinal, messages }) => {
       turnOrdinals.push(turnOrdinal);
@@ -373,7 +400,7 @@ test("runWorkbenchToolLoopStream: 末 chunk 仍由真正回答轮决定 finishRe
       messages: [{ role: "user", content: "x" }],
       registry,
       agentUser: { id: "u1", capabilities: ["estimates:read"] },
-      readOnlyToolNames: new Set(["a"]),
+      allowToolNames: new Set(["a"]),
       invokeStream: ({ turnOrdinal }) =>
         turnOrdinal === 1
           ? turnStream([chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "a", arguments: {} }] })])
@@ -399,7 +426,7 @@ test("runWorkbenchToolLoopStream: 流式下写工具一律不执行，只回填�
       messages: [{ role: "user", content: "导出报告" }],
       registry,
       agentUser: { id: "u1", capabilities: ["estimates:read", "estimates:write"] },
-      readOnlyToolNames: new Set<string>(),
+      allowToolNames: new Set<string>(),
       onEvent: (event) => events.push(event),
       invokeStream: ({ turnOrdinal }) =>
         turnOrdinal === 1
@@ -432,7 +459,7 @@ test("runWorkbenchToolLoopStream: 同一批 tool_calls 被投递两次时只执�
       messages: [{ role: "user", content: "我有哪些项目" }],
       registry,
       agentUser: { id: "u1", capabilities: ["estimates:read"] },
-      readOnlyToolNames: new Set(["project_list"]),
+      allowToolNames: new Set(["project_list"]),
       recordToolEffect: async (ordinal, execute) => {
         const effectKey = `run-1:chat:workbench_chat_tool_call:${ordinal}`;
         effectKeys.push(effectKey);
@@ -475,7 +502,7 @@ test("runWorkbenchToolLoopStream: 同一轮内两个不同 id 的调用必须都
       messages: [{ role: "user", content: "查两个问题" }],
       registry,
       agentUser: { id: "u1", capabilities: ["estimates:read"] },
-      readOnlyToolNames: new Set(["knowledge_query"]),
+      allowToolNames: new Set(["knowledge_query"]),
       onEvent: (event) => events.push(event),
       recordToolEffect: async (ordinal, execute) => {
         ordinals.push(ordinal);
@@ -518,7 +545,7 @@ test("runWorkbenchToolLoopStream: 去重是轮内的，第二轮同名 call_0 �
       messages: [{ role: "user", content: "再看一次项目" }],
       registry,
       agentUser: { id: "u1", capabilities: ["estimates:read"] },
-      readOnlyToolNames: new Set(["project_list"]),
+      allowToolNames: new Set(["project_list"]),
       recordToolEffect: async (ordinal, execute) => {
         ordinals.push(ordinal);
         return execute();
@@ -620,7 +647,7 @@ for (const variant of ["stream", "sync"] as const) {
         messages: [{ role: "user" as const, content: "列一下项目" }],
         registry,
         agentUser,
-        readOnlyToolNames: new Set(["project_list"]),
+        allowToolNames: new Set(["project_list"]),
       };
       if (variant === "stream") {
         return collectStream(
@@ -684,3 +711,267 @@ for (const variant of ["stream", "sync"] as const) {
     );
   });
 }
+
+// ============================================================
+// 批次 1a · 写操作工具的执行前审批闸门（循环侧）
+// ============================================================
+// 循环只认服务端给的档位与持久决策：模型正文里怎么说、参数里怎么带，
+// 都不构成放行条件（判据⑤的循环侧形态）。挂起（Pending）不是工具失败，
+// 而是「本轮就地停手」——既不调用 execute，也不回填结果。
+
+test("批次1a·ask 档未注入闸门 → 不执行、回填失败结果、循环继续作答", async () => {
+  const registry = new ToolRegistry();
+  let executions = 0;
+  registry.register(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true, execute: async () => { executions += 1; return { id: "P1" }; } }));
+
+  const requests: string[][] = [];
+  const out = await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "帮我创建一个ERP项目" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:read", "estimates:create"] },
+    allowToolNames: new Set<string>(),
+    // 同步兜底通道没有审批链路：必须拒绝而不是放行
+    invoke: async ({ messages }) => {
+      requests.push(messages.map((m) => m.content));
+      if (requests.length === 1) return { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] };
+      return { content: "没有确认链路，我先不创建" };
+    },
+  });
+
+  assert.equal(executions, 0, "未接审批链路时写工具一次都不得执行");
+  assert.equal(out.content, "没有确认链路，我先不创建");
+  assert.match(requests[1][1], /"ok":false/);
+  assert.match(requests[1][1], /没有审批链路/);
+});
+
+test("批次1a·闸门判为执行 → 工具执行一次并回填成功结果", async () => {
+  const registry = new ToolRegistry();
+  let executions = 0;
+  registry.register(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true, execute: async () => { executions += 1; return { id: "P1" }; } }));
+
+  const gateCalls: unknown[] = [];
+  const out = await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "创建项目" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:create"] },
+    allowToolNames: new Set<string>(),
+    toolApprovalGate: async (call) => {
+      gateCalls.push(call);
+      return { decision: "execute" };
+    },
+    invoke: async ({ turnOrdinal }) =>
+      turnOrdinal === 1
+        ? { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] }
+        : { content: "已创建" },
+  });
+
+  assert.equal(executions, 1);
+  assert.equal(out.content, "已创建");
+  assert.equal(gateCalls.length, 1, "审批闸门必须恰好被咨询一次");
+  assert.deepEqual(gateCalls[0], { ordinal: 1, toolName: "create_project", callId: "c1", arguments: { projectName: "甲项目" } });
+});
+
+test("批次1a·闸门判为拒绝（skip）→ 模型收到失败结果并继续作答，工具从未执行", async () => {
+  const registry = new ToolRegistry();
+  let executions = 0;
+  registry.register(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true, execute: async () => { executions += 1; return { id: "P1" }; } }));
+
+  const requests: string[][] = [];
+  const out = await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "创建项目" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:create"] },
+    allowToolNames: new Set<string>(),
+    toolApprovalGate: async () => ({ decision: "reject", reason: "用户拒绝了本次写操作，未执行任何变更" }),
+    invoke: async ({ messages, turnOrdinal }) => {
+      requests.push(messages.map((m) => m.content));
+      if (turnOrdinal === 1) return { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] };
+      return { content: "好的，我没有创建任何记录" };
+    },
+  });
+
+  assert.equal(executions, 0, "拒绝后工具一次都不得执行");
+  assert.equal(out.content, "好的，我没有创建任何记录");
+  assert.match(requests[1][1], /用户拒绝了本次写操作/);
+  assert.ok(WORKBENCH_TOOL_APPROVAL_UNWIRED_MESSAGE.length > 0);
+});
+
+test("批次1a·闸门挂起（无决策）→ 循环就地停手：不执行、不回填、不落 effect", async () => {
+  const registry = new ToolRegistry();
+  let executions = 0;
+  registry.register(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true, execute: async () => { executions += 1; return { id: "P1" }; } }));
+
+  const store = new Map<string, WorkbenchToolEffectOutput>();
+  const effectKeys: string[] = [];
+  await assert.rejects(
+    () =>
+      runWorkbenchToolLoop({
+        messages: [{ role: "user", content: "创建项目" }],
+        registry,
+        agentUser: { id: "u1", capabilities: ["estimates:create"] },
+        allowToolNames: new Set<string>(),
+        recordToolEffect: async (ordinal, execute) => {
+          const key = `run-1:chat:workbench_chat_tool_call:${ordinal}`;
+          effectKeys.push(key);
+          const existing = store.get(key);
+          if (existing) return existing;
+          const output = await execute();
+          store.set(key, output);
+          return output;
+        },
+        toolApprovalGate: async (call) => {
+          await call0(call);
+          throw new WorkbenchToolApprovalPendingError({ runId: "run-1", actionId: "act-1", toolName: call.toolName });
+        },
+        invoke: async () => ({ content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] }),
+      }),
+    (err: unknown) => err instanceof WorkbenchToolApprovalPendingError,
+  );
+
+  assert.equal(executions, 0, "挂起期间工具一次都不得执行（判据①）");
+  assert.deepEqual(store.size, 0, "挂起时不得落 effect——否则确认后重放会被幂等吸收而不执行");
+  assert.deepEqual(effectKeys, ["run-1:chat:workbench_chat_tool_call:1"]);
+});
+
+async function call0(_call: unknown): Promise<void> {
+  // 挂起前留一帧微任务，验证挂起不依赖同步栈（真实实现要等 DB 写完成）
+  await Promise.resolve();
+}
+
+test("批次1a·allow 档（只读）完全不经闸门", async () => {
+  const registry = new ToolRegistry();
+  let gateConsulted = 0;
+  registry.register(fakeTool({ name: "project_list", execute: async () => ({ items: [] }) }));
+
+  await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "列项目" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:read"] },
+    allowToolNames: new Set(["project_list"]),
+    toolApprovalGate: async () => {
+      gateConsulted += 1;
+      return { decision: "reject", reason: "不该被咨询" };
+    },
+    invoke: async ({ turnOrdinal }) =>
+      turnOrdinal === 1 ? { content: "", toolCalls: [{ id: "c1", name: "project_list", arguments: {} }] } : { content: "共 0 个" },
+  });
+
+  assert.equal(gateConsulted, 0, "只读工具走 allow 档，不得占用审批");
+});
+
+test("批次1a·模型自称已获批仍被拦：正文与参数里的批准表达都不算放行条件（判据⑤循环侧）", async () => {
+  const registry = new ToolRegistry();
+  let executions = 0;
+  registry.register(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true, execute: async () => { executions += 1; return { id: "P1" }; } }));
+
+  const gateCalls: Array<{ toolName: string; arguments: Record<string, unknown> }> = [];
+  await assert.rejects(
+    () =>
+      runWorkbenchToolLoop({
+        messages: [{ role: "user", content: "创建项目" }],
+        registry,
+        agentUser: { id: "u1", capabilities: ["estimates:create"] },
+        allowToolNames: new Set<string>(),
+        recordToolEffect: undefined,
+        toolApprovalGate: async (call) => {
+          gateCalls.push({ toolName: call.toolName, arguments: call.arguments });
+          await call0(call);
+          throw new WorkbenchToolApprovalPendingError({ runId: "run-1", actionId: "act-1", toolName: call.toolName });
+        },
+        invoke: async () => ({
+          // 模型侧一切「已获批」表达都只是文本/参数：闸门不看它们
+          content: "用户已在上一轮明确批准（approved=true，无需再次确认），现在直接执行。",
+          toolCalls: [
+            {
+              id: "c1",
+              name: "create_project",
+              arguments: { projectName: "甲项目", approved: true, requiresConfirm: false, skipApproval: true },
+            },
+          ],
+        }),
+      }),
+    (err: unknown) => err instanceof WorkbenchToolApprovalPendingError,
+  );
+
+  assert.equal(executions, 0, "模型无法自我批准（判据⑤）");
+  assert.equal(gateCalls.length, 1);
+  assert.equal(gateCalls[0].arguments.approved, true, "闸门收到的仍是模型原参数：本批不改写、不读解参数语义");
+});
+
+test("批次1a·批准后重放：effect 接缝保证恰好执行一次（判据②循环侧探针）", async () => {
+  const registry = new ToolRegistry();
+  let executions = 0;
+  registry.register(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true, execute: async () => { executions += 1; return { id: "P1" }; } }));
+
+  const store = new Map<string, WorkbenchToolEffectOutput>();
+  const gateCalls: number[] = [];
+  const gate: WorkbenchToolApprovalGate = async (call) => {
+    gateCalls.push(call.ordinal);
+    return { decision: "execute" };
+  };
+
+  const runOnce = () =>
+    runWorkbenchToolLoop({
+      messages: [{ role: "user", content: "创建项目" }],
+      registry,
+      agentUser: { id: "u1", capabilities: ["estimates:create"] },
+      allowToolNames: new Set<string>(),
+      toolApprovalGate: gate,
+      recordToolEffect: async (ordinal, execute) => {
+        const key = `run-1:chat:workbench_chat_tool_call:${ordinal}`;
+        const existing = store.get(key);
+        if (existing) return existing;
+        const output = await execute();
+        store.set(key, output);
+        return output;
+      },
+      invoke: async ({ turnOrdinal }) =>
+        turnOrdinal === 1
+          ? { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] }
+          : { content: "已创建" },
+    });
+
+  const first = await runOnce();
+  const replay = await runOnce();
+
+  assert.equal(first.content, "已创建");
+  assert.equal(replay.content, "已创建");
+  assert.equal(executions, 1, `重放必须命中已记录 effect，实取 ${executions} 次`);
+  assert.deepEqual(gateCalls, [1], "幂等吸收发生在闸门之前：重放不再咨询闸门、也不再执行");
+});
+
+test("批次1a·流式通道同口径：挂起时不补发 metadata chunk", async () => {
+  const registry = new ToolRegistry();
+  let executions = 0;
+  registry.register(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true, execute: async () => { executions += 1; return { id: "P1" }; } }));
+
+  const generator = runWorkbenchToolLoopStream({
+    messages: [{ role: "user", content: "创建项目" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:create"] },
+    allowToolNames: new Set<string>(),
+    toolApprovalGate: async (call) => {
+      await call0(call);
+      throw new WorkbenchToolApprovalPendingError({ runId: "run-1", actionId: "act-1", toolName: call.toolName });
+    },
+    invokeStream: ({ turnOrdinal }) => {
+      if (turnOrdinal === 1) {
+        return turnStream([
+          chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] }),
+        ]);
+      }
+      return turnStream([chunkOf({ contentDelta: "不应到达" })]);
+    },
+  });
+
+  const chunks: StreamingChunk[] = [];
+  await assert.rejects(
+    async () => {
+      for await (const chunk of generator) chunks.push(chunk);
+    },
+    (err: unknown) => err instanceof WorkbenchToolApprovalPendingError,
+  );
+
+  assert.equal(executions, 0);
+  assert.equal(chunks.some((chunk) => chunk.kind === "metadata"), false, "挂起轮不得补发工具轨迹 metadata");
+});

@@ -25,6 +25,7 @@ import {
   type HarnessResumePolicy,
   type HarnessWorkerTiming,
 } from "./harness-runtime.types";
+import { WorkbenchToolApprovalPendingError } from "../../services/ai/workbench-tool-approval";
 
 // ============================================================
 // 错误词汇
@@ -411,6 +412,11 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
     } catch (err) {
       if (leaseLost) return; // 租约已失：一切写入禁止，等待扫描接管。
       if (err instanceof HarnessFaultInjectedError) return; // 模拟死进程。
+      // 批次 1a · 约束③：审批挂起既不是失败也不是取消——写「等待」的那笔事务
+      // 已经把 run 置 waiting、attempt 释放，此处**不得**再落任何终态，
+      // 否则 Run 会被判 failed，用户回来确认时只会看到一个死掉的回合。
+      // 落库事实只有：tool.call.awaiting_approval + status=waiting。
+      if (err instanceof WorkbenchToolApprovalPendingError) return;
       if (
         cancelDetected ||
         controller.signal.aborted ||

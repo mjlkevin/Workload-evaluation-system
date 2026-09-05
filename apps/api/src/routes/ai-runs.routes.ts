@@ -2,7 +2,7 @@
 // AI Runs 路由（RP-047 Batch C）
 // ============================================================
 // 挂载 /api/v1/ai-runs：active 列表、snapshot、SSE 回放、
-// cancel / inputs / confirm / retry 动作端点（规格 §2.2）。
+// cancel / inputs / confirm / reject / retry 动作端点（规格 §2.2 + 批次 1a）。
 // 路由工厂模式：enabled flag 与 SSE 时序参数可注入，
 // 生产接线见 routes/index.ts（flag 读取点收敛，D2）。
 
@@ -47,6 +47,8 @@ export function createAiRunsRouter(deps: AiRunsRouterDeps): Router {
   router.post("/:runId/cancel", handlers.cancelRunHandler);
   router.post("/:runId/inputs", handlers.submitInputsHandler);
   router.post("/:runId/actions/:actionId/confirm", handlers.confirmActionHandler);
+  // 批次 1a · skip 档：拒绝与同意同为幂等动作，只认 actionId（不接收工具参数）
+  router.post("/:runId/actions/:actionId/reject", handlers.rejectActionHandler);
   router.post("/:runId/retry", handlers.retryRunHandler);
   return router;
 }

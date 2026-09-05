@@ -1,7 +1,9 @@
 // ============================================================
-// O4 S5：7 个 handler 的直接单元测试
+// O4 S5：handler 的直接单元测试
 // 不经 dispatch，逐 handler 断言其 intents 声明与输出契约，
 // 保证搬迁后的 handler 可独立被分发器调用。
+// （批次 1a：write_action_request 的正则 handler 已退役——「帮我创建XX项目」这类话
+//  必须走到模型 + 工具 + 执行前审批闸门，被正则截走即等于闸门永远不被经过。）
 // ============================================================
 
 import assert from "node:assert/strict";
@@ -13,7 +15,6 @@ import type { WorkbenchDispatchInput } from "../workbench-dispatch.service";
 import type { WorkbenchHandlerParams } from "./handler.types";
 import { capabilityHandler } from "./capability.handler";
 import { wesDataQueryHandler } from "./wes-data-query.handler";
-import { writeActionHandler } from "./write-action.handler";
 import { harnessReportHandler } from "./harness-report.handler";
 import { knowledgeQueryHandler } from "./knowledge-query.handler";
 import { attachmentQaHandler } from "./attachment-qa.handler";
@@ -79,33 +80,6 @@ test("wesDataQueryHandler: intents 声明 + owner 数据查询静态回复", asy
   assert.equal(result.intent, "wes_data_query");
   assert.equal(result.model, "rule-static");
   assert.equal(result.suggestedActions[0]?.actionType, "open_project_list");
-});
-
-test("writeActionHandler: 带项目名返回 create_project_evaluation 待确认动作", async () => {
-  assert.deepEqual([...writeActionHandler.intents], ["write_action_request"]);
-  const result = await writeActionHandler.handle(
-    paramsFor(
-      { intent: "write_action_request", confidence: 0.85, routingRule: "write_action_keywords" },
-      makeInput({ message: "帮我创建广州可味达项目" }),
-    ),
-  );
-  assert.equal(result.intent, "write_action_request");
-  assert.equal(result.suggestedActions[0]?.actionType, "create_project_evaluation");
-  assert.equal(result.suggestedActions[0]?.requiresConfirm, true);
-  assert.equal(result.suggestedActions[0]?.payload?.projectName, "广州可味达");
-});
-
-test("writeActionHandler: 疑问句提取出的垃圾名不生成任何确认动作", async () => {
-  const result = await writeActionHandler.handle(
-    paramsFor(
-      { intent: "write_action_request", confidence: 0.85, routingRule: "write_action_keywords" },
-      makeInput({ message: "我创建了什么项目" }),
-    ),
-  );
-  assert.equal(result.intent, "write_action_request");
-  assert.deepEqual(result.suggestedActions, []);
-  assert.ok(result.answer.includes("项目"));
-  assert.equal(result.answer.includes("写动作"), false);
 });
 
 test("harnessReportHandler: 覆盖报告生成与 v2 提交两类意图", async () => {

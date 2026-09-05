@@ -25,6 +25,7 @@ import { createHarnessRuntimeRepository, type HarnessRuntimeRepository } from ".
 import type { AiRunsUsecase } from "../modules/harness/harness-runtime.usecase";
 import { startHarnessRuntime } from "../modules/harness/harness-boot";
 import { routeWorkbenchIntent } from "../services/ai/workbench-intent.service";
+import { WorkbenchToolApprovalPendingError } from "../services/ai/workbench-tool-approval";
 import { appendAiSessionEvent, createAiSession, deleteAiSession } from "../modules/ai-sessions/ai-sessions.usecase";
 import { signAuthToken } from "../middleware/auth";
 import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
@@ -601,6 +602,95 @@ test("confirm rejects non-waiting runs with 409", { skip: !testDatabaseUrl }, as
   assert.equal(rejected.status, 409);
 });
 
+// ── 批次 1a · skip 档：reject 动作端点（与 confirm 同为幂等、同认 waiting）────
+
+test("批次1a reject：waiting Run 拒绝审批 → 202 + tool.call.rejected + 回 queued", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const waitingRunId = await driveRunToWaiting();
+  const actionId = `action-${randomUUID()}`;
+  // 审批请求先存在（真实链路里由 pauseRunForToolApproval 写入），拒绝事件要抄它的 callId
+  await repo!.appendRunEvent({
+    runId: waitingRunId,
+    eventType: "tool.call.awaiting_approval",
+    payload: { actionId, callId: "call_create_http", ordinal: 1, toolName: "create_project" },
+  });
+
+  const first = await request(app)
+    .post(`/ai-runs/${waitingRunId}/actions/${actionId}/reject`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(first.status, 202, `首次拒绝必须 202，实取 ${first.status} ${JSON.stringify(first.body)}`);
+  assert.equal(first.body.data.actionId, actionId);
+  const resumed = await repo!.findRunForOwner(waitingRunId, alice!.id);
+  assert.equal(resumed?.status, "queued", "拒绝后 Run 必须回 queued，让模型把话说完");
+  const rejectedEvents = await listEvents(waitingRunId, "tool.call.rejected");
+  assert.equal(rejectedEvents.length, 1);
+  assert.equal((rejectedEvents[0].payload as { callId?: string }).callId, "call_create_http", "拒绝事件必须抄 callId 供对账");
+  assert.equal(
+    (rejectedEvents[0].payload as { rejectedBy?: string }).rejectedBy,
+    alice!.id,
+    "拒绝人必须是 JWT 用户本人，不接受请求体传入",
+  );
+  assert.equal(
+    JSON.stringify(Object.keys(rejectedEvents[0].payload as Record<string, unknown>).sort()),
+    JSON.stringify(["actionId", "callId", "rejectedBy", "toolName"]),
+    "拒绝请求不得携带第二份工具参数",
+  );
+  assert.equal((await listEvents(waitingRunId, "run_action_confirmed")).length, 0, "拒绝不得顺手写确认");
+});
+
+test("批次1a reject：二次拒绝幂等回放 200 且不重复事件", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const waitingRunId = await driveRunToWaiting();
+  const actionId = `action-${randomUUID()}`;
+  const first = await request(app)
+    .post(`/ai-runs/${waitingRunId}/actions/${actionId}/reject`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(first.status, 202);
+  const second = await request(app)
+    .post(`/ai-runs/${waitingRunId}/actions/${actionId}/reject`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(second.status, 200, "幂等重放必须 200");
+  assert.equal((await listEvents(waitingRunId, "tool.call.rejected")).length, 1, "二次拒绝不得重复事件");
+});
+
+test("批次1a reject：非 waiting 一律 409（不得对已续跑的 Run 追写决策）", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const sessionId = await makeSession(alice!);
+  const submitted = await submitValidRun(aliceToken, sessionId, app);
+  track(submitted.body.data.runId);
+  const conflict = await request(app)
+    .post(`/ai-runs/${submitted.body.data.runId}/actions/action-1/reject`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.body.code, "RUN_NOT_WAITING");
+});
+
+test("批次1a reject：非 owner 一律 404（不泄露存在性）", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const waitingRunId = await driveRunToWaiting();
+  const asBob = await request(app)
+    .post(`/ai-runs/${waitingRunId}/actions/action-1/reject`)
+    .set("Authorization", `Bearer ${bobToken}`);
+  assert.equal(asBob.status, 404);
+  assert.equal((await listEvents(waitingRunId, "tool.call.rejected")).length, 0, "非 owner 不得留下任何决策痕迹");
+});
+
+test("批次1a reject：confirm 与 reject 互斥——先确认后拒绝不得改写决策", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const waitingRunId = await driveRunToWaiting();
+  const actionId = `action-${randomUUID()}`;
+  const confirmed = await request(app)
+    .post(`/ai-runs/${waitingRunId}/actions/${actionId}/confirm`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(confirmed.status, 202);
+  const afterConfirm = await request(app)
+    .post(`/ai-runs/${waitingRunId}/actions/${actionId}/reject`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(afterConfirm.status, 409, "Run 已因确认回到 queued：迟到的拒绝必须被状态前置挡住");
+  assert.equal((await listEvents(waitingRunId, "tool.call.rejected")).length, 0);
+  assert.equal((await listEvents(waitingRunId, "run_action_confirmed")).length, 1);
+});
+
 test("retry only allows failed terminal runs, carries retryOfRunId and keeps the original immutable", { skip: !testDatabaseUrl }, async () => {
   const app = makeApp({ enabled: true });
 
@@ -757,6 +847,10 @@ test("client disconnect does not cancel the run and replay can resume", { skip: 
 /** 工具执行耗时注入：progress 心跳间隔 25ms × 延迟 80ms ⇒ 每次调用至少一条心跳。 */
 function makeToolStepCtx(input: {
   runId: string;
+  /** 必须是库里真实的 attemptId：harness_run_attempt_id 是 uuid 列，
+   *  假 id 会让「挂起时释放 attempt」那笔 UPDATE 直接报参数类型错并回滚整笔事务
+   *  （批次 1a 的 pauseRunForToolApproval 就是被这条用例测出来的）。 */
+  attemptId: string;
   ownerUserId: string;
   ownerUsername: string;
   aiSessionId: string;
@@ -780,7 +874,7 @@ function makeToolStepCtx(input: {
       updatedAt: new Date(),
     } as any,
     attempt: {
-      harnessRunAttemptId: `attempt-${input.runId}`,
+      harnessRunAttemptId: input.attemptId,
       harnessRunId: input.runId,
       workerId: "b05-worker",
       attemptNo: 1,
@@ -850,7 +944,12 @@ test("批次0.5·②：四类工具事件落 harness_run_events 并按序经 SSE
             model: "kimi-test",
             finishReason: "tool_calls",
             toolCalls: [
+              // 结局一：只读工具放行成功 → started / progress / completed
               { id: "call_hist", name: "estimate_history", arguments: { page: 1, pageSize: 1 } },
+              // 结局二：未注册工具一律不执行 → started / progress / failed
+              // （批次 1a 起，写工具不再落在这里——它落进结局三）
+              { id: "call_ghost", name: "no_such_tool", arguments: { whatever: 1 } },
+              // 结局三：写工具进入审批闸门 → started / awaiting_approval（且就地停手）
               { id: "call_write", name: "create_project", arguments: { projectName: "批次0.5落库探针" } },
             ],
           };
@@ -886,6 +985,7 @@ test("批次0.5·②：四类工具事件落 harness_run_events 并按序经 SSE
           if (!workflow) throw new Error("workflow not found");
           await workflow.executeStep("chat", makeToolStepCtx({
             runId,
+            attemptId: claimed.attempt.harnessRunAttemptId,
             ownerUserId: alice!.id,
             ownerUsername: alice!.username,
             aiSessionId: sessionId,
@@ -901,10 +1001,16 @@ test("批次0.5·②：四类工具事件落 harness_run_events 并按序经 SSE
     }),
   });
   await runtime.stop();
-  assert.equal(bootError, null, `workflow 执行不得抛错：${bootError instanceof Error ? bootError.message : String(bootError)}`);
-  // 反空断：模型必须真被调用两轮（工具轮 + 回答轮）。缺这条断言时「provider 没跑」
-  // 与「事件没发射」都表现为零行，二者根因完全不同却无从分辨。
-  assert.equal(callTurn, 2, `provider 必须被调用两轮（工具轮 + 回答轮），实取 ${callTurn} 次`);
+  // 批次 1a：本轮以「写工具待用户确认」就地停手——挂起既不是执行成功也不是失败，
+  // 而是抛 WorkbenchToolApprovalPendingError（Run 留在 waiting，见 e2e 判据①④）。
+  assert.ok(
+    bootError instanceof WorkbenchToolApprovalPendingError,
+    `第三个调用必须触发审批挂起，实取 ${bootError instanceof Error ? `${bootError.name}: ${bootError.message}` : String(bootError)}`,
+  );
+  // 反空断：模型必须真被调用过；挂起轮不再进入第二轮（工具没跑完，没有可回填的结果）
+  assert.equal(callTurn, 1, `provider 必须恰好调用一轮（工具轮），实取 ${callTurn} 次`);
+  const pausedRun = await repo!.findRunForOwner(runId, alice!.id);
+  assert.equal(String(pausedRun?.status), "waiting", "挂起后 Run 必须停在 waiting");
   await repo!.completeAttemptAndRun({ attemptId: claimed.attempt.harnessRunAttemptId, runId, outcome: "succeeded" });
 
   // ---------- 判据 3：查表，不是查日志 ----------
@@ -916,31 +1022,71 @@ test("批次0.5·②：四类工具事件落 harness_run_events 并按序经 SSE
   }
   console.log("[B05·② harness_run_events 实取] runId=%s\n%s", runId,
     rows.map((row) => `  sequence=${row.sequence} event_type=${row.eventType} payload=${JSON.stringify(row.payload)}`).join("\n"));
-  for (const type of ["tool.call.started", "tool.call.progress", "tool.call.completed", "tool.call.failed"]) {
+  for (const type of [
+    "tool.call.started",
+    "tool.call.progress",
+    "tool.call.completed",
+    "tool.call.failed",
+    "tool.call.awaiting_approval",
+  ]) {
     assert.ok((typeCounts.get(type) ?? 0) >= 1, `表内必须存在 ${type} 行，实取 ${typeCounts.get(type) ?? 0} 行`);
   }
   // 复用既有单调 sequence：连续无空洞，(runId, sequence) 唯一性由 DB 保证
   assert.deepEqual(rows.map((row) => row.sequence), rows.map((_, i) => i + 1), "sequence 必须是该 Run 内的连续单调序号");
 
   const tableMarkers = [...new Set(toolRows.map((row) => `${row.eventType}#${(row.payload as { callIndex?: number }).callIndex}`))];
-  assert.deepEqual(tableMarkers, [
+  // progress 的心跳条数取决于 DB 耗时，逐条比对会 flaky；因此**非心跳**事件的
+  // 顺序按位钉死，心跳只要求「每个调用至少一条」且「不得晚于该调用的终态」。
+  const nonProgressMarkers = toolRows
+    .filter((row) => row.eventType !== "tool.call.progress")
+    .map((row) => `${row.eventType}#${(row.payload as { callIndex?: number }).callIndex}`);
+  assert.deepEqual(nonProgressMarkers, [
     "tool.call.started#1",
-    "tool.call.progress#1",
     "tool.call.completed#1",
     "tool.call.started#2",
-    "tool.call.progress#2",
     "tool.call.failed#2",
-  ], "表内四类事件必须按【调用一：started→progress→completed / 调用二：started→progress→failed】顺序落库");
-  // 只读工具成功、写工具被白名单拒绝（批次 0 冻结口径）
+    "tool.call.started#3",
+    // 审批挂起按 callIndex 配对到调用三；其 payload 刻意不带 callIndex（见下方字段集合断言）
+    "tool.call.awaiting_approval#undefined",
+  ], `表内事件必须按【调用一成功 / 调用二失败 / 调用三待审批】顺序落库，实取 ${JSON.stringify(nonProgressMarkers)}`);
+  for (const callIndex of [1, 2, 3]) {
+    assert.ok(
+      toolRows.some((row) => row.eventType === "tool.call.progress" && (row.payload as { callIndex?: number }).callIndex === callIndex),
+      `callIndex=${callIndex} 必须有 tool.call.progress 心跳`,
+    );
+  }
+  // 只读工具成功、未注册工具失败、写工具进审批闸门（批次 1a 取代批次 0 的只读白名单）
   const completedRow = toolRows.find((row) => row.eventType === "tool.call.completed")!;
   const failedRow = toolRows.find((row) => row.eventType === "tool.call.failed")!;
   assert.equal((completedRow.payload as { name?: string }).name, "estimate_history");
-  assert.equal((failedRow.payload as { name?: string }).name, "create_project");
-  assert.match(String((failedRow.payload as { error?: string }).error), /仅开放只读工具/);
+  assert.equal((failedRow.payload as { name?: string }).name, "no_such_tool");
+  assert.match(String((failedRow.payload as { error?: string }).error), /未注册工具/);
+  const thirdStarted = toolRows.find((row) => row.eventType === "tool.call.started" && (row.payload as { callIndex?: number }).callIndex === 3)!;
   assert.equal(
-    JSON.stringify((toolRows.find((row) => row.eventType === "tool.call.started" && (row.payload as { callIndex?: number }).callIndex === 2)!.payload as { arguments?: unknown }).arguments),
+    JSON.stringify((thirdStarted.payload as { arguments?: unknown }).arguments),
     JSON.stringify({ projectName: "批次0.5落库探针" }),
     "工具入参必须完整落库供 UI 呈现（UI 侧不做二次截断）",
+  );
+  // 批次 1a · 约束②：参数只有这一份；审批事件按同一 callId 回查
+  assert.equal((thirdStarted.payload as { callId?: string }).callId, "call_write", "started 必须带 callId 供审批事件对账");
+  const awaitingRow = toolRows.find((row) => row.eventType === "tool.call.awaiting_approval")!;
+  assert.deepEqual(
+    Object.keys((awaitingRow.payload ?? {}) as Record<string, unknown>).sort(),
+    ["actionId", "callId", "ordinal", "toolName"],
+    `审批事件字段集合被锁死，实取 ${JSON.stringify(Object.keys((awaitingRow.payload ?? {}) as Record<string, unknown>))}`,
+  );
+  assert.equal((awaitingRow.payload as { callId?: string }).callId, "call_write");
+  assert.ok(
+    awaitingRow.sequence > thirdStarted.sequence,
+    "awaiting_approval 必须晚于其 tool.call.started（否则界面按 callId 查不到参数）",
+  );
+  // 挂起即停心跳：待审批之后不得再落「执行中」——两条状态互相矛盾
+  const progressOfThird = toolRows
+    .filter((row) => row.eventType === "tool.call.progress" && (row.payload as { callIndex?: number }).callIndex === 3)
+    .map((row) => Number(row.sequence));
+  assert.ok(
+    progressOfThird.every((sequence) => sequence < awaitingRow.sequence),
+    `awaiting 之后不得再有 callIndex=3 的 progress，实取 progress=${JSON.stringify(progressOfThird)} awaiting=${awaitingRow.sequence}`,
   );
 
   // ---------- 判据 1：实际抓帧，不是只看最后一帧 ----------
@@ -963,7 +1109,7 @@ test("批次0.5·②：四类工具事件落 harness_run_events 并按序经 SSE
     )];
     assert.deepEqual(frameMarkers, tableMarkers, "SSE 帧序列里的四类事件顺序必须与落库顺序一致");
     const frameTypes = new Set(stream.events.map((frame) => frame.event));
-    for (const type of ["tool.call.started", "tool.call.progress", "tool.call.completed", "tool.call.failed"]) {
+    for (const type of ["tool.call.started", "tool.call.progress", "tool.call.completed", "tool.call.failed", "tool.call.awaiting_approval"]) {
       assert.ok(frameTypes.has(type), `帧流必须回放 ${type}`);
     }
     // 帧内 payload 与表内 payload 同构（无字段丢失/二次包装）
@@ -975,6 +1121,116 @@ test("批次0.5·②：四类工具事件落 harness_run_events 并按序经 SSE
   } finally {
     await server.close();
   }
+});
+
+// ============================================================
+// 批次 1a：写操作审批闸门的 skip 档（reject）HTTP 契约
+// ============================================================
+// 判据落点：拒绝与同意同为**幂等 + 只认 waiting**，且拒绝侧同样不得携带工具参数。
+
+async function driveRunToWaitingWithApproval(actionId = `action-${randomUUID()}`) {
+  const runId = await driveRunToWaiting();
+  await repo!.appendRunEvent({
+    runId,
+    eventType: "tool.call.awaiting_approval",
+    payload: { actionId, callId: "call_http_1", ordinal: 1, toolName: "create_project" },
+  });
+  return { runId, actionId };
+}
+
+test("reject is idempotent: first 202 appends tool.call.rejected, replay 200 without duplicate", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const { runId, actionId } = await driveRunToWaitingWithApproval();
+
+  const first = await request(app)
+    .post(`/ai-runs/${runId}/actions/${actionId}/reject`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(first.status, 202, `首次拒绝应 202，实取 ${first.status}`);
+  assert.equal(first.body.data.actionId, actionId);
+  const afterFirst = await repo!.findRunForOwner(runId, alice!.id);
+  assert.equal(afterFirst?.status, "queued", "拒绝后必须回 queued，让模型把话说完");
+
+  const second = await request(app)
+    .post(`/ai-runs/${runId}/actions/${actionId}/reject`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(second.status, 200, "幂等重放必须 200");
+
+  const events = await listEvents(runId, "tool.call.rejected");
+  assert.equal(events.length, 1, "二次拒绝不得重复事件");
+  // 约束②：决策事件只带标识，不带第二份参数；callId 由服务端从审批请求抄入
+  assert.deepEqual(Object.keys(events[0].payload as Record<string, unknown>).sort(), ["actionId", "callId", "rejectedBy", "toolName"]);
+  assert.equal((events[0].payload as { callId?: string }).callId, "call_http_1");
+  assert.equal((events[0].payload as { rejectedBy?: string }).rejectedBy, alice!.id, "拒绝人必须是 JWT 用户本人");
+  assert.equal((await listEvents(runId, "run_action_confirmed")).length, 0, "拒绝不得顺手写确认");
+});
+
+test("reject on a non-waiting run returns 409 RUN_NOT_WAITING", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const sessionId = await makeSession(alice!);
+  const submitted = await submitValidRun(aliceToken, sessionId, app);
+  track(submitted.body.data.runId);
+  const conflict = await request(app)
+    .post(`/ai-runs/${submitted.body.data.runId}/actions/action-1/reject`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.body.code, "RUN_NOT_WAITING");
+});
+
+test("reject by non-owner returns 404 and leaves no decision row", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const { runId, actionId } = await driveRunToWaitingWithApproval();
+  const bobTry = await request(app)
+    .post(`/ai-runs/${runId}/actions/${actionId}/reject`)
+    .set("Authorization", `Bearer ${bobToken}`);
+  assert.equal(bobTry.status, 404);
+  assert.equal((await listEvents(runId, "tool.call.rejected")).length, 0, "非 owner 不得写入任何决策");
+  const stillWaiting = await repo!.findRunForOwner(runId, alice!.id);
+  assert.equal(stillWaiting?.status, "waiting", "越权尝试不得改变 Run 状态");
+});
+
+test("confirm and reject are mutually exclusive: a late reject after confirm is refused", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const { runId, actionId } = await driveRunToWaitingWithApproval();
+  const ok = await request(app)
+    .post(`/ai-runs/${runId}/actions/${actionId}/confirm`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(ok.status, 202);
+  assert.equal((ok.body.data as { status?: string }).status, "queued");
+
+  const late = await request(app)
+    .post(`/ai-runs/${runId}/actions/${actionId}/reject`)
+    .set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(late.status, 409, "已确认续跑的 Run 不接受迟到的拒绝");
+  assert.equal((await listEvents(runId, "tool.call.rejected")).length, 0);
+  assert.equal((await listEvents(runId, "run_action_confirmed")).length, 1);
+});
+
+test("reject requires a valid JWT (401 without Authorization)", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const { runId, actionId } = await driveRunToWaitingWithApproval();
+  const anonymous = await request(app).post(`/ai-runs/${runId}/actions/${actionId}/reject`);
+  assert.equal(anonymous.status, 401, "新端点必须与 confirm 同一道鉴权门闸");
+  assert.equal((await listEvents(runId, "tool.call.rejected")).length, 0);
+});
+
+test("批次1a：审批挂起对读取侧可见（snapshot 状态 + 事件回放游标）", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const { runId, actionId } = await driveRunToWaitingWithApproval();
+  const snapshot = await request(app).get(`/ai-runs/${runId}`).set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(snapshot.status, 200);
+  assert.equal((snapshot.body.data as { run?: { status?: string } }).run?.status, "waiting");
+
+  // SSE handler 的同一读路径（listRunEventsAfter）——1b 的按钮只靠这一行拿 actionId
+  const replay = await repo!.listRunEventsAfter({ runId, afterSequence: 0, limit: 200 });
+  const awaiting = replay.filter((row) => row.eventType === "tool.call.awaiting_approval");
+  assert.equal(awaiting.length, 1);
+  assert.equal((awaiting[0].payload as { actionId?: string }).actionId, actionId);
+  assert.equal((awaiting[0].payload as { callId?: string }).callId, "call_http_1");
+  assert.equal(
+    "arguments" in (awaiting[0].payload as Record<string, unknown>),
+    false,
+    "回放给界面的审批请求不得带第二份参数",
+  );
 });
 
 // ============================================================

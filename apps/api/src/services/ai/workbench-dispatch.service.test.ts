@@ -620,39 +620,54 @@ test("workbench dispatch exposes lightweight modelRun trace for attachment qa", 
   assert.ok(result.trace.contextRefs.includes("attachment:蓝海需求.xlsx"));
 });
 
-// RP-025: 项目创建意图路由分发
-test("workbench dispatch returns create_project_evaluation action with project name", async () => {
+// RP-025 → 批次 1a：项目创建意图不再由正则 handler 返回静态待确认动作。
+// 原用例锁的是「dispatch 自己产出 create_project_evaluation 建议动作」；本批退役该规则后，
+// 这类措辞必须交回模型（工具循环 → create_project → 执行前审批闸门）。
+// 能力承接：用户点确认后由 create_project 工具写库，副作用与 requiresConfirm 语义
+// 由 workbench-tool-approval.e2e.test.ts 判据①②在真库上验证（挂起零行 → 确认后恰好一行）。
+for (const message of ["帮我创建广州可味达项目", "帮我创建一个ERP项目"]) {
+  test(`workbench dispatch 把「${message}」交回模型，不再自行产出 create_project_evaluation`, async () => {
+    let modelCalls = 0;
+    const result = await dispatchHomeWorkbenchTurn({
+      user,
+      workflowKey: "free_chat",
+      message,
+      businessRole: "pre_sales",
+      roleLabel: "售前顾问",
+      model: "kimi-test",
+      modelChat: async () => {
+        modelCalls += 1;
+        return { answer: "模型自然回复：可以，我先确认一下项目名。", rawContent: "" };
+      },
+    });
+
+    assert.notEqual(result.intent, "write_action_request", "意图已退役");
+    assert.equal(result.trace.routingRule, "default_domain_qa", `实取 ${JSON.stringify(result.trace)}`);
+    assert.ok(modelCalls >= 1, `模型必须被真正调用，实取 ${modelCalls} 次`);
+    assert.notEqual(result.model, "rule-static", "不得再走静态 handler");
+    assert.deepEqual(
+      result.suggestedActions.filter((action) => action.actionType === "create_project_evaluation"),
+      [],
+      "dispatch 不得再自行产出 create_project_evaluation 建议动作",
+    );
+  });
+}
+
+test("批次1a：审批闸门本身不产出任何建议动作（确认与否不由 dispatch 决定）", async () => {
   const result = await dispatchHomeWorkbenchTurn({
     user,
     workflowKey: "free_chat",
-    message: "帮我创建广州可味达项目",
+    message: "帮我创建一个ERP项目",
     businessRole: "pre_sales",
     roleLabel: "售前顾问",
     model: "kimi-test",
-    modelChat: async () => ({ answer: "", rawContent: "" }),
+    modelChat: async () => ({ answer: "模型自然回复：需要确认项目名。", rawContent: "" }),
   });
-
-  assert.equal(result.intent, "write_action_request");
-  assert.equal(result.suggestedActions.length, 1);
-  assert.equal(result.suggestedActions[0].actionType, "create_project_evaluation");
-  assert.equal(result.suggestedActions[0].payload?.projectName, "广州可味达");
-  assert.ok(result.answer.includes("广州可味达"));
-});
-
-test("workbench dispatch returns no suggested action for write action without project name", async () => {
-  const result = await dispatchHomeWorkbenchTurn({
-    user,
-    workflowKey: "free_chat",
-    message: "帮我创建评估草稿",
-    businessRole: "pre_sales",
-    roleLabel: "售前顾问",
-    model: "kimi-test",
-    modelChat: async () => ({ answer: "", rawContent: "" }),
-  });
-
-  assert.equal(result.intent, "write_action_request");
-  assert.deepEqual(result.suggestedActions, []);
-  assert.ok(result.answer.includes("项目"));
+  assert.equal(
+    result.suggestedActions.some((action) => action.requiresConfirm === true),
+    false,
+    `待确认动作只能来自审批闸门（Run 事件流），实取 ${JSON.stringify(result.suggestedActions)}`,
+  );
 });
 
 // ── RP-003: 模型意图分类兜底 ──────────────────────────────────
@@ -850,8 +865,10 @@ test("RP-049: unsupported classification below 0.85 threshold is not adopted, st
   assert.equal(result.trace.modelClassification?.confidence, 0.7);
 });
 
-test("RP-049: wes_data_query and write_action_request classifications are never adopted regardless of confidence", async () => {
-  for (const classifiedIntent of ["wes_data_query", "write_action_request"] as const) {
+// 批次 1a：write_action_request 已离开词汇表，另有一条更强的守护
+// （classifyIntentWithModel 对它返回 null）——见 workbench-intent.service.test.ts。
+test("RP-049: wes_data_query classification is never adopted regardless of confidence", async () => {
+  for (const classifiedIntent of ["wes_data_query"] as const) {
     const result = await dispatchHomeWorkbenchTurn({
       user,
       workflowKey: "free_chat",

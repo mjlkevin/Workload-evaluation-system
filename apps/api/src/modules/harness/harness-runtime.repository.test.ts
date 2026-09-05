@@ -902,3 +902,165 @@ describeOrSkip("R11 releaseAttemptForShutdown requeues the run or completes a pe
   const [cancelledRun] = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, claimedCancel.run.harnessRunId));
   assert.equal(cancelledRun.status, "cancelled");
 });
+
+// ============================================================
+// 批次 1a：写操作工具的审批闸门（可持久挂起 / 拒绝 / 决策读取）
+// ============================================================
+// 本段锁的是**存储层不变量**（waiting 是一行、决策是一行、幂等与状态前置）；
+// 端到端「工具到底有没有执行」见 workbench-tool-approval.e2e.test.ts 的六条判据。
+
+function approvalInput(runId: string, attemptId: string, overrides: Partial<{ actionId: string; callId: string; ordinal: number; toolName: string }> = {}) {
+  return {
+    runId,
+    attemptId,
+    actionId: `run:chat:workbench_chat_tool_approval:1:create_project:${randomUUID().slice(0, 8)}`,
+    callId: "call_create_1",
+    ordinal: 1,
+    toolName: "create_project",
+    ...overrides,
+  };
+}
+
+async function eventsOf(runId: string, eventType: string) {
+  return await testDb!.select().from(harnessRunEvents).where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, eventType)));
+}
+
+test("批次1a pause：running 的 Run 挂起 → awaiting 事件 + status=waiting + attempt 释放", async () => {
+  const claimed = await makeClaimedRun();
+  const runId = claimed.run.harnessRunId;
+  const input = approvalInput(runId, claimed.attempt.harnessRunAttemptId);
+
+  const paused = await repo!.pauseRunForToolApproval(input);
+  assert.equal(paused.paused, true);
+  assert.equal(paused.run.status, "waiting");
+  assert.deepEqual(
+    Object.keys((paused.event.payload ?? {}) as Record<string, unknown>).sort(),
+    ["actionId", "callId", "ordinal", "toolName"],
+    `挂起事件不得携带第二份工具参数，实取 ${JSON.stringify(Object.keys((paused.event.payload ?? {}) as Record<string, unknown>))}`,
+  );
+
+  const [attempt] = await testDb!.select().from(harnessRunAttempts).where(eq(harnessRunAttempts.harnessRunAttemptId, claimed.attempt.harnessRunAttemptId));
+  assert.equal(attempt.status, "cancelled", "attempt 必须释放，否则 lease 过期会被恢复扫描判为孤儿");
+  // waiting 不得被排进可认领队列：availableAt 保持挂起前的值（认领只看 queued）
+  const claimable = await repo!.claimNextQueuedRun({ workerId: "worker-should-not-take-it", leaseMs: 300_000 });
+  assert.equal(claimable?.run.harnessRunId === runId, false, "waiting 的 Run 不能被 worker 认领走");
+});
+
+test("批次1a pause：幂等——同一 actionId 重复挂起只留一条审批请求", async () => {
+  const claimed = await makeClaimedRun();
+  const runId = claimed.run.harnessRunId;
+  const input = approvalInput(runId, claimed.attempt.harnessRunAttemptId);
+  await repo!.pauseRunForToolApproval(input);
+  // 挂起后状态已是 waiting：第二次挂起必须被状态前置挡住（不得刷出第二条提问）
+  await assert.rejects(
+    () => repo!.pauseRunForToolApproval(input),
+    (err: unknown) => (err as { code?: string }).code === "HARNESS_RUN_NOT_RUNNING",
+  );
+  const rows = await eventsOf(runId, "tool.call.awaiting_approval");
+  assert.equal(rows.length, 1, `审批请求必须恰好一条，实取 ${rows.length}`);
+});
+
+test("批次1a pause：非 running（queued / 终态）一律拒绝挂起（失败方向关闭）", async () => {
+  const queued = await repo!.createQueuedRun(makeQueuedRunInput());
+  track(queued.run.harnessRunId);
+  await assert.rejects(
+    () => repo!.pauseRunForToolApproval(approvalInput(queued.run.harnessRunId, "attempt-none")),
+    (err: unknown) => (err as { code?: string }).code === "HARNESS_RUN_NOT_RUNNING",
+    "没有 worker 在跑的 Run 不得被停在 waiting",
+  );
+});
+
+test("批次1a pause：ordinal / 标识字段校验通过固定错误码，不穿透驱动错误", async () => {
+  const claimed = await makeClaimedRun();
+  await assert.rejects(
+    () => repo!.pauseRunForToolApproval({ ...approvalInput(claimed.run.harnessRunId, claimed.attempt.harnessRunAttemptId), ordinal: 0 }),
+    (err: unknown) => (err as { code?: string }).code === "HARNESS_RUNTIME_INPUT_INVALID",
+  );
+  await assert.rejects(
+    () => repo!.pauseRunForToolApproval({ ...approvalInput(claimed.run.harnessRunId, claimed.attempt.harnessRunAttemptId), callId: "  " }),
+    (err: unknown) => (err as { code?: string }).code === "HARNESS_RUNTIME_INPUT_INVALID",
+  );
+});
+
+test("批次1a confirm：由服务端从审批请求抄入 callId / toolName（对账），旧调用方形状不变", async () => {
+  const claimed = await makeClaimedRun();
+  const runId = claimed.run.harnessRunId;
+  const input = approvalInput(runId, claimed.attempt.harnessRunAttemptId);
+  await repo!.pauseRunForToolApproval(input);
+
+  const confirmed = await repo!.confirmRunAction({ runId, actionId: input.actionId, confirmedBy: "owner-check" });
+  assert.equal(confirmed.created, true);
+  assert.equal(confirmed.run.status, "queued", "确认后必须回 queued 让 worker 续跑");
+  assert.deepEqual(
+    Object.keys((confirmed.event!.payload ?? {}) as Record<string, unknown>).sort(),
+    ["actionId", "callId", "confirmedBy", "toolName"],
+    `run_action_confirmed 必须补 callId / toolName 以便对账，实取 ${JSON.stringify((confirmed.event!.payload ?? {}) as Record<string, unknown>)}`,
+  );
+  assert.equal((confirmed.event!.payload as { callId?: string }).callId, "call_create_1");
+
+  // 反向：无审批请求的 actionId（正式评估等既有调用方）payload 形状保持原样，零回归。
+  // 该 Run 同样先挂起（凑齐 waiting 前置），但确认的是另一条无审批请求的 actionId。
+  const otherRun = await makeClaimedRun();
+  const otherPause = approvalInput(otherRun.run.harnessRunId, otherRun.attempt.harnessRunAttemptId);
+  await repo!.pauseRunForToolApproval(otherPause);
+  const plain = await repo!.confirmRunAction({ runId: otherRun.run.harnessRunId, actionId: "enter_formal_estimation", confirmedBy: "owner-check" });
+  assert.deepEqual(Object.keys((plain.event!.payload ?? {}) as Record<string, unknown>).sort(), ["actionId", "confirmedBy"]);
+});
+
+test("批次1a reject：waiting 可拒；拒绝后回 queued 且不落确认事件", async () => {
+  const claimed = await makeClaimedRun();
+  const runId = claimed.run.harnessRunId;
+  const input = approvalInput(runId, claimed.attempt.harnessRunAttemptId);
+  await repo!.pauseRunForToolApproval(input);
+
+  const rejected = await repo!.rejectRunAction({ runId, actionId: input.actionId, rejectedBy: "owner-check" });
+  assert.equal(rejected.created, true);
+  assert.equal(rejected.run.status, "queued");
+  assert.deepEqual(
+    Object.keys((rejected.event!.payload ?? {}) as Record<string, unknown>).sort(),
+    ["actionId", "callId", "rejectedBy", "toolName"],
+    `拒绝事件字段集合被锁死（不带参数副本），实取 ${JSON.stringify((rejected.event!.payload ?? {}) as Record<string, unknown>)}`,
+  );
+  assert.equal((await eventsOf(runId, "run_action_confirmed")).length, 0, "拒绝不得顺手写确认");
+
+  const again = await repo!.rejectRunAction({ runId, actionId: input.actionId, rejectedBy: "owner-check" });
+  assert.equal(again.created, false, "二次拒绝必须幂等回放");
+  assert.equal((await eventsOf(runId, "tool.call.rejected")).length, 1);
+});
+
+test("批次1a reject：非 waiting 拒绝报固定错误码（不得对已续跑的 Run 追写决策）", async () => {
+  const queued = await repo!.createQueuedRun(makeQueuedRunInput());
+  track(queued.run.harnessRunId);
+  await assert.rejects(
+    () => repo!.rejectRunAction({ runId: queued.run.harnessRunId, actionId: "act-x", rejectedBy: "owner-check" }),
+    (err: unknown) => (err as { code?: string }).code === "HARNESS_RUN_NOT_WAITING",
+  );
+});
+
+test("批次1a findRunToolApprovalDecision：无决策→null；确认→approved；拒绝→rejected；换 actionId 查不到旧决策", async () => {
+  const claimed = await makeClaimedRun();
+  const runId = claimed.run.harnessRunId;
+  const input = approvalInput(runId, claimed.attempt.harnessRunAttemptId);
+  await repo!.pauseRunForToolApproval(input);
+  assert.equal(await repo!.findRunToolApprovalDecision({ runId, actionId: input.actionId }), null, "挂起本身不构成决策");
+
+  await repo!.confirmRunAction({ runId, actionId: input.actionId, confirmedBy: "owner-check" });
+  assert.equal(await repo!.findRunToolApprovalDecision({ runId, actionId: input.actionId }), "approved");
+  // 参数漂移即换 actionId：旧批准不得复用到新调用上（判据⑤的第二道锁）
+  assert.equal(await repo!.findRunToolApprovalDecision({ runId, actionId: `${input.actionId}:drift` }), null);
+
+  const other = await makeClaimedRun();
+  const otherInput = approvalInput(other.run.harnessRunId, other.attempt.harnessRunAttemptId);
+  await repo!.pauseRunForToolApproval(otherInput);
+  await repo!.rejectRunAction({ runId: other.run.harnessRunId, actionId: otherInput.actionId, rejectedBy: "owner-check" });
+  assert.equal(await repo!.findRunToolApprovalDecision({ runId: other.run.harnessRunId, actionId: otherInput.actionId }), "rejected");
+});
+
+test("批次1a 词汇：awaiting / rejected 两类事件可写入白名单（appendRunEvent 放行）", async () => {
+  const created = await repo!.createQueuedRun(makeQueuedRunInput());
+  track(created.run.harnessRunId);
+  for (const eventType of ["tool.call.awaiting_approval", "tool.call.rejected"] as const) {
+    const event = await repo!.appendRunEvent({ runId: created.run.harnessRunId, eventType, payload: { actionId: "a-1" } });
+    assert.equal(event.eventType, eventType);
+  }
+});

@@ -100,6 +100,11 @@ export function createAiRunsHandlers(deps: AiRunsHandlersDeps) {
     res.status(result.status).json(ok(result.data, randomUUID()));
   });
 
+  const rejectActionHandler = guard(async (req, res) => {
+    const result = await usecase.rejectAction(req.user!, asString(req.params.runId), req.params.actionId);
+    res.status(result.status).json(ok(result.data, randomUUID()));
+  });
+
   const retryRunHandler = guard(async (req, res) => {
     const result = await usecase.retryRun(req.user!, asString(req.params.runId));
     res.status(result.status).json(ok(result.data, randomUUID()));
@@ -117,6 +122,7 @@ export function createAiRunsHandlers(deps: AiRunsHandlersDeps) {
     cancelRunHandler,
     submitInputsHandler,
     confirmActionHandler,
+    rejectActionHandler,
     retryRunHandler,
     submitRunHandler,
   };

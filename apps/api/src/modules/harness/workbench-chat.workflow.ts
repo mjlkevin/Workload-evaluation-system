@@ -32,6 +32,7 @@ import type {
 } from "../../services/ai/workbench-dispatch.service";
 import type { WorkbenchToolEffectOutput } from "../../services/ai/workbench-tool-loop";
 import { createWorkbenchToolEventSink, toWorkbenchToolCallMetadata } from "../../services/ai/workbench-tool-event-surface";
+import { WorkbenchToolApprovalPendingError, type WorkbenchToolApprovalGate } from "../../services/ai/workbench-tool-approval";
 import type { WorkbenchToolCallSummary } from "../../services/ai/workbench-tool-event-surface";
 import type {
   AppendAiSessionMessageIdempotentInput,
@@ -91,6 +92,21 @@ export type WorkbenchChatWorkflowDeps = {
    * 缺省取 WORKBENCH_TOOL_CALL_PROGRESS_INTERVAL_MS；0 关闭心跳。
    */
   toolCallProgressIntervalMs?: number;
+  /**
+   * 批次 1a · 约束③：写操作工具的审批闸门工厂（additive）。仅异步 Run 通道注入。
+   * 闸门的两端口必须由 **Run 事件流 + run.status** 实现（可持久），不得用内存 Promise：
+   * 判据④（等待期间重启 worker → 确认仍然有效）专门验这一点。
+   *
+   * `beforePause` 由本 workflow 提供：挂起前必须先冲刷工具事件写链，
+   * 让 tool.call.started（参数唯一来源）严格早于 tool.call.awaiting_approval 落库，
+   * 否则界面拿到一条按 callId 查不到参数的审批请求。
+   */
+  buildToolApprovalGate?(input: {
+    runId: string;
+    attemptId: string;
+    stepKey: string;
+    beforePause: () => Promise<unknown>;
+  }): WorkbenchToolApprovalGate;
   /**
    * ISS-2026-08-16-002：会话级附件回退——请求未携带附件时，从已落库会话
    * 记录中取最近一个带 parsedSummary 的附件作为 dispatch 上下文（与同步
@@ -203,6 +219,18 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
         // 异步路径降级为普通问答，由意图分发器路由到静态文案）。
       }
 
+      // 批次 1a：审批闸门随本 Run 构造。gate 只认服务端持久决策（run_action_confirmed /
+      // tool.call.rejected），模型与前端都无从表达「本次无需确认」。
+      let flushUiEventsBeforePause: () => Promise<unknown> = async () => {};
+      const toolApprovalGate = deps.buildToolApprovalGate
+        ? deps.buildToolApprovalGate({
+            runId: run.harnessRunId,
+            attemptId: ctx.attempt.harnessRunAttemptId,
+            stepKey,
+            beforePause: () => flushUiEventsBeforePause(),
+          })
+        : undefined;
+
       // effectKey 冻结口径：外层 dispatch 副作用恒为 workbench_chat_answer:1。
       // 批次 0 · ④：工具调用不复用这个 key——一轮 Run 内可能有 N 次工具调用，
       // 共用固定 key 会让第 2..N 次命中第 1 次已记录的 effect 被直接跳过
@@ -222,6 +250,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
           // 副作用位于 execute 内，恢复重放经 recordToolEffectOnce 跳过，幂等天然成立；
           // 写链串行化保持事件时序，单条写失败不阻断模型主链路。
           let streamEventChain: Promise<unknown> = Promise.resolve();
+          // 闸门挂起前冲刷写链（见 deps.buildToolApprovalGate 的 beforePause 说明）
           const appendStreamEvent = (eventType: HarnessRunEventType, payload: Record<string, unknown>) => {
             if (!deps.appendRunEvent) return; // 未注入（兼容构造点）时静默跳过
             const append = deps.appendRunEvent;
@@ -259,6 +288,14 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
             emit: appendStreamEvent,
             progressIntervalMs: deps.toolCallProgressIntervalMs,
           });
+          // 闸门挂起前先停心跳：向用户提问的那一刻，这个调用已经不在「执行中」了。
+          // 不停 timer 就会在 awaiting 之后又落一条 tool.call.progress
+          // （批次 1a 实取时真实发生过，routes 层已把它钉成断言）。
+          flushUiEventsBeforePause = async () => {
+            toolEventSink.stop();
+            await streamEventChain;
+          };
+
           let result: Awaited<ReturnType<WorkbenchChatWorkflowDeps["dispatch"]>>;
           try {
             result = await deps.dispatch({
@@ -272,6 +309,8 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               // 批次 0.5 · ②：工具事件 → UI 事件接缝（additive）。仅异步 Run 通道
               // 注入；同步直写路径不经 Harness 事件流，无 runId 可写，不注入即为 undefined。
               onToolEvent: toolEventSink.onToolEvent,
+              // 批次 1a · 约束③：审批闸门接缝（additive，仅本异步通道注入）。
+              ...(toolApprovalGate ? { toolApprovalGate } : {}),
               // 批次 0 · ⑤：发送-vs-存储对账的读取钩子。必须当场重取会话记录，
               // 不得复用上面的 historyMessages——那份正是被对账的发送侧，同源即永真。
               ...(deps.getSessionRecord
@@ -295,6 +334,11 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               },
             });
           } catch (err) {
+            // 批次 1a：审批挂起不是回合失败——Run 停在 waiting 等用户，既不落失败
+            // trace（会被当成一次故障污染考卷），也不由 runtime 标记 failed。
+            if (err instanceof WorkbenchToolApprovalPendingError) {
+              throw err;
+            }
             // RP-030：失败 trace 归档（与同步路径同口径；归档自身失败静默吸收），随后重抛由 runtime 标记 run failed
             if (deps.recordTurnFailureTrace) {
               const reason = err instanceof Error ? err.message : "workbench_chat_failed";

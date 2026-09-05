@@ -74,6 +74,17 @@ export const HARNESS_RUN_EVENT_TYPES = [
   "tool.call.progress",
   "tool.call.completed",
   "tool.call.failed",
+  // 批次 1a（additive）：写操作工具的执行前审批闸门——
+  // 批次 0/0.5 只放开只读工具，写工具一律被循环拒绝；本批把「先问用户再执行」
+  // 做成可持久闸门（run.status = waiting + 既有 confirmRunAction），故词汇表需要
+  // 两个新状态：等待确认、用户拒绝。
+  // **「同意」不新增类型**：复用既有 run_action_confirmed（已由 confirmRunAction
+  // 产生），其 payload 补 callId 与本族事件对账——再造一个 tool.call.confirmed 就是
+  // 让同一个事实在两处各说一遍，正是本批要消灭的漂移形态。
+  // 两条 payload 只带 actionId / callId / toolName，**不带工具参数**：参数以
+  // tool.call.started 那一份为唯一来源，界面显示与实际执行因此不可能分叉。
+  "tool.call.awaiting_approval",
+  "tool.call.rejected",
 ] as const;
 export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
 
