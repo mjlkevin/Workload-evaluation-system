@@ -88,6 +88,28 @@ export const HARNESS_RUN_EVENT_TYPES = [
 ] as const;
 export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
 
+/**
+ * 批次 1b（additive）：一个 Run 的「工具痕迹」事件子集 —— 界面重建工具 chip 所需的
+ * 全部持久事实（GET /ai-runs/:runId/tool-events 的过滤口径）。
+ *
+ * 含同意侧的 run_action_confirmed：用户点完同意到 worker 续跑之间有一段窗口，
+ * 只读 tool.* 会把这一段读成「还在等你确认」，于是同一件事被问第二遍。
+ * 不含 tool.call.progress：心跳只更新耗时，终态帧自带的 elapsedMs 已够重建用，
+ * 把它读回来只会放大响应（长任务的心跳可达数十条）。
+ *
+ * 由 HARNESS_RUN_EVENT_TYPES 逐字取子集（satisfies 当场校验），不重列字符串：
+ * 有人改白名单时这里立即编译失败，不会出现「接口在筛一个不存在的词」。
+ */
+export const HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES = [
+  "tool.call.started",
+  "tool.call.completed",
+  "tool.call.failed",
+  "tool.call.awaiting_approval",
+  "tool.call.rejected",
+  "run_action_confirmed",
+] as const satisfies readonly HarnessRunEventType[];
+export type HarnessRunToolTrailEventType = (typeof HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES)[number];
+
 export type HarnessEffectKeyInput = {
   runId: string;
   stepKey: string;

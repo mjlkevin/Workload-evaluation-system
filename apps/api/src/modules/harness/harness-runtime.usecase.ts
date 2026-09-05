@@ -113,6 +113,8 @@ export type AiRunsRepoPort = {
     actionId: string;
     rejectedBy: string;
   }): Promise<{ created: boolean; run: Record<string, unknown>; event: Record<string, unknown> | null }>;
+  /** 批次 1b · 只读：按 run 取回工具痕迹事件（界面重建 chip 用），不写任何状态 */
+  listRunToolEvents(input: { runId: string; limit?: number }): Promise<Array<Record<string, unknown>>>;
 };
 
 export type AiRunsUsecaseDeps = {
@@ -412,10 +414,34 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
     };
   }
 
+  /**
+   * 批次 1b · 只读：按 run 取回工具痕迹事件，供界面在刷新后重建工具 chip。
+   *
+   * 架构裁决：痕迹的事实源是 harness_run_events，不往会话消息里复制第二份 ——
+   * 副本会漂，且批次 2 要把历史表示整体换成事件序列，届时这份副本还得删。
+   * owner 语义与其余 ai-runs 读端点逐字一致：非 owner 与不存在同为 404，不泄露存在性。
+   */
+  async function listRunToolEvents(user: AuthUser, runId: string) {
+    assertEnabled(deps);
+    const run = await repo.findRunForOwner(runId, user.id);
+    if (!run) throw new AiRunsNotFoundError("任务不存在");
+    const rows = await repo.listRunToolEvents({ runId });
+    return {
+      runId,
+      items: (Array.isArray(rows) ? rows : []).map((row: Record<string, unknown>) => ({
+        sequence: Number(row.sequence ?? 0),
+        eventType: String(row.eventType ?? ""),
+        payload: isPlainObject(row.payload) ? row.payload : {},
+        createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt ?? ""),
+      })),
+    };
+  }
+
   return {
     submitRun,
     listActiveRuns,
     getRunSnapshot,
+    listRunToolEvents,
     cancelRun,
     submitInputs,
     confirmAction,

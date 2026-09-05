@@ -1288,3 +1288,87 @@ test("system:manage admin list filters by status/domain and orders by updatedAt 
   assert.equal(domainItems.length, 1, "domain 过滤应生效");
   assert.equal(domainItems[0].sessionId, older);
 });
+
+// ============================================================
+// 批次 1b · GET /ai-runs/:runId/tool-events —— 按 run 读取工具痕迹（只读）
+// ============================================================
+// 界面刷新后要还原工具 chip，事实源只能是 harness_run_events：往会话消息里再存
+// 一份就是副本，副本会漂。本族用例锁三件事：筛得准（只回痕迹词、按 sequence 升序）、
+// 读得安全（owner / JWT / flag 与既有 ai-runs 端点同一道门闸）、写得干净
+// （纯读路径，调用前后事件表一行不多）。
+
+test("批次1b tool-events：只回痕迹事件并按 sequence 升序，progress 与 text.delta 不进响应", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const runId = await driveRunToWaiting();
+  const actionId = `action-${randomUUID()}`;
+
+  // 交错写入：噪声事件与痕迹事件混在一条时序里，筛错一个词就会被界面看见
+  await repo!.appendRunEvent({ runId, eventType: "text.delta", payload: { delta: "正在思考" } });
+  await repo!.appendRunEvent({ runId, eventType: "tool.call.started", payload: { callIndex: 1, name: "create_project", callId: "call_1", arguments: { projectName: "可味达" } } });
+  await repo!.appendRunEvent({ runId, eventType: "tool.call.progress", payload: { callIndex: 1, name: "create_project", elapsedMs: 3000 } });
+  await repo!.appendRunEvent({ runId, eventType: "tool.call.awaiting_approval", payload: { actionId, callId: "call_1", ordinal: 1, toolName: "create_project" } });
+  await repo!.confirmRunAction({ runId, actionId, confirmedBy: alice!.id });
+  await repo!.appendRunEvent({ runId, eventType: "tool.call.completed", payload: { callIndex: 1, name: "create_project", elapsedMs: 120 } });
+  const eventsBefore = await listEvents(runId);
+
+  const response = await request(app).get(`/ai-runs/${runId}/tool-events`).set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(response.status, 200);
+  const items = response.body.data.items as Array<{
+    sequence: number; eventType: string; createdAt: string; payload: Record<string, unknown>;
+  }>;
+  assert.deepEqual(
+    items.map((item) => item.eventType),
+    [
+      "tool.call.started",
+      "tool.call.awaiting_approval",
+      "run_action_confirmed",
+      "tool.call.completed",
+    ],
+    `只回痕迹词且按时序，实取 ${JSON.stringify(items.map((item) => item.eventType))}`,
+  );
+  assert.deepEqual(items.map((item) => item.sequence), [...items.map((item) => item.sequence)].sort((a, b) => a - b));
+  // 参数只在 started 那一份里——界面按 callId 回查的就是它
+  assert.deepEqual(items[0].payload.arguments, { projectName: "可味达" });
+  assert.equal(items[1].payload.actionId, actionId);
+  assert.ok(items.every((item) => typeof item.createdAt === "string" && item.createdAt.length > 0), "createdAt 必须带上，界面按它排时间线");
+
+  const eventsAfter = await listEvents(runId);
+  assert.equal(eventsAfter.length, eventsBefore.length, "只读接口不得写任何事件");
+});
+
+test("批次1b tool-events：已拒绝的调用也在痕迹里，且空痕迹 Run 返回空数组", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const runId = await driveRunToWaiting();
+  const actionId = `action-${randomUUID()}`;
+  await repo!.appendRunEvent({ runId, eventType: "tool.call.started", payload: { callIndex: 1, name: "create_project", callId: "call_r", arguments: {} } });
+  await repo!.appendRunEvent({ runId, eventType: "tool.call.awaiting_approval", payload: { actionId, callId: "call_r", ordinal: 1, toolName: "create_project" } });
+  await repo!.rejectRunAction({ runId, actionId, rejectedBy: alice!.id });
+
+  const response = await request(app).get(`/ai-runs/${runId}/tool-events`).set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(response.status, 200);
+  const types = (response.body.data.items as Array<{ eventType: string }>).map((item) => item.eventType);
+  assert.ok(types.includes("tool.call.rejected"), `拒绝痕迹必须能重建出来，实取 ${JSON.stringify(types)}`);
+
+  const emptyRunId = await driveRunToWaiting();
+  const empty = await request(app).get(`/ai-runs/${emptyRunId}/tool-events`).set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.body.data.items, [], "无工具调用的 Run 返回空数组而不是 null");
+});
+
+test("批次1b tool-events：非 owner 与不存在的 Run 同为 404，无 JWT 401，flag 关闭 503", { skip: !testDatabaseUrl }, async () => {
+  const app = makeApp({ enabled: true });
+  const runId = await driveRunToWaiting();
+
+  const other = await request(app).get(`/ai-runs/${runId}/tool-events`).set("Authorization", `Bearer ${bobToken}`);
+  assert.equal(other.status, 404, "非 owner 不得区分于不存在（不泄露存在性）");
+
+  const anonymous = await request(app).get(`/ai-runs/${runId}/tool-events`);
+  assert.equal(anonymous.status, 401, "新端点必须与既有 ai-runs 端点同一道鉴权门闸");
+
+  const missing = await request(app).get(`/ai-runs/${randomUUID()}/tool-events`).set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(missing.status, 404);
+
+  const disabledApp = makeApp({ enabled: false });
+  const disabled = await request(disabledApp).get(`/ai-runs/${runId}/tool-events`).set("Authorization", `Bearer ${aliceToken}`);
+  assert.equal(disabled.status, 503);
+});

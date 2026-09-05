@@ -85,6 +85,12 @@ export function createAiRunsHandlers(deps: AiRunsHandlersDeps) {
     res.json(ok(snapshot, randomUUID()));
   });
 
+  /** 批次 1b · 只读：按 run 取工具痕迹事件，供界面刷新后重建 chip（不写任何状态）。 */
+  const listRunToolEventsHandler = guard(async (req, res) => {
+    const result = await usecase.listRunToolEvents(req.user!, asString(req.params.runId));
+    res.json(ok(result, randomUUID()));
+  });
+
   const cancelRunHandler = guard(async (req, res) => {
     const result = await usecase.cancelRun(req.user!, asString(req.params.runId));
     res.status(result.status).json(ok(result.data, randomUUID()));
@@ -119,6 +125,7 @@ export function createAiRunsHandlers(deps: AiRunsHandlersDeps) {
   return {
     listActiveRunsHandler,
     getRunSnapshotHandler,
+    listRunToolEventsHandler,
     cancelRunHandler,
     submitInputsHandler,
     confirmActionHandler,

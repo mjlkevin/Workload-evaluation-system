@@ -31,6 +31,7 @@ import {
   HARNESS_RUN_ACTIVE_STATUSES,
   HARNESS_RUN_EVENT_TYPES,
   HARNESS_RUN_TERMINAL_STATUSES,
+  HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES,
   type HarnessCheckpointKind,
   type HarnessOutputStatus,
   type HarnessResumePolicy,
@@ -291,6 +292,11 @@ export interface HarnessRuntimeRepository {
   rejectRunAction(
     input: RejectHarnessRunActionInput,
   ): Promise<{ created: boolean; run: HarnessRunRow; event: HarnessRunEventRow | null }>;
+  /**
+   * 批次 1b · 只读：按 run 取回工具痕迹事件（界面刷新后重建工具 chip 的唯一事实源）。
+   * 纯读路径，不占锁、不写事件；过滤口径见 HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES。
+   */
+  listRunToolEvents(input: { runId: string; limit?: number }): Promise<HarnessRunEventRow[]>;
   /** 批次 1a · 闸门读持久决策；无决策返回 null（调用方按未获批准处理） */
   findRunToolApprovalDecision(input: { runId: string; actionId: string }): Promise<HarnessToolApprovalDecision | null>;
 }
@@ -1360,6 +1366,27 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
             and(
               eq(harnessRunEvents.harnessRunId, input.runId),
               gt(harnessRunEvents.sequence, afterSequence),
+            ),
+          )
+          .orderBy(asc(harnessRunEvents.sequence))
+          .limit(limit);
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async listRunToolEvents(input) {
+      try {
+        assertNonEmptyText(input.runId, "runId");
+        const requested = Number(input.limit);
+        const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.floor(requested), 1), 1000) : 200;
+        return await dbInstance
+          .select()
+          .from(harnessRunEvents)
+          .where(
+            and(
+              eq(harnessRunEvents.harnessRunId, input.runId),
+              inArray(harnessRunEvents.eventType, [...HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES]),
             ),
           )
           .orderBy(asc(harnessRunEvents.sequence))
