@@ -869,6 +869,12 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
           <td><span class="status warn"><span class="dot"></span>已立项 / 待触发</span>：来源 DEF-2026-09-03-001 修复轮实取发现；触发条件——上方两个硬编码缺陷修复后，守卫作为「清理小批」收尾项一并落地。</td>
           <td>退役名单非空；CI 中任一步新增 <code class="inline">*.ts</code> 源码命中退役名即 fail；现有 <code class="inline">RETIRED_KIMI_MODELS</code> 列表作为扫描输入。</td>
         </tr>
+        <tr data-board-event-id="BE-2026-09-05-readme-latent-broken-links:plan">
+          <td class="mono">【只登记·未处置】<br>README 既存断链 2 处</td>
+          <td><code class="inline">README.md</code>「文档入口」仍有两条指向不存在路径的条目：<code class="inline">06_发布与部署/部署说明-待完善.md</code>（该路径实取不存在，同目录现役文件为 <code class="inline">06_发布与部署/部署说明.md</code>，疑为改名后引用未同步）、<code class="inline">对话流程总结/对话流程与里程碑总览.md</code>（正本实取位于 <code class="inline">99_归档/对话流程总结/</code>）。二者均非本批造成，属既存欠账；本批按派单只处置横幅与过期索引引用，未动这两行。</td>
+          <td><span class="status warn"><span class="dot"></span>待触发 / 不排期</span>：触发条件——下次改到 README「文档入口」段落或做归档链清理小批时顺带处置；不做单独排期。<b>本批未处置</b>。</td>
+          <td>README 内 Markdown 链接与反引号文档路径逐条 <code class="inline">[ -e ]</code> 可达（glob 与裸文件名写法除外）；或条目改指向 <code class="inline">99_归档/</code> 正本并标注历史归档。</td>
+        </tr>
       </table>
     </section>
 
