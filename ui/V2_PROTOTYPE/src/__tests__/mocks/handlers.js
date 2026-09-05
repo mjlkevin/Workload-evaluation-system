@@ -57,6 +57,12 @@ export const handlers = [
     success: true,
     data: { run: { runId: params.runId, status: 'completed' }, attempt: null, checkpoint: null, output: null },
   })),
+  // 批次 1b：按 run 读取工具痕迹事件（界面刷新后重建工具 chip）。
+  // 默认「该轮没有工具调用」= 不产生待确认托盘；需要痕迹的场景测试用 server.use 覆盖。
+  http.get(`${BASE}/ai-runs/:runId/tool-events`, ({ params }) => HttpResponse.json({
+    success: true,
+    data: { runId: params.runId, items: [] },
+  })),
   http.get(`${BASE}/project-evaluations`, () => HttpResponse.json({ success: true, data: { items: mockProjectEvaluations } })),
   http.post(`${BASE}/project-evaluations`, async ({ request }) => {
     const body = await request.json()

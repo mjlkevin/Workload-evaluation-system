@@ -36,6 +36,11 @@ export default function BackgroundRunsPanel({ runs, runCounts, onStopRun }) {
         >
           <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${statusDotClassName(run.status)}`} />
           <span className="min-w-0 flex-1 truncate">{run.title || run.runId}</span>
+          {run.status === 'waiting' && (
+            <span className="shrink-0 font-bold text-warn-ink" title="这个任务停在写操作确认上，不点不会自己往下走">
+              <span aria-hidden="true">! </span>等你确认
+            </span>
+          )}
           <button
             type="button"
             className="btn btn-out shrink-0"

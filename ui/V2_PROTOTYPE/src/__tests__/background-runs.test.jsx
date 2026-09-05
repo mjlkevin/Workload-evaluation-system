@@ -236,7 +236,14 @@ describe('background-runs: G2 后台继续', () => {
   })
 
   test('background-runs: 通知区保持 role="region" + aria-live="polite"（T1）', async () => {
-    setupBackgroundRuns({ listResponses: [[buildActiveRun()]], eventFrames: [], keepOpen: true })
+    const { pusher } = setupBackgroundRuns({ listResponses: [[buildActiveRun()]], eventFrames: [], keepOpen: true })
+    // 默认快照兜底返回 completed（handlers.js），会把本用例的活跃态盖掉——按场景覆盖
+    server.use(
+      http.get(`${BASE}/ai-runs/run-1`, () => HttpResponse.json({
+        success: true,
+        data: { run: { runId: 'run-1', status: 'running' }, attempt: null, checkpoint: null, output: null },
+      })),
+    )
     renderShellApp()
 
     const liveRegion = await screen.findByRole('region', { name: '后台任务通知' })
@@ -396,7 +403,14 @@ describe('background-runs: G2 后台继续', () => {
   })
 
   test('background-runs: 指示器点击弹出任务清单气泡，外部点击失焦后消失（RP-058）', async () => {
-    setupBackgroundRuns({ listResponses: [[buildActiveRun()]], eventFrames: [], keepOpen: true })
+    const { pusher } = setupBackgroundRuns({ listResponses: [[buildActiveRun()]], eventFrames: [], keepOpen: true })
+    // 默认快照兜底返回 completed（handlers.js），会把本用例的活跃态盖掉——按场景覆盖
+    server.use(
+      http.get(`${BASE}/ai-runs/run-1`, () => HttpResponse.json({
+        success: true,
+        data: { run: { runId: 'run-1', status: 'running' }, attempt: null, checkpoint: null, output: null },
+      })),
+    )
     renderShellApp()
 
     // 指示器为可点击控件，点击后附近弹出气泡清单
@@ -461,5 +475,32 @@ describe('background-runs: G2 后台继续', () => {
     expect(localStorage.getItem('wes-ai-active-session-id')).toBe('session-a')
     expect(sessionRuntimeStore.getSessionView('session-a')?.unread).toBe(false)
     expect(liveRegion.querySelectorAll('.background-run-notification')).toHaveLength(0)
+  })
+
+  // 批次 1b · 过线判据④：不设超时的代价是「等待中的任务」必须在列表上立刻看得出来。
+  // 服务端把 Run 挂起时只落一条 tool.call.awaiting_approval，不改 run_status_changed，
+  // 因此徽标的即时性只能靠界面消费这个事件——等下一次列表刷新就是让用户去找那趟车。
+  test('background-runs: 批次1b 审批挂起即时把会话徽标转为等待确认，决策后不再挂着', async () => {
+    const { pusher } = setupBackgroundRuns({ listResponses: [[buildActiveRun()]], eventFrames: [], keepOpen: true })
+    // 默认快照兜底返回 completed（handlers.js），会把本用例的活跃态盖掉——按场景覆盖
+    server.use(
+      http.get(`${BASE}/ai-runs/run-1`, () => HttpResponse.json({
+        success: true,
+        data: { run: { runId: 'run-1', status: 'running' }, attempt: null, checkpoint: null, output: null },
+      })),
+    )
+    renderShellApp()
+    await screen.findByText('AI 页面 · 活跃任务 1')
+    expect(sessionRuntimeStore.getSessionView('session-a')?.runStatus).toBe('running')
+
+    act(() => pusher.pushFrame({
+      sequence: 5, eventType: 'tool.call.awaiting_approval', payload: { actionId: 'act-1', callId: 'call-1', ordinal: 1, toolName: 'create_project' },
+    }))
+    await waitFor(() => expect(sessionRuntimeStore.getSessionView('session-a')?.runStatus).toBe('waiting'))
+
+    act(() => pusher.pushFrame({
+      sequence: 6, eventType: 'run_action_confirmed', payload: { actionId: 'act-1', callId: 'call-1', confirmedBy: 'u3', toolName: 'create_project' },
+    }))
+    await waitFor(() => expect(sessionRuntimeStore.getSessionView('session-a')?.runStatus).not.toBe('waiting'))
   })
 })

@@ -22,6 +22,9 @@ export default function MessageBubble({
   copyDraft,
   onToggleThought,
   onRetryParse,
+  onApproveToolCall,
+  onRejectToolCall,
+  toolActionState,
 }) {
   const isUser = message.role === 'user'
   const hasArtifacts = !isUser && !message.error && pickArray(message.artifacts).length > 0
@@ -46,6 +49,9 @@ export default function MessageBubble({
             knowledgeTool={message.knowledgeTool}
             toolCalls={message.toolCalls}
             memoryRef={message.memoryRef}
+            onApproveToolCall={onApproveToolCall}
+            onRejectToolCall={onRejectToolCall}
+            toolActionState={toolActionState}
           />
         )}
         {message.loading ? (

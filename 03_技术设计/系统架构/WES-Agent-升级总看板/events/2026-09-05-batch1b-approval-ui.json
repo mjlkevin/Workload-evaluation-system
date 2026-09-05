@@ -1,0 +1,69 @@
+{
+  "id": "BE-2026-09-05-batch1b-approval-ui",
+  "date": "2026-09-05",
+  "type": "implementation",
+  "scope": "批次 1b · 写操作审批的前端界面 + 工具痕迹留存",
+  "summary": "批次 1a 的执行前审批闸门从「只能经 API 审批」变成界面上可点：工具 chip 状态机扩到开始→等你确认→执行中→完成/失败/已拒绝，同意/拒绝就地长在 chip 上（不做模态弹窗）；工具痕迹按 run 从 harness_run_events 只读重建，刷新页面与切回旧会话都还在；等待确认的会话在会话列表与后台任务面板上即时可见。",
+  "status": "已回填 / 待 Codex 复核",
+  "pages": ["changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js",
+      "summary": "STREAM_EVENT_TYPES 补 tool.call.awaiting_approval / tool.call.rejected / run_action_confirmed；waiting Run 纳入页面级订阅；新增痕迹重建与 approve/reject 接线"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/messageFormatter.js",
+      "summary": "chip 状态机扩到五态；参数按 callId 走有界暂存缓存、只在待确认槽位上出现，收口即丢弃；normalizeToolCalls 白名单不变（参数/审批痕迹不落进会话消息）"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/routes/ai-runs.routes.ts",
+      "summary": "新增只读端点 GET /api/v1/ai-runs/{runId}/tool-events（owner 同 404、flag 503、JWT 401），过滤口径 HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "67 files / 537 tests passed（开工基线 66/511，净 +1 文件 +26 用例）"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:harness",
+      "result": "pass",
+      "summary": "265 pass / 0 fail / 0 skipped（开工基线 262，+3 为 tool-events 端点用例）"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web && npm run build:api",
+      "result": "pass",
+      "summary": "两条构建均 exit 0"
+    },
+    {
+      "kind": "gate",
+      "ref": "本地真浏览器实取（Chrome + 假 provider + 独立空库 workload_eval_b1b，不碰开发库与真实密钥）",
+      "result": "pass",
+      "summary": "六条过线判据逐条实取：同意后落库行 created_at 晚于确认时刻、拒绝后副作用行数 0→0 且模型续答、刷新后 chip 与按钮原样还原且重建的 actionId 点下去真能放行、等待中会话两处标记、只读工具无按钮且不产生审批事件"
+    }
+  ],
+  "next": "待架构侧复核后合入 main。批次 2 把历史表示整体换成事件序列时，需一并评估退休 metadata.toolCalls 镜像（本批未复用它，重建走事件表）。",
+  "board": {
+    "change": {
+      "stage": "批次 1b：审批界面 + 工具痕迹留存 · 分支 feat/batch1b-approval-ui 未合入",
+      "result": "已回填 / 待 Codex 复核"
+    },
+    "testing": [
+      {
+        "command": "npm run test:web",
+        "result": "pass",
+        "summary": "67 files / 537 tests（基线 66/511）"
+      },
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:harness",
+        "result": "pass",
+        "summary": "265 pass / 0 fail / 0 skipped（基线 262）"
+      }
+    ]
+  }
+}

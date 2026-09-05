@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import BackgroundRunsPanel from '../pages/AiHomeWorkbench/components/ChatArea/BackgroundRunsPanel.jsx'
 
 describe('BackgroundRunsPanel', () => {
@@ -31,6 +31,21 @@ describe('BackgroundRunsPanel', () => {
 
     fireEvent.click(screen.getByLabelText('停止后台任务：任务A'))
     expect(onStopRun).toHaveBeenCalledWith(runs[0])
+  })
+
+  // 批次 1b · 过线判据④：等待确认与「正在跑」对用户是两件不同的事——
+  // 前者不动手就一直停着，后者不需要人管。只有一个脉冲点在两者之间不做区分。
+  test('等待确认的 run 在任务面板上带得出「等你确认」文字标记', () => {
+    const runs = [
+      { runId: 'r1', title: '任务A', status: 'waiting', sessionId: 's1' },
+      { runId: 'r2', title: '任务B', status: 'running', sessionId: 's2' },
+    ]
+    render(
+      <BackgroundRunsPanel runs={runs} runCounts={{ active: 2, completed: 0 }} onStopRun={() => {}} />,
+    )
+    const waitingRow = screen.getByText('任务A').closest('div')
+    expect(within(waitingRow).getByText('等你确认')).toBeInTheDocument()
+    expect(within(screen.getByText('任务B').closest('div')).queryByText('等你确认')).not.toBeInTheDocument()
   })
 
   test('已完成/失败状态的 run 不出现在行列表里（只计入顶部计数）', () => {

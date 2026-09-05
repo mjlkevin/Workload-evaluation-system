@@ -56,6 +56,42 @@ export async function submitRun(sessionId, { submissionKey, clientMessageId, con
 }
 
 /**
+ * 批次 1b · 痕迹重建：按 run 读取工具调用事件（只读，事实源仍是 harness_run_events）。
+ * 只取当前可见会话的活跃 Run，不做全量拉取；503（异步 Run 关闭）与网络失败一律
+ * 归一为空列表——重建失败不得影响对话主链路。
+ */
+export async function getRunToolEvents(runId) {
+  if (!runId) return []
+  try {
+    const data = unwrap(await apiClient.get(`/ai-runs/${runId}/tool-events`, undefined, { suppressUnauthorizedRedirect: true }))
+    return Array.isArray(data?.items) ? data.items : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * 批次 1b · 同意/拒绝一次写操作。
+ * actionId 必须逐字来自 tool.call.awaiting_approval 事件——它由服务端按
+ * (runId, stepKey, ordinal, toolName, 参数摘要) 推导，前端自拼必定对不上批准。
+ */
+export async function confirmRunAction(runId, actionId) {
+  return unwrap(await apiClient.post(
+    `/ai-runs/${runId}/actions/${encodeURIComponent(actionId)}/confirm`,
+    {},
+    { suppressUnauthorizedRedirect: true },
+  ))
+}
+
+export async function rejectRunAction(runId, actionId) {
+  return unwrap(await apiClient.post(
+    `/ai-runs/${runId}/actions/${encodeURIComponent(actionId)}/reject`,
+    {},
+    { suppressUnauthorizedRedirect: true },
+  ))
+}
+
+/**
  * 订阅 Run 事件流（SSE 回放）。自含 fetch + Bearer + 解析：
  * - `Last-Event-ID` 头与 `after` 参数同值下发（服务端头优先，契约 D6）；
  * - 注释帧（心跳 `: heartbeat`）静默忽略；

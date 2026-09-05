@@ -883,6 +883,73 @@ paths:
               schema:
                 $ref: "#/components/schemas/AiRunsDisabledResponse"
 
+  /api/v1/ai-runs/{runId}/tool-events:
+    get:
+      tags: [AIRuns]
+      summary: 按 Run 读取工具痕迹事件（批次 1b，只读）
+      description: >
+        界面刷新后重建工具 chip 的事实源。架构裁决：痕迹不往会话消息里复制第二份
+        （副本会漂，且历史表示后续要整体换成事件序列），因此本端点直接按 run 读
+        harness_run_events 的工具痕迹子集，纯读路径，不写任何状态。
+        过滤口径见 HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES：tool.call.started /
+        completed / failed / awaiting_approval / rejected + run_action_confirmed
+        （同意侧复用既有事件，服务端约束②）；不含 tool.call.progress —— 心跳只更新
+        耗时，终态帧自带的 elapsedMs 已够重建用。
+        参数只在 tool.call.started 那一份事件里（审批事件只带 actionId/callId），
+        界面按 callId 回查后显示在同意/拒绝按钮旁。
+        非 owner 与不存在的 Run 同为 404，不泄露存在性。
+      operationId: listAiRunToolEvents
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 痕迹事件列表（按 sequence 升序，上限 200 条）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      runId:
+                        type: string
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            sequence:
+                              type: integer
+                            eventType:
+                              type: string
+                            payload:
+                              type: object
+                            createdAt:
+                              type: string
+        "404":
+          description: Run 不存在或非 owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
+
   /api/v1/ai-runs/{runId}/cancel:
     post:
       tags: [AIRuns]
