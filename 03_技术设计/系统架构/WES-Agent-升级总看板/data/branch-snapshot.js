@@ -1,14 +1,14 @@
 window.WES_BRANCH_SNAPSHOT = {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-05T02:33:42.830Z",
+  "generatedAt": "2026-09-05T03:00:52.927Z",
   "repoRoot": "/Users/kevin/AI/Workload-evaluation-system",
   "mainBranch": "main",
   "summary": {
     "localBranchCount": 5,
-    "remoteRefCount": 15,
+    "remoteRefCount": 16,
     "worktreeCount": 3,
-    "ancestorCount": 1,
-    "nonAncestorCount": 3,
+    "ancestorCount": 0,
+    "nonAncestorCount": 4,
     "duplicateTipGroupCount": 0,
     "warningCount": 0
   },
@@ -25,7 +25,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "docs",
       "gitRelation": "non_ancestor",
       "ahead": 14,
-      "behind": 4,
+      "behind": 5,
       "worktreePath": "",
       "worktreeDirty": "",
       "duplicateTipGroup": "",
@@ -33,20 +33,20 @@ window.WES_BRANCH_SNAPSHOT = {
       "governanceSuggestion": "待确认集成、返工或归档"
     },
     {
-      "branchName": "feat/design-system-bridge",
-      "headFull": "ad42cb0f56461fdc7620bc03b09efd143f10be22",
-      "headShort": "ad42cb0",
-      "committerDate": "2026-09-01T23:17:19+08:00",
+      "branchName": "fix/dead-confirm-button",
+      "headFull": "0be8b83ac079d24d5b123dc5393b95d1258499cf",
+      "headShort": "0be8b83",
+      "committerDate": "2026-09-05T10:48:41+08:00",
       "author": "kevin",
-      "subject": "docs(看板): 阶段3批2合入回填（changes.html 事件行 + plan.html 状态更新）",
-      "upstream": "origin/main",
-      "upstreamTrack": "<",
-      "prefix": "feat",
-      "gitRelation": "ancestor",
-      "ahead": 0,
-      "behind": 103,
-      "worktreePath": "/Users/kevin/AI/wes-worktrees/design-system",
-      "worktreeDirty": "dirty",
+      "subject": "fix(AI工作台): 删掉无项目名写动作兜底里的死按钮 —— 用户表达含糊时系统只给空头承诺",
+      "upstream": "origin/fix/dead-confirm-button",
+      "upstreamTrack": "=",
+      "prefix": "fix",
+      "gitRelation": "non_ancestor",
+      "ahead": 19,
+      "behind": 5,
+      "worktreePath": "/Users/kevin/AI/wes-worktrees/dead-button",
+      "worktreeDirty": "clean",
       "duplicateTipGroup": "",
       "duplicateTipGroupId": null,
       "governanceSuggestion": "活跃工作区，先复核任务状态"
@@ -63,7 +63,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "fix",
       "gitRelation": "non_ancestor",
       "ahead": 1,
-      "behind": 242,
+      "behind": 243,
       "worktreePath": "",
       "worktreeDirty": "",
       "duplicateTipGroup": "",
@@ -72,11 +72,11 @@ window.WES_BRANCH_SNAPSHOT = {
     },
     {
       "branchName": "main",
-      "headFull": "91bd181a754f8b26fe1bde63690931a97862457d",
-      "headShort": "91bd181",
-      "committerDate": "2026-09-05T10:32:44+08:00",
+      "headFull": "5a5247c6bfe759e591c0044bf5df924c5dfbeb11",
+      "headShort": "5a5247c",
+      "committerDate": "2026-09-05T10:34:10+08:00",
       "author": "kevin",
-      "subject": "chore(环境清理): 已合入分支与陈旧 worktree 下线 · 本地 17→5 分支 / 15→3 worktree",
+      "subject": "docs(WES 看板): 环境清理批 CI 证据回填 · 基线权威绿更正为 run 33880999973 @ e6e28de",
       "upstream": "origin/main",
       "upstreamTrack": "<>",
       "prefix": "other",
@@ -101,7 +101,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "qoder",
       "gitRelation": "non_ancestor",
       "ahead": 23,
-      "behind": 4,
+      "behind": 5,
       "worktreePath": "/Users/kevin/AI/wes-worktrees/ui-remove-homeworkspace",
       "worktreeDirty": "clean",
       "duplicateTipGroup": "",
@@ -267,6 +267,19 @@ window.WES_BRANCH_SNAPSHOT = {
       "isSymbolic": false
     },
     {
+      "branchName": "origin/fix/dead-confirm-button",
+      "headFull": "0be8b83ac079d24d5b123dc5393b95d1258499cf",
+      "headShort": "0be8b83",
+      "committerDate": "2026-09-05T10:48:41+08:00",
+      "author": "kevin",
+      "subject": "fix(AI工作台): 删掉无项目名写动作兜底里的死按钮 —— 用户表达含糊时系统只给空头承诺",
+      "upstream": "",
+      "upstreamTrack": "",
+      "refKind": "remote_tracking",
+      "symbolicTarget": "",
+      "isSymbolic": false
+    },
+    {
       "branchName": "origin/fix/web-resource-cost-placeholder",
       "headFull": "9862b1697f1f04f8de1a4cc104ed4821b6c5dc56",
       "headShort": "9862b16",
@@ -313,15 +326,15 @@ window.WES_BRANCH_SNAPSHOT = {
       "locked": false,
       "prunable": false,
       "path": "/Users/kevin/AI/Workload-evaluation-system",
-      "headFull": "91bd181a754f8b26fe1bde63690931a97862457d"
+      "headFull": "5a5247c6bfe759e591c0044bf5df924c5dfbeb11"
     },
     {
-      "branchName": "feat/design-system-bridge",
+      "branchName": "fix/dead-confirm-button",
       "detached": false,
       "locked": false,
       "prunable": false,
-      "path": "/Users/kevin/AI/wes-worktrees/design-system",
-      "headFull": "ad42cb0f56461fdc7620bc03b09efd143f10be22"
+      "path": "/Users/kevin/AI/wes-worktrees/dead-button",
+      "headFull": "0be8b83ac079d24d5b123dc5393b95d1258499cf"
     },
     {
       "branchName": "qoder/ui-remove-homeworkspace",
@@ -341,8 +354,8 @@ window.WES_BRANCH_SNAPSHOT = {
   "provenance": {
     "semantics": "as_of_generation",
     "sourceCheckoutBranch": "main",
-    "sourceCheckoutHead": "91bd181a754f8b26fe1bde63690931a97862457d",
-    "configuredMainlineHead": "91bd181a754f8b26fe1bde63690931a97862457d",
+    "sourceCheckoutHead": "5a5247c6bfe759e591c0044bf5df924c5dfbeb11",
+    "configuredMainlineHead": "5a5247c6bfe759e591c0044bf5df924c5dfbeb11",
     "observationNote": "This is an as-of-generation observation and can precede the commit containing it."
   }
 };
