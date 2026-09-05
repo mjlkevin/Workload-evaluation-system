@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import {
   mockAdminAiSessions,
+  mockAiTools,
   mockAssessmentVersion,
   mockAiSessions,
   mockComments,
@@ -755,6 +756,7 @@ export const handlers = [
       .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)))
     return HttpResponse.json({ success: true, data: { items } })
   }),
+  http.get(`${BASE}/system/ai-tools`, () => HttpResponse.json({ success: true, data: { items: mockAiTools } })),
   http.get(`${BASE}/harness/test-results`, () => HttpResponse.json({ success: true, data: { items: [] } })),
   http.get(`${BASE}/templates`, () => HttpResponse.json({ success: true, data: [{ templateId: 'T1', templateName: '实施评估标准版', description: '标准模板', tags: ['标准'] }] })),
   http.post(`${BASE}/system/version-code-rules/:id/activate`, () => HttpResponse.json({ success: true, data: {} })),
