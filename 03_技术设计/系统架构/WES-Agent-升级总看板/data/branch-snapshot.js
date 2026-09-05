@@ -1,6 +1,6 @@
 window.WES_BRANCH_SNAPSHOT = {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-05T02:25:41.061Z",
+  "generatedAt": "2026-09-05T02:33:42.830Z",
   "repoRoot": "/Users/kevin/AI/Workload-evaluation-system",
   "mainBranch": "main",
   "summary": {
@@ -25,7 +25,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "docs",
       "gitRelation": "non_ancestor",
       "ahead": 14,
-      "behind": 3,
+      "behind": 4,
       "worktreePath": "",
       "worktreeDirty": "",
       "duplicateTipGroup": "",
@@ -44,7 +44,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "feat",
       "gitRelation": "ancestor",
       "ahead": 0,
-      "behind": 102,
+      "behind": 103,
       "worktreePath": "/Users/kevin/AI/wes-worktrees/design-system",
       "worktreeDirty": "dirty",
       "duplicateTipGroup": "",
@@ -63,7 +63,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "fix",
       "gitRelation": "non_ancestor",
       "ahead": 1,
-      "behind": 241,
+      "behind": 242,
       "worktreePath": "",
       "worktreeDirty": "",
       "duplicateTipGroup": "",
@@ -72,11 +72,11 @@ window.WES_BRANCH_SNAPSHOT = {
     },
     {
       "branchName": "main",
-      "headFull": "48ab30485590445e68fd9ac3727b4ae8af13de25",
-      "headShort": "48ab304",
-      "committerDate": "2026-09-03T22:45:21+08:00",
+      "headFull": "91bd181a754f8b26fe1bde63690931a97862457d",
+      "headShort": "91bd181",
+      "committerDate": "2026-09-05T10:32:44+08:00",
       "author": "kevin",
-      "subject": "docs(WES 看板): 批次 0.5 合入回填 · 主基线升 1337 + 两条残留入风险池",
+      "subject": "chore(环境清理): 已合入分支与陈旧 worktree 下线 · 本地 17→5 分支 / 15→3 worktree",
       "upstream": "origin/main",
       "upstreamTrack": "<>",
       "prefix": "other",
@@ -101,7 +101,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "prefix": "qoder",
       "gitRelation": "non_ancestor",
       "ahead": 23,
-      "behind": 3,
+      "behind": 4,
       "worktreePath": "/Users/kevin/AI/wes-worktrees/ui-remove-homeworkspace",
       "worktreeDirty": "clean",
       "duplicateTipGroup": "",
@@ -313,7 +313,7 @@ window.WES_BRANCH_SNAPSHOT = {
       "locked": false,
       "prunable": false,
       "path": "/Users/kevin/AI/Workload-evaluation-system",
-      "headFull": "48ab30485590445e68fd9ac3727b4ae8af13de25"
+      "headFull": "91bd181a754f8b26fe1bde63690931a97862457d"
     },
     {
       "branchName": "feat/design-system-bridge",
@@ -341,8 +341,8 @@ window.WES_BRANCH_SNAPSHOT = {
   "provenance": {
     "semantics": "as_of_generation",
     "sourceCheckoutBranch": "main",
-    "sourceCheckoutHead": "48ab30485590445e68fd9ac3727b4ae8af13de25",
-    "configuredMainlineHead": "48ab30485590445e68fd9ac3727b4ae8af13de25",
+    "sourceCheckoutHead": "91bd181a754f8b26fe1bde63690931a97862457d",
+    "configuredMainlineHead": "91bd181a754f8b26fe1bde63690931a97862457d",
     "observationNote": "This is an as-of-generation observation and can precede the commit containing it."
   }
 };
