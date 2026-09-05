@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as AiSessionsModule from "../modules/ai-sessions/ai-sessions.module";
 import * as SystemModule from "../modules/system/system.module";
 import { requireCapability, requireAnyCapability } from "../rbac/middleware";
+import { listAiToolsHandler } from "./tool-inventory.routes";
 
 const router = Router();
 
@@ -28,5 +29,7 @@ router.post("/knowledge-base-config/test", requireCapability("system:manage"), S
 router.get("/role-capabilities", requireCapability("system:manage"), SystemModule.getRoleCapabilitiesMatrix);
 // 会话管理：管理员审计全量用户 AI 会话
 router.get("/ai-sessions", requireCapability("system:manage"), AiSessionsModule.listAllSessionsForAdmin);
+// 批次 6a：AI 工具清单（只读，运行时从 ToolRegistry 派生）
+router.get("/ai-tools", requireCapability("system:manage"), listAiToolsHandler);
 
 export default router;

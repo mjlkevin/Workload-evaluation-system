@@ -6,6 +6,7 @@ import AiSessionAuditPanel from '../components/system/AiSessionAuditPanel.jsx'
 import KnowledgeBaseProfilesPanel from '../components/system/KnowledgeBaseProfilesPanel.jsx'
 import KnowledgeRetrievalDiagnosePanel from '../components/system/KnowledgeRetrievalDiagnosePanel.jsx'
 import MemoryManagementPanel from '../components/system/MemoryManagementPanel.jsx'
+import AiToolInventoryPanel from '../components/system/AiToolInventoryPanel.jsx'
 import { SYSTEM_MANAGEMENT_SECTIONS, getSystemManagementSectionById } from '../config/systemManagementSections.js'
 import useSystemManagement from '../hooks/useSystemManagement.js'
 import { useToast } from '../hooks/useToast.jsx'
@@ -1312,6 +1313,10 @@ export default function SystemManagement({ sectionId }) {
 
         {activeSectionId === 'memory' && (
           <MemoryManagementPanel />
+        )}
+
+        {activeSectionId === 'tools' && (
+          <AiToolInventoryPanel />
         )}
       </div>
 

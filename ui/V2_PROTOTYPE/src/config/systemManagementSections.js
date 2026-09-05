@@ -9,6 +9,7 @@ export const SYSTEM_MANAGEMENT_SECTIONS = [
   { id: 'testResults', route: '/system/test-results', label: '测试结果', icon: '✓', subtitle: '人工测试结果登记与追踪' },
   { id: 'sessions', route: '/system/sessions', label: '会话管理', icon: 'S', subtitle: '全量用户 AI 会话审计与跟踪' },
   { id: 'memory', route: '/system/memory', label: '记忆管理', icon: '忆', subtitle: 'AI 工作台跨会话记忆查看与确认' },
+  { id: 'tools', route: '/system/tools', label: '工具清单', icon: '⚒', subtitle: 'AI 工作台可调用工具与权限位一览' },
 ]
 
 export const DEFAULT_SYSTEM_MANAGEMENT_ROUTE = SYSTEM_MANAGEMENT_SECTIONS[0].route
