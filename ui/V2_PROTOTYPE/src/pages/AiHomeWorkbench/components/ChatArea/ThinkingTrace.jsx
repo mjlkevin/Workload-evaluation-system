@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ToolCallChip from './ToolCallChip.jsx'
 import { TOOL_CALL_STATUS } from '../../utils/messageFormatter.js'
 
 /**
@@ -16,6 +17,9 @@ export default function ThinkingTrace({
   knowledgeTool,
   toolCalls,
   memoryRef,
+  onApproveToolCall,
+  onRejectToolCall,
+  toolActionState,
 }) {
   // null = 用户未显式操作过：此时由「流式期间是否有运行中项」自动决定展开，
   // 保证 started→running 阶段免点击即可见（批次 0.5 ③）。用户一旦点过开关，
@@ -28,7 +32,16 @@ export default function ThinkingTrace({
   const toolCallList = Array.isArray(toolCalls) ? toolCalls.filter((t) => t && t.name) : []
   const hasToolCalls = toolCallList.length > 0
   const hasLiveRunning = streaming && toolCallList.some((call) => call.status === TOOL_CALL_STATUS.RUNNING)
-  const showToolList = toolsExpanded ?? hasLiveRunning
+  // 批次 1b：写工具挂起时整条链是停着的，收起列表等于把「在等你」藏起来——
+  // 待确认项一律免点击可见，且不受折叠状态影响（用户主动收起时才听用户的）。
+  // 「已拒绝」与「已同意但未收口」同样免点击：拒绝后服务端秒级重放回填失败，
+  // 同意之后回答可能还没开始流式（streaming 仍为 false）——按「终态/非流式即收起」
+  // 处理会让用户以为按钮没生效。
+  const hasVisibleDecision = toolCallList.some((call) => call.status === TOOL_CALL_STATUS.AWAITING_APPROVAL
+    || call.status === TOOL_CALL_STATUS.REJECTED
+    || (call.approval && call.status === TOOL_CALL_STATUS.RUNNING))
+  const hasAwaitingApproval = toolCallList.some((call) => call.status === TOOL_CALL_STATUS.AWAITING_APPROVAL)
+  const showToolList = toolsExpanded ?? (hasLiveRunning || hasVisibleDecision)
   const scenesCount = Number(memoryRef?.scenesCount) || 0
   const atomsCount = Number(memoryRef?.atomsCount) || 0
   const hasMemoryRef = scenesCount > 0 || atomsCount > 0
@@ -65,13 +78,17 @@ export default function ThinkingTrace({
           >
             <span aria-hidden="true">{showToolList ? '▾' : '▸'}</span>
             工具调用 {toolCallList.length} 项
+            {hasAwaitingApproval && !showToolList && <span className="font-bold text-warn-ink">· 等你确认</span>}
           </button>
           {showToolList && toolCallList.map((call, idx) => (
-            <span key={`${call.name}-${idx}`} className="inline-flex items-center gap-1">
-              <code className="border-0 bg-transparent p-0">{call.name}</code>
-              {call.source === 'list_tools' && <em className="not-italic text-ink-3">· 经发现</em>}
-              <ToolCallStatusTag call={call} streaming={streaming} />
-            </span>
+            <ToolCallChip
+              key={`${call.name}-${idx}`}
+              call={call}
+              streaming={streaming}
+              onApprove={onApproveToolCall}
+              onReject={onRejectToolCall}
+              actionState={call.approval?.actionId ? toolActionState?.[call.approval.actionId] : undefined}
+            />
           ))}
         </div>
       )}
@@ -104,35 +121,4 @@ function KnowledgeTraceChip({ knowledgeTool }) {
       {hasFallback && !isUnavailable && <span className="text-warn">检索未命中</span>}
     </div>
   )
-}
-
-/**
- * 工具调用状态标签（批次 0.5 ③）：started→运行中、completed→已完成、failed→失败
- * 三态各自可见。存量数据无 status 时不渲染任何标签，保持既有行为。
- */
-function ToolCallStatusTag({ call, streaming }) {
-  const elapsed = formatToolCallElapsed(call.elapsedMs)
-  if (call.status === TOOL_CALL_STATUS.RUNNING) {
-    // 流已结束却仍残留 running，只说明本轮未收到终态帧，不臆造「运行中」。
-    if (!streaming) return null
-    return <em className="not-italic text-brand">· 运行中{elapsed ? ` ${elapsed}` : ''}</em>
-  }
-  if (call.status === TOOL_CALL_STATUS.COMPLETED) {
-    return <em className="not-italic text-ink-3">· 已完成{elapsed ? ` ${elapsed}` : ''}</em>
-  }
-  if (call.status === TOOL_CALL_STATUS.FAILED) {
-    return (
-      <em className="not-italic text-warn">
-        · 失败{elapsed ? ` ${elapsed}` : ''}{call.errorPreview ? ` · ${call.errorPreview}` : ''}
-      </em>
-    )
-  }
-  return null
-}
-
-/** 耗时可读化：< 1s 用毫秒，其余保留一位小数秒 */
-function formatToolCallElapsed(value) {
-  const ms = Number(value)
-  if (!Number.isFinite(ms) || ms <= 0) return ''
-  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
 }

@@ -4,6 +4,7 @@ import { HoverBadge } from './MessageBits.jsx'
 import MessageList from './MessageList.jsx'
 import Composer from './Composer.jsx'
 import AiDegradationNotice from './AiDegradationNotice.jsx'
+import RunToolTray from './RunToolTray.jsx'
 import { apiClient } from '../../../../api/client.js'
 
 const panel = {
@@ -60,6 +61,10 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
     onToggleThought: chat.toggleThought,
     // DEF-2026-08-27-003：解析失败气泡的重试入口
     onRetryParse: chat.retryAttachmentParse,
+    // 批次 1b：写工具的同意 / 拒绝（就地长在 chip 上，不弹窗）
+    onApproveToolCall: chat.approveToolCall,
+    onRejectToolCall: chat.rejectToolCall,
+    toolActionState: chat.toolActionState,
   }
 
   // O8：当前活跃 Run（用于停止按钮）
@@ -118,6 +123,14 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
 
       {/* 批次 0.5 · Part2：应答通道改走备用时必须可见（贴发送区，用户正要按发送键） */}
       <AiDegradationNotice notice={chat.degradationNotice} />
+
+      {/* 批次 1b：本轮 Run 的工具痕迹（刷新后仍在）+ 写操作的同意 / 拒绝入口 */}
+      <RunToolTray
+        calls={chat.toolTrail}
+        toolActionState={chat.toolActionState}
+        onApprove={chat.approveToolCall}
+        onReject={chat.rejectToolCall}
+      />
 
       <Composer
         composer={workbench.composer}

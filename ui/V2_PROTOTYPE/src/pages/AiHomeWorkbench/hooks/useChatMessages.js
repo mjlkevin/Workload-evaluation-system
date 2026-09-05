@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '../../../api/client.js'
 import { unwrap } from '../../../api/utils.js'
-import { submitRun } from '../../../api/aiRuns.js'
+import { submitRun, getRunToolEvents, confirmRunAction, rejectRunAction } from '../../../api/aiRuns.js'
 import { useRunEventStream } from '../../../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../../../hooks/useSessionRuntimeStore.js'
 import { pickArray } from '../utils/harnessPayload.js'
@@ -11,14 +11,17 @@ import {
   attachFormBlockToLatestAssistant,
   attachKnowledgeToolToLatestAssistant,
   attachTraceChipsToLatestAssistant,
+  createToolCallArgsCache,
   mapSessionMessages,
   mergePreservedLocalFileMessages,
   normalizeClientFormBlock,
   normalizeKnowledgeTool,
   normalizeMemoryRef,
   normalizeToolCalls,
+  reduceToolCallTrail,
   sameMessageList,
   stripFormBlockJson,
+  TOOL_CALL_STATUS,
   withCurrentUserFile,
 } from '../utils/messageFormatter.js'
 import { AI_DEGRADATION_REASONS, recordAiDegradation } from '../utils/degradationTrace.js'
@@ -26,6 +29,8 @@ import { AI_DEGRADATION_REASONS, recordAiDegradation } from '../utils/degradatio
 // O8 Sprint 3A：流式事件类型（前端映射，后端事件流底座已就绪）
 // 批次 0.5 · ③：四类 tool.call.* 为工具调用 UI 投影事件（异步 Run 通道），
 // 字符串与 HARNESS_RUN_EVENT_TYPES 白名单逐字一致。
+// 批次 1b：再补 1a 落表的两个审批事件；同意侧服务端复用既有 run_action_confirmed
+// （见 workbench-tool-approval.ts 约束②），前端照抄这个事实，不自造第五种词。
 const STREAM_EVENT_TYPES = {
   TEXT_DELTA: 'text.delta',
   THOUGHT: 'thought',
@@ -33,6 +38,9 @@ const STREAM_EVENT_TYPES = {
   TOOL_CALL_PROGRESS: 'tool.call.progress',
   TOOL_CALL_COMPLETED: 'tool.call.completed',
   TOOL_CALL_FAILED: 'tool.call.failed',
+  TOOL_CALL_AWAITING_APPROVAL: 'tool.call.awaiting_approval',
+  TOOL_CALL_REJECTED: 'tool.call.rejected',
+  RUN_ACTION_CONFIRMED: 'run_action_confirmed',
   RUN_COMPLETED: 'run_completed',
   RUN_FAILED: 'run_failed',
   RUN_CANCELLED: 'run_cancelled',
@@ -263,10 +271,118 @@ export default function useChatMessages(workbench) {
   // ISS-2026-08-10-004（层 1）：统一视图 runs 契约字段为 runId（后端无 id）——
   // 此前取 .id 恒为 undefined，activeRunId 恒 ''，页面级 SSE 订阅永不建立；
   // runId 为主、id 兜底兼容，不得反向（后端契约不得新增 id 别名）。
+  // 批次 1b：口径补上 `waiting`——写工具挂起等用户时 Run 就停在这个状态，
+  // 不订阅就等于把一个正在等答案的问题从界面上抹掉。
   const activeRun = workbench.unifiedView?.runs?.find(
-    (run) => run.sessionId === activeSessionKey && ['running', 'queued', 'recovering'].includes(run.status),
+    (run) => run.sessionId === activeSessionKey && ['running', 'queued', 'recovering', 'waiting'].includes(run.status),
   )
   const activeRunId = activeRun?.runId || activeRun?.id || ''
+  const activeRunIdRef = useRef(activeRunId)
+  activeRunIdRef.current = activeRunId
+  // 批次 1b：参数的暂存缓存按页面生命周期一份（started→awaiting 之间用），
+  // 每轮发送重建，避免跨轮按 callId 串到上一次的参数。
+  const toolArgsCacheRef = useRef(null)
+  if (!toolArgsCacheRef.current) toolArgsCacheRef.current = createToolCallArgsCache()
+
+  function toolEventContext() {
+    return { runId: activeRunIdRef.current, argsCache: toolArgsCacheRef.current }
+  }
+
+  // 批次 1b · 痕迹重建：只按「当前可见会话的活跃 Run」拉一次工具事件，
+  // 不做全量历史拉取；事实源是 harness_run_events，界面侧不复制任何副本。
+  const [runTrail, setRunTrail] = useState({ runId: '', calls: [] })
+  const [toolActionState, setToolActionState] = useState({})
+  const trailRunId = activeRunId && ['running', 'waiting', 'recovering'].includes(activeRun?.status || '') ? activeRunId : ''
+  useEffect(() => {
+    let cancelled = false
+    if (!trailRunId) {
+      setRunTrail((prev) => (prev.runId ? { runId: '', calls: [] } : prev))
+      return undefined
+    }
+    getRunToolEvents(trailRunId).then((events) => {
+      if (cancelled) return
+      setRunTrail({ runId: trailRunId, calls: reduceToolCallTrail(events, { runId: trailRunId }) })
+    })
+    return () => { cancelled = true }
+  }, [trailRunId])
+
+  /**
+   * 批次 1b：托盘内容 = 本轮 Run 的痕迹里「消息区还没有的那部分」。
+   * 实时链路已经把 chip 挂在回答气泡上，两处同时出现就是重复；
+   * 刷新后消息区还没有（异步 Run 的会话消息要等本轮收尾才落库），托盘负责补上，
+   * 这就是「痕迹不只活在一次 SSE 连接里」的还原路径。
+   */
+  const toolTrail = useMemo(() => {
+    const renderedActionIds = new Set()
+    const renderedSlots = new Set()
+    messages.forEach((message) => {
+      (Array.isArray(message.toolCalls) ? message.toolCalls : []).forEach((call) => {
+        if (!call) return
+        if (call.approval?.actionId) renderedActionIds.add(call.approval.actionId)
+        renderedSlots.add(`${call.name || ''}#${call.callIndex || 0}`)
+      })
+    })
+    return runTrail.calls.filter((call) => {
+      if (!call) return false
+      if (call.approval?.actionId && renderedActionIds.has(call.approval.actionId)) return false
+      return !renderedSlots.has(`${call.name || ''}#${call.callIndex || 0}`)
+    })
+  }, [runTrail, messages])
+
+  const pendingToolApprovals = useMemo(
+    () => toolTrail.filter((call) => call.status === TOOL_CALL_STATUS.AWAITING_APPROVAL),
+    [toolTrail],
+  )
+
+  /**
+   * 批次 1b · 同意 / 拒绝。请求只带 (runId, actionId)，参数一律由服务端按
+   * actionId 里那份摘要回查——摘要对不上就是用户批的不是要执行的，闸门会再问一次。
+   * 成功后把同一个决策当作事件喂回既有状态机（与 SSE 重放幂等），不另开一条 UI 通道。
+   */
+  const answerToolApproval = useCallback(async (call, decision) => {
+    const runId = call?.approval?.runId || activeRunIdRef.current
+    const actionId = call?.approval?.actionId
+    if (!runId || !actionId) return
+    setToolActionState((prev) => ({ ...prev, [actionId]: { pending: true } }))
+    try {
+      if (decision === 'approve') await confirmRunAction(runId, actionId)
+      else await rejectRunAction(runId, actionId)
+      const echoEvent = decision === 'approve'
+        ? { eventType: 'run_action_confirmed', payload: { actionId, callId: call?.callId, toolName: call?.name } }
+        : { eventType: 'tool.call.rejected', payload: { actionId, callId: call?.callId, toolName: call?.name } }
+      const context = { runId, argsCache: toolArgsCacheRef.current }
+      setMessages((prev) => {
+        let changed = false
+        const next = prev.map((message) => {
+          if (!Array.isArray(message.toolCalls)) return message
+          const applied = applyToolCallEventToList(message.toolCalls, echoEvent, context)
+          if (applied === null) return message
+          changed = true
+          return { ...message, toolCalls: applied }
+        })
+        return changed ? next : prev
+      })
+      setRunTrail((prev) => {
+        const applied = applyToolCallEventToList(prev.calls, echoEvent, context)
+        return applied === null ? prev : { ...prev, calls: applied }
+      })
+      // 列表徽标与统一视图都要跟着变（任务不再等这个人，或者换下一个问题）
+      workbenchRef.current?.refreshUnifiedView?.().catch(() => {}) // 批次1b：决策后统一视图刷新为 fire-and-forget——错误由 unifiedViewError 承载，不阻塞审批动作，可静默
+      // 服务端把 Run 打回 queued 后由 worker 续跑，重新读一次痕迹即可收敛到真实状态。
+      if (runId) getRunToolEvents(runId).then((events) => {
+        setRunTrail((prev) => (prev.runId === runId ? { runId, calls: reduceToolCallTrail(events, { runId }) } : prev))
+      })
+      setToolActionState((prev) => ({ ...prev, [actionId]: { pending: false } }))
+    } catch (err) {
+      setToolActionState((prev) => ({
+        ...prev,
+        [actionId]: { pending: false, error: err?.message || '提交失败，请重试' },
+      }))
+    }
+  }, [])
+
+  const approveToolCall = useCallback((call) => answerToolApproval(call, 'approve'), [answerToolApproval])
+  const rejectToolCall = useCallback((call) => answerToolApproval(call, 'reject'), [answerToolApproval])
 
   // O8：SSE 流式事件处理（逐字呈现 + 思考折叠）
   const handleStreamEvent = useCallback((event) => {
@@ -355,8 +471,13 @@ export default function useChatMessages(workbench) {
       case STREAM_EVENT_TYPES.TOOL_CALL_STARTED:
       case STREAM_EVENT_TYPES.TOOL_CALL_PROGRESS:
       case STREAM_EVENT_TYPES.TOOL_CALL_COMPLETED:
-      case STREAM_EVENT_TYPES.TOOL_CALL_FAILED: {
-        // 批次 0.5 · ③：工具调用三态可视化。四类事件喂进既有 toolCalls 通道
+      case STREAM_EVENT_TYPES.TOOL_CALL_FAILED:
+      // 批次 1b：1a 的两个审批事件 + 同意侧复用的 run_action_confirmed 进同一条
+      // 归约链——chip 的状态机只有一个owner，实时与重建不会给出两种答案。
+      case STREAM_EVENT_TYPES.TOOL_CALL_AWAITING_APPROVAL:
+      case STREAM_EVENT_TYPES.TOOL_CALL_REJECTED:
+      case STREAM_EVENT_TYPES.RUN_ACTION_CONFIRMED: {
+        // 批次 0.5 · ③：工具调用状态可视化。事件喂进既有 toolCalls 通道
         // （WorkbenchToolCallTrace → MessageBubble → ThinkingTrace），不建新通道。
         // 目标消息选取与 THOUGHT 同款：工具事件天然先于首个 text.delta 到达，
         // streamingMessageIdRef 尚未建立时兜底挂到当前 loading 占位。
@@ -370,7 +491,7 @@ export default function useChatMessages(workbench) {
           }
           return prev.map((m) => {
             if (m.id !== targetId) return m
-            const next = applyToolCallEventToList(m.toolCalls, event)
+            const next = applyToolCallEventToList(m.toolCalls, event, toolEventContext())
             return next === null ? m : { ...m, toolCalls: next }
           })
         })
@@ -712,6 +833,8 @@ export default function useChatMessages(workbench) {
     // O8：重置流式状态
     streamingMessageIdRef.current = null
     processedSequencesRef.current.clear()
+    // 批次 1b：参数暂存随轮换一茬——上一轮的 callId 不该被这一轮的审批事件回查到
+    toolArgsCacheRef.current = createToolCallArgsCache()
     // 前端插批（项二）：新发送周期重置错误提示闸门
     streamErrorNotifiedRef.current = false
     // 批次 0.5 · Part2：单轮提示不得赖着不走（否则下一轮明明恢复了还挂着警告）；
@@ -1044,6 +1167,13 @@ export default function useChatMessages(workbench) {
     goLogin,
     // O8：流式 UX 暴露
     toggleThought,
+    // 批次 1b：写操作的同意/拒绝接线 + 刷新后的痕迹还原
+    activeRunId,
+    toolTrail,
+    pendingToolApprovals,
+    approveToolCall,
+    rejectToolCall,
+    toolActionState,
     // 批次 0.5 · Part2：改走备用通道的可见状态（null = 正常路径不渲染任何提示）
     degradationNotice,
   }

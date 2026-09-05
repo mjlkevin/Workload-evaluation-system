@@ -34,6 +34,15 @@ const TERMINAL_TEXT = {
   run_cancelled: (title) => `${title} 已取消`,
 }
 
+// 批次 1b：写工具的审批闸门事件（服务端词表见 HARNESS_RUN_EVENT_TYPES）。
+// 挂起时服务端**不发** run_status_changed——它把「等待」写成一行
+// tool.call.awaiting_approval 事件（批次 1a 约束③）。所以列表徽标要跟上一个用户
+// 正在等的任务，只能靠消费这个事件；等下一次列表刷新等于让用户去找那趟已经开走的车。
+const TOOL_APPROVAL_REQUEST_EVENT = 'tool.call.awaiting_approval'
+const TOOL_APPROVAL_DECISION_EVENTS = ['run_action_confirmed', 'tool.call.rejected']
+/** 决策之后向服务端对账一次的防抖时长（决策本身已在本地收敛，不依赖这一次） */
+const APPROVAL_RECONCILE_DEBOUNCE_MS = 1200
+
 export function BackgroundRunProvider({ children }) {
   const [runs, setRuns] = useState([])
   const [enabled, setEnabled] = useState(true)
@@ -47,6 +56,8 @@ export function BackgroundRunProvider({ children }) {
   const snapshotFetchedRef = useRef(new Set()) // 恢复序列：snapshot 每 run 只读一次
   const mergedSessionsRef = useRef(new Set())  // 已合并进 store 的 sessionId
   const notifiedRef = useRef(new Set())     // `${runId}:${eventType}` 一次性通知去重
+  // 批次 1b：审批决策后的列表对账防抖（决策本身已在本地收敛，这一次只是向服务端核对）
+  const approvalReconcileQueuedRef = useRef(false)
   const retryDelayRef = useRef(RETRY_BASE_MS)
   const timersRef = useRef([])
   const lastRunsNotifyRef = useRef(0)
@@ -108,6 +119,23 @@ export function BackgroundRunProvider({ children }) {
       setRuns((prev) => prev.map((run) => (run.runId === runId ? { ...run, status: nextStatus } : run)))
     }
 
+    // 批次 1b：审批挂起 / 决策。只改本 provider 持有的 Run 摘要（会话徽标的唯一
+    // 数据源仍在这里，由下方 [runs] 效应映射进 sessionViews），不另写一份状态。
+    if (event.eventType === TOOL_APPROVAL_REQUEST_EVENT) {
+      setRuns((prev) => prev.map((run) => (run.runId === runId ? { ...run, status: 'waiting' } : run)))
+    } else if (TOOL_APPROVAL_DECISION_EVENTS.includes(event.eventType)) {
+      setRuns((prev) => prev.map((run) => (
+        run.runId === runId && run.status === 'waiting' ? { ...run, status: 'queued' } : run
+      )))
+      if (!approvalReconcileQueuedRef.current) {
+        approvalReconcileQueuedRef.current = true
+        scheduleTimer(() => {
+          approvalReconcileQueuedRef.current = false
+          refresh()
+        }, APPROVAL_RECONCILE_DEBOUNCE_MS)
+      }
+    }
+
     if (isTerminalRunEvent(event.eventType)) {
       const notifyKey = `${runId}:${event.eventType}`
       if (notifiedRef.current.has(notifyKey)) return
@@ -134,7 +162,7 @@ export function BackgroundRunProvider({ children }) {
     // 再通知消息区对账，避免当前会话的 unread 清除被终态写入覆盖。
     const listeners = eventListenersRef.current.get(runId)
     if (listeners) listeners.forEach((listener) => listener.onEvent?.(event))
-  }, [refresh])
+  }, [refresh, scheduleTimer])
 
   const handleEventRef = useRef(handleEvent)
   handleEventRef.current = handleEvent
