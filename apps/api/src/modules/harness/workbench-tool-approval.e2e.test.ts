@@ -224,7 +224,7 @@ async function drivePhase(input: {
     const runtime = startHarnessRuntime({
       repo: phaseRepo,
       enabled: true,
-      resolveApiKey: () => ({ apiKey: "b1a-placeholder" }),
+      resolveApiKey: () => ({ apiKey: "placeholder" }),
       getProvider: () => fakeProvider as never,
       resolveScenario: async () => ({
         model: "kimi-b1a",
