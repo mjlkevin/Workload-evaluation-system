@@ -34,7 +34,6 @@ export type WorkbenchSuggestedAction = {
     | "generate_requirement_report"
     | "submit_structured_answers"
     | "open_project_list"
-    | "confirm_write_action"
     | "company_lookup"
     | "create_project_evaluation";
   requiresConfirm: boolean;

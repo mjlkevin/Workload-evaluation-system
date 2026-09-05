@@ -147,14 +147,14 @@ test("snapshot: 带项目名的创建请求 → write_action_request，仅返回
   assert.equal(result.suggestedActions[0].payload?.projectName, "广州可味达");
 });
 
-test("snapshot: 无项目名的写动作 → write_action_request，confirm_write_action 需确认", async () => {
+test("snapshot: 无项目名的写动作 → write_action_request，不返回动作并提示补充说明", async () => {
   const result = await dispatchHomeWorkbenchTurn(baseInput({
     message: "帮我创建评估草稿",
     modelChat: STATIC_MODEL_CHAT,
   }));
   assert.equal(result.intent, "write_action_request");
-  assert.equal(result.suggestedActions[0]?.actionType, "confirm_write_action");
-  assert.equal(result.suggestedActions[0]?.requiresConfirm, true);
+  assert.deepEqual(result.suggestedActions, []);
+  assert.ok(result.answer.includes("项目"));
 });
 
 // ── 4. harness-report handler（报告生成 / v2 提交建议）─────────────────────

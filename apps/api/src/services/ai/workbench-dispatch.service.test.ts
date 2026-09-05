@@ -639,7 +639,7 @@ test("workbench dispatch returns create_project_evaluation action with project n
   assert.ok(result.answer.includes("广州可味达"));
 });
 
-test("workbench dispatch returns confirm_write_action for write action without project name", async () => {
+test("workbench dispatch returns no suggested action for write action without project name", async () => {
   const result = await dispatchHomeWorkbenchTurn({
     user,
     workflowKey: "free_chat",
@@ -651,8 +651,8 @@ test("workbench dispatch returns confirm_write_action for write action without p
   });
 
   assert.equal(result.intent, "write_action_request");
-  assert.equal(result.suggestedActions.length, 1);
-  assert.equal(result.suggestedActions[0].actionType, "confirm_write_action");
+  assert.deepEqual(result.suggestedActions, []);
+  assert.ok(result.answer.includes("项目"));
 });
 
 // ── RP-003: 模型意图分类兜底 ──────────────────────────────────
