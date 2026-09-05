@@ -95,7 +95,7 @@ test("writeActionHandler: 带项目名返回 create_project_evaluation 待确认
   assert.equal(result.suggestedActions[0]?.payload?.projectName, "广州可味达");
 });
 
-test("writeActionHandler: 疑问句提取出的垃圾名不生成创建确认动作", async () => {
+test("writeActionHandler: 疑问句提取出的垃圾名不生成任何确认动作", async () => {
   const result = await writeActionHandler.handle(
     paramsFor(
       { intent: "write_action_request", confidence: 0.85, routingRule: "write_action_keywords" },
@@ -103,8 +103,9 @@ test("writeActionHandler: 疑问句提取出的垃圾名不生成创建确认动
     ),
   );
   assert.equal(result.intent, "write_action_request");
-  assert.equal(result.suggestedActions[0]?.actionType, "confirm_write_action");
-  assert.notEqual(result.suggestedActions[0]?.payload?.projectName, "了什么");
+  assert.deepEqual(result.suggestedActions, []);
+  assert.ok(result.answer.includes("项目"));
+  assert.equal(result.answer.includes("写动作"), false);
 });
 
 test("harnessReportHandler: 覆盖报告生成与 v2 提交两类意图", async () => {

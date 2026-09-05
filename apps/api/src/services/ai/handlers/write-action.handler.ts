@@ -51,21 +51,14 @@ function buildWriteActionResponse(intent: { confidence: number; routingRule: str
     };
   }
 
-  const answer = "这是一个写动作请求。为了安全，我不会自动创建正式记录。请确认以下动作后再执行：";
+  const answer = "没听出你要创建什么，所以我没有创建任何记录。请补充说明一下，例如「帮我创建XX项目」。";
   return {
     intent: "write_action_request",
     answer,
     businessRole: input.businessRole,
     roleLabel: input.roleLabel,
     model: "rule-static",
-    suggestedActions: [
-      {
-        id: "confirm_write_action",
-        label: "确认执行写动作",
-        actionType: "confirm_write_action",
-        requiresConfirm: true,
-      },
-    ],
+    suggestedActions: [],
     trace: {
       intentConfidence: intent.confidence,
       routingRule: intent.routingRule,
