@@ -262,6 +262,12 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-09-05-batch1b-approval-ui:risks-1">
+          <td>主干 CI 存在两条与批次无关的偶发红（批次 1b 开工基线自取时实取）。批次 1a 合入后的 main CI <code class="inline">33946862686</code> 结论 failure：① Test harness 报 <code class="inline">only one recovery actor may win per run, got ["scheduled","scheduled"]</code>；② Test Web 报 <code class="inline">draft-roundtrip.test.jsx</code> 找不到「复制草稿」按钮。</td>
+          <td>任何一条工作线的分支 CI 都可能被这两条随机判红，复核方无法从「红」本身区分「本批引入的回归」与「环境偶发」，处置成本转嫁给每个后续批次。</td>
+          <td>批次 1b 已在<b>同一 commit（<code class="inline">c636a4a</code>）本地实取排除</b>：<code class="inline">test:harness</code> 262 全绿、<code class="inline">test:web</code> 511 全绿 ⇒ 两条均为 CI 侧偶发，与本批无因果。处置归<b>稳定性线</b>（flaky-timing 已治过三连，本次是新的两条）；执行方<b>不得</b>以放宽断言 / 加重试的方式自行解红。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属稳定性线（非本批范围）</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-09-03-batch05-merged:risks-1">
           <td>模型可见的工具结果无长度上限（批次 0.5 残留）。UI 侧有截断（条数 / 键数 / 字符三重），模型侧沿用批次 0 原样。</td>
           <td>超长工具输出不受限进入模型上下文，挤占上下文预算。本批不改的判断正确（该正文形态同步通道也在用，改它等于动同步通道的模型输入，超出「只做异步路径」范围），但<b>风险真实</b>。</td>
