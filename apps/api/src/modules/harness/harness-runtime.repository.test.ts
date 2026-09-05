@@ -1064,3 +1064,29 @@ test("批次1a 词汇：awaiting / rejected 两类事件可写入白名单（app
     assert.equal(event.eventType, eventType);
   }
 });
+
+test("批次1a 逃生阀：不设超时 ⇒ 挂起中的 Run 必须仍可被取消，且取消后决策不可再提交", async () => {
+  const claimed = await makeClaimedRun();
+  const runId = claimed.run.harnessRunId;
+  const input = approvalInput(runId, claimed.attempt.harnessRunAttemptId);
+  await repo!.pauseRunForToolApproval(input);
+  const persisted = await testDb!.select().from(harnessRuns).where(eq(harnessRuns.harnessRunId, runId));
+  assert.equal(String(persisted[0].status), "waiting", "挂起后必须停在 waiting");
+
+  // 产品口径「不自动拒绝」的代价是用户可能一直不答；唯一出口是取消。
+  // waiting 且无活跃 attempt 的 Run 必须直接落 cancelled（见 requestRunCancel 的 hasActiveAttempt 分支）。
+  const cancelled = await repo!.requestRunCancel({ runId, requestedBy: "owner-test" });
+  assert.equal(cancelled.changed, true);
+  assert.equal(cancelled.run.status, "cancelled", "挂起中的 Run 必须可取消，否则会话被永久占住");
+
+  await assert.rejects(
+    () => repo!.confirmRunAction({ runId, actionId: input.actionId, confirmedBy: "owner-test" }),
+    (err: unknown) => (err as { code?: string }).code === "HARNESS_RUN_NOT_WAITING",
+    "已取消的 Run 不得再被批准执行",
+  );
+  assert.equal(
+    await repo!.findRunToolApprovalDecision({ runId, actionId: input.actionId }),
+    null,
+    "取消后既不批准也不拒绝：不得留下任何决策痕迹",
+  );
+});
