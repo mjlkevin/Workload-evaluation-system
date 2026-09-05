@@ -131,31 +131,43 @@ test("snapshot: 疑问句“我创建了什么项目”→ wes_data_query，不�
   assert.equal(result.suggestedActions[0]?.actionType, "open_project_list");
 });
 
-// ── 3. write-action handler（写动作确认 + stage 校验防护）─────────────────
+// ── 3.（批次 1a 退役）write-action handler 已下线：这类措辞必须真的走到模型 ──
+// 原快照锁的是「正则命中 → 静态返回 create_project_evaluation 待确认动作」，
+// 模型与工具在它之后永不被执行。本批把它退役，快照随之改为锁**新基线**：
+// 模型被调用、dispatch 不再自行产出 create_project_evaluation 建议动作。
+// 该能力的承接关系：用户点确认后由 create_project 工具 + 执行前审批闸门写入，
+// 见 workbench-tool-approval.e2e.test.ts 判据①②（真库零副作用 → 确认后恰好一行）。
 
-test("snapshot: 带项目名的创建请求 → write_action_request，仅返回待确认动作", async () => {
-  const result = await dispatchHomeWorkbenchTurn(baseInput({
-    message: "帮我创建广州可味达项目",
-    modelChat: STATIC_MODEL_CHAT,
-  }));
-  assert.equal(result.intent, "write_action_request");
-  assert.equal(result.trace.routingRule, "write_action_keywords");
-  assert.equal(result.model, "rule-static");
-  assert.equal(result.suggestedActions.length, 1);
-  assert.equal(result.suggestedActions[0].actionType, "create_project_evaluation");
-  assert.equal(result.suggestedActions[0].requiresConfirm, true);
-  assert.equal(result.suggestedActions[0].payload?.projectName, "广州可味达");
-});
+function countingModelChat(): { chat: WorkbenchDispatchInput["modelChat"]; calls: () => number } {
+  let calls = 0;
+  return {
+    chat: async () => {
+      calls += 1;
+      return {
+        answer: "模型自然回复：已结合上下文回答。",
+        rawContent: "模型自然回复：已结合上下文回答。",
+        provider: "kimi",
+        model: "kimi-test",
+      };
+    },
+    calls: () => calls,
+  };
+}
 
-test("snapshot: 无项目名的写动作 → write_action_request，不返回动作并提示补充说明", async () => {
-  const result = await dispatchHomeWorkbenchTurn(baseInput({
-    message: "帮我创建评估草稿",
-    modelChat: STATIC_MODEL_CHAT,
-  }));
-  assert.equal(result.intent, "write_action_request");
-  assert.deepEqual(result.suggestedActions, []);
-  assert.ok(result.answer.includes("项目"));
-});
+for (const message of ["帮我创建广州可味达项目", "帮我创建一个ERP项目"]) {
+  test(`snapshot: 「${message}」→ 交回模型，dispatch 不再自行产出待确认动作`, async () => {
+    const modelChat = countingModelChat();
+    const result = await dispatchHomeWorkbenchTurn(baseInput({ message, modelChat: modelChat.chat }));
+    assert.notEqual(result.intent, "write_action_request", "意图已退役");
+    assert.equal(result.trace.routingRule, "default_domain_qa", `实取 ${JSON.stringify(result.trace)}`);
+    assert.ok(modelChat.calls() >= 1, `退役后模型必须真的被调用（否则仍被正则截走），实取 ${modelChat.calls()} 次`);
+    assert.deepEqual(
+      result.suggestedActions.filter((action) => action.actionType === "create_project_evaluation"),
+      [],
+      "静态 handler 的 create_project_evaluation 建议动作不得再出现",
+    );
+  });
+}
 
 // ── 4. harness-report handler（报告生成 / v2 提交建议）─────────────────────
 

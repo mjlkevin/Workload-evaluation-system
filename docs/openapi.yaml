@@ -1043,6 +1043,71 @@ paths:
               schema:
                 $ref: "#/components/schemas/AiRunsDisabledResponse"
 
+  /api/v1/ai-runs/{runId}/actions/{actionId}/reject:
+    post:
+      tags: [AIRuns]
+      summary: 拒绝 Run 动作（批次 1a 写操作审批闸门 skip 档，幂等）
+      description: >
+        批次 1a：写操作工具（create_project / generate_wbs / export_report）在执行前
+        进入审批闸门——服务端把「等待」写成持久事实（append tool.call.awaiting_approval
+        事件 + run.status=waiting），用户经本端点或 confirm 端点作答。
+        首次拒绝返回 202 并 append tool.call.rejected 事件 + waiting→queued，
+        工具永不执行，模型收到失败结果后继续作答；
+        重复拒绝同一 actionId 返回 200 且不重复写事件；非 waiting 返回 409 RUN_NOT_WAITING。
+        请求体不接收工具参数：被拒调用的参数唯一来源是 tool.call.started 事件（约束②）。
+        同意侧不新增端点也不新增事件类型，继续复用 …/confirm 与 run_action_confirmed。
+      operationId: rejectAiRunAction
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: actionId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 幂等重放（此前已拒绝过该 actionId）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "202":
+          description: 首次拒绝已受理，Run 回到 queued 续跑
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: Run 不存在或非 owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Run 非 waiting 状态（code=RUN_NOT_WAITING）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsConflictResponse"
+        "422":
+          description: actionId 缺失或非法（code=42200）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Feature flag 关闭（code=ASYNC_RUNS_DISABLED）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiRunsDisabledResponse"
+
   /api/v1/ai-runs/{runId}/retry:
     post:
       tags: [AIRuns]

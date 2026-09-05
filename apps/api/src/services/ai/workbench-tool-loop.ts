@@ -1,22 +1,3 @@
-// ============================================================
-// 批次 0 · AI 工作台只读工具循环
-// ============================================================
-// 冻结口径（工单 ②③，不可放宽）：
-//  · 只把 mutates === false 的工具注入模型；过滤发生在注入点，
-//    不改 ToolRegistry、不改任何工具定义（写操作确认闸门属批次 1）。
-//  · 模型返回的 tool_calls 必须被真正执行并回填，否则「传了 tools
-//    等于模型说了没人听」；单个调用被拒绝也必须回填 ok:false，
-//    否则模型会认为调用成功而无限重试。
-//  · 工具异常/拒绝一律不阻断主链路：回填失败结果后继续下一轮。
-//  · 事件词汇表复用 agent.types 的 AgentEvent 既有 kind，不自造。
-//  · 轮次上限沿用 orchestrator 的 DEFAULT_MAX_TURNS 口径（12）；达上限
-//    不抛错，返回末轮内容并标记 truncated（工作台不能因工具轮数耗尽而报错）。
-//
-// 与 apps/api/src/agent/orchestrator.ts 的关系：只参照其回填消息形态，
-// 不复用其循环——orchestrator 返回 Promise<string>，与工作台异步 Run 的
-// 流式/幂等形态冲突（见雷达文档 §三①）。
-// ============================================================
-
 import type { ChatRole, ToolCall, ToolDefinition } from "../../ai/provider/model-provider";
 import type { AgentEvent, AgentUser } from "../../agent/agent.types";
 import type { ToolRegistry } from "../../agent/tool-registry";
@@ -27,7 +8,30 @@ import { legacyRoleToV2Roles } from "../../rbac/roles";
 import type { AuthUser } from "../../types";
 import type { StreamingChunk, WorkbenchToolCallTrace } from "./workbench-dispatch.service";
 import { toWorkbenchModelVisibleToolMessage } from "./workbench-tool-event-surface";
+import {
+  WORKBENCH_TOOL_APPROVAL_UNWIRED_MESSAGE,
+  normalizeWorkbenchToolCallId,
+  resolveWorkbenchToolDecisionSlot,
+  type WorkbenchToolApprovalGate,
+} from "./workbench-tool-approval";
 
+// ============================================================
+// 工作台工具循环 · 批次 0（只读工具真跑）→ 批次 1a（写操作执行前审批闸门）
+// ============================================================
+// 批次 0 冻结口径「只注入 mutates === false」的原因是**当时没有确认闸门**。
+// 批次 1a 做出闸门（workbench-tool-approval + run.status=waiting + confirmRunAction），
+// 注入集因此扩到 allow ∪ ask，三个写工具（create_project / generate_wbs /
+// export_report）放开但必须经用户确认。其余冻结口径不变：
+//  · 模型返回的 tool_calls 必须被真正执行并回填，单个调用被拒也必须回填 ok:false；
+//  · 工具异常/拒绝一律不阻断主链路（**唯一例外**：审批挂起不是异常，是就地停手）；
+//  · 事件词汇表复用 AgentEvent 既有 kind，不自造；
+//  · 轮次上限 12，达上限不抛错。
+//
+// 与 apps/api/src/agent/orchestrator.ts 的关系：只参照其回填消息形态，
+// 不复用其循环——orchestrator 返回 Promise<string>，与工作台异步 Run 的
+// 流式/幂等形态冲突（见雷达文档 §三①）；它的 `await confirm(...)` 是内存 Promise，
+// 本批刻意不复用（判据④会失败）。
+// ============================================================
 /** 轮次上限：与 orchestrator 的 DEFAULT_MAX_TURNS 同口径 */
 export const WORKBENCH_TOOL_LOOP_MAX_TURNS = 12;
 
@@ -45,38 +49,48 @@ export type WorkbenchToolEffectOutput = {
   error?: string;
 };
 
-/** 注入点解析结果：tools 供模型调用，readOnlyToolNames 供执行侧白名单校验 */
-export type ReadOnlyWorkbenchToolSet = {
+/** 注入点解析结果：tools 供模型调用，两张集合供执行侧按决策槽分流 */
+export type WorkbenchInjectableToolSet = {
   registry: ToolRegistry;
   agentUser: AgentUser;
   tools: ToolDefinition[];
-  readOnlyToolNames: Set<string>;
+  /** allow 档：服务端直接放行（mutates === false） */
+  allowToolNames: Set<string>;
+  /** ask 档：执行前必须拿到用户的持久决策（写工具） */
+  approvalRequiredToolNames: Set<string>;
 };
 
 /**
- * ② 硬约束落点：在工作台侧解析「可注入给模型的只读工具集」。
+ * ② 注入点硬约束（批次 1a 起）：解析「可注入给模型的工作台工具集」。
  *
  * 能力位必须由服务端可信身份（legacy role）推导，不接受模型或前端传入，
- * 否则等于让调用方自行扩权。registry 过滤只读，不改注册表本身。
+ * 否则等于让调用方自行扩权。registry 只做分流，不改注册表本身。
+ *
+ * 批次 0 冻结的口径是「只注入 mutates === false」，因为当时没有确认闸门；
+ * 闸门（本模块的 toolApprovalGate）就位后注入集扩到「allow ∪ ask」。分流是**穷尽**的：
+ * 一个工具要么在 allowToolNames（严格 mutates === false），要么落 ask
+ * （mutates 为 true / 缺失 / 非布尔 / 注册表查不到）——不存在第三条放行路径，
+ * 因此「新加一个工具忘了标 mutates」的后果是多问一次，而不是静默放行。
  */
-export function resolveReadOnlyWorkbenchTools(
+export function resolveWorkbenchInjectableTools(
   user: AuthUser,
   options: { runtime?: RuntimeContext; registry?: ToolRegistry } = {},
-): ReadOnlyWorkbenchToolSet {
+): WorkbenchInjectableToolSet {
   const agentUser: AgentUser = {
     id: user.id,
     capabilities: getCombinedCapabilities(legacyRoleToV2Roles(user.role)),
   };
   const registry = options.registry ?? createDefaultRegistry(user, options.runtime);
-  const tools = registry
-    .listFullToolsFor(agentUser)
-    .filter((definition) => registry.get(definition.function.name)?.mutates === false);
-  return {
-    registry,
-    agentUser,
-    tools,
-    readOnlyToolNames: new Set(tools.map((definition) => definition.function.name)),
-  };
+  const definitions = registry.listFullToolsFor(agentUser);
+  const allowToolNames = new Set(
+    definitions
+      .filter((definition) => resolveWorkbenchToolDecisionSlot(registry.get(definition.function.name)) === "allow")
+      .map((definition) => definition.function.name),
+  );
+  const approvalRequiredToolNames = new Set(
+    definitions.map((definition) => definition.function.name).filter((name) => !allowToolNames.has(name)),
+  );
+  return { registry, agentUser, tools: definitions, allowToolNames, approvalRequiredToolNames };
 }
 
 /** ④ 落 effect 时随附的审计信息：哪只工具、什么参数 */
@@ -113,8 +127,17 @@ type WorkbenchToolLoopCommon = {
   messages: WorkbenchToolLoopMessage[];
   registry: ToolRegistry;
   agentUser: AgentUser;
-  /** 执行侧白名单：ToolRegistry.execute 只校验能力位、不校验 mutates，故循环自带判定 */
-  readOnlyToolNames: Set<string>;
+  /**
+   * allow 档白名单：ToolRegistry.execute 只校验能力位、不校验 mutates，
+   * 故循环自带分流判定（批次 0 时它是唯一闸门；批次 1a 起它只覆盖只读侧）。
+   */
+  allowToolNames: Set<string>;
+  /**
+   * 批次 1a · ask 档审批端口（additive）。**未注入即拒绝执行任何 ask 档工具**：
+   * 审批依赖可持久的 Run 事件流，只有异步 Run 通道有，同步兜底通道拿不到决策
+   * 就不能放行——这是失败方向关闭，不是功能缺失。
+   */
+  toolApprovalGate?: WorkbenchToolApprovalGate;
   runtime?: RuntimeContext;
   maxTurns?: number;
   onEvent?: (event: AgentEvent) => void;
@@ -143,6 +166,25 @@ function toEffectError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * 批次 1a · ask 档执行前的审批取数。返回 undefined = 已获准，可继续执行；
+ * 返回失败结果 = 用户拒绝（skip 档），回填给模型后继续作答；
+ * 闸门抛 Pending = 本轮就地停手（由调用链把 Run 留在 waiting）。
+ */
+async function requireToolApproval(
+  ctx: WorkbenchToolLoopCommon,
+  call: { ordinal: number; toolName: string; callId: string; arguments: Record<string, unknown> },
+): Promise<WorkbenchToolEffectOutput | undefined> {
+  if (!ctx.toolApprovalGate) {
+    return { ok: false, error: `${call.toolName}: ${WORKBENCH_TOOL_APPROVAL_UNWIRED_MESSAGE}` };
+  }
+  const gateResult = await ctx.toolApprovalGate(call);
+  if (gateResult.decision === "reject") {
+    return { ok: false, error: `${call.toolName}: ${gateResult.reason}` };
+  }
+  return undefined;
+}
+
 type ToolBatchContext = WorkbenchToolLoopCommon & {
   workingMessages: WorkbenchToolLoopMessage[];
   trace: WorkbenchToolCallTrace[];
@@ -154,17 +196,27 @@ async function executeToolCallBatch(ctx: ToolBatchContext, calls: ToolCall[]): P
   for (const call of calls) {
     const name = call.name;
     const args = call.arguments ?? {};
-    ctx.onEvent?.({ kind: "tool_call", name, arguments: args });
+    // callId 在这一点归一化：UI 事件（参数唯一来源）与审批事件必须带同一份，
+    // 否则 1b 按 callId 回查参数会查不到。模型给的原始 id 不直接落库。
+    const callId = normalizeWorkbenchToolCallId(call.id);
+    ctx.onEvent?.({ kind: "tool_call", name, arguments: args, toolCallId: callId });
 
     ctx.callCursor.value += 1;
     const ordinal = ctx.callCursor.value;
 
     const resolveOutcome = async (): Promise<WorkbenchToolEffectOutput> => {
-      if (!ctx.readOnlyToolNames.has(name)) {
-        return { ok: false, error: `工作台仅开放只读工具，${name} 未获准执行` };
-      }
-      if (!ctx.registry.get(name)) {
+      const registered = ctx.registry.get(name);
+      if (!registered) {
         return { ok: false, error: `未注册工具: ${name}` };
+      }
+      if (resolveWorkbenchToolDecisionSlot(registered) === "ask") {
+        // 闸门抛 Pending 时本函数不返回：异常向上传播，Run 停在 waiting，
+        // 工具一次都没被执行（判据①）。effect 也因此在挂起时不落库，
+        // 确认后重放才会第一次真正执行（判据②）。
+        const gateOutcome = await requireToolApproval(ctx, { ordinal, toolName: name, callId, arguments: args });
+        if (gateOutcome) return gateOutcome;
+      } else if (!ctx.allowToolNames.has(name)) {
+        return { ok: false, error: `工作台未开放该工具，${name} 未获准执行` };
       }
       try {
         const data = await ctx.registry.execute(name, args, ctx.agentUser, ctx.runtime);
@@ -180,14 +232,14 @@ async function executeToolCallBatch(ctx: ToolBatchContext, calls: ToolCall[]): P
 
     ctx.onEvent?.(
       outcome.ok
-        ? { kind: "tool_result", name, ok: true, data: outcome.data }
-        : { kind: "tool_result", name, ok: false, error: outcome.error },
+        ? { kind: "tool_result", name, ok: true, data: outcome.data, toolCallId: callId }
+        : { kind: "tool_result", name, ok: false, error: outcome.error, toolCallId: callId },
     );
     ctx.trace.push({ name });
     // ④：工具结果回灌模型必须走模型可见面的唯一构造点。完整参数（args）、
     // 心跳中间态（callIndex/elapsedMs）、结果预览（resultPreview）都只进 UI
     // 事件，不得进 messages；正文形态与批次 0 逐字节一致（同步通道共用）。
-    ctx.workingMessages.push(toWorkbenchModelVisibleToolMessage({ toolName: name, callId: call.id, outcome }));
+    ctx.workingMessages.push(toWorkbenchModelVisibleToolMessage({ toolName: name, callId, outcome }));
   }
 }
 

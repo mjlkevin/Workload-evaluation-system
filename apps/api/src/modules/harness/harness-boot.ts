@@ -14,7 +14,8 @@ import { createHarnessWorkflowRegistry } from "./harness-runtime.worker";
 import { dispatchHomeWorkbenchTurn } from "../../services/ai/workbench-dispatch.service";
 import type { StreamingChunk } from "../../services/ai/workbench-dispatch.service";
 import { buildWorkbenchChatDispatchInput, buildWorkbenchChatModelInput, getKimiProvider, resolveWorkbenchChatScenario } from "../../services/ai/handlers/workbench-shared";
-import { resolveReadOnlyWorkbenchTools, runWorkbenchToolLoopStream } from "../../services/ai/workbench-tool-loop";
+import { resolveWorkbenchInjectableTools, runWorkbenchToolLoopStream } from "../../services/ai/workbench-tool-loop";
+import { createWorkbenchToolApprovalGate } from "../../services/ai/workbench-tool-approval";
 import { assertWorkbenchModelRequestMatchesStorage } from "../../services/ai/workbench-request-invariant";
 import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.repository";
 import { getAiSession } from "../ai-sessions/ai-sessions.usecase";
@@ -39,6 +40,13 @@ export type HarnessRuntimeBootOptions = {
    */
   getProvider?: () => ReturnType<typeof getKimiProvider>;
   resolveApiKey?: () => { apiKey: string };
+  /**
+   * 批次 1a 测试注入用：场景（模型/baseUrl/凭据 scope/超时）解析器。
+   * 与 getProvider 同一动机——CI 无 KIMI_API_KEY 且系统配置表为空时
+   * resolveWorkbenchChatScenario 会抛 model_not_configured，异步 Run 的审批链路
+   * 就无法在回归里被驱动到。缺省仍取生产默认（DEF-2026-09-03-001 口径不变）。
+   */
+  resolveScenario?: () => Promise<Awaited<ReturnType<typeof resolveWorkbenchChatScenario>>>;
   /**
    * 批次 0.5 · ② 测试注入用：工具执行中 `tool.call.progress` 心跳间隔（ms）。
    * 缺省走 sink 的生产默认（3s）。boot 级回归要观测 progress 这一新增状态，
@@ -159,7 +167,7 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
       const modelChatStream = async function* (params: { systemPrompt: string; userContent: string }): AsyncIterable<StreamingChunk> {
         // DEF-2026-09-03-001：模型/baseUrl/凭据 scope 统一取自场景配置（assessment 绑定），
         // 不再直读 config.kimi.model——后者是 env 默认值，用户改系统设置不生效。
-        const scenario = await resolveWorkbenchChatScenario();
+        const scenario = await (options.resolveScenario ?? resolveWorkbenchChatScenario)();
         const { apiKey } = (options.resolveApiKey ?? (() => resolveActiveApiKeyForScope(scenario.credentialScope)))();
         if (!apiKey) throw new Error("required_or_env_missing");
         const provider = (options.getProvider ?? getKimiProvider)();
@@ -190,15 +198,16 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
         const timeoutMs = scenario.timeoutMs;
         // 批次 0 · ①②③：本条是生产实际在跑的异步路径（流式闸门恒命中），
         // 必须与同步路径同口径传 tools 并真正执行 tool_calls——DEF-2026-08-27-001
-        // 的根因正是「只修了没在跑的分支」。只读过滤在注入点完成，不改 ToolRegistry。
-        const toolSet = resolveReadOnlyWorkbenchTools(user);
+        // 的根因正是「只修了没在跑的分支」。工具分流在注入点完成，不改 ToolRegistry；
+        // 批次 1a：本通道是生产唯一接审批闸门的路径，ask 档写工具须经用户确认后才执行。
+        const toolSet = resolveWorkbenchInjectableTools(user);
         const streamChatCompletion = provider.streamChatCompletion!.bind(provider);
         // 单轮流式调用：透传 provider 全部可见字段（含 toolCalls，工具循环靠它识别调用）
         for await (const chunk of runWorkbenchToolLoopStream({
           messages: modelInput.messages,
           registry: toolSet.registry,
           agentUser: toolSet.agentUser,
-          readOnlyToolNames: toolSet.readOnlyToolNames,
+          allowToolNames: toolSet.allowToolNames,
           // 批次 0 · ④：workflow 注入的幂等接缝必须接到本循环——
           // 每次工具调用经它落 `runId:stepKey:workbench_chat_tool_call:N`，
           // 中途失败重跑时已执行的轮次命中存量 effect 不再重复执行。
@@ -206,6 +215,8 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
           // 批次 0.5 · ②：工具事件 UI 投影接缝。仅异步 Run 通道接线（同步路径是历史
           // 兜底、批次 2 合并即删，不给它加台账）。本接缝只消费、不参与模型上下文构造。
           onEvent: input.onToolEvent,
+          // 批次 1a：ask 档（写工具）执行前的审批闸门。异步通道注入；缺省即拒绝执行。
+          toolApprovalGate: input.toolApprovalGate,
           invokeStream: async function* ({ messages }) {
             const stream = streamChatCompletion({
               // DEF-2026-09-03-001：模型与 baseUrl 取自场景配置，不再直读 env 默认值。
@@ -257,6 +268,20 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
     // （白名单校验 + 序号分配 + SSE 透传均走既有链路）。
     appendRunEvent: (input) => options.repo.appendRunEvent(input),
     toolCallProgressIntervalMs: options.toolCallProgressIntervalMs,
+    // 批次 1a · 约束③：审批闸门的两端口一律落在 Run 事件流 + run.status 上（可持久）。
+    // 刻意不复用 orchestrator.ts:64 的 `await confirm(...)`——内存 Promise 在 worker
+    // 重启后永远等不回来，且库里没有任何一行记录说它曾存在（判据④即验此）。
+    buildToolApprovalGate: ({ runId, attemptId, stepKey, beforePause }) =>
+      createWorkbenchToolApprovalGate({ runId, attemptId, stepKey }, {
+        // 查不到 / 抛错 → 闸门按「未获批准」处理（失败方向关闭）
+        findDecision: (input) => options.repo.findRunToolApprovalDecision(input),
+        pauseForApproval: async (input) => {
+          // 先冲刷工具事件写链：tool.call.started（参数唯一来源）必须严格早于
+          // tool.call.awaiting_approval 落库，否则审批请求按 callId 查不到参数。
+          await beforePause();
+          await options.repo.pauseRunForToolApproval(input);
+        },
+      }),
     // ISS-2026-08-16-002：会话级附件回退——请求未携带附件时，从已落库会话
     // 记录中取最近一个带 parsedSummary 的附件（与同步路径同一口径）。
     getSessionRecord: (sessionId, ownerUserId) => {

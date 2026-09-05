@@ -107,6 +107,12 @@ export type AiRunsRepoPort = {
     actionId: string;
     confirmedBy: string;
   }): Promise<{ created: boolean; run: Record<string, unknown>; event: Record<string, unknown> | null }>;
+  /** 批次 1a · skip 档：用户拒绝，工具永不执行，Run 回 queued 续跑 */
+  rejectRunAction(input: {
+    runId: string;
+    actionId: string;
+    rejectedBy: string;
+  }): Promise<{ created: boolean; run: Record<string, unknown>; event: Record<string, unknown> | null }>;
 };
 
 export type AiRunsUsecaseDeps = {
@@ -334,6 +340,29 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
     };
   }
 
+  /**
+   * 批次 1a · C3 动作：reject（skip 档）。与 confirm 同为**幂等**且同样只认 waiting：
+   * 决策一旦落库即随 Run 持久存在，worker 重启后仍有效（判据④）。
+   * 请求体不接收工具参数——被拒的那一次调用以 tool.call.started 为唯一事实。
+   */
+  async function rejectAction(user: AuthUser, runId: string, actionId: unknown) {
+    assertEnabled(deps);
+    const run = await repo.findRunForOwner(runId, user.id);
+    if (!run) throw new AiRunsNotFoundError("任务不存在");
+    const actionKey = asText(actionId);
+    if (!actionKey) throw new AiRunsValidationError("actionId 必填");
+    let result: { created: boolean; run: Record<string, unknown>; event: Record<string, unknown> | null };
+    try {
+      result = await repo.rejectRunAction({ runId, actionId: actionKey, rejectedBy: user.id });
+    } catch (err) {
+      return mapRepoConflict(err);
+    }
+    return {
+      status: result.created ? (202 as const) : (200 as const),
+      data: { runId, actionId: actionKey, status: String(result.run.status ?? "") },
+    };
+  }
+
   /** C3 动作：retry。仅 failed 终态可重试；新 Run 带 retryOfRunId，原 Run 行零变更。 */
   async function retryRun(user: AuthUser, runId: string) {
     assertEnabled(deps);
@@ -390,6 +419,7 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
     cancelRun,
     submitInputs,
     confirmAction,
+    rejectAction,
     retryRun,
   };
 }

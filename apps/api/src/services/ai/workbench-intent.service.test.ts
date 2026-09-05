@@ -123,20 +123,27 @@ test("routes clientAction generate_requirement_report to harness_report_generati
   assert.equal(result.routingRule, "client_action");
 });
 
-test("routes write action request for creating draft", () => {
+// ── 批次 1a：write_action_request 规则退役守护 ──────────────────────
+// 原规则命中「写动作词 + 写目标词」即判 write_action_request 并交给静态 handler，
+// 模型与工具在这一步之前就被绕过——只加审批闸门而不退役它，本批等于没做。
+// 退役后这类措辞一律落到能被模型接管的路径（domain_qa 兜底 → 工具循环 → 执行前审批闸门）。
+for (const message of ["进入正式评估", "发布正式需求记录", "帮我创建草稿"]) {
+  test(`批次1a退役：「${message}」不再被写动作正则截走`, () => {
+    const result = routeWorkbenchIntent({ message, hasAttachment: false, hasLatestV1Artifact: false });
+    assert.notEqual(result.intent, "write_action_request", "该意图已下线");
+    assert.notEqual(result.routingRule, "write_action_keywords", "该规则已下线");
+    assert.equal(result.routingRule, "default_domain_qa", `必须交回模型，实取 ${JSON.stringify(result)}`);
+  });
+}
+
+// 退役的连带影响（如实登记，不藏）：原规则 4 排在报告生成之前，会把
+// 「创建评估草稿」这类措辞先截走；删掉它之后这类话落到报告生成规则。
+// 这不是本批要修的路由设计（批次 4 整体退役正则时一并处理），但必须留痕：
+// 有人在此断言被改成 domain_qa 时，说明报告生成规则也被动了。
+test("批次1a连带影响：「帮我创建评估草稿」改由报告生成规则接管（不再经写动作规则）", () => {
   const result = routeWorkbenchIntent({ message: "帮我创建评估草稿", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "write_action_request");
-  assert.equal(result.routingRule, "write_action_keywords");
-});
-
-test("routes write action request for entering formal estimation", () => {
-  const result = routeWorkbenchIntent({ message: "进入正式评估", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "write_action_request");
-});
-
-test("routes write action request for publishing", () => {
-  const result = routeWorkbenchIntent({ message: "发布正式需求记录", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "write_action_request");
+  assert.equal(result.routingRule, "report_generation_keywords", `实取 ${JSON.stringify(result)}`);
+  assert.equal(result.intent, "harness_report_generation");
 });
 
 test("default domain_qa for ordinary question after v1", () => {
@@ -174,23 +181,27 @@ test("routes search knowledge base query", () => {
   assert.equal(result.routingRule, "explicit_knowledge_query");
 });
 
-// RP-025: 项目创建意图路由
-test("routes create project with name to write_action_request", () => {
-  const result = routeWorkbenchIntent({ message: "帮我创建广州可味达项目", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "write_action_request");
-  assert.equal(result.routingRule, "write_action_keywords");
+// RP-025: 项目创建意图路由（批次 1a 起交回模型 + create_project 工具 + 审批闸门）
+for (const message of ["帮我创建广州可味达项目", "新建一个项目", "创建项目评估", "帮我创建一个ERP项目"]) {
+  test(`批次1a退役：「${message}」走模型路径（原 write_action_request）`, () => {
+    const result = routeWorkbenchIntent({ message, hasAttachment: false, hasLatestV1Artifact: false });
+    assert.equal(result.routingRule, "default_domain_qa", `实取 ${JSON.stringify(result)}`);
+    assert.notEqual(result.intent, "write_action_request");
+  });
+}
+
+test("批次1a退役：模型分类兜底也不采纳 write_action_request", async () => {
+  // 词汇表已删该意图：模型就算这么答，也必须被判为无效分类（返回 null → 保持 domain_qa）
+  const result = await classifyIntentWithModel("帮我创建一个ERP项目", async () => ({
+    answer: JSON.stringify({ intent: "write_action_request", confidence: 0.99, reason: "自称写动作" }),
+    rawContent: "",
+  }));
+  assert.equal(result, null, "已下线的意图不得被采纳");
 });
 
-test("routes create project without name to write_action_request", () => {
-  const result = routeWorkbenchIntent({ message: "新建一个项目", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "write_action_request");
-  assert.equal(result.routingRule, "write_action_keywords");
-});
-
-test("routes create project evaluation to write_action_request", () => {
-  const result = routeWorkbenchIntent({ message: "创建项目评估", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "write_action_request");
-  assert.equal(result.routingRule, "write_action_keywords");
+test("批次1a退役：疑问句仍走数据查询，不得被误当成创建请求", () => {
+  const result = routeWorkbenchIntent({ message: "我创建了什么项目", hasAttachment: false, hasLatestV1Artifact: false });
+  assert.equal(result.intent, "wes_data_query");
 });
 
 // ── RP-003: classifyIntentWithModel ──────────────────────────────────

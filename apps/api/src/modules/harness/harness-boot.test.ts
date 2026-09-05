@@ -655,14 +655,17 @@ test("批次0.5·②：四类 tool.call.* 经生产装配落入 run 事件流，
       const turnNo = providerCalls.length;
       return (async function* () {
         if (turnNo === 1) {
-          // 一轮内两个调用：只读工具（应 completed）+ 写工具（批次0 白名单必拒 → failed）
+          // 一轮内两个调用：只读工具（应 completed）+ 未注册工具（一律不执行 → failed）。
+          // 批次 1a 起写工具不再落在这里——它落进审批闸门并就地挂起（Run 停 waiting、
+          // 不回填终态），那条路径由 routes 层同名用例与 workbench-tool-approval.e2e 覆盖；
+          // 本用例守的是「四类 UI 事件 + 两轮回填」这条批次 0.5 结构，故用未注册工具占位。
           yield {
             contentDelta: "",
             model: "kimi-test",
             finishReason: "tool_calls",
             toolCalls: [
               { id: "call_hist", name: "estimate_history", arguments: { page: 1, pageSize: 1 } },
-              { id: "call_write", name: "create_project", arguments: { projectName: B05_SENTINEL } },
+              { id: "call_write", name: "workbench_write_unregistered_probe", arguments: { projectName: B05_SENTINEL } },
             ],
           };
           return;
@@ -735,7 +738,7 @@ test("批次0.5·②：四类 tool.call.* 经生产装配落入 run 事件流，
     assert.ok(started1 >= 0, `必须发射 callIndex=1 的 tool.call.started，实取 ${JSON.stringify(indexes)}`);
     assert.ok(completed1 >= 0, "estimate_history 成功必须发射 tool.call.completed");
     assert.ok(started2 >= 0, "第二个调用必须发射 callIndex=2 的 tool.call.started");
-    assert.ok(failed2 >= 0, "写工具被批次0 白名单拒绝必须发射 tool.call.failed");
+    assert.ok(failed2 >= 0, "未注册工具被拒绝执行必须发射 tool.call.failed");
     assert.ok(progress1 >= 0, "长耗时调用必须发射 tool.call.progress（本批唯一新增状态）");
     assert.ok(progress2 >= 0, "第二个调用同样要有 progress 心跳");
     assert.ok(firstTextDelta >= 0, "模型回答正文仍须走 text.delta（既有事件不得被工具事件取代）");
@@ -759,8 +762,13 @@ test("批次0.5·②：四类 tool.call.* 经生产装配落入 run 事件流，
     }
 
     const failedEvent = family[failed2];
-    assert.match(String(failedEvent.payload.error), /仅开放只读工具/, `写工具失败原因必须回填批次0 口径，实取 ${String(failedEvent.payload.error)}`);
-    assert.equal(failedEvent.payload.name, "create_project");
+    assert.match(String(failedEvent.payload.error), /未注册工具/, `失败原因必须说清是未注册，实取 ${String(failedEvent.payload.error)}`);
+    assert.equal(failedEvent.payload.name, "workbench_write_unregistered_probe");
+    assert.equal(
+      runEvents.some((e) => e.eventType === "tool.call.awaiting_approval"),
+      false,
+      "未注册工具不得占用用户注意力（不该发出审批请求）",
+    );
     assert.ok(
       typeof family[completed1].payload.resultPreview === "string" && String(family[completed1].payload.resultPreview).length > 0,
       "completed 必须带 resultPreview 供 UI 展示结果摘要",
@@ -782,7 +790,7 @@ test("批次0.5·②：四类 tool.call.* 经生产装配落入 run 事件流，
       assert.ok(secondRequest.includes(leaked) === false, `UI 事件字段「${leaked}」不得进入模型可见 messages`);
     }
     assert.ok(secondRequest.includes("[工具结果] estimate_history"), "批次0 的回填契约不得被本批削弱（工具结果必须回灌模型）");
-    assert.ok(secondRequest.includes("[工具结果] create_project"), "被拒绝的调用同样必须回填 ok:false，否则模型会无限重试");
+    assert.ok(secondRequest.includes("[工具结果] workbench_write_unregistered_probe"), "被拒绝的调用同样必须回填 ok:false，否则模型会无限重试");
     assert.deepEqual(
       providerCalls[1].map((m) => m.role),
       ["system", "user", "assistant", "assistant"],

@@ -82,8 +82,8 @@ test("Batch B adds recovery and cancellation event types additively (E1)", () =>
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_cancelled"));
   assert.equal(
     HARNESS_RUN_EVENT_TYPES.length,
-    20,
-    "Batch B 词汇 12 类 + Batch C/ISS-004/批次0.5 additive 追加 2+2+4 类 = 20",
+    22,
+    "Batch B 词汇 12 类 + Batch C/ISS-004/批次0.5/批次1a additive 追加 2+2+4+2 类 = 22",
   );
 });
 
@@ -109,8 +109,8 @@ test("Batch C adds inputs and confirmation event types additively (E1)", () => {
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_action_confirmed"));
   assert.equal(
     HARNESS_RUN_EVENT_TYPES.length,
-    20,
-    "Batch C + ISS-004/批次0.5 additive 追加 2+4 类事件 = 20",
+    22,
+    "Batch C + ISS-004/批次0.5/批次1a additive 追加 2+4+2 类事件 = 22",
   );
 });
 
@@ -150,8 +150,8 @@ test("ISS-2026-08-10-004 adds streaming text.delta/thought event types additivel
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("thought"), "模型思考事件类型必须入白名单");
   assert.equal(
     HARNESS_RUN_EVENT_TYPES.length,
-    20,
-    "ISS-004 之后的词汇 + 批次0.5 additive 追加 4 类工具事件（16 → 20）",
+    22,
+    "ISS-004 之后的词汇 + 批次0.5/批次1a additive 追加 4+2 类工具事件（16 → 22）",
   );
 });
 
@@ -192,21 +192,73 @@ test("批次0.5 adds tool.call.* event types additively", () => {
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.progress"), "工具执行进度必须入白名单");
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.completed"), "工具调用成功必须入白名单");
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.failed"), "工具调用失败必须入白名单");
-  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 20, "批次0.5 只允许 additive 追加 4 类事件（16 → 20）");
+  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 22, "批次0.5 追加 4 类 + 批次1a 追加 2 类（16 → 22）");
 
-  // 点号命名族必须恰好是这 4 条：不得夹带其他 tool.* 变体（防词汇漂移）
+  // 点号命名族必须恰好是这 6 条：不得夹带其他 tool.* 变体（防词汇漂移）。
+  // 批次 0.5 登记 4 条，批次 1a（写操作审批闸门）additive 追加 2 条。
   const toolFamily = HARNESS_RUN_EVENT_TYPES.filter((type) => type.startsWith("tool."));
   assert.deepEqual(
     [...toolFamily].sort(),
-    ["tool.call.completed", "tool.call.failed", "tool.call.progress", "tool.call.started"],
-    "tool.* 族只允许本批登记的 4 类",
+    [
+      "tool.call.awaiting_approval",
+      "tool.call.completed",
+      "tool.call.failed",
+      "tool.call.progress",
+      "tool.call.rejected",
+      "tool.call.started",
+    ],
+    "tool.* 族只允许批次 0.5（4 类）+ 批次 1a（2 类）登记的 6 类",
   );
 
-  // 负向守护：confirm/拦截相关事件属批次 1，本批不得预登记
-  for (const premature of ["tool.call.confirmed", "tool.call.rejected", "tool.confirm.required"]) {
+  // 负向守护：批次 1a 的「同意」刻意**不新增**事件类型——复用既有 run_action_confirmed。
+  // 造一个 tool.call.confirmed 等于让同一事实在两处各说一遍，正是本批要消灭的漂移形态。
+  // （原「tool.call.rejected 属批次 1 不得预登记」的守护随本批正式登记而失效，已移除。）
+  for (const premature of ["tool.call.confirmed", "tool.confirm.required", "tool.call.approved"]) {
     assert.ok(
       !(HARNESS_RUN_EVENT_TYPES as readonly string[]).includes(premature),
-      `${premature} 属批次 1（确认闸门）范围，本批不得登记`,
+      `${premature} 不得登记：同意复用 run_action_confirmed，不另起词汇`,
     );
   }
+});
+
+// ============================================================
+// 批次 1a（additive）：写操作工具的执行前审批闸门词汇
+// ============================================================
+// 闸门必须落在 run 事件流上才扛得住 worker 重启（判据④）：「等待确认」与「用户拒绝」
+// 得是持久事件，而不是内存里的 Promise。同意复用既有 run_action_confirmed。
+
+test("批次1a adds tool approval gate event types additively", () => {
+  const preApprovalFrozen20 = [
+    "run_queued",
+    "run_claimed",
+    "run_status_changed",
+    "checkpoint_committed",
+    "output_updated",
+    "outbox_enqueued",
+    "cancel_requested",
+    "run_completed",
+    "run_failed",
+    "recovery_started",
+    "recovery_completed",
+    "run_cancelled",
+    "run_inputs_submitted",
+    "run_action_confirmed",
+    "text.delta",
+    "thought",
+    "tool.call.started",
+    "tool.call.progress",
+    "tool.call.completed",
+    "tool.call.failed",
+  ];
+  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 20 + 2, "批次 1a 只允许 additive 追加 2 类");
+  assert.deepEqual(
+    [...HARNESS_RUN_EVENT_TYPES].slice(0, 20),
+    preApprovalFrozen20,
+    "前 20 类必须逐位不变——本批不得重排、删除或改名既有词汇",
+  );
+  assert.deepEqual(
+    [...HARNESS_RUN_EVENT_TYPES].slice(20),
+    ["tool.call.awaiting_approval", "tool.call.rejected"],
+    "本批新增的两类审批事件名与顺序必须精确一致",
+  );
 });

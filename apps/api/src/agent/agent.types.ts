@@ -36,9 +36,12 @@ export interface ToolResult {
 }
 
 /** 编排单步事件（供上层流式上报前端） */
+// 批次 1a（additive）：kind 词汇沿用批次 0 冻结的四种，只给 tool_call /
+// tool_result 补可选 `toolCallId`。审批闸门与 UI 事件按 callId 对账——审批请求
+// 只带 callId、参数以 tool.call.started 那一份为唯一来源，事件里就必须带得上这个 id。
 export type AgentEvent =
-  | { kind: "tool_call"; name: string; arguments: Record<string, unknown> }
-  | { kind: "tool_result"; name: string; ok: boolean; data?: unknown; error?: string }
+  | { kind: "tool_call"; name: string; arguments: Record<string, unknown>; toolCallId?: string }
+  | { kind: "tool_result"; name: string; ok: boolean; data?: unknown; error?: string; toolCallId?: string }
   | { kind: "need_confirm"; name: string; arguments: Record<string, unknown> }
   | { kind: "final"; content: string };
 

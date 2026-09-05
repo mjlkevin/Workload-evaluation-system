@@ -13,7 +13,7 @@ import { resolveActiveApiKeyForScope, resolveActiveRequirementKimiApiKey } from 
 import { appendAiSessionEvent, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import { dispatchHomeWorkbenchTurn, type StreamingAdapter, type StreamingChunk } from "../workbench-dispatch.service";
 import {
-  resolveReadOnlyWorkbenchTools,
+  resolveWorkbenchInjectableTools,
   runWorkbenchToolLoop,
   runWorkbenchToolLoopStream,
 } from "../workbench-tool-loop";
@@ -199,15 +199,16 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       // DEF-2026-09-03-001：模型 / baseUrl / 超时统一取自场景配置（assessment 绑定）。
       const scenario = await resolveWorkbenchChatScenario();
       const timeoutMs = scenario.timeoutMs;
-      // 批次 0 · ①②③：只读工具在注入点过滤（不改 ToolRegistry），并把单轮流式调用
+      // 批次 0 · ①②③：分流在注入点完成（不改 ToolRegistry），并把单轮流式调用
+      // 批次 1a：本 SSE 兜底通道不接审批闸门 → ask 档（写工具）一律拒绝执行。
       // 交给工具循环——模型返回的 tool_calls 必须被真正执行后回填再问，否则
       // 「传了 tools 等于模型说了没人听」。
-      const toolSet = resolveReadOnlyWorkbenchTools(user);
+      const toolSet = resolveWorkbenchInjectableTools(user);
       for await (const chunk of runWorkbenchToolLoopStream({
         messages: modelInput.messages,
         registry: toolSet.registry,
         agentUser: toolSet.agentUser,
-        readOnlyToolNames: toolSet.readOnlyToolNames,
+        allowToolNames: toolSet.allowToolNames,
         invokeStream: async function* ({ messages }) {
           const stream = provider.streamChatCompletion!({
             model: scenario.model,
@@ -249,14 +250,14 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
         messages,
         projectId: "default",
       });
-      // 批次 0 · ①②③：与流式路径同口径——注入点过滤只读工具 + 真正执行 tool_calls。
-      const toolSet = resolveReadOnlyWorkbenchTools(user);
+      // 批次 0 · ①②③：与流式路径同口径——注入点分流 + 真正执行 tool_calls（写工具无闸门即拒绝）。
+      const toolSet = resolveWorkbenchInjectableTools(user);
       let lastCompletion: ChatCompletionResponse | undefined;
       const loop = await runWorkbenchToolLoop({
         messages: modelInput.messages,
         registry: toolSet.registry,
         agentUser: toolSet.agentUser,
-        readOnlyToolNames: toolSet.readOnlyToolNames,
+        allowToolNames: toolSet.allowToolNames,
         invoke: async ({ messages }) => {
           const completion = await getKimiProvider().chatCompletion({
             model: scenario.model,

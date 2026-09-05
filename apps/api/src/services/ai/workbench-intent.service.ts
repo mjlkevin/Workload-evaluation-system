@@ -13,7 +13,6 @@ export type WorkbenchIntent =
   | "harness_report_generation"
   | "harness_answer_submission"
   | "wes_data_query"
-  | "write_action_request"
   | "unsupported_or_out_of_scope";
 
 export type WorkbenchIntentInput = {
@@ -35,10 +34,6 @@ const GREETING_PATTERNS = /^(你好|您好|hello|hi|嗨|在吗)[!！。,.，\s]*
 
 // WES 数据查询关键词
 const WES_DATA_QUERY_PATTERNS = /我之前.*项目|创建过哪些项目|历史项目|我的项目|我的评估|历史评估|我创建过|待确认动作|待办动作|待确认.*评估|评估状态|项目状态|查询.*项目|查看.*项目|列出.*项目|我.*建立的?项目|我.*创建的?项目|(创建|新建|建立|建)了(什么|哪些|哪个|几个|多少个).*(项目|评估)|(有什么|有哪些|多少个|几个)项目/;
-
-// 写动作关键词
-const WRITE_ACTION_PATTERNS = /创建|新建|生成|进入|发布/;
-const WRITE_TARGET_PATTERNS = /草稿|正式|评估记录|需求记录|项目评估|正式评估|发布|项目/;
 
 // 报告生成关键词
 const REPORT_GEN_VERB_PATTERNS = /生成|输出|创建|启动|生成需求|输出需求|创建需求|启动需求/;
@@ -64,13 +59,13 @@ const INDUSTRY_KNOWLEDGE_PATTERNS = /行业|痛点|难点|挑战|解决方案|�
  * 1. 前端显式 clientAction（结构化卡片提交）
  * 2. 能力发现关键词
  * 3. WES 数据查询关键词
- * 4. 写动作关键词
- * 5. 报告生成关键词（区分 v1/v2）
- * 6. 有附件但无明确报告意图 → attachment_qa / attachment_summary
- * 7. 显式知识库查询（用户提到"知识库/文档/方案"）→ knowledge_query
- * 8. 无附件产品知识问题 → knowledge_query
- * 8b. 行业/业务场景知识问题（痛点、解决方案等）→ knowledge_query
- * 9. 兜底 → domain_qa
+ * 4. 报告生成关键词（区分 v1/v2）
+ *    （原「写动作关键词」规则已于批次 1a 退役，见下方第 4 步注释）
+ * 5. 有附件但无明确报告意图 → attachment_qa / attachment_summary
+ * 6. 显式知识库查询（用户提到"知识库/文档/方案"）→ knowledge_query
+ * 7. 无附件产品知识问题 → knowledge_query
+ * 7b. 行业/业务场景知识问题（痛点、解决方案等）→ knowledge_query
+ * 8. 兜底 → domain_qa
  */
 export function routeWorkbenchIntent(input: WorkbenchIntentInput): WorkbenchIntentResult {
   const text = (input.message || "").trim().toLowerCase();
@@ -98,14 +93,13 @@ export function routeWorkbenchIntent(input: WorkbenchIntentInput): WorkbenchInte
     return { intent: "wes_data_query", confidence: 0.9, routingRule: "wes_data_keywords" };
   }
 
-  // 4. 写动作请求（创建草稿、进入正式评估、发布等）
-  if (WRITE_ACTION_PATTERNS.test(text) && WRITE_TARGET_PATTERNS.test(text)) {
-    // 排除"生成报告"类——那些属于报告生成
-    if (!REPORT_GEN_TARGET_PATTERNS.test(text) || /草稿|正式|发布/.test(text)) {
-      return { intent: "write_action_request", confidence: 0.85, routingRule: "write_action_keywords" };
-    }
-  }
-
+  // 4.（批次 1a 退役）写动作请求不再由正则截走。
+  // 原规则命中「写动作词 + 写目标词」即判 write_action_request 并交给静态 handler，
+  // 结果是「帮我创建一个ERP项目」这类话**根本到不了模型**——工具与审批闸门在它之后
+  // 永远不会被走到。退役后这类话落兜底 domain_qa，由模型决定调用 create_project，
+  // 再经批次 1a 的执行前审批闸门（workbench-tool-approval）确认才真正写库。
+  // 只退役这一条：其余正则 handler 属批次 4。
+  //
   // 5. 明确要求生成 v2 报告（在 v1 之后）
   if (input.hasLatestV1Artifact && V2_EXPLICIT_PATTERNS.test(text)) {
     return { intent: "harness_answer_submission", confidence: 0.9, routingRule: "v2_explicit_keywords" };
@@ -161,7 +155,6 @@ const VALID_MODEL_INTENTS: WorkbenchIntent[] = [
   "knowledge_query",
   "attachment_qa",
   "wes_data_query",
-  "write_action_request",
   "unsupported_or_out_of_scope",
 ];
 
@@ -170,7 +163,6 @@ const INTENT_CLASSIFICATION_PROMPT = `你是一个意图分类器。根据用户
 - capability_discovery：询问系统能力（如"你能做什么"、"有什么功能"）
 - knowledge_query：产品/行业知识问题（如"金蝶云是什么"、"制造业痛点"）
 - wes_data_query：查询用户自己的项目/评估数据（如"我的项目"、"之前创建的"）
-- write_action_request：创建/新建/发布等操作请求（如"帮我建一个项目"）
 - domain_qa：普通业务问答，不属于以上任何类别（如"这个风险是什么意思"）
 - unsupported_or_out_of_scope：无关闲聊、乱码、空白、与系统完全无关的请求（如"今天天气怎样"、"帮我写一首诗"）
 

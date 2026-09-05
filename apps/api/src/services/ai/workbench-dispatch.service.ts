@@ -7,6 +7,7 @@
 import type { AuthUser, BusinessRole } from "../../types";
 import type { ToolCall } from "../../ai/provider/model-provider";
 import type { WorkbenchToolEffectRecorder } from "./workbench-tool-loop";
+import type { WorkbenchToolApprovalGate } from "./workbench-tool-approval";
 import type { AgentEvent } from "../../agent/agent.types";
 import type { ZhipuKnowledgeToolConfig, ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import { routeWorkbenchIntent, classifyIntentWithModel, type WorkbenchIntent, type ModelClassificationResult } from "./workbench-intent.service";
@@ -16,7 +17,6 @@ import type { InteractiveFormBlock } from "./handlers/form-block";
 import type { WorkbenchIntentHandler } from "./handlers/handler.types";
 import { capabilityHandler } from "./handlers/capability.handler";
 import { wesDataQueryHandler } from "./handlers/wes-data-query.handler";
-import { writeActionHandler } from "./handlers/write-action.handler";
 import { harnessReportHandler } from "./handlers/harness-report.handler";
 import { knowledgeQueryHandler } from "./handlers/knowledge-query.handler";
 import { attachmentQaHandler } from "./handlers/attachment-qa.handler";
@@ -135,6 +135,13 @@ export type WorkbenchDispatchInput = {
    * 与「模型可见」侧的边界见 ④（workbench-tool-event-surface）。
    */
   onToolEvent?: (event: AgentEvent) => void;
+  /**
+   * 批次 1a · ask 档审批闸门（additive）。仅异步 Run 通道注入——由
+   * workbench-chat.workflow 用 run 事件流 + run.status=waiting 实现，使「等待确认」
+   * 成为可持久事实（worker 重启后仍然有效，判据④）。它只回答服务端已持久化的决策，
+   * **不接受模型或前端的批准表达**；未注入即拒绝执行写工具（失败方向关闭）。
+   */
+  toolApprovalGate?: WorkbenchToolApprovalGate;
 };
 
 /** RP-047 Batch B：dispatch 取消错误，供调用方区分取消与真实模型故障。 */
@@ -213,7 +220,6 @@ const ADOPTABLE_INTENTS = new Set<WorkbenchIntent>(["unsupported_or_out_of_scope
 const WORKBENCH_HANDLERS: WorkbenchIntentHandler[] = [
   capabilityHandler,
   wesDataQueryHandler,
-  writeActionHandler,
   harnessReportHandler,
   knowledgeQueryHandler,
   unsupportedHandler,

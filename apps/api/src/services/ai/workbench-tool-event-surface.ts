@@ -180,7 +180,14 @@ export function createWorkbenchToolEventSink(input: {
         const name = event.name;
         current = { callIndex: index, name, status: WORKBENCH_TOOL_CALL_STATUS.RUNNING, elapsedMs: 0 };
         summaries.push(current);
-        input.emit("tool.call.started", { callIndex: index, name, arguments: toUiVisibleJson(event.arguments) });
+        // 批次 1a · 约束②：本事件是工具参数的**唯一**持久来源，审批事件只带
+        // callId 不带第二份参数——那么 callId 必须落在这一行上，界面才能按它回查参数。
+        input.emit("tool.call.started", {
+          callIndex: index,
+          name,
+          ...(event.toolCallId ? { callId: event.toolCallId } : {}),
+          arguments: toUiVisibleJson(event.arguments),
+        });
         if (progressIntervalMs > 0) {
           timer = setInterval(() => {
             const elapsedMs = Math.max(0, now() - startedAt);
