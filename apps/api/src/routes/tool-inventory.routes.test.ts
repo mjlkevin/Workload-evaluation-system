@@ -20,6 +20,7 @@ type ToolItem = {
   capability: string;
   category: string;
   discoverable: boolean;
+  callable: boolean;
 };
 
 after(async () => {
@@ -68,7 +69,10 @@ test("GET /system/ai-tools: admin 取到 9 个工具，其中写数据恰 3 个"
   for (const item of items) {
     assert.ok(item.capability, `${item.name} 应带所需能力位`);
     assert.equal(typeof item.discoverable, "boolean");
+    assert.equal(typeof item.callable, "boolean");
   }
+  // ADMIN 持有全部能力位，故对其本人而言 9 个工具都可调用
+  assert.equal(items.filter((item) => item.callable).length, 9);
 });
 
 test("GET /system/ai-tools: 响应不含参数 schema 与执行实现", { skip: !testDatabaseUrl }, async () => {

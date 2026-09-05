@@ -282,6 +282,7 @@ export const mockAiTools = [
     mutates: false,
     category: 'estimate',
     discoverable: false,
+    callable: true,
   },
   {
     name: 'project_list',
@@ -290,6 +291,7 @@ export const mockAiTools = [
     mutates: false,
     category: 'project',
     discoverable: false,
+    callable: true,
   },
   {
     name: 'estimate_history',
@@ -298,6 +300,7 @@ export const mockAiTools = [
     mutates: false,
     category: 'estimate',
     discoverable: true,
+    callable: true,
   },
   {
     name: 'knowledge_query',
@@ -306,6 +309,7 @@ export const mockAiTools = [
     mutates: false,
     category: 'knowledge',
     discoverable: true,
+    callable: true,
   },
   {
     name: 'rule_lookup',
@@ -314,6 +318,7 @@ export const mockAiTools = [
     mutates: false,
     category: 'rule',
     discoverable: true,
+    callable: true,
   },
   {
     name: 'create_project',
@@ -322,6 +327,7 @@ export const mockAiTools = [
     mutates: true,
     category: 'project',
     discoverable: true,
+    callable: true,
   },
   {
     name: 'generate_wbs',
@@ -330,6 +336,7 @@ export const mockAiTools = [
     mutates: true,
     category: 'wbs',
     discoverable: true,
+    callable: true,
   },
   {
     name: 'export_report',
@@ -338,6 +345,7 @@ export const mockAiTools = [
     mutates: true,
     category: 'export',
     discoverable: true,
+    callable: true,
   },
   {
     name: 'list_tools',
@@ -346,5 +354,6 @@ export const mockAiTools = [
     mutates: false,
     category: 'discovery',
     discoverable: false,
+    callable: true,
   },
 ]

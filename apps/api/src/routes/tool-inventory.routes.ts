@@ -10,7 +10,7 @@ import { buildToolInventory } from "../agent/tool-inventory";
 import { getCombinedCapabilities } from "../rbac/permissions";
 import { ok } from "../utils/response";
 
-/** GET /system/ai-tools：返回调用方权限内可见的工具清单 */
+/** GET /system/ai-tools：返回注册表全部工具，逐条标出查看者本人能否调用（不按查看者权限裁剪清单） */
 export function listAiToolsHandler(req: Request, res: Response): void {
   const user = req.user;
   if (!user) {
