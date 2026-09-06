@@ -12,6 +12,7 @@ import { requireAuth, resolveBusinessRole } from "../../../middleware/auth";
 import { loadRequirementSystemConfigStore, resolveActiveApiKeyForScope } from "../../../modules/system/system.repository";
 import { resolveScenarioConfig } from "../../../modules/system/model-providers";
 import { createAiSession, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
+import { deriveSessionMessages } from "../../../modules/ai-sessions/session-history";
 import type { AiSessionRecord } from "../../../modules/ai-sessions/ai-sessions.types";
 import type { AuthUser, BusinessRole } from "../../../types";
 import { defaultProviderRegistry, type ChatCompletionResponse, type ChatRole, type ModelProvider } from "../../../ai/provider";
@@ -291,11 +292,15 @@ export async function buildWorkbenchChatModelInput(
  * 附件按 message.attachmentIds 从会话 attachments 解析（与同步路径来前端的
  * messages[].attachments 同一形状，使 buildHomeMessageContentForModel 能拼出
  * 【附件解析上下文】）；system/tool 角色与空正文不进历史窗口。
+ *
+ * 批次 2a：历史取自派生缝 deriveSessionMessages（「取」的唯一口子），本函数只保留
+ * 整形口径；附件仍在会话记录上，未随本批入缝（见 session-history.ts 口径边界 ②）。
  */
 export function sessionRecordToHomeMessages(session: AiSessionRecord | null | undefined): HomeMessageInput[] {
-  if (!session || !Array.isArray(session.messages)) return [];
+  if (!session) return [];
+  const history = deriveSessionMessages(session);
   const attachmentsById = new Map((Array.isArray(session.attachments) ? session.attachments : []).map((attachment) => [attachment.attachmentId, attachment]));
-  return session.messages
+  return history
     .filter((message) => (message.role === "user" || message.role === "assistant") && asString(message.content))
     .map((message) => ({
       role: message.role as "user" | "assistant",

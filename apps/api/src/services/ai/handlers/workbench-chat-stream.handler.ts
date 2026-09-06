@@ -11,6 +11,7 @@ import { normalizeKimiModelName } from "../../../utils/model-name";
 import { resolveBusinessRole } from "../../../middleware/auth";
 import { resolveActiveApiKeyForScope, resolveActiveRequirementKimiApiKey } from "../../../modules/system/system.repository";
 import { appendAiSessionEvent, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
+import { deriveSessionMessages } from "../../../modules/ai-sessions/session-history";
 import { dispatchHomeWorkbenchTurn, type StreamingAdapter, type StreamingChunk } from "../workbench-dispatch.service";
 import { hasOngoingWorkbenchToolInteraction } from "../workbench-intent.service";
 import {
@@ -299,7 +300,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       // 批次 1c · 缺陷二：与 workbench-chat.handler.ts 同口径——判据取自已落库的会话记录
       // （sessionWithUserTurn 已含本轮用户消息，判据只看它之前那条 assistant），不读前端标记。
       // 三条通道共用一份判据，否则换一条通道就换一种断法。
-      hasOngoingToolInteraction: hasOngoingWorkbenchToolInteraction(sessionWithUserTurn.messages),
+      hasOngoingToolInteraction: hasOngoingWorkbenchToolInteraction(deriveSessionMessages(sessionWithUserTurn)),
       businessRole,
       roleLabel,
       model: modelName,
