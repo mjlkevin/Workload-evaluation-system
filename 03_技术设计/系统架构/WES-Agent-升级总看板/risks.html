@@ -262,6 +262,24 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-09-06-batch2a-session-history-seam:risks-1">
+          <td><b>同步两条对话通道的模型历史仍取自前端请求体，不从库里推导</b>（批次 2a 造缝时实取，未修）。非流式 <code class="inline">workbench-chat.handler.ts:40</code> 与流式 <code class="inline">workbench-chat-stream.handler.ts:79</code> 的 <code class="inline">messages</code> 都来自 <code class="inline">normalizeHomeMessages(body.messages)</code>；只有异步 Run 通道经 <code class="inline">sessionRecordToHomeMessages(getSessionRecord(...))</code> 取已落库历史。</td>
+          <td>发给模型的历史窗口由客户端决定：前端少传、传旧、或构造一段不存在于库里的对话，都会原样进 prompt。DEF-2026-08-27-001 修的是「异步通道丢历史」，同步侧「历史来自客户端」这一半从未被覆盖。批次 0 的请求重建不变量也只在异步通道生效（<code class="inline">readSessionForInvariant</code> 未注入即不对账），所以这条不对称不会被现有断言抓到。</td>
+          <td>本批按派单纪律<b>只造缝不改行为</b>——把同步两路改成取库属换数据源，一旦同时做就说不清「逐字节不变」是重构成立还是在修 bug，故只登记。<b>缝已把这条路变成一处单点改动</b>：两处 handler 各把 <code class="inline">messages</code> 换成 <code class="inline">sessionRecordToHomeMessages(sessionWithUserTurn)</code> 即与异步同口径（取历史时机是硬约束：必须在当前用户轮次落库之后，否则末条覆盖语义会丢上一轮 assistant）。建议排在 2b 之后单独立项，并同时给同步通道挂上 <code class="inline">readSessionForInvariant</code>。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属后续批次（非本批范围）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-06-batch2a-session-history-seam:risks-2">
+          <td><b>缝对「非数组 messages」归一为空历史，与改造前两处消费端口径不完全相同</b>（登记为 F-2a-1，由对照用例显式钉住而非默认无害）。旧视图表达式 <code class="inline">session.messages?.length ?? 0</code> 在 messages 是 JSON <b>字符串</b>时取到<b>字符长度</b>（字符数被当消息数）；旧审计表达式 <code class="inline">session.messages.find(...)</code> 在这种行上直接抛 <code class="inline">TypeError</code>。</td>
+          <td>只在「某行 messages 不是 jsonb 数组」时成立。当前不可达：<code class="inline">ai_sessions.messages</code> 为 <code class="inline">NOT NULL DEFAULT &#39;[]&#39;::jsonb</code>（<code class="inline">db/schema/json_runtime.ts:213</code>），仓储 row→record 又 <code class="inline">?? []</code>，且对照脚本每次<b>实取</b>全库 <code class="inline">jsonb_typeof</code> 非 array 的行数并打印（本批实取为 0）——不把「不可达」当成默认成立的假设。</td>
+          <td>本批不修（一改就分不清是重构还是在修 bug）。真正的处置点在 <b>2b</b>：换事件源之后「读到什么形状算合法历史」必须显式定义，届时这条归一就从「等价性偏差」升格为缝的<b>契约</b>。脚本与用例都已把它写成可查的账，2b 若改变归一行为会当场红。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 2b（口径升格为契约）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-06-batch2a-session-history-seam:risks-3">
+          <td><b>附件与 <code class="inline">metadata.toolCalls</code> 两份数据没进缝</b>，2b 若只换 messages 源会留下混合态。附件解析上下文仍读 <code class="inline">session.attachments</code>（同为 jsonb 快照）；批次 1c 的「进行中工具交互」判据读 assistant 消息的 <code class="inline">metadata.toolCalls</code>，而批次 1b 已声明工具痕迹改由 <code class="inline">harness_run_events</code> 只读重建、<b>未复用</b>这份镜像。</td>
+          <td>历史来自事件、附件来自快照 ⇒ 同一条消息的两个组成部分来自两套时间线，跨源引用一致性（<code class="inline">attachmentIds</code> 指向已不存在或尚未可见的附件）在 2b 之后才可能出现，现有数据里悬挂引用为 0（脚本普查实取），出问题不会有现成告警。镜像与事件源并存则意味着「判据读镜像、界面读事件」两份真相。</td>
+          <td>派单明文「不动 metadata.toolCalls 的写入与读取（批次 1c 依赖它，批次 2b 再统一收敛）」，本批照办；附件去向在 <code class="inline">session-history.ts</code> 文件头口径边界 ② 写死「不要顺手塞进本函数」，避免 2b 误以为附件已在缝内。2b 开工时需一并裁决：判据改读事件流后退休镜像，以及退休时批次 1c 的连续性判据数据源如何切换。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 2b（裁决项，非缺陷）</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-09-06-batch1c-tool-desc-intent-continuity:risks-1">
           <td><b>「边等审批边补信息」这条路径在入口就是断的</b>（批次 1c 实现期实取）。缺陷一修好后模型真的会发起写调用，Run 真的会停在 <code class="inline">waiting</code>；而库里 <code class="inline">harness_runs_active_workbench_session_unique</code> 规定同一会话同时只能有一个活跃 workbench_chat Run 且 waiting 属活跃态，用户此时输入的补充信息在提交入口 <code class="inline">POST /api/v1/ai-sessions/:sessionId/runs</code> 即得 409 <code class="inline">SESSION_HAS_ACTIVE_RUN</code>，界面回显「请等待完成后再发送」。</td>
           <td>用户想「在审批还没批的时候把缺的客户信息补上」做不到，只能先同意 / 拒绝那一次调用；若他同意的是参数不全的调用（如只给了项目名），结果就是一行不完整的草稿。批次 1c 的连续性判据只覆盖<b>工具轮之后</b>那一轮，覆盖不到这个窗口。</td>

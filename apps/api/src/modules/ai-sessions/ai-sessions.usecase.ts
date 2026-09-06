@@ -5,6 +5,7 @@ import { resolveBusinessRole } from "../../middleware/auth";
 import { asString } from "../../utils";
 import { AiRunsConflictError } from "../harness/harness-runtime.usecase";
 import { getAiSessionsRepository } from "./ai-sessions.repository";
+import { deriveSessionMessages } from "./session-history";
 import type {
   AiArtifact,
   AiArtifactStatus,
@@ -150,10 +151,42 @@ function parseAuditTimeBoundary(value: unknown, endOfDay: boolean): number | nul
 }
 
 /**
+ * 单条会话 → 管理员审计摘要。
+ *
+ * 批次 2a：历史取自派生缝 deriveSessionMessages，本函数不再直读 `session.messages`；
+ * 摘要字段与截断口径逐字照搬改造前的内联实现（原为 listAllAiSessionsForAdmin 的
+ * map 回调，提为具名函数只为让逐字节对照能定向命中，无行为变更）。
+ */
+export function summarizeSessionForAdminAudit(session: AiSessionRecord): AdminAiSessionSummary {
+  const history = deriveSessionMessages(session);
+  const firstUserMessage = history.find((message) => message.role === "user");
+  const lastAssistantMessage = [...history].reverse().find((message) => message.role === "assistant");
+  return {
+    sessionId: session.sessionId,
+    title: session.title,
+    ownerUserId: session.ownerUserId,
+    ownerUsername: session.ownerUsername,
+    businessRole: asString(session.businessRole),
+    domain: session.domain,
+    workflowKey: session.workflowKey,
+    status: session.status,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    messageCount: history.length,
+    turnCount: history.filter((message) => message.role === "user").length,
+    attachmentCount: session.attachments.length,
+    artifactCount: session.artifacts.length,
+    firstUserMessage: truncateAuditText(firstUserMessage?.content),
+    lastAssistantMessage: truncateAuditText(lastAssistantMessage?.content),
+  };
+}
+
+/**
  * 管理员审计视图：跨用户聚合全部会话并输出摘要。
  * 摘要不携带 messages 原文数组，仅保留首轮输入/最终输出截断文本。
+ *
+ * 阶段 2 批 3：函数体改经仓储行级读（管理员审计跨用户全量）。
  */
-/** 阶段 2 批 3：函数体改经仓储行级读（管理员审计跨用户全量）。 */
 export async function listAllAiSessionsForAdmin(filters: AdminAiSessionFilters = {}): Promise<AdminAiSessionSummary[]> {
   const q = asString(filters.q).trim().toLowerCase();
   const status = asString(filters.status);
@@ -182,28 +215,7 @@ export async function listAllAiSessionsForAdmin(filters: AdminAiSessionFilters =
     })
     .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)))
     .slice(0, limit)
-    .map((session): AdminAiSessionSummary => {
-      const firstUserMessage = session.messages.find((message) => message.role === "user");
-      const lastAssistantMessage = [...session.messages].reverse().find((message) => message.role === "assistant");
-      return {
-        sessionId: session.sessionId,
-        title: session.title,
-        ownerUserId: session.ownerUserId,
-        ownerUsername: session.ownerUsername,
-        businessRole: asString(session.businessRole),
-        domain: session.domain,
-        workflowKey: session.workflowKey,
-        status: session.status,
-        createdAt: session.createdAt,
-        updatedAt: session.updatedAt,
-        messageCount: session.messages.length,
-        turnCount: session.messages.filter((message) => message.role === "user").length,
-        attachmentCount: session.attachments.length,
-        artifactCount: session.artifacts.length,
-        firstUserMessage: truncateAuditText(firstUserMessage?.content),
-        lastAssistantMessage: truncateAuditText(lastAssistantMessage?.content),
-      };
-    });
+    .map((session): AdminAiSessionSummary => summarizeSessionForAdminAudit(session));
 }
 
 /** 阶段 2 批 3：函数体改经仓储行级读（归属过滤在仓储层）。 */

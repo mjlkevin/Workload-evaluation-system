@@ -44,6 +44,7 @@ import type { HomeMessageInput } from "../../services/ai/handlers/workbench-shar
 import { resolveRunMemoryProjectId } from "./harness.types";
 import { runExplicitHomeReportFlow } from "../../services/ai/handlers/report-flow";
 import { hasOngoingWorkbenchToolInteraction } from "../../services/ai/workbench-intent.service";
+import { deriveSessionMessages } from "../ai-sessions/session-history";
 import type { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
 
 export type WorkbenchChatWorkflowDeps = {
@@ -316,7 +317,7 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               projectId: memoryProjectId,
               // 批次 1c · 缺陷二：进行中的工具交互 → 意图路由让位（判据取自上面那次
               // 已落库读取，不新增查询；本轮用户消息是末条，判据看的是它之前那条 assistant）
-              hasOngoingToolInteraction: hasOngoingWorkbenchToolInteraction(sessionRecordWithUserTurn?.messages),
+              hasOngoingToolInteraction: hasOngoingWorkbenchToolInteraction(deriveSessionMessages(sessionRecordWithUserTurn)),
               streamingAdapter,
               // 批次 0.5 · ②：工具事件 → UI 事件接缝（additive）。仅异步 Run 通道
               // 注入；同步直写路径不经 Harness 事件流，无 runId 可写，不注入即为 undefined。

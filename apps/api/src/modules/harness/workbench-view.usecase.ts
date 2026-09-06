@@ -9,6 +9,7 @@
 
 import type { AuthUser } from "../../types";
 import { listAiSessions, getAiSession } from "../ai-sessions/ai-sessions.usecase";
+import { deriveSessionMessages } from "../ai-sessions/session-history";
 import type { AiSessionRecord, AiArtifact, AiPendingAction } from "../ai-sessions/ai-sessions.types";
 import { HarnessRuntimeError } from "./harness-runtime.repository";
 
@@ -239,7 +240,7 @@ export function createWorkbenchViewUsecase(deps: WorkbenchViewUsecaseDeps) {
         domain: session.domain,
         status: session.status,
         workflowKey: session.workflowKey,
-        messageCount: session.messages?.length ?? 0,
+        messageCount: deriveSessionMessages(session).length,
         attachmentCount: session.attachments?.length ?? 0,
         artifactCount: session.artifacts?.length ?? 0,
         pendingActionCount: session.pendingActions?.length ?? 0,
