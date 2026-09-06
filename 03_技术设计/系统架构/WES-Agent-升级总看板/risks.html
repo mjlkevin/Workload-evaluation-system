@@ -262,6 +262,18 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-09-06-batch1c-tool-desc-intent-continuity:risks-1">
+          <td><b>「边等审批边补信息」这条路径在入口就是断的</b>（批次 1c 实现期实取）。缺陷一修好后模型真的会发起写调用，Run 真的会停在 <code class="inline">waiting</code>；而库里 <code class="inline">harness_runs_active_workbench_session_unique</code> 规定同一会话同时只能有一个活跃 workbench_chat Run 且 waiting 属活跃态，用户此时输入的补充信息在提交入口 <code class="inline">POST /api/v1/ai-sessions/:sessionId/runs</code> 即得 409 <code class="inline">SESSION_HAS_ACTIVE_RUN</code>，界面回显「请等待完成后再发送」。</td>
+          <td>用户想「在审批还没批的时候把缺的客户信息补上」做不到，只能先同意 / 拒绝那一次调用；若他同意的是参数不全的调用（如只给了项目名），结果就是一行不完整的草稿。批次 1c 的连续性判据只覆盖<b>工具轮之后</b>那一轮，覆盖不到这个窗口。</td>
+          <td>批次 1c 派单明文「只做进行中则跳过路由这一条」，故本批<b>未动</b>该 409 语义与唯一索引（放宽会牵动闸门幂等与 <code class="inline">argsDigest</code>「批准的那一次就是执行的这一次」的语义）。同时正因为这个窗口，判据未采用「最近 run 处于 waiting」这条看起来更直觉的依据——它在 dispatch 时点根本读不到，写出来即死代码（已由端到端用例把「挂起期间不落 assistant 消息」钉成断言）。转批次 2 / 批次 4 与「补充信息通道」（既有 <code class="inline">run_inputs_submitted</code> 端点目前无前端消费者）一并裁决。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属后续批次（非本批范围）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-06-batch1c-tool-desc-intent-continuity:risks-2">
+          <td>能力发现文案里仍写着「所有写操作均需用户确认」（<code class="inline">workbench-capability-facts.ts</code> 的 <code class="inline">write_action</code> 条目）。它与缺陷一被摘掉的那句同源。</td>
+          <td>该文案不是工具 description，而是 <code class="inline">capability_discovery</code> 意图下<b>答给用户</b>的正文；但它会作为 assistant 消息落库并在此后每一轮进模型历史，所以模型仍有机会读到一句「写操作要先确认」的表述，理论上保留了与缺陷一同类的诱导面（弱得多：它不是"这个工具的调用条件"）。</td>
+          <td>批次 1c 范围只冻结在三个写工具的 description（派单：「变的只是给模型看的那句话」），且改这句属<b>产品口径</b>而非缺陷修复，执行方不自行裁决。登记待架构侧判断是否连它一并去机制化，或明确保留（它确实是对用户正确的一句承诺）。工具 description 侧已由守护用例锁死：全仓 <code class="inline">description:</code> 字面量含「确认 / 审批 / approval / confirm」即失败。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 待架构侧口径裁决</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-09-05-batch1b-approval-ui:risks-1">
           <td>主干 CI 存在两条与批次无关的偶发红（批次 1b 开工基线自取时实取）。批次 1a 合入后的 main CI <code class="inline">33946862686</code> 结论 failure：① Test harness 报 <code class="inline">only one recovery actor may win per run, got ["scheduled","scheduled"]</code>；② Test Web 报 <code class="inline">draft-roundtrip.test.jsx</code> 找不到「复制草稿」按钮。</td>
           <td>任何一条工作线的分支 CI 都可能被这两条随机判红，复核方无法从「红」本身区分「本批引入的回归」与「环境偶发」，处置成本转嫁给每个后续批次。</td>

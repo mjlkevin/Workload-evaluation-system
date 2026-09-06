@@ -1,0 +1,74 @@
+{
+  "id": "BE-2026-09-06-batch1c-tool-desc-intent-continuity",
+  "date": "2026-09-06",
+  "type": "implementation",
+  "scope": "批次 1c · 写工具 description 去机制化 + 进行中工具交互跳过意图路由",
+  "summary": "修两个真实会话（830bdb17）里查库实取确认的逻辑缺陷。缺陷一：create_project / generate_wbs / export_report 的 description 里写着「（写操作，执行前需用户确认）」，那是服务端机制的说明，模型读到就在正文里自己演一遍确认流程而不发起调用，批次 1a 的审批闸门因此根本没机会触发（该 run 166 条事件全是 thought / text.delta，零条 tool.call.*）；三句改为只讲「这个工具做什么」，mutates 与闸门逻辑一字未动。缺陷二：意图路由对每条消息独立分类，用户对上一轮追问的回答「客户名称：…；客户行业：综合集团；」因含「行业」二字被 industry_knowledge_terms 劫走、交给正则 handler，模型从未收到；新增服务端「进行中工具交互」判据，命中即整条正则路由让位、交回模型 + 工具路径，不在进行中的会话路由逐字不变。",
+  "status": "已回填 / 待 Codex 复核",
+  "pages": ["changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/agent/tools/mutation.tools.ts",
+      "summary": "三个写工具 description 摘掉机制措辞（L55/L88/L104）；export_report 的 items 入参说明同步去掉「已确认的」；mutates / capability / execute 全部未动；文件头注释改为记录「机制措辞为何不得进 description」的实测后果"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/workbench-intent.service.ts",
+      "summary": "新增 hasOngoingWorkbenchToolInteraction(messages)（读已落库会话记录里最后一条 assistant 的 metadata.toolCalls）；routeWorkbenchIntent 增 1b 步：进行中即返回 domain_qa + routingRule ongoing_tool_interaction，刻意排在 clientAction 之后、其余关键词之前，且不复用 default_domain_qa（那会触发 RP-003 二次分类，把残缺补充信息判成超范围拒答）"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/workbench-chat.workflow.ts",
+      "summary": "异步 Run 通道：兼用本轮已有一次会话读取推导进行中判据（不新增查询），经 harness-boot 逐字段接力到路由；同步非流式与同步流式两条通道同口径注入"
+    },
+    {
+      "kind": "command",
+      "ref": "一次性核对脚本（已删）：git show ef1a77a 的旧路由器与新路由器并排跑同一批语料",
+      "result": "pass",
+      "summary": "判据②零回归：520 组输入（26 句 × 4 组上下文 × 5 种 clientAction）逐字节相同，覆盖全部 12 个 routingRule 取值；两句原话在「未注入进行中判据」时新旧结果完全一致"
+    },
+    {
+      "kind": "gate",
+      "ref": "bash scripts/verify-local-db-tests.sh test:harness（新增 workbench-intent-continuity.e2e.test.ts）",
+      "result": "pass",
+      "summary": "判据④端到端实取（真库真 workflow，只 fake provider）：轮一 → tool.call.started → awaiting_approval → 用户确认 → tool.call.completed → run_completed，轮一 assistant 消息确实带上 metadata.toolCalls(create_project)，轮二「客户行业：综合集团」落库 routingRule=ongoing_tool_interaction、答案出自模型真实输出；反向对照：轮一无工具调用时轮二仍逐字走 industry_knowledge_terms"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "两条构建均 exit 0"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "67 files / 537 tests passed（与开工基线同值；本批只同步了工具目录夹具 mock 的三句描述）"
+    }
+  ],
+  "next": "待架构侧复核后合入 main。登记一条风险：修完缺陷一之后模型真的会发起写调用，Run 停在 waiting 期间同一会话的新消息一律 409 SESSION_HAS_ACTIVE_RUN（库里的单会话单活跃 Run 唯一索引），「边等审批边补信息」这条路径在入口就是断的——连续性判据只覆盖工具轮之后那一轮，放宽该唯一约束属另一批次。",
+  "board": {
+    "change": {
+      "stage": "批次 1c：工具描述去机制化 + 意图连续性 · 分支 fix/tool-desc-and-intent-continuity 未合入",
+      "result": "已回填 / 待 Codex 复核"
+    },
+    "testing": [
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:modules",
+        "result": "pass",
+        "summary": "480 pass / 0 fail（基线 472，+8 为本批用例）"
+      },
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:harness",
+        "result": "pass",
+        "summary": "267 pass / 0 fail（基线 265，+2 为本批判据④端到端与反向对照）"
+      },
+      {
+        "command": "npm run test:agent",
+        "result": "pass",
+        "summary": "122 pass / 0 fail（基线 121，+1 为 description 机制措辞守护）"
+      }
+    ]
+  }
+}
