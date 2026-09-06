@@ -322,7 +322,7 @@ export const mockAiTools = [
   },
   {
     name: 'create_project',
-    description: '为当前用户创建项目评估草稿（写操作，执行前需用户确认）',
+    description: '为当前用户创建项目评估草稿',
     capability: 'estimates:create',
     mutates: true,
     category: 'project',
@@ -331,7 +331,7 @@ export const mockAiTools = [
   },
   {
     name: 'generate_wbs',
-    description: '基于当前用户最新总方案生成 WBS 草稿任务（写操作，执行前需用户确认）',
+    description: '基于当前用户最新总方案生成 WBS 草稿任务',
     capability: 'estimates:write',
     mutates: true,
     category: 'wbs',
@@ -340,7 +340,7 @@ export const mockAiTools = [
   },
   {
     name: 'export_report',
-    description: '对给定的评估条目执行计算并导出 Excel/PDF 报告（写操作，执行前需用户确认）',
+    description: '对给定的评估条目执行计算并导出 Excel/PDF 报告',
     capability: 'estimates:write',
     mutates: true,
     category: 'export',

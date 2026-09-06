@@ -20,6 +20,12 @@ export type WorkbenchIntentInput = {
   hasAttachment: boolean;
   hasLatestV1Artifact: boolean;
   clientAction?: string;
+  /**
+   * 批次 1c · 缺陷二：本会话是否处在一场还没结束的工具交互里。
+   * 由服务端从已落库的会话记录判定（见 hasOngoingWorkbenchToolInteraction），
+   * **不接受前端传入**——前端能表达的只有「我想跳过路由」，而那等于把路由权交出去。
+   */
+  hasOngoingToolInteraction?: boolean;
 };
 
 export type WorkbenchIntentResult = {
@@ -52,11 +58,53 @@ const EXPLICIT_KNOWLEDGE_QUERY_PATTERNS = /知识库|知识库里|文档.*有没
 // 行业知识 / 业务场景 / 痛点 / 解决方案类问题 → knowledge_query（无附件时进入知识库）
 const INDUSTRY_KNOWLEDGE_PATTERNS = /行业|痛点|难点|挑战|解决方案|最佳实践|案例|经验|趋势|前景|现状|常见问题|怎么做|如何处理|如何应对|优势|劣势|机会|威胁|竞品|对标|标杆/;
 
+/** 判定只读会话消息的两个字段；其余字段（正文、时间戳…）原样放行，不做形状要求 */
+export type WorkbenchSessionTurn = {
+  readonly role?: unknown;
+  readonly metadata?: unknown;
+  readonly [key: string]: unknown;
+};
+
+/**
+ * （批次 1c · 缺陷二）服务端判定：本会话是否处在一场还没结束的工具交互里。
+ *
+ * 依据 = **已落库会话记录里最后一条 assistant 消息是否由工具路径产出**
+ * （其 metadata.toolCalls 非空）。三个候选依据里只有这一条在真实链路上可达且够用：
+ *
+ *  · 「最近一个 run 处于 waiting」/「最近一轮有未闭合的 tool.call.*」（未闭合只在
+ *    waiting 时成立，两条同生同灭）——查不到也不该查：库里
+ *    `harness_runs_active_workbench_session_unique` 规定同一会话同时只能有一个活跃
+ *    workbench_chat Run，而 waiting 属活跃态。所以 Run 停在 waiting 期间用户再发消息，
+ *    提交入口 POST /api/v1/ai-sessions/:sessionId/runs（submitRunHandler）直接 409
+ *    SESSION_HAS_ACTIVE_RUN（前端原样回显「该会话存在进行中的任务，请等待完成后再发送」），
+ *    这句话根本进不了 dispatch。基于它写分支即死代码。
+ *  · 本条判据跨 Run 成立，且三条通道（异步 Run / 同步非流式 / 同步流式）都在 assistant
+ *    消息 metadata.toolCalls 这同一个字段上留痕，一份实现覆盖全部入口。
+ *
+ * 窗口只有一轮：下一轮若没有工具调用，本判定即回落 false，不会把 17 个正则 handler
+ * 长期关掉（那是批次 4 的事）。读的是会话记录，不新增任何查询。
+ */
+export function hasOngoingWorkbenchToolInteraction(
+  messages: readonly WorkbenchSessionTurn[] | null | undefined,
+): boolean {
+  if (!Array.isArray(messages)) return false;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || message.role !== "assistant") continue;
+    const toolCalls = (message.metadata as { toolCalls?: unknown } | undefined)?.toolCalls;
+    // 形状异常（不是数组）按「本轮没发生工具调用」处理：宁可多走一次正则路由，
+    // 也不要把一个读不懂的字段当成放行的理由。
+    return Array.isArray(toolCalls) && toolCalls.length > 0;
+  }
+  return false;
+}
+
 /**
  * 意图路由纯函数。
  *
  * 规则优先级：
  * 1. 前端显式 clientAction（结构化卡片提交）
+ * 1b. 进行中的工具交互 → 整条正则路由让位，交回模型（批次 1c，见下方第 1b 步注释）
  * 2. 能力发现关键词
  * 3. WES 数据查询关键词
  * 4. 报告生成关键词（区分 v1/v2）
@@ -76,6 +124,23 @@ export function routeWorkbenchIntent(input: WorkbenchIntentInput): WorkbenchInte
   }
   if (input.clientAction === "generate_requirement_report") {
     return { intent: "harness_report_generation", confidence: 1, routingRule: "client_action" };
+  }
+
+  // 1b.（批次 1c · 缺陷二）进行中的工具交互：整条正则路由让位，交回模型 + 工具路径。
+  // 刻意排在 clientAction 之后、其余关键词之前：结构化卡片提交是按钮而非一句话，
+  // 语义已经确定，不该被本短路改道；而关键词规则恰恰是本题里会误判的那一层。
+  //
+  // 之所以必须让位：这里的话是**上一轮工具交互的延续**，不是新提问。真实会话
+  // 830bdb17 里，用户答「客户名称：深圳蓝海集团； 客户行业：综合集团；」因含「行业」
+  // 二字命中 industry_knowledge_terms，被交给正则 handler 答了一段知识库检索，
+  // 模型从未收到这句回答——多轮交互就此断在半路。这类残缺短句恰恰最不该由关键词判。
+  //
+  // 刻意**不复用** routingRule "default_domain_qa"：那个值是 RP-003 模型二次分类的
+  // 触发口（dispatch 只在它上面调 classifyIntentWithModel），而一句只剩「客户行业：
+  // 综合集团」的补充信息极易被分类器判成 unsupported_or_out_of_scope 直接拒答——
+  // 那就是换一个地方重演同一个劫走。
+  if (input.hasOngoingToolInteraction) {
+    return { intent: "domain_qa", confidence: 1, routingRule: "ongoing_tool_interaction" };
   }
 
   // 2. 简短问候走本地能力说明，避免基础测试消耗模型额度或触发外部限流

@@ -4,8 +4,15 @@ import { asString } from "../../utils/helpers";
 
 /**
  * Agent 写操作类工具（O2 · A2）
- * 全部标记 mutates=true：编排循环会先发 need_confirm 事件，
- * 经用户确认（requiresConfirm 语义）后才会真正执行。
+ * 全部标记 mutates=true，执行前是否要问用户由**服务端**判定：注册表的 mutates
+ * 决定闸门走 ask 档（见 workbench-tool-approval 的 resolveWorkbenchToolDecisionSlot），
+ * 用户有没有批准只看库里持久化的决策，模型与前端都无从表达。
+ *
+ * 因此给模型看的 description 里**不得出现任何审批机制措辞**（「需用户确认」
+ * 「无需确认」都不行）：批次 1a 上线后实测，模型读到「执行前需用户确认」就在正文里
+ * 自己演一遍确认流程（"请确认以下信息…确认创建？"）而不发起调用，闸门拦的是调用、
+ * 调用从未发生，于是整条审批链路被绕过。description 只回答「这个工具做什么」。
+ *
  * 口径：附件/证据只能作为上下文引用入参（evidenceId / artifactId），
  * 任何工具不得因「存在文件」而自动触发；写动作只由用户意图驱动。
  */
@@ -41,11 +48,11 @@ function assertUsecaseOk(result: unknown): unknown {
   return result;
 }
 
-/** 创建项目草稿工具（写操作，需用户确认） */
+/** 创建项目草稿工具（写操作） */
 export function buildCreateProjectTool(createProject: CreateProjectFn): AgentTool {
   return {
     name: "create_project",
-    description: "为当前用户创建项目评估草稿（写操作，执行前需用户确认）",
+    description: "为当前用户创建项目评估草稿",
     parameters: {
       type: "object",
       properties: {
@@ -74,11 +81,11 @@ export function buildCreateProjectTool(createProject: CreateProjectFn): AgentToo
   };
 }
 
-/** 生成 WBS 草稿工具（写操作，需用户确认） */
+/** 生成 WBS 草稿工具（写操作） */
 export function buildGenerateWbsTool(generateWbs: GenerateWbsFn): AgentTool {
   return {
     name: "generate_wbs",
-    description: "基于当前用户最新总方案生成 WBS 草稿任务（写操作，执行前需用户确认）",
+    description: "基于当前用户最新总方案生成 WBS 草稿任务",
     parameters: { type: "object", properties: {} },
     capability: "estimates:write",
     mutates: true,
@@ -90,15 +97,15 @@ export function buildGenerateWbsTool(generateWbs: GenerateWbsFn): AgentTool {
   };
 }
 
-/** 导出评估报告工具（写操作，需用户确认；产出导出文件并返回下载链接） */
+/** 导出评估报告工具（写操作；产出导出文件并返回下载链接） */
 export function buildExportReportTool(exportReport: ExportReportFn): AgentTool {
   return {
     name: "export_report",
-    description: "对给定的评估条目执行计算并导出 Excel/PDF 报告（写操作，执行前需用户确认）",
+    description: "对给定的评估条目执行计算并导出 Excel/PDF 报告",
     parameters: {
       type: "object",
       properties: {
-        items: { type: "array", description: "评估条目数组（来自已确认的需求包或初估结果）" },
+        items: { type: "array", description: "评估条目数组（来自需求包或初估结果）" },
         exportType: { type: "string", enum: ["excel", "pdf"], description: "导出格式（默认 excel）" },
         exportProjectName: { type: "string", description: "导出文件使用的项目名（可选）" },
       },

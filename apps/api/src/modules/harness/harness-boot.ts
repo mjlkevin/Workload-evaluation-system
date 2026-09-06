@@ -251,6 +251,9 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
         attachment: dispatchInput.attachment,
         latestHarnessArtifact: dispatchInput.latestHarnessArtifact,
         clientAction: dispatchInput.clientAction,
+        // 批次 1c · 缺陷二：boot 这层逐字段列举转发，漏一个字段就是静默丢失——
+        // workflow 从已落库会话记录推导的「进行中」判据必须在此接力到路由。
+        hasOngoingToolInteraction: input.hasOngoingToolInteraction,
         businessRole: dispatchInput.businessRole,
         roleLabel: dispatchInput.roleLabel,
         model: dispatchInput.model,

@@ -13,6 +13,7 @@ import { ok, fail } from "../../../utils/response";
 import { resolveBusinessRole } from "../../../middleware/auth";
 import { appendAiSessionEvent, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import { dispatchHomeWorkbenchTurn } from "../workbench-dispatch.service";
+import { hasOngoingWorkbenchToolInteraction } from "../workbench-intent.service";
 import { recordWorkbenchTurnFailureTrace, recordWorkbenchTurnTrace } from "../../../modules/trace/trace.usecase";
 import {
   HOME_ROLE_PRESETS,
@@ -97,6 +98,9 @@ export async function homeWorkbenchChat(req: Request, res: Response) {
       attachment: parsedAttachment ? { name: parsedAttachment.name, size: parsedAttachment.size, type: parsedAttachment.type, parsedSummary: parsedAttachment.parsedSummary } : null,
       latestHarnessArtifact: null,
       clientAction: asString(body.clientAction),
+      // 批次 1c · 缺陷二：进行中判据取自**已落库的会话记录**（sessionWithUserTurn 已含本轮
+      // 用户消息，判据只看它之前那条 assistant），不读前端传来的任何标记。
+      hasOngoingToolInteraction: hasOngoingWorkbenchToolInteraction(sessionWithUserTurn.messages),
       businessRole: dispatchInput.businessRole,
       roleLabel: dispatchInput.roleLabel,
       model: dispatchInput.model,
