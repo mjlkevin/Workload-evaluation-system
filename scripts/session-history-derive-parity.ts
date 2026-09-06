@@ -214,6 +214,14 @@ async function main(): Promise<void> {
 
     const sessions = (await pool.query("select * from ai_sessions order by session_id")).rows;
 
+    // 零比对不构成通过：本脚本的前提是「拿存量数据比对」，空库上「全部一致」是空跑。
+    // CI 的测试库就是空的，故它不在 CI 跑（确定性覆盖由 session-history.test.ts 的
+    // 合成用例承担）；若将来有人把它接进 CI 而计数为 0，必须当场红而不是绿。
+    if (sessions.length === 0) {
+      console.error("[parity] 结论：FAIL（空跑）—— 目标库 %s 无任何会话，无从比对", describeTarget(url));
+      process.exit(2);
+    }
+
     let compared = 0;
     let mismatched = 0;
     const perLayer = new Map<Layer, number>();
