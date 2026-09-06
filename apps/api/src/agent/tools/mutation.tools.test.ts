@@ -174,3 +174,46 @@ function scriptRunner(seq: Partial<ChatCompletionResponse>[]): ChatRunner {
     },
   };
 }
+
+// ------------------------------------------------------------------
+// 批次 1c · 缺陷一：description 只回答「这个工具做什么」
+// ------------------------------------------------------------------
+// 「（写操作，执行前需用户确认）」是**服务端机制**的描述，实测后果是模型读到它
+// 之后自己在正文里演一遍确认流程（"请确认以下信息…确认创建？"）而不发起调用——
+// 于是批次 1a 的审批闸门根本没机会触发（它拦的是工具调用，调用从未发生）。
+// 审批与否由注册表 mutates + 闸门决定，与这句话无关；**任何**机制措辞都不得进
+// description，反向暗示（"无需确认"）同样不得进。
+
+const APPROVAL_MECHANISM_WORDING = /确认|审批|approval|approve|confirm/i;
+
+test("写操作工具 description: 不含任何审批机制措辞（批次1c）", () => {
+  const tools = [
+    buildCreateProjectTool(async () => ({})),
+    buildGenerateWbsTool(async () => ({})),
+    buildExportReportTool(async () => ({ ok: true, data: {} })),
+  ];
+  for (const tool of tools) {
+    // 入参说明同样是给模型看的文本：机制措辞一处都不能留
+    const properties = (tool.parameters as { properties?: Record<string, { description?: unknown }> }).properties ?? {};
+    const texts: Array<[string, string]> = [["description", tool.description]];
+    for (const [param, schema] of Object.entries(properties)) {
+      if (typeof schema.description === "string") texts.push([`parameters.${param}`, schema.description]);
+    }
+    for (const [where, text] of texts) {
+      assert.equal(
+        APPROVAL_MECHANISM_WORDING.test(text),
+        false,
+        `${tool.name} 的 ${where} 含机制措辞，会诱导模型自己演确认流程：${text}`,
+      );
+    }
+  }
+  // 机制描述被摘掉后，「这个工具做什么」必须仍然说得清
+  assert.deepEqual(
+    tools.map((t) => t.description),
+    [
+      "为当前用户创建项目评估草稿",
+      "基于当前用户最新总方案生成 WBS 草稿任务",
+      "对给定的评估条目执行计算并导出 Excel/PDF 报告",
+    ],
+  );
+});

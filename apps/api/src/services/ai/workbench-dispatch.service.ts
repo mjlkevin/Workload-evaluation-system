@@ -102,6 +102,13 @@ export type WorkbenchDispatchInput = {
   attachment?: WorkbenchAttachmentContext | null;
   latestHarnessArtifact?: WorkbenchHarnessArtifactContext | null;
   clientAction?: string;
+  /**
+   * 批次 1c · 缺陷二（additive）：本会话是否处在一场还没结束的工具交互里。
+   * 三条对话通道各自从**已落库的会话记录**推导后注入（见 hasOngoingWorkbenchToolInteraction），
+   * 端点层不从请求体接收同名字段——判据必须是服务端查得出的事实。
+   * 缺省（未注入）即按「不在进行中」处理，路由行为与本批之前逐字相同。
+   */
+  hasOngoingToolInteraction?: boolean;
   /** 由调用方提供的模型回复函数；toolCalls/memoryRef 为 additive 返回字段（chip 数据通路，缺省即无） */
   modelChat: (params: { systemPrompt: string; userContent: string }) => Promise<{ answer: string; rawContent: string; provider?: string; model?: string; attempts?: number; finishReason?: string; toolCalls?: WorkbenchToolCallTrace[]; memoryRef?: WorkbenchMemoryRefTrace }>;
   /** 由调用方提供的角色标签 */
@@ -259,6 +266,8 @@ export async function dispatchHomeWorkbenchTurn(input: WorkbenchDispatchInput): 
     hasAttachment: Boolean(effectiveInput.attachment),
     hasLatestV1Artifact: effectiveInput.latestHarnessArtifact?.artifactType === "requirement_report_v1",
     clientAction: effectiveInput.clientAction,
+    // 批次 1c · 缺陷二：进行中判据由调用通道从会话记录推导，本函数不自行判读请求内容
+    hasOngoingToolInteraction: effectiveInput.hasOngoingToolInteraction,
   });
 
   // RP-003: 规则兜底时调用模型二次分类

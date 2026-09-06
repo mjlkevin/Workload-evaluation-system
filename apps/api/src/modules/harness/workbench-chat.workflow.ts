@@ -43,6 +43,7 @@ import { normalizeHomeAttachments, latestSessionAttachmentWithSummary, sessionRe
 import type { HomeMessageInput } from "../../services/ai/handlers/workbench-shared";
 import { resolveRunMemoryProjectId } from "./harness.types";
 import { runExplicitHomeReportFlow } from "../../services/ai/handlers/report-flow";
+import { hasOngoingWorkbenchToolInteraction } from "../../services/ai/workbench-intent.service";
 import type { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
 
 export type WorkbenchChatWorkflowDeps = {
@@ -55,6 +56,13 @@ export type WorkbenchChatWorkflowDeps = {
   dispatch(input: Pick<WorkbenchDispatchInput, "message" | "user" | "workflowKey"> & Partial<WorkbenchDispatchInput> & {
     messages?: HomeMessageInput[];
     projectId?: string;
+    /**
+     * 批次 1c · 缺陷二（additive）：本会话是否处在一场还没结束的工具交互里。
+     * 由本 workflow 从**已落库的会话记录**推导（上一轮 assistant 是否带工具痕迹），
+     * 经 harness-boot 透传给 dispatchHomeWorkbenchTurn 的意图路由。端点层不接收
+     * 前端的同名字段——判据必须是服务端查得出的事实。
+     */
+    hasOngoingToolInteraction?: boolean;
     /**
      * 批次 0 · ⑤：存储侧快照读取钩子（additive）。`messages` 是**发送侧**
      * （已经过 workflow → dispatch → modelChatStream 管道），本钩子供调用方
@@ -186,9 +194,10 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       // 取历史时机是硬约束——必须在上面 appendSessionMessage 之后：
       // workbench-shared 的历史整形是「覆盖末条为用户本轮」而非追加，
       // 落库前取会把上一轮 assistant 当成末条覆盖丢失。
-      const historyMessages = sessionRecordToHomeMessages(
-        (await deps.getSessionRecord?.(aiSessionId, run.ownerUserId)) ?? null,
-      );
+      // 批次 1c：同一次读取兼作「进行中工具交互」判据的数据源——判据读的正是
+      // 这份已落库记录里本轮之前那条 assistant，另起一次查询只会读到同一份数据。
+      const sessionRecordWithUserTurn = (await deps.getSessionRecord?.(aiSessionId, run.ownerUserId)) ?? null;
+      const historyMessages = sessionRecordToHomeMessages(sessionRecordWithUserTurn);
       const memoryProjectId = resolveRunMemoryProjectId(run);
 
       // ISS-2026-08-16-004：显式报告闸门——当 dispatchAttachment 存在且用户消息
@@ -305,6 +314,9 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               workflowKey: "free_chat",
               messages: historyMessages,
               projectId: memoryProjectId,
+              // 批次 1c · 缺陷二：进行中的工具交互 → 意图路由让位（判据取自上面那次
+              // 已落库读取，不新增查询；本轮用户消息是末条，判据看的是它之前那条 assistant）
+              hasOngoingToolInteraction: hasOngoingWorkbenchToolInteraction(sessionRecordWithUserTurn?.messages),
               streamingAdapter,
               // 批次 0.5 · ②：工具事件 → UI 事件接缝（additive）。仅异步 Run 通道
               // 注入；同步直写路径不经 Harness 事件流，无 runId 可写，不注入即为 undefined。

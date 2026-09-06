@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { routeWorkbenchIntent, classifyIntentWithModel, INTENT_CLASSIFICATION_PROMPT } from "./workbench-intent.service";
+import {
+  routeWorkbenchIntent,
+  classifyIntentWithModel,
+  hasOngoingWorkbenchToolInteraction,
+  INTENT_CLASSIFICATION_PROMPT,
+} from "./workbench-intent.service";
 
 test("routes capability discovery", () => {
   const result = routeWorkbenchIntent({ message: "你能做什么？", hasAttachment: false, hasLatestV1Artifact: false });
@@ -259,4 +264,104 @@ test("INTENT_CLASSIFICATION_PROMPT contains all supported intents", () => {
   assert.match(INTENT_CLASSIFICATION_PROMPT, /knowledge_query/);
   assert.match(INTENT_CLASSIFICATION_PROMPT, /domain_qa/);
   assert.match(INTENT_CLASSIFICATION_PROMPT, /unsupported_or_out_of_scope/);
+});
+
+// ── 批次 1c · 缺陷二：进行中的工具交互不得被意图路由劫走 ────────────────
+// 两句原话取自真实会话 830bdb17-ceb8-421d-ba34-55e68ea31de6（架构侧直接调用
+// routeWorkbenchIntent 实取）：第二句是用户对上一轮追问的回答，却因含「行业」二字
+// 被判成行业知识查询、交给正则 handler，模型压根没收到。
+
+/** 真实会话里的连续两句原话，逐字抄录，不做任何"顺手清洗" */
+const REAL_TURN_CREATE = "帮我创建一个新的项目，项目名：测试项目09061112";
+const REAL_TURN_ANSWER = "客户名称：深圳蓝海集团； 客户行业：综合集团；";
+
+test("批次1c零回归：不在进行中的会话，两句话的分类结果逐字不变", () => {
+  const first = routeWorkbenchIntent({ message: REAL_TURN_CREATE, hasAttachment: false, hasLatestV1Artifact: false });
+  assert.deepEqual(first, { intent: "domain_qa", confidence: 0.65, routingRule: "default_domain_qa" });
+
+  const second = routeWorkbenchIntent({ message: REAL_TURN_ANSWER, hasAttachment: false, hasLatestV1Artifact: false });
+  assert.deepEqual(second, { intent: "knowledge_query", confidence: 0.82, routingRule: "industry_knowledge_terms" });
+});
+
+test("批次1c：进行中的工具交互时，含「行业」的追问不再被判给 knowledge_query", () => {
+  const result = routeWorkbenchIntent({
+    message: REAL_TURN_ANSWER,
+    hasAttachment: false,
+    hasLatestV1Artifact: false,
+    hasOngoingToolInteraction: true,
+  });
+  assert.equal(result.intent, "domain_qa", `应交回模型路径，实取 ${JSON.stringify(result)}`);
+  assert.equal(result.routingRule, "ongoing_tool_interaction", `实取 ${JSON.stringify(result)}`);
+});
+
+test("批次1c：进行中短路覆盖所有正则规则，但不夺走前端结构化动作", () => {
+  const hijackCandidates = [
+    "我之前创建过哪些项目？",
+    "请生成需求解析报告",
+    "智能会计平台是什么，可以支持哪些模块？",
+    "搜索知识库",
+    "多组织业务往来一般包含哪些模块？",
+  ];
+  for (const message of hijackCandidates) {
+    const result = routeWorkbenchIntent({ message, hasAttachment: false, hasLatestV1Artifact: false, hasOngoingToolInteraction: true });
+    assert.equal(result.routingRule, "ongoing_tool_interaction", `「${message}」未被短路，实取 ${JSON.stringify(result)}`);
+    assert.equal(result.intent, "domain_qa");
+  }
+  // 结构化卡片提交不是"一句话"，是按钮：仍按 clientAction 走
+  const structured = routeWorkbenchIntent({
+    message: REAL_TURN_ANSWER,
+    hasAttachment: false,
+    hasLatestV1Artifact: false,
+    clientAction: "submit_structured_answers",
+    hasOngoingToolInteraction: true,
+  });
+  assert.equal(structured.routingRule, "client_action");
+  assert.equal(structured.intent, "harness_answer_submission");
+});
+
+test("批次1c：进行中短路不得触发模型二次分类兜底", () => {
+  // dispatch 只在 routingRule === "default_domain_qa" 时才调 classifyIntentWithModel。
+  // 若本短路复用 default_domain_qa，一句残缺的「客户行业：综合集团」会被分类器
+  // 判成 unsupported_or_out_of_scope 而直接拒答——那正是本批要消灭的劫走形态。
+  const result = routeWorkbenchIntent({ message: REAL_TURN_ANSWER, hasAttachment: false, hasLatestV1Artifact: false, hasOngoingToolInteraction: true });
+  assert.notEqual(result.routingRule, "default_domain_qa");
+});
+
+// ── hasOngoingWorkbenchToolInteraction：服务端事实判定 ──────────────────
+
+test("进行中判定：最后一条 assistant 消息带工具痕迹即为 true", () => {
+  const messages = [
+    { role: "user", content: REAL_TURN_CREATE },
+    { role: "assistant", content: "已创建", metadata: { toolCalls: [{ callIndex: 1, name: "create_project", status: "completed" }] } },
+    { role: "user", content: REAL_TURN_ANSWER },
+  ];
+  assert.equal(hasOngoingWorkbenchToolInteraction(messages), true);
+});
+
+test("进行中判定：本轮用户消息之前的那条 assistant 才是判据（不看更早的轮次）", () => {
+  const messages = [
+    { role: "user", content: REAL_TURN_CREATE },
+    { role: "assistant", content: "已创建", metadata: { toolCalls: [{ callIndex: 1, name: "create_project", status: "completed" }] } },
+    { role: "user", content: "行业知识问题" },
+    { role: "assistant", content: "制造业常见痛点是……" },
+    { role: "user", content: REAL_TURN_ANSWER },
+  ];
+  assert.equal(hasOngoingWorkbenchToolInteraction(messages), false, "上一轮无工具痕迹即不得长期关掉正则路由");
+});
+
+test("进行中判定：空列表 / 无 assistant / 工具痕迹为空数组都判 false", () => {
+  assert.equal(hasOngoingWorkbenchToolInteraction([]), false);
+  assert.equal(hasOngoingWorkbenchToolInteraction(undefined), false);
+  assert.equal(hasOngoingWorkbenchToolInteraction(null), false);
+  assert.equal(hasOngoingWorkbenchToolInteraction([{ role: "user", content: "hi" }]), false);
+  assert.equal(
+    hasOngoingWorkbenchToolInteraction([{ role: "assistant", content: "hi", metadata: { toolCalls: [] } }]),
+    false,
+    "空数组是「本轮没有工具调用」，不是「有工具调用」",
+  );
+  assert.equal(
+    hasOngoingWorkbenchToolInteraction([{ role: "assistant", content: "hi", metadata: { toolCalls: "not-an-array" } }]),
+    false,
+    "持久化字段形状异常时按未发生处理（失败方向关闭）",
+  );
 });
