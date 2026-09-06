@@ -1,0 +1,100 @@
+{
+  "id": "BE-2026-09-06-batch2a-session-history-seam",
+  "date": "2026-09-06",
+  "type": "implementation",
+  "scope": "批次 2a · 会话历史派生缝（「取历史」的唯一口子）",
+  "summary": "纯重构：把全部「取会话历史」的读取点收口到 modules/ai-sessions/session-history.ts 的 deriveSessionMessages 一个函数，存储侧仍是 ai_sessions.messages（jsonb 快照）——未建表、未写迁移、未动 schema、未改任何用户可见行为。批次 2b 把历史换成 append-only 事件序列时只需换这一个函数的实现，不必再逐个改读取点。收口面实取 6 处改道 + 1 处保留直读（存储适配层自身）+ 4 处派单候选经判定为误报未动。逐字节证据两份且互补：开发库存量 100 条会话 × 6 层 = 600 次比对全部一致（脚本留仓，2b 每次翻转实现都要重跑），以及 8 条合成边界用例锁形状（真实数据上从未被触发的分支由它兜底）。",
+  "status": "已回填 / 待 Codex 复核",
+  "pages": ["changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/ai-sessions/session-history.ts",
+      "summary": "缝本体（新增）：deriveSessionMessages(session): readonly AiMessage[]，本批实现仍读 jsonb 快照、返回新数组、存储原序不过滤不改形。归属选在 ai-sessions 存储域而非 services/ai：缝的意义是「存储侧的唯一出口」，方向应与既有 services/ai → modules/ai-sessions 依赖一致。文件头写死三条口径边界：① 只承担「取」不承担「整形」，workbench-request-invariant 的第二份整形实现刻意不入缝（两边同源则不变式永真）；② 附件解析上下文仍读 session.attachments，不在本缝内；③ 同步签名之所以成立是因为现存 6 个读取点全都已持有整条记录，2b 若按 sessionId 查事件表则改 async 并向外机械传播这 6 处"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/handlers/workbench-shared.ts:301",
+      "summary": "sessionRecordToHomeMessages 历史改经缝取；角色过滤、空正文过滤、attachmentIds 解引用、附件 Map 口径一字未动"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/handlers/workbench-chat.handler.ts:104 · workbench-chat-stream.handler.ts:303 · modules/harness/workbench-chat.workflow.ts:320",
+      "summary": "三条工作台对话通道的「进行中工具交互」判据（批次 1c 的数据源）历史一律改经缝取，判据函数 hasOngoingWorkbenchToolInteraction 与 metadata.toolCalls 的读写均未触碰"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/ai-sessions/ai-sessions.usecase.ts:161 · modules/harness/workbench-view.usecase.ts:243",
+      "summary": "管理员审计摘要与会话视图计数的历史改经缝取；审计的 map 回调提为具名函数 summarizeSessionForAdminAudit 只为让逐字节对照能定向命中，字段与截断口径逐字照搬，两计数的分母差异（messageCount 含 system/tool、turnCount 只数 user）另有断言钉住"
+    },
+    {
+      "kind": "gate",
+      "ref": "npm run check:session-history-parity（新增留仓脚本 scripts/session-history-derive-parity.ts，指向开发库）",
+      "result": "pass",
+      "summary": "判据①逐字节：存量 100 条会话 × 6 层（原始历史 / 模型历史整形 / 模型请求窗口 / 进行中判据 / 审计摘要 / 视图计数）= 600 次 JSON.stringify 严格比对全部一致，0 差异。旧路径在脚本内以改造前表达式的冻结副本实现、不 import 被改函数，避免自己等于自己。脚本同时打印数据普查：non_array_messages=0、empty_messages=84、non_empty=16、总消息 44 条、最长历史 8 条（< 窗口 12）、角色仅 user 25 / assistant 19（无 system/tool）、带附件引用 2 条、悬挂引用 0、带工具痕迹 1 条、跨 10 个 owner、日期跨度 2026-08-27→09-06"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:modules（新增 session-history.test.ts 已登记）",
+      "result": "pass",
+      "summary": "488 pass / 0 fail / 0 skipped（开工基线 480，净 +8 全为本批对照用例，无删除无跳过）。8 条用例覆盖真实数据上根本不会走到的分支：空历史、>12 窗口截断、system/tool 与空正文过滤、attachmentIds 指向不存在与重复引用、附件数组缺失、末条为 assistant、null/undefined 会话、工具痕迹四态（有/无/空数组/形状异常）、超长正文截断与空白折叠"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "两条构建均 exit 0"
+    },
+    {
+      "kind": "command",
+      "ref": "本地九套件计数（开工基线自取 origin/main CI run 34011269022）",
+      "result": "pass",
+      "summary": "rules 8 → 8 · agent 122 → 122 · security 17+2 → 17+2 · scripts 72 → 72 · web 67 files/537 → 67/537 · serial-store 171 → 171 · harness 267 → 267 · ai 286 → 286 · integration 1 → 1（首轮红在 templates_status_not_200，补 db:seed 即绿，与 CI 的 migrate→测试→seed→integration 顺序一致，属既有环境前置非本批引入）· modules 480 → 488。合计 1914 → 1922，只增不减，前端零文件改动"
+    },
+    {
+      "kind": "command",
+      "ref": "grep -rnE \"(session|Session|record|Record)[A-Za-z_]*\\\\??\\\\.messages\\\\b\" apps/api/src（判据⑤实取）",
+      "result": "pass",
+      "summary": "生产代码中残留的会话记录 .messages 直读只剩三类且均有依据：缝自身（session-history.ts:50-51）、存储适配层 ai-sessions-pg.repository.ts（行→记录映射 / 写入序列化 / jsonb 原子追加 / 幂等查重读改写——正是 2b 要替换的那一层，让缝经它取历史会形成自引用环，架构侧已批准为唯一合法直读源）、agent/context/run-state.ts:95（其 session 是本地声明的结构类型 RunStateSessionSnapshot，不 import ai-sessions，且全仓无生产调用方）。消费侧直读为 0"
+    }
+  ],
+  "next": "待架构侧复核后合入 main，本批未自行合入。交接给 2b 的三件：① 换 deriveSessionMessages 实现后必须重跑 npm run check:session-history-parity 并通过，它是这道缝的等价闸门；② 附件（session.attachments）与 metadata.toolCalls 镜像两份都还没入缝，2b 需明确去向；③ 本批实取到两条未修现状已入 risks.html——同步两条通道的模型历史仍取自前端请求体而非库里推导（异步通道才是取库），缝建好后这个不对称变得可直接修，属 2b 之后的自然目标。",
+  "board": {
+    "change": {
+      "stage": "批次 2a：会话历史派生缝 · 分支 feat/batch2a-derive-seam 未合入",
+      "result": "已回填 / 待 Codex 复核"
+    },
+    "testing": [
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:modules",
+        "result": "pass",
+        "summary": "488 pass / 0 fail / 0 skipped（基线 480，+8 为本批逐字节对照用例）"
+      },
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:harness",
+        "result": "pass",
+        "summary": "267 pass / 0 fail / 0 skipped（与开工基线同值，含批次 0 请求重建不变量与批次 1c 意图连续性 e2e 全部未退化）"
+      },
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:ai",
+        "result": "pass",
+        "summary": "286 pass / 0 fail / 0 skipped（同值）"
+      },
+      {
+        "command": "npm run test:agent",
+        "result": "pass",
+        "summary": "122 pass / 0 fail（同值；含 workbench-request-invariant 的 7 条负向用例——本批未把它的第二份整形并入缝，故其判别力不变）"
+      },
+      {
+        "command": "npm run check:session-history-parity",
+        "result": "pass",
+        "summary": "开发库存量 100 条会话 × 6 层 = 600 次逐字节比对全部一致；数据普查同时实取 empty_messages=84 / 最长历史 8 条 / 无 system·tool 角色 / 悬挂附件引用 0，据此说明真实数据的覆盖力边界"
+      },
+      {
+        "command": "npm run build:api && npm run build:web && npm run test:web",
+        "result": "pass",
+        "summary": "两条构建 exit 0；test:web 67 files / 537 tests 与基线逐位相同（本批前端零文件改动）"
+      }
+    ]
+  }
+}
