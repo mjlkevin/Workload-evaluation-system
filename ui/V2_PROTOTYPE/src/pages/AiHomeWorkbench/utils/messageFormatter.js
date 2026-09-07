@@ -48,6 +48,8 @@ export function normalizeKnowledgeTool(value) {
 export const TOOL_CALL_STATUS = {
   RUNNING: 'running',
   AWAITING_APPROVAL: 'awaiting_approval',
+  // 批次 9：ask_user 在等这个人填表（与 awaiting_approval 是两种等待，不合并）
+  AWAITING_INPUT: 'awaiting_input',
   COMPLETED: 'completed',
   FAILED: 'failed',
   REJECTED: 'rejected',
@@ -68,6 +70,8 @@ const TOOL_CALL_EVENT_TYPES = {
   AWAITING_APPROVAL: 'tool.call.awaiting_approval',
   REJECTED: 'tool.call.rejected',
   CONFIRMED: 'run_action_confirmed',
+  // 批次 9：向用户发起交互（执行本身即暂停），payload 自带表单结构
+  AWAITING_INPUT: 'tool.call.awaiting_input',
 }
 
 /** 失败原因进列表前截断：列表要落进会话消息，不得被长错误堆爆 */
@@ -177,7 +181,12 @@ export function applyToolCallEventToList(calls, event, context = {}) {
   if (eventType === TOOL_CALL_EVENT_TYPES.STARTED) {
     cache?.remember?.(toolCallArgsKey(runId, { callId, name: displayName, callIndex }), payload.arguments)
     // 重放吸收：同一次被审批过的调用不新建 chip
-    const absorbIndex = lastOpenIndex(list, (call) => call.approval && (!displayName || call.name === displayName))
+    // 批次 9：被问过表单的槽位同样要吸收重放——只认 approval 会把一次 ask_user
+    // 调用劈成两个 chip（挂起前一个、恢复重放一个）。
+    const absorbIndex = lastOpenIndex(
+      list,
+      (call) => (call.approval || call.input) && (!displayName || call.name === displayName),
+    )
     if (absorbIndex >= 0) {
       const current = list[absorbIndex]
       // 已拒绝的槽位保持已拒绝：模型重试被服务端拦下时，用户看到的仍是他当年的决定
@@ -211,6 +220,20 @@ export function applyToolCallEventToList(calls, event, context = {}) {
     name: displayName || call?.name,
     callIndex: callIndex || call?.callIndex,
   }))
+
+  // 批次 9：表单请求自带结构（服务端已按契约校验过那一份），
+  // 不回填即渲染不出控件——这是与审批事件唯一的 payload 差别。
+  const buildForm = (current) => {
+    const formBlock = payload.formBlock && typeof payload.formBlock === 'object' && !Array.isArray(payload.formBlock)
+      ? payload.formBlock
+      : current?.input?.formBlock
+    return {
+      actionId: actionId || current?.input?.actionId || '',
+      runId: runId || current?.input?.runId || '',
+      ...(displayName ? { toolName: displayName } : {}),
+      ...(formBlock ? { formBlock } : {}),
+    }
+  }
 
   const buildApproval = (current) => {
     const cachedArgs = argsFor(current)
@@ -247,6 +270,14 @@ export function applyToolCallEventToList(calls, event, context = {}) {
     // 页面中途打开 / 订阅晚于 started：终态与审批帧自带状态，可直接补建，不丢可视化。
     if (eventType === TOOL_CALL_EVENT_TYPES.PROGRESS) return null
     if (!displayName) return null
+    if (eventType === TOOL_CALL_EVENT_TYPES.AWAITING_INPUT) {
+      return [...list, {
+        name: displayName,
+        ...(callId ? { callId } : {}),
+        status: TOOL_CALL_STATUS.AWAITING_INPUT,
+        input: buildForm(null),
+      }]
+    }
     if (eventType === TOOL_CALL_EVENT_TYPES.AWAITING_APPROVAL) {
       return [...list, {
         name: displayName,
@@ -276,6 +307,16 @@ export function applyToolCallEventToList(calls, event, context = {}) {
     const elapsedMs = Number.isFinite(payload.elapsedMs) && payload.elapsedMs >= 0 ? payload.elapsedMs : current.elapsedMs
     if (elapsedMs === current.elapsedMs) return null
     return list.map((call, i) => (i === index ? { ...call, elapsedMs } : call))
+  }
+
+  if (eventType === TOOL_CALL_EVENT_TYPES.AWAITING_INPUT) {
+    const next = {
+      ...current,
+      ...(callId && !current.callId ? { callId } : {}),
+      status: TOOL_CALL_STATUS.AWAITING_INPUT,
+      input: buildForm(current),
+    }
+    return list.map((call, i) => (i === index ? next : call))
   }
 
   if (eventType === TOOL_CALL_EVENT_TYPES.AWAITING_APPROVAL) {
@@ -322,8 +363,26 @@ export function applyToolCallEventToList(calls, event, context = {}) {
     next.approval = { ...next.approval }
     delete next.approval.arguments
   }
+  if (next.input) {
+    // 批次 9：答完即弃结构，控件不再需要它（会话消息会随轮次持久化这条列表）
+    next.input = { ...next.input }
+    delete next.input.formBlock
+  }
   if (JSON.stringify(next) === JSON.stringify(current)) return null
   return list.map((call, i) => (i === index ? next : call))
+}
+
+/**
+ * 批次 9 · 待填表单取数：从工具痕迹列表里挑出「正在等这个人回答」的交互控件。
+ *
+ * 唯一口径是 status === awaiting_input 且带 formBlock——答完（收口为 completed / failed）
+ * 后结构即被丢弃，控件自然消失，不需要另外维护一份「已提交」集合去猜状态。
+ * 消息气泡与刷新后的托盘共用本函数，两处渲染逻辑不可能给出不同答案。
+ */
+export function pendingInteractiveForms(calls) {
+  return (Array.isArray(calls) ? calls : []).filter(
+    (call) => call?.status === TOOL_CALL_STATUS.AWAITING_INPUT && call?.input?.formBlock,
+  )
 }
 
 /**

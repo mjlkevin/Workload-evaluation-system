@@ -1,0 +1,127 @@
+{
+  "id": "BE-2026-09-07-batch9-ask-user-tool",
+  "date": "2026-09-07",
+  "type": "implementation",
+  "scope": "批次 9 · 把「向用户发起交互」做成工具（ask_user）",
+  "summary": "四个零件早就齐（交互控件、严格契约、waiting 暂停恢复、SSE 与 chip 管道），坏的只有一处：formBlock 由模型在自由文本里自己写、再靠正则抽出来，写错一步就把整段协议 JSON 当正文渲染给用户（会话 7f5cbf75 实证，且模型把字段键猜成 name 而契约要 id）。本批把产生方式换成工具调用：模型调 ask_user 传表单结构 → 服务端按既有 INTERACTIVE_FORM_BLOCK_CONTRACT 校验 → 执行本身即暂停（run.status=waiting + 新事件 tool.call.awaiting_input，payload 自带校验后的表单结构）→ 前端渲染既有控件 → 用户填选后经 POST /:runId/inputs 恢复 → 结构化 values 作为工具结果回灌模型。ask_user 落 mutates:false + estimates:read + 决策槽 allow，全程不经审批（问一句话不危险，再要一道确认是多余摩擦）。恢复路径要害写死：会话存在活跃 Run 时新消息一律被 harness_runs_active_workbench_session_unique 挡成 409 SESSION_HAS_ACTIVE_RUN，而 waiting 属活跃态——正是批次 1c 登记过的那条断头路，本批用 inputs 端点把它接通。",
+  "status": "已回填 / 待 Codex 复核",
+  "pages": ["changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/workbench-tool-user-input.ts",
+      "summary": "新增闸门模块（本批判定全部收敛于此）：validateAskUserFormArguments 直接复用既有契约跑 ajv + semanticValidate，不另写第二份 schema、不扩字段类型；未过校验即返回可读错误（含字段路径与被 ajv 藏在 params 里的多余键名），连等待事件都不写——挂起一个渲染不出来的状态比拒绝更糟；未答则经 pauseForInput 落持久事实后抛 WorkbenchToolAwaitingInputError 就地停手（刻意不复用 orchestrator 的内存 Promise）"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/agent/tools/ask-user.tools.ts",
+      "summary": "新增工具注册：mutates:false、capability:estimates:read、parameters 逐字引用 INTERACTIVE_FORM_BLOCK_CONTRACT.schema（同一对象引用，由断言钉住「不得出现第二套表单 schema」）；execute 只兜住没有闸门的同步兜底通道，那里明确失败而非假装问过了"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/workbench-tool-loop.ts",
+      "summary": "分流必须落在 allow 腿内、registry.execute 之前：allow 档工具的 execute 抛错会被既有 catch 吞成一次普通工具失败，Run 会继续跑完并答一句「用户没回答」，永远不停在 waiting；仍走既有 allowToolNames 成员校验，能力位口径与其他只读工具完全一致"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/harness-runtime.repository.ts",
+      "summary": "新增 pauseRunForToolInput + findRunToolInputAnswer；批次 1a 的审批挂起与本批的填表挂起抽出共用 pauseRunForToolWait 原语（释放 attempt、取消优先于等待两条护栏只留一处实现），审批侧入参/事件/payload/错误文案逐字不变——批次 1a 那份 10 例 e2e 全绿即其回归证据"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/harness-runtime.types.ts",
+      "summary": "事件词汇 additive 追加 tool.call.awaiting_input（22 → 23），并纳入工具痕迹子集（否则刷新后控件消失，用户对着仍在 waiting 的 Run 无处可填）；刻意不复用 tool.call.awaiting_approval：两者 payload 与语义都不同"
+    },
+    {
+      "kind": "file",
+      "ref": "ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js",
+      "summary": "submitInteractiveForm：结构化 values 走 inputs 端点、模板渲染出的人话作为用户这一轮的可见发言进对话（两份产出用途不同、缺一不可）；控件撤下依赖本地 submitted 标记，不留着诱导第二次提交撞 409；遗留的 handleInteractiveFormSubmit（发聊天消息那条）一字未动"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh src/modules/harness/workbench-ask-user.e2e.test.ts（真库真装配，只 fake provider）",
+      "result": "pass",
+      "summary": "判据①②③④端到端实取 8 例全绿：判据① seq3:text.delta → seq4:tool.call.awaiting_input 且 Run 停在 waiting，全部 text.delta 拼起来不含一个花括号（正文零 JSON）；判据② seq6:run_inputs_submitted → seq11:tool.call.completed → run_completed，且续跑轮请求的 messages 里确有 ask_user 工具结果并逐字含 industry/manufacturing/scale/含二期，用户轮次仍只有发起 Run 那一句；判据③ 五种错法（缺 blockId / 类型不支持 / 多余属性 / 字段键用 name / single_select 无 options）均不写等待事件、不落 completed、Run 不停 waiting、回填一条带字段路径的可读失败；判据④ 全程零条 tool.call.awaiting_approval、零条 run_action_confirmed。另含一条参数漂移：换表单结构即换新 actionId，旧答案不复用、重新问一次"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:agent（新增 ask-user.tools.test.ts 18 例）",
+      "result": "pass",
+      "summary": "140 pass / 0 fail（开工基线 122，+18 全为本批用例）；实取 ask_user 决策槽 = allow，并钉住字段类型仍只有契约那五种"
+    },
+    {
+      "kind": "command",
+      "ref": "npx tsx scripts/b9-legacy-formblock-ab.mts（留仓对照脚本）",
+      "result": "pass",
+      "summary": "判据⑤ 零回归：改前（git HEAD 原件）与改后（工作区）并排喂 21 条输入 × 3 种调用形态 = 63 组调用，返回值 JSON 序列化逐字节相同、差异 0；语料含围栏/裸 JSON/截断/契约边界与「字段键用 name」这条真实错法；脚本内置零比对即失败守卫，临时件跑完自删"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "两条构建均 exit 0"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:harness",
+      "result": "pass",
+      "summary": "276 pass / 0 fail / 0 skipped（本批前同套件 268，+8 为本批 e2e；批次 1a 审批 10 例、批次 1c 连续性、批次 0 请求重建不变量全部未退化）"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "68 files / 548 tests passed（基线 67/537，+1 文件 +11 用例为本批 ask-user-form.test.jsx）；含「提交一次消息都没发」这条负向断言（postedUrls 恰为 ['/ai-runs/:runId/inputs']，未打 /ai-sessions/:id/runs、未打 /ai/home-workbench/chat、未打 /confirm）"
+    },
+    {
+      "kind": "command",
+      "ref": "九套件计数（test:modules / serial-store / rules / ai / security / scripts / integration / agent / harness / web）",
+      "result": "pass",
+      "summary": "modules 488→488 · serial-store 171→171 · rules 8→8 · ai 286→286 · security 17+2→17+2 · scripts 72→72 · integration 1→1 · agent 122→140 · harness 268→276 · web 537→548：合计 1972 → 2009，全部 pass / 0 fail / 0 skipped，净 +37 恰好等于三个新增测试文件之和（18+8+11），无删除无跳过"
+    },
+    {
+      "kind": "file",
+      "ref": "docs/openapi.yaml",
+      "summary": "两处契约同步：tool-events 的痕迹过滤口径补 awaiting_input；/ai-runs/{runId}/inputs 描述写明它是 ask_user 的唯一恢复通路、答复形状为 input={actionId,values}、并记明「发新聊天消息」为何必然 409（AGENTS.md：冲突时先修文档再交付）"
+    }
+  ],
+  "next": "待架构侧复核后合入 main，本批未自行合入。三件留给后续：① 用户那句可见发言目前只活在当前视图（提交即本地追加），刷新后从会话记录投影里看不到——把它做成持久用户轮次会撞批次 0 的发送-vs-存储不变量（workbench-request-invariant.ts 把历史末条覆盖成本轮原始用户正文，中途插一条 user 即长度/内容不符 → 续跑当场抛错），渲染文本已随 run_inputs_submitted 持久在事件流里，去向应随批次 2（历史表示重构）一并决定；② 旧的文本抽取路径按裁决保留未动（判据⑤ 已证零回归），整体退役与批次 4 合并评估；③ 控件字段类型仍只有契约那五种，「选 ABC」够用，扩类型属前端另案。",
+  "board": {
+    "change": {
+      "stage": "批次 9：交互控件做成工具 · 分支 feat/batch9-ask-user 未合入",
+      "result": "已回填 / 待 Codex 复核"
+    },
+    "testing": [
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:harness",
+        "result": "pass",
+        "summary": "276 pass / 0 fail / 0 skipped（基线 268，+8 为本批判据①②③④端到端与参数漂移）"
+      },
+      {
+        "command": "npm run test:agent",
+        "result": "pass",
+        "summary": "140 pass / 0 fail（基线 122，+18 为本批闸门单测：决策槽 allow、契约复用、三分支、actionId 漂移）"
+      },
+      {
+        "command": "npm run test:web",
+        "result": "pass",
+        "summary": "68 files / 548 passed（基线 67/537，+11 为本批：痕迹归约、重放吸收、提交只打 inputs 端点、两份产出、遗留控件行为不变）"
+      },
+      {
+        "command": "npm run test:modules",
+        "result": "pass",
+        "summary": "488 pass / 0 fail（与基线同值；五份防漂移脚本排在最前且全绿，含 test-file-reference 对本批两个新测试文件的 CI 可达性校验）"
+      },
+      {
+        "command": "npx tsx scripts/b9-legacy-formblock-ab.mts",
+        "result": "pass",
+        "summary": "判据⑤：63 组调用改前改后逐字节相同，0 差异"
+      },
+      {
+        "command": "npm run build:api && npm run build:web",
+        "result": "pass",
+        "summary": "两条构建均 exit 0"
+      }
+    ]
+  }
+}

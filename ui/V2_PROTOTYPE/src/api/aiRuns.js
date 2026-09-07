@@ -42,6 +42,21 @@ export async function cancelRun(runId) {
 }
 
 /**
+ * 批次 9 · 提交交互表单的答复（POST /ai-runs/:runId/inputs）。
+ *
+ * 这是恢复 waiting Run 的**唯一**通路，不是「发一条聊天消息」的替代品而是它的对立物：
+ * 会话存在活跃 Run 时提交新消息会被 harness_runs_active_workbench_session_unique
+ * 唯一索引挡成 409 SESSION_HAS_ACTIVE_RUN，而 waiting 正属活跃态——
+ * 挂在「等用户回答」上的 Run，只能用 inputs 端点解挂。
+ *
+ * actionId 必须逐字来自 tool.call.awaiting_input 事件：服务端按
+ * (runId, stepKey, ordinal, toolName, 表单结构摘要) 推导，前端自拼必定对不上这一次提问。
+ */
+export async function submitRunInputs(runId, input) {
+  return unwrap(await apiClient.post(`/ai-runs/${runId}/inputs`, { input }, { suppressUnauthorizedRedirect: true }))
+}
+
+/**
  * 提交 Run（RP-047 Batch E · Step 3）。
  * POST /ai-sessions/:sessionId/runs，返回 { runId, status, eventCursor }。
  * 503 ASYNC_RUNS_DISABLED 抛错供调用方回退旧同步路径。

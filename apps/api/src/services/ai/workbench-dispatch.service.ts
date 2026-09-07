@@ -8,6 +8,7 @@ import type { AuthUser, BusinessRole } from "../../types";
 import type { ToolCall } from "../../ai/provider/model-provider";
 import type { WorkbenchToolEffectRecorder } from "./workbench-tool-loop";
 import type { WorkbenchToolApprovalGate } from "./workbench-tool-approval";
+import type { WorkbenchToolInputGate } from "./workbench-tool-user-input";
 import type { AgentEvent } from "../../agent/agent.types";
 import type { ZhipuKnowledgeToolConfig, ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import { routeWorkbenchIntent, classifyIntentWithModel, type WorkbenchIntent, type ModelClassificationResult } from "./workbench-intent.service";
@@ -149,6 +150,15 @@ export type WorkbenchDispatchInput = {
    * **不接受模型或前端的批准表达**；未注入即拒绝执行写工具（失败方向关闭）。
    */
   toolApprovalGate?: WorkbenchToolApprovalGate;
+  /**
+   * 批次 9 · ask_user 交互闸门（additive）。同样仅异步 Run 通道注入。
+   * 与 toolApprovalGate 的分工是概念性的、不是实现取巧：审批闸门在**执行前**暂停
+   * （该不该让它做），本闸门是**执行本身即暂停**（它的作用就是等一个回答）。
+   * 两者共用 run.status=waiting 底层，恢复路径不同（confirmRunAction / submitRunInput），
+   * 因此是两个端口、两类事件，不得合并成一个。
+   * 未注入即不挂起：同步兜底通道没有可挂的 Run，表单不渲染、明确失败回给模型。
+   */
+  toolInputGate?: WorkbenchToolInputGate;
 };
 
 /** RP-047 Batch B：dispatch 取消错误，供调用方区分取消与真实模型故障。 */

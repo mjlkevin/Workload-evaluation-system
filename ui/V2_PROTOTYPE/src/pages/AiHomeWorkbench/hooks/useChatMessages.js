@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '../../../api/client.js'
 import { unwrap } from '../../../api/utils.js'
-import { submitRun, getRunToolEvents, confirmRunAction, rejectRunAction } from '../../../api/aiRuns.js'
+import { submitRun, getRunToolEvents, confirmRunAction, rejectRunAction, submitRunInputs } from '../../../api/aiRuns.js'
 import { useRunEventStream } from '../../../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../../../hooks/useSessionRuntimeStore.js'
 import { pickArray } from '../utils/harnessPayload.js'
@@ -39,6 +39,8 @@ const STREAM_EVENT_TYPES = {
   TOOL_CALL_COMPLETED: 'tool.call.completed',
   TOOL_CALL_FAILED: 'tool.call.failed',
   TOOL_CALL_AWAITING_APPROVAL: 'tool.call.awaiting_approval',
+  // 批次 9：ask_user「执行即暂停」——字符串与 HARNESS_RUN_EVENT_TYPES 白名单逐字一致
+  TOOL_CALL_AWAITING_INPUT: 'tool.call.awaiting_input',
   TOOL_CALL_REJECTED: 'tool.call.rejected',
   RUN_ACTION_CONFIRMED: 'run_action_confirmed',
   RUN_COMPLETED: 'run_completed',
@@ -384,6 +386,48 @@ export default function useChatMessages(workbench) {
   const approveToolCall = useCallback((call) => answerToolApproval(call, 'approve'), [answerToolApproval])
   const rejectToolCall = useCallback((call) => answerToolApproval(call, 'reject'), [answerToolApproval])
 
+  /**
+   * 批次 9 · 提交交互表单（ask_user 的恢复路径）。
+   *
+   * 两份产出用途不同，缺一不可：
+   *  · 结构化 values → POST /ai-runs/:runId/inputs，作为**工具结果**进入模型上下文；
+   *  · 模板渲染出的那句人话 → 作为用户这一轮的**可见发言**显示在对话里。
+   *
+   * 为什么绝不能改走「发一条聊天消息」：会话存在活跃 Run 时提交新消息会被
+   * harness_runs_active_workbench_session_unique 挡成 409 SESSION_HAS_ACTIVE_RUN，
+   * 而 waiting 正属活跃态——挂在「等回答」上的 Run 只能用 inputs 端点解挂。
+   * 服务端侧同口径见 api/aiRuns.js 的 submitRunInputs 注释。
+   */
+  const submitInteractiveForm = useCallback(async (call, messageText, values) => {
+    const runId = call?.input?.runId || activeRunIdRef.current
+    const actionId = call?.input?.actionId
+    if (!runId || !actionId) return
+    setToolActionState((prev) => ({ ...prev, [actionId]: { pending: true } }))
+    try {
+      await submitRunInputs(runId, { actionId, values, message: messageText })
+      // 用户这一轮的发言必须看得见。不加这一条，整段会话读起来就是
+      // 「用户什么都没说，AI 自己接着讲」——表单答案在库里是工具结果，不在对话里是话。
+      appendMessage({
+        id: `ai-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        role: 'user',
+        text: messageText,
+        createdAt: new Date().toISOString(),
+      })
+      // 本地收口：控件立即撤下，避免 worker 续跑前被重复提交。
+      // 重复提交会命中「只接受 waiting」的 409，答案本身已持久化，不会丢。
+      setToolActionState((prev) => ({ ...prev, [actionId]: { pending: false, submitted: true } }))
+      workbenchRef.current?.refreshUnifiedView?.().catch(() => {}) // 批次9：与审批同口径，统一视图刷新为 fire-and-forget，可静默
+      getRunToolEvents(runId).then((events) => {
+        setRunTrail((prev) => (prev.runId === runId ? { runId, calls: reduceToolCallTrail(events, { runId }) } : prev))
+      })
+    } catch (err) {
+      setToolActionState((prev) => ({
+        ...prev,
+        [actionId]: { pending: false, error: err?.message || '提交失败，请重试' },
+      }))
+    }
+  }, [appendMessage])
+
   // O8：SSE 流式事件处理（逐字呈现 + 思考折叠）
   const handleStreamEvent = useCallback((event) => {
     const seq = event.sequence
@@ -476,6 +520,9 @@ export default function useChatMessages(workbench) {
       // 归约链——chip 的状态机只有一个owner，实时与重建不会给出两种答案。
       case STREAM_EVENT_TYPES.TOOL_CALL_AWAITING_APPROVAL:
       case STREAM_EVENT_TYPES.TOOL_CALL_REJECTED:
+      // 批次 9：交互表单走同一条归约链——chip 状态机仍只有一个 owner，
+      // 控件的可渲染事实因此与刷新后重建的结果不可能分叉。
+      case STREAM_EVENT_TYPES.TOOL_CALL_AWAITING_INPUT:
       case STREAM_EVENT_TYPES.RUN_ACTION_CONFIRMED: {
         // 批次 0.5 · ③：工具调用状态可视化。事件喂进既有 toolCalls 通道
         // （WorkbenchToolCallTrace → MessageBubble → ThinkingTrace），不建新通道。
@@ -1173,6 +1220,8 @@ export default function useChatMessages(workbench) {
     pendingToolApprovals,
     approveToolCall,
     rejectToolCall,
+    // 批次 9：交互表单的提交入口（走 inputs 端点恢复 Run）
+    submitInteractiveForm,
     toolActionState,
     // 批次 0.5 · Part2：改走备用通道的可见状态（null = 正常路径不渲染任何提示）
     degradationNotice,

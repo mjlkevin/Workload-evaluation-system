@@ -892,9 +892,11 @@ paths:
         （副本会漂，且历史表示后续要整体换成事件序列），因此本端点直接按 run 读
         harness_run_events 的工具痕迹子集，纯读路径，不写任何状态。
         过滤口径见 HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES：tool.call.started /
-        completed / failed / awaiting_approval / rejected + run_action_confirmed
-        （同意侧复用既有事件，服务端约束②）；不含 tool.call.progress —— 心跳只更新
-        耗时，终态帧自带的 elapsedMs 已够重建用。
+        completed / failed / awaiting_approval / rejected / awaiting_input
+        + run_action_confirmed（同意侧复用既有事件，服务端约束②）；不含
+        tool.call.progress —— 心跳只更新耗时，终态帧自带的 elapsedMs 已够重建用。
+        批次 9：含 tool.call.awaiting_input，否则刷新后交互控件消失，用户对着一个
+        仍在 waiting 的 Run 无处可填。该事件 payload 自带契约校验后的 formBlock。
         参数只在 tool.call.started 那一份事件里（审批事件只带 actionId/callId），
         界面按 callId 回查后显示在同意/拒绝按钮旁。
         非 owner 与不存在的 Run 同为 404，不泄露存在性。
@@ -998,6 +1000,15 @@ paths:
         仅 waiting 状态可提交（事务内 append run_inputs_submitted 事件并
         waiting→queued）；非 waiting 返回 409 RUN_NOT_WAITING；input 必须为
         非空对象，否则 422。
+        批次 9 起本端点是 ask_user 交互表单的**唯一**恢复通路（另一条恢复通路是
+        confirm/reject，服务批次 1a 的写操作审批，两者不可混用）。表单答复的形状为
+        input = { actionId, values }：actionId 必须逐字来自该 Run 的
+        tool.call.awaiting_input 事件（服务端按 runId/stepKey/ordinal/toolName/
+        表单结构摘要推导，换题目即对不上）；values 为字段键值对，恢复后作为
+        **工具结果**回灌模型上下文，不作为新的用户轮次。
+        为什么不能改用「发一条新聊天消息」：会话存在活跃 Run 时提交新消息会被
+        harness_runs_active_workbench_session_unique 挡成 409
+        SESSION_HAS_ACTIVE_RUN，而 waiting 属活跃态。
       operationId: submitAiRunInputs
       security:
         - bearerAuth: []

@@ -14,6 +14,11 @@ import {
   resolveWorkbenchToolDecisionSlot,
   type WorkbenchToolApprovalGate,
 } from "./workbench-tool-approval";
+import {
+  ASK_USER_TOOL_NAME,
+  WORKBENCH_TOOL_INPUT_UNWIRED_MESSAGE,
+  type WorkbenchToolInputGate,
+} from "./workbench-tool-user-input";
 
 // ============================================================
 // 工作台工具循环 · 批次 0（只读工具真跑）→ 批次 1a（写操作执行前审批闸门）
@@ -138,6 +143,13 @@ type WorkbenchToolLoopCommon = {
    * 就不能放行——这是失败方向关闭，不是功能缺失。
    */
   toolApprovalGate?: WorkbenchToolApprovalGate;
+  /**
+   * 批次 9 · ask_user 档：向用户发起交互的闸门（additive）。
+   * 与 toolApprovalGate 同为「依赖可持久 Run 事件流」的端口，故同样只有异步 Run 通道注入：
+   * 同步兜底通道没有可挂起的 Run，缺闸门即明确失败（失败方向关闭），
+   * 绝不静默当作「已经问过了」。
+   */
+  toolInputGate?: WorkbenchToolInputGate;
   runtime?: RuntimeContext;
   maxTurns?: number;
   onEvent?: (event: AgentEvent) => void;
@@ -185,6 +197,33 @@ async function requireToolApproval(
   return undefined;
 }
 
+/**
+ * 批次 9 · ask_user 的交互取数。返回即「本轮可定案」：
+ *  { ok:true, data }  —— 用户已答（答案只可能来自 run_inputs_submitted 那一份持久事实）
+ *  { ok:false, error } —— 参数不合契约（含没有闸门可挂起的通道），可读错误回给模型自行纠正
+ * 不返回即挂起：闸门已把 tool.call.awaiting_input + status=waiting 落库，
+ * 随后抛出 WorkbenchToolAwaitingInputError，本函数不吞。
+ *
+ * 为什么必须在 registry.execute **之前**拦、而不是让工具的 execute 自己抛：
+ * ask_user 是 allow 档（mutates=false，无需审批），而 allow 档的 execute 抛错会被
+ * 下方 resolveOutcome 的 catch 吞成 { ok:false } 工具失败——Run 会继续跑完并答一句
+ * 「用户没回答」，永远不会停在 waiting。挂起语义在这里不是异常，是就地停手，
+ * 与批次 1a 对 Pending 的处理同构。
+ */
+async function requireToolUserInput(
+  ctx: WorkbenchToolLoopCommon,
+  call: { ordinal: number; toolName: string; callId: string; arguments: Record<string, unknown> },
+): Promise<WorkbenchToolEffectOutput> {
+  if (!ctx.toolInputGate) {
+    return { ok: false, error: `${call.toolName}: ${WORKBENCH_TOOL_INPUT_UNWIRED_MESSAGE}` };
+  }
+  const gateResult = await ctx.toolInputGate(call);
+  if (gateResult.outcome === "invalid") {
+    return { ok: false, error: gateResult.error };
+  }
+  return { ok: true, data: gateResult.data };
+}
+
 type ToolBatchContext = WorkbenchToolLoopCommon & {
   workingMessages: WorkbenchToolLoopMessage[];
   trace: WorkbenchToolCallTrace[];
@@ -217,6 +256,11 @@ async function executeToolCallBatch(ctx: ToolBatchContext, calls: ToolCall[]): P
         if (gateOutcome) return gateOutcome;
       } else if (!ctx.allowToolNames.has(name)) {
         return { ok: false, error: `工作台未开放该工具，${name} 未获准执行` };
+      } else if (name === ASK_USER_TOOL_NAME) {
+        // 批次 9：allow 档且执行本身即暂停——必须在 registry.execute 之前分流，
+        // 否则挂起信号会被下方 catch 吞成一次普通工具失败（见 requireToolUserInput 说明）。
+        // 仍走上面的 allowToolNames 成员校验：能力位口径与其他只读工具完全一致。
+        return requireToolUserInput(ctx, { ordinal, toolName: name, callId, arguments: args });
       }
       try {
         const data = await ctx.registry.execute(name, args, ctx.agentUser, ctx.runtime);

@@ -26,6 +26,7 @@ import {
   type HarnessWorkerTiming,
 } from "./harness-runtime.types";
 import { WorkbenchToolApprovalPendingError } from "../../services/ai/workbench-tool-approval";
+import { WorkbenchToolAwaitingInputError } from "../../services/ai/workbench-tool-user-input";
 
 // ============================================================
 // 错误词汇
@@ -416,7 +417,9 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
       // 已经把 run 置 waiting、attempt 释放，此处**不得**再落任何终态，
       // 否则 Run 会被判 failed，用户回来确认时只会看到一个死掉的回合。
       // 落库事实只有：tool.call.awaiting_approval + status=waiting。
-      if (err instanceof WorkbenchToolApprovalPendingError) return;
+      // 批次 9 · 填表挂起同构（落库事实是 tool.call.awaiting_input + status=waiting）：
+      // 用户还没答，答了才有下一步，两种等待都不该被写成一次故障。
+      if (err instanceof WorkbenchToolApprovalPendingError || err instanceof WorkbenchToolAwaitingInputError) return;
       if (
         cancelDetected ||
         controller.signal.aborted ||

@@ -14,6 +14,7 @@ import {
   buildGenerateWbsTool,
 } from "./tools/mutation.tools";
 import { buildListToolsTool } from "./tools/list-tools.tools";
+import { buildAskUserTool } from "./tools/ask-user.tools";
 import { calculateEstimateOnly, listExportHistoryByOwner } from "../modules/estimates/estimates.module";
 import { calculateAndExportEstimate } from "../modules/estimates/estimates.usecase";
 import {
@@ -26,7 +27,8 @@ import { queryZhipuKnowledgeBase } from "../services/ai/knowledge-tool.service";
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
 
 /**
- * 默认 Agent 工具注册表（O2 · A3）：注册全部 8 个工具。
+ * 默认 Agent 工具注册表（O2 · A3）：注册全部 10 个工具（批次 9 起 = 原 8 个
+ * + ask_user + 内置发现工具 list_tools）。
  *
  * 能力位映射说明：计划文档中的 project:read / estimate:read / knowledge:read /
  * rule:read / project:write / wbs:write / export:write 在当前 RBAC Capability
@@ -76,6 +78,11 @@ export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext):
       ),
     ),
   );
+
+  // ---- 批次 9：向用户发起交互（mutates=false → allow 档，不经审批） ----
+  // 注册在写操作之后、发现工具之前：既有 8 个工具的注入顺序因此逐字节不变，
+  // list_tools 仍在末位（按需发现模式按 category=discovery 排除它）。
+  registry.register(buildAskUserTool());
 
   // ---- SP-2026-007 MS3：内置发现工具（注册在最后，全量回退时按 category=discovery 排除，
   //      保证旧 8 工具注入顺序逐字节一致；按需发现模式下常驻核心注入集） ----

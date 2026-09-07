@@ -82,8 +82,8 @@ test("Batch B adds recovery and cancellation event types additively (E1)", () =>
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_cancelled"));
   assert.equal(
     HARNESS_RUN_EVENT_TYPES.length,
-    22,
-    "Batch B 词汇 12 类 + Batch C/ISS-004/批次0.5/批次1a additive 追加 2+2+4+2 类 = 22",
+    23,
+    "Batch B 词汇 12 类 + Batch C/ISS-004/批次0.5/批次1a/批次9 additive 追加 2+2+4+2+1 类 = 23",
   );
 });
 
@@ -109,8 +109,8 @@ test("Batch C adds inputs and confirmation event types additively (E1)", () => {
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_action_confirmed"));
   assert.equal(
     HARNESS_RUN_EVENT_TYPES.length,
-    22,
-    "Batch C + ISS-004/批次0.5/批次1a additive 追加 2+4+2 类事件 = 22",
+    23,
+    "Batch C + ISS-004/批次0.5/批次1a/批次9 additive 追加 2+4+2+1 类事件 = 23",
   );
 });
 
@@ -150,8 +150,8 @@ test("ISS-2026-08-10-004 adds streaming text.delta/thought event types additivel
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("thought"), "模型思考事件类型必须入白名单");
   assert.equal(
     HARNESS_RUN_EVENT_TYPES.length,
-    22,
-    "ISS-004 之后的词汇 + 批次0.5/批次1a additive 追加 4+2 类工具事件（16 → 22）",
+    23,
+    "ISS-004 之后的词汇 + 批次0.5/批次1a/批次9 additive 追加 4+2+1 类工具事件（16 → 23）",
   );
 });
 
@@ -192,22 +192,24 @@ test("批次0.5 adds tool.call.* event types additively", () => {
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.progress"), "工具执行进度必须入白名单");
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.completed"), "工具调用成功必须入白名单");
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.failed"), "工具调用失败必须入白名单");
-  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 22, "批次0.5 追加 4 类 + 批次1a 追加 2 类（16 → 22）");
+  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 23, "批次0.5 追加 4 类 + 批次1a 追加 2 类 + 批次9 追加 1 类（16 → 23）");
 
-  // 点号命名族必须恰好是这 6 条：不得夹带其他 tool.* 变体（防词汇漂移）。
-  // 批次 0.5 登记 4 条，批次 1a（写操作审批闸门）additive 追加 2 条。
+  // 点号命名族必须恰好是这 7 条：不得夹带其他 tool.* 变体（防词汇漂移）。
+  // 批次 0.5 登记 4 条，批次 1a（写操作审批闸门）additive 追加 2 条，
+  // 批次 9（ask_user 交互表单）additive 追加 1 条。
   const toolFamily = HARNESS_RUN_EVENT_TYPES.filter((type) => type.startsWith("tool."));
   assert.deepEqual(
     [...toolFamily].sort(),
     [
       "tool.call.awaiting_approval",
+      "tool.call.awaiting_input",
       "tool.call.completed",
       "tool.call.failed",
       "tool.call.progress",
       "tool.call.rejected",
       "tool.call.started",
     ],
-    "tool.* 族只允许批次 0.5（4 类）+ 批次 1a（2 类）登记的 6 类",
+    "tool.* 族只允许批次 0.5（4 类）+ 批次 1a（2 类）+ 批次 9（1 类）登记的 7 类",
   );
 
   // 负向守护：批次 1a 的「同意」刻意**不新增**事件类型——复用既有 run_action_confirmed。
@@ -250,15 +252,40 @@ test("批次1a adds tool approval gate event types additively", () => {
     "tool.call.completed",
     "tool.call.failed",
   ];
-  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 20 + 2, "批次 1a 只允许 additive 追加 2 类");
   assert.deepEqual(
     [...HARNESS_RUN_EVENT_TYPES].slice(0, 20),
     preApprovalFrozen20,
-    "前 20 类必须逐位不变——本批不得重排、删除或改名既有词汇",
+    "前 20 类必须逐位不变——批次 1a 起不得重排、删除或改名既有词汇",
   );
   assert.deepEqual(
-    [...HARNESS_RUN_EVENT_TYPES].slice(20),
+    [...HARNESS_RUN_EVENT_TYPES].slice(20, 22),
     ["tool.call.awaiting_approval", "tool.call.rejected"],
-    "本批新增的两类审批事件名与顺序必须精确一致",
+    "本批新增的两类审批事件名与顺序必须精确一致（后续批次只能继续往后加，不得插入本批槽位）",
+  );
+});
+
+// ============================================================
+// 批次 9（additive）：ask_user 交互表单的「执行即暂停」词汇
+// ============================================================
+// 必须独立成类而非复用 tool.call.awaiting_approval：两者 payload 不同
+// （审批只带 actionId / callId / toolName，本类必须带整份表单结构），
+// 语义也不同（该不该让它做 vs 等你回答）。同一条事件表达两种事实，
+// 读侧就只能靠猜分支——那正是本表要锁死的漂移形态。
+
+test("批次9 adds the ask_user awaiting-input event type additively", () => {
+  assert.equal(
+    HARNESS_RUN_EVENT_TYPES.length,
+    22 + 1,
+    "批次 9 只允许在批次 1a 的 22 类之上 additive 追加 1 类",
+  );
+  assert.deepEqual(
+    [...HARNESS_RUN_EVENT_TYPES].slice(22),
+    ["tool.call.awaiting_input"],
+    "本批新增的唯一一类必须落在末位且名称精确一致",
+  );
+  // 两条 awaiting 事件必须同时在册：合并成一条即为本批要防的语义漂移
+  assert.ok(
+    (HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.awaiting_approval"),
+    "审批等待不得被表单等待顶掉——两者是不同的等待",
   );
 });
