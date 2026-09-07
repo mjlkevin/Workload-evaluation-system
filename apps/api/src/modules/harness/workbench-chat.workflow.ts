@@ -33,6 +33,11 @@ import type {
 import type { WorkbenchToolEffectOutput } from "../../services/ai/workbench-tool-loop";
 import { createWorkbenchToolEventSink, toWorkbenchToolCallMetadata } from "../../services/ai/workbench-tool-event-surface";
 import { WorkbenchToolApprovalPendingError, type WorkbenchToolApprovalGate } from "../../services/ai/workbench-tool-approval";
+import {
+  WorkbenchToolAwaitingInputError,
+  createWorkbenchToolInputGate,
+  type WorkbenchToolInputGate,
+} from "../../services/ai/workbench-tool-user-input";
 import type { WorkbenchToolCallSummary } from "../../services/ai/workbench-tool-event-surface";
 import type {
   AppendAiSessionMessageIdempotentInput,
@@ -116,6 +121,19 @@ export type WorkbenchChatWorkflowDeps = {
     stepKey: string;
     beforePause: () => Promise<unknown>;
   }): WorkbenchToolApprovalGate;
+  /**
+   * 批次 9 · ask_user 交互闸门工厂（additive）。仅异步 Run 通道注入。
+   * 两端口同样必须由 Run 事件流 + run.status 实现（可持久）：
+   *  · findAnswer  读 run_inputs_submitted 里那份按 actionId 对上的答案；
+   *  · pauseForInput 落 tool.call.awaiting_input（带表单结构）+ status=waiting。
+   * 挂起前同样要 `beforePause` 冲刷写链，让 tool.call.started 严格早于等待事件。
+   */
+  buildToolInputGate?(input: {
+    runId: string;
+    attemptId: string;
+    stepKey: string;
+    beforePause: () => Promise<unknown>;
+  }): WorkbenchToolInputGate;
   /**
    * ISS-2026-08-16-002：会话级附件回退——请求未携带附件时，从已落库会话
    * 记录中取最近一个带 parsedSummary 的附件作为 dispatch 上下文（与同步
@@ -241,6 +259,17 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
           })
         : undefined;
 
+      // 批次 9：交互闸门随本 Run 构造。答案只可能来自服务端持久事实
+      // （run_inputs_submitted 里按 actionId 对上的那一份），模型与前端都无从表达「已答」。
+      const toolInputGate = deps.buildToolInputGate
+        ? deps.buildToolInputGate({
+            runId: run.harnessRunId,
+            attemptId: ctx.attempt.harnessRunAttemptId,
+            stepKey,
+            beforePause: () => flushUiEventsBeforePause(),
+          })
+        : undefined;
+
       // effectKey 冻结口径：外层 dispatch 副作用恒为 workbench_chat_answer:1。
       // 批次 0 · ④：工具调用不复用这个 key——一轮 Run 内可能有 N 次工具调用，
       // 共用固定 key 会让第 2..N 次命中第 1 次已记录的 effect 被直接跳过
@@ -324,6 +353,8 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               onToolEvent: toolEventSink.onToolEvent,
               // 批次 1a · 约束③：审批闸门接缝（additive，仅本异步通道注入）。
               ...(toolApprovalGate ? { toolApprovalGate } : {}),
+              // 批次 9 · ask_user 闸门接缝（additive，仅本异步通道注入）。
+              ...(toolInputGate ? { toolInputGate } : {}),
               // 批次 0 · ⑤：发送-vs-存储对账的读取钩子。必须当场重取会话记录，
               // 不得复用上面的 historyMessages——那份正是被对账的发送侧，同源即永真。
               ...(deps.getSessionRecord
@@ -349,7 +380,11 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
           } catch (err) {
             // 批次 1a：审批挂起不是回合失败——Run 停在 waiting 等用户，既不落失败
             // trace（会被当成一次故障污染考卷），也不由 runtime 标记 failed。
-            if (err instanceof WorkbenchToolApprovalPendingError) {
+            // 批次 9：填表挂起同理（同一种「等一个人」，只是等的东西不同）。
+            if (
+              err instanceof WorkbenchToolApprovalPendingError ||
+              err instanceof WorkbenchToolAwaitingInputError
+            ) {
               throw err;
             }
             // RP-030：失败 trace 归档（与同步路径同口径；归档自身失败静默吸收），随后重抛由 runtime 标记 run failed

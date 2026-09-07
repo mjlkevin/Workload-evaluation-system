@@ -85,7 +85,13 @@ for (const role of ["admin", "sub_admin", "user"] as const) {
     // 普通 user 因此只拿到 create_project。放开闸门不得顺手放宽权限。
     const WRITE_TOOLS = ["create_project", "generate_wbs", "export_report"] as const;
     const READ_TOOLS = ["estimate_implementation", "project_list", "estimate_history", "knowledge_query", "rule_lookup"] as const;
-    assert.deepEqual(names, [...READ_TOOLS, ...WRITE_TOOLS.filter((name) => set.registry.get(name) && set.agentUser.capabilities.includes(set.registry.get(name)!.capability))]);
+    // 批次 9：ask_user 注册在原 8 个之后（注入序同注册序），落 allow 档、不经审批
+    const ASK_USER_TOOL = "ask_user";
+    assert.deepEqual(names, [
+      ...READ_TOOLS,
+      ...WRITE_TOOLS.filter((name) => set.registry.get(name) && set.agentUser.capabilities.includes(set.registry.get(name)!.capability)),
+      ASK_USER_TOOL,
+    ]);
     assert.equal((names as string[]).includes("list_tools"), false);
     for (const writeTool of WRITE_TOOLS) {
       const injected: boolean = names.includes(writeTool);
@@ -95,6 +101,9 @@ for (const role of ["admin", "sub_admin", "user"] as const) {
     for (const readOnlyTool of READ_TOOLS) {
       assert.equal(set.allowToolNames.has(readOnlyTool), true, `${readOnlyTool} 应直接放行`);
     }
+    // 判据④：ask_user 走 allow 档——注入即直接放行，且绝不进审批名单
+    assert.equal(set.allowToolNames.has(ASK_USER_TOOL), true, "ask_user 应直接放行（问一句话不要审批）");
+    assert.equal(set.approvalRequiredToolNames.has(ASK_USER_TOOL), false, "ask_user 不得进审批名单");
     if (set.agentUser.capabilities.includes("estimates:write")) {
       assert.deepEqual(
         WRITE_TOOLS.filter((name) => names.includes(name)),

@@ -64,6 +64,8 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
     // 批次 1b：写工具的同意 / 拒绝（就地长在 chip 上，不弹窗）
     onApproveToolCall: chat.approveToolCall,
     onRejectToolCall: chat.rejectToolCall,
+    // 批次 9：ask_user 控件的提交（走 inputs 端点恢复 Run，不走发消息）
+    onAskUserSubmit: chat.submitInteractiveForm,
     toolActionState: chat.toolActionState,
   }
 
@@ -130,6 +132,7 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
         toolActionState={chat.toolActionState}
         onApprove={chat.approveToolCall}
         onReject={chat.rejectToolCall}
+        onAskUserSubmit={chat.submitInteractiveForm}
       />
 
       <Composer

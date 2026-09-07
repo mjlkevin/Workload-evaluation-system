@@ -16,6 +16,7 @@ import type { StreamingChunk } from "../../services/ai/workbench-dispatch.servic
 import { buildWorkbenchChatDispatchInput, buildWorkbenchChatModelInput, getKimiProvider, resolveWorkbenchChatScenario } from "../../services/ai/handlers/workbench-shared";
 import { resolveWorkbenchInjectableTools, runWorkbenchToolLoopStream } from "../../services/ai/workbench-tool-loop";
 import { createWorkbenchToolApprovalGate } from "../../services/ai/workbench-tool-approval";
+import { createWorkbenchToolInputGate } from "../../services/ai/workbench-tool-user-input";
 import { assertWorkbenchModelRequestMatchesStorage } from "../../services/ai/workbench-request-invariant";
 import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.repository";
 import { getAiSession } from "../ai-sessions/ai-sessions.usecase";
@@ -217,6 +218,8 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
           onEvent: input.onToolEvent,
           // 批次 1a：ask 档（写工具）执行前的审批闸门。异步通道注入；缺省即拒绝执行。
           toolApprovalGate: input.toolApprovalGate,
+          // 批次 9：ask_user 的交互闸门（执行本身即暂停）。同样仅异步通道注入。
+          toolInputGate: input.toolInputGate,
           invokeStream: async function* ({ messages }) {
             const stream = streamChatCompletion({
               // DEF-2026-09-03-001：模型与 baseUrl 取自场景配置，不再直读 env 默认值。
@@ -283,6 +286,21 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
           // tool.call.awaiting_approval 落库，否则审批请求按 callId 查不到参数。
           await beforePause();
           await options.repo.pauseRunForToolApproval(input);
+        },
+      }),
+    // 批次 9 · ask_user：交互闸门的两端口同样落在 Run 事件流 + run.status 上。
+    // 答案的唯一来源是 run_inputs_submitted 那一份持久事实（用户经
+    // POST /ai-runs/:runId/inputs 提交），与审批同为「可持久等待」——
+    // worker 重启后仍然认这份答案，不会把已经答过的问题再问一遍。
+    buildToolInputGate: ({ runId, attemptId, stepKey, beforePause }) =>
+      createWorkbenchToolInputGate({ runId, attemptId, stepKey }, {
+        // 查不到 / 抛错 → 按「未答」处理，重新挂起问一次（失败方向关闭）
+        findAnswer: (input) => options.repo.findRunToolInputAnswer(input),
+        pauseForInput: async (input) => {
+          // 与审批同一条冲刷理由：tool.call.started（参数唯一来源）必须严格早于
+          // 等待事件落库，否则界面按 callId 回查不到这次提问的原始参数。
+          await beforePause();
+          await options.repo.pauseRunForToolInput(input);
         },
       }),
     // ISS-2026-08-16-002：会话级附件回退——请求未携带附件时，从已落库会话

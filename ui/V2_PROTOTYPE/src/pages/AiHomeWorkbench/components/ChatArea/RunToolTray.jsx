@@ -1,5 +1,6 @@
 import ToolCallChip from './ToolCallChip.jsx'
 import { TOOL_CALL_STATUS } from '../../utils/messageFormatter.js'
+import AskUserForm from './AskUserForm.jsx'
 
 /**
  * 本轮 Run 的工具痕迹托盘（批次 1b）。
@@ -11,24 +12,31 @@ import { TOOL_CALL_STATUS } from '../../utils/messageFormatter.js'
  *
  * 刻意不是弹窗：弹窗会盖住正在流式输出的回答（工单口径）。
  */
-export default function RunToolTray({ calls, toolActionState, onApprove, onReject }) {
+export default function RunToolTray({ calls, toolActionState, onApprove, onReject, onAskUserSubmit }) {
   const list = Array.isArray(calls) ? calls.filter((call) => call && (call.name || call.approval)) : []
   if (!list.length) return null
   const hasAwaiting = list.some((call) => call.status === TOOL_CALL_STATUS.AWAITING_APPROVAL)
+  // 批次 9：本批同样有「在等这个人」的形态，且等的是回答而非同意——两者要分开提示
+  const hasAwaitingInput = list.some((call) => call.status === TOOL_CALL_STATUS.AWAITING_INPUT)
 
   return (
     <div
       role="group"
-      aria-label={hasAwaiting ? '等待你确认的写操作' : '本轮工具调用痕迹'}
+      aria-label={hasAwaiting ? '等待你确认的写操作' : hasAwaitingInput ? '等待你回答的提问' : '本轮工具调用痕迹'}
       className={`m-0 mt-0 flex flex-col gap-1.5 rounded-md border px-3 py-2 text-xs ${
-        hasAwaiting ? 'border-warn/50 bg-warn-soft' : 'border-line bg-bg-soft'
+        hasAwaiting || hasAwaitingInput ? 'border-warn/50 bg-warn-soft' : 'border-line bg-bg-soft'
       }`}
       style={{ margin: '0 20px' }}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <b className="text-[12px] text-ink">{hasAwaiting ? '这个任务在等你确认' : '本轮工具调用'}</b>
+        <b className="text-[12px] text-ink">
+          {hasAwaiting ? '这个任务在等你确认' : hasAwaitingInput ? '这个任务在等你回答' : '本轮工具调用'}
+        </b>
         {hasAwaiting && (
           <span className="text-ink-3">不点就一直等着——系统不会替你决定，也不会超时自动放行</span>
+        )}
+        {hasAwaitingInput && !hasAwaiting && (
+          <span className="text-ink-3">填完提交就继续，不提交就一直等着（没有超时自动跳过）</span>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
@@ -43,6 +51,10 @@ export default function RunToolTray({ calls, toolActionState, onApprove, onRejec
           />
         ))}
       </div>
+      {/* 批次 9：刷新后仍要能把控件交回用户，否则 Run 卡在 waiting 而界面上无处可填 */}
+      {onAskUserSubmit && (
+        <AskUserForm calls={list} actionState={toolActionState} onSubmit={onAskUserSubmit} />
+      )}
     </div>
   )
 }

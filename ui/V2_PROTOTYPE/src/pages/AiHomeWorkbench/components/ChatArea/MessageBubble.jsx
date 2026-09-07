@@ -6,6 +6,7 @@ import DraftLinker from '../WorkspacePanel/DraftLinker.jsx'
 import AttachmentCard from './AttachmentCard.jsx'
 import RichAiMessage from './RichAiMessage.jsx'
 import LoadingState from './LoadingState.jsx'
+import AskUserForm from './AskUserForm.jsx'
 import { CopyMessageButton, MessageTimestamp } from './MessageBits.jsx'
 
 export default function MessageBubble({
@@ -25,6 +26,8 @@ export default function MessageBubble({
   onApproveToolCall,
   onRejectToolCall,
   toolActionState,
+  // 批次 9：ask_user 控件的提交入口（走 inputs 端点恢复 Run，不是发消息）
+  onAskUserSubmit,
 }) {
   const isUser = message.role === 'user'
   const hasArtifacts = !isUser && !message.error && pickArray(message.artifacts).length > 0
@@ -71,6 +74,16 @@ export default function MessageBubble({
             formBlock={message.formBlock}
             disabled={sending}
             onSubmit={onFormSubmit}
+          />
+        )}
+        {/* 批次 9：工具调用产生的交互表单（口径来自工具痕迹，答完即消失）。
+            与上面那段【遗留】文本抽取控件互不影响：那条路没有 actionId，也就无从恢复 Run。 */}
+        {!isUser && !message.error && (
+          <AskUserForm
+            calls={message.toolCalls}
+            actionState={toolActionState}
+            disabled={sending}
+            onSubmit={onAskUserSubmit}
           />
         )}
         {!isUser && !message.error && pickArray(message.artifacts).map((artifact) => (

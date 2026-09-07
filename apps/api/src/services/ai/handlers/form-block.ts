@@ -90,6 +90,23 @@ function extractFormBlockPayload(record: Record<string, unknown>): InteractiveFo
   return normalizeInteractiveFormBlock(record.formBlock);
 }
 
+/**
+ * 【遗留路径 · 批次 9 起不再是发起交互的正道，行为保持原样】
+ *
+ * 本函数从模型**自由文本**里抽 formBlock：模型必须自己想起来写一整段 JSON，
+ * 且格式完全正确。实证失效（2026-09-06 会话 7f5cbf75）：抽取失败时那段 JSON
+ * 逐字出现在 text.delta 里被当正文渲染给用户；且模型把字段键猜成 `name`
+ * 而契约要求 `id`。产生方式不可靠，控件本身其实没问题。
+ *
+ * 批次 9 已把「向用户发起交互」做成工具（ask_user，见
+ * services/ai/workbench-tool-user-input.ts）：参数由 provider 结构化下发、
+ * 服务端按同一份 INTERACTIVE_FORM_BLOCK_CONTRACT 校验，渲染与否不再取决于
+ * 模型是否记得写对格式。新用法一律走工具。
+ *
+ * 保留而不删（§9.8.3 裁决）：报告生成等其它流程可能在用，尚未逐条盘点；
+ * 删除的风险大于本批收益。整体退役与批次 4（正则 handler 退役）合并评估。
+ * 本批对其**行为零改动**，判据⑤以同一批输入做改前改后逐字节对照。
+ */
 export function extractFormBlockFromModelOutput(answer: string, rawContent?: string): { answer: string; formBlock?: InteractiveFormBlock } {
   const inspectTexts = [answer, rawContent || ""].filter(Boolean);
 

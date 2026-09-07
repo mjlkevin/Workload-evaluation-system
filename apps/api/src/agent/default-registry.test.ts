@@ -25,12 +25,13 @@ function visibleNames(registry: ReturnType<typeof createDefaultRegistry>, caps: 
     .sort();
 }
 
-test("createDefaultRegistry: 注册数 ≥9 且工具名单快照（含内置 list_tools）", () => {
+test("createDefaultRegistry: 注册数 ≥10 且工具名单快照（含内置 list_tools）", () => {
   const registry = createDefaultRegistry(fakeUser);
   const names = visibleNames(registry, FULL_CAPS);
 
-  assert.ok(names.length >= 9, `注册数应 ≥9，实际 ${names.length}`);
+  assert.ok(names.length >= 10, `注册数应 ≥10，实际 ${names.length}`);
   assert.deepEqual(names, [
+    "ask_user",
     "create_project",
     "estimate_history",
     "estimate_implementation",
@@ -46,8 +47,10 @@ test("createDefaultRegistry: 注册数 ≥9 且工具名单快照（含内置 li
 test("createDefaultRegistry: 能力位 → 工具映射快照", () => {
   const registry = createDefaultRegistry(fakeUser);
 
-  // estimates:read：4 个查询工具 + 内置发现工具 list_tools
+  // estimates:read：4 个查询工具 + 批次 9 的 ask_user + 内置发现工具 list_tools
+  // （ask_user 用只读档是裁决：凡能用工作台的人都可被提问）
   assert.deepEqual(visibleNames(registry, ["estimates:read"]), [
+    "ask_user",
     "estimate_history",
     "knowledge_query",
     "list_tools",
@@ -96,7 +99,7 @@ test("MS3: 默认注册表含内置 list_tools（发现类，核心注入）", (
   assert.notEqual(tool.discoverable, true, "list_tools 本身应常驻核心注入集");
 });
 
-test("MS3: 全量回退注入与旧行为逐字节一致（原 8 工具、原顺序、无 list_tools）", () => {
+test("MS3: 全量回退注入与旧行为逐字节一致（原 8 工具、原顺序、无 list_tools；批次 9 起末尾追加 ask_user）", () => {
   const registry = createDefaultRegistry(fakeUser);
   const names = registry
     .listFullToolsFor({ id: fakeUser.id, capabilities: FULL_CAPS })
@@ -111,6 +114,8 @@ test("MS3: 全量回退注入与旧行为逐字节一致（原 8 工具、原顺
     "create_project",
     "generate_wbs",
     "export_report",
+    // 批次 9 注册在原 8 个之后、发现工具之前：旧注入顺序逐字节不变
+    "ask_user",
   ]);
 });
 

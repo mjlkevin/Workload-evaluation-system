@@ -85,6 +85,15 @@ export const HARNESS_RUN_EVENT_TYPES = [
   // tool.call.started 那一份为唯一来源，界面显示与实际执行因此不可能分叉。
   "tool.call.awaiting_approval",
   "tool.call.rejected",
+  // 批次 9（additive）：ask_user 工具「执行本身即暂停」——
+  // 与批次 1a 的区别是概念性的，不是实现取巧：1a 是**执行前**暂停（该不该让它做），
+  // 本条是**执行即**暂停（它的作用就是等一个回答）。两者共用 run.status=waiting 底层，
+  // 但恢复路径不同——确认走 confirmRunAction，填表走 submitRunInput。
+  // 刻意不复用 tool.call.awaiting_approval：两者 payload 不同（一个只带 actionId /
+  // callId / toolName，一个必须带整份表单结构），语义也不同（该不该让它做 vs 等你回答）。
+  // 同一条事件要表达两种事实，读侧就必须靠猜分支——那正是本表要锁死的漂移形态。
+  // payload 带 formBlock 表单结构本身（参数唯一来源仍是 tool.call.started 那一份）。
+  "tool.call.awaiting_input",
 ] as const;
 export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
 
@@ -94,6 +103,8 @@ export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
  *
  * 含同意侧的 run_action_confirmed：用户点完同意到 worker 续跑之间有一段窗口，
  * 只读 tool.* 会把这一段读成「还在等你确认」，于是同一件事被问第二遍。
+ * 含批次 9 的 tool.call.awaiting_input：交互表单同样是「界面在等这个人」的状态，
+ * 不并进来则刷新页面后控件消失，用户对着一个还在 waiting 的 Run 无从下手。
  * 不含 tool.call.progress：心跳只更新耗时，终态帧自带的 elapsedMs 已够重建用，
  * 把它读回来只会放大响应（长任务的心跳可达数十条）。
  *
@@ -106,6 +117,7 @@ export const HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES = [
   "tool.call.failed",
   "tool.call.awaiting_approval",
   "tool.call.rejected",
+  "tool.call.awaiting_input",
   "run_action_confirmed",
 ] as const satisfies readonly HarnessRunEventType[];
 export type HarnessRunToolTrailEventType = (typeof HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES)[number];

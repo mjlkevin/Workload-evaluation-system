@@ -235,6 +235,27 @@ export type RejectHarnessRunActionInput = {
 /** 批次 1a：持久审批决策（approved ← run_action_confirmed，rejected ← tool.call.rejected） */
 export type HarnessToolApprovalDecision = "approved" | "rejected";
 
+/**
+ * 批次 9：ask_user 挂起入参。与审批的唯一差别是 payload 必须带**整份表单结构**
+ * ——控件渲染不出「一个没有题目的问题」，而 tool.call.started 里那份参数是模型原始
+ * 入参（未经契约归一），渲染它等于把校验前的脏数据交给界面。
+ */
+export type PauseHarnessRunForToolInputInput = {
+  runId: string;
+  attemptId: string;
+  actionId: string;
+  callId: string;
+  ordinal: number;
+  toolName: string;
+  formBlock: Record<string, unknown>;
+  now?: Date;
+};
+
+/** 批次 9：用户经 POST /:runId/inputs 提交的答案（values 键即表单 field.id） */
+export type HarnessToolInputAnswer = {
+  values: Record<string, unknown>;
+};
+
 export interface HarnessRuntimeRepository {
   createQueuedRun(input: CreateQueuedHarnessRunInput): Promise<{ run: HarnessRunRow; created: boolean }>;
   findRunForOwner(runId: string, ownerUserId: string): Promise<HarnessRunRow | null>;
@@ -299,6 +320,16 @@ export interface HarnessRuntimeRepository {
   listRunToolEvents(input: { runId: string; limit?: number }): Promise<HarnessRunEventRow[]>;
   /** 批次 1a · 闸门读持久决策；无决策返回 null（调用方按未获批准处理） */
   findRunToolApprovalDecision(input: { runId: string; actionId: string }): Promise<HarnessToolApprovalDecision | null>;
+  /**
+   * 批次 9 · 把「等用户填表」写成持久事实——同一事务内落 tool.call.awaiting_input
+   * （payload 带整份表单结构）+ 释放当前 attempt + run.status 置 waiting。
+   * 与 pauseRunForToolApproval 共用挂起原语，但恢复走 submitRunInput 而非 confirmRunAction。
+   */
+  pauseRunForToolInput(
+    input: PauseHarnessRunForToolInputInput,
+  ): Promise<{ paused: boolean; run: HarnessRunRow; event: HarnessRunEventRow }>;
+  /** 批次 9 · 闸门读持久答案（run_inputs_submitted）；未答返回 null（调用方按未答处理） */
+  findRunToolInputAnswer(input: { runId: string; actionId: string }): Promise<HarnessToolInputAnswer | null>;
 }
 
 type HarnessTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -480,6 +511,89 @@ async function findRunEventByActionId(
     .orderBy(asc(harnessRunEvents.sequence))
     .limit(1);
   return rows[0];
+}
+
+// ============================================================
+// 工具等待用户：挂起原语（批次 1a 审批 + 批次 9 填表共用同一段事务体）
+// ============================================================
+// 两者等待的是不同的东西（该不该让它做 vs 等你回答），但**挂起这个动作本身同构**：
+// 落一条等待事件 + 释放 attempt + run.status 置 waiting，全部在同一事务内。
+// 抽出来是为了让「释放 attempt」「取消优先于等待」这两条易漏的护栏只有一处实现——
+// 复制一遍就会在下一批次里少抄一条（attempt 不释放 → lease 到期被判孤儿 →
+// waiting 的 Run 改写成 recovering → 用户提交时得到 409）。
+// 差异只在传进来的 eventType / payload / 两条错误文案，行为逐字保持各自批次原样。
+
+async function pauseRunForToolWait(
+  dbInstance: Database,
+  input: {
+    runId: string;
+    attemptId: string;
+    actionId: string;
+    eventType: HarnessRunEventType;
+    payload: Record<string, unknown>;
+    terminalMessage: string;
+    notRunningMessage: string;
+    cancelReason: string;
+    now?: Date;
+  },
+): Promise<{ paused: boolean; run: HarnessRunRow; event: HarnessRunEventRow }> {
+  return await dbInstance.transaction(async (tx) => {
+    const run = await lockRunRow(tx, input.runId);
+    if ((HARNESS_RUN_TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
+      throw new HarnessRuntimeError("HARNESS_RUN_TERMINAL", input.terminalMessage);
+    }
+    // 只有正在执行本 attempt 的 Run 才有权挂起：给 queued/waiting 的 Run 置
+    // waiting 会凭空造出一个没有 worker 在推的死等。
+    if (run.status !== "running") {
+      throw new HarnessRuntimeError("HARNESS_RUN_NOT_RUNNING", input.notRunningMessage);
+    }
+    const now = input.now ?? (await readDbNow(tx));
+    // 幂等：同一 actionId 只向用户问一次（重放/双投不得刷出两条等待请求）
+    const pending = await findRunEventByActionId(tx, input.runId, input.eventType, input.actionId);
+    const event =
+      pending ??
+      (await appendRunEventInTransaction(tx, {
+        runId: input.runId,
+        eventType: input.eventType,
+        payload: input.payload,
+      }));
+    // 释放 attempt：留在 claimed/running 会在 lease 到期后被恢复扫描判为孤儿，
+    // 把 waiting 的 Run 改写成 recovering，用户随后确认即得 409。
+    await tx
+      .update(harnessRunAttempts)
+      .set({ status: "cancelled", finishedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(harnessRunAttempts.harnessRunAttemptId, input.attemptId),
+          eq(harnessRunAttempts.harnessRunId, input.runId),
+          inArray(harnessRunAttempts.status, ["claimed", "running"]),
+        ),
+      );
+    // 取消优先于等待：已挂取消的 Run 直接落终态，不停在 waiting 等一个不会来的 worker
+    if (run.cancelRequestedAt) {
+      const [cancelled] = await tx
+        .update(harnessRuns)
+        .set({ status: "cancelled", completedAt: now, updatedAt: now })
+        .where(eq(harnessRuns.harnessRunId, input.runId))
+        .returning();
+      await appendRunEventInTransaction(tx, {
+        runId: input.runId,
+        eventType: "run_cancelled",
+        payload: {
+          reason: input.cancelReason,
+          actionId: input.actionId,
+          attemptId: input.attemptId,
+        },
+      });
+      return { paused: false, run: cancelled, event };
+    }
+    const [waiting] = await tx
+      .update(harnessRuns)
+      .set({ status: "waiting", updatedAt: now })
+      .where(eq(harnessRuns.harnessRunId, input.runId))
+      .returning();
+    return { paused: true, run: waiting, event };
+  });
 }
 
 // ============================================================
@@ -1495,72 +1609,93 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
         if (!Number.isInteger(input.ordinal) || input.ordinal < 1) {
           throw new HarnessRuntimeError("HARNESS_RUNTIME_INPUT_INVALID", "ordinal must be a positive integer");
         }
-        return await dbInstance.transaction(async (tx) => {
-          const run = await lockRunRow(tx, input.runId);
-          if ((HARNESS_RUN_TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
-            throw new HarnessRuntimeError("HARNESS_RUN_TERMINAL", "cannot request approval for a terminal run");
-          }
-          // 只有正在执行本 attempt 的 Run 才有权挂起：给 queued/waiting 的 Run 置
-          // waiting 会凭空造出一个没有 worker 在推的死等。
-          if (run.status !== "running") {
-            throw new HarnessRuntimeError(
-              "HARNESS_RUN_NOT_RUNNING",
-              "tool approval can only be requested by a running run",
-            );
-          }
-          const now = input.now ?? (await readDbNow(tx));
-          // 幂等：同一 actionId 只向用户问一次（重放/双投不得刷出两条审批请求）
-          const pending = await findRunEventByActionId(tx, input.runId, "tool.call.awaiting_approval", input.actionId);
-          const event =
-            pending ??
-            (await appendRunEventInTransaction(tx, {
-              runId: input.runId,
-              eventType: "tool.call.awaiting_approval",
-              // 只带标识，不带工具参数：参数的唯一持久来源是 tool.call.started
-              payload: {
-                actionId: input.actionId,
-                callId: input.callId,
-                ordinal: input.ordinal,
-                toolName: input.toolName,
-              },
-            }));
-          // 释放 attempt：留在 claimed/running 会在 lease 到期后被恢复扫描判为孤儿，
-          // 把 waiting 的 Run 改写成 recovering，用户随后确认即得 409。
-          await tx
-            .update(harnessRunAttempts)
-            .set({ status: "cancelled", finishedAt: now, updatedAt: now })
-            .where(
-              and(
-                eq(harnessRunAttempts.harnessRunAttemptId, input.attemptId),
-                eq(harnessRunAttempts.harnessRunId, input.runId),
-                inArray(harnessRunAttempts.status, ["claimed", "running"]),
-              ),
-            );
-          // 取消优先于审批：已挂取消的 Run 直接落终态，不停在 waiting 等一个不会来的 worker
-          if (run.cancelRequestedAt) {
-            const [cancelled] = await tx
-              .update(harnessRuns)
-              .set({ status: "cancelled", completedAt: now, updatedAt: now })
-              .where(eq(harnessRuns.harnessRunId, input.runId))
-              .returning();
-            await appendRunEventInTransaction(tx, {
-              runId: input.runId,
-              eventType: "run_cancelled",
-              payload: {
-                reason: "tool_approval_requested_with_pending_cancel",
-                actionId: input.actionId,
-                attemptId: input.attemptId,
-              },
-            });
-            return { paused: false, run: cancelled, event };
-          }
-          const [waiting] = await tx
-            .update(harnessRuns)
-            .set({ status: "waiting", updatedAt: now })
-            .where(eq(harnessRuns.harnessRunId, input.runId))
-            .returning();
-          return { paused: true, run: waiting, event };
+        return await pauseRunForToolWait(dbInstance, {
+          runId: input.runId,
+          attemptId: input.attemptId,
+          actionId: input.actionId,
+          now: input.now,
+          eventType: "tool.call.awaiting_approval",
+          // 只带标识，不带工具参数：参数的唯一持久来源是 tool.call.started
+          payload: {
+            actionId: input.actionId,
+            callId: input.callId,
+            ordinal: input.ordinal,
+            toolName: input.toolName,
+          },
+          terminalMessage: "cannot request approval for a terminal run",
+          notRunningMessage: "tool approval can only be requested by a running run",
+          cancelReason: "tool_approval_requested_with_pending_cancel",
         });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    // ============================================================
+    // 批次 9：ask_user「执行即暂停」的挂起与答案读取
+    // ============================================================
+    // 与审批共用挂起原语（同一事务内：落等待事件 + 释放 attempt + status=waiting），
+    // 但恢复路径**刻意不同**：审批走 confirmRunAction（只认 actionId），
+    // 填表走 submitRunInput（带 actionId + 结构化 values）。
+    // 判据①的口径：本方法落库成功后，控件的可渲染事实才存在；参数不合契约时
+    // 闸门根本不会调到这里（它在校验阶段就把可读错误回给模型了）。
+
+    async pauseRunForToolInput(input) {
+      try {
+        assertNonEmptyText(input.attemptId, "attemptId");
+        assertNonEmptyText(input.actionId, "actionId");
+        assertNonEmptyText(input.callId, "callId");
+        assertNonEmptyText(input.toolName, "toolName");
+        if (!Number.isInteger(input.ordinal) || input.ordinal < 1) {
+          throw new HarnessRuntimeError("HARNESS_RUNTIME_INPUT_INVALID", "ordinal must be a positive integer");
+        }
+        // 表单结构必须是可持久 JSON：它直接决定界面渲染成什么，
+        // 脏数据进来会得到一个渲染不出来的 waiting 状态（比拒绝更糟）。
+        assertSafeJsonObject(input.formBlock);
+        return await pauseRunForToolWait(dbInstance, {
+          runId: input.runId,
+          attemptId: input.attemptId,
+          actionId: input.actionId,
+          now: input.now,
+          eventType: "tool.call.awaiting_input",
+          payload: {
+            actionId: input.actionId,
+            callId: input.callId,
+            ordinal: input.ordinal,
+            toolName: input.toolName,
+            // 与审批的唯一差别：本条必须带整份表单结构（见 PauseHarnessRunForToolInputInput）
+            formBlock: normalizeJsonObject(input.formBlock),
+          },
+          terminalMessage: "cannot request user input for a terminal run",
+          notRunningMessage: "tool user input can only be requested by a running run",
+          cancelReason: "tool_input_requested_with_pending_cancel",
+        });
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async findRunToolInputAnswer(input) {
+      try {
+        assertNonEmptyText(input.actionId, "actionId");
+        const rows = await dbInstance
+          .select()
+          .from(harnessRunEvents)
+          .where(
+            and(
+              eq(harnessRunEvents.harnessRunId, input.runId),
+              eq(harnessRunEvents.eventType, "run_inputs_submitted"),
+              sql`${harnessRunEvents.payload}->'input'->>'actionId' = ${input.actionId}`,
+            ),
+          )
+          .orderBy(asc(harnessRunEvents.sequence))
+          .limit(1);
+        const submitted = (rows[0]?.payload as Record<string, unknown> | undefined)?.input;
+        const submittedValues = isPlainObject(submitted) ? submitted.values : undefined;
+        // 缺 values / values 不是对象 → 按「未答」处理，宁可重新问一次，
+        // 也不把一份对不上号的东西当作用户的答案回灌模型。
+        if (!isPlainObject(submittedValues)) return null;
+        return { values: normalizeJsonObject(submittedValues) };
       } catch (err) {
         throw toSafeError(err);
       }
