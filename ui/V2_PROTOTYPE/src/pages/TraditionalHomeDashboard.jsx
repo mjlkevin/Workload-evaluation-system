@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import PageShell from '../components/Layout/PageShell.jsx'
 import useHomeDashboard from '../hooks/useHomeDashboard.js'
+import { useIndustryOptions } from '../hooks/useIndustryMasterData.js'
 import { apiClient } from '../api/client.js'
 
 const PROJECT_ACTIONS = [
@@ -293,7 +294,7 @@ export default function TraditionalHomeDashboard() {
           <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-2)' }}>请填写项目评估基础信息</p>
           <Field label="项目名称" placeholder="如：利民集团数字化二期" value={newPlan.projectName} onChange={(value) => setNewPlan((p) => ({ ...p, projectName: value }))} />
           <Field label="客户名称" placeholder="如：利民集团" value={newPlan.customerName} onChange={(value) => setNewPlan((p) => ({ ...p, customerName: value }))} />
-          <Field label="客户行业" placeholder="制造-离散 / 流程 / 零售..." value={newPlan.industry} onChange={(value) => setNewPlan((p) => ({ ...p, industry: value }))} />
+          <IndustryField value={newPlan.industry} onChange={(value) => setNewPlan((p) => ({ ...p, industry: value }))} />
           <Field label="规模（用户数）" placeholder="100" value={newPlan.userCount} onChange={(value) => setNewPlan((p) => ({ ...p, userCount: value }))} />
           <Field label="模板" placeholder="实施评估标准版" value={newPlan.template} onChange={(value) => setNewPlan((p) => ({ ...p, template: value }))} />
         </DialogShell>
@@ -379,6 +380,49 @@ function DialogShell({ title, children, onClose, onConfirm, confirmLabel = '确�
           <button type="button" onClick={onConfirm} disabled={confirmDisabled} className="btn btn-pri" style={{ height: 30, fontSize: 12, padding: '0 14px', opacity: confirmDisabled ? 0.7 : 1 }}>{confirmLabel}</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * 「客户行业」下拉（批次 10a）。
+ *
+ * 为什么不再是自由文本：库里行业长期是没人管的手工值，AI 与人都各自编过一套
+ * （离散制造 / 流程制造 / 电子高科技…）。留着文本框，系统里就同时存在
+ * 「自由文本」和「行业主数据」两个来源，正是本批要消灭的漂移。
+ *
+ * 清单取不到时不堵死新建这条路：仍然渲染下拉并保留当前值，让用户能继续，
+ * 但要把失败说清楚——静默出一个空下拉，用户会以为是自己的数据没了。
+ */
+function IndustryField({ value, onChange }) {
+  const { displayOptions, loading, error } = useIndustryOptions({ currentValue: value })
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <label htmlFor="new-plan-industry" style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', marginBottom: 4, fontWeight: 600 }}>
+        客户行业
+      </label>
+      <select
+        id="new-plan-industry"
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        style={{
+          width: '100%', padding: '8px 10px', border: '1px solid var(--line)',
+          borderRadius: 'var(--r-md)', fontSize: 13, fontFamily: 'inherit', outline: 'none',
+          background: 'var(--surface)', color: 'var(--ink)',
+        }}
+      >
+        <option value="">{loading ? '行业清单加载中…' : error ? '行业清单暂不可用' : '请选择行业'}</option>
+        {displayOptions.map((option) => (
+          <option key={`${option.level ?? 'x'}:${option.value}`} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {error && (
+        <div style={{ fontSize: 11, color: 'var(--err)', marginTop: 4 }}>
+          行业清单加载失败，可先不填行业；稍后到【基础管理 → 行业】维护清单。
+        </div>
+      )}
     </div>
   )
 }

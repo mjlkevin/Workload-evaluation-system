@@ -27,10 +27,12 @@ const WbsList = lazy(() => import('./pages/WbsList.jsx'))
 const HistoryList = lazy(() => import('./pages/HistoryList.jsx'))
 const HistoryDetail = lazy(() => import('./pages/HistoryDetail.jsx'))
 const SystemManagement = lazy(() => import('./pages/SystemManagement.jsx'))
+const IndustryMasterData = lazy(() => import('./pages/IndustryMasterData.jsx'))
 const UserManagement = lazy(() => import('./pages/UserManagement.jsx'))
 const ApiKeys = lazy(() => import('./pages/ApiKeys.jsx'))
 import { isAuthenticated } from './api/auth.js'
 import { DEFAULT_SYSTEM_MANAGEMENT_ROUTE, SYSTEM_MANAGEMENT_PARENT_ROUTE, SYSTEM_MANAGEMENT_SECTIONS } from './config/systemManagementSections.js'
+import { BASE_MANAGEMENT_PARENT_ROUTE, BASE_MANAGEMENT_SECTIONS, DEFAULT_BASE_MANAGEMENT_ROUTE } from './config/baseManagementSections.js'
 import useCurrentUser from './hooks/useCurrentUser.js'
 import { isAdminOnlyPath, isAdminUser } from './utils/adminAccess.js'
 
@@ -97,6 +99,14 @@ export default function App() {
             key={section.id}
             path={section.route}
             element={<SystemManagement sectionId={section.id} />}
+          />
+        ))}
+        <Route path={BASE_MANAGEMENT_PARENT_ROUTE} element={<Navigate to={DEFAULT_BASE_MANAGEMENT_ROUTE} replace />} />
+        {BASE_MANAGEMENT_SECTIONS.map((section) => (
+          <Route
+            key={section.id}
+            path={section.route}
+            element={<IndustryMasterData sectionId={section.id} />}
           />
         ))}
         <Route path="/users" element={<UserManagement />} />
