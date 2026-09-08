@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { after, afterEach, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
 
@@ -101,6 +101,130 @@ describeOrSkip("createQueuedRun returns the persisted eventSequence", { skip: !t
   const persisted = await repo!.findRunForOwner(created.run.harnessRunId, created.run.ownerUserId);
   assert.equal(created.run.eventSequence, 1);
   assert.equal(persisted?.eventSequence, 1);
+});
+
+// ============================================================
+// 批次 2b-1：user/message —— Run 入队即把「用户这一轮说的话」写成持久事实
+// ============================================================
+// 此前事件流里没有用户正文：run_queued 的载荷恒为空 {}（全库 92 条实取），用户的
+// 话只在 harness_runs.title —— 而 title 语义上是「标题」，今天恰好等于正文。
+// 本组用例把两件事钉死：① 正文逐字节来自提交入参；② 它**不是**从 title 抄来的
+// （用例刻意让 title 与正文不同，且正文长过 title 的 80 字上限）。
+
+const B2B1_LONG_BODY = `第一轮请先看这段：${"需求细节".repeat(40)}\n第二行含换行与 emoji ✅，以及全角括号（测试）`;
+
+describeOrSkip("createQueuedRun appends user/message carrying the submitted body verbatim", { skip: !testDatabaseUrl }, async () => {
+  const input = makeQueuedRunInput({
+    title: B2B1_LONG_BODY.slice(0, 80),
+    userMessage: B2B1_LONG_BODY,
+  });
+  const created = await repo!.createQueuedRun(input);
+  track(created.run.harnessRunId);
+
+  const events = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(eq(harnessRunEvents.harnessRunId, created.run.harnessRunId))
+    .orderBy(asc(harnessRunEvents.sequence));
+
+  assert.deepEqual(
+    events.map((row) => row.eventType),
+    ["run_queued", "user/message"],
+    "本事件与 run_queued 同一事务提交，紧随其后、不插到别处",
+  );
+  assert.deepEqual(events[0].payload, {}, "run_queued 的载荷不变（本批不给它塞正文——正文有自己的事件）");
+  assert.deepEqual(
+    events[1].payload,
+    { content: B2B1_LONG_BODY },
+    "载荷正文必须逐字节等于提交原始入参：不截断、不折叠换行、不丢非 ASCII",
+  );
+  assert.notEqual(
+    String((events[1].payload as { content?: string }).content),
+    String(created.run.title),
+    "正文不得取自 title：title 是 80 字标题，正文明显更长，两者相等即为回归",
+  );
+  assert.equal(events[1].sequence, 2, "序号由 Run 行原子分配，紧随 run_queued");
+});
+
+describeOrSkip("user/message is appended once per submission key even on replay", { skip: !testDatabaseUrl }, async () => {
+  const input = makeQueuedRunInput({ userMessage: "同一 submissionKey 重放两次" });
+  const first = await repo!.createQueuedRun(input);
+  track(first.run.harnessRunId);
+  const second = await repo!.createQueuedRun(input);
+  assert.equal(second.created, false);
+  assert.equal(second.run.harnessRunId, first.run.harnessRunId);
+
+  const rows = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, first.run.harnessRunId), eq(harnessRunEvents.eventType, "user/message")));
+  assert.equal(rows.length, 1, "重放必须走「返回原 Run 不追加事件」分支：一条用户正文就是一条");
+});
+
+describeOrSkip("createQueuedRun without userMessage stays event-shape compatible", { skip: !testDatabaseUrl }, async () => {
+  // additive 兼容：既有构造点（replay/regression 等非对话提交）不传正文时，
+  // 事件面与批次 2b-1 之前逐字一致——只有 run_queued，没有空的 user/message。
+  const created = await repo!.createQueuedRun(makeQueuedRunInput());
+  track(created.run.harnessRunId);
+  const rows = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(eq(harnessRunEvents.harnessRunId, created.run.harnessRunId));
+  assert.deepEqual(rows.map((row) => row.eventType), ["run_queued"]);
+});
+
+describeOrSkip("conversation fact events are appended at most once per run", { skip: !testDatabaseUrl }, async () => {
+  const created = await repo!.createQueuedRun(makeQueuedRunInput({ userMessage: "第一轮正文" }));
+  track(created.run.harnessRunId);
+  const runId = created.run.harnessRunId;
+
+  const first = await repo!.appendRunEvent({ runId, eventType: "assistant/message", payload: { content: "答复正文" } });
+  const replay = await repo!.appendRunEvent({ runId, eventType: "assistant/message", payload: { content: "答复正文（重放再写一次）" } });
+  assert.equal(
+    replay.harnessRunEventId,
+    first.harnessRunEventId,
+    "重复写必须幂等吸收并返回首行：本事件是「当时答复了什么」的记录，两条正文=凭空多一轮",
+  );
+
+  const facts = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, "assistant/message")));
+  assert.equal(facts.length, 1, "一个 Run 只能有一条 assistant/message");
+  assert.deepEqual((facts[0].payload as { content: string }).content, "答复正文", "首写获胜，重放的正文不得覆盖它");
+
+  // 反向守护：幂等只作用于对话正文族。text.delta 合法地一次答复可落多条，
+  // 若哪天有人把它也纳入单次清单，这条用例即红。
+  await repo!.appendRunEvent({ runId, eventType: "text.delta", payload: { delta: "a" } });
+  await repo!.appendRunEvent({ runId, eventType: "text.delta", payload: { delta: "b" } });
+  const deltas = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(and(eq(harnessRunEvents.harnessRunId, runId), eq(harnessRunEvents.eventType, "text.delta")));
+  assert.equal(deltas.length, 2, "text.delta 必须逐条落库，不得被幂等吞掉（传输面零变化）");
+});
+
+describeOrSkip("createQueuedRun rolls back entirely when user/message exceeds the payload ceiling", { skip: !testDatabaseUrl }, async () => {
+  // 事件表对单条载荷有 1 MiB 硬闸（assertSafeJsonObject）。正文超限时**整笔入队**
+  // 回滚，而不是留下一个「有 Run 无用户正文」的半提交态——后者正是本批要消灭的形态。
+  const input = makeQueuedRunInput({ userMessage: "x".repeat(1024 * 1024 + 64) });
+  try {
+    await assert.rejects(
+      repo!.createQueuedRun(input),
+      (err: unknown) => err instanceof HarnessRuntimeError && err.code === "HARNESS_RUNTIME_PAYLOAD_TOO_LARGE",
+    );
+    const residualRuns = await testDb!
+      .select()
+      .from(harnessRuns)
+      .where(and(eq(harnessRuns.ownerUserId, input.ownerUserId), eq(harnessRuns.submissionKey, input.submissionKey)));
+    assert.equal(residualRuns.length, 0, "超限即整笔回滚，不得留下没有用户正文的 Run");
+  } finally {
+    // 本用例不调 track()（正常情况下压根没有 Run）：红的时候也不把夹具留给后面的
+    // 全表计数用例与队列认领用例。
+    await testDb!
+      .delete(harnessRuns)
+      .where(and(eq(harnessRuns.ownerUserId, input.ownerUserId), eq(harnessRuns.submissionKey, input.submissionKey)));
+  }
 });
 
 describeOrSkip("createQueuedRun rolls back the run when run_queued event insert fails", { skip: !testDatabaseUrl }, async () => {

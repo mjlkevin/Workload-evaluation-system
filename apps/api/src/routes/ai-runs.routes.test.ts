@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { createAiRunsRouter } from "./ai-runs.routes";
 import { createAiSessionsRouter } from "./ai-sessions.routes";
@@ -342,10 +342,31 @@ test("submit returns HTTP 202 with the frozen envelope", { skip: !testDatabaseUr
   track(response.body.data.runId);
   assert.equal(response.body.data.sessionId, sessionId);
   assert.equal(response.body.data.status, "queued");
-  assert.equal(response.body.data.eventCursor, 1);
+  // 批次 2b-1：入队事务现在多落一条 user/message，游标随之从 1 变 2。
+  // 游标的语义没变（= Run 当前已产生的事件序号，客户端从此处续订 SSE）；变的只是
+  // 一次入队产生的事件条数。前端订阅点本就在游标之后，且它对新事件类型走 default 分支
+  // 忽略，因此这条数字变化不改变任何界面行为。
+  assert.equal(response.body.data.eventCursor, 2);
 
   const run = await repo!.findRunForOwner(response.body.data.runId, alice!.id);
   assert.equal((run?.metadata as { clientMessageId?: string })?.clientMessageId, clientMessageId, "clientMessageId 必须原样承载于 metadata");
+
+  // 提交一发生，用户正文就已在事件流里——不必等 worker 认领、也不依赖 title
+  const submittedEvents = await testDb!
+    .select()
+    .from(harnessRunEvents)
+    .where(eq(harnessRunEvents.harnessRunId, response.body.data.runId))
+    .orderBy(asc(harnessRunEvents.sequence));
+  assert.deepEqual(
+    submittedEvents.map((row) => row.eventType),
+    ["run_queued", "user/message"],
+    "POST /runs 即写入 user/message（本批只写不读，读取路径不受影响）",
+  );
+  assert.deepEqual(
+    submittedEvents[1].payload,
+    { content: "请分析这份需求文件" },
+    "载荷正文逐字节等于提交的 content，不是 title 的派生物",
+  );
 });
 
 test("duplicate submissionKey returns the same runId idempotently", { skip: !testDatabaseUrl }, async () => {

@@ -19,10 +19,12 @@ import type { AiSessionRecord } from "../ai-sessions/ai-sessions.types";
 import {
   AiRunsConflictError,
   AiRunsDisabledError,
+  AiRunsValidationError,
   createAiRunsUsecase,
   isDurableRunsEnabledFromEnv,
   type AiRunsUsecaseDeps,
 } from "./harness-runtime.usecase";
+import { HarnessRuntimeError } from "./harness-runtime.repository";
 
 function makeUser(overrides: Partial<AuthUser> = {}): AuthUser {
   const id = randomUUID();
@@ -104,10 +106,14 @@ function makeRunRow(overrides: Record<string, unknown> = {}): Record<string, unk
 
 type FakeRepoOptions = {
   activeRunForSession?: boolean;
+  /** 批次 2b-1：模拟仓储在入队时以「载荷超 1 MiB」抛错（真仓储在事务内做这个校验） */
+  failWithPayloadTooLarge?: boolean;
 };
 
 function makeFakeRepo(options: FakeRepoOptions = {}) {
   const runs: Array<Record<string, unknown>> = [];
+  /** 批次 2b-1：记录每次 createQueuedRun 的**原始入参**，用于断言正文取值来源 */
+  const queuedInputs: Array<Record<string, unknown>> = [];
   const calls: Record<string, number> = {};
   const bump = (name: string) => {
     calls[name] = (calls[name] ?? 0) + 1;
@@ -115,8 +121,13 @@ function makeFakeRepo(options: FakeRepoOptions = {}) {
   const repo = {
     calls,
     runs,
+    queuedInputs,
     async createQueuedRun(input: Record<string, unknown>) {
       bump("createQueuedRun");
+      queuedInputs.push(input);
+      if (options.failWithPayloadTooLarge) {
+        throw new HarnessRuntimeError("HARNESS_RUNTIME_PAYLOAD_TOO_LARGE", "payload exceeds 1 MiB JSON limit");
+      }
       const replayed = runs.find((run) => run.ownerUserId === input.ownerUserId && run.submissionKey === input.submissionKey);
       if (replayed) return { run: replayed, created: false };
       const run = makeRunRow({
@@ -181,8 +192,8 @@ type TestDeps = AiRunsUsecaseDeps & {
   sessions: Map<string, AiSessionRecord>;
 };
 
-function makeDeps(overrides: Partial<AiRunsUsecaseDeps> = {}): TestDeps {
-  const repo = makeFakeRepo();
+function makeDeps(overrides: Partial<AiRunsUsecaseDeps> = {}, repoOptions: FakeRepoOptions = {}): TestDeps {
+  const repo = makeFakeRepo(repoOptions);
   const sessions = new Map<string, AiSessionRecord>();
   return {
     repo,
@@ -218,6 +229,77 @@ test("submitRun returns 202 payload with queued status and eventCursor", async (
   assert.equal(result.data.sessionId, session.sessionId);
   assert.equal(result.data.eventCursor, 1);
   assert.ok(result.data.runId);
+});
+
+// ----------------------------------------------------------------
+// 批次 2b-1：提交原文必须作为 user/message 的正文带入队（不取自 title）
+// ----------------------------------------------------------------
+// title 是 `content.slice(0, 80)`——它今天恰好是正文的前 80 字，但语义是标题。
+// 本批的意义正是**不再依赖那个巧合**，所以用例要让正文长过 80 字、并带首尾空白，
+// 同时断言 userMessage 与 executionConfig.content 逐字节相同（后者是 workflow 落
+// ai_sessions 用户消息时读的同一份，两者相同即事件载荷与会话消息逐字节相同）。
+
+test("批次2b-1: submitRun 把提交原文整体带入 userMessage，且与 title 解耦", async () => {
+  const deps = makeDeps();
+  const user = makeUser();
+  const session = makeSession(user);
+  deps.sessions.set(session.sessionId, session);
+  const usecase = createAiRunsUsecase(deps);
+
+  const longBody = `第一轮请先看这段：${"需求细节".repeat(30)}\n第二行含换行`;
+  const result = await usecase.submitRun(user, session.sessionId, {
+    submissionKey: randomUUID(),
+    content: `  ${longBody}  `,
+  });
+  assert.equal(result.status, 202);
+
+  const queued = deps.repo.queuedInputs[0];
+  assert.equal(queued.userMessage, longBody, "userMessage 必须是提交原文（首尾空白按既有 content 口径归一）");
+  assert.deepEqual(
+    (queued.executionConfig as { content: string }).content,
+    queued.userMessage,
+    "正文与会话消息读的是同一份：两份不一致，事件就会与 ai_sessions 逐字节对不上",
+  );
+  assert.equal(queued.title, longBody.slice(0, 80), "title 仍是 80 字标题，本批不改它的语义");
+  assert.notEqual(queued.userMessage, queued.title, "正文长度明显超过 title，两者相等即为「从 title 抄」的回归");
+});
+
+test("批次2b-1: retryRun 从原 Run 带出正文，重试出的新 Run 同样有用户正文", async () => {
+  const deps = makeDeps();
+  const user = makeUser();
+  const session = makeSession(user);
+  deps.sessions.set(session.sessionId, session);
+  const usecase = createAiRunsUsecase(deps);
+  const body = "会失败的那一轮正文，重试后仍要能在事件流里读到";
+  const submitted = await usecase.submitRun(user, session.sessionId, { submissionKey: randomUUID(), content: body });
+  const run = deps.repo.runs.find((item: Record<string, unknown>) => item.harnessRunId === submitted.data.runId);
+  if (run) {
+    run.status = "failed";
+    run.errorCode = "WORKER_STEP_FAILED";
+  }
+
+  await usecase.retryRun(user, submitted.data.runId);
+  const retryQueued = deps.repo.queuedInputs[1];
+  assert.equal(retryQueued.userMessage, body, "retry 提交的仍是同一轮用户正文，不得因换个 Run 就丢掉");
+});
+
+test("批次2b-1: 正文超事件载荷闸门时映射为 422 校验错误，不是不透明的 500", async () => {
+  const deps = makeDeps({}, { failWithPayloadTooLarge: true });
+  const user = makeUser();
+  const session = makeSession(user);
+  deps.sessions.set(session.sessionId, session);
+  const usecase = createAiRunsUsecase(deps);
+
+  await assert.rejects(
+    usecase.submitRun(user, session.sessionId, { submissionKey: randomUUID(), content: "x".repeat(1024 * 1024) }),
+    (err: unknown) => {
+      assert.ok(err instanceof AiRunsValidationError, `应为 AiRunsValidationError(422)，实为 ${String(err)}`);
+      assert.match(err.message, /正文/, "报错要点名是「正文」出问题，而不是笼统的提交失败");
+      assert.match(err.message, /载荷上限/, "要说清触发了事件载荷上限");
+      assert.match(err.message, /回滚/, "要说明本次提交整体回滚（没有半提交的 Run）");
+      return true;
+    },
+  );
 });
 
 test("ISS-2026-08-11-007: submitRun persists normalized attachments in executionConfig", async () => {

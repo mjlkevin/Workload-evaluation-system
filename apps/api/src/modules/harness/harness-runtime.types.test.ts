@@ -13,6 +13,7 @@ import {
   HARNESS_RECOVERY_LIMIT_ERROR_CODE,
   HARNESS_RECOVERY_TIMING_DEFAULTS,
   HARNESS_RUN_EVENT_TYPES,
+  HARNESS_RUN_SINGLETON_EVENT_TYPES,
   HARNESS_RUN_KINDS,
   HARNESS_RUN_TERMINAL_STATUSES,
   HARNESS_WORKER_TIMING_DEFAULTS,
@@ -82,8 +83,8 @@ test("Batch B adds recovery and cancellation event types additively (E1)", () =>
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_cancelled"));
   assert.equal(
     HARNESS_RUN_EVENT_TYPES.length,
-    23,
-    "Batch B 词汇 12 类 + Batch C/ISS-004/批次0.5/批次1a/批次9 additive 追加 2+2+4+2+1 类 = 23",
+    25,
+    "Batch B 词汇 12 类 + Batch C/ISS-004/批次0.5/批次1a/批次9/批次2b-1 additive 追加 2+2+4+2+1+2 类 = 25",
   );
 });
 
@@ -109,8 +110,8 @@ test("Batch C adds inputs and confirmation event types additively (E1)", () => {
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("run_action_confirmed"));
   assert.equal(
     HARNESS_RUN_EVENT_TYPES.length,
-    23,
-    "Batch C + ISS-004/批次0.5/批次1a/批次9 additive 追加 2+4+2+1 类事件 = 23",
+    25,
+    "Batch C + ISS-004/批次0.5/批次1a/批次9/批次2b-1 additive 追加 2+4+2+1+2 类事件 = 25",
   );
 });
 
@@ -150,8 +151,8 @@ test("ISS-2026-08-10-004 adds streaming text.delta/thought event types additivel
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("thought"), "模型思考事件类型必须入白名单");
   assert.equal(
     HARNESS_RUN_EVENT_TYPES.length,
-    23,
-    "ISS-004 之后的词汇 + 批次0.5/批次1a/批次9 additive 追加 4+2+1 类工具事件（16 → 23）",
+    25,
+    "ISS-004 之后的词汇 + 批次0.5/批次1a/批次9/批次2b-1 additive 追加 4+2+1+2 类（16 → 23 → 25）",
   );
 });
 
@@ -192,7 +193,7 @@ test("批次0.5 adds tool.call.* event types additively", () => {
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.progress"), "工具执行进度必须入白名单");
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.completed"), "工具调用成功必须入白名单");
   assert.ok((HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.failed"), "工具调用失败必须入白名单");
-  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 23, "批次0.5 追加 4 类 + 批次1a 追加 2 类 + 批次9 追加 1 类（16 → 23）");
+  assert.equal(HARNESS_RUN_EVENT_TYPES.length, 25, "批次0.5 追加 4 类 + 批次1a 追加 2 类 + 批次9 追加 1 类 + 批次2b-1 追加 2 类（16 → 25）");
 
   // 点号命名族必须恰好是这 7 条：不得夹带其他 tool.* 变体（防词汇漂移）。
   // 批次 0.5 登记 4 条，批次 1a（写操作审批闸门）additive 追加 2 条，
@@ -273,19 +274,98 @@ test("批次1a adds tool approval gate event types additively", () => {
 // 读侧就只能靠猜分支——那正是本表要锁死的漂移形态。
 
 test("批次9 adds the ask_user awaiting-input event type additively", () => {
-  assert.equal(
-    HARNESS_RUN_EVENT_TYPES.length,
-    22 + 1,
-    "批次 9 只允许在批次 1a 的 22 类之上 additive 追加 1 类",
-  );
   assert.deepEqual(
-    [...HARNESS_RUN_EVENT_TYPES].slice(22),
-    ["tool.call.awaiting_input"],
-    "本批新增的唯一一类必须落在末位且名称精确一致",
+    [...HARNESS_RUN_EVENT_TYPES].slice(0, 23),
+    [
+      "run_queued",
+      "run_claimed",
+      "run_status_changed",
+      "checkpoint_committed",
+      "output_updated",
+      "outbox_enqueued",
+      "cancel_requested",
+      "run_completed",
+      "run_failed",
+      "recovery_started",
+      "recovery_completed",
+      "run_cancelled",
+      "run_inputs_submitted",
+      "run_action_confirmed",
+      "text.delta",
+      "thought",
+      "tool.call.started",
+      "tool.call.progress",
+      "tool.call.completed",
+      "tool.call.failed",
+      "tool.call.awaiting_approval",
+      "tool.call.rejected",
+      "tool.call.awaiting_input",
+    ],
+    "批次 9 收口时的 23 类必须逐位不变：批次 2b-1 起只能继续往后加",
   );
   // 两条 awaiting 事件必须同时在册：合并成一条即为本批要防的语义漂移
   assert.ok(
     (HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool.call.awaiting_approval"),
     "审批等待不得被表单等待顶掉——两者是不同的等待",
+  );
+});
+
+// ============================================================
+// 批次 2b-1（additive）：对话正文的持久事实事件词汇
+// ============================================================
+// 事件流此前**不是**对话记录：实取全库分布 thought 17874 · text.delta 17731 ·
+// run_queued 92 …，run_queued 载荷恒为 {}，用户说的话只存在于 harness_runs.title，
+// 助手说的话只有 text.delta 碎片。两者都是「碰巧能用」，没有一行是「当时说了什么」
+// 的正式记录。本批把这份记录建出来，命名沿用斜杠风格（与 workbench-tool-event-surface
+// 里 dsh SurfaceEventType 的同形词一致，雷达文档 §8/§9.3 已引用该形状）。
+//
+// 刻意不叫 message.user：本表的词是「surface/正文」这一族，与 tool/result 同形，
+// 改成点号会把同一族拆成两种命名法，读侧只能靠记住历史来对齐。
+
+test("批次2b-1 adds the conversation-body event types additively", () => {
+  // 批次 9 之前冻结的 22 类 + 批次 9 的 1 类，槽位不得被本批顶掉
+  assert.deepEqual(
+    [...HARNESS_RUN_EVENT_TYPES].slice(22, 23),
+    ["tool.call.awaiting_input"],
+    "批次 9 的槽位必须仍在原位——本批只能往后加",
+  );
+  assert.deepEqual(
+    [...HARNESS_RUN_EVENT_TYPES].slice(23),
+    ["user/message", "assistant/message"],
+    "本批新增的两类必须按「用户先、助手后」落在末位，名称精确一致",
+  );
+  assert.equal(
+    HARNESS_RUN_EVENT_TYPES.length,
+    23 + 2,
+    "批次 2b-1 只允许在批次 9 的 23 类之上 additive 追加 2 类",
+  );
+
+  // 斜杠命名的「对话正文」族恰好这两条：不得夹带第三种
+  const messageFamily = HARNESS_RUN_EVENT_TYPES.filter((type) => type.endsWith("/message"));
+  assert.deepEqual(
+    [...messageFamily].sort(),
+    ["assistant/message", "user/message"],
+    "/message 族只允许本批登记的 2 类",
+  );
+
+  // tool/result 是**模型可见面**的词汇（workbench-tool-event-surface 的准入白名单，
+  // 描述「哪些内容能进模型上下文」），不是持久化的 Run 事件：工具执行的事实已经由
+  // tool.call.* 六类承载。把它登记进本表等于让同一个事实有两个持久来源。
+  assert.ok(
+    !(HARNESS_RUN_EVENT_TYPES as readonly string[]).includes("tool/result"),
+    "tool/result 不得登记为 Run 事件类型：它是模型可见面词汇，工具事实已由 tool.call.* 承载",
+  );
+
+  // 「一个 Run 内最多一条」的清单必须与 /message 族逐字相同。
+  // text.delta 绝不能在列：一次答复合法地对应上千条 delta，把它纳入就等于
+  // 让仓储吞掉后续分片——那是把传输通道当事实处理的反向错误。
+  assert.deepEqual(
+    [...HARNESS_RUN_SINGLETON_EVENT_TYPES].sort(),
+    [...messageFamily].sort(),
+    "幂等追加清单必须恰好是对话正文族，两者不得各自演化",
+  );
+  assert.ok(
+    !(HARNESS_RUN_SINGLETON_EVENT_TYPES as readonly string[]).includes("text.delta"),
+    "text.delta 是传输碎片，合法地可重复，不得纳入单次清单",
   );
 });

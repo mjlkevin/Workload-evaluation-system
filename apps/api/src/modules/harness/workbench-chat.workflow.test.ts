@@ -435,6 +435,9 @@ test("ISS-004 层 2：dispatch 入参携带 streamingAdapter，onToken 逐 chunk
       ["run-1", "text.delta", { delta: "你好" }],
       ["run-1", "thought", { text: "先拆解问题" }],
       ["run-1", "text.delta", { delta: "世界" }],
+      // 批次 2b-1：流式碎片之后紧跟一条完整正文的事实事件。delta 那三条的条数、
+      // 内容与顺序一字未动（判据④）——新增的是第四行，不是改动前三行。
+      ["run-1", "assistant/message", { content: "你好世界" }],
     ],
     "contentDelta → text.delta(payload.delta)，reasoningContentDelta → thought(payload.text)，空增量不写事件",
   );
@@ -473,12 +476,18 @@ test("ISS-004 层 2：恢复重放跳过 execute，流式事件不重复发射�
   };
   const ctx = makeFakeCtx({ recordToolEffectOnce: recordToolEffectOnce as any });
 
+  const deltasOf = () => appended.filter((event) => event.eventType === "text.delta").length;
   await wf.executeStep("chat", ctx);
-  assert.equal(appended.length, 1, "首次执行发射 1 条 text.delta");
+  assert.equal(deltasOf(), 1, "首次执行发射 1 条 text.delta");
 
   // 恢复重放：recordToolEffectOnce 命中缓存跳过 execute，流式副作用不得重放
   await wf.executeStep("chat", ctx);
-  assert.equal(appended.length, 1, "恢复重放不得重复发射流式事件");
+  assert.equal(deltasOf(), 1, "恢复重放不得重复发射流式事件");
+  assert.equal(
+    appended.filter((event) => event.eventType === "assistant/message").length,
+    1,
+    "批次 2b-1：事实事件同样只此一条（它与 delta 共用 execute 内的幂等副作用位）",
+  );
 });
 
 // ============================================================
@@ -1002,8 +1011,8 @@ test("DEF-2026-08-27-001：kind=metadata chunk 不写 run 事件，memoryRef 落
 
   assert.deepEqual(
     runEvents.map((e) => `${e.eventType}:${JSON.stringify(e.payload)}`),
-    ['text.delta:{"delta":"模"}', 'text.delta:{"delta":"型回复"}'],
-    "metadata chunk 不得进入 run 事件流（既非 text.delta 也非 thought）",
+    ['text.delta:{"delta":"模"}', 'text.delta:{"delta":"型回复"}', 'assistant/message:{"content":"模型回复"}'],
+    "metadata chunk 不得进入 run 事件流（既非 text.delta 也非 thought）；批次 2b-1 起末尾多一条完整正文，两条 delta 原文未动",
   );
   const assistant = appended.find((c) => c.role === "assistant");
   assert.ok(assistant, "assistant 消息必须落库");
@@ -1232,6 +1241,21 @@ function collapseProgress(events: RecordedRunEvent[]): string[] {
   return out;
 }
 
+/**
+ * 批次 2b-1 起，每轮末尾多出一条 assistant/message 事实事件（用户正文则落在
+ * workflow 之外的入队事务里）。下面这些「只关心流式面 / 工具面」的顺序与计数断言
+ * 因此先过这道过滤。
+ *
+ * 边界要说清，否则这个助手会被后人拿来消音任何新事件：它**只**剔除
+ * user/message 与 assistant/message 两类，text.delta / thought / tool.call.*
+ * 一条都不滤——判据④「delta 条数与内容零变化」正是靠这些断言的**原文**未改来证明的。
+ * 对话事实本身由文件末尾「批次2b-1」三条用例单独钉，不靠这里。
+ */
+const CONVERSATION_FACT_EVENT_TYPES = new Set<string>(["user/message", "assistant/message"]);
+function withoutConversationFacts(events: RecordedRunEvent[]): RecordedRunEvent[] {
+  return events.filter((event) => !CONVERSATION_FACT_EVENT_TYPES.has(event.eventType));
+}
+
 test("批次0.5·②：工具调用经 appendRunEvent 落 started→progress→completed，顺序与载荷形状冻结", async () => {
   const appended: RecordedRunEvent[] = [];
   let toolEventCount = 0;
@@ -1253,7 +1277,7 @@ test("批次0.5·②：工具调用经 appendRunEvent 落 started→progress→c
   assert.equal(toolEventCount, 1, "dispatch 必须收到 onToolEvent（未下发则事件无处产生）");
 
   assert.deepEqual(
-    collapseProgress(appended),
+    collapseProgress(withoutConversationFacts(appended)),
     ["tool.call.started", "tool.call.progress", "tool.call.completed"],
     "长耗时工具必须依次发射 started → progress → completed",
   );
@@ -1298,13 +1322,14 @@ test("批次0.5·②：工具执行失败落 tool.call.failed 并携带 error", 
   });
 
   await wf.executeStep("chat", makeFakeCtx());
+  const toolEvents = withoutConversationFacts(appended);
   assert.deepEqual(
-    appended.map((event) => event.eventType),
+    toolEvents.map((event) => event.eventType),
     ["tool.call.started", "tool.call.failed"],
     "ok=false 必须落 failed，不得伪装成 completed",
   );
-  assert.equal(appended[1].payload.error, "权限不足");
-  assert.equal(appended[1].payload.callIndex, 1);
+  assert.equal(toolEvents[1].payload.error, "权限不足");
+  assert.equal(toolEvents[1].payload.callIndex, 1);
 });
 
 test("批次0.5·②：多次调用 callIndex 逐次递增；非工具类 AgentEvent 不产工具事件", async () => {
@@ -1326,7 +1351,7 @@ test("批次0.5·②：多次调用 callIndex 逐次递增；非工具类 AgentE
 
   await wf.executeStep("chat", makeFakeCtx());
   assert.deepEqual(
-    appended.map((event) => [event.eventType, event.payload.callIndex, event.payload.name]),
+    withoutConversationFacts(appended).map((event) => [event.eventType, event.payload.callIndex, event.payload.name]),
     [
       ["tool.call.started", 1, "t1"],
       ["tool.call.completed", 1, "t1"],
@@ -1353,7 +1378,7 @@ test("批次0.5·②：短调用不触发 progress 心跳（心跳是长耗时�
 
   await wf.executeStep("chat", makeFakeCtx());
   assert.deepEqual(
-    appended.map((event) => event.eventType),
+    withoutConversationFacts(appended).map((event) => event.eventType),
     ["tool.call.started", "tool.call.completed"],
     "未达心跳间隔不得发 progress",
   );
@@ -1398,16 +1423,17 @@ test("批次0.5·②：超大工具结果必须截断，不得整条被 1 MiB �
   });
 
   await wf.executeStep("chat", makeFakeCtx());
+  const survivingToolEvents = withoutConversationFacts(appended);
   assert.deepEqual(
-    appended.map((event) => event.eventType),
+    survivingToolEvents.map((event) => event.eventType),
     ["tool.call.started", "tool.call.completed"],
     "事件必须存活到落库——丢弃等于回到本批要消灭的不可见",
   );
   assert.ok(
-    JSON.stringify(appended[0].payload.arguments).length < 10_000,
+    JSON.stringify(survivingToolEvents[0].payload.arguments).length < 10_000,
     "arguments 必须截断后透出（String(object) 恒为 [object Object]，故按序列化长度断言）",
   );
-  assert.ok(String(appended[1].payload.resultPreview).length < 10_000, "resultPreview 必须截断后透出");
+  assert.ok(String(survivingToolEvents[1].payload.resultPreview).length < 10_000, "resultPreview 必须截断后透出");
 });
 
 test("批次0.5·②：未注入 appendRunEvent 时 onToolEvent 为空操作，不抛错也不阻断主链路", async () => {
@@ -1454,9 +1480,14 @@ test("批次0.5·②：恢复重放命中既有 effect 时不重发工具事件"
   const ctx = makeFakeCtx({ recordToolEffectOnce: recordToolEffectOnce as any });
 
   await wf.executeStep("chat", ctx);
-  assert.equal(appended.length, 2, "首跑发射 started + completed");
+  assert.equal(withoutConversationFacts(appended).length, 2, "首跑发射 started + completed");
   await wf.executeStep("chat", ctx);
-  assert.equal(appended.length, 2, "重放跳过 execute，工具事件不得重发");
+  assert.equal(withoutConversationFacts(appended).length, 2, "重放跳过 execute，工具事件不得重发");
+  assert.equal(
+    appended.filter((event) => event.eventType === "assistant/message").length,
+    1,
+    "同一条幂等链也必须保证对话事实只写一次",
+  );
 });
 
 test("批次0.5·②：工具事件与 text.delta 共用同一写链，顺序即模型真实产生顺序", async () => {
@@ -1477,8 +1508,8 @@ test("批次0.5·②：工具事件与 text.delta 共用同一写链，顺序即
   await wf.executeStep("chat", makeFakeCtx());
   assert.deepEqual(
     appended.map((event) => event.eventType),
-    ["text.delta", "tool.call.started", "tool.call.completed", "text.delta"],
-    "两条事件族必须共用串行链，否则 sequence 会反映错误的时序",
+    ["text.delta", "tool.call.started", "tool.call.completed", "text.delta", "assistant/message"],
+    "两条事件族必须共用串行链，否则 sequence 会反映错误的时序；批次 2b-1 的事实事件排在定稿处（链尾）",
   );
 });
 
@@ -1646,4 +1677,123 @@ test("批次0.5·③：恢复重放吸收整轮 effect 后，metadata.toolCalls 
     assistants[0].metadata?.toolCalls,
     "镜像必须经 execute 返回值传递：重放跳过 execute，只靠 sink 内存态会写出空列表",
   );
+});
+
+// ============================================================
+// 批次 2b-1（只写不读）：assistant/message —— 本轮答复的持久事实
+// ============================================================
+// 此前「助手说了什么」在事件流里只有 text.delta 碎片，而批次 0.5 已把 text.delta
+// 定性为展示/传输通道：让持久事实押在「一片都没丢」上，等于把历史对不对交给传输
+// 完整性。本组用例钉住三件事：
+//  ① 答复定稿时写出**一条** assistant/message，正文与会话里那条 assistant 消息
+//     逐字节相同（判据①的结构化版本）；
+//  ② 恢复重放不得写出第二条 —— 这正是把写入放在 execute 内、而不是放在
+//     appendSessionMessage 旁边的理由：会话侧靠来源键幂等，事件侧没有来源键，
+//     只能借 effect 的幂等；
+//  ③ 本轮一条 text.delta 都没有时，仍然有这一条事实 —— 事实不依赖传输。
+
+function makeAssistantMessageWorkflow(input: {
+  answer: string;
+  deltas?: string[];
+  events: RecordedRunEvent[];
+  messages: RecordedAppendCall[];
+}) {
+  return createWorkbenchChatWorkflow({
+    dispatch: async (dispatchInput) => {
+      for (const delta of input.deltas ?? []) {
+        dispatchInput.streamingAdapter?.onToken({ contentDelta: delta });
+      }
+      return {
+        answer: input.answer,
+        intent: "domain_qa",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock", contextRefs: [] },
+      } as any;
+    },
+    appendSessionMessage: makeRecordingAppendSessionMessage(input.messages),
+    appendRunEvent: async (event) => {
+      input.events.push(event);
+      return event;
+    },
+  });
+}
+
+function eventsOfType(events: RecordedRunEvent[], type: string): RecordedRunEvent[] {
+  return events.filter((event) => event.eventType === type);
+}
+
+test("批次2b-1：答复定稿写一条 assistant/message，正文与会话 assistant 消息逐字节相同", async () => {
+  const events: RecordedRunEvent[] = [];
+  const messages: RecordedAppendCall[] = [];
+  const answer = "第一轮答复：先看这段。\n第二段含换行与 emoji ✅";
+  const wf = makeAssistantMessageWorkflow({
+    answer,
+    deltas: ["第一轮答复：先看这段。", "\n第二段含换行与 emoji ✅"],
+    events,
+    messages,
+  });
+
+  await wf.executeStep("chat", makeFakeCtx());
+
+  const factEvents = eventsOfType(events, "assistant/message");
+  assert.equal(factEvents.length, 1, "一轮答复只有一条事实事件");
+  assert.deepEqual(factEvents[0].payload, { content: answer }, "载荷必须是完整正文，不截断不改形");
+  assert.equal(factEvents[0].runId, "run-1");
+
+  const assistantMessage = messages.find((call) => call.role === "assistant");
+  assert.ok(assistantMessage, "会话侧的 assistant 消息照旧落库（双写期，两边都要有）");
+  assert.equal(
+    (factEvents[0].payload as { content: string }).content,
+    assistantMessage!.content,
+    "判据①：事件载荷正文必须与 ai_sessions 里那条 assistant 正文逐字节相同",
+  );
+
+  // 事实事件排在全部传输碎片之后：同一写链 ⇒ sequence 天然反映「先流式、后定稿」
+  assert.deepEqual(
+    events.map((event) => event.eventType),
+    ["text.delta", "text.delta", "assistant/message"],
+    "assistant/message 必须排在本轮全部 text.delta 之后（同一条串行写链）",
+  );
+});
+
+test("批次2b-1：恢复重放不再写第二条 assistant/message", async () => {
+  const events: RecordedRunEvent[] = [];
+  const messages: RecordedAppendCall[] = [];
+  const store = new Map<string, Record<string, unknown>>();
+  const recordToolEffectOnce = async (effect: FakeEffect) => {
+    const existing = store.get(effect.effectKey);
+    if (existing) return { output: existing, created: false };
+    const output = await effect.execute();
+    store.set(effect.effectKey, output);
+    return { output, created: true };
+  };
+  const wf = makeAssistantMessageWorkflow({
+    answer: "首轮已定稿的答复",
+    deltas: ["首轮已定稿的答复"],
+    events,
+    messages,
+  });
+  const ctx = makeFakeCtx({ recordToolEffectOnce: recordToolEffectOnce as any });
+
+  await wf.executeStep("chat", ctx);
+  await wf.executeStep("chat", ctx);
+
+  assert.equal(
+    eventsOfType(events, "assistant/message").length,
+    1,
+    "重放跳过 execute ⇒ 事实事件不重复；若把写入放在 appendSessionMessage 旁边，这里会是两条",
+  );
+});
+
+test("批次2b-1：本轮没有任何 text.delta 时仍然有 assistant/message（事实不依赖传输）", async () => {
+  const events: RecordedRunEvent[] = [];
+  const messages: RecordedAppendCall[] = [];
+  const wf = makeAssistantMessageWorkflow({ answer: "静态文案答复，无流式", events, messages });
+
+  await wf.executeStep("chat", makeFakeCtx());
+
+  assert.equal(eventsOfType(events, "text.delta").length, 0, "本轮确实一片 delta 都没落");
+  const factEvents = eventsOfType(events, "assistant/message");
+  assert.equal(factEvents.length, 1, "delta 为零也不能丢掉这轮答复的事实");
+  assert.deepEqual(factEvents[0].payload, { content: "静态文案答复，无流式" });
 });

@@ -94,6 +94,36 @@ export const HARNESS_RUN_EVENT_TYPES = [
   // 同一条事件要表达两种事实，读侧就必须靠猜分支——那正是本表要锁死的漂移形态。
   // payload 带 formBlock 表单结构本身（参数唯一来源仍是 tool.call.started 那一份）。
   "tool.call.awaiting_input",
+  // 批次 2b-1（additive）：对话正文的持久事实。
+  //
+  // 为什么必须新增而不是复用既有事件（架构侧 2026-09-08 实取，非推测）：
+  // 本表此前**不是**对话记录。全库事件分布实取为
+  //   thought 17874 · text.delta 17731 · run_claimed 94 · run_queued 92 ·
+  //   run_completed 78 · outbox_enqueued 68 · run_failed 13 · run_cancelled 9 · tool.call.* 16
+  // 且 run_queued 的载荷全部是空 {}。于是：
+  //  · **用户说的话根本不在事件流里**——它只存在于 harness_runs.title。title 与用户
+  //    正文今天逐条相同（23 对全量比对、无截断），但 title 语义上是「标题」：哪天
+  //    有人给长消息加摘要，按事件流重建历史就会**悄悄**坏掉。
+  //  · **助手说的话只有 text.delta 碎片**，而批次 0.5 已把 text.delta 定性为展示/
+  //    传输通道。让持久事实依赖「一片都没丢」，等于把历史对不对押在传输完整性上。
+  // 两者都是「碰巧能用」，没有一行是「当时说了什么」的正式记录。本批把这份记录建出来。
+  //
+  // 分工（后一条是本批最容易被误解的地方，务必连注释一起读）：
+  //   text.delta      = **传输通道**。逐 chunk、可为 0 条也可为上千条、按到达顺序落库，
+  //                     作用是让正在看的人实时看到字在长。恢复重放会重复落，这对展示无害。
+  //   assistant/message = **持久事实**。一轮一条、正文完整，作用是「当时答复的是什么」。
+  //   两者并存不冲突也不冗余：删掉全部 text.delta，历史依然完整；只留 text.delta，
+  //   历史就要赌「一片都没丢」。写在这里而不在读侧做合并，是为了让事实不依赖派生。
+  //
+  // 写入时机（见各自调用点）：user/message 在 Run 入队事务内、与 run_queued 同轨提交
+  // （正文取提交时的原始入参，**不从 title 取**）；assistant/message 在本轮答复定稿时
+  // 写一次（置于幂等 effect 内，恢复重放天然不重复）。
+  //
+  // 命名沿用斜杠风格：与 workbench-tool-event-surface 中 dsh SurfaceEventType 的
+  // user/message、assistant/message、tool/result 同形（雷达文档 §8/§9.3 引用该形状）。
+  // 刻意不改成 message.user——同一族词汇两种命名法，读侧只能靠记历史。
+  "user/message",
+  "assistant/message",
 ] as const;
 export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
 
@@ -121,6 +151,28 @@ export const HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES = [
   "run_action_confirmed",
 ] as const satisfies readonly HarnessRunEventType[];
 export type HarnessRunToolTrailEventType = (typeof HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES)[number];
+
+/**
+ * 批次 2b-1（additive）：一个 Run 内**最多一条**的事件类型 —— 对话正文。
+ * 由仓储在 appendRunEvent 里强制执行（重复写幂等吸收、首写获胜）。
+ *
+ * 为什么需要这条约束，而不是只靠「写在幂等位上」这个约定：
+ * 崩溃窗口是真实存在的——execute 跑完、事件已落库，但 effect 行尚未提交时进程死掉，
+ * 恢复重放会**重新执行整个 execute**，于是再写一条 assistant/message。会话侧不会
+ * 重复（它有 ${runId}:assistant:1 来源键），事件侧没有来源键。两条同名正文等于
+ * 让重建出来的历史凭空多出一轮，而这正是本批要消灭的形态。
+ *
+ * 清单只含对话正文，**刻意不含 text.delta**：一次答复合法地对应多条 delta，
+ * 把它纳入就是让仓储吞掉传输分片——那是把传输通道当事实处理的反向错误。
+ *
+ * 同 HARNESS_RUN_TOOL_TRAIL_EVENT_TYPES：由白名单 satisfies 取子集，不重列字符串，
+ * 有人改词汇表时这里当场编译失败。
+ */
+export const HARNESS_RUN_SINGLETON_EVENT_TYPES = [
+  "user/message",
+  "assistant/message",
+] as const satisfies readonly HarnessRunEventType[];
+export type HarnessRunSingletonEventType = (typeof HARNESS_RUN_SINGLETON_EVENT_TYPES)[number];
 
 export type HarnessEffectKeyInput = {
   runId: string;

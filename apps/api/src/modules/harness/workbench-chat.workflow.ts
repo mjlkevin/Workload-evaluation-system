@@ -408,6 +408,23 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
             // 存活定时器会持续往已失败的 Run 写 progress（事件泄漏 + 污染时序）。
             toolEventSink.stop();
           }
+          // 批次 2b-1：本轮答复**定稿**，写一条持久事实。
+          //
+          // 分工（不写清后人会以为重复）：text.delta 是**传输通道**——逐 chunk、
+          // 一次答复可能 0 片也可能上千片，只服务「正看着屏幕的人看到字在长」；
+          // assistant/message 是**持久事实**——一轮一条、正文完整，是重建历史时
+          // 该读的那一行。两者并存不冲突：删掉全部 delta，历史依然完整；只留
+          // delta，历史就得赌「一片都没丢」。
+          //
+          // 位置刻意在 execute **内**、而不是下方 appendSessionMessage 旁边：
+          // 会话消息有来源键（${runId}:assistant:1）吸收重放，事件表没有来源键，
+          // 放在旁边恢复重放就会写出第二条；放在这里才与整轮副作用同借
+          // recordToolEffectOnce 的幂等——重放跳过 execute，事实天然只有一条。
+          //
+          // 归一化口径必须与下面落会话消息用的 answer（String(output.answer ?? "")）
+          // 一致，否则「事件载荷 ≡ 会话正文」在 answer 为 undefined/非字符串时静默对不上。
+          const assistantMessageContent = String(result.answer ?? "");
+          appendStreamEvent("assistant/message", { content: assistantMessageContent });
           // execute 返回前冲刷写链，避免流式事件丢失在游离 promise 中
           await streamEventChain;
           // RP-030：成功 trace 归档（置于 execute 内，恢复重放跳过不重复写）
