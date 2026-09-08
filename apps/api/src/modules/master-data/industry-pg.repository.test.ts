@@ -234,16 +234,36 @@ test("removeSubcategory 恒抛 MASTER_DATA_DELETE_FORBIDDEN，且行仍在", { s
   assert.ok(await repo!.getSubcategory(sub.id), "被拒后行必须完好");
 });
 
-test("绕开仓储直连 DELETE 有子节点的一级，被外键 RESTRICT 挡住（23001）", { skip: !testDatabaseUrl }, async () => {
+test("绕开仓储直连 DELETE 有子节点的一级，被外键 RESTRICT 挡住", { skip: !testDatabaseUrl }, async () => {
   const cat = await makeCategory(`${OWN_PREFIX}RESTRICT父`);
   await repo!.createSubcategory({ id: uniqueId("sub"), categoryId: cat.id, name: `${OWN_PREFIX}RESTRICT子` });
-  // 码值取 23001 而非 23503：实跑 pg 驱动 err.code 确认，ON DELETE RESTRICT 命中
-  // 的是 restrict_violation（23001），「父键不存在」才是 foreign_key_violation（23503，
-  // 见下一条「三级无处可挂」用例）。两者混用会让断言在约束被改动后静默失真。
+
+  // 断言锚在**约束名**上，不锚在裸码值上。码值随服务端版本变（2026-09-08 实测同一份
+  // 迁移、同一对表、同一句裸 DELETE）：
+  //   PG 17.11（CI 镜像 postgres:17-alpine）→ 23503 foreign_key_violation
+  //     message: update or delete on table "industry_categories" violates foreign key constraint …
+  //   PG 18.3（本机 Postgres.app）           → 23001 restrict_violation
+  //     message: update or delete on table "industry_categories" violates RESTRICT setting of foreign key constraint …
+  // 两边 err.constraint 恒为下面这个约束名，且删除都确实被挡住——保护与版本无关，
+  // 只有码值有关。上一版把 23001 当成唯一正确答案，在 CI 上即判红。
+  // 复现：起一个 postgres:17-alpine 容器跑 migrate.cli，再对父行发裸 DELETE。
+  const CONSTRAINT_NAME = "industry_subcategories_category_id_industry_categories_id_fk";
   await assert.rejects(
     () => pool!.query("DELETE FROM industry_categories WHERE id = $1", [cat.id]),
-    (err: unknown) => (err as { code?: string }).code === "23001",
-    "外键 RESTRICT 应抛 23001（restrict_violation）",
+    (err: unknown) => {
+      const e = err as { code?: string; constraint?: string; message?: string };
+      assert.equal(
+        e.constraint,
+        CONSTRAINT_NAME,
+        `挡住删除的应当是本域外键约束本身，实际 constraint=${JSON.stringify(e.constraint)}`,
+      );
+      assert.ok(
+        e.code === "23503" || e.code === "23001",
+        `码值应是外键/RESTRICT 违反类，实际 code=${JSON.stringify(e.code)}`,
+      );
+      assert.match(String(e.message), /violates (RESTRICT setting of )?foreign key constraint/);
+      return true;
+    },
   );
 });
 
