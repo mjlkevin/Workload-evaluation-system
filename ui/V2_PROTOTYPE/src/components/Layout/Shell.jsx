@@ -8,6 +8,7 @@ import { primeStoredActiveSessionId } from '../../hooks/useAiSessions.js'
 import useCurrentUser from '../../hooks/useCurrentUser.js'
 import { clearToken, isAuthenticated } from '../../api/auth.js'
 import { SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
+import { BASE_MANAGEMENT_SECTIONS } from '../../config/baseManagementSections.js'
 import { APP_VERSION } from '../../config/app.js'
 import { isAdminUser } from '../../utils/adminAccess.js'
 
@@ -32,6 +33,17 @@ const navGroups = [
         label: '系统管理',
         icon: '⚙',
         children: SYSTEM_MANAGEMENT_SECTIONS.map((section) => ({
+          to: section.route,
+          label: section.label,
+          icon: section.icon,
+        })),
+      },
+      {
+        // 批次 10a：业务记录会引用的主数据（行业…）——与「系统管理」分界见
+        // config/baseManagementSections.js 文件头。
+        label: '基础管理',
+        icon: '▦',
+        children: BASE_MANAGEMENT_SECTIONS.map((section) => ({
           to: section.route,
           label: section.label,
           icon: section.icon,

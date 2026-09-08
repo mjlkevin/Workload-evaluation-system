@@ -98,6 +98,12 @@ export const TRUNCATE_TEST_TABLE_NAMES: string[] = [
   "traces",
   // 知识域（1，阶段 2 批 9）
   "knowledge_entries",
+  // 行业主数据域（2，批次 10a · 第 10 个存储域）
+  // 本域读路径按主键 / 父键收敛（listCategories 全表读但只服务本域自身的
+  // 树查询，测试断言一律按 wes-b10a-* 前缀数据集隔离），不属无界读表，
+  // 故不进入 single-doc-serial-scope.drift.test.ts 的串行白名单。
+  "industry_categories",
+  "industry_subcategories",
 ];
 
 /**

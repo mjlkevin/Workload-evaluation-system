@@ -1,0 +1,16 @@
+{
+  "version": "industry-master-data-v1",
+  "description": "行业主数据首批种子（批次 10a）。只装库中真实存过的值，作为一级节点；二级留空由用户在【基础管理 → 行业】自行维护。",
+  "provenance": {
+    "derivedAt": "2026-09-08",
+    "source": "workload_eval 库 version_records.payload->>'industry' 去重实取",
+    "command": "select payload->>'industry' as ind, count(*) from version_records group by 1 order by 2 desc",
+    "observed": "制造业=20 其他=1 空串=68 NULL=7；history_projects 0 行；requirement_packs.industry 10 行全 NULL",
+    "rule": "不得凭空新增种子：任何本文件里多出来的一级节点，都会让现存记录在「权威清单」里对不上号。"
+  },
+  "categories": [
+    { "id": "industry-cat-manufacturing", "name": "制造业", "sortOrder": 0 },
+    { "id": "industry-cat-other", "name": "其他", "sortOrder": 1 }
+  ],
+  "subcategories": []
+}

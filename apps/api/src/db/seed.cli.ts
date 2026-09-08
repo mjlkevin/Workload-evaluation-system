@@ -23,7 +23,9 @@ async function main(): Promise<void> {
     `[db:seed] admin={username:${admin.username}, created:${admin.created}} ` +
       `versionCodeRules=${base.versionCodeRules} templates=${base.templates} ` +
       `ruleSets=${base.ruleSets} systemConfigs=${base.systemConfigs} ` +
-      `knowledgeEntries=${base.knowledgeEntries} force=${force}`,
+      `knowledgeEntries=${base.knowledgeEntries} ` +
+      `industryCategories=${base.industryCategories} industrySubcategories=${base.industrySubcategories} ` +
+      `force=${force}`,
   );
 }
 

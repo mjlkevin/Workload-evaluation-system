@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ROUTE_REDIRECTS, SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
+import { BASE_MANAGEMENT_ROUTE_REDIRECTS, BASE_MANAGEMENT_SECTIONS } from '../../config/baseManagementSections.js'
 import { useUnsavedNavigation } from '../../hooks/useUnsavedChanges.jsx'
 
 const STORAGE_KEY = 'wes-v2-workspace-tabs-v1'
@@ -17,10 +18,15 @@ const STATIC_TITLES = {
   '/reviews': '评审',
   '/history': '历史项目',
   '/system': '系统管理',
+  '/base-data': '基础管理',
   '/users': '用户管理',
   '/api-keys': 'API 密钥',
   ...Object.fromEntries(SYSTEM_MANAGEMENT_SECTIONS.map((section) => [section.route, section.label])),
+  ...Object.fromEntries(BASE_MANAGEMENT_SECTIONS.map((section) => [section.route, section.label])),
 }
+
+// 各管理区各自登记自己的父路由跳转（见各自 config 文件），这里只合并查表。
+const ALL_ROUTE_REDIRECTS = { ...ROUTE_REDIRECTS, ...BASE_MANAGEMENT_ROUTE_REDIRECTS }
 
 const DETAIL_TITLES = [
   { pattern: /^\/requirements\/[^/]+\/ai-evaluation$/, title: 'AI 评估台' },
@@ -81,7 +87,7 @@ function normalizeTabs(input) {
 function resolveRedirectPath(path) {
   const raw = String(path || '').trim()
   const [basePath, query = ''] = raw.split('?')
-  const target = ROUTE_REDIRECTS[basePath]
+  const target = ALL_ROUTE_REDIRECTS[basePath]
   if (!target) return raw
   return query ? `${target}?${query}` : target
 }

@@ -14,6 +14,12 @@
 //                            2026-08-29 补：本项原先不在清单内，导致新库重建后
 //                            知识语料不会被带回、「AI 检索恒空」事故复发（见事故记录）；
 //                            同时吸收一次性脚本 scripts/migrate-knowledge-json-to-pg.cjs 的职责
+//   7. industry_categories     <- config/master-data/industries.json（批次 10a 行业主数据）
+//      industry_subcategories    一级只播 `制造业` / `其他` 两条——它们是 workload_eval 库
+//                            version_records.payload->>'industry' 去重实取的全部非空真实值；
+//                            二级留空，由用户在【基础管理 → 行业】自行维护。
+//                            不得凭空补几条「像样的行业分类」：那会让现存记录在权威清单里
+//                            对不上号，等于把本批要解决的根因反过来再犯一次。
 //   +  ensureAdminSeed    <- WES_ADMIN_USERNAME / WES_ADMIN_PASSWORD（生产缺密码拒绝启动）
 //
 // 幂等口径：缺失才插（onConflictDoNothing），不 TRUNCATE、不覆盖运行时写入；
@@ -26,6 +32,12 @@
 //     源里的值**。种子数据以仓库文件为准是 --force 的设计语义，不是数据丢失；
 //     用户自建、id 不在种子源里的知识词条，两种模式下都不会被动。
 //
+// 例外：industry_categories / industry_subcategories **不参与 --force**。
+//   本域要害就是「禁止硬删」（历史记录按名称文本引用行业），若让 db:seed --force
+//   成为唯一能把主数据物理删掉的后门，等于自己拆掉刚立的规矩；且行业主数据自建立
+//   之日起就是用户可维护的业务主数据，不是可回放的配置快照。
+//   两种模式下种子行都只补缺、不覆盖、不删除。
+//
 // 本模块只落 seed 函数；db:seed 脚本接线与启动 migrate 属事项 7。
 
 import fs from "node:fs";
@@ -35,7 +47,16 @@ import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 
 import { db } from "./client";
-import { knowledgeEntries, ruleSets, systemConfigs, templates, users, versionCodeRules } from "./schema";
+import {
+  industryCategories,
+  industrySubcategories,
+  knowledgeEntries,
+  ruleSets,
+  systemConfigs,
+  templates,
+  users,
+  versionCodeRules,
+} from "./schema";
 import { resolveRootDir } from "../utils/file";
 import type { RuleSet, Template, VersionCodeRule, VersionCodeRulesStore } from "../types";
 
@@ -45,6 +66,8 @@ export type SeedBaseConfigResult = {
   ruleSets: number;
   systemConfigs: number;
   knowledgeEntries: number;
+  industryCategories: number;
+  industrySubcategories: number;
 };
 
 export type SeedAdminResult = {
@@ -149,6 +172,91 @@ export function buildKnowledgeSeedRows(
   return rows;
 }
 
+/** seed 源里的单条行业主数据（config/master-data/industries.json）。 */
+type IndustrySeedSource = {
+  categories?: Array<{ id?: unknown; name?: unknown; sortOrder?: unknown } | null>;
+  subcategories?: Array<{ id?: unknown; categoryId?: unknown; name?: unknown; sortOrder?: unknown } | null>;
+};
+
+/**
+ * 行业主数据 seed 行构造（纯函数，不碰 DB）。
+ *
+ * 字段口径与 industry-pg.repository 一致：name 去首尾空白、status 直接 active、
+ * 两个时间同源同一刻。
+ *
+ * id 缺省时按**名称派生**（不是按数组下标）：seed 的幂等依赖「同一份源文件
+ * 两次运行得到同一批主键」，下标派生会在源文件中间插一条时整体错位，
+ * 把已有行当成新行再插一遍。
+ *
+ * 跳过规则（不产生脏行）：name 为空的条目；二级缺 categoryId 或其父不在
+ * 本次一级集合里的条目——后者若不挡，插入会被外键拒绝而让整次 seed 失败。
+ */
+export function buildIndustrySeedRows(raw: unknown, now: Date = new Date()): {
+  categories: Array<{ id: string; name: string; status: "active"; sortOrder: number; createdAt: Date; updatedAt: Date }>;
+  subcategories: Array<{
+    id: string;
+    categoryId: string;
+    name: string;
+    status: "active";
+    sortOrder: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+} {
+  const source = (raw ?? {}) as IndustrySeedSource;
+
+  const slug = (name: string) => name.trim().toLowerCase().replace(/\s+/g, "-");
+
+  const categories: Array<{
+    id: string;
+    name: string;
+    status: "active";
+    sortOrder: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }> = [];
+  for (const [index, entry] of (source.categories ?? []).entries()) {
+    const name = typeof entry?.name === "string" ? entry.name.trim() : "";
+    if (!name) continue;
+    const id = typeof entry?.id === "string" && entry.id.trim() ? entry.id.trim() : `industry-cat-${slug(name) || index}`;
+    categories.push({
+      id,
+      name,
+      status: "active",
+      sortOrder: Number.isFinite(Number(entry?.sortOrder)) ? Number(entry?.sortOrder) : index,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const categoryIds = new Set(categories.map((c) => c.id));
+  const subcategories: Array<{
+    id: string;
+    categoryId: string;
+    name: string;
+    status: "active";
+    sortOrder: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }> = [];
+  for (const [index, entry] of (source.subcategories ?? []).entries()) {
+    const name = typeof entry?.name === "string" ? entry.name.trim() : "";
+    const categoryId = typeof entry?.categoryId === "string" ? entry.categoryId.trim() : "";
+    if (!name || !categoryId || !categoryIds.has(categoryId)) continue;
+    subcategories.push({
+      id: typeof entry?.id === "string" && entry.id.trim() ? entry.id.trim() : `industry-sub-${slug(categoryId) || index}`,
+      categoryId,
+      name,
+      status: "active",
+      sortOrder: Number.isFinite(Number(entry?.sortOrder)) ? Number(entry?.sortOrder) : index,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  return { categories, subcategories };
+}
+
 function resolveAdminCredentials(options: SeedAdminOptions): { username: string; password: string } {
   const username = (options.adminUsername || process.env.WES_ADMIN_USERNAME || "admin").trim();
   const password = options.adminPassword || process.env.WES_ADMIN_PASSWORD || "Admin@2026!";
@@ -171,6 +279,7 @@ function loadSeedSources(rootDir: string) {
       ["knowledgeBaseConfig", readJsonOr<unknown>(rootDir, "config/system/knowledge-base-config.json", null)],
     ] as const,
     knowledgeStore: readJsonOr<unknown>(rootDir, "config/knowledge/store.json", null),
+    industries: readJsonOr<unknown>(rootDir, "config/master-data/industries.json", null),
   };
 }
 
@@ -290,12 +399,32 @@ export async function seedBaseConfig(options: SeedBaseConfigOptions = {}): Promi
         .returning()
     : [];
 
+  // 行业主数据（批次 10a）：只补缺，**不参与 --force**（理由见文件头「例外」段）。
+  // 二级有指向一级的外键，插入顺序不能颠倒。
+  const industrySeedRows = buildIndustrySeedRows(sources.industries);
+  const insertedIndustryCategories = industrySeedRows.categories.length
+    ? await db
+        .insert(industryCategories)
+        .values(industrySeedRows.categories)
+        .onConflictDoNothing({ target: industryCategories.id })
+        .returning()
+    : [];
+  const insertedIndustrySubcategories = industrySeedRows.subcategories.length
+    ? await db
+        .insert(industrySubcategories)
+        .values(industrySeedRows.subcategories)
+        .onConflictDoNothing({ target: industrySubcategories.id })
+        .returning()
+    : [];
+
   return {
     versionCodeRules: insertedRules.length,
     templates: insertedTemplates.length,
     ruleSets: insertedRuleSets.length,
     systemConfigs: insertedSystemConfigs.length,
     knowledgeEntries: insertedKnowledgeEntries.length,
+    industryCategories: insertedIndustryCategories.length,
+    industrySubcategories: insertedIndustrySubcategories.length,
   };
 }
 

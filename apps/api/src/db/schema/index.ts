@@ -28,3 +28,4 @@ export * from "./memory";
 export * from "./json_runtime";
 export * from "./credentials";
 export * from "./knowledge";
+export * from "./industry";

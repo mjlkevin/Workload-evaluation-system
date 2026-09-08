@@ -8,6 +8,8 @@ import {
   mockDeliverables,
   mockDslRules,
   mockEstimateResult,
+  mockIndustryOptions,
+  mockIndustryTree,
   mockProjectEvaluations,
   mockRequirement,
   mockResourceCost,
@@ -770,4 +772,17 @@ export const handlers = [
   http.post(`${BASE}/versions/:id/checkout`, () => HttpResponse.json({ success: true, data: { checkoutStatus: 'checked_out' } })),
   http.post(`${BASE}/versions/:id/checkin`, () => HttpResponse.json({ success: true, data: { checkoutStatus: 'checked_in' } })),
   http.post(`${BASE}/versions/:id/promote`, () => HttpResponse.json({ success: true, data: {} })),
+
+  // 批次 10a · 行业主数据（基础管理）。响应形状与后端真实信封一致：
+  // { code, message, data: { items, total } }
+  http.get(`${BASE}/master-data/industries/tree`, () => HttpResponse.json({
+    code: 0,
+    message: 'ok',
+    data: { items: mockIndustryTree, total: mockIndustryTree.length },
+  })),
+  http.get(`${BASE}/master-data/industries/options`, () => HttpResponse.json({
+    code: 0,
+    message: 'ok',
+    data: { items: mockIndustryOptions, total: mockIndustryOptions.length },
+  })),
 ]

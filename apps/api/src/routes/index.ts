@@ -36,6 +36,8 @@ import { notFoundHandler } from "../middleware/error-handler";
 import { isDurableRunsEnabledFromEnv } from "../modules/harness/harness-runtime.usecase";
 import { createHarnessRuntimeRepository } from "../modules/harness/harness-runtime.repository";
 import { getKnowledgeRepository } from "../modules/knowledge/knowledge.module";
+import { createMasterDataRouter } from "./master-data.routes";
+import { getIndustryRepository } from "../modules/master-data/master-data.module";
 
 const router = Router();
 
@@ -50,6 +52,9 @@ const knowledgeRoutes = createKnowledgeRouter({ repo: getKnowledgeRepository() }
 
 // SP-2026-007 MS2：会话记忆分层蒸馏
 const memoryRoutes = createMemoryRouter({ repo: getMemoryRepository() });
+
+// 批次 10a：基础管理 · 行业主数据（第 10 个存储域，自始即 PG 主存储）
+const masterDataRoutes = createMasterDataRouter({ repo: getIndustryRepository() });
 
 // 业务路由
 router.use("/auth", authRoutes);
@@ -78,6 +83,7 @@ router.use("/harness", harnessRoutes);
 router.use("/traces", traceRoutes);
 router.use("/knowledge", knowledgeRoutes);
 router.use("/memory", memoryRoutes);
+router.use("/master-data", masterDataRoutes);
 
 /** 未匹配 /api/v1/* 时返回标准 JSON，避免 Express 默认纯文本 404 导致前端误判为「非 JSON」 */
 router.use((req, res) => {

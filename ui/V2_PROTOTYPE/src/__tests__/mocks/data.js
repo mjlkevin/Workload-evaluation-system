@@ -357,3 +357,45 @@ export const mockAiTools = [
     callable: true,
   },
 ]
+
+// 批次 10a · 行业主数据（基础管理）
+// tree 含一个已停用的大类，用于钉「停用只挡新单据选项、管理页仍看得见」；
+// options 只含启用项（后端过滤），两者口径必须一致：
+// tree 给管理页看全量，options 给业务单据取下拉。
+export const mockIndustryTree = [
+  {
+    id: 'industry-cat-manufacturing',
+    name: '制造业',
+    status: 'active',
+    sortOrder: 0,
+    createdAt: '2026-09-08T00:00:00.000Z',
+    updatedAt: '2026-09-08T00:00:00.000Z',
+    children: [
+      {
+        id: 'industry-sub-1',
+        categoryId: 'industry-cat-manufacturing',
+        name: '流程制造',
+        status: 'active',
+        sortOrder: 0,
+        createdAt: '2026-09-08T00:00:00.000Z',
+        updatedAt: '2026-09-08T00:00:00.000Z',
+      },
+    ],
+  },
+  {
+    id: 'industry-cat-other',
+    name: '其他',
+    status: 'inactive',
+    sortOrder: 1,
+    createdAt: '2026-09-08T00:00:00.000Z',
+    updatedAt: '2026-09-08T00:00:00.000Z',
+    children: [],
+  },
+]
+
+export const mockIndustryOptions = [
+  { value: '制造业', label: '制造业', level: 1, parentValue: null },
+  // 刻意不放 `离散制造`：它是 useDevAssessmentDetail.js:125 写死的编造缺省值，
+  // 主数据里不存在，正好用来验「历史非标准值仍能显示」。
+  { value: '流程制造', label: '制造业 / 流程制造', level: 2, parentValue: '制造业' },
+]
