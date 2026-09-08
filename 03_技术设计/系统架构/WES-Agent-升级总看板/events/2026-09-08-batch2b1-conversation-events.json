@@ -1,0 +1,108 @@
+{
+  "id": "BE-2026-09-08-batch2b1-conversation-events",
+  "date": "2026-09-08",
+  "type": "implementation",
+  "scope": "批次 2b-1 · 对话正文事件（只写不读）：user/message 与 assistant/message",
+  "summary": "把「当时说了什么」正式写进事件流。此前事件流不是对话记录：全库 35 987 条事件实取分布 thought 17874 · text.delta 17731 · run_queued 92（载荷全部为空 {}）· 其余零星——用户说的话根本不在事件流里，只存在于 harness_runs.title（23 对逐条比对今天与正文相同，但 title 语义是标题，谁给长消息加摘要，按事件流重建历史就会悄悄坏掉）；助手说的话只有 text.delta 碎片，而批次 0.5 已把 text.delta 定性为展示/传输通道。本批新增两个事件类型（23 → 25，additive）：user/message 在 Run 入队事务内与 run_queued 同轨提交、正文取提交原始入参（刻意不读 title）；assistant/message 在本轮答复定稿时写一次、正文完整。仓储侧对这两类强制「一个 Run 最多一条、首写获胜」的幂等追加，堵住崩溃在 effect 提交前、恢复重放再跑一遍 execute 会写出第二条正文的窗口（会话侧有来源键，事件侧没有）。本批只写不读：未改任何读取路径、未换 deriveSessionMessages 数据源、未回填历史（2b-2）、未动 ai_sessions.messages 写入（双写期两边都要有）、未建表未写迁移（事件表 event_type 本就是 text，无 CHECK 约束，实取确认）。",
+  "status": "已回填 / 待 Codex 复核",
+  "pages": [
+    "changes",
+    "testing"
+  ],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/harness-runtime.types.ts",
+      "summary": "登记处：HARNESS_RUN_EVENT_TYPES 末尾追加 user/message、assistant/message（斜杠命名沿用 dsh SurfaceEventType 同形，刻意不改 message.user——同族两种命名法，读侧只能靠记历史）。注释内嵌全库事件分布实取、title 巧合的失效路径、以及「delta 是传输、本事件是事实」的分工。新增 HARNESS_RUN_SINGLETON_EVENT_TYPES（同 tool-trail 清单写法，satisfies 取子集）：只含对话正文两类，显式排除 text.delta（一次答复合法对应多条 delta，纳入即等于让仓储吞掉传输分片）"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/harness-runtime.repository.ts",
+      "summary": "写入点①（用户侧）：createQueuedRun 在 run_queued 之后、同一事务内落 user/message，载荷 {content} 先过既有 1 MiB 闸门——超限即整笔回滚，不留「有 Run 无正文」的半提交态；重放走「返回原 Run 不追加事件」分支，故天然一条。写入点③（幂等）：appendRunEventInTransaction 对单次清单先分配序号（该 UPDATE 锁住 Run 行使同 Run 并发追加串行化）再查重，已存在即返回首行不再插入；被吸收时事件序号留一个空洞，游标语义是 sequence > cursor 故不影响回放与续订。取值来源经 CreateQueuedHarnessRunInput.userMessage 显式传入，仓储不猜 executionConfig 形状、更不读 title"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/workbench-chat.workflow.ts",
+      "summary": "写入点②（助手侧）：execute 内 dispatch 返回后，经与 text.delta **同一条串行写链**写一条 assistant/message，因此它排在本轮全部 delta 之后、sequence 反映「先流式后定稿」。位置刻意在 execute 内而非下方 appendSessionMessage 旁边：事件表没有来源键，只有借 recordToolEffectOnce 的幂等才能保证重放不重复。正文归一化 String(result.answer ?? \"\") 与落会话消息用的 answer 同口径，两侧才可能逐字节相同"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/harness-runtime.usecase.ts",
+      "summary": "取值来源：submitRun 把提交原始入参 content 作为 userMessage 带入队（与 executionConfig.content 同一份，也正是 workflow 落会话用户消息的那一份）；retryRun 从原 Run 的 executionConfig.content 取，同一轮正文不因换 Run 而丢。另把仓储的 HARNESS_RUNTIME_PAYLOAD_TOO_LARGE 映射为 AiRunsValidationError（422 带原因），否则超长正文会落进 controller 兜底变成不透明的 500"
+    },
+    {
+      "kind": "gate",
+      "ref": "判据① apps/api/src/modules/harness/workbench-conversation-events.e2e.test.ts（新增，已登记进 test:harness）",
+      "result": "pass",
+      "summary": "真实两轮对话：提交口用真实 usecase、会话读写用真实 ai-sessions、执行用真实 boot 装配 + 真实 worker + 真库（只替换最外层模型 provider，否则判据依赖外部模型服务不可重跑）。实取事件序列 第 1 轮 seq1:run_queued → seq2:user/message → seq3:run_claimed → seq4~7:text.delta → seq8:assistant/message → seq9:run_completed；第 2 轮同构（2 片 delta）。逐字节比对（字节数 + SHA-256 前 12 位成对打印）：第 1 轮 user 事件[325B/18a4aac1b03c] 会话[325B/18a4aac1b03c]、assistant 事件[71B/378348a11419] 会话[71B/378348a11419]；第 2 轮 user 51B/2eded7d3bd03 两侧同、assistant 51B/5344f26021e6 两侧同。会话侧按 metadata.projectionSource.deduplicationKey 定位，不靠数组下标。附带一条：正文长过 title 80 字上限（实取 325B）仍完整入库，即「不取自 title」的实证"
+    },
+    {
+      "kind": "gate",
+      "ref": "判据② npm run check:session-history-parity（本批只写不读，读取行为必须零变化——本批最重要的判据）",
+      "result": "pass",
+      "summary": "开发库 workload_eval 实取 101 条会话 × 6 层 = 606 次 JSON.stringify 逐字节比对，六层全部 101/101 一致、0 差异。数据普查同时实取 non_array_messages=0、empty_messages=84、non_empty=17、总消息 48 条、角色仅 user 27 / assistant 21、带附件引用 2、悬挂引用 0、带工具痕迹 2（会话数与消息数较批次 2a 的 100/44 增长，为其间正常使用所致，非本批写入——本批未回填任何历史会话）"
+    },
+    {
+      "kind": "command",
+      "ref": "判据③ npx tsx 实取 HARNESS_RUN_EVENT_TYPES.length + test:harness 防漂移用例",
+      "result": "pass",
+      "summary": "计数 23 → 25，末两位为 user/message | assistant/message。长度断言共 4 处显式钉住数字（批次 0.5 起的老钉子，批次 9 改过一次，本批再改）：Batch B / Batch C / ISS-004 / 批次0.5 用例的 23 全部改 25，归因串各补批次 2b-1 的 +2；批次 9 用例改为断言前 23 类逐位不变（不再钉总数，后续批次继续往后加时不必再动它）。新增批次 2b-1 用例钉：批次 9 槽位仍在原位、新两类按「用户先助手后」落末位、/message 族恰好 2 条（防夹带第三种）、tool/result 不得登记（它是模型可见面词汇，工具事实已由 tool.call.* 承载）、单次清单必须与 /message 族逐字相同且不含 text.delta"
+    },
+    {
+      "kind": "command",
+      "ref": "判据④ text.delta 行为零变化（同一轮对话，delta 条数与内容与改前一致）",
+      "result": "pass",
+      "summary": "同一份 e2e 用例在改前与改后各跑一次对照（改前=把本批改动 stash 掉、基线 commit 上跑同一文件，用例本身不随改动变）。改前序列 seq1:run_queued → seq2:run_claimed → seq3~6:text.delta → seq7:run_completed，text.delta × 4 = [\"第一轮答复：\",\"建议按 \",\"3 个模块估算\",\"。\\n含换行与 emoji ✅\"]；改后同一轮 text.delta × 4，四个分片字符串与顺序逐字相同，多出来的只有 seq2:user/message 与 seq8:assistant/message 两行。用例内并以断言钉住 delta 数组等于模型实发分片数组。既有 4 处全序列断言（ISS-004 层2 / DEF-2026-08-27-001 / 批次0.5② 交错链）只在**末尾追加**事实事件那一行、前三行 delta 原文未改；6 处工具族断言改经过 withoutConversationFacts 过滤，该助手只剔 user/message 与 assistant/message，不滤任何 delta 或 tool 事件"
+    },
+    {
+      "kind": "command",
+      "ref": "判据⑤ 构建与套件计数（开工基线自取 origin/main CI run 34186172649，HEAD 与主干同为 c53a094）",
+      "result": "pass",
+      "summary": "build:api（tsc）与 build:web 均 exit 0。计数 rules 8→8 · agent 140→140 · security 17+2→17+2 · scripts 72→72 · web 69 files/560→69/560（本批前端零文件改动）· ai 286→286 · serial-store 171→171 · integration 1→1 · modules 537→537 · harness 276→290。合计 1929→1943，净 +14 全归因本批新增用例（types +1、repository +5、usecase +3、workflow +3、e2e +2），无删除无跳过"
+    }
+  ],
+  "next": "待架构侧复核后合入 main，本批未自行合入、未等 CI。交接给 2b-2 / 2b-3 的实取事项：① 双写期已成立，2b-3 换 deriveSessionMessages 数据源前，每条对话在事件流里都有 user/message + assistant/message 一对，且与会话消息逐字节相同——但**存量 101 条会话里没有任何一条有这两个事件**（本批不回填），2b-2 回填前不得翻转读取源；② 报告登记的两处未修现状（同步通道无 Run 故无事件；显式报告旁路不经本 workflow 的定稿口）需架构侧定性是否纳入 2b-3 范围；③ retry 会把同一轮用户正文再落一份（会话来源键含 runId、retry 是新 runId），2b-2 回填前须先定归并口径，否则重复会被固化进事件流；④ 超长答复（>1 MiB）事件侧会静默丢弃而会话侧仍落库，2b-3 读事件源前须先定这个边界。",
+  "board": {
+    "change": {
+      "stage": "批次 2b-1：对话正文事件（只写不读）· 分支 feat/batch2b1-conversation-events 未合入",
+      "result": "已回填 / 待 Codex 复核"
+    },
+    "testing": [
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:harness",
+        "result": "pass",
+        "summary": "290 pass / 0 fail / 0 skipped（开工基线 276，净 +14 中本域 +14：types 11、repository 55、usecase 23、workflow 40、e2e 2 条真实两轮对话）"
+      },
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:modules",
+        "result": "pass",
+        "summary": "537 pass / 0 fail（同值；含零引用防漂移用例——新增 e2e 文件已登记进 test:harness 脚本，未登记即红）"
+      },
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:ai / test:modules:serial-store",
+        "result": "pass",
+        "summary": "ai 286 → 286、serial-store 171 → 171（同值，本批未触及其读取路径）"
+      },
+      {
+        "command": "npm run test:rules / test:agent / test:security / test:scripts / test:web",
+        "result": "pass",
+        "summary": "8 · 140 · 17+2 · 72 · 69 files/560 tests，逐位与基线相同；前端零文件改动，新事件类型经前端 STREAM_EVENT_TYPES 白名单外的 default 分支忽略，界面行为零变化"
+      },
+      {
+        "command": "npm run check:session-history-parity",
+        "result": "pass",
+        "summary": "开发库 101 条会话 × 6 层 = 606 次逐字节比对全部一致（判据②，本批读取行为零变化的直接证据）"
+      },
+      {
+        "command": "WES_TEST_DB_URL=…workload_eval_b2b1_test bash scripts/verify-local-db-tests.sh test:integration",
+        "result": "pass",
+        "summary": "1 pass / 0 fail。须按 CI 顺序在**干净库**上跑（migrate → 测试 → seed → integration）：长期复用的共享测试库 workload_eval_test 的 templates 表会被其他套件的清理打到 0 行，loadTemplate 抛 TEMPLATE_STORE_NOT_FOUND，集成检查红在 templates_status_not_200（属既有环境前置，非本批引入，已登记风险）"
+      },
+      {
+        "command": "npm run build:api && npm run build:web",
+        "result": "pass",
+        "summary": "两条构建均 exit 0"
+      }
+    ]
+  }
+}

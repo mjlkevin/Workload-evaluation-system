@@ -262,6 +262,36 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-09-08-batch2b1-conversation-events:risks-1">
+          <td><b>同步两条工作台通道不产生对话正文事件</b>（批次 2b-1 只写异步 Run 通道，未修）。<code class="inline">workbench-chat.handler.ts</code> 与 <code class="inline">workbench-chat-stream.handler.ts</code> 直写 <code class="inline">ai_sessions</code>、不经 Harness 事件流（<b>无 runId 可写</b>），本批两个新事件对它们结构性不可达。</td>
+          <td>2b-3 一旦把 <code class="inline">deriveSessionMessages</code> 的数据源换成事件序列，走过同步通道的那次会话历史将<b>重建为空</b>：事件流里连一条 <code class="inline">user/message</code> 都没有。今天同步通道是 503 回退兜底（workflow 注释原话「503 回退同步路径不经本 workflow，零双写」），量小但不为零，且失败方向是「历史凭空消失」而非报错。</td>
+          <td>本批照派单只覆盖异步通道（与批次 0.5 / 1a / 9 同一口径，判据②的 606 次逐字节比对已实取读取行为零变化）。处置点必须排在 2b-3 之前：要么给同步通道补一个不落 Run 的正文写入口（先定「没有 Run 的事件属于谁」），要么并入批次 2a 已登记的「同步通道改取库」一并裁决其退役。不建议塞进 2b-3 那一笔改动里。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 2b（翻转读取源的前置裁决）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-08-batch2b1-conversation-events:risks-2">
+          <td><b>显式报告旁路不经答复定稿口，那一轮只有 <code class="inline">user/message</code>、没有 <code class="inline">assistant/message</code></b>（批次 2b-1 实现期实取，未修）。<code class="inline">workbench-chat.workflow.ts:226-248</code>：带附件且命中「生成需求解析报告」时改调 <code class="inline">runExplicitHomeReportFlow</code> 并提前 return，assistant 消息由该 flow 内部 <code class="inline">appendAiSessionEvent</code> 直接落库，不经本 workflow 写答复事实的那一行。</td>
+          <td>该轮答复在会话里存在、在事件流里缺席。2b-2 回填与 2b-3 重建时，这一轮会呈现「用户问了、助手没答」的断头历史；而报告答复往往恰是最长、最需要留档的那一条。</td>
+          <td>本批不扩范围（派单「只写不读、不新建机制」；硬接需把 runId 与正文一起透传进 report-flow，属另一处数据源设计）。登记为 2b-2 回填必须覆盖的形态之一，并建议与 risks-1 合并为一次「旁路与同步通道正文入事件流」的立项。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 2b-2（回填范围裁决项）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-08-batch2b1-conversation-events:risks-3">
+          <td><b>答复正文超 1 MiB 时事件侧静默丢弃、会话侧仍落库</b>（批次 2b-1 沿用既有写链语义，未修）。<code class="inline">assistant/message</code> 复用 <code class="inline">appendStreamEvent</code>，其 <code class="inline">.catch</code> 只 <code class="inline">console.error</code> 不阻断主链路——这是批次 0.5 为传输面定的规矩，套到事实面就成了「丢了没人知道」。</td>
+          <td>两侧从此不一致：会话里有完整答复、事件里没有。触发需单次答复超 ~1 MB 文本，现实里对应超长报告类输出，概率低但不为零（工具结果预览各有截断，正文本身没有上限）。</td>
+          <td>用户侧不存在这个问题：入队那笔 <code class="inline">user/message</code> 与 Run 同一事务、超限即整笔回滚并映射为 422 带原因（已实取用例）。答复侧留待 2b-3 前定边界，二选一：给事实事件另开不吞错的写入口（写失败即回合失败），或事件面分片承载、读侧拼接（代价是把「一片都没丢」的赌注重新引回来，与本批立意相悖）。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 2b-3 前置（边界待定）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-08-batch2b1-conversation-events:risks-5">
+          <td><b>retry 一条失败对话会把同一轮用户正文再落一份，事件侧也各一条</b>（批次 2b-1 实现期读代码实取，未跑真实 retry 场景、未修）。会话用户消息的来源键是 <code class="inline">${run.harnessRunId}:user:1</code>（<code class="inline">workbench-chat.workflow.ts:206</code>），而 <code class="inline">retryRun</code> 用的是 <code class="inline">submissionKey: randomUUID()</code> 造出的<b>新 Run、新 runId</b> ⇒ 键不同 ⇒ 幂等吸收不住，会话里出现两条同正文的 user 消息；本批的 <code class="inline">user/message</code> 随各自 Run 入队，同样各一条。</td>
+          <td>「重试」在语义上是<b>同一轮</b>的第二次尝试，不是用户又说了一遍。2b-2 回填、2b-3 按事件重建历史时，这一轮会被读成两轮对话（用户问了两次），且模型下一轮收到的历史里确实有两条重复正文——这个失真今天在会话侧就已存在，本批把它也复制到事件侧，使重建之后更难以察觉。</td>
+          <td>派单明文「不动 <code class="inline">ai_sessions.messages</code> 的写入（双写期两边都要有）」，故本批只登记。处置需同时定两件事：retry 是否应改用 <code class="inline">${原runId}:user:1</code> 或加 attempt 维度，以及事件侧重建时按 <code class="inline">retryOfRunId</code> 归并同一轮。建议作为 2b-2 的前置裁决项——回填之前先定，否则回填会把重复固化进事件流。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 2b-2 前置（回填前先定归并口径）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-08-batch2b1-conversation-events:risks-4">
+          <td><b>共享测试库 <code class="inline">workload_eval_test</code> 的种子数据会被其他套件清空，<code class="inline">test:integration</code> 因此假红</b>（批次 2b-1 验证期实取）。该库 <code class="inline">templates</code> 表实取 0 行 → <code class="inline">templates-pg.repository.ts:108</code> 抛 <code class="inline">TEMPLATE_STORE_NOT_FOUND</code> → GET /api/v1/templates 500 → 集成检查红在 <code class="inline">templates_status_not_200</code>；<code class="inline">knowledge_entries</code> 同被清成 0 行。</td>
+          <td>与本批改动无关（templates / knowledge 两域本批零触碰），但足以让执行方误判「我改坏了」，或反过来让真回归混在已知假红里被放过。CI 每次都是干净服务容器，暴露不出这条。</td>
+          <td>正确配方是按 CI 顺序在干净库上跑：migrate → 测试（此时 knowledge 必须为空，serial-store 的「空表合法状态」两条用例才有判别力）→ seed → integration。本批已用独立 scratch 库实取该顺序下 integration 1 pass、serial-store 171 pass，并把共享库重新 seed 回可用状态。建议给 <code class="inline">verify-local-db-tests.sh</code> 加前置段（跑 integration 前先 seed、跑 serial-store 前先清 knowledge），或每次建临时库。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属验证配方（非产品缺陷）</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-09-06-batch2a-session-history-seam:risks-1">
           <td><b>同步两条对话通道的模型历史仍取自前端请求体，不从库里推导</b>（批次 2a 造缝时实取，未修）。非流式 <code class="inline">workbench-chat.handler.ts:40</code> 与流式 <code class="inline">workbench-chat-stream.handler.ts:79</code> 的 <code class="inline">messages</code> 都来自 <code class="inline">normalizeHomeMessages(body.messages)</code>；只有异步 Run 通道经 <code class="inline">sessionRecordToHomeMessages(getSessionRecord(...))</code> 取已落库历史。</td>
           <td>发给模型的历史窗口由客户端决定：前端少传、传旧、或构造一段不存在于库里的对话，都会原样进 prompt。DEF-2026-08-27-001 修的是「异步通道丢历史」，同步侧「历史来自客户端」这一半从未被覆盖。批次 0 的请求重建不变量也只在异步通道生效（<code class="inline">readSessionForInvariant</code> 未注入即不对账），所以这条不对称不会被现有断言抓到。</td>

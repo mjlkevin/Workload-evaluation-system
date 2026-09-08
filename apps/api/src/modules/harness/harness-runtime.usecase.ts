@@ -87,6 +87,8 @@ export type AiRunsRepoPort = {
     executionConfig?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
     retryOfRunId?: string;
+    /** 批次 2b-1（additive）：本轮用户正文原文，非空即随入队事务落一条 user/message */
+    userMessage?: string;
   }): Promise<{ run: Record<string, unknown>; created: boolean }>;
   findRunForOwner(runId: string, ownerUserId: string): Promise<Record<string, unknown> | null>;
   listActiveRunsForOwner(ownerUserId: string): Promise<Array<Record<string, unknown>>>;
@@ -205,6 +207,12 @@ function mapRepoConflict(err: unknown): never {
     if (err.code === "HARNESS_RUN_NOT_WAITING") {
       throw new AiRunsConflictError("RUN_NOT_WAITING", "仅 waiting 状态的任务可执行该动作");
     }
+    // 批次 2b-1：正文要随 Run 一起落进事件表，而事件表对单条载荷有硬上限（仓储在事务内
+    // 校验）。超限即整笔回滚——此时必须给用户一个说得通的原因，而不是兜底的「服务内部错误」：
+    // 「提交失败，原因未知」比「提交被拒，因为太长」糟糕得多。
+    if (err.code === "HARNESS_RUNTIME_PAYLOAD_TOO_LARGE") {
+      throw new AiRunsValidationError("消息正文超出单事件载荷上限，本次提交已整体回滚");
+    }
   }
   throw err;
 }
@@ -254,6 +262,11 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
         workflowVersion: WORKBENCH_WORKFLOW_VERSION,
         executionConfig: { content, ...(attachments.length ? { attachments } : {}) },
         metadata,
+        // 批次 2b-1：用户正文随入队落一条 user/message。取值是**提交原始入参** content
+        // （与 executionConfig.content 同一份，也正是 workflow 落会话用户消息的那一份），
+        // 刻意不读上面那行 title：title 是 80 字标题，今天恰好等于正文是巧合，
+        // 依赖它就等于把「历史对不对」押在「没人给长消息加摘要」上。
+        userMessage: content,
       }),
     );
 
@@ -386,6 +399,10 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
       throw new AiRunsConflictError("RUN_NOT_RETRYABLE", "任务未绑定会话，无法重试");
     }
 
+    const retryExecutionConfig = isPlainObject(run.executionConfig)
+      ? (JSON.parse(JSON.stringify(run.executionConfig)) as Record<string, unknown>)
+      : {};
+
     const created = await createRunOrThrow(() =>
       repo.createQueuedRun({
         ownerUserId: user.id,
@@ -395,11 +412,12 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
         title: String(run.title ?? ""),
         workflowId: String(run.workflowId ?? WORKBENCH_WORKFLOW_ID),
         workflowVersion: String(run.workflowVersion ?? WORKBENCH_WORKFLOW_VERSION),
-        executionConfig: isPlainObject(run.executionConfig)
-          ? (JSON.parse(JSON.stringify(run.executionConfig)) as Record<string, unknown>)
-          : {},
+        executionConfig: retryExecutionConfig,
         metadata,
         retryOfRunId: runId,
+        // 批次 2b-1：retry 提交的是**同一轮**用户正文，只可能在原 Run 的
+        // executionConfig.content 里（与 submitRun 那份同源）。这里同样不读 title。
+        userMessage: asText(retryExecutionConfig.content),
       }),
     );
 
