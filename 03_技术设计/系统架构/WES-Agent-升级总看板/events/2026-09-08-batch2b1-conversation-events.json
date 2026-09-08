@@ -61,7 +61,7 @@
       "summary": "build:api（tsc）与 build:web 均 exit 0。计数 rules 8→8 · agent 140→140 · security 17+2→17+2 · scripts 72→72 · web 69 files/560→69/560（本批前端零文件改动）· ai 286→286 · serial-store 171→171 · integration 1→1 · modules 537→537 · harness 276→290。合计 1929→1943，净 +14 全归因本批新增用例（types +1、repository +5、usecase +3、workflow +3、e2e +2），无删除无跳过"
     }
   ],
-  "next": "待架构侧复核后合入 main，本批未自行合入、未等 CI。交接给 2b-2 / 2b-3 的实取事项：① 双写期已成立，2b-3 换 deriveSessionMessages 数据源前，每条对话在事件流里都有 user/message + assistant/message 一对，且与会话消息逐字节相同——但**存量 101 条会话里没有任何一条有这两个事件**（本批不回填），2b-2 回填前不得翻转读取源；② 报告登记的两处未修现状（同步通道无 Run 故无事件；显式报告旁路不经本 workflow 的定稿口）需架构侧定性是否纳入 2b-3 范围；③ 超长答复（>1 MiB）事件侧会静默丢弃而会话侧仍落库，2b-3 读事件源前须先定这个边界。",
+  "next": "待架构侧复核后合入 main，本批未自行合入、未等 CI。交接给 2b-2 / 2b-3 的实取事项：① 双写期已成立，2b-3 换 deriveSessionMessages 数据源前，每条对话在事件流里都有 user/message + assistant/message 一对，且与会话消息逐字节相同——但**存量 101 条会话里没有任何一条有这两个事件**（本批不回填），2b-2 回填前不得翻转读取源；② 报告登记的两处未修现状（同步通道无 Run 故无事件；显式报告旁路不经本 workflow 的定稿口）需架构侧定性是否纳入 2b-3 范围；③ retry 会把同一轮用户正文再落一份（会话来源键含 runId、retry 是新 runId），2b-2 回填前须先定归并口径，否则重复会被固化进事件流；④ 超长答复（>1 MiB）事件侧会静默丢弃而会话侧仍落库，2b-3 读事件源前须先定这个边界。",
   "board": {
     "change": {
       "stage": "批次 2b-1：对话正文事件（只写不读）· 分支 feat/batch2b1-conversation-events 未合入",

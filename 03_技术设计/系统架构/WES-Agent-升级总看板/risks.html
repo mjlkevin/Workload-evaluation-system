@@ -280,6 +280,12 @@
           <td>用户侧不存在这个问题：入队那笔 <code class="inline">user/message</code> 与 Run 同一事务、超限即整笔回滚并映射为 422 带原因（已实取用例）。答复侧留待 2b-3 前定边界，二选一：给事实事件另开不吞错的写入口（写失败即回合失败），或事件面分片承载、读侧拼接（代价是把「一片都没丢」的赌注重新引回来，与本批立意相悖）。</td>
           <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 2b-3 前置（边界待定）</span></td>
         </tr>
+        <tr data-board-event-id="BE-2026-09-08-batch2b1-conversation-events:risks-5">
+          <td><b>retry 一条失败对话会把同一轮用户正文再落一份，事件侧也各一条</b>（批次 2b-1 实现期读代码实取，未跑真实 retry 场景、未修）。会话用户消息的来源键是 <code class="inline">${run.harnessRunId}:user:1</code>（<code class="inline">workbench-chat.workflow.ts:206</code>），而 <code class="inline">retryRun</code> 用的是 <code class="inline">submissionKey: randomUUID()</code> 造出的<b>新 Run、新 runId</b> ⇒ 键不同 ⇒ 幂等吸收不住，会话里出现两条同正文的 user 消息；本批的 <code class="inline">user/message</code> 随各自 Run 入队，同样各一条。</td>
+          <td>「重试」在语义上是<b>同一轮</b>的第二次尝试，不是用户又说了一遍。2b-2 回填、2b-3 按事件重建历史时，这一轮会被读成两轮对话（用户问了两次），且模型下一轮收到的历史里确实有两条重复正文——这个失真今天在会话侧就已存在，本批把它也复制到事件侧，使重建之后更难以察觉。</td>
+          <td>派单明文「不动 <code class="inline">ai_sessions.messages</code> 的写入（双写期两边都要有）」，故本批只登记。处置需同时定两件事：retry 是否应改用 <code class="inline">${原runId}:user:1</code> 或加 attempt 维度，以及事件侧重建时按 <code class="inline">retryOfRunId</code> 归并同一轮。建议作为 2b-2 的前置裁决项——回填之前先定，否则回填会把重复固化进事件流。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 2b-2 前置（回填前先定归并口径）</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-09-08-batch2b1-conversation-events:risks-4">
           <td><b>共享测试库 <code class="inline">workload_eval_test</code> 的种子数据会被其他套件清空，<code class="inline">test:integration</code> 因此假红</b>（批次 2b-1 验证期实取）。该库 <code class="inline">templates</code> 表实取 0 行 → <code class="inline">templates-pg.repository.ts:108</code> 抛 <code class="inline">TEMPLATE_STORE_NOT_FOUND</code> → GET /api/v1/templates 500 → 集成检查红在 <code class="inline">templates_status_not_200</code>；<code class="inline">knowledge_entries</code> 同被清成 0 行。</td>
           <td>与本批改动无关（templates / knowledge 两域本批零触碰），但足以让执行方误判「我改坏了」，或反过来让真回归混在已知假红里被放过。CI 每次都是干净服务容器，暴露不出这条。</td>
