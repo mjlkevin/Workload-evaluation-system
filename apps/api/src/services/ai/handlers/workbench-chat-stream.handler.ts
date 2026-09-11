@@ -208,6 +208,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       const toolSet = resolveWorkbenchInjectableTools(user);
       for await (const chunk of runWorkbenchToolLoopStream({
         messages: modelInput.messages,
+        contextBudget: { tools: toolSet.tools },
         registry: toolSet.registry,
         agentUser: toolSet.agentUser,
         allowToolNames: toolSet.allowToolNames,

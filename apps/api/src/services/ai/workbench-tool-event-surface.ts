@@ -289,6 +289,34 @@ export type WorkbenchModelVisibleMessage = { role: ChatRole; content: string };
 /** 工具执行产出（与 WorkbenchToolEffectOutput 结构一致；同上理由） */
 export type WorkbenchModelVisibleToolOutcome = { ok: boolean; data?: unknown; error?: string };
 
+/**
+ * 批次 3 · 收口批次 0.5 登记的开放项：**模型可见的工具结果此前无长度上限**。
+ *
+ * 批次 0.5 给两侧立了不同上限——UI 侧逐字段截断（MAX_UI_FIELD_CHARS / MAX_UI_JSON_CHARS，
+ * 外加 repository 的 1 MiB 闸门兜底），模型侧「沿用批次 0 原样」。当时工具还只跑只读
+ * 小结果，这条边界看不出代价；列表类工具一次返回几十条记录、每条十几个字段时，一个
+ * 超大结果就能把批次 3 刚建立的上下文预算整个顶掉——所以它归本批收口。
+ *
+ * 上限刻意**小于** UI 侧的 MAX_UI_JSON_CHARS(8_000)：两侧上限不同是批次 0.5 立的边界，
+ * 收口开放项不等于把两侧拉平。模型要的是结论，UI 才需要呈现全貌。
+ */
+export const WORKBENCH_MODEL_TOOL_RESULT_MAX_CHARS = 4_000;
+
+/**
+ * 模型可见正文的确定性截断：同输入同输出（不读时钟、不取随机），并且在正文里
+ * **明说**被截断了、原长多少——否则模型会以为自己看到的就是全部，据残缺结果作答；
+ * 尾注同时指向 UI 侧的完整结果，免得模型反过来告诉用户「数据丢了」。
+ */
+export function clipWorkbenchModelVisibleText(
+  text: string,
+  maxChars: number = WORKBENCH_MODEL_TOOL_RESULT_MAX_CHARS,
+): string {
+  if (text.length <= maxChars) return text;
+  const tail = `…[模型侧已截断：原 ${text.length} 字符，此处保留前 ${maxChars} 字符；完整结果见界面上的工具调用卡片]`;
+  const keep = Math.max(0, maxChars - tail.length);
+  return `${text.slice(0, keep)}${tail}`;
+}
+
 /** 运行时准入判定：UI 专用面（tool.call.*）永远返回 false */
 export function isWorkbenchModelVisibleSurfaceType(value: string): value is WorkbenchModelVisibleSurfaceType {
   return (WORKBENCH_MODEL_VISIBLE_SURFACE_TYPES as readonly string[]).includes(value);
@@ -321,8 +349,9 @@ export function toWorkbenchModelVisibleMessage(input: {
 
 /**
  * 工具结果回灌模型的唯一构造点。
- * 正文形态逐字节沿用批次 0（`[工具结果] name (callId=...): {json}`）：同步通道
- * 也在用这个形态，改动它等于动同步通道的模型输入，超出本批范围。
+ * 正文前缀形态沿用批次 0（`[工具结果] name (callId=...): {json}`）：同步通道也在用
+ * 这个形态。批次 0.5 当时把「改正文长度」划在批次范围外，留下模型侧无上限的开放项；
+ * 该项由批次 3 在此收口——只加长度上限，不改前缀形态。
  * 只带 outcome（模型需要的结论），不带 callIndex/elapsedMs/resultPreview 等 UI 状态。
  */
 export function toWorkbenchModelVisibleToolMessage(input: {
@@ -333,6 +362,8 @@ export function toWorkbenchModelVisibleToolMessage(input: {
   return toWorkbenchModelVisibleMessage({
     surfaceType: "tool/result",
     role: "assistant",
-    content: `[工具结果] ${input.toolName} (callId=${input.callId}): ${safeStringify(input.outcome)}`,
+    content: clipWorkbenchModelVisibleText(
+      `[工具结果] ${input.toolName} (callId=${input.callId}): ${safeStringify(input.outcome)}`,
+    ),
   });
 }
