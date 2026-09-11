@@ -20,12 +20,27 @@
 // 全表填充放大内存与多副本分歧面。读路径直查，owner_idx / owner_updated_idx
 // 索引支撑；多副本部署下天然强一致（每次读即最新提交值），无 users 域的
 // 副本分歧问题。
+//
+// ============================================================
+// 批次 2b-3 · 「取会话历史」换源
+// ============================================================
+// 本仓储交出去的每条 AiSessionRecord，其 `messages` 携带的是**解析后的**历史：
+// 能被事件流对话事实完整覆盖的会话给重建结果，覆盖不住的整会话回落快照。
+// 判定与全部口径在 session-history.ts，本文件只做两件事：
+//  ① 把一次**批量**事实读取接在 row→record 之后（一批会话一次查询；架构侧
+//     2026-09-11 硬要求：管理员审计是全表逐条 map，逐会话查即 N+1。实测次数由
+//     conversation-event-history.test.ts 断言，并由对照脚本每次打印）；
+//  ② 不碰写入侧——双写期 ai_sessions.messages 继续写，appendMessageIdempotent 的
+//     来源键查重仍建立在裸快照之上（那是「恰好一次落库」的幂等防线，与本批无关）。
+// 消费端一律经 deriveSessionMessages，因此它们看不见源在哪——这正是 2a 造缝买的东西。
 
 import { and, eq, sql } from "drizzle-orm";
 
 import { db, type Database } from "../../db/client";
 import { readDbNow } from "../../db/now";
 import { aiSessions } from "../../db/schema";
+import { createConversationEventHistorySource } from "../harness/conversation-event-history";
+import { applyEventStreamHistory, type SessionConversationFactSource } from "./session-history";
 import type {
   AiAttachment,
   AiArtifact,
@@ -97,7 +112,19 @@ export interface AiSessionsPgRepository extends AiSessionsStoreRepository {
   __dbForTest(): Database;
 }
 
-export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessionsPgRepository {
+/**
+ * @param dbInstance 注入库实例（测试用），默认进程单例
+ * @param historySource 对话事实批量读取口。**默认与 dbInstance 同源**——注入测试库时
+ *   若仍用默认源（指向生产 db 单例），读回来的就是别的库的事实，逐字节对照当场失真。
+ *   传 null 表示「不解析」（仅用于装配测试；生产路径不传）。
+ */
+export function createAiSessionsPgRepository(
+  dbInstance: Database = db,
+  historySource: SessionConversationFactSource | null = createConversationEventHistorySource(dbInstance),
+): AiSessionsPgRepository {
+  // 一批记录一次取事实（架构侧硬要求）。调用点全在各方法的 try 内，故读取失败同样
+  // 收敛成 AiSessionsStoreError，不会静默退回快照（范式 #5：读取失败必须抛）。
+  const resolve = (records: AiSessionRecord[]) => applyEventStreamHistory(records, historySource);
   return {
     __dbForTest() {
       return dbInstance;
@@ -105,7 +132,8 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
 
     async createSession(input: CreateAiSessionInput) {
       try {
-        return await dbInstance.transaction(async (tx) => {
+        // 解析放在事务**之外**：入会话锁的时间不该被一次额外查询拉长
+        const result = await dbInstance.transaction(async (tx) => {
           const now = input.now ?? (await readDbNow(tx));
           const session = input.session;
           const inserted = await tx
@@ -140,6 +168,7 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
           }
           throw new AiSessionsStoreError("AI_SESSIONS_STORE_INTERNAL", "ai session insert conflict unresolved");
         });
+        return { created: result.created, session: (await resolve([result.session]))[0] };
       } catch (err) {
         throw toSafeError(err);
       }
@@ -148,7 +177,8 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
     async listSessionsByOwner(ownerUserId) {
       try {
         const rows = await dbInstance.select().from(aiSessions).where(eq(aiSessions.ownerUserId, ownerUserId));
-        return rows.map(toSessionRecord);
+        // 整页一次解析 = 一次事实查询（工作台会话列表）
+        return await resolve(rows.map(toSessionRecord));
       } catch (err) {
         throw toSafeError(err);
       }
@@ -157,7 +187,8 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
     async listAllSessions() {
       try {
         const rows = await dbInstance.select().from(aiSessions);
-        return rows.map(toSessionRecord);
+        // 管理员审计走这条全表路：整表一次取事实，不得逐会话查（架构侧 2b-3 硬要求）
+        return await resolve(rows.map(toSessionRecord));
       } catch (err) {
         throw toSafeError(err);
       }
@@ -169,7 +200,9 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
           .select()
           .from(aiSessions)
           .where(and(eq(aiSessions.sessionId, input.sessionId), eq(aiSessions.ownerUserId, input.ownerUserId)));
-        return row ? toSessionRecord(row) : null;
+        if (!row) return null;
+        const [resolved] = await resolve([toSessionRecord(row)]);
+        return resolved;
       } catch (err) {
         throw toSafeError(err);
       }
@@ -177,7 +210,7 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
 
     async renameSession(input) {
       try {
-        return await dbInstance.transaction(async (tx) => {
+        const renamed = await dbInstance.transaction(async (tx) => {
           const now = await readDbNow(tx);
           const rows = await tx
             .update(aiSessions)
@@ -186,6 +219,9 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
             .returning();
           return rows.length > 0 ? toSessionRecord(rows[0]) : null;
         });
+        if (!renamed) return null;
+        const [resolved] = await resolve([renamed]);
+        return resolved;
       } catch (err) {
         throw toSafeError(err);
       }
@@ -205,7 +241,7 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
 
     async appendSessionEvent(input: AppendAiSessionEventInput) {
       try {
-        return await dbInstance.transaction(async (tx) => {
+        const appended = await dbInstance.transaction(async (tx) => {
           const now = await readDbNow(tx);
           // 单语句条件 UPDATE：jsonb 数组拼接在行锁内串行化，
           // 同会话并发追加互不覆盖（范式 #3，消灭整存 RMW 窗口）
@@ -222,6 +258,14 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
             .returning();
           return rows.length > 0 ? toSessionRecord(rows[0]) : null;
         });
+        // 这条回读记录既是同步通道算「进行中工具交互」判据的入参，又直接进 HTTP 响应
+        // 给前端渲染。同步通道不产对话事件（无 runId 可写），所以刚追加的这一轮在事件流里
+        // 结构性不存在——覆盖判定会因此整会话回落快照，把这一轮原样带回去。
+        // 若这里不解析（或改用「有没有事件」的存在性判据），用户就会在响应里看不见自己
+        // 刚说过的话：见 session-history.ts 口径 ② 与看板 BE-2026-09-08…:risks-1。
+        if (!appended) return null;
+        const [resolved] = await resolve([appended]);
+        return resolved;
       } catch (err) {
         throw toSafeError(err);
       }
@@ -230,6 +274,10 @@ export function createAiSessionsPgRepository(dbInstance: Database = db): AiSessi
     /**
      * RP-047 Batch B 幂等投影追加（PG 版）：事务内行锁 + 来源键查重。
      * 并发重放同一 deduplicationKey 时行锁串行化，恰好一条 created=true。
+     *
+     * 批次 2b-3 换源**刻意不接进本方法**：这是写入与幂等查重路径，它读的是裸快照
+     * （`row.messages`）并按 `metadata.projectionSource.deduplicationKey` 查重。
+     * 让「恰好一次落库」的防线去依赖读取源，等于把写入正确性挂在另一条线的解析结果上。
      */
     async appendMessageIdempotent(
       input: AppendAiSessionMessageIdempotentInput,
