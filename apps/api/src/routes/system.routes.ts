@@ -29,7 +29,11 @@ router.post("/knowledge-base-config/test", requireCapability("system:manage"), S
 router.get("/role-capabilities", requireCapability("system:manage"), SystemModule.getRoleCapabilitiesMatrix);
 // 会话管理：管理员审计全量用户 AI 会话
 router.get("/ai-sessions", requireCapability("system:manage"), AiSessionsModule.listAllSessionsForAdmin);
-// 批次 6a：AI 工具清单（只读，运行时从 ToolRegistry 派生）
+// 批次 6a：AI 工具清单（只读，运行时从 ToolRegistry 派生）；批次 6b：清单响应叠加生效策略视图与 token 计量
 router.get("/ai-tools", requireCapability("system:manage"), listAiToolsHandler);
+// 批次 6b：工具策略（system_configs 第五配置区）——只存策略决定，清单永不落库
+router.get("/tool-policy", requireCapability("system:manage"), SystemModule.getToolPolicy);
+router.patch("/tool-policy/draft", requireCapability("system:manage"), SystemModule.updateToolPolicyDraft);
+router.post("/tool-policy/activate", requireCapability("system:manage"), SystemModule.activateToolPolicy);
 
 export default router;

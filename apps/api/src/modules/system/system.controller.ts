@@ -20,4 +20,7 @@ export {
   activateKnowledgeBaseConfig,
   testKnowledgeBaseConnectivity,
   getRoleCapabilitiesMatrix,
+  getToolPolicy,
+  updateToolPolicyDraft,
+  activateToolPolicy,
 } from "./system.usecase";

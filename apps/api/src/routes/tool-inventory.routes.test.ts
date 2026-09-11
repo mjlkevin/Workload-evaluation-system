@@ -91,3 +91,35 @@ test("GET /system/ai-tools: 响应不含参数 schema 与执行实现", { skip: 
     assert.equal("execute" in item, false, `${item.name} 不应带出 execute`);
   }
 });
+
+// -------------------- 批次 6b：/system/tool-policy 端点守卫 --------------------
+// 只读写守卫与形状；策略生命周期与审计轨迹在 system.tool-policy.test.ts（串行组）。
+
+test("GET /system/tool-policy: 未登录 401 / 无 system:manage 403", { skip: !testDatabaseUrl }, async () => {
+  const anonymous = await setupApp().get("/system/tool-policy");
+  assert.equal(anonymous.status, 401);
+
+  const asUser = await setupApp().get("/system/tool-policy").set("Authorization", `Bearer ${await tokenFor("user")}`);
+  assert.equal(asUser.status, 403);
+  assert.equal(asUser.body.data, undefined, "拒绝时不得带出策略数据");
+});
+
+test("PATCH draft / POST activate: 非 system:manage 一律 403（写端点守卫与读同闸）", { skip: !testDatabaseUrl }, async () => {
+  const token = await tokenFor("user");
+  const patch = await setupApp().patch("/system/tool-policy/draft").set("Authorization", `Bearer ${token}`).send({ policies: {} });
+  assert.equal(patch.status, 403);
+  const activate = await setupApp().post("/system/tool-policy/activate").set("Authorization", `Bearer ${token}`).send({});
+  assert.equal(activate.status, 403);
+});
+
+test("GET /system/tool-policy: admin 取到第五配置区形状（version/draft/active/revisions）", { skip: !testDatabaseUrl }, async () => {
+  const res = await setupApp().get("/system/tool-policy").set("Authorization", `Bearer ${await tokenFor("admin")}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.code, 0);
+  const data = res.body.data;
+  assert.ok(Number.isFinite(Number(data.version)) && Number(data.version) >= 1);
+  assert.equal(data.draft.schemaVersion, 1);
+  assert.equal(typeof data.draft.policies, "object");
+  assert.equal(typeof data.active.policies, "object");
+  assert.ok(Array.isArray(data.revisions));
+});

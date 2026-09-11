@@ -358,6 +358,33 @@ export const mockAiTools = [
   },
 ]
 
+// 批次 6b：清单条目追加字段（tokens=定义注入估算、exfiltrates=外发维度、
+// injected=生效策略下的注入判定、activePolicy=生效策略视图）。
+// 形状照抄后端派生；token 为固定假值（前端不参与计量，只显示后端算好的数）。
+export const DEFAULT_AI_TOOL_POLICY_ENTRY = { enabled: true, visibleRoles: [], approvalStrategy: 'default', injectionMode: 'default' }
+
+export const mockAiToolsWithPolicy = mockAiTools.map((tool, index) => ({
+  ...tool,
+  exfiltrates: false,
+  tokens: 40 + index * 12,
+  injected: tool.callable && tool.category !== 'discovery',
+  activePolicy: { ...DEFAULT_AI_TOOL_POLICY_ENTRY },
+}))
+
+export const mockAiToolsSummary = {
+  injectedCount: mockAiToolsWithPolicy.filter((tool) => tool.injected).length,
+  injectedTokens: mockAiToolsWithPolicy.filter((tool) => tool.injected).reduce((sum, tool) => sum + tool.tokens, 0),
+}
+
+export const mockAiToolPolicy = {
+  version: 1,
+  draft: { schemaVersion: 1, policies: {} },
+  active: { schemaVersion: 1, policies: {} },
+  updatedAt: '2026-09-12T00:00:00.000Z',
+  effectiveAt: '2026-09-12T00:00:00.000Z',
+  revisions: [],
+}
+
 // 批次 10a · 行业主数据（基础管理）
 // tree 含一个已停用的大类，用于钉「停用只挡新单据选项、管理页仍看得见」；
 // options 只含启用项（后端过滤），两者口径必须一致：

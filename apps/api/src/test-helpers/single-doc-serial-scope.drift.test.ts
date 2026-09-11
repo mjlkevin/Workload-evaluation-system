@@ -62,6 +62,10 @@ const SERIAL_SCOPE_FILES = [
   // version_code_rules 单文档表的文件移进串行组
   "modules/system/system-pg.repository.test.ts",
   "modules/system/system.kb-config.test.ts",
+  // 批次 6b（2026-09-12）：toolPolicy 是 system_configs 第五 config_key（jsonb 单行
+  // upsert，无隔离维度）。本文件经 saveToolPolicyStore 写该行，与 kb-config /
+  // requirementSettings 等共写同表——同 S3 判据，必须待在串行组。
+  "modules/system/system.tool-policy.test.ts",
   "services/ai/assessment.service.test.ts",
   "services/ai/workbench-dispatch.service.test.ts",
   // S5（2026-08-30）：teams 六表整存替换（TRUNCATE + 全量 INSERT）与 store 级
@@ -114,6 +118,12 @@ const WRITER_PATTERNS: RegExp[] = [
   /\bsaveRequirementSystemConfigStore\b/,
   /\bsaveKnowledgeBaseConfigStore\b/,
   /\bsaveImplementationDependencyRulesStore\b/,
+  // 批次 6b：第五 config_key（toolPolicy）写入口——save* 之外，usecase 处理器
+  // （updateToolPolicyDraft / activateToolPolicy）是路由层唯一的持久化路径，
+  // 经它们写行的测试文件同样恒写 system_configs.toolPolicy 行，必须断到。
+  /\bsaveToolPolicyStore\b/,
+  /\bupdateToolPolicyDraft\b/,
+  /\bactivateToolPolicy\b/,
   /\bsaveVersionCodeRulesStore\b/,
   /\bcreateTeamPgRepository\b/,
   /\bTeamsPgRepository\b/,
@@ -264,8 +274,8 @@ test("串行白名单与 package.json 脚本参数列表逐位一致", () => {
 test("串行白名单计数钉定（新增触碰或批次收敛都必须显式更新本条）", () => {
   assert.equal(
     SERIAL_SCOPE_FILES.length,
-    12,
+    13,
     `SERIAL_SCOPE_FILES 实为 ${SERIAL_SCOPE_FILES.length} 条：新增即意味着有新的无界读表写入方，` +
-      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进；S5：9→10，teams 域 JSON 路径删除使 modules.usecase 的 team 用例改走 PG 整存快照-还原，team-pg.repository 随之移进串行组；S3B1：10→11，ai.repository.test.ts 接入串行组，before 自种 system_configs.requirementSettings 行；DEF-2026-09-03-001：11→12，workbench-chat-scenario.test.ts 需在改配置前后各跑一次并比对实际发给 provider 的 model，经 saveRequirementSystemConfigStore 改写 assessment 绑定再还原）"
+      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进；S5：9→10，teams 域 JSON 路径删除使 modules.usecase 的 team 用例改走 PG 整存快照-还原，team-pg.repository 随之移进串行组；S3B1：10→11，ai.repository.test.ts 接入串行组，before 自种 system_configs.requirementSettings 行；DEF-2026-09-03-001：11→12，workbench-chat-scenario.test.ts 需在改配置前后各跑一次并比对实际发给 provider 的 model，经 saveRequirementSystemConfigStore 改写 assessment 绑定再还原；批次 6b：12→13，system.tool-policy.test.ts 经 saveToolPolicyStore 写第五 config_key toolPolicy 行）"
   );
 });

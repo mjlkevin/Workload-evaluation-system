@@ -48,6 +48,35 @@ test("POST /agent/chat: 登录后返回统一 JSON 事件数组", { skip: !testD
   );
 });
 
+test("POST /agent/chat: 请求体 confirm 不再被当作批准——写工具在本通道失败关闭", { skip: !testDatabaseUrl }, async () => {
+  // 批次 6b 返修（③）：本通道没有可持久化的审批闸门，过去靠 req.body.confirm 一个布尔
+  // 一刀切批准本轮全部待确认调用。现在该字段不再被读取：ask 档工具一律不执行。
+  const token = createTokenForUser(await createTempUser({ role: "admin" }));
+  const res = await supertest(
+    miniApp(
+      fakeRunner([
+        { toolCalls: [{ id: "call_1", name: "create_project", arguments: { projectName: "越权建项目" } }] },
+        { content: "该操作未执行" },
+      ]),
+    ),
+  )
+    .post("/agent/chat")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ message: "建个项目", confirm: true });
+
+  assert.equal(res.status, 200);
+  const events = res.body.data.events as Array<{ type: string; name?: string; ok?: boolean; error?: string }>;
+  assert.ok(
+    !events.some((event) => event.type === "tool_started" && event.name === "create_project"),
+    `带 confirm:true 的请求体不得换来写工具执行：${JSON.stringify(events)}`,
+  );
+  const refusal = events.find((event) => event.type === "tool_finished" && event.name === "create_project");
+  assert.ok(refusal, "必须回填一条该工具的失败结果，否则模型会以为已执行");
+  assert.equal(refusal.ok, false);
+  assert.match(refusal.error ?? "", /未经发现|没有审批链路|停用|不可见/, "失败原因必须说清是哪道闸门挡下的");
+  assert.equal(res.body.data.result, "该操作未执行");
+});
+
 test("POST /agent/chat: 事件 type 只来自白名单", { skip: !testDatabaseUrl }, async () => {
   const token = createTokenForUser(await createTempUser({ role: "admin" }));
   const res = await supertest(miniApp(fakeRunner([{ content: "ok" }])))

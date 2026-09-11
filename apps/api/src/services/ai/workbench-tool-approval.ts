@@ -28,6 +28,7 @@
 
 import { createHash } from "node:crypto";
 import type { AgentTool } from "../../agent/agent.types";
+import type { ToolPolicyEntry } from "../../types";
 
 /**
  * callId 上限：callId 由模型给出（provider 生成的工具调用 id），且会落进
@@ -111,9 +112,21 @@ export const WORKBENCH_TOOL_APPROVAL_UNWIRED_MESSAGE = "写操作需用户确认
 /**
  * (1) 服务端策略判定：只有注册表明确 mutates === false 才落到 allow。
  * 工具查不到、mutates 缺失/为 null/为非布尔——一律 ask。宁可多问一次，不可少问一次。
+ *
+ * 批次 6b 叠加两条，方向都只能是**收紧**：
+ *  · `exfiltrates === true`（数据外发维度，独立于 mutates）无条件 ask——外发不改
+ *    本地库却把数据送出系统，每次内容都不同，**不适用任何「记住本次选择」豁免**；
+ *    豁免机制本批不存在，本条把它钉成下限，后续批次引入会话记忆时不得绕过。
+ *  · 生效策略 `approvalStrategy === "user-confirm"` 同样强制 ask（只读工具也可被策略
+ *    要求审批）；策略没有「免审批」方向，写/外发工具不因策略降级——见类型注释。
  */
-export function resolveWorkbenchToolDecisionSlot(tool: AgentTool | undefined): WorkbenchToolDecisionSlot {
+export function resolveWorkbenchToolDecisionSlot(
+  tool: AgentTool | undefined,
+  policyEntry?: ToolPolicyEntry,
+): WorkbenchToolDecisionSlot {
   if (!tool) return "ask";
+  if (tool.exfiltrates === true) return "ask";
+  if (policyEntry?.approvalStrategy === "user-confirm") return "ask";
   return tool.mutates === false ? "allow" : "ask";
 }
 

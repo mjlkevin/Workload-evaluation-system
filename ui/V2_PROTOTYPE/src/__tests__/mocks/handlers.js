@@ -1,7 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import {
   mockAdminAiSessions,
-  mockAiTools,
   mockAssessmentVersion,
   mockAiSessions,
   mockComments,
@@ -19,9 +18,18 @@ import {
   mockTemplate,
   mockUsers,
   mockVersions,
+  mockAiToolsWithPolicy,
+  mockAiToolsSummary,
+  mockAiToolPolicy,
 } from './data.js'
 
 const BASE = '/api/v1'
+
+// 批次 6b：策略 store 在 mock 内可变（PATCH draft → POST activate 的时序用例依赖）
+let toolPolicyStore = { ...mockAiToolPolicy }
+export function __resetToolPolicyStoreForTest() {
+  toolPolicyStore = { ...mockAiToolPolicy, draft: { schemaVersion: 1, policies: {} }, active: { schemaVersion: 1, policies: {} }, revisions: [], version: 1 }
+}
 
 export const handlers = [
   http.get(`${BASE}/versions`, ({ request }) => {
@@ -764,7 +772,61 @@ export const handlers = [
       .sort((a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)))
     return HttpResponse.json({ success: true, data: { items } })
   }),
-  http.get(`${BASE}/system/ai-tools`, () => HttpResponse.json({ success: true, data: { items: mockAiTools } })),
+  http.get(`${BASE}/system/ai-tools`, () => HttpResponse.json({ success: true, data: { items: mockAiToolsWithPolicy, summary: mockAiToolsSummary } })),
+  // 批次 6b：工具策略（system_configs 第五配置区）——draft→生效 + version + 轨迹
+  http.get(`${BASE}/system/tool-policy`, () => HttpResponse.json({ success: true, data: toolPolicyStore })),
+  http.patch(`${BASE}/system/tool-policy/draft`, async ({ request }) => {
+    const body = await request.json().catch(() => ({}))
+    const policies = body?.policies || {}
+    toolPolicyStore = {
+      ...toolPolicyStore,
+      draft: { schemaVersion: 1, policies },
+      updatedAt: '2026-09-12T01:00:00.000Z',
+      revisions: [
+        ...toolPolicyStore.revisions,
+        {
+          seq: toolPolicyStore.revisions.length + 1,
+          version: toolPolicyStore.version,
+          action: 'draft-update',
+          actor: 'admin',
+          at: '2026-09-12T01:00:00.000Z',
+          changes: Object.entries(policies).map(([tool, entry]) => ({
+            tool, field: 'enabled', from: 'true', to: String(entry?.enabled !== false),
+          })),
+        },
+      ],
+    }
+    return HttpResponse.json({
+      success: true,
+      data: { version: toolPolicyStore.version, draft: toolPolicyStore.draft, updatedAt: toolPolicyStore.updatedAt, revisions: toolPolicyStore.revisions },
+    })
+  }),
+  http.post(`${BASE}/system/tool-policy/activate`, () => {
+    const activatedPolicies = toolPolicyStore.draft.policies || {}
+    toolPolicyStore = {
+      ...toolPolicyStore,
+      active: toolPolicyStore.draft,
+      version: toolPolicyStore.version + 1,
+      effectiveAt: '2026-09-12T02:00:00.000Z',
+      revisions: [
+        ...toolPolicyStore.revisions,
+        {
+          seq: toolPolicyStore.revisions.length + 1,
+          version: toolPolicyStore.version + 1,
+          action: 'activate',
+          actor: 'admin',
+          at: '2026-09-12T02:00:00.000Z',
+          changes: Object.entries(activatedPolicies).map(([tool, entry]) => ({
+            tool, field: 'enabled', from: 'true', to: String(entry?.enabled !== false),
+          })),
+        },
+      ],
+    }
+    return HttpResponse.json({
+      success: true,
+      data: { version: toolPolicyStore.version, active: toolPolicyStore.active, effectiveAt: toolPolicyStore.effectiveAt, revisions: toolPolicyStore.revisions },
+    })
+  }),
   http.get(`${BASE}/harness/test-results`, () => HttpResponse.json({ success: true, data: { items: [] } })),
   http.get(`${BASE}/templates`, () => HttpResponse.json({ success: true, data: [{ templateId: 'T1', templateName: '实施评估标准版', description: '标准模板', tags: ['标准'] }] })),
   http.post(`${BASE}/system/version-code-rules/:id/activate`, () => HttpResponse.json({ success: true, data: {} })),
