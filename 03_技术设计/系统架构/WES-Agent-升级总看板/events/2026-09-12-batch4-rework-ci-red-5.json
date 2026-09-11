@@ -1,0 +1,53 @@
+{
+  "id": "BE-2026-09-12-batch4-rework-ci-34628861811",
+  "date": "2026-09-12",
+  "type": "rework",
+  "scope": "批次 4 返工 · 分支 CI 34628861811 的 5 条红（3 条漏改计数 + 1 条功能丢失 + 1 条测试钉旧实现）",
+  "summary": "三分类判定本身不变（架构侧与 kimi 双复核已通过），本批只处置 CI 红的 5 条，且按性质分两组分别处置，不夹带裁决。第一组 3 条是执行侧漏改的计数：`resolveWorkbenchInjectableTools: admin / sub_admin / user 分流互斥穷尽` 钉的是注入集穷尽清单，本批新增 describe_capabilities 使注册工具 10→11，清单没跟着改——改测试把新工具纳入穷尽清单并补其档位断言（allow 档、不进审批名单），「写工具恰 3 个」的断言一字未放宽。第二组 ① `homeWorkbenchChat persists knowledge tool trace in assistant message metadata` 是真实功能丢失，补实现而非放宽断言：退役 knowledge-query.handler 后工具循环只把**工具名**落进 metadata.toolCalls，原先的 toolId / retrievalTriggered / confidence / contextRef 等痕迹字段失去产生方，而前端 ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/utils/messageFormatter.js 的 normalizeKnowledgeTool 仍无条件读这一组字段——知识检索的来源信息会在界面上静默消失。补的产生路径：工具循环在 allow 档工具执行成功处捕获（workbench-tool-loop 的 executeToolCallBatch），经 modelChat 的 additive 返回字段进 dispatch 捕获包装、写回 trace.knowledgeTool，三条既有消费点（同步 handler / 流式 handler / 异步 Run 的 assistant metadata 组装）无需改动即重新拿到数据；流式与异步通道不经过 modelChat 捕获包装，故痕迹改随工具批后本就存在的 kind:metadata chunk 上送、由 model-answer 暂存（该 chunk 在流式通道不下发前端，只增内部字段）。同时把退役前 handler 挂载的选库归属（knowledgeBaseProfileId / knowledgeBaseName / route.attempts）搬进 runKnowledgeQuery——trace 的知识库 span 一直在读这三个字段，少它们同样属来源信息丢失。前端零改动，且新增断言把「metadata 必带这一组字段」钉成回归闸门。第二组 ② `homeWorkbenchChat keeps upload guidance ...` 是测试钉旧实现：上传引导功能仍在，变的是触发条件从「正则命中这句话」变成「按钮显式发起」，正是本批「退役正则、保留 command」的预期结果——给用例补 clientAction: generate_requirement_report，未把词表请回来。批次 1c 的进行中短路、clientAction 优先分支、批次 3 的 basic-chat.handler.ts 与 workbench-chat-stream.handler.ts、以及全部前端文件均未触碰。",
+  "status": "已回填 / 待 Codex 复核",
+  "pages": ["changes", "testing"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/workbench-tool-loop.ts, apps/api/src/services/ai/workbench-tool-loop.test.ts",
+      "summary": "痕迹捕获点：allow 档工具执行成功且产出通过 isZhipuKnowledgeToolTrace 判别时记入回合游标（多次检索取末次成功，与回填给模型的那份一致），经 WorkbenchToolLoopResult.knowledgeTool 与 kind:metadata chunk 双通路送出；新增三条循环侧回归（原样回传、非痕迹形状不得凭空造出、流式通道经 chunk 上送）"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/agent/default-registry.ts, apps/api/src/agent/default-registry.test.ts",
+      "summary": "runKnowledgeQuery 返回前挂 attachKnowledgeRoute / summarizeKnowledgeAttempt（逐字节沿用退役前 handler 的两个纯函数），恢复 knowledgeBaseProfileId / knowledgeBaseName / route.attempts；新增两条用例分别钉单次命中的归属与回退成功时的两次尝试记录。选库三约束（角色授权 → 关键词/显式库名 → 安全默认）与「仅 retrieval_empty 回退一次」未动"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/modules.handlers.test.ts",
+      "summary": "① 用例改为经模型选工具驱动（注入 kimi 密钥 + mock 模型先发起 knowledge_query 再定案），凡涉及痕迹字段的断言逐字保留，并新增「assistant metadata 必带前端无条件读取的那组字段」断言；intent 断言按退役事实由 knowledge_query 改判 domain_qa（knowledge_query 已不是路由意图）。② 用例补 clientAction，断言全部原样保留，其 fetch 抛错桩仍是「静态路径不得调用模型」的证据"
+    },
+    {
+      "kind": "gate",
+      "ref": "DOCKER_HOST=colima USE_TESTCONTAINERS=true npm run test:modules / test:modules:serial-store / test:ai / test:agent / test:rules，integration 与 harness 先 db:seed",
+      "result": "pass",
+      "summary": "分支 CI 基线（同一 commit、改动前）→ 改动后：modules 567→569、serial-store 166 中 2 红→166 全绿、agent 146（3 红）→151 全绿、ai 286→286、rules 8→8、integration 1→1。计数只增不减，5 条目标用例全绿"
+    },
+    {
+      "kind": "gate",
+      "ref": "test:harness（309 条）",
+      "result": "pass_with_known_flaky",
+      "summary": "308 绿 + T7a `concurrent scans recover the same run exactly once` 红。该红与本批无关且属本机时序：在**不含本批改动的 HEAD 副本**、六个新建独立库上各跑三轮，改动侧 2 红 1 绿、基线侧 1 红 2 绿，两侧同形态复现（本机经 colima 起库，两条并发 scanOnce 的时序与 GitHub runner 不同）。分支 CI 未跑到该步（serial-store 先红即中止），故无 CI 侧基线可比"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web && npm run check:session-history-parity",
+      "result": "pass",
+      "summary": "两端构建 exit 0；parity 对开发库实取 101 条会话 × 6 层逐字节相同（含第 ④ 层「进行中工具交互判据」），与批次 4 原口径一致"
+    }
+  ],
+  "gaps": [
+    "「痕迹进 assistant metadata」的实取证据来自同步通道（homeWorkbenchChat 端到端用例）。流式与异步 Run 两条通道的同形状落库只有循环侧与消费侧的单元断言（runWorkbenchToolLoopStream 的 chunk 携带 + model-answer 暂存），没有端到端用例——本批禁改 workbench-chat-stream.handler.ts，端到端缝合宜并入批次 3 的对话通道专项。",
+    "① 用例的 intent 断言值确实改了（knowledge_query → domain_qa）。理由是该意图名随词表退役已不存在于 WorkbenchIntent 联合类型，属预期变更而非放宽；但它与「不许靠改断言变绿」的边界由架构侧判定，故在此显式登记。",
+    "本批未做真实模型对话验证（无凭据），与批次 4 原 event 的 gaps 第 1 条同源，收口方式不变。"
+  ],
+  "followups": [
+    "关闭 BE-2026-09-12-batch4-retire-intent-handlers 的 followups 第 2 条（「知识库审计形态随 handler 退出……knowledgeTool 字段与消费端保留未删，删除动作应并入批次 3 一并裁决」）：本批不删该契约，而是把产生方从 handler 换成工具并补齐归属字段，故该条由「裁决是否删除」转为「已恢复，剩流式/异步端到端缝合」。",
+    "原 event followups 第 1 条（前端建议动作不发 clientAction、按钮结构上未闭合）本批未解，仍待按 ui-skills 前置单独排期——本批只是把 ② 用例的触发条件对齐到该 command 入口，没有替前端补发送方。"
+  ]
+}

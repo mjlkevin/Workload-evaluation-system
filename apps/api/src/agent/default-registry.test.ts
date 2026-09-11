@@ -327,6 +327,38 @@ test("批次4·知识库工具：无可见库时以空凭据下传（失败方�
   assert.deepEqual(calls, [{ knowledgeId: "", apiKey: "" }], "无授权库时不得带凭据去查任何库");
 });
 
+// 痕迹的「归属」字段（选了哪个库 / 按什么口径选的 / 每次尝试的结果）退役前由
+// knowledge-query.handler 挂载，是前端来源卡片与 trace 知识库 span 的数据源。
+// 批次 4 把检索入口收拢到 runKnowledgeQuery 后，这组字段必须一并搬过来。
+test("批次4·知识库工具：痕迹带上选库归属（profile 名称 + route.attempts），与退役前同形", async () => {
+  const { invoke } = kbRecorder();
+  const trace = await runKnowledgeQuery("网上银行实施边界怎么划分？", "pre_sales", undefined, depsFor(invoke));
+
+  assert.equal(trace.knowledgeBaseProfileId, "treasury");
+  assert.equal(trace.knowledgeBaseName, "司库与银企知识库");
+  assert.equal(trace.route?.primaryProfileId, "treasury");
+  assert.ok(trace.route?.reason, "route.reason 必须留下选库理由");
+  assert.deepEqual(
+    trace.route?.attempts.map((attempt) => [attempt.profileId, attempt.chunksCount]),
+    [["treasury", 2]],
+    "单次命中只应记录一次尝试",
+  );
+});
+
+test("批次4·知识库工具：回退成功时 attempts 记录两次并写出 fallbackProfileId", async () => {
+  const { invoke } = kbRecorder((knowledgeId) =>
+    knowledgeId === "kb-treasury" ? { fallbackReason: "retrieval_empty", chunksCount: 0, topScore: 0, confidence: "low" } : {},
+  );
+  const trace = await runKnowledgeQuery("网上银行实施边界怎么划分？", "pre_sales", undefined, depsFor(invoke));
+
+  assert.equal(trace.knowledgeBaseProfileId, "solutions", "最终归属必须是实际作答的那个库");
+  assert.equal(trace.route?.fallbackProfileId, "solutions");
+  assert.deepEqual(
+    trace.route?.attempts.map((attempt) => [attempt.profileId, attempt.fallbackReason ?? ""]),
+    [["treasury", "retrieval_empty"], ["solutions", ""]],
+  );
+});
+
 // ── 批次 4 · describe_capabilities ──────────────────────────
 // 退役前由 capability_keywords 词表决定「这句话要回能力清单」；退役后由模型自己调本工具。
 // 事实源本身没变：仍是 CAPABILITY_FACTS 单一来源，防的是模型编造未实现能力。

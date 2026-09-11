@@ -1,4 +1,4 @@
-import type { AuthUser, BusinessRole } from "../types";
+import type { AuthUser, BusinessRole, KnowledgeBaseProfile } from "../types";
 import type { RuntimeContext } from "./context/context.types";
 import { ToolRegistry } from "./tool-registry";
 import { buildEstimateTool } from "./tools/presales.tools";
@@ -17,7 +17,7 @@ import { buildListToolsTool } from "./tools/list-tools.tools";
 import { buildAskUserTool } from "./tools/ask-user.tools";
 import { buildDescribeCapabilitiesTool } from "./tools/capability.tools";
 import { resolveBusinessRole } from "../middleware/auth";
-import { routeKnowledgeBase } from "../services/ai/knowledge-base-router.service";
+import { routeKnowledgeBase, type KnowledgeBaseRouteDecision } from "../services/ai/knowledge-base-router.service";
 import type { ZhipuKnowledgeToolConfig, ZhipuKnowledgeToolTrace } from "../services/ai/knowledge-tool.service";
 import { calculateEstimateOnly, listExportHistoryByOwner } from "../modules/estimates/estimates.module";
 import { calculateAndExportEstimate } from "../modules/estimates/estimates.usecase";
@@ -106,6 +106,53 @@ export type KnowledgeQueryDeps = {
   invoke?: (query: string, config: ZhipuKnowledgeToolConfig) => Promise<ZhipuKnowledgeToolTrace>;
 };
 
+type KnowledgeAttemptSummary = {
+  profileId: string;
+  fallbackReason?: ZhipuKnowledgeToolTrace["fallbackReason"];
+  chunksCount: number;
+  topScore: number;
+  contextRef?: string;
+};
+
+function summarizeKnowledgeAttempt(profile: KnowledgeBaseProfile, trace: ZhipuKnowledgeToolTrace): KnowledgeAttemptSummary {
+  return {
+    profileId: profile.id,
+    ...(trace.fallbackReason ? { fallbackReason: trace.fallbackReason } : {}),
+    chunksCount: trace.chunksCount,
+    topScore: trace.topScore,
+    ...(trace.contextRef ? { contextRef: trace.contextRef } : {}),
+  };
+}
+
+/**
+ * 痕迹的「归属」侧字段：选了哪个库、按什么口径选的、每次尝试的结果。
+ * 退役前由 knowledge-query.handler 挂载，批次 4 随检索入口收拢到本函数——少了这一步，
+ * trace 的知识库 span（`knowledgeBaseProfileId` / `knowledgeBaseName` / `route`）与前端
+ * 消息上的来源信息会一起静默消失。
+ */
+function attachKnowledgeRoute(
+  trace: ZhipuKnowledgeToolTrace,
+  profile: KnowledgeBaseProfile | undefined,
+  route: KnowledgeBaseRouteDecision,
+  attempts: KnowledgeAttemptSummary[],
+): ZhipuKnowledgeToolTrace {
+  return {
+    ...trace,
+    ...(profile ? {
+      knowledgeBaseProfileId: profile.id,
+      knowledgeBaseName: profile.name,
+    } : {}),
+    route: {
+      mode: route.mode,
+      confidence: route.confidence,
+      reason: route.reason,
+      ...(route.primaryProfile ? { primaryProfileId: route.primaryProfile.id } : {}),
+      ...(attempts.length > 1 && route.fallbackProfile ? { fallbackProfileId: route.fallbackProfile.id } : {}),
+      attempts,
+    },
+  };
+}
+
 /**
  * 知识库查询接线（批次 4 起 = `knowledge_query` 工具的实现）。
  *
@@ -139,10 +186,17 @@ export async function runKnowledgeQuery(
     configVersion: catalog.configVersion,
     ...(runtime?.requestId ? { requestId: runtime.requestId } : {}),
   });
-  if (!route.primaryProfile) return call("");
-  const trace = await call(route.primaryProfile.knowledgeId);
-  if (trace.fallbackReason === "retrieval_empty" && route.fallbackProfile) {
-    return call(route.fallbackProfile.knowledgeId);
+  if (!route.primaryProfile) {
+    return attachKnowledgeRoute(await call(""), undefined, route, []);
   }
-  return trace;
+  let selectedProfile = route.primaryProfile;
+  const attempts: KnowledgeAttemptSummary[] = [];
+  let trace = await call(route.primaryProfile.knowledgeId);
+  attempts.push(summarizeKnowledgeAttempt(route.primaryProfile, trace));
+  if (trace.fallbackReason === "retrieval_empty" && route.fallbackProfile) {
+    trace = await call(route.fallbackProfile.knowledgeId);
+    attempts.push(summarizeKnowledgeAttempt(route.fallbackProfile, trace));
+    selectedProfile = route.fallbackProfile;
+  }
+  return attachKnowledgeRoute(trace, selectedProfile, route, attempts);
 }

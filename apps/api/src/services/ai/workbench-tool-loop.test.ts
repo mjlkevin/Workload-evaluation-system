@@ -87,10 +87,14 @@ for (const role of ["admin", "sub_admin", "user"] as const) {
     const READ_TOOLS = ["estimate_implementation", "project_list", "estimate_history", "knowledge_query", "rule_lookup"] as const;
     // 批次 9：ask_user 注册在原 8 个之后（注入序同注册序），落 allow 档、不经审批
     const ASK_USER_TOOL = "ask_user";
+    // 批次 4：describe_capabilities 注册在 ask_user 之后（注入序同注册序），
+    // mutates=false 故同落 allow 档；穷尽清单必须随注册表同步，否则「穷尽」二字是空的。
+    const CAPABILITY_TOOL = "describe_capabilities";
     assert.deepEqual(names, [
       ...READ_TOOLS,
       ...WRITE_TOOLS.filter((name) => set.registry.get(name) && set.agentUser.capabilities.includes(set.registry.get(name)!.capability)),
       ASK_USER_TOOL,
+      CAPABILITY_TOOL,
     ]);
     assert.equal((names as string[]).includes("list_tools"), false);
     for (const writeTool of WRITE_TOOLS) {
@@ -104,6 +108,9 @@ for (const role of ["admin", "sub_admin", "user"] as const) {
     // 判据④：ask_user 走 allow 档——注入即直接放行，且绝不进审批名单
     assert.equal(set.allowToolNames.has(ASK_USER_TOOL), true, "ask_user 应直接放行（问一句话不要审批）");
     assert.equal(set.approvalRequiredToolNames.has(ASK_USER_TOOL), false, "ask_user 不得进审批名单");
+    // 批次 4：describe_capabilities 只读，同落 allow 档
+    assert.equal(set.allowToolNames.has(CAPABILITY_TOOL), true, "describe_capabilities 应直接放行（只读清单）");
+    assert.equal(set.approvalRequiredToolNames.has(CAPABILITY_TOOL), false, "describe_capabilities 不得进审批名单");
     if (set.agentUser.capabilities.includes("estimates:write")) {
       assert.deepEqual(
         WRITE_TOOLS.filter((name) => names.includes(name)),
@@ -155,6 +162,93 @@ test("runWorkbenchToolLoop: 执行工具→回填→再问一次，返回最终�
   assert.match(seenMessages[1][1].content, /\[工具结果\] knowledge_query/);
   assert.match(seenMessages[1][1].content, /"hit":"ERP"/);
   assert.deepEqual(events.map((event) => event.kind), ["tool_call", "tool_result"]);
+});
+
+/**
+ * 批次 4 · 知识库痕迹回归：退役 knowledge-query.handler 后，`knowledge_query` 工具是
+ * 知识库检索的唯一入口。工具产出必须随回合结果一起回传，否则「检索确实发生过、但 assistant
+ * 消息的 metadata 里没有来源」——前端消息卡片上的知识库来源会静默消失。
+ */
+function fakeKnowledgeTrace(overrides: Record<string, unknown> = {}) {
+  return {
+    toolId: "knowledge_base.query_product_knowledge",
+    available: true,
+    model: "glm-4.6",
+    knowledgeId: "kb-sales",
+    query: "存货核算",
+    answer: "需结合库存管理与总账确认边界。",
+    confidence: "high",
+    retrievalTriggered: true,
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    latencyMs: 12,
+    contextRef: "knowledge:kb-sales:doc-1",
+    chunksCount: 1,
+    topScore: 0.92,
+    ...overrides,
+  };
+}
+
+async function loopWithKnowledgeResult(execute: () => Promise<unknown>) {
+  const registry = new ToolRegistry();
+  registry.register(fakeTool({ name: "knowledge_query", execute }));
+  let invoked = 0;
+  return runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "查一下知识库" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:read"] },
+    allowToolNames: new Set(["knowledge_query"]),
+    invoke: async () => {
+      invoked += 1;
+      return invoked === 1
+        ? { content: "", toolCalls: [{ id: "c1", name: "knowledge_query", arguments: { query: "存货核算" } }] }
+        : { content: "知识库结果是 …" };
+    },
+  });
+}
+
+test("runWorkbenchToolLoop: knowledge_query 的知识库痕迹随回合结果回传（批次 4 退役 handler 后唯一产生通路）", async () => {
+  const trace = fakeKnowledgeTrace();
+  const out = await loopWithKnowledgeResult(async () => trace);
+
+  assert.deepEqual(out.toolCalls, [{ name: "knowledge_query" }], "工具名轨迹不得因新字段而变");
+  assert.equal(out.knowledgeTool, trace, "痕迹必须原样回传，不得只留工具名");
+});
+
+test("runWorkbenchToolLoop: knowledge_query 产出不是痕迹形状时不得凭空造出痕迹", async () => {
+  const shaped = await loopWithKnowledgeResult(async () => ({ hit: "ERP" }));
+  assert.equal("knowledgeTool" in shaped, false, "非痕迹产出必须缺省该字段");
+
+  const failed = await loopWithKnowledgeResult(async () => {
+    throw new Error("retrieval_failed");
+  });
+  assert.equal("knowledgeTool" in failed, false, "工具失败时必须缺省该字段");
+});
+
+test("runWorkbenchToolLoopStream: 知识库痕迹随工具批后补发的 metadata chunk 上送（流式/异步通道唯一通路）", async () => {
+  const registry = new ToolRegistry();
+  const trace = fakeKnowledgeTrace({ contextRef: "knowledge:kb-sales:doc-2" });
+  registry.register(fakeTool({ name: "knowledge_query", execute: async () => trace }));
+  let invoked = 0;
+
+  const collected = await collectStream(runWorkbenchToolLoopStream({
+    messages: [{ role: "user", content: "查一下知识库" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:read"] },
+    allowToolNames: new Set(["knowledge_query"]),
+    invokeStream: () => {
+      invoked += 1;
+      return invoked === 1
+        ? turnStream([chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "knowledge_query", arguments: { query: "存货核算" } }] })])
+        : turnStream([chunkOf({ contentDelta: "知识库结果是 …", finishReason: "stop" })]);
+    },
+  }));
+
+  const metadata = collected.chunks.filter((chunk) => chunk.kind === "metadata");
+  assert.equal(metadata.length, 1, "每个工具批仍只补发一条 metadata chunk");
+  assert.equal(metadata[0]?.knowledgeTool, trace, "痕迹必须挂在该 chunk 上——本通道不经 modelChat 捕获包装");
+  assert.equal(collected.result.knowledgeTool, trace, "流式结果与 chunk 必须是同一份痕迹");
 });
 
 test("runWorkbenchToolLoop: 写工具与未注册工具一律不执行，只回填失败结果", async () => {

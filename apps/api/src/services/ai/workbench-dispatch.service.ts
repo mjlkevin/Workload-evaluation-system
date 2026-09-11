@@ -107,8 +107,8 @@ export type WorkbenchDispatchInput = {
    * 缺省（未注入）即按「不在进行中」处理，路由行为与本批之前逐字相同。
    */
   hasOngoingToolInteraction?: boolean;
-  /** 由调用方提供的模型回复函数；toolCalls/memoryRef 为 additive 返回字段（chip 数据通路，缺省即无） */
-  modelChat: (params: { systemPrompt: string; userContent: string }) => Promise<{ answer: string; rawContent: string; provider?: string; model?: string; attempts?: number; finishReason?: string; toolCalls?: WorkbenchToolCallTrace[]; memoryRef?: WorkbenchMemoryRefTrace }>;
+  /** 由调用方提供的模型回复函数；toolCalls/memoryRef/knowledgeTool 为 additive 返回字段（chip 与来源痕迹数据通路，缺省即无） */
+  modelChat: (params: { systemPrompt: string; userContent: string }) => Promise<{ answer: string; rawContent: string; provider?: string; model?: string; attempts?: number; finishReason?: string; toolCalls?: WorkbenchToolCallTrace[]; memoryRef?: WorkbenchMemoryRefTrace; knowledgeTool?: ZhipuKnowledgeToolTrace }>;
   /** 由调用方提供的角色标签 */
   businessRole: BusinessRole;
   roleLabel: string;
@@ -215,6 +215,13 @@ export type StreamingChunk = {
    * 补发的 kind === "metadata" chunk 上；无工具调用时缺省，既有消费端零回归。
    */
   toolCalls?: ToolCall[];
+  /**
+   * 批次 4（additive）：kind === "metadata" 时携带——本回合 `knowledge_query` 工具检索出的
+   * 知识库痕迹。流式与异步 Run 通道不经过 modelChat 的捕获包装，痕迹只能随这条 chunk
+   * 上送给消费端（model-answer），与 toolCalls 同一数据通路。缺数据时字段缺省，
+   * 既有 chunk 形状逐字节不变。
+   */
+  knowledgeTool?: ZhipuKnowledgeToolTrace;
 };
 
 /** RP-029 返工：流式 adapter — 由调用方实现，dispatch 内部模型调用路径会回调此 adapter */
@@ -310,8 +317,10 @@ export async function dispatchHomeWorkbenchTurn(input: WorkbenchDispatchInput): 
   const capturedToolCalls: WorkbenchToolCallTrace[] = [];
   const seenToolCalls = new Set<string>();
   let capturedMemoryRef: WorkbenchMemoryRefTrace | undefined;
+  let capturedKnowledgeTool: ZhipuKnowledgeToolTrace | undefined;
   const capturingModelChat: WorkbenchDispatchInput["modelChat"] = async (params) => {
     const result = await effectiveInput.modelChat(params);
+    if (result.knowledgeTool) capturedKnowledgeTool = result.knowledgeTool;
     if (Array.isArray(result.toolCalls)) {
       for (const call of result.toolCalls) {
         if (!call || typeof call.name !== "string" || !call.name) continue;
@@ -340,6 +349,11 @@ export async function dispatchHomeWorkbenchTurn(input: WorkbenchDispatchInput): 
   }
   if (capturedMemoryRef) {
     data.trace.memoryRef = capturedMemoryRef;
+  }
+  // 批次 4：知识库痕迹的产生方从 handler 变成了工具，捕获点因此也在 modelChat 这一侧。
+  // handler 若已自行给出痕迹（它比回合级捕获更精确），不被这里覆盖。
+  if (capturedKnowledgeTool && !data.trace.knowledgeTool) {
+    data.trace.knowledgeTool = capturedKnowledgeTool;
   }
   return data;
 }

@@ -2,6 +2,9 @@ import type { ChatRole, ToolCall, ToolDefinition } from "../../ai/provider/model
 import type { AgentEvent, AgentUser } from "../../agent/agent.types";
 import type { ToolRegistry } from "../../agent/tool-registry";
 import { createDefaultRegistry } from "../../agent/default-registry";
+import { KNOWLEDGE_QUERY_TOOL_NAME } from "../../agent/tools/query.tools";
+import type { ZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
+import { isZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import type { RuntimeContext } from "../../agent/context/context.types";
 import { getCombinedCapabilities } from "../../rbac/permissions";
 import { legacyRoleToV2Roles } from "../../rbac/roles";
@@ -125,6 +128,14 @@ export type WorkbenchToolLoopResult = {
   truncated: boolean;
   /** 本会话内发生过的工具调用轨迹（供 MS3 工具 chip） */
   toolCalls: WorkbenchToolCallTrace[];
+  /**
+   * 批次 4（additive）：本回合 `knowledge_query` 工具检索出的知识库痕迹。
+   * 退役前它由 knowledge-query.handler 直接放进 dispatch trace；退役后工具是知识库检索
+   * 的唯一入口，而工具产出原先只回灌模型、不进 trace——前端消息卡片上的来源信息因此
+   * 静默消失。缺数据时字段缺省（未调用该工具 / 调用失败），消费端零回归。
+   * 多次检索取**末次成功**的那一份：回填给模型的也是它，回答真正依据的就是这次检索。
+   */
+  knowledgeTool?: ZhipuKnowledgeToolTrace;
 };
 
 type WorkbenchToolLoopCommon = {
@@ -228,7 +239,25 @@ type ToolBatchContext = WorkbenchToolLoopCommon & {
   workingMessages: WorkbenchToolLoopMessage[];
   trace: WorkbenchToolCallTrace[];
   callCursor: { value: number };
+  /** 本回合最后一次成功检索出的知识库痕迹（批次 4，见 WorkbenchToolLoopResult.knowledgeTool） */
+  knowledgeTrace: { value?: ZhipuKnowledgeToolTrace };
 };
+
+function toWorkbenchToolLoopResult(
+  content: string,
+  turns: number,
+  truncated: boolean,
+  trace: WorkbenchToolCallTrace[],
+  knowledgeTrace: { value?: ZhipuKnowledgeToolTrace },
+): WorkbenchToolLoopResult {
+  return {
+    content,
+    turns,
+    truncated,
+    toolCalls: trace,
+    ...(knowledgeTrace.value ? { knowledgeTool: knowledgeTrace.value } : {}),
+  };
+}
 
 /** 串行执行一批工具调用：逐个解析结果 → 落 effect → 发事件 → 回填消息 */
 async function executeToolCallBatch(ctx: ToolBatchContext, calls: ToolCall[]): Promise<void> {
@@ -280,6 +309,11 @@ async function executeToolCallBatch(ctx: ToolBatchContext, calls: ToolCall[]): P
         : { kind: "tool_result", name, ok: false, error: outcome.error, toolCallId: callId },
     );
     ctx.trace.push({ name });
+    // 批次 4：知识库痕迹必须在这里落进回合——退役前它是 handler 的返回值，退役后工具产出
+    // 只回灌模型，不捕获就等于「检索发生过、但界面上查不到来源」。
+    if (name === KNOWLEDGE_QUERY_TOOL_NAME && outcome.ok && isZhipuKnowledgeToolTrace(outcome.data)) {
+      ctx.knowledgeTrace.value = outcome.data;
+    }
     // ④：工具结果回灌模型必须走模型可见面的唯一构造点。完整参数（args）、
     // 心跳中间态（callIndex/elapsedMs）、结果预览（resultPreview）都只进 UI
     // 事件，不得进 messages；正文形态与批次 0 逐字节一致（同步通道共用）。
@@ -295,19 +329,20 @@ export async function runWorkbenchToolLoop(
   const workingMessages: WorkbenchToolLoopMessage[] = [...input.messages];
   const trace: WorkbenchToolCallTrace[] = [];
   const callCursor = { value: 0 };
+  const knowledgeTrace: { value?: ZhipuKnowledgeToolTrace } = {};
   let content = "";
 
   for (let turn = 1; turn <= maxTurns; turn += 1) {
     const response = await input.invoke({ messages: [...workingMessages], turnOrdinal: turn });
     content = response.content ?? "";
     const calls = response.toolCalls ?? [];
-    if (calls.length === 0) return { content, turns: turn, truncated: false, toolCalls: trace };
+    if (calls.length === 0) return toWorkbenchToolLoopResult(content, turn, false, trace, knowledgeTrace);
     // 已达上限：不再执行工具（避免无收敛的副作用），把末轮正文交回用户
-    if (turn === maxTurns) return { content, turns: turn, truncated: true, toolCalls: trace };
-    await executeToolCallBatch({ ...input, workingMessages, trace, callCursor }, calls);
+    if (turn === maxTurns) return toWorkbenchToolLoopResult(content, turn, true, trace, knowledgeTrace);
+    await executeToolCallBatch({ ...input, workingMessages, trace, callCursor, knowledgeTrace }, calls);
   }
 
-  return { content, turns: maxTurns, truncated: true, toolCalls: trace };
+  return toWorkbenchToolLoopResult(content, maxTurns, true, trace, knowledgeTrace);
 }
 
 /**
@@ -324,6 +359,7 @@ export async function* runWorkbenchToolLoopStream(
   const workingMessages: WorkbenchToolLoopMessage[] = [...input.messages];
   const trace: WorkbenchToolCallTrace[] = [];
   const callCursor = { value: 0 };
+  const knowledgeTrace: { value?: ZhipuKnowledgeToolTrace } = {};
   let content = "";
 
   for (let turn = 1; turn <= maxTurns; turn += 1) {
@@ -344,13 +380,19 @@ export async function* runWorkbenchToolLoopStream(
       }
     }
     content = turnContent;
-    if (turnCalls.length === 0) return { content, turns: turn, truncated: false, toolCalls: trace };
-    if (turn === maxTurns) return { content, turns: turn, truncated: true, toolCalls: trace };
-    await executeToolCallBatch({ ...input, workingMessages, trace, callCursor }, turnCalls);
-    yield { contentDelta: "", kind: "metadata", toolCalls: turnCalls };
+    if (turnCalls.length === 0) return toWorkbenchToolLoopResult(content, turn, false, trace, knowledgeTrace);
+    if (turn === maxTurns) return toWorkbenchToolLoopResult(content, turn, true, trace, knowledgeTrace);
+    await executeToolCallBatch({ ...input, workingMessages, trace, callCursor, knowledgeTrace }, turnCalls);
+    yield {
+      contentDelta: "",
+      kind: "metadata",
+      toolCalls: turnCalls,
+      // 批次 4：流式/异步通道不经 modelChat 捕获包装，痕迹只能随这条 chunk 上送
+      ...(knowledgeTrace.value ? { knowledgeTool: knowledgeTrace.value } : {}),
+    };
   }
 
-  return { content, turns: maxTurns, truncated: true, toolCalls: trace };
+  return toWorkbenchToolLoopResult(content, maxTurns, true, trace, knowledgeTrace);
 }
 
 /**
