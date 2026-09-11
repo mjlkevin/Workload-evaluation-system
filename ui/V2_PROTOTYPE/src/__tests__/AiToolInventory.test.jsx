@@ -107,7 +107,7 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(screen.getByText('草稿与生效一致')).toBeInTheDocument()
     const enabledCheckbox = within(toolRow('project_list')).getByLabelText('启用 project_list')
     fireEvent.click(enabledCheckbox)
-    expect(screen.getByText('草稿未生效')).toBeInTheDocument()
+    expect(screen.getByText('有未保存的修改')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /保存草稿/ }))
     // 保存只落草稿：未生效前脏标记仍在，version 不动
@@ -121,6 +121,66 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     const trajectoryTable = trajectoryHeading.parentElement.querySelector('table')
     expect(within(trajectoryTable).getAllByText('admin').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/project_list · enabled: true → false/).length).toBeGreaterThan(0)
+  })
+
+  // 批次 6b 返修①（阻塞项）：改完**不保存**直接点「生效」，编辑曾被静默丢弃而页面报成功。
+  // 这条用例在旧实现上必红两处：① 旧代码此时没有「有未保存的修改」这一态；
+  // ② 旧代码的生效按钮是 enabled={!dirty}，本地未保存也算 dirty → 可点。
+  test('批次6b返修①·未保存的编辑不得被「生效」静默丢弃：按钮禁用 + 明确提示 + 保存后才带上', async () => {
+    renderAppAt('/system/tools')
+    expect(await screen.findByText('project_list', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.getByText('草稿与生效一致')).toBeInTheDocument()
+
+    fireEvent.click(within(toolRow('project_list')).getByLabelText('启用 project_list'))
+
+    // 要害（先断言它，失败信息才直指缺陷本身）：未保存时「生效」不可点
+    const activateButton = screen.getByRole('button', { name: /^生效$/ })
+    expect(activateButton).toBeDisabled()
+    expect(activateButton).toHaveAttribute('title', expect.stringContaining('保存草稿'))
+
+    // 未保存态被单独标出来，且给出**可见**提示（不只 tooltip）
+    expect(screen.getByText('有未保存的修改')).toBeInTheDocument()
+    expect(screen.queryByText('草稿未生效')).not.toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('不会进入生效版本')
+
+    // 保存之后才是「草稿已存、待生效」——按钮解禁
+    fireEvent.click(screen.getByRole('button', { name: /保存草稿/ }))
+    await waitFor(() => expect(screen.getByText('草稿未生效')).toBeInTheDocument())
+    expect(screen.queryByText('有未保存的修改')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^生效$/ })).toBeEnabled()
+
+    // 生效后：那次编辑真的进了生效版本
+    fireEvent.click(screen.getByRole('button', { name: /^生效$/ }))
+    await waitFor(() => expect(screen.getByText(/生效版本 v2/)).toBeInTheDocument())
+    const trajectoryTable = screen.getByText(/变更轨迹/).parentElement.querySelector('table')
+    expect(within(trajectoryTable).getAllByText(/project_list · enabled: true → false/).length).toBeGreaterThan(0)
+    expect(screen.getByText('草稿与生效一致')).toBeInTheDocument()
+  })
+
+  // 「放弃」的两个动作各管一件事，名字与行为必须对得上（返修①附带收口）
+  test('批次6b返修①·放弃未保存只回退本地，回退生效版本才写服务端草稿', async () => {
+    renderAppAt('/system/tools')
+    expect(await screen.findByText('project_list', {}, { timeout: 3000 })).toBeInTheDocument()
+
+    // 先存一个未生效的草稿（服务端草稿 ≠ 生效版）
+    fireEvent.click(within(toolRow('project_list')).getByLabelText('启用 project_list'))
+    fireEvent.click(screen.getByRole('button', { name: /保存草稿/ }))
+    await waitFor(() => expect(screen.getByText('草稿未生效')).toBeInTheDocument())
+
+    // 再叠一处**未保存**的编辑（estimate_history 注入模式）
+    fireEvent.change(within(toolRow('estimate_history')).getAllByRole('combobox')[1], { target: { value: 'on-demand' } })
+    expect(screen.getByText('有未保存的修改')).toBeInTheDocument()
+
+    // 「放弃未保存的修改」：只丢本地这处，服务端已存的停用草稿仍在 → 仍是「草稿未生效」
+    fireEvent.click(screen.getByRole('button', { name: /放弃未保存的修改/ }))
+    expect(screen.queryByText('有未保存的修改')).not.toBeInTheDocument()
+    expect(screen.getByText('草稿未生效')).toBeInTheDocument()
+
+    // 「草稿回退为生效版本」：这一次写服务端，草稿回到生效版内容 → 两态皆清
+    fireEvent.click(screen.getByRole('button', { name: /草稿回退为生效版本/ }))
+    await waitFor(() => expect(screen.getByText('草稿与生效一致')).toBeInTheDocument())
+    expect(screen.queryByText('草稿未生效')).not.toBeInTheDocument()
   })
 
   test('批次6b·判据③口径：写/外发工具的审批显示为代码下限，策略下拉不可选', async () => {
@@ -145,7 +205,7 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     const readOnlyApproval = within(toolRow('rule_lookup')).getAllByRole('combobox')[0]
     expect(readOnlyApproval).toBeEnabled()
     fireEvent.change(readOnlyApproval, { target: { value: 'user-confirm' } })
-    expect(screen.getByText('草稿未生效')).toBeInTheDocument()
+    expect(screen.getByText('有未保存的修改')).toBeInTheDocument()
   })
 
   test('批次6b：策略停用只裁注入，不收本人权限（callable 仍按权限位）', async () => {
@@ -154,7 +214,7 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     fireEvent.click(within(toolRow('rule_lookup')).getByLabelText('启用 rule_lookup'))
     const approval = within(toolRow('rule_lookup')).getByText('注入')
     expect(approval).toBeInTheDocument() // 未生效前，生效视图不变
-    await waitFor(() => screen.getByText('草稿未生效'))
+    await waitFor(() => screen.getByText('有未保存的修改'))
   })
 
   test('page states the code/data boundary: inventory read-only, policy is the editable decision', async () => {

@@ -5,9 +5,7 @@ import {
   DEFAULT_TOOL_POLICY_ENTRY,
   applyToolPolicyToDefinitions,
   diffToolPolicyConfigs,
-  isToolCoreInjectableUnderPolicy,
   isToolDiscoverableUnderPolicy,
-  isToolEnabledUnderPolicy,
   isToolInjectableOnFullChannel,
   normalizeToolPolicyConfig,
   normalizeToolPolicyEntry,
@@ -116,7 +114,7 @@ test("判据②：角色可见性只收窄不提权——visibleRoles 未命中�
   // PRE_SALES 不在名单：剔除
   assert.equal(applyToolPolicyToDefinitions(definitions, registry, { policy: policy({ export_report: { visibleRoles: ["ADMIN"] } }), roles: ["PRE_SALES"] }).length, 0);
   // 策略对 PM 开放 ≠ PM 获得 estimates:write——那是 selector 的事，本层永远不放大
-  assert.equal(isToolEnabledUnderPolicy("export_report", policy({ export_report: { visibleRoles: ["PM"] } }), ["PM"]), true, "本层判「角色可见」，不判 capability");
+  assert.equal(isToolDiscoverableUnderPolicy(tool({ name: "export_report", capability: "estimates:write", mutates: true }), policy({ export_report: { visibleRoles: ["PM"] } }), ["PM"]), true, "本层判「角色可见」，不判 capability");
 });
 
 test("多角色用户：任一持有角色命中即可见（与 capability 的并集口径同构）", () => {
@@ -126,20 +124,16 @@ test("多角色用户：任一持有角色命中即可见（与 capability 的�
   );
 });
 
-test("注入模式 on-demand：全量通道不再主动注入；发现通道仍可见", () => {
+test("注入模式 on-demand：全量注入集不再主动注入（两条通道同一判据）；发现通道仍可见", () => {
   const item = tool({ name: "knowledge_query", discoverable: true });
   const onDemand = policy({ knowledge_query: { injectionMode: "on-demand" } });
   assert.equal(isToolInjectableOnFullChannel(item, onDemand, ["ADMIN"]), false);
   assert.equal(isToolDiscoverableUnderPolicy(item, onDemand, ["ADMIN"]), true, "降档不是停用，发现通道保留");
-});
-
-test("注入模式对常驻核心集的作用：常驻工具被降档后核心集剔除；本已 discoverable 的不受核心集口径影响", () => {
+  // 代码标记为常驻（discoverable !== true）的工具被策略降档：同样从注入集剔除——
+  // 判据与上面同一条（编排通道与工作台通道的注入集都出自 isToolInjectableOnFullChannel）。
   const core = tool({ name: "rule_lookup" });
-  assert.equal(isToolCoreInjectableUnderPolicy(core, policy({ rule_lookup: { injectionMode: "on-demand" } }), ["ADMIN"]), false);
-  assert.equal(isToolCoreInjectableUnderPolicy(core, undefined, ["ADMIN"]), true);
-  // discoverable 工具本来就不进核心集（selector 已排除）；本层只表达「停用/角色」对它的影响
-  const lazy = tool({ name: "knowledge_query", discoverable: true });
-  assert.equal(isToolCoreInjectableUnderPolicy(lazy, policy({ knowledge_query: { enabled: false } }), ["ADMIN"]), false);
+  assert.equal(isToolInjectableOnFullChannel(core, policy({ rule_lookup: { injectionMode: "on-demand" } }), ["ADMIN"]), false);
+  assert.equal(isToolInjectableOnFullChannel(core, undefined, ["ADMIN"]), true, "无策略 = 默认条目，常驻工具照注入（零回归）");
 });
 
 test("停用 + 角色不可见叠加：任一条成立即剔除", () => {

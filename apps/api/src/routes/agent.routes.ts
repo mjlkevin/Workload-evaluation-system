@@ -75,13 +75,18 @@ export function createAgentRouter(deps: AgentRouterDeps = {}) {
     const toolPolicy = await resolveActiveToolPolicy();
 
     try {
+      // 批次 6b 返修（③）：**不传 confirm 端口**。本通道（同步 HTTP，无 Run 事件流）
+      // 没有可持久化的审批闸门，编排层因此对落 ask 档的工具（写 / 外发 / 策略
+      // user-confirm）一律失败关闭并回原因。
+      // 此前这里是 `async () => req.body?.confirm === true`：请求体一个布尔即一次性批准
+      // 本轮全部待确认调用，等于把审批判交回被审方——管理员在策略页设的「逐次确认」
+      // 走这条路形同空文。请求体的 confirm 字段自此**不再被读取**（传什么都不生效）。
       const result = await runAgent({
         userMessage: message,
         user,
         registry,
         runner,
         onEvent: (event) => events.push(toApiEvent(event)),
-        confirm: async () => req.body?.confirm === true,
         runtimeContext,
         toolPolicy,
       });

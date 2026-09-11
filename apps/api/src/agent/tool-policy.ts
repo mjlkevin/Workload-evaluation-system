@@ -104,13 +104,6 @@ export function isToolDiscoverableUnderPolicy(tool: AgentTool, policy: ToolPolic
   return isRoleVisible(entry, roles);
 }
 
-/** 代码标记为常驻（discoverable !== true）的工具被策略降为 on-demand 时，从常驻注入集中剔除 */
-export function isToolCoreInjectableUnderPolicy(tool: AgentTool, policy: ToolPolicyConfig | undefined, roles: readonly V2Role[]): boolean {
-  if (!isToolDiscoverableUnderPolicy(tool, policy, roles)) return false;
-  const entry = resolveToolPolicyEntry(policy, tool.name);
-  return entry.injectionMode !== "on-demand";
-}
-
 function isRoleVisible(entry: ToolPolicyEntry, roles: readonly V2Role[]): boolean {
   if (entry.visibleRoles.length === 0) return true;
   return entry.visibleRoles.some((role) => (roles as readonly string[]).includes(role));
@@ -119,6 +112,11 @@ function isRoleVisible(entry: ToolPolicyEntry, roles: readonly V2Role[]): boolea
 /**
  * 对注册表**已按 capability 过滤后**的 Provider 定义集应用策略裁切（只做减法）。
  * 入参 definitions 的顺序保持逐字节不变（过滤不重排），返回新的 Provider 定义列表。
+ *
+ * 判据的唯一三处出口（两条通道都调它们，不再各自内联）：
+ *  · 全量注入准入 → isToolInjectableOnFullChannel
+ *  · 发现通道准入 → isToolDiscoverableUnderPolicy
+ *  · 要不要审批 → resolveWorkbenchToolDecisionSlot（../services/ai/workbench-tool-approval.ts）
  */
 export function applyToolPolicyToDefinitions(
   definitions: readonly ToolDefinition[],
@@ -129,13 +127,6 @@ export function applyToolPolicyToDefinitions(
   return definitions.filter((definition) =>
     isToolInjectableOnFullChannel(registry.get(definition.function.name), ctx.policy, ctx.roles),
   );
-}
-
-/** 执行准入（审批与否的唯一服务端判据见 resolveWorkbenchToolDecisionSlot；这里只回答「该工具此刻能不能被注入/执行」） */
-export function isToolEnabledUnderPolicy(name: string, policy: ToolPolicyConfig | undefined, roles: readonly V2Role[]): boolean {
-  const entry = resolveToolPolicyEntry(policy, name);
-  if (entry.enabled === false) return false;
-  return isRoleVisible(entry, roles);
 }
 
 /**

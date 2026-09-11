@@ -1203,12 +1203,24 @@ test("批次6b·策略 user-confirm：只读工具也进 ask 档，执行前过�
 });
 
 test("批次6b·模型点名被停用工具：直接拒绝，不给审批机会（审批放行≠策略放行）", async () => {
-  const registry = registryWith(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true }));
+  let executions = 0;
+  const registry = registryWith(
+    fakeTool({
+      name: "create_project",
+      capability: "estimates:create",
+      mutates: true,
+      // 执行计数由工具自身累加：边界一旦失守（停用工具真的被执行）本用例即红，
+      // 而不是恒等于 0 的空断言。
+      execute: async () => {
+        executions += 1;
+        return { content: "ok" };
+      },
+    }),
+  );
   const policy: ToolPolicyConfig = { schemaVersion: 1, policies: { create_project: entry({ enabled: false }) } };
   const set = resolveWorkbenchInjectableTools(authUser("admin"), { registry, toolPolicy: policy });
 
   let gateConsulted = 0;
-  let executions = 0;
   const requests: string[][] = [];
   await runWorkbenchToolLoop({
     messages: [{ role: "user", content: "建项目" }],
@@ -1230,7 +1242,7 @@ test("批次6b·模型点名被停用工具：直接拒绝，不给审批机会�
   });
 
   assert.equal(gateConsulted, 0, "停用工具不得进入审批流程——批准只在「本可注入」前提下有意义");
-  assert.equal(executions, 0);
+  assert.equal(executions, 0, "被策略停用的工具一次都不能执行（execute 内计数，失守即红）");
   assert.match(requests[1][1], /停用|不可见/);
 });
 

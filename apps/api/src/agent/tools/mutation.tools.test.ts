@@ -113,6 +113,10 @@ test("runAgent + 写工具: 触发 need_confirm 事件，confirm=true 才执行"
       onEvent: (event) => events.push(event),
       confirm: async () => confirmAnswer,
       runtimeContext: runtime,
+      // 本用例测「写工具须经确认」，与注入模式无关：三个写工具都是 discoverable，
+      // discovery 模式首轮不注入它们，会被 injectedToolNames 执行边界先挡下。
+      // 钉成 full（= 工作台 allow∪ask 同口径的注入集），让它继续测确认这一件事。
+      toolInjectionMode: "full",
     });
 
     const kinds = events.map((e) => e.kind);
@@ -148,6 +152,8 @@ test("runAgent + 全部写工具: 每个都触发 need_confirm", async () => {
       ]),
       onEvent: (event) => events.push(event),
       confirm: async () => true,
+      // 同「runAgent + 写工具」用例：写工具是 discoverable，须钉 full 注入才测得到确认环节
+      toolInjectionMode: "full",
     });
 
     assert.ok(

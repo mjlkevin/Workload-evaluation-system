@@ -34,6 +34,12 @@ export function useAiToolPolicy() {
   const [summary, setSummary] = useState({ injectedTokens: 0, injectedCount: 0 })
   const [version, setVersion] = useState(1)
   const [draft, setDraft] = useState({ policies: {} })
+  /**
+   * 服务端**实际存着**的草稿（本地编辑的对照基线）。只在 load() 与 PATCH 响应里更新，
+   * 本地 setEntry 不动它——「页面上的编辑」与「服务端存的草稿」是两件事，
+   * 混为一谈正是返修①的根因：生效提升的是服务端草稿，未保存的编辑会被静默丢弃。
+   */
+  const [savedDraft, setSavedDraft] = useState({ policies: {} })
   const [active, setActive] = useState({ policies: {} })
   const [updatedAt, setUpdatedAt] = useState('')
   const [effectiveAt, setEffectiveAt] = useState('')
@@ -41,6 +47,7 @@ export function useAiToolPolicy() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [activating, setActivating] = useState(false)
+  const [reverting, setReverting] = useState(false)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
@@ -57,6 +64,7 @@ export function useAiToolPolicy() {
       const policy = unwrap(policyPayload) || {}
       setVersion(Number(policy.version) || 1)
       setDraft(policy.draft || { policies: {} })
+      setSavedDraft(policy.draft || { policies: {} })
       setActive(policy.active || { policies: {} })
       setUpdatedAt(policy.updatedAt || '')
       setEffectiveAt(policy.effectiveAt || '')
@@ -75,7 +83,9 @@ export function useAiToolPolicy() {
     try {
       const payload = await apiClient.patch('/system/tool-policy/draft', { policies: nextPolicies })
       const data = unwrap(payload) || {}
-      setDraft(data.draft || { policies: nextPolicies })
+      const serverDraft = data.draft || { policies: nextPolicies }
+      setDraft(serverDraft)
+      setSavedDraft(serverDraft)
       setUpdatedAt(data.updatedAt || '')
       setRevisions(Array.isArray(data.revisions) ? data.revisions : [])
       return true
@@ -118,12 +128,38 @@ export function useAiToolPolicy() {
     }))
   }, [])
 
-  const resetDraftToActive = useCallback(() => setDraft(active), [active])
+  /** 弃掉**本地未保存**的编辑，回到服务端存着的草稿（不写服务端：服务端草稿原样保留） */
+  const discardLocalEdits = useCallback(() => setDraft(savedDraft), [savedDraft])
 
-  const dirty = useMemo(
-    () => JSON.stringify(draft.policies || {}) !== JSON.stringify(active.policies || {}),
-    [draft, active],
-  )
+  /**
+   * 把服务端的草稿回退成当前生效版本（这是一次**服务端写入**，与 discardLocalEdits
+   * 是两件事：后者只丢本地未保存的改动，前者抹掉已落库的草稿）。
+   */
+  const revertSavedDraftToActive = useCallback(async () => {
+    setReverting(true)
+    setError('')
+    try {
+      const payload = await apiClient.patch('/system/tool-policy/draft', { policies: active.policies || {} })
+      const data = unwrap(payload) || {}
+      const serverDraft = data.draft || { policies: active.policies || {} }
+      setDraft(serverDraft)
+      setSavedDraft(serverDraft)
+      setUpdatedAt(data.updatedAt || '')
+      setRevisions(Array.isArray(data.revisions) ? data.revisions : [])
+      return true
+    } catch (err) {
+      setError(`草稿回退失败：${err.message || '请求失败'}`)
+      return false
+    } finally {
+      setReverting(false)
+    }
+  }, [active])
+
+  const policiesOf = (config) => JSON.stringify(config?.policies || {})
+  /** 页面编辑态 ≠ 服务端草稿：此时点「生效」会丢掉这些编辑（服务端只提升已存草稿） */
+  const unsavedLocal = useMemo(() => policiesOf(draft) !== policiesOf(savedDraft), [draft, savedDraft])
+  /** 服务端草稿 ≠ 生效版：这才是「生效」按钮该可用的唯一条件 */
+  const pendingActivation = useMemo(() => policiesOf(savedDraft) !== policiesOf(active), [savedDraft, active])
 
   return {
     tools,
@@ -137,12 +173,15 @@ export function useAiToolPolicy() {
     loading,
     saving,
     activating,
+    reverting,
     error,
-    dirty,
+    unsavedLocal,
+    pendingActivation,
     load,
     saveDraft,
     activate,
     setEntry,
-    resetDraftToActive,
+    discardLocalEdits,
+    revertSavedDraftToActive,
   }
 }

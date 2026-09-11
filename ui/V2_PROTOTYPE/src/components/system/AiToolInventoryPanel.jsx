@@ -31,8 +31,8 @@ export default function AiToolInventoryPanel() {
   const {
     tools, summary, version, draftPolicies, activePolicies,
     updatedAt, effectiveAt, revisions,
-    loading, saving, activating, error, dirty,
-    load, saveDraft, activate, setEntry, resetDraftToActive,
+    loading, saving, activating, reverting, error, unsavedLocal, pendingActivation,
+    load, saveDraft, activate, setEntry, discardLocalEdits, revertSavedDraftToActive,
   } = useAiToolPolicy()
   const [savingOk, setSavingOk] = useState(false)
 
@@ -65,6 +65,11 @@ export default function AiToolInventoryPanel() {
     await activate()
   }
 
+  const handleRevertDraft = async () => {
+    setSavingOk(false)
+    await revertSavedDraftToActive()
+  }
+
   const toggleRole = (tool, roleId) => {
     const current = entryFor(tool)
     const visibleRoles = current.visibleRoles.includes(roleId)
@@ -88,7 +93,8 @@ export default function AiToolInventoryPanel() {
 
       <p className="sys-field__v--dim" style={{ margin: '0 0 10px', fontSize: 12 }}>
         工具本身（名称、参数、实现）来自代码，清单只读不可编辑；本页编辑的是**策略决定**——启用、角色可见、审批要求、注入模式。
-        策略只做减法：capability 权限之上再裁一层，两层都通过才注入；任何策略都不能放宽权限。改完先「保存草稿」，「生效」后才对模型注入起作用。
+        策略只做减法：capability 权限之上再裁一层，两层都通过才注入；任何策略都不能放宽权限。
+        编辑先「保存草稿」落到服务端，「生效」提升的是服务端已存的草稿——没保存的修改不会进入生效版本，两步都不可省。
         {exfilCount > 0
           ? '外发类工具（把数据送出系统）必须逐次审批，且不可配置为免审批。'
           : '「外发」维度独立于「写入」：不改本地库但把数据送出系统的工具同样必须逐次审批。'}
@@ -100,19 +106,61 @@ export default function AiToolInventoryPanel() {
           {effectiveAt ? ` · 生效于 ${formatTime(effectiveAt)}` : ''}
           {updatedAt ? ` · 草稿更新于 ${formatTime(updatedAt)}` : ''}
         </span>
-        {dirty ? <span className="bdg warn"><span className="dot" />草稿未生效</span> : <span className="bdg muted"><span className="dot" />草稿与生效一致</span>}
+        {unsavedLocal ? (
+          <span className="bdg warn" title="页面上的编辑还没写入服务端草稿；此时点「生效」不会带上它们">
+            <span className="dot" />有未保存的修改
+          </span>
+        ) : null}
+        {pendingActivation ? <span className="bdg warn"><span className="dot" />草稿未生效</span> : null}
+        {!unsavedLocal && !pendingActivation ? (
+          <span className="bdg muted"><span className="dot" />草稿与生效一致</span>
+        ) : null}
         {savingOk ? <span className="bdg acc"><span className="dot" />草稿已保存</span> : null}
         <span style={{ flex: 1 }} />
-        <button type="button" className="btn btn-out btn-sm" onClick={() => { setSavingOk(false); resetDraftToActive() }} disabled={!dirty || saving || activating}>
-          放弃草稿
+        <button
+          type="button"
+          className="btn btn-out btn-sm"
+          onClick={() => { setSavingOk(false); discardLocalEdits() }}
+          disabled={!unsavedLocal || saving || activating || reverting}
+          title="只丢弃本页面未保存的编辑，回到服务端存着的草稿（不改动服务端；刷新不会带回这些编辑）"
+        >
+          放弃未保存的修改
         </button>
-        <button type="button" className="btn btn-out btn-sm" onClick={handleSave} disabled={!dirty || saving}>
+        <button type="button" className="btn btn-out btn-sm" onClick={handleSave} disabled={!unsavedLocal || saving}>
           {saving ? '保存中...' : '保存草稿'}
         </button>
-        <button type="button" className="btn btn-pri btn-sm" onClick={handleActivate} disabled={!dirty || activating}>
+        <button
+          type="button"
+          className="btn btn-out btn-sm"
+          onClick={handleRevertDraft}
+          disabled={!pendingActivation || saving || activating || reverting}
+          title="把服务端的草稿回退成当前生效版本（这是一次服务端写入，会记入变更轨迹；未保存的本地编辑同时丢弃）"
+        >
+          {reverting ? '回退中...' : '草稿回退为生效版本'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-pri btn-sm"
+          onClick={handleActivate}
+          disabled={!pendingActivation || unsavedLocal || activating}
+          title={
+            unsavedLocal
+              ? '有未保存的修改：「生效」提升的是服务端已存的草稿，先「保存草稿」再「生效」，否则这些编辑不会进入生效版本'
+              : pendingActivation
+                ? '把服务端草稿提升为生效版本（version +1，记入变更轨迹）'
+                : '草稿与生效版本一致，无需生效'
+          }
+        >
           {activating ? '生效中...' : '生效'}
         </button>
       </div>
+
+      {unsavedLocal ? (
+        <div className="sys-field__v--dim" role="alert" style={{ margin: '0 0 10px', fontSize: 12 }}>
+          本页有未保存的修改：「生效」只会把服务端已存的草稿提升为生效版本，这些修改不会进入生效版本。
+          请先点「保存草稿」，再点「生效」。
+        </div>
+      ) : null}
 
       {error ? <div className="sys-empty">{error}</div> : null}
 
