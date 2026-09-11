@@ -262,6 +262,24 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-09-11-batch2b3-switch-history-source:risks-1">
+          <td><b>混合会话：同步降级轮不产对话事件，换源后靠覆盖判定才拦得住</b>（批次 2b-3 实现期实取发现，架构侧采纳为回落判据）。派单原定判据是「会话没有对话事件 → 回落」，这是<b>存在性</b>判定；但 <code class="inline">workbench-chat.handler.ts</code> 与 <code class="inline">workbench-chat-stream.handler.ts</code> 直写 <code class="inline">ai_sessions</code>、无 runId、结构性不产事件（即 BE-2026-09-08…:risks-1），于是「第 1 轮走异步、第 2 轮提交 503 回退同步」的会话<b>有</b>事件，存在性判据判它走事件路径。</td>
+          <td>那一整轮在事件流里根本不存在 → 历史静默少一轮；且这条会话的 <code class="inline">appendSessionEvent</code> 回读记录直接进 HTTP 响应给前端渲染，<b>用户会看见自己刚说过的话消失</b>。实取开发库混合会话 0 条（今天全库对话事件本身为 0 条），但这是可达路径不是理论形状：前端 Run 提交失败即自动回退旧同步通道，同一 sessionId。</td>
+          <td>批次 2b-3 已把判据改为<b>覆盖判定</b>：快照每条消息都能被事件流解释才走事件路径，否则整会话回落（仍是整会话级，不逐条拼接），并在 <code class="inline">[session-history] 覆盖不住</code> 一行里可数。用例锁两侧：合成用例 + 真库 e2e 判别用例（改掉快照正文仍读到事件那份）。<b>2c 退役 jsonb 快照前必须先解决同步通道的正文入事件流</b>（先定「没有 Run 的事件属于谁」），否则退役即等于永久丢掉那些轮。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属 2c 前置（换源已由覆盖判定兜住）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-11-batch2b3-switch-history-source:risks-2">
+          <td><b>两处事件缺失在换源后换了表现形态</b>（本体是已登记的 BE-2026-09-08…:risks-2 报告旁路与 :risks-3 答复超 1 MiB 静默丢，均未修）。旁路那一轮的答复经 <code class="inline">appendAiSessionEvent</code> 直写且不带来源键；答复事件写丢时快照那条仍在。</td>
+          <td>换源前差异无害（读的就是快照）；换源后它们会让<b>整个会话</b>落到快照路径上——事件流对该会话永久不完整，2c 也就数不到「残量归零」。</td>
+          <td>批次 2b-3 用合成用例 + e2e 反证用例把行为钉成确定而非碰巧：这类会话整会话回落、历史一条不少，且残量按 <code class="inline">覆盖不住</code> 单独计数（与「无对话事件」的纯存量分开数），所以它不会被「回落很多」这个笼统数字掩盖。<b>兜住不等于修好</b>：旁路与 1 MiB 边界仍须另批处置。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属 2b 后续（本批只兜不修）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-11-batch2b3-switch-history-source:risks-3">
+          <td><b>换源带来的三项观察项</b>（批次 2b-3 实取，未修）。① 每次会话读取多一条 <code class="inline">harness_run_events join harness_runs</code> 查询；② 批量口用 drizzle <code class="inline">inArray</code>，展开为 $n 参数列表；③ 存量会话每次被读到都会打一行 <code class="inline">[session-history] 换源批 … 回落快照=N</code>。</td>
+          <td>①管理员审计与工作台列表读放大（今天 101 条会话实测 SQL=1，不构成问题）；②万级会话时参数个数会先撞上限；③双写期日志里会有固定噪声，真噪声（覆盖不住）混在其中需按前缀分辨。</td>
+          <td>①刻意<b>不</b>加缓存、也不给审计开「继续读快照」的例外（架构侧裁过不留按消费方划分的例外）；②已在 <code class="inline">conversation-event-history.ts</code> 文件头写明届时换 <code class="inline">= any(array)</code> 或临时表；③「覆盖不住」另打 ⚠ 行到 session id 级，残量与异常两个数分开可读。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 观察项（今天量级未触及）</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-09-11-batch2b2-conversation-envelope:risks-1">
           <td><b>对话事件载荷一度只有 <code class="inline">{content}</code></b>（批次 2b-2 已修）。开发库实取 48 条消息：messageId 48 · createdAt 48 · metadata 44 · attachmentIds 27，事件侧一条都没有。</td>
           <td>2b-3 按事件重建历史时，附件解析上下文与 <code class="inline">metadata.toolCalls</code>（进行中工具交互判据）无处可取——少的是字段不是条数，比少一条更难察觉。</td>

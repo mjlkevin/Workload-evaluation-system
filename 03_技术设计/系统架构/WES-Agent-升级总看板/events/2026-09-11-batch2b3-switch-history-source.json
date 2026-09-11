@@ -1,0 +1,82 @@
+{
+  "id": "BE-2026-09-11-batch2b3-switch-history-source",
+  "date": "2026-09-11",
+  "type": "implementation",
+  "scope": "批次 2b-3 · 「取会话历史」换源：jsonb 快照 → append-only 对话事件流（含整会话回落）",
+  "summary": "把 deriveSessionMessages 的数据源从 ai_sessions.messages（jsonb 快照）换成 harness_run_events 里的 user/message / assistant/message 事实序列，缝本身保持同步：I/O 落在 ai-sessions PG 仓储读取口，一批会话一次查询取回全部对话事实，解析完再写进记录的 messages 字段。改 async 会把签名外溢到 sessionRecordToHomeMessages / summarizeSessionForAdminAudit 这些整形边界，那是 2a「取与整形分离」要防的事，故不采纳派单 ③ 里那句预留推测。\n\n回落判据由「有没有对话事件」（存在性）改为**覆盖判定**（执行方实取提出、架构侧 2026-09-11 采纳并单独登记）：快照里每一条消息都能被事件流里的对应事实解释，才走事件路径；否则整会话回落，绝不逐条拼接。存在性判据会被混合通道击穿——异步轮有事件、同步降级轮直写 jsonb 且结构性无 runId 无事件，「有 ≥1 条事件」为真却会静默少一整轮，且少在前端响应里（用户看不见自己刚说过的话）。retry 归并造成的差异（快照两条同正文 user、事件重建一条）显式计入已覆盖，否则口径①永远生效不了。落库侧零改动：双写期继续写快照，appendMessageIdempotent 的来源键查重仍建立在裸快照之上；未回填历史、未改事件表 schema、未改 2b-1/2b-2 写入逻辑、未动 workbench-request-invariant 那份刻意保留的第二实现（换源后它是唯一独立对照）。\n\n实取收口：开发库 606/606 六层逐字节一致；101 条会话换源解析实测 1 条 SQL（逐会话查会是 101 条）；残量回落 17 条与开工实取逐位相同、全部为 no-conversation-facts、覆盖不住 0 条；判据② 在真库新建真实两轮对话（会话 cdb9094c-0cc2-4472-8796-7ea897bfd001）走 events 路径、四份历史序列摘要同为 2259B/020acfcf0ebe；另有判别用例（改掉快照正文仍读到事件那份）与反证回落方向用例各一条。API 套件 1533→1559（净 +26 全为本批新用例），前端零文件改动。",
+  "status": "已回填 / 待 Codex 复核",
+  "branch": "feat/batch2b3-switch-source",
+  "baseCommit": "a1d3f83",
+  "pages": ["changes", "testing", "risks"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/ai-sessions/session-history.ts",
+      "summary": "换源判定唯一持有处（本批要害）。deriveSessionMessages 签名与行为不变（缝仍是「取」）；新增 SessionConversationFactEvent / SessionConversationFactSource（批量口）、resolveSessionHistory（纯函数：跨 Run 按 runCreatedAt + runId 定序、Run 内按 sequence、retryOfRunId 非空的用户轮归并不计入历史但计入覆盖、按快照来源键做覆盖判定，输出 events|snapshot 判定与未覆盖归因）、resolveSessionHistories / applyEventStreamHistory（一批会话一次取事实 + 回落残量 console.warn 计数，日志只带 id 与条数不带正文）。三条口径与批量硬要求写在文件头"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/conversation-event-history.ts",
+      "summary": "新增：对话事实批量读取适配器（harness 域持有 harness_* 形状）。一次 select 从 harness_run_events join harness_runs，按 ai_session_id 集合 + 两类对话事件过滤，带回 runId / retryOfRunId / runCreatedAt / sequence / 原样载荷；retry_of_run_id 空值映射为 null 不留 undefined；载荷不做任何整形。对 ai-sessions 仅 type-only import，不与既有 harness→ai-sessions 方向构成环"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/ai-sessions/ai-sessions-pg.repository.ts",
+      "summary": "读取口接入：createSession / listSessionsByOwner / listAllSessions / findSession / renameSession / appendSessionEvent 六处交出的记录一律经 applyEventStreamHistory；createSession 与两条 UPDATE 把解析移到事务之外，避免额外查询拉长行锁窗口。工厂第二参 historySource 默认与注入的 dbInstance 同源（否则测试库读到别的库的事实）。appendMessageIdempotent 刻意不接——它是写入与幂等查重路径，读裸快照"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/test-helpers/drive-workbench-turn.ts",
+      "summary": "新增：把 2b-1/2b-2 的「真 usecase 提交 + 真 boot 装配 + 真 worker + 真库」驱动一轮对话的夹具参数化复用。2b-1 / 2b-2 那两个 e2e 文件原样未动（它们是已交付判据的冻结证据）"
+    },
+    {
+      "kind": "gate",
+      "ref": "判据① npm run check:session-history-parity（开发库 workload_eval，只读）",
+      "result": "pass",
+      "summary": "101 条会话 × 6 层 = 606 次逐字节比对，六层全部 101/101 一致、0 差异（①原始历史 ②模型历史整形 ③模型请求窗口 ④进行中工具交互判据 ⑤管理员审计摘要 ⑥视图消息计数）。脚本升级为走真实解析路径：LEGACY 冻结副本读裸快照，现行侧读事件解析后的记录，两侧同库同表。普查实取 non_array_messages=0 · empty=84 · 非空 17 · 总消息 48 · runs=101 · retry_runs=0 · sessions_with_runs=50 · 对话事实 []"
+    },
+    {
+      "kind": "gate",
+      "ref": "判据② apps/api/src/modules/harness/workbench-history-source.e2e.test.ts（真库新建真实两轮对话，3 用例）",
+      "result": "pass",
+      "summary": "A：新建会话 id=cdb9094c-0cc2-4472-8796-7ea897bfd001（run1=3d8bcffb-df59-4468-9dd2-1378fcdc9a78 / run2=77c2ad73-28b8-400b-904c-db61fdb48590），对话事实 4 条，判定 源=events 原因=covered 未覆盖=0 —— 明确是事件路径而非回落；快照 / 事件重建 / deriveSessionMessages(生产读取口) 三份历史序列摘要同为 2259B/020acfcf0ebe，逐条 messageId 与 createdAt 相同，user 侧键集合 [attachmentIds,content,createdAt,messageId,metadata,role]、assistant 侧 [content,createdAt,messageId,metadata,role]，来源键仍为 ${runId}:user:1 / :assistant:1。B 判别用例：把快照第 4 条正文改掉（68B/39eb8d3f9a89），读回来的仍是事件那份（53B/654abe241b2c）——没有这条，A 可能只是 jsonb 与 jsonb 自比的空转。C 反证：删掉第 2 轮 assistant/message 事件、快照不动，判定翻成 源=snapshot 原因=snapshot-not-covered 未覆盖=[no-matching-event]，历史仍完整 4 条——失败方向是回落多读，不是静默少一条"
+    },
+    {
+      "kind": "gate",
+      "ref": "判据③ 回落残量可数（整会话级）",
+      "result": "pass",
+      "summary": "实取 源分布：事件路径=84（其中真正重建出非空历史=0）回落快照=17（无对话事件=17 覆盖不住=0）归并 retry 用户轮=0。17 条与开工前实取的「17 条带消息的存量」逐位相同，逐条打到 session id + 原因 + 快照条数 + 未覆盖清单；运行时同一判定由 [session-history] 换源批 一行给出。对照脚本另印一条 ⚠：本库没有任何会话的历史真正来自事件流，此 PASS 只证明回落无回归，事件路径的逐字节证据在判据②的 e2e——把「假绿」写在闸门自己的输出里而不是留在报告里"
+    },
+    {
+      "kind": "gate",
+      "ref": "判据④ 批量加载（架构侧硬要求：管理员审计全表逐条 map 不得变 N+1）",
+      "result": "pass",
+      "summary": "conversation-event-history.test.ts 实测：4 个会话一次取回，harness_run_events 相关 SQL 恰好 1 条；空集合零查询。对照脚本在全表上实测：101 条会话换源解析 harness_run_events SQL = 1 条（逐会话查会是 101 条）。审计路径未开「继续读快照」的例外，与工作台/对话路径同源同尺"
+    },
+    {
+      "kind": "gate",
+      "ref": "判据⑤ 合成用例（apps/api/src/modules/ai-sessions/session-history-events.test.ts，16 条，不连库）",
+      "result": "pass",
+      "summary": "归并三条：retryOfRunId 非空的 Run 不产生额外用户轮次（快照 3 条 → 历史 2 条、user 计数恰 1）/ retry 仍失败时不凭空多出空轮次 / 正文相同但非 retry 的第二轮必须算新一轮（派单实取全库 retry 0 条，故只能合成）。delta 两条：有 delta 无 assistant/message 时该轮只有用户轮、绝不拿 delta 拼答复；答复在快照存在而事实缺失时回落。另含覆盖判定 4 条、排序 3 条（含同毫秒按 runId 定序、乱序传入结果可复现）、逐字节透传 2 条。跨域词汇表断言：读取侧对话事实清单必须与写入侧 HARNESS_RUN_SINGLETON_EVENT_TYPES 同集合"
+    },
+    {
+      "kind": "command",
+      "ref": "判据⑥ 构建与套件计数（开工基线自取 origin/main CI run 34588881591，基线 HEAD 与分支 base 同为 a1d3f83）",
+      "result": "pass",
+      "summary": "build:api 与 build:web 均 exit 0（tsc 两份配置同绿）。逐套件 rules 8→8 · agent 140→140 · security 17+2→17+2 · scripts 72→72 · ai 286→286 · serial-store 171→171 · integration 1→1 · modules 537→553(+16) · harness 299→309(+10)，API 合计 1533→1559，净 +26 全归因本批新增用例（session-history-events 16 + conversation-event-history 7 + 换源 e2e 3），无删除无跳过、无任何套件计数下降。web 69 files/560→69/560，前端零文件改动（首跑 HomeWorkspace.test.jsx 有 1 条偶发红，复跑两次均 560/560；与 2a 已登记的 draft-roundtrip 同名形态偶发同类，本批未触前端）"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:integration（干净库按 CI 顺序）",
+      "result": "pass",
+      "summary": "先按 CI 顺序跑 test:modules / test:ai / test:harness / serial-store 时 integration 红在 templates_status_not_200 —— 与已登记的 BE-2026-09-08-batch2b1…:risks-4 逐字相符（serial-store 套件会清掉 templates / knowledge 种子，非本批改动）。补 db:seed 后按 migrate→测试→seed→integration 复跑，integration 1 pass / 0 fail"
+    }
+  ],
+  "risks_registered": [
+    "混合会话（异步轮 + 同步降级轮）是覆盖判据拦住的新发现形态，登记为 BE-2026-09-08-batch2b1-conversation-events:risks-1 的补充条目：同步通道不产对话事件是根因，2c 退役 jsonb 快照前必须先解决，否则退役即等于永久丢掉那些轮",
+    "对话事实写入仍经 appendStreamEvent 的 .catch 吞错（2b-1 :risks-3 未修）：换源后一次答复事件写丢不再只是「两侧不一致」，而是会让整会话回落——回落兜住了丢失，但兜住不等于修好，边界仍待定",
+    "显式报告旁路（2b-1 :risks-2 未修）那一轮只有 user/message、答复经 report-flow 直写且不带来源键：换源后该会话按覆盖判定整会话回落，历史不丢，事件流仍缺那一条事实",
+    "管理员审计与工作台会话列表每次读多一条 join 查询；inArray 展开为 $n 参数列表，万级会话需换 = any(array) 或临时表（今天 101 条远未触及，登记为观察项）"
+  ],
+  "next_step": "待架构侧复核后合入 main；本批未自行合入、未等 CI。交接给 2c 的实取事项：① 残量数到 0（当前 17，全部 no-conversation-facts）才谈退役 ai_sessions.messages；② 混合通道与报告旁路的正文入事件流须先于退役解决；③ 答复侧 1 MiB 静默丢的边界须定（现由回落兜住，兜住非修好）"
+}
