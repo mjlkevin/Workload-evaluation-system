@@ -206,6 +206,7 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
         // 单轮流式调用：透传 provider 全部可见字段（含 toolCalls，工具循环靠它识别调用）
         for await (const chunk of runWorkbenchToolLoopStream({
           messages: modelInput.messages,
+          contextBudget: { tools: toolSet.tools },
           registry: toolSet.registry,
           agentUser: toolSet.agentUser,
           allowToolNames: toolSet.allowToolNames,

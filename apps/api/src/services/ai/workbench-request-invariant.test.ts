@@ -192,7 +192,13 @@ test("⑤红：历史窗口口径漂移（一处改常量另一处没改）→ �
     () => assertWorkbenchModelRequestMatchesStorage({ sent, session, userContent: many[many.length - 1].content }),
     (err: unknown) => {
       assert.ok(err instanceof WorkbenchModelRequestInvariantError);
-      assert.match(err.reason, /^history_length_mismatch: sent=13 expected=12$/);
+      // 计数由常量派生：本用例测的是「两侧窗口不一致」，不是某个具体窗口值。
+      // 批次 3 · ② 把窗口从 12 放宽到常量现值（条数只作形状兜底，token 预算才是决策者），
+      // 写死 13/12 会让改常量必须回来改这里——那等于把本用例的判据从「漂移」偷换成「值没变」。
+      assert.match(
+        err.reason,
+        new RegExp(`^history_length_mismatch: sent=${WORKBENCH_MODEL_HISTORY_WINDOW + 1} expected=${WORKBENCH_MODEL_HISTORY_WINDOW}$`),
+      );
       return true;
     },
   );

@@ -12,7 +12,8 @@
 import { config } from "../../config/env";
 import { asString, round1 } from "../../utils/helpers";
 import { normalizeKimiModelName } from "../../utils/model-name";
-import { getKimiProvider, asModelObject, pickModelField } from "../../services/ai/handlers/workbench-shared";
+import { getKimiProvider, asModelObject, pickModelField, WORKBENCH_MODEL_HISTORY_WINDOW } from "../../services/ai/handlers/workbench-shared";
+import { applyModelContextBudget } from "../../services/ai/context/context-budget";
 import { buildKimiAssessmentDraftMarkdown } from "../../utils/kimi-assessment-markdown";
 import {
   estimateFallbackAssessmentDraft,
@@ -201,15 +202,18 @@ class AiUsecase {
         .map((item) => ({ role: item.role, content: asString(item.content) }))
         .filter((item) => item.content);
 
+      // 批次 3 · ②：条数窗口取共享常量（原为硬编码 12），再过一遍出口 token 预算。
       const completion = await getKimiProvider().chatCompletion({
         model: config.kimi.model,
         temperature: 0.3,
         promptCacheKey: "kimi-basic-chat-v1",
         credentialsOverride: { apiKey, apiBaseUrl: config.kimi.apiBaseUrl },
-        messages: [
-          { role: "system", content: "你是工作量评估系统内置助手（KIMI）。请用中文简洁回答，优先结合用户上下文，避免冗余。" },
-          ...safeMessages.slice(-12),
-        ],
+        messages: applyModelContextBudget({
+          messages: [
+            { role: "system", content: "你是工作量评估系统内置助手（KIMI）。请用中文简洁回答，优先结合用户上下文，避免冗余。" },
+            ...safeMessages.slice(-WORKBENCH_MODEL_HISTORY_WINDOW),
+          ],
+        }).messages,
       });
 
       return {

@@ -22,6 +22,7 @@ import {
   WORKBENCH_TOOL_INPUT_UNWIRED_MESSAGE,
   type WorkbenchToolInputGate,
 } from "./workbench-tool-user-input";
+import { applyModelContextBudget } from "./context/context-budget";
 
 // ============================================================
 // 工作台工具循环 · 批次 0（只读工具真跑）→ 批次 1a（写操作执行前审批闸门）
@@ -45,6 +46,43 @@ export const WORKBENCH_TOOL_LOOP_MAX_TURNS = 12;
 
 /** 工作台对话的消息形态（与 ChatMessage 兼容；本地定义以避免与 workbench-shared 形成模块环） */
 export type WorkbenchToolLoopMessage = { role: ChatRole; content: string };
+
+/**
+ * 批次 3 · ②③：出口侧上下文预算入参（additive，缺省即按默认预算裁）。
+ * tools 参与计量——provider 按序列化后的 JSON Schema 计费，漏算会系统性低估，
+ * 而工具定义是工作台通道每轮都带着的固定开销。
+ */
+export type WorkbenchContextBudgetInput = {
+  tools?: readonly ToolDefinition[];
+  maxInputTokens?: number;
+};
+
+/**
+ * 批次 3 · ②③：每次真正发给 provider 之前按 token 预算裁一次。
+ * 挂在出口而不是组装点的理由见 context-budget.ts 头注释（两条：组装点被
+ * workbench-request-invariant 的第二份整形实现对账、且只有出口看得见工具循环
+ * 自己回填的 [工具结果]）。
+ * 剪完即**回写 workingMessages**：下一轮在已定额的集合上继续追加，否则第 N 轮
+ * 的增量会把上一轮的剪枝白做。
+ */
+function applyEgressContextBudget(
+  messages: WorkbenchToolLoopMessage[],
+  budget: WorkbenchContextBudgetInput | undefined,
+): WorkbenchToolLoopMessage[] {
+  const result = applyModelContextBudget({
+    messages,
+    ...(budget?.tools ? { tools: budget.tools } : {}),
+    ...(budget?.maxInputTokens != null ? { maxInputTokens: budget.maxInputTokens } : {}),
+  });
+  if (result.stillOverBudget) {
+    // 只报计数与预算，不报正文：工作台历史是客户的需求原文。
+    console.warn(
+      `[context-budget] 剪至保护项仍在预算外 估算=${result.estimatedInputTokens} ` +
+        `上限=${budget?.maxInputTokens ?? ""} 消息数=${result.messages.length} 钉住=${result.pinnedCount}`,
+    );
+  }
+  return result.messages;
+}
 
 /**
  * 单次工具调用的副作用产出。
@@ -141,6 +179,11 @@ export type WorkbenchToolLoopResult = {
 type WorkbenchToolLoopCommon = {
   /** 送模型的初始消息（系统提示词 + 历史窗口）；本函数不修改入参数组 */
   messages: WorkbenchToolLoopMessage[];
+  /**
+   * 批次 3 · ②③（additive）：本循环**每一次**模型调用的出口预算。
+   * 缺省即按 WORKBENCH_MODEL_MAX_INPUT_TOKENS 裁；传 tools 则把工具 Schema 一并计入。
+   */
+  contextBudget?: WorkbenchContextBudgetInput;
   registry: ToolRegistry;
   agentUser: AgentUser;
   /**
@@ -326,13 +369,15 @@ export async function runWorkbenchToolLoop(
   input: WorkbenchToolLoopInput,
 ): Promise<WorkbenchToolLoopResult> {
   const maxTurns = input.maxTurns ?? WORKBENCH_TOOL_LOOP_MAX_TURNS;
-  const workingMessages: WorkbenchToolLoopMessage[] = [...input.messages];
+  let workingMessages: WorkbenchToolLoopMessage[] = [...input.messages];
   const trace: WorkbenchToolCallTrace[] = [];
   const callCursor = { value: 0 };
   const knowledgeTrace: { value?: ZhipuKnowledgeToolTrace } = {};
   let content = "";
 
   for (let turn = 1; turn <= maxTurns; turn += 1) {
+    // 批次 3 · ②③：出口预算——每一轮发请求前按 token 裁一次（确定性剪枝 + 早期历史压缩）
+    workingMessages = applyEgressContextBudget(workingMessages, input.contextBudget);
     const response = await input.invoke({ messages: [...workingMessages], turnOrdinal: turn });
     content = response.content ?? "";
     const calls = response.toolCalls ?? [];
@@ -356,7 +401,7 @@ export async function* runWorkbenchToolLoopStream(
   input: WorkbenchToolLoopStreamInput,
 ): AsyncGenerator<StreamingChunk, WorkbenchToolLoopResult, void> {
   const maxTurns = input.maxTurns ?? WORKBENCH_TOOL_LOOP_MAX_TURNS;
-  const workingMessages: WorkbenchToolLoopMessage[] = [...input.messages];
+  let workingMessages: WorkbenchToolLoopMessage[] = [...input.messages];
   const trace: WorkbenchToolCallTrace[] = [];
   const callCursor = { value: 0 };
   const knowledgeTrace: { value?: ZhipuKnowledgeToolTrace } = {};
@@ -365,6 +410,8 @@ export async function* runWorkbenchToolLoopStream(
   for (let turn = 1; turn <= maxTurns; turn += 1) {
     let turnContent = "";
     const turnCalls: ToolCall[] = [];
+    // 批次 3 · ②③：出口预算（与同步循环同口径——生产实际在跑的是这条）
+    workingMessages = applyEgressContextBudget(workingMessages, input.contextBudget);
     // 轮内去重（执行侧兜底）：provider 可能把同一批调用投两次（结束帧 + 其后补发的用量帧），
     // 而 id 缺失时 provider 按 index 兜底成 call_0，故第二轮的同名调用是合法新调用。
     // 集合声明在轮循环内 → 每轮天然重置；若改成全局去重会吞掉后续轮次的调用。

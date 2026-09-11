@@ -22,6 +22,7 @@ import { resolveWorkbenchInjectableTools, runWorkbenchToolLoop } from "../workbe
 import type { WorkbenchAttachmentContext } from "../workbench-context.service";
 import { createMemoryUsecase, getMemoryRepository } from "../../../modules/memory/memory.module";
 import type { MemoryContextBlock } from "../../../modules/memory/memory.usecase";
+import { recordProviderUsage } from "../context/token-meter";
 
 export function getKimiProvider(): ModelProvider {
   const provider = defaultProviderRegistry.get("kimi");
@@ -172,7 +173,9 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
     "请用中文回答。回答要面向业务推进，优先给出下一步动作、需要确认的问题和可沉淀到系统的结果。",
     "当用户上传附件且消息中包含【附件解析上下文】时，必须基于解析出的客户、项目、业务需求、模块线索和工作表信息推进需求识别、粗评建议和待确认问题；不要声称无法接收附件。",
   ].join("\n");
-  const safeMessages = params.messages.slice(-12).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
+  // 批次 3 · ②：条数窗口改用共享常量（此处原为硬编码 12），实际发多少由出口侧
+  // token 预算决定；本行只留形状兜底。
+  const safeMessages = params.messages.slice(-WORKBENCH_MODEL_HISTORY_WINDOW).map((message) => ({ role: message.role, content: buildHomeMessageContentForModel(message) }));
   // 阶段 1 批 5：loadRequirementSystemConfigStore 已异步化，对象字面量内调用提升为变量后补 await。
   const requirementSystemConfig = await loadRequirementSystemConfigStore();
   const timeoutMs = requirementSystemConfig.active.kimiEvaluation.timeoutMs || 120000;
@@ -185,6 +188,7 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
   let lastCompletion: ChatCompletionResponse | undefined;
   const loop = await runWorkbenchToolLoop({
     messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
+    contextBudget: { tools: toolSet.tools },
     registry: toolSet.registry,
     agentUser: toolSet.agentUser,
     allowToolNames: toolSet.allowToolNames,
@@ -199,6 +203,14 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
         ...(toolSet.tools.length > 0 ? { tools: toolSet.tools, toolChoice: "auto" as const } : {}),
       });
       lastCompletion = completion;
+      // 批次 3 · ①：本地估算 vs provider 实测的对照台账（只落计数，不落正文）
+      recordProviderUsage({
+        channel: "home-workbench-chat-v1",
+        model: completion.model,
+        messages,
+        tools: toolSet.tools,
+        usage: completion.usage,
+      });
       return { content: completion.content, toolCalls: completion.toolCalls };
     },
   });
@@ -237,11 +249,17 @@ export type ModelChatFactory = (params: {
 // ============================================================
 // 三条工作台对话路径（同步非流式 / 同步流式 / 异步 Run）共用本函数，
 // 避免「中间层对了、底层另写一份」的口径分叉再次发生：
-//  · 历史窗口 slice(-12) 且**覆盖末条**为用户本轮——因此调用方必须
-//    在当前用户消息落库之后再取历史，否则上一轮 assistant 会被覆盖丢失；
+//  · 历史窗口取**最近 WORKBENCH_MODEL_HISTORY_WINDOW 条**且**覆盖末条**为用户本轮
+//    ——因此调用方必须在当前用户消息落库之后再取历史，否则上一轮 assistant 会被覆盖丢失；
 //  · 仅当传入 projectId 才注入 active 记忆，失败静默降级为无记忆模式。
-
-export const WORKBENCH_MODEL_HISTORY_WINDOW = 12;
+//
+// 批次 3 · ②：窗口大小不再是决策者。条数只留作**形状兜底**（防消息数本身爆掉），
+// 真正决定发多少的是出口侧的 token 预算（services/ai/context/context-budget）。
+// 为什么这里仍留条数上限而不由 token 预算全权接管：本常量同时被
+// `workbench-request-invariant` 的第二份整形实现 import 使用（2a 裁决刻意保留、
+// 批次 3 明令不动的独立对照）。改**值**两边同步跟随、对账继续成立；
+// 改**结构**（换成 token 剪枝）则会让那条防线在超预算时必红。
+export const WORKBENCH_MODEL_HISTORY_WINDOW = 60;
 
 export type WorkbenchModelMessage = { role: ChatRole; content: string };
 
@@ -390,6 +408,7 @@ export function buildWorkbenchChatModelChat(
     let lastCompletion: ChatCompletionResponse | undefined;
     const loop = await runWorkbenchToolLoop({
       messages: modelInput.messages,
+      contextBudget: { tools: toolSet.tools },
       registry: toolSet.registry,
       agentUser: toolSet.agentUser,
       allowToolNames: toolSet.allowToolNames,
@@ -404,6 +423,14 @@ export function buildWorkbenchChatModelChat(
           ...(toolSet.tools.length > 0 ? { tools: toolSet.tools, toolChoice: "auto" as const } : {}),
         });
         lastCompletion = completion;
+        // 批次 3 · ①：估算 vs provider 实测对照（只落计数，不落正文）
+        recordProviderUsage({
+          channel: "home-workbench-dispatch-v1",
+          model: completion.model,
+          messages,
+          tools: toolSet.tools,
+          usage: completion.usage,
+        });
         return { content: completion.content, toolCalls: completion.toolCalls };
       },
     });
