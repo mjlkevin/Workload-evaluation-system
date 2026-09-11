@@ -31,39 +31,51 @@ const user: AuthUser = {
 };
 
 // ── Intent 层测试（≥5 类）────────────────────────────────────
+//
+// 批次 4 口径变更（本文件原 1–4 条断言的是能力词表命中，该词表已整体退役）：
+// 「你会干什么 / 支持哪些操作 / 你有什么能力」这类句子现在落兜底 domain_qa，
+// 由模型自行决定是否调用 describe_capabilities 工具取能力事实表。
+// 留在路由层的正则只剩锚定全串的寒暄，故 capability handler 的可达入口改用「你好」。
+// 下面四条因此从「断言命中」改写为「断言不再命中」的退役守护（同批次 1a 的写法）。
 
-// 1. 自然问法命中能力发现
+// 1. 能力问法不再被词表截走
 
-test("O10-C: routes '你会干什么' to capability_discovery", () => {
-  const result = routeWorkbenchIntent({ message: "你会干什么", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "capability_discovery");
-  assert.equal(result.routingRule, "capability_keywords");
+for (const message of ["你会干什么", "你能帮我干啥", "支持哪些操作", "你有什么能力"]) {
+  test(`批次4退役：「${message}」不再由能力词表截走，交回模型`, () => {
+    const result = routeWorkbenchIntent({ message, hasAttachment: false });
+    assert.notEqual(result.routingRule, "capability_keywords", "该规则已下线");
+    assert.notEqual(result.intent, "capability_discovery");
+    assert.equal(result.routingRule, "default_domain_qa", `必须交回模型，实取 ${JSON.stringify(result)}`);
+  });
+}
+
+// 1b. 原词表的夹带误伤面（退役理由的实证）：这些句子要的**不是**能力清单
+
+for (const message of ["产品帮助文档在哪里？", "这个需求你能做什么样的拆解？", "我需要给新同事提供帮助清单"]) {
+  test(`批次4退役：「${message}」曾被能力词表劫走，现交回模型`, () => {
+    const result = routeWorkbenchIntent({ message, hasAttachment: false });
+    assert.equal(result.intent, "domain_qa", `实取 ${JSON.stringify(result)}`);
+  });
+}
+
+// 2. 能力+业务混合意图：批次 4 后两类句子同走模型路径，不存在「谁优先」
+
+test("批次4退役：能力问法与业务问法混合时不再有优先级之争（两条规则都已退役）", () => {
+  const result = routeWorkbenchIntent({ message: "你会干什么，还有多组织业务往来怎么理解", hasAttachment: false });
+  assert.equal(result.routingRule, "default_domain_qa");
 });
 
-test("O10-C: routes '你能帮我干啥' to capability_discovery", () => {
-  const result = routeWorkbenchIntent({ message: "你能帮我干啥", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "capability_discovery");
-});
+// 3. 报告请求改由 command 承接（词表退役，按钮保留）
 
-test("O10-C: routes '支持哪些操作' to capability_discovery", () => {
-  const result = routeWorkbenchIntent({ message: "支持哪些操作", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "capability_discovery");
-});
+test("批次4退役：「生成需求解析报告」不再被报告词表截走，改由按钮 command 承接", () => {
+  const spoken = routeWorkbenchIntent({ message: "生成需求解析报告", hasAttachment: false });
+  assert.notEqual(spoken.routingRule, "report_generation_keywords", "该规则已下线");
+  assert.equal(spoken.routingRule, "default_domain_qa", `应交回模型，实取 ${JSON.stringify(spoken)}`);
 
-// 2. 能力+业务混合意图不误判 — 先命中 capability，不落入 domain_qa
-
-test("O10-C: '你会干什么，还有多组织业务往来' routes to capability_discovery (priority)", () => {
-  const result = routeWorkbenchIntent({ message: "你会干什么，还有多组织业务往来怎么理解", hasAttachment: false, hasLatestV1Artifact: false });
-  // capability_keywords 优先级高于 product_knowledge_terms
-  assert.equal(result.intent, "capability_discovery");
-});
-
-// 3. 报告显式请求不误入 capability_reply
-
-test("O10-C: explicit report request '生成需求解析报告' routes to harness_report_generation, not capability", () => {
-  const result = routeWorkbenchIntent({ message: "生成需求解析报告", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "harness_report_generation");
-  assert.equal(result.routingRule, "report_generation_keywords");
+  // 显式入口（前端按钮 = 结构化动作）必须仍然可达，且是**唯一**入口
+  const clicked = routeWorkbenchIntent({ message: "", hasAttachment: false, clientAction: "generate_requirement_report" });
+  assert.equal(clicked.intent, "harness_report_generation");
+  assert.equal(clicked.routingRule, "client_action");
 });
 
 // 4. 问候语仍走 capability_discovery（硬口径零变更）
@@ -74,10 +86,12 @@ test("O10-C: explicit report request '生成需求解析报告' routes to harnes
 // 6. 模型辅助路径：capability handler 调用 modelChat 并返回模型回复
 
 test("O10-C: capability handler uses model-assisted reply when model returns valid answer", async () => {
+  // 批次 4：能力词表退役后，capability handler 经「锚定寒暄」这条保留规则可达。
+  // handler 自身的职责（事实表接地 + 静态降级）不因入口变更而失效，断言原样保留。
   const result = await dispatchHomeWorkbenchTurn({
     user,
     workflowKey: "free_chat",
-    message: "你能做什么",
+    message: "你好",
     businessRole: "pre_sales",
     roleLabel: "售前顾问",
     model: "kimi-test",
@@ -85,7 +99,7 @@ test("O10-C: capability handler uses model-assisted reply when model returns val
       // 验证 system prompt 包含事实表约束
       assert.match(systemPrompt, /真实能力清单/);
       assert.match(systemPrompt, /禁止编造/);
-      assert.match(userContent, /你能做什么/);
+      assert.match(userContent, /你好/);
       return {
         answer: "我可以帮你上传文件、生成报告、查询项目数据等。",
         rawContent: "",
@@ -107,7 +121,7 @@ test("O10-C: capability handler falls back to structured facts when model throws
   const result = await dispatchHomeWorkbenchTurn({
     user,
     workflowKey: "free_chat",
-    message: "你能做什么",
+    message: "你好",
     businessRole: "pre_sales",
     roleLabel: "售前顾问",
     model: "kimi-test",
@@ -128,7 +142,7 @@ test("O10-C: capability handler falls back when model returns empty answer", asy
   const result = await dispatchHomeWorkbenchTurn({
     user,
     workflowKey: "free_chat",
-    message: "你能做什么",
+    message: "你好",
     businessRole: "pre_sales",
     roleLabel: "售前顾问",
     model: "kimi-test",
@@ -172,9 +186,13 @@ test("O10-C: capability handler direct call passes modelClassification and produ
   assert.deepEqual(result.trace.modelClassification, modelClassification);
 });
 
-// 10. 混合意图：附件+能力问法 → 能力发现优先（无附件时）
+// 10. 附件仍是结构判据：有附件时寒暄以外的任何问法都归附件问答（批次 4 保留项）
 
-test("O10-C: capability question without attachment routes to capability, not attachment_qa", () => {
-  const result = routeWorkbenchIntent({ message: "你有什么能力", hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(result.intent, "capability_discovery");
+test("批次4保留：附件在场是服务端结构事实，不因问法措辞而改变归属", () => {
+  const withAttachment = routeWorkbenchIntent({ message: "你有什么能力", hasAttachment: true });
+  assert.equal(withAttachment.intent, "attachment_qa");
+  assert.equal(withAttachment.routingRule, "attachment_context");
+  // 同句无附件 → 交回模型（词表已退役）
+  const withoutAttachment = routeWorkbenchIntent({ message: "你有什么能力", hasAttachment: false });
+  assert.equal(withoutAttachment.intent, "domain_qa");
 });

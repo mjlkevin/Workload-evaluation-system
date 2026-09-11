@@ -22,10 +22,10 @@ function inventory(capabilities: Capability[]) {
   return buildToolInventory(fakeUser, capabilities);
 }
 
-test("buildToolInventory: 全能力位下派生 10 个工具，保持注册顺序", () => {
+test("buildToolInventory: 全能力位下派生 11 个工具，保持注册顺序", () => {
   const items = inventory(FULL_CAPS);
 
-  assert.equal(items.length, 10);
+  assert.equal(items.length, 11);
   assert.deepEqual(
     items.map((item) => item.name),
     [
@@ -38,6 +38,8 @@ test("buildToolInventory: 全能力位下派生 10 个工具，保持注册顺�
       "generate_wbs",
       "export_report",
       "ask_user",
+      // 批次 4：capability_discovery 正则退役后的承接工具，注册在 ask_user 之后
+      "describe_capabilities",
       "list_tools",
     ],
   );
@@ -87,7 +89,7 @@ test("buildToolInventory: 清单恒为注册表全量，不按查看者业务权
   // 一旦按查看者权限过滤，审计页会对着 0 条或 5 条清单让人误判「系统里就这么几个工具」。
   for (const caps of [[], ["system:manage"], ["estimates:read"], FULL_CAPS] as Capability[][]) {
     const items = inventory(caps);
-    assert.equal(items.length, 10, `查看者能力位为 [${caps.join(",")}] 时仍须列出全部 10 个工具`);
+    assert.equal(items.length, 11, `查看者能力位为 [${caps.join(",")}] 时仍须列出全部 11 个工具`);
     assert.equal(items.filter((item) => item.mutates).length, 3);
   }
 });
@@ -96,11 +98,12 @@ test("buildToolInventory: callable 随查看者权限变化，标记「有这个
   const callableCount = (caps: Capability[]) => inventory(caps).filter((item) => item.callable).length;
 
   assert.equal(callableCount([]), 0);
-  // 纯系统管理员：10 个工具全部可见，但本人一个都调不动
+  // 纯系统管理员：11 个工具全部可见，但本人一个都调不动
   assert.equal(callableCount(["system:manage"]), 0);
-  // 只有读权限：4 个 estimates:read 业务工具 + ask_user + list_tools 可调，3 个写工具与初估工具不可调
-  assert.equal(callableCount(["estimates:read"]), 6);
-  assert.equal(callableCount(FULL_CAPS), 10);
+  // 只有读权限：4 个 estimates:read 业务工具 + 批次 4 能力清单 + ask_user + list_tools 可调，
+  // 3 个写工具与初估工具不可调
+  assert.equal(callableCount(["estimates:read"]), 7);
+  assert.equal(callableCount(FULL_CAPS), 11);
 
   const readOnlyViewer = new Map(inventory(["estimates:read"]).map((item) => [item.name, item]));
   assert.equal(readOnlyViewer.get("project_list")?.callable, true);

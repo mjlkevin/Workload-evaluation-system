@@ -2,23 +2,35 @@
 // WES Agent Phase 1G — AI 工作台意图路由器
 // 纯函数路由：根据用户输入、附件、Harness artifact 状态决定执行路径。
 // 规则优先：显式 clientAction → 阶段边界 → 关键词 → 兜底 domain_qa。
+//
+// 批次 4 · 正则意图退役（对应雷达文档 §三③「按谁发起分」）：
+// 本文件只保留**发起人不是「一句话」**的规则。判据是发起方式，不是规则好坏：
+//  · 前端结构化动作（clientAction = 按钮）→ 保留
+//  · 服务端可判定的结构事实（本轮有已解析附件）→ 保留
+//  · 锚定全串的寒暄（不是语义判断，且要在模型不可用时仍能应答）→ 保留
+//  · 靠词表猜「这句话想用哪个能力」→ 一律退役，交回模型 + 工具
+// 退役明细与逐条依据见各规则的删除处注释，以及
+// 03_技术设计/系统演进/实现与文档对齐说明.md。
 // ============================================================
 
 export type WorkbenchIntent =
   | "capability_discovery"
   | "domain_qa"
-  | "knowledge_query"
   | "attachment_summary"
   | "attachment_qa"
   | "harness_report_generation"
   | "harness_answer_submission"
-  | "wes_data_query"
   | "unsupported_or_out_of_scope";
 
 export type WorkbenchIntentInput = {
   message: string;
   hasAttachment: boolean;
-  hasLatestV1Artifact: boolean;
+  /**
+   * 批次 4 移除 `hasLatestV1Artifact`：它原先只被 v2 / 报告两条词表规则读，
+   * 规则退役后没有幸存规则再需要它。「会话已有 v1」这个事实没有消失——它经
+   * `buildWorkbenchContext` 进入模型上下文（见 model-answer 的【已有 v1 报告】段），
+   * 由模型判断该追问还是该补充，而不是由路由猜。
+   */
   clientAction?: string;
   /**
    * 批次 1c · 缺陷二：本会话是否处在一场还没结束的工具交互里。
@@ -34,29 +46,34 @@ export type WorkbenchIntentResult = {
   routingRule: string;
 };
 
-// 能力发现关键词
-const CAPABILITY_PATTERNS = /你会干什么|你能帮我干啥|支持哪些操作|你能做什么|能做什么|你可以做什么|帮助|你能帮我什么|你有哪些功能|你有什么能力/;
+// 寒暄白名单（**保留**，批次 4 判据：它不猜语义）。
+// 锚定全串 `^(…)[!！。,.，\s]*$`：只有「整句就是一句寒暄」才命中，不存在被长句夹带命中的形态，
+// 与下面那些被退役的词表规则有结构差别。保留的第二条理由是可用性的：能力清单是**唯一**
+// 在模型不可用时仍能给出静态降级应答（model: "rule-static"）的路径，而寒暄正是限流/缺 Key
+// 时用户的第一句话。退役它不会让模型判断得更好，只会把第一句换成一次分类调用 + 可能拒答。
 const GREETING_PATTERNS = /^(你好|您好|hello|hi|嗨|在吗)[!！。,.，\s]*$/i;
 
-// WES 数据查询关键词
-const WES_DATA_QUERY_PATTERNS = /我之前.*项目|创建过哪些项目|历史项目|我的项目|我的评估|历史评估|我创建过|待确认动作|待办动作|待确认.*评估|评估状态|项目状态|查询.*项目|查看.*项目|列出.*项目|我.*建立的?项目|我.*创建的?项目|(创建|新建|建立|建)了(什么|哪些|哪个|几个|多少个).*(项目|评估)|(有什么|有哪些|多少个|几个)项目/;
-
-// 报告生成关键词
-const REPORT_GEN_VERB_PATTERNS = /生成|输出|创建|启动|生成需求|输出需求|创建需求|启动需求/;
-const REPORT_GEN_TARGET_PATTERNS = /需求解析报告|需求包|评估输入|评估草稿|报告|v1|v2/;
-
-// 补充报告关键词（v2）
-const V2_EXPLICIT_PATTERNS = /生成\s*v2|补充.*v2|生成.*补充.*报告|生成.*需求.*报告.*v2|v2.*报告/;
-
-// 产品知识查询关键词：只在无附件/非报告/非 WES 数据查询时进入知识库工具路由。
-const PRODUCT_KNOWLEDGE_TERM_PATTERNS = /智能会计平台|金蝶云|金蝶产品|产品知识|资金管理|网上银行|融资管理|销售管理|供应链|财务云|存货核算|多组织业务往来|总账|应收|应付|采购管理|库存管理|生产管理/;
-const PRODUCT_KNOWLEDGE_QUESTION_PATTERNS = /是什么|哪些模块|支持哪些|必须购买|相关模块|功能|依赖|区别|适用|场景|口径|怎么理解/;
-
-// 显式知识库查询关键词：用户明确提到"知识库/文档/方案"等，无论是否含产品术语均路由到 knowledge_query。
-const EXPLICIT_KNOWLEDGE_QUERY_PATTERNS = /知识库|知识库里|文档.*有没有|方案.*有没有|有没有.*相关.*文档|有没有.*相关.*方案|帮我看看.*知识库|查一下.*知识库|搜索.*知识库/;
-
-// 行业知识 / 业务场景 / 痛点 / 解决方案类问题 → knowledge_query（无附件时进入知识库）
-const INDUSTRY_KNOWLEDGE_PATTERNS = /行业|痛点|难点|挑战|解决方案|最佳实践|案例|经验|趋势|前景|现状|常见问题|怎么做|如何处理|如何应对|优势|劣势|机会|威胁|竞品|对标|标杆/;
+// ── 批次 4 退役记录（对应雷达文档 §三③：需理解自然语言的 → 交模型选工具）──────────
+//
+// 以下 5 组词表规则已整体删除，不留兜底、不改写为「更聪明的正则」。它们共同的失效形态
+// 是「一个子串把整句话劫走」，架构侧 `routeWorkbenchIntent` 直取实证的三例（退役前）：
+//   · 「产品帮助文档在哪里？」           → capability_keywords（命中「帮助」）
+//   · 「这个需求你能做什么样的拆解？」    → capability_keywords（命中「能做什么」）
+//   · 「评估状态怎么流转？」             → wes_data_keywords（命中「评估状态」，
+//                                          而 handler 只会把用户的项目列表吐回来）
+// 承接方逐条如下：
+//   capability_keywords   → describe_capabilities 工具（CAPABILITY_FACTS 仍作为唯一事实源，
+//                           由模型自行决定何时取用）
+//   wes_data_keywords     → 已注册的 project_list / estimate_history 工具
+//   knowledge_*_keywords  → 已注册的 knowledge_query 工具
+//                           （本批同时把它从 `profiles[0]` 收口为按业务角色路由，
+//                             见 agent/default-registry.ts）
+//   report_generation_keywords / v2_explicit_keywords
+//                         → command：前端按钮 clientAction
+//                           generate_requirement_report / submit_structured_answers
+//                           （下方第 1 步仍在，那才是「用户明确要系统做一件事」的入口）；
+//                           有附件时的真实生成闸门在各对话通道的 isExplicitReportRequest，
+//                           本路由从未参与过那次生成。
 
 /** 判定只读会话消息的两个字段；其余字段（正文、时间戳…）原样放行，不做形状要求 */
 export type WorkbenchSessionTurn = {
@@ -81,8 +98,9 @@ export type WorkbenchSessionTurn = {
  *  · 本条判据跨 Run 成立，且三条通道（异步 Run / 同步非流式 / 同步流式）都在 assistant
  *    消息 metadata.toolCalls 这同一个字段上留痕，一份实现覆盖全部入口。
  *
- * 窗口只有一轮：下一轮若没有工具调用，本判定即回落 false，不会把 17 个正则 handler
- * 长期关掉（那是批次 4 的事）。读的是会话记录，不新增任何查询。
+ * 窗口只有一轮：下一轮若没有工具调用，本判定即回落 false，不会把正则路由长期关掉。
+ * （原句写「17 个正则 handler」，沿用雷达文档 §七 的旧口径；批次 4 已把该口径退役到
+ *   只剩寒暄与附件两条非语义规则，实数考证见本文件顶部。）读的是会话记录，不新增任何查询。
  */
 export function hasOngoingWorkbenchToolInteraction(
   messages: readonly WorkbenchSessionTurn[] | null | undefined,
@@ -102,18 +120,15 @@ export function hasOngoingWorkbenchToolInteraction(
 /**
  * 意图路由纯函数。
  *
- * 规则优先级：
- * 1. 前端显式 clientAction（结构化卡片提交）
+ * 批次 4 之后只剩四条规则，且**没有一条是在读「这句话想干什么」**：
+ * 1. 前端显式 clientAction（结构化卡片提交 / 报告按钮）——发起人点的是按钮
  * 1b. 进行中的工具交互 → 整条正则路由让位，交回模型（批次 1c，见下方第 1b 步注释）
- * 2. 能力发现关键词
- * 3. WES 数据查询关键词
- * 4. 报告生成关键词（区分 v1/v2）
- *    （原「写动作关键词」规则已于批次 1a 退役，见下方第 4 步注释）
- * 5. 有附件但无明确报告意图 → attachment_qa / attachment_summary
- * 6. 显式知识库查询（用户提到"知识库/文档/方案"）→ knowledge_query
- * 7. 无附件产品知识问题 → knowledge_query
- * 7b. 行业/业务场景知识问题（痛点、解决方案等）→ knowledge_query
- * 8. 兜底 → domain_qa
+ * 2. 锚定全串的寒暄（`GREETING_PATTERNS`）
+ * 3. 本轮有已解析附件（服务端结构事实）→ attachment_qa / attachment_summary
+ * 4. 其余一律 → 兜底 domain_qa，由模型 + 工具决定用哪个能力
+ *
+ * 曾经的第 2/3/4/6/7/7b/8 步（能力词表、WES 数据词表、报告词表、知识库词表）
+ * 已整体删除，依据与承接方见文件上方的退役记录。
  */
 export function routeWorkbenchIntent(input: WorkbenchIntentInput): WorkbenchIntentResult {
   const text = (input.message || "").trim().toLowerCase();
@@ -148,60 +163,24 @@ export function routeWorkbenchIntent(input: WorkbenchIntentInput): WorkbenchInte
     return { intent: "capability_discovery", confidence: 0.9, routingRule: "greeting_keywords" };
   }
 
-  // 2. 能力发现
-  if (CAPABILITY_PATTERNS.test(text)) {
-    return { intent: "capability_discovery", confidence: 0.95, routingRule: "capability_keywords" };
-  }
-
-  // 3. WES 数据查询
-  if (WES_DATA_QUERY_PATTERNS.test(text)) {
-    return { intent: "wes_data_query", confidence: 0.9, routingRule: "wes_data_keywords" };
-  }
-
-  // 4.（批次 1a 退役）写动作请求不再由正则截走。
+  // 3.（批次 1a 退役）写动作请求不再由正则截走。
   // 原规则命中「写动作词 + 写目标词」即判 write_action_request 并交给静态 handler，
   // 结果是「帮我创建一个ERP项目」这类话**根本到不了模型**——工具与审批闸门在它之后
   // 永远不会被走到。退役后这类话落兜底 domain_qa，由模型决定调用 create_project，
   // 再经批次 1a 的执行前审批闸门（workbench-tool-approval）确认才真正写库。
-  // 只退役这一条：其余正则 handler 属批次 4。
   //
-  // 5. 明确要求生成 v2 报告（在 v1 之后）
-  if (input.hasLatestV1Artifact && V2_EXPLICIT_PATTERNS.test(text)) {
-    return { intent: "harness_answer_submission", confidence: 0.9, routingRule: "v2_explicit_keywords" };
-  }
-
-  // 6. 明确要求生成需求解析报告 / 需求包 / 评估输入
-  if (REPORT_GEN_VERB_PATTERNS.test(text) && REPORT_GEN_TARGET_PATTERNS.test(text)) {
-    // 有 v1 时，"生成报告"指代 v2 补充
-    if (input.hasLatestV1Artifact) {
-      return { intent: "harness_answer_submission", confidence: 0.85, routingRule: "report_generation_keywords_with_v1" };
-    }
-    return { intent: "harness_report_generation", confidence: 0.9, routingRule: "report_generation_keywords" };
-  }
-
-  // 7. 有附件但无明确报告意图
+  // 4.（批次 4 退役）能力词表 / WES 数据词表 / 报告词表 / 知识库词表同批撤除，
+  // 失效形态与批次 1a 同源——正则抢在模型之前定完了能力，工具就永远没机会被选中。
+  // 逐条依据与承接方见文件顶部的退役记录。
+  //
+  // 5. 本轮有已解析附件：服务端结构事实，不是语义判断 → 附件问答 / 附件摘要
   if (input.hasAttachment) {
     return text
       ? { intent: "attachment_qa", confidence: 0.8, routingRule: "attachment_context" }
       : { intent: "attachment_summary", confidence: 0.8, routingRule: "attachment_context" };
   }
 
-  // 7. 显式知识库查询：用户明确提到"知识库/文档/方案"等
-  if (EXPLICIT_KNOWLEDGE_QUERY_PATTERNS.test(text)) {
-    return { intent: "knowledge_query", confidence: 0.9, routingRule: "explicit_knowledge_query" };
-  }
-
-  // 8. 无附件产品知识问题：进入只读知识库查询工具
-  if (PRODUCT_KNOWLEDGE_TERM_PATTERNS.test(text) && PRODUCT_KNOWLEDGE_QUESTION_PATTERNS.test(text)) {
-    return { intent: "knowledge_query", confidence: 0.86, routingRule: "product_knowledge_terms" };
-  }
-
-  // 8b. 行业/业务场景知识问题（痛点、解决方案、案例等）→ 知识库查询
-  if (INDUSTRY_KNOWLEDGE_PATTERNS.test(text)) {
-    return { intent: "knowledge_query", confidence: 0.82, routingRule: "industry_knowledge_terms" };
-  }
-
-  // 9. 兜底：普通业务问答
+  // 6. 兜底：交模型 + 工具自行决定用哪个能力
   return { intent: "domain_qa", confidence: 0.65, routingRule: "default_domain_qa" };
 }
 
@@ -214,21 +193,20 @@ export type ModelClassificationResult = {
   latencyMs: number;
 };
 
+// 批次 4：词汇表随正则同步收缩。knowledge_query / wes_data_query 已无生产方，
+// 且分类结果本就只采纳 unsupported_or_out_of_scope（RP-049 Batch A），留着它们
+// 只是让模型每次都往两个没人接的桶里投票。
 const VALID_MODEL_INTENTS: WorkbenchIntent[] = [
   "capability_discovery",
   "domain_qa",
-  "knowledge_query",
   "attachment_qa",
-  "wes_data_query",
   "unsupported_or_out_of_scope",
 ];
 
 const INTENT_CLASSIFICATION_PROMPT = `你是一个意图分类器。根据用户输入，判断其意图属于以下哪一类：
 
 - capability_discovery：询问系统能力（如"你能做什么"、"有什么功能"）
-- knowledge_query：产品/行业知识问题（如"金蝶云是什么"、"制造业痛点"）
-- wes_data_query：查询用户自己的项目/评估数据（如"我的项目"、"之前创建的"）
-- domain_qa：普通业务问答，不属于以上任何类别（如"这个风险是什么意思"）
+- domain_qa：普通业务问答——含产品/行业知识咨询、查询用户自己的项目或评估数据、以及一切需要动用工具才能回答的问题
 - unsupported_or_out_of_scope：无关闲聊、乱码、空白、与系统完全无关的请求（如"今天天气怎样"、"帮我写一首诗"）
 
 只输出 JSON，格式为：{"intent":"xxx","confidence":0.8,"reason":"简短理由"}

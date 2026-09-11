@@ -74,6 +74,8 @@ test("RP-048: sample set meets minimum requirements", () => {
     "business_consultation",
     "attachment_qa_guidance",
     "out_of_scope",
+    // 批次 4：报告词表退役后，显式入口（按钮）是唯一可达路径，必须纳入基线
+    "report_command",
   ];
   for (const cat of requiredCategories) {
     assert.ok(stats.categories[cat] !== undefined, `缺少必需场景: ${cat}`);
@@ -88,7 +90,6 @@ test("RP-048: intent routing baseline — capability discovery", () => {
     const result = routeWorkbenchIntent({
       message: sample.message,
       hasAttachment: Boolean(sample.hasAttachment),
-      hasLatestV1Artifact: Boolean(sample.hasLatestV1Artifact),
       clientAction: sample.clientAction,
     });
     assert.equal(result.intent, sample.expectedIntent, `样本 ${sample.id}: intent 路由错误`);
@@ -103,7 +104,6 @@ test("RP-048: intent routing baseline — greeting", () => {
     const result = routeWorkbenchIntent({
       message: sample.message,
       hasAttachment: Boolean(sample.hasAttachment),
-      hasLatestV1Artifact: Boolean(sample.hasLatestV1Artifact),
       clientAction: sample.clientAction,
     });
     assert.equal(result.intent, sample.expectedIntent, `样本 ${sample.id}: intent 路由错误`);
@@ -115,7 +115,6 @@ test("RP-048: intent routing baseline — explicit report request", () => {
     const result = routeWorkbenchIntent({
       message: sample.message,
       hasAttachment: Boolean(sample.hasAttachment),
-      hasLatestV1Artifact: Boolean(sample.hasLatestV1Artifact),
       clientAction: sample.clientAction,
     });
     assert.equal(result.intent, sample.expectedIntent, `样本 ${sample.id}: intent 路由错误`);
@@ -127,7 +126,6 @@ test("RP-048: intent routing baseline — business consultation", () => {
     const result = routeWorkbenchIntent({
       message: sample.message,
       hasAttachment: Boolean(sample.hasAttachment),
-      hasLatestV1Artifact: Boolean(sample.hasLatestV1Artifact),
       clientAction: sample.clientAction,
     });
     assert.equal(result.intent, sample.expectedIntent, `样本 ${sample.id}: intent 路由错误`);
@@ -139,7 +137,6 @@ test("RP-048: intent routing baseline — attachment qa guidance", () => {
     const result = routeWorkbenchIntent({
       message: sample.message,
       hasAttachment: Boolean(sample.hasAttachment),
-      hasLatestV1Artifact: Boolean(sample.hasLatestV1Artifact),
       clientAction: sample.clientAction,
     });
     assert.equal(result.intent, sample.expectedIntent, `样本 ${sample.id}: intent 路由错误`);
@@ -151,7 +148,6 @@ test("RP-048: intent routing baseline — knowledge query", () => {
     const result = routeWorkbenchIntent({
       message: sample.message,
       hasAttachment: Boolean(sample.hasAttachment),
-      hasLatestV1Artifact: Boolean(sample.hasLatestV1Artifact),
       clientAction: sample.clientAction,
     });
     assert.equal(result.intent, sample.expectedIntent, `样本 ${sample.id}: intent 路由错误`);
@@ -163,7 +159,6 @@ test("RP-048: intent routing baseline — wes data query", () => {
     const result = routeWorkbenchIntent({
       message: sample.message,
       hasAttachment: Boolean(sample.hasAttachment),
-      hasLatestV1Artifact: Boolean(sample.hasLatestV1Artifact),
       clientAction: sample.clientAction,
     });
     assert.equal(result.intent, sample.expectedIntent, `样本 ${sample.id}: intent 路由错误`);
@@ -186,6 +181,8 @@ test("RP-048: dispatch end-to-end baseline — all samples pass assertions", asy
       roleLabel: "售前顾问",
       model: "eval-mock",
       modelChat: mockModelChat,
+      // 批次 4：报告生成的入口是按钮（结构化动作），样本用 clientAction 表达，必须透传
+      clientAction: sample.clientAction,
       ...(sample.hasAttachment
         ? {
             attachment: {
@@ -259,12 +256,10 @@ test("RP-048: out-of-scope samples are intercepted with unsupported_or_out_of_sc
   }
 });
 
-// ── 专项断言：报告请求路由 ──────────────────────────────────
+// ── 专项断言：报告入口（批次 4 起 = 按钮，不是措辞）────────────
 
-test("RP-048: report request samples route to harness_report_generation", async () => {
-  for (const sample of EVAL_SAMPLES.filter((s) => s.category === "explicit_report_request")) {
-    const mockModelChat = createMockModelChatForSample(sample.id);
-
+test("批次4: 报告按钮直达报告意图，口头表达不再被词表截走", async () => {
+  for (const sample of EVAL_SAMPLES.filter((s) => s.category === "report_command")) {
     const result = await dispatchHomeWorkbenchTurn({
       user,
       workflowKey: "free_chat",
@@ -272,14 +267,25 @@ test("RP-048: report request samples route to harness_report_generation", async 
       businessRole: "pre_sales",
       roleLabel: "售前顾问",
       model: "eval-mock",
-      modelChat: mockModelChat,
+      modelChat: createMockModelChatForSample(sample.id),
+      clientAction: sample.clientAction,
     });
+    assert.equal(result.trace.routingRule, "client_action", `样本 ${sample.id} 应由按钮接管`);
+    assert.ok(result.suggestedActions.length > 0, `样本 ${sample.id} 应带回按钮对应的建议动作`);
+    assert.ok(result.answer.length > 0, `样本 ${sample.id} 回复不应为空`);
+  }
 
-    assert.equal(
-      result.intent,
-      "harness_report_generation",
-      `样本 ${sample.id} 应路由到 harness_report_generation`,
-    );
+  for (const sample of EVAL_SAMPLES.filter((s) => s.category === "explicit_report_request")) {
+    const result = await dispatchHomeWorkbenchTurn({
+      user,
+      workflowKey: "free_chat",
+      message: sample.message,
+      businessRole: "pre_sales",
+      roleLabel: "售前顾问",
+      model: "eval-mock",
+      modelChat: createMockModelChatForSample(sample.id),
+    });
+    assert.equal(result.intent, "domain_qa", `样本 ${sample.id} 报告词表应已退役，实取 ${result.trace.routingRule}`);
     assert.ok(result.answer.length > 0, `样本 ${sample.id} 回复不应为空`);
   }
 });
@@ -287,7 +293,9 @@ test("RP-048: report request samples route to harness_report_generation", async 
 // ── 专项断言：capability 回复事实表边界 ──────────────────────
 
 test("RP-048: capability discovery replies stay within CAPABILITY_FACTS bounds", async () => {
-  for (const sample of EVAL_SAMPLES.filter((s) => s.category === "capability_discovery" || s.category === "greeting")) {
+  // 批次 4：能力词表退役后，capability handler 只剩锚定寒暄一条入口，
+  // 原 capability_discovery 三条样本已改判 domain_qa（见 samples.ts），故此处只跑 greeting。
+  for (const sample of EVAL_SAMPLES.filter((s) => s.category === "greeting")) {
     const mockModelChat = createMockModelChatForSample(sample.id);
 
     const result = await dispatchHomeWorkbenchTurn({
@@ -313,4 +321,39 @@ test("RP-048: capability discovery replies stay within CAPABILITY_FACTS bounds",
       );
     }
   }
+});
+
+// ── 批次 4：评测语料不得再引用已退役的路由规则 ────────────────
+// 语料里的 expectedRoutingRule 是「基线」的定义。若它继续引用已删除的规则名，
+// 基线本身就成了谎报——这条断言把两者锁在一起。
+
+test("批次4：样本集不再把已退役的正则规则当作期望基线", () => {
+  const retiredRules = [
+    "capability_keywords",
+    "wes_data_keywords",
+    "report_generation_keywords",
+    "report_generation_keywords_with_v1",
+    "v2_explicit_keywords",
+    "explicit_knowledge_query",
+    "product_knowledge_terms",
+    "industry_knowledge_terms",
+  ];
+  const referenced = EVAL_SAMPLES.filter((sample) =>
+    sample.expectedRoutingRule && retiredRules.includes(sample.expectedRoutingRule));
+  assert.deepEqual(
+    referenced.map((sample) => `${sample.id}→${sample.expectedRoutingRule}`),
+    [],
+    "退役规则不得再出现在样本期望里",
+  );
+
+  // 退役后仍被期望的意图必须只剩保留集合
+  const retiredIntents = ["knowledge_query", "wes_data_query", "write_action_request"];
+  const stale = EVAL_SAMPLES.filter((sample) => retiredIntents.includes(sample.expectedIntent));
+  assert.deepEqual(stale.map((sample) => sample.id), [], "已退役意图不得再作为期望结果");
+
+  // 显式入口必须仍被语料覆盖（command 与保留规则各至少一条）
+  const stats = getSampleStats();
+  assert.ok(stats.categories.report_command >= 1, "按钮 command 入口须在基线内");
+  assert.ok(stats.categories.greeting >= 1, "保留的寒暄规则须在基线内");
+  assert.ok(stats.categories.attachment_qa_guidance >= 1, "保留的附件结构判据须在基线内");
 });

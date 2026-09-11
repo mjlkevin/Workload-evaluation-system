@@ -274,13 +274,17 @@ test("判据④ 端到端：说创建项目 → 工具 → waiting → 确认后
   assert.equal(afterSecondTurn[1]!.content, "已把客户信息补进这个项目。", "答案必须出自模型本轮的真实输出，而不是知识库正则 handler 的文案");
   assert.equal(second.modelTurns >= 1, true);
 
-  // 反向核验：劫走它的那条正则今天仍然在位（本批没退役任何 handler），
-  // 只是在这一轮被让位规则挡在了后面。
-  const rawRule = routeWorkbenchIntent({ message: TURN_ANSWER, hasAttachment: false, hasLatestV1Artifact: false });
-  assert.equal(rawRule.routingRule, "industry_knowledge_terms", `正则规则必须原样还在，实取 ${JSON.stringify(rawRule)}`);
+  // 反向核验（批次 4 反转）：批次 1c 立档时，劫走这句话的行业知识词表「仍在位」，
+  // 让位规则是唯一的保护。批次 4 已把该词表整体退役，因此这里改断言两件事：
+  //  a) 那条正则确实没了——同一句话在不进行中的会话里也不再被截走；
+  //  b) 让位规则本身仍可观测：进行中 → ongoing_tool_interaction，不进行 → default_domain_qa，
+  //     两者 intent 相同、routingRule 不同，故本用例对批次 1c 的判据依然成立。
+  const rawRule = routeWorkbenchIntent({ message: TURN_ANSWER, hasAttachment: false });
+  assert.equal(rawRule.routingRule, "default_domain_qa", `行业词表应已退役，实取 ${JSON.stringify(rawRule)}`);
+  assert.equal(rawRule.intent, "domain_qa");
 
   // 窗口只有一轮：轮二没有工具调用，判据必须回落到 false，
-  // 否则等价于把这个会话的正则路由永久关掉（那是批次 4 的范围）。
+  // 否则等价于把这个会话的正则路由永久关掉（批次 4 已把该词表退役，此处守的仍是「窗口只有一轮」这条）。
   assert.equal(hasOngoingWorkbenchToolInteraction((await getAiSession(alice!, first.sessionId))!.messages), false, "无工具痕迹的一轮之后不得继续短路");
 
   console.log(
@@ -303,12 +307,13 @@ test("反向对照：轮一没有工具调用时，同一句补充信息的路�
   // 本轮落库的路由结果也必须仍是原来的兜底口径（本批对不存在的进行中状态零改动）
   assert.equal(routingOf(assistant[0]).routingRule, "default_domain_qa", `实取 ${JSON.stringify(routingOf(assistant[0]))}`);
 
-  // 于是轮二这句「行业」追问照旧命中行业知识规则——零回归的持久化侧证据
+  // 轮二这句「行业」追问：批次 1c 立档时它照旧命中行业知识规则（那时是本用例的
+  // 「零回归」一侧）。批次 4 退役该词表后，它落普通问答——重点是它**没有**被判成
+  // ongoing_tool_interaction，即进行中判据没有越窗生效。
   const second = routeWorkbenchIntent({
     message: TURN_ANSWER,
     hasAttachment: false,
-    hasLatestV1Artifact: false,
     hasOngoingToolInteraction: hasOngoingWorkbenchToolInteraction((await getAiSession(alice!, plain.sessionId))!.messages),
   });
-  assert.deepEqual(second, { intent: "knowledge_query", confidence: 0.82, routingRule: "industry_knowledge_terms" });
+  assert.deepEqual(second, { intent: "domain_qa", confidence: 0.65, routingRule: "default_domain_qa" });
 });

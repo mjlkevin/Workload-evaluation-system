@@ -1,8 +1,11 @@
 // ============================================================
 // O4 R3 前置快照测试集 — 意图路由 + 闸门判定行为锁定
 // 目的：在 handler 化重构（纯结构搬迁）前锁定现状行为基线。
-// 固定输入消息 → 断言固定意图与路由结果；覆盖全部 7 类 handler 意图。
-// 任何一条快照在重构后发生变化即视为行为变更，必须停止并报告。
+// 固定输入消息 → 断言固定意图与路由结果。
+// 本文件为 O4 结构搬迁的前置快照：搬迁不得改行为，任何变化即视为回归。
+// 批次 4 是有意的行为变更（正则意图退役），受影响的两类快照已按批次 1a 的先例
+// 改锁**新基线**（措辞不再被词表截走、模型确实被调用），并在每条旁注明退役理由；
+// 未受影响的快照（寒暄 / 附件 / clientAction / 兜底 / 超范围采纳）逐字未动。
 // ============================================================
 
 import assert from "node:assert/strict";
@@ -89,13 +92,15 @@ function knowledgeTrace(query: string): ZhipuKnowledgeToolTrace {
 test("snapshot: 能力发现关键词 → capability_discovery / capability_keywords（静态，不调模型）", async () => {
   const result = await dispatchHomeWorkbenchTurn(baseInput({
     message: "你能做什么",
-    modelChat: STATIC_MODEL_CHAT,
+    modelChat: countingModelChat().chat,
   }));
-  assert.equal(result.intent, "capability_discovery");
-  assert.equal(result.trace.routingRule, "capability_keywords");
-  assert.equal(result.model, "rule-static");
-  assert.match(result.answer, /WES AI 工作台/);
-  assert.equal(result.trace.modelClassification, undefined);
+  // 批次 4 退役：能力词表（capability_keywords）已删除，此类问法交回模型，
+  // 由模型自行调用 describe_capabilities 工具取 CAPABILITY_FACTS 事实表。
+  // 快照随之改锁新基线：模型被调用、不再产出 rule-static。
+  assert.equal(result.trace.routingRule, "default_domain_qa");
+  assert.notEqual(result.intent, "capability_discovery");
+  assert.notEqual(result.model, "rule-static");
+  assert.match(result.answer, /模型自然回复/);
 });
 
 test("snapshot: 简短问候 → capability_discovery / greeting_keywords（静态，不调模型）", async () => {
@@ -110,26 +115,26 @@ test("snapshot: 简短问候 → capability_discovery / greeting_keywords（静�
 
 // ── 2. wes-data-query handler（WES 数据查询）─────────────────────────────
 
-test("snapshot: 查询自己的项目 → wes_data_query / wes_data_keywords（静态，不调模型）", async () => {
-  const result = await dispatchHomeWorkbenchTurn(baseInput({
-    message: "我创建过哪些项目",
-    modelChat: STATIC_MODEL_CHAT,
-  }));
-  assert.equal(result.intent, "wes_data_query");
-  assert.equal(result.trace.routingRule, "wes_data_keywords");
-  assert.equal(result.model, "rule-static");
-  assert.equal(result.suggestedActions[0]?.actionType, "open_project_list");
-});
-
-test("snapshot: 疑问句“我创建了什么项目”→ wes_data_query，不误判为写动作", async () => {
-  const result = await dispatchHomeWorkbenchTurn(baseInput({
-    message: "我创建了什么项目",
-    modelChat: STATIC_MODEL_CHAT,
-  }));
-  assert.equal(result.intent, "wes_data_query");
-  assert.equal(result.trace.routingRule, "wes_data_keywords");
-  assert.equal(result.suggestedActions[0]?.actionType, "open_project_list");
-});
+// 批次 4 退役：wes_data_keywords 词表整条删除。它原先把「我的项目 / 评估状态 /
+// 待确认动作」等措辞一律判成项目列表查询，实取证伪两句：
+//   · 「评估状态怎么流转？」是流程口径问题，却被回成一份项目清单；
+//   · 「今天有哪些待确认动作？」handler 根本没有这个能力。
+// 承接方 = 已注册的 project_list / estimate_history 工具（owner 隔离由注入的
+// listProjectEvaluationsForUser(user, …) 保证，模型入参无从越权）。
+for (const message of ["我创建过哪些项目", "我创建了什么项目", "评估状态怎么流转？"]) {
+  test(`批次4退役快照：「${message}」不再被数据词表截走，模型确实被调用`, async () => {
+    const modelChat = countingModelChat();
+    const result = await dispatchHomeWorkbenchTurn(baseInput({ message, modelChat: modelChat.chat }));
+    assert.notEqual(result.intent, "wes_data_query", "意图已退役");
+    assert.equal(result.trace.routingRule, "default_domain_qa", `实取 ${JSON.stringify(result.trace)}`);
+    assert.ok(modelChat.calls() >= 1, `退役后模型必须真的被调用，实取 ${modelChat.calls()} 次`);
+    assert.deepEqual(
+      result.suggestedActions.filter((action) => action.actionType === "open_project_list"),
+      [],
+      "静态 handler 的 open_project_list 建议动作不得再出现",
+    );
+  });
+}
 
 // ── 3.（批次 1a 退役）write-action handler 已下线：这类措辞必须真的走到模型 ──
 // 原快照锁的是「正则命中 → 静态返回 create_project_evaluation 待确认动作」，
@@ -171,15 +176,25 @@ for (const message of ["帮我创建广州可味达项目", "帮我创建一个E
 
 // ── 4. harness-report handler（报告生成 / v2 提交建议）─────────────────────
 
-test("snapshot: 明确要求生成报告（无附件）→ harness_report_generation，仅建议动作不生成", async () => {
-  const result = await dispatchHomeWorkbenchTurn(baseInput({
-    message: "生成需求解析报告",
+// 批次 4 退役 → command：报告词表（report_generation_keywords）删除。
+// 它从未生成过报告：有附件时真实闸门是各通道的 isExplicitReportRequest（见文件末
+// 的 gate 快照，本批逐字未动），无附件时它只回一句「请上传文件并点按钮」。
+// 现在这句话交回模型，而**按钮**（clientAction=generate_requirement_report）成为唯一入口。
+test("批次4退役快照：口头「生成需求解析报告」交回模型；按钮仍是显式入口", async () => {
+  const spoken = countingModelChat();
+  const result = await dispatchHomeWorkbenchTurn(baseInput({ message: "生成需求解析报告", modelChat: spoken.chat }));
+  assert.notEqual(result.trace.routingRule, "report_generation_keywords", "该规则已下线");
+  assert.equal(result.trace.routingRule, "default_domain_qa");
+  assert.ok(spoken.calls() >= 1, "退役后模型必须真的被调用");
+
+  const clicked = await dispatchHomeWorkbenchTurn(baseInput({
+    message: "",
+    clientAction: "generate_requirement_report",
     modelChat: STATIC_MODEL_CHAT,
   }));
-  assert.equal(result.intent, "harness_report_generation");
-  assert.equal(result.trace.routingRule, "report_generation_keywords");
-  assert.equal(result.model, "rule-static");
-  assert.equal(result.suggestedActions[0]?.actionType, "generate_requirement_report");
+  assert.equal(clicked.intent, "harness_report_generation");
+  assert.equal(clicked.trace.routingRule, "client_action");
+  assert.equal(clicked.suggestedActions[0]?.actionType, "generate_requirement_report");
 });
 
 test("snapshot: 前端显式 clientAction 提交 → harness_answer_submission / client_action", async () => {
@@ -193,14 +208,19 @@ test("snapshot: 前端显式 clientAction 提交 → harness_answer_submission /
   assert.equal(result.suggestedActions[0]?.actionType, "submit_structured_answers");
 });
 
-test("snapshot: 已有 v1 报告时生成 v2 → harness_answer_submission / v2_explicit_keywords", async () => {
+test("批次4退役快照：已有 v1 时口头「生成 v2 报告」不再被词表判成提交动作", async () => {
+  const v2 = countingModelChat();
   const result = await dispatchHomeWorkbenchTurn(baseInput({
     message: "生成 v2 报告",
     latestHarnessArtifact: { artifactType: "requirement_report_v1", harnessRunId: "run-v1" },
-    modelChat: STATIC_MODEL_CHAT,
+    modelChat: v2.chat,
   }));
-  assert.equal(result.intent, "harness_answer_submission");
-  assert.equal(result.trace.routingRule, "v2_explicit_keywords");
+  assert.notEqual(result.trace.routingRule, "v2_explicit_keywords", "该规则已下线");
+  assert.equal(result.trace.routingRule, "default_domain_qa");
+  assert.ok(v2.calls() >= 1);
+  // v1 事实没有消失：它仍随 latestHarnessArtifact 进入上下文与模型提示词
+  // （见 model-answer 的【已有 v1 报告】段），由模型判断该追问还是该补充；
+  // 卡片提交本身仍走 clientAction（上一条快照守着）。
 });
 
 // ── 5. attachment-qa handler（附件问答 / 摘要，含"文件上传不触发工作流"）─────
@@ -250,21 +270,20 @@ test("snapshot: 文件上传不触发工作流 — 附件 + 非报告类提问�
 
 // ── 6. knowledge-query handler（知识库查询）───────────────────────────────
 
-test("snapshot: 产品知识问题 → knowledge_query / product_knowledge_terms（走知识库工具）", async () => {
-  let capturedQuery = "";
-  const result = await dispatchHomeWorkbenchTurn(baseInput({
-    message: "购买存货核算模块必须购买哪些相关模块？",
-    modelChat: STATIC_MODEL_CHAT,
-    knowledgeQuery: async (query) => {
-      capturedQuery = query;
-      return knowledgeTrace(query);
-    },
-  }));
-  assert.equal(result.intent, "knowledge_query");
-  assert.equal(result.trace.routingRule, "product_knowledge_terms");
-  assert.equal(capturedQuery, "购买存货核算模块必须购买哪些相关模块？");
-  assert.equal(result.trace.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
-});
+// 批次 4 退役：三条知识库词表（explicit / product / industry）整批删除，
+// knowledge_query 意图随之从词汇表移除。承接方 = 已注册的 knowledge_query 工具；
+// 该工具本批同时收口为按业务角色选库（见 default-registry.test.ts 的 runKnowledgeQuery 组）。
+// 失效实证：「客户名称：X； 客户行业：Y；」这类对上一轮追问的回答，因含「行业」二字
+// 曾被判成行业知识查询、模型压根收不到（批次 1c 的原始缺陷现场）。
+for (const message of ["购买存货核算模块必须购买哪些相关模块？", "搜索知识库", "制造业财务共享中心的痛点有哪些？"]) {
+  test(`批次4退役快照：「${message}」不再被知识库词表截走`, async () => {
+    const modelChat = countingModelChat();
+    const result = await dispatchHomeWorkbenchTurn(baseInput({ message, modelChat: modelChat.chat }));
+    assert.notEqual(result.intent, "knowledge_query", "意图已退役");
+    assert.equal(result.trace.routingRule, "default_domain_qa", `实取 ${JSON.stringify(result.trace)}`);
+    assert.ok(modelChat.calls() >= 1, "退役后模型必须真的被调用（由其决定是否用 knowledge_query 工具）");
+  });
+}
 
 // ── 7. domain-qa handler（普通业务问答 + O10 Batch A 兜底采纳锁定）──────────
 

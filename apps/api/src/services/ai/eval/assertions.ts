@@ -152,23 +152,37 @@ function assertOutOfScopeIntercepted(
 }
 
 /**
- * 断言 6：报告请求样本必须命中 harness_report_generation
+ * 断言 6（批次 4 改写）：报告生成的入口是**按钮**，不是措辞。
+ *  · report_command（带 clientAction 的结构化动作）必须直达报告意图；
+ *  · explicit_report_request（用户嘴上说「生成需求解析报告」）必须**不再**被词表判定，
+ *    而是落兜底交回模型——这正是被退役的那条规则留下的守护位。
  */
 function assertReportRequestRouted(
   sample: EvalSample,
   result: WorkbenchDispatchData,
 ): AssertionResult {
-  if (sample.category !== "explicit_report_request") {
-    return { pass: true, label: "report_request_routed", detail: "非报告请求样本，跳过" };
+  if (sample.category === "report_command") {
+    const pass = result.trace.routingRule === "client_action"
+      && (result.intent === "harness_report_generation" || result.intent === "harness_answer_submission");
+    return {
+      pass,
+      label: "report_command_entry",
+      detail: pass
+        ? `按钮动作正确直达 ${result.intent}`
+        : `按钮动作未直达报告意图：intent=${result.intent}, rule=${result.trace.routingRule}`,
+    };
   }
-  const pass = result.intent === "harness_report_generation";
-  return {
-    pass,
-    label: "report_request_routed",
-    detail: pass
-      ? "报告请求已正确路由"
-      : `报告请求路由错误，实际 intent=${result.intent}`,
-  };
+  if (sample.category === "explicit_report_request") {
+    const pass = result.intent === "domain_qa" && result.trace.routingRule === "default_domain_qa";
+    return {
+      pass,
+      label: "report_regex_retired",
+      detail: pass
+        ? "报告词表已退役：口头表达交回模型"
+        : `报告词表仍在拦截：intent=${result.intent}, rule=${result.trace.routingRule}`,
+    };
+  }
+  return { pass: true, label: "report_request_routed", detail: "非报告类样本，跳过" };
 }
 
 // ── 聚合断言 ────────────────────────────────────────────────

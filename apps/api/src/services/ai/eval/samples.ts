@@ -20,8 +20,6 @@ export interface EvalSample {
   expectedRoutingRule?: string;
   /** 是否需要附件上下文 */
   hasAttachment?: boolean;
-  /** 是否有最新 v1 artifact */
-  hasLatestV1Artifact?: boolean;
   /** 前端显式 action（可选） */
   clientAction?: string;
   /** 样本描述 */
@@ -37,7 +35,8 @@ export type EvalCategory =
   | "attachment_qa_guidance"    // 附件问答引导
   | "out_of_scope"              // 超范围请求（应被 Batch A 拦截）
   | "knowledge_query"           // 知识库查询
-  | "wes_data_query";           // WES 数据查询
+  | "wes_data_query"            // WES 数据查询
+  | "report_command";           // 报告生成按钮（结构化 command 入口）
 
 // ── 样本集 ──────────────────────────────────────────────────
 
@@ -47,25 +46,25 @@ export const EVAL_SAMPLES: EvalSample[] = [
     id: "cap-001",
     category: "capability_discovery",
     message: "你会干什么",
-    expectedIntent: "capability_discovery",
-    expectedRoutingRule: "capability_keywords",
-    description: "最直接的能力问法",
+    expectedIntent: "domain_qa",
+    expectedRoutingRule: "default_domain_qa",
+    description: "最直接的能力问法（批次 4 起交回模型 + describe_capabilities 工具）",
   },
   {
     id: "cap-002",
     category: "capability_discovery",
     message: "支持哪些操作",
-    expectedIntent: "capability_discovery",
-    expectedRoutingRule: "capability_keywords",
-    description: "操作列表问法",
+    expectedIntent: "domain_qa",
+    expectedRoutingRule: "default_domain_qa",
+    description: "操作列表问法（批次 4 起交回模型）",
   },
   {
     id: "cap-003",
     category: "capability_discovery",
     message: "你能帮我干啥",
-    expectedIntent: "capability_discovery",
-    expectedRoutingRule: "capability_keywords",
-    description: "口语化能力问法",
+    expectedIntent: "domain_qa",
+    expectedRoutingRule: "default_domain_qa",
+    description: "口语化能力问法（批次 4 起交回模型）",
   },
 
   // ── 2. 问候语（2 条）───────────────────────────────────────
@@ -91,17 +90,17 @@ export const EVAL_SAMPLES: EvalSample[] = [
     id: "report-001",
     category: "explicit_report_request",
     message: "生成需求解析报告",
-    expectedIntent: "harness_report_generation",
-    expectedRoutingRule: "report_generation_keywords",
-    description: "v1 报告生成请求（无 v1 artifact）",
+    expectedIntent: "domain_qa",
+    expectedRoutingRule: "default_domain_qa",
+    description: "口头表达的报告请求：批次 4 起报告词表退役，真实生成入口是按钮（见 report-003）",
   },
   {
     id: "report-002",
     category: "explicit_report_request",
     message: "帮我输出需求包",
-    expectedIntent: "harness_report_generation",
-    expectedRoutingRule: "report_generation_keywords",
-    description: "同义词报告请求",
+    expectedIntent: "domain_qa",
+    expectedRoutingRule: "default_domain_qa",
+    description: "同义词报告请求（批次 4 起交回模型，不再由词表判定）",
   },
 
   // ── 4. 业务咨询（2 条）─────────────────────────────────────
@@ -109,17 +108,17 @@ export const EVAL_SAMPLES: EvalSample[] = [
     id: "biz-001",
     category: "business_consultation",
     message: "购买存货核算模块必须购买哪些相关模块",
-    expectedIntent: "knowledge_query",
-    expectedRoutingRule: "product_knowledge_terms",
-    description: "ERP 模块依赖咨询",
+    expectedIntent: "domain_qa",
+    expectedRoutingRule: "default_domain_qa",
+    description: "ERP 模块依赖咨询（批次 4 起由模型选 knowledge_query 工具）",
   },
   {
     id: "biz-002",
     category: "business_consultation",
     message: "多组织业务往来怎么理解",
-    expectedIntent: "knowledge_query",
-    expectedRoutingRule: "product_knowledge_terms",
-    description: "WES 业务口径咨询",
+    expectedIntent: "domain_qa",
+    expectedRoutingRule: "default_domain_qa",
+    description: "WES 业务口径咨询（批次 4 起由模型选工具）",
   },
 
   // ── 5. 附件问答引导（1 条）─────────────────────────────────
@@ -154,19 +153,39 @@ export const EVAL_SAMPLES: EvalSample[] = [
     id: "know-001",
     category: "knowledge_query",
     message: "请查询知识库：网上银行实施边界怎么划分",
-    expectedIntent: "knowledge_query",
-    expectedRoutingRule: "explicit_knowledge_query",
-    description: "显式知识库查询",
+    expectedIntent: "domain_qa",
+    expectedRoutingRule: "default_domain_qa",
+    description: "即便用户显式点名知识库，也由模型决定调用 knowledge_query 工具（批次 4）",
   },
 
   // ── 8. WES 数据查询（1 条）─────────────────────────────────
+  // ── 8b. 报告生成按钮（批次 4：command 显式入口，正则退役后的唯一入口）─────
+  {
+    id: "report-cmd-001",
+    category: "report_command",
+    message: "",
+    expectedIntent: "harness_report_generation",
+    expectedRoutingRule: "client_action",
+    clientAction: "generate_requirement_report",
+    description: "用户点「生成需求解析报告」按钮：结构化动作，语义已确定，不经模型",
+  },
+  {
+    id: "report-cmd-002",
+    category: "report_command",
+    message: "客户名称：深圳蓝海集团； 客户行业：综合集团；",
+    expectedIntent: "harness_answer_submission",
+    expectedRoutingRule: "client_action",
+    clientAction: "submit_structured_answers",
+    description: "v1 之后用户提交结构化卡片：即使正文含「行业」二字也不得被词表劫走（批次 1c + 批次 4 双守护）",
+  },
+
   {
     id: "wes-001",
     category: "wes_data_query",
     message: "我之前创建过哪些项目",
-    expectedIntent: "wes_data_query",
-    expectedRoutingRule: "wes_data_keywords",
-    description: "用户历史项目查询",
+    expectedIntent: "domain_qa",
+    expectedRoutingRule: "default_domain_qa",
+    description: "用户历史项目查询（批次 4 起由模型选 project_list 工具）",
   },
 ];
 

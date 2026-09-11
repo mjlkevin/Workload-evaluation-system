@@ -4,6 +4,9 @@
 // 保证搬迁后的 handler 可独立被分发器调用。
 // （批次 1a：write_action_request 的正则 handler 已退役——「帮我创建XX项目」这类话
 //  必须走到模型 + 工具 + 执行前审批闸门，被正则截走即等于闸门永远不被经过。）
+// （批次 4：knowledgeQueryHandler / wesDataQueryHandler 连同其正则规则一并删除——
+//  「该查知识库还是该查我的项目」是自然语言判断，交回模型选工具；本文件因此不再覆盖它们。
+//  工具侧的对应断言见 agent/default-registry.test.ts 与 agent/tools/query.tools.test.ts。）
 // ============================================================
 
 import assert from "node:assert/strict";
@@ -14,12 +17,9 @@ import type { WorkbenchContext } from "../workbench-context.service";
 import type { WorkbenchDispatchInput } from "../workbench-dispatch.service";
 import type { WorkbenchHandlerParams } from "./handler.types";
 import { capabilityHandler } from "./capability.handler";
-import { wesDataQueryHandler } from "./wes-data-query.handler";
 import { harnessReportHandler } from "./harness-report.handler";
-import { knowledgeQueryHandler } from "./knowledge-query.handler";
 import { attachmentQaHandler } from "./attachment-qa.handler";
 import { domainQaHandler, unsupportedHandler } from "./domain-qa.handler";
-import type { ZhipuKnowledgeToolTrace } from "../knowledge-tool.service";
 
 const user: AuthUser = {
   id: "user-o4-handler-test",
@@ -72,16 +72,6 @@ test("capabilityHandler: intents 声明 + 静态能力回复 + modelClassificati
   assert.deepEqual(result.trace.modelClassification, MODEL_CLASSIFICATION);
 });
 
-test("wesDataQueryHandler: intents 声明 + owner 数据查询静态回复", async () => {
-  assert.deepEqual([...wesDataQueryHandler.intents], ["wes_data_query"]);
-  const result = await wesDataQueryHandler.handle(
-    paramsFor({ intent: "wes_data_query", confidence: 0.9, routingRule: "wes_data_keywords" }, makeInput()),
-  );
-  assert.equal(result.intent, "wes_data_query");
-  assert.equal(result.model, "rule-static");
-  assert.equal(result.suggestedActions[0]?.actionType, "open_project_list");
-});
-
 test("harnessReportHandler: 覆盖报告生成与 v2 提交两类意图", async () => {
   assert.deepEqual([...harnessReportHandler.intents], ["harness_report_generation", "harness_answer_submission"]);
   const v1 = await harnessReportHandler.handle(
@@ -92,38 +82,6 @@ test("harnessReportHandler: 覆盖报告生成与 v2 提交两类意图", async 
     paramsFor({ intent: "harness_answer_submission", confidence: 1, routingRule: "client_action" }, makeInput()),
   );
   assert.equal(v2.suggestedActions[0]?.actionType, "submit_structured_answers");
-});
-
-test("knowledgeQueryHandler: 调用注入的知识库工具并透出 knowledgeTool trace", async () => {
-  assert.deepEqual([...knowledgeQueryHandler.intents], ["knowledge_query"]);
-  const trace: ZhipuKnowledgeToolTrace = {
-    toolId: "knowledge_base.query_product_knowledge",
-    available: true,
-    model: "GLM-5V-Turbo",
-    knowledgeId: "kb-solutions",
-    query: "存货核算相关模块",
-    answer: "存货核算通常需要结合库存管理等模块。",
-    confidence: "high",
-    retrievalTriggered: true,
-    promptTokens: 10,
-    completionTokens: 5,
-    totalTokens: 15,
-    latencyMs: 5,
-    contextRef: "knowledge:kb-solutions:handler-test",
-    chunksCount: 2,
-    topScore: 0.8,
-    prompt: { id: "rag-answer", version: 1, hash: "c".repeat(64) },
-    retrievalParams: { topK: 8, topN: 20, recallMethod: "mixed", rerankStatus: 1, rerankModel: "rerank", fractionalThreshold: 0.2 },
-  };
-  const result = await knowledgeQueryHandler.handle(
-    paramsFor(
-      { intent: "knowledge_query", confidence: 0.86, routingRule: "product_knowledge_terms" },
-      makeInput({ knowledgeQuery: async () => trace }),
-    ),
-  );
-  assert.equal(result.intent, "knowledge_query");
-  assert.equal(result.trace.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
-  assert.match(result.answer, /知识库参考/);
 });
 
 test("attachmentQaHandler: 覆盖 attachment_qa/attachment_summary，产出轻量 modelRun", async () => {
@@ -192,4 +150,49 @@ test("harnessReportHandler: 无附件上下文时保留原上传引导文案", a
   );
   assert.match(result.answer, /请上传需求文件/);
   assert.equal(result.suggestedActions[0]?.actionType, "generate_requirement_report");
+});
+
+// ─── 批次 4：正则退役后，幸存 handler 的契约边界 ───────────────────────────
+// 退役改变的是「谁决定用哪个 handler」，不该改变 handler 自身的保证。
+// 下面三条把这条口径钉住：接地事实仍强制、附件轻量审计仍记录、模型路径不伪造检索痕迹。
+
+test("批次4：capability handler 仍把能力事实表原文压进 system prompt（防编造未实现能力）", async () => {
+  let prompt = "";
+  const result = await capabilityHandler.handle({
+    ...paramsFor(
+      { intent: "capability_discovery", confidence: 0.9, routingRule: "greeting_keywords" },
+      makeInput({
+        modelChat: async ({ systemPrompt }) => {
+          prompt = systemPrompt;
+          return { answer: "我可以帮你解析需求文件并生成报告。", rawContent: "" };
+        },
+      }),
+    ),
+  });
+  assert.match(prompt, /唯一事实源/);
+  assert.match(prompt, /禁止编造/);
+  assert.match(prompt, /需求解析报告/, "事实表条目应随提示词一并送达");
+  assert.equal(result.answer, "我可以帮你解析需求文件并生成报告。");
+});
+
+test("批次4：附件空消息走 attachment_summary，轻量审计口径与问答态同形", async () => {
+  const result = await attachmentQaHandler.handle({
+    ...paramsFor(
+      { intent: "attachment_summary", confidence: 0.8, routingRule: "attachment_context" },
+      makeInput({ message: "", attachment: { name: "需求.xlsx", parsedSummary: "项目：X" } }),
+    ),
+  });
+  assert.equal(result.intent, "attachment_summary");
+  assert.equal(result.trace.modelRun?.runKind, "attachment_summary");
+  assert.equal(result.trace.modelRun?.createsHarnessRun, false, "上传附件仅提问不得建 Harness Run");
+});
+
+test("批次4：知识类问法改走 domain_qa 后，不伪造知识库检索痕迹", async () => {
+  // 退役前这类句子由 knowledge-query handler 产出 trace.knowledgeTool；
+  // 退役后落模型路径，若仍出现 knowledgeTool 即为凭空捏造的检索证据。
+  const result = await domainQaHandler.handle(
+    paramsFor({ intent: "domain_qa", confidence: 0.65, routingRule: "default_domain_qa" }, makeInput({ message: "存货核算必须购买哪些模块？" })),
+  );
+  assert.equal(result.trace.knowledgeTool, undefined);
+  assert.equal(result.intent, "domain_qa");
 });

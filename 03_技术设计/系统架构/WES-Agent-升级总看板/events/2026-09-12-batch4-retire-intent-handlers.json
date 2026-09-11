@@ -1,0 +1,78 @@
+{
+  "id": "BE-2026-09-12-batch4-retire-intent-handlers",
+  "date": "2026-09-12",
+  "type": "implementation",
+  "scope": "批次 4 · 正则意图 handler 按「谁发起」退役（command / tool / 保留三分类）",
+  "summary": "把 AI 工作台意图路由从「靠词表猜这句话要用哪个能力」改为「只按发起人分流」。实取口径与雷达文档 §七 不符：文档写「18 个正则 handler」，`services/ai/handlers/` 里真正注册 intent 的只有 7 个文件（6 个 handler + 1 个共享类型），其余是工具函数或批次 1a 已退役项——文档数字待架构侧订正。逐个按「谁发起」三分：① 用户点按钮的结构化动作 → command，报告词表两条删除、clientAction 两个分支逐字保留；② 本质是「这句话该用哪个能力」→ tool，能力/数据/知识库五组词表删除，knowledge-query 与 wes-data-query 两个 handler 随之删除，承接方是注册表既有的 knowledge_query / project_list / estimate_history 与本批新增的 describe_capabilities；③ 有非语义硬性理由的 → 保留（附件在场是服务端结构事实、寒暄是锚定全串且是模型不可用时唯一可应答路径、domain_qa 是兜底本身、harness-report 只服务按钮意图）。退役依据不是「规则不好」而是可实取的夹带误伤：`产品帮助文档在哪里？` 与 `这个需求你能做什么样的拆解？` 曾被能力词表按「帮助」「能做什么」整句劫走，`评估状态怎么流转？` 曾被数据词表按「评估状态」回成一份项目清单，`客户名称：…； 客户行业：…；` 曾被行业词表劫走致模型收不到（批次 1c 原始缺陷现场）。退役同时收口一处越权面：knowledge_query 工具原实现取 catalog.profiles[0]，不看业务角色可见性也不看优先级，词表退役后它会成为唯一路径，故改走与退役前 handler 同一个 routeKnowledgeBase。",
+  "status": "已回填 / 待 Codex 复核",
+  "pages": ["changes", "testing", "plan", "risks"],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/workbench-intent.service.ts",
+      "summary": "删除 5 组词表常量（capability_keywords / wes_data_keywords / report_generation+v2_explicit / explicit_knowledge_query+product_knowledge / industry_knowledge）与其全部命中分支，不留注释版死代码；WorkbenchIntent 移除 knowledge_query、wes_data_query；分类器词汇表与提示词同步收缩（已退役桶即使模型仍这么答也判为无效分类）；WorkbenchIntentInput 移除退役后无规则再读的 hasLatestV1Artifact。批次 1c 的 ongoing_tool_interaction 短路与两个 clientAction 分支逐字节未动（仅在该短路文档块内订正了一处过期的「17 个正则 handler」计数措辞）"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/services/ai/handlers/knowledge-query.handler.ts, apps/api/src/services/ai/handlers/wes-data-query.handler.ts",
+      "summary": "两文件删除（git rm）。dispatch 的 WORKBENCH_HANDLERS 由 7 降为 5；随主体一并移除 dispatch 侧已无人读取的 knowledgeQuery / knowledgeBaseCatalog 注入位"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/agent/tools/capability.tools.ts",
+      "summary": "新增 describe_capabilities（只读、estimates:read、discoverable、category=capability）：返回 CAPABILITY_FACTS 原文 + 越界约束 + 条目 id 全集。category 刻意不用 discovery，否则被 listFullToolsFor 排除、工作台模型反而调不到"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/agent/default-registry.ts",
+      "summary": "注册 describe_capabilities（ask_user 之后、list_tools 之前，原 8 工具注入顺序逐字节不变）；新增导出的 runKnowledgeQuery 取代 profiles[0] 取法，按调用者业务角色经 routeKnowledgeBase 选库，仅 retrieval_empty 回退一次，无授权库时以空凭据下传"
+    },
+    {
+      "kind": "command",
+      "ref": "一次性探针（收工前移出仓库）：直调 routeWorkbenchIntent 比对退役前后落点",
+      "result": "pass",
+      "summary": "判据③「原正则路径不再命中」：`你能做什么` / `我之前创建过哪些项目` / `购买存货核算模块必须购买哪些相关模块？` / `搜索知识库` / `生成需求解析报告` 五句全部由各自词表命中改为 default_domain_qa；保留项不受影响（`你好` 仍 greeting_keywords，带附件仍 attachment_context）"
+    },
+    {
+      "kind": "command",
+      "ref": "resolveWorkbenchInjectableTools(user) 实取注入集",
+      "result": "pass",
+      "summary": "判据②「模型调得到」的线上边界证据：发给 provider 的 tools 数组含 describe_capabilities 且落 allow 档（免审批直接执行），同集含 knowledge_query / project_list / estimate_history 三个承接工具"
+    },
+    {
+      "kind": "gate",
+      "ref": "bash scripts/verify-local-db-tests.sh test:modules test:rules test:ai，另 db:seed 后 test:integration",
+      "result": "pass",
+      "summary": "四套件全绿且计数只增不减：modules 553→567、ai 286→286、rules 8→8、integration 1→1。新增断言含退役规则逐条不可再产出（8 个规则名 × 探针句）、保留规则边界（寒暄夹带不命中、clientAction 优先于寒暄与附件）、runKnowledgeQuery 的角色越权库永不命中、describe_capabilities 可经 list_tools 发现"
+    },
+    {
+      "kind": "gate",
+      "ref": "GET /system/ai-tools（routes/tool-inventory.routes.test.ts，真 app + admin JWT + 真库）",
+      "result": "pass",
+      "summary": "判据②端点实取：清单 10→11 条且含 describe_capabilities（mutates=false、callable 随查看者能力位）；注册即自动出现在审计页，无独立登记表需同步"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run check:session-history-parity",
+      "result": "pass",
+      "summary": "判据⑤零回归：101 条会话 × 6 层 = 606 次比对逐字节相同，含第 ④ 层「进行中工具交互判据」——本批刻意未动该判据与短路本体，2b-3 的回落依赖保持完好"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:api && npm run build:web && npm run test:web",
+      "result": "pass",
+      "summary": "两端构建 exit 0；前端 69 文件 560 用例全绿（本批未改任何 UI 文件，此三项为独立回归面）"
+    }
+  ],
+  "gaps": [
+  "判据②『走一条真实对话、确认模型确实发起该工具调用』未执行。原因：本 worktree 内不存在任何模型凭据——config/*.json 无非空 apiKey 字段、环境无 KIMI/MOONSHOT 变量，且补齐需触碰凭据域与 JWT 登录边界（本批禁改）。已用两条等价证据替代：其一，GET /system/ai-tools 经真 app + admin JWT + 真库返回含 describe_capabilities 的 11 条清单；其二，实取 resolveWorkbenchInjectableTools 的返回，即工作台发给 provider 的 tools 数组本体，其中含 describe_capabilities 且落 allow 档（allow 档由 runWorkbenchToolLoop 真实执行并回填，见 workbench-tool-loop.test.ts）。收口方式：由持有凭据的一侧跑一轮真实对话（问『你能做什么』），确认落库的 assistant metadata.toolCalls 出现 describe_capabilities。",
+  "本地基线一度虚报，已澄清并留此备查：新建 worktree 缺 gitignored 的 .env.local，直接跑 test:* 会因 DATABASE_URL 缺失产生 18 例伪失败；补上该文件后又因 CREDENTIAL_KEK 被 dotenv 注入而使 credentials.store 一例转红。两者均为环境工件、非代码问题。最终基线口径：不放 .env.local，带库套件一律走 scripts/verify-local-db-tests.sh（该守卫同时阻止把夹具写进开发库），integration 前先 db:seed。",
+  "雷达文档 §七 与 §三③ 的『18 个正则 handler』计数经实取不成立（注册 intent 的 handler 实为 6 个 + 1 个共享类型文件）。本批只登记差异，未代改该复盘文档——它是对比结论的存档，口径订正归架构侧。"
+],
+  "followups": [
+    "command 入口的形态欠账（本批最大发现）：前端「生成需求解析报告 / 提交补充并生成 v2 / 打开项目列表」三个建议动作并不发送 clientAction，只把一句话预填进输入框（ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/hooks/useChatMessages.js:1163-1181），而后端 3 条通道都在读 body.clientAction——全仓库除测试与文档外无任何发送方。退役前那些句子能被词表接住，退役后词表没了：报告仍做得成（有附件时走各通道 isExplicitReportRequest 这道未动的闸门），但「按钮」在结构上仍未闭合。把点击改成真发 clientAction 是一次前端交互改动，须按 AGENTS §9 走 ui-skills 前置并单独排期，且与并行的 ui-remove-homeworkspace 工作树同表面，不宜夹在本批",
+    "知识库审计形态随 handler 退出：工作台正则路径不再是 trace.knowledgeTool / 知识检索 span / metadata.knowledgeTool 的生产方，改由 tool.call.* 事件与消息 metadata.toolCalls 承载；knowledgeTool 字段与其消费端（含批次 3 的 workbench-chat-stream.handler.ts）作为可选契约保留未删，删除动作应并入批次 3 一并裁决",
+    "knowledge_query 工具不做「授权候选内的模型选库」那一档（handler 原有）：多库且关键词不命中时退到安全默认库。需要恢复时应在工具侧补，而不是把词表请回来",
+    "WorkbenchContext.visibleProjects 自本批起无生产方读取（唯一读者 wes-data-query.handler 已删），但 buildWorkbenchContext 仍在算它并据此写 project:* 上下文引用——留待批次 3 或上下文预算专项一并收口"
+  ]
+}
