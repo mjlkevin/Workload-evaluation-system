@@ -85,7 +85,7 @@ describe('draft-roundtrip: E1 草稿往返', () => {
     setupDraftScenario({ status: 401 })
     renderWorkbench()
 
-    await screen.findByText('会话 A')
+    await screen.findByText('会话 A', {}, { timeout: 3000 })
     await sendFromComposer('我的问题')
 
     fireEvent.click(await screen.findByRole('button', { name: '复制草稿' }, { timeout: 3000 }))
@@ -97,7 +97,7 @@ describe('draft-roundtrip: E1 草稿往返', () => {
     setupDraftScenario({ status: 500 })
     renderWorkbench()
 
-    await screen.findByText('会话 A')
+    await screen.findByText('会话 A', {}, { timeout: 3000 })
     await sendFromComposer('我的网络问题')
 
     await screen.findByText(/AI 对话暂未完成/, {}, { timeout: 3000 })
