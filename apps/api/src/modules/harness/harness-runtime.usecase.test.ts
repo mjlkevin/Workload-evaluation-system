@@ -232,14 +232,22 @@ test("submitRun returns 202 payload with queued status and eventCursor", async (
 });
 
 // ----------------------------------------------------------------
-// 批次 2b-1：提交原文必须作为 user/message 的正文带入队（不取自 title）
+// 批次 2b-1 / 2b-2：提交原文与会话消息信封必须整体带进队载荷（不取自 title）
 // ----------------------------------------------------------------
 // title 是 `content.slice(0, 80)`——它今天恰好是正文的前 80 字，但语义是标题。
-// 本批的意义正是**不再依赖那个巧合**，所以用例要让正文长过 80 字、并带首尾空白，
-// 同时断言 userMessage 与 executionConfig.content 逐字节相同（后者是 workflow 落
-// ai_sessions 用户消息时读的同一份，两者相同即事件载荷与会话消息逐字节相同）。
+// 2b-1 消灭的是「正文从 title 抄」；2b-2 进一步要求载荷带齐信封（messageId /
+// createdAt / attachmentIds / metadata），因为 2b-3 之后重建历史只能读事件流。
+// 用例让正文长过 80 字、并带首尾空白，再断言载荷正文与 executionConfig.content
+// 逐字节相同（后者是 workflow 落 ai_sessions 用户消息时读的同一份）。
 
-test("批次2b-1: submitRun 把提交原文整体带入 userMessage，且与 title 解耦", async () => {
+/** 从入队记录里取出按某个假想 runId 构造的载荷。 */
+function queuedUserMessageFact(queued: Record<string, unknown>, runId: string): Record<string, unknown> {
+  const build = queued.userMessageFact as ((id: string) => Record<string, unknown>) | undefined;
+  assert.ok(typeof build === "function", "对话提交必须传 userMessageFact 构造器（不传即不写事件）");
+  return build(runId);
+}
+
+test("批次2b-1: submitRun 把提交原文整体带入载荷，且与 title 解耦", async () => {
   const deps = makeDeps();
   const user = makeUser();
   const session = makeSession(user);
@@ -254,14 +262,35 @@ test("批次2b-1: submitRun 把提交原文整体带入 userMessage，且与 tit
   assert.equal(result.status, 202);
 
   const queued = deps.repo.queuedInputs[0];
-  assert.equal(queued.userMessage, longBody, "userMessage 必须是提交原文（首尾空白按既有 content 口径归一）");
-  assert.deepEqual(
-    (queued.executionConfig as { content: string }).content,
-    queued.userMessage,
+  const executionConfig = queued.executionConfig as {
+    content: string;
+    conversationFact?: { userMessage?: { messageId?: string; createdAt?: string }; attachments?: unknown[] };
+  };
+  const payload = queuedUserMessageFact(queued, "run-fixture-1");
+
+  assert.equal(payload.content, longBody, "载荷正文必须是提交原文（首尾空白按既有 content 口径归一）");
+  assert.equal(
+    executionConfig.content,
+    payload.content,
     "正文与会话消息读的是同一份：两份不一致，事件就会与 ai_sessions 逐字节对不上",
   );
   assert.equal(queued.title, longBody.slice(0, 80), "title 仍是 80 字标题，本批不改它的语义");
-  assert.notEqual(queued.userMessage, queued.title, "正文长度明显超过 title，两者相等即为「从 title 抄」的回归");
+  assert.notEqual(payload.content, queued.title, "正文长度明显超过 title，两者相等即为「从 title 抄」的回归");
+
+  // 批次 2b-2：信封四要素齐备，且身份字段来自**随 Run 持久化**的那份（重放要读回它）
+  assert.equal(payload.role, "user");
+  assert.deepEqual(payload.attachmentIds, [], "attachmentIds 恒在（无附件为空数组）");
+  assert.equal(payload.messageId, executionConfig.conversationFact?.userMessage?.messageId, "messageId 取自持久化信封");
+  assert.equal(payload.createdAt, executionConfig.conversationFact?.userMessage?.createdAt, "createdAt 取自持久化信封");
+  assert.ok(
+    String(payload.createdAt).length > 0 && String(payload.messageId).startsWith("msg-"),
+    "信封身份必须是提交时刻 mint 的正式 id",
+  );
+  assert.deepEqual(
+    (payload.metadata as { projectionSource?: unknown }).projectionSource,
+    { deduplicationKey: "run-fixture-1:user:1", runId: "run-fixture-1", eventType: "user_message" },
+    "runId 由仓储在入队事务内给出，载荷的来源键必须跟着它走",
+  );
 });
 
 test("批次2b-1: retryRun 从原 Run 带出正文，重试出的新 Run 同样有用户正文", async () => {
@@ -280,7 +309,29 @@ test("批次2b-1: retryRun 从原 Run 带出正文，重试出的新 Run 同样�
 
   await usecase.retryRun(user, submitted.data.runId);
   const retryQueued = deps.repo.queuedInputs[1];
-  assert.equal(retryQueued.userMessage, body, "retry 提交的仍是同一轮用户正文，不得因换个 Run 就丢掉");
+  const retryPayload = queuedUserMessageFact(retryQueued, "run-retry-1");
+  assert.equal(retryPayload.content, body, "retry 提交的仍是同一轮用户正文，不得因换个 Run 就丢掉");
+
+  // 批次 2b-2：重试是新一轮会话消息，信封**必须重新 mint**。复用原 Run 的 messageId
+  // 会让会话里两条用户消息同 id——那比「同正文重复两轮」更难查（看板 risks-5）。
+  const originalPayload = queuedUserMessageFact(deps.repo.queuedInputs[0], "run-original-1");
+  assert.notEqual(
+    retryPayload.messageId,
+    originalPayload.messageId,
+    "retry 必须另起 messageId，否则会话里两条消息按 id 分不清",
+  );
+  // createdAt **不断言不等**：两次 mint 可能落在同一毫秒（实取 2026-09-11 同一秒内
+  // 两条 ISO 完全相同），那是时钟分辨率而非本批要保证的性质，写成不等会偶发误红。
+  // 这里要钉的是「各自的 createdAt 来自各自的信封」，由上面 messageId 那条覆盖。
+  const retryFact = (retryQueued.executionConfig as { conversationFact?: { userMessage?: { createdAt?: string } } })
+    .conversationFact?.userMessage;
+  assert.equal(retryPayload.createdAt, retryFact?.createdAt, "重试轮的 createdAt 取自重试时新 mint 的信封");
+  assert.deepEqual(
+    (retryPayload.metadata as { projectionSource?: { deduplicationKey?: string } }).projectionSource
+      ?.deduplicationKey,
+    "run-retry-1:user:1",
+    "来源键按各自 Run 构造（会话侧正是靠它吸收/区分）",
+  );
 });
 
 test("批次2b-1: 正文超事件载荷闸门时映射为 422 校验错误，不是不透明的 500", async () => {

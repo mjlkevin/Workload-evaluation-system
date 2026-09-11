@@ -75,16 +75,20 @@ export type CreateQueuedHarnessRunInput = {
   // RP-047 Batch C（additive）：retry 动作创建新 Run 时指向原 failed Run
   retryOfRunId?: string;
   /**
-   * 批次 2b-1（additive）：本轮**用户说的话的完整正文**，非空时随入队事务落成一条
-   * `user/message` 事件。此前事件流里没有用户正文（run_queued 载荷恒为 {}），
-   * 它只活在 `title` 里——而 title 语义上是标题，今天恰好等于正文，哪天有人加
-   * 摘要就会悄悄改掉历史。
+   * 批次 2b-1（additive）：本轮用户正文随入队事务落成一条 `user/message` 事件。
+   * 此前事件流里没有用户正文（run_queued 载荷恒为 {}），它只活在 `title` 里——而
+   * title 语义上是标题，今天恰好等于正文，哪天有人加摘要就会悄悄改掉历史。
    *
-   * 刻意由调用方显式传入，不让仓储自己去读 `executionConfig.content`：仓储不认识
-   * workbench_chat 的配置形状，猜它就等于把配置约定复制到第二处；更不能读 title。
+   * 批次 2b-2：入参由「正文串」改为「runId → 完整消息载荷」的构造函数。载荷现在必须
+   * 等于会话里那条消息（messageId / createdAt / attachmentIds / metadata，见
+   * workbench-conversation-fact.ts 头注），而这些字段里只有 runId 要到本事务内才存在。
+   * 来源键 `${runId}:user:1` 是 workbench 的投影约定，不是本仓储的领域知识——交给
+   * 调用方构造、仓储只序列化，是把约定留在它 belong 的地方的最小办法；仓储自己拼那个
+   * 字符串，等于把同一个约定复制到第二处（这正是 2b-1 注释当初拒绝的事）。
+   *
    * 不传即为不写（replay / regression 等非对话提交保持原事件面）。
    */
-  userMessage?: string;
+  userMessageFact?: (runId: string) => Record<string, unknown>;
 };
 
 export type ClaimNextHarnessRunInput = {
@@ -666,16 +670,20 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
             // 首事件与 Run 在同一事务内提交，序号由 Run 行原子分配
             await appendRunEventInTransaction(tx, { runId, eventType: "run_queued" });
             // 批次 2b-1：把「用户这一轮说了什么」与 Run 同轨提交。
+            // 批次 2b-2：载荷从 `{content}` 扩成**完整消息信封**——与会话里那条消息逐字段
+            // 相同，否则 2b-3 换读取源时 messageId / createdAt / attachmentIds / metadata
+            // 无处可取（口径与理由见 workbench-conversation-fact.ts 头注）。
             // 三条口径钉在这里，因为它们都是后人最容易改错的点：
-            //  ① 正文取自入参 `input.userMessage`，**与 title 无关**——run_queued 的
-            //    载荷也保持原样不动，正文有自己的事件，不需要挤进状态事件。
+            //  ① 载荷由调用方按 runId 构造（`input.userMessageFact`），本仓储**只序列化**：
+            //    既不认识 workbench 的配置形状，也不拼 `${runId}:user:1` 那种投影约定。
+            //    与 title 无关——run_queued 的载荷也保持原样不动，正文有自己的事件。
             //  ② 与 run_queued 同一事务：要么两者都在（Run 一定带着它的用户正文），
             //    要么都不在。分开写就会出现「有 Run 无正文」的半提交态。
             //  ③ 载荷同样过 1 MiB 闸门：超限即整笔回滚，而不是静默丢一条正文。
-            //    （静默丢正是本批要消灭的形态——正文丢了历史就缺一段，还无人知晓。）
-            const userMessage = typeof input.userMessage === "string" ? input.userMessage : "";
-            if (userMessage.length > 0) {
-              const userMessagePayload = { content: userMessage };
+            //    （静默丢正是本批要消灭的形态——正文丢了历史就缺一段，还无人知晓。
+            //    信封比裸正文大，这条闸门因此更吃紧，但它挡的是「整笔提交」而非历史。）
+            if (input.userMessageFact) {
+              const userMessagePayload = input.userMessageFact(runId);
               assertSafeJsonObject(userMessagePayload);
               await appendRunEventInTransaction(tx, {
                 runId,

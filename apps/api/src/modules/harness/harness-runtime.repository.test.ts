@@ -22,6 +22,7 @@ import {
   type HarnessRuntimeRepository,
   type HarnessRuntimeValidation,
 } from "./harness-runtime.repository";
+import { buildWorkbenchUserMessageFact, mintWorkbenchConversationFact } from "./workbench-conversation-fact";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const describeOrSkip = test;
@@ -113,11 +114,21 @@ describeOrSkip("createQueuedRun returns the persisted eventSequence", { skip: !t
 
 const B2B1_LONG_BODY = `第一轮请先看这段：${"需求细节".repeat(40)}\n第二行含换行与 emoji ✅，以及全角括号（测试）`;
 
+/** 批次 2b-2：提交侧 mint 一份信封，载荷由它 + 事务内的 runId 构造。 */
+function makeUserMessageFactInput(overrides: Partial<CreateQueuedHarnessRunInput> = {}, body = B2B1_LONG_BODY) {
+  const fact = mintWorkbenchConversationFact({ attachments: [] });
+  return {
+    fact,
+    input: makeQueuedRunInput({
+      title: body.slice(0, 80),
+      userMessageFact: (runId) => buildWorkbenchUserMessageFact({ runId, fact, content: body }),
+      ...overrides,
+    }),
+  };
+}
+
 describeOrSkip("createQueuedRun appends user/message carrying the submitted body verbatim", { skip: !testDatabaseUrl }, async () => {
-  const input = makeQueuedRunInput({
-    title: B2B1_LONG_BODY.slice(0, 80),
-    userMessage: B2B1_LONG_BODY,
-  });
+  const { fact, input } = makeUserMessageFactInput();
   const created = await repo!.createQueuedRun(input);
   track(created.run.harnessRunId);
 
@@ -133,13 +144,24 @@ describeOrSkip("createQueuedRun appends user/message carrying the submitted body
     "本事件与 run_queued 同一事务提交，紧随其后、不插到别处",
   );
   assert.deepEqual(events[0].payload, {}, "run_queued 的载荷不变（本批不给它塞正文——正文有自己的事件）");
+
+  // 批次 2b-2：载荷是**完整消息信封**，不是 { content } 一份正文。逐字段断言（不是把
+  // 构造器再调一遍）——这里要钉的是「仓储确实把事务内 mint 的 runId 交给了构造器」，
+  // 以及「这份载荷落库后逐字节原样读回」，两者都是 2b-3 换读取源的前提。
+  const payload = events[1].payload as Record<string, unknown>;
+  const projection = (payload.metadata as { projectionSource?: Record<string, unknown> }).projectionSource;
+  assert.equal(payload.content, B2B1_LONG_BODY, "正文逐字节等于提交原始入参：不截断、不折叠换行、不丢非 ASCII");
+  assert.equal(payload.role, "user");
+  assert.equal(payload.messageId, fact.userMessage.messageId, "messageId 必须来自提交侧 mint 的信封");
+  assert.equal(payload.createdAt, fact.userMessage.createdAt, "createdAt 必须来自提交侧 mint 的信封");
+  assert.deepEqual(payload.attachmentIds, [], "attachmentIds 恒在（无附件为空数组），与会话侧同形");
   assert.deepEqual(
-    events[1].payload,
-    { content: B2B1_LONG_BODY },
-    "载荷正文必须逐字节等于提交原始入参：不截断、不折叠换行、不丢非 ASCII",
+    projection,
+    { deduplicationKey: `${created.run.harnessRunId}:user:1`, runId: created.run.harnessRunId, eventType: "user_message" },
+    "来源键里的 runId 必须是本次事务真正 mint 的那个——键在事务外拼不出来",
   );
   assert.notEqual(
-    String((events[1].payload as { content?: string }).content),
+    String(payload.content),
     String(created.run.title),
     "正文不得取自 title：title 是 80 字标题，正文明显更长，两者相等即为回归",
   );
@@ -147,7 +169,7 @@ describeOrSkip("createQueuedRun appends user/message carrying the submitted body
 });
 
 describeOrSkip("user/message is appended once per submission key even on replay", { skip: !testDatabaseUrl }, async () => {
-  const input = makeQueuedRunInput({ userMessage: "同一 submissionKey 重放两次" });
+  const { input } = makeUserMessageFactInput({}, "同一 submissionKey 重放两次");
   const first = await repo!.createQueuedRun(input);
   track(first.run.harnessRunId);
   const second = await repo!.createQueuedRun(input);
@@ -161,8 +183,8 @@ describeOrSkip("user/message is appended once per submission key even on replay"
   assert.equal(rows.length, 1, "重放必须走「返回原 Run 不追加事件」分支：一条用户正文就是一条");
 });
 
-describeOrSkip("createQueuedRun without userMessage stays event-shape compatible", { skip: !testDatabaseUrl }, async () => {
-  // additive 兼容：既有构造点（replay/regression 等非对话提交）不传正文时，
+describeOrSkip("createQueuedRun without userMessageFact stays event-shape compatible", { skip: !testDatabaseUrl }, async () => {
+  // additive 兼容：既有构造点（replay/regression 等非对话提交）不传构造器时，
   // 事件面与批次 2b-1 之前逐字一致——只有 run_queued，没有空的 user/message。
   const created = await repo!.createQueuedRun(makeQueuedRunInput());
   track(created.run.harnessRunId);
@@ -174,7 +196,8 @@ describeOrSkip("createQueuedRun without userMessage stays event-shape compatible
 });
 
 describeOrSkip("conversation fact events are appended at most once per run", { skip: !testDatabaseUrl }, async () => {
-  const created = await repo!.createQueuedRun(makeQueuedRunInput({ userMessage: "第一轮正文" }));
+  const { input } = makeUserMessageFactInput({}, "第一轮正文");
+  const created = await repo!.createQueuedRun(input);
   track(created.run.harnessRunId);
   const runId = created.run.harnessRunId;
 
@@ -207,7 +230,7 @@ describeOrSkip("conversation fact events are appended at most once per run", { s
 describeOrSkip("createQueuedRun rolls back entirely when user/message exceeds the payload ceiling", { skip: !testDatabaseUrl }, async () => {
   // 事件表对单条载荷有 1 MiB 硬闸（assertSafeJsonObject）。正文超限时**整笔入队**
   // 回滚，而不是留下一个「有 Run 无用户正文」的半提交态——后者正是本批要消灭的形态。
-  const input = makeQueuedRunInput({ userMessage: "x".repeat(1024 * 1024 + 64) });
+  const { input } = makeUserMessageFactInput({}, "x".repeat(1024 * 1024 + 64));
   try {
     await assert.rejects(
       repo!.createQueuedRun(input),

@@ -12,6 +12,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { startHarnessRuntime, createRunTerminalMemoryHook } from "./harness-boot";
+import { attachWorkbenchConversationFact } from "./workbench-conversation-fact";
 import { createMemoryUsecase } from "../memory/memory.usecase";
 import type { distillRunMemory } from "../memory/memory.distiller";
 import type { AuthUser } from "../../types";
@@ -106,7 +107,7 @@ test("boot: 默认组装出的 workflow dispatch 不是占位", async () => {
             title: "测试",
             workflowId: "workbench_chat_v1",
             workflowVersion: "1.0.0",
-            executionConfig: { content: "hello" },
+            executionConfig: attachWorkbenchConversationFact({ content: "hello" }).executionConfig,
             status: "running",
             eventSequence: 1,
             metadata: {},
@@ -180,7 +181,7 @@ test("boot: G-E1 focused 端到端——stub modelChat 注入后被调用", asyn
               title: "测试",
               workflowId: "workbench_chat_v1",
               workflowVersion: "1.0.0",
-              executionConfig: { content: "请帮我分析这个需求" },
+              executionConfig: attachWorkbenchConversationFact({ content: "请帮我分析这个需求" }).executionConfig,
               status: "running",
               eventSequence: 1,
               metadata: {},
@@ -405,7 +406,7 @@ function makeRunStepCtx(input: {
       title: input.content.slice(0, 40),
       workflowId: "workbench_chat_v1",
       workflowVersion: "1.0.0",
-      executionConfig: { content: input.content },
+      executionConfig: attachWorkbenchConversationFact({ content: input.content }).executionConfig,
       status: "running",
       eventSequence: 1,
       metadata: {},

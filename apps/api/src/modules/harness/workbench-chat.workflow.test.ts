@@ -16,6 +16,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createWorkbenchChatWorkflow, type WorkbenchChatWorkflowDeps } from "./workbench-chat.workflow";
+import {
+  attachWorkbenchConversationFact,
+  withWorkbenchProjectionSource,
+  type WorkbenchConversationAttachment,
+} from "./workbench-conversation-fact";
 import type { HarnessWorkflowStepContext } from "./harness-runtime.worker";
 import {
   type AppendAiSessionMessageIdempotentInput,
@@ -78,6 +83,12 @@ type RecordedAppendCall = {
   content: string;
   deduplicationKey: string;
   attachmentIds?: string[];
+  /**
+   * 批次 2b-2：完整消息与来源键。事件载荷与会话那条消息是否**逐字段**相同，
+   * 是本批唯一的过线判据，只留 role/content 就无法在单元层比对（e2e 比的是真库那一行）。
+   */
+  message?: AppendAiSessionMessageIdempotentInput["message"];
+  source?: AppendAiSessionMessageIdempotentInput["source"];
 };
 
 /** S2b-2 后 appendSessionMessage 为注入 dep（直写 PG 由 repository 层守护）：
@@ -90,8 +101,16 @@ function makeRecordingAppendSessionMessage(calls: RecordedAppendCall[]) {
       content: input.message.content,
       deduplicationKey: input.source.deduplicationKey,
       attachmentIds: input.message.attachmentIds,
+      // 存**副本**：workflow 落库后仍可能持有同一对象，直接引用会让断言看不出中途改写
+      message: JSON.parse(JSON.stringify(input.message)),
+      source: JSON.parse(JSON.stringify(input.source)),
     });
-    return { found: false, created: true, message: input.message };
+    // 复刻 repository 语义：新建时返回补上 projectionSource 的那一份（幂等吸收由上层夹具管）
+    return {
+      found: true,
+      created: true,
+      message: withWorkbenchProjectionSource(input.message, input.source),
+    };
   };
 }
 
@@ -107,10 +126,48 @@ type FakeEffect = {
   execute: () => Promise<Record<string, unknown>>;
 };
 
+/**
+ * 复刻 worker 的真实幂等语义：命中既有 effectKey 时返回**首跑持久化的那份 output**、
+ * 不调用 execute。
+ *
+ * 批次 2b-2 起刻意不再手写 `{ answer: "cached" }` 当缓存值：本轮 assistant 消息的
+ * 信封（messageId / createdAt / metadata）正是随那份 output 一起持久化的，
+ * 手搓一份只有 answer 的假 output 等于在测试里绕过「重放读回同一份信封」这条保证——
+ * 而那恰恰是本批唯一的新契约。
+ */
+function makeEffectStore() {
+  const outputs = new Map<string, Record<string, unknown>>();
+  const executions: string[] = [];
+  const recordToolEffectOnce = async (effect: FakeEffect) => {
+    const existing = outputs.get(effect.effectKey);
+    if (existing) return { output: existing, created: false };
+    executions.push(effect.effectKey);
+    const output = await effect.execute();
+    outputs.set(effect.effectKey, output);
+    return { output, created: true };
+  };
+  return { recordToolEffectOnce, executions };
+}
+
 function makeFakeCtx(overrides: {
   run?: Partial<HarnessWorkflowStepContext["run"]>;
+  /**
+   * 批次 2b-2：本轮对话的信封由「提交侧」mint，workflow 只读不回造（读不到即抛）。
+   * 故夹具经本字段给 executionConfig，信封由 makeFakeCtx 用**生产同一构造函数**补齐；
+   * 需要断言信封字段（如 attachmentIds / messageId）的用例读
+   * `ctx.run.executionConfig.conversationFact`。
+   * 刻意不走 `run.executionConfig` 那条：绕过信封的夹具只会让 executeStep 抛，
+   * 而「抛」正是本批要保住的行为，不该被夹具悄悄放宽。
+   */
+  executionConfig?: Record<string, unknown>;
   recordToolEffectOnce?: HarnessWorkflowStepContext["recordToolEffectOnce"];
 } = {}): HarnessWorkflowStepContext {
+  const executionConfig = attachWorkbenchConversationFact(
+    { content: "你好", ...overrides.executionConfig },
+    Array.isArray(overrides.executionConfig?.attachments)
+      ? (overrides.executionConfig.attachments as WorkbenchConversationAttachment[])
+      : [],
+  ).executionConfig;
   const run = {
     harnessRunId: "run-1",
     ownerUserId: "user-1",
@@ -120,14 +177,14 @@ function makeFakeCtx(overrides: {
     title: "测试",
     workflowId: "workbench_chat_v1",
     workflowVersion: "1.0.0",
-    executionConfig: { content: "你好" },
+    executionConfig,
     status: "running",
     eventSequence: 1,
     metadata: {},
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides.run,
-  } as HarnessWorkflowStepContext["run"];
+  } as unknown as HarnessWorkflowStepContext["run"];
 
   const effects: FakeEffect[] = [];
 
@@ -191,9 +248,6 @@ test("executeStep 从 executionConfig.content 取输入并 dispatch", async () =
 });
 
 test("recordToolEffectOnce 幂等：重复执行不产生第二次 AI 调用", async () => {
-  let callCount = 0;
-  const recordedEffects: string[] = [];
-
   const wf = createWorkbenchChatWorkflow({
     dispatch: async () => ({
       intent: "domain_qa",
@@ -207,26 +261,16 @@ test("recordToolEffectOnce 幂等：重复执行不产生第二次 AI 调用", a
     appendRunEvent: makeNoOpAppendRunEvent(),
   });
 
-  const recordToolEffectOnce = async (effect: FakeEffect) => {
-    const key = effect.effectKey;
-    if (recordedEffects.includes(key)) {
-      return { output: { answer: "cached" }, created: false };
-    }
-    recordedEffects.push(key);
-    callCount += 1;
-    const output = await effect.execute();
-    return { output, created: true };
-  };
-
+  const { recordToolEffectOnce, executions } = makeEffectStore();
   const ctx = makeFakeCtx({ recordToolEffectOnce: recordToolEffectOnce as any });
 
   // 第一次执行
   await wf.executeStep("chat", ctx);
-  assert.equal(callCount, 1);
+  assert.equal(executions.length, 1);
 
   // 第二次执行（模拟恢复后重跑同 step）
   await wf.executeStep("chat", ctx);
-  assert.equal(callCount, 1, "幂等性保证：第二次不应触发新的 AI 调用");
+  assert.equal(executions.length, 1, "幂等性保证：第二次不应触发新的 AI 调用");
 });
 
 test("assistant 消息来源键冻结为 ${runId}:assistant:1", async () => {
@@ -349,16 +393,14 @@ test("ISS-2026-08-11-007: 附件写入会话并作为模型上下文 dispatch", 
     appendRunEvent: makeNoOpAppendRunEvent(),
   });
   const ctx = makeFakeCtx({
-    run: {
-      executionConfig: {
-        content: "多组织业务往来一般包含哪些模块？",
-        attachments: [{
-          name: "客户需求.xlsx",
-          size: 4096,
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
-        }],
-      },
+    executionConfig: {
+      content: "多组织业务往来一般包含哪些模块？",
+      attachments: [{
+        name: "客户需求.xlsx",
+        size: 4096,
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
+      }],
     },
   });
 
@@ -429,23 +471,27 @@ test("ISS-004 层 2：dispatch 入参携带 streamingAdapter，onToken 逐 chunk
   await wf.executeStep("chat", makeFakeCtx());
 
   assert.ok(seenAdapter, "dispatch 入参必须携带 streamingAdapter（异步通道逐字流式前提）");
+  // 批次 2b-1：流式碎片之后紧跟一条完整正文的事实事件。delta / thought 那三条的条数、
+  // 内容与顺序一字未动（判据④）——新增的是第四行，不是改动前三行。
+  // 批次 2b-2：第四行载荷已是**完整消息信封**。本用例主题是传输面映射，故只对传输行
+  // 逐字对照、对事实行断类型与正文；信封完整性由「批次2b-2」那组用例与 e2e 专门钉。
+  const transport = appended.filter((event) => event.eventType !== "assistant/message");
   assert.deepEqual(
-    appended.map((event) => [event.runId, event.eventType, event.payload]),
+    transport.map((event) => [event.runId, event.eventType, event.payload]),
     [
       ["run-1", "text.delta", { delta: "你好" }],
       ["run-1", "thought", { text: "先拆解问题" }],
       ["run-1", "text.delta", { delta: "世界" }],
-      // 批次 2b-1：流式碎片之后紧跟一条完整正文的事实事件。delta 那三条的条数、
-      // 内容与顺序一字未动（判据④）——新增的是第四行，不是改动前三行。
-      ["run-1", "assistant/message", { content: "你好世界" }],
     ],
     "contentDelta → text.delta(payload.delta)，reasoningContentDelta → thought(payload.text)，空增量不写事件",
   );
+  const factEvent = appended[appended.length - 1];
+  assert.equal(factEvent.eventType, "assistant/message", "全部流式碎片之后必须紧跟一条完整正文事实事件");
+  assert.equal(factEvent.payload.content, "你好世界", "事实事件承载完整答复而非碎片");
 });
 
 test("ISS-004 层 2：恢复重放跳过 execute，流式事件不重复发射（幂等天然成立）", async () => {
   const appended: Array<{ runId: string; eventType: string; payload: Record<string, unknown> }> = [];
-  const recordedEffects: string[] = [];
 
   const wf = createWorkbenchChatWorkflow({
     dispatch: async (input) => {
@@ -466,14 +512,7 @@ test("ISS-004 层 2：恢复重放跳过 execute，流式事件不重复发射�
     },
   });
 
-  const recordToolEffectOnce = async (effect: FakeEffect) => {
-    if (recordedEffects.includes(effect.effectKey)) {
-      return { output: { answer: "cached" }, created: false };
-    }
-    recordedEffects.push(effect.effectKey);
-    const output = await effect.execute();
-    return { output, created: true };
-  };
+  const { recordToolEffectOnce } = makeEffectStore();
   const ctx = makeFakeCtx({ recordToolEffectOnce: recordToolEffectOnce as any });
 
   const deltasOf = () => appended.filter((event) => event.eventType === "text.delta").length;
@@ -546,11 +585,9 @@ test("ISS-2026-08-16-002：第二轮无附件请求时，dispatchAttachment 从�
 
     // 第二轮：用户发送纯文本，无附件（executionConfig.attachments 为空）
     const ctx = makeFakeCtx({
-      run: {
-        executionConfig: {
-          content: "请基于当前附件生成需求解析报告",
-          attachments: [], // 第二轮无附件
-        },
+      executionConfig: {
+        content: "请基于当前附件生成需求解析报告",
+        attachments: [], // 第二轮无附件
       },
     });
 
@@ -609,16 +646,14 @@ test("ISS-2026-08-16-002：请求级附件优先于会话级回退（不覆盖�
 
     // 第二轮：用户上传了新附件
     const ctx = makeFakeCtx({
-      run: {
-        executionConfig: {
-          content: "请解析这个新文件",
-          attachments: [{
-            name: "新需求文档.xlsx",
-            size: 8192,
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            parsedSummary: "新项目：新需求",
-          }],
-        },
+      executionConfig: {
+        content: "请解析这个新文件",
+        attachments: [{
+          name: "新需求文档.xlsx",
+          size: 8192,
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          parsedSummary: "新项目：新需求",
+        }],
       },
     });
 
@@ -673,9 +708,7 @@ test("ISS-2026-08-16-004：显式报告闸门——附件存在且消息为「�
     });
 
     const ctx = makeFakeCtx({
-      run: {
-        executionConfig: { content: "生成需求解析报告" },
-      },
+      executionConfig: { content: "生成需求解析报告" },
     });
 
     const outcome = await wf.executeStep("chat", ctx);
@@ -710,9 +743,7 @@ test("ISS-2026-08-16-004：显式报告闸门——无附件时不触发（走�
   });
 
   const ctx = makeFakeCtx({
-    run: {
-      executionConfig: { content: "生成需求解析报告" },
-    },
+    executionConfig: { content: "生成需求解析报告" },
   });
 
   const outcome = await wf.executeStep("chat", ctx);
@@ -844,7 +875,25 @@ test("RP-030 覆盖：恢复重放跳过 execute，trace 不重复写（幂等�
   // 重放语义：recordToolEffectOnce 命中既有 effect，直接返回 output 不执行 execute
   const replayCtx = makeFakeCtx({
     recordToolEffectOnce: async () => ({
-      output: { answer: "缓存回复", intent: "domain_qa", suggestedActions: [], trace: { intentConfidence: 0.9, routingRule: "mock_rule", contextRefs: [] } },
+      output: {
+        answer: "缓存回复",
+        intent: "domain_qa",
+        suggestedActions: [],
+        trace: { intentConfidence: 0.9, routingRule: "mock_rule", contextRefs: [] },
+        // 批次 2b-2：信封随首跑 output 一起持久化，重放读回的就是它——缺了它，
+        // 本夹具模拟的就是一个今天不可能存在的存量 effect 行。
+        assistantMessage: {
+          messageId: "msg-replayed",
+          role: "assistant",
+          content: "缓存回复",
+          createdAt: "2026-09-11T00:00:00.000Z",
+          metadata: {
+            intent: "domain_qa",
+            suggestedActions: [],
+            trace: { intentConfidence: 0.9, routingRule: "mock_rule", contextRefs: [] },
+          },
+        },
+      },
       created: false,
     }),
   });
@@ -946,7 +995,7 @@ test("DEF-2026-08-27-001：第二轮 dispatch 入参含第一轮 user+assistant�
   });
 
   await wf.executeStep("chat", makeFakeCtx({
-    run: { executionConfig: { content: "第二轮：那实施周期多久" } },
+    executionConfig: { content: "第二轮：那实施周期多久" },
   }));
 
   assert.equal(dispatchInputs.length, 1, "本轮必须恰好一次 dispatch");
@@ -1007,12 +1056,26 @@ test("DEF-2026-08-27-001：kind=metadata chunk 不写 run 事件，memoryRef 落
     },
   });
 
-  await wf.executeStep("chat", makeFakeCtx({ run: { executionConfig: { content: "追问" } } }));
+  await wf.executeStep("chat", makeFakeCtx({ executionConfig: { content: "追问" } }));
 
+  // metadata chunk 不得进 run 事件流（既非 text.delta 也非 thought）；批次 2b-1 起
+  // 末尾多一条完整正文，两条 delta 原文未动。批次 2b-2 起该条载荷是**完整信封**，
+  // 不再是一行 `{content}`，故传输行逐字对照、事实行按字段对照。
+  const transportEvents = runEvents.filter((e) => e.eventType !== "assistant/message");
   assert.deepEqual(
-    runEvents.map((e) => `${e.eventType}:${JSON.stringify(e.payload)}`),
-    ['text.delta:{"delta":"模"}', 'text.delta:{"delta":"型回复"}', 'assistant/message:{"content":"模型回复"}'],
-    "metadata chunk 不得进入 run 事件流（既非 text.delta 也非 thought）；批次 2b-1 起末尾多一条完整正文，两条 delta 原文未动",
+    transportEvents.map((e) => `${e.eventType}:${JSON.stringify(e.payload)}`),
+    ['text.delta:{"delta":"模"}', 'text.delta:{"delta":"型回复"}'],
+    "metadata chunk 不得进入 run 事件流；text.delta 原文未动",
+  );
+  const factEvent = runEvents[runEvents.length - 1];
+  assert.equal(factEvent.eventType, "assistant/message");
+  assert.equal(factEvent.payload.content, "模型回复", "事实事件承载完整答复");
+  assert.equal(
+    (factEvent.payload.metadata as { memoryRef?: unknown } | undefined)?.memoryRef
+      ? JSON.stringify((factEvent.payload.metadata as { memoryRef: unknown }).memoryRef)
+      : undefined,
+    JSON.stringify({ scenesCount: 1, atomsCount: 2 }),
+    "memoryRef 同样要进事件载荷的 metadata——否则 2b-3 换源后这一轮的记号只在会话里存在",
   );
   const assistant = appended.find((c) => c.role === "assistant");
   assert.ok(assistant, "assistant 消息必须落库");
@@ -1120,7 +1183,7 @@ test("批次0·⑤：注入 getSessionRecord 时下发 readSessionForInvariant�
   });
 
   await wf.executeStep("chat", makeFakeCtx({
-    run: { executionConfig: { content: "第二轮：那实施周期多久" } },
+    executionConfig: { content: "第二轮：那实施周期多久" },
   }));
 
   assert.ok(hook, "具备存储读取能力时 dispatch 必须收到 readSessionForInvariant，否则无人对账");
@@ -1200,7 +1263,7 @@ test("批次0·⑤：接线点上生产 builder + 生产断言为绿，管道丢
   });
 
   await wf.executeStep("chat", makeFakeCtx({
-    run: { executionConfig: { content: "第二轮：那实施周期多久" } },
+    executionConfig: { content: "第二轮：那实施周期多久" },
   }));
 
   assert.equal(greenPassed, true, "接线点两侧一致时必须为绿");
@@ -1442,7 +1505,6 @@ test("批次0.5·②：未注入 appendRunEvent 时 onToolEvent 为空操作，�
   const wf = createWorkbenchChatWorkflow({
     dispatch: async (input) => {
       assert.ok(input.onToolEvent, "即使未注入 appendRunEvent，接缝也应下发（additive 契约）");
-      input.onToolEvent?.({ kind: "tool_call", name: "t", arguments: {} });
       fired += 1;
       input.onToolEvent?.({ kind: "tool_result", name: "t", ok: true, data: 1 });
       return { answer: "ok", intent: "domain_qa", suggestedActions: [], trace: {} } as any;
@@ -1460,7 +1522,6 @@ test("批次0.5·②：未注入 appendRunEvent 时 onToolEvent 为空操作，�
 
 test("批次0.5·②：恢复重放命中既有 effect 时不重发工具事件", async () => {
   const appended: RecordedRunEvent[] = [];
-  const recordedEffects: string[] = [];
   const wf = createWorkbenchChatWorkflow({
     dispatch: async (input) => {
       input.onToolEvent?.({ kind: "tool_call", name: "t", arguments: {} });
@@ -1472,11 +1533,7 @@ test("批次0.5·②：恢复重放命中既有 effect 时不重发工具事件"
     toolCallProgressIntervalMs: 10_000,
   });
 
-  const recordToolEffectOnce = async (effect: FakeEffect) => {
-    if (recordedEffects.includes(effect.effectKey)) return { output: { answer: "cached" }, created: false };
-    recordedEffects.push(effect.effectKey);
-    return { output: await effect.execute(), created: true };
-  };
+  const { recordToolEffectOnce } = makeEffectStore();
   const ctx = makeFakeCtx({ recordToolEffectOnce: recordToolEffectOnce as any });
 
   await wf.executeStep("chat", ctx);
@@ -1737,15 +1794,29 @@ test("批次2b-1：答复定稿写一条 assistant/message，正文与会话 ass
 
   const factEvents = eventsOfType(events, "assistant/message");
   assert.equal(factEvents.length, 1, "一轮答复只有一条事实事件");
-  assert.deepEqual(factEvents[0].payload, { content: answer }, "载荷必须是完整正文，不截断不改形");
   assert.equal(factEvents[0].runId, "run-1");
 
   const assistantMessage = messages.find((call) => call.role === "assistant");
   assert.ok(assistantMessage, "会话侧的 assistant 消息照旧落库（双写期，两边都要有）");
+
+  // 批次 2b-2 判据①（单元层）：载荷 ≡ 会话里那条消息的**完整信封**，逐字段比对、
+  // 不排除任何键。期望值由「workflow 交给 appendSessionMessage 的那份 + 来源键」组合而成，
+  // 组合用的是 repository 落库时的同一表达式（withWorkbenchProjectionSource），
+  // 所以这里比的是「事件写的那一份」与「会话存的那一份」是否同源，而不是两份手搓常量。
+  const expectedMessage = withWorkbenchProjectionSource(assistantMessage!.message!, assistantMessage!.source!);
   assert.equal(
-    (factEvents[0].payload as { content: string }).content,
-    assistantMessage!.content,
-    "判据①：事件载荷正文必须与 ai_sessions 里那条 assistant 正文逐字节相同",
+    JSON.stringify(factEvents[0].payload),
+    JSON.stringify(expectedMessage),
+    "判据①：事件载荷必须与 ai_sessions 里那条 assistant 消息逐字段相同（messageId / createdAt / metadata 全在内）",
+  );
+  assert.equal(factEvents[0].payload.content, answer, "载荷正文是完整正文，不截断不改形");
+  assert.equal(typeof factEvents[0].payload.messageId, "string", "messageId 必须在载荷里");
+  assert.equal(typeof factEvents[0].payload.createdAt, "string", "createdAt 必须在载荷里");
+  assert.equal(
+    ((factEvents[0].payload.metadata as { projectionSource?: { deduplicationKey?: string } }).projectionSource)
+      ?.deduplicationKey,
+    "run-1:assistant:1",
+    "来源键随载荷一起进事件流——它是「恰好一次落库」的幂等防线，不是可省的簿记",
   );
 
   // 事实事件排在全部传输碎片之后：同一写链 ⇒ sequence 天然反映「先流式、后定稿」
@@ -1783,6 +1854,28 @@ test("批次2b-1：恢复重放不再写第二条 assistant/message", async () =
     1,
     "重放跳过 execute ⇒ 事实事件不重复；若把写入放在 appendSessionMessage 旁边，这里会是两条",
   );
+
+  // 批次 2b-2 新增保证：重放时信封取自首跑持久化的 effect output，**不重新 mint**。
+  // 会话侧靠来源键本就只有一条，但今天重放若换 messageId，事件里那份 id 与存储里那份
+  // 就会分叉——差异要到 2b-3 换读取源才看得见，所以必须在写入侧当场钉住。
+  const assistants = messages.filter((call) => call.role === "assistant");
+  assert.equal(assistants.length, 2, "两次执行各调一次直写（吸收在 repository 层）");
+  assert.ok(assistants[0].message?.messageId, "首跑必须带 messageId");
+  assert.equal(
+    assistants[1].message?.messageId,
+    assistants[0].message?.messageId,
+    "重放写出的 messageId 必须与首跑同一份",
+  );
+  assert.equal(
+    assistants[1].message?.createdAt,
+    assistants[0].message?.createdAt,
+    "createdAt 同理：答复定稿时刻只有一个",
+  );
+  assert.equal(
+    eventsOfType(events, "assistant/message")[0].payload.messageId,
+    assistants[0].message?.messageId,
+    "事件载荷里的 id 就是存储那条的 id",
+  );
 });
 
 test("批次2b-1：本轮没有任何 text.delta 时仍然有 assistant/message（事实不依赖传输）", async () => {
@@ -1795,5 +1888,10 @@ test("批次2b-1：本轮没有任何 text.delta 时仍然有 assistant/message�
   assert.equal(eventsOfType(events, "text.delta").length, 0, "本轮确实一片 delta 都没落");
   const factEvents = eventsOfType(events, "assistant/message");
   assert.equal(factEvents.length, 1, "delta 为零也不能丢掉这轮答复的事实");
-  assert.deepEqual(factEvents[0].payload, { content: "静态文案答复，无流式" });
+  assert.deepEqual(
+    Object.keys(factEvents[0].payload).sort(),
+    ["content", "createdAt", "messageId", "metadata", "role"],
+    "批次 2b-2：载荷是完整消息信封（无 delta 时同样成立——事实不依赖传输，也不依赖传输留下多少字段）",
+  );
+  assert.equal(factEvents[0].payload.content, "静态文案答复，无流式");
 });
