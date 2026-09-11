@@ -15,9 +15,14 @@ import {
   RequirementKimiCredentialsConfig,
   RequirementSystemConfig,
   RequirementSystemConfigStore,
+  ToolPolicyConfig,
+  ToolPolicyRevision,
+  ToolPolicyStore,
   VersionCodeRule,
   VersionCodeRulesStore,
 } from "../../types";
+import { TOOL_POLICY_REVISION_LIMIT } from "../../types";
+import { normalizeToolPolicyConfig } from "../../agent/tool-policy";
 import { config } from "../../config/env";
 import { applyVersionCodeFormat } from "../../utils/version-code-format";
 // S3（2026-08-30）：四个 *StorePath 导入随 JSON 读写路径删除。注意
@@ -1310,4 +1315,88 @@ export async function loadKnowledgeBaseConfigStore(): Promise<KnowledgeBaseConfi
 
 export async function saveKnowledgeBaseConfigStore(store: KnowledgeBaseConfigStore): Promise<void> {
   await getSystemRepository().saveKnowledgeBaseConfigStore(normalizeKnowledgeBaseStore(store));
+}
+
+// -------------------- 批次 6b：工具策略（第五配置区） --------------------
+
+export function createDefaultToolPolicyConfig(): ToolPolicyConfig {
+  return { schemaVersion: 1, policies: {} };
+}
+
+function normalizeToolPolicyRevision(input: unknown): ToolPolicyRevision | null {
+  const source = (input || {}) as Partial<ToolPolicyRevision>;
+  const actor = String(source.actor ?? "").trim();
+  const at = String(source.at ?? "").trim();
+  if (!actor || !at) return null;
+  const action = source.action === "activate" ? "activate" : source.action === "draft-update" ? "draft-update" : null;
+  if (!action) return null;
+  const changes = Array.isArray(source.changes)
+    ? source.changes
+        .map((change) => ({
+          tool: String(change?.tool ?? "").trim(),
+          field: (["enabled", "visibleRoles", "approvalStrategy", "injectionMode"] as const).includes(
+            change?.field as never,
+          )
+            ? change!.field
+            : undefined,
+          from: String(change?.from ?? ""),
+          to: String(change?.to ?? ""),
+        }))
+        .filter((change): change is ToolPolicyRevision["changes"][number] => Boolean(change.tool && change.field))
+    : [];
+  return {
+    seq: Number.isFinite(Number(source.seq)) ? Math.max(0, Number(source.seq)) : 0,
+    version: Number.isFinite(Number(source.version)) ? Math.max(1, Number(source.version)) : 1,
+    action,
+    actor,
+    at,
+    changes,
+  };
+}
+
+/**
+ * 归一化 store（读写共用，与其余配置区同范式）：
+ *  · draft/active 同走 normalizeToolPolicyConfig，active 缺省回落 draft（存量行未生效过即两态一致）；
+ *  · revisions 有界：超上限保留**最近** TOOL_POLICY_REVISION_LIMIT 条（旧→新排列，截头保尾）。
+ */
+export function normalizeToolPolicyStore(input: unknown): ToolPolicyStore {
+  const data = (input || {}) as Partial<ToolPolicyStore>;
+  const now = new Date().toISOString();
+  const draft = normalizeToolPolicyConfig(data.draft);
+  const active = normalizeToolPolicyConfig(data.active ?? data.draft);
+  const revisions = (Array.isArray(data.revisions) ? data.revisions : [])
+    .map(normalizeToolPolicyRevision)
+    .filter((revision): revision is ToolPolicyRevision => revision !== null);
+  const bounded =
+    revisions.length > TOOL_POLICY_REVISION_LIMIT ? revisions.slice(revisions.length - TOOL_POLICY_REVISION_LIMIT) : revisions;
+  return {
+    version: Number.isFinite(Number(data.version)) ? Math.max(1, Number(data.version)) : 1,
+    draft,
+    active,
+    updatedAt: String(data.updatedAt || now),
+    effectiveAt: String(data.effectiveAt || now),
+    revisions: bounded,
+  };
+}
+
+export async function loadToolPolicyStore(): Promise<ToolPolicyStore> {
+  const store = await getSystemRepository().loadToolPolicyStore();
+  if (store) return normalizeToolPolicyStore(store);
+  const now = new Date().toISOString();
+  const initial = createDefaultToolPolicyConfig();
+  return { version: 1, draft: initial, active: initial, updatedAt: now, effectiveAt: now, revisions: [] };
+}
+
+export async function saveToolPolicyStore(store: ToolPolicyStore): Promise<void> {
+  await getSystemRepository().saveToolPolicyStore(normalizeToolPolicyStore(store));
+}
+
+/**
+ * 注入点读取当前**生效**策略（工作台/Agent 通道每次组装工具时调用）。
+ * 无缓存（与配置域「改完立即生效」口径一致）；读失败抛 SystemStoreError，
+ * 调用方按失败方向关闭处理——拿不到策略不是「放行全部」的理由。
+ */
+export async function resolveActiveToolPolicy(): Promise<ToolPolicyConfig> {
+  const store = await loadToolPolicyStore();
+  return store.active;
 }

@@ -22,7 +22,7 @@ import { appendAiSessionMessageIdempotent } from "../ai-sessions/ai-sessions.rep
 import { getAiSession } from "../ai-sessions/ai-sessions.usecase";
 import { recordWorkbenchTurnTrace, recordWorkbenchTurnFailureTrace } from "../trace/trace.usecase";
 import type { AuthUser } from "../../types";
-import { resolveActiveApiKeyForScope, resolveActiveRequirementKimiApiKey } from "../system/system.repository";
+import { resolveActiveApiKeyForScope, resolveActiveRequirementKimiApiKey, resolveActiveToolPolicy } from "../system/system.repository";
 import { distillRunMemory } from "../memory/memory.distiller";
 import { getMemoryRepository } from "../memory/memory.module";
 
@@ -201,7 +201,10 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
         // 必须与同步路径同口径传 tools 并真正执行 tool_calls——DEF-2026-08-27-001
         // 的根因正是「只修了没在跑的分支」。工具分流在注入点完成，不改 ToolRegistry；
         // 批次 1a：本通道是生产唯一接审批闸门的路径，ask 档写工具须经用户确认后才执行。
-        const toolSet = resolveWorkbenchInjectableTools(user);
+        // 批次 6b：注入点读取生效工具策略（system_configs.toolPolicy），在 capability
+        // 过滤之上叠加策略裁切；策略读失败即抛错停跑，不按「无策略」放行。
+        const toolPolicy = await resolveActiveToolPolicy();
+        const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy });
         const streamChatCompletion = provider.streamChatCompletion!.bind(provider);
         // 单轮流式调用：透传 provider 全部可见字段（含 toolCalls，工具循环靠它识别调用）
         for await (const chunk of runWorkbenchToolLoopStream({
@@ -210,6 +213,9 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
           registry: toolSet.registry,
           agentUser: toolSet.agentUser,
           allowToolNames: toolSet.allowToolNames,
+          // 批次 6b：注入集之外的工具点名即拒（不给审批机会）；审批分流读取同一份生效策略
+          injectedToolNames: toolSet.injectedToolNames,
+          toolPolicy,
           // 批次 0 · ④：workflow 注入的幂等接缝必须接到本循环——
           // 每次工具调用经它落 `runId:stepKey:workbench_chat_tool_call:N`，
           // 中途失败重跑时已执行的轮次命中存量 effect 不再重复执行。

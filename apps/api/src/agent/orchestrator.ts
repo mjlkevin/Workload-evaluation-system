@@ -8,6 +8,8 @@ import type { AgentEvent, AgentUser } from "./agent.types";
 import type { RuntimeContext } from "./context/context.types";
 import type { ToolRegistry } from "./tool-registry";
 import { extractDiscoveredToolNames, LIST_TOOLS_TOOL_NAME } from "./tools/list-tools.tools";
+import type { ToolPolicyConfig } from "../types";
+import { isToolDiscoverableUnderPolicy, isToolEnabledUnderPolicy, resolveToolPolicyEntry } from "./tool-policy";
 import { config } from "../config/env";
 
 /** 编排只依赖 chatCompletion，便于测试注入假 Provider */
@@ -35,6 +37,13 @@ export interface RunAgentParams {
    * （环境变量 WES_AGENT_TOOL_INJECTION，默认 discovery；置 full 一键回退旧全量注入）。
    */
   toolInjectionMode?: ToolInjectionMode;
+  /**
+   * 批次 6b（additive）：生效工具策略（system_configs.toolPolicy）。由调用方从
+   * 服务端可信存储读取后传入，不接受模型/前端提供。本层只做减法：capability 过滤
+   * （注册表 selector 的既有逻辑，本批不动）之上再裁掉停用、角色不可见、
+   * on-demand 降档三类；审批确认条件同时读取策略（user-confirm 收紧）。
+   */
+  toolPolicy?: ToolPolicyConfig;
 }
 
 const DEFAULT_MAX_TURNS = 12;
@@ -43,12 +52,29 @@ export async function runAgent(params: RunAgentParams): Promise<string> {
   const { userMessage, user, registry, runner, onEvent, confirm } = params;
   const maxTurns = params.maxTurns ?? DEFAULT_MAX_TURNS;
   const mode = params.toolInjectionMode ?? config.agent.toolInjection;
+  const policy = params.toolPolicy;
+  const roles = user.roles ?? [];
   // full：全量回退，注入集与旧行为逐字节一致（全部业务工具、无 list_tools）；
   // discovery：核心工具 + list_tools，其余经发现后补入当轮注入集。
-  const tools: ToolDefinition[] =
+  // 批次 6b：两条模式的注入集都要过策略减法（停用 / 角色 / on-demand）。
+  // discovery 模式下 on-demand 降档 = 不再常驻、仅可经 list_tools 发现；
+  // 全量模式下 on-demand = 不主动注入（本通道无发现机制，等同排除——方向是减法，可接受）。
+  const rawTools: ToolDefinition[] =
     mode === "full"
       ? registry.listFullToolsFor(user)
       : [...registry.listCoreToolsFor(user), ...registry.listDiscoveryToolsFor(user)];
+  const tools: ToolDefinition[] = policy
+    ? rawTools.filter((definition) => {
+        const tool = registry.get(definition.function.name);
+        if (!tool) return false;
+        const entry = resolveToolPolicyEntry(policy, tool.name);
+        if (entry.enabled === false) return false;
+        if (!isToolEnabledUnderPolicy(tool.name, policy, roles)) return false;
+        // 仅全量通道需要 on-demand 排除；discovery 通道的 core 集里 on-demand 同样不常驻
+        if (entry.injectionMode === "on-demand") return false;
+        return true;
+      })
+    : rawTools;
 
   const messages: ChatMessage[] = [];
   if (params.systemPrompt) messages.push({ role: "system", content: params.systemPrompt });
@@ -60,13 +86,28 @@ export async function runAgent(params: RunAgentParams): Promise<string> {
     if (reply.toolCalls && reply.toolCalls.length > 0) {
       for (const call of reply.toolCalls) {
         const tool = registry.get(call.name);
-        if (tool?.mutates) {
+        // 批次 6b：确认条件与工作台决策槽同向（只能收紧）——写、外发、策略 user-confirm
+        // 三者任一为真都必须确认；外发不适用任何豁免（每次内容不同）。
+        const entry = policy ? resolveToolPolicyEntry(policy, call.name) : undefined;
+        const requiresConfirm =
+          Boolean(tool?.mutates) || tool?.exfiltrates === true || entry?.approvalStrategy === "user-confirm";
+        // 批次 6b：策略停用/角色不可见的工具即使被点名也不可执行（与注入侧同一判据）。
+        const policyAllowsExecution = tool
+          ? (entry?.enabled !== false) && isToolEnabledUnderPolicy(call.name, policy, roles)
+          : true;
+        if (requiresConfirm) {
           onEvent({ kind: "need_confirm", name: call.name, arguments: call.arguments });
           const okToRun = await confirm(call.name, call.arguments);
           if (!okToRun) {
             messages.push(toolResultMessage(call.id, call.name, { ok: false, error: "用户取消" }));
             continue;
           }
+        }
+        if (!policyAllowsExecution) {
+          const error = `工具 ${call.name} 已被工具策略停用或对本角色不可见，未执行`;
+          onEvent({ kind: "tool_result", name: call.name, ok: false, error });
+          messages.push(toolResultMessage(call.id, call.name, { ok: false, error }));
+          continue;
         }
 
         onEvent({ kind: "tool_call", name: call.name, arguments: call.arguments });
@@ -76,10 +117,16 @@ export async function runAgent(params: RunAgentParams): Promise<string> {
           messages.push(toolResultMessage(call.id, call.name, { ok: true, data }));
           // MS3：list_tools 命中后，把发现的 discoverable 工具补入后续轮注入集（去重）
           if (mode === "discovery" && call.name === LIST_TOOLS_TOOL_NAME) {
-            const discovered = registry.listDiscoveredToolDefinitionsFor(
-              user,
-              extractDiscoveredToolNames(data),
-            );
+            const discovered = registry
+              .listDiscoveredToolDefinitionsFor(user, extractDiscoveredToolNames(data))
+              // 批次 6b：发现后的补注入同样过策略（停用/角色不可见不得经发现绕回来）
+              .filter((definition) => {
+                const discoveredTool = registry.get(definition.function.name);
+                return (
+                  discoveredTool !== undefined &&
+                  (!policy || isToolDiscoverableUnderPolicy(discoveredTool, policy, roles))
+                );
+              });
             const injected = new Set(tools.map((t) => t.function.name));
             for (const def of discovered) {
               if (!injected.has(def.function.name)) tools.push(def);

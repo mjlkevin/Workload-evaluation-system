@@ -1,11 +1,14 @@
 import type { ToolDefinition } from "../ai/provider/model-provider";
 import type { Capability } from "../rbac/permissions";
+import type { V2Role } from "../rbac/roles";
 import type { RuntimeContext } from "./context/context.types";
 
 /** 当前用户上下文（编排循环透传，用于权限与数据隔离） */
 export interface AgentUser {
   id: string;
   capabilities: Capability[];
+  /** 批次 6b：v2 角色列表，供工具策略的角色可见性层（additive；缺省时策略角色层不生效，仅 capability 过滤） */
+  roles?: readonly V2Role[];
 }
 
 /** 一个可被 LLM 调用的工具 */
@@ -18,6 +21,16 @@ export interface AgentTool {
   capability: Capability;
   /** 是否写操作（true 需用户确认） */
   mutates: boolean;
+  /**
+   * 批次 6b · 数据外发维度：**独立于 mutates，不得互相兼任**。
+   * mutates 表达「改本地数据」；exfiltrates 表达「把数据送出系统边界」
+   * （如把会话总结发到 IM/外部服务）。后者可以不改本地库（mutates=false）
+   * 却比多数写操作危险——送出去的内容不可回收。
+   * 外发为代码侧属性（属工具实现事实，不落库，见批次 6b 边界），
+   * 且是审批**下限**：true 时永远逐次用户确认，不适用任何「记住本次选择」豁免
+   * ——每次外发的内容都不同，批准过一次不等于批准下一次。
+   */
+  exfiltrates?: boolean;
   /** SP-2026-007 MS3：工具分类（发现/分组用）；内置发现工具为 "discovery" */
   category?: string;
   /** SP-2026-007 MS3：true 时默认不注入 tools 参数，经 list_tools 发现后进入当轮注入集 */

@@ -9,10 +9,13 @@ import {
   RequirementKimiCredentialsPublic,
   RequirementSystemConfig,
   RequirementSystemConfigPublic,
+  ToolPolicyEntry,
   VersionCodeRule,
   VersionCodeRuleModuleKey,
   VersionCodeRuleStatus,
 } from "../../types";
+import { TOOL_POLICY_REVISION_LIMIT } from "../../types";
+import { diffToolPolicyConfigs, normalizeToolPolicyConfig } from "../../agent/tool-policy";
 import { config } from "../../config/env";
 import { requireAuth, isAdminUser } from "../../middleware/auth";
 import { fail, ok } from "../../utils/response";
@@ -35,6 +38,8 @@ import {
   resolveActiveRequirementKimiApiKey,
   resolveDraftKimiApiKeyForTest,
   resolveDraftKnowledgeBaseConfigForTest,
+  loadToolPolicyStore,
+  saveToolPolicyStore,
   saveImplementationDependencyRulesStore,
   saveKnowledgeBaseConfigStore,
   saveRequirementSystemConfigStore,
@@ -1109,4 +1114,104 @@ export async function testKnowledgeBaseConnectivityWithFetcher(
 
 export async function testKnowledgeBaseConnectivity(req: Request, res: Response) {
   return testKnowledgeBaseConnectivityWithFetcher(req, res);
+}
+
+// -------------------- 批次 6b：工具策略（system_configs 第五配置区） --------------------
+//
+// 边界（与类型注释同源，不得放宽）：
+//  · 这里只存**策略**（启用 / 角色可见 / 审批策略 / 注入模式）——工具的 execute、
+//    参数 schema、实现留在代码；清单仍从运行时 ToolRegistry 派生（批次 6a 裁决）。
+//  · draft→生效 + version 复用其余配置区同一套机制，不另造草稿存储。
+//  · 变更轨迹（revisions）记 actor（JWT 可信身份 username）+ at + 字段级 diff，
+//    与 version 递增对账：activate 条目 version 即生效后值。
+
+function nextRevisionSeq(store: { revisions: Array<{ seq: number }> }): number {
+  return store.revisions.reduce((max, revision) => Math.max(max, revision.seq), 0) + 1;
+}
+
+/** 草稿 PATCH：整图替换 draft.policies（页面持有全集，稀疏语义由归一化保证） */
+export async function updateToolPolicyDraft(req: Request, res: Response) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const actor = auth.user.username;
+  const payload = (req.body || {}) as { policies?: Record<string, Partial<ToolPolicyEntry>> };
+  const now = new Date().toISOString();
+  const store = await loadToolPolicyStore();
+  const previousDraft = store.draft;
+  const nextDraft = normalizeToolPolicyConfig({
+    schemaVersion: previousDraft.schemaVersion,
+    policies: payload.policies ?? previousDraft.policies,
+  });
+  const changes = diffToolPolicyConfigs(previousDraft, nextDraft);
+  store.draft = nextDraft;
+  store.updatedAt = now;
+  if (changes.length > 0) {
+    store.revisions = [
+      ...store.revisions,
+      { seq: nextRevisionSeq(store), version: store.version, action: "draft-update" as const, actor, at: now, changes },
+    ].slice(-TOOL_POLICY_REVISION_LIMIT);
+  }
+  await saveToolPolicyStore(store);
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        draft: store.draft,
+        updatedAt: store.updatedAt,
+        revisions: store.revisions,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+/** 生效：active ← draft，version+1，记字段级 diff（prev active → new active） */
+export async function activateToolPolicy(req: Request, res: Response) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const actor = auth.user.username;
+  const now = new Date().toISOString();
+  const store = await loadToolPolicyStore();
+  const previousActive = store.active;
+  const nextActive = normalizeToolPolicyConfig(store.draft);
+  const changes = diffToolPolicyConfigs(previousActive, nextActive);
+  store.active = nextActive;
+  store.version = Number(store.version || 1) + 1;
+  store.effectiveAt = now;
+  store.updatedAt = now;
+  store.revisions = [
+    ...store.revisions,
+    { seq: nextRevisionSeq(store), version: store.version, action: "activate" as const, actor, at: now, changes },
+  ].slice(-TOOL_POLICY_REVISION_LIMIT);
+  await saveToolPolicyStore(store);
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        active: store.active,
+        effectiveAt: store.effectiveAt,
+        revisions: store.revisions,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+/** 读取：draft + active + version + 轨迹一次给全（页面编辑态以 draft 为准，生效视图以 active 为准） */
+export async function getToolPolicy(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
+  const store = await loadToolPolicyStore();
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        draft: store.draft,
+        active: store.active,
+        updatedAt: store.updatedAt,
+        effectiveAt: store.effectiveAt,
+        revisions: store.revisions,
+      },
+      randomUUID(),
+    ),
+  );
 }

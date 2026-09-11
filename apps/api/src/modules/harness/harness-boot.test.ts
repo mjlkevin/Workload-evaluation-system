@@ -801,3 +801,124 @@ test("批次0.5·②：四类 tool.call.* 经生产装配落入 run 事件流，
     await deleteAiSession(user, session.sessionId);
   }
 });
+
+// ============================================================
+// 批次 6b · 判据①②（传输层实取）：停用的工具不得出现在真正发给模型的
+// 请求体 tools 里；策略「启用」不得越过 capability 把工具塞进请求体。
+// 这里验的是 harness 生产路径（harness-boot → resolveWorkbenchInjectableTools
+// → provider 请求体），而不是任何页面状态。
+//
+// 策略行用裸 SQL 播种而非 saveToolPolicyStore：本文件在串行 test:harness 套件内，
+// 播种只是给生产读路径一条生效策略；把它登记进 test:modules:serial-store 会让
+// 整个 boot 套件双跑。写入范围限定 config_key='toolPolicy'，finally 清理。
+// ============================================================
+
+const b6bTestDatabaseUrl = process.env.TEST_DATABASE_URL;
+
+test("批次6b·判据①②：策略停用/提权方向在 provider 请求体上实取", { skip: !b6bTestDatabaseUrl }, async () => {
+  const { db } = await import("../../db/client");
+  const { systemConfigs } = await import("../../db/schema");
+  const { eq } = await import("drizzle-orm");
+
+  const ownerUserId = `wes-t-b6b-${randomUUID().slice(0, 8)}`;
+  // workflow 侧 dispatch 用户按 run.ownerUsername 重建为 legacy "user"（= PRE_SALES）：
+  // 持有 estimates:read/create，不持有 estimates:write —— 判据② 的正好对照面。
+  const user: AuthUser = { id: ownerUserId, username: ownerUserId, role: "user", status: "active", passwordHash: "", createdAt: "", lastLoginAt: "" };
+  const session = await createAiSession(user, { title: "批次6b 策略请求体会话", workflowKey: "free_chat" });
+
+  const now = new Date();
+  const toolPolicyStore = {
+    version: 1,
+    draft: {
+      schemaVersion: 1,
+      policies: {
+        project_list: { enabled: false, visibleRoles: [], approvalStrategy: "default", injectionMode: "default" },
+        generate_wbs: { enabled: true, visibleRoles: [], approvalStrategy: "default", injectionMode: "default" },
+      },
+    },
+    active: {
+      schemaVersion: 1,
+      policies: {
+        project_list: { enabled: false, visibleRoles: [], approvalStrategy: "default", injectionMode: "default" },
+        generate_wbs: { enabled: true, visibleRoles: [], approvalStrategy: "default", injectionMode: "default" },
+      },
+    },
+    updatedAt: now.toISOString(),
+    effectiveAt: now.toISOString(),
+    revisions: [],
+  };
+
+  let bootError: unknown = null;
+  const injectedToolNames: string[][] = [];
+  try {
+    await db
+      .insert(systemConfigs)
+      .values({ configKey: "toolPolicy", store: toolPolicyStore, version: 1, updatedAt: now, effectiveAt: now })
+      .onConflictDoUpdate({ target: systemConfigs.configKey, set: { store: toolPolicyStore, version: 1, updatedAt: now, effectiveAt: now } });
+
+    const fakeProvider = {
+      name: "kimi",
+      defaultModel: "kimi-test",
+      isAvailable: () => true,
+      chatCompletion: async () => {
+        throw new Error("chatCompletion_should_not_be_called");
+      },
+      streamChatCompletion: (req: { messages: unknown; tools?: Array<{ function?: { name?: string } }> }) => {
+        injectedToolNames.push((req.tools ?? []).map((tool) => tool.function?.name ?? "?"));
+        return (async function* () {
+          yield { contentDelta: "策略已生效", model: "kimi-test", finishReason: "stop" };
+        })();
+      },
+    };
+
+    const runtime = startHarnessRuntime({
+      repo: { appendRunEvent: async (input: unknown) => input, getRunSnapshot: async () => null } as any,
+      enabled: true,
+      resolveApiKey: () => ({ apiKey: "placeholder" }),
+      getProvider: () => fakeProvider as never,
+      createModelChat: () => async () => ({
+        answer: "非结构化分类兜底",
+        rawContent: "非结构化分类兜底",
+        provider: "stub",
+        model: "stub",
+        attempts: 1,
+        finishReason: "stop",
+      }),
+      createWorker: ({ registry }) => ({
+        start: async () => {
+          try {
+            const workflow = registry.get("workbench_chat_v1", "1.0.0");
+            if (!workflow) throw new Error("workflow not found");
+            await workflow.executeStep("chat", makeRunStepCtx({
+              harnessRunId: `run-b6b-${ownerUserId}`,
+              ownerUserId,
+              aiSessionId: session.sessionId,
+              content: "批次6b 请求体实取",
+            }));
+          } catch (err) {
+            bootError = err;
+          }
+        },
+        stop: async () => {},
+        runNextAttempt: async () => false,
+        isStopping: () => false,
+      }),
+    });
+    await runtime.stop();
+
+    assert.equal(bootError, null, `生产路径不得抛错：${bootError instanceof Error ? bootError.message : String(bootError)}`);
+    assert.equal(injectedToolNames.length, 1, `provider 应恰收到一次请求，实取 ${injectedToolNames.length} 次`);
+    const names = injectedToolNames[0];
+    assert.ok(names.length > 0, "工作台请求体必须携带 tools（零工具等于没接线）");
+    // 判据①：被停用的工具真的不在请求体里
+    assert.equal(names.includes("project_list"), false, `停用工具泄进了模型请求体：${names.join(",")}`);
+    // 判据②：策略启用但 capability 不满足 → 仍不在请求体里（策略不是提权入口）
+    assert.equal(names.includes("generate_wbs"), false, `策略「启用」越过 capability 泄进请求体：${names.join(",")}`);
+    // 未受牵连的工具照常注入
+    assert.equal(names.includes("estimate_history"), true, `无策略干预的只读工具必须仍在请求体里：${names.join(",")}`);
+    assert.equal(names.includes("project_list") === false && names.includes("create_project"), true, "create_project 不受牵连");
+  } finally {
+    await db.delete(systemConfigs).where(eq(systemConfigs.configKey, "toolPolicy"));
+    await deleteAiSession(user, session.sessionId);
+  }
+});

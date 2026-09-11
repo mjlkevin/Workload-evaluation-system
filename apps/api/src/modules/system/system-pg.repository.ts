@@ -3,10 +3,10 @@
 // ============================================================
 // 范围：system.repository.ts 的 8 个 accessor 对应的存储操作——
 //   version_code_rules            行式表（sort_order 保序，事务内整表替换）
-//   system_configs 三个 config key  jsonb 单行（requirementSettings /
+//   system_configs 四个 config key  jsonb 单行（requirementSettings /
 //                                  implementationDependencyRules /
-//                                  knowledgeBaseConfig）
-// modelVerifyStatus 是第 5 个配置、独立路径，不在批 4 范围。
+//                                  knowledgeBaseConfig / toolPolicy[批次 6b]）
+// modelVerifyStatus 走独立 JSON 路径，不在本仓储范围。
 //
 // 五条硬性范式落实（批 1–3 基准，harness 同源）：
 //  1. 错误边界：SystemStoreError（稳定 code），每个公开方法 try/catch 后
@@ -46,6 +46,7 @@ import type {
   ImplementationDependencyRulesStore,
   KnowledgeBaseConfigStore,
   RequirementSystemConfigStore,
+  ToolPolicyStore,
   VersionCodeRule,
   VersionCodeRulesStore,
 } from "../../types";
@@ -84,6 +85,9 @@ export interface SystemStoreRepository {
   saveImplementationDependencyRulesStore(store: ImplementationDependencyRulesStore): Promise<void>;
   loadKnowledgeBaseConfigStore(): Promise<KnowledgeBaseConfigStore | null>;
   saveKnowledgeBaseConfigStore(store: KnowledgeBaseConfigStore): Promise<void>;
+  /** 批次 6b：第五配置区（system_configs.toolPolicy，jsonb 单行 upsert，同套 version 机制） */
+  loadToolPolicyStore(): Promise<ToolPolicyStore | null>;
+  saveToolPolicyStore(store: ToolPolicyStore): Promise<void>;
 }
 
 // ============================================================
@@ -274,6 +278,26 @@ export function createSystemPgRepository(dbInstance: Database = db): SystemPgRep
     async saveKnowledgeBaseConfigStore(store) {
       try {
         await upsertConfig("knowledgeBaseConfig", store, store.version);
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    // 批次 6b：第五配置区 toolPolicy。缺行返回 null（默认值兜底在公开 accessor，
+    // 与 knowledgeBaseConfig 同口径：seed 可能未播种该 key，读路径不写回）。
+
+    async loadToolPolicyStore() {
+      try {
+        const row = await loadConfigRow("toolPolicy");
+        return row ? (row.store as ToolPolicyStore) : null;
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async saveToolPolicyStore(store) {
+      try {
+        await upsertConfig("toolPolicy", store, store.version);
       } catch (err) {
         throw toSafeError(err);
       }

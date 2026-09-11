@@ -33,13 +33,14 @@ import type {
   ImplementationDependencyRulesStore,
   KnowledgeBaseConfigStore,
   RequirementSystemConfigStore,
+  ToolPolicyStore,
   VersionCodeRule,
   VersionCodeRulesStore,
 } from "../../types";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
-const CONFIG_KEYS = ["requirementSettings", "implementationDependencyRules", "knowledgeBaseConfig"] as const;
+const CONFIG_KEYS = ["requirementSettings", "implementationDependencyRules", "knowledgeBaseConfig", "toolPolicy"] as const;
 
 let pool: Pool | null = null;
 let repo: SystemPgRepository | null = null;
@@ -202,10 +203,35 @@ test("knowledgeBaseConfig round-trip：apiKey 保留（与 JSON 文件行为一�
   assert.equal(loaded!.draft.credentials.apiKey, "wes-t-kb-key", "KB 密钥随 jsonb 保存（既有 JSON 语义）");
 });
 
-test("缺失行语义：三个 config key 未播种时 load 返回 null（默认值由路由层兜底）", { skip: !testDatabaseUrl }, async () => {
+test("批次6b：toolPolicy round-trip（store 深相等 + revisions 轨迹原样往返 + version 透传）", { skip: !testDatabaseUrl }, async () => {
+  const input: ToolPolicyStore = {
+    version: 3,
+    draft: { schemaVersion: 1, policies: { export_report: { enabled: false, visibleRoles: ["PM"], approvalStrategy: "user-confirm", injectionMode: "default" } } },
+    active: { schemaVersion: 1, policies: {} },
+    updatedAt: NOW_ISO,
+    effectiveAt: NOW_ISO,
+    revisions: [
+      { seq: 1, version: 2, action: "draft-update", actor: "wes-t-tester", at: NOW_ISO, changes: [{ tool: "export_report", field: "enabled", from: "true", to: "false" }] },
+      { seq: 2, version: 3, action: "activate", actor: "wes-t-tester", at: NOW_ISO, changes: [] },
+    ],
+  };
+  await repo!.saveToolPolicyStore(input);
+
+  const loaded = await repo!.loadToolPolicyStore();
+  assert.ok(loaded);
+  assert.deepEqual(loaded, input, "策略与轨迹必须原样往返（审计不得在存储层丢字段）");
+
+  const versionRow = await pool!.query<{ version: string | number }>(
+    "SELECT version FROM system_configs WHERE config_key = 'toolPolicy'",
+  );
+  assert.equal(Number(versionRow.rows[0]!.version), 3, "version 列与 store.version 同源");
+});
+
+test("缺失行语义：四个 config key 未播种时 load 返回 null（默认值由路由层兜底）", { skip: !testDatabaseUrl }, async () => {
   assert.equal(await repo!.loadRequirementSystemConfigStore(), null);
   assert.equal(await repo!.loadImplementationDependencyRulesStore(), null);
   assert.equal(await repo!.loadKnowledgeBaseConfigStore(), null);
+  assert.equal(await repo!.loadToolPolicyStore(), null, "批次 6b：缺行返回 null，读路径不写回");
 });
 
 // ─── §4.6 并发：不同实体互不覆盖 ─────────────────────────────
@@ -214,17 +240,27 @@ test("并发写不同 config key：互不覆盖（§4.6）", { skip: !testDataba
   const reqStore = makeRequirementStore(5, "wes-t-concurrent-req");
   const implStore = makeImplStore(6, "wes-t-concurrent-impl");
   const kbStore = makeKbStore(7, "wes-t-concurrent-kb");
+  const policyStore: ToolPolicyStore = {
+    version: 8,
+    draft: { schemaVersion: 1, policies: { export_report: { enabled: false, visibleRoles: [], approvalStrategy: "default", injectionMode: "default" } } },
+    active: { schemaVersion: 1, policies: {} },
+    updatedAt: NOW_ISO,
+    effectiveAt: NOW_ISO,
+    revisions: [],
+  };
 
   await Promise.all([
     repo!.saveRequirementSystemConfigStore(reqStore),
     repo!.saveImplementationDependencyRulesStore(implStore),
     repo!.saveKnowledgeBaseConfigStore(kbStore),
+    repo!.saveToolPolicyStore(policyStore),
   ]);
 
-  const [req, impl, kb] = await Promise.all([
+  const [req, impl, kb, policy] = await Promise.all([
     repo!.loadRequirementSystemConfigStore(),
     repo!.loadImplementationDependencyRulesStore(),
     repo!.loadKnowledgeBaseConfigStore(),
+    repo!.loadToolPolicyStore(),
   ]);
   assert.equal(req!.version, 5);
   assert.equal(req!.draft.kimiEvaluation.promptTemplate, "wes-t-concurrent-req");
@@ -232,6 +268,8 @@ test("并发写不同 config key：互不覆盖（§4.6）", { skip: !testDataba
   assert.equal(impl!.draft.source, "wes-t-concurrent-impl");
   assert.equal(kb!.version, 7);
   assert.equal(kb!.draft.model, "wes-t-concurrent-kb");
+  assert.equal(policy!.version, 8, "批次 6b：第五 key 并发写互不覆盖");
+  assert.equal(policy!.draft.policies.export_report.enabled, false);
 });
 
 test("并发写同一 config key：收敛为其中一个完整输入（无字段混写）", { skip: !testDatabaseUrl }, async () => {

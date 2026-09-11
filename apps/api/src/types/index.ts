@@ -563,6 +563,87 @@ export type KnowledgeBaseConfigStore = {
   effectiveAt: string;
 };
 
+// -------------------- 批次 6b：工具策略（system_configs 第五配置区） --------------------
+//
+// 代码/数据边界（要害）：落库的只有**策略**——启用、角色可见、审批要求、注入模式。
+// 工具的 execute、参数 schema、实现**留在代码**；清单仍从运行时 ToolRegistry 派生
+// （批次 6a 裁决）：策略是挂在清单上的决定，不是清单的副本。
+// 策略层只做减法：capability/角色/启用三层全部通过才注入，缺省即不额外限制。
+
+/**
+ * 注入模式（策略侧）。刻意只有降档词汇：
+ * - "default"   跟随代码注册（常驻 or 按需发现由代码 discoverable 决定）
+ * - "on-demand" 强制按需发现——全量注入通道不再主动注入该工具
+ * 不存在「强制常驻」：把代码标记为按需发现的工具提升为常驻属于**加法**，
+ * 与「策略只做减法、不得成为提权入口」的裁决冲突。
+ */
+export const TOOL_POLICY_INJECTION_MODES = ["default", "on-demand"] as const;
+export type ToolPolicyInjectionMode = (typeof TOOL_POLICY_INJECTION_MODES)[number];
+
+/**
+ * 审批策略（策略侧）。同样只有收紧方向：
+ * - "default"      按代码口径（mutates / exfiltrates 决定）
+ * - "user-confirm" 强制逐次用户确认（即使代码标记 mutates=false 的只读工具）
+ * 「免审批」不在词汇表内：只读工具本就走 allow 档，无需策略再放行；
+ * 而写/外发工具的审批是代码侧下限，策略不得解除。外发类工具（exfiltrates=true）
+ * 永远强制 user-confirm，不适用任何「记住本次选择」豁免——每次外发的内容都不同。
+ */
+export const TOOL_POLICY_APPROVAL_STRATEGIES = ["default", "user-confirm"] as const;
+export type ToolPolicyApprovalStrategy = (typeof TOOL_POLICY_APPROVAL_STRATEGIES)[number];
+
+/** 单个工具的策略决定（稀疏覆盖：未列出的工具全部走代码默认） */
+export type ToolPolicyEntry = {
+  /** 是否启用；false → 任何通道都不注入、不可执行 */
+  enabled: boolean;
+  /** 可见角色（v2 角色名）。空数组 = 不额外限制，仅由 capability 过滤决定 */
+  visibleRoles: string[];
+  /** 审批策略 */
+  approvalStrategy: ToolPolicyApprovalStrategy;
+  /** 注入模式 */
+  injectionMode: ToolPolicyInjectionMode;
+};
+
+/** 工具策略配置（draft / active 同形状） */
+export type ToolPolicyConfig = {
+  schemaVersion: number;
+  /** 按工具名的策略覆盖；未列出的工具走代码默认（启用 + 无角色限制 + 代码审批口径） */
+  policies: Record<string, ToolPolicyEntry>;
+};
+
+/** 变更轨迹单条改动（字段级，供审计页呈现「改了什么」） */
+export type ToolPolicyRevisionChange = {
+  tool: string;
+  field: "enabled" | "visibleRoles" | "approvalStrategy" | "injectionMode";
+  from: string;
+  to: string;
+};
+
+/** 变更轨迹条目：谁、何时、改了什么，绑定当时的 version */
+export type ToolPolicyRevision = {
+  seq: number;
+  /** 该条落库时 store 的 version（draft-update 不改 version，activate 改后记新值） */
+  version: number;
+  action: "draft-update" | "activate";
+  /** 操作者用户名（JWT 可信身份） */
+  actor: string;
+  at: string;
+  changes: ToolPolicyRevisionChange[];
+};
+
+/** 工具策略 store：与其余配置区同构的 draft→生效 + version，外加轨迹数组 */
+export type ToolPolicyStore = {
+  version: number;
+  draft: ToolPolicyConfig;
+  active: ToolPolicyConfig;
+  updatedAt: string;
+  effectiveAt: string;
+  /** 有界轨迹（最近 TOOL_POLICY_REVISION_LIMIT 条，新→旧或旧→新由 normalize 统一为旧→新） */
+  revisions: ToolPolicyRevision[];
+};
+
+/** 轨迹上限：配置区是 jsonb 单行，不封顶会让高频改草稿无限撑大行 */
+export const TOOL_POLICY_REVISION_LIMIT = 50;
+
 // -------------------- 会话与幂等 --------------------
 
 export type SessionEstimateContext = {

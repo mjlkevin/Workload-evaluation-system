@@ -24,7 +24,7 @@ import { ToolRegistry, DISCOVERY_CATEGORY } from "../../agent/tool-registry";
 import { createDefaultRegistry } from "../../agent/default-registry";
 import type { AgentEvent, AgentTool, AgentUser } from "../../agent/agent.types";
 import type { StreamingChunk } from "./workbench-dispatch.service";
-import type { AuthUser } from "../../types";
+import type { AuthUser, ToolPolicyConfig } from "../../types";
 
 // ============================================================
 // 批次 0 · ②注入点只读过滤 + ③最小工具执行循环
@@ -1077,4 +1077,191 @@ test("批次1a·流式通道同口径：挂起时不补发 metadata chunk", asyn
 
   assert.equal(executions, 0);
   assert.equal(chunks.some((chunk) => chunk.kind === "metadata"), false, "挂起轮不得补发工具轨迹 metadata");
+});
+
+// ============================================================
+// 批次 6b · 工具策略层叠加在 capability 过滤之上（只做减法）
+// ============================================================
+
+function entry(overrides: Partial<ToolPolicyConfig["policies"][string]> = {}): ToolPolicyConfig["policies"][string] {
+  return { enabled: true, visibleRoles: [], approvalStrategy: "default", injectionMode: "default", ...overrides };
+}
+
+function registryWith(...tools: AgentTool[]): ToolRegistry {
+  const registry = new ToolRegistry();
+  for (const tool of tools) registry.register(tool);
+  return registry;
+}
+
+test("批次6b·判据①：停用 export_report → 组装后的注入集里真的没有它（tools/allow/ask/injected 四集合一致）", () => {
+  const user = authUser("admin");
+  const policy: ToolPolicyConfig = { schemaVersion: 1, policies: { export_report: entry({ enabled: false }) } };
+  const set = resolveWorkbenchInjectableTools(user, { registry: createDefaultRegistry(user), toolPolicy: policy });
+
+  const names = set.tools.map((definition) => definition.function.name);
+  assert.equal(names.includes("export_report"), false, "停用工具不得出现在发给模型的 tools 里");
+  assert.equal(set.injectedToolNames.has("export_report"), false);
+  assert.equal(set.allowToolNames.has("export_report"), false);
+  assert.equal(set.approvalRequiredToolNames.has("export_report"), false);
+  // 其余工具不受牵连
+  assert.equal(names.includes("generate_wbs"), true);
+  assert.equal(set.approvalRequiredToolNames.has("generate_wbs"), true);
+});
+
+test("批次6b·判据②：策略启用了但用户无 capability → 仍不注入（两层都通过才注入，策略不是提权入口）", () => {
+  const user = authUser("user"); // PRE_SALES：无 estimates:write，generate_wbs 本不可注入
+  const policy: ToolPolicyConfig = { schemaVersion: 1, policies: { generate_wbs: entry({ enabled: true }) } };
+  const set = resolveWorkbenchInjectableTools(user, { registry: createDefaultRegistry(user), toolPolicy: policy });
+
+  const names = set.tools.map((definition) => definition.function.name);
+  assert.equal(names.includes("generate_wbs"), false, "策略「启用」绝不能越过 capability 过滤");
+});
+
+test("批次6b·判据③：合成外发工具（mutates=false, exfiltrates=true）→ 注入集里落 ask 档，执行前必过审批闸门", async () => {
+  const user = authUser("admin");
+  let executions = 0;
+  const registry = registryWith(
+    fakeTool({ name: "send_summary_to_im", mutates: false, exfiltrates: true, execute: async () => { executions += 1; return { sent: true }; } }),
+  );
+  const set = resolveWorkbenchInjectableTools(user, { registry });
+  assert.equal(set.allowToolNames.has("send_summary_to_im"), false, "外发工具不得走 allow（mutates 不兼任外发维度）");
+  assert.equal(set.approvalRequiredToolNames.has("send_summary_to_im"), true);
+
+  const gateCalls: string[] = [];
+  const out = await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "把总结发到IM" }],
+    registry,
+    agentUser: set.agentUser,
+    allowToolNames: set.allowToolNames,
+    injectedToolNames: set.injectedToolNames,
+    toolApprovalGate: async (call) => {
+      gateCalls.push(call.toolName);
+      return { decision: "execute" };
+    },
+    invoke: async ({ turnOrdinal }) =>
+      turnOrdinal === 1
+        ? { content: "", toolCalls: [{ id: "c1", name: "send_summary_to_im", arguments: { text: "会话总结" } }] }
+        : { content: "已发送" },
+  });
+
+  assert.deepEqual(gateCalls, ["send_summary_to_im"], "外发必须触发审批");
+  assert.equal(executions, 1, "获批后才执行一次");
+  assert.equal(out.content, "已发送");
+});
+
+test("批次6b·外发无闸门通道：SSE/同步兜底不接闸门 → 一次都不执行（失败方向关闭）", async () => {
+  const registry = registryWith(
+    fakeTool({ name: "send_summary_to_im", mutates: false, exfiltrates: true, execute: async () => ({ sent: true }) }),
+  );
+  let executions = 0;
+  registry.get("send_summary_to_im")!.execute = async () => {
+    executions += 1;
+    return { sent: true };
+  };
+  const requests: string[][] = [];
+  await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "发总结" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:read"] },
+    allowToolNames: new Set<string>(),
+    // 故意不传 toolApprovalGate
+    invoke: async ({ messages, turnOrdinal }) => {
+      requests.push(messages.map((m) => m.content));
+      if (turnOrdinal === 1) return { content: "", toolCalls: [{ id: "c1", name: "send_summary_to_im", arguments: {} }] };
+      return { content: "没链路我不发" };
+    },
+  });
+  assert.equal(executions, 0, "无审批链路时外发工具一次都不得执行");
+  assert.match(requests[1][1], /没有审批链路/);
+});
+
+test("批次6b·策略 user-confirm：只读工具也进 ask 档，执行前过闸门", async () => {
+  const registry = registryWith(fakeTool({ name: "knowledge_query" }));
+  const policy: ToolPolicyConfig = { schemaVersion: 1, policies: { knowledge_query: entry({ approvalStrategy: "user-confirm" }) } };
+  const set = resolveWorkbenchInjectableTools(authUser("admin"), { registry, toolPolicy: policy });
+  assert.equal(set.allowToolNames.has("knowledge_query"), false);
+  assert.equal(set.approvalRequiredToolNames.has("knowledge_query"), true);
+
+  const gateCalls: string[] = [];
+  await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "查知识库" }],
+    registry,
+    agentUser: set.agentUser,
+    allowToolNames: set.allowToolNames,
+    injectedToolNames: set.injectedToolNames,
+    toolPolicy: policy,
+    toolApprovalGate: async (call) => {
+      gateCalls.push(call.toolName);
+      return { decision: "execute" };
+    },
+    invoke: async ({ turnOrdinal }) =>
+      turnOrdinal === 1
+        ? { content: "", toolCalls: [{ id: "c1", name: "knowledge_query", arguments: { query: "x" } }] }
+        : { content: "查到" },
+  });
+  assert.deepEqual(gateCalls, ["knowledge_query"]);
+});
+
+test("批次6b·模型点名被停用工具：直接拒绝，不给审批机会（审批放行≠策略放行）", async () => {
+  const registry = registryWith(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true }));
+  const policy: ToolPolicyConfig = { schemaVersion: 1, policies: { create_project: entry({ enabled: false }) } };
+  const set = resolveWorkbenchInjectableTools(authUser("admin"), { registry, toolPolicy: policy });
+
+  let gateConsulted = 0;
+  let executions = 0;
+  const requests: string[][] = [];
+  await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "建项目" }],
+    registry: set.registry,
+    agentUser: set.agentUser,
+    allowToolNames: set.allowToolNames,
+    injectedToolNames: set.injectedToolNames,
+    toolPolicy: policy,
+    toolApprovalGate: async (call) => {
+      gateConsulted += 1;
+      void call;
+      return { decision: "execute" };
+    },
+    invoke: async ({ messages, turnOrdinal }) => {
+      requests.push(messages.map((m) => m.content));
+      if (turnOrdinal === 1) return { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲" } }] };
+      return { content: "该工具已停用" };
+    },
+  });
+
+  assert.equal(gateConsulted, 0, "停用工具不得进入审批流程——批准只在「本可注入」前提下有意义");
+  assert.equal(executions, 0);
+  assert.match(requests[1][1], /停用|不可见/);
+});
+
+test("批次6b·缺省零回归：不传策略时注入集与批次 6a 逐字节一致，injectedToolNames = tools 全集", () => {
+  const user = authUser("admin");
+  const bare = resolveWorkbenchInjectableTools(user, { registry: createDefaultRegistry(user) });
+  const empty = resolveWorkbenchInjectableTools(user, { registry: createDefaultRegistry(user), toolPolicy: { schemaVersion: 1, policies: {} } });
+  assert.deepEqual(
+    bare.tools.map((definition) => definition.function.name),
+    empty.tools.map((definition) => definition.function.name),
+  );
+  assert.deepEqual([...bare.injectedToolNames], bare.tools.map((definition) => definition.function.name));
+});
+
+test("批次6b·角色可见性：visibleRoles 排除当前角色 → 不注入；命中 → 注入", () => {
+  const user = authUser("user"); // legacy user → PRE_SALES
+  const registry = createDefaultRegistry(user);
+  const hidePolicy: ToolPolicyConfig = { schemaVersion: 1, policies: { project_list: entry({ visibleRoles: ["PM"] }) } };
+  const hidden = resolveWorkbenchInjectableTools(user, { registry, toolPolicy: hidePolicy });
+  assert.equal(hidden.tools.map((d) => d.function.name).includes("project_list"), false);
+
+  const showPolicy: ToolPolicyConfig = { schemaVersion: 1, policies: { project_list: entry({ visibleRoles: ["PRE_SALES"] }) } };
+  const shown = resolveWorkbenchInjectableTools(user, { registry, toolPolicy: showPolicy });
+  assert.equal(shown.tools.map((d) => d.function.name).includes("project_list"), true);
+});
+
+test("批次6b·注入模式 on-demand：常驻工具被降档后不进注入集（停用之外的第二种减法）", () => {
+  const user = authUser("admin");
+  const policy: ToolPolicyConfig = { schemaVersion: 1, policies: { rule_lookup: entry({ injectionMode: "on-demand" }) } };
+  const set = resolveWorkbenchInjectableTools(user, { registry: createDefaultRegistry(user), toolPolicy: policy });
+  const names = set.tools.map((definition) => definition.function.name);
+  assert.equal(names.includes("rule_lookup"), false);
+  assert.equal(names.includes("project_list"), true, "降档只裁声明的那个工具");
 });

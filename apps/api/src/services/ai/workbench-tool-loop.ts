@@ -8,7 +8,8 @@ import { isZhipuKnowledgeToolTrace } from "./knowledge-tool.service";
 import type { RuntimeContext } from "../../agent/context/context.types";
 import { getCombinedCapabilities } from "../../rbac/permissions";
 import { legacyRoleToV2Roles } from "../../rbac/roles";
-import type { AuthUser } from "../../types";
+import type { AuthUser, ToolPolicyConfig } from "../../types";
+import { applyToolPolicyToDefinitions, resolveToolPolicyEntry } from "../../agent/tool-policy";
 import type { StreamingChunk, WorkbenchToolCallTrace } from "./workbench-dispatch.service";
 import { toWorkbenchModelVisibleToolMessage } from "./workbench-tool-event-surface";
 import {
@@ -104,6 +105,12 @@ export type WorkbenchInjectableToolSet = {
   allowToolNames: Set<string>;
   /** ask 档：执行前必须拿到用户的持久决策（写工具） */
   approvalRequiredToolNames: Set<string>;
+  /**
+   * 批次 6b：本回合**实际注入**的工具名全集（allow ∪ ask）。
+   * 执行侧据此拒绝「注入集之外」的调用——停用/角色不可见的工具即便被模型
+   * 凭空点名，也拿不到审批机会（审批放行不等于策略放行）。
+   */
+  injectedToolNames: Set<string>;
 };
 
 /**
@@ -117,26 +124,49 @@ export type WorkbenchInjectableToolSet = {
  * 一个工具要么在 allowToolNames（严格 mutates === false），要么落 ask
  * （mutates 为 true / 缺失 / 非布尔 / 注册表查不到）——不存在第三条放行路径，
  * 因此「新加一个工具忘了标 mutates」的后果是多问一次，而不是静默放行。
+ *
+ * 批次 6b 在其上叠加**策略层**（只叠加、不改注册表五个 selector 的 capability 过滤）：
+ *  · 生效策略（toolPolicy）由调用方从 system_configs 读取后传入——本函数保持纯函数，
+ *    不 import 仓储，避免 ai 服务层依赖 system 域存储细节；
+ *  · 过滤只做减法：停用、角色不可见、on-demand 降档三类从注入集剔除；
+ *    审批分流读取每工具策略条目（user-confirm 把只读工具也推入 ask 档）；
+ *  · 缺省（无策略 / 空策略）与批次 6a 行为逐字节一致。
  */
 export function resolveWorkbenchInjectableTools(
   user: AuthUser,
-  options: { runtime?: RuntimeContext; registry?: ToolRegistry } = {},
+  options: {
+    runtime?: RuntimeContext;
+    registry?: ToolRegistry;
+    toolPolicy?: ToolPolicyConfig;
+  } = {},
 ): WorkbenchInjectableToolSet {
+  const roles = legacyRoleToV2Roles(user.role);
   const agentUser: AgentUser = {
     id: user.id,
-    capabilities: getCombinedCapabilities(legacyRoleToV2Roles(user.role)),
+    capabilities: getCombinedCapabilities(roles),
+    roles,
   };
   const registry = options.registry ?? createDefaultRegistry(user, options.runtime);
-  const definitions = registry.listFullToolsFor(agentUser);
+  const definitions = applyToolPolicyToDefinitions(registry.listFullToolsFor(agentUser), registry, {
+    policy: options.toolPolicy,
+    roles: agentUser.roles ?? [],
+  });
   const allowToolNames = new Set(
     definitions
-      .filter((definition) => resolveWorkbenchToolDecisionSlot(registry.get(definition.function.name)) === "allow")
+      .filter(
+        (definition) =>
+          resolveWorkbenchToolDecisionSlot(
+            registry.get(definition.function.name),
+            resolveToolPolicyEntry(options.toolPolicy, definition.function.name),
+          ) === "allow",
+      )
       .map((definition) => definition.function.name),
   );
   const approvalRequiredToolNames = new Set(
     definitions.map((definition) => definition.function.name).filter((name) => !allowToolNames.has(name)),
   );
-  return { registry, agentUser, tools: definitions, allowToolNames, approvalRequiredToolNames };
+  const injectedToolNames = new Set(definitions.map((definition) => definition.function.name));
+  return { registry, agentUser, tools: definitions, allowToolNames, approvalRequiredToolNames, injectedToolNames };
 }
 
 /** ④ 落 effect 时随附的审计信息：哪只工具、什么参数 */
@@ -191,6 +221,14 @@ type WorkbenchToolLoopCommon = {
    * 故循环自带分流判定（批次 0 时它是唯一闸门；批次 1a 起它只覆盖只读侧）。
    */
   allowToolNames: Set<string>;
+  /**
+   * 批次 6b（additive）：本回合实际注入的工具全集（allow ∪ ask）。
+   * 缺省 = 不启用策略门禁（既有调用方零改动）；传入时，注入集之外的工具名
+   * 直接拒绝——策略停用/角色不可见的工具即使被模型凭空点名也不给审批机会。
+   */
+  injectedToolNames?: Set<string>;
+  /** 批次 6b（additive）：生效工具策略；审批分流与执行准入共用同一份，不接受模型/前端传入 */
+  toolPolicy?: ToolPolicyConfig;
   /**
    * 批次 1a · ask 档审批端口（additive）。**未注入即拒绝执行任何 ask 档工具**：
    * 审批依赖可持久的 Run 事件流，只有异步 Run 通道有，同步兜底通道拿不到决策
@@ -320,7 +358,12 @@ async function executeToolCallBatch(ctx: ToolBatchContext, calls: ToolCall[]): P
       if (!registered) {
         return { ok: false, error: `未注册工具: ${name}` };
       }
-      if (resolveWorkbenchToolDecisionSlot(registered) === "ask") {
+      // 批次 6b：注入集之外（停用 / 角色不可见 / on-demand 降档）的工具不给任何执行机会，
+      // 包括不给审批——「用户批准」只在「本可注入」的前提下有意义。
+      if (ctx.injectedToolNames && !ctx.injectedToolNames.has(name)) {
+        return { ok: false, error: `工具 ${name} 已被工具策略停用或对本角色不可见，未执行` };
+      }
+      if (resolveWorkbenchToolDecisionSlot(registered, resolveToolPolicyEntry(ctx.toolPolicy, name)) === "ask") {
         // 闸门抛 Pending 时本函数不返回：异常向上传播，Run 停在 waiting，
         // 工具一次都没被执行（判据①）。effect 也因此在挂起时不落库，
         // 确认后重放才会第一次真正执行（判据②）。

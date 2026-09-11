@@ -70,6 +70,65 @@ test("resolveWorkbenchToolDecisionSlot: 工具不在已知清单（查不到）�
   assert.equal(resolveWorkbenchToolDecisionSlot(undefined), "ask");
 });
 
+// -------------------- 批次 6b：数据外发维度 + 策略审批收紧 --------------------
+//
+// 外发独立于 mutates：mutates 表达「改本地数据」，外发表达「把数据送出系统」——
+// 一个不改本地库（mutates=false）的外发工具必须照样触发审批（判据③的合成用例）。
+// 同时外发是审批**下限**：不适用任何「记住本次选择」豁免（本批豁免不存在，
+// 但判据已钉死：外发的 ask 来自服务端直判，不经过任何可被豁免的中间层）。
+
+test("批次6b·判据③：mutates=false 但 exfiltrates=true → 仍 ask（外发不被 mutates 兼任）", () => {
+  assert.equal(
+    resolveWorkbenchToolDecisionSlot(tool({ name: "send_summary_to_im", mutates: false, exfiltrates: true })),
+    "ask",
+    "外发工具即使不改本地数据也必须审批",
+  );
+});
+
+test("批次6b：exfiltrates=false / 缺省的只读工具仍 allow（维度缺省零回归）", () => {
+  assert.equal(resolveWorkbenchToolDecisionSlot(tool({ mutates: false, exfiltrates: false })), "allow");
+  assert.equal(resolveWorkbenchToolDecisionSlot(tool({ mutates: false })), "allow");
+});
+
+test("批次6b：写 + 外发双真 → ask（两维度互不遮蔽）", () => {
+  assert.equal(resolveWorkbenchToolDecisionSlot(tool({ mutates: true, exfiltrates: true })), "ask");
+});
+
+test("批次6b·策略只能收紧审批：user-confirm 把只读工具推入 ask", () => {
+  assert.equal(
+    resolveWorkbenchToolDecisionSlot(tool({ mutates: false }), {
+      enabled: true,
+      visibleRoles: [],
+      approvalStrategy: "user-confirm",
+      injectionMode: "default",
+    }),
+    "ask",
+  );
+});
+
+test("批次6b·策略没有免审批方向：default 条目不会给外发/写工具降档放行", () => {
+  // approvalStrategy 词汇表里没有「免除审批」值；即便传 default，代码下限仍生效
+  assert.equal(
+    resolveWorkbenchToolDecisionSlot(tool({ name: "send_summary_to_im", mutates: false, exfiltrates: true }), {
+      enabled: true,
+      visibleRoles: [],
+      approvalStrategy: "default",
+      injectionMode: "default",
+    }),
+    "ask",
+  );
+  // 写工具同理：策略 default 不会把 mutates=true 降成 allow
+  assert.equal(
+    resolveWorkbenchToolDecisionSlot(tool({ name: "create_project", mutates: true }), {
+      enabled: true,
+      visibleRoles: [],
+      approvalStrategy: "default",
+      injectionMode: "default",
+    }),
+    "ask",
+  );
+});
+
 test("buildWorkbenchToolActionId: 同参同工具同序号 → 同一 actionId（重放可对账）", () => {
   const base = { runId: "r1", stepKey: "chat", ordinal: 1, toolName: "create_project", arguments: { projectName: "甲" } };
   assert.equal(buildWorkbenchToolActionId(base), buildWorkbenchToolActionId({ ...base }));

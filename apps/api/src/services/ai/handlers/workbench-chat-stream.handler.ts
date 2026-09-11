@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { asString } from "../../../utils/helpers";
 import { normalizeKimiModelName } from "../../../utils/model-name";
 import { resolveBusinessRole } from "../../../middleware/auth";
-import { resolveActiveApiKeyForScope, resolveActiveRequirementKimiApiKey } from "../../../modules/system/system.repository";
+import { resolveActiveApiKeyForScope, resolveActiveRequirementKimiApiKey, resolveActiveToolPolicy } from "../../../modules/system/system.repository";
 import { appendAiSessionEvent, getAiSession } from "../../../modules/ai-sessions/ai-sessions.usecase";
 import { deriveSessionMessages } from "../../../modules/ai-sessions/session-history";
 import { dispatchHomeWorkbenchTurn, type StreamingAdapter, type StreamingChunk } from "../workbench-dispatch.service";
@@ -205,13 +205,17 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       // 批次 1a：本 SSE 兜底通道不接审批闸门 → ask 档（写工具）一律拒绝执行。
       // 交给工具循环——模型返回的 tool_calls 必须被真正执行后回填再问，否则
       // 「传了 tools 等于模型说了没人听」。
-      const toolSet = resolveWorkbenchInjectableTools(user);
+      // 批次 6b：同生产异步路径口径叠加生效工具策略（capability 过滤之上做减法）。
+      const toolPolicy = await resolveActiveToolPolicy();
+      const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy });
       for await (const chunk of runWorkbenchToolLoopStream({
         messages: modelInput.messages,
         contextBudget: { tools: toolSet.tools },
         registry: toolSet.registry,
         agentUser: toolSet.agentUser,
         allowToolNames: toolSet.allowToolNames,
+        injectedToolNames: toolSet.injectedToolNames,
+        toolPolicy,
         invokeStream: async function* ({ messages }) {
           const stream = provider.streamChatCompletion!({
             model: scenario.model,
@@ -254,13 +258,17 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
         projectId: "default",
       });
       // 批次 0 · ①②③：与流式路径同口径——注入点分流 + 真正执行 tool_calls（写工具无闸门即拒绝）。
-      const toolSet = resolveWorkbenchInjectableTools(user);
+      // 批次 6b：与流式路径同口径叠加生效工具策略。
+      const toolPolicy = await resolveActiveToolPolicy();
+      const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy });
       let lastCompletion: ChatCompletionResponse | undefined;
       const loop = await runWorkbenchToolLoop({
         messages: modelInput.messages,
         registry: toolSet.registry,
         agentUser: toolSet.agentUser,
         allowToolNames: toolSet.allowToolNames,
+        injectedToolNames: toolSet.injectedToolNames,
+        toolPolicy,
         invoke: async ({ messages }) => {
           const completion = await getKimiProvider().chatCompletion({
             model: scenario.model,
