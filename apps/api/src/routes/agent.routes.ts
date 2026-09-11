@@ -9,6 +9,7 @@ import { defaultProviderRegistry } from "../ai/provider";
 import { requireAuthenticated } from "../rbac/middleware";
 import { getCombinedCapabilities } from "../rbac/permissions";
 import { resolveActiveToolPolicy } from "../modules/system/system.repository";
+import { resolveActiveMcpTools } from "../agent/mcp/mcp-runtime";
 import { asString } from "../utils/helpers";
 
 export interface AgentRouterDeps {
@@ -69,10 +70,14 @@ export function createAgentRouter(deps: AgentRouterDeps = {}) {
       channel: "api",
       workflowKey: "agent_chat",
     });
-    const registry = deps.registry ?? createDefaultRegistry(authUser, runtimeContext);
+    const registryBase = deps.registry ?? createDefaultRegistry(authUser, runtimeContext);
     // 批次 6b：注入点读取生效策略（读失败抛错 → 下方 catch 收敛为执行失败，
     // 绝不按「无策略」放行全部工具）
     const toolPolicy = await resolveActiveToolPolicy();
+    // 批次 7：本回合现问现得的 MCP 工具快照。deps.registry 是跨请求实例，绝不原地
+    // 附加（服务残影会活到下一请求）——一律合并进副本；无快照时不复制，零开销。
+    const mcp = await resolveActiveMcpTools();
+    const registry = mcp.tools.length > 0 ? registryBase.cloneWithMcpTools(mcp.tools) : registryBase;
 
     try {
       // 批次 6b 返修（③）：**不传 confirm 端口**。本通道（同步 HTTP，无 Run 事件流）

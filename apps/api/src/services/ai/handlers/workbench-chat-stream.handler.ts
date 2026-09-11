@@ -19,6 +19,7 @@ import {
   runWorkbenchToolLoop,
   runWorkbenchToolLoopStream,
 } from "../workbench-tool-loop";
+import { resolveActiveMcpTools } from "../../../agent/mcp/mcp-runtime";
 import type { ChatCompletionResponse } from "../../../ai/provider";
 import { recordWorkbenchTurnFailureTrace, recordWorkbenchTurnTrace } from "../../../modules/trace/trace.usecase";
 import {
@@ -207,7 +208,8 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       // 「传了 tools 等于模型说了没人听」。
       // 批次 6b：同生产异步路径口径叠加生效工具策略（capability 过滤之上做减法）。
       const toolPolicy = await resolveActiveToolPolicy();
-      const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy });
+      const mcp = await resolveActiveMcpTools();
+      const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy, mcpTools: mcp.tools });
       for await (const chunk of runWorkbenchToolLoopStream({
         messages: modelInput.messages,
         contextBudget: { tools: toolSet.tools },
@@ -260,7 +262,8 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
       // 批次 0 · ①②③：与流式路径同口径——注入点分流 + 真正执行 tool_calls（写工具无闸门即拒绝）。
       // 批次 6b：与流式路径同口径叠加生效工具策略。
       const toolPolicy = await resolveActiveToolPolicy();
-      const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy });
+      const mcp = await resolveActiveMcpTools();
+      const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy, mcpTools: mcp.tools });
       let lastCompletion: ChatCompletionResponse | undefined;
       const loop = await runWorkbenchToolLoop({
         messages: modelInput.messages,

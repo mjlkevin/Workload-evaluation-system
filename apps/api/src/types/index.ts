@@ -644,6 +644,97 @@ export type ToolPolicyStore = {
 /** 轨迹上限：配置区是 jsonb 单行，不封顶会让高频改草稿无限撑大行 */
 export const TOOL_POLICY_REVISION_LIMIT = 50;
 
+// -------------------- 批次 7：MCP 服务接入（system_configs 第六配置区） --------------------
+//
+// 落库边界（裁决一，要害）：这里存的只有两样——
+//  ① 接了哪些服务（名称、地址、传输方式、凭据**引用**、超时）；
+//  ② 每个服务下**被人工放行**的工具名单（上报名 + 放行时看到的定义摘要）。
+// 服务提供哪些工具、参数 schema、description **绝不落库**——每次回合现问（tools/list），
+// 定义摘要对不上即自动回落未放行（裁决二第三条）。任何「把 tools/list 结果存下来下次
+// 直接用」的形态都是清单副本，且是第三方可变而我方不可见的副本，属本批失败。
+
+/** 传输方式：stdio（本机拉起子进程）与 streamable HTTP。不提供发现即可用形态——配了才连。 */
+export const MCP_TRANSPORTS = ["stdio", "http"] as const;
+export type McpTransport = (typeof MCP_TRANSPORTS)[number];
+
+/** 单个 MCP 工具的人工放行条目：摘要 = sha256(稳定序列化(上报名+description+inputSchema)) 前 32 位 */
+export type McpToolApproval = {
+  /** 放行时观察到的定义摘要；运行时每回合复算，不等即回落未放行 */
+  digest: string;
+  /** 放行人（JWT 可信身份 username） */
+  approvedBy: string;
+  approvedAt: string;
+};
+
+/** 一个 MCP 服务条目（显式允许清单的成员；凭据只存 credentials 域的 scope 引用，裁决六） */
+export type McpServerEntry = {
+  /** 内部稳定标识：^[a-z0-9][a-z0-9_-]{0,31}$，参与工具稳定名 mcp__<id>__<tool>；改 id 即新服务 */
+  id: string;
+  /** 展示名 */
+  name: string;
+  transport: McpTransport;
+  /** transport=http 时必填；仅 http(s):// */
+  url: string;
+  /** transport=http：携带凭据的方式（bearer = Authorization 头，值从 credentialScope 现取） */
+  authType: "none" | "bearer";
+  /** transport=stdio 时必填：白名单命令或绝对路径 */
+  command: string;
+  /** transport=stdio：固定参数 */
+  args: string[];
+  /** transport=stdio：额外环境变量（非敏感；敏感值一律走 credentialScope 注入固定键） */
+  env: Record<string, string>;
+  /** credentials 域 scope 引用；空 = 无凭据。真实密钥永不进本配置区 */
+  credentialScope: string;
+  /** 回合级显式超时（连接+列工具+调用共用）；缺省回落 MCP_SERVER_DEFAULT_TIMEOUT_MS，不允许无限等 */
+  timeoutMs: number;
+  /** 被人工放行的工具：键为服务**上报**的工具名（非稳定名），值为放行条目 */
+  approvedTools: Record<string, McpToolApproval>;
+};
+
+/** MCP 服务配置（draft / active 同形状） */
+export type McpConfig = {
+  schemaVersion: number;
+  servers: McpServerEntry[];
+};
+
+/** 变更轨迹单条（target 形如 server:<id> 或 server:<id>#<tool>） */
+export type McpRevisionChange = {
+  target: string;
+  field: string;
+  from: string;
+  to: string;
+};
+
+export type McpRevision = {
+  seq: number;
+  version: number;
+  action: "draft-update" | "activate";
+  actor: string;
+  at: string;
+  changes: McpRevisionChange[];
+};
+
+/** 第六配置区 store：与第五区同构的 draft→生效 + version + 有界轨迹 */
+export type McpConfigStore = {
+  version: number;
+  draft: McpConfig;
+  active: McpConfig;
+  updatedAt: string;
+  effectiveAt: string;
+  revisions: McpRevision[];
+};
+
+export const MCP_REVISION_LIMIT = 50;
+/** 服务数上限：单回合要逐个建连，无封顶会让配置页把工作台拖成串行动物园 */
+export const MCP_SERVER_LIMIT = 20;
+/** 超时缺省值：显式设置而非依赖 SDK 默认（裁决五「超时值要显式设置并可配」） */
+export const MCP_SERVER_DEFAULT_TIMEOUT_MS = 8000;
+export const MCP_SERVER_TIMEOUT_BOUNDS = { min: 500, max: 60000 } as const;
+/** stdio 命令白名单：PATH 内 node/npx/tsx 或绝对路径脚本；防配置页变成任意命令执行器 */
+export const MCP_STDIO_COMMAND_ALLOWLIST = ["node", "npx", "tsx"] as const;
+/** stdio 子进程可见凭据的固定环境变量名（值来自 credentials 域，绝不进配置区） */
+export const MCP_CREDENTIAL_ENV_KEY = "WES_MCP_CREDENTIAL";
+
 // -------------------- 会话与幂等 --------------------
 
 export type SessionEstimateContext = {

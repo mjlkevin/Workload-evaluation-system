@@ -1,16 +1,86 @@
 import type { ToolDefinition } from "../ai/provider/model-provider";
 import { type AgentTool, type AgentUser, toToolDefinition } from "./agent.types";
 import type { RuntimeContext } from "./context/context.types";
+import { MCP_TOOL_PREFIX, parseMcpToolName } from "./mcp/mcp-names";
 
 /** SP-2026-007 MS3：内置发现类工具的 category 常量 */
 export const DISCOVERY_CATEGORY = "discovery";
+
+/** 批次 7：工具重名注册冲突（MCP 桥接工具与代码工具互顶属此类，必须显式失败） */
+export class ToolNameConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ToolNameConflictError";
+  }
+}
 
 export class ToolRegistry {
   private readonly tools = new Map<string, AgentTool>();
 
   register(tool: AgentTool): void {
     if (!tool.name) throw new Error("ToolRegistry.register: 工具名不能为空");
+    // 批次 7（裁决四）·第一道：命名守卫落在注册点，不依赖调用方自觉。
+    // 代码工具一律不得占用 mcp__ 保留前缀——否则内部工具可伪装成桥接工具绕开归属校验。
+    if (tool.source !== "mcp" && tool.name.startsWith(MCP_TOOL_PREFIX)) {
+      throw new ToolNameConflictError(
+        `ToolRegistry.register: 代码工具不得使用保留前缀 ${MCP_TOOL_PREFIX}（${tool.name}）`,
+      );
+    }
+    if (this.tools.has(tool.name)) {
+      // 批次 7：重名必须显式失败（MCP 桥接撞内部工具名的最后防线；
+      // 既有代码工具重名同样失败，此前是静默后写覆盖先写）。
+      throw new ToolNameConflictError(`ToolRegistry.register: 工具名重复: ${tool.name}`);
+    }
     this.tools.set(tool.name, tool);
+  }
+
+  /**
+   * 批次 7（裁决四）·第二道：注册归属自己服务的 MCP 工具。
+   * 稳定名必须无前缀不成、服务 id 与本地登记不符不成——恶意服务上报
+   * `mcp__other__tool` 或裸名 `create_project` 都会在这一层被拒。
+   */
+  attachMcpTool(serverId: string, tool: AgentTool): void {
+    if (tool.source !== "mcp") {
+      throw new Error(`attachMcpTool: 非 MCP 来源工具不得使用本入口（${tool.name}）`);
+    }
+    const parsed = parseMcpToolName(tool.name);
+    if (!parsed) {
+      throw new ToolNameConflictError(`attachMcpTool: MCP 工具稳定名不合法（缺前缀或形态错误）: ${tool.name}`);
+    }
+    if (parsed.serverId !== serverId) {
+      throw new ToolNameConflictError(
+        `attachMcpTool: 工具 ${tool.name} 申报的归属服务 ${serverId} 与稳定名前缀 ${parsed.serverId} 不符`,
+      );
+    }
+    this.register(tool);
+  }
+
+  /** 全部已注册工具（注册顺序），供回合级快照合并 */
+  allTools(): AgentTool[] {
+    return Array.from(this.tools.values());
+  }
+
+  /**
+   * 批次 7（方案 C）：把本回合现问现得的 MCP 工具快照合并进一份**新**注册表。
+   * 不原地改：调用方可能传入跨请求复用的 registry（如路由 deps），原地附加会让
+   * 上一回合的服务残影活到下一回合——快照必须随回合生、随回合灭。
+   */
+  cloneWithMcpTools(mcpTools: readonly AgentTool[]): ToolRegistry {
+    const clone = new ToolRegistry();
+    for (const tool of this.allTools()) {
+      clone.register(tool);
+    }
+    const seen = new Set<string>();
+    for (const tool of mcpTools) {
+      const parsed = parseMcpToolName(tool.name);
+      if (!parsed) {
+        throw new ToolNameConflictError(`cloneWithMcpTools: MCP 工具稳定名不合法: ${tool.name}`);
+      }
+      if (seen.has(tool.name)) continue; // 同一快照内重复上报取首份（防御，非语义）
+      seen.add(tool.name);
+      clone.attachMcpTool(parsed.serverId, tool);
+    }
+    return clone;
   }
 
   get(name: string): AgentTool | undefined {

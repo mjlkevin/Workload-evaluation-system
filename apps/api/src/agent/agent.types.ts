@@ -35,6 +35,12 @@ export interface AgentTool {
   category?: string;
   /** SP-2026-007 MS3：true 时默认不注入 tools 参数，经 list_tools 发现后进入当轮注入集 */
   discoverable?: boolean;
+  /**
+   * 批次 7：工具来源。缺省（undefined / "code"）= 代码工具；"mcp" = MCP 桥接工具。
+   * 注册表据此执行命名守卫（裁决四）：代码工具禁用 mcp__ 前缀，MCP 工具必须带
+   * 且只带自己服务的合法前缀——防护落在注册时，不依赖调用方自觉。
+   */
+  source?: "code" | "mcp";
   /** 真正执行：调用底层 usecase；runtime 为可信运行上下文（O2 · A4 注入） */
   execute(args: Record<string, unknown>, user: AgentUser, runtime?: RuntimeContext): Promise<unknown>;
 }

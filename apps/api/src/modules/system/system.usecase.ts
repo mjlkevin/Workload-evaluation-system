@@ -15,7 +15,11 @@ import {
   VersionCodeRuleStatus,
 } from "../../types";
 import { TOOL_POLICY_REVISION_LIMIT } from "../../types";
+import { MCP_REVISION_LIMIT } from "../../types";
 import { diffToolPolicyConfigs, normalizeToolPolicyConfig } from "../../agent/tool-policy";
+import { diffMcpConfigs, normalizeMcpConfig } from "../../agent/mcp/mcp-bridge";
+import { probeMcpServer } from "../../agent/mcp/mcp-runtime";
+import { resetMcpSessions } from "../../agent/mcp/mcp-manager";
 import { config } from "../../config/env";
 import { requireAuth, isAdminUser } from "../../middleware/auth";
 import { fail, ok } from "../../utils/response";
@@ -40,6 +44,8 @@ import {
   resolveDraftKnowledgeBaseConfigForTest,
   loadToolPolicyStore,
   saveToolPolicyStore,
+  loadMcpConfigStore,
+  saveMcpConfigStore,
   saveImplementationDependencyRulesStore,
   saveKnowledgeBaseConfigStore,
   saveRequirementSystemConfigStore,
@@ -1214,4 +1220,142 @@ export async function getToolPolicy(req: Request, res: Response) {
       randomUUID(),
     ),
   );
+}
+
+// ============================================================
+// 批次 7 · MCP 服务配置（system_configs 第六配置区）
+// ============================================================
+// 边界（与裁决一/二/六同源，不得放宽）：
+//  · 这里只存**服务清单与人工放行名单**（地址、传输、凭据 scope 引用、被放行工具
+//    的名字+定义摘要）。服务上报的工具清单/schema/description 永不落此——
+//    注入与探测路径每次都现问 tools/list；
+//  · 放行条目（approvedBy/approvedAt）由服务端按 JWT 可信身份落章：摘要没变的
+//    既有条目保留原放行人（重放同一份草稿不得冒充他人重新放行），摘要变过的
+//    条目视为**新放行**，盖章当前操作人；
+//  · activate 后销毁全部 MCP 会话：端点/凭据引用可能已变，下一回合按新配置重连；
+//  · 探测端点（probe）是管理员放行前的「逐看」通道：每次真连接、真发 tools/list、
+//    现算摘要，结果只回给调用方，不落任何缓存。
+
+export async function getMcpConfig(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
+  const store = await loadMcpConfigStore();
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        draft: store.draft,
+        active: store.active,
+        updatedAt: store.updatedAt,
+        effectiveAt: store.effectiveAt,
+        revisions: store.revisions,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+/** 草稿 PATCH：整图替换 draft.servers（页面持有全集；未放行工具进不了注入快照，稀疏即安全） */
+export async function updateMcpConfigDraft(req: Request, res: Response) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const actor = auth.user.username;
+  const payload = (req.body || {}) as { servers?: unknown[] };
+  const now = new Date().toISOString();
+  const store = await loadMcpConfigStore();
+  const previousDraft = store.draft;
+  const nextDraft = normalizeMcpConfig({
+    schemaVersion: previousDraft.schemaVersion,
+    servers: payload.servers ?? previousDraft.servers,
+  });
+  // 放行落章：摘要未变 → 保留原放行人/时间；新增或摘要已变 → 盖章当前操作人。
+  for (const server of nextDraft.servers) {
+    const previousServer = previousDraft.servers.find((entry) => entry.id === server.id);
+    for (const [toolName, approval] of Object.entries(server.approvedTools)) {
+      const previous = previousServer?.approvedTools[toolName];
+      if (previous && previous.digest === approval.digest) {
+        server.approvedTools[toolName] = {
+          digest: approval.digest,
+          approvedBy: previous.approvedBy,
+          approvedAt: previous.approvedAt,
+        };
+      } else {
+        server.approvedTools[toolName] = {
+          digest: approval.digest,
+          approvedBy: actor,
+          approvedAt: now,
+        };
+      }
+    }
+  }
+  const changes = diffMcpConfigs(previousDraft, nextDraft);
+  store.draft = nextDraft;
+  store.updatedAt = now;
+  if (changes.length > 0) {
+    store.revisions = [
+      ...store.revisions,
+      { seq: nextMcpRevisionSeq(store), version: store.version, action: "draft-update" as const, actor, at: now, changes },
+    ].slice(-MCP_REVISION_LIMIT);
+  }
+  await saveMcpConfigStore(store);
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        draft: store.draft,
+        updatedAt: store.updatedAt,
+        revisions: store.revisions,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+/** 生效：active ← draft，version+1，记字段级 diff，并销毁会话池（下一回合按新配置重连） */
+export async function activateMcpConfig(req: Request, res: Response) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+  const actor = auth.user.username;
+  const now = new Date().toISOString();
+  const store = await loadMcpConfigStore();
+  const previousActive = store.active;
+  const nextActive = normalizeMcpConfig(store.draft);
+  const changes = diffMcpConfigs(previousActive, nextActive);
+  store.active = nextActive;
+  store.version = Number(store.version || 1) + 1;
+  store.effectiveAt = now;
+  store.updatedAt = now;
+  store.revisions = [
+    ...store.revisions,
+    { seq: nextMcpRevisionSeq(store), version: store.version, action: "activate" as const, actor, at: now, changes },
+  ].slice(-MCP_REVISION_LIMIT);
+  await saveMcpConfigStore(store);
+  await resetMcpSessions();
+  return res.json(
+    ok(
+      {
+        version: store.version,
+        active: store.active,
+        effectiveAt: store.effectiveAt,
+        revisions: store.revisions,
+      },
+      randomUUID(),
+    ),
+  );
+}
+
+/** 现问探测：按草稿（默认）或生效配置真连真问，返回逐工具摘要与放行状态；绝不落缓存 */
+export async function probeMcpServerHandler(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
+  const payload = (req.body || {}) as { serverId?: string; source?: string };
+  const serverId = String(payload.serverId ?? "").trim();
+  if (!serverId) {
+    return fail(res, 40001, "serverId 不能为空");
+  }
+  const source = payload.source === "active" ? ("active" as const) : ("draft" as const);
+  const result = await probeMcpServer(serverId, source);
+  return res.json(ok(result, randomUUID()));
+}
+
+function nextMcpRevisionSeq(store: { revisions: Array<{ seq: number }> }): number {
+  return store.revisions.reduce((max, revision) => Math.max(max, revision.seq), 0) + 1;
 }

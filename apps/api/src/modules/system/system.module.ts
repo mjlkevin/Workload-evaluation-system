@@ -23,4 +23,8 @@ export {
   getToolPolicy,
   updateToolPolicyDraft,
   activateToolPolicy,
+  getMcpConfig,
+  updateMcpConfigDraft,
+  activateMcpConfig,
+  probeMcpServerHandler,
 } from "./system.controller";

@@ -1,5 +1,5 @@
 import type { ChatRole, ToolCall, ToolDefinition } from "../../ai/provider/model-provider";
-import type { AgentEvent, AgentUser } from "../../agent/agent.types";
+import type { AgentEvent, AgentTool, AgentUser } from "../../agent/agent.types";
 import type { ToolRegistry } from "../../agent/tool-registry";
 import { createDefaultRegistry } from "../../agent/default-registry";
 import { KNOWLEDGE_QUERY_TOOL_NAME } from "../../agent/tools/query.tools";
@@ -138,6 +138,15 @@ export function resolveWorkbenchInjectableTools(
     runtime?: RuntimeContext;
     registry?: ToolRegistry;
     toolPolicy?: ToolPolicyConfig;
+    /**
+     * 批次 7（方案 C）：本回合现问现得的 MCP 工具快照（已过人工放行 + 定义摘要复验）。
+     * 传入即合并进注册表——**合并到副本**（cloneWithMcpTools），调用方传入的 registry
+     * 实例永不被原地改动（deps 复用的注册表不能携带上一回合的服务残影）。
+     * 合并后注入分流、策略减法、registry.get/execute 对 MCP 工具与代码工具同权处理，
+     * 执行侧零特判——「注册表是工具唯一真相」在 MCP 时代继续成立。
+     * 缺省（不传）时行为与批次 6b 逐字节一致。
+     */
+    mcpTools?: readonly AgentTool[];
   } = {},
 ): WorkbenchInjectableToolSet {
   const roles = legacyRoleToV2Roles(user.role);
@@ -146,7 +155,11 @@ export function resolveWorkbenchInjectableTools(
     capabilities: getCombinedCapabilities(roles),
     roles,
   };
-  const registry = options.registry ?? createDefaultRegistry(user, options.runtime);
+  const baseRegistry = options.registry ?? createDefaultRegistry(user, options.runtime);
+  const registry =
+    options.mcpTools && options.mcpTools.length > 0
+      ? baseRegistry.cloneWithMcpTools(options.mcpTools)
+      : baseRegistry;
   const definitions = applyToolPolicyToDefinitions(registry.listFullToolsFor(agentUser), registry, {
     policy: options.toolPolicy,
     roles: agentUser.roles ?? [],

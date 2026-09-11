@@ -22,6 +22,8 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist/", "node_modules/"],
+    // 批次 7：MCP stdio stub 是**故意**的裸 CommonJS 测试夹具（模拟最野的第三方，
+    // 不经 TS 工程），面向 .ts 的规则对它不适用。
+    ignores: ["dist/", "node_modules/", "src/**/__fixtures__/*.cjs"],
   }
 );

@@ -45,6 +45,7 @@ import { systemConfigs, versionCodeRules } from "../../db/schema";
 import type {
   ImplementationDependencyRulesStore,
   KnowledgeBaseConfigStore,
+  McpConfigStore,
   RequirementSystemConfigStore,
   ToolPolicyStore,
   VersionCodeRule,
@@ -88,6 +89,10 @@ export interface SystemStoreRepository {
   /** 批次 6b：第五配置区（system_configs.toolPolicy，jsonb 单行 upsert，同套 version 机制） */
   loadToolPolicyStore(): Promise<ToolPolicyStore | null>;
   saveToolPolicyStore(store: ToolPolicyStore): Promise<void>;
+  /** 批次 7：第六配置区（system_configs.mcpConfig，jsonb 单行 upsert，同套 version 机制）。
+   *  只存服务清单与人工放行名单（含定义摘要）；服务上报的工具清单/schema/description 永不落此。 */
+  loadMcpConfigStore(): Promise<McpConfigStore | null>;
+  saveMcpConfigStore(store: McpConfigStore): Promise<void>;
 }
 
 // ============================================================
@@ -298,6 +303,25 @@ export function createSystemPgRepository(dbInstance: Database = db): SystemPgRep
     async saveToolPolicyStore(store) {
       try {
         await upsertConfig("toolPolicy", store, store.version);
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    // 批次 7：第六配置区 mcpConfig（缺行返回 null，与 toolPolicy 同口径）
+
+    async loadMcpConfigStore() {
+      try {
+        const row = await loadConfigRow("mcpConfig");
+        return row ? (row.store as McpConfigStore) : null;
+      } catch (err) {
+        throw toSafeError(err);
+      }
+    },
+
+    async saveMcpConfigStore(store) {
+      try {
+        await upsertConfig("mcpConfig", store, store.version);
       } catch (err) {
         throw toSafeError(err);
       }

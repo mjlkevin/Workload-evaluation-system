@@ -39,6 +39,10 @@ export type Capability =
   // --- 证据链 ---
   | "evidence:read"
   | "evidence:write"
+  // --- 批次 7：MCP 第三方工具 ---
+  // 全角色授予：MCP 工具的「默认不可用」不靠能力位实现，而由显式允许清单（配了才连）、
+  // 工具级人工放行（未放行不进注册表）与外发恒 ask 三层承担；本位是 RBAC 侧总开关。
+  | "mcp:invoke"
   // --- ADMIN 专属 ---
   | "dsl:manage"
   | "template:manage"
@@ -58,6 +62,7 @@ export const ROLE_CAPABILITIES: Record<V2Role, Capability[]> = {
     "estimates:read",
     "estimates:write",
     "contract:initiate",
+    "mcp:invoke",
   ],
 
   PRE_SALES: [
@@ -68,6 +73,7 @@ export const ROLE_CAPABILITIES: Record<V2Role, Capability[]> = {
     "requirement:maintain",
     "evidence:read",
     "deliverable:review",
+    "mcp:invoke",
   ],
 
   IMPL: [
@@ -79,6 +85,7 @@ export const ROLE_CAPABILITIES: Record<V2Role, Capability[]> = {
     "assumption:write",
     "evidence:read",
     "evidence:write",
+    "mcp:invoke",
   ],
 
   PM: [
@@ -89,11 +96,13 @@ export const ROLE_CAPABILITIES: Record<V2Role, Capability[]> = {
     "man-day:adjust",
     "deliverable:generate",
     "evidence:read",
+    "mcp:invoke",
   ],
 
   DEV: [
     "dev:read",
     "dev:write",
+    "mcp:invoke",
   ],
 
   PMO: [
@@ -101,6 +110,7 @@ export const ROLE_CAPABILITIES: Record<V2Role, Capability[]> = {
     "deliverable:review",
     "deliverable:reject",
     "evidence:read",
+    "mcp:invoke",
   ],
 
   ADMIN: [
@@ -130,6 +140,7 @@ export const ROLE_CAPABILITIES: Record<V2Role, Capability[]> = {
     "rule:manage",
     "user:manage",
     "system:manage",
+    "mcp:invoke",
   ],
 };
 

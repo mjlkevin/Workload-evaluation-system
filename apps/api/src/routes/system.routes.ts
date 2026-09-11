@@ -35,5 +35,11 @@ router.get("/ai-tools", requireCapability("system:manage"), listAiToolsHandler);
 router.get("/tool-policy", requireCapability("system:manage"), SystemModule.getToolPolicy);
 router.patch("/tool-policy/draft", requireCapability("system:manage"), SystemModule.updateToolPolicyDraft);
 router.post("/tool-policy/activate", requireCapability("system:manage"), SystemModule.activateToolPolicy);
+// 批次 7：MCP 服务配置（system_configs 第六配置区）——只存服务清单与人工放行名单；
+// probe 为放行前的现问通道（每次真连真问 tools/list，结果不落任何缓存）。
+router.get("/mcp", requireCapability("system:manage"), SystemModule.getMcpConfig);
+router.patch("/mcp/draft", requireCapability("system:manage"), SystemModule.updateMcpConfigDraft);
+router.post("/mcp/activate", requireCapability("system:manage"), SystemModule.activateMcpConfig);
+router.post("/mcp/probe", requireCapability("system:manage"), SystemModule.probeMcpServerHandler);
 
 export default router;

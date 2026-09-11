@@ -15,6 +15,7 @@ import { dispatchHomeWorkbenchTurn } from "../../services/ai/workbench-dispatch.
 import type { StreamingChunk } from "../../services/ai/workbench-dispatch.service";
 import { buildWorkbenchChatDispatchInput, buildWorkbenchChatModelInput, getKimiProvider, resolveWorkbenchChatScenario } from "../../services/ai/handlers/workbench-shared";
 import { resolveWorkbenchInjectableTools, runWorkbenchToolLoopStream } from "../../services/ai/workbench-tool-loop";
+import { resolveActiveMcpTools } from "../../agent/mcp/mcp-runtime";
 import { createWorkbenchToolApprovalGate } from "../../services/ai/workbench-tool-approval";
 import { createWorkbenchToolInputGate } from "../../services/ai/workbench-tool-user-input";
 import { assertWorkbenchModelRequestMatchesStorage } from "../../services/ai/workbench-request-invariant";
@@ -204,7 +205,8 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
         // 批次 6b：注入点读取生效工具策略（system_configs.toolPolicy），在 capability
         // 过滤之上叠加策略裁切；策略读失败即抛错停跑，不按「无策略」放行。
         const toolPolicy = await resolveActiveToolPolicy();
-        const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy });
+        const mcp = await resolveActiveMcpTools();
+        const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy, mcpTools: mcp.tools });
         const streamChatCompletion = provider.streamChatCompletion!.bind(provider);
         // 单轮流式调用：透传 provider 全部可见字段（含 toolCalls，工具循环靠它识别调用）
         for await (const chunk of runWorkbenchToolLoopStream({

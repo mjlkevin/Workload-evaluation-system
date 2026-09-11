@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAiToolPolicy, normalizeEntry } from '../../hooks/useAiToolPolicy.js'
+import AiMcpServersPanel from './AiMcpServersPanel.jsx'
 
 /**
  * 批次 6a：AI 工具清单（系统管理 · 只读，运行时从 ToolRegistry 派生）。
@@ -192,11 +193,20 @@ export default function AiToolInventoryPanel() {
                   <tr key={tool.name}>
                     <td>
                       <span className="mono" style={{ fontWeight: 600 }}>{tool.name}</span>
-                      {tool.category ? (
-                        <div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {tool.category ? (
                           <span className="tag brd" style={{ fontSize: 10 }}>{tool.category}</span>
-                        </div>
-                      ) : null}
+                        ) : null}
+                        {tool.origin === 'mcp' ? (
+                          <span
+                            className="tag brd"
+                            style={{ fontSize: 10 }}
+                            title={`MCP 桥接工具（第三方撰写，逐个放行）· 归属服务：${tool.mcpServer?.name || tool.mcpServer?.id || ''}`}
+                          >
+                            MCP{tool.mcpServer ? ` · ${tool.mcpServer.name || tool.mcpServer.id}` : ''}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td><span className="sys-cell-clip" title={tool.description}>{tool.description || '—'}</span></td>
                     <td><span className="mono" style={{ fontSize: 11 }}>{tool.capability || '—'}</span></td>
@@ -349,6 +359,8 @@ export default function AiToolInventoryPanel() {
           </div>
         )}
       </div>
+
+      <AiMcpServersPanel />
     </div>
   )
 }
