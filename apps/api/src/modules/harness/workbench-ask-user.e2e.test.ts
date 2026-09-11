@@ -30,6 +30,7 @@ import {
   createHarnessRuntimeRepository,
   type HarnessRuntimeRepository,
 } from "./harness-runtime.repository";
+import { attachWorkbenchConversationFact } from "./workbench-conversation-fact";
 import { createHarnessRuntimeWorker, type HarnessWorkflowRegistry } from "./harness-runtime.worker";
 import { startHarnessRuntime } from "./harness-boot";
 import { createAiSession } from "../ai-sessions/ai-sessions.usecase";
@@ -165,7 +166,7 @@ async function drivePhase(input: {
         title: input.content,
         workflowId: "workbench_chat_v1",
         workflowVersion: "1.0.0",
-        executionConfig: { content: input.content },
+        executionConfig: attachWorkbenchConversationFact({ content: input.content }).executionConfig,
       });
       runId = queued.run.harnessRunId;
       createdRunIds.push(runId);

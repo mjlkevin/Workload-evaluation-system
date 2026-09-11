@@ -262,6 +262,30 @@
       <h2>新增风险池</h2>
       <table>
         <tr><th>风险</th><th>影响</th><th>控制方式</th><th>状态</th></tr>
+        <tr data-board-event-id="BE-2026-09-11-batch2b2-conversation-envelope:risks-1">
+          <td><b>对话事件载荷一度只有 <code class="inline">{content}</code></b>（批次 2b-2 已修）。开发库实取 48 条消息：messageId 48 · createdAt 48 · metadata 44 · attachmentIds 27，事件侧一条都没有。</td>
+          <td>2b-3 按事件重建历史时，附件解析上下文与 <code class="inline">metadata.toolCalls</code>（进行中工具交互判据）无处可取——少的是字段不是条数，比少一条更难察觉。</td>
+          <td>本批让 <code class="inline">user/message</code> / <code class="inline">assistant/message</code> 承载完整信封，真库新建对话逐字段比对通过（不排除任何键，含 <code class="inline">projectionSource</code>）。</td>
+          <td><span class="status done"><span class="dot"></span>已修 / 批次 2b-2</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-11-batch2b2-conversation-envelope:risks-2">
+          <td><b>「双写期已成立」当时是推导，不是实测</b>（架构侧提出，执行方实取证伪）。全库 35 987 条事件里 <code class="inline">user/message</code> 0 条、<code class="inline">assistant/message</code> 0 条。</td>
+          <td>据此排的 2b-3 判据（13 条存量会话走事件路径）在真实数据上没有样本可验，会以「全部走回落」的方式假绿通过。</td>
+          <td>登记为失效形态实例：<b>从「代码已合入」推不出「数据已存在」</b>。派单前提须连库实取后再排判据；架构侧同日认错并改单。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 复核纪律（方法论）</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-11-batch2b2-conversation-envelope:risks-3">
+          <td><b>换源前必须先补载荷</b>（给后续批次的排序纪律）。载荷补齐前翻转读取源，17 条有消息的会话会 100% 落回 jsonb。</td>
+          <td>那样判据只能证明「回落没出错」，证不了「事件流重建会不会静默少历史」——而后者是整条 2b 线的要害。</td>
+          <td>已按 A→B 拆批执行：2b-2 补载荷（本批）→ 2b-3 换源。2b-3 判据②改为真库新建对话的 e2e 逐字段对照，不靠存量数据。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 归属批次 2b-3</span></td>
+        </tr>
+        <tr data-board-event-id="BE-2026-09-11-batch2b2-conversation-envelope:risks-4">
+          <td><b>用户消息 <code class="inline">createdAt</code> 语义变化</b>（批次 2b-2 裁决 ② 的代价）：由「worker 执行时刻」变为「提交时刻」。</td>
+          <td>会话里用户消息的时间戳整体提前（几秒到几分钟），按 <code class="inline">createdAt</code> 排序与展示的时刻随之改变。</td>
+          <td>换来的是 <code class="inline">user/message</code> 仍与 Run 同一事务提交：超限即整体回滚，不出现「会话有这条消息、事件没有」的静默丢正文窗口。人工验收待做。</td>
+          <td><span class="status warn"><span class="dot"></span>开放 / 已知行为变化，待人工验收</span></td>
+        </tr>
         <tr data-board-event-id="BE-2026-09-08-batch2b1-conversation-events:risks-1">
           <td><b>同步两条工作台通道不产生对话正文事件</b>（批次 2b-1 只写异步 Run 通道，未修）。<code class="inline">workbench-chat.handler.ts</code> 与 <code class="inline">workbench-chat-stream.handler.ts</code> 直写 <code class="inline">ai_sessions</code>、不经 Harness 事件流（<b>无 runId 可写</b>），本批两个新事件对它们结构性不可达。</td>
           <td>2b-3 一旦把 <code class="inline">deriveSessionMessages</code> 的数据源换成事件序列，走过同步通道的那次会话历史将<b>重建为空</b>：事件流里连一条 <code class="inline">user/message</code> 都没有。今天同步通道是 503 回退兜底（workflow 注释原话「503 回退同步路径不经本 workflow，零双写」），量小但不为零，且失败方向是「历史凭空消失」而非报错。</td>

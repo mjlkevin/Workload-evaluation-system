@@ -17,7 +17,6 @@
 //   已无生产者与消费者的 `outbox` 返回字段（旧注释里的「outbox 恒空」自此
 //   不再是「存在但为空」，而是「结构上不存在」）。
 
-import { randomUUID } from "node:crypto";
 import type {
   HarnessWorkflow,
   HarnessWorkflowStepContext,
@@ -38,15 +37,22 @@ import {
   createWorkbenchToolInputGate,
   type WorkbenchToolInputGate,
 } from "../../services/ai/workbench-tool-user-input";
-import type { WorkbenchToolCallSummary } from "../../services/ai/workbench-tool-event-surface";
 import type {
   AppendAiSessionMessageIdempotentInput,
   AppendAiSessionMessageIdempotentResult,
 } from "../ai-sessions/ai-sessions.repository";
-import type { AiAttachment, AiSessionRecord } from "../ai-sessions/ai-sessions.types";
+import type { AiAttachment, AiMessage, AiSessionRecord } from "../ai-sessions/ai-sessions.types";
 import { normalizeHomeAttachments, latestSessionAttachmentWithSummary, sessionRecordToHomeMessages, isExplicitReportRequest } from "../../services/ai/handlers/workbench-shared";
 import type { HomeMessageInput } from "../../services/ai/handlers/workbench-shared";
 import { resolveRunMemoryProjectId } from "./harness.types";
+import {
+  composeWorkbenchUserMessage,
+  mintWorkbenchAssistantMessage,
+  readWorkbenchConversationFact,
+  workbenchAssistantProjectionSource,
+  workbenchUserProjectionSource,
+  withWorkbenchProjectionSource,
+} from "./workbench-conversation-fact";
 import { runExplicitHomeReportFlow } from "../../services/ai/handlers/report-flow";
 import { hasOngoingWorkbenchToolInteraction } from "../../services/ai/workbench-intent.service";
 import { deriveSessionMessages } from "../ai-sessions/session-history";
@@ -178,12 +184,15 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       if (!aiSessionId) {
         throw new Error("run.aiSessionId is required for workbench chat");
       }
-      const attachments = normalizeHomeAttachments(executionConfig.attachments).slice(0, 5);
-      const storedAttachments: AiAttachment[] = attachments.map((attachment) => ({
-        attachmentId: `att-${randomUUID()}`,
-        ...attachment,
-        createdAt: new Date().toISOString(),
-      }));
+      // 批次 2b-2：本轮消息的身份字段由提交侧 mint 并随 executionConfig 持久化，本处只读不回造
+      // （读不到即抛，与 content 同一口径：两条生成路径等于把同一字段放回两处各写一遍）。
+      const fact = readWorkbenchConversationFact(executionConfig);
+      const attachments = normalizeHomeAttachments(
+        // 批次 2b-2：附件与会话消息的身份字段唯一来源是提交侧 mint 的信封（下表），
+        // 不再是本处现造——dispatch 用的展示字段与 attachmentIds 因此不可能分叉。
+        fact.attachments,
+      ).slice(0, 5);
+      const storedAttachments: AiAttachment[] = fact.attachments;
       // ISS-2026-08-16-002：请求级附件优先，缺失时经 getSessionRecord 回退到
       // 已落库会话附件（与同步路径 workbench-chat.handler.ts L59 同一口径）——
       // 覆盖「同一会话第二轮无附件请求」场景（如先传附件解析，再发"生成报告"）。
@@ -192,21 +201,13 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
 
       // C2 缺陷 B：用户消息先于 dispatch 幂等落库（旧同步路径同款结构）；
       // 来源键 run 维度 deduplicationKey，恢复重放由去重吸收，不重复。
+      // 批次 2b-2：消息本体（messageId / createdAt / attachmentIds）取自提交侧信封，
+      // 与入队事务里那条 user/message 载荷同一份——见 workbench-conversation-fact.ts。
       await deps.appendSessionMessage({
         sessionId: aiSessionId,
-        message: {
-          messageId: `msg-${randomUUID()}`,
-          role: "user",
-          content,
-          createdAt: new Date().toISOString(),
-          attachmentIds: storedAttachments.map((attachment) => attachment.attachmentId),
-        },
+        message: composeWorkbenchUserMessage({ fact, content }),
         attachments: storedAttachments,
-        source: {
-          deduplicationKey: `${run.harnessRunId}:user:1`,
-          runId: run.harnessRunId,
-          eventType: "user_message",
-        },
+        source: workbenchUserProjectionSource(run.harnessRunId),
       });
 
       // DEF-2026-08-27-001 第一层：异步 Run 通道必须携带会话历史与记忆项目。
@@ -421,10 +422,39 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
           // 放在旁边恢复重放就会写出第二条；放在这里才与整轮副作用同借
           // recordToolEffectOnce 的幂等——重放跳过 execute，事实天然只有一条。
           //
-          // 归一化口径必须与下面落会话消息用的 answer（String(output.answer ?? "")）
-          // 一致，否则「事件载荷 ≡ 会话正文」在 answer 为 undefined/非字符串时静默对不上。
-          const assistantMessageContent = String(result.answer ?? "");
-          appendStreamEvent("assistant/message", { content: assistantMessageContent });
+          // 批次 2b-2：载荷由 `{content}` 扩成**完整消息信封**。messageId / createdAt
+          // 必须在这里 mint，并随下面的返回值进入**已持久化的 effect output**：恢复重放
+          // 跳过 execute、只读回同一份 output，会话侧才落到与事件载荷同一个 id 上。
+          // 若留到 execute 之后再 mint，重放会给同一条会话消息换一个新 messageId
+          // （来源键吸收的是 deduplicationKey，不是 id），事件与会话从此对不上——
+          // 而这个「对不上」要到 2b-3 换读取源才看得见。
+          //
+          // 批次 0.5 · ③：工具调用快照取在这里。sink 已在上面的 finally 里 stop、dispatch
+          // 已返回，读到的就是整轮工具循环落定后的终态（终态由循环结束决定，与写链何时冲刷
+          // 无关），故提到写事实之前不改变其内容——但**不能再往前移到循环还在跑时**。
+          // 镜像到 metadata **顶层** toolCalls 的口径不变（前端 mapSessionMessages 只读顶层）。
+          const toolCallSummaries = toolEventSink.getToolCalls();
+          const assistantToolCalls = toWorkbenchToolCallMetadata(
+            toolCallSummaries,
+            (result.trace as { toolCalls?: unknown } | undefined)?.toolCalls,
+          );
+          const assistantMessage = mintWorkbenchAssistantMessage({
+            // 归一化口径与落会话消息用的是同一个对象，不再各写一遍 String(answer ?? "")。
+            content: String(result.answer ?? ""),
+            metadata: {
+              intent: String(result.intent ?? "domain_qa"),
+              suggestedActions: result.suggestedActions ?? [],
+              trace: result.trace ?? {},
+              ...(result.formBlock ? { formBlock: result.formBlock } : {}),
+              // 前端 messageFormatter 只读 metadata 顶层 memoryRef，不得嵌进 trace
+              ...(memoryRef ? { memoryRef } : {}),
+              ...(assistantToolCalls ? { toolCalls: assistantToolCalls } : {}),
+            },
+          });
+          appendStreamEvent(
+            "assistant/message",
+            withWorkbenchProjectionSource(assistantMessage, workbenchAssistantProjectionSource(run.harnessRunId)),
+          );
           // execute 返回前冲刷写链，避免流式事件丢失在游离 promise 中
           await streamEventChain;
           // RP-030：成功 trace 归档（置于 execute 内，恢复重放跳过不重复写）
@@ -440,9 +470,6 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
               // trace 写入失败不影响主链路
             });
           }
-          // 批次 0.5 · ③：快照取在写链冲刷之后——sink 与四类事件同源，
-          // 此处读到的一定是整轮工具循环落定后的终态。
-          const toolCallSummaries = toolEventSink.getToolCalls();
           return {
             answer: result.answer,
             intent: result.intent,
@@ -455,33 +482,24 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
             // 批次 0.5 · ③：工具调用展示摘要同理——重放若不从 output 读，
             // sink 内存态已随第一次执行销毁，重放会写出空列表（可视化倒退）。
             ...(toolCallSummaries.length ? { toolCalls: toolCallSummaries } : {}),
+            // 批次 2b-2：本轮 assistant 消息的信封整体进 output。重放读回它，
+            // 下面的会话落库与上面那条事件载荷才是同一份字段。
+            assistantMessage,
           };
         },
       });
 
-      const output = effectResult.output ?? { answer: "" };
-      const answer = String(output.answer ?? "");
-      const intent = String((output as any).intent ?? "domain_qa");
-      const suggestedActions = (output as any).suggestedActions ?? [];
-      const trace = (output as any).trace ?? {};
-      const formBlock = (output as any).formBlock;
-      const memoryRef = (output as any).memoryRef as WorkbenchMemoryRefTrace | undefined;
-      const absorbedToolCalls = (output as any).toolCalls as WorkbenchToolCallSummary[] | undefined;
-      // 批次 0.5 · ③：镜像到 metadata **顶层** toolCalls。前端 mapSessionMessages
-      // 只读顶层（MS3 口径），而 trace.toolCalls 嵌在 metadata.trace 下——不镜像
-      // 则刷新页面/重开会话后 ② 的三态全部消失，可视化只活在一次 SSE 连接里。
-      // 落库只带展示字段（callIndex/name/status/elapsedMs/errorPreview + source），
-      // 完整参数与结果预览留在事件面，不进随会话持久化的列表。
-      const toolCalls = toWorkbenchToolCallMetadata(absorbedToolCalls ?? [], (trace as { toolCalls?: unknown }).toolCalls);
-      const messageMetadata = {
-        intent,
-        suggestedActions,
-        trace,
-        ...(formBlock ? { formBlock } : {}),
-        // 前端 messageFormatter 只读 metadata 顶层 memoryRef，不得嵌进 trace
-        ...(memoryRef ? { memoryRef } : {}),
-        ...(toolCalls ? { toolCalls } : {}),
-      };
+      // 批次 2b-2：会话侧这条 assistant 消息**就是**上面写进事件流的那一份信封
+      // （随 execute 返回值经 effect output 传递，恢复重放读回同一份 id 与 metadata），
+      // 本处不再重新组装一遍 metadata——那是「同一事实两处各写一遍」的旧形态。
+      const assistantMessage = (
+        effectResult.output as { assistantMessage?: AiMessage } | null | undefined
+      )?.assistantMessage;
+      if (!assistantMessage) {
+        // 不回落「就地组装一份」：那会让重放写出与事件载荷不同的 id，
+        // 而差异要到 2b-3 换读取源才暴露。缺字段属装配错误，当场红。
+        throw new Error("workbench chat effect output is missing assistantMessage");
+      }
 
       // S2b-2（§4.8 补偿链删除）：assistant 消息与 user 消息同款经
       // appendSessionMessage 直接幂等落库（同库直写），来源键
@@ -489,18 +507,8 @@ export function createWorkbenchChatWorkflow(deps: WorkbenchChatWorkflowDeps): Ha
       // （projector/sink/outbox 表已随补偿链删除，恢复重放由去重吸收）。
       await deps.appendSessionMessage({
         sessionId: aiSessionId,
-        message: {
-          messageId: `msg-${randomUUID()}`,
-          role: "assistant",
-          content: answer,
-          createdAt: new Date().toISOString(),
-          metadata: messageMetadata,
-        },
-        source: {
-          deduplicationKey: `${run.harnessRunId}:assistant:1`,
-          runId: run.harnessRunId,
-          eventType: "assistant_message",
-        },
+        message: assistantMessage,
+        source: workbenchAssistantProjectionSource(run.harnessRunId),
       });
 
       return {

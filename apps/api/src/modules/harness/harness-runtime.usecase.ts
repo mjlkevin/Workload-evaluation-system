@@ -17,6 +17,11 @@ import { randomUUID } from "node:crypto";
 import type { AuthUser } from "../../types";
 import type { AiSessionRecord } from "../ai-sessions/ai-sessions.types";
 import { HarnessRuntimeError } from "./harness-runtime.repository";
+import {
+  attachWorkbenchConversationFact,
+  buildWorkbenchUserMessageFact,
+  type WorkbenchConversationAttachment,
+} from "./workbench-conversation-fact";
 
 // ============================================================
 // 错误类型（状态码矩阵 §2 冻结）
@@ -87,8 +92,11 @@ export type AiRunsRepoPort = {
     executionConfig?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
     retryOfRunId?: string;
-    /** 批次 2b-1（additive）：本轮用户正文原文，非空即随入队事务落一条 user/message */
-    userMessage?: string;
+    /**
+     * 批次 2b-1（additive）→ 2b-2：本轮用户消息的完整信封载荷，按 runId 构造，
+     * 随入队事务落一条 user/message（约定所有权在 workbench 层，仓储只序列化）。
+     */
+    userMessageFact?: (runId: string) => Record<string, unknown>;
   }): Promise<{ run: Record<string, unknown>; created: boolean }>;
   findRunForOwner(runId: string, ownerUserId: string): Promise<Record<string, unknown> | null>;
   listActiveRunsForOwner(ownerUserId: string): Promise<Array<Record<string, unknown>>>;
@@ -251,6 +259,16 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
     const metadata: Record<string, unknown> = {};
     if (clientMessageId) metadata.clientMessageId = clientMessageId;
 
+    // 批次 2b-2：本轮消息的身份字段（messageId / createdAt / 附件 attachmentId）在**提交时刻**
+    // 一次 mint，随 executionConfig 持久化。workflow 执行时复用而不再自造，于是
+    // 「事件载荷」与「会话里那条消息」是同一份字段的两次写出——2b-3 换读取源时历史才会
+    // 逐字段还原，而不是只剩正文。附件身份一并前移：它是 attachmentIds 的来源，
+    // 留在执行期生成就等于让事件少知道一部分自己该承载的事实。
+    const { executionConfig, fact } = attachWorkbenchConversationFact(
+      { content, ...(attachments.length ? { attachments } : {}) },
+      attachments,
+    );
+
     const created = await createRunOrThrow(() =>
       repo.createQueuedRun({
         ownerUserId: user.id,
@@ -260,13 +278,14 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
         title: content.slice(0, 80),
         workflowId: WORKBENCH_WORKFLOW_ID,
         workflowVersion: WORKBENCH_WORKFLOW_VERSION,
-        executionConfig: { content, ...(attachments.length ? { attachments } : {}) },
+        executionConfig,
         metadata,
-        // 批次 2b-1：用户正文随入队落一条 user/message。取值是**提交原始入参** content
+        // 批次 2b-1：用户正文随入队落一条 user/message。正文取自**提交原始入参** content
         // （与 executionConfig.content 同一份，也正是 workflow 落会话用户消息的那一份），
         // 刻意不读上面那行 title：title 是 80 字标题，今天恰好等于正文是巧合，
         // 依赖它就等于把「历史对不对」押在「没人给长消息加摘要」上。
-        userMessage: content,
+        // 批次 2b-2：同一份 content 连同刚 mint 的信封构成完整载荷，runId 由仓储在本事务内给出。
+        userMessageFact: (runId) => buildWorkbenchUserMessageFact({ runId, fact, content }),
       }),
     );
 
@@ -403,6 +422,20 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
       ? (JSON.parse(JSON.stringify(run.executionConfig)) as Record<string, unknown>)
       : {};
 
+    // 批次 2b-2：重试是**新一轮会话消息**（新 Run、新来源键），信封必须重新 mint。
+    // 原样复用克隆来的 conversationFact 会让两条用户消息共享同一个 messageId——
+    // 那比今天「同正文重复两轮」（看板 BE-2026-09-08…:risks-5）更糟，重复会从
+    // 「看得出来」变成「按 messageId 分不清」。附件身份同理：今天每次执行本就新造
+    // att- id，重 mint 保持原行为不变。
+    const retryAttachments = Array.isArray(retryExecutionConfig.attachments)
+      ? (retryExecutionConfig.attachments as WorkbenchConversationAttachment[])
+      : [];
+    const { executionConfig: retryConfig, fact: retryFact } = attachWorkbenchConversationFact(
+      retryExecutionConfig,
+      retryAttachments,
+    );
+    const retryContent = asText(retryConfig.content);
+
     const created = await createRunOrThrow(() =>
       repo.createQueuedRun({
         ownerUserId: user.id,
@@ -412,12 +445,13 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
         title: String(run.title ?? ""),
         workflowId: String(run.workflowId ?? WORKBENCH_WORKFLOW_ID),
         workflowVersion: String(run.workflowVersion ?? WORKBENCH_WORKFLOW_VERSION),
-        executionConfig: retryExecutionConfig,
+        executionConfig: retryConfig,
         metadata,
         retryOfRunId: runId,
         // 批次 2b-1：retry 提交的是**同一轮**用户正文，只可能在原 Run 的
         // executionConfig.content 里（与 submitRun 那份同源）。这里同样不读 title。
-        userMessage: asText(retryExecutionConfig.content),
+        userMessageFact: (runIdForFact) =>
+          buildWorkbenchUserMessageFact({ runId: runIdForFact, fact: retryFact, content: retryContent }),
       }),
     );
 

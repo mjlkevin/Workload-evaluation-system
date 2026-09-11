@@ -23,6 +23,7 @@ import { createAiSessionsRouter } from "./ai-sessions.routes";
 import systemRouter from "./system.routes";
 import { createHarnessRuntimeRepository, type HarnessRuntimeRepository } from "../modules/harness/harness-runtime.repository";
 import type { AiRunsUsecase } from "../modules/harness/harness-runtime.usecase";
+import { attachWorkbenchConversationFact } from "../modules/harness/workbench-conversation-fact";
 import { startHarnessRuntime } from "../modules/harness/harness-boot";
 import { routeWorkbenchIntent } from "../services/ai/workbench-intent.service";
 import { WorkbenchToolApprovalPendingError } from "../services/ai/workbench-tool-approval";
@@ -362,10 +363,31 @@ test("submit returns HTTP 202 with the frozen envelope", { skip: !testDatabaseUr
     ["run_queued", "user/message"],
     "POST /runs 即写入 user/message（本批只写不读，读取路径不受影响）",
   );
+  // 批次 2b-2：载荷不再只是 `{content}`——它是**完整消息信封**。本用例走真实
+  // HTTP → usecase → 入队事务这条链，是「2b-3 换读取源时历史能否逐字段还原」在
+  // API 表面的证据；期望值取自 Run 上持久化的 conversationFact 与本次 runId，
+  // 而不是把生产构造器再调一遍（那样等于自己验自己）。
+  const payload = submittedEvents[1].payload as Record<string, unknown>;
+  const persistedFact = (run?.executionConfig as { conversationFact?: { userMessage?: { messageId?: string; createdAt?: string } } })
+    ?.conversationFact?.userMessage;
+  assert.ok(persistedFact?.messageId && persistedFact.createdAt, "信封必须随 executionConfig 持久化（重放要读回同一份）");
   assert.deepEqual(
-    submittedEvents[1].payload,
-    { content: "请分析这份需求文件" },
-    "载荷正文逐字节等于提交的 content，不是 title 的派生物",
+    payload,
+    {
+      messageId: persistedFact.messageId,
+      role: "user",
+      content: "请分析这份需求文件",
+      createdAt: persistedFact.createdAt,
+      attachmentIds: [],
+      metadata: {
+        projectionSource: {
+          deduplicationKey: `${response.body.data.runId}:user:1`,
+          runId: response.body.data.runId,
+          eventType: "user_message",
+        },
+      },
+    },
+    "载荷必须等于会话里那条用户消息：正文逐字节等于提交的 content，身份字段等于提交时 mint 的信封",
   );
 });
 
@@ -887,7 +909,7 @@ function makeToolStepCtx(input: {
       title: input.content.slice(0, 40),
       workflowId: "workbench_chat_v1",
       workflowVersion: "1.0.0",
-      executionConfig: { content: input.content },
+      executionConfig: attachWorkbenchConversationFact({ content: input.content }).executionConfig,
       status: "running",
       eventSequence: 1,
       metadata: {},

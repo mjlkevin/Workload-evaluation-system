@@ -1,0 +1,103 @@
+{
+  "id": "BE-2026-09-11-batch2b2-conversation-envelope",
+  "date": "2026-09-11",
+  "type": "implementation",
+  "scope": "批次 2b-2 · 对话事件载荷承载完整消息信封（补写入侧，不切读取源）",
+  "summary": "承接 2b-3 派单的两次前提证伪：① 事件流里 user/message 与 assistant/message 各 0 条（全库 35 987 条事件，最后一条 09-07，早于 2b-1 合入），「双写期已成立」是从「代码已合入」推出来的，没做过数据实测；② 2b-1 的载荷只有 {content}，而开发库 48 条存量消息带 messageId 48 · createdAt 48 · metadata 44 · attachmentIds 27——按这份载荷重建历史，少的是字段而不是条数，更难察觉。架构侧据此把 2b 拆成 A（本批，补载荷）→ B（2b-3，换源），并解除「不许改 2b-1 写入逻辑」这一条禁令。本批按裁决 ② 实施：本轮消息信封在**提交时刻** mint（含附件身份）并随 executionConfig 持久化，workflow 执行时复用而不再自造，事件载荷与会话那条消息由同一份字段两次写出。user/message 仍留在入队事务内（保住 2b-1 的「正文与 Run 同轨、超 1 MiB 整体回滚并映射 422」），投影约定由 workbench 层以 runId => 载荷 的构造器交给仓储，仓储只序列化。projectionSource 一并进载荷，逐字段比对不留排除键。本批未切换读取源（deriveSessionMessages 仍读 jsonb）、未回填历史、未停写 ai_sessions.messages、未改事件类型名与数量（仍 25 类）、未建表未写迁移。",
+  "status": "已回填 / 待 Codex 复核",
+  "pages": [
+    "changes",
+    "testing"
+  ],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/workbench-conversation-fact.ts",
+      "summary": "新增：信封约定的唯一持有者。mintWorkbenchConversationFact（提交时刻 mint messageId/createdAt/附件身份）、attachWorkbenchConversationFact（mint + 写进 executionConfig 的同一表达式，生产与夹具共用，防夹具拼出生产不存在的形状）、readWorkbenchConversationFact（读回，缺失或形状不对当场抛，不回落自造）、workbenchUser/AssistantProjectionSource（来源键 ${runId}:user:1 / :assistant:1）、withWorkbenchProjectionSource（复刻 ai-sessions-pg.repository.ts:258-261 落库时补来源键的同一表达式）、buildWorkbenchUserMessageFact（runId => 完整载荷）、mintWorkbenchAssistantMessage"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/harness-runtime.repository.ts",
+      "summary": "入队写入点：CreateQueuedHarnessRunInput.userMessage?: string 改为 userMessageFact?: (runId) => 载荷。runId 在本事务内 mint，故载荷必须由调用方按它构造；仓储只 assertSafeJsonObject + 序列化，不认识 workbench 配置形状、不拼投影键（2b-1 注释当初拒绝的事仍然拒绝）。同一事务、同一 1 MiB 闸门两条口径原样保留；不传构造器即不写（replay/regression 提交事件面不变）"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/harness-runtime.usecase.ts",
+      "summary": "提交侧 mint：submitRun 用 attachWorkbenchConversationFact 生成带信封的 executionConfig 并交出载荷构造器；retryRun **重新 mint 并覆盖**克隆来的旧信封——复用原 messageId 会让会话里两条用户消息同 id，那比已登记的 risks-5「同正文重复两轮」更难查"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/harness/workbench-chat.workflow.ts",
+      "summary": "执行侧复用：executeStep 读回信封（不再自造 msg-/att- id），用户消息落库与附件都用它，dispatch 用的附件展示字段也从同一份派生；助手侧 messageId/createdAt 在 execute 内 mint、metadata 组装自 execute 之后上移至此（工具快照相应提前两行，仍在 sink.stop() 与 dispatch 返回之后，内容不变），整条 assistantMessage 随 execute 返回值进入**已持久化的 effect output**，恢复重放读回同一份——故重放不再换 id。execute 之后那段重新组装 metadata 的代码删除，改为直接用线程出来的那条消息落库"
+    },
+    {
+      "kind": "gate",
+      "ref": "判据① apps/api/src/modules/harness/workbench-conversation-events.e2e.test.ts（口径由「只比 content」升级为「整条消息逐字段」）",
+      "result": "pass",
+      "summary": "真库真实两轮对话 + 新增一条带附件的真实轮次，共 3 用例全绿。逐字段打印 + JSON.stringify 全等，**不排除任何键**：第 1 轮 user 两侧字段集合均为 [attachmentIds, content, createdAt, messageId, metadata, role]，assistant 均为 [content, createdAt, messageId, metadata, role]，每个字段的字节数 + SHA-256 前 12 位成对相同（如 user content 328B/506288c441a3 两侧同、metadata 161B 两侧同；assistant metadata 553B 两侧同）；第 2 轮同构。附件轮 attachmentIds 44B 两侧同，且引用到的附件实体真实存在于会话 attachments（防悬挂引用）。事件序列仍 seq1:run_queued → seq2:user/message → seq3:run_claimed → …→ assistant/message → run_completed，text.delta 条数与内容与模型实发分片逐字相同（传输面零变化）"
+    },
+    {
+      "kind": "gate",
+      "ref": "判据② npm run check:session-history-parity（本批不切读取源，读取行为必须零变化）",
+      "result": "pass",
+      "summary": "开发库 workload_eval 实取 101 条会话 × 6 层 = 606 次逐字节比对，六层全部 101/101 一致、0 差异，与开工基线逐位相同（开工时先跑过一次同为 606 全一致，证明红绿归因不靠猜）。普查同时实取 non_array_messages=0 · empty=84 · 非空 17 · 总消息 48 · 带附件引用 2 · 悬挂 0 · 带工具痕迹 2"
+    },
+    {
+      "kind": "command",
+      "ref": "判据③ 事件类型仍 25 类 + 防漂移",
+      "result": "pass",
+      "summary": "npx tsx 实取 HARNESS_RUN_EVENT_TYPES.length = 25，末四位 … | tool.call.awaiting_input | user/message | assistant/message；HARNESS_RUN_SINGLETON_EVENT_TYPES = user/message , assistant/message。types.test 的长度与逐位断言未改动即通过，说明本批没有夹带新事件类型、也没有把载荷的形状变化反映进词汇表"
+    },
+    {
+      "kind": "command",
+      "ref": "判据④ 构建与套件计数（开工基线自取 origin/main CI run 34213214105）",
+      "result": "pass",
+      "summary": "build:api 与 build:web 均 exit 0。逐套件 rules 8→8 · agent 140→140 · security 17+2→17+2 · scripts 72→72 · web 69 files/560→69/560 · ai 286→286 · modules 537→537 · serial-store 171→171 · integration 1→1 · harness 290→299。合计 1943→1952，净 +9 全归因本批新增用例（workbench-conversation-fact.test.ts 8 条 + 附件轮次 e2e 1 条），无删除无跳过、无任何套件计数下降"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:integration（干净库按 CI 顺序）",
+      "result": "pass",
+      "summary": "本批另建 scratch 库 workload_eval_b2b3_test 按 CI 顺序 migrate → 测试 → seed → integration 实取，规避已登记的共享测试库种子被清问题（BE-2026-09-08…:risks-4）；integration 1 pass / 0 fail"
+    }
+  ],
+  "next": "待架构侧复核后合入 main；本批未自行合入、未等 CI。交接给 2b-3（B：换源）的实取事项：① 载荷补齐后，新建对话的 user/message 与 assistant/message 已与会话消息逐字段相同，2b-3 可据此把 deriveSessionMessages 换成事件源，判据②请用本文件同一装配（真库新建对话逐字段对照）而非存量 17 条；② 存量 101 条会话仍无任何对话事件，换源时必须整会话级回落 jsonb 并打可数残量日志；③ 已登记的同步通道（BE-2026-09-08…:risks-1）与显式报告旁路（:risks-2）仍不经本装配，其行现在与「整会话回落」口径同时成立，复核时请一并改其处置口径；④ retryOfRunId 归并在事件侧尚无存量数据命中，2b-3 仍需合成用例覆盖；⑤ 答复超 1 MiB 事件侧仍静默丢弃（:risks-3 未修），换源前须定边界。",
+  "board": {
+    "change": {
+      "stage": "批次 2b-2：对话事件载荷补成完整消息信封（写入侧）· 分支 feat/batch2b3-read-from-events 未合入",
+      "result": "已回填 / 待 Codex 复核"
+    },
+    "testing": [
+      {
+        "command": "bash scripts/verify-local-db-tests.sh test:harness",
+        "result": "pass",
+        "summary": "299 pass / 0 fail / 0 skipped（开工基线 290，净 +9：新增 workbench-conversation-fact.test.ts 8 条 + 附件轮次 e2e 1 条）"
+      },
+      {
+        "command": "npm run check:session-history-parity",
+        "result": "pass",
+        "summary": "开发库 101 条会话 × 6 层 = 606 次逐字节比对全部一致（判据②：本批读取行为零变化的直接证据）"
+      },
+      {
+        "command": "bash scripts/verify-local-db-tests.sh src/modules/harness/workbench-conversation-events.e2e.test.ts",
+        "result": "pass",
+        "summary": "3 pass / 0 fail：真实两轮对话 + 一条带附件轮次，事件载荷与会话消息逐字段 + 整对象逐字节相同（判据①，不排除任何键）"
+      },
+      {
+        "command": "WES_TEST_DB_URL=…workload_eval_b2b3_test bash scripts/verify-local-db-tests.sh test:ai test:modules test:modules:serial-store test:integration",
+        "result": "pass",
+        "summary": "干净 scratch 库按 CI 顺序：ai 286 · modules 537 · serial-store 171 · integration 1，逐位与基线相同；新增测试文件已登记进 test:harness 脚本（零引用防漂移用例同批通过）"
+      },
+      {
+        "command": "npm run test:rules / test:agent / test:security / test:scripts / test:web",
+        "result": "pass",
+        "summary": "8 · 140 · 17+2 · 72 · 69 files/560 tests，逐位与基线相同；前端零文件改动"
+      },
+      {
+        "command": "npm run build:api && npm run build:web",
+        "result": "pass",
+        "summary": "两条构建均 exit 0"
+      }
+    ]
+  }
+}

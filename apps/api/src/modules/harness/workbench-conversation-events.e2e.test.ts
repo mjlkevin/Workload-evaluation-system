@@ -1,8 +1,15 @@
 // ============================================================
-// 批次 2b-1 · 对话正文事件 —— 过线判据①端到端实取（两轮真实对话）
+// 批次 2b-2 · 对话正文事件 —— 过线判据①端到端实取（两轮真实对话）
 // ============================================================
 // 判据①要求：走一条真实对话（含至少两轮）→ 每轮各有一条 user/message 与一条
-// assistant/message，且载荷正文与 ai_sessions.messages 里对应消息**逐字节相同**。
+// assistant/message，且载荷与 ai_sessions.messages 里对应消息**逐字节相同**。
+//
+// 口径在 2b-2 收紧了一档：2b-1 只比 `payload.content ≡ message.content`，而载荷
+// 当时**只有** content 一个字段。开发库实取（48 条存量消息）：messageId 48 条、
+// createdAt 48 条、metadata 44 条、attachmentIds 27 条——这些 2b-3 换读取源后
+// 无处可取。所以本文件现在比的是**整条消息**，逐字段打印 + JSON.stringify 全等，
+// **不排除任何键**（projectionSource 也在内：它是「恰好一次落库」的幂等防线，
+// 一份即将成为事实源的记录必须自带）。
 //
 // 刻意不 mock 的部分（mock 了就等于验自己）：
 //  · 提交口用真实 usecase `createAiRunsUsecase.submitRun`（HTTP POST /runs 的同一落库口），
@@ -33,7 +40,8 @@ import type { AuthUser } from "../../types";
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 type EventRow = { sequence: number; eventType: string; payload: Record<string, unknown> };
-type SessionMessage = {
+/** 整条消息（原样取自 jsonb），比对要求看到所有字段，故不预先收窄形状。 */
+type SessionMessage = Record<string, unknown> & {
   role: string;
   content: string;
   metadata?: { projectionSource?: { deduplicationKey?: string } };
@@ -108,6 +116,8 @@ async function driveTurn(input: {
   sessionId: string;
   content: string;
   deltas: string[];
+  /** 批次 2b-2：附件轮次用于验 attachmentIds 也在信封里逐字节对齐。 */
+  attachments?: Array<{ name: string; size?: number; type?: string; parsedSummary?: string }>;
 }): Promise<{ runId: string; answer: string }> {
   const phasePool = new Pool({ connectionString: TEST_DATABASE_URL!, max: 6 });
   const phaseDb = drizzle(phasePool);
@@ -123,6 +133,7 @@ async function driveTurn(input: {
     const submitted = await usecase.submitRun(alice!, input.sessionId, {
       submissionKey: `b2b1-${randomUUID()}`,
       content: input.content,
+      ...(input.attachments ? { attachments: input.attachments } : {}),
     });
     assert.equal(submitted.status, 202, "提交必须经真实 usecase 成功");
     const runId = submitted.data.runId;
@@ -214,8 +225,40 @@ function digestOf(value: unknown): string {
   return `${bytes}B/${createHash("sha256").update(text, "utf8").digest("hex").slice(0, 12)}`;
 }
 
+/**
+ * 判据①（2b-2 口径）：事件载荷 ≡ 会话里那条消息，**逐字段 + 整对象逐字节**。
+ *
+ * 为什么两层都要：
+ *  · 只比整对象 JSON，红的时候看不出差在哪个字段，回填证据无从下手；
+ *  · 只逐字段比，会漏掉「两侧字段集合本身不同」——所以先比键集合，再比序列化全文。
+ * 刻意**不列排除键**：projectionSource 也要比（架构侧 2026-09-11 裁决——一份即将
+ * 成为事实源的记录必须自带全部字段；开了「除某键之外」的口子，三批之后没人记得
+ * 这把尺子还量不量得准）。
+ */
+function assertEnvelopeIdentical(
+  label: string,
+  payload: Record<string, unknown>,
+  stored: Record<string, unknown>,
+): void {
+  const payloadKeys = Object.keys(payload).sort();
+  const storedKeys = Object.keys(stored).sort();
+  console.log(`[B2b2·${label}] 事件字段 ${JSON.stringify(payloadKeys)} · 会话字段 ${JSON.stringify(storedKeys)}`);
+  for (const key of storedKeys) {
+    console.log(
+      `[B2b2·${label}]   ${key}: 事件[${digestOf(JSON.stringify(payload[key] ?? null))}] ` +
+        `会话[${digestOf(JSON.stringify(stored[key] ?? null))}]`,
+    );
+  }
+  assert.deepEqual(payloadKeys, storedKeys, `${label}：两侧字段集合必须相同（少一个字段=2b-3 重建时该字段无处可取）`);
+  assert.equal(
+    JSON.stringify(payload),
+    JSON.stringify(stored),
+    `${label}：事件载荷必须与会话那条消息逐字节相同（逐字段摘要见上，差异不得以「字段无关紧要」放过）`,
+  );
+}
+
 test(
-  "批次2b-1 判据①：真实两轮对话后，每轮各一条 user/message 与 assistant/message，正文与会话消息逐字节相同",
+  "批次2b-2 判据①：真实两轮对话后，每轮各一条 user/message 与 assistant/message，整条消息与会话侧逐字段相同",
   { skip: !TEST_DATABASE_URL },
   async () => {
     const session = await createAiSession(alice!, { title: "批次2b1对话事件会话", workflowKey: "free_chat" });
@@ -253,11 +296,10 @@ test(
       assert.ok(sessionUser, `${turn.label}：会话里应有本轮 user 消息`);
       assert.ok(sessionAssistant, `${turn.label}：会话里应有本轮 assistant 消息`);
 
-      // 逐字节：两侧都必须是 string，且严格相等（不用 trim/normalize 放宽）
+      // 逐字节：整条消息，逐字段 + JSON.stringify 全等（2b-2 口径，不排除任何键）
       assert.equal(typeof userEvents[0].payload.content, "string", "载荷 content 必须是字符串");
-      assert.equal(userEvents[0].payload.content, sessionUser!.content, `${turn.label}：用户正文逐字节相同`);
-      assert.equal(Buffer.byteLength(String(userEvents[0].payload.content), "utf-8"), Buffer.byteLength(sessionUser!.content, "utf-8"), `${turn.label}：UTF-8 字节长度相同`);
-      assert.equal(assistantEvents[0].payload.content, sessionAssistant!.content, `${turn.label}：助手正文逐字节相同`);
+      assertEnvelopeIdentical(`${turn.label} user`, userEvents[0].payload, sessionUser!);
+      assertEnvelopeIdentical(`${turn.label} assistant`, assistantEvents[0].payload, sessionAssistant!);
 
       // 完整性自检：正文没被截成标题（长度对齐提交原文）、也没被拆成碎片
       assert.equal(userEvents[0].payload.content, turn.content, `${turn.label}：事件正文即提交原文`);
@@ -300,5 +342,50 @@ test(
     const userEvent = eventsOfType(rows, "user/message")[0];
     assert.equal(userEvent.payload.content, long, "完整正文入事件流，不受 title 80 字上限影响");
     assert.ok(String(userEvent.payload.content).length > 80, `实取长度 ${String(userEvent.payload.content).length}`);
+  },
+);
+
+test(
+  "批次2b-2 判据①附带：带附件的真实轮次，attachmentIds 与附件身份逐字节对齐",
+  { skip: !TEST_DATABASE_URL },
+  async () => {
+    // 开发库存量 48 条消息里 27 条带 attachmentIds——2b-3 换源后若载荷不带它，
+    // 附件解析上下文（模型历史里那段【附件解析上下文】）会整块丢失。
+    // 本用例走真实提交（附件随 submission 进 executionConfig）+ 真实执行。
+    const session = await createAiSession(alice!, { title: "批次2b2附件轮次会话", workflowKey: "free_chat" });
+    createdSessionIds.push(session.sessionId);
+    const content = "这份需求文件里的多组织协同怎么落地？";
+    const { runId } = await driveTurn({
+      sessionId: session.sessionId,
+      content,
+      deltas: ["按组织维度拆分范围后单独排期。"],
+      attachments: [{
+        name: "客户需求.xlsx",
+        size: 4096,
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        parsedSummary: "项目：蓝海制造\n需求：多组织业务协同",
+      }],
+    });
+
+    const rows = await readEvents(runId);
+    const messages = await readSessionMessages(session.sessionId);
+    const userEvent = eventsOfType(rows, "user/message")[0];
+    const sessionUser = sessionMessageByKey(messages, `${runId}:user:1`);
+    assert.ok(userEvent, "带附件的轮次同样必须有 user/message");
+    assert.ok(sessionUser, "带附件的轮次同样必须有会话用户消息");
+    assertEnvelopeIdentical("附件轮 user", userEvent.payload, sessionUser!);
+
+    const attachmentIds = userEvent.payload.attachmentIds as string[];
+    assert.equal(attachmentIds.length, 1, "实取：本轮应引用 1 个附件");
+    assert.ok(attachmentIds[0].startsWith("att-"), "附件身份仍是 att- 前缀（未改口径，只是改由提交侧 mint）");
+    // 附件实体必须真的落在会话 attachments 上，且 id 与消息引用一致——否则 2b-3 之后
+    // 「消息说有附件、附件表里没有」就是悬挂引用（parity 脚本正是按这个特征计数的）。
+    const sessionRow = await q!.select().from(aiSessions).where(eq(aiSessions.sessionId, session.sessionId));
+    const storedAttachments = (sessionRow[0]?.attachments ?? []) as Array<{ attachmentId: string; name: string }>;
+    assert.deepEqual(
+      storedAttachments.filter((item) => attachmentIds.includes(item.attachmentId)).map((item) => item.name),
+      ["客户需求.xlsx"],
+      "attachmentIds 指向的附件实体必须真实存在（会话侧引用完整性）",
+    );
   },
 );
