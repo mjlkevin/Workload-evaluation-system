@@ -104,6 +104,20 @@ const TOOL_ID = "knowledge_base.query_product_knowledge" as const;
 const DEFAULT_MODEL = "GLM-5V-Turbo";
 const DEFAULT_API_BASE_URL = "https://open.bigmodel.cn/api/paas/v4";
 
+/**
+ * 批次 4：知识库检索的唯一出口从 handler 返回值变成了 `knowledge_query` 工具的返回值，
+ * 而工具产出对执行侧只是 `unknown`。本判别用于在落进回合 trace 前确认形状，
+ * 判据取「痕迹专有字段齐备」而非仅 toolId——避免任意带 toolId 字段的对象被当成痕迹。
+ */
+export function isZhipuKnowledgeToolTrace(value: unknown): value is ZhipuKnowledgeToolTrace {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const trace = value as Record<string, unknown>;
+  return trace.toolId === TOOL_ID
+    && typeof trace.contextRef === "string"
+    && typeof trace.chunksCount === "number"
+    && typeof trace.topScore === "number";
+}
+
 // 检索 API 使用 /api/ 根路径（不含 /paas/v4）
 const RETRIEVE_API_PATH = "/llm-application/open/knowledge/retrieve";
 

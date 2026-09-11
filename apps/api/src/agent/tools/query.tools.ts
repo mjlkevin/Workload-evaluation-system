@@ -63,10 +63,13 @@ export function buildEstimateHistoryTool(listHistory: EstimateHistoryFn): AgentT
   };
 }
 
+/** 知识库查询工具名（批次 4 起为知识库检索的唯一入口，执行侧按名识别其产出） */
+export const KNOWLEDGE_QUERY_TOOL_NAME = "knowledge_query";
+
 /** 知识库查询工具（读操作；知识库未配置时由底层返回降级说明） */
 export function buildKnowledgeQueryTool(queryKnowledge: KnowledgeQueryFn): AgentTool {
   return {
-    name: "knowledge_query",
+    name: KNOWLEDGE_QUERY_TOOL_NAME,
     description: "检索产品/实施知识库并基于真实文档回答用户问题",
     parameters: {
       type: "object",

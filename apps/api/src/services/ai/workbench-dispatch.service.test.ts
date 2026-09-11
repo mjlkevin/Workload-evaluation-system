@@ -365,200 +365,21 @@ test("workbench dispatch repairs truncated JSON and extracts formBlock", async (
   assert.equal(result.answer.trim(), "需要补充以下信息。");
 });
 
-test("workbench dispatch calls knowledge tool and exposes auditable trace", async () => {
-  let capturedQuery = "";
-  const result = await dispatchHomeWorkbenchTurn({
-    user,
-    workflowKey: "free_chat",
-    message: "购买存货核算模块必须购买哪些相关模块？",
-    businessRole: "pre_sales",
-    roleLabel: "售前顾问",
-    model: "kimi-test",
-    modelChat: async () => {
-      throw new Error("kimi_should_not_be_called_for_knowledge_query");
-    },
-    knowledgeQuery: async (query) => {
-      capturedQuery = query;
-      return createKnowledgeTrace({ query });
-    },
-  });
+// ── 批次 4：knowledge-query handler 及其三条词表已退役，本文件不再从 dispatch 层驱动它 ──
+// 原先此处 6 条用例锁的是「dispatch 按词表命中 → handler 查库 → 回传 knowledgeTool trace」，
+// 其中三条是**授权与选库口径**（角色可见、关键词命中、仅 retrieval_empty 回退一次、
+// 失败不向多库扩散）。这四条硬约束没有消失，而是整体搬到它们现在唯一的生产方上：
+// 见 agent/default-registry.test.ts 的 runKnowledgeQuery 组（同 catalog fixture、同断言强度）。
+// 随 handler 一并退出的还有两条纯展示/审计形态断言（「## 知识库参考」正文排版、
+// trace.modelRun.runKind === "knowledge_fallback"）——它们的主体已不存在，如实登记，不伪造替代断言。
 
-  assert.equal(capturedQuery, "购买存货核算模块必须购买哪些相关模块？");
-  assert.equal(result.intent, "knowledge_query");
-  assert.equal(result.model, "GLM-5V-Turbo");
-  assert.match(result.answer, /知识库参考/);
-  assert.match(result.answer, /存货核算/);
-  assert.match(result.answer, /不会自动改写正式估算/);
-  assert.equal(result.trace.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
-  assert.equal(result.trace.knowledgeTool?.retrievalTriggered, true);
-  assert.equal(result.trace.knowledgeTool?.confidence, "high");
-  assert.equal(result.trace.knowledgeTool?.chunksCount, 5);
-  assert.ok(result.trace.contextRefs.includes("knowledge:kb-sales:%E5%AD%98%E8%B4%A7:chunks=5:score=0.92"));
-  assert.deepEqual(result.suggestedActions, []);
-});
-
-test("workbench dispatch falls back to model when knowledge tool has fallbackReason", async () => {
-  const result = await dispatchHomeWorkbenchTurn({
-    user,
-    workflowKey: "free_chat",
-    message: "智能会计平台是什么？",
-    businessRole: "pre_sales",
-    roleLabel: "售前顾问",
-    model: "kimi-test",
-    modelChat: async () => ({
-      answer: "⚠️ 知识库未检索到相关文档，以下为模型通用知识。智能会计平台是...",
-      rawContent: "⚠️ 知识库未检索到相关文档，以下为模型通用知识。智能会计平台是...",
-      provider: "kimi",
-      model: "kimi-test",
-    }),
-    knowledgeQuery: async (query) => createKnowledgeTrace({
-      available: false,
-      query,
-      answer: "智谱知识库配置不完整，当前无法读取知识库。",
-      confidence: "low",
-      retrievalTriggered: false,
-      fallbackReason: "missing_config",
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0,
-      contextRef: "knowledge:unconfigured:unavailable",
-      chunksCount: 0,
-      topScore: 0,
-    }),
-  });
-
-  assert.equal(result.intent, "knowledge_query");
-  assert.match(result.answer, /智谱知识库配置不完整/);
-  assert.match(result.answer, /missing_config/);
-  assert.match(result.answer, /智能会计平台/);
-  assert.equal(result.trace.knowledgeTool?.available, false);
-  assert.equal(result.trace.knowledgeTool?.fallbackReason, "missing_config");
-  assert.ok(result.trace.contextRefs.includes("knowledge:unconfigured:unavailable"));
-  assert.equal(result.trace.modelRun?.runKind, "knowledge_fallback");
-});
-
-test("workbench dispatch routes a strong keyword to one profile without route-model classification", async () => {
-  let routeModelCalled = false;
-  let selectedKnowledgeId = "";
-  const result = await dispatchHomeWorkbenchTurn({
-    user,
-    workflowKey: "free_chat",
-    message: "请查询知识库：网上银行实施边界怎么划分？",
-    businessRole: "pre_sales",
-    roleLabel: "售前顾问",
-    model: "kimi-test",
-    knowledgeBaseCatalog: multiKnowledgeCatalog,
-    modelChat: async ({ systemPrompt }) => {
-      if (systemPrompt.includes("知识库路由器")) routeModelCalled = true;
-      throw new Error("model_should_not_be_called");
-    },
-    knowledgeQuery: async (query, config?: any) => {
-      selectedKnowledgeId = config?.knowledgeId || "";
-      return createKnowledgeTrace({ query, knowledgeId: selectedKnowledgeId });
-    },
-  });
-
-  assert.equal(routeModelCalled, false);
-  assert.equal(selectedKnowledgeId, "kb-treasury");
-  assert.equal(result.trace.knowledgeTool?.route?.mode, "rule");
-  assert.equal(result.trace.knowledgeTool?.knowledgeBaseProfileId, "treasury");
-});
-
-test("workbench dispatch uses the model router only with authorized candidates", async () => {
-  let routePrompt = "";
-  let selectedKnowledgeId = "";
-  const result = await dispatchHomeWorkbenchTurn({
-    user,
-    workflowKey: "free_chat",
-    message: "请查询知识库，这个业务边界怎么判断？",
-    businessRole: "pre_sales",
-    roleLabel: "售前顾问",
-    model: "kimi-test",
-    knowledgeBaseCatalog: multiKnowledgeCatalog,
-    modelChat: async ({ systemPrompt, userContent }) => {
-      if (systemPrompt.includes("知识库路由器")) {
-        routePrompt = `${systemPrompt}\n${userContent}`;
-        const raw = JSON.stringify({ knowledgeBaseId: "treasury", confidence: 0.88, reason: "涉及司库业务" });
-        return { answer: raw, rawContent: raw };
-      }
-      return { answer: "通用回答", rawContent: "通用回答" };
-    },
-    knowledgeQuery: async (query, config?: any) => {
-      selectedKnowledgeId = config?.knowledgeId || "";
-      return createKnowledgeTrace({ query, knowledgeId: selectedKnowledgeId });
-    },
-  });
-
-  assert.match(routePrompt, /treasury/);
-  assert.doesNotMatch(routePrompt, /dev-private/);
-  assert.equal(selectedKnowledgeId, "kb-treasury");
-  assert.equal(result.trace.knowledgeTool?.route?.mode, "model");
-});
-
-test("workbench dispatch retries exactly one authorized fallback only for empty retrieval", async () => {
-  const calls: string[] = [];
-  const result = await dispatchHomeWorkbenchTurn({
-    user,
-    workflowKey: "free_chat",
-    message: "请查询知识库：网上银行实施边界怎么划分？",
-    businessRole: "pre_sales",
-    roleLabel: "售前顾问",
-    model: "kimi-test",
-    knowledgeBaseCatalog: multiKnowledgeCatalog,
-    modelChat: async () => { throw new Error("model_should_not_be_called"); },
-    knowledgeQuery: async (query, config?: any) => {
-      calls.push(config?.knowledgeId || "");
-      if (config?.knowledgeId === "kb-treasury") {
-        return createKnowledgeTrace({
-          query,
-          knowledgeId: "kb-treasury",
-          answer: "未检索到相关文档。",
-          confidence: "low",
-          fallbackReason: "retrieval_empty",
-          chunksCount: 0,
-          topScore: 0,
-          contextRef: "knowledge:kb-treasury:empty",
-        });
-      }
-      return createKnowledgeTrace({ query, knowledgeId: "kb-solutions" });
-    },
-  });
-
-  assert.deepEqual(calls, ["kb-treasury", "kb-solutions"]);
-  assert.equal(result.trace.knowledgeTool?.knowledgeBaseProfileId, "solutions");
-  assert.equal(result.trace.knowledgeTool?.route?.attempts.length, 2);
-  assert.equal(result.trace.knowledgeTool?.route?.fallbackProfileId, "solutions");
-});
-
-test("workbench dispatch does not fan out on provider failures", async () => {
-  const calls: string[] = [];
-  await dispatchHomeWorkbenchTurn({
-    user,
-    workflowKey: "free_chat",
-    message: "请查询知识库：网上银行实施边界怎么划分？",
-    businessRole: "pre_sales",
-    roleLabel: "售前顾问",
-    model: "kimi-test",
-    knowledgeBaseCatalog: multiKnowledgeCatalog,
-    modelChat: async () => ({ answer: "⚠️ 通用知识", rawContent: "⚠️ 通用知识" }),
-    knowledgeQuery: async (query, config?: any) => {
-      calls.push(config?.knowledgeId || "");
-      return createKnowledgeTrace({
-        query,
-        knowledgeId: config?.knowledgeId,
-        confidence: "low",
-        fallbackReason: "retrieval_failed",
-        chunksCount: 0,
-        topScore: 0,
-      });
-    },
-  });
-
-  assert.deepEqual(calls, ["kb-treasury"]);
-});
-
-test("workbench dispatch summarizes owner scoped project status and pending AI draft review", async () => {
+// 批次 4 退役：wes_data_keywords 词表与静态项目清单 handler 一并删除。
+// 本用例随之改锁两件事：① 这类措辞现在**必须**走到模型；② owner 隔离的可观测证据
+// 仍在——上下文引用只含本人项目，他人项目不得出现（工具侧由注入的
+// listProjectEvaluationsForUser(user, …) 逐层保证，模型入参里没有 owner 字段可填）。
+test("批次4退役：项目状态问法交回模型，且上下文引用仍只含本人项目", async () => {
   await withVersionsFixtures(async () => {
+    let modelCalled = 0;
     const result = await dispatchHomeWorkbenchTurn({
       user,
       workflowKey: "free_chat",
@@ -567,21 +388,20 @@ test("workbench dispatch summarizes owner scoped project status and pending AI d
       roleLabel: "售前顾问",
       model: "kimi-test",
       modelChat: async () => {
-        throw new Error("model_should_not_be_called_for_wes_data_query");
+        modelCalled += 1;
+        return { answer: "模型自然回复：已结合上下文回答。", rawContent: "模型自然回复：已结合上下文回答。" };
       },
     });
 
-    assert.equal(result.intent, "wes_data_query");
-    assert.match(result.answer, /状态汇总/);
-    assert.match(result.answer, /草稿：1/);
-    assert.match(result.answer, /评审中：1/);
-    assert.match(result.answer, /待确认 AI 草稿：1/);
-    assert.match(result.answer, /蓝海 WMS 项目/);
-    assert.match(result.answer, /星河 ERP 项目/);
-    assert.doesNotMatch(result.answer, /其他用户项目/);
+    assert.notEqual(result.intent, "wes_data_query", "意图已退役");
+    assert.equal(result.trace.routingRule, "default_domain_qa");
+    assert.ok(modelCalled >= 1, "退役后模型必须真的被调用");
     assert.ok(result.trace.contextRefs.includes("project:project-draft"));
     assert.ok(result.trace.contextRefs.includes("project:project-reviewing"));
-    assert.equal(result.suggestedActions[0]?.actionType, "open_project_list");
+    assert.ok(
+      !result.trace.contextRefs.some((ref) => String(ref).includes("project-other")),
+      `上下文引用不得越到他人项目，实取 ${JSON.stringify(result.trace.contextRefs)}`,
+    );
   });
 });
 
@@ -757,7 +577,7 @@ test("workbench dispatch does not call model classification when rule matches", 
   const result = await dispatchHomeWorkbenchTurn({
     user,
     workflowKey: "free_chat",
-    message: "你能做什么",  // 匹配 capability_keywords，不触发分类
+    message: "你好",  // 匹配保留下来的锚定寒暄规则（批次 4 后唯一仍命中的语义类规则），不触发分类
     businessRole: "pre_sales",
     roleLabel: "售前顾问",
     model: "kimi-test",
@@ -771,7 +591,7 @@ test("workbench dispatch does not call model classification when rule matches", 
 
   assert.equal(classificationCalled, false);
   assert.equal(result.intent, "capability_discovery");
-  assert.equal(result.trace.routingRule, "capability_keywords");
+  assert.equal(result.trace.routingRule, "greeting_keywords");
   assert.equal(result.trace.modelClassification, undefined);
 });
 
@@ -867,8 +687,11 @@ test("RP-049: unsupported classification below 0.85 threshold is not adopted, st
 
 // 批次 1a：write_action_request 已离开词汇表，另有一条更强的守护
 // （classifyIntentWithModel 对它返回 null）——见 workbench-intent.service.test.ts。
-test("RP-049: wes_data_query classification is never adopted regardless of confidence", async () => {
-  for (const classifiedIntent of ["wes_data_query"] as const) {
+// 批次 4：knowledge_query / wes_data_query 随正则一并退出分类词汇表。
+// 原断言是「白名单外不采纳、但仍写入 trace」；现在更靠前一步——
+// 词汇表校验直接判为无效分类（null），连 trace 都不记，避免留下无人消费的桶。
+test("批次4：已退役意图不被分类器接受，保持 domain_qa 模型自然回复", async () => {
+  for (const classifiedIntent of ["wes_data_query", "knowledge_query", "write_action_request"] as const) {
     const result = await dispatchHomeWorkbenchTurn({
       user,
       workflowKey: "free_chat",
@@ -887,14 +710,12 @@ test("RP-049: wes_data_query classification is never adopted regardless of confi
       },
     });
 
-    // 白名单外：任何置信度均不采纳，保持 domain_qa 模型自然回复
     assert.equal(result.intent, "domain_qa", `${classifiedIntent} 不应被采纳`);
     assert.equal(result.trace.routingRule, "default_domain_qa", `${classifiedIntent} 不应替换路由规则`);
     assert.notEqual(result.model, "rule-static");
     assert.match(result.answer, /模型自然回复/);
-    // 分类结果未采纳也写入 trace
-    assert.ok(result.trace.modelClassification, `${classifiedIntent} 分类结果应写入 trace`);
-    assert.equal(result.trace.modelClassification?.intent, classifiedIntent);
+    // 与 RP-049 的白名单外意图不同：已退役意图在词汇表校验处即被判无效，不写入 trace
+    assert.equal(result.trace.modelClassification, undefined, `${classifiedIntent} 已退出词汇表，不应留下分类痕迹`);
   }
 });
 
@@ -1109,40 +930,53 @@ test("ISS-005: domain_qa 路径（model-answer）systemPrompt 含输出排版规
   assert.match(answerPrompt, /列表项各自独占一行/);
 });
 
-test("ISS-005: knowledge fallback 路径（knowledge-query.handler）systemPrompt 含输出排版规范", async () => {
-  let fallbackPrompt = "";
-  await dispatchHomeWorkbenchTurn({
+// 批次 4：原「ISS-005 knowledge fallback 路径排版」用例随 knowledge-query.handler 一并退役。
+// 排版规范（【输出排版规范】）在仍存在的两条通道上各自有断言：
+// domain_qa / 附件问答见本文件 ISS-005 domain_qa 用例，模型兜底文案由 model-answer 统一承载。
+
+// ── 批次 4：正则退役后的 dispatch 侧收口 ────────────────────
+
+test("批次4：知识类问法在 dispatch 各触发一次分类与一次回答，且不伪造检索痕迹", async () => {
+  let classifierCalls = 0;
+  let answerCalls = 0;
+  const result = await dispatchHomeWorkbenchTurn({
     user,
     workflowKey: "free_chat",
-    message: "智能会计平台是什么？",
+    message: "购买存货核算模块必须购买哪些相关模块？",
     businessRole: "pre_sales",
     roleLabel: "售前顾问",
     model: "kimi-test",
     modelChat: async ({ systemPrompt }) => {
-      fallbackPrompt = systemPrompt;
-      return {
-        answer: "⚠️ 知识库未检索到相关文档，以下为模型通用知识。智能会计平台是...",
-        rawContent: "⚠️ 知识库未检索到相关文档，以下为模型通用知识。智能会计平台是...",
-      };
+      if (systemPrompt.includes("意图分类器")) classifierCalls += 1;
+      else answerCalls += 1;
+      return { answer: "模型自然回复：需要结合具体来源判断。", rawContent: "" };
     },
-    knowledgeQuery: async (query) => createKnowledgeTrace({
-      available: false,
-      query,
-      answer: "智谱知识库配置不完整，当前无法读取知识库。",
-      confidence: "low",
-      retrievalTriggered: false,
-      fallbackReason: "missing_config",
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0,
-      contextRef: "knowledge:unconfigured:unavailable",
-      chunksCount: 0,
-      topScore: 0,
-    }),
   });
+  assert.equal(classifierCalls, 1, "兜底路径应只分类一次");
+  assert.equal(answerCalls, 1, "退役后回答模型必须被真正调用");
+  assert.equal(result.intent, "domain_qa");
+  assert.equal(result.trace.knowledgeTool, undefined);
+});
 
-  assert.ok(fallbackPrompt, "knowledge fallback 回答模型应被调用");
-  assert.match(fallbackPrompt, /【输出排版规范】/);
-  assert.match(fallbackPrompt, /# 后必须有空格/);
-  assert.match(fallbackPrompt, /列表项各自独占一行/);
+test("批次4：退役规则不得再产出 rule-static 静态回复", async () => {
+  const probes = [
+    "购买存货核算模块必须购买哪些相关模块？",
+    "我创建了什么项目",
+    "生成需求解析报告",
+    "搜索知识库",
+    "制造业财务共享中心的痛点有哪些？",
+  ];
+  for (const message of probes) {
+    const result = await dispatchHomeWorkbenchTurn({
+      user,
+      workflowKey: "free_chat",
+      message,
+      businessRole: "pre_sales",
+      roleLabel: "售前顾问",
+      model: "kimi-test",
+      modelChat: async () => ({ answer: "模型自然回复：已结合上下文回答。", rawContent: "" }),
+    });
+    assert.notEqual(result.model, "rule-static", `退役规则不得再产出静态回复，「${message}」实取 ${result.model}`);
+    assert.equal(result.trace.routingRule, "default_domain_qa", `「${message}」实取 ${JSON.stringify(result.trace)}`);
+  }
 });

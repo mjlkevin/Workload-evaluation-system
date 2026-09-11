@@ -1,4 +1,4 @@
-import type { AuthUser } from "../types";
+import type { AuthUser, BusinessRole, KnowledgeBaseProfile } from "../types";
 import type { RuntimeContext } from "./context/context.types";
 import { ToolRegistry } from "./tool-registry";
 import { buildEstimateTool } from "./tools/presales.tools";
@@ -15,6 +15,10 @@ import {
 } from "./tools/mutation.tools";
 import { buildListToolsTool } from "./tools/list-tools.tools";
 import { buildAskUserTool } from "./tools/ask-user.tools";
+import { buildDescribeCapabilitiesTool } from "./tools/capability.tools";
+import { resolveBusinessRole } from "../middleware/auth";
+import { routeKnowledgeBase, type KnowledgeBaseRouteDecision } from "../services/ai/knowledge-base-router.service";
+import type { ZhipuKnowledgeToolConfig, ZhipuKnowledgeToolTrace } from "../services/ai/knowledge-tool.service";
 import { calculateEstimateOnly, listExportHistoryByOwner } from "../modules/estimates/estimates.module";
 import { calculateAndExportEstimate } from "../modules/estimates/estimates.usecase";
 import {
@@ -22,13 +26,13 @@ import {
   listProjectEvaluationsForUser,
 } from "../modules/project-evaluations/project-evaluations.module";
 import { loadRuleSet } from "../modules/rules/rules.repository";
-import { resolveActiveKnowledgeBaseCatalog } from "../modules/system/system.repository";
+import { resolveActiveKnowledgeBaseCatalog, type ResolvedActiveKnowledgeBaseCatalog } from "../modules/system/system.repository";
 import { queryZhipuKnowledgeBase } from "../services/ai/knowledge-tool.service";
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
 
 /**
- * 默认 Agent 工具注册表（O2 · A3）：注册全部 10 个工具（批次 9 起 = 原 8 个
- * + ask_user + 内置发现工具 list_tools）。
+ * 默认 Agent 工具注册表（O2 · A3）：注册全部 11 个工具（批次 9 起 = 原 8 个
+ * + ask_user + 内置发现工具 list_tools；批次 4 再起 + describe_capabilities）。
  *
  * 能力位映射说明：计划文档中的 project:read / estimate:read / knowledge:read /
  * rule:read / project:write / wbs:write / export:write 在当前 RBAC Capability
@@ -40,6 +44,7 @@ import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
  */
 export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext): ToolRegistry {
   const registry = new ToolRegistry();
+  const businessRole = resolveBusinessRole(user);
 
   // ---- 既有：实施初估（读） ----
   registry.register(
@@ -53,7 +58,7 @@ export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext):
   registry.register(
     buildEstimateHistoryTool((query) => listExportHistoryByOwner(user.id, query.page, query.pageSize)),
   );
-  registry.register(buildKnowledgeQueryTool((query) => queryKnowledgeBase(query, runtime)));
+  registry.register(buildKnowledgeQueryTool((query) => runKnowledgeQuery(query, businessRole, runtime)));
   registry.register(buildRuleLookupTool(() => loadRuleSet()));
 
   // ---- 写操作类（A2，全部 mutates=true → need_confirm） ----
@@ -84,6 +89,10 @@ export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext):
   // list_tools 仍在末位（按需发现模式按 category=discovery 排除它）。
   registry.register(buildAskUserTool());
 
+  // ---- 批次 4：能力清单（capability_discovery 正则退役后的承接方） ----
+  // 排在 ask_user 之后、发现工具之前：原 8 个工具的注入顺序仍逐字节不变。
+  registry.register(buildDescribeCapabilitiesTool());
+
   // ---- SP-2026-007 MS3：内置发现工具（注册在最后，全量回退时按 category=discovery 排除，
   //      保证旧 8 工具注入顺序逐字节一致；按需发现模式下常驻核心注入集） ----
   registry.register(buildListToolsTool(registry));
@@ -91,13 +100,85 @@ export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext):
   return registry;
 }
 
-/** 知识库查询接线：复用生效知识库目录，未配置时由底层返回降级说明 */
-async function queryKnowledgeBase(query: string, runtime?: RuntimeContext) {
-  const catalog = await resolveActiveKnowledgeBaseCatalog();
-  const profile = catalog.profiles[0];
-  return queryZhipuKnowledgeBase(query, {
-    apiKey: catalog.apiKey,
-    knowledgeId: profile?.knowledgeId ?? "",
+/** 知识库查询的可注入接缝：默认走真实目录与智谱客户端，测试据此断言选库口径 */
+export type KnowledgeQueryDeps = {
+  loadCatalog?: () => Promise<ResolvedActiveKnowledgeBaseCatalog>;
+  invoke?: (query: string, config: ZhipuKnowledgeToolConfig) => Promise<ZhipuKnowledgeToolTrace>;
+};
+
+type KnowledgeAttemptSummary = {
+  profileId: string;
+  fallbackReason?: ZhipuKnowledgeToolTrace["fallbackReason"];
+  chunksCount: number;
+  topScore: number;
+  contextRef?: string;
+};
+
+function summarizeKnowledgeAttempt(profile: KnowledgeBaseProfile, trace: ZhipuKnowledgeToolTrace): KnowledgeAttemptSummary {
+  return {
+    profileId: profile.id,
+    ...(trace.fallbackReason ? { fallbackReason: trace.fallbackReason } : {}),
+    chunksCount: trace.chunksCount,
+    topScore: trace.topScore,
+    ...(trace.contextRef ? { contextRef: trace.contextRef } : {}),
+  };
+}
+
+/**
+ * 痕迹的「归属」侧字段：选了哪个库、按什么口径选的、每次尝试的结果。
+ * 退役前由 knowledge-query.handler 挂载，批次 4 随检索入口收拢到本函数——少了这一步，
+ * trace 的知识库 span（`knowledgeBaseProfileId` / `knowledgeBaseName` / `route`）与前端
+ * 消息上的来源信息会一起静默消失。
+ */
+function attachKnowledgeRoute(
+  trace: ZhipuKnowledgeToolTrace,
+  profile: KnowledgeBaseProfile | undefined,
+  route: KnowledgeBaseRouteDecision,
+  attempts: KnowledgeAttemptSummary[],
+): ZhipuKnowledgeToolTrace {
+  return {
+    ...trace,
+    ...(profile ? {
+      knowledgeBaseProfileId: profile.id,
+      knowledgeBaseName: profile.name,
+    } : {}),
+    route: {
+      mode: route.mode,
+      confidence: route.confidence,
+      reason: route.reason,
+      ...(route.primaryProfile ? { primaryProfileId: route.primaryProfile.id } : {}),
+      ...(attempts.length > 1 && route.fallbackProfile ? { fallbackProfileId: route.fallbackProfile.id } : {}),
+      attempts,
+    },
+  };
+}
+
+/**
+ * 知识库查询接线（批次 4 起 = `knowledge_query` 工具的实现）。
+ *
+ * 退役前这套口径写在 knowledge-query.handler 里，由正则决定要不要用它；批次 4 把
+ * 「这句话该不该查知识库」交回模型之后，本函数成为**唯一**入口，因此把 handler 原本
+ * 承担的三条硬约束原样搬过来，一条都不放松：
+ *  1. 授权：`routeKnowledgeBase` 先按调用者业务角色过滤可见库（`allowedBusinessRoles`），
+ *     模型无从指定、也无从越权——原实现直接取 `catalog.profiles[0]`，既不看角色可见性
+ *     也不看优先级，退役后会成为唯一路径，故一并收口。
+ *  2. 选定：命中库名/关键词优先，其次唯一可见库，再次安全默认库。
+ *  3. 回退：**只有** `retrieval_empty` 才重试一次授权内的候选库；
+ *     其它失败（`retrieval_failed` / `missing_config`…）就地返回，不向多个库扩散。
+ * 无可见库时以空凭据下传，由底层返回「不可用」说明——失败方向关闭，与退役前同款。
+ */
+export async function runKnowledgeQuery(
+  query: string,
+  businessRole: BusinessRole,
+  runtime?: RuntimeContext,
+  deps: KnowledgeQueryDeps = {},
+): Promise<ZhipuKnowledgeToolTrace> {
+  const catalog = await (deps.loadCatalog ?? resolveActiveKnowledgeBaseCatalog)();
+  const invoke = deps.invoke ?? queryZhipuKnowledgeBase;
+  const route = await routeKnowledgeBase({ query, businessRole, profiles: catalog.profiles });
+  const call = (knowledgeId: string) => invoke(query, {
+    apiKey: knowledgeId ? catalog.apiKey : "",
+    knowledgeId,
     model: catalog.model,
     apiBaseUrl: catalog.apiBaseUrl,
     retrievalParams: catalog.retrievalParams,
@@ -105,4 +186,17 @@ async function queryKnowledgeBase(query: string, runtime?: RuntimeContext) {
     configVersion: catalog.configVersion,
     ...(runtime?.requestId ? { requestId: runtime.requestId } : {}),
   });
+  if (!route.primaryProfile) {
+    return attachKnowledgeRoute(await call(""), undefined, route, []);
+  }
+  let selectedProfile = route.primaryProfile;
+  const attempts: KnowledgeAttemptSummary[] = [];
+  let trace = await call(route.primaryProfile.knowledgeId);
+  attempts.push(summarizeKnowledgeAttempt(route.primaryProfile, trace));
+  if (trace.fallbackReason === "retrieval_empty" && route.fallbackProfile) {
+    trace = await call(route.fallbackProfile.knowledgeId);
+    attempts.push(summarizeKnowledgeAttempt(route.fallbackProfile, trace));
+    selectedProfile = route.fallbackProfile;
+  }
+  return attachKnowledgeRoute(trace, selectedProfile, route, attempts);
 }

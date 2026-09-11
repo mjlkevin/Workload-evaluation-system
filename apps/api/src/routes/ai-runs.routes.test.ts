@@ -946,7 +946,6 @@ test("批次0.5·②：四类工具事件落 harness_run_events 并按序经 SSE
   const routed = routeWorkbenchIntent({
     message: content,
     hasAttachment: false,
-    hasLatestV1Artifact: false,
     clientAction: "",
   });
   assert.equal(routed.routingRule, "default_domain_qa", `前置条件：content 必须命中模型问答分支，实取 ${JSON.stringify(routed)}`);

@@ -17,6 +17,7 @@ import type { AiSessionRecord } from "../../../modules/ai-sessions/ai-sessions.t
 import type { AuthUser, BusinessRole } from "../../../types";
 import { defaultProviderRegistry, type ChatCompletionResponse, type ChatRole, type ModelProvider } from "../../../ai/provider";
 import type { StreamingChunk } from "../workbench-dispatch.service";
+import type { ZhipuKnowledgeToolTrace } from "../knowledge-tool.service";
 import { resolveWorkbenchInjectableTools, runWorkbenchToolLoop } from "../workbench-tool-loop";
 import type { WorkbenchAttachmentContext } from "../workbench-context.service";
 import { createMemoryUsecase, getMemoryRepository } from "../../../modules/memory/memory.module";
@@ -223,6 +224,12 @@ export type ModelChatFactory = (params: {
   toolCalls?: { name: string; source?: string }[];
   /** additive：本轮注入的 active 记忆计数（MS2-PATCH 引用记忆 chip 数据源） */
   memoryRef?: { scenesCount: number; atomsCount: number };
+  /**
+   * additive（批次 4）：本轮 `knowledge_query` 工具检索出的知识库痕迹。
+   * 退役前它由 handler 直接写进 dispatch trace；退役后工具是唯一产生方，
+   * 少了这条返回通路，前端消息上的来源信息就会静默消失。
+   */
+  knowledgeTool?: ZhipuKnowledgeToolTrace;
 }>;
 
 // ============================================================
@@ -409,6 +416,7 @@ export function buildWorkbenchChatModelChat(
       attempts: completion?.attempts,
       finishReason: completion?.finishReason,
       ...(loop.toolCalls.length > 0 ? { toolCalls: loop.toolCalls } : {}),
+      ...(loop.knowledgeTool ? { knowledgeTool: loop.knowledgeTool } : {}),
       ...(modelInput.memoryRef ? { memoryRef: modelInput.memoryRef } : {}),
     };
   };

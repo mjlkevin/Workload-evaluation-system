@@ -1780,6 +1780,7 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
     const res = createMockRes();
     const originalFetch = (globalThis as { fetch?: unknown }).fetch;
     const originalZhipu = { ...(config as any).zhipu };
+    const originalKimiApiKey = config.kimi.apiKey;
     try {
       (config as any).zhipu = {
         apiKey: "zhipu-unit-test-key",
@@ -1803,44 +1804,79 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
         updatedAt: "2026-06-28T00:00:00.000Z",
         effectiveAt: "2026-06-28T00:00:00.000Z",
       });
-      const zhipuCalls: Array<{ url: string; payload: Record<string, unknown> }> = [];
+      // 批次 4：正则退役后「这句话要不要查知识库」由模型决定，因此本用例必须把模型
+      // 这一环也钉住——否则回合根本走不到 knowledge_query 工具。知识库侧的调用口径
+      // （选库、检索、检索后作答用目录里的模型）与退役前逐字不变。
+      config.kimi.apiKey = "unit-test-key";
+      bootstrapAiProviders();
+      const kbCalls: Array<{ url: string; payload: Record<string, unknown> }> = [];
+      const modelCalls: Array<{ url: string; payload: Record<string, unknown> }> = [];
+      const json = (payload: unknown) => ({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => payload,
+      });
       (globalThis as { fetch?: unknown }).fetch = async (url: unknown, init?: { body?: string }) => {
         const urlText = String(url);
-        const payload = JSON.parse(String(init?.body || "{}")) as { tools?: unknown };
-        zhipuCalls.push({ url: urlText, payload: payload as Record<string, unknown> });
+        const payload = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+        if (urlText.includes("open.bigmodel.cn")) kbCalls.push({ url: urlText, payload });
+        else modelCalls.push({ url: urlText, payload });
+        const messages = (payload.messages ?? []) as Array<{ role: string; content: string }>;
+
         if (urlText.includes("/knowledge/retrieve")) {
-          assert.deepEqual((payload as Record<string, unknown>).knowledge_ids, ["kb-sales"]);
-          return {
-            ok: true,
-            status: 200,
-            headers: { get: () => null },
-            json: async () => ({
-              code: 200,
-              data: [
-                {
-                  text: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。",
-                  score: 0.92,
-                  metadata: { doc_name: "产品知识文档", doc_id: "doc-1", knowledge_id: "kb-sales" },
-                },
-              ],
-            }),
-          } as unknown;
+          assert.deepEqual(payload.knowledge_ids, ["kb-sales"]);
+          return json({
+            code: 200,
+            data: [
+              {
+                text: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。",
+                score: 0.92,
+                metadata: { doc_name: "产品知识文档", doc_id: "doc-1", knowledge_id: "kb-sales" },
+              },
+            ],
+          }) as unknown;
         }
-        assert.ok(urlText.includes("/chat/completions"));
-        assert.equal(
-          (payload as Record<string, unknown>).model,
-          "glm-4.6",
-          JSON.stringify(zhipuCalls.map((call) => ({ url: call.url, model: call.payload.model }))),
-        );
-        return {
-          ok: true,
-          status: 200,
-          headers: { get: () => null },
-          json: async () => ({
+        assert.ok(urlText.includes("/chat/completions"), urlText);
+
+        if (urlText.includes("open.bigmodel.cn")) {
+          // 知识库阶段二（检索后作答）必须用目录里配置的模型，与退役前同款
+          assert.equal(payload.model, "glm-4.6", JSON.stringify(kbCalls.map((call) => ({ url: call.url, model: call.payload.model }))));
+          return json({
             choices: [{ message: { content: "存货核算通常需要结合库存管理、采购管理、应付和总账等模块确认边界。" } }],
             usage: { prompt_tokens: 1420, completion_tokens: 48, total_tokens: 1468 },
-          }),
-        } as unknown;
+          }) as unknown;
+        }
+
+        // 模型侧三条轮次：意图分类轮（只回分类结论，不得发起工具调用）→
+        // 问答首轮（发起 knowledge_query）→ 拿到工具回填后的定案轮。
+        if (typeof messages[0]?.content === "string" && messages[0].content.includes("意图分类器")) {
+          return json({ choices: [{ message: { content: "这是需要查询产品知识库的业务问答。" }, finish_reason: "stop" }] }) as unknown;
+        }
+        const toolResultBackfilled = messages.some(
+          (message) => typeof message.content === "string" && message.content.includes("[工具结果] knowledge_query"),
+        );
+        if (!toolResultBackfilled) {
+          return json({
+            choices: [{
+              message: {
+                content: "",
+                tool_calls: [{
+                  id: "call-kb-1",
+                  type: "function",
+                  function: { name: "knowledge_query", arguments: JSON.stringify({ query: "购买存货核算模块必须购买哪些相关模块" }) },
+                }],
+              },
+              finish_reason: "tool_calls",
+            }],
+          }) as unknown;
+        }
+        return json({
+          choices: [{
+            message: { content: "## 知识库参考\n\n依据产品知识文档，存货核算通常需结合库存管理、采购管理、应付和总账等模块确认边界。" },
+            finish_reason: "stop",
+          }],
+        }) as unknown;
       };
 
       await homeWorkbenchChat(req, res as unknown as Response);
@@ -1856,7 +1892,9 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
         };
       };
       assert.equal(body.code, 0);
-      assert.equal(body.data.intent, "knowledge_query");
+      // 批次 4 退役口径：`knowledge_query` 不再是路由意图（词表已删），本回合按 domain_qa
+      // 路由、由模型选工具完成检索。意图字段的期望值随之改变，但下面的痕迹字段一字不改。
+      assert.equal(body.data.intent, "domain_qa");
       assert.match(body.data.answer, /知识库参考/);
       assert.equal(body.data.trace.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
       assert.equal(body.data.trace.knowledgeTool?.retrievalTriggered, true);
@@ -1864,12 +1902,24 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
       assert.equal(body.data.session.messages.length, 2);
       assert.equal(body.data.session.messages[1]?.metadata?.knowledgeTool?.toolId, "knowledge_base.query_product_knowledge");
       assert.equal(body.data.session.messages[1]?.metadata?.knowledgeTool?.contextRef, body.data.trace.knowledgeTool?.contextRef);
-      assert.equal(zhipuCalls.length, 2);
-      assert.ok(zhipuCalls[0]?.url.includes("/knowledge/retrieve"));
-      assert.ok(zhipuCalls[1]?.url.includes("/chat/completions"));
+      // 前端消费点（messageFormatter.normalizeKnowledgeTool）读的是 **assistant 消息的 metadata**，
+      // 并无条件取用以下字段；退役前 handler 还挂了来源库与选库口径——前端一行不改的前提，
+      // 是后端仍原样产出这一组字段。
+      const knowledgeMetadata = body.data.session.messages[1]?.metadata?.knowledgeTool as unknown as Record<string, unknown>;
+      assert.ok(knowledgeMetadata, "assistant metadata 必须带 knowledgeTool");
+      for (const field of ["toolId", "model", "available", "confidence", "retrievalTriggered", "contextRef", "chunksCount", "topScore", "knowledgeBaseName", "route"]) {
+        assert.ok(field in knowledgeMetadata, `assistant metadata 的知识库痕迹必须仍带 ${field}（前端零改动的前提）`);
+      }
+      // 知识库侧仍是「先检索、后作答」两次调用；模型侧多出「分类 + 发起工具 + 定案」三轮
+      assert.equal(kbCalls.length, 2, JSON.stringify(kbCalls.map((call) => call.url)));
+      assert.ok(kbCalls[0]?.url.includes("/knowledge/retrieve"));
+      assert.ok(kbCalls[1]?.url.includes("/chat/completions"));
+      assert.equal(modelCalls.length, 3, JSON.stringify(modelCalls.map((call) => ({ url: call.url, system: String((call.payload.messages as Array<{ content: string }>)?.[0]?.content).slice(0, 24) }))));
     } finally {
       (globalThis as { fetch?: unknown }).fetch = originalFetch;
       (config as any).zhipu = originalZhipu;
+      config.kimi.apiKey = originalKimiApiKey;
+      _resetAiBootstrapForTest();
     }
   });
 });
@@ -2195,6 +2245,10 @@ test("ai.usecase: homeWorkbenchChat keeps upload guidance when neither session n
     body: {
       workflowKey: "parse_requirement_file",
       messages: [{ role: "user", content: "生成需求解析报告" }],
+      // 批次 4：报告的两条词表退役为 command——上传引导这段应答本身没有消失，消失的是
+      // 「靠正则猜这句话想要报告」。触发条件因此从「文本命中」变为「按钮显式发起」，
+      // 本用例随之改为注入 clientAction（不得为了让它绿而把词表加回来）。
+      clientAction: "generate_requirement_report",
     },
   });
   const res = createMockRes();

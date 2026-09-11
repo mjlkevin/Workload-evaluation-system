@@ -54,7 +54,7 @@ test("GET /system/ai-tools: 无 system:manage 的普通用户返回 403", { skip
   assert.equal(res.body.data, undefined, "拒绝时不得带出任何清单数据");
 });
 
-test("GET /system/ai-tools: admin 取到 10 个工具（批次 9 起含 ask_user），其中写数据恰 3 个", { skip: !testDatabaseUrl }, async () => {
+test("GET /system/ai-tools: admin 取到 11 个工具（批次 9 起含 ask_user、批次 4 起含 describe_capabilities），其中写数据恰 3 个", { skip: !testDatabaseUrl }, async () => {
   const res = await setupApp().get("/system/ai-tools").set("Authorization", `Bearer ${await tokenFor("admin")}`);
 
   assert.equal(res.status, 200);
@@ -62,8 +62,13 @@ test("GET /system/ai-tools: admin 取到 10 个工具（批次 9 起含 ask_user
 
   const items = res.body.data.items as ToolItem[];
   // 批次 9 · §9.8.5 印证：清单从代码派生，注册即自动多出一行，无需任何同步动作
-  assert.equal(items.length, 10);
+  assert.equal(items.length, 11);
   assert.ok(items.some((item) => item.name === "ask_user"), "清单须含 ask_user（无独立登记表可漏同步）");
+  // 批次 4 判据②：能力词表退役为工具后，端点清单必须真的出现它——这是「模型调得到」的前提
+  assert.ok(
+    items.some((item) => item.name === "describe_capabilities" && item.mutates === false),
+    "批次 4：describe_capabilities 应在 GET /system/ai-tools 清单内且为只读",
+  );
   assert.deepEqual(
     items.filter((item) => item.mutates).map((item) => item.name).sort(),
     ["create_project", "export_report", "generate_wbs"],
@@ -73,8 +78,8 @@ test("GET /system/ai-tools: admin 取到 10 个工具（批次 9 起含 ask_user
     assert.equal(typeof item.discoverable, "boolean");
     assert.equal(typeof item.callable, "boolean");
   }
-  // ADMIN 持有全部能力位，故对其本人而言 10 个工具都可调用
-  assert.equal(items.filter((item) => item.callable).length, 10);
+  // ADMIN 持有全部能力位，故对其本人而言 11 个工具都可调用
+  assert.equal(items.filter((item) => item.callable).length, 11);
 });
 
 test("GET /system/ai-tools: 响应不含参数 schema 与执行实现", { skip: !testDatabaseUrl }, async () => {

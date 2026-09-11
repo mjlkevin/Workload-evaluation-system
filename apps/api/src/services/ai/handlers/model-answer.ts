@@ -5,6 +5,7 @@
 
 import type { WorkbenchContext } from "../workbench-context.service";
 import type { WorkbenchIntent } from "../workbench-intent.service";
+import type { ZhipuKnowledgeToolTrace } from "../knowledge-tool.service";
 import type {
   StreamingChunk,
   WorkbenchDispatchData,
@@ -58,6 +59,9 @@ export async function answerWithModelAndContext(
   if (input.streamingAdapter && input.modelChatStream) {
     let fullContent = "";
     let lastChunk: StreamingChunk | undefined;
+    // 批次 4：流式分支不经 modelChat 捕获包装，知识库痕迹只能从工具循环补发的 metadata
+    // chunk 上暂存（与该分支里 memoryRef 的处理同构），末次带出的那份为准。
+    let knowledgeTool: ZhipuKnowledgeToolTrace | undefined;
     // 批次 0 · ③：流式分支不经过 modelChat，dispatch 的捕获包装看不到工具调用，
     // 故在此按 chunk 收集（去双投 + 按名去重），使流式/非流式 trace 同形状。
     const toolCallTrace = createWorkbenchToolCallTraceCollector();
@@ -66,6 +70,7 @@ export async function answerWithModelAndContext(
       for await (const chunk of stream) {
         input.streamingAdapter.onToken(chunk);
         toolCallTrace.absorb(chunk);
+        if (chunk.knowledgeTool) knowledgeTool = chunk.knowledgeTool;
         fullContent += chunk.contentDelta || "";
         lastChunk = chunk;
       }
@@ -119,6 +124,7 @@ export async function answerWithModelAndContext(
         routingRule: intent.routingRule,
         contextRefs: context.contextRefs,
         modelRun: modelRunTrace,
+        ...(knowledgeTool ? { knowledgeTool } : {}),
         ...(toolCallTrace.toTrace() ? { toolCalls: toolCallTrace.toTrace() } : {}),
       },
     };

@@ -588,12 +588,12 @@ test("退役核对：写动作措辞不再被正则截走（否则本批等于�
     "进入正式评估",
     "我创建了什么项目",
   ]) {
-    const routed = routeWorkbenchIntent({ message, hasAttachment: false, hasLatestV1Artifact: false, clientAction: "" });
+    const routed = routeWorkbenchIntent({ message, hasAttachment: false, clientAction: "" });
     assert.notEqual(routed.intent, "write_action_request", `退役后不得再命中 write_action_request：${message}`);
     assert.notEqual(routed.routingRule, "write_action_keywords", `退役后不得再走该规则：${message}`);
   }
   // 「创建项目」类必须落到能被模型接管的路径（兜底 domain_qa → 工具循环 → 审批闸门）
-  const routed = routeWorkbenchIntent({ message: "帮我创建一个ERP项目", hasAttachment: false, hasLatestV1Artifact: false, clientAction: "" });
+  const routed = routeWorkbenchIntent({ message: "帮我创建一个ERP项目", hasAttachment: false, clientAction: "" });
   assert.equal(routed.routingRule, "default_domain_qa", `实取 ${JSON.stringify(routed)}`);
 });
 
