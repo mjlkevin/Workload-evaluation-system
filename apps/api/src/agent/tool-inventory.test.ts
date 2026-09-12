@@ -88,8 +88,12 @@ test("buildToolInventory: 不返回 execute 实现，也不返回参数 schema�
       "discoverable",
       "exfiltrates",
       "injected",
+      "mcpApproval",
+      "mcpDigest",
+      "mcpServer",
       "mutates",
       "name",
+      "origin",
       "tokens",
     ]);
   }

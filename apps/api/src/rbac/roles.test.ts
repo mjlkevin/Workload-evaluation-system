@@ -86,11 +86,12 @@ test("ADMIN 拥有 estimates:create（超级管理员可执行全部业务操作
   assert.equal(roleHasCapability("ADMIN", "estimates:create"), true);
 });
 
-test("DEV 只有 dev:read 和 dev:write", () => {
+test("DEV 只有 dev:read、dev:write 与 mcp:invoke（批次 7 起全角色授予 MCP 能力位）", () => {
   const devCaps = getRoleCapabilities("DEV");
-  assert.equal(devCaps.length, 2);
+  assert.equal(devCaps.length, 3);
   assert.ok(devCaps.includes("dev:read"));
   assert.ok(devCaps.includes("dev:write"));
+  assert.ok(devCaps.includes("mcp:invoke"));
   assert.equal(roleHasCapability("DEV", "estimates:read"), false);
 });
 
