@@ -95,18 +95,30 @@ export DATABASE_URL="$TEST_DB_URL"
 export TEST_DATABASE_URL="$TEST_DB_URL"
 
 run_npm_script() {
-  local name="$1" args
-  args="$("$NODE_BIN" -e '
+  local name="$1" script args
+  script="$("$NODE_BIN" -e '
     // 注：`node -e` 的 process.argv 是 [execPath, ...用户参数]，**没有脚本文件名占位**，
     // 故只跳一格。曾误写 [,, file, name] 使 file 拿到 name 的值，npm script 分支
     // 全部误报「未知 npm script」（单文件分支不走此路径，故未暴露）。
     const [, file, name] = process.argv;
     const s = require(file).scripts[name];
     if (!s) { process.exit(1); }
-    process.stdout.write(s.replace(/^tsx\s+/, ""));
+    process.stdout.write(s);
   ' "$PKG_JSON" "$name")" || { echo "=== $name: 未知 npm script ==="; return 1; }
   echo "=== npm run $name ==="
-  ( cd "$API_DIR" && "$NODE_BIN" "$TSX_CLI" ${args} ) > "$LOG_DIR/$name.log" 2>&1
+  # 执行器有两种形态，都必须落到本脚本解析出的**真 node**上（拒 Electron shim 是本脚本存在的理由之一）：
+  #  · `node --import tsx …`（2026-09-12 CI 稳定性修复后的现形态）→ 剥掉开头的 `node`，其余原样交给 $NODE_BIN；
+  #  · `tsx …`（旧形态，留兼容）→ 剥掉开头的 `tsx`，其余交给 $NODE_BIN $TSX_CLI。
+  # 教训：此前这里写死了剥 `^tsx\s+`，主干把全部测试脚本换成 `node --import tsx` 后该正则不再命中，
+  # 于是把整条脚本文本当参数塞给 tsx CLI，所有套件经本包装器一律失败——而 CI 直接跑 npm script 不受影响，
+  # 所以只在本地炸。执行器形态变更必须同步改这里。
+  if [ "${script#node }" != "$script" ]; then
+    args="${script#node }"
+    ( cd "$API_DIR" && "$NODE_BIN" ${args} ) > "$LOG_DIR/$name.log" 2>&1
+  else
+    args="${script#tsx }"
+    ( cd "$API_DIR" && "$NODE_BIN" "$TSX_CLI" ${args} ) > "$LOG_DIR/$name.log" 2>&1
+  fi
   local code=$?
   echo "exit=$code"
   grep -E '^(ℹ )?(tests|suites|pass|fail|cancelled|skipped|todo)\b' "$LOG_DIR/$name.log" | tail -8
