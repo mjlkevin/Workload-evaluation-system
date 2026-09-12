@@ -199,6 +199,13 @@ export async function freshList(server: McpServerEntry, options: McpCollectOptio
   }
 }
 
+/** 包装错误并保留 cause（本仓 target ES2020，Error 构造器不带 ErrorOptions） */
+function wrapMcpError(message: string, cause: unknown): Error {
+  const error = new Error(message) as Error & { cause?: unknown };
+  error.cause = cause;
+  return error;
+}
+
 function classify(err: unknown, phase: "connect" | "list"): Error & { mcpErrorKind?: string } {
   const wrapped = new Error(`mcp-${phase}-failed`) as Error & { mcpErrorKind?: string };
   const message = err instanceof Error ? err.message : String(err);
@@ -264,9 +271,9 @@ export async function collectMcpInjectableTools(
               } catch (err) {
                 await dropSession(server.id);
                 const timeout = err instanceof Error && err.message === "mcp-timeout";
-                throw new Error(
+                throw wrapMcpError(
                   timeout ? `MCP 工具 ${tool.name} 执行超时，本次调用结果未知` : `MCP 工具 ${tool.name} 执行失败`,
-                  { cause: err },
+                  err,
                 );
               }
             },
