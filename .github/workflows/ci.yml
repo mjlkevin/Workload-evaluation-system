@@ -187,55 +187,11 @@ jobs:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
           TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
-      # 🔬 一次性诊断（批次 7 返修 ①，结案前必须整体还原为下方注释里的原步骤）：
-      # 现象——Test modules 开跑 ~5s 后整个 runner 零输出直到 15 分钟 job 超时被杀。
-      # 本步骤用 CI 自身当仪器：spec 报告器给出「最后启动未完成」的文件名，
-      # --test-timeout 把永不 resolve 的用例变成带名字的失败，30s 轮询转储
-      # 进程/套接字/负载/pg_stat_activity，用于区分「卡在 import」「等 DB 锁」「等外网」。
-      # 命令从 package.json 的 test:modules 就地派生（只在 `--test` 后插两个开关），
-      # 不复制 64 个文件清单，避免两处清单漂移。
       - name: Test modules
-        run: |
-          cd apps/api
-          node -e 'const o=require("os");console.log("[diag] node="+process.version+" platform="+process.platform+" arch="+process.arch+" availableParallelism="+o.availableParallelism()+" cpus="+o.cpus().length+" loadavg="+o.loadavg().join(","))'
-          node -e 'const s=require("./package.json").scripts["test:modules"];const cmd=s.replace("tsx --test ","npx tsx --test --test-reporter=spec --test-timeout=15000 --test-concurrency=4 ");console.log("[diag] argv tail:",cmd.slice(-160));require("node:child_process").spawn(cmd,{shell:true,stdio:"inherit"})' > /tmp/tm.log 2>&1 &
-          TP=$!
-          for i in $(seq 1 22); do
-            sleep 20
-            if ! kill -0 $TP 2>/dev/null; then echo "[diag] runner exited at T+$((i*20))s"; break; fi
-            echo "########## [diag] T+$((i*20))s  logBytes=$(wc -c < /tmp/tm.log)  loadavg=$(cat /proc/loadavg) ##########"
-            echo "--- [diag] tail -12 of runner log ---"
-            tail -12 /tmp/tm.log 2>/dev/null
-            ps -eo pid,ppid,etimes,stat,pcpu,comm,args --sort=-pcpu 2>/dev/null | head -28
-            echo "--- [diag] node children of runner tree ---"
-            ps -eo pid,etimes,stat,pcpu,args 2>/dev/null | grep -E 'tsx|node' | grep -v grep | head -25
-            echo "--- [diag] per-worker cmdline / fd / status ---"
-            for pid in $(ps -eo pid,comm,args 2>/dev/null | grep -E 'tsx|node' | grep -v grep | awk '{print $1}'); do
-              echo "==== pid=$pid ===="
-              echo "cmdline: $(cat /proc/$pid/cmdline 2>/dev/null | tr '\0' ' ' | sed 's/  */ /g')"
-              echo "--- fd ---"
-              ls -la /proc/$pid/fd 2>/dev/null | head -30
-              echo "--- status ---"
-              cat /proc/$pid/status 2>/dev/null | grep -E '^(State|Threads|SigBlk|SigCgt)' | head -10
-            done
-            echo "--- [diag] tcp sockets ---"
-            (ss -tanp 2>/dev/null || ss -tan 2>/dev/null || netstat -tan 2>/dev/null) | grep -Ev '^State' | head -30
-            echo "--- [diag] pg_stat_activity ---"
-            node -e 'const{Pool}=require("pg");const p=new Pool({connectionString:process.env.TEST_DATABASE_URL,max:1,connectionTimeoutMillis:5000});(async()=>{try{const a=await p.query("select pid,state,wait_event_type,wait_event,age(now(),xact_start) as xact_age,age(now(),query_start) as query_age,left(query,110) as query from pg_stat_activity where datname=current_database() order by query_start nulls last");console.table(a.rows);const l=await p.query("select locktype,relation::regclass as relation,mode,granted,pid from pg_locks join pg_stat_activity using(pid) where datname=current_database() and (not granted or locktype in (''transactionid'',''advisory'',''tuple'')) order by granted,pid");console.table(l.rows);}catch(e){console.log("[diag] pg query failed:",e.message);}finally{await p.end();}})()' 2>&1 | head -45
-          done
-          echo "--- [diag] last 60 lines of runner output ---"
-          tail -60 /tmp/tm.log
-          wait $TP
+        run: cd apps/api && npm run test:modules
         env:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
           TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
-
-      # 原始步骤（诊断结案后原样还原）：
-      # - name: Test modules
-      #   run: cd apps/api && npm run test:modules
-      #   env:
-      #     DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
-      #     TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
       # B1/B2/B3（2026-08-29 架构侧裁决 O1）：单文档表（templates / rule_sets 取「最近写入行」
       # 为活动文档）与无界读表（knowledge_entries.list() 全表读）的测试文件必须串行执行，
