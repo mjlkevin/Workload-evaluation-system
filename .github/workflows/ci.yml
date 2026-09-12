@@ -209,6 +209,15 @@ jobs:
             ps -eo pid,ppid,etimes,stat,pcpu,comm,args --sort=-pcpu 2>/dev/null | head -28
             echo "--- [diag] node children of runner tree ---"
             ps -eo pid,etimes,stat,pcpu,args 2>/dev/null | grep -E 'tsx|node' | grep -v grep | head -25
+            echo "--- [diag] per-worker cmdline / fd / status ---"
+            for pid in $(ps -eo pid,comm,args 2>/dev/null | grep -E 'tsx|node' | grep -v grep | awk '{print $1}'); do
+              echo "==== pid=$pid ===="
+              echo "cmdline: $(cat /proc/$pid/cmdline 2>/dev/null | tr '\0' ' ' | sed 's/  */ /g')"
+              echo "--- fd ---"
+              ls -la /proc/$pid/fd 2>/dev/null | head -30
+              echo "--- status ---"
+              cat /proc/$pid/status 2>/dev/null | grep -E '^(State|Threads|SigBlk|SigCgt)' | head -10
+            done
             echo "--- [diag] tcp sockets ---"
             (ss -tanp 2>/dev/null || ss -tan 2>/dev/null || netstat -tan 2>/dev/null) | grep -Ev '^State' | head -30
             echo "--- [diag] pg_stat_activity ---"
