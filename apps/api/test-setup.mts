@@ -133,22 +133,3 @@ if (effectiveTestDbUrl) {
     );
   }
 }
-
-// ============================================================
-// 一次性诊断（批次 7 CI 间歇性挂起定位）
-// ============================================================
-// 目标：把 worker pid 与当前测试文件对应，并在退出前/运行期打印活跃句柄。
-// 本块在诊断结案后删除。
-
-const DIAG_TEST_FILE = process.argv[1] ?? "unknown";
-const diagPrefix = `[diag:worker pid=${process.pid} file=${path.basename(DIAG_TEST_FILE)}]`;
-console.error(`${diagPrefix} worker started`);
-
-process.on("beforeExit", () => {
-  console.error(`${diagPrefix} beforeExit active:`, (process as unknown as { getActiveResourcesInfo(): string[] }).getActiveResourcesInfo());
-});
-
-const diagInterval = setInterval(() => {
-  console.error(`${diagPrefix} active:`, (process as unknown as { getActiveResourcesInfo(): string[] }).getActiveResourcesInfo());
-}, 5000);
-diagInterval.unref?.();
