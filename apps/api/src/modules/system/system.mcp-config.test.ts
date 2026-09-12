@@ -151,27 +151,30 @@ test("放行落章：新条目盖当前操作人；重放同摘要保留原放�
   const { updateMcpConfigDraft, getMcpConfig } = await import("./system.usecase");
   const { computeMcpToolDigest } = await import("../../agent/mcp/mcp-bridge");
   const digest = computeMcpToolDigest({ name: "send_summary", description: "d", inputSchema: { type: "object" } });
+  const allowedRoles = ["ADMIN", "SALES"] as [string, string];
   const first = responseCapture();
   await updateMcpConfigDraft(
     await requestFor(testAdmin, {
-      servers: [httpServerInput({ approvedTools: { send_summary: { digest } } })],
+      servers: [httpServerInput({ approvedTools: { send_summary: { digest, allowedRoles } } })],
     }),
     first.response,
   );
   const stamped = first.payload.data.draft.servers[0].approvedTools.send_summary;
   assert.equal(stamped.approvedBy, "b7-admin", "未盖章条目由服务端按 JWT 身份落章");
   assert.ok(stamped.approvedAt, "落章带时间");
+  assert.deepEqual(stamped.allowedRoles, allowedRoles, "落章必须保留放行角色");
 
   const second = responseCapture();
   await updateMcpConfigDraft(
     await requestFor(testAdmin, {
-      servers: [httpServerInput({ approvedTools: { send_summary: { digest, approvedBy: "someone-else", approvedAt: "2020-01-01" } } })],
+      servers: [httpServerInput({ approvedTools: { send_summary: { digest, allowedRoles, approvedBy: "someone-else", approvedAt: "2020-01-01" } } })],
     }),
     second.response,
   );
   const replayed = second.payload.data.draft.servers[0].approvedTools.send_summary;
   assert.equal(replayed.approvedBy, "b7-admin", "同摘要重放保留原放行人，不接受载荷伪造的 approvedBy");
   assert.notEqual(replayed.approvedBy, "someone-else");
+  assert.deepEqual(replayed.allowedRoles, allowedRoles, "重放必须保留原放行角色");
 });
 
 test("裁决六：真实密钥在 credentials 域，配置读取整个 payload 不回显密钥值", dbOnly, async () => {

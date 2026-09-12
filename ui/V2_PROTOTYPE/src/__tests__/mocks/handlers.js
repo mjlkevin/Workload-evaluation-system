@@ -861,7 +861,7 @@ export const handlers = [
       ...server,
       approvedTools: Object.fromEntries(Object.entries(server.approvedTools || {}).map(([name, entry]) => [
         name,
-        { digest: entry.digest, approvedBy: entry.approvedBy || 'admin', approvedAt: entry.approvedAt || '2026-09-12T01:00:00.000Z' },
+        { digest: entry.digest, allowedRoles: entry.allowedRoles || [], approvedBy: entry.approvedBy || 'admin', approvedAt: entry.approvedAt || '2026-09-12T01:00:00.000Z' },
       ])),
     }))
     mcpStore = {

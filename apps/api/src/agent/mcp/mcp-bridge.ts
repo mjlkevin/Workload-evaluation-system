@@ -112,6 +112,8 @@ export interface McpBridgedTool extends AgentTool {
 export function bridgeMcpTool(input: {
   serverId: string;
   reported: McpReportedTool;
+  /** 放行记录里的角色触达面（非空）。注入侧不再回落 DEFAULT_TOOL_POLICY_ENTRY 的空 visibleRoles。 */
+  allowedRoles: [V2Role, ...V2Role[]];
   call: (args: Record<string, unknown>, user: AgentUser, runtime?: RuntimeContext) => Promise<unknown>;
 }): McpBridgedTool {
   const reportedName = input.reported.name;
@@ -132,6 +134,9 @@ export function bridgeMcpTool(input: {
     input.reported.inputSchema && typeof input.reported.inputSchema === "object"
       ? (input.reported.inputSchema as Record<string, unknown>)
       : { type: "object", properties: {} };
+  if (!input.allowedRoles || input.allowedRoles.length === 0) {
+    throw new Error(`bridgeMcpTool[${input.serverId}]: 放行记录缺少角色触达面`);
+  }
   return {
     name: stableName,
     description,
@@ -146,6 +151,8 @@ export function bridgeMcpTool(input: {
     mcpServerId: input.serverId,
     mcpReportedName: reportedName,
     mcpDigest: computeMcpToolDigest(input.reported),
+    // 注入侧角色可见性的唯一来源：直接来自放行记录，不得再回落策略条目的 visibleRoles。
+    mcpAllowedRoles: input.allowedRoles,
     execute: (args, user, runtime) => input.call(args ?? {}, user, runtime),
   };
 }

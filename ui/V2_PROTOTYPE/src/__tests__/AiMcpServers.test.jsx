@@ -65,7 +65,7 @@ describe('System management MCP servers (批次 7 第六配置区)', () => {
   test('登记服务 → 保存草稿 → 生效：三态徽章推进，active 后显示「已生效」', async () => {
     renderAppAt('/system/tools')
     expect(await screen.findByText('MCP 第三方服务（第六配置区）', {}, { timeout: 3000 })).toBeInTheDocument()
-    expect(screen.getByText('未登记任何 MCP 服务（默认状态：什么都不连）')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('未登记任何 MCP 服务（默认状态：什么都不连）')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: '＋ 登记 MCP 服务' }))
     const dialog = await screen.findByRole('dialog', { name: '登记 MCP 服务' })
@@ -102,9 +102,17 @@ describe('System management MCP servers (批次 7 第六配置区)', () => {
     fireEvent.click(screen.getByRole('button', { name: '拉取工具' }))
     await waitFor(() => expect(__mcpProbeCallsForTest.count).toBe(before + 2))
 
-    // 放行（进草稿）→ 保存草稿 → mock 服务端盖章 approvedBy=admin（不回显任何密钥）
+    // 放行（进草稿）：必须先选角色，再确认，最后保存
     fireEvent.click(screen.getByRole('button', { name: '放行（进草稿）' }))
+    const approveDialog = await screen.findByRole('dialog', { name: /放行 MCP 工具/ })
+    fireEvent.click(within(approveDialog).getByLabelText('系统管理员'))
+    fireEvent.click(within(approveDialog).getByRole('button', { name: '放行（进草稿）' }))
+
     fireEvent.click(screen.getByRole('button', { name: '保存 MCP 草稿' }))
-    await waitFor(() => expect(__getMcpStoreForTest().draft.servers[0].approvedTools.send_summary?.approvedBy).toBe('admin'))
+    await waitFor(() => {
+      const entry = __getMcpStoreForTest().draft.servers[0].approvedTools.send_summary
+      expect(entry?.approvedBy).toBe('admin')
+      expect(entry?.allowedRoles).toContain('ADMIN')
+    })
   })
 })

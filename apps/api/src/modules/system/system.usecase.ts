@@ -1267,7 +1267,8 @@ export async function updateMcpConfigDraft(req: Request, res: Response) {
     schemaVersion: previousDraft.schemaVersion,
     servers: payload.servers ?? previousDraft.servers,
   });
-  // 放行落章：摘要未变 → 保留原放行人/时间；新增或摘要已变 → 盖章当前操作人。
+  // 放行落章：摘要未变 → 保留原放行人/时间/角色；新增或摘要已变 → 盖章当前操作人。
+  // allowedRoles 是放行动作本身的一部分，必须逐条保留，不得落章时丢掉。
   for (const server of nextDraft.servers) {
     const previousServer = previousDraft.servers.find((entry) => entry.id === server.id);
     for (const [toolName, approval] of Object.entries(server.approvedTools)) {
@@ -1275,12 +1276,14 @@ export async function updateMcpConfigDraft(req: Request, res: Response) {
       if (previous && previous.digest === approval.digest) {
         server.approvedTools[toolName] = {
           digest: approval.digest,
+          allowedRoles: approval.allowedRoles,
           approvedBy: previous.approvedBy,
           approvedAt: previous.approvedAt,
         };
       } else {
         server.approvedTools[toolName] = {
           digest: approval.digest,
+          allowedRoles: approval.allowedRoles,
           approvedBy: actor,
           approvedAt: now,
         };

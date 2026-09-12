@@ -165,8 +165,13 @@ export function buildToolInventory(
       const [definition] = [toToolDefinition(tool)];
       const tokens = estimateToolsTokens([definition]);
       const capabilityOk = viewerCaps.has(tool.capability);
-      const roleOk = activePolicy.visibleRoles.length === 0
-        || activePolicy.visibleRoles.some((role) => (viewerRoles as readonly string[]).includes(role));
+      // 批次 7：MCP 工具的角色可见性只能来自放行记录 mcpAllowedRoles，不得回落策略条目的空 visibleRoles。
+      const mcpAllowedRoles = tool.source === "mcp" ? tool.mcpAllowedRoles : undefined;
+      const roleOk =
+        mcpAllowedRoles !== undefined
+          ? mcpAllowedRoles.length > 0 && mcpAllowedRoles.some((role) => (viewerRoles as readonly string[]).includes(role))
+          : activePolicy.visibleRoles.length === 0 ||
+            activePolicy.visibleRoles.some((role) => (viewerRoles as readonly string[]).includes(role));
       // 与工作台全量通道（listFullToolsFor ∩ 策略减法）同一口径逐条对齐：
       // 内置 discovery 类（list_tools）不在此通道；discoverable 业务工具**在**。
       const injected =

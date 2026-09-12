@@ -23,6 +23,24 @@ function endpointOf(server) {
 
 const EMPTY_FORM = { ...MCP_DEFAULT_SERVER, args: [] }
 
+const V2_ROLES = [
+  { id: 'SALES', label: '销售' },
+  { id: 'PRE_SALES', label: '售前' },
+  { id: 'IMPL', label: '实施' },
+  { id: 'PM', label: '项目经理' },
+  { id: 'DEV', label: '开发' },
+  { id: 'PMO', label: 'PMO' },
+  { id: 'ADMIN', label: '系统管理员' },
+]
+
+function formatSchema(schema) {
+  try {
+    return JSON.stringify(schema ?? null, null, 2)
+  } catch {
+    return String(schema ?? '')
+  }
+}
+
 function ServerFormDialog({ open, initial, existingIds, isNew, onClose, onSubmit }) {
   const [form, setForm] = useState(initial || EMPTY_FORM)
   useEffect(() => {
@@ -115,6 +133,78 @@ function ServerFormDialog({ open, initial, existingIds, isNew, onClose, onSubmit
   )
 }
 
+function ToolDetailDialog({ open, toolRow, onClose }) {
+  return (
+    <Dialog open={open} title={`MCP 工具详情 · ${toolRow?.reportedName || ''}`} onClose={onClose} wide>
+      <div className="sys-form" style={{ maxHeight: '70vh', overflow: 'auto' }}>
+        <div className="sys-field">
+          <span className="sys-field__k">稳定名（注入模型用）</span>
+          <span className="mono" style={{ fontSize: 12 }}>{toolRow?.stableName || '—'}</span>
+        </div>
+        <div className="sys-field">
+          <span className="sys-field__k">说明（第三方撰写，注入模型前经 2000 字符裁剪）</span>
+          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, margin: 0 }}>{toolRow?.description || '—'}</pre>
+        </div>
+        <div className="sys-field">
+          <span className="sys-field__k">参数 schema（进模型上下文的 JSON Schema）</span>
+          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11, margin: 0 }}>{formatSchema(toolRow?.inputSchema)}</pre>
+        </div>
+        <div className="sys-field">
+          <span className="sys-field__k">定义摘要</span>
+          <span className="mono" style={{ fontSize: 11 }}>{toolRow?.digest || '—'}</span>
+        </div>
+      </div>
+      <DialogActions>
+        <button type="button" className="btn btn-out btn-sm" onClick={onClose}>关闭</button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+function ApproveDialog({ open, toolRow, selectedRoles, onChangeRoles, onClose, onConfirm }) {
+  const invalid = selectedRoles.length === 0
+  return (
+    <Dialog open={open} title={`放行 MCP 工具 · ${toolRow?.reportedName || ''}`} onClose={onClose}>
+      <div className="sys-form">
+        <p className="sys-field__v--dim" style={{ margin: '0 0 10px' }}>
+          必须至少选择一个角色；未选角色不能提交。放行后仅被选中的角色可在工作台看到该工具。
+        </p>
+        <div className="sys-field">
+          <span className="sys-field__k">可见角色</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            {V2_ROLES.map((role) => (
+              <label key={role.id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={selectedRoles.includes(role.id)}
+                  onChange={(event) => {
+                    const next = event.target.checked
+                      ? [...selectedRoles, role.id]
+                      : selectedRoles.filter((id) => id !== role.id)
+                    onChangeRoles(next)
+                  }}
+                />
+                {role.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+      <DialogActions>
+        <button type="button" className="btn btn-out btn-sm" onClick={onClose}>取消</button>
+        <button
+          type="button"
+          className="btn btn-pri btn-sm"
+          disabled={invalid}
+          onClick={() => onConfirm(selectedRoles)}
+        >
+          放行（进草稿）
+        </button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
 export default function AiMcpServersPanel() {
   const {
     version, draftServers, activeServers, updatedAt, effectiveAt, revisions,
@@ -125,6 +215,9 @@ export default function AiMcpServersPanel() {
   const [formState, setFormState] = useState(null) // { mode: 'add'|'edit', server }
   const [expanded, setExpanded] = useState('')
   const [savedOk, setSavedOk] = useState(false)
+  const [detailTool, setDetailTool] = useState(null) // { toolRow }
+  const [approvalTool, setApprovalTool] = useState(null) // { server, toolRow }
+  const [selectedRoles, setSelectedRoles] = useState([])
 
   useEffect(() => { load() }, [load])
 
@@ -148,7 +241,7 @@ export default function AiMcpServersPanel() {
     setServers((current) => current.filter((entry) => entry.id !== serverId))
   }
 
-  const toggleApproval = (server, toolRow) => {
+  const toggleApproval = (server, toolRow, selectedRoles) => {
     setSavedOk(false)
     const existing = server.approvedTools?.[toolRow.reportedName]
     const nextEntry = Object.fromEntries(
@@ -156,7 +249,7 @@ export default function AiMcpServersPanel() {
     )
     const approvedTools = existing
       ? nextEntry
-      : { ...nextEntry, [toolRow.reportedName]: { digest: toolRow.digest } }
+      : { ...nextEntry, [toolRow.reportedName]: { digest: toolRow.digest, allowedRoles: selectedRoles } }
     edit({ ...server, approvedTools })
   }
 
@@ -280,17 +373,53 @@ export default function AiMcpServersPanel() {
                       <tr key={toolRow.reportedName}>
                         <td><span className="mono">{toolRow.reportedName}</span></td>
                         <td><span className="mono" style={{ fontSize: 11 }}>{toolRow.stableName}</span></td>
-                        <td><span className="sys-cell-clip" title={toolRow.description}>{toolRow.description || '—'}</span></td>
-                        <td><span className="mono" style={{ fontSize: 10 }}>{toolRow.digest.slice(0, 12)}…</span></td>
+                        <td>
+                          <span className="sys-cell-clip" title={toolRow.description}>{toolRow.description || '—'}</span>
+                          {' '}
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm"
+                            style={{ padding: 0, fontSize: 12 }}
+                            onClick={() => setDetailTool(toolRow)}
+                          >
+                            查看全文
+                          </button>
+                        </td>
+                        <td>
+                          <span className="mono" style={{ fontSize: 10 }}>{toolRow.digest.slice(0, 12)}…</span>
+                          {' '}
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm"
+                            style={{ padding: 0, fontSize: 12 }}
+                            onClick={() => setDetailTool(toolRow)}
+                          >
+                            schema
+                          </button>
+                        </td>
                         <td>
                           {toolRow.approvalStatus === 'definition-changed' ? <span className="bdg warn"><span className="dot" />定义已变·待重放行</span> : null}
                           {toolRow.approvalStatus === 'not-approved' && !approved ? <span className="bdg muted"><span className="dot" />未放行</span> : null}
                           {(approved || toolRow.approvalStatus === 'approved') ? <span className="bdg acc"><span className="dot" />已放行{approved && toolRow.approvalStatus !== 'approved' ? '（草稿）' : ''}</span> : null}
                         </td>
                         <td>
-                          <button type="button" className="btn btn-out btn-sm" disabled={!server} onClick={() => toggleApproval(server, toolRow)}>
-                            {approved ? '收回放行' : '放行（进草稿）'}
-                          </button>
+                          {approved ? (
+                            <button type="button" className="btn btn-out btn-sm" disabled={!server} onClick={() => toggleApproval(server, toolRow, [])}>
+                              收回放行
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-out btn-sm"
+                              disabled={!server}
+                              onClick={() => {
+                                setApprovalTool({ server, toolRow })
+                                setSelectedRoles([])
+                              }}
+                            >
+                              放行（进草稿）
+                            </button>
+                          )}
                         </td>
                       </tr>
                     )
@@ -339,6 +468,24 @@ export default function AiMcpServersPanel() {
         )}
       </div>
 
+      <ToolDetailDialog
+        open={Boolean(detailTool)}
+        toolRow={detailTool}
+        onClose={() => setDetailTool(null)}
+      />
+      <ApproveDialog
+        open={Boolean(approvalTool)}
+        toolRow={approvalTool?.toolRow}
+        selectedRoles={selectedRoles}
+        onChangeRoles={setSelectedRoles}
+        onClose={() => setApprovalTool(null)}
+        onConfirm={(roles) => {
+          if (approvalTool) {
+            toggleApproval(approvalTool.server, approvalTool.toolRow, roles)
+          }
+          setApprovalTool(null)
+        }}
+      />
       <ServerFormDialog
         open={Boolean(formState)}
         isNew={formState?.mode === 'add'}

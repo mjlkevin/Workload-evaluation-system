@@ -255,6 +255,7 @@ export async function collectMcpInjectableTools(
           tools.push(bridgeMcpTool({
             serverId: server.id,
             reported: tool,
+            allowedRoles: decision.allowedRoles,
             call: async (args: Record<string, unknown>, _user: AgentUser, _runtime?: RuntimeContext) => {
               // 执行绑定活会话；会话坏了即抛错（本轮该服务余下调用都会失败并回填
               // ok:false），绝不重连重放——副作用不可靠重放第二遍。

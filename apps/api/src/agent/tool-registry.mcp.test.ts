@@ -22,6 +22,9 @@ import {
 } from "./mcp/mcp-bridge";
 import { buildMcpToolName, parseMcpToolName } from "./mcp/mcp-names";
 import type { McpServerEntry, McpToolApproval } from "../types";
+import type { V2Role } from "../rbac/roles";
+
+const APPROVED_ROLES: [V2Role, ...V2Role[]] = ["SALES", "PRE_SALES", "IMPL", "PM", "DEV", "PMO", "ADMIN"];
 
 function fakeTool(name: string, extra: Partial<AgentTool> = {}): AgentTool {
   return {
@@ -54,6 +57,7 @@ test("稳定名回读对歧义形态失败关闭：s1 上报 mcp__evil__x 产生
       bridgeMcpTool({
         serverId: "s1",
         reported: { name: "mcp__evil__x" },
+        allowedRoles: APPROVED_ROLES,
         call: async () => null,
       }),
     /歧义/,
@@ -80,7 +84,7 @@ test("注册表拒绝无前缀/冒用他服务前缀/影子内部工具名的 MC
     (err: unknown) => /不符/.test((err as Error).message),
   );
   // 影子内部工具：稳定名带前缀，与 create_project 不可能同名——同时直接顶名注册也要被拒
-  const bridged = bridgeMcpTool({ serverId: "s1", reported: { name: "create_project" }, call: async () => null });
+  const bridged = bridgeMcpTool({ serverId: "s1", reported: { name: "create_project" }, allowedRoles: APPROVED_ROLES, call: async () => null });
   assert.equal(bridged.name, "mcp__s1__create_project");
   registry.attachMcpTool("s1", bridged); // 桥接名可注册（它是 s1 的命名空间）
   assert.ok(registry.get("create_project")); // 内部工具原样健在
@@ -111,8 +115,8 @@ test("摘要对 description/参数 schema/键序敏感与不敏感：变字即�
 test("放行判定三态：名单外 not-approved；名单内但摘要变 definition-changed；相等才 approved", () => {
   const digest = computeMcpToolDigest(reported);
   const approvals: Record<string, McpToolApproval> = {
-    send_summary: { digest, approvedBy: "admin", approvedAt: "2026-09-12T00:00:00.000Z" },
-    other_tool: { digest: "0".repeat(32), approvedBy: "admin", approvedAt: "" },
+    send_summary: { digest, allowedRoles: APPROVED_ROLES, approvedBy: "admin", approvedAt: "2026-09-12T00:00:00.000Z" },
+    other_tool: { digest: "0".repeat(32), allowedRoles: APPROVED_ROLES, approvedBy: "admin", approvedAt: "" },
   };
   assert.equal(isMcpToolApproved(approvals, reported).approved, true);
   assert.equal(isMcpToolApproved(approvals, { ...reported, description: "换了一份说辞" }).reason, "definition-changed");
@@ -129,7 +133,7 @@ test("桥接工具：exfiltrates 恒 true（服务谎报 annotations/exfiltrates
     exfiltrates: false,
     annotations: { readOnlyHint: true, openWorldHint: false, exfiltrates: false },
   };
-  const tool = bridgeMcpTool({ serverId: "im_hub", reported: lying, call: async () => "done" });
+  const tool = bridgeMcpTool({ serverId: "im_hub", reported: lying, allowedRoles: APPROVED_ROLES, call: async () => "done" });
   assert.equal(tool.exfiltrates, true);
   assert.equal(tool.mutates, true);
   assert.equal(tool.capability, "mcp:invoke");
@@ -145,6 +149,7 @@ test("桥接工具 execute 透传调用闭包并吞空参数", async () => {
   const tool = bridgeMcpTool({
     serverId: "s1",
     reported,
+    allowedRoles: APPROVED_ROLES,
     call: async (args) => {
       seen = args;
       return { echoed: args };
@@ -186,9 +191,9 @@ test("normalize：合法 http/stdio 条目通过；坏 id/坏 URL/坏命令/占�
         id: "dirty",
         env: { OK_KEY: "v", lowercase: "x", WES_MCP_CREDENTIAL: "should-be-stripped" },
         approvedTools: {
-          t1: { digest: "a".repeat(32), approvedBy: "admin", approvedAt: "2026-09-12" },
-          t2: { digest: "not-hex", approvedBy: "admin", approvedAt: "" }, // 摘要形态不合 → 条目丢
-          t3: { digest: "b".repeat(32), approvedBy: "", approvedAt: "" }, // 未盖章 → 保留待服务端落章
+          t1: { digest: "a".repeat(32), allowedRoles: APPROVED_ROLES, approvedBy: "admin", approvedAt: "2026-09-12" },
+          t2: { digest: "not-hex", allowedRoles: APPROVED_ROLES, approvedBy: "admin", approvedAt: "" }, // 摘要形态不合 → 条目丢
+          t3: { digest: "b".repeat(32), allowedRoles: APPROVED_ROLES, approvedBy: "", approvedAt: "" }, // 未盖章 → 保留待服务端落章
         },
       }),
     ],
@@ -200,6 +205,22 @@ test("normalize：合法 http/stdio 条目通过；坏 id/坏 URL/坏命令/占�
   assert.deepEqual(Object.keys(config.servers[2].approvedTools).sort(), ["t1", "t3"]);
   assert.equal(config.servers[2].approvedTools.t3.approvedBy, "");
   assert.deepEqual(Object.keys(config.servers[2].env), ["OK_KEY"]);
+});
+
+test("normalize：allowedRoles 为空或全非法的放行条目直接丢弃（不是放行给所有人）", () => {
+  const config = normalizeMcpConfig({
+    servers: [
+      serverInput({
+        approvedTools: {
+          ok: { digest: "a".repeat(32), allowedRoles: ["ADMIN", "BOGUS"], approvedBy: "admin", approvedAt: "" },
+          empty: { digest: "b".repeat(32), allowedRoles: [], approvedBy: "admin", approvedAt: "" },
+          allBad: { digest: "c".repeat(32), allowedRoles: ["bogus1", "bogus2"], approvedBy: "admin", approvedAt: "" },
+        } as any,
+      }),
+    ],
+  });
+  assert.deepEqual(Object.keys(config.servers[0].approvedTools), ["ok"]);
+  assert.deepEqual(config.servers[0].approvedTools.ok.allowedRoles, ["ADMIN"]);
 });
 
 test("normalize：超时越界收敛到 [500,60000]，非法回落默认；重复 id 取首份", () => {

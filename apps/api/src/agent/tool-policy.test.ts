@@ -147,6 +147,30 @@ test("未注册工具（查不到）一律不可注入（失败方向关闭）",
   assert.equal(isToolInjectableOnFullChannel(undefined, undefined, ["ADMIN"]), false);
 });
 
+test("批次 7：MCP 工具角色可见性来自放行记录 mcpAllowedRoles，不回落策略空 visibleRoles", () => {
+  const mcpTool = tool({
+    name: "mcp__sv__t",
+    capability: "mcp:invoke",
+    source: "mcp",
+    mcpAllowedRoles: ["ADMIN"],
+  } as Partial<AgentTool>);
+  // 策略 visibleRoles 为空（代码工具语义 = 仅受 capability 约束），对 MCP 工具不得被读成「所有人可见」
+  assert.equal(isToolInjectableOnFullChannel(mcpTool, policy({ "mcp__sv__t": { visibleRoles: [] } }), ["ADMIN"]), true);
+  assert.equal(isToolInjectableOnFullChannel(mcpTool, policy({ "mcp__sv__t": { visibleRoles: [] } }), ["DEV"]), false);
+  // 即便策略显式把 visibleRoles 设给 DEV，MCP 工具仍以放行记录为准
+  assert.equal(isToolInjectableOnFullChannel(mcpTool, policy({ "mcp__sv__t": { visibleRoles: ["DEV"] } }), ["DEV"]), false);
+});
+
+test("批次 7：MCP 工具缺少 mcpAllowedRoles 时一律不可见（不存在「默认对所有人」）", () => {
+  const mcpTool = tool({
+    name: "mcp__sv__wide",
+    capability: "mcp:invoke",
+    source: "mcp",
+  } as Partial<AgentTool>);
+  assert.equal(isToolInjectableOnFullChannel(mcpTool, undefined, ["ADMIN"]), false);
+  assert.equal(isToolDiscoverableUnderPolicy(mcpTool, undefined, ["ADMIN"]), false);
+});
+
 // -------------------- diff：变更轨迹的「改了什么」 --------------------
 
 test("diffToolPolicyConfigs: 字段级变化逐条产出，未变条目不产噪音", () => {

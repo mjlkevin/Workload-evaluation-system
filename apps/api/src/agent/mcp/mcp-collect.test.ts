@@ -51,7 +51,12 @@ function stdioServer(id: string, env: Record<string, string>, overrides: Partial
 }
 
 function approvedFor(tool: { name: string; description?: string; inputSchema?: Record<string, unknown> }, actor = "admin"): McpToolApproval {
-  return { digest: computeMcpToolDigest(tool), approvedBy: actor, approvedAt: "2026-09-12T00:00:00.000Z" };
+  return {
+    digest: computeMcpToolDigest(tool),
+    allowedRoles: ["ADMIN"],
+    approvedBy: actor,
+    approvedAt: "2026-09-12T00:00:00.000Z",
+  };
 }
 
 const SUMMARY_TOOL = {
