@@ -26,6 +26,13 @@ import {
   type McpTransport,
 } from "../../types";
 import { buildMcpToolName, MCP_SERVER_ID_PATTERN, parseMcpToolName } from "./mcp-names";
+// 角色名单的唯一来源：不在本文件重列一份，避免白名单与角色定义漂移。
+import { V2_ROLES, type V2Role } from "../../rbac/roles";
+
+/** 角色的规范序（按 V2_ROLES 定义序）：同一份角色集合无论输入顺序如何都归一成同一串，轨迹 diff 才不产生噪音 */
+function canonicalRoleOrder(roles: readonly string[]): V2Role[] {
+  return V2_ROLES.filter((role) => roles.includes(role));
+}
 
 /** 服务上报的工具形状（tools/list 单条；字段全部不可信，逐把关） */
 export type McpReportedTool = {
@@ -60,7 +67,7 @@ export function computeMcpToolDigest(tool: Pick<McpReportedTool, "name" | "descr
 
 /** 放行判定：名单里有 + 摘要逐字节相等才注入；任何一项不满足都是拒绝（裁决二） */
 export type McpApprovalDecision =
-  | { approved: true; digest: string; reason: "approved" }
+  | { approved: true; digest: string; reason: "approved"; allowedRoles: [V2Role, ...V2Role[]] }
   | { approved: false; digest: string; reason: "not-approved" | "definition-changed" };
 
 export function isMcpToolApproved(
@@ -73,7 +80,9 @@ export function isMcpToolApproved(
     : undefined;
   if (!entry) return { approved: false, digest, reason: "not-approved" };
   if (entry.digest !== digest) return { approved: false, digest, reason: "definition-changed" };
-  return { approved: true, digest, reason: "approved" };
+  // 角色触达面随判定一起交出：注入侧不需要、也不得再去别处找一份角色口径（两处口径 = 一处漂移）。
+  // 非空由两处把关保证：归一化（不可信 JSON 的入口）丢弃无角色条目，bridgeMcpTool 构造时无角色即抛。
+  return { approved: true, digest, reason: "approved", allowedRoles: entry.allowedRoles };
 }
 
 /** 桥接产出的工具附带归属信息，供清单页呈现（origin 分流）与执行侧回查 */
@@ -85,6 +94,12 @@ export interface McpBridgedTool extends AgentTool {
   mcpReportedName: string;
   /** 当前定义摘要 */
   mcpDigest: string;
+  /**
+   * 放行记录里的角色触达面（非空）。注入期角色可见性的**唯一**来源：
+   * MCP 工具不得回落到 DEFAULT_TOOL_POLICY_ENTRY 的空 visibleRoles
+   * ——空数组对代码工具意为「仅受权限位约束」，对 MCP 工具会被读成「所有人」，语义相反。
+   */
+  mcpAllowedRoles: [V2Role, ...V2Role[]];
 }
 
 /**
@@ -163,9 +178,13 @@ function isAllowedCommand(value: string): boolean {
 }
 
 /**
- * 放行条目归一化：只认 32 位十六进制摘要（形态不合 = 不可信条目，丢弃）。
- * approvedBy **允许为空**：页面新增放行时不带操作人，由 usecase 在服务端按
- * JWT 可信身份盖章（updateMcpConfigDraft 落章后这里再也不会见到空值）。
+ * 放行条目归一化（不可信 JSON 的唯一入口；「放行了但没说给谁用」在这里就表示不出来）：
+ *  · digest 必须是 32 位十六进制——形态不合即条目不可信，整条丢弃；
+ *  · **allowedRoles 必须是 V2 角色名单的非空子集**——缺字段、空数组、全是不认识的角色
+ *    同样整条丢弃。宁可回落「未放行」（该工具进不了注入集），也不存在「已放行但对
+ *    全体角色可见」这条中间态：后者对本批的第三方工具就是提权。
+ *  · approvedBy **允许为空**：页面新增放行时不带操作人，由 usecase 在服务端按 JWT 可信
+ *    身份盖章（updateMcpConfigDraft 落章后这里再也不会见到空值）。
  */
 function normalizeApprovedTools(input: unknown): Record<string, McpToolApproval> {
   const out: Record<string, McpToolApproval> = {};
@@ -175,8 +194,15 @@ function normalizeApprovedTools(input: unknown): Record<string, McpToolApproval>
     const entry = (raw || {}) as Partial<McpToolApproval>;
     const digest = String(entry.digest ?? "").trim();
     if (!/^[0-9a-f]{32}$/.test(digest)) continue; // 摘要形态不合 = 条目不可信，丢弃
+    const allowedRoles = canonicalRoleOrder(
+      Array.isArray(entry.allowedRoles)
+        ? entry.allowedRoles.map((role) => (typeof role === "string" ? role.trim() : ""))
+        : [],
+    );
+    if (allowedRoles.length === 0) continue; // 无角色 = 没说放行给谁，丢弃（不是「放行给所有人」）
     out[name] = {
       digest,
+      allowedRoles: allowedRoles as [V2Role, ...V2Role[]], // 上一行已实证非空
       approvedBy: String(entry.approvedBy ?? "").trim().slice(0, 64),
       approvedAt: String(entry.approvedAt ?? "").trim().slice(0, 64),
     };

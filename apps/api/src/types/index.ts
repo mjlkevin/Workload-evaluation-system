@@ -2,6 +2,10 @@
 // 统一类型定义 - 从 main.ts 提取
 // ============================================================
 
+// 类型级引用（import type：编译期擦除，不给本文件引入任何运行时依赖）。
+// 批次 7 的放行记录要携带 v2 角色，角色名单的唯一定义在 rbac/roles，不在这里重列。
+import type { V2Role } from "../rbac/roles";
+
 // -------------------- 模板相关 --------------------
 
 export type TemplateItem = {
@@ -657,10 +661,20 @@ export const TOOL_POLICY_REVISION_LIMIT = 50;
 export const MCP_TRANSPORTS = ["stdio", "http"] as const;
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];
 
-/** 单个 MCP 工具的人工放行条目：摘要 = sha256(稳定序列化(上报名+description+inputSchema)) 前 32 位 */
+/**
+ * 单个 MCP 工具的人工放行条目：摘要 = sha256(稳定序列化(上报名+description+inputSchema)) 前 32 位
+ *
+ * `allowedRoles` 是**放行动作本身的一部分**，不是放行之后另一件可以忘掉的事：
+ * MCP 工具来自第三方、没人审过实现，若沿用代码工具那套「visibleRoles 为空 = 所有人可见」，
+ * 一次放行的触达面就是全部角色，比我们自己写的工具还宽。所以这里用**非空元组**类型，
+ * 配合 mcp-bridge 归一化处的入口把关（外部载荷里角色集合为空的条目直接丢弃），
+ * 使「放行了但没说给谁用」这个状态在类型层与数据层都不可表示。
+ */
 export type McpToolApproval = {
   /** 放行时观察到的定义摘要；运行时每回合复算，不等即回落未放行 */
   digest: string;
+  /** 被放行给哪些角色（非空）；运行时角色可见性的唯一来源 */
+  allowedRoles: [V2Role, ...V2Role[]];
   /** 放行人（JWT 可信身份 username） */
   approvedBy: string;
   approvedAt: string;

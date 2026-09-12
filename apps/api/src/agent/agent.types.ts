@@ -41,6 +41,13 @@ export interface AgentTool {
    * 且只带自己服务的合法前缀——防护落在注册时，不依赖调用方自觉。
    */
   source?: "code" | "mcp";
+  /**
+   * 批次 7：MCP 桥接工具的角色触达面（来自人工放行记录；桥接层保证非空才产得出工具）。
+   * 代码工具永无此字段——它们的角色口径仍是策略条目的 visibleRoles（空 = 仅受权限位约束）。
+   * 策略层遇到 source==="mcp" 而本字段缺失或为空时**只能判不可见**：
+   * 在这里放宽的后果就是「一个没人审过实现的第三方工具对所有角色可见」。
+   */
+  mcpAllowedRoles?: readonly V2Role[];
   /** 真正执行：调用底层 usecase；runtime 为可信运行上下文（O2 · A4 注入） */
   execute(args: Record<string, unknown>, user: AgentUser, runtime?: RuntimeContext): Promise<unknown>;
 }
