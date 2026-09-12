@@ -29,6 +29,20 @@ export interface ToolInventoryItem {
   injected: boolean;
   /** 批次 6b：生效策略的该工具条目（无覆盖条目时为代码默认），供页面呈现当前生效决定 */
   activePolicy: ToolPolicyEntry;
+  /** 批次 7：工具来源。"code" = 代码工具（经 PR/CI 评审）；"mcp" = MCP 桥接工具（第三方撰写，逐个人工放行） */
+  origin: "code" | "mcp";
+  /** 批次 7：MCP 工具归属服务（本地登记的 id/name；代码工具为 null） */
+  mcpServer: { id: string; name: string } | null;
+  /**
+   * 批次 7：MCP 工具的人工放行状态（按**当前**定义摘要复验）：
+   *  - "approved" 已放行且定义未变；
+   *  - "definition-changed" 放行过但第三方改了 description/schema → 已自动回落，需重新人工放行；
+   *  - "not-approved" 未经放行。
+   * 代码工具为 null。
+   */
+  mcpApproval: "approved" | "definition-changed" | "not-approved" | null;
+  /** 批次 7：MCP 工具当前定义摘要（放行名单比对基准；代码工具为 null） */
+  mcpDigest: string | null;
 }
 
 /** 批次 6b：注入集合计（按查看者生效视图计算） */
@@ -66,6 +80,7 @@ const CAPABILITY_UNIVERSE = {
   "deliverable:reject": true,
   "evidence:read": true,
   "evidence:write": true,
+  "mcp:invoke": true,
   "dsl:manage": true,
   "template:manage": true,
   "rate-card:manage": true,
@@ -76,6 +91,26 @@ const CAPABILITY_UNIVERSE = {
 } satisfies Record<Capability, true>;
 
 const ALL_CAPABILITIES = Object.keys(CAPABILITY_UNIVERSE) as Capability[];
+
+/** 桥接工具（mcp-bridge.McpBridgedTool）在 AgentTool 之上附加的归属字段；此处只做读取 */
+type McpToolShape = { mcpServerId?: string; mcpDigest?: string };
+
+function mcpServerIdOf(tool: AgentTool): string | undefined {
+  return (tool as AgentTool & McpToolShape).mcpServerId;
+}
+
+function mcpDigestOf(tool: AgentTool): string | null {
+  return (tool as AgentTool & McpToolShape).mcpDigest ?? null;
+}
+
+/**
+ * 出现在注册表里的 MCP 工具**必然**是已放行且摘要相符的——未放行/已变卦的工具
+ * 在采集层就被挡下，从不进入快照（裁决二：默认不可用是进不来，不是进来了被标灰）。
+ */
+function mcpApprovalOf(tool: AgentTool): "approved" {
+  void tool;
+  return "approved";
+}
 
 /**
  * 批次 6a：从运行时 ToolRegistry 派生工具清单。
@@ -97,11 +132,28 @@ const ALL_CAPABILITIES = Object.keys(CAPABILITY_UNIVERSE) as Capability[];
 export function buildToolInventory(
   user: AuthUser,
   viewerCapabilities: Capability[],
-  options: { policy?: ToolPolicyConfig; viewerRoles?: readonly V2Role[] } = {},
+  options: {
+    policy?: ToolPolicyConfig;
+    viewerRoles?: readonly V2Role[];
+    /**
+     * 批次 7：本回合现问现得、已放行且摘要复验通过的 MCP 工具快照。
+     * 合并进注册表副本后与代码工具走**同一条**派生路径——清单仍从运行时注册表
+     * 派生（批次 6a 裁决的扩法：只把「代码」扩成「运行时注册表」一词），不落库、
+     * 不缓存。未放行/已变卦的工具不在快照里，也就不会伪装成「存在但未注入」。
+     */
+    mcpTools?: readonly AgentTool[];
+    /** 批次 7：MCP 服务展示名映射（本地登记的 id→name；不来自服务上报） */
+    mcpServerNames?: Readonly<Record<string, string>>;
+  } = {},
 ): { items: ToolInventoryItem[]; summary: ToolInventoryInjectionSummary } {
-  const registry = createDefaultRegistry(user);
+  const baseRegistry = createDefaultRegistry(user);
+  const registry =
+    options.mcpTools && options.mcpTools.length > 0
+      ? baseRegistry.cloneWithMcpTools(options.mcpTools)
+      : baseRegistry;
   const viewerCaps = new Set(viewerCapabilities);
   const viewerRoles = options.viewerRoles ?? [];
+  const mcpServerNames = options.mcpServerNames ?? {};
 
   const items: ToolInventoryItem[] = registry
     .listToolsFor({ id: user.id, capabilities: ALL_CAPABILITIES })
@@ -113,8 +165,13 @@ export function buildToolInventory(
       const [definition] = [toToolDefinition(tool)];
       const tokens = estimateToolsTokens([definition]);
       const capabilityOk = viewerCaps.has(tool.capability);
-      const roleOk = activePolicy.visibleRoles.length === 0
-        || activePolicy.visibleRoles.some((role) => (viewerRoles as readonly string[]).includes(role));
+      // 批次 7：MCP 工具的角色可见性只能来自放行记录 mcpAllowedRoles，不得回落策略条目的空 visibleRoles。
+      const mcpAllowedRoles = tool.source === "mcp" ? tool.mcpAllowedRoles : undefined;
+      const roleOk =
+        mcpAllowedRoles !== undefined
+          ? mcpAllowedRoles.length > 0 && mcpAllowedRoles.some((role) => (viewerRoles as readonly string[]).includes(role))
+          : activePolicy.visibleRoles.length === 0 ||
+            activePolicy.visibleRoles.some((role) => (viewerRoles as readonly string[]).includes(role));
       // 与工作台全量通道（listFullToolsFor ∩ 策略减法）同一口径逐条对齐：
       // 内置 discovery 类（list_tools）不在此通道；discoverable 业务工具**在**。
       const injected =
@@ -136,6 +193,12 @@ export function buildToolInventory(
         tokens,
         injected,
         activePolicy,
+        origin: tool.source === "mcp" ? "mcp" : "code",
+        mcpServer: tool.source === "mcp" && mcpServerIdOf(tool)
+          ? { id: mcpServerIdOf(tool) as string, name: mcpServerNames[mcpServerIdOf(tool) as string] ?? mcpServerIdOf(tool) as string }
+          : null,
+        mcpApproval: tool.source === "mcp" ? mcpApprovalOf(tool) : null,
+        mcpDigest: tool.source === "mcp" ? mcpDigestOf(tool) : null,
       };
     });
 

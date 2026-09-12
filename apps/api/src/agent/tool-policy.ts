@@ -91,7 +91,7 @@ export function isToolInjectableOnFullChannel(tool: AgentTool | undefined, polic
   if (!tool) return false;
   const entry = resolveToolPolicyEntry(policy, tool.name);
   if (entry.enabled === false) return false;
-  if (!isRoleVisible(entry, roles)) return false;
+  if (!isRoleVisible(tool, entry, roles)) return false;
   // on-demand：全量通道不主动注入（agent 发现通道另行处理）
   if (entry.injectionMode === "on-demand") return false;
   return true;
@@ -101,10 +101,17 @@ export function isToolInjectableOnFullChannel(tool: AgentTool | undefined, polic
 export function isToolDiscoverableUnderPolicy(tool: AgentTool, policy: ToolPolicyConfig | undefined, roles: readonly V2Role[]): boolean {
   const entry = resolveToolPolicyEntry(policy, tool.name);
   if (entry.enabled === false) return false;
-  return isRoleVisible(entry, roles);
+  return isRoleVisible(tool, entry, roles);
 }
 
-function isRoleVisible(entry: ToolPolicyEntry, roles: readonly V2Role[]): boolean {
+function isRoleVisible(tool: AgentTool, entry: ToolPolicyEntry, roles: readonly V2Role[]): boolean {
+  // 批次 7：MCP 工具的角色触达面来自人工放行记录，不是策略条目的 visibleRoles。
+  // 空数组对代码工具意为「仅受权限位约束」，对 MCP 工具会被读成「所有人」，语义相反。
+  if (tool.source === "mcp") {
+    const allowed = tool.mcpAllowedRoles;
+    if (!allowed || allowed.length === 0) return false;
+    return allowed.some((role) => (roles as readonly string[]).includes(role));
+  }
   if (entry.visibleRoles.length === 0) return true;
   return entry.visibleRoles.some((role) => (roles as readonly string[]).includes(role));
 }

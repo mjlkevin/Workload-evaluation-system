@@ -31,6 +31,29 @@ export function __resetToolPolicyStoreForTest() {
   toolPolicyStore = { ...mockAiToolPolicy, draft: { schemaVersion: 1, policies: {} }, active: { schemaVersion: 1, policies: {} }, revisions: [], version: 1 }
 }
 
+// 批次 7：MCP 服务配置 store（system_configs 第六配置区）——同样在 mock 内可变，
+// 并暴露探测次数计数器供「每次现问、绝不缓存」的断言。
+export const __mcpProbeCallsForTest = { count: 0 }
+const emptyMcpConfig = () => ({ schemaVersion: 1, servers: [] })
+let mcpStore = null
+function freshMcpStore() {
+  return {
+    version: 1,
+    draft: emptyMcpConfig(),
+    active: emptyMcpConfig(),
+    updatedAt: '2026-09-12T00:00:00.000Z',
+    effectiveAt: '2026-09-12T00:00:00.000Z',
+    revisions: [],
+  }
+}
+export function __resetMcpStoreForTest(seed) {
+  mcpStore = seed ? { ...freshMcpStore(), ...seed } : freshMcpStore()
+  __mcpProbeCallsForTest.count = 0
+}
+export function __getMcpStoreForTest() {
+  return mcpStore
+}
+
 export const handlers = [
   http.get(`${BASE}/versions`, ({ request }) => {
     const url = new URL(request.url)
@@ -826,6 +849,69 @@ export const handlers = [
       success: true,
       data: { version: toolPolicyStore.version, active: toolPolicyStore.active, effectiveAt: toolPolicyStore.effectiveAt, revisions: toolPolicyStore.revisions },
     })
+  }),
+  // 批次 7：MCP 服务配置（system_configs 第六配置区）
+  http.get(`${BASE}/system/mcp`, () => HttpResponse.json({ success: true, data: mcpStore || (mcpStore = freshMcpStore()) })),
+  http.patch(`${BASE}/system/mcp/draft`, async ({ request }) => {
+    const body = await request.json().catch(() => ({}))
+    const store = mcpStore || (mcpStore = freshMcpStore())
+    const servers = Array.isArray(body?.servers) ? body.servers : store.draft.servers
+    // 与后端同口径：未盖章放行条目由服务端按操作人落章（mock 固定 admin）
+    const stamped = servers.map((server) => ({
+      ...server,
+      approvedTools: Object.fromEntries(Object.entries(server.approvedTools || {}).map(([name, entry]) => [
+        name,
+        { digest: entry.digest, allowedRoles: entry.allowedRoles || [], approvedBy: entry.approvedBy || 'admin', approvedAt: entry.approvedAt || '2026-09-12T01:00:00.000Z' },
+      ])),
+    }))
+    mcpStore = {
+      ...store,
+      draft: { schemaVersion: store.draft.schemaVersion, servers: stamped },
+      updatedAt: '2026-09-12T01:00:00.000Z',
+      revisions: [
+        ...store.revisions,
+        {
+          seq: store.revisions.length + 1,
+          version: store.version,
+          action: 'draft-update',
+          actor: 'admin',
+          at: '2026-09-12T01:00:00.000Z',
+          changes: [{ target: `server:${stamped[0]?.id || '-'}`, field: 'servers', from: String(store.draft.servers.length), to: String(stamped.length) }],
+        },
+      ],
+    }
+    return HttpResponse.json({ success: true, data: { version: mcpStore.version, draft: mcpStore.draft, updatedAt: mcpStore.updatedAt, revisions: mcpStore.revisions } })
+  }),
+  http.post(`${BASE}/system/mcp/activate`, () => {
+    const store = mcpStore || (mcpStore = freshMcpStore())
+    mcpStore = {
+      ...store,
+      active: store.draft,
+      version: store.version + 1,
+      effectiveAt: '2026-09-12T02:00:00.000Z',
+      revisions: [
+        ...store.revisions,
+        { seq: store.revisions.length + 1, version: store.version + 1, action: 'activate', actor: 'admin', at: '2026-09-12T02:00:00.000Z', changes: [] },
+      ],
+    }
+    return HttpResponse.json({ success: true, data: { version: mcpStore.version, active: mcpStore.active, effectiveAt: mcpStore.effectiveAt, revisions: mcpStore.revisions } })
+  }),
+  http.post(`${BASE}/system/mcp/probe`, async ({ request }) => {
+    __mcpProbeCallsForTest.count += 1
+    const body = await request.json().catch(() => ({}))
+    const store = mcpStore || (mcpStore = freshMcpStore())
+    const server = (store.draft.servers || []).find((entry) => entry.id === body?.serverId)
+    if (!server) return HttpResponse.json({ success: true, data: { ok: false, serverId: body?.serverId, errorKind: 'not-configured' } })
+    const tools = Array.isArray(globalThis.__MCP_PROBE_TOOLS__) ? globalThis.__MCP_PROBE_TOOLS__ : [{
+      reportedName: 'send_summary',
+      stableName: `mcp__${server.id}__send_summary`,
+      description: '把会话总结发送到 IM',
+      inputSchema: { type: 'object', properties: { text: { type: 'string' } } },
+      digest: 'a'.repeat(32),
+      currentDigest: 'a'.repeat(32),
+      approvalStatus: server.approvedTools?.send_summary ? 'approved' : 'not-approved',
+    }]
+    return HttpResponse.json({ success: true, data: { ok: true, serverId: server.id, tools } })
   }),
   http.get(`${BASE}/harness/test-results`, () => HttpResponse.json({ success: true, data: { items: [] } })),
   http.get(`${BASE}/templates`, () => HttpResponse.json({ success: true, data: [{ templateId: 'T1', templateName: '实施评估标准版', description: '标准模板', tags: ['标准'] }] })),

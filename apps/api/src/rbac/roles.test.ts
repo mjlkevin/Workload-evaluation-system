@@ -86,11 +86,15 @@ test("ADMIN 拥有 estimates:create（超级管理员可执行全部业务操作
   assert.equal(roleHasCapability("ADMIN", "estimates:create"), true);
 });
 
-test("DEV 只有 dev:read 和 dev:write", () => {
+test("DEV 的业务能力位仍只有 dev:read、dev:write；mcp:invoke 是批次 7 起全角色统一授予的外发能力位，不是新增业务权限", () => {
   const devCaps = getRoleCapabilities("DEV");
-  assert.equal(devCaps.length, 2);
-  assert.ok(devCaps.includes("dev:read"));
-  assert.ok(devCaps.includes("dev:write"));
+  const businessCaps = devCaps.filter((capability) => capability !== "mcp:invoke");
+  assert.deepEqual(
+    businessCaps.sort(),
+    ["dev:read", "dev:write"],
+    "DEV 原有的业务能力位不得因 mcp:invoke 加入而静默扩权",
+  );
+  assert.ok(devCaps.includes("mcp:invoke"), "批次 7 起 mcp:invoke 为全角色统一外发能力位");
   assert.equal(roleHasCapability("DEV", "estimates:read"), false);
 });
 

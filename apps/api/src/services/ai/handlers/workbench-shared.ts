@@ -19,6 +19,7 @@ import { defaultProviderRegistry, type ChatCompletionResponse, type ChatRole, ty
 import type { StreamingChunk } from "../workbench-dispatch.service";
 import type { ZhipuKnowledgeToolTrace } from "../knowledge-tool.service";
 import { resolveWorkbenchInjectableTools, runWorkbenchToolLoop } from "../workbench-tool-loop";
+import { resolveActiveMcpTools } from "../../../agent/mcp/mcp-runtime";
 import type { WorkbenchAttachmentContext } from "../workbench-context.service";
 import { createMemoryUsecase, getMemoryRepository } from "../../../modules/memory/memory.module";
 import type { MemoryContextBlock } from "../../../modules/memory/memory.usecase";
@@ -185,7 +186,8 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
   // 不改注册表；注入集为空时连 tools 字段都不传，行为与修复前逐字节一致。
   // 批次 6b：同生产路径口径叠加生效工具策略（capability 过滤之上做减法）。
   const toolPolicy = await resolveActiveToolPolicy();
-  const toolSet = resolveWorkbenchInjectableTools(params.user, { toolPolicy });
+  const mcp = await resolveActiveMcpTools();
+  const toolSet = resolveWorkbenchInjectableTools(params.user, { toolPolicy, mcpTools: mcp.tools });
   // 循环只回传末轮正文，provider 元信息（rawContent/model/attempts…）取末轮实际响应
   let lastCompletion: ChatCompletionResponse | undefined;
   const loop = await runWorkbenchToolLoop({
@@ -409,7 +411,8 @@ export function buildWorkbenchChatModelChat(
     // 批次 0 · ①②③：注入点解析只读工具集（mutates===false），不改 ToolRegistry。
     // 批次 6b：同口径叠加生效工具策略。
     const toolPolicy = await resolveActiveToolPolicy();
-    const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy });
+    const mcp = await resolveActiveMcpTools();
+    const toolSet = resolveWorkbenchInjectableTools(user, { toolPolicy, mcpTools: mcp.tools });
     // provider 元信息取末轮（真正回答轮）的实际响应，首轮多为工具调用轮
     let lastCompletion: ChatCompletionResponse | undefined;
     const loop = await runWorkbenchToolLoop({

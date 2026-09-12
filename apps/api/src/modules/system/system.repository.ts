@@ -23,6 +23,13 @@ import {
 } from "../../types";
 import { TOOL_POLICY_REVISION_LIMIT } from "../../types";
 import { normalizeToolPolicyConfig } from "../../agent/tool-policy";
+import {
+  MCP_REVISION_LIMIT,
+  type McpConfig,
+  type McpConfigStore,
+  type McpRevision,
+} from "../../types";
+import { createDefaultMcpConfig, normalizeMcpConfig } from "../../agent/mcp/mcp-bridge";
 import { config } from "../../config/env";
 import { applyVersionCodeFormat } from "../../utils/version-code-format";
 // S3（2026-08-30）：四个 *StorePath 导入随 JSON 读写路径删除。注意
@@ -1398,5 +1405,77 @@ export async function saveToolPolicyStore(store: ToolPolicyStore): Promise<void>
  */
 export async function resolveActiveToolPolicy(): Promise<ToolPolicyConfig> {
   const store = await loadToolPolicyStore();
+  return store.active;
+}
+
+// -------------------- 批次 7：MCP 服务配置（第六配置区） --------------------
+
+function normalizeMcpRevision(input: unknown): McpRevision | null {
+  const source = (input || {}) as Partial<McpRevision>;
+  const actor = String(source.actor ?? "").trim();
+  const at = String(source.at ?? "").trim();
+  if (!actor || !at) return null;
+  const action = source.action === "activate" ? "activate" : source.action === "draft-update" ? "draft-update" : null;
+  if (!action) return null;
+  const changes = Array.isArray(source.changes)
+    ? source.changes
+        .map((change) => ({
+          target: String(change?.target ?? "").trim(),
+          field: String(change?.field ?? "").trim(),
+          from: String(change?.from ?? ""),
+          to: String(change?.to ?? ""),
+        }))
+        .filter((change) => Boolean(change.target && change.field))
+    : [];
+  return {
+    seq: Number.isFinite(Number(source.seq)) ? Math.max(0, Number(source.seq)) : 0,
+    version: Number.isFinite(Number(source.version)) ? Math.max(1, Number(source.version)) : 1,
+    action,
+    actor,
+    at,
+    changes,
+  };
+}
+
+/** 归一化 store（读写共用，与第五配置区同范式）；revisions 截头保尾有界 */
+export function normalizeMcpConfigStore(input: unknown): McpConfigStore {
+  const data = (input || {}) as Partial<McpConfigStore>;
+  const now = new Date().toISOString();
+  const draft = normalizeMcpConfig(data.draft);
+  const active = normalizeMcpConfig(data.active ?? data.draft);
+  const revisions = (Array.isArray(data.revisions) ? data.revisions : [])
+    .map(normalizeMcpRevision)
+    .filter((revision): revision is McpRevision => revision !== null);
+  const bounded =
+    revisions.length > MCP_REVISION_LIMIT ? revisions.slice(revisions.length - MCP_REVISION_LIMIT) : revisions;
+  return {
+    version: Number.isFinite(Number(data.version)) ? Math.max(1, Number(data.version)) : 1,
+    draft,
+    active,
+    updatedAt: String(data.updatedAt || now),
+    effectiveAt: String(data.effectiveAt || now),
+    revisions: bounded,
+  };
+}
+
+export async function loadMcpConfigStore(): Promise<McpConfigStore> {
+  const store = await getSystemRepository().loadMcpConfigStore();
+  if (store) return normalizeMcpConfigStore(store);
+  const now = new Date().toISOString();
+  const initial = createDefaultMcpConfig();
+  return { version: 1, draft: initial, active: initial, updatedAt: now, effectiveAt: now, revisions: [] };
+}
+
+export async function saveMcpConfigStore(store: McpConfigStore): Promise<void> {
+  await getSystemRepository().saveMcpConfigStore(normalizeMcpConfigStore(store));
+}
+
+/**
+ * 注入点读取当前**生效** MCP 服务清单（每回合组装工具时现读，无缓存）。
+ * 读失败抛 SystemStoreError——不知道允许了哪些服务，就不能连接（方向关闭）；
+ * 与「服务连不上 → 该服务缺席」是两条不同的失败路径（裁决五），不可互套。
+ */
+export async function resolveActiveMcpConfig(): Promise<McpConfig> {
+  const store = await loadMcpConfigStore();
   return store.active;
 }
