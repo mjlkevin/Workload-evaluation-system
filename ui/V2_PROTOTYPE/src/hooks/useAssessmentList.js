@@ -101,7 +101,10 @@ export default function useAssessmentList({
       setLocalRows((prev) => [local, ...prev])
       setRows((prev) => [local, ...prev])
       setCreateError(err)
-      return local.id
+      // 失败时返回 null：调用方一律 `if (id) navigate(...)`，若这里回本地 id，
+      // 用户会被带到一个服务器上并不存在的详情页，页面上的失败提示也就永远看不到。
+      // 本地行仍保留（乐观插入），但不当作「创建成功」。判例：useReviewList 早已区分成败。
+      return null
     } finally {
       setCreating(false)
     }
