@@ -1000,6 +1000,43 @@ npm run build --prefix ui/V2_PROTOTYPE</pre>
       </div>
     </section>
 
+
+    <section>
+      <div class="h-num">Section 14</div>
+      <h2>前端优化线（批 1–8）</h2>
+      <p class="lead">与 Agent/存储主线并行的前端质量线，业务目标是把「用户点开看到的东西」修到可信：可达性（点得到、读得全）、真实性（界面不显示假数据、不放假控件）、以及测试确实在测生产路径。受 AGENTS §9 门禁约束——单次一个业务表面、最多三个已证实根问题。<b>截至 2026-09-13，批 1–8 全部已合入 main</b>。</p>
+      <div class="callout warn">
+        <div><b>基线数字的读法</b>本表引用的 test-web 文件数/用例数<b>不是本线单独造成的</b>——同期有多条并行线在增删前端用例，跨批次数字不可直接相减归因。其中批 7 的 <b>−5</b> 是<b>按用户裁决删除不可达页面所致，非测试倒退</b>（口径已在 <a href="testing.html">testing.html</a> 同日行钉死）。</div>
+      </div>
+      <div class="callout" style="margin-top:14px">
+        <div><b>补登说明</b>本节为 2026-09-13 架构侧一次性补登：此前批 1–8 的过程数据只落在 <a href="changes.html">changes.html</a> / <a href="testing.html">testing.html</a> / <a href="issues.html">issues.html</a>，plan.html 中<b>零条记录</b>。批 4–8 的 merge SHA 与 CI run 号均为本次<b>逐笔服务器实取</b>；批 1–3 与「更名」完成于更早会话，本次<b>未逐笔追溯 SHA</b>，已在表内如实标注，不得当作已核验证据引用。</div>
+      </div>
+      <table>
+        <tr><th>批次</th><th>内容</th><th>状态</th><th>验收证据</th></tr>
+        <tr><td class="mono">批 1</td><td>登录页 4 项：密码框常驻蓝边、关闭按钮缺 <code class="inline">btn-out</code>、缺可见标签、聚焦边框被行内样式短路。</td><td><span class="status done"><span class="dot"></span>已合入</span></td><td>本节补登时该批已在主干，合入证据见 <a href="changes.html">changes.html</a> 同期事件行（本次补登未追溯其 merge SHA，标注为<b>未逐笔核验</b>）。</td></tr>
+        <tr><td class="mono">批 2</td><td>认证页 6 项：360px 溢出登录按钮被裁、input 尺寸交回规范、后端 <code class="inline">reason</code> → 人话映射、报错随输入清除、删除假语言切换器、半角问号。</td><td><span class="status done"><span class="dot"></span>已合入</span></td><td>同上，<b>未逐笔核验</b>。删除假语言切换器一项后来成为批 4「删除假筛选标签」的判例来源。</td></tr>
+        <tr><td class="mono">批 3</td><td>11 项 P0/P1，横跨 8 个业务表面（受保护路由回跳、<code class="inline">/dev-assessments</code> 吞错、<code class="inline">/users@360</code> 四列不可达、<code class="inline">.btn:disabled</code> 样式、KPI 假零值、页签去重、6 张表格滚动容器等）。</td><td><span class="status done"><span class="dot"></span>已合入</span></td><td><b>该批越 §9 上限（1 表面 / 3 根问题），事后补 C13 例外登记</b>——自批 4 起恢复上限并要求开工前申请，此为本线最重要的流程教训之一。</td></tr>
+        <tr><td class="mono">更名</td><td>产品名统一为 Datum（界面 6 处 + <code class="inline">pages/</code> 沙箱页全量 + 版本号单一来源）。</td><td><span class="status done"><span class="dot"></span>已合入</span></td><td>同上，<b>未逐笔核验</b>。</td></tr>
+        <tr><td class="mono">批 4</td><td><code class="inline">/projects</code> 项目列表三根问题：加载中误显示「未找到匹配的项目」、KPI 卡恒空进度条（删除而非编分母）、工具条两个点不动的假筛选标签。</td><td><span class="status done"><span class="dot"></span>已合入</span></td><td>merge <code class="inline">dccc5a8</code>；分支 CI <code class="inline">33737659967</code>（test-web 62 files / 475 tests，实取）。</td></tr>
+        <tr><td class="mono">批 5</td><td>AI 工作台测试宿主对齐生产路径：104 条用例由不可达的 <code class="inline">HomeWorkspace</code> 壳改挂真实路径（<code class="inline">/</code> → HomePage → AiHomeWorkbench）。</td><td><span class="status done"><span class="dot"></span>已合入</span></td><td>merge <code class="inline">2e4fe75</code>；分支 CI <code class="inline">33771579240</code>（64 files / 501 tests，实取，<b>用例数零增减</b>）。<b>关键结论</b>：换宿主后全绿 ⇒ 该壳<b>未掩盖任何生产缺陷</b>，隐患真实但未成事故。</td></tr>
+        <tr><td class="mono">批 6</td><td>首页（<code class="inline">/</code> AI 工作台）窄屏气泡越界：消息行 <code class="inline">min-w-0</code> + 气泡盒 <code class="inline">break-words</code>，净改 4 行。</td><td><span class="status done"><span class="dot"></span>已合入</span></td><td>merge <code class="inline">fb1dd9c</code>；分支 CI <code class="inline">33780214025</code>（65 files / 505 tests，实取）。三档浏览器实测越界元素 39 → 0。原记录 right=392 <b>未复现</b>（实测随内容长度变化，本轮 989），定性成立、数值口径作废。</td></tr>
+        <tr><td class="mono">批 7</td><td>删除生产不可达的 <code class="inline">HomeWorkspace</code> 切换页（<b>用户 2026-09-04 裁决「删除」</b>）：页面 + 其专属 5 条用例，保留同文件另外 46 条并重命名为 <code class="inline">AiHomeWorkbench.test.jsx</code>。</td><td><span class="status done"><span class="dot"></span>已合入</span></td><td>merge <code class="inline">81482d9</code> + 回填 <code class="inline">8e71376</code>；主干 CI <code class="inline">34763188530</code> 六 job 全 success（70 files / <b>564</b> tests，实取）。<b>分支搁置九天</b>（09-04 完成 → 09-13 合入），起点由 <code class="inline">e6e28de</code> 更新为 <code class="inline">7be59aa</code>、冲突面由 1 处变 2 处。</td></tr>
+        <tr><td class="mono">批 8</td><td>窄屏 composer 发送按钮被永久裁切（ISS-2026-09-04-001）：<code class="inline">.ai-composer__row</code> 解除网格项 <code class="inline">min-width:auto</code>，净改一条属性。</td><td><span class="status done"><span class="dot"></span>已合入</span></td><td>merge <code class="inline">5fd8785</code> + 回填 <code class="inline">a3e690c</code>；主干 CI <code class="inline">34765161675</code> 六 job 全 success（71 files / <b>568</b> tests，实取）。360 档越界元素 2 → 0，发送按钮 right 375 → 310。<b>一处假设被实测证伪并撤回</b>（先改 textarea 无效，绑定约束在网格项）。</td></tr>
+      </table>
+      <h3 style="margin-top:18px">留存的待办与已结案项</h3>
+      <table>
+        <tr><th>项</th><th>状态</th><th>说明</th></tr>
+        <tr><td>四个「新建」页无条件 <code class="inline">navigate</code>；行内 <code class="inline">padding</code> 覆盖 <code class="inline">.input</code> 规范（10+ 文件）；emoji 当图标与线性图标混用（≥8 页）；5 张表格无 <code class="inline">&lt;caption&gt;</code>；空态统一「📭 暂无数据」不含下一步；<code class="inline">/</code> 上 <code class="inline">auth/me</code> 请求 3×（<code class="inline">useCurrentUser</code> 无共享缓存）</td><td><span class="status warn"><span class="dot"></span>待排期</span></td><td>全站公共层，单批难以容纳；需按 §9 拆表面立批。</td></tr>
+        <tr><td>对比度整改（<code class="inline">--ink-3</code> 实测 3.65:1、<code class="inline">--err</code> 4.00:1，均低于 AA 4.5:1）；输入框 13px 低于 iOS Safari 16px 聚焦放大线</td><td><span class="status warn"><span class="dot"></span>暂缓</span></td><td>有前置条件：改这两个变量影响全站每一处灰字与红字，<b>必须有前后截图</b>；批 8 已在仓库留下 <code class="inline">ui/V2_PROTOTYPE/scripts/measure-composer.mjs</code> 作为浏览器实测样板。</td></tr>
+        <tr><td>ISS-2026-09-04-002：几何回归守卫缺口（批 6/8 的守卫只断言 CSS/类名契约，浏览器实测未进 CI）</td><td><span class="status done"><span class="dot"></span>已结案 · 用户裁决「不做」</span></td><td><b>留存风险不因结案而消失</b>：上游布局若被改动，窄屏溢出可复发而守卫仍全绿；几何证据只在本地工具，需人工复跑。后来人若重开请引用该条并说明触发原因，不要当作遗漏补登。</td></tr>
+        <tr><td><code class="inline">fix/web-resource-cost-placeholder</code>（资源成本页三项修复）</td><td><span class="status warn"><span class="dot"></span>留档不合入</span></td><td>项目侧已明确资源成本 / 评审 / WBS 属占位功能，后续细化开发时再处理。</td></tr>
+        <tr><td>删除 HomeWorkspace 后的 5 项残渣（<code class="inline">PageShell</code> 的 <code class="inline">CRUMB_ROUTE_MAP</code> 两条目、<code class="inline">fillViewport</code> 死分支、<code class="inline">wes_home_view</code> key 等）</td><td><span class="status warn"><span class="dot"></span>已登记 · 待评估</span></td><td><code class="inline">PageShell</code> 为多页共用组件，清理需单独评估，未在批 7 内处置。</td></tr>
+      </table>
+      <div class="callout" style="margin-top:14px">
+        <div><b>本线沉淀的三条判据（对后来人比修复本身更有用）</b>① <b>溢出不能只看 <code class="inline">scrollWidth-clientWidth</code></b>：本项目 html/body 均 <code class="inline">overflow-x:hidden</code>，该差值恒为 0，只看它必然误判为无溢出；必须给逐元素 <code class="inline">right &gt; innerWidth</code> 清单 + 最近滚动祖先的 <code class="inline">overflow-x</code>（<code class="inline">auto</code> 尚可滚，<code class="inline">hidden</code> 即永久不可达）。② <b>假绿判据</b>：<code class="inline">if (x.ok) { assert }</code> 形态跑绿不构成证据；关键断言必须无条件执行。另有 jsdom 变体——含 <code class="inline">var()</code> 的 <code class="inline">linear-gradient</code> 会被序列化丢弃导致断言恒真（批 6 自查抓出）。③ <b>推导值不得填进实测格式</b>：出现「实测 / 改前 / 改后 / 差值」列时数据必须来自真实运行，推导值单独标注方法。</div>
+      </div>
+    </section>
+
     <footer class="footer">
       <a href="index.html">返回总览</a> · 计划与进度 · WES 项目管理 · 2026-08-17
     </footer>
