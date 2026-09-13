@@ -11,8 +11,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { sessionRuntimeStore } from '../hooks/useSessionRuntimeStore.js'
 import { ToastProvider } from '../hooks/useToast.jsx'
-// ISS-2026-09-03-005：挂载真实生产路径（路由 / → HomePage → AiHomeWorkbench）；
-// HomeWorkspace 在生产中无路由可达，其 PageShell 壳会掩盖真实渲染结构。
+// ISS-2026-09-03-005：挂载真实生产路径（路由 / → HomePage → AiHomeWorkbench）。
+// 原第二宿主 HomeWorkspace 已随 ISS-2026-09-03-001（用户裁决：删除）移出代码库。
 import HomePage from '../pages/HomePage.jsx'
 import { server } from './mocks/server.js'
 
