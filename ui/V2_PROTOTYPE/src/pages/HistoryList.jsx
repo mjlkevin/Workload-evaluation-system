@@ -4,9 +4,12 @@ import ListPage from '../components/ListPage.jsx'
 import { historyItems } from '../mock/listData.js'
 import useHistoryProjects from '../hooks/useHistoryProjects.js'
 
+// 创建失败时给出可感知反馈：hook 早已导出 createError，此前本页未取用，
+// 失败时按钮转一下就复原、界面无任何提示，用户无法判断成没成功。
+// 判例：DevAssessmentList / ReviewList 已用同一条 feedback 通道（role=alert）。
 export default function HistoryList() {
   const navigate = useNavigate()
-  const { projects, loading, loadError, refetch, remove, create, creating } = useHistoryProjects({
+  const { projects, loading, loadError, createError, refetch, remove, create, creating } = useHistoryProjects({
     fallbackData: historyItems,
   })
 
@@ -35,6 +38,7 @@ export default function HistoryList() {
       error={loadError}
       errorText="加载历史项目列表失败，请检查网络后重试"
       onRetry={refetch}
+      feedback={createError ? { role: 'alert', message: '创建历史项目失败，已先保留在本地列表，请稍后重试' } : null}
       rowKey="id"
       onRowClick={(row) => navigate(`/history/${row.id}`)}
       onBulkAction={handleBulkAction}

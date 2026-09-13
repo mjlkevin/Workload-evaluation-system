@@ -4,9 +4,12 @@ import ListPage from '../components/ListPage.jsx'
 import useResourceCostList from '../hooks/useResourceCostList.js'
 import { resourceCosts as mockData } from '../mock/listData.js'
 
+// 创建失败时给出可感知反馈：hook 早已导出 createError，此前本页未取用，
+// 失败时按钮转一下就复原、界面无任何提示，用户无法判断成没成功。
+// 判例：DevAssessmentList / ReviewList 已用同一条 feedback 通道（role=alert）。
 export default function ResourceCostList() {
   const navigate = useNavigate()
-  const { rows, loading, loadError, creating, refetch, create, remove } = useResourceCostList({ fallbackData: mockData })
+  const { rows, loading, loadError, createError, creating, refetch, create, remove } = useResourceCostList({ fallbackData: mockData })
 
   const kpiCards = useMemo(() => {
     const total = rows.length
@@ -50,6 +53,7 @@ export default function ResourceCostList() {
       error={loadError}
       errorText="加载资源成本列表失败，请检查网络后重试"
       onRetry={refetch}
+      feedback={createError ? { role: 'alert', message: '创建资源成本失败，已先保留在本地列表，请稍后重试' } : null}
       rowKey="id"
       kpiCards={kpiCards}
       onRowClick={(row) => navigate(`/resource-costs/${row.id}`)}

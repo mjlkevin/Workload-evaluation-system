@@ -187,7 +187,8 @@ export default function useHistoryProjects({
       return record.id || local.id
     } catch (err) {
       setCreateError(err)
-      return local.id
+      // 失败时返回 null，理由同 useAssessmentList：不能把失败当成功带用户跳转。
+      return null
     } finally {
       setCreating(false)
     }
