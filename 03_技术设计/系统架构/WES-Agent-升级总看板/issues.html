@@ -102,9 +102,9 @@
               <td>架构侧批 6 复核提出（2.2）· 执行方已在回填中自行披露同一缺口</td>
               <td>批 6 新增的 4 条守卫用例断言的是 <code class="inline">classList.contains('min-w-0' / 'break-words')</code>，即<b>类名契约</b>而非溢出行为本身。由此产生一个真实缺口：<b>上游布局若被改动（外层 grid 定轨方式变化、或 Tailwind utility 被移除/改名），本缺陷会复发，而这 4 条用例仍会全绿。</b>真正的证据是浏览器三档实测，而它<b>不在 CI 里</b>。</td>
               <td><code class="inline">ui/V2_PROTOTYPE/src/__tests__/home-bubble-narrow-overflow.test.jsx</code>（4 条均为类名断言）· 执行方披露原文：「jsdom 无布局引擎，用例断的是 DOM 类名契约，几何结论全部来自真实浏览器实测」· 实测脚本与 JSON 留存于分支 <code class="inline">.cache/batch6/</code>（gitignore 内，未入库，故亦不可复跑）</td>
-              <td><span class="status warn"><span class="dot"></span>已登记 · 待架构侧排期</span></td>
+              <td><span class="status done"><span class="dot"></span>已结案 · 用户裁决「不做」</span>（2026-09-13）</td>
               <td>待架构侧裁决（本批只登记不处置）</td>
-              <td><b>处置方向留白</b>：是否把浏览器几何实测纳入 CI、以何种形态纳入，属架构决策，交架构侧排期定调，本批未开工、不提方案。</td>
+              <td><b>已结案 · 不排期</b>：2026-09-13 用户明确裁决<b>不做</b>——不把浏览器几何实测纳入 CI。因此本条不再作为待办跟踪。<b>留存的已知风险（不因结案而消失）</b>：批 6 与批 8 的守卫都只断言 CSS/类名契约，上游布局若被改动（grid 定轨方式变化、utility 被移除或改名），窄屏溢出可复发而守卫仍全绿；几何证据只存在于本地工具（批 6 的一次性脚本、批 8 的 <code class="inline">ui/V2_PROTOTYPE/scripts/measure-composer.mjs</code>），需要时由人手动复跑。后来人若要重开，请引用本条并说明触发原因，不要当作遗漏补登。</td>
             </tr>
             <tr data-board-event-id="BE-2026-09-04-ui-home-bubble-overflow:issues-composer-clip">
               <td class="mono">ISS-2026-09-04-001</td>
@@ -113,9 +113,9 @@
               <td>前端优化线批 6 全页扫描（真实浏览器实测，同表面其余问题按 §9 只登记不修）</td>
               <td>批 6 在修气泡越界时对 <code class="inline">/</code> 做整页逐元素扫描：360 视口下 <code class="inline">div.ai-composer__row</code> right=375&gt;360、<code class="inline">button.ai-composer__send</code> right=375、发送图标 svg right=365，最近滚动祖先为聊天 <code class="inline">section</code>（实测 <code class="inline">overflow-x:hidden</code>）= 发送按钮部分不可点。390/414 档复测无越界。</td>
               <td><code class="inline">ui/V2_PROTOTYPE/src/pages/AiHomeWorkbench/components/ChatArea/Composer.jsx</code>；测量：playwright-core + 系统 Chrome，<code class="inline">page.route('**/api/v1/**')</code> 打桩，360/390/414 三档逐元素 <code class="inline">rect.right &gt; innerWidth</code> 清单（本行数值为浏览器实取，非推导）。扫描在批 6 气泡修复落地后进行（修复前整页气泡面已越界、未单独扫描 composer）；该元素属输入区组件，与本批气泡修复无共享样式因果，判为独立既有问题。</td>
-              <td><span class="status warn"><span class="dot"></span>已登记 · 待分诊</span></td>
+              <td><span class="status done"><span class="dot"></span>已处置 · 已合入 main</span> · 前端优化线批 8（merge <code class="inline">5fd8785</code>，2026-09-13）</td>
               <td>defect 候选（窄屏可用性），严重度中——360 档发送按钮被裁但 textarea 仍可见可输入</td>
-              <td>下一批若接，业务表面申报为 <code class="inline">/</code>（AiHomeWorkbench Composer），修法优先响应式收敛（composer 行 min-width:0 / 按钮列换行或弹性收缩），不给聊天区加横向滚动。</td>
+              <td><b>已闭环</b>：批 8 以 1 表面 + 1 根问题承接并合入 main。实测复现与原记录逐位一致（360 档 right=375 &gt; 360，最近滚动祖先 <code class="inline">section</code> 为 <code class="inline">overflow-x:hidden</code>，按钮永久不可达）；根因定位在网格项 <code class="inline">.ai-composer__row</code> 的 <code class="inline">min-width:auto</code>，非最初假设的 <code class="inline">textarea</code>（该假设已被浏览器实测证伪并撤回）。改后三档越界元素归零，详见 <a href="changes.html">BE-2026-09-13-ui-composer-clip-merged</a>。</td>
             </tr>
             <tr data-board-event-id="BE-2026-09-03-ui-projects-load-state:issues-homeworkspace">
               <td class="mono">ISS-2026-09-03-001</td>
