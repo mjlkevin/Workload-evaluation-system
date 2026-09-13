@@ -32,7 +32,7 @@ function requestSessionDelete(title) {
   fireEvent.click(screen.getByRole('button', { name: '删除会话' }))
 }
 
-describe('HomeWorkspace', () => {
+describe('AiHomeWorkbench', () => {
   beforeEach(() => {
     localStorage.removeItem('wes_home_view')
     localStorage.removeItem('wes-ai-active-session-id')
