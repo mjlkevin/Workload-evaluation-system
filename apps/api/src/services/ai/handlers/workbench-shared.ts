@@ -217,7 +217,7 @@ async function homeChatWithKimi(params: { apiUrl: string; apiKey: string; model:
         tools: toolSet.tools,
         usage: completion.usage,
       });
-      return { content: completion.content, toolCalls: completion.toolCalls };
+      return { content: completion.content, toolCalls: completion.toolCalls, reasoningContent: completion.reasoningContent };
     },
   });
   return { answer: loop.content, rawContent: lastCompletion?.rawContent ?? loop.content, businessRole, roleLabel: preset.label };
@@ -267,7 +267,29 @@ export type ModelChatFactory = (params: {
 // 改**结构**（换成 token 剪枝）则会让那条防线在超预算时必红。
 export const WORKBENCH_MODEL_HISTORY_WINDOW = 60;
 
-export type WorkbenchModelMessage = { role: ChatRole; content: string };
+/**
+ * 异步通道交给 Provider 的消息形态，必须与 `WorkbenchToolLoopMessage` 同形。
+ *
+ * 教训（本次缺陷的第二现场）：工具循环侧把类型加宽成携带 function-calling 协议字段后，
+ * **本类型漏改**，于是 tool_calls / tool_call_id / name / reasoning_content 在
+ * tool-loop → workbench-shared → provider 这条边界上被整体丢掉——同步通道已协议化、
+ * 异步通道仍在发畸形历史，而异步通道正是生产实际在跑的那条。
+ * 这几个字段只存活于一次 Run 的循环内存，回传 Provider 后即弃，不进任何持久面
+ * （不写 ai_sessions.messages、不写对话事实、不改 deriveSessionMessages 产出）。
+ */
+export type WorkbenchModelMessage = {
+  role: ChatRole;
+  content: string;
+  messageId?: string;
+  /** 仅 assistant 消息：Kimi 思考模式要求跨轮回传的原始思考内容 */
+  reasoning_content?: string;
+  /** 仅 assistant 消息：本轮发出的工具调用请求 */
+  tool_calls?: { id: string; name: string; arguments: Record<string, unknown> }[];
+  /** 仅 tool 消息：对应的调用 id，模型据此把结果与自己发出的 tool_call 对齐 */
+  tool_call_id?: string;
+  /** 仅 tool 消息：工具名 */
+  name?: string;
+};
 
 export type WorkbenchModelMemoryRef = { scenesCount: number; atomsCount: number };
 
@@ -442,7 +464,7 @@ export function buildWorkbenchChatModelChat(
           tools: toolSet.tools,
           usage: completion.usage,
         });
-        return { content: completion.content, toolCalls: completion.toolCalls };
+        return { content: completion.content, toolCalls: completion.toolCalls, reasoningContent: completion.reasoningContent };
       },
     });
     const completion = lastCompletion;

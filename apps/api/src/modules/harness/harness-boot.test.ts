@@ -386,7 +386,20 @@ test("MS2 补测：注入通道只读 active 记忆（draft 未确认不注入�
 // 真实落库读回，故需 PG（TEST_DATABASE_URL）。
 // ============================================================
 
-type ProviderCall = { role: string; content: string }[];
+/**
+ * 捕获发给 Provider 的消息。**必须保留 function-calling 协议字段**——此前这里只留
+ * { role, content }，等于在取证时就把最该看的证据扔了：assistant 有没有带 tool_calls、
+ * tool 结果的 tool_call_id 对不对得上，全都看不见，于是「工具结果回灌模型」这条断言
+ * 只能退化成在正文里找工具名字符串。本次缺陷（异步通道发畸形历史、Kimi 400）之所以
+ * 能长期躲过测试，这个取证盲区是原因之一。
+ */
+type ProviderCall = {
+  role: string;
+  content: string;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: { id: string; name: string }[];
+}[];
 
 function makeRunStepCtx(input: {
   harnessRunId: string;
@@ -455,7 +468,14 @@ test("DEF-2026-08-27-001：同一会话连发两轮，第二轮 provider 实收�
       throw new Error("chatCompletion_should_not_be_called");
     },
     streamChatCompletion: (req: { messages: ProviderCall }) => {
-      providerCalls.push(req.messages.map((m) => ({ role: String(m.role), content: String(m.content) })));
+      providerCalls.push(req.messages.map((m) => ({
+        role: String(m.role),
+        content: String(m.content ?? ""),
+        // 协议字段原样保留：取证不得丢掉判断历史合不合法所需的信息
+        ...(m.name ? { name: String(m.name) } : {}),
+        ...(m.tool_call_id ? { tool_call_id: String(m.tool_call_id) } : {}),
+        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+      })));
       const answer = `第 ${providerCalls.length} 轮回答`;
       return (async function* () {
         yield { contentDelta: answer, model: "kimi-test", finishReason: "stop" };
@@ -652,7 +672,14 @@ test("批次0.5·②：四类 tool.call.* 经生产装配落入 run 事件流，
       throw new Error("chatCompletion_should_not_be_called");
     },
     streamChatCompletion: (req: { messages: ProviderCall }) => {
-      providerCalls.push(req.messages.map((m) => ({ role: String(m.role), content: String(m.content) })));
+      providerCalls.push(req.messages.map((m) => ({
+        role: String(m.role),
+        content: String(m.content ?? ""),
+        // 协议字段原样保留：取证不得丢掉判断历史合不合法所需的信息
+        ...(m.name ? { name: String(m.name) } : {}),
+        ...(m.tool_call_id ? { tool_call_id: String(m.tool_call_id) } : {}),
+        ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
+      })));
       const turnNo = providerCalls.length;
       return (async function* () {
         if (turnNo === 1) {
@@ -784,18 +811,66 @@ test("批次0.5·②：四类 tool.call.* 经生产装配落入 run 事件流，
       "tool.call.started 必须把完整参数投给 UI 事件面",
     );
 
-    // ④ 边界：第二轮模型请求只带批次 0 的 [工具结果] 回填，不带参数、不带中间态
+    // ④ 边界：第二轮模型请求不得带 UI 中间态。
+    //
+    // 【架构侧裁决，2026-09-13：本条哨兵断言由「全不许」收窄为「只许在一处」】
+    // 批次 0.5 原文是「不带参数、不带中间态」，哨兵在整个请求里出现即判泄漏。那条规则
+    // 成立于**非协议实现**时期——当时工具结果被伪装成 assistant 文本回灌，请求里本来就
+    // 不该有 arguments。改用 function-calling 协议后，assistant 消息**必须**回放自己发出的
+    // tool_calls（连同 arguments），否则 tool 结果就是无主数据，Kimi 直接 400。
+    // 而那份 arguments 是**模型自己吐出来的**，把它原样还给模型不属于「UI 数据泄进上下文」。
+    //
+    // 因此收窄为：哨兵只允许出现在 assistant 自己的 tool_calls[].arguments 里，别处一律不许。
+    // 这比原断言更精确——原断言只能说「整串里没有」，现在能说清「只有那一处可以有」。
+    // 真正要防的 UI 专属元数据（下面那组 leaked）一条未松。
+    const secondMessagesRaw = providerCalls[1];
+    const nonToolCallPayload = JSON.stringify(
+      secondMessagesRaw.map((m) => ({ ...m, tool_calls: undefined })),
+    );
+    assert.ok(
+      nonToolCallPayload.includes(B05_SENTINEL) === false,
+      `UI 专属的完整参数泄到了 assistant.tool_calls 之外：${nonToolCallPayload}`,
+    );
+    const toolCallPayload = JSON.stringify(secondMessagesRaw.flatMap((m) => m.tool_calls ?? []));
+    assert.ok(
+      toolCallPayload.includes(B05_SENTINEL),
+      "assistant 必须原样回放自己发出的 tool_calls（含 arguments），否则 tool 结果成无主数据",
+    );
     const secondRequest = JSON.stringify(providerCalls[1]);
-    assert.ok(secondRequest.includes(B05_SENTINEL) === false, `UI 专属的完整参数泄进了模型上下文：${secondRequest}`);
     for (const leaked of ["tool.call.", "elapsedMs", "callIndex", "resultPreview"]) {
       assert.ok(secondRequest.includes(leaked) === false, `UI 事件字段「${leaked}」不得进入模型可见 messages`);
     }
-    assert.ok(secondRequest.includes("[工具结果] estimate_history"), "批次0 的回填契约不得被本批削弱（工具结果必须回灌模型）");
-    assert.ok(secondRequest.includes("[工具结果] workbench_write_unregistered_probe"), "被拒绝的调用同样必须回填 ok:false，否则模型会无限重试");
+    // 回填契约（本条守的东西一个字没松，只是形态从「assistant 文本前缀」换成了协议字段）：
+    // 改前工具结果以 role:"assistant"、正文 `[工具结果] name (callId=...)` 回灌——那不是
+    // function-calling 协议，而是把工具结果伪装成助手自己说过的话；改后按协议以 role:"tool"
+    // 回填并携带 tool_call_id。断言随之改成查协议字段，**覆盖面不比原来窄**：
+    //   · 原来只能证明「正文里出现过这个工具名」；
+    //   · 现在还要求 tool_call_id 与前面 assistant 发出的 tool_calls 对得上（原来无从校验）。
+    const secondMessages = providerCalls[1] as Array<{
+      role: string;
+      content: string;
+      name?: string;
+      tool_call_id?: string;
+      tool_calls?: Array<{ id: string }>;
+    }>;
+    const assistantCallIds = new Set(
+      secondMessages.flatMap((m) => (m.role === "assistant" ? (m.tool_calls ?? []).map((c) => c.id) : [])),
+    );
+    for (const [toolName, why] of [
+      ["estimate_history", "批次0 的回填契约不得被本批削弱（工具结果必须回灌模型）"],
+      ["workbench_write_unregistered_probe", "被拒绝的调用同样必须回填 ok:false，否则模型会无限重试"],
+    ] as const) {
+      const toolMessage = secondMessages.find((m) => m.role === "tool" && m.name === toolName);
+      assert.ok(toolMessage, `${why}（缺 role="tool" name="${toolName}" 的回填消息）`);
+      assert.ok(
+        toolMessage.tool_call_id && assistantCallIds.has(toolMessage.tool_call_id),
+        `${toolName} 的 tool_call_id 对不上前面 assistant 的 tool_calls —— 模型会把结果当无主数据（实测表现为重复调用同一工具）`,
+      );
+    }
     assert.deepEqual(
-      providerCalls[1].map((m) => m.role),
-      ["system", "user", "assistant", "assistant"],
-      `第二轮模型入参形状错误，实取 ${JSON.stringify(providerCalls[1].map((m) => `${m.role}:${m.content.slice(0, 40)}`))}`,
+      secondMessages.map((m) => m.role),
+      ["system", "user", "assistant", "tool", "tool"],
+      `第二轮模型入参形状错误，实取 ${JSON.stringify(secondMessages.map((m) => `${m.role}:${(m.content ?? "").slice(0, 40)}`))}`,
     );
   } finally {
     await deleteAiSession(user, session.sessionId);

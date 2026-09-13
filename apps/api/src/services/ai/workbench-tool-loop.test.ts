@@ -7,6 +7,7 @@ import {
   runWorkbenchToolLoop,
   runWorkbenchToolLoopStream,
   type WorkbenchToolEffectOutput,
+  type WorkbenchToolLoopMessage,
 } from "./workbench-tool-loop";
 import {
   WorkbenchToolApprovalPendingError,
@@ -57,6 +58,43 @@ function fakeTool(overrides: Partial<AgentTool> = {}): AgentTool {
     execute: async () => ({ content: "ok" }),
     ...overrides,
   };
+}
+
+/**
+ * 裁决三：假 Provider 必须像真 Provider 一样挑剔。
+ * 校验发给模型的历史满足 OpenAI/Kimi function-calling 契约：
+ *  · 每条 role="tool" 消息前面必须存在携带对应 tool_call_id 的 assistant(tool_calls)；
+ *  · 每条 assistant(tool_calls) 后面必须存在对应每个 tool_call_id 的 tool 结果。
+ */
+function assertProviderMessageContract(messages: WorkbenchToolLoopMessage[]): void {
+  for (let i = 0; i < messages.length; i += 1) {
+    const message = messages[i]!;
+    if (message.role === "tool") {
+      assert.ok(message.tool_call_id, `第 ${i} 条 tool 消息缺少 tool_call_id`);
+      assert.ok(message.name, `第 ${i} 条 tool 消息缺少 name`);
+      let matched = false;
+      for (let j = i - 1; j >= 0; j -= 1) {
+        const candidate = messages[j]!;
+        if (candidate.role === "assistant" && candidate.tool_calls?.some((call) => call.id === message.tool_call_id)) {
+          matched = true;
+          break;
+        }
+      }
+      assert.ok(matched, `第 ${i} 条 tool 消息(${message.name}, ${message.tool_call_id}) 找不到对应的 assistant(tool_calls)`);
+    }
+    if (message.role === "assistant" && message.tool_calls && message.tool_calls.length > 0) {
+      for (const call of message.tool_calls) {
+        let matched = false;
+        for (let j = i + 1; j < messages.length; j += 1) {
+          if (messages[j]!.role === "tool" && messages[j]!.tool_call_id === call.id) {
+            matched = true;
+            break;
+          }
+        }
+        assert.ok(matched, `assistant(tool_calls) 中的 ${call.name}(${call.id}) 缺少对应的 tool 结果`);
+      }
+    }
+  }
 }
 
 /**
@@ -134,7 +172,7 @@ test("runWorkbenchToolLoop: 执行工具→回填→再问一次，返回最终�
   let calls = 0;
   registry.register(fakeTool({ name: "knowledge_query", execute: async (args) => { calls += 1; return { hit: args.q }; } }));
 
-  const seenMessages: { role: string; content: string }[][] = [];
+  const seenMessages: WorkbenchToolLoopMessage[][] = [];
   const events: AgentEvent[] = [];
   const out = await runWorkbenchToolLoop({
     messages: [{ role: "user", content: "查一下知识库" }],
@@ -143,7 +181,8 @@ test("runWorkbenchToolLoop: 执行工具→回填→再问一次，返回最终�
     allowToolNames: new Set(["knowledge_query"]),
     onEvent: (event) => events.push(event),
     invoke: async ({ messages }) => {
-      seenMessages.push(messages.map((m) => ({ role: m.role, content: m.content })));
+      assertProviderMessageContract(messages);
+      seenMessages.push(messages);
       if (seenMessages.length === 1) {
         return { content: "", toolCalls: [{ id: "c1", name: "knowledge_query", arguments: { q: "ERP" } }] };
       }
@@ -156,11 +195,15 @@ test("runWorkbenchToolLoop: 执行工具→回填→再问一次，返回最终�
   assert.equal(out.turns, 2);
   assert.equal(out.truncated, false);
   assert.deepEqual(out.toolCalls, [{ name: "knowledge_query" }]);
-  // 第二轮必须带上工具结果回填（否则等于模型说了没人听）
-  assert.equal(seenMessages[1].length, 2);
+  // 第二轮必须是 user + assistant(tool_calls) + tool 结果的原子组
+  assert.equal(seenMessages[1].length, 3);
   assert.equal(seenMessages[1][0].content, "查一下知识库");
-  assert.match(seenMessages[1][1].content, /\[工具结果\] knowledge_query/);
-  assert.match(seenMessages[1][1].content, /"hit":"ERP"/);
+  assert.equal(seenMessages[1][1].role, "assistant");
+  assert.deepEqual(seenMessages[1][1].tool_calls, [{ id: "c1", name: "knowledge_query", arguments: { q: "ERP" } }]);
+  assert.equal(seenMessages[1][2].role, "tool");
+  assert.equal(seenMessages[1][2].tool_call_id, "c1");
+  assert.equal(seenMessages[1][2].name, "knowledge_query");
+  assert.match(seenMessages[1][2].content, /"hit":"ERP"/);
   assert.deepEqual(events.map((event) => event.kind), ["tool_call", "tool_result"]);
 });
 
@@ -199,7 +242,8 @@ async function loopWithKnowledgeResult(execute: () => Promise<unknown>) {
     registry,
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
     allowToolNames: new Set(["knowledge_query"]),
-    invoke: async () => {
+    invoke: async ({ messages }) => {
+      assertProviderMessageContract(messages);
       invoked += 1;
       return invoked === 1
         ? { content: "", toolCalls: [{ id: "c1", name: "knowledge_query", arguments: { query: "存货核算" } }] }
@@ -237,7 +281,8 @@ test("runWorkbenchToolLoopStream: 知识库痕迹随工具批后补发的 metada
     registry,
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
     allowToolNames: new Set(["knowledge_query"]),
-    invokeStream: () => {
+    invokeStream: ({ messages }) => {
+      assertProviderMessageContract(messages);
       invoked += 1;
       return invoked === 1
         ? turnStream([chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "knowledge_query", arguments: { query: "存货核算" } }] })])
@@ -259,7 +304,7 @@ test("runWorkbenchToolLoop: 写工具与未注册工具一律不执行，只回�
   registry.register(fakeTool({ name: "project_list", execute: async () => { readCalled = true; return { items: [] }; } }));
 
   const events: AgentEvent[] = [];
-  const seenMessages: string[][] = [];
+  const seenMessages: WorkbenchToolLoopMessage[][] = [];
   const out = await runWorkbenchToolLoop({
     messages: [{ role: "user", content: "导出报告" }],
     registry,
@@ -269,7 +314,8 @@ test("runWorkbenchToolLoop: 写工具与未注册工具一律不执行，只回�
     // 模型每轮都提同一批调用：上限设 2 → 第 1 轮执行并回填，第 2 轮触顶不再执行
     maxTurns: 2,
     invoke: async ({ messages }) => {
-      seenMessages.push(messages.map((message) => message.content));
+      assertProviderMessageContract(messages);
+      seenMessages.push(messages);
       return {
         content: "",
         toolCalls: [
@@ -295,13 +341,19 @@ test("runWorkbenchToolLoop: 写工具与未注册工具一律不执行，只回�
   // 拒绝执行也要回填，否则模型会以为调用成功而无限重试
   assert.equal(out.turns, 2);
   assert.equal(out.truncated, true, "第 2 轮触顶，不得再执行工具");
-  assert.equal(seenMessages[1].length, 4, "三个调用结果都必须在下一轮入参中");
-  assert.match(seenMessages[1][1], /\[工具结果\] export_report/);
-  assert.match(seenMessages[1][1], /"ok":false/);
-  assert.match(seenMessages[1][2], /not_registered/);
-  assert.match(seenMessages[1][2], /"ok":false/);
-  assert.match(seenMessages[1][3], /project_list/);
-  assert.match(seenMessages[1][3], /"ok":true/);
+  // user + assistant(tool_calls) + 3 条 tool 结果
+  assert.equal(seenMessages[1].length, 5, "三个调用结果都必须在下一轮入参中");
+  assert.equal(seenMessages[1][1].role, "assistant");
+  assert.deepEqual(seenMessages[1][1].tool_calls?.map((c) => c.id), ["c1", "c2", "c3"]);
+  assert.equal(seenMessages[1][2].role, "tool");
+  assert.equal(seenMessages[1][2].name, "export_report");
+  assert.match(seenMessages[1][2].content, /"ok":false/);
+  assert.equal(seenMessages[1][3].role, "tool");
+  assert.equal(seenMessages[1][3].name, "not_registered");
+  assert.match(seenMessages[1][3].content, /"ok":false/);
+  assert.equal(seenMessages[1][4].role, "tool");
+  assert.equal(seenMessages[1][4].name, "project_list");
+  assert.match(seenMessages[1][4].content, /"ok":true/);
 });
 
 test("runWorkbenchToolLoop: 工具抛错不阻断主链路，异常摘要回填", async () => {
@@ -313,10 +365,12 @@ test("runWorkbenchToolLoop: 工具抛错不阻断主链路，异常摘要回填"
     registry,
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
     allowToolNames: new Set(["boom"]),
-    invoke: async ({ messages }) =>
-      messages.length === 1
+    invoke: async ({ messages }) => {
+      assertProviderMessageContract(messages);
+      return messages.length === 1
         ? { content: "", toolCalls: [{ id: "c1", name: "boom", arguments: {} }] }
-        : { content: "已降级回答" },
+        : { content: "已降级回答" };
+    },
   });
 
   assert.equal(out.content, "已降级回答");
@@ -334,7 +388,8 @@ test("runWorkbenchToolLoop: 达最大轮数不抛错，返回末轮内容并标�
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
     allowToolNames: new Set(["a"]),
     maxTurns: 3,
-    invoke: async () => {
+    invoke: async ({ messages }) => {
+      assertProviderMessageContract(messages);
       invokes += 1;
       return { content: `第${invokes}轮`, toolCalls: [{ id: `c${invokes}`, name: "a", arguments: {} }] };
     },
@@ -373,12 +428,14 @@ test("runWorkbenchToolLoop: recordToolEffect 逐次独立编号，重放命中�
         return output;
       },
       // 前两轮各一次工具调用，第三轮收敛 → 两个互相独立的 effect
-      invoke: async ({ turnOrdinal }) =>
-        turnOrdinal === 1
+      invoke: async ({ messages, turnOrdinal }) => {
+        assertProviderMessageContract(messages);
+        return turnOrdinal === 1
           ? { content: "", toolCalls: [{ id: "c1", name: "a", arguments: {} }] }
           : turnOrdinal === 2
             ? { content: "", toolCalls: [{ id: "c2", name: "a", arguments: {} }] }
-            : { content: "答案" },
+            : { content: "答案" };
+      },
     });
 
   const first = await runOnce();
@@ -429,12 +486,14 @@ test("runWorkbenchToolLoopStream: 无工具调用时逐 chunk 原样透传（零
       registry,
       agentUser: { id: "u1", capabilities: ["estimates:read"] },
       allowToolNames: new Set<string>(),
-      invokeStream: () =>
-        turnStream([
+      invokeStream: ({ messages }) => {
+        assertProviderMessageContract(messages);
+        return turnStream([
           chunkOf({ kind: "metadata", memoryRef: { scenesCount: 1, atomsCount: 2 } }),
           chunkOf({ contentDelta: "你好" }),
           chunkOf({ contentDelta: "世界", model: "kimi-for-coding", finishReason: "stop" }),
-        ]),
+        ]);
+      },
     }),
   );
 
@@ -466,6 +525,7 @@ test("runWorkbenchToolLoopStream: 首轮工具调用执行后补发 metadata，�
     allowToolNames: new Set(["project_list"]),
     onEvent: (event) => events.push(event),
     invokeStream: ({ turnOrdinal, messages }) => {
+      assertProviderMessageContract(messages);
       turnOrdinals.push(turnOrdinal);
       messagesPerTurn.push(messages.length);
       if (turnOrdinal === 1) {
@@ -481,7 +541,7 @@ test("runWorkbenchToolLoopStream: 首轮工具调用执行后补发 metadata，�
   const collected = await collectStream(stream);
   assert.equal(executed, 1);
   assert.deepEqual(turnOrdinals, [1, 2]);
-  assert.deepEqual(messagesPerTurn, [1, 2], "第二轮必须带上工具结果回填");
+  assert.deepEqual(messagesPerTurn, [1, 3], "第二轮必须带上 assistant(tool_calls) + tool 结果的原子组");
 
   // metadata chunk 由循环补发，必须先于第二轮正文，chip 才能与答案同帧出现
   const metadataIndex = collected.chunks.findIndex((chunk) => chunk.kind === "metadata" && chunk.toolCalls);
@@ -504,10 +564,12 @@ test("runWorkbenchToolLoopStream: 末 chunk 仍由真正回答轮决定 finishRe
       registry,
       agentUser: { id: "u1", capabilities: ["estimates:read"] },
       allowToolNames: new Set(["a"]),
-      invokeStream: ({ turnOrdinal }) =>
-        turnOrdinal === 1
+      invokeStream: ({ turnOrdinal, messages }) => {
+        assertProviderMessageContract(messages);
+        return turnOrdinal === 1
           ? turnStream([chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "a", arguments: {} }] })])
-          : turnStream([chunkOf({ contentDelta: "最终答复" }), chunkOf({ model: "kimi-for-coding", finishReason: "stop" })]),
+          : turnStream([chunkOf({ contentDelta: "最终答复" }), chunkOf({ model: "kimi-for-coding", finishReason: "stop" })]);
+      },
     }),
   );
 
@@ -531,10 +593,12 @@ test("runWorkbenchToolLoopStream: 流式下写工具一律不执行，只回填�
       agentUser: { id: "u1", capabilities: ["estimates:read", "estimates:write"] },
       allowToolNames: new Set<string>(),
       onEvent: (event) => events.push(event),
-      invokeStream: ({ turnOrdinal }) =>
-        turnOrdinal === 1
+      invokeStream: ({ turnOrdinal, messages }) => {
+        assertProviderMessageContract(messages);
+        return turnOrdinal === 1
           ? turnStream([chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "export_report", arguments: {} }] })])
-          : turnStream([chunkOf({ contentDelta: "无法导出" })]),
+          : turnStream([chunkOf({ contentDelta: "无法导出" })]);
+      },
     }),
   );
 
@@ -568,7 +632,8 @@ test("runWorkbenchToolLoopStream: 同一批 tool_calls 被投递两次时只执�
         effectKeys.push(effectKey);
         return execute();
       },
-      invokeStream: ({ turnOrdinal }) => {
+      invokeStream: ({ turnOrdinal, messages }) => {
+        assertProviderMessageContract(messages);
         const c1 = [{ id: "c1", name: "project_list", arguments: {} }];
         if (turnOrdinal === 1) {
           return turnStream([
@@ -611,7 +676,8 @@ test("runWorkbenchToolLoopStream: 同一轮内两个不同 id 的调用必须都
         ordinals.push(ordinal);
         return execute();
       },
-      invokeStream: ({ turnOrdinal }) => {
+      invokeStream: ({ turnOrdinal, messages }) => {
+        assertProviderMessageContract(messages);
         if (turnOrdinal === 1) {
           // 同名不同参的并行调用：去重键若取 name 会误合成一个
           return turnStream([
@@ -654,6 +720,7 @@ test("runWorkbenchToolLoopStream: 去重是轮内的，第二轮同名 call_0 �
         return execute();
       },
       invokeStream: ({ turnOrdinal, messages }) => {
+        assertProviderMessageContract(messages);
         messagesPerTurn.push(messages.length);
         // provider 在 id 缺失时按 index 兜底成 call_0，故第二轮的合法新调用 id 与第一轮相同
         if (turnOrdinal <= 2) {
@@ -666,7 +733,7 @@ test("runWorkbenchToolLoopStream: 去重是轮内的，第二轮同名 call_0 �
 
   assert.equal(executed, 2, "全局去重会吞掉第二轮的合法调用（表现为「第二次调同一个工具没反应」）");
   assert.deepEqual(ordinals, [1, 2]);
-  assert.deepEqual(messagesPerTurn, [1, 2, 3], "每轮都要带上前一轮的回填");
+  assert.deepEqual(messagesPerTurn, [1, 3, 5], "每轮都要带上前一轮的 assistant(tool_calls) + tool 结果");
   assert.equal(collected.result.content, "两次都查了");
   assert.equal(collected.result.turns, 3);
 });
@@ -711,24 +778,29 @@ test("批次0.5·④：模型可见消息构造点是运行时准入，UI 事件
   }
 });
 
-test("批次0.5·④：工具回填消息形态与批次 0 逐字节一致（同步通道零回归）", () => {
+test("批次0.5·④：工具回填消息形态符合 OpenAI/Kimi function-calling 协议（role=tool）", () => {
   const message = toWorkbenchModelVisibleToolMessage({
     toolName: "estimate_history",
     callId: "call_hist",
     outcome: { ok: true, data: { total: 0, items: [] } },
   });
   assert.deepEqual(message, {
-    role: "assistant",
-    content: '[工具结果] estimate_history (callId=call_hist): {"ok":true,"data":{"total":0,"items":[]}}',
+    role: "tool",
+    tool_call_id: "call_hist",
+    name: "estimate_history",
+    content: '{"ok":true,"data":{"total":0,"items":[]}}',
   });
   const failed = toWorkbenchModelVisibleToolMessage({
     toolName: "create_project",
     callId: "call_write",
     outcome: { ok: false, error: "工作台仅开放只读工具，create_project 未获准执行" },
   });
+  assert.equal(failed.role, "tool");
+  assert.equal(failed.tool_call_id, "call_write");
+  assert.equal(failed.name, "create_project");
   assert.equal(
     failed.content,
-    '[工具结果] create_project (callId=call_write): {"ok":false,"error":"工作台仅开放只读工具，create_project 未获准执行"}',
+    '{"ok":false,"error":"工作台仅开放只读工具，create_project 未获准执行"}',
   );
 });
 
@@ -743,7 +815,7 @@ for (const variant of ["stream", "sync"] as const) {
       }),
     );
 
-    const requests: { role: string; content: string }[][] = [];
+    const requests: WorkbenchToolLoopMessage[][] = [];
     const runLoop = async () => {
       const agentUser: AgentUser = { id: "u1", capabilities: ["estimates:read"] };
       const common = {
@@ -757,7 +829,8 @@ for (const variant of ["stream", "sync"] as const) {
           runWorkbenchToolLoopStream({
             ...common,
             invokeStream: ({ turnOrdinal, messages }) => {
-              requests.push(messages.map((m) => ({ role: String(m.role), content: String(m.content) })));
+              assertProviderMessageContract(messages);
+              requests.push(messages);
               if (turnOrdinal === 1) {
                 return turnStream([
                   chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "call_1", name: "project_list", arguments: { keyword: B04_ARG_SENTINEL } }] }),
@@ -771,7 +844,8 @@ for (const variant of ["stream", "sync"] as const) {
       return runWorkbenchToolLoop({
         ...common,
         invoke: ({ turnOrdinal, messages }) => {
-          requests.push(messages.map((m) => ({ role: String(m.role), content: String(m.content) })));
+          assertProviderMessageContract(messages);
+          requests.push(messages);
           if (turnOrdinal === 1) {
             return Promise.resolve({ content: "", toolCalls: [{ id: "call_1", name: "project_list", arguments: { keyword: B04_ARG_SENTINEL } }] });
           }
@@ -787,17 +861,17 @@ for (const variant of ["stream", "sync"] as const) {
     assert.equal(result.toolCalls.length, 1);
 
     const secondTurn = JSON.stringify(requests[1]);
-    // 工具结果按 tool/result 口径回灌是允许的（模型需要知道调用成功），
-    // 但必须是冻结形态：只含 [工具结果] name (callId=...) + outcome，不含参数与 UI 投影字段。
-    assert.deepEqual(requests[1][1], {
-      role: "assistant",
-      content: `[工具结果] project_list (callId=call_1): {"ok":true,"data":{"items":[{"name":"${B04_ARG_SENTINEL}"}]}}`,
-    });
-    assert.equal(
-      secondTurn.includes("keyword"),
-      false,
-      `工具完整参数（arguments）不得进模型上下文，实取 ${secondTurn}`,
-    );
+    // 第二轮必须是 user + assistant(tool_calls) + tool 结果
+    assert.equal(requests[1].length, 3);
+    assert.equal(requests[1][1].role, "assistant");
+    assert.deepEqual(requests[1][1].tool_calls, [{ id: "call_1", name: "project_list", arguments: { keyword: B04_ARG_SENTINEL } }]);
+    assert.equal(requests[1][2].role, "tool");
+    assert.equal(requests[1][2].tool_call_id, "call_1");
+    assert.equal(requests[1][2].name, "project_list");
+    assert.match(requests[1][2].content, /"ok":true/);
+    assert.match(requests[1][2].content, new RegExp(B04_ARG_SENTINEL));
+    // 注意：arguments 是 assistant(tool_calls) 的法定字段，OpenAI/Kimi 协议要求携带；
+    // 这里禁止的是「UI 中间态」和「结果预览形态」混进 messages。
     for (const leak of ["callIndex", "elapsedMs", "resultPreview", "tool.call."]) {
       assert.equal(
         secondTurn.includes(leak),
@@ -805,8 +879,6 @@ for (const variant of ["stream", "sync"] as const) {
         `UI 投影字段 ${leak} 不得进模型上下文（它只属于 run 事件流）`,
       );
     }
-    // 结果正文本身允许回灌（tool/result 在准入集合内），这里只断言它没有被 UI 预览形态取代
-    assert.ok(secondTurn.includes("[工具结果] project_list"));
     console.log(
       `[B05·④ 请求侧 messages 实取] variant=${variant} 轮次=${requests.length} ` +
         `第一轮(${requests[0].length}条)=${JSON.stringify(requests[0])} ` +
@@ -814,6 +886,124 @@ for (const variant of ["stream", "sync"] as const) {
     );
   });
 }
+
+// ============================================================
+// 缺陷修复：reasoning_content 只在循环内存里累积并回传 Provider，不进持久面
+// ============================================================
+
+test("reasoning_content 在同步循环中挂在 assistant(tool_calls) 上并随下一轮回传", async () => {
+  const registry = new ToolRegistry();
+  registry.register(fakeTool({ name: "project_list", execute: async () => ({ items: [] }) }));
+
+  const seenMessages: WorkbenchToolLoopMessage[][] = [];
+  await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "列项目" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:read"] },
+    allowToolNames: new Set(["project_list"]),
+    invoke: async ({ messages }) => {
+      assertProviderMessageContract(messages);
+      seenMessages.push(messages);
+      if (seenMessages.length === 1) {
+        return {
+          content: "",
+          reasoningContent: "我需要先列出项目。",
+          toolCalls: [{ id: "c1", name: "project_list", arguments: {} }],
+        };
+      }
+      return { content: "没有项目" };
+    },
+  });
+
+  assert.equal(seenMessages[1].length, 3);
+  const assistant = seenMessages[1][1]!;
+  assert.equal(assistant.role, "assistant");
+  assert.equal(assistant.reasoning_content, "我需要先列出项目。");
+  assert.equal(seenMessages[1][2].role, "tool");
+  assert.equal(seenMessages[1][2].reasoning_content, undefined, "tool 结果不得携带 reasoning_content");
+});
+
+test("reasoning_content 在流式循环中累积并挂在 assistant(tool_calls) 上", async () => {
+  const registry = new ToolRegistry();
+  registry.register(fakeTool({ name: "project_list", execute: async () => ({ items: [] }) }));
+
+  const seenMessages: WorkbenchToolLoopMessage[][] = [];
+  await collectStream(runWorkbenchToolLoopStream({
+    messages: [{ role: "user", content: "列项目" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:read"] },
+    allowToolNames: new Set(["project_list"]),
+    invokeStream: ({ turnOrdinal, messages }) => {
+      assertProviderMessageContract(messages);
+      seenMessages.push(messages);
+      if (turnOrdinal === 1) {
+        return turnStream([
+          chunkOf({ reasoningContentDelta: "我先" }),
+          chunkOf({ reasoningContentDelta: "列项目" }),
+          chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "project_list", arguments: {} }] }),
+        ]);
+      }
+      return turnStream([chunkOf({ contentDelta: "没有项目" }), chunkOf({ finishReason: "stop" })]);
+    },
+  }));
+
+  assert.equal(seenMessages[1].length, 3);
+  assert.equal(seenMessages[1][1].role, "assistant");
+  assert.equal(seenMessages[1][1].reasoning_content, "我先列项目");
+});
+
+/**
+ * 裁决四：同步循环与流式循环必须产出同一形状的历史。
+ * 对同一组输入分别跑两条通道，断言发给 Provider 的第二轮 messages 逐字段一致。
+ */
+test("同步与流式两条通道发给 Provider 的消息序列一致", async () => {
+  const registry = new ToolRegistry();
+  registry.register(fakeTool({ name: "project_list", execute: async () => ({ items: ["P1"] }) }));
+
+  const syncMessages: WorkbenchToolLoopMessage[][] = [];
+  await runWorkbenchToolLoop({
+    messages: [{ role: "user", content: "我有哪些项目" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:read"] },
+    allowToolNames: new Set(["project_list"]),
+    invoke: async ({ messages }) => {
+      assertProviderMessageContract(messages);
+      syncMessages.push(messages);
+      if (syncMessages.length === 1) {
+        return { content: "", toolCalls: [{ id: "c1", name: "project_list", arguments: {} }] };
+      }
+      return { content: "你有 1 个项目" };
+    },
+  });
+
+  const streamMessages: WorkbenchToolLoopMessage[][] = [];
+  await collectStream(runWorkbenchToolLoopStream({
+    messages: [{ role: "user", content: "我有哪些项目" }],
+    registry,
+    agentUser: { id: "u1", capabilities: ["estimates:read"] },
+    allowToolNames: new Set(["project_list"]),
+    invokeStream: ({ turnOrdinal, messages }) => {
+      assertProviderMessageContract(messages);
+      streamMessages.push(messages);
+      if (turnOrdinal === 1) {
+        return turnStream([chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "project_list", arguments: {} }] })]);
+      }
+      return turnStream([chunkOf({ contentDelta: "你有 1 个项目" }), chunkOf({ finishReason: "stop" })]);
+    },
+  }));
+
+  const normalize = (messages: WorkbenchToolLoopMessage[]) =>
+    messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+      reasoning_content: m.reasoning_content,
+      tool_calls: m.tool_calls?.map((c) => ({ id: c.id, name: c.name, arguments: c.arguments })),
+      tool_call_id: m.tool_call_id,
+      name: m.name,
+    }));
+
+  assert.deepEqual(normalize(streamMessages[1]), normalize(syncMessages[1]), "流式与同步通道第二轮发给 Provider 的消息必须一致");
+});
 
 // ============================================================
 // 批次 1a · 写操作工具的执行前审批闸门（循环侧）
@@ -827,7 +1017,7 @@ test("批次1a·ask 档未注入闸门 → 不执行、回填失败结果、循�
   let executions = 0;
   registry.register(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true, execute: async () => { executions += 1; return { id: "P1" }; } }));
 
-  const requests: string[][] = [];
+  const requests: WorkbenchToolLoopMessage[][] = [];
   const out = await runWorkbenchToolLoop({
     messages: [{ role: "user", content: "帮我创建一个ERP项目" }],
     registry,
@@ -835,7 +1025,8 @@ test("批次1a·ask 档未注入闸门 → 不执行、回填失败结果、循�
     allowToolNames: new Set<string>(),
     // 同步兜底通道没有审批链路：必须拒绝而不是放行
     invoke: async ({ messages }) => {
-      requests.push(messages.map((m) => m.content));
+      assertProviderMessageContract(messages);
+      requests.push(messages);
       if (requests.length === 1) return { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] };
       return { content: "没有确认链路，我先不创建" };
     },
@@ -843,8 +1034,9 @@ test("批次1a·ask 档未注入闸门 → 不执行、回填失败结果、循�
 
   assert.equal(executions, 0, "未接审批链路时写工具一次都不得执行");
   assert.equal(out.content, "没有确认链路，我先不创建");
-  assert.match(requests[1][1], /"ok":false/);
-  assert.match(requests[1][1], /没有审批链路/);
+  assert.equal(requests[1].length, 3);
+  assert.match(requests[1][2].content, /"ok":false/);
+  assert.match(requests[1][2].content, /没有审批链路/);
 });
 
 test("批次1a·闸门判为执行 → 工具执行一次并回填成功结果", async () => {
@@ -862,10 +1054,12 @@ test("批次1a·闸门判为执行 → 工具执行一次并回填成功结果",
       gateCalls.push(call);
       return { decision: "execute" };
     },
-    invoke: async ({ turnOrdinal }) =>
-      turnOrdinal === 1
+    invoke: async ({ messages, turnOrdinal }) => {
+      assertProviderMessageContract(messages);
+      return turnOrdinal === 1
         ? { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] }
-        : { content: "已创建" },
+        : { content: "已创建" };
+    },
   });
 
   assert.equal(executions, 1);
@@ -879,7 +1073,7 @@ test("批次1a·闸门判为拒绝（skip）→ 模型收到失败结果并继�
   let executions = 0;
   registry.register(fakeTool({ name: "create_project", capability: "estimates:create", mutates: true, execute: async () => { executions += 1; return { id: "P1" }; } }));
 
-  const requests: string[][] = [];
+  const requests: WorkbenchToolLoopMessage[][] = [];
   const out = await runWorkbenchToolLoop({
     messages: [{ role: "user", content: "创建项目" }],
     registry,
@@ -887,7 +1081,8 @@ test("批次1a·闸门判为拒绝（skip）→ 模型收到失败结果并继�
     allowToolNames: new Set<string>(),
     toolApprovalGate: async () => ({ decision: "reject", reason: "用户拒绝了本次写操作，未执行任何变更" }),
     invoke: async ({ messages, turnOrdinal }) => {
-      requests.push(messages.map((m) => m.content));
+      assertProviderMessageContract(messages);
+      requests.push(messages);
       if (turnOrdinal === 1) return { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] };
       return { content: "好的，我没有创建任何记录" };
     },
@@ -895,7 +1090,8 @@ test("批次1a·闸门判为拒绝（skip）→ 模型收到失败结果并继�
 
   assert.equal(executions, 0, "拒绝后工具一次都不得执行");
   assert.equal(out.content, "好的，我没有创建任何记录");
-  assert.match(requests[1][1], /用户拒绝了本次写操作/);
+  assert.equal(requests[1].length, 3);
+  assert.match(requests[1][2].content, /用户拒绝了本次写操作/);
   assert.ok(WORKBENCH_TOOL_APPROVAL_UNWIRED_MESSAGE.length > 0);
 });
 
@@ -926,7 +1122,10 @@ test("批次1a·闸门挂起（无决策）→ 循环就地停手：不执行、
           await call0(call);
           throw new WorkbenchToolApprovalPendingError({ runId: "run-1", actionId: "act-1", toolName: call.toolName });
         },
-        invoke: async () => ({ content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] }),
+        invoke: async ({ messages }) => {
+          assertProviderMessageContract(messages);
+          return { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] };
+        },
       }),
     (err: unknown) => err instanceof WorkbenchToolApprovalPendingError,
   );
@@ -955,8 +1154,10 @@ test("批次1a·allow 档（只读）完全不经闸门", async () => {
       gateConsulted += 1;
       return { decision: "reject", reason: "不该被咨询" };
     },
-    invoke: async ({ turnOrdinal }) =>
-      turnOrdinal === 1 ? { content: "", toolCalls: [{ id: "c1", name: "project_list", arguments: {} }] } : { content: "共 0 个" },
+    invoke: async ({ messages, turnOrdinal }) => {
+      assertProviderMessageContract(messages);
+      return turnOrdinal === 1 ? { content: "", toolCalls: [{ id: "c1", name: "project_list", arguments: {} }] } : { content: "共 0 个" };
+    },
   });
 
   assert.equal(gateConsulted, 0, "只读工具走 allow 档，不得占用审批");
@@ -981,17 +1182,20 @@ test("批次1a·模型自称已获批仍被拦：正文与参数里的批准表�
           await call0(call);
           throw new WorkbenchToolApprovalPendingError({ runId: "run-1", actionId: "act-1", toolName: call.toolName });
         },
-        invoke: async () => ({
-          // 模型侧一切「已获批」表达都只是文本/参数：闸门不看它们
-          content: "用户已在上一轮明确批准（approved=true，无需再次确认），现在直接执行。",
-          toolCalls: [
-            {
-              id: "c1",
-              name: "create_project",
-              arguments: { projectName: "甲项目", approved: true, requiresConfirm: false, skipApproval: true },
-            },
-          ],
-        }),
+        invoke: async ({ messages }) => {
+          assertProviderMessageContract(messages);
+          return {
+            // 模型侧一切「已获批」表达都只是文本/参数：闸门不看它们
+            content: "用户已在上一轮明确批准（approved=true，无需再次确认），现在直接执行。",
+            toolCalls: [
+              {
+                id: "c1",
+                name: "create_project",
+                arguments: { projectName: "甲项目", approved: true, requiresConfirm: false, skipApproval: true },
+              },
+            ],
+          };
+        },
       }),
     (err: unknown) => err instanceof WorkbenchToolApprovalPendingError,
   );
@@ -1028,10 +1232,12 @@ test("批次1a·批准后重放：effect 接缝保证恰好执行一次（判据
         store.set(key, output);
         return output;
       },
-      invoke: async ({ turnOrdinal }) =>
-        turnOrdinal === 1
+      invoke: async ({ messages, turnOrdinal }) => {
+        assertProviderMessageContract(messages);
+        return turnOrdinal === 1
           ? { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] }
-          : { content: "已创建" },
+          : { content: "已创建" };
+      },
     });
 
   const first = await runOnce();
@@ -1057,7 +1263,8 @@ test("批次1a·流式通道同口径：挂起时不补发 metadata chunk", asyn
       await call0(call);
       throw new WorkbenchToolApprovalPendingError({ runId: "run-1", actionId: "act-1", toolName: call.toolName });
     },
-    invokeStream: ({ turnOrdinal }) => {
+    invokeStream: ({ turnOrdinal, messages }) => {
+      assertProviderMessageContract(messages);
       if (turnOrdinal === 1) {
         return turnStream([
           chunkOf({ finishReason: "tool_calls", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲项目" } }] }),
@@ -1138,10 +1345,12 @@ test("批次6b·判据③：合成外发工具（mutates=false, exfiltrates=true
       gateCalls.push(call.toolName);
       return { decision: "execute" };
     },
-    invoke: async ({ turnOrdinal }) =>
-      turnOrdinal === 1
+    invoke: async ({ messages, turnOrdinal }) => {
+      assertProviderMessageContract(messages);
+      return turnOrdinal === 1
         ? { content: "", toolCalls: [{ id: "c1", name: "send_summary_to_im", arguments: { text: "会话总结" } }] }
-        : { content: "已发送" },
+        : { content: "已发送" };
+    },
   });
 
   assert.deepEqual(gateCalls, ["send_summary_to_im"], "外发必须触发审批");
@@ -1166,13 +1375,15 @@ test("批次6b·外发无闸门通道：SSE/同步兜底不接闸门 → 一次�
     allowToolNames: new Set<string>(),
     // 故意不传 toolApprovalGate
     invoke: async ({ messages, turnOrdinal }) => {
+      assertProviderMessageContract(messages);
       requests.push(messages.map((m) => m.content));
       if (turnOrdinal === 1) return { content: "", toolCalls: [{ id: "c1", name: "send_summary_to_im", arguments: {} }] };
       return { content: "没链路我不发" };
     },
   });
   assert.equal(executions, 0, "无审批链路时外发工具一次都不得执行");
-  assert.match(requests[1][1], /没有审批链路/);
+  assert.equal(requests[1].length, 3);
+  assert.match(requests[1][2], /没有审批链路/);
 });
 
 test("批次6b·策略 user-confirm：只读工具也进 ask 档，执行前过闸门", async () => {
@@ -1194,10 +1405,12 @@ test("批次6b·策略 user-confirm：只读工具也进 ask 档，执行前过�
       gateCalls.push(call.toolName);
       return { decision: "execute" };
     },
-    invoke: async ({ turnOrdinal }) =>
-      turnOrdinal === 1
+    invoke: async ({ messages, turnOrdinal }) => {
+      assertProviderMessageContract(messages);
+      return turnOrdinal === 1
         ? { content: "", toolCalls: [{ id: "c1", name: "knowledge_query", arguments: { query: "x" } }] }
-        : { content: "查到" },
+        : { content: "查到" };
+    },
   });
   assert.deepEqual(gateCalls, ["knowledge_query"]);
 });
@@ -1235,6 +1448,7 @@ test("批次6b·模型点名被停用工具：直接拒绝，不给审批机会�
       return { decision: "execute" };
     },
     invoke: async ({ messages, turnOrdinal }) => {
+      assertProviderMessageContract(messages);
       requests.push(messages.map((m) => m.content));
       if (turnOrdinal === 1) return { content: "", toolCalls: [{ id: "c1", name: "create_project", arguments: { projectName: "甲" } }] };
       return { content: "该工具已停用" };
@@ -1243,7 +1457,8 @@ test("批次6b·模型点名被停用工具：直接拒绝，不给审批机会�
 
   assert.equal(gateConsulted, 0, "停用工具不得进入审批流程——批准只在「本可注入」前提下有意义");
   assert.equal(executions, 0, "被策略停用的工具一次都不能执行（execute 内计数，失守即红）");
-  assert.match(requests[1][1], /停用|不可见/);
+  assert.equal(requests[1].length, 3);
+  assert.match(requests[1][2], /停用|不可见/);
 });
 
 test("批次6b·缺省零回归：不传策略时注入集与批次 6a 逐字节一致，injectedToolNames = tools 全集", () => {

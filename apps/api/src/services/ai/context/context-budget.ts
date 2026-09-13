@@ -67,7 +67,19 @@ export const WORKBENCH_DIGEST_MAX_LINES = 40;
 export const WORKBENCH_DIGEST_EXCERPT_CHARS = 60;
 
 /** 出口侧消息形态：与 WorkbenchToolLoopMessage 结构一致，另可携带来源 id。 */
-export type BudgetedModelMessage = { role: ChatRole; content: string; messageId?: string };
+export type BudgetedModelMessage = {
+  role: ChatRole;
+  content: string;
+  messageId?: string;
+  /** 仅 assistant 消息，跨轮回传 Provider 的思考内容（用完即弃，不进持久面） */
+  reasoning_content?: string;
+  /** 仅 assistant 消息携带的工具调用请求 */
+  tool_calls?: { id: string; name: string; arguments: Record<string, unknown> }[];
+  /** 仅 tool 消息对应的调用 id */
+  tool_call_id?: string;
+  /** 仅 tool 消息的工具名 */
+  name?: string;
+};
 
 export type ModelContextBudgetResult = {
   /** 实际可发出的消息序列（system 在头，摘要紧随其后） */
@@ -201,6 +213,23 @@ export function applyModelContextBudget(input: {
   /** middle 每条是否被剪；剪枝集合完全由这个位串决定（确定性第 2 条） */
   const droppedFlags: boolean[] = middle.map(() => false);
 
+  /**
+   * 工具调用原子组：assistant(tool_calls) 与它对应的所有 tool 结果必须同进同退，
+   * 否则会出现「孤儿 tool 消息」或「有 tool_calls 无结果」的畸形历史。
+   */
+  function toolCallGroupRange(startIndex: number): { start: number; end: number } | undefined {
+    const message = middle[startIndex]!;
+    if (message.role !== "assistant" || !message.tool_calls || message.tool_calls.length === 0) return undefined;
+    const callIds = new Set(message.tool_calls.map((call) => call.id));
+    let end = startIndex + 1;
+    while (end < middle.length) {
+      const next = middle[end]!;
+      if (next.role !== "tool" || !callIds.has(next.tool_call_id ?? "")) break;
+      end += 1;
+    }
+    return { start: startIndex, end: end - 1 };
+  }
+
   const project = (): { assembled: BudgetedModelMessage[]; dropped: BudgetedModelMessage[]; tokens: number } => {
     const kept: BudgetedModelMessage[] = [];
     const dropped: BudgetedModelMessage[] = [];
@@ -220,18 +249,42 @@ export function applyModelContextBudget(input: {
   };
 
   let current = project();
-  // 候选按从最旧到最新逐条试剪；钉住的（附件解析上下文）永不进候选
-  for (let index = 0; index < middle.length; index += 1) {
+  // 候选按从最旧到最新逐条/逐原子组试剪；钉住的（附件解析上下文）永不进候选
+  for (let index = 0; index < middle.length; ) {
     if (current.tokens <= maxInputTokens) break;
-    if (isPinned(middle[index]!)) continue;
-    droppedFlags[index] = true;
-    const trial = project();
-    if (trial.tokens >= current.tokens) {
-      // 剪了反而不降（摘要自身也要占 token）：回退并停止，保持单向轨迹
-      droppedFlags[index] = false;
-      break;
+    const group = toolCallGroupRange(index);
+    if (group) {
+      // 原子组：整组一起剪、一起留
+      const { start, end } = group;
+      const anyPinned = middle.slice(start, end + 1).some(isPinned);
+      if (anyPinned) {
+        index = end + 1;
+        continue;
+      }
+      for (let i = start; i <= end; i += 1) droppedFlags[i] = true;
+      const trial = project();
+      if (trial.tokens >= current.tokens) {
+        // 回退整组并保持单向轨迹
+        for (let i = start; i <= end; i += 1) droppedFlags[i] = false;
+        break;
+      }
+      current = trial;
+      index = end + 1;
+    } else {
+      if (isPinned(middle[index]!)) {
+        index += 1;
+        continue;
+      }
+      droppedFlags[index] = true;
+      const trial = project();
+      if (trial.tokens >= current.tokens) {
+        // 剪了反而不降（摘要自身也要占 token）：回退并停止，保持单向轨迹
+        droppedFlags[index] = false;
+        break;
+      }
+      current = trial;
+      index += 1;
     }
-    current = trial;
   }
 
   return {

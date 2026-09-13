@@ -46,7 +46,20 @@ import { applyModelContextBudget } from "./context/context-budget";
 export const WORKBENCH_TOOL_LOOP_MAX_TURNS = 12;
 
 /** 工作台对话的消息形态（与 ChatMessage 兼容；本地定义以避免与 workbench-shared 形成模块环） */
-export type WorkbenchToolLoopMessage = { role: ChatRole; content: string };
+export type WorkbenchToolLoopMessage = {
+  role: ChatRole;
+  content: string;
+  /** 来源 id，仅用于上下文预算的摘要追溯 */
+  messageId?: string;
+  /** Kimi 思考模式要求回传的原始思考内容；只存活于一次 Run 的循环内存，不进持久面 */
+  reasoning_content?: string;
+  /** assistant 消息携带的工具调用请求 */
+  tool_calls?: ToolCall[];
+  /** tool 消息对应的调用 id */
+  tool_call_id?: string;
+  /** tool 消息的工具名 */
+  name?: string;
+};
 
 /**
  * 批次 3 · ②③：出口侧上下文预算入参（additive，缺省即按默认预算裁）。
@@ -269,7 +282,7 @@ export type WorkbenchToolLoopInput = WorkbenchToolLoopCommon & {
   invoke: (params: {
     messages: WorkbenchToolLoopMessage[];
     turnOrdinal: number;
-  }) => Promise<{ content: string; toolCalls?: ToolCall[] }>;
+  }) => Promise<{ content: string; toolCalls?: ToolCall[]; reasoningContent?: string }>;
 };
 
 export type WorkbenchToolLoopStreamInput = WorkbenchToolLoopCommon & {
@@ -440,6 +453,14 @@ export async function runWorkbenchToolLoop(
     if (calls.length === 0) return toWorkbenchToolLoopResult(content, turn, false, trace, knowledgeTrace);
     // 已达上限：不再执行工具（避免无收敛的副作用），把末轮正文交回用户
     if (turn === maxTurns) return toWorkbenchToolLoopResult(content, turn, true, trace, knowledgeTrace);
+    // 工具调用轮：先把 assistant(tool_calls) 原子地写进历史，再回填 tool 结果。
+    // reasoning_content 只在循环内存里累积、回传 Provider，不进入任何持久面。
+    workingMessages.push({
+      role: "assistant",
+      content,
+      reasoning_content: response.reasoningContent,
+      tool_calls: calls,
+    });
     await executeToolCallBatch({ ...input, workingMessages, trace, callCursor, knowledgeTrace }, calls);
   }
 
@@ -465,6 +486,7 @@ export async function* runWorkbenchToolLoopStream(
 
   for (let turn = 1; turn <= maxTurns; turn += 1) {
     let turnContent = "";
+    let turnReasoningContent = "";
     const turnCalls: ToolCall[] = [];
     // 批次 3 · ②③：出口预算（与同步循环同口径——生产实际在跑的是这条）
     workingMessages = applyEgressContextBudget(workingMessages, input.contextBudget);
@@ -475,6 +497,7 @@ export async function* runWorkbenchToolLoopStream(
     for await (const chunk of input.invokeStream({ messages: [...workingMessages], turnOrdinal: turn })) {
       yield chunk;
       if (chunk.kind !== "metadata") turnContent += chunk.contentDelta ?? "";
+      if (chunk.reasoningContentDelta) turnReasoningContent += chunk.reasoningContentDelta;
       for (const call of chunk.toolCalls ?? []) {
         const dedupKey = call.id || `${call.name}:${turnCalls.length}`;
         if (seenTurnCallIds.has(dedupKey)) continue;
@@ -485,6 +508,14 @@ export async function* runWorkbenchToolLoopStream(
     content = turnContent;
     if (turnCalls.length === 0) return toWorkbenchToolLoopResult(content, turn, false, trace, knowledgeTrace);
     if (turn === maxTurns) return toWorkbenchToolLoopResult(content, turn, true, trace, knowledgeTrace);
+    // 工具调用轮：先把 assistant(tool_calls) 原子地写进历史，再回填 tool 结果。
+    // reasoning_content 只在循环内存里累积、回传 Provider，不进入任何持久面。
+    workingMessages.push({
+      role: "assistant",
+      content: turnContent,
+      reasoning_content: turnReasoningContent || undefined,
+      tool_calls: turnCalls,
+    });
     await executeToolCallBatch({ ...input, workingMessages, trace, callCursor, knowledgeTrace }, turnCalls);
     yield {
       contentDelta: "",

@@ -346,6 +346,20 @@ function toKimiMessage(message: ChatMessage): Record<string, unknown> {
     content: asString(message.content),
   };
   if (message.partial === true) item.partial = true;
+  if (message.reasoning_content) item.reasoning_content = message.reasoning_content;
+  if (message.role === "assistant" && message.tool_calls && message.tool_calls.length > 0) {
+    item.tool_calls = message.tool_calls.map((call) => ({
+      id: call.id,
+      type: "function",
+      function: { name: call.name, arguments: JSON.stringify(call.arguments ?? {}) },
+    }));
+    // 带 tool_calls 的 assistant 消息，content 为空时必须显式传 null（OpenAI 兼容协议要求）
+    if (item.content === "") item.content = null;
+  }
+  if (message.role === "tool") {
+    item.tool_call_id = message.tool_call_id;
+    item.name = message.name;
+  }
   return item;
 }
 
@@ -498,8 +512,8 @@ async function parseSuccess(
 ): Promise<ChatCompletionResponse> {
   const json = (await response.json()) as { choices?: RawChoice[]; usage?: RawUsage };
   const choice = json?.choices?.[0] ?? {};
-  const { content, toolCalls, finishReason } = parseChoiceMessage(choice);
-  if (!content && (!toolCalls || toolCalls.length === 0)) {
+  const { content, toolCalls, finishReason, reasoningContent } = parseChoiceMessage(choice);
+  if (!content && !reasoningContent && (!toolCalls || toolCalls.length === 0)) {
     throw new ProviderError("empty_response", "model_empty_response", {
       providerName: PROVIDER_NAME,
       retryable: false,
@@ -514,6 +528,7 @@ async function parseSuccess(
     attempts,
     finishReason,
     toolCalls,
+    reasoningContent,
     usage: extractUsage(json?.usage),
   };
 }
@@ -746,22 +761,27 @@ function parseToolArguments(raw: string | undefined): Record<string, unknown> {
   return {};
 }
 
-/** 纯函数：把厂商 choice 解析为 { content, toolCalls, finishReason } */
+/** 纯函数：把厂商 choice 解析为 { content, toolCalls, finishReason, reasoningContent } */
 export function parseChoiceMessage(choice: RawChoice): {
   content: string;
   toolCalls?: ToolCall[];
   finishReason?: string;
+  reasoningContent?: string;
 } {
   const content = asString(choice?.message?.content);
+  const reasoningContent = asString(
+    (choice?.message as { reasoning_content?: unknown; reasoningContent?: unknown } | undefined)?.reasoning_content ||
+      (choice?.message as { reasoning_content?: unknown; reasoningContent?: unknown } | undefined)?.reasoningContent,
+  ) || undefined;
   const finishReason = asString(choice?.finish_reason) || undefined;
   const rawCalls = choice?.message?.tool_calls;
   if (!Array.isArray(rawCalls) || rawCalls.length === 0) {
-    return { content, finishReason };
+    return { content, reasoningContent, finishReason };
   }
   const toolCalls: ToolCall[] = rawCalls.map((c, i) => ({
     id: asString(c?.id) || `call_${i}`,
     name: asString(c?.function?.name),
     arguments: parseToolArguments(c?.function?.arguments),
   }));
-  return { content, toolCalls, finishReason };
+  return { content, toolCalls, finishReason, reasoningContent };
 }
