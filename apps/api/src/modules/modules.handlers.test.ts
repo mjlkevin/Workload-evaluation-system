@@ -1822,7 +1822,7 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
         const payload = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
         if (urlText.includes("open.bigmodel.cn")) kbCalls.push({ url: urlText, payload });
         else modelCalls.push({ url: urlText, payload });
-        const messages = (payload.messages ?? []) as Array<{ role: string; content: string }>;
+        const messages = (payload.messages ?? []) as Array<{ role: string; content: string; name?: string }>;
 
         if (urlText.includes("/knowledge/retrieve")) {
           assert.deepEqual(payload.knowledge_ids, ["kb-sales"]);
@@ -1853,8 +1853,12 @@ test("ai.usecase: homeWorkbenchChat persists knowledge tool trace in assistant m
         if (typeof messages[0]?.content === "string" && messages[0].content.includes("意图分类器")) {
           return json({ choices: [{ message: { content: "这是需要查询产品知识库的业务问答。" }, finish_reason: "stop" }] }) as unknown;
         }
+        // 按 function-calling 协议判断「工具结果是否已回填」：找 role="tool" 且 name 对得上的消息。
+        // 此前这里嗅的是正文前缀「[工具结果] knowledge_query」——那是工具结果被伪装成 assistant
+        // 文本回灌的旧形态；协议化之后正文是纯 JSON、没有前缀，继续嗅字符串会让这个假模型
+        // 永远认为还没拿到结果、无限要求调工具。判据改成协议字段，不再与正文措辞耦合。
         const toolResultBackfilled = messages.some(
-          (message) => typeof message.content === "string" && message.content.includes("[工具结果] knowledge_query"),
+          (message) => message.role === "tool" && message.name === "knowledge_query",
         );
         if (!toolResultBackfilled) {
           return json({

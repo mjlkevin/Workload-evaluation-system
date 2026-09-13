@@ -284,7 +284,19 @@ export const WORKBENCH_MODEL_VISIBLE_SURFACE_TYPES = [
 export type WorkbenchModelVisibleSurfaceType = (typeof WORKBENCH_MODEL_VISIBLE_SURFACE_TYPES)[number];
 
 /** 模型可见消息形态（与 WorkbenchToolLoopMessage 结构一致；本地声明以避免与工具循环形成模块环） */
-export type WorkbenchModelVisibleMessage = { role: ChatRole; content: string };
+export type WorkbenchModelVisibleMessage = {
+  role: ChatRole;
+  content: string;
+  messageId?: string;
+  /** 仅 assistant 消息，跨轮回传 Provider 的思考内容（用完即弃，不进持久面） */
+  reasoning_content?: string;
+  /** 仅 assistant 消息携带的工具调用请求 */
+  tool_calls?: { id: string; name: string; arguments: Record<string, unknown> }[];
+  /** 仅 tool 消息对应的调用 id */
+  tool_call_id?: string;
+  /** 仅 tool 消息的工具名 */
+  name?: string;
+};
 
 /** 工具执行产出（与 WorkbenchToolEffectOutput 结构一致；同上理由） */
 export type WorkbenchModelVisibleToolOutcome = { ok: boolean; data?: unknown; error?: string };
@@ -340,18 +352,30 @@ export function toWorkbenchModelVisibleMessage(input: {
   surfaceType: WorkbenchModelVisibleSurfaceType | string;
   role: ChatRole;
   content: string;
+  messageId?: string;
+  reasoning_content?: string;
+  tool_calls?: { id: string; name: string; arguments: Record<string, unknown> }[];
+  tool_call_id?: string;
+  name?: string;
 }): WorkbenchModelVisibleMessage {
   if (!isWorkbenchModelVisibleSurfaceType(input.surfaceType)) {
     throw new Error(`workbench_model_visible_surface_not_allowed: ${input.surfaceType}`);
   }
-  return { role: input.role, content: input.content };
+  return {
+    role: input.role,
+    content: input.content,
+    ...(input.messageId ? { messageId: input.messageId } : {}),
+    ...(input.reasoning_content ? { reasoning_content: input.reasoning_content } : {}),
+    ...(input.tool_calls ? { tool_calls: input.tool_calls } : {}),
+    ...(input.tool_call_id ? { tool_call_id: input.tool_call_id } : {}),
+    ...(input.name ? { name: input.name } : {}),
+  };
 }
 
 /**
  * 工具结果回灌模型的唯一构造点。
- * 正文前缀形态沿用批次 0（`[工具结果] name (callId=...): {json}`）：同步通道也在用
- * 这个形态。批次 0.5 当时把「改正文长度」划在批次范围外，留下模型侧无上限的开放项；
- * 该项由批次 3 在此收口——只加长度上限，不改前缀形态。
+ * 按 OpenAI/Kimi function-calling 协议以 role="tool" 消息回填，携带 tool_call_id
+ * 与 name，使 assistant(tool_calls) + tool 结果构成不可分割的原子组。
  * 只带 outcome（模型需要的结论），不带 callIndex/elapsedMs/resultPreview 等 UI 状态。
  */
 export function toWorkbenchModelVisibleToolMessage(input: {
@@ -361,9 +385,9 @@ export function toWorkbenchModelVisibleToolMessage(input: {
 }): WorkbenchModelVisibleMessage {
   return toWorkbenchModelVisibleMessage({
     surfaceType: "tool/result",
-    role: "assistant",
-    content: clipWorkbenchModelVisibleText(
-      `[工具结果] ${input.toolName} (callId=${input.callId}): ${safeStringify(input.outcome)}`,
-    ),
+    role: "tool",
+    tool_call_id: input.callId,
+    name: input.toolName,
+    content: clipWorkbenchModelVisibleText(safeStringify(input.outcome)),
   });
 }

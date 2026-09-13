@@ -283,7 +283,7 @@ export async function homeWorkbenchChatStream(req: Request, res: Response) {
             ...(toolSet.tools.length > 0 ? { tools: toolSet.tools, toolChoice: "auto" as const } : {}),
           });
           lastCompletion = completion;
-          return { content: completion.content, toolCalls: completion.toolCalls };
+          return { content: completion.content, toolCalls: completion.toolCalls, reasoningContent: completion.reasoningContent };
         },
       });
       const completion = lastCompletion;

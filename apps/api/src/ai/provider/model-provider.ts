@@ -10,7 +10,7 @@
 //  2. 内置重试/超时/温度兼容等稳定性细节，调用方无需重复实现。
 //  3. 通过 ProviderError 统一错误码，方便上层做降级与可观测性。
 
-export type ChatRole = "system" | "user" | "assistant";
+export type ChatRole = "system" | "user" | "assistant" | "tool";
 
 export interface ChatMessage {
   role: ChatRole;
@@ -20,6 +20,17 @@ export interface ChatMessage {
    * provider 会透传；其他 provider 可忽略。
    */
   partial?: boolean;
+  /**
+   * Kimi 思考模式要求回传的原始思考内容。仅用于一次请求内的 assistant 消息，
+   * 不得写入任何持久化面（会话/对话事实）。
+   */
+  reasoning_content?: string;
+  /** assistant 消息携带的工具调用请求（OpenAI function-calling 协议） */
+  tool_calls?: ToolCall[];
+  /** tool 消息对应的调用 id（必填） */
+  tool_call_id?: string;
+  /** tool 消息的工具名（OpenAI 推荐填写） */
+  name?: string;
 }
 
 export interface JsonSchemaResponseFormat {
@@ -114,6 +125,11 @@ export interface ChatCompletionResponse {
   finishReason?: string;
   /** 模型发起的工具调用；无则 undefined 或空数组 */
   toolCalls?: ToolCall[];
+  /**
+   * Kimi 等厂商在 thinking 模式下返回的完整思考内容。
+   * Provider 不累积，仅透传当次响应中的值；消费方如需跨轮回传须自行累积。
+   */
+  reasoningContent?: string;
   /** Token 消耗统计；部分厂商或场景可能不返回 */
   usage?: TokenUsage;
 }

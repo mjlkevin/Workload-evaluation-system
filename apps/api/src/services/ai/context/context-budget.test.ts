@@ -59,6 +59,37 @@ function fakeTool(overrides: Partial<AgentTool> = {}): AgentTool {
   };
 }
 
+/** 裁决三：校验发给模型的历史满足 OpenAI/Kimi function-calling 契约（context-budget 侧复用） */
+function assertProviderMessageContract(messages: { role: string; content: string; tool_calls?: { id: string }[]; tool_call_id?: string }[]): void {
+  for (let i = 0; i < messages.length; i += 1) {
+    const message = messages[i]!;
+    if (message.role === "tool") {
+      assert.ok(message.tool_call_id, `第 ${i} 条 tool 消息缺少 tool_call_id`);
+      let matched = false;
+      for (let j = i - 1; j >= 0; j -= 1) {
+        const candidate = messages[j]!;
+        if (candidate.role === "assistant" && candidate.tool_calls?.some((call) => call.id === message.tool_call_id)) {
+          matched = true;
+          break;
+        }
+      }
+      assert.ok(matched, `第 ${i} 条 tool 消息(${message.tool_call_id}) 找不到对应的 assistant(tool_calls)`);
+    }
+    if (message.role === "assistant" && message.tool_calls && message.tool_calls.length > 0) {
+      for (const call of message.tool_calls) {
+        let matched = false;
+        for (let j = i + 1; j < messages.length; j += 1) {
+          if (messages[j]!.role === "tool" && messages[j]!.tool_call_id === call.id) {
+            matched = true;
+            break;
+          }
+        }
+        assert.ok(matched, `assistant(tool_calls) 中的 ${call.id} 缺少对应的 tool 结果`);
+      }
+    }
+  }
+}
+
 // ------------------------------------------------------------
 // ① token 计量：不是字符数
 // ------------------------------------------------------------
@@ -295,6 +326,47 @@ test("③ 摘要行数超上限时折叠为区间行，仍给出全部指纹", (
   assert.ok(text.includes(`指纹=${contentFingerprint(dropped[0]!.content)}`));
 });
 
+/**
+ * 裁决一：assistant(tool_calls) 与它的 tool 结果是一个原子单元。
+ * 构造一组必须触发剪枝的历史：system + assistant(tool_calls) + tool + 超大 user 末条。
+ * 预算足够小，只能把 assistant+tool 这组整体扔掉；原子性要求不能出现「assistant 被剪、tool 被留」
+ * 或「tool 被剪、assistant 被留」的孤儿形态。
+ */
+test("② 原子剪枝：assistant(tool_calls) 与对应 tool 结果同进同退，不得产生孤儿消息", () => {
+  // 工具结果故意放大，使整组被剪后 token 确实下降，从而触发剪枝路径
+  const toolContent = '{"ok":true,"data":{"items":[' + '"x",'.repeat(300).slice(0, -1) + "]}}";
+  const messages: BudgetedModelMessage[] = [
+    { role: "system", content: "sys" },
+    {
+      role: "assistant",
+      content: "",
+      tool_calls: [{ id: "call_1", name: "project_list", arguments: {} }],
+    },
+    { role: "tool", tool_call_id: "call_1", name: "project_list", content: toolContent },
+    { role: "user", content: "那二期呢".repeat(800) },
+  ];
+  const result = applyModelContextBudget({ messages, maxInputTokens: 500 });
+
+  const roles = result.messages.map((m) => m.role);
+  assert.ok(roles.includes("system"), "system 必须保留");
+  assert.ok(roles.includes("user"), "末条 user 必须保留");
+
+  const hasAssistant = result.messages.some((m) => m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0);
+  const hasTool = result.messages.some((m) => m.role === "tool");
+  // 原子组要么都在、要么都走；本组可被剪，故期望整组被剪掉
+  assert.equal(
+    hasAssistant,
+    hasTool,
+    `assistant(tool_calls) 与 tool 结果必须同进同退，实取 roles=${JSON.stringify(roles)}`,
+  );
+  assert.equal(hasTool, false, "超预算时原子组应整体被剪，不应留下孤儿 tool 消息");
+
+  // 被剪的消息里同时包含 assistant 与 tool，证明不是只剪了一半
+  const droppedRoles = result.dropped.map((m) => m.role);
+  assert.ok(droppedRoles.includes("assistant"), "被剪集合必须包含 assistant(tool_calls)");
+  assert.ok(droppedRoles.includes("tool"), "被剪集合必须包含对应的 tool 结果");
+});
+
 // ------------------------------------------------------------
 // 出口侧接线：工具循环每轮都过预算
 // ------------------------------------------------------------
@@ -315,6 +387,7 @@ test("②③ 出口接线：工具循环每一轮发请求前都按预算裁，�
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
     allowToolNames: new Set(["list_projects"]),
     invoke: async ({ messages }) => {
+      assertProviderMessageContract(messages);
       seen.push(messages.map((m) => estimateMessageTokens(m)));
       if (seen.length === 1) {
         return { content: "", toolCalls: [{ id: "c1", name: "list_projects", arguments: {} }] };
@@ -344,14 +417,17 @@ test("② 出口接线：未超预算时工具循环零改写（逐字节与改�
     agentUser: { id: "u1", capabilities: ["estimates:read"] },
     allowToolNames: new Set(["knowledge_query"]),
     invoke: async ({ messages }) => {
+      assertProviderMessageContract(messages);
       seen.push(messages.map((m) => m.content));
       if (seen.length === 1) return { content: "", toolCalls: [{ id: "c1", name: "knowledge_query", arguments: { q: "ERP" } }] };
       return { content: "答复" };
     },
   });
-  assert.equal(seen[1].length, 2, "预算未触发时不得剪任何一条，也不得插入摘要");
+  assert.equal(seen[1].length, 3, "预算未触发时不得剪任何一条，也不得插入摘要；第二轮为 user + assistant(tool_calls) + tool");
   assert.equal(seen[1][0], "查一下知识库");
-  assert.match(seen[1][1], /\[工具结果\] knowledge_query/);
+  assert.equal(seen[1][1], "");
+  assert.match(seen[1][2], /"ok":true/);
+  assert.match(seen[1][2], /"hit":"x"/);
 });
 
 // ------------------------------------------------------------
@@ -361,11 +437,13 @@ test("② 出口接线：未超预算时工具循环零改写（逐字节与改�
 test("⑤ 模型可见工具结果有上限，且上限低于 UI 侧上限", () => {
   const huge = { ok: true, data: Array.from({ length: 500 }, (_, i) => ({ id: i, text: "长".repeat(40) })) };
   const message = toWorkbenchModelVisibleToolMessage({ toolName: "list_projects", callId: "c1", outcome: huge });
+  assert.equal(message.role, "tool");
+  assert.equal(message.tool_call_id, "c1");
+  assert.equal(message.name, "list_projects");
   assert.ok(
     message.content.length <= WORKBENCH_MODEL_TOOL_RESULT_MAX_CHARS + 200,
     `模型侧正文应受限，实取 ${message.content.length} 字符`,
   );
-  assert.match(message.content, /\[工具结果\] list_projects \(callId=c1\):/, "前缀形态不得改动（同步通道共用）");
   assert.match(message.content, /模型侧已截断：原 \d+ 字符/, "必须在正文里明说被截断、原长多少");
   assert.match(message.content, /完整结果见界面上的工具调用卡片/, "指向 UI 侧完整结果，免得模型宣称数据丢失");
   assert.ok(WORKBENCH_MODEL_TOOL_RESULT_MAX_CHARS < 8_000,
@@ -374,15 +452,18 @@ test("⑤ 模型可见工具结果有上限，且上限低于 UI 侧上限", () 
 
 test("⑤ 未超限的工具结果逐字节不变（不回归批次 0 冻结形态）", () => {
   const small = toWorkbenchModelVisibleToolMessage({ toolName: "knowledge_query", callId: "c1", outcome: { ok: true, data: { hit: "ERP" } } });
-  assert.equal(small.content, '[工具结果] knowledge_query (callId=c1): {"ok":true,"data":{"hit":"ERP"}}');
+  assert.equal(small.role, "tool");
+  assert.equal(small.tool_call_id, "c1");
+  assert.equal(small.name, "knowledge_query");
+  assert.equal(small.content, '{"ok":true,"data":{"hit":"ERP"}}');
 });
 
 test("⑤ UI 侧与模型侧上限各自生效：同一超大结果，UI 保留得比模型多", () => {
   const serialized = JSON.stringify({ ok: true, data: { rows: "x".repeat(6_000) } });
-  const modelSide = clipWorkbenchModelVisibleText(`[工具结果] list_projects (callId=c1): ${serialized}`);
+  const modelSide = clipWorkbenchModelVisibleText(serialized);
   assert.ok(modelSide.length < serialized.length, "模型侧必须被截");
   assert.ok(serialized.length > WORKBENCH_MODEL_TOOL_RESULT_MAX_CHARS);
   assert.ok(serialized.length < 8_000 || true, "UI 侧上限为 8000（批次 0.5），比模型侧宽");
   // 确定性：同一输入两次截断结果一致
-  assert.equal(modelSide, clipWorkbenchModelVisibleText(`[工具结果] list_projects (callId=c1): ${serialized}`));
+  assert.equal(modelSide, clipWorkbenchModelVisibleText(serialized));
 });
