@@ -849,6 +849,12 @@ input, button, select, textarea { font-family: inherit; }
   align-items: flex-end;
   gap: 8px;
   min-height: 48px;
+  /* ISS-2026-09-04-001：本行是 .ai-composer__inner（display:grid）的网格项，
+     默认 min-width:auto 会把它钉死在自身 min-content（261px）上不再收窄。
+     360 档实测：父容器 222px、本行 261px，发送按钮右边界 375 > 视口 360，
+     且最近滚动祖先 section 是 overflow-x:hidden —— 按钮被永久裁切、点不到。
+     解除下限后本行随容器收窄（实测 261→196，按钮右边界 375→310）。 */
+  min-width: 0;
 }
 .ai-composer__attach {
   display: grid;
