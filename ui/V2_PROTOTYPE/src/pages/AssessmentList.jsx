@@ -11,6 +11,13 @@ export default function AssessmentList() {
   const navigate = useNavigate()
   const { rows, loading, loadError, createError, creating, refetch, create, remove } = useAssessmentList({ fallbackData: mockData })
 
+  // 新建按钮与空态按钮共用同一条路径：创建失败时 create() 回 null，
+  // 于是留在列表页由 feedback 报错，而不是跳到一个并不存在的详情页。
+  const handleCreate = async () => {
+    const id = await create()
+    if (id) navigate(`/assessments/${id}`)
+  }
+
   const kpiCards = useMemo(() => {
     const total = rows.length
     const checkedOut = rows.filter((r) => r.status === '已检出').length
@@ -62,6 +69,12 @@ export default function AssessmentList() {
       error={loadError}
       errorText="加载实施评估列表失败，请检查网络后重试"
       onRetry={refetch}
+      emptyText="还没有实施评估，新建一条就能开始估算工作量"
+      emptyAction={
+        <button type="button" className="btn btn-pri" disabled={creating} onClick={handleCreate}>
+          {creating ? '创建中...' : '+ 新建实施评估'}
+        </button>
+      }
       feedback={createError ? { role: 'alert', message: '创建实施评估失败，已先保留在本地列表，请稍后重试' } : null}
       rowKey="id"
       kpiCards={kpiCards}
@@ -87,7 +100,7 @@ export default function AssessmentList() {
         { key: 'updatedAt', title: '更新时间' },
       ]}
       actions={[
-        <button type="button" key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}} disabled={creating} onClick={async () => { const id = await create(); if (id) navigate(`/assessments/${id}`) }}>{creating ? '创建中...' : '+ 新建'}</button>,
+        <button type="button" key="new" className="btn btn-pri" style={{height:32,padding:'0 14px',fontSize:13}} disabled={creating} onClick={handleCreate}>{creating ? '创建中...' : '+ 新建'}</button>,
         <button type="button" key="refresh" className="btn btn-out" style={{height:32,padding:'0 14px',fontSize:13}} onClick={() => refetch()}>⟳ 刷新</button>,
       ]}
     />

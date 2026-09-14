@@ -43,6 +43,8 @@ export default function ListPage({
   emptyText = '暂无数据',
   emptyIcon = '📭',
   emptyAction,
+  // 表格需要可被读屏播报的名字；不传就用页面标题兜底（见 <caption>）。
+  tableCaption,
   rowKey = 'id',
   pageSize = 10,
   onRowClick,
@@ -384,6 +386,9 @@ export default function ListPage({
               minWidth: 600,
             }}
           >
+            <caption className="sr-only">
+              {tableCaption || (title ? `${title}数据表` : '数据表')}
+            </caption>
             <thead>
               <tr>
                 <th style={{ width: 40, padding: '10px', background: 'var(--bg-soft)', borderBottom: '1px solid var(--line)' }}>
