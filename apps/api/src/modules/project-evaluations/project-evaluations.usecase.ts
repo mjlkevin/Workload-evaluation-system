@@ -8,6 +8,8 @@ import { getVersionsRepository } from "../versions/versions.repository";
 import type { HarnessRequirementReportV2Content } from "../harness/harness.types";
 import { createHarnessRepository, type HarnessRepository } from "../harness/harness.repository";
 import { PROJECT_EVALUATION_RECORD_KIND, findHarnessDraftRecords, findProjectRecordByAssessmentDraft, listProjectRecords, mapGlobalVersionToProject, saveProjectRecord, saveProjectRecords } from "./project-evaluations.repository";
+import { getProductMasterDataRepository } from "../master-data/master-data.module";
+import { buildProductMasterSnapshot } from "../master-data/product-master-data.usecase";
 import type { AiAssessmentDraftManualConfirmResult, AiDraftManualConfirmation, ProjectEvaluationDraftBundle, ProjectEvaluationPlan } from "./project-evaluations.types";
 
 /**
@@ -73,6 +75,7 @@ export async function createProjectEvaluationForUser(user: AuthUser, input: Reco
   const createdFromSessionId = asString(input.createdFromSessionId);
   const recordId = randomUUID();
   const versionCode = await generateProjectVersionCode(user.id);
+  const productMasterSnapshot = buildProductMasterSnapshot(await getProductMasterDataRepository().listActiveAssignments());
   const payload: Record<string, unknown> = {
     recordKind: PROJECT_EVALUATION_RECORD_KIND,
     projectName,
@@ -82,6 +85,7 @@ export async function createProjectEvaluationForUser(user: AuthUser, input: Reco
     projectStatus: "draft",
     createdFromSessionId,
     totalDays: Number(input.totalDays) || 0,
+    productMasterSnapshot,
   };
   const record: VersionRecord = {
     id: recordId,
@@ -206,6 +210,7 @@ export async function createProjectAndAssessmentDraftsFromHarness(
   const projectVersionCode = await generateProjectVersionCode(user.id);
   const assessmentRecordId = randomUUID();
   const assessmentVersionCode = buildAiDraftVersionCode("IA", assessmentRecordId);
+  const productMasterSnapshot = buildProductMasterSnapshot(await getProductMasterDataRepository().listActiveAssignments());
   const assessmentPayload: Record<string, unknown> = {
     draftStatus: "draft_from_ai",
     draftSource: "harness",
@@ -279,6 +284,7 @@ export async function createProjectAndAssessmentDraftsFromHarness(
       answeredQuestions,
       requirementFindings,
     },
+    productMasterSnapshot,
   };
   const assessmentRecord: VersionRecord = {
     id: assessmentRecordId,

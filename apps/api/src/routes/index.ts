@@ -37,7 +37,7 @@ import { isDurableRunsEnabledFromEnv } from "../modules/harness/harness-runtime.
 import { createHarnessRuntimeRepository } from "../modules/harness/harness-runtime.repository";
 import { getKnowledgeRepository } from "../modules/knowledge/knowledge.module";
 import { createMasterDataRouter } from "./master-data.routes";
-import { getIndustryRepository } from "../modules/master-data/master-data.module";
+import { getIndustryRepository, getProductMasterDataRepository } from "../modules/master-data/master-data.module";
 
 const router = Router();
 
@@ -53,8 +53,11 @@ const knowledgeRoutes = createKnowledgeRouter({ repo: getKnowledgeRepository() }
 // SP-2026-007 MS2：会话记忆分层蒸馏
 const memoryRoutes = createMemoryRouter({ repo: getMemoryRepository() });
 
-// 批次 10a：基础管理 · 行业主数据（第 10 个存储域，自始即 PG 主存储）
-const masterDataRoutes = createMasterDataRouter({ repo: getIndustryRepository() });
+// 批次 10a/10b：基础管理 · 行业 + 产品主数据
+const masterDataRoutes = createMasterDataRouter({
+  industryRepo: getIndustryRepository(),
+  productRepo: getProductMasterDataRepository(),
+});
 
 // 业务路由
 router.use("/auth", authRoutes);

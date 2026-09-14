@@ -19,6 +19,7 @@ import supertest from "supertest";
 
 import { createMasterDataRouter } from "./master-data.routes";
 import { createIndustryInMemoryRepository } from "../test-helpers/industry-in-memory.repository";
+import { createProductMasterDataInMemoryRepository } from "../test-helpers/product-master-data-in-memory.repository";
 import { signAuthToken } from "../middleware/auth";
 import { cleanupTestUsers, createTestUser } from "../test-helpers/test-users";
 
@@ -64,7 +65,7 @@ function setupApp() {
   });
   const app = express();
   app.use(express.json());
-  app.use("/master-data", createMasterDataRouter({ repo }));
+  app.use("/master-data", createMasterDataRouter({ industryRepo: repo, productRepo: createProductMasterDataInMemoryRepository() }));
   return { request: supertest(app), repo };
 }
 

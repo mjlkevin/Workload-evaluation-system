@@ -1,51 +1,19 @@
 // ============================================================
-// Templates 域 PG 仓储（阶段 2 批 8 · 第 1–3 步）
+// Templates 域 PG 仓储（阶段 2 批 8 · 第 1–3 步；批次 10b 改写）
 // ============================================================
 // 接口形态：单文档 load/save（与 JSON 整文件语义 1:1）。
-// templates 域只有一个活动模板（config/templates/example-template.json
-// 整文件 = 唯一文档），管理端导入（JSON/Excel）整体替换该文档。
 //
-// PG 侧形态（表已存在，字段 1:1，批 8 零 migration）：
-//  - templates 表以 template_id 为主键。导入可能携带不同 templateId
-//    （importTemplateExcel 生成 tmpl-import-<ts>），因此写入为
-//    「按输入 templateId 的单行 upsert」；读取取「最近写入行」
-//    （updated_at DESC + template_id DESC 确定性兜底）为活动文档。
-//  - 不做整表替换/TRUNCATE（持续性约束 §4.9 C1）：单行 upsert 天
-//    然满足「整文档替换」的 API 契约——listTemplates / getTemplate /
-//    估算上下文全部经 loadTemplate() 只见活动文档；被替换的旧
-//    templateId 行不再对任何 API 可见（语义等同 JSON 整文件覆盖），
-//    仅存储层残留，由 db:seed --force 的整表重置兜底清理。
+// 批次 10b 裁决一：新表是事实源，loadTemplate() 保持签名与返回形状不变，
+// 内部改从产品主数据表派生；saveTemplate() 除保留 templates 表单行外，
+// 同步把条目写入产品主数据表，避免「页面导入成功、估算读不到」的双源割裂。
 //
-// 五条硬性范式落实（批 1–7 基准）：
-//  1. 错误边界：TemplateStoreError（稳定 code），每个公开方法
-//     try/catch 后经 toSafeError 收敛；基础设施错误统一
-//     TEMPLATE_STORE_INTERNAL，pg/drizzle 原始错误（可能含 SQL
-//     参数/连接串）不外泄。
-//  2. 幂等：单行 upsert（onConflictDoUpdate）对同一输入重复执行
-//     结果不变。
-//  3. 并发控制：单语句 upsert 无字段混写——同 templateId 并发写
-//     last-writer-wins 收敛为完整输入；不同 templateId 并发写各自
-//     成行、读侧取最新行（确定性排序），与 JSON 整文件写的
-//     last-writer-wins 竞态结果同构（无部分字段撕裂）。
-//  4. 时间：updated_at 一律 readDbNow(tx)（DB 时钟），禁止
-//     Date.now() 落库。
-//  5. ISS-2026-08-18-004：读取失败必须抛错。缺行亦抛错
-//     （TEMPLATE_STORE_NOT_FOUND）——对齐 JSON 侧「缺文件抛
-//     Config file not found」语义（模板无空结构兜底概念；
-//     db:seed 保证行存在）。
-//
-// 缓存策略：不加缓存层（批 8 指令要求先测量 414KB 单行读取耗时，
-// 实测 2026-08-24，开发库，n=50）：
-//  - PG 单行读取（414KB jsonb：groups 12.7KB + items 345KB +
-//    sheets 0.2KB）中位 2.27ms（min 1.50 / p95 2.62）；
-//    JSON 同文件 readFileSync+parse 中位 1.07ms（min 0.95 /
-//    p95 1.32）。PG 约为 JSON 2 倍但同为毫秒级，绝对差 ~1.2ms。
-//  - 不引入缓存的理由：①绝对耗时亚 3ms，估算请求含 585 items
-//    计算与 HTTP 往返，1.2ms 差异不可感知；②模板经管理端导入后
-//    必须立即生效（批 4 system 同口径：管理界面变更不容 TTL
-//    滞后）；③多副本部署下进程级缓存引入分歧（§4.7 同论证）；
-//    ④读取频率为每次估算请求一次，非高频循环读。
-//  - 带外 SQL 写入立即可见由测试用例证明（无缓存层 → 无需失效协调）。
+// 五条硬性范式继续落实（批 1–7 基准）：
+//  1. 错误边界：TemplateStoreError（稳定 code），每个公开方法 try/catch 后经
+//     toSafeError 收敛。
+//  2. 幂等：templates 表 upsert + 产品主数据表按唯一键 upsert。
+//  3. 并发控制：单事务内完成双写，无字段混写。
+//  4. 时间：updated_at 一律 readDbNow(tx)。
+//  5. 读取失败/缺数据抛错（TEMPLATE_STORE_NOT_FOUND）。
 
 import { desc, sql } from "drizzle-orm";
 
@@ -53,6 +21,7 @@ import { db, type Database } from "../../db/client";
 import { readDbNow } from "../../db/now";
 import { templates } from "../../db/schema";
 import type { Template } from "../../types";
+import { deriveTemplateFromProductTables, persistTemplateToProductTables } from "./product-template-derivation";
 
 // ============================================================
 // 安全错误（范式 #1 / #5）
@@ -96,26 +65,11 @@ export type TemplatesPgRepository = TemplateStoreRepository & {
 export function createTemplatesPgRepository(dbInstance: Database = db): TemplatesPgRepository {
   async function loadTemplate(): Promise<Template> {
     try {
-      // 活动文档 = 最近写入行；template_id DESC 为同 updated_at 时的
-      // 确定性兜底（并发写同刻提交时读侧结果可预测）。
-      const rows = await dbInstance
-        .select()
-        .from(templates)
-        .orderBy(desc(templates.updatedAt), desc(templates.templateId))
-        .limit(1);
-      const row = rows[0];
-      if (!row) {
-        throw new TemplateStoreError("TEMPLATE_STORE_NOT_FOUND", "template row missing");
-      }
-      return {
-        templateId: row.templateId,
-        templateVersion: row.templateVersion,
-        templateName: row.templateName,
-        groups: row.groups as Template["groups"],
-        items: row.items as Template["items"],
-        sheets: (row.sheets ?? []) as Template["sheets"],
-      };
+      return await deriveTemplateFromProductTables(dbInstance);
     } catch (err) {
+      if (err instanceof Error && (err.message === "PRODUCT_TEMPLATE_META_MISSING" || err.message === "PRODUCT_TEMPLATE_ASSIGNMENTS_EMPTY")) {
+        throw new TemplateStoreError("TEMPLATE_STORE_NOT_FOUND", err.message);
+      }
       throw toSafeError(err);
     }
   }
@@ -124,23 +78,31 @@ export function createTemplatesPgRepository(dbInstance: Database = db): Template
     try {
       await dbInstance.transaction(async (tx) => {
         const now = await readDbNow(tx);
-        const values = {
-          templateId: template.templateId,
-          templateVersion: template.templateVersion,
-          templateName: template.templateName,
-          groups: template.groups,
-          items: template.items,
-          // 与 db:seed 归一化口径一致（sheets 缺省 []）
-          sheets: template.sheets ?? [],
-          updatedAt: now,
-        };
+        // 1. 保留 templates 表作为归档/种子兼容层（写路径不变）
         await tx
           .insert(templates)
-          .values(values)
+          .values({
+            templateId: template.templateId,
+            templateVersion: template.templateVersion,
+            templateName: template.templateName,
+            groups: template.groups,
+            items: template.items,
+            sheets: template.sheets ?? [],
+            updatedAt: now,
+          })
           .onConflictDoUpdate({
             target: templates.templateId,
-            set: values,
+            set: {
+              templateVersion: template.templateVersion,
+              templateName: template.templateName,
+              groups: template.groups,
+              items: template.items,
+              sheets: template.sheets ?? [],
+              updatedAt: now,
+            },
           });
+        // 2. 同步写入产品主数据表（事实源）
+        await persistTemplateToProductTables(tx, template);
       });
     } catch (err) {
       throw toSafeError(err);

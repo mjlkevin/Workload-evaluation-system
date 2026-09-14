@@ -28,6 +28,7 @@ const HistoryList = lazy(() => import('./pages/HistoryList.jsx'))
 const HistoryDetail = lazy(() => import('./pages/HistoryDetail.jsx'))
 const SystemManagement = lazy(() => import('./pages/SystemManagement.jsx'))
 const IndustryMasterData = lazy(() => import('./pages/IndustryMasterData.jsx'))
+const ProductMasterData = lazy(() => import('./pages/ProductMasterData.jsx'))
 const UserManagement = lazy(() => import('./pages/UserManagement.jsx'))
 const ApiKeys = lazy(() => import('./pages/ApiKeys.jsx'))
 import { isAuthenticated } from './api/auth.js'
@@ -106,7 +107,7 @@ export default function App() {
           <Route
             key={section.id}
             path={section.route}
-            element={<IndustryMasterData sectionId={section.id} />}
+            element={section.id === 'products' ? <ProductMasterData sectionId={section.id} /> : <IndustryMasterData sectionId={section.id} />}
           />
         ))}
         <Route path="/users" element={<UserManagement />} />

@@ -1,24 +1,23 @@
 // ============================================================
-// Templates 域 PG 仓储测试（阶段 2 批 8 · 第 1–3 步）
+// Templates 域 PG 仓储测试（阶段 2 批 8 · 第 1–3 步；批次 10b 改写）
 // ============================================================
 // 口径：按批 1–7 确立的五条硬性范式验证单文档模板的 PG 实现——
 // 单行 upsert 幂等、整文档替换语义（活动文档 = 最近写入行）、
 // DB 时钟、安全错误边界、缺行抛错；外加 §4.6 测试套件模板的并发
 // 用例（同 templateId 并发写收敛无字段混写 / 不同 templateId 并发
 // 写读侧确定性取最新）与缓存策略用例（不加缓存层 → 带外 SQL 写入
-// 立即可见）。仅读取 TEST_DATABASE_URL；缺失时按 §4.6 规则诚实报
-// skip（禁止空跑绿）。
+// 立即可见）。
+//
+// 批次 10b 新增：
+//   - loadTemplate() 改从产品主数据表派生，saveTemplate() 双写 templates +
+//     产品主数据表；
+//   - 全字段往返用例覆盖裁决一「派生 Template 与迁移前 jsonb 逐字段等价」；
+//   - 空名模块用例覆盖裁决五「未导入且出现在清单」。
 //
 // 隔离（批 3/5/6/7 口径，§4.9 C5）：共享测试库下多文件并发执行，
 // 全部模板行使用 wes-t-tmpl-* templateId 前缀，清理为条件 DELETE
-// （cleanupTemplateRowsByPrefix），不做整表计数与整表清理。
-// 「活动文档 = 最近写入行」用例要求测试行 updated_at 最新。S6（2026-08-29）
-// 起本域表不再只由本文件触碰——modules.usecase.test.ts 与
-// modules.handlers.test.ts 也经 seedSingleDocStoreFixture 写入行（台账 B3
-// 处置）；三个文件同在 test:modules:serial-store 串行套件内，由
-// --test-concurrency=1 保证时序互斥，且各自用独立行前缀（wes-t-tmpl- /
-// wes-t-uc- / wes-t-hdr-）。本文件测试行经仓储写入（readDbNow 当下时刻）
-// 必然晚于任何存量行，且串行期内无其他写者，故取最新断言成立。
+// （cleanupTemplateRowsByPrefix + cleanProductMasterRows），不做整表计数
+// 与整表清理。
 //
 // 缺行/错误边界用例不依赖真实库：以最小 stub executor 注入
 // 仓储构造器，验证纯逻辑分支（TEMPLATE_STORE_NOT_FOUND / 收敛不泄
@@ -38,10 +37,11 @@ import {
   createTemplatesPgRepository,
   type TemplatesPgRepository,
 } from "./templates-pg.repository";
+import { persistTemplateToProductTables } from "./product-template-derivation";
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
-// 数据集隔离前缀：本文件所有模板行 templateId 均以此开头
+// 数据集隔离前缀：本文件所有模板行 templateId / 产品名 / SKU 名 / 模块名均以此开头
 const TEMPLATE_PREFIX = "wes-t-tmpl-";
 
 let pool: Pool | null = null;
@@ -60,29 +60,50 @@ function deepEquals(a: unknown, b: unknown): boolean {
 
 function makeTemplate(salt: string, opts?: { noSheets?: boolean }): Template {
   const templateId = `${TEMPLATE_PREFIX}${salt}`;
+  const productName = `${TEMPLATE_PREFIX}product-x-${salt}`;
+  const skuA = `${TEMPLATE_PREFIX}sku-a-${salt}`;
+  const skuB = `${TEMPLATE_PREFIX}sku-b-${salt}`;
+  const groupAName = `${TEMPLATE_PREFIX}group-a-${salt}`;
+  const groupBName = `${TEMPLATE_PREFIX}group-b-${salt}`;
+
   const template: Template = {
     templateId,
     templateVersion: `v-${salt}`,
-    templateName: `UT 模板 ${salt}`,
+    templateName: `UT template ${salt}`,
     groups: [
-      { groupId: "grp-1", groupName: `分组A-${salt}` },
-      { groupId: "grp-2", groupName: `分组B-${salt}` },
+      { groupId: "grp-1", groupName: groupAName },
+      { groupId: "grp-2", groupName: groupBName },
     ],
     items: [
       {
         templateItemId: "item-1",
         groupId: "grp-1",
-        itemName: `条目一-${salt}`,
+        itemName: `${TEMPLATE_PREFIX}item-one-${salt}`,
         standardDays: 3.5,
         sheetName: "模块报价",
-        cloudProduct: "云产品X",
+        cloudProduct: productName,
+        skuName: skuA,
+        appGroup: groupAName,
+        deliveryModule: `${TEMPLATE_PREFIX}module-one-${salt}`,
+        deliveryPoint: `${TEMPLATE_PREFIX}delivery-point-one-${salt}`,
+        deliveryDesc: `${TEMPLATE_PREFIX}delivery-desc-one-${salt}`,
+        evalDesc: `${TEMPLATE_PREFIX}eval-desc-one-${salt}`,
         defaultIncluded: true,
       },
       {
         templateItemId: "item-2",
         groupId: "grp-2",
-        itemName: `条目二-${salt}`,
+        itemName: `${TEMPLATE_PREFIX}item-two-${salt}`,
         standardDays: 1,
+        sheetName: "模块报价",
+        cloudProduct: productName,
+        skuName: skuB,
+        appGroup: groupBName,
+        deliveryModule: `${TEMPLATE_PREFIX}module-two-${salt}`,
+        deliveryPoint: undefined,
+        deliveryDesc: undefined,
+        evalDesc: undefined,
+        defaultIncluded: false,
       },
     ],
     sheets: [{ sheetId: "sheet-1", sheetName: "模块报价" }],
@@ -92,7 +113,24 @@ function makeTemplate(salt: string, opts?: { noSheets?: boolean }): Template {
 }
 
 async function cleanOwnRows(): Promise<void> {
-  if (repo) await cleanupTemplateRowsByPrefix(repo.__dbForTest(), TEMPLATE_PREFIX);
+  if (!repo) return;
+  const dbInstance = repo.__dbForTest();
+  await cleanupTemplateRowsByPrefix(dbInstance, TEMPLATE_PREFIX);
+  await cleanProductMasterRows(dbInstance, TEMPLATE_PREFIX);
+}
+
+async function cleanProductMasterRows(dbInstance: ReturnType<TemplatesPgRepository["__dbForTest"]>, prefix: string): Promise<void> {
+  const p = `${prefix}%`;
+  await dbInstance.execute(
+    sql`DELETE FROM product_sku_module_assignments WHERE product_id IN (SELECT id FROM product_lines WHERE name LIKE ${p})`,
+  );
+  await dbInstance.execute(
+    sql`DELETE FROM product_line_sku_links WHERE product_id IN (SELECT id FROM product_lines WHERE name LIKE ${p})`,
+  );
+  await dbInstance.execute(sql`DELETE FROM product_modules WHERE name LIKE ${p}`);
+  await dbInstance.execute(sql`DELETE FROM product_skus WHERE name LIKE ${p}`);
+  await dbInstance.execute(sql`DELETE FROM product_lines WHERE name LIKE ${p}`);
+  await dbInstance.execute(sql`DELETE FROM product_templates WHERE template_id LIKE ${p}`);
 }
 
 before(async () => {
@@ -112,7 +150,7 @@ after(async () => {
 
 // ─── 基础读写与语义（有库套件，缺库诚实 skip）──────────────────
 
-test("全字段往返：标量 + groups + items + sheets 一致", { skip: !testDatabaseUrl }, async () => {
+test("全字段往返：标量 + groups + items + sheets 一致（裁决一：派生与迁移前 jsonb 逐字段等价）", { skip: !testDatabaseUrl }, async () => {
   const input = makeTemplate("roundtrip");
   await repo!.saveTemplate(input);
   const loaded = await repo!.loadTemplate();
@@ -127,6 +165,8 @@ test("全字段往返：标量 + groups + items + sheets 一致", { skip: !testD
 
 test("sheets 缺省归一化为 []（与 db:seed 口径一致）", { skip: !testDatabaseUrl }, async () => {
   const input = makeTemplate("nosheets", { noSheets: true });
+  // 同时去掉 item 的 sheetName，确保没有「默认」sheet 被发明出来
+  for (const item of input.items) delete item.sheetName;
   await repo!.saveTemplate(input);
   const loaded = await repo!.loadTemplate();
   assert.deepEqual(loaded.sheets, []);
@@ -146,7 +186,40 @@ test("整文档替换语义：新 templateId 保存后 load 返回新文档", { 
   await repo!.saveTemplate(makeTemplate("replace-b"));
   const loaded = await repo!.loadTemplate();
   assert.equal(loaded.templateId, `${TEMPLATE_PREFIX}replace-b`);
-  assert.equal(loaded.templateName, "UT 模板 replace-b");
+  assert.equal(loaded.templateName, "UT template replace-b");
+});
+
+// ─── 模块可选层级：空模块条目照常导入 ─────────────────────────
+
+test("迁移忠实导入：模块为空照常进，Excel 小计行也进但被标记为待清理", { skip: !testDatabaseUrl }, async () => {
+  const input = makeTemplate("empty-module");
+  input.items.push({
+    templateItemId: "item-empty",
+    groupId: "grp-1",
+    itemName: "空名条目",
+    standardDays: 2,
+    sheetName: "模块报价",
+    cloudProduct: input.items[0]!.cloudProduct,
+    skuName: input.items[0]!.skuName,
+    deliveryModule: "",
+    defaultIncluded: false,
+  });
+
+  const result = await persistTemplateToProductTables(repo!.__dbForTest(), input);
+  // 2026-09-14 业务澄清：模块是可选层级，套件类 SKU 直接挂交付要点。
+  // 旧断言「只有两条有名模块应被导入 / 空名模块应被记录」编码的是被推翻的口径——
+  // 那会把这类条目丢掉（实测全量数据里是 53 行、139.2 人天）。
+  assert.equal(result.importedAssignments, 3, "三条全部导入，空模块条目不得被丢弃");
+  assert.equal(result.moduleLessAssignments, 1, "其中一条无模块层级");
+  assert.deepEqual(result.skippedRows, [], "产品/SKU 齐全，不该有未导入条目");
+  assert.deepEqual(result.dataQualityFlags, [], "本夹具没有 Excel 小计行");
+
+  const loaded = await repo!.loadTemplate();
+  assert.equal(loaded.items.length, 3, "派生 Template 含空模块条目——它们是套件类 SKU 的正常行");
+  const emptyModuleItem = loaded.items.find((it) => it.templateItemId === "item-empty");
+  assert.ok(emptyModuleItem, "空模块条目必须出现在派生结果里——套件类 SKU 无模块层级是正常形态");
+  assert.equal(emptyModuleItem!.deliveryModule, undefined, "模块位保持为空，不得被占位模块顶替");
+  assert.equal(emptyModuleItem!.standardDays, 2, "人天一分不丢");
 });
 
 // ─── §4.6 并发验证 ────────────────────────────────────────────
@@ -207,11 +280,12 @@ test("DB 时钟：updated_at 落在保存前后两次 SELECT now() 之间（毫�
   );
 });
 
-test("带外 SQL 写入立即可见（不加缓存层的证明）", { skip: !testDatabaseUrl }, async () => {
+test("带外 SQL 写入产品主数据表立即可见（不加缓存层的证明）", { skip: !testDatabaseUrl }, async () => {
   const dbInstance = repo!.__dbForTest();
-  await repo!.saveTemplate(makeTemplate("oob-base"));
+  const input = makeTemplate("oob-base");
+  await repo!.saveTemplate(input);
   await dbInstance.execute(
-    sql`UPDATE templates SET template_name = ${"带外改名"} WHERE template_id LIKE ${TEMPLATE_PREFIX + "%"}`,
+    sql`UPDATE product_templates SET template_name = ${"带外改名"} WHERE template_id LIKE ${TEMPLATE_PREFIX + "%"}`,
   );
   const loaded = await repo!.loadTemplate();
   assert.equal(loaded.templateName, "带外改名");
@@ -223,8 +297,10 @@ test("缺行读取抛 TEMPLATE_STORE_NOT_FOUND（对齐 JSON 缺文件抛错）"
   const stub = {
     select: () => ({
       from: () => ({
-        orderBy: () => ({
-          limit: async () => [],
+        where: () => ({
+          orderBy: () => ({
+            limit: async () => [],
+          }),
         }),
       }),
     }),

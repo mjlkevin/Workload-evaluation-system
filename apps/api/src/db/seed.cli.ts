@@ -25,6 +25,7 @@ async function main(): Promise<void> {
       `ruleSets=${base.ruleSets} systemConfigs=${base.systemConfigs} ` +
       `knowledgeEntries=${base.knowledgeEntries} ` +
       `industryCategories=${base.industryCategories} industrySubcategories=${base.industrySubcategories} ` +
+      `productMasterDataImported=${base.productMasterDataImported} productMasterDataSkipped=${base.productMasterDataSkipped} ` +
       `force=${force}`,
   );
 }
