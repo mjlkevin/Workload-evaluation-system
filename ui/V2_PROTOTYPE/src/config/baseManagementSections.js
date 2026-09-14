@@ -19,6 +19,13 @@ export const BASE_MANAGEMENT_SECTIONS = [
     icon: '行',
     subtitle: '行业主数据（一级大类 + 二级细分），供业务单据引用；只停用不硬删',
   },
+  {
+    id: 'products',
+    route: '/base-data/products',
+    label: '产品主数据',
+    icon: '产',
+    subtitle: '产品 / SKU / 模块 / 标准人天，供实施评估引用；只停用不硬删',
+  },
 ]
 
 export const DEFAULT_BASE_MANAGEMENT_ROUTE = BASE_MANAGEMENT_SECTIONS[0].route

@@ -45,3 +45,65 @@ export async function updateIndustrySubcategory(id, patch) {
 export async function setIndustrySubcategoryStatus(id, status) {
   return unwrap(await apiClient.post(`${BASE}/subcategories/${id}/status`, { status }), 'row')
 }
+
+// ============================================================
+// 基础管理 · 产品主数据 API 访问层（批次 10b）
+// ============================================================
+
+const PRODUCT_BASE = '/master-data/products'
+
+export async function listProductMasterDataTree() {
+  return unwrap(await apiClient.get(`${PRODUCT_BASE}/tree`), 'items') ?? []
+}
+
+export async function listProductMasterDataOptions() {
+  return unwrap(await apiClient.get(`${PRODUCT_BASE}/options`), 'items') ?? {}
+}
+
+export async function createProductLine(input) {
+  return unwrap(await apiClient.post(`${PRODUCT_BASE}/lines`, input), 'row')
+}
+
+export async function createProductSku(input) {
+  return unwrap(await apiClient.post(`${PRODUCT_BASE}/skus`, input), 'row')
+}
+
+export async function createProductModule(input) {
+  return unwrap(await apiClient.post(`${PRODUCT_BASE}/modules`, input), 'row')
+}
+
+export async function createProductAssignment(input) {
+  return unwrap(await apiClient.post(`${PRODUCT_BASE}/assignments`, input), 'row')
+}
+
+export async function updateProductLine(id, patch) {
+  return unwrap(await apiClient.patch(`${PRODUCT_BASE}/lines/${id}`, patch), 'row')
+}
+
+export async function updateProductSku(id, patch) {
+  return unwrap(await apiClient.patch(`${PRODUCT_BASE}/skus/${id}`, patch), 'row')
+}
+
+export async function updateProductModule(id, patch) {
+  return unwrap(await apiClient.patch(`${PRODUCT_BASE}/modules/${id}`, patch), 'row')
+}
+
+export async function updateProductAssignment(id, patch) {
+  return unwrap(await apiClient.patch(`${PRODUCT_BASE}/assignments/${id}`, patch), 'row')
+}
+
+export async function setProductLineStatus(id, status) {
+  return unwrap(await apiClient.post(`${PRODUCT_BASE}/lines/${id}/status`, { status }), 'row')
+}
+
+export async function setProductSkuStatus(id, status) {
+  return unwrap(await apiClient.post(`${PRODUCT_BASE}/skus/${id}/status`, { status }), 'row')
+}
+
+export async function setProductModuleStatus(id, status) {
+  return unwrap(await apiClient.post(`${PRODUCT_BASE}/modules/${id}/status`, { status }), 'row')
+}
+
+export async function setProductAssignmentStatus(id, status) {
+  return unwrap(await apiClient.post(`${PRODUCT_BASE}/assignments/${id}/status`, { status }), 'row')
+}

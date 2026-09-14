@@ -84,6 +84,11 @@ const SERIAL_SCOPE_FILES = [
   // 用例需在「改配置前后」各跑一次并比对实际发给 provider 的 model，
   // 故经 saveRequirementSystemConfigStore 改写 assessment 绑定再还原——同 S3 判据。
   "services/ai/handlers/workbench-chat-scenario.test.ts",
+  // 批次 10b（2026-09-14）：product master data 表成为 loadTemplate() 的事实源；
+  // product-master-data-pg.repository.test.ts 经 createProductMasterDataPgRepository /
+  // createAssignment / updateAssignment 等产品主数据表写入口写入行，会改变全局活动
+  // 文档——与 templates 单文档表同族危害，必须串行。
+  "modules/master-data/product-master-data-pg.repository.test.ts",
 ] as const;
 
 /** 串行套件脚本名与并行套件脚本名。 */
@@ -139,6 +144,17 @@ const WRITER_PATTERNS: RegExp[] = [
   /\bgetTeamRepository\b/,
   /\bsaveTeamStore\b/,
   /\bsaveTeamStoreWithExpectedVersion\b/,
+  // 批次 10b：product master data 表成为 loadTemplate() 事实源，写 product_* 表即改变
+  // 全局活动文档；persistTemplateToProductTables 是 saveTemplate 双写产品主数据表的
+  // 入口；create* 等方法为 product-master-data-pg.repository 的写入口。
+  /\bpersistTemplateToProductTables\b/,
+  /\bcreateProductMasterDataPgRepository\b/,
+  /\bProductMasterDataPgRepository\b/,
+  /\bcreateAssignment\b/,
+  /\bupdateAssignment\b/,
+  /\bcreateProductLine\b/,
+  /\bcreateProductSku\b/,
+  /\bcreateProductModule\b/,
 ];
 
 /**
@@ -283,8 +299,8 @@ test("串行白名单与 package.json 脚本参数列表逐位一致", () => {
 test("串行白名单计数钉定（新增触碰或批次收敛都必须显式更新本条）", () => {
   assert.equal(
     SERIAL_SCOPE_FILES.length,
-    14,
+    15,
     `SERIAL_SCOPE_FILES 实为 ${SERIAL_SCOPE_FILES.length} 条：新增即意味着有新的无界读表写入方，` +
-      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进；S5：9→10，teams 域 JSON 路径删除使 modules.usecase 的 team 用例改走 PG 整存快照-还原，team-pg.repository 随之移进串行组；S3B1：10→11，ai.repository.test.ts 接入串行组，before 自种 system_configs.requirementSettings 行；DEF-2026-09-03-001：11→12，workbench-chat-scenario.test.ts 需在改配置前后各跑一次并比对实际发给 provider 的 model，经 saveRequirementSystemConfigStore 改写 assessment 绑定再还原；批次 6b：12→13，system.tool-policy.test.ts 经 saveToolPolicyStore 写第五 config_key toolPolicy 行；批次 7：13→14，system.mcp-config.test.ts 经 updateMcpConfigDraft / activateMcpConfig 写第六 config_key mcpConfig 行）"
+      "减少即意味着有测试文件退役或改为数据集隔离——两种情况都需同步更新本计数与 §10 台账（S6：6→5，knowledge 两用例改 in-memory 替身移出、modules.handlers 因 B3 种入移进；S3：5→9，system 域 JSON 路径删除后四个恒写 system_configs / version_code_rules 的文件移进；S5：9→10，teams 域 JSON 路径删除使 modules.usecase 的 team 用例改走 PG 整存快照-还原，team-pg.repository 随之移进串行组；S3B1：10→11，ai.repository.test.ts 接入串行组，before 自种 system_configs.requirementSettings 行；DEF-2026-09-03-001：11→12，workbench-chat-scenario.test.ts 需在改配置前后各跑一次并比对实际发给 provider 的 model，经 saveRequirementSystemConfigStore 改写 assessment 绑定再还原；批次 6b：12→13，system.tool-policy.test.ts 经 saveToolPolicyStore 写第五 config_key toolPolicy 行；批次 7：13→14，system.mcp-config.test.ts 经 updateMcpConfigDraft / activateMcpConfig 写第六 config_key mcpConfig 行；批次 10b：14→15，product-master-data-pg.repository.test.ts 经 createProductMasterDataPgRepository / createAssignment / updateAssignment 等产品主数据表写入口写入 product_lines / product_skus / product_modules / product_sku_module_assignments 行；loadTemplate() 已改由产品主数据表派生，任何写入都会改变全局活动文档——与 templates 单文档表同族危害，必须串行）"
   );
 });

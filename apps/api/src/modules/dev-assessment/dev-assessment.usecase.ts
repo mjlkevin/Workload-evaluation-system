@@ -2,7 +2,7 @@ import type { DevAssessmentRow } from "../../db/schema";
 import { generateDevAssessmentDraft } from "../../services/dev-assessment/dev-assessment-ai";
 import type { GenerateDevAssessmentDraftResult } from "../../services/dev-assessment/dev-assessment-ai";
 import {
-  createDevAssessment,
+  createDevAssessment as createDevAssessmentRepo,
   findDevAssessmentById,
   listDevAssessmentsByVersionId,
   listDevAssessmentsByUser,
@@ -15,6 +15,8 @@ import {
   type UpdateDevAssessmentInput,
   type MergeToVersionInput,
 } from "./dev-assessment.repository";
+import { getProductMasterDataRepository } from "../master-data/master-data.module";
+import { buildProductMasterSnapshot } from "../master-data/product-master-data.usecase";
 
 export type { CreateDevAssessmentInput, UpdateDevAssessmentInput, MergeToVersionInput, DevAssessmentItemInput } from "./dev-assessment.repository";
 
@@ -22,7 +24,21 @@ export type { CreateDevAssessmentInput, UpdateDevAssessmentInput, MergeToVersion
 // CRUD passthrough
 // ------------------------------------------------------------------
 
-export { createDevAssessment, findDevAssessmentById, listDevAssessmentsByVersionId, deleteDevAssessment };
+export { findDevAssessmentById, listDevAssessmentsByVersionId, deleteDevAssessment };
+
+/**
+ * 批次 10b：新建开发评估时把当前产品主数据标准人天快照进 context_snapshot，
+ * 保证「当时是多少就是多少」。若调用方已显式传入 contextSnapshot，则合并而非覆盖。
+ */
+export async function createDevAssessment(input: CreateDevAssessmentInput): Promise<DevAssessmentRow> {
+  const assignments = await getProductMasterDataRepository().listActiveAssignments();
+  const snapshot = buildProductMasterSnapshot(assignments);
+  const mergedContextSnapshot: Record<string, unknown> = {
+    ...(input.contextSnapshot ?? {}),
+    productMasterData: snapshot,
+  };
+  return createDevAssessmentRepo({ ...input, contextSnapshot: mergedContextSnapshot });
+}
 
 export function listByAssessedBy(userId: string, status?: string) {
   return listDevAssessmentsByUser(userId, status, "assessedByUserId");

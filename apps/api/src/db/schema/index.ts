@@ -29,3 +29,4 @@ export * from "./json_runtime";
 export * from "./credentials";
 export * from "./knowledge";
 export * from "./industry";
+export * from "./product_master_data";

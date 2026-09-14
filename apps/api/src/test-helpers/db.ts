@@ -104,6 +104,14 @@ export const TRUNCATE_TEST_TABLE_NAMES: string[] = [
   // 故不进入 single-doc-serial-scope.drift.test.ts 的串行白名单。
   "industry_categories",
   "industry_subcategories",
+  // 批次 10b：产品主数据六表。顺序无关（TRUNCATE ... CASCADE），但必须全量登记，
+  // 否则 db.drift.test.ts 的「schema 全集 ⊆ truncate 覆盖集」会红。
+  "product_lines",
+  "product_skus",
+  "product_modules",
+  "product_line_sku_links",
+  "product_sku_module_assignments",
+  "product_templates",
 ];
 
 /**

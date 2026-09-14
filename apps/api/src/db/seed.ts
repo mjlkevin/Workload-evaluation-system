@@ -58,6 +58,7 @@ import {
   versionCodeRules,
 } from "./schema";
 import { resolveRootDir } from "../utils/file";
+import { migrateActiveTemplateRowToProductTables } from "../modules/templates/product-template-derivation";
 import type { RuleSet, Template, VersionCodeRule, VersionCodeRulesStore } from "../types";
 
 export type SeedBaseConfigResult = {
@@ -68,6 +69,8 @@ export type SeedBaseConfigResult = {
   knowledgeEntries: number;
   industryCategories: number;
   industrySubcategories: number;
+  productMasterDataImported: number;
+  productMasterDataSkipped: number;
 };
 
 export type SeedAdminResult = {
@@ -417,6 +420,20 @@ export async function seedBaseConfig(options: SeedBaseConfigOptions = {}): Promi
         .returning()
     : [];
 
+  // 批次 10b：从 templates 表活动行迁移到产品主数据表（事实源）。
+  // 幂等：product_* 表已有数据时，migrate 会走 upsert 不破坏既有数据。
+  let productMasterDataImported = 0;
+  let productMasterDataSkipped = 0;
+  try {
+    const migration = await migrateActiveTemplateRowToProductTables(db);
+    productMasterDataImported = migration.importedAssignments;
+    productMasterDataSkipped = migration.skippedRows.length;
+  } catch (err) {
+    // templates 表空或已迁移过（无可迁移活动行）不是致命错误，记录后继续
+    productMasterDataImported = 0;
+    productMasterDataSkipped = 0;
+  }
+
   return {
     versionCodeRules: insertedRules.length,
     templates: insertedTemplates.length,
@@ -425,6 +442,8 @@ export async function seedBaseConfig(options: SeedBaseConfigOptions = {}): Promi
     knowledgeEntries: insertedKnowledgeEntries.length,
     industryCategories: insertedIndustryCategories.length,
     industrySubcategories: insertedIndustrySubcategories.length,
+    productMasterDataImported,
+    productMasterDataSkipped,
   };
 }
 
