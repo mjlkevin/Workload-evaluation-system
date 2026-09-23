@@ -1,0 +1,24 @@
+{
+  "id": "BE-2026-09-23-test-concurrent-confirm-winner-merged",
+  "date": "2026-09-23",
+  "type": "implementation",
+  "scope": "fix/test-concurrent-confirm-winner · 并发人工确认用例改断言「唯一胜者」性质",
+  "summary": "并发人工确认 winner 用例原先假定第一个参数必胜、依赖执行顺序导致随机失败；改为断言「恰好一个确认生效」的唯一胜者性质。仅改 apps/api/src/modules/harness/harness.usecase.test.ts（+9/−2），零生产代码改动。功能提交 603b7a3，merge ab67f8c 已进 main。",
+  "status": "已合入 main",
+  "pages": ["changes", "testing"],
+  "evidence": [
+    {
+      "kind": "command",
+      "ref": "git show --stat 603b7a3",
+      "result": "pass",
+      "summary": "单测试文件 +9/−2，零生产代码改动"
+    },
+    {
+      "kind": "command",
+      "ref": "gh run view 35806643947 / 35807425006 --json jobs；gh run view --job 107011508425 --log",
+      "result": "pass",
+      "summary": "分支 CI 35806643947 success（该用例此前随机失败）；主干 run 35807425006 六 job 全绿，harness 310 pass / 0 fail / 0 skipped（日志实取）"
+    }
+  ],
+  "next": "无未关闭项。"
+}

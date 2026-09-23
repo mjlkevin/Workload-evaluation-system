@@ -192,13 +192,14 @@
     <section>
       <div class="h-num">Section 05</div>
       <h2>CI 状态</h2>
-      <div class="callout ok"><div><b>GitHub Actions 已恢复绿色（2026-08-17 run 32005821482 实测；run 32024508745 事项 2 后复核仍全绿；2026-09-12 run 34668922131 修复 Test modules 间歇挂起后 attempts 2–8 全绿）</b>阶段 0 事项 5 收口后：lint / tsc / test-non-db / test-with-db / docker-build 全部 success；四套件 skipped 全为 0。此前已修复 <code class="inline">scripts/api-integration-check.js</code> 的 dev-server 进程组清理，避免 <code class="inline">test-non-db</code> 在测试结束后被子进程挂住。2026-09-12 另修 <code class="inline">tsx --test</code> 导致的 esbuild 服务子进程泄漏，使 <code class="inline">Test modules</code> 不再 15 分钟超时，详见 <a href="changes.html#BE-2026-09-12-ci-hang-tsx-esbuild-fix">changes.html</a>。</div></div>
+      <div class="callout ok"><div><b>GitHub Actions 已恢复绿色（2026-09-23 run 35807425006 实测六 job 全绿，为当前基线；2026-08-17 run 32005821482 实测；run 32024508745 事项 2 后复核仍全绿；2026-09-12 run 34668922131 修复 Test modules 间歇挂起后 attempts 2–8 全绿）</b>2026-09-23 当前基线（<code class="inline">gh run view 35807425006 --json jobs</code> 实取）：lint / tsc / test-web / test-with-db / test-non-db / docker-build 全部 success；test-web 74 files / 595 tests，后端 rules 8 / agent 240 / AI 286 / modules 580 / serial-store 186 / integration 1 / harness 310 / security 17+2 / scripts 72，skipped 全 0。此前已修复 <code class="inline">scripts/api-integration-check.js</code> 的 dev-server 进程组清理，避免 <code class="inline">test-non-db</code> 在测试结束后被子进程挂住。2026-09-12 另修 <code class="inline">tsx --test</code> 导致的 esbuild 服务子进程泄漏，使 <code class="inline">Test modules</code> 不再 15 分钟超时，详见 <a href="changes.html#BE-2026-09-12-ci-hang-tsx-esbuild-fix">changes.html</a>。</div></div>
       <table>
         <tr><th>Job</th><th>状态</th><th>说明</th></tr>
         <tr><td class="mono">lint</td><td><span class="status done"><span class="dot"></span>success</span></td><td>静态检查通过。</td></tr>
         <tr><td class="mono">tsc</td><td><span class="status done"><span class="dot"></span>success</span></td><td>类型检查通过。</td></tr>
         <tr><td class="mono">test-non-db</td><td><span class="status done"><span class="dot"></span>success</span></td><td>CI timeout 已修复。</td></tr>
-        <tr><td class="mono">test-with-db</td><td><span class="status done"><span class="dot"></span>success</span></td><td>db:migrate → test:ai 287/287 → test:modules 377/377 → test:integration 1/1，skipped 全 0。2026-09-12 修 tsx 子进程泄漏后稳定 ~64s，8 次 rerun 7/8 全绿。</td></tr>
+        <tr><td class="mono">test-web</td><td><span class="status done"><span class="dot"></span>success</span></td><td>2026-09-23 run 35807425006 日志实取 74 files / 595 tests，skipped 0，成为 main 新基线（+2 用例归因 hooks 刷新修复守卫）。</td></tr>
+        <tr><td class="mono">test-with-db</td><td><span class="status done"><span class="dot"></span>success</span></td><td>db:migrate → test:ai 286/286 → test:modules 580/580 → test:harness 310/310 → test:integration 1/1，skipped 全 0（2026-09-23 run 实取；历史 287/377 为 08-17 口径）。2026-09-12 修 tsx 子进程泄漏后稳定 ~64s，8 次 rerun 7/8 全绿。</td></tr>
         <tr><td class="mono">docker-build</td><td><span class="status done"><span class="dot"></span>success</span></td><td>2026-08-17 分支条件已收窄为仅 main，本轮 run 实际构建成功。</td></tr>
       </table>
     </section>
@@ -346,7 +347,7 @@ harness_tool_events
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 监控与审计 · WES 项目管理 · 2026-08-03
+      <a href="index.html">返回总览</a> · 监控与审计 · WES 项目管理 · 2026-09-23
     </footer>
   </main>
   <script src="assets/board-ui.js" defer></script>
