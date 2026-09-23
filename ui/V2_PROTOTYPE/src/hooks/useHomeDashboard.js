@@ -109,6 +109,7 @@ export default function useHomeDashboard({
   const [loading, setLoading] = useState(Boolean(enabled))
   const [error, setError] = useState(null)
   const [localPlans, setLocalPlans] = useState([])
+  const [refetchId, setRefetchId] = useState(0)
 
   const load = useCallback(async () => {
     if (!enabled) return { ...fallback, error: null }
@@ -195,7 +196,7 @@ export default function useHomeDashboard({
       })
 
     return () => { cancelled = true }
-  }, [enabled, fallback, load, localPlans, applyResult])
+  }, [enabled, fallback, load, localPlans, applyResult, refetchId])
 
   const refetch = useCallback(() => {
     if (!enabled) {
@@ -206,16 +207,11 @@ export default function useHomeDashboard({
       })
       return
     }
-    setLoading(true)
-    setError(null)
-    load()
-      .then(applyResult)
-      .catch((err) => {
-        setError(err)
-        setData(EMPTY_DASHBOARD)
-      })
-      .finally(() => setLoading(false))
-  }, [enabled, fallback, localPlans, load, applyResult])
+    // 递增 refetchId 交给 useEffect 重新取数，而不是直接调 load()：
+    // 直接调用拿的是调用时那一版 localPlans，且结果不受 cancelled 保护——
+    // 新建进行中点刷新、这次又晚于新建完成返回时，会把本地占位行写回列表。
+    setRefetchId((n) => n + 1)
+  }, [enabled, localPlans])
 
   const remove = useCallback(async (versionCode) => {
     if (!enabled) return

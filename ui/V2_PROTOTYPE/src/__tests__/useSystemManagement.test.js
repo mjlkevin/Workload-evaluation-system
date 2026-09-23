@@ -269,4 +269,28 @@ describe('useSystemManagement', () => {
     expect(added.subject).toBe('测试新增规则')
     expect(added.enabled).toBe(true)
   })
+
+  test('activateModel：服务端已生效但生效配置刷新失败时，不报「成功」也不报「未生效」', async () => {
+    let activateCalls = 0
+    server.use(
+      http.post(`${BASE}/system/requirement-settings/activate`, () => {
+        activateCalls += 1
+        return HttpResponse.json({ success: true, data: { version: 2 } })
+      }),
+      http.get(`${BASE}/system/requirement-settings/effective`, () => HttpResponse.json({ message: 'boom' }, { status: 500 }))
+    )
+
+    const { result } = renderHook(() => useSystemManagement())
+    await waitFor(() => expect(result.current.modelConfig.kimiEvaluation.model).toBe('kimi-k2.5'))
+
+    let outcome
+    await act(async () => {
+      outcome = await result.current.actions.activateModel()
+    })
+
+    expect(activateCalls).toBe(1)
+    expect(outcome.success).toBe(false)
+    expect(outcome.error).toMatch(/已生效/)
+    expect(outcome.error).toMatch(/刷新生效配置失败/)
+  })
 })

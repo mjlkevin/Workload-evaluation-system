@@ -279,16 +279,23 @@ export default function useSystemManagement({
   }, [])
 
   // --- T2：生效状态加载 ---
-  const loadEffective = useCallback(async () => {
+  // 严格版：失败即抛，供需要感知结果的动作（activateModel）使用
+  const loadEffectiveStrict = useCallback(async () => {
     if (!enabled) return
     setEffectiveLoading(true)
     try {
       const payload = await apiClient.get('/system/requirement-settings/effective')
       const data = unwrapSingle(payload)
-      if (data?.scenarios) setEffectiveConfig(data)
-    } catch (_) { /* 保留旧值：接口不可用时表格退回草稿视图 */ }
-    finally { setEffectiveLoading(false) }
+      if (!data?.scenarios) throw new Error('生效配置接口返回格式异常：缺少 scenarios')
+      setEffectiveConfig(data)
+    } finally { setEffectiveLoading(false) }
   }, [enabled])
+
+  // 保留旧值：接口不可用时表格退回草稿视图
+  const loadEffective = useCallback(
+    () => loadEffectiveStrict().catch(() => {}),
+    [loadEffectiveStrict]
+  )
 
   // --- T4：验证此场景（用生效模型发最小真实请求，结果写回最近验证） ---
   const testScenario = useCallback((scenario) => {
@@ -338,8 +345,14 @@ export default function useSystemManagement({
   const activateModel = useCallback(() => withAction('activateModel', async () => {
     if (enabled) await apiClient.post('/system/requirement-settings/activate')
     await loadModels()
-    await loadEffective()
-  }), [enabled, withAction, loadModels, loadEffective])
+    // 生效配置刷新失败不能报成功（表格「生效模型」会停在「—」），
+    // 也不能报成未生效（服务端此时已经生效）
+    try {
+      await loadEffectiveStrict()
+    } catch (err) {
+      throw new Error(`模型已生效，但刷新生效配置失败：${err?.message || '未知错误'}`)
+    }
+  }), [enabled, withAction, loadModels, loadEffectiveStrict])
 
   const testApiKey = useCallback((key, model) => withAction('testApiKey', async () => {
     if (enabled) {
