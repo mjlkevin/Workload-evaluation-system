@@ -1,0 +1,24 @@
+{
+  "id": "BE-2026-09-23-radar-local-assets-merged",
+  "date": "2026-09-23",
+  "type": "implementation",
+  "scope": "docs/radar-and-local-assets-0923 · 认领主目录积压的本地改动（雷达日报 9 份 + GT-010 Dify + 团队协作设计入库 + 模型验证配置）",
+  "summary": "纯 docs 零代码：GitHub 雷达日报 9 份 + GT-010 Dify 收录 + CI 挂起修复补记入 radar 页；2026-08-27 WES 团队协作设计（734 行）入库 docs；模型验证配置（config/system/model-verify-status.json）更新；删除已下线「skill 集成」HTML/SVG 两份。功能提交 c868e32，merge 4c11358 已进 main。",
+  "status": "已合入 main",
+  "pages": ["changes", "sources"],
+  "evidence": [
+    {
+      "kind": "command",
+      "ref": "git show --stat c868e32",
+      "result": "pass",
+      "summary": "9 份雷达分析报告 + 已分析项目清单 + 看板 radar/monitoring/sources 三页 + model-verify-status.json + 协作设计 md；skill 集成.html（1037 行）/ .svg（321 行）删除"
+    },
+    {
+      "kind": "command",
+      "ref": "gh run view 35807425006 --json jobs",
+      "result": "pass",
+      "summary": "主干 CI 六 job 全绿（lint/tsc/test-web/test-with-db/test-non-db/docker-build），同 run 一并覆盖当日另两笔合入后的 main 树"
+    }
+  ],
+  "next": "sources.html 文档资产计数若需 +9（雷达日报）由后续对账统一重算，本次未动文档 KPI。"
+}

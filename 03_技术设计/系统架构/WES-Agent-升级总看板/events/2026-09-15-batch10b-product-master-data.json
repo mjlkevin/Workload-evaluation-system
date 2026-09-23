@@ -1,0 +1,27 @@
+{
+  "id": "BE-2026-09-15-batch10b-product-master-data-merged",
+  "date": "2026-09-15",
+  "type": "implementation",
+  "scope": "批次 10b · 产品主数据规范化（PG 六表事实源 + loadTemplate 改派生 + 标准人天挂行项）",
+  "summary": "承接批次 10a 行业主数据：产品主数据建成 PostgreSQL 六表事实源（drizzle 0023 迁移），585 条产品主数据由单条 templates jsonb 迁入六表，loadTemplate() 签名不变、改从六表派生（两个消费方零改动，不做双源），标准人天挂到行项。merge 11a3322 已进 main（功能提交 6bfdb7a）。本事件 2026-09-23 看板对账补登。",
+  "status": "已合入 main",
+  "pages": [
+    "changes",
+    "plan"
+  ],
+  "evidence": [
+    {
+      "kind": "command",
+      "ref": "git log main --oneline --grep=批次10b / git show --stat 6bfdb7a",
+      "result": "pass",
+      "summary": "merge 11a3322；改动 20+ 文件：product-master-data 全栈（schema 189 行 / PG 仓储 598 行 + 测试 277 行 / controller 231 行 / usecase / 内存仓储）+ templates/product-template-derivation.ts 373 行 + migration 0023 + routes/seed/前端 api/masterData.js"
+    },
+    {
+      "kind": "command",
+      "ref": "gh run view 34866437277 / 34868470225 --json jobs",
+      "result": "pass",
+      "summary": "分支 CI 34866437277 绿；主干 CI 34868470225（2026-09-14 push）success"
+    }
+  ],
+  "next": "无未关闭项；loadTemplate 派生路径的既有模板数据迁移口径如后续出现按独立批次登记。"
+}

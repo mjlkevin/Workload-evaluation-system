@@ -69,7 +69,7 @@
         <span><b>这页回答</b> 哪些业务场景需要人工验收、目前是否通过、失败后如何处理</span>
         <span><b>验收范围</b> AI 工作台主流程、权限边界、知识库配置、附件问答、报告生成、草稿确认与过程追溯；具体需求编号保留在下方用例中</span>
         <span><b>当前结论</b> 自动化主线全绿；DEF-2026-08-11-003 已完成合成附件真实运行复验，其他人工验收项仍按台账逐项关闭</span>
-        <span><b>最近更新</b> 2026-08-12</span>
+        <span><b>最近更新</b> 2026-09-23</span>
       </p>
       <div class="pill-row" style="margin-top:18px">
         <span class="pill err">P0 主链路</span>
@@ -716,6 +716,7 @@
       <div class="callout ok" data-board-event-id="BE-2026-08-03-rp-047-a2-mainline-integrated:testing"><div><b>RP-047 Batch A2 已集成并复验</b>A2 已进入业务主线 <code class="inline">88054d5</code>。Codex 在最终组合分支复跑 Testcontainers Harness 95/95、modules 227/227、AI 190/190、integration 1/1、Web 206/206、API/Web build 与安全扫描，全部通过且 0 fail；Harness 0 skip，随机容器已停止。RP-047 尚未交付，Batch B-E 未启动。</div></div>
       <table>
         <tr><th>命令</th><th>最近结果</th><th>覆盖范围</th></tr>
+        <tr data-board-event-id="BE-2026-09-23-main-baseline-595:testing"><td class="mono">test-web <b>main 新基线 74 files / 595 tests</b>（2026-09-23：hooks 刷新修复 + 并发确认唯一胜者断言合入）</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-09-23：74/593 → <b>74/595</b>，+2 用例全部归因 hooks 修复新增守卫。主干 CI <code class="inline">35807425006</code> 六 job 全绿，fail 0。<details class="tech-detail"><summary>两端实取（gh run view --log）</summary>test-web 日志：<code class="inline">Test Files 74 passed (74)</code> / <code class="inline">Tests 595 passed (595)</code>。后端同 run 逐块实取：rules 8 / agent 240 / AI 286 / modules 580 / serial-store 186 / integration 1 / harness 310 / security 17+2 / scripts 72，全块 fail 0 / skipped 0。两笔功能 merge：<code class="inline">e0b4baf</code>（fix/web-hooks-stale-refresh，分支 CI <code class="inline">35805738750</code>，守卫 +2 用例）与 <code class="inline">ab67f8c</code>（fix/test-concurrent-confirm-winner，分支 CI <code class="inline">35806643947</code>，仅改断言、计数不变）；当日第三笔 <code class="inline">4c11358</code>（纯 docs）同 run 覆盖。并发确认用例此前随机失败、本分支 CI 绿为修复证据。</details></td></tr>
         <tr data-board-event-id="BE-2026-09-14-ui-a11y-empty-action-merged:testing"><td class="mono">test-web <b>main 新基线 74 files / 593 tests</b>（前端优化线批 11 已合入 main）</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-09-14：73/581 → <b>74/593</b>，+1 文件 +12 用例，<b>全部归因新增守卫文件</b> <code class="inline">src/__tests__/ListPageA11yAndEmptyAction.test.jsx</code>，既有用例零改动、零 skip。<b>RED 实跑</b>：撤掉 ListPage 与四个列表页的改动后该文件 12 failed（含「表格按 accessible name 定位不到」与「空态只剩暂无数据、无动作按钮」两类），具鉴别力。两端实取：分支 CI <code class="inline">34797643448</code> 与主干 CI <code class="inline">34799587694</code> 同值。本线自 2026-09-14 起冻结，本行为冻结后按用户单独指示合入的最后一批。</td></tr>
         <tr data-board-event-id="BE-2026-09-13-ui-composer-clip-merged:testing"><td class="mono">test-web <b>main 新基线 71 files / 568 tests</b>（前端优化线批 8 已合入 main）</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-09-13：70/564 → <b>71/568</b>，+1 文件 +4 用例，<b>全部归因新增守卫文件</b> <code class="inline">src/__tests__/composer-narrow-clip.test.js</code>，既有用例零改动、零 skip。<b>RED 实跑已做</b>：把修复行摘掉后该文件 1 failed / 3 passed，失败的正是 <code class="inline">min-width:0</code> 那条断言（具鉴别力，非恒真）。<b>守卫性质如实声明</b>：断言的是 CSS 契约而非几何——jsdom 无布局引擎，本文件不假装测几何；几何证据来自 <code class="inline">scripts/measure-composer.mjs</code> 的三档浏览器实测（本地工具，未进 CI，见 ISS-2026-09-04-002 的结案口径）。两端实取：合并树本地 71/568；主干 CI run <code class="inline">34765161675</code> 六 job 全 success，test-web 日志同值。</td></tr>
         <tr data-board-event-id="BE-2026-09-13-ui-remove-homeworkspace-merged:testing"><td class="mono">test-web <b>main 新基线 70 files / 564 tests</b>（前端优化线批 7 已合入 main）</td><td><span class="status done"><span class="dot"></span>pass</span></td><td>2026-09-13：用例数 <b>569 → 564</b>。<b>−5 系按用户裁决删除生产不可达页面（ISS-2026-09-03-001）所致，非测试倒退</b>——删的是 <code class="inline">HomeWorkspace</code> 专属的 5 条视图切换器 / PageShell 契约用例，其被测对象已随页面移出代码库；同文件另外 46 条工作台行为用例逐字未动、断言零改，文件重命名为 <code class="inline">AiHomeWorkbench.test.jsx</code>（文件数不变）。两端实取：推送前合并树本地 <code class="inline">npx vitest run</code> = 70/564；主干 CI run <code class="inline">34763188530</code> 六 job 全 success（lint / tsc / test-with-db / test-web / test-non-db / docker-build），test-web 日志实取 70 files / 564 tests。分支期登记的 65/500 为九天前口径，已由本行取代。</td></tr>
@@ -857,7 +858,7 @@
     </section>
 
     <footer class="footer">
-      <a href="index.html">返回总览</a> · 测试 · WES 项目管理 · 2026-08-03
+      <a href="index.html">返回总览</a> · 测试 · WES 项目管理 · 2026-09-23
     </footer>
   </main>
   <script src="assets/board-ui.js" defer></script>

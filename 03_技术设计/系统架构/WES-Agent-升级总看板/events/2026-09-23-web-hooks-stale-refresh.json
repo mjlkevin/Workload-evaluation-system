@@ -1,0 +1,30 @@
+{
+  "id": "BE-2026-09-23-web-hooks-stale-refresh-merged",
+  "date": "2026-09-23",
+  "type": "implementation",
+  "scope": "fix/web-hooks-stale-refresh · 首页刷新不再用过期本地列表覆盖新数据 + 模型生效后刷新失败不再报成功",
+  "summary": "修复两个 V2 前端 hook 的刷新竞态：useHomeDashboard 保存后用内存旧列表回写、覆盖服务端新数据；useSystemManagement 模型配置生效后刷新失败仍报成功。功能提交 ead4217，merge e0b4baf 已进 main。",
+  "status": "已合入 main",
+  "pages": ["changes", "testing", "index"],
+  "evidence": [
+    {
+      "kind": "command",
+      "ref": "git show --stat ead4217",
+      "result": "pass",
+      "summary": "4 文件（2 hook + 2 测试），+110/−18；守卫用例 +2 条（useHomeDashboard.test.js +61 行 / useSystemManagement.test.js +24 行）"
+    },
+    {
+      "kind": "command",
+      "ref": "gh run view --job 107011508424 --log（run 35807425006 test-web）",
+      "result": "pass",
+      "summary": "主干 test-web 日志实取 Test Files 74 passed (74) / Tests 595 passed (595)；74/593 → +2 用例全部归因本批守卫"
+    },
+    {
+      "kind": "command",
+      "ref": "gh run view 35805738750 --json jobs",
+      "result": "pass",
+      "summary": "分支 CI 35805738750 success"
+    }
+  ],
+  "next": "无未关闭项。"
+}
