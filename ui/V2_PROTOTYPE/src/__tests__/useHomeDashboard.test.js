@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { describe, expect, test } from 'vitest'
 import useHomeDashboard from '../hooks/useHomeDashboard.js'
 import { server } from './mocks/server.js'
@@ -139,5 +139,64 @@ describe('useHomeDashboard', () => {
     expect(result.current.kpi.every((k) => k.state === 'error')).toBe(true)
     expect(result.current.kpi.every((k) => k.num === null)).toBe(true)
     expect(result.current.plans).toEqual([])
+  })
+
+  test('新建进行中触发的刷新晚于新建返回时，不会把本地占位行写回列表', async () => {
+    let releasePost
+    const postGate = new Promise((resolve) => { releasePost = resolve })
+    let created = false
+    let slowNextGet = false
+    const createdRecord = {
+      projectId: 'project-created',
+      projectName: '新项目',
+      customerName: '新客户',
+      industry: '制造业',
+      currentStage: 'rough_estimate',
+      status: 'draft',
+      ownerUsername: 'arch',
+      createdAt: '2026-06-14T00:00:00.000Z',
+      updatedAt: '2026-06-14T00:00:00.000Z',
+      totalDays: 0,
+    }
+    server.use(
+      http.post(`${BASE}/project-evaluations`, async () => {
+        await postGate
+        created = true
+        return HttpResponse.json({ success: true, data: { project: createdRecord } })
+      }),
+      http.get(`${BASE}/project-evaluations`, async () => {
+        const items = created ? [createdRecord, ...mockProjectEvaluations] : mockProjectEvaluations
+        if (slowNextGet) {
+          slowNextGet = false
+          await delay(150)
+        }
+        return HttpResponse.json({ success: true, data: { items } })
+      })
+    )
+
+    const { result } = renderHook(() => useHomeDashboard())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    let createPromise
+    act(() => {
+      createPromise = result.current.create({ projectName: '新项目', customerName: '新客户', industry: '制造业' })
+    })
+    await waitFor(() => expect(result.current.plans.some((p) => String(p.id).startsWith('local-'))).toBe(true))
+
+    // 用户在新建请求未返回时点了刷新：这次取数故意慢于新建完成后的那次
+    slowNextGet = true
+    act(() => {
+      result.current.refetch()
+    })
+
+    await act(async () => {
+      releasePost()
+      await createPromise
+    })
+    await waitFor(() => expect(result.current.plans.some((p) => p.id === 'project-created')).toBe(true))
+    await act(async () => { await delay(250) })
+
+    expect(result.current.plans.some((p) => p.id === 'project-created')).toBe(true)
+    expect(result.current.plans.filter((p) => String(p.id).startsWith('local-'))).toEqual([])
   })
 })
