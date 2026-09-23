@@ -1331,10 +1331,17 @@ test("project-evaluations: concurrent manual confirmation creates one audit even
 
     assert.equal(first?.harness.toolEventId, second?.harness.toolEventId);
     const events = await repo.listToolEvents(run.harnessRunId);
-    assert.equal(events.filter((event) => event.toolName === "manual_confirm_ai_draft").length, 1);
+    const confirmEvents = events.filter((event) => event.toolName === "manual_confirm_ai_draft");
+    assert.equal(confirmEvents.length, 1);
+    // 谁先拿到确认锁取决于锁前那次取记录的查询谁先返回，不由 Promise.all 的参数顺序决定；
+    // 要守的是「只有一个胜者，且记录、审计事件、两次返回都指向同一个胜者」，不是「第一个参数必胜」。
+    const winnerNote = first?.assessmentDraft.manualConfirmation?.note;
+    assert.ok(winnerNote === "第一次确认" || winnerNote === "第二次确认", `unexpected winner note: ${winnerNote}`);
+    assert.equal(second?.assessmentDraft.manualConfirmation?.note, winnerNote);
+    assert.equal((confirmEvents[0].input as { note?: string } | undefined)?.note, winnerNote);
     // 原形态：loadVersionsStore() 整读后 find；PG 侧按 recordId 取行。
     const assessmentRecord = await getVersionsRepository().findRecordById(draft.assessmentDraft.recordId);
-    assert.equal((assessmentRecord?.payload?.aiDraftReview as { note?: string } | undefined)?.note, "第一次确认");
+    assert.equal((assessmentRecord?.payload?.aiDraftReview as { note?: string } | undefined)?.note, winnerNote);
   });
 });
 
