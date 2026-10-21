@@ -8,7 +8,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test } from 'vitest'
 import MessageBubble from '../pages/AiHomeWorkbench/components/ChatArea/MessageBubble.jsx'
-import { mapSessionMessages } from '../pages/AiHomeWorkbench/utils/messageFormatter.js'
+import { mapSessionMessages, sameMessageList } from '../pages/AiHomeWorkbench/utils/messageFormatter.js'
 
 function renderBubble(message) {
   return render(
@@ -104,5 +104,61 @@ describe('mapSessionMessages chip metadata 归一', () => {
     const messages = mapSessionMessages(session)
     expect(messages[0]?.toolCalls).toBeUndefined()
     expect(messages[0]?.memoryRef).toBeUndefined()
+  })
+})
+
+describe('mapSessionMessages 模型名归一（悬停信息区）', () => {
+  test('metadata.modelRun.model（直写 handler 顶层形态）映射到 message.model', () => {
+    const session = {
+      sessionId: 's-model-1',
+      messages: [{
+        messageId: 'a1',
+        role: 'assistant',
+        content: '已评估。',
+        metadata: { modelRun: { provider: 'kimi', model: 'kimi-k2-turbo-preview' } },
+      }],
+    }
+
+    const messages = mapSessionMessages(session)
+    expect(messages[0]?.model).toBe('kimi-k2-turbo-preview')
+  })
+
+  test('metadata.trace.modelRun.model（O8 异步 Run 嵌套形态）映射到 message.model', () => {
+    const session = {
+      sessionId: 's-model-2',
+      messages: [{
+        messageId: 'a2',
+        role: 'assistant',
+        content: '已解析。',
+        metadata: { trace: { modelRun: { provider: 'kimi', model: 'glm-4.6' } } },
+      }],
+    }
+
+    const messages = mapSessionMessages(session)
+    expect(messages[0]?.model).toBe('glm-4.6')
+  })
+
+  test('metadata 无 modelRun（静态意图/历史消息）时 model 为 undefined（静默降级）', () => {
+    const session = {
+      sessionId: 's-model-3',
+      messages: [{ messageId: 'a3', role: 'assistant', content: '能力清单如下…', metadata: {} }],
+    }
+
+    const messages = mapSessionMessages(session)
+    expect(messages[0]?.model).toBeUndefined()
+  })
+})
+
+describe('sameMessageList 模型名比较', () => {
+  test('model 字段不同时判定为不同列表（驱动水合后视图更新模型名）', () => {
+    const left = [{ id: 'a1', role: 'assistant', text: '同文' }]
+    const right = [{ id: 'a1', role: 'assistant', text: '同文', model: 'kimi-k2-turbo-preview' }]
+    expect(sameMessageList(left, right)).toBe(false)
+  })
+
+  test('model 字段相同时仍判定为同一列表（不触发无谓重建）', () => {
+    const left = [{ id: 'a1', role: 'assistant', text: '同文', model: 'kimi-k2-turbo-preview' }]
+    const right = [{ id: 'a1', role: 'assistant', text: '同文', model: 'kimi-k2-turbo-preview' }]
+    expect(sameMessageList(left, right)).toBe(true)
   })
 })

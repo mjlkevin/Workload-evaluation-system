@@ -73,4 +73,44 @@ describe('RP-056 MessageBubble 复制控件 + 时间戳', () => {
     )
     expect(screen.queryByRole('button', { name: '复制消息' })).not.toBeInTheDocument()
   })
+
+  test('AI 消息带 model 时：悬停信息区在复制控件与时间戳之间显示模型名', () => {
+    render(
+      <MessageBubble
+        message={{ id: 'm1', role: 'assistant', text: '模型回答', model: 'kimi-k2-turbo-preview', createdAt: '2026-08-10T09:05:00' }}
+        sending={false}
+      />,
+    )
+
+    const copyButton = screen.getByRole('button', { name: '复制消息' })
+    const modelName = screen.getByText('kimi-k2-turbo-preview')
+    const time = screen.getByText('08-10 09:05')
+    // 顺序：复制控件 → 模型名 → 时间戳
+    expect(copyButton.compareDocumentPosition(modelName) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(modelName.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('AI 消息无 model 时：不显示模型名（历史消息/静态意图静默降级）', () => {
+    render(
+      <MessageBubble
+        message={{ id: 'm2', role: 'assistant', text: '普通回答', createdAt: '2026-08-10T09:05:00' }}
+        sending={false}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '复制消息' })).toBeInTheDocument()
+    expect(screen.queryByText('kimi-k2-turbo-preview')).not.toBeInTheDocument()
+  })
+
+  test('用户消息：不显示模型名', () => {
+    render(
+      <MessageBubble
+        message={{ id: 'u2', role: 'user', text: '用户提问', model: 'kimi-k2-turbo-preview', createdAt: '2026-08-10T10:20:00' }}
+        sending={false}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '复制消息' })).toBeInTheDocument()
+    expect(screen.queryByText('kimi-k2-turbo-preview')).not.toBeInTheDocument()
+  })
 })

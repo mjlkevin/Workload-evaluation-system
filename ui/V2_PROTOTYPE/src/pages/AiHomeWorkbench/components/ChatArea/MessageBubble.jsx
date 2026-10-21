@@ -7,7 +7,7 @@ import AttachmentCard from './AttachmentCard.jsx'
 import RichAiMessage from './RichAiMessage.jsx'
 import LoadingState from './LoadingState.jsx'
 import AskUserForm from './AskUserForm.jsx'
-import { CopyMessageButton, MessageTimestamp } from './MessageBits.jsx'
+import { CopyMessageButton, MessageModelName, MessageTimestamp } from './MessageBits.jsx'
 
 export default function MessageBubble({
   message,
@@ -143,6 +143,7 @@ export default function MessageBubble({
       {showMetaBar && (
         <div className={`ai-msg-meta flex ${metaAlign}`}>
           <CopyMessageButton text={message.text} />
+          {!isUser && <MessageModelName model={message.model} />}
           <MessageTimestamp createdAt={message.createdAt} />
         </div>
       )}

@@ -24,6 +24,12 @@ export function MessageTimestamp({ createdAt }) {
   return <time className="ai-msg-time" dateTime={createdAt}>{label}</time>
 }
 
+/* 悬停信息区模型名（assistant 侧）：取当轮实际运行的模型名，缺数据静默降级（静态意图/历史消息） */
+export function MessageModelName({ model }) {
+  if (!model) return null
+  return <span className="ai-msg-model" title="本次回答使用的模型">{model}</span>
+}
+
 /* ── Copy Session ID Icon ── */
 export function CopyMessageButton({ text }) {
   const [copied, setCopied] = useState(false)

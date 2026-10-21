@@ -459,6 +459,12 @@ export function mapSessionMessages(session) {
       const memoryRef = normalizeMemoryRef(metadata.memoryRef)
       const suggestedActions = normalizeSuggestedActions(metadata.suggestedActions)
       const intent = typeof metadata.intent === 'string' && metadata.intent ? metadata.intent : undefined
+      // 悬停信息区模型名：直写 handler（同步/流式 chat）把 modelRun 提在 metadata 顶层，
+      // O8 异步 Run worker 嵌在 metadata.trace 下；两条持久化形态取其一，
+      // 缺数据（静态意图无模型运行/历史消息）静默降级不显示。
+      const metadataTrace = pickObject(metadata.trace)
+      const rawModel = pickObject(metadata.modelRun).model || pickObject(metadataTrace.modelRun).model
+      const model = typeof rawModel === 'string' && rawModel ? rawModel : undefined
       return {
         id: message.messageId || `${session.sessionId}-${index}`,
         role: message.role,
@@ -478,6 +484,7 @@ export function mapSessionMessages(session) {
         memoryRef,
         suggestedActions,
         intent,
+        model,
       }
     })
     .filter((message) => message.text)
@@ -525,6 +532,7 @@ export function sameMessageList(left, right) {
   return left.every((message, index) => (
     message.role === right[index]?.role &&
     message.text === right[index]?.text &&
+    message.model === right[index]?.model &&
     message.file?.name === right[index]?.file?.name &&
     message.file?.size === right[index]?.file?.size &&
     message.file?.type === right[index]?.file?.type &&
