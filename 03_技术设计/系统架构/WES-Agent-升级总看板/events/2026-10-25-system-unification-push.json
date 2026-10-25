@@ -1,0 +1,27 @@
+{
+  "id": "BE-2026-10-25-system-unification-push",
+  "date": "2026-10-25",
+  "type": "push",
+  "scope": "ISS-2026-10-21-001 / RP-065 系统管理统一化",
+  "authorization": "用户：可以推送",
+  "remote": "origin/main",
+  "commits": [
+    "fe2b6ed",
+    "226cb7f"
+  ],
+  "result": "git push origin main成功；origin/main与226cb7f完整提交ID核对一致",
+  "head": "226cb7fdc696d90d45e4cf5db2694c88174cda46",
+  "pages": [
+    "changes",
+    "index",
+    "plan",
+    "monitoring",
+    "requirements",
+    "issues"
+  ],
+  "limits": [
+    "未宣称新CI已通过",
+    "模板真实500与实际业务写入验收保持开放",
+    "其他未提交改动保留"
+  ]
+}
