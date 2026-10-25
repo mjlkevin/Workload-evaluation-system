@@ -3864,6 +3864,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/system/state-machines:
+    get:
+      tags: [System]
+      summary: 获取状态机目录（admin，只读可视化真源）
+      description: |
+        返回全量状态机目录：各业务对象与版本文档的状态轴、流转触发条件、
+        前置守卫与不变式。数据为静态代码事实（不落库），由防漂移测试
+        `state-machines.catalog.test.ts` 钉住与源码枚举一致；
+        `implemented: false` 如实标注口径已定义但后端暂无写入路径的流转。
+      operationId: listStateMachines
+      responses:
+        "200":
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StateMachineCatalogResponse"
+        "401":
+          description: 未登录或凭证失效
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: 无权限
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/v1/presales/requirement-packs:
     post:
       tags: [Presales]
@@ -8520,6 +8550,103 @@ components:
     # ============================================================
     # System Schemas
     # ============================================================
+
+    StateMachineStatus:
+      type: object
+      properties:
+        key:
+          type: string
+          description: 状态键（与源码枚举常量逐字一致）
+        label:
+          type: string
+          description: 中文名
+        description:
+          type: string
+        terminal:
+          type: boolean
+          description: 终态：进入后不再流出
+      required: [key, label, description]
+
+    StateMachineTransition:
+      type: object
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        trigger:
+          type: string
+          description: 触发方式（代码里真实存在的端点/写入点）
+        guard:
+          type: string
+          description: 前置守卫（含错误码口径）
+        implemented:
+          type: boolean
+          description: false = 口径已定义但后端暂无写入路径
+      required: [from, to, trigger, guard, implemented]
+
+    StateMachineAxis:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        initial:
+          type: string
+          description: 初始态，必须在该轴 statuses 内
+        statuses:
+          type: array
+          items:
+            $ref: "#/components/schemas/StateMachineStatus"
+        transitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/StateMachineTransition"
+      required: [key, label, initial, statuses, transitions]
+
+    StateMachineDescriptor:
+      type: object
+      properties:
+        id:
+          type: string
+        objectLabel:
+          type: string
+        domain:
+          type: string
+          enum: [business_object, version_document]
+        sourceRef:
+          type: string
+          description: 权威源码位置（前端展示供溯源）
+        axes:
+          type: array
+          items:
+            $ref: "#/components/schemas/StateMachineAxis"
+        invariants:
+          type: array
+          items:
+            type: string
+          description: 不随流转变化的硬约束
+      required: [id, objectLabel, domain, sourceRef, axes, invariants]
+
+    StateMachineCatalogResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+          const: ok
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/StateMachineDescriptor"
+          required: [items]
+      required: [code, message, data]
 
     VersionCodeRule:
       type: object

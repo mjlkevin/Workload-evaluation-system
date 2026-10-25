@@ -41,5 +41,7 @@ router.get("/mcp", requireCapability("system:manage"), SystemModule.getMcpConfig
 router.patch("/mcp/draft", requireCapability("system:manage"), SystemModule.updateMcpConfigDraft);
 router.post("/mcp/activate", requireCapability("system:manage"), SystemModule.activateMcpConfig);
 router.post("/mcp/probe", requireCapability("system:manage"), SystemModule.probeMcpServerHandler);
+// 状态机目录（只读可视化真源）：静态代码事实，不落库；防漂移测试钉住与源码枚举一致
+router.get("/state-machines", requireCapability("system:manage"), SystemModule.listStateMachines);
 
 export default router;

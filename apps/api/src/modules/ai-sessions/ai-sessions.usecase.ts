@@ -20,7 +20,8 @@ import type {
 } from "./ai-sessions.types";
 
 const VALID_DOMAINS: AiSessionDomain[] = ["business_evaluation", "standard_governance"];
-const VALID_STATUSES: AiSessionStatus[] = [
+// export：状态机目录防漂移测试（system/state-machines.catalog.test.ts）钉住枚举变更
+export const VALID_STATUSES: AiSessionStatus[] = [
   "temporary_chat",
   "rough_estimate",
   "project_discovery",

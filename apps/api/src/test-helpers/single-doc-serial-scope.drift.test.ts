@@ -163,6 +163,11 @@ const WRITER_PATTERNS: RegExp[] = [
  */
 const DECLARED_NON_WRITERS: Array<{ file: string; expectedHits: number; why: string }> = [
   {
+    file: "modules/system/state-machines.capabilities.drift.test.ts",
+    expectedHits: 1,
+    why: "状态机能力契约只导入静态目录；命中仅为正则断言中的知识仓储类名，不构造仓储、不调用写入方法或访问 DB，命中数变化须重新复核",
+  },
+  {
     file: "modules/knowledge/knowledge.repository.test.ts",
     expectedHits: 6,
     why: "S6 后收缩为装配测试：只取用选择器断实现装配与单例语义，全程不 await 任何仓储方法，不写 knowledge_entries 行",

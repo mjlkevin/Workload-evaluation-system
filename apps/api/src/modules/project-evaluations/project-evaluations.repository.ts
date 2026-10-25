@@ -3,7 +3,8 @@ import { asString } from "../../utils";
 import { getVersionsRepository } from "../versions/versions.repository";
 import type { ProjectEvaluationPlan, ProjectEvaluationStatus } from "./project-evaluations.types";
 
-const VALID_PROJECT_STATUSES: ProjectEvaluationStatus[] = ["draft", "active", "reviewing", "published", "archived"];
+// export：状态机目录防漂移测试（state-machines.catalog.test.ts）钉住枚举变更
+export const VALID_PROJECT_STATUSES: ProjectEvaluationStatus[] = ["draft", "active", "reviewing", "published", "archived"];
 export const PROJECT_EVALUATION_RECORD_KIND = "project_evaluation";
 
 function normalizeProjectStatus(value: unknown): ProjectEvaluationStatus {

@@ -55,6 +55,7 @@ import {
   clearKimiApiKey,
 } from "./system.repository";
 import { probeKnowledgeBaseAccess } from "./knowledge-base-access-probe";
+import { STATE_MACHINE_CATALOG } from "./state-machines.catalog";
 import { getAuditLog, resolveKek, KIMI_SCOPE, getCachedApiKey, setApiKey as dbSetProviderApiKey, clearApiKey as dbClearProviderApiKey } from "./credentials.store";
 import {
   BUILTIN_MOONSHOT_PROVIDER_ID,
@@ -1361,4 +1362,14 @@ export async function probeMcpServerHandler(req: Request, res: Response) {
 
 function nextMcpRevisionSeq(store: { revisions: Array<{ seq: number }> }): number {
   return store.revisions.reduce((max, revision) => Math.max(max, revision.seq), 0) + 1;
+}
+
+// ============================================================
+// 状态机目录（系统管理「状态机规则」可视化 · 只读真源）
+// ============================================================
+
+/** GET /api/v1/system/state-machines — 返回全量状态机目录（静态代码事实，不落库） */
+export async function listStateMachines(req: Request, res: Response) {
+  if (!(await requireAdmin(req, res))) return;
+  res.json(ok({ items: STATE_MACHINE_CATALOG }, randomUUID()));
 }
