@@ -1,26 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAiToolPolicy, normalizeEntry } from '../../hooks/useAiToolPolicy.js'
 import AiMcpServersPanel from './AiMcpServersPanel.jsx'
-
-/**
- * 批次 6a：AI 工具清单（系统管理 · 只读，运行时从 ToolRegistry 派生）。
- * 批次 6b：清单仍是唯一事实来源、永不可编辑；本页新增的是挂在清单上的**策略决定**
- * （启用 / 角色可见 / 审批策略 / 注入模式）——编辑进草稿、显式生效、version 递增、
- * 变更轨迹可查（system_configs 第五配置区，与其余四区同套 draft→生效 机制）。
- * token 列为批次 3 计量口径（定义注入模型时的开销），合计为当前注入集开销。
- */
-
-const V2_ROLES = [
-  { id: 'SALES', label: '销售' },
-  { id: 'PRE_SALES', label: '售前' },
-  { id: 'IMPL', label: '实施' },
-  { id: 'PM', label: '项目经理' },
-  { id: 'DEV', label: '开发' },
-  { id: 'PMO', label: 'PMO' },
-  { id: 'ADMIN', label: '系统管理员' },
-]
-
-const ROLE_LABELS = Object.fromEntries(V2_ROLES.map((role) => [role.id, role.label]))
+import SystemObjectList, { SystemBadge, systemButton, systemPrimaryButton, systemTextButton } from './SystemObjectList.jsx'
+import ToolPolicyDialog, { approvalLabel, injectionLabel, rolesLabel } from './ToolPolicyDialog.jsx'
 
 function formatTime(value) {
   if (!value) return '—'
@@ -30,337 +12,59 @@ function formatTime(value) {
 
 export default function AiToolInventoryPanel() {
   const {
-    tools, summary, version, draftPolicies, activePolicies,
-    updatedAt, effectiveAt, revisions,
+    tools, summary, version, draftPolicies, activePolicies, updatedAt, effectiveAt, revisions,
     loading, saving, activating, reverting, error, unsavedLocal, pendingActivation,
     load, saveDraft, activate, setEntry, discardLocalEdits, revertSavedDraftToActive,
   } = useAiToolPolicy()
   const [savingOk, setSavingOk] = useState(false)
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  const writerCount = tools.filter((tool) => tool.mutates).length
-  const exfilCount = tools.filter((tool) => tool.exfiltrates).length
-  const callableCount = tools.filter((tool) => tool.callable).length
-
+  const searchRef = useRef(null)
+  const [view, setView] = useState(null)
+  useEffect(() => { load() }, [load])
+  const busy = loading || saving || activating || reverting
   const entryFor = (tool) => normalizeEntry(draftPolicies[tool.name] ?? activePolicies[tool.name])
-  const codeApprovalRequired = (tool) => tool.mutates === true || tool.exfiltrates === true
-  const roleDisabled = (tool) => entryFor(tool).enabled === false
-
-  // 任何编辑都作废「已保存」提示，避免它挂在过期状态上
-  const editEntry = (toolName, patch) => {
-    setSavingOk(false)
-    setEntry(toolName, patch)
-  }
-
-  const handleSave = async () => {
-    setSavingOk(false)
-    const ok = await saveDraft(draftPolicies)
-    if (ok) setSavingOk(true)
-  }
-
-  const handleActivate = async () => {
-    setSavingOk(false)
-    await activate()
-  }
-
-  const handleRevertDraft = async () => {
-    setSavingOk(false)
-    await revertSavedDraftToActive()
-  }
-
-  const toggleRole = (tool, roleId) => {
-    const current = entryFor(tool)
-    const visibleRoles = current.visibleRoles.includes(roleId)
-      ? current.visibleRoles.filter((role) => role !== roleId)
-      : [...current.visibleRoles, roleId]
-    editEntry(tool.name, { visibleRoles })
-  }
-
+  const editEntry = (name, patch) => { setSavingOk(false); setEntry(name, patch) }
+  const handleSave = async () => { setSavingOk(false); if (await saveDraft(draftPolicies)) setSavingOk(true) }
+  const open = (mode, tool) => setView({ mode, tool, entry: entryFor(tool), activeEntry: normalizeEntry(activePolicies[tool.name]) })
+  const filters = [
+    { value: 'enabled', label: '已启用', matches: (tool) => entryFor(tool).enabled },
+    { value: 'disabled', label: '已停用', matches: (tool) => !entryFor(tool).enabled },
+  ]
+  const columns = [
+    { key: 'name', label: '工具名称', render: (tool) => <div className="min-w-0"><button type="button" className={`${systemTextButton} h-auto min-h-7 justify-start px-0 text-left font-mono font-semibold wrap-anywhere`} onClick={() => open('detail', tool)}>{tool.name}</button><div className="flex flex-wrap gap-x-2 text-xs leading-5 text-ink-2"><span>{tool.category || '未分类'}</span><span className={tool.mutates ? 'text-warn-ink' : ''}>{tool.mutates ? '会写数据' : '只读'}</span>{tool.exfiltrates && <span className="text-warn-ink">会外发</span>}{tool.origin === 'mcp' && <span title={tool.mcpServer?.name || tool.mcpServer?.id}>MCP · {tool.mcpServer?.name || tool.mcpServer?.id || '未知服务'}</span>}</div></div> },
+    { key: 'description', label: '说明', hideBelow: 'lg', className: 'max-w-56', render: (tool) => <span className="line-clamp-2 text-xs leading-5 text-ink-2" title={tool.description}>{tool.description || '—'}</span> },
+    { key: 'enabled', label: '草稿状态', render: (tool) => <div className="space-y-1 whitespace-nowrap"><SystemBadge tone={entryFor(tool).enabled ? 'ok' : 'neutral'}>{entryFor(tool).enabled ? '已启用' : '已停用'}</SystemBadge><div className="text-xs leading-5 text-ink-2">{tool.callable ? '可调用' : '不可调用'}</div></div> },
+    { key: 'roles', label: '可见角色', hideBelow: 'lg', render: (tool) => { const entry = entryFor(tool); const labels = rolesLabel(entry).split('、'); return <span className="text-xs leading-5 text-ink-2" title={rolesLabel(entry)}>{labels.slice(0, 2).join('、')}{labels.length > 2 ? ` +${labels.length - 2}` : ''}</span> } },
+    { key: 'approval', label: '审批策略', hideBelow: 'lg', render: (tool) => <span className="whitespace-nowrap text-xs text-ink-2">{approvalLabel(tool, entryFor(tool))}</span> },
+    { key: 'injection', label: '注入方式', hideBelow: 'md', render: (tool) => <div className="whitespace-nowrap text-xs leading-5 text-ink-2"><div>{injectionLabel(tool, entryFor(tool))}</div><div>{tool.injected ? '已注入' : '未注入'}</div></div> },
+    { key: 'actions', label: '操作', render: (tool) => <div className="flex whitespace-nowrap"><button type="button" className={systemTextButton} aria-label={`查看 ${tool.name}`} onClick={() => open('detail', tool)}>查看</button><button type="button" className={systemTextButton} aria-label={`编辑 ${tool.name}`} disabled={busy} onClick={() => open('edit', tool)}>编辑</button></div> },
+  ]
   return (
-    <div>
-      <div className="sys-toolbar">
-        <span className="meta">
-          共 {tools.length} 个工具 · 其中 {writerCount} 个会写数据 · {exfilCount} 个会外发数据 · 你本人可调用 {callableCount} 个
-          {' · '}当前注入 {summary.injectedCount ?? 0} 个 / {summary.injectedTokens ?? 0} tokens
-          {loading ? ' · 加载中...' : ''}
-        </span>
-        <button type="button" className="btn btn-out btn-sm" onClick={load} disabled={loading}>
-          ↻ 刷新
-        </button>
-      </div>
-
-      <p className="sys-field__v--dim" style={{ margin: '0 0 10px', fontSize: 12 }}>
-        工具本身（名称、参数、实现）来自代码，清单只读不可编辑；本页编辑的是**策略决定**——启用、角色可见、审批要求、注入模式。
-        策略只做减法：capability 权限之上再裁一层，两层都通过才注入；任何策略都不能放宽权限。
-        编辑先「保存草稿」落到服务端，「生效」提升的是服务端已存的草稿——没保存的修改不会进入生效版本，两步都不可省。
-        {exfilCount > 0
-          ? '外发类工具（把数据送出系统）必须逐次审批，且不可配置为免审批。'
-          : '「外发」维度独立于「写入」：不改本地库但把数据送出系统的工具同样必须逐次审批。'}
-      </p>
-
-      <div className="sys-toolbar" style={{ gap: 8, alignItems: 'center' }}>
-        <span className="meta">
-          生效版本 v{version}
-          {effectiveAt ? ` · 生效于 ${formatTime(effectiveAt)}` : ''}
-          {updatedAt ? ` · 草稿更新于 ${formatTime(updatedAt)}` : ''}
-        </span>
-        {unsavedLocal ? (
-          <span className="bdg warn" title="页面上的编辑还没写入服务端草稿；此时点「生效」不会带上它们">
-            <span className="dot" />有未保存的修改
-          </span>
-        ) : null}
-        {pendingActivation ? <span className="bdg warn"><span className="dot" />草稿未生效</span> : null}
-        {!unsavedLocal && !pendingActivation ? (
-          <span className="bdg muted"><span className="dot" />草稿与生效一致</span>
-        ) : null}
-        {savingOk ? <span className="bdg acc"><span className="dot" />草稿已保存</span> : null}
-        <span style={{ flex: 1 }} />
-        <button
-          type="button"
-          className="btn btn-out btn-sm"
-          onClick={() => { setSavingOk(false); discardLocalEdits() }}
-          disabled={!unsavedLocal || saving || activating || reverting}
-          title="只丢弃本页面未保存的编辑，回到服务端存着的草稿（不改动服务端；刷新不会带回这些编辑）"
-        >
-          放弃未保存的修改
-        </button>
-        <button type="button" className="btn btn-out btn-sm" onClick={handleSave} disabled={!unsavedLocal || saving}>
-          {saving ? '保存中...' : '保存草稿'}
-        </button>
-        <button
-          type="button"
-          className="btn btn-out btn-sm"
-          onClick={handleRevertDraft}
-          disabled={!pendingActivation || saving || activating || reverting}
-          title="把服务端的草稿回退成当前生效版本（这是一次服务端写入，会记入变更轨迹；未保存的本地编辑同时丢弃）"
-        >
-          {reverting ? '回退中...' : '草稿回退为生效版本'}
-        </button>
-        <button
-          type="button"
-          className="btn btn-pri btn-sm"
-          onClick={handleActivate}
-          disabled={!pendingActivation || unsavedLocal || activating}
-          title={
-            unsavedLocal
-              ? '有未保存的修改：「生效」提升的是服务端已存的草稿，先「保存草稿」再「生效」，否则这些编辑不会进入生效版本'
-              : pendingActivation
-                ? '把服务端草稿提升为生效版本（version +1，记入变更轨迹）'
-                : '草稿与生效版本一致，无需生效'
-          }
-        >
-          {activating ? '生效中...' : '生效'}
-        </button>
-      </div>
-
-      {unsavedLocal ? (
-        <div className="sys-field__v--dim" role="alert" style={{ margin: '0 0 10px', fontSize: 12 }}>
-          本页有未保存的修改：「生效」只会把服务端已存的草稿提升为生效版本，这些修改不会进入生效版本。
-          请先点「保存草稿」，再点「生效」。
-        </div>
-      ) : null}
-
-      {error ? <div className="sys-empty">{error}</div> : null}
-
-      {!error && tools.length === 0 && !loading ? <div className="sys-empty">暂无已注册的工具</div> : null}
-
-      {tools.length > 0 ? (
-        <div className="sys-table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>工具</th>
-                <th>说明</th>
-                <th>所需权限</th>
-                <th>写入</th>
-                <th>外发</th>
-                <th title="定义（名称+描述+参数 schema）注入模型时的 token 估算，批次 3 计量口径">Token</th>
-                <th>启用</th>
-                <th>可见角色</th>
-                <th>审批策略</th>
-                <th>注入模式</th>
-                <th>生效注入</th>
-                <th>本人可调用</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tools.map((tool) => {
-                const entry = entryFor(tool)
-                return (
-                  <tr key={tool.name}>
-                    <td>
-                      <span className="mono" style={{ fontWeight: 600 }}>{tool.name}</span>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        {tool.category ? (
-                          <span className="tag brd" style={{ fontSize: 10 }}>{tool.category}</span>
-                        ) : null}
-                        {tool.origin === 'mcp' ? (
-                          <span
-                            className="tag brd"
-                            style={{ fontSize: 10 }}
-                            title={`MCP 桥接工具（第三方撰写，逐个放行）· 归属服务：${tool.mcpServer?.name || tool.mcpServer?.id || ''}`}
-                          >
-                            MCP{tool.mcpServer ? ` · ${tool.mcpServer.name || tool.mcpServer.id}` : ''}
-                          </span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td><span className="sys-cell-clip" title={tool.description}>{tool.description || '—'}</span></td>
-                    <td><span className="mono" style={{ fontSize: 11 }}>{tool.capability || '—'}</span></td>
-                    <td>
-                      <span className={`bdg ${tool.mutates ? 'warn' : 'muted'}`}><span className="dot" />{tool.mutates ? '会写数据' : '只读'}</span>
-                    </td>
-                    <td>
-                      {/* 外发独立于写入：琥珀告警色——送出系统的数据不可回收 */}
-                      <span className={`bdg ${tool.exfiltrates ? 'warn' : 'muted'}`}><span className="dot" />{tool.exfiltrates ? '会外发' : '不外发'}</span>
-                    </td>
-                    <td><span className="mono" style={{ fontSize: 11 }}>{tool.tokens}</span></td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        className="sys-check"
-                        checked={entry.enabled}
-                        onChange={(event) => editEntry(tool.name, { enabled: event.target.checked })}
-                        aria-label={`启用 ${tool.name}`}
-                      />
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: 220 }}>
-                        {V2_ROLES.map((role) => {
-                          const on = entry.visibleRoles.includes(role.id)
-                          return (
-                            <button
-                              key={role.id}
-                              type="button"
-                              className={`tag ${on ? 'acc' : 'brd'}`}
-                              title={on ? `已限定对「${role.label}」可见（取消勾选=不限制）` : `对「${role.label}」${entry.visibleRoles.length ? '不可见' : '可见（未设限）'}`}
-                              aria-pressed={on}
-                              disabled={roleDisabled(tool)}
-                              onClick={() => toggleRole(tool, role.id)}
-                            >
-                              {role.label}
-                            </button>
-                          )
-                        })}
-                        {entry.visibleRoles.length === 0 ? <span className="meta" style={{ fontSize: 11 }}>全部角色（仅受权限位约束）</span> : null}
-                      </div>
-                    </td>
-                    <td>
-                      <select
-                        className="input"
-                        value={entry.approvalStrategy}
-                        disabled={codeApprovalRequired(tool) || roleDisabled(tool)}
-                        title={
-                          codeApprovalRequired(tool)
-                            ? '该工具按代码事实必须逐次审批（写/外发），策略不可放宽'
-                            : '只读工具默认免审批，可收紧为逐次确认'
-                        }
-                        onChange={(event) => editEntry(tool.name, { approvalStrategy: event.target.value })}
-                      >
-                        <option value="default">{codeApprovalRequired(tool) ? '必须审批（代码下限）' : '按代码（免审批）'}</option>
-                        <option value="user-confirm">逐次确认</option>
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        className="input"
-                        value={entry.injectionMode}
-                        disabled={roleDisabled(tool)}
-                        title="注入模式只能降档：按需发现 = 不再主动注入（发现类工具本就只能按需发现，二者互不冲突）"
-                        onChange={(event) => editEntry(tool.name, { injectionMode: event.target.value })}
-                      >
-                        <option value="default">跟随代码{tool.discoverable ? '（按需发现）' : '（常驻）'}</option>
-                        <option value="on-demand">强制按需发现</option>
-                      </select>
-                    </td>
-                    <td>
-                      <span
-                        className={`bdg ${tool.injected ? 'acc' : 'muted'}`}
-                        title={
-                          tool.injected
-                            ? '按当前生效策略，该工具会注入给模型的这位使用者'
-                            : '按当前生效策略不注入（权限位 / 停用 / 角色不可见 / 按需降档 之一）'
-                        }
-                      >
-                        <span className="dot" />{tool.injected ? '注入' : '不注入'}
-                      </span>
-                    </td>
-                    <td>
-                      {/* 权限差异不是错误态：不可调用只给中性品牌色，与「会写数据」的琥珀告警区分开 */}
-                      <span
-                        className={`bdg ${tool.callable ? 'muted' : 'brd'}`}
-                        title={
-                          tool.callable
-                            ? `你本人持有 ${tool.capability}，可直接调用`
-                            : `工具已在系统中注册，但你本人缺少 ${tool.capability}，无法调用`
-                        }
-                      >
-                        <span className="dot" />
-                        {tool.callable ? '可调用' : '不可调用'}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-
-      <div style={{ marginTop: 18 }}>
-        <h3 style={{ fontSize: 13, margin: '0 0 8px' }}>变更轨迹（最近 {revisions.length} 条，与 version 对账）</h3>
-        {revisions.length === 0 ? (
-          <div className="sys-empty">暂无策略变更记录</div>
-        ) : (
-          <div className="sys-table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>版本</th>
-                  <th>动作</th>
-                  <th>操作者</th>
-                  <th>时间</th>
-                  <th>改了什么</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...revisions].reverse().map((revision) => (
-                  <tr key={`${revision.seq}-${revision.at}`}>
-                    <td><span className="mono">{revision.seq}</span></td>
-                    <td><span className="mono">v{revision.version}</span></td>
-                    <td>
-                      <span className={`bdg ${revision.action === 'activate' ? 'acc' : 'muted'}`}>
-                        <span className="dot" />{revision.action === 'activate' ? '生效' : '草稿'}
-                      </span>
-                    </td>
-                    <td><span className="mono">{revision.actor}</span></td>
-                    <td><span style={{ fontSize: 11 }}>{formatTime(revision.at)}</span></td>
-                    <td>
-                      {revision.changes.length === 0
-                        ? <span className="meta" style={{ fontSize: 11 }}>无字段变化</span>
-                        : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {revision.changes.map((change, index) => (
-                              <span key={`${revision.seq}-${index}`} className="mono" style={{ fontSize: 11 }}>
-                                {change.tool} · {change.field}: {change.from || '—'} → {change.to || '—'}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <div className="min-w-0 space-y-5">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs leading-6 text-ink-2"><span>共 {tools.length} 个工具 · 其中 {tools.filter((tool) => tool.mutates).length} 个会写数据 · {tools.filter((tool) => tool.exfiltrates).length} 个会外发数据 · 你本人可调用 {tools.filter((tool) => tool.callable).length} 个</span><span>当前注入 {summary.injectedCount ?? 0} 个 / {summary.injectedTokens ?? 0} tokens</span></div>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-solid border-line bg-surface px-4 py-3">
+          <span className="text-xs font-semibold text-ink">生效版本 v{version}</span>
+          {unsavedLocal && <SystemBadge tone="warn">有未保存的修改</SystemBadge>}
+          {pendingActivation && <SystemBadge tone="warn">草稿未生效</SystemBadge>}
+          {!unsavedLocal && !pendingActivation && <SystemBadge>草稿与生效一致</SystemBadge>}
+          {savingOk && <SystemBadge tone="ok">草稿已保存</SystemBadge>}
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button type="button" className={systemButton} disabled={!unsavedLocal || busy} onClick={() => { setSavingOk(false); discardLocalEdits() }}>放弃未保存的修改</button>
+            <button type="button" className={systemButton} disabled={!unsavedLocal || busy} onClick={handleSave}>{saving ? '保存中...' : '保存草稿'}</button>
+            <button type="button" className={systemButton} disabled={!pendingActivation || busy} onClick={async () => { setSavingOk(false); await revertSavedDraftToActive() }} title="把服务端草稿回退成生效版本，同时丢弃未保存编辑；会记入变更轨迹">{reverting ? '回退中...' : '草稿回退为生效版本'}</button>
+            <button type="button" className={systemPrimaryButton} disabled={!pendingActivation || unsavedLocal || busy} title={unsavedLocal ? '先保存草稿，再生效' : pendingActivation ? '把服务端草稿提升为生效版本' : '草稿与生效版本一致，无需生效'} onClick={async () => { setSavingOk(false); await activate() }}>{activating ? '生效中...' : '生效'}</button>
           </div>
-        )}
+        </div>
+        {unsavedLocal && <p role="alert" className="m-0 rounded-md bg-warn-soft px-3 py-2 text-xs leading-6 text-warn-ink">本页有未保存的修改，这些修改不会进入生效版本。请先保存草稿，再生效。</p>}
       </div>
-
+      <SystemObjectList title="工具策略" searchInputRef={searchRef} rows={tools} rowKey="name" columns={columns} filters={filters} loading={loading} error={error} onRetry={unsavedLocal ? undefined : load} emptyText="暂无已注册的工具" searchText={(tool) => [tool.name, tool.description, tool.category, tool.capability].join(' ')} actions={<button type="button" className={systemButton} disabled={busy || unsavedLocal} title={unsavedLocal ? '先保存或放弃未保存的修改' : undefined} onClick={load}>刷新</button>} />
+      <details className="rounded-lg border border-solid border-line bg-surface px-4 py-3 text-xs leading-6 text-ink-2"><summary className="cursor-pointer font-medium text-ink">策略说明与配置时间</summary><p>工具本身（名称、参数、实现）来自代码，清单只读不可编辑；本页编辑的是策略决定：启用、角色可见、审批要求、注入模式。策略只做减法，不能放宽权限。写入和外发工具必须逐次审批。</p><p className="mb-0">生效于 {formatTime(effectiveAt)} · 草稿更新于 {formatTime(updatedAt)}</p></details>
+      <section className="min-w-0 space-y-3">
+        <h3 className="m-0 text-sm font-semibold leading-6 text-ink">变更轨迹（最近 {revisions.length} 条，与 version 对账）</h3>
+        {revisions.length === 0 ? <p className="m-0 text-xs text-ink-2">暂无策略变更记录</p> : <div className="overflow-x-auto rounded-lg border border-solid border-line bg-surface"><table aria-label="工具策略变更轨迹" className="w-full border-collapse text-left text-xs leading-6 text-ink-2"><thead><tr>{['#', '版本', '动作', '操作者', '时间', '改了什么'].map((label) => <th key={label} className="border-0 border-b border-solid border-line bg-bg-soft px-3 py-2 font-medium">{label}</th>)}</tr></thead><tbody>{[...revisions].reverse().map((revision) => <tr key={`${revision.seq}-${revision.at}`}><td className="px-3 py-2">{revision.seq}</td><td className="px-3 py-2">v{revision.version}</td><td className="px-3 py-2">{revision.action === 'activate' ? '生效' : '草稿'}</td><td className="px-3 py-2">{revision.actor}</td><td className="whitespace-nowrap px-3 py-2">{formatTime(revision.at)}</td><td className="px-3 py-2">{revision.changes.length ? revision.changes.map((change, index) => <div key={index} className="font-mono wrap-anywhere">{change.tool} · {change.field}: {change.from || '—'} → {change.to || '—'}</div>) : '无字段变化'}</td></tr>)}</tbody></table></div>}
+      </section>
       <AiMcpServersPanel />
+      {view && <ToolPolicyDialog {...view} fallbackFocusRef={searchRef} onClose={() => setView(null)} onApply={editEntry} />}
     </div>
   )
 }

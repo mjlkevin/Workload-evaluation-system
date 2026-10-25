@@ -67,7 +67,7 @@
         <div class="crumb">项目资料与可信度说明</div>
         <h1>项目信息来源</h1>
         <div class="meta">
-          <span>共盘点 <b>80</b> 份项目资料</span>
+          <span>共登记 <b>95</b> 项资料（主台账去重）</span>
           <span>当前事实源 <b>22</b> 份</span>
           <span>项目管理页面 <b>19</b> 个</span>
           <span>历史参考 <b>5</b> 份</span>
@@ -89,6 +89,11 @@
       <button class="mobile-menu-btn" onclick="document.querySelector('.navlinks').classList.toggle('open')" aria-label="菜单">☰</button>
     </div>
 
+    <section data-board-event-id="BE-2026-10-25-system-unification-submit:sources"><h2>统一化资料 · 已补提交前验证</h2><p><a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">方案、截图与提交验证</a>第16节及同目录verification-2026-10-25.json补充授权、分离提交、目录纠正与最新验证；沿用原资料条目，来源台账96行/95个去重引用不变。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-batch4:sources"><h2>统一化资料 · 四批记录与最终证据齐备</h2><p><a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">统一方案与最终验证</a>第14、15节记录最后三页及最终检查，新增17张截图与最终DSL图；沿用原文档来源，主台账96行/95项去重引用不变。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-batch3:sources"><h2>统一化资料 · 第三批证据补充</h2><p><a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">方案与第三批证据</a>第13节新增3页规格、复核与18张截图；沿用已有来源条目，主台账96行/95项去重引用不变。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-batch2:sources"><h2>系统管理统一化资料 · 第二批证据已补充</h2><p><a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">方案与第二批实施证据</a>第 12 节记录四页规格、验证和 14 张现场截图；沿用同一来源条目，主台账仍为 96 行 / 95 项去重主引用。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-pilot:sources"><h2>系统管理统一化资料 · 已补首批实施证据</h2><p><a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">方案与首批实施证据</a>已补充两页样板文件、验证结果和 7 张实施截图；沿用同一资料条目，主台账仍为 96 行 / 95 项去重主引用。</p></section>
     <section>
       <div class="wrap" data-tech-collapse data-tech-label="分层明细">
         <div class="sec-head">
@@ -585,7 +590,7 @@
       <div class="wrap" data-tech-collapse data-tech-label="矩阵明细">
         <div class="sec-head">
           <div class="num">02 / Phase Matrix</div>
-          <h2>Phase × 文档矩阵</h2>
+          <h2>Phase × 文档矩阵</h2><p data-board-event-id="BE-2026-10-21-system-unification-research:sources-matrix">阶段 3 / RP-065 阶段 B：<a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">完整调研与重构方案（含 15 张截图）</a>；12页前端已实现，已授权本地提交；联调和实际写入验收保持开放。</p>
           <p>横轴为当前已定义的 Phase，纵轴为文档类型。单元格展示该 Phase 下对应文档的入口或状态。</p>
         </div>
 
@@ -905,6 +910,10 @@
               </tr>
             </thead>
             <tbody>
+              <tr data-board-event-id="BE-2026-10-21-system-unification-research:sources"><td>设计调研</td><td><a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">完整调研与重构方案（含 15 张截图）</a></td><td class="mono">02_产品设计/系统管理统一化重构调研-2026-10-21/</td><td>12子页调研、统一规范、四批实现及最终截图验证</td><td>前端实现完成 / 待验收</td><td>Codex；方案与实施状态变化时更新</td><td>否</td><td>阶段 3 / RP-065 阶段 B</td></tr>
+              <tr data-board-event-id="BE-2026-10-17-state-machines-catalog-and-system-ia:sources">
+                <td>设计文档</td><td><a href="../../../03_技术设计/数据模型/状态控制规则梳理-V1.md">状态控制规则梳理-V1.md</a></td><td colspan="6">21 个状态机描述符（20 类业务对象 + 版本文档三轴/六动作守卫）静态快照；口径以 <code class="inline">GET /api/v1/system/state-machines</code> 为准，目录与源码枚举由防漂移测试钉住（RP-065，2026-10-17）。2026-10-21 控件改版附件：<a href="../../../docs/superpowers/plans/2026-10-21-system-controls-polish.md">改版计划与证据</a>。当前用途：状态控制规则梳查与可视化页对照；维护责任：随目录代码变更同步。</td>
+              </tr>
               <tr data-board-event-id="BE-2026-08-28-open-design-system-extraction:sources-package">
                 <td>设计资产</td><td><a href="../../../ui/V2_PROTOTYPE/design-system/wes-workbench/DESIGN.md">wes-workbench 设计系统包</a></td><td colspan="6">从 ui/V2_PROTOTYPE 提炼的 Open-Design 可链接设计系统包（od-design-system-project/v1）：13 文件、84 token（56 共享 schema + 28 白名单扩展），官方守卫 3/4 全绿；已同步落位 Open Design 桌面版用户体系目录并补齐工作区成员绑定，桌面版「你的体系」可见（已人工验收）；守卫链接副本在 <code class="inline">.codex-tools/open-design/design-systems/wes-workbench/</code>，入口文档 DESIGN.md / USAGE.md。</td>
               </tr>
@@ -2316,7 +2325,7 @@
     </section>
 
     <footer class="wrap footer">
-      WES 项目管理 · 项目信息来源 · 2026-08-04 · 80 份项目资料 · 5 份历史参考
+      WES 项目管理 · 项目信息来源 · 2026-10-21 · 95 项资料（主台账去重） · 5 份历史参考
     </footer>
   </main>
 

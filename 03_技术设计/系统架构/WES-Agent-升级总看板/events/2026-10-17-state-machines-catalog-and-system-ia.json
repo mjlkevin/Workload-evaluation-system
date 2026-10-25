@@ -1,0 +1,64 @@
+{
+  "id": "BE-2026-10-17-state-machines-catalog-and-system-ia",
+  "date": "2026-10-17",
+  "type": "implementation",
+  "scope": "feat(system)+refactor(web)+feat(web) · RP-065 状态机目录只读接口 + 系统管理三级 URL + 状态机规则可视化页",
+  "summary": "状态机规则可视化与系统管理三级分类重构（RP-065）四阶段交付：后端 21 个状态机描述符目录 + GET /api/v1/system/state-machines 只读接口（admin）+ 8 条防漂移测试钉住目录与源码枚举逐字一致；前端系统管理重排 /system/{group}/{section} 三级（3 分组 12 子页，11 条旧扁平路由重定向且保留 query，两级页签+侧栏分组）；新增只读可视化页 StateMachinesSection（折叠卡/状态流条/转换守卫表/未实现标记/三轴六动作/搜索域筛选）。openapi.yaml 与实现对齐文档、梳理沉淀文档同步。未提交未推送，等待用户验收后按四笔拆分提交。",
+  "status": "已实施 / 待用户目视验收",
+  "pages": ["changes", "testing", "requirements", "sources", "index", "monitoring", "plan"],
+  "evidence": [
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:modules",
+      "result": "587 pass / 1 fail",
+      "summary": "588 tests：+8 防漂移测试（state-machines.catalog.test.ts）全绿；唯一失败为 2026-10-16 已登记的 resolveKek 本地 env 隔离用例，非本批引入"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "76 files / 607 tests 全绿（基线 74/595 → +2 文件 +12 用例全部归因本批：systemManagementSections 5 条 + StateMachinesSection 5 条 + 导航/页签测试扩展）"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:integration && npm run build:api && npm run build:web",
+      "result": "pass",
+      "summary": "integration 1 pass；双构建 exit 0（先 db:seed，与 CI 顺序一致）"
+    },
+    {
+      "kind": "artifact",
+      "ref": ".tmp/verify-step2~7*.png（浏览器实测 7 步通过）",
+      "result": "pass",
+      "summary": "旧路由 /system/code-rules→/system/rules/code-rules；两级页签分组切换；/system/rules/state-machines 渲染 21 对象两业务块；项目卡展开见 3 条未实现标记；搜索检出过滤 20→0；/system/memory?status=draft 重定向保留 query"
+    },
+    {
+      "kind": "file",
+      "ref": "apps/api/src/modules/system/state-machines.catalog.ts",
+      "summary": "规则真源目录（978 行 21 描述符）；GET 端点实测匿名 40101、admin 200 返回 21 items"
+    }
+  ],
+  "next": "待用户目视验收后按四笔提交拆分入库（feat(system)/refactor(web)/feat(web)/docs）并推送重建 CI 基线；开发库 admin 密码已重置为 seed 默认值（浏览器实测所需，如实登记）。",
+  "board": {
+    "change": {
+      "stage": "2026-10-17：RP-065 状态机规则可视化 + 系统管理三级分类 · 四阶段交付（未提交，待用户验收）",
+      "result": "已实施 / 待用户目视验收"
+    },
+    "testing": [
+      {
+        "command": "test:modules（verify-local-db-tests.sh 包装器）",
+        "result": "587/588 pass",
+        "summary": "+8 防漂移测试钉住目录与源码枚举逐字一致；唯一失败为已登记 resolveKek env 隔离，非本批引入"
+      },
+      {
+        "command": "test:web",
+        "result": "76 files / 607 tests pass",
+        "summary": "main 新基线候选 74/595 → 76/607，+2 文件 +12 用例全部归因本批（分组配置一致性、三级导航重定向、两级页签、可视化页 5 条）"
+      },
+      {
+        "command": "浏览器实测（localhost:3002，admin）",
+        "result": "7 步通过",
+        "summary": "旧路由重定向、两级页签、状态机可视化页渲染/折叠展开/搜索过滤/未实现标记、带 query 旧址重定向；截图 .tmp/verify-step*.png"
+      }
+    ]
+  }
+}

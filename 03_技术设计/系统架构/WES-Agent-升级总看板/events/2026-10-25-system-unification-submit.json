@@ -1,0 +1,40 @@
+{
+  "id": "BE-2026-10-25-system-unification-submit",
+  "date": "2026-10-25",
+  "type": "commit",
+  "summary": "用户授权系统管理统一化本地提交，必要目录接口与12页前端分离收口，未推送",
+  "scope": "ISS-2026-10-21-001 / RP-065",
+  "apiCommit": "fe2b6ed",
+  "status": "本地提交记录随本提交生效 / 待业务验收 / 未推送",
+  "pages": [
+    "changes",
+    "plan",
+    "index",
+    "monitoring",
+    "testing",
+    "design",
+    "risks",
+    "sources",
+    "issues",
+    "requirements"
+  ],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "02_产品设计/系统管理统一化重构调研-2026-10-21/verification-2026-10-25.json",
+      "summary": "Web688、双构建、modules595/596、能力/范围12项及安全范围"
+    },
+    {
+      "kind": "review",
+      "ref": "commit_catalog_review / catalog_facts_impl",
+      "result": "pass",
+      "summary": "目录事实纠正后独立复核，静态接口权限边界保留"
+    }
+  ],
+  "limits": [
+    "模板真实接口500",
+    "实际业务写入/激活/外部验证未执行",
+    "人工结果zeroUUID运行关联未验",
+    "未推送"
+  ]
+}

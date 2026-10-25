@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, test } from 'vitest'
 import App from '../App.jsx'
-import { mockUsers } from './mocks/data.js'
+import { mockAdminAiSessions, mockUsers } from './mocks/data.js'
 import { server } from './mocks/server.js'
 
 const BASE = '/api/v1'
@@ -30,23 +30,29 @@ describe('System management sessions audit', () => {
     // 跨用户聚合：admin 与 arch 的会话都出现（状态徽章 + 筛选下拉各含一份文本）
     expect(screen.getAllByText('粗估').length).toBeGreaterThan(0)
     expect(screen.getAllByText('标准评审').length).toBeGreaterThan(0)
-    expect(screen.getByText(/共 2 条 AI 会话/)).toBeInTheDocument()
+    expect(screen.getByText(/已加载 2 条 AI 会话/)).toBeInTheDocument()
 
-    // 侧边栏提供会话管理入口
+    // 侧边栏提供会话管理入口（三级重排后址 /system/ops/sessions，旧址重定向仍可用）
     const navigation = screen.getByRole('navigation', { name: '主导航' })
-    expect(within(navigation).getByRole('link', { name: /会话管理/ })).toHaveAttribute('href', '/system/sessions')
+    expect(within(navigation).getByRole('link', { name: /会话管理/ })).toHaveAttribute('href', '/system/ops/sessions')
   })
 
   test('status filter narrows the audit list via server-side query', async () => {
+    const queries = []
+    server.use(http.get(`${BASE}/system/ai-sessions`, ({ request }) => {
+      const status = new URL(request.url).searchParams.get('status')
+      queries.push(status)
+      return HttpResponse.json({ data: { items: mockAdminAiSessions.filter((session) => !status || session.status === status) } })
+    }))
     renderAppAt('/system/sessions')
 
     await screen.findByText('金蝶云星空评估会话')
     fireEvent.change(screen.getByRole('combobox', { name: '会话状态' }), { target: { value: 'standard_review' } })
 
-    await waitFor(() => {
-      expect(screen.queryByText('金蝶云星空评估会话')).not.toBeInTheDocument()
-    }, { timeout: 3000 })
-    expect(screen.getByText('标准治理评审会话')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(await screen.findByText('标准治理评审会话')).toBeInTheDocument()
+    expect(screen.queryByText('金蝶云星空评估会话')).not.toBeInTheDocument()
+    expect(queries.at(-1)).toBe('standard_review')
   })
 
   test('non-admin user is redirected away from the sessions audit page', async () => {

@@ -1,0 +1,48 @@
+{
+  "id": "BE-2026-10-21-system-unification-research",
+  "date": "2026-10-21",
+  "type": "design",
+  "scope": "系统管理 12 子页统一列表型展示的调研与方案（ISS-2026-10-21-001 范围扩展 / RP-065 阶段 B）",
+  "summary": "用户明确先调研并给出方案。采集当前 12 子页及参照/窄屏共 15 张有效截图，识别主视图不一致、摘要详情未分层、浏览编辑生效混合三个根问题；推荐统一列表＋统一详情/编辑 Dialog＋专用任务区。",
+  "status": "调研完成 / 方案待用户确认 / 未开发",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "design",
+    "changes",
+    "risks",
+    "sources",
+    "index"
+  ],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md",
+      "summary": "逐页盘点、三路线比较、推荐方案、能力边界、四批建议与 15 张截图索引"
+    },
+    {
+      "kind": "artifact",
+      "ref": "02_产品设计/系统管理统一化重构调研-2026-10-21/assets/",
+      "summary": "15 张现场 JPEG；1440×1000 覆盖 12 子页，760×1000 抽样工具策略；加载中与初始回退图已重采"
+    },
+    {
+      "kind": "browser",
+      "ref": "/system/ai/tools",
+      "summary": "1440 下表格 12 列，前 3 条数据行均约 218px；仅查看，未修改策略"
+    },
+    {
+      "kind": "source",
+      "ref": "ui/V2_PROTOTYPE/src/components/ListPage.jsx / pages/SystemManagement.jsx / hooks/useSystemManagement.js / components/system/",
+      "summary": "核实可复用列表及 RateCard/模板/分页/会话详情边界；运行时与源码候选分开陈述"
+    }
+  ],
+  "sourceInventory": {
+    "rows": 96,
+    "uniquePrimaryReferences": 95,
+    "retainedDuplicate": "github-radar.html",
+    "note": "新增一项调研资料后按来源主台账主引用去重，统一此前滞后的 80/81 标签；不改历史来源行。"
+  },
+  "next": "用户确认推荐 B 路线后，再编写第一批两页样板实施规格；不启动实现 Loop，不分派 Qoder。",
+  "verificationLimits": "仅调研与文档校验；未运行产品测试，未修改业务代码，未执行写操作或外部模型验证；测试结果非空界面只经源码确认。"
+}

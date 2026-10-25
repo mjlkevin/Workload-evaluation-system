@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-25",
+  "scope": "ISS-2026-10-21-001 / RP-065 系统管理统一化提交前核对",
+  "authorization": "用户：可以提交；仅本地提交，未授权推送",
+  "apiCommit": "fe2b6ed",
+  "checks": {
+    "web": {
+      "files": 84,
+      "passed": 688,
+      "failed": 0
+    },
+    "buildWeb": "passed",
+    "buildApi": "passed",
+    "modules": {
+      "tests": 596,
+      "passed": 595,
+      "failed": 1,
+      "skipped": 0,
+      "knownFailure": "resolveKek: 环境变量未配置时返回 null 且 dev 环境输出警告"
+    },
+    "catalogCapabilitiesAndScopeGuard": {
+      "passed": 12,
+      "failed": 0
+    },
+    "securityTests": "passed",
+    "stagedSecretScan": "passed",
+    "dependencyAuditAdvisories": {
+      "critical": 1,
+      "high": 12,
+      "moderate": 14,
+      "note": "既有依赖库存；未改依赖或lockfile，未作全库可利用性结论"
+    }
+  },
+  "catalogCorrections": [
+    "值域校验不等于不可逆步进",
+    "memory归档及恢复已实现",
+    "AI创建或追加不等于已有对象状态更新",
+    "change实际端点前缀",
+    "20业务对象+1版本文档描述符"
+  ],
+  "limits": [
+    "模板真实接口500",
+    "实际业务写入/激活/外部验证未执行",
+    "人工结果zeroUUID运行关联未验",
+    "未推送"
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "id": "BE-2026-10-21-system-unification-batch2",
+  "date": "2026-10-21",
+  "type": "implementation",
+  "scope": "ISS-2026-10-21-001 / RP-065 阶段B第二批：DSL、模板、状态机、RateCard 前端",
+  "summary": "用户确认首批后继续统一四页列表与领域详情，保留草稿/生效与只读边界；模板真实接口500显式呈现，不再回退默认资产掩盖失败。",
+  "status": "四页前端已实现 / 自动与浏览器检查完成 / 第二批目视待验收 / 模板真实联调受阻 / 未提交",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "design",
+    "testing",
+    "monitoring",
+    "changes",
+    "risks",
+    "sources",
+    "index"
+  ],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md",
+      "summary": "第12节规格、逐页结果、限制与14张截图"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "最终79文件640/640，净增13项"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "最终exit0，6.34秒"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base HEAD -- 本批12个UI文件",
+      "result": "pass",
+      "summary": "0新增确定性发现"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:modules",
+      "result": "partial",
+      "summary": "587/588、skip0；唯一既有resolveKek环境隔离失败"
+    },
+    {
+      "kind": "browser",
+      "ref": "/system/rules/dsl-rules / state-machines / rate-card / templates",
+      "result": "partial",
+      "summary": "1440/760；DSL31条与状态机21对象分页到底，窄屏对话框底部、取消/焦点、RateCard默认单价通过；模板只验证真实500失败与重试"
+    },
+    {
+      "kind": "review",
+      "ref": "batch2_dsl_review / batch2_catalog_review",
+      "result": "pass",
+      "summary": "完整草稿差异意见已修复并复核；额外过期请求保护通过独立实取"
+    },
+    {
+      "kind": "artifact",
+      "ref": "02_产品设计/系统管理统一化重构调研-2026-10-21/assets/batch2-dsl-page4-narrow.jpg",
+      "result": "pass",
+      "summary": "原后台浮标拦截分页点击，footer留空后依次实际到达4/4最后一条"
+    }
+  ],
+  "limits": [
+    "模板GET /api/v1/templates 500根因未确认，真实成功列表/详情未现场验证，仅MSW通过",
+    "未对实际配置执行保存/生效，无数据库播种或后端修改",
+    "其他六页未启动，第二批用户目视验收待执行，未提交或推送"
+  ],
+  "next": "继续已确认路线的第三批；模板真实目录待接口恢复后补验，第二批用户目视验收保留待回填。"
+}

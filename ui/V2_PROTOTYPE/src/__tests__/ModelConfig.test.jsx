@@ -40,6 +40,7 @@ describe('ModelConfig · 保存/生效内联反馈', () => {
     renderAppAtModelConfig()
 
     const saveBtn = await screen.findByRole('button', { name: '保存草稿' })
+    await waitFor(() => expect(saveBtn).toBeEnabled())
     fireEvent.click(saveBtn)
 
     const status = await screen.findByRole('status')
@@ -57,6 +58,7 @@ describe('ModelConfig · 保存/生效内联反馈', () => {
     renderAppAtModelConfig()
 
     const activateBtn = await screen.findByRole('button', { name: /生效配置/ })
+    await waitFor(() => expect(activateBtn).toBeEnabled())
     fireEvent.click(activateBtn)
 
     const status = await screen.findByRole('status')

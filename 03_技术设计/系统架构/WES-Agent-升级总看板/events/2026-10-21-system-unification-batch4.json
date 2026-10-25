@@ -1,0 +1,71 @@
+{
+  "id": "BE-2026-10-21-system-unification-batch4",
+  "date": "2026-10-21",
+  "type": "implementation",
+  "scope": "ISS-2026-10-21-001 / RP-065 第四批会话/测试结果/检索诊断及12页最终检查",
+  "summary": "12页前端统一完成，保留服务端范围、只读诊断与写操作边界，未提交",
+  "status": "前端已实现/自动与浏览器检查完成/后续目视待验收/模板联调受阻",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "design",
+    "testing",
+    "monitoring",
+    "changes",
+    "risks",
+    "sources",
+    "index"
+  ],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md",
+      "summary": "第14、15节最终结果及截图"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "84文件688/688"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "5.25秒"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base HEAD -- 本批8个UI文件",
+      "result": "pass",
+      "summary": "0新增确定性发现"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:modules",
+      "result": "partial",
+      "summary": "587/588 skip0，既有resolveKek环境隔离失败"
+    },
+    {
+      "kind": "review",
+      "ref": "sessions_spec_review / sessions_quality_review / last_pages_spec_review / last_pages_quality_review / unification_final_review",
+      "result": "pass",
+      "summary": "分阶段与最终集成通过，13字段遗漏已修复复核"
+    },
+    {
+      "kind": "browser",
+      "ref": "12个 /system/ 路由",
+      "result": "partial",
+      "summary": "1440/760无页面横溢，真实会话搜索分页/诊断只读查询通过；测试结果实库为空，非空布局用显著演示页；模板服务器失败持续"
+    }
+  ],
+  "limits": [
+    "模板真实500未解决",
+    "实际写入/激活/外部验证未执行",
+    "测试结果原zeroUUID与Run外键实际兼容未验",
+    "第二至四批目视待验收",
+    "未提交/推送"
+  ],
+  "next": "用户目视验收统一界面；模板服务恢复后补真实目录检查，实际业务写入另验"
+}

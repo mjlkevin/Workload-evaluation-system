@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Dialog, DialogActions } from '../ui/Dialog.jsx'
+import { useRef, useState } from 'react'
+import SystemObjectList, { SystemBadge, systemButton, systemInput, systemPrimaryButton, systemTextButton } from './SystemObjectList.jsx'
+import SystemObjectDialog, { SystemObjectFacts } from './SystemObjectDialog.jsx'
 
 const BUSINESS_ROLES = [
   { id: 'sales', label: '销售' },
@@ -40,6 +41,21 @@ function parseKeywords(value) {
   return [...new Set(value.split(/[,，\n]/).map((item) => item.trim()).filter(Boolean))]
 }
 
+function probeLabel(probe) {
+  return probe?.status === 'success' ? '已验证' : probe?.status === 'failure' ? '验证失败' : '待测试'
+}
+
+function profileSearchText(profile) {
+  return [profile.name, profile.id, profile.knowledgeId, profile.description, keywordText(profile), roleText(profile), profile.priority].join(' ')
+}
+
+const PROFILE_FILTERS = [
+  { value: 'enabled', label: '已启用', matches: (profile) => profile.enabled },
+  { value: 'disabled', label: '已停用', matches: (profile) => !profile.enabled },
+]
+const fieldClass = 'flex min-w-0 flex-col gap-1.5 text-sm font-medium leading-5 text-ink-2'
+const checkboxClass = 'flex items-center gap-2 text-sm font-normal leading-6 text-ink'
+
 export default function KnowledgeBaseProfilesPanel({
   profiles = [],
   probes = {},
@@ -49,44 +65,40 @@ export default function KnowledgeBaseProfilesPanel({
   onTest,
 }) {
   const [editor, setEditor] = useState(null)
+  const [detail, setDetail] = useState(null)
   const [form, setForm] = useState(emptyProfile)
+  const [keywords, setKeywords] = useState('')
   const [error, setError] = useState('')
+  const searchRef = useRef(null)
+  const nameRef = useRef(null)
 
-  const openNew = () => {
-    setEditor({ index: -1 })
-    setForm(emptyProfile())
+  const openEditor = (profile, index) => {
+    const next = { ...profile, routingKeywords: [...(profile.routingKeywords || [])], allowedBusinessRoles: [...(profile.allowedBusinessRoles || [])] }
+    const nextKeywords = next.routingKeywords.join('，')
+    setEditor({ index, initial: JSON.stringify([next, nextKeywords]) })
+    setForm(next)
+    setKeywords(nextKeywords)
     setError('')
   }
-
-  const openEdit = (profile, index) => {
-    setEditor({ index })
-    setForm({ ...profile, routingKeywords: [...(profile.routingKeywords || [])], allowedBusinessRoles: [...(profile.allowedBusinessRoles || [])] })
-    setError('')
-  }
-
-  const closeEditor = () => {
-    setEditor(null)
-    setError('')
-  }
+  const closeEditor = () => { setEditor(null); setError('') }
+  const dirty = Boolean(editor && editor.initial !== JSON.stringify([form, keywords]))
 
   const saveProfile = () => {
+    if (disabled || !editor) return
     const candidate = {
       ...form,
       id: String(form.id || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, ''),
       name: String(form.name || '').trim(),
       description: String(form.description || '').trim(),
       knowledgeId: String(form.knowledgeId || '').trim(),
+      routingKeywords: parseKeywords(keywords),
       priority: Math.max(0, Math.min(999, Number(form.priority) || 0)),
     }
     if (!candidate.name || !candidate.id || !candidate.knowledgeId) {
       setError('请填写知识库名称、内部标识和知识库 ID')
       return
     }
-    const duplicate = profiles.some((profile, index) => (
-      index !== editor.index
-      && (profile.id === candidate.id || profile.knowledgeId === candidate.knowledgeId)
-    ))
-    if (duplicate) {
+    if (profiles.some((profile, index) => index !== editor.index && (profile.id === candidate.id || profile.knowledgeId === candidate.knowledgeId))) {
       setError('内部标识或知识库 ID 已存在')
       return
     }
@@ -97,6 +109,7 @@ export default function KnowledgeBaseProfilesPanel({
     closeEditor()
   }
 
+  const setField = (field, value) => setForm((current) => ({ ...current, [field]: value }))
   const toggleRole = (roleId) => {
     setForm((current) => ({
       ...current,
@@ -105,110 +118,78 @@ export default function KnowledgeBaseProfilesPanel({
         : [...current.allowedBusinessRoles, roleId],
     }))
   }
+  const columns = [
+    { key: 'name', label: '知识库', className: 'min-w-48 max-w-64', render: (profile) => <div className="min-w-0 space-y-1">
+      <div className="flex flex-wrap items-center gap-2"><strong className="max-w-52 truncate font-medium">{profile.name}</strong>{profile.isDefault && <SystemBadge tone="brand">默认</SystemBadge>}{!profile.enabled && <SystemBadge>已停用</SystemBadge>}</div>
+      <div className="max-w-60 truncate font-mono text-xs text-ink-2">{profile.knowledgeId}</div>
+    </div> },
+    { key: 'routingKeywords', label: '路由关键词', hideBelow: 'lg', className: 'min-w-36 max-w-52', render: (profile) => <span className="block max-w-48 truncate text-xs text-ink-2">{keywordText(profile)}</span> },
+    { key: 'allowedBusinessRoles', label: '角色范围', hideBelow: 'lg', className: 'min-w-32 max-w-48', render: (profile) => <span className="block max-w-44 truncate text-xs text-ink-2">{roleText(profile)}</span> },
+    { key: 'probe', label: '验证状态', className: 'whitespace-nowrap', render: (profile) => <SystemBadge tone={probes[profile.id]?.status === 'success' ? 'ok' : probes[profile.id]?.status === 'failure' ? 'warn' : 'neutral'}>{probeLabel(probes[profile.id])}</SystemBadge> },
+    { key: 'actions', label: '操作', className: 'whitespace-nowrap', render: (profile) => <div className="flex items-center gap-1">
+      <button type="button" className={systemTextButton} aria-label={`查看 ${profile.name}`} onClick={() => setDetail(profile)}>查看</button>
+      <button type="button" className={systemTextButton} aria-label={testingProfileId === profile.id ? '测试中...' : `测试 ${profile.name}`} disabled={disabled || !profile.enabled || Boolean(testingProfileId)} onClick={() => onTest?.(profile.id)}>{testingProfileId === profile.id ? '测试中...' : '测试'}</button>
+      <button type="button" className={systemTextButton} aria-label={`编辑 ${profile.name}`} disabled={disabled} onClick={() => openEditor(profile, profiles.indexOf(profile))}>编辑</button>
+    </div> },
+  ]
+  const detailProbe = detail ? probes[detail.id] : null
 
   return (
-    <section className="kb-profiles" aria-labelledby="kb-profiles-title">
-      <div className="kb-profiles__header">
-        <div>
-          <h3 id="kb-profiles-title">知识库档案</h3>
-          <p>先按角色和关键词路由，无法确定时才由 AI 在授权候选中选择。</p>
-        </div>
-        <button type="button" className="btn btn-ghost" aria-label="新增知识库" disabled={disabled} onClick={openNew}>＋ 新增知识库</button>
-      </div>
+    <section className="min-w-0 space-y-3" aria-labelledby="kb-profiles-title">
+      <h3 id="kb-profiles-title" className="m-0 text-base font-semibold leading-6 text-ink">知识库档案</h3>
+      <SystemObjectList title="知识库档案" rows={profiles} columns={columns} searchText={profileSearchText} filters={PROFILE_FILTERS} filterAllLabel="全部启用状态" searchInputRef={searchRef}
+        emptyText="尚未配置知识库档案。新增后保存草稿，并逐个完成连通性测试。"
+        actions={<button type="button" className={systemPrimaryButton} aria-label="新增知识库" disabled={disabled} onClick={() => openEditor(emptyProfile(), -1)}>＋ 新增知识库</button>} />
 
-      {profiles.length === 0 ? (
-        <div className="kb-profiles__empty">尚未配置知识库档案。新增后保存草稿，并逐个完成连通性测试。</div>
-      ) : (
-        <div className="kb-profiles__table-wrap">
-          <table className="kb-profiles__table">
-            <thead>
-              <tr>
-                <th>知识库</th>
-                <th>路由关键词</th>
-                <th>角色范围</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profiles.map((profile, index) => {
-                const probe = probes[profile.id]
-                const probeLabel = probe?.status === 'success' ? '已验证' : probe?.status === 'failure' ? '验证失败' : '待测试'
-                return (
-                  <tr key={`${profile.id}-${index}`}>
-                    <td data-label="知识库">
-                      <div className="kb-profile__title">
-                        <strong>{profile.name}</strong>
-                        {profile.isDefault ? <span className="bdg ci">默认</span> : null}
-                        {!profile.enabled ? <span className="bdg">已停用</span> : null}
-                      </div>
-                      <div className="kb-profile__meta mono">{profile.knowledgeId}</div>
-                      {profile.description ? <div className="kb-profile__description">{profile.description}</div> : null}
-                    </td>
-                    <td data-label="路由关键词"><span className="kb-profile__summary">{keywordText(profile)}</span></td>
-                    <td data-label="角色范围"><span className="kb-profile__summary">{roleText(profile)}</span></td>
-                    <td data-label="状态">
-                      <span className={`kb-profile__probe kb-profile__probe--${probe?.status || 'pending'}`}>{probeLabel}</span>
-                    </td>
-                    <td data-label="操作">
-                      <div className="kb-profile__actions">
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          aria-label={testingProfileId === profile.id ? '测试中...' : `测试 ${profile.name}`}
-                          disabled={disabled || !profile.enabled || Boolean(testingProfileId)}
-                          onClick={() => onTest?.(profile.id)}
-                        >
-                          {testingProfileId === profile.id ? '测试中...' : '测试'}
-                        </button>
-                        <button type="button" className="btn btn-ghost" aria-label={`编辑 ${profile.name}`} disabled={disabled} onClick={() => openEdit(profile, index)}>编辑</button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <SystemObjectDialog open={Boolean(detail)} title={`知识库详情：${detail?.name || ''}`} onClose={() => setDetail(null)} fallbackFocusRef={searchRef}>
+        {detail && <SystemObjectFacts items={[
+          { label: '知识库名称', value: detail.name },
+          { label: '内部标识', value: detail.id },
+          { label: '知识库 ID', value: detail.knowledgeId },
+          { label: '说明', value: detail.description || '—' },
+          { label: '路由关键词', value: keywordText(detail) },
+          { label: '角色范围', value: roleText(detail) },
+          { label: '启用状态', value: detail.enabled ? '已启用' : '已停用' },
+          { label: '安全默认库', value: detail.isDefault ? '是' : '否' },
+          { label: '优先级', value: detail.priority },
+          { label: '验证状态', value: probeLabel(detailProbe) },
+          { label: '验证状态值', value: detailProbe?.status },
+          { label: '验证时间', value: detailProbe?.checkedAt },
+          { label: '验证耗时', value: detailProbe?.latencyMs != null ? `${detailProbe.latencyMs} ms` : null },
+          { label: '验证档案标识', value: detailProbe?.profileId },
+          { label: '验证提示', value: detailProbe?.warning },
+          { label: '错误代码', value: detailProbe?.errorCode },
+          { label: '供应商业务码', value: detailProbe?.providerCode },
+          { label: '供应商说明', value: detailProbe?.providerMessage },
+          { label: '供应商请求标识', value: detailProbe?.providerRequestId },
+          { label: '验证配置摘要', value: detailProbe?.configHash },
+        ]} />}
+      </SystemObjectDialog>
 
-      <Dialog
-        open={Boolean(editor)}
-        title={editor?.index === -1 ? '新增知识库' : '编辑知识库'}
-        description="路由器只会在当前用户有权访问且已启用的知识库中选择。"
-        onClose={closeEditor}
-        wide
-      >
-        <div className="kb-profile-form">
-          {error ? <div role="alert" className="kb-profile-form__error">{error}</div> : null}
-          <div className="kb-profile-form__grid">
-            <label>知识库名称<input className="input" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
-            <label>内部标识<input className="input" value={form.id} onChange={(event) => setForm((current) => ({ ...current, id: event.target.value }))} /></label>
-            <label>知识库 ID<input className="input" value={form.knowledgeId} onChange={(event) => setForm((current) => ({ ...current, knowledgeId: event.target.value }))} /></label>
-            <label>优先级<input className="input" type="number" min="0" max="999" value={form.priority} onChange={(event) => setForm((current) => ({ ...current, priority: Number(event.target.value) }))} /></label>
+      <SystemObjectDialog open={Boolean(editor)} title={editor?.index === -1 ? '新增知识库' : '编辑知识库'} description="路由器只会在当前用户有权访问且已启用的知识库中选择。" onClose={closeEditor} dirty={dirty} initialFocusRef={nameRef} fallbackFocusRef={searchRef}
+        footer={(requestClose) => <><button type="button" className={systemButton} onClick={requestClose}>取消</button><button type="button" className={systemPrimaryButton} disabled={disabled} onClick={saveProfile}>保存档案</button></>}>
+        <div className="min-w-0 space-y-4">
+          {error && <div role="alert" className="rounded-md border border-solid border-err/30 bg-err-soft p-3 text-sm leading-6 text-err-ink">{error}</div>}
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className={fieldClass}>知识库名称<input ref={nameRef} className={systemInput} value={form.name} onChange={(event) => setField('name', event.target.value)} /></label>
+            <label className={fieldClass}>内部标识<input className={systemInput} value={form.id} onChange={(event) => setField('id', event.target.value)} /></label>
+            <label className={fieldClass}>知识库 ID<input className={systemInput} value={form.knowledgeId} onChange={(event) => setField('knowledgeId', event.target.value)} /></label>
+            <label className={fieldClass}>优先级<input className={systemInput} type="number" min="0" max="999" value={form.priority} onChange={(event) => setField('priority', Number(event.target.value))} /></label>
           </div>
-          <label>说明<textarea className="input" rows="2" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} /></label>
-          <label>路由关键词<textarea className="input" rows="2" placeholder="用逗号或换行分隔，例如：资金计划，网上银行" value={(form.routingKeywords || []).join('，')} onChange={(event) => setForm((current) => ({ ...current, routingKeywords: parseKeywords(event.target.value) }))} /></label>
-          <fieldset className="kb-profile-form__roles">
-            <legend>可访问业务角色</legend>
-            <p>不勾选表示全部已认证业务角色可访问。</p>
-            <div>
-              {BUSINESS_ROLES.map((role) => (
-                <label key={role.id}><input type="checkbox" checked={form.allowedBusinessRoles.includes(role.id)} onChange={() => toggleRole(role.id)} />{role.label}</label>
-              ))}
-            </div>
+          <label className={fieldClass}>说明<textarea className={`${systemInput} h-auto py-2`} rows="2" value={form.description || ''} onChange={(event) => setField('description', event.target.value)} /></label>
+          <label className={fieldClass}>路由关键词<textarea className={`${systemInput} h-auto py-2`} rows="2" placeholder="用逗号或换行分隔，例如：资金计划，网上银行" value={keywords} onChange={(event) => setKeywords(event.target.value)} /></label>
+          <fieldset className="m-0 min-w-0 rounded-md border border-solid border-line p-3">
+            <legend className="px-1 text-sm font-medium text-ink-2">可访问业务角色</legend>
+            <p className="mt-0 mb-3 text-xs leading-5 text-ink-2">不勾选表示全部已认证业务角色可访问。</p>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">{BUSINESS_ROLES.map((role) => <label className={checkboxClass} key={role.id}><input type="checkbox" checked={form.allowedBusinessRoles.includes(role.id)} onChange={() => toggleRole(role.id)} />{role.label}</label>)}</div>
           </fieldset>
-          <div className="kb-profile-form__switches">
-            <label><input type="checkbox" checked={form.enabled} onChange={(event) => setForm((current) => ({ ...current, enabled: event.target.checked }))} />启用知识库</label>
-            <label><input type="checkbox" checked={form.isDefault} onChange={(event) => setForm((current) => ({ ...current, isDefault: event.target.checked }))} />设为安全默认库</label>
-            {form.isDefault ? <span>保存后会替换当前默认库。</span> : null}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <label className={checkboxClass}><input type="checkbox" checked={form.enabled} onChange={(event) => setField('enabled', event.target.checked)} />启用知识库</label>
+            <label className={checkboxClass}><input type="checkbox" checked={form.isDefault} onChange={(event) => setField('isDefault', event.target.checked)} />设为安全默认库</label>
+            {form.isDefault && <span className="text-xs leading-5 text-ink-2">保存后会替换当前默认库。</span>}
           </div>
         </div>
-        <DialogActions>
-          <button type="button" className="btn btn-out" onClick={closeEditor}>取消</button>
-          <button type="button" className="btn btn-pri" onClick={saveProfile}>保存档案</button>
-        </DialogActions>
-      </Dialog>
+      </SystemObjectDialog>
     </section>
   )
 }

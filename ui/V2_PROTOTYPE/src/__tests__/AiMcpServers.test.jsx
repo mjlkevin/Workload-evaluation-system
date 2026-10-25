@@ -59,7 +59,8 @@ describe('System management MCP servers (批次 7 第六配置区)', () => {
     expect(screen.getByText('MCP · IM Hub')).toBeInTheDocument()
     // 外发徽章：MCP 工具恒「会外发」（按构造），代码工具「不外发」
     expect(screen.getByText('会外发')).toBeInTheDocument()
-    expect(screen.getByText('不外发')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '查看 estimate_implementation' }))
+    expect(within(screen.getByRole('dialog', { name: '工具策略详情' })).getByText('不外发')).toBeInTheDocument()
   })
 
   test('登记服务 → 保存草稿 → 生效：三态徽章推进，active 后显示「已生效」', async () => {

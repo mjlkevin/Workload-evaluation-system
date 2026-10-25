@@ -29,8 +29,21 @@ function mockToolsResponse(items, summary) {
 
 /** 取某工具所在行（按工具名单元格定位） */
 function toolRow(name) {
-  const cell = screen.getByText(name, { selector: 'td span.mono' })
+  const cell = within(screen.getByRole('table', { name: '工具策略列表' })).getByText(name)
   return cell.closest('tr')
+}
+
+function editTool(name) {
+  fireEvent.click(within(toolRow(name)).getByRole('button', { name: `编辑 ${name}` }))
+  return screen.getByRole('dialog', { name: '编辑工具策略' })
+}
+function applyTool() {
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '应用修改' }))
+}
+function toggleEnabled(name) {
+  const dialog = editTool(name)
+  fireEvent.click(within(dialog).getByLabelText(`启用 ${name}`))
+  applyTool()
 }
 
 describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () => {
@@ -53,7 +66,6 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(screen.getAllByText('会写数据')).toHaveLength(3)
     expect(screen.getAllByText('只读')).toHaveLength(6)
     expect(screen.queryAllByText('会外发')).toHaveLength(0)
-    expect(screen.getAllByText('不外发')).toHaveLength(9)
     expect(screen.getByText(/共 9 个工具/)).toBeInTheDocument()
     expect(screen.getByText(/其中 3 个会写数据/)).toBeInTheDocument()
     expect(screen.getByText(/0 个会外发数据/)).toBeInTheDocument()
@@ -64,12 +76,14 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(screen.getByText(/你本人可调用 9 个/)).toBeInTheDocument()
 
     // 权限位与分类可见
-    expect(screen.getAllByText('estimates:write').length).toBeGreaterThan(0)
+    fireEvent.click(within(toolRow('estimate_implementation')).getByRole('button', { name: '查看 estimate_implementation' }))
+    expect(within(screen.getByRole('dialog')).getByText('estimates:create')).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '关闭' }))
     expect(screen.getByText('discovery')).toBeInTheDocument()
 
-    // 侧边栏入口（6b 起更名「工具策略」，路由不变）
+    // 侧边栏入口（6b 起更名「工具策略」；三级重排后址 /system/ai/tools，旧址重定向仍可用）
     const navigation = screen.getByRole('navigation', { name: '主导航' })
-    expect(within(navigation).getByRole('link', { name: /工具策略/ })).toHaveAttribute('href', '/system/tools')
+    expect(within(navigation).getByRole('link', { name: /工具策略/ })).toHaveAttribute('href', '/system/ai/tools')
   })
 
   test('tools the viewer cannot call stay listed with a quiet marker', async () => {
@@ -85,9 +99,9 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(screen.getByText(/你本人可调用 5 个/)).toBeInTheDocument()
 
     // 这是权限差异，不是错误：不得复用「会写数据」的 warn 告警色
-    const marker = screen.getAllByText('不可调用')[0].closest('.bdg')
-    expect(marker).toHaveClass('brd')
-    expect(marker).not.toHaveClass('warn')
+    const marker = screen.getAllByText('不可调用')[0]
+    expect(marker).toHaveClass('text-ink-2')
+    expect(marker).not.toHaveClass('text-warn-ink')
   })
 
   test('判据④：token 列与合计显示后端计量值（前端不自算）', async () => {
@@ -95,7 +109,9 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(await screen.findByText('estimate_implementation', {}, { timeout: 3000 })).toBeInTheDocument()
 
     // 夹具首个工具 tokens=40
-    expect(within(toolRow('estimate_implementation')).getByText('40')).toBeInTheDocument()
+    fireEvent.click(within(toolRow('estimate_implementation')).getByRole('button', { name: '查看 estimate_implementation' }))
+    expect(within(screen.getByRole('dialog')).getByText('40')).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '关闭' }))
     const expectedTotal = mockAiToolsWithPolicy.filter((tool) => tool.injected).reduce((sum, tool) => sum + tool.tokens, 0)
     expect(screen.getByText(new RegExp(`当前注入 \\d+ 个 / ${expectedTotal} tokens`))).toBeInTheDocument()
   })
@@ -105,8 +121,7 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(await screen.findByText('estimate_implementation', {}, { timeout: 3000 })).toBeInTheDocument()
 
     expect(screen.getByText('草稿与生效一致')).toBeInTheDocument()
-    const enabledCheckbox = within(toolRow('project_list')).getByLabelText('启用 project_list')
-    fireEvent.click(enabledCheckbox)
+    toggleEnabled('project_list')
     expect(screen.getByText('有未保存的修改')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /保存草稿/ }))
@@ -131,7 +146,7 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(await screen.findByText('project_list', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getByText('草稿与生效一致')).toBeInTheDocument()
 
-    fireEvent.click(within(toolRow('project_list')).getByLabelText('启用 project_list'))
+    toggleEnabled('project_list')
 
     // 要害（先断言它，失败信息才直指缺陷本身）：未保存时「生效」不可点
     const activateButton = screen.getByRole('button', { name: /^生效$/ })
@@ -164,12 +179,13 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(await screen.findByText('project_list', {}, { timeout: 3000 })).toBeInTheDocument()
 
     // 先存一个未生效的草稿（服务端草稿 ≠ 生效版）
-    fireEvent.click(within(toolRow('project_list')).getByLabelText('启用 project_list'))
+    toggleEnabled('project_list')
     fireEvent.click(screen.getByRole('button', { name: /保存草稿/ }))
     await waitFor(() => expect(screen.getByText('草稿未生效')).toBeInTheDocument())
 
     // 再叠一处**未保存**的编辑（estimate_history 注入模式）
-    fireEvent.change(within(toolRow('estimate_history')).getAllByRole('combobox')[1], { target: { value: 'on-demand' } })
+    fireEvent.change(within(editTool('estimate_history')).getByLabelText('注入模式'), { target: { value: 'on-demand' } })
+    applyTool()
     expect(screen.getByText('有未保存的修改')).toBeInTheDocument()
 
     // 「放弃未保存的修改」：只丢本地这处，服务端已存的停用草稿仍在 → 仍是「草稿未生效」
@@ -194,25 +210,28 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(within(toolRow('knowledge_query')).getByText('会外发')).toBeInTheDocument()
     // 行内两个下拉：第一个是审批策略、第二个是注入模式
     // 写工具 create_project：审批锁定「必须审批（代码下限）」且禁用——策略没有免审批方向
-    const writeApprovalSelect = within(toolRow('create_project')).getAllByRole('combobox')[0]
+    const writeApprovalSelect = within(editTool('create_project')).getByLabelText('审批策略')
     expect(writeApprovalSelect).toBeDisabled()
     expect(within(writeApprovalSelect).getByRole('option', { selected: true }).textContent).toContain('必须审批')
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '取消' }))
     // 外发工具同理锁定
-    const exfilApprovalSelect = within(toolRow('knowledge_query')).getAllByRole('combobox')[0]
+    const exfilApprovalSelect = within(editTool('knowledge_query')).getByLabelText('审批策略')
     expect(exfilApprovalSelect).toBeDisabled()
     expect(within(exfilApprovalSelect).getByRole('option', { selected: true }).textContent).toContain('必须审批')
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '取消' }))
     // 只读工具 rule_lookup：策略可收紧为逐次确认
-    const readOnlyApproval = within(toolRow('rule_lookup')).getAllByRole('combobox')[0]
+    const readOnlyApproval = within(editTool('rule_lookup')).getByLabelText('审批策略')
     expect(readOnlyApproval).toBeEnabled()
     fireEvent.change(readOnlyApproval, { target: { value: 'user-confirm' } })
+    applyTool()
     expect(screen.getByText('有未保存的修改')).toBeInTheDocument()
   })
 
   test('批次6b：策略停用只裁注入，不收本人权限（callable 仍按权限位）', async () => {
     renderAppAt('/system/tools')
     expect(await screen.findByText('rule_lookup', {}, { timeout: 3000 })).toBeInTheDocument()
-    fireEvent.click(within(toolRow('rule_lookup')).getByLabelText('启用 rule_lookup'))
-    const approval = within(toolRow('rule_lookup')).getByText('注入')
+    toggleEnabled('rule_lookup')
+    const approval = within(toolRow('rule_lookup')).getByText('已注入')
     expect(approval).toBeInTheDocument() // 未生效前，生效视图不变
     await waitFor(() => screen.getByText('有未保存的修改'))
   })
@@ -221,7 +240,7 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     renderAppAt('/system/tools')
     expect(
       await screen.findByText(
-        /工具本身（名称、参数、实现）来自代码，清单只读不可编辑；本页编辑的是\*\*策略决定\*\*/,
+        /工具本身（名称、参数、实现）来自代码，清单只读不可编辑；本页编辑的是策略决定/,
         {},
         { timeout: 3000 },
       ),
@@ -261,4 +280,50 @@ describe('System management AI tool policy (批次 6a 清单 + 6b 策略)', () =
     expect(await screen.findByRole('heading', { name: 'AI 工作台' }, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '工具策略' })).not.toBeInTheDocument()
   })
+  test('编辑隔离在弹窗内，取消确认后页面和服务端都不变', async () => {
+    let writes = 0
+    server.use(http.patch(`${BASE}/system/tool-policy/draft`, () => { writes += 1; return HttpResponse.json({ data: {} }) }))
+    renderAppAt('/system/tools')
+    await screen.findByText('project_list')
+    const dialog = editTool('project_list')
+    fireEvent.click(within(dialog).getByLabelText('启用 project_list'))
+    expect(within(dialog).getByLabelText('审批策略')).toBeDisabled()
+    expect(within(dialog).getByLabelText('注入模式')).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: '销售', exact: true })).toBeDisabled()
+    expect(screen.queryByText('有未保存的修改')).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('放弃')
+    fireEvent.click(within(dialog).getByRole('button', { name: '放弃修改' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(toolRow('project_list')).getByText('已启用')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '保存草稿' })).toBeDisabled()
+    expect(writes).toBe(0)
+  })
+
+  test('列表支持搜索、状态筛选和分页，详情保留隐藏字段', async () => {
+    mockToolsResponse([...mockAiToolsWithPolicy, ...Array.from({ length: 3 }, (_, index) => ({ ...mockAiToolsWithPolicy[0], name: `extra_tool_${index}` }))])
+    renderAppAt('/system/tools')
+    await screen.findByText('project_list')
+    expect(within(screen.getByRole('table', { name: '工具策略列表' })).getAllByRole('row')).toHaveLength(11)
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }))
+    fireEvent.click(within(toolRow('extra_tool_2')).getByRole('button', { name: '查看 extra_tool_2' }))
+    expect(within(screen.getByRole('dialog')).getByText('estimates:create')).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '关闭' }))
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜索工具策略' }), { target: { value: 'project_list' } })
+    expect(within(screen.getByRole('table', { name: '工具策略列表' })).getAllByRole('row')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled()
+    toggleEnabled('project_list')
+    fireEvent.change(screen.getByRole('combobox', { name: '筛选工具策略' }), { target: { value: 'disabled' } })
+    expect(within(toolRow('project_list')).getByText('已停用')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '刷新' })).toBeDisabled()
+  })
+
+  test('筛选后编辑移除当前行时，焦点回到列表搜索入口', async () => {
+    renderAppAt('/system/tools')
+    await screen.findByText('project_list')
+    fireEvent.change(screen.getByRole('combobox', { name: '筛选工具策略' }), { target: { value: 'enabled' } })
+    toggleEnabled('project_list')
+    await waitFor(() => expect(screen.getByRole('searchbox', { name: '搜索工具策略' })).toHaveFocus())
+  })
+
 })

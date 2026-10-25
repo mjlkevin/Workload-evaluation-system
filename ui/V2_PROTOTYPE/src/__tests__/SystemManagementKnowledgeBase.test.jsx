@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, test, vi } from 'vitest'
@@ -69,9 +69,11 @@ describe('SystemManagement knowledge base feedback', () => {
       }),
     )
     await renderKnowledgeBase()
+    fireEvent.click(screen.getByRole('button', { name: '编辑共享接入' }))
     fireEvent.change(screen.getByLabelText('Top K'), { target: { value: '12' } })
     fireEvent.change(screen.getByLabelText('召回方式'), { target: { value: 'keyword' } })
     fireEvent.change(screen.getByLabelText('相似度阈值'), { target: { value: '0.35' } })
+    fireEvent.click(screen.getByRole('button', { name: '应用到本地草稿' }))
     fireEvent.click(screen.getByRole('button', { name: '保存草稿' }))
     await waitFor(() => expect(payload).toBeTruthy())
     expect(payload.retrievalParams).toMatchObject({ topK: 12, recallMethod: 'keyword', fractionalThreshold: 0.35 })
@@ -278,6 +280,7 @@ describe('SystemManagement knowledge base feedback', () => {
   test('rerank checkbox defaults off with an explanatory hint (DEF-2026-09-02-001)', async () => {
     await renderKnowledgeBase()
 
+    fireEvent.click(screen.getByRole('button', { name: '编辑共享接入' }))
     const checkbox = screen.getByRole('checkbox', { name: '启用检索重排' })
     expect(checkbox).not.toBeChecked()
     expect(screen.getByText(/开启需账号具备重排权限且填写供应商认可的重排模型名，否则连通性测试会失败/)).toBeInTheDocument()
@@ -377,4 +380,35 @@ describe('SystemManagement knowledge base feedback', () => {
     expect(await screen.findByText('知识库配置草稿已保存')).toBeInTheDocument()
     expect(screen.queryByText(/形似占位值/)).not.toBeInTheDocument()
   })
+  test('connection dialog keeps candidates local until apply, and discard does not write or change the draft', async () => {
+    const payloads = []
+    server.use(http.patch(`${BASE}/system/knowledge-base-config/draft`, async ({ request }) => {
+      payloads.push(await request.json())
+      return HttpResponse.json({ code: 0, data: {} })
+    }))
+    await renderKnowledgeBase()
+    expect(screen.queryByLabelText('Top K')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '编辑共享接入' }))
+    const dialog = screen.getByRole('dialog', { name: '编辑共享接入' })
+    fireEvent.change(within(dialog).getByLabelText('Top K'), { target: { value: '21' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消', exact: true }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('尚未应用')
+    fireEvent.click(within(dialog).getByRole('button', { name: '放弃修改' }))
+    expect(payloads).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }))
+    await waitFor(() => expect(payloads).toHaveLength(1))
+    expect(payloads[0].retrievalParams.topK).not.toBe(21)
+  })
+
+  test('knowledge loading failure is explicit and retry restores the list', async () => {
+    let fail = true
+    server.use(http.get(`${BASE}/system/knowledge-base-config`, () => fail ? new HttpResponse(null, { status: 500 }) : HttpResponse.json({ code: 0, data: { draft: { knowledgeBases: [{ id: 'restored', name: '恢复知识库', knowledgeId: 'kb-restored', enabled: true }] } } })))
+    render(<ToastProvider><MemoryRouter><SystemManagement sectionId="kb" /></MemoryRouter></ToastProvider>)
+    expect(await screen.findByRole('alert')).toHaveTextContent('知识库配置加载失败')
+    expect(screen.queryByRole('button', { name: '编辑共享接入' })).not.toBeInTheDocument()
+    fail = false
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect(await screen.findByText('恢复知识库')).toBeInTheDocument()
+  })
+
 })

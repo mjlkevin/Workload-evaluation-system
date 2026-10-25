@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiClient } from '../api/client.js'
 import { unwrap } from '../api/utils.js'
 
@@ -9,16 +9,29 @@ function normalizeItems(payload) {
 }
 
 /**
- * 管理员会话审计：拉取全量用户 AI 会话摘要（GET /system/ai-sessions，仅 admin）。
- * 筛选参数直接透传给后端做服务端过滤。
+ * 管理员会话审计：跨用户摘要（GET /system/ai-sessions，仅 admin）。
+ * 筛选参数直接透传；服务端默认最多返回 200 条，没有分页/total 契约。
  */
 export function useAdminAiSessions() {
   const [sessions, setSessions] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const requestId = useRef(0)
+
+  useEffect(() => () => { requestId.current += 1 }, [])
+
+  // 筛选输入改变时即失效，不能等到防抖后的新请求才挡住旧响应。
+  const invalidateSessions = useCallback(() => {
+    requestId.current += 1
+    setSessions([])
+    setError('')
+    setLoading(true)
+  }, [])
 
   const loadAllSessions = useCallback(async (filters = {}) => {
+    const currentRequest = ++requestId.current
     setLoading(true)
+    setSessions([])
     setError('')
     try {
       const params = Object.fromEntries(
@@ -26,17 +39,19 @@ export function useAdminAiSessions() {
       )
       const payload = await apiClient.get('/system/ai-sessions', params)
       const items = normalizeItems(unwrap(payload))
+      if (currentRequest !== requestId.current) return []
       setSessions(items)
       return items
     } catch (err) {
+      if (currentRequest !== requestId.current) return []
       const message = `会话审计加载失败：${err.message || '请求失败'}`
       setError(message)
       setSessions([])
       return []
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
   }, [])
 
-  return { sessions, loading, error, loadAllSessions }
+  return { sessions, loading, error, loadAllSessions, invalidateSessions }
 }

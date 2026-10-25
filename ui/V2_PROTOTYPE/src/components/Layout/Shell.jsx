@@ -7,7 +7,7 @@ import { sessionRuntimeStore } from '../../hooks/useSessionRuntimeStore.js'
 import { primeStoredActiveSessionId } from '../../hooks/useAiSessions.js'
 import useCurrentUser from '../../hooks/useCurrentUser.js'
 import { clearToken, isAuthenticated } from '../../api/auth.js'
-import { SYSTEM_MANAGEMENT_SECTIONS } from '../../config/systemManagementSections.js'
+import { SYSTEM_MANAGEMENT_GROUPS, getSystemManagementSectionsByGroup } from '../../config/systemManagementSections.js'
 import { BASE_MANAGEMENT_SECTIONS } from '../../config/baseManagementSections.js'
 import { APP_VERSION } from '../../config/app.js'
 import { isAdminUser } from '../../utils/adminAccess.js'
@@ -32,11 +32,15 @@ const navGroups = [
       {
         label: '系统管理',
         icon: '⚙',
-        children: SYSTEM_MANAGEMENT_SECTIONS.map((section) => ({
-          to: section.route,
-          label: section.label,
-          icon: section.icon,
-        })),
+        // 两级导航：分组标题行（不可点）+ 组内子页；与页签条/路由共用同一份分组配置
+        children: SYSTEM_MANAGEMENT_GROUPS.flatMap((group) => [
+          { groupLabel: group.label },
+          ...getSystemManagementSectionsByGroup(group.id).map((section) => ({
+            to: section.route,
+            label: section.label,
+            icon: section.icon,
+          })),
+        ]),
       },
       {
         // 批次 10a：业务记录会引用的主数据（行业…）——与「系统管理」分界见
@@ -286,7 +290,14 @@ export default function Shell({ children, currentUser = null }) {
                           aria-label={item.label}
                         >
                           <div className="sidebar-nav-children-inner">
-                            {item.children.map((child) => (
+                            {item.children.map((child) => (child.groupLabel ? (
+                              <div
+                                key={`group-${child.groupLabel}`}
+                                className="px-2 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-3"
+                              >
+                                {child.groupLabel}
+                              </div>
+                            ) : (
                               <NavLink
                                 key={child.to}
                                 to={child.to}
@@ -296,7 +307,7 @@ export default function Shell({ children, currentUser = null }) {
                                 <span className="ic">{child.icon}</span>
                                 {child.label}
                               </NavLink>
-                            ))}
+                            )))}
                           </div>
                         </div>
                       )}

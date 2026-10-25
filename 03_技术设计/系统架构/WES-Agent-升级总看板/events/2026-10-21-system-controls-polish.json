@@ -1,0 +1,58 @@
+{
+  "id": "BE-2026-10-21-system-controls-polish",
+  "date": "2026-10-21",
+  "type": "implementation",
+  "scope": "系统管理两级导航与状态机控件视觉改版（RP-065 补充）",
+  "summary": "用户截图反馈入池 ISS-2026-10-21-001，扩展已有 RP-065；重设计导航、搜索筛选与状态机折叠卡，修复原生按钮/输入外观，源码移入详情，保留只读与后端真源。",
+  "status": "已实现 / Web 验证通过 / 待用户目视验收（未提交）",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "design",
+    "testing",
+    "monitoring",
+    "changes",
+    "sources",
+    "index"
+  ],
+  "evidence": [
+    {
+      "kind": "command",
+      "ref": "npm run test --prefix ui/V2_PROTOTYPE -- src/__tests__/StateMachinesSection.test.jsx src/__tests__/SystemManagementNavigation.test.jsx",
+      "result": "pass",
+      "summary": "13/13；RED 已先失败，独立复核再次复跑 13/13"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "76 文件 / 618 用例，净增 3 项行为测试"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "exit 0，2.54s"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base HEAD -- ui/V2_PROTOTYPE/src/pages/SystemManagement.jsx ui/V2_PROTOTYPE/src/pages/system/SystemManagementNav.jsx ui/V2_PROTOTYPE/src/pages/system/StateMachinesSection.jsx",
+      "result": "pass",
+      "summary": "No new deterministic UI findings"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:modules",
+      "result": "partial",
+      "summary": "587/588，唯一失败仍为 resolveKek 已登记本地 env 隔离"
+    },
+    {
+      "kind": "artifact",
+      "ref": ".tmp/ui-system-controls/desktop.png / desktop-expanded.png / narrow-expanded.png / narrow-keyboard.png / dsl-desktop.png",
+      "result": "pass",
+      "summary": "IAB 1440/760 实测通过；760px 页面宽760、main宽/scroll宽696；规则表容器589/表640，键盘横滚40px、焦点可见。"
+    }
+  ],
+  "next": "用户目视确认后再关闭 RP-065；本轮不提交、不推送，保留既有未提交工作。"
+}

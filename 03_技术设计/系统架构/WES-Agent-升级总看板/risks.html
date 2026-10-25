@@ -94,6 +94,12 @@
       </ol>
     </div>
 
+    <section data-board-event-id="BE-2026-10-25-system-unification-submit:risks"><h2>本地提交保留范围 · 联调和依赖告警待后续</h2><p>模板真实接口500、真实配置写入/激活、外部验证、记忆操作及人工结果落库未验；原zeroUUID运行关联风险保持。modules唯一既有resolveKek环境隔离失败仍开放。</p><details><summary>依赖审计与本次安全范围</summary><p>npm audit当前依赖告警27项（critical1/high12/moderate14），未作全库可利用性判定；本次不变更依赖版本或lockfile，不宣称告警已修复。此次GET只返回静态目录，JWT、system:manage与严格admin检查保留，密钥扫描通过，无新增接口安全阻断。</p></details></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-batch4:risks"><h2>最终验收边界 · 模板联调与真实业务写入</h2><p>模板接口真实500根因未确认，成功目录/详情仅模拟验证；实际配置保存/生效、外部模型/KB验证及记忆确认/归档未执行。第二至四批仍需用户目视验收。</p><p>测试结果实库为空：有记录视觉用隔离演示数据，实际新建/删除未验。原无运行ID时全零UUID回退与Harness外键关联保持旧行为，需单独联调，当前无法据MSW证明真实落库。modules唯一resolveKek环境隔离失败仍保留。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-batch3:risks"><h2>第三批验收边界与既有阻断</h2><p>模板接口500与resolveKek环境隔离失败仍未关闭；不能将前端检查通过等同真实模板联调通过。第三批真实配置写入与外部验证未执行，确认/归档只通过模拟API测试；第二、三批待用户目视验收。最后三页待接续。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-batch2:risks"><h2>系统管理第二批 · 模板联调与验收边界</h2><p>模板接口实际返回 500，根因未确认。旧界面以三个默认模板回退掩盖失败；新界面明确失败与重试。前端成功路径仅经 MSW 验证，真实目录、版本和详情待接口恢复后补验。</p><p>RateCard 继续仅为默认参考数据，未接通持久化编辑。真实 DSL 保存/生效未在管理员配置执行；后端 modules 的 1 项既有环境隔离失败仍保留。第二批待用户目视验收，剩余六页未启动。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-pilot:risks"><h2>系统管理统一化样板 · 剩余验收边界</h2><p>两页样板待用户目视验收，其余十页未启动；不据首批结果宣称全模块已统一。</p><p>模块套件的 resolveKek 本地环境隔离失败继续沿用原登记。此次未修改凭据域、后端与真实生效配置；实际写入端到端验收未执行。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-research:risks"><h2>系统管理统一化方案 · 开工前约束</h2><p>以下是方案实施约束，不代表已发生数据或权限事故。</p><ul><li>功能假象：RateCard 编辑和模板使用未形成完整业务能力；先按现有可用能力展示。</li><li>状态语义：领域草稿、生效、启用与密钥操作不能因界面统一而合并；保留原业务审批与确认。</li><li>数据范围：记忆总量/分页、会话详情字段与管理员/owner 边界先核实；不把已加载记录当全量。</li></ul></section>
     <section>
       <div class="h-num">Section 01</div>
       <h2>风险总览</h2>

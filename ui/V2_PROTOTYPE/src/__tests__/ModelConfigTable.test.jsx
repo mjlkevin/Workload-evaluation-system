@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, test } from 'vitest'
 import App from '../App.jsx'
 import { mockUsers } from './mocks/data.js'
@@ -52,8 +52,8 @@ describe('ModelConfig · 表格 + 行详情（RP-053）', () => {
   test('内容生成行置灰为"规划中"，编辑与验证按钮禁用', async () => {
     renderAppAtModelConfig()
 
-    await screen.findByText('规划中')
-    const scenarioTable = screen.getByRole('table', { name: '场景模型绑定' })
+    const scenarioTable = await screen.findByRole('table', { name: '场景模型绑定' })
+    expect(within(scenarioTable).getByText('规划中')).toBeInTheDocument()
     const verifyButtons = Array.from(scenarioTable.querySelectorAll('button')).filter((b) => b.textContent.includes('验证此场景'))
     const editButtons = Array.from(scenarioTable.querySelectorAll('button')).filter((b) => b.textContent === '编辑')
     // 三行顺序：评估 / 解析 / 生成 —— 生成行（最后一个）禁用
@@ -64,12 +64,12 @@ describe('ModelConfig · 表格 + 行详情（RP-053）', () => {
     expect(verifyButtons[0]).toBeEnabled()
   })
 
-  test('点击行展开行详情：显示接线参数与 notes；再点收起', async () => {
+  test('明确查看入口打开统一详情，保留接线与差异并可关闭', async () => {
     renderAppAtModelConfig()
 
     const scenarioTable = await screen.findByRole('table', { name: '场景模型绑定' })
-    const sceneCell = await within(scenarioTable).findByText('实施评估')
-    fireEvent.click(sceneCell.closest('tr'))
+    fireEvent.click(within(scenarioTable).getByRole('button', { name: '查看 实施评估' }))
+    expect(screen.getByRole('dialog', { name: '场景模型详情' })).toBeInTheDocument()
 
     // 展开详情：接线参数 chips + notes + 草稿 vs 生效
     expect(await screen.findByText('接线参数')).toBeInTheDocument()
@@ -78,7 +78,7 @@ describe('ModelConfig · 表格 + 行详情（RP-053）', () => {
     expect(screen.getByText('草稿 vs 生效')).toBeInTheDocument()
 
     // 再点收起
-    fireEvent.click(within(scenarioTable).getByText('实施评估').closest('tr'))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '关闭', exact: true }))
     await waitFor(() => expect(screen.queryByText('接线参数')).not.toBeInTheDocument())
   })
 
@@ -103,4 +103,58 @@ describe('ModelConfig · 表格 + 行详情（RP-053）', () => {
     // 最近变更审计
     expect(screen.getByText(/最近变更/)).toBeInTheDocument()
   })
+  test('供应商与场景列表可搜索，查看不触发编辑或验证', async () => {
+    renderAppAtModelConfig()
+    await screen.findByRole('table', { name: '场景模型绑定' })
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜索场景模型绑定' }), { target: { value: '文件解析' } })
+    expect(within(screen.getByRole('table', { name: '场景模型绑定' })).getAllByRole('row')).toHaveLength(2)
+    expect(screen.getByRole('searchbox', { name: '搜索模型供应商' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '查看 文件解析' }))
+    expect(within(screen.getByRole('dialog', { name: '场景模型详情' })).getByText('接线参数')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '编辑 文件解析' })).not.toBeInTheDocument()
+  })
+
+  test('模型读取失败明确报错且可重试，不把默认表格当生效配置', async () => {
+    let fail = true
+    server.use(http.get(`${BASE}/system/requirement-settings`, () => fail ? new HttpResponse(null, { status: 500 }) : HttpResponse.json({ data: { draft: { modelProviders: [] } } })))
+    renderAppAtModelConfig()
+    expect((await screen.findAllByRole('alert')).some((node) => node.textContent.includes('模型配置加载失败'))).toBe(true)
+    expect(screen.queryByRole('table', { name: '场景模型绑定' })).not.toBeInTheDocument()
+    fail = false
+    fireEvent.click(screen.getAllByRole('button', { name: '重试' })[0])
+    expect(await screen.findByRole('table', { name: '场景模型绑定' })).toBeInTheDocument()
+  })
+
+  test('effective read failure cannot silently promote a draft model to active, and retry refreshes effective state', async () => {
+    let fail = true
+    server.use(http.get(`${BASE}/system/requirement-settings/effective`, () => fail ? new HttpResponse(null, { status: 500 }) : HttpResponse.json({ data: { credentials: { configured: true }, scenarios: [{ key: 'assessment', wired: true, resolvedModel: 'restored-effective-model', wiredParams: [], providerName: '恢复供应商' }] } })))
+    renderAppAtModelConfig()
+    expect((await screen.findAllByRole('alert')).some((node) => node.textContent.includes('生效模型加载失败'))).toBe(true)
+    expect(screen.queryByRole('table', { name: '场景模型绑定' })).not.toBeInTheDocument()
+    fail = false
+    fireEvent.click(screen.getAllByRole('button', { name: '重试' })[0])
+    expect(await screen.findByText('restored-effective-model')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '查看 实施评估' }))
+    expect(within(screen.getByRole('dialog')).getByText('恢复供应商')).toBeInTheDocument()
+  })
+
+  test('model loading and read failure block save and activation to protect the stored configuration', async () => {
+    let writes = 0
+    server.use(
+      http.get(`${BASE}/system/requirement-settings`, async () => { await delay(80); return new HttpResponse(null, { status: 500 }) }),
+      http.patch(`${BASE}/system/requirement-settings/draft`, () => { writes += 1; return HttpResponse.json({ data: {} }) }),
+      http.post(`${BASE}/system/requirement-settings/activate`, () => { writes += 1; return HttpResponse.json({ data: {} }) }),
+    )
+    renderAppAtModelConfig()
+    const save = await screen.findByRole('button', { name: '保存草稿' })
+    const activate = screen.getByRole('button', { name: /生效配置/ })
+    expect(save).toBeDisabled()
+    expect(activate).toBeDisabled()
+    await screen.findAllByRole('alert')
+    expect(save).toBeDisabled()
+    expect(activate).toBeDisabled()
+    fireEvent.click(save); fireEvent.click(activate)
+    expect(writes).toBe(0)
+  })
+
 })

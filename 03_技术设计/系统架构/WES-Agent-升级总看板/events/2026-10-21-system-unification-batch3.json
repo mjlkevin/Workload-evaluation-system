@@ -1,0 +1,64 @@
+{
+  "id": "BE-2026-10-21-system-unification-batch3",
+  "date": "2026-10-21",
+  "type": "implementation",
+  "scope": "ISS-2026-10-21-001 / RP-065 第三批模型、知识库、记忆",
+  "summary": "累计9页前端统一，保留草稿/生效与记忆操作边界，读取失败阻止默认配置写入",
+  "status": "前端已实现/自动及浏览器检查通过/目视待验收/未提交",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "design",
+    "testing",
+    "monitoring",
+    "changes",
+    "risks",
+    "sources",
+    "index"
+  ],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md",
+      "summary": "第13节，18张截图与复核边界"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "81文件671/671"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "2.67秒"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base HEAD -- 本批7个UI文件",
+      "result": "pass",
+      "summary": "0新增发现"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:modules",
+      "result": "partial",
+      "summary": "587/588 skip0，既有resolveKek环境隔离失败"
+    },
+    {
+      "kind": "browser",
+      "ref": "/system/ai/model-config / knowledge-base / memory",
+      "result": "pass",
+      "summary": "1440/760列表详情搜索分页取消检查；记忆58条，KB窄屏646表宽"
+    }
+  ],
+  "limits": [
+    "真实配置保存/生效和外部验证未执行",
+    "真实记忆确认/归档未执行",
+    "模板真实接口500仍待联调",
+    "第二三批目视待验收，最后三页待接续"
+  ],
+  "next": "继续会话审计、测试结果与检索诊断"
+}

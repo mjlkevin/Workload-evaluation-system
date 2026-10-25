@@ -36,7 +36,7 @@ describe('ModelProviders · 多供应商管理（ISS-2026-08-11-001 / RP-055）'
     expect(within(table).getByText('智谱 GLM')).toBeInTheDocument()
     expect(within(table).getByText('https://open.bigmodel.cn/api/paas/v4')).toBeInTheDocument()
     // 模型 chips
-    expect(within(table).getByText('kimi-k3')).toBeInTheDocument()
+    expect(within(table).getByText(/kimi-k3/)).toBeInTheDocument()
     expect(within(table).getByText('glm-4.6')).toBeInTheDocument()
     // Key 状态：moonshot 已配置（显示 hint）；智谱未配置
     expect(within(table).getByText(/····epCz/)).toBeInTheDocument()
@@ -47,6 +47,7 @@ describe('ModelProviders · 多供应商管理（ISS-2026-08-11-001 / RP-055）'
     renderAppAtModelConfig()
 
     const addBtn = await screen.findByRole('button', { name: /新增供应商/ })
+    await waitFor(() => expect(addBtn).toBeEnabled())
     fireEvent.click(addBtn)
 
     const dialog = await screen.findByRole('dialog', { name: '新增供应商' })

@@ -58,6 +58,7 @@ describe('SystemManagement shared dialogs', () => {
   test('uses the shared wide dialog for a new manual test result', async () => {
     renderSection('testResults')
     const trigger = await screen.findByRole('button', { name: '+ 新建' })
+    await waitFor(() => expect(trigger).toBeEnabled())
 
     fireEvent.click(trigger)
     const dialog = await screen.findByRole('dialog', { name: '新建人工测试结果' })

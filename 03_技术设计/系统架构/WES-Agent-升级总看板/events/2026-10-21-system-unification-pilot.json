@@ -1,0 +1,71 @@
+{
+  "id": "BE-2026-10-21-system-unification-pilot",
+  "date": "2026-10-21",
+  "type": "implementation",
+  "scope": "ISS-2026-10-21-001 / RP-065 阶段B首批：编码规则与工具策略",
+  "summary": "统一嵌入列表、搜索筛选、10条分页、详情/编辑Dialog；保持工具本地编辑、保存草稿、显式生效与权限下限，规则读回真实字段和服务器状态。",
+  "status": "已实现 / 自动检查与浏览器验证通过 / 待用户目视验收 / 未提交",
+  "pages": [
+    "issues",
+    "requirements",
+    "plan",
+    "design",
+    "testing",
+    "monitoring",
+    "changes",
+    "risks",
+    "sources",
+    "index"
+  ],
+  "evidence": [
+    {
+      "kind": "file",
+      "ref": "02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md",
+      "summary": "第11节规格、实施结果与7张截图"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run test:web",
+      "result": "pass",
+      "summary": "77文件627/627；净增9项"
+    },
+    {
+      "kind": "command",
+      "ref": "npm run build:web",
+      "result": "pass",
+      "summary": "exit0"
+    },
+    {
+      "kind": "command",
+      "ref": "node skills/improving-wes-ui/scripts/check-ui-scope.mjs --base HEAD -- 本轮11个UI文件",
+      "result": "pass",
+      "summary": "0新增确定性发现"
+    },
+    {
+      "kind": "command",
+      "ref": "bash scripts/verify-local-db-tests.sh test:modules",
+      "result": "partial",
+      "summary": "587/588；唯一既有resolveKek环境隔离失败"
+    },
+    {
+      "kind": "browser",
+      "ref": "/system/rules/code-rules / /system/ai/tools",
+      "result": "pass",
+      "summary": "1440/760；工具行高65px，760下页面宽760表宽631；详情、取消、搜索、分页、焦点；不写实际配置"
+    },
+    {
+      "kind": "review",
+      "ref": "pilot_review",
+      "result": "pass",
+      "summary": "草稿禁用限制与筛选后焦点丢失两项均先红后绿修正，复核无阻塞"
+    },
+    {
+      "kind": "command",
+      "ref": "node scripts/board-build.js / node scripts/board-consistency-check.js",
+      "result": "pass",
+      "summary": "21页0错误0警告；RP-065表格截图无容器溢出"
+    }
+  ],
+  "next": "用户目视验收两页样板；其余十页按方案分批推进。",
+  "limits": "实际写入端到端未执行，MSW验证保存/生效/回退；无API变更、新依赖或提交；不据本地结果更新CI。"
+}

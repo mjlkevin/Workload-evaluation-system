@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '../api/client.js'
 import { isAuthenticated } from '../api/auth.js'
 import { ApiError } from '../api/errors.js'
@@ -93,36 +93,44 @@ function mapRules(raw) {
   return raw.map((r) => ({
     id: r.id || r.ruleId,
     module: r.module || r.moduleName || '',
-    code: r.code || r.prefix || '',
+    code: r.code || r.moduleCode || r.prefix || '',
     prefix: r.prefix || r.codePrefix || '',
     format: r.format || r.codePattern || '',
-    example: r.example || r.codeExample || '',
+    example: r.example || r.sample || r.codeExample || '',
     status: r.status || (r.active ? 'active' : 'draft'),
-    activatedAt: r.activatedAt || '',
+    activatedAt: r.activatedAt || r.effectiveAt || '',
   }))
 }
 
+const updateRule = (previous, ruleId, response, fallbackPatch) => {
+    const item = unwrapSingle(response)?.item
+    return previous.map((rule) => rule.id === ruleId || rule.code === ruleId
+      ? item ? mapRules([item])[0] : { ...rule, ...fallbackPatch(rule) }
+      : rule)
+  }
 function mapDslRules(raw) {
   // 真实后端规则结构：{ id, subject, scope, logic, trigger, dependencies, enabled }
   // 兼容旧校验规则结构：{ id, type, message }（mock/fallback 场景）
   return raw.map((r) => ({
+    ...r,
     id: r.id || r.ruleId || '',
     subject: r.subject || r.name || r.message || '',
     trigger: r.trigger || r.description || '',
     logic: r.logic || r.type || 'requires_all',
-    dependencies: Array.isArray(r.dependencies)
-      ? r.dependencies
-      : Array.isArray(r.anyOfGroups)
-        ? r.anyOfGroups.flat()
-        : [],
+    dependencies: Array.isArray(r.dependencies) ? r.dependencies : [],
     enabled: Boolean(r.enabled ?? r.active ?? true),
   }))
+}
+
+function dslConfig(config, fallbackRules = []) {
+  return { ...config, rules: mapDslRules(config?.rules || fallbackRules) }
 }
 
 function mapTemplates(raw) {
   return raw.map((t) => ({
     id: t.id || t.templateId || '',
     name: t.name || t.templateName || '',
+    version: t.templateVersion || t.version || '',
     desc: t.description || t.desc || '',
     tags: Array.isArray(t.tags) ? t.tags : [],
   }))
@@ -147,24 +155,35 @@ export default function useSystemManagement({
 
   const [rules, setRules] = useState(fallback.rules)
   const [rulesLoading, setRulesLoading] = useState(false)
+  const [rulesError, setRulesError] = useState('')
 
   const [modelConfig, setModelConfig] = useState(fallback.modelConfig)
-  const [modelsLoading, setModelsLoading] = useState(false)
+  const [modelsLoading, setModelsLoading] = useState(enabled)
+  const [modelsError, setModelsError] = useState('')
 
   // --- T3：生效（active）配置视图，供模型配置表格与草稿 diff 使用 ---
   const [modelActiveConfig, setModelActiveConfig] = useState(null)
 
   // --- T2：模型配置生效状态（Effective State） ---
   const [effectiveConfig, setEffectiveConfig] = useState(null)
-  const [effectiveLoading, setEffectiveLoading] = useState(false)
+  const [effectiveLoading, setEffectiveLoading] = useState(enabled)
+  const [effectiveError, setEffectiveError] = useState('')
 
-  const [ratecard, setRatecard] = useState(fallback.ratecard)
+  const ratecard = fallback.ratecard
 
-  const [dslRules, setDslRules] = useState(fallback.dslRules)
-  const [dslLoading, setDslLoading] = useState(false)
+  const [dslRules, setDslRules] = useState(() => mapDslRules(fallback.dslRules))
+  const [dslLoading, setDslLoading] = useState(enabled)
+  const [dslError, setDslError] = useState('')
+  const [dslSavedConfig, setDslSavedConfig] = useState(() => dslConfig(null, fallback.dslRules))
+  const [dslActiveConfig, setDslActiveConfig] = useState(() => dslConfig(null, fallback.dslRules))
+  const dslLoadSequence = useRef(0)
+  const [dslVersion, setDslVersion] = useState(null)
+  const dslUnsaved = JSON.stringify(dslRules) !== JSON.stringify(dslSavedConfig.rules)
+  const dslPending = JSON.stringify(dslSavedConfig) !== JSON.stringify(dslActiveConfig)
 
   const [templates, setTemplates] = useState(fallback.templates)
-  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [templatesLoading, setTemplatesLoading] = useState(enabled)
+  const [templatesError, setTemplatesError] = useState('')
 
   const [prompts, setPrompts] = useState(fallback.prompts)
 
@@ -181,11 +200,19 @@ export default function useSystemManagement({
     retrievalParams: { ...DEFAULT_KB_RETRIEVAL_PARAMS },
     promptProfile: { id: 'rag-answer', version: 1 },
   })
-  const [kbLoading, setKbLoading] = useState(false)
+  const [kbLoading, setKbLoading] = useState(enabled)
+  const [kbError, setKbError] = useState('')
 
   // --- 人工测试结果 ---
   const [testResults, setTestResults] = useState([])
-  const [testResultsLoading, setTestResultsLoading] = useState(false)
+  const [testResultsLoading, setTestResultsLoading] = useState(enabled)
+  const [testResultsError, setTestResultsError] = useState('')
+  const [testResultsMoreLoading, setTestResultsMoreLoading] = useState(false)
+  const [testResultsHasMore, setTestResultsHasMore] = useState(false)
+  const testResultsRef = useRef([])
+  const testResultsOffset = useRef(0)
+  const testResultsSequence = useRef(0)
+  const testResultsMoreBusy = useRef(false)
 
   // --- RP-026: 角色能力矩阵 ---
   const [roleCapabilities, setRoleCapabilities] = useState({ roles: [], legacyMapping: [], capabilityLabels: {} })
@@ -217,33 +244,35 @@ export default function useSystemManagement({
   const loadRules = useCallback(async () => {
     if (!enabled) return
     setRulesLoading(true)
+    setRulesError('')
     try {
       const payload = await apiClient.get('/system/version-code-rules')
       const mapped = mapRules(unwrapList(payload))
       setRules(mapped)
-    } catch (_) { /* keep fallback */ }
+    } catch (error) { setRulesError(`编码规则加载失败：${error?.message || '请稍后重试'}`) }
     finally { setRulesLoading(false) }
   }, [enabled])
 
   const configureRule = useCallback((ruleId, patch) => withAction(`configure:${ruleId}`, async () => {
-    if (enabled) await apiClient.patch(`/system/version-code-rules/${ruleId}/config`, patch)
-    setRules((prev) => prev.map((rule) => (rule.id === ruleId || rule.code === ruleId ? { ...rule, ...patch, status: 'draft' } : rule)))
+    const response = enabled ? await apiClient.patch(`/system/version-code-rules/${ruleId}/config`, patch) : null
+    setRules((prev) => updateRule(prev, ruleId, response, (rule) => ({ ...patch, status: rule.status === 'disabled' ? 'draft' : rule.status })))
   }), [enabled, withAction])
 
   const activateRule = useCallback((ruleId) => withAction(`activate:${ruleId}`, async () => {
-    if (enabled) await apiClient.post(`/system/version-code-rules/${ruleId}/activate`)
-    setRules((prev) => prev.map((r) => r.id === ruleId || r.code === ruleId ? { ...r, status: 'active', activatedAt: new Date().toISOString() } : r))
+    const response = enabled ? await apiClient.post(`/system/version-code-rules/${ruleId}/activate`) : null
+    setRules((prev) => updateRule(prev, ruleId, response, () => ({ status: 'active', activatedAt: new Date().toISOString() })))
   }), [enabled, withAction])
 
   const disableRule = useCallback((ruleId) => withAction(`disable:${ruleId}`, async () => {
-    if (enabled) await apiClient.post(`/system/version-code-rules/${ruleId}/disable`)
-    setRules((prev) => prev.map((r) => r.id === ruleId || r.code === ruleId ? { ...r, status: 'draft', activatedAt: null } : r))
+    const response = enabled ? await apiClient.post(`/system/version-code-rules/${ruleId}/disable`) : null
+    setRules((prev) => updateRule(prev, ruleId, response, () => ({ status: 'disabled' })))
   }), [enabled, withAction])
 
   // --- Models ---
   const loadModels = useCallback(async () => {
     if (!enabled) return
     setModelsLoading(true)
+    setModelsError('')
     try {
       const payload = await apiClient.get('/system/requirement-settings')
       const data = unwrapSingle(payload)
@@ -266,7 +295,7 @@ export default function useSystemManagement({
           kimiGeneration: { ...DEFAULT_MODEL_CONFIG.kimiGeneration, ...a.kimiGeneration },
         })
       }
-    } catch (_) { /* keep fallback */ }
+    } catch (_) { setModelsError('模型配置加载失败，请重试') }
     finally { setModelsLoading(false) }
   }, [enabled])
 
@@ -283,15 +312,19 @@ export default function useSystemManagement({
   const loadEffectiveStrict = useCallback(async () => {
     if (!enabled) return
     setEffectiveLoading(true)
+    setEffectiveError('')
     try {
       const payload = await apiClient.get('/system/requirement-settings/effective')
       const data = unwrapSingle(payload)
       if (!data?.scenarios) throw new Error('生效配置接口返回格式异常：缺少 scenarios')
       setEffectiveConfig(data)
+    } catch (error) {
+      setEffectiveError('生效模型加载失败，请重试')
+      throw error
     } finally { setEffectiveLoading(false) }
   }, [enabled])
 
-  // 保留旧值：接口不可用时表格退回草稿视图
+  // 读取错误交由页面明确呈现；动作调用可复用严格版感知失败。
   const loadEffective = useCallback(
     () => loadEffectiveStrict().catch(() => {}),
     [loadEffectiveStrict]
@@ -387,24 +420,25 @@ export default function useSystemManagement({
     return res?.data || res
   }), [enabled, withAction])
 
-  // --- DSL ---
+  // --- DSL: local edits, saved draft and active rules are separate states. ---
   const loadDsl = useCallback(async () => {
     if (!enabled) return
+    const request = ++dslLoadSequence.current
     setDslLoading(true)
+    setDslError('')
     try {
       const payload = await apiClient.get('/system/implementation-dependency-rules')
-      // 真实后端返回 { data: { version, draft: { rules }, active } }；mock 返回数组。两种形态都兼容。
       const data = payload?.data ?? payload ?? {}
-      const rules = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.draft?.rules)
-          ? data.draft.rules
-          : Array.isArray(data?.rules)
-            ? data.rules
-            : []
-      setDslRules(mapDslRules(rules))
-    } catch (_) { /* keep fallback */ }
-    finally { setDslLoading(false) }
+      const rules = Array.isArray(data) ? data : data?.draft?.rules || data?.rules || []
+      if (request !== dslLoadSequence.current) return
+      const saved = dslConfig(data?.draft, rules)
+      const mapped = saved.rules
+      setDslRules(mapped)
+      setDslSavedConfig(saved)
+      setDslActiveConfig(dslConfig(data?.active || data?.draft, rules))
+      setDslVersion(data?.version ?? null)
+    } catch (error) { if (request === dslLoadSequence.current) setDslError(`DSL 规则加载失败：${error?.message || '请稍后重试'}`) }
+    finally { if (request === dslLoadSequence.current) setDslLoading(false) }
   }, [enabled])
 
   const toggleDsl = useCallback((id) => {
@@ -416,28 +450,34 @@ export default function useSystemManagement({
   }, [])
 
   const saveDslDraft = useCallback(() => withAction('saveDslDraft', async () => {
-    if (enabled) await apiClient.patch('/system/implementation-dependency-rules/draft', { rules: dslRules })
-  }), [enabled, dslRules, withAction])
+    const response = enabled ? await apiClient.patch('/system/implementation-dependency-rules/draft', { rules: dslRules }) : null
+    const data = unwrapSingle(response)
+    const saved = dslConfig({ ...dslSavedConfig, ...data?.draft, rules: data?.draft?.rules || dslRules })
+    setDslRules(saved.rules)
+    setDslSavedConfig(saved)
+  }), [enabled, dslRules, dslSavedConfig, withAction])
 
   const activateDsl = useCallback(() => withAction('activateDsl', async () => {
-    if (enabled) await apiClient.post('/system/implementation-dependency-rules/activate')
-  }), [enabled, withAction])
+    if (dslUnsaved) throw new Error('请先保存草稿，再生效')
+    const response = enabled ? await apiClient.post('/system/implementation-dependency-rules/activate') : null
+    const data = unwrapSingle(response)
+    setDslActiveConfig(dslConfig({ ...dslSavedConfig, ...data?.active }))
+    if (data?.version != null) setDslVersion(data.version)
+  }), [enabled, dslUnsaved, dslSavedConfig, withAction])
 
   // --- Templates ---
   const loadTemplates = useCallback(async () => {
     if (!enabled) return
     setTemplatesLoading(true)
+    setTemplatesError('')
     try {
       const payload = await apiClient.get('/templates')
-      const mapped = mapTemplates(unwrapList(payload))
+      const data = payload?.data ?? payload
+      const mapped = mapTemplates(Array.isArray(data?.list) ? data.list : unwrapList(payload))
       setTemplates(mapped)
-    } catch (_) { /* keep fallback */ }
+    } catch (error) { setTemplatesError(`模板加载失败：${error?.message || '请稍后重试'}`) }
     finally { setTemplatesLoading(false) }
   }, [enabled])
-
-  const useTemplate = useCallback((templateName) => {
-    return templateName
-  }, [])
 
   const importTemplate = useCallback((formData) => withAction('importTemplate', async () => {
     if (enabled) {
@@ -458,15 +498,28 @@ export default function useSystemManagement({
   }), [enabled, prompts, withAction])
 
   // --- 人工测试结果 ---
-  const loadTestResults = useCallback(async () => {
-    if (!enabled) return
-    setTestResultsLoading(true)
+  const loadTestResults = useCallback(async ({ append = false } = {}) => {
+    if (!enabled || (append && testResultsMoreBusy.current)) return
+    const sequence = ++testResultsSequence.current
+    testResultsMoreBusy.current = append
+    if (append) setTestResultsMoreLoading(true)
+    else { setTestResultsLoading(true); setTestResultsMoreLoading(false) }
+    setTestResultsError('')
     try {
-      const payload = await apiClient.get('/harness/test-results')
+      const payload = await apiClient.get('/harness/test-results', { limit: 20, offset: append ? testResultsOffset.current : 0 })
+      if (sequence !== testResultsSequence.current) return
       const items = payload?.data?.items || payload?.items || []
-      setTestResults(Array.isArray(items) ? items : [])
-    } catch (_) { /* keep empty */ }
-    finally { setTestResultsLoading(false) }
+      const records = Array.isArray(items) ? items : []
+      const next = append ? [...new Map([...testResultsRef.current, ...records].map((row) => [row.manualTestResultId, row])).values()] : records
+      testResultsOffset.current = (append ? testResultsOffset.current : 0) + records.length
+      testResultsRef.current = next
+      setTestResults(next)
+      setTestResultsHasMore(records.length === 20)
+    } catch (_) {
+      if (sequence === testResultsSequence.current) setTestResultsError('测试结果加载失败，请重试')
+    } finally {
+      if (sequence === testResultsSequence.current) { setTestResultsLoading(false); setTestResultsMoreLoading(false); testResultsMoreBusy.current = false }
+    }
   }, [enabled])
 
   const createTestResult = useCallback((data) => withAction('createTestResult', async () => {
@@ -487,6 +540,7 @@ export default function useSystemManagement({
   const loadKbConfig = useCallback(async () => {
     if (!enabled) return
     setKbLoading(true)
+    setKbError('')
     try {
       const payload = await apiClient.get('/system/knowledge-base-config')
       const data = unwrapSingle(payload)
@@ -511,7 +565,7 @@ export default function useSystemManagement({
           promptProfile: draft.promptProfile || active.promptProfile || { id: 'rag-answer', version: 1 },
         })
       }
-    } catch (_) { /* keep fallback */ }
+    } catch (_) { setKbError('知识库配置加载失败，请重试') }
     finally { setKbLoading(false) }
   }, [enabled])
 
@@ -626,28 +680,42 @@ export default function useSystemManagement({
   return {
     rules,
     rulesLoading,
+    rulesError,
     modelConfig,
     modelsLoading,
+    modelsError,
     modelActiveConfig,
     effectiveConfig,
     effectiveLoading,
+    effectiveError,
     loadEffective,
     ratecard,
     dslRules,
     dslLoading,
+    dslError,
+    dslUnsaved,
+    dslPending,
+    dslVersion,
     templates,
     templatesLoading,
+    templatesError,
     prompts,
     setPrompts,
     kbConfig,
     kbLoading,
+    kbError,
     testResults,
     testResultsLoading,
+    testResultsError,
+    testResultsMoreLoading,
+    testResultsHasMore,
     actionLoading,
     actions: {
+      loadRules,
       configureRule,
       activateRule,
       disableRule,
+      loadModels,
       saveModelDraft,
       saveModelDraftWithKey,
       clearApiKeyDraft,
@@ -658,14 +726,16 @@ export default function useSystemManagement({
       clearProviderApiKey,
       testProviderApiKey,
       testScenario,
+      loadDsl,
       toggleDsl,
       addDslRule,
       saveDslDraft,
       activateDsl,
-      useTemplate,
+      loadTemplates,
       importTemplate,
       testPrompt,
       savePrompts,
+      loadKbConfig,
       saveKbDraft,
       clearKbApiKeyDraft,
       activateKbConfig,

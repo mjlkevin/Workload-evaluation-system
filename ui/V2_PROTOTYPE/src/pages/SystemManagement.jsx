@@ -1,13 +1,20 @@
+import TestResultsSection from './system/TestResultsSection.jsx'
+import ModelConfigurationSection from './system/ModelConfigurationSection.jsx'
+import TemplatesSection from './system/TemplatesSection.jsx'
+import RateCardSection from './system/RateCardSection.jsx'
+import DslRulesSection from './system/DslRulesSection.jsx'
+import CodeRulesSection from './system/CodeRulesSection.jsx'
 import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import PageShell from '../components/Layout/PageShell.jsx'
 import { Dialog, DialogActions } from '../components/ui/Dialog.jsx'
 import AiSessionAuditPanel from '../components/system/AiSessionAuditPanel.jsx'
-import KnowledgeBaseProfilesPanel from '../components/system/KnowledgeBaseProfilesPanel.jsx'
+import KnowledgeBaseSection from './system/KnowledgeBaseSection.jsx'
 import KnowledgeRetrievalDiagnosePanel from '../components/system/KnowledgeRetrievalDiagnosePanel.jsx'
 import MemoryManagementPanel from '../components/system/MemoryManagementPanel.jsx'
 import AiToolInventoryPanel from '../components/system/AiToolInventoryPanel.jsx'
 import { SYSTEM_MANAGEMENT_SECTIONS, getSystemManagementSectionById } from '../config/systemManagementSections.js'
+import StateMachinesSection from './system/StateMachinesSection.jsx'
+import SystemManagementNav from './system/SystemManagementNav.jsx'
 import useSystemManagement from '../hooks/useSystemManagement.js'
 import { useToast } from '../hooks/useToast.jsx'
 
@@ -49,25 +56,6 @@ function describeKbTestFailure(kbTestResult) {
     default:
       return kbTestResult?.error || '未知错误'
   }
-}
-
-// DSL 依赖规则逻辑类型 → 徽标展示映射
-const DSL_LOGIC_META = {
-  requires_all: { label: '全部依赖', cls: 'lock' },
-  requires_any: { label: '任一依赖', cls: 'warn' },
-  combo: { label: '组合依赖', cls: 'warn' },
-  blocking: { label: '阻断', cls: 'lock' },
-  warning: { label: '警告', cls: 'warn' },
-}
-
-function DslLogicBadge({ logic }) {
-  const meta = DSL_LOGIC_META[logic] || { label: logic || '规则', cls: 'warn' }
-  return (
-    <span className={`bdg ${meta.cls}`}>
-      <span className="dot" />
-      {meta.label}
-    </span>
-  )
 }
 
 const MODEL_CARDS = [
@@ -169,43 +157,31 @@ function buildScenarioDiff(draftCfg, activeCfg) {
   return diffs
 }
 
-const TEST_RESULT_STATUS = {
-  passed: { cls: 'ci', label: '通过' },
-  failed: { cls: 'lock', label: '失败' },
-  blocked: { cls: 'warn', label: '阻塞' },
-  skipped: { cls: 'muted', label: '跳过' },
-}
+
 
 export default function SystemManagement({ sectionId }) {
   const {
-    rules, modelConfig, modelActiveConfig, effectiveConfig, effectiveLoading, ratecard,
-    dslRules, dslLoading, templates, prompts, setPrompts,
-    kbConfig, kbLoading,
-    testResults, testResultsLoading,
+    rules, rulesLoading, rulesError, modelConfig, modelsLoading, modelsError, modelActiveConfig, effectiveConfig, effectiveLoading, effectiveError, loadEffective, ratecard,
+    dslRules, dslLoading, dslError, dslUnsaved, dslPending, dslVersion, templates, templatesLoading, templatesError, prompts, setPrompts,
+    kbConfig, kbLoading, kbError,
+    testResults, testResultsLoading, testResultsError, testResultsMoreLoading, testResultsHasMore,
     actionLoading,
     actions,
   } = useSystemManagement()
 
-  const navigate = useNavigate()
-  const [dialog, setDialog] = useState(null) // 'prompt' | 'rule' | 'dslNew' | null
-  const [dslNewForm, setDslNewForm] = useState({ subject: '', trigger: '', logic: 'requires_all', dependenciesText: '', enabled: true })
+  const [dialog, setDialog] = useState(null) // 'prompt' | null
   const [promptTab, setPromptTab] = useState('assessment')
   const [promptResult, setPromptResult] = useState(null)
-  const [selectedRuleCode, setSelectedRuleCode] = useState('')
-  const [ruleConfigForm, setRuleConfigForm] = useState({ prefix: '', format: '' })
   const toast = useToast()
   const [editingModel, setEditingModel] = useState(null)
   const [extInput, setExtInput] = useState('')
   const [kbTestingProfileId, setKbTestingProfileId] = useState('')
   const [confirmClearKbKey, setConfirmClearKbKey] = useState(false)
-  const [testResultDialog, setTestResultDialog] = useState(false)
-  const [testResultForm, setTestResultForm] = useState({ executorName: '', environment: '', account: '', testCaseKey: '', resultStatus: 'passed', screenshotUrl: '', notes: '' })
   const [modelSaveResult, setModelSaveResult] = useState(null)
   const [modelDirty, setModelDirty] = useState(false)
   const [confirmDiscardModel, setConfirmDiscardModel] = useState(false)
   const [modelSaveError, setModelSaveError] = useState(null)
   const [modelSaving, setModelSaving] = useState(false)
-  const [expandedScenario, setExpandedScenario] = useState(null)
   // ISS-2026-08-11-001：供应商新增/编辑弹窗 + 弹窗内嵌 Key 块状态
   const [providerDialog, setProviderDialog] = useState(null) // { mode:'create' } | { mode:'edit', id }
   const [providerForm, setProviderForm] = useState({ name: '', baseUrl: '', enabled: true, models: [] })
@@ -219,28 +195,6 @@ export default function SystemManagement({ sectionId }) {
   const dedicatedSection = sectionId ? getSystemManagementSectionById(sectionId) : null
   const activeSection = dedicatedSection || SYSTEM_MANAGEMENT_SECTIONS[0]
   const activeSectionId = activeSection.id
-  const tabs = SYSTEM_MANAGEMENT_SECTIONS.map((section) => ({
-    ...section,
-    count: section.id === 'rules' ? rules.length : undefined,
-  }))
-  const selectedRule = rules.find((rule) => rule.code === selectedRuleCode) || rules[0]
-  const selectedRuleId = selectedRule?.id || selectedRule?.code || ''
-
-  useEffect(() => {
-    if (!selectedRuleCode && rules[0]?.code) setSelectedRuleCode(rules[0].code)
-  }, [rules, selectedRuleCode])
-
-  const openRuleConfig = (rule) => {
-    const target = rule || selectedRule
-    if (!target) return
-    setSelectedRuleCode(target.code)
-    setRuleConfigForm({
-      prefix: target.prefix || '',
-      format: target.format || '',
-    })
-    setDialog('rule')
-  }
-
   const handleSaveKbDraft = async () => {
     const result = await actions.saveKbDraft()
     if (result.success) {
@@ -279,26 +233,6 @@ export default function SystemManagement({ sectionId }) {
     } else {
       toast.error(gateMessage || result.error || '知识库配置生效失败')
     }
-  }
-
-  const handleAddDslRule = () => {
-    const subject = (dslNewForm.subject || '').trim()
-    const trigger = (dslNewForm.trigger || '').trim()
-    if (!subject || !trigger) {
-      toast.error('规则主题与触发场景必填')
-      return
-    }
-    const dependencies = (dslNewForm.dependenciesText || '').split(/[,，]/).map((s) => s.trim()).filter(Boolean)
-    actions.addDslRule({
-      id: `dep-custom-${Date.now().toString(36)}`,
-      subject,
-      trigger,
-      logic: dslNewForm.logic,
-      dependencies,
-      enabled: dslNewForm.enabled,
-    })
-    setDialog(null)
-    toast.success('已添加规则，请点「保存草稿」后「生效」写入系统')
   }
 
   const handleClearKbKey = async () => {
@@ -664,99 +598,21 @@ export default function SystemManagement({ sectionId }) {
         </button>,
       ]}
     >
-      <div className="system-tabs" role="tablist" aria-label="系统管理配置分类">
-        {tabs.map((t) => {
-          const active = activeSectionId === t.id
-          return (
-            <button
-              type="button"
-              key={t.id}
-              role="tab"
-              aria-selected={active}
-              className={active ? 'system-tab on' : 'system-tab'}
-              onClick={() => { if (!active) navigate(t.route) }}
-            >
-              <span>{t.label}</span>
-              {t.count ? <span className="ct">{t.count}</span> : null}
-            </button>
-          )
-        })}
-      </div>
+      <SystemManagementNav activeSection={activeSection} ruleCount={rules.length} />
 
-      <div style={{ padding: '18px 24px' }}>
+      <div className="min-w-0 pt-5">
         {activeSectionId === 'rules' && (
-          <div>
-            <div className="sys-toolbar">
-              <span className="meta">共 {rules.length} 条编码规则 · 点击卡片选中后可配置 / 生效 / 禁用</span>
-              <button type="button" className="btn btn-out btn-sm" onClick={() => openRuleConfig()}>配置</button>
-              <button type="button" className="btn btn-pri btn-sm" onClick={async () => { const r = await actions.activateRule(selectedRuleId); r.success ? toast.success('编码规则已生效') : toast.error(r.error || '操作失败') }}>
-                ⌁ 生效
-              </button>
-              <button type="button" className="btn btn-dan btn-sm" onClick={async () => { const r = await actions.disableRule(selectedRuleId); r.success ? toast.success('编码规则已禁用') : toast.error(r.error || '操作失败') }}>
-                禁用
-              </button>
-            </div>
-            <div className="sys-grid">
-              {rules.map((r) => {
-                const selected = selectedRule?.code === r.code
-                return (
-                  <div
-                    key={r.id || r.code}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={selected}
-                    className={selected ? 'sys-card sys-card--selected' : 'sys-card'}
-                    onClick={() => setSelectedRuleCode(r.code)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedRuleCode(r.code) } }}
-                  >
-                    <div className="sys-card__hd">
-                      <span className="sys-card__title">{r.module}</span>
-                      <span className={`bdg ${r.status === 'active' ? 'ci' : 'draft'}`}>
-                        <span className="dot" />
-                        {r.status === 'active' ? '生效中' : '已禁用'}
-                      </span>
-                      <span className="sys-card__code mono">{r.code}</span>
-                    </div>
-                    <div className="sys-card__bd">
-                      <div className="sys-field">
-                        <span className="sys-field__lb">前缀</span>
-                        <span className="sys-field__v mono">{r.prefix}</span>
-                      </div>
-                      <div className="sys-field">
-                        <span className="sys-field__lb">格式</span>
-                        <span className="sys-field__v mono">{r.format}</span>
-                      </div>
-                      <div className="sys-field">
-                        <span className="sys-field__lb">示例</span>
-                        <span className="sys-field__v mono">{r.example}</span>
-                      </div>
-                      <div className="sys-field">
-                        <span className="sys-field__lb">生效时间</span>
-                        <span className="sys-field__v sys-field__v--dim mono">
-                          {r.activatedAt ? r.activatedAt.replace('T', ' ').replace('Z', '') : '—'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="sys-card__ft" onClick={(e) => e.stopPropagation()}>
-                      <button type="button" className="btn btn-out btn-sm" onClick={() => openRuleConfig(r)}>配置</button>
-                      <button type="button" className="btn btn-pri btn-sm" onClick={async () => { const res = await actions.activateRule(r.id || r.code); res.success ? toast.success('编码规则已生效') : toast.error(res.error || '操作失败') }}>⌁ 生效</button>
-                      <button type="button" className="btn btn-dan btn-sm" onClick={async () => { const res = await actions.disableRule(r.id || r.code); res.success ? toast.success('编码规则已禁用') : toast.error(res.error || '操作失败') }}>禁用</button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <CodeRulesSection rules={rules} loading={rulesLoading} error={rulesError} onRetry={actions.loadRules} actions={actions} actionLoading={actionLoading} />
         )}
 
         {activeSectionId === 'model' && (
           <div>
             <div className="sys-toolbar">
               <span className="meta">修改后先保存草稿再生效</span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraft}>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveModelDraft} disabled={actionLoading.saveModelDraft || actionLoading.activateModel || modelsLoading || effectiveLoading || Boolean(modelsError || effectiveError)}>
                 {actionLoading.saveModelDraft ? '...' : '保存草稿'}
               </button>
-              <button type="button" className="btn btn-pri btn-sm" onClick={handleActivateModel} disabled={actionLoading.activateModel}>
+              <button type="button" className="btn btn-pri btn-sm" onClick={handleActivateModel} disabled={actionLoading.activateModel || actionLoading.saveModelDraft || modelsLoading || effectiveLoading || Boolean(modelsError || effectiveError)}>
                 {actionLoading.activateModel ? '...' : '⌁ 生效配置'}
               </button>
             </div>
@@ -769,247 +625,34 @@ export default function SystemManagement({ sectionId }) {
               </div>
             )}
 
-            {/* RP-057：区段标题范式——标题 + 单行描述 + 右侧操作/状态，替代孤儿 caption 与表尾状态行 */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', margin: '10px 0 8px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>模型供应商</h3>
-                <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>
-                  凭据按供应商加密托管
-                  {effectiveConfig?.credentials?.lastAudit ? (
-                    <>
-                      {' · '}最近变更：{effectiveConfig.credentials.lastAudit.action === 'set' ? '设置密钥' : effectiveConfig.credentials.lastAudit.action === 'clear' ? '清除密钥' : effectiveConfig.credentials.lastAudit.action}
-                      {' · '}{effectiveConfig.credentials.lastAudit.actor}
-                      {' · '}{formatRelativeTime(effectiveConfig.credentials.lastAudit.at)}
-                    </>
-                  ) : null}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                {effectiveConfig?.credentials ? (
-                  <>
-                    <span className={`tag ${effectiveConfig.credentials.source === 'store' ? 'ok' : effectiveConfig.credentials.source === 'env' ? 'warn' : 'err'}`}>
-                      {effectiveConfig.credentials.source === 'store' ? '凭据域托管（加密落库）'
-                        : effectiveConfig.credentials.source === 'env' ? '环境变量兜底'
-                        : '凭据未配置'}
-                    </span>
-                    <span className={`tag ${effectiveConfig.credentials.kekReady ? 'ok' : 'err'}`}>
-                      KEK {effectiveConfig.credentials.kekReady ? '就绪' : '未配置'}
-                    </span>
-                  </>
-                ) : null}
-                <button type="button" className="btn btn-pri btn-sm" onClick={openCreateProvider}>+ 新增供应商</button>
-              </div>
-            </div>
-            <div className="sys-table-wrap" style={{ marginBottom: 14 }}>
-              <table className="table sys-model-table" aria-label="模型供应商">
-                <thead>
-                  <tr>
-                    <th>供应商</th>
-                    <th>Base URL</th>
-                    <th>模型</th>
-                    <th>API Key</th>
-                    <th>状态</th>
-                    <th style={{ textAlign: 'right' }}>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {draftProviders.map((provider) => {
-                    const eff = effectiveProvidersById[provider.id] || null
-                    return (
-                      <tr key={provider.id} className="sys-model-row">
-                        <td>
-                          <div className="sys-model-scene">
-                            <span className="sys-model-scene__name">{provider.name}</span>
-                            <span className="sys-model-scene__purpose mono">{provider.protocol || 'openai-compatible'}</span>
-                          </div>
-                        </td>
-                        <td><span className="mono" style={{ fontSize: 12 }}>{provider.baseUrl || '—'}</span></td>
-                        <td>
-                          <div className="sys-model-chips">
-                            {(provider.models || []).map((m) => <span key={m.id} className="sys-model-chip mono">{m.id}</span>)}
-                            {!provider.models?.length ? <span className="sys-model-detail__mut">—</span> : null}
-                          </div>
-                        </td>
-                        <td>
-                          {eff ? (
-                            eff.keyConfigured ? (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                <span className="mono" style={{ fontSize: 12 }}>已配置 {eff.keyHint}</span>
-                                <span className={`tag ${eff.keySource === 'store' ? 'ok' : 'warn'}`}>{eff.keySource === 'store' ? '凭据托管' : '环境变量'}</span>
-                              </span>
-                            ) : <span className="tag err">未配置</span>
-                          ) : '—'}
-                        </td>
-                        <td>
-                          <span className={`bdg ${provider.enabled !== false ? 'ci' : 'draft'}`}>
-                            <span className="dot" />
-                            {provider.enabled !== false ? '启用' : '停用'}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => openEditProvider(provider)}>编辑</button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {!draftProviders.length ? (
-                    <tr><td colSpan={6} className="sys-model-detail__mut" style={{ textAlign: 'center', padding: 16 }}>暂无供应商，点击右上角「新增供应商」接入第一家模型服务</td></tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '4px 0 8px' }}>
-              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>场景模型绑定</h3>
-              <span className="sys-field__v sys-field__v--dim" style={{ fontSize: 11 }}>点击行查看接线与差异</span>
-            </div>
-            <div className="sys-table-wrap">
-              <table className="table sys-model-table" aria-label="场景模型绑定">
-                <thead>
-                  <tr>
-                    <th>场景</th>
-                    <th>生效模型</th>
-                    <th>来源</th>
-                    <th>关键参数</th>
-                    <th>最近验证</th>
-                    <th>状态</th>
-                    <th style={{ textAlign: 'right' }}>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {MODEL_CARDS.map((card) => {
-                    const scenarioKey = SCENARIO_KEY_BY_CONFIG[card.key]
-                    const scenario = effectiveConfig?.scenarios?.find((s) => s.key === scenarioKey) || null
-                    const activeCfg = modelActiveConfig?.[card.key] || null
-                    const draftCfg = modelConfig[card.key] || {}
-                    const diffs = buildScenarioDiff(draftCfg, activeCfg)
-                    const wired = scenario ? scenario.wired : card.key !== 'kimiGeneration'
-                    const resolvedModel = scenario?.resolvedModel || activeCfg?.model || draftCfg.model || '—'
-                    const source = scenario?.source || 'binding'
-                    const sourceBadge = SOURCE_BADGE[source] || SOURCE_BADGE.binding
-                    const lastVerified = scenario?.lastVerified || null
-                    const expanded = expandedScenario === card.key
-                    const verifyLoading = Boolean(actionLoading[`testScenario:${scenarioKey}`])
-                    return (
-                      <React.Fragment key={card.key}>
-                        <tr
-                          className={`sys-model-row${expanded ? ' row-selected' : ''}${wired ? '' : ' sys-model-row--off'}`}
-                          onClick={() => setExpandedScenario(expanded ? null : card.key)}
-                        >
-                          <td>
-                            <div className="sys-model-scene">
-                              <span className="sys-model-scene__name">{card.title}</span>
-                              <span className="sys-model-scene__purpose">{card.desc}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <span className="mono">{resolvedModel}</span>
-                            {scenario?.providerName ? <div className="sys-model-detail__mut" style={{ fontSize: 11 }}>{scenario.providerName}</div> : null}
-                          </td>
-                          <td><span className={`tag ${sourceBadge.cls}`}>{sourceBadge.label}</span></td>
-                          <td className="sys-model-params">{wired ? buildParamSummary(card.key, activeCfg || draftCfg) : '—'}</td>
-                          <td>
-                            {lastVerified ? (
-                              <span className={`sys-model-verify ${lastVerified.ok ? 'ok' : 'err'}`}>
-                                {lastVerified.ok ? '✓' : '✗'} {formatRelativeTime(lastVerified.at)}
-                                <span className="sys-model-verify__model mono">{lastVerified.model}</span>
-                              </span>
-                            ) : '—'}
-                          </td>
-                          <td>
-                            {!wired ? (
-                              <span className="bdg draft"><span className="dot" />规划中</span>
-                            ) : diffs.length ? (
-                              <span className="bdg warn"><span className="dot" />有草稿待生效</span>
-                            ) : (
-                              <span className="bdg ci"><span className="dot" />已生效</span>
-                            )}
-                          </td>
-                          <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                            <div className="sys-model-actions">
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                disabled={!wired}
-                                title={wired ? '' : '该场景尚未接入业务链路（规划中）'}
-                                onClick={() => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setKeyInput(''); setKeyTestResult(null); setEditingModel(card.key) }}
-                              >
-                                编辑
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                disabled={!wired || verifyLoading || (effectiveConfig ? !effectiveConfig.credentials.configured : false)}
-                                title={!wired ? '该场景尚未接入业务链路（规划中）' : effectiveConfig && !effectiveConfig.credentials.configured ? '未配置 API Key' : '用生效模型发最小真实请求'}
-                                onClick={async () => {
-                                  const r = await actions.testScenario(scenarioKey)
-                                  if (r.success) {
-                                    const d = r.data || {}
-                                    const detail = [
-                                      d.resolvedModel && `生效模型: ${d.resolvedModel}`,
-                                      d.respondedModel && `响应模型: ${d.respondedModel}`,
-                                      d.latencyMs != null && `延迟: ${d.latencyMs}ms`,
-                                    ].filter(Boolean).join(' · ')
-                                    if (d.modelMatch === false) {
-                                      toast.warn('验证通过，但模型名不匹配', { detail, duration: 6000 })
-                                    } else {
-                                      toast.success(`${card.title} 验证通过`, { detail, duration: 5000 })
-                                    }
-                                  } else {
-                                    toast.error(r.error || `${card.title} 验证失败`)
-                                  }
-                                }}
-                              >
-                                {verifyLoading ? '验证中…' : '验证此场景'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        {expanded && (
-                          <tr className="sys-model-detail">
-                            <td colSpan={7}>
-                              <div className="sys-model-detail__grid">
-                                <div>
-                                  <div className="sys-model-detail__hd">接线参数</div>
-                                  {scenario && scenario.wiredParams.length ? (
-                                    <div className="sys-model-chips">
-                                      {scenario.wiredParams.map((p) => <span key={p} className="sys-model-chip mono">{p}</span>)}
-                                    </div>
-                                  ) : (
-                                    <span className="sys-model-detail__mut">该场景暂无接线参数</span>
-                                  )}
-                                  {scenario?.notes?.length ? (
-                                    <ul className="sys-model-notes">
-                                      {scenario.notes.map((n) => <li key={n}>{n}</li>)}
-                                    </ul>
-                                  ) : null}
-                                </div>
-                                <div>
-                                  <div className="sys-model-detail__hd">草稿 vs 生效</div>
-                                  {diffs.length ? (
-                                    <ul className="sys-model-diff">
-                                      {diffs.map((d) => (
-                                        <li key={d.field}>
-                                          <span className="mono">{d.field}</span>
-                                          <span className="sys-model-diff__change">{d.from} → <b>{d.to}</b></span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  ) : (
-                                    <span className="sys-model-detail__mut">草稿与生效一致</span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
+            <ModelConfigurationSection
+              providers={draftProviders} effectiveProviders={effectiveProvidersById} credentials={effectiveConfig?.credentials}
+              loading={modelsLoading || effectiveLoading} error={modelsError || effectiveError} onRetry={() => Promise.all([actions.loadModels(), loadEffective()])}
+              onCreateProvider={openCreateProvider} onEditProvider={openEditProvider} formatTime={formatRelativeTime}
+              scenarios={MODEL_CARDS.map((card) => {
+                const scenarioKey = SCENARIO_KEY_BY_CONFIG[card.key]
+                const scenario = effectiveConfig?.scenarios?.find((entry) => entry.key === scenarioKey) || null
+                const activeCfg = modelActiveConfig?.[card.key] || null
+                const draftCfg = modelConfig[card.key] || {}
+                return { ...card, id: card.key, scenarioKey, scenario, diffs: buildScenarioDiff(draftCfg, activeCfg),
+                  wired: scenario ? scenario.wired : card.key !== 'kimiGeneration',
+                  resolvedModel: scenario?.resolvedModel || activeCfg?.model || draftCfg.model || '—',
+                  sourceLabel: (SOURCE_BADGE[scenario?.source] || SOURCE_BADGE.binding).label,
+                  paramSummary: buildParamSummary(card.key, activeCfg || draftCfg),
+                  verifying: Boolean(actionLoading[`testScenario:${scenarioKey}`]),
+                }
+              })}
+              onEditScenario={(row) => { modelSnapshotRef.current = JSON.parse(JSON.stringify(modelConfig)); setModelDirty(false); setModelSaveError(null); setKeyInput(''); setKeyTestResult(null); setEditingModel(row.key) }}
+              onVerifyScenario={async (row) => {
+                const result = await actions.testScenario(row.scenarioKey)
+                if (result.success) {
+                  const data = result.data || {}
+                  const detail = [data.resolvedModel && `生效模型: ${data.resolvedModel}`, data.respondedModel && `响应模型: ${data.respondedModel}`, data.latencyMs != null && `延迟: ${data.latencyMs}ms`].filter(Boolean).join(' · ')
+                  if (data.modelMatch === false) toast.warn('验证通过，但模型名不匹配', { detail, duration: 6000 })
+                  else toast.success(`${row.title} 验证通过`, { detail, duration: 5000 })
+                } else toast.error(result.error || `${row.title} 验证失败`)
+              }}
+            />
           </div>
         )}
 
@@ -1018,110 +661,18 @@ export default function SystemManagement({ sectionId }) {
           <div>
             <div className="sys-toolbar">
               <span className="meta">智谱知识库接入与连通性验证</span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveKbDraft} disabled={actionLoading.saveKbDraft || kbLoading}>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSaveKbDraft} disabled={actionLoading.saveKbDraft || kbLoading || Boolean(kbError)}>
                 {actionLoading.saveKbDraft ? '保存中...' : '保存草稿'}
               </button>
-              <button type="button" className="btn btn-pri btn-sm" onClick={handleActivateKb} disabled={actionLoading.activateKbConfig || kbLoading}>
+              <button type="button" className="btn btn-pri btn-sm" onClick={handleActivateKb} disabled={actionLoading.activateKbConfig || kbLoading || Boolean(kbError)}>
                 {actionLoading.activateKbConfig ? '...' : '⌁ 生效配置'}
               </button>
             </div>
 
-            <div className="sys-card">
-              <div className="sys-card__hd">
-                <span className="sys-card__title">智谱共享接入配置</span>
-              </div>
-              <div className="sys-card__bd sys-card__bd--col" style={{ paddingTop: 14 }}>
-                <div className="sys-field sys-field--loose">
-                  <span className="sys-field__lb">API Key</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    {kbConfig.apiHint && !kbConfig.apiKey && (
-                      <span className="bdg muted">{kbConfig.apiHint}</span>
-                    )}
-                    <input
-                      className="input"
-                      style={{ flex: 1, minWidth: 200, maxWidth: 400 }}
-                      type="password"
-                      placeholder="输入智谱 API Key"
-                      value={kbConfig.apiKey}
-                      onChange={(e) => actions.updateKbConfig({ apiKey: e.target.value })}
-                    />
-                    {kbConfig.apiKey && (
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => actions.updateKbConfig({ apiKey: '' })}>
-                        清除
-                      </button>
-                    )}
-                    {kbConfig.apiHint && !kbConfig.apiKey && (
-                      <button type="button" className="btn btn-dan btn-sm" onClick={() => setConfirmClearKbKey(true)}>
-                        清除已保存密钥
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px,1fr) minmax(240px,2fr)', gap: 12 }}>
-                  <div className="sys-field sys-field--loose">
-                    <span className="sys-field__lb">模型</span>
-                    <input
-                      className="input"
-                      value={kbConfig.model}
-                      onChange={(e) => actions.updateKbConfig({ model: e.target.value })}
-                    />
-                  </div>
-                  <div className="sys-field sys-field--loose">
-                    <span className="sys-field__lb">API Base URL</span>
-                    <input
-                      className="input"
-                      value={kbConfig.apiBaseUrl}
-                      onChange={(e) => actions.updateKbConfig({ apiBaseUrl: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <fieldset className="kb-retrieval-params">
-                  <legend>检索参数</legend>
-                  <div className="kb-retrieval-params__grid">
-                    <label>
-                      Top K
-                      <input className="input" type="number" min="1" max="50" value={kbConfig.retrievalParams.topK} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, topK: Number(e.target.value) } })} />
-                    </label>
-                    <label>
-                      Top N
-                      <input className="input" type="number" min="1" max="100" value={kbConfig.retrievalParams.topN} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, topN: Number(e.target.value) } })} />
-                    </label>
-                    <label>
-                      召回方式
-                      <select className="input" value={kbConfig.retrievalParams.recallMethod} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, recallMethod: e.target.value } })}>
-                        <option value="mixed">混合检索</option>
-                        <option value="vector">向量检索</option>
-                        <option value="keyword">关键词检索</option>
-                      </select>
-                    </label>
-                    <label>
-                      相似度阈值
-                      <input className="input" type="number" min="0" max="1" step="0.05" value={kbConfig.retrievalParams.fractionalThreshold} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, fractionalThreshold: Number(e.target.value) } })} />
-                    </label>
-                    <label>
-                      重排模型
-                      <input className="input" value={kbConfig.retrievalParams.rerankModel} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, rerankModel: e.target.value } })} />
-                    </label>
-                    <label className="kb-retrieval-params__check">
-                      <input type="checkbox" checked={kbConfig.retrievalParams.rerankStatus === 1} onChange={(e) => actions.updateKbConfig({ retrievalParams: { ...kbConfig.retrievalParams, rerankStatus: e.target.checked ? 1 : 0 } })} />
-                      启用检索重排
-                    </label>
-                    <p className="kb-retrieval-params__hint">开启需账号具备重排权限且填写供应商认可的重排模型名，否则连通性测试会失败。</p>
-                  </div>
-                </fieldset>
-
-                <KnowledgeBaseProfilesPanel
-                  profiles={kbConfig.knowledgeBases}
-                  probes={kbConfig.probes}
-                  disabled={kbLoading || actionLoading.saveKbDraft || actionLoading.activateKbConfig}
-                  testingProfileId={kbTestingProfileId}
-                  onChange={(knowledgeBases) => actions.updateKbConfig({ knowledgeBases })}
-                  onTest={handleTestKbProfile}
-                />
-              </div>
-            </div>
+            <KnowledgeBaseSection config={kbConfig} loading={kbLoading} error={kbError}
+              busy={Boolean(kbLoading || actionLoading.saveKbDraft || actionLoading.activateKbConfig || kbTestingProfileId)}
+              testingProfileId={kbTestingProfileId} onRetry={actions.loadKbConfig} onChange={actions.updateKbConfig}
+              onTest={handleTestKbProfile} onClearKey={() => setConfirmClearKbKey(true)} />
           </div>
         )}
 
@@ -1130,182 +681,20 @@ export default function SystemManagement({ sectionId }) {
         )}
 
         {activeSectionId === 'rate' && (
-          <div>
-            <div className="sys-toolbar">
-              <span className="meta">RateCard · 当前生效 · 共 {ratecard.length} 个角色基准</span>
-              <button type="button" className="btn btn-ghost btn-sm">
-                编辑
-              </button>
-            </div>
-            <div className="sys-grid">
-              {ratecard.map((r) => (
-                <div key={r.role} className="sys-card">
-                  <div className="sys-card__hd">
-                    <span className="sys-card__title">{r.role}</span>
-                  </div>
-                  <div className="sys-card__bd sys-card__bd--col">
-                    <div className="sys-field">
-                      <span className="sys-field__lb">人天单价</span>
-                      <span className="sys-field__v" style={{ fontSize: 16, fontWeight: 800 }}>{r.price}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <RateCardSection rates={ratecard} />
         )}
 
         {activeSectionId === 'dsl' && (
-          <div>
-            <div className="sys-toolbar">
-              <span className="meta">共 {dslRules.length} 条实施评估依赖规则{dslLoading ? '（加载中…）' : ''}</span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDslNewForm({ subject: '', trigger: '', logic: 'requires_all', dependenciesText: '', enabled: true }); setDialog('dslNew') }}>+ 新增规则</button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={async () => { const r = await actions.saveDslDraft(); r.success ? toast.success('DSL 草稿已保存') : toast.error(r.error || '保存失败') }}>
-                保存草稿
-              </button>
-              <button type="button" className="btn btn-pri btn-sm" onClick={async () => { const r = await actions.activateDsl(); r.success ? toast.success('DSL 规则已生效') : toast.error(r.error || '操作失败') }}>
-                ⌁ 生效
-              </button>
-            </div>
-            <div className="sys-grid">
-              {dslRules.map((r) => (
-                <div key={r.id} className="sys-card">
-                  <div className="sys-card__hd">
-                    <span className="sys-card__title">{r.subject || r.id}</span>
-                    <DslLogicBadge logic={r.logic} />
-                  </div>
-                  <div className="sys-card__bd sys-card__bd--col">
-                    {r.trigger ? (
-                      <div className="sys-field">
-                        <span className="sys-field__lb">触发场景</span>
-                        <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500, lineHeight: 1.6 }}>{r.trigger}</span>
-                      </div>
-                    ) : null}
-                    <div className="sys-field">
-                      <span className="sys-field__lb">依赖模块</span>
-                      <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500, lineHeight: 1.6 }}>
-                        {r.dependencies?.length ? r.dependencies.join('、') : '无固定依赖（按任一/组合条件校验）'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="sys-card__ft">
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--ink-2)', cursor: 'pointer' }}>
-                      <input type="checkbox" className="sys-check" checked={r.enabled} onChange={() => actions.toggleDsl(r.id)} />
-                      {r.enabled ? '已启用' : '已停用'}
-                    </label>
-                  </div>
-                </div>
-              ))}
-              {!dslLoading && dslRules.length === 0 ? (
-                <div className="sys-card">
-                  <div className="sys-card__bd sys-card__bd--col">
-                    <span className="sys-field__v sys-field__v--dim" style={{ lineHeight: 1.6 }}>暂无规则，点击右上角「+ 新增规则」创建第一条。</span>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
+          <DslRulesSection rules={dslRules} loading={dslLoading} error={dslError} unsaved={dslUnsaved} pending={dslPending} version={dslVersion} actions={actions} actionLoading={actionLoading} />
         )}
 
         {activeSectionId === 'tpl' && (
-          <div>
-            <div className="sys-toolbar">
-              <span className="meta">共 {templates.length} 个评估模板与复用资产</span>
-            </div>
-            <div className="sys-grid">
-              {templates.map((t) => (
-                <div key={t.id} className="sys-card">
-                  <div className="sys-card__hd">
-                    <span className="sys-card__title">{t.name}</span>
-                  </div>
-                  <div className="sys-card__bd sys-card__bd--col">
-                    <div className="sys-field">
-                      <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500, lineHeight: 1.6 }}>{t.desc}</span>
-                    </div>
-                    <div className="sys-field">
-                      <span className="sys-field__lb">标签</span>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {t.tags.map((tag) => (
-                          <span key={tag} className="bdg brd">{tag}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="sys-card__ft">
-                    <span className="sp" />
-                    <button type="button"
-                      className="btn btn-pri btn-sm"
-                      onClick={() => { const name = actions.useTemplate(t.name); toast.success(`已使用模板「${name}」`) }}
-                    >
-                      使用
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <TemplatesSection templates={templates} loading={templatesLoading} error={templatesError} onRetry={actions.loadTemplates} />
         )}
 
-        {activeSectionId === 'testResults' && (
-          <div>
-            <div className="sys-toolbar">
-              <span className="meta">共 {testResults.length} 条人工测试结果登记</span>
-              <button type="button" className="btn btn-pri btn-sm" onClick={() => setTestResultDialog(true)}>+ 新建</button>
-            </div>
-            {testResultsLoading ? (
-              <div className="sys-empty">加载中...</div>
-            ) : testResults.length === 0 ? (
-              <div className="sys-empty">暂无测试结果记录</div>
-            ) : (
-              <div className="sys-grid">
-                {testResults.map((r) => {
-                  const st = TEST_RESULT_STATUS[r.resultStatus] || TEST_RESULT_STATUS.skipped
-                  return (
-                    <div key={r.manualTestResultId} className="sys-card">
-                      <div className="sys-card__hd">
-                        <span className="sys-card__title mono">{r.testCaseKey || '—'}</span>
-                        <span className={`bdg ${st.cls}`}>
-                          <span className="dot" />
-                          {st.label}
-                        </span>
-                      </div>
-                      <div className="sys-card__bd">
-                        <div className="sys-field">
-                          <span className="sys-field__lb">执行人</span>
-                          <span className="sys-field__v">{r.executorName}</span>
-                        </div>
-                        <div className="sys-field">
-                          <span className="sys-field__lb">环境</span>
-                          <span className="sys-field__v">{r.environment}</span>
-                        </div>
-                        <div className="sys-field">
-                          <span className="sys-field__lb">账号</span>
-                          <span className="sys-field__v sys-field__v--dim">{r.account || '—'}</span>
-                        </div>
-                        <div className="sys-field">
-                          <span className="sys-field__lb">截图</span>
-                          <span className="sys-field__v">
-                            {r.screenshotUrl ? <a href={r.screenshotUrl} target="_blank" rel="noreferrer">查看</a> : '—'}
-                          </span>
-                        </div>
-                        {r.notes && (
-                          <div className="sys-field sys-field--full">
-                            <span className="sys-field__lb">备注</span>
-                            <span className="sys-field__v sys-field__v--dim" style={{ fontWeight: 500 }}>{r.notes}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="sys-card__ft">
-                        <span className="sp" />
-                        <button type="button" className="btn btn-dan btn-sm" onClick={async () => { if (confirm('确认删除？')) await actions.deleteTestResult(r.harnessRunId, r.manualTestResultId) }}>删除</button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
+        {activeSectionId === 'testResults' && <TestResultsSection rows={testResults} loading={testResultsLoading} error={testResultsError}
+          moreLoading={testResultsMoreLoading} hasMore={testResultsHasMore} onRetry={() => actions.loadTestResults()} onLoadMore={() => actions.loadTestResults({ append: true })}
+          onCreate={actions.createTestResult} onDelete={actions.deleteTestResult} />}
 
         {activeSectionId === 'sessions' && (
           <AiSessionAuditPanel />
@@ -1318,49 +707,11 @@ export default function SystemManagement({ sectionId }) {
         {activeSectionId === 'tools' && (
           <AiToolInventoryPanel />
         )}
-      </div>
 
-      {/* 编码规则配置 dialog */}
-      <Dialog
-        open={dialog === 'rule'}
-        title="配置编码规则"
-        onClose={() => setDialog(null)}
-      >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                前缀
-                <input
-                  className="input"
-                  value={ruleConfigForm.prefix}
-                  onChange={(event) => setRuleConfigForm((current) => ({ ...current, prefix: event.target.value }))}
-                />
-              </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                格式
-                <input
-                  className="input"
-                  value={ruleConfigForm.format}
-                  onChange={(event) => setRuleConfigForm((current) => ({ ...current, format: event.target.value }))}
-                />
-              </label>
-            </div>
-            <DialogActions>
-              <button type="button" className="btn btn-out" onClick={() => setDialog(null)}>
-                取消
-              </button>
-              <button
-                type="button"
-                className="btn btn-pri"
-                disabled={actionLoading[`configure:${selectedRuleId}`]}
-                onClick={async () => {
-                  const result = await actions.configureRule(selectedRuleId, ruleConfigForm)
-                  if (result.success) { setDialog(null); toast.success('编码规则配置已保存') } else { toast.error(result.error || '保存失败') }
-                }}
-              >
-                {actionLoading[`configure:${selectedRuleId}`] ? '保存中...' : '保存配置'}
-              </button>
-            </DialogActions>
-      </Dialog>
+        {activeSectionId === 'stateMachines' && (
+          <StateMachinesSection />
+        )}
+      </div>
 
       {/* 提示词 dialog */}
       <Dialog
@@ -1416,42 +767,6 @@ export default function SystemManagement({ sectionId }) {
                 {actionLoading.savePrompts ? '保存中...' : '保存'}
               </button>
             </DialogActions>
-      </Dialog>
-
-      {/* 新增实施依赖规则 dialog */}
-      <Dialog
-        open={dialog === 'dslNew'}
-        title="新增实施依赖规则"
-        onClose={() => setDialog(null)}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <FormRow label="规则主题">
-            <input className="input" value={dslNewForm.subject} onChange={(e) => setDslNewForm({ ...dslNewForm, subject: e.target.value })} placeholder="如：研发文档查阅" />
-          </FormRow>
-          <FormRow label="触发场景">
-            <input className="input" value={dslNewForm.trigger} onChange={(e) => setDslNewForm({ ...dslNewForm, trigger: e.target.value })} placeholder="如：使用研发文档查阅场景" />
-          </FormRow>
-          <FormRow label="依赖逻辑">
-            <select className="input" value={dslNewForm.logic} onChange={(e) => setDslNewForm({ ...dslNewForm, logic: e.target.value })}>
-              <option value="requires_all">全部依赖（缺一不可）</option>
-              <option value="requires_any">任一依赖（满足一组即可）</option>
-              <option value="combo">组合依赖（依赖 + 组合项）</option>
-            </select>
-          </FormRow>
-          <FormRow label="依赖模块">
-            <input className="input" value={dslNewForm.dependenciesText} onChange={(e) => setDslNewForm({ ...dslNewForm, dependenciesText: e.target.value })} placeholder="多个用逗号分隔，如：合同管理,税企直连" />
-          </FormRow>
-          <FormRow label="启用">
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-              <input type="checkbox" checked={dslNewForm.enabled} onChange={(e) => setDslNewForm({ ...dslNewForm, enabled: e.target.checked })} />
-              新增后立即启用
-            </label>
-          </FormRow>
-        </div>
-        <DialogActions>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDialog(null)}>取消</button>
-          <button type="button" className="btn btn-pri btn-sm" onClick={handleAddDslRule}>添加规则</button>
-        </DialogActions>
       </Dialog>
 
       {/* 模型编辑 dialog */}
@@ -1707,51 +1022,6 @@ export default function SystemManagement({ sectionId }) {
         </DialogActions>
       </Dialog>
 
-      {/* 新建测试结果 dialog */}
-      <Dialog
-        open={testResultDialog}
-        title="新建人工测试结果"
-        onClose={() => setTestResultDialog(false)}
-        wide
-      >
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <FormRow label="执行人 *">
-                <input className="input" value={testResultForm.executorName} onChange={(e) => setTestResultForm((f) => ({ ...f, executorName: e.target.value }))} />
-              </FormRow>
-              <FormRow label="环境 *">
-                <input className="input" value={testResultForm.environment} onChange={(e) => setTestResultForm((f) => ({ ...f, environment: e.target.value }))} />
-              </FormRow>
-              <FormRow label="账号">
-                <input className="input" value={testResultForm.account} onChange={(e) => setTestResultForm((f) => ({ ...f, account: e.target.value }))} />
-              </FormRow>
-              <FormRow label="用例编号">
-                <input className="input" value={testResultForm.testCaseKey} onChange={(e) => setTestResultForm((f) => ({ ...f, testCaseKey: e.target.value }))} />
-              </FormRow>
-              <FormRow label="结果状态 *">
-                <select className="input" value={testResultForm.resultStatus} onChange={(e) => setTestResultForm((f) => ({ ...f, resultStatus: e.target.value }))}>
-                  <option value="passed">通过</option>
-                  <option value="failed">失败</option>
-                  <option value="blocked">阻塞</option>
-                  <option value="skipped">跳过</option>
-                </select>
-              </FormRow>
-              <FormRow label="截图 URL">
-                <input className="input" value={testResultForm.screenshotUrl} onChange={(e) => setTestResultForm((f) => ({ ...f, screenshotUrl: e.target.value }))} />
-              </FormRow>
-              <FormRow label="备注" className="sys-field--full">
-                <textarea className="input" style={{ height: 'auto', minHeight: 64, padding: '6px 10px', resize: 'vertical' }} value={testResultForm.notes} onChange={(e) => setTestResultForm((f) => ({ ...f, notes: e.target.value }))} />
-              </FormRow>
-            </div>
-            <DialogActions>
-              <button type="button" className="btn btn-out btn-sm" onClick={() => setTestResultDialog(false)}>取消</button>
-              <button type="button" className="btn btn-pri btn-sm" onClick={async () => {
-                if (!testResultForm.executorName || !testResultForm.environment) { toast.warn('执行人和环境必填'); return }
-                await actions.createTestResult(testResultForm)
-                setTestResultDialog(false)
-                setTestResultForm({ executorName: '', environment: '', account: '', testCaseKey: '', resultStatus: 'passed', screenshotUrl: '', notes: '' })
-              }}>确定</button>
-            </DialogActions>
-      </Dialog>
     </PageShell>
   )
 }

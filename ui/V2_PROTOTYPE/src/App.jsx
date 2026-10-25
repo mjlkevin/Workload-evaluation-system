@@ -32,10 +32,17 @@ const ProductMasterData = lazy(() => import('./pages/ProductMasterData.jsx'))
 const UserManagement = lazy(() => import('./pages/UserManagement.jsx'))
 const ApiKeys = lazy(() => import('./pages/ApiKeys.jsx'))
 import { isAuthenticated } from './api/auth.js'
-import { DEFAULT_SYSTEM_MANAGEMENT_ROUTE, SYSTEM_MANAGEMENT_PARENT_ROUTE, SYSTEM_MANAGEMENT_SECTIONS } from './config/systemManagementSections.js'
+import { ROUTE_REDIRECTS, SYSTEM_MANAGEMENT_SECTIONS } from './config/systemManagementSections.js'
 import { BASE_MANAGEMENT_PARENT_ROUTE, BASE_MANAGEMENT_SECTIONS, DEFAULT_BASE_MANAGEMENT_ROUTE } from './config/baseManagementSections.js'
 import useCurrentUser from './hooks/useCurrentUser.js'
 import { isAdminOnlyPath, isAdminUser } from './utils/adminAccess.js'
+
+// 系统管理旧址/分组父路由的跳转：带上的查询串必须随行——外部链接依赖
+// /system/memory?status=draft 这类带参入口，裸 <Navigate to> 会把 query 吞掉。
+function SearchPreservingNavigate({ to }) {
+  const location = useLocation()
+  return <Navigate to={`${to}${location.search || ''}`} replace />
+}
 
 function ProtectedLayout() {
   const location = useLocation()
@@ -94,7 +101,10 @@ export default function App() {
         <Route path="/wbs" element={<WbsList />} />
         <Route path="/history" element={<HistoryList />} />
         <Route path="/history/:id" element={<HistoryDetail />} />
-        <Route path={SYSTEM_MANAGEMENT_PARENT_ROUTE} element={<Navigate to={DEFAULT_SYSTEM_MANAGEMENT_ROUTE} replace />} />
+        {/* 父路由/分组父路由/旧扁平路由的跳转全部来自配置表，不另写路由 */}
+        {Object.entries(ROUTE_REDIRECTS).map(([from, to]) => (
+          <Route key={from} path={from} element={<SearchPreservingNavigate to={to} />} />
+        ))}
         {SYSTEM_MANAGEMENT_SECTIONS.map((section) => (
           <Route
             key={section.id}

@@ -99,6 +99,13 @@
       </ol>
     </div>
 
+    <section data-board-event-id="BE-2026-10-25-system-unification-submit:design"><h2>状态目录口径纠正 · 以执行路径区分能力</h2><p>复核区分值域、业务标签和实际前态约束：简报/协作/评审/版本主状态允许回退，知识archived不可恢复；记忆已有归档/恢复，AI会话/产物现行入口仅创建/追加。目录与静态快照同步，业务代码无改动；防漂移测试覆盖已核实能力但不自动解析全部源码守卫。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-batch4:design"><h2>审计与诊断 · 保留任务差异，统一结果浏览</h2><p>会话保留唯一服务端筛选，默认最多返回200条，消息明确为截断摘要；测试结果按20条分批加载并独立推进offset；诊断保留本地试查、预算、耗时与完整返回内容。<a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">统一方案与最终验证</a></p><p>三页结果均复用10行列表和只读详情；测试结果创建/删除采用明确目标、候选取消及忙时保护。共享组件仅增加可关闭本地搜索的参数，避免把服务端搜索混成第二搜索框。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-batch3:design"><h2>AI 配置与记忆 · 列表与候选编辑分离</h2><p>模型保留供应商/场景两个列表，接线与草稿差异改详情；知识库以档案列表和连接摘要为主，共享参数进弹窗；记忆以类型可辨的统一列表呈现。<a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">方案与第三批证据</a></p><p>模型两接口读取错误显式呈现且禁止保存/生效，避免默认参数覆盖。记忆按后端两类独立总数加载，搜索仅限已加载范围；确认/归档固定详情目标且防重。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-batch2:design"><h2>规则与资产目录 · 统一列表和领域详情</h2><p>四页复用首批搜索、分页和 Dialog，移出父页卡片与表单；状态机保留轴、流转、守卫及源码，RateCard 明示默认参考来源，模板保留真实版本且不再提示虚假套用成功。<a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">方案与第二批实施证据</a></p><p>DSL 保留组合字段，区分本地编辑、服务端草稿和完整生效配置；差异比较包含互斥规则，保存仅提交本页拥有的 rules。较旧请求不覆盖本地编辑。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-pilot:design"><h2>系统管理统一列表 · 两页样板已落地</h2><p>共用列表负责搜索、状态筛选、10 条分页及加载/空/错态；现有 Dialog 负责详情与编辑，增加未应用修改确认及焦点后备。<a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">方案与首批实施证据</a></p><p>工具策略编辑先留在弹窗，应用后进入页面草稿；保存与生效继续分开。规则操作按真实 id，状态、示例与生效时间采用后端返回。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-unification-research:design"><h2>系统管理列表统一化 · 推荐方案草案</h2><p>推荐「统一列表骨架＋统一详情/编辑弹窗＋少量业务专用区域」。12 个子页沿用现有导航、tokens、Dialog 和权限；摘要与详情分层，工具策略不再常驻整组角色编辑控件。<a href="../../../02_产品设计/系统管理统一化重构调研-2026-10-21/调研与重构方案.md">完整调研与重构方案（含 15 张截图）</a></p><p>RateCard 真实编辑、模板真实引用、记忆分页总量和完整会话接口需要独立核实，不能借视觉重构宣称功能已接通。本方案当时尚未获得实现授权；后续首批已确认。</p></section>
+    <section data-board-event-id="BE-2026-10-21-system-controls-polish:design"><h2>RP-065 控件设计补充 · 2026-10-21</h2><p>一级分组用分段导航，二级页签用下划线；输入与按钮显式重置原生外观；规则卡片优先展示业务对象与状态/流转数，源码移入详情。状态集合不虚构相邻流转，流转表保留真实方向。<a href="../../../docs/superpowers/plans/2026-10-21-system-controls-polish.md">改版计划与证据</a></p><p>沿用既有 Tailwind v4 + tokens；preflight 关闭，不新增依赖、不扩增冻结 CSS。</p></section>
     <section>
       <div class="h-num">Section 01</div>
       <h2>产品定义</h2>
@@ -112,6 +119,9 @@
       <div class="callout warn"><div><b>输入边界</b>WES Harness 第一阶段遵循“上传文件为主”。不连接用户本地工作目录，不开放 bash/命令执行，不做桌面连接器。所有 Excel、Word、PDF、访谈纪要和标准文件都通过上传、绑定、解析和 evidence 留痕进入 Harness。</div></div>
       <div class="callout" data-board-event-id="BE-2026-07-25-wes-ui-quality-gate-implementation:design">
         <div><b>RP-043 · UI 质量门禁实现</b>已落地项目内 <code class="inline">improving-wes-ui</code> Skill，并保持 <code class="inline">ui/V2_PROTOTYPE</code>、现有 CSS Token、WES Issue-first 与“单页面族/最多三个根问题”边界。共享 <code class="inline">Dialog(open, title, description, onClose, children, wide, closeOnBackdrop, initialFocusRef)</code> 采用原生 <code class="inline">&lt;dialog&gt;</code> 与可访问降级路径，统一标题/描述关联、可见关闭按钮、Escape、初始焦点、Tab 环、关闭后焦点恢复、遮罩策略和视口内顶部拖拽；SystemManagement 四处弹窗已迁移且未新增第三方依赖。自动化通过，真实浏览器人工证据因管理员认证阻塞待回填。</div>
+      </div>
+      <div class="callout" data-board-event-id="BE-2026-10-17-state-machines-catalog-and-system-ia:design">
+        <div><b>RP-065 · 状态机规则与系统管理信息架构（2026-10-17）</b>规则真源=后端只读接口 <code class="inline">GET /api/v1/system/state-machines</code>（admin，不落库），前端不镜像静态配置；目录与源码枚举由防漂移测试钉住，未落地流转如实标「未实现」。系统管理三级 URL <code class="inline">/system/{group}/{section}</code>（3 分组 12 子页），单一事实源 <code class="inline">systemManagementSections.js</code> 一处登记四处消费；旧扁平路由全量重定向且保留 query。边界：不实现界面编辑状态机规则，规则变更只能改代码 + 防漂移测试；沉淀文档 <code class="inline">03_技术设计/数据模型/状态控制规则梳理-V1.md</code> 以接口为准。</div>
       </div>
     </section>
 
