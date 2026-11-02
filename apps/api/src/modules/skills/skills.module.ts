@@ -13,6 +13,6 @@ export { createExecutionManifestService, prepareExecution, readPersistedExecutio
 export type { ExecutionManifest, ExecutionRequest, PreparedExecution, ExecutionDbExecutor } from './execution-manifest.types';
 export { createSkillInvocationService, submitInvocation, type InvocationRepository } from './skills.invocation';
 
-export { compileSkillPayloadSchema } from './skills.validation';
+export { compileSkillPayloadSchema, skillPathParts } from './skills.validation';
 export { skillDefinitionHash } from './skills.hash';
 export { copyTrialJson } from './skills.sandbox';

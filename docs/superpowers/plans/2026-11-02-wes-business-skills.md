@@ -430,3 +430,60 @@ resolveExecutionConfig?: (tx: QueueDbExecutor) => Promise<Record<string, unknown
 边界与下一步：CP与output仍分步持久化，强制恢复再进入executor仅防无产物假完成，不代替持久写幂等。下一单元C2b.1实现四类节点解释与受限映射，随后C2b.2接单次生产Skill/预算；C2c继续等待/确认、实时授权/紧急禁用、持久幂等和统一视图，C3后才开放工作台。公开snapshot私有清单投影、会话删除并发保护、retryRun实时授权三项门槛保持。本轮未调用真实LLM/工具、未更新3006/3004或用户模型配置，未合main/推送；C2整体和MVP尚未完成。
 
 C2a.2总看板回填：主目录总览、需求、计划、测试、监控、风险、变更、运行、设计九页已更新；board-build与21页一致性检查0错误0警告。浏览器确认RP-050仍C实施中、C2a.2已验证、节点/真实执行与工作台/D待完成，截图c2a2-board-requirements.png保存于本会话visualizations。存量台账ID折行和列宽未改，不声称UI视觉优化；关闭自建验证页/3008临时服务，保留用户3006/3004与模型配置。
+
+
+### C2b.1 精细工单：四类节点纯解释器与受限映射（2026-11-03）
+
+用户“继续下一步”，基线abf5a64 / codex/wes-skills-c；继续原RP-050，不新增需求/Loop。本单元实现可恢复、无外部副作用的流程解释规则，输入为C1保存的Workflow manifest及服务端executionId。默认生产executor仍不接线，不挂HTTP/UI，不运行LLM或工具、不做持久等待/批准授权，3006/3004与用户模型状态文件保持。真正执行和等待门槛继续C2b.2/C2c。
+
+责任文件：新增modules/harness/workflows.runtime.types.ts（状态/命令）、workflows.runtime-values.ts（映射与条件）、workflows.runtime-adapter.ts（有限状态推进）、workflows.runtime.test.ts与必要的workflows.runtime.fixture.ts；窄改skills.module.ts导出现有skillPathParts、apps/api/package.json登记纯测试和test:workflow-runtime。解释器是Harness内部组件，不在harness.module或workflows.module新增聚合出口；后续同域executor直接组装，避免workflows.module→解释器→skills.module→C1→workflows.module的新barrel环。不得改既有已发布定义Shape/语义、Harness/boot、DB结构/依赖或工具注册。代码+测试目标500–850行；超过999先拆单元。既有字段映射只支持literal/path/fallback，本单元不扩展隐式类型转换、脚本、JSONPath表达式。
+
+```ts
+// 内部纯服务，不接受来自HTTP的runtime state或函数；命名可保持项目约定。
+createWorkflowRuntime(manifest: ExecutionManifest, executionId: string): {
+  next(state?: unknown): WorkflowDecision;
+  settle(state: unknown, receipt: { operationId: string; output: unknown }): WorkflowDecision;
+  fail(state: unknown, receipt: { operationId: string; code: WorkflowFailureCode }): WorkflowDecision;
+};
+// Decision: ready（四类节点命令）, waiting（失败/次数上限）, failed, completed（冻结Schema合法输出）。
+```
+
+确定性语义：create先用readPersistedExecutionManifest验证并独立复制，只接受kind=workflow。executionId为服务端稳定执行身份（当前Run/将来重试血缘由调用层选择），operationId=hash(executionId/manifestHash/stepId/iteration)，无时间/随机数；这只是节点身份，不代表工具恰好一次或用户授权。状态schemaVersion=1、executionId、manifestHash、receipts数组，使用有序回执重放推导cursor/分支/次数，不能相信客户端或存储里单独给出的cursor。回执按当前推导operationId匹配、结构/原输出Schema验证；拒绝跨实例/跨manifest/未知版本/额外字段/未来或乱序回执、终态后额外记录。全状态既有copyTrialJson 1MiB/32深度/危险属性约束，回执最多500，四类节点总访问亦受已发布50步/每步最多10次的既有定义约束。next/settle/fail和返回值均不修改调用者输入或内部冻结定义。
+
+字段映射：复用skillPathParts，只可读取$.input.<field>或$.steps.<id>.output.<field>自有属性；目标沿用单层已声明字段。literal和fallback独立JSON复制，fallback仅缺字段时用，null/false/0/空串不是缺失；组装整份节点输入及最终output后按冻结Schema校验。条件数组为AND，exists区分字段存在与值为null；eq/neq/in用JSON结构相等，不做JS隐式类型比较；数值比较只接受有限数字。非法/缺少必需源、原生工具缺输出契约不得凭空发明字段或偷偷跳过。
+
+推进顺序：prerequisite为false时跳过该节点，既不执行branch也不执行repeat；成功回执验证后更新该节点最新输出，再判断repeat.while（do-while，maxIterations包含第一次），仍为true且到上限按onLimit产生waiting/failed且绝不多发一次命令；未重复则按声明顺序取第一个匹配branch（严格向前/$end），无匹配取下一节点。跳过节点的输出按既有fallback规则处理。失败回执仅接受固定安全枚举码，按onFailure返回waiting/failed，不自动重试/推进。waiting为纯决策且保持不变，不代表已持久挂起，也不提供未经授权的继续/覆盖接口。
+
+四类命令：skill带精确skillId/version和原输入输出契约；userInput带原prompt/input/output契约；confirmation输出沿用{approved:boolean}原契约，true/false都是可分支的业务数据，绝不作为后续工具调用的授权凭据（实际拒绝/批准动作由C2c核验后选择settle/fail）；tool带冻结原生参数契约与更严格requiresConfirmation，结果仅受安全JSON约束、作为opaque回执保留，不暴露为可映射的$.steps.tool.output。所有命令只描述动作，纯解释器不执行。工具写入和外发仍需独立的当前权限/参数hash确认与持久幂等。
+
+重复回执：同operationId及同内容的settle/fail只返回当前推导状态，不追加、不重复进入下一步；不同内容/成功失败碰撞或错误operationId明确拒绝。终结状态保存原产物证据并可由有序回执重新推导，JSON往返恢复不重新要求已完成步骤，不取latest。
+
+- [x] RED→GREEN：四节点顺序、原Schema/精确依赖、literal/path/fallback/null等、原生工具不可映射输出；最小失败后实现，纯命令不触发I/O。
+- [x] 控制流：skip、首匹配分支/$end、深结构比较/exists/数值严格类型、重复0/1/10界限及onLimit/onFailure wait/fail，不能多发命令或自动绕过人工处理。
+- [x] 恢复/幂等：JSON往返中途和完成恢复、原manifest被外部修改不影响实例、同回执重放/冲突、两实例及manifest隔离、坏/越序/超500/超限/危险字段状态拒绝，错误固定脱敏。
+- [x] 组合测试：用已存在BusinessSkills适配器的可信测试端口保存解释器state/原产物，在中途/终态重进后仍同版本且不重做已回执节点。只测试接缝，不改生产boot、不宣称真实Worker/模型业务运行通过。
+- [x] 父独立定向、modules、既有适配器回归、API/Web构建与必要跨域检查；先规格后质量/安全复核，回填README/对齐说明及总看板。既有通用集成模板夹具缺口仍单列，不以局部通过关闭C2/C3/MVP。
+
+**C2b.1契约实取纠正：** 存储策略枚举TOOL_POLICY_APPROVAL_STRATEGIES只有default/user-confirm（types/index.ts:595），ask是resolveWorkbenchToolDecisionSlot的运行时分流结果，不是可持久化策略值。纯工具命令保守OR冻结policy.approvalStrategy=user-confirm，不引入无效ask兼容分支；新增合法策略反例65项中1fail（false!==true）后修正转65/65，证据/tmp/wes-c2b1-policy-red与/tmp/wes-c2b1-policy-green。以当前类型和生产函数实取为准，不沿用口头术语。
+
+**C2b.1首候选规格复核：** 实现者首候选定向67/67、modules845/845及API构建通过；父独立首候选67/845/既有适配器58通过。规格独立纯67通过后以合法大结果探针发现P2：output600011B、完整state600269B均符合1MiB边界，但返回decision重复携带state中的output及顶层output，整体再次copyTrialJson误将合法state缩额，首次settle/恢复next均INVALID_STATE。规格REQUEST_CHANGES，正在按RED/GREEN修正独立逻辑对象的验证/复制边界；完整state、映射后的整份input、最终output仍各受原1MiB/深度/危险属性限制，返回组合信封不再重复算配额。不扩大共享helper限额、不将原67项绿色当完成。
+
+**C2b.1返修复审记录：** 合法600k输出/600269B状态的首次settle、独立state.next、JSON恢复、重复回执与副本隔离已修复；完整state、每轮重放映射后的整input和最终output分别保留1MiB/深度/unsafe界限，不将组合信封的重复数据算成更低额度。新增修前72项中3fail、旧步骤重放聚合input反例72项中1fail，最终纯72/72。规格复审独立探针及72/72后APPROVE；fresh质量/安全亦独立纯72/72后APPROVE，依赖audit仍45既有基线。最终父套件正在串行复跑。
+
+返修modules首轮850中849pass/1fail，唯一为原skills.evaluation.test.ts:87的20ms预算用例读取空cases；隔离19/19、实现者一次安静全量850/850通过。相关生产域/旧测试/预算未改，先前C2a.1同类证据继续保留。本轮失败日志/tmp/wes-c2b1-return-final/test:modules.log、隔离/tmp/wes-c2b1-budget-isolated、一次复核/tmp/wes-c2b1-modules-confirm，不覆盖或删去失败历史。
+
+
+**C2b.1最终回填（2026-11-03）：** Harness内部纯Workflow解释器已实现并经独立规格/质量安全APPROVE。C1保存manifest只读验证，四类节点生成纯命令；literal/path/fallback沿用原契约、falsey/null不误回落、自有安全字段、严格结构/数字条件、前置跳过/首匹配向前分支/$end、do-while上限含首次及onFailure/onLimit均按已发布配置解释。有序回执从原输入推导cursor，拒绝乱序/未来/跨实例/错manifest/终态追加；同ID同内容不追加/不跳步，冲突拒绝。工具保留opaque回执且不能凭空映射其output，确认策略保守OR真实user-confirm；确认业务数据不作为后续工具授权。
+
+大小/恢复约束：完整state、每次历史重放映射后的整input及最终output分别保留既有1MiB/32深度/unsafe限制；组合返回不再重复缩额。合法600k输出首次完成、独立保存状态恢复、重复回执与副本隔离已实证；真正超大聚合input/output/state仍拒绝，最多500回执与50步/每步10次控制保持。通过既有BusinessSkills适配器可信测试端口组合中途/终态state及原产物，已回执节点不重发；该组合仅纯接缝，不冒充真实Worker业务或LLM调用验收。
+
+父独立最终候选：test:workflow-runtime **72/72**、test:modules **850/850**（29 suites）、test:business-skills-runtime **58/58**、test:ai **286/286**，均0fail/0skip（/tmp/wes-c2b1-parent-reviewed）；API/Web构建通过（/tmp/wes-c2b1-parent-build-api.log、/tmp/wes-c2b1-parent-build-web.log），定向secret-scan零命中、diff-check通过。规格复审与fresh五轴质量安全分别独立纯72/72后APPROVE，质量未做性能压测；npm audit实取45项既有基线（32moderate/12high/1critical），依赖及lockfile无改动。本单元没有改Worker/boot，已复跑原适配器58项；前单元完整Harness338是其原记录，不冒充本轮重新执行。
+
+通用集成test:integration **0/1**，仍在templates_status_not_200失败；只读核对workload_eval_test活动模板/分配均0，相关模板域、路由、集成测试与abf5a64无变更。夹具缺口继续保留，不填业务/预览数据放绿；远端CI未执行。返修前旧20ms预算用例一次850中1fail、隔离19/19、实现者一次850/850及父最终850/850均保留，未改评估器、旧测试或预算，也未删除初次失败证据。
+
+完整审查史：58项首次行为RED→GREEN；user-confirm合法策略反例65中1fail→修复；首候选67/845/适配器58/AI286通过但规格探针600011B输出/600269B状态被重复信封误拒，REQUEST_CHANGES。补大结果及聚合限额RED72中3fail、旧步骤重放input额度RED72中1fail后最小修复，并经同规格复审。日志/tmp/wes-c2b1-red、/tmp/wes-c2b1-policy-red、/tmp/wes-c2b1-return-boundary-red-guards、/tmp/wes-c2b1-input-replay-red和各GREEN保留，先前绿色不冒充最终候选。新5文件577行，另仅skills.module窄出口与API测试脚本；无新聚合入口/DB/schema/依赖/路由/UI，没有改用户模型状态文件。
+
+下一步与边界：C2b.2接单次生产Skill与调用预算，C2c接持久等待/确认、实时授权/紧急禁用、写入幂等与统一视图，C3后开放工作台。当前waiting只是纯决策，operationId/checksum不是授权或业务恰好一次；服务端executionId的重试血缘由后续调用层绑定。公开snapshot投影、会话删除并发保护、retry授权门槛仍开放。未运行真实模型/工具、未接生产executor/更新3006或3004、未合main/推送，C2/C3/D及MVP均未被关闭。
+
+
+**C2b.1总看板复验（2026-11-03）：** 九个相关页面已同步，board-build与board-consistency-check通过（21页、0错误/0警告）；浏览器展开完整台账后实读RP-050仍为C实施中，下一步为生产Skill/预算。截图：/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2b1-2026-11-03-board-requirements.png。新增状态可读，表格原有窄列换行保留，未声称完成视觉优化。本次临时3008服务与自建验证页已关闭，用户3006页未操作。
