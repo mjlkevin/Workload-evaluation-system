@@ -502,3 +502,20 @@ test('模型请求进行中显示处理中，不误报冲突或要求关闭；�
   expect(within(dialog).getByText(/发布状态与当前记录不一致/)).toHaveTextContent('请刷新发布状态')
   expect(within(dialog).getByRole('button', { name: '关闭' })).toBeEnabled()
 })
+
+test.each([
+  [['SKILL_ALREADY_PUBLISHED'], false],
+  [['SKILL_ALREADY_PUBLISHED', 'SKILL_DISABLED'], true],
+])('UI 模拟已发布记录用中性状态，不误报未完成门禁：%j', async (blockers, restricted) => {
+  // MSW UI fixture only; this test does not claim a real model trial or publication.
+  record.versions[1].status = 'published'
+  record.activeVersionId = 'v1'
+  server.use(http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ blockers, publishAvailable: true, trials: [trial()], review: { evaluationId: 'eval-1', versionId: 'v1', hash: 'hash-1', contextHash: 'ctx-1' } }) })))
+  const dialog = await open()
+  expect(await within(dialog).findByText('当前版本已发布，维护请升版。')).toBeInTheDocument()
+  expect(within(dialog).queryByText(/样例测试与审核门禁尚未完成/)).not.toBeInTheDocument()
+  expect(within(dialog).queryByText('当前版本已发布')).not.toBeInTheDocument()
+  expect(Boolean(within(dialog).queryByText('当前状态限制'))).toBe(restricted)
+  expect(within(dialog).getByRole('button', { name: '发布' })).toBeDisabled()
+  expect(within(dialog).getByRole('button', { name: '升版' })).toBeEnabled()
+})

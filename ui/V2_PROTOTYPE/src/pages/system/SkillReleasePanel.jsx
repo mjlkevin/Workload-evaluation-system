@@ -7,7 +7,7 @@ import SkillInfluences from './SkillInfluences.jsx'
 
 const blockerLabels = {
   SKILL_MODEL_TRIAL_REQUIRED: '需要当前定义与依赖下通过的真实模型试运行',
-  SKILL_REVIEW_REQUIRED: '需要复核通过', SKILL_ALREADY_PUBLISHED: '当前版本已发布',
+  SKILL_REVIEW_REQUIRED: '需要复核通过',
   SKILL_CHECKIN_REQUIRED: '请先检入当前版本', SKILL_DISABLED: 'Skill 已停用', SKILL_ARCHIVED: 'Skill 已归档',
 }
 export default function SkillReleasePanel({ record, version, dirty, busy, setBusy, onRecord, viewerId }) {
@@ -22,13 +22,15 @@ export default function SkillReleasePanel({ record, version, dirty, busy, setBus
   const locked = version.checkoutStatus === 'checked_out' && version.checkedOutBy !== viewerId
   const blocked = busy || dirty || historical || locked || record.archived || !record.enabled
   const { readiness } = release
+  const published = version.status === 'published'
+  const blockers = (readiness?.blockers || []).filter(code => code !== 'SKILL_ALREADY_PUBLISHED')
   const chosen = release.candidates.find(item => item.id === evaluationId) || release.candidates[0]
   const proofKey = chosen ? `${chosen.id}:${chosen.hash}:${chosen.contextHash}` : ''
   const previousProof = useRef('')
   useEffect(() => { if (proofKey && previousProof.current !== proofKey) { setAcknowledged(false); previousProof.current = proofKey } }, [proofKey])
   const simulated = chosen?.result.simulatedSteps || []
   const reviewAvailable = !blocked && release.fresh && readiness?.reviewAvailable && chosen && reason.trim() && (!simulated.length || acknowledged)
-  const publishAvailable = !blocked && release.fresh && readiness?.publishAvailable && release.reviewed && version.checkoutStatus === 'checked_in'
+  const publishAvailable = !published && !blocked && release.fresh && readiness?.publishAvailable && release.reviewed && version.checkoutStatus === 'checked_in'
   const targets = readiness?.revision === record.revision ? readiness.rollbackVersions || [] : []
   const rollbackTarget = targets.find(item => item.versionId === rollbackId)
   const activeVersion = record.versions.find(item => item.skillVersionId === record.activeVersionId)
@@ -51,7 +53,8 @@ export default function SkillReleasePanel({ record, version, dirty, busy, setBus
       {dirty && <p className="m-0 text-sm text-warn-ink">请先保存草稿，再试运行、复核或发布。</p>}
       <div className="flex flex-wrap gap-2"><button type="button" className={systemPrimaryButton} onClick={() => mutate('trial', { mode: 'model' })} disabled={blocked || release.loading}>模型试运行</button><button type="button" className={systemButton} onClick={() => mutate('trial', { mode: 'simulation' })} disabled={blocked || release.loading}>样例模拟</button></div>
       <p className="m-0 text-xs text-ink-2">模拟使用样例期望值，不能作为发布证明；模型试运行中的写入、外发工具仅模拟执行。</p>
-      {readiness?.blockers?.length > 0 && <details className="text-sm text-warn-ink" open><summary className="cursor-pointer">样例测试与审核门禁尚未完成，暂不可发布。</summary><ul className="my-2 pl-5">{readiness.blockers.map(code => <li key={code} className="wrap-anywhere">{blockerLabels[code] || code}</li>)}</ul></details>}
+      {published && <p className="m-0 text-sm text-ink-2">当前版本已发布，维护请升版。</p>}
+      {blockers.length > 0 && <details className={published ? "text-sm text-ink-2" : "text-sm text-warn-ink"} open><summary className="cursor-pointer">{published ? '当前状态限制' : '样例测试与审核门禁尚未完成，暂不可发布。'}</summary><ul className="my-2 pl-5">{blockers.map(code => <li key={code} className="wrap-anywhere">{blockerLabels[code] || code}</li>)}</ul></details>}
       <div className="space-y-3">{displayedTrials.map(item => <SkillTrialEvidence key={item.id} trial={item} examples={item.hash === version.hash ? version.definition.examples : []} />)}</div>
       <div className="min-w-0 space-y-3 border-0 border-t border-solid border-line pt-3">
         <label className="flex min-w-0 flex-col gap-2 text-sm text-ink-2">复核试运行<select className={systemInput} value={chosen?.id || ''} disabled={blocked || !release.candidates.length} onChange={e => { setEvaluationId(e.target.value); setAcknowledged(false) }}><option value="">选择通过的当前模型试运行</option>{release.candidates.map(item => <option key={item.id} value={item.id}>{item.id} · {item.createdAt}</option>)}</select></label>
