@@ -31,13 +31,67 @@ async function open() {
   return screen.findByRole('dialog', { name: 'Skill 定义' })
 }
 async function edit() { const dialog = await open(); fireEvent.click(within(dialog).getByRole('button', { name: '检出' })); await waitFor(() => expect(within(dialog).getByLabelText('名称')).toBeEnabled()); return dialog }
+async function openRelease() {
+  render(<SkillsSection />)
+  fireEvent.click(await screen.findByRole('button', { name: '试运行与发布 需求拆解' }))
+  return screen.findByRole('dialog', { name: 'Skill 试运行与发布' })
+}
+
+test('查看定义不请求发布证明；从清单另开操作弹窗并恢复入口焦点', async () => {
+  let releaseReads = 0
+  server.use(http.get(`${BASE}/:id/release`, () => { releaseReads++; return HttpResponse.json({ code: 0, data: readiness() }) }))
+  const definitionDialog = await open()
+  expect(releaseReads).toBe(0)
+  fireEvent.click(within(definitionDialog).getByRole('button', { name: '关闭' }))
+  const opener = screen.getByRole('button', { name: '试运行与发布 需求拆解' })
+  opener.focus(); fireEvent.click(opener)
+  // Native browsers blur a disabled trigger while the detail request is pending.
+  opener.blur()
+  const dialog = await screen.findByRole('dialog', { name: 'Skill 试运行与发布' })
+  await waitFor(() => expect(releaseReads).toBe(1))
+  expect(screen.queryByRole('dialog', { name: 'Skill 定义' })).not.toBeInTheDocument()
+  for (const name of ['名称', '指令', '输入 Schema (JSON)']) expect(within(dialog).queryByLabelText(name)).not.toBeInTheDocument()
+  for (const name of ['检出', '保存草稿', '检入', '升版']) expect(within(dialog).queryByRole('button', { name })).not.toBeInTheDocument()
+  fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }))
+  expect(opener).toHaveFocus()
+})
+
+test('未提交的复核理由阻止静默关闭和切版，放弃只清除操作输入', async () => {
+  const dialog = await openRelease()
+  fireEvent.change(within(dialog).getByLabelText('复核理由'), { target: { value: '待提交的复核说明' } })
+  expect(within(dialog).getByLabelText('查看版本')).toBeDisabled()
+  fireEvent.keyDown(dialog, { key: 'Escape' })
+  expect(within(dialog).getByRole('alert')).toHaveTextContent('有尚未应用的修改')
+  fireEvent.click(within(dialog).getByRole('button', { name: '继续编辑' }))
+  expect(within(dialog).getByLabelText('复核理由')).toHaveValue('待提交的复核说明')
+  fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '放弃修改' }))
+  fireEvent.click(screen.getByRole('button', { name: '试运行与发布 需求拆解' }))
+  const reopened = await screen.findByRole('dialog', { name: 'Skill 试运行与发布' })
+  expect(within(reopened).getByLabelText('复核理由')).toHaveValue('')
+  expect(writes).toHaveLength(0)
+  expect(record.revision).toBe(1)
+})
+
+test('异步读取期间入口失焦，关闭独立弹窗仍返回原入口', async () => {
+  server.use(http.get(`${BASE}/:id`, async () => { await delay(50); return HttpResponse.json({ code: 0, data: { record } }) }))
+  render(<SkillsSection />)
+  const opener = await screen.findByRole('button', { name: '试运行与发布 需求拆解' })
+  opener.focus(); fireEvent.click(opener)
+  expect(opener).toBeDisabled()
+  opener.blur()
+  const dialog = await screen.findByRole('dialog', { name: 'Skill 试运行与发布' })
+  fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }))
+  await waitFor(() => expect(opener).toHaveFocus())
+})
 
 describe('Skill 管理', () => {
-  test('已检入只读，检出后允许编辑，发布明确禁用', async () => {
+  test('定义只负责编辑与版本维护，不混入试运行发布控件', async () => {
     const dialog = await open()
     expect(within(dialog).getByLabelText('名称')).toBeDisabled()
-    expect(within(dialog).getByRole('button', { name: '发布' })).toBeDisabled()
-    expect(within(dialog).getByText(/样例测试与审核门禁尚未完成/)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: '发布' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: '模型试运行' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('region', { name: 'Skill 试运行与发布' })).not.toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: '检出' }))
     await waitFor(() => expect(within(dialog).getByLabelText('名称')).toBeEnabled())
   })
@@ -261,7 +315,7 @@ describe('Skill 试运行与发布', () => {
       writes.push(await request.json()); record.revision++
       return HttpResponse.json({ code: 0, data: { record, evaluation: failed } })
     }))
-    const dialog = await open()
+    const dialog = await openRelease()
     fireEvent.click(await within(dialog).findByRole('button', { name: '模型试运行' }))
     expect(await within(dialog).findByText('试运行失败')).toBeInTheDocument()
     expect(within(dialog).getByText(/MODEL_REQUEST_FAILED/)).toBeInTheDocument()
@@ -274,7 +328,7 @@ describe('Skill 试运行与发布', () => {
   test('模拟清楚标示未调用模型，不把内部计数当真实 Tokens', async () => {
     const simulated = trial({ mode: 'simulation', modelExecuted: false, releaseEligible: false, usage: { modelAttempts: 1, outputTokens: 1, toolCalls: 0, elapsedMs: 2 } })
     server.use(http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ trials: [simulated] }) })))
-    const dialog = await open()
+    const dialog = await openRelease()
     expect((await within(dialog).findAllByText(/未调用模型/)).length).toBeGreaterThan(0)
     expect(within(dialog).queryByText(/输出 Tokens：1/)).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: '发布' })).toBeDisabled()
@@ -286,7 +340,7 @@ describe('Skill 试运行与发布', () => {
       http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ trials: [proof], reviewAvailable: true }) })),
       http.post(`${BASE}/:id/review`, async ({ request }) => { writes.push(await request.json()); return HttpResponse.json({ code: 40901, message: '依赖已变化，请重新测试' }, { status: 409 }) }),
     )
-    const dialog = await open()
+    const dialog = await openRelease()
     const review = await within(dialog).findByRole('button', { name: '复核通过' })
     expect(review).toBeDisabled()
     fireEvent.change(within(dialog).getByLabelText('复核理由'), { target: { value: '业务断言已检查' } })
@@ -304,7 +358,7 @@ describe('Skill 试运行与发布', () => {
     record.activeVersionId = 'v0'
     const proof = trial()
     server.use(http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ trials: [proof], review: { evaluationId: proof.id, versionId: 'v1', hash: 'hash-1', contextHash: 'ctx-1' }, publishAvailable: true, blockers: [] }) })))
-    const dialog = await open()
+    const dialog = await openRelease()
     const publish = within(dialog).getByRole('button', { name: '发布' })
     await waitFor(() => expect(publish).toBeEnabled())
     fireEvent.click(publish)
@@ -316,17 +370,16 @@ describe('Skill 试运行与发布', () => {
   })
   test('不匹配 revision 或过期 trial 即使服务端开关为真也不可发布', async () => {
     server.use(http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ revision: 99, publishAvailable: true, trials: [trial()], blockers: [] }) })))
-    const dialog = await open()
+    const dialog = await openRelease()
     await within(dialog).findByText(/发布状态与当前记录不一致/)
     expect(within(dialog).getByRole('button', { name: '发布' })).toBeDisabled()
   })
-  test('未保存修改禁用试运行；过期的试运行证据仍可查看', async () => {
+  test('过期证据留在独立弹窗，不开放发布或定义编辑', async () => {
     server.use(http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ trials: [{ ...trial(), current: false }] }) })))
-    const dialog = await edit()
+    const dialog = await openRelease()
     expect(await within(dialog).findByText(/已过期，不用于发布/)).toBeInTheDocument()
-    fireEvent.change(within(dialog).getByLabelText('指令'), { target: { value: '修改中的指令' } })
-    expect(within(dialog).getByRole('button', { name: '模型试运行' })).toBeDisabled()
-    expect(within(dialog).getByRole('button', { name: '样例模拟' })).toBeDisabled()
+    expect(within(dialog).queryByLabelText('指令')).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: '发布' })).toBeDisabled()
   })
   test('回滚失败保留目标、理由和生效指针', async () => {
     record.activeVersionId = 'v1'
@@ -334,7 +387,7 @@ describe('Skill 试运行与发布', () => {
       http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ rollbackVersions: [{ versionId: 'v0', versionCode: 'A.0' }] }) })),
       http.post(`${BASE}/:id/rollback`, async ({ request }) => { writes.push(await request.json()); return HttpResponse.json({ code: 40901, message: '回滚冲突' }, { status: 409 }) }),
     )
-    const dialog = await open()
+    const dialog = await openRelease()
     await within(dialog).findByRole('option', { name: 'A.0' })
     fireEvent.change(within(dialog).getByLabelText('回滚目标'), { target: { value: 'v0' } })
     fireEvent.change(within(dialog).getByLabelText('回滚理由'), { target: { value: '恢复已验收版本' } })
@@ -354,7 +407,7 @@ describe('Skill 试运行与发布', () => {
       if (id === 'v1') await delay(80)
       return HttpResponse.json({ code: 0, data: { items: [{ workflowId: 'wf1', workflowVersionId: id, workflowName: id === 'v0' ? '历史依赖流程' : '迟到流程', versionCode: id, stepId: 'extract', binding: 'fixed', history: true, archived: true, current: false, active: false, upgradePath: 'promote → checkout' }] } })
     }))
-    const dialog = await open()
+    const dialog = await openRelease()
     fireEvent.change(within(dialog).getByLabelText('查看版本'), { target: { value: 'v0' } })
     expect(await within(dialog).findByText('历史依赖流程')).toBeInTheDocument()
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -374,17 +427,17 @@ describe('Skill 发布请求边界', () => {
       if (first) await delay(100)
       return HttpResponse.json({ code: 0, data: readiness(first ? { publishAvailable: true, blockers: [], trials: [trial()], review: { evaluationId: 'eval-1', versionId: 'v1', hash: 'hash-1', contextHash: 'ctx-1' } } : {}) })
     }))
-    const dialog = await open()
+    const dialog = await openRelease()
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }))
-    fireEvent.click(screen.getByRole('button', { name: '查看 需求拆解' }))
-    const reopened = await screen.findByRole('dialog', { name: 'Skill 定义' })
+    fireEvent.click(screen.getByRole('button', { name: '试运行与发布 需求拆解' }))
+    const reopened = await screen.findByRole('dialog', { name: 'Skill 试运行与发布' })
     await new Promise(resolve => setTimeout(resolve, 130))
     expect(within(reopened).getByRole('button', { name: '发布' })).toBeDisabled()
   })
   test('已过期的模型结果即使 publishAvailable 为真也不可发布', async () => {
     const stale = { ...trial(), current: false }
     server.use(http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ publishAvailable: true, blockers: [], trials: [stale], review: { evaluationId: 'eval-1', versionId: 'v1', hash: 'hash-1', contextHash: 'ctx-1' } }) })))
-    const dialog = await open()
+    const dialog = await openRelease()
     expect(await within(dialog).findByText(/已过期，不用于发布/)).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: '发布' })).toBeDisabled()
   })
@@ -412,7 +465,7 @@ test('试运行、复核、发布使用逐次更新的 revision，刷新后保�
       return HttpResponse.json({ code: 0, data: { record } })
     }),
   )
-  const dialog = await open()
+  const dialog = await openRelease()
   const trialButton = within(dialog).getByRole('button', { name: '模型试运行' })
   await waitFor(() => expect(trialButton).toBeEnabled())
   fireEvent.click(trialButton)
@@ -429,10 +482,10 @@ test('试运行、复核、发布使用逐次更新的 revision，刷新后保�
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '发布 Skill' })).not.toBeInTheDocument())
   expect(writes).toEqual([['trial', { revision: 1, mode: 'model' }], ['review', { revision: 2, evaluationId: 'eval-1', reason: '核实业务输出' }], ['publish', { revision: 3 }]])
   fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }))
-  fireEvent.click(screen.getByRole('button', { name: '查看 需求拆解' }))
-  const reopened = await screen.findByRole('dialog', { name: 'Skill 定义' })
+  fireEvent.click(screen.getByRole('button', { name: '试运行与发布 需求拆解' }))
+  const reopened = await screen.findByRole('dialog', { name: 'Skill 试运行与发布' })
   expect(within(reopened).getByText(/当前工作版本：A.1 · 当前生效版本：A.1/)).toBeInTheDocument()
-  expect(within(reopened).getByLabelText('名称')).toBeDisabled()
+  expect(within(reopened).queryByLabelText('名称')).not.toBeInTheDocument()
 })
 
 test('刚完成的试运行经服务器确认过期后仍明确显示过期，不能被 latest 标记遮住', async () => {
@@ -449,7 +502,7 @@ test('刚完成的试运行经服务器确认过期后仍明确显示过期，�
       return HttpResponse.json({ code: 0, data: { record, evaluation: returned } })
     }),
   )
-  const dialog = await open()
+  const dialog = await openRelease()
   const start = within(dialog).getByRole('button', { name: '模型试运行' })
   await waitFor(() => expect(start).toBeEnabled())
   fireEvent.click(start)
@@ -461,7 +514,7 @@ test('刚完成的试运行经服务器确认过期后仍明确显示过期，�
 test('回滚确认内 Tab 保持焦点，Escape 只取消确认并保留详情输入和操作焦点', async () => {
   record.activeVersionId = 'v1'
   server.use(http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ rollbackVersions: [{ versionId: 'v0', versionCode: 'A.0' }] }) })))
-  const dialog = await open()
+  const dialog = await openRelease()
   await within(dialog).findByRole('option', { name: 'A.0' })
   fireEvent.change(within(dialog).getByLabelText('回滚目标'), { target: { value: 'v0' } })
   fireEvent.change(within(dialog).getByLabelText('回滚理由'), { target: { value: '保留待确认的回滚理由' } })
@@ -478,7 +531,7 @@ test('回滚确认内 Tab 保持焦点，Escape 只取消确认并保留详情�
   expect(last).toHaveFocus()
   fireEvent.keyDown(last, { key: 'Escape' })
   expect(screen.queryByRole('dialog', { name: '回滚生效版本' })).not.toBeInTheDocument()
-  expect(screen.getByRole('dialog', { name: 'Skill 定义' })).toBeInTheDocument()
+  expect(screen.getByRole('dialog', { name: 'Skill 试运行与发布' })).toBeInTheDocument()
   expect(within(dialog).getByLabelText('回滚理由')).toHaveValue('保留待确认的回滚理由')
   expect(within(dialog).getByLabelText('回滚目标')).toHaveValue('v0')
   expect(opener).toHaveFocus()
@@ -489,7 +542,7 @@ test('模型请求进行中显示处理中，不误报冲突或要求关闭；�
     await delay(120)
     return HttpResponse.json({ code: 50301, message: '模型服务暂不可用，请稍后重试' }, { status: 503 })
   }))
-  const dialog = await open()
+  const dialog = await openRelease()
   const start = within(dialog).getByRole('button', { name: '模型试运行' })
   await waitFor(() => expect(start).toBeEnabled())
   fireEvent.click(start)
@@ -511,11 +564,11 @@ test.each([
   record.versions[1].status = 'published'
   record.activeVersionId = 'v1'
   server.use(http.get(`${BASE}/:id/release`, () => HttpResponse.json({ code: 0, data: readiness({ blockers, publishAvailable: true, trials: [trial()], review: { evaluationId: 'eval-1', versionId: 'v1', hash: 'hash-1', contextHash: 'ctx-1' } }) })))
-  const dialog = await open()
+  const dialog = await openRelease()
   expect(await within(dialog).findByText('当前版本已发布，维护请升版。')).toBeInTheDocument()
   expect(within(dialog).queryByText(/样例测试与审核门禁尚未完成/)).not.toBeInTheDocument()
   expect(within(dialog).queryByText('当前版本已发布')).not.toBeInTheDocument()
   expect(Boolean(within(dialog).queryByText('当前状态限制'))).toBe(restricted)
   expect(within(dialog).getByRole('button', { name: '发布' })).toBeDisabled()
-  expect(within(dialog).getByRole('button', { name: '升版' })).toBeEnabled()
+  expect(within(dialog).queryByRole('button', { name: '升版' })).not.toBeInTheDocument()
 })

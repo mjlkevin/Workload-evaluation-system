@@ -1,0 +1,87 @@
+{
+  "id": "BE-2026-11-02-skill-release-dialog",
+  "date": "2026-11-02",
+  "type": "verification",
+  "scope": "ISS-2026-11-02-006 / RP-050 / B6",
+  "summary": "Skill清单拆为定义、试运行与发布两套独立弹窗；关闭保护、原入口回焦及1440/760实测通过。Web758、模块685、AI286及双构建通过；集成检查因测试库缺模板未过，B仍待用户验收。",
+  "status": "已验证 / 待用户验收",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "issues",
+    "design"
+  ],
+  "source": {
+    "raw": "将整个试运行与发布，单独用一套弹窗和操作体系来封装。不要混在skill的定义里",
+    "dedup": "未命中相同交互问题，新增ISS-2026-11-02-006；分诊requirement，扩展既有RP-050，不新增RP",
+    "location": "3006 /system/ai/skills / Skill定义 > 试运行与发布"
+  },
+  "evidence": [
+    {
+      "kind": "command",
+      "ref": "/tmp/wes-skill-dialog-red.log",
+      "result": "RED19failed;20passed",
+      "summary": "定义包含发布操作及缺少独立入口的行为失败先复现"
+    },
+    {
+      "kind": "command",
+      "ref": "/tmp/wes-skill-dialog-{green,web,modules,ai,web-build,api-build}.log",
+      "result": "focused40;Web758;modules685;AI286;API+Webbuild pass",
+      "summary": "成功检查均0失败0跳过；UI scope无新增问题；独立五轴复核及焦点修正复核APPROVE"
+    },
+    {
+      "kind": "command",
+      "ref": "/tmp/wes-skill-dialog-integration-diagnostic.log",
+      "result": "templates500;code50000;integration1failed",
+      "summary": "只读核对专用测试库活动产品模板及条目均0；不记为全绿，未改模板业务或业务库"
+    },
+    {
+      "kind": "runtime",
+      "ref": "b31c33ab-3a98-40c2-ae73-61722f0e925b",
+      "result": "simulation;modelExecuted=false;31ms",
+      "summary": "独立弹窗内模拟完成后仍留在操作体系；原生回焦、输入关闭保护及确认Escape通过，未审核发布回滚"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-skill-definition-only-1440.png",
+      "summary": "定义弹窗只包含定义和版本维护"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-skill-release-dialog-1440.png",
+      "summary": "独立试运行与发布弹窗"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-skill-release-dialog-760.png",
+      "summary": "窄屏独立操作可达"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-skill-release-history-760.png",
+      "summary": "历史只读且可查看固定依赖"
+    },
+    {
+      "kind": "screenshot",
+      "ref": "/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/wes-skill-release-confirm-760.png",
+      "summary": "确认框Tab约束与Escape只取消确认，保留操作输入"
+    }
+  ],
+  "issueRecount": {
+    "rows": 49,
+    "uniqueIds": 46,
+    "defect": 24,
+    "requirement": 11,
+    "other": 11,
+    "pending": 3,
+    "note": "按分流列前缀逐行重算；更正旧头部分类差异，总计闭合，不重写历史撞号"
+  },
+  "next": "用户验证清单双入口及独立弹窗；B待最终验收，C/D未启动，候选不合入或推送"
+}

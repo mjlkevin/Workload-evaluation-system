@@ -10,7 +10,7 @@ const blockerLabels = {
   SKILL_REVIEW_REQUIRED: '需要复核通过',
   SKILL_CHECKIN_REQUIRED: '请先检入当前版本', SKILL_DISABLED: 'Skill 已停用', SKILL_ARCHIVED: 'Skill 已归档',
 }
-export default function SkillReleasePanel({ record, version, dirty, busy, setBusy, onRecord, viewerId }) {
+export default function SkillReleasePanel({ record, version, dirty, busy, setBusy, onRecord, viewerId, onDirtyChange }) {
   const release = useSkillRelease({ record, version, dirty, setBusy, onRecord })
   const [evaluationId, setEvaluationId] = useState('')
   const [reason, setReason] = useState('')
@@ -18,6 +18,7 @@ export default function SkillReleasePanel({ record, version, dirty, busy, setBus
   const [rollbackId, setRollbackId] = useState('')
   const [rollbackReason, setRollbackReason] = useState('')
   const [confirm, setConfirm] = useState(null)
+  useEffect(() => { onDirtyChange?.(Boolean(reason || rollbackReason)) }, [reason, rollbackReason, onDirtyChange])
   const historical = version.skillVersionId !== record.currentVersionId
   const locked = version.checkoutStatus === 'checked_out' && version.checkedOutBy !== viewerId
   const blocked = busy || dirty || historical || locked || record.archived || !record.enabled
