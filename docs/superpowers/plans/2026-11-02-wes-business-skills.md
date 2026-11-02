@@ -390,3 +390,43 @@ resolveExecutionConfig?: (tx: QueueDbExecutor) => Promise<Record<string, unknown
 总看板同步：已窄改主目录index、requirements、plan、testing、monitoring、risks、changes、runtime、design九页及两侧事件JSON，未改其他用户工作；board-build与一致性校验0错误0警告。浏览器目视确认RP-050仍C实施中、下一步为执行/确认与工作台，截图c2a1-board-requirements.png留存于本会话visualizations。存量台账列宽和ID折行仍在，本轮未更改共享表格样式，不宣称完成视觉优化。
 
 补充跨域检查：AI回归286/286、Web构建通过；通用integration为0/1，仍在templates_status_not_200失败。只读核对workload_eval_test活动product_templates=0、active product_sku_module_assignments=0，与B6已记录测试库缺模板相同；未为通过测试改动预览或填充业务数据。日志/tmp/wes-c2a1-cross-check及/tmp/wes-c2a1-web-build.log保留，不将定向通过表述为通用集成或远端CI通过。
+
+
+### C2a.2 精细工单：固定执行适配器与存量快照恢复（2026-11-02）
+
+用户“继续”，基线4e0cc98 / codex/wes-skills-c。沿用已批准C2分解，本审查单元只把business_skills_v1/1.0.0登记到现有Worker并建立纯恢复/执行端口；真正四类节点解释、生产LLM/工具调用、等待确认、实时授权/紧急禁用与幂等仍按C2b/c后续接入。没有新增HTTP/UI，3006/3004保持B冻结预览，保留用户模型状态文件，不合main、不推送。
+
+架构实取：Worker在executeStep之前选择检查点，resume_next且nextStepKey=null会直接进入完成。因此不能仅在executeStep内部恢复manifest；增加可选preflight（run与已读checkpoints）并await在检查点选择/恢复事件/步骤/终态之前执行，旧流程无钩子保持原行为。业务适配器每次attempt用C1 readPersistedExecutionManifest读取run.executionConfig，不查latest/定义仓储/模型/工具/资料，核对workflow身份、runKind、owner/caller、会话与C2a.1提交指纹绑定。
+
+责任文件：新增harness/business-skills.identity.ts、business-skills.workflow.ts及纯/真实PG测试（必要时测试fixture拆文件）；窄改harness-boot.ts注册及可信executor注入、harness-runtime.worker.ts可选preflight、harness.module.ts身份常量导出、skills.invocation.ts复用常量、apps/api/package.json CI可达枚举。不改存储结构/迁移/既有HTTP读写，不复制Harness队列或检查点库。新增代码与测试目标500–850行，超过999行先拆。
+
+端口约定：固定一个Harness步骤execute，业务cursor和状态交给后续解释器；服务端可信execute回调接收已校验manifest、上次业务state和既有步骤context，不接受客户端函数。业务state在checkpoint中使用schemaVersion=1、runId、manifestHash与state对象信封；不重复保存完整manifest。适配器封装每次结果statePatch、只允许execute或null后继，要求显式checkpoint，拒绝畸形结果/不一致输出hash并按冻结最终outputSchema验证最终输出，不能无输出假完成。恢复逐一验证checkpoint信封、当前run/hash绑定和固定步骤/后继；坏/未知信封或篡改不能被terminal checkpoint绕过，错误固定脱敏。复制的临时manifest与state不应允许executor改写已保存run。
+
+默认boot注册适配器但不注入生产executor，业务Run以固定安全原因明确失败，零模型/工具/业务写入；不冒充节点执行已实现。可信executor仅供后续生产接线及当前测试注入。业务Run不进入普通对话的记忆蒸馏钩子，不意外调用LLM。当前身份/来源的实时授权仍是C2c门槛；本单元owner绑定只验证已保存数据内部对应，checksum不是授权凭据。
+
+- [x] RED→GREEN：boot启用时同时登记普通聊天与精确业务id/version，停用零start/副作用；默认缺executor失败，普通聊天不受影响。
+- [x] 纯恢复：单Skill与Workflow精确旧依赖/原Schema/资料保留；manifest缺失/损坏/未知schema、owner/session/adapter或指纹不对应、未知step、checkpoint错误run/hash/schema/后继均拒绝且不调用executor；取消/异常不泄露私有内容。
+- [x] 执行端口：独立快照/状态副本、state结果受限、checkpoint绑定、同一execute步骤可继续/完成，完成需冻结Schema正确的显式final output；无生产模型/工具注册。
+- [x] 真实PG：C2a.1入队→Worker真实claim/commit→模拟重启从checkpoint恢复原快照；发布新版本/普通停用不替换旧定义，哈希/owner坏数据及terminal checkpoint篡改在执行前失败，无模型/工具调用，max=1可用；测试双URL守卫、串行且CI可达，禁止预览库写入。
+- [x] 父独立定向、modules、受影响Harness回归、API/Web构建与所需跨域检查；先规格再五轴质量/安全复审。回填README、对齐说明与总看板；通用集成已知模板夹具缺失单列，不声称C2/C3或MVP完成。
+
+后续门槛保持：公开Run snapshot白名单投影、会话删除并发保护、retryRun实时授权与恢复校验；本子项不借注册适配器开放公共创建入口。
+
+**C2a.2实取后的最小收敛：** 允许skills.module窄导出现有compileSkillPayloadSchema及skillDefinitionHash，避免跨域深路径依赖，不改实现。Worker当前先commitCheckpoint后upsertRunOutput，故业务检查点一律restart_step、固定execute；preflight与返回结果均拒绝resume_next/manual等策略，包含nextStepKey=null也必须重进adapter/执行端口，不能跳过产物验证直接完成。默认executor缺失在preflight即拒绝。后续解释器负责从cursor/缓存结果恢复，持久写幂等仍C2c门槛；本单元不改通用CP/Output提交语义，也不宣称两者已原子提交。
+
+**C2a.2测试隔离补充：** 真实PG测试创建的Skill/Workflow历史受不可变trigger保护，直接按ID删除会被WORKFLOW_HISTORY_IMMUTABLE等拒绝。按正常领域操作将本套跟踪根停用+归档并断言，不删除版本/审计、不用session_replication_role或绕过trigger，不新增CI超级用户权限要求。保留已归档fixture历史属于领域契约，不能称测试资产物理清零；仅清理本套精确IDs的Run/session/user，不能动预览或其他测试资产。
+
+**C2a.2首候选复核记录：** 首候选新增6文件478行，定向57/57、模块777/777、Harness338/338及API构建通过；独立规格实跑纯49/49。规格复核REQUEST_CHANGES：Workflow PG用例只有切版/停用后的首次执行，没有保存CP、崩溃及重建恢复；纯夹具亦只有Skill。属于验证缺口，未声称生产代码已坏。补纯Workflow CP恢复和真实PG流程故障恢复，新旧Skill指令/model/Schema与Workflow精确依赖须不同，完整原manifest/资料/cursor/输出与不再读取依赖均直接断言；不把两条不同场景测试的组合推论称为Workflow恢复实测。补充测试若直接GREEN如实记录，先补证据再规格复审与质量复核。
+
+
+**C2a.2最终回填（2026-11-02）：** 固定business_skills_v1/1.0.0适配器已与普通聊天并列注册；C2a.1调用复用同一身份常量。Worker在读取检查点后、选择/恢复事件/执行/终态前await可选preflight，业务适配器只读C1保存manifest，检查owner/session/runKind/adapter与提交指纹。业务checkpoint以schemaVersion/runId/manifestHash/state信封绑定，全为restart_step/execute，拒绝坏hash/未知信封/错误后继和伪terminal绕过。executor收到独立事实副本、原样函数/AbortSignal；结果复用copyTrialJson边界，完成需显式、hash吻合且通过冻结Schema的final output。错误固定脱敏、取消保持；业务Run不进入普通聊天记忆蒸馏。默认生产executor未接线时前置安全失败，没有假产物或模型/工具调用。
+
+父代理独立最终实跑：test:business-skills-runtime **58/58**、test:modules **778/778**、test:harness **338/338**、test:ai **286/286**，全部0fail/0skip（/tmp/wes-c2a2-parent-final）；API/Web构建均通过（/tmp/wes-c2a2-parent-build-api.log、/tmp/wes-c2a2-parent-build-web.log），定向secret-scan零命中、diff-check通过。通用test:integration **0/1**，仍在templates_status_not_200失败；只读确认workload_eval_test活动模板0、active分配0，templates模块/集成测试/路由与基线4e0cc98无改动。保留B6/C2a.1已记录的夹具缺口，不填预览或业务数据来放绿，不称全部集成或远端CI通过。
+
+独立规格复审与五轴质量/安全复审均APPROVE，两位分别实跑纯**50/50**，0skip；父PG实跑承担实际数据库证据。先前Workflow首次执行≠检查点恢复的P2验证缺口已补齐：纯Workflow保存完整manifest/CP后恢复；PG真实CP/fault后正常检出/保存/检入并发布不同Skill指令、.7参数、minLength40新Schema，Workflow改绑新Skill版本并发布、普通停用两根；重建Worker/RecoveryCoordinator恢复完整原manifest、旧Schema/model/material/cursor/final，旧输出长度<新Schema40、dependencyReads不增及两份CP均无条件断言。此次仅补测试，原生产实现直接GREEN，未制造产品RED；第一次新增纯fixture漏import的ReferenceError已修正，不计为产品失败证据。
+
+有效RED保留：首轮36项因适配器尚缺preflight/行为失败（/tmp/wes-c2a2-red-behavior）；JSON安全边界44项中6fail→复用既有copyTrialJson后GREEN（/tmp/wes-c2a2-json-red）。新增6文件547行，含既有文件窄接线合计567增/7删（不含文档），未增加依赖/迁移/HTTP/UI；现有依赖audit仍45项（32moderate/12high/1critical），未在本单元处理。PG max=1、双URL守卫、串行CI可达；测试根按跟踪ID正常停用归档并断言，保留不可变版本/审计，没有绕过trigger。
+
+边界与下一步：CP与output仍分步持久化，强制恢复再进入executor仅防无产物假完成，不代替持久写幂等。下一单元C2b.1实现四类节点解释与受限映射，随后C2b.2接单次生产Skill/预算；C2c继续等待/确认、实时授权/紧急禁用、持久幂等和统一视图，C3后才开放工作台。公开snapshot私有清单投影、会话删除并发保护、retryRun实时授权三项门槛保持。本轮未调用真实LLM/工具、未更新3006/3004或用户模型配置，未合main/推送；C2整体和MVP尚未完成。
+
+C2a.2总看板回填：主目录总览、需求、计划、测试、监控、风险、变更、运行、设计九页已更新；board-build与21页一致性检查0错误0警告。浏览器确认RP-050仍C实施中、C2a.2已验证、节点/真实执行与工作台/D待完成，截图c2a2-board-requirements.png保存于本会话visualizations。存量台账ID折行和列宽未改，不声称UI视觉优化；关闭自建验证页/3008临时服务，保留用户3006/3004与模型配置。

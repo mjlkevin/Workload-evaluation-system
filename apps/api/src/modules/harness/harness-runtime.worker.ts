@@ -111,6 +111,7 @@ export type HarnessWorkflow = {
   workflowVersion: string;
   firstStepKey: string;
   stepKeys: readonly string[];
+  preflight?(run: HarnessRunRow, checkpoints: readonly HarnessRunCheckpointRow[]): void | Promise<void>;
   executeStep(stepKey: string, ctx: HarnessWorkflowStepContext): Promise<HarnessWorkflowStepOutcome>;
 };
 
@@ -279,6 +280,7 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
       }
 
       const checkpoints = await repository.listCheckpointsForRun({ runId });
+      await workflow.preflight?.(run, checkpoints);
       let resumeFrom: HarnessRunCheckpointRow | null = null;
       if (checkpoints.length > 0) {
         resumeFrom = selectHarnessResumeCheckpoint({ checkpoints, workflow, runId });

@@ -6,6 +6,8 @@
 // enabled=false 返回 no-op stop。
 // S2b-2（2026-08-28）：session projector/sink 已随 §4.8 补偿链删除。
 
+import { createBusinessSkillsWorkflow, type BusinessSkillsExecutor } from './business-skills.workflow';
+import { BUSINESS_SKILLS_WORKFLOW_ID } from './business-skills.identity';
 import type { HarnessRuntimeRepository } from "./harness-runtime.repository";
 import { createHarnessRuntimeWorker, type HarnessRuntimeWorker } from "./harness-runtime.worker";
 import { createWorkbenchChatWorkflow } from "./workbench-chat.workflow";
@@ -30,6 +32,8 @@ import { getMemoryRepository } from "../memory/memory.module";
 export type HarnessRuntimeBootOptions = {
   repo: HarnessRuntimeRepository;
   enabled: boolean;
+  /** Trusted server-only port; absent until production execution is approved. */
+  businessSkillsExecutor?: BusinessSkillsExecutor;
   /** 测试注入用：自定义 worker 工厂 */
   createWorker?: (opts: { repo: HarnessRuntimeRepository; registry: ReturnType<typeof createHarnessWorkflowRegistry> }) => HarnessRuntimeWorker;
   /** 测试注入用：自定义 modelChat 工厂（覆盖默认真实组装） */
@@ -88,7 +92,7 @@ export type RunTerminalMemoryHookDeps = {
 
 export function createRunTerminalMemoryHook(deps: RunTerminalMemoryHookDeps) {
   return async (run: any, outcome: RunTerminalOutcome): Promise<void> => {
-    if (outcome !== "completed") return;
+    if (outcome !== "completed" || run.workflowId === BUSINESS_SKILLS_WORKFLOW_ID) return;
     try {
       const snapshot = await deps.repo.getRunSnapshot(run.harnessRunId);
       const outputContent = snapshot?.output?.content as Record<string, unknown> | undefined;
@@ -323,7 +327,7 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
     recordTurnTrace: (input) => recordWorkbenchTurnTrace(input),
     recordTurnFailureTrace: (input) => recordWorkbenchTurnFailureTrace(input),
   });
-  const registry = createHarnessWorkflowRegistry([workflow]);
+  const registry = createHarnessWorkflowRegistry([workflow, createBusinessSkillsWorkflow({ executor: options.businessSkillsExecutor })]);
 
   // SP-2026-007 MS2：Run 终态后异步蒸馏记忆钩子（工厂装配真实依赖；
   // 失败留痕走 onError → console.error，与此前口径一致并补 success=false 留痕）

@@ -1,0 +1,82 @@
+{
+  "id": "BE-2026-11-02-skills-c2a2-adapter",
+  "date": "2026-11-02",
+  "type": "implementation",
+  "scope": "RP-050 C2a.2 适配器与快照恢复",
+  "summary": "C2a.2固定适配器与原快照恢复已验证：恢复前检查原定义和检查点，完成必须有符合原Schema的产物；默认生产执行端口尚未接线，明确失败。运行58、模块778、Harness338通过，真实执行与工作台待接入，3006保持B验收版。",
+  "status": "C2a.2自动验证及规格/质量复核通过 / 真实执行待接入",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "runtime",
+    "design"
+  ],
+  "evidence": [
+    {
+      "kind": "user",
+      "ref": "2026-11-02 continuation after C2a.1",
+      "summary": "继续"
+    },
+    {
+      "kind": "git",
+      "ref": "4e0cc98",
+      "summary": "已核实当前分支codex/wes-skills-c，C2a.1内部入队本地提交；仅既有模型状态文件改动"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "C2a.2工单，恢复preflight、精确身份、受控执行端口及串行PG验证"
+    },
+    {
+      "kind": "review",
+      "ref": "skills_c2a2_spec_review",
+      "summary": "首候选57/777/338与纯49通过；REQUEST_CHANGES：Workflow只首次执行，需补独立CP崩溃恢复实测，不把组合推论当证据"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2a2-parent-final",
+      "summary": "父独立运行58/58、模块778/778、Harness338/338、AI286/286，均0fail/0skip；API/Web构建通过，定向扫描零命中"
+    },
+    {
+      "kind": "review",
+      "ref": "skills_c2a2_spec_review / skills_c2a2_quality_review",
+      "summary": "Workflow恢复P2证据补齐后两轮APPROVE，独立纯50/50各通过；父单独实跑PG"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2a2-red-behavior / /tmp/wes-c2a2-json-red",
+      "summary": "首轮36红；JSON边界44中6红后GREEN；Workflow补证据直接GREEN，不冒充生产修复RED"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2a2-workflow-final",
+      "summary": "真实Workflow CP故障、不同新定义/Schema/Skill依赖发布、disable及重建恢复；完整旧manifest/cursor/final和dependencyReads直接断言"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2a2-parent-final/test:integration.log",
+      "summary": "通用集成0/1 templates_status_not_200；只读确认活动模板/分配均0，既有夹具缺口保留，未修改预览数据"
+    },
+    {
+      "kind": "security",
+      "ref": "skills_c2a2_quality_review",
+      "summary": "无本scope新增具体可利用漏洞；依赖audit45既有基线未改依赖；未绕过历史trigger，测试根正常归档"
+    }
+  ],
+  "next": "C2b.1四类节点解释与受限映射，随后单次生产Skill/预算、等待确认与实时授权/持久幂等；C2完整后接C3工作台。",
+  "boundaries": [
+    "不写预览库，不重启3006/3004，不读或修改用户模型状态文件",
+    "无HTTP/UI/迁移/生产模型与工具执行",
+    "继续RP-050，不新增需求编号或实现Loop",
+    "未合main、未推送，C2整体/C3/D仍待完成",
+    "CP/output仍分步提交，恢复重进executor不代替持久幂等",
+    "通用集成夹具缺失仍失败，未执行远端CI"
+  ]
+}

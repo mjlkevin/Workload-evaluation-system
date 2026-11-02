@@ -1,6 +1,6 @@
 import type { AuthUser } from '../../types';
 import { createHarnessRuntimeRepository, HarnessRuntimeError, attachWorkbenchConversationFact, buildWorkbenchUserMessageFact,
-  type HarnessRuntimeRepository, type AiRunsSubmitResult, type QueueDbExecutor } from '../harness/harness.module';
+  BUSINESS_SKILLS_WORKFLOW_ID, BUSINESS_SKILLS_WORKFLOW_VERSION, type HarnessRuntimeRepository, type AiRunsSubmitResult, type QueueDbExecutor } from '../harness/harness.module';
 import { prepareExecution, validateExecutionRequest } from './execution-manifest';
 import type { PreparedExecution, SourceReference } from './execution-manifest.types';
 import { skillDefinitionHash as hash } from './skills.hash';
@@ -77,7 +77,7 @@ export function createSkillInvocationService(options: Options = {}) {
       const { fact, executionConfig } = attachWorkbenchConversationFact({ content: request.content });
       const result = await queue.createQueuedRun({ ownerUserId: user.id, ownerUsername: user.username, aiSessionId: sessionId,
         submissionKey: request.submissionKey, submissionFingerprint: fingerprint, title: request.content.slice(0, 80),
-        workflowId: 'business_skills_v1', workflowVersion: '1.0.0',
+        workflowId: BUSINESS_SKILLS_WORKFLOW_ID, workflowVersion: BUSINESS_SKILLS_WORKFLOW_VERSION,
         validateSubmission: tx => queueCheck(() => sources.verify(tx)),
         resolveExecutionConfig: tx => queueCheck(async () => {
           if (!prepared) fail('INVOCATION_CONTEXT_CHANGED');
