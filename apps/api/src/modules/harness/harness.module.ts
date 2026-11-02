@@ -16,3 +16,5 @@ export * from "./harness.regression";
 export * from "./harness.repository";
 export * from "./harness.types";
 export * from "./harness.usecase";
+export { createConversationEventHistorySource } from './conversation-event-history';
+export { attachWorkbenchConversationFact, buildWorkbenchUserMessageFact } from './workbench-conversation-fact';

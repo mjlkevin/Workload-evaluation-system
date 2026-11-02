@@ -58,6 +58,21 @@ function toSafeError(err: unknown): HarnessRuntimeError {
   return new HarnessRuntimeError("HARNESS_RUNTIME_INTERNAL", "harness runtime persistence failed");
 }
 
+const QUEUE_CALLBACK_ERRORS: Record<string, string> = {
+  INVOCATION_NOT_FOUND: 'invocation session or source not found',
+  INVOCATION_FORBIDDEN: 'invocation authority changed',
+  INVOCATION_SOURCE_CHANGED: 'invocation source changed',
+  INVOCATION_CONTEXT_CHANGED: 'invocation execution context changed',
+};
+async function safeQueueCallback<T>(callback: () => Promise<T>): Promise<T> {
+  try { return await callback(); }
+  catch (error) {
+    const code = error instanceof HarnessRuntimeError ? error.code : '';
+    if (Object.prototype.hasOwnProperty.call(QUEUE_CALLBACK_ERRORS, code)) throw new HarnessRuntimeError(code, QUEUE_CALLBACK_ERRORS[code]);
+    throw new HarnessRuntimeError('HARNESS_RUNTIME_INTERNAL', 'queue submission validation failed');
+  }
+}
+
 // ============================================================
 // 输入类型与接口
 // ============================================================
@@ -71,6 +86,11 @@ export type CreateQueuedHarnessRunInput = {
   workflowId: string;
   workflowVersion: string;
   executionConfig?: Record<string, unknown>;
+  /** Server-only hooks. They must use this transaction connection without external I/O. */
+  resolveExecutionConfig?: (tx: QueueDbExecutor) => Promise<Record<string, unknown>>;
+  validateSubmission?: (tx: QueueDbExecutor) => Promise<void>;
+  /** Absent for legacy chat; present for strict business invocation idempotency. */
+  submissionFingerprint?: string;
   metadata?: Record<string, unknown>;
   // RP-047 Batch C（additive）：retry 动作创建新 Run 时指向原 failed Run
   retryOfRunId?: string;
@@ -90,6 +110,16 @@ export type CreateQueuedHarnessRunInput = {
    */
   userMessageFact?: (runId: string) => Record<string, unknown>;
 };
+
+export type QueueDbExecutor = Pick<Database, 'select' | 'insert' | 'update' | 'execute'>;
+
+function assertSubmissionReplay(run: HarnessRunRow, input: CreateQueuedHarnessRunInput): void {
+  const prior = (run.metadata as Record<string, unknown> | null)?.invocationFingerprint;
+  if (prior === undefined && input.submissionFingerprint === undefined) return; // Legacy chat semantics.
+  if (prior !== input.submissionFingerprint || run.aiSessionId !== input.aiSessionId
+    || run.workflowId !== input.workflowId || run.workflowVersion !== input.workflowVersion)
+    throw new HarnessRuntimeError('SUBMISSION_KEY_CONFLICT', 'submission key belongs to a different request');
+}
 
 export type ClaimNextHarnessRunInput = {
   workerId: string;
@@ -274,6 +304,7 @@ export type HarnessToolInputAnswer = {
 
 export interface HarnessRuntimeRepository {
   createQueuedRun(input: CreateQueuedHarnessRunInput): Promise<{ run: HarnessRunRow; created: boolean }>;
+  findRunForSubmissionKey(ownerUserId: string, submissionKey: string): Promise<HarnessRunRow | null>;
   findRunForOwner(runId: string, ownerUserId: string): Promise<HarnessRunRow | null>;
   claimNextQueuedRun(
     input: ClaimNextHarnessRunInput,
@@ -642,6 +673,19 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
     async createQueuedRun(input) {
       try {
         return await dbInstance.transaction(async (tx) => {
+          // Serialize this owner's key across sessions and submission kinds before resolving anything.
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([input.ownerUserId, input.submissionKey])}, 0))`);
+          if (input.validateSubmission) await safeQueueCallback(() => input.validateSubmission!(tx));
+          const [replay] = await tx.select().from(harnessRuns).where(and(
+            eq(harnessRuns.ownerUserId, input.ownerUserId), eq(harnessRuns.submissionKey, input.submissionKey),
+          ));
+          if (replay) {
+            assertSubmissionReplay(replay, input);
+            return { run: replay, created: false };
+          }
+          const executionConfig = input.resolveExecutionConfig
+            ? await safeQueueCallback(() => input.resolveExecutionConfig!(tx)) : input.executionConfig ?? {};
+          if (input.resolveExecutionConfig) assertSafeJsonObject(executionConfig);
           const runId = randomUUID();
           const inserted = await tx
             .insert(harnessRuns)
@@ -658,8 +702,8 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
               workflowId: input.workflowId,
               workflowVersion: input.workflowVersion,
               submissionKey: input.submissionKey,
-              executionConfig: input.executionConfig ?? {},
-              metadata: input.metadata ?? {},
+              executionConfig,
+              metadata: { ...input.metadata, ...(input.submissionFingerprint !== undefined ? { invocationFingerprint: input.submissionFingerprint } : {}) },
               // RP-047 Batch C（additive）：retry 血缘，缺省为 null
               retryOfRunId: input.retryOfRunId ?? null,
             })
@@ -709,6 +753,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
               ),
             );
           if (existing) {
+            assertSubmissionReplay(existing, input);
             return { run: existing, created: false };
           }
 
@@ -721,6 +766,15 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
       } catch (err) {
         throw toSafeError(err);
       }
+    },
+
+    async findRunForSubmissionKey(ownerUserId, submissionKey) {
+      try {
+        const [run] = await dbInstance.select().from(harnessRuns).where(and(
+          eq(harnessRuns.ownerUserId, ownerUserId), eq(harnessRuns.submissionKey, submissionKey),
+        ));
+        return run ?? null;
+      } catch (error) { throw toSafeError(error); }
     },
 
     async findRunForOwner(runId, ownerUserId) {

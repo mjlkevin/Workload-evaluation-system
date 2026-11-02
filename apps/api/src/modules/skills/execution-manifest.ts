@@ -22,7 +22,7 @@ function json<T>(value: T): T {
   try { return copyTrialJson(value, 'definition') as T; } catch { return invalid(); }
 }
 function exactKeys(value: Record<string, unknown>, keys: string[]) { if (Object.keys(value).some(key => !keys.includes(key))) invalid(); }
-function requestShape(value: unknown): ExecutionRequest {
+export function validateExecutionRequest(value: unknown): ExecutionRequest {
   const request = json(value);
   if (!object(request) || !['skill', 'workflow'].includes(String(request.kind))) invalid();
   const idKey = request.kind === 'skill' ? 'skillId' : 'workflowId';
@@ -87,7 +87,7 @@ type ServiceOptions = {
 export function createExecutionManifestService(options: ServiceOptions = {}) {
   const database = options.database ?? db; const repository = options.repository ?? createExecutionManifestPgRepository();
   return { async prepareExecution(value: unknown, initialUser: AuthUser): Promise<PreparedExecution> {
-    const request = requestShape(value); const user = structuredClone(initialUser);
+    const request = validateExecutionRequest(value); const user = structuredClone(initialUser);
     const before = await database.transaction(tx => repository.read(tx, request, false), { isolationLevel: 'repeatable read', accessMode: 'read only' });
     authorize(before, user, request.input);
     const uris = before.skills.flatMap(skill => skill.definition.references.map(ref => ref.uri));

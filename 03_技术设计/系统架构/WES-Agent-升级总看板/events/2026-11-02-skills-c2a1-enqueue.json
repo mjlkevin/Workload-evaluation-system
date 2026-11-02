@@ -1,0 +1,76 @@
+{
+  "id": "BE-2026-11-02-skills-c2a1-enqueue",
+  "date": "2026-11-02",
+  "type": "implementation",
+  "scope": "RP-050 C2a.1 原子入队",
+  "summary": "C2a.1内部调用与原子入队已验证：执行快照、任务和首条用户消息同事务保存，重复请求返回原任务。27项调用、728项模块、330项Harness测试及API构建通过；执行器和工作台入口仍待接入，3006保留B验收版。",
+  "status": "C2a.1自动检查及独立复核通过 / C2整体未完成",
+  "pages": [
+    "index",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes"
+  ],
+  "additionalBoardPages": [
+    "runtime",
+    "design"
+  ],
+  "evidence": [
+    {
+      "kind": "user",
+      "ref": "2026-11-02 continuation",
+      "summary": "继续"
+    },
+    {
+      "kind": "git",
+      "ref": "0b12a7a",
+      "summary": "C1已验证本地基线，当前仅用户模型状态文件既有改动"
+    },
+    {
+      "kind": "plan",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "C2a.1精细工单、内部入口与可信事务回调，严格重放和来源归属"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2a1-parent-final",
+      "summary": "父代理最终调用27/27、模块728/728、Harness330/330，0fail/0skip；API构建通过、定向密钥扫描零命中"
+    },
+    {
+      "kind": "review",
+      "ref": "skills_c2a1_spec_review / skills_c2a1_quality_review",
+      "summary": "独立规格与质量/安全APPROVE，各实跑纯7/7；父独立负责PG实跑"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2a1-race-red / /tmp/wes-c2a1-race-green",
+      "summary": "并发prepare失败重放P2先RED4fail，修复后27/27；来源digest删除探针2项确实失败"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2a1-parent / /tmp/wes-c2a1-budget-diagnostic",
+      "summary": "初次模块725中既有20ms预算用例1fail；相关代码未改，独立19及最终728通过；不放宽预算或隐藏初次失败"
+    },
+    {
+      "kind": "boundary",
+      "ref": "docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "未挂HTTP/Worker/UI；snapshot私有清单、会话删除竞态及retryRun授权为后续公开门槛"
+    },
+    {
+      "kind": "test",
+      "ref": "/tmp/wes-c2a1-cross-check",
+      "summary": "AI286/286、Web构建通过；通用集成0/1停于templates_status_not_200，测试库活动模板与分配均0，既有环境缺口保留"
+    }
+  ],
+  "next": "C2a.2接存量清单恢复与固定适配器，随后节点执行/等待确认/实时授权；公开前关闭snapshot、删除并发与retry授权门槛，再接C3工作台。",
+  "boundaries": [
+    "无UI/HTTP入口/模型工具执行/迁移",
+    "测试库与3006预览物理隔离",
+    "保留用户config改动，未合main或推送",
+    "沿用RP-050，不新增Issue/RP、不创建实现Loop",
+    "通用集成模板夹具缺失仍失败；定向通过不代表全部集成或远端CI通过"
+  ]
+}

@@ -348,3 +348,45 @@ C2拆为独立审查单元：a.1统一调用服务与同tx入队（skills.invoca
 父代理最终实跑：test:execution-manifest 44/44、test:modules 721/721，0fail/0skip（/tmp/wes-skills-c-delivery）；串行test:modules:serial-store 194/194，0fail/0skip（/tmp/wes-skills-c-final-reviewed/test:modules:serial-store.log），API构建通过，定向secret-scan零命中。最后只将3处静态假凭据测试值改为本地randomUUID，未弱化断言/扫描；重跑44与721通过，质量复核确认原APPROVE保持。CI未执行，不将本机通过写为远端CI绿。C1 PG已接CI可达serial-store与守卫16项，测试库纯guard兼容本机/CI/容器且错误不含env值，不读取KEK。六个新增文件约665行，未新增依赖或迁移。
 
 复核发现及闭合：整份hash不能代替内部契约一致性，已补模型字段缺失、未知工具、资料A/A替代A/B、非文本正文、Workflow工具缺字段/假依赖/坏hash的RED和明确拒绝；CI路径首轮695/696因PG测试零引用失败，已登记修复；本机固定URL/KEK断言问题亦修正。旧失败证据保留。下一项C2a.1将resolveInTransaction接入createQueuedRun同事务，随后按C2工单完成等待/确认、真实执行与持久幂等，再开放C3界面验证；D未启动。
+
+### C2a.1 精细工单：快照与任务原子入队（2026-11-02）
+
+用户“继续”授权按C2顺序推进，基线0b12a7a / codex/wes-skills-c；保留config/system/model-verify-status.json用户改动及3006/3004冻结预览。本审查单元只完成内部调用服务和真实队列持久化，不挂HTTP/UI，避免在通用Worker尚未注册前开放无法执行的任务；公开入口在C2a.2及后续运行适配完成后接通。C2a.1包含下列两段顺序实施，代码和测试合计超过999行先拆提交。
+
+责任文件：新增modules/skills/skills.invocation.ts、skills.invocation-pg.repository.ts及对应纯/真实PG测试；窄改modules/harness/harness-runtime.repository.ts队列端口与createQueuedRun、skills.module.ts导出、package.json CI可达测试登记。源材料归属使用当前会话已保存attachmentId/messageId；数据层在传入executor下锁定并核对ai_sessions/user，业务层不直接读表。跨域生产导入经module出口。
+
+```ts
+// 服务端内部端口；未挂到HTTP。
+submitInvocation(user: AuthUser, sessionId: string, body: {
+  submissionKey: string;
+  content: string;
+  execution: ExecutionRequest;
+}): Promise<AiRunsSubmitResult>;
+// Harness新增可信回调（不能由JSON/body传入）；事务内只解析已有准备结果。
+resolveExecutionConfig?: (tx: QueueDbExecutor) => Promise<Record<string, unknown>>;
+```
+
+- [x] RED：当前createQueuedRun忽略解析回调；补回调结果与Run/首事件/user-message同提交、异常及超限全部回滚、max=1无嵌套连接、发布竞争只得到完整旧/新版或冲突。
+- [x] GREEN：事务外C1 prepare，队列原事务内resolveInTransaction；保留workbench_chat runKind及同会话活动唯一约束。对业务调用owner+submissionKey用稳定数据库事务锁串行化；在调用回调前识别已存在请求，不重复解析/写事件。不得把事务包住网络/模型或另造Run表。
+- [x] 内部调用严格只接受submissionKey/content/execution，execution由C1校验稳定id/input/sources，拒绝客户端owner/version/definition/manifest等额外字段。当前用户active、系统/业务角色与会话owner在短事务内复核；不存在/非owner会话统一404，来源ID必须属于该会话且能读取。来源内容变化于prepare与commit之间明确拒绝，不能只相信客户端ID。
+- [x] 指纹绑定sessionId、业务kind/target/input/sources和原始规范化content，排除新生成的消息信封ID。相同key相同请求重放原Run/manifest，不因新发布或普通停用而换版；同key换session/content/target/input/sources或业务/普通对话相互碰撞必须409，普通对话旧幂等行为保持。
+- [x] 失败映射只保留固定业务错误码与安全文本，不把pg/SQL/资料/配置内容放入错误。返回只含runId/sessionId/status/eventCursor，不返回私有manifest、指令、资料或策略；本子项不改现有snapshot HTTP读端口，尚无公开Skill入队入口。
+- [x] 真实PG证明同key并发只一Run、一份manifest、两条首事件；两key同会话和普通聊天竞争仍只有一个active；owner/角色/来源变化及用户消息事件失败均不落半记录；Workflow固定旧Skill绑定；回滚、max=1及提交后重放保留原版本。真实PG双URL只到workload_eval_test，测试读取env守卫，不钉本机账号、不读取或输出KEK，串行且CI可达。
+- [x] 定向GREEN、modules、API build、受影响Harness回归；先独立规格再质量/安全复核，更新说明及总看板。没有执行模型/工具，没有等待/确认/恢复/UI运行完成声明。
+
+**C2a.1必要接缝补充：** 当前历史已使用Harness事件事实和整会话legacy回落，conversation来源复用resolveSessionHistory，不另造消息权威源。允许conversation-event-history.ts最小扩展Pick<Database,'select'>、可选owner过滤与事件SHARE锁；经harness.module和ai-sessions.module导出现有读取/类型供同executor复用。C1请求形状解析可最小导出供重放前严格校验，避免重放再次读取latest或复制校验规则。队列严格重放检查同时覆盖pre-read和ON CONFLICT fallback；业务指纹还要核对session/adapter身份，legacy两侧无业务指纹维持原语义。
+
+**后续公开入口门槛：** getRunSnapshot当前返回原Run含executionConfig；C2a.2/公开接线前必须白名单投影版本/来源摘要，不能向普通调用者返回包含私有指令/资料/策略的完整manifest。代码检查另发现现有deleteAiSession为activeRunChecker与deleteSession两步，存在先查后删竞态风险；当前会话SHARE锁只证明提交时归属有效，不能代替完整删除并发保护。此风险在C2c/公开接线前做确定性并发复测并关闭，不将本次原子入队声明扩大为删除竞态已修复。 质量复核另指出retryRun复制原executionConfig/metadata且不经过submitInvocation；C2执行器/公开接线前必须覆盖重试血缘的实时授权和恢复校验，不能以首次提交检查代替重试检查。本项未开放业务Run创建入口，不宣称该后续路径已验证。
+
+
+**C2a.1最终回填（2026-11-02）：** 内部submitInvocation已实现并经独立规格、五轴质量/安全复核APPROVE。C1事务外prepare、既有Harness createQueuedRun事务内resolve；同事务保存完整manifest、Run及run_queued/user-message两首事件，异常或超限整笔回滚，max=1无嵌套连接。当前用户状态/系统与业务角色、会话归属、已保存附件/对话来源在同executor复核并锁定；事件权威历史与整会话legacy回落复用既有规则，来源内容变化明确拒绝。同owner+key事务锁、两条strict replay路径与准备失败后的并发回查共同保证重复调用回放原Run/版本，异请求、跨会话、普通聊天碰撞拒绝；返回仅runId/sessionId/status/eventCursor，错误固定脱敏。
+
+父代理最终候选实跑：test:skill-invocation **27/27**、test:modules **728/728**、test:harness **330/330**，全部0fail/0skip（/tmp/wes-c2a1-parent-final）；API构建通过（/tmp/wes-c2a1-parent-final-build.log），定向secret-scan零命中、diff-check通过。独立复审分别实跑纯7/7；未以读取报告代替父代理PG实跑。测试接入test:harness/CI，使用既有双URL测试库守卫；未新增依赖/迁移、未改公共路由/OpenAPI/UI，未执行模型或业务工具，未重启3006/3004，用户模型状态文件保留。
+
+保留失败证据：初轮队列RED4fail/1pass；来源digest删除探针12项中2fail；规格复核发现“首次查空后另一个请求提交且Skill停用，prepare先失败导致未进入严格重放”的P2，确定性新增纯3+PG1先RED4项，最小修复后27项GREEN（/tmp/wes-c2a1-race-red、/tmp/wes-c2a1-race-green）。首轮父模块725项中既有20ms总预算用例1fail，耗时已在进入首case前越限，测试读取空cases触发TypeError；相关评价器、sandbox和测试无C2改动，独立19/19、最终全量728/728通过。未放宽时间预算或断言、未改既有测试；首次失败日志/tmp/wes-c2a1-parent保留，不称CI已执行。
+
+本单元仅完成可审查的内部入队接缝，adapter business_skills_v1/1.0.0尚未注册，未开放可创建业务Run的HTTP入口。下一单元C2a.2接存量快照恢复和固定适配器；后续四类节点、真实Skill执行、等待/确认、实时授权/紧急禁用与持久幂等完成后才接C3工作台。公开接线前保留snapshot私有清单投影、会话删除并发保护、retryRun实时授权/恢复三个门槛；不把本单元通过写为C2整体或MVP完成，不合main、不推送。
+
+总看板同步：已窄改主目录index、requirements、plan、testing、monitoring、risks、changes、runtime、design九页及两侧事件JSON，未改其他用户工作；board-build与一致性校验0错误0警告。浏览器目视确认RP-050仍C实施中、下一步为执行/确认与工作台，截图c2a1-board-requirements.png留存于本会话visualizations。存量台账列宽和ID折行仍在，本轮未更改共享表格样式，不宣称完成视觉优化。
+
+补充跨域检查：AI回归286/286、Web构建通过；通用integration为0/1，仍在templates_status_not_200失败。只读核对workload_eval_test活动product_templates=0、active product_sku_module_assignments=0，与B6已记录测试库缺模板相同；未为通过测试改动预览或填充业务数据。日志/tmp/wes-c2a1-cross-check及/tmp/wes-c2a1-web-build.log保留，不将定向通过表述为通用集成或远端CI通过。

@@ -11,3 +11,4 @@ export { resolveSkillDependencyContext } from './skills.context';
 export type { SkillReleaseRepository, SkillPublishedVersion, SkillReleaseEvidence, SkillDependencySnapshot, SkillPersistedTrialResult } from './skills-release.types';
 export { createExecutionManifestService, prepareExecution, readPersistedExecutionManifest } from './execution-manifest';
 export type { ExecutionManifest, ExecutionRequest, PreparedExecution, ExecutionDbExecutor } from './execution-manifest.types';
+export { createSkillInvocationService, submitInvocation, type InvocationRepository } from './skills.invocation';
