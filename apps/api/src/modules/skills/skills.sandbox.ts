@@ -72,10 +72,10 @@ export function createSkillSandbox(value: unknown, allowedTools: SkillToolDefini
       }
       if (!isDeepStrictEqual(parameters, mapped)) throw new SkillTrialFailure('tool', 'TOOL_MAPPING_MISMATCH');
       if (signal.aborted) throw new SkillTrialFailure('budget', 'TOTAL_TIMEOUT');
-      const step = { callId: call.id, toolName: call.name, arguments: parameters, simulated: native.mutates || !!native.exfiltrates };
+      const step = { callId: call.id, toolName: call.name, arguments: parameters, simulated: native.mutates || !!native.exfiltrates || !!native.simulationOnly };
       if (step.simulated) {
-        if (!binding.requiresConfirmation) throw new SkillError('SKILL_INVALID_DEFINITION', '工具确认规则无效');
-        return { ...step, result: { dryRun: true, executed: false, reason: native.exfiltrates ? 'exfiltration_isolated' : 'mutation_isolated' } };
+        if ((native.mutates || native.exfiltrates) && !binding.requiresConfirmation) throw new SkillError('SKILL_INVALID_DEFINITION', '工具确认规则无效');
+        return { ...step, result: { dryRun: true, executed: false, reason: native.exfiltrates ? 'exfiltration_isolated' : native.mutates ? 'mutation_isolated' : 'unverified_or_remote_read_isolated' } };
       }
       if (!runReadTool) throw new SkillTrialFailure('tool', 'READ_EXECUTOR_UNAVAILABLE');
       let toolOutput: unknown;

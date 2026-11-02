@@ -8,7 +8,7 @@ import type { SkillRepository } from './skills.repository';
 import { skillDefinitionHash } from './skills.hash';
 import { SkillError, type SkillActor, type SkillAudit, type SkillRecord, type SkillVersion } from './skills.types';
 
-type DbLike = Pick<Database, 'select' | 'insert' | 'update' | 'execute'>;
+export type SkillDbExecutor = Pick<Database, 'select' | 'insert' | 'update' | 'execute'>;
 type DefinitionRow = typeof skillDefinitions.$inferSelect;
 const clone = <T>(value: T): T => structuredClone(value);
 const internal = (error: unknown): SkillError => error instanceof SkillError ? error
@@ -17,7 +17,7 @@ function immutable(): never {
   throw new SkillError('SKILL_HISTORY_IMMUTABLE', '技能身份或历史版本不可修改', 409);
 }
 
-async function assemble(executor: DbLike, rows: DefinitionRow[]): Promise<SkillRecord[]> {
+async function assemble(executor: SkillDbExecutor, rows: DefinitionRow[]): Promise<SkillRecord[]> {
   if (!rows.length) return [];
   const ids = rows.map(row => row.skillId);
   const versions = await executor.select().from(skillVersions).where(inArray(skillVersions.skillId, ids))
@@ -105,7 +105,7 @@ function addAudit(record: SkillRecord, actor: SkillActor, action: string, now: s
   record.audit.push(audit);
   return audit;
 }
-async function insertRevision(tx: DbLike, record: SkillRecord, audit: SkillAudit): Promise<void> {
+async function insertRevision(tx: SkillDbExecutor, record: SkillRecord, audit: SkillAudit): Promise<void> {
   await tx.insert(skillRevisions).values({ ...audit, skillId: record.skillId, revision: record.revision,
     snapshot: clone(record), createdAt: new Date(audit.createdAt) });
 }
@@ -148,6 +148,15 @@ export function createSkillsPgRepository(dbInstance: Database = db): SkillReposi
       } catch (error) { throw internal(error); }
     },
     async mutate(skillId, expectedRevision, actor, action, update) {
+      return mutateSkillTransaction(dbInstance, skillId, expectedRevision, actor, action, (record, now) => update(record, now));
+    },
+  };
+}
+
+/** Server-only transaction boundary shared with release evidence; never expose callbacks over HTTP. */
+export async function mutateSkillTransaction(dbInstance: Database, skillId: string, expectedRevision: number,
+  actor: SkillActor, action: string,
+  update: (record: SkillRecord, now: string, tx: SkillDbExecutor) => void | Promise<void>): Promise<SkillRecord> {
       try {
         return await dbInstance.transaction(async tx => {
           // Lock the aggregate root before reading versions: no same-revision writer can observe a partial aggregate.
@@ -156,7 +165,7 @@ export function createSkillsPgRepository(dbInstance: Database = db): SkillReposi
           if (roots[0].revision !== expectedRevision) throw new SkillError('SKILL_REVISION_CONFLICT', '技能已更新，请刷新后重试', 409);
           const before = (await assemble(tx, roots))[0]; const candidate = clone(before);
           const now = await readDbNow(tx); const iso = now.toISOString();
-          update(candidate, iso);
+          await update(candidate, iso, tx);
           verifyMutation(before, candidate, actor, action);
           // Detach from references retained by the callback before the first persistence await.
           const next = clone(candidate);
@@ -177,6 +186,4 @@ export function createSkillsPgRepository(dbInstance: Database = db): SkillReposi
           return clone(next);
         });
       } catch (error) { throw internal(error); }
-    },
-  };
 }

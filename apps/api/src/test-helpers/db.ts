@@ -32,6 +32,9 @@ export const testDb = drizzle(testPool, { schema });
 // 顺序无关（RESTART IDENTITY CASCADE 自行处理外键依赖）。
 
 export const TRUNCATE_TEST_TABLE_NAMES: string[] = [
+  "skill_evaluations",
+  "skill_release_reviews",
+  "skill_release_events",
   "skill_definitions",
   "skill_versions",
   "skill_revisions",

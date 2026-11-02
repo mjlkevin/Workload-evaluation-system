@@ -31,7 +31,7 @@ test('admin receives envelope, missing record 404, invalid definition 400 and st
   const list = await api.get('/skills').set('Authorization', `Bearer ${admin}`);
   assert.equal(list.status, 200); assert.equal(list.body.code, 0); assert.deepEqual(list.body.data.items, []);
   const meta = await api.get('/skills/metadata').set('Authorization', `Bearer ${admin}`);
-  assert.equal(meta.status, 200); assert.equal(meta.body.data.publishAvailable, false); assert.deepEqual(meta.body.data.tools, []);
+  assert.equal(meta.status, 200); assert.equal(meta.body.data.publishAvailable, true); assert.deepEqual(meta.body.data.tools, []);
   assert.equal((await api.get('/skills/no-record').set('Authorization', `Bearer ${admin}`)).status, 404);
   const invalid = await api.post('/skills').set('Authorization', `Bearer ${admin}`).send({ definition: { name: '不完整' } });
   assert.equal(invalid.status, 400); assert.ok(invalid.body.details.length > 0);
@@ -43,4 +43,17 @@ test('raw persistence errors are hidden and clients cannot inject actor or publi
   assert.equal(JSON.stringify(res.body).includes('PRIVATE_DATABASE_DIAGNOSTIC'), false);
   const inject = await app().post('/skills/x/checkout').set('Authorization', `Bearer ${admin}`).send({ revision: 1, actor: { id: 'forged' } });
   assert.equal(inject.status, 400); assert.equal(inject.body.errorCode, 'SKILL_INVALID_REQUEST');
+});
+
+test('release API authenticates every action, rejects forged proof and exposes a role-filtered safe catalog', async () => {
+  const admin = await token('admin'); const user = await token('user'); const api = app();
+  assert.equal((await api.get('/skills/catalog')).status, 401);
+  assert.equal((await api.get('/skills/catalog').set('Authorization', `Bearer ${user}`)).status, 200);
+  for (const action of ['trial', 'review', 'publish', 'rollback']) {
+    assert.equal((await api.post(`/skills/x/${action}`).send({ revision: 1 })).status, 401);
+    assert.equal((await api.post(`/skills/x/${action}`).set('Authorization', `Bearer ${user}`).send({ revision: 1 })).status, 403);
+    const forged = await api.post(`/skills/x/${action}`).set('Authorization', `Bearer ${admin}`).send({ revision: 1, proof: { passed: true }, actor: { id: 'other' } });
+    assert.equal(forged.status, 400); assert.equal(forged.body.errorCode, 'SKILL_INVALID_REQUEST');
+  }
+  assert.equal((await api.get('/skills/x/release').set('Authorization', `Bearer ${user}`)).status, 403);
 });

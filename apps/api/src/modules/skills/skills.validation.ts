@@ -3,7 +3,7 @@ import { isBusinessRole } from '../../middleware/auth';
 import { SkillError, type SkillDefinition } from './skills.types';
 import { mappedInput, schemaFits } from './skills.schema-compatibility';
 
-export type SkillToolDefinition = { name: string; description: string; parameters: Record<string, unknown>; mutates: boolean; exfiltrates?: boolean };
+export type SkillToolDefinition = { name: string; description: string; parameters: Record<string, unknown>; mutates: boolean; exfiltrates?: boolean; simulationOnly?: boolean };
 const ajv = new Ajv({ allErrors: true, strict: false, validateFormats: false, addUsedSchema: false });
 const text = (maxLength: number, minLength = 0) => ({ type: 'string', minLength, maxLength });
 const object = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({ type: 'object', additionalProperties: false, properties, required });

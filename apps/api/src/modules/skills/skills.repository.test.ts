@@ -4,7 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import { skillDefinitionHash } from './skills.hash';
 import { createSkillUsecase } from './skills.usecase';
 import { testDb, testPool } from '../../test-helpers/db';
-import { skillRevisions, skillVersions } from '../../db/schema';
+import { skillRevisions, skillVersions, skillReleaseEvents, skillEvaluations, skillReleaseReviews } from '../../db/schema';
 import { createSkillsPgRepository } from './skills-pg.repository';
 import { SkillError, type SkillDefinition } from './skills.types';
 
@@ -25,7 +25,7 @@ function code(expected: string) {
 }
 after(async () => {
   assert.equal(new URL(process.env.TEST_DATABASE_URL!).pathname, '/workload_eval_test');
-  try { await testDb.execute(sql`TRUNCATE TABLE skill_revisions, skill_versions, skill_definitions`); }
+  try { await testDb.execute(sql`TRUNCATE TABLE skill_release_events, skill_release_reviews, skill_evaluations, skill_revisions, skill_versions, skill_definitions`); }
   finally { await testPool.end(); }
 });
 
@@ -237,4 +237,164 @@ test('hash tampering and skipped minor revisions fail closed without changing st
     version.createdAt = now; version.updatedAt = now; next.versions.push(version); next.currentVersionId = version.skillVersionId;
   }), code('SKILL_HISTORY_IMMUTABLE'));
   assert.deepEqual(await repo.get(record.skillId), record);
+});
+
+
+test('release repository persists proof separately, atomically reviews/publishes and CAS admits one winner', async () => {
+  const { createSkillReleaseRepository } = await import('./skills-release.repository');
+  const release = createSkillReleaseRepository(testDb);
+  const { evaluateSkill } = await import('./skills.evaluation');
+  const value = { ...definition, examples: [{ title: 'sample', input: {}, expected: {} }] };
+  const record = await repo.create(value, actor);
+  const result = await evaluateSkill(value, { mode: 'model', allowedTools: [], complete: async () => ({ output: {}, provider: 'kimi', model: 'kimi-test', usage: { outputTokens: 2 } }) });
+  const dependencyContext = { schemaVersion: 1 as const, references: [{ uri: 'wes://knowledge/test-ref', version: '2026-11-02T00:00:00.000Z', digest: 'reference-digest' }], model: { providerId: 'moonshot', model: 'kimi-test', modelSource: 'binding', credentialScope: 'kimi', baseUrlDigest: 'endpoint-digest', params: value.model, capabilities: ['chat'], supportedParams: [] }, tools: [], roles: ['ADMIN' as const] };
+  const trial = await release.appendEvaluation(record.skillId, 1, actor, { versionId: record.currentVersionId, hash: record.versions[0].hash, contextHash: 'context-a', result: { ...result, dependencyContext } });
+  assert.equal(trial.record.revision, 2);
+  assert.equal((await release.evidence(record.skillId)).evaluations.length, 1);
+  assert.deepEqual((await release.evidence(record.skillId)).evaluations[0].result.dependencyContext, dependencyContext);
+  const reviewed = await release.review(record.skillId, 2, actor, { evaluationId: trial.evaluation.id, reason: '样例和边界已核对', contextHash: 'context-a' });
+  assert.equal(reviewed.versions[0].status, 'reviewed');
+  const outcomes = await Promise.allSettled([release.publish(record.skillId, 3, actor, 'context-a'), release.publish(record.skillId, 3, actor, 'context-a')]);
+  assert.equal(outcomes.filter(item => item.status === 'fulfilled').length, 1);
+  assert.ok(code('SKILL_REVISION_CONFLICT')((outcomes.find(item => item.status === 'rejected') as PromiseRejectedResult).reason));
+  const published = (await repo.get(record.skillId))!;
+  assert.equal(published.activeVersionId, record.currentVersionId);
+  assert.equal((await release.evidence(record.skillId)).events.length, 1);
+  assert.equal((await release.getPublishedVersion(record.skillId, record.currentVersionId, record.versions[0].hash))!.version.hash, record.versions[0].hash);
+  const snapshots = await testDb.select().from(skillRevisions).where(eq(skillRevisions.skillId, record.skillId));
+  assert.equal(JSON.stringify(snapshots).includes('context-a'), false);
+  for (const table of [skillEvaluations, skillReleaseReviews, skillReleaseEvents]) {
+    await assert.rejects(testDb.delete(table));
+  }
+});
+
+test('release gate rejects simulation, no proof, stale context, checked-out review and post-network edits', async () => {
+  const { createSkillReleaseRepository } = await import('./skills-release.repository');
+  const { evaluateSkill } = await import('./skills.evaluation');
+  const release = createSkillReleaseRepository(testDb);
+  const value = { ...definition, examples: [{ title: 'sample', input: {}, expected: {} }] };
+  let record = await repo.create(value, actor);
+  await assert.rejects(release.publish(record.skillId, 1, actor, 'ctx'), code('SKILL_RELEASE_GATE_PENDING'));
+  const result = await evaluateSkill(value, { mode: 'simulation', allowedTools: [], complete: async () => ({ output: {}, provider: 'simulation', model: 'expected', usage: { outputTokens: 1 } }) });
+  const trial = await release.appendEvaluation(record.skillId, 1, actor, { versionId: record.currentVersionId, hash: record.versions[0].hash, contextHash: 'ctx', result });
+  record = trial.record;
+  await assert.rejects(release.review(record.skillId, record.revision, actor, { evaluationId: trial.evaluation.id, reason: '核对', contextHash: 'ctx' }), code('SKILL_RELEASE_GATE_PENDING'));
+  const service = createSkillUsecase(repo, async () => []);
+  const locked = await service.action(record.skillId, record.revision, actor, 'checkout');
+  await assert.rejects(release.appendEvaluation(record.skillId, record.revision, actor, { versionId: record.currentVersionId, hash: record.versions[0].hash, contextHash: 'ctx', result }), code('SKILL_REVISION_CONFLICT'));
+  await assert.rejects(release.review(record.skillId, locked.revision, actor, { evaluationId: trial.evaluation.id, reason: '核对', contextHash: 'ctx' }), code('SKILL_CHECKIN_REQUIRED'));
+  assert.equal((await repo.get(record.skillId))!.activeVersionId, null);
+});
+
+async function releaseFixture(value: SkillDefinition = { ...definition, examples: [{ title: 'sample', input: {}, expected: {} }] }) {
+  const { createSkillReleaseRepository } = await import('./skills-release.repository');
+  const { evaluateSkill } = await import('./skills.evaluation');
+  const release = createSkillReleaseRepository(testDb);
+  const service = createSkillUsecase(repo, async () => []);
+  const prove = async (record: Awaited<ReturnType<typeof create>>, contextHash = 'current-context') => {
+    const version = record.versions.find(v => v.skillVersionId === record.currentVersionId)!;
+    const result = await evaluateSkill(version.definition, { mode: 'model', allowedTools: [], complete: async () => ({ output: {}, provider: 'kimi', model: 'test-model', usage: { outputTokens: 1 } }) });
+    const trial = await release.appendEvaluation(record.skillId, record.revision, actor, { versionId: version.skillVersionId, hash: version.hash, contextHash, result });
+    const reviewed = await release.review(record.skillId, trial.record.revision, actor, { evaluationId: trial.evaluation.id, reason: '核对完成', contextHash });
+    return { trial, reviewed };
+  };
+  return { record: await repo.create(value, actor), release, service, prove };
+}
+
+test('stale native/model/reference context, edited candidate and failed/no-sample results cannot release', async () => {
+  const f = await releaseFixture();
+  const { trial, reviewed } = await f.prove(f.record);
+  await assert.rejects(f.release.publish(reviewed.skillId, reviewed.revision, actor, 'changed-native-context'), code('SKILL_RELEASE_GATE_PENDING'));
+  const evidence = await f.release.evidence(reviewed.skillId); assert.equal(evidence.events.length, 0);
+  let edited = await f.service.action(reviewed.skillId, reviewed.revision, actor, 'checkout');
+  edited = await f.service.save(edited.skillId, edited.revision, actor, { ...definition, name: 'changed', examples: [{ title: 'sample', input: {}, expected: {} }] });
+  edited = await f.service.action(edited.skillId, edited.revision, actor, 'checkin');
+  await assert.rejects(f.release.review(edited.skillId, edited.revision, actor, { evaluationId: trial.evaluation.id, reason: '检查', contextHash: 'current-context' }), code('SKILL_RELEASE_GATE_PENDING'));
+  assert.equal((await repo.get(edited.skillId))!.activeVersionId, null);
+  for (const value of [{ ...definition, examples: [] }, { ...definition, examples: [{ title: 'fail', input: {}, expected: { expected: true } }] }]) {
+    const { evaluateSkill } = await import('./skills.evaluation');
+    const candidate = await repo.create(value, actor);
+    const result = await evaluateSkill(value, { mode: 'model', allowedTools: [], complete: async () => ({ output: {}, provider: 'kimi', model: 'test', usage: { outputTokens: 1 } }) });
+    assert.equal(result.releaseEligible, false);
+    const saved = await f.release.appendEvaluation(candidate.skillId, candidate.revision, actor, { versionId: candidate.currentVersionId, hash: candidate.versions[0].hash, contextHash: 'current-context', result });
+    await assert.rejects(f.release.review(candidate.skillId, saved.record.revision, actor, { evaluationId: saved.evaluation.id, reason: '检查', contextHash: 'current-context' }), code('SKILL_RELEASE_GATE_PENDING'));
+    assert.equal((await repo.get(candidate.skillId))!.activeVersionId, null);
+  }
+});
+
+test('model dry-run steps require explicit review acknowledgement that persists with the boundary', async () => {
+  const { createSkillReleaseRepository } = await import('./skills-release.repository');
+  const { evaluateSkill } = await import('./skills.evaluation');
+  const release = createSkillReleaseRepository(testDb);
+  const value = { ...definition, tools: [{ toolName: 'isolated_write', inputMapping: {}, requiresConfirmation: true }], examples: [{ title: 'sample', input: {}, expected: {} }] };
+  const record = await repo.create(value, actor); let attempt = 0;
+  const result = await evaluateSkill(value, { mode: 'model', allowedTools: [{ name: 'isolated_write', description: '', parameters: { type: 'object' }, mutates: true }], complete: async () => (++attempt === 1
+    ? { toolCalls: [{ id: 'call-1', name: 'isolated_write', arguments: {} }], provider: 'kimi', model: 'test', usage: { outputTokens: 1 } }
+    : { output: {}, provider: 'kimi', model: 'test', usage: { outputTokens: 1 } }) });
+  assert.equal(result.releaseEligible, true); assert.equal(result.simulatedSteps.length, 1);
+  const trial = await release.appendEvaluation(record.skillId, 1, actor, { versionId: record.currentVersionId, hash: record.versions[0].hash, contextHash: 'ctx', result });
+  await assert.rejects(release.review(record.skillId, trial.record.revision, actor, { evaluationId: trial.evaluation.id, reason: '检查', contextHash: 'ctx' }), code('SKILL_SIMULATION_ACK_REQUIRED'));
+  const reviewed = await release.review(record.skillId, trial.record.revision, actor, { evaluationId: trial.evaluation.id, reason: '确认写入仅为模拟', acknowledgeSimulation: true, contextHash: 'ctx' });
+  const published = await release.publish(record.skillId, reviewed.revision, actor, 'ctx');
+  assert.equal(published.activeVersionId, record.currentVersionId);
+  assert.equal((await release.evidence(record.skillId)).reviews[0].acknowledgedSimulation, true);
+});
+
+test('event/active-pointer persistence failure rolls back root and release records with original pointer intact', async () => {
+  const f = await releaseFixture(); const { reviewed } = await f.prove(f.record);
+  // Constraint targets only this UUID; other test files cannot trigger it.
+  await testDb.execute(sql.raw(`ALTER TABLE skill_definitions ADD CONSTRAINT skill_test_release_root_failure CHECK (active_version_id IS DISTINCT FROM '${reviewed.currentVersionId}') NOT VALID`));
+  try {
+    await assert.rejects(f.release.publish(reviewed.skillId, reviewed.revision, actor, 'current-context'), code('SKILL_STORE_INTERNAL'));
+    assert.deepEqual(await repo.get(reviewed.skillId), reviewed);
+    assert.equal((await f.release.evidence(reviewed.skillId)).events.length, 0);
+  } finally { await testDb.execute(sql`ALTER TABLE skill_definitions DROP CONSTRAINT skill_test_release_root_failure`); }
+  const published = await f.release.publish(reviewed.skillId, reviewed.revision, actor, 'current-context');
+  const before = structuredClone(published);
+  await testDb.execute(sql`ALTER TABLE skill_release_events ADD CONSTRAINT skill_test_release_event_failure CHECK (reason <> 'reject-event-fixture') NOT VALID`);
+  try {
+    let promoted = await f.service.action(published.skillId, published.revision, actor, 'promote');
+    const proof = await f.prove(promoted);
+    // A new immutable review for the same proof supplies a sentinel rejected only by the event constraint.
+    promoted = await f.release.review(promoted.skillId, proof.reviewed.revision, actor, { evaluationId: proof.trial.evaluation.id, reason: 'reject-event-fixture', contextHash: 'current-context' });
+    await assert.rejects(f.release.publish(promoted.skillId, promoted.revision, actor, 'current-context'), code('SKILL_STORE_INTERNAL'));
+    const after = (await repo.get(promoted.skillId))!;
+    assert.equal(after.activeVersionId, before.activeVersionId); assert.equal(after.revision, promoted.revision);
+    assert.equal(after.versions[1].status, 'reviewed'); assert.equal((await f.release.evidence(promoted.skillId)).events.length, 1);
+  } finally { await testDb.execute(sql`ALTER TABLE skill_release_events DROP CONSTRAINT skill_test_release_event_failure`); }
+});
+
+test('rollback only switches pointer to this Skill published compatible history; published content stays immutable', async () => {
+  const f = await releaseFixture(); let { reviewed } = await f.prove(f.record);
+  const a = await f.release.publish(reviewed.skillId, reviewed.revision, actor, 'current-context');
+  let b = await f.service.action(a.skillId, a.revision, actor, 'promote');
+  ({ reviewed } = await f.prove(b)); b = await f.release.publish(reviewed.skillId, reviewed.revision, actor, 'current-context');
+  const other = await releaseFixture(); const otherProof = await other.prove(other.record);
+  const otherPublished = await other.release.publish(other.record.skillId, otherProof.reviewed.revision, actor, 'current-context');
+  for (const target of ['missing-version', otherPublished.currentVersionId]) {
+    await assert.rejects(f.release.rollback(b.skillId, b.revision, actor, target, '业务回退'), code('SKILL_ROLLBACK_TARGET_INVALID'));
+    assert.deepEqual(await repo.get(b.skillId), b);
+  }
+  await assert.rejects(f.release.rollback(b.skillId, b.revision, actor, a.currentVersionId, '  '), code('SKILL_REASON_REQUIRED'));
+  const rolled = await f.release.rollback(b.skillId, b.revision, actor, a.currentVersionId, '业务回退');
+  assert.equal(rolled.activeVersionId, a.currentVersionId); assert.equal(rolled.currentVersionId, b.currentVersionId);
+  assert.deepEqual(rolled.versions, b.versions);
+  assert.equal((await f.release.evidence(b.skillId)).events.at(-1)!.kind, 'rollback');
+  assert.equal((await f.release.getPublishedVersion(b.skillId, b.currentVersionId, b.versions[1].hash))!.version.skillVersionId, b.currentVersionId);
+  const disabled = await f.service.setStatus(rolled.skillId, rolled.revision, actor, { enabled: false });
+  await assert.rejects(f.release.rollback(disabled.skillId, disabled.revision, actor, b.currentVersionId, '回退'), code('SKILL_DISABLED'));
+});
+
+test('rollback refuses incompatible input contract and nonpublished draft without changing active pointer', async () => {
+  const strict: SkillDefinition = { ...definition, inputSchema: { type: 'object', properties: { must: { type: 'string' } }, required: ['must'] }, examples: [{ title: 'sample', input: { must: 'yes' }, expected: {} }] };
+  const f = await releaseFixture(strict); let { reviewed } = await f.prove(f.record);
+  const a = await f.release.publish(reviewed.skillId, reviewed.revision, actor, 'current-context');
+  let b = await f.service.action(a.skillId, a.revision, actor, 'promote');
+  await assert.rejects(f.release.rollback(b.skillId, b.revision, actor, b.currentVersionId, '回退草稿'), code('SKILL_ROLLBACK_TARGET_INVALID'));
+  b = await f.service.action(b.skillId, b.revision, actor, 'checkout');
+  b = await f.service.save(b.skillId, b.revision, actor, { ...definition, examples: [{ title: 'sample', input: {}, expected: {} }] });
+  b = await f.service.action(b.skillId, b.revision, actor, 'checkin');
+  ({ reviewed } = await f.prove(b)); b = await f.release.publish(b.skillId, reviewed.revision, actor, 'current-context');
+  await assert.rejects(f.release.rollback(b.skillId, b.revision, actor, a.currentVersionId, '不兼容回退'), code('SKILL_ROLLBACK_INCOMPATIBLE'));
+  assert.deepEqual(await repo.get(b.skillId), b);
 });

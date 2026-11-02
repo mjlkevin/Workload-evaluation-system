@@ -31,6 +31,8 @@ export interface AgentTool {
    * ——每次外发的内容都不同，批准过一次不等于批准下一次。
    */
   exfiltrates?: boolean;
+  /** Code-owned assertion of local, read-only trial safety. Default false; never an admin policy override. */
+  sandboxReadSafe?: boolean;
   /** SP-2026-007 MS3：工具分类（发现/分组用）；内置发现工具为 "discovery" */
   category?: string;
   /** SP-2026-007 MS3：true 时默认不注入 tools 参数，经 list_tools 发现后进入当轮注入集 */

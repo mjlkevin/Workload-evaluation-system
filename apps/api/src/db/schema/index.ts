@@ -31,3 +31,4 @@ export * from "./knowledge";
 export * from "./industry";
 export * from "./product_master_data";
 export * from "./skills";
+export * from './skill_releases';
