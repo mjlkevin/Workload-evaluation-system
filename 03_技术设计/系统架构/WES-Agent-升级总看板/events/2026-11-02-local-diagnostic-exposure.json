@@ -1,0 +1,30 @@
+{
+  "id": "BE-2026-11-02-local-diagnostic-exposure",
+  "date": "2026-11-02",
+  "type": "process_change",
+  "scope": "本地执行诊断 / 敏感输出控制",
+  "summary": "完整进程参数诊断意外带出终端继承的其他工具服务敏感环境信息；已停止该诊断并通知用户",
+  "status": "诊断已停止 / 未写入仓库",
+  "pages": [
+    "risks",
+    "monitoring",
+    "changes"
+  ],
+  "source": {
+    "origin": "执行过程自查",
+    "dedup": "非WES应用缺陷，不新增需求；与模型401环境问题分别记录"
+  },
+  "evidence": [
+    {
+      "kind": "execution",
+      "ref": "本次本地进程诊断工具返回",
+      "summary": "只记录事故类别，不复制字段或值；未将敏感内容写入代码、文档资产或看板"
+    },
+    {
+      "kind": "control",
+      "ref": "后续诊断约束",
+      "summary": "只读取PID及状态，不再输出完整进程参数、环境变量或原始provider响应；用户可在对应服务轮换已显示的凭据"
+    }
+  ],
+  "next": "继续已授权B批；凭据轮换由用户在对应服务完成，不由诊断任务擅改"
+}

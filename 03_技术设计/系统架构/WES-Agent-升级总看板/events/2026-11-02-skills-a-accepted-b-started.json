@@ -1,0 +1,58 @@
+{
+  "id": "BE-2026-11-02-skills-a-accepted-b-started",
+  "date": "2026-11-02",
+  "type": "process_change",
+  "scope": "ISS-2026-08-06-002 / RP-050 / A验收与B开工",
+  "summary": "用户确认A批界面验收通过并授权继续，A基线本地提交b5853a4；B批独立工作区开工",
+  "status": "A界面已验收 / B实施中 / 主线未合入",
+  "pages": [
+    "index",
+    "issues",
+    "requirements",
+    "plan",
+    "testing",
+    "monitoring",
+    "risks",
+    "changes",
+    "sources"
+  ],
+  "additionalBoardPages": [
+    "design"
+  ],
+  "source": {
+    "raw": "通过，继续下一步工作",
+    "dedup": "沿用ISS-2026-08-06-002及RP-050，不新增编号"
+  },
+  "evidence": [
+    {
+      "kind": "git",
+      "ref": "b5853a4 / codex/wes-skills-a",
+      "summary": "A本地基线已提交，未合主线、未推送"
+    },
+    {
+      "kind": "workspace",
+      "ref": "/Users/kevin/.codex/worktrees/wes-skills-b/Workload-evaluation-system",
+      "summary": "B独立分支codex/wes-skills-b，以A验收基线开始；主目录SKU现场不变"
+    },
+    {
+      "kind": "database",
+      "ref": "workload_eval_skills_preview_20261102",
+      "summary": "A预览库已克隆并逐表摘要验证；2Skill/4版本/16历史/4用户一致，3004预览已切换；自动测试只用workload_eval_test"
+    }
+  ],
+  "board": {
+    "testing": [
+      {
+        "command": "A批用户界面验收",
+        "result": "用户确认通过",
+        "summary": "编辑、检出检入、升版及历史版本查看，按用户明确通过结论记录；不扩展为B/C/D或MVP验收"
+      }
+    ]
+  },
+  "limits": [
+    "A主线集成尚未执行，主目录有其他dirty现场",
+    "B尚在实施，试运行/发布/流程未宣称完成",
+    "保留3006已验收预览数据，C/D未启动，不自动推送"
+  ],
+  "next": "按B细分工单串行实现与独立复核，完成后验证真实模型及发布/回滚/流程依赖"
+}
