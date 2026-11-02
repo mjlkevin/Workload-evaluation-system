@@ -14,7 +14,7 @@ const definitionSchema = object({
   inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
   model: object({ scenario: { enum: ['assessment', 'fileParsing', 'generation'] }, temperature: { type: 'number', minimum: 0, maximum: 2 }, maxTokens: { type: 'integer', minimum: 1, maximum: 64000 }, timeoutMs: { type: 'integer', minimum: 1000, maximum: 300000 } }),
   tools: { type: 'array', maxItems: 30, items: object({ toolName: text(160, 1), inputMapping: { type: 'object', maxProperties: 50, additionalProperties: text(300, 1) }, requiresConfirmation: { type: 'boolean' } }) },
-  examples: { type: 'array', maxItems: 30, items: object({ title: text(120, 1), input: {}, expected: {} }) },
+  examples: { type: 'array', maxItems: 30, items: object({ title: text(120, 1), input: {}, expected: {}, assertions: { type: 'array', minItems: 1, maxItems: 30, items: object({ path: text(300, 1), op: { enum: ['equals', 'contains', 'exists', 'minItems'] }, value: {} }, ['path', 'op']) } }, ['title', 'input', 'expected']) },
 });
 const validateDefinition = ajv.compile(definitionSchema);
 const schemaKeys = new Set(['type', 'properties', 'required', 'additionalProperties', 'items', 'enum', 'const', 'description', 'title', 'default', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'minLength', 'maxLength', 'minItems', 'maxItems', 'uniqueItems', 'minProperties', 'maxProperties', '$defs', 'definitions', '$ref', '$schema']);
@@ -57,6 +57,18 @@ function compileSchema(schema: Record<string, unknown>, field: string, compiler:
   inspectSchema(schema, schema, field);
   try { return compiler.compile(schema); } catch { return invalid(field, 'invalid_json_schema'); }
 }
+export function skillPathParts(path: string): string[] {
+  if (typeof path !== 'string' || path.length > 300 || !/^\$(\.[A-Za-z0-9_-]+){0,16}$/.test(path)) invalid('path', 'invalid_field_path');
+  const parts = path.split('.').slice(1);
+  if (parts.some(part => forbiddenKeys.has(part))) invalid('path', 'unsafe_field_path');
+  return parts;
+}
+
+/** Dynamic schemas use a fresh compiler, never the static definition validator cache. */
+export function compileSkillPayloadSchema(schema: Record<string, unknown>, field: string) {
+  return compileSchema(schema, field, new Ajv({ allErrors: true, strict: false, validateFormats: false, addUsedSchema: false }));
+}
+
 export function validateSkillDefinition(value: unknown, tools: SkillToolDefinition[]): SkillDefinition {
   let serialized: string;
   try { serialized = JSON.stringify(value); } catch { return invalid('definition', 'json_required'); }
@@ -72,6 +84,11 @@ export function validateSkillDefinition(value: unknown, tools: SkillToolDefiniti
   for (const [i, example] of definition.examples.entries()) {
     if (!input(example.input)) errors(`examples/${i}/input`, input.errors);
     if (!output(example.expected)) errors(`examples/${i}/expected`, output.errors);
+    for (const assertion of example.assertions || []) {
+      skillPathParts(assertion.path);
+      if (assertion.op !== 'exists' && !Object.prototype.hasOwnProperty.call(assertion, 'value')) invalid(`examples/${i}/assertions`, 'assertion_value_required');
+      if (assertion.op === 'minItems' && (!Number.isInteger(assertion.value) || (assertion.value as number) < 0 || (assertion.value as number) > 100000)) invalid(`examples/${i}/assertions`, 'invalid_min_items');
+    }
   }
   const seen = new Set<string>();
   for (const [i, binding] of definition.tools.entries()) {

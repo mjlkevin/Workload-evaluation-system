@@ -1,3 +1,4 @@
+export type SkillAssertion = { path: string; op: 'equals' | 'contains' | 'exists' | 'minItems'; value?: unknown };
 export type SkillActor = { id: string; username: string };
 export type SkillDefinition = {
   name: string; description: string; category: string; instructions: string; roles: string[];
@@ -5,7 +6,7 @@ export type SkillDefinition = {
   inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown>;
   model: { scenario: string; temperature: number; maxTokens: number; timeoutMs: number };
   tools: Array<{ toolName: string; inputMapping: Record<string, string>; requiresConfirmation: boolean }>;
-  examples: Array<{ title: string; input: unknown; expected: unknown }>;
+  examples: Array<{ title: string; input: unknown; expected: unknown; assertions?: SkillAssertion[] }>;
 };
 export type SkillVersion = {
   skillVersionId: string; versionCode: string; majorLetter: string; minorNumber: number;
