@@ -64,6 +64,14 @@ describe('System management navigation', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '新建 Skill' })).toBeEnabled())
   })
 
+  test('Workflow 管理三级入口挂载', async () => {
+    server.use(http.get(`${BASE}/workflows`, () => HttpResponse.json({ code: 0, data: { items: [] } })), http.get(`${BASE}/workflows/metadata`, () => HttpResponse.json({ code: 0, data: { viewerId: 'admin-1', roles: ['delivery'], tools: [], publishedSkills: [] } })))
+    renderAppAt('/system/ai/workflows')
+    expect(await screen.findByRole('heading', { name: 'Workflow 管理' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: '新建 Workflow' })).toBeEnabled())
+    expect(screen.getAllByRole('link', { name: /Workflow 管理/ })[0]).toHaveAttribute('href', '/system/ai/workflows')
+  })
+
   test('opens a dedicated page for each system management submodule', async () => {
     renderAppAt('/system/rules/dsl-rules')
 

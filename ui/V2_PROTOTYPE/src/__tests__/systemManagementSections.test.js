@@ -72,6 +72,7 @@ describe('systemManagementSections 分组配置一致性', () => {
     expect(DEFAULT_SYSTEM_MANAGEMENT_ROUTE).toBe(getSystemManagementSectionsByGroup(firstGroup.id)[0].route)
     expect(getSystemManagementGroupById(firstGroup.id).label).toBe(firstGroup.label)
     expect(getSystemManagementSectionsByGroup('ai')).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'skills', route: '/system/ai/skills', label: 'Skill 管理' })]))
+    expect(getSystemManagementSectionsByGroup('ai')).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'workflows', route: '/system/ai/workflows', label: 'Workflow 管理' })]))
     // 「状态机规则」子页必须存在且归属规则与标准分组
     const stateMachines = SYSTEM_MANAGEMENT_SECTIONS.find((s) => s.id === 'stateMachines')
     expect(stateMachines).toBeTruthy()

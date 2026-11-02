@@ -29,6 +29,7 @@ export const SYSTEM_MANAGEMENT_SECTIONS = [
   { id: 'kb', groupId: 'ai', route: '/system/ai/knowledge-base', label: '知识库', icon: 'K', subtitle: '智谱知识库接入与连通性验证' },
   { id: 'kbRetrieval', groupId: 'ai', route: '/system/ai/kb-retrieval', label: '检索诊断', icon: '检', subtitle: '本地知识库中文检索基线诊断与试查' },
   { id: 'skills', groupId: 'ai', route: '/system/ai/skills', label: 'Skill 管理', icon: '技', subtitle: '维护 Skill 定义、试运行与复核；发布、回滚及固定版本影响可追溯' },
+  { id: 'workflows', groupId: 'ai', route: '/system/ai/workflows', label: 'Workflow 管理', icon: '流', subtitle: '配置步骤、固定 Skill 版本依赖、静态校验与发布复核' },
   { id: 'tools', groupId: 'ai', route: '/system/ai/tools', label: '工具策略', icon: '⚒', subtitle: 'AI 工具清单（代码派生·只读）与启用/可见/审批/注入策略' },
   { id: 'memory', groupId: 'ai', route: '/system/ai/memory', label: '记忆管理', icon: '忆', subtitle: 'AI 工作台跨会话记忆查看与确认' },
   // —— 运行与审计 ——

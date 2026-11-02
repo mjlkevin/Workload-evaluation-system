@@ -1,3 +1,4 @@
+import WorkflowsSection from './system/WorkflowsSection.jsx'
 import SkillsSection from './system/SkillsSection.jsx'
 import TestResultsSection from './system/TestResultsSection.jsx'
 import ModelConfigurationSection from './system/ModelConfigurationSection.jsx'
@@ -705,6 +706,7 @@ export default function SystemManagement({ sectionId }) {
           <MemoryManagementPanel />
         )}
 
+        {activeSectionId === 'workflows' && <WorkflowsSection />}
         {activeSectionId === 'skills' && <SkillsSection />}
 
         {activeSectionId === 'tools' && (
