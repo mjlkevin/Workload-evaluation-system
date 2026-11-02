@@ -8,7 +8,7 @@
 
 **Tech Stack:** 现有 TypeScript/Express/modules、PostgreSQL/Drizzle、AJV、Harness；前端沿用 Vite/React、现有共享组件和 Tailwind tokens 桥接。
 
-设计依据：`../specs/2026-11-02-wes-business-skills-design.md`。2026-11-02 用户“评审通过”，随后授权“开始实施”，现已确认“通过，继续下一步工作”。A批界面验收通过；B候选代码、管理界面和契约已验证，真实Kimi拆解、复核发布、升版回滚及固定Skill流程引用均已验证；B用户最终验收未完成。主线集成仍待执行，远端未推送；C/D 未启动，完整 MVP 尚未验收。
+设计依据：`../specs/2026-11-02-wes-business-skills-design.md`。2026-11-02 用户“评审通过”，随后授权“开始实施”，现已确认“通过，继续下一步工作”。A批界面验收通过；B候选代码、管理界面和契约已验证，真实Kimi拆解、复核发布、升版回滚及固定Skill流程引用均已验证；用户已确认B手动验收完成。主线集成仍待执行，远端未推送；C批进入运行快照接入，D未启动，完整MVP尚未验收。
 
 ## 0. 批次划分和开工纪律
 
@@ -293,3 +293,58 @@ npm run test:rules
 来源ISS-2026-11-02-007 / DEF-2026-11-02-004，关联RP-050。用户手动模型试运行9427d4c8已返回两条，失败为BUSINESS_ASSERTION_FAILED；原样例无assertions，默认expected整份精确比较。只修该示例配置：保留指令、输入输出Schema及expected，通过检出/保存/检入添加13项字段断言（条目数、编号、来源、查询/导出/Excel、待澄清）。离线持久化输出回放从失败转通过，6组反例仍失败；之后真实重测，不改通用比较规则、不自动发布。
 
 **B7验证记录（2026-11-02）：** 通过3006原用户示例检出/保存/检入为SK-767c8165-VB.2，真实kimi-k3证明5591c9ae-2c76-4810-b6dd-46031d05e61e通过：1次模型、252输出Tokens、11458ms、0工具。只读PG深比较确认仅examples[0].assertions新增13项，原指令、Schema、expected均保留；revision13、checked_in、active=null、复核/发布事件均0。原9427d4c8失败证明仍在，UI标记已过期。持久化输出离线回放由失败转通过，6组错误反例仍被拒绝。配置修正不改代码或通用比较语义；未重跑无关全量代码测试，不替代B用户最终验收，C/D未启动。问题ISS-2026-11-02-007 / DEF-2026-11-02-004待用户复核。
+
+### B批用户验收完成 / C批启动（2026-11-02）
+
+用户原文：“手动验证完了，下一步”。按上下文确认B批独立试运行发布及示例断言修正验收完成，关闭ISS-2026-11-02-006/007及DEF-2026-11-02-003/004人工复核；RP-050整体仍实施中。该确认不执行任何Skill审核、发布或回滚，不等于MVP通过。3006继续使用B冻结构建，3004不重启，模型配置不改。C实现分支codex/wes-skills-c，复用现有隔离工作区，主目录其他改动保持；不推送。
+
+### C批精细工单（顺序执行，各项独立复核）
+
+1. C1 执行清单：服务端解析生效Skill/Workflow、固定依赖及资料正文，提供同事务解析接缝；本子项不接工作台或真实运行。
+2. C2 Harness接入：在createQueuedRun现事务内解析/保存清单；既有Worker注册表接适配器，四类节点、等待原契约、确认内容hash、步骤幂等和实时权限/紧急禁用。使用现有Run/事件/检查点/输出。
+3. C3 工作台：单表面选择/推荐/启动、字段补齐、等待回答/确认、重试/停止与版本追溯；保留普通对话，所有入口共用服务端调用服务。先执行UI技能服务和项目UI技能，分小提交。
+4. C4 联调与验收：真实两版等待对照、离页/刷新恢复、权限收紧、重复确认不重复写入及旧功能回归，更新OpenAPI/说明和总看板，用户验收前不进入D。
+
+#### C1责任、接口与验证
+
+新增execution-manifest.types.ts、execution-manifest.ts、execution-manifest-pg.repository.ts及对应纯/真实PG测试、test-helpers/execution-database-guard.ts纯测试连接守卫，目录apps/api/src/modules/skills；仅修改skills.module.ts导出、workflows.module.ts导出既有校验器以遵守跨域边界、apps/api/package.json测试枚举及test-helpers/single-doc-serial-scope.drift.test.ts共享写表测试登记。生产和测试合计超过1000行则拆分C1a/C1b。暂不修改Harness/API/UI/DB schema。
+
+```ts
+type ExecutionRequest =
+  | { kind: 'skill'; skillId: string; input: unknown; sources?: SourceReference[] }
+  | { kind: 'workflow'; workflowId: string; input: unknown; sources?: SourceReference[] };
+interface PreparedExecution {
+  resolveInTransaction(tx: ExecutionDbExecutor): Promise<ExecutionManifest>;
+}
+// 服务端依赖注入：发布定义、当前身份/工具/模型/资料解析；客户端不得传定义、版本或清单。
+prepareExecution(request: unknown, user: AuthUser): Promise<PreparedExecution>;
+```
+
+清单含schemaVersion、kind、目标id/version/hash、完整定义、各步骤准确Skill定义/版本/hash、初始输入和来源、服务端资料正文/version/digest、非敏感模型配置、原生工具与策略摘要、manifestHash。template/rule实际绑定尚无解析入口，assetBindings显式空数组，不声称已冻结业务资产。清单只含受限JSON，拒绝危险属性、凭据键、超限正文；原输入作为业务数据必须按既有JSON安全边界处理，不得随意删合法字段。恢复读函数验证清单形状/hash/内部版本对应且不访问latest；清单hash只防意外篡改，不能作为外部提交的授权凭证。
+
+- [x] RED：拒绝额外definition/version/hash/manifest和伪造ID、草稿/未发布/停用/归档，当前业务角色不满足Workflow或任一Skill时拒绝，输入不符合冻结Schema时拒绝。
+- [x] GREEN：事务外prepare完成模型/工具/资料读取；resolveInTransaction仅使用传入executor，Workflow根SHARE后按ID排序Skill根SHARE，完整复核版本/hash/依赖及authority fence，不嵌套DB/外部I/O。准备后切版返回明确冲突供重试，不返回混合清单。
+- [x] 真实PG：并发切换Skill/Workflow指针及依赖；成功值完整旧或新版，停用竞争明确拒绝或先前完整快照；调用方事务回滚不留下额外记录；max=1连接池不死锁。测试双URL只到workload_eval_test，串行执行，0skip。
+- [x] 恢复：原清单脱离当前仓储仍可读取，原Schema与资料正文保留；篡改hash、内部依赖不一致和未知schemaVersion拒绝。普通停用不改变旧清单；实时执行授权属于C2，不能因此宣称已可运行。
+- [x] 定向GREEN、test:modules、build:api通过；先规格审查后五轴质量审查，总看板回填。真实模型未调用、运行入队/等待/确认/UI仍待C2/C3，不用纯解析结果冒充C批完成。
+
+#### C2接入前实取与执行约束（2026-11-02）
+
+- createQueuedRun当前写死workbench_chat，继续保留同会话活动唯一约束；业务目标使用固定适配器workflowId/version，实际Skill/流程版本由executionConfig.executionManifest承载，不增加第二Run库或通过新增runKind绕开约束。
+- submitRunInput当前只检查waiting/JSON，confirmRunAction只按actionId查重；C2必须在同一Run锁事务内验证待答节点/occurrence/原契约/manifestHash及产物、参数hash，错误回答和旧确认不得推进。暂停时检查点和waiting事实同事务保存。
+- Worker的recordToolEffectOnce为execute后记账；retryRun又新建Run且不继承检查点。稳定业务operation key必须沿重试血缘/节点/迭代保留；本地写工具未补持久幂等适配时拒绝自动执行，不以外层effect记录冒充恰好一次。远端写工具结果不确定则等待人工核对，不自动重放；首版不扩展所有MCP写工具恢复能力。
+- 现Skill/Workflow没有紧急禁用字段/API。按已批准设计补独立管理员动作与原因/时间审计；解除后需要人工重试，不自动恢复写操作。普通enabled=false仅阻止新启动，已入队任务继续受当前权限约束。
+- 当前manifest模型仅保存baseUrlDigest；执行前核对provider/endpoint与冻结快照一致后取当前凭据，不重解析scenario替换原model。配置不一致进入明确等待/失败，不能静默换模型。
+- C1来源ID只做形状与冻结，不代表访问授权；C2启动必须校验file/conversation来源属于当前用户可访问会话/附件。模板/规则业务绑定属于D的真实解析，不把assetBindings=[]描述成已固定。
+
+C2拆为独立审查单元：a.1统一调用服务与同tx入队（skills.invocation、Harness仓储/usecase）；a.2固定适配器注册与存量清单恢复（business-skills.workflow、harness-boot）；b.1纯四类节点解释器（workflows.runtime-adapter）；b.2单次生产Skill执行与预算（skills.execution，不复用遍历样例的evaluateSkill）；c.1原契约等待/确认（business-skills.wait）；c.2实时授权与紧急禁用（skills.execution-authority及独立API/迁移）；c.3本地写工具持久幂等；c.4统一视图从既有Run事件/输出派生。各单元代码与测试目标500–850行，超过999行先再拆。C1仅是前置能力，不代替上述子项。
+
+**C1复核中记录：** 基线modules685/685；新增行为RED先5失败，恢复契约与资料对应、Workflow工具快照及CI可达性继续补充反例。首轮候选父代理实跑31/31、modules708/708、serial-store194/194及API构建通过；独立质量复核随后发现CI连接串硬编码/凭据断言和Workflow工具恢复完整性、跨域导出边界，正在按RED/GREEN修正，前述本机通过不等于最终候选或CI通过。依赖审计仍45项既有基线（32moderate/12high/1critical），本批未改依赖或lockfile。
+
+**B验收后只读实取：** 原需求拆解Skill当前VB.2 / published / checked_in / revision15，生效指针为3af83d1d-b0cf-47b0-87f0-f599d5d4fa1e；与上次复测时的未发布状态不同。B验收样例仍工作VC.1/生效VB.0；另有用户新增第三个草稿Skill。此次仅查询，不修改任一记录或服务；不将先前“未发布”快照当作当前状态。
+
+**C1最终回填（2026-11-02）：** 运行清单组件已实现，独立规格与五轴质量复核均APPROVE。固定生效Skill或Workflow及精确Skill依赖、输入Schema、初始输入/来源、准确资料正文/version/digest、非敏感模型/工具/策略快照；事务回调只使用传入executor，当前身份/发布状态/authority fence复核，恢复只读存量清单并验证完整shape与内部对应。没有接通Harness入队/Worker/HTTP/UI，也未调用模型或业务工具；来源ID尚需C2验证所属会话，assetBindings=[]不代表模板/规则版本已固定。
+
+父代理最终实跑：test:execution-manifest 44/44、test:modules 721/721，0fail/0skip（/tmp/wes-skills-c-delivery）；串行test:modules:serial-store 194/194，0fail/0skip（/tmp/wes-skills-c-final-reviewed/test:modules:serial-store.log），API构建通过，定向secret-scan零命中。最后只将3处静态假凭据测试值改为本地randomUUID，未弱化断言/扫描；重跑44与721通过，质量复核确认原APPROVE保持。CI未执行，不将本机通过写为远端CI绿。C1 PG已接CI可达serial-store与守卫16项，测试库纯guard兼容本机/CI/容器且错误不含env值，不读取KEK。六个新增文件约665行，未新增依赖或迁移。
+
+复核发现及闭合：整份hash不能代替内部契约一致性，已补模型字段缺失、未知工具、资料A/A替代A/B、非文本正文、Workflow工具缺字段/假依赖/坏hash的RED和明确拒绝；CI路径首轮695/696因PG测试零引用失败，已登记修复；本机固定URL/KEK断言问题亦修正。旧失败证据保留。下一项C2a.1将resolveInTransaction接入createQueuedRun同事务，随后按C2工单完成等待/确认、真实执行与持久幂等，再开放C3界面验证；D未启动。
