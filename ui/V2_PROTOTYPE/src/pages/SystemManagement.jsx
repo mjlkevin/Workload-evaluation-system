@@ -1,3 +1,4 @@
+import SkillsSection from './system/SkillsSection.jsx'
 import TestResultsSection from './system/TestResultsSection.jsx'
 import ModelConfigurationSection from './system/ModelConfigurationSection.jsx'
 import TemplatesSection from './system/TemplatesSection.jsx'
@@ -703,6 +704,8 @@ export default function SystemManagement({ sectionId }) {
         {activeSectionId === 'memory' && (
           <MemoryManagementPanel />
         )}
+
+        {activeSectionId === 'skills' && <SkillsSection />}
 
         {activeSectionId === 'tools' && (
           <AiToolInventoryPanel />

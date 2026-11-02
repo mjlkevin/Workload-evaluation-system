@@ -1,5 +1,9 @@
 # Modules Refactor Guide
 
+## 新业务域：skills（2026-11-02，A 批）
+
+独立 controller/usecase/repository 与 PostgreSQL 三表（定义、版本、修订审计），由 `/api/v1/skills` 管理端接入。所有读写均 JWT 且仅 admin；不复用 assessment VersionType。仓储保护检出所有者、revision 并发及发布/审计历史；Schema 和原生工具参数映射静态校验，生产 publish 恒返回 409。后续流程/工作台执行不在本批范围。
+
 该目录用于承载"领域模块化重构"后的实现，目标是在**不改变外部接口契约**的前提下提升可维护性。
 
 ## 迁移原则

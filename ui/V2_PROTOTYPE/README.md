@@ -1,5 +1,9 @@
 # WES V2 Prototype Sandbox
 
+## 业务 Skill 管理 A 批（2026-11-02）
+
+管理员入口 `/system/ai/skills`：完整定义、Schema、工具/模型/样例配置、版本检出检入和历史审计。JSON 错误不写入，保存冲突保留输入，归档可刷新后恢复。复用系统对象清单及可拖拽 Dialog。正式发布禁用；模型试运行、流程组装和工作台调用尚未接入。
+
 ## 如何打开
 
 直接用浏览器打开 `ui/V2_PROTOTYPE/pages/index.html`，即可进入导航中心，逐页验收。

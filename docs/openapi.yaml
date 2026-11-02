@@ -45,11 +45,582 @@ tags:
   - name: DevAssessment
   - name: Change
   - name: History
+  - name: Skills
 
 security:
   - bearerAuth: []
 
 paths:
+  /api/v1/skills:
+    get:
+      tags:
+      - Skills
+      summary: Skill管理清单（不提供普通用户可执行目录）
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - items
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SkillRecord'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      parameters:
+      - name: includeArchived
+        in: query
+        schema:
+          type: boolean
+          default: false
+    post:
+      tags:
+      - Skills
+      summary: 创建已检入草稿，无生效版本
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '201':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - definition
+              properties:
+                definition:
+                  $ref: '#/components/schemas/SkillDefinition'
+  /api/v1/skills/metadata:
+    get:
+      tags:
+      - Skills
+      summary: 管理元数据与实时注册工具的原生参数
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - tools
+                    - viewerId
+                    - roles
+                    - modelScenarios
+                    - publishAvailable
+                    properties:
+                      tools:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required:
+                          - name
+                          - description
+                          - parameters
+                          - mutates
+                          - exfiltrates
+                          properties:
+                            name:
+                              type: string
+                            description:
+                              type: string
+                            parameters:
+                              type: object
+                              additionalProperties: true
+                            mutates:
+                              type: boolean
+                            exfiltrates:
+                              type: boolean
+                      viewerId:
+                        type: string
+                      roles:
+                        type: array
+                        items:
+                          type: string
+                      modelScenarios:
+                        type: array
+                        items:
+                          type: string
+                      publishAvailable:
+                        const: false
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+  /api/v1/skills/validate:
+    post:
+      tags:
+      - Skills
+      summary: 定义与工具映射静态校验，不执行模型或工具
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - code
+                - message
+                - data
+                properties:
+                  code:
+                    const: 0
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - valid
+                    - releaseReady
+                    - reason
+                    properties:
+                      valid:
+                        const: true
+                      releaseReady:
+                        const: false
+                      reason:
+                        const: SKILL_RELEASE_GATE_PENDING
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - definition
+              properties:
+                definition:
+                  $ref: '#/components/schemas/SkillDefinition'
+  /api/v1/skills/{skillId}:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+      - Skills
+      summary: 读取当前及历史版本与操作审计
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+  /api/v1/skills/{skillId}/save-draft:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    patch:
+      tags:
+      - Skills
+      summary: 仅当前检出人保存；revision不匹配返回409
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              - definition
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                definition:
+                  $ref: '#/components/schemas/SkillDefinition'
+  /api/v1/skills/{skillId}/status:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    patch:
+      tags:
+      - Skills
+      summary: 启停或归档；至少一个布尔状态，归档会停用
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - revision
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                enabled:
+                  type: boolean
+                archived:
+                  type: boolean
+  /api/v1/skills/{skillId}/checkout:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 检出当前草稿
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/checkin:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 检入并递增小版本
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/undo-checkout:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 撤销并恢复最近检入快照
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/promote:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 保留历史并创建下一主版本草稿
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/force-unlock:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: 管理员强制解锁并恢复检入快照
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecordResponse'
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
+  /api/v1/skills/{skillId}/publish:
+    parameters:
+    - name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Skills
+      summary: A批恒拒绝正式发布，等待B批测试与审核门槛
+      description: 需要有效JWT且账号角色为admin；不接受前端操作者或发布证明。
+      responses:
+        '400':
+          $ref: '#/components/responses/SkillFailure'
+        '401':
+          $ref: '#/components/responses/SkillFailure'
+        '403':
+          $ref: '#/components/responses/SkillFailure'
+        '404':
+          $ref: '#/components/responses/SkillFailure'
+        '409':
+          $ref: '#/components/responses/SkillFailure'
+        '500':
+          $ref: '#/components/responses/SkillFailure'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRevisionInput'
   /api/v1/health:
     get:
       tags: [Health]
@@ -6200,6 +6771,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: "登录 `POST /api/v1/auth/login` 获取 token，请求头 `Authorization: Bearer <token>`"
+  responses:
+    SkillFailure:
+      description: Skill参数、权限、版本或存储错误；errorCode和details给出稳定原因
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SkillError'
   parameters:
     IdempotencyHeader:
       name: Idempotency-Key
@@ -6218,6 +6796,304 @@ components:
       description: 模型供应商标识。
 
   schemas:
+    SkillDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - description
+      - category
+      - instructions
+      - roles
+      - references
+      - inputSchema
+      - outputSchema
+      - model
+      - tools
+      - examples
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        category:
+          type: string
+          minLength: 1
+          maxLength: 80
+        instructions:
+          type: string
+          minLength: 1
+          maxLength: 30000
+        roles:
+          type: array
+          items:
+            enum:
+            - sales
+            - pre_sales
+            - delivery
+            - pm
+            - pmo
+            - dev
+            - admin
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+        references:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - label
+            - uri
+            - version
+            properties:
+              label:
+                type: string
+              uri:
+                type: string
+              version:
+                type: string
+          maxItems: 30
+        inputSchema:
+          type: object
+          additionalProperties: true
+        outputSchema:
+          type: object
+          additionalProperties: true
+        model:
+          type: object
+          additionalProperties: false
+          required:
+          - scenario
+          - temperature
+          - maxTokens
+          - timeoutMs
+          properties:
+            scenario:
+              enum:
+              - assessment
+              - fileParsing
+              - generation
+            temperature:
+              type: number
+              minimum: 0
+              maximum: 2
+            maxTokens:
+              type: integer
+              minimum: 1
+              maximum: 64000
+            timeoutMs:
+              type: integer
+              minimum: 1000
+              maximum: 300000
+        tools:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - toolName
+            - inputMapping
+            - requiresConfirmation
+            properties:
+              toolName:
+                type: string
+              inputMapping:
+                type: object
+                additionalProperties:
+                  type: string
+              requiresConfirmation:
+                type: boolean
+          maxItems: 30
+        examples:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - title
+            - input
+            - expected
+            properties:
+              title:
+                type: string
+              input: {}
+              expected: {}
+          maxItems: 30
+      description: 管理员完整定义。整体不超过128000字节；输入输出根类型object，受限JSON Schema、本地非递归引用；工具映射须能证明兼容完整原生Schema。未知约束、远程引用和pattern拒绝。
+    SkillVersion:
+      type: object
+      additionalProperties: false
+      required:
+      - skillVersionId
+      - versionCode
+      - majorLetter
+      - minorNumber
+      - status
+      - checkoutStatus
+      - checkedOutBy
+      - definition
+      - hash
+      - lastCheckinDefinition
+      - createdAt
+      - updatedAt
+      properties:
+        skillVersionId:
+          type: string
+        versionCode:
+          type: string
+        majorLetter:
+          type: string
+        minorNumber:
+          type: integer
+          minimum: 0
+        status:
+          enum:
+          - draft
+          - reviewed
+          - published
+        checkoutStatus:
+          enum:
+          - checked_in
+          - checked_out
+        checkedOutBy:
+          type:
+          - string
+          - 'null'
+        definition:
+          $ref: '#/components/schemas/SkillDefinition'
+        hash:
+          type: string
+        lastCheckinDefinition:
+          $ref: '#/components/schemas/SkillDefinition'
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    SkillRecord:
+      type: object
+      additionalProperties: false
+      required:
+      - skillId
+      - enabled
+      - archived
+      - activeVersionId
+      - currentVersionId
+      - revision
+      - versions
+      - audit
+      - createdAt
+      - updatedAt
+      properties:
+        skillId:
+          type: string
+        enabled:
+          type: boolean
+        archived:
+          type: boolean
+        activeVersionId:
+          type:
+          - string
+          - 'null'
+        currentVersionId:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillVersion'
+        audit:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - id
+            - action
+            - actorId
+            - actorName
+            - createdAt
+            - versionId
+            properties:
+              id:
+                type: string
+              action:
+                type: string
+              actorId:
+                type: string
+              actorName:
+                type: string
+              createdAt:
+                type: string
+              versionId:
+                type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    SkillRecordResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - message
+      - data
+      properties:
+        code:
+          const: 0
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: false
+          required:
+          - record
+          properties:
+            record:
+              $ref: '#/components/schemas/SkillRecord'
+    SkillRevisionInput:
+      type: object
+      additionalProperties: false
+      required:
+      - revision
+      properties:
+        revision:
+          type: integer
+          minimum: 1
+    SkillError:
+      type: object
+      additionalProperties: true
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: 'null'
+        errorCode:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - field
+            - reason
+            properties:
+              field:
+                type: string
+              reason:
+                type: string
     GenericOkResponse:
       type: object
       properties:

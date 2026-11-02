@@ -169,6 +169,20 @@
       "when": 1789400078173,
       "tag": "0023_wandering_lily_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793589686144,
+      "tag": "0024_spooky_violations",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793589771376,
+      "tag": "0025_skills_history_guards",
+      "breakpoints": true
     }
   ]
 }

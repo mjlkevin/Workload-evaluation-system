@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, test } from 'vitest'
@@ -47,6 +47,7 @@ describe('System management navigation', () => {
 
     const navigation = screen.getByRole('navigation', { name: '主导航' })
     expect(within(navigation).getByRole('link', { name: /编码规则/ })).toHaveAttribute('href', '/system/rules/code-rules')
+    expect(within(navigation).getByRole('link', { name: /Skill 管理/ })).toHaveAttribute('href', '/system/ai/skills')
     expect(within(navigation).getByRole('link', { name: /模型配置/ })).toHaveAttribute('href', '/system/ai/model-config')
     expect(within(navigation).getByRole('link', { name: /知识库/ })).toHaveAttribute('href', '/system/ai/knowledge-base')
     expect(within(navigation).getByRole('link', { name: /RateCard/ })).toHaveAttribute('href', '/system/rules/rate-card')
@@ -54,6 +55,13 @@ describe('System management navigation', () => {
     expect(within(navigation).getByRole('link', { name: /模板/ })).toHaveAttribute('href', '/system/rules/templates')
     expect(within(navigation).getByRole('link', { name: /测试结果/ })).toHaveAttribute('href', '/system/ops/test-results')
     expect(within(navigation).getByRole('link', { name: /状态机规则/ })).toHaveAttribute('href', '/system/rules/state-machines')
+  })
+
+  test('Skill 管理可从唯一三级路由到达', async () => {
+    server.use(http.get(`${BASE}/skills`, () => HttpResponse.json({ code: 0, data: { items: [] } })), http.get(`${BASE}/skills/metadata`, () => HttpResponse.json({ code: 0, data: { viewerId: 'admin-1', roles: [], tools: [], modelScenarios: [], publishAvailable: false } })))
+    renderAppAt('/system/ai/skills')
+    expect(await screen.findByRole('heading', { name: 'Skill 管理' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: '新建 Skill' })).toBeEnabled())
   })
 
   test('opens a dedicated page for each system management submodule', async () => {
