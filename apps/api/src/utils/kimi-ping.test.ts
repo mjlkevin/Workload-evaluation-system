@@ -26,6 +26,21 @@ test("pingKimiChatCompletion: K2 模型不发送 temperature，使用 max_comple
   }
 });
 
+test("pingKimiChatCompletion: K3 verification omits unsupported temperature", async () => {
+  const originalFetch = globalThis.fetch;
+  let captured: Record<string, unknown> | undefined;
+  globalThis.fetch = async (_url, init) => {
+    captured = JSON.parse(String(init?.body));
+    if (Object.prototype.hasOwnProperty.call(captured!, "temperature")) return new Response(JSON.stringify({ error: { message: "temperature is not supported for this model" } }), { status: 400 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }], model: "kimi-k3" }), { status: 200 });
+  };
+  try {
+    const result = await pingKimiChatCompletion({ apiUrl: "https://api.moonshot.cn/v1", apiKey: "placeholder", model: "kimi-k3" });
+    assert.equal(result.httpStatus, 200);
+    assert.equal(Object.prototype.hasOwnProperty.call(captured!, "temperature"), false);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("pingKimiChatCompletion: 上游挂起时在限期內中止并抛 timeout", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (_url, init) =>

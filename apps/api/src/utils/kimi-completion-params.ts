@@ -1,7 +1,7 @@
 /**
  * Moonshot / Kimi：部分模型（尤其 thinking / reasoning）仅支持 temperature = 1。
- * K2 系列由平台按 thinking / 非 thinking 模式固定采样参数，不主动发送
- * temperature，避免 K2.5/K2.6/K2.7 请求因 temperature 不兼容失败。
+ * K2 系列及 kimi-k3 由平台固定采样参数，不主动发送 temperature，
+ * 避免请求因 temperature 不兼容失败。
  * @example invalid temperature: only 1 is allowed for this model
  */
 export function resolveKimiCompletionTemperature(modelId: string, preferred: number): number {
@@ -13,7 +13,7 @@ export function resolveKimiCompletionTemperature(modelId: string, preferred: num
 export function resolveKimiCompletionTemperatureParam(modelId: string, preferred: number): number | undefined {
   const id = String(modelId || "").trim().toLowerCase();
   if (!id) return clamp01(preferred);
-  if (isKimiK2Model(id)) return undefined;
+  if (isKimiK2Model(id) || id === "kimi-k3") return undefined;
   if (id.includes("thinking")) return 1;
   return clamp01(preferred);
 }

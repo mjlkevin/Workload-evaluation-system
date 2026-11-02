@@ -199,6 +199,31 @@ test("KimiProvider: caller abort signal cancels the upstream request without ret
   }
 });
 
+for (const streaming of [false, true]) {
+  test(`KimiProvider: K3 ${streaming ? "stream" : "completion"} omits unsupported temperature`, async () => {
+    const originalFetch = globalThis.fetch;
+    let captured: Record<string, unknown> | undefined;
+    globalThis.fetch = async (_url, init) => {
+      captured = JSON.parse(String(init?.body));
+      if (Object.prototype.hasOwnProperty.call(captured!, "temperature")) return new Response(JSON.stringify({ error: { message: "temperature is not supported for this model" } }), { status: 400 });
+      return streaming
+        ? new Response('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { status: 200 })
+        : new Response(JSON.stringify({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }), { status: 200 });
+    };
+    try {
+      const provider = new KimiProvider({ apiKey: "placeholder" });
+      const request = { model: "kimi-k3", temperature: 0.1, messages: [{ role: "user" as const, content: "hello" }], thinking: "disabled" as const, maxCompletionTokens: 128 };
+      if (streaming) {
+        let content = "";
+        for await (const chunk of provider.streamChatCompletion(request)) content += chunk.contentDelta;
+        assert.equal(content, "ok");
+      } else assert.equal((await provider.chatCompletion(request)).content, "ok");
+      assert.equal(Object.prototype.hasOwnProperty.call(captured!, "temperature"), false);
+      assert.equal(captured!.max_completion_tokens, 128);
+    } finally { globalThis.fetch = originalFetch; }
+  });
+}
+
 test("KimiProvider: K2 请求省略 temperature 并透传 Kimi 专属补全参数与 usage", async () => {
   const originalFetch = globalThis.fetch;
   let capturedBody: Record<string, unknown> | undefined;
