@@ -1,7 +1,7 @@
 import { asc, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { db, type Database } from '../../db/client';
-import { skillEvaluations, skillReleaseEvents, skillReleaseReviews } from '../../db/schema';
+import { skillDefinitions, skillVersions, skillEvaluations, skillReleaseEvents, skillReleaseReviews } from '../../db/schema';
 import { createSkillsPgRepository, mutateSkillTransaction, type SkillDbExecutor } from './skills-pg.repository';
 import { schemaFits } from './skills.schema-compatibility';
 import { SkillError, type SkillRecord } from './skills.types';
@@ -36,7 +36,14 @@ export function createSkillReleaseRepository(database: Database = db): SkillRele
   const roots = createSkillsPgRepository(database);
   return {
     async evidence(skillId) { return database.transaction(tx => readEvidence(tx, skillId), { isolationLevel: 'repeatable read', accessMode: 'read only' }); },
-    async getPublishedVersion(skillId, versionId, hash) {
+    async getPublishedVersion(skillId, versionId, hash, executor) {
+      if (executor) {
+        const [root] = await executor.select().from(skillDefinitions).where(eq(skillDefinitions.skillId, skillId));
+        const [row] = await executor.select().from(skillVersions).where(eq(skillVersions.skillVersionId, versionId));
+        if (!root || !row || row.skillId !== skillId || row.status !== 'published' || (hash && row.hash !== hash)) return null;
+        const { skillId: _skillId, position: _position, ...version } = row;
+        return { skillId, enabled: root.enabled, archived: root.archived, version: { ...version, createdAt: version.createdAt.toISOString(), updatedAt: version.updatedAt.toISOString() } };
+      }
       const record = await roots.get(skillId);
       const version = record?.versions.find(v => v.skillVersionId === versionId && v.status === 'published' && (!hash || v.hash === hash));
       return record && version ? { skillId, enabled: record.enabled, archived: record.archived, version } : null;
@@ -58,7 +65,7 @@ export function createSkillReleaseRepository(database: Database = db): SkillRele
       return mutateSkillTransaction(database, skillId, revision, actor, 'review', async (record, now, tx) => {
         requireReleaseCandidate(record);
         if (currentSkillVersion(record).status === 'published') throw new SkillError('SKILL_PUBLISHED_IMMUTABLE', '已发布版本无需重复审核', 409);
-        const contextHash = typeof value.contextHash === 'function' ? await value.contextHash(record) : value.contextHash;
+        const contextHash = typeof value.contextHash === 'function' ? await value.contextHash(record, tx) : value.contextHash;
         const { evaluations } = await readEvidence(tx, skillId);
         const evaluation = evaluations.find(item => item.id === value.evaluationId);
         if (!evaluation || !validEvaluation(evaluation, record, contextHash)) releasePending();
@@ -75,7 +82,7 @@ export function createSkillReleaseRepository(database: Database = db): SkillRele
         requireReleaseCandidate(record);
         const current = currentSkillVersion(record);
         if (current.status !== 'reviewed') releasePending();
-        const contextHash = typeof resolveContext === 'function' ? await resolveContext(record) : resolveContext;
+        const contextHash = typeof resolveContext === 'function' ? await resolveContext(record, tx) : resolveContext;
         const evidence = await readEvidence(tx, skillId);
         const review = [...evidence.reviews].reverse().find(item => item.versionId === current.skillVersionId && item.hash === current.hash && item.contextHash === contextHash);
         const evaluation = evidence.evaluations.find(item => item.id === review?.evaluationId);

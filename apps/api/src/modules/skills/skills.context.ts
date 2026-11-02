@@ -37,8 +37,8 @@ export type SkillResolvedContext = {
   hash: string; snapshot: SkillDependencySnapshot; tools: SkillToolDefinition[]; complete: SkillTrialDependencies['complete']; runReadTool: SkillReadExecutor;
 };
 /** Shared by Skill release and future Workflow publication. Hash includes resolved native/model/reference contracts. */
-export async function resolveSkillDependencyContext(definition: SkillDefinition, user: AuthUser, options: { requireModel?: boolean } = {}): Promise<SkillResolvedContext> {
-  const native = await resolveCurrentSkillTools(user);
+export async function resolveSkillDependencyContext(definition: SkillDefinition, user: AuthUser, options: { requireModel?: boolean; inventory?: Awaited<ReturnType<typeof resolveCurrentSkillTools>> } = {}): Promise<SkillResolvedContext> {
+  const native = options.inventory ?? await resolveCurrentSkillTools(user);
   const contracts = native.tools.map(skillToolContract);
   validateSkillDefinition(definition, contracts);
   const references = await resolveSkillReferences(definition.references, id => getKnowledgeRepository().get(id));

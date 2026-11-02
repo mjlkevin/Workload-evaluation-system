@@ -1,4 +1,6 @@
 import type { AuthUser } from '../../types';
+import { prepareSkillAuthority } from './skills.authority';
+import type { SkillContextResolver } from './skills-release.types';
 import { resolveBusinessRole } from '../../middleware/auth';
 import { evaluateSkill } from './skills.evaluation';
 import { resolveCurrentSkillTools, skillToolContract, type SkillResolvedContext } from './skills.context';
@@ -22,6 +24,15 @@ export function createSkillReleaseService(roots: SkillRepository, release: Skill
     return record;
   };
   const contextHash = async (record: SkillRecord) => (await loadContext(currentSkillVersion(record).definition, user)).hash;
+  const preparedHash = async (id: string, expected: number): Promise<SkillContextResolver> => {
+    const snapshot = await read(id, expected); const version = currentSkillVersion(snapshot);
+    const context = await prepareSkillAuthority(version.definition.references.map(r => r.uri), () => loadContext(version.definition, user));
+    return async (record, tx) => {
+      const current = currentSkillVersion(record);
+      if (current.skillVersionId !== version.skillVersionId || current.hash !== version.hash) throw new SkillError('SKILL_REVISION_CONFLICT', '定义已变化，请重新读取', 409);
+      await context.verify(tx); return context.value.hash;
+    };
+  };
   return {
     async readiness(id: string) {
       const record = await read(id); const version = currentSkillVersion(record);
@@ -33,7 +44,7 @@ export function createSkillReleaseService(roots: SkillRepository, release: Skill
         current: e.hash === version.hash && e.contextHash === hash, result: e.result,
       }));
       const eligible = trials.filter(e => e.current && e.result.releaseEligible && e.result.mode === 'model' && e.result.modelExecuted && e.result.passed);
-      const review = [...evidence.reviews].reverse().find(r => r.versionId === version.skillVersionId && r.hash === version.hash && r.contextHash === hash && eligible.some(e => e.id === r.evaluationId));
+      const review = version.status === 'draft' ? undefined : [...evidence.reviews].reverse().find(r => r.versionId === version.skillVersionId && r.hash === version.hash && r.contextHash === hash && eligible.some(e => e.id === r.evaluationId));
       if (!eligible.length) blockers.push('SKILL_MODEL_TRIAL_REQUIRED');
       if (!review) blockers.push('SKILL_REVIEW_REQUIRED');
       if (version.status === 'published') blockers.push('SKILL_ALREADY_PUBLISHED');
@@ -60,9 +71,9 @@ export function createSkillReleaseService(roots: SkillRepository, release: Skill
     },
     async review(id: string, revision: unknown, evaluationId: unknown, reason: unknown, acknowledgeSimulation: unknown) {
       if (typeof evaluationId !== 'string' || !evaluationId || evaluationId.length > 160 || (acknowledgeSimulation !== undefined && typeof acknowledgeSimulation !== 'boolean')) throw new SkillError('SKILL_INVALID_REQUEST', '审核参数无效');
-      return release.review(id, skillRevision(revision), actor, { evaluationId, reason: releaseReason(reason), acknowledgeSimulation: acknowledgeSimulation as boolean | undefined, contextHash });
+      return release.review(id, skillRevision(revision), actor, { evaluationId, reason: releaseReason(reason), acknowledgeSimulation: acknowledgeSimulation as boolean | undefined, contextHash: await preparedHash(id, skillRevision(revision)) });
     },
-    async publish(id: string, revision: unknown) { return release.publish(id, skillRevision(revision), actor, contextHash); },
+    async publish(id: string, revision: unknown) { return release.publish(id, skillRevision(revision), actor, await preparedHash(id, skillRevision(revision))); },
     async rollback(id: string, revision: unknown, targetVersionId: unknown, reason: unknown) {
       if (typeof targetVersionId !== 'string' || !targetVersionId || targetVersionId.length > 160) throw new SkillError('SKILL_INVALID_REQUEST', '回滚版本无效');
       return release.rollback(id, skillRevision(revision), actor, targetVersionId, releaseReason(reason));

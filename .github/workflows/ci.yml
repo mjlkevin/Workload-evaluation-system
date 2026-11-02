@@ -193,6 +193,12 @@ jobs:
           DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
           TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
 
+      - name: Test workflows (isolated exact Skill dependencies)
+        run: cd apps/api && npm run test:workflows
+        env:
+          DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
+          TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/workload_eval_test
+
       # B1/B2/B3（2026-08-29 架构侧裁决 O1）：单文档表（templates / rule_sets 取「最近写入行」
       # 为活动文档）与无界读表（knowledge_entries.list() 全表读）的测试文件必须串行执行，
       # 否则并发写互相顶掉活动文档 / 打破「空表合法状态」断言。B3（S6）是 B1 的镜像形态：

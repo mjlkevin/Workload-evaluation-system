@@ -8,7 +8,7 @@ import type { SkillToolDefinition } from './skills.validation';
 import type { SkillReleaseRepository } from './skills-release.types';
 import { createSkillReleaseService, type SkillContextLoader } from './skills.release';
 
-export type SkillControllerDeps = { repo: SkillRepository; releaseRepo: SkillReleaseRepository; loadContext: SkillContextLoader; getTools(user: AuthUser): Promise<SkillToolDefinition[]> };
+export type SkillControllerDeps = { repo: SkillRepository; releaseRepo: SkillReleaseRepository; loadContext: SkillContextLoader; getTools(user: AuthUser): Promise<SkillToolDefinition[]>; getInfluences?(skillId: string, skillVersionId?: string): Promise<unknown[]> };
 function body(req: Request, allowed: string[]) {
   const value = req.body;
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !allowed.includes(key))) throw new SkillError('SKILL_INVALID_REQUEST', '请求中包含不支持的字段');
@@ -27,6 +27,11 @@ export function createSkillHandlers(deps: SkillControllerDeps) {
   const actor = (req: Request) => ({ id: req.user!.id, username: req.user!.username });
   const id = (req: Request) => String(req.params.skillId);
   return {
+    influences: handle(async (req, res) => {
+      const version = req.query.skillVersionId;
+      if (version !== undefined && (typeof version !== 'string' || !version || version.length > 160)) throw new SkillError('SKILL_INVALID_REQUEST', '版本参数无效');
+      res.json(ok({ items: await deps.getInfluences!(id(req), version as string | undefined) }));
+    }),
     catalog: handle(async (req, res) => { res.json(ok({ items: await releases(req).catalog() })); }),
     readiness: handle(async (req, res) => { res.json(ok(await releases(req).readiness(id(req)))); }),
     trial: handle(async (req, res) => { const input = body(req, ['revision', 'mode']); res.json(ok(await releases(req).trial(id(req), input.revision, input.mode))); }),

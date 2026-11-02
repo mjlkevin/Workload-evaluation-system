@@ -1,3 +1,4 @@
+import type { SkillDbExecutor } from './skills-pg.repository';
 import type { SkillTrialResult } from './skills.evaluation';
 import type { SkillToolDefinition } from './skills.validation';
 import type { ToolPolicyEntry } from '../../types';
@@ -29,10 +30,10 @@ export type SkillReleaseEvent = {
 export type SkillReleaseEvidence = { evaluations: SkillEvaluation[]; reviews: SkillReleaseReview[]; events: SkillReleaseEvent[] };
 export type SkillPublishedVersion = { skillId: string; enabled: boolean; archived: boolean; version: SkillVersion };
 /** Exact version/hash lookups deliberately do not resolve "latest"; Workflow bindings remain stable. */
-export type SkillContextResolver = string | ((record: SkillRecord) => Promise<string>);
+export type SkillContextResolver = string | ((record: SkillRecord, tx: SkillDbExecutor) => Promise<string>);
 export interface SkillReleaseRepository {
   evidence(skillId: string): Promise<SkillReleaseEvidence>;
-  getPublishedVersion(skillId: string, versionId: string, hash?: string): Promise<SkillPublishedVersion | null>;
+  getPublishedVersion(skillId: string, versionId: string, hash?: string, executor?: SkillDbExecutor): Promise<SkillPublishedVersion | null>;
   appendEvaluation(skillId: string, revision: number, actor: SkillActor,
     value: Pick<SkillEvaluation, 'versionId' | 'hash' | 'contextHash' | 'result'>): Promise<{ record: SkillRecord; evaluation: SkillEvaluation }>;
   review(skillId: string, revision: number, actor: SkillActor,

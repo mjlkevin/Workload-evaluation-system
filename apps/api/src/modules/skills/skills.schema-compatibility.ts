@@ -24,7 +24,7 @@ function same(a: unknown, b: unknown): boolean {
 
 /** Prove the supported source schema is no broader than the native parameter schema. Unknown constraints fail closed. */
 export function schemaFits(source: Schema, target: Schema, sourceRoot: Schema, targetRoot: Schema, depth = 0): boolean {
-  if (depth > 16) return false;
+  if (depth > 16 || !source || typeof source !== 'object' || Array.isArray(source) || !target || typeof target !== 'object' || Array.isArray(target)) return false;
   const s = resolve(source, sourceRoot); const t = resolve(target, targetRoot);
   if (!s || !t) return false;
   if (s !== source || t !== target) return schemaFits(s, t, sourceRoot, targetRoot, depth + 1);

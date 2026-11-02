@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createWorkflowsPgRepository } from '../modules/workflows/workflows.module';
 import { requireCapability, requireAuthenticated } from '../rbac/middleware';
 import { resolveCurrentSkillTools, resolveSkillDependencyContext, skillToolContract } from '../modules/skills/skills.context';
 import { createSkillReleaseRepository } from '../modules/skills/skills-release.repository';
@@ -7,6 +8,7 @@ import { createSkillHandlers, createSkillsPgRepository, type SkillControllerDeps
 export function createSkillsRouter(deps?: Partial<SkillControllerDeps>): Router {
   const router = Router();
   const handlers = createSkillHandlers({
+    getInfluences: deps?.getInfluences ?? ((skillId, versionId) => createWorkflowsPgRepository().influences(skillId, versionId)),
     repo: deps?.repo ?? createSkillsPgRepository(),
     releaseRepo: deps?.releaseRepo ?? createSkillReleaseRepository(),
     loadContext: deps?.loadContext ?? resolveSkillDependencyContext,
@@ -23,6 +25,7 @@ export function createSkillsRouter(deps?: Partial<SkillControllerDeps>): Router 
   router.get('/metadata', handlers.metadata);
   router.post('/validate', handlers.validate);
   router.post('/', handlers.create);
+  router.get('/:skillId/influences', handlers.influences);
   router.get('/:skillId/release', handlers.readiness);
   router.post('/:skillId/trial', handlers.trial);
   router.post('/:skillId/review', handlers.review);

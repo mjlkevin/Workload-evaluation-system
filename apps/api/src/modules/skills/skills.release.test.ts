@@ -91,3 +91,12 @@ test('read executor refreshes identity before native execution; disabled or chan
   const changed = createSkillReadExecutor(user, [skillToolContract(tool)], async () => ({ ...await inventory(), tools: [{ ...tool, parameters: { type: 'object', required: ['newField'] } }] }), async () => user);
   await assert.rejects(changed(tool.name, {}, new AbortController().signal)); assert.equal(calls, 1);
 });
+test('readiness cannot reuse a historical same-hash review after undo resets the current version to draft', async () => {
+  const r = record(); const version = r.versions[0];
+  const evaluation = { id: 'old-evaluation', skillId: r.skillId, versionId: version.skillVersionId, hash: version.hash, contextHash: 'ctx', snapshotRevision: 1, actorId: user.id, createdAt: '', result: { releaseEligible: true, mode: 'model', modelExecuted: true, passed: true } };
+  const review = { id: 'old-review', skillId: r.skillId, versionId: version.skillVersionId, evaluationId: evaluation.id, hash: version.hash, contextHash: 'ctx', reason: 'old same-hash review', acknowledgedSimulation: false, actorId: user.id, createdAt: '' };
+  const roots = { get: async () => r } as unknown as SkillRepository;
+  const release = { evidence: async () => ({ evaluations: [evaluation], reviews: [review], events: [] }) } as unknown as SkillReleaseRepository;
+  const service = createSkillReleaseService(roots, release, async () => ({ hash: 'ctx' } as never), user);
+  const readiness = await service.readiness(r.skillId); assert.equal(readiness.publishAvailable, false); assert.ok(readiness.blockers.includes('SKILL_REVIEW_REQUIRED')); assert.equal(readiness.review, null);
+});

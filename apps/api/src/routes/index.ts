@@ -4,6 +4,7 @@
 
 import { Router } from "express";
 import { createSkillsRouter } from "./skills.routes";
+import { createWorkflowsRouter } from "./workflows.routes";
 
 import authRoutes from "./auth.routes";
 import versionsRoutes from "./versions.routes";
@@ -42,6 +43,7 @@ import { getIndustryRepository, getProductMasterDataRepository } from "../module
 
 const router = Router();
 router.use('/skills', createSkillsRouter());
+router.use('/workflows', createWorkflowsRouter());
 
 // RP-047 Batch C：异步 Run API 接线（flag 读取点收敛于此，D2）
 const durableRunsEnabled = isDurableRunsEnabledFromEnv();
