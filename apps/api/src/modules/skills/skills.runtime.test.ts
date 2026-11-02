@@ -18,17 +18,17 @@ test('trusted simulation-only remote read never reaches executor and records its
 });
 test('model adapter uses existing provider with bounded request, tool messages and no expected/reasoning persistence', async () => {
   let sent!: ChatCompletionRequest;
-  const complete = createSkillModelAdapter({ scenario: { providerId: 'moonshot', providerName: 'Moonshot', baseUrl: 'https://model.test/v1', model: 'kimi-test', modelSource: 'binding', credentialScope: 'kimi' }, apiKey: 'private-credential', referenceContent: 'reference-data',
+  const complete = createSkillModelAdapter({ scenario: { providerId: 'moonshot', providerName: 'Moonshot', baseUrl: 'https://model.test/v1', model: 'kimi-test', modelSource: 'binding', credentialScope: 'kimi' }, apiKey: 'placeholder', referenceContent: 'reference-data',
     provider: { chatCompletion: async request => { sent = request; return { content: '{"ok":true}', rawContent: '{"ok":true}', model: 'kimi-test', provider: 'kimi', attempts: 1, usage: { completionTokens: 5, promptTokens: 10, totalTokens: 15 }, reasoningContent: 'NEVER_STORE_REASONING' }; } } });
   const signal = new AbortController().signal;
   const result = await complete({ instructions: definition.instructions, input: { q: 'hello' }, outputSchema: definition.outputSchema, model: definition.model, tools: [], toolResults: [{ callId: 'call-1', toolName: 'remote', arguments: { q: 'hello' }, result: { dryRun: true }, simulated: true }], signal });
   assert.deepEqual(result.output, { ok: true }); assert.equal(result.usage.outputTokens, 5);
   assert.equal(sent.maxAttempts, 1); assert.equal(sent.maxCompletionTokens, 80); assert.equal(sent.abortSignal, signal); assert.equal(sent.thinking, 'disabled');
-  assert.equal(sent.credentialsOverride!.apiKey, 'private-credential');
+  assert.equal(sent.credentialsOverride!.apiKey, 'placeholder');
   assert.equal(sent.messages[2].role, 'assistant'); assert.equal(sent.messages[2].tool_calls![0].id, 'call-1');
   assert.equal(sent.messages[3].tool_call_id, 'call-1');
   assert.equal(JSON.stringify(sent.messages).includes('NEVER_SEND_EXPECTED'), false);
-  assert.equal(JSON.stringify(result).includes('private-credential'), false); assert.equal(JSON.stringify(result).includes('NEVER_STORE_REASONING'), false);
+  assert.equal(JSON.stringify(result).includes('placeholder'), false); assert.equal(JSON.stringify(result).includes('NEVER_STORE_REASONING'), false);
   assert.equal(JSON.stringify(sent.messages).includes('reference-data'), true);
 });
 test('references resolve only active internal exact versions and bound content contributes digest', async () => {
