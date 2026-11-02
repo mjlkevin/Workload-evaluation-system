@@ -483,3 +483,22 @@ test('回滚确认内 Tab 保持焦点，Escape 只取消确认并保留详情�
   expect(within(dialog).getByLabelText('回滚目标')).toHaveValue('v0')
   expect(opener).toHaveFocus()
 })
+
+test('模型请求进行中显示处理中，不误报冲突或要求关闭；失败后保留错误与刷新提示', async () => {
+  server.use(http.post(`${BASE}/:id/trial`, async () => {
+    await delay(120)
+    return HttpResponse.json({ code: 50301, message: '模型服务暂不可用，请稍后重试' }, { status: 503 })
+  }))
+  const dialog = await open()
+  const start = within(dialog).getByRole('button', { name: '模型试运行' })
+  await waitFor(() => expect(start).toBeEnabled())
+  fireEvent.click(start)
+  expect(within(dialog).getByRole('button', { name: '关闭' })).toBeDisabled()
+  expect(within(dialog).queryByText(/发布状态与当前记录不一致/)).not.toBeInTheDocument()
+  expect(within(dialog).queryByText(/请关闭后重新读取 Skill/)).not.toBeInTheDocument()
+  expect(within(dialog).getByRole('status')).toHaveTextContent('正在处理，请稍候…')
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('模型服务暂不可用')
+  expect(within(dialog).getByRole('button', { name: '刷新发布状态' })).toBeEnabled()
+  expect(within(dialog).getByText(/发布状态与当前记录不一致/)).toHaveTextContent('请刷新发布状态')
+  expect(within(dialog).getByRole('button', { name: '关闭' })).toBeEnabled()
+})

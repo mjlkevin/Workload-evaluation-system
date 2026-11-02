@@ -45,8 +45,9 @@ export default function SkillReleasePanel({ record, version, dirty, busy, setBus
     <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="m-0 text-base font-semibold text-ink">试运行与发布</h3><button type="button" className={systemButton} onClick={release.reload} disabled={busy || dirty || release.loading}>刷新发布状态</button></div>
     <p className="m-0 text-sm text-ink-2 wrap-anywhere">当前工作版本：{record.versions.find(item => item.skillVersionId === record.currentVersionId)?.versionCode} · 当前生效版本：{activeVersion?.versionCode || '无'}</p>
     {historical ? <p className="m-0 text-sm text-ink-2">历史版本只读。试运行接口仅提供当前版本记录，历史证据暂不可在此读取。</p> : <>
-      {release.loading && <p role="status" className="m-0 text-sm text-ink-2">正在核对发布状态…</p>}
-      {!release.loading && readiness && !release.exact && <p className="m-0 text-sm text-warn-ink">发布状态与当前记录不一致，请关闭后重新读取 Skill。</p>}
+      {busy && <p role="status" className="m-0 text-sm text-ink-2">正在处理，请稍候…</p>}
+      {!busy && release.loading && <p role="status" className="m-0 text-sm text-ink-2">正在核对发布状态…</p>}
+      {!busy && !release.loading && readiness && !release.exact && <p className="m-0 text-sm text-warn-ink">发布状态与当前记录不一致，请刷新发布状态；若仍有冲突，请关闭后重新读取 Skill。</p>}
       {dirty && <p className="m-0 text-sm text-warn-ink">请先保存草稿，再试运行、复核或发布。</p>}
       <div className="flex flex-wrap gap-2"><button type="button" className={systemPrimaryButton} onClick={() => mutate('trial', { mode: 'model' })} disabled={blocked || release.loading}>模型试运行</button><button type="button" className={systemButton} onClick={() => mutate('trial', { mode: 'simulation' })} disabled={blocked || release.loading}>样例模拟</button></div>
       <p className="m-0 text-xs text-ink-2">模拟使用样例期望值，不能作为发布证明；模型试运行中的写入、外发工具仅模拟执行。</p>
