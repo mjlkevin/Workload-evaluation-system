@@ -11,7 +11,7 @@ const jsonFields = [
   ['inputSchema', '输入 Schema', '对象 Schema：type 为 object；支持本地非递归引用'],
   ['outputSchema', '输出 Schema', '对象 Schema：type 为 object；支持本地非递归引用'],
   ['tools', '工具配置', '数组：toolName、inputMapping（原生参数名 → $.输入字段）、requiresConfirmation'],
-  ['examples', '样例', '数组：title、input、expected'],
+  ['examples', '样例', '数组：title、input、expected；可选 assertions（path、op、value）'],
 ]
 export function toSkillForm(definition) {
   return { ...definition, ...Object.fromEntries(jsonFields.map(([key]) => [key, JSON.stringify(definition[key], null, 2)])) }

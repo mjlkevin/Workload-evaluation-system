@@ -28,7 +28,7 @@ export const SYSTEM_MANAGEMENT_SECTIONS = [
   { id: 'model', groupId: 'ai', route: '/system/ai/model-config', label: '模型配置', icon: 'M', subtitle: '接入模型供应商、绑定业务场景并按模型能力配置参数' },
   { id: 'kb', groupId: 'ai', route: '/system/ai/knowledge-base', label: '知识库', icon: 'K', subtitle: '智谱知识库接入与连通性验证' },
   { id: 'kbRetrieval', groupId: 'ai', route: '/system/ai/kb-retrieval', label: '检索诊断', icon: '检', subtitle: '本地知识库中文检索基线诊断与试查' },
-  { id: 'skills', groupId: 'ai', route: '/system/ai/skills', label: 'Skill 管理', icon: '技', subtitle: '维护完整 Skill 定义、编辑锁、版本与审计；发布待测试审核门禁' },
+  { id: 'skills', groupId: 'ai', route: '/system/ai/skills', label: 'Skill 管理', icon: '技', subtitle: '维护 Skill 定义、试运行与复核；发布、回滚及固定版本影响可追溯' },
   { id: 'tools', groupId: 'ai', route: '/system/ai/tools', label: '工具策略', icon: '⚒', subtitle: 'AI 工具清单（代码派生·只读）与启用/可见/审批/注入策略' },
   { id: 'memory', groupId: 'ai', route: '/system/ai/memory', label: '记忆管理', icon: '忆', subtitle: 'AI 工作台跨会话记忆查看与确认' },
   // —— 运行与审计 ——

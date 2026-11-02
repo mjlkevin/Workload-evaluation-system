@@ -3,6 +3,7 @@ import { skillsApi } from '../../api/skills.js'
 import useSkillManagement from '../../hooks/useSkillManagement.js'
 import SystemObjectList, { SystemBadge, systemButton, systemInput, systemPrimaryButton, systemTextButton } from '../../components/system/SystemObjectList.jsx'
 import SystemObjectDialog from '../../components/system/SystemObjectDialog.jsx'
+import SkillReleasePanel from './SkillReleasePanel.jsx'
 import SkillDefinitionEditor, { defaultSkillDefinition, parseSkillForm, toSkillForm } from './SkillDefinitionEditor.jsx'
 
 const currentVersion = (record) => record.versions.find((version) => version.skillVersionId === record.currentVersionId)
@@ -60,7 +61,7 @@ export default function SkillsSection() {
             : action === 'status' ? await skillsApi.status(record.skillId, record.revision, status)
               : await skillsApi.action(record.skillId, action, record.revision)
       if (result.data.record) replaceRecord(result.data.record)
-      setNotice(action === 'validate' ? '结构校验通过；样例测试与审核门禁尚未完成，暂不可发布。' : '操作成功，已显示服务器保存的状态。')
+      setNotice(action === 'validate' ? '结构校验通过；请继续模型试运行与复核。' : '操作成功，已显示服务器保存的状态。')
       setConfirm(null)
     } catch (cause) {
       setErrorField(definitionField(cause.details?.[0]?.field || cause.details?.[0]?.path))
@@ -85,11 +86,10 @@ export default function SkillsSection() {
       {mine && version?.status === 'draft' && !record?.archived && <><button type="button" className={systemButton} onClick={() => run('validate')} disabled={busy}>校验定义</button><button type="button" className={systemPrimaryButton} onClick={() => run('save')} disabled={busy}>保存草稿</button><button type="button" className={systemButton} onClick={() => run('checkin')} disabled={busy || dirty} title={dirty ? '请先保存草稿再检入' : undefined}>检入</button><button type="button" className={systemButton} onClick={() => setConfirm({ action: 'undo-checkout', title: '撤销检出', description: '将恢复最近检入的定义，丢弃本次检出期间的修改。' })} disabled={busy}>撤销检出</button></>}
       {version?.checkoutStatus === 'checked_in' && !record?.archived && <button type="button" className={systemButton} onClick={() => run('promote')} disabled={busy}>升版</button>}
       {version?.checkoutStatus === 'checked_out' && !mine && <button type="button" className={systemButton} onClick={() => setConfirm({ action: 'force-unlock', title: '管理员强制解锁', description: '将释放他人的编辑锁并保留审计记录。' })} disabled={busy}>管理员强制解锁</button>}
-      <button type="button" className={systemButton} disabled aria-describedby="skill-publish-gate">发布</button>
     </>}</div>}>
       {form && metadata && <div className="min-w-0 space-y-5">
         {record && <div className="flex flex-wrap items-center gap-3"><label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-ink-2">查看版本<select className={systemInput} value={selectedVersionId} disabled={busy || dirty} title={dirty ? '请先保存或关闭并放弃修改，再切换版本' : undefined} onChange={(e) => { setSelectedVersionId(e.target.value); install(record.versions.find((item) => item.skillVersionId === e.target.value).definition); setActionError(''); setNotice('') }}>{record.versions.map((item) => <option key={item.skillVersionId} value={item.skillVersionId}>{item.versionCode}{item.skillVersionId === record.currentVersionId ? ' · 当前' : ' · 历史'}</option>)}</select></label><SystemBadge tone={historical ? 'neutral' : mine ? 'brand' : 'neutral'}>{historical ? '历史版本，只读' : mine ? '由你检出' : version?.checkoutStatus === 'checked_out' ? `由 ${version.checkedOutBy} 检出，只读` : '已检入，只读'}</SystemBadge></div>}
-        <p id="skill-publish-gate" className="m-0 rounded-md bg-warn-soft p-3 text-sm leading-6 text-warn-ink">样例测试与审核门禁尚未完成，暂不可发布。检入仅保存版本，不会使 Skill 可调用。</p>
+        {record && version && <SkillReleasePanel key={`${record.skillId}:${selectedVersionId}`} record={record} version={version} dirty={dirty} busy={busy} setBusy={setBusy} onRecord={replaceRecord} viewerId={metadata.viewerId} />}
         {actionError && <p id="skill-form-error" role="alert" className="m-0 text-sm leading-6 text-err-ink wrap-anywhere">{actionError}</p>}
         {notice && <p role="status" className="m-0 text-sm leading-6 text-ok-ink">{notice}</p>}
         {dirty && <p className="m-0 text-sm text-warn-ink">有未保存的修改，请先保存草稿再检入或切换版本。</p>}
