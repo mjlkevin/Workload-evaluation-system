@@ -960,3 +960,9 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **持久游标与原角色证据独立收口：** R source311、V244，SPEC二者通过，fresh质量四pure92/92、0fail/cancel/skip（/tmp/wes-finish-state-roles-quality）；父模块984/984已过。cursor只用于服务器锁定CP结构/绑定损坏检测，不认证任意客户端状态；生产host必须自行读CP且每dispatch真实授权与持久budget。v2direct工具冻结真实V2角色/安全属性并与当前交集，v1无历史证据仍拒绝；prepare-tool仅check不grant，默认写/外发/MCP确认门禁不松。首次RED17fail及35项中24fail保留。C2c host/Workflow scope接线与P1修复仍独立推进，不等同全部C/D已验证。
 
 **Host/Workflow作用域独立收口：** H source638、S305，分别SPEC/fresh五轴安全通过。S独立PG12/12，原组合新12+旧25/21/20=78；H独立新15及旧consumer20+budget21=56/56，全0fail/cancel/skip。H owner advisory超预算迟到创建P1已真实RED5vs4并修；absolute deadline/signal/timeout只服务器controls，受控SQL与tx返回前guard保证锁/库存迟到及insert后abort回滚。无controls旧body/事务shape保持。COMMIT发出后ack不确定窗口仍保留。S current checkpoint与原anchor分离，新retry新批准复用旧receipt；v1/rootSkill旧内容key保留。只rootSkill host候选，尚未boot/HTTP/UI接线；Workflow宿主正以真实RED8fail接四节点，不提前关闭C/D。
+
+**D真实来源补齐的内部细化（2026-11-03）：** 实取现有 `/ai/parse-basic-info` 仅内存解析，会话附件的 `parsedSummary` 由客户端提交且截断，不能当作上传原文。为完成既定文件/文字统一来源要求，新增受JWT与会话归属保护的真实上传入口，复用现有PG会话附件JSON持久保存服务器产生的不可伪造原文、文件摘要与工作表/单元格定位；普通附件写入口继续白名单归一化，不能写入服务器来源字段。公开会话投影不下发原始base64；执行清单冻结经服务器校验的有界原文，旧summary不升级为真实来源，超过限额明确拒绝。无新增数据库表或迁移，不变更任何账号/凭据。拆解、澄清、匹配仍为管理仓储中的可编辑Skill，纯验证/取冻结目录/确认事实校验/规则计算与草稿事务为原生工具；流程顺序以发布Workflow步骤表组装，不写死应用业务序列。真实样本的规则预期与用户验收独立记录。
+
+**D原生结果契约细化：** 现有直接tool步骤故意只保存opaqueResult，缺可信输出契约时不能驱动后续映射；D的取原文、验证需求和取冻结评估目录需要可组合输出。为原生Registry新增可选代码所有的outputSchema，发布与执行快照固定其摘要；仅有该可信契约的工具才验证结果并允许后续字段映射。旧工具字段缺省时保持旧hash与opaque语义，不让管理员或模型自行声明可信输出，不增加新节点类型。该项属于既定D原生能力缺口补齐，需纯解释器/发布/恢复反例及权限复核后再接业务Skill。
+
+**D纯契约准备独立收口：** 需求编号由服务器生成，澄清保留编号、来源与冲突；逐字来源校验和报告摘要确认防止模型自批，匹配校验冻结目录的真实条目、完整覆盖与未匹配项，AI增量建议单列，计算请求桥复用既有引擎。真实RED18项及边界RED3项保留，最终纯测21/21、0skip，SPEC与fresh五轴质量均APPROVE；此处只提交可复用纯契约和待确认样本，不开放D生产流程。C公开确认恢复/失败重试及W晚撤权仍在独立修复，不能以此关闭C/D或MVP。样本的用户选择与真实模型、Excel、签入刷新均后续留证。

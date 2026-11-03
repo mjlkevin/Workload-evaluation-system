@@ -53,7 +53,27 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-operation-scope-quality; /tmp/wes-finish-host-quality; /tmp/wes-finish-host-quality-regression",
       "summary": "S source305 freshPG12及H638 fresh56通过，P1真实迟到写已修。默认boot/Workflow/API/UI未接齐，C/D继续。"
+    },
+    {
+      "kind": "git",
+      "ref": "a74a3e3;1faf103;25f2f73;2db604e",
+      "summary": "事务项目、累计预算、持久游标/原角色证据、root宿主及Workflow操作作用域已独立复核并本地提交，未推送。"
+    },
+    {
+      "kind": "continuous-review",
+      "ref": "/tmp/wes-finish-workflow-host/timeout-authority-green; /tmp/wes-finish-workbench-ui/spec-green.log",
+      "summary": "W发现普通超时与晚撤权分类P2，真实RED4项后组合92通过；UI local-ref/跨会话P2真实RED9项后37通过。候选待fresh质量，未作整体验收。"
+    },
+    {
+      "kind": "continuous-review",
+      "ref": "/tmp/wes-finish-workbench-api; apps/api/src/modules/skills/fixtures/mvp-acceptance-baseline.md",
+      "summary": "公开操作确认恢复事务fence与Workflow失败receipt重试P2在修；原summary不可当上传原文，D补真实来源。预览真实585目录及标准2+3天样本已整理待用户选定。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-mvp-contracts/green-boundaries.log",
+      "summary": "D纯需求/匹配契约21/21零跳过，SPEC和fresh质量APPROVE；样本待用户选定，不等同生产链或业务验收。"
     }
   ],
-  "next": "先闭合生产工具与预算，再接生产宿主和工作台，完成同样本端到端证据。"
+  "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"
 }
