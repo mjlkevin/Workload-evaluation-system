@@ -4,6 +4,7 @@ import type { WorkflowDefinition, WorkflowDependencySnapshot, WorkflowProof, Wor
 export const workflowDefinitions = pgTable('workflow_definitions', {
     workflowId: text('workflow_id').primaryKey(), name: text('name').notNull(), description: text('description').notNull(), category: text('category').notNull(),
     enabled: boolean('enabled').notNull(), archived: boolean('archived').notNull(), currentVersionId: text('current_version_id').notNull(), activeVersionId: text('active_version_id'), revision: integer('revision').notNull(),
+    emergencyStopped: boolean('emergency_stopped').notNull().default(false), emergencyEpoch: integer('emergency_epoch').notNull().default(0), emergencyRevision: integer('emergency_revision').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(), updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 });
 export const workflowVersions = pgTable('workflow_versions', {
