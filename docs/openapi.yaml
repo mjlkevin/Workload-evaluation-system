@@ -2683,6 +2683,82 @@ paths:
                 $ref: "#/components/schemas/GenericOkResponse"
 
   # ------------------------------------------------------------
+  /api/v1/business-assessments/{recordId}/basis:
+    get:
+      tags: [Estimates]
+      summary: 读取实施评估的服务器冻结计算依据
+      description: >
+        仅当前有读取能力的活动 owner 可访问。服务器以实际记录 ID 查询真实原生草稿成功回执，
+        核对历史操作及批准、来源 Run、冻结清单和目录摘要，不采信可编辑 payload 中的自称快照。
+        普通旧记录明确返回 kind=legacy；真正业务流程草稿返回 kind=frozen。
+        移除可编辑来源标记不解除冻结；声明来源但依据缺失、损坏或借用其他记录的回执返回 409，
+        不自动读取最新模板。原记录 minor 签入后 ID 不变，仍读取原依据；复制来源到新 ID 不成立。
+      operationId: readBusinessAssessmentBasis
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: recordId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: 明确的 legacy 或服务器复证的 frozen 依据。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessAssessmentBasisResponse'
+        "400": { description: 记录 ID 无效。 }
+        "401": { description: JWT 缺失或失效。 }
+        "403": { description: 当前身份或读取能力无效。 }
+        "404": { description: 评估不存在或非 owner。 }
+        "409": { description: 原始计算依据缺失、损坏或不匹配，不回退最新目录。 }
+        "503": { description: 依据服务暂不可用，内部错误不外泄。 }
+
+  /api/v1/business-assessments/{recordId}/calculate:
+    post:
+      tags: [Estimates]
+      summary: 以原冻结模板和规则只读重算业务流程评估
+      description: >
+        与 basis 相同的 owner 和历史依据校验。只接受明确参数与条目选择，由既有 WES 引擎计算，
+        不保存记录、不检出检入、不执行模型或导出。模板和规则 ID 可省略，提供时必须等于冻结 ID；
+        客户端不能提交模板、规则、快照或计算结果。条目必须完整覆盖原模板，不允许重复或未知 ID。
+        customStandardDays 仅代表显式人工输入，不自动采用 AI 增量建议。legacy 返回 409，
+        调用方只有在 basis 明确为 legacy 时才使用原有普通计算入口。
+      operationId: calculateBusinessAssessmentWithFrozenBasis
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: recordId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessAssessmentCalculateRequest'
+      responses:
+        "200":
+          description: 规则引擎结果，记录和冻结依据未被修改。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, message, data]
+                properties:
+                  code: { const: 0 }
+                  message: { type: string }
+                  requestId: { type: string }
+                  data: { $ref: '#/components/schemas/EstimateResult' }
+        "400": { description: 无效 ID、参数、条目、未知字段或客户端快照。 }
+        "401": { description: JWT 缺失或失效。 }
+        "403": { description: 当前身份或读取能力无效。 }
+        "404": { description: 评估不存在或非 owner。 }
+        "409": { description: 依据不匹配或 BUSINESS_ASSESSMENT_LEGACY，不回退计算。 }
+        "503": { description: 依据服务暂不可用。 }
+
   # 真实来源上传独立于异步 Run 开关；只有显式启动任务才调用模型。
   /api/v1/ai-sessions/{sessionId}/execution-sources:
     post:
@@ -10569,6 +10645,78 @@ components:
               const: false
             fixedSkillVersions:
               const: true
+    BusinessAssessmentBasisResponse:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: { const: 0 }
+        message: { type: string }
+        requestId: { type: string }
+        data:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required: [kind]
+              properties:
+                kind: { const: legacy }
+            - type: object
+              additionalProperties: false
+              required: [kind, template, ruleSet, basis]
+              properties:
+                kind: { const: frozen }
+                template: { $ref: '#/components/schemas/TemplateDetail' }
+                ruleSet: { $ref: '#/components/schemas/RuleSet' }
+                basis:
+                  type: object
+                  additionalProperties: false
+                  required: [operationId, executionId, runId, rootRunId, manifestHash, workflowId, workflowVersionId, workflowHash, templateId, templateVersion, ruleSetId, ruleVersion, pipelineVersion, snapshotDigest]
+                  properties:
+                    operationId: { type: string, format: uuid }
+                    executionId: { type: string, format: uuid }
+                    runId: { type: string, format: uuid }
+                    rootRunId: { type: string, format: uuid }
+                    manifestHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+                    workflowId: { type: string }
+                    workflowVersionId: { type: string }
+                    workflowHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+                    templateId: { type: string }
+                    templateVersion: { type: string }
+                    ruleSetId: { type: string }
+                    ruleVersion: { type: string }
+                    pipelineVersion: { type: string }
+                    snapshotDigest: { type: string, pattern: '^[a-f0-9]{64}$' }
+
+    BusinessAssessmentCalculateRequest:
+      type: object
+      additionalProperties: false
+      required: [userCount, difficultyFactor, orgCount, orgSimilarityFactor, items]
+      properties:
+        templateId: { type: string, minLength: 1, maxLength: 160 }
+        ruleSetId: { type: string, minLength: 1, maxLength: 160 }
+        userCount: { type: integer, minimum: 0, maximum: 1000000000 }
+        orgCount: { type: integer, minimum: 0, maximum: 1000000000 }
+        difficultyFactor: { type: number, minimum: 0, maximum: 1000000 }
+        orgSimilarityFactor: { type: number, minimum: 0, maximum: 1 }
+        selectedSheet: { type: string, maxLength: 200 }
+        selectedCloudNames:
+          type: array
+          maxItems: 1000
+          items: { type: string, maxLength: 200 }
+        exportProjectName: { type: string, maxLength: 500 }
+        exportAssessmentVersionCode: { type: string, maxLength: 500 }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            type: object
+            additionalProperties: false
+            required: [templateItemId, included]
+            properties:
+              templateItemId: { type: string, minLength: 1, maxLength: 160 }
+              included: { type: boolean }
+              customStandardDays: { type: number, minimum: 0, maximum: 1000000000 }
+
     GenericOkResponse:
       type: object
       properties:
@@ -11374,19 +11522,21 @@ components:
 
     VersionCreateRequest:
       type: object
-      required: [type, versionCode, status]
+      required: [type]
       properties:
         type:
           type: string
           enum: [requirementImport, assessment, resource, dev, global]
         versionCode:
           type: string
+          description: 可选；省略或空串时按当前生效的模块编码规则分配，assessment 分配与插入处于同一事务。
         templateId:
           type: string
           default: default
         status:
           type: string
           enum: [draft, reviewed, published]
+          default: draft
         payload:
           type: object
           additionalProperties: true

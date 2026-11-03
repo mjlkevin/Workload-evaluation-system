@@ -55,6 +55,7 @@ const queue = createHarnessRuntimeRepository(database);
 const user = { id: randomUUID(), username: `draft-${randomUUID()}`, role: 'admin', businessRole: 'pre_sales', status: 'active' } as AuthUser;
 const other = { ...user, id: randomUUID(), username: `draft-other-${randomUUID()}` };
 const fixtureId = `draft-rule-${randomUUID()}`;
+const fixtureWorkflowIds = new Set<string>();
 let originalRules: Array<typeof schema.versionCodeRules.$inferSelect> = [];
 const nativeTools = [...buildMvpRequirementTools(user.id), ...buildMvpAssessmentTools(user.id), ...buildMvpAssessmentDraftTools(user.id)];
 const tools = nativeTools.map(({ execute: _execute, category: _category, discoverable: _discoverable, ...tool }) => ({ ...tool,
@@ -108,7 +109,8 @@ async function fixture(variant: Variant = 'normal') {
     ...Object.entries({ ...fixtureScope, ...(variant === 'changed-params' ? { params: { ...params, difficultyFactor: 0.5 } } : {}) }).map(([k,v]) => literal(k,v))], onFailure: 'fail' },
  ], outputMapping: [] };
  const service = createWorkflowService(createWorkflowsPgRepository(database), createWorkflowContextLoader({ database, getTools: async () => tools as any }), user);
- let workflow = await service.create(definition); workflow = await service.validate(workflow.workflowId, workflow.revision);
+ let workflow = await service.create(definition); fixtureWorkflowIds.add(workflow.workflowId);
+ workflow = await service.validate(workflow.workflowId, workflow.revision);
  workflow = await service.review(workflow.workflowId, workflow.revision, 'Synthetic transaction test'); workflow = await service.publish(workflow.workflowId, workflow.revision);
  const sessionId = randomUUID(), now = new Date();
  await database.insert(schema.aiSessions).values({ sessionId, ownerUserId: user.id, ownerUsername: user.username, title: 'Draft transaction fixture', domain: 'business_evaluation',
@@ -159,6 +161,15 @@ before(async () => {
   format: '{PREFIX}-{GL}-{NNN}', status: 'active', sortOrder: -2147483648, updatedAt: new Date() });
 });
 after(async () => {
+ // Preserve immutable workflow history while removing only this process's fixtures from authorized catalogs.
+ const workflowRepository = createWorkflowsPgRepository(database);
+ const workflows = createWorkflowService(workflowRepository, createWorkflowContextLoader({ database, getTools: async () => tools as any }), user);
+ for (const id of fixtureWorkflowIds) {
+  const workflow = await workflowRepository.get(id); assert.ok(workflow);
+  if (workflow.enabled || !workflow.archived) await workflows.status(id, workflow.revision, { enabled: false, archived: true });
+  const retained = await workflowRepository.get(id); assert.ok(retained); assert.equal(retained.enabled, false); assert.equal(retained.archived, true);
+ }
+ console.info(`TEST ONLY retained archived D3 workflows=${fixtureWorkflowIds.size}`);
  await database.delete(schema.versionRecords).where(eq(schema.versionRecords.ownerUserId, user.id));
  await database.delete(schema.harnessRuns).where(eq(schema.harnessRuns.ownerUserId, user.id));
  await database.delete(schema.aiSessions).where(eq(schema.aiSessions.ownerUserId, user.id));
@@ -196,6 +207,37 @@ test('real consumer persists one linked project and normal assessment, computes 
   const p = project.payload as any; assert.equal(p.currentAssessmentVersionId, assessment.recordId); assert.equal(p.assessmentVersionCode, assessment.versionCode);
   assert.equal(p.totalDays, 5); assert.equal(p.createdFromSessionId, f.sessionId); assert.ok(Array.isArray(p.productMasterSnapshot.assignments));
   assert.deepEqual(await execute().executeOperation(user, f.command), first); assert.equal((await receipts(f.prepared.rootRunId)).length, 1);
+
+  // This receipt was produced by the real D3 consumer above, never inserted as a fixture.
+  const app = express(); app.use(express.json()); app.use('/api/v1', (await import('../../routes/index')).default);
+  const authorization = `Bearer ${signAuthToken({ ...user, username: currentUsername })}`, basisPath = `/api/v1/business-assessments/${assessment.recordId}`;
+  const originalBasis = await supertest(app).get(`${basisPath}/basis`).set('Authorization', authorization);
+  assert.equal(originalBasis.status, 200, JSON.stringify(originalBasis.body)); assert.equal(originalBasis.body.data.kind, 'frozen');
+  assert.equal(originalBasis.body.data.basis.operationId, f.prepared.operationId);
+  assert.equal(originalBasis.body.data.basis.snapshotDigest, catalog.snapshotDigest);
+  const calculationRequest = { templateId: template.templateId, ruleSetId: ruleSet.ruleSetId, ...params, items: payload.items };
+  const calculated = await supertest(app).post(`${basisPath}/calculate`).set('Authorization', authorization).send(calculationRequest);
+  assert.equal(calculated.status, 200, JSON.stringify(calculated.body)); assert.equal(calculated.body.data.totalDays, 5);
+  const versionPath = `/api/v1/versions/${assessment.recordId}`;
+  const checkedOut = await supertest(app).post(`${versionPath}/checkout`).set('Authorization', authorization).send({});
+  assert.equal(checkedOut.status, 200); assert.equal(checkedOut.body.code, 0, JSON.stringify(checkedOut.body));
+  assert.equal(checkedOut.body.data.record.checkoutStatus, 'checked_out');
+  const savedPayload = { ...payload, result: calculated.body.data, reviewNote: 'D3 to D4 real version lifecycle' };
+  const saved = await supertest(app).patch(`${versionPath}/save-draft`).set('Authorization', authorization).send({ payload: savedPayload });
+  assert.equal(saved.status, 200); assert.equal(saved.body.code, 0, JSON.stringify(saved.body));
+  assert.equal(saved.body.data.record.payload.result.totalDays, 5);
+  const checkedIn = await supertest(app).post(`${versionPath}/checkin`).set('Authorization', authorization).send({});
+  assert.equal(checkedIn.status, 200); assert.equal(checkedIn.body.code, 0, JSON.stringify(checkedIn.body));
+  assert.equal(checkedIn.body.data.record.id, assessment.recordId); assert.equal(checkedIn.body.data.record.checkoutStatus, 'checked_in');
+  assert.equal(checkedIn.body.data.record.minorNumber, 1); assert.notEqual(checkedIn.body.data.record.versionCode, output.versionCode);
+  const refreshed = await supertest(app).get(versionPath).set('Authorization', authorization);
+  assert.equal(refreshed.status, 200); assert.equal(refreshed.body.code, 0, JSON.stringify(refreshed.body));
+  assert.equal(refreshed.body.data.record.id, assessment.recordId); assert.equal(refreshed.body.data.record.payload.result.totalDays, 5);
+  assert.equal(refreshed.body.data.record.payload.reviewNote, savedPayload.reviewNote);
+  const refreshedBasis = await supertest(app).get(`${basisPath}/basis`).set('Authorization', authorization);
+  assert.equal(refreshedBasis.status, 200, JSON.stringify(refreshedBasis.body)); assert.deepEqual(refreshedBasis.body.data, originalBasis.body.data);
+  const recalculated = await supertest(app).post(`${basisPath}/calculate`).set('Authorization', authorization).send(calculationRequest);
+  assert.equal(recalculated.status, 200, JSON.stringify(recalculated.body)); assert.equal(recalculated.body.data.totalDays, 5);
  } finally { await database.update(schema.users).set({ username: user.username }).where(eq(schema.users.userId, user.id)); }
 });
 test('two concurrent consumers and reconstruction create exactly one project, one assessment and one receipt', async () => {

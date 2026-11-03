@@ -153,6 +153,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-quote-transport-red.log; /tmp/wes-quote-transport-quality-tests.log; /tmp/wes-quote-transport-quality-tsc.log",
       "summary": "模型引用传输边界SPEC/fresh质量APPROVE，RED1pass9fail后独立40/40及tsc0；同需求两不同旧锚点拒绝探针通过。仅唯一逐字引用派生位置，规范报告/确认/原生证明不放宽；不等同模型验收。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-mvp-frozen/history-red; /tmp/wes-finish-mvp-frozen/review/d4-13.log; /tmp/wes-finish-mvp-frozen/review/d3-d4-integration-green.log; /tmp/wes-d4-openapi/result.log",
+      "summary": "D4冻结依据/只读重算SPEC及fresh质量APPROVE；历史批准P2经RED6fail修复，作者55与独立13全过。真实D3创建→检出/保存/检入→刷新/重算5天精准1例通过（另17未重跑）；保留JWT夹具401及被其他线阻塞tsc证据，后续共同tsc0。OpenAPI unique YAML/AJV16通过，198paths。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

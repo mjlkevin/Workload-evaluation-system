@@ -112,8 +112,11 @@ function fixedInput(value: Context) {
     payloadHash: p.payloadHash, manifestHash: value.admission.manifest.manifestHash, ownerId: value.admission.identity.id,
     sessionId: p.sessionId, toolName: p.request.toolName };
 }
-/** Historical identity is evidence only. Current admission and approval have already run. */
-async function originalApproval(tx: QueueDbExecutor, value: Context, currentBasis: Basis, input: Record<string, unknown>) {
+type HistoricalApprovalContext = { pending: Context['pending']; admission: Pick<Context['admission'], 'identity' | 'manifest'> };
+type HistoricalApprovalBasis = Omit<Basis, 'runId' | 'executionAuthority' | 'identity' | 'currentToolsHash' | 'configRevisions'>;
+/** Strict read-only historical approval evidence. Never calls current admission or grants execution.
+ * Historical identity/tools/config stamps come from the actual approval ledger, not caller placeholders. */
+export async function readHistoricalOperationApprovalInTransaction(tx: QueueDbExecutor, value: HistoricalApprovalContext, currentBasis: HistoricalApprovalBasis, input: Record<string, unknown>) {
   const { sourceRunId, decisionId, confirmationHash } = input;
   if (!uuid(sourceRunId) || !uuid(decisionId) || !digest(confirmationHash)) return fail('OPERATION_EXECUTION_INVALID');
   const pending = await readPreparedOperationInTransaction(tx, sourceRunId, value.pending.operationId, value.admission.identity.id, value.admission.manifest);
@@ -146,7 +149,7 @@ async function receiptResult(tx: QueueDbExecutor, row: typeof harnessToolEvents.
   const [time] = await tx.select({ valid: sql<boolean>`isfinite(${harnessToolEvents.createdAt}) AND isfinite(${harnessToolEvents.resolvedAt}) AND ${harnessToolEvents.resolvedAt} >= ${harnessToolEvents.createdAt}` })
     .from(harnessToolEvents).where(eq(harnessToolEvents.harnessToolEventId, row.harnessToolEventId));
   if (!time?.valid) fail('OPERATION_EXECUTION_INVALID');
-  await originalApproval(tx, value, basis, input);
+  await readHistoricalOperationApprovalInTransaction(tx, value, basis, input);
   nativeOutput(value, output.result);
   return json({ operationId: value.pending.operationId, executionId: row.harnessToolEventId, rootRunId: value.pending.rootRunId, status: 'succeeded' as const, result: output.result });
 }
