@@ -118,6 +118,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-typed-final; /tmp/wes-finish-typed-quality-final",
       "summary": "原生可选输出契约SPEC/fresh质量通过；真实RED39中3fail后GREEN39、相关208、独立114均0skip。无效结果按Workflow等待、完成历史复验与SQL写回滚已覆盖；旧hash/MCP边界保持。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-source-spec-independent; /tmp/wes-finish-source-quality",
+      "summary": "S1来源632gross及小hunk SPEC/fresh质量APPROVE；独立15/15、APIbuild0及真实distJS原文/并发槽/超时退出恢复/Buffer快照探针通过。HTTP S2独立接线中；不把旧deadline断言错误当漏洞RED。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

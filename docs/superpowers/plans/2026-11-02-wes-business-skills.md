@@ -980,3 +980,5 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **D业务基线用户确认（2026-11-03）：** 用户明确采用标准目录样本：销售基础资料设置2人天、销售基本业务处理3人天，50用户、1组织、难度增量0、组织相似度1，人工预期由现有WES规则算出5人天。查询/导出保留拆解及未匹配反例；本次只确认测试输入与预期，不替代运行时需求/范围确认、真实模型全流程证据或最终界面验收。详细基线见apps/api/src/modules/skills/fixtures/mvp-acceptance-baseline.md；继续既定C/D实施，不再等待样本选择。
 
 **原生工具输出契约独立收口（2026-11-03）：** 可选代码所有outputSchema已纳入冻结快照、发布验证、结果映射与当前合同交集；旧字段缺省保留旧hash/opaque语义，MCP与管理员不能自行声明。SPEC两项P2以真实RED39中3失败补齐：child/direct无效输出形成invalid_output并遵循onFailure等待；completed child保存的工具历史按冻结schema复验，损坏CP拒绝。GREEN39及相关208零跳过；fresh五轴质量独立纯114/114，事务消费者先前21/21，tsc与作用域diff检查通过。日志/tmp/wes-finish-typed-final与/tmp/wes-finish-typed-quality-final；不等同完整业务模型或最终界面验收。
+
+**S1真实原文与安全独立收口（2026-11-03）：** 真实XLSX/UTF8材料在受限独立进程解析，服务器保存原文、字节摘要和工作表/单元格位置；公开会话仅元数据，客户端summary不升级为原文。解析前及提交锁内双重复核当前身份和会话归属，解析期间不持DB锁。原评论原型污染与授权顺序真实RED已保留；deadline旧RED是同步签名断言错误，不作旧阻塞漏洞证据。632gross及两repository小hunk分别SPEC/fresh五轴质量APPROVE；独立15/15零跳过、API构建0，真实distJS无tsx的txt/XLSX探针及并发槽/超时kill退出/恢复/Buffer快照独立探针通过。日志/tmp/wes-finish-source-spec-independent和/tmp/wes-finish-source-quality。HTTP上传S2另单元，尚未开放，不代表全MVP验收。

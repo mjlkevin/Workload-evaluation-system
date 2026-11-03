@@ -10,6 +10,7 @@ import type { SourceReference } from './execution-manifest.types';
 import type { InvocationRepository } from './skills.invocation';
 import { skillDefinitionHash as hash } from './skills.hash';
 import { SkillError } from './skills.types';
+import { frozenFileMaterial } from './source-documents/source-document.projection';
 
 function missing(): never { throw new SkillError('INVOCATION_NOT_FOUND', '资源不存在', 404); }
 async function read(tx: QueueDbExecutor, user: AuthUser, sessionId: string, sources: SourceReference[]): Promise<{ fingerprint: string; sourceMaterials: FrozenSourceMaterial[] }> {
@@ -29,14 +30,15 @@ async function read(tx: QueueDbExecutor, user: AuthUser, sessionId: string, sour
     const matches = source.kind === 'file' ? attachments.filter(a => a.attachmentId === source.id) : messages.filter(m => m.messageId === source.id);
     if (matches.length !== 1) return missing();
     const item = matches[0] as Record<string, unknown>;
-    const content = source.kind === 'file' ? item.parsedSummary : item.content;
+    const content = source.kind === 'file' ? frozenFileMaterial(item)?.text ?? item.parsedSummary : item.content;
     if (typeof content !== 'string' || !content.trim()
       || (source.kind === 'conversation' && !['user', 'assistant'].includes(String(item.role)))) return missing();
     return { source, item };
   });
-  const sourceMaterials: FrozenSourceMaterial[] = values.filter(value => value.source.kind === 'conversation').map(({ source, item }) => {
+  const sourceMaterials: FrozenSourceMaterial[] = values.flatMap(({ source, item }) => {
+    if (source.kind === 'file') { const material = frozenFileMaterial(item); return material ? [material] : []; }
     const body = { id: source.id, kind: 'conversation' as const, text: item.content as string, location: `message:${source.id}` };
-    return { ...body, digest: hash(body) };
+    return [{ ...body, digest: hash(body) }];
   });
   return { fingerprint: hash(values), sourceMaterials };
 }

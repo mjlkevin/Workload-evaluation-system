@@ -38,6 +38,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { db, type Database } from "../../db/client";
 import { readDbNow } from "../../db/now";
+import { publicSourceAttachment } from '../skills/source-documents/source-document.projection';
 import { aiSessions, harnessRuns } from "../../db/schema";
 import { HARNESS_RUN_ACTIVE_STATUSES } from "../harness/harness-runtime.types";
 import type { QueueDbExecutor } from "../harness/harness-runtime.repository";
@@ -95,7 +96,7 @@ function toSessionRecord(row: AiSessionRow): AiSessionRecord {
     status: row.status as AiSessionRecord["status"],
     summary: row.summary,
     messages: (row.messages ?? []) as AiMessage[],
-    attachments: (row.attachments ?? []) as AiAttachment[],
+    attachments: ((row.attachments ?? []) as Record<string, unknown>[]).map(publicSourceAttachment),
     artifacts: (row.artifacts ?? []) as AiArtifact[],
     pendingActions: (row.pendingActions ?? []) as AiPendingAction[],
     linkedRecords: (row.linkedRecords ?? {}) as AiSessionRecord["linkedRecords"],
