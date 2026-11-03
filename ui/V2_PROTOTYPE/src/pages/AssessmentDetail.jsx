@@ -40,6 +40,8 @@ export default function AssessmentDetail() {
   const vm = useAssessmentDetail(id)
   const setUnsavedDirty = useSetUnsavedDirty()
   const tabs = getTabs(vm)
+  const frozen = vm.calculationBasis?.kind === 'frozen'
+  const legacy = vm.calculationBasis?.kind === 'legacy'
 
   useEffect(() => {
     setUnsavedDirty(Boolean(vm.vcs?.hasLocalChanges && !vm.vcs?.isReadonly))
@@ -50,11 +52,11 @@ export default function AssessmentDetail() {
     <PageShell
       crumb="工作台 / 实施评估 / 详情"
       title="实施评估详情"
-      actions={[
+      actions={legacy ? [
         <button type="button" key="hist" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={async () => { setHistoryOpen(true); setHistoryLoading(true); try { const payload = await apiClient.get('/versions', { type: 'assessment' }); const list = unwrapList(payload).filter(r => r.baseCode === (vm.globalVersion || id)); setHistoryRows(list.map(r => ({ version: r.versionCode || r.version || '', status: mapVcsStatus(r), owner: r.checkedOutByUsername || r.updatedByUsername || '—', updatedAt: (r.updatedAt || '').slice(0, 10) }))); } catch (err) { alert('加载历史失败: ' + err.message); } finally { setHistoryLoading(false); } }}>🕘 历史</button>,
         <button type="button" key="export" className="btn btn-ghost" style={{ height: 32, fontSize: 12, padding: '0 10px' }} onClick={() => downloadJSON(vm, `assessment-${vm.versionCode || id}.json`)}>↓ 导出</button>,
         <button type="button" key="checkin" className="btn btn-pri" style={{ height: 32, fontSize: 12, padding: '0 12px' }} onClick={() => vm.actions?.checkin?.()}>⇡ 签入</button>,
-      ]}
+      ] : []}
     >
       {/* DSL Banner */}
       <DslBanner dsl={vm.dsl} />
@@ -74,9 +76,17 @@ export default function AssessmentDetail() {
           />
         )}
         <ProjectIdentityCard data={vm} />
-        <VcsToolbar dsl={vm.dsl} hasLocalChanges={vm.vcs?.hasLocalChanges} />
+        {legacy && <VcsToolbar dsl={vm.dsl} hasLocalChanges={vm.vcs?.hasLocalChanges} />}
+        {frozen && <FrozenBasisCard key={id} vm={vm} />}
+        {vm.loading && <p role="status" className="text-ink-2">正在读取原始计算依据…</p>}
+        {!vm.loading && vm.estimateError && (
+          <div role="alert" className="mt-3 rounded-md border border-line bg-bg-soft p-3 text-err-ink">
+            估算暂不可用：{vm.estimateError.message || '原始计算依据不可用'}
+            {!frozen && <button type="button" className="btn btn-out ml-3" onClick={vm.refetch}>刷新</button>}
+          </div>
+        )}
         <ParamMiniBar params={vm.params} />
-        <AdvancedCollapsible context={vm.context} />
+        {legacy && <AdvancedCollapsible context={vm.context} />}
       </div>
 
       {/* Tabs */}
@@ -191,26 +201,8 @@ export default function AssessmentDetail() {
         <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
           {activeTab === 'sku' && (
             <>
-              <KpiCards kpi={vm.kpi} dsl={vm.dsl} />
-              {/* ISS-2026-08-18-005（档 2）：估算失败页面内占位（非弹窗）——
-                  估算区明确展示「估算暂不可用」，其余评估信息继续展示。 */}
-              {vm.estimateError && (
-                <div style={{
-                  padding: '10px 14px',
-                  borderRadius: 'var(--r-md)',
-                  background: 'var(--bg-soft)',
-                  border: '1px solid var(--line)',
-                  color: 'var(--err)',
-                  fontSize: 12.5,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                }}>
-                  <span>⚠️</span>
-                  <span>估算暂不可用：{vm.estimateError?.message || '估算服务异常'}，已保留其余评估信息</span>
-                </div>
-              )}
-              <PathBreadcrumb path={vm.path} />
+              {!vm.loading && !vm.estimateError && <KpiCards kpi={vm.kpi} dsl={vm.dsl} />}
+              {legacy && <PathBreadcrumb path={vm.path} />}
               <div
                 className="reg"
                 style={{
@@ -239,7 +231,16 @@ export default function AssessmentDetail() {
                   SKU
                 </div>
                 <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>模块明细 · SKU 主表</h3>
-                <SkuTable groups={vm.skuGroups} />
+                {frozen ? (
+                  <div className="overflow-x-auto">
+                    <table className="table" aria-label="已确认评估范围">
+                      <thead><tr><th>实施要点</th><th>是否纳入</th><th>标准人天</th><th>人工覆盖</th><th>计算人天</th></tr></thead>
+                      <tbody>{vm.skuGroups.flatMap(group => group.children).map(item => (
+                        <tr key={item.templateItemId}><td>{item.name}</td><td>{item.included === null ? '未确认' : item.included ? '已纳入' : '未纳入'}</td><td>{item.baseDays}</td><td>{item.confirmedCustomDays ?? '未覆盖'}</td><td>{vm.estimateError ? '暂不可用' : item.customDays}</td></tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ) : legacy ? <SkuTable groups={vm.skuGroups} /> : null}
               </div>
             </>
           )}
@@ -419,7 +420,7 @@ export default function AssessmentDetail() {
         </div>
 
         {/* Side panel */}
-        <SidePanel kpi={vm.kpi} summary={vm.summary} aiCopilot={vm.aiCopilot} />
+        {!vm.loading && !vm.estimateError && <SidePanel kpi={vm.kpi} summary={vm.summary} aiCopilot={vm.aiCopilot} />}
       </div>
     {/* 版本历史弹窗 */}
       {historyOpen && (
@@ -447,6 +448,32 @@ export default function AssessmentDetail() {
         </div>
       )}
     </PageShell>
+  )
+}
+
+function FrozenBasisCard({ vm }) {
+  const [error, setError] = useState('')
+  const basis = vm.calculationBasis.basis
+  const busy = vm.loading || Object.values(vm.actionLoading || {}).some(Boolean)
+  const readonly = vm.vcs.isReadonly
+  const action = readonly ? 'checkout' : 'checkin'
+  return (
+    <section aria-label="原始计算依据" aria-busy={busy} className="mt-3 rounded-md border border-line bg-surface p-4 text-ink">
+      <h2 className="m-0 text-sm font-semibold">原始计算依据</h2>
+      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-2">
+        <span>模板版本：{basis.templateVersion}</span><span>规则版本：{basis.ruleVersion}</span>
+        <span>流水线版本：{basis.pipelineVersion}</span><span>{readonly ? '已检入 · 只读' : '已检出'}</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="btn btn-pri" disabled={busy} onClick={async () => {
+          setError('')
+          const result = await vm.actions[action]()
+          if (!result.success) setError(result.error)
+        }}>{busy ? '处理中…' : readonly ? '检出' : '检入'}</button>
+        <button type="button" className="btn btn-out" disabled={busy} onClick={vm.refetch}>刷新</button>
+      </div>
+      {error && <p role="alert" className="mb-0 mt-2 text-sm text-err-ink">{error}</p>}
+    </section>
   )
 }
 
