@@ -17,6 +17,7 @@ import PathBreadcrumb from '../components/Assessment/PathBreadcrumb.jsx'
 import SkuTable from '../components/Assessment/SkuTable.jsx'
 import DslBanner from '../components/Assessment/DslBanner.jsx'
 import SidePanel from '../components/Assessment/SidePanel.jsx'
+import FrozenAssessmentResults from '../components/Assessment/FrozenAssessmentResults.jsx'
 
 function getTabs(vm) {
   const skuCount = vm.skuGroups?.length || 0
@@ -59,7 +60,7 @@ export default function AssessmentDetail() {
       ] : []}
     >
       {/* DSL Banner */}
-      <DslBanner dsl={vm.dsl} />
+      {legacy && <DslBanner dsl={vm.dsl} />}
 
       {/* Top region */}
       <div style={{ padding: '16px 24px 0' }}>
@@ -90,7 +91,7 @@ export default function AssessmentDetail() {
       </div>
 
       {/* Tabs */}
-      <div
+      {legacy && <div
         style={{
           display: 'flex',
           gap: 6,
@@ -188,18 +189,19 @@ export default function AssessmentDetail() {
             展开全部
           </span>
         </span>
-      </div>
+      </div>}
 
       {/* Main body */}
       <div
-        className="grid-1fr-280"
+        className={frozen ? 'grid grid-cols-1' : 'grid-1fr-280'}
         style={{
           gap: 16,
           padding: '16px 24px 24px',
         }}
       >
         <div style={{ display: 'grid', gap: 16, minWidth: 0 }}>
-          {activeTab === 'sku' && (
+          {frozen && <FrozenAssessmentResults key={id} vm={vm} />}
+          {legacy && activeTab === 'sku' && (
             <>
               {!vm.loading && !vm.estimateError && <KpiCards kpi={vm.kpi} dsl={vm.dsl} />}
               {legacy && <PathBreadcrumb path={vm.path} />}
@@ -231,21 +233,12 @@ export default function AssessmentDetail() {
                   SKU
                 </div>
                 <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>模块明细 · SKU 主表</h3>
-                {frozen ? (
-                  <div className="overflow-x-auto">
-                    <table className="table" aria-label="已确认评估范围">
-                      <thead><tr><th>实施要点</th><th>是否纳入</th><th>标准人天</th><th>人工覆盖</th><th>计算人天</th></tr></thead>
-                      <tbody>{vm.skuGroups.flatMap(group => group.children).map(item => (
-                        <tr key={item.templateItemId}><td>{item.name}</td><td>{item.included === null ? '未确认' : item.included ? '已纳入' : '未纳入'}</td><td>{item.baseDays}</td><td>{item.confirmedCustomDays ?? '未覆盖'}</td><td>{vm.estimateError ? '暂不可用' : item.customDays}</td></tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
-                ) : legacy ? <SkuTable groups={vm.skuGroups} /> : null}
+                <SkuTable groups={vm.skuGroups} />
               </div>
             </>
           )}
 
-          {activeTab === 'multi' && (
+          {legacy && activeTab === 'multi' && (
             <div
               className="reg"
               style={{
@@ -308,7 +301,7 @@ export default function AssessmentDetail() {
             </div>
           )}
 
-          {activeTab === 'diff' && (
+          {legacy && activeTab === 'diff' && (
             <div className="reg" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 18, boxShadow: 'var(--shadow-1)' }}>
               <h3 style={{ margin: '0 0 12px' }}>变更对比</h3>
               {vm.diff && vm.diff.length ? (
@@ -341,7 +334,7 @@ export default function AssessmentDetail() {
             </div>
           )}
 
-          {activeTab === 'dsl' && (
+          {legacy && activeTab === 'dsl' && (
             <div className="reg" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 18, boxShadow: 'var(--shadow-1)' }}>
               <h3 style={{ margin: '0 0 12px' }}>DSL 规则审阅</h3>
               {vm.dsl?.issues?.length ? (
@@ -376,7 +369,7 @@ export default function AssessmentDetail() {
             </div>
           )}
 
-          {activeTab === 'story' && (
+          {legacy && activeTab === 'story' && (
             <div className="reg" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 18, boxShadow: 'var(--shadow-1)' }}>
               <h3 style={{ margin: '0 0 12px' }}>五段叙事</h3>
               {vm.story && vm.story.length ? (
@@ -394,7 +387,7 @@ export default function AssessmentDetail() {
             </div>
           )}
 
-          {activeTab === 'sow' && (
+          {legacy && activeTab === 'sow' && (
             <div className="reg" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-lg)', padding: 18, boxShadow: 'var(--shadow-1)' }}>
               <h3 style={{ margin: '0 0 12px' }}>附件 SOW</h3>
               {vm.sow && vm.sow.length ? (
@@ -420,7 +413,7 @@ export default function AssessmentDetail() {
         </div>
 
         {/* Side panel */}
-        {!vm.loading && !vm.estimateError && <SidePanel kpi={vm.kpi} summary={vm.summary} aiCopilot={vm.aiCopilot} />}
+        {legacy && !vm.loading && !vm.estimateError && <SidePanel kpi={vm.kpi} summary={vm.summary} aiCopilot={vm.aiCopilot} />}
       </div>
     {/* 版本历史弹窗 */}
       {historyOpen && (

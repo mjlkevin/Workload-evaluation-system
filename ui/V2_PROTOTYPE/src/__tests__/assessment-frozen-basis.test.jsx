@@ -41,6 +41,33 @@ function setupFrozen() {
 }
 const options = { fallbackData: { kpi: { totalDays: 777 } } }
 const loaded = result => waitFor(() => expect(result.current.loading).toBe(false))
+function renderDetail() {
+  return render(<MemoryRouter initialEntries={['/assessments/A']}><Routes><Route path="/assessments/:id" element={<AssessmentDetail />} /></Routes></MemoryRouter>)
+}
+function setupFullScope({ missing = [], overrides = {} } = {}) {
+  const calls = setupFrozen()
+  const items = Array.from({ length: 585 }, (_, index) => ({ templateItemId: `item-${index}`, groupId: 'g',
+    itemName: `范围项${index}`, standardDays: index === 60 ? 2 : index === 62 ? 3 : 1, defaultIncluded: true,
+  }))
+  const saved = items.filter((_, index) => !missing.includes(index)).map(item => ({ templateItemId: item.templateItemId,
+    included: ['item-60', 'item-62'].includes(item.templateItemId),
+    ...(Object.hasOwn(overrides, item.templateItemId) ? { customStandardDays: overrides[item.templateItemId] } : {}),
+  }))
+  server.use(
+    http.get(`${BASE}/versions/:id`, () => HttpResponse.json({ data: { record: { id: 'A', versionCode: 'IA1', checkoutStatus: 'checked_in', payload: {
+      projectName: '真实范围项目', params: { userCount: 0, difficultyFactor: 0, orgCount: 1, orgSimilarityFactor: 1 }, items: saved,
+    } } } })),
+    http.get(`${BASE}/business-assessments/:id/basis`, () => HttpResponse.json({ data: { ...basis, template: { ...basis.template, items } } })),
+    http.post(`${BASE}/business-assessments/:id/calculate`, async ({ request }) => {
+      calls.calculate.push(await request.json())
+      return HttpResponse.json({ data: { totalDays: 5, baseDays: 5, groupSubtotals: [{ groupName: '未纳入的长名称云产品', subtotalDays: 0 }],
+        itemResults: items.map(item => ({ templateItemId: item.templateItemId, included: ['item-60', 'item-62'].includes(item.templateItemId),
+          standardDays: item.standardDays, effectiveStandardDays: item.standardDays })),
+      } })
+    }),
+  )
+  return calls
+}
 
 describe('AssessmentDetail original server basis', () => {
   test('keeps the original 5 through checkout, save, checkin and refresh without reading the latest catalog', async () => {
@@ -214,5 +241,72 @@ describe('AssessmentDetail original server basis', () => {
     fireEvent.click(screen.getByRole('button', { name: '检入' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('检入失败，请重试')
     expect(screen.getByRole('button', { name: '刷新' })).toBeInTheDocument()
+  })
+
+  test('585项冻结目录默认仅显示2项真实纳入范围，紧凑统计不复用旧KPI和假入口', async () => {
+    const calls = setupFullScope(); renderDetail()
+    const stats = await screen.findByRole('region', { name: '评估计算统计' })
+    expect(stats).toHaveTextContent('总评估人天 · 实时5'); expect(stats).toHaveTextContent('基础人天5')
+    expect(stats).toHaveTextContent('已纳入实施项2 / 585')
+    expect(within(screen.getByRole('table', { name: '已确认评估范围' })).getAllByRole('row')).toHaveLength(3)
+    expect(screen.queryByText('云产品工作量')).not.toBeInTheDocument()
+    expect(screen.queryByText('未纳入的长名称云产品')).not.toBeInTheDocument()
+    expect(screen.queryByText('DSL 依赖校验')).not.toBeInTheDocument()
+    expect(screen.queryByText('已选 1 SKU · 1 模块')).not.toBeInTheDocument()
+    for (const label of ['仅显示已勾选', '展开全部', '多组织推广估算', '五段叙事', '附件 SOW']) expect(screen.queryByText(label)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '检出' })).toBeInTheDocument(); expect(calls.latest + calls.generic).toBe(0)
+  })
+
+  test('完整目录按钮真实切换585项与2项范围，纯查看不保存或重新计算', async () => {
+    const calls = setupFullScope(); renderDetail(); await screen.findByRole('region', { name: '评估计算统计' })
+    const table = screen.getByRole('table', { name: '已确认评估范围' }), before = structuredClone(calls.calculate)
+    const expand = screen.getByRole('button', { name: '查看完整目录' })
+    expect(expand).toHaveAttribute('aria-pressed', 'false'); fireEvent.click(expand)
+    expect(within(table).getAllByRole('row')).toHaveLength(586)
+    const excluded = within(table).getByRole('row', { name: /范围项0 未纳入/ })
+    expect(within(excluded).getAllByRole('cell').at(-1)).toHaveTextContent('未计入')
+    expect(screen.getByRole('button', { name: '返回评估范围' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: '返回评估范围' }))
+    expect(within(table).getAllByRole('row')).toHaveLength(3)
+    expect(calls.calculate).toEqual(before); expect(calls.saves).toHaveLength(0)
+  })
+
+  test('默认范围同时保留缺失保存状态和已排除的人工覆盖0及7，不把模板默认纳入当确认', async () => {
+    setupFullScope({ missing: [5], overrides: { 'item-3': 0, 'item-4': 7 } }); renderDetail()
+    await screen.findByRole('region', { name: '评估计算统计' })
+    const table = screen.getByRole('table', { name: '已确认评估范围' })
+    expect(within(table).getAllByRole('row')).toHaveLength(6)
+    for (const [id, override] of [[3, '0'], [4, '7']]) {
+      const row = within(table).getByRole('row', { name: new RegExp(`范围项${id} 未纳入`) })
+      expect(within(row).getAllByRole('cell').map(cell => cell.textContent)).toEqual([`范围项${id}`, '未纳入', '1', override, '未计入'])
+    }
+    const unknown = within(table).getByRole('row', { name: /范围项5 未确认/ })
+    expect(within(unknown).getAllByRole('cell').at(-1)).toHaveTextContent('待确认')
+    expect(screen.getByRole('region', { name: '评估计算统计' })).toHaveTextContent('已纳入实施项2 / 585')
+  })
+
+  test('真实范围刷新503后隐藏成功统计，默认范围仍保留0及7覆盖和未确认证据', async () => {
+    setupFullScope({ missing: [5], overrides: { 'item-3': 0, 'item-4': 7 } }); renderDetail()
+    await screen.findByRole('region', { name: '评估计算统计' })
+    server.use(http.post(`${BASE}/business-assessments/:id/calculate`, () => HttpResponse.json({ message: '计算服务不可用' }, { status: 503 })))
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('计算服务不可用')
+    expect(screen.queryByRole('region', { name: '评估计算统计' })).not.toBeInTheDocument()
+    const table = screen.getByRole('table', { name: '已确认评估范围' })
+    expect(within(table).getAllByRole('row')).toHaveLength(6)
+    for (const [id, status, custom] of [[3, '未纳入', '0'], [4, '未纳入', '7'], [5, '未确认', '未覆盖']]) {
+      expect(within(within(table).getByRole('row', { name: new RegExp(`范围项${id} ${status}`) })).getAllByRole('cell').map(cell => cell.textContent))
+        .toEqual([`范围项${id}`, status, '1', custom, '暂不可用'])
+    }
+    expect(screen.getAllByRole('button', { name: '刷新' })).toHaveLength(1)
+  })
+
+  test('legacy详情继续使用原标签页、KPI和侧栏', async () => {
+    setupFrozen(); server.use(http.get(`${BASE}/business-assessments/:id/basis`, () => HttpResponse.json({ data: { kind: 'legacy' } })))
+    renderDetail(); await screen.findByText('总评估人天 · 实时')
+    expect(screen.getByText('云产品工作量')).toBeInTheDocument(); expect(screen.getByText('校验摘要')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '多组织推广估算' })).toBeInTheDocument()
+    expect(screen.getByText('仅显示已勾选')).toBeInTheDocument(); expect(screen.getByText('展开全部')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '查看完整目录' })).not.toBeInTheDocument()
   })
 })
