@@ -487,3 +487,64 @@ createWorkflowRuntime(manifest: ExecutionManifest, executionId: string): {
 
 
 **C2b.1总看板复验（2026-11-03）：** 九个相关页面已同步，board-build与board-consistency-check通过（21页、0错误/0警告）；浏览器展开完整台账后实读RP-050仍为C实施中，下一步为生产Skill/预算。截图：/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2b1-2026-11-03-board-requirements.png。新增状态可读，表格原有窄列换行保留，未声称完成视觉优化。本次临时3008服务与自建验证页已关闭，用户3006页未操作。
+
+
+### C2b.2 精细工单：单次生产Skill与调用预算（2026-11-03）
+
+用户“下一步”授权继续原RP-050，基线4458439/codex/wes-skills-c。沿用已批准受控执行设计，不重新开展需求评审。本单元实现独立单Skill执行服务，使用真实业务input而非examples；不复用evaluateSkill的样例遍历，也不复用sandbox.runTool的模拟分支。模型适配器具有生产默认实现，本轮验证只使用可信端口替身，不调用真实外部模型。当前无HTTP/UI/Worker接线，不更新3006/3004、不写预览库或用户模型状态文件。
+
+责任文件：skills.execution.ts（执行循环、校验、预算、取消）、skills.execution-model.ts（固定模型与凭据准备）、skills.execution.test.ts和必要的模型专项测试；窄改skills.module.ts出口、apps/api/package.json登记test:skill-execution与modules。沿用既有SkillModelRequest/Response和安全JSON/Schema/path helper，不新增依赖、DB迁移或工具目录。目标代码测试500–850行，超过999行先拆单元。父代理维护文档与总看板；执行方不自行提交，完成后先独立规格、再五轴质量/安全复核。
+
+```ts
+createSkillExecutionService(trustedPorts?).execute({
+  manifest, stepId, input, signal, budgets
+}): Promise<{
+  status: 'succeeded' | 'failed' | 'cancelled'; code?: string; output?: unknown;
+  usage: { modelAttempts: number; toolCalls: number; outputTokens: number; elapsedMs: number };
+  // 模型身份记录冻结providerId/model及实际transportProvider，不能互相冒充。
+}>;
+```
+
+内部契约：manifest由C1原读器重新验证复制，stepId只选择原固定依赖；输入整份安全JSON和冻结Schema校验，输出同样验证。独立Skill/流程内依赖共用服务，例子/期望值/测试断言不得当生产输入或验收条件。冻结instructions/model参数、资料正文按原绑定顺序进入提示，不重读latest知识或scenario。模型响应不合结构直接失败，不自动修复重试。
+
+生产准备：按冻结providerId查当前目录，核对启用、协议、原model存在、credentialScope和baseUrlDigest；缺项或漂移明确失败，不切供应商/模型。只在内存闭包取得该scope当前凭据，允许同scope轮换；原场景改绑不改本运行模型。复用createSkillModelAdapter的兼容传输，返回prepareModel.complete及预期实际transportProvider=kimi；响应provider按真实传输核对，model必须原精确值。证据分开保存冻结供应商与实际传输标识，不能假称providerId是模型响应。凭据/端点/原始异常不进入结果/日志。
+
+工具：只向模型声明原白名单和原生参数Schema。整批请求先验证callId唯一、toolName真实绑定、参数安全JSON+原生Schema+原inputMapping完全相等；拒绝output混合toolCalls。执行端口接收冻结caller/native/policy/binding/call/input和AbortSignal，只能由服务端装配。默认无端口时TOOL_GATE_UNAVAILABLE，绝不模拟成功或直接写入/外发。真实授权、人工确认、紧急禁用、幂等仍由C2c提供，快照/confirmation布尔值不是授权。工具结果安全JSON后才能反馈下一轮。
+
+预算：单次服务调用累计modelAttempts/toolCalls/outputTokens/elapsedMs；沿用原评估器上限60/60/128000/300000，允许收紧而不扩大。模型每次maxTokens取剩余额度和冻结定义较小值；耗尽前禁止下一次调用，工具批量预算不足时不执行部分批次。总截止从入口开始含prepare/model/gate，每次模型额外受原timeoutMs限制；父取消同时中止并通过race结束忽略signal的端口，清理定时器/监听器，迟到结果不能触发下一轮或工具。错误与失败消耗返回固定安全字段，跨节点/跨Run持久预算和恢复不属于本单次函数承诺。
+
+- [x] RED：真实input/无样例运行、原Skill/Workflow依赖、Schema与JSON、冻结资料/模型、目录变化/缺凭据/端点漂移、同scope轮换与scenario改绑；留存行为失败日志。
+- [x] GREEN：最小单次生产执行及默认准备，模型/工具响应、批次预检、精确映射与安全错误；不接真实工具端口或Worker。
+- [x] RED→GREEN：尝试/工具/tokens/timeout预算，准备阶段超时、父取消、忽略signal和迟到响应；确认无超限后的额外副作用。
+- [x] 独立规格复核通过后再五轴质量/安全复核；父实跑新测试、modules、原解释器/适配器、AI及双构建，通用集成缺模板继续单列。
+- [x] 更新README/对齐说明、总看板计划/需求进度/设计/运行/测试/监控/风险/变更；精确文件本地提交，未合main/推送，C2/C3/D和MVP不关闭。
+
+
+**C2b.2实现前契约修订：** 实取KimiProvider发现温度兼容重试可在maxAttempts=1之外再次请求，且通用适配器会丢弃混合toolCalls/content及坏JSON的usage。为保证本次预算真实约束网络次数，复用既有Provider传输，新增内部可选frozenExecution标记：非流式固定一次请求，显式原model与温度，不做兼容重试或参数改写；冻结supportedParams不允许temperature时由执行准备省略该字段。普通调用默认行为保持，流式带此标记明确拒绝。本单元可窄改ai/provider/model-provider.ts、kimi-provider.ts及新增冻结模式协议测试；执行专用消息适配器保留usage后校验坏JSON/混合响应，不另建HTTP传输。Provider原响应model字段由请求派生，不把该字段称为上游独立证明。总量超过999行先拆单元。
+
+
+**C2b.2输入追溯补充：** 单独Skill运行的input必须与manifest.initialInput结构相等（或直接取该值），不允许覆写已冻结的根输入；流程内Skill接受解释器映射后的input并验证原Schema，映射来源由C2b.1负责。新增根输入不一致反例须在模型准备前拒绝。
+
+
+**C2b.2规格澄清（既有参数语义）：** model-providers.ts已规定supportedParams非空为白名单、空数组为未声明约束（不限制，向后兼容）。因此空数组允许发送冻结temperature，只有非空白名单排除temperature时才省略。本工单“不允许temperature”的表述按该既有契约解释，不另造空数组等同禁止的新语义。规格复核以独立空数组探针发现歧义，现明确采用当前事实源，无需改变生产实现。
+
+
+**C2b.2首候选规格复核：** 新定向56/56、执行方modules906/906、父定向56/56及原解释器72/72、API/Web构建通过；独立规格复核以实际KimiProvider和拦截fetch构造非function原生调用，实得succeeded/gates1/modelAttempts2/outputTokens6，发现P2：严格解析丢弃原call.type。已REQUEST_CHANGES，新增全链反例要求错误类型在gate前拒绝、保留收到的usage；默认旧解析不改。首候选通过证据保留，不冒充返修后结果。
+
+
+**C2b.2最终回填（2026-11-03）：** 单次生产Skill服务与独立模型准备已实现，经规格及fresh五轴质量/安全APPROVE。实际业务input与样例执行分离，C1原manifest复验、精确依赖与根输入一致、冻结Schema/JSON及资料正文/顺序保持。当前供应商目录按原providerId/model/protocol/scope/endpointDigest核对，仅在内存取当前同scope凭据；不重解析scenario、不重读latest资料。保留目录供应商与实际kimi传输两种身份；响应model仍为既有Provider从请求派生的字段，不声称上游独立证明。
+
+预算与取消：单次调用统计模型尝试、实际门禁调用、收到的合法输出token和耗时；额度只收紧，发送maxTokens受剩余额度限制。准备、模型、工具均纳入总截止，模型另受原单次timeout；父取消及超时race忽略signal端口，阶段后守卫防迟到结果再触发下一轮。不能撤销已发出的I/O，也不能让不合作的可信工具端口收回自行造成的副作用；生产工具端口当前未装配。该预算不是跨节点/Run/重试持久预算，后续宿主接线仍须补持久约束。
+
+原生工具整批校验白名单、ID、原Schema与精确映射后才进入可信门禁；结果安全JSON后才能给下一轮。默认无门禁为TOOL_GATE_UNAVAILABLE，无模拟成功/真实写入外发。冻结Provider模式复用现有HTTP实现，强制单次且不做温度兼容重试/参数改写；普通/试运行默认行为不变，冻结流式明确拒绝。严格原生解析不修复坏参数或ID，不丢弃显式非法调用类型，收到的usage先于业务结构失败统计。非空supportedParams白名单与空数组未声明约束语义均保持。
+
+父最终独立候选：专项 **58/58**（/tmp/wes-c2b2-parent-final-target）、modules **908/908**（29 suites）、原Provider协议 **17/17**（/tmp/wes-c2b2-parent-final），均0fail/0skip；最终API构建通过（/tmp/wes-c2b2-parent-build-api-final.log）、Web构建通过（/tmp/wes-c2b2-parent-build-web.log），范围secret-scan零命中、diff-check通过。规格与质量各独立专项58/58后APPROVE；质量无新增具体可利用漏洞，未做负载测试，npm audit仍45既有基线（32moderate/12high/1critical），未改依赖/lockfile。
+
+本轮首候选906/906后、严格类型小修前的跨域回归：原解释器72/72、真实适配器58/58、AI286/286、Agent242/242通过（/tmp/wes-c2b2-parent-target、/tmp/wes-c2b2-parent-reviewed）；返修只影响新增冻结解析路径，最终908及17已覆盖该路径与旧协议默认行为，不冒充重新执行全部跨域套件。通用集成仍 **0/1 templates_status_not_200**，只读核对测试库活动模板/分配均0；模板域/路由/旧集成测试未改，不向预览或主库填数据放绿，远端CI未执行。
+
+完整审查史保留：首次行为RED48中40fail；严格解析RED8中7fail；根输入/预算形状/原生类型等RED56中4fail；首候选56/906绿色后，规格独立实际Provider探针发现P2（非function类型被丢弃，工具端口调用1次），REQUEST_CHANGES。补全链RED58中1fail后最小修复，最终实际探针为failed/门禁0/模型1/token3，规格复审通过。日志/tmp/wes-c2b2-red、/tmp/wes-c2b2-red-parser、/tmp/wes-c2b2-provenance-red、/tmp/wes-c2b2-native-type-red及GREEN、/tmp/wes-c2b2-spec-native-type-before.log与after.log均保留。新增四文件467行及Provider/module窄改，无新HTTP传输、DB迁移或依赖。
+
+边界与下一步：C2c.1接原契约持久等待/确认，随后C2c.2实时权限/紧急禁用、C2c.3写入幂等及跨调用预算、C2c.4统一视图，满足公开snapshot投影/会话删除并发/retry授权门槛后再接宿主执行与C3工作台。未开放HTTP、未接生产Worker、未调用真实模型或业务工具，不声称真实业务验收。未读取/改动用户model-verify-status文件、未更新3006/3004或预览数据，未合main/推送；C2整体/C3/D与MVP继续保持未完成。
+
+
+**C2b.2总看板复验：** 九页已同步，board-build与21页一致性检查0错0警告；浏览器展开RP-050台账实读仍C实施中，下一步等待/确认授权/幂等。截图/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2b2-2026-11-03-board-requirements.png。既有窄列/P2换行保持，不声称完成视觉优化。已关闭本次临时3008服务及自建页，未操作用户3006页。

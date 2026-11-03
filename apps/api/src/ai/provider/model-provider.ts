@@ -72,6 +72,8 @@ export interface ToolCall {
 export type ToolChoice = "auto" | "none";
 
 export interface ChatCompletionRequest {
+  /** Server-only frozen Skill invocation: exact model/parameters, one attempt, no compatibility retries. */
+  frozenExecution?: boolean;
   /** 覆盖 Provider 默认模型；不传则使用 Provider 默认 */
   model?: string;
   messages: ChatMessage[];
