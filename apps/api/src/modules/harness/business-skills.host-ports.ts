@@ -1,6 +1,8 @@
 import { db, type Database } from '../../db/client';
 import type { AuthUser } from '../../types';
+import type { RuntimeContext } from '../../agent/context/context.types';
 import { legacyRoleToV2Roles } from '../../rbac/roles';
+import { getCombinedCapabilities } from '../../rbac/permissions';
 import { resolveCurrentSkillTools, skillToolContract } from '../skills/skills.context';
 import { createExecutionAuthority, validateFrozenExecutionTools } from '../skills/execution-authority';
 import { createExecutionBudgetService } from '../skills/execution-budget';
@@ -16,8 +18,9 @@ import { skillDefinitionHash as hash } from '../skills/skills.hash';
 import { SkillError } from '../skills/skills.types';
 import { HarnessWorkflowCancelledError } from './harness-runtime.worker';
 import { createBusinessSkillOperationWaitService } from './business-skills.operation-wait';
+import { BUSINESS_SKILLS_WORKFLOW_ID } from './business-skills.identity';
 export type BusinessSkillHostOptions = { database?: Database; inventory?: typeof resolveCurrentSkillTools; prepareModel?: typeof prepareFrozenSkillModel };
-type Scope = BusinessSkillHostOptions & { manifest: ExecutionManifest; runId: string; ownerUserId: string;
+type Scope = BusinessSkillHostOptions & { manifest: ExecutionManifest; runId: string; ownerUserId: string; aiSessionId: string | null;
  identity: Awaited<ReturnType<typeof assertRunAdmissionInTransaction>>['identity']; signal: AbortSignal; pendingOperation?: { operationId: string } };
 type ToolRequest = Pick<ResumableSkillToolRequest, 'stepId' | 'ordinal' | 'snapshot' | 'call' | 'signal'>
  & { binding: Pick<ResumableSkillToolRequest['binding'], 'requiresConfirmation'> };
@@ -94,7 +97,12 @@ export function createBusinessSkillHostPorts(scope: Scope) {
       ...(native.outputSchema !== undefined ? { outputSchema: native.outputSchema } : {}) })) return fail('BUSINESS_SKILLS_TOOL_UNSUPPORTED');
     await check('tool', request.stepId, request.call.name);
     if (limits.signal.aborted) throw new HarnessWorkflowCancelledError();
-    const value = await tool.execute(request.call.arguments as Record<string, unknown>, { id: ownerUserId, roles: legacyRoleToV2Roles(user.role), capabilities: [tool.capability] });
+    const roles = legacyRoleToV2Roles(user.role);
+    const runtime: RuntimeContext = { requestId: `${runId}:${request.stepId}:${request.ordinal}`, traceId: runId,
+     actor: { userId: ownerUserId, roles, capabilities: getCombinedCapabilities(roles) }, channel: 'api',
+     workflowKey: BUSINESS_SKILLS_WORKFLOW_ID, harnessRunId: runId,
+     ...(scope.aiSessionId ? { aiSessionId: scope.aiSessionId } : {}) };
+    const value = await tool.execute(request.call.arguments as Record<string, unknown>, { id: ownerUserId, roles, capabilities: [tool.capability] }, runtime);
     return { value };
    });
    return { kind: 'completed', result };

@@ -30,14 +30,16 @@ import { skillDefinitionHash as hash } from '../skills/skills.hash';
 import { buildCreateProjectTool } from '../../agent/tools/mutation.tools';
 import type { AuthUser } from '../../types';
 import type { SkillDefinition } from '../skills/skills.types';
+import type { RuntimeContext } from '../../agent/context/context.types';
 const pool = new Pool({ connectionString: resolveExecutionTestDatabaseUrl(process.env), max: 1, connectionTimeoutMillis: 2000 });
 const database = drizzle(pool, { schema }), queue = createHarnessRuntimeRepository(database);
 const user = { id: randomUUID(), username: `host-${randomUUID()}`, role: 'admin', businessRole: 'pre_sales', status: 'active' } as AuthUser;
 let nativeCalls = 0;
+let nativeRuntime: RuntimeContext | undefined;
 const write = { ...buildCreateProjectTool(async () => { nativeCalls++; throw new Error('NATIVE WRITE MUST NOT RUN'); }), source: 'code' as const };
 const read = { name: 'read_one', description: 'A safe local read', parameters: write.parameters, mutates: false, exfiltrates: false,
  source: 'code' as const, sandboxReadSafe: true, capability: 'estimates:read' as const,
- async execute() { nativeCalls++; return { found: true }; } };
+ async execute(_args: unknown, _user: unknown, runtime?: RuntimeContext) { nativeCalls++; nativeRuntime = runtime; return { found: true }; } };
 const tools = [write, read];
 let currentTools = tools;
 const inventory = async () => ({ registry: { get: (name: string) => currentTools.find(t => t.name === name) }, tools: currentTools,
@@ -107,6 +109,11 @@ test('safe native reads run inside durable tool budget after the model checkpoin
  const checkpoints = await cps(f.runId); assert.equal(checkpoints.length, 3);
  assert.equal((checkpoints[2].state as any).businessSkills.state.skill.toolResults.length, 0);
  const budget = await createExecutionBudgetService({ database }).readBudget(user.id, f.runId); assert.equal(budget.toolCalls, 1);
+ assert.equal(nativeRuntime?.harnessRunId, f.runId); assert.equal(nativeRuntime?.aiSessionId, f.sessionId);
+ assert.equal(nativeRuntime?.actor.userId, user.id); assert.deepEqual(nativeRuntime?.actor.roles, ['ADMIN']);
+ assert.equal(nativeRuntime?.channel, 'api'); assert.equal(nativeRuntime?.workflowKey, 'business_skills_v1');
+ assert.equal(nativeRuntime?.traceId, f.runId); assert.ok(nativeRuntime?.actor.capabilities.includes('estimates:read'));
+ assert.notEqual(nativeRuntime?.requestId, 'call1');
 });
 test('current tool removal and emergency epoch block a resumed approved operation', async () => {
  for (const control of ['tool', 'epoch']) {

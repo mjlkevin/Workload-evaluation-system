@@ -15,7 +15,7 @@ const fakeUser: AuthUser = {
   lastLoginAt: "2026-01-01T00:00:00.000Z",
 };
 
-/** 全能力位视图（覆盖全部 8 个工具所需能力位） */
+/** 全能力位视图（覆盖全部代码工具所需能力位） */
 const FULL_CAPS: Capability[] = ["estimates:read", "estimates:create", "estimates:write"];
 
 function visibleNames(registry: ReturnType<typeof createDefaultRegistry>, caps: Capability[]): string[] {
@@ -25,13 +25,15 @@ function visibleNames(registry: ReturnType<typeof createDefaultRegistry>, caps: 
     .sort();
 }
 
-test("createDefaultRegistry: 注册数 ≥11 且工具名单快照（含内置 list_tools）", () => {
+test("createDefaultRegistry: 注册数 17 且工具名单快照（含内置 list_tools）", () => {
   const registry = createDefaultRegistry(fakeUser);
   const names = visibleNames(registry, FULL_CAPS);
 
-  assert.ok(names.length >= 11, `注册数应 ≥11，实际 ${names.length}`);
+  assert.equal(names.length, 17);
   assert.deepEqual(names, [
     "ask_user",
+    "assessment_catalog",
+    "assessment_match_validate",
     "create_project",
     // 批次 4：capability_discovery 正则退役后的承接工具
     "describe_capabilities",
@@ -42,6 +44,10 @@ test("createDefaultRegistry: 注册数 ≥11 且工具名单快照（含内置 l
     "knowledge_query",
     "list_tools",
     "project_list",
+    "requirement_clarify",
+    "requirement_confirm",
+    "requirement_normalize",
+    "requirement_sources",
     "rule_lookup",
   ]);
 });
@@ -49,15 +55,21 @@ test("createDefaultRegistry: 注册数 ≥11 且工具名单快照（含内置 l
 test("createDefaultRegistry: 能力位 → 工具映射快照", () => {
   const registry = createDefaultRegistry(fakeUser);
 
-  // estimates:read：4 个查询工具 + 批次 4 的能力清单 + 批次 9 的 ask_user + 内置发现工具 list_tools
+  // estimates:read：原 7 个只读工具 + 六个 MVP 原生读工具
   // （ask_user 用只读档是裁决：凡能用工作台的人都可被提问）
   assert.deepEqual(visibleNames(registry, ["estimates:read"]), [
     "ask_user",
+    "assessment_catalog",
+    "assessment_match_validate",
     "describe_capabilities",
     "estimate_history",
     "knowledge_query",
     "list_tools",
     "project_list",
+    "requirement_clarify",
+    "requirement_confirm",
+    "requirement_normalize",
+    "requirement_sources",
     "rule_lookup",
   ]);
   // estimates:create：初估 + 建项目
@@ -102,7 +114,7 @@ test("MS3: 默认注册表含内置 list_tools（发现类，核心注入）", (
   assert.notEqual(tool.discoverable, true, "list_tools 本身应常驻核心注入集");
 });
 
-test("MS3: 全量回退注入与旧行为逐字节一致（原 8 工具、原顺序、无 list_tools；批次 9 起末尾追加 ask_user）", () => {
+test("MS3: 全量注入保留原 8 工具顺序，在发现工具前追加 MVP 原生工具", () => {
   const registry = createDefaultRegistry(fakeUser);
   const names = registry
     .listFullToolsFor({ id: fakeUser.id, capabilities: FULL_CAPS })
@@ -121,6 +133,12 @@ test("MS3: 全量回退注入与旧行为逐字节一致（原 8 工具、原顺
     "ask_user",
     // 批次 4 追加在 ask_user 之后：前 9 项顺序仍逐字节不变
     "describe_capabilities",
+    "requirement_sources",
+    "requirement_normalize",
+    "requirement_clarify",
+    "requirement_confirm",
+    "assessment_catalog",
+    "assessment_match_validate",
   ]);
 });
 

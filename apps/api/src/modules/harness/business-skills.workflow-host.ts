@@ -37,7 +37,7 @@ export function createBusinessSkillsWorkflowExecutor(options: BusinessSkillHostO
   const runtime = createWorkflowRuntime(manifest, locked.chain.root);
   const host: BusinessSkillsHostState = locked.state ?? { schemaVersion: 1, kind: 'workflow', workflow: runtime.next().state };
   const ports = createBusinessSkillHostPorts({ ...options, database, inventory, manifest, runId, ownerUserId,
-   identity: locked.identity, signal: context.abortSignal, pendingOperation: host.pendingOperation });
+   aiSessionId: context.run.aiSessionId, identity: locked.identity, signal: context.abortSignal, pendingOperation: host.pendingOperation });
   await ports.check('resume'); guard();
   function checkpoint(next: BusinessSkillsHostState): BusinessSkillsExecutionResult {
    guard(); return { nextStepKey: 'execute', state: next, checkpoint: { key: `host:${hash(next)}`, kind: 'structural', resumePolicy: 'restart_step' } };

@@ -30,7 +30,7 @@ export function createBusinessSkillHost(options: BusinessSkillHostOptions = {}):
     if (manifest.kind !== 'skill' || manifest.skills.length !== 1) fail('BUSINESS_SKILLS_HOST_KIND_UNSUPPORTED');
     const host: BusinessSkillsHostState = locked.state ?? { schemaVersion: 1, kind: 'skill' };
     const ports = createBusinessSkillHostPorts({ ...options, database, inventory, manifest, runId, ownerUserId,
-      identity: locked.identity, signal: context.abortSignal, pendingOperation: host.pendingOperation });
+      aiSessionId: context.run.aiSessionId, identity: locked.identity, signal: context.abortSignal, pendingOperation: host.pendingOperation });
     await ports.check('resume'); guard();
     if (host.pendingOperation) {
       const status = await ports.pendingStatus(); guard();

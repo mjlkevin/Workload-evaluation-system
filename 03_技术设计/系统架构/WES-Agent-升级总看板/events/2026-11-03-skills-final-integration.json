@@ -133,6 +133,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-mvp-proof-quality; /tmp/wes-finish-mvp-proof-quality-share",
       "summary": "D1真实来源/确认/最新输出证明SPEC/fresh质量通过；独立13+2及最终11PG零跳过。一次visit同规模读取7903.9→495.54ms；SHARE兼容且冻结六类更新，不降低500receipt配额。D3草稿/模型验收另待。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-mvp-native; /tmp/wes-finish-mvp-native-quality",
+      "summary": "六原生工具及真实runtime接线SPEC/fresh质量通过；RED88中11fail后GREEN88及独立pure9/六工具发布合同探针通过，0skip。清单17保留旧8顺序；模型三Skill/草稿业务验收尚未完成。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

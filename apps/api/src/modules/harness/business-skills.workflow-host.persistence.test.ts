@@ -31,15 +31,18 @@ import { buildCreateProjectTool } from '../../agent/tools/mutation.tools';
 import type { AuthUser } from '../../types';
 import type { SkillDefinition } from '../skills/skills.types';
 import type { WorkflowDefinition } from '../workflows/workflows.types';
+import type { RuntimeContext } from '../../agent/context/context.types';
 const pool = new Pool({ connectionString: resolveExecutionTestDatabaseUrl(process.env), max: 1, connectionTimeoutMillis: 2000 });
 const database = drizzle(pool, { schema }), queue = createHarnessRuntimeRepository(database);
 const user = { id: randomUUID(), username: `workflow-host-${randomUUID()}`, role: 'admin', businessRole: 'pre_sales', status: 'active' } as AuthUser;
 const actor = { id: user.id, username: user.username };
 const payload = { type: 'object', properties: { projectName: { type: 'string' } }, required: ['projectName'], additionalProperties: false };
 let reads = 0;
+const nativeRuntimes: Array<RuntimeContext | undefined> = [];
 const write = { ...buildCreateProjectTool(async () => { assert.fail('Native write must never dispatch'); }), source: 'code' as const };
 const read = { name: 'workflow_read', description: 'Safe local read', parameters: payload, source: 'code' as const, sandboxReadSafe: true,
- mutates: false, exfiltrates: false, capability: 'estimates:read' as const, async execute() { reads++; return { found: true }; } };
+ mutates: false, exfiltrates: false, capability: 'estimates:read' as const,
+ async execute(_args: unknown, _user: unknown, runtime?: RuntimeContext) { reads++; nativeRuntimes.push(runtime); return { found: true }; } };
 const tools = [write, read]; let currentTools = tools;
 const inventory = async () => ({ registry: { get: (name: string) => currentTools.find(t => t.name === name) }, tools: currentTools,
  policy: { schemaVersion: 1, policies: {} } }) as any;
@@ -95,7 +98,7 @@ async function recover(runId: string) {
  await database.update(schema.harnessRuns).set({ status: 'queued' }).where(eq(schema.harnessRuns.harnessRunId, runId));
 }
 test('real Worker dispatches all four nodes and a fresh service resumes original explicit contracts', async () => {
- const f = await fixture(), counter = { models: 0 }, before = reads; await worker(counter);
+ const f = await fixture(), counter = { models: 0 }, before = reads, runtimeCount = nativeRuntimes.length; await worker(counter);
  assert.equal((await saved(f.runId)).status, 'waiting'); assert.equal(counter.models, 2); assert.equal(reads, before + 1);
  const all = await checkpoints(f.runId), bootstrap = (all.at(-1)!.state as any).businessSkills.state;
  assert.equal(bootstrap.kind, 'workflow'); assert.deepEqual(bootstrap.workflow.receipts, []); assert.equal(bootstrap.skill, undefined);
@@ -110,6 +113,14 @@ test('real Worker dispatches all four nodes and a fresh service resumes original
  assert.equal(final.workflow.receipts.length, 4); assert.equal(final.skill, undefined); assert.equal(final.pendingOperation, undefined);
  assert.equal((await createBusinessSkillsWaitService(database).answer(first)).created, false);
  const budget = await createExecutionBudgetService({ database }).readBudget(user.id, f.runId); assert.equal(budget.modelAttempts, 2); assert.equal(budget.toolCalls, 2);
+ const contexts = nativeRuntimes.slice(runtimeCount); assert.equal(contexts.length, 2);
+ for (const runtime of contexts) {
+  assert.equal(runtime?.harnessRunId, f.runId); assert.equal(runtime?.aiSessionId, f.sessionId);
+  assert.equal(runtime?.actor.userId, user.id); assert.deepEqual(runtime?.actor.roles, ['ADMIN']);
+  assert.equal(runtime?.channel, 'api'); assert.equal(runtime?.workflowKey, 'business_skills_v1');
+  assert.equal(runtime?.traceId, f.runId); assert.ok(runtime?.actor.capabilities.includes('estimates:read'));
+  assert.notEqual(runtime?.requestId, 'read1');
+ }
 });
 test('persisted model batch resumes with a fresh Worker without repeating the model response', async () => {
  const f = await fixture(), counter = { models: 0 }; let commits = 0;

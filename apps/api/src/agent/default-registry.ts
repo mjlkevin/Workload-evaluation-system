@@ -16,6 +16,8 @@ import {
 import { buildListToolsTool } from "./tools/list-tools.tools";
 import { buildAskUserTool } from "./tools/ask-user.tools";
 import { buildDescribeCapabilitiesTool } from "./tools/capability.tools";
+import { buildMvpRequirementTools } from "./tools/mvp-requirements.tools";
+import { buildMvpAssessmentTools } from "./tools/mvp-assessment.tools";
 import { resolveBusinessRole } from "../middleware/auth";
 import { routeKnowledgeBase, type KnowledgeBaseRouteDecision } from "../services/ai/knowledge-base-router.service";
 import type { ZhipuKnowledgeToolConfig, ZhipuKnowledgeToolTrace } from "../services/ai/knowledge-tool.service";
@@ -31,8 +33,7 @@ import { queryZhipuKnowledgeBase } from "../services/ai/knowledge-tool.service";
 import { buildDerivedWbsItemsForUser } from "../routes/wbs.routes";
 
 /**
- * 默认 Agent 工具注册表（O2 · A3）：注册全部 11 个工具（批次 9 起 = 原 8 个
- * + ask_user + 内置发现工具 list_tools；批次 4 再起 + describe_capabilities）。
+ * 默认 Agent 工具注册表：原 11 个工具 + 六个 MVP 原生读/校验工具。
  *
  * 能力位映射说明：计划文档中的 project:read / estimate:read / knowledge:read /
  * rule:read / project:write / wbs:write / export:write 在当前 RBAC Capability
@@ -92,6 +93,9 @@ export function createDefaultRegistry(user: AuthUser, runtime?: RuntimeContext):
   // ---- 批次 4：能力清单（capability_discovery 正则退役后的承接方） ----
   // 排在 ask_user 之后、发现工具之前：原 8 个工具的注入顺序仍逐字节不变。
   registry.register(buildDescribeCapabilitiesTool());
+
+  // Code-owned contracts remain visible in catalog/publication; execution requires a trusted Run proof.
+  for (const tool of [...buildMvpRequirementTools(user.id), ...buildMvpAssessmentTools(user.id)]) registry.register(tool);
 
   // ---- SP-2026-007 MS3：内置发现工具（注册在最后，全量回退时按 category=discovery 排除，
   //      保证旧 8 工具注入顺序逐字节一致；按需发现模式下常驻核心注入集） ----
