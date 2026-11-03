@@ -148,6 +148,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-mvp-draft/code-cross-red; /tmp/wes-finish-mvp-draft/code-cross-regression; /tmp/wes-finish-mvp-draft/quality-four-cases.log",
       "summary": "D3原子草稿及typed-root SPEC/fresh质量APPROVE；作者新18+旧23及兼容14通过，独立精准4例通过（另14未跑）。跨真实普通创建重复编码RED经共用事务锁修复；规则引擎5天、回执失败回滚与当前run重试已核。真实LLM/业务验收另待。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-quote-transport-red.log; /tmp/wes-quote-transport-quality-tests.log; /tmp/wes-quote-transport-quality-tsc.log",
+      "summary": "模型引用传输边界SPEC/fresh质量APPROVE，RED1pass9fail后独立40/40及tsc0；同需求两不同旧锚点拒绝探针通过。仅唯一逐字引用派生位置，规范报告/确认/原生证明不放宽；不等同模型验收。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

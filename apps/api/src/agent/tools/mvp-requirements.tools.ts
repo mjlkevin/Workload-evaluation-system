@@ -3,10 +3,12 @@ import type { RuntimeContext } from '../context/context.types';
 import type { MvpExecutionProof } from '../../modules/skills/mvp/execution-proof.repository';
 import {
  confirmRequirements, normalizeRequirementCandidates, validateRequirementClarification, requirementReportDigest,
- mvpArray, mvpInvalid, mvpObject, mvpText, parseMvpContract, REQUIREMENT_CANDIDATES_SCHEMA,
+ mvpArray, mvpInvalid, mvpObject, mvpText, parseMvpContract,
  REQUIREMENT_EXTRACTION_INPUT_SCHEMA, REQUIREMENT_REPORT_SCHEMA,
  type RequirementReport, type RequirementConfirmation,
 } from '../../modules/skills/mvp/requirements';
+import { resolveCandidateQuotes, resolveReportQuotes, TRANSPORT_REQUIREMENT_CANDIDATES_SCHEMA,
+ TRANSPORT_REQUIREMENT_REPORT_SCHEMA } from '../../modules/skills/mvp/quote-transport';
 
 export type MvpProofReader = (ownerUserId: string, runtime: RuntimeContext | undefined, toolName: string, parameters: unknown) => Promise<MvpExecutionProof>;
 const readProof: MvpProofReader = async (owner, runtime, name, parameters) => {
@@ -56,13 +58,17 @@ export function buildMvpRequirementTools(ownerUserId: string, reader?: MvpProofR
   mvpReadTool(ownerUserId, reader, { name: 'requirement_sources', description: '读取本次已冻结材料和用户实际补充的需求来源',
    parameters: mvpObject({}), outputSchema: REQUIREMENT_EXTRACTION_INPUT_SCHEMA, run: (_input, proof) => ({ sources: boundedSources(proof) }) }),
   mvpReadTool(ownerUserId, reader, { name: 'requirement_normalize', description: '验证需求候选的原文出处并生成稳定需求编号',
-   parameters: mvpObject({ candidates: REQUIREMENT_CANDIDATES_SCHEMA }), outputSchema: REQUIREMENT_REPORT_ENVELOPE_SCHEMA,
-   run: (input: { candidates: unknown }, proof) => requirementReportEnvelope(normalizeRequirementCandidates({ sources: boundedSources(proof) }, input.candidates)) }),
+   parameters: mvpObject({ candidates: TRANSPORT_REQUIREMENT_CANDIDATES_SCHEMA }), outputSchema: REQUIREMENT_REPORT_ENVELOPE_SCHEMA,
+   run(input: { candidates: unknown }, proof) {
+    const sources = boundedSources(proof);
+    return requirementReportEnvelope(normalizeRequirementCandidates({ sources }, resolveCandidateQuotes(sources, input.candidates)));
+   } }),
   mvpReadTool(ownerUserId, reader, { name: 'requirement_clarify', description: '根据真实补充回答验证澄清报告，保留需求编号和原文引用',
-   parameters: mvpObject({ previous: REQUIREMENT_REPORT_SCHEMA, report: REQUIREMENT_REPORT_SCHEMA }), outputSchema: REQUIREMENT_REPORT_ENVELOPE_SCHEMA,
-   run(input: { previous: RequirementReport; report: RequirementReport }, proof) {
+   parameters: mvpObject({ previous: REQUIREMENT_REPORT_SCHEMA, report: TRANSPORT_REQUIREMENT_REPORT_SCHEMA }), outputSchema: REQUIREMENT_REPORT_ENVELOPE_SCHEMA,
+   run(input: { previous: RequirementReport; report: unknown }, proof) {
     proof.assertPreviousOutput(['requirement_normalize', 'requirement_clarify'], requirementReportEnvelope(input.previous));
-    return requirementReportEnvelope(validateRequirementClarification(input.previous, boundedSources(proof), input.report));
+    const sources = boundedSources(proof);
+    return requirementReportEnvelope(validateRequirementClarification(input.previous, sources, resolveReportQuotes(sources, input.report, input.previous)));
    } }),
   mvpReadTool(ownerUserId, reader, { name: 'requirement_confirm', description: '核对用户已确认的完整报告、需求选择及冲突处理，输出可信需求范围',
    parameters: REQUIREMENT_CONFIRM_PARAMETERS, outputSchema: CONFIRMED_REQUIREMENTS_SCHEMA,
