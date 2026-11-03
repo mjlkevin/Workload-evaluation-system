@@ -89,8 +89,7 @@ async function countRuns() { return Number((await pool.query('SELECT count(*) n 
 async function persisted(id: string) { return (await queue.findRunForOwner(id, user.id))!; }
 test('manual retry keeps frozen version/input/content, remints message and records actor/reason/lineage atomically', async () => {
   const f = await failed(); const old = structuredClone(f.run); const body = request();
-  await database.insert(schema.harnessRunCheckpoints).values({ harnessRunCheckpointId: randomUUID(), harnessRunId: f.run.harnessRunId, sequence: 1, checkpointKey: 'old', checkpointKind: 'structural',
-    workflowId: f.run.workflowId!, workflowVersion: f.run.workflowVersion!, stepKey: 'old', resumePolicy: 'resume_next', state: { confirmed: true }, stateHash: hash('old'), runtimeValidation: {} });
+  // A source without a checkpoint still starts a fresh Run; corrupt/orphan checkpoints are covered separately.
   await database.insert(schema.harnessRunOutputs).values({ harnessRunOutputId: randomUUID(), harnessRunId: f.run.harnessRunId, status: 'final', content: { old: true }, contentHash: hash('old') });
   // New startup uses the old published version, even when the root points elsewhere.
   await database.update(schema.skillDefinitions).set({ activeVersionId: randomUUID() }).where(eq(schema.skillDefinitions.skillId, f.root.skillId));

@@ -182,13 +182,21 @@ test('real create_project production metadata permits explicit local adapter exe
 test('explicit failed-run retry keeps logical cursor and operation identity and needs current-run approval before receipt reuse', async () => {
  const f = await fixture(), counter = { models: 0 }, count = (await records()).length;
  await worker(hostOptions(f, counter)); const firstView = await service().read(user, f.runId);
- await service().answer(user, answer(f.runId, firstView, 'approve')); await worker(hostOptions(f, counter));
- const original = ((await cps(f.runId))[0].state as any).businessSkills.state.skill;
+ await service().answer(user, answer(f.runId, firstView, 'approve'));
+ // Preserve a real pending checkpoint after the effect commits but before its progress checkpoint does.
+ const wrapped = Object.create(queue); wrapped.commitCheckpoint = async (input: any) => {
+  if (input.state.businessSkills.state.skill.toolResults.length === 1) throw new HarnessFaultInjectedError('RETRY AFTER RECEIPT BEFORE CHECKPOINT');
+  return queue.commitCheckpoint(input);
+ };
+ await worker(hostOptions(f, counter), { repository: wrapped });
+ assert.equal(counter.models, 1); assert.equal((await records()).length, count + 1);
+ const sourceCheckpoints = await cps(f.runId), original = (sourceCheckpoints[sourceCheckpoints.length - 1].state as any).businessSkills.state.skill;
+ await database.update(schema.harnessRunAttempts).set({ status: 'cancelled', finishedAt: new Date() }).where(eq(schema.harnessRunAttempts.harnessRunId, f.runId));
  await database.update(schema.harnessRuns).set({ status: 'failed' }).where(eq(schema.harnessRuns.harnessRunId, f.runId));
  await database.update(schema.skillDefinitions).set({ emergencyEpoch: 1 }).where(eq(schema.skillDefinitions.skillId, f.root.skillId));
  const retried = await createSkillRetryService({ database, inventory, prepareModel: async () => ({ transportProvider: 'kimi', async complete() { assert.fail('Retry preparation cannot dispatch'); } }) })
   .retryInvocation(user, f.runId, { submissionKey: randomUUID(), reason: 'Explicit receipt recovery' });
- const retryId = retried.data.runId; await worker(hostOptions(f, counter)); assert.equal((await saved(retryId)).status, 'waiting');
+ const retryId = retried.data.runId; await worker(hostOptions(f, counter)); assert.equal((await saved(retryId)).status, 'waiting'); assert.equal(counter.models, 1);
  const state = ((await cps(retryId))[0].state as any).businessSkills.state.skill, view = await service().read(user, retryId);
  assert.equal(state.runId, f.runId); assert.equal(state.operationId, original.operationId); assert.equal(view.operationId, firstView.operationId);
  assert.equal(view.status, 'pending'); assert.notEqual(view.confirmationHash, firstView.confirmationHash);
@@ -197,7 +205,7 @@ test('explicit failed-run retry keeps logical cursor and operation identity and 
  await assert.rejects(service().answer(user, { ...answer(retryId, view, 'approve'), confirmationHash: firstView.confirmationHash }));
  assert.equal((await saved(retryId)).status, 'waiting'); assert.equal((await records()).length, count + 1);
  await service().answer(user, answer(retryId, view, 'approve')); await worker(hostOptions(f, counter));
- assert.equal((await saved(retryId)).status, 'completed'); assert.equal((await records()).length, count + 1);
+ assert.equal((await saved(retryId)).status, 'completed'); assert.equal((await records()).length, count + 1); assert.equal(counter.models, 2);
 });
 
 test('real model authority rechecks DB identity at the actual dispatch boundary after budget reservation', async () => {

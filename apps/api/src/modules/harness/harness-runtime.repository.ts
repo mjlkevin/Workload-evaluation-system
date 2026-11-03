@@ -95,6 +95,8 @@ export type CreateQueuedHarnessRunInput = {
   /** Server-only hooks. They must use this transaction connection without external I/O. */
   resolveExecutionConfig?: (tx: QueueDbExecutor) => Promise<Record<string, unknown>>;
   validateSubmission?: (tx: QueueDbExecutor) => Promise<void>;
+  /** Server-only atomic initialization; the queued Run is invisible until this transaction commits. */
+  initializeRun?: (tx: HarnessTx, run: HarnessRunRow) => Promise<void>;
   /** Absent for legacy chat; present for strict business invocation idempotency. */
   submissionFingerprint?: string;
   metadata?: Record<string, unknown>;
@@ -844,6 +846,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
                 payload: userMessagePayload,
               });
             }
+            if (input.initializeRun) await safeQueueCallback(() => input.initializeRun!(tx, inserted[0]));
             const [persisted] = await tx
               .select()
               .from(harnessRuns)
