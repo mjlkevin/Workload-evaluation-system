@@ -188,6 +188,16 @@
       "kind": "preview-backup",
       "ref": "workload_eval_skills_backup_20261103142252; /tmp/wes-preview-final/backup-result.log",
       "summary": "恢复前已克隆原预览库，10表仅取count和digest；用户4、凭据1、原Skill3/版本7。未迁移或改账号/密钥，待0030升级后复证哈希。"
+    },
+    {
+      "kind": "live-environment",
+      "ref": "/tmp/wes-preview-final/post-migrate-check.log; /tmp/wes-preview-final/stored-key-restored.log",
+      "summary": "0030升级后原10表摘要不变。初次启动误用主目录无效KEK，继而无法解密而回退env401；已找回A预览原专用0600配置，原DB密钥解密成功且真实Kimi输出350tokens。未改账号/凭据/主配置，不归咎用户密钥，旧失败证据保留。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-preview-final/decompose-trial-evidence.json; /tmp/wes-managed-assets-quality-recheck-tests.log; /tmp/wes-final-cd-validation/semantic-assertions",
+      "summary": "真实拆解样例被约束数组字面断言误拒；仅修新增定义的语义判据并收紧数量，原文引用不变。SPEC/fresh质量48/48、父模块1095/1095及APIbuild0；新增模拟回归明确不具发布资格。新Skill已正式检出保存检入A.1，真实复测/发布继续，原失败不抹除。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

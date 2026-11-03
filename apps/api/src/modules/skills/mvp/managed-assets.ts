@@ -85,10 +85,10 @@ function examples(): Record<keyof MvpSkillBindings, SkillDefinition['examples']>
  return {
   decompose: [
    { title: 'TEST ONLY 可分别验收的查询与导出', input: { sources: [source] }, expected: candidates,
-    assertions: [{ path: '$.requirements', op: 'minItems', value: 2 }, { path: '$.requirements.0.sources', op: 'contains', value: candidates.requirements[0].sources[0] },
-     { path: '$.requirements.1.constraints', op: 'contains', value: 'Excel' }, { path: '$.requirements.1.sources', op: 'contains', value: candidates.requirements[1].sources[0] }] },
+    assertions: [{ path: '$.requirements.length', op: 'equals', value: 2 }, { path: '$.requirements.0.sources', op: 'contains', value: candidates.requirements[0].sources[0] },
+     { path: '$.requirements.1.description', op: 'contains', value: 'Excel' }, { path: '$.requirements.1.sources', op: 'contains', value: candidates.requirements[1].sources[0] }] },
    { title: 'TEST ONLY 保留完整目录交付意图', input: { sources: [wholeSource] }, expected: wholeCandidates,
-    assertions: [{ path: '$.requirements.length', op: 'equals', value: 1 }, { path: '$.requirements.0.constraints', op: 'contains', value: '全部实施交付' },
+    assertions: [{ path: '$.requirements.length', op: 'equals', value: 1 }, { path: '$.requirements.0.description', op: 'contains', value: '全部实施交付' },
      { path: '$.requirements.0.sources', op: 'contains', value: wholeCandidates.requirements[0].sources[0] }] },
   ],
   clarify: [

@@ -5,6 +5,7 @@ import { buildMvpAssessmentTools } from '../../../agent/tools/mvp-assessment.too
 import { buildMvpAssessmentDraftTools } from '../../../agent/tools/mvp-assessment-draft.tools';
 import { validateSkillDefinition, compileSkillPayloadSchema } from '../skills.validation';
 import { skillDefinitionHash } from '../skills.hash';
+import { evaluateSkill } from '../skills.evaluation';
 import { validateWorkflowDefinition } from '../../workflows/workflows.validation';
 import type { WorkflowValidationContext, WorkflowDefinition } from '../../workflows/workflows.types';
 import { REQUIREMENT_EXTRACTION_INPUT_SCHEMA, REQUIREMENT_CLARIFICATION_INPUT_SCHEMA, REQUIREMENT_REPORT_SCHEMA,
@@ -154,5 +155,51 @@ test('human-authored matching examples preserve all frozen references and cover 
   if (/完整目录/.test(example.title)) {
    assert.equal(output.matches.length, 0); assert.equal(output.unmatched.length, input.confirmedRequirementIds.length);
   }
+ }
+});
+
+test('SIMULATION ONLY decompose assertions accept equivalent descriptions while rejecting lost scope and fragmented requirements', async () => {
+ const definition = buildMvpSkillDefinitions().decompose;
+ const outputs = definition.examples.map(example => structuredClone(example.expected)) as Array<{
+  requirements: Array<{ description: string; constraints: string[] }>;
+ }>;
+ // Equivalent valid wording observed in failed real trial; these clones are simulation data, never live-model evidence.
+ outputs[0].requirements[0].constraints = ['查询条件为客户'];
+ outputs[0].requirements[0].description = '销售主管能够按客户条件查询订单，获得对应的订单查询结果。';
+ outputs[0].requirements[1].constraints = ['导出格式为Excel', '导出内容来源于当前查询结果'];
+ outputs[0].requirements[1].description = '销售主管能够将按客户查询得到的订单结果导出为Excel文件，以便离线查看或进一步处理。';
+ outputs[1].requirements[0].constraints = [];
+ outputs[1].requirements[0].description = '实施顾问完成纯测试销售目录的全部实施交付。该需求为整体范围意图，保留完整交付范围，不拆分为子功能。';
+ const simulate = async (value: typeof definition, cases = outputs) => {
+  let index = 0;
+  const result = await evaluateSkill(value, { mode: 'simulation', allowedTools: [], complete: async () => ({
+   output: structuredClone(cases[index++]), provider: 'test-only-simulation', model: 'cloned-fixture', usage: { outputTokens: 1 },
+  }) });
+  assert.equal(result.mode, 'simulation'); assert.equal(result.modelExecuted, false); assert.equal(result.releaseEligible, false);
+  return result;
+ };
+ const legacy = structuredClone(definition);
+ legacy.examples[0].assertions![0] = { path: '$.requirements', op: 'minItems', value: 2 };
+ legacy.examples[0].assertions = legacy.examples[0].assertions!.map(assertion => assertion.value === 'Excel'
+  ? { ...assertion, path: '$.requirements.1.constraints' } : assertion);
+ legacy.examples[1].assertions = legacy.examples[1].assertions!.map(assertion => assertion.value === '全部实施交付'
+  ? { ...assertion, path: '$.requirements.0.constraints' } : assertion);
+ const oldResult = await simulate(legacy);
+ assert.deepEqual(oldResult.cases.map(item => item.passed), [false, false]);
+ assert.ok(oldResult.cases.every(item => item.failures[0]?.code === 'BUSINESS_ASSERTION_FAILED'));
+ const accepted = await simulate(definition);
+ assert.equal(accepted.passed, true); assert.equal(accepted.releaseReason, 'SIMULATION_ONLY');
+ const mutations: Array<[number, (value: typeof outputs) => void]> = [
+  [0, value => { value[0].requirements.pop(); }],
+  [0, value => { value[0].requirements[1].description = '将查询结果导出为文本文件'; }],
+  [1, value => { value[1].requirements.push(structuredClone(value[1].requirements[0])); }],
+  [1, value => { value[1].requirements[0].description = '只实施订单查询子功能'; }],
+ ];
+ for (const [caseIndex, mutate] of mutations) {
+  const bad = structuredClone(outputs); mutate(bad);
+  const rejected = await simulate(definition, bad);
+  assert.equal(rejected.passed, false); assert.equal(rejected.cases[caseIndex].passed, false);
+  assert.equal(rejected.cases[caseIndex].failures[0]?.code, 'BUSINESS_ASSERTION_FAILED');
+  assert.equal(rejected.cases[1 - caseIndex].passed, true);
  }
 });
