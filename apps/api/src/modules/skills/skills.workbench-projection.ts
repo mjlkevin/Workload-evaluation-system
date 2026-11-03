@@ -1,11 +1,13 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db, type Database } from '../../db/client';
-import { aiSessions, harnessToolEvents } from '../../db/schema';
+import { aiSessions } from '../../db/schema';
 import type { AuthUser } from '../../types';
 import { createExecutionManifestPgRepository } from './execution-manifest-pg.repository';
 import { resolveCurrentSkillTools } from './skills.context';
 import { createExecutionBudgetService } from './execution-budget';
 import { buildBusinessExecutionView, safeBusinessJson } from './skills.workbench-view';
+import { readBusinessExecutionHistoryInTransaction } from './skills.workbench-history';
+import { buildBusinessExecutionTimeline } from './skills.workbench-timeline';
 import { SkillError } from './skills.types';
 import { HarnessRuntimeError, lockRunRow } from '../harness/harness-runtime.repository';
 import { readBusinessSkillHostCheckpointInTransaction, createBusinessSkillOperationWaitService } from '../harness/business-skills.operation-wait';
@@ -27,9 +29,9 @@ export function createBusinessExecutionProjectionService(options: Options = {}) 
     if (!session || session.owner !== user.id) fail(404);
     await identity.verifyCaller(tx, user);
     const saved = await readBusinessSkillHostCheckpointInTransaction(tx, run);
-    const effects = await tx.select({ toolName: harnessToolEvents.toolName, output: harnessToolEvents.output }).from(harnessToolEvents)
-      .where(and(eq(harnessToolEvents.harnessRunId, saved.chain.root), eq(harnessToolEvents.eventType, 'business_operation_executed'), eq(harnessToolEvents.status, 'succeeded')));
-    return { run, ...saved, effects };
+    const history = await readBusinessExecutionHistoryInTransaction(tx, saved);
+    const effects = history.toolEvents.filter(row => row.eventType === 'business_operation_executed' && row.status === 'succeeded');
+    return { run, ...saved, effects, history };
   });
   return { async read(user: AuthUser, runId: string) {
     try {
@@ -38,7 +40,6 @@ export function createBusinessExecutionProjectionService(options: Options = {}) 
       // Inventory/confirmation reads never retain this snapshot's Run lock.
       // A changed checkpoint invalidates the whole provisional view, at most once.
       for (let attempt = 0; attempt < 2; attempt++) {
-        const view = buildBusinessExecutionView(current.manifest, current.state);
         const budget = await createExecutionBudgetService({ database }).readBudget(user.id, runId);
         const { rootRunId: _root, ...safeBudget } = budget;
         const active = ['queued', 'running', 'waiting', 'recovering'].includes(current.run.status) && !current.run.cancelRequestedAt;
@@ -56,8 +57,9 @@ export function createBusinessExecutionProjectionService(options: Options = {}) 
             current = after;
             continue;
           }
+          current = after;
           if (operationError) throw operationError;
-          if (!operation || operation.operationId !== current.state.pendingOperation.operationId) return fail();
+          if (!operation || operation.operationId !== current.state?.pendingOperation?.operationId) return fail();
           pendingOperation = { actionId: operation.actionId, operationId: operation.operationId, stepId: operation.stepId,
             toolName: operation.toolName, parameters: safeBusinessJson(operation.parameters), confirmationHash: operation.confirmationHash, status: operation.status };
         } else if (active && current.manifest.kind === 'workflow') {
@@ -65,6 +67,9 @@ export function createBusinessExecutionProjectionService(options: Options = {}) 
           if (current.run.status === 'waiting' && decision.kind === 'ready' && ['userInput', 'confirmation'].includes(decision.command.type))
             pendingInput = safeBusinessJson(businessSkillsWaitDescriptor(current.run, decision.command as BusinessSkillsWaitCommand));
         }
+        const view = buildBusinessExecutionView(current.manifest, current.state);
+        const timeline = buildBusinessExecutionTimeline({ manifest: current.manifest, state: current.state, runId, rootRunId: current.chain.root,
+          ownerUserId: user.id, sessionId: current.chain.sessionId, runStatus: current.run.status, ...current.history });
         for (const effect of current.effects) {
           const output = effect.output as Record<string, unknown> | null;
           if (!output || output.schemaVersion !== 1 || !Object.prototype.hasOwnProperty.call(output, 'result') || Object.keys(output).length !== 2) fail();
@@ -73,7 +78,7 @@ export function createBusinessExecutionProjectionService(options: Options = {}) 
             view.results.effects.push({ toolName: effect.toolName, result });
         }
         if (current.run.status === 'waiting' && view.currentStep) view.currentStep.status = 'waiting';
-        return { ...view, budget: safeBudget, ...(pendingInput ? { pendingInput } : {}), ...(pendingOperation ? { pendingOperation } : {}) };
+        return { ...view, timeline, budget: safeBudget, ...(pendingInput ? { pendingInput } : {}), ...(pendingOperation ? { pendingOperation } : {}) };
       }
       return fail();
     } catch (error) {

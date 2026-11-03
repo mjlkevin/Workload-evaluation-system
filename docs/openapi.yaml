@@ -11065,6 +11065,83 @@ components:
           description: SSE 回放起始游标（事件 sequence）
       required: [runId, sessionId, status, eventCursor]
 
+    BusinessExecutionTimeline:
+      type: object
+      additionalProperties: false
+      description: >
+        只读阶段消息投影；来源仅限当前用户、会话及经验证的物理重试祖先链。
+        runId 仅在物理来源已验证时返回；不以逻辑执行ID或最终完成Run猜测来源。
+        历史缺失时保留可验证阶段并标记partial，不生成推测消息。GET不写会话、账本或业务数据。
+        最终业务产物仍由businessExecution.results.output提供。
+      required: [version, rootRunId, entries, coverage, unavailable]
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        rootRunId:
+          type: string
+          format: uuid
+        entries:
+          type: array
+          maxItems: 4096
+          items:
+            $ref: "#/components/schemas/BusinessExecutionTimelineEntry"
+        coverage:
+          type: string
+          enum: [complete, partial]
+        unavailable:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items:
+            type: string
+            enum: [receipt_origin_missing, wait_history_missing, unsupported_history, state_missing]
+
+    BusinessExecutionTimelineEntry:
+      type: object
+      additionalProperties: false
+      required: [id, kind, role, title, status]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [stage, question, answer, confirmation, decision, tool_result, result, failure]
+        role:
+          type: string
+          enum: [assistant, user, system]
+        title:
+          type: string
+        status:
+          type: string
+        runId:
+          type: string
+          format: uuid
+        stageId:
+          type: string
+          description: 服务端生成的逻辑阶段关联ID；客户端无需重新运行工作流解释器。
+        stepId:
+          type: string
+        stepType:
+          type: string
+          enum: [skill, tool, userInput, confirmation]
+        operationId:
+          type: string
+        iteration:
+          type: integer
+          minimum: 0
+        ordinal:
+          type: integer
+          minimum: 0
+        toolName:
+          type: string
+        content:
+          description: 经脱敏业务JSON；不包含host状态、权限依据或账本私有信封。
+        occurredAt:
+          type: string
+          format: date-time
+          description: 仅在存在已验证真实时间时返回，不用最近检查点时间补齐。
+
     AiRunSnapshotEnvelope:
       type: object
       properties:
@@ -11096,6 +11173,13 @@ components:
               type: object
               additionalProperties: true
               nullable: true
+            businessExecution:
+              type: object
+              additionalProperties: true
+              description: 业务Skill和工作流的用户可见投影；旧客户端可以忽略新增timeline字段。
+              properties:
+                timeline:
+                  $ref: "#/components/schemas/BusinessExecutionTimeline"
           required: [run, attempt, checkpoint, output]
       required: [code, message, data]
 

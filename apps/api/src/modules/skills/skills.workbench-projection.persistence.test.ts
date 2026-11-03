@@ -61,3 +61,12 @@ test('projection refuses other owners, revoked DB identity and corrupted checkpo
  await database.update(schema.harnessRuns).set({ lastCheckpointId: randomUUID() }).where(eq(schema.harnessRuns.harnessRunId, f.runId));
  await assert.rejects(service().read(user, f.runId), (e: any) => e.status === 409);
 });
+
+test('owned GET exposes an additive bounded timeline without writing conversation or ledger rows', async () => {
+ const f = await fixture();
+ const counts = async () => (await Promise.all([database.select().from(schema.harnessRunEvents), database.select().from(schema.harnessToolEvents), database.select({ messages: schema.aiSessions.messages }).from(schema.aiSessions)])).map(rows => rows.length);
+ const before = await counts(), view: any = await service().read(user, f.runId);
+ assert.equal(view.timeline?.version, 1); assert.equal(view.timeline.rootRunId, f.runId);
+ assert.deepEqual(view.timeline.entries, []); assert.equal(view.timeline.coverage, 'partial');
+ assert.deepEqual(await counts(), before);
+});

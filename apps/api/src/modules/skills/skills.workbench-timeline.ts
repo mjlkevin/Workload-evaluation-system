@@ -31,7 +31,7 @@ export type BusinessTimelineEntry = {
 };
 export type BusinessExecutionTimeline = { version: 1; rootRunId: string; entries: BusinessTimelineEntry[];
  coverage: 'complete' | 'partial'; unavailable: Array<'receipt_origin_missing' | 'wait_history_missing' | 'unsupported_history' | 'state_missing'> };
-const invalid = (): never => { throw new Error('BUSINESS_TIMELINE_FACT_INVALID'); };
+const invalid: () => never = () => { throw new Error('BUSINESS_TIMELINE_FACT_INVALID'); };
 const limit = (): never => { throw new Error('BUSINESS_TIMELINE_LIMIT_EXCEEDED'); };
 const record = (value: unknown): Record<string, any> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : invalid();
 const timestamp = (value: Date): string => value instanceof Date && Number.isFinite(value.getTime()) ? value.toISOString() : invalid();

@@ -12,6 +12,27 @@ import { readBusinessSkillsHostState } from '../harness/business-skills.host-sta
 import { skillDefinitionHash as hash } from './skills.hash';
 import { SkillError } from './skills.types';
 const invalid = (): never => { throw new SkillError('INVOCATION_CONTEXT_CHANGED', '原任务检查点已变化或损坏，请重新读取', 409); };
+/** The exact retry inheritance transform, shared by initialization and read-only provenance. */
+export function businessRetryResumeState(raw: Record<string, unknown> | undefined,
+ state: import('../harness/business-skills.host-state').BusinessSkillsHostState | undefined, manifest: ExecutionManifest, rootRunId: string) {
+  let resumeRaw = raw;
+  if (manifest.kind === 'workflow' && state?.workflow) {
+    const runtime = createWorkflowRuntime(manifest, rootRunId), workflow = state.workflow;
+    const decision = runtime.next(workflow);
+    if (decision.kind === 'failed' || decision.kind === 'waiting') {
+      if (!['execution_failed', 'invalid_output'].includes(decision.code))
+        throw new SkillError('INVOCATION_RETRY_NOT_ALLOWED', '已拒绝或达到重复上限的节点不能重置，请重新发起业务任务', 409);
+      const failure = workflow.receipts[workflow.receipts.length - 1];
+      if (!failure || failure.status !== 'failed' || failure.code !== decision.code) invalid();
+      const retry = runtime.next({ ...workflow, receipts: workflow.receipts.slice(0, -1) });
+      if (retry.kind !== 'ready' || retry.command.operationId !== failure.operationId || !['skill', 'tool'].includes(retry.command.type)) return invalid();
+      // Only the terminal execution failure is reopened. Successful prefix/iterations and logical IDs stay fixed.
+      resumeRaw = raw?.kind === 'workflow' ? { ...raw, workflow: retry.state } : { ...retry.state };
+      readBusinessSkillsHostState(resumeRaw, manifest, rootRunId);
+    }
+  }
+  return resumeRaw;
+}
 /** Trusted latest source only. No caller can supply state, a checkpoint ID or a resume ordinal. */
 export async function prepareBusinessRetryCheckpoint(database: Database, sourceRunId: string, ownerId: string, manifest: ExecutionManifest) {
   async function load(tx: HarnessTx) {
@@ -22,22 +43,7 @@ export async function prepareBusinessRetryCheckpoint(database: Database, sourceR
     } catch { return invalid(); }
   }
   const original = await database.transaction(load);
-  let resumeRaw = original.raw;
-  if (manifest.kind === 'workflow' && original.state?.workflow) {
-    const runtime = createWorkflowRuntime(manifest, original.chain.root), workflow = original.state.workflow;
-    const decision = runtime.next(workflow);
-    if (decision.kind === 'failed' || decision.kind === 'waiting') {
-      if (!['execution_failed', 'invalid_output'].includes(decision.code))
-        throw new SkillError('INVOCATION_RETRY_NOT_ALLOWED', '已拒绝或达到重复上限的节点不能重置，请重新发起业务任务', 409);
-      const failure = workflow.receipts[workflow.receipts.length - 1];
-      if (!failure || failure.status !== 'failed' || failure.code !== decision.code) invalid();
-      const retry = runtime.next({ ...workflow, receipts: workflow.receipts.slice(0, -1) });
-      if (retry.kind !== 'ready' || retry.command.operationId !== failure.operationId || !['skill', 'tool'].includes(retry.command.type)) return invalid();
-      // Only the terminal execution failure is reopened. Successful prefix/iterations and logical IDs stay fixed.
-      resumeRaw = original.raw?.kind === 'workflow' ? { ...original.raw, workflow: retry.state } : { ...retry.state };
-      readBusinessSkillsHostState(resumeRaw, manifest, original.chain.root);
-    }
-  }
+  const resumeRaw = businessRetryResumeState(original.raw, original.state, manifest, original.chain.root);
   const proof = original.cp ? { runId: sourceRunId, checkpointId: original.cp.harnessRunCheckpointId,
     sequence: original.cp.sequence, stateHash: original.cp.stateHash } : undefined;
   return {

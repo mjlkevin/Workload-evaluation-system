@@ -34,6 +34,7 @@ function command(body: unknown): Request {
 }
 /** All nodes are locked SHARE: never upgrade a root Run lock just to allocate an operation. */
 async function lineage(tx: QueueDbExecutor, runId: string, ownerId: string, manifest: ExecutionManifest, fingerprint?: string, sessionId?: string) {
+  const runs: Array<typeof harnessRuns.$inferSelect> = [];
   const seen = new Set<string>(); let next: string | null = runId;
   let first: typeof harnessRuns.$inferSelect | undefined, root = runId;
   while (next) {
@@ -55,9 +56,9 @@ async function lineage(tx: QueueDbExecutor, runId: string, ownerId: string, mani
     if (saved.manifestHash !== manifest.manifestHash || hash(saved) !== hash(manifest)
       || fingerprint !== undefined && mark !== fingerprint || sessionId !== undefined && run.aiSessionId !== sessionId) return fail('OPERATION_LINEAGE_INVALID');
     if (!first) { first = run; fingerprint = String(mark); sessionId = run.aiSessionId!; }
-    root = run.harnessRunId; next = run.retryOfRunId;
+    runs.push(run); root = run.harnessRunId; next = run.retryOfRunId;
   }
-  return { root, first: first!, fingerprint: fingerprint!, sessionId: sessionId! };
+  return { root, runs, first: first!, fingerprint: fingerprint!, sessionId: sessionId! };
 }
 /** Shared strict retry ancestry; resolving a root never grants execution permission. */
 export async function resolveBusinessExecutionRootInTransaction(tx: QueueDbExecutor, runId: string, ownerId: string, manifest: ExecutionManifest) {
