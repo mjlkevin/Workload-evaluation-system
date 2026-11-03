@@ -4,7 +4,7 @@
   "type": "implementation",
   "scope": "RP-050 已批准C/D剩余连续实现",
   "summary": "按用户最新授权连续完成事务业务工具、累计预算、生产宿主、统一工作台和MVP收口；保持技术验证与人工业务验收分开。",
-  "status": "真实业务主链通过，推荐入口与读取竞态补缺",
+  "status": "C/D本地实现与技术验证完成，待用户最终验收；未合主线、未推送",
   "pages": [
     "index",
     "requirements",
@@ -12,7 +12,12 @@
     "testing",
     "monitoring",
     "risks",
-    "changes"
+    "changes",
+    "runtime",
+    "design",
+    "sources",
+    "issues",
+    "defects"
   ],
   "additionalBoardPages": [
     "runtime",
@@ -228,7 +233,38 @@
       "kind": "approved-scope-gap",
       "ref": "docs/superpowers/specs/2026-11-02-wes-business-skills-design.md#12; docs/superpowers/plans/2026-11-02-wes-business-skills.md",
       "summary": "实取C3仅显式目录选择，原定推荐卡片尚缺；沿既有RP-050补只读授权目录模型推荐和现有Dialog显式启动，API/UI分单TDD和双重复核，不扩展自动启动。"
+    },
+    {
+      "kind": "browser-defect",
+      "ref": "ISS-2026-11-03-004; DEF-2026-11-03-004; /Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/mvp-detail-before-1440.jpg",
+      "summary": "浏览器已有信息恢复临时管理员登录；真实5天详情只纳入2项但显示585行及旧假筛选/无关零值云摘要。项目名称实际正常，未误报。沿已批准UI③范围登记缺陷并最小补修，传统评估与旧SKU表不改。"
+    },
+    {
+      "kind": "final-regression",
+      "ref": "/tmp/wes-final-closure-api-summary.log; /tmp/wes-final-closure-web-status.log; /tmp/wes-final-closure-build-web-status.log; /tmp/wes-final-closure-build-api.log",
+      "summary": "模块1140/1140、Harness668/668、AI286/286、Agent254/254、Web96文件908/908及API/Web双构建通过；此前未改动的存储228、规则8、流程17通过。通用integration0/1缺活动模板；原失败及audit45基线保留。"
+    },
+    {
+      "kind": "browser-acceptance",
+      "ref": "/tmp/wes-preview-final/browser-acceptance-state.json; /tmp/wes-preview-final/browser-write-receipt.json; /tmp/wes-preview-final/browser-terminal-runs.json",
+      "summary": "完整普通UI登录/推荐/上传/补充/三次明确确认/原生5天/检出检入刷新通过，Run543f1f23及独立Skill28fe6846均completed；新评估bb213f8a为IA1101-VA1。最终用户验收待回填。"
+    },
+    {
+      "kind": "ui-fixes",
+      "ref": "19b2036; 3eb6d83; ISS/DEF-2026-11-03-004/005",
+      "summary": "冻结详情真实2项范围、紧凑5天统计及1440/760通过；状态对账实际终态一致。SPEC71及独立3探针、QUALITY84通过。"
+    },
+    {
+      "kind": "preservation-final",
+      "ref": "/tmp/wes-preview-final/original-records-preserved.json; /tmp/wes-preview-final/user-metadata-differences.json",
+      "summary": "10表旧记录保留；账号4/凭据1/审计1不变。正常登录仅更新last_login_at/updated_at，密码/身份与凭据未变；不把正常登录时间变更称作用户全行字节不变。"
+    },
+    {
+      "kind": "final-governance-review",
+      "ref": "/tmp/wes-final-board-build.log; /tmp/wes-final-board-check.log; mvp-final-board-requirements.jpg; mvp-final-board-defects.jpg; mvp-final-board-issues.jpg",
+      "summary": "独立最终证据一致性复核APPROVE；12页同步，21页构建/一致性0错误0警告，浏览器实读RP050与新ISS/DEF状态。问题55行52编号；缺陷39=7open+13done+19manual，未修历史窄列或代用户验收。"
     }
   ],
-  "next": "补齐原规格推荐卡片、核实完成期间读取竞态，完成反例及浏览器检查；最终用户验收另记。"
+  "next": "用户最终业务验收；主线集成与推送另行授权。",
+  "updatedAt": "2026-11-04"
 }
