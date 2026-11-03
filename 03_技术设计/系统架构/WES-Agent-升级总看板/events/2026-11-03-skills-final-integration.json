@@ -163,6 +163,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-ui2-spec-red.log; /tmp/wes-ui2-quality-independent.log",
       "summary": "工作台报告/真实范围选择/原生草稿链接UI② SPEC及fresh质量APPROVE；有效懒挂载RED2后独立6files79/79，scope/diff0。规范报告/未匹配/AI建议分明，正式工期仅取真实草稿效果；不等同浏览器或人工验收。"
+    },
+    {
+      "kind": "unit",
+      "ref": "apps/api/src/modules/skills/mvp/managed-assets.ts; /tmp/wes-managed-assets-quality-own.log; /tmp/wes-managed-assets-quality-regression.log; /tmp/wes-managed-assets-quality-tsc.log",
+      "summary": "三个可维护语义Skill及精确版本绑定15步Workflow初始定义SPEC/fresh质量APPROVE；人工TESTONLY样例，7/7新增与独立48纯回归/tsc0。只返回管理定义、不直接发布或伪造证明；真实模型试运行、正式发布及实际业务验收仍待执行。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"
