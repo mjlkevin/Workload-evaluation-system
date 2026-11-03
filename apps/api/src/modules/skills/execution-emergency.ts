@@ -45,6 +45,14 @@ function references(manifest: ExecutionManifest): Array<Omit<ExecutionAuthorityB
   const skills = [...new Set(manifest.skills.map(s => s.skillId))].sort().map(id => ({ kind: 'skill' as const, id }));
   return manifest.kind === 'workflow' ? [{ kind: 'workflow', id: manifest.target.id }, ...skills] : skills;
 }
+/** Shape only; historical retry epochs are not refreshed or treated as current grants. */
+export function readExecutionAuthorityBindings(manifest: ExecutionManifest, value: unknown): ExecutionAuthorityBinding[] {
+  const expected = references(manifest);
+  if (!Array.isArray(value) || value.length !== expected.length || value.some((binding, i) => !binding || typeof binding !== 'object'
+    || Object.keys(binding).sort().join(',') !== 'epoch,id,kind' || binding.kind !== expected[i].kind || binding.id !== expected[i].id
+    || !Number.isSafeInteger(binding.epoch) || binding.epoch < 0)) failure('EXECUTION_RUN_BINDING_INVALID', '执行任务权限绑定无效');
+  return value as ExecutionAuthorityBinding[];
+}
 function authorize(manifest: ExecutionManifest, current: Awaited<ReturnType<typeof currentUser>>) {
   const role = resolveBusinessRole({ role: current.role, businessRole: isBusinessRole(current.businessRole) ? current.businessRole : undefined });
   if (manifest.caller.id !== current.id || manifest.caller.businessRole !== role || !manifest.target.definition.roles.includes(role)
@@ -74,15 +82,12 @@ async function verifyRun(tx: QueueDbExecutor, run: Run, ownerUserId: string, ret
   const execution = { kind: manifest.kind, [manifest.kind === 'skill' ? 'skillId' : 'workflowId']: manifest.target.id, input: manifest.initialInput, sources: manifest.sources };
   if (hash({ sessionId: run.aiSessionId, content: config.content, execution }) !== (run.metadata as Record<string, unknown>).invocationFingerprint)
     failure('EXECUTION_RUN_BINDING_INVALID', '执行任务提交绑定无效');
-  const expected = references(manifest); const bindings = config.executionAuthority;
-  if (!Array.isArray(bindings) || bindings.length !== expected.length || bindings.some((binding, i) => !binding || typeof binding !== 'object'
-    || Object.keys(binding).sort().join(',') !== 'epoch,id,kind' || binding.kind !== expected[i].kind || binding.id !== expected[i].id
-    || !Number.isSafeInteger(binding.epoch) || binding.epoch < 0)) failure('EXECUTION_RUN_BINDING_INVALID', '执行任务权限绑定无效');
+  const expected = references(manifest); const bindings = readExecutionAuthorityBindings(manifest, config.executionAuthority);
   for (const [i, reference] of expected.entries()) {
     const control = await root(tx, reference.kind, reference.id, 'share');
     if (control.stopped) failure('EXECUTION_EMERGENCY_STOPPED', '技能或流程已被管理员紧急停止');
     if (retry === 'new' && (!control.enabled || control.archived)) failure('EXECUTION_REFERENCE_UNAVAILABLE', '原执行版本已不可引用');
-    if (!retry && (bindings as ExecutionAuthorityBinding[])[i].epoch !== control.epoch) failure('EXECUTION_MANUAL_RETRY_REQUIRED', '任务曾被紧急停止，请手动重新发起');
+    if (!retry && bindings[i].epoch !== control.epoch) failure('EXECUTION_MANUAL_RETRY_REQUIRED', '任务曾被紧急停止，请手动重新发起');
   }
   if (retry === 'new') {
     const check = async (kind: EmergencyKind, id: string, versionId: string, expectedHash: string) => {
@@ -173,13 +178,16 @@ export function createExecutionEmergencyRepository(database: Database = db) {
       } catch (error) { safe(error); }
     },
     async assertRunAdmission(runId: string, ownerUserId: string) {
-      try { return await database.transaction(async tx => {
-        if (!/^[a-f0-9-]{36}$/i.test(runId)) return failure('EXECUTION_RUN_NOT_FOUND', '执行任务不存在', 404);
-        const [run] = await tx.select().from(harnessRuns).where(and(eq(harnessRuns.harnessRunId, runId), eq(harnessRuns.ownerUserId, ownerUserId))).for('share');
-        if (!run) return failure('EXECUTION_RUN_NOT_FOUND', '执行任务不存在', 404);
-        if (!['queued', 'running', 'waiting', 'recovering'].includes(run.status)) failure('EXECUTION_RUN_NOT_ACTIVE', '执行任务已结束');
-        return verifyRun(tx, run, ownerUserId);
-      }); } catch (error) { return safe(error); }
+      try { return await database.transaction(tx => assertRunAdmissionInTransaction(tx, runId, ownerUserId)); } catch (error) { return safe(error); }
     },
   };
+}
+
+/** Same default admission in a caller-owned short transaction; no relaxed epoch/status mode. */
+export async function assertRunAdmissionInTransaction(tx: QueueDbExecutor, runId: string, ownerUserId: string) {
+  if (!/^[a-f0-9-]{36}$/i.test(runId)) return failure('EXECUTION_RUN_NOT_FOUND', '执行任务不存在', 404);
+  const [run] = await tx.select().from(harnessRuns).where(and(eq(harnessRuns.harnessRunId, runId), eq(harnessRuns.ownerUserId, ownerUserId))).for('share');
+  if (!run) return failure('EXECUTION_RUN_NOT_FOUND', '执行任务不存在', 404);
+  if (!['queued', 'running', 'waiting', 'recovering'].includes(run.status)) failure('EXECUTION_RUN_NOT_ACTIVE', '执行任务已结束');
+  return verifyRun(tx, run, ownerUserId);
 }

@@ -21,3 +21,5 @@ export { createExecutionEmergencyRepository, type InvocationEmergencyAuthority, 
 export { createExecutionAuthority, type ExecutionAuthority, type ExecutionAction } from './execution-authority';
 
 export { createSkillRetryService, retryInvocation } from './skills.retry';
+
+export { createSkillOperationService } from './skills.operations';

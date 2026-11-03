@@ -791,3 +791,60 @@ retryInvocation(user: AuthUser, sourceRunId: string,
 
 
 **C2c.2c收尾检查：** fresh文档快核修正证据目录后DOC APPROVE；两份OpenAPI与event解析通过，三条既有受保护路径及9页映射一致，无内部retry请求体外露。自建3008服务和临时看板页已关闭，用户3006页未操作。暂存仅本批16个文件（最终代码/测试gross747，总变更约930行），原模型状态文件未读取或暂存；实际本地提交号在提交后单独实取回填主看板，不伪造自引用。
+
+
+### C2c.3 分批与 C2c.3a 精细工单：待确认操作持久登记与稳定重试身份（2026-11-03）
+
+用户“继续下一步”，基线8dba8a7/codex/wes-skills-c。沿用已评审设计§8及C2工单的稳定步骤幂等/确认/累计预算范围，不重开产品审批。使用writing-plans把大项分为独立可验收单元：3a待确认操作登记及重试稳定身份；3b持久确认决策/当前内容与权限绑定；3c明确本地工具的同事务写入幂等，远端不确定结果人工核对；3d跨调用累计预算及宿主强制接线。每单元目标500–850手写行、999前拆分，C2c.3整体不随3a关闭。前置方案已获用户评审并多次授权继续，拆批是实现粒度，不新增业务范围。
+
+选择复用Harness现有harness_tool_events及(rootRunId,effectKey)唯一约束，记录eventType=business_operation_prepared/status=pending；不新增表或迁移，不依赖内存Set，不把Worker“执行后记账”当同事务业务幂等。登记行绑定原始业务Run，另存首次发起runId；不更新原Run行、事件序号、检查点或产物。原Run链缺失则安全拒绝，不能重建一个新身份洗掉历史。该登记只表达待确认意图，不表达工具执行、用户批准或可复用grant。3a无confirm/execute入口，不松开.2b写/外发/MCP门禁，无新业务HTTP/UI/生产boot，无LLM或真实业务工具调用；3006/3004、主库/预览库和凭据不动，config/system/model-verify-status.json禁止读/扫描/写/暂存；保留其原dirty。只写guarded workload_eval_test、本地保存不合main/推送。
+
+本单元只支持根Skill（manifest.kind=skill）的原生工具意图；Workflow直接工具缺原V2角色证据仍拒绝，流程内Skill的实际发生位置绑定和接线留后续宿主。接口只供服务端可信装配，位置ordinal由执行器给出，不接受模型callId、operationKey、manifest、approved等客户端凭据或派生定义；本单元不把ordinal当授权证明，也不对外暴露该命令。
+
+```ts
+// apps/api/src/modules/skills/skills.operations.ts
+createSkillOperationService(options?: { database?: Database; inventory?: typeof resolveCurrentSkillTools });
+// AuthUser来自服务端登录上下文，真实身份仍从DB复核。
+prepareOperation(user: AuthUser, body: {
+  runId: string; stepId: string; ordinal: number; toolName: string; parameters: unknown;
+}): Promise<{ operationId: string; operationKey: string; payloadHash: string; rootRunId: string; status: 'pending' }>;
+// ordinal 0..59：同一根Skill执行中的工具逻辑位置，非累计预算也非模型callId。
+```
+
+输入与权限：body只允许上述五字段，run UUID先校验并规范小写；step/tool有界非空，ordinal整数0..59，parameters沿copyTrialJson安全JSON/1MiB/32层约束。实际persisted owned active业务Run是唯一依据，必须有有效manifest/指纹/精确epoch绑定、Session归属/可用、当前用户与业务角色。stepId须等于唯一根Skill步骤，tool须原白名单与snapshot绑定，原native Schema校验成功且parameters完全等于由冻结initialInput按原binding.inputMapping生成的参数；不能仅凭hash或自行声明参数。只有写/外发/MCP或原绑定/策略需确认的工具才登记；普通无需确认的只读动作拒绝登记。当前Registry/capability/原角色/原现策略交集复用validateFrozenExecutionTools的resume语义（仅允许意图准备，不给实际工具调用授权），保留未知工具、契约变化、禁用、降权等失败关闭。
+
+事务边界：先用真实默认Run准入取得before manifest/identity，事务外通过prepareSkillAuthority包裹库存解析并校验，期间不占连接。最终短事务复用同tx的默认准入检查（新增narrow assertRunAdmissionInTransaction，不暴露放宽epoch或状态的选项），复查before identity/hash并verify配置fence；无嵌套连接。准备期间stop+release/撤权/会话失效或配置变化都拒绝，零半行。默认authority不能由body或可选checker替换。当前工具库存外部变化仍由将来每次真正dispatch重查，本单元不宣称DB与MCP原子授权。
+
+稳定身份：从当前真实Run沿retryOfRunId读取至原Run，最多64个节点，cycle/缺父/跨owner/session/非business adapter/不同完整manifestHash或invocationFingerprint/非failed祖先/坏旧epoch绑定结构都拒绝。所有祖先由服务端readBusinessSkillsRun和共享绑定结构校验器核实；旧epoch可不同（显式retry已重新授权），但不能缺失或多根/坏形状。祖先正常停用不改变已入队语义；当前Run仍必须通过当前epoch与权限校验。各Run FOR SHARE防删除，不升级root UPDATE，避免双请求SHARE升级死锁。操作key=hash({schemaVersion:1,rootRunId,stepId,ordinal})加独立business-op:v1:前缀；toolName/参数/版本等进入payloadHash，不进入位置key，确保同位置改工具/改内容报冲突而非再造一次动作。payloadHash绑定完整manifestHash、目标Skill/version/hash、step/ordinal、toolName、原binding/native/policy及规范参数。不可从模型callId或新retryRunId生成位置key。
+
+登记：harnessToolEvents.harnessRunId=rootRunId，effectKey=operationKey，actionId=operationKey，toolName真实原名，input保存严格schemaVersion1意图（包含rootRunId、首次sourceRunId、manifestHash、step/ordinal、参数与payloadHash等），output/error/resolvedAt空，状态仅pending。依现有唯一约束ON CONFLICT返回同一登记；同key不同payload、误撞legacy effect、状态/内容/绑定被改坏都409安全拒绝，不覆盖或伪装已执行。existing行须按严格schema与原manifest完整重验，不只对比其中一个hash；重复与并发不追加额外Run事件/模型记录/工具effects。当前运行的权限即使重放仍核实；新retry跨紧停解除可以在新epoch准备同一pending意图，但旧Run不能恢复授权，登记不是审批记录。
+
+责任：新skills.operations.ts、skills.operations.persistence.test.ts（可按职责拆小型纯helper/test但先登记CI）；窄改execution-emergency.ts提取共享epoch绑定形状校验和同tx准入，既有准入默认行为/错误保持；skills.module.ts出口；若复用readBusinessSkillsRun需harness.module.ts仅窄导出，验证无barrel初始化回归。不改skills.execution工具门禁、skills.retry既有重试语义、Worker生产装配、schema或业务写仓储。父负责package CI引用/专项、README/对齐说明/本计划与九页看板；实现方不stage/commit。现有根/不可变审计测试夹具按原边界保留，Run/Session/user after清理；若中断需核实专属夹具不再活动后再跑全局Worker测试，不全表truncate改绿。
+
+- [x] RED：重复/重建service/手动retry同逻辑位置没有稳定持久登记的反例，保存真实失败，不以编译错误代替行为RED。
+- [x] GREEN：默认真实Run/owner/Session/epoch与原现工具权限核验，冻结参数校验，稳定root+slot key及唯一pending行，读回深拷贝，登记非执行/批准；单连接无嵌套。
+- [x] 实PG：同连接/独立连接并发同位置同payload只一行，真锁门闩+pg_stat_activity证明等待；改工具/内容冲突，legacy撞key/坏ledger行、祖先缺失/循环/跨归属/不同清单和坏绑定、UUID大小写均拒绝或同意图重放；不复制新位置洗历史。
+- [x] 时序：prepare库存期间禁用用户/角色变化/stop+release/配置变化/会话失效拒绝；旧Run拒绝、新显式retry准备同pending；故障回滚无行，原Run/CP/output/eventSequence不变，模型/真实工具dispatch计数0。
+- [x] 先SPEC后fresh五轴质量安全复核，父独立专项/原modules/Harness/AI及API/Web构建；仅新服务相关源码/测试变更后扩大必要检查，保留通用集成缺模板与audit45事实。更新契约说明但无新HTTP body、九页总看板和本地提交实取，3a完成不冒充本地写幂等/持久确认/累计预算或MVP完成。
+
+自检：此分解复用现有表/唯一约束，不引第二执行系统；已发布内容和Run记录保持，位置key不依赖模型的不稳定callId；外部I/O与DB短事务分离。登记行只待确认，真正批准/执行仍有后续强制门槛，因此没有以内部待办行开放业务写工具。公开业务retry、生产宿主/C3/D继续未开放。
+
+
+**C2c.3a血缘完整性补充（实现前/早期收敛）：** root的retryOfRunId为空时不得保留retryRequestHash/retryActorId/retryReason；每条真实retry边同时核对.2c metadata：actor等于owner、trimmed reason1..1000、retryRequestHash=hash({sourceRunId:canonicalParentId,sessionId,fingerprint:invocationFingerprint,reason})。防止仅改parent到另一同清单/同输入根或清空parent洗掉原操作身份。旧缺证据链保守拒绝，不升级为新根；有效链用真实.2c内部retry构造，哈希仍是完整性校验而非授权。首RED0/2为真实PG重复/重试身份与缺持久登记失败，非编译或导入错误（/tmp/wes-c2c3a-impl/red）；父基线154/154、0skip已完成。
+
+
+**C2c.3a开发冻结证据：** 首RED0/2（重复/重建/跨retry身份），血缘清空parent反例15/16，再补composed payload反例22/24（超限未拒绝+MCP夹具遗漏ADMIN手动allow被既有权限正确拒绝）。前者加完整意图safeJSON边界、后者仅补测试真实授权元数据，未松实际工具门禁。最终新PG25/25、0skip且after核实专属Run/Session/user0（/tmp/wes-c2c3a-impl/target-compat-final）；原默认modules931/931、0skip后API首编译暴露Object.hasOwn不在目标lib及fixture状态字面量类型，已等价ownproperty兼容写法+asconst修正，最终buildexit0（build-api-final.log），失败日志保留。代码/测试gross583，父最终原modules会覆盖最后等价表达式。
+
+登记payloadHash特意不含首次sourceRunId以维持重试稳定性，source须是相同实际owner/session/完整清单/血缘根的规范UUID。它是审计线索，不能单靠DB行证明哪一个合法同根sibling最先写入，也不是授权grant；无额外不可变来源锚点，不承诺防数据库管理者整体篡改。实际首次source只在INSERT写一次，合法重放不覆写；其他根、假source或结构损坏均拒绝。当前audit仍45既有风险（32moderate/12high/1critical），依赖未变。
+
+
+**C2c.3a父回归中的测试选行修正：** 父默认modules931/931、0skip；登记专项首110/111，唯一失败为测试先创建ordinal0及59后，以无ORDERBY查询首行当作ordinal0，实际读到59。生产稳定key无新偏差；规格和fresh质量均静态确认，应按operationId选择并assert存在、明确校验ordinal0。为避免同一命令中途换候选，待当前Harness/AI/集成正常结束再窄改测试并单独复验，首日志/tmp/wes-c2c3a-parent-final保留；完整Harness随后已441/441、0skip，其他测试after均正常清理，不需要额外手工清库。
+
+
+**C2c.3a最终回填：** 待确认操作现已持久登记：重复准备、服务重建及明确手动重试沿用同一逻辑身份，同位置变更内容报冲突。登记仍是pending意图，批准和真实工具执行继续后续。父独立登记专项111、模块931、Harness441、AI286及API/Web双构建通过，均0skip。规格历史25/25和修正后静态复核通过、fresh质量PG25/纯测155均0skip后APPROVE。首RED0/2、血缘RED15/16、组合边界RED22/24含MCP夹具遗漏手动allow、首API编译目标lib/状态字面量类型失败，以及父首专项110/111无序行选择失败均保留，不以改并发或弱化断言改绿。最终按operationId精确检查ordinal0，生产源码未因夹具问题调整。通用集成0/1缺模板，audit45基线保留；Run/Session/userafter0，不宣称根/审计清空。无新文档资产，sources计数不变；九页总看板同步，RP-050保持C实施中，C2c.3整体及MVP未关闭。下一步绑定持久确认决定与当前参数/权限（C2c.3b），随后完成本地同事务写幂等和跨调用预算（3c/3d）、统一视图、生产宿主和工作台。本地提交/浏览器目视在收尾实取补记。
+
+
+**C2c.3a收尾实查：** 最终代码/测试gross586（5文件），无新schema或迁移。父最后模块931/专项111（parent-recheck）、Harness441/AI286（parent-final）均0skip，API/Web实际exit0，fresh质量PG25/纯测155覆盖最终PK选行夹具后APPROVE。新event回归证据ref已补实际build-api/web日志，避免只指向套件目录却包含构建结论；文档范围、历史SPEC25+静态复核及最终质量证据区分保留。九页board build和21页一致性0错0警，浏览器实读RP-050仍C实施中及后续确认/写幂等/预算；截图/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c3a-2026-11-03-board-requirements.png。原窄列/P2换行与大空列不改，不宣称视觉优化。
+
+
+**C2c.3a预览与提交边界：** 自建3008看板服务及临时tab已关闭，未操作用户3006页；交付前lsof3006/3004均无LISTEN，本批未启动或更新预览。仅本批文件精确暂存，原模型状态文件仅dirty状态保留、不读/不扫描/不暂存；本地提交后另将实际sha回填主看板，未合主线/推送。
