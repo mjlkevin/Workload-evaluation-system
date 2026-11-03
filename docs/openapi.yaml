@@ -2683,6 +2683,74 @@ paths:
                 $ref: "#/components/schemas/GenericOkResponse"
 
   # ------------------------------------------------------------
+  # 真实来源上传独立于异步 Run 开关；只有显式启动任务才调用模型。
+  /api/v1/ai-sessions/{sessionId}/execution-sources:
+    post:
+      tags: [AIRuns]
+      summary: 为本人会话上传真实需求来源材料
+      description: >
+        JWT 与 estimates:read 校验后，接受一个名为 file 的 .xlsx、.txt 或 .md 文件，
+        原始文件不超过 2 MiB；每用户每分钟最多 60 次，不接受附加文本字段或客户端 sourceDocument。
+        服务器检查当前身份及会话归属，在受限进程中提取不超过 200000 字符的原文，
+        保存字节摘要、工作表及单元格位置，提交前重新检查权限。每会话最多 10 份材料、
+        合计 500000 字符；不静默截断。返回附件元数据，不返回原始字节或规范化原文。
+        后续执行使用 sources 中的 file 引用冻结材料；旧 parsedSummary 不作为上传原文。
+      operationId: uploadBusinessExecutionSource
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 一个不超过 2097152 原始字节的 XLSX 或 UTF-8 文本文件。
+      responses:
+        "200":
+          description: 原文已持久化，data 直接包含附件元数据。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, message, data]
+                properties:
+                  code: { const: 0 }
+                  message: { type: string }
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [attachmentId, name, size, type, createdAt, sourceAvailable, sourceDigest, sourceCharCount]
+                    properties:
+                      attachmentId: { type: string, format: uuid }
+                      name: { type: string, minLength: 1, maxLength: 255 }
+                      size: { type: integer, minimum: 1, maximum: 2097152 }
+                      type: { enum: [application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/plain, text/markdown] }
+                      createdAt: { type: string, format: date-time }
+                      sourceAvailable: { const: true }
+                      sourceDigest: { type: string, pattern: '^[a-f0-9]{64}$' }
+                      sourceCharCount: { type: integer, minimum: 1, maximum: 200000 }
+        "400": { description: 无效会话 ID、文件、编码或 multipart 内容，错误为安全响应信封。 }
+        "401": { description: JWT 缺失、失效或过期。 }
+        "403": { description: 能力不足或当前身份已变化。 }
+        "404": { description: 会话不存在、已归档或不属于当前用户。 }
+        "409": { description: 会话材料数量或累计字符达到上限。 }
+        "413": { description: 文件、提取内容或并发解析达到处理上限。 }
+        "429": { description: 当前用户上传过于频繁。 }
+        "500": { description: 原文服务内部失败，返回固定安全消息。 }
+        "503": { description: 材料上传暂不可用，不返回内部异常。 }
+
+  # ------------------------------------------------------------
   # AI Runs — 异步 Run API（RP-047 Batch C）
   # ------------------------------------------------------------
   # 受 feature flag `WES_AI_DURABLE_RUNS_ENABLED` 控制（默认关闭）：

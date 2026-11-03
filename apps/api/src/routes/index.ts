@@ -4,6 +4,7 @@
 
 import { Router } from "express";
 import { createAiExecutionsRouter } from "./ai-executions.routes";
+import executionSourcesRoutes from "./execution-sources.routes";
 import { createSkillsRouter } from "./skills.routes";
 import { createWorkflowsRouter } from "./workflows.routes";
 
@@ -71,6 +72,7 @@ router.use("/templates", templatesRoutes);
 router.use("/rule-sets", rulesRoutes);
 router.use("/estimates", estimatesRoutes);
 router.use("/ai", aiRoutes);
+router.use("/ai-sessions", executionSourcesRoutes);
 router.use("/ai-sessions", aiSessionsRoutes);
 router.use("/ai-runs", aiRunsRoutes);
 router.use("/ai-executions", createAiExecutionsRouter({ enabled: durableRunsEnabled }));
