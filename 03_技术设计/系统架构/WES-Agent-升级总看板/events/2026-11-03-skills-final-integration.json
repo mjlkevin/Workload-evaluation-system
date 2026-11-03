@@ -4,7 +4,7 @@
   "type": "implementation",
   "scope": "RP-050 已批准C/D剩余连续实现",
   "summary": "按用户最新授权连续完成事务业务工具、累计预算、生产宿主、统一工作台和MVP收口；保持技术验证与人工业务验收分开。",
-  "status": "实施中 / C-D连续完成",
+  "status": "真实业务主链通过，推荐入口与读取竞态补缺",
   "pages": [
     "index",
     "requirements",
@@ -198,7 +198,37 @@
       "kind": "unit",
       "ref": "/tmp/wes-preview-final/decompose-trial-evidence.json; /tmp/wes-managed-assets-quality-recheck-tests.log; /tmp/wes-final-cd-validation/semantic-assertions",
       "summary": "真实拆解样例被约束数组字面断言误拒；仅修新增定义的语义判据并收紧数量，原文引用不变。SPEC/fresh质量48/48、父模块1095/1095及APIbuild0；新增模拟回归明确不具发布资格。新Skill已正式检出保存检入A.1，真实复测/发布继续，原失败不抹除。"
+    },
+    {
+      "kind": "live-model-release",
+      "ref": "/tmp/wes-preview-final/publish-semantic.log; /tmp/wes-preview-final/managed-assets-state.json",
+      "summary": "真实Kimi六样例全过：decompose344、clarify374、matching531输出tokens，各2次模型尝试；三Skill正式审核发布，15步Workflow A.0发布。实际业务运行独立验证中。"
+    },
+    {
+      "kind": "live-business-chain",
+      "ref": "/tmp/wes-preview-final/acceptance-vcs.log; /tmp/wes-preview-final/baseline-vcs-refresh.json; apps/api/src/modules/skills/fixtures/mvp-acceptance-baseline.md",
+      "summary": "真实Excel两条来源经Kimi拆解/澄清/匹配、真实需求/范围/参数及操作明确批准，Run98670192完成15步；1889输出tokens/3模型/8工具。原生item60+62算5天，创建项目1fed1664和评估110a8e31；IA1101检出保存检入IA1101-VA1，刷新原frozen依据一致、重算5天。此为技术HTTP验收，非用户界面验收。"
+    },
+    {
+      "kind": "version-freeze",
+      "ref": "/tmp/wes-preview-final/workflow-version-freeze.json; /tmp/wes-preview-final/negative-state.json",
+      "summary": "原A.0业务Run在澄清等待期间正式升版发布B.0；原Run继续A.0完成，新查询导出反例Run固定B.0。首反例仍有未答问题，未确认或建草稿，已停止后以明确补充复跑。"
+    },
+    {
+      "kind": "preservation",
+      "ref": "/tmp/wes-preview-final/original-records-preserved.json",
+      "summary": "备份与预览对照10表原始记录多重集摘要全部保持；用户4、凭据1、凭据审计1条且总数不变。仅新MVP Skill3与Workflow1及其版本历史新增，旧用户记录未覆盖。"
+    },
+    {
+      "kind": "investigation",
+      "ref": "/tmp/wes-preview-final/acceptance-final.log; /tmp/wes-preview-final/probe-projection.log; ISS-2026-11-03-003",
+      "summary": "写入批准完成期间一次状态GET409后重读completed，原证据保留并入问题池待分诊；同15receipt/364122字节CP实测旧投影270.9ms/单visit含构造211.8ms，结果相同，未把分钟级延迟归因于投影或宣称优化已完成。"
+    },
+    {
+      "kind": "approved-scope-gap",
+      "ref": "docs/superpowers/specs/2026-11-02-wes-business-skills-design.md#12; docs/superpowers/plans/2026-11-02-wes-business-skills.md",
+      "summary": "实取C3仅显式目录选择，原定推荐卡片尚缺；沿既有RP-050补只读授权目录模型推荐和现有Dialog显式启动，API/UI分单TDD和双重复核，不扩展自动启动。"
     }
   ],
-  "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"
+  "next": "补齐原规格推荐卡片、核实完成期间读取竞态，完成反例及浏览器检查；最终用户验收另记。"
 }
