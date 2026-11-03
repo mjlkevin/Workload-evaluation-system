@@ -1,3 +1,4 @@
+import { executionRequestFromManifest } from '../skills/execution-request';
 import type { HarnessRunCheckpointRow, HarnessRunRow } from '../../db/schema';
 import {
   createExecutionAuthority, type ExecutionAuthority, compileSkillPayloadSchema, copyTrialJson, readPersistedExecutionManifest,
@@ -40,12 +41,7 @@ export function readBusinessSkillsRun(run: HarnessRunRow): ExecutionManifest {
     if (run.workflowId !== ID || run.workflowVersion !== VERSION || run.runKind !== 'workbench_chat'
       || typeof run.aiSessionId !== 'string' || !run.aiSessionId.trim() || run.ownerUserId !== manifest.caller.id
       || typeof config.content !== 'string' || !config.content.trim()) invalidRun();
-    const execution = {
-      kind: manifest.kind,
-      [manifest.kind === 'skill' ? 'skillId' : 'workflowId']: manifest.target.id,
-      input: manifest.initialInput,
-      sources: manifest.sources,
-    };
+    const execution = executionRequestFromManifest(manifest);
     const expected = hash({ sessionId: run.aiSessionId, content: config.content.trim(), execution });
     if ((run.metadata as Record<string, unknown>)?.invocationFingerprint !== expected) invalidRun();
     return manifest;

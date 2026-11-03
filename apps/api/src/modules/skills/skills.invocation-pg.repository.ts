@@ -5,13 +5,14 @@ import type { AuthUser } from '../../types';
 import { isBusinessRole, resolveBusinessRole } from '../../middleware/auth';
 import { resolveSessionHistory, type AiSessionRecord } from '../ai-sessions/ai-sessions.module';
 import { createConversationEventHistorySource, type QueueDbExecutor } from '../harness/harness.module';
+import type { FrozenSourceMaterial } from './mvp/execution-assets';
 import type { SourceReference } from './execution-manifest.types';
 import type { InvocationRepository } from './skills.invocation';
 import { skillDefinitionHash as hash } from './skills.hash';
 import { SkillError } from './skills.types';
 
 function missing(): never { throw new SkillError('INVOCATION_NOT_FOUND', '资源不存在', 404); }
-async function read(tx: QueueDbExecutor, user: AuthUser, sessionId: string, sources: SourceReference[]): Promise<string> {
+async function read(tx: QueueDbExecutor, user: AuthUser, sessionId: string, sources: SourceReference[]): Promise<{ fingerprint: string; sourceMaterials: FrozenSourceMaterial[] }> {
   const [current] = await tx.select().from(users).where(eq(users.userId, user.id)).for('share');
   if (!current || current.status !== 'active' || current.role !== user.role || user.status !== 'active'
     || resolveBusinessRole({ role: current.role, businessRole: isBusinessRole(current.businessRole) ? current.businessRole : undefined }) !== resolveBusinessRole(user))
@@ -33,7 +34,11 @@ async function read(tx: QueueDbExecutor, user: AuthUser, sessionId: string, sour
       || (source.kind === 'conversation' && !['user', 'assistant'].includes(String(item.role)))) return missing();
     return { source, item };
   });
-  return hash(values);
+  const sourceMaterials: FrozenSourceMaterial[] = values.filter(value => value.source.kind === 'conversation').map(({ source, item }) => {
+    const body = { id: source.id, kind: 'conversation' as const, text: item.content as string, location: `message:${source.id}` };
+    return { ...body, digest: hash(body) };
+  });
+  return { fingerprint: hash(values), sourceMaterials };
 }
 /** Session/source ownership stays in this PG port. Both phases use their supplied connection. */
 export function createInvocationPgRepository(database: Database = db): InvocationRepository {
@@ -41,10 +46,10 @@ export function createInvocationPgRepository(database: Database = db): Invocatio
     try {
       const user = structuredClone(initialUser); const sources = structuredClone(initialSources);
       const before = await database.transaction(tx => read(tx, user, sessionId, sources));
-      return { async verify(tx) {
+      return { sourceMaterials: before.sourceMaterials, async verify(tx) {
         try {
           const current = await read(tx, user, sessionId, sources);
-          if (before !== current) throw new SkillError('INVOCATION_SOURCE_CHANGED', '来源材料已变化', 409);
+          if (before.fingerprint !== current.fingerprint) throw new SkillError('INVOCATION_SOURCE_CHANGED', '来源材料已变化', 409);
         } catch (error) {
           if (error instanceof SkillError) throw error;
           throw new SkillError('INVOCATION_INTERNAL', '调用暂时不可用', 500);

@@ -1,3 +1,4 @@
+import { executionRequestFromManifest } from './execution-request';
 import { and, desc, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { db, type Database } from '../../db/client';
@@ -79,7 +80,7 @@ async function verifyRun(tx: QueueDbExecutor, run: Run, ownerUserId: string, ret
   if (!session || session.owner !== ownerUserId || session.status === 'archived') failure('EXECUTION_RUN_NOT_FOUND', '执行任务不存在', 404);
   const config = run.executionConfig as Record<string, unknown>;
   const manifest = readPersistedExecutionManifest(config.executionManifest); authorize(manifest, current);
-  const execution = { kind: manifest.kind, [manifest.kind === 'skill' ? 'skillId' : 'workflowId']: manifest.target.id, input: manifest.initialInput, sources: manifest.sources };
+  const execution = executionRequestFromManifest(manifest);
   if (hash({ sessionId: run.aiSessionId, content: config.content, execution }) !== (run.metadata as Record<string, unknown>).invocationFingerprint)
     failure('EXECUTION_RUN_BINDING_INVALID', '执行任务提交绑定无效');
   const expected = references(manifest); const bindings = readExecutionAuthorityBindings(manifest, config.executionAuthority);

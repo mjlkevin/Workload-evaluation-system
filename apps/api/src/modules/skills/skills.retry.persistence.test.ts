@@ -227,17 +227,19 @@ test('real registered routers enforce JWT retry-channel and DELETE 409/404 with 
 });
 test('retry keeps frozen source input and knowledge body while verifying the old source IDs remain accessible', async () => {
   const f = await fixture({ references: [{ uri: 'wes://knowledge/retry_reference', version: 'v1', label: 'Reference' }] });
-  const attachmentId = randomUUID(); await database.update(schema.aiSessions).set({ attachments: [{ attachmentId, name: 'source', parsedSummary: 'original attachment' }] }).where(eq(schema.aiSessions.sessionId, f.sessionId));
-  const body = { ...f.body, execution: { ...f.body.execution, sources: [{ kind: 'file', id: attachmentId }] } };
+  const messageId = randomUUID(), createdAt = new Date().toISOString();
+  await database.update(schema.aiSessions).set({ messages: [{ messageId, role: 'user', content: 'original source message', createdAt }] }).where(eq(schema.aiSessions.sessionId, f.sessionId));
+  const body = { ...f.body, execution: { ...f.body.execution, sources: [{ kind: 'conversation', id: messageId }] } };
   const accepted = await invocation().submitInvocation(user, f.sessionId, body); const original = await persisted(accepted.data.runId);
   await database.update(schema.harnessRuns).set({ status: 'failed' }).where(eq(schema.harnessRuns.harnessRunId, original.harnessRunId));
   const savedMaterial = material; material = { title: 'Latest title', content: 'Latest content must not replace frozen content' };
   try {
-    await database.update(schema.aiSessions).set({ attachments: [{ attachmentId, name: 'source', parsedSummary: 'current attachment' }] }).where(eq(schema.aiSessions.sessionId, f.sessionId));
+    await database.update(schema.aiSessions).set({ messages: [{ messageId, role: 'user', content: 'current source message', createdAt }] }).where(eq(schema.aiSessions.sessionId, f.sessionId));
     const r = await retry().retryInvocation(user, original.harnessRunId, request()); const next = await persisted(r.data.runId);
     assert.deepEqual((next.executionConfig as any).executionManifest, (original.executionConfig as any).executionManifest);
     await database.update(schema.harnessRuns).set({ status: 'failed' }).where(eq(schema.harnessRuns.harnessRunId, next.harnessRunId));
-    await database.update(schema.aiSessions).set({ attachments: [] }).where(eq(schema.aiSessions.sessionId, f.sessionId));
+    assert.equal((next.executionConfig as any).executionManifest.sourceMaterials[0].text, 'original source message');
+    await database.update(schema.aiSessions).set({ messages: [] }).where(eq(schema.aiSessions.sessionId, f.sessionId));
     await assert.rejects(retry().retryInvocation(user, original.harnessRunId, request()), (e: any) => e.code === 'INVOCATION_NOT_FOUND');
   } finally { material = savedMaterial; }
 });

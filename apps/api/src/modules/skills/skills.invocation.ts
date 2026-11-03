@@ -1,3 +1,4 @@
+import type { FrozenSourceMaterial } from './mvp/execution-assets';
 import type { AuthUser } from '../../types';
 import { createHarnessRuntimeRepository, HarnessRuntimeError, attachWorkbenchConversationFact, buildWorkbenchUserMessageFact,
   BUSINESS_SKILLS_WORKFLOW_ID, BUSINESS_SKILLS_WORKFLOW_VERSION, type HarnessRuntimeRepository, type AiRunsSubmitResult, type QueueDbExecutor } from '../harness/harness.module';
@@ -10,7 +11,7 @@ import { createInvocationPgRepository } from './skills.invocation-pg.repository'
 import { createExecutionEmergencyRepository, type InvocationEmergencyAuthority, type ExecutionAuthorityBinding } from './execution-emergency';
 
 export interface InvocationRepository {
-  prepare(user: AuthUser, sessionId: string, sources: SourceReference[]): Promise<{ verify(tx: QueueDbExecutor): Promise<void> }>;
+  prepare(user: AuthUser, sessionId: string, sources: SourceReference[]): Promise<{ sourceMaterials?: FrozenSourceMaterial[]; verify(tx: QueueDbExecutor): Promise<void> }>;
 }
 type Options = {
   repository?: InvocationRepository;
@@ -22,6 +23,7 @@ const errors: Record<string, [number, string]> = {
   INVOCATION_INVALID_REQUEST: [400, '调用请求无效，请检查输入'],
   INVOCATION_NOT_FOUND: [404, '资源不存在'],
   INVOCATION_FORBIDDEN: [403, '当前权限已变化，请重新读取'],
+  INVOCATION_SOURCE_UNAVAILABLE: [409, '原始来源材料不可用，请重新上传或选择会话原文'],
   INVOCATION_SOURCE_CHANGED: [409, '来源材料已变化，请重新读取后重试'],
   INVOCATION_CONTEXT_CHANGED: [409, '执行定义或配置已变化，请重新读取后重试'],
   SUBMISSION_KEY_CONFLICT: [409, '该提交标识已用于其他请求'],
@@ -41,7 +43,8 @@ function errorCode(error: unknown): string {
   if (Object.prototype.hasOwnProperty.call(errors, code)) return code;
   if (code === 'HARNESS_RUNTIME_PAYLOAD_TOO_LARGE') return 'INVOCATION_TOO_LARGE';
   if (['EXECUTION_FORBIDDEN', 'EXECUTION_AUTHORITY_CHANGED'].includes(code)) return 'INVOCATION_FORBIDDEN';
-  if (['EXECUTION_UNAVAILABLE', 'EXECUTION_CONTEXT_CHANGED', 'SKILL_CONTEXT_CHANGED', 'EXECUTION_REFERENCE_UNAVAILABLE'].includes(code)) return 'INVOCATION_CONTEXT_CHANGED';
+  if (code === 'EXECUTION_SOURCE_UNAVAILABLE') return 'INVOCATION_SOURCE_UNAVAILABLE';
+  if (['EXECUTION_UNAVAILABLE', 'EXECUTION_CONTEXT_CHANGED', 'SKILL_CONTEXT_CHANGED', 'EXECUTION_REFERENCE_UNAVAILABLE', 'EXECUTION_ASSET_UNAVAILABLE'].includes(code)) return 'INVOCATION_CONTEXT_CHANGED';
   if (['EXECUTION_INVALID_REQUEST', 'EXECUTION_INPUT_SCHEMA_FAILED'].includes(code)) return 'INVOCATION_INVALID_REQUEST';
   return 'INVOCATION_INTERNAL';
 }
@@ -75,7 +78,7 @@ export function createSkillInvocationService(options: Options = {}) {
       let prepared: PreparedExecution | undefined;
       let baseline: ExecutionAuthorityBinding[] | undefined;
       if (!existing) {
-        try { baseline = await authority.prepare(execution, user); prepared = await (options.prepareExecution ?? prepareExecution)(execution, user); }
+        try { baseline = await authority.prepare(execution, user); prepared = await (options.prepareExecution ?? prepareExecution)(execution, user, sources.sourceMaterials ? { sourceMaterials: sources.sourceMaterials } : undefined); }
         catch (error) {
           // A concurrent submit can commit after our first miss, then become unavailable to new calls.
           // Only the queue's locked replay path may reuse it; authority, sources and fingerprint still apply.

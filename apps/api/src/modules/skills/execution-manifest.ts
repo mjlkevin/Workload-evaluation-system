@@ -1,3 +1,6 @@
+import { createExecutionAssetPgRepository } from './mvp/execution-assets-pg.repository';
+import { normalizeExecutionAssets, validateFrozenExecutionAssets, validateFrozenSourceMaterials, assertExecutionAssetPermission,
+  type ExecutionAssetRepository, type ExecutionSourceContext } from './mvp/execution-assets';
 import { db, type Database } from '../../db/client';
 import Ajv from 'ajv';
 import type { AuthUser } from '../../types';
@@ -26,9 +29,11 @@ export function validateExecutionRequest(value: unknown): ExecutionRequest {
   const request = json(value);
   if (!object(request) || !['skill', 'workflow'].includes(String(request.kind))) invalid();
   const idKey = request.kind === 'skill' ? 'skillId' : 'workflowId';
-  exactKeys(request, ['kind', idKey, 'input', 'sources']);
+  exactKeys(request, ['kind', idKey, 'input', 'sources', 'assets']);
   if (!text(request[idKey]) || !Object.prototype.hasOwnProperty.call(request, 'input')) invalid();
   if (request.sources !== undefined) sourcesShape(request.sources);
+  const assets = normalizeExecutionAssets(request.assets);
+  delete request.assets; if (assets.length) request.assets = assets;
   return request as ExecutionRequest;
 }
 function sourcesShape(value: unknown): asserts value is SourceReference[] {
@@ -85,13 +90,25 @@ type ServiceOptions = {
   database?: Database; repository?: ExecutionManifestRepository;
   loadSkillContext?: typeof resolveSkillDependencyContext; loadWorkflowTools?: typeof workflowToolMetadata;
   loadReference?: (id: string) => ReturnType<ReturnType<typeof getKnowledgeRepository>['get']>;
-  prepareAuthority?: typeof prepareSkillAuthority;
+  prepareAuthority?: typeof prepareSkillAuthority; assetRepository?: ExecutionAssetRepository;
 };
 export function createExecutionManifestService(options: ServiceOptions = {}) {
   const database = options.database ?? db; const repository = options.repository ?? createExecutionManifestPgRepository();
-  return { async prepareExecution(value: unknown, initialUser: AuthUser): Promise<PreparedExecution> {
+  const assets = options.assetRepository ?? createExecutionAssetPgRepository();
+  return { async prepareExecution(value: unknown, initialUser: AuthUser, sourceContext?: ExecutionSourceContext): Promise<PreparedExecution> {
     const request = validateExecutionRequest(value); const user = structuredClone(initialUser);
-    const before = await database.transaction(tx => repository.read(tx, request, false), { isolationLevel: 'repeatable read', accessMode: 'read only' });
+    const assetRefs = request.assets ?? [];
+    if (assetRefs.length) assertExecutionAssetPermission(user);
+    const sourceMaterials = sourceContext && json(sourceContext.sourceMaterials);
+    if (sourceMaterials) {
+      validateFrozenSourceMaterials(sourceMaterials);
+      const refs = request.sources ?? [];
+      if (refs.length !== sourceMaterials.length || refs.some(ref => !sourceMaterials.some(m => m.id === ref.id && m.kind === ref.kind))) invalid('EXECUTION_SOURCE_UNAVAILABLE', 409);
+    }
+    const { before, assetBindings } = await database.transaction(async tx => ({ before: await repository.read(tx, request, false),
+      assetBindings: await assets.read(tx, assetRefs) }), { isolationLevel: 'repeatable read', accessMode: 'read only' });
+    validateFrozenExecutionAssets(assetBindings);
+    if (hash(assetBindings.map(({ kind, templateId }) => ({ kind, templateId }))) !== hash(assetRefs)) invalid('EXECUTION_ASSET_UNAVAILABLE', 409);
     authorize(before, user, request.input);
     const uris = before.skills.flatMap(skill => skill.definition.references.map(ref => ref.uri));
     const authority = await (options.prepareAuthority ?? prepareSkillAuthority)(uris, async () => {
@@ -135,37 +152,46 @@ export function createExecutionManifestService(options: ServiceOptions = {}) {
       return json({ ...before, skills, tools, ...version });
     }, database);
     const body = json({ ...authority.value, caller: { id: user.id, businessRole: resolveBusinessRole(user) },
-      initialInput: request.input, sources: request.sources ?? [], assetBindings: [] as [] });
+      initialInput: request.input, sources: request.sources ?? [], assetBindings, ...(sourceMaterials?.length ? { sourceMaterials } : {}) });
     const manifest: ExecutionManifest = { ...body, manifestHash: hash(body) };
-    // No resolver, provider, pool acquisition or definition lookup survives into this short transaction callback.
+    // The commit phase uses only the supplied connection and prepared authority; no provider, file I/O or pool acquisition.
     return { async resolveInTransaction(tx) {
       const current = await repository.read(tx, request, true);
       if (hash(current) !== hash(before)) invalid('EXECUTION_CONTEXT_CHANGED', 409);
       await repository.verifyCaller(tx, user);
+      if (assetRefs.length) assertExecutionAssetPermission(user);
+      if (hash(await assets.read(tx, assetRefs)) !== hash(assetBindings)) invalid('EXECUTION_CONTEXT_CHANGED', 409);
       await authority.verify(tx);
       return readPersistedExecutionManifest(manifest);
     } };
   } };
 }
-export const prepareExecution = (request: unknown, user: AuthUser) => createExecutionManifestService().prepareExecution(request, user);
+export const prepareExecution = (request: unknown, user: AuthUser, sources?: ExecutionSourceContext) => createExecutionManifestService().prepareExecution(request, user, sources);
 
 /** Server-only persisted data reader. A checksum detects accidental corruption; it is not an authorization credential. */
 export function readPersistedExecutionManifest(value: unknown): ExecutionManifest {
   const result = json(value) as ExecutionManifest;
   if (!object(result)) invalid('EXECUTION_MANIFEST_INVALID');
-  exactKeys(result, ['schemaVersion', 'kind', 'target', 'skills', 'publishedDependencies', 'tools', 'caller', 'initialInput', 'sources', 'assetBindings', 'manifestHash',
+  exactKeys(result, ['schemaVersion', 'kind', 'target', 'skills', 'publishedDependencies', 'tools', 'caller', 'initialInput', 'sources', 'assetBindings', 'sourceMaterials', 'manifestHash',
     ...(result.schemaVersion === 2 ? ['toolAuthority'] : [])]);
   const { manifestHash, ...body } = result;
   if (![1, 2].includes(result.schemaVersion) || !['skill', 'workflow'].includes(result.kind) || manifestHash !== hash(body)
     || !object(result.target) || !text(result.target.id) || !text(result.target.versionId)
     || !object(result.target.definition) || result.target.hash !== hash(result.target.definition)
-    || !object(result.caller) || !text(result.caller.id) || !Array.isArray(result.assetBindings) || result.assetBindings.length
+    || !object(result.caller) || !text(result.caller.id)
     || !Array.isArray(result.skills) || !validateToolBindings(result.tools)
     || (result.kind === 'workflow' && !validatePublishedDependencies(result.publishedDependencies))) invalid('EXECUTION_MANIFEST_INVALID');
   if (result.schemaVersion === 2 && (result.kind !== 'workflow' || !result.tools.length || !validateToolAuthority(result.toolAuthority)
     || new Set(result.toolAuthority.tools.map(tool => tool.stepId)).size !== result.tools.length
     || multiset(result.toolAuthority.tools.map(tool => tool.stepId)) !== multiset(result.tools.map(tool => tool.stepId)))) invalid('EXECUTION_MANIFEST_INVALID');
   sourcesShape(result.sources);
+  try {
+    validateFrozenExecutionAssets(result.assetBindings);
+    if (result.sourceMaterials !== undefined) {
+      validateFrozenSourceMaterials(result.sourceMaterials);
+      if (result.sources.length !== result.sourceMaterials.length || result.sources.some(ref => !result.sourceMaterials!.some(m => m.id === ref.id && m.kind === ref.kind))) invalid();
+    }
+  } catch { invalid('EXECUTION_MANIFEST_INVALID'); }
   const definition = result.target.definition;
   if (!Array.isArray(definition.roles) || !definition.roles.includes(result.caller.businessRole)
     || !compileSkillPayloadSchema(definition.inputSchema, 'inputSchema')(result.initialInput)) invalid('EXECUTION_MANIFEST_INVALID');

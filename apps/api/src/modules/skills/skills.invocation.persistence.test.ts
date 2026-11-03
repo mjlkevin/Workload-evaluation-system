@@ -143,14 +143,22 @@ test('persisted conversation events are valid sources before snapshot projection
   await assert.rejects(service().submitInvocation(user, other, request(s.skillId, refs)), (e: any) => e.code === 'INVOCATION_NOT_FOUND');
   await assert.rejects(service().submitInvocation(user, id, request(s.skillId, [{ kind: 'conversation', id: history.run.harnessRunId }])), (e: any) => e.code === 'INVOCATION_NOT_FOUND');
 });
-test('attachment and legacy conversation body drift between prepare and commit is rejected with no half Run', async () => {
+test('legacy attachment cannot start new work; repository metadata drift and owned conversation drift remain rejected', async () => {
   const s = await skill();
   for (const kind of ['file', 'conversation'] as const) {
     const a = attachment(); const m = message(); const id = await session({ attachments: [a], messages: [m] });
     const b = request(s.skillId, [{ kind, id: kind === 'file' ? a.attachmentId : m.messageId }]);
+    if (kind === 'file') {
+      const legacy = await repository.prepare(user, id, [{ kind, id: a.attachmentId }]);
+      assert.deepEqual(legacy.sourceMaterials, []);
+      await database.update(schema.aiSessions).set({ attachments: [{ ...a, parsedSummary: 'changed' }] }).where(eq(schema.aiSessions.sessionId, id));
+      await assert.rejects(database.transaction(tx => legacy.verify(tx)), (e: any) => e.code === 'INVOCATION_SOURCE_CHANGED');
+      await assert.rejects(service().submitInvocation(user, id, b), (e: any) => e.code === 'INVOCATION_SOURCE_UNAVAILABLE');
+      assert.equal((await runRows(b.submissionKey)).length, 0); continue;
+    }
     const stale = service(async (...args) => {
       const prepared = await manifest.prepareExecution(...args);
-      await database.update(schema.aiSessions).set(kind === 'file' ? { attachments: [{ ...a, parsedSummary: 'changed' }] } : { messages: [{ ...m, content: 'changed' }] }).where(eq(schema.aiSessions.sessionId, id));
+      await database.update(schema.aiSessions).set({ messages: [{ ...m, content: 'changed' }] }).where(eq(schema.aiSessions.sessionId, id));
       return prepared;
     });
     await assert.rejects(stale.submitInvocation(user, id, b), (e: any) => e.code === 'INVOCATION_SOURCE_CHANGED');
@@ -213,7 +221,7 @@ test('publication change during prepare rejects stale admission; max=1 service a
     const a = attachment(); const m = message(); const withSources = await session({ messages: [m], attachments: [a] });
     const source = createExecutionManifestService({ database: one, loadSkillContext: async d => { await single.query('SELECT 1'); return loadContext(d); } });
     const run = await createSkillInvocationService({ queue: createHarnessRuntimeRepository(one), repository: createInvocationPgRepository(one), prepareExecution: source.prepareExecution })
-      .submitInvocation(user, withSources, request(s.skillId, [{ kind: 'file', id: a.attachmentId }, { kind: 'conversation', id: m.messageId }]));
+      .submitInvocation(user, withSources, request(s.skillId, [{ kind: 'conversation', id: m.messageId }]));
     assert.equal(run.status, 202); assert.notEqual((await persisted(run.data.runId)).executionConfig, undefined);
   } finally { await single.end(); }
 });

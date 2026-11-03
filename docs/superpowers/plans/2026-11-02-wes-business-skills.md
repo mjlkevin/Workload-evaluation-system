@@ -972,3 +972,5 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **W四节点生产宿主独立收口：** 真实Skill、工具、userInput、confirmation复用持久清单、预算、权限与操作消费，默认boot已装配；父精确保留rootSkill原有路径。普通超时遵循节点onFailure，晚到模型/读取/获批写入撤权均保持宿主拒绝与预算结算。新源码696gross，真实反例及旧等待/根宿主/Scope/boot组合95/95、0skip、tsc0；SPEC及fresh五轴质量APPROVE。七源冻结实取通过。取消终态竞态另单元仍开放，不因本组合本次通过而隐藏。C公开接线/统一视图/UI和D尚待整体门禁，未作真实模型或人工MVP验收声明。
 
 **C3工作台界面分单收口：** 同一工作台显式选择发布目标、按Schema填写并启动，支持等待回答、原决定恢复、失败重试、停止及结果回读；普通聊天不作授权。UI①645gross、②644gross分别SPEC/fresh质量APPROVE，focused43/43。local-ref、const/无type枚举与跨会话/ABA迟到结果问题均保留真实RED并修正；原37项未删。仅使用现有Dialog和tokens/Tailwind，无新栈或依赖。全量Web、构建及1440/760真实界面验收仍待整体收口，不用RTL模拟代替业务模型执行。
+
+**真实资产与会话原文底座独立收口：** 执行清单冻结服务器读取的模板、规则、完整摘要与本人实际会话正文，入队事务复验，原input保持；空资产省略兼容旧指纹。SPEC发现权限入口漏资产指纹P1后，以实际admission、Worker/预算和失败重试三项RED修成统一helper。最终新17、相关纯3、旧PG60均0skip，512gross分别SPEC/fresh五轴安全APPROVE。全局模板/规则夹具还原摘要一致，owned数据清理0。当前旧文件summary明确不能作为新调用原文，真实上传另单元；无客户端快照/模型自批或模板seed造绿。P1期间API并行静态RED的编译错误保留，后续API类型验证已0，不混算实测业务验收。
