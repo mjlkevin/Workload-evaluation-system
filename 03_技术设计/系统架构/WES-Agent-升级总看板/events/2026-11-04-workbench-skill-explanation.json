@@ -6,7 +6,7 @@
   "relatedRequirements": [
     "RP-050"
   ],
-  "status": "交互稿已确认，实施中",
+  "status": "实现与自动检查完成，最终界面验收待登录",
   "dedup": "Matched ISS-2026-11-04-001; extend RP-050, no new RP",
   "evidence": [
     "用户浏览器截图批注1/2",
@@ -20,11 +20,12 @@
     "design",
     "changes",
     "testing",
-    "monitoring"
+    "monitoring",
+    "runtime"
   ],
   "implementationPerformed": true,
   "previousDisposition": "question",
-  "decision": "用户明确要求Skill完整执行过程与交互记录进入消息界面。中间承载分析说明、进度、工具结果、补充、确认和产物；右侧仅辅助摘要。命中ISS-2026-11-04-001，复用RP-050，交互调整尚未实施。",
+  "decision": "用户已确认执行阶段、分析与工具明细进入消息流，右侧摘要，输入区选择业务任务；正在按已确认交互稿实现。",
   "userApproval": {
     "defaultDisplay": "stages; analysis and tool details expandable",
     "prototype": "http://127.0.0.1:3007/",
@@ -32,7 +33,7 @@
     "date": "2026-11-04"
   },
   "implementationStarted": true,
-  "implementationProgress": "A1真实消息历史基础完成；A2数据读取与正式前端接线实施中",
+  "implementationProgress": "消息流交互已实现，Web974、模块1159、执行套件679及双构建通过；3006最终界面验收待登录后执行。",
   "validationEvidence": {
     "unit": "A1",
     "commit": "e193d48",
@@ -47,5 +48,113 @@
     ],
     "independentReviews": "SPEC PASS;QUALITY APPROVE",
     "userInterfaceAcceptance": "pending"
+  },
+  "implementationUnits": [
+    {
+      "unit": "A1",
+      "commit": "e193d48",
+      "focused": "18/18"
+    },
+    {
+      "unit": "A2",
+      "commit": "25a3209",
+      "focused": "66/66",
+      "buildApi": "passed"
+    },
+    {
+      "unit": "B1",
+      "commit": "740e55f",
+      "focused": "93/93"
+    },
+    {
+      "unit": "summary-read",
+      "commit": "52ea8d5",
+      "focused": "38/38; strengthened assertions9/9",
+      "buildApi": "passed"
+    },
+    {
+      "unit": "B2",
+      "commit": "26a0e25",
+      "focused": "60/60",
+      "review": "SPEC PASS;QUALITY APPROVE"
+    },
+    {
+      "unit": "C",
+      "commit": "a80049b",
+      "fullWeb": "99 files;974/974;0skip",
+      "buildWeb": "passed",
+      "review": "SPEC PASS;QUALITY APPROVE",
+      "scrollRed": "/tmp/wes-c-default-open-red.log",
+      "scrollGreen": "/tmp/wes-c-default-open-green.log"
+    },
+    {
+      "unit": "projection-gate-fixture",
+      "commit": "d037e45",
+      "focused": "33/33 before final compatibility-call replacement; final API build passed",
+      "review": "SPEC PASS;QUALITY APPROVE",
+      "fullHarness": "679/679;0skip on final compatibility-call revision"
+    }
+  ],
+  "latestModules": {
+    "result": "1159/1159;0skip",
+    "log": "/tmp/wes-message-final-verified-summary.log"
+  },
+  "runtimeObservation": {
+    "fullHistoryMs": 5069,
+    "internalSummaryMs": 1317,
+    "sameReadScope": false,
+    "source": "owned preview standard catalog completed run",
+    "uiAcceptance": "pending"
+  },
+  "implementationCompleted": true,
+  "verificationSnapshot": {
+    "web": "99 files;974/974;0skip",
+    "modules": "1159/1159;0skip",
+    "harness": "679/679;0skip",
+    "ai": "286/286;0skip",
+    "agent": "254/254;0skip",
+    "buildWeb": "passed",
+    "buildApi": "passed",
+    "openApi": "199 unique paths;19 positive/negative cases passed",
+    "integration": "failed templates_status_not_200;active_templates=0;assignment_rows=0;baseline unchanged",
+    "browser": "still login;no new UI/manual acceptance",
+    "reviews": "all units SPEC PASS then QUALITY APPROVE;B2+C seam review APPROVE",
+    "logs": [
+      "/tmp/wes-message-final-web-v2.log",
+      "/tmp/wes-message-final-build-web-v2.log",
+      "/tmp/wes-projection-gate-build-api.log",
+      "/tmp/wes-message-final-verified-summary.log",
+      "/tmp/wes-message-final-api-summary.log",
+      "/tmp/wes-message-timeline-openapi-validation.log"
+    ]
+  },
+  "previewPreservation": {
+    "health": "3004 and3006 HTTP200",
+    "originalUsers": 4,
+    "originalUsersPreserved": true,
+    "originalSkillAndWorkflowRecordsPreserved": true,
+    "credentialByteEquality": false,
+    "existingCredentialDifference": [
+      "api_key_encrypted",
+      "updated_at"
+    ],
+    "credentialSetAuditAt": "2026-11-03T16:50:09.485Z",
+    "credentialDifferencePredatesFinalRegression": true,
+    "credentialCurrentValueRetained": true,
+    "strictOldBackupCheck": "failed and retained /tmp/wes-message-final-preservation.log",
+    "boundedMetadataRecheck": "passed /tmp/wes-message-final-preservation-v2.log"
+  },
+  "latestHarness": {
+    "result": "679/679;0skip",
+    "log": "/tmp/wes-message-final-verified-summary.log"
+  },
+  "userInterfaceAcceptance": "pending login and actual browser/manual verification",
+  "integrationState": "local only;not merged;not pushed",
+  "boardValidation": {
+    "pages": 21,
+    "errors": 0,
+    "warnings": 0,
+    "worktreeLog": "/tmp/wes-message-final-board-0.log",
+    "canonicalLog": "/tmp/wes-message-final-board-1.log"
   }
 }
