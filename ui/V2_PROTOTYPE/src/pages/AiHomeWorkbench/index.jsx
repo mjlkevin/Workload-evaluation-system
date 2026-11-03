@@ -5,6 +5,9 @@ import { useBackgroundRuns } from '../../hooks/useBackgroundRuns.jsx'
 import { sessionRuntimeStore } from '../../hooks/useSessionRuntimeStore.js'
 import useChatMessages from './hooks/useChatMessages.js'
 import useHarnessRun from './hooks/useHarnessRun.js'
+import useBusinessExecution from './hooks/useBusinessExecution.js'
+import SkillInvocationDialog from './components/SkillInvocationDialog.jsx'
+import BusinessExecutionPanel from './components/BusinessExecutionPanel.jsx'
 import useWorkbenchState from './hooks/useWorkbenchState.js'
 import ChatArea from './components/ChatArea/index.jsx'
 import BackgroundRunsPanel from './components/ChatArea/BackgroundRunsPanel.jsx'
@@ -28,6 +31,9 @@ export default function AiHomeWorkbench({ currentUser }) {
   // RP-047 Batch D（G4 明确停止）：活跃 Run 按 sessionId 映射到会话行；
   // cancel 唯一入口仅由用户显式点击停止并经二次确认后触发。
   const backgroundRuns = useBackgroundRuns()
+  const business = useBusinessExecution(workbench.activeSession?.sessionId)
+  const [invocationOpen, setInvocationOpen] = useState(false)
+  const ensureBusinessSession = async (name) => workbench.activeSession || workbench.createSession({ title: name, workflowKey: 'free_chat', status: 'temporary_chat' })
   const sessionRuns = useMemo(() => {
     const map = {}
     backgroundRuns.runs.forEach((run) => { if (run.sessionId) map[run.sessionId] = run })
@@ -144,6 +150,7 @@ export default function AiHomeWorkbench({ currentUser }) {
     <div className={`ai-home-workbench${workbench.workspacePanelCollapsed ? ' ai-home-workbench--inspector-collapsed' : ''}`} data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
       <h1 className="sr-only">AI 工作台</h1>
       <aside className="ai-home-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
+        <button type="button" className="btn btn-pri shrink-0" onClick={() => setInvocationOpen(true)}>启动 Skill / 工作流</button>
         <BackgroundRunsPanel runs={backgroundRuns.runs} runCounts={runCounts} onStopRun={requestStopRun} />
         <SessionRail
           sessions={workbench.sessions}
@@ -173,6 +180,23 @@ export default function AiHomeWorkbench({ currentUser }) {
         confirmingActionId={harness.confirmingActionId}
         messageCount={chat.messages.length}
         outputState={workbench.outputState}
+      >
+        <BusinessExecutionPanel
+          runs={business.runs} loading={business.loading} error={business.error} busy={business.busy}
+          onRefresh={business.refresh} onInput={business.submitInput} onDecision={business.decide}
+          onRetry={business.retry} onStop={business.stop}
+        />
+      </WorkspacePanel>
+      <SkillInvocationDialog
+        open={invocationOpen}
+        onClose={() => setInvocationOpen(false)}
+        ensureSession={ensureBusinessSession}
+        session={workbench.activeSession}
+        onStarted={() => {
+          business.refresh()
+          backgroundRuns.notifyRunsChanged?.()
+          if (workbench.workspacePanelCollapsed) workbench.toggleWorkspacePanel()
+        }}
       />
 
       {workbench.deleteTargetSession && (

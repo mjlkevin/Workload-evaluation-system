@@ -13,6 +13,7 @@ export default function WorkspacePanel({
   confirmingActionId,
   messageCount,
   outputState,
+  children,
 }) {
   return (
     <aside className={`ai-home-inspector${collapsed ? ' ai-home-inspector--collapsed' : ''}`} role="complementary" aria-label="AI 工作区" aria-expanded={!collapsed}>
@@ -29,6 +30,7 @@ export default function WorkspacePanel({
         </button>
       </div>
       <div className={`ai-home-inspector__content${collapsed ? ' ai-home-inspector__content--hidden' : ''}`}>
+        {children}
         <StatusPanel session={session} sending={sending} onConfirmAction={onConfirmAction} confirmingActionId={confirmingActionId} />
         <ResultCard title={messageCount ? outputState.activeTitle : outputState.title}>
           {messageCount ? outputState.activeDesc : outputState.empty}

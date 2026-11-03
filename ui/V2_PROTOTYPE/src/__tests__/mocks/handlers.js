@@ -55,6 +55,7 @@ export function __getMcpStoreForTest() {
 }
 
 export const handlers = [
+  http.get(`${BASE}/ai-executions/runs`, () => HttpResponse.json({ data: { items: [] } })),
   http.get(`${BASE}/versions`, ({ request }) => {
     const url = new URL(request.url)
     const type = url.searchParams.get('type')
