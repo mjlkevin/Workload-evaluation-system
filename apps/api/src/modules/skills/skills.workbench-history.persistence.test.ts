@@ -133,8 +133,11 @@ test('timeline retains real questions, false confirmation, completed child tools
  assert.equal(legacy.entries.filter(e => e.kind === 'tool_result').length, 0);
  assert.ok(legacy.entries.some(e => e.kind === 'result' && e.stepId === 'child'));
  await database.insert(schema.harnessRunCheckpoints).values(completed);
+ const summary = await projection().readSummary(user, f.runId);
  await database.update(schema.harnessRunCheckpoints).set({ stateHash: '0'.repeat(64) }).where(eq(schema.harnessRunCheckpoints.harnessRunCheckpointId, completed.harnessRunCheckpointId));
  await assert.rejects(projection().read(user, f.runId), (e: any) => e.status === 409);
+ assert.deepEqual(await projection().readSummary(user, f.runId), summary);
+ assert.deepEqual(summary.results.output, view.results.output);
 });
 test('historical approved result and rejected decision retain exact public shape and ignore unrelated sources', async () => {
  const edit = (d: WorkflowDefinition) => { const direct = d.steps[3]; if (direct.type !== 'tool') throw Error();
@@ -227,7 +230,7 @@ test('a retry with tools from two physical runs omits group provenance instead o
  assert.equal(final.entries.find(e => e.kind === 'result')?.runId, child); assert.equal(reads, before + 2);
 });
 
-test('a decision-only race with unchanged checkpoint returns approved action and the same fresh timeline', async () => {
+for (const readMode of ['read', 'readSummary'] as const) test(`${readMode}: a decision-only race with unchanged checkpoint returns the approved current action`, async () => {
  const f = await fixture(d => { const direct = d.steps[3]; if (direct.type !== 'tool') throw Error();
  direct.toolName = write.name; direct.requiresConfirmation = true; direct.inputMapping = [path('projectName', '$.input.projectName')]; d.steps = [direct]; d.outputMapping = [path('projectName', '$.input.projectName')]; });
  const counter = { models: 0 }; await worker(counter);
@@ -237,7 +240,57 @@ test('a decision-only race with unchanged checkpoint returns approved action and
   if (!changed) { changed = true; await createSkillOperationDecisionService({ database, inventory }).decideOperation(user,
    { runId: f.runId, operationId: prompt.operationId, confirmationHash: prompt.confirmationHash, decision: 'approve' }); }
   return inventory();
- } }).read(user, f.runId);
+ } })[readMode](user, f.runId);
  assert.equal((await saved(f.runId)).lastCheckpointId, cp); assert.equal((await saved(f.runId)).status, 'waiting');
- assert.equal(view.pendingOperation?.status, 'approved'); assert.equal(view.timeline.entries.find(e => e.kind === 'decision')?.status, 'approved');
+ assert.equal(view.pendingOperation?.status, 'approved');
+ if (readMode === 'read') {
+  assert.ok('timeline' in view);
+  assert.equal(view.timeline.entries.find(e => e.kind === 'decision')?.status, 'approved');
+ } else assert.equal('timeline' in view, false);
+ const summary = await projection().readSummary(user, f.runId);
+ assert.deepEqual(summary.pendingOperation, view.pendingOperation); assert.equal('timeline' in summary, false);
+});
+
+test('summary refresh handles operation completion and cancellation during unlocked inventory without a stale approval', async () => {
+ for (const change of ['complete', 'cancel'] as const) {
+  const f = await fixture(d => { const direct = d.steps[3]; if (direct.type !== 'tool') throw Error();
+   direct.toolName = write.name; direct.requiresConfirmation = true; direct.inputMapping = [path('projectName', '$.input.projectName')];
+   d.steps = [direct]; d.outputMapping = [path('projectName', '$.input.projectName')]; });
+  const counter = { models: 0 }; await worker(counter);
+  const waits = createBusinessSkillOperationWaitService({ database, inventory }), prompt = await waits.read(user, f.runId);
+  let calls = 0;
+  const service = createBusinessExecutionProjectionService({ database, readHistory: async () => assert.fail('No history for summary'), inventory: async () => {
+   calls++;
+   if (change === 'complete') {
+    await waits.answer(user, { runId: f.runId, actionId: prompt.actionId, confirmationHash: prompt.confirmationHash, decision: 'approve' });
+    await worker(counter);
+   } else await database.update(schema.harnessRuns).set({ cancelRequestedAt: new Date() }).where(eq(schema.harnessRuns.harnessRunId, f.runId));
+   return inventory();
+  } });
+  const view = await service.readSummary(user, f.runId);
+  assert.equal(calls, 1); assert.equal(view.pendingOperation, undefined); assert.equal(view.pendingInput, undefined);
+  if (change === 'complete') {
+   assert.equal((await saved(f.runId)).status, 'completed');
+   assert.deepEqual(view.results.output, (await projection().read(user, f.runId)).results.output);
+  } else assert.ok((await saved(f.runId)).cancelRequestedAt);
+ }
+});
+
+test('summary fails closed on DB revocation during inventory and retries a moving current Run at most once', async () => {
+ for (const change of ['revoke', 'move'] as const) {
+  const f = await fixture(d => { const direct = d.steps[3]; if (direct.type !== 'tool') throw Error();
+   direct.toolName = write.name; direct.requiresConfirmation = true; direct.inputMapping = [path('projectName', '$.input.projectName')];
+   d.steps = [direct]; d.outputMapping = [path('projectName', '$.input.projectName')]; });
+  await worker({ models: 0 }); let calls = 0;
+  const service = createBusinessExecutionProjectionService({ database, readHistory: async () => assert.fail('No history for summary'), inventory: async () => {
+   calls++;
+   if (change === 'revoke') await database.update(schema.users).set({ businessRole: 'delivery' }).where(eq(schema.users.userId, user.id));
+   else await database.update(schema.harnessRuns).set({ status: calls === 1 ? 'queued' : 'running' }).where(eq(schema.harnessRuns.harnessRunId, f.runId));
+   return inventory();
+  } });
+  try {
+   await assert.rejects(service.readSummary(user, f.runId), (e: any) => e.status === (change === 'revoke' ? 403 : 409));
+   assert.equal(calls, change === 'revoke' ? 1 : 2);
+  } finally { await database.update(schema.users).set({ businessRole: 'pre_sales' }).where(eq(schema.users.userId, user.id)); }
+ }
 });

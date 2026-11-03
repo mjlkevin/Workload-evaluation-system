@@ -70,3 +70,27 @@ test('owned GET exposes an additive bounded timeline without writing conversatio
  assert.deepEqual(view.timeline.entries, []); assert.equal(view.timeline.coverage, 'partial');
  assert.deepEqual(await counts(), before);
 });
+
+test('internal summary reads current authority without fetching history or writing Run/session/ledger rows', async () => {
+ const f = await fixture(); let historyReads = 0;
+ const projection = createBusinessExecutionProjectionService({ database, readHistory: async () => {
+  historyReads++; assert.fail('Summary must not fetch historical checkpoints or ledgers');
+ } });
+ const rows = async () => Promise.all([
+  database.select().from(schema.harnessRuns).where(eq(schema.harnessRuns.harnessRunId, f.runId)),
+  database.select().from(schema.aiSessions).where(eq(schema.aiSessions.sessionId, f.sessionId)),
+  database.select().from(schema.harnessRunEvents).where(eq(schema.harnessRunEvents.harnessRunId, f.runId)),
+  database.select().from(schema.harnessToolEvents).where(eq(schema.harnessToolEvents.harnessRunId, f.runId)),
+ ]);
+ const before = await rows();
+ const summary = await projection.readSummary(user, f.runId);
+ assert.equal('timeline' in summary, false); assert.equal(historyReads, 0);
+ assert.deepEqual(summary.target, (await service().read(user, f.runId)).target);
+ assert.deepEqual(await rows(), before);
+ await assert.rejects(projection.readSummary({ ...user, id: randomUUID() }, f.runId), (e: any) => e.status === 404);
+ await database.update(schema.users).set({ businessRole: 'delivery' }).where(eq(schema.users.userId, user.id));
+ try { await assert.rejects(projection.readSummary(user, f.runId), (e: any) => e.status === 403); }
+ finally { await database.update(schema.users).set({ businessRole: 'pre_sales' }).where(eq(schema.users.userId, user.id)); }
+ await database.update(schema.harnessRuns).set({ lastCheckpointId: randomUUID() }).where(eq(schema.harnessRuns.harnessRunId, f.runId));
+ await assert.rejects(projection.readSummary(user, f.runId), (e: any) => e.status === 409);
+});

@@ -18,7 +18,7 @@ export type BusinessExecutionView = {
     effects: Array<{ toolName: string; parameters?: unknown; result: unknown }>; output?: unknown };
 };
 /** Only validated server-owned state enters this projector; it is never a cursor parser or an authority source. */
-export function buildBusinessExecutionView(manifest: ExecutionManifest, state?: BusinessSkillsHostState): BusinessExecutionView {
+export function buildBusinessExecutionView(manifest: ExecutionManifest, state?: BusinessSkillsHostState, options: { includeDetails?: boolean } = {}): BusinessExecutionView {
   const definition = manifest.target.definition;
   const steps = manifest.kind === 'skill' ? [{ id: '$skill', name: definition.name, type: 'skill', versionId: manifest.target.versionId }]
     : (definition as WorkflowDefinition).steps.map(step => ({ id: step.id, name: step.name, type: step.type,
@@ -29,7 +29,7 @@ export function buildBusinessExecutionView(manifest: ExecutionManifest, state?: 
   if (state?.workflow) {
     const runtime = createWorkflowRuntime(manifest, state.workflow.executionId);
     const decision = runtime.next(state.workflow);
-    for (let index = 0; index < state.workflow.receipts.length; index++) {
+    for (let index = 0; options.includeDetails !== false && index < state.workflow.receipts.length; index++) {
       const before = runtime.next({ ...state.workflow, receipts: state.workflow.receipts.slice(0, index) });
       if (before.kind !== 'ready') throw new Error('BUSINESS_SKILLS_PROJECTION_INVALID');
       const receipt = state.workflow.receipts[index];
@@ -44,10 +44,10 @@ export function buildBusinessExecutionView(manifest: ExecutionManifest, state?: 
   if (state?.skill) {
     const skill = state.skill;
     view.currentStep = { id: skill.stepId, status: skill.phase === 'completed' ? 'completed' : 'running' };
-    view.results.effects = skill.toolResults.map(tool => ({ toolName: tool.toolName, parameters: safeBusinessJson(tool.arguments), result: safeBusinessJson(tool.result) }));
+    if (options.includeDetails !== false) view.results.effects = skill.toolResults.map(tool => ({ toolName: tool.toolName, parameters: safeBusinessJson(tool.arguments), result: safeBusinessJson(tool.result) }));
     if (skill.phase === 'completed') {
       if (manifest.kind === 'skill') view.results.output = safeBusinessJson(skill.output);
-      view.results.steps.push({ stepId: skill.stepId, status: 'succeeded', output: safeBusinessJson(skill.output) });
+      if (options.includeDetails !== false) view.results.steps.push({ stepId: skill.stepId, status: 'succeeded', output: safeBusinessJson(skill.output) });
     }
   }
   return view;

@@ -39,16 +39,22 @@ test('unified workbench derives business tasks and artifacts from the same owned
   { submissionKey: randomUUID(), content: 'Start unified workflow', execution: { kind: 'workflow', workflowId: root.workflowId, input: {} } });
  const runId = started.data.runId; await tick();
  const base = { sessions: [{ sessionId, pendingActionCount: 0, artifactCount: 0 }], runs: [], tasks: [], artifacts: [], failedRuns: [] } as any;
- const service = createBusinessWorkbenchViewService({ database, inventory });
+ let historyReads = 0;
+ const service = createBusinessWorkbenchViewService({ database, inventory, readHistory: async () => {
+  historyReads++; assert.fail('Unified summaries must not fetch timeline history');
+ } });
  const unified = createWorkbenchViewUsecase({ repo: queue, business: service } as any);
  const waiting: any = await unified.getUnifiedView(user);
  assert.equal(waiting.runs[0].runId, runId); assert.equal(waiting.runs[0].hasBusinessExecution, true);
  assert.equal(waiting.tasks.length, 1); assert.equal(waiting.tasks[0].runId, runId); assert.equal(waiting.tasks[0].actionType, 'business_input');
  assert.equal(waiting.artifacts.length, 0); assert.equal(waiting.sessions[0].pendingActionCount, 1);
  const projection = await createBusinessExecutionProjectionService({ database, inventory }).read(user, runId), pending = projection.pendingInput!;
+ const summary = await createBusinessExecutionProjectionService({ database, inventory }).readSummary(user, runId);
+ assert.deepEqual(summary.pendingInput, pending); assert.equal('timeline' in summary, false);
  await wait.answer({ runId, sessionId, requestedBy: user.id, actionId: pending.actionId, kind: 'userInput', stepId: pending.stepId, contentHash: pending.contentHash, value: {} }); await tick();
  const completed: any = await unified.getUnifiedView(user); assert.equal(completed.tasks.length, 0); assert.equal(completed.artifacts.length, 1); assert.equal(completed.artifacts[0].runId, runId);
  assert.equal(completed.artifacts[0].type, 'business_execution'); assert.equal(completed.sessions[0].artifactCount, 1);
  assert.deepEqual((await database.select().from(schema.aiSessions).where(eq(schema.aiSessions.sessionId, sessionId)))[0].pendingActions, []);
+ assert.equal(historyReads, 0);
  await assert.rejects(service.extend({ ...user, id: randomUUID() }, base), (e: any) => e.status === 403);
 });

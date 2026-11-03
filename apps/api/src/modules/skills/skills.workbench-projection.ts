@@ -14,7 +14,7 @@ import { readBusinessSkillHostCheckpointInTransaction, createBusinessSkillOperat
 import { businessSkillsWaitDescriptor, type BusinessSkillsWaitCommand } from '../harness/business-skills.wait';
 import { createWorkflowRuntime } from '../harness/workflows.runtime-adapter';
 const fail = (status = 409): never => { throw new SkillError('BUSINESS_SKILLS_PROJECTION_UNAVAILABLE', '任务信息暂不可用，请刷新后重试', status); };
-type Options = { database?: Database; inventory?: typeof resolveCurrentSkillTools };
+type Options = { database?: Database; inventory?: typeof resolveCurrentSkillTools; readHistory?: typeof readBusinessExecutionHistoryInTransaction };
 const movedOperation = (error: unknown) => error instanceof HarnessRuntimeError
   ? error.code === 'BUSINESS_SKILLS_OPERATION_WAIT_INVALID'
   : error instanceof SkillError && ['EXECUTION_RUN_NOT_ACTIVE', 'OPERATION_SCOPE_INVALID'].includes(error.code);
@@ -22,21 +22,20 @@ const movedOperation = (error: unknown) => error instanceof HarnessRuntimeError
 export function createBusinessExecutionProjectionService(options: Options = {}) {
   const database = options.database ?? db, identity = createExecutionManifestPgRepository();
   const operationWait = createBusinessSkillOperationWaitService({ database, inventory: options.inventory });
-  const loadCurrent = (user: AuthUser, runId: string) => database.transaction(async tx => {
+  const loadCurrent = (user: AuthUser, runId: string, includeDetails: boolean) => database.transaction(async tx => {
     const run = await lockRunRow(tx, runId);
     if (run.ownerUserId !== user.id) fail(404);
     const [session] = await tx.select({ owner: aiSessions.ownerUserId }).from(aiSessions).where(eq(aiSessions.sessionId, run.aiSessionId!)).for('share');
     if (!session || session.owner !== user.id) fail(404);
     await identity.verifyCaller(tx, user);
     const saved = await readBusinessSkillHostCheckpointInTransaction(tx, run);
-    const history = await readBusinessExecutionHistoryInTransaction(tx, saved);
-    const effects = history.toolEvents.filter(row => row.eventType === 'business_operation_executed' && row.status === 'succeeded');
-    return { run, ...saved, effects, history };
+    const history = includeDetails ? await (options.readHistory ?? readBusinessExecutionHistoryInTransaction)(tx, saved) : undefined;
+    return { run, ...saved, history };
   });
-  return { async read(user: AuthUser, runId: string) {
+  async function read(user: AuthUser, runId: string, includeDetails: boolean) {
     try {
       if (!/^[a-f0-9-]{36}$/i.test(runId)) fail(404);
-      let current = await loadCurrent(user, runId);
+      let current = await loadCurrent(user, runId, includeDetails);
       // Inventory/confirmation reads never retain this snapshot's Run lock.
       // A changed checkpoint invalidates the whole provisional view, at most once.
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -50,7 +49,7 @@ export function createBusinessExecutionProjectionService(options: Options = {}) 
           let operationError: unknown;
           try { operation = await operationWait.read(user, runId); }
           catch (error) { if (!movedOperation(error)) throw error; operationError = error; }
-          const after = await loadCurrent(user, runId);
+          const after = await loadCurrent(user, runId, includeDetails);
           if (after.run.lastCheckpointId !== current.run.lastCheckpointId || after.run.status !== current.run.status
             || after.run.cancelRequestedAt?.getTime() !== current.run.cancelRequestedAt?.getTime()) {
             if (attempt === 1) fail();
@@ -67,10 +66,10 @@ export function createBusinessExecutionProjectionService(options: Options = {}) 
           if (current.run.status === 'waiting' && decision.kind === 'ready' && ['userInput', 'confirmation'].includes(decision.command.type))
             pendingInput = safeBusinessJson(businessSkillsWaitDescriptor(current.run, decision.command as BusinessSkillsWaitCommand));
         }
-        const view = buildBusinessExecutionView(current.manifest, current.state);
-        const timeline = buildBusinessExecutionTimeline({ manifest: current.manifest, state: current.state, runId, rootRunId: current.chain.root,
+        const view = buildBusinessExecutionView(current.manifest, current.state, { includeDetails });
+        const timeline = current.history && buildBusinessExecutionTimeline({ manifest: current.manifest, state: current.state, runId, rootRunId: current.chain.root,
           ownerUserId: user.id, sessionId: current.chain.sessionId, runStatus: current.run.status, ...current.history });
-        for (const effect of current.effects) {
+        for (const effect of current.history?.toolEvents.filter(row => row.eventType === 'business_operation_executed' && row.status === 'succeeded') ?? []) {
           const output = effect.output as Record<string, unknown> | null;
           if (!output || output.schemaVersion !== 1 || !Object.prototype.hasOwnProperty.call(output, 'result') || Object.keys(output).length !== 2) fail();
           const result = safeBusinessJson(output!.result);
@@ -78,7 +77,7 @@ export function createBusinessExecutionProjectionService(options: Options = {}) 
             view.results.effects.push({ toolName: effect.toolName, result });
         }
         if (current.run.status === 'waiting' && view.currentStep) view.currentStep.status = 'waiting';
-        return { ...view, timeline, budget: safeBudget, ...(pendingInput ? { pendingInput } : {}), ...(pendingOperation ? { pendingOperation } : {}) };
+        return { ...view, ...(timeline ? { timeline } : {}), budget: safeBudget, ...(pendingInput ? { pendingInput } : {}), ...(pendingOperation ? { pendingOperation } : {}) };
       }
       return fail();
     } catch (error) {
@@ -86,5 +85,17 @@ export function createBusinessExecutionProjectionService(options: Options = {}) 
       if (error instanceof HarnessRuntimeError && error.code === 'HARNESS_RUN_NOT_FOUND') return fail(404);
       return fail();
     }
-  } };
+  }
+  return {
+    async read(user: AuthUser, runId: string) {
+      const projection = await read(user, runId, true);
+      return { ...projection, timeline: projection.timeline ?? fail() };
+    },
+    /** Internal unified-view projection: current authority only; historical audit data remains on read(). */
+    async readSummary(user: AuthUser, runId: string) {
+      const { kind, target, results, pendingInput, pendingOperation } = await read(user, runId, false);
+      return { kind, target, results: { ...(results.output !== undefined ? { output: results.output } : {}) },
+        ...(pendingInput ? { pendingInput } : {}), ...(pendingOperation ? { pendingOperation } : {}) };
+    },
+  };
 }

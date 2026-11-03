@@ -50,3 +50,12 @@ test('safe business projection preserves assessment adjustment basis while exclu
  const view = buildBusinessExecutionView(manifest, { kind: 'skill', skill: { phase: 'completed', stepId: '$skill', toolResults: [], output } } as any);
  assert.deepEqual(view.input, { basis: '业务输入依据' }); assert.deepEqual(view.results.output, output);
 });
+
+test('summary projection omits unconsumed tool and step copies while preserving sanitized final output', () => {
+ const manifest = { kind: 'skill', target: { id: 's1', versionId: 'v1', definition: { name: 'Summary', description: '' } } } as any;
+ const state = { skill: { phase: 'completed', stepId: '$skill', output: { days: 3, credentialScope: 'PRIVATE' },
+  toolResults: [{ toolName: 'read', arguments: {}, result: { rows: [1, 2, 3] } }] } } as any;
+ const view = buildBusinessExecutionView(manifest, state, { includeDetails: false });
+ assert.deepEqual(view.results.steps, []); assert.deepEqual(view.results.effects, []);
+ assert.deepEqual(view.results.output, { days: 3 });
+});

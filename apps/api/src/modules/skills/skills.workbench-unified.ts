@@ -1,16 +1,15 @@
 import { and, desc, eq } from 'drizzle-orm';
-import { db, type Database } from '../../db/client';
+import { db } from '../../db/client';
 import { harnessRuns, harnessRunOutputs } from '../../db/schema';
 import type { AuthUser } from '../../types';
 import type { WorkbenchUnifiedView } from '../harness/workbench-view.usecase';
 import { BUSINESS_SKILLS_WORKFLOW_ID } from '../harness/business-skills.identity';
 import { createExecutionManifestPgRepository } from './execution-manifest-pg.repository';
 import { createBusinessExecutionProjectionService } from './skills.workbench-projection';
-import { resolveCurrentSkillTools } from './skills.context';
 import { safeBusinessJson } from './skills.workbench-view';
 import { skillDefinitionHash as hash } from './skills.hash';
 import { SkillError } from './skills.types';
-type Options = { database?: Database; inventory?: typeof resolveCurrentSkillTools };
+type Options = NonNullable<Parameters<typeof createBusinessExecutionProjectionService>[0]>;
 /** Read-only overlay. Run checkpoints and published outputs own these tasks/artifacts; sessions are never modified. */
 export function createBusinessWorkbenchViewService(options: Options = {}) {
  const database = options.database ?? db, projection = createBusinessExecutionProjectionService(options);
@@ -23,7 +22,7 @@ export function createBusinessWorkbenchViewService(options: Options = {}) {
   });
   for (const run of runs) {
    if (!run.aiSessionId || !result.sessions.some(session => session.sessionId === run.aiSessionId)) continue;
-   const business = await projection.read(user, run.harnessRunId), sessionId = run.aiSessionId;
+   const business = await projection.readSummary(user, run.harnessRunId), sessionId = run.aiSessionId;
    const createdAt = run.createdAt.toISOString(), updatedAt = run.updatedAt.toISOString();
    const item = { runId: run.harnessRunId, sessionId, title: run.title, status: run.status, latestEventKind: `run_${run.status}`,
     hasBusinessExecution: true, businessExecution: { kind: business.kind, target: business.target }, createdAt, updatedAt };
