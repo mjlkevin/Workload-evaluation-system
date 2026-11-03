@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, inArray, lt } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, type Database } from "../../db/client";
+import { BUSINESS_SKILLS_WORKFLOW_ID } from './business-skills.identity';
 import {
   harnessRunAttempts,
   harnessRunCheckpoints,
@@ -119,6 +120,11 @@ function assertSubmissionReplay(run: HarnessRunRow, input: CreateQueuedHarnessRu
   if (prior !== input.submissionFingerprint || run.aiSessionId !== input.aiSessionId
     || run.workflowId !== input.workflowId || run.workflowVersion !== input.workflowVersion)
     throw new HarnessRuntimeError('SUBMISSION_KEY_CONFLICT', 'submission key belongs to a different request');
+}
+
+function assertLegacyWaitChannel(run: HarnessRunRow): void {
+  if (run.workflowId === BUSINESS_SKILLS_WORKFLOW_ID)
+    throw new HarnessRuntimeError('BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED');
 }
 
 export type ClaimNextHarnessRunInput = {
@@ -379,7 +385,7 @@ export interface HarnessRuntimeRepository {
   findRunToolInputAnswer(input: { runId: string; actionId: string }): Promise<HarnessToolInputAnswer | null>;
 }
 
-type HarnessTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
+export type HarnessTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 const MIN_LEASE_MS = 1_000;
 const MAX_LEASE_MS = 300_000;
@@ -412,7 +418,7 @@ async function allocateEventSequence(tx: HarnessTx, runId: string): Promise<numb
   return Number(rows[0].event_sequence);
 }
 
-async function appendRunEventInTransaction(
+export async function appendRunEventInTransaction(
   tx: HarnessTx,
   input: { runId: string; eventType: HarnessRunEventType; payload?: Record<string, unknown> },
 ): Promise<HarnessRunEventRow> {
@@ -452,7 +458,7 @@ async function appendRunEventInTransaction(
 }
 
 /** 读取数据库时钟，避免主机与 DB 时钟偏差导致 lease/队列比较漂移。 */
-async function readDbNow(tx: HarnessTx): Promise<Date> {
+export async function readDbNow(tx: HarnessTx): Promise<Date> {
   const result = await tx.execute(sql`SELECT now() AS db_now`);
   const value = (result.rows as Array<{ db_now: Date | string }>)[0]?.db_now;
   return value instanceof Date ? value : new Date(value);
@@ -545,7 +551,7 @@ function assertRuntimeValidation(value: unknown): asserts value is HarnessRuntim
 }
 
 /** 事务内锁定 Run 行，串行化同一 Run 的检查点/输出/事件原语。 */
-async function lockRunRow(tx: HarnessTx, runId: string): Promise<HarnessRunRow> {
+export async function lockRunRow(tx: HarnessTx, runId: string): Promise<HarnessRunRow> {
   const locked = await tx.execute(sql`
     SELECT harness_run_id
     FROM harness_runs
@@ -560,7 +566,7 @@ async function lockRunRow(tx: HarnessTx, runId: string): Promise<HarnessRunRow> 
 }
 
 /** 按 actionId 取本 Run 内某一类事件的首行（审批请求与决策的对账键）。 */
-async function findRunEventByActionId(
+export async function findRunEventByActionId(
   tx: HarnessTx,
   runId: string,
   eventType: HarnessRunEventType,
@@ -591,7 +597,7 @@ async function findRunEventByActionId(
 // waiting 的 Run 改写成 recovering → 用户提交时得到 409）。
 // 差异只在传进来的 eventType / payload / 两条错误文案，行为逐字保持各自批次原样。
 
-async function pauseRunForToolWait(
+export async function pauseRunForToolWait(
   dbInstance: Database,
   input: {
     runId: string;
@@ -603,6 +609,7 @@ async function pauseRunForToolWait(
     notRunningMessage: string;
     cancelReason: string;
     now?: Date;
+    beforeWait?: (tx: HarnessTx, run: HarnessRunRow) => Promise<{ actionId: string; payload: Record<string, unknown>; eventType?: HarnessRunEventType }>;
   },
 ): Promise<{ paused: boolean; run: HarnessRunRow; event: HarnessRunEventRow }> {
   return await dbInstance.transaction(async (tx) => {
@@ -612,18 +619,20 @@ async function pauseRunForToolWait(
     }
     // 只有正在执行本 attempt 的 Run 才有权挂起：给 queued/waiting 的 Run 置
     // waiting 会凭空造出一个没有 worker 在推的死等。
-    if (run.status !== "running") {
+    if (run.status !== "running" && !(input.beforeWait && run.status === 'cancelling' && run.cancelRequestedAt)) {
       throw new HarnessRuntimeError("HARNESS_RUN_NOT_RUNNING", input.notRunningMessage);
     }
+    const prepared = input.beforeWait ? await input.beforeWait(tx, run) : input;
+    const waitingEventType = prepared.eventType ?? input.eventType;
     const now = input.now ?? (await readDbNow(tx));
     // 幂等：同一 actionId 只向用户问一次（重放/双投不得刷出两条等待请求）
-    const pending = await findRunEventByActionId(tx, input.runId, input.eventType, input.actionId);
+    const pending = await findRunEventByActionId(tx, input.runId, waitingEventType, prepared.actionId);
     const event =
       pending ??
       (await appendRunEventInTransaction(tx, {
         runId: input.runId,
-        eventType: input.eventType,
-        payload: input.payload,
+        eventType: waitingEventType,
+        payload: prepared.payload,
       }));
     // 释放 attempt：留在 claimed/running 会在 lease 到期后被恢复扫描判为孤儿，
     // 把 waiting 的 Run 改写成 recovering，用户随后确认即得 409。
@@ -649,7 +658,7 @@ async function pauseRunForToolWait(
         eventType: "run_cancelled",
         payload: {
           reason: input.cancelReason,
-          actionId: input.actionId,
+          actionId: prepared.actionId,
           attemptId: input.attemptId,
         },
       });
@@ -667,6 +676,98 @@ async function pauseRunForToolWait(
 // ============================================================
 // 工厂
 // ============================================================
+
+export async function commitHarnessCheckpointInTransaction(tx: HarnessTx, input: CommitHarnessCheckpointInput) {
+  assertNonEmptyText(input.runId, "runId");
+  assertNonEmptyText(input.checkpointKey, "checkpointKey");
+  assertNonEmptyText(input.workflowId, "workflowId");
+  assertNonEmptyText(input.workflowVersion, "workflowVersion");
+  assertNonEmptyText(input.stepKey, "stepKey");
+  assertNonEmptyText(input.stateHash, "stateHash");
+  assertNonEmptyText(input.resumePolicy, "resumePolicy");
+  assertSafeJsonObject(input.state);
+  assertRuntimeValidation(input.runtimeValidation);
+  const state = normalizeJsonObject(input.state);
+  if (input.effectKeys !== undefined) {
+    if (!Array.isArray(input.effectKeys) || input.effectKeys.some((key) => typeof key !== "string")) {
+      throw new HarnessRuntimeError("HARNESS_RUNTIME_PAYLOAD_INVALID", "effectKeys must be a string array");
+    }
+  }
+  if (input.aiMilestone !== undefined) {
+    assertSafeJsonObject(input.aiMilestone);
+  }
+  const aiMilestone = input.aiMilestone !== undefined ? normalizeJsonObject(input.aiMilestone) : null;
+  // 先锁 Run 行：串行化同一 Run 的检查点写入与序号计算
+  await lockRunRow(tx, input.runId);
+
+  const existing = await tx
+    .select()
+    .from(harnessRunCheckpoints)
+    .where(
+      and(
+        eq(harnessRunCheckpoints.harnessRunId, input.runId),
+        eq(harnessRunCheckpoints.checkpointKey, input.checkpointKey),
+      ),
+    );
+  if (existing.length > 0) {
+    const current = existing[0];
+    if (current.stateHash !== input.stateHash) {
+      throw new HarnessRuntimeError(
+        "CHECKPOINT_KEY_CONFLICT",
+        "checkpoint key already committed with a different state hash",
+      );
+    }
+    return { checkpoint: current, created: false };
+  }
+
+  const sequenceResult = await tx.execute(sql`
+    SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence
+    FROM harness_run_checkpoints
+    WHERE harness_run_id = ${input.runId}
+  `);
+  const sequence = Number(
+    (sequenceResult.rows as Array<{ next_sequence: number }>)[0]?.next_sequence ?? 1,
+  );
+
+  const [checkpoint] = await tx
+    .insert(harnessRunCheckpoints)
+    .values({
+      harnessRunCheckpointId: randomUUID(),
+      harnessRunId: input.runId,
+      harnessRunAttemptId: input.attemptId ?? null,
+      sequence,
+      checkpointKey: input.checkpointKey,
+      checkpointKind: input.checkpointKind,
+      workflowId: input.workflowId,
+      workflowVersion: input.workflowVersion,
+      stepKey: input.stepKey,
+      resumePolicy: input.resumePolicy,
+      state,
+      stateHash: input.stateHash,
+      inputHash: input.inputHash ?? null,
+      effectKeys: input.effectKeys ?? [],
+      aiMilestone,
+      runtimeValidation: normalizeJsonObject(input.runtimeValidation) as HarnessRuntimeValidation,
+    })
+    .returning();
+
+  await tx
+    .update(harnessRuns)
+    .set({ lastCheckpointId: checkpoint.harnessRunCheckpointId, currentStepKey: input.stepKey })
+    .where(eq(harnessRuns.harnessRunId, input.runId));
+
+  await appendRunEventInTransaction(tx, {
+    runId: input.runId,
+    eventType: "checkpoint_committed",
+    payload: {
+      checkpointId: checkpoint.harnessRunCheckpointId,
+      checkpointKey: input.checkpointKey,
+      sequence,
+    },
+  });
+
+  return { checkpoint, created: true };
+}
 
 export function createHarnessRuntimeRepository(dbInstance: Database = db): HarnessRuntimeRepository {
   return {
@@ -901,101 +1002,8 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
 
     async commitCheckpoint(input) {
       try {
-        assertNonEmptyText(input.runId, "runId");
-        assertNonEmptyText(input.checkpointKey, "checkpointKey");
-        assertNonEmptyText(input.workflowId, "workflowId");
-        assertNonEmptyText(input.workflowVersion, "workflowVersion");
-        assertNonEmptyText(input.stepKey, "stepKey");
-        assertNonEmptyText(input.stateHash, "stateHash");
-        assertNonEmptyText(input.resumePolicy, "resumePolicy");
-        assertSafeJsonObject(input.state);
-        assertRuntimeValidation(input.runtimeValidation);
-        const state = normalizeJsonObject(input.state);
-        if (input.effectKeys !== undefined) {
-          if (!Array.isArray(input.effectKeys) || input.effectKeys.some((key) => typeof key !== "string")) {
-            throw new HarnessRuntimeError("HARNESS_RUNTIME_PAYLOAD_INVALID", "effectKeys must be a string array");
-          }
-        }
-        if (input.aiMilestone !== undefined) {
-          assertSafeJsonObject(input.aiMilestone);
-        }
-        const aiMilestone = input.aiMilestone !== undefined ? normalizeJsonObject(input.aiMilestone) : null;
-
-        return await dbInstance.transaction(async (tx) => {
-          // 先锁 Run 行：串行化同一 Run 的检查点写入与序号计算
-          await lockRunRow(tx, input.runId);
-
-          const existing = await tx
-            .select()
-            .from(harnessRunCheckpoints)
-            .where(
-              and(
-                eq(harnessRunCheckpoints.harnessRunId, input.runId),
-                eq(harnessRunCheckpoints.checkpointKey, input.checkpointKey),
-              ),
-            );
-          if (existing.length > 0) {
-            const current = existing[0];
-            if (current.stateHash !== input.stateHash) {
-              throw new HarnessRuntimeError(
-                "CHECKPOINT_KEY_CONFLICT",
-                "checkpoint key already committed with a different state hash",
-              );
-            }
-            return { checkpoint: current, created: false };
-          }
-
-          const sequenceResult = await tx.execute(sql`
-            SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence
-            FROM harness_run_checkpoints
-            WHERE harness_run_id = ${input.runId}
-          `);
-          const sequence = Number(
-            (sequenceResult.rows as Array<{ next_sequence: number }>)[0]?.next_sequence ?? 1,
-          );
-
-          const [checkpoint] = await tx
-            .insert(harnessRunCheckpoints)
-            .values({
-              harnessRunCheckpointId: randomUUID(),
-              harnessRunId: input.runId,
-              harnessRunAttemptId: input.attemptId ?? null,
-              sequence,
-              checkpointKey: input.checkpointKey,
-              checkpointKind: input.checkpointKind,
-              workflowId: input.workflowId,
-              workflowVersion: input.workflowVersion,
-              stepKey: input.stepKey,
-              resumePolicy: input.resumePolicy,
-              state,
-              stateHash: input.stateHash,
-              inputHash: input.inputHash ?? null,
-              effectKeys: input.effectKeys ?? [],
-              aiMilestone,
-              runtimeValidation: normalizeJsonObject(input.runtimeValidation) as HarnessRuntimeValidation,
-            })
-            .returning();
-
-          await tx
-            .update(harnessRuns)
-            .set({ lastCheckpointId: checkpoint.harnessRunCheckpointId, currentStepKey: input.stepKey })
-            .where(eq(harnessRuns.harnessRunId, input.runId));
-
-          await appendRunEventInTransaction(tx, {
-            runId: input.runId,
-            eventType: "checkpoint_committed",
-            payload: {
-              checkpointId: checkpoint.harnessRunCheckpointId,
-              checkpointKey: input.checkpointKey,
-              sequence,
-            },
-          });
-
-          return { checkpoint, created: true };
-        });
-      } catch (err) {
-        throw toSafeError(err);
-      }
+        return await dbInstance.transaction(tx => commitHarnessCheckpointInTransaction(tx, input));
+      } catch (err) { throw toSafeError(err); }
     },
 
     async upsertRunOutput(input) {
@@ -1630,6 +1638,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
         const payloadInput = normalizeJsonObject(input.input);
         return await dbInstance.transaction(async (tx) => {
           const run = await lockRunRow(tx, input.runId);
+          assertLegacyWaitChannel(run);
           if (run.status !== "waiting") {
             throw new HarnessRuntimeError("HARNESS_RUN_NOT_WAITING", "run inputs are only accepted while waiting");
           }
@@ -1657,6 +1666,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
         assertNonEmptyText(input.confirmedBy, "confirmedBy");
         return await dbInstance.transaction(async (tx) => {
           const run = await lockRunRow(tx, input.runId);
+          assertLegacyWaitChannel(run);
           // 幂等：同一 actionId 已确认过则直接回放既有事件，不改状态不追加事件
           const existing = await tx
             .select()
@@ -1820,6 +1830,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
         assertNonEmptyText(input.rejectedBy, "rejectedBy");
         return await dbInstance.transaction(async (tx) => {
           const run = await lockRunRow(tx, input.runId);
+          assertLegacyWaitChannel(run);
           // 幂等：同一 actionId 的二次拒绝回放既有事件，不改状态不追加事件
           const existing = await findRunEventByActionId(tx, input.runId, "tool.call.rejected", input.actionId);
           if (existing) {

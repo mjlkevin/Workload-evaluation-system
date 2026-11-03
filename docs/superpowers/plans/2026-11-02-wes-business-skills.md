@@ -548,3 +548,68 @@ createSkillExecutionService(trustedPorts?).execute({
 
 
 **C2b.2总看板复验：** 九页已同步，board-build与21页一致性检查0错0警告；浏览器展开RP-050台账实读仍C实施中，下一步等待/确认授权/幂等。截图/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2b2-2026-11-03-board-requirements.png。既有窄列/P2换行保持，不声称完成视觉优化。已关闭本次临时3008服务及自建页，未操作用户3006页。
+
+
+### C2c.1 精细工单：流程原契约持久等待与确认（2026-11-03）
+
+用户“继续下一步”，基线4ac3bde/codex/wes-skills-c，继续原RP-050及已批准设计。目标是在现有Harness上完成真实PG持久的userInput/confirmation等待、匹配回答、重启恢复与幂等推进；不是内存Promise或纯决策模拟。生产Skill/工具仍不接宿主，内部等待专用executor只接受这两类节点及已完成结果，其他命令安全拒绝。无新HTTP/UI/生产boot接线，无DB迁移、依赖或真实模型/工具调用；保护用户模型状态、3006/3004、预览库与主目录既有改动。
+
+复用方案：既有pauseRunForToolWait事务内持有Run锁，新增仅服务端beforeWait(tx,run)钩子，在同笔事务写检查点、等待事件、释放当前attempt并置waiting；抽取commitCheckpoint原事务体为同域共享函数，旧入口保留验证与行为。不得先提交检查点后单独调用pause，也不得嵌套获取连接。仅新业务等待额外锁定并核对真实当前attempt归属、运行状态和有效租约，陈旧/错run attempt在写入前拒绝。取消优先：不得把取消中的运行留成waiting。
+
+责任文件：新modules/harness/business-skills.wait.ts（内部等待仓储/服务及有限executor，可按职责窄拆同前缀文件）、business-skills.wait.persistence.test.ts；窄改harness-runtime.repository.ts/worker.ts/types.ts、business-skills.workflow.ts/usecase.ts及必要module出口。parent只维护package脚本/文档/总看板，不与实现者并改业务文件。代码和测试目标750–900行，连同已有代码搬移的实际diff若超过999，先收敛或拆审查单元，不以文件净增隐藏规模。
+
+```ts
+createBusinessSkillsWaitService(database).pause({runId, attemptId});
+createBusinessSkillsWaitService(database).answer({
+  runId, sessionId, requestedBy, actionId, kind, stepId, contentHash, value
+});
+createBusinessWorkflowWaitExecutor(service); // 内部服务器装配，仅userInput/confirmation/completed
+```
+
+契约：用C1保存manifest和C2b.1有序回执重新推导当前命令；不信客户端传入Schema/指令/游标/批准身份。actionId绑定run/owner/session/manifestHash/operationId/kind/stepId/原契约及prompt+displayInput的contentHash。私有businessSkills检查点保存原runtimeState，等待事件只放待答提示/原输出结构/显示数据和必要标识，禁止复制完整manifest、Skill私有指令、引用知识正文或工具策略。以既有事件白名单增量登记workflow.awaiting_input、workflow.awaiting_confirmation、workflow.answer_recorded，不新增等待状态或表。新恢复路径对owner/session/runKind/adapter、快照hash和最新CP完整性逐项复验。
+
+回答事务持有同一Run锁：当前owner/session匹配，actionId/kind/stepId/contentHash必须对应本次等待；整份value安全JSON及原Schema通过才可追加回执。非法回答保持waiting，先前已完成节点不重新执行。相同绑定+相同答案返回首个记录，不重复事件/检查点/入队；冲突、旧内容、跨run/错owner/错节点拒绝；并发不同回答至多一个写入，同答并发只接受一次。confirmation原契约{approved:boolean}保持，false是显式记录的业务数据，沿已发布false分支推进，不冒充写工具执行授权。回答后原子提交新检查点+回答事件+queued；终态/取消不被旧回答重新打开。
+
+通道隔离：既有submitRunInput/confirmRunAction/rejectRunAction对business_skills_v1运行明确拒绝，防通用接口绕过本契约。针对已知snapshot私有清单门槛，getRunSnapshot的业务Run采用窄安全投影去除executionConfig和checkpoint.state；其他返回完整Run的公开读取也需核对，未覆盖者列为门槛。等待专用executor事务成功后抛HarnessWorkflowWaitingError，business适配器与Worker保留该控制流，不把已持久等待写成失败。正常启动仍无生产executor，不提前开放业务创建入口。
+
+- [x] RED：真实PG等待事务包含CP/事件/attempt释放；原manifest、Schema、原输入/显示内容绑定，错attempt/过期lease在写入前拒绝。
+- [x] GREEN：复用同事务helper、内部pause/answer与有限executor，新事件/控制流；max>=2真实并发回答验证一次推进，失败事务完整回滚。
+- [x] 新service/repository/Worker实例恢复原userInput→confirmation→final；invalid值不推进，同答重放/冲突/旧hash/跨run/错owner-session-kind-step拒绝，false分支、取消优先及取消/回答竞态。
+- [x] 泛用输入/确认/拒绝接口不可绕过；业务snapshot不返回私有manifest/state，旧聊天等待语义与既有Harness回归保持。
+- [x] 规格独立复核后fresh质量/安全复核；父独立专项/模块/Harness及受影响回归/双构建，集成缺模板继续如实记录；精确文件本地提交并同步九页看板，不合main/推送，不关闭C2/C3/D/MVP。
+
+
+**C2c.1实现前收敛：** pause只接受runId/attemptId，在同一持锁事务中读取原manifest和最新私有检查点，再由解释器推导等待命令；不接受调用方传入runtimeState、Schema、指令或显示内容。初次无CP从原输入开始，恢复CP复用业务适配器原验证器。测试直接用真实队列保存合法冻结清单，不为等待测试建立无关发布资产。
+
+
+**C2c.1契约同步补充：** 公共既有snapshot的业务Run变体去除executionConfig及私有checkpoint.state/aiMilestone；现有inputs/confirm/reject对业务Run返回409 BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED，不转成通用500。OpenAPI同步描述上述既有端点变化，无新增业务等待HTTP入口；用例/路由测试验证owner与冲突响应。活动Run列表原本已是摘要投影。版本/来源统一展示、retry实时授权及会话删除并发仍是后续门槛。
+
+
+**C2c.1开发中实取修正：** 父代码检查提出合法大答案在业务适配器完成结果中被state/output重复包装计入1MiB的风险，实现者以真实等待→回答→确认→最终结果复现13/14中的失败（/tmp/wes-c2c1-red-large）。本单元允许窄改同一business-skills.workflow.ts完成结果复制边界：metadata、完整state、output内容各保留原安全JSON限制，不提高共享限额，不让组合信封重复缩额；必须以600k真实恢复反例转绿。通用回答错误需映射为409的RED3失败与GREEN13通过、max1单连接路径已有证据（/tmp/wes-c2c1-red-http、/tmp/wes-c2c1-green-http），最终候选仍待独立复核。新PG套件登记test:business-skills-wait与现有串行test:harness，避免在modules并行组与Harness争用表。
+
+
+**C2c.1首候选独立规格复核：** 父真实等待22/22、modules908/908通过，规格独立22/22及8个大小/危险属性/未知字段探针通过，但锁竞争探针发现P2：businesspause以now()（事务开始时间）校验lease，等待Run锁后实际已过期仍写waiting与CP。独立实得xact_start .113Z/lease .123Z/actual_now .124Z、accepted=true/CP1，REQUEST_CHANGES；证据/tmp/wes-c2c1-spec/independent-probe.mts及.log。返修仅在新业务pause取得Run与Attempt两锁后用实时clock_timestamp校验租约，补锁等待反例；不改旧通用租约语义。同时取消/回答竞态独立12轮均cancelled，原允许cancelling的断言须收紧。首候选绿色保留，不冒充最终复审通过。
+
+
+**C2c.1租约返修与规格复审：** 实现者真实Run锁与Attempt锁竞争反例均先红（24中2fail，/tmp/wes-c2c1-lease-red）；新业务pause先锁两行，再单独SQL按clock_timestamp和DB原精度判断lease，旧通用时钟与租约逻辑不改。最终专项24/24及API构建通过。规格独立重跑24/24、两种自建锁争用均拒绝过期租约且CP0、取消竞态12轮均cancelled、8个大小/危险属性/未知字段探针通过后APPROVE，证据/tmp/wes-c2c1-spec-final。父专项24/24和模块908/908也通过，质量/完整Harness及跨域回归仍在进行，不先宣布全部通过。
+
+
+**C2c.1首轮完整回归记录：** 父最终等待24/24、modules908/908通过，但首次完整Harness362中355pass/7fail，均为原事件词汇25类/历批additive差集断言未登记本批3类，日志/tmp/wes-c2c1-parent-final/test:harness.log。允许窄改harness-runtime.types.test.ts：保留旧25词汇顺序与全部历史校验，把3类新事件追加尾部并单独冻结28总量/准确名称/去重，不删除旧防线或放宽任意事件。补完后须重新做完整Harness与独立复核；本轮旧失败保留，不宣称全绿。
+
+
+**C2c.1最终回填（2026-11-03）：** 内部原契约等待服务、回答及有限executor已实现，规格和fresh五轴质量/安全APPROVE。既有Harness同事务原语保存检查点/等待事件/attempt释放/waiting；回答持Run锁，绑定owner/session/原manifest/节点/原Schema/待显示内容hash，校验后原子写回执检查点、回答记录并queued。非法回答零推进；并发同答仅一次，冲突拒绝；新service/repository/Worker实例恢复原流程，false确认沿发布分支跳过实际后继节点。确认数据不作为工具写入授权。
+
+锁后租约修复：先按Run→Attempt顺序锁定，再独立SQL按clock_timestamp与数据库原时间精度检查有效租约；两种实际锁争用在租约过期后都拒绝且CP0，不改旧通用时钟。取消/回答竞态12轮均cancelled，终态不被旧回答重开。故障注入在实际CP插入后失败时整笔回滚；坏hash/policy/next/unsafe/manifest/pointer均拒绝。合法600k答案经真实等待→回答→确认→最终结果通过，组合返回不再重复缩额；真正超大/危险属性/过深状态输出仍拒绝。
+
+通道与隐私：普通inputs/confirm/reject事务内拒绝业务Run，经usecase映射409 BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED；getSnapshot业务变体去除executionConfig及私有CPstate/aiMilestone，原owner404保持；活动列表沿用摘要。OpenAPI同步既有端点描述，无新增等待HTTP接口。新增3类事件追加尾部，旧25类顺序及全部历史保护保持；新契约冻结28总量/准确名称/去重，并验证移除/改名/重复/未知事件都会触发失败。
+
+父最终独立验证：完整Harness **364/364**、modules **908/908**（29 suites），0fail/0skip（/tmp/wes-c2c1-parent-rereviewed）；父真实等待专项 **24/24**（/tmp/wes-c2c1-parent-final）及API/Web构建通过（/tmp/wes-c2c1-parent-build-api-final.log、/tmp/wes-c2c1-parent-build-web.log），YAML解析/diff检查通过、范围秘密扫描0命中。规格独立24/24、两种租约争用/12取消竞态/8边界探针后APPROVE（/tmp/wes-c2c1-spec-final）；fresh质量独立纯逻辑118、边界8、事件契约13、PG24均通过后APPROVE（/tmp/wes-c2c1-quality-pg）。质量首次直接启动因测试库变量未对齐被守卫拒绝连接，保留/tmp/wes-c2c1-quality-pg.log，随后统一包装通过，无生产库访问。
+
+本轮AI **286/286** 在事件词汇顺序/测试登记调整前通过，末次只重跑完整Harness及模块，不冒充再次运行全部AI。通用集成仍 **0/1 templates_status_not_200**（/tmp/wes-c2c1-parent-final）；末次只读查询workload_eval_test活动模板/分配均0，模板域/路由/集成测试未改，不填主库或预览数据放绿。远端CI及真实模型/工具验收未执行。依赖audit实取仍45既有基线（32moderate/12high/1critical），无依赖/lock变更；质量无本scope新增具体可利用漏洞，未做负载测试，事务重复解析/重放仅按1MiB/32深度/500回执约束，不承诺吞吐量。
+
+审查失败与修复证据全部保留：初始guards4fail/core4pass5fail、409映射RED3fail、600k结果RED13/14；首候选独立22及父22/908绿色后规格租约探针REQUEST_CHANGES，Run/Attempt争用RED24中2fail→修复；首轮完整Harness362中7项旧词汇断言失败，原puretypes4pass7fail/新guard12pass1fail后追加顺序及契约修复，最终puretypes13与完整364通过。日志/tmp/wes-c2c1-red-core-behavior、red-http、red-large、lease-red/green、types-original-red.log、types-newguard-red.log、types-green.log及父首轮日志保留；没有删除或弱化旧防线。
+
+边界/下一步：C2c.2接当前权限、紧急禁用与retry实时授权、会话删除并发保护；C2c.3持久写入幂等/跨调用预算，C2c.4版本来源及等待统一投影，最后接生产宿主与C3工作台。当前只有内部等待专用executor（其他Skill/tool命令安全不可用），未更新生产boot或3006/3004、未读取/修改用户模型状态、未写预览数据，未合main/推送。快照直接私有配置暴露已收窄，统一视图与公开入口其他门槛仍保留；C2整体/C3/D/MVP未关闭。
+
+
+**C2c.1总看板复验：** 九页已同步，board-build及21页一致性0错0警告。浏览器展开RP-050实读仍C实施中，下一步实时权限/紧急禁用/幂等；截图/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c1-2026-11-03-board-requirements.png。原表格窄列/P2换行未改，不声称视觉优化通过。本次自建页及临时3008服务已关闭，用户3006页未操作。

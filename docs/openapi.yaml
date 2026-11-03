@@ -2820,7 +2820,9 @@ paths:
     get:
       tags: [AIRuns]
       summary: Run snapshot（run + attempt + checkpoint + output）
-      description: 非 owner 与不存在同为 404，不泄露资源存在性。
+      description: >
+        非 owner 与不存在同为 404，不泄露资源存在性。business_skills_v1 业务运行快照
+        省略 run.executionConfig 及 checkpoint.state、checkpoint.aiMilestone，避免返回私有执行清单与进度正文。
       operationId: getAiRunSnapshot
       security:
         - bearerAuth: []
@@ -3027,6 +3029,8 @@ paths:
         为什么不能改用「发一条新聊天消息」：会话存在活跃 Run 时提交新消息会被
         harness_runs_active_workbench_session_unique 挡成 409
         SESSION_HAS_ACTIVE_RUN，而 waiting 属活跃态。
+        business_skills_v1 业务流程不接受本通道，返回 409 BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED；
+        业务等待专用恢复服务本批仅内部调用，尚未开放 HTTP 入口。
       operationId: submitAiRunInputs
       security:
         - bearerAuth: []
@@ -3087,6 +3091,8 @@ paths:
         首次确认返回 202 并 append run_action_confirmed 事件 + waiting→queued；
         重复确认同一 actionId 返回 200 且不重复写事件；非 waiting 返回
         409 RUN_NOT_WAITING。
+        business_skills_v1 业务流程不接受本通道，返回 409 BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED；
+        业务等待专用恢复服务本批仅内部调用，尚未开放 HTTP 入口。
       operationId: confirmAiRunAction
       security:
         - bearerAuth: []
@@ -3152,6 +3158,8 @@ paths:
         重复拒绝同一 actionId 返回 200 且不重复写事件；非 waiting 返回 409 RUN_NOT_WAITING。
         请求体不接收工具参数：被拒调用的参数唯一来源是 tool.call.started 事件（约束②）。
         同意侧不新增端点也不新增事件类型，继续复用 …/confirm 与 run_action_confirmed。
+        business_skills_v1 业务流程不接受本通道，返回 409 BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED；
+        业务等待专用恢复服务本批仅内部调用，尚未开放 HTTP 入口。
       operationId: rejectAiRunAction
       security:
         - bearerAuth: []
@@ -10138,7 +10146,9 @@ components:
           type: string
         data:
           type: object
-          description: run 行 + 当前 attempt + 最近 checkpoint + output（可空字段）
+          description: >
+            run 行 + 当前 attempt + 最近 checkpoint + output（可空字段）。业务 Skill 运行省略
+            run.executionConfig 及 checkpoint.state、checkpoint.aiMilestone；这些私有字段不属于公开投影。
           properties:
             run:
               type: object
@@ -10162,7 +10172,8 @@ components:
       type: object
       description: >
         409 业务冲突；code 为字符串业务码：SESSION_HAS_ACTIVE_RUN /
-        RUN_ALREADY_TERMINAL / RUN_NOT_WAITING / RUN_NOT_FAILED / RUN_NOT_RETRYABLE
+        RUN_ALREADY_TERMINAL / RUN_NOT_WAITING / RUN_NOT_FAILED / RUN_NOT_RETRYABLE /
+        BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED
       properties:
         code:
           type: string

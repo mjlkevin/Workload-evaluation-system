@@ -40,6 +40,9 @@ export class HarnessWorkflowCancelledError extends Error {
   }
 }
 
+/** Raised only after the durable wait transaction has committed. */
+export class HarnessWorkflowWaitingError extends Error {}
+
 /** 故障注入错误：模拟进程崩溃，Worker 不得再写任何状态。 */
 export class HarnessFaultInjectedError extends Error {
   constructor(message?: string) {
@@ -421,7 +424,7 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
       // 落库事实只有：tool.call.awaiting_approval + status=waiting。
       // 批次 9 · 填表挂起同构（落库事实是 tool.call.awaiting_input + status=waiting）：
       // 用户还没答，答了才有下一步，两种等待都不该被写成一次故障。
-      if (err instanceof WorkbenchToolApprovalPendingError || err instanceof WorkbenchToolAwaitingInputError) return;
+      if (err instanceof HarnessWorkflowWaitingError || err instanceof WorkbenchToolApprovalPendingError || err instanceof WorkbenchToolAwaitingInputError) return;
       if (
         cancelDetected ||
         controller.signal.aborted ||

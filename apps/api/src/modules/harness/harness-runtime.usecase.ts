@@ -13,6 +13,7 @@
 //     本文件仅 type-import ai-sessions.types，避免循环导入。
 
 import { randomUUID } from "node:crypto";
+import { BUSINESS_SKILLS_WORKFLOW_ID } from './business-skills.identity';
 
 import type { AuthUser } from "../../types";
 import type { AiSessionRecord } from "../ai-sessions/ai-sessions.types";
@@ -215,6 +216,9 @@ function mapRepoConflict(err: unknown): never {
     if (err.code === "HARNESS_RUN_NOT_WAITING") {
       throw new AiRunsConflictError("RUN_NOT_WAITING", "仅 waiting 状态的任务可执行该动作");
     }
+    if (err.code === 'BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED') {
+      throw new AiRunsConflictError(err.code, '该业务流程需要通过对应的回答或确认入口继续');
+    }
     // 批次 2b-1：正文要随 Run 一起落进事件表，而事件表对单条载荷有硬上限（仓储在事务内
     // 校验）。超限即整笔回滚——此时必须给用户一个说得通的原因，而不是兜底的「服务内部错误」：
     // 「提交失败，原因未知」比「提交被拒，因为太长」糟糕得多。
@@ -320,6 +324,12 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
     assertEnabled(deps);
     const snapshot = await repo.getRunSnapshot(runId);
     if (!snapshot || snapshot.run.ownerUserId !== user.id) throw new AiRunsNotFoundError("任务不存在");
+    if (snapshot.run.workflowId === BUSINESS_SKILLS_WORKFLOW_ID) {
+      const { executionConfig: _privateConfig, ...run } = snapshot.run;
+      const checkpoint = snapshot.checkpoint && typeof snapshot.checkpoint === 'object'
+        ? Object.fromEntries(Object.entries(snapshot.checkpoint).filter(([key]) => !['state', 'aiMilestone'].includes(key))) : null;
+      return { ...snapshot, run, checkpoint };
+    }
     return snapshot;
   }
 

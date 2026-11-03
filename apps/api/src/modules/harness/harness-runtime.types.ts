@@ -124,6 +124,10 @@ export const HARNESS_RUN_EVENT_TYPES = [
   // 刻意不改成 message.user——同一族词汇两种命名法，读侧只能靠记历史。
   "user/message",
   "assistant/message",
+  // C2c.1 additive: preserve all 25 legacy event slots; append business Workflow waits and answers.
+  "workflow.awaiting_input",
+  "workflow.awaiting_confirmation",
+  "workflow.answer_recorded",
 ] as const;
 export type HarnessRunEventType = (typeof HARNESS_RUN_EVENT_TYPES)[number];
 

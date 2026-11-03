@@ -9,7 +9,7 @@ import {
 } from './business-skills.identity';
 import { HARNESS_CHECKPOINT_KINDS } from './harness-runtime.types';
 import {
-  HarnessWorkflowCancelledError, hashHarnessCheckpointState, type HarnessWorkflow,
+  HarnessWorkflowCancelledError, HarnessWorkflowWaitingError, hashHarnessCheckpointState, type HarnessWorkflow,
   type HarnessWorkflowStepContext, type HarnessWorkflowCheckpointDirective,
   type HarnessWorkflowOutputDirective,
 } from './harness-runtime.worker';
@@ -33,7 +33,7 @@ function invalidRun(): never { return fail('BUSINESS_SKILLS_INVALID_RUN'); }
 function invalidState(): never { return fail('BUSINESS_SKILLS_INVALID_STATE'); }
 function invalidResult(): never { return fail('BUSINESS_SKILLS_INVALID_RESULT'); }
 
-function readRun(run: HarnessRunRow): ExecutionManifest {
+export function readBusinessSkillsRun(run: HarnessRunRow): ExecutionManifest {
   try {
     const config = run.executionConfig as Record<string, unknown>;
     const manifest = readPersistedExecutionManifest(config?.executionManifest);
@@ -52,7 +52,7 @@ function readRun(run: HarnessRunRow): ExecutionManifest {
   } catch { return invalidRun(); }
 }
 
-function readCheckpoint(cp: HarnessRunCheckpointRow, run: HarnessRunRow, manifest: ExecutionManifest): Record<string, unknown> {
+export function readBusinessSkillsCheckpoint(cp: HarnessRunCheckpointRow, run: HarnessRunRow, manifest: ExecutionManifest): Record<string, unknown> {
   try {
     const state = cp.state as Record<string, unknown>;
     const envelope = state?.businessSkills;
@@ -74,7 +74,7 @@ function readState(ctx: HarnessWorkflowStepContext, manifest: ExecutionManifest)
   try {
     if (ctx.resumeFrom) {
       if (!Object.keys(ctx.state).length) invalidState();
-      readCheckpoint(ctx.resumeFrom, ctx.run, manifest);
+      readBusinessSkillsCheckpoint(ctx.resumeFrom, ctx.run, manifest);
     }
     if (!Object.keys(ctx.state).length) return {};
     // Worker retains the attempt's original resumeFrom while subsequent steps advance state.
@@ -84,13 +84,22 @@ function readState(ctx: HarnessWorkflowStepContext, manifest: ExecutionManifest)
       stepKey: STEP, resumePolicy: 'restart_step', state: ctx.state,
       stateHash: hashHarnessCheckpointState(ctx.state), effectKeys: [],
     } as unknown as HarnessRunCheckpointRow;
-    return readCheckpoint(current, ctx.run, manifest);
+    return readBusinessSkillsCheckpoint(current, ctx.run, manifest);
   } catch { return invalidState(); }
 }
 
 function readResult(raw: unknown, runId: string, manifest: ExecutionManifest): BusinessSkillsExecutionResult {
   try {
-    const value = copyTrialJson(raw, 'definition') as BusinessSkillsExecutionResult;
+    if (!object(raw)) invalidResult();
+    // Bound each persisted business payload independently; the result envelope aliases state/output.
+    const hasOutput = Object.prototype.hasOwnProperty.call(raw, 'output');
+    const value = copyTrialJson({ ...raw, state: null, ...(hasOutput ? { output: null } : {}) }, 'definition') as BusinessSkillsExecutionResult;
+    value.state = copyTrialJson(raw.state, 'definition') as Record<string, unknown>;
+    if (hasOutput) {
+      if (!object(raw.output)) invalidResult();
+      value.output = { ...copyTrialJson({ ...raw.output, content: null }, 'definition') as HarnessWorkflowOutputDirective,
+        content: copyTrialJson(raw.output.content, 'definition') as Record<string, unknown> };
+    }
     if (!object(value) || Object.keys(value).some(key => !['nextStepKey', 'state', 'checkpoint', 'output'].includes(key))
       || (value.nextStepKey !== STEP && value.nextStepKey !== null) || !object(value.state)) invalidResult();
     const cp = value.checkpoint;
@@ -116,13 +125,13 @@ export function createBusinessSkillsWorkflow(options: { executor?: BusinessSkill
     firstStepKey: STEP,
     stepKeys: [STEP],
     preflight(run, checkpoints) {
-      const manifest = readRun(run);
+      const manifest = readBusinessSkillsRun(run);
       if (!Array.isArray(checkpoints)) invalidState();
-      for (const cp of checkpoints) readCheckpoint(cp, run, manifest);
+      for (const cp of checkpoints) readBusinessSkillsCheckpoint(cp, run, manifest);
       available();
     },
     async executeStep(stepKey, ctx) {
-      const manifest = readRun(ctx.run);
+      const manifest = readBusinessSkillsRun(ctx.run);
       if (stepKey !== STEP || ctx.stepKey !== STEP) invalidState();
       const state = readState(ctx, manifest);
       available();
@@ -138,7 +147,7 @@ export function createBusinessSkillsWorkflow(options: { executor?: BusinessSkill
           },
         });
       } catch (error) {
-        if (error instanceof HarnessWorkflowCancelledError) throw error;
+        if (error instanceof HarnessWorkflowCancelledError || error instanceof HarnessWorkflowWaitingError) throw error;
         if (ctx.abortSignal.aborted) throw new HarnessWorkflowCancelledError();
         return fail('BUSINESS_SKILLS_EXECUTION_FAILED');
       }
