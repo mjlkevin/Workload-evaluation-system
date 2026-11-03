@@ -5,6 +5,7 @@
 // JWT 鉴权，返回统一视图数据
 
 import { Router } from "express";
+import { createBusinessWorkbenchViewService } from "../modules/skills/skills.module";
 
 import { createHarnessRuntimeRepository } from "../modules/harness/harness-runtime.repository";
 import { createWorkbenchViewHandlers } from "../modules/harness/workbench-view.controller";
@@ -13,7 +14,7 @@ import { createWorkbenchViewUsecase } from "../modules/harness/workbench-view.us
 export function createWorkbenchViewRouter(): Router {
   // repo 缺省接全局懒加载 db 代理（模块加载不建连接）
   const repo = createHarnessRuntimeRepository();
-  const usecase = createWorkbenchViewUsecase({ repo });
+  const usecase = createWorkbenchViewUsecase({ repo, business: createBusinessWorkbenchViewService() });
   const handlers = createWorkbenchViewHandlers({ usecase });
 
   const router = Router();

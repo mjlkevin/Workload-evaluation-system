@@ -34,3 +34,4 @@ export { createExecutionCatalogService, toExecutionCatalogEntry } from './skills
 export { createBusinessSkillsWorkbenchService, type BusinessSkillsWorkbenchService } from './skills.workbench-actions';
 export { createBusinessExecutionProjectionService } from './skills.workbench-projection';
 export { safeBusinessJson, buildBusinessExecutionView, sanitizeBusinessRunSnapshot, type BusinessExecutionView } from './skills.workbench-view';
+export { createBusinessWorkbenchViewService, type BusinessWorkbenchViewService } from './skills.workbench-unified';
