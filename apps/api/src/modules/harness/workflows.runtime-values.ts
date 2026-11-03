@@ -14,7 +14,7 @@ export type WorkflowValues = { input: unknown; steps: Record<string, { output: u
 function source(context: WorkflowValues, path: string): { exists: boolean; value?: unknown } {
   let parts: string[];
   try { parts = skillPathParts(path); } catch { return reject('INVALID_VALUES'); }
-  if (!((parts[0] === 'input' && parts.length >= 2) || (parts[0] === 'steps' && parts[2] === 'output' && parts.length >= 4))) reject('INVALID_VALUES');
+  if (!((parts[0] === 'input' && parts.length >= 2) || (parts[0] === 'steps' && parts[2] === 'output' && parts.length >= 3))) reject('INVALID_VALUES');
   let value: unknown = context;
   for (const part of parts) {
     if (!value || typeof value !== 'object' || !own(value, part)) return { exists: false };

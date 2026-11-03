@@ -25,15 +25,16 @@ function visibleNames(registry: ReturnType<typeof createDefaultRegistry>, caps: 
     .sort();
 }
 
-test("createDefaultRegistry: 注册数 17 且工具名单快照（含内置 list_tools）", () => {
+test("createDefaultRegistry: 注册数 18 且工具名单快照（含内置 list_tools）", () => {
   const registry = createDefaultRegistry(fakeUser);
   const names = visibleNames(registry, FULL_CAPS);
 
-  assert.equal(names.length, 17);
+  assert.equal(names.length, 18);
   assert.deepEqual(names, [
     "ask_user",
     "assessment_catalog",
     "assessment_match_validate",
+    "create_assessment_draft",
     "create_project",
     // 批次 4：capability_discovery 正则退役后的承接工具
     "describe_capabilities",
@@ -72,8 +73,9 @@ test("createDefaultRegistry: 能力位 → 工具映射快照", () => {
     "requirement_sources",
     "rule_lookup",
   ]);
-  // estimates:create：初估 + 建项目
+  // estimates:create：初估 + 建项目 + 建实施评估草稿
   assert.deepEqual(visibleNames(registry, ["estimates:create"]), [
+    "create_assessment_draft",
     "create_project",
     "estimate_implementation",
   ]);
@@ -139,6 +141,7 @@ test("MS3: 全量注入保留原 8 工具顺序，在发现工具前追加 MVP �
     "requirement_confirm",
     "assessment_catalog",
     "assessment_match_validate",
+    "create_assessment_draft",
   ]);
 });
 

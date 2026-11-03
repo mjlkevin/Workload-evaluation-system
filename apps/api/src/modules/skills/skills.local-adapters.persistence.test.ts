@@ -117,8 +117,8 @@ test('approved create_project writes a normal project draft using current owner,
  } finally { await database.update(schema.users).set({ username: user.username }).where(eq(schema.users.userId, user.id)); }
 });
 
-test('only create_project is explicitly assembled; no default service grant or native dispatch', async () => {
- assert.deepEqual([...adapters().keys()], ['create_project']); const f = await approved(), count = (await business()).length;
+test('only project and assessment draft adapters are explicitly assembled; no default service grant or native dispatch', async () => {
+ assert.deepEqual([...adapters().keys()], ['create_project', 'create_assessment_draft']); const f = await approved(), count = (await business()).length;
  await assert.rejects(execution({ adapters: undefined }).executeOperation(user, f.command), deny('OPERATION_EXECUTION_TOOL_DENIED'));
  assert.equal((await business()).length, count); assert.equal((await receipts(f.op.rootRunId)).length, 0);
 });

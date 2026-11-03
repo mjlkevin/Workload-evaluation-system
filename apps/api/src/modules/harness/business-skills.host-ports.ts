@@ -71,7 +71,7 @@ export function createBusinessSkillHostPorts(scope: Scope) {
    const confirmation = request.binding.requiresConfirmation || request.snapshot.policy.approvalStrategy === 'user-confirm'
     || native.mutates || native.exfiltrates || native.source === 'mcp';
    if (confirmation) {
-    if (native.name !== 'create_project' || native.source !== 'code' || !native.mutates || native.exfiltrates || native.simulationOnly) return fail('BUSINESS_SKILLS_OPERATION_UNSUPPORTED');
+    if (!['create_project', 'create_assessment_draft'].includes(native.name) || native.source !== 'code' || !native.mutates || native.exfiltrates || native.simulationOnly) return fail('BUSINESS_SKILLS_OPERATION_UNSUPPORTED');
     await check('prepare-tool', request.stepId, request.call.name); guard();
     const operation = await operations.prepareOperation(user, { runId, stepId: request.stepId, ordinal: request.ordinal,
      toolName: request.call.name, parameters: request.call.arguments });

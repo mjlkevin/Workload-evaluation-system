@@ -56,7 +56,7 @@ export function validateWorkflowDefinition(value: unknown, context: WorkflowVali
                 invalid('path', 'input_field_missing');
             return { ...found, root: definition.inputSchema };
         }
-        if (parts[0] !== 'steps' || parts[2] !== 'output' || parts.length < 4)
+        if (parts[0] !== 'steps' || parts[2] !== 'output' || parts.length < 3)
             invalid('path', 'only_input_or_step_output_paths');
         const index = ids.get(parts[1]);
         if (index === undefined || index > at || (index === at && !allowCurrent))
@@ -65,6 +65,8 @@ export function validateWorkflowDefinition(value: unknown, context: WorkflowVali
         // Only a frozen code-owned native schema can make tool output available to mappings.
         if (!output)
             invalid('path', 'tool_output_contract_unavailable');
+        if (parts.length === 3)
+            return { schema: output, required: available.has(parts[1]), root: output };
         const found = mappedInput(output, `$.${parts.slice(3).join('.')}`);
         if (!found)
             invalid('path', 'step_output_field_missing');

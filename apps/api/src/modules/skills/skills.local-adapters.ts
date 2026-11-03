@@ -1,3 +1,4 @@
+import { createMvpAssessmentDraftTransactionAdapter } from '../project-evaluations/assessment-draft-transaction';
 import { createProjectEvaluationInTransaction } from '../project-evaluations/project-evaluation-transaction';
 import type { SkillLocalTransactionAdapter } from './skills.operation-execution';
 import { SkillError } from './skills.types';
@@ -23,5 +24,5 @@ export function createSkillLocalTransactionAdapters(): ReadonlyMap<string, Skill
     const project = await createProjectEvaluationInTransaction(tx, input.ownerId, { ...parameters, createdFromSessionId: input.sessionId });
     // The public mapper includes absent optional fields; receipts require exact JSON.
     return Object.fromEntries(Object.entries(project).filter(([, value]) => value !== undefined));
-  } }]]);
+  } }], ['create_assessment_draft', createMvpAssessmentDraftTransactionAdapter()]]);
 }

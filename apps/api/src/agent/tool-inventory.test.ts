@@ -29,10 +29,10 @@ function inventoryWithPolicy(capabilities: Capability[], policy: ToolPolicyConfi
   return buildToolInventory(fakeUser, capabilities, { policy, viewerRoles: ["ADMIN"] }).items;
 }
 
-test("buildToolInventory: 全能力位下派生 17 个工具，保持注册顺序", () => {
+test("buildToolInventory: 全能力位下派生 18 个工具，保持注册顺序", () => {
   const items = inventory(FULL_CAPS);
 
-  assert.equal(items.length, 17);
+  assert.equal(items.length, 18);
   assert.deepEqual(
     items.map((item) => item.name),
     [
@@ -53,18 +53,19 @@ test("buildToolInventory: 全能力位下派生 17 个工具，保持注册顺�
       "requirement_confirm",
       "assessment_catalog",
       "assessment_match_validate",
+      "create_assessment_draft",
       "list_tools",
     ],
   );
 });
 
-test("buildToolInventory: mutates=true 恰为 3 个写操作工具", () => {
+test("buildToolInventory: mutates=true 恰为 4 个写操作工具", () => {
   const writers = inventory(FULL_CAPS)
     .filter((item) => item.mutates)
     .map((item) => item.name)
     .sort();
 
-  assert.deepEqual(writers, ["create_project", "export_report", "generate_wbs"]);
+  assert.deepEqual(writers, ["create_assessment_draft", "create_project", "export_report", "generate_wbs"]);
 });
 
 test("buildToolInventory: 每条都带权限位/分类/可发现性，供后台显示谁能用", () => {
@@ -110,8 +111,8 @@ test("buildToolInventory: 清单恒为注册表全量，不按查看者业务权
   // 一旦按查看者权限过滤，审计页会对着 0 条或 5 条清单让人误判「系统里就这么几个工具」。
   for (const caps of [[], ["system:manage"], ["estimates:read"], FULL_CAPS] as Capability[][]) {
     const items = inventory(caps);
-    assert.equal(items.length, 17, `查看者能力位为 [${caps.join(",")}] 时仍须列出全部 17 个工具`);
-    assert.equal(items.filter((item) => item.mutates).length, 3);
+    assert.equal(items.length, 18, `查看者能力位为 [${caps.join(",")}] 时仍须列出全部 18 个工具`);
+    assert.equal(items.filter((item) => item.mutates).length, 4);
   }
 });
 
@@ -119,12 +120,12 @@ test("buildToolInventory: callable 随查看者权限变化，标记「有这个
   const callableCount = (caps: Capability[]) => inventory(caps).filter((item) => item.callable).length;
 
   assert.equal(callableCount([]), 0);
-  // 纯系统管理员：17 个工具全部可见，但本人一个都调不动
+  // 纯系统管理员：18 个工具全部可见，但本人一个都调不动
   assert.equal(callableCount(["system:manage"]), 0);
   // 只有读权限：原 7 个只读工具 + 六个 MVP 原生工具通过能力位检查，
-  // 3 个写工具与初估工具不可调
+  // 4 个写工具与初估工具不可调
   assert.equal(callableCount(["estimates:read"]), 13);
-  assert.equal(callableCount(FULL_CAPS), 17);
+  assert.equal(callableCount(FULL_CAPS), 18);
 
   const readOnlyViewer = new Map(inventory(["estimates:read"]).map((item) => [item.name, item]));
   assert.equal(readOnlyViewer.get("project_list")?.callable, true);
