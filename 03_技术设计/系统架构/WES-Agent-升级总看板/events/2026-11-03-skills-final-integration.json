@@ -158,6 +158,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-mvp-frozen/history-red; /tmp/wes-finish-mvp-frozen/review/d4-13.log; /tmp/wes-finish-mvp-frozen/review/d3-d4-integration-green.log; /tmp/wes-d4-openapi/result.log",
       "summary": "D4冻结依据/只读重算SPEC及fresh质量APPROVE；历史批准P2经RED6fail修复，作者55与独立13全过。真实D3创建→检出/保存/检入→刷新/重算5天精准1例通过（另17未重跑）；保留JWT夹具401及被其他线阻塞tsc证据，后续共同tsc0。OpenAPI unique YAML/AJV16通过，198paths。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-ui2-spec-red.log; /tmp/wes-ui2-quality-independent.log",
+      "summary": "工作台报告/真实范围选择/原生草稿链接UI② SPEC及fresh质量APPROVE；有效懒挂载RED2后独立6files79/79，scope/diff0。规范报告/未匹配/AI建议分明，正式工期仅取真实草稿效果；不等同浏览器或人工验收。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

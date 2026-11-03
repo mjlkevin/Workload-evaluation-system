@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { resolveBusinessSchema, unavailableSchemaMessage } from './businessInputSchema.js'
 
-const labels = { sources: '原始材料', answers: '补充回答', params: '计算参数', templateId: '评估模板', title: '名称', text: '原文', kind: '类型', id: '标识', previous: '上一版内容' }
+const labels = { sources: '原始材料', answers: '补充回答', params: '计算参数', templateId: '评估模板', title: '名称', text: '原文', kind: '类型', id: '标识', previous: '上一版内容', selectedItemIds: '实施范围' }
 const hasConst = schema => Object.hasOwn(schema, 'const')
 const valueType = value => value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
@@ -22,7 +22,7 @@ export function initialBusinessInput(schema = {}) {
   }
   return typeOf(schema) === 'array' ? [] : undefined
 }
-export function validateBusinessInput(schema = {}, value) {
+export function validateBusinessInput(schema = {}, value, resourceOptions = {}) {
   try { schema = resolveBusinessSchema(schema) } catch { return { '': unavailableSchemaMessage } }
   const errors = {}
   function visit(rule, item, path, required = false) {
@@ -39,6 +39,8 @@ export function validateBusinessInput(schema = {}, value) {
       if (!Array.isArray(item)) { errors[path] = '请输入列表'; return }
       if (item.length < (rule.minItems ?? 0)) errors[path] = `至少添加 ${rule.minItems} 项`
       if (rule.maxItems !== undefined && item.length > rule.maxItems) errors[path] = `最多 ${rule.maxItems} 项`
+      const options = resourceOptions.byPath?.[path] ?? (rule.format && resourceOptions[rule.format])
+      if (Array.isArray(options) && item.some(selected => !options.some(option => sameValue(Object.hasOwn(option, 'value') ? option.value : option.id, selected)))) errors[path] = '请选择有效资源'
       if (rule.uniqueItems && new Set(item.map(entry => JSON.stringify(entry))).size !== item.length) errors[path] = '请移除重复项'
       item.forEach((child, index) => visit(rule.items || {}, child, `${path}.${index}`, true))
     } else if (type === 'number' || type === 'integer') {
@@ -65,7 +67,13 @@ function Field({ schema, value, onChange, label, path, required, errors, disable
   const properties = Object.entries(schema.properties || {})
   const enumValues = schema.enum || (hasConst(schema) ? [schema.const] : null)
   const offered = resourceOptions.byPath?.[path] ?? (schema.format && resourceOptions[schema.format])
-  const resources = offered && enumValues
+  const resources = type === 'array' && offered ? offered.filter(option => {
+    const candidate = Object.hasOwn(option, 'value') ? option.value : option.id
+    const item = schema.items || {}
+    return (!item.enum || item.enum.some(value => sameValue(candidate, value)))
+      && (!hasConst(item) || sameValue(candidate, item.const))
+      && (!hasConst(schema) || Array.isArray(schema.const) && schema.const.some(value => sameValue(candidate, value)))
+  }) : offered && enumValues
     ? offered.filter(option => {
       const value = Object.hasOwn(option, 'value') ? option.value : option.id
       return (!schema.enum || schema.enum.some(allowed => sameValue(value, allowed))) && (!hasConst(schema) || sameValue(value, schema.const))
@@ -83,6 +91,22 @@ function Field({ schema, value, onChange, label, path, required, errors, disable
     </div>
   )
   let control
+  if (type === 'array' && resources) {
+    const selected = Array.isArray(value) ? value : []
+    return <fieldset disabled={disabled} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className="m-0 grid min-w-0 gap-2 rounded-md border border-line p-3">
+      <legend className="text-sm font-medium">{label}{required ? ' *' : ''}</legend>
+      {resources.length ? resources.map(option => {
+        const candidate = Object.hasOwn(option, 'value') ? option.value : option.id
+        const checked = selected.some(item => sameValue(item, candidate))
+        return <label key={option.id} className="flex min-w-0 items-start gap-2 text-sm">
+          <input type="checkbox" checked={checked} disabled={disabled || hasConst(schema) || !checked && schema.maxItems !== undefined && selected.length >= schema.maxItems}
+            onChange={event => onChange(event.target.checked ? [...selected, candidate] : selected.filter(item => !sameValue(item, candidate)))} />
+          <span className="break-words">{option.name}</span>
+        </label>
+      }) : <p className="m-0 text-sm text-ink-2">暂无可选资源，请刷新任务后重试。</p>}
+      {error && <p id={`${id}-error`} role="alert" className="m-0 text-sm text-err-ink">{error}</p>}
+    </fieldset>
+  }
   if (!resources && !enumValues && type === 'object' && properties.length) {
     return (
       <fieldset disabled={disabled} className="m-0 grid min-w-0 gap-3 rounded-md border border-line p-3">

@@ -1,5 +1,7 @@
 import { useId, useRef, useState } from 'react'
 import { Dialog, DialogActions } from '../../../components/ui/Dialog.jsx'
+import BusinessValue, { Collapsed, isCatalog } from './BusinessResult.jsx'
+import { resolveBusinessSchema } from './businessInputSchema.js'
 import BusinessInputForm, { initialBusinessInput, validateBusinessInput } from './BusinessInputForm.jsx'
 
 const statuses = {
@@ -7,44 +9,14 @@ const statuses = {
   completed: '已完成', failed: '执行失败', cancelled: '已停止', succeeded: '已完成', pending: '待处理',
 }
 const activeStatuses = ['queued', 'running', 'recovering', 'waiting']
-const names = {
-  title: '名称', name: '名称', description: '说明', requirements: '需求明细', params: '计算参数',
-  answers: '补充回答', selectedItemIds: '已选范围', templateId: '模板', userCount: '用户数量',
-  orgCount: '组织数量', difficultyFactor: '难度系数', orgSimilarityFactor: '组织相似系数',
-}
-function BusinessValue({ value, depth = 0 }) {
-  if (value === undefined || value === null) return <span className="text-ink-2">暂无内容</span>
-  if (typeof value !== 'object') {
-    return <span className="whitespace-pre-wrap break-words">{typeof value === 'boolean' ? value ? '是' : '否' : String(value)}</span>
-  }
-  if (depth > 6) {
-    return (
-      <details>
-        <summary>展开详细内容</summary>
-        <pre className="whitespace-pre-wrap break-all">{JSON.stringify(value, null, 2)}</pre>
-      </details>
-    )
-  }
-  if (Array.isArray(value)) {
-    return value.length ? (
-      <ol className="m-0 grid min-w-0 gap-2 pl-5">
-        {value.map((entry, index) => <li key={index}><BusinessValue value={entry} depth={depth + 1} /></li>)}
-      </ol>
-    ) : <span className="text-ink-2">无</span>
-  }
-  return (
-    <dl className="m-0 grid min-w-0 gap-2">
-      {Object.entries(value).map(([key, entry]) => (
-        <div key={key} className="min-w-0">
-          <dt className="text-xs text-ink-2">{names[key] || key}</dt>
-          <dd className="m-0 min-w-0 text-sm"><BusinessValue value={entry} depth={depth + 1} /></dd>
-        </div>
-      ))}
-    </dl>
-  )
-}
-function WaitingInput({ runId, pending, busy, onInput, onDecision, resourceOptions, resumeDecision }) {
+function WaitingInput({ runId, pending, busy, onInput, onDecision, resourceOptions = {}, resumeDecision }) {
   const [input, setInput] = useState(() => initialBusinessInput(pending.outputSchema) ?? {})
+  let selectionSchema
+  try { selectionSchema = resolveBusinessSchema(pending.outputSchema).properties?.selectedItemIds } catch { /* Form reports invalid schema. */ }
+  const hasSelection = selectionSchema?.type === 'array'
+  const catalog = isCatalog(pending.displayInput?.catalog) ? pending.displayInput.catalog : null
+  const choices = resourceOptions.byPath?.selectedItemIds ?? (catalog ? catalog.template.items.map(item => ({ id: item.templateItemId, name: `${item.itemName} · ${item.templateItemId}` })) : [])
+  const inputResources = hasSelection ? { ...resourceOptions, byPath: { ...resourceOptions.byPath, selectedItemIds: choices } } : resourceOptions
   const [errors, setErrors] = useState({})
   const [error, setError] = useState('')
   const lock = useRef(false)
@@ -53,7 +25,8 @@ function WaitingInput({ runId, pending, busy, onInput, onDecision, resourceOptio
     event?.preventDefault()
     if (busy || lock.current) return
     if (!decision) {
-      const next = validateBusinessInput(pending.outputSchema, input)
+      const submitted = hasSelection ? { ...input, selectedItemIds: input.selectedItemIds ?? [] } : input
+      const next = validateBusinessInput(pending.outputSchema, submitted, inputResources)
       setErrors(next)
       if (Object.keys(next).length) return
     }
@@ -62,7 +35,7 @@ function WaitingInput({ runId, pending, busy, onInput, onDecision, resourceOptio
     setError('')
     try {
       if (decision) await onDecision(runId, pending, decision)
-      else await onInput(runId, pending, input)
+      else await onInput(runId, pending, hasSelection ? { ...input, selectedItemIds: input.selectedItemIds ?? [] } : input)
     } catch (err) {
       setError(err?.message || '操作失败，请重试')
     } finally {
@@ -83,8 +56,9 @@ function WaitingInput({ runId, pending, busy, onInput, onDecision, resourceOptio
         <form noValidate className="grid min-w-0 gap-3" onSubmit={event => send(event)}>
           <BusinessInputForm
             schema={pending.outputSchema} value={input} onChange={setInput} errors={errors}
-            disabled={busy || requesting} resourceOptions={resourceOptions}
+            disabled={busy || requesting} resourceOptions={inputResources}
           />
+          {hasSelection && !input.selectedItemIds?.length && <p className="m-0 text-sm text-warn-ink">未选择任何实施项；提交后将使用空范围。</p>}
           <button type="submit" className="btn btn-pri justify-self-start" disabled={busy || requesting}>提交补充信息</button>
         </form>
       ) : (
@@ -204,15 +178,17 @@ export default function BusinessExecutionPanel({ runs = [], loading = false, bus
               />
             )}
             {results.steps?.map((step, index) => (
-              <details key={`${step.stepId}:${index}`} open>
-                <summary className="text-sm">{execution.steps?.find(item => item.id === step.stepId)?.name || '步骤结果'} · {statuses[step.status] || step.status}</summary>
+              <Collapsed
+                key={`${step.stepId}:${index}`} summaryClassName="text-sm"
+                title={`${execution.steps?.find(item => item.id === step.stepId)?.name || '步骤结果'} · ${statuses[step.status] || step.status}`}
+              >
                 <BusinessValue value={step.output ?? step.result} />
-              </details>
+              </Collapsed>
             ))}
             {!!results.effects?.length && (
               <div className="grid gap-2">
                 <h4 className="m-0 text-sm font-medium">已完成操作</h4>
-                {results.effects.map((effect, index) => <BusinessValue key={index} value={effect.result} />)}
+                {results.effects.map((effect, index) => <BusinessValue key={index} value={effect.result} nativeDraft={effect.toolName === 'create_assessment_draft'} />)}
               </div>
             )}
             {results.output !== undefined && (

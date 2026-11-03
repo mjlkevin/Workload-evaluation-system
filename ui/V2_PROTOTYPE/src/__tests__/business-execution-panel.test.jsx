@@ -19,6 +19,9 @@ describe('业务执行等待与结果', () => {
   it('保留已完成结果并按服务端schema补输入，错误字段不提交', async () => {
     const actions = props(); render(<BusinessExecutionPanel {...actions} />)
     expect(screen.getByText('需求整理')).toBeInTheDocument()
+    const step = screen.getByText('整理需求 · 已完成', { selector: 'summary' }).closest('details')
+    step.open = true
+    fireEvent(step, new Event('toggle'))
     expect(screen.getByText('销售订单')).toBeInTheDocument()
     expect(screen.getByText('已经创建的评估')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '提交补充信息' }))
