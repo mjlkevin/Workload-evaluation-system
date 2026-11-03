@@ -173,6 +173,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-ui3-p2-red.log; /tmp/wes-ui3-quality-review-tests.log; /tmp/wes-final-cd-validation/modules/test:modules.log",
       "summary": "评估详情UI③ SPEC/fresh质量APPROVE，独立21/21及scope/diff0。仅明确legacy读最新；frozen按原依据重算/真实检出检入，503保留实际人工scope与覆盖7而隐藏计算值。父原并发模块1080中1079过1旧20ms超时case失败，保留证据并独立定位，不改生产预算/原并发或降低断言。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-trial-deadline-probe.log; /tmp/wes-trial-deadline-quality.log; /tmp/wes-final-cd-validation/modules-fixed/test:modules.log; /tmp/wes-final-web.log",
+      "summary": "旧试运行超时测试独立定位并以test-only时钟控制修正，SPEC/fresh质量APPROVE，独立26/26；原20ms真实timer/abort/旧断言及并发均保留，另证setup超时不调模型。父原并发modules1081/1081、Web93files851/851通过，零跳过；原1080/1079/1失败日志保留，串行/Harness/AI/构建和真实预览继续。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

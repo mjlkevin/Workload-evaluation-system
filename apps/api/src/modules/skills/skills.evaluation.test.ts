@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { performance } from 'node:perf_hooks';
 import { evaluateSkill, type SkillTrialDependencies, type SkillModelRequest } from './skills.evaluation';
 import type { SkillDefinition } from './skills.types';
 function trialDefinition(): SkillDefinition {
@@ -75,16 +76,35 @@ test('model tools are mapped and writes isolated; repeats, unknown calls and abs
     assert.equal(repeated.passed, false); assert.equal(repeated.cases[0].failures[0].category, 'tool');
   }
 });
-test('attempt, output token, tool and wall-clock budgets bound provider loops', async () => {
+test('attempt, output token, tool and wall-clock budgets bound provider loops', async t => {
   const d = trialDefinition(); d.tools = [{ toolName: 'write', inputMapping: { query: '$.text' }, requiresConfirmation: true }];
   for (const budget of [{ maxModelAttempts: 1 }, { maxOutputTokens: 1 }, { maxToolCalls: 0 }]) {
     let id = 0;
     const result = await evaluateSkill(d, deps(async () => ({ toolCalls: [{ id: String(id++), name: 'write', arguments: { query: '审批' } }], provider: 'p', model: 'm', usage: { outputTokens: 2 } })), budget);
     assert.equal(result.passed, false); assert.equal(result.cases[0].failures[0].category, 'budget');
   }
-  let signal: AbortSignal | undefined; const start = Date.now();
-  const result = await evaluateSkill(d, deps(async r => { signal = r.signal; return new Promise(() => {}); }), { totalTimeoutMs: 20 });
-  assert.equal(result.cases[0].failures[0].category, 'budget'); assert.equal(signal?.aborted, true); assert.ok(Date.now() - start < 500);
+  let signal: AbortSignal | undefined; let providerEnteredAt: number | undefined; let requestedTimeout: number | undefined;
+  const realNow = performance.now.bind(performance); const start = Date.now();
+  // Isolate the hung-I/O budget from variable schema setup cost; timers remain real.
+  const clock = t.mock.method(performance, 'now', () => providerEnteredAt === undefined ? 0 : realNow() - providerEnteredAt);
+  try {
+    const result = await evaluateSkill(d, deps(async r => {
+      providerEnteredAt = realNow(); signal = r.signal; requestedTimeout = r.model.timeoutMs;
+      return new Promise(() => {});
+    }), { totalTimeoutMs: 20 });
+    assert.notEqual(providerEnteredAt, undefined); assert.equal(requestedTimeout, 20);
+    assert.equal(result.cases[0].failures[0].category, 'budget'); assert.equal(signal?.aborted, true); assert.ok(Date.now() - start < 500);
+  } finally { clock.mock.restore(); }
+});
+test('setup exceeding the total deadline prevents provider entry', async t => {
+  let clockReads = 0; let providerCalls = 0;
+  const clock = t.mock.method(performance, 'now', () => clockReads++ === 0 ? 0 : 21);
+  try {
+    const result = await evaluateSkill(trialDefinition(), deps(async () => { providerCalls++; return new Promise(() => {}); }), { totalTimeoutMs: 20 });
+    assert.deepEqual(result.failures, [{ category: 'budget', code: 'TOTAL_TIMEOUT' }]);
+    assert.equal(result.cases.length, 0); assert.equal(result.usage.modelAttempts, 0); assert.equal(providerCalls, 0);
+    assert.equal(result.modelExecuted, false); assert.equal(result.passed, false); assert.equal(result.releaseEligible, false);
+  } finally { clock.mock.restore(); }
 });
 test('errors are safe and missing/invalid usage cannot become release evidence', async () => {
   const secret = 'sk-example-credential';
