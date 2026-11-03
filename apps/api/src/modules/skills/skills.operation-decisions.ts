@@ -11,7 +11,7 @@ import { assertRunAdmissionInTransaction } from './execution-emergency';
 import { validateFrozenExecutionTools } from './execution-authority';
 import { prepareSkillAuthority } from './skills.authority';
 import { resolveCurrentSkillTools, skillToolContract } from './skills.context';
-import { assertOperationNeedsConfirmation, readPreparedOperationInTransaction } from './skills.operations';
+import { assertOperationNeedsConfirmation, assertOperationIsCurrentInTransaction, readPreparedOperationInTransaction } from './skills.operations';
 import { copyTrialJson } from './skills.sandbox';
 import { skillDefinitionHash as hash } from './skills.hash';
 import { SkillError } from './skills.types';
@@ -48,6 +48,7 @@ async function context(tx: QueueDbExecutor, request: Request, user: AuthUser, in
   const admission = await assertRunAdmissionInTransaction(tx, request.runId, user.id);
   if (user.status !== 'active' || user.role !== admission.identity.role) fail('EXECUTION_AUTHORITY_CHANGED', 403);
   const pending = await readPreparedOperationInTransaction(tx, request.runId, request.operationId, user.id, admission.manifest);
+  await assertOperationIsCurrentInTransaction(tx, request.runId, user.id, admission.manifest, pending);
   return { admission, pending, stamps: includeStamps ? await stamps(tx) : [] };
 }
 type Context = Awaited<ReturnType<typeof context>>;
@@ -59,10 +60,10 @@ function basisFor(value: Context, currentToolsHash: string) {
     executionAuthority: pending.executionAuthority, identity: admission.identity, currentToolsHash, configRevisions: value.stamps });
 }
 function currentTools(value: Context, now: Awaited<ReturnType<typeof resolveCurrentSkillTools>>) {
-  validateFrozenExecutionTools(value.admission.manifest, value.admission.identity, now);
+  validateFrozenExecutionTools(value.admission.manifest, value.admission.identity, now, { phase: 'prepare-tool', stepId: value.pending.request.stepId, toolName: value.pending.request.toolName });
   assertOperationNeedsConfirmation(value.pending, now, value.pending.request.toolName);
   // Explicit projection excludes callbacks, MCP connection details and credential material.
-  return hash(json(value.pending.skill.context.tools.map(snapshot => {
+  return hash(json(value.pending.tools.map(snapshot => {
     const tool = now.registry.get(snapshot.native.name)!;
     return { contract: skillToolContract(tool), capability: tool.capability, source: tool.source ?? 'code', sandboxReadSafe: tool.sandboxReadSafe === true,
       mcpAllowedRoles: tool.source === 'mcp' ? [...(tool.mcpAllowedRoles ?? [])].sort() : [], policy: resolveToolPolicyEntry(now.policy, tool.name) };

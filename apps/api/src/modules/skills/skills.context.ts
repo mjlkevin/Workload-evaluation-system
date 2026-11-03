@@ -25,7 +25,7 @@ export function permittedSkillTools(tools: AgentTool[], user: AuthUser, policy: 
 }
 export function skillToolContract(tool: AgentTool): SkillToolDefinition {
   return { name: tool.name, description: tool.description, parameters: tool.parameters, mutates: tool.mutates,
-    exfiltrates: Boolean(tool.exfiltrates), simulationOnly: tool.source === 'mcp' || tool.sandboxReadSafe !== true };
+    exfiltrates: Boolean(tool.exfiltrates), simulationOnly: tool.source === 'mcp' || (tool.simulationOnly ?? tool.sandboxReadSafe !== true) };
 }
 export async function resolveCurrentSkillTools(user: AuthUser) {
   const mcp = await resolveActiveMcpTools();

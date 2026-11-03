@@ -33,6 +33,8 @@ export interface AgentTool {
   exfiltrates?: boolean;
   /** Code-owned assertion of local, read-only trial safety. Default false; never an admin policy override. */
   sandboxReadSafe?: boolean;
+  /** Code-owned execution restriction. False allows only an explicitly assembled production adapter; it never grants trial writes. */
+  simulationOnly?: boolean;
   /** SP-2026-007 MS3：工具分类（发现/分组用）；内置发现工具为 "discovery" */
   category?: string;
   /** SP-2026-007 MS3：true 时默认不注入 tools 参数，经 list_tools 发现后进入当轮注入集 */

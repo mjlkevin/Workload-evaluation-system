@@ -1,4 +1,3 @@
-import Ajv from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { and, eq } from 'drizzle-orm';
@@ -11,11 +10,11 @@ import { assertRunAdmissionInTransaction, createExecutionEmergencyRepository, re
 import { validateFrozenExecutionTools } from './execution-authority';
 import { prepareSkillAuthority } from './skills.authority';
 import { resolveCurrentSkillTools } from './skills.context';
-import { copyTrialJson, readSkillPath } from './skills.sandbox';
+import { copyTrialJson } from './skills.sandbox';
 import { skillDefinitionHash as hash } from './skills.hash';
 import { SkillError } from './skills.types';
 import type { ExecutionManifest } from './execution-manifest.types';
-import type { FrozenExecutionSkill } from './skills.execution-model';
+import { selectSkillOperation, readWorkflowOperationScope, operationContent, type OperationSelection } from './skills.operation-scope';
 type Request = { runId: string; stepId: string; ordinal: number; toolName: string; parameters: unknown };
 type Options = { database?: Database; inventory?: typeof resolveCurrentSkillTools };
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
@@ -65,20 +64,8 @@ export async function resolveBusinessExecutionRootInTransaction(tx: QueueDbExecu
   return lineage(tx, runId, ownerId, manifest);
 }
 function intent(manifest: ExecutionManifest, request: Request) {
-  if (manifest.kind !== 'skill' || manifest.skills.length !== 1 || manifest.tools.length) fail('OPERATION_SCOPE_INVALID');
-  const skill = manifest.skills[0] as FrozenExecutionSkill;
-  if (request.stepId !== skill.stepId) fail('OPERATION_SCOPE_INVALID');
-  const binding = skill.definition.tools.find(t => t.toolName === request.toolName);
-  const snapshot = skill.context.tools.find(t => t.native.name === request.toolName);
-  if (!binding || !snapshot) return fail('OPERATION_TOOL_DENIED', 403);
-  const validator = new Ajv({ allErrors: true, strict: false, validateFormats: false, addUsedSchema: false }).compile(snapshot.native.parameters);
-  if (!validator(request.parameters)) fail('OPERATION_PARAMETERS_INVALID', 400);
-  const mapped: Record<string, unknown> = {};
-  for (const [key, path] of Object.entries(binding.inputMapping)) {
-    const value = readSkillPath(manifest.initialInput, path); if (value !== undefined) mapped[key] = value;
-  }
-  if (!isDeepStrictEqual(request.parameters, mapped)) fail('OPERATION_PARAMETERS_MISMATCH');
-  return { skill, binding, snapshot };
+  if (manifest.kind !== 'skill' || manifest.skills.length !== 1 || manifest.tools.length) return fail('OPERATION_SCOPE_INVALID');
+  return selectSkillOperation(manifest.skills[0], manifest.initialInput, request);
 }
 type Chain = Awaited<ReturnType<typeof lineage>>;
 async function validatePreparedOperation(tx: QueueDbExecutor, row: typeof harnessToolEvents.$inferSelect | undefined,
@@ -88,7 +75,7 @@ async function validatePreparedOperation(tx: QueueDbExecutor, row: typeof harnes
     || row.toolName !== input.toolName || row.output !== null || row.errorMessage !== null || row.resolvedAt !== null || row.riskLevel !== null) conflict();
   const stored = ledgerJson(row.input) as typeof input;
   if (!stored || !uuid(stored.sourceRunId) || stored.sourceRunId !== stored.sourceRunId.toLowerCase()
-    || !isDeepStrictEqual(stored, { ...input, sourceRunId: stored.sourceRunId }) || hash(stored) !== hash({ ...input, sourceRunId: stored.sourceRunId })) conflict();
+    || !isDeepStrictEqual(stored, { ...input, sourceRunId: stored.sourceRunId, ...(input.schemaVersion === 2 ? { sourceCheckpointId: stored.sourceCheckpointId, sourceCheckpointSequence: stored.sourceCheckpointSequence, sourceCheckpointHash: stored.sourceCheckpointHash } : {}) })) conflict();
   const source = await lineage(tx, stored.sourceRunId, ownerId, manifest, chain.fingerprint, chain.sessionId);
   if (source.root !== chain.root) conflict();
 }
@@ -100,21 +87,31 @@ export async function readPreparedOperationInTransaction(tx: QueueDbExecutor, ru
   const stored = ledgerJson(row.input) as Record<string, unknown>;
   if (!stored || typeof stored !== 'object') conflict();
   const request = command({ runId, stepId: stored.stepId, ordinal: stored.ordinal, toolName: stored.toolName, parameters: stored.parameters });
-  const selected = intent(manifest, request);
-  const operationKey = `business-op:v1:${hash({ schemaVersion: 1, rootRunId: chain.root, stepId: request.stepId, ordinal: request.ordinal })}`;
-  const content = { schemaVersion: 1, rootRunId: chain.root, manifestHash: manifest.manifestHash,
-    skillId: selected.skill.skillId, versionId: selected.skill.versionId, definitionHash: selected.skill.hash,
-    stepId: request.stepId, ordinal: request.ordinal, toolName: request.toolName, binding: selected.binding,
-    native: selected.snapshot.native, policy: selected.snapshot.policy, parameters: request.parameters };
-  const payloadHash = hash(content), input = ledgerJson({ ...content, sourceRunId: runId, payloadHash });
+  if (!uuid(stored.sourceRunId) || stored.sourceRunId !== stored.sourceRunId.toLowerCase()) conflict();
+  const source = await lineage(tx, stored.sourceRunId as string, ownerId, manifest, chain.fingerprint, chain.sessionId);
+  if (source.root !== chain.root) conflict();
+  const workflow = manifest.kind === 'workflow' ? await readWorkflowOperationScope(tx, source.first, chain.root, manifest, request, String(stored.sourceCheckpointId)) : undefined;
+  const selected = workflow?.selected ?? intent(manifest, request);
+  const { operationKey, content } = operationContent(manifest, chain.root, request, selected, workflow);
+  const payloadHash = hash(content), input = ledgerJson({ ...content, sourceRunId: runId, ...(workflow ? { sourceCheckpointId: workflow.sourceCheckpointId, sourceCheckpointSequence: workflow.sourceCheckpointSequence, sourceCheckpointHash: workflow.sourceCheckpointHash } : {}), payloadHash });
+  if (workflow && (stored.sourceCheckpointSequence !== workflow.sourceCheckpointSequence || stored.sourceCheckpointHash !== workflow.sourceCheckpointHash)) conflict();
   if (row.effectKey !== operationKey) conflict();
   await validatePreparedOperation(tx, row, input, operationKey, ownerId, manifest, chain);
   return { operationId: row.harnessToolEventId, operationKey, payloadHash, rootRunId: chain.root, sessionId: chain.sessionId,
     executionAuthority: readExecutionAuthorityBindings(manifest, (chain.first.executionConfig as Record<string, unknown>).executionAuthority),
     input: ledgerJson(row.input), request, ...selected };
 }
+/** Current admission adds a latest-cursor fence; historical provenance intentionally omits it. */
+export async function assertOperationIsCurrentInTransaction(tx: QueueDbExecutor, runId: string, ownerId: string, manifest: ExecutionManifest,
+ pending: Awaited<ReturnType<typeof readPreparedOperationInTransaction>>) {
+ if (manifest.kind !== 'workflow') return;
+ const chain = await lineage(tx, runId, ownerId, manifest);
+ const workflow = await readWorkflowOperationScope(tx, chain.first, chain.root, manifest, pending.request);
+ const { operationKey, content } = operationContent(manifest, chain.root, pending.request, workflow.selected, workflow);
+ if (operationKey !== pending.operationKey || hash(content) !== pending.payloadHash) fail('OPERATION_SCOPE_INVALID');
+}
 /** Shared confirmation condition; it cannot grant dispatch. */
-export function assertOperationNeedsConfirmation(selected: ReturnType<typeof intent>, current: Awaited<ReturnType<typeof resolveCurrentSkillTools>>, toolName: string) {
+export function assertOperationNeedsConfirmation(selected: OperationSelection, current: Awaited<ReturnType<typeof resolveCurrentSkillTools>>, toolName: string) {
   const { binding, snapshot } = selected;
   if (!(binding.requiresConfirmation || snapshot.policy.approvalStrategy === 'user-confirm' || snapshot.native.mutates
     || snapshot.native.exfiltrates || snapshot.native.source === 'mcp'
@@ -129,28 +126,33 @@ export function createSkillOperationService(options: Options = {}) {
       const before = await admission.assertRunAdmission(request.runId, user.id);
       const { manifest, identity } = before;
       if (user.status !== 'active' || user.role !== identity.role) fail('EXECUTION_AUTHORITY_CHANGED', 403);
-      const { skill, binding, snapshot } = intent(manifest, request);
+      const selection = manifest.kind === 'workflow' ? await database.transaction(async tx => {
+        const chain = await lineage(tx, request.runId, user.id, manifest);
+        return (await readWorkflowOperationScope(tx, chain.first, chain.root, manifest, request)).selected;
+      }) : intent(manifest, request);
       const prepared = await prepareSkillAuthority([], async () => {
         const current = await (options.inventory ?? resolveCurrentSkillTools)({ ...user, ...identity, businessRole: manifest.caller.businessRole } as AuthUser);
-        validateFrozenExecutionTools(manifest, identity, current);
-        assertOperationNeedsConfirmation({ skill, binding, snapshot }, current, request.toolName);
+        validateFrozenExecutionTools(manifest, identity, current, { phase: 'prepare-tool', stepId: request.stepId, toolName: request.toolName });
+        assertOperationNeedsConfirmation(selection, current, request.toolName);
       }, database);
       return await database.transaction(async tx => {
         const after = await assertRunAdmissionInTransaction(tx, request.runId, user.id);
         if (hash(after) !== hash(before)) fail('EXECUTION_AUTHORITY_CHANGED', 403);
         await prepared.verify(tx);
         const chain = await lineage(tx, request.runId, user.id, manifest);
-        const operationKey = `business-op:v1:${hash({ schemaVersion: 1, rootRunId: chain.root, stepId: request.stepId, ordinal: request.ordinal })}`;
-        const content = { schemaVersion: 1, rootRunId: chain.root, manifestHash: manifest.manifestHash,
-          skillId: skill.skillId, versionId: skill.versionId, definitionHash: skill.hash,
-          stepId: request.stepId, ordinal: request.ordinal, toolName: request.toolName, binding, native: snapshot.native, policy: snapshot.policy, parameters: request.parameters };
-        const payloadHash = hash(content), input = ledgerJson({ ...content, sourceRunId: request.runId, payloadHash });
+        const workflow = manifest.kind === 'workflow' ? await readWorkflowOperationScope(tx, chain.first, chain.root, manifest, request) : undefined;
+        const selected = workflow?.selected ?? intent(manifest, request);
+        if (!isDeepStrictEqual(selected, selection)) fail('OPERATION_SCOPE_INVALID');
+        const { operationKey, content } = operationContent(manifest, chain.root, request, selected, workflow);
+        const payloadHash = hash(content), input = ledgerJson({ ...content, sourceRunId: request.runId, ...(workflow ? { sourceCheckpointId: workflow.sourceCheckpointId, sourceCheckpointSequence: workflow.sourceCheckpointSequence, sourceCheckpointHash: workflow.sourceCheckpointHash } : {}), payloadHash });
         const [inserted] = await tx.insert(harnessToolEvents).values({ harnessToolEventId: randomUUID(), harnessRunId: chain.root,
           effectKey: operationKey, actionId: operationKey, toolName: request.toolName, eventType: 'business_operation_prepared', status: 'pending', input })
           .onConflictDoNothing({ target: [harnessToolEvents.harnessRunId, harnessToolEvents.effectKey] }).returning();
         const [row] = inserted ? [inserted] : await tx.select().from(harnessToolEvents)
           .where(and(eq(harnessToolEvents.harnessRunId, chain.root), eq(harnessToolEvents.effectKey, operationKey))).for('share');
         await validatePreparedOperation(tx, row, input, operationKey, user.id, manifest, chain);
+        // Existing winner is checked against its immutable original checkpoint, never reanchored.
+        await readPreparedOperationInTransaction(tx, request.runId, row.harnessToolEventId, user.id, manifest);
         return { operationId: row.harnessToolEventId, operationKey, payloadHash, rootRunId: chain.root, status: 'pending' as const };
       });
     } catch (error) {

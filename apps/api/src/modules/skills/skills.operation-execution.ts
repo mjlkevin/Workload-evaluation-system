@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { isDeepStrictEqual } from 'node:util';
 import { and, eq, sql } from 'drizzle-orm';
 import { db, type Database } from '../../db/client';
@@ -20,6 +21,49 @@ export type SkillLocalTransactionAdapter = { readonly kind: 'local-transaction';
 export type SkillOperationExecutionResult = { operationId: string; executionId: string; rootRunId: string; status: 'succeeded'; result: unknown };
 type Options = { database?: Database; inventory?: typeof resolveCurrentSkillTools; adapters?: ReadonlyMap<string, SkillLocalTransactionAdapter> };
 type Request = { runId: string; operationId: string; confirmationHash: string };
+/** Server-only dispatch controls, never part of the three-field operation command. */
+export type SkillOperationExecutionControls = { signal: AbortSignal; timeoutMs: number; deadline: number };
+function controlledExecution(database: Database, inventory: typeof resolveCurrentSkillTools, controls?: SkillOperationExecutionControls) {
+  if (controls === undefined) return { database, inventory, guard: () => {} };
+  if (!controls || Object.keys(controls).sort().join(',') !== 'deadline,signal,timeoutMs' || !(controls.signal instanceof AbortSignal)
+    || !Number.isSafeInteger(controls.timeoutMs) || controls.timeoutMs < 1 || controls.timeoutMs > 300000
+    || !Number.isFinite(controls.deadline)) return fail('OPERATION_EXECUTION_CONTROLS_INVALID', 400);
+  const signal = controls.signal, deadline = Math.min(controls.deadline, performance.now() + controls.timeoutMs);
+  const guard = () => {
+    if (performance.now() >= deadline) fail('EXECUTION_BUDGET_TIMEOUT');
+    if (signal.aborted) fail('EXECUTION_BUDGET_ABORTED');
+  };
+  const bounded = Object.create(database) as Database;
+  bounded.transaction = ((callback: any, settings: any) => {
+    guard();
+    return database.transaction(async tx => {
+      const limits = async () => {
+        guard(); const remaining = String(Math.max(1, Math.ceil(deadline - performance.now())));
+        // Refresh for EACH statement, not each transaction: prior queries consume the same absolute allowance.
+        await tx.execute(sql`SELECT set_config('lock_timeout', ${remaining}, true), set_config('statement_timeout', ${remaining}, true)`);
+        guard();
+      };
+      const run = async (execute: () => PromiseLike<unknown>) => { await limits(); const value = await execute(); guard(); return value; };
+      const wrap = (value: any): any => value && typeof value === 'object' ? new Proxy(value, { get(target, key) {
+        const item = Reflect.get(target, key, target);
+        // Drizzle builders are lazy thenables. Bound the actual SQL, after the complete chain is built.
+        if (key === 'then' && typeof item === 'function') return (yes: any, no: any) => run(() => target).then(yes, no);
+        if (typeof item !== 'function') return item;
+        if (key === 'execute' || key === 'all') return (...args: any[]) => run(() => item.apply(target, args));
+        return (...args: any[]) => { guard(); return wrap(item.apply(target, args)); };
+      } }) : value;
+      const checked = new Proxy(tx, { get(target, key) {
+        const method = Reflect.get(target, key, target);
+        return typeof method === 'function' ? (...args: any[]) => { guard(); return wrap(method.apply(target, args)); } : method;
+      } });
+      guard(); const result = await callback(checked);
+      // Drizzle issues COMMIT after this callback; leave its SQL timeout at the remaining absolute allowance.
+      await limits(); guard(); return result;
+    }, settings);
+  }) as Database['transaction'];
+  return { database: bounded, guard, inventory: (async user => { guard(); const value = await inventory(user); guard(); return value; }) as typeof inventory };
+}
+
 type Context = Awaited<ReturnType<Awaited<ReturnType<typeof prepareOperationConfirmation>>['verify']>>;
 type Basis = Awaited<ReturnType<typeof prepareOperationConfirmation>>['basis'];
 const fail = (code: string, status = 409): never => { throw new SkillError(code, '操作执行暂不可用，请重新检查任务、确认和权限', status); };
@@ -106,11 +150,13 @@ export function createSkillOperationExecutionService(options: Options = {}) {
   // Snapshot both mapping and callable: caller mutation cannot replace an in-flight adapter.
   const adapters = new Map([...(options.adapters ?? [])].map(([name, adapter]) => [name,
     { kind: adapter.kind, execute: adapter.execute }] as const));
-  return { async executeOperation(initialUser: AuthUser, body: unknown): Promise<SkillOperationExecutionResult> {
+  return { async executeOperation(initialUser: AuthUser, body: unknown, controls?: SkillOperationExecutionControls): Promise<SkillOperationExecutionResult> {
     try {
       const request = command(body), user = structuredClone(initialUser);
-      const prepared = await prepareOperationConfirmation(database, inventory, request, user);
-      return await database.transaction(async tx => {
+      const controlled = controlledExecution(database, inventory, controls); controlled.guard();
+      const prepared = await prepareOperationConfirmation(controlled.database, controlled.inventory, request, user);
+      controlled.guard();
+      return await controlled.database.transaction(async tx => {
         const current = await prepared.verify(tx);
         if (request.confirmationHash !== prepared.confirmationHash) fail('OPERATION_CONFIRMATION_CHANGED');
         localTool(current);
@@ -125,13 +171,15 @@ export function createSkillOperationExecutionService(options: Options = {}) {
           .onConflictDoNothing({ target: [harnessToolEvents.harnessRunId, harnessToolEvents.effectKey] }).returning();
         let row = inserted;
         if (inserted) {
+          controlled.guard();
           const result = json(await adapter.execute(tx, { operationId: request.operationId, ownerId: user.id,
             sessionId: current.pending.sessionId, parameters: json(current.pending.request.parameters) }));
+          controlled.guard();
           [row] = await tx.update(harnessToolEvents).set({ status: 'succeeded', output: json({ schemaVersion: 1, result }), resolvedAt: await readDbNow(tx) })
             .where(and(eq(harnessToolEvents.harnessToolEventId, inserted.harnessToolEventId), eq(harnessToolEvents.status, 'executing'))).returning();
         } else [row] = await tx.select().from(harnessToolEvents).where(and(eq(harnessToolEvents.harnessRunId, current.pending.rootRunId), eq(harnessToolEvents.effectKey, effectKey))).for('share');
         if (!row) fail('OPERATION_EXECUTION_INVALID');
-        return await receiptResult(tx, row, current, prepared.basis, effectKey);
+        const result = await receiptResult(tx, row, current, prepared.basis, effectKey); controlled.guard(); return result;
       });
     } catch (error) {
       if (error instanceof SkillError) throw error;

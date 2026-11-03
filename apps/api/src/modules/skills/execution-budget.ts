@@ -12,7 +12,7 @@ import { copyTrialJson } from './skills.sandbox';
 import { SkillError } from './skills.types';
 import type { ExecutionManifest } from './execution-manifest.types';
 export type ExecutionBudgetRequest = { runId: string; ownerUserId: string; kind: 'model' | 'tool'; maxOutputTokens?: number; timeoutMs: number; signal?: AbortSignal };
-export type ExecutionBudgetCallbackContext = { signal: AbortSignal; maxOutputTokens: number; timeoutMs: number };
+export type ExecutionBudgetCallbackContext = { signal: AbortSignal; maxOutputTokens: number; timeoutMs: number; deadline: number };
 type Counts = { modelAttempts: number; toolCalls: number; outputTokens: number; activeMs: number };
 export type ExecutionBudgetSnapshot = Counts & { rootRunId: string; remaining: Counts };
 type Binding = { schemaVersion: 1; ownerUserId: string; rootRunId: string; manifestHash: string; manifestDigest: string; sessionId: string; fingerprint: string };
@@ -204,7 +204,7 @@ export function createExecutionBudgetService(options: { database?: Database } = 
      });
      result = await Promise.race([Promise.resolve().then(() => {
       checkDeadline();
-      return callback({ signal: controller.signal, maxOutputTokens: saved.stored.reservedTokens, timeoutMs: saved.stored.reservedMs });
+      return callback({ signal: controller.signal, maxOutputTokens: saved.stored.reservedTokens, timeoutMs: saved.stored.reservedMs, deadline });
      }), interrupted]);
      checkDeadline();
      if (!(exact(result, 'value') || exact(result, 'value,outputTokens'))

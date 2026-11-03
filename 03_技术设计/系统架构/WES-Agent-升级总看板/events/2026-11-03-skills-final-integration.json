@@ -48,6 +48,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-state-roles-quality; /tmp/wes-finish-core-modules",
       "summary": "游标311+权限244gross，SPEC/fresh纯92/92与模块984通过；服务器CP信任边界与v1直连拒绝保留，host另行接线。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-operation-scope-quality; /tmp/wes-finish-host-quality; /tmp/wes-finish-host-quality-regression",
+      "summary": "S source305 freshPG12及H638 fresh56通过，P1真实迟到写已修。默认boot/Workflow/API/UI未接齐，C/D继续。"
     }
   ],
   "next": "先闭合生产工具与预算，再接生产宿主和工作台，完成同样本端到端证据。"
