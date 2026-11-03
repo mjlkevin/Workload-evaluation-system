@@ -26,3 +26,4 @@ export { createSkillOperationService } from './skills.operations';
 export { createSkillOperationDecisionService } from './skills.operation-decisions';
 
 export { createSkillOperationExecutionService, type SkillLocalTransactionAdapter, type SkillOperationExecutionResult } from './skills.operation-execution';
+export { createExecutionBudgetService, type ExecutionBudgetRequest, type ExecutionBudgetCallbackContext, type ExecutionBudgetSnapshot } from './execution-budget';

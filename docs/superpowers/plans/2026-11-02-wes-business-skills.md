@@ -952,3 +952,7 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **连续实施候选与复核事实：** 3c.2生产create_project共享事务/当前身份/可信session/真实规则和快照，初始9项通过后SPEC发现空规则GL兜底遗漏，已真实RED9pass/2fail并修复为原默认工厂，最终12/12及fresh质量12/12、清理夹具全0；source gross678，旧Harness其他草稿路径协调范围保留。3d预算20项后SPEC发现同步阻塞越过timer且错误退款，新增真实RED1fail并加单调deadline，最终21/21/tsc0，source gross490，SPEC复核进行中。持久Skill逐步cursor17项通过（source311），Workflow v2原角色证据及prepare-tool只检权限75项通过（source244），两者静态SPEC通过；cursor仅可信服务器CP损坏检测非客户端防伪。Host与Workflow scope正在接线，两个真实RED分别7fail与2fail已保留，未提前声明生产接入/完整MVP。UI前置使用NODE_USE_ENV_PROXY=1 npx --offline ui-skills start成功加载官方routing，普通联网尝试日志/进程待统一清理；没有引入UI技术栈。
 
 **事务项目适配本地收口：** 原9项后SPEC空规则P2经真实RED修复，当前source gross678，SPEC及fresh五轴安全APPROVE，独立PG12/12、清理7类fixture0；父原modules+R/V新增纯测984/984，0fail/cancel/skip。原serial-store新增明确writer第17项、指纹与脚本一致。只提交此已复核业务适配与文档/脚本子集，其他预算/游标/权限/host/scope候选不混入；总build/最终C/D继续，不停止用户授权任务。
+
+**连续完成调度细化：** 为减少阶段等待，D的脱敏样本/人工预期草案、纯业务数据契约与测试准备可与C宿主/API/UI接线并行；D生产运行/真实模型及最终验收仍以前述C门槛通过为前置，不提前关闭D。不得用待测模型生成标准答案，需业务确认的具体预期准备成可审阅样本后再最小化澄清。
+
+**累计预算独立收口：** 固定60/60/128000/300000活动毫秒，跨root/retry持久预留。SPEC同步堵事件循环P2已真实RED并修成performance deadline，最终PG21/21、fresh质量21/21、tsc0，冻结hash一致；readBudget终态只读不grant；根/审计保留，owned Run/Session/user0。API仍server-trusted callback只返回value。Host写事务预算传播另被SPEC发现P1待修，不用预算库绿来掩盖生产host问题；下一提交H会增加绝对deadline并实际传入消费事务，B基础不宣称C/D完成。

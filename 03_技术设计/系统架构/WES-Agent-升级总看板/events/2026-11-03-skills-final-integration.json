@@ -38,6 +38,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-project/empty-rules-final; /tmp/wes-finish-project-quality; /tmp/wes-finish-core-modules/test:modules.log",
       "summary": "事务项目adapter source678；SPEC/fresh质量通过，PG12/12与父模块984通过。空规则P2已修，生产host/metadata和全MVP继续接线。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-budget/green-blocked-deadline-final; /tmp/wes-finish-budget-quality",
+      "summary": "预算库SPEC/fresh质量通过21/21；source490。同步阻塞deadline P2修复；Host事务超时传播P1正在修，整体C/D未关闭。"
     }
   ],
   "next": "先闭合生产工具与预算，再接生产宿主和工作台，完成同样本端到端证据。"

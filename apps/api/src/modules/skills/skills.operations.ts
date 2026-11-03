@@ -60,6 +60,10 @@ async function lineage(tx: QueueDbExecutor, runId: string, ownerId: string, mani
   }
   return { root, first: first!, fingerprint: fingerprint!, sessionId: sessionId! };
 }
+/** Shared strict retry ancestry; resolving a root never grants execution permission. */
+export async function resolveBusinessExecutionRootInTransaction(tx: QueueDbExecutor, runId: string, ownerId: string, manifest: ExecutionManifest) {
+  return lineage(tx, runId, ownerId, manifest);
+}
 function intent(manifest: ExecutionManifest, request: Request) {
   if (manifest.kind !== 'skill' || manifest.skills.length !== 1 || manifest.tools.length) fail('OPERATION_SCOPE_INVALID');
   const skill = manifest.skills[0] as FrozenExecutionSkill;
