@@ -2904,6 +2904,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/ai-executions/recommendations:
+    post:
+      tags: [AIRuns]
+      summary: 从当前授权目录推荐 Skill 或工作流
+      description: >
+        仅接受业务目标；服务端读取授权目录，单次调用现有 generation 模型并在返回前重验当前身份及精确发布版本。
+        不创建会话、消息、Run、操作批准或业务记录，卡片点击后仍须补齐输入并明确启动。
+        目录最多100项及48KiB，目标最多4000个UTF-16字符；一次调用最多512输出tokens，准备和目录复读共享30秒总超时。
+        卡片名称与用途来自服务端目录；未知或重复候选、畸形输出及工具调用拒绝。无匹配返回空卡片及固定补充提示。
+        每用户每分钟最多20次请求；需 estimates:read 能力且后台任务开关开启。
+      operationId: recommendBusinessExecutions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecutionRecommendationRequest"
+      responses:
+        "200":
+          description: 推荐卡片或无匹配结果，不代表已启动任务
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionRecommendationResponse"
+        "400":
+          description: 目标为空、超过上限或请求包含其他字段
+        "401":
+          description: 未登录或JWT无效
+        "403":
+          description: 缺少能力或当前数据库身份已变化
+        "413":
+          description: 授权目录数量或投影大小超过推荐上限，请手动选择
+        "429":
+          description: 当前用户推荐请求超过每分钟20次
+        "502":
+          description: 模型返回非法、重复或未知候选或工具调用
+        "503":
+          description: 后台任务关闭、目录或实际generation模型暂不可用
+        "504":
+          description: 超过共享30秒总期限，模型信号已取消
+
   /api/v1/ai-executions/runs:
     get:
       tags: [AIRuns]
@@ -10755,6 +10798,75 @@ components:
       required: [code, message, details, requestId]
 
     # AI Runs（RP-047 Batch C） ----------------------------------
+    ExecutionRecommendationRequest:
+      type: object
+      additionalProperties: false
+      required: [goal]
+      properties:
+        goal:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          pattern: '\S'
+
+    ExecutionRecommendationResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          const: 0
+        message:
+          type: string
+        requestId:
+          type: string
+        data:
+          type: object
+          additionalProperties: false
+          required: [outcome, message, items]
+          oneOf:
+            - properties:
+                outcome:
+                  const: recommended
+                message:
+                  const: 请选择候选项，补齐输入后明确启动。
+                items:
+                  minItems: 1
+            - properties:
+                outcome:
+                  const: no_match
+                message:
+                  const: 请补充希望完成的业务目标，或继续普通对话。
+                items:
+                  maxItems: 0
+          properties:
+            outcome:
+              type: string
+              enum: [recommended, no_match]
+            message:
+              type: string
+              enum: [请选择候选项，补齐输入后明确启动。, 请补充希望完成的业务目标，或继续普通对话。]
+            items:
+              type: array
+              maxItems: 3
+              items:
+                type: object
+                additionalProperties: false
+                required: [kind, id, versionId, name, description]
+                properties:
+                  kind:
+                    type: string
+                    enum: [skill, workflow]
+                  id:
+                    type: string
+                  versionId:
+                    type: string
+                  name:
+                    type: string
+                  description:
+                    type: string
+
     BusinessExecutionRequest:
       type: object
       additionalProperties: false

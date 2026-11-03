@@ -31,6 +31,7 @@ export { createResumableSkillExecutor, ResumableSkillFailure, type ResumableSkil
 export type { SkillExecutionState } from './skills.execution-state';
 
 export { createExecutionCatalogService, toExecutionCatalogEntry } from './skills.workbench';
+export { createExecutionRecommendationService, type ExecutionRecommendations } from './skills.recommendations';
 export { createBusinessSkillsWorkbenchService, type BusinessSkillsWorkbenchService } from './skills.workbench-actions';
 export { createBusinessExecutionProjectionService } from './skills.workbench-projection';
 export { safeBusinessJson, buildBusinessExecutionView, sanitizeBusinessRunSnapshot, type BusinessExecutionView } from './skills.workbench-view';

@@ -1,14 +1,29 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
+import rateLimit from 'express-rate-limit';
 import { requireCapability } from '../rbac/middleware';
 import { ok } from '../utils/response';
-import { SkillError, createExecutionCatalogService, createBusinessSkillsWorkbenchService } from '../modules/skills/skills.module';
+import { SkillError, createExecutionCatalogService, createBusinessSkillsWorkbenchService, createExecutionRecommendationService } from '../modules/skills/skills.module';
 import { isDurableRunsEnabledFromEnv } from '../modules/harness/harness-runtime.usecase';
-type Options = { enabled?: boolean; catalog?: ReturnType<typeof createExecutionCatalogService>; business?: ReturnType<typeof createBusinessSkillsWorkbenchService> };
+type Options = { enabled?: boolean; catalog?: ReturnType<typeof createExecutionCatalogService>; business?: ReturnType<typeof createBusinessSkillsWorkbenchService>;
+  recommendations?: ReturnType<typeof createExecutionRecommendationService> };
 export function createAiExecutionsRouter(options: Options = {}) {
   const enabled = options.enabled ?? isDurableRunsEnabledFromEnv(), catalog = options.catalog ?? createExecutionCatalogService();
   const business = options.business ?? createBusinessSkillsWorkbenchService(), router = Router();
+  const recommendations = options.recommendations ?? createExecutionRecommendationService({ catalog });
   router.use(requireCapability('estimates:read'));
+  const recommendationLimit = rateLimit({ windowMs: 60000, limit: 20, standardHeaders: true, legacyHeaders: false,
+    keyGenerator: req => `user:${req.user!.id}`,
+    message: { code: 'EXECUTION_RECOMMENDATION_RATE_LIMIT', message: '推荐请求过于频繁，请稍后再试。', data: null } });
+  router.post('/recommendations', recommendationLimit, async (req, res) => {
+    try {
+      if (!enabled) { res.status(503).json({ code: 'ASYNC_RUNS_DISABLED', message: '后台任务尚未开启', data: null }); return; }
+      res.json(ok(await recommendations.recommend(req.user!, req.body), randomUUID()));
+    } catch (error) {
+      res.status(error instanceof SkillError ? error.status : 503).json({ code: error instanceof SkillError ? error.code : 'EXECUTION_RECOMMENDATION_UNAVAILABLE',
+        message: error instanceof SkillError ? error.message : '推荐暂不可用，请手动选择 Skill 或工作流。', data: null, requestId: randomUUID() });
+    }
+  });
   router.get(['/catalog', '/runs'], async (req, res) => {
     try {
       if (!enabled) { res.status(503).json({ code: 'ASYNC_RUNS_DISABLED', message: '后台任务尚未开启', data: null }); return; }

@@ -7,6 +7,7 @@ import { SkillError, type SkillDefinition } from './skills.types';
 import { skillDefinitionHash } from './skills.hash';
 import type { SkillTrialDependencies } from './skills.evaluation';
 import { copyTrialJson } from './skills.sandbox';
+import { resolveKimiCompletionTemperatureParam } from '../../utils/kimi-completion-params';
 
 /** Only internal knowledge references are supported; no HTTP, filesystem or arbitrary resolver. */
 export async function resolveSkillReferences(references: SkillDefinition['references'], get: (id: string) => Promise<KnowledgeEntry | null>) {
@@ -29,6 +30,8 @@ export async function resolveSkillReferences(references: SkillDefinition['refere
 }
 export function createSkillModelAdapter(options: {
   scenario: ScenarioConfigResolution; apiKey: string; referenceContent: string; provider?: Pick<ModelProvider, 'chatCompletion'>;
+  /** Server-only opt-in: one transport attempt and strict native response parsing; legacy callers retain compatibility behavior. */
+  strictProviderMode?: boolean;
 }): SkillTrialDependencies['complete'] {
   // Credentials remain inside this closure; neither scenario snapshots nor trial results include them.
   return async request => {
@@ -43,8 +46,12 @@ export function createSkillModelAdapter(options: {
       messages.push({ role: 'assistant', content: '', tool_calls: [{ id: step.callId, name: step.toolName, arguments: step.arguments as Record<string, unknown> }] });
       messages.push({ role: 'tool', tool_call_id: step.callId, name: step.toolName, content: JSON.stringify({ simulated: step.simulated, result: step.result }) });
     }
+    const temperature = options.strictProviderMode
+      ? resolveKimiCompletionTemperatureParam(options.scenario.model, request.model.temperature) : request.model.temperature;
     const response = await provider.chatCompletion({
-      model: options.scenario.model, messages, temperature: request.model.temperature, thinking: 'disabled',
+      model: options.scenario.model, messages, thinking: 'disabled',
+      ...(options.strictProviderMode ? { frozenExecution: true } : {}),
+      ...(temperature !== undefined ? { temperature } : {}),
       responseFormat: 'json_object', maxCompletionTokens: request.model.maxTokens,
       timeoutMs: request.model.timeoutMs, maxAttempts: 1, abortSignal: request.signal,
       credentialsOverride: { apiKey: options.apiKey, apiBaseUrl: options.scenario.baseUrl },
