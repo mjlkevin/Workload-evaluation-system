@@ -234,6 +234,13 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
     let leaseLost = false;
     let cancelDetected = false;
     let heartbeatBusy = false;
+    const notifyTerminal = (result: Awaited<ReturnType<HarnessRuntimeRepository['completeAttemptAndRun']>>) => {
+      const status = result.run.status;
+      if (result.changed && (status === 'completed' || status === 'failed' || status === 'cancelled')) {
+        // The locked repository result, rather than this attempt's stale snapshot, owns the outcome.
+        void options.onRunTerminal?.(result.run, status).catch(() => {});
+      }
+    };
 
     const heartbeat = setInterval(() => {
       if (heartbeatBusy) return;
@@ -412,9 +419,9 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
         stepKey = outcome.nextStepKey;
       }
 
-      await repository.completeAttemptAndRun({ attemptId, runId, outcome: "succeeded" });
+      const terminal = await repository.completeAttemptAndRun({ attemptId, runId, outcome: "succeeded" });
       // SP-2026-007 MS2：终态后触发异步蒸馏（不阻塞、不抛错）
-      void options.onRunTerminal?.(run, "completed").catch(() => {});
+      notifyTerminal(terminal);
     } catch (err) {
       if (leaseLost) return; // 租约已失：一切写入禁止，等待扫描接管。
       if (err instanceof HarnessFaultInjectedError) return; // 模拟死进程。
@@ -431,12 +438,12 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
         err instanceof HarnessWorkflowCancelledError ||
         err instanceof HarnessStepBoundaryAbort
       ) {
-        await repository.completeAttemptAndRun({ attemptId, runId, outcome: "cancelled" });
+        const terminal = await repository.completeAttemptAndRun({ attemptId, runId, outcome: "cancelled" });
         // SP-2026-007 MS2：终态后触发异步蒸馏（不阻塞、不抛错）
-        void options.onRunTerminal?.(run, "cancelled").catch(() => {});
+        notifyTerminal(terminal);
         return;
       }
-      await repository.completeAttemptAndRun({
+      const terminal = await repository.completeAttemptAndRun({
         attemptId,
         runId,
         outcome: "failed",
@@ -444,7 +451,7 @@ export function createHarnessRuntimeWorker(options: HarnessRuntimeWorkerOptions)
         errorMessage: err instanceof Error ? err.message.slice(0, 200) : "worker step failed",
       });
       // SP-2026-007 MS2：终态后触发异步蒸馏（不阻塞、不抛错）
-      void options.onRunTerminal?.(run, "failed").catch(() => {});
+      notifyTerminal(terminal);
     } finally {
       clearInterval(heartbeat);
     }

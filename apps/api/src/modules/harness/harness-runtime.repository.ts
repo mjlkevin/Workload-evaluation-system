@@ -1345,6 +1345,12 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
           if ((HARNESS_RUN_TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
             return { changed: false, run };
           }
+          // The Run lock orders cancellation against terminal completion. A committed
+          // cancellation wins; an already committed terminal result returned above stays final.
+          const outcome = run.cancelRequestedAt ? 'cancelled' : input.outcome;
+          const errors = outcome === 'failed'
+            ? { errorCode: input.errorCode ?? null, errorMessage: input.errorMessage ?? null }
+            : { errorCode: null, errorMessage: null };
           const now = input.now ?? (await readDbNow(tx));
           const attemptRows = await tx
             .select()
@@ -1358,24 +1364,22 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
             await tx
               .update(harnessRunAttempts)
               .set({
-                status: input.outcome,
+                status: outcome,
                 finishedAt: now,
                 updatedAt: now,
-                ...(input.outcome === "failed" ? { errorCode: input.errorCode ?? null, errorMessage: input.errorMessage ?? null } : {}),
+                ...errors,
               })
               .where(eq(harnessRunAttempts.harnessRunAttemptId, input.attemptId));
           }
-          const runStatus = input.outcome === "succeeded" ? "completed" : input.outcome === "failed" ? "failed" : "cancelled";
-          const eventType = input.outcome === "succeeded" ? "run_completed" : input.outcome === "failed" ? "run_failed" : "run_cancelled";
+          const runStatus = outcome === "succeeded" ? "completed" : outcome === "failed" ? "failed" : "cancelled";
+          const eventType = outcome === "succeeded" ? "run_completed" : outcome === "failed" ? "run_failed" : "run_cancelled";
           const [updated] = await tx
             .update(harnessRuns)
             .set({
               status: runStatus,
               completedAt: now,
               updatedAt: now,
-              ...(input.outcome === "failed"
-                ? { errorCode: input.errorCode ?? null, errorMessage: input.errorMessage ?? null }
-                : {}),
+              ...errors,
             })
             .where(eq(harnessRuns.harnessRunId, input.runId))
             .returning();
@@ -1384,7 +1388,7 @@ export function createHarnessRuntimeRepository(dbInstance: Database = db): Harne
             eventType,
             payload: {
               attemptId: input.attemptId,
-              ...(input.outcome === "failed" ? { errorCode: input.errorCode ?? "WORKER_STEP_FAILED" } : {}),
+              ...(outcome === "failed" ? { errorCode: input.errorCode ?? "WORKER_STEP_FAILED" } : {}),
             },
           });
           return { changed: true, run: updated };
