@@ -76,6 +76,46 @@ function intent(manifest: ExecutionManifest, request: Request) {
   if (!isDeepStrictEqual(request.parameters, mapped)) fail('OPERATION_PARAMETERS_MISMATCH');
   return { skill, binding, snapshot };
 }
+type Chain = Awaited<ReturnType<typeof lineage>>;
+async function validatePreparedOperation(tx: QueueDbExecutor, row: typeof harnessToolEvents.$inferSelect | undefined,
+  input: Record<string, unknown> & { sourceRunId: string }, operationKey: string, ownerId: string, manifest: ExecutionManifest, chain: Chain) {
+  if (!row) return conflict();
+  if (row.eventType !== 'business_operation_prepared' || row.status !== 'pending' || row.actionId !== operationKey
+    || row.toolName !== input.toolName || row.output !== null || row.errorMessage !== null || row.resolvedAt !== null || row.riskLevel !== null) conflict();
+  const stored = ledgerJson(row.input) as typeof input;
+  if (!stored || !uuid(stored.sourceRunId) || stored.sourceRunId !== stored.sourceRunId.toLowerCase()
+    || !isDeepStrictEqual(stored, { ...input, sourceRunId: stored.sourceRunId }) || hash(stored) !== hash({ ...input, sourceRunId: stored.sourceRunId })) conflict();
+  const source = await lineage(tx, stored.sourceRunId, ownerId, manifest, chain.fingerprint, chain.sessionId);
+  if (source.root !== chain.root) conflict();
+}
+/** Read-only internal seam: same full pending validation, never prepares or inserts an intent. */
+export async function readPreparedOperationInTransaction(tx: QueueDbExecutor, runId: string, operationId: string, ownerId: string, manifest: ExecutionManifest) {
+  const chain = await lineage(tx, runId, ownerId, manifest);
+  const [row] = await tx.select().from(harnessToolEvents).where(and(eq(harnessToolEvents.harnessToolEventId, operationId), eq(harnessToolEvents.harnessRunId, chain.root))).for('share');
+  if (!row) return fail('OPERATION_NOT_FOUND', 404);
+  const stored = ledgerJson(row.input) as Record<string, unknown>;
+  if (!stored || typeof stored !== 'object') conflict();
+  const request = command({ runId, stepId: stored.stepId, ordinal: stored.ordinal, toolName: stored.toolName, parameters: stored.parameters });
+  const selected = intent(manifest, request);
+  const operationKey = `business-op:v1:${hash({ schemaVersion: 1, rootRunId: chain.root, stepId: request.stepId, ordinal: request.ordinal })}`;
+  const content = { schemaVersion: 1, rootRunId: chain.root, manifestHash: manifest.manifestHash,
+    skillId: selected.skill.skillId, versionId: selected.skill.versionId, definitionHash: selected.skill.hash,
+    stepId: request.stepId, ordinal: request.ordinal, toolName: request.toolName, binding: selected.binding,
+    native: selected.snapshot.native, policy: selected.snapshot.policy, parameters: request.parameters };
+  const payloadHash = hash(content), input = ledgerJson({ ...content, sourceRunId: runId, payloadHash });
+  if (row.effectKey !== operationKey) conflict();
+  await validatePreparedOperation(tx, row, input, operationKey, ownerId, manifest, chain);
+  return { operationId: row.harnessToolEventId, operationKey, payloadHash, rootRunId: chain.root, sessionId: chain.sessionId,
+    executionAuthority: readExecutionAuthorityBindings(manifest, (chain.first.executionConfig as Record<string, unknown>).executionAuthority),
+    input: ledgerJson(row.input), request, ...selected };
+}
+/** Shared confirmation condition; it cannot grant dispatch. */
+export function assertOperationNeedsConfirmation(selected: ReturnType<typeof intent>, current: Awaited<ReturnType<typeof resolveCurrentSkillTools>>, toolName: string) {
+  const { binding, snapshot } = selected;
+  if (!(binding.requiresConfirmation || snapshot.policy.approvalStrategy === 'user-confirm' || snapshot.native.mutates
+    || snapshot.native.exfiltrates || snapshot.native.source === 'mcp'
+    || resolveToolPolicyEntry(current.policy, toolName).approvalStrategy === 'user-confirm')) fail('OPERATION_CONFIRMATION_NOT_REQUIRED');
+}
 /** Internal PREPARE ONLY. A durable pending intent is neither approval nor dispatch authority. */
 export function createSkillOperationService(options: Options = {}) {
   const database = options.database ?? db, admission = createExecutionEmergencyRepository(database);
@@ -89,9 +129,7 @@ export function createSkillOperationService(options: Options = {}) {
       const prepared = await prepareSkillAuthority([], async () => {
         const current = await (options.inventory ?? resolveCurrentSkillTools)({ ...user, ...identity, businessRole: manifest.caller.businessRole } as AuthUser);
         validateFrozenExecutionTools(manifest, identity, current);
-        if (!(binding.requiresConfirmation || snapshot.policy.approvalStrategy === 'user-confirm' || snapshot.native.mutates
-          || snapshot.native.exfiltrates || snapshot.native.source === 'mcp'
-          || resolveToolPolicyEntry(current.policy, request.toolName).approvalStrategy === 'user-confirm')) fail('OPERATION_CONFIRMATION_NOT_REQUIRED');
+        assertOperationNeedsConfirmation({ skill, binding, snapshot }, current, request.toolName);
       }, database);
       return await database.transaction(async tx => {
         const after = await assertRunAdmissionInTransaction(tx, request.runId, user.id);
@@ -108,13 +146,7 @@ export function createSkillOperationService(options: Options = {}) {
           .onConflictDoNothing({ target: [harnessToolEvents.harnessRunId, harnessToolEvents.effectKey] }).returning();
         const [row] = inserted ? [inserted] : await tx.select().from(harnessToolEvents)
           .where(and(eq(harnessToolEvents.harnessRunId, chain.root), eq(harnessToolEvents.effectKey, operationKey))).for('share');
-        if (!row || row.eventType !== 'business_operation_prepared' || row.status !== 'pending' || row.actionId !== operationKey
-          || row.toolName !== request.toolName || row.output !== null || row.errorMessage !== null || row.resolvedAt !== null || row.riskLevel !== null) conflict();
-        const stored = ledgerJson(row.input) as typeof input;
-        if (!stored || !uuid(stored.sourceRunId) || stored.sourceRunId !== stored.sourceRunId.toLowerCase()
-          || !isDeepStrictEqual(stored, { ...input, sourceRunId: stored.sourceRunId }) || hash(stored) !== hash({ ...input, sourceRunId: stored.sourceRunId })) conflict();
-        const source = await lineage(tx, stored.sourceRunId, user.id, manifest, chain.fingerprint, chain.sessionId);
-        if (source.root !== chain.root) conflict();
+        await validatePreparedOperation(tx, row, input, operationKey, user.id, manifest, chain);
         return { operationId: row.harnessToolEventId, operationKey, payloadHash, rootRunId: chain.root, status: 'pending' as const };
       });
     } catch (error) {

@@ -848,3 +848,58 @@ prepareOperation(user: AuthUser, body: {
 
 
 **C2c.3a预览与提交边界：** 自建3008看板服务及临时tab已关闭，未操作用户3006页；交付前lsof3006/3004均无LISTEN，本批未启动或更新预览。仅本批文件精确暂存，原模型状态文件仅dirty状态保留、不读/不扫描/不暂存；本地提交后另将实际sha回填主看板，未合主线/推送。
+
+
+### C2c.3b 精细工单：持久确认决定与当前内容/权限绑定（2026-11-03）
+
+用户“继续”，基线d490238/codex/wes-skills-c。按已批准设计§8及3a拆分实施3b：读取可供人工复核的当前操作内容与确认摘要，明确approve/reject命令持久保存为单独事实；同一有效上下文重复决定幂等、相反决定冲突，重试/撤权/策略变化不得复用旧确认。原pending意图行保持pending不覆写。确认事实本身仍不是可复用执行grant；实际本地写幂等/原子消费属3c，累计预算属3d，宿主/工作台/UI继续后续。不要求用户重审已批准方向，当前是内部实现细化。使用既有隔离worktree与先RED/后GREEN/规格后fresh质量工作法。
+
+不新增schema/迁移/依赖/HTTP/UI/生产boot，不动.2b实际写/外发/MCP/user-confirm dispatch门禁、不改旧WaitService终态同答幂等。禁止读取/扫描/修改/暂存config/system/model-verify-status.json、任何真实凭据、主库/预览库，不启动或更新3006/3004。只用guarded workload_eval_test；本地保存，不合main/推送。旧通用业务retry仍409，不能用确认服务开放它。
+
+接口（独立factory，保留3a service仅prepareOperation的既有表面）：
+```ts
+// apps/api/src/modules/skills/skills.operation-decisions.ts
+createSkillOperationDecisionService(options?: { database?: Database; inventory?: typeof resolveCurrentSkillTools });
+readForConfirmation(user: AuthUser, body: { runId: string; operationId: string }): Promise<ConfirmationView>;
+decideOperation(user: AuthUser, body: {
+  runId: string; operationId: string; confirmationHash: string; decision: 'approve' | 'reject';
+}): Promise<ConfirmationView>;
+// View包含实际runId/operationId/rootRunId/payloadHash/confirmationHash/toolName/parameters；
+// status只为pending|approved|rejected；有已保存决定才含decisionId/decision。
+// 不返回权限快照、配置行、凭据digest或任何可执行回调/授权票据。
+```
+
+严格边界：read只允许runId/operationId，decide只允许上列4字段；拒绝approved/parameters/owner/manifest/epoch/key等额外字段及坏JSON。UUID/十六进制摘要先校验并规范小写，decision字面量严格。AuthUser来自服务端登录上下文，真实owner/用户状态/角色/业务角色必须从DB核实，不能只信token快照。两方法默认真实权限，不能用客户端checker或grant替换。只支持3a实际登记的根Skill；未知/外来operation同404，无意图时不创建它；旧ledger误撞、坏状态/内容/来源/指纹/血缘都拒绝。
+
+复用3a完整意图校验：窄提取readPreparedOperationInTransaction（名字可等价），从当前真实Run沿原64节点、same owner/session/manifest/fingerprint/.2c metadata血缘找到root后读精确operationId+root行，按原Schema/映射重新计算key/payloadHash并严格核对整行及source同根来源。仅抽取数据读取/核验，不新增放宽准入模式；3a prepare的API/存储/错误语义保持。不要在read或decide中调用会INSERT的prepare来“读取”，也不能只凭传来的operationId/hash认定授权。full composed/stored JSON沿1MiB/32层与危险字段规则，返回parameters为独立拷贝。
+
+确认上下文：实际当前Run/owner/session、原operationId/root/key、manifestHash/payloadHash、当前Run的精确executionAuthority绑定（非祖先旧epoch）、当前DB身份，以及原/现工具交集核验后的当前原生契约/capability/source/sandboxReadSafe/MCP人工allow角色/有效toolPolicy摘要均进入确认basis。MCP/toolPolicy配置的非敏感revision戳也绑定：按configKey排序选择system_configs的configKey/version/updatedAt/effectiveAt（仅toolPolicy/mcpConfig，缺行显式表示）；不读取/暴露秘密字段生成客户端摘要，不用全credential digest充当凭据。confirmationHash=hash(严格schemaVersion1 basis)，只作乐观内容/权限版本匹配，绝不是安全token。basis内可存这些非敏感快照或单项摘要，禁止原凭据/模型密钥。用户/策略配置经既有写入路径变更戳，旧hash失效；不承诺防数据库管理者同时伪造配置元数据或远端MCP行为。
+
+时序：短tx先真实默认admission+精确pending读取+配置revision戳，释放连接；外部inventory用prepareSkillAuthority包裹、validateFrozenExecutionTools的resume交集及仍需确认条件，与3a一致；最终短tx重新真实admission/意图/配置戳并verify配置fence，与before的内容/身份/绑定一致后才返回view或保存决定。DB连接不跨外部I/O，不嵌套（max1实际测试）。正常Run queued→running等仍active变化不应让同内容摘要每次变；不把now/eventSequence/临时模型callId放摘要。撤权、取消/终态、会话归档/删除、紧停或stop+release、配置/契约变化都安全拒绝或需新hash，零决定半行。普通enabled停用仍沿旧Run语义，不作紧停；新的明确retry即使复用同一pending行，因新Run/epoch而需新确认，旧决定只保留历史。当前调用始终真实有效才允许幂等回放；已失效/terminal/revoked请求拒绝不删旧事实，旧WaitService末态同答行为不受影响。
+
+持久化复用harness_tool_events及(rootRunId,effectKey)唯一约束，独立eventType=business_operation_decision，status=approved|rejected；harnessRunId仍root，toolName真实原名，effectKey/actionId使用独立business-op-decision:v1:前缀+hash({operationId,runId,confirmationHash})。input严格含schemaVersion1、basis、confirmationHash、decision、actorId（若basis已有actor可去重但须严格校验）；output/error/risk为空，createdAt/resolvedAt均为同一readDbNow(tx)时刻。首次INSERT赢；同scope同decision返回同decisionId，不追加其他Run事件/模型/工具效果，不覆写原pending；相反选择409 OPERATION_DECISION_CONFLICT，不后写覆盖。既有decision行必须重验专有eventType、key、完整JSON、actor、basis/hash、状态/choice/时间及空输出等，不可把legacy confirmation/confirmed或伪造approved布尔当本服务事实。
+
+readForConfirmation不写任何状态；当前basis对应无决定时仅pending，已有严格匹配事实才显示approved/rejected。配置/身份或Run变更后basis变新，不把旧basis已批准当当前批准；decide使用旧hash时409且不写新记录，新read+明确新选择才可保存新scope。接口只给明确人工操作的未来服务端入口调用，绝不注册为模型可用NativeTool，不从聊天“好的”推断决定。两方法均不执行工具、不修改Run状态/CP/output/eventSequence，也不将确认变成通用Workflow boolean授权。
+
+责任：新skills.operation-decisions.ts及skills.operation-decisions.persistence.test.ts；skills.operations.ts仅窄提取共享读取/验证/需确认判断，必要小型internal helper防重复（新增文件立即登记CI，物理移动也计gross）；skills.module.ts导出新factory。原则上不改execution-emergency/authority、3a唯一约束/schema、WaitService、Worker或业务写仓储。父负责package专项/CI、README/OpenAPI说明/对齐/本计划和9页看板。实现方不stage/commit；目标500–850手写行，900预警，999前先拆，不用净增隐藏搬移。测试依实际before/after清理专属Run/Session/user，根/不可变审计残留按既有披露，不全表truncate或改DDL来绿。
+
+- [x] RED：服务重建后决定丢失/重复同意多记录或相反选择覆盖、旧hash/旧Run或旧epoch可误用等真实PG反例，记录行为失败而非导入/编译错误。
+- [x] GREEN：read无写、明确决定持久且严格当前basis；pending原行不改、同scope同choice幂等、相反冲突，新retry新确认，返回参数深拷贝，真实工具/model dispatch0。
+- [x] 实PG并发：同意/同意与同意/拒绝独立连接，真实INSERT后门闩+pg_stat_activity/blocking_pids证明确等待，至多一事实；事务异常回滚无半行；同连接池max1在inventory查询正常，所有门闩有界finally释放，不靠sleep猜顺序。
+- [x] 边界：未知/跨owner/跨root/坏ledger/坏血缘/额外字段/UUID和摘要大小写/坏hash/legacy碰撞/损坏决定完整验证；read→decide间参数或策略stamp/角色/epoch变化拒绝旧hash；prepare中撤权/配置变化/stop+release/会话失效拒绝；有效普通停用、same-scope重读、历史保留语义明确。
+- [x] 规格先审后fresh五轴质量安全独立验证；父原modules/确认专项/Harness/AI/双构建及已知通用集成缺模板实取，保持audit45边界。3a专项兼容、原确认/默认dispatch安全门禁不回归，文档/9页看板回填；本地实际sha提交后再记录，不提前声称公开入口/真实写工具/预算或MVP完成。
+
+自检：3a pending是固定意图，3b decision是针对当前上下文的用户事实，3c消费时仍须同事务重新授权与幂等控制；本单元不直接调用任何写端口。配置戳仅非敏感版本元数据，实际权限仍默认真实重验；来源/哈希不是授权。沿已批准方向实现，没有新用户确认UI或第二运行库。
+
+
+**C2c.3b确认摘要的时间戳规范：** config revision戳必须是安全JSON标量，禁止把Date对象直接传给skillDefinitionHash（canonical对Date会丢失枚举字段）。建议SQL选择EXTRACT(EPOCH FROM updated_at/effective_at)::text，保留PG微秒且时区无关，避免JS Date毫秒截断使同version的快速配置更新漏失。只读取configKey/version及两个非敏感时间戳，不把store或credential数据放确认basis；prepareSkillAuthority的既有私有fence保持，未对客户端暴露。合法配置变化经正常仓储更新戳；无DB管理者篡改防护声明。
+
+
+**C2c.3b首RED与基础GREEN：** 父基线登记专项111/111、0skip（/tmp/wes-c2c3b-baseline）。真实PG行为RED2/2失败：明确approve仍pending，retry复用同一confirmationHash（/tmp/wes-c2c3b-impl/red-behavior）；更早red目录是临时view缺parameters导致TypeError，保留但不作为有效业务RED。基础实现2/2 GREEN，随后扩并发/损坏/权限与时序用例。新skills.operation-decisions.persistence.test.ts已登记原串行Harness及test:execution-operation-decisions专项（同时覆盖3a登记/旧逐次权限/重试）；不以零引用测试验收。audit实取仍45既有项，未改依赖。
+
+
+**C2c.3b最终回填：** 明确批准/拒绝决定现已持久保存并绑定当前操作内容、Run与权限。同一有效上下文重复决定幂等，相反选择冲突；重试或配置权限变化需要新确认。真实工具执行仍关闭。父独立确认专项86、模块931、Harness462、AI286及API/Web双构建通过，均0skip。规格独立21、fresh质量PG21/纯测41均0skip后APPROVE。原pending及Run/CP/output/eventSequence/model记录不变，3a兼容；真实INSERT锁竞争/首写赢、max1无外部I/O持锁、回滚、严格旧行、legacy隔离、角色/重试/epoch/微秒配置失效均有实际无条件断言。readDbNow仅改为共享db/now等价import，父最终命令覆盖。保留所有RED、无序快照夹具PK排序及首次TS编译失败；通用集成0/1与audit45不造绿。九页总看板同步，RP-050仍C实施中；无独立新文档资产，sources计数不变。下一步将获准操作与本地业务写入纳入同一事务，完成实际写入幂等（C2c.3c）；再做跨调用预算（3d）、统一视图、生产宿主和工作台。本地提交和看板目视随后实取记录，不提前称MVP已验收。
+
+**C2c.3b收尾实取：** 规格与fresh五轴安全复核均APPROVE；四源码/测试改动gross618行（含窄提取搬移），无>1000行整批审查。父原命令modules931/931、确认专项86/86、Harness462/462、AI286/286均fail/cancel/skip0，双构建exit0。integration0/1保留templates_status_not_200；guarded测试库只读核实活动模板0、有效分配0，不填造业务数据。有效RED0/2；PG微秒决定损坏反例15/17含无序快照夹具问题，PK排序修正保留说明；最终配置fence戳顺序RED20/21；首TS编译失败与修正记录均保留。
+
+九页总看板build/check覆盖21页，0错误/0警告；OpenAPI YAML解析193条路径，未新增确认HTTP入口。IAB独立3008只读台账核验RP-050仍C实施中，next为事务写幂等/预算/生产宿主/工作台/D；截图 /Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c3b-2026-11-03-board-requirements.png。沿用表格短列换行/长行留白未改，不作视觉优化验收声明；sources无新资产且53唯一需求/54台账行未改。仅自建3008服务/标签，收尾关闭；3006/3004未启动或更新。下一步3c尚未实施，本次不自动进入下一单元。

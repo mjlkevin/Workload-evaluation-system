@@ -23,3 +23,4 @@ export { createExecutionAuthority, type ExecutionAuthority, type ExecutionAction
 export { createSkillRetryService, retryInvocation } from './skills.retry';
 
 export { createSkillOperationService } from './skills.operations';
+export { createSkillOperationDecisionService } from './skills.operation-decisions';
