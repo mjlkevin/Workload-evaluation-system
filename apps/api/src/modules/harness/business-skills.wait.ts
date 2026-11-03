@@ -32,11 +32,20 @@ function envelope(run: HarnessRunRow, state: WorkflowRuntimeState, host?: Busine
     state: host ? { schemaVersion: 1, kind: 'workflow', workflow: state } : state }, nextStepKey: STEP };
 }
 export function businessSkillsWaitDescriptor(run: HarnessRunRow, command: WaitCommand) {
+  return businessSkillsWaitDescriptorFromValidatedManifest(run, readBusinessSkillsRun(run).manifestHash, command);
+}
+/** Server-only seam: caller has already validated and locked this Run's manifest/lineage. */
+export function businessSkillsWaitActionId(run: HarnessRunRow, manifestHash: string, content: {
+  operationId: string; kind: WaitCommand['type']; stepId: string; contractHash: string; contentHash: string;
+}) {
+  return hash({ runId: run.harnessRunId, ownerUserId: run.ownerUserId, sessionId: run.aiSessionId, manifestHash, ...content });
+}
+/** Same descriptor, without repeatedly parsing a manifest already validated by the caller. */
+export function businessSkillsWaitDescriptorFromValidatedManifest(run: HarnessRunRow, manifestHash: string, command: WaitCommand) {
   const contentHash = hash({ prompt: command.prompt, displayInput: command.input });
-  const binding = { runId: run.harnessRunId, ownerUserId: run.ownerUserId, sessionId: run.aiSessionId,
-    manifestHash: readBusinessSkillsRun(run).manifestHash, operationId: command.operationId,
+  const binding = { operationId: command.operationId,
     kind: command.type, stepId: command.stepId, contractHash: hash(command.outputSchema), contentHash };
-  return { actionId: hash(binding), kind: command.type, stepId: command.stepId, contentHash,
+  return { actionId: businessSkillsWaitActionId(run, manifestHash, binding), kind: command.type, stepId: command.stepId, contentHash,
     prompt: command.prompt, outputSchema: command.outputSchema, displayInput: command.input };
 }
 async function latest(tx: HarnessTx, run: HarnessRunRow) {

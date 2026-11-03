@@ -12,11 +12,11 @@ import { skillDefinitionHash as hash } from '../skills/skills.hash';
 import { readBusinessSkillsCheckpoint, readBusinessSkillsRun } from './business-skills.workflow';
 import { readBusinessSkillsHostState } from './business-skills.host-state';
 import { createWorkflowRuntime } from './workflows.runtime-adapter';
-import { HarnessRuntimeError, lockRunRow, pauseRunForToolWait, readDbNow, type HarnessTx } from './harness-runtime.repository';
+import { HarnessRuntimeError, lockRunRow, pauseRunForToolWait, readDbNow, type HarnessTx, type QueueDbExecutor } from './harness-runtime.repository';
 const invalid = (): never => { throw new HarnessRuntimeError('BUSINESS_SKILLS_OPERATION_WAIT_INVALID'); };
 const uuid = (v: unknown): v is string => typeof v === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
 /** Caller locks the Run first. No inventory, model or additional pool transaction is called under this lock. */
-export async function readBusinessSkillHostCheckpointInTransaction(tx: HarnessTx, run: HarnessRunRow) {
+export async function readBusinessSkillHostCheckpointInTransaction(tx: QueueDbExecutor, run: HarnessRunRow) {
   const manifest = readBusinessSkillsRun(run);
   const chain = await resolveBusinessExecutionRootInTransaction(tx, run.harnessRunId, run.ownerUserId, manifest);
   const [cp] = await tx.select().from(harnessRunCheckpoints).where(eq(harnessRunCheckpoints.harnessRunId, run.harnessRunId))

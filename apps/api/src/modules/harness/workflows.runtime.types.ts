@@ -21,6 +21,8 @@ export type WorkflowDecision = { state: WorkflowRuntimeState } & (
 );
 export interface WorkflowRuntime {
   next(state?: unknown): WorkflowDecision;
+  /** Trusted server-only synchronous inspection. Entries are detached; retain only needed projections. */
+  visit(state: unknown, visitor: (entry: { command: WorkflowCommand; receipt: WorkflowReceipt; index: number }) => void): WorkflowDecision;
   settle(state: unknown, receipt: { operationId: string; output: unknown }): WorkflowDecision;
   fail(state: unknown, receipt: { operationId: string; code: WorkflowFailureCode }): WorkflowDecision;
 }

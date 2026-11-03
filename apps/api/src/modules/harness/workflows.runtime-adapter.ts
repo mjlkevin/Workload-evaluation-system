@@ -42,7 +42,7 @@ export function createWorkflowRuntime(value: ExecutionManifest, executionId: str
     }
     return s as WorkflowRuntimeState;
   }
-  function replay(s: WorkflowRuntimeState): WorkflowDecision {
+  function replay(s: WorkflowRuntimeState, visitor?: Parameters<WorkflowRuntime['visit']>[1]): WorkflowDecision {
     const values: WorkflowValues = { input: manifest.initialInput, steps: {} }; let consumed = 0; let index = 0;
     const finish = (decision: WorkflowDecision): WorkflowDecision => {
       if (consumed !== s.receipts.length) reject('INVALID_STATE');
@@ -64,23 +64,27 @@ export function createWorkflowRuntime(value: ExecutionManifest, executionId: str
         const input = copy(mapValues(step.inputMapping, values), 'INVALID_STATE');
         if (!contract.input(input)) reject('INVALID_STATE');
         const id = operationId(step.id, iteration); const receipt = s.receipts[consumed];
-        if (!receipt) {
+        const command = (): WorkflowCommand => {
           const common = { operationId: id, stepId: step.id, iteration, input, inputSchema: contract.inputSchema };
           let command: WorkflowCommand;
           if (step.type === 'skill') command = { ...common, type: 'skill', skillId: step.skillId, skillVersionId: step.skillVersionId, dependency: contract.dependency!, outputSchema: contract.outputSchema! };
           else if (step.type === 'tool') command = { ...common, type: 'tool', toolName: step.toolName, contract: contract.tool!,
             requiresConfirmation: Boolean(step.requiresConfirmation || contract.tool!.requiresConfirmation || contract.tool!.mutates || contract.tool!.exfiltrates || (object(contract.tool!.policy) && contract.tool!.policy.approvalStrategy === 'user-confirm')) };
           else command = { ...common, type: step.type, prompt: step.prompt, outputSchema: contract.outputSchema! };
-          return finish({ kind: 'ready', command, state: s });
-        }
+          return command;
+        };
+        if (!receipt) return finish({ kind: 'ready', command: command(), state: s });
         if (receipt.operationId !== id) reject('INVALID_STATE');
         consumed++;
-        if (receipt.status === 'failed') return finish({ kind: step.onFailure === 'wait' ? 'waiting' : 'failed', stepId: step.id, code: receipt.code, state: s });
+        const visit = () => visitor?.({ command: structuredClone(command()), receipt: structuredClone(receipt), index: consumed - 1 });
+        if (receipt.status === 'failed') { visit(); return finish({ kind: step.onFailure === 'wait' ? 'waiting' : 'failed', stepId: step.id, code: receipt.code, state: s }); }
         if (step.type === 'tool' && !contract.output) { if (!own(receipt, 'opaqueResult')) reject('INVALID_STATE'); }
         else {
           if (!own(receipt, 'output') || !contract.output!((receipt as { output: unknown }).output)) reject('INVALID_STATE');
           values.steps[step.id] = { output: (receipt as { output: unknown }).output };
         }
+        // No callback references reach interpreter-owned values, schemas or manifest dependencies.
+        visit();
         if (!step.repeat || !predicates(step.repeat.while, values)) break;
         if (iteration >= step.repeat.maxIterations) return finish({ kind: step.repeat.onLimit === 'wait' ? 'waiting' : 'failed', stepId: step.id, code: 'repeat_limit', state: s });
         iteration++;
@@ -117,6 +121,7 @@ export function createWorkflowRuntime(value: ExecutionManifest, executionId: str
   }
   return {
     next: value => replay(value === undefined ? initial() : state(value)),
+    visit: (value, visitor) => replay(state(value), visitor),
     settle: (state, receipt) => append(state, receipt, false),
     fail: (state, receipt) => append(state, receipt, true),
   };
