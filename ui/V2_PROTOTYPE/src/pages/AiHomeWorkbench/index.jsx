@@ -43,6 +43,20 @@ export default function AiHomeWorkbench({ currentUser }) {
   const [stoppingRun, setStoppingRun] = useState(false)
   const [stopError, setStopError] = useState('')
 
+  // Business polling already reads authoritative Run snapshots. Reconcile the other
+  // summaries only when run membership/status changes, never on every poll/render.
+  const businessStatusesRef = useRef({ sessionId: null, signature: '' })
+  useEffect(() => {
+    const sessionId = workbench.activeSession?.sessionId || ''
+    const signature = JSON.stringify(business.runs.map(run => [run.runId, run.status]).sort())
+    const previous = businessStatusesRef.current
+    businessStatusesRef.current = { sessionId, signature }
+    if (!sessionId || (previous.sessionId === sessionId && previous.signature === signature)) return
+    if (previous.sessionId !== sessionId && !business.runs.length) return
+    workbench.refreshUnifiedView?.()
+    backgroundRuns.notifyRunsChanged?.()
+  }, [business.runs, workbench.activeSession?.sessionId, workbench.refreshUnifiedView, backgroundRuns.notifyRunsChanged])
+
   // ISS-2026-08-09-003 C3（离页返回旧缓存渲染、AI 回复不显示）：「后台任务」角标
   // 接入统一视图 runs 的活跃/已完成计数——O5 接口已一次取齐 runs，不再只看活跃数。
   const runCounts = useMemo(() => {
@@ -194,6 +208,7 @@ export default function AiHomeWorkbench({ currentUser }) {
         session={workbench.activeSession}
         onStarted={() => {
           business.refresh()
+          workbench.refreshUnifiedView?.()
           backgroundRuns.notifyRunsChanged?.()
           if (workbench.workspacePanelCollapsed) workbench.toggleWorkspacePanel()
         }}
