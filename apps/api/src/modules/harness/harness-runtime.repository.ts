@@ -60,6 +60,7 @@ function toSafeError(err: unknown): HarnessRuntimeError {
 }
 
 const QUEUE_CALLBACK_ERRORS: Record<string, string> = {
+  AI_RUN_SESSION_NOT_FOUND: "会话不存在",
   INVOCATION_NOT_FOUND: 'invocation session or source not found',
   INVOCATION_FORBIDDEN: 'invocation authority changed',
   INVOCATION_SOURCE_CHANGED: 'invocation source changed',
@@ -119,6 +120,9 @@ export type CreateQueuedHarnessRunInput = {
 export type QueueDbExecutor = Pick<Database, 'select' | 'insert' | 'update' | 'execute'>;
 
 function assertSubmissionReplay(run: HarnessRunRow, input: CreateQueuedHarnessRunInput): void {
+  const retryHash = (run.metadata as Record<string, unknown> | null)?.retryRequestHash;
+  if (retryHash !== input.metadata?.retryRequestHash || (retryHash !== undefined && run.retryOfRunId !== input.retryOfRunId))
+    throw new HarnessRuntimeError('SUBMISSION_KEY_CONFLICT');
   const prior = (run.metadata as Record<string, unknown> | null)?.invocationFingerprint;
   if (prior === undefined && input.submissionFingerprint === undefined) return; // Legacy chat semantics.
   if (prior !== input.submissionFingerprint || run.aiSessionId !== input.aiSessionId

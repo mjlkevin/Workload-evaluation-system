@@ -128,7 +128,7 @@ async function driveRunToTerminal(status: "completed" | "failed"): Promise<{ run
   const created = await repo!.createQueuedRun({
     ownerUserId: alice!.id,
     ownerUsername: alice!.username,
-    aiSessionId: `session-${randomUUID()}`,
+    aiSessionId: await makeSession(alice!),
     submissionKey: `submission-${randomUUID()}`,
     title: "终态驱动",
     workflowId: "workbench_chat_v1",

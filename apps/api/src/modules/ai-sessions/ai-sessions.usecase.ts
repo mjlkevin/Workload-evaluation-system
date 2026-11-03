@@ -4,6 +4,7 @@ import type { AuthUser } from "../../types";
 import { resolveBusinessRole } from "../../middleware/auth";
 import { asString } from "../../utils";
 import { AiRunsConflictError } from "../harness/harness-runtime.usecase";
+import { AiSessionsStoreError } from "./ai-sessions-pg.repository";
 import { getAiSessionsRepository } from "./ai-sessions.repository";
 import { deriveSessionMessages } from "./session-history";
 import type {
@@ -241,10 +242,8 @@ export type DeleteAiSessionDeps = {
 };
 
 /**
- * 删除会话。缺省（无 checker）保持原有布尔语义（await 解包后仍为 boolean）；
- * 注入 activeRunChecker 时返回 Promise，命中活跃 Run 抛
- * AiRunsConflictError(SESSION_HAS_ACTIVE_RUN) 且不删除会话（规格 §11.3）。
- * 阶段 1 批 8：签名 1 由 boolean 改 Promise<boolean>（统一异步契约），实现 不动。
+ * 删除会话。PG 事务始终检查活跃 Run；可选 checker 仅用于提前拒绝。
+ * 活跃 Run 抛 AiRunsConflictError(SESSION_HAS_ACTIVE_RUN)，其余仍返回 boolean。
  */
 export function deleteAiSession(user: AuthUser, sessionId: string): Promise<boolean>;
 export function deleteAiSession(
@@ -272,11 +271,16 @@ export function deleteAiSession(
   })();
 }
 
-/** 阶段 2 批 3：函数体改经仓储行级条件 DELETE（范式 #3）。 */
+/** 仓储锁定所属会话后检查活跃 Run，再执行 DELETE。 */
 async function deleteAiSessionSync(user: AuthUser, sessionId: string): Promise<boolean> {
   const id = asString(sessionId);
   if (!id) return false;
-  return getAiSessionsRepository().deleteSession({ ownerUserId: user.id, sessionId: id });
+  try { return await getAiSessionsRepository().deleteSession({ ownerUserId: user.id, sessionId: id }); }
+  catch (error) {
+    if (error instanceof AiSessionsStoreError && error.code === 'SESSION_HAS_ACTIVE_RUN')
+      throw new AiRunsConflictError('SESSION_HAS_ACTIVE_RUN', '会话存在进行中的异步任务，无法删除');
+    throw error;
+  }
 }
 
 /** 阶段 2 批 3：函数体改经仓储 appendSessionEvent（jsonb 原子追加，范式 #3）；归一化/校验保留在 usecase 层。 */

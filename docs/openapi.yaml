@@ -2701,7 +2701,11 @@ paths:
         该会话是否存在活跃 Run：命中时返回 409 SESSION_HAS_ACTIVE_RUN
         且不删除（前端冻结文案：该会话仍有后台任务运行中，请先停止任务。），
         会话不存在或非 owner 返回 404（不泄露存在性）。
-        本条为 Batch D 契约增补，不回填其他旧域端点。
+        仓储在同一事务先锁定所属 Session（FOR UPDATE），再以独立 SQL
+        查询 queued/running/waiting/recovering/cancelling 五种活跃状态后删除。
+        生产提交与普通重试在入队事务持有 Session FOR SHARE：入队先提交则删除
+        返回 409；删除先提交则提交或重试返回 404，不创建孤儿任务。
+        外层检查器不能绕过仓储保护。本条不回填其他旧域端点。
       operationId: deleteAiSession
       security:
         - bearerAuth: []
@@ -2739,7 +2743,8 @@ paths:
         将一条会话消息提交为后台 Run，立即返回 202。重复 submissionKey
         返回同一 runId（幂等重放）。session 不属于当前用户时返回 404
         （不泄露存在性）；该 session 已存在活跃工作台 Run 时返回
-        409 SESSION_HAS_ACTIVE_RUN。
+        409 SESSION_HAS_ACTIVE_RUN。入队事务重新锁定并检查当前 Session
+        归属和可用性；并发删除已提交时返回 404，Run、事件和消息均不落库。
       operationId: submitAiRun
       security:
         - bearerAuth: []
@@ -3219,7 +3224,10 @@ paths:
       description: >
         仅终态 failed 可重试：新建带 retryOfRunId 的 Run（新 submissionKey），
         原 Run 行保持不可变；非 failed 返回 409 RUN_NOT_FAILED，无法定位
-        原 session 返回 409 RUN_NOT_RETRYABLE。
+        原 session 返回 409 RUN_NOT_RETRYABLE；原 session 当前不存在、已归档或
+        非 owner 返回 404，入队事务重新检查 Session，防止并发删除后生成孤儿任务。
+        business_skills_v1 业务任务一律返回 409 BUSINESS_SKILLS_RETRY_CHANNEL_REQUIRED，
+        须通过内部手动命令重新授权；本端点未开放业务 Skill 的公开重试能力。
       operationId: retryAiRun
       security:
         - bearerAuth: []
@@ -3237,13 +3245,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/GenericOkResponse"
         "404":
-          description: Run 不存在或非 owner
+          description: Run 或当前 Session 不存在、非 owner，或 Session 已归档
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: 非 failed 终态或不可重试（code=RUN_NOT_FAILED/RUN_NOT_RETRYABLE）
+          description: 非 failed、不可重试或业务任务需专用通道（code=RUN_NOT_FAILED/RUN_NOT_RETRYABLE/BUSINESS_SKILLS_RETRY_CHANNEL_REQUIRED）
           content:
             application/json:
               schema:
@@ -10545,7 +10553,7 @@ components:
       description: >
         409 业务冲突；code 为字符串业务码：SESSION_HAS_ACTIVE_RUN /
         RUN_ALREADY_TERMINAL / RUN_NOT_WAITING / RUN_NOT_FAILED / RUN_NOT_RETRYABLE /
-        BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED
+        BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED / BUSINESS_SKILLS_RETRY_CHANNEL_REQUIRED
       properties:
         code:
           type: string

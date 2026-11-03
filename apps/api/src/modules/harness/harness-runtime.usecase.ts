@@ -10,8 +10,10 @@
 //   - feature flag 关闭时所有新端点 503 ASYNC_RUNS_DISABLED（G4，D2）。
 //   - repository 错误只消费固定 code，不穿透 Drizzle/pg 原始错误。
 //   - 单向依赖：ai-sessions.usecase 引入本文件的 AiRunsConflictError，
-//     本文件仅 type-import ai-sessions.types，避免循环导入。
+//     会话归属锁仅走 ai-sessions PG 的窄端口，不调用该域 usecase。
 
+import { AiSessionsStoreError, lockOwnedSessionForRun } from "../ai-sessions/ai-sessions-pg.repository";
+import type { QueueDbExecutor } from "./harness-runtime.repository";
 import { randomUUID } from "node:crypto";
 import { BUSINESS_SKILLS_WORKFLOW_ID } from './business-skills.identity';
 
@@ -93,6 +95,7 @@ export type AiRunsRepoPort = {
     executionConfig?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
     retryOfRunId?: string;
+    validateSubmission?: (tx: QueueDbExecutor) => Promise<void>;
     /**
      * 批次 2b-1（additive）→ 2b-2：本轮用户消息的完整信封载荷，按 runId 构造，
      * 随入队事务落一条 user/message（约定所有权在 workbench 层，仓储只序列化）。
@@ -210,6 +213,7 @@ function assertEnabled(deps: AiRunsUsecaseDeps): void {
 /** repository 固定 code → API 冲突码映射（其余原样上抛由 controller 兜底）。 */
 function mapRepoConflict(err: unknown): never {
   if (err instanceof HarnessRuntimeError) {
+    if (err.code === "AI_RUN_SESSION_NOT_FOUND") throw new AiRunsNotFoundError("会话不存在");
     if (err.code === "ACTIVE_WORKBENCH_RUN_EXISTS") {
       throw new AiRunsConflictError("SESSION_HAS_ACTIVE_RUN", "该会话存在进行中的异步任务");
     }
@@ -246,6 +250,12 @@ async function createRunOrThrow(
 
 export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
   const repo = toRepo(deps);
+  const lockSession = async (tx: QueueDbExecutor, user: AuthUser, sessionId: string) => {
+    try { await lockOwnedSessionForRun(tx, user.id, sessionId); }
+    catch (error) {
+      throw new HarnessRuntimeError(error instanceof AiSessionsStoreError && error.code === 'AI_RUN_SESSION_NOT_FOUND' ? 'AI_RUN_SESSION_NOT_FOUND' : 'HARNESS_RUNTIME_INTERNAL');
+    }
+  };
 
   /** C1 提交契约：202 + submissionKey 幂等；flag/校验/归属顺序冻结。 */
   async function submitRun(user: AuthUser, sessionId: string, input: AiRunsSubmitInput): Promise<AiRunsSubmitResult> {
@@ -284,6 +294,7 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
         workflowVersion: WORKBENCH_WORKFLOW_VERSION,
         executionConfig,
         metadata,
+        validateSubmission: tx => lockSession(tx, user, sessionId),
         // 批次 2b-1：用户正文随入队落一条 user/message。正文取自**提交原始入参** content
         // （与 executionConfig.content 同一份，也正是 workflow 落会话用户消息的那一份），
         // 刻意不读上面那行 title：title 是 80 字标题，今天恰好等于正文是巧合，
@@ -412,6 +423,9 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
     assertEnabled(deps);
     const run = await repo.findRunForOwner(runId, user.id);
     if (!run) throw new AiRunsNotFoundError("任务不存在");
+    if (run.workflowId === BUSINESS_SKILLS_WORKFLOW_ID) {
+      throw new AiRunsConflictError('BUSINESS_SKILLS_RETRY_CHANNEL_REQUIRED', '该业务任务需要通过内部手动重试入口重新授权');
+    }
     if (String(run.status) !== "failed") {
       throw new AiRunsConflictError("RUN_NOT_FAILED", "仅失败终态的任务可重试");
     }
@@ -458,6 +472,7 @@ export function createAiRunsUsecase(deps: AiRunsUsecaseDeps) {
         executionConfig: retryConfig,
         metadata,
         retryOfRunId: runId,
+        validateSubmission: tx => lockSession(tx, user, sessionId),
         // 批次 2b-1：retry 提交的是**同一轮**用户正文，只可能在原 Run 的
         // executionConfig.content 里（与 submitRun 那份同源）。这里同样不读 title。
         userMessageFact: (runIdForFact) =>

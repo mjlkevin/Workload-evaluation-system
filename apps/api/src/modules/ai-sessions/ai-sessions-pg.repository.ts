@@ -34,11 +34,13 @@
 //     来源键查重仍建立在裸快照之上（那是「恰好一次落库」的幂等防线，与本批无关）。
 // 消费端一律经 deriveSessionMessages，因此它们看不见源在哪——这正是 2a 造缝买的东西。
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { db, type Database } from "../../db/client";
 import { readDbNow } from "../../db/now";
-import { aiSessions } from "../../db/schema";
+import { aiSessions, harnessRuns } from "../../db/schema";
+import { HARNESS_RUN_ACTIVE_STATUSES } from "../harness/harness-runtime.types";
+import type { QueueDbExecutor } from "../harness/harness-runtime.repository";
 import { createConversationEventHistorySource } from "../harness/conversation-event-history";
 import { applyEventStreamHistory, type SessionConversationFactSource } from "./session-history";
 import type {
@@ -229,11 +231,17 @@ export function createAiSessionsPgRepository(
 
     async deleteSession(input) {
       try {
-        const rows = await dbInstance
-          .delete(aiSessions)
-          .where(and(eq(aiSessions.sessionId, input.sessionId), eq(aiSessions.ownerUserId, input.ownerUserId)))
-          .returning({ sessionId: aiSessions.sessionId });
-        return rows.length > 0;
+        return await dbInstance.transaction(async tx => {
+          const [session] = await tx.select({ id: aiSessions.sessionId }).from(aiSessions)
+            .where(and(eq(aiSessions.sessionId, input.sessionId), eq(aiSessions.ownerUserId, input.ownerUserId))).for('update');
+          if (!session) return false;
+          // MVCC read only: never take a Run lock after the Session lock.
+          const [active] = await tx.select({ id: harnessRuns.harnessRunId }).from(harnessRuns)
+            .where(and(eq(harnessRuns.aiSessionId, input.sessionId), inArray(harnessRuns.status, [...HARNESS_RUN_ACTIVE_STATUSES]))).limit(1);
+          if (active) throw new AiSessionsStoreError('SESSION_HAS_ACTIVE_RUN');
+          await tx.delete(aiSessions).where(eq(aiSessions.sessionId, input.sessionId));
+          return true;
+        });
       } catch (err) {
         throw toSafeError(err);
       }
@@ -324,4 +332,11 @@ export function createAiSessionsPgRepository(
       }
     },
   };
+}
+
+/** Called inside the queue transaction; shares its connection and fences concurrent DELETE. */
+export async function lockOwnedSessionForRun(tx: QueueDbExecutor, ownerUserId: string, sessionId: string): Promise<void> {
+  const [session] = await tx.select({ status: aiSessions.status }).from(aiSessions)
+    .where(and(eq(aiSessions.sessionId, sessionId), eq(aiSessions.ownerUserId, ownerUserId))).for('share');
+  if (!session || session.status === 'archived') throw new AiSessionsStoreError('AI_RUN_SESSION_NOT_FOUND');
 }

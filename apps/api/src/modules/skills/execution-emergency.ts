@@ -2,7 +2,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { db, type Database } from '../../db/client';
 import { readDbNow } from '../../db/now';
-import { aiSessions, executionEmergencyAudits as audits, harnessRuns, skillDefinitions, workflowDefinitions, users } from '../../db/schema';
+import { aiSessions, executionEmergencyAudits as audits, harnessRuns, skillDefinitions, skillVersions, workflowDefinitions, workflowVersions, users } from '../../db/schema';
 import { isBusinessRole, resolveBusinessRole } from '../../middleware/auth';
 import { BUSINESS_SKILLS_WORKFLOW_ID, BUSINESS_SKILLS_WORKFLOW_VERSION, type QueueDbExecutor } from '../harness/harness.module';
 import type { AuthUser } from '../../types';
@@ -28,7 +28,7 @@ function target(kind: EmergencyKind, id: string) {
 }
 async function root(tx: QueueDbExecutor, kind: EmergencyKind, id: string, lock: 'share' | 'update') {
   const { table, where } = target(kind, id);
-  const [control] = await tx.select({ stopped: table.emergencyStopped, epoch: table.emergencyEpoch, revision: table.emergencyRevision }).from(table).where(where).for(lock);
+  const [control] = await tx.select({ stopped: table.emergencyStopped, epoch: table.emergencyEpoch, revision: table.emergencyRevision, enabled: table.enabled, archived: table.archived }).from(table).where(where).for(lock);
   if (!control) return failure('EXECUTION_CONTROL_NOT_FOUND', '技能或流程不存在', 404);
   return control;
 }
@@ -61,7 +61,7 @@ async function capture(tx: QueueDbExecutor, manifest: ExecutionManifest, user: A
   return bindings;
 }
 type Run = typeof harnessRuns.$inferSelect;
-async function verifyRun(tx: QueueDbExecutor, run: Run, ownerUserId: string) {
+async function verifyRun(tx: QueueDbExecutor, run: Run, ownerUserId: string, retry: false | 'new' | 'replay' = false) {
   if (run.ownerUserId !== ownerUserId || run.runKind !== 'workbench_chat' || run.workflowId !== BUSINESS_SKILLS_WORKFLOW_ID
     || run.workflowVersion !== BUSINESS_SKILLS_WORKFLOW_VERSION || !run.aiSessionId || !run.submissionKey
     || !/^[a-f0-9]{64}$/.test(String((run.metadata as Record<string, unknown>)?.invocationFingerprint)))
@@ -81,18 +81,49 @@ async function verifyRun(tx: QueueDbExecutor, run: Run, ownerUserId: string) {
   for (const [i, reference] of expected.entries()) {
     const control = await root(tx, reference.kind, reference.id, 'share');
     if (control.stopped) failure('EXECUTION_EMERGENCY_STOPPED', '技能或流程已被管理员紧急停止');
-    if ((bindings as ExecutionAuthorityBinding[])[i].epoch !== control.epoch) failure('EXECUTION_MANUAL_RETRY_REQUIRED', '任务曾被紧急停止，请手动重新发起');
+    if (retry === 'new' && (!control.enabled || control.archived)) failure('EXECUTION_REFERENCE_UNAVAILABLE', '原执行版本已不可引用');
+    if (!retry && (bindings as ExecutionAuthorityBinding[])[i].epoch !== control.epoch) failure('EXECUTION_MANUAL_RETRY_REQUIRED', '任务曾被紧急停止，请手动重新发起');
+  }
+  if (retry === 'new') {
+    const check = async (kind: EmergencyKind, id: string, versionId: string, expectedHash: string) => {
+      const table = kind === 'skill' ? skillVersions : workflowVersions;
+      const key = kind === 'skill' ? skillVersions.skillVersionId : workflowVersions.workflowVersionId;
+      const [version] = await tx.select().from(table).where(eq(key, versionId)).for('share');
+      if (!version || ('skillId' in version ? version.skillId : version.workflowId) !== id || version.status !== 'published'
+        || version.hash !== expectedHash || hash(version.definition) !== expectedHash)
+        failure('EXECUTION_REFERENCE_UNAVAILABLE', '原执行版本已不可引用');
+    };
+    await check(manifest.kind, manifest.target.id, manifest.target.versionId, manifest.target.hash);
+    for (const skill of manifest.skills) await check('skill', skill.skillId, skill.versionId, skill.hash);
   }
   return { runId: run.harnessRunId, manifest, identity: current };
+}
+/** Separate failed-only admission: ordinary dispatch can never opt out of epoch checks. */
+async function retrySource(tx: QueueDbExecutor, runId: string, ownerUserId: string, submissionKey?: string) {
+  const [saved] = submissionKey ? await tx.select({ parent: harnessRuns.retryOfRunId }).from(harnessRuns)
+    .where(and(eq(harnessRuns.ownerUserId, ownerUserId), eq(harnessRuns.submissionKey, submissionKey))).for('share') : [];
+  const [run] = await tx.select().from(harnessRuns).where(and(eq(harnessRuns.harnessRunId, runId), eq(harnessRuns.ownerUserId, ownerUserId))).for('share');
+  if (!run) return failure('EXECUTION_RUN_NOT_FOUND', '执行任务不存在', 404);
+  if (run.status !== 'failed') failure('EXECUTION_RUN_NOT_FAILED', '仅失败任务可手动重试');
+  return { ...await verifyRun(tx, run, ownerUserId, saved?.parent === runId ? 'replay' : 'new'), run };
 }
 /** Admission only. Callers must add current Registry/policy checks before each external action. */
 export function createExecutionEmergencyRepository(database: Database = db) {
   return {
+    async prepareRetry(runId: string, ownerUserId: string, submissionKey?: string) {
+      try { return await database.transaction(async tx => {
+        const source = await retrySource(tx, runId, ownerUserId, submissionKey);
+        return { ...source, bindings: await capture(tx, source.manifest, { id: ownerUserId } as AuthUser) };
+      }); } catch (error) { return safe(error); }
+    },
+    async verifyRetry(tx: QueueDbExecutor, runId: string, ownerUserId: string, submissionKey?: string) {
+      try { return await retrySource(tx, runId, ownerUserId, submissionKey); } catch (error) { return safe(error); }
+    },
     async read(kind: EmergencyKind, id: string, actor: AuthUser) {
       try { return await database.transaction(async tx => {
         await admin(tx, actor); const control = await root(tx, kind, id, 'share');
         const entries = await tx.select().from(audits).where(eq(kind === 'skill' ? audits.skillId : audits.workflowId, id)).orderBy(desc(audits.revision), desc(audits.id)).limit(101);
-        return { control, hasMore: entries.length > 100, audit: entries.slice(0, 100).reverse().map(({ skillId, workflowId, ...event }) => ({ ...event, createdAt: event.createdAt.toISOString() })) };
+        return { control: { stopped: control.stopped, epoch: control.epoch, revision: control.revision }, hasMore: entries.length > 100, audit: entries.slice(0, 100).reverse().map(({ skillId, workflowId, ...event }) => ({ ...event, createdAt: event.createdAt.toISOString() })) };
       }); } catch (error) { return safe(error); }
     },
     async change(kind: EmergencyKind, id: string, actor: AuthUser, revision: unknown, reason: unknown, action: 'stop' | 'release') {

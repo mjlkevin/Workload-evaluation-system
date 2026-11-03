@@ -724,3 +724,70 @@ interface ExecutionAuthority { check(action: ExecutionAction): Promise<void> }
 
 
 **C2c.2b收尾证据：** fresh五轴质量安全独立154/154、纯测125/125、0skip后APPROVE，无新增阻断finding；根/audit测试保留披露，未声称零残留。父最终计数与两份OpenAPI六控制路径解析核验通过；九页总看板build/21页一致性0错0警，浏览器实读最终标题、C实施中及后续门槛。自建3008服务和临时看板页已关闭；3006/3004未启动、未更新。质量文档快核指出的预览状态与中间review进行中文字已收口；源代码未改。
+
+### C2c.2c 精细工单：手动重试重新授权与会话删除并发（2026-11-03）
+
+用户“继续”，基线b5ff77f/codex/wes-skills-c，继续已评审RP-050范围。实现两条相连保护：原任务failed后明确手动重试时保留原版本/输入/来源及重试血缘，重新核验当前权限并同事务保存新epoch；会话删除与生产提交/重试共用行锁，消除先查后删窗口。旧普通对话链路保留；业务Skill公开retry不提前开放，内部专用手动命令与通用HTTP路径隔离。无DB迁移、无新UI/业务启动入口、无真实LLM/业务工具调用，不启动或改3006/3004，不读/改/扫描config/system/model-verify-status.json及凭据。只写guarded workload_eval_test；本地保存、不合main/推送。
+
+语义裁决：重试是新Run（仅failed），原Run/manifest/CP/output原样保留；新Run固定原manifest而不是重解析latest，checkpoint/已确认布尔值不复制，conversationFact及消息身份重新mint。因为它是显式新启动，当前根enabled且非archived，原固定版本仍为已发布可引用版本；当前紧停一律拒绝。解除后可由新的明确手动命令捕获新epoch，但旧Run绑定永不重写。缺失/伪造旧绑定、原清单/指纹/owner/session不符、无效状态或当前用户/角色/工具权限不符均失败关闭；普通停用仍不影响已入队原Run，但新retry不得绕过停用。
+
+内部命令建议（名字可收敛，不接受客户端执行配置或grant）：
+```ts
+// Service-only; no public business retry HTTP channel is opened.
+retryInvocation(user: AuthUser, sourceRunId: string,
+  body: { submissionKey: string; reason: string }): Promise<AiRunsSubmitResult>;
+// key 1..160; trimmed reason 1..1000; unknown fields rejected.
+```
+真正的执行依据来自实际持久failed Run。服务先读取并验证原Run与旧epoch绑定结构，记录当前身份/根epoch基线，再在事务外解析当前工具Registry/策略和模型配置可用性（只预检，不请求LLM）；当前用户权限、原角色/白名单与原/现策略交集复用.2b规则，直接Workflow工具缺原V2角色证据仍拒绝，写外发/确认工具不因retry获得执行grant。来源至少重新验证会话归属及原来源ID可访问，输入/资料正文保持原快照，不更新为latest内容。原模型provider/model/scope/endpoint身份必须仍可用；预检不冒充供应商认证健康或真实执行证据。服务端可信测试端口可注入库存/模型准备，默认真实权限/DB路径必须可实测，HTTP不能传端口。
+
+在队列已有同事务回调内重新读取原failed Run、当前身份、当前根可用性/固定版本与epoch；与准备基线不符（含prepare期间stop+release或降权）整笔回滚。新Run/config/epoch/metadata（retryOf/actor/reason）及run_queued/user-message同事务落库，无数据库连接跨MCP/模型准备。重复submissionKey同一retry意图只返回原新Run，不追加消息/事件，不刷新旧epoch；换父Run/会话/原输入或reason等意图冲突拒绝，不能与原提交key或普通chat混淆。并发不同key同Session仍由既有活动唯一约束保证至多一个活动Run；原Run必须保持不变，未完成持久写幂等前仍不开放实际写/外发工具。
+
+公开门槛：现有POST /ai-runs/:id/retry对business_skills_v1必须返回409 BUSINESS_SKILLS_RETRY_CHANNEL_REQUIRED（或等价固定码），不能继续无脑复制executionConfig。普通chat retry维持既有API形状/新消息信封与血缘，同时必须在创建事务核验当前Session归属/存在，不能在删除后制造孤儿Run；错owner/不存在保持404。内部业务重试验收不等于公开业务入口已可用。
+
+删除保护：AiSessions PG repository在同一事务SELECT owner Session FOR UPDATE → SELECT真实active Run → DELETE；非owner/无Session先返回false，不泄漏Run存在性。active状态复用HARNESS_RUN_ACTIVE_STATUSES全部5项（queued/running/waiting/recovering/cancelling），不能硬写4项或锁Run后再锁Session形成反向依赖。存在active抛稳定store code，经usecase转原409 SESSION_HAS_ACTIVE_RUN。外部可选checker只可更早拒绝，false/未注入不能绕过仓储真实检查；无active仍保持boolean返回。所有生产会话提交/普通retry在createQueuedRun同tx回调内SELECT owner Session FOR SHARE；业务submit已有source.verify的SHARE，业务retry同样要有。低层队列可供既有内部/测试无绑定夹具使用，但已注册生产usecase不得遗漏真实Session事务回调，也不能接受客户端覆盖它。推荐在ai-sessions仓储提供窄的lockOwnedSessionForRun(tx,owner,id)内部出口、usecase默认调用；不引入可由请求传入的绕过选项。锁顺序和阻塞由真实PG latches+pg_stat_activity证明，不用sleep猜锁。
+
+责任文件：新增skills/skills.retry.ts及真实PG测试；必要小改execution-emergency.ts（严格failed专用读取/新epoch捕获，不能给普通admission放宽模式参数）、execution-authority.ts（提取/复用原/现交集校验）、skills.module.ts；harness-runtime.usecase.ts（关闭generic business retry、普通submit/retry事务Session校验）、必要repo输入type/错误allowlist或精确重放意图区分；ai-sessions PG repo/usecase/module及小型锁helper、API controller错误映射（若需要）；对应module/route/PG回归。父负责package、README/OpenAPI/对齐说明、计划与九页看板。实现方不改这些父文件，不stage/commit；新测试文件及时报父登记CI，不能用测试豁免。手写code/tests目标≤800，900预警，达到999前先报告拆分，不以净增隐藏移动。无关已有dirty保留。
+
+- [x] RED：普通business retry当前会复制旧绑定、失败任务跨紧停解除仍旧epoch；DELETE先查后删与同时入队的真实PG反例，日志保存实际错误/计数。
+- [x] GREEN：内部严格手动retry，当前权限/模型预检与原版本输入固定，新epoch同队列事务，旧Run/旧epoch/CP/确认记录不变；generic public business retry关闭，普通对话重试不回归。
+- [x] 重试同key幂等/冲突、不同key竞争、错owner/坏绑定/Session删除/模型工具失效/根停用/prepare中撤权或stop+release/事务故障回滚，确认新Run首消息与血缘，不运行LLM或真实业务工具。
+- [x] DELETE与submit、business submit、retry、等待回答/Worker恢复的确定性并发：入队先提交则DELETE409；删除先提交则入队404/安全拒绝；拒绝的请求零孤儿Run/消息/事件，跨owner404，所有5 active态保护，单连接不嵌套；false或缺checker不绕过。
+- [x] SPEC通过后fresh五轴质量安全复核，父独立专项/模块/Harness/存储/AI与双构建；保留通用集成缺模板与审计45基线，回填契约/九页看板，本地提交事实单独实取，不提前称生产宿主/公开业务/MVP已验收。
+
+方案自检：默认业务执行仍经.2b每次检查；手动retry仅新建并绑定当前权限，不扩大原工具范围/版本/输入，不复制旧确认或产物。删除是实际DB事务保护，外层checker不构成原子性证明。当前生产入口逐一登记Session SHARE检查，避免只补business路径而漏普通chat。
+
+
+**C2c.2c首RED：** 两项真实PG反例0/2：公开generic business retry仍复制旧授权；DELETE在business submit的Session SHARE锁后等待，但入队提交后仍删除Session。日志/tmp/wes-c2c2c-impl/red，父实读断言失败记录。新skills.retry.persistence.test.ts登记CI可达串行Harness，并新增test:execution-retry显式五文件回归，不以未引用测试充当验证。
+
+
+**C2c.2c开发验证：** 扩展真实PG首轮14/14、0skip（/tmp/wes-c2c2c-impl/green-more），包括已注册router真实JWT的business retry409与DELETE flag开/关映射、false checker不能绕过DB；内部retry当前权限与新epoch、旧Run不改及事务锁路径已具备。继续补same-key在普通disabled/archived后的合法重放、四入口DELETE双顺序真实锁等待与draft固定版本反例；该阶段不先宣布最终复核通过。
+
+
+**C2c.2c验证命令纠正：** 实现方曾主动中断一次未完成的默认modules运行，并临时尝试注入--test-concurrency=1。父明确拒绝以改并发配置替代在役CI命令；两次中断日志均保留，不计作通过。随后未修改命令的test:modules完成931/931、0skip（/tmp/wes-c2c2c-impl/modules-default）。PG串行约束指不同套件/执行者间互斥，并不改写modules内部既有并发配置。旧ai-runs路由首次38/39，唯一失败为随机未落库Session夹具被新事务校验正确拒绝，窄改为真实makeSession，不改生产门禁/原断言；中间API编译类型错误也保留，最终计数待冻结复验。
+
+
+**C2c.2c规格覆盖补齐：** 首次冻结10个代码/测试文件gross620，新增22项真实PG测试，原命令modules931、专项95、路由39及API构建通过；fresh规格独立专项95/95、0skip（/tmp/wes-c2c2c-spec）且静态未发现功能偏差。规格方指出第四项“等待回答/Worker恢复与删除”只有全部5态保护和旧等待恢复回归，尚无独立确定性竞态。父不以理论等价勾选，要求补真实WaitService.answer和fresh Worker重入与真实仓储DELETE的Session锁门闩测试，无生产代码或授权绕过。该项补测及最终规格结论仍待收口。
+
+
+**C2c.2c等待/恢复实并发补测：** 仅测试新增两项，冻结gross726。真实answer走原生tx.execute锁Run而非select.for；首版门闩匹配错误的挂起运行已停止并保留/wait-delete，属于夹具错误，不计业务RED。修正后通过PgDialect匹配真实Run FOR UPDATE已完成再暂停，独立SHARE探针和pg_blocking_pids证明确持锁；DELETE仍409且不反向等待Run。另一条真实DELETE持Session UPDATE时fresh Worker被实锁阻塞，DELETE409后Worker依原答案完成，答案事件仅一条、终态同答仍幂等。门闩进入有5秒界限，finally释放。24/24、0skip及API build通过（/tmp/wes-c2c2c-impl/wait-delete-corrected、build-api-wait-final.log），生产零新增改动；最终独立复验随后收口。
+
+
+**C2c.2c父首轮回归与诊断：** 原默认modules929/931，两项未改动旧夹具分别50ms CPU超时在case入列前耗尽、30ms取消用例先被总超时抢先；已核对相关测试和生产evaluation/execution文件相对基线无diff，不更改默认并发参数。随后重试96/97、逐次权限144/154、Harness409/415，真实测试库仅元数据查询定位到本次被中止wait-delete夹具43个Run及其事件，Worker误领遗留任务且恢复扫描多出2项，旧全局CHECK注入亦被遗留run_queued事件阻断。证据/tmp/wes-c2c2c-aborted-fixture-before.json；待当前runner正常完成其afterhooks后，只补执行该中止夹具原after清理（精确owner+随机username+43条数+workload_eval_test双护栏），不清无关数据/根/不可变审计，不改DDL使测试变绿。所有首轮日志保留/tmp/wes-c2c2c-parent-final，受影响套件另存parent-recheck复验。
+
+
+**C2c.2c残留核实与质量发现：** 父首轮正常运行至存储194/194、AI286/286通过，通用集成仍0/1模板缺口。后续套件正常结束后，精确中止夹具owner的Run/Session/user均实查0；原计划额外清理的43条数护栏发现已变化而整事务回滚，没有提交任何额外手工删除。证据/tmp/wes-c2c2c-aborted-fixture-precleanup.json及cleanup.json；不将根/审计残留和中止任务残留混为一谈。fresh质量静态发现有效大写UUID重复重试会在PG返回小写parent后误判意图冲突，且影响普通停用后的合法重放；质量REQUEST CHANGES。仅同批内部命令边界新增真实PG反例后统一UUID规范，规格/质量对该小修复复核，受影响四套件重新原命令运行，不以报告替代验证。
+
+
+**C2c.2c UUID修复复核：** 真实PG新反例25中24pass/1fail，失败为首次uppercase成功后同uppercase重放SUBMISSION_KEY_CONFLICT（/tmp/wes-c2c2c-impl/uuid-red）；仅校验通过后sourceRunId统一小写一行修复，GREEN25/25、0skip及API build通过（uuid-green、build-api-uuid-final.log）。规格独立25/25、0skip后PATCH APPROVE（/tmp/wes-c2c2c-spec-uuid），未扩大业务权限/输入范围。质量提出随机UUID字母夹具while的非阻断维护点，已改为总≤8次并明确assert，所有业务断言不变；最终gross747，父四套件和质量独立测试覆盖该最终夹具。父原默认modules已931/931、重试98/98、逐次权限154/154通过，完整Harness继续实取，首轮失败不覆盖。
+
+
+**C2c.2c最终回填：** 内部手动重试已保留原版本和输入并重新授权；会话删除与提交、重试及等待恢复的并发保护通过。公开业务重试、生产宿主和工作台仍待后续。父独立重试98、逐次权限154、紧停42、模块931、Harness416、存储194、AI286及双构建通过，均0skip。规格先审后fresh五轴质量安全APPROVE；新增等待回答/Worker并发证据单独复核，未以全5态理论等价替代。原RED0/2、路由38/39随机Session夹具失败、编译中间失败、门闩夹具挂起及中止日志均保留。父首modules929/931两旧计时用例失败，首重试96/97、逐次权限144/154及Harness409/415受挂起测试遗留任务干扰；后续正常套件结束后精确实查本次中止fixture为0，再以原命令复验，日志不覆盖。默认modules命令未改并发配置。通用集成0/1缺模板、audit45、测试根/审计残留与未更新预览如上，均不冒充已清零或业务验收。OpenAPI只更新原3路径/冲突码，不公开内部命令请求体。九页总看板同步，RP-050仍C实施中；sources无新文档资产、无需增计数。下一步完成持久工具确认、写入幂等与跨调用预算（C2c.3），再接统一视图、生产宿主、工作台及D验收。本地提交与看板目视证据在收尾后实取补记。
+
+
+**C2c.2c最终独立实取：** 父原命令复验931/98/154/416四套件全部exit0、0fail/0skip（/tmp/wes-c2c2c-parent-recheck），紧停42/存储194/AI286先前无关路径绿色结果保留；最终API/Web构建均exit0（/tmp/wes-c2c2c-build-{api,web}.log）。fresh质量独立PG25及权限/执行/评估/模型/Workflow纯测216均exit0、0skip后五轴安全APPROVE（/tmp/wes-c2c2c-quality-final-pg、-pure），UUID P2已关闭。通用集成实取templates_status_not_200，活动模板及分配均0；audit45既有风险保留。交付前再次lsof，3006/3004仍无LISTEN，本批未操作预览。九页看板与契约已收口，目视与实际提交信息随后登记。
+
+
+**C2c.2c看板与文档快核：** 九页同步后board build及21页一致性校验0错0警，浏览器展开完整台账实读RP-050仍C实施中、下一步持久确认/幂等/预算；截图/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c2c-2026-11-03-board-requirements.png。原窄列/P2换行及大空列保持，未改共享CSS。fresh文档快核指出event原parent-final指针不应配最终绿色计数，已改为首轮真实失败与无关绿色计数；最终四项绿色另指parent-recheck，避免把失败目录当通过证据。OpenAPI三条现有路径无私有retry请求体。
+
+
+**C2c.2c收尾检查：** fresh文档快核修正证据目录后DOC APPROVE；两份OpenAPI与event解析通过，三条既有受保护路径及9页映射一致，无内部retry请求体外露。自建3008服务和临时看板页已关闭，用户3006页未操作。暂存仅本批16个文件（最终代码/测试gross747，总变更约930行），原模型状态文件未读取或暂存；实际本地提交号在提交后单独实取回填主看板，不伪造自引用。
