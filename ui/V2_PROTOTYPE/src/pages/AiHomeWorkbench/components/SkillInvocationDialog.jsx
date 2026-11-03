@@ -192,7 +192,7 @@ export default function SkillInvocationDialog({ open, onClose, onStarted, ensure
     }
   }
   return (
-    <Dialog open={open} title="启动 Skill / 工作流" onClose={requestClose} dismissDisabled={busy} wide>
+    <Dialog open={open} title="选择业务任务" onClose={requestClose} dismissDisabled={busy} wide>
       <form noValidate onSubmit={submit} className="grid min-w-0 gap-4" aria-busy={busy || loading}>
         <BusinessRecommendationPanel key={`${revision}:${scope.capture().target}`} scope={scope}
           disabled={busy || loading} onSelect={selectRecommendation} onDirty={() => setDirty(true)} />

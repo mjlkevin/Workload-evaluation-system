@@ -82,7 +82,7 @@ export default function BusinessExecutionMessage({ entry, run, busy = false, err
     return <BusinessValue value={entry.content} />
   }
   return (
-    <article id={businessEntryDomId(entry)} aria-label={entry.kind === 'coverage' ? '部分执行记录不可用' : entry.title}
+    <article tabIndex={-1} id={businessEntryDomId(entry)} aria-label={entry.kind === 'coverage' ? '部分执行记录不可用' : entry.title}
       className={`grid min-w-0 gap-2 text-ink ${user ? 'ml-auto max-w-full rounded-lg bg-brand-soft p-3 sm:max-w-4/5' : entry.kind === 'stage' ? 'border-l-2 border-line pl-3' : 'rounded-md border border-line bg-surface p-4'}`}>
       <header className="flex flex-wrap items-center gap-2">
         <h3 className="m-0 text-sm font-semibold">{entry.kind === 'coverage' ? '部分执行记录不可用' : entry.title}</h3>

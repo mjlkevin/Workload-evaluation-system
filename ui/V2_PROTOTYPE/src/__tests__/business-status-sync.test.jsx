@@ -14,18 +14,20 @@ vi.mock('../pages/AiHomeWorkbench/hooks/useWorkbenchState.js', () => ({ default:
 vi.mock('../pages/AiHomeWorkbench/hooks/useChatMessages.js', () => ({ default: () => ({ messages: [], bindHarness() {} }) }))
 vi.mock('../pages/AiHomeWorkbench/hooks/useHarnessRun.js', () => ({ default: () => ({}) }))
 vi.mock('../components/AiWorkbench/SessionRail.jsx', () => ({ default: () => null }))
-vi.mock('../pages/AiHomeWorkbench/components/ChatArea/index.jsx', () => ({ default: () => null }))
 vi.mock('../pages/AiHomeWorkbench/components/ChatArea/WorkflowTemplates.jsx', () => ({ default: () => null }))
 vi.mock('../pages/AiHomeWorkbench/components/WorkspacePanel/index.jsx', () => ({ default: ({ children }) => children }))
 vi.mock('../pages/AiHomeWorkbench/components/SkillInvocationDialog.jsx', () => ({ default: ({ open, onStarted }) => open && <button onClick={onStarted}>模拟服务端启动成功</button> }))
-vi.mock('../pages/AiHomeWorkbench/components/BusinessExecutionPanel.jsx', () => ({ default: ({ runs, onRefresh, onInput, onDecision, onRetry, onStop }) => <>
+vi.mock('../pages/AiHomeWorkbench/components/ChatArea/index.jsx', () => ({ default: ({ business, onChooseBusinessTask }) => {
+  const { runs, refresh: onRefresh, submitInput: onInput, decide: onDecision, retry: onRetry, stop: onStop } = business
+  return <>
+  <button onClick={onChooseBusinessTask}>选择业务任务</button>
   <output data-testid="business-status">{runs.map(run => run.status).join(',')}</output>
   <button onClick={onRefresh}>刷新业务状态</button>
   <button onClick={() => onInput('business-1', {}, {})}>业务输入</button>
   <button onClick={() => onDecision('business-1', {}, 'confirm')}>业务确认</button>
   <button onClick={() => onRetry('business-1', {})}>业务重试</button>
   <button onClick={() => onStop('business-1')}>业务停止</button>
-</> }))
+</> } }))
 
 const activeRun = { runId: 'business-1', sessionId: 'session-a', title: '业务流程', status: 'queued' }
 let subscriptions
@@ -35,7 +37,7 @@ beforeEach(() => {
   sessionRuntimeStore.resetAllSessionViews()
   subscriptions = new Map()
   runsApi.listActiveRuns.mockResolvedValue({ enabled: true, failed: false, runs: [activeRun] })
-  runsApi.getRunSnapshot.mockResolvedValue({ run: activeRun, businessExecution: { kind: 'workflow' } })
+  runsApi.getRunSnapshot.mockResolvedValue({ run: activeRun, businessExecution: { kind: 'workflow', target: { name: '业务流程' } } })
   runsApi.subscribeRunEvents.mockImplementation((id, callbacks) => {
     subscriptions.set(id, callbacks)
     return { abort: vi.fn() }
@@ -116,7 +118,7 @@ describe('业务执行与统一视图计数对账', () => {
     refreshUnifiedView = vi.fn()
     workbench = { activeSession: { sessionId: 'session-a' }, sessions: [], preset: { workflows: [] }, workspacePanelCollapsed: false }
     businessApi.listBusinessRuns.mockImplementation(async id => serverRuns.filter(run => run.sessionId === id))
-    runsApi.getRunSnapshot.mockImplementation(async id => ({ run: serverRuns.find(run => run.runId === id), businessExecution: { kind: 'workflow' } }))
+    runsApi.getRunSnapshot.mockImplementation(async id => ({ run: serverRuns.find(run => run.runId === id), businessExecution: { kind: 'workflow', target: { name: '业务流程' } } }))
     useWorkbenchState.mockImplementation(() => {
       const [unifiedView, setView] = useState({ runs: [] })
       refreshUnifiedView.mockImplementation(async () => { setView({ runs: [...serverRuns] }); return { runs: [...serverRuns] } })
@@ -124,13 +126,16 @@ describe('业务执行与统一视图计数对账', () => {
     })
   })
   it('启动成功立即刷新统一视图，即使业务面板列表暂未出现新任务', async () => {
+    workbench.workspacePanelCollapsed = true
+    workbench.toggleWorkspacePanel = vi.fn()
     render(<AiHomeWorkbench />)
     serverRuns = [activeRun]
     businessApi.listBusinessRuns.mockResolvedValue([])
-    fireEvent.click(screen.getByRole('button', { name: '启动 Skill / 工作流' }))
+    fireEvent.click(screen.getByRole('button', { name: '选择业务任务' }))
     fireEvent.click(screen.getByRole('button', { name: '模拟服务端启动成功' }))
     expect(await screen.findByText('后台任务 进行中 1 · 已完成 0')).toBeInTheDocument()
     expect(refreshUnifiedView).toHaveBeenCalled()
+    expect(workbench.toggleWorkspacePanel).not.toHaveBeenCalled()
   })
   it.each(['业务输入', '业务确认', '业务重试', '业务停止'])('%s后的服务端状态更新顶部计数，重复刷新不再请求统一视图', async name => {
     serverRuns = [{ ...activeRun, status: 'waiting' }]

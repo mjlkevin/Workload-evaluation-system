@@ -7,7 +7,8 @@ import useChatMessages from './hooks/useChatMessages.js'
 import useHarnessRun from './hooks/useHarnessRun.js'
 import useBusinessExecution from './hooks/useBusinessExecution.js'
 import SkillInvocationDialog from './components/SkillInvocationDialog.jsx'
-import BusinessExecutionPanel from './components/BusinessExecutionPanel.jsx'
+import BusinessExecutionSummary from './components/BusinessExecutionSummary.jsx'
+import { buildBusinessConversationEntries, groupBusinessConversationEntries } from './utils/businessMessageTimeline.js'
 import useWorkbenchState from './hooks/useWorkbenchState.js'
 import ChatArea from './components/ChatArea/index.jsx'
 import BackgroundRunsPanel from './components/ChatArea/BackgroundRunsPanel.jsx'
@@ -32,6 +33,12 @@ export default function AiHomeWorkbench({ currentUser }) {
   // cancel 唯一入口仅由用户显式点击停止并经二次确认后触发。
   const backgroundRuns = useBackgroundRuns()
   const business = useBusinessExecution(workbench.activeSession?.sessionId)
+  const conversation = useMemo(() => groupBusinessConversationEntries(buildBusinessConversationEntries(
+    chat.messages, business.runs, { sessionId: workbench.activeSession?.sessionId || '' },
+  )), [chat.messages, business.runs, workbench.activeSession?.sessionId])
+  const hasBusinessExecution = business.runs.length > 0 || !!workbench.unifiedView?.runs?.some(
+    run => run.sessionId === workbench.activeSession?.sessionId && run.hasBusinessExecution,
+  )
   const [invocationOpen, setInvocationOpen] = useState(false)
   const ensureBusinessSession = async (name) => workbench.activeSession || workbench.createSession({ title: name, workflowKey: 'free_chat', status: 'temporary_chat' })
   const sessionRuns = useMemo(() => {
@@ -164,7 +171,6 @@ export default function AiHomeWorkbench({ currentUser }) {
     <div className={`ai-home-workbench${workbench.workspacePanelCollapsed ? ' ai-home-workbench--inspector-collapsed' : ''}`} data-testid="ai-home-workbench" style={{ display: 'grid', gap: 16, height: '100%', minHeight: 0, overflow: 'hidden', padding: '12px 16px' }}>
       <h1 className="sr-only">AI 工作台</h1>
       <aside className="ai-home-rail" style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
-        <button type="button" className="btn btn-pri shrink-0" onClick={() => setInvocationOpen(true)}>启动 Skill / 工作流</button>
         <BackgroundRunsPanel runs={backgroundRuns.runs} runCounts={runCounts} onStopRun={requestStopRun} />
         <SessionRail
           sessions={workbench.sessions}
@@ -183,7 +189,7 @@ export default function AiHomeWorkbench({ currentUser }) {
         />
       </aside>
 
-      <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={{ ...chat, sendMessage: sendMessageWithRunsNotify }} harness={harness} />
+      <ChatArea preset={workbench.preset} workbench={{ ...workbench, backgroundRuns }} chat={{ ...chat, sendMessage: sendMessageWithRunsNotify }} harness={harness} conversation={conversation} business={business} onChooseBusinessTask={() => setInvocationOpen(true)} />
 
       <WorkspacePanel
         collapsed={workbench.workspacePanelCollapsed}
@@ -194,12 +200,9 @@ export default function AiHomeWorkbench({ currentUser }) {
         confirmingActionId={harness.confirmingActionId}
         messageCount={chat.messages.length}
         outputState={workbench.outputState}
+        hasBusinessExecution={hasBusinessExecution}
       >
-        <BusinessExecutionPanel
-          runs={business.runs} loading={business.loading} error={business.error} busy={business.busy}
-          onRefresh={business.refresh} onInput={business.submitInput} onDecision={business.decide}
-          onRetry={business.retry} onStop={business.stop}
-        />
+        {hasBusinessExecution && <BusinessExecutionSummary entries={conversation} runs={business.runs} />}
       </WorkspacePanel>
       <SkillInvocationDialog
         open={invocationOpen}
@@ -210,7 +213,6 @@ export default function AiHomeWorkbench({ currentUser }) {
           business.refresh()
           workbench.refreshUnifiedView?.()
           backgroundRuns.notifyRunsChanged?.()
-          if (workbench.workspacePanelCollapsed) workbench.toggleWorkspacePanel()
         }}
       />
 

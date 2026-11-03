@@ -83,7 +83,7 @@ function projectGroup(root, attempts) {
     }
     if (stamp(entry.occurredAt) !== undefined) fields.occurredAt = entry.occurredAt
     if (entry.kind === 'tool_result' || entry.kind === 'result') fields.detail = true
-    records.push(make(entry.id, fields))
+    records.push(make(entry.id, { ...fields, sourceId: entry.sourceId ?? entry.id }))
   }
   attachPending(records, current, make)
   if (owns(execution.results, 'output')) records.push(make('$output', {
@@ -129,12 +129,15 @@ function mergeCausalEntries(attempts) {
     let previous
     for (const entry of timeline.entries) {
       if (!entry || typeof entry.id !== 'string' || !kinds.has(entry.kind)) continue
-      if (!facts.has(entry.id)) { edges.set(entry.id, new Set()); incoming.set(entry.id, 0) }
-      facts.set(entry.id, entry)
-      if (previous && previous !== entry.id && !edges.get(previous).has(entry.id)) {
-        edges.get(previous).add(entry.id); incoming.set(entry.id, incoming.get(entry.id) + 1)
+      // A retry can fail the same logical command again; preserve each actual attempt.
+      const id = entry.kind === 'failure' && typeof entry.runId === 'string' && entry.runId
+        ? `failure-attempt:${JSON.stringify([entry.id, entry.runId])}` : entry.id
+      if (!facts.has(id)) { edges.set(id, new Set()); incoming.set(id, 0) }
+      facts.set(id, id === entry.id ? entry : { ...entry, id, sourceId: entry.id })
+      if (previous && previous !== id && !edges.get(previous).has(id)) {
+        edges.get(previous).add(id); incoming.set(id, incoming.get(id) + 1)
       }
-      previous = entry.id
+      previous = id
     }
   }
   const result = [], remaining = new Set(facts.keys())

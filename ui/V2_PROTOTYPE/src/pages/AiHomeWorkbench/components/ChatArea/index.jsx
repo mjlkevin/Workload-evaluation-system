@@ -31,7 +31,7 @@ async function fetchDraftMemoryCount() {
  * 中间对话区：头部徽标栏 + 消息列表 + 输入区。
  * workbench/chat/harness 为页面级 hook 返回值，本页私有组件直接消费。
  */
-export default function ChatArea({ preset, workbench, chat, harness }) {
+export default function ChatArea({ preset, workbench, chat, harness, conversation, business, onChooseBusinessTask }) {
   // MS2-PATCH：run 终态（sending true→false）后若存在 draft 记忆，出提示条
   const [draftMemoryCount, setDraftMemoryCount] = useState(0)
   const sending = chat.sending
@@ -89,7 +89,10 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
       </div>
 
       <MessageList
-        messages={chat.messages}
+        messages={conversation ?? chat.messages}
+        sessionId={workbench.activeSession?.sessionId}
+        business={business}
+        sending={chat.sending}
         paneRef={chat.messagePaneRef}
         activeWorkflow={workbench.activeWorkflow}
         centerTitle={workbench.centerTitle}
@@ -136,6 +139,7 @@ export default function ChatArea({ preset, workbench, chat, harness }) {
       />
 
       <Composer
+        onChooseBusinessTask={onChooseBusinessTask}
         composer={workbench.composer}
         setComposer={workbench.setComposer}
         sending={chat.sending}

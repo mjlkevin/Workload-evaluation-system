@@ -1,6 +1,6 @@
 import AttachmentCard from './AttachmentCard.jsx'
 
-export default function Composer({ composer, setComposer, sending, selectedFile, placeholder, fileInputRef, onChooseFile, onAttachFile, onRemoveFile, onSend, onStop, activeRun }) {
+export default function Composer({ composer, setComposer, sending, selectedFile, placeholder, fileInputRef, onChooseFile, onAttachFile, onRemoveFile, onSend, onStop, activeRun, onChooseBusinessTask }) {
   function handleComposerKeyDown(event) {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent?.isComposing) return
     event.preventDefault()
@@ -28,6 +28,7 @@ export default function Composer({ composer, setComposer, sending, selectedFile,
             </button>
           </div>
         )}
+        {onChooseBusinessTask && <button type="button" className="btn btn-out mb-2 text-sm" onClick={onChooseBusinessTask}>选择业务任务</button>}
         <div className="ai-composer__row">
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.pdf,.docx,.txt" style={{ display: 'none' }} onChange={(event) => onAttachFile(event.target.files?.[0] || null)} />
           <button className="ai-composer__attach" type="button" onClick={onChooseFile} aria-label={selectedFile ? '替换附件' : '附加文件'} title={selectedFile ? '替换附件' : '附加文件'}>

@@ -14,6 +14,7 @@ export default function WorkspacePanel({
   messageCount,
   outputState,
   children,
+  hasBusinessExecution = false,
 }) {
   return (
     <aside className={`ai-home-inspector${collapsed ? ' ai-home-inspector--collapsed' : ''}`} role="complementary" aria-label="AI 工作区" aria-expanded={!collapsed}>
@@ -31,6 +32,7 @@ export default function WorkspacePanel({
       </div>
       <div className={`ai-home-inspector__content${collapsed ? ' ai-home-inspector__content--hidden' : ''}`}>
         {children}
+        {!hasBusinessExecution && <>
         <StatusPanel session={session} sending={sending} onConfirmAction={onConfirmAction} confirmingActionId={confirmingActionId} />
         <ResultCard title={messageCount ? outputState.activeTitle : outputState.title}>
           {messageCount ? outputState.activeDesc : outputState.empty}
@@ -38,6 +40,7 @@ export default function WorkspacePanel({
             {outputState.outputs.map((item) => <span key={item} className="tag wes-output-tag">{item}</span>)}
           </div>
         </ResultCard>
+        </>}
       </div>
     </aside>
   )

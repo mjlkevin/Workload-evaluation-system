@@ -78,6 +78,17 @@ describe('business conversation projection', () => {
     expect(result.some(item => item.sourceId === 'decision-2')).toBe(true)
     expect(result.filter(item => item.sourceId === 's')).toHaveLength(2)
   })
+  it('retains repeated failures from distinct physical attempts without duplicating the inherited successful prefix', () => {
+    const prefix = [event('stage:prefix:0', 'stage', { stageId: 'stage:prefix:0' })]
+    const failure = event('failure:write:0', 'failure', { stageId: 'stage:write:0', status: 'failed', content: { code: 'WRITE_FAILED' } })
+    const parent = run([...prefix, failure], { status: 'failed' })
+    const child = run([...prefix, { ...failure, runId: 'r2' }], { runId: 'r2', status: 'failed', createdAt: time(5) })
+    const entries = business(build([], [child, parent]))
+    expect(entries.filter(entry => entry.kind === 'failure').map(entry => entry.runId)).toEqual(['r1', 'r2'])
+    expect(entries.filter(entry => entry.kind === 'stage')).toHaveLength(1)
+    expect(new Set(entries.map(entry => entry.id)).size).toBe(entries.length)
+    expect(entries.filter(entry => entry.kind === 'failure').every(entry => entry.stageId === 'stage:write:0')).toBe(true)
+  })
   it('retains real failed legacy parent receipts when the retry has a successful timeline', () => {
     const parent = run([], { status: 'failed', execution: { timeline: undefined, results: { steps: [
       { stepId: 'prefix', status: 'succeeded', output: '旧成功前缀' }, { stepId: 's', status: 'failed', code: 'TOOL_DENIED' },

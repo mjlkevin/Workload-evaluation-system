@@ -87,7 +87,7 @@ describe('业务执行启动', () => {
   it('Escape保护已输入表单并允许继续编辑，键盘焦点留在共享Dialog内', async () => {
     const { onClose } = openDialog()
     await chooseAndFill()
-    const dialog = screen.getByRole('dialog', { name: '启动 Skill / 工作流' })
+    const dialog = screen.getByRole('dialog', { name: '选择业务任务' })
     fireEvent.keyDown(dialog, { key: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByText('有未提交的输入，确定放弃吗？')).toBeInTheDocument()
