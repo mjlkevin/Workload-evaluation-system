@@ -974,3 +974,5 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **C3工作台界面分单收口：** 同一工作台显式选择发布目标、按Schema填写并启动，支持等待回答、原决定恢复、失败重试、停止及结果回读；普通聊天不作授权。UI①645gross、②644gross分别SPEC/fresh质量APPROVE，focused43/43。local-ref、const/无type枚举与跨会话/ABA迟到结果问题均保留真实RED并修正；原37项未删。仅使用现有Dialog和tokens/Tailwind，无新栈或依赖。全量Web、构建及1440/760真实界面验收仍待整体收口，不用RTL模拟代替业务模型执行。
 
 **真实资产与会话原文底座独立收口：** 执行清单冻结服务器读取的模板、规则、完整摘要与本人实际会话正文，入队事务复验，原input保持；空资产省略兼容旧指纹。SPEC发现权限入口漏资产指纹P1后，以实际admission、Worker/预算和失败重试三项RED修成统一helper。最终新17、相关纯3、旧PG60均0skip，512gross分别SPEC/fresh五轴安全APPROVE。全局模板/规则夹具还原摘要一致，owned数据清理0。当前旧文件summary明确不能作为新调用原文，真实上传另单元；无客户端快照/模型自批或模板seed造绿。P1期间API并行静态RED的编译错误保留，后续API类型验证已0，不混算实测业务验收。
+
+**C3公开服务分单收口：** 授权目录/安全投影a、HTTP命令b、可信检查点重试c、统一工作台只读叠加d分别小于1000gross，并分别通过SPEC与fresh五轴质量。业务basis误删、操作决定后恢复围栏、失败回执原样复制导致永久失败，以及Workflow新答的系统角色竞态均保留真实RED并关闭。初次修复11项、关联58项全通过；最后公开身份门闩RED2后37/37、0skip与tsc0。坏/孤CP拒绝，成功前缀和逻辑根保留，rejected/repeat_limit不能重置；统一视图不写pendingActions。OpenAPI业务请求与旧通道互斥分支经unique YAML及AJV11项正反例通过。取消终态修复另待复核、全套及浏览器继续，不宣称MVP已验收。

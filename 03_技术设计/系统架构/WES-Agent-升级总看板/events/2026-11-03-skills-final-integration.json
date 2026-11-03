@@ -88,6 +88,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-mvp-assets/p1-red.log; /tmp/wes-finish-mvp-assets/p1-green.log",
       "summary": "真实资产/会话底座512gross，SPEC及fresh质量APPROVE；新17、相关纯3、旧PG60通过。遗漏资产指纹P1经真实admission/Worker/预算/retry三RED修复；file原文另单元补齐。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-workbench-api/spec-green; /tmp/wes-finish-workbench-api/spec-regression; /tmp/wes-finish-workbench-api/role-fence-green",
+      "summary": "C3 a/b/c/d分别SPEC和fresh质量通过；11+58关联及最终身份37全0skip。权限命令/可信retry及安全投影已接；OpenAPI11正反例已核，取消与全套门禁继续。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"
