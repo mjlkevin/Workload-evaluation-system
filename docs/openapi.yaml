@@ -2735,6 +2735,58 @@ paths:
               schema:
                 $ref: "#/components/schemas/AiRunsConflictResponse"
 
+  /api/v1/ai-executions/catalog:
+    get:
+      tags: [AIRuns]
+      summary: 当前用户可执行的 Skill 和工作流目录
+      description: >
+        JWT 与当前数据库身份校验后，仅返回可调用的启用发布版本。
+        data.items 包含 kind、id、versionId、name、description、inputSchema；不返回指令、模型凭据或授权证明。
+        目录用于显式选择和推荐；提交时仍重新检查定义、权限和依赖。
+      operationId: listBusinessExecutionCatalog
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: data.items 为授权目录
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "503":
+          description: 后台任务关闭或目录暂不可用
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/ai-executions/runs:
+    get:
+      tags: [AIRuns]
+      summary: 指定本人会话的最近业务执行任务
+      description: 返回最多20条业务Run元数据，包含已结束任务；不存在和非本人会话均返回404。
+      operationId: listBusinessExecutionRuns
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 160
+      responses:
+        "200":
+          description: data.items 为业务任务摘要，不含执行清单或检查点正文
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericOkResponse"
+        "404":
+          description: 会话不存在或非owner
+        "503":
+          description: 后台任务关闭或查询暂不可用
+
   /api/v1/ai-sessions/{sessionId}/runs:
     post:
       tags: [AIRuns]
@@ -2745,6 +2797,8 @@ paths:
         （不泄露存在性）；该 session 已存在活跃工作台 Run 时返回
         409 SESSION_HAS_ACTIVE_RUN。入队事务重新锁定并检查当前 Session
         归属和可用性；并发删除已提交时返回 404，Run、事件和消息均不落库。
+        提供 execution 时走业务调用：严格校验发布目标、原输入Schema与本人来源材料，
+        同事务冻结版本、依赖及授权；不接收客户端执行清单、游标、模型凭据或批准标志。
       operationId: submitAiRun
       security:
         - bearerAuth: []
@@ -2759,7 +2813,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AiRunSubmitRequest"
+              oneOf:
+                - allOf:
+                    - $ref: "#/components/schemas/AiRunSubmitRequest"
+                    - not:
+                        required: [execution]
+                - $ref: "#/components/schemas/BusinessInvocationSubmitRequest"
       responses:
         "202":
           description: 任务已进入后台执行
@@ -2828,6 +2887,9 @@ paths:
       description: >
         非 owner 与不存在同为 404，不泄露资源存在性。business_skills_v1 业务运行快照
         省略 run.executionConfig 及 checkpoint.state、checkpoint.aiMilestone，避免返回私有执行清单与进度正文。
+        业务快照另有 businessExecution：发布目标/步骤元数据、原输入、步骤结果、实际写入回执、
+        累计预算和当前 pendingInput 或 pendingOperation。表单及确认仅接受该投影的actionId与摘要，
+        不以浏览器缓存或普通聊天文字授权。
       operationId: getAiRunSnapshot
       security:
         - bearerAuth: []
@@ -3038,8 +3100,9 @@ paths:
         为什么不能改用「发一条新聊天消息」：会话存在活跃 Run 时提交新消息会被
         harness_runs_active_workbench_session_unique 挡成 409
         SESSION_HAS_ACTIVE_RUN，而 waiting 属活跃态。
-        business_skills_v1 业务流程不接受本通道，返回 409 BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED；
-        业务等待专用恢复服务本批仅内部调用，尚未开放 HTTP 入口。
+        business_skills_v1 使用独立严格请求 BusinessExecutionInputAnswer；kind固定userInput，
+        actionId、stepId、contentHash及冻结回答Schema均由服务器检查。
+        首答在持久写入事务内复核当前身份与紧停epoch；已记录的完全相同回答保持幂等。
       operationId: submitAiRunInputs
       security:
         - bearerAuth: []
@@ -3054,12 +3117,16 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                input:
-                  type: object
-                  additionalProperties: true
-              required: [input]
+              oneOf:
+                - type: object
+                  not:
+                    required: [kind]
+                  properties:
+                    input:
+                      type: object
+                      additionalProperties: true
+                  required: [input]
+                - $ref: "#/components/schemas/BusinessExecutionInputAnswer"
       responses:
         "202":
           description: 补充信息已受理，Run 恢复排队
@@ -3100,8 +3167,9 @@ paths:
         首次确认返回 202 并 append run_action_confirmed 事件 + waiting→queued；
         重复确认同一 actionId 返回 200 且不重复写事件；非 waiting 返回
         409 RUN_NOT_WAITING。
-        business_skills_v1 业务流程不接受本通道，返回 409 BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED；
-        业务等待专用恢复服务本批仅内部调用，尚未开放 HTTP 入口。
+        business_skills_v1 的流程确认提交 stepId/contentHash，实际业务操作确认提交 confirmationHash。
+        参数只来自已保存的服务器操作；当前身份、原权限与紧停epoch在决定和恢复排队事务内复核。
+        相同决定可恢复已记录但未排队的任务；相反决定冲突，不能通过聊天文字批准。
       operationId: confirmAiRunAction
       security:
         - bearerAuth: []
@@ -3116,6 +3184,14 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/BusinessWorkflowDecision"
+                - $ref: "#/components/schemas/BusinessOperationDecision"
       responses:
         "200":
           description: 幂等重放（此前已确认过该 actionId）
@@ -3167,8 +3243,7 @@ paths:
         重复拒绝同一 actionId 返回 200 且不重复写事件；非 waiting 返回 409 RUN_NOT_WAITING。
         请求体不接收工具参数：被拒调用的参数唯一来源是 tool.call.started 事件（约束②）。
         同意侧不新增端点也不新增事件类型，继续复用 …/confirm 与 run_action_confirmed。
-        business_skills_v1 业务流程不接受本通道，返回 409 BUSINESS_SKILLS_WAIT_CHANNEL_REQUIRED；
-        业务等待专用恢复服务本批仅内部调用，尚未开放 HTTP 入口。
+        business_skills_v1 使用与confirm相同的摘要请求体，决定固定为reject；不得替换已记录的approve。
       operationId: rejectAiRunAction
       security:
         - bearerAuth: []
@@ -3183,6 +3258,14 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/BusinessWorkflowDecision"
+                - $ref: "#/components/schemas/BusinessOperationDecision"
       responses:
         "200":
           description: 幂等重放（此前已拒绝过该 actionId）
@@ -3230,8 +3313,10 @@ paths:
         原 Run 行保持不可变；非 failed 返回 409 RUN_NOT_FAILED，无法定位
         原 session 返回 409 RUN_NOT_RETRYABLE；原 session 当前不存在、已归档或
         非 owner 返回 404，入队事务重新检查 Session，防止并发删除后生成孤儿任务。
-        business_skills_v1 业务任务一律返回 409 BUSINESS_SKILLS_RETRY_CHANNEL_REQUIRED，
-        须通过内部手动命令重新授权；本端点未开放业务 Skill 的公开重试能力。
+        business_skills_v1 要求 BusinessExecutionRetryRequest，按当前身份/策略和epoch重新授权，
+        原子继承可信检查点、原发布清单和逻辑根，累计预算不重置；保留成功步骤及业务写入回执。
+        execution_failed或invalid_output的末尾失败节点可显式重试；rejected与repeat_limit不可用重试改写，
+        返回409 INVOCATION_RETRY_NOT_ALLOWED。损坏或孤儿检查点返回409，不能提交客户端恢复状态。
       operationId: retryAiRun
       security:
         - bearerAuth: []
@@ -3241,6 +3326,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessExecutionRetryRequest"
       responses:
         "202":
           description: 重试 Run 已创建
@@ -3255,7 +3346,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: 非 failed、不可重试或业务任务需专用通道（code=RUN_NOT_FAILED/RUN_NOT_RETRYABLE/BUSINESS_SKILLS_RETRY_CHANNEL_REQUIRED）
+          description: 非failed、不可重试、检查点损坏或当前授权已失效
           content:
             application/json:
               schema:
@@ -10448,6 +10539,134 @@ components:
       required: [code, message, details, requestId]
 
     # AI Runs（RP-047 Batch C） ----------------------------------
+    BusinessExecutionRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, input]
+      properties:
+        kind:
+          type: string
+          enum: [skill, workflow]
+        skillId:
+          type: string
+        workflowId:
+          type: string
+        input:
+          description: 必须符合选中发布版本的原输入Schema
+        sources:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [kind, id]
+            properties:
+              kind:
+                type: string
+                enum: [file, conversation]
+              id:
+                type: string
+                minLength: 1
+                maxLength: 160
+              location:
+                type: string
+                minLength: 1
+                maxLength: 1000
+        assets:
+          type: array
+          maxItems: 10
+          description: 仅服务器解析实际目录并冻结模板和规则；空列表按省略处理
+          items:
+            type: object
+            additionalProperties: false
+            required: [kind, templateId]
+            properties:
+              kind:
+                type: string
+                enum: [assessment-catalog]
+              templateId:
+                type: string
+                minLength: 1
+                maxLength: 160
+                pattern: '^[A-Za-z0-9_-]+$'
+      oneOf:
+        - required: [skillId]
+          properties:
+            kind:
+              enum: [skill]
+          not:
+            required: [workflowId]
+        - required: [workflowId]
+          properties:
+            kind:
+              enum: [workflow]
+          not:
+            required: [skillId]
+
+    BusinessInvocationSubmitRequest:
+      type: object
+      additionalProperties: false
+      required: [submissionKey, content, execution]
+      properties:
+        submissionKey:
+          type: string
+          minLength: 1
+          maxLength: 160
+        content:
+          type: string
+          minLength: 1
+        execution:
+          $ref: "#/components/schemas/BusinessExecutionRequest"
+
+    BusinessExecutionInputAnswer:
+      type: object
+      additionalProperties: false
+      required: [actionId, kind, stepId, contentHash, input]
+      properties:
+        actionId:
+          type: string
+        kind:
+          type: string
+          enum: [userInput]
+        stepId:
+          type: string
+        contentHash:
+          type: string
+        input:
+          description: 按pendingInput.outputSchema校验的回答
+
+    BusinessWorkflowDecision:
+      type: object
+      additionalProperties: false
+      required: [stepId, contentHash]
+      properties:
+        stepId:
+          type: string
+        contentHash:
+          type: string
+
+    BusinessOperationDecision:
+      type: object
+      additionalProperties: false
+      required: [confirmationHash]
+      properties:
+        confirmationHash:
+          type: string
+
+    BusinessExecutionRetryRequest:
+      type: object
+      additionalProperties: false
+      required: [submissionKey, reason]
+      properties:
+        submissionKey:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+
     AiRunSubmitRequest:
       type: object
       properties:

@@ -3,6 +3,7 @@
 // ============================================================
 
 import { Router } from "express";
+import { createAiExecutionsRouter } from "./ai-executions.routes";
 import { createSkillsRouter } from "./skills.routes";
 import { createWorkflowsRouter } from "./workflows.routes";
 
@@ -72,6 +73,7 @@ router.use("/estimates", estimatesRoutes);
 router.use("/ai", aiRoutes);
 router.use("/ai-sessions", aiSessionsRoutes);
 router.use("/ai-runs", aiRunsRoutes);
+router.use("/ai-executions", createAiExecutionsRouter({ enabled: durableRunsEnabled }));
 router.use("/project-evaluations", projectEvaluationsRoutes);
 router.use("/sessions", sessionsRoutes);
 router.use("/exports", exportsRoutes);

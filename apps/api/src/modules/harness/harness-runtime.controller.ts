@@ -9,6 +9,11 @@
 // 客户端断线只释放连接，禁止触发 cancel/aborted。
 
 import { Request, Response, RequestHandler } from "express";
+import { sanitizeBusinessRunSnapshot } from "../skills/skills.workbench-view";
+import { HarnessRuntimeError } from "./harness-runtime.repository";
+import { BUSINESS_SKILLS_WORKFLOW_ID } from "./business-skills.identity";
+import type { BusinessSkillsWorkbenchService } from "../skills/skills.workbench-actions";
+import { SkillError } from "../skills/skills.types";
 import { randomUUID } from "node:crypto";
 
 import { requireCapability } from "../../rbac/middleware";
@@ -29,6 +34,14 @@ import {
 // ============================================================
 
 function writeAiRunsError(res: Response, err: unknown): void {
+  if (err instanceof HarnessRuntimeError && err.code.startsWith('BUSINESS_SKILLS_')) {
+    res.status(409).json({ code: err.code, message: '任务状态或确认内容已变化，请刷新后重试', details: [], requestId: randomUUID() });
+    return;
+  }
+  if (err instanceof SkillError) {
+    res.status(err.status).json({ code: err.code, message: err.message, details: [], requestId: randomUUID() });
+    return;
+  }
   if (err instanceof AiRunsDisabledError) {
     res.status(503).json({ code: err.code, message: err.message, details: [], requestId: randomUUID() });
     return;
@@ -70,6 +83,7 @@ function guard(handler: (req: Request, res: Response) => Promise<void> | void): 
 export type AiRunsHandlersDeps = {
   // 鸭子类型：真实为 AiRunsUsecase，测试为 stub；开放类型以兼容 stub 注入
   usecase: any;
+  business?: BusinessSkillsWorkbenchService;
 };
 
 export function createAiRunsHandlers(deps: AiRunsHandlersDeps) {
@@ -82,7 +96,9 @@ export function createAiRunsHandlers(deps: AiRunsHandlersDeps) {
 
   const getRunSnapshotHandler = guard(async (req, res) => {
     const snapshot = await usecase.getRunSnapshot(req.user!, asString(req.params.runId));
-    res.json(ok(snapshot, randomUUID()));
+    const data = deps.business && snapshot.run.workflowId === BUSINESS_SKILLS_WORKFLOW_ID
+      ? { ...sanitizeBusinessRunSnapshot(snapshot), businessExecution: await deps.business.read(req.user!, asString(req.params.runId)) } : snapshot;
+    res.json(ok(data, randomUUID()));
   });
 
   /** 批次 1b · 只读：按 run 取工具痕迹事件，供界面刷新后重建 chip（不写任何状态）。 */
@@ -97,28 +113,39 @@ export function createAiRunsHandlers(deps: AiRunsHandlersDeps) {
   });
 
   const submitInputsHandler = guard(async (req, res) => {
-    const result = await usecase.submitInputs(req.user!, asString(req.params.runId), req.body || {});
+    const runId = asString(req.params.runId);
+    const result = deps.business && await deps.business.isBusinessRun(req.user!, runId)
+      ? await deps.business.inputs(req.user!, runId, req.body || {}) : await usecase.submitInputs(req.user!, runId, req.body || {});
     res.status(result.status).json(ok(result.data, randomUUID()));
   });
 
   const confirmActionHandler = guard(async (req, res) => {
-    const result = await usecase.confirmAction(req.user!, asString(req.params.runId), req.params.actionId);
+    const runId = asString(req.params.runId);
+    const result = deps.business && await deps.business.isBusinessRun(req.user!, runId)
+      ? await deps.business.decision(req.user!, runId, asString(req.params.actionId), 'approve', req.body || {}) : await usecase.confirmAction(req.user!, runId, req.params.actionId);
     res.status(result.status).json(ok(result.data, randomUUID()));
   });
 
   const rejectActionHandler = guard(async (req, res) => {
-    const result = await usecase.rejectAction(req.user!, asString(req.params.runId), req.params.actionId);
+    const runId = asString(req.params.runId);
+    const result = deps.business && await deps.business.isBusinessRun(req.user!, runId)
+      ? await deps.business.decision(req.user!, runId, asString(req.params.actionId), 'reject', req.body || {}) : await usecase.rejectAction(req.user!, runId, req.params.actionId);
     res.status(result.status).json(ok(result.data, randomUUID()));
   });
 
   const retryRunHandler = guard(async (req, res) => {
-    const result = await usecase.retryRun(req.user!, asString(req.params.runId));
+    const runId = asString(req.params.runId);
+    const result = deps.business && await deps.business.isBusinessRun(req.user!, runId)
+      ? await deps.business.retry(req.user!, runId, req.body || {}) : await usecase.retryRun(req.user!, runId);
     res.status(result.status).json(ok(result.data, randomUUID()));
   });
 
   /** 挂在 POST /ai-sessions/:sessionId/runs 的提交 handler。 */
   const submitRunHandler = guard(async (req, res) => {
-    const result = await usecase.submitRun(req.user!, asString(req.params.sessionId), req.body || {});
+    const body = req.body || {};
+    const result = deps.business && Object.prototype.hasOwnProperty.call(body, 'execution')
+      ? await deps.business.submitInvocation(req.user!, asString(req.params.sessionId), body)
+      : await usecase.submitRun(req.user!, asString(req.params.sessionId), body);
     res.status(result.status).json({ code: 0, message: "任务已进入后台执行", data: result.data, requestId: randomUUID() });
   });
 

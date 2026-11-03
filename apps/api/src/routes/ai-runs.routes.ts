@@ -8,6 +8,7 @@
 // 生产接线见 routes/index.ts（flag 读取点收敛，D2）。
 
 import { Router } from "express";
+import { createBusinessSkillsWorkbenchService, type BusinessSkillsWorkbenchService } from "../modules/skills/skills.module";
 
 import {
   createAiRunsHandlers,
@@ -19,6 +20,7 @@ import { getAiSession } from "../modules/ai-sessions/ai-sessions.usecase";
 
 export type AiRunsRouterDeps = {
   repo: HarnessRuntimeRepository;
+  business?: BusinessSkillsWorkbenchService;
   enabled: boolean;
   heartbeatMs?: number;
   pollMs?: number;
@@ -32,7 +34,7 @@ export function createAiRunsRouter(deps: AiRunsRouterDeps): Router {
     // owner 归 ai-sessions 域：非 owner 与不存在同为 null → 上层 404
     findSession: async (user, sessionId) => getAiSession(user, sessionId),
   });
-  const handlers = createAiRunsHandlers({ usecase });
+  const handlers = createAiRunsHandlers({ usecase, business: deps.enabled ? deps.business ?? createBusinessSkillsWorkbenchService({ repo: deps.repo }) : undefined });
   const eventsHandler = createRunEventsHandler({
     enabled: deps.enabled,
     repo: deps.repo,

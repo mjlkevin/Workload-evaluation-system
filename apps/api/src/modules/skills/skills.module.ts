@@ -29,3 +29,8 @@ export { createSkillOperationExecutionService, type SkillLocalTransactionAdapter
 export { createExecutionBudgetService, type ExecutionBudgetRequest, type ExecutionBudgetCallbackContext, type ExecutionBudgetSnapshot } from './execution-budget';
 export { createResumableSkillExecutor, ResumableSkillFailure, type ResumableSkillPorts, type ResumableSkillAdvanceRequest, type ResumableSkillAdvanceResult, type ResumableSkillModelRequest, type ResumableSkillToolRequest, type ResumableSkillPendingOperation } from './skills.execution-resumable';
 export type { SkillExecutionState } from './skills.execution-state';
+
+export { createExecutionCatalogService, toExecutionCatalogEntry } from './skills.workbench';
+export { createBusinessSkillsWorkbenchService, type BusinessSkillsWorkbenchService } from './skills.workbench-actions';
+export { createBusinessExecutionProjectionService } from './skills.workbench-projection';
+export { safeBusinessJson, buildBusinessExecutionView, sanitizeBusinessRunSnapshot, type BusinessExecutionView } from './skills.workbench-view';

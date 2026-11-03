@@ -1,5 +1,6 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client';
+import type { AuthUser } from '../../types';
 import { harnessRunAttempts, harnessRunCheckpoints, harnessRuns, type HarnessRunRow } from '../../db/schema';
 import { copyTrialJson, skillDefinitionHash as hash } from '../skills/skills.module';
 import {
@@ -91,7 +92,7 @@ export function createBusinessSkillsWaitService(database: Database) {
         });
       });
     },
-    answer(input: Answer) {
+    answer(input: Answer, expectedRole?: AuthUser['role']) {
       return safe(async () => {
         const data = copyTrialJson(input, 'definition') as Answer;
         if (Object.keys(data).sort().join(',') !== ['runId', 'sessionId', 'requestedBy', 'actionId', 'kind', 'stepId', 'contentHash', 'value'].sort().join(',')) invalid();
@@ -119,8 +120,11 @@ export function createBusinessSkillsWaitService(database: Database) {
           if (run.status !== 'waiting' || run.cancelRequestedAt || current.cp?.harnessRunCheckpointId !== waitCheckpoint.harnessRunCheckpointId) invalid();
           // Historical exact answers above grant nothing new. New modern answers must still
           // hold the current DB permission/epoch fence in this same checkpoint-write transaction.
-          if (Object.prototype.hasOwnProperty.call(run.executionConfig, 'executionAuthority'))
-            await assertRunAdmissionInTransaction(tx, run.harnessRunId, data.requestedBy);
+          if (Object.prototype.hasOwnProperty.call(run.executionConfig, 'executionAuthority')) {
+            const admission = await assertRunAdmissionInTransaction(tx, run.harnessRunId, data.requestedBy);
+            // HTTP supplies the trusted authenticated role separately from the answer body.
+            if (expectedRole !== undefined && admission.identity.role !== expectedRole) invalid();
+          }
           await checkpoint(tx, run, `answer:${data.actionId}`, settled.state, undefined, originalRaw.kind === 'workflow' ? originalHost : undefined);
           const event = await appendRunEventInTransaction(tx, { runId: run.harnessRunId, eventType: 'workflow.answer_recorded',
             payload: { actionId: data.actionId, kind: data.kind, stepId: data.stepId, contentHash: data.contentHash,

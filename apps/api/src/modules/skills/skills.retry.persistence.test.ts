@@ -211,12 +211,15 @@ test('all five active statuses protect DELETE, including missing/false optional 
   assert.equal(await sessions.deleteSession({ ownerUserId: user.id, sessionId: f.sessionId }), false);
 });
 
-test('real registered routers enforce JWT retry-channel and DELETE 409/404 with flag on and off', async () => {
+test('real registered routers enforce JWT strict business retry commands and DELETE 409/404 with flag on and off', async () => {
   const f = await failed(); const token = signAuthToken(user); const app = express(); app.use(express.json());
   app.use('/ai-runs', createAiRunsRouter({ enabled: true, repo: queue }));
   assert.equal((await http(app).post(`/ai-runs/${f.run.harnessRunId}/retry`)).status, 401);
+  const before = await countRuns();
   const response = await http(app).post(`/ai-runs/${f.run.harnessRunId}/retry`).set('Authorization', `Bearer ${token}`);
-  assert.equal(response.status, 409); assert.equal(response.body.code, 'BUSINESS_SKILLS_RETRY_CHANNEL_REQUIRED');
+  // C3 opens the dedicated public business channel, while a missing strict command remains invalid.
+  assert.equal(response.status, 400); assert.equal(response.body.code, 'INVOCATION_INVALID_REQUEST');
+  assert.equal(await countRuns(), before);
   await database.update(schema.harnessRuns).set({ status: 'recovering' }).where(eq(schema.harnessRuns.harnessRunId, f.run.harnessRunId));
   for (const enabled of [true, false]) {
     const app = express(); app.use(express.json()); app.use('/ai-sessions', createAiSessionsRouter({ enabled, repo: { ...queue, hasActiveRunForSession: async () => false } }));

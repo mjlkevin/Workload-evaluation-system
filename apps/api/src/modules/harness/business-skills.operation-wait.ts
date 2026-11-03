@@ -5,6 +5,8 @@ import type { AuthUser } from '../../types';
 import { resolveCurrentSkillTools } from '../skills/skills.context';
 import { readPreparedOperationInTransaction, resolveBusinessExecutionRootInTransaction } from '../skills/skills.operations';
 import { createSkillOperationDecisionService } from '../skills/skills.operation-decisions';
+import { assertRunAdmissionInTransaction } from '../skills/execution-emergency';
+import { SkillError } from '../skills/skills.types';
 import { copyTrialJson } from '../skills/skills.sandbox';
 import { skillDefinitionHash as hash } from '../skills/skills.hash';
 import { readBusinessSkillsCheckpoint, readBusinessSkillsRun } from './business-skills.workflow';
@@ -100,6 +102,10 @@ export function createBusinessSkillOperationWaitService(options: Options = {}) {
       return database.transaction(async tx => {
         const run = await lockRunRow(tx, input.runId);
         if (run.ownerUserId !== user.id || run.cancelRequestedAt) invalid();
+        // The recorded decision is history; queue admission is a fresh grant in this transaction.
+        const admission = await assertRunAdmissionInTransaction(tx, run.harnessRunId, user.id);
+        if (user.status !== 'active' || user.role !== admission.identity.role)
+          throw new SkillError('EXECUTION_AUTHORITY_CHANGED', '当前用户权限已变化', 403);
         if (run.status !== 'waiting') return { resumed: false, run, decision: view };
         const after = await pending(tx, run);
         if (after.descriptor.actionId !== input.actionId || after.prepared.operationId !== view.operationId) invalid();
