@@ -73,6 +73,11 @@
       "kind": "unit",
       "ref": "/tmp/wes-finish-mvp-contracts/green-boundaries.log",
       "summary": "D纯需求/匹配契约21/21零跳过，SPEC和fresh质量APPROVE；样本待用户选定，不等同生产链或业务验收。"
+    },
+    {
+      "kind": "unit",
+      "ref": "/tmp/wes-finish-workflow-host/source-freeze-write-authority.sha256; /tmp/wes-finish-workflow-host/write-authority-green",
+      "summary": "四节点生产host696gross，SPEC及fresh质量APPROVE；95/95零跳过与tsc0。普通超时及写入晚撤权均已真实反例验证；取消终态竞态另单元开放。"
     }
   ],
   "next": "闭合独立审查发现的超时、恢复事务围栏及失败节点重试问题，完成C统一工作台验证；随后接D真实材料、原生业务工具和同样本端到端证据。"

@@ -7,6 +7,7 @@
 // S2b-2（2026-08-28）：session projector/sink 已随 §4.8 补偿链删除。
 
 import { createBusinessSkillsWorkflow, type BusinessSkillsExecutor } from './business-skills.workflow';
+import { createBusinessSkillsWorkflowExecutor } from './business-skills.workflow-host';
 import { BUSINESS_SKILLS_WORKFLOW_ID } from './business-skills.identity';
 import type { HarnessRuntimeRepository } from "./harness-runtime.repository";
 import { createHarnessRuntimeWorker, type HarnessRuntimeWorker } from "./harness-runtime.worker";
@@ -32,7 +33,7 @@ import { getMemoryRepository } from "../memory/memory.module";
 export type HarnessRuntimeBootOptions = {
   repo: HarnessRuntimeRepository;
   enabled: boolean;
-  /** Trusted server-only port; absent until production execution is approved. */
+  /** Trusted server-only test override; production uses the persistent Skill/Workflow host. */
   businessSkillsExecutor?: BusinessSkillsExecutor;
   /** 测试注入用：自定义 worker 工厂 */
   createWorker?: (opts: { repo: HarnessRuntimeRepository; registry: ReturnType<typeof createHarnessWorkflowRegistry> }) => HarnessRuntimeWorker;
@@ -327,7 +328,7 @@ export function startHarnessRuntime(options: HarnessRuntimeBootOptions): Harness
     recordTurnTrace: (input) => recordWorkbenchTurnTrace(input),
     recordTurnFailureTrace: (input) => recordWorkbenchTurnFailureTrace(input),
   });
-  const registry = createHarnessWorkflowRegistry([workflow, createBusinessSkillsWorkflow({ executor: options.businessSkillsExecutor })]);
+  const registry = createHarnessWorkflowRegistry([workflow, createBusinessSkillsWorkflow({ executor: options.businessSkillsExecutor ?? createBusinessSkillsWorkflowExecutor() })]);
 
   // SP-2026-007 MS2：Run 终态后异步蒸馏记忆钩子（工厂装配真实依赖；
   // 失败留痕走 onError → console.error，与此前口径一致并补 success=false 留痕）

@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRunTerminalMemoryHook, startHarnessRuntime } from './harness-boot';
-import { context, outcome, runFixture } from './business-skills.test-fixture';
+import { context, outcome, runFixture, frozenWorkflowManifest } from './business-skills.test-fixture';
+test('default boot supplies the production executor for root Skill and Workflow preflight', async () => {
+  let checked = false;
+  const runtime = startHarnessRuntime({ repo: {} as any, enabled: true, createWorker({ registry }) {
+    return { async start() { const business = registry.get('business_skills_v1', '1.0.0')!;
+      assert.doesNotThrow(() => business.preflight!(runFixture(), []));
+      assert.doesNotThrow(() => business.preflight!(runFixture(frozenWorkflowManifest()), [])); checked = true;
+    }, async stop() {}, async runNextAttempt() { return false; }, isStopping() { return false; } };
+  } });
+  await runtime.stop(); assert.equal(checked, true);
+});
 test('boot installs precisely the fixed business adapter and ordinary chat identities, once', async () => {
   let starts = 0; let executions = 0;
   const runtime = startHarnessRuntime({ repo: {} as any, enabled: true, businessSkillsExecutor: async () => { executions++; return outcome(); },
@@ -23,7 +33,7 @@ test('default business adapter never falls through to chat/model/tool factories'
   const runtime = startHarnessRuntime({ repo: {} as any, enabled: true, createModelChat: forbidden, getProvider: forbidden, resolveApiKey: forbidden, resolveScenario: forbidden,
     createWorker({ registry }) { return { async start() {
       const business = registry.get('business_skills_v1', '1.0.0')!;
-      await assert.rejects(business.executeStep('execute', context()), { message: 'BUSINESS_SKILLS_EXECUTOR_UNAVAILABLE' }); checked = true;
+      await assert.rejects(business.executeStep('execute', context()), { message: 'BUSINESS_SKILLS_AUTHORITY_DENIED' }); checked = true;
     }, async stop() {}, async runNextAttempt() { return false; }, isStopping() { return false; } }; } });
   await runtime.stop(); assert.equal(checked, true); assert.equal(factories, 0);
 });

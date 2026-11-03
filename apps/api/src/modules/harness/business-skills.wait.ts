@@ -11,8 +11,12 @@ import { HarnessWorkflowWaitingError, hashHarnessCheckpointState } from './harne
 import { readBusinessSkillsCheckpoint, readBusinessSkillsRun, type BusinessSkillsExecutor } from './business-skills.workflow';
 import { createWorkflowRuntime, type WorkflowCommand, type WorkflowRuntimeState } from './workflows.runtime-adapter';
 import { BUSINESS_SKILLS_EXECUTE_STEP as STEP } from './business-skills.identity';
+import { readBusinessSkillsHostState, type BusinessSkillsHostState } from './business-skills.host-state';
+import { resolveBusinessExecutionRootInTransaction } from '../skills/skills.operations';
+import { assertRunAdmissionInTransaction } from '../skills/execution-emergency';
 
-type WaitCommand = Extract<WorkflowCommand, { type: 'userInput' | 'confirmation' }>;
+export type BusinessSkillsWaitCommand = Extract<WorkflowCommand, { type: 'userInput' | 'confirmation' }>;
+type WaitCommand = BusinessSkillsWaitCommand;
 type Answer = { runId: string; sessionId: string; requestedBy: string; actionId: string;
   kind: 'userInput' | 'confirmation'; stepId: string; contentHash: string; value: unknown };
 function invalid(): never { throw new HarnessRuntimeError('BUSINESS_SKILLS_WAIT_INVALID'); }
@@ -22,10 +26,11 @@ function safe<T>(operation: () => Promise<T>): Promise<T> {
     throw new HarnessRuntimeError('BUSINESS_SKILLS_WAIT_INVALID');
   });
 }
-function envelope(run: HarnessRunRow, state: WorkflowRuntimeState) {
-  return { businessSkills: { schemaVersion: 1, runId: run.harnessRunId, manifestHash: state.manifestHash, state }, nextStepKey: STEP };
+function envelope(run: HarnessRunRow, state: WorkflowRuntimeState, host?: BusinessSkillsHostState) {
+  return { businessSkills: { schemaVersion: 1, runId: run.harnessRunId, manifestHash: state.manifestHash,
+    state: host ? { schemaVersion: 1, kind: 'workflow', workflow: state } : state }, nextStepKey: STEP };
 }
-function descriptor(run: HarnessRunRow, command: WaitCommand) {
+export function businessSkillsWaitDescriptor(run: HarnessRunRow, command: WaitCommand) {
   const contentHash = hash({ prompt: command.prompt, displayInput: command.input });
   const binding = { runId: run.harnessRunId, ownerUserId: run.ownerUserId, sessionId: run.aiSessionId,
     manifestHash: readBusinessSkillsRun(run).manifestHash, operationId: command.operationId,
@@ -35,15 +40,21 @@ function descriptor(run: HarnessRunRow, command: WaitCommand) {
 }
 async function latest(tx: HarnessTx, run: HarnessRunRow) {
   const manifest = readBusinessSkillsRun(run);
+  // Pre-authority bare Workflow waits remain answerable. They cannot authorize production dispatch
+  // or a retry; every admitted/retried Run must use the strict original-root lineage reader.
+  const legacy = !run.retryOfRunId && !Object.prototype.hasOwnProperty.call(run.executionConfig, 'executionAuthority');
+  const chain = legacy ? { root: run.harnessRunId } : await resolveBusinessExecutionRootInTransaction(tx, run.harnessRunId, run.ownerUserId, manifest);
   const [cp] = await tx.select().from(harnessRunCheckpoints).where(eq(harnessRunCheckpoints.harnessRunId, run.harnessRunId))
-    .orderBy(desc(harnessRunCheckpoints.sequence)).limit(1);
+    .orderBy(desc(harnessRunCheckpoints.sequence)).limit(1).for('share');
   if ((cp?.harnessRunCheckpointId ?? null) !== run.lastCheckpointId) invalid();
-  const state = cp ? readBusinessSkillsCheckpoint(cp, run, manifest) : undefined;
-  const runtime = createWorkflowRuntime(manifest, run.harnessRunId);
-  return { cp, runtime, decision: runtime.next(state) };
+  const raw = cp ? readBusinessSkillsCheckpoint(cp, run, manifest) : undefined;
+  if (legacy && raw?.kind !== undefined) invalid();
+  const state = raw ? readBusinessSkillsHostState(raw, manifest, chain.root) : undefined;
+  const runtime = createWorkflowRuntime(manifest, chain.root);
+  return { cp, raw, state, chain, runtime, wrapped: raw?.kind === 'workflow', decision: runtime.next(state?.workflow) };
 }
-async function checkpoint(tx: HarnessTx, run: HarnessRunRow, key: string, state: WorkflowRuntimeState, attemptId?: string) {
-  const value = envelope(run, state);
+async function checkpoint(tx: HarnessTx, run: HarnessRunRow, key: string, state: WorkflowRuntimeState, attemptId?: string, host?: BusinessSkillsHostState) {
+  const value = envelope(run, state, host);
   return commitHarnessCheckpointInTransaction(tx, { runId: run.harnessRunId, attemptId, checkpointKey: key,
     checkpointKind: 'structural', workflowId: run.workflowId, workflowVersion: run.workflowVersion, stepKey: STEP,
     resumePolicy: 'restart_step', state: value, stateHash: hashHarnessCheckpointState(value),
@@ -71,9 +82,9 @@ export function createBusinessSkillsWaitService(database: Database) {
             if ((lease.rows as Array<{ valid: boolean }>)[0]?.valid !== true || current.decision.kind !== 'ready'
               || !['userInput', 'confirmation'].includes(current.decision.command.type)) invalid();
             const command = current.decision.command as WaitCommand;
-            const payload = descriptor(run, command);
+            const payload = businessSkillsWaitDescriptor(run, command);
             copyTrialJson(payload, 'definition');
-            await checkpoint(tx, run, `wait:${payload.actionId}`, current.decision.state, identifiers.attemptId);
+            await checkpoint(tx, run, `wait:${payload.actionId}`, current.decision.state, identifiers.attemptId, current.wrapped ? current.state : undefined);
             return { actionId: payload.actionId, payload, eventType: command.type === 'userInput'
               ? 'workflow.awaiting_input' : 'workflow.awaiting_confirmation' };
           },
@@ -92,9 +103,11 @@ export function createBusinessSkillsWaitService(database: Database) {
           const [waitCheckpoint] = await tx.select().from(harnessRunCheckpoints).where(and(
             eq(harnessRunCheckpoints.harnessRunId, run.harnessRunId), eq(harnessRunCheckpoints.checkpointKey, `wait:${data.actionId}`)));
           if (!waitCheckpoint) invalid();
-          const original = createWorkflowRuntime(manifest, run.harnessRunId).next(readBusinessSkillsCheckpoint(waitCheckpoint, run, manifest));
+          const originalRaw = readBusinessSkillsCheckpoint(waitCheckpoint, run, manifest);
+          const originalHost = readBusinessSkillsHostState(originalRaw, manifest, current.chain.root);
+          const original = current.runtime.next(originalHost.workflow);
           if (original.kind !== 'ready' || !['userInput', 'confirmation'].includes(original.command.type)) invalid();
-          const expected = descriptor(run, original.command as WaitCommand);
+          const expected = businessSkillsWaitDescriptor(run, original.command as WaitCommand);
           for (const key of ['actionId', 'kind', 'stepId', 'contentHash'] as const) if (data[key] !== expected[key]) invalid();
           const settled = current.runtime.settle(original.state, { operationId: original.command.operationId, output: data.value });
           const valueHash = hash(data.value);
@@ -104,7 +117,11 @@ export function createBusinessSkillsWaitService(database: Database) {
             return { created: false, run, event: existing };
           }
           if (run.status !== 'waiting' || run.cancelRequestedAt || current.cp?.harnessRunCheckpointId !== waitCheckpoint.harnessRunCheckpointId) invalid();
-          await checkpoint(tx, run, `answer:${data.actionId}`, settled.state);
+          // Historical exact answers above grant nothing new. New modern answers must still
+          // hold the current DB permission/epoch fence in this same checkpoint-write transaction.
+          if (Object.prototype.hasOwnProperty.call(run.executionConfig, 'executionAuthority'))
+            await assertRunAdmissionInTransaction(tx, run.harnessRunId, data.requestedBy);
+          await checkpoint(tx, run, `answer:${data.actionId}`, settled.state, undefined, originalRaw.kind === 'workflow' ? originalHost : undefined);
           const event = await appendRunEventInTransaction(tx, { runId: run.harnessRunId, eventType: 'workflow.answer_recorded',
             payload: { actionId: data.actionId, kind: data.kind, stepId: data.stepId, contentHash: data.contentHash,
               requestedBy: data.requestedBy, valueHash, ...(data.kind === 'confirmation' ? { approved: (data.value as { approved: boolean }).approved } : {}) } });
