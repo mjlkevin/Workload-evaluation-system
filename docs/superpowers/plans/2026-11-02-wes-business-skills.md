@@ -1091,9 +1091,10 @@ C/D技术验证已完成；按用户反馈调整消息流主交互，完成后�
 - [ ] GREEN：在现有锁内读取中查询当前已验证Run血缘范围的事件/ledger，构建可加性的timeline字段，已有snapshot字段和完成竞态围栏保持。
 - [ ] 稳定ID采用实际事件/ledger ID或command.operationId，保留iteration、真实物理runId和rootRunId。只显示真实持久化时间；缺少阶段时间时保留顺序不造时间，不以updatedAt代替。
 - [ ] 真实历史回答/决定不再调用要求“当前待办”的确认接口；复用历史批准证明边界。仅投影白名单业务值并使用safeBusinessJson，查询有界且不重新加载每份巨大checkpoint正文。
+- [ ] 运行时阶段重放保持单遍；阶段内混合读写工具按真实ordinal合并，确认请求插入对应物理执行的决定之前。允许对有界历史事实排序，避免按数据来源先后分组造成时序反转；缺少真实时间时不生成时间。
 - [ ] 用已确认脱敏样本与实际operation/answer结构的测试验证；独立SPEC→QUALITY，定向及guarded模块通过后本地精确提交。
 
-接口约束：`businessExecution.timeline={version:1,rootRunId,entries:[{id,runId,kind,stepId?,occurrenceId?,iteration?,occurredAt?,sequence?,name?,stepType?,status?,prompt?,value?,decision?,toolName?,parameters?,result?}]}`；只含实际事实，按可信因果顺序提供。现有客户端可以忽略该新增字段，不能改请求/批准契约。
+接口约束：`businessExecution.timeline={version:1,rootRunId,coverage,unavailable,entries:[{id,kind,role,title,status,runId?,stepId?,stepType?,operationId?,iteration?,ordinal?,toolName?,content?,occurredAt?,stageId?}]}`。`kind` 为 stage/question/answer/confirmation/decision/tool_result/result/failure，`content` 仅含对应事实的业务值。稳定 command/iteration 阶段关联由服务端提供；历史不完整时 `coverage=partial` 并列明缺失原因，不造时间或物理执行归属。只含实际事实，按可信因果顺序提供。现有客户端可以忽略该新增字段，不能改请求/批准契约。
 
 测试命令沿既有guard脚本：
 `CREDENTIAL_KEK='' WES_REAL_NODE=/Users/kevin/.nvm/versions/node/v24.15.0/bin/node WES_KEEP_LOGS=/tmp/wes-message-history-modules bash scripts/verify-local-db-tests.sh test:modules`。
@@ -1142,4 +1143,3 @@ C/D技术验证已完成；按用户反馈调整消息流主交互，完成后�
 - [ ] 真实3006回看旧完成Run、刷新问答/确认历史；普通聊天与业务任务共存；至少一条真实新Workflow从消息区补充、范围确认、写入批准到WES5天，单Skill也可查看。
 - [ ] 1440/760、展开/收起、焦点、Tab/Escape、关闭保护和滚动行为实际留图；用户看同一已批准场景验收。
 - [ ] 命中原ISS/RP同步总看板、当前实现文档和既有资产，不新增重复问题或虚增文档数。保留integration空活动模板基线、历史失败与本地未合入/未推送边界。
-
