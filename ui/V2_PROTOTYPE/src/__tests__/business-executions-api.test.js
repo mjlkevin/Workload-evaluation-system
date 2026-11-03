@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../api/client.js'
-import { listExecutionCatalog, listBusinessRuns, startBusinessExecution, submitBusinessInput, decideBusinessAction, retryBusinessExecution } from '../api/businessExecutions.js'
-vi.mock('../api/client.js', () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }))
+import { listExecutionCatalog, listBusinessRuns, startBusinessExecution, submitBusinessInput, decideBusinessAction, retryBusinessExecution, uploadExecutionSource, listExecutionTemplates } from '../api/businessExecutions.js'
+vi.mock('../api/client.js', () => ({ apiClient: { get: vi.fn(), post: vi.fn(), upload: vi.fn() } }))
 beforeEach(() => { vi.clearAllMocks(); apiClient.get.mockResolvedValue({ data: { items: [] } }); apiClient.post.mockResolvedValue({ data: { runId: 'r1' } }) })
 describe('工作台业务执行API命令', () => {
   it('从已鉴权客户端读取目录与当前会话Run', async () => {
@@ -28,3 +28,22 @@ describe('工作台业务执行API命令', () => {
     expect((apiClient.post.mock.calls[0] || []).slice(0, 2)).toEqual(['/ai-runs/r1/retry', { submissionKey: 'retry-a', reason: '重新执行失败步骤' }])
   })
 })
+
+  it('上传真实FormData到当前会话，不通过JSON post且不启动Run', async () => {
+    const file = new File(['需求正文'], '需求.md', { type: 'text/markdown' })
+    apiClient.upload.mockResolvedValue({ data: { attachmentId: 'file-server', sourceAvailable: true } })
+    expect(await uploadExecutionSource('session/a', file)).toEqual({ attachmentId: 'file-server', sourceAvailable: true })
+    const [path, body, options] = apiClient.upload.mock.calls[0]
+    expect(path).toBe('/ai-sessions/session%2Fa/execution-sources')
+    expect(body).toBeInstanceOf(FormData)
+    expect(body.get('file')).toBe(file)
+    expect(options).toEqual({ suppressUnauthorizedRedirect: true })
+    expect(apiClient.post).not.toHaveBeenCalled()
+  })
+  it('解包实际模板list并只发送允许的模板资产引用', async () => {
+    const templates = [{ templateId: 'actual-template', templateVersion: 'V3', templateName: '交付评估' }]
+    apiClient.get.mockResolvedValue({ data: { list: templates } })
+    expect(await listExecutionTemplates()).toEqual(templates)
+    await startBusinessExecution('session-a', { submissionKey: 'key-assets', execution: { kind: 'skill', skillId: 'skill-a', input: { templateId: 'actual-template' }, assets: [{ kind: 'assessment-catalog', templateId: 'actual-template', catalog: ['forged'], grants: ['forged'] }, { kind: 'unknown', templateId: 'forged' }] } })
+    expect(apiClient.post.mock.calls[0][1].execution.assets).toEqual([{ kind: 'assessment-catalog', templateId: 'actual-template' }])
+  })

@@ -18,7 +18,7 @@ function openDialog(extra = {}) {
   const onClose = vi.fn()
   const onStarted = vi.fn()
   const ensureSession = vi.fn().mockResolvedValue({ sessionId: 'session-a' })
-  render(<SkillInvocationDialog open onClose={onClose} onStarted={onStarted} ensureSession={ensureSession} session={{ sessionId: 'session-a', attachments: [{ attachmentId: 'owned-file', name: '需求.xlsx' }] }} {...extra} />)
+  render(<SkillInvocationDialog open onClose={onClose} onStarted={onStarted} ensureSession={ensureSession} session={{ sessionId: 'session-a', attachments: [{ attachmentId: 'owned-file', name: '需求.xlsx', sourceAvailable: true }] }} {...extra} />)
   return { onClose, onStarted, ensureSession }
 }
 beforeEach(() => {

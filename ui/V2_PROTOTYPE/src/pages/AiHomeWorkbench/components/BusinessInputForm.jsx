@@ -63,8 +63,14 @@ function Field({ schema, value, onChange, label, path, required, errors, disable
     'aria-invalid': !!error, 'aria-describedby': error ? `${id}-error` : undefined,
   }
   const properties = Object.entries(schema.properties || {})
-  const resources = schema.format && resourceOptions[schema.format]
   const enumValues = schema.enum || (hasConst(schema) ? [schema.const] : null)
+  const offered = resourceOptions.byPath?.[path] ?? (schema.format && resourceOptions[schema.format])
+  const resources = offered && enumValues
+    ? offered.filter(option => {
+      const value = Object.hasOwn(option, 'value') ? option.value : option.id
+      return (!schema.enum || schema.enum.some(allowed => sameValue(value, allowed))) && (!hasConst(schema) || sameValue(value, schema.const))
+    })
+    : offered
   const heading = (
     <div className="flex items-center gap-2">
       <label htmlFor={id} className="text-sm font-medium text-ink">{label}{required ? ' *' : ''}</label>
