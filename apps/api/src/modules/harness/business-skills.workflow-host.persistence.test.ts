@@ -395,7 +395,9 @@ function projectionGate(kind: 'snapshot' | 'owned', advance: (n: number) => Prom
  const wrapped = Object.create(database); let gates = 0;
  wrapped.transaction = async (callback: any, config: any) => {
   const value: any = await database.transaction(callback, config);
-  if (kind === 'snapshot' ? value?.run && Array.isArray(value.effects) : value?.run && value?.descriptor && value?.prepared)
+  if (kind === 'snapshot'
+   ? value?.run && value?.manifest && value?.chain && Object.prototype.hasOwnProperty.call(value, 'history')
+   : value?.run && value?.descriptor && value?.prepared)
    await advance(++gates);
   return value;
  };
@@ -416,6 +418,7 @@ for (const window of ['snapshot', 'owned'] as const) test(`projection race ${win
   committedAudit = await projectionAudit(f.runId); committedRun = await saved(f.runId);
  });
  const result = await createBusinessExecutionProjectionService({ database: gated.database, inventory }).read(user, f.runId);
+ assert.ok(gated.gates() > 0, 'Projection race gate must fire');
  assert.deepEqual(result.results.output, { projectName: 'Original project' });
  assert.equal(result.pendingOperation, undefined); assert.equal(result.pendingInput, undefined);
  assert.equal((await database.select({ id: schema.versionRecords.recordId }).from(schema.versionRecords)
@@ -456,6 +459,7 @@ for (const denial of ['role', 'owner', 'inventory'] as const) test(`projection r
   await assert.rejects(createBusinessExecutionProjectionService({ database: gated.database, inventory: denial === 'inventory'
    ? async () => { throw new SkillError('OPERATION_DECISION_UNAVAILABLE', 'Fixture inventory unavailable', 503); } : inventory }).read(user, f.runId),
    (e: any) => e.status === (denial === 'role' ? 403 : denial === 'owner' ? 404 : 503));
+  assert.ok(gated.gates() > 0, 'Projection race gate must fire');
   assert.ok(gated.gates() <= 2);
  } finally {
   await database.update(schema.users).set({ role: 'admin' }).where(eq(schema.users.userId, user.id));
@@ -470,6 +474,7 @@ test('projection race returns no action after normal cancellation without dispat
   if (n === 1) await queue.requestRunCancel({ runId: f.runId, requestedBy: user.id });
  });
  const result = await createBusinessExecutionProjectionService({ database: gated.database, inventory }).read(user, f.runId);
+ assert.ok(gated.gates() > 0, 'Projection race gate must fire');
  assert.equal(result.pendingOperation, undefined); assert.equal(result.pendingInput, undefined);
  assert.equal((await saved(f.runId)).status, 'cancelled'); assert.equal(reads, before);
  const audit = await database.select().from(schema.harnessToolEvents).where(eq(schema.harnessToolEvents.harnessRunId, f.runId));
