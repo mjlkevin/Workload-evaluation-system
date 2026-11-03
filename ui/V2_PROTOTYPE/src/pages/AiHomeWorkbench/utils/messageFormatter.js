@@ -435,6 +435,14 @@ export function normalizeSuggestedActions(value) {
   return actions.length ? actions : undefined
 }
 
+// Only the persisted business-start identity is exposed; other metadata stays private.
+export function normalizeProjectionSource(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || typeof value.runId !== 'string' || !value.runId.trim()
+    || value.eventType !== 'user_message' || value.deduplicationKey !== `${value.runId}:user:1`) return undefined
+  return { runId: value.runId, deduplicationKey: value.deduplicationKey, eventType: value.eventType }
+}
+
 export function mapSessionMessages(session) {
   if (!Array.isArray(session?.messages)) return []
   const attachmentsById = new Map((Array.isArray(session.attachments) ? session.attachments : [])
@@ -485,6 +493,7 @@ export function mapSessionMessages(session) {
         suggestedActions,
         intent,
         model,
+        ...(normalizeProjectionSource(metadata.projectionSource) ? { projectionSource: normalizeProjectionSource(metadata.projectionSource) } : {}),
       }
     })
     .filter((message) => message.text)
@@ -533,6 +542,7 @@ export function sameMessageList(left, right) {
     message.role === right[index]?.role &&
     message.text === right[index]?.text &&
     message.model === right[index]?.model &&
+    JSON.stringify(message.projectionSource || null) === JSON.stringify(right[index]?.projectionSource || null) &&
     message.file?.name === right[index]?.file?.name &&
     message.file?.size === right[index]?.file?.size &&
     message.file?.type === right[index]?.file?.type &&
