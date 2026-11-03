@@ -8227,8 +8227,9 @@ paths:
       description: Requires JWT, system:manage and an active current database admin.
         Control uses an independent revision. Stop increments epoch; release
         leaves the epoch unchanged, so old Runs require explicit reauthorization.
-        This API provides submission/admission fencing only; per-model/tool
-        dispatch checks and production host wiring remain separate.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
         Already-dispatched I/O cannot be revoked.
       parameters:
         - name: skillId
@@ -8264,8 +8265,9 @@ paths:
       description: Requires JWT, system:manage and an active current database admin.
         Control uses an independent revision. Stop increments epoch; release
         leaves the epoch unchanged, so old Runs require explicit reauthorization.
-        This API provides submission/admission fencing only; per-model/tool
-        dispatch checks and production host wiring remain separate.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
         Already-dispatched I/O cannot be revoked.
       parameters:
         - name: skillId
@@ -8307,8 +8309,9 @@ paths:
       description: Requires JWT, system:manage and an active current database admin.
         Control uses an independent revision. Stop increments epoch; release
         leaves the epoch unchanged, so old Runs require explicit reauthorization.
-        This API provides submission/admission fencing only; per-model/tool
-        dispatch checks and production host wiring remain separate.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
         Already-dispatched I/O cannot be revoked.
       parameters:
         - name: skillId
@@ -8350,8 +8353,9 @@ paths:
       description: Requires JWT, system:manage and an active current database admin.
         Control uses an independent revision. Stop increments epoch; release
         leaves the epoch unchanged, so old Runs require explicit reauthorization.
-        This API provides submission/admission fencing only; per-model/tool
-        dispatch checks and production host wiring remain separate.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
         Already-dispatched I/O cannot be revoked.
       parameters:
         - name: workflowId
@@ -8387,8 +8391,9 @@ paths:
       description: Requires JWT, system:manage and an active current database admin.
         Control uses an independent revision. Stop increments epoch; release
         leaves the epoch unchanged, so old Runs require explicit reauthorization.
-        This API provides submission/admission fencing only; per-model/tool
-        dispatch checks and production host wiring remain separate.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
         Already-dispatched I/O cannot be revoked.
       parameters:
         - name: workflowId
@@ -8430,8 +8435,9 @@ paths:
       description: Requires JWT, system:manage and an active current database admin.
         Control uses an independent revision. Stop increments epoch; release
         leaves the epoch unchanged, so old Runs require explicit reauthorization.
-        This API provides submission/admission fencing only; per-model/tool
-        dispatch checks and production host wiring remain separate.
+        This API provides submission/admission fencing. Internal per-model/Skill-tool
+        dispatch and Worker-resume checks are implemented separately; production
+        host wiring and business start/resume HTTP entrypoints remain unavailable.
         Already-dispatched I/O cannot be revoked.
       parameters:
         - name: workflowId

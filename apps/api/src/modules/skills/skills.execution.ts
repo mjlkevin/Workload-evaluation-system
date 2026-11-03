@@ -1,4 +1,5 @@
 import Ajv from 'ajv';
+import { createExecutionAuthority, type ExecutionAuthority } from './execution-authority';
 import { performance } from 'node:perf_hooks';
 import { isDeepStrictEqual } from 'node:util';
 import { anyRoleHasCapability } from '../../rbac/permissions';
@@ -8,7 +9,7 @@ import { compileSkillPayloadSchema } from './skills.validation';
 import { copyTrialJson, readSkillPath, type SkillToolCall, type SkillToolStep } from './skills.sandbox';
 import type { SkillModelResponse, SkillTrialBudgets } from './skills.evaluation';
 import { prepareFrozenSkillModel, type FrozenExecutionSkill, type PreparedSkillModel } from './skills.execution-model';
-export type SkillExecutionRequest = { manifest: unknown; stepId: string; input: unknown; signal: AbortSignal; budgets?: Partial<SkillTrialBudgets> };
+export type SkillExecutionRequest = { runId: string; ownerUserId: string; manifest: unknown; stepId: string; input: unknown; signal: AbortSignal; budgets?: Partial<SkillTrialBudgets> };
 export type SkillExecutionResult = { status: 'succeeded' | 'failed' | 'cancelled'; code?: string; output?: unknown;
   model?: { providerId: string; model: string; transportProvider: string };
   usage: { modelAttempts: number; toolCalls: number; outputTokens: number; elapsedMs: number } };
@@ -16,14 +17,14 @@ export type SkillExecutionToolRequest = { caller: ExecutionManifest['caller']; s
   binding: FrozenExecutionSkill['definition']['tools'][number]; snapshot: FrozenExecutionSkill['context']['tools'][number];
   call: SkillToolCall; input: unknown; signal: AbortSignal };
 /** These are trusted server assembly ports, never client callbacks or authorization claims. */
-export type SkillExecutionPorts = { prepareModel?: (skill: FrozenExecutionSkill, signal: AbortSignal) => Promise<PreparedSkillModel>;
+export type SkillExecutionPorts = { createAuthority?: () => ExecutionAuthority; prepareModel?: (skill: FrozenExecutionSkill, signal: AbortSignal) => Promise<PreparedSkillModel>;
   toolGate?: (request: SkillExecutionToolRequest) => Promise<unknown> };
 const ceilings: SkillTrialBudgets = { maxModelAttempts: 60, maxToolCalls: 60, maxOutputTokens: 128000, totalTimeoutMs: 300000 };
 class Failure extends Error { constructor(readonly code: string) { super(code); } }
 function fail(code: string): never { throw new Failure(code); }
 const safeId = (value: unknown) => typeof value === 'string' && /^[A-Za-z0-9_.:/-]{1,160}$/.test(value) && !/(sk-|bearer|api[-_]?key|token|secret)/i.test(value);
 function json(value: unknown) { try { return copyTrialJson(value); } catch { return fail('INVALID_OR_OVERSIZED_JSON'); } }
-/** Per-invocation accounting only. Persistent workflow/run budgets and authorization are later layers. */
+/** Per-invocation accounting only. Persistent workflow/run budgets remain a later layer. */
 export function createSkillExecutionService(ports: SkillExecutionPorts = {}) {
   return { async execute(request: SkillExecutionRequest): Promise<SkillExecutionResult> {
     const started = performance.now(); const controller = new AbortController();
@@ -65,7 +66,17 @@ export function createSkillExecutionService(ports: SkillExecutionPorts = {}) {
       const core = async (): Promise<unknown> => {
         deadlineGuard(); let manifest: ExecutionManifest;
         try { manifest = readPersistedExecutionManifest(request.manifest); } catch { return fail('EXECUTION_MANIFEST_INVALID'); }
-        const skill = (manifest.skills as FrozenExecutionSkill[]).find(s => s.stepId === request.stepId);
+        const { runId, ownerUserId, stepId } = request;
+        if (!runId || !ownerUserId || ownerUserId !== manifest.caller.id) fail('EXECUTION_AUTHORITY_DENIED');
+        let authority: ExecutionAuthority;
+        try { authority = (ports.createAuthority ?? createExecutionAuthority)(); } catch { return fail('EXECUTION_AUTHORITY_DENIED'); }
+        const check = async (phase: 'model' | 'tool', toolName?: string) => {
+          deadlineGuard();
+          try { await authority.check({ runId, ownerUserId, manifestHash: manifest.manifestHash, phase, stepId, toolName }); }
+          catch { deadlineGuard(); return fail('EXECUTION_AUTHORITY_DENIED'); }
+          deadlineGuard();
+        };
+        const skill = (manifest.skills as FrozenExecutionSkill[]).find(s => s.stepId === stepId);
         if (!skill) fail('EXECUTION_STEP_NOT_FOUND');
         const definition = skill.definition; const input = json(request.input);
         if (manifest.kind === 'skill' && !isDeepStrictEqual(input, manifest.initialInput)) fail('EXECUTION_INPUT_MISMATCH');
@@ -80,18 +91,18 @@ export function createSkillExecutionService(ports: SkillExecutionPorts = {}) {
         }
         const validators = new Map(skill.context.tools.map(t => [t.native.name, compiler.compile(t.native.parameters)]));
         const tools = skill.context.tools.map(({ native }) => ({ name: native.name, description: native.description, parameters: native.parameters }));
-        deadlineGuard();
-        let prepared: PreparedSkillModel;
-        try { prepared = await (ports.prepareModel ?? prepareFrozenSkillModel)(structuredClone(skill), controller.signal); }
-        catch { deadlineGuard(); return fail('MODEL_PREPARATION_FAILED'); }
-        deadlineGuard();
-        if (!prepared || typeof prepared.complete !== 'function' || !safeId(prepared.transportProvider) || !safeId(skill.context.model.providerId) || !safeId(skill.context.model.model)) fail('INVALID_PROVIDER_METADATA');
         const seen = new Set<string>(); const toolResults: SkillToolStep[] = [];
         while (true) {
           deadlineGuard();
           if (usage.modelAttempts >= budgets.maxModelAttempts) fail('MODEL_ATTEMPT_LIMIT');
           const tokens = Math.min(definition.model.maxTokens, budgets.maxOutputTokens - usage.outputTokens);
           if (tokens <= 0) fail('OUTPUT_TOKEN_LIMIT');
+          await check('model');
+          let prepared: PreparedSkillModel;
+          try { prepared = await (ports.prepareModel ?? ((s, signal) => prepareFrozenSkillModel(s, signal, { beforeDispatch: () => check('model') })))(structuredClone(skill), controller.signal); }
+          catch { deadlineGuard(); return fail('MODEL_PREPARATION_FAILED'); }
+          await check('model');
+          if (!prepared || typeof prepared.complete !== 'function' || !safeId(prepared.transportProvider) || !safeId(skill.context.model.providerId) || !safeId(skill.context.model.model)) fail('INVALID_PROVIDER_METADATA');
           let response: SkillModelResponse;
           try { response = await modelBound(async () => {
             deadlineGuard(); usage.modelAttempts++;
@@ -127,6 +138,8 @@ export function createSkillExecutionService(ports: SkillExecutionPorts = {}) {
             return { binding, snapshot, call: { id: call.id, name: call.name, arguments: parameters } };
           });
           for (const entry of batch) {
+            await check('tool', entry.call.name);
+            if (entry.binding.requiresConfirmation || entry.snapshot.policy.approvalStrategy === 'user-confirm' || entry.snapshot.native.mutates || entry.snapshot.native.exfiltrates || entry.snapshot.native.source === 'mcp') fail('EXECUTION_AUTHORITY_DENIED');
             deadlineGuard(); if (!ports.toolGate) fail('TOOL_GATE_UNAVAILABLE');
             seen.add(entry.call.id); usage.toolCalls++;
             let result: unknown;

@@ -47,7 +47,7 @@ async function enqueue(id: string, kind: 'skill' | 'workflow' = 'skill') {
     [kind === 'skill' ? 'skillId' : 'workflowId']: id, input: { text: 'original' } } }); return result.data.runId;
 }
 const persisted = async (id: string) => (await queue.findRunForOwner(id, user.id))!;
-const registry = (executor?: BusinessSkillsExecutor) => createHarnessWorkflowRegistry([createBusinessSkillsWorkflow({ executor })]);
+const registry = (executor?: BusinessSkillsExecutor) => createHarnessWorkflowRegistry([createBusinessSkillsWorkflow({ createAuthority: () => ({ check: async () => {} }), executor })]);
 const worker = (r: ReturnType<typeof registry>, options: any = {}) => createHarnessRuntimeWorker({ repository: queue, registry: r, workerId: randomUUID(), ...options });
 async function recover(id: string, r: ReturnType<typeof registry>) {
   await database.update(schema.harnessRunAttempts).set({ leaseExpiresAt: new Date(Date.now() - 10000) }).where(eq(schema.harnessRunAttempts.harnessRunId, id));

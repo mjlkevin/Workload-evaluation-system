@@ -12,6 +12,7 @@ export type FrozenExecutionSkill = ExecutionManifest['skills'][number];
 export type PreparedSkillModel = { complete(request: SkillModelRequest): Promise<SkillModelResponse>; transportProvider: string };
 /** Trusted server-only ports; never accepted from an HTTP body or persisted manifest. */
 export type FrozenModelPorts = {
+  beforeDispatch?: () => Promise<void>;
   loadProviders?: () => Promise<Array<Pick<ConfiguredProvider, 'id' | 'name' | 'protocol' | 'enabled' | 'baseUrl'> & { models: Array<{ id: string }> }>>;
   loadCredential?: (scope: string) => Promise<string>;
   provider?: Pick<ModelProvider, 'chatCompletion'>;
@@ -19,13 +20,20 @@ export type FrozenModelPorts = {
 export async function prepareFrozenSkillModel(skill: FrozenExecutionSkill, signal: AbortSignal, ports: FrozenModelPorts = {}): Promise<PreparedSkillModel> {
   const guard = () => { if (signal.aborted) throw new Error('CANCELLED'); }; guard();
   const frozen = structuredClone(skill.context.model);
-  const providers = await (ports.loadProviders ?? (async () => (await loadRequirementSystemConfigStore()).active.modelProviders ?? []))(); guard();
-  const provider = providers.find(p => p.id === frozen.providerId);
-  if (!provider || !provider.enabled || provider.protocol !== 'openai-compatible' || !provider.models.some(m => m.id === frozen.model)
-    || credentialScopeForProvider(provider.id) !== frozen.credentialScope || skillDefinitionHash(provider.baseUrl) !== frozen.baseUrlDigest) throw new Error('MODEL_PREPARATION_FAILED');
-  const baseUrl = provider.baseUrl;
-  const apiKey = await (ports.loadCredential ?? (async scope => { await warmCredentialScopes([scope]); guard(); return resolveActiveApiKeyForScope(scope).apiKey; }))(frozen.credentialScope); guard();
-  if (!apiKey.trim()) throw new Error('MODEL_PREPARATION_FAILED');
+  async function credentials() {
+    async function currentProvider() {
+      const providers = await (ports.loadProviders ?? (async () => (await loadRequirementSystemConfigStore()).active.modelProviders ?? []))(); guard();
+      const provider = providers.find(p => p.id === frozen.providerId);
+      if (!provider || !provider.enabled || provider.protocol !== 'openai-compatible' || !provider.models.some(m => m.id === frozen.model)
+        || credentialScopeForProvider(provider.id) !== frozen.credentialScope || skillDefinitionHash(provider.baseUrl) !== frozen.baseUrlDigest) throw new Error('MODEL_PREPARATION_FAILED');
+      return provider;
+    }
+    await currentProvider();
+    const apiKey = await (ports.loadCredential ?? (async scope => { await warmCredentialScopes([scope]); guard(); return resolveActiveApiKeyForScope(scope).apiKey; }))(frozen.credentialScope); guard();
+    if (!apiKey.trim()) throw new Error('MODEL_PREPARATION_FAILED');
+    return { apiKey, baseUrl: (await currentProvider()).baseUrl };
+  }
+  await credentials();
   const referenceContent = skill.definition.references.map(ref => {
     const material = skill.materials.find(m => m.uri === ref.uri && m.version === ref.version)!;
     return JSON.stringify({ label: ref.label, title: material.title, content: material.content });
@@ -45,6 +53,9 @@ export async function prepareFrozenSkillModel(skill: FrozenExecutionSkill, signa
       messages.push({ role: 'assistant', content: '', tool_calls: [{ id: step.callId, name: step.toolName, arguments: step.arguments as Record<string, unknown> }] });
       messages.push({ role: 'tool', tool_call_id: step.callId, name: step.toolName, content: JSON.stringify({ result: step.result }) });
     }
+    const { apiKey, baseUrl } = await credentials();
+    if (!ports.beforeDispatch) throw new Error('EXECUTION_AUTHORITY_DENIED');
+    await ports.beforeDispatch(); guard(); if (request.signal.aborted) throw new Error('CANCELLED');
     const response = await transport.chatCompletion({
       frozenExecution: true, model: frozen.model, messages, thinking: 'disabled', responseFormat: 'json_object',
       ...(frozen.supportedParams.length === 0 || frozen.supportedParams.includes('temperature') ? { temperature: request.model.temperature } : {}),

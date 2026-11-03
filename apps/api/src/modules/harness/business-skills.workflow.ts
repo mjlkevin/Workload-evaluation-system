@@ -1,6 +1,6 @@
 import type { HarnessRunCheckpointRow, HarnessRunRow } from '../../db/schema';
 import {
-  compileSkillPayloadSchema, copyTrialJson, readPersistedExecutionManifest,
+  createExecutionAuthority, type ExecutionAuthority, compileSkillPayloadSchema, copyTrialJson, readPersistedExecutionManifest,
   skillDefinitionHash as hash, type ExecutionManifest,
 } from '../skills/skills.module';
 import {
@@ -115,7 +115,7 @@ function readResult(raw: unknown, runId: string, manifest: ExecutionManifest): B
   } catch { return invalidResult(); }
 }
 
-export function createBusinessSkillsWorkflow(options: { executor?: BusinessSkillsExecutor } = {}): HarnessWorkflow {
+export function createBusinessSkillsWorkflow(options: { executor?: BusinessSkillsExecutor; createAuthority?: () => ExecutionAuthority } = {}): HarnessWorkflow {
   function available() {
     if (!options.executor) fail('BUSINESS_SKILLS_EXECUTOR_UNAVAILABLE');
   }
@@ -135,6 +135,9 @@ export function createBusinessSkillsWorkflow(options: { executor?: BusinessSkill
       if (stepKey !== STEP || ctx.stepKey !== STEP) invalidState();
       const state = readState(ctx, manifest);
       available();
+      if (ctx.abortSignal.aborted) throw new HarnessWorkflowCancelledError();
+      try { await (options.createAuthority ?? createExecutionAuthority)().check({ runId: ctx.run.harnessRunId, ownerUserId: ctx.run.ownerUserId, manifestHash: manifest.manifestHash, phase: 'resume' }); }
+      catch { if (ctx.abortSignal.aborted) throw new HarnessWorkflowCancelledError(); return fail('BUSINESS_SKILLS_AUTHORITY_DENIED'); }
       if (ctx.abortSignal.aborted) throw new HarnessWorkflowCancelledError();
       let raw: unknown;
       try {

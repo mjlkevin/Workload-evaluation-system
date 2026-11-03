@@ -8,9 +8,9 @@ test('boot installs precisely the fixed business adapter and ordinary chat ident
     createWorker({ registry }) {
       assert.ok(registry.get('workbench_chat_v1', '1.0.0')); const business = registry.get('business_skills_v1', '1.0.0')!;
       assert.ok(business); assert.equal(registry.get('business_skills_v1', '2'), undefined); assert.equal(registry.get('skill', 'version'), undefined);
-      return { async start() { starts++; await business.executeStep('execute', context()); }, async stop() {}, async runNextAttempt() { return false; }, isStopping() { return false; } };
+      return { async start() { starts++; await assert.rejects(business.executeStep('execute', context()), { message: 'BUSINESS_SKILLS_AUTHORITY_DENIED' }); }, async stop() {}, async runNextAttempt() { return false; }, isStopping() { return false; } };
     } });
-  await runtime.stop(); assert.equal(starts, 1); assert.equal(executions, 1);
+  await runtime.stop(); assert.equal(starts, 1); assert.equal(executions, 0);
 });
 test('disabled boot has no worker or executor side effect', async () => {
   const forbidden = () => { throw new Error('must not run'); };

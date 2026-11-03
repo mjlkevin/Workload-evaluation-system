@@ -34,9 +34,9 @@ const call = (id = 'call1', changes: Record<string, unknown> = {}) => ({ id, nam
 const toolsResponse = (calls = [call()]) => response({ output: undefined, toolCalls: calls });
 function toolResponse(calls = [call()]) { const value = toolsResponse(calls); delete (value as any).output; return value; }
 function runner(complete: any = async () => response(), extra: any = {}) {
-  return createSkillExecutionService({ prepareModel: async () => ({ complete, transportProvider: 'kimi' }), ...extra });
+  return createSkillExecutionService({ createAuthority: () => ({ check: async () => {} }), prepareModel: async () => ({ complete, transportProvider: 'kimi' }), ...extra });
 }
-const execute = (service: ReturnType<typeof runner>, m = manifest(), changes: Record<string, unknown> = {}) => service.execute({ manifest: m, stepId: m.skills[0].stepId, input, signal: new AbortController().signal, ...changes });
+const execute = (service: ReturnType<typeof runner>, m = manifest(), changes: Record<string, unknown> = {}) => service.execute({ runId: 'trusted-run', ownerUserId: m.caller.id, manifest: m, stepId: m.skills[0].stepId, input, signal: new AbortController().signal, ...changes });
 test('runs actual business input once with no examples; supports selected workflow dependency', async () => {
   for (const workflow of [false, true]) {
     let requests = 0;
@@ -154,7 +154,7 @@ test('already cancelled request performs no model preparation', async () => {
 });
 const provider = () => ({ id: 'custom', name: 'Catalog supplier', protocol: 'openai-compatible', enabled: true, baseUrl: 'https://endpoint.invalid/v1', models: [{ id: 'Exact-Model' }] });
 function modelPorts(changes: any = {}) {
-  return { loadProviders: async () => [provider()], loadCredential: async () => fixtureCredential, provider: { chatCompletion: async () => ({ content: '{"ok":true}', model: 'Exact-Model', provider: 'kimi', usage: { completionTokens: 4 } }) }, ...changes };
+  return { beforeDispatch: async () => {}, loadProviders: async () => [provider()], loadCredential: async () => fixtureCredential, provider: { chatCompletion: async () => ({ content: '{"ok":true}', model: 'Exact-Model', provider: 'kimi', usage: { completionTokens: 4 } }) }, ...changes };
 }
 test('production preparation uses current frozen-scope credential, original model/params and frozen references', async () => {
   let sent: any; let scopes: string[] = []; let rotation = 0;
@@ -162,10 +162,10 @@ test('production preparation uses current frozen-scope credential, original mode
   for (let i = 1; i <= 2; i++) {
     const prepared = await prepareFrozenSkillModel(manifest().skills[0], new AbortController().signal, ports);
     const r = await prepared.complete({ instructions: 'Original instructions', input, outputSchema, model: manifest().skills[0].definition.model, tools: [], toolResults: [], signal: new AbortController().signal });
-    assert.equal(prepared.transportProvider, 'kimi'); assert.equal(sent.frozenExecution, true); assert.equal(sent.maxAttempts, 1); assert.equal(sent.temperature, 1.7); assert.equal(sent.model, 'Exact-Model'); assert.equal(sent.credentialsOverride.apiKey, `${fixtureCredential}-${i}`);
+    assert.equal(prepared.transportProvider, 'kimi'); assert.equal(sent.frozenExecution, true); assert.equal(sent.maxAttempts, 1); assert.equal(sent.temperature, 1.7); assert.equal(sent.model, 'Exact-Model'); assert.equal(sent.credentialsOverride.apiKey, `${fixtureCredential}-${i * 2}`);
     assert.equal(JSON.stringify(sent.messages).includes('Original body'), true); assert.equal(JSON.stringify(r).includes(fixtureCredential), false); assert.deepEqual(r.output, { ok: true });
   }
-  assert.deepEqual(scopes, ['provider:custom', 'provider:custom']);
+  assert.deepEqual(scopes, Array(4).fill('provider:custom'));
 });
 for (const [name, change] of [['disabled', { enabled: false }], ['missing model', { models: [{ id: 'latest' }] }], ['changed endpoint', { baseUrl: 'https://changed.invalid' }], ['wrong protocol', { protocol: 'unknown' }]] as const)
   test(`production preparation rejects ${name} before credential/model execution`, async () => {
@@ -203,4 +203,85 @@ test('empty frozen supportedParams leaves exact temperature unconstrained', asyn
   const prepared = await prepareFrozenSkillModel(skill, new AbortController().signal, modelPorts({ provider: { chatCompletion: async (req: any) => { sent = req; return { content: '{"ok":true}', model: 'Exact-Model', provider: 'kimi', usage: { completionTokens: 3 } }; } } }));
   await prepared.complete({ instructions: skill.definition.instructions, input, outputSchema, model: skill.definition.model, tools: [], toolResults: [], signal: new AbortController().signal });
   assert.equal(sent.temperature, 1.7);
+});
+
+test('execution requires trusted Run identity before any model preparation', async () => {
+  let prepares = 0;
+  const service = createSkillExecutionService({ prepareModel: async () => { prepares++; return { complete: async () => response(), transportProvider: 'kimi' }; } });
+  const result = await execute(service, manifest(), { runId: undefined, ownerUserId: undefined });
+  assert.equal(result.status, 'failed'); assert.equal(result.code, 'EXECUTION_AUTHORITY_DENIED'); assert.equal(prepares, 0);
+});
+
+test('checker unavailable is sanitized and prevents preparation', async () => {
+  let prepares = 0;
+  const r = await execute(runner(undefined, { createAuthority: () => ({ check: async () => { throw new Error('private SQL credentials'); } }), prepareModel: async () => { prepares++; return {}; } }));
+  assert.equal(r.code, 'EXECUTION_AUTHORITY_DENIED'); assert.equal(prepares, 0); assert.equal(JSON.stringify(r).includes('private'), false);
+});
+for (const phase of ['model', 'tool', 'prepare']) test(`authority revocation between ${phase} actions prevents subsequent I/O`, async () => {
+  let revoked = false; let models = 0; let gates = 0;
+  const service = runner(async () => { models++; if (phase === 'model') revoked = true; return toolResponse([call('a'), call('b')]); }, {
+    createAuthority: () => ({ check: async () => { if (revoked) throw new Error('denied'); } }),
+    ...(phase === 'prepare' ? { prepareModel: async () => { revoked = true; return { complete: async () => { models++; return response(); }, transportProvider: 'kimi' }; } } : {}),
+    toolGate: async () => { gates++; if (phase === 'tool') revoked = true; return {}; },
+  });
+  const r = await execute(service, manifest(true)); assert.equal(r.code, 'EXECUTION_AUTHORITY_DENIED');
+  assert.equal(models, phase === 'prepare' ? 0 : 1); assert.equal(gates, phase === 'tool' ? 1 : 0);
+});
+for (const mode of ['cancel', 'deadline']) test(`late authority after ${mode} cannot prepare model`, async () => {
+  const pending = deferred(); const parent = new AbortController(); let prepares = 0;
+  const running = execute(runner(undefined, { createAuthority: () => ({ check: () => pending.promise }), prepareModel: async () => { prepares++; return {}; } }), manifest(),
+    { signal: parent.signal, budgets: { totalTimeoutMs: 30 } });
+  await new Promise(r => setImmediate(r)); if (mode === 'cancel') parent.abort();
+  const r = await running; assert.equal(r.code, mode === 'cancel' ? 'CANCELLED' : 'TOTAL_TIMEOUT');
+  pending.resolve(undefined); await new Promise(r => setImmediate(r)); assert.equal(prepares, 0);
+});
+test('prepared model rechecks current provider and credentials on every complete; missing hook cannot send', async () => {
+  let enabled = true; let sends = 0; let keys = 0;
+  const ports = modelPorts({ loadProviders: async () => [{ ...provider(), enabled }], loadCredential: async () => `${fixtureCredential}-${++keys}`,
+    provider: { chatCompletion: async () => { sends++; return response(); } } });
+  const s = manifest().skills[0]; const req = { instructions: '', input, outputSchema, model: s.definition.model, tools: [], toolResults: [], signal: new AbortController().signal };
+  const prepared = await prepareFrozenSkillModel(s, req.signal, ports); enabled = false;
+  await assert.rejects(prepared.complete(req)); assert.equal(sends, 0);
+  enabled = true; const unguarded = await prepareFrozenSkillModel(s, req.signal, { ...ports, beforeDispatch: undefined });
+  await assert.rejects(unguarded.complete(req)); assert.equal(sends, 0);
+});
+for (const change of ['confirmation', 'ask', 'mutates', 'exfiltrates', 'mcp']) test(`no persistent grant means ${change} never reaches tool gate`, async () => {
+  const m = manifest(true); const snapshot = m.skills[0].context.tools[0];
+  if (change === 'confirmation') m.skills[0].definition.tools[0].requiresConfirmation = true;
+  if (change === 'ask') snapshot.policy.approvalStrategy = 'user-confirm';
+  if (change === 'mutates' || change === 'exfiltrates') { snapshot.native[change] = true; m.skills[0].definition.tools[0].requiresConfirmation = true; }
+  if (change === 'mcp') { snapshot.native.source = 'mcp'; snapshot.native.simulationOnly = true; snapshot.native.name = 'mcp__server__read'; m.skills[0].definition.tools[0].toolName = snapshot.native.name; }
+  m.skills[0].hash = hash(m.skills[0].definition); m.target.definition = structuredClone(m.skills[0].definition); m.target.hash = m.skills[0].hash; rehash(m);
+  let gates = 0; const r = await execute(runner(async () => toolResponse([call('a', { name: snapshot.native.name })]), { toolGate: async () => { gates++; return {}; } }), m);
+  assert.equal(r.code, 'EXECUTION_AUTHORITY_DENIED'); assert.equal(gates, 0);
+});
+
+for (const mode of ['cancel', 'deadline']) test(`late post-prepare checker after ${mode} cannot complete model`, async () => {
+  const pending = deferred(); const parent = new AbortController(); let checks = 0; let models = 0;
+  const running = execute(runner(async () => { models++; return response(); }, { createAuthority: () => ({ check: async () => { if (++checks === 2) await pending.promise; } }) }), manifest(),
+    { signal: parent.signal, budgets: { totalTimeoutMs: 30 } });
+  await new Promise(r => setImmediate(r)); if (mode === 'cancel') parent.abort();
+  const r = await running; assert.equal(r.code, mode === 'cancel' ? 'CANCELLED' : 'TOTAL_TIMEOUT');
+  pending.resolve(undefined); await new Promise(r => setImmediate(r)); assert.equal(models, 0);
+});
+test('provider disabled while current credential is loading cannot send a model request', async () => {
+  let enabled = true; let sends = 0;
+  await assert.rejects(prepareFrozenSkillModel(manifest().skills[0], new AbortController().signal, modelPorts({
+    loadProviders: async () => [{ ...provider(), enabled }], loadCredential: async () => { enabled = false; return fixtureCredential; },
+    provider: { chatCompletion: async () => { sends++; return response(); } },
+  })));
+  assert.equal(sends, 0);
+});
+test('late model dispatch checker cannot send after cancellation', async () => {
+  const pending = deferred(); const controller = new AbortController(); let checks = 0; let sends = 0;
+  const ports = modelPorts({ beforeDispatch: async () => { checks++; await pending.promise; },
+    provider: { chatCompletion: async () => { sends++; return response(); } } });
+  const s = manifest().skills[0]; const prepared = await prepareFrozenSkillModel(s, controller.signal, ports);
+  const running = prepared.complete({ instructions: '', input, outputSchema, model: s.definition.model, tools: [], toolResults: [], signal: controller.signal });
+  await new Promise(r => setImmediate(r)); assert.equal(checks, 1);
+  controller.abort(); pending.resolve(undefined); await assert.rejects(running); assert.equal(sends, 0);
+});
+test('unavailable checker factory fails before model preparation', async () => {
+  let prepares = 0; const r = await execute(runner(undefined, { createAuthority: () => { throw new Error('private internal failure'); }, prepareModel: async () => { prepares++; return {}; } }));
+  assert.equal(r.code, 'EXECUTION_AUTHORITY_DENIED'); assert.equal(prepares, 0);
 });

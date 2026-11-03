@@ -662,3 +662,65 @@ API（沿用原JWT/system:manage/实际admin）：GET /api/v1/skills/:skillId/em
 
 
 **C2c.2a复核与收尾证据：** fresh质量独立专项42/42、0skip及8项事务/安全探针通过，探针外层回滚后users/root/audit自身夹具均0残留，无DDL变化；规格及质量均APPROVE。schema组7文件含8823行完整生成快照，与runtime/API/tests/docs组21文件分别审查，后者最终diff低于999行。九页总看板新状态与后续门槛已同步，build及21页一致性0错0警；浏览器实读最终标题及RP-050下一步，临时页和自建3008服务已关闭，用户3006页未操作。
+
+### C2c.2b 精细工单：逐次执行权限与恢复复核（2026-11-03）
+
+用户“继续下一步”，基线1309fe9/codex/wes-skills-c；沿用已评审RP-050设计和.2a后续门槛，不新增需求或自动Loop。本单元实施必须默认生效的真实Run权限检查，接到每轮模型、每个Skill工具调用，以及Worker重新进入流程（含等待回答后的恢复）。继续留在既有隔离worktree，禁止读取/修改/扫描config/system/model-verify-status.json，禁止主库/预览操作、3006/3004重启或真实LLM/工具业务写入；无新DB迁移、无新增HTTP/UI。retry重新授权/会话删除并发留.2c，写确认/持久幂等/跨调用预算及生产宿主继续后续。
+
+架构：新增skills/execution-authority.ts，默认依赖真实PG紧停准入、当前用户角色、当前工具Registry/生效策略。检查只绑定持久runId+ownerUserId+manifestHash及原stepId/toolName；调用者manifest/hash不是授权。每次先核验实际Run/session/user/epoch，再解析当前inventory，最后重新核验DB准入/当前身份，避免库存解析期间撤权/stop被忽略。无连接跨MCP/模型I/O。原生参数/来源/能力位/副作用契约必须与原快照相容；当前能力与原允许范围取交集，策略只做减法，不新增原白名单外工具；MCP当前人工角色名单必查。原普通停用不追溯旧Run，原epoch release不复活。
+
+内部契约（具体名称可由实现方收敛，但语义和默认门禁不能改变）：
+```ts
+type ExecutionAction = { runId: string; ownerUserId: string; manifestHash: string;
+  phase: 'model' | 'tool' | 'resume'; stepId?: string; toolName?: string };
+interface ExecutionAuthority { check(action: ExecutionAction): Promise<void> }
+// createExecutionAuthority(database?, inventory?) uses real persisted admission by default.
+// SkillExecutionRequest adds trusted runId/ownerUserId; absent/incorrect context fails before any I/O.
+```
+权限检查结果不可保存为后续调用的通行证，服务端依赖注入仅供测试/可信装配，HTTP不可传checker/port。现有SkillExecutionService每轮模型请求前与prepare后再次检查（避免异步准备期间撤权），每个批内工具逐个重查；每轮重新验证原provider/model/endpoint/scope并取当前凭据，不复用失效模型配置。检查异常只映射固定安全错误码，取消/总预算覆盖异步检查，迟到的检查结果不能触发后续调用。
+
+工具确认边界：模型可声明原允许工具，但执行时必须同时满足原绑定、原权限与当前capability/Registry/策略；原/当前requiresConfirmation或ask、写入、外发（包括MCP）均不得凭confirmation布尔值/参数hash/operationId通过。由于持久工具确认与幂等未接，本批这些实际执行保持失败关闭，不调用toolGate；原先无生产toolGate的默认行为继续关闭。本批可验证有明确可信端口的只读调用，但不把模拟端口当真实业务工具验收。
+
+恢复边界：BusinessSkillsWorkflow在每次executeStep调用可信executor前强制用真实Run做resume权限检查，因此等待恢复/重启/旧CP同样受保护；default boot仍无生产executor，不开放业务入口。普通回答的已保存幂等回放不变，回答记录是业务数据而非工具授权。恢复检查在Worker重新执行前完成；不是声称等待回答写入事务已与外部策略存储原子化。若为此需要修改WaitService，必须保持max=1不嵌套连接、终态同答幂等与既有锁/租约语义；优先不改该服务。
+
+责任文件：新增execution-authority.ts及对应真实PG测试；必要窄改execution-emergency.ts返回当前身份供内部使用、skills.module.ts出口；skills.execution.ts/.test.ts、skills.execution-model.ts（若需要每次complete刷新）及BusinessSkillsWorkflow.ts与其unit/PG/wait fixture测试。旧单元/有限等待夹具可显式注入可信checker，保留原语义断言，并必须另有真实默认PG检查覆盖，不能将新默认安全路径都mock掉。父负责package脚本引用、计划/README/对齐说明/OpenAPI说明及九页看板；实现方不改这些文件。手写代码+测试尽量≤800，达到900预警，超过999先拆，不以净增隐藏搬移。无新增生成快照。
+
+- [x] RED：无run上下文/默认checker不可用时零模型准备、零工具调用；真实PG任务被禁用用户/角色能力撤销/停用根/stop+release/会话失效/错owner或manifest/step拒绝。记录失败原因而非仅编译错误。
+- [x] GREEN：默认真实Run checker，原白名单∩当前Registry/能力/策略；模型每轮刷新，批内工具逐次检查，原/当前ask与写外发保持关闭；错误不泄露凭据。
+- [x] 在模型准备中、第一工具之后、第一模型轮之后改变权限或停用，后续dispatch计数不增加；inventory期间变化必须被最后DB重验拦截，取消/超时后迟到checker不调模型/工具。
+- [x] 等待回答后，重建Worker/service/checker恢复前再核实；紧停或撤权后零executor调用；原.2a/等待/预算/旧版本恢复语义保持。真实PG单连接守卫、归属/manifest不伪造；无真实外部模型/业务工具验收声明。
+- [x] 规格APPROVE后fresh五轴质量安全复核；所有PG套件串行，modules期间不并行build。父独立专项/模块/Harness/AI/双构建，保留通用集成缺模板事实，文档/九页总看板回填，不合main/推送；本地提交在收尾实取记录。
+
+方案自检：已批准方向中的逐次门禁与原清单交集可落实；不新增可选unchecked默认通道；等待恢复边界明确为Worker重入，不扩大成回答事务与外部MCP原子授权。新功能不改变原manifest shape/hash，也不补造真实业务或模型通过证据。
+
+
+**C2c.2b原权限证据裁决：** 实读Workflow顶层tool contract有能力位/原生契约，但未保存原调用者V2角色集合（Skill子节点context.roles有）。本批不从businessRole发明第二套RBAC映射、不扩C1清单shape/hash；缺原角色证据的顶层tool执行及含该节点恢复保守拒绝，不能把capability元数据或hash当原授权。现无该生产宿主，不冒充直连Workflow工具已可执行；未来宿主/清单版本接入须补原权限证据后再开放。Skill子节点按原roles与当前权限交集继续实施。
+
+
+**C2c.2b默认门禁与旧夹具调整：** 首轮modules发现workflows.runtime.test.ts及business-skills.boot.test.ts旧fake Run夹具不含真实持久权限绑定。纯状态机测试显式注入可信checker并保留原断言；boot不增加可绕过checker的装配开关，改验证默认真实门禁拒绝fake Run且executor计数0，固定身份/注册仍验证。正向executor路径保留在adapter与真实PG测试。新增两文件纳入本单元窄改责任范围，原失败日志/计数保留。
+
+
+**C2c.2b开发证据：** 首RED缺Run请求原succeeded而期望failed（49中48pass/1fail，/tmp/wes-c2c2b-impl/red）。真实PG首轮7/7、0skip（check3），覆盖缺省service权限与fresh Worker回答后stop/revoke零executor。首modules926中924pass/2fail，确为boot和纯Harness两处旧fake夹具未带新门禁；按上条责任范围调整，不改生产boot装配，不弱化原预算/守卫。后续最终计数独立实取。
+
+
+**C2c.2b单次执行身份边界裁决：** 真实PG新增prepare期间admin→user但businessRole不变且无工具的反例为10/11（原会继续complete，red-prepare-downgrade）。允许checker在一次execute/executeStep实例内记录首次成功身份摘要，后续任何身份变化保守拒绝；摘要仅作约束，每次仍查真实DB/库存，不是可复用grant。每次调用新建实例，同一service的不同合法Run不互相污染；不可将首次owner缓存于全局/service工厂或建无界Map。跨调用/Worker重建仍按原范围与当前权限重验，紧停epoch旧绑定规则保留。
+
+
+**C2c.2b冻结与规格复核：** 实现方14个code/test文件gross519行（tracked155增46删+新318），modules931、紧停42、专项154均0fail/0skip，最后将late-hook测试无界while改为setImmediate后assert检查已进入并补66/66，fresh API build exit0（/tmp/wes-c2c2b-impl/regression-final及build-api-final.log）。规格方独立专项154/154、0skip后SPEC APPROVE（/tmp/wes-c2c2b-spec），未把实现方日志冒充本人复跑。父独立modules931/931已通过，质量/其他跨域检查继续进行；无真实模型/业务工具/工作台验收声明。
+
+
+**C2c.2b测试数据边界（质量非阻断观察）：** 新真实PG套件沿用既有invocation模式，after清Run/session/user，随机Skill/Workflow根、版本与不可变紧停审计仍留在workload_eval_test；不宣称该suite或全库零残留。为保留审计不可删除约束，本批不关trigger、不改DDL或全表TRUNCATE来做选择性清理；受守卫modules清理链承担后续套件隔离。质量额外probe需外层事务回滚不留下自身新增数据。预览/主库无写入，这些随机测试夹具不作为业务验收数据。
+
+
+**C2c.2b本机预览实查：** 交付前只读lsof检查3006/3004均无LISTEN记录（exit1/空输出）。本批未启动/重启或更新这两个预览，B代码基线保留；不将浏览器旧页面视为当前服务正在运行，也不宣称C批已部署到3006。
+
+
+**C2c.2b看板表格回归：** RP-050保持C实施中，下一步已更新为重试授权/会话删除并发及幂等，浏览器展开完整台账实读通过。截图/Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c2b-2026-11-03-board-requirements.png；原窄列/P2换行与大空列保持，不宣称共享样式或视觉优化通过。
+
+
+**C2c.2b最终回填（2026-11-03）：** 逐次默认真实checker及每次execute身份变化边界、模型发送前可信钩子/每complete配置凭据刷新、逐个工具交集核验及Worker恢复前检查已实现。父独立专项154、紧停42、模块931、Harness391、串行存储194、AI286及API/Web双构建通过，均0skip；规格与fresh五轴质量安全APPROVE。日志/tmp/wes-c2c2b-parent-final、/tmp/wes-c2c2b-spec、/tmp/wes-c2c2b-quality及/tmp/wes-c2c2b-build-{api,web}.log。通用集成0/1仍templates_status_not_200，活动模板/分配缺失，不补造业务数据；npm audit仍45项既有风险（32moderate/12high/1critical），未改依赖，不冒充风险清零。两份RED、首modules旧夹具2失败、TS中间失败保留；最终不是从报告推导计数。
+
+本批未改WaitService回答事务或boot的生产装配开关，旧终态同答幂等保留；Worker重新进入executor才是恢复检查边界，非跨MCP原子授权。Workflow顶层tool原角色证据、持久工具确认和幂等未接前均保守拒绝；不把布尔确认或hash当grant。无新HTTP/UI/DB迁移/真实LLM或业务工具验收，3006/3004及用户模型状态文件未操作，主线未合入/未推送。下一步C2c.2c显式retry重新授权与会话删除并发保护，再做持久确认/幂等/跨调用预算、统一视图、生产宿主/C3/D。
+
+
+**C2c.2b收尾证据：** fresh五轴质量安全独立154/154、纯测125/125、0skip后APPROVE，无新增阻断finding；根/audit测试保留披露，未声称零残留。父最终计数与两份OpenAPI六控制路径解析核验通过；九页总看板build/21页一致性0错0警，浏览器实读最终标题、C实施中及后续门槛。自建3008服务和临时看板页已关闭；3006/3004未启动、未更新。质量文档快核指出的预览状态与中间review进行中文字已收口；源代码未改。

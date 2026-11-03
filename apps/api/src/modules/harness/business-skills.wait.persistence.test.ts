@@ -45,7 +45,7 @@ const service = () => createBusinessSkillsWaitService(database);
 async function execute() {
   const repository = createHarnessRuntimeRepository(database);
   const executor = createBusinessWorkflowWaitExecutor(createBusinessSkillsWaitService(database));
-  const registry = createHarnessWorkflowRegistry([createBusinessSkillsWorkflow({ executor })]);
+  const registry = createHarnessWorkflowRegistry([createBusinessSkillsWorkflow({ createAuthority: () => ({ check: async () => {} }), executor })]);
   assert.equal(await createHarnessRuntimeWorker({ repository, registry, workerId: randomUUID() }).runNextAttempt(), true);
 }
 async function events(runId: string) { return queue.listRunEventsAfter({ runId, afterSequence: 0, limit: 200 }); }

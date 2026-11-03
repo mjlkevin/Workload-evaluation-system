@@ -83,7 +83,7 @@ async function verifyRun(tx: QueueDbExecutor, run: Run, ownerUserId: string) {
     if (control.stopped) failure('EXECUTION_EMERGENCY_STOPPED', '技能或流程已被管理员紧急停止');
     if ((bindings as ExecutionAuthorityBinding[])[i].epoch !== control.epoch) failure('EXECUTION_MANUAL_RETRY_REQUIRED', '任务曾被紧急停止，请手动重新发起');
   }
-  return { runId: run.harnessRunId, manifest };
+  return { runId: run.harnessRunId, manifest, identity: current };
 }
 /** Admission only. Callers must add current Registry/policy checks before each external action. */
 export function createExecutionEmergencyRepository(database: Database = db) {

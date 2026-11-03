@@ -183,7 +183,7 @@ test('wrong kind, execution ID, corrupt manifest and frozen bad schema fail clos
 
 test('trusted Harness test port saves pure state and restores intermediate and final output without duplicate commands', async () => {
   const m = manifest(); const run = runFixture(m); const requested: string[] = [];
-  const adapter = createBusinessSkillsWorkflow({ executor: async ({ manifest: frozen, state }) => {
+  const adapter = createBusinessSkillsWorkflow({ createAuthority: () => ({ check: async () => {} }), executor: async ({ manifest: frozen, state }) => {
     const r = createWorkflowRuntime(frozen, run.harnessRunId); let d = r.next(Object.keys(state).length ? state : undefined);
     if (d.kind === 'ready') { requested.push(d.command.stepId); const outputs: Record<string, unknown> = { s: { text: 's' }, u: { text: 'original final' }, c: { approved: false }, t: { opaque: 'saved' } };
       d = r.settle(d.state, { operationId: d.command.operationId, output: outputs[d.command.stepId] }); }
