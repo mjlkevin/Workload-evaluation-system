@@ -1,3 +1,5 @@
+import { db } from "../../db/client";
+import { createProjectEvaluationInTransaction } from "./project-evaluation-transaction";
 import { randomUUID } from "node:crypto";
 
 import type { AuthUser, VersionRecord } from "../../types";
@@ -65,53 +67,9 @@ export async function getProjectEvaluationForUser(user: AuthUser, projectId: str
   return mapGlobalVersionToProject(record);
 }
 
-/** 阶段 1 批 4：级联改 async（generateProjectVersionCode / saveProjectRecord 异步化），实现不动。 */
+/** Normal creation shares allocation, snapshot and insertion semantics with local transactional tools. */
 export async function createProjectEvaluationForUser(user: AuthUser, input: Record<string, unknown>): Promise<ProjectEvaluationPlan> {
-  const nowIso = new Date().toISOString();
-  const projectName = asString(input.projectName) || "新项目评估";
-  const customerName = asString(input.customerName);
-  const industry = asString(input.industry);
-  const currentStage = asString(input.currentStage) || "project_discovery";
-  const createdFromSessionId = asString(input.createdFromSessionId);
-  const recordId = randomUUID();
-  const versionCode = await generateProjectVersionCode(user.id);
-  const productMasterSnapshot = buildProductMasterSnapshot(await getProductMasterDataRepository().listActiveAssignments());
-  const payload: Record<string, unknown> = {
-    recordKind: PROJECT_EVALUATION_RECORD_KIND,
-    projectName,
-    customerName,
-    industry,
-    currentStage,
-    projectStatus: "draft",
-    createdFromSessionId,
-    totalDays: Number(input.totalDays) || 0,
-    productMasterSnapshot,
-  };
-  const record: VersionRecord = {
-    id: recordId,
-    type: "global",
-    versionCode,
-    templateId: "project-evaluation",
-    ownerUserId: user.id,
-    status: "draft",
-    payload,
-    createdAt: nowIso,
-    updatedAt: nowIso,
-    createdByUserId: user.id,
-    createdByUsername: user.username,
-    updatedByUserId: user.id,
-    updatedByUsername: user.username,
-    checkoutStatus: "checked_in",
-    versionDocStatus: "drafting",
-    majorLetter: "A",
-    minorNumber: 0,
-    baseCode: versionCode,
-    isHistoricalArchive: false,
-    lastCheckinPayload: {},
-  };
-
-  await saveProjectRecord(record);
-  return mapGlobalVersionToProject(record);
+  return db.transaction(tx => createProjectEvaluationInTransaction(tx, user.id, input));
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

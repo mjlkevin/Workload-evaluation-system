@@ -935,3 +935,20 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **C2c.3c.1最终回填：** 本地业务写入与成功回执现可同事务提交：重复、并发和明确重试只写一次，失败整笔回滚；重放也须当前权限与新确认有效。默认没有生产工具适配器。父独立执行专项106、模块931、Harness482、AI286及API/Web双构建通过，测试均0skip。SPEC20后fresh质量PG20/纯测41APPROVE；全阶段0skip。保留专属有效RED0/2、来源/MCP夹具失败和首次TS收窄失败；没有改原modules并发、弱化旧断言/预算或seed模板造绿。真实SQL唯一冲突等待/赢家rollback接管/写与撤权两种锁序、坏JSON和完成更新失败整笔rollback、retry重新approve后只复用、微秒fence与历史source/decision完整性均有无条件断言。完整JSON配额以每个包装边界为准，可信adapter不是自动网络沙箱。仅测试库真实业务记录证明底座，生产工具仍待3c.2；3c整体与C/D/MVP未关闭。九页看板同步，RP-050保持C实施中，sources无新文档资产/计数不变。下一步接具体生产业务工具的事务适配（C2c.3c.2），再做跨调用累计预算（3d）、统一视图、生产宿主、工作台和D验收。实际本地sha和板检截图随后实取补记。
 
 **C2c.3c.1板检实取：** canonical九页build/check覆盖21页，0错误/0警告（/tmp/wes-c2c3c1-board-build-final.log与board-check-final.log）；OpenAPI YAML解析193条path未增公开入口。IAB只读核验RP-050仍C实施中，next明确具体生产工具/预算/宿主/工作台/D；53唯一需求/54数据行不变。截图 /Users/kevin/.codex/visualizations/2026/11/02/01a19a18-92f8-7bf1-b70c-df3fd911608f/c2c3c1-2026-11-03-board-requirements.png；沿用既有短列换行和长行留白，不作UI优化声明。自建3008服务/标签已关闭，不动3006/3004。源码gross586（含搬移），本地提交sha随后实取回填；3c.2具体生产工具未在本次实施。
+
+### 连续完成剩余范围（2026-11-03，用户授权直到完成再汇报）
+
+用户在0251415后明确要求继续直到做完，不再逐批等待“继续”。本次在同一会话连续执行已批准C/D剩余实现与可执行验证，不创建自动化/heartbeat或需求池Loop；原“本单元不自动进入下一单元”由本次明确授权替代。保持codex/wes-skills-c隔离本地实现，未获push/main合并授权，不覆盖主目录既有UI dirty；protected config/system/model-verify-status.json禁止读取/扫描/修改/暂存，凭据不出现在对话/文档/日志。所有自动测试仅guarded workload_eval_test；预览库如进入最终验收只准受控业务操作，禁止测试cleanup。原3006/3004阶段冻结可在C/D实现与验证齐备后，按既有预览库/端口恢复供最终验收，账号密码保持。
+
+剩余顺序与责任：
+- [ ] 3c.2：具体create_project本地事务adapter，复用生产项目草稿契约/编码规则/产品快照/当前owner与session；同tx创建业务行+receipt，默认只显式白名单装配，网络/导出/MCP不纳入事务承诺。现有创建路径同规则，不以测试夹具代替生产adapter。
+- [ ] 3d：持久Run/root累计模型尝试/工具调用/输出Token/活动执行时长预算，跨恢复/retry不清零；调用前预留/扣费，外部I/O不持PG连接，未知结果保守记账；上限不可由客户端扩大，取消/超时不留下免计费窗口。
+- [ ] C2c.4/宿主：Skill及四类Workflow节点在生产Harness启动/恢复端口接线；现有等待/确认与新操作确认、预算、幂等端口实际强制使用；单一Run/事件/检查点/输出权威，禁止多库拼装状态、最新定义漂移或默认权限回退。
+- [ ] C3：JWT授权目录/同一提交入口、推荐与显式选择/流程启动、原输入Schema补齐、等待/确认/失败重试/停止与结果溯源统一工作台；普通对话保留；UI遵守npx ui-skills及单表面规则。
+- [ ] D：真实来源的拆解/澄清/实施匹配三个业务Skill初始内容通过正式管理/发布路径导入；稳定需求ID/真实templateItemId/未匹配项、权威规则计算、草稿关联/签入与刷新；样本期望从已人工确认需求及固定业务/规则依据产生，不由待测模型作标准答案。业务预期确需用户确认时准备可审阅实物后最小化提问，其余工作继续。最终技术完成与真实模型、人工业务验收分别报告。
+
+内部执行仍按TDD真实RED→GREEN→重构、fresh实现者→规格→fresh五轴安全复核。独立文件边界可并行开发/静态阅读，但PG套件与构建统一租约串行调度，保持原modules脚本并发不改；每个review/本地提交目标<1000 gross行，超过前按可验收单元拆，不隐去搬移。父统一维护包脚本、OpenAPI/README/对齐/九页总看板与事实日志，相关单元提交后继续剩余工作，不发阶段性最终答复。用户期望少打扰；仅必要的执行状态/阻断信息简述。
+
+**连续实施候选与复核事实：** 3c.2生产create_project共享事务/当前身份/可信session/真实规则和快照，初始9项通过后SPEC发现空规则GL兜底遗漏，已真实RED9pass/2fail并修复为原默认工厂，最终12/12及fresh质量12/12、清理夹具全0；source gross678，旧Harness其他草稿路径协调范围保留。3d预算20项后SPEC发现同步阻塞越过timer且错误退款，新增真实RED1fail并加单调deadline，最终21/21/tsc0，source gross490，SPEC复核进行中。持久Skill逐步cursor17项通过（source311），Workflow v2原角色证据及prepare-tool只检权限75项通过（source244），两者静态SPEC通过；cursor仅可信服务器CP损坏检测非客户端防伪。Host与Workflow scope正在接线，两个真实RED分别7fail与2fail已保留，未提前声明生产接入/完整MVP。UI前置使用NODE_USE_ENV_PROXY=1 npx --offline ui-skills start成功加载官方routing，普通联网尝试日志/进程待统一清理；没有引入UI技术栈。
+
+**事务项目适配本地收口：** 原9项后SPEC空规则P2经真实RED修复，当前source gross678，SPEC及fresh五轴安全APPROVE，独立PG12/12、清理7类fixture0；父原modules+R/V新增纯测984/984，0fail/cancel/skip。原serial-store新增明确writer第17项、指纹与脚本一致。只提交此已复核业务适配与文档/脚本子集，其他预算/游标/权限/host/scope候选不混入；总build/最终C/D继续，不停止用户授权任务。

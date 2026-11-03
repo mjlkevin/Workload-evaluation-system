@@ -192,7 +192,7 @@ export interface VersionsStoreRepository {
 
 type VersionRecordRow = typeof versionRecords.$inferSelect;
 
-function toVersionRecord(row: VersionRecordRow): VersionRecord {
+export function toVersionRecord(row: VersionRecordRow): VersionRecord {
   const record: VersionRecord = {
     id: row.recordId,
     type: row.type as VersionRecord["type"],
@@ -226,7 +226,7 @@ function toVersionRecord(row: VersionRecordRow): VersionRecord {
 
 type VersionRecordValues = typeof versionRecords.$inferInsert;
 
-function toRowValues(record: VersionRecord): VersionRecordValues {
+export function toRowValues(record: VersionRecord): VersionRecordValues {
   return {
     recordId: record.id,
     type: record.type,
