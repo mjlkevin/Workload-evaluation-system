@@ -19,7 +19,7 @@ export function createWorkflowRuntime(value: ExecutionManifest, executionId: str
     const dependency = skills.find(skill => skill.stepId === step.id);
     const tool = manifest.tools.find(tool => tool.stepId === step.id)?.contract;
     const inputSchema = step.type === 'skill' ? dependency!.definition.inputSchema : step.type === 'tool' ? tool!.parameters : step.inputSchema;
-    const outputSchema = step.type === 'skill' ? dependency!.definition.outputSchema : step.type === 'userInput' ? step.outputSchema : step.type === 'confirmation' ? confirmationOutput : null;
+    const outputSchema = step.type === 'skill' ? dependency!.definition.outputSchema : step.type === 'tool' ? tool!.outputSchema ?? null : step.type === 'userInput' ? step.outputSchema : confirmationOutput;
     return { dependency, tool, inputSchema, outputSchema, input: compileSkillPayloadSchema(inputSchema, 'inputSchema'),
       output: outputSchema ? compileSkillPayloadSchema(outputSchema, 'outputSchema') : null };
   });
@@ -76,7 +76,7 @@ export function createWorkflowRuntime(value: ExecutionManifest, executionId: str
         if (receipt.operationId !== id) reject('INVALID_STATE');
         consumed++;
         if (receipt.status === 'failed') return finish({ kind: step.onFailure === 'wait' ? 'waiting' : 'failed', stepId: step.id, code: receipt.code, state: s });
-        if (step.type === 'tool') { if (!own(receipt, 'opaqueResult')) reject('INVALID_STATE'); }
+        if (step.type === 'tool' && !contract.output) { if (!own(receipt, 'opaqueResult')) reject('INVALID_STATE'); }
         else {
           if (!own(receipt, 'output') || !contract.output!((receipt as { output: unknown }).output)) reject('INVALID_STATE');
           values.steps[step.id] = { output: (receipt as { output: unknown }).output };
@@ -110,7 +110,7 @@ export function createWorkflowRuntime(value: ExecutionManifest, executionId: str
     else {
       const index = definition.steps.findIndex(step => step.id === command.stepId); const contract = contracts[index];
       if (contract.output && !contract.output(data.output)) reject('INVALID_OUTPUT');
-      receipt = { operationId: data.operationId, status: 'succeeded', ...(command.type === 'tool' ? { opaqueResult: data.output } : { output: data.output }) };
+      receipt = { operationId: data.operationId, status: 'succeeded', ...(command.type === 'tool' && !contract.output ? { opaqueResult: data.output } : { output: data.output }) };
     }
     s.receipts.push(receipt);
     return replay(state(s));

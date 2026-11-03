@@ -13,6 +13,7 @@ import { readPreparedOperationInTransaction } from './skills.operations';
 import { copyTrialJson } from './skills.sandbox';
 import { skillDefinitionHash as hash } from './skills.hash';
 import { SkillError } from './skills.types';
+import { compileNativeToolOutput } from './skills.validation';
 
 /** Trusted server assembly only. Implementations MUST use only tx for local DB work:
  * no external I/O or global pools. Arbitrary JavaScript cannot be sandboxed by this port. */
@@ -101,6 +102,10 @@ function localTool(value: Context) {
   const tool = value.pending.snapshot.native;
   if ((tool.source ?? 'code') !== 'code' || tool.mutates !== true || tool.exfiltrates === true || tool.simulationOnly === true) fail('OPERATION_EXECUTION_TOOL_DENIED', 403);
 }
+function nativeOutput(value: Context, result: unknown) {
+  const validate = compileNativeToolOutput(value.pending.snapshot.native);
+  if (validate && !validate(result)) fail('OPERATION_NATIVE_OUTPUT_SCHEMA_FAILED');
+}
 function fixedInput(value: Context) {
   const p = value.pending;
   return { schemaVersion: 1, operationId: p.operationId, rootRunId: p.rootRunId, operationKey: p.operationKey,
@@ -142,6 +147,7 @@ async function receiptResult(tx: QueueDbExecutor, row: typeof harnessToolEvents.
     .from(harnessToolEvents).where(eq(harnessToolEvents.harnessToolEventId, row.harnessToolEventId));
   if (!time?.valid) fail('OPERATION_EXECUTION_INVALID');
   await originalApproval(tx, value, basis, input);
+  nativeOutput(value, output.result);
   return json({ operationId: value.pending.operationId, executionId: row.harnessToolEventId, rootRunId: value.pending.rootRunId, status: 'succeeded' as const, result: output.result });
 }
 /** Explicit internal local transaction consumer. No default registry dispatch or general ToolGate grant. */
@@ -174,6 +180,8 @@ export function createSkillOperationExecutionService(options: Options = {}) {
           controlled.guard();
           const result = json(await adapter.execute(tx, { operationId: request.operationId, ownerId: user.id,
             sessionId: current.pending.sessionId, parameters: json(current.pending.request.parameters) }));
+          // Throw inside the adapter's transaction so invalid output rolls back its business writes too.
+          nativeOutput(current, result);
           controlled.guard();
           [row] = await tx.update(harnessToolEvents).set({ status: 'succeeded', output: json({ schemaVersion: 1, result }), resolvedAt: await readDbNow(tx) })
             .where(and(eq(harnessToolEvents.harnessToolEventId, inserted.harnessToolEventId), eq(harnessToolEvents.status, 'executing'))).returning();

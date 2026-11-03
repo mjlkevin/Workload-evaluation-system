@@ -72,7 +72,8 @@ export function createWorkflowContextLoader(options: {
                 const tool = allowed.find(t => t.name === step.toolName);
                 if (!tool)
                     throw new WorkflowError('WORKFLOW_DEPENDENCY_UNAVAILABLE', '原生工具当前未获角色或策略授权', 409);
-                const contract = { name: tool.name, description: tool.description, parameters: tool.parameters, mutates: tool.mutates, exfiltrates: tool.exfiltrates, simulationOnly: tool.simulationOnly, source: tool.source, capability: tool.capability, requiresConfirmation: tool.requiresConfirmation, policy: tool.policy };
+                const contract = { name: tool.name, description: tool.description, parameters: tool.parameters, mutates: tool.mutates, exfiltrates: tool.exfiltrates, simulationOnly: tool.simulationOnly, source: tool.source, capability: tool.capability, requiresConfirmation: tool.requiresConfirmation, policy: tool.policy,
+                    ...(tool.outputSchema !== undefined ? { outputSchema: tool.outputSchema } : {}) };
                 snapshot.tools.push({ stepId: step.id, contract, hash: skillDefinitionHash(contract) });
             }
         }

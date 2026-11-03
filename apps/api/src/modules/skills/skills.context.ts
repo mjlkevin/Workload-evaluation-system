@@ -13,7 +13,7 @@ import { getUsersRepository } from '../auth/users.repository';
 import { getKnowledgeRepository } from '../knowledge/knowledge.module';
 import { SkillError, type SkillDefinition } from './skills.types';
 import { skillDefinitionHash } from './skills.hash';
-import { validateSkillDefinition, type SkillToolDefinition } from './skills.validation';
+import { compileNativeToolOutput, validateSkillDefinition, type SkillToolDefinition } from './skills.validation';
 import { createSkillModelAdapter, resolveSkillReferences } from './skills.runtime';
 import type { SkillReadExecutor } from './skills.sandbox';
 import type { SkillDependencySnapshot } from './skills-release.types';
@@ -24,7 +24,9 @@ export function permittedSkillTools(tools: AgentTool[], user: AuthUser, policy: 
   return tools.filter(tool => anyRoleHasCapability(roles, tool.capability) && isToolDiscoverableUnderPolicy(tool, policy, roles));
 }
 export function skillToolContract(tool: AgentTool): SkillToolDefinition {
+  if (tool.source !== 'mcp') compileNativeToolOutput(tool);
   return { name: tool.name, description: tool.description, parameters: tool.parameters, mutates: tool.mutates,
+    ...(tool.source !== 'mcp' && tool.outputSchema !== undefined ? { outputSchema: tool.outputSchema } : {}),
     exfiltrates: Boolean(tool.exfiltrates), simulationOnly: tool.source === 'mcp' || (tool.simulationOnly ?? tool.sandboxReadSafe !== true) };
 }
 export async function resolveCurrentSkillTools(user: AuthUser) {
@@ -79,7 +81,10 @@ export function createSkillReadExecutor(initialUser: AuthUser, contracts: SkillT
     if (!tool || !before || tool.source === 'mcp' || tool.sandboxReadSafe !== true || tool.mutates || tool.exfiltrates
       || skillDefinitionHash(skillToolContract(tool)) !== skillDefinitionHash(before)) throw new Error('SKILL_TOOL_AUTHORITY_CHANGED');
     if (signal.aborted) throw new Error('SKILL_TRIAL_ABORTED');
-    return now.registry.execute(name, parameters, { id: user.id, roles: legacyRoleToV2Roles(user.role), capabilities: [tool.capability] });
+    const result = await now.registry.execute(name, parameters, { id: user.id, roles: legacyRoleToV2Roles(user.role), capabilities: [tool.capability] });
+    const validate = compileNativeToolOutput(before);
+    if (validate && !validate(result)) throw new Error('NATIVE_OUTPUT_SCHEMA_FAILED');
+    return result;
   };
 }
 

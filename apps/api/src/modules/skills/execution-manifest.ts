@@ -62,6 +62,7 @@ const toolFields = { name: nonempty, description: { type: 'string' }, parameters
 const policyShape = fields({ enabled: { type: 'boolean' }, visibleRoles: { type: 'array', items: { enum: V2_ROLES }, uniqueItems: true },
   approvalStrategy: { enum: TOOL_POLICY_APPROVAL_STRATEGIES }, injectionMode: { enum: TOOL_POLICY_INJECTION_MODES } });
 const native = fields({ ...toolFields, sandboxReadSafe: { type: 'boolean' } });
+native.properties.outputSchema = { type: 'object' };
 const contextShape = fields({ schemaVersion: { const: 1 },
   references: { type: 'array', maxItems: 30, items: fields({ uri: nonempty, version: nonempty, digest }) },
   tools: { type: 'array', maxItems: 30, items: fields({ native, policy: policyShape }) },
@@ -70,8 +71,9 @@ const contextShape = fields({ schemaVersion: { const: 1 },
     baseUrlDigest: digest, params: { type: 'object' }, capabilities: strings, supportedParams: strings }) });
 const compiler = new Ajv({ strict: false });
 const validateContext = compiler.compile(contextShape);
-const toolBindingsShape = { type: 'array', maxItems: 50, items: fields({ stepId: nonempty, hash: digest,
-  contract: fields({ ...toolFields, requiresConfirmation: { type: 'boolean' }, policy: policyShape }) }) };
+const directToolContract = fields({ ...toolFields, requiresConfirmation: { type: 'boolean' }, policy: policyShape });
+directToolContract.properties.outputSchema = { type: 'object' };
+const toolBindingsShape = { type: 'array', maxItems: 50, items: fields({ stepId: nonempty, hash: digest, contract: directToolContract }) };
 const validateToolBindings = compiler.compile(toolBindingsShape);
 const validateToolAuthority = compiler.compile(fields({ schemaVersion: { const: 1 },
   roles: { type: 'array', minItems: 1, maxItems: V2_ROLES.length, items: { enum: V2_ROLES }, uniqueItems: true },
@@ -140,7 +142,8 @@ export function createExecutionManifestService(options: ServiceOptions = {}) {
           if (typeof current.sandboxReadSafe !== 'boolean') invalid('EXECUTION_CONTEXT_CHANGED', 409);
           toolEvidence.push({ stepId: step.id, sandboxReadSafe: current.sandboxReadSafe });
           const contract = { name: current.name, description: current.description, parameters: current.parameters, mutates: current.mutates, exfiltrates: current.exfiltrates,
-            simulationOnly: current.simulationOnly, source: current.source, capability: current.capability, requiresConfirmation: current.requiresConfirmation, policy: current.policy };
+            simulationOnly: current.simulationOnly, source: current.source, capability: current.capability, requiresConfirmation: current.requiresConfirmation, policy: current.policy,
+            ...(current.outputSchema !== undefined ? { outputSchema: current.outputSchema } : {}) };
           const published = before.publishedDependencies?.tools.find(tool => tool.stepId === step.id);
           if (!published || published.hash !== hash(contract)) invalid('EXECUTION_CONTEXT_CHANGED', 409);
           noCredentials(contract); tools.push({ stepId: step.id, contract, hash: hash(contract) });

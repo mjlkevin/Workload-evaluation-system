@@ -94,6 +94,24 @@ test('adapter writes followed by invalid JSON result roll back the business row 
  await assert.rejects(execution({ adapters: new Map([[native.name, { kind: 'local-transaction', async execute(tx: any, input: any) { await adapter.execute(tx, input); return { bad: Infinity }; } }]]) }).executeOperation(user, f.command));
  assert.equal((await business(f.op.operationId)).length, 0); assert.equal((await receipts(f.op.rootRunId)).length, 0);
 });
+test('typed native adapter rolls back schema-invalid output before business row and receipt commit', async () => {
+ (native as any).outputSchema = payload;
+ try {
+  const f = await approved();
+  const invalid = { kind: 'local-transaction', async execute(tx: any, input: any) { await adapter.execute(tx, input); return { text: 9 }; } };
+  let refused: unknown;
+  try { await execution({ adapters: new Map([[native.name, invalid]]) }).executeOperation(user, f.command); } catch (error) { refused = error; }
+  assert.equal((await business(f.op.operationId)).length, 0, 'schema-invalid native output must roll back the actual business row');
+  assert.equal((await receipts(f.op.rootRunId)).length, 0); assert.equal((refused as any)?.code, 'OPERATION_NATIVE_OUTPUT_SCHEMA_FAILED');
+  const valid = { kind: 'local-transaction', async execute(tx: any, input: any) { await adapter.execute(tx, input); return { text: 'written' }; } };
+  const service = execution({ adapters: new Map([[native.name, valid]]) });
+  const first = await service.executeOperation(user, f.command); assert.deepEqual(first.result, { text: 'written' });
+  assert.deepEqual(await service.executeOperation(user, f.command), first); assert.equal((await business(f.op.operationId)).length, 1);
+  const receipt = (await receipts(f.op.rootRunId))[0];
+  await database.update(schema.harnessToolEvents).set({ output: { schemaVersion: 1, result: { text: 9 } } }).where(eq(schema.harnessToolEvents.harnessToolEventId, receipt.harnessToolEventId));
+  await assert.rejects(service.executeOperation(user, f.command), deny('OPERATION_NATIVE_OUTPUT_SCHEMA_FAILED'));
+ } finally { delete (native as any).outputSchema; }
+});
 const updateRun = (id: string, patch: any) => database.update(schema.harnessRuns).set(patch).where(eq(schema.harnessRuns.harnessRunId, id));
 const updateUser = (patch: any) => database.update(schema.users).set(patch).where(eq(schema.users.userId, user.id));
 const updateEvent = (id: string, patch: any) => database.update(schema.harnessToolEvents).set(patch).where(eq(schema.harnessToolEvents.harnessToolEventId, id));

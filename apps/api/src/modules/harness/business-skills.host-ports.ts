@@ -90,7 +90,8 @@ export function createBusinessSkillHostPorts(scope: Scope) {
     const tool = current.registry.get(request.call.name);
     if (!tool || (tool.source ?? 'code') !== 'code' || tool.sandboxReadSafe !== true || tool.mutates || tool.exfiltrates
      || hash(skillToolContract(tool)) !== hash({ name: native.name, description: native.description, parameters: native.parameters,
-      mutates: native.mutates, exfiltrates: Boolean(native.exfiltrates), simulationOnly: native.simulationOnly })) return fail('BUSINESS_SKILLS_TOOL_UNSUPPORTED');
+      mutates: native.mutates, exfiltrates: Boolean(native.exfiltrates), simulationOnly: native.simulationOnly,
+      ...(native.outputSchema !== undefined ? { outputSchema: native.outputSchema } : {}) })) return fail('BUSINESS_SKILLS_TOOL_UNSUPPORTED');
     await check('tool', request.stepId, request.call.name);
     if (limits.signal.aborted) throw new HarnessWorkflowCancelledError();
     const value = await tool.execute(request.call.arguments as Record<string, unknown>, { id: ownerUserId, roles: legacyRoleToV2Roles(user.role), capabilities: [tool.capability] });

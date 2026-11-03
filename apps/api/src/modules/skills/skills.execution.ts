@@ -5,7 +5,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { anyRoleHasCapability } from '../../rbac/permissions';
 import { readPersistedExecutionManifest } from './execution-manifest';
 import type { ExecutionManifest } from './execution-manifest.types';
-import { compileSkillPayloadSchema } from './skills.validation';
+import { compileNativeToolOutput, compileSkillPayloadSchema } from './skills.validation';
 import { copyTrialJson, readSkillPath, type SkillToolCall, type SkillToolStep } from './skills.sandbox';
 import type { SkillModelResponse, SkillTrialBudgets } from './skills.evaluation';
 import { prepareFrozenSkillModel, type FrozenExecutionSkill, type PreparedSkillModel } from './skills.execution-model';
@@ -146,7 +146,9 @@ export function createSkillExecutionService(ports: SkillExecutionPorts = {}) {
             try { result = await ports.toolGate({ caller: structuredClone(manifest.caller), stepId: skill.stepId, skillId: skill.skillId, versionId: skill.versionId,
               binding: structuredClone(entry.binding), snapshot: structuredClone(entry.snapshot), call: structuredClone(entry.call), input: structuredClone(input), signal: controller.signal }); }
             catch { deadlineGuard(); return fail('TOOL_GATE_FAILED'); }
-            deadlineGuard(); toolResults.push({ callId: entry.call.id, toolName: entry.call.name, arguments: entry.call.arguments, simulated: false, result: json(result) });
+            deadlineGuard(); const output = json(result), validate = compileNativeToolOutput(entry.snapshot.native);
+            if (validate && !validate(output)) fail('NATIVE_OUTPUT_SCHEMA_FAILED');
+            toolResults.push({ callId: entry.call.id, toolName: entry.call.name, arguments: entry.call.arguments, simulated: false, result: output });
           }
         }
       };

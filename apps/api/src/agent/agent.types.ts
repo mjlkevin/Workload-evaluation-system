@@ -17,6 +17,8 @@ export interface AgentTool {
   description: string;
   /** JSON Schema 参数对象 */
   parameters: Record<string, unknown>;
+  /** Optional code-owned result contract; absence preserves opaque legacy results. */
+  outputSchema?: Record<string, unknown>;
   /** 所需 RBAC 能力位；调用前校验 */
   capability: Capability;
   /** 是否写操作（true 需用户确认） */

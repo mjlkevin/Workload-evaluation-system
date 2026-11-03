@@ -4,7 +4,7 @@ import { anyRoleHasCapability } from '../../rbac/permissions';
 import { readPersistedExecutionManifest } from './execution-manifest';
 import type { ExecutionManifest } from './execution-manifest.types';
 import { skillDefinitionHash as hash } from './skills.hash';
-import { compileSkillPayloadSchema } from './skills.validation';
+import { compileNativeToolOutput, compileSkillPayloadSchema } from './skills.validation';
 import { copyTrialJson, readSkillPath, type SkillToolCall } from './skills.sandbox';
 import { SkillError } from './skills.types';
 import { readSkillExecutionState, safeSkillMetadata, type SkillExecutionStateBinding } from './skills.execution-state';
@@ -57,6 +57,7 @@ export function createResumableSkillExecutor(ports: ResumableSkillPorts = {}) {
         || (native.source === 'code' && policy.visibleRoles.length && !policy.visibleRoles.some(role => skill.context.roles.some(current => current === role)))) fail('TOOL_SNAPSHOT_DENIED');
     }
     const validators = new Map(skill.context.tools.map(t => [t.native.name, compiler.compile(t.native.parameters)]));
+    const outputValidators = new Map(skill.context.tools.map(t => [t.native.name, compileNativeToolOutput(t.native)]));
     const validateCall = (value: SkillToolCall) => {
       if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !['id', 'name', 'arguments'].includes(key))
         || typeof value.id !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(value.id) || typeof value.name !== 'string') fail('INVALID_OR_REPEATED_TOOL_CALL');
@@ -75,7 +76,13 @@ export function createResumableSkillExecutor(ports: ResumableSkillPorts = {}) {
     const binding: SkillExecutionStateBinding = { ...identity, inputHash: hash(input) };
     let state: SkillExecutionState;
     if (request.state !== undefined) {
-      try { state = readSkillExecutionState(request.state, binding, { ...skill.context.model, maxTokens: definition.model.maxTokens }, validateCall, validateOutput); }
+      try {
+        state = readSkillExecutionState(request.state, binding, { ...skill.context.model, maxTokens: definition.model.maxTokens }, validateCall, validateOutput);
+        for (const result of state.toolResults) {
+          const validate = outputValidators.get(result.toolName);
+          if (validate && !validate(result.result)) fail('EXECUTION_STATE_INVALID');
+        }
+      }
       catch { return fail('EXECUTION_STATE_INVALID'); }
     } else state = { schemaVersion: 1, ...binding, phase: 'model', toolResults: [], seenCallIds: [], pendingBatch: [], nextToolIndex: 0, usage: { modelAttempts: 0, outputTokens: 0 } };
     const finish = (kind: ResumableSkillAdvanceResult['kind'], pendingOperation?: ResumableSkillPendingOperation): ResumableSkillAdvanceResult => {
@@ -100,6 +107,8 @@ export function createResumableSkillExecutor(ports: ResumableSkillPorts = {}) {
         return finish('waiting', { operationId: result.operationId, ...(result.confirmationHash !== undefined ? { confirmationHash: result.confirmationHash } : {}) });
       }
       if (result.kind !== 'completed' || !own(result, 'result') || Object.keys(result).some(key => !['kind', 'result'].includes(key))) fail('TOOL_PORT_INVALID');
+      const validate = outputValidators.get(entry.name);
+      if (validate && !validate(result.result)) fail('NATIVE_OUTPUT_SCHEMA_FAILED');
       state.toolResults.push({ callId: entry.callId, toolName: entry.name, arguments: entry.arguments, simulated: false, result: result.result });
       state.nextToolIndex++;
       if (state.nextToolIndex === state.pendingBatch.length) { state.phase = 'model'; state.pendingBatch = []; state.nextToolIndex = 0; }

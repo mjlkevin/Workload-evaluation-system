@@ -57,7 +57,7 @@ export function validateFrozenExecutionTools(manifest: ExecutionManifest, identi
     || action.phase !== 'resume' && !skill && !directAction) denied();
   if (!['admin', 'user', 'sub_admin'].includes(identity.role)) denied();
   const roles = legacyRoleToV2Roles(identity.role);
-  const checkTool = (original: { name: string; description: string; parameters: Record<string, unknown>; mutates: boolean; exfiltrates?: boolean; simulationOnly?: boolean; source?: string; capability?: string }, policy: ToolPolicyEntry, originalRoles: typeof roles, requiresConfirmation: boolean, directTool = false) => {
+  const checkTool = (original: { name: string; description: string; parameters: Record<string, unknown>; outputSchema?: Record<string, unknown>; mutates: boolean; exfiltrates?: boolean; simulationOnly?: boolean; source?: string; capability?: string }, policy: ToolPolicyEntry, originalRoles: typeof roles, requiresConfirmation: boolean, directTool = false) => {
     const current = now.registry.get(original.name);
     if (!current || !original.capability || !anyRoleHasCapability(originalRoles, original.capability as Capability)
       || !anyRoleHasCapability(roles, current.capability) || original.capability !== current.capability
@@ -67,7 +67,8 @@ export function validateFrozenExecutionTools(manifest: ExecutionManifest, identi
       || directTool && !isToolDiscoverableUnderPolicy(current, now.policy, originalRoles)) denied();
     const contract = skillToolContract(current!);
     if (hash({ name: original.name, description: original.description, parameters: original.parameters, mutates: original.mutates,
-      exfiltrates: Boolean(original.exfiltrates), simulationOnly: original.simulationOnly }) !== hash(contract)) denied();
+      exfiltrates: Boolean(original.exfiltrates), simulationOnly: original.simulationOnly,
+      ...(original.outputSchema !== undefined ? { outputSchema: original.outputSchema } : {}) }) !== hash(contract)) denied();
     if (action.phase === 'tool' && action.toolName === original.name && (requiresConfirmation || policy.approvalStrategy === 'user-confirm'
       || resolveToolPolicyEntry(now.policy, original.name).approvalStrategy === 'user-confirm' || current!.mutates || current!.exfiltrates || current!.source === 'mcp')) denied();
   };

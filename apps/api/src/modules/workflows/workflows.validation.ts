@@ -1,5 +1,5 @@
 import { mappedInput, schemaFits } from '../skills/skills.schema-compatibility';
-import { compileSkillPayloadSchema, skillPathParts } from '../skills/skills.validation';
+import { compileNativeToolOutput, compileSkillPayloadSchema, skillPathParts } from '../skills/skills.validation';
 import { workflowShape } from './workflows.shape';
 import { workflowInvalid as invalid, type WorkflowDefinition, type WorkflowMapping, type WorkflowPredicate, type WorkflowSchema, type WorkflowValidationContext } from './workflows.types';
 const confirmationOutput = { type: 'object', additionalProperties: false, properties: { approved: { type: 'boolean' } }, required: ['approved'] };
@@ -32,7 +32,9 @@ export function validateWorkflowDefinition(value: unknown, context: WorkflowVali
                 invalid(`steps.${step.id}`, 'tool_unavailable_under_current_policy');
             if ((tool.mutates || tool.exfiltrates || tool.requiresConfirmation) && !step.requiresConfirmation)
                 invalid(`steps.${step.id}.requiresConfirmation`, 'native_confirmation_required');
-            return { input: tool.parameters, output: null };
+            try { compileNativeToolOutput(tool); }
+            catch { invalid(`steps.${step.id}`, 'unsupported_native_output_schema'); }
+            return { input: tool.parameters, output: tool.outputSchema ?? null };
         }
         return { input: step.inputSchema, output: step.type === 'confirmation' ? confirmationOutput : step.outputSchema };
     });
@@ -60,7 +62,7 @@ export function validateWorkflowDefinition(value: unknown, context: WorkflowVali
         if (index === undefined || index > at || (index === at && !allowCurrent))
             invalid('path', 'forward_or_missing_step_reference');
         const output = contracts[index].output;
-        // AgentTool has no trusted output schema: even fallback cannot make an invented contract safe.
+        // Only a frozen code-owned native schema can make tool output available to mappings.
         if (!output)
             invalid('path', 'tool_output_contract_unavailable');
         const found = mappedInput(output, `$.${parts.slice(3).join('.')}`);

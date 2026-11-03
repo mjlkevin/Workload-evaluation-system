@@ -3,7 +3,7 @@ import { isBusinessRole } from '../../middleware/auth';
 import { SkillError, type SkillDefinition } from './skills.types';
 import { mappedInput, schemaFits } from './skills.schema-compatibility';
 
-export type SkillToolDefinition = { name: string; description: string; parameters: Record<string, unknown>; mutates: boolean; exfiltrates?: boolean; simulationOnly?: boolean };
+export type SkillToolDefinition = { name: string; description: string; parameters: Record<string, unknown>; outputSchema?: Record<string, unknown>; mutates: boolean; exfiltrates?: boolean; simulationOnly?: boolean };
 const ajv = new Ajv({ allErrors: true, strict: false, validateFormats: false, addUsedSchema: false });
 const text = (maxLength: number, minLength = 0) => ({ type: 'string', minLength, maxLength });
 const object = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({ type: 'object', additionalProperties: false, properties, required });
@@ -69,6 +69,13 @@ export function compileSkillPayloadSchema(schema: Record<string, unknown>, field
   return compileSchema(schema, field, new Ajv({ allErrors: true, strict: false, validateFormats: false, addUsedSchema: false }));
 }
 
+/** Only Registry code may supply this contract. Missing schemas never acquire defaults on replay. */
+export function compileNativeToolOutput(tool: { outputSchema?: Record<string, unknown>; source?: string }) {
+  if (tool.outputSchema === undefined) return null;
+  if (tool.source !== undefined && tool.source !== 'code') invalid('outputSchema', 'native_code_output_contract_required');
+  return compileSkillPayloadSchema(tool.outputSchema, 'native.outputSchema');
+}
+
 export function validateSkillDefinition(value: unknown, tools: SkillToolDefinition[]): SkillDefinition {
   let serialized: string;
   try { serialized = JSON.stringify(value); } catch { return invalid('definition', 'json_required'); }
@@ -95,6 +102,7 @@ export function validateSkillDefinition(value: unknown, tools: SkillToolDefiniti
     const field = `tools/${i}`;
     const tool = tools.find(item => item.name === binding.toolName);
     if (!tool || seen.has(binding.toolName)) invalid(field, 'unknown_or_duplicate_tool');
+    compileNativeToolOutput(tool);
     seen.add(binding.toolName);
     if ((tool.mutates || tool.exfiltrates) && !binding.requiresConfirmation) invalid(field, 'native_confirmation_cannot_be_relaxed');
     if (!compiler.validateSchema(tool.parameters)) invalid(field, 'invalid_native_parameter_schema');

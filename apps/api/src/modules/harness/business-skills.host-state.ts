@@ -6,7 +6,7 @@ import { readPersistedExecutionManifest } from '../skills/execution-manifest';
 import { readSkillExecutionState, type SkillExecutionState } from '../skills/skills.execution-state';
 import { copyTrialJson, readSkillPath } from '../skills/skills.sandbox';
 import { skillDefinitionHash as hash } from '../skills/skills.hash';
-import { compileSkillPayloadSchema } from '../skills/skills.validation';
+import { compileNativeToolOutput, compileSkillPayloadSchema } from '../skills/skills.validation';
 import { createWorkflowRuntime, type WorkflowRuntimeState } from './workflows.runtime-adapter';
 
 /** Stored only within the existing server-owned businessSkills.state checkpoint. */
@@ -52,6 +52,11 @@ export function readBusinessSkillsHostState(value: unknown, rawManifest: Executi
         for (const [key, path] of Object.entries(binding.inputMapping)) { const item = readSkillPath(input, path); if (item !== undefined) mapped[key] = item; }
         if (!isDeepStrictEqual(mapped, call.arguments)) invalid();
       }, compileSkillPayloadSchema(skill.definition.outputSchema, 'outputSchema'));
+      const outputValidators = new Map(skill.context.tools.map(t => [t.native.name, compileNativeToolOutput(t.native)]));
+      for (const result of state.skill.toolResults) {
+        const validate = outputValidators.get(result.toolName);
+        if (validate && !validate(result.result)) invalid();
+      }
     }
     if (state.pendingOperation !== undefined && (!object(state.pendingOperation)
       || Object.keys(state.pendingOperation).join(',') !== 'operationId' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(state.pendingOperation.operationId)

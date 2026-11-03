@@ -1,7 +1,7 @@
 import Ajv from 'ajv';
 import { isDeepStrictEqual } from 'node:util';
 import { SkillError } from './skills.types';
-import { compileSkillPayloadSchema, skillPathParts, validateSkillDefinition, type SkillToolDefinition } from './skills.validation';
+import { compileNativeToolOutput, compileSkillPayloadSchema, skillPathParts, validateSkillDefinition, type SkillToolDefinition } from './skills.validation';
 
 export type SkillToolCall = { id: string; name: string; arguments: unknown };
 export type SkillToolStep = { callId: string; toolName: string; arguments: unknown; simulated: boolean; result: unknown };
@@ -81,6 +81,8 @@ export function createSkillSandbox(value: unknown, allowedTools: SkillToolDefini
       let toolOutput: unknown;
       try { toolOutput = await runReadTool(call.name, structuredClone(parameters) as Record<string, unknown>, signal); }
       catch { throw new SkillTrialFailure('tool', 'READ_TOOL_FAILED'); }
+      const validate = compileNativeToolOutput(native);
+      if (validate && !validate(toolOutput)) throw new SkillTrialFailure('tool', 'NATIVE_OUTPUT_SCHEMA_FAILED');
       return { ...step, result: copyTrialJson(toolOutput, 'tool') };
     },
   };

@@ -250,6 +250,24 @@ test('a previously recorded exact answer remains historical and idempotent after
 const oneCommand = (kind: 'child' | 'direct') => fixture(d => { d.steps = [d.steps[kind === 'child' ? 0 : 3]];
  d.steps[0].onFailure = 'wait'; d.steps[0].inputMapping = [path('projectName', '$.input.projectName')]; d.outputMapping = [path('projectName', '$.input.projectName')]; });
 const hostState = async (runId: string) => ((await checkpoints(runId))[0].state as any).businessSkills.state;
+for (const kind of ['child', 'direct'] as const) test(`${kind} invalid typed native output checkpoints one failure and waits before later I/O`, async () => {
+ const typedSchema = { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false };
+ Object.assign(read, { outputSchema: typedSchema });
+ try {
+  const f = await oneCommand(kind), counter = { models: 0 }, beforeReads = reads;
+  currentTools = tools.map(t => t.name === read.name ? { ...t, async execute() { reads++; return { text: 9 }; } } : t) as any;
+  await worker(counter);
+  const state = await hostState(f.runId);
+  assert.deepEqual({ status: (await saved(f.runId)).status, receipts: state.workflow.receipts.map((r: any) => ({ status: r.status, code: r.code })) },
+   { status: 'waiting', receipts: [{ status: 'failed', code: 'invalid_output' }] });
+  assert.equal(state.skill, undefined); assert.equal(state.pendingOperation, undefined);
+  assert.equal((await awaiting(f.runId)).kind, 'failure');
+  assert.equal(reads, beforeReads + 1); assert.equal(counter.models, kind === 'child' ? 1 : 0);
+  await worker(counter);
+  assert.equal((await saved(f.runId)).status, 'waiting'); assert.deepEqual(await hostState(f.runId), state);
+  assert.equal(reads, beforeReads + 1); assert.equal(counter.models, kind === 'child' ? 1 : 0);
+ } finally { delete (read as any).outputSchema; currentTools = tools; }
+});
 const stallModel = (before?: () => Promise<void>) => async (_skill: any, _signal: any, ports: any) => ({ transportProvider: 'kimi', async complete(request: any) {
  await before?.(); await ports.beforeDispatch(); return new Promise<never>((_resolve, reject) => {
   const abort = () => reject(Error('Interrupted fixture provider'));

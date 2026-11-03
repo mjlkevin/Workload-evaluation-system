@@ -4,6 +4,7 @@ import { resolveCurrentSkillTools } from '../skills/skills.context';
 import { assertRunAdmissionInTransaction } from '../skills/execution-emergency';
 import { createResumableSkillExecutor, ResumableSkillFailure } from '../skills/skills.execution-resumable';
 import { skillDefinitionHash as hash } from '../skills/skills.hash';
+import { compileNativeToolOutput } from '../skills/skills.validation';
 import { SkillError } from '../skills/skills.types';
 import type { ResumableSkillToolRequest } from '../skills/skills.execution-resumable';
 import { createBusinessSkillHost } from './business-skills.host';
@@ -64,7 +65,7 @@ export function createBusinessSkillsWorkflowExecutor(options: BusinessSkillHostO
   if (command.type === 'userInput' || command.type === 'confirmation') {
    await waits.pause({ runId, attemptId: context.attempt.harnessRunAttemptId }); throw new HarnessWorkflowWaitingError();
   }
-  const failed = (code: 'execution_failed' | 'rejected') => checkpoint({ schemaVersion: 1, kind: 'workflow',
+  const failed = (code: 'execution_failed' | 'invalid_output' | 'rejected') => checkpoint({ schemaVersion: 1, kind: 'workflow',
    workflow: runtime.fail(decision.state, { operationId: command.operationId, code }).state });
   if (host.pendingOperation) {
    const status = await ports.pendingStatus(); guard();
@@ -82,7 +83,8 @@ export function createBusinessSkillsWorkflowExecutor(options: BusinessSkillHostO
     return checkpoint({ schemaVersion: 1, kind: 'workflow', workflow: decision.state, skill: advanced.state,
      ...(advanced.pendingOperation ? { pendingOperation: { operationId: advanced.pendingOperation.operationId } } : {}) });
    } catch (error) {
-    guard(); if (error instanceof ResumableSkillFailure && ['MODEL_REQUEST_FAILED', 'INVALID_MODEL_RESPONSE', 'INVALID_MODEL_USAGE', 'OUTPUT_SCHEMA_FAILED', 'TOOL_PORT_FAILED', 'EXECUTION_BUDGET_CALLBACK_FAILED', 'EXECUTION_BUDGET_TIMEOUT'].includes(error.code)) return failed('execution_failed');
+    guard(); if (error instanceof ResumableSkillFailure && error.code === 'NATIVE_OUTPUT_SCHEMA_FAILED') return failed('invalid_output');
+    if (error instanceof ResumableSkillFailure && ['MODEL_REQUEST_FAILED', 'INVALID_MODEL_RESPONSE', 'INVALID_MODEL_USAGE', 'OUTPUT_SCHEMA_FAILED', 'TOOL_PORT_FAILED', 'EXECUTION_BUDGET_CALLBACK_FAILED', 'EXECUTION_BUDGET_TIMEOUT'].includes(error.code)) return failed('execution_failed');
     throw error;
    }
   }
@@ -97,6 +99,8 @@ export function createBusinessSkillsWorkflowExecutor(options: BusinessSkillHostO
    call: { id: command.operationId, name: command.toolName, arguments: command.input }, signal: context.abortSignal }); guard(); }
   catch (error) { guard(); if (error instanceof SkillError && ['EXECUTION_BUDGET_CALLBACK_FAILED', 'EXECUTION_BUDGET_TIMEOUT'].includes(error.code)) return failed('execution_failed'); throw error; }
   if (result.kind === 'waiting') return checkpoint({ ...host, pendingOperation: { operationId: result.operationId } });
+  const validateOutput = compileNativeToolOutput(contract);
+  if (validateOutput && !validateOutput(result.result)) return failed('invalid_output');
   return checkpoint({ schemaVersion: 1, kind: 'workflow', workflow: runtime.settle(decision.state,
    { operationId: command.operationId, output: result.result }).state });
  };

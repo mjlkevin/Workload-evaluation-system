@@ -978,3 +978,5 @@ readForConfirmation不写任何状态；当前basis对应无决定时仅pending�
 **C3公开服务分单收口：** 授权目录/安全投影a、HTTP命令b、可信检查点重试c、统一工作台只读叠加d分别小于1000gross，并分别通过SPEC与fresh五轴质量。业务basis误删、操作决定后恢复围栏、失败回执原样复制导致永久失败，以及Workflow新答的系统角色竞态均保留真实RED并关闭。初次修复11项、关联58项全通过；最后公开身份门闩RED2后37/37、0skip与tsc0。坏/孤CP拒绝，成功前缀和逻辑根保留，rejected/repeat_limit不能重置；统一视图不写pendingActions。OpenAPI业务请求与旧通道互斥分支经unique YAML及AJV11项正反例通过。取消终态修复另待复核、全套及浏览器继续，不宣称MVP已验收。
 
 **D业务基线用户确认（2026-11-03）：** 用户明确采用标准目录样本：销售基础资料设置2人天、销售基本业务处理3人天，50用户、1组织、难度增量0、组织相似度1，人工预期由现有WES规则算出5人天。查询/导出保留拆解及未匹配反例；本次只确认测试输入与预期，不替代运行时需求/范围确认、真实模型全流程证据或最终界面验收。详细基线见apps/api/src/modules/skills/fixtures/mvp-acceptance-baseline.md；继续既定C/D实施，不再等待样本选择。
+
+**原生工具输出契约独立收口（2026-11-03）：** 可选代码所有outputSchema已纳入冻结快照、发布验证、结果映射与当前合同交集；旧字段缺省保留旧hash/opaque语义，MCP与管理员不能自行声明。SPEC两项P2以真实RED39中3失败补齐：child/direct无效输出形成invalid_output并遵循onFailure等待；completed child保存的工具历史按冻结schema复验，损坏CP拒绝。GREEN39及相关208零跳过；fresh五轴质量独立纯114/114，事务消费者先前21/21，tsc与作用域diff检查通过。日志/tmp/wes-finish-typed-final与/tmp/wes-finish-typed-quality-final；不等同完整业务模型或最终界面验收。
